@@ -6,7 +6,8 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"github.hootops.com/production-delivery/atlantis/logging"
+
+	"github.com/hootsuite/atlantis/logging"
 )
 
 const InlineShebang = "/bin/sh -e"

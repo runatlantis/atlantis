@@ -9,7 +9,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"github.hootops.com/production-delivery/atlantis/logging"
+
+	"github.com/hootsuite/atlantis/logging"
 )
 
 // PlanExecutor handles everything related to running the Terraform plan including integration with Stash, S3, Terraform, and Github

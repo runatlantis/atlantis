@@ -4,7 +4,8 @@ import (
 	"log"
 	"os"
 	"testing"
-	"github.hootops.com/production-delivery/atlantis/logging"
+
+	"github.com/hootsuite/atlantis/logging"
 )
 
 var level = logging.Info

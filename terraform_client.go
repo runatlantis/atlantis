@@ -6,7 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"github.hootops.com/production-delivery/atlantis/logging"
+
+	"github.com/hootsuite/atlantis/logging"
 )
 
 type TerraformClient struct {

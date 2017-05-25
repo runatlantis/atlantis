@@ -5,7 +5,8 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
-	"github.hootops.com/production-delivery/atlantis/logging"
+
+	"github.com/hootsuite/atlantis/logging"
 )
 
 const stashUrl = "http://stash.hootops.com"

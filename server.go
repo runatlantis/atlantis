@@ -2,21 +2,21 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
-	"encoding/json"
 
-	"github.com/google/go-github/github"
-	"github.com/urfave/cli"
-	"github.hootops.com/production-delivery/atlantis/recovery"
-	"github.com/urfave/negroni"
-	"github.hootops.com/production-delivery/atlantis/middleware"
-	"github.hootops.com/production-delivery/atlantis/logging"
 	"github.com/elazarl/go-bindata-assetfs"
+	"github.com/google/go-github/github"
+	"github.com/hootsuite/atlantis/logging"
+	"github.com/hootsuite/atlantis/middleware"
+	"github.com/hootsuite/atlantis/recovery"
+	"github.com/urfave/cli"
+	"github.com/urfave/negroni"
 )
 
 // WebhookServer listens for Github webhooks and runs the necessary Atlantis command
@@ -36,17 +36,17 @@ type Server struct {
 }
 
 type ServerConfig struct {
-	githubUsername   string
-	githubPassword   string
-	githubHostname   string
-	sshKey           string
-	awsAssumeRole    string
-	port             int
-	scratchDir       string
-	awsRegion        string
-	s3Bucket         string
-	logLevel         string
-	requireApproval  bool
+	githubUsername  string
+	githubPassword  string
+	githubHostname  string
+	sshKey          string
+	awsAssumeRole   string
+	port            int
+	scratchDir      string
+	awsRegion       string
+	s3Bucket        string
+	logLevel        string
+	requireApproval bool
 }
 
 type ExecutionContext struct {
