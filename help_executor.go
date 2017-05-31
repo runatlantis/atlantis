@@ -31,9 +31,8 @@ atlantis apply
 `
 
 func (h *HelpExecutor) execute(ctx *ExecutionContext, github *GithubClient) {
-	prCtx := &PullRequestContext{
-		owner:                 ctx.repoOwner,
-		repoName:              ctx.repoName,
+	pullCtx := &PullRequestContext{
+		repoFullName:          ctx.repoFullName,
 		head:                  ctx.head,
 		base:                  ctx.base,
 		number:                ctx.pullNum,
@@ -41,7 +40,7 @@ func (h *HelpExecutor) execute(ctx *ExecutionContext, github *GithubClient) {
 		terraformApplier:      ctx.requesterUsername,
 		terraformApplierEmail: ctx.requesterEmail,
 	}
-	github.CreateComment(prCtx, helpComment)
+	github.CreateComment(pullCtx, helpComment)
 
 	ctx.log.Info("generating help comment....")
 	return

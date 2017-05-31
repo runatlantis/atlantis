@@ -7,11 +7,10 @@ import (
 )
 
 type Run struct {
-	RepoOwner  string
-	RepoName   string
+	RepoFullName string
 	Path       string
 	Env        string
-	PullID     int
+	PullNum     int
 	User       string
 	Timestamp  time.Time
 }
@@ -21,7 +20,7 @@ type Run struct {
 func (r Run) StateKey() []byte {
 	// we combine the repository, path into the repo where terraform is being run and the environment
 	// to make up the state key and then hash it with sha256
-	key := fmt.Sprintf("%s/%s/%s/%s", r.RepoOwner, r.RepoName, r.Path, r.Env)
+	key := fmt.Sprintf("%s/%s/%s", r.RepoFullName, r.Path, r.Env)
 	h := sha256.New()
 	h.Write([]byte(key))
 	return h.Sum(nil)

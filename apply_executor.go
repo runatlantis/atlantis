@@ -54,35 +54,35 @@ func (n NoPlansFailure) Template() *CompiledTemplate {
 	return NoPlansFailureTmpl
 }
 
-func (a *ApplyExecutor) execute(ctx *ExecutionContext, prCtx *PullRequestContext) ExecutionResult {
-	res := a.setupAndApply(ctx, prCtx)
+func (a *ApplyExecutor) execute(ctx *ExecutionContext, pullCtx *PullRequestContext) ExecutionResult {
+	res := a.setupAndApply(ctx, pullCtx)
 	res.Command = Apply
 	return res
 }
 
-func (a *ApplyExecutor) setupAndApply(ctx *ExecutionContext, prCtx *PullRequestContext) ExecutionResult {
-	a.github.UpdateStatus(prCtx, PendingStatus, "Applying...")
+func (a *ApplyExecutor) setupAndApply(ctx *ExecutionContext, pullCtx *PullRequestContext) ExecutionResult {
+	a.github.UpdateStatus(pullCtx, PendingStatus, "Applying...")
 
 	if a.requireApproval {
-		ok, err := a.github.PullIsApproved(prCtx)
+		ok, err := a.github.PullIsApproved(pullCtx)
 		if err != nil {
 			msg := fmt.Sprintf("failed to determine if pull request was approved: %v", err)
 			ctx.log.Err(msg)
-			a.github.UpdateStatus(prCtx, ErrorStatus, "Apply Error")
+			a.github.UpdateStatus(pullCtx, ErrorStatus, "Apply Error")
 			return ExecutionResult{SetupError: GeneralError{errors.New(msg)}}
 		}
 		if !ok {
 			ctx.log.Info("pull request was not approved")
-			a.github.UpdateStatus(prCtx, FailureStatus, "Apply Failed")
+			a.github.UpdateStatus(pullCtx, FailureStatus, "Apply Failed")
 			return ExecutionResult{SetupFailure: PullNotApprovedFailure{}}
 		}
 	}
 
-	planPaths, err := a.downloadPlans(ctx.repoOwner, ctx.repoName, ctx.pullNum, ctx.command.environment, a.scratchDir, a.awsConfig, a.s3Bucket)
+	planPaths, err := a.downloadPlans(ctx.repoFullName, ctx.pullNum, ctx.command.environment, a.scratchDir, a.awsConfig, a.s3Bucket)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to download plans: %v", err)
 		ctx.log.Err(errMsg)
-		a.github.UpdateStatus(prCtx, ErrorStatus, "Apply Error")
+		a.github.UpdateStatus(pullCtx, ErrorStatus, "Apply Error")
 		return ExecutionResult{SetupError: GeneralError{errors.New(errMsg)}}
 	}
 
@@ -90,26 +90,26 @@ func (a *ApplyExecutor) setupAndApply(ctx *ExecutionContext, prCtx *PullRequestC
 	if len(planPaths) == 0 {
 		failure := "found 0 plans for this pull request"
 		ctx.log.Warn(failure)
-		a.github.UpdateStatus(prCtx, FailureStatus, "Apply Failure")
+		a.github.UpdateStatus(pullCtx, FailureStatus, "Apply Failure")
 		return ExecutionResult{SetupFailure: NoPlansFailure{}}
 	}
 
 	//runLog = append(runLog, fmt.Sprintf("-> Downloaded plans: %v", planPaths))
 	applyOutputs := []PathResult{}
 	for _, planPath := range planPaths {
-		output := a.apply(ctx, prCtx, planPath)
+		output := a.apply(ctx, pullCtx, planPath)
 		output.Path = planPath
 		applyOutputs = append(applyOutputs, output)
 	}
-	a.updateGithubStatus(prCtx, applyOutputs)
+	a.updateGithubStatus(pullCtx, applyOutputs)
 	return ExecutionResult{PathResults: applyOutputs}
 }
 
-func (a *ApplyExecutor) apply(ctx *ExecutionContext, prCtx *PullRequestContext, planPath string) PathResult {
+func (a *ApplyExecutor) apply(ctx *ExecutionContext, pullCtx *PullRequestContext, planPath string) PathResult {
 	//runLog = append(runLog, fmt.Sprintf("-> Running apply %s", planPath))
 	planName := path.Base(planPath)
 	planSubDir := a.determinePlanSubDir(planName, ctx.pullNum)
-	planDir := filepath.Join(a.scratchDir, ctx.repoOwner, ctx.repoName, fmt.Sprintf("%v", ctx.pullNum), planSubDir)
+	planDir := filepath.Join(a.scratchDir, ctx.repoFullName, fmt.Sprintf("%v", ctx.pullNum), planSubDir)
 	execPath := NewExecutionPath(planDir, planSubDir)
 	var config Config
 	var remoteStatePath string
@@ -167,12 +167,11 @@ func (a *ApplyExecutor) apply(ctx *ExecutionContext, prCtx *PullRequestContext, 
 			tfEnv = "default"
 		}
 		run := locking.Run{
-			RepoOwner: prCtx.owner,
-			RepoName: prCtx.repoName,
+			RepoFullName: pullCtx.repoFullName,
 			Path: execPath.Relative,
 			Env: tfEnv,
-			PullID: prCtx.number,
-			User: prCtx.terraformApplier,
+			PullNum: pullCtx.number,
+			User: pullCtx.terraformApplier,
 			Timestamp: time.Now(),
 		}
 
@@ -183,10 +182,10 @@ func (a *ApplyExecutor) apply(ctx *ExecutionContext, prCtx *PullRequestContext, 
 				Result: GeneralError{fmt.Errorf("failed to acquire lock: %s", err)},
 			}
 		}
-		if lockAttempt.LockAcquired != true && lockAttempt.LockingRun.PullID != prCtx.number {
+		if lockAttempt.LockAcquired != true && lockAttempt.LockingRun.PullNum != pullCtx.number {
 			return PathResult{
 				Status: "error",
-				Result: GeneralError{fmt.Errorf("failed to acquire lock: lock held by pull request #%d", lockAttempt.LockingRun.PullID)},
+				Result: GeneralError{fmt.Errorf("failed to acquire lock: lock held by pull request #%d", lockAttempt.LockingRun.PullNum)},
 			}
 		}
 	}
@@ -239,7 +238,7 @@ func (a *ApplyExecutor) apply(ctx *ExecutionContext, prCtx *PullRequestContext, 
 	}
 }
 
-func (a *ApplyExecutor) downloadPlans(repoOwner string, repoName string, pullNum int, env string, outputDir string, awsConfig *AWSConfig, s3Bucket string) (planPaths []string, err error) {
+func (a *ApplyExecutor) downloadPlans(repoFullName string, pullNum int, env string, outputDir string, awsConfig *AWSConfig, s3Bucket string) (planPaths []string, err error) {
 	awsSession, err := awsConfig.CreateAWSSession()
 	if err != nil {
 		return nil, fmt.Errorf("failed to assume role: %v", err)
@@ -249,7 +248,7 @@ func (a *ApplyExecutor) downloadPlans(repoOwner string, repoName string, pullNum
 	s3Client := s3.New(awsSession)
 
 	// this will be plans/owner/repo/owner_repo_1, may be more than one if there are subdirs or multiple envs
-	plansPath := fmt.Sprintf("plans/%s/%s/%s_%s_%d", repoOwner, repoName, repoOwner, repoName, pullNum)
+	plansPath := fmt.Sprintf("plans/%s/%s_%d", repoFullName, strings.Replace(repoFullName, "/", "_", -1), pullNum)
 	list, err := s3Client.ListObjects(&s3.ListObjectsInput{Bucket: aws.String(s3Bucket), Prefix: &plansPath})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list plans in path: %v", err)

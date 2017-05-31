@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/google/go-github/github"
 	"context"
+	"strings"
 )
 
 type GithubClient struct {
@@ -21,13 +22,15 @@ const (
 
 func (g *GithubClient) UpdateStatus(ctx *PullRequestContext, status string, description string) {
 	repoStatus := github.RepoStatus{State: github.String(status), Description: github.String(description), Context: github.String(statusContext)}
-	g.client.Repositories.CreateStatus(g.ctx, ctx.owner, ctx.repoName, ctx.head, &repoStatus)
+	owner, repo := g.repoFullNameToOwnerAndRepo(ctx.repoFullName)
+	g.client.Repositories.CreateStatus(g.ctx, owner, repo, ctx.head, &repoStatus)
 	// todo: deal with error updating status
 }
 
 func (g *GithubClient) GetModifiedFiles(ctx *PullRequestContext) ([]string, error) {
 	var files = []string{}
-	comparison, _, err := g.client.Repositories.CompareCommits(g.ctx, ctx.owner, ctx.repoName, ctx.base, ctx.head)
+	owner, repo := g.repoFullNameToOwnerAndRepo(ctx.repoFullName)
+	comparison, _, err := g.client.Repositories.CompareCommits(g.ctx, owner, repo, ctx.base, ctx.head)
 	if err != nil {
 		return files, err
 	}
@@ -38,7 +41,8 @@ func (g *GithubClient) GetModifiedFiles(ctx *PullRequestContext) ([]string, erro
 }
 
 func (g *GithubClient) CreateComment(ctx *PullRequestContext, comment string) error {
-	_, _, err := g.client.Issues.CreateComment(g.ctx, ctx.owner, ctx.repoName, ctx.number, &github.IssueComment{Body: &comment})
+	owner, repo := g.repoFullNameToOwnerAndRepo(ctx.repoFullName)
+	_, _, err := g.client.Issues.CreateComment(g.ctx, owner, repo, ctx.number, &github.IssueComment{Body: &comment})
 	return err
 }
 
@@ -47,7 +51,8 @@ func (g *GithubClient) CommentExists(ctx *PullRequestContext, matcher func(*gith
 	opt := &github.IssueListCommentsOptions{}
 	// need to loop since there may be multiple pages of comments
 	for {
-		comments, resp, err := g.client.Issues.ListComments(g.ctx, ctx.owner, ctx.repoName, ctx.number, opt)
+		owner, repo := g.repoFullNameToOwnerAndRepo(ctx.repoFullName)
+		comments, resp, err := g.client.Issues.ListComments(g.ctx, owner, repo, ctx.number, opt)
 		if err != nil {
 			return false, fmt.Errorf("failed to retrieve comments: %v", err)
 		}
@@ -67,7 +72,8 @@ func (g *GithubClient) CommentExists(ctx *PullRequestContext, matcher func(*gith
 func (g *GithubClient) PullIsApproved(ctx *PullRequestContext) (bool, error) {
 	// todo: move back to using g.client.PullRequests.ListReviews when we update our GitHub enterprise version
 	// to where we don't need to include the custom accept header
-	u := fmt.Sprintf("repos/%v/%v/pulls/%d/reviews", ctx.owner, ctx.repoName, ctx.number)
+	owner, repo := g.repoFullNameToOwnerAndRepo(ctx.repoFullName)
+	u := fmt.Sprintf("repos/%v/%v/pulls/%d/reviews", owner, repo, ctx.number)
 	req, err := g.client.NewRequest("GET", u, nil)
 	if err != nil {
 		return false, err
@@ -87,6 +93,17 @@ func (g *GithubClient) PullIsApproved(ctx *PullRequestContext) (bool, error) {
 	return false, nil
 }
 
-func (g *GithubClient) GetPullRequest(owner string, repo string, number int) (*github.PullRequest, *github.Response, error) {
+func (g *GithubClient) GetPullRequest(repoFullName string, number int) (*github.PullRequest, *github.Response, error) {
+	owner, repo := g.repoFullNameToOwnerAndRepo(repoFullName)
 	return g.client.PullRequests.Get(g.ctx, owner, repo, number)
+}
+
+// repoFullNameToOwnerAndRepo splits up a repository full name which contains the organization and repo name separated by /
+// into its two parts: organization and repo name. ex baxterthehacker/public-repo => (baxterthehacker, public-repo)
+func (g *GithubClient) repoFullNameToOwnerAndRepo(fullName string) (string, string) {
+	split := strings.SplitN(fullName, "/", 2)
+	if len(split) != 2 {
+		return fmt.Sprintf("repo name %s could not be split into organization and name", fullName), ""
+	}
+	return split[0], split[1]
 }

@@ -63,8 +63,7 @@ type ServerConfig struct {
 }
 
 type ExecutionContext struct {
-	repoOwner         string
-	repoName          string
+	repoFullName      string
 	pullNum           int
 	requesterUsername string
 	requesterEmail    string
@@ -239,13 +238,13 @@ func (s *Server) postHooks(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) executeCommand(ctx *ExecutionContext) {
-	src := fmt.Sprintf("%s/%s/pull/%d", ctx.repoOwner, ctx.repoName, ctx.pullNum)
+	src := fmt.Sprintf("%s/pull/%d", ctx.repoFullName, ctx.pullNum)
 	// it's safe to reuse the underlying logger s.logger.Log
 	ctx.log = logging.NewSimpleLogger(src, s.logger.Log, true, s.logger.Level)
 	defer s.recover(ctx)
 
 	// we've got data from the comment, now we need to get data from the actual PR
-	pull, _, err := s.githubClient.GetPullRequest(ctx.repoOwner, ctx.repoName, ctx.pullNum)
+	pull, _, err := s.githubClient.GetPullRequest(ctx.repoFullName, ctx.pullNum)
 	if err != nil {
 		ctx.log.Err("pull request data api call failed: %v", err)
 		return

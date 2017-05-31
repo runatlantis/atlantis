@@ -68,13 +68,9 @@ func (r *RequestParser) determineCommand(comment *github.IssueCommentEvent) (*Co
 func (r *RequestParser) extractCommentData(comment *github.IssueCommentEvent, params *ExecutionContext) error {
 	missingField := "<nil>"
 
-	owner := comment.Repo.Owner.Login
-	if owner == nil {
-		return errors.New("key 'comment.repo.owner.login' is null")
-	}
-	repoName := comment.Repo.Name
-	if repoName == nil {
-		return errors.New("key 'comment.repo.name' is null")
+	repoFullName := comment.Repo.FullName
+	if repoFullName == nil {
+		return errors.New("key 'comment.repo.full_name' is null")
 	}
 	pullNum := comment.Issue.Number
 	if pullNum == nil {
@@ -102,10 +98,9 @@ func (r *RequestParser) extractCommentData(comment *github.IssueCommentEvent, pa
 	}
 	params.requesterUsername = *commentorUsername
 	params.requesterEmail = *commentorEmail
-	params.repoOwner = *owner
+	params.repoFullName = *repoFullName
 	params.pullNum = *pullNum
 	params.pullCreator = *pullCreator
-	params.repoName = *repoName
 	params.repoSSHUrl = *repoSSHURL
 	params.htmlUrl = *htmlURL
 	return nil

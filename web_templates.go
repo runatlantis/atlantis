@@ -35,7 +35,7 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
     {{ if . }}
     {{ range . }}
       <div class="twelve columns button content lock-row">
-        <div class="list-title">{{.RepoOwner}}/{{.RepoName}} - <span class="heading-font-size">#{{.PullID}}</span></div>
+        <div class="list-title">{{.RepoFullName}} - <span class="heading-font-size">#{{.PullNum}}</span></div>
         <div class="list-unlock"><button class="unlock"><a class="unlock-link" href="/locks/{{.ID}}?method=DELETE">Unlock</a></button></div>
         <div class="list-status"><code>Locked</code></div>
         <div class="list-timestamp"><span class="heading-font-size">{{.Timestamp}}</span></div>

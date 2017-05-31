@@ -1,5 +1,5 @@
 package main
 
 type Executor interface {
-	execute(ctx *ExecutionContext, prCtx *PullRequestContext) ExecutionResult
+	execute(ctx *ExecutionContext, pullCtx *PullRequestContext) ExecutionResult
 }

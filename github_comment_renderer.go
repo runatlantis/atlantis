@@ -50,7 +50,7 @@ var (
 			"* To **discard** this plan click [here]({{.LockURL}}).",
 	}
 	RunLockedFailureTmpl *CompiledTemplate = &CompiledTemplate{
-		text: "This plan is currently locked by #{{.LockingPullID}}\n" +
+		text: "This plan is currently locked by #{{.LockingPullNum}}\n" +
 			"The locking plan must be applied or discarded before future plans can execute.",
 	}
 	TerraformFailureTmpl *CompiledTemplate = &CompiledTemplate{

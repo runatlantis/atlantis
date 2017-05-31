@@ -18,8 +18,7 @@ type BaseExecutor struct {
 }
 
 type PullRequestContext struct {
-	owner                 string
-	repoName              string
+	repoFullName          string
 	head                  string
 	base                  string
 	number                int
@@ -54,15 +53,15 @@ func NewExecutionPath(absolutePath string, relativePath string) ExecutionPath {
 	return ExecutionPath{filepath.Clean(absolutePath), filepath.Clean(relativePath)}
 }
 
-func (b *BaseExecutor) updateGithubStatus(prCtx *PullRequestContext, pathResults []PathResult) {
+func (b *BaseExecutor) updateGithubStatus(pullCtx *PullRequestContext, pathResults []PathResult) {
 	// the status will be the worst result
 	worstResult := b.worstResult(pathResults)
 	if worstResult == "success" {
-		b.github.UpdateStatus(prCtx, SuccessStatus, "Plan Succeeded")
+		b.github.UpdateStatus(pullCtx, SuccessStatus, "Plan Succeeded")
 	} else if worstResult == "failure" {
-		b.github.UpdateStatus(prCtx, FailureStatus, "Plan Failed")
+		b.github.UpdateStatus(pullCtx, FailureStatus, "Plan Failed")
 	} else {
-		b.github.UpdateStatus(prCtx, ErrorStatus, "Plan Error")
+		b.github.UpdateStatus(pullCtx, ErrorStatus, "Plan Error")
 	}
 }
 
@@ -79,16 +78,15 @@ func (b *BaseExecutor) worstResult(results []PathResult) string {
 }
 
 func (b *BaseExecutor) Exec(f func(*ExecutionContext, *PullRequestContext) ExecutionResult, ctx *ExecutionContext, github *GithubClient) {
-	prCtx := b.githubContext(ctx)
-	result := f(ctx, prCtx)
+	pullCtx := b.githubContext(ctx)
+	result := f(ctx, pullCtx)
 	comment := b.githubCommentRenderer.render(result, ctx.log.History.String(), ctx.command.verbose)
-	github.CreateComment(prCtx, comment)
+	github.CreateComment(pullCtx, comment)
 }
 
 func (b *BaseExecutor) githubContext(ctx *ExecutionContext) *PullRequestContext {
 	return &PullRequestContext{
-		owner:                 ctx.repoOwner,
-		repoName:              ctx.repoName,
+		repoFullName:          ctx.repoFullName,
 		head:                  ctx.head,
 		base:                  ctx.base,
 		number:                ctx.pullNum,

@@ -14,11 +14,10 @@ import (
 const LockBucket = "locks"
 
 var run = locking.Run{
-	RepoOwner: "repoOwner",
-	RepoName: "repo",
+	RepoFullName: "owner/repo",
 	Path: "parent/child",
 	Env: "default",
-	PullID: 1,
+	PullNum: 1,
 	User: "user",
 	Timestamp: time.Now(),
 }
@@ -26,11 +25,8 @@ var run = locking.Run{
 func keyWithNewField(fieldName string, value string) locking.Run {
 	copy := run
 	switch fieldName {
-	case "RepoOwner":
-		copy.RepoOwner = value
-		return copy
-	case "RepoName":
-		copy.RepoName = value
+	case "RepoFullName":
+		copy.RepoFullName = value
 		return copy
 	case "Path":
 		copy.Path = value
@@ -112,7 +108,7 @@ var regularLock = LockCommand{
 	locking.TryLockResponse{
 		LockAcquired: true,
 		LockingRun: run,
-		LockID: "f13c9d87dc7156638cc075f0164d628f1338d23b17296dd391d922ea6fe6e9f8",
+		LockID: "cae47fa9dfe223b0d8fefd51f2fbbf9849047c9d048d659d1ba906acc2913534",
 	},
 }
 
@@ -138,7 +134,7 @@ var tableTestData = []struct {
 		sequence: []interface{}{
 			regularLock,
 			UnlockCommand{
-				"f13c9d87dc7156638cc075f0164d628f1338d23b17296dd391d922ea6fe6e9f8",
+				"cae47fa9dfe223b0d8fefd51f2fbbf9849047c9d048d659d1ba906acc2913534",
 				nil,
 			},
 		},
@@ -158,27 +154,14 @@ var tableTestData = []struct {
 		},
 	},
 	{
-		description: "lock when existing lock is for different repo owner should succeed",
+		description: "lock when existing lock is for different repo name should succeed",
 		sequence: []interface{}{
 			regularLock,
 			LockCommand{
-				keyWithNewField("RepoOwner", "different"),
+				keyWithNewField("RepoFullName", "repo/different"),
 				locking.TryLockResponse{
 					LockAcquired: true,
-					LockingRun: keyWithNewField("RepoOwner", "different"),
-				},
-			},
-		},
-	},
-	{
-		description: "lock when existing lock is for different repo should succeed",
-		sequence: []interface{}{
-			regularLock,
-			LockCommand{
-				keyWithNewField("RepoName", "different"),
-				locking.TryLockResponse{
-					LockAcquired: true,
-					LockingRun: keyWithNewField("RepoName", "different"),
+					LockingRun: keyWithNewField("RepoFullName", "repo/different"),
 				},
 			},
 		},
@@ -214,7 +197,7 @@ var tableTestData = []struct {
 		sequence: []interface{}{
 			regularLock,
 			UnlockCommand{
-				"f13c9d87dc7156638cc075f0164d628f1338d23b17296dd391d922ea6fe6e9f8",
+				"cae47fa9dfe223b0d8fefd51f2fbbf9849047c9d048d659d1ba906acc2913534",
 				nil,
 			},
 			LockCommand{
