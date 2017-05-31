@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-
 	"github.com/hootsuite/atlantis/logging"
 )
 

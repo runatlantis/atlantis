@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -9,19 +8,21 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-
+	"github.com/hootsuite/atlantis/locking"
+	"time"
 	"github.com/hootsuite/atlantis/logging"
 )
 
-// PlanExecutor handles everything related to running the Terraform plan including integration with Stash, S3, Terraform, and Github
+// PlanExecutor handles everything related to running the Terraform plan including integration with S3, Terraform, and Github
 type PlanExecutor struct {
 	BaseExecutor
+	atlantisURL string
 }
 
 /** Result Types **/
 type PlanSuccess struct {
 	TerraformOutput string
-	DiscardPlanLink string
+	LockURL   string
 }
 
 func (p PlanSuccess) Template() *CompiledTemplate {
@@ -29,7 +30,7 @@ func (p PlanSuccess) Template() *CompiledTemplate {
 }
 
 type RunLockedFailure struct {
-	LockingPullLink string
+	LockingPullID int
 }
 
 func (r RunLockedFailure) Template() *CompiledTemplate {
@@ -66,7 +67,6 @@ func (p *PlanExecutor) execute(ctx *ExecutionContext, prCtx *PullRequestContext)
 }
 
 func (p *PlanExecutor) setupAndPlan(ctx *ExecutionContext, prCtx *PullRequestContext) ExecutionResult {
-	stashCtx := p.stashContext(ctx)
 	p.github.UpdateStatus(prCtx, "pending", "Planning...")
 
 	// todo: lock when cloning or somehow separate workspaces
@@ -184,7 +184,7 @@ func (p *PlanExecutor) setupAndPlan(ctx *ExecutionContext, prCtx *PullRequestCon
 				p.terraform.tfExecutableName = "terraform"
 			}
 		}
-		generatePlanResponse := p.plan(ctx.log, p.stash, stashCtx, cloneDir, p.scratchDir, tfPlanName, s3Client, path, ctx.command.environment, s3Key, p.sshKey, ctx.pullCreator, config.StashPath)
+		generatePlanResponse := p.plan(ctx.log, prCtx, cloneDir, p.scratchDir, tfPlanName, s3Client, path, ctx.command.environment, s3Key, p.sshKey, ctx.pullCreator, config.StashPath)
 		generatePlanResponse.Path = path.Relative
 		planOutputs = append(planOutputs, generatePlanResponse)
 	}
@@ -195,8 +195,7 @@ func (p *PlanExecutor) setupAndPlan(ctx *ExecutionContext, prCtx *PullRequestCon
 // plan runs the steps necessary to run `terraform plan`. If there is an error, the error message will be encapsulated in error
 // and the GeneratePlanResponse struct will also contain the full log including the error
 func (p *PlanExecutor) plan(log *logging.SimpleLogger,
-	stash *StashPRClient,
-	stashCtx *StashPullRequestContext,
+	prCtx *PullRequestContext,
 	repoDir string,
 	planOutDir string,
 	tfPlanName string,
@@ -208,40 +207,40 @@ func (p *PlanExecutor) plan(log *logging.SimpleLogger,
 	pullRequestCreator string,
 	stashPath string) PathResult {
 	log.Info("generating plan for path %q", path)
-	var discardUrl string
-	var remoteStatePath string
+	run := locking.Run{
+		RepoOwner: prCtx.owner,
+		RepoName:  prCtx.repoName,
+		Path:      path.Relative,
+		Env:       tfEnvName,
+		PullID:    prCtx.number,
+		User:      prCtx.terraformApplier,
+		Timestamp: time.Now(),
+	}
 
 	// NOTE: THIS CODE IS TO SUPPORT TERRAFORM PROJECTS THAT AREN'T USING ATLANTIS CONFIG FILE.
 	if stashPath == "" {
-		remoteStatePath, err := p.terraform.ConfigureRemoteState(log, path, tfEnvName, sshKey)
+		_, err := p.terraform.ConfigureRemoteState(log, path, tfEnvName, sshKey)
 		if err != nil {
 			return PathResult{
 				Status: "error",
 				Result: GeneralError{fmt.Errorf("failed to configure remote state: %s", err)},
 			}
 		}
-
-		stashLockResponse := stash.LockState(log, stashCtx, remoteStatePath)
-		if !stashLockResponse.Success {
-			return PathResult{
-				Status: "failure",
-				Result: RunLockedFailure{stashLockResponse.PullRequestLink},
-			}
+	}
+	lockAttempt, err := p.lockManager.TryLock(run)
+	if err != nil {
+		return PathResult{
+			Status:" failure",
+			Result: GeneralError{fmt.Errorf("failed to lock state: %v", err)},
 		}
+	}
 
-		discardUrl = stashLockResponse.DiscardUrl
-	} else {
-		// use state path from config file
-		remoteStatePath = generateStatePath(stashPath, tfEnvName)
-		stashLockResponse := stash.LockState(log, stashCtx, remoteStatePath)
-		if !stashLockResponse.Success {
-			return PathResult{
-				Status: "failure",
-				Result: RunLockedFailure{stashLockResponse.PullRequestLink},
-			}
+	// the run is locked unless the locking run is the same pull id as this run
+	if lockAttempt.LockAcquired == false && lockAttempt.LockingRun.PullID != prCtx.number {
+		return PathResult{
+			Status: "failure",
+			Result: RunLockedFailure{lockAttempt.LockingRun.PullID},
 		}
-
-		discardUrl = stashLockResponse.DiscardUrl
 	}
 
 	// Run terraform plan
@@ -301,9 +300,10 @@ func (p *PlanExecutor) plan(log *logging.SimpleLogger,
 			Output:  output,
 		}
 		log.Err("error running terraform plan: %v", output)
-		log.Info("unlocking stash state since plan failed")
-		stash.UnlockState(log, stashCtx, remoteStatePath)
-		// todo: log if error locking state in stash
+		log.Info("unlocking state since plan failed")
+		if err := p.lockManager.Unlock(lockAttempt.LockID); err != nil {
+			log.Err("error unlocking state: %v", err)
+		}
 		return PathResult{
 			Status: "failure",
 			Result: err,
@@ -314,8 +314,9 @@ func (p *PlanExecutor) plan(log *logging.SimpleLogger,
 	if err := UploadPlanFile(s3Client, s3Key, tfPlanOutputPath); err != nil {
 		err = fmt.Errorf("failed to upload to S3: %v", err)
 		log.Err(err.Error())
-		stash.UnlockState(log, stashCtx, remoteStatePath)
-		// todo: log if error locking state in stash
+		if err := p.lockManager.Unlock(lockAttempt.LockID); err != nil {
+			log.Err("error unlocking state: %v", err)
+		}
 		return PathResult{
 			Status: "error",
 			Result: GeneralError{err},
@@ -332,7 +333,7 @@ func (p *PlanExecutor) plan(log *logging.SimpleLogger,
 		Status: "success",
 		Result: PlanSuccess{
 			TerraformOutput: output,
-			DiscardPlanLink: stashUrl + discardUrl, // todo: stashUrl shouldn't be here, wrong level of abstraction
+			LockURL: fmt.Sprintf("%s%s/%s?method=DELETE", p.atlantisURL, lockPath, lockAttempt.LockID),
 		},
 	}
 }
@@ -356,15 +357,6 @@ func (p *PlanExecutor) trimSuffix(s, suffix string) string {
 		s = s[:len(s)-len(suffix)]
 	}
 	return s
-}
-
-func concatStr(s []string) string {
-	var buffer bytes.Buffer
-	for _, str := range s {
-		buffer.WriteString(str)
-	}
-
-	return buffer.String()
 }
 
 func (p *PlanExecutor) removeDuplicates(paths []ExecutionPath) []ExecutionPath {

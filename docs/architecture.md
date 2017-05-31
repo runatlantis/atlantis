@@ -15,20 +15,20 @@ results:
     - path-execution results
 
 naming:
-  - `Atlantis` has (currently) two `commands`: `plan`, `apply`. There could be more like `help`
+  - `Atlantis` has (currently) three `commands`: `plan`, `apply`, and `help`
   - `Terraform` has `commands` like `plan`, `apply`, `get`, `remote`
   - When a user comments with an `Atlantis` `command`, they trigger an `execution`
     - We determine the `Atlantis` `command` (ex. `plan` or `apply`)
       - We also determine the `context` of the `execution`, or `executionContext`. This consists of data like the `repo owner`, the `pull request number`, the `commentor username`, etc.
     - From the `command` type, we know which `executor` to use. Either the `PlanExecutor`, or the `ApplyExecutor`
     - We then tell the `executor` to `execute` the `command`
-    - There may be multiple `execution paths` involved in an `execution` because we may have to run `terraform plan/apply` in multiple `paths`.
+    - There may be multiple `terraform projects` involved in an `execution` because we may have to run `terraform plan/apply` in multiple `paths`.
     - The `executor` returns to us the `executionResult`
       - each `result` has one of three `statuses`: `successful`, `failed`, `errored`
         - `successful` is when... it was successful
         - `failed` is when it didn't work but because of a user-solvable problem, like their terraform was wrong, or that environment doesn't exist
         - `errored` is when there was an internal Atlantis error that couldn't be fixed by the user, like a request to github timed out
-      - `result` has sub-types to represent different results. For example there is a `PlanResult` that has the output of `terraform plan`, and the url to `stash` to discard the plan
+      - `result` has sub-types to represent different results. For example there is a `PlanResult` that has the output of `terraform plan`, and the url to discard the plan and lock
     - We then need to add a `comment` back to the `pull request`, so we `render` the `executionResult` using a `renderer`. In this case, we need the `GithubCommentRenderer`
       - We can then add the `comment` to the `pull request` by using the `githubClient`
 
@@ -36,7 +36,6 @@ components:
   clients for external services:
     - github (created)
     - s3 (created)
-    - stash (created)
   clients for on-host "services":
     - git
     - aws cli
@@ -58,3 +57,13 @@ logging guidelines:
   - if something is an error, ex. we couldn't clean up the workspace, use the words "failed to" in the log
   - never use colons "`:`" in a log since that's used to separate error descriptions and causes
     - if you need to have a break in your comment, either use `-` or `,` ex. `failed to clean directory, continuing regardless` or `POST /404 - Response code 404`
+
+Glossary
+
+* **Run**: Encompasses the two steps (plan and apply) for modifying infrastructure in a specific environment
+* **Run Lock**: When a run has started but is not yet completed, the infrastructure and environment that's being modified is "locked" against
+other runs being started for the same set of infrastructure and environment. We determine what infrastructure is being modified by combining the
+repository name, the directory in the repository at which the terraform commands need to be run, and the environment that's being modified
+* **Run Path**: The path relative to the repository's root at which terraform commands need to be executed for this Run
+* **Run Key**: The unique id for the set of infrastructure that is being modified in a Run. It is a combination of the repository name, run path, and environment
+* **Run Id**: The id for this specific Run

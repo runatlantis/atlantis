@@ -47,10 +47,10 @@ var (
 		text: "```diff\n" +
 			"{{.TerraformOutput}}\n" +
 			"```\n\n" +
-			"* To **discard** this plan click [here]({{.DiscardPlanLink}}).",
+			"* To **discard** this plan click [here]({{.LockURL}}).",
 	}
 	RunLockedFailureTmpl *CompiledTemplate = &CompiledTemplate{
-		text: "This plan is currently locked by {{.LockingPullLink}}\n" +
+		text: "This plan is currently locked by #{{.LockingPullID}}\n" +
 			"The locking plan must be applied or discarded before future plans can execute.",
 	}
 	TerraformFailureTmpl *CompiledTemplate = &CompiledTemplate{

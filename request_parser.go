@@ -66,7 +66,7 @@ func (r *RequestParser) determineCommand(comment *github.IssueCommentEvent) (*Co
 }
 
 func (r *RequestParser) extractCommentData(comment *github.IssueCommentEvent, params *ExecutionContext) error {
-	missingField := "<nil>" // todo move this to shared
+	missingField := "<nil>"
 
 	owner := comment.Repo.Owner.Login
 	if owner == nil {

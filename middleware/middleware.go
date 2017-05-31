@@ -2,9 +2,8 @@ package middleware
 
 import (
 	"net/http"
-
-	"github.com/hootsuite/atlantis/logging"
 	"github.com/urfave/negroni"
+	"github.com/hootsuite/atlantis/logging"
 )
 
 func NewNon200Logger(logger *logging.SimpleLogger) *FailedRequestLogger {
@@ -12,7 +11,7 @@ func NewNon200Logger(logger *logging.SimpleLogger) *FailedRequestLogger {
 }
 
 // FailedRequestLogger logs the request when a response code >= 400 is sent
-type FailedRequestLogger struct {
+type FailedRequestLogger struct{
 	logger *logging.SimpleLogger
 }
 

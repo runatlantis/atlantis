@@ -1,6 +1,9 @@
 package main
 
-import "path/filepath"
+import (
+	"path/filepath"
+	"github.com/hootsuite/atlantis/locking"
+)
 
 type BaseExecutor struct {
 	github                *GithubClient
@@ -8,10 +11,10 @@ type BaseExecutor struct {
 	scratchDir            string
 	s3Bucket              string
 	sshKey                string
-	stash                 *StashPRClient
 	ghComments            *GithubCommentRenderer
 	terraform             *TerraformClient
 	githubCommentRenderer *GithubCommentRenderer
+	lockManager           locking.LockManager
 }
 
 type PullRequestContext struct {
@@ -73,17 +76,6 @@ func (b *BaseExecutor) worstResult(results []PathResult) string {
 		}
 	}
 	return worst
-}
-
-func (b *BaseExecutor) stashContext(ctx *ExecutionContext) *StashPullRequestContext {
-	return &StashPullRequestContext{
-		owner:                 ctx.repoOwner,
-		repoName:              ctx.repoName,
-		number:                ctx.pullNum,
-		pullRequestLink:       ctx.pullLink,
-		terraformApplier:      ctx.requesterUsername,
-		terraformApplierEmail: ctx.requesterEmail,
-	}
 }
 
 func (b *BaseExecutor) Exec(f func(*ExecutionContext, *PullRequestContext) ExecutionResult, ctx *ExecutionContext, github *GithubClient) {

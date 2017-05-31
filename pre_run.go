@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-
 	"github.com/hootsuite/atlantis/logging"
 )
 

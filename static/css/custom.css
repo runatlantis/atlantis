@@ -142,7 +142,7 @@ tbody {
     -webkit-filter: drop-shadow(0 0 6px rgba(0,0,0,.1));
        -moz-filter: drop-shadow(0 0 6px rgba(0,0,0,.1));
             filter: drop-shadow(0 0 6px rgba(0,0,0,.1)); }
-  .popover-item:first-child .popover-link:after, 
+  .popover-item:first-child .popover-link:after,
   .popover-item:first-child .popover-link:before {
     bottom: 100%;
     left: 50%;
@@ -232,4 +232,21 @@ tbody {
   background-color: #E74C3C;
   border: #E74C3C;
   color: #FFFFFF;
+}
+.unlock{
+  height: 16px;
+  margin-top: 12px;
+  line-height: 18px;
+  padding: 0 10px;
+  font-family: monospace;
+}
+.list-unlock{
+  float: right;
+}
+.lock-row{
+  cursor: default;
+}
+.unlock-link{
+  color: #555;
+  text-decoration: none;
 }

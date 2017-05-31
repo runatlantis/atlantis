@@ -2,21 +2,29 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
+	"encoding/json"
 
-	"github.com/elazarl/go-bindata-assetfs"
 	"github.com/google/go-github/github"
-	"github.com/hootsuite/atlantis/logging"
-	"github.com/hootsuite/atlantis/middleware"
-	"github.com/hootsuite/atlantis/recovery"
 	"github.com/urfave/cli"
+	"github.com/hootsuite/atlantis/recovery"
+	"github.com/hootsuite/atlantis/locking"
+	"github.com/boltdb/bolt"
 	"github.com/urfave/negroni"
+	"github.com/hootsuite/atlantis/middleware"
+	"github.com/hootsuite/atlantis/logging"
+	"github.com/elazarl/go-bindata-assetfs"
+	"github.com/gorilla/mux"
+	"github.com/pkg/errors"
+)
+
+const (
+	lockPath = "/locks"
 )
 
 // WebhookServer listens for Github webhooks and runs the necessary Atlantis command
@@ -33,20 +41,25 @@ type Server struct {
 	logger           *logging.SimpleLogger
 	githubComments   *GithubCommentRenderer
 	requestParser    *RequestParser
+	lockManager      locking.LockManager
 }
 
 type ServerConfig struct {
-	githubUsername  string
-	githubPassword  string
-	githubHostname  string
-	sshKey          string
-	awsAssumeRole   string
-	port            int
-	scratchDir      string
-	awsRegion       string
-	s3Bucket        string
-	logLevel        string
-	requireApproval bool
+	githubUsername   string
+	githubPassword   string
+	githubHostname   string
+	sshKey           string
+	awsAssumeRole    string
+	port             int
+	scratchDir       string
+	awsRegion        string
+	s3Bucket         string
+	logLevel         string
+	atlantisURL      string
+	requireApproval  bool
+	dataDir          string
+	lockingBackend   string
+	lockingTable        string
 }
 
 type ExecutionContext struct {
@@ -59,16 +72,16 @@ type ExecutionContext struct {
 	repoSSHUrl        string
 	head              string
 	// commit base sha
-	base        string
-	pullLink    string
-	branch      string
-	htmlUrl     string
-	pullCreator string
-	command     *Command
+	base              string
+	pullLink          string
+	branch            string
+	htmlUrl           string
+	pullCreator       string
+	command           *Command
 	log         *logging.SimpleLogger
 }
 
-func NewServer(config *ServerConfig) *Server {
+func NewServer(config *ServerConfig, db *bolt.DB) (*Server, error) {
 	tp := github.BasicAuthTransport{
 		Username: strings.TrimSpace(config.githubUsername),
 		Password: strings.TrimSpace(config.githubPassword),
@@ -77,7 +90,6 @@ func NewServer(config *ServerConfig) *Server {
 	githubClientCtx := context.Background()
 	githubBaseClient.BaseURL, _ = url.Parse(fmt.Sprintf("https://%s/api/v3/", config.githubHostname))
 	githubClient := &GithubClient{client: githubBaseClient, ctx: githubClientCtx}
-	stashClient := &StashClient{}
 	terraformClient := &TerraformClient{
 		tfExecutableName: "terraform",
 	}
@@ -86,19 +98,29 @@ func NewServer(config *ServerConfig) *Server {
 		AWSRegion:  config.awsRegion,
 		AWSRoleArn: config.awsAssumeRole,
 	}
+	var lockManager locking.LockManager
+	if config.lockingBackend == dynamoDBLockingBackend {
+		session, err := awsConfig.CreateAWSSession()
+		if err != nil {
+			return nil, errors.Wrap(err, "creating aws session for DynamoDB")
+		}
+		lockManager = locking.NewDynamoDBLockManager(config.lockingTable, session)
+	} else {
+		lockManager = locking.NewBoltDBLockManager(db, boltDBRunLocksBucket)
+	}
 	baseExecutor := BaseExecutor{
 		github:                githubClient,
 		awsConfig:             awsConfig,
 		scratchDir:            config.scratchDir,
 		s3Bucket:              config.s3Bucket,
 		sshKey:                config.sshKey,
-		stash:                 &StashPRClient{client: stashClient},
 		ghComments:            githubComments,
 		terraform:             terraformClient,
 		githubCommentRenderer: githubComments,
+		lockManager:           lockManager,
 	}
 	applyExecutor := &ApplyExecutor{BaseExecutor: baseExecutor, requireApproval: config.requireApproval, atlantisGithubUser: config.githubUsername}
-	planExecutor := &PlanExecutor{BaseExecutor: baseExecutor}
+	planExecutor := &PlanExecutor{BaseExecutor: baseExecutor, atlantisURL: config.atlantisURL}
 	helpExecutor := &HelpExecutor{BaseExecutor: baseExecutor}
 	logger := logging.NewSimpleLogger("server", log.New(os.Stderr, "", log.LstdFlags), false, logging.ToLogLevel(config.logLevel))
 	return &Server{
@@ -114,14 +136,23 @@ func NewServer(config *ServerConfig) *Server {
 		logger:           logger,
 		githubComments:   githubComments,
 		requestParser:    &RequestParser{},
-	}
+		lockManager:      lockManager,
+	}, nil
 }
 
 func (s *Server) Start() error {
-	router := http.NewServeMux()
-	router.HandleFunc("/", s.index)
-	router.Handle("/static/", http.FileServer(&assetfs.AssetFS{Asset: Asset, AssetDir: AssetDir, AssetInfo: AssetInfo}))
-	router.HandleFunc("/hooks", s.postHooks)
+	router := mux.NewRouter()
+	router.HandleFunc("/", s.index).Methods("GET").MatcherFunc(func(r *http.Request, rm *mux.RouteMatch) bool {
+		return r.URL.Path == "/" || r.URL.Path == "/index.html"
+	})
+	router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: Asset, AssetDir: AssetDir, AssetInfo: AssetInfo}))
+	router.HandleFunc("/hooks", s.postHooks).Methods("POST")
+	router.HandleFunc("/locks/{id}", s.deleteLock).Methods("DELETE")
+	// todo: remove this route when there is a detail view
+	// right now we need this route because from the pull request comment in GitHub only a GET request can be made
+	// in the future, the pull discard link will link to the detail view which will have a Delete button which will
+	// make an real DELETE call but we don't have a detail view right now
+	router.HandleFunc("/locks/{id}", s.deleteLock).Queries("method", "DELETE").Methods("GET")
 	n := negroni.New(&negroni.Recovery{
 		Logger:     log.New(os.Stdout, "", log.LstdFlags),
 		PrintStack: false,
@@ -134,33 +165,42 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) index(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" && r.URL.Path != "/index.html" {
-		http.NotFound(w, r)
+	locks, err := s.lockManager.ListLocks()
+	if err != nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		fmt.Fprintf(w, "Could not retrieve locks: %s", err)
 		return
 	}
-	// this is just a placeholder to test the ui
-	type result struct {
-		RepoOwner     string
-		RepoName      string
-		PullRequestId int
-		Timestamp     string
-	}
-	res := result{}
-	res.RepoOwner = "anubhavmishra"
-	res.RepoName = "atlantis-test"
-	res.PullRequestId = 10
-	res.Timestamp = "2017-05-08T11:18:43.91646206-07:00"
 
-	var results []result
-	results = append(results, res)
+	type runLock struct {
+		locking.Run
+		ID string
+	}
+	var results []runLock
+	for id, v := range locks {
+		results = append(results, runLock{
+			v,
+			id,
+		})
+	}
 	indexTemplate.Execute(w, results)
 }
 
-func (s *Server) postHooks(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.NotFound(w, r)
+func (s *Server) deleteLock(w http.ResponseWriter, r *http.Request) {
+	id, ok := mux.Vars(r)["id"]
+	if !ok {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, "no lock id in request")
+	}
+	if err := s.lockManager.Unlock(id); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "Failed to unlock: %s", err)
 		return
 	}
+	fmt.Fprint(w, "Unlocked successfully")
+}
+
+func (s *Server) postHooks(w http.ResponseWriter, r *http.Request) {
 	githubReqID := "X-Github-Delivery=" + r.Header.Get("X-Github-Delivery")
 
 	// try to parse webhook data as a comment event

@@ -13,7 +13,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	"github.com/google/go-github/github"
+	"github.com/hootsuite/atlantis/locking"
+	"time"
 )
 
 type ApplyExecutor struct {
@@ -60,7 +61,6 @@ func (a *ApplyExecutor) execute(ctx *ExecutionContext, prCtx *PullRequestContext
 }
 
 func (a *ApplyExecutor) setupAndApply(ctx *ExecutionContext, prCtx *PullRequestContext) ExecutionResult {
-	stashCtx := a.stashContext(ctx)
 	a.github.UpdateStatus(prCtx, PendingStatus, "Applying...")
 
 	if a.requireApproval {
@@ -77,8 +77,6 @@ func (a *ApplyExecutor) setupAndApply(ctx *ExecutionContext, prCtx *PullRequestC
 			return ExecutionResult{SetupFailure: PullNotApprovedFailure{}}
 		}
 	}
-
-	//runLog = append(runLog, "-> Confirmed pull request was plus one'd")
 
 	planPaths, err := a.downloadPlans(ctx.repoOwner, ctx.repoName, ctx.pullNum, ctx.command.environment, a.scratchDir, a.awsConfig, a.s3Bucket)
 	if err != nil {
@@ -99,7 +97,7 @@ func (a *ApplyExecutor) setupAndApply(ctx *ExecutionContext, prCtx *PullRequestC
 	//runLog = append(runLog, fmt.Sprintf("-> Downloaded plans: %v", planPaths))
 	applyOutputs := []PathResult{}
 	for _, planPath := range planPaths {
-		output := a.apply(ctx, stashCtx, planPath)
+		output := a.apply(ctx, prCtx, planPath)
 		output.Path = planPath
 		applyOutputs = append(applyOutputs, output)
 	}
@@ -107,7 +105,7 @@ func (a *ApplyExecutor) setupAndApply(ctx *ExecutionContext, prCtx *PullRequestC
 	return ExecutionResult{PathResults: applyOutputs}
 }
 
-func (a *ApplyExecutor) apply(ctx *ExecutionContext, stashCtx *StashPullRequestContext, planPath string) PathResult {
+func (a *ApplyExecutor) apply(ctx *ExecutionContext, prCtx *PullRequestContext, planPath string) PathResult {
 	//runLog = append(runLog, fmt.Sprintf("-> Running apply %s", planPath))
 	planName := path.Base(planPath)
 	planSubDir := a.determinePlanSubDir(planName, ctx.pullNum)
@@ -164,18 +162,33 @@ func (a *ApplyExecutor) apply(ctx *ExecutionContext, stashCtx *StashPullRequestC
 	}
 
 	if remoteStatePath != "" {
-		//runLog = append(runLog, "-> Remote state configured")
-		// now lock the state prior to applying
-		stashLockResponse := a.stash.LockState(ctx.log, stashCtx, remoteStatePath)
-		if !stashLockResponse.Success {
-			msg := fmt.Sprintf("failed to lock state: %s", stashLockResponse.Message)
-			ctx.log.Err(msg)
+		tfEnv := ctx.command.environment
+		if tfEnv == "" {
+			tfEnv = "default"
+		}
+		run := locking.Run{
+			RepoOwner: prCtx.owner,
+			RepoName: prCtx.repoName,
+			Path: execPath.Relative,
+			Env: tfEnv,
+			PullID: prCtx.number,
+			User: prCtx.terraformApplier,
+			Timestamp: time.Now(),
+		}
+
+		lockAttempt, err := a.lockManager.TryLock(run)
+		if err != nil {
 			return PathResult{
 				Status: "error",
-				Result: GeneralError{errors.New(msg)},
+				Result: GeneralError{fmt.Errorf("failed to acquire lock: %s", err)},
 			}
 		}
-		//runLog = append(runLog, "-> Stash lock aquired")
+		if lockAttempt.LockAcquired != true && lockAttempt.LockingRun.PullID != prCtx.number {
+			return PathResult{
+				Status: "error",
+				Result: GeneralError{fmt.Errorf("failed to acquire lock: lock held by pull request #%d", lockAttempt.LockingRun.PullID)},
+			}
+		}
 	}
 
 	// need to get auth data from assumed role
@@ -223,23 +236,6 @@ func (a *ApplyExecutor) apply(ctx *ExecutionContext, stashCtx *StashPullRequestC
 	return PathResult{
 		Status: "success",
 		Result: ApplySuccess{output},
-	}
-}
-
-func (a *ApplyExecutor) validatePlusOne(prSubmitter string) func(*github.IssueComment) bool {
-	return func(c *github.IssueComment) bool {
-		if c == nil || c.Body == nil {
-			return false
-		}
-		body := *c.Body
-		if !(strings.Contains(body, ":+1:") || strings.Contains(body, "+1") || strings.ContainsRune(body, '\U0001f44d')) {
-			return false
-		}
-		if c.User == nil || c.User.Login == nil {
-			return false
-		}
-		// the plus-oner can't be the user that submitted the PR or ourselves (otherwise our comment telling the user they're missing a +1 would count as approval)
-		return *c.User.Login != prSubmitter && *c.User.Login != a.atlantisGithubUser
 	}
 }
 
