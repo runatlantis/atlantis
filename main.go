@@ -274,7 +274,7 @@ func validateConfig(c *cli.Context, hostname string) (*ServerConfig, error) {
 		if config.LockingBackend != nil {
 			lockingBackend = *config.LockingBackend
 		}
-		if config.LockingBackend != nil {
+		if config.LockingTable != nil {
 			lockingTable = *config.LockingTable
 		}
 		requireApproval = config.RequireApproval
