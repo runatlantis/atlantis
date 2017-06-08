@@ -15,6 +15,12 @@ type Run struct {
 	Timestamp  time.Time
 }
 
+const (
+	FileLockingBackend = "file"
+	DynamoDBLockingBackend = "dynamodb"
+	BoltDBRunLocksBucket   = "runLocks"
+)
+
 // StateKey returns the unique key to identify the set of infrastructure being modified by this run.
 // Used in locking to determine what part of the infrastructure is locked.
 func (r Run) StateKey() []byte {

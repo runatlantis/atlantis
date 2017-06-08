@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"context"
@@ -14,7 +14,6 @@ import (
 	"github.com/urfave/cli"
 	"github.com/hootsuite/atlantis/recovery"
 	"github.com/hootsuite/atlantis/locking"
-	"github.com/boltdb/bolt"
 	"github.com/urfave/negroni"
 	"github.com/hootsuite/atlantis/middleware"
 	"github.com/hootsuite/atlantis/logging"
@@ -44,22 +43,23 @@ type Server struct {
 	lockManager      locking.LockManager
 }
 
+// the mapstructure tags correspond to flags in cmd/server.go
 type ServerConfig struct {
-	githubUsername   string
-	githubPassword   string
-	githubHostname   string
-	sshKey           string
-	awsAssumeRole    string
-	port             int
-	scratchDir       string
-	awsRegion        string
-	s3Bucket         string
-	logLevel         string
-	atlantisURL      string
-	requireApproval  bool
-	dataDir          string
-	lockingBackend   string
-	lockingTable        string
+	GitHubHostname  string `mapstructure:"gh-hostname"`
+	GitHubUser      string `mapstructure:"gh-user"`
+	GitHubPassword  string `mapstructure:"gh-password"`
+	SSHKey          string `mapstructure:"ssh-key"`
+	AssumeRole      string `mapstructure:"aws-assume-role-arn"`
+	Port            int    `mapstructure:"port"`
+	ScratchDir      string `mapstructure:"scratch-dir"`
+	AWSRegion       string `mapstructure:"aws-region"`
+	S3Bucket        string `mapstructure:"s3-bucket"`
+	LogLevel        string `mapstructure:"log-level"`
+	AtlantisURL     string `mapstructure:"atlantis-url"`
+	RequireApproval bool   `mapstructure:"require-approval"`
+	DataDir         string `mapstructure:"data-dir"`
+	LockingBackend  string `mapstructure:"locking-backend"`
+	LockingTable    string `mapstructure:"locking-table"`
 }
 
 type ExecutionContext struct {
@@ -80,53 +80,57 @@ type ExecutionContext struct {
 	log         *logging.SimpleLogger
 }
 
-func NewServer(config *ServerConfig, db *bolt.DB) (*Server, error) {
+func NewServer(config ServerConfig) (*Server, error) {
 	tp := github.BasicAuthTransport{
-		Username: strings.TrimSpace(config.githubUsername),
-		Password: strings.TrimSpace(config.githubPassword),
+		Username: strings.TrimSpace(config.GitHubUser),
+		Password: strings.TrimSpace(config.GitHubPassword),
 	}
 	githubBaseClient := github.NewClient(tp.Client())
 	githubClientCtx := context.Background()
-	githubBaseClient.BaseURL, _ = url.Parse(fmt.Sprintf("https://%s/api/v3/", config.githubHostname))
+	githubBaseClient.BaseURL, _ = url.Parse(fmt.Sprintf("https://%s/api/v3/", config.GitHubHostname))
 	githubClient := &GithubClient{client: githubBaseClient, ctx: githubClientCtx}
 	terraformClient := &TerraformClient{
 		tfExecutableName: "terraform",
 	}
 	githubComments := &GithubCommentRenderer{}
 	awsConfig := &AWSConfig{
-		AWSRegion:  config.awsRegion,
-		AWSRoleArn: config.awsAssumeRole,
+		AWSRegion:  config.AWSRegion,
+		AWSRoleArn: config.AssumeRole,
 	}
 	var lockManager locking.LockManager
-	if config.lockingBackend == dynamoDBLockingBackend {
+	if config.LockingBackend == locking.DynamoDBLockingBackend {
 		session, err := awsConfig.CreateAWSSession()
 		if err != nil {
 			return nil, errors.Wrap(err, "creating aws session for DynamoDB")
 		}
-		lockManager = locking.NewDynamoDBLockManager(config.lockingTable, session)
+		lockManager = locking.NewDynamoDBLockManager(config.LockingTable, session)
 	} else {
-		lockManager = locking.NewBoltDBLockManager(db, boltDBRunLocksBucket)
+		var err error
+		lockManager, err = locking.NewBoltDBLockManager(config.DataDir, locking.BoltDBRunLocksBucket)
+		if err != nil {
+			return nil, err
+		}
 	}
 	baseExecutor := BaseExecutor{
 		github:                githubClient,
 		awsConfig:             awsConfig,
-		scratchDir:            config.scratchDir,
-		s3Bucket:              config.s3Bucket,
-		sshKey:                config.sshKey,
+		scratchDir:            config.ScratchDir,
+		s3Bucket:              config.S3Bucket,
+		sshKey:                config.SSHKey,
 		ghComments:            githubComments,
 		terraform:             terraformClient,
 		githubCommentRenderer: githubComments,
 		lockManager:           lockManager,
 	}
-	applyExecutor := &ApplyExecutor{BaseExecutor: baseExecutor, requireApproval: config.requireApproval, atlantisGithubUser: config.githubUsername}
-	planExecutor := &PlanExecutor{BaseExecutor: baseExecutor, atlantisURL: config.atlantisURL}
+	applyExecutor := &ApplyExecutor{BaseExecutor: baseExecutor, requireApproval: config.RequireApproval, atlantisGithubUser: config.GitHubUser}
+	planExecutor := &PlanExecutor{BaseExecutor: baseExecutor, atlantisURL: config.AtlantisURL}
 	helpExecutor := &HelpExecutor{BaseExecutor: baseExecutor}
-	logger := logging.NewSimpleLogger("server", log.New(os.Stderr, "", log.LstdFlags), false, logging.ToLogLevel(config.logLevel))
+	logger := logging.NewSimpleLogger("server", log.New(os.Stderr, "", log.LstdFlags), false, logging.ToLogLevel(config.LogLevel))
 	return &Server{
-		port:             config.port,
-		scratchDir:       config.scratchDir,
-		awsRegion:        config.awsRegion,
-		s3Bucket:         config.s3Bucket,
+		port:             config.Port,
+		scratchDir:       config.ScratchDir,
+		awsRegion:        config.AWSRegion,
+		s3Bucket:         config.S3Bucket,
 		applyExecutor:    applyExecutor,
 		planExecutor:     planExecutor,
 		helpExecutor:     helpExecutor,

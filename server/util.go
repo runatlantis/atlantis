@@ -1,4 +1,4 @@
-package main
+package server
 
 // ContainsStr returns true if slice has a value equal to search and false otherwise
 func ContainsStr(slice []string, search string) bool {

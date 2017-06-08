@@ -1,4 +1,6 @@
-package main
+package server
+
+import "github.com/spf13/viper"
 
 type HelpExecutor struct {
 	BaseExecutor
@@ -6,7 +8,7 @@ type HelpExecutor struct {
 
 var helpComment = "```cmake\n" +
 `atlantis - Terraform collaboration tool that enables you to collaborate on infrastructure
-safely and securely. (v` + version + `)
+safely and securely. (v` + viper.GetString("version") + `)
 
 Usage: atlantis <command> [environment] [--verbose]
 

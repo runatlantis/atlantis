@@ -1,4 +1,4 @@
-package main
+package server
 
 // taken from https://github.com/benbjohnson/testing
 

@@ -6,6 +6,9 @@ import (
 	"encoding/json"
 	"github.com/pkg/errors"
 	"encoding/hex"
+	"os"
+	"time"
+	"path"
 )
 
 type BoltDBLockManager struct {
@@ -13,8 +16,33 @@ type BoltDBLockManager struct {
 	locksBucket []byte
 }
 
-func NewBoltDBLockManager(db *bolt.DB, locksBucket string) *BoltDBLockManager {
-	return &BoltDBLockManager{db, []byte(locksBucket)}
+func NewBoltDBLockManager(dataDir string, locksBucket string) (*BoltDBLockManager, error) {
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		return nil, errors.Wrap(err,"creating data dir")
+	}
+	db, err := bolt.Open(path.Join(dataDir, "atlantis.db"), 0600, &bolt.Options{Timeout: 1 * time.Second})
+	if err != nil {
+		if err.Error() == "timeout" {
+			return nil, errors.New("starting BoltDB: timeout (a possible cause is another Atlantis instance already running)")
+		}
+		return nil, errors.Wrap(err,"starting BoltDB")
+	}
+	err = db.Update(func(tx *bolt.Tx) error {
+		if _, err := tx.CreateBucketIfNotExists([]byte(locksBucket)); err != nil {
+			return errors.Wrapf(err, "creating %q bucket", locksBucket)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, errors.Wrap(err,"starting BoltDB")
+	}
+	// todo: close BoltDB when server is sigtermed
+	return &BoltDBLockManager{db, []byte(locksBucket)}, nil
+}
+
+// NewBoltDBLockManagerWithDB is used for testing
+func NewBoltDBLockManagerWithDB(db *bolt.DB, locksBucket string) (*BoltDBLockManager, error) {
+	return &BoltDBLockManager{db, []byte(locksBucket)}, nil
 }
 
 func (b BoltDBLockManager) TryLock(run Run) (TryLockResponse, error) {

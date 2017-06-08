@@ -9,7 +9,7 @@
 // static/images/atlantis-icon_512.png
 // DO NOT EDIT!
 
-package main
+package server
 
 import (
 	"github.com/elazarl/go-bindata-assetfs"
