@@ -87,7 +87,11 @@ func NewServer(config ServerConfig) (*Server, error) {
 	}
 	githubBaseClient := github.NewClient(tp.Client())
 	githubClientCtx := context.Background()
-	githubBaseClient.BaseURL, _ = url.Parse(fmt.Sprintf("https://%s/api/v3/", config.GitHubHostname))
+	ghHostname := fmt.Sprintf("https://%s/api/v3/", config.GitHubHostname)
+	if config.GitHubHostname == "api.github.com" {
+		ghHostname = fmt.Sprintf("https://%s/", config.GitHubHostname)
+	}
+	githubBaseClient.BaseURL, _ = url.Parse(ghHostname)
 	githubClient := &GithubClient{client: githubBaseClient, ctx: githubClientCtx}
 	terraformClient := &TerraformClient{
 		tfExecutableName: "terraform",
