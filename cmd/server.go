@@ -36,6 +36,7 @@ var stringFlags = []stringFlag{
 	{
 		name:        ghHostnameFlag,
 		description: "Hostname of Github installation.",
+		value: "api.github.com",
 	},
 	{
 		name:        logLevelFlag,
