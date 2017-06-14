@@ -29,7 +29,7 @@ const (
 	atlantisURLFlag     = "atlantis-url"
 	dataDirFlag         = "data-dir"
 	lockingBackendFlag  = "locking-backend"
-	lockingTableFlag    = "locking-table"
+	lockingTableFlag    = "locking-dynamodb-table"
 )
 
 var stringFlags = []stringFlag{
@@ -139,6 +139,7 @@ var serverCmd = &cobra.Command{
 
 Flags can also be set in a yaml config file (see --` + configFlag + `).
 Config values are overridden by environment variables which in turn are overridden by flags.`,
+	SilenceUsage: true,
 
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		// if passed a config file then try and load it
@@ -207,6 +208,9 @@ func validate(config server.ServerConfig) error {
 	}
 	if config.GitHubPassword == "" {
 		return fmt.Errorf("%s must be set", ghPasswordFlag)
+	}
+	if config.LockingBackend != server.LockingFileBackend && config.LockingBackend != server.LockingDynamoDBBackend {
+		return fmt.Errorf("unsupported locking backend %q: not one of %q or %q", config.LockingBackend, server.LockingFileBackend, server.LockingDynamoDBBackend)
 	}
 	return nil
 }

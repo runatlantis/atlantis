@@ -175,7 +175,7 @@ func (a *ApplyExecutor) apply(ctx *ExecutionContext, pullCtx *PullRequestContext
 			Timestamp: time.Now(),
 		}
 
-		lockAttempt, err := a.lockManager.TryLock(run)
+		lockAttempt, err := a.lockingBackend.TryLock(run)
 		if err != nil {
 			return PathResult{
 				Status: "error",

@@ -16,7 +16,8 @@ import (
 // PlanExecutor handles everything related to running the Terraform plan including integration with S3, Terraform, and Github
 type PlanExecutor struct {
 	BaseExecutor
-	atlantisURL string
+	// DeleteLockURL is a function that given a lock id will return a url for deleting the lock
+	DeleteLockURL func(id string) (url string)
 }
 
 /** Result Types **/
@@ -226,7 +227,7 @@ func (p *PlanExecutor) plan(log *logging.SimpleLogger,
 			}
 		}
 	}
-	lockAttempt, err := p.lockManager.TryLock(run)
+	lockAttempt, err := p.lockingBackend.TryLock(run)
 	if err != nil {
 		return PathResult{
 			Status:" failure",
@@ -300,7 +301,7 @@ func (p *PlanExecutor) plan(log *logging.SimpleLogger,
 		}
 		log.Err("error running terraform plan: %v", output)
 		log.Info("unlocking state since plan failed")
-		if err := p.lockManager.Unlock(lockAttempt.LockID); err != nil {
+		if err := p.lockingBackend.Unlock(lockAttempt.LockID); err != nil {
 			log.Err("error unlocking state: %v", err)
 		}
 		return PathResult{
@@ -313,7 +314,7 @@ func (p *PlanExecutor) plan(log *logging.SimpleLogger,
 	if err := UploadPlanFile(s3Client, s3Key, tfPlanOutputPath); err != nil {
 		err = fmt.Errorf("failed to upload to S3: %v", err)
 		log.Err(err.Error())
-		if err := p.lockManager.Unlock(lockAttempt.LockID); err != nil {
+		if err := p.lockingBackend.Unlock(lockAttempt.LockID); err != nil {
 			log.Err("error unlocking state: %v", err)
 		}
 		return PathResult{
@@ -332,7 +333,7 @@ func (p *PlanExecutor) plan(log *logging.SimpleLogger,
 		Status: "success",
 		Result: PlanSuccess{
 			TerraformOutput: output,
-			LockURL: fmt.Sprintf("%s%s/%s?method=DELETE", p.atlantisURL, lockPath, lockAttempt.LockID),
+			LockURL: p.DeleteLockURL(lockAttempt.LockID),
 		},
 	}
 }

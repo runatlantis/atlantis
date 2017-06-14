@@ -19,6 +19,6 @@ func (l *FailedRequestLogger) ServeHTTP(rw http.ResponseWriter, r *http.Request,
 	next(rw, r)
 	res := rw.(negroni.ResponseWriter)
 	if res.Status() >= 400 {
-		l.logger.Info("%s %s - Response code %d", r.Method, r.URL.Path, res.Status())
+		l.logger.Info("%s %s - Response code %d", r.Method, r.URL.RequestURI(), res.Status())
 	}
 }

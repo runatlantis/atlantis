@@ -14,7 +14,7 @@ type BaseExecutor struct {
 	ghComments            *GithubCommentRenderer
 	terraform             *TerraformClient
 	githubCommentRenderer *GithubCommentRenderer
-	lockManager           locking.LockManager
+	lockingBackend        locking.Backend
 }
 
 type PullRequestContext struct {

@@ -20,14 +20,20 @@ import (
 	"github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
+	"io/ioutil"
+	"github.com/hootsuite/atlantis/locking/dynamodb"
+	"github.com/hootsuite/atlantis/locking/boltdb"
 )
 
 const (
-	lockPath = "/locks"
+	deleteLockRoute        = "delete-lock"
+	LockingFileBackend     = "file"
+	LockingDynamoDBBackend = "dynamodb"
 )
 
 // WebhookServer listens for Github webhooks and runs the necessary Atlantis command
 type Server struct {
+	router           *mux.Router
 	port             int
 	scratchDir       string
 	awsRegion        string
@@ -40,7 +46,8 @@ type Server struct {
 	logger           *logging.SimpleLogger
 	githubComments   *GithubCommentRenderer
 	requestParser    *RequestParser
-	lockManager      locking.LockManager
+	lockingBackend   locking.Backend
+	atlantisURL      string
 }
 
 // the mapstructure tags correspond to flags in cmd/server.go
@@ -49,17 +56,17 @@ type ServerConfig struct {
 	GitHubUser      string `mapstructure:"gh-user"`
 	GitHubPassword  string `mapstructure:"gh-password"`
 	SSHKey          string `mapstructure:"ssh-key"`
-	AssumeRole      string `mapstructure:"aws-assume-role-arn"`
-	Port            int    `mapstructure:"port"`
-	ScratchDir      string `mapstructure:"scratch-dir"`
-	AWSRegion       string `mapstructure:"aws-region"`
-	S3Bucket        string `mapstructure:"s3-bucket"`
-	LogLevel        string `mapstructure:"log-level"`
-	AtlantisURL     string `mapstructure:"atlantis-url"`
-	RequireApproval bool   `mapstructure:"require-approval"`
-	DataDir         string `mapstructure:"data-dir"`
-	LockingBackend  string `mapstructure:"locking-backend"`
-	LockingTable    string `mapstructure:"locking-table"`
+	AssumeRole           string `mapstructure:"aws-assume-role-arn"`
+	Port                 int    `mapstructure:"port"`
+	ScratchDir           string `mapstructure:"scratch-dir"`
+	AWSRegion            string `mapstructure:"aws-region"`
+	S3Bucket             string `mapstructure:"s3-bucket"`
+	LogLevel             string `mapstructure:"log-level"`
+	AtlantisURL          string `mapstructure:"atlantis-url"`
+	RequireApproval      bool   `mapstructure:"require-approval"`
+	DataDir              string `mapstructure:"data-dir"`
+	LockingBackend       string `mapstructure:"locking-backend"`
+	LockingDynamoDBTable string `mapstructure:"locking-dynamodb-table"`
 }
 
 type ExecutionContext struct {
@@ -101,16 +108,16 @@ func NewServer(config ServerConfig) (*Server, error) {
 		AWSRegion:  config.AWSRegion,
 		AWSRoleArn: config.AssumeRole,
 	}
-	var lockManager locking.LockManager
-	if config.LockingBackend == locking.DynamoDBLockingBackend {
+	var lockingBackend locking.Backend
+	if config.LockingBackend == LockingDynamoDBBackend {
 		session, err := awsConfig.CreateAWSSession()
 		if err != nil {
 			return nil, errors.Wrap(err, "creating aws session for DynamoDB")
 		}
-		lockManager = locking.NewDynamoDBLockManager(config.LockingTable, session)
+		lockingBackend = dynamodb.New(config.LockingDynamoDBTable, session)
 	} else {
 		var err error
-		lockManager, err = locking.NewBoltDBLockManager(config.DataDir, locking.BoltDBRunLocksBucket)
+		lockingBackend, err = boltdb.New(config.DataDir)
 		if err != nil {
 			return nil, err
 		}
@@ -124,13 +131,15 @@ func NewServer(config ServerConfig) (*Server, error) {
 		ghComments:            githubComments,
 		terraform:             terraformClient,
 		githubCommentRenderer: githubComments,
-		lockManager:           lockManager,
+		lockingBackend:        lockingBackend,
 	}
 	applyExecutor := &ApplyExecutor{BaseExecutor: baseExecutor, requireApproval: config.RequireApproval, atlantisGithubUser: config.GitHubUser}
-	planExecutor := &PlanExecutor{BaseExecutor: baseExecutor, atlantisURL: config.AtlantisURL}
+	planExecutor := &PlanExecutor{BaseExecutor: baseExecutor}
 	helpExecutor := &HelpExecutor{BaseExecutor: baseExecutor}
 	logger := logging.NewSimpleLogger("server", log.New(os.Stderr, "", log.LstdFlags), false, logging.ToLogLevel(config.LogLevel))
+	router := mux.NewRouter()
 	return &Server{
+		router:           router,
 		port:             config.Port,
 		scratchDir:       config.ScratchDir,
 		awsRegion:        config.AWSRegion,
@@ -143,36 +152,44 @@ func NewServer(config ServerConfig) (*Server, error) {
 		logger:           logger,
 		githubComments:   githubComments,
 		requestParser:    &RequestParser{},
-		lockManager:      lockManager,
+		lockingBackend:   lockingBackend,
+		atlantisURL:      config.AtlantisURL,
 	}, nil
 }
 
 func (s *Server) Start() error {
-	router := mux.NewRouter()
-	router.HandleFunc("/", s.index).Methods("GET").MatcherFunc(func(r *http.Request, rm *mux.RouteMatch) bool {
+	s.router.HandleFunc("/", s.index).Methods("GET").MatcherFunc(func(r *http.Request, rm *mux.RouteMatch) bool {
 		return r.URL.Path == "/" || r.URL.Path == "/index.html"
 	})
-	router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: Asset, AssetDir: AssetDir, AssetInfo: AssetInfo}))
-	router.HandleFunc("/hooks", s.postHooks).Methods("POST")
-	router.HandleFunc("/locks/{id}", s.deleteLock).Methods("DELETE")
+	s.router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: Asset, AssetDir: AssetDir, AssetInfo: AssetInfo}))
+	s.router.HandleFunc("/hooks", s.postHooks).Methods("POST")
+	s.router.HandleFunc("/locks", s.deleteLock).Methods("DELETE").Queries("id", "{id:.*}")
 	// todo: remove this route when there is a detail view
 	// right now we need this route because from the pull request comment in GitHub only a GET request can be made
 	// in the future, the pull discard link will link to the detail view which will have a Delete button which will
 	// make an real DELETE call but we don't have a detail view right now
-	router.HandleFunc("/locks/{id}", s.deleteLock).Queries("method", "DELETE").Methods("GET")
+	deleteLockRoute := s.router.HandleFunc("/locks", s.deleteLock).Queries("id", "{id}", "method", "DELETE").Methods("GET").Name(deleteLockRoute)
+
+	// function that planExecutor can use to construct delete lock urls
+	// injecting this here because this is the earliest routes are created
+	s.planExecutor.DeleteLockURL = func (lockID string) string {
+		// ignoring error since guaranteed to succeed if "id" is specified
+		u, _ := deleteLockRoute.URL("id", url.QueryEscape(lockID))
+		return s.atlantisURL + u.RequestURI()
+	}
 	n := negroni.New(&negroni.Recovery{
 		Logger:     log.New(os.Stdout, "", log.LstdFlags),
 		PrintStack: false,
 		StackAll:   false,
 		StackSize:  1024 * 8,
 	}, middleware.NewNon200Logger(s.logger))
-	n.UseHandler(router)
+	n.UseHandler(s.router)
 	s.logger.Info("Atlantis started - listening on port %v", s.port)
 	return cli.NewExitError(http.ListenAndServe(fmt.Sprintf(":%d", s.port), n), 1)
 }
 
 func (s *Server) index(w http.ResponseWriter, r *http.Request) {
-	locks, err := s.lockManager.ListLocks()
+	locks, err := s.lockingBackend.ListLocks()
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		fmt.Fprintf(w, "Could not retrieve locks: %s", err)
@@ -181,13 +198,14 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 
 	type runLock struct {
 		locking.Run
-		ID string
+		UnlockURL string
 	}
 	var results []runLock
 	for id, v := range locks {
+		u, _ := s.router.Get(deleteLockRoute).URL("id", url.QueryEscape(id))
 		results = append(results, runLock{
 			v,
-			id,
+			u.String(),
 		})
 	}
 	indexTemplate.Execute(w, results)
@@ -199,7 +217,12 @@ func (s *Server) deleteLock(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprint(w, "no lock id in request")
 	}
-	if err := s.lockManager.Unlock(id); err != nil {
+	idUnencoded, err := url.PathUnescape(id)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, "invalid lock id")
+	}
+	if err := s.lockingBackend.Unlock(idUnencoded); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, "Failed to unlock: %s", err)
 		return
@@ -207,24 +230,64 @@ func (s *Server) deleteLock(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "Unlocked successfully")
 }
 
+// postHooks handles comment and pull request events from GitHub
 func (s *Server) postHooks(w http.ResponseWriter, r *http.Request) {
 	githubReqID := "X-Github-Delivery=" + r.Header.Get("X-Github-Delivery")
 
-	// try to parse webhook data as a comment event
-	decoder := json.NewDecoder(r.Body)
-	var comment github.IssueCommentEvent
-	if err := decoder.Decode(&comment); err != nil {
-		s.logger.Debug("Ignoring non-comment-event request %s", githubReqID)
-		fmt.Fprintln(w, "Ignoring")
+	defer r.Body.Close()
+	bytes, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w,"could not read body: %s\n", err)
 		return
 	}
 
-	if comment.Action == nil || *comment.Action != "created" {
-		s.logger.Debug("Ignoring request because the action was not 'created' %s", githubReqID)
+	// Try to unmarshal the request into the supported event types
+	var commentEvent github.IssueCommentEvent
+	var pullEvent github.PullRequestEvent
+	if json.Unmarshal(bytes, &commentEvent) == nil && s.isCommentCreatedEvent(commentEvent) {
+		s.logger.Debug("Handling comment event %s", githubReqID)
+		s.handleCommentCreatedEvent(w, commentEvent, githubReqID)
+	} else if json.Unmarshal(bytes, &pullEvent) == nil && s.isPullClosedEvent(pullEvent) {
+		s.logger.Debug("Handling pull request event %s", githubReqID)
+		s.handlePullClosedEvent(w, pullEvent, githubReqID)
+	} else {
+		s.logger.Debug("Ignoring unsupported event %s", githubReqID)
 		fmt.Fprintln(w, "Ignoring")
+	}
+}
+
+// handlePullClosedEvent will delete any locks associated with the pull request
+func (s *Server) handlePullClosedEvent(w http.ResponseWriter, pullEvent github.PullRequestEvent, githubReqID string) {
+	repo := *pullEvent.Repo.FullName
+	pullNum := *pullEvent.PullRequest.Number
+	locks, err := s.lockingBackend.FindLocksForPull(repo, pullNum)
+	if err != nil {
+		s.logger.Err("finding locks for repo %s pull %d: %s", repo, pullNum, err)
+		w.WriteHeader(http.StatusServiceUnavailable)
+		fmt.Fprintf(w, "Error finding locks: %s\n", err)
 		return
 	}
 
+	s.logger.Debug("Unlocking locks %v %s", locks, githubReqID)
+	var errors []error
+	for _, l := range locks {
+		if err := s.lockingBackend.Unlock(l); err != nil {
+			errors = append(errors, err)
+		}
+	}
+
+	if len(errors) != 0 {
+		s.logger.Err("unlocking locks for repo %s pull %d: %v", repo, pullNum, errors)
+		w.WriteHeader(http.StatusServiceUnavailable)
+		fmt.Fprintf(w, "Error unlocking locks: %v\n", errors)
+		return
+	}
+
+	fmt.Fprintln(w,"Locks unlocked")
+}
+
+func (s *Server) handleCommentCreatedEvent(w http.ResponseWriter, comment github.IssueCommentEvent, githubReqID string) {
 	// determine if the comment matches a plan or apply command
 	ctx := &ExecutionContext{}
 	command, err := s.requestParser.determineCommand(&comment)
@@ -272,6 +335,14 @@ func (s *Server) executeCommand(ctx *ExecutionContext) {
 	default:
 		ctx.log.Err("failed to determine desired command, neither plan nor apply")
 	}
+}
+
+func (s *Server) isCommentCreatedEvent(event github.IssueCommentEvent) bool {
+	return event.Action != nil && *event.Action == "created" && event.Comment != nil
+}
+
+func (s *Server) isPullClosedEvent(event github.PullRequestEvent) bool {
+	return event.Action != nil && *event.Action == "closed" && event.PullRequest != nil
 }
 
 // recover logs and creates a comment on the pull request for panics
