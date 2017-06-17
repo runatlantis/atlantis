@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 )
 
-var defaultAtlantisURL = "http://localhost:4141/hooks"
+var defaultAtlantisURL = "http://localhost:4141"
 var projectTypes = []Project{
 	Project{"standalone", "run plan", "run apply"},
 	Project{"standalone-with-env", "run plan staging", "run apply staging"},
