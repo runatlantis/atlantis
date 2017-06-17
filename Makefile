@@ -16,7 +16,7 @@ debug: ## Output internal make variables
 	@echo WORKSPACE = $(WORKSPACE)
 
 deps:
-	go get .
+	go get -v .
 
 build-service: ## Build the main Go service
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o atlantis .
