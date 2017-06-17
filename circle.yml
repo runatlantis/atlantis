@@ -30,10 +30,10 @@ test:
   post:
     - cd "${WORKDIR}" && ./scripts/e2e-deps.sh
     # Start atlantis server
-    - cd "${WORKDIR}" && ./atlantis server --gh-user="$GITHUB_USERNAME" --gh-password="$GITHUB_PASSWORD" --data-dir="/tmp" --require-approval=false --s3-bucket="$ATLANTIS_S3_BUCKET_NAME" --log-level="debug" &> /tmp/atlantis-server.log:
+    - cd "${WORKDIR}/e2e" && ./atlantis server --gh-user="$GITHUB_USERNAME" --gh-password="$GITHUB_PASSWORD" --data-dir="/tmp" --require-approval=false --s3-bucket="$ATLANTIS_S3_BUCKET_NAME" --log-level="debug" &> /tmp/atlantis-server.log:
           background: true
     - sleep 2
-    - cd "${WORKDIR}" && ./ngrok http 4141:
+    - cd "${WORKDIR}/e2e" && ./ngrok http 4141:
           background: true
     - sleep 2
     # Set ATLANTIS_URL environment variable to be used by atlantis e2e test to create the webhook
