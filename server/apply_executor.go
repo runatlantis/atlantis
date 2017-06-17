@@ -316,3 +316,16 @@ func (a *ApplyExecutor) worstResult(results []PathResult) string {
 	}
 	return worst
 }
+
+type ExecutionPath struct {
+	// Absolute is the full path on the OS where we will execute.
+	// Will never end with a '/'.
+	Absolute string
+	// Relative is the path relative to the repo root.
+	// Will never end with a '/'.
+	Relative string
+}
+
+func NewExecutionPath(absolutePath string, relativePath string) ExecutionPath {
+	return ExecutionPath{filepath.Clean(absolutePath), filepath.Clean(relativePath)}
+}
