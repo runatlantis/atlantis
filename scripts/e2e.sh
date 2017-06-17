@@ -19,11 +19,9 @@ make test
 echo "Running 'make build'"
 make build
 
-# Set ATLANTIS_URL environment variable to be used by atlantis e2e test to create the webhook
-echo "Get the tunnel url"
-curl -s 'http://localhost:4040/api/tunnels' | jq -r '.tunnels[1].public_url'
-
-ATLANTIS_URL=$(curl -s 'http://localhost:4040/api/tunnels' | jq -r '.tunnels[1].public_url')
+    # Set ATLANTIS_URL environment variable to be used by atlantis e2e test to create the webhook
+echo 'export ATLANTIS_URL=$(curl -s 'http://localhost:4040/api/tunnels' | jq -r '.tunnels[1].public_url')' >> ~/.circlerc
+cat ~/.circlerc
 echo "ATLANTIS_URL="${ATLANTIS_URL}
 
 # Run e2e tests
