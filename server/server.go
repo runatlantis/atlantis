@@ -319,7 +319,7 @@ func (s *Server) handlePullClosedEvent(w http.ResponseWriter, pullEvent github.P
 func (s *Server) handleCommentCreatedEvent(w http.ResponseWriter, comment github.IssueCommentEvent, githubReqID string) {
 	// determine if the comment matches a plan or apply command
 	ctx := &CommandContext{}
-	command, err := s.requestParser.determineCommand(&comment)
+	command, err := s.requestParser.DetermineCommand(&comment)
 	if err != nil {
 		s.logger.Debug("Ignoring request: %v %s", err, githubReqID)
 		fmt.Fprintln(w, "Ignoring")
@@ -327,7 +327,7 @@ func (s *Server) handleCommentCreatedEvent(w http.ResponseWriter, comment github
 	}
 	ctx.Command = command
 
-	if err = s.requestParser.extractCommentData(&comment, ctx); err != nil {
+	if err = s.requestParser.ExtractCommentData(&comment, ctx); err != nil {
 		s.logger.Err("Failed parsing event: %v %s", err, githubReqID)
 		fmt.Fprintln(w, "Ignoring")
 		return
@@ -349,7 +349,7 @@ func (s *Server) executeCommand(ctx *CommandContext) {
 		ctx.Log.Err("pull request data api call failed: %v", err)
 		return
 	}
-	if err := s.requestParser.extractPullData(pull, ctx); err != nil {
+	if err := s.requestParser.ExtractPullData(pull, ctx); err != nil {
 		ctx.Log.Err("failed to extract required fields from comment data: %v", err)
 		return
 	}

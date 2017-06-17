@@ -24,7 +24,7 @@ type Command struct {
 	commandType CommandType
 }
 
-func (r *RequestParser) determineCommand(comment *github.IssueCommentEvent) (*Command, error) {
+func (r *RequestParser) DetermineCommand(comment *github.IssueCommentEvent) (*Command, error) {
 	// for legacy, also support "run" instead of atlantis
 	atlantisCommentRegex := `^(?:run|atlantis) (plan|apply|help)([[:blank:]])?([a-zA-Z0-9_-]+)?\s*(--verbose)?$`
 	runPlanMatcher := regexp.MustCompile(atlantisCommentRegex)
@@ -62,7 +62,7 @@ func (r *RequestParser) determineCommand(comment *github.IssueCommentEvent) (*Co
 	return command, nil
 }
 
-func (r *RequestParser) extractCommentData(comment *github.IssueCommentEvent, ctx *CommandContext) error {
+func (r *RequestParser) ExtractCommentData(comment *github.IssueCommentEvent, ctx *CommandContext) error {
 	repoFullName := comment.Repo.GetFullName()
 	if repoFullName == "" {
 		return errors.New("repository.full_name is null")
@@ -110,7 +110,7 @@ func (r *RequestParser) extractCommentData(comment *github.IssueCommentEvent, ct
 	return nil
 }
 
-func (r *RequestParser) extractPullData(pull *github.PullRequest, params *CommandContext) error {
+func (r *RequestParser) ExtractPullData(pull *github.PullRequest, params *CommandContext) error {
 	commit := pull.Head.GetSHA()
 	if commit == "" {
 		return errors.New("head.sha is null")
