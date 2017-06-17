@@ -14,7 +14,7 @@ import (
 	"strings"
 )
 
-// PlanExecutor handles everything related to running the Terraform plan including integration with S3, Terraform, and Github
+// PlanExecutor handles everything related to running the Terraform plan including integration with S3, Terraform, and GitHub
 type PlanExecutor struct {
 	github                *GithubClient
 	awsConfig             *AWSConfig

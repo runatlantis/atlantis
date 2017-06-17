@@ -24,7 +24,6 @@ import (
 	"github.com/urfave/cli"
 	"github.com/urfave/negroni"
 	"io/ioutil"
-	"path/filepath"
 	"time"
 )
 
@@ -34,7 +33,7 @@ const (
 	LockingDynamoDBBackend = "dynamodb"
 )
 
-// Server listens for Github webhooks and runs the necessary Atlantis command
+// Server listens for GitHub events and runs the necessary Atlantis command
 type Server struct {
 	router           *mux.Router
 	port             int
@@ -72,7 +71,6 @@ type ServerConfig struct {
 	LockingDynamoDBTable string `mapstructure:"locking-dynamodb-table"`
 }
 
-// todo: rename to Command
 type CommandContext struct {
 	Repo    models.Repo
 	Pull    models.PullRequest
@@ -94,18 +92,6 @@ type PathResult struct {
 	Result Templater
 }
 
-type ExecutionPath struct {
-	// Absolute is the full path on the OS where we will execute.
-	// Will never end with a '/'.
-	Absolute string
-	// Relative is the path relative to the repo root.
-	// Will never end with a '/'.
-	Relative string
-}
-
-func NewExecutionPath(absolutePath string, relativePath string) ExecutionPath {
-	return ExecutionPath{filepath.Clean(absolutePath), filepath.Clean(relativePath)}
-}
 
 type Templater interface {
 	Template() *CompiledTemplate
