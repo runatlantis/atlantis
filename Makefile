@@ -1,5 +1,6 @@
 BUILD_ID := $(shell git rev-parse --short HEAD 2>/dev/null || echo no-commit-id)
 WORKSPACE := $(shell pwd)
+PKG := $(shell go list ./... | grep -v e2e)
 
 .PHONY: test
 
@@ -14,18 +15,19 @@ debug: ## Output internal make variables
 	@echo BUILD_ID = $(BUILD_ID)
 	@echo IMAGE_NAME = $(IMAGE_NAME)
 	@echo WORKSPACE = $(WORKSPACE)
+	@echo PKG = $(PKG)
 
 deps:
-	go get -v $(go list ./... | grep -v e2e)
+	go get -v $(PKG)
 
 build-service: ## Build the main Go service
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o atlantis .
 
 deps-test:
-	go get -t $(go list ./... | grep -v e2e)
+	go get -t $(PKG)
 
 test: ## Run tests, coverage reports, and clean (coverage taints the compiled code)
-	go test -v $(go list ./... | grep -v e2e)
+	go test -v $(PKG)
 
 test-coverage:
 	go test -v ./... -coverprofile=c.out

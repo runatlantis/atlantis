@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 echo "Preparing to run e2e tests"
-mv atlantis e2e/
+mv atlantis ${WORKDIR}/e2e/
 
 # cd into e2e folder
 cd e2e/
