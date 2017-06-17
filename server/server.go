@@ -10,6 +10,11 @@ import (
 	"os"
 	"strings"
 
+<<<<<<< d425de95fa1f3ee312a8b569290932163bc93bf1
+=======
+	"io/ioutil"
+
+>>>>>>> Adding ci for atlantis
 	"github.com/elazarl/go-bindata-assetfs"
 	"github.com/google/go-github/github"
 	"github.com/gorilla/mux"
@@ -18,14 +23,20 @@ import (
 	"github.com/hootsuite/atlantis/locking/dynamodb"
 	"github.com/hootsuite/atlantis/logging"
 	"github.com/hootsuite/atlantis/middleware"
+<<<<<<< d425de95fa1f3ee312a8b569290932163bc93bf1
 	"github.com/hootsuite/atlantis/models"
+=======
+>>>>>>> Adding ci for atlantis
 	"github.com/hootsuite/atlantis/recovery"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	"github.com/urfave/negroni"
+<<<<<<< d425de95fa1f3ee312a8b569290932163bc93bf1
 	"io/ioutil"
 	"path/filepath"
 	"time"
+=======
+>>>>>>> Adding ci for atlantis
 )
 
 const (
@@ -72,6 +83,7 @@ type ServerConfig struct {
 	LockingDynamoDBTable string `mapstructure:"locking-dynamodb-table"`
 }
 
+<<<<<<< d425de95fa1f3ee312a8b569290932163bc93bf1
 // todo: rename to Command
 type CommandContext struct {
 	Repo    models.Repo
@@ -117,6 +129,24 @@ type GeneralError struct {
 
 func (g GeneralError) Template() *CompiledTemplate {
 	return GeneralErrorTmpl
+=======
+type ExecutionContext struct {
+	repoFullName      string
+	pullNum           int
+	requesterUsername string
+	requesterEmail    string
+	comment           string
+	repoSSHUrl        string
+	head              string
+	// commit base sha
+	base        string
+	pullLink    string
+	branch      string
+	htmlUrl     string
+	pullCreator string
+	command     *Command
+	log         *logging.SimpleLogger
+>>>>>>> Adding ci for atlantis
 }
 
 func NewServer(config ServerConfig) (*Server, error) {
@@ -313,6 +343,10 @@ func (s *Server) handlePullClosedEvent(w http.ResponseWriter, pullEvent github.P
 		fmt.Fprintf(w, "Error unlocking locks: %v\n", err)
 		return
 	}
+<<<<<<< d425de95fa1f3ee312a8b569290932163bc93bf1
+=======
+
+>>>>>>> Adding ci for atlantis
 	fmt.Fprintln(w, "Locks unlocked")
 }
 

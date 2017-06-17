@@ -1,0 +1,32 @@
+machine:
+  # Environment variables for build
+  environment:
+    TERRAFORM_VERSION: 0.8.8
+
+dependencies:
+  override:
+    # Install dependencies
+    - make deps
+
+test:
+  pre:
+    # Test dependencies
+    - make deps-test
+  
+  override:
+    # Run tests
+    - ./scripts/build.sh
+
+  # Run e2e tests
+  post:
+    - ./scripts/e2e-deps.sh
+    # Start atlantis server
+    - ./atlantis server --gh-user="$GITHUB_USERNAME" --gh-password="$GITHUB_PASSWORD" --data-dir="/tmp" --require-approval=false --s3-bucket="$ATLANTIS_S3_BUCKET_NAME" --log-level="debug" &> /tmp/atlantis-server.log:
+          background: true
+    - sleep 2
+    - ./ngrok http 4141:
+          background: true
+    - sleep 2
+    # Set ATLANTIS_URL environment variable to be used by atlantis e2e test to create the webhook
+    - echo 'export ATLANTIS_URL=$(curl -s 'http://localhost:4040/api/tunnels' | jq -r '.tunnels[1].public_url') ' >> ~/.circlerc
+    - ./scripts/e2e.sh
