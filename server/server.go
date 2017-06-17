@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"io/ioutil"
-	"path/filepath"
 	"time"
 
 	"github.com/elazarl/go-bindata-assetfs"
@@ -93,7 +92,6 @@ type PathResult struct {
 	Status string // todo: this should be an enum for success/error/failure
 	Result Templater
 }
-
 
 type Templater interface {
 	Template() *CompiledTemplate
