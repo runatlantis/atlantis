@@ -10,7 +10,7 @@ debug: ## Output internal make variables
 	@echo WORKSPACE = $(WORKSPACE)
 
 deps: ## Get go dependencies
-	go get .
+	go get -v .
 
 build: ## Build the main Go service
 	go build -v -o atlantis-tests .

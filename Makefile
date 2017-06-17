@@ -16,16 +16,16 @@ debug: ## Output internal make variables
 	@echo WORKSPACE = $(WORKSPACE)
 
 deps:
-	go get -v .
+	go get -v $(go list ./... | grep -v e2e)
 
 build-service: ## Build the main Go service
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o atlantis .
 
 deps-test:
-	go get -t
+	go get -t $(go list ./... | grep -v e2e)
 
 test: ## Run tests, coverage reports, and clean (coverage taints the compiled code)
-	go test -v ./...
+	go test -v $(go list ./... | grep -v e2e)
 
 test-coverage:
 	go test -v ./... -coverprofile=c.out
