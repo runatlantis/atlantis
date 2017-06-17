@@ -6,6 +6,10 @@ machine:
     TERRAFORM_VERSION: 0.8.8
 
 dependencies:
+  pre:
+    # remove old go files
+    - rm -rf "$GOPATH"
+
   override:
     # move repository to the canonical import path
     - mkdir -p "$(dirname ${WORKDIR})"
