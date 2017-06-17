@@ -19,9 +19,6 @@ make test
 echo "Running 'make build'"
 make build
 
-cat ~/.circlerc
-echo "ATLANTIS_URL="${ATLANTIS_URL}
-
 # Run e2e tests
 echo "Running e2e test: 'make run'"
 make run
