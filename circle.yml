@@ -36,4 +36,7 @@ test:
     - cd "${WORKDIR}" && ./ngrok http 4141:
           background: true
     - sleep 2
+    # Set ATLANTIS_URL environment variable to be used by atlantis e2e test to create the webhook
+    - echo '\n' >> ~/.circlerc
+    - echo 'export ATLANTIS_URL=$(curl -s 'http://localhost:4040/api/tunnels' | jq -r '.tunnels[1].public_url')' >> ~/.circlerc
     - cd "${WORKDIR}/e2e" && ../scripts/e2e.sh
