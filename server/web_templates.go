@@ -16,12 +16,12 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
   <link rel="stylesheet" href="/static/css/normalize.css">
   <link rel="stylesheet" href="/static/css/skeleton.css">
   <link rel="stylesheet" href="/static/css/custom.css">
-  <link rel="icon" type="image/png" href="/static/atlantis-icon.png">
+  <link rel="icon" type="image/png" href="/static/images/atlantis-icon.png">
 </head>
 <body>
 <div class="container">
   <section class="header">
-    <a title="atlantis" href="/"><img src="/static/atlantis-icon.png"/></a>
+    <a title="atlantis" href="/"><img src="/static/images/atlantis-icon.png"/></a>
     <p style="font-family: monospace, monospace; font-size: 1.1em; text-align: center;">atlantis</p>
   </section>
   <nav class="navbar">
@@ -38,7 +38,7 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
         <div class="list-title">{{.RepoFullName}} - <span class="heading-font-size">#{{.PullNum}}</span></div>
         <div class="list-unlock"><button class="unlock"><a class="unlock-link" href="{{.UnlockURL}}">Unlock</a></button></div>
         <div class="list-status"><code>Locked</code></div>
-        <div class="list-timestamp"><span class="heading-font-size">{{.Timestamp}}</span></div>
+        <div class="list-timestamp"><span class="heading-font-size">{{.Time}}</span></div>
       </div>
     {{ end }}
     {{ else }}

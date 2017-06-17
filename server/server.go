@@ -2,27 +2,30 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
-	"encoding/json"
 
-	"github.com/google/go-github/github"
-	"github.com/urfave/cli"
-	"github.com/hootsuite/atlantis/recovery"
-	"github.com/hootsuite/atlantis/locking"
-	"github.com/urfave/negroni"
-	"github.com/hootsuite/atlantis/middleware"
-	"github.com/hootsuite/atlantis/logging"
 	"github.com/elazarl/go-bindata-assetfs"
+	"github.com/google/go-github/github"
 	"github.com/gorilla/mux"
-	"github.com/pkg/errors"
-	"io/ioutil"
-	"github.com/hootsuite/atlantis/locking/dynamodb"
+	"github.com/hootsuite/atlantis/locking"
 	"github.com/hootsuite/atlantis/locking/boltdb"
+	"github.com/hootsuite/atlantis/locking/dynamodb"
+	"github.com/hootsuite/atlantis/logging"
+	"github.com/hootsuite/atlantis/middleware"
+	"github.com/hootsuite/atlantis/models"
+	"github.com/hootsuite/atlantis/recovery"
+	"github.com/pkg/errors"
+	"github.com/urfave/cli"
+	"github.com/urfave/negroni"
+	"io/ioutil"
+	"path/filepath"
+	"time"
 )
 
 const (
@@ -31,7 +34,7 @@ const (
 	LockingDynamoDBBackend = "dynamodb"
 )
 
-// WebhookServer listens for Github webhooks and runs the necessary Atlantis command
+// Server listens for Github webhooks and runs the necessary Atlantis command
 type Server struct {
 	router           *mux.Router
 	port             int
@@ -46,16 +49,16 @@ type Server struct {
 	logger           *logging.SimpleLogger
 	githubComments   *GithubCommentRenderer
 	requestParser    *RequestParser
-	lockingBackend   locking.Backend
+	lockingClient    *locking.Client
 	atlantisURL      string
 }
 
 // the mapstructure tags correspond to flags in cmd/server.go
 type ServerConfig struct {
-	GitHubHostname  string `mapstructure:"gh-hostname"`
-	GitHubUser      string `mapstructure:"gh-user"`
-	GitHubPassword  string `mapstructure:"gh-password"`
-	SSHKey          string `mapstructure:"ssh-key"`
+	GitHubHostname       string `mapstructure:"gh-hostname"`
+	GitHubUser           string `mapstructure:"gh-user"`
+	GitHubPassword       string `mapstructure:"gh-password"`
+	SSHKey               string `mapstructure:"ssh-key"`
 	AssumeRole           string `mapstructure:"aws-assume-role-arn"`
 	Port                 int    `mapstructure:"port"`
 	ScratchDir           string `mapstructure:"scratch-dir"`
@@ -69,22 +72,51 @@ type ServerConfig struct {
 	LockingDynamoDBTable string `mapstructure:"locking-dynamodb-table"`
 }
 
-type ExecutionContext struct {
-	repoFullName      string
-	pullNum           int
-	requesterUsername string
-	requesterEmail    string
-	comment           string
-	repoSSHUrl        string
-	head              string
-	// commit base sha
-	base              string
-	pullLink          string
-	branch            string
-	htmlUrl           string
-	pullCreator       string
-	command           *Command
-	log         *logging.SimpleLogger
+// todo: rename to Command
+type CommandContext struct {
+	Repo    models.Repo
+	Pull    models.PullRequest
+	User    models.User
+	Command *Command
+	Log     *logging.SimpleLogger
+}
+
+type ExecutionResult struct {
+	SetupError   Templater
+	SetupFailure Templater
+	PathResults  []PathResult
+	Command      CommandType
+}
+
+type PathResult struct {
+	Path   string
+	Status string // todo: this should be an enum for success/error/failure
+	Result Templater
+}
+
+type ExecutionPath struct {
+	// Absolute is the full path on the OS where we will execute.
+	// Will never end with a '/'.
+	Absolute string
+	// Relative is the path relative to the repo root.
+	// Will never end with a '/'.
+	Relative string
+}
+
+func NewExecutionPath(absolutePath string, relativePath string) ExecutionPath {
+	return ExecutionPath{filepath.Clean(absolutePath), filepath.Clean(relativePath)}
+}
+
+type Templater interface {
+	Template() *CompiledTemplate
+}
+
+type GeneralError struct {
+	Error error
+}
+
+func (g GeneralError) Template() *CompiledTemplate {
+	return GeneralErrorTmpl
 }
 
 func NewServer(config ServerConfig) (*Server, error) {
@@ -108,34 +140,42 @@ func NewServer(config ServerConfig) (*Server, error) {
 		AWSRegion:  config.AWSRegion,
 		AWSRoleArn: config.AssumeRole,
 	}
-	var lockingBackend locking.Backend
+	var lockingClient *locking.Client
 	if config.LockingBackend == LockingDynamoDBBackend {
 		session, err := awsConfig.CreateAWSSession()
 		if err != nil {
 			return nil, errors.Wrap(err, "creating aws session for DynamoDB")
 		}
-		lockingBackend = dynamodb.New(config.LockingDynamoDBTable, session)
+		lockingClient = locking.NewClient(dynamodb.New(config.LockingDynamoDBTable, session))
 	} else {
-		var err error
-		lockingBackend, err = boltdb.New(config.DataDir)
+		backend, err := boltdb.New(config.DataDir)
 		if err != nil {
 			return nil, err
 		}
+		lockingClient = locking.NewClient(backend)
 	}
-	baseExecutor := BaseExecutor{
+	applyExecutor := &ApplyExecutor{
 		github:                githubClient,
 		awsConfig:             awsConfig,
 		scratchDir:            config.ScratchDir,
 		s3Bucket:              config.S3Bucket,
 		sshKey:                config.SSHKey,
-		ghComments:            githubComments,
 		terraform:             terraformClient,
 		githubCommentRenderer: githubComments,
-		lockingBackend:        lockingBackend,
+		lockingClient:         lockingClient,
+		requireApproval:       config.RequireApproval,
 	}
-	applyExecutor := &ApplyExecutor{BaseExecutor: baseExecutor, requireApproval: config.RequireApproval, atlantisGithubUser: config.GitHubUser}
-	planExecutor := &PlanExecutor{BaseExecutor: baseExecutor}
-	helpExecutor := &HelpExecutor{BaseExecutor: baseExecutor}
+	planExecutor := &PlanExecutor{
+		github:                githubClient,
+		awsConfig:             awsConfig,
+		scratchDir:            config.ScratchDir,
+		s3Bucket:              config.S3Bucket,
+		sshKey:                config.SSHKey,
+		terraform:             terraformClient,
+		githubCommentRenderer: githubComments,
+		lockingClient:         lockingClient,
+	}
+	helpExecutor := &HelpExecutor{}
 	logger := logging.NewSimpleLogger("server", log.New(os.Stderr, "", log.LstdFlags), false, logging.ToLogLevel(config.LogLevel))
 	router := mux.NewRouter()
 	return &Server{
@@ -152,7 +192,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 		logger:           logger,
 		githubComments:   githubComments,
 		requestParser:    &RequestParser{},
-		lockingBackend:   lockingBackend,
+		lockingClient:    lockingClient,
 		atlantisURL:      config.AtlantisURL,
 	}, nil
 }
@@ -172,7 +212,7 @@ func (s *Server) Start() error {
 
 	// function that planExecutor can use to construct delete lock urls
 	// injecting this here because this is the earliest routes are created
-	s.planExecutor.DeleteLockURL = func (lockID string) string {
+	s.planExecutor.DeleteLockURL = func(lockID string) string {
 		// ignoring error since guaranteed to succeed if "id" is specified
 		u, _ := deleteLockRoute.URL("id", url.QueryEscape(lockID))
 		return s.atlantisURL + u.RequestURI()
@@ -189,23 +229,27 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) index(w http.ResponseWriter, r *http.Request) {
-	locks, err := s.lockingBackend.ListLocks()
+	locks, err := s.lockingClient.List()
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		fmt.Fprintf(w, "Could not retrieve locks: %s", err)
 		return
 	}
 
-	type runLock struct {
-		locking.Run
-		UnlockURL string
+	type lock struct {
+		UnlockURL    string
+		RepoFullName string
+		PullNum      int
+		Time         time.Time
 	}
-	var results []runLock
+	var results []lock
 	for id, v := range locks {
 		u, _ := s.router.Get(deleteLockRoute).URL("id", url.QueryEscape(id))
-		results = append(results, runLock{
-			v,
-			u.String(),
+		results = append(results, lock{
+			UnlockURL:    u.String(),
+			RepoFullName: v.Project.RepoFullName,
+			PullNum:      v.PullNum,
+			Time:         v.Time,
 		})
 	}
 	indexTemplate.Execute(w, results)
@@ -222,7 +266,7 @@ func (s *Server) deleteLock(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprint(w, "invalid lock id")
 	}
-	if err := s.lockingBackend.Unlock(idUnencoded); err != nil {
+	if err := s.lockingClient.Unlock(idUnencoded); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, "Failed to unlock: %s", err)
 		return
@@ -238,7 +282,7 @@ func (s *Server) postHooks(w http.ResponseWriter, r *http.Request) {
 	bytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w,"could not read body: %s\n", err)
+		fmt.Fprintf(w, "could not read body: %s\n", err)
 		return
 	}
 
@@ -261,42 +305,27 @@ func (s *Server) postHooks(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handlePullClosedEvent(w http.ResponseWriter, pullEvent github.PullRequestEvent, githubReqID string) {
 	repo := *pullEvent.Repo.FullName
 	pullNum := *pullEvent.PullRequest.Number
-	locks, err := s.lockingBackend.FindLocksForPull(repo, pullNum)
+	s.logger.Debug("Unlocking locks for repo %s and pull %d %s", repo, pullNum, githubReqID)
+	err := s.lockingClient.UnlockByPull(repo, pullNum)
 	if err != nil {
-		s.logger.Err("finding locks for repo %s pull %d: %s", repo, pullNum, err)
+		s.logger.Err("unlocking locks for repo %s pull %d: %v", repo, pullNum, err)
 		w.WriteHeader(http.StatusServiceUnavailable)
-		fmt.Fprintf(w, "Error finding locks: %s\n", err)
+		fmt.Fprintf(w, "Error unlocking locks: %v\n", err)
 		return
 	}
-
-	s.logger.Debug("Unlocking locks %v %s", locks, githubReqID)
-	var errors []error
-	for _, l := range locks {
-		if err := s.lockingBackend.Unlock(l); err != nil {
-			errors = append(errors, err)
-		}
-	}
-
-	if len(errors) != 0 {
-		s.logger.Err("unlocking locks for repo %s pull %d: %v", repo, pullNum, errors)
-		w.WriteHeader(http.StatusServiceUnavailable)
-		fmt.Fprintf(w, "Error unlocking locks: %v\n", errors)
-		return
-	}
-
-	fmt.Fprintln(w,"Locks unlocked")
+	fmt.Fprintln(w, "Locks unlocked")
 }
 
 func (s *Server) handleCommentCreatedEvent(w http.ResponseWriter, comment github.IssueCommentEvent, githubReqID string) {
 	// determine if the comment matches a plan or apply command
-	ctx := &ExecutionContext{}
+	ctx := &CommandContext{}
 	command, err := s.requestParser.determineCommand(&comment)
 	if err != nil {
 		s.logger.Debug("Ignoring request: %v %s", err, githubReqID)
 		fmt.Fprintln(w, "Ignoring")
 		return
 	}
-	ctx.command = command
+	ctx.Command = command
 
 	if err = s.requestParser.extractCommentData(&comment, ctx); err != nil {
 		s.logger.Err("Failed parsing event: %v %s", err, githubReqID)
@@ -308,32 +337,32 @@ func (s *Server) handleCommentCreatedEvent(w http.ResponseWriter, comment github
 	go s.executeCommand(ctx)
 }
 
-func (s *Server) executeCommand(ctx *ExecutionContext) {
-	src := fmt.Sprintf("%s/pull/%d", ctx.repoFullName, ctx.pullNum)
+func (s *Server) executeCommand(ctx *CommandContext) {
+	src := fmt.Sprintf("%s/pull/%d", ctx.Repo.FullName, ctx.Pull.Num)
 	// it's safe to reuse the underlying logger s.logger.Log
-	ctx.log = logging.NewSimpleLogger(src, s.logger.Log, true, s.logger.Level)
+	ctx.Log = logging.NewSimpleLogger(src, s.logger.Log, true, s.logger.Level)
 	defer s.recover(ctx)
 
 	// we've got data from the comment, now we need to get data from the actual PR
-	pull, _, err := s.githubClient.GetPullRequest(ctx.repoFullName, ctx.pullNum)
+	pull, _, err := s.githubClient.GetPullRequest(ctx.Repo, ctx.Pull.Num)
 	if err != nil {
-		ctx.log.Err("pull request data api call failed: %v", err)
+		ctx.Log.Err("pull request data api call failed: %v", err)
 		return
 	}
 	if err := s.requestParser.extractPullData(pull, ctx); err != nil {
-		ctx.log.Err("failed to extract required fields from comment data: %v", err)
+		ctx.Log.Err("failed to extract required fields from comment data: %v", err)
 		return
 	}
 
-	switch ctx.command.commandType {
+	switch ctx.Command.commandType {
 	case Plan:
-		s.planExecutor.Exec(s.planExecutor.execute, ctx, s.githubClient)
+		s.planExecutor.execute(ctx, s.githubClient)
 	case Apply:
-		s.applyExecutor.Exec(s.applyExecutor.execute, ctx, s.githubClient)
+		s.applyExecutor.execute(ctx, s.githubClient)
 	case Help:
 		s.helpExecutor.execute(ctx, s.githubClient)
 	default:
-		ctx.log.Err("failed to determine desired command, neither plan nor apply")
+		ctx.Log.Err("failed to determine desired command, neither plan nor apply")
 	}
 }
 
@@ -346,11 +375,10 @@ func (s *Server) isPullClosedEvent(event github.PullRequestEvent) bool {
 }
 
 // recover logs and creates a comment on the pull request for panics
-func (s *Server) recover(ctx *ExecutionContext) {
+func (s *Server) recover(ctx *CommandContext) {
 	if err := recover(); err != nil {
-		ghCtx := s.planExecutor.githubContext(ctx) // this won't have every field but it has the ones needed by CreateComment
 		stack := recovery.Stack(3)
-		s.githubClient.CreateComment(ghCtx, fmt.Sprintf("**Error: goroutine panic. This is a bug.**\n```\n%s\n%s```", err, stack))
-		ctx.log.Err("PANIC: %s\n%s", err, stack)
+		s.githubClient.CreateComment(ctx, fmt.Sprintf("**Error: goroutine panic. This is a bug.**\n```\n%s\n%s```", err, stack))
+		ctx.Log.Err("PANIC: %s\n%s", err, stack)
 	}
 }

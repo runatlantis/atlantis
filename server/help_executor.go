@@ -2,12 +2,10 @@ package server
 
 import "github.com/spf13/viper"
 
-type HelpExecutor struct {
-	BaseExecutor
-}
+type HelpExecutor struct{}
 
 var helpComment = "```cmake\n" +
-`atlantis - Terraform collaboration tool that enables you to collaborate on infrastructure
+	`atlantis - Terraform collaboration tool that enables you to collaborate on infrastructure
 safely and securely. (v` + viper.GetString("version") + `)
 
 Usage: atlantis <command> [environment] [--verbose]
@@ -32,18 +30,8 @@ atlantis apply staging
 atlantis apply
 `
 
-func (h *HelpExecutor) execute(ctx *ExecutionContext, github *GithubClient) {
-	pullCtx := &PullRequestContext{
-		repoFullName:          ctx.repoFullName,
-		head:                  ctx.head,
-		base:                  ctx.base,
-		number:                ctx.pullNum,
-		pullRequestLink:       ctx.pullLink,
-		terraformApplier:      ctx.requesterUsername,
-		terraformApplierEmail: ctx.requesterEmail,
-	}
-	github.CreateComment(pullCtx, helpComment)
-
-	ctx.log.Info("generating help comment....")
+func (h *HelpExecutor) execute(ctx *CommandContext, github *GithubClient) {
+	ctx.Log.Info("generating help comment....")
+	github.CreateComment(ctx, helpComment)
 	return
 }

@@ -1,10 +1,10 @@
 package server
 
 import (
+	. "github.com/hootsuite/atlantis/testing_util"
 	"io/ioutil"
 	"os"
 	"testing"
-	. "github.com/hootsuite/atlantis/testing_util"
 )
 
 var tempConfigFile = "/tmp/" + AtlantisConfigFile

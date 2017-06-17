@@ -1,11 +1,11 @@
 package server
 
 import (
+	"github.com/hootsuite/atlantis/logging"
+	. "github.com/hootsuite/atlantis/testing_util"
 	"log"
 	"os"
 	"testing"
-	. "github.com/hootsuite/atlantis/testing_util"
-	"github.com/hootsuite/atlantis/logging"
 )
 
 var level logging.LogLevel = logging.Info

@@ -1,40 +1,41 @@
 package server
 
 import (
-	"reflect"
+	"github.com/hootsuite/atlantis/models"
+	. "github.com/hootsuite/atlantis/testing_util"
 	"testing"
 )
 
-func TestDetermineExecPaths(t *testing.T) {
-	runTest(t, "should handle empty plan paths", "/repoPath", []string{}, []ExecutionPath{})
-	runTest(t, "should extract path and append to repoPath", "/repoPath", []string{"a/b/c.ext"}, []ExecutionPath{{"/repoPath/a/b", "a/b"}})
-	runTest(t, "should return repoPath if at root", "/repoPath", []string{"a.ext"}, []ExecutionPath{{"/repoPath", "."}})
-	runTest(t, "should handle repoPath with trailing slash", "/repoPath/", []string{"a.ext"}, []ExecutionPath{{"/repoPath", "."}})
-	runTest(t, "should set plan dir one level up from env/ directories", "/repoPath/", []string{"env/a.ext"}, []ExecutionPath{{"/repoPath", "."}})
-	runTest(t, "should set plan dir one level up from env/ directories and deduplicate plans.", "/repoPath/", []string{"env/a.ext", "b.ext"}, []ExecutionPath{{"/repoPath", "."}})
-	runTest(t, "should de-depluciate", "/repoPath/", []string{"a/b/c.ext", "a/b/d.ext"}, []ExecutionPath{{"/repoPath/a/b", "a/b"}})
+var p PlanExecutor
+
+func TestModifiedProjects(t *testing.T) {
+	runTest(t, "should handle no files modified", []string{}, []string{})
+	runTest(t, "should handle files at root", []string{"root.tf"}, []string{"."})
+	runTest(t, "should de-duplicate files at root", []string{"root1.tf", "root2.tf"}, []string{"."})
+	runTest(t, "should handle sub directories", []string{"sub/dir/file.tf"}, []string{"sub/dir"})
+	runTest(t, "should de-duplicate files in sub directories", []string{"sub/dir/file.tf", "sub/dir/file2.tf"}, []string{"sub/dir"})
+	runTest(t, "should handle nested sub directories", []string{"root.tf", "sub/child.tf", "sub/sub/child.tf"}, []string{".", "sub", "sub/sub"})
+	runTest(t, "should use parent of env/ dirs", []string{"env/env.tf"}, []string{"."})
+	runTest(t, "should use parent of env/ dirs in sub dirs", []string{"sub/env/env.tf"}, []string{"sub"})
 }
 
-func runTest(t *testing.T, testDescrip string, repoPath string, filesChanged []string, expected []ExecutionPath) {
-	p := PlanExecutor{}
-	plans := p.DetermineExecPaths(repoPath, filesChanged)
-	if !reflect.DeepEqual(expected, plans) {
-		t.Errorf("%s: expected %v, got %v", testDescrip, expected, plans)
+func runTest(t *testing.T, testDescrip string, filesChanged []string, expectedPaths []string) {
+	projects := p.ModifiedProjects("owner/repo", filesChanged)
+	for i, p := range projects {
+		t.Log(testDescrip)
+		Equals(t, expectedPaths[i], p.Path)
 	}
 }
 
 func TestGenerateOutputFilename(t *testing.T) {
-	runTestGetOutputFilename(t, "should handle empty plan path", "/repoPath", NewExecutionPath("", ""), "env", ".tfplan.env")
-	runTestGetOutputFilename(t, "should handle empty environment", "/repoPath", NewExecutionPath("", ""), "", ".tfplan")
-	runTestGetOutputFilename(t, "should prepend underscore on relative paths", "/repoPath", NewExecutionPath("", "a/b"), "", "_a_b.tfplan")
-	runTestGetOutputFilename(t, "should work with relative path and environment", "/repoPath", NewExecutionPath("", "a/b"), "env", "_a_b.tfplan.env")
-	runTestGetOutputFilename(t, "should exec path at root", "/a/b", NewExecutionPath("", "."), "env", ".tfplan.env")
+	runTestGetOutputFilename(t, "should handle root", ".", "env", ".tfplan.env")
+	runTestGetOutputFilename(t, "should handle empty environment", ".", "", ".tfplan")
+	runTestGetOutputFilename(t, "should prepend underscore on relative paths", "a/b", "", "_a_b.tfplan")
+	runTestGetOutputFilename(t, "should prepend underscore on relative paths and env", "a/b", "env", "_a_b.tfplan.env")
 }
 
-func runTestGetOutputFilename(t *testing.T, testDescrip string, repoPath string, tfPlanPath ExecutionPath, tfEnvName string, expected string) {
-	p := PlanExecutor{}
-	outputFileName := p.GenerateOutputFilename(repoPath, tfPlanPath, tfEnvName)
-	if !reflect.DeepEqual(expected, outputFileName) {
-		t.Errorf("%s: expected %v, got %v", testDescrip, expected, outputFileName)
-	}
+func runTestGetOutputFilename(t *testing.T, testDescrip string, path string, env string, expected string) {
+	t.Log(testDescrip)
+	outputFileName := p.GenerateOutputFilename(models.NewProject("owner/repo", path), env)
+	Equals(t, expected, outputFileName)
 }

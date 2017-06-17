@@ -14,13 +14,20 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/hootsuite/atlantis/locking"
-	"time"
+	"github.com/hootsuite/atlantis/models"
+	"strconv"
 )
 
 type ApplyExecutor struct {
-	BaseExecutor
-	requireApproval    bool
-	atlantisGithubUser string
+	github                *GithubClient
+	awsConfig             *AWSConfig
+	scratchDir            string
+	s3Bucket              string
+	sshKey                string
+	terraform             *TerraformClient
+	githubCommentRenderer *GithubCommentRenderer
+	lockingClient         *locking.Client
+	requireApproval       bool
 }
 
 /** Result Types **/
@@ -54,82 +61,85 @@ func (n NoPlansFailure) Template() *CompiledTemplate {
 	return NoPlansFailureTmpl
 }
 
-func (a *ApplyExecutor) execute(ctx *ExecutionContext, pullCtx *PullRequestContext) ExecutionResult {
-	res := a.setupAndApply(ctx, pullCtx)
+func (a *ApplyExecutor) execute(ctx *CommandContext, github *GithubClient) {
+	res := a.setupAndApply(ctx)
 	res.Command = Apply
-	return res
+	comment := a.githubCommentRenderer.render(res, ctx.Log.History.String(), ctx.Command.verbose)
+	github.CreateComment(ctx, comment)
 }
 
-func (a *ApplyExecutor) setupAndApply(ctx *ExecutionContext, pullCtx *PullRequestContext) ExecutionResult {
-	a.github.UpdateStatus(pullCtx, PendingStatus, "Applying...")
+func (a *ApplyExecutor) setupAndApply(ctx *CommandContext) ExecutionResult {
+	a.github.UpdateStatus(ctx.Repo, ctx.Pull, PendingStatus, "Applying...")
 
 	if a.requireApproval {
-		ok, err := a.github.PullIsApproved(pullCtx)
+		ok, err := a.github.PullIsApproved(ctx.Repo, ctx.Pull)
 		if err != nil {
 			msg := fmt.Sprintf("failed to determine if pull request was approved: %v", err)
-			ctx.log.Err(msg)
-			a.github.UpdateStatus(pullCtx, ErrorStatus, "Apply Error")
+			ctx.Log.Err(msg)
+			a.github.UpdateStatus(ctx.Repo, ctx.Pull, ErrorStatus, "Apply Error")
 			return ExecutionResult{SetupError: GeneralError{errors.New(msg)}}
 		}
 		if !ok {
-			ctx.log.Info("pull request was not approved")
-			a.github.UpdateStatus(pullCtx, FailureStatus, "Apply Failed")
+			ctx.Log.Info("pull request was not approved")
+			a.github.UpdateStatus(ctx.Repo, ctx.Pull, FailureStatus, "Apply Failed")
 			return ExecutionResult{SetupFailure: PullNotApprovedFailure{}}
 		}
 	}
 
-	planPaths, err := a.downloadPlans(ctx.repoFullName, ctx.pullNum, ctx.command.environment, a.scratchDir, a.awsConfig, a.s3Bucket)
+	planPaths, err := a.downloadPlans(ctx.Repo.FullName, ctx.Pull.Num, ctx.Command.environment, a.scratchDir, a.awsConfig, a.s3Bucket)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to download plans: %v", err)
-		ctx.log.Err(errMsg)
-		a.github.UpdateStatus(pullCtx, ErrorStatus, "Apply Error")
+		ctx.Log.Err(errMsg)
+		a.github.UpdateStatus(ctx.Repo, ctx.Pull, ErrorStatus, "Apply Error")
 		return ExecutionResult{SetupError: GeneralError{errors.New(errMsg)}}
 	}
 
 	// If there are no plans found for the pull request
 	if len(planPaths) == 0 {
 		failure := "found 0 plans for this pull request"
-		ctx.log.Warn(failure)
-		a.github.UpdateStatus(pullCtx, FailureStatus, "Apply Failure")
+		ctx.Log.Warn(failure)
+		a.github.UpdateStatus(ctx.Repo, ctx.Pull, FailureStatus, "Apply Failure")
 		return ExecutionResult{SetupFailure: NoPlansFailure{}}
 	}
 
 	//runLog = append(runLog, fmt.Sprintf("-> Downloaded plans: %v", planPaths))
 	applyOutputs := []PathResult{}
 	for _, planPath := range planPaths {
-		output := a.apply(ctx, pullCtx, planPath)
+		output := a.apply(ctx, planPath)
 		output.Path = planPath
 		applyOutputs = append(applyOutputs, output)
 	}
-	a.updateGithubStatus(pullCtx, applyOutputs)
+	a.updateGithubStatus(ctx, applyOutputs)
 	return ExecutionResult{PathResults: applyOutputs}
 }
 
-func (a *ApplyExecutor) apply(ctx *ExecutionContext, pullCtx *PullRequestContext, planPath string) PathResult {
-	//runLog = append(runLog, fmt.Sprintf("-> Running apply %s", planPath))
+func (a *ApplyExecutor) apply(ctx *CommandContext, planPath string) PathResult {
 	planName := path.Base(planPath)
-	planSubDir := a.determinePlanSubDir(planName, ctx.pullNum)
-	planDir := filepath.Join(a.scratchDir, ctx.repoFullName, fmt.Sprintf("%v", ctx.pullNum), planSubDir)
+	planSubDir := a.determinePlanSubDir(planName, ctx.Pull.Num)
+	// todo: don't assume repo is cloned here
+	repoDir := filepath.Join(a.scratchDir, ctx.Repo.FullName, strconv.Itoa(ctx.Pull.Num))
+	planDir := filepath.Join(repoDir, planSubDir)
+	project := models.NewProject(ctx.Repo.FullName, planSubDir)
 	execPath := NewExecutionPath(planDir, planSubDir)
 	var config Config
 	var remoteStatePath string
 	// check if config file is found, if not we continue the run
 	if config.Exists(execPath.Absolute) {
-		ctx.log.Info("Config file found in %s", execPath.Absolute)
+		ctx.Log.Info("Config file found in %s", execPath.Absolute)
 		err := config.Read(execPath.Absolute)
 		if err != nil {
 			msg := fmt.Sprintf("Error reading config file: %v", err)
-			ctx.log.Err(msg)
+			ctx.Log.Err(msg)
 			return PathResult{
 				Status: "error",
 				Result: GeneralError{errors.New(msg)},
 			}
 		}
 		// need to use the remote state path and backend to do remote configure
-		err = PreRun(&config, ctx.log, execPath.Absolute, ctx.command)
+		err = PreRun(&config, ctx.Log, execPath.Absolute, ctx.Command)
 		if err != nil {
 			msg := fmt.Sprintf("pre run failed: %v", err)
-			ctx.log.Err(msg)
+			ctx.Log.Err(msg)
 			return PathResult{
 				Status: "error",
 				Result: GeneralError{errors.New(msg)},
@@ -146,10 +156,10 @@ func (a *ApplyExecutor) apply(ctx *ExecutionContext, pullCtx *PullRequestContext
 	// NOTE: THIS CODE IS TO SUPPORT TERRAFORM PROJECTS THAT AREN'T USING ATLANTIS CONFIG FILE.
 	if config.StashPath == "" {
 		// configure remote state
-		statePath, err := a.terraform.ConfigureRemoteState(ctx.log, execPath, ctx.command.environment, a.sshKey)
+		statePath, err := a.terraform.ConfigureRemoteState(ctx.Log, repoDir, project, ctx.Command.environment, a.sshKey)
 		if err != nil {
 			msg := fmt.Sprintf("failed to set up remote state: %v", err)
-			ctx.log.Err(msg)
+			ctx.Log.Err(msg)
 			return PathResult{
 				Status: "error",
 				Result: GeneralError{errors.New(msg)},
@@ -158,72 +168,62 @@ func (a *ApplyExecutor) apply(ctx *ExecutionContext, pullCtx *PullRequestContext
 		remoteStatePath = statePath
 	} else {
 		// use state path from config file
-		remoteStatePath = generateStatePath(config.StashPath, ctx.command.environment)
+		remoteStatePath = generateStatePath(config.StashPath, ctx.Command.environment)
 	}
 
 	if remoteStatePath != "" {
-		tfEnv := ctx.command.environment
+		tfEnv := ctx.Command.environment
 		if tfEnv == "" {
 			tfEnv = "default"
 		}
-		run := locking.Run{
-			RepoFullName: pullCtx.repoFullName,
-			Path: execPath.Relative,
-			Env: tfEnv,
-			PullNum: pullCtx.number,
-			User: pullCtx.terraformApplier,
-			Timestamp: time.Now(),
-		}
 
-		lockAttempt, err := a.lockingBackend.TryLock(run)
+		lockAttempt, err := a.lockingClient.TryLock(project, tfEnv, ctx.Pull.Num)
 		if err != nil {
 			return PathResult{
 				Status: "error",
 				Result: GeneralError{fmt.Errorf("failed to acquire lock: %s", err)},
 			}
 		}
-		if lockAttempt.LockAcquired != true && lockAttempt.LockingRun.PullNum != pullCtx.number {
+		if lockAttempt.LockAcquired != true && lockAttempt.LockingPullNum != ctx.Pull.Num {
 			return PathResult{
 				Status: "error",
-				Result: GeneralError{fmt.Errorf("failed to acquire lock: lock held by pull request #%d", lockAttempt.LockingRun.PullNum)},
+				Result: GeneralError{fmt.Errorf("failed to acquire lock: lock held by pull request #%d", lockAttempt.LockingPullNum)},
 			}
 		}
 	}
 
 	// need to get auth data from assumed role
 	// todo: de-duplicate calls to assumeRole
-	//runLog = append(runLog, "-> Assuming role prior to running apply")
-	a.awsConfig.AWSSessionName = ctx.pullCreator
+	a.awsConfig.AWSSessionName = ctx.User.Username
 	awsSession, err := a.awsConfig.CreateAWSSession()
 	if err != nil {
-		ctx.log.Err(err.Error())
+		ctx.Log.Err(err.Error())
 		return PathResult{
 			Status: "error",
 			Result: GeneralError{err},
 		}
 	}
-	//runLog = append(runLog, "-> Assumed AWS role successfully")
 
 	credVals, err := awsSession.Config.Credentials.Get()
 	if err != nil {
 		msg := fmt.Sprintf("failed to get assumed role credentials: %v", err)
-		ctx.log.Err(msg)
+		ctx.Log.Err(msg)
 		return PathResult{
 			Status: "error",
 			Result: GeneralError{errors.New(msg)},
 		}
 	}
 
-	ctx.log.Info("running apply from %q", execPath.Relative)
+	ctx.Log.Info("running apply from %q", execPath.Relative)
 
-	terraformApplyCmdArgs, output, err := a.terraform.RunTerraformCommand(execPath, []string{"apply", "-no-color", planPath}, []string{
+	terraformApplyCmdArgs, output, err := a.terraform.RunTerraformCommand(execPath.Absolute, []string{"apply", "-no-color", planPath}, []string{
 		fmt.Sprintf("AWS_ACCESS_KEY_ID=%s", credVals.AccessKeyID),
 		fmt.Sprintf("AWS_SECRET_ACCESS_KEY=%s", credVals.SecretAccessKey),
 		fmt.Sprintf("AWS_SESSION_TOKEN=%s", credVals.SessionToken),
 	})
 	//runLog = append(runLog, "```\n Apply output:\n", fmt.Sprintf("```bash\n%s\n", string(out[:])))
 	if err != nil {
-		ctx.log.Err("failed to apply: %v %s", err, output)
+		ctx.Log.Err("failed to apply: %v %s", err, output)
 		return PathResult{
 			Status: "failure",
 			Result: ApplyFailure{Command: strings.Join(terraformApplyCmdArgs, " "), Output: output, ErrorMessage: err.Error()},
@@ -291,4 +291,28 @@ func (a *ApplyExecutor) determinePlanSubDir(planName string, pullNum int) string
 	}
 	dirsStr := match[1] // in form dir_subdir_subsubdir
 	return filepath.Clean(strings.Replace(dirsStr, "_", "/", -1))
+}
+
+func (a *ApplyExecutor) updateGithubStatus(ctx *CommandContext, pathResults []PathResult) {
+	// the status will be the worst result
+	worstResult := a.worstResult(pathResults)
+	if worstResult == "success" {
+		a.github.UpdateStatus(ctx.Repo, ctx.Pull, SuccessStatus, "Apply Succeeded")
+	} else if worstResult == "failure" {
+		a.github.UpdateStatus(ctx.Repo, ctx.Pull, FailureStatus, "Apply Failed")
+	} else {
+		a.github.UpdateStatus(ctx.Repo, ctx.Pull, ErrorStatus, "Apply Error")
+	}
+}
+
+func (a *ApplyExecutor) worstResult(results []PathResult) string {
+	var worst string = "success"
+	for _, result := range results {
+		if result.Status == "error" {
+			return result.Status
+		} else if result.Status == "failure" {
+			worst = result.Status
+		}
+	}
+	return worst
 }

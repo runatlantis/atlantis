@@ -26,9 +26,9 @@ const (
 
 func NewSimpleLogger(source string, log *log.Logger, keepHistory bool, level LogLevel) *SimpleLogger {
 	return &SimpleLogger{
-		Source: source,
-		Log:    log,
-		Level:  level,
+		Source:      source,
+		Log:         log,
+		Level:       level,
 		KeepHistory: keepHistory,
 	}
 }

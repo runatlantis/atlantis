@@ -48,6 +48,7 @@ func NewS3Client(awsConfig *AWSConfig, bucketName string, prefix string) S3Clien
 	return _s3.GetS3Info()
 }
 
+// todo: make OO
 func UploadPlanFile(s S3Client, key string, outputFilePath string) error {
 	file, err := os.Open(outputFilePath)
 	if err != nil {
@@ -75,7 +76,7 @@ func UploadPlanFile(s S3Client, key string, outputFilePath string) error {
 		ContentLength: aws.Int64(size),
 		ContentType:   aws.String(fileType),
 		Metadata: map[string]*string{
-			"Key": aws.String("MetadataValue"), //required
+			"Key": aws.String("MetadataValue"), //required //todo: I don't think this is required
 		},
 	}
 

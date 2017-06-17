@@ -1,18 +1,16 @@
 package dynamodb
 
 import (
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/aws/client"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/pkg/errors"
-	"encoding/json"
 	"fmt"
-	"encoding/hex"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
-	"time"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/client"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
+	"github.com/hootsuite/atlantis/models"
+	"github.com/pkg/errors"
 	"strconv"
-	"github.com/hootsuite/atlantis/locking"
+	"time"
 )
 
 type Backend struct {
@@ -20,104 +18,114 @@ type Backend struct {
 	LockTable string
 }
 
-type dynamoRun struct {
-	LockID       string
+// dynamoLock duplicates the fields of models.ProjectLock and adds LocksKey
+// so everything is a top-level field for serialization and then querying
+// in DynamodB and also so any changes to models.ProjectLock won't affect
+// how we're storing our data or will at least cause a compile error
+type dynamoLock struct {
+	LockKey      string
 	RepoFullName string
 	Path         string
-	Env          string
 	PullNum      int
-	User         string
-	Timestamp    time.Time
+	Env          string
+	Time         time.Time
 }
 
-func New(lockTable string, p client.ConfigProvider) *Backend {
-	return &Backend{
+func New(lockTable string, p client.ConfigProvider) Backend {
+	return Backend{
 		DB:        dynamodb.New(p),
 		LockTable: lockTable,
 	}
 }
 
-func (d *Backend) TryLock(run locking.Run) (locking.TryLockResponse, error) {
-	var r locking.TryLockResponse
-	newRunSerialized, err := d.toDynamoItem(run)
+func (b Backend) key(project models.Project, env string) string {
+	return fmt.Sprintf("%s/%s/%s", project.RepoFullName, project.Path, env)
+}
+
+func (b Backend) TryLock(project models.Project, env string, pullNum int) (bool, int, error) {
+	key := b.key(project, env)
+	newDynamoLock := dynamoLock{
+		LockKey:      key,
+		RepoFullName: project.RepoFullName,
+		Path:         project.Path,
+		PullNum:      pullNum,
+		Env:          env,
+		Time:         time.Now(),
+	}
+	newLockSerialized, err := dynamodbattribute.MarshalMap(newDynamoLock)
 	if err != nil {
-		return r, errors.Wrap(err, "serializing")
+		return false, 0, errors.Wrap(err, "serializing")
 	}
 
 	// check if there is an existing lock
 	getItemParams := &dynamodb.GetItemInput{
 		Key: map[string]*dynamodb.AttributeValue{
-			"LockID": {
-				S: aws.String(run.StateKey()),
+			"LockKey": {
+				S: aws.String(key),
 			},
 		},
-		TableName: aws.String(d.LockTable),
+		TableName:      aws.String(b.LockTable),
 		ConsistentRead: aws.Bool(true),
 	}
-	item, err := d.DB.GetItem(getItemParams)
+	item, err := b.DB.GetItem(getItemParams)
 	if err != nil {
-		return r, errors.Wrap(err, "checking if lock exists")
+		return false, 0, errors.Wrap(err, "checking if lock exists")
 	}
 
-
 	// if there is already a lock then we can't acquire a lock. Return the existing lock
+	var currLock dynamoLock
 	if len(item.Item) != 0 {
-		var dynamoRun dynamoRun
-		if err := dynamodbattribute.UnmarshalMap(item.Item, &dynamoRun); err != nil {
-			return r, errors.Wrap(err,"found an existing lock at that id but it could not be deserialized. We suggest manually deleting this key from DynamoDB")
+		if err := dynamodbattribute.UnmarshalMap(item.Item, &currLock); err != nil {
+			return false, 0, errors.Wrap(err, "found an existing lock at that key but it could not be deserialized. We suggest manually deleting this key from DynamoDB")
 		}
-		lockingRun := d.fromDynamoItem(dynamoRun)
-		return locking.TryLockResponse{
-			LockAcquired: false,
-			LockingRun: lockingRun,
-			LockID: run.StateKey(),
-		}, nil
+		return false, currLock.PullNum, nil
 	}
 
 	// else we should be able to lock
 	putItem := &dynamodb.PutItemInput{
-		Item:      newRunSerialized,
-		TableName: aws.String(d.LockTable),
+		Item:      newLockSerialized,
+		TableName: aws.String(b.LockTable),
 		// this will ensure that we don't insert the new item in a race situation
 		// where someone has written this key just after our read
-		ConditionExpression: aws.String("attribute_not_exists(LockID)"),
+		ConditionExpression: aws.String("attribute_not_exists(LockKey)"),
 	}
-	if _, err := d.DB.PutItem(putItem); err != nil {
-		return r, errors.Wrap(err, "writing lock")
+	if _, err := b.DB.PutItem(putItem); err != nil {
+		return false, 0, errors.Wrap(err, "writing lock")
 	}
-	return locking.TryLockResponse{
-		LockAcquired: true,
-		LockingRun: run,
-		LockID: run.StateKey(),
-	}, nil
+	return true, pullNum, nil
 }
 
-func (d *Backend) Unlock(lockID string) error {
+func (b Backend) Unlock(project models.Project, env string) error {
+	key := b.key(project, env)
 	params := &dynamodb.DeleteItemInput{
 		Key: map[string]*dynamodb.AttributeValue{
-			"LockID": {S: aws.String(lockID)},
+			"LockKey": {S: aws.String(key)},
 		},
-		TableName: aws.String(d.LockTable),
+		TableName: aws.String(b.LockTable),
 	}
-	_, err := d.DB.DeleteItem(params)
+	_, err := b.DB.DeleteItem(params)
 	return errors.Wrap(err, "deleting lock")
 }
 
-func (d *Backend) ListLocks() (map[string]locking.Run, error) {
-	params := &dynamodb.ScanInput{
-		TableName: aws.String(d.LockTable),
-	}
-
-	m := make(map[string]locking.Run)
+func (b Backend) List() ([]models.ProjectLock, error) {
+	var locks []models.ProjectLock
 	var err, internalErr error
-	err = d.DB.ScanPages(params, func(out *dynamodb.ScanOutput, lastPage bool) bool {
-		var runs []dynamoRun
-		if err := dynamodbattribute.UnmarshalListOfMaps(out.Items, &runs); err != nil {
-			internalErr = errors.Wrap(err,"deserializing locks")
+	params := &dynamodb.ScanInput{
+		TableName: aws.String(b.LockTable),
+	}
+	err = b.DB.ScanPages(params, func(out *dynamodb.ScanOutput, lastPage bool) bool {
+		var dynamoLocks []dynamoLock
+		if err := dynamodbattribute.UnmarshalListOfMaps(out.Items, &dynamoLocks); err != nil {
+			internalErr = errors.Wrap(err, "deserializing locks")
 			return false
 		}
-		for _, run := range runs {
-			m[run.LockID] = d.fromDynamoItem(run)
+		for _, lock := range dynamoLocks {
+			locks = append(locks, models.ProjectLock{
+				PullNum: lock.PullNum,
+				Project: models.NewProject(lock.RepoFullName, lock.Path),
+				Env:     lock.Env,
+				Time:    lock.Time,
+			})
 		}
 		return lastPage
 	})
@@ -125,10 +133,10 @@ func (d *Backend) ListLocks() (map[string]locking.Run, error) {
 	if err == nil && internalErr != nil {
 		err = internalErr
 	}
-	return m, errors.Wrap(err, "scanning dynamodb")
+	return locks, errors.Wrap(err, "scanning dynamodb")
 }
 
-func (d *Backend) FindLocksForPull(repoFullName string, pullNum int) ([]string, error) {
+func (b Backend) UnlockByPull(repoFullName string, pullNum int) error {
 	params := &dynamodb.ScanInput{
 		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
 			":pullNum": {
@@ -139,77 +147,31 @@ func (d *Backend) FindLocksForPull(repoFullName string, pullNum int) ([]string, 
 			},
 		},
 		FilterExpression: aws.String("RepoFullName = :repoFullName and PullNum = :pullNum"),
-		TableName: aws.String(d.LockTable),
+		TableName:        aws.String(b.LockTable),
 	}
 
-	var ids []string
+	// scan DynamoDB for locks that match the pull request
+	var locks []dynamoLock
 	var err, internalErr error
-	err = d.DB.ScanPages(params, func(out *dynamodb.ScanOutput, lastPage bool) bool {
-		var runs []dynamoRun
-		if err := dynamodbattribute.UnmarshalListOfMaps(out.Items, &runs); err != nil {
-			internalErr = errors.Wrap(err,"deserializing locks")
+	err = b.DB.ScanPages(params, func(out *dynamodb.ScanOutput, lastPage bool) bool {
+		if err := dynamodbattribute.UnmarshalListOfMaps(out.Items, &locks); err != nil {
+			internalErr = errors.Wrap(err, "deserializing locks")
 			return false
-		}
-		for _, run := range runs {
-			ids = append(ids, run.LockID)
 		}
 		return lastPage
 	})
-
-	if err == nil && internalErr != nil {
+	if err == nil {
 		err = internalErr
 	}
-	return ids, errors.Wrap(err,"scanning dynamodb")
-}
-
-func (d *Backend) deserializeItem(item map[string]*dynamodb.AttributeValue) (string, locking.Run, error) {
-	var lockID string
-	var run locking.Run
-
-	lockIDItem, ok := item["LockID"]
-	if !ok || lockIDItem == nil {
-		return lockID, run, fmt.Errorf("lock did not have expected key 'LockID'")
-	}
-	lockID = string(hex.EncodeToString(lockIDItem.B))
-	runItem, ok := item["Run"]
-	if !ok || runItem == nil {
-		return lockID, run, fmt.Errorf("lock did not have expected key 'Run'")
+	if err != nil {
+		return errors.Wrap(err, "scanning dynamodb")
 	}
 
-	if err := d.deserialize(runItem.B, &run); err != nil {
-		return lockID, run, fmt.Errorf("deserializing run at key %q: %s", lockID, err)
+	// now we can unlock all of them
+	for _, lock := range locks {
+		if err := b.Unlock(models.NewProject(lock.RepoFullName, lock.Path), lock.Env); err != nil {
+			return errors.Wrapf(err, "unlocking repo %s, path %s, env %s", lock.RepoFullName, lock.Path, lock.Env)
+		}
 	}
-	return lockID, run, nil
-}
-
-func (d *Backend) deserialize(bs []byte, run *locking.Run) error {
-	return json.Unmarshal(bs, run)
-}
-
-func (d *Backend) serialize(run locking.Run) ([]byte, error) {
-	return json.Marshal(run)
-}
-
-func (d *Backend) toDynamoItem(run locking.Run) (map[string]*dynamodb.AttributeValue, error) {
-	item := dynamoRun{
-		LockID: run.StateKey(),
-		PullNum: run.PullNum,
-		RepoFullName: run.RepoFullName,
-		Env: run.Env,
-		Path: run.Path,
-		Timestamp: run.Timestamp,
-		User: run.User,
-	}
-	return dynamodbattribute.MarshalMap(item)
-}
-
-func (d *Backend) fromDynamoItem(dynamoRun dynamoRun) locking.Run {
-	return locking.Run{
-		User: dynamoRun.User,
-		Timestamp: dynamoRun.Timestamp,
-		Path: dynamoRun.Path,
-		Env: dynamoRun.Env,
-		RepoFullName: dynamoRun.RepoFullName,
-		PullNum: dynamoRun.PullNum,
-	}
+	return nil
 }

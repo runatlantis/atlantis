@@ -12,10 +12,10 @@
 package server
 
 import (
-	"github.com/elazarl/go-bindata-assetfs"
 	"bytes"
 	"compress/gzip"
 	"fmt"
+	"github.com/elazarl/go-bindata-assetfs"
 	"io"
 	"io/ioutil"
 	"os"
@@ -267,12 +267,12 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"static/atlantis-icon.png": staticAtlantisIconPng,
-	"static/atlantis-icon_512.png": staticAtlantisIcon_512Png,
-	"static/css/custom.css": staticCssCustomCss,
-	"static/css/normalize.css": staticCssNormalizeCss,
-	"static/css/skeleton.css": staticCssSkeletonCss,
-	"static/images/atlantis-icon.png": staticImagesAtlantisIconPng,
+	"static/atlantis-icon.png":            staticAtlantisIconPng,
+	"static/atlantis-icon_512.png":        staticAtlantisIcon_512Png,
+	"static/css/custom.css":               staticCssCustomCss,
+	"static/css/normalize.css":            staticCssNormalizeCss,
+	"static/css/skeleton.css":             staticCssSkeletonCss,
+	"static/images/atlantis-icon.png":     staticImagesAtlantisIconPng,
 	"static/images/atlantis-icon_512.png": staticImagesAtlantisIcon_512Png,
 }
 
@@ -315,18 +315,19 @@ type bintree struct {
 	Func     func() (*asset, error)
 	Children map[string]*bintree
 }
+
 var _bintree = &bintree{nil, map[string]*bintree{
-	"static": &bintree{nil, map[string]*bintree{
-		"atlantis-icon.png": &bintree{staticAtlantisIconPng, map[string]*bintree{}},
-		"atlantis-icon_512.png": &bintree{staticAtlantisIcon_512Png, map[string]*bintree{}},
-		"css": &bintree{nil, map[string]*bintree{
-			"custom.css": &bintree{staticCssCustomCss, map[string]*bintree{}},
-			"normalize.css": &bintree{staticCssNormalizeCss, map[string]*bintree{}},
-			"skeleton.css": &bintree{staticCssSkeletonCss, map[string]*bintree{}},
+	"static": {nil, map[string]*bintree{
+		"atlantis-icon.png":     {staticAtlantisIconPng, map[string]*bintree{}},
+		"atlantis-icon_512.png": {staticAtlantisIcon_512Png, map[string]*bintree{}},
+		"css": {nil, map[string]*bintree{
+			"custom.css":    {staticCssCustomCss, map[string]*bintree{}},
+			"normalize.css": {staticCssNormalizeCss, map[string]*bintree{}},
+			"skeleton.css":  {staticCssSkeletonCss, map[string]*bintree{}},
 		}},
-		"images": &bintree{nil, map[string]*bintree{
-			"atlantis-icon.png": &bintree{staticImagesAtlantisIconPng, map[string]*bintree{}},
-			"atlantis-icon_512.png": &bintree{staticImagesAtlantisIcon_512Png, map[string]*bintree{}},
+		"images": {nil, map[string]*bintree{
+			"atlantis-icon.png":     {staticImagesAtlantisIconPng, map[string]*bintree{}},
+			"atlantis-icon_512.png": {staticImagesAtlantisIcon_512Png, map[string]*bintree{}},
 		}},
 	}},
 }}
@@ -377,7 +378,6 @@ func _filePath(dir, name string) string {
 	cannonicalName := strings.Replace(name, "\\", "/", -1)
 	return filepath.Join(append([]string{dir}, strings.Split(cannonicalName, "/")...)...)
 }
-
 
 func assetFS() *assetfs.AssetFS {
 	for k := range _bintree.Children {

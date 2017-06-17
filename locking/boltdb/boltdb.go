@@ -1,19 +1,19 @@
 package boltdb
 
 import (
-	"github.com/boltdb/bolt"
-	"fmt"
-	"encoding/json"
-	"github.com/pkg/errors"
 	"bytes"
+	"encoding/json"
+	"fmt"
+	"github.com/boltdb/bolt"
+	"github.com/hootsuite/atlantis/models"
+	"github.com/pkg/errors"
 	"os"
-	"time"
 	"path"
-	"github.com/hootsuite/atlantis/locking"
+	"time"
 )
 
 type Backend struct {
-	db          *bolt.DB
+	db     *bolt.DB
 	bucket []byte
 }
 
@@ -21,14 +21,14 @@ const bucketName = "runLocks"
 
 func New(dataDir string) (*Backend, error) {
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
-		return nil, errors.Wrap(err,"creating data dir")
+		return nil, errors.Wrap(err, "creating data dir")
 	}
 	db, err := bolt.Open(path.Join(dataDir, "atlantis.db"), 0600, &bolt.Options{Timeout: 1 * time.Second})
 	if err != nil {
 		if err.Error() == "timeout" {
 			return nil, errors.New("starting BoltDB: timeout (a possible cause is another Atlantis instance already running)")
 		}
-		return nil, errors.Wrap(err,"starting BoltDB")
+		return nil, errors.Wrap(err, "starting BoltDB")
 	}
 	err = db.Update(func(tx *bolt.Tx) error {
 		if _, err := tx.CreateBucketIfNotExists([]byte(bucketName)); err != nil {
@@ -37,7 +37,7 @@ func New(dataDir string) (*Backend, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, errors.Wrap(err,"starting BoltDB")
+		return nil, errors.Wrap(err, "starting BoltDB")
 	}
 	// todo: close BoltDB when server is sigtermed
 	return &Backend{db, []byte(bucketName)}, nil
@@ -48,104 +48,111 @@ func NewWithDB(db *bolt.DB, bucket string) (*Backend, error) {
 	return &Backend{db, []byte(bucket)}, nil
 }
 
-func (b Backend) TryLock(run locking.Run) (locking.TryLockResponse, error) {
-	var response locking.TryLockResponse
-	newRunSerialized, _ := json.Marshal(run)
-	lockID := run.StateKey()
+func (b *Backend) TryLock(project models.Project, env string, pullNum int) (bool, int, error) {
+	// return variables
+	var lockAcquired bool
+	var lockingPullNum int
+	key := b.key(project, env)
+	newLock := models.ProjectLock{
+		PullNum: pullNum,
+		Project: project,
+		Time:    time.Now(),
+		Env:     env,
+	}
+	newLockSerialized, _ := json.Marshal(newLock)
 	transactionErr := b.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(b.bucket)
 
 		// if there is no run at that key then we're free to create the lock
-		lockingRunSerialized := bucket.Get([]byte(lockID))
-		if lockingRunSerialized == nil {
-			bucket.Put([]byte(lockID), newRunSerialized) // not a readonly bucketName so okay to ignore error
-			response = locking.TryLockResponse{
-				LockAcquired: true,
-				LockingRun:   run,
-				LockID:       lockID,
-			}
+		currLockSerialized := bucket.Get([]byte(key))
+		if currLockSerialized == nil {
+			bucket.Put([]byte(key), newLockSerialized) // not a readonly bucketName so okay to ignore error
+			lockAcquired = true
+			lockingPullNum = pullNum
 			return nil
 		}
 
 		// otherwise the lock fails, return to caller the run that's holding the lock
-		var lockingRun locking.Run
-		if err := b.deserialize(lockingRunSerialized, &lockingRun); err != nil {
-			return errors.Wrap(err, "failed to deserialize run")
+		var currLock models.ProjectLock
+		if err := json.Unmarshal(currLockSerialized, &currLock); err != nil {
+			return errors.Wrap(err, "failed to deserialize current lock")
 		}
-		response = locking.TryLockResponse{
-			LockAcquired: false,
-			LockingRun: lockingRun,
-			LockID: lockID,
-		}
+		lockAcquired = false
+		lockingPullNum = currLock.PullNum
 		return nil
 	})
 
 	if transactionErr != nil {
-		return response, errors.Wrap(transactionErr, "DB transaction failed")
+		return false, lockingPullNum, errors.Wrap(transactionErr, "DB transaction failed")
 	}
 
-	return response, nil
+	return lockAcquired, lockingPullNum, nil
 }
 
-func (b Backend) Unlock(lockID string) error {
+func (b Backend) Unlock(p models.Project, env string) error {
+	key := b.key(p, env)
 	err := b.db.Update(func(tx *bolt.Tx) error {
 		locks := tx.Bucket(b.bucket)
-		return locks.Delete([]byte(lockID))
+		return locks.Delete([]byte(key))
 	})
 	return errors.Wrap(err, "DB transaction failed")
 }
 
-func (b Backend) ListLocks() (map[string]locking.Run, error) {
-	m := make(map[string]locking.Run)
-	bytes := make(map[string][]byte)
-
+func (b Backend) List() ([]models.ProjectLock, error) {
+	var locks []models.ProjectLock
+	var locksBytes [][]byte
 	err := b.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(b.bucket)
 		c := bucket.Cursor()
 		for k, v := c.First(); k != nil; k, v = c.Next() {
-			bytes[string(k)] = v
+			locksBytes = append(locksBytes, v)
 		}
 		return nil
 	})
 	if err != nil {
-		return m, errors.Wrap(err, "DB transaction failed")
+		return locks, errors.Wrap(err, "DB transaction failed")
 	}
 
 	// deserialize bytes into the proper objects
-	for k, v := range bytes {
-		var run locking.Run
-		if err := b.deserialize(v, &run); err != nil {
-			return m, errors.Wrap(err, fmt.Sprintf("failed to deserialize run at key %q", string(k)))
+	for k, v := range locksBytes {
+		var lock models.ProjectLock
+		if err := json.Unmarshal(v, &lock); err != nil {
+			return locks, errors.Wrap(err, fmt.Sprintf("failed to deserialize lock at key %q", string(k)))
 		}
-		m[k] = run
+		locks = append(locks, lock)
 	}
 
-	return m, nil
+	return locks, nil
 }
 
-func (b Backend) FindLocksForPull(repoFullName string, pullNum int) ([]string, error) {
-	var ids []string
+func (b Backend) UnlockByPull(repoFullName string, pullNum int) error {
+	// get the locks that match that pull request
+	var locks []models.ProjectLock
 	err := b.db.View(func(tx *bolt.Tx) error {
 		c := tx.Bucket(b.bucket).Cursor()
 
-		// the key for each lock is repoFullName/path/env so we can scan through all entries
-		// and get the locks for that repo. Then we can check if the lock is for the right pull
-		prefix := []byte(repoFullName + "/")
-		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
-			var run locking.Run
-			if err := b.deserialize(v, &run); err != nil {
-				return errors.Wrapf(err, "failed to deserialize run at key %q", string(k))
+		// we can use the repoFullName as a prefix search since that's the first part of the key
+		for k, v := c.Seek([]byte(repoFullName)); k != nil && bytes.HasPrefix(k, []byte(repoFullName)); k, v = c.Next() {
+			var lock models.ProjectLock
+			if err := json.Unmarshal(v, &lock); err != nil {
+				return errors.Wrapf(err, "failed to deserialize lock at key %q", string(k))
 			}
-			if run.PullNum == pullNum {
-				ids = append(ids, string(k))
+			if lock.PullNum == pullNum {
+				locks = append(locks, lock)
 			}
 		}
-
 		return nil
 	})
-	return ids, err
+
+	// delete the locks
+	for _, lock := range locks {
+		if err = b.Unlock(lock.Project, lock.Env); err != nil {
+			return errors.Wrapf(err, "unlocking repo %s, path %s, env %s", lock.Project.RepoFullName, lock.Project.Path, lock.Env)
+		}
+	}
+	return nil
 }
 
-func (b Backend) deserialize(bs []byte, run *locking.Run) error {
-	return json.Unmarshal(bs, run)
+func (b Backend) key(p models.Project, env string) string {
+	return fmt.Sprintf("%s/%s/%s", p.RepoFullName, p.Path, env)
 }

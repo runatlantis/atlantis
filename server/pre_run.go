@@ -3,17 +3,18 @@ package server
 import (
 	"bufio"
 	"fmt"
+	"github.com/hootsuite/atlantis/logging"
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"github.com/hootsuite/atlantis/logging"
 )
 
 const InlineShebang = "/bin/sh -e"
 
+// todo: make OO
 // PreRun is a function that will determine whether
-func PreRun(c *Config, log *logging.SimpleLogger, execPath string, command *Command) error {
-	log.Info("Staring pre run in %s", execPath)
+func PreRun(c *Config, log *logging.SimpleLogger, path string, command *Command) error {
+	log.Info("Staring pre run in %s", path)
 	var execScript string
 
 	if command.commandType == Plan {
@@ -44,7 +45,7 @@ func PreRun(c *Config, log *logging.SimpleLogger, execPath string, command *Comm
 		if c.TerraformVersion != "" {
 			os.Setenv("ATLANTIS_TERRAFORM_VERSION", c.TerraformVersion)
 		}
-		os.Setenv("WORKSPACE", execPath)
+		os.Setenv("WORKSPACE", path)
 		output, err := execute(execScript)
 		if err != nil {
 			return err
