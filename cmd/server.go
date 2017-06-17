@@ -10,51 +10,36 @@ import (
 )
 
 // To add a new flag you must
-// 1. Add a const with the flag name
+// 1. Add a const with the flag name (in alphabetic order)
 // 2. Add a new field to server.ServerConfig and set the mapstructure tag equal to the flag name
 // 3. Add your flag's description etc. to the stringFlags, intFlags, or boolFlags slices
 const (
-	ghUserFlag          = "gh-user"
-	ghPasswordFlag      = "gh-password"
-	ghHostnameFlag      = "gh-hostname"
-	sshKeyFlag          = "ssh-key"
-	portFlag            = "port"
-	awsAssumeRoleFlag   = "aws-assume-role-arn"
-	scratchDirFlag      = "scratch-dir"
-	awsRegionFlag       = "aws-region"
-	s3BucketFlag        = "s3-bucket"
-	logLevelFlag        = "log-level"
-	configFlag          = "config"
-	requireApprovalFlag = "require-approval"
 	atlantisURLFlag     = "atlantis-url"
+	awsAssumeRoleFlag   = "aws-assume-role-arn"
+	awsRegionFlag       = "aws-region"
+	configFlag          = "config"
 	dataDirFlag         = "data-dir"
+	ghHostnameFlag      = "gh-hostname"
+	ghPasswordFlag      = "gh-password"
+	ghUserFlag          = "gh-user"
 	lockingBackendFlag  = "locking-backend"
 	lockingTableFlag    = "locking-dynamodb-table"
+	logLevelFlag        = "log-level"
+	portFlag            = "port"
+	requireApprovalFlag = "require-approval"
+	s3BucketFlag        = "s3-bucket"
+	scratchDirFlag      = "scratch-dir"
+	sshKeyFlag          = "ssh-key"
 )
 
 var stringFlags = []stringFlag{
 	{
-		name:        ghHostnameFlag,
-		description: "Hostname of Github installation.",
-		value:       "api.github.com",
-	},
-	{
-		name:        logLevelFlag,
-		description: "Log level. Either debug, info, warn, or error.",
-		value:       "warn",
-	},
-	{
-		name:        sshKeyFlag,
-		description: "Path to SSH key used for GitHub.",
+		name:        atlantisURLFlag,
+		description: "Url that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is the port flag.",
 	},
 	{
 		name:        awsAssumeRoleFlag,
 		description: "The Amazon Resource Name (`arn`) to assume when running Terraform commands. If not specified, will use AWS credentials via environment variables, or credentials files.",
-	},
-	{
-		name:        scratchDirFlag,
-		description: "Path to directory to use as a temporary workspace for checking out repos.",
-		value:       "/tmp/atlantis",
 	},
 	{
 		name:        awsRegionFlag,
@@ -62,18 +47,28 @@ var stringFlags = []stringFlag{
 		value:       "us-east-1",
 	},
 	{
-		name:        s3BucketFlag,
-		description: "The S3 bucket name to store atlantis data (terraform plans, terraform state, etc).",
-		value:       "atlantis",
-	},
-	{
-		name:        atlantisURLFlag,
-		description: "Url that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is the port flag.",
+		name:        configFlag,
+		description: "Config file.",
 	},
 	{
 		name:        dataDirFlag,
 		description: "Path to directory to store Atlantis data.",
 		value:       "/var/lib/atlantis",
+	},
+	{
+		name:        ghHostnameFlag,
+		description: "Hostname of Github installation.",
+		value:       "api.github.com",
+	},
+	{
+		name:        ghPasswordFlag,
+		description: "GitHub password of API user. Can also be specified via the ATLANTIS_GH_PASSWORD environment variable.",
+		env:         "ATLANTIS_GH_PASSWORD",
+	},
+	{
+		name:        ghUserFlag,
+		description: "GitHub username of API user. Can also be specified via the ATLANTIS_GH_USER environment variable.",
+		env:         "ATLANTIS_GH_USER",
 	},
 	{
 		name:        lockingBackendFlag,
@@ -86,18 +81,23 @@ var stringFlags = []stringFlag{
 		value:       "atlantis-locks",
 	},
 	{
-		name:        configFlag,
-		description: "Config file.",
+		name:        logLevelFlag,
+		description: "Log level. Either debug, info, warn, or error.",
+		value:       "warn",
 	},
 	{
-		name:        ghUserFlag,
-		description: "GitHub username of API user. Can also be specified via the ATLANTIS_GH_USER environment variable.",
-		env:         "ATLANTIS_GH_USER",
+		name:        s3BucketFlag,
+		description: "The S3 bucket name to store atlantis data (terraform plans, terraform state, etc).",
+		value:       "atlantis",
 	},
 	{
-		name:        ghPasswordFlag,
-		description: "GitHub password of API user. Can also be specified via the ATLANTIS_GH_PASSWORD environment variable.",
-		env:         "ATLANTIS_GH_PASSWORD",
+		name:        scratchDirFlag,
+		description: "Path to directory to use as a temporary workspace for checking out repos.",
+		value:       "/tmp/atlantis",
+	},
+	{
+		name:        sshKeyFlag,
+		description: "Path to SSH key used for GitHub.",
 	},
 }
 var boolFlags = []boolFlag{

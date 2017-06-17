@@ -54,21 +54,21 @@ type Server struct {
 
 // the mapstructure tags correspond to flags in cmd/server.go
 type ServerConfig struct {
-	GitHubHostname       string `mapstructure:"gh-hostname"`
-	GitHubUser           string `mapstructure:"gh-user"`
-	GitHubPassword       string `mapstructure:"gh-password"`
-	SSHKey               string `mapstructure:"ssh-key"`
-	AssumeRole           string `mapstructure:"aws-assume-role-arn"`
-	Port                 int    `mapstructure:"port"`
-	ScratchDir           string `mapstructure:"scratch-dir"`
 	AWSRegion            string `mapstructure:"aws-region"`
-	S3Bucket             string `mapstructure:"s3-bucket"`
-	LogLevel             string `mapstructure:"log-level"`
+	AssumeRole           string `mapstructure:"aws-assume-role-arn"`
 	AtlantisURL          string `mapstructure:"atlantis-url"`
-	RequireApproval      bool   `mapstructure:"require-approval"`
 	DataDir              string `mapstructure:"data-dir"`
+	GitHubHostname       string `mapstructure:"gh-hostname"`
+	GitHubPassword       string `mapstructure:"gh-password"`
+	GitHubUser           string `mapstructure:"gh-user"`
 	LockingBackend       string `mapstructure:"locking-backend"`
 	LockingDynamoDBTable string `mapstructure:"locking-dynamodb-table"`
+	LogLevel             string `mapstructure:"log-level"`
+	Port                 int    `mapstructure:"port"`
+	RequireApproval      bool   `mapstructure:"require-approval"`
+	S3Bucket             string `mapstructure:"s3-bucket"`
+	SSHKey               string `mapstructure:"ssh-key"`
+	ScratchDir           string `mapstructure:"scratch-dir"`
 }
 
 type CommandContext struct {
