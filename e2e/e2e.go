@@ -48,7 +48,7 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 
 	cloneCmd := exec.Command("git", "clone", t.repoUrl, cloneDir)
 	// git clone the repo
-	log.Printf("git cloning %s into %q", t.repoUrl, cloneDir)
+	log.Printf("git cloning into %q", cloneDir)
 	if output, err := cloneCmd.CombinedOutput(); err != nil {
 		return e2eResult, errors.New(fmt.Sprintf("failed to clone repository: %v: %s", err, string(output)))
 	}
