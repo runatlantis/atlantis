@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -43,14 +42,14 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	// create the directory and parents if necessary
 	log.Printf("creating dir %q", cloneDir)
 	if err := os.MkdirAll(cloneDir, 0755); err != nil {
-		return e2eResult, errors.New(fmt.Sprintf("failed to create dir %q prior to cloning, attempting to continue: %v", cloneDir, err))
+		return e2eResult, fmt.Errorf("failed to create dir %q prior to cloning, attempting to continue: %v", cloneDir, err)
 	}
 
 	cloneCmd := exec.Command("git", "clone", t.repoUrl, cloneDir)
 	// git clone the repo
 	log.Printf("git cloning into %q", cloneDir)
 	if output, err := cloneCmd.CombinedOutput(); err != nil {
-		return e2eResult, errors.New(fmt.Sprintf("failed to clone repository: %v: %s", err, string(output)))
+		return e2eResult, fmt.Errorf("failed to clone repository: %v: %s", err, string(output))
 	}
 
 	// checkout a new branch for the project
@@ -58,7 +57,7 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	checkoutCmd := exec.Command("git", "checkout", "-b", branchName)
 	checkoutCmd.Dir = cloneDir
 	if err := checkoutCmd.Run(); err != nil {
-		return e2eResult, errors.New(fmt.Sprintf("failed to git checkout branch %q: %v", branchName, err))
+		return e2eResult, fmt.Errorf("failed to git checkout branch %q: %v", branchName, err)
 	}
 
 	// write a file for running the tests
@@ -67,7 +66,7 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	log.Printf("creating file to commit %q", filePath)
 	err := ioutil.WriteFile(filePath, randomData, 0644)
 	if err != nil {
-		return e2eResult, errors.New(fmt.Sprintf("couldn't write file %s: %v", filePath, err))
+		return e2eResult, fmt.Errorf("couldn't write file %s: %v", filePath, err)
 	}
 
 	// add the file
@@ -75,7 +74,7 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	addCmd := exec.Command("git", "add", filePath)
 	addCmd.Dir = cloneDir
 	if err := addCmd.Run(); err != nil {
-		return e2eResult, errors.New(fmt.Sprintf("failed to git add file %q: %v", filePath, err))
+		return e2eResult, fmt.Errorf("failed to git add file %q: %v", filePath, err)
 	}
 
 	// commit the file
@@ -83,7 +82,7 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	commitCmd := exec.Command("git", "commit", "-am", "test commit")
 	commitCmd.Dir = cloneDir
 	if output, err := commitCmd.CombinedOutput(); err != nil {
-		return e2eResult, errors.New(fmt.Sprintf("failed to run git commit in %q: %v", cloneDir, err, string(output)))
+		return e2eResult, fmt.Errorf("failed to run git commit in %q: %v", cloneDir, err, string(output))
 	}
 
 	// push the branch to remote
@@ -91,7 +90,7 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	pushCmd := exec.Command("git", "push", "origin", branchName)
 	pushCmd.Dir = cloneDir
 	if err := pushCmd.Run(); err != nil {
-		return e2eResult, errors.New(fmt.Sprintf("failed to git push branch %q: %v", branchName, err))
+		return e2eResult, fmt.Errorf("failed to git push branch %q: %v", branchName, err)
 	}
 
 	// create a new pr
@@ -103,7 +102,7 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 
 	pull, _, err := t.githubClient.client.PullRequests.Create(t.githubClient.ctx, t.ownerName, t.repoName, newPullRequest)
 	if err != nil {
-		return e2eResult, errors.New(fmt.Sprintf("error while creating new pull request: %v", err))
+		return e2eResult, fmt.Errorf("error while creating new pull request: %v", err)
 	}
 
 	// set pull request url
@@ -118,7 +117,7 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	log.Printf("creating plan comment: %q", t.projectType.PlanCommand)
 	_, _, err = t.githubClient.client.Issues.CreateComment(t.githubClient.ctx, t.ownerName, t.repoName, pull.GetNumber(), &github.IssueComment{Body: github.String(t.projectType.PlanCommand)})
 	if err != nil {
-		return e2eResult, errors.New(fmt.Sprintf("error creating 'run plan' comment on github"))
+		return e2eResult, fmt.Errorf("error creating 'run plan' comment on github")
 	}
 
 	// wait for atlantis to respond to webhook
@@ -126,12 +125,13 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 
 	state := "not started"
 	// waiting for atlantis run and finish
-	for checkStatus(state) {
-		if state == "" {
-			log.Println("atlantis run hasn't started")
-		}
+	for i := 0; i < 100 && checkStatus(state); i++ {
 		time.Sleep(2 * time.Second)
 		state, _ = getAtlantisStatus(t, branchName)
+		if state == "" {
+			log.Println("atlantis run hasn't started")
+			continue
+		}
 		log.Printf("atlantis run is in %s state", state)
 	}
 
@@ -139,7 +139,7 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	e2eResult.testResult = state
 	// check if atlantis run was a success
 	if state != "\"success\"" {
-		return e2eResult, errors.New(fmt.Sprintf("atlantis run project type %q failed with %s status", t.projectType.Name, state))
+		return e2eResult, fmt.Errorf("atlantis run project type %q failed with %s status", t.projectType.Name, state)
 	}
 
 	return e2eResult, nil
@@ -153,7 +153,7 @@ func getAtlantisStatus(t *E2ETester, branchName string) (string, error) {
 	}
 
 	for _, status := range combinedStatus.Statuses {
-		if github.Stringify(status.Context) == "\"Atlantis\"" {
+		if status.GetContext() == "\"Atlantis\"" {
 			return github.Stringify(status.State), nil
 		}
 	}
@@ -174,14 +174,14 @@ func cleanUp(t *E2ETester, pullRequestNumber int, branchName string) error {
 	// clean up
 	pullClosed, _, err := t.githubClient.client.PullRequests.Edit(t.githubClient.ctx, t.ownerName, t.repoName, pullRequestNumber, &github.PullRequest{State: github.String("closed")})
 	if err != nil {
-		return errors.New(fmt.Sprintf("error while closing new pull request: %v", err))
+		return fmt.Errorf("error while closing new pull request: %v", err)
 	}
 	log.Printf("closed pull request %d", pullClosed.GetNumber())
 
 	deleteBranchName := fmt.Sprintf("%s/%s", "heads", branchName)
 	_, err = t.githubClient.client.Git.DeleteRef(t.githubClient.ctx, t.ownerName, t.repoName, deleteBranchName)
 	if err != nil {
-		return errors.New(fmt.Sprintf("error while deleting branch %s: %v", deleteBranchName, err))
+		return fmt.Errorf("error while deleting branch %s: %v", deleteBranchName, err)
 	}
 	log.Printf("deleted branch %s", deleteBranchName)
 

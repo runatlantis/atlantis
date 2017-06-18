@@ -136,10 +136,7 @@ func deleteAtlantisHook(g *GithubClient, ownerName string, repoName string, hook
 }
 
 func cleanDir(path string) error {
-	if err := os.RemoveAll(path); err != nil {
-		return err
-	}
-	return nil
+	return os.RemoveAll(path)
 }
 
 func startTests(e2e E2ETester) ([]*E2EResult, error) {

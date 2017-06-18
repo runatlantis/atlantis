@@ -5,7 +5,7 @@ mv atlantis ${WORKDIR}/e2e/
 
 # cd into e2e folder
 cd e2e/
-# Encrypting secrets for atlantis runtime: https://github.com/circleci/encrypted-files
+# Decrypting secrets for atlantis runtime: https://github.com/circleci/encrypted-files
 openssl aes-256-cbc -d -in secrets-envs -k $KEY >> ~/.circlerc
 # Download terraform
 curl -LOk https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip

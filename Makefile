@@ -30,7 +30,7 @@ test: ## Run tests, coverage reports, and clean (coverage taints the compiled co
 	go test -v $(PKG)
 
 test-coverage:
-	go test -v ./... -coverprofile=c.out
+	go test -v $(PKG) -coverprofile=c.out
 	go tool cover -html=c.out -o coverage.html
 
 dist: ## Package up everything in static/ using go-bindata-assetfs so it can be served by a single binary
