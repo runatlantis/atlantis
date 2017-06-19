@@ -10,6 +10,9 @@ import (
 	"os"
 	"strings"
 
+	"io/ioutil"
+	"time"
+
 	"github.com/elazarl/go-bindata-assetfs"
 	"github.com/google/go-github/github"
 	"github.com/gorilla/mux"
@@ -23,8 +26,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	"github.com/urfave/negroni"
-	"io/ioutil"
-	"time"
 )
 
 const (
@@ -91,7 +92,6 @@ type PathResult struct {
 	Status string // todo: this should be an enum for success/error/failure
 	Result Templater
 }
-
 
 type Templater interface {
 	Template() *CompiledTemplate

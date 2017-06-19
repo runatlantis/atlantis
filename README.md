@@ -1,4 +1,6 @@
 # atlantis
+[![CircleCI](https://circleci.com/gh/hootsuite/atlantis.svg?style=svg&circle-token=6a0c78c9b1fd77486c72a5e22512c7c9175f2aaf)](https://circleci.com/gh/hootsuite/atlantis)
+
 A [terraform](https://www.terraform.io/) collaboration tool that enables you to collaborate on infrastructure safely and securely.
 
 ## Locking
