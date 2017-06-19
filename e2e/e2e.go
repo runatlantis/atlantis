@@ -125,7 +125,7 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 
 	state := "not started"
 	// waiting for atlantis run and finish
-	for i := 0; i < 100 && checkStatus(state); i++ {
+	for i := 0; i < 20 && checkStatus(state); i++ {
 		time.Sleep(2 * time.Second)
 		state, _ = getAtlantisStatus(t, branchName)
 		if state == "" {
@@ -138,7 +138,7 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	log.Printf("atlantis run finished with %s status", state)
 	e2eResult.testResult = state
 	// check if atlantis run was a success
-	if state != "\"success\"" {
+	if state != "success" {
 		return e2eResult, fmt.Errorf("atlantis run project type %q failed with %s status", t.projectType.Name, state)
 	}
 
@@ -153,8 +153,8 @@ func getAtlantisStatus(t *E2ETester, branchName string) (string, error) {
 	}
 
 	for _, status := range combinedStatus.Statuses {
-		if status.GetContext() == "\"Atlantis\"" {
-			return github.Stringify(status.State), nil
+		if status.GetContext() == "Atlantis" {
+			return status.GetState(), nil
 		}
 	}
 
@@ -162,7 +162,7 @@ func getAtlantisStatus(t *E2ETester, branchName string) (string, error) {
 }
 
 func checkStatus(state string) bool {
-	for _, s := range []string{"\"success\"", "\"error\"", "\"failure\""} {
+	for _, s := range []string{"success", "error", "failure"} {
 		if state == s {
 			return false
 		}
