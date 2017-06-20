@@ -7,7 +7,7 @@ import (
 
 var RootCmd = &cobra.Command{
 	Use:   "atlantis",
-	Short: "Terraform collaboration tool",
+	Short: "Terraform collaboration tool", // todo: decide on name #opensource
 }
 
 func Execute() {

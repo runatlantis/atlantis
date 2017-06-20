@@ -2,9 +2,9 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"github.com/google/go-github/github"
 	"github.com/hootsuite/atlantis/models"
+	"github.com/pkg/errors"
 )
 
 type GithubClient struct {
@@ -14,16 +14,47 @@ type GithubClient struct {
 
 const (
 	statusContext = "Atlantis"
-	PendingStatus = "pending"
-	SuccessStatus = "success"
-	ErrorStatus   = "error"
-	FailureStatus = "failure"
 )
 
-func (g *GithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, status string, description string) {
-	repoStatus := github.RepoStatus{State: github.String(status), Description: github.String(description), Context: github.String(statusContext)}
+type Status int
+
+const (
+	Pending Status = iota
+	Success
+	Failure
+	Error
+)
+
+func (s Status) String() string {
+	switch s {
+	case Pending:
+		return "pending"
+	case Success:
+		return "success"
+	case Failure:
+		return "failure"
+	case Error:
+		return "error"
+	}
+	return "error"
+}
+
+func WorstStatus(ss []Status) Status {
+	if len(ss) == 0 {
+		return Success
+	}
+	worst := Success
+	for _, s := range ss {
+		if s > worst {
+			worst = s
+		}
+	}
+	return worst
+}
+
+func (g *GithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, status Status, description string) {
+	repoStatus := github.RepoStatus{State: github.String(status.String()), Description: github.String(description), Context: github.String(statusContext)}
 	g.client.Repositories.CreateStatus(g.ctx, repo.Owner, repo.Name, pull.HeadCommit, &repoStatus)
-	// todo: deal with error updating status
 }
 
 // GetModifiedFiles returns the names of files that were modified in the pull request.
@@ -46,22 +77,12 @@ func (g *GithubClient) CreateComment(ctx *CommandContext, comment string) error 
 }
 
 func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
-	// todo: move back to using g.client.PullRequests.ListReviews when we update our GitHub enterprise version
-	// to where we don't need to include the custom accept header
-	u := fmt.Sprintf("repos/%v/%v/pulls/%d/reviews", repo.Owner, repo.Name, pull.Num)
-	req, err := g.client.NewRequest("GET", u, nil)
+	reviews, _, err := g.client.PullRequests.ListReviews(g.ctx, repo.Owner, repo.Name, pull.Num, nil)
 	if err != nil {
-		return false, err
-	}
-	req.Header.Set("Accept", "application/vnd.github.black-cat-preview+json")
-
-	var reviews []*github.PullRequestReview
-	_, err = g.client.Do(g.ctx, req, &reviews)
-	if err != nil {
-		return false, fmt.Errorf("failed to retrieve reviews: %v", err)
+		return false, errors.Wrap(err, "getting reviews")
 	}
 	for _, review := range reviews {
-		if review != nil && review.State != nil && *review.State == "APPROVED" {
+		if review != nil && review.GetState() == "APPROVED" {
 			return true, nil
 		}
 	}

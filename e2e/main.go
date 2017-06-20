@@ -14,8 +14,8 @@ import (
 
 var defaultAtlantisURL = "http://localhost:4141"
 var projectTypes = []Project{
-	Project{"standalone", "run plan", "run apply"},
-	Project{"standalone-with-env", "run plan staging", "run apply staging"},
+	{"standalone", "run plan", "run apply"},
+	{"standalone-with-env", "run plan staging", "run apply staging"},
 }
 
 type Project struct {

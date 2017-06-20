@@ -8,7 +8,7 @@ import (
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "Print the current atlantis version",
+	Short: "Print the current Atlantis version",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Printf("atlantis %s\n", viper.Get("version"))
 	},

@@ -67,7 +67,7 @@ func (t *TerraformClient) ConfigureRemoteState(log *logging.SimpleLogger, repoDi
 	// Get remote state path from setup.sh output
 	r, _ := regexp.Compile("REMOTE_STATE_PATH=([^ ]*.tfstate)")
 	match := r.FindStringSubmatch(output)
-	// Store remote state path
+	// Backend remote state path
 	remoteStatePath := match[1]
 	log.Info("remote state path %q", remoteStatePath)
 

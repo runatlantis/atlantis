@@ -6,6 +6,7 @@ import (
 	"github.com/hootsuite/atlantis/locking"
 	"github.com/hootsuite/atlantis/logging"
 	"github.com/hootsuite/atlantis/models"
+	"github.com/hootsuite/atlantis/plan"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -26,6 +27,7 @@ type PlanExecutor struct {
 	lockingClient         *locking.Client
 	// DeleteLockURL is a function that given a lock id will return a url for deleting the lock
 	DeleteLockURL func(id string) (url string)
+	planStorage   plan.Backend
 }
 
 /** Result Types **/
@@ -77,7 +79,7 @@ func (p *PlanExecutor) execute(ctx *CommandContext, github *GithubClient) {
 }
 
 func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
-	p.github.UpdateStatus(ctx.Repo, ctx.Pull, "pending", "Planning...")
+	p.github.UpdateStatus(ctx.Repo, ctx.Pull, Pending, "Planning...")
 
 	// todo: lock when cloning or somehow separate workspaces
 	// clean the directory where we're going to clone
@@ -100,7 +102,7 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
 		if err != nil {
 			errMsg := fmt.Sprintf("failed to create git ssh wrapper: %v", err)
 			ctx.Log.Err(errMsg)
-			p.github.UpdateStatus(ctx.Repo, ctx.Pull, ErrorStatus, "Plan Error")
+			p.github.UpdateStatus(ctx.Repo, ctx.Pull, Error, "Plan Error")
 			return ExecutionResult{SetupError: GeneralError{errors.New(errMsg)}}
 		}
 
@@ -115,7 +117,7 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
 	if output, err := cloneCmd.CombinedOutput(); err != nil {
 		errMsg := fmt.Sprintf("failed to clone repository %q: %v: %s", ctx.Repo.SSHURL, err, string(output))
 		ctx.Log.Err(errMsg)
-		p.github.UpdateStatus(ctx.Repo, ctx.Pull, ErrorStatus, "Plan Error")
+		p.github.UpdateStatus(ctx.Repo, ctx.Pull, Error, "Plan Error")
 		return ExecutionResult{SetupError: GeneralError{errors.New(errMsg)}}
 	}
 
@@ -126,7 +128,7 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
 	if err := checkoutCmd.Run(); err != nil {
 		errMsg := fmt.Sprintf("failed to git checkout branch %q: %v", ctx.Pull.Branch, err)
 		ctx.Log.Err(errMsg)
-		p.github.UpdateStatus(ctx.Repo, ctx.Pull, ErrorStatus, "Plan Error")
+		p.github.UpdateStatus(ctx.Repo, ctx.Pull, Error, "Plan Error")
 		return ExecutionResult{SetupError: GeneralError{errors.New(errMsg)}}
 	}
 
@@ -135,13 +137,13 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to retrieve list of modified files from GitHub: %v", err)
 		ctx.Log.Err(errMsg)
-		p.github.UpdateStatus(ctx.Repo, ctx.Pull, ErrorStatus, "Plan Error")
+		p.github.UpdateStatus(ctx.Repo, ctx.Pull, Error, "Plan Error")
 		return ExecutionResult{SetupError: GeneralError{errors.New(errMsg)}}
 	}
 	modifiedTerraformFiles := p.filterToTerraform(modifiedFiles)
 	if len(modifiedTerraformFiles) == 0 {
 		ctx.Log.Info("no modified terraform files found, exiting")
-		p.github.UpdateStatus(ctx.Repo, ctx.Pull, FailureStatus, "Plan Failed")
+		p.github.UpdateStatus(ctx.Repo, ctx.Pull, Failure, "Plan Failed")
 		return ExecutionResult{SetupError: GeneralError{errors.New("Plan Failed: no modified terraform files found")}}
 	}
 	ctx.Log.Debug("Found %d modified terraform files: %v", len(modifiedTerraformFiles), modifiedTerraformFiles)
@@ -149,7 +151,7 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
 	projects := p.ModifiedProjects(ctx.Repo.FullName, modifiedTerraformFiles)
 	if len(projects) == 0 {
 		ctx.Log.Info("no Terraform projects were modified")
-		p.github.UpdateStatus(ctx.Repo, ctx.Pull, FailureStatus, "Plan Failed")
+		p.github.UpdateStatus(ctx.Repo, ctx.Pull, Failure, "Plan Failed")
 		return ExecutionResult{SetupError: GeneralError{errors.New("Plan Failed: we determined that no terraform projects were modified")}}
 	}
 
@@ -157,19 +159,13 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
 	if err := p.CleanWorkspace(ctx.Log, planFilesPrefix, p.scratchDir, cloneDir, projects); err != nil {
 		errMsg := fmt.Sprintf("failed to clean workspace, aborting: %v", err)
 		ctx.Log.Err(errMsg)
-		p.github.UpdateStatus(ctx.Repo, ctx.Pull, ErrorStatus, "Plan Error")
+		p.github.UpdateStatus(ctx.Repo, ctx.Pull, Error, "Plan Error")
 		return ExecutionResult{SetupError: GeneralError{errors.New(errMsg)}}
 	}
-	s3Client := NewS3Client(p.awsConfig, p.s3Bucket, "plans")
 
 	var config Config
-	// run `terraform plan` in each plan path and collect the results
 	planOutputs := []PathResult{}
 	for _, project := range projects {
-		// todo: not sure it makes sense to be generating the output filename and plan name here
-		tfPlanFilename := p.GenerateOutputFilename(project, ctx.Command.environment)
-		tfPlanName := fmt.Sprintf("%s_%d%s", strings.Replace(ctx.Repo.FullName, "/", "_", -1), ctx.Pull.Num, tfPlanFilename)
-		s3Key := fmt.Sprintf("%s/%s", ctx.Repo.FullName, tfPlanName)
 		// check if config file is found, if not we continue the run
 		absolutePath := filepath.Join(cloneDir, project.Path)
 		if config.Exists(absolutePath) {
@@ -195,7 +191,7 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
 				p.terraform.tfExecutableName = "terraform"
 			}
 		}
-		generatePlanResponse := p.plan(ctx, cloneDir, p.scratchDir, tfPlanName, s3Client, project, s3Key, p.sshKey, config.StashPath)
+		generatePlanResponse := p.plan(ctx, cloneDir, p.scratchDir, project, p.sshKey, config.StashPath)
 		generatePlanResponse.Path = project.Path
 		planOutputs = append(planOutputs, generatePlanResponse)
 	}
@@ -209,10 +205,7 @@ func (p *PlanExecutor) plan(
 	ctx *CommandContext,
 	repoDir string,
 	planOutDir string,
-	tfPlanName string,
-	s3Client S3Client,
 	project models.Project,
-	s3Key string,
 	sshKey string,
 	stashPath string) PathResult {
 	ctx.Log.Info("generating plan for path %q", project.Path)
@@ -222,7 +215,7 @@ func (p *PlanExecutor) plan(
 		_, err := p.terraform.ConfigureRemoteState(ctx.Log, repoDir, project, ctx.Command.environment, sshKey)
 		if err != nil {
 			return PathResult{
-				Status: "error",
+				Status: Error,
 				Result: GeneralError{fmt.Errorf("failed to configure remote state: %s", err)},
 			}
 		}
@@ -235,7 +228,7 @@ func (p *PlanExecutor) plan(
 	lockAttempt, err := p.lockingClient.TryLock(project, ctx.Command.environment, ctx.Pull.Num)
 	if err != nil {
 		return PathResult{
-			Status: " failure",
+			Status: Failure,
 			Result: GeneralError{fmt.Errorf("failed to lock state: %v", err)},
 		}
 	}
@@ -243,7 +236,7 @@ func (p *PlanExecutor) plan(
 	// the run is locked unless the locking run is the same pull id as this run
 	if lockAttempt.LockAcquired == false && lockAttempt.LockingPullNum != ctx.Pull.Num {
 		return PathResult{
-			Status: "failure",
+			Status: Failure,
 			Result: RunLockedFailure{lockAttempt.LockingPullNum},
 		}
 	}
@@ -251,22 +244,20 @@ func (p *PlanExecutor) plan(
 	// Run terraform plan
 	ctx.Log.Info("running terraform plan in directory %q", project.Path)
 	tfPlanCmd := []string{"plan", "-refresh", "-no-color"}
-	// Generate terraform plan filename
-	tfPlanOutputPath := filepath.Join(planOutDir, tfPlanName)
-	// Generate terraform plan arguments
+	planFile := filepath.Join(repoDir, project.Path, fmt.Sprintf("%s.tfplan", tfEnv))
 	if ctx.Command.environment != "" {
 		tfEnvFileName := filepath.Join("env", ctx.Command.environment+".tfvars")
 		if _, err := os.Stat(filepath.Join(repoDir, project.Path, tfEnvFileName)); err == nil {
-			tfPlanCmd = append(tfPlanCmd, "-var-file", tfEnvFileName, "-out", tfPlanOutputPath)
+			tfPlanCmd = append(tfPlanCmd, "-var-file", tfEnvFileName, "-out", planFile)
 		} else {
 			ctx.Log.Err("environment file %q not found", tfEnvFileName)
 			return PathResult{
-				Status: "failure",
+				Status: Failure,
 				Result: EnvironmentFileNotFoundFailure{tfEnvFileName},
 			}
 		}
 	} else {
-		tfPlanCmd = append(tfPlanCmd, "-out", tfPlanOutputPath)
+		tfPlanCmd = append(tfPlanCmd, "-out", planFile)
 	}
 
 	// set pull request creator as the session name
@@ -275,7 +266,7 @@ func (p *PlanExecutor) plan(
 	if err != nil {
 		ctx.Log.Err(err.Error())
 		return PathResult{
-			Status: "error",
+			Status: Error,
 			Result: GeneralError{err},
 		}
 	}
@@ -285,7 +276,7 @@ func (p *PlanExecutor) plan(
 		err = fmt.Errorf("failed to get assumed role credentials: %v", err)
 		ctx.Log.Err(err.Error())
 		return PathResult{
-			Status: "error",
+			Status: Error,
 			Result: GeneralError{err},
 		}
 	}
@@ -310,32 +301,31 @@ func (p *PlanExecutor) plan(
 			ctx.Log.Err("error unlocking state: %v", err)
 		}
 		return PathResult{
-			Status: "failure",
+			Status: Failure,
 			Result: err,
 		}
 	}
-	// Upload plan to S3
-	ctx.Log.Info("uploading plan to S3 with key %q", s3Key)
-	if err := UploadPlanFile(s3Client, s3Key, tfPlanOutputPath); err != nil {
-		err = fmt.Errorf("failed to upload to S3: %v", err)
-		ctx.Log.Err(err.Error())
+	// Save the plan
+	if err := p.planStorage.SavePlan(planFile, project, tfEnv, ctx.Pull.Num); err != nil {
+		ctx.Log.Err("saving plan: %s", err)
+		// there was an error planning so unlock
 		if err := p.lockingClient.Unlock(lockAttempt.LockKey); err != nil {
-			ctx.Log.Err("error unlocking state: %v", err)
+			ctx.Log.Err("error unlocking: %v", err)
 		}
 		return PathResult{
-			Status: "error",
+			Status: Error,
 			Result: GeneralError{err},
 		}
 	}
+	ctx.Log.Info("saved plan successfully")
+
 	// Delete local plan file
-	planFilePath := fmt.Sprintf("%s/%s", planOutDir, tfPlanName)
-	ctx.Log.Info("deleting local plan file %q", planFilePath)
-	if err := os.Remove(planFilePath); err != nil {
-		ctx.Log.Err("failed to delete local plan file %q", planFilePath, err)
-		// todo: return an error
+	if err := os.Remove(planFile); err != nil {
+		ctx.Log.Err("failed to delete local plan file %q: %s", planFile, err)
+		// don't return an error since it should still be fine
 	}
 	return PathResult{
-		Status: "success",
+		Status: Success,
 		Result: PlanSuccess{
 			TerraformOutput: output,
 			LockURL:         p.DeleteLockURL(lockAttempt.LockKey),
@@ -355,13 +345,6 @@ func (p *PlanExecutor) filterToTerraform(files []string) []string {
 
 func (p *PlanExecutor) isInExcludeList(fileName string) bool {
 	return strings.Contains(fileName, "terraform.tfstate") || strings.Contains(fileName, "terraform.tfstate.backup") || strings.Contains(fileName, "_modules") || strings.Contains(fileName, "modules")
-}
-
-func (p *PlanExecutor) trimSuffix(s, suffix string) string {
-	if strings.HasSuffix(s, suffix) {
-		s = s[:len(s)-len(suffix)]
-	}
-	return s
 }
 
 // ModifiedProjects returns the list of Terraform projects that have been changed due to the
@@ -416,53 +399,15 @@ func (p *PlanExecutor) CleanWorkspace(log *logging.SimpleLogger, deleteFilesPref
 	return nil
 }
 
-func (p *PlanExecutor) DeleteLocalPlanFile(path string) error {
-	return os.Remove(path)
-}
-
-// GenerateOutputFilename determines the name of the plan that will be stored in s3
-// if we're executing inside a sub directory, there will be a leading underscore
-func (p *PlanExecutor) GenerateOutputFilename(project models.Project, tfEnvName string) string {
-	prefix := ""
-	if project.Path != "." {
-		// If not executing at repo root, need to encode the sub dir in the name of the output file.
-		// We do this by substituting / for _
-		// We also add an _ because this gets appended to a larger path
-		// todo: refactor the path handling so it's all in one place
-		prefix = "_" + strings.Replace(project.Path, "/", "_", -1)
-	}
-	suffix := ""
-	if tfEnvName != "" {
-		suffix = "." + tfEnvName
-	}
-
-	return prefix + ".tfplan" + suffix
-}
-
 func generateStatePath(path string, tfEnvName string) string {
 	return strings.Replace(path, "$ENVIRONMENT", tfEnvName, -1)
 }
 
-func (p *PlanExecutor) updateGithubStatus(ctx *CommandContext, pathResults []PathResult) {
-	// the status will be the worst result
-	worstResult := p.worstResult(pathResults)
-	if worstResult == "success" {
-		p.github.UpdateStatus(ctx.Repo, ctx.Pull, SuccessStatus, "Plan Succeeded")
-	} else if worstResult == "failure" {
-		p.github.UpdateStatus(ctx.Repo, ctx.Pull, FailureStatus, "Plan Failed")
-	} else {
-		p.github.UpdateStatus(ctx.Repo, ctx.Pull, ErrorStatus, "Plan Error")
+func (a *PlanExecutor) updateGithubStatus(ctx *CommandContext, pathResults []PathResult) {
+	var statuses []Status
+	for _, p := range pathResults {
+		statuses = append(statuses, p.Status)
 	}
-}
-
-func (p *PlanExecutor) worstResult(results []PathResult) string {
-	var worst string = "success"
-	for _, result := range results {
-		if result.Status == "error" {
-			return result.Status
-		} else if result.Status == "failure" {
-			worst = result.Status
-		}
-	}
-	return worst
+	worst := WorstStatus(statuses)
+	a.github.UpdateStatus(ctx.Repo, ctx.Pull, worst, "Plan "+worst.String())
 }

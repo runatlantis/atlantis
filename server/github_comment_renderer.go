@@ -144,7 +144,7 @@ func (g *GithubCommentRenderer) render(res ExecutionResult, log string, verbose 
 	} else {
 		hasErrors := false
 		for _, res := range res.PathResults {
-			if res.Status == "error" {
+			if res.Status == Error {
 				hasErrors = true
 			}
 		}

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"github.com/hootsuite/atlantis/models"
 	. "github.com/hootsuite/atlantis/testing_util"
 	"testing"
 )
@@ -25,17 +24,4 @@ func runTest(t *testing.T, testDescrip string, filesChanged []string, expectedPa
 		t.Log(testDescrip)
 		Equals(t, expectedPaths[i], p.Path)
 	}
-}
-
-func TestGenerateOutputFilename(t *testing.T) {
-	runTestGetOutputFilename(t, "should handle root", ".", "env", ".tfplan.env")
-	runTestGetOutputFilename(t, "should handle empty environment", ".", "", ".tfplan")
-	runTestGetOutputFilename(t, "should prepend underscore on relative paths", "a/b", "", "_a_b.tfplan")
-	runTestGetOutputFilename(t, "should prepend underscore on relative paths and env", "a/b", "env", "_a_b.tfplan.env")
-}
-
-func runTestGetOutputFilename(t *testing.T, testDescrip string, path string, env string, expected string) {
-	t.Log(testDescrip)
-	outputFileName := p.GenerateOutputFilename(models.NewProject("owner/repo", path), env)
-	Equals(t, expected, outputFileName)
 }

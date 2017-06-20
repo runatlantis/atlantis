@@ -25,9 +25,11 @@ const (
 	lockingBackendFlag  = "locking-backend"
 	lockingTableFlag    = "locking-dynamodb-table"
 	logLevelFlag        = "log-level"
+	planBackendFlag     = "plan-backend"
+	planS3BucketFlag    = "plan-s3-bucket"
+	planS3PrefixFlag    = "plan-s3-prefix"
 	portFlag            = "port"
 	requireApprovalFlag = "require-approval"
-	s3BucketFlag        = "s3-bucket"
 	scratchDirFlag      = "scratch-dir"
 	sshKeyFlag          = "ssh-key"
 )
@@ -77,7 +79,7 @@ var stringFlags = []stringFlag{
 	},
 	{
 		name:        lockingTableFlag,
-		description: "Name of table in DynamoDB to use for locking. Only read if locking-backend is set to dynamodb.",
+		description: "Name of table in DynamoDB to use for locking. Only read if " + lockingBackendFlag + " is set to dynamodb.",
 		value:       "atlantis-locks",
 	},
 	{
@@ -86,9 +88,19 @@ var stringFlags = []stringFlag{
 		value:       "warn",
 	},
 	{
-		name:        s3BucketFlag,
-		description: "The S3 bucket name to store atlantis data (terraform plans, terraform state, etc).",
+		name:        planS3BucketFlag,
+		description: "S3 bucket for storing plan files. Only read if " + planBackendFlag + " is set to s3",
 		value:       "atlantis",
+	},
+	{
+		name:        planS3PrefixFlag,
+		description: "Prefix of plan file names stored in S3. Only read if " + planBackendFlag + " is set to s3",
+		value:       "",
+	},
+	{
+		name:        planBackendFlag,
+		description: "How to store plan files: file or s3. If set to file, will store plan files on disk in the directory specified by data-dir.",
+		value:       "file",
 	},
 	{
 		name:        scratchDirFlag,
@@ -147,7 +159,7 @@ Config values are overridden by environment variables which in turn are overridd
 		if configFile != "" {
 			viper.SetConfigFile(configFile)
 			if err := viper.ReadInConfig(); err != nil {
-				return fmt.Errorf("invalid config: reading %s: %s", configFile, err)
+				return errors.Wrapf(err, "invalid config: reading %s", configFile)
 			}
 		}
 		return nil
@@ -211,6 +223,9 @@ func validate(config server.ServerConfig) error {
 	}
 	if config.LockingBackend != server.LockingFileBackend && config.LockingBackend != server.LockingDynamoDBBackend {
 		return fmt.Errorf("unsupported locking backend %q: not one of %q or %q", config.LockingBackend, server.LockingFileBackend, server.LockingDynamoDBBackend)
+	}
+	if config.PlanBackend != server.PlanFileBackend && config.PlanBackend != server.PlanS3Backend {
+		return fmt.Errorf("unsupported plan backend %q: not one of %q or %q", config.PlanBackend, server.PlanFileBackend, server.PlanS3Backend)
 	}
 	return nil
 }

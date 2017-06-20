@@ -8,23 +8,9 @@ import (
 	"regexp"
 )
 
-type RequestParser struct{}
+type EventParser struct{}
 
-type CommandType int
-
-const (
-	Apply CommandType = iota
-	Plan
-	Help
-)
-
-type Command struct {
-	verbose     bool
-	environment string
-	commandType CommandType
-}
-
-func (r *RequestParser) DetermineCommand(comment *github.IssueCommentEvent) (*Command, error) {
+func (e *EventParser) DetermineCommand(comment *github.IssueCommentEvent) (*Command, error) {
 	// for legacy, also support "run" instead of atlantis
 	atlantisCommentRegex := `^(?:run|atlantis) (plan|apply|help)([[:blank:]])?([a-zA-Z0-9_-]+)?\s*(--verbose)?$`
 	runPlanMatcher := regexp.MustCompile(atlantisCommentRegex)
@@ -62,7 +48,7 @@ func (r *RequestParser) DetermineCommand(comment *github.IssueCommentEvent) (*Co
 	return command, nil
 }
 
-func (r *RequestParser) ExtractCommentData(comment *github.IssueCommentEvent, ctx *CommandContext) error {
+func (e *EventParser) ExtractCommentData(comment *github.IssueCommentEvent, ctx *CommandContext) error {
 	repoFullName := comment.Repo.GetFullName()
 	if repoFullName == "" {
 		return errors.New("repository.full_name is null")
@@ -110,38 +96,38 @@ func (r *RequestParser) ExtractCommentData(comment *github.IssueCommentEvent, ct
 	return nil
 }
 
-func (r *RequestParser) ExtractPullData(pull *github.PullRequest, params *CommandContext) error {
+func (e *EventParser) ExtractPullData(pull *github.PullRequest) (models.PullRequest, error) {
+	var pullModel models.PullRequest
 	commit := pull.Head.GetSHA()
 	if commit == "" {
-		return errors.New("head.sha is null")
+		return pullModel, errors.New("head.sha is null")
 	}
 	base := pull.Base.GetSHA()
 	if base == "" {
-		return errors.New("base.sha is null")
+		return pullModel, errors.New("base.sha is null")
 	}
 	pullLink := pull.GetHTMLURL()
 	if pullLink == "" {
-		return errors.New("html_url is null")
+		return pullModel, errors.New("html_url is null")
 	}
 	branch := pull.Head.GetRef()
 	if branch == "" {
-		return errors.New("head.ref is null")
+		return pullModel, errors.New("head.ref is null")
 	}
 	authorUsername := pull.User.GetLogin()
 	if authorUsername == "" {
-		return errors.New("user.login is null")
+		return pullModel, errors.New("user.login is null")
 	}
 	num := pull.GetNumber()
 	if num == 0 {
-		return errors.New("number is null")
+		return pullModel, errors.New("number is null")
 	}
-	params.Pull = models.PullRequest{
+	return models.PullRequest{
 		BaseCommit: base,
 		Author:     authorUsername,
 		Branch:     branch,
 		HeadCommit: commit,
 		Link:       pullLink,
 		Num:        num,
-	}
-	return nil
+	}, nil
 }
