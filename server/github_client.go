@@ -5,6 +5,7 @@ import (
 	"github.com/google/go-github/github"
 	"github.com/hootsuite/atlantis/models"
 	"github.com/pkg/errors"
+	"fmt"
 )
 
 type GithubClient struct {
@@ -23,6 +24,9 @@ const (
 	Success
 	Failure
 	Error
+
+	PlanStep = "plan"
+	ApplyStep = "apply"
 )
 
 func (s Status) String() string {
@@ -52,8 +56,8 @@ func WorstStatus(ss []Status) Status {
 	return worst
 }
 
-func (g *GithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, status Status, description string) {
-	repoStatus := github.RepoStatus{State: github.String(status.String()), Description: github.String(description), Context: github.String(statusContext)}
+func (g *GithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, status Status, step string) {
+	repoStatus := github.RepoStatus{State: github.String(status.String()), Description: github.String(fmt.Sprintf("%s %s", step, status.String())), Context: github.String(statusContext)}
 	g.client.Repositories.CreateStatus(g.ctx, repo.Owner, repo.Name, pull.HeadCommit, &repoStatus)
 }
 

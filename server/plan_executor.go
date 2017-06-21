@@ -1,7 +1,6 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"github.com/hootsuite/atlantis/locking"
 	"github.com/hootsuite/atlantis/logging"
@@ -13,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"github.com/pkg/errors"
 )
 
 // PlanExecutor handles everything related to running the Terraform plan including integration with S3, Terraform, and GitHub
@@ -79,7 +79,7 @@ func (p *PlanExecutor) execute(ctx *CommandContext, github *GithubClient) {
 }
 
 func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
-	p.github.UpdateStatus(ctx.Repo, ctx.Pull, Pending, "Planning...")
+	p.github.UpdateStatus(ctx.Repo, ctx.Pull, Pending, PlanStep)
 
 	// todo: lock when cloning or somehow separate workspaces
 	// clean the directory where we're going to clone
@@ -100,12 +100,8 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
 	if p.sshKey != "" {
 		err := GenerateSSHWrapper()
 		if err != nil {
-			errMsg := fmt.Sprintf("failed to create git ssh wrapper: %v", err)
-			ctx.Log.Err(errMsg)
-			p.github.UpdateStatus(ctx.Repo, ctx.Pull, Error, "Plan Error")
-			return ExecutionResult{SetupError: GeneralError{errors.New(errMsg)}}
+			return p.setupError(ctx, errors.Wrap(err, "creating git ssh wrapper"))
 		}
-
 		cloneCmd.Env = []string{
 			fmt.Sprintf("GIT_SSH=%s", defaultSSHWrapper),
 			fmt.Sprintf("PKEY=%s", p.sshKey),
@@ -115,10 +111,7 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
 	// git clone the repo
 	ctx.Log.Info("git cloning %q into %q", ctx.Repo.SSHURL, cloneDir)
 	if output, err := cloneCmd.CombinedOutput(); err != nil {
-		errMsg := fmt.Sprintf("failed to clone repository %q: %v: %s", ctx.Repo.SSHURL, err, string(output))
-		ctx.Log.Err(errMsg)
-		p.github.UpdateStatus(ctx.Repo, ctx.Pull, Error, "Plan Error")
-		return ExecutionResult{SetupError: GeneralError{errors.New(errMsg)}}
+		return p.setupError(ctx, fmt.Errorf("cloning %s: %s: %s", ctx.Repo.SSHURL, err, string(output)))
 	}
 
 	// check out the branch for this PR
@@ -126,24 +119,18 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
 	checkoutCmd := exec.Command("git", "checkout", ctx.Pull.Branch)
 	checkoutCmd.Dir = cloneDir
 	if err := checkoutCmd.Run(); err != nil {
-		errMsg := fmt.Sprintf("failed to git checkout branch %q: %v", ctx.Pull.Branch, err)
-		ctx.Log.Err(errMsg)
-		p.github.UpdateStatus(ctx.Repo, ctx.Pull, Error, "Plan Error")
-		return ExecutionResult{SetupError: GeneralError{errors.New(errMsg)}}
+		return p.setupError(ctx, errors.Wrapf(err, "checking out branch %s", ctx.Pull.Branch))
 	}
 
 	ctx.Log.Info("listing modified files from pull request")
 	modifiedFiles, err := p.github.GetModifiedFiles(ctx.Repo, ctx.Pull)
 	if err != nil {
-		errMsg := fmt.Sprintf("failed to retrieve list of modified files from GitHub: %v", err)
-		ctx.Log.Err(errMsg)
-		p.github.UpdateStatus(ctx.Repo, ctx.Pull, Error, "Plan Error")
-		return ExecutionResult{SetupError: GeneralError{errors.New(errMsg)}}
+		return p.setupError(ctx, errors.Wrap(err, "getting modified files"))
 	}
 	modifiedTerraformFiles := p.filterToTerraform(modifiedFiles)
 	if len(modifiedTerraformFiles) == 0 {
 		ctx.Log.Info("no modified terraform files found, exiting")
-		p.github.UpdateStatus(ctx.Repo, ctx.Pull, Failure, "Plan Failed")
+		p.github.UpdateStatus(ctx.Repo, ctx.Pull, Failure, PlanStep)
 		return ExecutionResult{SetupError: GeneralError{errors.New("Plan Failed: no modified terraform files found")}}
 	}
 	ctx.Log.Debug("Found %d modified terraform files: %v", len(modifiedTerraformFiles), modifiedTerraformFiles)
@@ -151,16 +138,14 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
 	projects := p.ModifiedProjects(ctx.Repo.FullName, modifiedTerraformFiles)
 	if len(projects) == 0 {
 		ctx.Log.Info("no Terraform projects were modified")
-		p.github.UpdateStatus(ctx.Repo, ctx.Pull, Failure, "Plan Failed")
+		p.github.UpdateStatus(ctx.Repo, ctx.Pull, Failure, PlanStep)
 		return ExecutionResult{SetupError: GeneralError{errors.New("Plan Failed: we determined that no terraform projects were modified")}}
 	}
 
+	// todo: update how we clean the workspace based on the new way of storing plans
 	planFilesPrefix := fmt.Sprintf("%s_%d", strings.Replace(ctx.Repo.FullName, "/", "_", -1), ctx.Pull.Num)
 	if err := p.CleanWorkspace(ctx.Log, planFilesPrefix, p.scratchDir, cloneDir, projects); err != nil {
-		errMsg := fmt.Sprintf("failed to clean workspace, aborting: %v", err)
-		ctx.Log.Err(errMsg)
-		p.github.UpdateStatus(ctx.Repo, ctx.Pull, Error, "Plan Error")
-		return ExecutionResult{SetupError: GeneralError{errors.New(errMsg)}}
+		return p.setupError(ctx, errors.Wrap(err, "cleaning workspace"))
 	}
 
 	var config Config
@@ -399,15 +384,22 @@ func (p *PlanExecutor) CleanWorkspace(log *logging.SimpleLogger, deleteFilesPref
 	return nil
 }
 
+// todo: make OO
 func generateStatePath(path string, tfEnvName string) string {
 	return strings.Replace(path, "$ENVIRONMENT", tfEnvName, -1)
 }
 
-func (a *PlanExecutor) updateGithubStatus(ctx *CommandContext, pathResults []PathResult) {
+func (p *PlanExecutor) updateGithubStatus(ctx *CommandContext, pathResults []PathResult) {
 	var statuses []Status
 	for _, p := range pathResults {
 		statuses = append(statuses, p.Status)
 	}
 	worst := WorstStatus(statuses)
-	a.github.UpdateStatus(ctx.Repo, ctx.Pull, worst, "Plan "+worst.String())
+	p.github.UpdateStatus(ctx.Repo, ctx.Pull, worst, PlanStep)
+}
+
+func (p *PlanExecutor) setupError(ctx *CommandContext, err error) ExecutionResult {
+	ctx.Log.Err(err.Error())
+	p.github.UpdateStatus(ctx.Repo, ctx.Pull, Error, PlanStep)
+	return ExecutionResult{SetupError: GeneralError{err}}
 }

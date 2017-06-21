@@ -57,7 +57,7 @@ func (n NoPlansFailure) Template() *CompiledTemplate {
 }
 
 func (a *ApplyExecutor) execute(ctx *CommandContext, github *GithubClient) {
-	a.github.UpdateStatus(ctx.Repo, ctx.Pull, Pending, "Applying...")
+	a.github.UpdateStatus(ctx.Repo, ctx.Pull, Pending, ApplyStep)
 	res := a.setupAndApply(ctx)
 	res.Command = Apply
 	comment := a.githubCommentRenderer.render(res, ctx.Log.History.String(), ctx.Command.verbose)
@@ -75,13 +75,13 @@ func (a *ApplyExecutor) setupAndApply(ctx *CommandContext) ExecutionResult {
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to get plans: %s", err)
 		ctx.Log.Err(errMsg)
-		a.github.UpdateStatus(ctx.Repo, ctx.Pull, Error, "Apply Error")
+		a.github.UpdateStatus(ctx.Repo, ctx.Pull, Error, ApplyStep)
 		return ExecutionResult{SetupError: GeneralError{errors.New(errMsg)}}
 	}
 	if len(plans) == 0 {
 		failure := "found 0 plans for this pull request"
 		ctx.Log.Warn(failure)
-		a.github.UpdateStatus(ctx.Repo, ctx.Pull, Failure, "Apply Failure")
+		a.github.UpdateStatus(ctx.Repo, ctx.Pull, Failure, ApplyStep)
 		return ExecutionResult{SetupFailure: NoPlansFailure{}}
 	}
 
@@ -219,7 +219,7 @@ func (a *ApplyExecutor) updateGithubStatus(ctx *CommandContext, pathResults []Pa
 		statuses = append(statuses, p.Status)
 	}
 	worst := WorstStatus(statuses)
-	a.github.UpdateStatus(ctx.Repo, ctx.Pull, worst, "Apply "+worst.String())
+	a.github.UpdateStatus(ctx.Repo, ctx.Pull, worst, ApplyStep)
 }
 
 func (a *ApplyExecutor) isApproved(ctx *CommandContext) (bool, ExecutionResult) {
@@ -231,12 +231,12 @@ func (a *ApplyExecutor) isApproved(ctx *CommandContext) (bool, ExecutionResult) 
 	if err != nil {
 		msg := fmt.Sprintf("failed to determine if pull request was approved: %v", err)
 		ctx.Log.Err(msg)
-		a.github.UpdateStatus(ctx.Repo, ctx.Pull, Error, "Apply Error")
+		a.github.UpdateStatus(ctx.Repo, ctx.Pull, Error, ApplyStep)
 		return false, ExecutionResult{SetupError: GeneralError{errors.New(msg)}}
 	}
 	if !ok {
 		ctx.Log.Info("pull request was not approved")
-		a.github.UpdateStatus(ctx.Repo, ctx.Pull, Failure, "Apply Failed")
+		a.github.UpdateStatus(ctx.Repo, ctx.Pull, Failure, ApplyStep)
 		return false, ExecutionResult{SetupFailure: PullNotApprovedFailure{}}
 	}
 	return true, ExecutionResult{}
