@@ -154,17 +154,17 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan plan.Pla
 			tfEnv = "default"
 		}
 
-		lockAttempt, err := a.lockingClient.TryLock(plan.Project, tfEnv, ctx.Pull.Num)
+		lockAttempt, err := a.lockingClient.TryLock(plan.Project, tfEnv, ctx.Pull, ctx.User)
 		if err != nil {
 			return PathResult{
 				Status: Error,
 				Result: GeneralError{fmt.Errorf("failed to acquire lock: %s", err)},
 			}
 		}
-		if lockAttempt.LockAcquired != true && lockAttempt.LockingPullNum != ctx.Pull.Num {
+		if lockAttempt.LockAcquired != true && lockAttempt.CurrLock.Pull.Num != ctx.Pull.Num {
 			return PathResult{
 				Status: Error,
-				Result: GeneralError{fmt.Errorf("failed to acquire lock: lock held by pull request #%d", lockAttempt.LockingPullNum)},
+				Result: GeneralError{fmt.Errorf("failed to acquire lock: lock held by pull request #%d", lockAttempt.CurrLock.Pull.Num)},
 			}
 		}
 	}

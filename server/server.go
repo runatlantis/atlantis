@@ -254,7 +254,7 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 		results = append(results, lock{
 			UnlockURL:    u.String(),
 			RepoFullName: v.Project.RepoFullName,
-			PullNum:      v.PullNum,
+			PullNum:      v.Pull.Num,
 			Time:         v.Time,
 		})
 	}

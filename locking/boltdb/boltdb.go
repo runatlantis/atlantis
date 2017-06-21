@@ -48,17 +48,11 @@ func NewWithDB(db *bolt.DB, bucket string) (*Backend, error) {
 	return &Backend{db, []byte(bucket)}, nil
 }
 
-func (b *Backend) TryLock(project models.Project, env string, pullNum int) (bool, int, error) {
+func (b *Backend) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, error) {
 	// return variables
 	var lockAcquired bool
-	var lockingPullNum int
-	key := b.key(project, env)
-	newLock := models.ProjectLock{
-		PullNum: pullNum,
-		Project: project,
-		Time:    time.Now(),
-		Env:     env,
-	}
+	var currLock models.ProjectLock
+	key := b.key(newLock.Project, newLock.Env)
 	newLockSerialized, _ := json.Marshal(newLock)
 	transactionErr := b.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(b.bucket)
@@ -68,25 +62,23 @@ func (b *Backend) TryLock(project models.Project, env string, pullNum int) (bool
 		if currLockSerialized == nil {
 			bucket.Put([]byte(key), newLockSerialized) // not a readonly bucketName so okay to ignore error
 			lockAcquired = true
-			lockingPullNum = pullNum
+			currLock = newLock
 			return nil
 		}
 
 		// otherwise the lock fails, return to caller the run that's holding the lock
-		var currLock models.ProjectLock
 		if err := json.Unmarshal(currLockSerialized, &currLock); err != nil {
 			return errors.Wrap(err, "failed to deserialize current lock")
 		}
 		lockAcquired = false
-		lockingPullNum = currLock.PullNum
 		return nil
 	})
 
 	if transactionErr != nil {
-		return false, lockingPullNum, errors.Wrap(transactionErr, "DB transaction failed")
+		return false, currLock, errors.Wrap(transactionErr, "DB transaction failed")
 	}
 
-	return lockAcquired, lockingPullNum, nil
+	return lockAcquired, currLock, nil
 }
 
 func (b Backend) Unlock(p models.Project, env string) error {
@@ -137,7 +129,7 @@ func (b Backend) UnlockByPull(repoFullName string, pullNum int) error {
 			if err := json.Unmarshal(v, &lock); err != nil {
 				return errors.Wrapf(err, "failed to deserialize lock at key %q", string(k))
 			}
-			if lock.PullNum == pullNum {
+			if lock.Pull.Num == pullNum {
 				locks = append(locks, lock)
 			}
 		}

@@ -210,7 +210,7 @@ func (p *PlanExecutor) plan(
 	if tfEnv == "" {
 		tfEnv = "default"
 	}
-	lockAttempt, err := p.lockingClient.TryLock(project, ctx.Command.environment, ctx.Pull.Num)
+	lockAttempt, err := p.lockingClient.TryLock(project, ctx.Command.environment, ctx.Pull, ctx.User)
 	if err != nil {
 		return PathResult{
 			Status: Failure,
@@ -219,10 +219,10 @@ func (p *PlanExecutor) plan(
 	}
 
 	// the run is locked unless the locking run is the same pull id as this run
-	if lockAttempt.LockAcquired == false && lockAttempt.LockingPullNum != ctx.Pull.Num {
+	if lockAttempt.LockAcquired == false && lockAttempt.CurrLock.Pull.Num != ctx.Pull.Num {
 		return PathResult{
 			Status: Failure,
-			Result: RunLockedFailure{lockAttempt.LockingPullNum},
+			Result: RunLockedFailure{lockAttempt.CurrLock.Pull.Num},
 		}
 	}
 
