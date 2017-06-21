@@ -8,6 +8,10 @@ run_unit_test() {
 # Run unit tests
 run_unit_test
 
+# Get deps
+echo "Running 'make deps'"
+make deps
+
 # Build packages to make sure they can be compiled
 echo "Running 'make build'"
 make build-service

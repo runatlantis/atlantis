@@ -17,11 +17,7 @@ dependencies:
     # Install dependencies
     - cd "${WORKDIR}" && make deps
 
-test:
-  pre:
-    # Test dependencies
-    - cd "${WORKDIR}" && make deps-test
-  
+test:  
   override:
     # Run tests
     - cd "${WORKDIR}" && ./scripts/build.sh

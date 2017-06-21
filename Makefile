@@ -1,6 +1,6 @@
 BUILD_ID := $(shell git rev-parse --short HEAD 2>/dev/null || echo no-commit-id)
 WORKSPACE := $(shell pwd)
-PKG := $(shell go list ./... | grep -v e2e)
+PKG := $(shell go list ./... | grep -v e2e | grep -v vendor)
 
 .PHONY: test
 
@@ -17,14 +17,11 @@ debug: ## Output internal make variables
 	@echo WORKSPACE = $(WORKSPACE)
 	@echo PKG = $(PKG)
 
-deps:
-	go get -v $(PKG)
+deps: ## Download dependencies
+	go get -u github.com/kardianos/govendor
 
 build-service: ## Build the main Go service
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o atlantis .
-
-deps-test:
-	go get -t $(PKG)
 
 test: ## Run tests, coverage reports, and clean (coverage taints the compiled code)
 	go test -v $(PKG)
@@ -35,4 +32,7 @@ test-coverage:
 
 dist: ## Package up everything in static/ using go-bindata-assetfs so it can be served by a single binary
 	go-bindata-assetfs static/...
+
+vendor-status:
+	@govendor status
 
