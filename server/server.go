@@ -55,9 +55,9 @@ type ServerConfig struct {
 	AssumeRole           string `mapstructure:"aws-assume-role-arn"`
 	AtlantisURL          string `mapstructure:"atlantis-url"`
 	DataDir              string `mapstructure:"data-dir"`
-	GitHubHostname       string `mapstructure:"gh-hostname"`
-	GitHubPassword       string `mapstructure:"gh-password"`
-	GitHubUser           string `mapstructure:"gh-user"`
+	GithubHostname       string `mapstructure:"gh-hostname"`
+	GithubPassword       string `mapstructure:"gh-password"`
+	GithubUser           string `mapstructure:"gh-user"`
 	LockingBackend       string `mapstructure:"locking-backend"`
 	LockingDynamoDBTable string `mapstructure:"locking-dynamodb-table"`
 	LogLevel             string `mapstructure:"log-level"`
@@ -108,17 +108,18 @@ func (g GeneralError) Template() *CompiledTemplate {
 
 func NewServer(config ServerConfig) (*Server, error) {
 	tp := github.BasicAuthTransport{
-		Username: strings.TrimSpace(config.GitHubUser),
-		Password: strings.TrimSpace(config.GitHubPassword),
+		Username: strings.TrimSpace(config.GithubUser),
+		Password: strings.TrimSpace(config.GithubPassword),
 	}
 	githubBaseClient := github.NewClient(tp.Client())
 	githubClientCtx := context.Background()
-	ghHostname := fmt.Sprintf("https://%s/api/v3/", config.GitHubHostname)
-	if config.GitHubHostname == "api.github.com" {
-		ghHostname = fmt.Sprintf("https://%s/", config.GitHubHostname)
+	ghHostname := fmt.Sprintf("https://%s/api/v3/", config.GithubHostname)
+	if config.GithubHostname == "api.github.com" {
+		ghHostname = fmt.Sprintf("https://%s/", config.GithubHostname)
 	}
 	githubBaseClient.BaseURL, _ = url.Parse(ghHostname)
 	githubClient := &GithubClient{client: githubBaseClient, ctx: githubClientCtx}
+	githubStatus := &GithubStatus{client: githubClient}
 	terraformClient := &TerraformClient{
 		tfExecutableName: "terraform",
 	}
@@ -161,6 +162,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 	}
 	applyExecutor := &ApplyExecutor{
 		github:                githubClient,
+		githubStatus:          githubStatus,
 		awsConfig:             awsConfig,
 		scratchDir:            config.ScratchDir,
 		sshKey:                config.SSHKey,
@@ -172,6 +174,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 	}
 	planExecutor := &PlanExecutor{
 		github:                githubClient,
+		githubStatus:          githubStatus,
 		awsConfig:             awsConfig,
 		scratchDir:            config.ScratchDir,
 		sshKey:                config.SSHKey,

@@ -215,10 +215,10 @@ func validate(config server.ServerConfig) error {
 	if logLevel != "debug" && logLevel != "info" && logLevel != "warn" && logLevel != "error" {
 		return errors.New("invalid log level: not one of debug, info, warn, error")
 	}
-	if config.GitHubUser == "" {
+	if config.GithubUser == "" {
 		return fmt.Errorf("%s must be set", ghUserFlag)
 	}
-	if config.GitHubPassword == "" {
+	if config.GithubPassword == "" {
 		return fmt.Errorf("%s must be set", ghPasswordFlag)
 	}
 	if config.LockingBackend != server.LockingFileBackend && config.LockingBackend != server.LockingDynamoDBBackend {

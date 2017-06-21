@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"text/template"
 )
 
@@ -126,7 +127,7 @@ func init() {
 }
 
 func (g *GithubCommentRenderer) render(res ExecutionResult, log string, verbose bool) string {
-	commandStr := g.commandToString(res.Command)
+	commandStr := strings.Title(res.Command.String())
 	if res.SetupError != nil {
 		renderedError := g.renderTemplate(res.SetupError.Template().Template, res.SetupError)
 		return g.renderTemplate(ErrorTmpl.Template, struct {
@@ -178,14 +179,4 @@ func (g *GithubCommentRenderer) renderTemplate(tmpl *template.Template, data int
 		return fmt.Sprintf("Failed to render template, this is a bug: %v", err)
 	}
 	return buf.String()
-}
-
-func (g *GithubCommentRenderer) commandToString(command CommandType) string {
-	switch command {
-	case Plan:
-		return "Plan"
-	case Apply:
-		return "Apply"
-	}
-	return "Unknown Command"
 }

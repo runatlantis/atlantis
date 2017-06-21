@@ -6,18 +6,19 @@ import (
 	"github.com/hootsuite/atlantis/logging"
 	"github.com/hootsuite/atlantis/models"
 	"github.com/hootsuite/atlantis/plan"
+	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
-	"github.com/pkg/errors"
 )
 
 // PlanExecutor handles everything related to running the Terraform plan including integration with S3, Terraform, and GitHub
 type PlanExecutor struct {
 	github                *GithubClient
+	githubStatus          *GithubStatus
 	awsConfig             *AWSConfig
 	scratchDir            string
 	s3Bucket              string
@@ -79,7 +80,7 @@ func (p *PlanExecutor) execute(ctx *CommandContext, github *GithubClient) {
 }
 
 func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
-	p.github.UpdateStatus(ctx.Repo, ctx.Pull, Pending, PlanStep)
+	p.githubStatus.Update(ctx.Repo, ctx.Pull, Pending, PlanStep)
 
 	// todo: lock when cloning or somehow separate workspaces
 	// clean the directory where we're going to clone
@@ -130,7 +131,7 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
 	modifiedTerraformFiles := p.filterToTerraform(modifiedFiles)
 	if len(modifiedTerraformFiles) == 0 {
 		ctx.Log.Info("no modified terraform files found, exiting")
-		p.github.UpdateStatus(ctx.Repo, ctx.Pull, Failure, PlanStep)
+		p.githubStatus.Update(ctx.Repo, ctx.Pull, Failure, PlanStep)
 		return ExecutionResult{SetupError: GeneralError{errors.New("Plan Failed: no modified terraform files found")}}
 	}
 	ctx.Log.Debug("Found %d modified terraform files: %v", len(modifiedTerraformFiles), modifiedTerraformFiles)
@@ -138,7 +139,7 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
 	projects := p.ModifiedProjects(ctx.Repo.FullName, modifiedTerraformFiles)
 	if len(projects) == 0 {
 		ctx.Log.Info("no Terraform projects were modified")
-		p.github.UpdateStatus(ctx.Repo, ctx.Pull, Failure, PlanStep)
+		p.githubStatus.Update(ctx.Repo, ctx.Pull, Failure, PlanStep)
 		return ExecutionResult{SetupError: GeneralError{errors.New("Plan Failed: we determined that no terraform projects were modified")}}
 	}
 
@@ -180,7 +181,7 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
 		generatePlanResponse.Path = project.Path
 		planOutputs = append(planOutputs, generatePlanResponse)
 	}
-	p.updateGithubStatus(ctx, planOutputs)
+	p.githubStatus.UpdatePathResult(ctx, planOutputs)
 	return ExecutionResult{PathResults: planOutputs}
 }
 
@@ -389,17 +390,8 @@ func generateStatePath(path string, tfEnvName string) string {
 	return strings.Replace(path, "$ENVIRONMENT", tfEnvName, -1)
 }
 
-func (p *PlanExecutor) updateGithubStatus(ctx *CommandContext, pathResults []PathResult) {
-	var statuses []Status
-	for _, p := range pathResults {
-		statuses = append(statuses, p.Status)
-	}
-	worst := WorstStatus(statuses)
-	p.github.UpdateStatus(ctx.Repo, ctx.Pull, worst, PlanStep)
-}
-
 func (p *PlanExecutor) setupError(ctx *CommandContext, err error) ExecutionResult {
 	ctx.Log.Err(err.Error())
-	p.github.UpdateStatus(ctx.Repo, ctx.Pull, Error, PlanStep)
+	p.githubStatus.Update(ctx.Repo, ctx.Pull, Error, PlanStep)
 	return ExecutionResult{SetupError: GeneralError{err}}
 }
