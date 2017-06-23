@@ -16,7 +16,7 @@ type PullRequest struct {
 	Num        int
 	HeadCommit string
 	BaseCommit string
-	Link       string
+	URL        string
 	Branch     string
 	Author     string
 }
@@ -27,7 +27,8 @@ type User struct {
 
 type ProjectLock struct {
 	Project Project
-	PullNum int
+	Pull PullRequest
+	User User
 	Env     string
 	Time    time.Time
 }

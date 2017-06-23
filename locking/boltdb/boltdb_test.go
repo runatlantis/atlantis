@@ -11,12 +11,24 @@ import (
 
 	"github.com/hootsuite/atlantis/locking/boltdb"
 	"github.com/hootsuite/atlantis/models"
+	"time"
 )
 
 var lockBucket = "bucket"
 var project = models.NewProject("owner/repo", "parent/child")
 var env = "default"
 var pullNum = 1
+var lock = models.ProjectLock{
+	Pull: models.PullRequest{
+		Num: pullNum,
+	},
+	User: models.User{
+		Username: "lkysow",
+	},
+	Env: env,
+	Project: project,
+	Time: time.Now(),
+}
 
 func TestListNoLocks(t *testing.T) {
 	t.Log("listing locks when there are none should return an empty list")
@@ -31,7 +43,7 @@ func TestListOneLock(t *testing.T) {
 	t.Log("listing locks when there is one should return it")
 	db, b := newTestDB()
 	defer cleanupDB(db)
-	_, _, err := b.TryLock(project, env, pullNum)
+	_, _, err := b.TryLock(lock)
 	Ok(t, err)
 	ls, err := b.List()
 	Ok(t, err)
@@ -52,7 +64,9 @@ func TestListMultipleLocks(t *testing.T) {
 	}
 
 	for _, r := range repos {
-		_, _, err := b.TryLock(models.NewProject(r, "path"), env, pullNum)
+		newLock := lock
+		newLock.Project = models.NewProject(r, "path")
+		_, _, err := b.TryLock(newLock)
 		Ok(t, err)
 	}
 	ls, err := b.List()
@@ -73,7 +87,7 @@ func TestListAddRemove(t *testing.T) {
 	t.Log("listing after adding and removing should return none")
 	db, b := newTestDB()
 	defer cleanupDB(db)
-	_, _, err := b.TryLock(project, env, pullNum)
+	_, _, err := b.TryLock(lock)
 	Ok(t, err)
 	b.Unlock(project, env)
 
@@ -86,50 +100,57 @@ func TestLockingNoLocks(t *testing.T) {
 	t.Log("with no locks yet, lock should succeed")
 	db, b := newTestDB()
 	defer cleanupDB(db)
-	acquired, lockingPullNum, err := b.TryLock(project, env, pullNum)
+	acquired, currLock, err := b.TryLock(lock)
 	Ok(t, err)
 	Equals(t, true, acquired)
-	Equals(t, pullNum, lockingPullNum)
+	Equals(t, lock, currLock)
 }
 
 func TestLockingExistingLock(t *testing.T) {
 	t.Log("if there is an existing lock, lock should...")
 	db, b := newTestDB()
 	defer cleanupDB(db)
-	_, _, err := b.TryLock(project, env, pullNum)
+	_, _, err := b.TryLock(lock)
 	Ok(t, err)
 
 	t.Log("...succeed if the new project has a different path")
 	{
-		acquired, lockingPull, err := b.TryLock(models.NewProject(project.RepoFullName, "different/path"), env, pullNum)
+		newLock := lock
+		newLock.Project = models.NewProject(project.RepoFullName, "different/path")
+		acquired, currLock, err := b.TryLock(newLock)
 		Ok(t, err)
 		Equals(t, true, acquired)
-		Equals(t, pullNum, lockingPull)
+		Equals(t, pullNum, currLock.Pull.Num)
 	}
 
 	t.Log("...succeed if the new project has a different environment")
 	{
-		acquired, lockingPull, err := b.TryLock(project, "different-env", pullNum)
+		newLock := lock
+		newLock.Env = "different-env"
+		acquired, currLock, err := b.TryLock(newLock)
 		Ok(t, err)
 		Equals(t, true, acquired)
-		Equals(t, pullNum, lockingPull)
+		Equals(t, newLock, currLock)
 	}
 
 	t.Log("...succeed if the new project has a different repoName")
 	{
-		acquired, lockingPull, err := b.TryLock(models.NewProject("different/repo", project.Path), env, pullNum)
+		newLock := lock
+		newLock.Project = models.NewProject("different/repo", project.Path)
+		acquired, currLock, err := b.TryLock(newLock)
 		Ok(t, err)
 		Equals(t, true, acquired)
-		Equals(t, pullNum, lockingPull)
+		Equals(t, newLock, currLock)
 	}
 
 	t.Log("...not succeed if the new project only has a different pullNum")
 	{
-		newPull := pullNum + 1
-		acquired, lockingPull, err := b.TryLock(project, env, newPull)
+		newLock := lock
+		newLock.Pull.Num = lock.Pull.Num + 1
+		acquired, currLock, err := b.TryLock(newLock)
 		Ok(t, err)
 		Equals(t, false, acquired)
-		Equals(t, lockingPull, pullNum)
+		Equals(t, currLock.Pull.Num, pullNum)
 	}
 }
 
@@ -146,7 +167,7 @@ func TestUnlocking(t *testing.T) {
 	db, b := newTestDB()
 	defer cleanupDB(db)
 
-	b.TryLock(project, env, pullNum)
+	b.TryLock(lock)
 	Ok(t, b.Unlock(project, env))
 
 	// should be no locks listed
@@ -155,11 +176,12 @@ func TestUnlocking(t *testing.T) {
 	Equals(t, 0, len(ls))
 
 	// should be able to re-lock that repo with a new pull num
-	newPull := pullNum + 1
-	acquired, lockingPull, err := b.TryLock(project, env, newPull)
+	newLock := lock
+	newLock.Pull.Num = lock.Pull.Num + 1
+	acquired, currLock, err := b.TryLock(newLock)
 	Ok(t, err)
 	Equals(t, true, acquired)
-	Equals(t, newPull, lockingPull)
+	Equals(t, newLock, currLock)
 }
 
 func TestUnlockingMultiple(t *testing.T) {
@@ -167,23 +189,24 @@ func TestUnlockingMultiple(t *testing.T) {
 	db, b := newTestDB()
 	defer cleanupDB(db)
 
-	b.TryLock(project, env, pullNum)
+	b.TryLock(lock)
 
-	new := project
-	new.RepoFullName = "new/repo"
-	b.TryLock(project, env, pullNum)
+	new := lock
+	new.Project.RepoFullName = "new/repo"
+	b.TryLock(new)
 
-	new2 := project
-	new2.Path = "new/path"
-	b.TryLock(project, env, pullNum)
+	new2 := lock
+	new2.Project.Path = "new/path"
+	b.TryLock(new2)
 
-	new3Env := "new-env"
-	b.TryLock(project, new3Env, pullNum)
+	new3 := lock
+	new3.Env = "new-env"
+	b.TryLock(new3)
 
 	// now try and unlock them
-	Ok(t, b.Unlock(project, new3Env))
-	Ok(t, b.Unlock(new2, env))
-	Ok(t, b.Unlock(new, env))
+	Ok(t, b.Unlock(new3.Project, new3.Env))
+	Ok(t, b.Unlock(new2.Project, env))
+	Ok(t, b.Unlock(new.Project, env))
 	Ok(t, b.Unlock(project, env))
 
 	// should be none left
@@ -205,7 +228,7 @@ func TestUnlockByPullOne(t *testing.T) {
 	t.Log("with one lock, UnlockByPull should...")
 	db, b := newTestDB()
 	defer cleanupDB(db)
-	_, _, err := b.TryLock(project, env, pullNum)
+	_, _, err := b.TryLock(lock)
 	Ok(t, err)
 
 	t.Log("...delete nothing when its the same repo but a different pull")
@@ -238,7 +261,7 @@ func TestUnlockByPullAfterUnlock(t *testing.T) {
 	t.Log("after locking and unlocking, UnlockByPull should be successful")
 	db, b := newTestDB()
 	defer cleanupDB(db)
-	_, _, err := b.TryLock(project, env, pullNum)
+	_, _, err := b.TryLock(lock)
 	Ok(t, err)
 	Ok(t, b.Unlock(project, env))
 
@@ -253,15 +276,17 @@ func TestUnlockByPullMatching(t *testing.T) {
 	t.Log("UnlockByPull should delete all locks in that repo and pull num")
 	db, b := newTestDB()
 	defer cleanupDB(db)
-	_, _, err := b.TryLock(project, env, pullNum)
+	_, _, err := b.TryLock(lock)
 	Ok(t, err)
 
 	// add additional locks with the same repo and pull num but different paths/envs
-	new := project
-	new.Path = "dif/path"
-	_, _, err = b.TryLock(new, env, pullNum)
+	new := lock
+	new.Project.Path = "dif/path"
+	_, _, err = b.TryLock(new)
 	Ok(t, err)
-	_, _, err = b.TryLock(project, "new-env", pullNum)
+	new2 := lock
+	new2.Env = "new-env"
+	_, _, err = b.TryLock(new2)
 	Ok(t, err)
 
 	// there should now be 3

@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"github.com/hootsuite/atlantis/models"
 	"regexp"
+	"time"
 )
 
 type Backend interface {
-	TryLock(project models.Project, env string, pullNum int) (bool, int, error)
+	TryLock(lock models.ProjectLock) (bool, models.ProjectLock, error)
 	Unlock(project models.Project, env string) error
 	List() ([]models.ProjectLock, error)
 	UnlockByPull(repoFullName string, pullNum int) error
@@ -16,7 +17,7 @@ type Backend interface {
 
 type TryLockResponse struct {
 	LockAcquired   bool
-	LockingPullNum int
+	CurrLock models.ProjectLock
 	LockKey        string
 }
 
@@ -33,12 +34,19 @@ func NewClient(backend Backend) *Client {
 // keyRegex matches and captures {repoFullName}/{path}/{env} where path can have multiple /'s in it
 var keyRegex = regexp.MustCompile(`^(.*?\/.*?)\/(.*)\/(.*)$`)
 
-func (c *Client) TryLock(p models.Project, env string, pullNum int) (TryLockResponse, error) {
-	lockAcquired, lockingPullNum, err := c.backend.TryLock(p, env, pullNum)
+func (c *Client) TryLock(p models.Project, env string, pull models.PullRequest, user models.User) (TryLockResponse, error) {
+	lock := models.ProjectLock{
+		Env: env,
+		Time: time.Now(),
+		Project: p,
+		User: user,
+		Pull: pull,
+	}
+	lockAcquired, currLock, err := c.backend.TryLock(lock)
 	if err != nil {
 		return TryLockResponse{}, err
 	}
-	return TryLockResponse{lockAcquired, lockingPullNum, c.key(p, env)}, nil
+	return TryLockResponse{lockAcquired, currLock, c.key(p, env)}, nil
 }
 
 func (c *Client) Unlock(key string) error {

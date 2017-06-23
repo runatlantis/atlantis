@@ -106,8 +106,8 @@ func (e *EventParser) ExtractPullData(pull *github.PullRequest) (models.PullRequ
 	if base == "" {
 		return pullModel, errors.New("base.sha is null")
 	}
-	pullLink := pull.GetHTMLURL()
-	if pullLink == "" {
+	url := pull.GetHTMLURL()
+	if url == "" {
 		return pullModel, errors.New("html_url is null")
 	}
 	branch := pull.Head.GetRef()
@@ -127,7 +127,7 @@ func (e *EventParser) ExtractPullData(pull *github.PullRequest) (models.PullRequ
 		Author:     authorUsername,
 		Branch:     branch,
 		HeadCommit: commit,
-		Link:       pullLink,
+		URL:        url,
 		Num:        num,
 	}, nil
 }

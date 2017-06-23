@@ -18,15 +18,21 @@ type Backend struct {
 	LockTable string
 }
 
-// dynamoLock duplicates the fields of models.ProjectLock and adds LocksKey
-// so everything is a top-level field for serialization and then querying
-// in DynamodB and also so any changes to models.ProjectLock won't affect
-// how we're storing our data or will at least cause a compile error
+// dynamoLock duplicates the fields of some models and adds LocksKey.
+// This is so everything is a top-level field for serialization and querying
+// and also so any changes to models won't affect
+// how we're storing our data (or will at least cause a compile error)
 type dynamoLock struct {
 	LockKey      string
 	RepoFullName string
 	Path         string
-	PullNum      int
+	PullNum        int
+	PullHeadCommit string
+	PullBaseCommit string
+	PullURL        string
+	PullBranch     string
+	PullAuthor     string
+	UserUsername string
 	Env          string
 	Time         time.Time
 }
@@ -42,19 +48,13 @@ func (b Backend) key(project models.Project, env string) string {
 	return fmt.Sprintf("%s/%s/%s", project.RepoFullName, project.Path, env)
 }
 
-func (b Backend) TryLock(project models.Project, env string, pullNum int) (bool, int, error) {
-	key := b.key(project, env)
-	newDynamoLock := dynamoLock{
-		LockKey:      key,
-		RepoFullName: project.RepoFullName,
-		Path:         project.Path,
-		PullNum:      pullNum,
-		Env:          env,
-		Time:         time.Now(),
-	}
+func (b Backend) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, error) {
+	var currLock models.ProjectLock
+	key := b.key(newLock.Project, newLock.Env)
+	newDynamoLock := b.toDynamo(key, newLock)
 	newLockSerialized, err := dynamodbattribute.MarshalMap(newDynamoLock)
 	if err != nil {
-		return false, 0, errors.Wrap(err, "serializing")
+		return false, currLock, errors.Wrap(err, "serializing")
 	}
 
 	// check if there is an existing lock
@@ -69,16 +69,16 @@ func (b Backend) TryLock(project models.Project, env string, pullNum int) (bool,
 	}
 	item, err := b.DB.GetItem(getItemParams)
 	if err != nil {
-		return false, 0, errors.Wrap(err, "checking if lock exists")
+		return false, currLock, errors.Wrap(err, "checking if lock exists")
 	}
 
 	// if there is already a lock then we can't acquire a lock. Return the existing lock
-	var currLock dynamoLock
+	var currDynamoLock dynamoLock
 	if len(item.Item) != 0 {
-		if err := dynamodbattribute.UnmarshalMap(item.Item, &currLock); err != nil {
-			return false, 0, errors.Wrap(err, "found an existing lock at that key but it could not be deserialized. We suggest manually deleting this key from DynamoDB")
+		if err := dynamodbattribute.UnmarshalMap(item.Item, &currDynamoLock); err != nil {
+			return false, currLock, errors.Wrap(err, "found an existing lock at that key but it could not be deserialized. We suggest manually deleting this key from DynamoDB")
 		}
-		return false, currLock.PullNum, nil
+		return false, b.fromDynamo(currDynamoLock), nil
 	}
 
 	// else we should be able to lock
@@ -90,9 +90,9 @@ func (b Backend) TryLock(project models.Project, env string, pullNum int) (bool,
 		ConditionExpression: aws.String("attribute_not_exists(LockKey)"),
 	}
 	if _, err := b.DB.PutItem(putItem); err != nil {
-		return false, 0, errors.Wrap(err, "writing lock")
+		return false, currLock, errors.Wrap(err, "writing lock")
 	}
-	return true, pullNum, nil
+	return true, newLock, nil
 }
 
 func (b Backend) Unlock(project models.Project, env string) error {
@@ -120,12 +120,7 @@ func (b Backend) List() ([]models.ProjectLock, error) {
 			return false
 		}
 		for _, lock := range dynamoLocks {
-			locks = append(locks, models.ProjectLock{
-				PullNum: lock.PullNum,
-				Project: models.NewProject(lock.RepoFullName, lock.Path),
-				Env:     lock.Env,
-				Time:    lock.Time,
-			})
+			locks = append(locks, b.fromDynamo(lock))
 		}
 		return lastPage
 	})
@@ -174,4 +169,43 @@ func (b Backend) UnlockByPull(repoFullName string, pullNum int) error {
 		}
 	}
 	return nil
+}
+
+func (b Backend) toDynamo(key string, l models.ProjectLock) dynamoLock {
+	return dynamoLock{
+		LockKey:      key,
+		RepoFullName: l.Project.RepoFullName,
+		Path:         l.Project.Path,
+		PullNum:      l.Pull.Num,
+		PullHeadCommit: l.Pull.HeadCommit,
+		PullBaseCommit: l.Pull.BaseCommit,
+		PullURL: l.Pull.URL,
+		PullBranch: l.Pull.Branch,
+		PullAuthor: l.Pull.Author,
+		UserUsername: l.User.Username,
+		Env:          l.Env,
+		Time:         time.Now(),
+	}
+}
+
+func (b Backend) fromDynamo(d dynamoLock) models.ProjectLock {
+	return models.ProjectLock{
+		Pull: models.PullRequest{
+			Author: d.PullAuthor,
+			Branch: d.PullBranch,
+			URL: d.PullURL,
+			BaseCommit: d.PullBaseCommit,
+			HeadCommit: d.PullHeadCommit,
+			Num: d.PullNum,
+		},
+		User: models.User{
+			Username: d.UserUsername,
+		},
+		Project: models.Project{
+			RepoFullName: d.RepoFullName,
+			Path: d.Path,
+		},
+		Time: d.Time,
+		Env: d.Env,
+	}
 }
