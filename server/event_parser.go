@@ -49,21 +49,9 @@ func (e *EventParser) DetermineCommand(comment *github.IssueCommentEvent) (*Comm
 }
 
 func (e *EventParser) ExtractCommentData(comment *github.IssueCommentEvent, ctx *CommandContext) error {
-	repoFullName := comment.Repo.GetFullName()
-	if repoFullName == "" {
-		return errors.New("repository.full_name is null")
-	}
-	repoOwner := comment.Repo.Owner.GetLogin()
-	if repoOwner == "" {
-		return errors.New("repository.owner.login is null")
-	}
-	repoName := comment.Repo.GetName()
-	if repoName == "" {
-		return errors.New("repository.name is null")
-	}
-	repoSSHURL := comment.Repo.GetSSHURL()
-	if repoSSHURL == "" {
-		return errors.New("comment.repository.ssh_url is null")
+	repo, err := e.ExtractRepoData(comment.Repo)
+	if err != nil {
+		return err
 	}
 	pullNum := comment.Issue.GetNumber()
 	if pullNum == 0 {
@@ -81,12 +69,7 @@ func (e *EventParser) ExtractCommentData(comment *github.IssueCommentEvent, ctx 
 	if htmlURL == "" {
 		return errors.New("comment.issue.html_url is null")
 	}
-	ctx.Repo = models.Repo{
-		FullName: repoFullName,
-		Owner:    repoOwner,
-		Name:     repoName,
-		SSHURL:   repoSSHURL,
-	}
+	ctx.Repo = repo
 	ctx.User = models.User{
 		Username: commentorUsername,
 	}
@@ -129,5 +112,31 @@ func (e *EventParser) ExtractPullData(pull *github.PullRequest) (models.PullRequ
 		HeadCommit: commit,
 		URL:        url,
 		Num:        num,
+	}, nil
+}
+
+func (e *EventParser) ExtractRepoData(ghRepo *github.Repository) (models.Repo, error) {
+	var repo models.Repo
+	repoFullName := ghRepo.GetFullName()
+	if repoFullName == "" {
+		return repo, errors.New("repository.full_name is null")
+	}
+	repoOwner := ghRepo.Owner.GetLogin()
+	if repoOwner == "" {
+		return repo, errors.New("repository.owner.login is null")
+	}
+	repoName := ghRepo.GetName()
+	if repoName == "" {
+		return repo, errors.New("repository.name is null")
+	}
+	repoSSHURL := ghRepo.GetSSHURL()
+	if repoSSHURL == "" {
+		return repo, errors.New("repository.ssh_url is null")
+	}
+	return models.Repo{
+		Owner: repoOwner,
+		FullName: repoFullName,
+		SSHURL: repoSSHURL,
+		Name: repoName,
 	}, nil
 }

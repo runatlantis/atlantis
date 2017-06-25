@@ -10,9 +10,9 @@ import (
 
 type Backend interface {
 	TryLock(lock models.ProjectLock) (bool, models.ProjectLock, error)
-	Unlock(project models.Project, env string) error
+	Unlock(project models.Project, env string) (*models.ProjectLock, error)
 	List() ([]models.ProjectLock, error)
-	UnlockByPull(repoFullName string, pullNum int) error
+	UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error)
 }
 
 type TryLockResponse struct {
@@ -49,10 +49,10 @@ func (c *Client) TryLock(p models.Project, env string, pull models.PullRequest, 
 	return TryLockResponse{lockAcquired, currLock, c.key(p, env)}, nil
 }
 
-func (c *Client) Unlock(key string) error {
+func (c *Client) Unlock(key string) (*models.ProjectLock, error) {
 	matches := keyRegex.FindStringSubmatch(key)
 	if len(matches) != 4 {
-		return errors.New("invalid key format")
+		return nil, errors.New("invalid key format")
 	}
 	return c.backend.Unlock(models.Project{matches[1], matches[2]}, matches[3])
 }
@@ -69,7 +69,7 @@ func (c *Client) List() (map[string]models.ProjectLock, error) {
 	return m, nil
 }
 
-func (c *Client) UnlockByPull(repoFullName string, pullNum int) error {
+func (c *Client) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
 	return c.backend.UnlockByPull(repoFullName, pullNum)
 }
 

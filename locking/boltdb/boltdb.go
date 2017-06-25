@@ -81,13 +81,26 @@ func (b *Backend) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock,
 	return lockAcquired, currLock, nil
 }
 
-func (b Backend) Unlock(p models.Project, env string) error {
+func (b Backend) Unlock(p models.Project, env string) (*models.ProjectLock, error) {
+	var lock models.ProjectLock
+	foundLock := false
 	key := b.key(p, env)
 	err := b.db.Update(func(tx *bolt.Tx) error {
-		locks := tx.Bucket(b.bucket)
-		return locks.Delete([]byte(key))
+		bucket := tx.Bucket(b.bucket)
+		serialized := bucket.Get([]byte(key))
+		if serialized != nil {
+			if err := json.Unmarshal(serialized, &lock); err != nil {
+				return errors.Wrap(err, "failed to deserialize lock")
+			}
+			foundLock = true
+		}
+		return bucket.Delete([]byte(key))
 	})
-	return errors.Wrap(err, "DB transaction failed")
+	err = errors.Wrap(err, "DB transaction failed")
+	if foundLock {
+		return &lock, err
+	}
+	return nil, err
 }
 
 func (b Backend) List() ([]models.ProjectLock, error) {
@@ -117,8 +130,7 @@ func (b Backend) List() ([]models.ProjectLock, error) {
 	return locks, nil
 }
 
-func (b Backend) UnlockByPull(repoFullName string, pullNum int) error {
-	// get the locks that match that pull request
+func (b Backend) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
 	var locks []models.ProjectLock
 	err := b.db.View(func(tx *bolt.Tx) error {
 		c := tx.Bucket(b.bucket).Cursor()
@@ -138,11 +150,11 @@ func (b Backend) UnlockByPull(repoFullName string, pullNum int) error {
 
 	// delete the locks
 	for _, lock := range locks {
-		if err = b.Unlock(lock.Project, lock.Env); err != nil {
-			return errors.Wrapf(err, "unlocking repo %s, path %s, env %s", lock.Project.RepoFullName, lock.Project.Path, lock.Env)
+		if _, err = b.Unlock(lock.Project, lock.Env); err != nil {
+			return locks, errors.Wrapf(err, "unlocking repo %s, path %s, env %s", lock.Project.RepoFullName, lock.Project.Path, lock.Env)
 		}
 	}
-	return nil
+	return locks, nil
 }
 
 func (b Backend) key(p models.Project, env string) string {

@@ -27,8 +27,8 @@ func (g *GithubClient) GetModifiedFiles(repo models.Repo, pull models.PullReques
 	return files, nil
 }
 
-func (g *GithubClient) CreateComment(ctx *CommandContext, comment string) error {
-	_, _, err := g.client.Issues.CreateComment(g.ctx, ctx.Repo.Owner, ctx.Repo.Name, ctx.Pull.Num, &github.IssueComment{Body: &comment})
+func (g *GithubClient) CreateComment(repo models.Repo, pull models.PullRequest, comment string) error {
+	_, _, err := g.client.Issues.CreateComment(g.ctx, repo.Owner, repo.Name, pull.Num, &github.IssueComment{Body: &comment})
 	return err
 }
 

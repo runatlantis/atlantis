@@ -81,7 +81,7 @@ func (s *CommandHandler) SetDeleteLockURL(f func(id string) (url string)) {
 func (s *CommandHandler) recover(ctx *CommandContext) {
 	if err := recover(); err != nil {
 		stack := recovery.Stack(3)
-		s.githubClient.CreateComment(ctx, fmt.Sprintf("**Error: goroutine panic. This is a bug.**\n```\n%s\n%s```", err, stack))
+		s.githubClient.CreateComment(ctx.Repo, ctx.Pull, fmt.Sprintf("**Error: goroutine panic. This is a bug.**\n```\n%s\n%s```", err, stack))
 		ctx.Log.Err("PANIC: %s\n%s", err, stack)
 	}
 }

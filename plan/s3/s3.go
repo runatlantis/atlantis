@@ -87,7 +87,7 @@ func (b *Backend) SavePlan(path string, project models.Project, env string, pull
 		return errors.Wrapf(err, "opening plan at %s", path)
 	}
 
-	key := pathutil.Join(b.keyPrefix, project.RepoFullName, strconv.Itoa(pullNum), project.Path, env+".tfplan")
+	key := b.path(project, env, pullNum)
 	_, err = b.uploader.Upload(&s3manager.UploadInput{
 		Bucket: aws.String(b.bucket),
 		Key:    &key,
@@ -103,4 +103,36 @@ func (b *Backend) SavePlan(path string, project models.Project, env string, pull
 		return errors.Wrap(err, "uploading plan to s3")
 	}
 	return nil
+}
+
+func (b *Backend) DeletePlan(project models.Project, env string, pullNum int) error {
+	_, err := b.s3.DeleteObject(&s3.DeleteObjectInput{
+		Bucket: aws.String(b.bucket),
+		Key: aws.String(b.path(project, env, pullNum)),
+	})
+	return err
+}
+
+func (b *Backend) DeletePlansByPull(repoFullName string, pullNum int) error {
+	// first list the plans with the correct prefix
+	prefix := pathutil.Join(b.keyPrefix, repoFullName, strconv.Itoa(pullNum))
+	list, err := b.s3.ListObjects(&s3.ListObjectsInput{Bucket: aws.String(b.bucket), Prefix: &prefix})
+	if err != nil {
+		return errors.Wrap(err, "listing plans")
+	}
+
+	var deleteList []*s3.ObjectIdentifier
+	for _, obj := range list.Contents {
+		deleteList = append(deleteList, &s3.ObjectIdentifier{Key: obj.Key})
+	}
+
+	_, err = b.s3.DeleteObjects(&s3.DeleteObjectsInput{
+		Bucket: aws.String(b.bucket),
+		Delete: &s3.Delete{Objects: deleteList},
+	})
+	return err
+}
+
+func (b *Backend) path(project models.Project, env string, pullNum int) string {
+	return pathutil.Join(b.keyPrefix, project.RepoFullName, strconv.Itoa(pullNum), project.Path, env+".tfplan")
 }

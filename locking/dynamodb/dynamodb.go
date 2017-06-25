@@ -95,16 +95,27 @@ func (b Backend) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, 
 	return true, newLock, nil
 }
 
-func (b Backend) Unlock(project models.Project, env string) error {
+func (b Backend) Unlock(project models.Project, env string) (*models.ProjectLock, error) {
 	key := b.key(project, env)
 	params := &dynamodb.DeleteItemInput{
 		Key: map[string]*dynamodb.AttributeValue{
 			"LockKey": {S: aws.String(key)},
 		},
 		TableName: aws.String(b.LockTable),
+		ReturnValues: aws.String("ALL_OLD"),
 	}
-	_, err := b.DB.DeleteItem(params)
-	return errors.Wrap(err, "deleting lock")
+	output, err := b.DB.DeleteItem(params)
+	if err != nil {
+		return nil, errors.Wrap(err, "deleting lock")
+	}
+
+	// deserialize the lock so we can return it
+	var dLock dynamoLock
+	if err := dynamodbattribute.UnmarshalMap(output.Attributes, &dLock); err != nil {
+		return nil, errors.Wrap(err, "found an existing lock at that key but it could not be deserialized. We suggest manually deleting this key from DynamoDB")
+	}
+	lock := b.fromDynamo(dLock)
+	return &lock, nil
 }
 
 func (b Backend) List() ([]models.ProjectLock, error) {
@@ -131,7 +142,7 @@ func (b Backend) List() ([]models.ProjectLock, error) {
 	return locks, errors.Wrap(err, "scanning dynamodb")
 }
 
-func (b Backend) UnlockByPull(repoFullName string, pullNum int) error {
+func (b Backend) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
 	params := &dynamodb.ScanInput{
 		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
 			":pullNum": {
@@ -146,10 +157,11 @@ func (b Backend) UnlockByPull(repoFullName string, pullNum int) error {
 	}
 
 	// scan DynamoDB for locks that match the pull request
-	var locks []dynamoLock
+	var dLocks []dynamoLock
+	var locks []models.ProjectLock
 	var err, internalErr error
 	err = b.DB.ScanPages(params, func(out *dynamodb.ScanOutput, lastPage bool) bool {
-		if err := dynamodbattribute.UnmarshalListOfMaps(out.Items, &locks); err != nil {
+		if err := dynamodbattribute.UnmarshalListOfMaps(out.Items, &dLocks); err != nil {
 			internalErr = errors.Wrap(err, "deserializing locks")
 			return false
 		}
@@ -159,16 +171,17 @@ func (b Backend) UnlockByPull(repoFullName string, pullNum int) error {
 		err = internalErr
 	}
 	if err != nil {
-		return errors.Wrap(err, "scanning dynamodb")
+		return locks, errors.Wrap(err, "scanning dynamodb")
 	}
 
 	// now we can unlock all of them
-	for _, lock := range locks {
-		if err := b.Unlock(models.NewProject(lock.RepoFullName, lock.Path), lock.Env); err != nil {
-			return errors.Wrapf(err, "unlocking repo %s, path %s, env %s", lock.RepoFullName, lock.Path, lock.Env)
+	for _, lock := range dLocks {
+		if _, err := b.Unlock(models.NewProject(lock.RepoFullName, lock.Path), lock.Env); err != nil {
+			return locks, errors.Wrapf(err, "unlocking repo %s, path %s, env %s", lock.RepoFullName, lock.Path, lock.Env)
 		}
+		locks = append(locks, b.fromDynamo(lock))
 	}
-	return nil
+	return locks, nil
 }
 
 func (b Backend) toDynamo(key string, l models.ProjectLock) dynamoLock {

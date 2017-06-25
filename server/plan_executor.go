@@ -28,7 +28,7 @@ type PlanExecutor struct {
 	lockingClient         *locking.Client
 	// DeleteLockURL is a function that given a lock id will return a url for deleting the lock
 	DeleteLockURL func(id string) (url string)
-	planStorage   plan.Backend
+	planBackend   plan.Backend
 }
 
 /** Result Types **/
@@ -76,7 +76,7 @@ func (p *PlanExecutor) execute(ctx *CommandContext, github *GithubClient) {
 	res := p.setupAndPlan(ctx)
 	res.Command = Plan
 	comment := p.githubCommentRenderer.render(res, ctx.Log.History.String(), ctx.Command.verbose)
-	github.CreateComment(ctx, comment)
+	github.CreateComment(ctx.Repo, ctx.Pull, comment)
 }
 
 func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
@@ -283,7 +283,7 @@ func (p *PlanExecutor) plan(
 		}
 		ctx.Log.Err("error running terraform plan: %v", output)
 		ctx.Log.Info("unlocking state since plan failed")
-		if err := p.lockingClient.Unlock(lockAttempt.LockKey); err != nil {
+		if _, err := p.lockingClient.Unlock(lockAttempt.LockKey); err != nil {
 			ctx.Log.Err("error unlocking state: %v", err)
 		}
 		return PathResult{
@@ -292,10 +292,10 @@ func (p *PlanExecutor) plan(
 		}
 	}
 	// Save the plan
-	if err := p.planStorage.SavePlan(planFile, project, tfEnv, ctx.Pull.Num); err != nil {
+	if err := p.planBackend.SavePlan(planFile, project, tfEnv, ctx.Pull.Num); err != nil {
 		ctx.Log.Err("saving plan: %s", err)
 		// there was an error planning so unlock
-		if err := p.lockingClient.Unlock(lockAttempt.LockKey); err != nil {
+		if _, err := p.lockingClient.Unlock(lockAttempt.LockKey); err != nil {
 			ctx.Log.Err("error unlocking: %v", err)
 		}
 		return PathResult{
