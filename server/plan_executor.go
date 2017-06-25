@@ -2,17 +2,18 @@ package server
 
 import (
 	"fmt"
-	"github.com/hootsuite/atlantis/locking"
-	"github.com/hootsuite/atlantis/logging"
-	"github.com/hootsuite/atlantis/models"
-	"github.com/hootsuite/atlantis/plan"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/hootsuite/atlantis/locking"
+	"github.com/hootsuite/atlantis/logging"
+	"github.com/hootsuite/atlantis/models"
+	"github.com/hootsuite/atlantis/plan"
+	"github.com/pkg/errors"
 )
 
 // PlanExecutor handles everything related to running the Terraform plan including integration with S3, Terraform, and GitHub
@@ -26,9 +27,9 @@ type PlanExecutor struct {
 	terraform             *TerraformClient
 	githubCommentRenderer *GithubCommentRenderer
 	lockingClient         *locking.Client
-	// DeleteLockURL is a function that given a lock id will return a url for deleting the lock
-	DeleteLockURL func(id string) (url string)
-	planBackend   plan.Backend
+	// LockURL is a function that given a lock id will return a url for detail view
+	LockURL     func(id string) (url string)
+	planBackend plan.Backend
 }
 
 /** Result Types **/
@@ -314,7 +315,7 @@ func (p *PlanExecutor) plan(
 		Status: Success,
 		Result: PlanSuccess{
 			TerraformOutput: output,
-			LockURL:         p.DeleteLockURL(lockAttempt.LockKey),
+			LockURL:         p.LockURL(lockAttempt.LockKey),
 		},
 	}
 }

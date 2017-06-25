@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+set -euo pipefail
+IFS=$'\n\t'
+
 run_unit_test() {
     echo "Running unit tests: 'make test'"
     make test

@@ -21,9 +21,9 @@ test:
   override:
     # Run tests
     - cd "${WORKDIR}" && ./scripts/build.sh
-
-  # Run e2e tests
+  
   post:
+    # Run e2e tests
     - cd "${WORKDIR}" && ./scripts/e2e-deps.sh
     # Start atlantis server
     - cd "${WORKDIR}/e2e" && ./atlantis server --gh-user="$GITHUB_USERNAME" --gh-password="$GITHUB_PASSWORD" --data-dir="/tmp" --require-approval=false --plan-backend="file" --log-level="debug" &> /tmp/atlantis-server.log:

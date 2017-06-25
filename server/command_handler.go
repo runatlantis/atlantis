@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+
 	"github.com/hootsuite/atlantis/logging"
 	"github.com/hootsuite/atlantis/recovery"
 )
@@ -73,8 +74,8 @@ func (s *CommandHandler) ExecuteCommand(ctx *CommandContext) {
 	}
 }
 
-func (s *CommandHandler) SetDeleteLockURL(f func(id string) (url string)) {
-	s.planExecutor.DeleteLockURL = f
+func (s *CommandHandler) SetLockURL(f func(id string) (url string)) {
+	s.planExecutor.LockURL = f
 }
 
 // recover logs and creates a comment on the pull request for panics

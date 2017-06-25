@@ -11,6 +11,8 @@ import (
 
 	"time"
 
+	"io/ioutil"
+
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/elazarl/go-bindata-assetfs"
 	"github.com/google/go-github/github"
@@ -27,7 +29,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	"github.com/urfave/negroni"
-	"io/ioutil"
 )
 
 const (
@@ -220,17 +221,12 @@ func (s *Server) Start() error {
 	s.router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: Asset, AssetDir: AssetDir, AssetInfo: AssetInfo}))
 	s.router.HandleFunc("/hooks", s.postHooks).Methods("POST")
 	s.router.HandleFunc("/locks", s.deleteLock).Methods("DELETE").Queries("id", "{id:.*}")
-	// todo: remove this route when there is a detail view
-	// right now we need this route because from the pull request comment in GitHub only a GET request can be made
-	// in the future, the pull discard link will link to the detail view which will have a Delete button which will
-	// make an real DELETE call but we don't have a detail view right now
-	deleteLockRoute := s.router.HandleFunc("/locks", s.deleteLock).Queries("id", "{id}", "method", "DELETE").Methods("GET").Name(deleteLockRoute)
-
-	// function that planExecutor can use to construct delete lock urls
+	lockRoute := s.router.HandleFunc("/lock", s.lock).Methods("GET").Queries("id", "{id}")
+	// function that planExecutor can use to construct detail view url
 	// injecting this here because this is the earliest routes are created
-	s.commandHandler.SetDeleteLockURL(func(lockID string) string {
+	s.commandHandler.SetLockURL(func(lockID string) string {
 		// ignoring error since guaranteed to succeed if "id" is specified
-		u, _ := deleteLockRoute.URL("id", url.QueryEscape(lockID))
+		u, _ := lockRoute.URL("id", url.QueryEscape(lockID))
 		return s.atlantisURL + u.RequestURI()
 	})
 	n := negroni.New(&negroni.Recovery{
@@ -253,22 +249,70 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type lock struct {
-		UnlockURL    string
+		LockURL      string
 		RepoFullName string
 		PullNum      int
 		Time         time.Time
 	}
 	var results []lock
 	for id, v := range locks {
-		u, _ := s.router.Get(deleteLockRoute).URL("id", url.QueryEscape(id))
 		results = append(results, lock{
-			UnlockURL:    u.String(),
+			// todo: make LockURL use the router to get /lock endpoint
+			LockURL:      fmt.Sprintf("/lock?id=%s", url.QueryEscape(id)),
 			RepoFullName: v.Project.RepoFullName,
 			PullNum:      v.Pull.Num,
 			Time:         v.Time,
 		})
 	}
 	indexTemplate.Execute(w, results)
+}
+
+func (s *Server) lock(w http.ResponseWriter, r *http.Request) {
+	id, ok := mux.Vars(r)["id"]
+	if !ok {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, "no lock id in request")
+	}
+	// get details for lock id
+	idUnencoded, err := url.QueryUnescape(id)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, "invalid lock id")
+	}
+
+	// for the given lock key get lock data
+	lock, err := s.lockingClient.GetLock(idUnencoded)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, err.Error())
+	}
+
+	type lockData struct {
+		UnlockURL       string
+		LockKeyEncoded  string
+		LockKey         string
+		RepoOwner       string
+		RepoName        string
+		PullRequestLink string
+		LockedBy        string
+		Environment     string
+		Time            time.Time
+	}
+
+	// extract the repo owner and repo name
+	repo := strings.Split(lock.Project.RepoFullName, "/")
+
+	l := lockData{
+		LockKeyEncoded:  id,
+		LockKey:         idUnencoded,
+		RepoOwner:       repo[0],
+		RepoName:        repo[1],
+		PullRequestLink: lock.Pull.URL,
+		LockedBy:        lock.Pull.Author,
+		Environment:     lock.Env,
+	}
+
+	lockTemplate.Execute(w, l)
 }
 
 func (s *Server) deleteLock(w http.ResponseWriter, r *http.Request) {

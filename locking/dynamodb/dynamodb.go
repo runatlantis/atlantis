@@ -2,6 +2,9 @@ package dynamodb
 
 import (
 	"fmt"
+	"strconv"
+	"time"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
@@ -9,8 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 	"github.com/hootsuite/atlantis/models"
 	"github.com/pkg/errors"
-	"strconv"
-	"time"
 )
 
 type Backend struct {
@@ -23,18 +24,18 @@ type Backend struct {
 // and also so any changes to models won't affect
 // how we're storing our data (or will at least cause a compile error)
 type dynamoLock struct {
-	LockKey      string
-	RepoFullName string
-	Path         string
+	LockKey        string
+	RepoFullName   string
+	Path           string
 	PullNum        int
 	PullHeadCommit string
 	PullBaseCommit string
 	PullURL        string
 	PullBranch     string
 	PullAuthor     string
-	UserUsername string
-	Env          string
-	Time         time.Time
+	UserUsername   string
+	Env            string
+	Time           time.Time
 }
 
 func New(lockTable string, p client.ConfigProvider) Backend {
@@ -142,6 +143,30 @@ func (b Backend) List() ([]models.ProjectLock, error) {
 	return locks, errors.Wrap(err, "scanning dynamodb")
 }
 
+func (b Backend) GetLock(p models.Project, env string) (models.ProjectLock, error) {
+	key := b.key(p, env)
+	params := &dynamodb.GetItemInput{
+		Key: map[string]*dynamodb.AttributeValue{
+			"LockKey": {
+				S: aws.String(key),
+			},
+		},
+		TableName:      aws.String(b.LockTable),
+		ConsistentRead: aws.Bool(true),
+	}
+	item, err := b.DB.GetItem(params)
+	if err != nil {
+		return models.ProjectLock{}, errors.Wrapf(err, "getting item %q", item)
+	}
+
+	var dynamoDBLock dynamoLock
+	if err := dynamodbattribute.UnmarshalMap(item.Item, &dynamoDBLock); err != nil {
+		return models.ProjectLock{}, errors.Wrap(err, "found a lock at that key but it could not be deserialized. We suggest manually deleting this key from DynamoDB")
+	}
+
+	return b.fromDynamo(dynamoDBLock), nil
+}
+
 func (b Backend) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
 	params := &dynamodb.ScanInput{
 		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
@@ -186,39 +211,39 @@ func (b Backend) UnlockByPull(repoFullName string, pullNum int) ([]models.Projec
 
 func (b Backend) toDynamo(key string, l models.ProjectLock) dynamoLock {
 	return dynamoLock{
-		LockKey:      key,
-		RepoFullName: l.Project.RepoFullName,
-		Path:         l.Project.Path,
-		PullNum:      l.Pull.Num,
+		LockKey:        key,
+		RepoFullName:   l.Project.RepoFullName,
+		Path:           l.Project.Path,
+		PullNum:        l.Pull.Num,
 		PullHeadCommit: l.Pull.HeadCommit,
 		PullBaseCommit: l.Pull.BaseCommit,
-		PullURL: l.Pull.URL,
-		PullBranch: l.Pull.Branch,
-		PullAuthor: l.Pull.Author,
-		UserUsername: l.User.Username,
-		Env:          l.Env,
-		Time:         time.Now(),
+		PullURL:        l.Pull.URL,
+		PullBranch:     l.Pull.Branch,
+		PullAuthor:     l.Pull.Author,
+		UserUsername:   l.User.Username,
+		Env:            l.Env,
+		Time:           time.Now(),
 	}
 }
 
 func (b Backend) fromDynamo(d dynamoLock) models.ProjectLock {
 	return models.ProjectLock{
 		Pull: models.PullRequest{
-			Author: d.PullAuthor,
-			Branch: d.PullBranch,
-			URL: d.PullURL,
+			Author:     d.PullAuthor,
+			Branch:     d.PullBranch,
+			URL:        d.PullURL,
 			BaseCommit: d.PullBaseCommit,
 			HeadCommit: d.PullHeadCommit,
-			Num: d.PullNum,
+			Num:        d.PullNum,
 		},
 		User: models.User{
 			Username: d.UserUsername,
 		},
 		Project: models.Project{
 			RepoFullName: d.RepoFullName,
-			Path: d.Path,
+			Path:         d.Path,
 		},
 		Time: d.Time,
-		Env: d.Env,
+		Env:  d.Env,
 	}
 }

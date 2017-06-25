@@ -3,15 +3,17 @@ package boltdb_test
 import (
 	. "github.com/hootsuite/atlantis/testing_util"
 
-	"github.com/boltdb/bolt"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
 	"testing"
 
+	"github.com/boltdb/bolt"
+	"github.com/pkg/errors"
+
+	"time"
+
 	"github.com/hootsuite/atlantis/locking/boltdb"
 	"github.com/hootsuite/atlantis/models"
-	"time"
 )
 
 var lockBucket = "bucket"
@@ -25,9 +27,9 @@ var lock = models.ProjectLock{
 	User: models.User{
 		Username: "lkysow",
 	},
-	Env: env,
+	Env:     env,
 	Project: project,
-	Time: time.Now(),
+	Time:    time.Now(),
 }
 
 func TestListNoLocks(t *testing.T) {
@@ -158,8 +160,9 @@ func TestUnlockingNoLocks(t *testing.T) {
 	t.Log("unlocking with no locks should succeed")
 	db, b := newTestDB()
 	defer cleanupDB(db)
+	_, err := b.Unlock(project, env)
 
-	Ok(t, b.Unlock(project, env))
+	Ok(t, err)
 }
 
 func TestUnlocking(t *testing.T) {
@@ -168,7 +171,8 @@ func TestUnlocking(t *testing.T) {
 	defer cleanupDB(db)
 
 	b.TryLock(lock)
-	Ok(t, b.Unlock(project, env))
+	_, err := b.Unlock(project, env)
+	Ok(t, err)
 
 	// should be no locks listed
 	ls, err := b.List()
@@ -204,10 +208,14 @@ func TestUnlockingMultiple(t *testing.T) {
 	b.TryLock(new3)
 
 	// now try and unlock them
-	Ok(t, b.Unlock(new3.Project, new3.Env))
-	Ok(t, b.Unlock(new2.Project, env))
-	Ok(t, b.Unlock(new.Project, env))
-	Ok(t, b.Unlock(project, env))
+	_, err := b.Unlock(new3.Project, new3.Env)
+	Ok(t, err)
+	_, err = b.Unlock(new2.Project, env)
+	Ok(t, err)
+	_, err = b.Unlock(new.Project, env)
+	Ok(t, err)
+	_, err = b.Unlock(project, env)
+	Ok(t, err)
 
 	// should be none left
 	ls, err := b.List()
@@ -220,7 +228,7 @@ func TestUnlockByPullNone(t *testing.T) {
 	db, b := newTestDB()
 	defer cleanupDB(db)
 
-	err := b.UnlockByPull("any/repo", 1)
+	_, err := b.UnlockByPull("any/repo", 1)
 	Ok(t, err)
 }
 
@@ -233,7 +241,7 @@ func TestUnlockByPullOne(t *testing.T) {
 
 	t.Log("...delete nothing when its the same repo but a different pull")
 	{
-		err := b.UnlockByPull(project.RepoFullName, pullNum+1)
+		_, err := b.UnlockByPull(project.RepoFullName, pullNum+1)
 		Ok(t, err)
 		ls, err := b.List()
 		Ok(t, err)
@@ -241,7 +249,7 @@ func TestUnlockByPullOne(t *testing.T) {
 	}
 	t.Log("...delete nothing when its the same pull but a different repo")
 	{
-		err := b.UnlockByPull("different/repo", pullNum)
+		_, err := b.UnlockByPull("different/repo", pullNum)
 		Ok(t, err)
 		ls, err := b.List()
 		Ok(t, err)
@@ -249,7 +257,7 @@ func TestUnlockByPullOne(t *testing.T) {
 	}
 	t.Log("...delete the lock when its the same repo and pull")
 	{
-		err := b.UnlockByPull(project.RepoFullName, pullNum)
+		_, err := b.UnlockByPull(project.RepoFullName, pullNum)
 		Ok(t, err)
 		ls, err := b.List()
 		Ok(t, err)
@@ -263,9 +271,10 @@ func TestUnlockByPullAfterUnlock(t *testing.T) {
 	defer cleanupDB(db)
 	_, _, err := b.TryLock(lock)
 	Ok(t, err)
-	Ok(t, b.Unlock(project, env))
+	_, err = b.Unlock(project, env)
+	Ok(t, err)
 
-	err = b.UnlockByPull(project.RepoFullName, pullNum)
+	_, err = b.UnlockByPull(project.RepoFullName, pullNum)
 	Ok(t, err)
 	ls, err := b.List()
 	Ok(t, err)
@@ -295,11 +304,23 @@ func TestUnlockByPullMatching(t *testing.T) {
 	Equals(t, 3, len(ls))
 
 	// should all be unlocked
-	err = b.UnlockByPull(project.RepoFullName, pullNum)
+	_, err = b.UnlockByPull(project.RepoFullName, pullNum)
 	Ok(t, err)
 	ls, err = b.List()
 	Ok(t, err)
 	Equals(t, 0, len(ls))
+}
+
+// todo: Write more tests for getting lock data
+func TestGetLock(t *testing.T) {
+	t.Log("get data for a existing lock")
+	db, b := newTestDB()
+	defer cleanupDB(db)
+	_, _, err := b.TryLock(lock)
+	Ok(t, err)
+
+	_, err = b.GetLock(project, env)
+	Ok(t, err)
 }
 
 // newTestDB returns a TestDB using a temporary path.
