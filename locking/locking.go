@@ -56,7 +56,6 @@ func (c *Client) Unlock(key string) (*models.ProjectLock, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return c.backend.Unlock(project, env)
 }
 

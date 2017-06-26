@@ -27,7 +27,7 @@ type PlanExecutor struct {
 	terraform             *TerraformClient
 	githubCommentRenderer *GithubCommentRenderer
 	lockingClient         *locking.Client
-	// LockURL is a function that given a lock id will return a url for detail view
+	// LockURL is a function that given a lock id will return the url to view that lock
 	LockURL     func(id string) (url string)
 	planBackend plan.Backend
 }
