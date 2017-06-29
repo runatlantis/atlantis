@@ -43,46 +43,52 @@ type Command struct {
 	commandType CommandType
 }
 
-func (s *CommandHandler) ExecuteCommand(ctx *CommandContext) {
+func (c *CommandHandler) ExecuteCommand(ctx *CommandContext) {
 	src := fmt.Sprintf("%s/pull/%d", ctx.Repo.FullName, ctx.Pull.Num)
 	// it'e safe to reuse the underlying logger e.logger.Log
-	ctx.Log = logging.NewSimpleLogger(src, s.logger.Log, true, s.logger.Level)
-	defer s.recover(ctx)
+	ctx.Log = logging.NewSimpleLogger(src, c.logger.Log, true, c.logger.Level)
+	defer c.recover(ctx)
 
 	// need to get additional data from the PR
-	ghPull, _, err := s.githubClient.GetPullRequest(ctx.Repo, ctx.Pull.Num)
+	ghPull, _, err := c.githubClient.GetPullRequest(ctx.Repo, ctx.Pull.Num)
 	if err != nil {
 		ctx.Log.Err("pull request data api call failed: %v", err)
 		return
 	}
-	pull, err := s.eventParser.ExtractPullData(ghPull)
+	pull, err := c.eventParser.ExtractPullData(ghPull)
 	if err != nil {
 		ctx.Log.Err("failed to extract required fields from comment data: %v", err)
 		return
 	}
 	ctx.Pull = pull
 
+	if ghPull.GetState() != "open" {
+		ctx.Log.Info("command run on closed pull request")
+		c.githubClient.CreateComment(ctx.Repo, ctx.Pull, "Atlantis commands can't be run on closed pull requests")
+		return
+	}
+
 	switch ctx.Command.commandType {
 	case Plan:
-		s.planExecutor.execute(ctx, s.githubClient)
+		c.planExecutor.execute(ctx, c.githubClient)
 	case Apply:
-		s.applyExecutor.execute(ctx, s.githubClient)
+		c.applyExecutor.execute(ctx, c.githubClient)
 	case Help:
-		s.helpExecutor.execute(ctx, s.githubClient)
+		c.helpExecutor.execute(ctx, c.githubClient)
 	default:
 		ctx.Log.Err("failed to determine desired command, neither plan nor apply")
 	}
 }
 
-func (s *CommandHandler) SetLockURL(f func(id string) (url string)) {
-	s.planExecutor.LockURL = f
+func (c *CommandHandler) SetLockURL(f func(id string) (url string)) {
+	c.planExecutor.LockURL = f
 }
 
 // recover logs and creates a comment on the pull request for panics
-func (s *CommandHandler) recover(ctx *CommandContext) {
+func (c *CommandHandler) recover(ctx *CommandContext) {
 	if err := recover(); err != nil {
 		stack := recovery.Stack(3)
-		s.githubClient.CreateComment(ctx.Repo, ctx.Pull, fmt.Sprintf("**Error: goroutine panic. This is a bug.**\n```\n%s\n%s```", err, stack))
+		c.githubClient.CreateComment(ctx.Repo, ctx.Pull, fmt.Sprintf("**Error: goroutine panic. This is a bug.**\n```\n%s\n%s```", err, stack))
 		ctx.Log.Err("PANIC: %s\n%s", err, stack)
 	}
 }
