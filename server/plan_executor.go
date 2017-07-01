@@ -150,6 +150,16 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
 				return ExecutionResult{SetupError: GeneralError{errors.New(errMsg)}}
 			}
 			ctx.Log.Info("terraform init and environment commands ran successfully %s", outputs)
+		} else {
+			// run terraform get for 0.8.8 and below
+			terraformGetCmd := append([]string{"get", "-no-color"}, config.GetExtraArguments("get")...)
+			_, output, err := p.terraform.RunTerraformCommand(absolutePath, terraformGetCmd, nil)
+			if err != nil {
+				errMsg := fmt.Sprintf("terraform get failed. %s %v", output, err)
+				ctx.Log.Err(errMsg)
+				return ExecutionResult{SetupError: GeneralError{errors.New(errMsg)}}
+			}
+			ctx.Log.Info("terraform get ran successfully %s", output)
 		}
 
 		// if there are pre plan commands then run them
