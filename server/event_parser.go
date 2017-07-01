@@ -3,9 +3,10 @@ package server
 import (
 	"errors"
 	"fmt"
+	"regexp"
+
 	"github.com/google/go-github/github"
 	"github.com/hootsuite/atlantis/models"
-	"regexp"
 )
 
 type EventParser struct{}
@@ -34,7 +35,12 @@ func (e *EventParser) DetermineCommand(comment *github.IssueCommentEvent) (*Comm
 	if match[4] == "--verbose" {
 		verbose = true
 	}
-	command := &Command{verbose: verbose, environment: match[3]}
+	// defaulting to terraform's default environment
+	env := "default"
+	if match[3] != "" {
+		env = match[3]
+	}
+	command := &Command{verbose: verbose, environment: env}
 	switch match[1] {
 	case "plan":
 		command.commandType = Plan
@@ -134,9 +140,9 @@ func (e *EventParser) ExtractRepoData(ghRepo *github.Repository) (models.Repo, e
 		return repo, errors.New("repository.ssh_url is null")
 	}
 	return models.Repo{
-		Owner: repoOwner,
+		Owner:    repoOwner,
 		FullName: repoFullName,
-		SSHURL: repoSSHURL,
-		Name: repoName,
+		SSHURL:   repoSSHURL,
+		Name:     repoName,
 	}, nil
 }

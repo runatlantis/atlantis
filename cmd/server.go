@@ -2,11 +2,12 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/hootsuite/atlantis/server"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"os"
 )
 
 // To add a new flag you must
@@ -179,7 +180,7 @@ Config values are overridden by environment variables which in turn are overridd
 		// config looks good, start the server
 		server, err := server.NewServer(config)
 		if err != nil {
-			return errors.Wrap(err, "Failed to initialize server")
+			return errors.Wrap(err, "initializing server")
 		}
 		return server.Start()
 	},

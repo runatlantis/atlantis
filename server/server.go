@@ -29,6 +29,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	"github.com/urfave/negroni"
+	"github.com/hootsuite/atlantis/prerun"
 )
 
 const (
@@ -41,14 +42,14 @@ const (
 
 // Server listens for GitHub events and runs the necessary Atlantis command
 type Server struct {
-	router         *mux.Router
-	port           int
-	commandHandler *CommandHandler
+	router             *mux.Router
+	port               int
+	commandHandler     *CommandHandler
 	pullClosedExecutor *PullClosedExecutor
-	logger         *logging.SimpleLogger
-	eventParser    *EventParser
-	lockingClient  *locking.Client
-	atlantisURL    string
+	logger             *logging.SimpleLogger
+	eventParser        *EventParser
+	lockingClient      *locking.Client
+	atlantisURL        string
 }
 
 // the mapstructure tags correspond to flags in cmd/server.go
@@ -108,6 +109,7 @@ func (g GeneralError) Template() *CompiledTemplate {
 
 // todo: /end
 
+
 func NewServer(config ServerConfig) (*Server, error) {
 	tp := github.BasicAuthTransport{
 		Username: strings.TrimSpace(config.GithubUser),
@@ -122,8 +124,9 @@ func NewServer(config ServerConfig) (*Server, error) {
 	githubBaseClient.BaseURL, _ = url.Parse(ghHostname)
 	githubClient := &GithubClient{client: githubBaseClient, ctx: githubClientCtx}
 	githubStatus := &GithubStatus{client: githubClient}
-	terraformClient := &TerraformClient{
-		tfExecutableName: "terraform",
+	terraformClient, err := NewTerraformClient()
+	if err != nil {
+		return nil, errors.Wrap(err, "initializing terraform")
 	}
 	githubComments := &GithubCommentRenderer{}
 	awsConfig := &AWSConfig{
@@ -133,7 +136,6 @@ func NewServer(config ServerConfig) (*Server, error) {
 
 	var awsSession *session.Session
 	var lockingClient *locking.Client
-	var err error
 	if config.LockingBackend == LockingDynamoDBBackend {
 		awsSession, err = awsConfig.CreateAWSSession()
 		if err != nil {
@@ -162,6 +164,8 @@ func NewServer(config ServerConfig) (*Server, error) {
 			return nil, errors.Wrap(err, "creating file backend for plans")
 		}
 	}
+	preRun := &prerun.PreRun{}
+	configReader := &ConfigReader{}
 	applyExecutor := &ApplyExecutor{
 		github:                githubClient,
 		githubStatus:          githubStatus,
@@ -173,6 +177,8 @@ func NewServer(config ServerConfig) (*Server, error) {
 		lockingClient:         lockingClient,
 		requireApproval:       config.RequireApproval,
 		planBackend:           planBackend,
+		preRun:                preRun,
+		configReader: configReader,
 	}
 	planExecutor := &PlanExecutor{
 		github:                githubClient,
@@ -184,12 +190,14 @@ func NewServer(config ServerConfig) (*Server, error) {
 		githubCommentRenderer: githubComments,
 		lockingClient:         lockingClient,
 		planBackend:           planBackend,
+		preRun:                preRun,
+		configReader: configReader,
 	}
 	helpExecutor := &HelpExecutor{}
 	pullClosedExecutor := &PullClosedExecutor{
 		planBackend: planBackend,
-		github: githubClient,
-		locking: lockingClient,
+		github:      githubClient,
+		locking:     lockingClient,
 	}
 	logger := logging.NewSimpleLogger("server", log.New(os.Stderr, "", log.LstdFlags), false, logging.ToLogLevel(config.LogLevel))
 	eventParser := &EventParser{}
@@ -203,14 +211,14 @@ func NewServer(config ServerConfig) (*Server, error) {
 	}
 	router := mux.NewRouter()
 	return &Server{
-		router:         router,
-		port:           config.Port,
-		commandHandler: commandHandler,
+		router:             router,
+		port:               config.Port,
+		commandHandler:     commandHandler,
 		pullClosedExecutor: pullClosedExecutor,
-		eventParser:    eventParser,
-		logger:         logger,
-		lockingClient:  lockingClient,
-		atlantisURL:    config.AtlantisURL,
+		eventParser:        eventParser,
+		logger:             logger,
+		lockingClient:      lockingClient,
+		atlantisURL:        config.AtlantisURL,
 	}, nil
 }
 

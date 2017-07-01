@@ -1,11 +1,13 @@
-package server
+package prerun
 
 import (
-	"github.com/hootsuite/atlantis/logging"
-	. "github.com/hootsuite/atlantis/testing_util"
 	"log"
 	"os"
 	"testing"
+
+	version "github.com/hashicorp/go-version"
+	"github.com/hootsuite/atlantis/logging"
+	. "github.com/hootsuite/atlantis/testing_util"
 )
 
 var level logging.LogLevel = logging.Info
@@ -15,11 +17,7 @@ var logger = &logging.SimpleLogger{
 	Level:  level,
 }
 
-func TestPreRunCreateScript_empty(t *testing.T) {
-	scriptName, err := createScript(nil)
-	Assert(t, scriptName == "", "there should not be a script name")
-	Assert(t, err == nil, "there should not be an error")
-}
+var preRun = &PreRun{}
 
 func TestPreRunCreateScript_valid(t *testing.T) {
 	cmds := []string{"echo", "date"}
@@ -45,23 +43,7 @@ func TestPreRunExecuteScript_valid(t *testing.T) {
 
 func TestPreRun_valid(t *testing.T) {
 	cmds := []string{"echo", "date"}
-	prePlan := PrePlan{Commands: cmds}
-	preApply := PreApply{Commands: cmds}
-	var config Config
-	config.PrePlan = prePlan
-	config.PreApply = preApply
-	config.StashPath = "/some/path"
-	err := PreRun(&config, logger, "/some/path", &Command{environment: "staging", commandType: Plan})
-	Assert(t, err == nil, "should not error")
-
-}
-
-func TestPreRun_partial_valid(t *testing.T) {
-	cmds := []string{"echo", "date"}
-	prePlan := PrePlan{Commands: cmds}
-	var config Config
-	config.PrePlan = prePlan
-	config.StashPath = "/some/path"
-	err := PreRun(&config, logger, "/some/path", &Command{environment: "staging", commandType: Plan})
-	Assert(t, err == nil, "should not error")
+	version, _ := version.NewVersion("0.8.8")
+	_, err := preRun.Start(cmds, "/tmp/atlantis", "staging", version)
+	Ok(t, err)
 }

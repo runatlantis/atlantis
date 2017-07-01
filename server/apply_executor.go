@@ -1,17 +1,20 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"path/filepath"
 
 	"strconv"
 
+	version "github.com/hashicorp/go-version"
 	"github.com/hootsuite/atlantis/locking"
 	"github.com/hootsuite/atlantis/plan"
+	"github.com/hootsuite/atlantis/prerun"
 )
 
 type ApplyExecutor struct {
@@ -25,6 +28,8 @@ type ApplyExecutor struct {
 	lockingClient         *locking.Client
 	requireApproval       bool
 	planBackend           plan.Backend
+	preRun                *prerun.PreRun
+	configReader          *ConfigReader
 }
 
 /** Result Types **/
@@ -67,8 +72,10 @@ func (a *ApplyExecutor) execute(ctx *CommandContext, github *GithubClient) {
 }
 
 func (a *ApplyExecutor) setupAndApply(ctx *CommandContext) ExecutionResult {
-	if approved, res := a.isApproved(ctx); !approved {
-		return res
+	if a.requireApproval {
+		if approved, res := a.isApproved(ctx); !approved {
+			return res
+		}
 	}
 
 	// todo: reclone repo and switch branch, don't assume it's already there
@@ -99,13 +106,28 @@ func (a *ApplyExecutor) setupAndApply(ctx *CommandContext) ExecutionResult {
 }
 
 func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan plan.Plan) PathResult {
-	var config Config
-	var remoteStatePath string
+	tfEnv := ctx.Command.environment
+	lockAttempt, err := a.lockingClient.TryLock(plan.Project, tfEnv, ctx.Pull, ctx.User)
+	if err != nil {
+		return PathResult{
+			Status: Error,
+			Result: GeneralError{errors.Wrap(err, "trying acquire lock")},
+		}
+	}
+	if lockAttempt.LockAcquired != true && lockAttempt.CurrLock.Pull.Num != ctx.Pull.Num {
+		return PathResult{
+			Status: Error,
+			Result: GeneralError{fmt.Errorf("failed to acquire lock: lock held by pull request #%d", lockAttempt.CurrLock.Pull.Num)},
+		}
+	}
+
 	// check if config file is found, if not we continue the run
 	projectAbsolutePath := filepath.Dir(plan.LocalPath)
-	if config.Exists(projectAbsolutePath) {
+	var terraformApplyExtraArgs []string
+	var config ProjectConfig
+	if a.configReader.Exists(projectAbsolutePath) {
 		ctx.Log.Info("Config file found in %s", projectAbsolutePath)
-		err := config.Read(projectAbsolutePath)
+		config, err := a.configReader.Read(projectAbsolutePath)
 		if err != nil {
 			msg := fmt.Sprintf("Error reading config file: %v", err)
 			ctx.Log.Err(msg)
@@ -114,8 +136,34 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan plan.Pla
 				Result: GeneralError{errors.New(msg)},
 			}
 		}
-		// need to use the remote state path and backend to do remote configure
-		err = PreRun(&config, ctx.Log, projectAbsolutePath, ctx.Command)
+
+		// add terraform arguments from project config
+		terraformApplyExtraArgs = config.GetExtraArguments(ctx.Command.commandType.String())
+	}
+
+	// check if terraform version is >= 0.9.0
+	terraformVersion := a.terraform.Version()
+	if config.TerraformVersion != nil {
+		terraformVersion = config.TerraformVersion
+	}
+	constraints, _ := version.NewConstraint(">= 0.9.0")
+	if constraints.Check(terraformVersion) {
+		// run terraform init and environment
+		outputs, err := a.terraform.RunTerraformInitAndEnv(projectAbsolutePath, tfEnv, config)
+		if err != nil {
+			msg := fmt.Sprintf("terraform init and environment commands failed. %s %v", outputs, err)
+			ctx.Log.Err(msg)
+			return PathResult{
+				Status: Error,
+				Result: GeneralError{errors.New(msg)},
+			}
+		}
+		ctx.Log.Info("terraform init and environment commands ran successfully %s", outputs)
+	}
+
+	// if there are pre plan commands then run them
+	if len(config.PrePlan.Commands) > 0 {
+		preRunOutput, err := a.preRun.Start(config.PreApply.Commands, projectAbsolutePath, ctx.Command.environment, config.TerraformVersion)
 		if err != nil {
 			msg := fmt.Sprintf("pre run failed: %v", err)
 			ctx.Log.Err(msg)
@@ -124,51 +172,7 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan plan.Pla
 				Result: GeneralError{errors.New(msg)},
 			}
 		}
-		// check if terraform version is specified in config
-		if config.TerraformVersion != "" {
-			a.terraform.tfExecutableName = "terraform" + config.TerraformVersion
-		} else {
-			a.terraform.tfExecutableName = "terraform"
-		}
-	}
-
-	// NOTE: THIS CODE IS TO SUPPORT TERRAFORM PROJECTS THAT AREN'T USING ATLANTIS CONFIG FILE.
-	if config.StashPath == "" {
-		// configure remote state
-		statePath, err := a.terraform.ConfigureRemoteState(ctx.Log, repoDir, plan.Project, ctx.Command.environment, a.sshKey)
-		if err != nil {
-			msg := fmt.Sprintf("failed to set up remote state: %v", err)
-			ctx.Log.Err(msg)
-			return PathResult{
-				Status: Error,
-				Result: GeneralError{errors.New(msg)},
-			}
-		}
-		remoteStatePath = statePath
-	} else {
-		// use state path from config file
-		remoteStatePath = generateStatePath(config.StashPath, ctx.Command.environment)
-	}
-
-	if remoteStatePath != "" {
-		tfEnv := ctx.Command.environment
-		if tfEnv == "" {
-			tfEnv = "default"
-		}
-
-		lockAttempt, err := a.lockingClient.TryLock(plan.Project, tfEnv, ctx.Pull, ctx.User)
-		if err != nil {
-			return PathResult{
-				Status: Error,
-				Result: GeneralError{fmt.Errorf("failed to acquire lock: %s", err)},
-			}
-		}
-		if lockAttempt.LockAcquired != true && lockAttempt.CurrLock.Pull.Num != ctx.Pull.Num {
-			return PathResult{
-				Status: Error,
-				Result: GeneralError{fmt.Errorf("failed to acquire lock: lock held by pull request #%d", lockAttempt.CurrLock.Pull.Num)},
-			}
-		}
+		ctx.Log.Info("Pre run output: \n%s", preRunOutput)
 	}
 
 	// need to get auth data from assumed role
@@ -194,7 +198,10 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan plan.Pla
 	}
 
 	ctx.Log.Info("running apply from %q", plan.Project.Path)
-	terraformApplyCmdArgs, output, err := a.terraform.RunTerraformCommand(projectAbsolutePath, []string{"apply", "-no-color", plan.LocalPath}, []string{
+	tfApplyCmd := []string{"apply", "-no-color", plan.LocalPath}
+	// append terraform arguments from config file
+	tfApplyCmd = append(tfApplyCmd, terraformApplyExtraArgs...)
+	terraformApplyCmdArgs, output, err := a.terraform.RunTerraformCommand(projectAbsolutePath, tfApplyCmd, []string{
 		fmt.Sprintf("AWS_ACCESS_KEY_ID=%s", credVals.AccessKeyID),
 		fmt.Sprintf("AWS_SECRET_ACCESS_KEY=%s", credVals.SecretAccessKey),
 		fmt.Sprintf("AWS_SESSION_TOKEN=%s", credVals.SessionToken),
@@ -219,10 +226,6 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan plan.Pla
 }
 
 func (a *ApplyExecutor) isApproved(ctx *CommandContext) (bool, ExecutionResult) {
-	if !a.requireApproval {
-		return false, ExecutionResult{}
-	}
-
 	ok, err := a.github.PullIsApproved(ctx.Repo, ctx.Pull)
 	if err != nil {
 		msg := fmt.Sprintf("failed to determine if pull request was approved: %v", err)

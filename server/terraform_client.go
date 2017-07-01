@@ -2,82 +2,63 @@ package server
 
 import (
 	"fmt"
-	"github.com/hootsuite/atlantis/logging"
-	"github.com/hootsuite/atlantis/models"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
+
+	version "github.com/hashicorp/go-version"
+	"github.com/pkg/errors"
 )
 
 type TerraformClient struct {
-	tfExecutableName string
+	defaultVersion *version.Version
 }
 
-func (t *TerraformClient) ConfigureRemoteState(log *logging.SimpleLogger, repoDir string, project models.Project, env string, sshKey string) (string, error) {
-	absolutePath := filepath.Join(repoDir, project.Path)
-	log.Info("setting up remote state in directory %q", absolutePath)
-	var remoteSetupCmdArgs []string
+var terraformVersionRegex = regexp.MustCompile("Terraform v(.*)\n")
 
-	// Check if setup file exists
-	setupFileInfo, err := os.Stat(filepath.Join(absolutePath, "setup.sh"))
+func NewTerraformClient() (*TerraformClient, error) {
+	versionCmdOutput, err := exec.Command("terraform", "version").CombinedOutput()
+	output := string(versionCmdOutput)
 	if err != nil {
-		return "", fmt.Errorf("setup.sh file doesn't exist in terraform plan path %q: %v", project.Path, err)
-	}
-	// Check if setup file is executed
-	if setupFileInfo.Mode() != os.FileMode(0755) {
-		return "", fmt.Errorf("setup file isn't executable, required permissions are 0755")
-	}
-	// Check if environment is specified
-	if env == "" {
-		// Check if env/ folder exist and environment isn't specified
-		// todo: make env a constant (environmentDirName)
-		if _, err := os.Stat(filepath.Join(absolutePath, "env")); err == nil {
-			log.Info("environment directory exists but no environment was supplied")
-			return "", nil
+		// exec.go line 35, Error() returns
+		// "exec: " + strconv.Quote(e.Name) + ": " + e.Err.Error()
+		if err.Error() == fmt.Sprintf("exec: \"terraform\": %s", exec.ErrNotFound.Error()) {
+			return nil, errors.New("terraform not found in $PATH. \n\nDownload terraform from https://www.terraform.io/downloads.html")
 		}
-	} else {
-		// Check if the environment file exists
-		envFile := env + ".tfvars"
-		envPath := filepath.Join(absolutePath, "env")
-		if _, err := os.Stat(filepath.Join(envPath, envFile)); err != nil {
-			return "", fmt.Errorf("environment file %q not found in %q", envFile, envPath)
-		}
+		return nil, errors.Wrapf(err, "running terraform version: %s", output)
 	}
-
-	// Set environment file parameter for ./setup.sh
-	if env != "" {
-		remoteSetupCmdArgs = append(remoteSetupCmdArgs, "-e", env)
+	match := terraformVersionRegex.FindStringSubmatch(output)
+	if len(match) <= 1 {
+		return nil, fmt.Errorf("could not parse terraform version from %s", output)
 	}
-	remoteSetupCmd := exec.Command("./setup.sh", remoteSetupCmdArgs...)
-	remoteSetupCmd.Dir = absolutePath
-	// Check if ssh key is set
-	if sshKey != "" {
-		// Fixing a bug when git isn't found in path when environment variables are set for command
-		remoteSetupCmd.Env = os.Environ()
-		remoteSetupCmd.Env = append(remoteSetupCmd.Env, fmt.Sprintf("GIT_SSH=%s", defaultSSHWrapper), fmt.Sprintf("PKEY=%s", sshKey))
-
-	}
-	out, err := remoteSetupCmd.CombinedOutput()
-	output := string(out[:])
-	log.Info("setup.sh output: \n%s", output)
+	version, err := version.NewVersion(match[1])
 	if err != nil {
-		return "", fmt.Errorf("failed to configure remote state: %v", err)
+		return nil, errors.Wrap(err, "parsing terraform version")
 	}
-	// Get remote state path from setup.sh output
-	r, _ := regexp.Compile("REMOTE_STATE_PATH=([^ ]*.tfstate)")
-	match := r.FindStringSubmatch(output)
-	// Backend remote state path
-	remoteStatePath := match[1]
-	log.Info("remote state path %q", remoteStatePath)
 
-	return remoteStatePath, nil
+	return &TerraformClient{
+		defaultVersion: version,
+	}, nil
 }
 
-func (t *TerraformClient) RunTerraformCommand(path string, tfPlanCmd []string, tfEnvVars []string) ([]string, string, error) {
-	terraformCmd := exec.Command(t.tfExecutableName, tfPlanCmd...)
+func (t *TerraformClient) RunTerraformCommand(path string, tfCmd []string, tfEnvVars []string) ([]string, string, error) {
+	return t.RunTerraformCommandWithVersion(path, tfCmd, tfEnvVars, t.defaultVersion)
+}
+
+func (t *TerraformClient) Version() *version.Version {
+	return t.defaultVersion
+}
+
+func (t *TerraformClient) RunTerraformCommandWithVersion(path string, tfCmd []string, tfEnvVars []string, v *version.Version) ([]string, string, error) {
+	tfExecutable := "terraform"
+	// if version is the same as the default, don't need to prepend the version name to the executable
+	if !v.Equal(t.defaultVersion) {
+		tfExecutable = fmt.Sprintf("%s%s", tfExecutable, v.String())
+	}
+	terraformCmd := exec.Command(tfExecutable, tfCmd...)
 	terraformCmd.Dir = path
-	terraformCmd.Env = tfEnvVars
+	if len(tfEnvVars) > 0 {
+		terraformCmd.Env = tfEnvVars
+	}
 	out, err := terraformCmd.CombinedOutput()
 	output := string(out)
 	if err != nil {
@@ -85,4 +66,26 @@ func (t *TerraformClient) RunTerraformCommand(path string, tfPlanCmd []string, t
 	}
 
 	return terraformCmd.Args, output, nil
+}
+
+func (t *TerraformClient) RunTerraformInitAndEnv(path string, env string, config ProjectConfig) ([]string, error) {
+	var outputs []string
+	// run terraform init
+	_, output, err := t.RunTerraformCommand(path, append([]string{"init", "-no-color"}, config.GetExtraArguments("init")...), []string{})
+	if err != nil {
+		return nil, errors.Wrapf(err, "running terraform init: %s", output)
+	}
+	outputs = append(outputs, output)
+
+	// run terraform env new and select
+	_, output, err = t.RunTerraformCommand(path, []string{"env", "select", "-no-color", env}, []string{})
+	if err != nil {
+		// if terraform env select fails we will run terraform env new
+		// to create a new environment
+		_, output, err = t.RunTerraformCommand(path, []string{"env", "new", "-no-color", env}, []string{})
+		if err != nil {
+			return nil, errors.Wrapf(err, "running terraform environment command: %s", output)
+		}
+	}
+	return append(outputs, output), nil
 }

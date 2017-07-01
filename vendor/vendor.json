@@ -251,6 +251,12 @@
 			"revisionTime": "2016-12-16T18:43:04Z"
 		},
 		{
+			"checksumSHA1": "tUGxc7rfX0cmhOOUDhMuAZ9rWsA=",
+			"path": "github.com/hashicorp/go-version",
+			"revision": "03c5bf6be031b6dd45afec16b1cf94fc8938bc77",
+			"revisionTime": "2017-02-02T08:07:59Z"
+		},
+		{
 			"checksumSHA1": "7JBkp3EZoc0MSbiyWfzVhO4RYoY=",
 			"path": "github.com/hashicorp/hcl",
 			"revision": "392dba7d905ed5d04a5794ba89f558b27e2ba1ca",

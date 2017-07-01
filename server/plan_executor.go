@@ -9,10 +9,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	version "github.com/hashicorp/go-version"
 	"github.com/hootsuite/atlantis/locking"
 	"github.com/hootsuite/atlantis/logging"
 	"github.com/hootsuite/atlantis/models"
 	"github.com/hootsuite/atlantis/plan"
+	"github.com/hootsuite/atlantis/prerun"
 	"github.com/pkg/errors"
 )
 
@@ -27,9 +29,11 @@ type PlanExecutor struct {
 	terraform             *TerraformClient
 	githubCommentRenderer *GithubCommentRenderer
 	lockingClient         *locking.Client
-	// LockURL is a function that given a lock id will return the url to view that lock
-	LockURL     func(id string) (url string)
-	planBackend plan.Backend
+	// LockURL is a function that given a lock id will return a url for lock view
+	LockURL      func(id string) (url string)
+	planBackend  plan.Backend
+	preRun       *prerun.PreRun
+	configReader *ConfigReader
 }
 
 /** Result Types **/
@@ -150,35 +154,55 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
 		return p.setupError(ctx, errors.Wrap(err, "cleaning workspace"))
 	}
 
-	var config Config
+	tfEnv := ctx.Command.environment
 	planOutputs := []PathResult{}
 	for _, project := range projects {
 		// check if config file is found, if not we continue the run
+		var config ProjectConfig
 		absolutePath := filepath.Join(cloneDir, project.Path)
-		if config.Exists(absolutePath) {
+		var terraformPlanExtraArgs []string
+		if p.configReader.Exists(absolutePath) {
 			ctx.Log.Info("Config file found in %s", absolutePath)
-			err := config.Read(absolutePath)
+			config, err = p.configReader.Read(absolutePath)
 			if err != nil {
 				errMsg := fmt.Sprintf("Error reading config file: %v", err)
 				ctx.Log.Err(errMsg)
 				return ExecutionResult{SetupError: GeneralError{errors.New(errMsg)}}
 			}
-			// need to use the remote state path and backend to do remote configure
-			err = PreRun(&config, ctx.Log, absolutePath, ctx.Command)
+
+			// add terraform arguments from project config
+			terraformPlanExtraArgs = config.GetExtraArguments(ctx.Command.commandType.String())
+		}
+
+		// check if terraform version is >= 0.9.0
+		terraformVersion := p.terraform.Version()
+		if config.TerraformVersion != nil {
+			terraformVersion = config.TerraformVersion
+		}
+		constraints, _ := version.NewConstraint(">= 0.9.0")
+		if constraints.Check(terraformVersion) {
+			// run terraform init and environment
+			outputs, err := p.terraform.RunTerraformInitAndEnv(absolutePath, tfEnv, config)
+			if err != nil {
+				errMsg := fmt.Sprintf("terraform init and environment commands failed. %s %v", outputs, err)
+				ctx.Log.Err(errMsg)
+				return ExecutionResult{SetupError: GeneralError{errors.New(errMsg)}}
+			}
+			ctx.Log.Info("terraform init and environment commands ran successfully %s", outputs)
+		}
+
+		// if there are pre plan commands then run them
+		if len(config.PrePlan.Commands) > 0 {
+			preRunOutput, err := p.preRun.Start(config.PrePlan.Commands, absolutePath, tfEnv, terraformVersion)
 			if err != nil {
 				errMsg := fmt.Sprintf("pre run failed: %v", err)
 				ctx.Log.Err(errMsg)
 				return ExecutionResult{SetupError: GeneralError{errors.New(errMsg)}}
 			}
-
-			// check if terraform version is specified in config
-			if config.TerraformVersion != "" {
-				p.terraform.tfExecutableName = "terraform" + config.TerraformVersion
-			} else {
-				p.terraform.tfExecutableName = "terraform"
-			}
+			ctx.Log.Info("Pre run output: \n%s", preRunOutput)
 		}
-		generatePlanResponse := p.plan(ctx, cloneDir, p.scratchDir, project, p.sshKey, config.StashPath)
+
+		generatePlanResponse := p.plan(ctx, cloneDir, p.scratchDir, project, p.sshKey, terraformPlanExtraArgs)
 		generatePlanResponse.Path = project.Path
 		planOutputs = append(planOutputs, generatePlanResponse)
 	}
@@ -194,25 +218,11 @@ func (p *PlanExecutor) plan(
 	planOutDir string,
 	project models.Project,
 	sshKey string,
-	stashPath string) PathResult {
+	terraformArgs []string) PathResult {
 	ctx.Log.Info("generating plan for path %q", project.Path)
 
-	// NOTE: THIS CODE IS TO SUPPORT TERRAFORM PROJECTS THAT AREN'T USING ATLANTIS CONFIG FILE.
-	if stashPath == "" {
-		_, err := p.terraform.ConfigureRemoteState(ctx.Log, repoDir, project, ctx.Command.environment, sshKey)
-		if err != nil {
-			return PathResult{
-				Status: Error,
-				Result: GeneralError{fmt.Errorf("failed to configure remote state: %s", err)},
-			}
-		}
-	}
-	// todo: setting environment to default should be done elsewhere
 	tfEnv := ctx.Command.environment
-	if tfEnv == "" {
-		tfEnv = "default"
-	}
-	lockAttempt, err := p.lockingClient.TryLock(project, ctx.Command.environment, ctx.Pull, ctx.User)
+	lockAttempt, err := p.lockingClient.TryLock(project, tfEnv, ctx.Pull, ctx.User)
 	if err != nil {
 		return PathResult{
 			Status: Failure,
@@ -230,21 +240,14 @@ func (p *PlanExecutor) plan(
 
 	// Run terraform plan
 	ctx.Log.Info("running terraform plan in directory %q", project.Path)
-	tfPlanCmd := []string{"plan", "-refresh", "-no-color"}
 	planFile := filepath.Join(repoDir, project.Path, fmt.Sprintf("%s.tfplan", tfEnv))
-	if ctx.Command.environment != "" {
-		tfEnvFileName := filepath.Join("env", ctx.Command.environment+".tfvars")
-		if _, err := os.Stat(filepath.Join(repoDir, project.Path, tfEnvFileName)); err == nil {
-			tfPlanCmd = append(tfPlanCmd, "-var-file", tfEnvFileName, "-out", planFile)
-		} else {
-			ctx.Log.Err("environment file %q not found", tfEnvFileName)
-			return PathResult{
-				Status: Failure,
-				Result: EnvironmentFileNotFoundFailure{tfEnvFileName},
-			}
-		}
-	} else {
-		tfPlanCmd = append(tfPlanCmd, "-out", planFile)
+	tfPlanCmd := []string{"plan", "-refresh", "-no-color", "-out", planFile}
+	// append terraform arguments from config file
+	tfPlanCmd = append(tfPlanCmd, terraformArgs...)
+	// check if env/{environment}.tfvars exist
+	tfEnvFileName := filepath.Join("env", tfEnv+".tfvars")
+	if _, err := os.Stat(filepath.Join(repoDir, project.Path, tfEnvFileName)); err == nil {
+		tfPlanCmd = append(tfPlanCmd, "-var-file", tfEnvFileName)
 	}
 
 	// set pull request creator as the session name
@@ -384,11 +387,6 @@ func (p *PlanExecutor) CleanWorkspace(log *logging.SimpleLogger, deleteFilesPref
 		}
 	}
 	return nil
-}
-
-// todo: make OO
-func generateStatePath(path string, tfEnvName string) string {
-	return strings.Replace(path, "$ENVIRONMENT", tfEnvName, -1)
 }
 
 func (p *PlanExecutor) setupError(ctx *CommandContext, err error) ExecutionResult {
