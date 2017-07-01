@@ -3,15 +3,14 @@ package server
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"os/user"
 	"strings"
-
 	"time"
-
-	"io/ioutil"
 
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/elazarl/go-bindata-assetfs"
@@ -26,10 +25,10 @@ import (
 	"github.com/hootsuite/atlantis/plan"
 	"github.com/hootsuite/atlantis/plan/file"
 	"github.com/hootsuite/atlantis/plan/s3"
+	"github.com/hootsuite/atlantis/prerun"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	"github.com/urfave/negroni"
-	"github.com/hootsuite/atlantis/prerun"
 )
 
 const (
@@ -70,7 +69,6 @@ type ServerConfig struct {
 	PlanBackend          string `mapstructure:"plan-backend"`
 	RequireApproval      bool   `mapstructure:"require-approval"`
 	SSHKey               string `mapstructure:"ssh-key"`
-	ScratchDir           string `mapstructure:"scratch-dir"`
 }
 
 type CommandContext struct {
@@ -109,8 +107,17 @@ func (g GeneralError) Template() *CompiledTemplate {
 
 // todo: /end
 
-
 func NewServer(config ServerConfig) (*Server, error) {
+	// if ~ was used in data-dir convert that to actual home directory otherwise we'll
+	// create a directory call "~" instead of actually using home
+	if strings.HasPrefix(config.DataDir, "~/") {
+		user, err := user.Current()
+		if err != nil {
+			return nil, errors.Wrap(err, "determining current user")
+		}
+		config.DataDir = user.HomeDir + strings.TrimPrefix(config.DataDir, "~")
+	}
+
 	tp := github.BasicAuthTransport{
 		Username: strings.TrimSpace(config.GithubUser),
 		Password: strings.TrimSpace(config.GithubPassword),
@@ -167,11 +174,14 @@ func NewServer(config ServerConfig) (*Server, error) {
 	preRun := &prerun.PreRun{}
 	configReader := &ConfigReader{}
 	concurrentRunLocker := NewConcurrentRunLocker()
+	workspace := &Workspace{
+		dataDir: config.DataDir,
+		sshKey:  config.SSHKey,
+	}
 	applyExecutor := &ApplyExecutor{
 		github:                githubClient,
 		githubStatus:          githubStatus,
 		awsConfig:             awsConfig,
-		scratchDir:            config.ScratchDir,
 		sshKey:                config.SSHKey,
 		terraform:             terraformClient,
 		githubCommentRenderer: githubComments,
@@ -179,28 +189,30 @@ func NewServer(config ServerConfig) (*Server, error) {
 		requireApproval:       config.RequireApproval,
 		planBackend:           planBackend,
 		preRun:                preRun,
-		configReader: configReader,
-		concurrentRunLocker: concurrentRunLocker,
+		configReader:          configReader,
+		concurrentRunLocker:   concurrentRunLocker,
+		workspace:             workspace,
 	}
 	planExecutor := &PlanExecutor{
 		github:                githubClient,
 		githubStatus:          githubStatus,
 		awsConfig:             awsConfig,
-		scratchDir:            config.ScratchDir,
 		sshKey:                config.SSHKey,
 		terraform:             terraformClient,
 		githubCommentRenderer: githubComments,
 		lockingClient:         lockingClient,
 		planBackend:           planBackend,
 		preRun:                preRun,
-		configReader: configReader,
-		concurrentRunLocker: concurrentRunLocker,
+		configReader:          configReader,
+		concurrentRunLocker:   concurrentRunLocker,
+		workspace:             workspace,
 	}
 	helpExecutor := &HelpExecutor{}
 	pullClosedExecutor := &PullClosedExecutor{
 		planBackend: planBackend,
 		github:      githubClient,
 		locking:     lockingClient,
+		workspace:   workspace,
 	}
 	logger := logging.NewSimpleLogger("server", log.New(os.Stderr, "", log.LstdFlags), false, logging.ToLogLevel(config.LogLevel))
 	eventParser := &EventParser{}

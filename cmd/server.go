@@ -31,7 +31,6 @@ const (
 	planS3PrefixFlag    = "plan-s3-prefix"
 	portFlag            = "port"
 	requireApprovalFlag = "require-approval"
-	scratchDirFlag      = "scratch-dir"
 	sshKeyFlag          = "ssh-key"
 )
 
@@ -56,7 +55,7 @@ var stringFlags = []stringFlag{
 	{
 		name:        dataDirFlag,
 		description: "Path to directory to store Atlantis data.",
-		value:       "/var/lib/atlantis",
+		value:       "~/.atlantis",
 	},
 	{
 		name:        ghHostnameFlag,
@@ -102,11 +101,6 @@ var stringFlags = []stringFlag{
 		name:        planBackendFlag,
 		description: "How to store plan files: file or s3. If set to file, will store plan files on disk in the directory specified by data-dir.",
 		value:       "file",
-	},
-	{
-		name:        scratchDirFlag,
-		description: "Path to directory to use as a temporary workspace for checking out repos.",
-		value:       "/tmp/atlantis",
 	},
 	{
 		name:        sshKeyFlag,

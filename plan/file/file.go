@@ -1,13 +1,14 @@
 package file
 
 import (
-	"github.com/hootsuite/atlantis/models"
-	"github.com/hootsuite/atlantis/plan"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
+
+	"github.com/hootsuite/atlantis/models"
+	"github.com/hootsuite/atlantis/plan"
+	"github.com/pkg/errors"
 )
 
 type Backend struct {

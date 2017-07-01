@@ -7,7 +7,7 @@ import (
 
 // ConcurrentRunLocker is used to prevent multiple runs and commands from occurring at the same time for a single
 // repo, pull, and environment
-type ConcurrentRunLocker struct{
+type ConcurrentRunLocker struct {
 	mutex sync.Mutex
 	locks map[string]interface{}
 }

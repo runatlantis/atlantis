@@ -1,9 +1,10 @@
 package server_test
 
 import (
-	. "github.com/hootsuite/atlantis/testing_util"
 	"testing"
+
 	"github.com/hootsuite/atlantis/server"
+	. "github.com/hootsuite/atlantis/testing_util"
 )
 
 var repo = "repo/owner"

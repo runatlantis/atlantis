@@ -102,7 +102,7 @@ func (b Backend) Unlock(project models.Project, env string) (*models.ProjectLock
 		Key: map[string]*dynamodb.AttributeValue{
 			"LockKey": {S: aws.String(key)},
 		},
-		TableName: aws.String(b.LockTable),
+		TableName:    aws.String(b.LockTable),
 		ReturnValues: aws.String("ALL_OLD"),
 	}
 	output, err := b.DB.DeleteItem(params)

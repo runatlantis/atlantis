@@ -27,8 +27,8 @@ type User struct {
 
 type ProjectLock struct {
 	Project Project
-	Pull PullRequest
-	User User
+	Pull    PullRequest
+	User    User
 	Env     string
 	Time    time.Time
 }

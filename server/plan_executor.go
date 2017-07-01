@@ -2,16 +2,13 @@ package server
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
 
 	version "github.com/hashicorp/go-version"
 	"github.com/hootsuite/atlantis/locking"
-	"github.com/hootsuite/atlantis/logging"
 	"github.com/hootsuite/atlantis/models"
 	"github.com/hootsuite/atlantis/plan"
 	"github.com/hootsuite/atlantis/prerun"
@@ -23,18 +20,18 @@ type PlanExecutor struct {
 	github                *GithubClient
 	githubStatus          *GithubStatus
 	awsConfig             *AWSConfig
-	scratchDir            string
 	s3Bucket              string
 	sshKey                string
 	terraform             *TerraformClient
 	githubCommentRenderer *GithubCommentRenderer
 	lockingClient         *locking.Client
 	// LockURL is a function that given a lock id will return a url for lock view
-	LockURL      func(id string) (url string)
-	planBackend  plan.Backend
-	preRun       *prerun.PreRun
-	configReader *ConfigReader
+	LockURL             func(id string) (url string)
+	planBackend         plan.Backend
+	preRun              *prerun.PreRun
+	configReader        *ConfigReader
 	concurrentRunLocker *ConcurrentRunLocker
+	workspace           *Workspace
 }
 
 /** Result Types **/
@@ -115,51 +112,9 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
 		return ExecutionResult{SetupError: GeneralError{errors.New("Plan Failed: we determined that no terraform projects were modified")}}
 	}
 
-	// set up our workspace by cloning the repo
-	cloneDir := fmt.Sprintf("%s/%s/%d", p.scratchDir, ctx.Repo.FullName, ctx.Pull.Num)
-	ctx.Log.Info("cleaning clone directory %q", cloneDir)
-	if err := os.RemoveAll(cloneDir); err != nil {
-		ctx.Log.Warn("failed to clean dir %q before cloning, attempting to continue: %v", cloneDir, err)
-	}
-
-	// create the directory and parents if necessary
-	ctx.Log.Info("creating dir %q", cloneDir)
-	if err := os.MkdirAll(cloneDir, 0755); err != nil {
-		ctx.Log.Warn("failed to create dir %q prior to cloning, attempting to continue: %v", cloneDir, err)
-	}
-
-	// Check if ssh key is set and create git ssh wrapper
-	cloneCmd := exec.Command("git", "clone", ctx.Repo.SSHURL, cloneDir)
-	if p.sshKey != "" {
-		err := GenerateSSHWrapper()
-		if err != nil {
-			return p.setupError(ctx, errors.Wrap(err, "creating git ssh wrapper"))
-		}
-		cloneCmd.Env = []string{
-			fmt.Sprintf("GIT_SSH=%s", defaultSSHWrapper),
-			fmt.Sprintf("PKEY=%s", p.sshKey),
-		}
-	}
-
-	// git clone the repo
-	ctx.Log.Info("git cloning %q into %q", ctx.Repo.SSHURL, cloneDir)
-	if output, err := cloneCmd.CombinedOutput(); err != nil {
-		return p.setupError(ctx, fmt.Errorf("cloning %s: %s: %s", ctx.Repo.SSHURL, err, string(output)))
-	}
-
-	// check out the branch for this PR
-	ctx.Log.Info("checking out branch %q", ctx.Pull.Branch)
-	checkoutCmd := exec.Command("git", "checkout", ctx.Pull.Branch)
-	checkoutCmd.Dir = cloneDir
-	if err := checkoutCmd.Run(); err != nil {
-		return p.setupError(ctx, errors.Wrapf(err, "checking out branch %s", ctx.Pull.Branch))
-	}
-	//workspace.Initialize(ctx.Repo, ctx.Pull.Num)
-
-	// todo: update how we clean the workspace based on the new way of storing plans
-	planFilesPrefix := fmt.Sprintf("%s_%d", strings.Replace(ctx.Repo.FullName, "/", "_", -1), ctx.Pull.Num)
-	if err := p.CleanWorkspace(ctx.Log, planFilesPrefix, p.scratchDir, cloneDir, projects); err != nil {
-		return p.setupError(ctx, errors.Wrap(err, "cleaning workspace"))
+	cloneDir, err := p.workspace.Clone(ctx)
+	if err != nil {
+		return ExecutionResult{SetupError: GeneralError{fmt.Errorf("Plan Failed: setting up workspace: %s", err)}}
 	}
 
 	tfEnv := ctx.Command.environment
@@ -210,7 +165,7 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
 			ctx.Log.Info("Pre run output: \n%s", preRunOutput)
 		}
 
-		generatePlanResponse := p.plan(ctx, cloneDir, p.scratchDir, project, p.sshKey, terraformPlanExtraArgs)
+		generatePlanResponse := p.plan(ctx, cloneDir, project, p.sshKey, terraformPlanExtraArgs)
 		generatePlanResponse.Path = project.Path
 		planOutputs = append(planOutputs, generatePlanResponse)
 	}
@@ -223,7 +178,6 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
 func (p *PlanExecutor) plan(
 	ctx *CommandContext,
 	repoDir string,
-	planOutDir string,
 	project models.Project,
 	sshKey string,
 	terraformArgs []string) PathResult {
@@ -370,31 +324,6 @@ func (p *PlanExecutor) getProjectPath(modifiedFilePath string) string {
 		return path.Dir(dir)
 	}
 	return dir
-}
-
-// CleanWorkspace deletes all .terraform/ folders from the project folders and cleans up any plans in the output directory
-func (p *PlanExecutor) CleanWorkspace(log *logging.SimpleLogger, deleteFilesPrefix string, planOutDir string, repoDir string, projects []models.Project) error {
-	log.Info("cleaning workspace directory %q", planOutDir)
-
-	// delete .terraform directories
-	for _, project := range projects {
-		os.RemoveAll(filepath.Join(repoDir, project.Path, ".terraform"))
-	}
-	// delete old plan files
-	files, err := ioutil.ReadDir(planOutDir)
-	if err != nil {
-		return err
-	}
-	for _, file := range files {
-		if strings.HasPrefix(file.Name(), deleteFilesPrefix) {
-			log.Info("deleting file %q", file.Name())
-			fullPath := filepath.Join(planOutDir, file.Name())
-			if err := os.Remove(fullPath); err != nil {
-				log.Warn("failed to remove plan file %q", fullPath)
-			}
-		}
-	}
-	return nil
 }
 
 func (p *PlanExecutor) setupError(ctx *CommandContext, err error) ExecutionResult {

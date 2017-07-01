@@ -9,8 +9,6 @@ import (
 
 	"path/filepath"
 
-	"strconv"
-
 	version "github.com/hashicorp/go-version"
 	"github.com/hootsuite/atlantis/locking"
 	"github.com/hootsuite/atlantis/plan"
@@ -21,7 +19,6 @@ type ApplyExecutor struct {
 	github                *GithubClient
 	githubStatus          *GithubStatus
 	awsConfig             *AWSConfig
-	scratchDir            string
 	sshKey                string
 	terraform             *TerraformClient
 	githubCommentRenderer *GithubCommentRenderer
@@ -30,7 +27,8 @@ type ApplyExecutor struct {
 	planBackend           plan.Backend
 	preRun                *prerun.PreRun
 	configReader          *ConfigReader
-	concurrentRunLocker *ConcurrentRunLocker
+	concurrentRunLocker   *ConcurrentRunLocker
+	workspace             *Workspace
 }
 
 /** Result Types **/
@@ -81,13 +79,19 @@ func (a *ApplyExecutor) execute(ctx *CommandContext, github *GithubClient) {
 
 func (a *ApplyExecutor) setupAndApply(ctx *CommandContext) ExecutionResult {
 	if a.requireApproval {
-		if approved, res := a.isApproved(ctx); !approved {
+		approved, res := a.isApproved(ctx)
+		if !approved {
 			return res
 		}
 	}
 
-	// todo: reclone repo and switch branch, don't assume it's already there
-	repoDir := filepath.Join(a.scratchDir, ctx.Repo.FullName, strconv.Itoa(ctx.Pull.Num))
+	repoDir, err := a.workspace.GetWorkspace(ctx)
+	if err != nil {
+		ctx.Log.Err(err.Error())
+		a.githubStatus.Update(ctx.Repo, ctx.Pull, Error, ApplyStep)
+		return ExecutionResult{SetupError: GeneralError{errors.New("Workspace missing, please plan again")}}
+	}
+
 	plans, err := a.planBackend.CopyPlans(repoDir, ctx.Repo.FullName, ctx.Command.environment, ctx.Pull.Num)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to get plans: %s", err)

@@ -8,7 +8,6 @@ import (
 
 	version "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
-
 	yaml "gopkg.in/yaml.v2"
 )
 

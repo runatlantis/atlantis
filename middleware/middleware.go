@@ -1,9 +1,10 @@
 package middleware
 
 import (
+	"net/http"
+
 	"github.com/hootsuite/atlantis/logging"
 	"github.com/urfave/negroni"
-	"net/http"
 )
 
 func NewNon200Logger(logger *logging.SimpleLogger) *FailedRequestLogger {

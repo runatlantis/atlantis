@@ -36,3 +36,5 @@ dist: ## Package up everything in static/ using go-bindata-assetfs so it can be 
 vendor-status:
 	@govendor status
 
+fmt: ## Run goimports (which also formats)
+	goimports -w $$(find . -type f -name '*.go' -not -path "./vendor/*")

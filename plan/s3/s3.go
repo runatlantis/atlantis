@@ -108,7 +108,7 @@ func (b *Backend) SavePlan(path string, project models.Project, env string, pull
 func (b *Backend) DeletePlan(project models.Project, env string, pullNum int) error {
 	_, err := b.s3.DeleteObject(&s3.DeleteObjectInput{
 		Bucket: aws.String(b.bucket),
-		Key: aws.String(b.path(project, env, pullNum)),
+		Key:    aws.String(b.path(project, env, pullNum)),
 	})
 	return err
 }

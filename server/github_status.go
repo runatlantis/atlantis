@@ -3,9 +3,10 @@ package server
 import (
 	"fmt"
 
+	"strings"
+
 	"github.com/google/go-github/github"
 	"github.com/hootsuite/atlantis/models"
-	"strings"
 )
 
 type Status int
@@ -40,9 +41,9 @@ func (s Status) String() string {
 
 func (g *GithubStatus) Update(repo models.Repo, pull models.PullRequest, status Status, step string) error {
 	repoStatus := github.RepoStatus{
-		State: github.String(status.String()),
+		State:       github.String(status.String()),
 		Description: github.String(fmt.Sprintf("%s %s", strings.Title(step), strings.Title(status.String()))),
-		Context: github.String(statusContext)}
+		Context:     github.String(statusContext)}
 	return g.client.UpdateStatus(repo, pull, &repoStatus)
 }
 
