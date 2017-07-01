@@ -34,6 +34,7 @@ type PlanExecutor struct {
 	planBackend  plan.Backend
 	preRun       *prerun.PreRun
 	configReader *ConfigReader
+	concurrentRunLocker *ConcurrentRunLocker
 }
 
 /** Result Types **/
@@ -78,6 +79,12 @@ func (e EnvironmentFailure) Template() *CompiledTemplate {
 }
 
 func (p *PlanExecutor) execute(ctx *CommandContext, github *GithubClient) {
+	if p.concurrentRunLocker.TryLock(ctx.Repo.FullName, ctx.Command.environment, ctx.Pull.Num) != true {
+		ctx.Log.Info("run was locked by a concurrent run")
+		github.CreateComment(ctx.Repo, ctx.Pull, "This environment is currently locked by another command that is running for this pull request. Wait until command is complete and try again")
+		return
+	}
+	defer p.concurrentRunLocker.Unlock(ctx.Repo.FullName, ctx.Command.environment, ctx.Pull.Num)
 	res := p.setupAndPlan(ctx)
 	res.Command = Plan
 	comment := p.githubCommentRenderer.render(res, ctx.Log.History.String(), ctx.Command.verbose)
@@ -87,8 +94,28 @@ func (p *PlanExecutor) execute(ctx *CommandContext, github *GithubClient) {
 func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
 	p.githubStatus.Update(ctx.Repo, ctx.Pull, Pending, PlanStep)
 
-	// todo: lock when cloning or somehow separate workspaces
-	// clean the directory where we're going to clone
+	// figure out what projects have been modified so we know where to run plan
+	ctx.Log.Info("listing modified files from pull request")
+	modifiedFiles, err := p.github.GetModifiedFiles(ctx.Repo, ctx.Pull)
+	if err != nil {
+		return p.setupError(ctx, errors.Wrap(err, "getting modified files"))
+	}
+	modifiedTerraformFiles := p.filterToTerraform(modifiedFiles)
+	if len(modifiedTerraformFiles) == 0 {
+		ctx.Log.Info("no modified terraform files found, exiting")
+		p.githubStatus.Update(ctx.Repo, ctx.Pull, Failure, PlanStep)
+		return ExecutionResult{SetupError: GeneralError{errors.New("Plan Failed: no modified terraform files found")}}
+	}
+	ctx.Log.Debug("Found %d modified terraform files: %v", len(modifiedTerraformFiles), modifiedTerraformFiles)
+
+	projects := p.ModifiedProjects(ctx.Repo.FullName, modifiedTerraformFiles)
+	if len(projects) == 0 {
+		ctx.Log.Info("no Terraform projects were modified")
+		p.githubStatus.Update(ctx.Repo, ctx.Pull, Failure, PlanStep)
+		return ExecutionResult{SetupError: GeneralError{errors.New("Plan Failed: we determined that no terraform projects were modified")}}
+	}
+
+	// set up our workspace by cloning the repo
 	cloneDir := fmt.Sprintf("%s/%s/%d", p.scratchDir, ctx.Repo.FullName, ctx.Pull.Num)
 	ctx.Log.Info("cleaning clone directory %q", cloneDir)
 	if err := os.RemoveAll(cloneDir); err != nil {
@@ -127,26 +154,7 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
 	if err := checkoutCmd.Run(); err != nil {
 		return p.setupError(ctx, errors.Wrapf(err, "checking out branch %s", ctx.Pull.Branch))
 	}
-
-	ctx.Log.Info("listing modified files from pull request")
-	modifiedFiles, err := p.github.GetModifiedFiles(ctx.Repo, ctx.Pull)
-	if err != nil {
-		return p.setupError(ctx, errors.Wrap(err, "getting modified files"))
-	}
-	modifiedTerraformFiles := p.filterToTerraform(modifiedFiles)
-	if len(modifiedTerraformFiles) == 0 {
-		ctx.Log.Info("no modified terraform files found, exiting")
-		p.githubStatus.Update(ctx.Repo, ctx.Pull, Failure, PlanStep)
-		return ExecutionResult{SetupError: GeneralError{errors.New("Plan Failed: no modified terraform files found")}}
-	}
-	ctx.Log.Debug("Found %d modified terraform files: %v", len(modifiedTerraformFiles), modifiedTerraformFiles)
-
-	projects := p.ModifiedProjects(ctx.Repo.FullName, modifiedTerraformFiles)
-	if len(projects) == 0 {
-		ctx.Log.Info("no Terraform projects were modified")
-		p.githubStatus.Update(ctx.Repo, ctx.Pull, Failure, PlanStep)
-		return ExecutionResult{SetupError: GeneralError{errors.New("Plan Failed: we determined that no terraform projects were modified")}}
-	}
+	//workspace.Initialize(ctx.Repo, ctx.Pull.Num)
 
 	// todo: update how we clean the workspace based on the new way of storing plans
 	planFilesPrefix := fmt.Sprintf("%s_%d", strings.Replace(ctx.Repo.FullName, "/", "_", -1), ctx.Pull.Num)

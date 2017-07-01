@@ -166,6 +166,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 	}
 	preRun := &prerun.PreRun{}
 	configReader := &ConfigReader{}
+	concurrentRunLocker := NewConcurrentRunLocker()
 	applyExecutor := &ApplyExecutor{
 		github:                githubClient,
 		githubStatus:          githubStatus,
@@ -179,6 +180,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 		planBackend:           planBackend,
 		preRun:                preRun,
 		configReader: configReader,
+		concurrentRunLocker: concurrentRunLocker,
 	}
 	planExecutor := &PlanExecutor{
 		github:                githubClient,
@@ -192,6 +194,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 		planBackend:           planBackend,
 		preRun:                preRun,
 		configReader: configReader,
+		concurrentRunLocker: concurrentRunLocker,
 	}
 	helpExecutor := &HelpExecutor{}
 	pullClosedExecutor := &PullClosedExecutor{
