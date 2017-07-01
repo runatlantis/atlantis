@@ -17,16 +17,16 @@ dependencies:
     # Install dependencies
     - cd "${WORKDIR}" && make deps
 
-test:  
+test:
   override:
     # Run tests
     - cd "${WORKDIR}" && ./scripts/build.sh
-  
+
   post:
     # Run e2e tests
     - cd "${WORKDIR}" && ./scripts/e2e-deps.sh
     # Start atlantis server
-    - cd "${WORKDIR}/e2e" && ./atlantis server --gh-user="$GITHUB_USERNAME" --gh-password="$GITHUB_PASSWORD" --data-dir="/tmp" --require-approval=false --plan-backend="file" --log-level="debug" &> /tmp/atlantis-server.log:
+    - cd "${WORKDIR}/e2e" && ./atlantis server --gh-user="$GITHUB_USERNAME" --gh-password="$GITHUB_PASSWORD" --data-dir="/tmp" --require-approval=false --log-level="debug" &> /tmp/atlantis-server.log:
           background: true
     - sleep 2
     - cd "${WORKDIR}/e2e" && ./ngrok http 4141:

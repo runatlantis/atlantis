@@ -8,15 +8,13 @@ import (
 
 	"github.com/hootsuite/atlantis/locking"
 	"github.com/hootsuite/atlantis/models"
-	"github.com/hootsuite/atlantis/plan"
 	"github.com/pkg/errors"
 )
 
 type PullClosedExecutor struct {
-	locking     *locking.Client
-	github      *GithubClient
-	planBackend plan.Backend
-	workspace   *Workspace
+	locking   *locking.Client
+	github    *GithubClient
+	workspace *Workspace
 }
 
 type templatedProject struct {
@@ -32,12 +30,6 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 	// delete the workspace
 	if err := p.workspace.Delete(repo, pull); err != nil {
 		return errors.Wrap(err, "cleaning workspace")
-	}
-
-	// delete plans
-	err := p.planBackend.DeletePlansByPull(repo.FullName, pull.Num)
-	if err != nil {
-		return errors.Wrap(err, "cleaning up plans")
 	}
 
 	// finally, delete locks. We do this last because when someone

@@ -11,7 +11,7 @@ import (
 
 	version "github.com/hashicorp/go-version"
 	"github.com/hootsuite/atlantis/locking"
-	"github.com/hootsuite/atlantis/plan"
+	"github.com/hootsuite/atlantis/models"
 	"github.com/hootsuite/atlantis/prerun"
 )
 
@@ -24,7 +24,6 @@ type ApplyExecutor struct {
 	githubCommentRenderer *GithubCommentRenderer
 	lockingClient         *locking.Client
 	requireApproval       bool
-	planBackend           plan.Backend
 	preRun                *prerun.PreRun
 	configReader          *ConfigReader
 	concurrentRunLocker   *ConcurrentRunLocker
@@ -92,15 +91,24 @@ func (a *ApplyExecutor) setupAndApply(ctx *CommandContext) ExecutionResult {
 		return ExecutionResult{SetupError: GeneralError{errors.New("Workspace missing, please plan again")}}
 	}
 
-	plans, err := a.planBackend.CopyPlans(repoDir, ctx.Repo.FullName, ctx.Command.environment, ctx.Pull.Num)
-	if err != nil {
-		errMsg := fmt.Sprintf("failed to get plans: %s", err)
-		ctx.Log.Err(errMsg)
-		a.githubStatus.Update(ctx.Repo, ctx.Pull, Error, ApplyStep)
-		return ExecutionResult{SetupError: GeneralError{errors.New(errMsg)}}
-	}
+	// plans are stored at project roots by their environment names. We just need to find them
+	var plans []models.Plan
+	filepath.Walk(repoDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		// if the plan is for the right env,
+		if !info.IsDir() && info.Name() == ctx.Command.environment+".tfplan" {
+			rel, _ := filepath.Rel(repoDir, filepath.Dir(path))
+			plans = append(plans, models.Plan{
+				Project:   models.NewProject(ctx.Repo.FullName, rel),
+				LocalPath: path,
+			})
+		}
+		return nil
+	})
 	if len(plans) == 0 {
-		failure := "found 0 plans for this pull request"
+		failure := "found 0 plans for that environment"
 		ctx.Log.Warn(failure)
 		a.githubStatus.Update(ctx.Repo, ctx.Pull, Failure, ApplyStep)
 		return ExecutionResult{SetupFailure: NoPlansFailure{}}
@@ -117,7 +125,7 @@ func (a *ApplyExecutor) setupAndApply(ctx *CommandContext) ExecutionResult {
 	return ExecutionResult{PathResults: applyOutputs}
 }
 
-func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan plan.Plan) PathResult {
+func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.Plan) PathResult {
 	tfEnv := ctx.Command.environment
 	lockAttempt, err := a.lockingClient.TryLock(plan.Project, tfEnv, ctx.Pull, ctx.User)
 	if err != nil {
@@ -226,11 +234,6 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan plan.Pla
 		}
 	}
 
-	// clean up, delete local plan file
-	os.Remove(plan.LocalPath) // swallow errors, okay if we failed to delete
-	if err := a.planBackend.DeletePlan(plan.Project, ctx.Command.environment, ctx.Pull.Num); err != nil {
-		ctx.Log.Err("deleting plan for repo %s, path %s, env %s: %s", plan.Project.RepoFullName, plan.Project.Path, ctx.Command.environment, err)
-	}
 	return PathResult{
 		Status: Success,
 		Result: ApplySuccess{output},

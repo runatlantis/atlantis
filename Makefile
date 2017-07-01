@@ -31,10 +31,10 @@ test-coverage:
 	go tool cover -html=c.out -o coverage.html
 
 dist: ## Package up everything in static/ using go-bindata-assetfs so it can be served by a single binary
-	go-bindata-assetfs static/...
+	go-bindata-assetfs -pkg server static/... && mv bindata_assetfs.go server
 
 vendor-status:
 	@govendor status
 
 fmt: ## Run goimports (which also formats)
-	goimports -w $$(find . -type f -name '*.go' -not -path "./vendor/*")
+	goimports -w $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "./server/bindata_assetfs.go")

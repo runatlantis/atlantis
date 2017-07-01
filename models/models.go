@@ -43,6 +43,12 @@ type Project struct {
 	Path string
 }
 
+type Plan struct {
+	Project Project
+	// LocalPath is the path to the plan on disk
+	LocalPath string
+}
+
 func NewProject(repoFullName string, path string) Project {
 	path = paths.Clean(path)
 	if path == "/" {

@@ -10,7 +10,6 @@ import (
 	version "github.com/hashicorp/go-version"
 	"github.com/hootsuite/atlantis/locking"
 	"github.com/hootsuite/atlantis/models"
-	"github.com/hootsuite/atlantis/plan"
 	"github.com/hootsuite/atlantis/prerun"
 	"github.com/pkg/errors"
 )
@@ -27,7 +26,6 @@ type PlanExecutor struct {
 	lockingClient         *locking.Client
 	// LockURL is a function that given a lock id will return a url for lock view
 	LockURL             func(id string) (url string)
-	planBackend         plan.Backend
 	preRun              *prerun.PreRun
 	configReader        *ConfigReader
 	concurrentRunLocker *ConcurrentRunLocker
@@ -257,25 +255,7 @@ func (p *PlanExecutor) plan(
 			Result: err,
 		}
 	}
-	// Save the plan
-	if err := p.planBackend.SavePlan(planFile, project, tfEnv, ctx.Pull.Num); err != nil {
-		ctx.Log.Err("saving plan: %s", err)
-		// there was an error planning so unlock
-		if _, err := p.lockingClient.Unlock(lockAttempt.LockKey); err != nil {
-			ctx.Log.Err("error unlocking: %v", err)
-		}
-		return PathResult{
-			Status: Error,
-			Result: GeneralError{err},
-		}
-	}
-	ctx.Log.Info("saved plan successfully")
 
-	// Delete local plan file
-	if err := os.Remove(planFile); err != nil {
-		ctx.Log.Err("failed to delete local plan file %q: %s", planFile, err)
-		// don't return an error since it should still be fine
-	}
 	return PathResult{
 		Status: Success,
 		Result: PlanSuccess{

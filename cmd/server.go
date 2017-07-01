@@ -26,9 +26,6 @@ const (
 	lockingBackendFlag  = "locking-backend"
 	lockingTableFlag    = "locking-dynamodb-table"
 	logLevelFlag        = "log-level"
-	planBackendFlag     = "plan-backend"
-	planS3BucketFlag    = "plan-s3-bucket"
-	planS3PrefixFlag    = "plan-s3-prefix"
 	portFlag            = "port"
 	requireApprovalFlag = "require-approval"
 	sshKeyFlag          = "ssh-key"
@@ -86,21 +83,6 @@ var stringFlags = []stringFlag{
 		name:        logLevelFlag,
 		description: "Log level. Either debug, info, warn, or error.",
 		value:       "warn",
-	},
-	{
-		name:        planS3BucketFlag,
-		description: "S3 bucket for storing plan files. Only read if " + planBackendFlag + " is set to s3",
-		value:       "atlantis",
-	},
-	{
-		name:        planS3PrefixFlag,
-		description: "Prefix of plan file names stored in S3. Only read if " + planBackendFlag + " is set to s3",
-		value:       "",
-	},
-	{
-		name:        planBackendFlag,
-		description: "How to store plan files: file or s3. If set to file, will store plan files on disk in the directory specified by data-dir.",
-		value:       "file",
 	},
 	{
 		name:        sshKeyFlag,
@@ -218,9 +200,6 @@ func validate(config server.ServerConfig) error {
 	}
 	if config.LockingBackend != server.LockingFileBackend && config.LockingBackend != server.LockingDynamoDBBackend {
 		return fmt.Errorf("unsupported locking backend %q: not one of %q or %q", config.LockingBackend, server.LockingFileBackend, server.LockingDynamoDBBackend)
-	}
-	if config.PlanBackend != server.PlanFileBackend && config.PlanBackend != server.PlanS3Backend {
-		return fmt.Errorf("unsupported plan backend %q: not one of %q or %q", config.PlanBackend, server.PlanFileBackend, server.PlanS3Backend)
 	}
 	return nil
 }

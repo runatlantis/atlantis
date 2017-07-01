@@ -22,9 +22,6 @@ import (
 	"github.com/hootsuite/atlantis/logging"
 	"github.com/hootsuite/atlantis/middleware"
 	"github.com/hootsuite/atlantis/models"
-	"github.com/hootsuite/atlantis/plan"
-	"github.com/hootsuite/atlantis/plan/file"
-	"github.com/hootsuite/atlantis/plan/s3"
 	"github.com/hootsuite/atlantis/prerun"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
@@ -35,8 +32,6 @@ const (
 	deleteLockRoute        = "delete-lock"
 	LockingFileBackend     = "file"
 	LockingDynamoDBBackend = "dynamodb"
-	PlanFileBackend        = "file"
-	PlanS3Backend          = "s3"
 )
 
 // Server listens for GitHub events and runs the necessary Atlantis command
@@ -64,9 +59,6 @@ type ServerConfig struct {
 	LockingDynamoDBTable string `mapstructure:"locking-dynamodb-table"`
 	LogLevel             string `mapstructure:"log-level"`
 	Port                 int    `mapstructure:"port"`
-	PlanS3Bucket         string `mapstructure:"plan-s3-bucket"`
-	PlanS3Prefix         string `mapstructure:"plan-s3-prefix"`
-	PlanBackend          string `mapstructure:"plan-backend"`
 	RequireApproval      bool   `mapstructure:"require-approval"`
 	SSHKey               string `mapstructure:"ssh-key"`
 }
@@ -156,21 +148,6 @@ func NewServer(config ServerConfig) (*Server, error) {
 		}
 		lockingClient = locking.NewClient(backend)
 	}
-	var planBackend plan.Backend
-	if config.PlanBackend == PlanS3Backend {
-		if awsSession == nil {
-			awsSession, err = awsConfig.CreateAWSSession()
-			if err != nil {
-				return nil, errors.Wrap(err, "creating aws session for S3")
-			}
-		}
-		planBackend = s3.New(awsSession, config.PlanS3Bucket, config.PlanS3Prefix)
-	} else {
-		planBackend, err = file.New(config.DataDir)
-		if err != nil {
-			return nil, errors.Wrap(err, "creating file backend for plans")
-		}
-	}
 	preRun := &prerun.PreRun{}
 	configReader := &ConfigReader{}
 	concurrentRunLocker := NewConcurrentRunLocker()
@@ -187,7 +164,6 @@ func NewServer(config ServerConfig) (*Server, error) {
 		githubCommentRenderer: githubComments,
 		lockingClient:         lockingClient,
 		requireApproval:       config.RequireApproval,
-		planBackend:           planBackend,
 		preRun:                preRun,
 		configReader:          configReader,
 		concurrentRunLocker:   concurrentRunLocker,
@@ -201,7 +177,6 @@ func NewServer(config ServerConfig) (*Server, error) {
 		terraform:             terraformClient,
 		githubCommentRenderer: githubComments,
 		lockingClient:         lockingClient,
-		planBackend:           planBackend,
 		preRun:                preRun,
 		configReader:          configReader,
 		concurrentRunLocker:   concurrentRunLocker,
@@ -209,10 +184,9 @@ func NewServer(config ServerConfig) (*Server, error) {
 	}
 	helpExecutor := &HelpExecutor{}
 	pullClosedExecutor := &PullClosedExecutor{
-		planBackend: planBackend,
-		github:      githubClient,
-		locking:     lockingClient,
-		workspace:   workspace,
+		github:    githubClient,
+		locking:   lockingClient,
+		workspace: workspace,
 	}
 	logger := logging.NewSimpleLogger("server", log.New(os.Stderr, "", log.LstdFlags), false, logging.ToLogLevel(config.LogLevel))
 	eventParser := &EventParser{}
