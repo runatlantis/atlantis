@@ -28,7 +28,6 @@ const (
 	logLevelFlag        = "log-level"
 	portFlag            = "port"
 	requireApprovalFlag = "require-approval"
-	sshKeyFlag          = "ssh-key"
 )
 
 var stringFlags = []stringFlag{

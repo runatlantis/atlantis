@@ -213,7 +213,7 @@ func (s *Server) Start() error {
 		return r.URL.Path == "/" || r.URL.Path == "/index.html"
 	})
 	s.router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: Asset, AssetDir: AssetDir, AssetInfo: AssetInfo}))
-	s.router.HandleFunc("/hooks", s.postHooks).Methods("POST")
+	s.router.HandleFunc("/events", s.postEvents).Methods("POST")
 	s.router.HandleFunc("/locks", s.deleteLock).Methods("DELETE").Queries("id", "{id:.*}")
 	lockRoute := s.router.HandleFunc("/lock", s.lock).Methods("GET").Queries("id", "{id}").Name(lockRoute)
 	// function that planExecutor can use to construct detail view url
@@ -334,8 +334,8 @@ func (s *Server) deleteLock(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "Unlocked successfully")
 }
 
-// postHooks handles comment and pull request events from GitHub
-func (s *Server) postHooks(w http.ResponseWriter, r *http.Request) {
+// postEvents handles comment and pull request events from GitHub
+func (s *Server) postEvents(w http.ResponseWriter, r *http.Request) {
 	githubReqID := "X-Github-Delivery=" + r.Header.Get("X-Github-Delivery")
 
 	var payload []byte

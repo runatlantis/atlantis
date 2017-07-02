@@ -38,8 +38,8 @@ func main() {
 	if atlantisURL == "" {
 		atlantisURL = defaultAtlantisURL
 	}
-	// add /hooks to the url
-	atlantisURL = fmt.Sprintf("%s/hooks", atlantisURL)
+	// add /events to the url
+	atlantisURL = fmt.Sprintf("%s/events", atlantisURL)
 	ownerName := os.Getenv("GITHUB_REPO_OWNER_NAME")
 	if ownerName == "" {
 		ownerName = "anubhavmishra"
