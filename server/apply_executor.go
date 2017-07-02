@@ -10,16 +10,19 @@ import (
 	"path/filepath"
 
 	version "github.com/hashicorp/go-version"
+	"github.com/hootsuite/atlantis/aws"
+	"github.com/hootsuite/atlantis/github"
 	"github.com/hootsuite/atlantis/locking"
 	"github.com/hootsuite/atlantis/models"
 	"github.com/hootsuite/atlantis/prerun"
+	"github.com/hootsuite/atlantis/terraform"
 )
 
 type ApplyExecutor struct {
-	github                *GithubClient
+	github                *github.Client
 	githubStatus          *GithubStatus
-	awsConfig             *AWSConfig
-	terraform             *TerraformClient
+	awsConfig             *aws.Config
+	terraform             *terraform.Client
 	githubCommentRenderer *GithubCommentRenderer
 	lockingClient         *locking.Client
 	requireApproval       bool
@@ -60,7 +63,7 @@ func (n NoPlansFailure) Template() *CompiledTemplate {
 	return NoPlansFailureTmpl
 }
 
-func (a *ApplyExecutor) execute(ctx *CommandContext, github *GithubClient) {
+func (a *ApplyExecutor) execute(ctx *CommandContext, github *github.Client) {
 	if a.concurrentRunLocker.TryLock(ctx.BaseRepo.FullName, ctx.Command.environment, ctx.Pull.Num) != true {
 		ctx.Log.Info("run was locked by a concurrent run")
 		github.CreateComment(ctx.BaseRepo, ctx.Pull, "This environment is currently locked by another command that is running for this pull request. Wait until command is complete and try again")
@@ -168,7 +171,7 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 	constraints, _ := version.NewConstraint(">= 0.9.0")
 	if constraints.Check(terraformVersion) {
 		// run terraform init and environment
-		outputs, err := a.terraform.RunTerraformInitAndEnv(projectAbsolutePath, tfEnv, config)
+		outputs, err := a.terraform.RunInitAndEnv(projectAbsolutePath, tfEnv, config.GetExtraArguments("init"))
 		if err != nil {
 			msg := fmt.Sprintf("terraform init and environment commands failed. %s %v", outputs, err)
 			ctx.Log.Err(msg)
@@ -196,8 +199,8 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 
 	// need to get auth data from assumed role
 	// todo: de-duplicate calls to assumeRole
-	a.awsConfig.AWSSessionName = ctx.User.Username
-	awsSession, err := a.awsConfig.CreateAWSSession()
+	a.awsConfig.SessionName = ctx.User.Username
+	awsSession, err := a.awsConfig.CreateSession()
 	if err != nil {
 		ctx.Log.Err(err.Error())
 		return PathResult{
@@ -220,7 +223,7 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 	tfApplyCmd := []string{"apply", "-no-color", plan.LocalPath}
 	// append terraform arguments from config file
 	tfApplyCmd = append(tfApplyCmd, terraformApplyExtraArgs...)
-	terraformApplyCmdArgs, output, err := a.terraform.RunTerraformCommand(projectAbsolutePath, tfApplyCmd, []string{
+	terraformApplyCmdArgs, output, err := a.terraform.RunCommand(projectAbsolutePath, tfApplyCmd, []string{
 		fmt.Sprintf("AWS_ACCESS_KEY_ID=%s", credVals.AccessKeyID),
 		fmt.Sprintf("AWS_SECRET_ACCESS_KEY=%s", credVals.SecretAccessKey),
 		fmt.Sprintf("AWS_SESSION_TOKEN=%s", credVals.SessionToken),

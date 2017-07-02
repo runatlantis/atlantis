@@ -1,6 +1,9 @@
 package server
 
-import "github.com/spf13/viper"
+import (
+	"github.com/hootsuite/atlantis/github"
+	"github.com/spf13/viper"
+)
 
 type HelpExecutor struct{}
 
@@ -30,7 +33,7 @@ atlantis apply staging
 atlantis apply
 `
 
-func (h *HelpExecutor) execute(ctx *CommandContext, github *GithubClient) {
+func (h *HelpExecutor) execute(ctx *CommandContext, github *github.Client) {
 	ctx.Log.Info("generating help comment....")
 	github.CreateComment(ctx.BaseRepo, ctx.Pull, helpComment)
 	return

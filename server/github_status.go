@@ -5,7 +5,7 @@ import (
 
 	"strings"
 
-	"github.com/google/go-github/github"
+	"github.com/hootsuite/atlantis/github"
 	"github.com/hootsuite/atlantis/models"
 )
 
@@ -22,7 +22,7 @@ const (
 )
 
 type GithubStatus struct {
-	client *GithubClient
+	client *github.Client
 }
 
 func (s Status) String() string {
@@ -40,11 +40,8 @@ func (s Status) String() string {
 }
 
 func (g *GithubStatus) Update(repo models.Repo, pull models.PullRequest, status Status, step string) error {
-	repoStatus := github.RepoStatus{
-		State:       github.String(status.String()),
-		Description: github.String(fmt.Sprintf("%s %s", strings.Title(step), strings.Title(status.String()))),
-		Context:     github.String(statusContext)}
-	return g.client.UpdateStatus(repo, pull, &repoStatus)
+	description := fmt.Sprintf("%s %s", strings.Title(step), strings.Title(status.String()))
+	return g.client.UpdateStatus(repo, pull, status.String(), description, statusContext)
 }
 
 func (g *GithubStatus) UpdatePathResult(ctx *CommandContext, pathResults []PathResult) error {

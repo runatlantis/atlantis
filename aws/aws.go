@@ -1,4 +1,4 @@
-package server
+package aws
 
 import (
 	"fmt"
@@ -11,18 +11,18 @@ import (
 	"github.com/aws/aws-sdk-go/service/sts"
 )
 
-const awsAssumeRoleSessionName = "atlantis"
+const assumeRoleSessionName = "atlantis"
 
-type AWSConfig struct {
-	AWSRegion      string
-	AWSRoleArn     string
-	AWSSessionName string
+type Config struct {
+	Region      string
+	RoleArn     string
+	SessionName string
 }
 
-// CreateAWSSession creates a new valid AWS session to be used by AWS clients
-func (c *AWSConfig) CreateAWSSession() (*session.Session, error) {
+// CreateSession creates a new valid AWS session to be used by AWS clients
+func (c *Config) CreateSession() (*session.Session, error) {
 	session, err := session.NewSessionWithOptions(session.Options{
-		Config:            aws.Config{Region: aws.String(c.AWSRegion)},
+		Config:            aws.Config{Region: aws.String(c.Region)},
 		SharedConfigState: session.SharedConfigEnable,
 	})
 	if err != nil {
@@ -35,7 +35,7 @@ func (c *AWSConfig) CreateAWSSession() (*session.Session, error) {
 	}
 
 	// generate a new session if aws role is provided
-	if c.AWSRoleArn != "" {
+	if c.RoleArn != "" {
 		return c.assumeRole(session), nil
 	}
 
@@ -43,17 +43,17 @@ func (c *AWSConfig) CreateAWSSession() (*session.Session, error) {
 }
 
 // assumeRole calls Amazon's Security Token Service and attempts to assume roleArn and provide credentials for that role
-func (c *AWSConfig) assumeRole(s *session.Session) *session.Session {
-	if c.AWSSessionName == "" {
-		c.AWSSessionName = awsAssumeRoleSessionName
+func (c *Config) assumeRole(s *session.Session) *session.Session {
+	if c.SessionName == "" {
+		c.SessionName = assumeRoleSessionName
 	}
 	stsClient := sts.New(s, s.Config)
-	creds := stscreds.NewCredentialsWithClient(stsClient, c.AWSRoleArn, func(p *stscreds.AssumeRoleProvider) {
-		p.RoleSessionName = c.AWSSessionName
+	creds := stscreds.NewCredentialsWithClient(stsClient, c.RoleArn, func(p *stscreds.AssumeRoleProvider) {
+		p.RoleSessionName = c.SessionName
 		// override default 15 minute time
 		p.Duration = time.Duration(30) * time.Minute
 	})
 
 	// now assume role
-	return session.New(&aws.Config{Credentials: creds, Region: aws.String(c.AWSRegion)})
+	return session.New(&aws.Config{Credentials: creds, Region: aws.String(c.Region)})
 }

@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 
+	"github.com/hootsuite/atlantis/github"
 	"github.com/hootsuite/atlantis/logging"
 	"github.com/hootsuite/atlantis/recovery"
 )
@@ -11,7 +12,7 @@ type CommandHandler struct {
 	planExecutor  *PlanExecutor
 	applyExecutor *ApplyExecutor
 	helpExecutor  *HelpExecutor
-	githubClient  *GithubClient
+	githubClient  *github.Client
 	eventParser   *EventParser
 	logger        *logging.SimpleLogger
 }

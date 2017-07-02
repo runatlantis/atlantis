@@ -1,4 +1,4 @@
-package server
+package terraform
 
 import (
 	"fmt"
@@ -9,13 +9,13 @@ import (
 	"github.com/pkg/errors"
 )
 
-type TerraformClient struct {
+type Client struct {
 	defaultVersion *version.Version
 }
 
-var terraformVersionRegex = regexp.MustCompile("Terraform v(.*)\n")
+var versionRegex = regexp.MustCompile("Terraform v(.*)\n")
 
-func NewTerraformClient() (*TerraformClient, error) {
+func NewClient() (*Client, error) {
 	versionCmdOutput, err := exec.Command("terraform", "version").CombinedOutput()
 	output := string(versionCmdOutput)
 	if err != nil {
@@ -26,7 +26,7 @@ func NewTerraformClient() (*TerraformClient, error) {
 		}
 		return nil, errors.Wrapf(err, "running terraform version: %s", output)
 	}
-	match := terraformVersionRegex.FindStringSubmatch(output)
+	match := versionRegex.FindStringSubmatch(output)
 	if len(match) <= 1 {
 		return nil, fmt.Errorf("could not parse terraform version from %s", output)
 	}
@@ -35,23 +35,23 @@ func NewTerraformClient() (*TerraformClient, error) {
 		return nil, errors.Wrap(err, "parsing terraform version")
 	}
 
-	return &TerraformClient{
+	return &Client{
 		defaultVersion: version,
 	}, nil
 }
 
-func (t *TerraformClient) RunTerraformCommand(path string, tfCmd []string, tfEnvVars []string) ([]string, string, error) {
-	return t.RunTerraformCommandWithVersion(path, tfCmd, tfEnvVars, t.defaultVersion)
+func (c *Client) RunCommand(path string, tfCmd []string, tfEnvVars []string) ([]string, string, error) {
+	return c.RunCommandWithVersion(path, tfCmd, tfEnvVars, c.defaultVersion)
 }
 
-func (t *TerraformClient) Version() *version.Version {
-	return t.defaultVersion
+func (c *Client) Version() *version.Version {
+	return c.defaultVersion
 }
 
-func (t *TerraformClient) RunTerraformCommandWithVersion(path string, tfCmd []string, tfEnvVars []string, v *version.Version) ([]string, string, error) {
+func (c *Client) RunCommandWithVersion(path string, tfCmd []string, tfEnvVars []string, v *version.Version) ([]string, string, error) {
 	tfExecutable := "terraform"
 	// if version is the same as the default, don't need to prepend the version name to the executable
-	if !v.Equal(t.defaultVersion) {
+	if !v.Equal(c.defaultVersion) {
 		tfExecutable = fmt.Sprintf("%s%s", tfExecutable, v.String())
 	}
 	terraformCmd := exec.Command(tfExecutable, tfCmd...)
@@ -68,21 +68,21 @@ func (t *TerraformClient) RunTerraformCommandWithVersion(path string, tfCmd []st
 	return terraformCmd.Args, output, nil
 }
 
-func (t *TerraformClient) RunTerraformInitAndEnv(path string, env string, config ProjectConfig) ([]string, error) {
+func (c *Client) RunInitAndEnv(path string, env string, extraArgs []string) ([]string, error) {
 	var outputs []string
 	// run terraform init
-	_, output, err := t.RunTerraformCommand(path, append([]string{"init", "-no-color"}, config.GetExtraArguments("init")...), []string{})
+	_, output, err := c.RunCommand(path, append([]string{"init", "-no-color"}, extraArgs...), []string{})
 	if err != nil {
 		return nil, errors.Wrapf(err, "running terraform init: %s", output)
 	}
 	outputs = append(outputs, output)
 
 	// run terraform env new and select
-	_, output, err = t.RunTerraformCommand(path, []string{"env", "select", "-no-color", env}, []string{})
+	_, output, err = c.RunCommand(path, []string{"env", "select", "-no-color", env}, []string{})
 	if err != nil {
 		// if terraform env select fails we will run terraform env new
 		// to create a new environment
-		_, output, err = t.RunTerraformCommand(path, []string{"env", "new", "-no-color", env}, []string{})
+		_, output, err = c.RunCommand(path, []string{"env", "new", "-no-color", env}, []string{})
 		if err != nil {
 			return nil, errors.Wrapf(err, "running terraform environment command: %s", output)
 		}
