@@ -32,13 +32,10 @@ func (w *Workspace) Clone(ctx *CommandContext) (string, error) {
 		return "", errors.Wrap(err, "creating new workspace")
 	}
 
-	// Check if ssh key is set and create git ssh wrapper
-	cloneCmd := exec.Command("git", "clone", ctx.Repo.SSHURL, cloneDir)
-
-	// clone the repo
-	ctx.Log.Info("git cloning %q into %q", ctx.Repo.SSHURL, cloneDir)
+	ctx.Log.Info("git cloning %q into %q", ctx.HeadRepo.SSHURL, cloneDir)
+	cloneCmd := exec.Command("git", "clone", ctx.HeadRepo.SSHURL, cloneDir)
 	if output, err := cloneCmd.CombinedOutput(); err != nil {
-		return "", errors.Wrapf(err, "cloning %s: %s", ctx.Repo.SSHURL, string(output))
+		return "", errors.Wrapf(err, "cloning %s: %s", ctx.HeadRepo.SSHURL, string(output))
 	}
 
 	// check out the branch for this PR
@@ -69,5 +66,5 @@ func (w *Workspace) repoPullDir(repo models.Repo, pull models.PullRequest) strin
 }
 
 func (w *Workspace) cloneDir(ctx *CommandContext) string {
-	return filepath.Join(w.repoPullDir(ctx.Repo, ctx.Pull), ctx.Command.environment)
+	return filepath.Join(w.repoPullDir(ctx.BaseRepo, ctx.Pull), ctx.Command.environment)
 }

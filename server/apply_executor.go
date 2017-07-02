@@ -61,18 +61,18 @@ func (n NoPlansFailure) Template() *CompiledTemplate {
 }
 
 func (a *ApplyExecutor) execute(ctx *CommandContext, github *GithubClient) {
-	if a.concurrentRunLocker.TryLock(ctx.Repo.FullName, ctx.Command.environment, ctx.Pull.Num) != true {
+	if a.concurrentRunLocker.TryLock(ctx.BaseRepo.FullName, ctx.Command.environment, ctx.Pull.Num) != true {
 		ctx.Log.Info("run was locked by a concurrent run")
-		github.CreateComment(ctx.Repo, ctx.Pull, "This environment is currently locked by another command that is running for this pull request. Wait until command is complete and try again")
+		github.CreateComment(ctx.BaseRepo, ctx.Pull, "This environment is currently locked by another command that is running for this pull request. Wait until command is complete and try again")
 		return
 	}
-	defer a.concurrentRunLocker.Unlock(ctx.Repo.FullName, ctx.Command.environment, ctx.Pull.Num)
+	defer a.concurrentRunLocker.Unlock(ctx.BaseRepo.FullName, ctx.Command.environment, ctx.Pull.Num)
 
-	a.githubStatus.Update(ctx.Repo, ctx.Pull, Pending, ApplyStep)
+	a.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Pending, ApplyStep)
 	res := a.setupAndApply(ctx)
 	res.Command = Apply
 	comment := a.githubCommentRenderer.render(res, ctx.Log.History.String(), ctx.Command.verbose)
-	github.CreateComment(ctx.Repo, ctx.Pull, comment)
+	github.CreateComment(ctx.BaseRepo, ctx.Pull, comment)
 }
 
 func (a *ApplyExecutor) setupAndApply(ctx *CommandContext) ExecutionResult {
@@ -86,7 +86,7 @@ func (a *ApplyExecutor) setupAndApply(ctx *CommandContext) ExecutionResult {
 	repoDir, err := a.workspace.GetWorkspace(ctx)
 	if err != nil {
 		ctx.Log.Err(err.Error())
-		a.githubStatus.Update(ctx.Repo, ctx.Pull, Error, ApplyStep)
+		a.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Error, ApplyStep)
 		return ExecutionResult{SetupError: GeneralError{errors.New("Workspace missing, please plan again")}}
 	}
 
@@ -100,7 +100,7 @@ func (a *ApplyExecutor) setupAndApply(ctx *CommandContext) ExecutionResult {
 		if !info.IsDir() && info.Name() == ctx.Command.environment+".tfplan" {
 			rel, _ := filepath.Rel(repoDir, filepath.Dir(path))
 			plans = append(plans, models.Plan{
-				Project:   models.NewProject(ctx.Repo.FullName, rel),
+				Project:   models.NewProject(ctx.BaseRepo.FullName, rel),
 				LocalPath: path,
 			})
 		}
@@ -109,7 +109,7 @@ func (a *ApplyExecutor) setupAndApply(ctx *CommandContext) ExecutionResult {
 	if len(plans) == 0 {
 		failure := "found 0 plans for that environment"
 		ctx.Log.Warn(failure)
-		a.githubStatus.Update(ctx.Repo, ctx.Pull, Failure, ApplyStep)
+		a.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Failure, ApplyStep)
 		return ExecutionResult{SetupFailure: NoPlansFailure{}}
 	}
 
@@ -240,16 +240,16 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 }
 
 func (a *ApplyExecutor) isApproved(ctx *CommandContext) (bool, ExecutionResult) {
-	ok, err := a.github.PullIsApproved(ctx.Repo, ctx.Pull)
+	ok, err := a.github.PullIsApproved(ctx.BaseRepo, ctx.Pull)
 	if err != nil {
 		msg := fmt.Sprintf("failed to determine if pull request was approved: %v", err)
 		ctx.Log.Err(msg)
-		a.githubStatus.Update(ctx.Repo, ctx.Pull, Error, ApplyStep)
+		a.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Error, ApplyStep)
 		return false, ExecutionResult{SetupError: GeneralError{errors.New(msg)}}
 	}
 	if !ok {
 		ctx.Log.Info("pull request was not approved")
-		a.githubStatus.Update(ctx.Repo, ctx.Pull, Failure, ApplyStep)
+		a.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Failure, ApplyStep)
 		return false, ExecutionResult{SetupFailure: PullNotApprovedFailure{}}
 	}
 	return true, ExecutionResult{}

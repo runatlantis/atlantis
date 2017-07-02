@@ -17,12 +17,25 @@ type GithubClient struct {
 // The names include the path to the file from the repo root, ex. parent/child/file.txt
 func (g *GithubClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	var files []string
-	comparison, _, err := g.client.Repositories.CompareCommits(g.ctx, repo.Owner, repo.Name, pull.BaseCommit, pull.HeadCommit)
-	if err != nil {
-		return files, err
-	}
-	for _, file := range comparison.Files {
-		files = append(files, *file.Filename)
+	nextPage := 0
+	for {
+		opts := github.ListOptions{
+			PerPage: 300,
+		}
+		if nextPage != 0 {
+			opts.Page = nextPage
+		}
+		pageFiles, resp, err := g.client.PullRequests.ListFiles(g.ctx, repo.Owner, repo.Name, pull.Num, &opts)
+		if err != nil {
+			return files, err
+		}
+		for _, f := range pageFiles {
+			files = append(files, f.GetFilename())
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		nextPage = resp.NextPage
 	}
 	return files, nil
 }

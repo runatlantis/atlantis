@@ -44,27 +44,28 @@ type Command struct {
 }
 
 func (c *CommandHandler) ExecuteCommand(ctx *CommandContext) {
-	src := fmt.Sprintf("%s/pull/%d", ctx.Repo.FullName, ctx.Pull.Num)
-	// it'e safe to reuse the underlying logger e.logger.Log
+	src := fmt.Sprintf("%s/pull/%d", ctx.BaseRepo.FullName, ctx.Pull.Num)
+	// it's safe to reuse the underlying logger e.logger.Log
 	ctx.Log = logging.NewSimpleLogger(src, c.logger.Log, true, c.logger.Level)
 	defer c.recover(ctx)
 
 	// need to get additional data from the PR
-	ghPull, _, err := c.githubClient.GetPullRequest(ctx.Repo, ctx.Pull.Num)
+	ghPull, _, err := c.githubClient.GetPullRequest(ctx.BaseRepo, ctx.Pull.Num)
 	if err != nil {
 		ctx.Log.Err("pull request data api call failed: %v", err)
 		return
 	}
-	pull, err := c.eventParser.ExtractPullData(ghPull)
+	pull, headRepo, err := c.eventParser.ExtractPullData(ghPull)
 	if err != nil {
 		ctx.Log.Err("failed to extract required fields from comment data: %v", err)
 		return
 	}
 	ctx.Pull = pull
+	ctx.HeadRepo = headRepo
 
 	if ghPull.GetState() != "open" {
 		ctx.Log.Info("command run on closed pull request")
-		c.githubClient.CreateComment(ctx.Repo, ctx.Pull, "Atlantis commands can't be run on closed pull requests")
+		c.githubClient.CreateComment(ctx.BaseRepo, ctx.Pull, "Atlantis commands can't be run on closed pull requests")
 		return
 	}
 
@@ -88,7 +89,7 @@ func (c *CommandHandler) SetLockURL(f func(id string) (url string)) {
 func (c *CommandHandler) recover(ctx *CommandContext) {
 	if err := recover(); err != nil {
 		stack := recovery.Stack(3)
-		c.githubClient.CreateComment(ctx.Repo, ctx.Pull, fmt.Sprintf("**Error: goroutine panic. This is a bug.**\n```\n%s\n%s```", err, stack))
+		c.githubClient.CreateComment(ctx.BaseRepo, ctx.Pull, fmt.Sprintf("**Error: goroutine panic. This is a bug.**\n```\n%s\n%s```", err, stack))
 		ctx.Log.Err("PANIC: %s\n%s", err, stack)
 	}
 }

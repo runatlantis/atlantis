@@ -75,7 +75,7 @@ func (e *EventParser) ExtractCommentData(comment *github.IssueCommentEvent, ctx 
 	if htmlURL == "" {
 		return errors.New("comment.issue.html_url is null")
 	}
-	ctx.Repo = repo
+	ctx.BaseRepo = repo
 	ctx.User = models.User{
 		Username: commentorUsername,
 	}
@@ -85,32 +85,40 @@ func (e *EventParser) ExtractCommentData(comment *github.IssueCommentEvent, ctx 
 	return nil
 }
 
-func (e *EventParser) ExtractPullData(pull *github.PullRequest) (models.PullRequest, error) {
+func (e *EventParser) ExtractPullData(pull *github.PullRequest) (models.PullRequest, models.Repo, error) {
 	var pullModel models.PullRequest
+	var headRepoModel models.Repo
+
 	commit := pull.Head.GetSHA()
 	if commit == "" {
-		return pullModel, errors.New("head.sha is null")
+		return pullModel, headRepoModel, errors.New("head.sha is null")
 	}
 	base := pull.Base.GetSHA()
 	if base == "" {
-		return pullModel, errors.New("base.sha is null")
+		return pullModel, headRepoModel, errors.New("base.sha is null")
 	}
 	url := pull.GetHTMLURL()
 	if url == "" {
-		return pullModel, errors.New("html_url is null")
+		return pullModel, headRepoModel, errors.New("html_url is null")
 	}
 	branch := pull.Head.GetRef()
 	if branch == "" {
-		return pullModel, errors.New("head.ref is null")
+		return pullModel, headRepoModel, errors.New("head.ref is null")
 	}
 	authorUsername := pull.User.GetLogin()
 	if authorUsername == "" {
-		return pullModel, errors.New("user.login is null")
+		return pullModel, headRepoModel, errors.New("user.login is null")
 	}
 	num := pull.GetNumber()
 	if num == 0 {
-		return pullModel, errors.New("number is null")
+		return pullModel, headRepoModel, errors.New("number is null")
 	}
+
+	headRepoModel, err := e.ExtractRepoData(pull.Head.Repo)
+	if err != nil {
+		return pullModel, headRepoModel, err
+	}
+
 	return models.PullRequest{
 		BaseCommit: base,
 		Author:     authorUsername,
@@ -118,7 +126,7 @@ func (e *EventParser) ExtractPullData(pull *github.PullRequest) (models.PullRequ
 		HeadCommit: commit,
 		URL:        url,
 		Num:        num,
-	}, nil
+	}, headRepoModel, nil
 }
 
 func (e *EventParser) ExtractRepoData(ghRepo *github.Repository) (models.Repo, error) {

@@ -73,39 +73,39 @@ func (e EnvironmentFailure) Template() *CompiledTemplate {
 }
 
 func (p *PlanExecutor) execute(ctx *CommandContext, github *GithubClient) {
-	if p.concurrentRunLocker.TryLock(ctx.Repo.FullName, ctx.Command.environment, ctx.Pull.Num) != true {
+	if p.concurrentRunLocker.TryLock(ctx.BaseRepo.FullName, ctx.Command.environment, ctx.Pull.Num) != true {
 		ctx.Log.Info("run was locked by a concurrent run")
-		github.CreateComment(ctx.Repo, ctx.Pull, "This environment is currently locked by another command that is running for this pull request. Wait until command is complete and try again")
+		github.CreateComment(ctx.BaseRepo, ctx.Pull, "This environment is currently locked by another command that is running for this pull request. Wait until command is complete and try again")
 		return
 	}
-	defer p.concurrentRunLocker.Unlock(ctx.Repo.FullName, ctx.Command.environment, ctx.Pull.Num)
+	defer p.concurrentRunLocker.Unlock(ctx.BaseRepo.FullName, ctx.Command.environment, ctx.Pull.Num)
 	res := p.setupAndPlan(ctx)
 	res.Command = Plan
 	comment := p.githubCommentRenderer.render(res, ctx.Log.History.String(), ctx.Command.verbose)
-	github.CreateComment(ctx.Repo, ctx.Pull, comment)
+	github.CreateComment(ctx.BaseRepo, ctx.Pull, comment)
 }
 
 func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
-	p.githubStatus.Update(ctx.Repo, ctx.Pull, Pending, PlanStep)
+	p.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Pending, PlanStep)
 
 	// figure out what projects have been modified so we know where to run plan
 	ctx.Log.Info("listing modified files from pull request")
-	modifiedFiles, err := p.github.GetModifiedFiles(ctx.Repo, ctx.Pull)
+	modifiedFiles, err := p.github.GetModifiedFiles(ctx.BaseRepo, ctx.Pull)
 	if err != nil {
 		return p.setupError(ctx, errors.Wrap(err, "getting modified files"))
 	}
 	modifiedTerraformFiles := p.filterToTerraform(modifiedFiles)
 	if len(modifiedTerraformFiles) == 0 {
 		ctx.Log.Info("no modified terraform files found, exiting")
-		p.githubStatus.Update(ctx.Repo, ctx.Pull, Failure, PlanStep)
+		p.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Failure, PlanStep)
 		return ExecutionResult{SetupError: GeneralError{errors.New("Plan Failed: no modified terraform files found")}}
 	}
 	ctx.Log.Debug("Found %d modified terraform files: %v", len(modifiedTerraformFiles), modifiedTerraformFiles)
 
-	projects := p.ModifiedProjects(ctx.Repo.FullName, modifiedTerraformFiles)
+	projects := p.ModifiedProjects(ctx.BaseRepo.FullName, modifiedTerraformFiles)
 	if len(projects) == 0 {
 		ctx.Log.Info("no Terraform projects were modified")
-		p.githubStatus.Update(ctx.Repo, ctx.Pull, Failure, PlanStep)
+		p.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Failure, PlanStep)
 		return ExecutionResult{SetupError: GeneralError{errors.New("Plan Failed: we determined that no terraform projects were modified")}}
 	}
 
@@ -316,6 +316,6 @@ func (p *PlanExecutor) getProjectPath(modifiedFilePath string) string {
 
 func (p *PlanExecutor) setupError(ctx *CommandContext, err error) ExecutionResult {
 	ctx.Log.Err(err.Error())
-	p.githubStatus.Update(ctx.Repo, ctx.Pull, Error, PlanStep)
+	p.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Error, PlanStep)
 	return ExecutionResult{SetupError: GeneralError{err}}
 }

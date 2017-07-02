@@ -53,7 +53,7 @@ func (g *GithubStatus) UpdatePathResult(ctx *CommandContext, pathResults []PathR
 		statuses = append(statuses, p.Status)
 	}
 	worst := g.worstStatus(statuses)
-	return g.Update(ctx.Repo, ctx.Pull, worst, ctx.Command.commandType.String())
+	return g.Update(ctx.BaseRepo, ctx.Pull, worst, ctx.Command.commandType.String())
 }
 
 func (g *GithubStatus) worstStatus(ss []Status) Status {
