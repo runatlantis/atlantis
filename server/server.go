@@ -8,11 +8,11 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/user"
 	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws/session"
+	homedir "github.com/mitchellh/go-homedir"
 	"github.com/elazarl/go-bindata-assetfs"
 	"github.com/google/go-github/github"
 	"github.com/gorilla/mux"
@@ -29,7 +29,6 @@ import (
 )
 
 const (
-	deleteLockRoute        = "delete-lock"
 	LockingFileBackend     = "file"
 	LockingDynamoDBBackend = "dynamodb"
 )
@@ -60,7 +59,6 @@ type ServerConfig struct {
 	LogLevel             string `mapstructure:"log-level"`
 	Port                 int    `mapstructure:"port"`
 	RequireApproval      bool   `mapstructure:"require-approval"`
-	SSHKey               string `mapstructure:"ssh-key"`
 }
 
 type CommandContext struct {
@@ -103,11 +101,11 @@ func NewServer(config ServerConfig) (*Server, error) {
 	// if ~ was used in data-dir convert that to actual home directory otherwise we'll
 	// create a directory call "~" instead of actually using home
 	if strings.HasPrefix(config.DataDir, "~/") {
-		user, err := user.Current()
+		expanded, err := homedir.Expand(config.DataDir)
 		if err != nil {
-			return nil, errors.Wrap(err, "determining current user")
+			return nil, errors.Wrap(err, "determining home directory")
 		}
-		config.DataDir = user.HomeDir + strings.TrimPrefix(config.DataDir, "~")
+		config.DataDir = expanded
 	}
 
 	tp := github.BasicAuthTransport{
@@ -153,13 +151,11 @@ func NewServer(config ServerConfig) (*Server, error) {
 	concurrentRunLocker := NewConcurrentRunLocker()
 	workspace := &Workspace{
 		dataDir: config.DataDir,
-		sshKey:  config.SSHKey,
 	}
 	applyExecutor := &ApplyExecutor{
 		github:                githubClient,
 		githubStatus:          githubStatus,
 		awsConfig:             awsConfig,
-		sshKey:                config.SSHKey,
 		terraform:             terraformClient,
 		githubCommentRenderer: githubComments,
 		lockingClient:         lockingClient,
@@ -173,7 +169,6 @@ func NewServer(config ServerConfig) (*Server, error) {
 		github:                githubClient,
 		githubStatus:          githubStatus,
 		awsConfig:             awsConfig,
-		sshKey:                config.SSHKey,
 		terraform:             terraformClient,
 		githubCommentRenderer: githubComments,
 		lockingClient:         lockingClient,

@@ -1,8 +1,6 @@
 package server
 
 import (
-	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const defaultSSHWrapper = "/tmp/git-ssh.sh"
 const workspacePrefix = "repos"
 
 type Workspace struct {
@@ -37,17 +34,6 @@ func (w *Workspace) Clone(ctx *CommandContext) (string, error) {
 
 	// Check if ssh key is set and create git ssh wrapper
 	cloneCmd := exec.Command("git", "clone", ctx.Repo.SSHURL, cloneDir)
-	if w.sshKey != "" {
-		// todo: is this still needed?
-		err := w.generateSSHWrapper()
-		if err != nil {
-			return "", errors.Wrap(err, "creating git ssh wrapper")
-		}
-		cloneCmd.Env = []string{
-			fmt.Sprintf("GIT_SSH=%s", defaultSSHWrapper),
-			fmt.Sprintf("PKEY=%s", w.sshKey),
-		}
-	}
 
 	// clone the repo
 	ctx.Log.Info("git cloning %q into %q", ctx.Repo.SSHURL, cloneDir)
@@ -84,9 +70,4 @@ func (w *Workspace) repoPullDir(repo models.Repo, pull models.PullRequest) strin
 
 func (w *Workspace) cloneDir(ctx *CommandContext) string {
 	return filepath.Join(w.repoPullDir(ctx.Repo, ctx.Pull), ctx.Command.environment)
-}
-
-func (w *Workspace) generateSSHWrapper() error {
-	d1 := []byte("#!/bin/sh\nif [ -z \"$PKEY\" ]; then\n# if PKEY is not specified, run ssh using default keyfile\nssh -oStrictHostKeyChecking=no \"$@\"\nelse\nssh -oStrictHostKeyChecking=no -i \"$PKEY\" \"$@\"\nfi")
-	return ioutil.WriteFile(defaultSSHWrapper, d1, 0755)
 }

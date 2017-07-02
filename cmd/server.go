@@ -84,10 +84,6 @@ var stringFlags = []stringFlag{
 		description: "Log level. Either debug, info, warn, or error.",
 		value:       "warn",
 	},
-	{
-		name:        sshKeyFlag,
-		description: "Path to SSH key used for GitHub.",
-	},
 }
 var boolFlags = []boolFlag{
 	{

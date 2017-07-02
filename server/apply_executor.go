@@ -19,7 +19,6 @@ type ApplyExecutor struct {
 	github                *GithubClient
 	githubStatus          *GithubStatus
 	awsConfig             *AWSConfig
-	sshKey                string
 	terraform             *TerraformClient
 	githubCommentRenderer *GithubCommentRenderer
 	lockingClient         *locking.Client

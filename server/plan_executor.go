@@ -20,7 +20,6 @@ type PlanExecutor struct {
 	githubStatus          *GithubStatus
 	awsConfig             *AWSConfig
 	s3Bucket              string
-	sshKey                string
 	terraform             *TerraformClient
 	githubCommentRenderer *GithubCommentRenderer
 	lockingClient         *locking.Client
@@ -173,7 +172,7 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) ExecutionResult {
 			ctx.Log.Info("Pre run output: \n%s", preRunOutput)
 		}
 
-		generatePlanResponse := p.plan(ctx, cloneDir, project, p.sshKey, terraformPlanExtraArgs)
+		generatePlanResponse := p.plan(ctx, cloneDir, project, terraformPlanExtraArgs)
 		generatePlanResponse.Path = project.Path
 		planOutputs = append(planOutputs, generatePlanResponse)
 	}
@@ -187,7 +186,6 @@ func (p *PlanExecutor) plan(
 	ctx *CommandContext,
 	repoDir string,
 	project models.Project,
-	sshKey string,
 	terraformArgs []string) PathResult {
 	ctx.Log.Info("generating plan for path %q", project.Path)
 
