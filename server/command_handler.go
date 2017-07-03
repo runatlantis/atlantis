@@ -17,6 +17,31 @@ type CommandHandler struct {
 	logger        *logging.SimpleLogger
 }
 
+type CommandResponse struct {
+	Error          error
+	Failure        string
+	ProjectResults []ProjectResult
+	Command        CommandType
+}
+
+type ProjectResult struct {
+	Path         string
+	Error        error
+	Failure      string
+	PlanSuccess  *PlanSuccess
+	ApplySuccess string
+}
+
+func (p ProjectResult) Status() Status {
+	if p.Error != nil {
+		return Error
+	}
+	if p.Failure != "" {
+		return Failure
+	}
+	return Success
+}
+
 type CommandType int
 
 const (
@@ -72,11 +97,11 @@ func (c *CommandHandler) ExecuteCommand(ctx *CommandContext) {
 
 	switch ctx.Command.commandType {
 	case Plan:
-		c.planExecutor.execute(ctx, c.githubClient)
+		c.planExecutor.execute(ctx)
 	case Apply:
-		c.applyExecutor.execute(ctx, c.githubClient)
+		c.applyExecutor.execute(ctx)
 	case Help:
-		c.helpExecutor.execute(ctx, c.githubClient)
+		c.helpExecutor.execute(ctx)
 	default:
 		ctx.Log.Err("failed to determine desired command, neither plan nor apply")
 	}

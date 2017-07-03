@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -51,13 +50,14 @@ func (c *ConfigReader) Exists(execPath string) bool {
 
 func (c *ConfigReader) Read(execPath string) (ProjectConfig, error) {
 	var pc ProjectConfig
-	raw, err := ioutil.ReadFile(filepath.Join(execPath, ProjectConfigFile))
+	filename := filepath.Join(execPath, ProjectConfigFile)
+	raw, err := ioutil.ReadFile(filename)
 	if err != nil {
-		return pc, fmt.Errorf("Couldn't read config file %q: %v", execPath, err)
+		return pc, errors.Wrapf(err, "reading %s", ProjectConfigFile)
 	}
 	var pcYaml ProjectConfigYaml
 	if err := yaml.Unmarshal(raw, &pcYaml); err != nil {
-		return pc, fmt.Errorf("Couldn't decode yaml in config file %q: %v", execPath, err)
+		return pc, errors.Wrapf(err, "parsing %s", ProjectConfigFile)
 	}
 
 	var v *version.Version
@@ -67,14 +67,12 @@ func (c *ConfigReader) Read(execPath string) (ProjectConfig, error) {
 			return pc, errors.Wrap(err, "parsing terraform_version")
 		}
 	}
-	pc = ProjectConfig{
+	return ProjectConfig{
 		TerraformVersion: v,
 		ExtraArguments:   pcYaml.ExtraArguments,
 		PreApply:         pcYaml.PreApply,
 		PrePlan:          pcYaml.PrePlan,
-	}
-
-	return pc, nil
+	}, nil
 }
 
 func (c *ProjectConfig) GetExtraArguments(command string) []string {

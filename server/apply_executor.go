@@ -3,7 +3,6 @@ package server
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/pkg/errors"
 
@@ -32,65 +31,34 @@ type ApplyExecutor struct {
 	workspace             *Workspace
 }
 
-/** Result Types **/
-type ApplyFailure struct {
-	Command      string
-	Output       string
-	ErrorMessage string
-}
-
-func (a ApplyFailure) Template() *CompiledTemplate {
-	return ApplyFailureTmpl
-}
-
-type ApplySuccess struct {
-	Output string
-}
-
-func (a ApplySuccess) Template() *CompiledTemplate {
-	return ApplySuccessTmpl
-}
-
-type PullNotApprovedFailure struct{}
-
-func (p PullNotApprovedFailure) Template() *CompiledTemplate {
-	return PullNotApprovedFailureTmpl
-}
-
-type NoPlansFailure struct{}
-
-func (n NoPlansFailure) Template() *CompiledTemplate {
-	return NoPlansFailureTmpl
-}
-
-func (a *ApplyExecutor) execute(ctx *CommandContext, github *github.Client) {
-	if a.concurrentRunLocker.TryLock(ctx.BaseRepo.FullName, ctx.Command.environment, ctx.Pull.Num) != true {
-		ctx.Log.Info("run was locked by a concurrent run")
-		github.CreateComment(ctx.BaseRepo, ctx.Pull, "This environment is currently locked by another command that is running for this pull request. Wait until command is complete and try again")
-		return
-	}
-	defer a.concurrentRunLocker.Unlock(ctx.BaseRepo.FullName, ctx.Command.environment, ctx.Pull.Num)
-
+func (a *ApplyExecutor) execute(ctx *CommandContext) {
 	a.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Pending, ApplyStep)
 	res := a.setupAndApply(ctx)
 	res.Command = Apply
 	comment := a.githubCommentRenderer.render(res, ctx.Log.History.String(), ctx.Command.verbose)
-	github.CreateComment(ctx.BaseRepo, ctx.Pull, comment)
+	a.github.CreateComment(ctx.BaseRepo, ctx.Pull, comment)
 }
 
-func (a *ApplyExecutor) setupAndApply(ctx *CommandContext) ExecutionResult {
+func (a *ApplyExecutor) setupAndApply(ctx *CommandContext) CommandResponse {
+	if a.concurrentRunLocker.TryLock(ctx.BaseRepo.FullName, ctx.Command.environment, ctx.Pull.Num) != true {
+		return a.failureResponse(ctx,
+			fmt.Sprintf("The %s environment is currently locked by another command that is running for this pull request. Wait until command is complete and try again.", ctx.Command.environment))
+	}
+	defer a.concurrentRunLocker.Unlock(ctx.BaseRepo.FullName, ctx.Command.environment, ctx.Pull.Num)
+
 	if a.requireApproval {
-		approved, res := a.isApproved(ctx)
+		approved, err := a.github.PullIsApproved(ctx.BaseRepo, ctx.Pull)
+		if err != nil {
+			return a.errorResponse(ctx, errors.Wrap(err, "checking if pull request was approved"))
+		}
 		if !approved {
-			return res
+			return a.failureResponse(ctx, "Pull request must be approved before running apply.")
 		}
 	}
 
 	repoDir, err := a.workspace.GetWorkspace(ctx)
 	if err != nil {
-		ctx.Log.Err(err.Error())
-		a.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Error, ApplyStep)
-		return ExecutionResult{SetupError: GeneralError{errors.New("Workspace missing, please plan again")}}
+		return a.failureResponse(ctx, "No workspace found. Did you run plan?")
 	}
 
 	// plans are stored at project roots by their environment names. We just need to find them
@@ -110,37 +78,29 @@ func (a *ApplyExecutor) setupAndApply(ctx *CommandContext) ExecutionResult {
 		return nil
 	})
 	if len(plans) == 0 {
-		failure := "found 0 plans for that environment"
-		ctx.Log.Warn(failure)
-		a.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Failure, ApplyStep)
-		return ExecutionResult{SetupFailure: NoPlansFailure{}}
+		return a.failureResponse(ctx, "No plans found for that environment.")
 	}
 
-	applyOutputs := []PathResult{}
+	results := []ProjectResult{}
 	for _, plan := range plans {
-		output := a.apply(ctx, repoDir, plan)
-		output.Path = plan.LocalPath
-		applyOutputs = append(applyOutputs, output)
-
+		result := a.apply(ctx, repoDir, plan)
+		result.Path = plan.LocalPath
+		results = append(results, result)
 	}
-	a.githubStatus.UpdatePathResult(ctx, applyOutputs)
-	return ExecutionResult{PathResults: applyOutputs}
+	a.githubStatus.UpdatePathResult(ctx, results)
+	return CommandResponse{ProjectResults: results}
 }
 
-func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.Plan) PathResult {
+func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.Plan) ProjectResult {
 	tfEnv := ctx.Command.environment
 	lockAttempt, err := a.lockingClient.TryLock(plan.Project, tfEnv, ctx.Pull, ctx.User)
 	if err != nil {
-		return PathResult{
-			Status: Error,
-			Result: GeneralError{errors.Wrap(err, "trying acquire lock")},
-		}
+		return ProjectResult{Error: errors.Wrap(err, "acquiring lock")}
 	}
 	if lockAttempt.LockAcquired != true && lockAttempt.CurrLock.Pull.Num != ctx.Pull.Num {
-		return PathResult{
-			Status: Error,
-			Result: GeneralError{fmt.Errorf("failed to acquire lock: lock held by pull request #%d", lockAttempt.CurrLock.Pull.Num)},
-		}
+		return ProjectResult{Failure: fmt.Sprintf(
+			"This project is currently locked by #%d. The locking plan must be applied or discarded before future plans can execute.",
+			lockAttempt.CurrLock.Pull.Num)}
 	}
 
 	// check if config file is found, if not we continue the run
@@ -151,12 +111,7 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 		ctx.Log.Info("Config file found in %s", projectAbsolutePath)
 		config, err := a.configReader.Read(projectAbsolutePath)
 		if err != nil {
-			msg := fmt.Sprintf("Error reading config file: %v", err)
-			ctx.Log.Err(msg)
-			return PathResult{
-				Status: Error,
-				Result: GeneralError{errors.New(msg)},
-			}
+			return ProjectResult{Error: err}
 		}
 
 		// add terraform arguments from project config
@@ -173,26 +128,16 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 		// run terraform init and environment
 		outputs, err := a.terraform.RunInitAndEnv(projectAbsolutePath, tfEnv, config.GetExtraArguments("init"))
 		if err != nil {
-			msg := fmt.Sprintf("terraform init and environment commands failed. %s %v", outputs, err)
-			ctx.Log.Err(msg)
-			return PathResult{
-				Status: Error,
-				Result: GeneralError{errors.New(msg)},
-			}
+			return ProjectResult{Error: err}
 		}
 		ctx.Log.Info("terraform init and environment commands ran successfully %s", outputs)
 	}
 
 	// if there are pre plan commands then run them
-	if len(config.PrePlan.Commands) > 0 {
+	if len(config.PreApply.Commands) > 0 {
 		preRunOutput, err := a.preRun.Start(config.PreApply.Commands, projectAbsolutePath, ctx.Command.environment, config.TerraformVersion)
 		if err != nil {
-			msg := fmt.Sprintf("pre run failed: %v", err)
-			ctx.Log.Err(msg)
-			return PathResult{
-				Status: Error,
-				Result: GeneralError{errors.New(msg)},
-			}
+			return ProjectResult{Error: err}
 		}
 		ctx.Log.Info("Pre run output: \n%s", preRunOutput)
 	}
@@ -202,58 +147,40 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 	a.awsConfig.SessionName = ctx.User.Username
 	awsSession, err := a.awsConfig.CreateSession()
 	if err != nil {
-		ctx.Log.Err(err.Error())
-		return PathResult{
-			Status: Error,
-			Result: GeneralError{err},
-		}
+		return ProjectResult{Error: err}
 	}
 
 	credVals, err := awsSession.Config.Credentials.Get()
 	if err != nil {
-		msg := fmt.Sprintf("failed to get assumed role credentials: %v", err)
-		ctx.Log.Err(msg)
-		return PathResult{
-			Status: Error,
-			Result: GeneralError{errors.New(msg)},
-		}
+		err = errors.Wrap(err, "getting assumed role credentials")
+		ctx.Log.Err(err.Error())
+		return ProjectResult{Error: err}
 	}
 
 	ctx.Log.Info("running apply from %q", plan.Project.Path)
 	tfApplyCmd := []string{"apply", "-no-color", plan.LocalPath}
 	// append terraform arguments from config file
 	tfApplyCmd = append(tfApplyCmd, terraformApplyExtraArgs...)
-	terraformApplyCmdArgs, output, err := a.terraform.RunCommand(projectAbsolutePath, tfApplyCmd, []string{
+	output, err := a.terraform.RunCommand(projectAbsolutePath, tfApplyCmd, []string{
 		fmt.Sprintf("AWS_ACCESS_KEY_ID=%s", credVals.AccessKeyID),
 		fmt.Sprintf("AWS_SECRET_ACCESS_KEY=%s", credVals.SecretAccessKey),
 		fmt.Sprintf("AWS_SESSION_TOKEN=%s", credVals.SessionToken),
 	})
 	if err != nil {
-		ctx.Log.Err("failed to apply: %v %s", err, output)
-		return PathResult{
-			Status: Failure,
-			Result: ApplyFailure{Command: strings.Join(terraformApplyCmdArgs, " "), Output: output, ErrorMessage: err.Error()},
-		}
+		return ProjectResult{Error: fmt.Errorf("%s\n%s", err.Error(), output)}
 	}
 
-	return PathResult{
-		Status: Success,
-		Result: ApplySuccess{output},
-	}
+	return ProjectResult{ApplySuccess: output}
 }
 
-func (a *ApplyExecutor) isApproved(ctx *CommandContext) (bool, ExecutionResult) {
-	ok, err := a.github.PullIsApproved(ctx.BaseRepo, ctx.Pull)
-	if err != nil {
-		msg := fmt.Sprintf("failed to determine if pull request was approved: %v", err)
-		ctx.Log.Err(msg)
-		a.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Error, ApplyStep)
-		return false, ExecutionResult{SetupError: GeneralError{errors.New(msg)}}
-	}
-	if !ok {
-		ctx.Log.Info("pull request was not approved")
-		a.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Failure, ApplyStep)
-		return false, ExecutionResult{SetupFailure: PullNotApprovedFailure{}}
-	}
-	return true, ExecutionResult{}
+func (a *ApplyExecutor) failureResponse(ctx *CommandContext, msg string) CommandResponse {
+	ctx.Log.Warn(msg)
+	a.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Failure, ApplyStep)
+	return CommandResponse{Failure: msg}
+}
+
+func (a *ApplyExecutor) errorResponse(ctx *CommandContext, err error) CommandResponse {
+	ctx.Log.Err(err.Error())
+	a.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Error, ApplyStep)
+	return CommandResponse{Error: err}
 }

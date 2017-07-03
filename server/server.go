@@ -72,34 +72,6 @@ type CommandContext struct {
 	Log      *logging.SimpleLogger
 }
 
-// todo: These structs have nothing to do with the server. Move to a different file/package #refactor
-type ExecutionResult struct {
-	SetupError   Templater
-	SetupFailure Templater
-	PathResults  []PathResult
-	Command      CommandType
-}
-
-type PathResult struct {
-	Path   string
-	Status Status
-	Result Templater
-}
-
-type Templater interface {
-	Template() *CompiledTemplate
-}
-
-type GeneralError struct {
-	Error error
-}
-
-func (g GeneralError) Template() *CompiledTemplate {
-	return GeneralErrorTmpl
-}
-
-// todo: /end
-
 func NewServer(config ServerConfig) (*Server, error) {
 	// if ~ was used in data-dir convert that to actual home directory otherwise we'll
 	// create a directory call "~" instead of actually using home
@@ -172,7 +144,9 @@ func NewServer(config ServerConfig) (*Server, error) {
 		concurrentRunLocker:   concurrentRunLocker,
 		workspace:             workspace,
 	}
-	helpExecutor := &HelpExecutor{}
+	helpExecutor := &HelpExecutor{
+		github: githubClient,
+	}
 	pullClosedExecutor := &PullClosedExecutor{
 		github:    githubClient,
 		locking:   lockingClient,
