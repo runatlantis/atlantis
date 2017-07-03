@@ -31,13 +31,12 @@ type ApplyExecutor struct {
 	workspace             *Workspace
 }
 
-// todo: why pass githbub.client here, just use the one on the struct
-func (a *ApplyExecutor) execute(ctx *CommandContext, github *github.Client) {
+func (a *ApplyExecutor) execute(ctx *CommandContext) {
 	a.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Pending, ApplyStep)
 	res := a.setupAndApply(ctx)
 	res.Command = Apply
 	comment := a.githubCommentRenderer.render(res, ctx.Log.History.String(), ctx.Command.verbose)
-	github.CreateComment(ctx.BaseRepo, ctx.Pull, comment)
+	a.github.CreateComment(ctx.BaseRepo, ctx.Pull, comment)
 }
 
 func (a *ApplyExecutor) setupAndApply(ctx *CommandContext) CommandResponse {

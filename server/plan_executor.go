@@ -40,12 +40,12 @@ type PlanSuccess struct {
 	LockURL         string
 }
 
-func (p *PlanExecutor) execute(ctx *CommandContext, github *github.Client) {
+func (p *PlanExecutor) execute(ctx *CommandContext) {
 	p.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Pending, PlanStep)
 	res := p.setupAndPlan(ctx)
 	res.Command = Plan
 	comment := p.githubCommentRenderer.render(res, ctx.Log.History.String(), ctx.Command.verbose)
-	github.CreateComment(ctx.BaseRepo, ctx.Pull, comment)
+	p.github.CreateComment(ctx.BaseRepo, ctx.Pull, comment)
 }
 
 func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) CommandResponse {

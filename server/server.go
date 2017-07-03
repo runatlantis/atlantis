@@ -144,7 +144,9 @@ func NewServer(config ServerConfig) (*Server, error) {
 		concurrentRunLocker:   concurrentRunLocker,
 		workspace:             workspace,
 	}
-	helpExecutor := &HelpExecutor{}
+	helpExecutor := &HelpExecutor{
+		github: githubClient,
+	}
 	pullClosedExecutor := &PullClosedExecutor{
 		github:    githubClient,
 		locking:   lockingClient,
