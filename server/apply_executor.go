@@ -31,37 +31,6 @@ type ApplyExecutor struct {
 	workspace             *Workspace
 }
 
-/** Result Types **/
-type ApplyFailure struct {
-	Command      string
-	Output       string
-	ErrorMessage string
-}
-
-func (a ApplyFailure) Template() *CompiledTemplate {
-	return ApplyFailureTmpl
-}
-
-type ApplySuccess struct {
-	Output string
-}
-
-func (a ApplySuccess) Template() *CompiledTemplate {
-	return ApplySuccessTmpl
-}
-
-type PullNotApprovedFailure struct{}
-
-func (p PullNotApprovedFailure) Template() *CompiledTemplate {
-	return PullNotApprovedFailureTmpl
-}
-
-type NoPlansFailure struct{}
-
-func (n NoPlansFailure) Template() *CompiledTemplate {
-	return NoPlansFailureTmpl
-}
-
 // todo: why pass githbub.client here, just use the one on the struct
 func (a *ApplyExecutor) execute(ctx *CommandContext, github *github.Client) {
 	a.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Pending, ApplyStep)

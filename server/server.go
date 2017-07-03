@@ -72,40 +72,6 @@ type CommandContext struct {
 	Log      *logging.SimpleLogger
 }
 
-// todo: These structs have nothing to do with the server. Move to a different file/package #refactor
-type CommandResponse struct {
-	Error          error
-	Failure        string
-	SetupError     Templater
-	SetupFailure   Templater
-	ProjectResults []ProjectResult
-	Command        CommandType
-}
-
-type ProjectResult struct {
-	Path        string
-	Status      Status
-	Result      Templater
-	Error       error
-	Failure     string
-	PlanSuccess *PlanSuccess
-	ApplySuccess string
-}
-
-type Templater interface {
-	Template() *CompiledTemplate
-}
-
-type GeneralError struct {
-	Error error
-}
-
-func (g GeneralError) Template() *CompiledTemplate {
-	return GeneralErrorTmpl
-}
-
-// todo: /end
-
 func NewServer(config ServerConfig) (*Server, error) {
 	// if ~ was used in data-dir convert that to actual home directory otherwise we'll
 	// create a directory call "~" instead of actually using home

@@ -40,41 +40,6 @@ type PlanSuccess struct {
 	LockURL         string
 }
 
-func (p PlanSuccess) Template() *CompiledTemplate {
-	return PlanSuccessTmpl
-}
-
-type RunLockedFailure struct {
-	LockingPullNum int
-}
-
-func (r RunLockedFailure) Template() *CompiledTemplate {
-	return RunLockedFailureTmpl
-}
-
-type EnvironmentFileNotFoundFailure struct {
-	Filename string
-}
-
-func (e EnvironmentFileNotFoundFailure) Template() *CompiledTemplate {
-	return EnvironmentFileNotFoundFailureTmpl
-}
-
-type TerraformFailure struct {
-	Command string
-	Output  string
-}
-
-func (t TerraformFailure) Template() *CompiledTemplate {
-	return TerraformFailureTmpl
-}
-
-type EnvironmentFailure struct{}
-
-func (e EnvironmentFailure) Template() *CompiledTemplate {
-	return EnvironmentErrorTmpl
-}
-
 func (p *PlanExecutor) execute(ctx *CommandContext, github *github.Client) {
 	p.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Pending, PlanStep)
 	res := p.setupAndPlan(ctx)
