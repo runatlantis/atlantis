@@ -160,7 +160,6 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 		return ProjectResult{Error: err}
 	}
 
-
 	// Run terraform plan
 	ctx.Log.Info("running terraform plan in directory %q", project.Path)
 	planFile := filepath.Join(repoDir, project.Path, fmt.Sprintf("%s.tfplan", tfEnv))

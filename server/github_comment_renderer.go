@@ -44,7 +44,7 @@ type GithubCommentRenderer struct{}
 type CommonData struct {
 	Command string
 	Verbose bool
-	Log string
+	Log     string
 }
 
 type ErrData struct {
@@ -62,7 +62,6 @@ type ResultData struct {
 	CommonData
 }
 
-
 func (g *GithubCommentRenderer) render(res CommandResponse, log string, verbose bool) string {
 	commandStr := strings.Title(res.Command.String())
 	common := CommonData{commandStr, verbose, log}
@@ -79,15 +78,15 @@ func (g *GithubCommentRenderer) renderProjectResults(pathResults []ProjectResult
 	results := make(map[string]string)
 	for _, result := range pathResults {
 		if result.Error != nil {
-			results[result.Path] = g.renderTemplate(errTmpl, struct{
+			results[result.Path] = g.renderTemplate(errTmpl, struct {
 				Command string
-				Output string
+				Output  string
 			}{
 				Command: common.Command,
-				Output: result.Error.Error(),
+				Output:  result.Error.Error(),
 			})
 		} else if result.Failure != "" {
-			results[result.Path] = g.renderTemplate(failureTmpl, struct{
+			results[result.Path] = g.renderTemplate(failureTmpl, struct {
 				Command string
 				Failure string
 			}{
@@ -97,7 +96,7 @@ func (g *GithubCommentRenderer) renderProjectResults(pathResults []ProjectResult
 		} else if result.PlanSuccess != nil {
 			results[result.Path] = g.renderTemplate(planSuccessTmpl, *result.PlanSuccess)
 		} else if result.ApplySuccess != "" {
-			results[result.Path] = g.renderTemplate(applySuccessTmpl, struct{Output string}{result.ApplySuccess})
+			results[result.Path] = g.renderTemplate(applySuccessTmpl, struct{ Output string }{result.ApplySuccess})
 		} else {
 			results[result.Path] = "Found no template. This is a bug!"
 		}

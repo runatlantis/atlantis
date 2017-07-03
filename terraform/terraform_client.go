@@ -5,9 +5,10 @@ import (
 	"os/exec"
 	"regexp"
 
+	"strings"
+
 	version "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
-	"strings"
 )
 
 type Client struct {
