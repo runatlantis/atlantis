@@ -7,8 +7,8 @@ import (
 	"text/template"
 )
 
-var singlePathTmpl = template.Must(template.New("").Parse("{{ range $result := .Results }}{{$result}}{{end}}\n" + logTmpl))
-var multiPathTmpl = template.Must(template.New("").Parse(
+var singleProjectTmpl = template.Must(template.New("").Parse("{{ range $result := .Results }}{{$result}}{{end}}\n" + logTmpl))
+var multiProjectTmpl = template.Must(template.New("").Parse(
 	"Ran {{.Command}} in {{ len .Results }} directories:\n" +
 		"{{ range $path, $result := .Results }}" +
 		" * `{{$path}}`\n" +
@@ -41,68 +41,75 @@ var logTmpl = "{{if .Verbose}}\n<details><summary>Log</summary>\n  <p>\n\n```\n{
 // GithubCommentRenderer renders responses as GitHub comments
 type GithubCommentRenderer struct{}
 
+type CommonData struct {
+	Command string
+	Verbose bool
+	Log string
+}
+
+type ErrData struct {
+	Error string
+	CommonData
+}
+
+type FailureData struct {
+	Failure string
+	CommonData
+}
+
+type ResultData struct {
+	Results map[string]string
+	CommonData
+}
+
 
 func (g *GithubCommentRenderer) render(res CommandResponse, log string, verbose bool) string {
 	commandStr := strings.Title(res.Command.String())
+	common := CommonData{commandStr, verbose, log}
 	if res.Error != nil {
-		return g.renderTemplate(errWithLogTmpl, struct{
-			Command string
-			Error string
-			Verbose bool
-			Log string
-		}{commandStr, res.Error.Error(), verbose, log})
+		return g.renderTemplate(errWithLogTmpl, ErrData{res.Error.Error(), common})
 	}
 	if res.Failure != "" {
-		return g.renderTemplate(failureWithLogTmpl, struct{
-			Command string
-			Failure string
-			Verbose bool
-			Log string
-		}{commandStr, res.Failure, verbose, log})
+		return g.renderTemplate(failureWithLogTmpl, FailureData{res.Failure, common})
 	}
-	return g.renderProjectResults(res.ProjectResults, commandStr, log, verbose)
+	return g.renderProjectResults(res.ProjectResults, common)
 }
 
-func (g *GithubCommentRenderer) renderProjectResults(pathResults []ProjectResult, command string, log string, verbose bool) string {
-	renderedOutputs := make(map[string]string)
+func (g *GithubCommentRenderer) renderProjectResults(pathResults []ProjectResult, common CommonData) string {
+	results := make(map[string]string)
 	for _, result := range pathResults {
 		if result.Error != nil {
-			renderedOutputs[result.Path] = g.renderTemplate(errTmpl, struct{
+			results[result.Path] = g.renderTemplate(errTmpl, struct{
 				Command string
 				Output string
 			}{
-				Command: command,
+				Command: common.Command,
 				Output: result.Error.Error(),
 			})
 		} else if result.Failure != "" {
-			renderedOutputs[result.Path] = g.renderTemplate(failureTmpl, struct{
+			results[result.Path] = g.renderTemplate(failureTmpl, struct{
 				Command string
 				Failure string
 			}{
-				Command: command,
+				Command: common.Command,
 				Failure: result.Failure,
 			})
 		} else if result.PlanSuccess != nil {
-			renderedOutputs[result.Path] = g.renderTemplate(planSuccessTmpl, *result.PlanSuccess)
+			results[result.Path] = g.renderTemplate(planSuccessTmpl, *result.PlanSuccess)
 		} else if result.ApplySuccess != "" {
-			renderedOutputs[result.Path] = g.renderTemplate(applySuccessTmpl, struct{Output string}{result.ApplySuccess})
+			results[result.Path] = g.renderTemplate(applySuccessTmpl, struct{Output string}{result.ApplySuccess})
 		} else {
-			renderedOutputs[result.Path] = "Found no template. This is a bug!"
+			results[result.Path] = "Found no template. This is a bug!"
 		}
 	}
 
 	var tmpl *template.Template
-	if len(renderedOutputs) == 1 {
-		tmpl = singlePathTmpl
+	if len(results) == 1 {
+		tmpl = singleProjectTmpl
 	} else {
-		tmpl = multiPathTmpl
+		tmpl = multiProjectTmpl
 	}
-	return g.renderTemplate(tmpl, struct {
-		Results map[string]string
-		Log     string
-		Verbose bool
-		Command string
-	}{renderedOutputs, log, verbose, command})
+	return g.renderTemplate(tmpl, ResultData{results, common})
 }
 
 func (g *GithubCommentRenderer) renderTemplate(tmpl *template.Template, data interface{}) string {
