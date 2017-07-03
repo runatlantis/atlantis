@@ -73,17 +73,23 @@ type CommandContext struct {
 }
 
 // todo: These structs have nothing to do with the server. Move to a different file/package #refactor
-type ExecutionResult struct {
-	SetupError   Templater
-	SetupFailure Templater
-	PathResults  []PathResult
-	Command      CommandType
+type CommandResponse struct {
+	Error          error
+	Failure        string
+	SetupError     Templater
+	SetupFailure   Templater
+	ProjectResults []ProjectResult
+	Command        CommandType
 }
 
-type PathResult struct {
-	Path   string
-	Status Status
-	Result Templater
+type ProjectResult struct {
+	Path        string
+	Status      Status
+	Result      Templater
+	Error       error
+	Failure     string
+	PlanSuccess *PlanSuccess
+	ApplySuccess string
 }
 
 type Templater interface {
