@@ -21,7 +21,7 @@ type CommandResponse struct {
 	Error          error
 	Failure        string
 	ProjectResults []ProjectResult
-	Command        CommandType
+	Command        CommandName
 }
 
 type ProjectResult struct {
@@ -42,16 +42,16 @@ func (p ProjectResult) Status() Status {
 	return Success
 }
 
-type CommandType int
+type CommandName int
 
 const (
-	Apply CommandType = iota
+	Apply CommandName = iota
 	Plan
 	Help
 	// Adding more? Don't forget to update String() below
 )
 
-func (c CommandType) String() string {
+func (c CommandName) String() string {
 	switch c {
 	case Apply:
 		return "apply"
@@ -64,9 +64,9 @@ func (c CommandType) String() string {
 }
 
 type Command struct {
-	verbose     bool
-	environment string
-	commandType CommandType
+	Verbose     bool
+	Environment string
+	Name        CommandName
 }
 
 func (c *CommandHandler) ExecuteCommand(ctx *CommandContext) {
@@ -95,7 +95,7 @@ func (c *CommandHandler) ExecuteCommand(ctx *CommandContext) {
 		return
 	}
 
-	switch ctx.Command.commandType {
+	switch ctx.Command.Name {
 	case Plan:
 		c.planExecutor.execute(ctx)
 	case Apply:

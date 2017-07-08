@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"strings"
+
 	"github.com/hootsuite/atlantis/server"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -46,7 +48,7 @@ var stringFlags = []stringFlag{
 	},
 	{
 		name:        configFlag,
-		description: "Config file.",
+		description: "Path to config file.",
 	},
 	{
 		name:        dataDirFlag,
@@ -122,7 +124,7 @@ var serverCmd = &cobra.Command{
 	Long: `Start the atlantis server
 
 Flags can also be set in a yaml config file (see --` + configFlag + `).
-Config values are overridden by environment variables which in turn are overridden by flags.`,
+Config file values are overridden by environment variables which in turn are overridden by flags.`,
 	SilenceUsage: true,
 
 	PreRunE: func(cmd *cobra.Command, args []string) error {
@@ -147,6 +149,7 @@ Config values are overridden by environment variables which in turn are overridd
 		if err := setAtlantisURL(&config); err != nil {
 			return err
 		}
+		sanitizeGithubUser(&config)
 
 		// config looks good, start the server
 		server, err := server.NewServer(config)
@@ -208,4 +211,9 @@ func setAtlantisURL(config *server.ServerConfig) error {
 		config.AtlantisURL = fmt.Sprintf("http://%s:%d", hostname, config.Port)
 	}
 	return nil
+}
+
+// sanitizeGithubUser trims @ from the front of the username if it exists
+func sanitizeGithubUser(config *server.ServerConfig) {
+	config.GithubUser = strings.TrimPrefix(config.GithubUser, "@")
 }
