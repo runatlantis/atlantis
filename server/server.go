@@ -197,7 +197,7 @@ func (s *Server) Start() error {
 		PrintStack: false,
 		StackAll:   false,
 		StackSize:  1024 * 8,
-	}, NewNon200Logger(s.logger))
+	}, NewRequestLogger(s.logger))
 	n.UseHandler(s.router)
 	s.logger.Info("Atlantis started - listening on port %v", s.port)
 	return cli.NewExitError(http.ListenAndServe(fmt.Sprintf(":%d", s.port), n), 1)
@@ -280,33 +280,30 @@ func (s *Server) lock(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) deleteLock(w http.ResponseWriter, r *http.Request) {
 	id, ok := mux.Vars(r)["id"]
-	if !ok {
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, "no lock id in request")
+	if !ok || id == "" {
+		s.respond(w, logging.Warn, http.StatusBadRequest, "No id in request")
+		return
 	}
 	idUnencoded, err := url.PathUnescape(id)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, "invalid lock id")
+		s.respond(w, logging.Warn, http.StatusBadRequest, "Invalid lock id: %s", err)
+		return
 	}
 	lock, err := s.lockingClient.Unlock(idUnencoded)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, "Failed to unlock: %s", err)
+		s.respond(w, logging.Error, http.StatusInternalServerError, "Failed to delete lock %s: %s", idUnencoded, err)
 		return
 	}
 	if lock == nil {
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, "No lock at that key")
+		s.respond(w, logging.Warn, http.StatusBadRequest, "No lock found at id %s", idUnencoded)
 		return
 	}
-	fmt.Fprint(w, "Unlocked successfully")
+	s.respond(w, logging.Info, http.StatusOK, "Deleted lock id %s", idUnencoded)
 }
 
 // postEvents handles comment and pull request events from GitHub
 func (s *Server) postEvents(w http.ResponseWriter, r *http.Request) {
 	githubReqID := "X-Github-Delivery=" + r.Header.Get("X-Github-Delivery")
-
 	var payload []byte
 
 	// webhook requests can either be application/json or application/x-www-form-urlencoded
@@ -314,10 +311,8 @@ func (s *Server) postEvents(w http.ResponseWriter, r *http.Request) {
 		// GitHub stores the json payload as a form value
 		payloadForm := r.PostFormValue("payload")
 		if payloadForm == "" {
-			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprint(w, "request did not contain expected 'payload' form value")
+			s.respond(w, logging.Warn, http.StatusBadRequest, "request did not contain expected 'payload' form value")
 			return
-
 		}
 		payload = []byte(payloadForm)
 	} else {
@@ -326,8 +321,7 @@ func (s *Server) postEvents(w http.ResponseWriter, r *http.Request) {
 		var err error
 		payload, err = ioutil.ReadAll(r.Body)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprintf(w, "could not read body: %s", err)
+			s.respond(w, logging.Warn, http.StatusBadRequest,  "could not read body: %s", err)
 			return
 		}
 	}
@@ -339,47 +333,38 @@ func (s *Server) postEvents(w http.ResponseWriter, r *http.Request) {
 	case *gh.PullRequestEvent:
 		s.handlePullRequestEvent(w, event, githubReqID)
 	default:
-		s.logger.Debug("Ignoring unsupported event %s", githubReqID)
-		fmt.Fprintln(w, "Ignoring")
+		s.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event %s", githubReqID)
 	}
 }
 
 // handlePullRequestEvent will delete any locks associated with the pull request
 func (s *Server) handlePullRequestEvent(w http.ResponseWriter, pullEvent *gh.PullRequestEvent, githubReqID string) {
 	if pullEvent.GetAction() != "closed" {
-		s.logger.Debug("Ignoring pull request event since action was not closed %s", githubReqID)
-		fmt.Fprintln(w, "Ignoring")
+		s.respond(w, logging.Debug, http.StatusOK, "Ignoring pull request event since action was not closed %s", githubReqID)
 		return
 	}
 	pull, _, err := s.eventParser.ExtractPullData(pullEvent.PullRequest)
 	if err != nil {
-		s.logger.Err("parsing pull data: %s", err)
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, "error parsing request: %s", err)
+		s.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s", err)
 		return
 	}
 	repo, err := s.eventParser.ExtractRepoData(pullEvent.Repo)
 	if err != nil {
-		s.logger.Err("parsing repo data: %s", err)
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, "error parsing request: %s", err)
+		s.respond(w, logging.Error, http.StatusBadRequest, "Error parsing repo data: %s", err)
 		return
 	}
 
-	s.logger.Info("cleaning up locks and plans for repo %s and pull %d", repo.FullName, pull.Num)
 	if err := s.pullClosedExecutor.CleanUpPull(repo, pull); err != nil {
-		s.logger.Err("cleaning pull request: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "Error cleaning pull request: %s", err)
+		s.respond(w, logging.Error, http.StatusInternalServerError, "Error cleaning pull request: %s", err)
 		return
 	}
+	s.logger.Info("deleted locks and workspace for repo %s, pull %d", repo.FullName, pull.Num)
 	fmt.Fprint(w, "Pull request cleaned successfully")
 }
 
 func (s *Server) handleCommentEvent(w http.ResponseWriter, event *gh.IssueCommentEvent, githubReqID string) {
 	if event.GetAction() != "created" {
-		s.logger.Debug("Ignoring comment event since action was not created %s", githubReqID)
-		fmt.Fprintln(w, "Ignoring")
+		s.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since action was not created %s", githubReqID)
 		return
 	}
 
@@ -387,18 +372,23 @@ func (s *Server) handleCommentEvent(w http.ResponseWriter, event *gh.IssueCommen
 	ctx := &CommandContext{}
 	command, err := s.eventParser.DetermineCommand(event)
 	if err != nil {
-		s.logger.Debug("Ignoring request: %v %s", err, githubReqID)
-		fmt.Fprintln(w, "Ignoring")
+		s.respond(w, logging.Debug, http.StatusOK, "Ignoring: %s %s", err, githubReqID)
 		return
 	}
 	ctx.Command = command
 
 	if err = s.eventParser.ExtractCommentData(event, ctx); err != nil {
-		s.logger.Err("Failed parsing event: %v %s", err, githubReqID)
-		fmt.Fprintln(w, "Ignoring")
+		s.respond(w, logging.Error, http.StatusInternalServerError, "Failed parsing event: %v %s", err, githubReqID)
 		return
 	}
 	// respond with success and then actually execute the command asynchronously
 	fmt.Fprintln(w, "Processing...")
 	go s.commandHandler.ExecuteCommand(ctx)
+}
+
+func (s *Server) respond(w http.ResponseWriter, lvl logging.LogLevel, code int, format string, args... interface{}) {
+	response := fmt.Sprintf(format, args...)
+	s.logger.Log(lvl, response)
+	w.WriteHeader(code)
+	fmt.Fprintln(w, response)
 }

@@ -13,7 +13,7 @@ import (
 var level logging.LogLevel = logging.Info
 var logger = &logging.SimpleLogger{
 	Source: "server",
-	Log:    log.New(os.Stderr, "", log.LstdFlags),
+	Logger: log.New(os.Stderr, "", log.LstdFlags),
 	Level:  level,
 }
 

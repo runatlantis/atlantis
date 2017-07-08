@@ -5,21 +5,22 @@ import (
 
 	"github.com/hootsuite/atlantis/logging"
 	"github.com/urfave/negroni"
+	"strings"
 )
 
-func NewNon200Logger(logger *logging.SimpleLogger) *FailedRequestLogger {
-	return &FailedRequestLogger{logger}
+func NewRequestLogger(logger *logging.SimpleLogger) *RequestLogger {
+	return &RequestLogger{logger}
 }
 
-// FailedRequestLogger logs the request when a response code >= 400 is sent
-type FailedRequestLogger struct {
+// RequestLogger logs requests and their response codes
+type RequestLogger struct {
 	logger *logging.SimpleLogger
 }
 
-func (l *FailedRequestLogger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+func (l *RequestLogger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	next(rw, r)
 	res := rw.(negroni.ResponseWriter)
-	if res.Status() >= 400 {
-		l.logger.Info("%s %s - Response code %d", r.Method, r.URL.RequestURI(), res.Status())
+	if !strings.HasPrefix(r.URL.RequestURI(), "/static") {
+		l.logger.Info("%d | %s %s", res.Status(), r.Method, r.URL.RequestURI())
 	}
 }

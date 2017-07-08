@@ -72,7 +72,7 @@ type Command struct {
 func (c *CommandHandler) ExecuteCommand(ctx *CommandContext) {
 	src := fmt.Sprintf("%s/pull/%d", ctx.BaseRepo.FullName, ctx.Pull.Num)
 	// it's safe to reuse the underlying logger e.logger.Log
-	ctx.Log = logging.NewSimpleLogger(src, c.logger.Log, true, c.logger.Level)
+	ctx.Log = logging.NewSimpleLogger(src, c.logger.Logger, true, c.logger.Level)
 	defer c.recover(ctx)
 
 	// need to get additional data from the PR

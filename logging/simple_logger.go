@@ -10,7 +10,7 @@ import (
 type SimpleLogger struct {
 	Source      string
 	History     bytes.Buffer
-	Log         *log.Logger
+	Logger      *log.Logger
 	KeepHistory bool
 	Level       LogLevel
 }
@@ -27,7 +27,7 @@ const (
 func NewSimpleLogger(source string, log *log.Logger, keepHistory bool, level LogLevel) *SimpleLogger {
 	return &SimpleLogger{
 		Source:      source,
-		Log:         log,
+		Logger:      log,
 		Level:       level,
 		KeepHistory: keepHistory,
 	}
@@ -48,28 +48,28 @@ func ToLogLevel(levelStr string) LogLevel {
 }
 
 func (l *SimpleLogger) Debug(format string, a ...interface{}) {
-	l.log(Debug, format, a...)
+	l.Log(Debug, format, a...)
 }
 
 func (l *SimpleLogger) Info(format string, a ...interface{}) {
-	l.log(Info, format, a...)
+	l.Log(Info, format, a...)
 }
 
 func (l *SimpleLogger) Warn(format string, a ...interface{}) {
-	l.log(Warn, format, a...)
+	l.Log(Warn, format, a...)
 }
 
 func (l *SimpleLogger) Err(format string, a ...interface{}) {
-	l.log(Error, format, a...)
+	l.Log(Error, format, a...)
 }
 
-func (l *SimpleLogger) log(level LogLevel, format string, a ...interface{}) {
+func (l *SimpleLogger) Log(level LogLevel, format string, a ...interface{}) {
 	levelStr := l.levelToString(level)
 	msg := l.capitalizeFirstLetter(fmt.Sprintf(format, a...))
 
 	// only log this message if configured to log at this level
 	if l.Level <= level {
-		l.Log.Printf("[%s] %s: %s\n", levelStr, l.Source, msg)
+		l.Logger.Printf("[%s] %s: %s\n", levelStr, l.Source, msg)
 	}
 
 	// keep history at all log levels
