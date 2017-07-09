@@ -141,7 +141,7 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 
 	// if there are pre apply commands then run them
 	if len(config.PreApply.Commands) > 0 {
-		_, err := a.preRun.Start(ctx.Log, config.PreApply.Commands, absolutePath, ctx.Command.Environment, config.TerraformVersion)
+		_, err := a.preRun.Execute(ctx.Log, config.PreApply.Commands, absolutePath, ctx.Command.Environment, config.TerraformVersion)
 		if err != nil {
 			return ProjectResult{Error: err}
 		}

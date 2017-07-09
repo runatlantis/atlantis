@@ -1,3 +1,6 @@
+// Package boltdb provides a locking implementation using Bolt.
+// Bolt is a key/value store that writes all data to a file.
+// See https://github.com/boltdb/bolt for more information.
 package boltdb
 
 import (
@@ -13,14 +16,17 @@ import (
 	"github.com/pkg/errors"
 )
 
-type Backend struct {
+// BoltLocker is a locking backend using BoltDB
+type BoltLocker struct {
 	db     *bolt.DB
 	bucket []byte
 }
 
 const bucketName = "runLocks"
 
-func New(dataDir string) (*Backend, error) {
+// New returns a valid locker. We need to be able to write to dataDir
+// since bolt stores its data as a file
+func New(dataDir string) (*BoltLocker, error) {
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
 		return nil, errors.Wrap(err, "creating data dir")
 	}
@@ -41,16 +47,19 @@ func New(dataDir string) (*Backend, error) {
 		return nil, errors.Wrap(err, "starting BoltDB")
 	}
 	// todo: close BoltDB when server is sigtermed
-	return &Backend{db, []byte(bucketName)}, nil
+	return &BoltLocker{db, []byte(bucketName)}, nil
 }
 
-// NewWithDB is used for testing
-func NewWithDB(db *bolt.DB, bucket string) (*Backend, error) {
-	return &Backend{db, []byte(bucket)}, nil
+// NewWithDB is used for testing.
+func NewWithDB(db *bolt.DB, bucket string) (*BoltLocker, error) {
+	return &BoltLocker{db, []byte(bucket)}, nil
 }
 
-func (b *Backend) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, error) {
-	// return variables
+// TryLock attempts to create a new lock. If the lock is
+// acquired, it will return true and the lock returned will be newLock.
+// If the lock is not acquired, it will return false and the current
+// lock that is preventing this lock from being acquired.
+func (b *BoltLocker) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, error) {
 	var lockAcquired bool
 	var currLock models.ProjectLock
 	key := b.key(newLock.Project, newLock.Env)
@@ -82,7 +91,11 @@ func (b *Backend) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock,
 	return lockAcquired, currLock, nil
 }
 
-func (b Backend) Unlock(p models.Project, env string) (*models.ProjectLock, error) {
+// Unlock attempts to unlock the project and environment.
+// If there is no lock, then it will return a nil pointer.
+// If there is a lock, then it will delete it, and then return a pointer
+// to the deleted lock.
+func (b BoltLocker) Unlock(p models.Project, env string) (*models.ProjectLock, error) {
 	var lock models.ProjectLock
 	foundLock := false
 	key := b.key(p, env)
@@ -104,7 +117,8 @@ func (b Backend) Unlock(p models.Project, env string) (*models.ProjectLock, erro
 	return nil, err
 }
 
-func (b Backend) List() ([]models.ProjectLock, error) {
+// List lists all current locks.
+func (b BoltLocker) List() ([]models.ProjectLock, error) {
 	var locks []models.ProjectLock
 	var locksBytes [][]byte
 	err := b.db.View(func(tx *bolt.Tx) error {
@@ -131,7 +145,8 @@ func (b Backend) List() ([]models.ProjectLock, error) {
 	return locks, nil
 }
 
-func (b Backend) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
+// UnlockByPull deletes all locks associated with that pull request and returns them.
+func (b BoltLocker) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
 	var locks []models.ProjectLock
 	err := b.db.View(func(tx *bolt.Tx) error {
 		c := tx.Bucket(b.bucket).Cursor()
@@ -158,7 +173,9 @@ func (b Backend) UnlockByPull(repoFullName string, pullNum int) ([]models.Projec
 	return locks, nil
 }
 
-func (b Backend) GetLock(p models.Project, env string) (models.ProjectLock, error) {
+// GetLock returns a pointer to the lock for that project and env.
+// If there is no lock, it returns a nil pointer.
+func (b BoltLocker) GetLock(p models.Project, env string) (*models.ProjectLock, error) {
 	key := b.key(p, env)
 	var lockBytes []byte
 	err := b.db.View(func(tx *bolt.Tx) error {
@@ -167,17 +184,21 @@ func (b Backend) GetLock(p models.Project, env string) (models.ProjectLock, erro
 		return nil
 	})
 	if err != nil {
-		return models.ProjectLock{}, errors.Wrap(err, "getting lock data")
+		return nil, errors.Wrap(err, "getting lock data")
+	}
+	// lockBytes will be nil if there was no data at that key
+	if lockBytes == nil {
+		return nil, nil
 	}
 
 	var lock models.ProjectLock
 	if err := json.Unmarshal(lockBytes, &lock); err != nil {
-		return models.ProjectLock{}, errors.Wrapf(err, "deserializing lock at key %q", key)
+		return nil, errors.Wrapf(err, "deserializing lock at key %q", key)
 	}
 
-	return lock, nil
+	return &lock, nil
 }
 
-func (b Backend) key(p models.Project, env string) string {
+func (b BoltLocker) key(p models.Project, env string) string {
 	return fmt.Sprintf("%s/%s/%s", p.RepoFullName, p.Path, env)
 }

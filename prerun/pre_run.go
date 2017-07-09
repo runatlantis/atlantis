@@ -1,3 +1,5 @@
+// Package prerun handles running commands prior to the
+// regular Atlantis commands.
 package prerun
 
 import (
@@ -13,12 +15,18 @@ import (
 	"github.com/pkg/errors"
 )
 
-const InlineShebang = "/bin/sh -e"
+const inlineShebang = "#!/bin/sh -e"
 
 type PreRun struct{}
 
-// Start is the function that starts the pre run
-func (p *PreRun) Start(log *logging.SimpleLogger, commands []string, path string, environment string, terraformVersion *version.Version) (string, error) {
+// Execute runs the commands by writing them as a script to disk
+// and then executing the script.
+func (p *PreRun) Execute(
+	log *logging.SimpleLogger,
+	commands []string,
+	path string,
+	environment string,
+	terraformVersion *version.Version) (string, error) {
 	// we create a script from the commands provided
 	if len(commands) == 0 {
 		return "", errors.New("prerun commands cannot be empty")
@@ -51,7 +59,7 @@ func createScript(cmds []string) (string, error) {
 
 	// Write our contents to it
 	writer := bufio.NewWriter(tmp)
-	writer.WriteString(fmt.Sprintf("#!%s\n", InlineShebang))
+	writer.WriteString(fmt.Sprintf("%s\n", inlineShebang))
 	cmdsJoined := strings.Join(cmds, "\n")
 	if _, err := writer.WriteString(cmdsJoined); err != nil {
 		return "", errors.Wrap(err, "preparing pre run")

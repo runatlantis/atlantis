@@ -125,9 +125,9 @@ var serverCmd = &cobra.Command{
 
 Flags can also be set in a yaml config file (see --` + configFlag + `).
 Config file values are overridden by environment variables which in turn are overridden by flags.`,
-	SilenceUsage: true,
+	SilenceErrors: true,
 
-	PreRunE: func(cmd *cobra.Command, args []string) error {
+	PreRunE: withErrPrint(func(cmd *cobra.Command, args []string) error {
 		// if passed a config file then try and load it
 		configFile := viper.GetString(configFlag)
 		if configFile != "" {
@@ -137,8 +137,8 @@ Config file values are overridden by environment variables which in turn are ove
 			}
 		}
 		return nil
-	},
-	RunE: func(cmd *cobra.Command, args []string) error {
+	}),
+	RunE: withErrPrint(func(cmd *cobra.Command, args []string) error {
 		var config server.ServerConfig
 		if err := viper.Unmarshal(&config); err != nil {
 			return err
@@ -157,7 +157,7 @@ Config file values are overridden by environment variables which in turn are ove
 			return errors.Wrap(err, "initializing server")
 		}
 		return server.Start()
-	},
+	}),
 }
 
 func init() {
@@ -191,10 +191,10 @@ func validate(config server.ServerConfig) error {
 		return errors.New("invalid log level: not one of debug, info, warn, error")
 	}
 	if config.GithubUser == "" {
-		return fmt.Errorf("%s must be set", ghUserFlag)
+		return fmt.Errorf("--%s must be set", ghUserFlag)
 	}
 	if config.GithubPassword == "" {
-		return fmt.Errorf("%s must be set", ghPasswordFlag)
+		return fmt.Errorf("--%s must be set", ghPasswordFlag)
 	}
 	if config.LockingBackend != server.LockingFileBackend && config.LockingBackend != server.LockingDynamoDBBackend {
 		return fmt.Errorf("unsupported locking backend %q: not one of %q or %q", config.LockingBackend, server.LockingFileBackend, server.LockingDynamoDBBackend)
@@ -202,6 +202,7 @@ func validate(config server.ServerConfig) error {
 	return nil
 }
 
+// setAtlantisURL sets the externally accessible URL for atlantis.
 func setAtlantisURL(config *server.ServerConfig) error {
 	if config.AtlantisURL == "" {
 		hostname, err := os.Hostname()
@@ -213,7 +214,18 @@ func setAtlantisURL(config *server.ServerConfig) error {
 	return nil
 }
 
-// sanitizeGithubUser trims @ from the front of the username if it exists
+// sanitizeGithubUser trims @ from the front of the github username if it exists.
 func sanitizeGithubUser(config *server.ServerConfig) {
 	config.GithubUser = strings.TrimPrefix(config.GithubUser, "@")
+}
+
+// withErrPrint prints out any errors to a terminal in red.
+func withErrPrint(f func(*cobra.Command, []string) error) func(*cobra.Command, []string) error {
+	return func(cmd *cobra.Command, args []string) error {
+		if err := f(cmd, args); err != nil {
+			fmt.Fprintf(os.Stderr, "\033[31mError: %s\033[39m\n\n", err.Error())
+			return err
+		}
+		return nil
+	}
 }

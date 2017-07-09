@@ -95,7 +95,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 	githubComments := &GithubCommentRenderer{}
 	awsConfig := &aws.Config{
 		Region:  config.AWSRegion,
-		RoleArn: config.AssumeRole,
+		RoleARN: config.AssumeRole,
 	}
 
 	var awsSession *session.Session
@@ -184,7 +184,7 @@ func (s *Server) Start() error {
 	s.router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: Asset, AssetDir: AssetDir, AssetInfo: AssetInfo}))
 	s.router.HandleFunc("/events", s.postEvents).Methods("POST")
 	s.router.HandleFunc("/locks", s.deleteLock).Methods("DELETE").Queries("id", "{id:.*}")
-	lockRoute := s.router.HandleFunc("/lock", s.lock).Methods("GET").Queries("id", "{id}").Name(lockRoute)
+	lockRoute := s.router.HandleFunc("/lock", s.getLock).Methods("GET").Queries("id", "{id}").Name(lockRoute)
 	// function that planExecutor can use to construct detail view url
 	// injecting this here because this is the earliest routes are created
 	s.commandHandler.SetLockURL(func(lockID string) string {
@@ -230,7 +230,7 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 	indexTemplate.Execute(w, results)
 }
 
-func (s *Server) lock(w http.ResponseWriter, r *http.Request) {
+func (s *Server) getLock(w http.ResponseWriter, r *http.Request) {
 	id, ok := mux.Vars(r)["id"]
 	if !ok {
 		w.WriteHeader(http.StatusBadRequest)
@@ -248,6 +248,10 @@ func (s *Server) lock(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprint(w, err.Error())
+	}
+	if lock == nil {
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprint(w, "no lock found at that id")
 	}
 
 	type lockData struct {

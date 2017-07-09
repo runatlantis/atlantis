@@ -10,13 +10,7 @@ import (
 	. "github.com/hootsuite/atlantis/testing_util"
 )
 
-var level logging.LogLevel = logging.Info
-var logger = &logging.SimpleLogger{
-	Source: "server",
-	Logger: log.New(os.Stderr, "", log.LstdFlags),
-	Level:  level,
-}
-
+var logger = logging.NewSimpleLogger("", log.New(os.Stderr, "", log.LstdFlags), false, logging.Debug)
 var preRun = &PreRun{}
 
 func TestPreRunCreateScript_valid(t *testing.T) {
@@ -44,7 +38,6 @@ func TestPreRunExecuteScript_valid(t *testing.T) {
 func TestPreRun_valid(t *testing.T) {
 	cmds := []string{"echo", "date"}
 	version, _ := version.NewVersion("0.8.8")
-	logger := logging.NewSimpleLogger("", log.New(os.Stderr, "", 0), false, logging.Debug)
-	_, err := preRun.Start(logger, cmds, "/tmp/atlantis", "staging", version)
+	_, err := preRun.Execute(logger, cmds, "/tmp/atlantis", "staging", version)
 	Ok(t, err)
 }

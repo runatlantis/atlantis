@@ -17,7 +17,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// PlanExecutor handles everything related to running the Terraform plan including integration with S3, Terraform, and GitHub
+// PlanExecutor handles everything related to running terraform plan
+// including integration with S3, Terraform, and GitHub
 type PlanExecutor struct {
 	github                *github.Client
 	githubStatus          *GithubStatus
@@ -141,7 +142,7 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 
 	// if there are pre plan commands then run them
 	if len(config.PrePlan.Commands) > 0 {
-		_, err := p.preRun.Start(ctx.Log, config.PrePlan.Commands, absolutePath, tfEnv, terraformVersion)
+		_, err := p.preRun.Execute(ctx.Log, config.PrePlan.Commands, absolutePath, tfEnv, terraformVersion)
 		if err != nil {
 			return ProjectResult{Error: errors.Wrap(err, "running pre plan commands")}
 		}

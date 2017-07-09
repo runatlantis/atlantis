@@ -1,3 +1,4 @@
+// Package terraform handles the actual running of terraform commands
 package terraform
 
 import (
@@ -43,24 +44,28 @@ func NewClient() (*Client, error) {
 	}, nil
 }
 
-func (c *Client) RunCommand(log *logging.SimpleLogger, path string, tfCmd []string, tfEnvVars []string) (string, error) {
-	return c.RunCommandWithVersion(log, path, tfCmd, tfEnvVars, c.defaultVersion)
+// RunCommand calls RunCommandWithVersion with the version of terraform in $PATH
+func (c *Client) RunCommand(log *logging.SimpleLogger, path string, args []string, envVars []string) (string, error) {
+	return c.RunCommandWithVersion(log, path, args, envVars, c.defaultVersion)
 }
 
+// Version returns the version of the terraform executable in our $PATH.
 func (c *Client) Version() *version.Version {
 	return c.defaultVersion
 }
 
-func (c *Client) RunCommandWithVersion(log *logging.SimpleLogger, path string, tfCmd []string, tfEnvVars []string, v *version.Version) (string, error) {
+// RunCommandWithVersion executes the provided version of terraform with
+// the provided args and envVars in path.
+func (c *Client) RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, envVars []string, v *version.Version) (string, error) {
 	tfExecutable := "terraform"
 	// if version is the same as the default, don't need to prepend the version name to the executable
 	if !v.Equal(c.defaultVersion) {
 		tfExecutable = fmt.Sprintf("%s%s", tfExecutable, v.String())
 	}
-	terraformCmd := exec.Command(tfExecutable, tfCmd...)
+	terraformCmd := exec.Command(tfExecutable, args...)
 	terraformCmd.Dir = path
-	if len(tfEnvVars) > 0 {
-		terraformCmd.Env = tfEnvVars
+	if len(envVars) > 0 {
+		terraformCmd.Env = envVars
 	}
 	out, err := terraformCmd.CombinedOutput()
 	if err != nil {
@@ -70,10 +75,13 @@ func (c *Client) RunCommandWithVersion(log *logging.SimpleLogger, path string, t
 	return string(out), nil
 }
 
-func (c *Client) RunInitAndEnv(log *logging.SimpleLogger, path string, env string, extraArgs []string) ([]string, error) {
+// RunInitAndEnv executes "terraform init" and "terraform env select" in path.
+// env is the environment to select and extraInitArgs are additional arguments
+// applied to the init command.
+func (c *Client) RunInitAndEnv(log *logging.SimpleLogger, path string, env string, extraInitArgs []string) ([]string, error) {
 	var outputs []string
 	// run terraform init
-	output, err := c.RunCommand(log, path, append([]string{"init", "-no-color"}, extraArgs...), nil)
+	output, err := c.RunCommand(log, path, append([]string{"init", "-no-color"}, extraInitArgs...), nil)
 	if err != nil {
 		return nil, err
 	}

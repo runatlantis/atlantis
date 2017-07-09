@@ -1,3 +1,4 @@
+// Package github provides convenience wrappers around the go-github package.
 package github
 
 import (
@@ -12,11 +13,13 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Client is used to perform GitHub actions.
 type Client struct {
 	client *github.Client
 	ctx    context.Context
 }
 
+// NewClient returns a valid GitHub client.
 func NewClient(hostname string, user string, pass string) (*Client, error) {
 	tp := github.BasicAuthTransport{
 		Username: strings.TrimSpace(user),
@@ -25,7 +28,7 @@ func NewClient(hostname string, user string, pass string) (*Client, error) {
 	client := github.NewClient(tp.Client())
 	// If we're using github.com then we don't need to do any additional configuration
 	// for the client. It we're using Github Enterprise, then we need to manually
-	// set the base url for the API
+	// set the base url for the API.
 	if hostname != "github.com" {
 		baseURL := fmt.Sprintf("https://%s/api/v3/", hostname)
 		base, err := url.Parse(baseURL)
@@ -42,7 +45,7 @@ func NewClient(hostname string, user string, pass string) (*Client, error) {
 }
 
 // GetModifiedFiles returns the names of files that were modified in the pull request.
-// The names include the path to the file from the repo root, ex. parent/child/file.txt
+// The names include the path to the file from the repo root, ex. parent/child/file.txt.
 func (c *Client) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	var files []string
 	nextPage := 0
@@ -68,11 +71,13 @@ func (c *Client) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]
 	return files, nil
 }
 
+// CreateComment creates a comment on the pull request.
 func (c *Client) CreateComment(repo models.Repo, pull models.PullRequest, comment string) error {
 	_, _, err := c.client.Issues.CreateComment(c.ctx, repo.Owner, repo.Name, pull.Num, &github.IssueComment{Body: &comment})
 	return err
 }
 
+// PullIsApproved returns true if the pull request was approved.
 func (c *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
 	reviews, _, err := c.client.PullRequests.ListReviews(c.ctx, repo.Owner, repo.Name, pull.Num, nil)
 	if err != nil {
@@ -86,10 +91,13 @@ func (c *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool
 	return false, nil
 }
 
+// GetPullRequest returns the pull request.
 func (c *Client) GetPullRequest(repo models.Repo, num int) (*github.PullRequest, *github.Response, error) {
 	return c.client.PullRequests.Get(c.ctx, repo.Owner, repo.Name, num)
 }
 
+// UpdateStatus updates the status badge on the pull request.
+// See https://github.com/blog/1227-commit-status-api.
 func (c *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, state string, description string, context string) error {
 	status := &github.RepoStatus{
 		State:       github.String(state),

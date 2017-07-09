@@ -1,3 +1,4 @@
+// Package logging handles logging throughout Atlantis.
 package logging
 
 import (
@@ -7,8 +8,17 @@ import (
 	"unicode"
 )
 
+// SimpleLogger wraps the standard logger with leveled logging
+// and the ability to store log history for later adding it
+// to a GitHub comment.
 type SimpleLogger struct {
-	Source      string
+	// Source is added as a prefix to each log entry.
+	// It's useful if you want to trace a log entry back to a
+	// context, for example a pull request id.
+	Source string
+	// History stores all log entries ever written using
+	// this logger. This is safe for short-lived loggers
+	// like those used during plan/apply commands.
 	History     bytes.Buffer
 	Logger      *log.Logger
 	KeepHistory bool
@@ -24,15 +34,26 @@ const (
 	Error
 )
 
-func NewSimpleLogger(source string, log *log.Logger, keepHistory bool, level LogLevel) *SimpleLogger {
+// NewSimpleLogger creates a new logger.
+// - source is added as a prefix to each log entry. It's useful if you want to trace a log entry back to a
+//   context, for example a pull request id.
+// - logger is the underlying logger.
+// - keepHistory set to true will store all log entries written using this logger.
+// - level will set the level at which logs >= than that level will be written.
+//   If keepHistory is set to true, we'll store logs at all levels, regardless of what level
+//   is set to.
+func NewSimpleLogger(source string, logger *log.Logger, keepHistory bool, level LogLevel) *SimpleLogger {
 	return &SimpleLogger{
 		Source:      source,
-		Logger:      log,
+		Logger:      logger,
 		Level:       level,
 		KeepHistory: keepHistory,
 	}
 }
 
+// ToLogLevel converts a log level string to a valid
+// LogLevel object. If the string doesn't match a level,
+// it will return Info.
 func ToLogLevel(levelStr string) LogLevel {
 	switch levelStr {
 	case "debug":

@@ -1,3 +1,5 @@
+// Package cmd holds all our cli commands.
+// These are different from the commands that get run via GitHub comments
 package cmd
 
 import (
@@ -8,7 +10,7 @@ import (
 
 var RootCmd = &cobra.Command{
 	Use:   "atlantis",
-	Short: "Terraform collaboration tool", // todo: decide on name #opensource
+	Short: "Manage your Terraform workflow from GitHub",
 }
 
 func Execute() {

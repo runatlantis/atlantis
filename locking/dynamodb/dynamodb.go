@@ -1,3 +1,8 @@
+// Package dynamodb provides a locking implementation with Amazon's DynamoDB.
+// We provide this functionality to mimic what is provided by Terraform itself.
+// DynamoDB can be queried in a consistent manner (instead of eventually consistent)
+// so it is safe to use to ensure global consistency.
+// See https://aws.amazon.com/dynamodb/ for more information.
 package dynamodb
 
 import (
@@ -14,15 +19,16 @@ import (
 	"github.com/pkg/errors"
 )
 
-type Backend struct {
+type DynamoLocker struct {
 	DB        dynamodbiface.DynamoDBAPI
 	LockTable string
 }
 
 // dynamoLock duplicates the fields of some models and adds LocksKey.
-// This is so everything is a top-level field for serialization and querying
-// and also so any changes to models won't affect
-// how we're storing our data (or will at least cause a compile error)
+// We need all data as a top-level field so we can use the go sdk's
+// serialization and deserialization methods and so we can query on all
+// fields. Duplicating fields of the models also ensures a change to
+// the models won't inadvertently affect how we're storing data in Dynamo
 type dynamoLock struct {
 	LockKey        string
 	RepoFullName   string
@@ -38,18 +44,19 @@ type dynamoLock struct {
 	Time           time.Time
 }
 
-func New(lockTable string, p client.ConfigProvider) Backend {
-	return Backend{
+// New returns a valid dynamo locker
+func New(lockTable string, p client.ConfigProvider) DynamoLocker {
+	return DynamoLocker{
 		DB:        dynamodb.New(p),
 		LockTable: lockTable,
 	}
 }
 
-func (b Backend) key(project models.Project, env string) string {
-	return fmt.Sprintf("%s/%s/%s", project.RepoFullName, project.Path, env)
-}
-
-func (b Backend) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, error) {
+// TryLock attempts to create a new lock. If the lock is
+// acquired, it will return true and the lock returned will be newLock.
+// If the lock is not acquired, it will return false and the current
+// lock that is preventing this lock from being acquired.
+func (b DynamoLocker) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, error) {
 	var currLock models.ProjectLock
 	key := b.key(newLock.Project, newLock.Env)
 	newDynamoLock := b.toDynamo(key, newLock)
@@ -96,7 +103,11 @@ func (b Backend) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, 
 	return true, newLock, nil
 }
 
-func (b Backend) Unlock(project models.Project, env string) (*models.ProjectLock, error) {
+// Unlock attempts to unlock the project and environment.
+// If there is no lock, then it will return a nil pointer.
+// If there is a lock, then it will delete it, and then return a pointer
+// to the deleted lock.
+func (b DynamoLocker) Unlock(project models.Project, env string) (*models.ProjectLock, error) {
 	key := b.key(project, env)
 	params := &dynamodb.DeleteItemInput{
 		Key: map[string]*dynamodb.AttributeValue{
@@ -119,7 +130,8 @@ func (b Backend) Unlock(project models.Project, env string) (*models.ProjectLock
 	return &lock, nil
 }
 
-func (b Backend) List() ([]models.ProjectLock, error) {
+// List lists all current locks.
+func (b DynamoLocker) List() ([]models.ProjectLock, error) {
 	var locks []models.ProjectLock
 	var err, internalErr error
 	params := &dynamodb.ScanInput{
@@ -143,7 +155,9 @@ func (b Backend) List() ([]models.ProjectLock, error) {
 	return locks, errors.Wrap(err, "scanning dynamodb")
 }
 
-func (b Backend) GetLock(p models.Project, env string) (models.ProjectLock, error) {
+// GetLock returns a pointer to the lock for that project and env.
+// If there is no lock, it returns a nil pointer.
+func (b DynamoLocker) GetLock(p models.Project, env string) (*models.ProjectLock, error) {
 	key := b.key(p, env)
 	params := &dynamodb.GetItemInput{
 		Key: map[string]*dynamodb.AttributeValue{
@@ -156,18 +170,24 @@ func (b Backend) GetLock(p models.Project, env string) (models.ProjectLock, erro
 	}
 	item, err := b.DB.GetItem(params)
 	if err != nil {
-		return models.ProjectLock{}, errors.Wrapf(err, "getting item %q", item)
+		return nil, errors.Wrapf(err, "getting item %q", item)
+	}
+	// if there is no lock at that key, item.Item will be nil
+	if item.Item == nil {
+		return nil, nil
 	}
 
 	var dynamoDBLock dynamoLock
 	if err := dynamodbattribute.UnmarshalMap(item.Item, &dynamoDBLock); err != nil {
-		return models.ProjectLock{}, errors.Wrap(err, "found a lock at that key but it could not be deserialized. We suggest manually deleting this key from DynamoDB")
+		return nil, errors.Wrap(err, "found a lock at that key but it could not be deserialized. We suggest manually deleting this key from DynamoDB")
 	}
 
-	return b.fromDynamo(dynamoDBLock), nil
+	lock := b.fromDynamo(dynamoDBLock)
+	return &lock, nil
 }
 
-func (b Backend) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
+// UnlockByPull deletes all locks associated with that pull request and returns them.
+func (b DynamoLocker) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
 	params := &dynamodb.ScanInput{
 		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
 			":pullNum": {
@@ -209,7 +229,7 @@ func (b Backend) UnlockByPull(repoFullName string, pullNum int) ([]models.Projec
 	return locks, nil
 }
 
-func (b Backend) toDynamo(key string, l models.ProjectLock) dynamoLock {
+func (b DynamoLocker) toDynamo(key string, l models.ProjectLock) dynamoLock {
 	return dynamoLock{
 		LockKey:        key,
 		RepoFullName:   l.Project.RepoFullName,
@@ -222,11 +242,11 @@ func (b Backend) toDynamo(key string, l models.ProjectLock) dynamoLock {
 		PullAuthor:     l.Pull.Author,
 		UserUsername:   l.User.Username,
 		Env:            l.Env,
-		Time:           time.Now(),
+		Time:           l.Time,
 	}
 }
 
-func (b Backend) fromDynamo(d dynamoLock) models.ProjectLock {
+func (b DynamoLocker) fromDynamo(d dynamoLock) models.ProjectLock {
 	return models.ProjectLock{
 		Pull: models.PullRequest{
 			Author:     d.PullAuthor,
@@ -246,4 +266,8 @@ func (b Backend) fromDynamo(d dynamoLock) models.ProjectLock {
 		Time: d.Time,
 		Env:  d.Env,
 	}
+}
+
+func (b DynamoLocker) key(project models.Project, env string) string {
+	return fmt.Sprintf("%s/%s/%s", project.RepoFullName, project.Path, env)
 }

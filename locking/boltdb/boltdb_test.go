@@ -311,20 +311,29 @@ func TestUnlockByPullMatching(t *testing.T) {
 	Equals(t, 0, len(ls))
 }
 
-// todo: Write more tests for getting lock data
+func TestGetLockNotThere(t *testing.T) {
+	t.Log("getting a lock that doesn't exist should return a nil pointer")
+	db, b := newTestDB()
+	defer cleanupDB(db)
+	l, err := b.GetLock(project, env)
+	Ok(t, err)
+	Equals(t, (*models.ProjectLock)(nil), l)
+}
+
 func TestGetLock(t *testing.T) {
-	t.Log("get data for a existing lock")
+	t.Log("getting a lock should return the lock")
 	db, b := newTestDB()
 	defer cleanupDB(db)
 	_, _, err := b.TryLock(lock)
 	Ok(t, err)
 
-	_, err = b.GetLock(project, env)
+	l, err := b.GetLock(project, env)
 	Ok(t, err)
+	Equals(t, &lock, l)
 }
 
 // newTestDB returns a TestDB using a temporary path.
-func newTestDB() (*bolt.DB, *boltdb.Backend) {
+func newTestDB() (*bolt.DB, *boltdb.BoltLocker) {
 	// Retrieve a temporary path.
 	f, err := ioutil.TempFile("", "")
 	if err != nil {
