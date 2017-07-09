@@ -35,16 +35,16 @@ func (a *ApplyExecutor) execute(ctx *CommandContext) {
 	a.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Pending, ApplyStep)
 	res := a.setupAndApply(ctx)
 	res.Command = Apply
-	comment := a.githubCommentRenderer.render(res, ctx.Log.History.String(), ctx.Command.verbose)
+	comment := a.githubCommentRenderer.render(res, ctx.Log.History.String(), ctx.Command.Verbose)
 	a.github.CreateComment(ctx.BaseRepo, ctx.Pull, comment)
 }
 
 func (a *ApplyExecutor) setupAndApply(ctx *CommandContext) CommandResponse {
-	if a.concurrentRunLocker.TryLock(ctx.BaseRepo.FullName, ctx.Command.environment, ctx.Pull.Num) != true {
+	if a.concurrentRunLocker.TryLock(ctx.BaseRepo.FullName, ctx.Command.Environment, ctx.Pull.Num) != true {
 		return a.failureResponse(ctx,
-			fmt.Sprintf("The %s environment is currently locked by another command that is running for this pull request. Wait until command is complete and try again.", ctx.Command.environment))
+			fmt.Sprintf("The %s environment is currently locked by another command that is running for this pull request. Wait until command is complete and try again.", ctx.Command.Environment))
 	}
-	defer a.concurrentRunLocker.Unlock(ctx.BaseRepo.FullName, ctx.Command.environment, ctx.Pull.Num)
+	defer a.concurrentRunLocker.Unlock(ctx.BaseRepo.FullName, ctx.Command.Environment, ctx.Pull.Num)
 
 	if a.requireApproval {
 		approved, err := a.github.PullIsApproved(ctx.BaseRepo, ctx.Pull)
@@ -68,7 +68,7 @@ func (a *ApplyExecutor) setupAndApply(ctx *CommandContext) CommandResponse {
 			return err
 		}
 		// if the plan is for the right env,
-		if !info.IsDir() && info.Name() == ctx.Command.environment+".tfplan" {
+		if !info.IsDir() && info.Name() == ctx.Command.Environment+".tfplan" {
 			rel, _ := filepath.Rel(repoDir, filepath.Dir(path))
 			plans = append(plans, models.Plan{
 				Project:   models.NewProject(ctx.BaseRepo.FullName, rel),
@@ -92,7 +92,7 @@ func (a *ApplyExecutor) setupAndApply(ctx *CommandContext) CommandResponse {
 }
 
 func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.Plan) ProjectResult {
-	tfEnv := ctx.Command.environment
+	tfEnv := ctx.Command.Environment
 	lockAttempt, err := a.lockingClient.TryLock(plan.Project, tfEnv, ctx.Pull, ctx.User)
 	if err != nil {
 		return ProjectResult{Error: errors.Wrap(err, "acquiring lock")}
@@ -115,7 +115,7 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 		}
 
 		// add terraform arguments from project config
-		terraformApplyExtraArgs = config.GetExtraArguments(ctx.Command.commandType.String())
+		terraformApplyExtraArgs = config.GetExtraArguments(ctx.Command.Name.String())
 	}
 
 	// check if terraform version is >= 0.9.0
@@ -135,7 +135,7 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 
 	// if there are pre plan commands then run them
 	if len(config.PreApply.Commands) > 0 {
-		preRunOutput, err := a.preRun.Start(config.PreApply.Commands, projectAbsolutePath, ctx.Command.environment, config.TerraformVersion)
+		preRunOutput, err := a.preRun.Start(config.PreApply.Commands, projectAbsolutePath, ctx.Command.Environment, config.TerraformVersion)
 		if err != nil {
 			return ProjectResult{Error: err}
 		}

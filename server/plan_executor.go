@@ -44,16 +44,16 @@ func (p *PlanExecutor) execute(ctx *CommandContext) {
 	p.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Pending, PlanStep)
 	res := p.setupAndPlan(ctx)
 	res.Command = Plan
-	comment := p.githubCommentRenderer.render(res, ctx.Log.History.String(), ctx.Command.verbose)
+	comment := p.githubCommentRenderer.render(res, ctx.Log.History.String(), ctx.Command.Verbose)
 	p.github.CreateComment(ctx.BaseRepo, ctx.Pull, comment)
 }
 
 func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) CommandResponse {
-	if p.concurrentRunLocker.TryLock(ctx.BaseRepo.FullName, ctx.Command.environment, ctx.Pull.Num) != true {
+	if p.concurrentRunLocker.TryLock(ctx.BaseRepo.FullName, ctx.Command.Environment, ctx.Pull.Num) != true {
 		return p.failureResponse(ctx,
-			fmt.Sprintf("The %s environment is currently locked by another command that is running for this pull request. Wait until command is complete and try again.", ctx.Command.environment))
+			fmt.Sprintf("The %s environment is currently locked by another command that is running for this pull request. Wait until command is complete and try again.", ctx.Command.Environment))
 	}
-	defer p.concurrentRunLocker.Unlock(ctx.BaseRepo.FullName, ctx.Command.environment, ctx.Pull.Num)
+	defer p.concurrentRunLocker.Unlock(ctx.BaseRepo.FullName, ctx.Command.Environment, ctx.Pull.Num)
 
 	// figure out what projects have been modified so we know where to run plan
 	ctx.Log.Info("listing modified files from pull request")
@@ -88,7 +88,7 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) CommandResponse {
 func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.Project) ProjectResult {
 	ctx.Log.Info("generating plan at %q", project.Path)
 
-	tfEnv := ctx.Command.environment
+	tfEnv := ctx.Command.Environment
 	lockAttempt, err := p.lockingClient.TryLock(project, tfEnv, ctx.Pull, ctx.User)
 	if err != nil {
 		return ProjectResult{Error: errors.Wrap(err, "acquiring lock")}
@@ -110,7 +110,7 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 		}
 
 		// add terraform arguments from project config
-		planExtraArgs = config.GetExtraArguments(ctx.Command.commandType.String())
+		planExtraArgs = config.GetExtraArguments(ctx.Command.Name.String())
 	}
 
 	// check if terraform version is >= 0.9.0

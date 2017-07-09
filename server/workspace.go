@@ -66,5 +66,5 @@ func (w *Workspace) repoPullDir(repo models.Repo, pull models.PullRequest) strin
 }
 
 func (w *Workspace) cloneDir(ctx *CommandContext) string {
-	return filepath.Join(w.repoPullDir(ctx.BaseRepo, ctx.Pull), ctx.Command.environment)
+	return filepath.Join(w.repoPullDir(ctx.BaseRepo, ctx.Pull), ctx.Command.Environment)
 }

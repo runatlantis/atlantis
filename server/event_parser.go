@@ -9,11 +9,27 @@ import (
 	"github.com/hootsuite/atlantis/models"
 )
 
-type EventParser struct{}
+type EventParser struct {
+	GithubUser string
+}
 
 func (e *EventParser) DetermineCommand(comment *github.IssueCommentEvent) (*Command, error) {
-	// for legacy, also support "run" instead of atlantis
-	atlantisCommentRegex := `^(?:run|atlantis) (plan|apply|help)([[:blank:]])?([a-zA-Z0-9_-]+)?\s*(--verbose)?$`
+	// regex matches:
+	// the initial "executable" name, 'run' or 'atlantis' or '@GithubUser' where GithubUser is the api user atlantis is running as
+	// then a command, either 'plan', 'apply', or 'help'
+	// then an optional environment and an optional --verbose flag
+	//
+	// examples:
+	// atlantis help
+	// run plan
+	// @GithubUser plan staging
+	// atlantis plan staging --verbose
+	//
+	// capture groups:
+	// 1: the command, i.e. plan/apply/help
+	// 2: the environment OR the --verbose flag (if they didn't specify and environment)
+	// 3: the --verbose flag (if they specified an environment)
+	atlantisCommentRegex := `^(?:run|atlantis|@` + e.GithubUser + `)[[:blank:]]+(plan|apply|help)(?:[[:blank:]]+([a-zA-Z0-9_-]+))?[[:blank:]]*(--verbose)?$`
 	runPlanMatcher := regexp.MustCompile(atlantisCommentRegex)
 
 	commentBody := comment.Comment.GetBody()
@@ -23,7 +39,7 @@ func (e *EventParser) DetermineCommand(comment *github.IssueCommentEvent) (*Comm
 
 	// extract the command and environment. ex. for "atlantis plan staging", the command is "plan", and the environment is "staging"
 	match := runPlanMatcher.FindStringSubmatch(commentBody)
-	if len(match) < 5 {
+	if len(match) < 4 {
 		var truncated = commentBody
 		if len(truncated) > 30 {
 			truncated = truncated[0:30] + "..."
@@ -31,27 +47,39 @@ func (e *EventParser) DetermineCommand(comment *github.IssueCommentEvent) (*Comm
 		return nil, errors.New("not an Atlantis command")
 	}
 
+	// depending on the comment, the command/env/verbose may be in different matching groups
+	// if there is no env (ex. just atlantis plan --verbose) then, verbose would be in the 2nd group
+	// if there is an env, then verbose would be in the 3rd
+	command := match[1]
+	env := match[2]
+	verboseFlag := match[3]
+	if verboseFlag == "" && env == "--verbose" {
+		verboseFlag = env
+		env = ""
+	}
+
+	// now we're ready to actually look at the values
 	verbose := false
-	if match[4] == "--verbose" {
+	if verboseFlag == "--verbose" {
 		verbose = true
 	}
-	// defaulting to terraform's default environment
-	env := "default"
-	if match[3] != "" {
-		env = match[3]
+	// if env not specified, use terraform's default
+	if env == "" {
+		env = "default"
 	}
-	command := &Command{verbose: verbose, environment: env}
-	switch match[1] {
+
+	c := &Command{Verbose: verbose, Environment: env}
+	switch command {
 	case "plan":
-		command.commandType = Plan
+		c.Name = Plan
 	case "apply":
-		command.commandType = Apply
+		c.Name = Apply
 	case "help":
-		command.commandType = Help
+		c.Name = Help
 	default:
 		return nil, fmt.Errorf("something went wrong with our regex, the command we parsed %q was not apply or plan", match[1])
 	}
-	return command, nil
+	return c, nil
 }
 
 func (e *EventParser) ExtractCommentData(comment *github.IssueCommentEvent, ctx *CommandContext) error {

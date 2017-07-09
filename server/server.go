@@ -153,7 +153,9 @@ func NewServer(config ServerConfig) (*Server, error) {
 		workspace: workspace,
 	}
 	logger := logging.NewSimpleLogger("server", log.New(os.Stderr, "", log.LstdFlags), false, logging.ToLogLevel(config.LogLevel))
-	eventParser := &EventParser{}
+	eventParser := &EventParser{
+		GithubUser: config.GithubUser,
+	}
 	commandHandler := &CommandHandler{
 		applyExecutor: applyExecutor,
 		planExecutor:  planExecutor,
