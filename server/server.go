@@ -321,7 +321,7 @@ func (s *Server) postEvents(w http.ResponseWriter, r *http.Request) {
 		var err error
 		payload, err = ioutil.ReadAll(r.Body)
 		if err != nil {
-			s.respond(w, logging.Warn, http.StatusBadRequest,  "could not read body: %s", err)
+			s.respond(w, logging.Warn, http.StatusBadRequest, "could not read body: %s", err)
 			return
 		}
 	}
@@ -386,7 +386,7 @@ func (s *Server) handleCommentEvent(w http.ResponseWriter, event *gh.IssueCommen
 	go s.commandHandler.ExecuteCommand(ctx)
 }
 
-func (s *Server) respond(w http.ResponseWriter, lvl logging.LogLevel, code int, format string, args... interface{}) {
+func (s *Server) respond(w http.ResponseWriter, lvl logging.LogLevel, code int, format string, args ...interface{}) {
 	response := fmt.Sprintf(format, args...)
 	s.logger.Log(lvl, response)
 	w.WriteHeader(code)

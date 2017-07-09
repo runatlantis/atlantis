@@ -24,10 +24,10 @@ build-service: ## Build the main Go service
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o atlantis .
 
 test: ## Run tests, coverage reports, and clean (coverage taints the compiled code)
-	go test -v $(PKG)
+	go test $(PKG)
 
 test-coverage:
-	go test -v $(PKG) -coverprofile=c.out
+	go test $(PKG) -coverprofile=c.out
 	go tool cover -html=c.out -o coverage.html
 
 dist: ## Package up everything in static/ using go-bindata-assetfs so it can be served by a single binary

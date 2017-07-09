@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	version "github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
 	"github.com/hootsuite/atlantis/logging"
+	"github.com/pkg/errors"
 )
 
 const InlineShebang = "/bin/sh -e"

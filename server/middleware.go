@@ -3,9 +3,10 @@ package server
 import (
 	"net/http"
 
+	"strings"
+
 	"github.com/hootsuite/atlantis/logging"
 	"github.com/urfave/negroni"
-	"strings"
 )
 
 func NewRequestLogger(logger *logging.SimpleLogger) *RequestLogger {

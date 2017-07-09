@@ -44,6 +44,7 @@ func TestPreRunExecuteScript_valid(t *testing.T) {
 func TestPreRun_valid(t *testing.T) {
 	cmds := []string{"echo", "date"}
 	version, _ := version.NewVersion("0.8.8")
-	_, err := preRun.Start(cmds, "/tmp/atlantis", "staging", version)
+	logger := logging.NewSimpleLogger("", log.New(os.Stderr, "", 0), false, logging.Debug)
+	_, err := preRun.Start(logger, cmds, "/tmp/atlantis", "staging", version)
 	Ok(t, err)
 }
