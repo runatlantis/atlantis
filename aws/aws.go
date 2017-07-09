@@ -1,14 +1,13 @@
 package aws
 
 import (
-	"fmt"
-
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sts"
+	"github.com/pkg/errors"
 )
 
 const assumeRoleSessionName = "atlantis"
@@ -26,12 +25,12 @@ func (c *Config) CreateSession() (*session.Session, error) {
 		SharedConfigState: session.SharedConfigEnable,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create new aws session: %v", err)
+		return nil, errors.Wrap(err, "create new aws session")
 	}
 
 	_, err = session.Config.Credentials.Get()
 	if err != nil {
-		return nil, fmt.Errorf("didn't find valid aws credentials. Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables: %v", err)
+		return nil, errors.Wrap(err, "getting AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables")
 	}
 
 	// generate a new session if aws role is provided
