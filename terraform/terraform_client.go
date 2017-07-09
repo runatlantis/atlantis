@@ -5,10 +5,10 @@ import (
 	"os/exec"
 	"regexp"
 
-	"strings"
-
 	version "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
+	"github.com/hootsuite/atlantis/logging"
+	"strings"
 )
 
 type Client struct {
@@ -42,15 +42,15 @@ func NewClient() (*Client, error) {
 	}, nil
 }
 
-func (c *Client) RunCommand(path string, tfCmd []string, tfEnvVars []string) (string, error) {
-	return c.RunCommandWithVersion(path, tfCmd, tfEnvVars, c.defaultVersion)
+func (c *Client) RunCommand(log *logging.SimpleLogger, path string, tfCmd []string, tfEnvVars []string) (string, error) {
+	return c.RunCommandWithVersion(log, path, tfCmd, tfEnvVars, c.defaultVersion)
 }
 
 func (c *Client) Version() *version.Version {
 	return c.defaultVersion
 }
 
-func (c *Client) RunCommandWithVersion(path string, tfCmd []string, tfEnvVars []string, v *version.Version) (string, error) {
+func (c *Client) RunCommandWithVersion(log *logging.SimpleLogger, path string, tfCmd []string, tfEnvVars []string, v *version.Version) (string, error) {
 	tfExecutable := "terraform"
 	// if version is the same as the default, don't need to prepend the version name to the executable
 	if !v.Equal(c.defaultVersion) {
@@ -62,26 +62,30 @@ func (c *Client) RunCommandWithVersion(path string, tfCmd []string, tfEnvVars []
 		terraformCmd.Env = tfEnvVars
 	}
 	out, err := terraformCmd.CombinedOutput()
-	return string(out), errors.Wrapf(err, "running %s", strings.Join(terraformCmd.Args, " "))
+	if err != nil {
+		return "", fmt.Errorf("%s: running %q in %q", err, strings.Join(terraformCmd.Args, " "), path)
+	}
+	log.Info("successfully ran %q in %q", strings.Join(terraformCmd.Args, " "), path)
+	return string(out), nil
 }
 
-func (c *Client) RunInitAndEnv(path string, env string, extraArgs []string) ([]string, error) {
+func (c *Client) RunInitAndEnv(log *logging.SimpleLogger, path string, env string, extraArgs []string) ([]string, error) {
 	var outputs []string
 	// run terraform init
-	output, err := c.RunCommand(path, append([]string{"init", "-no-color"}, extraArgs...), []string{})
+	output, err := c.RunCommand(log, path, append([]string{"init", "-no-color"}, extraArgs...), nil)
 	if err != nil {
-		return nil, errors.Wrapf(err, "running terraform init: %s", output)
+		return nil, err
 	}
 	outputs = append(outputs, output)
 
 	// run terraform env new and select
-	output, err = c.RunCommand(path, []string{"env", "select", "-no-color", env}, []string{})
+	output, err = c.RunCommand(log, path, []string{"env", "select", "-no-color", env}, nil)
 	if err != nil {
 		// if terraform env select fails we will run terraform env new
 		// to create a new environment
-		output, err = c.RunCommand(path, []string{"env", "new", "-no-color", env}, []string{})
+		output, err = c.RunCommand(log, path, []string{"env", "new", "-no-color", env}, nil)
 		if err != nil {
-			return nil, errors.Wrapf(err, "running terraform env new: %s", output)
+			return nil, err
 		}
 	}
 	return append(outputs, output), nil

@@ -34,7 +34,6 @@ type PlanExecutor struct {
 	workspace           *Workspace
 }
 
-/** Result Types **/
 type PlanSuccess struct {
 	TerraformOutput string
 	LockURL         string
@@ -56,17 +55,24 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) CommandResponse {
 	defer p.concurrentRunLocker.Unlock(ctx.BaseRepo.FullName, ctx.Command.Environment, ctx.Pull.Num)
 
 	// figure out what projects have been modified so we know where to run plan
-	ctx.Log.Info("listing modified files from pull request")
 	modifiedFiles, err := p.github.GetModifiedFiles(ctx.BaseRepo, ctx.Pull)
 	if err != nil {
 		return p.errorResponse(ctx, errors.Wrap(err, "getting modified files"))
 	}
+	ctx.Log.Info("found %d files modified in this pull request", len(modifiedFiles))
+
 	modifiedTerraformFiles := p.filterToTerraform(modifiedFiles)
 	if len(modifiedTerraformFiles) == 0 {
 		return p.failureResponse(ctx, "No Terraform files were modified.")
 	}
-	ctx.Log.Debug("Found %d modified terraform files: %v", len(modifiedTerraformFiles), modifiedTerraformFiles)
+	ctx.Log.Info("filtered modified files to %d non-module .tf files: %v", len(modifiedTerraformFiles), modifiedTerraformFiles)
+
 	projects := p.ModifiedProjects(ctx.BaseRepo.FullName, modifiedTerraformFiles)
+	var paths []string
+	for _, p := range projects {
+		paths = append(paths, p.Path)
+	}
+	ctx.Log.Info("based on files modified, determined we have %d modified project(s) at path(s): %v", len(projects), strings.Join(paths, ", "))
 
 	cloneDir, err := p.workspace.Clone(ctx)
 	if err != nil {
@@ -75,6 +81,7 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) CommandResponse {
 
 	results := []ProjectResult{}
 	for _, project := range projects {
+		ctx.Log.Info("running plan for project at path %s", project.Path)
 		result := p.plan(ctx, cloneDir, project)
 		result.Path = project.Path
 		results = append(results, result)
@@ -86,8 +93,6 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) CommandResponse {
 // plan runs the steps necessary to run `terraform plan`. If there is an error, the error message will be encapsulated in error
 // and the GeneratePlanResponse struct will also contain the full log including the error
 func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.Project) ProjectResult {
-	ctx.Log.Info("generating plan at %q", project.Path)
-
 	tfEnv := ctx.Command.Environment
 	lockAttempt, err := p.lockingClient.TryLock(project, tfEnv, ctx.Pull, ctx.User)
 	if err != nil {
@@ -98,6 +103,7 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 			"This project is currently locked by #%d. The locking plan must be applied or discarded before future plans can execute.",
 			lockAttempt.CurrLock.Pull.Num)}
 	}
+	ctx.Log.Info("acquired lock with id %q", lockAttempt.LockKey)
 
 	// check if config file is found, if not we continue the run
 	var config ProjectConfig
@@ -108,6 +114,7 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 		if err != nil {
 			return ProjectResult{Error: err}
 		}
+		ctx.Log.Info("parsed atlantis config file in %q", absolutePath)
 
 		// add terraform arguments from project config
 		planExtraArgs = config.GetExtraArguments(ctx.Command.Name.String())
@@ -120,29 +127,26 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 	}
 	constraints, _ := version.NewConstraint(">= 0.9.0")
 	if constraints.Check(terraformVersion) {
-		// run terraform init and environment
-		outputs, err := p.terraform.RunInitAndEnv(absolutePath, tfEnv, config.GetExtraArguments("init"))
+		ctx.Log.Info("determined that we are running terraform with version >= 0.9.0")
+		_, err := p.terraform.RunInitAndEnv(ctx.Log, absolutePath, tfEnv, config.GetExtraArguments("init"))
 		if err != nil {
 			return ProjectResult{Error: err}
 		}
-		ctx.Log.Info("terraform init and environment commands ran successfully %s", outputs)
 	} else {
-		// run terraform get for 0.8.8 and below
+		ctx.Log.Info("determined that we are running terraform with version < 0.9.0")
 		terraformGetCmd := append([]string{"get", "-no-color"}, config.GetExtraArguments("get")...)
-		output, err := p.terraform.RunCommand(absolutePath, terraformGetCmd, nil)
+		_, err := p.terraform.RunCommand(ctx.Log, absolutePath, terraformGetCmd, nil)
 		if err != nil {
 			return ProjectResult{Error: err}
 		}
-		ctx.Log.Info("terraform get ran successfully %s", output)
 	}
 
 	// if there are pre plan commands then run them
 	if len(config.PrePlan.Commands) > 0 {
-		preRunOutput, err := p.preRun.Start(config.PrePlan.Commands, absolutePath, tfEnv, terraformVersion)
+		_, err := p.preRun.Start(ctx.Log, config.PrePlan.Commands, absolutePath, tfEnv, terraformVersion)
 		if err != nil {
 			return ProjectResult{Error: errors.Wrap(err, "running pre plan commands")}
 		}
-		ctx.Log.Info("Pre run output: \n%s", preRunOutput)
 	}
 
 	// set pull request creator as the session name
@@ -152,26 +156,25 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 		ctx.Log.Err(err.Error())
 		return ProjectResult{Error: err}
 	}
-
 	credVals, err := awsSession.Config.Credentials.Get()
 	if err != nil {
-		err = errors.Wrap(err, "getting assumed role credentials")
+		err = errors.Wrap(err, "getting aws credentials")
 		ctx.Log.Err(err.Error())
 		return ProjectResult{Error: err}
 	}
+	ctx.Log.Info("created aws session")
 
 	// Run terraform plan
-	ctx.Log.Info("running terraform plan in directory %q", project.Path)
 	planFile := filepath.Join(repoDir, project.Path, fmt.Sprintf("%s.tfplan", tfEnv))
 	tfPlanCmd := []string{"plan", "-refresh", "-no-color", "-out", planFile}
-	// append terraform arguments from config file
 	tfPlanCmd = append(tfPlanCmd, planExtraArgs...)
+
 	// check if env/{environment}.tfvars exist
 	tfEnvFileName := filepath.Join("env", tfEnv+".tfvars")
 	if _, err := os.Stat(filepath.Join(repoDir, project.Path, tfEnvFileName)); err == nil {
 		tfPlanCmd = append(tfPlanCmd, "-var-file", tfEnvFileName)
 	}
-	output, err := p.terraform.RunCommand(filepath.Join(repoDir, project.Path), tfPlanCmd, []string{
+	output, err := p.terraform.RunCommand(ctx.Log, filepath.Join(repoDir, project.Path), tfPlanCmd, []string{
 		fmt.Sprintf("AWS_ACCESS_KEY_ID=%s", credVals.AccessKeyID),
 		fmt.Sprintf("AWS_SECRET_ACCESS_KEY=%s", credVals.SecretAccessKey),
 		fmt.Sprintf("AWS_SESSION_TOKEN=%s", credVals.SessionToken),
@@ -183,6 +186,7 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 		}
 		return ProjectResult{Error: fmt.Errorf("%s\n%s", err.Error(), output)}
 	}
+	ctx.Log.Info("plan succeeded")
 
 	return ProjectResult{
 		PlanSuccess: &PlanSuccess{

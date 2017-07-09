@@ -126,7 +126,7 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 	constraints, _ := version.NewConstraint(">= 0.9.0")
 	if constraints.Check(terraformVersion) {
 		// run terraform init and environment
-		outputs, err := a.terraform.RunInitAndEnv(projectAbsolutePath, tfEnv, config.GetExtraArguments("init"))
+		outputs, err := a.terraform.RunInitAndEnv(ctx.Log, projectAbsolutePath, tfEnv, config.GetExtraArguments("init"))
 		if err != nil {
 			return ProjectResult{Error: err}
 		}
@@ -135,7 +135,7 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 
 	// if there are pre plan commands then run them
 	if len(config.PreApply.Commands) > 0 {
-		preRunOutput, err := a.preRun.Start(config.PreApply.Commands, projectAbsolutePath, ctx.Command.Environment, config.TerraformVersion)
+		preRunOutput, err := a.preRun.Start(ctx.Log, config.PreApply.Commands, projectAbsolutePath, ctx.Command.Environment, config.TerraformVersion)
 		if err != nil {
 			return ProjectResult{Error: err}
 		}
@@ -161,7 +161,7 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 	tfApplyCmd := []string{"apply", "-no-color", plan.LocalPath}
 	// append terraform arguments from config file
 	tfApplyCmd = append(tfApplyCmd, terraformApplyExtraArgs...)
-	output, err := a.terraform.RunCommand(projectAbsolutePath, tfApplyCmd, []string{
+	output, err := a.terraform.RunCommand(ctx.Log, projectAbsolutePath, tfApplyCmd, []string{
 		fmt.Sprintf("AWS_ACCESS_KEY_ID=%s", credVals.AccessKeyID),
 		fmt.Sprintf("AWS_SECRET_ACCESS_KEY=%s", credVals.SecretAccessKey),
 		fmt.Sprintf("AWS_SESSION_TOKEN=%s", credVals.SessionToken),

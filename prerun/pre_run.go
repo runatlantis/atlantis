@@ -10,6 +10,7 @@ import (
 
 	version "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
+	"github.com/hootsuite/atlantis/logging"
 )
 
 const InlineShebang = "/bin/sh -e"
@@ -17,19 +18,20 @@ const InlineShebang = "/bin/sh -e"
 type PreRun struct{}
 
 // Start is the function that starts the pre run
-func (p *PreRun) Start(commands []string, path string, environment string, terraformVersion *version.Version) (string, error) {
+func (p *PreRun) Start(log *logging.SimpleLogger, commands []string, path string, environment string, terraformVersion *version.Version) (string, error) {
 	// we create a script from the commands provided
 	if len(commands) == 0 {
 		return "", errors.New("prerun commands cannot be empty")
 	}
 
 	s, err := createScript(commands)
-
 	if err != nil {
 		return "", err
 	}
-
 	defer os.Remove(s)
+
+	log.Info("running prerun commands: %v", commands)
+
 	// set environment variable for the run.
 	// this is to support scripts to use the ENVIRONMENT, ATLANTIS_TERRAFORM_VERSION
 	// and WORKSPACE variables in their scripts

@@ -71,26 +71,26 @@ type Command struct {
 
 func (c *CommandHandler) ExecuteCommand(ctx *CommandContext) {
 	src := fmt.Sprintf("%s/pull/%d", ctx.BaseRepo.FullName, ctx.Pull.Num)
-	// it's safe to reuse the underlying logger e.logger.Log
+	// it's safe to reuse the underlying logger
 	ctx.Log = logging.NewSimpleLogger(src, c.logger.Logger, true, c.logger.Level)
 	defer c.recover(ctx)
 
 	// need to get additional data from the PR
 	ghPull, _, err := c.githubClient.GetPullRequest(ctx.BaseRepo, ctx.Pull.Num)
 	if err != nil {
-		ctx.Log.Err("pull request data api call failed: %v", err)
+		ctx.Log.Err("making pull request API call to GitHub: %s", err)
 		return
 	}
 	pull, headRepo, err := c.eventParser.ExtractPullData(ghPull)
 	if err != nil {
-		ctx.Log.Err("failed to extract required fields from comment data: %v", err)
+		ctx.Log.Err("extracting required fields from comment data: %s", err)
 		return
 	}
 	ctx.Pull = pull
 	ctx.HeadRepo = headRepo
 
 	if ghPull.GetState() != "open" {
-		ctx.Log.Info("command run on closed pull request")
+		ctx.Log.Info("command was run on closed pull request")
 		c.githubClient.CreateComment(ctx.BaseRepo, ctx.Pull, "Atlantis commands can't be run on closed pull requests")
 		return
 	}
