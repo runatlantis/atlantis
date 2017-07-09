@@ -54,12 +54,14 @@ func (a *ApplyExecutor) setupAndApply(ctx *CommandContext) CommandResponse {
 		if !approved {
 			return a.failureResponse(ctx, "Pull request must be approved before running apply.")
 		}
+		ctx.Log.Info("confirmed pull request was approved")
 	}
 
 	repoDir, err := a.workspace.GetWorkspace(ctx)
 	if err != nil {
 		return a.failureResponse(ctx, "No workspace found. Did you run plan?")
 	}
+	ctx.Log.Info("found workspace in %q", repoDir)
 
 	// plans are stored at project roots by their environment names. We just need to find them
 	var plans []models.Plan
@@ -80,14 +82,20 @@ func (a *ApplyExecutor) setupAndApply(ctx *CommandContext) CommandResponse {
 	if len(plans) == 0 {
 		return a.failureResponse(ctx, "No plans found for that environment.")
 	}
+	var paths []string
+	for _, p := range plans {
+		paths = append(paths, p.LocalPath)
+	}
+	ctx.Log.Info("found %d plan(s) in our workspace: %v", len(plans), paths)
 
 	results := []ProjectResult{}
 	for _, plan := range plans {
+		ctx.Log.Info("running apply for project at path %q", plan.Project.Path)
 		result := a.apply(ctx, repoDir, plan)
 		result.Path = plan.LocalPath
 		results = append(results, result)
 	}
-	a.githubStatus.UpdatePathResult(ctx, results)
+	a.githubStatus.UpdateProjectResult(ctx, results)
 	return CommandResponse{ProjectResults: results}
 }
 
@@ -102,20 +110,19 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 			"This project is currently locked by #%d. The locking plan must be applied or discarded before future plans can execute.",
 			lockAttempt.CurrLock.Pull.Num)}
 	}
+	ctx.Log.Info("acquired lock with id %q", lockAttempt.LockKey)
 
 	// check if config file is found, if not we continue the run
-	projectAbsolutePath := filepath.Dir(plan.LocalPath)
-	var terraformApplyExtraArgs []string
+	absolutePath := filepath.Dir(plan.LocalPath)
+	var applyExtraArgs []string
 	var config ProjectConfig
-	if a.configReader.Exists(projectAbsolutePath) {
-		ctx.Log.Info("Config file found in %s", projectAbsolutePath)
-		config, err := a.configReader.Read(projectAbsolutePath)
+	if a.configReader.Exists(absolutePath) {
+		config, err := a.configReader.Read(absolutePath)
 		if err != nil {
 			return ProjectResult{Error: err}
 		}
-
-		// add terraform arguments from project config
-		terraformApplyExtraArgs = config.GetExtraArguments(ctx.Command.Name.String())
+		ctx.Log.Info("parsed atlantis config file in %q", absolutePath)
+		applyExtraArgs = config.GetExtraArguments(ctx.Command.Name.String())
 	}
 
 	// check if terraform version is >= 0.9.0
@@ -125,43 +132,37 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 	}
 	constraints, _ := version.NewConstraint(">= 0.9.0")
 	if constraints.Check(terraformVersion) {
-		// run terraform init and environment
-		outputs, err := a.terraform.RunInitAndEnv(ctx.Log, projectAbsolutePath, tfEnv, config.GetExtraArguments("init"))
+		ctx.Log.Info("determined that we are running terraform with version >= 0.9.0")
+		_, err := a.terraform.RunInitAndEnv(ctx.Log, absolutePath, tfEnv, config.GetExtraArguments("init"))
 		if err != nil {
 			return ProjectResult{Error: err}
 		}
-		ctx.Log.Info("terraform init and environment commands ran successfully %s", outputs)
 	}
 
-	// if there are pre plan commands then run them
+	// if there are pre apply commands then run them
 	if len(config.PreApply.Commands) > 0 {
-		preRunOutput, err := a.preRun.Start(ctx.Log, config.PreApply.Commands, projectAbsolutePath, ctx.Command.Environment, config.TerraformVersion)
+		_, err := a.preRun.Start(ctx.Log, config.PreApply.Commands, absolutePath, ctx.Command.Environment, config.TerraformVersion)
 		if err != nil {
 			return ProjectResult{Error: err}
 		}
-		ctx.Log.Info("Pre run output: \n%s", preRunOutput)
 	}
 
 	// need to get auth data from assumed role
-	// todo: de-duplicate calls to assumeRole
 	a.awsConfig.SessionName = ctx.User.Username
 	awsSession, err := a.awsConfig.CreateSession()
 	if err != nil {
 		return ProjectResult{Error: err}
 	}
-
 	credVals, err := awsSession.Config.Credentials.Get()
 	if err != nil {
-		err = errors.Wrap(err, "getting assumed role credentials")
+		err = errors.Wrap(err, "getting aws credentials")
 		ctx.Log.Err(err.Error())
 		return ProjectResult{Error: err}
 	}
+	ctx.Log.Info("created aws session")
 
-	ctx.Log.Info("running apply from %q", plan.Project.Path)
-	tfApplyCmd := []string{"apply", "-no-color", plan.LocalPath}
-	// append terraform arguments from config file
-	tfApplyCmd = append(tfApplyCmd, terraformApplyExtraArgs...)
-	output, err := a.terraform.RunCommand(ctx.Log, projectAbsolutePath, tfApplyCmd, []string{
+	tfApplyCmd := append([]string{"apply", "-no-color", plan.LocalPath}, applyExtraArgs...)
+	output, err := a.terraform.RunCommand(ctx.Log, absolutePath, tfApplyCmd, []string{
 		fmt.Sprintf("AWS_ACCESS_KEY_ID=%s", credVals.AccessKeyID),
 		fmt.Sprintf("AWS_SECRET_ACCESS_KEY=%s", credVals.SecretAccessKey),
 		fmt.Sprintf("AWS_SESSION_TOKEN=%s", credVals.SessionToken),
@@ -169,6 +170,7 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 	if err != nil {
 		return ProjectResult{Error: fmt.Errorf("%s\n%s", err.Error(), output)}
 	}
+	ctx.Log.Info("apply succeeded")
 
 	return ProjectResult{ApplySuccess: output}
 }

@@ -81,12 +81,12 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) CommandResponse {
 
 	results := []ProjectResult{}
 	for _, project := range projects {
-		ctx.Log.Info("running plan for project at path %s", project.Path)
+		ctx.Log.Info("running plan for project at path %q", project.Path)
 		result := p.plan(ctx, cloneDir, project)
 		result.Path = project.Path
 		results = append(results, result)
 	}
-	p.githubStatus.UpdatePathResult(ctx, results)
+	p.githubStatus.UpdateProjectResult(ctx, results)
 	return CommandResponse{ProjectResults: results}
 }
 
@@ -115,8 +115,6 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 			return ProjectResult{Error: err}
 		}
 		ctx.Log.Info("parsed atlantis config file in %q", absolutePath)
-
-		// add terraform arguments from project config
 		planExtraArgs = config.GetExtraArguments(ctx.Command.Name.String())
 	}
 
@@ -166,8 +164,7 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 
 	// Run terraform plan
 	planFile := filepath.Join(repoDir, project.Path, fmt.Sprintf("%s.tfplan", tfEnv))
-	tfPlanCmd := []string{"plan", "-refresh", "-no-color", "-out", planFile}
-	tfPlanCmd = append(tfPlanCmd, planExtraArgs...)
+	tfPlanCmd := append([]string{"plan", "-refresh", "-no-color", "-out", planFile}, planExtraArgs...)
 
 	// check if env/{environment}.tfvars exist
 	tfEnvFileName := filepath.Join("env", tfEnv+".tfvars")

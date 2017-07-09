@@ -44,9 +44,9 @@ func (g *GithubStatus) Update(repo models.Repo, pull models.PullRequest, status 
 	return g.client.UpdateStatus(repo, pull, status.String(), description, statusContext)
 }
 
-func (g *GithubStatus) UpdatePathResult(ctx *CommandContext, pathResults []ProjectResult) error {
+func (g *GithubStatus) UpdateProjectResult(ctx *CommandContext, projectResults []ProjectResult) error {
 	var statuses []Status
-	for _, p := range pathResults {
+	for _, p := range projectResults {
 		statuses = append(statuses, p.Status())
 	}
 	worst := g.worstStatus(statuses)
