@@ -196,6 +196,8 @@ func (b BoltLocker) GetLock(p models.Project, env string) (*models.ProjectLock, 
 		return nil, errors.Wrapf(err, "deserializing lock at key %q", key)
 	}
 
+	// need to set it to Local after deserialization due to https://github.com/golang/go/issues/19486
+	lock.Time = lock.Time.Local()
 	return &lock, nil
 }
 
