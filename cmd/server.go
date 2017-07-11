@@ -25,8 +25,6 @@ const (
 	ghHostnameFlag      = "gh-hostname"
 	ghPasswordFlag      = "gh-password"
 	ghUserFlag          = "gh-user"
-	lockingBackendFlag  = "locking-backend"
-	lockingTableFlag    = "locking-dynamodb-table"
 	logLevelFlag        = "log-level"
 	portFlag            = "port"
 	requireApprovalFlag = "require-approval"
@@ -69,16 +67,6 @@ var stringFlags = []stringFlag{
 		name:        ghUserFlag,
 		description: "GitHub username of API user. Can also be specified via the ATLANTIS_GH_USER environment variable.",
 		env:         "ATLANTIS_GH_USER",
-	},
-	{
-		name:        lockingBackendFlag,
-		description: "Which backend to use for locking. file or dynamodb.",
-		value:       "file",
-	},
-	{
-		name:        lockingTableFlag,
-		description: "Name of table in DynamoDB to use for locking. Only read if " + lockingBackendFlag + " is set to dynamodb.",
-		value:       "atlantis-locks",
 	},
 	{
 		name:        logLevelFlag,
@@ -195,9 +183,6 @@ func validate(config server.ServerConfig) error {
 	}
 	if config.GithubPassword == "" {
 		return fmt.Errorf("--%s must be set", ghPasswordFlag)
-	}
-	if config.LockingBackend != server.LockingFileBackend && config.LockingBackend != server.LockingDynamoDBBackend {
-		return fmt.Errorf("unsupported locking backend %q: not one of %q or %q", config.LockingBackend, server.LockingFileBackend, server.LockingDynamoDBBackend)
 	}
 	return nil
 }

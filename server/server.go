@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/elazarl/go-bindata-assetfs"
 	gh "github.com/google/go-github/github"
 	"github.com/gorilla/mux"
@@ -18,7 +17,6 @@ import (
 	"github.com/hootsuite/atlantis/github"
 	"github.com/hootsuite/atlantis/locking"
 	"github.com/hootsuite/atlantis/locking/boltdb"
-	"github.com/hootsuite/atlantis/locking/dynamodb"
 	"github.com/hootsuite/atlantis/logging"
 	"github.com/hootsuite/atlantis/models"
 	"github.com/hootsuite/atlantis/prerun"
@@ -30,9 +28,7 @@ import (
 )
 
 const (
-	lockRoute              = "lock-detail"
-	LockingFileBackend     = "file"
-	LockingDynamoDBBackend = "dynamodb"
+	lockRoute = "lock-detail"
 )
 
 // Server listens for GitHub events and runs the necessary Atlantis command
@@ -49,18 +45,16 @@ type Server struct {
 
 // the mapstructure tags correspond to flags in cmd/server.go
 type ServerConfig struct {
-	AWSRegion            string `mapstructure:"aws-region"`
-	AssumeRole           string `mapstructure:"aws-assume-role-arn"`
-	AtlantisURL          string `mapstructure:"atlantis-url"`
-	DataDir              string `mapstructure:"data-dir"`
-	GithubHostname       string `mapstructure:"gh-hostname"`
-	GithubPassword       string `mapstructure:"gh-password"`
-	GithubUser           string `mapstructure:"gh-user"`
-	LockingBackend       string `mapstructure:"locking-backend"`
-	LockingDynamoDBTable string `mapstructure:"locking-dynamodb-table"`
-	LogLevel             string `mapstructure:"log-level"`
-	Port                 int    `mapstructure:"port"`
-	RequireApproval      bool   `mapstructure:"require-approval"`
+	AWSRegion       string `mapstructure:"aws-region"`
+	AssumeRole      string `mapstructure:"aws-assume-role-arn"`
+	AtlantisURL     string `mapstructure:"atlantis-url"`
+	DataDir         string `mapstructure:"data-dir"`
+	GithubHostname  string `mapstructure:"gh-hostname"`
+	GithubPassword  string `mapstructure:"gh-password"`
+	GithubUser      string `mapstructure:"gh-user"`
+	LogLevel        string `mapstructure:"log-level"`
+	Port            int    `mapstructure:"port"`
+	RequireApproval bool   `mapstructure:"require-approval"`
 }
 
 type CommandContext struct {
@@ -98,21 +92,11 @@ func NewServer(config ServerConfig) (*Server, error) {
 		RoleARN: config.AssumeRole,
 	}
 
-	var awsSession *session.Session
-	var lockingClient *locking.Client
-	if config.LockingBackend == LockingDynamoDBBackend {
-		awsSession, err = awsConfig.CreateSession()
-		if err != nil {
-			return nil, errors.Wrap(err, "creating aws session for DynamoDB")
-		}
-		lockingClient = locking.NewClient(dynamodb.New(config.LockingDynamoDBTable, awsSession))
-	} else {
-		backend, err := boltdb.New(config.DataDir)
-		if err != nil {
-			return nil, err
-		}
-		lockingClient = locking.NewClient(backend)
+	boltdb, err := boltdb.New(config.DataDir)
+	if err != nil {
+		return nil, err
 	}
+	lockingClient := locking.NewClient(boltdb)
 	preRun := &prerun.PreRun{}
 	configReader := &ConfigReader{}
 	concurrentRunLocker := NewConcurrentRunLocker()
