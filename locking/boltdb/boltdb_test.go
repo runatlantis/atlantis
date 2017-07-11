@@ -329,6 +329,7 @@ func TestGetLock(t *testing.T) {
 
 	l, err := b.GetLock(project, env)
 	Ok(t, err)
+	l.Time = l.Time.Local()
 	Equals(t, &lock, l)
 }
 
