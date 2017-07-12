@@ -149,6 +149,12 @@ Config file values are overridden by environment variables which in turn are ove
 }
 
 func init() {
+	// if a user passes in an invalid flag, tell them what the flag was
+	serverCmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
+		fmt.Fprintf(os.Stderr, "\033[31mError: %s\033[39m\n\n", err.Error())
+		return err
+	})
+
 	// set string flags
 	for _, f := range stringFlags {
 		serverCmd.Flags().String(f.name, f.value, f.description)
