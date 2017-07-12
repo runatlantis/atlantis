@@ -183,7 +183,7 @@ func (s *Server) Start() error {
 		StackSize:  1024 * 8,
 	}, NewRequestLogger(s.logger))
 	n.UseHandler(s.router)
-	s.logger.Info("Atlantis started - listening on port %v", s.port)
+	s.logger.Warn("Atlantis started - listening on port %v", s.port)
 	return cli.NewExitError(http.ListenAndServe(fmt.Sprintf(":%d", s.port), n), 1)
 }
 
