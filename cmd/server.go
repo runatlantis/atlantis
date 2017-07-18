@@ -33,11 +33,11 @@ const (
 var stringFlags = []stringFlag{
 	{
 		name:        atlantisURLFlag,
-		description: "Url that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is the port flag.",
+		description: "Url that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port comes from the port flag.",
 	},
 	{
 		name:        awsAssumeRoleFlag,
-		description: "The Amazon Resource Name (`arn`) to assume when running Terraform commands. If not specified, will use AWS credentials via environment variables, or credentials files.",
+		description: "ARN of the role to assume when running Terraform against AWS. If not using assume role, no need to set.",
 	},
 	{
 		name:        awsRegionFlag,
@@ -55,18 +55,17 @@ var stringFlags = []stringFlag{
 	},
 	{
 		name:        ghHostnameFlag,
-		description: "Hostname of Github installation.",
+		description: "Hostname of your Github Enterprise installation. If using github.com, no need to set.",
 		value:       "github.com",
 	},
 	{
 		name:        ghPasswordFlag,
-		description: "GitHub password of API user. Can also be specified via the ATLANTIS_GH_PASSWORD environment variable.",
+		description: "[REQUIRED] GitHub password of API user. Can also be specified via the ATLANTIS_GH_PASSWORD environment variable.",
 		env:         "ATLANTIS_GH_PASSWORD",
 	},
 	{
 		name:        ghUserFlag,
-		description: "GitHub username of API user. Can also be specified via the ATLANTIS_GH_USER environment variable.",
-		env:         "ATLANTIS_GH_USER",
+		description: "[REQUIRED] GitHub username of API user.",
 	},
 	{
 		name:        logLevelFlag,
@@ -149,6 +148,12 @@ Config file values are overridden by environment variables which in turn are ove
 }
 
 func init() {
+	// if a user passes in an invalid flag, tell them what the flag was
+	serverCmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
+		fmt.Fprintf(os.Stderr, "\033[31mError: %s\033[39m\n\n", err.Error())
+		return err
+	})
+
 	// set string flags
 	for _, f := range stringFlags {
 		serverCmd.Flags().String(f.name, f.value, f.description)

@@ -148,9 +148,7 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 		}
 	}
 
-	// set pull request creator as the session name
-	p.awsConfig.SessionName = ctx.Pull.Author
-	awsSession, err := p.awsConfig.CreateSession()
+	awsSession, err := p.awsConfig.CreateSession(ctx.User.Username)
 	if err != nil {
 		ctx.Log.Err(err.Error())
 		return ProjectResult{Error: err}
