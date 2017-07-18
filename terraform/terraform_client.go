@@ -64,6 +64,8 @@ func (c *Client) RunCommandWithVersion(log *logging.SimpleLogger, path string, a
 	}
 	out, err := terraformCmd.CombinedOutput()
 	if err != nil {
+		// show debug output for terraform commands if they fail, helpful for debugging
+		log.Debug("error running %q in %q: \n%s", strings.Join(terraformCmd.Args, " "), path, out)
 		return "", fmt.Errorf("%s: running %q in %q", err, strings.Join(terraformCmd.Args, " "), path)
 	}
 	log.Info("successfully ran %q in %q", strings.Join(terraformCmd.Args, " "), path)
