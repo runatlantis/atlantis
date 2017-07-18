@@ -133,7 +133,7 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 	constraints, _ := version.NewConstraint(">= 0.9.0")
 	if constraints.Check(terraformVersion) {
 		ctx.Log.Info("determined that we are running terraform with version >= 0.9.0")
-		_, err := a.terraform.RunInitAndEnv(ctx.Log, absolutePath, tfEnv, config.GetExtraArguments("init"))
+		_, err := a.terraform.RunInitAndEnv(ctx.Log, absolutePath, tfEnv, config.GetExtraArguments("init"), terraformVersion)
 		if err != nil {
 			return ProjectResult{Error: err}
 		}
@@ -160,11 +160,11 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 	ctx.Log.Info("created aws session")
 
 	tfApplyCmd := append([]string{"apply", "-no-color", plan.LocalPath}, applyExtraArgs...)
-	output, err := a.terraform.RunCommand(ctx.Log, absolutePath, tfApplyCmd, []string{
+	output, err := a.terraform.RunCommandWithVersion(ctx.Log, absolutePath, tfApplyCmd, []string{
 		fmt.Sprintf("AWS_ACCESS_KEY_ID=%s", creds.AccessKeyID),
 		fmt.Sprintf("AWS_SECRET_ACCESS_KEY=%s", creds.SecretAccessKey),
 		fmt.Sprintf("AWS_SESSION_TOKEN=%s", creds.SessionToken),
-	})
+	}, terraformVersion)
 	if err != nil {
 		return ProjectResult{Error: fmt.Errorf("%s\n%s", err.Error(), output)}
 	}

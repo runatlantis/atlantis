@@ -44,11 +44,6 @@ func NewClient() (*Client, error) {
 	}, nil
 }
 
-// RunCommand calls RunCommandWithVersion with the version of terraform in $PATH
-func (c *Client) RunCommand(log *logging.SimpleLogger, path string, args []string, envVars []string) (string, error) {
-	return c.RunCommandWithVersion(log, path, args, envVars, c.defaultVersion)
-}
-
 // Version returns the version of the terraform executable in our $PATH.
 func (c *Client) Version() *version.Version {
 	return c.defaultVersion
@@ -78,21 +73,21 @@ func (c *Client) RunCommandWithVersion(log *logging.SimpleLogger, path string, a
 // RunInitAndEnv executes "terraform init" and "terraform env select" in path.
 // env is the environment to select and extraInitArgs are additional arguments
 // applied to the init command.
-func (c *Client) RunInitAndEnv(log *logging.SimpleLogger, path string, env string, extraInitArgs []string) ([]string, error) {
+func (c *Client) RunInitAndEnv(log *logging.SimpleLogger, path string, env string, extraInitArgs []string, version *version.Version) ([]string, error) {
 	var outputs []string
 	// run terraform init
-	output, err := c.RunCommand(log, path, append([]string{"init", "-no-color"}, extraInitArgs...), nil)
+	output, err := c.RunCommandWithVersion(log, path, append([]string{"init", "-no-color"}, extraInitArgs...), nil, version)
 	if err != nil {
 		return nil, err
 	}
 	outputs = append(outputs, output)
 
 	// run terraform env new and select
-	output, err = c.RunCommand(log, path, []string{"env", "select", "-no-color", env}, nil)
+	output, err = c.RunCommandWithVersion(log, path, []string{"env", "select", "-no-color", env}, nil, version)
 	if err != nil {
 		// if terraform env select fails we will run terraform env new
 		// to create a new environment
-		output, err = c.RunCommand(log, path, []string{"env", "new", "-no-color", env}, nil)
+		output, err = c.RunCommandWithVersion(log, path, []string{"env", "new", "-no-color", env}, nil, version)
 		if err != nil {
 			return nil, err
 		}

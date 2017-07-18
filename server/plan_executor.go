@@ -127,14 +127,14 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 	constraints, _ := version.NewConstraint(">= 0.9.0")
 	if constraints.Check(terraformVersion) {
 		ctx.Log.Info("determined that we are running terraform with version >= 0.9.0")
-		_, err := p.terraform.RunInitAndEnv(ctx.Log, absolutePath, tfEnv, config.GetExtraArguments("init"))
+		_, err := p.terraform.RunInitAndEnv(ctx.Log, absolutePath, tfEnv, config.GetExtraArguments("init"), terraformVersion)
 		if err != nil {
 			return ProjectResult{Error: err}
 		}
 	} else {
 		ctx.Log.Info("determined that we are running terraform with version < 0.9.0")
 		terraformGetCmd := append([]string{"get", "-no-color"}, config.GetExtraArguments("get")...)
-		_, err := p.terraform.RunCommand(ctx.Log, absolutePath, terraformGetCmd, nil)
+		_, err := p.terraform.RunCommandWithVersion(ctx.Log, absolutePath, terraformGetCmd, nil, terraformVersion)
 		if err != nil {
 			return ProjectResult{Error: err}
 		}
@@ -153,7 +153,7 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 		ctx.Log.Err(err.Error())
 		return ProjectResult{Error: err}
 	}
-	credVals, err := awsSession.Config.Credentials.Get()
+	creds, err := awsSession.Config.Credentials.Get()
 	if err != nil {
 		err = errors.Wrap(err, "getting aws credentials")
 		ctx.Log.Err(err.Error())
@@ -170,11 +170,11 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 	if _, err := os.Stat(filepath.Join(repoDir, project.Path, tfEnvFileName)); err == nil {
 		tfPlanCmd = append(tfPlanCmd, "-var-file", tfEnvFileName)
 	}
-	output, err := p.terraform.RunCommand(ctx.Log, filepath.Join(repoDir, project.Path), tfPlanCmd, []string{
-		fmt.Sprintf("AWS_ACCESS_KEY_ID=%s", credVals.AccessKeyID),
-		fmt.Sprintf("AWS_SECRET_ACCESS_KEY=%s", credVals.SecretAccessKey),
-		fmt.Sprintf("AWS_SESSION_TOKEN=%s", credVals.SessionToken),
-	})
+	output, err := p.terraform.RunCommandWithVersion(ctx.Log, filepath.Join(repoDir, project.Path), tfPlanCmd, []string{
+		fmt.Sprintf("AWS_ACCESS_KEY_ID=%s", creds.AccessKeyID),
+		fmt.Sprintf("AWS_SECRET_ACCESS_KEY=%s", creds.SecretAccessKey),
+		fmt.Sprintf("AWS_SESSION_TOKEN=%s", creds.SessionToken),
+	}, terraformVersion)
 	if err != nil {
 		// plan failed so unlock the state
 		if _, err := p.lockingClient.Unlock(lockAttempt.LockKey); err != nil {
