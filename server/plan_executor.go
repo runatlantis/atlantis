@@ -119,6 +119,25 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 		planExtraArgs = config.GetExtraArguments(ctx.Command.Name.String())
 	}
 
+	awsSession, err := p.awsConfig.CreateSession(ctx.User.Username)
+	if err != nil {
+		ctx.Log.Err(err.Error())
+		return ProjectResult{Error: err}
+	}
+	creds, err := awsSession.Config.Credentials.Get()
+	if err != nil {
+		err = errors.Wrap(err, "getting aws credentials")
+		ctx.Log.Err(err.Error())
+		return ProjectResult{Error: err}
+	}
+	ctx.Log.Info("created aws session")
+
+	credsEnvVars := []string{
+		fmt.Sprintf("AWS_ACCESS_KEY_ID=%s", creds.AccessKeyID),
+		fmt.Sprintf("AWS_SECRET_ACCESS_KEY=%s", creds.SecretAccessKey),
+		fmt.Sprintf("AWS_SESSION_TOKEN=%s", creds.SessionToken),
+	}
+
 	// check if terraform version is >= 0.9.0
 	terraformVersion := p.terraform.Version()
 	if config.TerraformVersion != nil {
@@ -127,7 +146,7 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 	constraints, _ := version.NewConstraint(">= 0.9.0")
 	if constraints.Check(terraformVersion) {
 		ctx.Log.Info("determined that we are running terraform with version >= 0.9.0")
-		_, err := p.terraform.RunInitAndEnv(ctx.Log, absolutePath, tfEnv, config.GetExtraArguments("init"), terraformVersion)
+		_, err := p.terraform.RunInitAndEnv(ctx.Log, absolutePath, tfEnv, config.GetExtraArguments("init"), credsEnvVars, terraformVersion)
 		if err != nil {
 			return ProjectResult{Error: err}
 		}
@@ -148,19 +167,6 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 		}
 	}
 
-	awsSession, err := p.awsConfig.CreateSession(ctx.User.Username)
-	if err != nil {
-		ctx.Log.Err(err.Error())
-		return ProjectResult{Error: err}
-	}
-	creds, err := awsSession.Config.Credentials.Get()
-	if err != nil {
-		err = errors.Wrap(err, "getting aws credentials")
-		ctx.Log.Err(err.Error())
-		return ProjectResult{Error: err}
-	}
-	ctx.Log.Info("created aws session")
-
 	// Run terraform plan
 	planFile := filepath.Join(repoDir, project.Path, fmt.Sprintf("%s.tfplan", tfEnv))
 	tfPlanCmd := append([]string{"plan", "-refresh", "-no-color", "-out", planFile}, planExtraArgs...)
@@ -170,11 +176,7 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 	if _, err := os.Stat(filepath.Join(repoDir, project.Path, tfEnvFileName)); err == nil {
 		tfPlanCmd = append(tfPlanCmd, "-var-file", tfEnvFileName)
 	}
-	output, err := p.terraform.RunCommandWithVersion(ctx.Log, filepath.Join(repoDir, project.Path), tfPlanCmd, []string{
-		fmt.Sprintf("AWS_ACCESS_KEY_ID=%s", creds.AccessKeyID),
-		fmt.Sprintf("AWS_SECRET_ACCESS_KEY=%s", creds.SecretAccessKey),
-		fmt.Sprintf("AWS_SESSION_TOKEN=%s", creds.SessionToken),
-	}, terraformVersion)
+	output, err := p.terraform.RunCommandWithVersion(ctx.Log, filepath.Join(repoDir, project.Path), tfPlanCmd, credsEnvVars, terraformVersion)
 	if err != nil {
 		// plan failed so unlock the state
 		if _, err := p.lockingClient.Unlock(lockAttempt.LockKey); err != nil {

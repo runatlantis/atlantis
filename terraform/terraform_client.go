@@ -3,6 +3,7 @@ package terraform
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"regexp"
 
@@ -60,7 +61,9 @@ func (c *Client) RunCommandWithVersion(log *logging.SimpleLogger, path string, a
 	terraformCmd := exec.Command(tfExecutable, args...)
 	terraformCmd.Dir = path
 	if len(envVars) > 0 {
-		terraformCmd.Env = envVars
+		// append current process's environment variables
+		// this is to prevent the $PATH variable being removed from the environment
+		terraformCmd.Env = append(os.Environ(), envVars...)
 	}
 	out, err := terraformCmd.CombinedOutput()
 	if err != nil {
@@ -75,21 +78,21 @@ func (c *Client) RunCommandWithVersion(log *logging.SimpleLogger, path string, a
 // RunInitAndEnv executes "terraform init" and "terraform env select" in path.
 // env is the environment to select and extraInitArgs are additional arguments
 // applied to the init command.
-func (c *Client) RunInitAndEnv(log *logging.SimpleLogger, path string, env string, extraInitArgs []string, version *version.Version) ([]string, error) {
+func (c *Client) RunInitAndEnv(log *logging.SimpleLogger, path string, env string, extraInitArgs []string, envVars []string, version *version.Version) ([]string, error) {
 	var outputs []string
 	// run terraform init
-	output, err := c.RunCommandWithVersion(log, path, append([]string{"init", "-no-color"}, extraInitArgs...), nil, version)
+	output, err := c.RunCommandWithVersion(log, path, append([]string{"init", "-no-color"}, extraInitArgs...), envVars, version)
 	if err != nil {
 		return nil, err
 	}
 	outputs = append(outputs, output)
 
 	// run terraform env new and select
-	output, err = c.RunCommandWithVersion(log, path, []string{"env", "select", "-no-color", env}, nil, version)
+	output, err = c.RunCommandWithVersion(log, path, []string{"env", "select", "-no-color", env}, envVars, version)
 	if err != nil {
 		// if terraform env select fails we will run terraform env new
 		// to create a new environment
-		output, err = c.RunCommandWithVersion(log, path, []string{"env", "new", "-no-color", env}, nil, version)
+		output, err = c.RunCommandWithVersion(log, path, []string{"env", "new", "-no-color", env}, envVars, version)
 		if err != nil {
 			return nil, err
 		}
