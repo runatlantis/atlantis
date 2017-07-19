@@ -21,6 +21,7 @@ type Client struct {
 var versionRegex = regexp.MustCompile("Terraform v(.*)\n")
 
 func NewClient() (*Client, error) {
+	// may be use exec.LookPath?
 	versionCmdOutput, err := exec.Command("terraform", "version").CombinedOutput()
 	output := string(versionCmdOutput)
 	if err != nil {
