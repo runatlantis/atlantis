@@ -30,9 +30,9 @@ func main() {
 	if githubUsername == "" {
 		log.Fatalf("GITHUB_USERNAME cannot be empty")
 	}
-	githubPassword := os.Getenv("GITHUB_PASSWORD")
-	if githubPassword == "" {
-		log.Fatalf("GITHUB_PASSWORD cannot be empty")
+	githubToken := os.Getenv("GITHUB_TOKEN")
+	if githubToken == "" {
+		log.Fatalf("GITHUB_TOKEN cannot be empty")
 	}
 	atlantisURL := os.Getenv("ATLANTIS_URL")
 	if atlantisURL == "" {
@@ -49,7 +49,7 @@ func main() {
 		repoName = "atlantis-tests"
 	}
 	// using https to clone the repo
-	repoUrl := fmt.Sprintf("https://%s:%s@github.com/%s/%s.git", githubUsername, githubPassword, ownerName, repoName)
+	repoUrl := fmt.Sprintf("https://%s:%s@github.com/%s/%s.git", githubUsername, githubToken, ownerName, repoName)
 	cloneDirRoot := os.Getenv("CLONE_DIR")
 	if cloneDirRoot == "" {
 		cloneDirRoot = "/tmp/atlantis-tests"
@@ -65,7 +65,7 @@ func main() {
 	// create github client
 	tp := github.BasicAuthTransport{
 		Username: strings.TrimSpace(githubUsername),
-		Password: strings.TrimSpace(githubPassword),
+		Password: strings.TrimSpace(githubToken),
 	}
 	ghClient := github.NewClient(tp.Client())
 

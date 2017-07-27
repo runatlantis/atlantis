@@ -50,7 +50,7 @@ type ServerConfig struct {
 	AtlantisURL     string `mapstructure:"atlantis-url"`
 	DataDir         string `mapstructure:"data-dir"`
 	GithubHostname  string `mapstructure:"gh-hostname"`
-	GithubPassword  string `mapstructure:"gh-password"`
+	GithubToken     string `mapstructure:"gh-token"`
 	GithubUser      string `mapstructure:"gh-user"`
 	LogLevel        string `mapstructure:"log-level"`
 	Port            int    `mapstructure:"port"`
@@ -77,7 +77,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 		config.DataDir = expanded
 	}
 
-	githubClient, err := github.NewClient(config.GithubHostname, config.GithubUser, config.GithubPassword)
+	githubClient, err := github.NewClient(config.GithubHostname, config.GithubUser, config.GithubToken)
 	if err != nil {
 		return nil, err
 	}

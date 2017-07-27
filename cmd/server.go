@@ -23,7 +23,7 @@ const (
 	configFlag          = "config"
 	dataDirFlag         = "data-dir"
 	ghHostnameFlag      = "gh-hostname"
-	ghPasswordFlag      = "gh-password"
+	ghTokenFlag         = "gh-token"
 	ghUserFlag          = "gh-user"
 	logLevelFlag        = "log-level"
 	portFlag            = "port"
@@ -59,9 +59,9 @@ var stringFlags = []stringFlag{
 		value:       "github.com",
 	},
 	{
-		name:        ghPasswordFlag,
-		description: "[REQUIRED] GitHub password of API user. Can also be specified via the ATLANTIS_GH_PASSWORD environment variable.",
-		env:         "ATLANTIS_GH_PASSWORD",
+		name:        ghTokenFlag,
+		description: "[REQUIRED] GitHub token of API user. Can also be specified via the ATLANTIS_GH_TOKEN environment variable.",
+		env:         "ATLANTIS_GH_TOKEN",
 	},
 	{
 		name:        ghUserFlag,
@@ -70,7 +70,7 @@ var stringFlags = []stringFlag{
 	{
 		name:        logLevelFlag,
 		description: "Log level. Either debug, info, warn, or error.",
-		value:       "warn",
+		value:       "info",
 	},
 }
 var boolFlags = []boolFlag{
@@ -186,8 +186,8 @@ func validate(config server.ServerConfig) error {
 	if config.GithubUser == "" {
 		return fmt.Errorf("--%s must be set", ghUserFlag)
 	}
-	if config.GithubPassword == "" {
-		return fmt.Errorf("--%s must be set", ghPasswordFlag)
+	if config.GithubToken == "" {
+		return fmt.Errorf("--%s must be set", ghTokenFlag)
 	}
 	return nil
 }
