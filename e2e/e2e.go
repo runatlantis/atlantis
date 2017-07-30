@@ -125,7 +125,9 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 
 	state := "not started"
 	// waiting for atlantis run and finish
-	for i := 0; i < 20 && checkStatus(state); i++ {
+	maxLoops := 20
+	i := 0
+	for ; i < maxLoops && checkStatus(state); i++ {
 		time.Sleep(2 * time.Second)
 		state, _ = getAtlantisStatus(t, branchName)
 		if state == "" {
@@ -134,12 +136,15 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 		}
 		log.Printf("atlantis run is in %s state", state)
 	}
+	if i == maxLoops {
+		state = "timed out"
+	}
 
-	log.Printf("atlantis run finished with %s status", state)
+	log.Printf("atlantis run finished with status %q", state)
 	e2eResult.testResult = state
 	// check if atlantis run was a success
 	if state != "success" {
-		return e2eResult, fmt.Errorf("atlantis run project type %q failed with %s status", t.projectType.Name, state)
+		return e2eResult, fmt.Errorf("atlantis run project type %q failed with %q status", t.projectType.Name, state)
 	}
 
 	return e2eResult, nil

@@ -10,7 +10,7 @@ import (
 
 var githubHostname = "http://api.github.com"
 var githubUsername string
-var githubPassword string
+var githubToken string
 
 // Client used for github interactions
 type Client struct {

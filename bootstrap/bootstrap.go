@@ -56,14 +56,14 @@ Follow these instructions to create a token (we don't store any tokens):
 - add "repo" scope
 - copy the access token
 `)
-	// read github password, check for error later
+	// read github token, check for error later
 	colorstring.Print("[white][bold]GitHub access token (will be hidden): ")
-	githubPassword, _ = readPassword()
+	githubToken, _ = readPassword()
 
 	// create github client
 	tp := github.BasicAuthTransport{
 		Username: strings.TrimSpace(githubUsername),
-		Password: strings.TrimSpace(githubPassword),
+		Password: strings.TrimSpace(githubToken),
 	}
 
 	githubClient := &Client{client: github.NewClient(tp.Client()), ctx: context.Background()}
@@ -137,7 +137,7 @@ Follow these instructions to create a token (we don't store any tokens):
 	// start atlantis server
 	colorstring.Printf("[white]=> starting atlantis server ")
 	s.Start()
-	atlantisCmd, err := executeCmd("./atlantis", []string{"server", "--gh-user", githubUsername, "--gh-password", githubPassword, "--data-dir", "/tmp/atlantis/data"})
+	atlantisCmd, err := executeCmd("./atlantis", []string{"server", "--gh-user", githubUsername, "--gh-token", githubToken, "--data-dir", "/tmp/atlantis/data"})
 	if err != nil {
 		return errors.Wrapf(err, "creating atlantis server")
 	}
