@@ -30,9 +30,9 @@ func main() {
 	if githubUsername == "" {
 		log.Fatalf("GITHUB_USERNAME cannot be empty")
 	}
-	githubToken := os.Getenv("GITHUB_TOKEN")
+	githubToken := os.Getenv("GITHUB_PASSWORD")
 	if githubToken == "" {
-		log.Fatalf("GITHUB_TOKEN cannot be empty")
+		log.Fatalf("GITHUB_PASSWORD cannot be empty")
 	}
 	atlantisURL := os.Getenv("ATLANTIS_URL")
 	if atlantisURL == "" {
