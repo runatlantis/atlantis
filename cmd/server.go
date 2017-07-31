@@ -77,7 +77,7 @@ var boolFlags = []boolFlag{
 	{
 		name:        requireApprovalFlag,
 		description: "Require pull requests to be \"Approved\" before allowing the apply command to be run.",
-		value:       true,
+		value:       false,
 	},
 }
 var intFlags = []intFlag{
