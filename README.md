@@ -6,7 +6,7 @@ A unified workflow for collaborating on Terraform through GitHub.
 ## Features
 ➜ Collaborate on Terraform with your team
 - Run terraform `plan` and `apply` **from GitHub pull requests** so everyone can review the output
-- todo: gif
+![atlantis plan](https://github.com/hootsuite/atlantis/raw/master/docs/atlantis-plan.gif)
 - **Lock environments** until pull requests are merged to prevent concurrent modification and confusion
 
 ➜ Developers can write Terraform safely
