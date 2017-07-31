@@ -19,8 +19,8 @@ import (
 	"os/signal"
 )
 
-var terraformExampleRepoOwner = "airauth"
-var terraformExampleRepo = "example"
+var terraformExampleRepoOwner = "hootsuite"
+var terraformExampleRepo = "atlantis-example"
 
 var bootstrapDescription = `[white]Welcome to Atlantis bootstrap!
 
@@ -170,7 +170,7 @@ Follow these instructions to create a token (we don't store any tokens):
 	// create a new pr in the example repo
 	colorstring.Printf("[white]=> creating a new pull request ")
 	s.Start()
-	pullRequestURL, err := githubClient.CreatePullRequest(githubUsername, "example", "example", "master")
+	pullRequestURL, err := githubClient.CreatePullRequest(githubUsername, terraformExampleRepo, "example", "master")
 	if err != nil {
 		return errors.Wrapf(err, "creating new pull request for repo %s/%s", githubUsername, terraformExampleRepo)
 	}
