@@ -199,7 +199,7 @@ Follow these instructions to create a token (we don't store any tokens):
 		select {
 		case <-signalChan:
 			colorstring.Println("\n[red]shutdown signal received, exiting....")
-			colorstring.Println("\n[green]Thank you for using atlantis :) \n[white]For more information about how to use atlantis in production go to: https://atlantis.run/link/to/docs")
+			colorstring.Println("\n[green]Thank you for using atlantis :) \n[white]For more information about how to use atlantis in production go to: https://github.com/hootsuite/atlantis")
 			return nil
 		}
 	}
