@@ -33,7 +33,7 @@ const (
 var stringFlags = []stringFlag{
 	{
 		name:        atlantisURLFlag,
-		description: "Url that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port comes from the port flag.",
+		description: "Url that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + portFlag + ".",
 	},
 	{
 		name:        awsAssumeRoleFlag,
@@ -41,7 +41,7 @@ var stringFlags = []stringFlag{
 	},
 	{
 		name:        awsRegionFlag,
-		description: "The Amazon region to connect to for API actions.",
+		description: "Amazon region to use for assume role. If not setting --" + awsAssumeRoleFlag + " then ignore.",
 		value:       "us-east-1",
 	},
 	{

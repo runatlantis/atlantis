@@ -36,7 +36,7 @@ var pullRequestBody = "In this pull request we will learn how to use atlantis. T
 	"* Start by typing `atlantis help` in the comments.\n" +
 	"* Next, lets plan by typing `atlantis plan` in the comments. That will run a `terraform plan`.\n" +
 	"* Now lets apply that plan. Type `atlantis apply` in the comments. This will run a `terraform apply`.\n" +
-	"\nThank you for using atlantis. For more info on running atlantis in production please follow: https://atlantis.run/link/to/doc"
+	"\nThank you for trying out atlantis. For more info on running atlantis in production see https://github.com/hootsuite/atlantis"
 
 func Start() error {
 	s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
@@ -133,11 +133,16 @@ Follow these instructions to create a token (we don't store any tokens):
 	time.Sleep(2 * time.Second)
 	s.Stop()
 	colorstring.Println("\n[green]=> started tunnel!")
+	tunnelURL, err := getTunnelAddr()
+	if err != nil {
+		return errors.Wrapf(err, "getting tunnel url")
+	}
+	s.Stop()
 
 	// start atlantis server
 	colorstring.Printf("[white]=> starting atlantis server ")
 	s.Start()
-	atlantisCmd, err := executeCmd("./atlantis", []string{"server", "--gh-user", githubUsername, "--gh-token", githubToken, "--data-dir", "/tmp/atlantis/data"})
+	atlantisCmd, err := executeCmd(os.Args[0], []string{"server", "--gh-user", githubUsername, "--gh-token", githubToken, "--data-dir", "/tmp/atlantis/data", "--atlantis-url", tunnelURL})
 	if err != nil {
 		return errors.Wrapf(err, "creating atlantis server")
 	}
@@ -148,12 +153,6 @@ Follow these instructions to create a token (we don't store any tokens):
 	}()
 	// if this function returns atlantis server should be stopped
 	defer atlantisCmd.Process.Kill()
-
-	tunnelURL, err := getTunnelAddr()
-	if err != nil {
-		return errors.Wrapf(err, "getting tunnel url")
-	}
-	s.Stop()
 	colorstring.Printf("\n[green]=> atlantis server is now securely exposed at [bold][underline]%s", tunnelURL)
 	fmt.Println("")
 

@@ -87,9 +87,15 @@ func NewServer(config ServerConfig) (*Server, error) {
 		return nil, errors.Wrap(err, "initializing terraform")
 	}
 	githubComments := &GithubCommentRenderer{}
-	awsConfig := &aws.Config{
-		Region:  config.AWSRegion,
-		RoleARN: config.AssumeRole,
+
+	// a nil awsConfig indicates that we won't be doing any AWS
+	// config in Atlantis
+	var awsConfig *aws.Config
+	if config.AssumeRole != "" {
+		awsConfig = &aws.Config{
+			Region:  config.AWSRegion,
+			RoleARN: config.AssumeRole,
+		}
 	}
 
 	boltdb, err := boltdb.New(config.DataDir)

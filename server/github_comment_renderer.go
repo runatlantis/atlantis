@@ -80,10 +80,10 @@ func (g *GithubCommentRenderer) renderProjectResults(pathResults []ProjectResult
 		if result.Error != nil {
 			results[result.Path] = g.renderTemplate(errTmpl, struct {
 				Command string
-				Error  string
+				Error   string
 			}{
 				Command: common.Command,
-				Error:  result.Error.Error(),
+				Error:   result.Error.Error(),
 			})
 		} else if result.Failure != "" {
 			results[result.Path] = g.renderTemplate(failureTmpl, struct {

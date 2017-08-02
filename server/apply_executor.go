@@ -125,22 +125,28 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 		applyExtraArgs = config.GetExtraArguments(ctx.Command.Name.String())
 	}
 
-	awsSession, err := a.awsConfig.CreateSession(ctx.User.Username)
-	if err != nil {
-		return ProjectResult{Error: err}
-	}
-	creds, err := awsSession.Config.Credentials.Get()
-	if err != nil {
-		err = errors.Wrap(err, "getting aws credentials")
-		ctx.Log.Err(err.Error())
-		return ProjectResult{Error: err}
-	}
-	ctx.Log.Info("created aws session")
+	// todo: de-duplicate this section between plan and apply
+	var credsEnvVars []string
+	// If awsConfig is nil we know that we're not using assume role and so
+	// don't need to do an AWS calls ourselves
+	if a.awsConfig != nil {
+		awsSession, err := a.awsConfig.CreateSession(ctx.User.Username)
+		if err != nil {
+			return ProjectResult{Error: err}
+		}
+		creds, err := awsSession.Config.Credentials.Get()
+		if err != nil {
+			err = errors.Wrap(err, "getting aws credentials")
+			ctx.Log.Err(err.Error())
+			return ProjectResult{Error: err}
+		}
+		ctx.Log.Info("created aws session")
 
-	credsEnvVars := []string{
-		fmt.Sprintf("AWS_ACCESS_KEY_ID=%s", creds.AccessKeyID),
-		fmt.Sprintf("AWS_SECRET_ACCESS_KEY=%s", creds.SecretAccessKey),
-		fmt.Sprintf("AWS_SESSION_TOKEN=%s", creds.SessionToken),
+		credsEnvVars = []string{
+			fmt.Sprintf("AWS_ACCESS_KEY_ID=%s", creds.AccessKeyID),
+			fmt.Sprintf("AWS_SECRET_ACCESS_KEY=%s", creds.SecretAccessKey),
+			fmt.Sprintf("AWS_SESSION_TOKEN=%s", creds.SessionToken),
+		}
 	}
 
 	// check if terraform version is >= 0.9.0
