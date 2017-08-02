@@ -8,7 +8,6 @@ import (
 	"github.com/google/go-github/github"
 )
 
-var githubHostname = "http://api.github.com"
 var githubUsername string
 var githubToken string
 
@@ -61,8 +60,22 @@ func (g *Client) CreateWebhook(ownerName string, repoName string, hookURL string
 	return nil
 }
 
-// CreatePullRequest creates a github pull request with custom title and description
+// CreatePullRequest creates a github pull request with custom title and description.
+// It first checks if there's already a pull request open for this branch
 func (g *Client) CreatePullRequest(ownerName string, repoName string, head string, base string) (string, error) {
+
+	// first check if the pull request already exists
+	pulls, _, err := g.client.PullRequests.List(g.ctx, ownerName, repoName, nil)
+	if err != nil {
+		return "", err
+	}
+	for _, pull := range pulls {
+		if pull.Head.GetRef() == head && pull.Base.GetRef() == base {
+			return pull.GetHTMLURL(), nil
+		}
+	}
+
+	// if not, create it
 	newPullRequest := &github.NewPullRequest{
 		Title: github.String("Welcome to Atlantis!"),
 		Head:  github.String(head),

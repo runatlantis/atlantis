@@ -1,14 +1,24 @@
 # atlantis
 ![atlantis-logo](./docs/atlantis-logo.png)
 
+A unified workflow for collaborating on Terraform through GitHub.
+
 [![CircleCI](https://circleci.com/gh/hootsuite/atlantis/tree/master.svg?style=shield&circle-token=08bf5b34233b0e168a9dd73e01cafdcf7dc4bf16)](https://circleci.com/gh/hootsuite/atlantis/tree/master)
 
-A unified workflow for collaborating on Terraform through GitHub.
+* [Features](#features)
+* [Getting Started](#getting-started)
+* [Production-Ready Deployment](#production-ready-deployment)
+* [Configuration](#configuration)
+* [AWS Credentials](#aws-credentials)
+* [Environments](#environments)
+* [Locking](#locking)
+* [Glossary](#glossary)
+    * [Project](#project)
+    * [Environment](#environment)
 
 ## Features
 ➜ Collaborate on Terraform with your team
 - Run terraform `plan` and `apply` **from GitHub pull requests** so everyone can review the output
-![atlantis plan](https://github.com/hootsuite/atlantis/raw/master/docs/atlantis-plan.gif)
 - **Lock environments** until pull requests are merged to prevent concurrent modification and confusion
 
 ➜ Developers can write Terraform safely
@@ -19,22 +29,6 @@ A unified workflow for collaborating on Terraform through GitHub.
 - No more **copy-pasted code across environments**. Atlantis supports using an `env/{env}.tfvars` file per environment so you can write your base configuration once
 - Support **multiple versions of Terraform** with a simple project config file
 
-* [Getting Started](#getting-started)
-* [Production-Ready Deployment](#production-ready-deployment)
-  * [Install Terraform](#install-terraform)
-  * [Hosting Atlantis](#hosting-atlantis)
-  * [Add GitHub Webhook](#add-github-webhook)
-  * [Create a GitHub Token](#create-a-github-token)
-  * [Start Atlantis](#start-atlantis)
-  * [Testing Out Atlantis](#testing-out-atlantis)
-* [Configuration](#configuration)
-* [AWS Credentials](#aws-credentials)
-  * [Assume Role Session Names](#assume-role-session-names)
-* [Environments](#environments)
-* [Locking](#locking)
-* [Glossary](#glossary)
-    * [Project](#project)
-    * [Environment](#environment)
 
 ## Getting Started
 Download from https://github.com/hootsuite/atlantis/releases

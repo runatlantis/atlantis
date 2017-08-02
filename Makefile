@@ -33,6 +33,9 @@ test-coverage:
 dist: ## Package up everything in static/ using go-bindata-assetfs so it can be served by a single binary
 	go-bindata-assetfs -pkg server static/... && mv bindata_assetfs.go server
 
+release: ## Create packages for a release
+	gox -os="darwin linux" -arch="amd64"
+
 vendor-status:
 	@govendor status
 
