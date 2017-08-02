@@ -33,7 +33,7 @@ const (
 var stringFlags = []stringFlag{
 	{
 		name:        atlantisURLFlag,
-		description: "Url that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + portFlag + ".",
+		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + portFlag + ".",
 	},
 	{
 		name:        awsAssumeRoleFlag,
