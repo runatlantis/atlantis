@@ -12,11 +12,15 @@
 
 * [Features](#features)
 * [Getting Started](#getting-started)
-* [Production-Ready Deployment](#production-ready-deployment)
-* [Configuration](#configuration)
-* [AWS Credentials](#aws-credentials)
+* [Project Structure](#project-structure)
 * [Environments](#environments)
+* [Terraform Versions](#terraform-versions)
+* [Project-Specific Customization](#project-specific-customization)
 * [Locking](#locking)
+* [Approvals](#approvals)
+* [Production-Ready Deployment](#production-ready-deployment)
+* [Server Configuration](#server-configuration)
+* [AWS Credentials](#aws-credentials)
 * [Glossary](#glossary)
     * [Project](#project)
     * [Environment](#environment)
@@ -50,6 +54,138 @@ This will walk you through running Atlantis locally. It will
 
 If you're ready to permanently set up Atlantis see [Production-Ready Deployment](#production-ready-deployment)
 
+## Project Structure
+Atlantis supports several Terraform project structures:
+- a single Terraform project at the repo root
+```
+.
+├── main.tf
+└── ...
+```
+-  multiple project folders in a single repo (monorepo)
+```
+.
+├── project1
+│   ├── main.tf
+|   └── ...
+└── project2
+    ├── main.tf
+    └── ...
+```
+-  one folder per environment
+```
+.
+├── staging
+│   ├── main.tf
+|   └── ...
+└── production
+    ├── main.tf
+    └── ...
+```
+-  using `env/{env}.tfvars` to define environment specific variables. This works in both multi-project repos and single-project repos.
+```
+.
+├── env
+│   ├── production.tfvars
+│   └── staging.tfvars
+└── main.tf
+```
+or
+```
+.
+├── project1
+│   ├── env
+│   │   ├── production.tfvars
+│   │   └── staging.tfvars
+│   └── main.tf
+└── project2
+    ├── env
+    │   ├── production.tfvars
+    │   └── staging.tfvars
+    └── main.tf
+```
+With the above project structure you can de-duplicate your Terraform code between environments without requiring extensive use of modules. At Hootsuite we've found this project format to be very successful and use it in all of our 100+ Terraform repositories.
+
+## Environments
+Terraform recently introduced [State Environments](https://www.terraform.io/docs/state/environments.html) that
+> allows a single folder of Terraform configurations to manage multiple distinct infrastructure resources
+
+If you're using a Terraform version >= 0.9.0, Atlantis supports environments through an additional argument to the `atlantis plan` and `atlantis apply` commands.
+For example,
+```
+atlantis plan staging
+```
+
+If an environment is specified Atlantis will use `terraform env select {env}` prior to running `terraform plan` or `terraform apply`.
+
+If you're using the `env/{env}.tfvars` [project structure](#project-structure) we will also append `-tfvars=env/{env}.tfvars` to `plan` and `apply`.
+
+If no environment is specified we will use `default` as the environment.
+
+## Terraform Versions
+By default, Atlantis will use the `terraform` executable that is in its path. To use a specific version of Terraform just install that version on the server that Atlantis is running on.
+
+If you would like to use a different version of Terraform for some projects but not for others
+1. Install the desired version of Terraform into the `$PATH` of where Atlantis is running and name it `terraform{version}`, ex. `terraform0.8.8`.
+2. In the project root (which is not necessarily the repo root) of any project that needs a specific version, create an `atlantis.yaml` file as follows
+```
+---
+terraform_version: 0.8.8 # set to desired version
+```
+
+So your project structure will look like
+```
+.
+├── main.tf
+└── atlantis.yaml
+```
+Now when Atlantis executes it will use the `terraform{version}` executable.
+
+## Project-Specific Customization
+An `atlantis.yaml` config file in your project root (which is not necessarily the repo root) can be used to customize
+- what commands Atlantis runs **before** `plan` and `apply` with `pre_plan` and `pre_apply`
+- additional arguments to be supplied to specific terraform commands with `extra_arguments`
+- what version of Terraform to use (see [Terraform Versions](#terraform-versions))
+
+The schema of the `atlantis.yaml` project config file is
+
+```yaml
+# atlantis.yaml
+---
+terraform_version: 0.8.8 # optional version
+pre_plan:
+  commands:
+  - "curl http://example.com"
+pre_apply:
+  commands:
+  - "curl http://example.com"
+extra_arguments:
+  - command: plan
+    arguments:
+    - "-tfvars=myvars.tfvars"
+```
+
+When running the `pre_plan` and `pre_apply` commands the following environment variables are available
+- `ENVIRONMENT`: if an environment argument is supplied to `atlantis plan` or `atlantis apply` this will
+be the value of that argument. Else it will be `default`
+- `ATLANTIS_TERRAFORM_VERSION`: local version of `terraform` or the version from `terraform_version` if specified, ex. `0.10.0`
+- `WORKSPACE`: absolute path to the root of the project on disk
+
+## Locking
+When `plan` is run, the [project](#project) and [environment](#environment) are **Locked** until an `apply` succeeds **and** the pull request is merged.
+This protects against concurrent modifications to the same set of infrastructure and prevents
+users from seeing a `plan` that will be invalid if another pull request is merged.
+
+To unlock the project and environment without completing an `apply` and merging, click the link
+at the bottom of the plan comment to discard the plan and delete the lock.
+Once a plan is discarded, you'll need to run `plan` again prior to running `apply`.
+
+## Approvals
+If you'd like to require pull requests to be approved prior to a user running `atlantis apply` simply run Atlantis with the `--require-approval` flag.
+By default, no approval is required.
+
+For more information on pull request reviews and approvals see: https://help.github.com/articles/about-pull-request-reviews/
+
 ## Production-Ready Deployment
 ### Install Terraform
 `terraform` needs to be in the `$PATH` for Atlantis.
@@ -60,7 +196,7 @@ unzip path/to/terraform_*.zip -d /usr/local/bin
 Check that it's in your `$PATH`
 ```
 $ terraform version
-Terraform v0.9.11
+Terraform v0.10.0
 ```
 If you want to use a different version of Terraform see [Terraform Versions](#terraform-versions)
 
@@ -127,9 +263,7 @@ If you'd like to test out Atlantis before running it on your own repositories yo
 	- `atlantis plan` will run `terraform plan` behind the scenes. You should see the output commented back on the pull request. You should also see some logs show up where you're running `atlantis server`
 	- `atlantis apply` will run `terraform apply`. Since our pull request creates a `null_resource` (which does nothing) this is safe to do.
 
-
-
-## Configuration
+## Server Configuration
 Atlantis configuration can be specified via command line flags or a YAML config file.
 The `gh-token` flag can also be specified via an `ATLANTIS_GH_TOKEN` environment variable.
 Config file values are overridden by environment variables which in turn are overridden by flags.
@@ -158,22 +292,10 @@ role to be assumed: `arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME`.
 
 If you're using Terraform's [built-in support](https://www.terraform.io/docs/providers/aws/#assume-role) for assume role then there is no need to set this flag (unless you also want your sessions to take the name of the GitHub user).
 
-## Environments
-
-
-## Locking
-When `plan` is run, the project and environment are Locked until an `apply` succeeds and the pull request is merged.
-This protects against concurrent modifications to the same set of infrastructure and prevents
-users from seeing a `plan` that will be invalid if another pull request is merged.
-
-To unlock the project and environment without completing an `apply`, click the link
-at the bottom of each plan to discard the plan and delete the lock.
-
 ## Glossary
 #### Project
 A Terraform project. Multiple projects can be in a single GitHub repo.
+We identify a project by its repo **and** the path to the root of the project within that repo.
 
 #### Environment
 A Terraform environment. See [terraform docs](https://www.terraform.io/docs/state/environments.html) for more information.
-
-
