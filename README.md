@@ -1,12 +1,14 @@
-# Atlantis [![CircleCI](https://circleci.com/gh/hootsuite/atlantis/tree/master.svg?style=shield&circle-token=08bf5b34233b0e168a9dd73e01cafdcf7dc4bf16)](https://circleci.com/gh/hootsuite/atlantis/tree/master)
+# Atlantis
 
 <p align="center">
   <img src="./docs/atlantis-logo.png" alt="Atlantis Logo"/><br><br>
-  A unified workflow for collaborating on Terraform through GitHub.
+  A unified workflow for collaborating on Terraform through GitHub
 </p>
 
 ## Walkthrough Video
 [![Atlantis Walkthrough](./docs/atlantis-walkthrough-icon.png)](https://www.youtube.com/watch?v=TmIPWda0IKg)
+
+[![CircleCI](https://circleci.com/gh/hootsuite/atlantis/tree/master.svg?style=shield&circle-token=08bf5b34233b0e168a9dd73e01cafdcf7dc4bf16)](https://circleci.com/gh/hootsuite/atlantis/tree/master)
 
 * [Features](#features)
 * [Getting Started](#getting-started)
