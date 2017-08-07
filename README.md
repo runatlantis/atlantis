@@ -237,7 +237,7 @@ Once you've created the user (or have decided to use an existing user) you need 
 ### Start Atlantis
 Now you're ready to start Atlantis! Run
 ```
-$ atlantis server --atlantis-url $URL --gh-username $USERNAME --gh-token $TOKEN
+$ atlantis server --atlantis-url $URL --gh-user $USERNAME --gh-token $TOKEN
 2049/10/6 00:00:00 [WARN] server: Atlantis started - listening on port 4141
 ```
 
