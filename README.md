@@ -300,3 +300,6 @@ We identify a project by its repo **and** the path to the root of the project wi
 
 #### Environment
 A Terraform environment. See [terraform docs](https://www.terraform.io/docs/state/environments.html) for more information.
+
+## Credits
+* Atlantis Logo: Icon made by [freepik](https://www.flaticon.com/authors/freepik) from www.flaticon.com
