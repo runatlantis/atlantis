@@ -42,7 +42,7 @@ func main() {
 	atlantisURL = fmt.Sprintf("%s/events", atlantisURL)
 	ownerName := os.Getenv("GITHUB_REPO_OWNER_NAME")
 	if ownerName == "" {
-		ownerName = "anubhavmishra"
+		ownerName = "hootsuite"
 	}
 	repoName := os.Getenv("GITHUB_REPO_NAME")
 	if repoName == "" {
