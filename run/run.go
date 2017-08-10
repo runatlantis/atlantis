@@ -1,6 +1,6 @@
-// Package prerun handles running commands prior to the
+// Package run handles running commands prior and following the
 // regular Atlantis commands.
-package prerun
+package run
 
 import (
 	"bufio"
@@ -17,28 +17,29 @@ import (
 
 const inlineShebang = "#!/bin/sh -e"
 
-type PreRun struct{}
+type Run struct{}
 
 // Execute runs the commands by writing them as a script to disk
 // and then executing the script.
-func (p *PreRun) Execute(
+func (p *Run) Execute(
 	log *logging.SimpleLogger,
 	commands []string,
 	path string,
 	environment string,
-	terraformVersion *version.Version) (string, error) {
+	terraformVersion *version.Version,
+	stage string) (string, error) {
 	// we create a script from the commands provided
 	if len(commands) == 0 {
-		return "", errors.New("prerun commands cannot be empty")
+		return "", errors.Errorf("%s commands cannot be empty", stage)
 	}
 
-	s, err := createScript(commands)
+	s, err := createScript(commands, stage)
 	if err != nil {
 		return "", err
 	}
 	defer os.Remove(s)
 
-	log.Info("running prerun commands: %v", commands)
+	log.Info("running %s commands: %v", stage, commands)
 
 	// set environment variable for the run.
 	// this is to support scripts to use the ENVIRONMENT, ATLANTIS_TERRAFORM_VERSION
@@ -49,10 +50,10 @@ func (p *PreRun) Execute(
 	return execute(s)
 }
 
-func createScript(cmds []string) (string, error) {
+func createScript(cmds []string, stage string) (string, error) {
 	tmp, err := ioutil.TempFile("/tmp", "atlantis-temp-script")
 	if err != nil {
-		return "", errors.Wrap(err, "preparing pre run shell script")
+		return "", errors.Wrapf(err, "preparing %s shell script", stage)
 	}
 
 	scriptName := tmp.Name()
@@ -62,7 +63,7 @@ func createScript(cmds []string) (string, error) {
 	writer.WriteString(fmt.Sprintf("%s\n", inlineShebang))
 	cmdsJoined := strings.Join(cmds, "\n")
 	if _, err := writer.WriteString(cmdsJoined); err != nil {
-		return "", errors.Wrap(err, "preparing pre run")
+		return "", errors.Wrapf(err, "preparing %s", stage)
 	}
 
 	if err := writer.Flush(); err != nil {
@@ -71,7 +72,7 @@ func createScript(cmds []string) (string, error) {
 	tmp.Close()
 
 	if err := os.Chmod(scriptName, 0755); err != nil {
-		return "", errors.Wrap(err, "making pre run script executable")
+		return "", errors.Wrapf(err, "making %s script executable", stage)
 	}
 
 	return scriptName, nil

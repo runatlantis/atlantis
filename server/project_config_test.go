@@ -12,6 +12,10 @@ var tempConfigFile = "/tmp/" + ProjectConfigFile
 var projectConfigFileStr = `
 ---
 terraform_version: "0.0.1"
+post_apply:
+  commands:
+    - "echo"
+    - "date"
 pre_apply:
   commands:
     - "echo"

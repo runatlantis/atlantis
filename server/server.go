@@ -19,7 +19,7 @@ import (
 	"github.com/hootsuite/atlantis/locking/boltdb"
 	"github.com/hootsuite/atlantis/logging"
 	"github.com/hootsuite/atlantis/models"
-	"github.com/hootsuite/atlantis/prerun"
+	"github.com/hootsuite/atlantis/run"
 	"github.com/hootsuite/atlantis/terraform"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
@@ -103,7 +103,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 		return nil, err
 	}
 	lockingClient := locking.NewClient(boltdb)
-	preRun := &prerun.PreRun{}
+	run := &run.Run{}
 	configReader := &ConfigReader{}
 	concurrentRunLocker := NewConcurrentRunLocker()
 	workspace := &Workspace{
@@ -117,7 +117,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 		githubCommentRenderer: githubComments,
 		lockingClient:         lockingClient,
 		requireApproval:       config.RequireApproval,
-		preRun:                preRun,
+		run:                   run,
 		configReader:          configReader,
 		concurrentRunLocker:   concurrentRunLocker,
 		workspace:             workspace,
@@ -129,7 +129,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 		terraform:             terraformClient,
 		githubCommentRenderer: githubComments,
 		lockingClient:         lockingClient,
-		preRun:                preRun,
+		run:                   run,
 		configReader:          configReader,
 		concurrentRunLocker:   concurrentRunLocker,
 		workspace:             workspace,

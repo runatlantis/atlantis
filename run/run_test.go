@@ -1,4 +1,4 @@
-package prerun
+package run
 
 import (
 	"log"
@@ -11,33 +11,33 @@ import (
 )
 
 var logger = logging.NewSimpleLogger("", log.New(os.Stderr, "", log.LstdFlags), false, logging.Debug)
-var preRun = &PreRun{}
+var run = &Run{}
 
-func TestPreRunCreateScript_valid(t *testing.T) {
+func TestRunCreateScript_valid(t *testing.T) {
 	cmds := []string{"echo", "date"}
-	scriptName, err := createScript(cmds)
+	scriptName, err := createScript(cmds, "post_apply")
 	Assert(t, scriptName != "", "there should be a script name")
 	Assert(t, err == nil, "there should not be an error")
 }
 
-func TestPreRunExecuteScript_invalid(t *testing.T) {
+func TestRunExecuteScript_invalid(t *testing.T) {
 	cmds := []string{"invalid", "command"}
-	scriptName, _ := createScript(cmds)
+	scriptName, _ := createScript(cmds, "post_apply")
 	_, err := execute(scriptName)
 	Assert(t, err != nil, "there should be an error")
 }
 
-func TestPreRunExecuteScript_valid(t *testing.T) {
+func TestRunExecuteScript_valid(t *testing.T) {
 	cmds := []string{"echo", "date"}
-	scriptName, _ := createScript(cmds)
+	scriptName, _ := createScript(cmds, "post_apply")
 	output, err := execute(scriptName)
 	Assert(t, err == nil, "there should not be an error")
 	Assert(t, output != "", "there should be output")
 }
 
-func TestPreRun_valid(t *testing.T) {
+func TestRun_valid(t *testing.T) {
 	cmds := []string{"echo", "date"}
 	version, _ := version.NewVersion("0.8.8")
-	_, err := preRun.Execute(logger, cmds, "/tmp/atlantis", "staging", version)
+	_, err := run.Execute(logger, cmds, "/tmp/atlantis", "staging", version, "post_apply")
 	Ok(t, err)
 }
