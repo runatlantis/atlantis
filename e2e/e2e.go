@@ -95,7 +95,7 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 
 	// create a new pr
 	title := fmt.Sprintf("This is a test pull request for atlantis e2e test for %s project type", t.projectType.Name)
-	head := fmt.Sprintf("%s:%s", t.githubClient.username, branchName)
+	head := fmt.Sprintf("%s:%s", t.ownerName, branchName)
 	body := ""
 	base := "master"
 	newPullRequest := &github.NewPullRequest{Title: &title, Head: &head, Body: &body, Base: &base}

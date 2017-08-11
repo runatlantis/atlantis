@@ -7,10 +7,6 @@ IFS=$'\n\t'
 echo "Running 'make deps'"
 make deps
 
-# Test dependencies
-echo "Running 'make deps-test'"
-make deps-test
-
 # Run tests
 echo "Running 'make test'"
 make test

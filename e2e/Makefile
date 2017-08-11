@@ -13,6 +13,7 @@ deps: ## Get go dependencies
 	go get -v .
 
 build: ## Build the main Go service
+	rm -f atlantis-tests
 	go build -v -o atlantis-tests .
 
 deps-test: ## Run tests for go dependencies
