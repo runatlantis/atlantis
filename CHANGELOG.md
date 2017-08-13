@@ -1,4 +1,4 @@
-# 0.1.1 (Unreleased)
+# v0.1.1 (Unreleased)
 ### Improvements
 * Support for HTTPS cloning using Github username and token provided to atlantis server ([#117](https://github.com/hootsuite/atlantis/pull/117))
 * Set custom user agent for AWS interactions by atlantis server ([#115](https://github.com/hootsuite/atlantis/pull/115))
