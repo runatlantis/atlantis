@@ -17,9 +17,12 @@ type Repo struct {
 	Owner string
 	// Name is just the repo name, ex. "atlantis".
 	Name string
-	// SSHURL is the full url for cloning.
-	// ex. "git@github.com:hootsuite/atlantis.git".
-	SSHURL string
+	// CloneURL is the full HTTPS url for cloning with username and token string
+	// ex. "https://username:token@github.com/atlantis/atlantis.git".
+	CloneURL string
+	// SanitizedCloneURL is the full HTTPS url for cloning without the username and password.
+	// ex. "https://github.com/atlantis/atlantis.git".
+	SanitizedCloneURL string
 }
 
 // PullRequest is a GitHub pull request.

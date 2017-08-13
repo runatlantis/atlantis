@@ -11,7 +11,7 @@ import (
 
 func TestDetermineCommandInvalid(t *testing.T) {
 	t.Log("given a comment that does not match the regex should return an error")
-	e := server.EventParser{"user"}
+	e := server.EventParser{"user", "token"}
 	comments := []string{
 		// just the executable, no command
 		"run",
@@ -35,7 +35,7 @@ func TestDetermineCommandInvalid(t *testing.T) {
 
 func TestDetermineCommandHelp(t *testing.T) {
 	t.Log("given a help comment, should match")
-	e := server.EventParser{"user"}
+	e := server.EventParser{"user", "token"}
 	comments := []string{
 		"run help",
 		"atlantis help",
@@ -50,7 +50,7 @@ func TestDetermineCommandHelp(t *testing.T) {
 }
 
 func TestDetermineCommandPermutations(t *testing.T) {
-	e := server.EventParser{"user"}
+	e := server.EventParser{"user", "token"}
 
 	execNames := []string{"run", "atlantis", "@user"}
 	commandNames := []server.CommandName{server.Plan, server.Apply}

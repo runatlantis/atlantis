@@ -4,13 +4,15 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/google/go-github/github"
 	"github.com/hootsuite/atlantis/models"
 )
 
 type EventParser struct {
-	GithubUser string
+	GithubUser  string
+	GithubToken string
 }
 
 func (e *EventParser) DetermineCommand(comment *github.IssueCommentEvent) (*Command, error) {
@@ -171,14 +173,19 @@ func (e *EventParser) ExtractRepoData(ghRepo *github.Repository) (models.Repo, e
 	if repoName == "" {
 		return repo, errors.New("repository.name is null")
 	}
-	repoSSHURL := ghRepo.GetSSHURL()
-	if repoSSHURL == "" {
-		return repo, errors.New("repository.ssh_url is null")
+	repoSanitizedCloneURL := ghRepo.GetCloneURL()
+	if repoSanitizedCloneURL == "" {
+		return repo, errors.New("repository.clone_url is null")
 	}
+
+	// construct HTTPS repo clone url string with username and password
+	repoCloneURL := strings.Replace(repoSanitizedCloneURL, "https://", fmt.Sprintf("https://%s:%s@", e.GithubUser, e.GithubToken), -1)
+
 	return models.Repo{
-		Owner:    repoOwner,
-		FullName: repoFullName,
-		SSHURL:   repoSSHURL,
-		Name:     repoName,
+		Owner:             repoOwner,
+		FullName:          repoFullName,
+		CloneURL:          repoCloneURL,
+		SanitizedCloneURL: repoSanitizedCloneURL,
+		Name:              repoName,
 	}, nil
 }

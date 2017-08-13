@@ -32,10 +32,10 @@ func (w *Workspace) Clone(ctx *CommandContext) (string, error) {
 		return "", errors.Wrap(err, "creating new workspace")
 	}
 
-	ctx.Log.Info("git cloning %q into %q", ctx.HeadRepo.SSHURL, cloneDir)
-	cloneCmd := exec.Command("git", "clone", ctx.HeadRepo.SSHURL, cloneDir)
+	ctx.Log.Info("git cloning %q into %q", ctx.HeadRepo.SanitizedCloneURL, cloneDir)
+	cloneCmd := exec.Command("git", "clone", ctx.HeadRepo.CloneURL, cloneDir)
 	if output, err := cloneCmd.CombinedOutput(); err != nil {
-		return "", errors.Wrapf(err, "cloning %s: %s", ctx.HeadRepo.SSHURL, string(output))
+		return "", errors.Wrapf(err, "cloning %s: %s", ctx.HeadRepo.SanitizedCloneURL, string(output))
 	}
 
 	// check out the branch for this PR
