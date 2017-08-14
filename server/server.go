@@ -2,13 +2,15 @@ package server
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 	"time"
+
+	"bytes"
+	"io/ioutil"
 
 	"github.com/elazarl/go-bindata-assetfs"
 	gh "github.com/google/go-github/github"
@@ -33,28 +35,30 @@ const (
 
 // Server listens for GitHub events and runs the necessary Atlantis command
 type Server struct {
-	router             *mux.Router
-	port               int
-	commandHandler     *CommandHandler
-	pullClosedExecutor *PullClosedExecutor
-	logger             *logging.SimpleLogger
-	eventParser        *EventParser
-	lockingClient      *locking.Client
-	atlantisURL        string
+	router              *mux.Router
+	port                int
+	commandHandler      *CommandHandler
+	pullClosedExecutor  *PullClosedExecutor
+	logger              *logging.SimpleLogger
+	eventParser         *EventParser
+	lockingClient       *locking.Client
+	atlantisURL         string
+	githubWebHookSecret []byte
 }
 
 // the mapstructure tags correspond to flags in cmd/server.go
 type ServerConfig struct {
-	AWSRegion       string `mapstructure:"aws-region"`
-	AssumeRole      string `mapstructure:"aws-assume-role-arn"`
-	AtlantisURL     string `mapstructure:"atlantis-url"`
-	DataDir         string `mapstructure:"data-dir"`
-	GithubHostname  string `mapstructure:"gh-hostname"`
-	GithubToken     string `mapstructure:"gh-token"`
-	GithubUser      string `mapstructure:"gh-user"`
-	LogLevel        string `mapstructure:"log-level"`
-	Port            int    `mapstructure:"port"`
-	RequireApproval bool   `mapstructure:"require-approval"`
+	AWSRegion           string `mapstructure:"aws-region"`
+	AssumeRole          string `mapstructure:"aws-assume-role-arn"`
+	AtlantisURL         string `mapstructure:"atlantis-url"`
+	DataDir             string `mapstructure:"data-dir"`
+	GithubHostname      string `mapstructure:"gh-hostname"`
+	GithubToken         string `mapstructure:"gh-token"`
+	GithubUser          string `mapstructure:"gh-user"`
+	GithubWebHookSecret string `mapstructure:"gh-webhook-secret"`
+	LogLevel            string `mapstructure:"log-level"`
+	Port                int    `mapstructure:"port"`
+	RequireApproval     bool   `mapstructure:"require-approval"`
 }
 
 type CommandContext struct {
@@ -156,14 +160,15 @@ func NewServer(config ServerConfig) (*Server, error) {
 	}
 	router := mux.NewRouter()
 	return &Server{
-		router:             router,
-		port:               config.Port,
-		commandHandler:     commandHandler,
-		pullClosedExecutor: pullClosedExecutor,
-		eventParser:        eventParser,
-		logger:             logger,
-		lockingClient:      lockingClient,
-		atlantisURL:        config.AtlantisURL,
+		router:              router,
+		port:                config.Port,
+		commandHandler:      commandHandler,
+		pullClosedExecutor:  pullClosedExecutor,
+		eventParser:         eventParser,
+		logger:              logger,
+		lockingClient:       lockingClient,
+		atlantisURL:         config.AtlantisURL,
+		githubWebHookSecret: []byte(config.GithubWebHookSecret),
 	}, nil
 }
 
@@ -300,7 +305,8 @@ func (s *Server) postEvents(w http.ResponseWriter, r *http.Request) {
 	githubReqID := "X-Github-Delivery=" + r.Header.Get("X-Github-Delivery")
 	var payload []byte
 
-	// webhook requests can either be application/json or application/x-www-form-urlencoded
+	// webhook requests can either be application/json or application/x-www-form-urlencoded.
+	// We accept both to make it easier on users that may choose x-www-form-urlencoded by mistake
 	if r.Header.Get("Content-Type") == "application/x-www-form-urlencoded" {
 		// GitHub stores the json payload as a form value
 		payloadForm := r.PostFormValue("payload")
@@ -308,15 +314,41 @@ func (s *Server) postEvents(w http.ResponseWriter, r *http.Request) {
 			s.respond(w, logging.Warn, http.StatusBadRequest, "request did not contain expected 'payload' form value")
 			return
 		}
+		if len(s.githubWebHookSecret) != 0 {
+			// github calculates the signature based on the query escaped
+			// post body. In order to use go-github's ValidatePayload method
+			// that only accepts an http request we need to override r.Body
+			// with a value that was the original raw body before it was
+			// parsed.
+			rawPayload := fmt.Sprintf("payload=%s", url.QueryEscape(payloadForm))
+			r.Body = ioutil.NopCloser(bytes.NewBuffer([]byte(rawPayload)))
+			_, err := gh.ValidatePayload(r, s.githubWebHookSecret)
+			if err != nil {
+				s.respond(w, logging.Warn, http.StatusBadRequest, "webhook failed secret key validation")
+				return
+			}
+		}
 		payload = []byte(payloadForm)
 	} else {
 		// else read it as json
-		defer r.Body.Close()
-		var err error
-		payload, err = ioutil.ReadAll(r.Body)
-		if err != nil {
-			s.respond(w, logging.Warn, http.StatusBadRequest, "could not read body: %s", err)
-			return
+		if len(s.githubWebHookSecret) != 0 {
+			var err error
+			payload, err = gh.ValidatePayload(r, s.githubWebHookSecret)
+			if err != nil {
+				s.respond(w, logging.Warn, http.StatusBadRequest, "webhook failed secret key validation")
+				return
+			}
+		} else {
+			// if we're not validating against the webhook secret then
+			// we can't use the ValidatePayload method and need to read
+			// the request body ourselves.
+			defer r.Body.Close()
+			var err error
+			payload, err = ioutil.ReadAll(r.Body)
+			if err != nil {
+				s.respond(w, logging.Warn, http.StatusBadRequest, "could not read body: %s", err)
+				return
+			}
 		}
 	}
 

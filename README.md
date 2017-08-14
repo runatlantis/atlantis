@@ -226,7 +226,7 @@ If installing on a single repository, navigate to the repository home page and c
 - Click **Add webhook**
 - set **Payload URL** to `http://$URL/events` where `$URL` is where Atlantis is hosted. **Be sure to add `/events`**
 - set **Content type** to `application/json`
-- leave **Secret** blank
+- leave **Secret** blank or set this to a random key (https://www.random.org/strings/). If you set it, you'll need to use the `--gh-webhook-secret` option when you start Atlantis
 - select **Let me select individual events**
 - check the boxes
 	- **Pull request review**
@@ -245,13 +245,14 @@ Once you've created the user (or have decided to use an existing user) you need 
 ### Start Atlantis
 Now you're ready to start Atlantis! Run
 ```
-$ atlantis server --atlantis-url $URL --gh-user $USERNAME --gh-token $TOKEN
+$ atlantis server --atlantis-url $URL --gh-user $USERNAME --gh-token $TOKEN --gh-webhook-secret $SECRET
 2049/10/6 00:00:00 [WARN] server: Atlantis started - listening on port 4141
 ```
 
 - `$URL` is the URL that Atlantis can be reached at
 - `$USERNAME` is the GitHub username you generated the token for
 - `$TOKEN` is the access token you created. If you don't want this to be passed in as an argument for security reasons you can specify it in a config file (see [Configuration](#configuration)) or as an environment variable: `ATLANTIS_GH_TOKEN`
+- `$SECRET` is the random key you used for the webhook secret. If you left the secret blank then don't specify this flag. If you don't want this to be passed in as an argument for security reasons you can specify it in a config file (see [Configuration](#configuration)) or as an environment variable: `ATLANTIS_GH_WEBHOOK_SECRET`
 
 Atlantis is now running!
 **We recommend running it under something like Systemd or Supervisord.**
