@@ -25,6 +25,7 @@ const (
 	ghHostnameFlag      = "gh-hostname"
 	ghTokenFlag         = "gh-token"
 	ghUserFlag          = "gh-user"
+	ghWebHookSecret     = "gh-webhook-secret"
 	logLevelFlag        = "log-level"
 	portFlag            = "port"
 	requireApprovalFlag = "require-approval"
@@ -66,6 +67,11 @@ var stringFlags = []stringFlag{
 	{
 		name:        ghUserFlag,
 		description: "[REQUIRED] GitHub username of API user.",
+	},
+	{
+		name:        ghWebHookSecret,
+		description: "Optional secret used for GitHub webhooks (see https://developer.github.com/webhooks/securing/). If not specified, Atlantis won't validate the incoming webhook call.",
+		env:         "ATLANTIS_GH_WEBHOOK_SECRET",
 	},
 	{
 		name:        logLevelFlag,
