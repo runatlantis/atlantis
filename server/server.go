@@ -15,7 +15,6 @@ import (
 	"github.com/elazarl/go-bindata-assetfs"
 	gh "github.com/google/go-github/github"
 	"github.com/gorilla/mux"
-	"github.com/hootsuite/atlantis/aws"
 	"github.com/hootsuite/atlantis/github"
 	"github.com/hootsuite/atlantis/locking"
 	"github.com/hootsuite/atlantis/locking/boltdb"
@@ -31,6 +30,9 @@ import (
 
 const (
 	lockRoute = "lock-detail"
+	// atlantisUserTFVar is the name of the variable we execute terraform
+	// with containing the github username of who is running the command
+	atlantisUserTFVar = "atlantis_user"
 )
 
 // Server listens for GitHub events and runs the necessary Atlantis command
@@ -48,8 +50,6 @@ type Server struct {
 
 // the mapstructure tags correspond to flags in cmd/server.go
 type ServerConfig struct {
-	AWSRegion           string `mapstructure:"aws-region"`
-	AssumeRole          string `mapstructure:"aws-assume-role-arn"`
 	AtlantisURL         string `mapstructure:"atlantis-url"`
 	DataDir             string `mapstructure:"data-dir"`
 	GithubHostname      string `mapstructure:"gh-hostname"`
@@ -92,16 +92,6 @@ func NewServer(config ServerConfig) (*Server, error) {
 	}
 	githubComments := &GithubCommentRenderer{}
 
-	// a nil awsConfig indicates that we won't be doing any AWS
-	// config in Atlantis
-	var awsConfig *aws.Config
-	if config.AssumeRole != "" {
-		awsConfig = &aws.Config{
-			Region:  config.AWSRegion,
-			RoleARN: config.AssumeRole,
-		}
-	}
-
 	boltdb, err := boltdb.New(config.DataDir)
 	if err != nil {
 		return nil, err
@@ -116,7 +106,6 @@ func NewServer(config ServerConfig) (*Server, error) {
 	applyExecutor := &ApplyExecutor{
 		github:                githubClient,
 		githubStatus:          githubStatus,
-		awsConfig:             awsConfig,
 		terraform:             terraformClient,
 		githubCommentRenderer: githubComments,
 		lockingClient:         lockingClient,
@@ -129,7 +118,6 @@ func NewServer(config ServerConfig) (*Server, error) {
 	planExecutor := &PlanExecutor{
 		github:                githubClient,
 		githubStatus:          githubStatus,
-		awsConfig:             awsConfig,
 		terraform:             terraformClient,
 		githubCommentRenderer: githubComments,
 		lockingClient:         lockingClient,
@@ -308,9 +296,10 @@ func (s *Server) postEvents(w http.ResponseWriter, r *http.Request) {
 
 	// webhook requests can either be application/json or application/x-www-form-urlencoded.
 	// We accept both to make it easier on users that may choose x-www-form-urlencoded by mistake
+	// todo: use go-github's ValidatePayload method if https://github.com/google/go-github/pull/693 is merged
 	if r.Header.Get("Content-Type") == "application/x-www-form-urlencoded" {
 		// GitHub stores the json payload as a form value
-		payloadForm := r.PostFormValue("payload")
+		payloadForm := r.FormValue("payload")
 		if payloadForm == "" {
 			s.respond(w, logging.Warn, http.StatusBadRequest, "request did not contain expected 'payload' form value")
 			return

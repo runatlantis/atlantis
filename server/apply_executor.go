@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 
 	version "github.com/hashicorp/go-version"
-	"github.com/hootsuite/atlantis/aws"
 	"github.com/hootsuite/atlantis/github"
 	"github.com/hootsuite/atlantis/locking"
 	"github.com/hootsuite/atlantis/models"
@@ -20,7 +19,6 @@ import (
 type ApplyExecutor struct {
 	github                *github.Client
 	githubStatus          *GithubStatus
-	awsConfig             *aws.Config
 	terraform             *terraform.Client
 	githubCommentRenderer *GithubCommentRenderer
 	lockingClient         *locking.Client
@@ -125,31 +123,6 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 		applyExtraArgs = config.GetExtraArguments(ctx.Command.Name.String())
 	}
 
-	// todo: de-duplicate this section between plan and apply
-	var credsEnvVars []string
-	// If awsConfig is nil we know that we're not using assume role and so
-	// don't need to do an AWS calls ourselves
-	if a.awsConfig != nil {
-		awsSession, err := a.awsConfig.CreateSession(ctx.User.Username)
-		if err != nil {
-			ctx.Log.Err(err.Error())
-			return ProjectResult{Error: err}
-		}
-		creds, err := awsSession.Config.Credentials.Get()
-		if err != nil {
-			err = errors.Wrap(err, "getting aws credentials")
-			ctx.Log.Err(err.Error())
-			return ProjectResult{Error: err}
-		}
-		ctx.Log.Info("created aws session")
-
-		credsEnvVars = []string{
-			fmt.Sprintf("AWS_ACCESS_KEY_ID=%s", creds.AccessKeyID),
-			fmt.Sprintf("AWS_SECRET_ACCESS_KEY=%s", creds.SecretAccessKey),
-			fmt.Sprintf("AWS_SESSION_TOKEN=%s", creds.SessionToken),
-		}
-	}
-
 	// check if terraform version is >= 0.9.0
 	terraformVersion := a.terraform.Version()
 	if config.TerraformVersion != nil {
@@ -158,7 +131,7 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 	constraints, _ := version.NewConstraint(">= 0.9.0")
 	if constraints.Check(terraformVersion) {
 		ctx.Log.Info("determined that we are running terraform with version >= 0.9.0. Running version %s", terraformVersion)
-		_, err := a.terraform.RunInitAndEnv(ctx.Log, absolutePath, tfEnv, config.GetExtraArguments("init"), credsEnvVars, terraformVersion)
+		_, err := a.terraform.RunInitAndEnv(ctx.Log, absolutePath, tfEnv, config.GetExtraArguments("init"), terraformVersion)
 		if err != nil {
 			return ProjectResult{Error: err}
 		}
@@ -172,8 +145,8 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 		}
 	}
 
-	tfApplyCmd := append([]string{"apply", "-no-color", plan.LocalPath}, applyExtraArgs...)
-	output, err := a.terraform.RunCommandWithVersion(ctx.Log, absolutePath, tfApplyCmd, credsEnvVars, terraformVersion)
+	tfApplyCmd := append([]string{"apply", "-no-color", "-var", fmt.Sprintf("%s=%s", atlantisUserTFVar, ctx.User.Username), plan.LocalPath}, applyExtraArgs...)
+	output, err := a.terraform.RunCommandWithVersion(ctx.Log, absolutePath, tfApplyCmd, terraformVersion)
 	if err != nil {
 		return ProjectResult{Error: fmt.Errorf("%s\n%s", err.Error(), output)}
 	}

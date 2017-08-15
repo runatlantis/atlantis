@@ -294,14 +294,42 @@ Atlantis simply shells out to `terraform` so you don't need to do anything speci
 As long as `terraform` works where you're hosting Atlantis, then Atlantis will work.
 See https://www.terraform.io/docs/providers/aws/#authentication for more detail.
 
+### Multiple AWS Accounts
+Atlantis supports multiple AWS accounts through the use of Terraform's
+[AWS Authentication](https://www.terraform.io/docs/providers/aws/#authentication).
+
+If you're using the [Shared Credentials file](https://www.terraform.io/docs/providers/aws/#shared-credentials-file)
+you'll need to ensure the server that Atlantis is executing on has the corresponding credentials file.
+
+If you're using [Assume role](https://www.terraform.io/docs/providers/aws/#assume-role)
+you'll need to ensure that the credentials file has a `default` profile that is able
+to assume all required roles.
+
+[Environment variables](https://www.terraform.io/docs/providers/aws/#environment-variables) authentication
+won't work for multiple accounts since Atlantis wouldn't know which environment variables to execute
+Terraform with.
+
 ### Assume Role Session Names
-Atlantis provides the ability to use AWS's Assume Role and **dynamically name the session** with the GitHub username of whoever commented `atlantis apply`.
+Atlantis injects the Terraform variable `atlantis_user` and sets it to the GitHub username of
+the user that is running the Atlantis command. This can be used to dynamically name the assume role
+session. This is used at Hootsuite so AWS API actions can be correlated with a specific user.
 
-This is used at Hootsuite so AWS API actions can be correlated with a specific user.
-To take advantage of this feature, simply set the `--aws-assume-role-arn` flag to the
-role to be assumed: `arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME`.
+To take advantage of this feature, use Terraform's [built-in support](https://www.terraform.io/docs/providers/aws/#assume-role) for assume role
+and use the `atlantis_user` terraform variable
 
-If you're using Terraform's [built-in support](https://www.terraform.io/docs/providers/aws/#assume-role) for assume role then there is no need to set this flag (unless you also want your sessions to take the name of the GitHub user).
+```hcl
+provider "aws" {
+  assume_role {
+    role_arn     = "arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME"
+    session_name = "${var.atlantis_user}"
+  }
+}
+
+# need to define the atlantis_user variable to avoid terraform errors
+variable "atlantis_user" {
+  default = "atlantis_user"
+}
+```
 
 ## Glossary
 #### Project
