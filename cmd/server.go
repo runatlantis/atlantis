@@ -18,8 +18,6 @@ import (
 // 3. Add your flag's description etc. to the stringFlags, intFlags, or boolFlags slices
 const (
 	atlantisURLFlag     = "atlantis-url"
-	awsAssumeRoleFlag   = "aws-assume-role-arn"
-	awsRegionFlag       = "aws-region"
 	configFlag          = "config"
 	dataDirFlag         = "data-dir"
 	ghHostnameFlag      = "gh-hostname"
@@ -35,15 +33,6 @@ var stringFlags = []stringFlag{
 	{
 		name:        atlantisURLFlag,
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + portFlag + ".",
-	},
-	{
-		name:        awsAssumeRoleFlag,
-		description: "ARN of the role to assume when running Terraform against AWS. If not using assume role, no need to set.",
-	},
-	{
-		name:        awsRegionFlag,
-		description: "Amazon region to use for assume role. If not setting --" + awsAssumeRoleFlag + " then ignore.",
-		value:       "us-east-1",
 	},
 	{
 		name:        configFlag,
