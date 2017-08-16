@@ -40,7 +40,7 @@ jobs:
           name: Push image
           command: |
             if [ "${CIRCLE_BRANCH}" == "master" ]; then
-              docker login -e "$DOCKER_EMAIL" -u "$DOCKER_USER" -p "$DOCKER_PASSWORD"
+              docker login -u "$DOCKER_USER" -p "$DOCKER_PASSWORD"
               docker push hootsuite/atlantis:latest
             fi
       - run:
