@@ -8,7 +8,7 @@ use the `atlantis_user` terraform variable alongside Terraform's
 * Atlantis has a docker image now ([#123](https://github.com/hootsuite/atlantis/pull/123)). Here is how you can try it out:
 
 ```bash
-docker run -it hootsuite/atlantis server --gh-user=GITHUB_USERNAME --gh-token=GITHUB_TOKEN
+docker run hootsuite/atlantis:v0.1.1 server --gh-user=GITHUB_USERNAME --gh-token=GITHUB_TOKEN
 ```
 
 ### Improvements
