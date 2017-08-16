@@ -367,6 +367,28 @@ variable "atlantis_user" {
 }
 ```
 
+If you're also using the [S3 Backend](https://www.terraform.io/docs/backends/types/s3.html)
+make sure to add the `role_arn` option:
+
+```hcl
+terraform {
+  backend "s3" {
+    bucket   = "mybucket"
+    key      = "path/to/my/key"
+    region   = "us-east-1"
+    role_arn = "arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME"
+    # can't use var.atlantis_user as the session name because
+    # interpolations are not allowed in backend configuration
+    # session_name = "${var.atlantis_user}" WON'T WORK
+  }
+}
+```
+
+Terraform doesn't support interpolations in backend config so you will not be
+able to use `session_name = "${var.atlantis_user}"`. However, the backend assumed
+role is only used for state-related API actions. Any other API actions will be performed using
+the assumed role specified in the `aws` provider and will have the session named as the GitHub user.
+
 ## Glossary
 #### Project
 A Terraform project. Multiple projects can be in a single GitHub repo.
