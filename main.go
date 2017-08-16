@@ -6,6 +6,6 @@ import (
 )
 
 func main() {
-	viper.Set("version", "0.1.0")
+	viper.Set("version", "0.1.1")
 	cmd.Execute()
 }
