@@ -21,3 +21,10 @@ docker run -it hootsuite/atlantis server --gh-user=GITHUB_USERNAME --gh-token=GI
 ### Features
 
 ### Core Changes
+
+## Downloads
+
+* [atlantis_darwin_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.1.1/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/hootsuite/atlantis/releases/download/v0.1.1/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.1.1/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/hootsuite/atlantis/releases/download/v0.1.1/atlantis_linux_arm.zip)
