@@ -1,4 +1,4 @@
-# v0.1.1 (Unreleased)
+# v0.1.1
 ### Backwards Incompatibilities / Notes:
 * `--aws-assume-role-arn` and `--aws-region` flags removed. Instead, to name the
 assume role session with the GitHub username of the user running the Atlantis command
