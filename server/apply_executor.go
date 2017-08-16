@@ -145,7 +145,7 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 		}
 	}
 
-	tfApplyCmd := append([]string{"apply", "-no-color", "-var", fmt.Sprintf("%s=%s", atlantisUserTFVar, ctx.User.Username), plan.LocalPath}, applyExtraArgs...)
+	tfApplyCmd := append([]string{"apply", "-no-color", plan.LocalPath}, applyExtraArgs...)
 	output, err := a.terraform.RunCommandWithVersion(ctx.Log, absolutePath, tfApplyCmd, terraformVersion)
 	if err != nil {
 		return ProjectResult{Error: fmt.Errorf("%s\n%s", err.Error(), output)}
