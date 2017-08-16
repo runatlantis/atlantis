@@ -3,3 +3,4 @@ atlantis
 *.iml
 .vscode
 atlantis.db
+output

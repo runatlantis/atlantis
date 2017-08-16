@@ -1,6 +1,7 @@
 BUILD_ID := $(shell git rev-parse --short HEAD 2>/dev/null || echo no-commit-id)
 WORKSPACE := $(shell pwd)
 PKG := $(shell go list ./... | grep -v e2e | grep -v vendor | grep -v static)
+IMAGE_NAME := hootsuite/atlantis
 
 .PHONY: test
 
@@ -34,10 +35,16 @@ dist: ## Package up everything in static/ using go-bindata-assetfs so it can be 
 	go-bindata-assetfs -pkg server static/... && mv bindata_assetfs.go server
 
 release: ## Create packages for a release
-	gox -os="darwin linux" -arch="amd64"
+	./scripts/binary-release.sh
 
 vendor-status:
 	@govendor status
 
 fmt: ## Run goimports (which also formats)
 	goimports -w $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "./server/bindata_assetfs.go")
+
+end-to-end-deps: ## Install e2e dependencies
+	./scripts/e2e-deps.sh
+
+end-to-end-tests: ## Run e2e tests
+	./scripts/e2e.sh

@@ -1,0 +1,56 @@
+version: 2
+jobs:
+  build:
+    working_directory: /go/src/github.com/hootsuite/atlantis
+    docker:
+      - image: circleci/golang:1.8
+        environment:
+          TERRAFORM_VERSION: 0.10.0
+    steps:
+      - checkout
+      - setup_remote_docker:
+          reusable: true
+      - run: make deps
+      - run: make test
+      - run: make build-service
+      - run:
+          name: Install e2e dependencies
+          command: make end-to-end-deps
+      - run:
+          name: Starting atlantis server in the background
+          command: cd "${CIRCLE_WORKING_DIRECTORY}/e2e" && ./atlantis server --gh-user="$GITHUB_USERNAME" --gh-token="$GITHUB_PASSWORD" --data-dir="/tmp" --log-level="debug" &> /tmp/atlantis-server.log
+          background: true
+      - run: sleep 2
+      - run: 
+          name: Starting ngrok
+          command: cd "${CIRCLE_WORKING_DIRECTORY}/e2e" && ./ngrok http 4141 > /tmp/ngrok.log
+          background: true
+      - run: sleep 2
+      - run: echo 'export ATLANTIS_URL=$(curl -s 'http://localhost:4040/api/tunnels' | jq -r '.tunnels[1].public_url')' >> $BASH_ENV
+      - run:
+          name: Run e2e tests
+          command: make end-to-end-tests
+      - run:
+          name: Build image
+          command: |
+            if [ "${CIRCLE_BRANCH}" == "master" ]; then
+              docker build -t hootsuite/atlantis:latest .
+            fi
+      - run:
+          name: Push image
+          command: |
+            if [ "${CIRCLE_BRANCH}" == "master" ]; then
+              docker login -e "$DOCKER_EMAIL" -u "$DOCKER_USER" -p "$DOCKER_PASSWORD"
+              docker push hootsuite/atlantis:latest
+            fi
+      - run:
+          name: Tag and push version if exists
+          # work around until tags are properly supported
+          # https://discuss.circleci.com/t/git-tag-deploys-in-2-0/9493/6
+          command: |
+            if [ "${CIRCLE_BRANCH}" == "master" ]; then
+              for TAG in $(git tag --contains $CIRCLE_SHA1); do
+                docker tag hootsuite/atlantis:latest hootsuite/atlantis:$TAG
+                docker push hootsuite/atlantis:$TAG
+              done
+            fi

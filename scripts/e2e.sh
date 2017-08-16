@@ -3,6 +3,8 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+cd e2e/
+
 # Download dependencies
 echo "Running 'make deps'"
 make deps
