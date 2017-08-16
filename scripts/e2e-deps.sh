@@ -5,7 +5,7 @@ if [ ! -f atlantis ]; then
     echo "atlantis binary not found. exiting...."
     exit 1
 fi
-mv atlantis ${CIRCLE_WORKING_DIRECTORY}/e2e/
+cp atlantis ${CIRCLE_WORKING_DIRECTORY}/e2e/
 
 # cd into e2e folder
 cd e2e/
