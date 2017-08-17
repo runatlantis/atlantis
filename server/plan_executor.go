@@ -148,7 +148,7 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 
 	// Run terraform plan
 	planFile := filepath.Join(repoDir, project.Path, fmt.Sprintf("%s.tfplan", tfEnv))
-	tfPlanCmd := append([]string{"plan", "-refresh", "-no-color", "-out", planFile, "-var", fmt.Sprintf("'%s=%s'", atlantisUserTFVar, ctx.User.Username)}, planExtraArgs...)
+	tfPlanCmd := append([]string{"plan", "-refresh", "-no-color", "-out", planFile, "-var", fmt.Sprintf("%s=%s", atlantisUserTFVar, ctx.User.Username)}, planExtraArgs...)
 
 	// check if env/{environment}.tfvars exist
 	tfEnvFileName := filepath.Join("env", tfEnv+".tfvars")
