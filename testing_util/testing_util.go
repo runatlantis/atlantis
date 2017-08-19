@@ -38,9 +38,9 @@ func Equals(tb testing.TB, exp, act interface{}) {
 }
 
 // Contains fails the test if the slice doesn't contain the expected element
-func Contains(tb testing.TB, exp interface{}, slice []interface{}) {
+func Contains(tb testing.TB, exp interface{}, slice []string) {
 	for _, v := range slice {
-		if reflect.DeepEqual(v, exp) {
+		if v == exp {
 			return
 		}
 	}
