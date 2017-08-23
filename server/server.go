@@ -384,7 +384,6 @@ func (s *Server) handleCommentEvent(w http.ResponseWriter, event *gh.IssueCommen
 		return
 	}
 
-	// determine if the comment matches a plan or apply command
 	ctx := &CommandContext{}
 	command, err := s.eventParser.DetermineCommand(event)
 	if err != nil {

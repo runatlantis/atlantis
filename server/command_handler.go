@@ -64,9 +64,10 @@ func (c CommandName) String() string {
 }
 
 type Command struct {
-	Verbose     bool
-	Environment string
 	Name        CommandName
+	Environment string
+	Verbose     bool
+	Flags       []string
 }
 
 func (c *CommandHandler) ExecuteCommand(ctx *CommandContext) {
