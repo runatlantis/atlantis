@@ -1,4 +1,4 @@
-# v0.1.2 (UNRELEASED)
+# v0.1.2 
 ## Features
 * all flags passed to `atlantis plan` or `atlantis apply` will now be passed through to `terraform`. ([#131](https://github.com/hootsuite/atlantis/pull/131))
 
