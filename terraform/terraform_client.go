@@ -63,9 +63,9 @@ func (c *Client) RunCommandWithVersion(log *logging.SimpleLogger, path string, a
 	out, err := terraformCmd.CombinedOutput()
 	commandStr := strings.Join(terraformCmd.Args, " ")
 	if err != nil {
-		err := fmt.Errorf("%s: running %q in %q: %s", err, commandStr, path, out)
+		err := fmt.Errorf("%s: running %q in %q: \n%s", err, commandStr, path, out)
 		log.Debug("error: %s", err)
-		return "", err
+		return string(out), err
 	}
 	log.Info("successfully ran %q in %q", commandStr, path)
 	return string(out), nil
@@ -78,20 +78,21 @@ func (c *Client) RunInitAndEnv(log *logging.SimpleLogger, path string, env strin
 	var outputs []string
 	// run terraform init
 	output, err := c.RunCommandWithVersion(log, path, append([]string{"init", "-no-color"}, extraInitArgs...), version)
-	if err != nil {
-		return nil, err
-	}
 	outputs = append(outputs, output)
+	if err != nil {
+		return outputs, err
+	}
 
 	// run terraform env new and select
 	output, err = c.RunCommandWithVersion(log, path, []string{"env", "select", "-no-color", env}, version)
+	outputs = append(outputs, output)
 	if err != nil {
 		// if terraform env select fails we will run terraform env new
 		// to create a new environment
 		output, err = c.RunCommandWithVersion(log, path, []string{"env", "new", "-no-color", env}, version)
 		if err != nil {
-			return nil, err
+			return outputs, err
 		}
 	}
-	return append(outputs, output), nil
+	return outputs, nil
 }
