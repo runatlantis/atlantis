@@ -298,7 +298,7 @@ COPY credentials /home/atlantis/.aws/credentials
 * Build docker image
 
 ```bash
-docker build -t {YOUR_DOCKER_ORG}/atlantis-custom -f Dockerfile-custom
+docker build -t {YOUR_DOCKER_ORG}/atlantis-custom -f Dockerfile-custom .
 ```
 
 * Run docker image
