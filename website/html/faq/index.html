@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+  <meta name="generator" content="Hugo 0.26" />
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title> FAQ </title>
+
+  
+  <meta name="description" content="All your Atlantis questions answered!"> 
+  
+  
+  
+  
+  
+  <meta name="robots" content="noindex">
+  
+
+    
+
+  <meta name="author" content="">
+
+
+  <meta property="og:title" content="FAQ" />
+<meta property="og:description" content="All your Atlantis questions answered!" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="http://atlantis.run/faq/" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+  
+  
+  
+  
+  <link href="http://atlantis.run/faq/index.xml" rel="alternate" type="application/rss+xml" title="Atlantis - A unified workflow for collaborating on Terraform through GitHub" /> 
+
+  <link rel="canonical" href="http://atlantis.run/faq/">  
+
+  <link rel="shortcut icon" type="image/png" href="/img/logo-384x384.png">
+
+
+  <link href="/css/font.css" rel="stylesheet" type="text/css">
+  <link href="/css/kube.min.css" rel="stylesheet" type="text/css">
+  <link href="/css/kube.legenda.css" rel="stylesheet" type="text/css">
+  <link href="/css/highlight.css" rel="stylesheet" type="text/css">
+  <link href="/css/master.css" rel="stylesheet" type="text/css">
+  <link href="/css/kube.demo.css" rel="stylesheet" type="text/css">
+
+ <link href="/css/custom.css" rel="stylesheet" type="text/css">
+
+  <script src="/js/jquery-2.1.4.min.js" type="text/javascript">
+  </script>
+
+  <script type="text/javascript" src="/js/tocbot.min.js"></script>
+  <script async defer src="https://buttons.github.io/buttons.js"></script>
+</head>
+
+
+<body class="page-kube">
+  <header>   <div class="show-sm">
+    <div id="nav-toggle-box">
+      <div id="nav-toggle-brand">
+        <a href="/">Atlantis</a>
+      </div><a data-component="toggleme" data-target="#top" href="#" id="nav-toggle"><i class="kube-menu"></i></a>
+    </div>
+  </div>
+  <div class="hide-sm" id="top">
+    <div id="top-brand">
+      <a href="/" title="home">Atlantis</a>
+    </div>
+    <nav id="top-nav-main">
+      <ul>
+       
+       
+    <li><a href="/blog/" >Blog</a></li>
+    
+    <li><a href="/docs/" >Docs</a></li>
+    
+    <li><a href="/faq/"  class="active">FAQ</a></li>
+    
+    <li><a href="https://www.youtube.com/watch?v=TmIPWda0IKg" >Demo</a></li>
+    
+      </ul>
+    </nav>
+    <nav id="top-nav-extra">
+      <ul>
+        <li>
+          <a class="github-button" href="https://github.com/hootsuite/atlantis" data-icon="octicon-star" data-size="large" aria-label="Star hootsuite/atlantis on GitHub">Star</a>
+        </li>
+      </ul>
+    </nav>
+  </div> </header>
+  <main>
+
+<div id="hero" class="wrap">
+  <h1>FAQ</h1>
+    <p>All your Atlantis questions answered!<br></p>
+</div>
+<div id="kube-faq">
+
+
+<h2 id="does-atlantis-affect-terraform-remote-state-https-www-terraform-io-docs-state-remote-html">Does Atlantis affect Terraform <a href="https://www.terraform.io/docs/state/remote.html">remote state</a>?</h2>
+
+<p>No. Atlantis does not interfere with Terraform remote state in anyway. Under the hood, Atlantis is simply executing <code>terraform plan</code> and <code>terraform apply</code>.</p>
+
+<h2 id="how-does-atlantis-locking-interact-with-terraform-locking-https-www-terraform-io-docs-state-locking-html">How does Atlantis locking interact with Terraform <a href="https://www.terraform.io/docs/state/locking.html">locking</a>?</h2>
+
+<p>Atlantis provides locking of pull requests that prevents concurrent modification of the same infrastructure (Terraform project) whereas Terraform locking only prevents two concurrent <code>terraform apply</code>&rsquo;s from happening.</p>
+
+<p>Terraform locking can be used alongside Atlantis locking since Atlantis is simply executing terraform commands.</p>
+
+<h2 id="how-to-run-atlantis-in-high-availability-mode-does-it-need-to-be">How to run Atlantis in high availability mode? Does it need to be?</h2>
+
+<p>Atlantis server can easily be run under the supervision of a init system like <code>upstart</code> or <code>systemd</code> to make sure <code>atlantis server</code> is always running.</p>
+
+<p>Atlantis currently stores all locking and Terraform plans locally on disk under the <code>--data-dir</code> directory (defaults to <code>~/.atlantis</code>). Because of this there is currently no way to run two or more Atlantis instances concurrently.</p>
+
+<p>However, if you were to lose the data, all you would need to do is run <code>atlantis plan</code> again on the pull requests that are open. If someone tries to run <code>atlantis apply</code> after the data has been lost then they will get an error back, so they will have to re-plan anyway.</p>
+
+<h2 id="how-to-add-ssl-to-atlantis-server">How to add SSL to Atlantis server?</h2>
+
+<p>Atlantis currently only supports HTTP. In order to add SSL you will need to front Atlantis server with NGINX or HAProxy. Follow the document <a href="https://github.com/hootsuite/atlantis/blob/master/docs/nginx-ssl-proxy.md">here</a> to use configure NGINX with SSL as a reverse proxy.</p>
+
+</div>
+</main>
+  <footer> 
+    <footer id="footer">
+    <nav>
+      <ul>
+        <li><span>Made with &lt;3 by the Owls at </span><strong>Hootsuite</strong></li>
+        <li>
+          <a href="/blog/">Blog</a>
+        </li>
+        <li>
+          <a href="/docs/">Docs</a>
+        </li>
+        <li>
+          <a href="/faq/">FAQ</a>
+        </li>
+      </ul>
+    </nav>
+    <p>&copy; Apache License 2.0.</p>
+  </footer> 
+</footer>
+
+
+  <script src="/js/kube.js" type="text/javascript">
+  </script>
+  <script src="/js/kube.legenda.js" type="text/javascript">
+  </script>
+  <script src="/js/master.js" type="text/javascript">
+  </script>
+</body>
+
+</html>

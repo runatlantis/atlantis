@@ -1,0 +1,58 @@
+{{ define "title"}} {{ .Title}} {{end}}
+{{ define "header"}} {{ partial "header" .}} {{end}}
+
+{{ define "main"}}
+<div class="push-center" itemscope itemtype="http://schema.org/BlogPosting">
+    {{ template "_internal/schema.html" . }}
+<div id="hero">
+    <h1 itemprop="headline">  {{.Title}}</h1>
+    {{ if .Description }}
+<blockquote itemprop="description">{{ .Description }}</blockquote>
+{{ end }}
+<time class="post-time">{{ partial "post/meta" . }}</time>
+</div>
+<div id="post-box">
+<div id="post" itemprop="articleBody">
+    
+    {{.Content | safeHTML}}
+
+</div>
+
+<!--
+<div class="form-subscribe">
+    <div id="form-subscribe-success" style="display: none;"></div>
+<div id="form-subscribe-box">
+        <h4>All about Redactor, Grafs and Kube.</h4>
+        <p>Monthly news &amp; updates. Just straight to the point.</p>
+
+        <form action="" name="mc-embedded-subscribe-form" method="post" class="form"><input type="hidden" name="authorize-token" value="">
+            <div id="subscribe-email-validation-error"></div>
+            <div class="form-item">
+                <div class="append">
+                    <input type="email" name="EMAIL" id="mce-EMAIL" placeholder="Email">
+                    <button class="button">Subscribe</button>
+                </div>
+            </div>
+    
+            --><!-- real people should not fill this in and expect good things - do not remove this or risk form bot signups-->
+            <!--<div style="position: absolute; left: -5000px;" aria-hidden="true"><input type="text" name="" tabindex="-1" value=""></div>
+        </form>
+
+    </div>
+</div> -->
+
+    <div class="">
+        {{ partial "post/byauthor" . }}
+        {{ partial "post/related-content" . }}
+    </div>
+    
+    {{ if .Site.DisqusShortname }}
+    <article>
+        {{ template "_internal/disqus.html" . }}
+    </article>
+    {{ end }}
+    
+</div>
+</div>
+{{ end }}
+{{ define "footer"}} {{ partial "footer.html" .}} {{ end }}

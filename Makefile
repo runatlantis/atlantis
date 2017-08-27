@@ -48,3 +48,9 @@ end-to-end-deps: ## Install e2e dependencies
 
 end-to-end-tests: ## Run e2e tests
 	./scripts/e2e.sh
+
+generate-website-html: ## Generate HTML for website
+	cd website/src && hugo -d ../html
+
+upload-website-html: ## Upload generated website to s3
+	aws s3 sync website/html/ s3://atlantis.run/

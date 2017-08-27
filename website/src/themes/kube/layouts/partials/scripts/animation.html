@@ -1,0 +1,127 @@
+<script>
+document.addEventListener("DOMContentLoaded",
+function(){
+    var animate = {
+        '#slide-up-btn': {
+            el: '#animation-box-slide-up',
+            to: 'slideUp',
+            back: 'slideDown'
+        },
+        '#slide-down-btn': {
+            el: '#animation-box-slide-down',
+            to: 'slideDown',
+            back: 'slideUp'
+        },
+        '#fade-in-btn': {
+            el: '#animation-box-fade-in',
+            to: 'fadeIn',
+            back: 'fadeOut'
+        },
+        '#fade-out-btn': {
+            el: '#animation-box-fade-out',
+            to: 'fadeOut',
+            back: 'fadeIn'
+        },
+        '#flip-in-btn': {
+            el: '#animation-box-flip-in',
+            to: 'flipIn',
+            back: 'flipOut'
+        },
+        '#flip-out-btn': {
+            el: '#animation-box-flip-out',
+            to: 'flipOut',
+            back: 'flipIn'
+        },
+        '#zoom-in-btn': {
+            el: '#animation-box-zoom-in',
+            to: 'zoomIn',
+            back: 'zoomOut'
+        },
+        '#zoom-out-btn': {
+            el: '#animation-box-zoom-out',
+            to: 'zoomOut',
+            back: 'zoomIn'
+        },
+        '#slide-in-right-btn': {
+            el: '#animation-box-slide-in-right',
+            to: 'slideInRight',
+            back: 'slideOutRight'
+        },
+        '#slide-in-left-btn': {
+            el: '#animation-box-slide-in-left',
+            to: 'slideInLeft',
+            back: 'slideOutLeft'
+        },
+        '#slide-in-down-btn': {
+            el: '#animation-box-slide-in-down',
+            to: 'slideInDown',
+            back: 'slideOutUp'
+        },
+        '#slide-out-right-btn': {
+            el: '#animation-box-slide-out-right',
+            to: 'slideOutRight',
+            back: 'slideInRight'
+        },
+        '#slide-out-left-btn': {
+            el: '#animation-box-slide-out-left',
+            to: 'slideOutLeft',
+            back: 'slideInLeft'
+        },
+        '#slide-out-up-btn': {
+            el: '#animation-box-slide-out-up',
+            to: 'slideOutUp',
+            back: 'slideInDown'
+        },
+    };
+
+    for (var key in animate)
+    {
+        $(key).attr('data-el', animate[key].el);
+        $(key).attr('data-to', animate[key].to);
+        $(key).attr('data-back', animate[key].back);
+
+        $(key).on('click', function(e)
+        {
+            e.preventDefault();
+            var $btn = $(e.target);
+            if ($btn.hasClass('demo-muted-link'))
+            {
+                return;
+            }
+
+            var $el = $($btn.attr('data-el'));
+            $btn.addClass('demo-muted-link');
+
+            $el.animation($btn.attr('data-to'));
+            setTimeout(function() {
+
+                $el.animation($btn.attr('data-back'));
+                $btn.removeClass('demo-muted-link');
+
+            }, 1500);
+
+        });
+    }
+
+
+    $('#rotate-btn').on('click', function(e)
+    {
+        e.preventDefault();
+        $('#animation-box-rotate').animation('rotate');
+    });
+
+    $('#shake-btn').on('click', function(e)
+    {
+        e.preventDefault();
+        $('#animation-box-shake').animation('shake');
+    });
+
+    $('#pulse-btn').on('click', function(e)
+    {
+        e.preventDefault();
+        $('#animation-box-pulse').animation('pulse');
+    });
+
+
+});
+</script>

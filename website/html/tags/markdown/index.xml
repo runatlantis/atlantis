@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Markdown on Atlantis - A unified workflow for collaborating on Terraform through GitHub</title>
+    <link>http://atlantis.run/tags/markdown/</link>
+    <description>Recent content in Markdown on Atlantis - A unified workflow for collaborating on Terraform through GitHub</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Thu, 02 Mar 2017 21:56:55 +0100</lastBuildDate>
+    
+	<atom:link href="http://atlantis.run/tags/markdown/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Welcome to Atlantis</title>
+      <link>http://atlantis.run/blog/welcome/</link>
+      <pubDate>Thu, 02 Mar 2017 21:56:55 +0100</pubDate>
+      
+      <guid>http://atlantis.run/blog/welcome/</guid>
+      <description> Welcome to Atlantis - This is the first post from us! </description>
+    </item>
+    
+  </channel>
+</rss>

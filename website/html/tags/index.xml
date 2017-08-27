@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Tags on Atlantis - A unified workflow for collaborating on Terraform through GitHub</title>
+    <link>http://atlantis.run/tags/</link>
+    <description>Recent content in Tags on Atlantis - A unified workflow for collaborating on Terraform through GitHub</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Thu, 02 Mar 2017 21:56:55 +0100</lastBuildDate>
+    
+	<atom:link href="http://atlantis.run/tags/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Example</title>
+      <link>http://atlantis.run/tags/example/</link>
+      <pubDate>Thu, 02 Mar 2017 21:56:55 +0100</pubDate>
+      
+      <guid>http://atlantis.run/tags/example/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>Markdown</title>
+      <link>http://atlantis.run/tags/markdown/</link>
+      <pubDate>Thu, 02 Mar 2017 21:56:55 +0100</pubDate>
+      
+      <guid>http://atlantis.run/tags/markdown/</guid>
+      <description></description>
+    </item>
+    
+  </channel>
+</rss>

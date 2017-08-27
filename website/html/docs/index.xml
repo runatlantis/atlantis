@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Docs on Atlantis - A unified workflow for collaborating on Terraform through GitHub</title>
+    <link>http://atlantis.run/docs/</link>
+    <description>Recent content in Docs on Atlantis - A unified workflow for collaborating on Terraform through GitHub</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    
+	<atom:link href="http://atlantis.run/docs/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Getting Started</title>
+      <link>http://atlantis.run/docs/getting-started/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>http://atlantis.run/docs/getting-started/</guid>
+      <description>Download Atlantis Download from https://github.com/hootsuite/atlantis/releases
+unzip atlantis_{os}_{arch}.zip  Run it! ./atlantis bootstrap  This will walk you through running Atlantis locally. It will
+ fork an example terraform project install terraform (if not already in your PATH) install ngrok so we can expose Atlantis to GitHub start Atlantis  If you&amp;rsquo;re ready to permanently set up Atlantis see Production-Ready Deployment</description>
+    </item>
+    
+  </channel>
+</rss>

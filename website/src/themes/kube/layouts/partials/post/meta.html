@@ -1,0 +1,14 @@
+<span class="icon">
+  <i class="fa fa-clock-o" aria-hidden="true"></i>
+</span>
+<span>{{ .ReadingTime }} minute read</span>
+<span class="icon">
+ <i class="fa fa-pencil" aria-hidden="true"></i>
+</span>
+{{ if .PublishDate.IsZero }}
+  Published: <time datetime="{{ .Date.Format "2006-01-02T15:04:05-07:00" }}">{{ .Date.Format "2 Jan, 2006" }}</time>
+{{ else if lt .PublishDate .Lastmod }}
+  Modified: <time datetime="{{ .Lastmod.Format "2006-01-02T15:04:05-07:00" }}">{{ .Lastmod.Format "2 Jan, 2006" }}</time>
+{{ else }}
+  Published: <time datetime="{{ .PublishDate.Format "2006-01-02T15:04:05-07:00" }}">{{ .PublishDate.Format "2 Jan, 2006" }}</time>
+{{ end }}

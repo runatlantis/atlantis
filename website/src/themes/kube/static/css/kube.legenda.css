@@ -1,0 +1,406 @@
+.autocomplete {
+  position: absolute;
+  z-index: 1000;
+  left: 0;
+  display: none;
+  margin: 0;
+  list-style: none;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  max-height: 250px;
+  overflow: auto;
+  font-size: 14px; }
+  .autocomplete a {
+    padding: 4px 10px;
+    color: #000;
+    display: block;
+    text-decoration: none; }
+    .autocomplete a:hover {
+      background: rgba(0, 0, 0, 0.05); }
+    .autocomplete a.active {
+      background: #007eff;
+      color: #fff; }
+
+.cardform label {
+  display: block;
+  text-transform: uppercase;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.5); }
+
+.cardform-view select,
+.cardform-view textarea,
+.cardform-view input {
+  border: none !important;
+  background: none;
+  padding: 0;
+  cursor: text;
+  -webkit-appearance: none; }
+  .cardform-view select:focus,
+  .cardform-view textarea:focus,
+  .cardform-view input:focus {
+    box-shadow: none;
+    background: none;
+    outline: none; }
+
+.cardform-controls {
+  margin-bottom: 24px; }
+
+.combobox {
+  position: relative; }
+  .combobox input {
+    padding-right: 32px;
+    width: 100%; }
+  .combobox .caret {
+    position: absolute;
+    z-index: 2;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 32px; }
+  .combobox .caret:before {
+    top: 45%;
+    left: 12px; }
+
+.combobox-list {
+  z-index: 1000;
+  position: absolute;
+  left: 0;
+  margin: 0;
+  list-style: none;
+  background: #fff;
+  font-size: 14px;
+  width: 100%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  max-height: 250px;
+  font-weight: normal;
+  overflow: auto; }
+  .combobox-list li {
+    padding: 4px 10px;
+    color: #000;
+    cursor: pointer; }
+    .combobox-list li:hover {
+      background: rgba(0, 0, 0, 0.05); }
+    .combobox-list li.active {
+      background: #007eff;
+      color: #fff; }
+
+.datepicker {
+  position: absolute;
+  background: #fff;
+  top: 0;
+  left: 0;
+  line-height: 24px;
+  padding: 20px 24px;
+  border-radius: 3px;
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2); }
+  .datepicker.datepicker-embed {
+    position: static;
+    box-shadow: none;
+    border: 1px solid rgba(0, 0, 0, 0.1); }
+
+.datepicker-head {
+  position: relative;
+  padding-bottom: 8px; }
+
+.datepicker-controls {
+  position: absolute;
+  top: 0;
+  right: 0; }
+
+.datepicker-control {
+  float: left;
+  width: 24px;
+  height: 24px;
+  background: #eee;
+  border-radius: 3px;
+  text-align: center;
+  cursor: pointer;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -khtml-user-select: none;
+  -ms-user-select: none;
+  user-select: none; }
+
+.datepicker-control-next {
+  margin-left: 4px; }
+
+.datepicker-month-box {
+  font-size: 14px;
+  color: #000;
+  font-weight: bold;
+  padding-left: 4px;
+  height: 24px; }
+
+.datepicker-select-year {
+  display: inline-block;
+  cursor: pointer;
+  background: #eee;
+  padding: 0 8px;
+  position: relative;
+  border-radius: 3px;
+  height: 24px;
+  line-height: 24px; }
+  .datepicker-select-year .datepicker-select-year-caret {
+    position: relative;
+    top: -1px;
+    display: inline-block;
+    width: 0;
+    height: 0;
+    margin-left: .3em;
+    vertical-align: middle;
+    border-top: 4px solid;
+    border-right: 4px solid transparent;
+    border-left: 4px solid transparent; }
+  .datepicker-select-year select {
+    z-index: 2;
+    position: absolute;
+    top: 0;
+    left: 0;
+    opacity: 0;
+    height: 24px;
+    -webkit-appearance: menulist-button;
+    -moz-appearance: menulist-button;
+    -ms-appearance: menulist-button;
+    appearance: menulist-button; }
+
+.datepicker-weekdays {
+  white-space: nowrap; }
+  .datepicker-weekdays span {
+    display: inline-block;
+    text-align: center;
+    width: 28px;
+    height: 28px;
+    margin: 0 2px;
+    font-size: 12px;
+    font-weight: bold;
+    color: rgba(0, 0, 0, 0.5); }
+
+.datepicker-row {
+  white-space: nowrap; }
+
+.datepicker-cell {
+  display: inline-block;
+  text-align: center;
+  width: 28px;
+  height: 28px;
+  margin: 0 2px;
+  font-size: 12px; }
+  .datepicker-cell a {
+    display: block;
+    color: #000;
+    text-decoration: none;
+    border-radius: 40px; }
+    .datepicker-cell a:hover {
+      background: #eee; }
+  .datepicker-cell.datepicker-day-hidden a {
+    visibility: hidden; }
+  .datepicker-cell.datepicker-day-weekend a {
+    color: rgba(0, 0, 0, 0.4);
+    font-weight: bold; }
+  .datepicker-cell.datepicker-day-today a {
+    background: #f23d3d;
+    color: #fff; }
+  .datepicker-cell.datepicker-day-last a {
+    background: none;
+    color: rgba(0, 0, 0, 0.4); }
+    .datepicker-cell.datepicker-day-last a:hover {
+      color: #000; }
+  .datepicker-cell.datepicker-day-selected a {
+    background: #3d79f2;
+    color: #fff; }
+    .datepicker-cell.datepicker-day-selected a:hover {
+      color: #fff; }
+  .datepicker-cell.datepicker-day-disabled a,
+  .datepicker-cell.datepicker-day-disabled a:hover {
+    background: none !important;
+    color: rgba(0, 0, 0, 0.3) !important;
+    cursor: default; }
+
+.editable[placeholder]:empty:before {
+  content: attr(placeholder);
+  color: rgba(0, 0, 0, 0.4);
+  font-weight: normal; }
+
+.editable[placeholder]:empty:focus:before {
+  content: ""; }
+
+.livesearch-box {
+  position: relative;
+  display: block;
+  width: 100%; }
+  .livesearch-box input {
+    min-width: 120px; }
+  .livesearch-box .close {
+    position: absolute;
+    top: 50%;
+    margin-top: -6px;
+    right: 8px; }
+
+.livesearch-dropdown {
+  position: absolute;
+  z-index: 1000;
+  margin: 0;
+  list-style: none;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  max-height: 250px;
+  overflow: auto; }
+
+.loader {
+  display: inline-block;
+  margin: auto;
+  position: relative;
+  width: 32px;
+  height: 32px; }
+  .loader.small {
+    width: 20px;
+    height: 20px; }
+
+button .loader {
+  margin-bottom: -4px; }
+
+.loader-spinner {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  margin: auto;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  margin: auto;
+  border: 4px solid rgba(0, 0, 0, 0.25);
+  border-bottom-color: #000;
+  -webkit-animation: rotate 2s linear 0s infinite;
+  animation: rotate 2s linear 0s infinite; }
+
+.notification {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  padding: .75rem 1rem;
+  padding-bottom: .5rem;
+  font-family: Consolas, Monaco, "Courier New", monospace;
+  font-size: 14px;
+  line-height: 20px;
+  background: #e0e1e1;
+  color: #313439;
+  font-weight: bold;
+  min-width: 220px;
+  max-width: 280px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2); }
+  @media (max-width: 768px) {
+    .notification {
+      max-width: 100%;
+      left: 1rem; } }
+
+@keyframes progress-bar-stripes {
+  from {
+    background-position: 40px 0; }
+  to {
+    background-position: 0 0; } }
+
+.progress {
+  background: #d4d4d4;
+  height: 12px; }
+  .progress.absolute {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%; }
+  .progress > div {
+    background-image: -webkit-linear-gradient(45deg, rgba(255, 255, 255, 0.2) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.2) 50%, rgba(255, 255, 255, 0.2) 75%, transparent 75%, transparent);
+    background-image: -o-linear-gradient(45deg, rgba(255, 255, 255, 0.2) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.2) 50%, rgba(255, 255, 255, 0.2) 75%, transparent 75%, transparent);
+    background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.2) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.2) 50%, rgba(255, 255, 255, 0.2) 75%, transparent 75%, transparent);
+    -webkit-animation: progress-bar-stripes 2s linear infinite;
+    -moz-animation: progress-bar-stripes 2s linear infinite;
+    animation: progress-bar-stripes 2s linear infinite;
+    font-size: 10px;
+    line-height: 10px;
+    color: #fff;
+    padding: 1px 2px;
+    height: 100%;
+    background-color: #007eff;
+    background-size: 40px 40px; }
+    .progress > div:empty {
+      padding: 1px 0; }
+
+.selector {
+  position: relative;
+  display: inline-block; }
+
+.selector select {
+  z-index: 2;
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  height: 100%;
+  width: 100%;
+  opacity: 0;
+  -webkit-appearance: menulist-button;
+  -moz-appearance: menulist-button;
+  -ms-appearance: menulist-button;
+  appearance: menulist-button; }
+
+.selector-trigger-box {
+  cursor: pointer;
+  position: relative;
+  display: block;
+  z-index: 1;
+  width: 100%;
+  padding-right: 8px; }
+
+.upload-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  position: relative;
+  font-size: 12px;
+  line-height: 20px;
+  width: 100%;
+  min-height: 80px;
+  border: 2px dashed #d4d4d4;
+  background: #e0e1e1;
+  cursor: pointer;
+  overflow: hidden;
+  text-align: center; }
+
+.upload-placeholder {
+  opacity: .6; }
+
+.upload-hover,
+.upload-error {
+  border-color: rgba(0, 0, 0, 0.2); }
+
+.upload-hover {
+  background-color: rgba(0, 126, 255, 0.1); }
+
+.upload-error {
+  background-color: rgba(255, 51, 102, 0.1); }
+
+div.upload-target {
+  display: flex; }
+
+ol.upload-target,
+ul.upload-target {
+  list-style: none;
+  margin-left: 0; }
+  ol.upload-target li,
+  ul.upload-target li {
+    display: flex; }
+  ol.upload-target .close,
+  ul.upload-target .close {
+    top: 2px; }
+
+.upload-target .close {
+  order: 1;
+  background: #d4d4d4;
+  border-radius: 20px;
+  margin-left: 4px;
+  width: 20px;
+  height: 20px;
+  line-height: 20px; }
