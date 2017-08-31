@@ -185,7 +185,7 @@ post_apply:
   commands:
   - "curl http://example.com"
 extra_arguments:
-  - command: plan
+  - command_name: plan
     arguments:
     - "-tfvars=myvars.tfvars"
 ```
