@@ -1,2 +1,6 @@
   .logo {
     height: 200px; }
+
+  figure figcaption {
+      text-align: center;
+  }

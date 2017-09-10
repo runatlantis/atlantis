@@ -7,7 +7,7 @@ Paginate = 4
 [[menu.main]]
     name = "Docs"
     weight = -100
-    url = "/docs/"
+    url = "https://github.com/hootsuite/atlantis#getting-started"
 [[menu.main]]
     name = "Blog"
     weight = -100
@@ -15,7 +15,7 @@ Paginate = 4
 [[menu.main]]
     name = "FAQ"
     weight = -100
-    url = "/faq/"
+    url = "https://github.com/hootsuite/atlantis#faq"
 [[menu.main]]
     name = "Demo"
     weight = 100

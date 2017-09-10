@@ -8,6 +8,8 @@
 ## Walkthrough Video
 [![Atlantis Walkthrough](./docs/atlantis-walkthrough-icon.png)](https://www.youtube.com/watch?v=TmIPWda0IKg)
 
+Read about [Why We Built Atlantis](https://www.atlantis.run/blog/atlantis-release/)
+
 [![CircleCI](https://circleci.com/gh/hootsuite/atlantis/tree/master.svg?style=shield&circle-token=08bf5b34233b0e168a9dd73e01cafdcf7dc4bf16)](https://circleci.com/gh/hootsuite/atlantis/tree/master)
 [![SuperDopeBadge](https://img.shields.io/badge/Hightower-extra%20dope-b9f2ff.svg)](https://twitter.com/kelseyhightower/status/893260922222813184)
 [![Slack Status](https://thawing-headland-22460.herokuapp.com/badge.svg)](https://thawing-headland-22460.herokuapp.com)

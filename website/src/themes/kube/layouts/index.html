@@ -3,40 +3,45 @@
 {{ define "main"}}
 
 <div id="main">
-  <div id="hero">
-    <img class="logo" src="/img/atlantis-logo.png" />
-    <h1>{{.Title}}</h1>
-    <p>{{.Description}}</p>
-  </div>
-  <div id="action-buttons">
-    <a class="button primary big" href="https://github.com/hootsuite/atlantis/releases/tag/v0.1.2">Download</a> <a class="button outline big" href="/docs/getting-started">Get Started</a>
-    <p>Version 0.1.2</p>
-  </div>
-  <div id="kube-features">
-    <div class="row gutters">
-      <div class="col col-4 item">
-        <figure>
-          <img alt="Collaborate" height="48" src="/img/collaborate.png" width="48">
-        </figure>
-        <h3>Collaborate on Terraform with your team</h3>
-        <p>Run terraform plan and apply from GitHub pull requests so everyone can review the output</p>
-      </div>
-      <div class="col col-4 item">
-        <figure>
-          <img alt="Lock Environment" height="48" src="/img/locking.png" width="48">
-        </figure>
-        <h3>Lock environments</h3>
-        <p>Lock environments until pull requests are merged to prevent concurrent modification and confusion.</p>
-      </div>
-      <div class="col col-4 item">
-        <figure>
-          <img alt="No need to distribute credentials" height="48" src="/img/no-need-to-distribute-keys.png" width="48">
-        </figure>
-        <h3>No need to distribute credentials</h3>
-        <p>No need to distribute credentials to your whole team. Developers can submit Terraform changes and run plan and apply directly from the pull request.</p>
-      </div>
+    <div id="hero">
+        <img class="logo" src="/img/atlantis-logo.png"/>
+        <h1>{{.Title}}</h1>
+        <p>{{.Description}}</p>
     </div>
-</div>
+    <div id="action-buttons">
+        <a class="button primary big" href="https://github.com/hootsuite/atlantis/releases/tag/v0.1.2">Download</a> <a
+            class="button outline big" href="https://github.com/hootsuite/atlantis#getting-started">Get Started</a>
+        <p>Version 0.1.2</p>
+    </div>
+    <div id="kube-features">
+        <div class="row gutters">
+            <div class="col col-4 item">
+                <figure>
+                    <img alt="Collaborate" height="48" src="/img/collaborate.png" width="48">
+                </figure>
+                <h3>Collaborate on Terraform with your team</h3>
+                <p>Run terraform plan and apply from GitHub pull requests so everyone can review the output</p>
+            </div>
+            <div class="col col-4 item">
+                <figure>
+                    <img alt="No need to distribute credentials" height="48" src="/img/no-need-to-distribute-keys.png"
+                         width="48">
+                </figure>
+                <h3>No need to distribute credentials</h3>
+                <p>No need to distribute credentials to your whole team. Developers can submit Terraform changes and run
+                    plan and apply directly from the pull request.</p>
+            </div>
+            <div class="col col-4 item">
+                <figure>
+                    <img alt="Lock Environment" height="48" src="/img/locking.png" width="48">
+                </figure>
+                <h3>Lock environments</h3>
+                <p>Lock environments until pull requests are merged to prevent concurrent modification and
+                    confusion.</p>
+            </div>
+        </div>
+    </div>
+    <div style="text-align: center; font-size: 21px; line-height: 32px; color: rgba(0,0,0,0.5)"><p>Read about <a href="/blog/atlantis-release/">Why We Built Atlantis</a><p></div>
 </div>
 {{ end }}
 {{ define "footer"}} {{ partial "footer" .}} {{end}}
