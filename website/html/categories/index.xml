@@ -10,14 +10,5 @@
 	<atom:link href="http://atlantis.run/categories/index.xml" rel="self" type="application/rss+xml" />
     
     
-    <item>
-      <title>General</title>
-      <link>http://atlantis.run/categories/general/</link>
-      <pubDate>Thu, 02 Mar 2017 21:56:55 +0100</pubDate>
-      
-      <guid>http://atlantis.run/categories/general/</guid>
-      <description></description>
-    </item>
-    
   </channel>
 </rss>

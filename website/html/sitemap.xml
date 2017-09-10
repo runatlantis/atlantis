@@ -3,22 +3,22 @@
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   
   <url>
-    <loc>http://atlantis.run/blog/welcome/</loc>
-    <lastmod>2017-03-02T21:56:55+01:00</lastmod>
-  </url>
-  
-  <url>
     <loc>http://atlantis.run/docs/getting-started/</loc>
   </url>
   
   <url>
+    <loc>http://atlantis.run/blog/atlantis-release/</loc>
+    <lastmod>2017-09-11T21:56:55-07:00</lastmod>
+  </url>
+  
+  <url>
     <loc>http://atlantis.run/</loc>
-    <lastmod>2017-03-02T21:56:55+01:00</lastmod>
+    <lastmod>2017-09-11T21:56:55-07:00</lastmod>
   </url>
   
   <url>
     <loc>http://atlantis.run/blog/</loc>
-    <lastmod>2017-03-02T21:56:55+01:00</lastmod>
+    <lastmod>2017-09-11T21:56:55-07:00</lastmod>
     <priority>0</priority>
   </url>
   
@@ -33,30 +33,11 @@
   </url>
   
   <url>
-    <loc>http://atlantis.run/tags/example/</loc>
-    <lastmod>2017-03-02T21:56:55+01:00</lastmod>
-    <priority>0</priority>
-  </url>
-  
-  <url>
     <loc>http://atlantis.run/faq/</loc>
   </url>
   
   <url>
-    <loc>http://atlantis.run/categories/general/</loc>
-    <lastmod>2017-03-02T21:56:55+01:00</lastmod>
-    <priority>0</priority>
-  </url>
-  
-  <url>
-    <loc>http://atlantis.run/tags/markdown/</loc>
-    <lastmod>2017-03-02T21:56:55+01:00</lastmod>
-    <priority>0</priority>
-  </url>
-  
-  <url>
     <loc>http://atlantis.run/tags/</loc>
-    <lastmod>2017-03-02T21:56:55+01:00</lastmod>
     <priority>0</priority>
   </url>
   

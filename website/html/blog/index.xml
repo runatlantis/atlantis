@@ -6,18 +6,19 @@
     <description>Recent content in Blogs on Atlantis - A unified workflow for collaborating on Terraform through GitHub</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Thu, 02 Mar 2017 21:56:55 +0100</lastBuildDate>
+    <lastBuildDate>Mon, 11 Sep 2017 21:56:55 -0700</lastBuildDate>
     
 	<atom:link href="http://atlantis.run/blog/index.xml" rel="self" type="application/rss+xml" />
     
     
     <item>
-      <title>Welcome to Atlantis</title>
-      <link>http://atlantis.run/blog/welcome/</link>
-      <pubDate>Thu, 02 Mar 2017 21:56:55 +0100</pubDate>
+      <title>Atlantis: A Unified Workflow For Collaborating On Terraform</title>
+      <link>http://atlantis.run/blog/atlantis-release/</link>
+      <pubDate>Mon, 11 Sep 2017 21:56:55 -0700</pubDate>
       
-      <guid>http://atlantis.run/blog/welcome/</guid>
-      <description> Welcome to Atlantis - This is the first post from us! </description>
+      <guid>http://atlantis.run/blog/atlantis-release/</guid>
+      <description>We&amp;rsquo;re very excited to announce the open source release of Atlantis! Atlantis is a tool for collaborating on Terraform that&amp;rsquo;s been in use at Hootsuite for over a year. The core functionality of Atlantis enables developers and operators to run terraform plan and apply directly from Terraform pull requests. Atlantis then comments back on the pull request with the output of the commands:
+This is a simple feature, however it has had a massive effect on how our team writes Terraform.</description>
     </item>
     
   </channel>
