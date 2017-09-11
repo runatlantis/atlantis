@@ -3,6 +3,7 @@ languageCode = "en-us"
 title = "Atlantis - A unified workflow for collaborating on Terraform through GitHub"
 theme = "kube"
 description = "A unified workflow for collaborating on Terraform through GitHub"
+googleAnalytics = "UA-106153942-1"
 Paginate = 4
 [[menu.main]]
     name = "Docs"

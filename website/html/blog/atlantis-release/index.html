@@ -50,6 +50,13 @@
   
   
   
+<script>
+window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+ga('create', 'UA-106153942-1', 'auto');
+ga('send', 'pageview');
+</script>
+<script async src='//www.google-analytics.com/analytics.js'></script>
+
   
 
   <link rel="canonical" href="http://atlantis.run/blog/atlantis-release/">  
@@ -170,7 +177,7 @@
 <p>When writing Terraform, there are a number of workflows you can follow. The simplest workflow is just using <code>master</code>:</p>
 
 <p style="text-align: center">
-<img src="/img/master-flow.png" style="height: 150px">
+<img src="/img/master-flow.png" style="max-height: 150px">
 </p>
 
 <p>In this workflow, you work on <code>master</code> and run <code>terraform</code> locally. The problem with this workflow is that there is no collaboration or code review. So we start to use pull requests:</p>
