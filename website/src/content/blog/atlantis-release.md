@@ -33,7 +33,7 @@ Atlantis was built to solve two problems that arose at Hootsuite as we adopted T
 When writing Terraform, there are a number of workflows you can follow. The simplest workflow is just using `master`:
 
 <p style="text-align: center">
-<img src="/img/master-flow.png" style="height: 150px">
+<img src="/img/master-flow.png" style="max-height: 150px">
 </p>
 
 In this workflow, you work on `master` and run `terraform` locally. The problem with this workflow is that there is no collaboration or code review. So we start to use pull requests:
