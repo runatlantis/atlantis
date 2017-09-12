@@ -54,3 +54,4 @@ generate-website-html: ## Generate HTML for website
 
 upload-website-html: ## Upload generated website to s3
 	aws s3 sync website/html/ s3://atlantis.run/
+	rm -rf website/html/
