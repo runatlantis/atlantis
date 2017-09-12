@@ -53,5 +53,6 @@ generate-website-html: ## Generate HTML for website
 	cd website/src && hugo -d ../html
 
 upload-website-html: ## Upload generated website to s3
+	aws s3 rm s3://atlantis.run/ --recursive
 	aws s3 sync website/html/ s3://atlantis.run/
 	rm -rf website/html/
