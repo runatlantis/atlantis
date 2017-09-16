@@ -128,6 +128,12 @@
   revision = "d0303fe809921458f417bcf828397a65db30a7e4"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/mohae/deepcopy"
+  packages = ["."]
+  revision = "491d3605edfb866af34a48075bd4355ac1bf46ca"
+
+[[projects]]
   name = "github.com/pelletier/go-buffruneio"
   packages = ["."]
   revision = "c37440a7cf42ac63b919c752ca73a85067e05992"
@@ -220,6 +226,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "e35b79854b0dbecf6218c77f173bfd5403f718c50fd48be273cd2ceae08abff2"
+  inputs-digest = "5f8263e051e92b10d478d81add4b1fc9d6e7cb7dba280c123a13b2c1d2150a64"
   solver-name = "gps-cdcl"
   solver-version = 1
