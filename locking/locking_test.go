@@ -1,6 +1,6 @@
 package locking_test
 
-import (
+	import (
 	"testing"
 	"github.com/hootsuite/atlantis/models"
 	"errors"

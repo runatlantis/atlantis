@@ -85,7 +85,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	githubStatus := &GithubStatus{client: githubClient}
+	githubStatus := &GithubStatus{Client: githubClient}
 	terraformClient, err := terraform.NewClient()
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing terraform")

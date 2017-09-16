@@ -25,7 +25,7 @@ const (
 )
 
 type GithubStatus struct {
-	client github.Client
+	Client github.Client
 }
 
 func (s Status) String() string {
@@ -44,7 +44,7 @@ func (s Status) String() string {
 
 func (g *GithubStatus) Update(repo models.Repo, pull models.PullRequest, status Status, step string) error {
 	description := fmt.Sprintf("%s %s", strings.Title(step), strings.Title(status.String()))
-	return g.client.UpdateStatus(repo, pull, status.String(), description, statusContext)
+	return g.Client.UpdateStatus(repo, pull, status.String(), description, statusContext)
 }
 
 func (g *GithubStatus) UpdateProjectResult(ctx *CommandContext, projectResults []ProjectResult) error {

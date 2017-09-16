@@ -13,18 +13,18 @@ import (
 	"github.com/pkg/errors"
 )
 
-// ConcreteClient is used to perform GitHub actions.
-type ConcreteClient struct {
-	client *github.Client
-	ctx    context.Context
-}
-
 type Client interface {
 	GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error)
 	CreateComment(repo models.Repo, pull models.PullRequest, comment string) error
 	PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error)
 	GetPullRequest(repo models.Repo, num int) (*github.PullRequest, *github.Response, error)
 	UpdateStatus(repo models.Repo, pull models.PullRequest, state string, description string, context string) error
+}
+
+// ConcreteClient is used to perform GitHub actions.
+type ConcreteClient struct {
+	client *github.Client
+	ctx    context.Context
 }
 
 // NewClient returns a valid GitHub client.
