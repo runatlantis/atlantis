@@ -17,7 +17,7 @@ import (
 )
 
 type ApplyExecutor struct {
-	github                *github.Client
+	github                github.Client
 	githubStatus          *GithubStatus
 	terraform             *terraform.Client
 	githubCommentRenderer *GithubCommentRenderer

@@ -31,6 +31,9 @@ test: ## Run tests, coverage reports, and clean (coverage taints the compiled co
 test-coverage:
 	./scripts/coverage.sh
 
+test-coverage-html:
+	./scripts/coverage.sh --html
+
 dist: ## Package up everything in static/ using go-bindata-assetfs so it can be served by a single binary
 	go-bindata-assetfs -pkg server static/... && mv bindata_assetfs.go server
 

@@ -12,17 +12,20 @@ import (
 type Status int
 
 const (
-	statusContext        = "Atlantis"
-	Pending       Status = iota
+	statusContext = "Atlantis"
+	PlanStep      = "plan"
+	ApplyStep     = "apply"
+)
+
+const (
+	Pending Status = iota
 	Success
 	Failure
 	Error
-	PlanStep  = "plan"
-	ApplyStep = "apply"
 )
 
 type GithubStatus struct {
-	client *github.Client
+	client github.Client
 }
 
 func (s Status) String() string {

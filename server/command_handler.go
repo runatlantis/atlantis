@@ -12,7 +12,7 @@ type CommandHandler struct {
 	planExecutor  *PlanExecutor
 	applyExecutor *ApplyExecutor
 	helpExecutor  *HelpExecutor
-	githubClient  *github.Client
+	githubClient  github.Client
 	eventParser   *EventParser
 	logger        *logging.SimpleLogger
 }

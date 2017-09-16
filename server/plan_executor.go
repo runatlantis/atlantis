@@ -19,7 +19,7 @@ import (
 // PlanExecutor handles everything related to running terraform plan
 // including integration with S3, Terraform, and GitHub
 type PlanExecutor struct {
-	github                *github.Client
+	github                github.Client
 	githubStatus          *GithubStatus
 	s3Bucket              string
 	terraform             *terraform.Client

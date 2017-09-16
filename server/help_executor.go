@@ -6,7 +6,7 @@ import (
 )
 
 type HelpExecutor struct {
-	github *github.Client
+	github github.Client
 }
 
 var helpComment = "```cmake\n" +
