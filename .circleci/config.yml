@@ -11,7 +11,6 @@ jobs:
       - setup_remote_docker:
           reusable: true
       - run: make deps
-      - run: make test-deps
       - run: make test
       - run: make build-service
       - run:

@@ -25,9 +25,6 @@ deps: ## Download dependencies
 build-service: ## Build the main Go service
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o atlantis .
 
-test-deps: ## Get test dependencies
-	go get -t .
-
 test: ## Run tests, coverage reports, and clean (coverage taints the compiled code)
 	go test $(PKG)
 
@@ -39,9 +36,6 @@ dist: ## Package up everything in static/ using go-bindata-assetfs so it can be 
 
 release: ## Create packages for a release
 	./scripts/binary-release.sh
-
-vendor-status:
-	@govendor status
 
 fmt: ## Run goimports (which also formats)
 	goimports -w $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "./server/bindata_assetfs.go")
