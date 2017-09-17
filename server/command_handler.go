@@ -74,7 +74,7 @@ func (c *CommandHandler) ExecuteCommand(ctx *CommandContext) {
 	src := fmt.Sprintf("%s/pull/%d", ctx.BaseRepo.FullName, ctx.Pull.Num)
 	// it's safe to reuse the underlying logger
 	ctx.Log = logging.NewSimpleLogger(src, c.logger.Logger, true, c.logger.Level)
-	defer c.recover(ctx)
+	defer c.logPanics(ctx)
 
 	// need to get additional data from the PR
 	ghPull, _, err := c.githubClient.GetPullRequest(ctx.BaseRepo, ctx.Pull.Num)
@@ -112,8 +112,8 @@ func (c *CommandHandler) SetLockURL(f func(id string) (url string)) {
 	c.planExecutor.LockURL = f
 }
 
-// recover logs and creates a comment on the pull request for panics
-func (c *CommandHandler) recover(ctx *CommandContext) {
+// logPanics logs and creates a comment on the pull request for panics
+func (c *CommandHandler) logPanics(ctx *CommandContext) {
 	if err := recover(); err != nil {
 		stack := recovery.Stack(3)
 		c.githubClient.CreateComment(ctx.BaseRepo, ctx.Pull, fmt.Sprintf("**Error: goroutine panic. This is a bug.**\n```\n%s\n%s```", err, stack))
