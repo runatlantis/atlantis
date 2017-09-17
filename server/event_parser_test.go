@@ -12,9 +12,21 @@ import (
 	"github.com/mohae/deepcopy"
 )
 
+var ghRepo = github.Repository{
+	FullName: github.String("owner/repo"),
+	Owner: &github.User{Login: github.String("owner")},
+	Name: github.String("repo"),
+	CloneURL: github.String("https://github.com/lkysow/atlantis-example.git"),
+}
+var parser = server.EventParser{"user", "token"}
+
+func TestDetermineCommandNoBody(t *testing.T) {
+	_, err := parser.DetermineCommand(&github.IssueCommentEvent{})
+	Equals(t, errors.New("comment.body is null"), err)
+}
+
 func TestDetermineCommandInvalid(t *testing.T) {
 	t.Log("given a comment that does not match the regex should return an error")
-	e := server.EventParser{"user", "token"}
 	comments := []string{
 		// just the executable, no command
 		"run",
@@ -29,14 +41,13 @@ func TestDetermineCommandInvalid(t *testing.T) {
 		"related comment mentioning atlantis",
 	}
 	for _, c := range comments {
-		_, e := e.DetermineCommand(buildComment(c))
+		_, e := parser.DetermineCommand(buildComment(c))
 		Assert(t, e != nil, "expected error for comment: "+c)
 	}
 }
 
 func TestDetermineCommandHelp(t *testing.T) {
 	t.Log("given a help comment, should match")
-	e := server.EventParser{"user", "token"}
 	comments := []string{
 		"run help",
 		"atlantis help",
@@ -44,15 +55,13 @@ func TestDetermineCommandHelp(t *testing.T) {
 		"atlantis help --verbose",
 	}
 	for _, c := range comments {
-		command, e := e.DetermineCommand(buildComment(c))
+		command, e := parser.DetermineCommand(buildComment(c))
 		Ok(t, e)
 		Equals(t, server.Help, command.Name)
 	}
 }
 
 func TestDetermineCommandPermutations(t *testing.T) {
-	e := server.EventParser{"user", "token"}
-
 	execNames := []string{"run", "atlantis", "@user"}
 	commandNames := []server.CommandName{server.Plan, server.Apply}
 	envs := []string{"", "default", "env", "env-dash", "env_underscore", "camelEnv"}
@@ -78,7 +87,7 @@ func TestDetermineCommandPermutations(t *testing.T) {
 					for _, lineEnding := range []string{"", "\r\n"} {
 						comment := strings.Join(append([]string{exec, name.String(), env}, flags...), " ") + lineEnding
 						t.Log("testing comment: " + comment)
-						c, err := e.DetermineCommand(buildComment(comment))
+						c, err := parser.DetermineCommand(buildComment(comment))
 						Ok(t, err)
 						Equals(t, name, c.Name)
 						if env == "" {
@@ -107,57 +116,43 @@ func TestDetermineCommandPermutations(t *testing.T) {
 }
 
 func TestExtractRepoData(t *testing.T) {
-	parser := &server.EventParser{"user", "token"}
-	repo := github.Repository{
-		FullName: github.String("owner/repo"),
-		Owner: &github.User{Login: github.String("owner")},
-		Name: github.String("repo"),
-		CloneURL: github.String("https://github.com/lkysow/atlantis-example.git"),
-	}
-
-	testRepo := repo
+	testRepo := ghRepo
 	testRepo.FullName = nil
 	_, err := parser.ExtractRepoData(&testRepo)
 	Equals(t, errors.New("repository.full_name is null"), err)
 
-	testRepo = repo
+	testRepo = ghRepo
 	testRepo.Owner = nil
 	_, err = parser.ExtractRepoData(&testRepo)
 	Equals(t, errors.New("repository.owner.login is null"), err)
 
-	testRepo = repo
+	testRepo = ghRepo
 	testRepo.Name = nil
 	_, err = parser.ExtractRepoData(&testRepo)
 	Equals(t, errors.New("repository.name is null"), err)
 
-	testRepo = repo
+	testRepo = ghRepo
 	testRepo.CloneURL = nil
 	_, err = parser.ExtractRepoData(&testRepo)
 	Equals(t, errors.New("repository.clone_url is null"), err)
 
 	t.Log("should replace https clone with user/pass")
 	{
-		r, err := parser.ExtractRepoData(&repo)
+		r, err := parser.ExtractRepoData(&ghRepo)
 		Ok(t, err)
 		Equals(t, models.Repo{
 			Owner: "owner",
 			FullName: "owner/repo",
 			CloneURL: "https://user:token@github.com/lkysow/atlantis-example.git",
-			SanitizedCloneURL: *repo.CloneURL,
+			SanitizedCloneURL: ghRepo.GetCloneURL(),
 			Name: "repo",
 		}, r)
 	}
 }
 
 func TestExtractCommentData(t *testing.T) {
-	parser := &server.EventParser{"user", "token"}
 	comment := github.IssueCommentEvent{
-		Repo: &github.Repository{
-			FullName: github.String("owner/repo"),
-			Owner: &github.User{Login: github.String("owner")},
-			Name: github.String("repo"),
-			CloneURL: github.String("https://github.com/lkysow/atlantis-example.git"),
-		},
+		Repo: &ghRepo,
 		Issue: &github.Issue{
 			Number: github.Int(1),
 			User: &github.User{Login: github.String("issue_user")},
@@ -210,6 +205,77 @@ func TestExtractCommentData(t *testing.T) {
 	Equals(t, models.PullRequest{
 		Num: *comment.Issue.Number,
 	}, ctx.Pull)
+}
+
+func TestExtractPullData(t *testing.T) {
+	pull := github.PullRequest{
+		Head: &github.PullRequestBranch{
+			SHA: github.String("sha256"),
+			Ref: github.String("ref"),
+			Repo: &ghRepo,
+		},
+		Base: &github.PullRequestBranch{
+			SHA: github.String("sha256"),
+		},
+		HTMLURL: github.String("html-url"),
+		User: &github.User{
+			Login: github.String("user"),
+		},
+		Number: github.Int(1),
+	}
+
+	testPull := deepcopy.Copy(pull).(github.PullRequest)
+	testPull.Head.SHA = nil
+	_, _, err := parser.ExtractPullData(&testPull)
+	Equals(t, errors.New("head.sha is null"), err)
+
+	testPull = deepcopy.Copy(pull).(github.PullRequest)
+	testPull.Base.SHA = nil
+	_, _, err = parser.ExtractPullData(&testPull)
+	Equals(t, errors.New("base.sha is null"), err)
+
+	testPull = deepcopy.Copy(pull).(github.PullRequest)
+	testPull.HTMLURL = nil
+	_, _, err = parser.ExtractPullData(&testPull)
+	Equals(t, errors.New("html_url is null"), err)
+
+	testPull = deepcopy.Copy(pull).(github.PullRequest)
+	testPull.Head.Ref = nil
+	_, _, err = parser.ExtractPullData(&testPull)
+	Equals(t, errors.New("head.ref is null"), err)
+
+	testPull = deepcopy.Copy(pull).(github.PullRequest)
+	testPull.User.Login = nil
+	_, _, err = parser.ExtractPullData(&testPull)
+	Equals(t, errors.New("user.login is null"), err)
+
+	testPull = deepcopy.Copy(pull).(github.PullRequest)
+	testPull.Number = nil
+	_, _, err = parser.ExtractPullData(&testPull)
+	Equals(t, errors.New("number is null"), err)
+
+	testPull = deepcopy.Copy(pull).(github.PullRequest)
+	testPull.Head.Repo = nil
+	_, _, err = parser.ExtractPullData(&testPull)
+	Equals(t, errors.New("repository.full_name is null"), err)
+
+	pullRes, repoRes, err := parser.ExtractPullData(&pull)
+	Equals(t, models.PullRequest{
+		BaseCommit: pull.Base.GetSHA(),
+		URL: pull.GetHTMLURL(),
+		Author: pull.User.GetLogin(),
+		Branch: pull.Head.GetRef(),
+		HeadCommit: pull.Head.GetSHA(),
+		Num: pull.GetNumber(),
+	}, pullRes)
+
+	Equals(t,models.Repo{
+		Owner: "owner",
+		FullName: "owner/repo",
+		CloneURL: "https://user:token@github.com/lkysow/atlantis-example.git",
+		SanitizedCloneURL: ghRepo.GetCloneURL(),
+		Name: "repo",
+	}, repoRes)
 }
 
 func buildComment(c string) *github.IssueCommentEvent {
