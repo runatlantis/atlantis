@@ -6,7 +6,7 @@ import (
 )
 
 type HelpExecutor struct {
-	github github.Client
+	Github github.Client
 }
 
 var helpComment = "```cmake\n" +
@@ -35,8 +35,8 @@ atlantis apply staging
 atlantis apply
 `
 
-func (h *HelpExecutor) execute(ctx *CommandContext) {
+func (h *HelpExecutor) Execute(ctx *CommandContext) {
 	ctx.Log.Info("generating help comment....")
-	h.github.CreateComment(ctx.BaseRepo, ctx.Pull, helpComment)
+	h.Github.CreateComment(ctx.BaseRepo, ctx.Pull, helpComment)
 	return
 }

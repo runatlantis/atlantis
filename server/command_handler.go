@@ -102,7 +102,7 @@ func (c *CommandHandler) ExecuteCommand(ctx *CommandContext) {
 	case Apply:
 		c.applyExecutor.execute(ctx)
 	case Help:
-		c.helpExecutor.execute(ctx)
+		c.helpExecutor.Execute(ctx)
 	default:
 		ctx.Log.Err("failed to determine desired command, neither plan nor apply")
 	}

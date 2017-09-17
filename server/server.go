@@ -127,7 +127,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 		workspace:             workspace,
 	}
 	helpExecutor := &HelpExecutor{
-		github: githubClient,
+		Github: githubClient,
 	}
 	pullClosedExecutor := &PullClosedExecutor{
 		github:    githubClient,
