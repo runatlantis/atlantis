@@ -3,13 +3,14 @@ package server_test
 import (
 	"testing"
 
+	"errors"
+	"strings"
+
 	"github.com/google/go-github/github"
+	. "github.com/hootsuite/atlantis/github/fixtures"
+	"github.com/hootsuite/atlantis/models"
 	"github.com/hootsuite/atlantis/server"
 	. "github.com/hootsuite/atlantis/testing_util"
-	. "github.com/hootsuite/atlantis/github/fixtures"
-	"strings"
-	"errors"
-	"github.com/hootsuite/atlantis/models"
 	"github.com/mohae/deepcopy"
 )
 
@@ -136,11 +137,11 @@ func TestExtractRepoData(t *testing.T) {
 		r, err := parser.ExtractRepoData(&Repo)
 		Ok(t, err)
 		Equals(t, models.Repo{
-			Owner: "owner",
-			FullName: "owner/repo",
-			CloneURL: "https://user:token@github.com/lkysow/atlantis-example.git",
+			Owner:             "owner",
+			FullName:          "owner/repo",
+			CloneURL:          "https://user:token@github.com/lkysow/atlantis-example.git",
 			SanitizedCloneURL: Repo.GetCloneURL(),
-			Name: "repo",
+			Name:              "repo",
 		}, r)
 	}
 }
@@ -149,8 +150,8 @@ func TestExtractCommentData(t *testing.T) {
 	comment := github.IssueCommentEvent{
 		Repo: &Repo,
 		Issue: &github.Issue{
-			Number: github.Int(1),
-			User: &github.User{Login: github.String("issue_user")},
+			Number:  github.Int(1),
+			User:    &github.User{Login: github.String("issue_user")},
 			HTMLURL: github.String("https://github.com/hootsuite/atlantis/issues/1"),
 		},
 		Comment: &github.IssueComment{
@@ -188,11 +189,11 @@ func TestExtractCommentData(t *testing.T) {
 	err = parser.ExtractCommentData(&comment, &ctx)
 	Ok(t, err)
 	Equals(t, models.Repo{
-		Owner: *comment.Repo.Owner.Login,
-		FullName: *comment.Repo.FullName,
-		CloneURL: "https://user:token@github.com/lkysow/atlantis-example.git",
+		Owner:             *comment.Repo.Owner.Login,
+		FullName:          *comment.Repo.FullName,
+		CloneURL:          "https://user:token@github.com/lkysow/atlantis-example.git",
 		SanitizedCloneURL: *comment.Repo.CloneURL,
-		Name: "repo",
+		Name:              "repo",
 	}, ctx.BaseRepo)
 	Equals(t, models.User{
 		Username: *comment.Comment.User.Login,
@@ -241,19 +242,19 @@ func TestExtractPullData(t *testing.T) {
 	PullRes, repoRes, err := parser.ExtractPullData(&Pull)
 	Equals(t, models.PullRequest{
 		BaseCommit: Pull.Base.GetSHA(),
-		URL: Pull.GetHTMLURL(),
-		Author: Pull.User.GetLogin(),
-		Branch: Pull.Head.GetRef(),
+		URL:        Pull.GetHTMLURL(),
+		Author:     Pull.User.GetLogin(),
+		Branch:     Pull.Head.GetRef(),
 		HeadCommit: Pull.Head.GetSHA(),
-		Num: Pull.GetNumber(),
+		Num:        Pull.GetNumber(),
 	}, PullRes)
 
-	Equals(t,models.Repo{
-		Owner: "owner",
-		FullName: "owner/repo",
-		CloneURL: "https://user:token@github.com/lkysow/atlantis-example.git",
+	Equals(t, models.Repo{
+		Owner:             "owner",
+		FullName:          "owner/repo",
+		CloneURL:          "https://user:token@github.com/lkysow/atlantis-example.git",
 		SanitizedCloneURL: Repo.GetCloneURL(),
-		Name: "repo",
+		Name:              "repo",
 	}, repoRes)
 }
 
@@ -273,4 +274,3 @@ func stringInSlice(a string, list []string) bool {
 	}
 	return false
 }
-

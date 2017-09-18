@@ -1,15 +1,16 @@
 package locking_test
 
 import (
-	"testing"
-	"github.com/hootsuite/atlantis/models"
 	"errors"
-	"github.com/hootsuite/atlantis/locking"
-	. "github.com/hootsuite/atlantis/testing_util"
-	"github.com/golang/mock/gomock"
-	"time"
 	"strings"
+	"testing"
+	"time"
+
+	"github.com/golang/mock/gomock"
+	"github.com/hootsuite/atlantis/locking"
 	"github.com/hootsuite/atlantis/locking/mocks"
+	"github.com/hootsuite/atlantis/models"
+	. "github.com/hootsuite/atlantis/testing_util"
 )
 
 var project = models.NewProject("owner/repo", "path")

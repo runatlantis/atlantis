@@ -1,20 +1,21 @@
 package server_test
 
 import (
+	"errors"
+	"log"
+	"os"
 	"testing"
+
 	"github.com/golang/mock/gomock"
-	"github.com/hootsuite/atlantis/server/mocks"
-	ghmocks "github.com/hootsuite/atlantis/github/mocks"
-	"github.com/hootsuite/atlantis/server"
+	"github.com/google/go-github/github"
 	gh "github.com/hootsuite/atlantis/github/fixtures"
+	ghmocks "github.com/hootsuite/atlantis/github/mocks"
+	"github.com/hootsuite/atlantis/logging"
+	"github.com/hootsuite/atlantis/models/fixtures"
+	"github.com/hootsuite/atlantis/server"
+	"github.com/hootsuite/atlantis/server/mocks"
 	. "github.com/hootsuite/atlantis/testing_util"
 	"github.com/mohae/deepcopy"
-	"github.com/google/go-github/github"
-	"github.com/hootsuite/atlantis/logging"
-	"os"
-	"log"
-	"github.com/hootsuite/atlantis/models/fixtures"
-	"errors"
 )
 
 func TestExecuteCommand_PullErr(t *testing.T) {
@@ -33,13 +34,13 @@ func TestExecuteCommand_PullErr(t *testing.T) {
 		HelpExecutor:  helper,
 		GithubClient:  ghClient,
 		EventParser:   parser,
-		Logger: logging.NewSimpleLogger("", log.New(os.Stderr, "", log.LstdFlags), false, logging.Debug),
+		Logger:        logging.NewSimpleLogger("", log.New(os.Stderr, "", log.LstdFlags), false, logging.Debug),
 	}
 
 	ghClient.EXPECT().GetPullRequest(fixtures.Repo, fixtures.Pull.Num).Return(nil, nil, errors.New("err"))
 	ch.ExecuteCommand(&server.CommandContext{
 		BaseRepo: fixtures.Repo,
-		Pull: fixtures.Pull,
+		Pull:     fixtures.Pull,
 	})
 }
 
@@ -59,7 +60,7 @@ func TestExecuteCommand_ExtractErr(t *testing.T) {
 		HelpExecutor:  helper,
 		GithubClient:  ghClient,
 		EventParser:   parser,
-		Logger: logging.NewSimpleLogger("", log.New(os.Stderr, "", log.LstdFlags), false, logging.Debug),
+		Logger:        logging.NewSimpleLogger("", log.New(os.Stderr, "", log.LstdFlags), false, logging.Debug),
 	}
 
 	pull := deepcopy.Copy(gh.Pull).(github.PullRequest)
@@ -69,7 +70,7 @@ func TestExecuteCommand_ExtractErr(t *testing.T) {
 
 	ch.ExecuteCommand(&server.CommandContext{
 		BaseRepo: fixtures.Repo,
-		Pull: fixtures.Pull,
+		Pull:     fixtures.Pull,
 	})
 }
 
@@ -90,7 +91,7 @@ func TestExecuteCommand_ClosedPull(t *testing.T) {
 		HelpExecutor:  helper,
 		GithubClient:  ghClient,
 		EventParser:   parser,
-		Logger: logging.NewSimpleLogger("", log.New(os.Stderr, "", log.LstdFlags), false, logging.Debug),
+		Logger:        logging.NewSimpleLogger("", log.New(os.Stderr, "", log.LstdFlags), false, logging.Debug),
 	}
 
 	pull := deepcopy.Copy(gh.Pull).(github.PullRequest)
@@ -100,8 +101,8 @@ func TestExecuteCommand_ClosedPull(t *testing.T) {
 
 	ch.ExecuteCommand(&server.CommandContext{
 		BaseRepo: fixtures.Repo,
-		User: fixtures.User,
-		Pull: fixtures.Pull,
+		User:     fixtures.User,
+		Pull:     fixtures.Pull,
 		Command: &server.Command{
 			Name: server.Plan,
 		},
@@ -124,7 +125,7 @@ func TestExecuteCommand_Executors(t *testing.T) {
 		HelpExecutor:  helper,
 		GithubClient:  ghClient,
 		EventParser:   parser,
-		Logger: logging.NewSimpleLogger("", log.New(os.Stderr, "", log.LstdFlags), false, logging.Debug),
+		Logger:        logging.NewSimpleLogger("", log.New(os.Stderr, "", log.LstdFlags), false, logging.Debug),
 	}
 	pull := deepcopy.Copy(gh.Pull).(github.PullRequest)
 	pull.State = github.String("open")
@@ -136,13 +137,13 @@ func TestExecuteCommand_Executors(t *testing.T) {
 		BaseRepo: fixtures.Repo,
 		User:     fixtures.User,
 		Pull:     fixtures.Pull,
-		Command: &cmd,
+		Command:  &cmd,
 	}
 
 	// plan
 	ghClient.EXPECT().GetPullRequest(fixtures.Repo, fixtures.Pull.Num).Return(&pull, nil, nil)
 	parser.EXPECT().ExtractPullData(&pull).Return(fixtures.Pull, fixtures.Repo, nil)
-	planner.EXPECT().Execute(gomock.Any()).Do(func (ctx *server.CommandContext) {
+	planner.EXPECT().Execute(gomock.Any()).Do(func(ctx *server.CommandContext) {
 		// validate that the context was populated with expected data
 		Equals(t, fixtures.Pull, ctx.Pull)
 		Equals(t, fixtures.Repo, ctx.HeadRepo)
@@ -154,7 +155,7 @@ func TestExecuteCommand_Executors(t *testing.T) {
 	cmd.Name = server.Apply
 	ghClient.EXPECT().GetPullRequest(fixtures.Repo, fixtures.Pull.Num).Return(&pull, nil, nil)
 	parser.EXPECT().ExtractPullData(&pull).Return(fixtures.Pull, fixtures.Repo, nil)
-	applier.EXPECT().Execute(gomock.Any()).Do(func (ctx *server.CommandContext) {
+	applier.EXPECT().Execute(gomock.Any()).Do(func(ctx *server.CommandContext) {
 		// validate that the context was populated with expected data
 		Equals(t, fixtures.Pull, ctx.Pull)
 		Equals(t, fixtures.Repo, ctx.HeadRepo)
@@ -166,7 +167,7 @@ func TestExecuteCommand_Executors(t *testing.T) {
 	cmd.Name = server.Help
 	ghClient.EXPECT().GetPullRequest(fixtures.Repo, fixtures.Pull.Num).Return(&pull, nil, nil)
 	parser.EXPECT().ExtractPullData(&pull).Return(fixtures.Pull, fixtures.Repo, nil)
-	helper.EXPECT().Execute(gomock.Any()).Do(func (ctx *server.CommandContext) {
+	helper.EXPECT().Execute(gomock.Any()).Do(func(ctx *server.CommandContext) {
 		// validate that the context was populated with expected data
 		Equals(t, fixtures.Pull, ctx.Pull)
 		Equals(t, fixtures.Repo, ctx.HeadRepo)

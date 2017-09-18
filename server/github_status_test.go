@@ -1,14 +1,15 @@
 package server_test
 
 import (
+	"errors"
+	"strings"
 	"testing"
-	"github.com/hootsuite/atlantis/server"
-	. "github.com/hootsuite/atlantis/testing_util"
+
 	"github.com/golang/mock/gomock"
 	"github.com/hootsuite/atlantis/github/mocks"
 	"github.com/hootsuite/atlantis/models"
-	"errors"
-	"strings"
+	"github.com/hootsuite/atlantis/server"
+	. "github.com/hootsuite/atlantis/testing_util"
 )
 
 var repoModel = models.Repo{}
@@ -51,7 +52,7 @@ func TestUpdateProjectResult(t *testing.T) {
 	}
 	s := server.GithubStatus{mock}
 
-	cases := []struct{
+	cases := []struct {
 		Statuses []string
 		Expected string
 	}{
@@ -92,7 +93,7 @@ func TestUpdateProjectResult(t *testing.T) {
 			results = append(results, result)
 		}
 
-		mock.EXPECT().UpdateStatus(repoModel, pullModel, c.Expected, "Plan " + strings.Title(c.Expected), "Atlantis")
+		mock.EXPECT().UpdateStatus(repoModel, pullModel, c.Expected, "Plan "+strings.Title(c.Expected), "Atlantis")
 		s.UpdateProjectResult(ctx, results)
 	}
 }
