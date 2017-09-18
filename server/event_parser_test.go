@@ -6,18 +6,13 @@ import (
 	"github.com/google/go-github/github"
 	"github.com/hootsuite/atlantis/server"
 	. "github.com/hootsuite/atlantis/testing_util"
+	. "github.com/hootsuite/atlantis/github/fixtures"
 	"strings"
 	"errors"
 	"github.com/hootsuite/atlantis/models"
 	"github.com/mohae/deepcopy"
 )
 
-var ghRepo = github.Repository{
-	FullName: github.String("owner/repo"),
-	Owner: &github.User{Login: github.String("owner")},
-	Name: github.String("repo"),
-	CloneURL: github.String("https://github.com/lkysow/atlantis-example.git"),
-}
 var parser = server.EventParser{"user", "token"}
 
 func TestDetermineCommandNoBody(t *testing.T) {
@@ -116,35 +111,35 @@ func TestDetermineCommandPermutations(t *testing.T) {
 }
 
 func TestExtractRepoData(t *testing.T) {
-	testRepo := ghRepo
+	testRepo := Repo
 	testRepo.FullName = nil
 	_, err := parser.ExtractRepoData(&testRepo)
 	Equals(t, errors.New("repository.full_name is null"), err)
 
-	testRepo = ghRepo
+	testRepo = Repo
 	testRepo.Owner = nil
 	_, err = parser.ExtractRepoData(&testRepo)
 	Equals(t, errors.New("repository.owner.login is null"), err)
 
-	testRepo = ghRepo
+	testRepo = Repo
 	testRepo.Name = nil
 	_, err = parser.ExtractRepoData(&testRepo)
 	Equals(t, errors.New("repository.name is null"), err)
 
-	testRepo = ghRepo
+	testRepo = Repo
 	testRepo.CloneURL = nil
 	_, err = parser.ExtractRepoData(&testRepo)
 	Equals(t, errors.New("repository.clone_url is null"), err)
 
 	t.Log("should replace https clone with user/pass")
 	{
-		r, err := parser.ExtractRepoData(&ghRepo)
+		r, err := parser.ExtractRepoData(&Repo)
 		Ok(t, err)
 		Equals(t, models.Repo{
 			Owner: "owner",
 			FullName: "owner/repo",
 			CloneURL: "https://user:token@github.com/lkysow/atlantis-example.git",
-			SanitizedCloneURL: ghRepo.GetCloneURL(),
+			SanitizedCloneURL: Repo.GetCloneURL(),
 			Name: "repo",
 		}, r)
 	}
@@ -152,7 +147,7 @@ func TestExtractRepoData(t *testing.T) {
 
 func TestExtractCommentData(t *testing.T) {
 	comment := github.IssueCommentEvent{
-		Repo: &ghRepo,
+		Repo: &Repo,
 		Issue: &github.Issue{
 			Number: github.Int(1),
 			User: &github.User{Login: github.String("issue_user")},
@@ -208,72 +203,56 @@ func TestExtractCommentData(t *testing.T) {
 }
 
 func TestExtractPullData(t *testing.T) {
-	pull := github.PullRequest{
-		Head: &github.PullRequestBranch{
-			SHA: github.String("sha256"),
-			Ref: github.String("ref"),
-			Repo: &ghRepo,
-		},
-		Base: &github.PullRequestBranch{
-			SHA: github.String("sha256"),
-		},
-		HTMLURL: github.String("html-url"),
-		User: &github.User{
-			Login: github.String("user"),
-		},
-		Number: github.Int(1),
-	}
-
-	testPull := deepcopy.Copy(pull).(github.PullRequest)
+	testPull := deepcopy.Copy(Pull).(github.PullRequest)
 	testPull.Head.SHA = nil
 	_, _, err := parser.ExtractPullData(&testPull)
 	Equals(t, errors.New("head.sha is null"), err)
 
-	testPull = deepcopy.Copy(pull).(github.PullRequest)
+	testPull = deepcopy.Copy(Pull).(github.PullRequest)
 	testPull.Base.SHA = nil
 	_, _, err = parser.ExtractPullData(&testPull)
 	Equals(t, errors.New("base.sha is null"), err)
 
-	testPull = deepcopy.Copy(pull).(github.PullRequest)
+	testPull = deepcopy.Copy(Pull).(github.PullRequest)
 	testPull.HTMLURL = nil
 	_, _, err = parser.ExtractPullData(&testPull)
 	Equals(t, errors.New("html_url is null"), err)
 
-	testPull = deepcopy.Copy(pull).(github.PullRequest)
+	testPull = deepcopy.Copy(Pull).(github.PullRequest)
 	testPull.Head.Ref = nil
 	_, _, err = parser.ExtractPullData(&testPull)
 	Equals(t, errors.New("head.ref is null"), err)
 
-	testPull = deepcopy.Copy(pull).(github.PullRequest)
+	testPull = deepcopy.Copy(Pull).(github.PullRequest)
 	testPull.User.Login = nil
 	_, _, err = parser.ExtractPullData(&testPull)
 	Equals(t, errors.New("user.login is null"), err)
 
-	testPull = deepcopy.Copy(pull).(github.PullRequest)
+	testPull = deepcopy.Copy(Pull).(github.PullRequest)
 	testPull.Number = nil
 	_, _, err = parser.ExtractPullData(&testPull)
 	Equals(t, errors.New("number is null"), err)
 
-	testPull = deepcopy.Copy(pull).(github.PullRequest)
+	testPull = deepcopy.Copy(Pull).(github.PullRequest)
 	testPull.Head.Repo = nil
 	_, _, err = parser.ExtractPullData(&testPull)
 	Equals(t, errors.New("repository.full_name is null"), err)
 
-	pullRes, repoRes, err := parser.ExtractPullData(&pull)
+	PullRes, repoRes, err := parser.ExtractPullData(&Pull)
 	Equals(t, models.PullRequest{
-		BaseCommit: pull.Base.GetSHA(),
-		URL: pull.GetHTMLURL(),
-		Author: pull.User.GetLogin(),
-		Branch: pull.Head.GetRef(),
-		HeadCommit: pull.Head.GetSHA(),
-		Num: pull.GetNumber(),
-	}, pullRes)
+		BaseCommit: Pull.Base.GetSHA(),
+		URL: Pull.GetHTMLURL(),
+		Author: Pull.User.GetLogin(),
+		Branch: Pull.Head.GetRef(),
+		HeadCommit: Pull.Head.GetSHA(),
+		Num: Pull.GetNumber(),
+	}, PullRes)
 
 	Equals(t,models.Repo{
 		Owner: "owner",
 		FullName: "owner/repo",
 		CloneURL: "https://user:token@github.com/lkysow/atlantis-example.git",
-		SanitizedCloneURL: ghRepo.GetCloneURL(),
+		SanitizedCloneURL: Repo.GetCloneURL(),
 		Name: "repo",
 	}, repoRes)
 }

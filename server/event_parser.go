@@ -9,6 +9,13 @@ import (
 	"github.com/hootsuite/atlantis/models"
 )
 
+type EventParsing interface {
+	DetermineCommand(comment *github.IssueCommentEvent) (*Command, error)
+	ExtractCommentData(comment *github.IssueCommentEvent, ctx *CommandContext) error
+	ExtractPullData(pull *github.PullRequest) (models.PullRequest, models.Repo, error)
+	ExtractRepoData(ghRepo *github.Repository) (models.Repo, error)
+}
+
 type EventParser struct {
 	GithubUser  string
 	GithubToken string

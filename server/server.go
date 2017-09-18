@@ -140,12 +140,12 @@ func NewServer(config ServerConfig) (*Server, error) {
 		GithubToken: config.GithubToken,
 	}
 	commandHandler := &CommandHandler{
-		applyExecutor: applyExecutor,
-		planExecutor:  planExecutor,
-		helpExecutor:  helpExecutor,
-		eventParser:   eventParser,
-		githubClient:  githubClient,
-		logger:        logger,
+		ApplyExecutor: applyExecutor,
+		PlanExecutor:  planExecutor,
+		HelpExecutor:  helpExecutor,
+		EventParser:   eventParser,
+		GithubClient:  githubClient,
+		Logger:        logger,
 	}
 	router := mux.NewRouter()
 	return &Server{
