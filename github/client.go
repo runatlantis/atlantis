@@ -13,14 +13,22 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Client is used to perform GitHub actions.
-type Client struct {
+type Client interface {
+	GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error)
+	CreateComment(repo models.Repo, pull models.PullRequest, comment string) error
+	PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error)
+	GetPullRequest(repo models.Repo, num int) (*github.PullRequest, *github.Response, error)
+	UpdateStatus(repo models.Repo, pull models.PullRequest, state string, description string, context string) error
+}
+
+// ConcreteClient is used to perform GitHub actions.
+type ConcreteClient struct {
 	client *github.Client
 	ctx    context.Context
 }
 
 // NewClient returns a valid GitHub client.
-func NewClient(hostname string, user string, pass string) (*Client, error) {
+func NewClient(hostname string, user string, pass string) (*ConcreteClient, error) {
 	tp := github.BasicAuthTransport{
 		Username: strings.TrimSpace(user),
 		Password: strings.TrimSpace(pass),
@@ -38,7 +46,7 @@ func NewClient(hostname string, user string, pass string) (*Client, error) {
 		client.BaseURL = base
 	}
 
-	return &Client{
+	return &ConcreteClient{
 		client: client,
 		ctx:    context.Background(),
 	}, nil
@@ -46,7 +54,7 @@ func NewClient(hostname string, user string, pass string) (*Client, error) {
 
 // GetModifiedFiles returns the names of files that were modified in the pull request.
 // The names include the path to the file from the repo root, ex. parent/child/file.txt.
-func (c *Client) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
+func (c *ConcreteClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	var files []string
 	nextPage := 0
 	for {
@@ -72,13 +80,13 @@ func (c *Client) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]
 }
 
 // CreateComment creates a comment on the pull request.
-func (c *Client) CreateComment(repo models.Repo, pull models.PullRequest, comment string) error {
+func (c *ConcreteClient) CreateComment(repo models.Repo, pull models.PullRequest, comment string) error {
 	_, _, err := c.client.Issues.CreateComment(c.ctx, repo.Owner, repo.Name, pull.Num, &github.IssueComment{Body: &comment})
 	return err
 }
 
 // PullIsApproved returns true if the pull request was approved.
-func (c *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (c *ConcreteClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
 	reviews, _, err := c.client.PullRequests.ListReviews(c.ctx, repo.Owner, repo.Name, pull.Num, nil)
 	if err != nil {
 		return false, errors.Wrap(err, "getting reviews")
@@ -92,13 +100,13 @@ func (c *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool
 }
 
 // GetPullRequest returns the pull request.
-func (c *Client) GetPullRequest(repo models.Repo, num int) (*github.PullRequest, *github.Response, error) {
+func (c *ConcreteClient) GetPullRequest(repo models.Repo, num int) (*github.PullRequest, *github.Response, error) {
 	return c.client.PullRequests.Get(c.ctx, repo.Owner, repo.Name, num)
 }
 
 // UpdateStatus updates the status badge on the pull request.
 // See https://github.com/blog/1227-commit-status-api.
-func (c *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, state string, description string, context string) error {
+func (c *ConcreteClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state string, description string, context string) error {
 	status := &github.RepoStatus{
 		State:       github.String(state),
 		Description: github.String(description),

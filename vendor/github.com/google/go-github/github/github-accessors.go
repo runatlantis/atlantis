@@ -100,12 +100,12 @@ func (a *Authorization) GetTokenLastEight() string {
 	return *a.TokenLastEight
 }
 
-// GetUpdateAt returns the UpdateAt field if it's non-nil, zero value otherwise.
-func (a *Authorization) GetUpdateAt() Timestamp {
-	if a == nil || a.UpdateAt == nil {
+// GetUpdatedAt returns the UpdatedAt field if it's non-nil, zero value otherwise.
+func (a *Authorization) GetUpdatedAt() Timestamp {
+	if a == nil || a.UpdatedAt == nil {
 		return Timestamp{}
 	}
-	return *a.UpdateAt
+	return *a.UpdatedAt
 }
 
 // GetURL returns the URL field if it's non-nil, zero value otherwise.
@@ -3516,6 +3516,14 @@ func (p *Project) GetURL() string {
 	return *p.URL
 }
 
+// GetColumnID returns the ColumnID field if it's non-nil, zero value otherwise.
+func (p *ProjectCard) GetColumnID() int {
+	if p == nil || p.ColumnID == nil {
+		return 0
+	}
+	return *p.ColumnID
+}
+
 // GetColumnURL returns the ColumnURL field if it's non-nil, zero value otherwise.
 func (p *ProjectCard) GetColumnURL() string {
 	if p == nil || p.ColumnURL == nil {
@@ -3562,6 +3570,14 @@ func (p *ProjectCard) GetUpdatedAt() Timestamp {
 		return Timestamp{}
 	}
 	return *p.UpdatedAt
+}
+
+// GetURL returns the URL field if it's non-nil, zero value otherwise.
+func (p *ProjectCard) GetURL() string {
+	if p == nil || p.URL == nil {
+		return ""
+	}
+	return *p.URL
 }
 
 // GetAction returns the Action field if it's non-nil, zero value otherwise.
@@ -4148,12 +4164,28 @@ func (p *PullRequestReviewRequest) GetBody() string {
 	return *p.Body
 }
 
+// GetCommitID returns the CommitID field if it's non-nil, zero value otherwise.
+func (p *PullRequestReviewRequest) GetCommitID() string {
+	if p == nil || p.CommitID == nil {
+		return ""
+	}
+	return *p.CommitID
+}
+
 // GetEvent returns the Event field if it's non-nil, zero value otherwise.
 func (p *PullRequestReviewRequest) GetEvent() string {
 	if p == nil || p.Event == nil {
 		return ""
 	}
 	return *p.Event
+}
+
+// GetDismissStaleReviews returns the DismissStaleReviews field if it's non-nil, zero value otherwise.
+func (p *PullRequestReviewsEnforcementUpdate) GetDismissStaleReviews() bool {
+	if p == nil || p.DismissStaleReviews == nil {
+		return false
+	}
+	return *p.DismissStaleReviews
 }
 
 // GetBase returns the Base field if it's non-nil, zero value otherwise.

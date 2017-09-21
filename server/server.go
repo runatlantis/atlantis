@@ -85,7 +85,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	githubStatus := &GithubStatus{client: githubClient}
+	githubStatus := &GithubStatus{Client: githubClient}
 	terraformClient, err := terraform.NewClient()
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing terraform")
@@ -127,7 +127,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 		workspace:             workspace,
 	}
 	helpExecutor := &HelpExecutor{
-		github: githubClient,
+		Github: githubClient,
 	}
 	pullClosedExecutor := &PullClosedExecutor{
 		github:    githubClient,
@@ -140,12 +140,12 @@ func NewServer(config ServerConfig) (*Server, error) {
 		GithubToken: config.GithubToken,
 	}
 	commandHandler := &CommandHandler{
-		applyExecutor: applyExecutor,
-		planExecutor:  planExecutor,
-		helpExecutor:  helpExecutor,
-		eventParser:   eventParser,
-		githubClient:  githubClient,
-		logger:        logger,
+		ApplyExecutor: applyExecutor,
+		PlanExecutor:  planExecutor,
+		HelpExecutor:  helpExecutor,
+		EventParser:   eventParser,
+		GithubClient:  githubClient,
+		Logger:        logger,
 	}
 	router := mux.NewRouter()
 	return &Server{

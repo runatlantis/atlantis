@@ -16,21 +16,29 @@ import (
 	"github.com/pkg/errors"
 )
 
+// todo: would like to use the Executor interface but need to find a way
+// to deal with the SetLockURL function
+type Planner interface {
+	Execute(ctx *CommandContext)
+	// SetLockURL takes a function that given a lock id, will return a url
+	// to view that lock
+	SetLockURL(func(id string) (url string))
+}
+
 // PlanExecutor handles everything related to running terraform plan
 // including integration with S3, Terraform, and GitHub
 type PlanExecutor struct {
-	github                *github.Client
+	github                github.Client
 	githubStatus          *GithubStatus
 	s3Bucket              string
 	terraform             *terraform.Client
 	githubCommentRenderer *GithubCommentRenderer
 	lockingClient         *locking.Client
-	// LockURL is a function that given a lock id will return a url for lock view
-	LockURL             func(id string) (url string)
-	run                 *run.Run
-	configReader        *ConfigReader
-	concurrentRunLocker *ConcurrentRunLocker
-	workspace           *Workspace
+	lockURL               func(id string) (url string)
+	run                   *run.Run
+	configReader          *ConfigReader
+	concurrentRunLocker   *ConcurrentRunLocker
+	workspace             *Workspace
 }
 
 type PlanSuccess struct {
@@ -38,12 +46,16 @@ type PlanSuccess struct {
 	LockURL         string
 }
 
-func (p *PlanExecutor) execute(ctx *CommandContext) {
+func (p *PlanExecutor) Execute(ctx *CommandContext) {
 	p.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Pending, PlanStep)
 	res := p.setupAndPlan(ctx)
 	res.Command = Plan
 	comment := p.githubCommentRenderer.render(res, ctx.Log.History.String(), ctx.Command.Verbose)
 	p.github.CreateComment(ctx.BaseRepo, ctx.Pull, comment)
+}
+
+func (p *PlanExecutor) SetLockURL(f func(id string) (url string)) {
+	p.lockURL = f
 }
 
 func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) CommandResponse {
@@ -177,7 +189,7 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 	return ProjectResult{
 		PlanSuccess: &PlanSuccess{
 			TerraformOutput: output,
-			LockURL:         p.LockURL(lockAttempt.LockKey),
+			LockURL:         p.lockURL(lockAttempt.LockKey),
 		},
 	}
 }

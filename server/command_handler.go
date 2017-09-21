@@ -9,12 +9,12 @@ import (
 )
 
 type CommandHandler struct {
-	planExecutor  *PlanExecutor
-	applyExecutor *ApplyExecutor
-	helpExecutor  *HelpExecutor
-	githubClient  *github.Client
-	eventParser   *EventParser
-	logger        *logging.SimpleLogger
+	PlanExecutor  Planner
+	ApplyExecutor Executor
+	HelpExecutor  Executor
+	GithubClient  github.Client
+	EventParser   EventParsing
+	Logger        *logging.SimpleLogger
 }
 
 type CommandResponse struct {
@@ -73,16 +73,23 @@ type Command struct {
 func (c *CommandHandler) ExecuteCommand(ctx *CommandContext) {
 	src := fmt.Sprintf("%s/pull/%d", ctx.BaseRepo.FullName, ctx.Pull.Num)
 	// it's safe to reuse the underlying logger
-	ctx.Log = logging.NewSimpleLogger(src, c.logger.Logger, true, c.logger.Level)
-	defer c.recover(ctx)
+	ctx.Log = logging.NewSimpleLogger(src, c.Logger.Logger, true, c.Logger.Level)
+	defer c.logPanics(ctx)
 
 	// need to get additional data from the PR
-	ghPull, _, err := c.githubClient.GetPullRequest(ctx.BaseRepo, ctx.Pull.Num)
+	ghPull, _, err := c.GithubClient.GetPullRequest(ctx.BaseRepo, ctx.Pull.Num)
 	if err != nil {
 		ctx.Log.Err("making pull request API call to GitHub: %s", err)
 		return
 	}
-	pull, headRepo, err := c.eventParser.ExtractPullData(ghPull)
+
+	if ghPull.GetState() != "open" {
+		ctx.Log.Info("command was run on closed pull request")
+		c.GithubClient.CreateComment(ctx.BaseRepo, ctx.Pull, "Atlantis commands can't be run on closed pull requests")
+		return
+	}
+
+	pull, headRepo, err := c.EventParser.ExtractPullData(ghPull)
 	if err != nil {
 		ctx.Log.Err("extracting required fields from comment data: %s", err)
 		return
@@ -90,33 +97,27 @@ func (c *CommandHandler) ExecuteCommand(ctx *CommandContext) {
 	ctx.Pull = pull
 	ctx.HeadRepo = headRepo
 
-	if ghPull.GetState() != "open" {
-		ctx.Log.Info("command was run on closed pull request")
-		c.githubClient.CreateComment(ctx.BaseRepo, ctx.Pull, "Atlantis commands can't be run on closed pull requests")
-		return
-	}
-
 	switch ctx.Command.Name {
 	case Plan:
-		c.planExecutor.execute(ctx)
+		c.PlanExecutor.Execute(ctx)
 	case Apply:
-		c.applyExecutor.execute(ctx)
+		c.ApplyExecutor.Execute(ctx)
 	case Help:
-		c.helpExecutor.execute(ctx)
+		c.HelpExecutor.Execute(ctx)
 	default:
 		ctx.Log.Err("failed to determine desired command, neither plan nor apply")
 	}
 }
 
 func (c *CommandHandler) SetLockURL(f func(id string) (url string)) {
-	c.planExecutor.LockURL = f
+	c.PlanExecutor.SetLockURL(f)
 }
 
-// recover logs and creates a comment on the pull request for panics
-func (c *CommandHandler) recover(ctx *CommandContext) {
+// logPanics logs and creates a comment on the pull request for panics
+func (c *CommandHandler) logPanics(ctx *CommandContext) {
 	if err := recover(); err != nil {
 		stack := recovery.Stack(3)
-		c.githubClient.CreateComment(ctx.BaseRepo, ctx.Pull, fmt.Sprintf("**Error: goroutine panic. This is a bug.**\n```\n%s\n%s```", err, stack))
+		c.GithubClient.CreateComment(ctx.BaseRepo, ctx.Pull, fmt.Sprintf("**Error: goroutine panic. This is a bug.**\n```\n%s\n%s```", err, stack))
 		ctx.Log.Err("PANIC: %s\n%s", err, stack)
 	}
 }

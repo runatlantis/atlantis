@@ -329,7 +329,11 @@ func TestGetLock(t *testing.T) {
 
 	l, err := b.GetLock(project, env)
 	Ok(t, err)
-	Equals(t, &lock, l)
+	// can't compare against time so doing each field
+	Equals(t, lock.Project, l.Project)
+	Equals(t, lock.Env, l.Env)
+	Equals(t, lock.Pull, l.Pull)
+	Equals(t, lock.User, l.User)
 }
 
 // newTestDB returns a TestDB using a temporary path.

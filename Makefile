@@ -19,7 +19,8 @@ debug: ## Output internal make variables
 	@echo PKG = $(PKG)
 
 deps: ## Download dependencies
-	go get -u github.com/kardianos/govendor
+	go get -u github.com/golang/dep/cmd/dep
+	dep ensure
 
 build-service: ## Build the main Go service
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o atlantis .
@@ -30,17 +31,17 @@ test: ## Run tests, coverage reports, and clean (coverage taints the compiled co
 test-coverage:
 	./scripts/coverage.sh
 
+test-coverage-html:
+	./scripts/coverage.sh --html
+
 dist: ## Package up everything in static/ using go-bindata-assetfs so it can be served by a single binary
 	go-bindata-assetfs -pkg server static/... && mv bindata_assetfs.go server
 
 release: ## Create packages for a release
 	./scripts/binary-release.sh
 
-vendor-status:
-	@govendor status
-
 fmt: ## Run goimports (which also formats)
-	goimports -w $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "./server/bindata_assetfs.go")
+	goimports -w $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "./server/bindata_assetfs.go" ! -path "**/mocks/*")
 
 end-to-end-deps: ## Install e2e dependencies
 	./scripts/e2e-deps.sh

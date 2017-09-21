@@ -17,7 +17,7 @@ import (
 )
 
 type ApplyExecutor struct {
-	github                *github.Client
+	github                github.Client
 	githubStatus          *GithubStatus
 	terraform             *terraform.Client
 	githubCommentRenderer *GithubCommentRenderer
@@ -29,7 +29,7 @@ type ApplyExecutor struct {
 	workspace             *Workspace
 }
 
-func (a *ApplyExecutor) execute(ctx *CommandContext) {
+func (a *ApplyExecutor) Execute(ctx *CommandContext) {
 	a.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Pending, ApplyStep)
 	res := a.setupAndApply(ctx)
 	res.Command = Apply

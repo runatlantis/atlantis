@@ -72,7 +72,8 @@ func (c *Client) Unlock(key string) (*models.ProjectLock, error) {
 	return c.backend.Unlock(project, env)
 }
 
-// List lists all current locks.
+// List returns a map of all locks with their lock key as the map key.
+// The lock key can be used in GetLock() and Unlock().
 func (c *Client) List() (map[string]models.ProjectLock, error) {
 	m := make(map[string]models.ProjectLock)
 	locks, err := c.backend.List()

@@ -9,6 +9,13 @@ import (
 	"github.com/hootsuite/atlantis/models"
 )
 
+type EventParsing interface {
+	DetermineCommand(comment *github.IssueCommentEvent) (*Command, error)
+	ExtractCommentData(comment *github.IssueCommentEvent, ctx *CommandContext) error
+	ExtractPullData(pull *github.PullRequest) (models.PullRequest, models.Repo, error)
+	ExtractRepoData(ghRepo *github.Repository) (models.Repo, error)
+}
+
 type EventParser struct {
 	GithubUser  string
 	GithubToken string
@@ -90,19 +97,19 @@ func (e *EventParser) ExtractCommentData(comment *github.IssueCommentEvent, ctx 
 	}
 	pullNum := comment.Issue.GetNumber()
 	if pullNum == 0 {
-		return errors.New("issue.number' is null")
+		return errors.New("issue.number is null")
 	}
 	pullCreator := comment.Issue.User.GetLogin()
 	if pullCreator == "" {
-		return errors.New("issue.user.login' is null")
+		return errors.New("issue.user.login is null")
+	}
+	htmlURL := comment.Issue.GetHTMLURL()
+	if htmlURL == "" {
+		return errors.New("issue.html_url is null")
 	}
 	commentorUsername := comment.Comment.User.GetLogin()
 	if commentorUsername == "" {
 		return errors.New("comment.user.login is null")
-	}
-	htmlURL := comment.Issue.GetHTMLURL()
-	if htmlURL == "" {
-		return errors.New("comment.issue.html_url is null")
 	}
 	ctx.BaseRepo = repo
 	ctx.User = models.User{
