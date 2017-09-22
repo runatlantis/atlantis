@@ -11,7 +11,10 @@ jobs:
       - setup_remote_docker:
           reusable: true
       - run: make deps
-      - run: make test
+      - run: make test-coverage
+      - run:
+          name: post coverage to codecov.io
+          command: bash <(curl -s https://codecov.io/bash)
       - run: make build-service
       - run:
           name: Install e2e dependencies
