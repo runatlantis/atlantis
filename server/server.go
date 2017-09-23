@@ -26,6 +26,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	"github.com/urfave/negroni"
+	"github.com/hootsuite/atlantis/static"
 )
 
 const (
@@ -165,7 +166,7 @@ func (s *Server) Start() error {
 	s.router.HandleFunc("/", s.index).Methods("GET").MatcherFunc(func(r *http.Request, rm *mux.RouteMatch) bool {
 		return r.URL.Path == "/" || r.URL.Path == "/index.html"
 	})
-	s.router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: Asset, AssetDir: AssetDir, AssetInfo: AssetInfo}))
+	s.router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: static.Asset, AssetDir: static.AssetDir, AssetInfo: static.AssetInfo}))
 	s.router.HandleFunc("/events", s.postEvents).Methods("POST")
 	s.router.HandleFunc("/locks", s.deleteLock).Methods("DELETE").Queries("id", "{id:.*}")
 	lockRoute := s.router.HandleFunc("/lock", s.getLock).Methods("GET").Queries("id", "{id}").Name(lockRoute)

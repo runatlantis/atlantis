@@ -29,13 +29,14 @@ test: ## Run tests, coverage reports, and clean (coverage taints the compiled co
 	go test $(PKG)
 
 test-coverage:
-	./scripts/coverage.sh
+	./scripts/coverage.sh $(PKG)
 
 test-coverage-html:
-	./scripts/coverage.sh --html
+	./scripts/coverage.sh $(PKG)
+	go tool cover -html .cover/cover.out
 
 dist: ## Package up everything in static/ using go-bindata-assetfs so it can be served by a single binary
-	go-bindata-assetfs -pkg server static/... && mv bindata_assetfs.go server
+	go-bindata-assetfs -pkg static static/... && mv bindata_assetfs.go static
 
 release: ## Create packages for a release
 	./scripts/binary-release.sh
