@@ -144,7 +144,7 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 	} else {
 		ctx.Log.Info("determined that we are running terraform with version < 0.9.0. Running version %s", terraformVersion)
 		terraformGetCmd := append([]string{"get", "-no-color"}, config.GetExtraArguments("get")...)
-		_, err := p.terraform.RunCommandWithVersion(ctx.Log, absolutePath, terraformGetCmd, terraformVersion)
+		_, err := p.terraform.RunCommandWithVersion(ctx.Log, absolutePath, terraformGetCmd, terraformVersion, tfEnv)
 		if err != nil {
 			return ProjectResult{Error: err}
 		}
@@ -168,7 +168,7 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 	if _, err := os.Stat(filepath.Join(repoDir, project.Path, tfEnvFileName)); err == nil {
 		tfPlanCmd = append(tfPlanCmd, "-var-file", tfEnvFileName)
 	}
-	output, err := p.terraform.RunCommandWithVersion(ctx.Log, filepath.Join(repoDir, project.Path), tfPlanCmd, terraformVersion)
+	output, err := p.terraform.RunCommandWithVersion(ctx.Log, filepath.Join(repoDir, project.Path), tfPlanCmd, terraformVersion, tfEnv)
 	if err != nil {
 		// plan failed so unlock the state
 		if _, err := p.lockingClient.Unlock(lockAttempt.LockKey); err != nil {

@@ -3,6 +3,7 @@ package terraform
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"regexp"
 
@@ -51,15 +52,33 @@ func (c *Client) Version() *version.Version {
 }
 
 // RunCommandWithVersion executes the provided version of terraform with
-// the provided args in path.
-func (c *Client) RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version) (string, error) {
+// the provided args in path. The variable "v" is the version of terraform executable to use and the variable "env" is the
+// environment specified by the user commenting "atlantis plan/apply {env}" which is set to "default" by default.
+func (c *Client) RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version, env string) (string, error) {
 	tfExecutable := "terraform"
 	// if version is the same as the default, don't need to prepend the version name to the executable
 	if !v.Equal(c.defaultVersion) {
 		tfExecutable = fmt.Sprintf("%s%s", tfExecutable, v.String())
 	}
-	terraformCmd := exec.Command(tfExecutable, args...)
+
+	// set environment variables
+	// this is to support scripts to use the ENVIRONMENT, ATLANTIS_TERRAFORM_VERSION
+	// and WORKSPACE variables in their scripts
+	// append current process's environment variables
+	// this is to prevent the $PATH variable being removed from the environment
+	envVars := []string{
+		fmt.Sprintf("ENVIRONMENT=%s", env),
+		fmt.Sprintf("ATLANTIS_TERRAFORM_VERSION=%s", v.String()),
+		fmt.Sprintf("WORKSPACE=%s", path),
+	}
+	envVars = append(envVars, os.Environ()...)
+
+	// append terraform executable name with args
+	tfCmd := fmt.Sprintf("%s %s", tfExecutable, strings.Join(args, " "))
+
+	terraformCmd := exec.Command("sh", "-c", tfCmd)
 	terraformCmd.Dir = path
+	terraformCmd.Env = envVars
 	out, err := terraformCmd.CombinedOutput()
 	commandStr := strings.Join(terraformCmd.Args, " ")
 	if err != nil {
@@ -77,19 +96,19 @@ func (c *Client) RunCommandWithVersion(log *logging.SimpleLogger, path string, a
 func (c *Client) RunInitAndEnv(log *logging.SimpleLogger, path string, env string, extraInitArgs []string, version *version.Version) ([]string, error) {
 	var outputs []string
 	// run terraform init
-	output, err := c.RunCommandWithVersion(log, path, append([]string{"init", "-no-color"}, extraInitArgs...), version)
+	output, err := c.RunCommandWithVersion(log, path, append([]string{"init", "-no-color"}, extraInitArgs...), version, env)
 	outputs = append(outputs, output)
 	if err != nil {
 		return outputs, err
 	}
 
 	// run terraform env new and select
-	output, err = c.RunCommandWithVersion(log, path, []string{"env", "select", "-no-color", env}, version)
+	output, err = c.RunCommandWithVersion(log, path, []string{"env", "select", "-no-color", env}, version, env)
 	outputs = append(outputs, output)
 	if err != nil {
 		// if terraform env select fails we will run terraform env new
 		// to create a new environment
-		output, err = c.RunCommandWithVersion(log, path, []string{"env", "new", "-no-color", env}, version)
+		output, err = c.RunCommandWithVersion(log, path, []string{"env", "new", "-no-color", env}, version, env)
 		if err != nil {
 			return outputs, err
 		}
