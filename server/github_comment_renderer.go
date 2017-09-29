@@ -14,9 +14,9 @@ var multiProjectTmpl = template.Must(template.New("").Parse(
 		" * `{{$path}}`\n" +
 		"{{end}}\n" +
 		"{{ range $path, $result := .Results }}" +
-		"##{{$path}}/\n" +
+		"## {{$path}}/\n" +
 		"{{$result}}\n" +
-		"---{{end}}" +
+		"---\n{{end}}" +
 		logTmpl))
 var planSuccessTmpl = template.Must(template.New("").Parse(
 	"```diff\n" +
@@ -62,7 +62,7 @@ type ResultData struct {
 	CommonData
 }
 
-func (g *GithubCommentRenderer) render(res CommandResponse, log string, verbose bool) string {
+func (g *GithubCommentRenderer) Render(res CommandResponse, log string, verbose bool) string {
 	commandStr := strings.Title(res.Command.String())
 	common := CommonData{commandStr, verbose, log}
 	if res.Error != nil {
