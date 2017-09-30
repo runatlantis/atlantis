@@ -44,7 +44,7 @@ type Server struct {
 	pullClosedExecutor  *PullClosedExecutor
 	logger              *logging.SimpleLogger
 	eventParser         *EventParser
-	lockingClient       *locking.Client
+	locker              locking.Locker
 	atlantisURL         string
 	githubWebHookSecret []byte
 }
@@ -101,7 +101,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 	run := &run.Run{}
 	configReader := &ConfigReader{}
 	concurrentRunLocker := NewConcurrentRunLocker()
-	workspace := &Workspace{
+	workspace := &FileWorkspace{
 		dataDir: config.DataDir,
 	}
 	applyExecutor := &ApplyExecutor{
@@ -109,7 +109,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 		githubStatus:          githubStatus,
 		terraform:             terraformClient,
 		githubCommentRenderer: githubComments,
-		lockingClient:         lockingClient,
+		locker:                lockingClient,
 		requireApproval:       config.RequireApproval,
 		run:                   run,
 		configReader:          configReader,
@@ -121,7 +121,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 		githubStatus:          githubStatus,
 		terraform:             terraformClient,
 		githubCommentRenderer: githubComments,
-		lockingClient:         lockingClient,
+		locker:                lockingClient,
 		run:                   run,
 		configReader:          configReader,
 		concurrentRunLocker:   concurrentRunLocker,
@@ -156,7 +156,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 		pullClosedExecutor:  pullClosedExecutor,
 		eventParser:         eventParser,
 		logger:              logger,
-		lockingClient:       lockingClient,
+		locker:              lockingClient,
 		atlantisURL:         config.AtlantisURL,
 		githubWebHookSecret: []byte(config.GithubWebHookSecret),
 	}, nil
@@ -189,7 +189,7 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) index(w http.ResponseWriter, r *http.Request) {
-	locks, err := s.lockingClient.List()
+	locks, err := s.locker.List()
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		fmt.Fprintf(w, "Could not retrieve locks: %s", err)
@@ -229,7 +229,7 @@ func (s *Server) getLock(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// for the given lock key get lock data
-	lock, err := s.lockingClient.GetLock(idUnencoded)
+	lock, err := s.locker.GetLock(idUnencoded)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprint(w, err.Error())
@@ -278,7 +278,7 @@ func (s *Server) deleteLock(w http.ResponseWriter, r *http.Request) {
 		s.respond(w, logging.Warn, http.StatusBadRequest, "Invalid lock id: %s", err)
 		return
 	}
-	lock, err := s.lockingClient.Unlock(idUnencoded)
+	lock, err := s.locker.Unlock(idUnencoded)
 	if err != nil {
 		s.respond(w, logging.Error, http.StatusInternalServerError, "Failed to delete lock %s: %s", idUnencoded, err)
 		return

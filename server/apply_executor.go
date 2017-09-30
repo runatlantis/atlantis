@@ -21,12 +21,12 @@ type ApplyExecutor struct {
 	githubStatus          *GithubStatus
 	terraform             *terraform.Client
 	githubCommentRenderer *GithubCommentRenderer
-	lockingClient         *locking.Client
+	locker                locking.Locker
 	requireApproval       bool
 	run                   *run.Run
 	configReader          *ConfigReader
 	concurrentRunLocker   *ConcurrentRunLocker
-	workspace             *Workspace
+	workspace             Workspace
 }
 
 func (a *ApplyExecutor) Execute(ctx *CommandContext) {
@@ -99,7 +99,7 @@ func (a *ApplyExecutor) setupAndApply(ctx *CommandContext) CommandResponse {
 
 func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.Plan) ProjectResult {
 	tfEnv := ctx.Command.Environment
-	lockAttempt, err := a.lockingClient.TryLock(plan.Project, tfEnv, ctx.Pull, ctx.User)
+	lockAttempt, err := a.locker.TryLock(plan.Project, tfEnv, ctx.Pull, ctx.User)
 	if err != nil {
 		return ProjectResult{Error: errors.Wrap(err, "acquiring lock")}
 	}

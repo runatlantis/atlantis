@@ -34,6 +34,14 @@ type Client struct {
 	backend Backend
 }
 
+type Locker interface {
+	TryLock(p models.Project, env string, pull models.PullRequest, user models.User) (TryLockResponse, error)
+	Unlock(key string) (*models.ProjectLock, error)
+	List() (map[string]models.ProjectLock, error)
+	UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error)
+	GetLock(key string) (*models.ProjectLock, error)
+}
+
 // NewClient returns a new locking client.
 func NewClient(backend Backend) *Client {
 	return &Client{

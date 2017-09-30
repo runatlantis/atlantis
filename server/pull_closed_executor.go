@@ -13,9 +13,9 @@ import (
 )
 
 type PullClosedExecutor struct {
-	locking   *locking.Client
+	locking   locking.Locker
 	github    github.Client
-	workspace *Workspace
+	workspace Workspace
 }
 
 type templatedProject struct {

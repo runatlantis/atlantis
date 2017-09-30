@@ -33,12 +33,12 @@ type PlanExecutor struct {
 	s3Bucket              string
 	terraform             *terraform.Client
 	githubCommentRenderer *GithubCommentRenderer
-	lockingClient         *locking.Client
+	locker                locking.Locker
 	lockURL               func(id string) (url string)
 	run                   *run.Run
 	configReader          *ConfigReader
 	concurrentRunLocker   *ConcurrentRunLocker
-	workspace             *Workspace
+	workspace             Workspace
 }
 
 type PlanSuccess struct {
@@ -105,7 +105,7 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) CommandResponse {
 // and the GeneratePlanResponse struct will also contain the full log including the error
 func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.Project) ProjectResult {
 	tfEnv := ctx.Command.Environment
-	lockAttempt, err := p.lockingClient.TryLock(project, tfEnv, ctx.Pull, ctx.User)
+	lockAttempt, err := p.locker.TryLock(project, tfEnv, ctx.Pull, ctx.User)
 	if err != nil {
 		return ProjectResult{Error: errors.Wrap(err, "acquiring lock")}
 	}
@@ -171,7 +171,7 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 	output, err := p.terraform.RunCommandWithVersion(ctx.Log, filepath.Join(repoDir, project.Path), tfPlanCmd, terraformVersion, tfEnv)
 	if err != nil {
 		// plan failed so unlock the state
-		if _, err := p.lockingClient.Unlock(lockAttempt.LockKey); err != nil {
+		if _, err := p.locker.Unlock(lockAttempt.LockKey); err != nil {
 			ctx.Log.Err("error unlocking state: %v", err)
 		}
 		return ProjectResult{Error: fmt.Errorf("%s\n%s", err.Error(), output)}

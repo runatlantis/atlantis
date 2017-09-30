@@ -12,12 +12,18 @@ import (
 
 const workspacePrefix = "repos"
 
-type Workspace struct {
+type Workspace interface {
+	Clone(ctx *CommandContext) (string, error)
+	GetWorkspace(ctx *CommandContext) (string, error)
+	Delete(repo models.Repo, pull models.PullRequest) error
+}
+
+type FileWorkspace struct {
 	dataDir string
 	sshKey  string
 }
 
-func (w *Workspace) Clone(ctx *CommandContext) (string, error) {
+func (w *FileWorkspace) Clone(ctx *CommandContext) (string, error) {
 	cloneDir := w.cloneDir(ctx)
 
 	// this is safe to do because we lock runs on repo/pull/env so no one else is using this workspace
@@ -48,7 +54,7 @@ func (w *Workspace) Clone(ctx *CommandContext) (string, error) {
 	return cloneDir, nil
 }
 
-func (w *Workspace) GetWorkspace(ctx *CommandContext) (string, error) {
+func (w *FileWorkspace) GetWorkspace(ctx *CommandContext) (string, error) {
 	repoDir := w.cloneDir(ctx)
 	if _, err := os.Stat(repoDir); err != nil {
 		return "", errors.Wrap(err, "checking if workspace exists")
@@ -57,14 +63,14 @@ func (w *Workspace) GetWorkspace(ctx *CommandContext) (string, error) {
 }
 
 // Delete deletes the workspace for this repo and pull
-func (w *Workspace) Delete(repo models.Repo, pull models.PullRequest) error {
+func (w *FileWorkspace) Delete(repo models.Repo, pull models.PullRequest) error {
 	return os.RemoveAll(w.repoPullDir(repo, pull))
 }
 
-func (w *Workspace) repoPullDir(repo models.Repo, pull models.PullRequest) string {
+func (w *FileWorkspace) repoPullDir(repo models.Repo, pull models.PullRequest) string {
 	return filepath.Join(w.dataDir, workspacePrefix, repo.FullName, strconv.Itoa(pull.Num))
 }
 
-func (w *Workspace) cloneDir(ctx *CommandContext) string {
+func (w *FileWorkspace) cloneDir(ctx *CommandContext) string {
 	return filepath.Join(w.repoPullDir(ctx.BaseRepo, ctx.Pull), ctx.Command.Environment)
 }
