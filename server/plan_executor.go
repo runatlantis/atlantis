@@ -16,6 +16,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_planner.go Planner
+
 // todo: would like to use the Executor interface but need to find a way
 // to deal with the SetLockURL function
 type Planner interface {

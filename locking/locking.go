@@ -10,6 +10,8 @@ import (
 	"github.com/hootsuite/atlantis/models"
 )
 
+//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_backend.go Backend
+
 // Backend is an implementation of the locking API we require.
 type Backend interface {
 	TryLock(lock models.ProjectLock) (bool, models.ProjectLock, error)

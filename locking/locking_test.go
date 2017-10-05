@@ -2,15 +2,16 @@ package locking_test
 
 import (
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/hootsuite/atlantis/locking"
 	"github.com/hootsuite/atlantis/locking/mocks"
 	"github.com/hootsuite/atlantis/models"
 	. "github.com/hootsuite/atlantis/testing_util"
+	. "github.com/petergtz/pegomock"
+	"reflect"
+	"strings"
 )
 
 var project = models.NewProject("owner/repo", "path")
@@ -22,39 +23,30 @@ var timeNow = time.Now().Local()
 var pl = models.ProjectLock{project, pull, user, env, timeNow}
 
 func TestTryLock_Err(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mock := mocks.NewMockBackend(ctrl)
-	mock.EXPECT().TryLock(gomock.Any()).Return(false, models.ProjectLock{}, expectedErr)
-
+	RegisterMockTestingT(t)
+	backend := mocks.NewMockBackend()
+	When(backend.TryLock(AnyProjectLock())).ThenReturn(false, models.ProjectLock{}, expectedErr)
 	t.Log("when the backend returns an error, TryLock should return that error")
-	l := locking.NewClient(mock)
+	l := locking.NewClient(backend)
 	_, err := l.TryLock(project, env, pull, user)
 	Equals(t, err, err)
 }
 
 func TestTryLock_Success(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
+	RegisterMockTestingT(t)
 	currLock := models.ProjectLock{}
-	mock := mocks.NewMockBackend(ctrl)
-	// Couldn't figure out how to match on the arg to TryLock.
-	// Need to deal with the Time field
-	mock.EXPECT().TryLock(gomock.Any()).Return(true, currLock, nil)
-
-	l := locking.NewClient(mock)
+	backend := mocks.NewMockBackend()
+	When(backend.TryLock(AnyProjectLock())).ThenReturn(true, currLock, nil)
+	l := locking.NewClient(backend)
 	r, err := l.TryLock(project, env, pull, user)
 	Ok(t, err)
 	Equals(t, locking.TryLockResponse{true, currLock, "owner/repo/path/env"}, r)
 }
 
 func TestUnlock_InvalidKey(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	mock := mocks.NewMockBackend(ctrl)
-	l := locking.NewClient(mock)
+	RegisterMockTestingT(t)
+	backend := mocks.NewMockBackend()
+	l := locking.NewClient(backend)
 
 	_, err := l.Unlock("invalidkey")
 	Assert(t, err != nil, "expected err")
@@ -62,46 +54,39 @@ func TestUnlock_InvalidKey(t *testing.T) {
 }
 
 func TestUnlock_Err(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	mock := mocks.NewMockBackend(ctrl)
-	mock.EXPECT().Unlock(project, env).Return(nil, expectedErr)
-
-	l := locking.NewClient(mock)
+	RegisterMockTestingT(t)
+	backend := mocks.NewMockBackend()
+	When(backend.Unlock(AnyProject(), AnyString())).ThenReturn(nil, expectedErr)
+	l := locking.NewClient(backend)
 	_, err := l.Unlock("owner/repo/path/env")
 	Equals(t, err, err)
+	backend.VerifyWasCalledOnce().Unlock(project, "env")
 }
 
 func TestUnlock(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	mock := mocks.NewMockBackend(ctrl)
-	mock.EXPECT().Unlock(project, env).Return(&pl, nil)
-
-	l := locking.NewClient(mock)
+	RegisterMockTestingT(t)
+	backend := mocks.NewMockBackend()
+	When(backend.Unlock(AnyProject(), AnyString())).ThenReturn(&pl, nil)
+	l := locking.NewClient(backend)
 	lock, err := l.Unlock("owner/repo/path/env")
 	Ok(t, err)
 	Equals(t, &pl, lock)
 }
 
 func TestList_Err(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	mock := mocks.NewMockBackend(ctrl)
-	mock.EXPECT().List().Return(nil, expectedErr)
-
-	l := locking.NewClient(mock)
+	RegisterMockTestingT(t)
+	backend := mocks.NewMockBackend()
+	When(backend.List()).ThenReturn(nil, expectedErr)
+	l := locking.NewClient(backend)
 	_, err := l.List()
 	Equals(t, expectedErr, err)
 }
 
 func TestList(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	mock := mocks.NewMockBackend(ctrl)
-	mock.EXPECT().List().Return([]models.ProjectLock{pl}, nil)
-
-	l := locking.NewClient(mock)
+	RegisterMockTestingT(t)
+	backend := mocks.NewMockBackend()
+	When(backend.List()).ThenReturn([]models.ProjectLock{pl}, nil)
+	l := locking.NewClient(backend)
 	list, err := l.List()
 	Ok(t, err)
 	Equals(t, map[string]models.ProjectLock{
@@ -110,46 +95,48 @@ func TestList(t *testing.T) {
 }
 
 func TestUnlockByPull(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	mock := mocks.NewMockBackend(ctrl)
-	mock.EXPECT().UnlockByPull("owner/repo", 1).Return(nil, expectedErr)
-
-	l := locking.NewClient(mock)
+	RegisterMockTestingT(t)
+	backend := mocks.NewMockBackend()
+	When(backend.UnlockByPull("owner/repo", 1)).ThenReturn(nil, expectedErr)
+	l := locking.NewClient(backend)
 	_, err := l.UnlockByPull("owner/repo", 1)
 	Equals(t, expectedErr, err)
 }
 
 func TestGetLock_BadKey(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	mock := mocks.NewMockBackend(ctrl)
-	l := locking.NewClient(mock)
-
+	RegisterMockTestingT(t)
+	backend := mocks.NewMockBackend()
+	l := locking.NewClient(backend)
 	_, err := l.GetLock("invalidkey")
 	Assert(t, err != nil, "err should not be nil")
 	Assert(t, strings.Contains(err.Error(), "invalid key format"), "expected different err")
 }
 
 func TestGetLock_Err(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	mock := mocks.NewMockBackend(ctrl)
-	mock.EXPECT().GetLock(project, env).Return(nil, expectedErr)
-	l := locking.NewClient(mock)
-
+	RegisterMockTestingT(t)
+	backend := mocks.NewMockBackend()
+	When(backend.GetLock(project, env)).ThenReturn(nil, expectedErr)
+	l := locking.NewClient(backend)
 	_, err := l.GetLock("owner/repo/path/env")
 	Equals(t, expectedErr, err)
 }
 
 func TestGetLock(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	mock := mocks.NewMockBackend(ctrl)
-	mock.EXPECT().GetLock(project, env).Return(&pl, nil)
-	l := locking.NewClient(mock)
-
+	RegisterMockTestingT(t)
+	backend := mocks.NewMockBackend()
+	When(backend.GetLock(project, env)).ThenReturn(&pl, nil)
+	l := locking.NewClient(backend)
 	lock, err := l.GetLock("owner/repo/path/env")
 	Ok(t, err)
 	Equals(t, &pl, lock)
+}
+
+func AnyProjectLock() models.ProjectLock {
+	RegisterMatcher(NewAnyMatcher(reflect.TypeOf(models.ProjectLock{})))
+	return models.ProjectLock{}
+}
+
+func AnyProject() models.Project {
+	RegisterMatcher(NewAnyMatcher(reflect.TypeOf(models.Project{})))
+	return models.Project{}
 }

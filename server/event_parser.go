@@ -9,6 +9,15 @@ import (
 	"github.com/hootsuite/atlantis/models"
 )
 
+//go:generate pegomock generate event_parser.go
+
+type Command struct {
+	Name        CommandName
+	Environment string
+	Verbose     bool
+	Flags       []string
+}
+
 type EventParsing interface {
 	DetermineCommand(comment *github.IssueCommentEvent) (*Command, error)
 	ExtractCommentData(comment *github.IssueCommentEvent, ctx *CommandContext) error

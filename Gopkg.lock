@@ -32,12 +32,6 @@
   version = "v1.4.2"
 
 [[projects]]
-  name = "github.com/golang/mock"
-  packages = ["gomock"]
-  revision = "13f360950a79f5864a972c786a10a50e44b69541"
-  version = "v1.0.0"
-
-[[projects]]
   branch = "master"
   name = "github.com/google/go-github"
   packages = ["github"]
@@ -134,6 +128,12 @@
   revision = "491d3605edfb866af34a48075bd4355ac1bf46ca"
 
 [[projects]]
+  name = "github.com/onsi/gomega"
+  packages = ["format"]
+  revision = "c893efa28eb45626cdaa76c9f653b62488858837"
+  version = "v1.2.0"
+
+[[projects]]
   name = "github.com/pelletier/go-buffruneio"
   packages = ["."]
   revision = "c37440a7cf42ac63b919c752ca73a85067e05992"
@@ -144,6 +144,12 @@
   packages = ["."]
   revision = "5ccdfb18c776b740aecaf085c4d9a2779199c279"
   version = "v1.0.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/petergtz/pegomock"
+  packages = [".","internal/verify"]
+  revision = "cc94f74ce20a9c2575a77736799f359ef247beef"
 
 [[projects]]
   name = "github.com/pkg/errors"
@@ -226,6 +232,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "5f8263e051e92b10d478d81add4b1fc9d6e7cb7dba280c123a13b2c1d2150a64"
+  inputs-digest = "ff26f498317e49b0c36b98f2ec0b91a1b7c9ccfb4b04777a3f1e8f7e143828b7"
   solver-name = "gps-cdcl"
   solver-version = 1

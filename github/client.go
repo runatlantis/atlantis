@@ -13,6 +13,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+//go:generate pegomock generate --package mocks -o mocks/mock_client.go client.go
+
 type Client interface {
 	GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error)
 	CreateComment(repo models.Repo, pull models.PullRequest, comment string) error

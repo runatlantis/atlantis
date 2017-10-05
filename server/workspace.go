@@ -12,6 +12,8 @@ import (
 
 const workspacePrefix = "repos"
 
+//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_workspace.go Workspace
+
 type Workspace interface {
 	Clone(ctx *CommandContext) (string, error)
 	GetWorkspace(ctx *CommandContext) (string, error)
