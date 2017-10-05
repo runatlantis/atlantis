@@ -50,7 +50,7 @@ func (p *PlanExecutor) Execute(ctx *CommandContext) {
 	p.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Pending, PlanStep)
 	res := p.setupAndPlan(ctx)
 	res.Command = Plan
-	comment := p.githubCommentRenderer.render(res, ctx.Log.History.String(), ctx.Command.Verbose)
+	comment := p.githubCommentRenderer.Render(res, ctx.Log.History.String(), ctx.Command.Verbose)
 	p.github.CreateComment(ctx.BaseRepo, ctx.Pull, comment)
 }
 

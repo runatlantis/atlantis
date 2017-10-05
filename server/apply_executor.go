@@ -33,7 +33,7 @@ func (a *ApplyExecutor) Execute(ctx *CommandContext) {
 	a.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Pending, ApplyStep)
 	res := a.setupAndApply(ctx)
 	res.Command = Apply
-	comment := a.githubCommentRenderer.render(res, ctx.Log.History.String(), ctx.Command.Verbose)
+	comment := a.githubCommentRenderer.Render(res, ctx.Log.History.String(), ctx.Command.Verbose)
 	a.github.CreateComment(ctx.BaseRepo, ctx.Pull, comment)
 }
 
