@@ -1,10 +1,11 @@
 package server_test
 
 import (
+	"errors"
 	"testing"
+
 	"github.com/hootsuite/atlantis/server"
 	. "github.com/hootsuite/atlantis/testing_util"
-	"errors"
 )
 
 func TestRenderErr(t *testing.T) {
@@ -196,11 +197,11 @@ func TestRenderProjectResults(t *testing.T) {
 					},
 				},
 				{
-					Path: "path2",
+					Path:    "path2",
 					Failure: "failure",
 				},
 				{
-					Path: "path3",
+					Path:  "path3",
 					Error: errors.New("error"),
 				},
 			},
@@ -211,15 +212,15 @@ func TestRenderProjectResults(t *testing.T) {
 			server.Apply,
 			[]server.ProjectResult{
 				{
-					Path: "path",
+					Path:         "path",
 					ApplySuccess: "success",
 				},
 				{
-					Path: "path2",
+					Path:    "path2",
 					Failure: "failure",
 				},
 				{
-					Path: "path3",
+					Path:  "path3",
 					Error: errors.New("error"),
 				},
 			},

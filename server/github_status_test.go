@@ -3,13 +3,14 @@ package server_test
 import (
 	"testing"
 
+	"errors"
+	"strings"
+
 	"github.com/hootsuite/atlantis/github/mocks"
 	"github.com/hootsuite/atlantis/models"
 	"github.com/hootsuite/atlantis/server"
 	. "github.com/hootsuite/atlantis/testing_util"
 	. "github.com/petergtz/pegomock"
-	"strings"
-	"errors"
 )
 
 var repoModel = models.Repo{}

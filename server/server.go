@@ -21,12 +21,12 @@ import (
 	"github.com/hootsuite/atlantis/logging"
 	"github.com/hootsuite/atlantis/models"
 	"github.com/hootsuite/atlantis/run"
+	"github.com/hootsuite/atlantis/static"
 	"github.com/hootsuite/atlantis/terraform"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	"github.com/urfave/negroni"
-	"github.com/hootsuite/atlantis/static"
 )
 
 const (

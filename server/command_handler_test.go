@@ -6,6 +6,8 @@ import (
 	"os"
 	"testing"
 
+	"reflect"
+
 	"github.com/google/go-github/github"
 	gh "github.com/hootsuite/atlantis/github/fixtures"
 	ghmocks "github.com/hootsuite/atlantis/github/mocks"
@@ -14,9 +16,8 @@ import (
 	"github.com/hootsuite/atlantis/server"
 	"github.com/hootsuite/atlantis/server/mocks"
 	. "github.com/hootsuite/atlantis/testing_util"
-	. "github.com/petergtz/pegomock"
 	"github.com/mohae/deepcopy"
-	"reflect"
+	. "github.com/petergtz/pegomock"
 )
 
 func TestExecuteCommand_PullErr(t *testing.T) {
