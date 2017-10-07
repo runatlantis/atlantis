@@ -36,6 +36,8 @@ type Client struct {
 	backend Backend
 }
 
+//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_locker.go Locker
+
 type Locker interface {
 	TryLock(p models.Project, env string, pull models.PullRequest, user models.User) (TryLockResponse, error)
 	Unlock(key string) (*models.ProjectLock, error)

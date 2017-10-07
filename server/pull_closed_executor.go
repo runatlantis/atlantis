@@ -13,9 +13,9 @@ import (
 )
 
 type PullClosedExecutor struct {
-	locking   locking.Locker
-	github    github.Client
-	workspace Workspace
+	Locker    locking.Locker
+	Github    github.Client
+	Workspace Workspace
 }
 
 type templatedProject struct {
@@ -23,20 +23,21 @@ type templatedProject struct {
 	Envs string
 }
 
-var pullClosedTemplate = template.Must(template.New("").Parse("Locks and plans deleted for the projects and environments modified in this pull request:\n" +
-	"{{ range . }}\n" +
-	"- path: `{{ .Path }}` {{ .Envs }}{{ end }}"))
+var pullClosedTemplate = template.Must(template.New("").Parse(
+	"Locks and plans deleted for the projects and environments modified in this pull request:\n" +
+		"{{ range . }}\n" +
+		"- path: `{{ .Path }}` {{ .Envs }}{{ end }}"))
 
 func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullRequest) error {
 	// delete the workspace
-	if err := p.workspace.Delete(repo, pull); err != nil {
+	if err := p.Workspace.Delete(repo, pull); err != nil {
 		return errors.Wrap(err, "cleaning workspace")
 	}
 
 	// finally, delete locks. We do this last because when someone
 	// unlocks a project, right now we don't actually delete the plan
 	// so we might have plans laying around but no locks
-	locks, err := p.locking.UnlockByPull(repo.FullName, pull.Num)
+	locks, err := p.Locker.UnlockByPull(repo.FullName, pull.Num)
 	if err != nil {
 		return errors.Wrap(err, "cleaning up locks")
 	}
@@ -51,7 +52,7 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 	if err = pullClosedTemplate.Execute(&buf, templateData); err != nil {
 		return errors.Wrap(err, "rendering template for comment")
 	}
-	return p.github.CreateComment(repo, pull, buf.String())
+	return p.Github.CreateComment(repo, pull, buf.String())
 }
 
 // buildTemplateData formats the lock data into a slice that can easily be templated
