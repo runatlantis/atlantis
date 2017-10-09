@@ -1,0 +1,2 @@
+#!/bin/bash
+$GOPATH/bin/ginkgo watch -succinct -notify -progress --depth=3 generate_test_mocks/gomock_reflect .

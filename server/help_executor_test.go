@@ -5,24 +5,32 @@ import (
 	"os"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/hootsuite/atlantis/github/mocks"
 	"github.com/hootsuite/atlantis/logging"
 	"github.com/hootsuite/atlantis/models"
 	"github.com/hootsuite/atlantis/server"
+	. "github.com/petergtz/pegomock"
 )
 
 func TestExecute(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	mock := mocks.NewMockClient(ctrl)
+	RegisterMockTestingT(t)
+	client := mocks.NewMockClient()
 
-	h := server.HelpExecutor{mock}
+	h := server.HelpExecutor{client}
 	ctx := server.CommandContext{
 		BaseRepo: models.Repo{},
 		Pull:     models.PullRequest{},
 		Log:      logging.NewSimpleLogger("", log.New(os.Stderr, "", log.LstdFlags), false, logging.Debug),
 	}
-	mock.EXPECT().CreateComment(ctx.BaseRepo, ctx.Pull, gomock.Any())
 	h.Execute(&ctx)
+	client.VerifyWasCalledOnce().CreateComment(EqRepo(ctx.BaseRepo), EqPull(ctx.Pull), AnyString())
+}
+
+func EqRepo(value models.Repo) models.Repo {
+	RegisterMatcher(&EqMatcher{Value: value})
+	return models.Repo{}
+}
+func EqPull(value models.PullRequest) models.PullRequest {
+	RegisterMatcher(&EqMatcher{Value: value})
+	return models.PullRequest{}
 }

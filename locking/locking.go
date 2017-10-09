@@ -10,6 +10,8 @@ import (
 	"github.com/hootsuite/atlantis/models"
 )
 
+//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_backend.go Backend
+
 // Backend is an implementation of the locking API we require.
 type Backend interface {
 	TryLock(lock models.ProjectLock) (bool, models.ProjectLock, error)
@@ -32,6 +34,16 @@ type TryLockResponse struct {
 // Client is used to perform locking actions.
 type Client struct {
 	backend Backend
+}
+
+//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_locker.go Locker
+
+type Locker interface {
+	TryLock(p models.Project, env string, pull models.PullRequest, user models.User) (TryLockResponse, error)
+	Unlock(key string) (*models.ProjectLock, error)
+	List() (map[string]models.ProjectLock, error)
+	UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error)
+	GetLock(key string) (*models.ProjectLock, error)
 }
 
 // NewClient returns a new locking client.

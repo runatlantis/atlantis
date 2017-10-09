@@ -63,13 +63,6 @@ func (c CommandName) String() string {
 	return ""
 }
 
-type Command struct {
-	Name        CommandName
-	Environment string
-	Verbose     bool
-	Flags       []string
-}
-
 func (c *CommandHandler) ExecuteCommand(ctx *CommandContext) {
 	src := fmt.Sprintf("%s/pull/%d", ctx.BaseRepo.FullName, ctx.Pull.Num)
 	// it's safe to reuse the underlying logger
