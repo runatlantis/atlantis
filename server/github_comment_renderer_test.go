@@ -33,12 +33,11 @@ func TestRenderErr(t *testing.T) {
 	r := server.GithubCommentRenderer{}
 	for _, c := range cases {
 		res := server.CommandResponse{
-			Command: c.Command,
-			Error:   c.Error,
+			Error: c.Error,
 		}
 		for _, verbose := range []bool{true, false} {
 			t.Log("testing " + c.Description)
-			s := r.Render(res, "log", verbose)
+			s := r.Render(res, c.Command, "log", verbose)
 			if !verbose {
 				Equals(t, c.Expected, s)
 			} else {
@@ -72,12 +71,11 @@ func TestRenderFailure(t *testing.T) {
 	r := server.GithubCommentRenderer{}
 	for _, c := range cases {
 		res := server.CommandResponse{
-			Command: c.Command,
 			Failure: c.Failure,
 		}
 		for _, verbose := range []bool{true, false} {
 			t.Log("testing " + c.Description)
-			s := r.Render(res, "log", verbose)
+			s := r.Render(res, c.Command, "log", verbose)
 			if !verbose {
 				Equals(t, c.Expected, s)
 			} else {
@@ -91,11 +89,10 @@ func TestRenderErrAndFailure(t *testing.T) {
 	t.Log("if there is an error and a failure, the error should be printed")
 	r := server.GithubCommentRenderer{}
 	res := server.CommandResponse{
-		Command: server.Plan,
 		Error:   errors.New("error"),
 		Failure: "failure",
 	}
-	s := r.Render(res, "", false)
+	s := r.Render(res, server.Plan, "", false)
 	Equals(t, "**Plan Error**\n```\nerror\n```\n\n", s)
 }
 
@@ -231,12 +228,11 @@ func TestRenderProjectResults(t *testing.T) {
 	r := server.GithubCommentRenderer{}
 	for _, c := range cases {
 		res := server.CommandResponse{
-			Command:        c.Command,
 			ProjectResults: c.ProjectResults,
 		}
 		for _, verbose := range []bool{true, false} {
 			t.Log("testing " + c.Description)
-			s := r.Render(res, "log", verbose)
+			s := r.Render(res, c.Command, "log", verbose)
 			if !verbose {
 				Equals(t, c.Expected, s)
 			} else {

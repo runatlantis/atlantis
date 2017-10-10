@@ -17,47 +17,30 @@ import (
 )
 
 type ApplyExecutor struct {
-	github                github.Client
-	githubStatus          *GithubStatus
-	terraform             *terraform.Client
-	githubCommentRenderer *GithubCommentRenderer
-	locker                locking.Locker
-	requireApproval       bool
-	run                   *run.Run
-	configReader          *ConfigReader
-	concurrentRunLocker   *ConcurrentRunLocker
-	workspace             Workspace
+	github          github.Client
+	terraform       *terraform.Client
+	locker          locking.Locker
+	requireApproval bool
+	run             *run.Run
+	configReader    *ConfigReader
+	workspace       Workspace
 }
 
-func (a *ApplyExecutor) Execute(ctx *CommandContext) {
-	a.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Pending, ApplyStep)
-	res := a.setupAndApply(ctx)
-	res.Command = Apply
-	comment := a.githubCommentRenderer.Render(res, ctx.Log.History.String(), ctx.Command.Verbose)
-	a.github.CreateComment(ctx.BaseRepo, ctx.Pull, comment)
-}
-
-func (a *ApplyExecutor) setupAndApply(ctx *CommandContext) CommandResponse {
-	if a.concurrentRunLocker.TryLock(ctx.BaseRepo.FullName, ctx.Command.Environment, ctx.Pull.Num) != true {
-		return a.failureResponse(ctx,
-			fmt.Sprintf("The %s environment is currently locked by another command that is running for this pull request. Wait until command is complete and try again.", ctx.Command.Environment))
-	}
-	defer a.concurrentRunLocker.Unlock(ctx.BaseRepo.FullName, ctx.Command.Environment, ctx.Pull.Num)
-
+func (a *ApplyExecutor) Execute(ctx *CommandContext) CommandResponse {
 	if a.requireApproval {
 		approved, err := a.github.PullIsApproved(ctx.BaseRepo, ctx.Pull)
 		if err != nil {
-			return a.errorResponse(ctx, errors.Wrap(err, "checking if pull request was approved"))
+			return CommandResponse{Error: errors.Wrap(err, "checking if pull request was approved")}
 		}
 		if !approved {
-			return a.failureResponse(ctx, "Pull request must be approved before running apply.")
+			return CommandResponse{Failure: "Pull request must be approved before running apply."}
 		}
 		ctx.Log.Info("confirmed pull request was approved")
 	}
 
 	repoDir, err := a.workspace.GetWorkspace(ctx)
 	if err != nil {
-		return a.failureResponse(ctx, "No workspace found. Did you run plan?")
+		return CommandResponse{Failure: "No workspace found. Did you run plan?"}
 	}
 	ctx.Log.Info("found workspace in %q", repoDir)
 
@@ -78,7 +61,7 @@ func (a *ApplyExecutor) setupAndApply(ctx *CommandContext) CommandResponse {
 		return nil
 	})
 	if len(plans) == 0 {
-		return a.failureResponse(ctx, "No plans found for that environment.")
+		return CommandResponse{Failure: "No plans found for that environment."}
 	}
 	var paths []string
 	for _, p := range plans {
@@ -93,7 +76,6 @@ func (a *ApplyExecutor) setupAndApply(ctx *CommandContext) CommandResponse {
 		result.Path = plan.LocalPath
 		results = append(results, result)
 	}
-	a.githubStatus.UpdateProjectResult(ctx, results)
 	return CommandResponse{ProjectResults: results}
 }
 
@@ -161,16 +143,4 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 	}
 
 	return ProjectResult{ApplySuccess: output}
-}
-
-func (a *ApplyExecutor) failureResponse(ctx *CommandContext, msg string) CommandResponse {
-	ctx.Log.Warn(msg)
-	a.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Failure, ApplyStep)
-	return CommandResponse{Failure: msg}
-}
-
-func (a *ApplyExecutor) errorResponse(ctx *CommandContext, err error) CommandResponse {
-	ctx.Log.Err(err.Error())
-	a.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Error, ApplyStep)
-	return CommandResponse{Error: err}
 }
