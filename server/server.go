@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"bytes"
 	"io/ioutil"
 
 	"github.com/elazarl/go-bindata-assetfs"
@@ -23,7 +22,7 @@ import (
 	"github.com/hootsuite/atlantis/run"
 	"github.com/hootsuite/atlantis/static"
 	"github.com/hootsuite/atlantis/terraform"
-	homedir "github.com/mitchellh/go-homedir"
+	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	"github.com/urfave/negroni"
@@ -295,51 +294,32 @@ func (s *Server) postEvents(w http.ResponseWriter, r *http.Request) {
 	githubReqID := "X-Github-Delivery=" + r.Header.Get("X-Github-Delivery")
 	var payload []byte
 
-	// webhook requests can either be application/json or application/x-www-form-urlencoded.
-	// We accept both to make it easier on users that may choose x-www-form-urlencoded by mistake
-	// todo: use go-github's ValidatePayload method if https://github.com/google/go-github/pull/693 is merged
-	if r.Header.Get("Content-Type") == "application/x-www-form-urlencoded" {
-		// GitHub stores the json payload as a form value
-		payloadForm := r.FormValue("payload")
-		if payloadForm == "" {
-			s.respond(w, logging.Warn, http.StatusBadRequest, "request did not contain expected 'payload' form value")
+	// If we need to validate the Webhook secret, we can use go-github's
+	// ValidatePayload method. Otherwise we need to parse the request ourselves.
+	if len(s.githubWebHookSecret) != 0 {
+		var err error
+		if payload, err = gh.ValidatePayload(r, s.githubWebHookSecret); err != nil {
+			s.respond(w, logging.Warn, http.StatusBadRequest, "webhook request failed secret key validation")
 			return
 		}
-		if len(s.githubWebHookSecret) != 0 {
-			// github calculates the signature based on the query escaped
-			// post body. In order to use go-github's ValidatePayload method
-			// that only accepts an http request we need to override r.Body
-			// with a value that was the original raw body before it was
-			// parsed.
-			rawPayload := fmt.Sprintf("payload=%s", url.QueryEscape(payloadForm))
-			r.Body = ioutil.NopCloser(bytes.NewBuffer([]byte(rawPayload)))
-			_, err := gh.ValidatePayload(r, s.githubWebHookSecret)
-			if err != nil {
-				s.respond(w, logging.Warn, http.StatusBadRequest, "webhook failed secret key validation")
-				return
-			}
-		}
-		payload = []byte(payloadForm)
 	} else {
-		// else read it as json
-		if len(s.githubWebHookSecret) != 0 {
+		switch ct := r.Header.Get("Content-Type"); ct {
+		case "application/json":
 			var err error
-			payload, err = gh.ValidatePayload(r, s.githubWebHookSecret)
-			if err != nil {
-				s.respond(w, logging.Warn, http.StatusBadRequest, "webhook failed secret key validation")
-				return
-			}
-		} else {
-			// if we're not validating against the webhook secret then
-			// we can't use the ValidatePayload method and need to read
-			// the request body ourselves.
-			defer r.Body.Close()
-			var err error
-			payload, err = ioutil.ReadAll(r.Body)
-			if err != nil {
+			if payload, err = ioutil.ReadAll(r.Body); err != nil {
 				s.respond(w, logging.Warn, http.StatusBadRequest, "could not read body: %s", err)
 				return
 			}
+		case "application/x-www-form-urlencoded":
+			// GitHub stores the json payload as a form value
+			payloadForm := r.FormValue("payload")
+			if payloadForm == "" {
+				s.respond(w, logging.Warn, http.StatusBadRequest, "webhook request did not contain expected 'payload' form value")
+				return
+			}
+			payload = []byte(payloadForm)
+		default:
+			s.respond(w, logging.Warn, http.StatusBadRequest, fmt.Sprintf("webhook request has unsupported Content-Type %q", ct))
 		}
 	}
 
