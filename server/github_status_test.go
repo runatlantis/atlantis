@@ -41,6 +41,32 @@ func TestUpdate(t *testing.T) {
 	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, "success", "Plan Success", "Atlantis")
 }
 
+func TestUpdateProjectResult_Error(t *testing.T) {
+	RegisterMockTestingT(t)
+	ctx := &server.CommandContext{
+		BaseRepo: repoModel,
+		Pull:     pullModel,
+		Command:  &server.Command{Name: server.Plan},
+	}
+	client := mocks.NewMockClient()
+	s := server.GithubStatus{client}
+	s.UpdateProjectResult(ctx, server.CommandResponse{Error: errors.New("err")})
+	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, server.Error.String(), "Plan Error", "Atlantis")
+}
+
+func TestUpdateProjectResult_Failure(t *testing.T) {
+	RegisterMockTestingT(t)
+	ctx := &server.CommandContext{
+		BaseRepo: repoModel,
+		Pull:     pullModel,
+		Command:  &server.Command{Name: server.Plan},
+	}
+	client := mocks.NewMockClient()
+	s := server.GithubStatus{client}
+	s.UpdateProjectResult(ctx, server.CommandResponse{Failure: "failure"})
+	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, server.Failure.String(), "Plan Failure", "Atlantis")
+}
+
 func TestUpdateProjectResult(t *testing.T) {
 	t.Log("should use worst status")
 	RegisterMockTestingT(t)
