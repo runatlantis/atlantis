@@ -9,10 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"io/ioutil"
-
 	"github.com/elazarl/go-bindata-assetfs"
-	gh "github.com/google/go-github/github"
 	"github.com/gorilla/mux"
 	"github.com/hootsuite/atlantis/server/github"
 	"github.com/hootsuite/atlantis/server/locking"
@@ -40,12 +37,11 @@ type Server struct {
 	router              *mux.Router
 	port                int
 	commandHandler      *CommandHandler
-	pullClosedExecutor  *PullClosedExecutor
 	logger              *logging.SimpleLogger
 	eventParser         *EventParser
 	locker              locking.Locker
 	atlantisURL         string
-	githubWebHookSecret []byte
+	eventsController    *EventsController
 }
 
 // the mapstructure tags correspond to flags in cmd/server.go
@@ -142,17 +138,23 @@ func NewServer(config ServerConfig) (*Server, error) {
 		GHCommentRenderer: githubComments,
 		Logger:            logger,
 	}
+	eventsController := &EventsController{
+		commandHandler:      commandHandler,
+		pullClosedExecutor:  pullClosedExecutor,
+		parser:              eventParser,
+		logger:              logger,
+		githubWebHookSecret: []byte(config.GithubWebHookSecret),
+	}
 	router := mux.NewRouter()
 	return &Server{
 		router:              router,
 		port:                config.Port,
 		commandHandler:      commandHandler,
-		pullClosedExecutor:  pullClosedExecutor,
 		eventParser:         eventParser,
 		logger:              logger,
 		locker:              lockingClient,
 		atlantisURL:         config.AtlantisURL,
-		githubWebHookSecret: []byte(config.GithubWebHookSecret),
+		eventsController:    eventsController,
 	}, nil
 }
 
@@ -284,101 +286,11 @@ func (s *Server) deleteLock(w http.ResponseWriter, r *http.Request) {
 	s.respond(w, logging.Info, http.StatusOK, "Deleted lock id %s", idUnencoded)
 }
 
-// postEvents handles comment and pull request events from GitHub
+// postEvents handles POST requests to our /events endpoint. These should be
+// GitHub webhook requests.
 func (s *Server) postEvents(w http.ResponseWriter, r *http.Request) {
-	githubReqID := "X-Github-Delivery=" + r.Header.Get("X-Github-Delivery")
-	var payload []byte
-
-	// If we need to validate the Webhook secret, we can use go-github's
-	// ValidatePayload method. Otherwise we need to parse the request ourselves.
-	if len(s.githubWebHookSecret) != 0 {
-		var err error
-		if payload, err = gh.ValidatePayload(r, s.githubWebHookSecret); err != nil {
-			s.respond(w, logging.Warn, http.StatusBadRequest, "webhook request failed secret key validation")
-			return
-		}
-	} else {
-		switch ct := r.Header.Get("Content-Type"); ct {
-		case "application/json":
-			var err error
-			if payload, err = ioutil.ReadAll(r.Body); err != nil {
-				s.respond(w, logging.Warn, http.StatusBadRequest, "could not read body: %s", err)
-				return
-			}
-		case "application/x-www-form-urlencoded":
-			// GitHub stores the json payload as a form value
-			payloadForm := r.FormValue("payload")
-			if payloadForm == "" {
-				s.respond(w, logging.Warn, http.StatusBadRequest, "webhook request did not contain expected 'payload' form value")
-				return
-			}
-			payload = []byte(payloadForm)
-		default:
-			s.respond(w, logging.Warn, http.StatusBadRequest, fmt.Sprintf("webhook request has unsupported Content-Type %q", ct))
-		}
-	}
-
-	event, _ := gh.ParseWebHook(gh.WebHookType(r), payload)
-	switch event := event.(type) {
-	case *gh.IssueCommentEvent:
-		s.handleCommentEvent(w, event, githubReqID)
-	case *gh.PullRequestEvent:
-		s.handlePullRequestEvent(w, event, githubReqID)
-	default:
-		s.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event %s", githubReqID)
-	}
+	s.eventsController.Post(w, r)
 }
-
-// handlePullRequestEvent will delete any locks associated with the pull request
-func (s *Server) handlePullRequestEvent(w http.ResponseWriter, pullEvent *gh.PullRequestEvent, githubReqID string) {
-	if pullEvent.GetAction() != "closed" {
-		s.respond(w, logging.Debug, http.StatusOK, "Ignoring pull request event since action was not closed %s", githubReqID)
-		return
-	}
-	pull, _, err := s.eventParser.ExtractPullData(pullEvent.PullRequest)
-	if err != nil {
-		s.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s", err)
-		return
-	}
-	repo, err := s.eventParser.ExtractRepoData(pullEvent.Repo)
-	if err != nil {
-		s.respond(w, logging.Error, http.StatusBadRequest, "Error parsing repo data: %s", err)
-		return
-	}
-
-	if err := s.pullClosedExecutor.CleanUpPull(repo, pull); err != nil {
-		s.respond(w, logging.Error, http.StatusInternalServerError, "Error cleaning pull request: %s", err)
-		return
-	}
-	s.logger.Info("deleted locks and workspace for repo %s, pull %d", repo.FullName, pull.Num)
-	fmt.Fprint(w, "Pull request cleaned successfully")
-}
-
-func (s *Server) handleCommentEvent(w http.ResponseWriter, event *gh.IssueCommentEvent, githubReqID string) {
-	if event.GetAction() != "created" {
-		s.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since action was not created %s", githubReqID)
-		return
-	}
-
-	ctx := &CommandContext{}
-	command, err := s.eventParser.DetermineCommand(event)
-	if err != nil {
-		s.respond(w, logging.Debug, http.StatusOK, "Ignoring: %s %s", err, githubReqID)
-		return
-	}
-	ctx.Command = command
-
-	if err = s.eventParser.ExtractCommentData(event, ctx); err != nil {
-		s.respond(w, logging.Error, http.StatusInternalServerError, "Failed parsing event: %v %s", err, githubReqID)
-		return
-	}
-	// Respond with success and then actually execute the command asynchronously.
-	// We use a goroutine so that this function returns and the connection is
-	// closed.
-	fmt.Fprintln(w, "Processing...")
-	go s.commandHandler.ExecuteCommand(ctx)
-}
-
 func (s *Server) respond(w http.ResponseWriter, lvl logging.LogLevel, code int, format string, args ...interface{}) {
 	response := fmt.Sprintf(format, args...)
 	s.logger.Log(lvl, response)
