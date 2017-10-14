@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	version "github.com/hashicorp/go-version"
-	"github.com/hootsuite/atlantis/logging"
+	"github.com/hootsuite/atlantis/server/logging"
 	"github.com/pkg/errors"
 )
 

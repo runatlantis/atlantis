@@ -5,8 +5,8 @@ import (
 
 	"strings"
 
-	"github.com/hootsuite/atlantis/github"
-	"github.com/hootsuite/atlantis/models"
+	"github.com/hootsuite/atlantis/server/github"
+	"github.com/hootsuite/atlantis/server/models"
 )
 
 type Status int

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/hootsuite/atlantis/models"
+	"github.com/hootsuite/atlantis/server/models"
 	"github.com/pkg/errors"
 )
 

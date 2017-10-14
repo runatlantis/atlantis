@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/google/go-github/github"
-	"github.com/hootsuite/atlantis/models"
+	"github.com/hootsuite/atlantis/server/models"
 	"github.com/pkg/errors"
 )
 

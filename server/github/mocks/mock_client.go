@@ -5,7 +5,7 @@ package mocks
 
 import (
 	github "github.com/google/go-github/github"
-	models "github.com/hootsuite/atlantis/models"
+	models "github.com/hootsuite/atlantis/server/models"
 	pegomock "github.com/petergtz/pegomock"
 	"reflect"
 )

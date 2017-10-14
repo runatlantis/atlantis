@@ -4,8 +4,8 @@
 package mocks
 
 import (
-	models "github.com/hootsuite/atlantis/models"
 	server "github.com/hootsuite/atlantis/server"
+	models "github.com/hootsuite/atlantis/server/models"
 	pegomock "github.com/petergtz/pegomock"
 	"reflect"
 )

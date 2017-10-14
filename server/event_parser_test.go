@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/google/go-github/github"
-	. "github.com/hootsuite/atlantis/github/fixtures"
-	"github.com/hootsuite/atlantis/models"
+	. "github.com/hootsuite/atlantis/server/github/fixtures"
+	"github.com/hootsuite/atlantis/server/models"
 	"github.com/hootsuite/atlantis/server"
 	. "github.com/hootsuite/atlantis/testing_util"
 	"github.com/mohae/deepcopy"

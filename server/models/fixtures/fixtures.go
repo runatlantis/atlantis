@@ -1,6 +1,6 @@
 package fixtures
 
-import "github.com/hootsuite/atlantis/models"
+import "github.com/hootsuite/atlantis/server/models"
 
 var Pull = models.PullRequest{
 	Num:        1,

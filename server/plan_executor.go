@@ -8,11 +8,11 @@ import (
 	"strings"
 
 	version "github.com/hashicorp/go-version"
-	"github.com/hootsuite/atlantis/github"
-	"github.com/hootsuite/atlantis/locking"
-	"github.com/hootsuite/atlantis/models"
-	"github.com/hootsuite/atlantis/run"
-	"github.com/hootsuite/atlantis/terraform"
+	"github.com/hootsuite/atlantis/server/github"
+	"github.com/hootsuite/atlantis/server/locking"
+	"github.com/hootsuite/atlantis/server/models"
+	"github.com/hootsuite/atlantis/server/run"
+	"github.com/hootsuite/atlantis/server/terraform"
 	"github.com/pkg/errors"
 )
 

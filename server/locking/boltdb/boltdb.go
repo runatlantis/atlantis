@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
-	"github.com/hootsuite/atlantis/models"
+	"github.com/hootsuite/atlantis/server/models"
 	"github.com/pkg/errors"
 )
 

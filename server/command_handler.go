@@ -3,9 +3,9 @@ package server
 import (
 	"fmt"
 
-	"github.com/hootsuite/atlantis/github"
-	"github.com/hootsuite/atlantis/logging"
-	"github.com/hootsuite/atlantis/recovery"
+	"github.com/hootsuite/atlantis/server/github"
+	"github.com/hootsuite/atlantis/server/logging"
+	"github.com/hootsuite/atlantis/server/recovery"
 )
 
 // CommandHandler is the first step when processing a comment command.

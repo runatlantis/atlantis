@@ -12,8 +12,8 @@ import (
 
 	"time"
 
-	"github.com/hootsuite/atlantis/locking/boltdb"
-	"github.com/hootsuite/atlantis/models"
+	"github.com/hootsuite/atlantis/server/models"
+	"github.com/hootsuite/atlantis/server/locking/boltdb"
 )
 
 var lockBucket = "bucket"
