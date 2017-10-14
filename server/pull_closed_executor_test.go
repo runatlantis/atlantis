@@ -5,12 +5,12 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/hootsuite/atlantis/server"
 	ghmocks "github.com/hootsuite/atlantis/server/github/mocks"
 	lockmocks "github.com/hootsuite/atlantis/server/locking/mocks"
+	"github.com/hootsuite/atlantis/server/mocks"
 	"github.com/hootsuite/atlantis/server/models"
 	"github.com/hootsuite/atlantis/server/models/fixtures"
-	"github.com/hootsuite/atlantis/server"
-	"github.com/hootsuite/atlantis/server/mocks"
 	. "github.com/hootsuite/atlantis/testing_util"
 	. "github.com/petergtz/pegomock"
 )

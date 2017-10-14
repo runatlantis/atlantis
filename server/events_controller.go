@@ -1,14 +1,15 @@
 package server
 
 import (
-	gh "github.com/google/go-github/github"
-	"net/http"
-	"io/ioutil"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+
+	gh "github.com/google/go-github/github"
 	"github.com/hootsuite/atlantis/server/logging"
 )
 
-type EventsController struct{
+type EventsController struct {
 	commandHandler      *CommandHandler
 	pullClosedExecutor  *PullClosedExecutor
 	logger              *logging.SimpleLogger

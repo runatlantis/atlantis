@@ -45,7 +45,7 @@ release: ## Create packages for a release
 	./scripts/binary-release.sh
 
 fmt: ## Run goimports (which also formats)
-	goimports -w $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "./static/bindata_assetfs.go" ! -path "**/mocks/*")
+	goimports -w $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "./server/static/bindata_assetfs.go" ! -path "**/mocks/*")
 
 end-to-end-deps: ## Install e2e dependencies
 	./scripts/e2e-deps.sh

@@ -8,11 +8,11 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/hootsuite/atlantis/server/locking"
 	"github.com/hootsuite/atlantis/server/locking/mocks"
 	"github.com/hootsuite/atlantis/server/models"
 	. "github.com/hootsuite/atlantis/testing_util"
 	. "github.com/petergtz/pegomock"
-	"github.com/hootsuite/atlantis/server/locking"
 )
 
 var project = models.NewProject("owner/repo", "path")

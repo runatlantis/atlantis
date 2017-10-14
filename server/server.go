@@ -34,14 +34,14 @@ const (
 
 // Server listens for GitHub events and runs the necessary Atlantis command
 type Server struct {
-	router              *mux.Router
-	port                int
-	commandHandler      *CommandHandler
-	logger              *logging.SimpleLogger
-	eventParser         *EventParser
-	locker              locking.Locker
-	atlantisURL         string
-	eventsController    *EventsController
+	router           *mux.Router
+	port             int
+	commandHandler   *CommandHandler
+	logger           *logging.SimpleLogger
+	eventParser      *EventParser
+	locker           locking.Locker
+	atlantisURL      string
+	eventsController *EventsController
 }
 
 // the mapstructure tags correspond to flags in cmd/server.go
@@ -147,14 +147,14 @@ func NewServer(config ServerConfig) (*Server, error) {
 	}
 	router := mux.NewRouter()
 	return &Server{
-		router:              router,
-		port:                config.Port,
-		commandHandler:      commandHandler,
-		eventParser:         eventParser,
-		logger:              logger,
-		locker:              lockingClient,
-		atlantisURL:         config.AtlantisURL,
-		eventsController:    eventsController,
+		router:           router,
+		port:             config.Port,
+		commandHandler:   commandHandler,
+		eventParser:      eventParser,
+		logger:           logger,
+		locker:           lockingClient,
+		atlantisURL:      config.AtlantisURL,
+		eventsController: eventsController,
 	}, nil
 }
 
