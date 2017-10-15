@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/hootsuite/atlantis/server/events"
 	ghmocks "github.com/hootsuite/atlantis/server/events/github/mocks"
 	lockmocks "github.com/hootsuite/atlantis/server/events/locking/mocks"
 	"github.com/hootsuite/atlantis/server/events/mocks"
@@ -12,7 +13,6 @@ import (
 	"github.com/hootsuite/atlantis/server/events/models/fixtures"
 	. "github.com/hootsuite/atlantis/testing_util"
 	. "github.com/petergtz/pegomock"
-	"github.com/hootsuite/atlantis/server/events"
 )
 
 func TestCleanUpPullWorkspaceErr(t *testing.T) {

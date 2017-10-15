@@ -1,11 +1,11 @@
 package events_test
 
-	import (
-		"errors"
+import (
+	"errors"
 	"testing"
 
-	. "github.com/hootsuite/atlantis/testing_util"
 	"github.com/hootsuite/atlantis/server/events"
+	. "github.com/hootsuite/atlantis/testing_util"
 )
 
 func TestRenderErr(t *testing.T) {

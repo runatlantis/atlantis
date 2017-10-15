@@ -13,4 +13,3 @@ type CommandContext struct {
 	Command  *Command
 	Log      *logging.SimpleLogger
 }
-

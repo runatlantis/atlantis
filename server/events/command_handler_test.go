@@ -9,15 +9,15 @@ import (
 	"strings"
 
 	"github.com/google/go-github/github"
+	"github.com/hootsuite/atlantis/server/events"
 	gh "github.com/hootsuite/atlantis/server/events/github/fixtures"
 	ghmocks "github.com/hootsuite/atlantis/server/events/github/mocks"
-	"github.com/hootsuite/atlantis/server/logging"
 	"github.com/hootsuite/atlantis/server/events/mocks"
 	"github.com/hootsuite/atlantis/server/events/models/fixtures"
+	"github.com/hootsuite/atlantis/server/logging"
 	. "github.com/hootsuite/atlantis/testing_util"
 	"github.com/mohae/deepcopy"
 	. "github.com/petergtz/pegomock"
-	"github.com/hootsuite/atlantis/server/events"
 )
 
 var applier *mocks.MockExecutor

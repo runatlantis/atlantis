@@ -7,11 +7,11 @@ import (
 	"strings"
 
 	"github.com/google/go-github/github"
+	"github.com/hootsuite/atlantis/server/events"
 	. "github.com/hootsuite/atlantis/server/events/github/fixtures"
 	"github.com/hootsuite/atlantis/server/events/models"
 	. "github.com/hootsuite/atlantis/testing_util"
 	"github.com/mohae/deepcopy"
-	"github.com/hootsuite/atlantis/server/events"
 )
 
 var parser = events.EventParser{"user", "token"}

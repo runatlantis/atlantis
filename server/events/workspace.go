@@ -5,10 +5,11 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/hootsuite/atlantis/server/events/models"
-	"github.com/pkg/errors"
-	"github.com/hootsuite/atlantis/server/logging"
 	"os/exec"
+
+	"github.com/hootsuite/atlantis/server/events/models"
+	"github.com/hootsuite/atlantis/server/logging"
+	"github.com/pkg/errors"
 )
 
 const workspacePrefix = "repos"

@@ -13,18 +13,18 @@ import (
 
 	"github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
+	"github.com/hootsuite/atlantis/server/events"
 	"github.com/hootsuite/atlantis/server/events/github"
 	"github.com/hootsuite/atlantis/server/events/locking"
 	"github.com/hootsuite/atlantis/server/events/locking/boltdb"
-	"github.com/hootsuite/atlantis/server/logging"
 	"github.com/hootsuite/atlantis/server/events/run"
-	"github.com/hootsuite/atlantis/server/static"
 	"github.com/hootsuite/atlantis/server/events/terraform"
+	"github.com/hootsuite/atlantis/server/logging"
+	"github.com/hootsuite/atlantis/server/static"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	"github.com/urfave/negroni"
-	"github.com/hootsuite/atlantis/server/events"
 )
 
 const lockRoute = "lock-detail"
