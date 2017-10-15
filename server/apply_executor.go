@@ -38,7 +38,7 @@ func (a *ApplyExecutor) Execute(ctx *CommandContext) CommandResponse {
 		ctx.Log.Info("confirmed pull request was approved")
 	}
 
-	repoDir, err := a.workspace.GetWorkspace(ctx)
+	repoDir, err := a.workspace.GetWorkspace(ctx.BaseRepo, ctx.Pull, ctx.Command.Environment)
 	if err != nil {
 		return CommandResponse{Failure: "No workspace found. Did you run plan?"}
 	}

@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	server "github.com/hootsuite/atlantis/server"
+	logging "github.com/hootsuite/atlantis/server/logging"
 	models "github.com/hootsuite/atlantis/server/models"
 	pegomock "github.com/petergtz/pegomock"
 	"reflect"
@@ -18,8 +18,8 @@ func NewMockWorkspace() *MockWorkspace {
 	return &MockWorkspace{fail: pegomock.GlobalFailHandler}
 }
 
-func (mock *MockWorkspace) Clone(ctx *server.CommandContext) (string, error) {
-	params := []pegomock.Param{ctx}
+func (mock *MockWorkspace) Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, env string) (string, error) {
+	params := []pegomock.Param{log, baseRepo, headRepo, p, env}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Clone", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
 	var ret1 error
@@ -34,8 +34,8 @@ func (mock *MockWorkspace) Clone(ctx *server.CommandContext) (string, error) {
 	return ret0, ret1
 }
 
-func (mock *MockWorkspace) GetWorkspace(ctx *server.CommandContext) (string, error) {
-	params := []pegomock.Param{ctx}
+func (mock *MockWorkspace) GetWorkspace(r models.Repo, p models.PullRequest, env string) (string, error) {
+	params := []pegomock.Param{r, p, env}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("GetWorkspace", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
 	var ret1 error
@@ -50,8 +50,8 @@ func (mock *MockWorkspace) GetWorkspace(ctx *server.CommandContext) (string, err
 	return ret0, ret1
 }
 
-func (mock *MockWorkspace) Delete(repo models.Repo, pull models.PullRequest) error {
-	params := []pegomock.Param{repo, pull}
+func (mock *MockWorkspace) Delete(r models.Repo, p models.PullRequest) error {
+	params := []pegomock.Param{r, p}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Delete", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
 	if len(result) != 0 {
@@ -80,8 +80,8 @@ type VerifierWorkspace struct {
 	inOrderContext         *pegomock.InOrderContext
 }
 
-func (verifier *VerifierWorkspace) Clone(ctx *server.CommandContext) *Workspace_Clone_OngoingVerification {
-	params := []pegomock.Param{ctx}
+func (verifier *VerifierWorkspace) Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, env string) *Workspace_Clone_OngoingVerification {
+	params := []pegomock.Param{log, baseRepo, headRepo, p, env}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Clone", params)
 	return &Workspace_Clone_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -91,24 +91,40 @@ type Workspace_Clone_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *Workspace_Clone_OngoingVerification) GetCapturedArguments() *server.CommandContext {
-	ctx := c.GetAllCapturedArguments()
-	return ctx[len(ctx)-1]
+func (c *Workspace_Clone_OngoingVerification) GetCapturedArguments() (*logging.SimpleLogger, models.Repo, models.Repo, models.PullRequest, string) {
+	log, baseRepo, headRepo, p, env := c.GetAllCapturedArguments()
+	return log[len(log)-1], baseRepo[len(baseRepo)-1], headRepo[len(headRepo)-1], p[len(p)-1], env[len(env)-1]
 }
 
-func (c *Workspace_Clone_OngoingVerification) GetAllCapturedArguments() (_param0 []*server.CommandContext) {
+func (c *Workspace_Clone_OngoingVerification) GetAllCapturedArguments() (_param0 []*logging.SimpleLogger, _param1 []models.Repo, _param2 []models.Repo, _param3 []models.PullRequest, _param4 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]*server.CommandContext, len(params[0]))
+		_param0 = make([]*logging.SimpleLogger, len(params[0]))
 		for u, param := range params[0] {
-			_param0[u] = param.(*server.CommandContext)
+			_param0[u] = param.(*logging.SimpleLogger)
+		}
+		_param1 = make([]models.Repo, len(params[1]))
+		for u, param := range params[1] {
+			_param1[u] = param.(models.Repo)
+		}
+		_param2 = make([]models.Repo, len(params[2]))
+		for u, param := range params[2] {
+			_param2[u] = param.(models.Repo)
+		}
+		_param3 = make([]models.PullRequest, len(params[3]))
+		for u, param := range params[3] {
+			_param3[u] = param.(models.PullRequest)
+		}
+		_param4 = make([]string, len(params[4]))
+		for u, param := range params[4] {
+			_param4[u] = param.(string)
 		}
 	}
 	return
 }
 
-func (verifier *VerifierWorkspace) GetWorkspace(ctx *server.CommandContext) *Workspace_GetWorkspace_OngoingVerification {
-	params := []pegomock.Param{ctx}
+func (verifier *VerifierWorkspace) GetWorkspace(r models.Repo, p models.PullRequest, env string) *Workspace_GetWorkspace_OngoingVerification {
+	params := []pegomock.Param{r, p, env}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetWorkspace", params)
 	return &Workspace_GetWorkspace_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -118,24 +134,32 @@ type Workspace_GetWorkspace_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *Workspace_GetWorkspace_OngoingVerification) GetCapturedArguments() *server.CommandContext {
-	ctx := c.GetAllCapturedArguments()
-	return ctx[len(ctx)-1]
+func (c *Workspace_GetWorkspace_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, string) {
+	r, p, env := c.GetAllCapturedArguments()
+	return r[len(r)-1], p[len(p)-1], env[len(env)-1]
 }
 
-func (c *Workspace_GetWorkspace_OngoingVerification) GetAllCapturedArguments() (_param0 []*server.CommandContext) {
+func (c *Workspace_GetWorkspace_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]*server.CommandContext, len(params[0]))
+		_param0 = make([]models.Repo, len(params[0]))
 		for u, param := range params[0] {
-			_param0[u] = param.(*server.CommandContext)
+			_param0[u] = param.(models.Repo)
+		}
+		_param1 = make([]models.PullRequest, len(params[1]))
+		for u, param := range params[1] {
+			_param1[u] = param.(models.PullRequest)
+		}
+		_param2 = make([]string, len(params[2]))
+		for u, param := range params[2] {
+			_param2[u] = param.(string)
 		}
 	}
 	return
 }
 
-func (verifier *VerifierWorkspace) Delete(repo models.Repo, pull models.PullRequest) *Workspace_Delete_OngoingVerification {
-	params := []pegomock.Param{repo, pull}
+func (verifier *VerifierWorkspace) Delete(r models.Repo, p models.PullRequest) *Workspace_Delete_OngoingVerification {
+	params := []pegomock.Param{r, p}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Delete", params)
 	return &Workspace_Delete_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -146,8 +170,8 @@ type Workspace_Delete_OngoingVerification struct {
 }
 
 func (c *Workspace_Delete_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest) {
-	repo, pull := c.GetAllCapturedArguments()
-	return repo[len(repo)-1], pull[len(pull)-1]
+	r, p := c.GetAllCapturedArguments()
+	return r[len(r)-1], p[len(p)-1]
 }
 
 func (c *Workspace_Delete_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest) {

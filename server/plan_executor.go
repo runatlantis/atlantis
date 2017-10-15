@@ -69,7 +69,7 @@ func (p *PlanExecutor) Execute(ctx *CommandContext) CommandResponse {
 	}
 	ctx.Log.Info("based on files modified, determined we have %d modified project(s) at path(s): %v", len(projects), strings.Join(paths, ", "))
 
-	cloneDir, err := p.workspace.Clone(ctx)
+	cloneDir, err := p.workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, ctx.Command.Environment)
 	if err != nil {
 		return CommandResponse{Error: err}
 	}
