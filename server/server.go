@@ -117,6 +117,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 		ApplyExecutor:     applyExecutor,
 		PlanExecutor:      planExecutor,
 		HelpExecutor:      helpExecutor,
+		LockURLGenerator:  planExecutor,
 		EventParser:       eventParser,
 		GHClient:          githubClient,
 		GHStatus:          githubStatus,

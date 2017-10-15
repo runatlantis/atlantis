@@ -16,12 +16,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_planner.go Planner
+//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_lock_url_generator.go LockURLGenerator
 
-// todo: would like to use the Executor interface but need to find a way
-// to deal with the SetLockURL function
-type Planner interface {
-	Execute(ctx *CommandContext) CommandResponse
+type LockURLGenerator interface {
 	// SetLockURL takes a function that given a lock id, will return a url
 	// to view that lock
 	SetLockURL(func(id string) (url string))

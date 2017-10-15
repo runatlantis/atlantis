@@ -10,9 +10,10 @@ import (
 
 // CommandHandler is the first step when processing a comment command.
 type CommandHandler struct {
-	PlanExecutor      Planner
+	PlanExecutor      Executor
 	ApplyExecutor     Executor
 	HelpExecutor      Executor
+	LockURLGenerator  LockURLGenerator
 	GHClient          github.Client
 	GHStatus          GHStatusUpdater
 	EventParser       EventParsing
@@ -50,7 +51,7 @@ func (c *CommandHandler) ExecuteCommand(ctx *CommandContext) {
 }
 
 func (c *CommandHandler) SetLockURL(f func(id string) (url string)) {
-	c.PlanExecutor.SetLockURL(f)
+	c.LockURLGenerator.SetLockURL(f)
 }
 
 func (c *CommandHandler) run(ctx *CommandContext) {
