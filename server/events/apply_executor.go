@@ -9,11 +9,11 @@ import (
 	"path/filepath"
 
 	version "github.com/hashicorp/go-version"
-	"github.com/hootsuite/atlantis/server/github"
-	"github.com/hootsuite/atlantis/server/locking"
-	"github.com/hootsuite/atlantis/server/models"
-	"github.com/hootsuite/atlantis/server/run"
-	"github.com/hootsuite/atlantis/server/terraform"
+	"github.com/hootsuite/atlantis/server/events/github"
+	"github.com/hootsuite/atlantis/server/events/locking"
+	"github.com/hootsuite/atlantis/server/events/models"
+	"github.com/hootsuite/atlantis/server/events/run"
+	"github.com/hootsuite/atlantis/server/events/terraform"
 )
 
 type ApplyExecutor struct {

@@ -6,8 +6,8 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/hootsuite/atlantis/server/github/mocks"
-	"github.com/hootsuite/atlantis/server/models"
+	"github.com/hootsuite/atlantis/server/events/github/mocks"
+	"github.com/hootsuite/atlantis/server/events/models"
 	. "github.com/hootsuite/atlantis/testing_util"
 	. "github.com/petergtz/pegomock"
 	"github.com/hootsuite/atlantis/server/events"

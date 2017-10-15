@@ -3,7 +3,7 @@ package events
 import (
 	"fmt"
 
-	"github.com/hootsuite/atlantis/server/github"
+	"github.com/hootsuite/atlantis/server/events/github"
 	"github.com/hootsuite/atlantis/server/logging"
 	"github.com/hootsuite/atlantis/server/recovery"
 )

@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	gh "github.com/google/go-github/github"
+	"github.com/google/go-github/github"
 	"github.com/hootsuite/atlantis/server/logging"
 	"github.com/hootsuite/atlantis/server/events"
 )
@@ -26,7 +26,7 @@ func (e *EventsController) Post(w http.ResponseWriter, r *http.Request) {
 	// ValidatePayload method. Otherwise we need to parse the request ourselvee.
 	if len(e.githubWebHookSecret) != 0 {
 		var err error
-		if payload, err = gh.ValidatePayload(r, e.githubWebHookSecret); err != nil {
+		if payload, err = github.ValidatePayload(r, e.githubWebHookSecret); err != nil {
 			e.respond(w, logging.Warn, http.StatusBadRequest, "webhook request failed secret key validation")
 			return
 		}
@@ -51,18 +51,18 @@ func (e *EventsController) Post(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	event, _ := gh.ParseWebHook(gh.WebHookType(r), payload)
+	event, _ := github.ParseWebHook(github.WebHookType(r), payload)
 	switch event := event.(type) {
-	case *gh.IssueCommentEvent:
+	case *github.IssueCommentEvent:
 		e.HandleCommentEvent(w, event, githubReqID)
-	case *gh.PullRequestEvent:
+	case *github.PullRequestEvent:
 		e.HandlePullRequestEvent(w, event, githubReqID)
 	default:
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event %s", githubReqID)
 	}
 }
 
-func (e *EventsController) HandleCommentEvent(w http.ResponseWriter, event *gh.IssueCommentEvent, githubReqID string) {
+func (e *EventsController) HandleCommentEvent(w http.ResponseWriter, event *github.IssueCommentEvent, githubReqID string) {
 	if event.GetAction() != "created" {
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since action was not created %s", githubReqID)
 		return
@@ -88,7 +88,7 @@ func (e *EventsController) HandleCommentEvent(w http.ResponseWriter, event *gh.I
 }
 
 // HandlePullRequestEvent will delete any locks associated with the pull request
-func (e *EventsController) HandlePullRequestEvent(w http.ResponseWriter, pullEvent *gh.PullRequestEvent, githubReqID string) {
+func (e *EventsController) HandlePullRequestEvent(w http.ResponseWriter, pullEvent *github.PullRequestEvent, githubReqID string) {
 	if pullEvent.GetAction() != "closed" {
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring pull request event since action was not closed %s", githubReqID)
 		return

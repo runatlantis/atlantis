@@ -1,3 +1,5 @@
+// Package server is the main package for Atlantis. It handles the web server
+// and executing commands that come in via pull request comments.
 package server
 
 import (
@@ -11,13 +13,13 @@ import (
 
 	"github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
-	"github.com/hootsuite/atlantis/server/github"
-	"github.com/hootsuite/atlantis/server/locking"
-	"github.com/hootsuite/atlantis/server/locking/boltdb"
+	"github.com/hootsuite/atlantis/server/events/github"
+	"github.com/hootsuite/atlantis/server/events/locking"
+	"github.com/hootsuite/atlantis/server/events/locking/boltdb"
 	"github.com/hootsuite/atlantis/server/logging"
-	"github.com/hootsuite/atlantis/server/run"
+	"github.com/hootsuite/atlantis/server/events/run"
 	"github.com/hootsuite/atlantis/server/static"
-	"github.com/hootsuite/atlantis/server/terraform"
+	"github.com/hootsuite/atlantis/server/events/terraform"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"

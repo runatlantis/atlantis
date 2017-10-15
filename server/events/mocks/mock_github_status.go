@@ -5,7 +5,7 @@ package mocks
 
 import (
 	events "github.com/hootsuite/atlantis/server/events"
-	models "github.com/hootsuite/atlantis/server/models"
+	models "github.com/hootsuite/atlantis/server/events/models"
 	pegomock "github.com/petergtz/pegomock"
 	"reflect"
 )

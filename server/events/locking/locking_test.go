@@ -8,9 +8,9 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/hootsuite/atlantis/server/locking"
-	"github.com/hootsuite/atlantis/server/locking/mocks"
-	"github.com/hootsuite/atlantis/server/models"
+	"github.com/hootsuite/atlantis/server/events/locking"
+	"github.com/hootsuite/atlantis/server/events/locking/mocks"
+	"github.com/hootsuite/atlantis/server/events/models"
 	. "github.com/hootsuite/atlantis/testing_util"
 	. "github.com/petergtz/pegomock"
 )
