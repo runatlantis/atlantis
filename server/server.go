@@ -15,7 +15,6 @@ import (
 	"github.com/hootsuite/atlantis/server/locking"
 	"github.com/hootsuite/atlantis/server/locking/boltdb"
 	"github.com/hootsuite/atlantis/server/logging"
-	"github.com/hootsuite/atlantis/server/models"
 	"github.com/hootsuite/atlantis/server/run"
 	"github.com/hootsuite/atlantis/server/static"
 	"github.com/hootsuite/atlantis/server/terraform"
@@ -23,22 +22,18 @@ import (
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	"github.com/urfave/negroni"
+	"github.com/hootsuite/atlantis/server/events"
 )
 
-const (
-	lockRoute = "lock-detail"
-	// atlantisUserTFVar is the name of the variable we execute terraform
-	// with containing the github username of who is running the command
-	atlantisUserTFVar = "atlantis_user"
-)
+const lockRoute = "lock-detail"
 
 // Server listens for GitHub events and runs the necessary Atlantis command
 type Server struct {
 	router           *mux.Router
 	port             int
-	commandHandler   *CommandHandler
+	commandHandler   *events.CommandHandler
 	logger           *logging.SimpleLogger
-	eventParser      *EventParser
+	eventParser      *events.EventParser
 	locker           locking.Locker
 	atlantisURL      string
 	eventsController *EventsController
@@ -57,15 +52,6 @@ type ServerConfig struct {
 	RequireApproval     bool   `mapstructure:"require-approval"`
 }
 
-type CommandContext struct {
-	BaseRepo models.Repo
-	HeadRepo models.Repo
-	Pull     models.PullRequest
-	User     models.User
-	Command  *Command
-	Log      *logging.SimpleLogger
-}
-
 func NewServer(config ServerConfig) (*Server, error) {
 	// if ~ was used in data-dir convert that to actual home directory otherwise we'll
 	// create a directory call "~" instead of actually using home
@@ -81,12 +67,12 @@ func NewServer(config ServerConfig) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	githubStatus := &GithubStatus{Client: githubClient}
+	githubStatus := &events.GithubStatus{Client: githubClient}
 	terraformClient, err := terraform.NewClient()
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing terraform")
 	}
-	githubComments := &GithubCommentRenderer{}
+	githubComments := &events.GithubCommentRenderer{}
 
 	boltdb, err := boltdb.New(config.DataDir)
 	if err != nil {
@@ -94,40 +80,40 @@ func NewServer(config ServerConfig) (*Server, error) {
 	}
 	lockingClient := locking.NewClient(boltdb)
 	run := &run.Run{}
-	configReader := &ConfigReader{}
-	concurrentRunLocker := NewEnvLock()
-	workspace := &FileWorkspace{
-		dataDir: config.DataDir,
+	configReader := &events.ConfigReader{}
+	concurrentRunLocker := events.NewEnvLock()
+	workspace := &events.FileWorkspace{
+		DataDir: config.DataDir,
 	}
-	applyExecutor := &ApplyExecutor{
-		github:          githubClient,
-		terraform:       terraformClient,
-		locker:          lockingClient,
-		requireApproval: config.RequireApproval,
-		run:             run,
-		configReader:    configReader,
-		workspace:       workspace,
+	applyExecutor := &events.ApplyExecutor{
+		Github:          githubClient,
+		Terraform:       terraformClient,
+		Locker:          lockingClient,
+		RequireApproval: config.RequireApproval,
+		Run:             run,
+		ConfigReader:    configReader,
+		Workspace:       workspace,
 	}
-	planExecutor := &PlanExecutor{
-		github:       githubClient,
-		terraform:    terraformClient,
-		locker:       lockingClient,
-		run:          run,
-		configReader: configReader,
-		workspace:    workspace,
+	planExecutor := &events.PlanExecutor{
+		Github:       githubClient,
+		Terraform:    terraformClient,
+		Locker:       lockingClient,
+		Run:          run,
+		ConfigReader: configReader,
+		Workspace:    workspace,
 	}
-	helpExecutor := &HelpExecutor{}
-	pullClosedExecutor := &PullClosedExecutor{
+	helpExecutor := &events.HelpExecutor{}
+	pullClosedExecutor := &events.PullClosedExecutor{
 		Github:    githubClient,
 		Locker:    lockingClient,
 		Workspace: workspace,
 	}
 	logger := logging.NewSimpleLogger("server", log.New(os.Stderr, "", log.LstdFlags), false, logging.ToLogLevel(config.LogLevel))
-	eventParser := &EventParser{
+	eventParser := &events.EventParser{
 		GithubUser:  config.GithubUser,
 		GithubToken: config.GithubToken,
 	}
-	commandHandler := &CommandHandler{
+	commandHandler := &events.CommandHandler{
 		ApplyExecutor:     applyExecutor,
 		PlanExecutor:      planExecutor,
 		HelpExecutor:      helpExecutor,

@@ -1,25 +1,25 @@
-package server_test
+package events_test
 
 import (
 	"errors"
 	"reflect"
 	"testing"
 
-	"github.com/hootsuite/atlantis/server"
 	ghmocks "github.com/hootsuite/atlantis/server/github/mocks"
 	lockmocks "github.com/hootsuite/atlantis/server/locking/mocks"
-	"github.com/hootsuite/atlantis/server/mocks"
+	"github.com/hootsuite/atlantis/server/events/mocks"
 	"github.com/hootsuite/atlantis/server/models"
 	"github.com/hootsuite/atlantis/server/models/fixtures"
 	. "github.com/hootsuite/atlantis/testing_util"
 	. "github.com/petergtz/pegomock"
+	"github.com/hootsuite/atlantis/server/events"
 )
 
 func TestCleanUpPullWorkspaceErr(t *testing.T) {
 	t.Log("when workspace.Delete returns an error, we return it")
 	RegisterMockTestingT(t)
 	w := mocks.NewMockWorkspace()
-	pce := server.PullClosedExecutor{
+	pce := events.PullClosedExecutor{
 		Workspace: w,
 	}
 	err := errors.New("err")
@@ -33,7 +33,7 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 	RegisterMockTestingT(t)
 	w := mocks.NewMockWorkspace()
 	l := lockmocks.NewMockLocker()
-	pce := server.PullClosedExecutor{
+	pce := events.PullClosedExecutor{
 		Locker:    l,
 		Workspace: w,
 	}
@@ -49,7 +49,7 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 	w := mocks.NewMockWorkspace()
 	l := lockmocks.NewMockLocker()
 	gh := ghmocks.NewMockClient()
-	pce := server.PullClosedExecutor{
+	pce := events.PullClosedExecutor{
 		Locker:    l,
 		Github:    gh,
 		Workspace: w,
@@ -129,7 +129,7 @@ func TestCleanUpPullComments(t *testing.T) {
 		w := mocks.NewMockWorkspace()
 		gh := ghmocks.NewMockClient()
 		l := lockmocks.NewMockLocker()
-		pce := server.PullClosedExecutor{
+		pce := events.PullClosedExecutor{
 			Locker:    l,
 			Github:    gh,
 			Workspace: w,

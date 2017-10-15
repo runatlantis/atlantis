@@ -1,4 +1,4 @@
-package server
+package events
 
 import (
 	"fmt"
@@ -17,18 +17,18 @@ import (
 )
 
 type ApplyExecutor struct {
-	github          github.Client
-	terraform       *terraform.Client
-	locker          locking.Locker
-	requireApproval bool
-	run             *run.Run
-	configReader    *ConfigReader
-	workspace       Workspace
+	Github          github.Client
+	Terraform       *terraform.Client
+	Locker          locking.Locker
+	RequireApproval bool
+	Run             *run.Run
+	ConfigReader    *ConfigReader
+	Workspace       Workspace
 }
 
 func (a *ApplyExecutor) Execute(ctx *CommandContext) CommandResponse {
-	if a.requireApproval {
-		approved, err := a.github.PullIsApproved(ctx.BaseRepo, ctx.Pull)
+	if a.RequireApproval {
+		approved, err := a.Github.PullIsApproved(ctx.BaseRepo, ctx.Pull)
 		if err != nil {
 			return CommandResponse{Error: errors.Wrap(err, "checking if pull request was approved")}
 		}
@@ -38,7 +38,7 @@ func (a *ApplyExecutor) Execute(ctx *CommandContext) CommandResponse {
 		ctx.Log.Info("confirmed pull request was approved")
 	}
 
-	repoDir, err := a.workspace.GetWorkspace(ctx.BaseRepo, ctx.Pull, ctx.Command.Environment)
+	repoDir, err := a.Workspace.GetWorkspace(ctx.BaseRepo, ctx.Pull, ctx.Command.Environment)
 	if err != nil {
 		return CommandResponse{Failure: "No workspace found. Did you run plan?"}
 	}
@@ -81,7 +81,7 @@ func (a *ApplyExecutor) Execute(ctx *CommandContext) CommandResponse {
 
 func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.Plan) ProjectResult {
 	tfEnv := ctx.Command.Environment
-	lockAttempt, err := a.locker.TryLock(plan.Project, tfEnv, ctx.Pull, ctx.User)
+	lockAttempt, err := a.Locker.TryLock(plan.Project, tfEnv, ctx.Pull, ctx.User)
 	if err != nil {
 		return ProjectResult{Error: errors.Wrap(err, "acquiring lock")}
 	}
@@ -96,8 +96,8 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 	absolutePath := filepath.Dir(plan.LocalPath)
 	var applyExtraArgs []string
 	var config ProjectConfig
-	if a.configReader.Exists(absolutePath) {
-		config, err = a.configReader.Read(absolutePath)
+	if a.ConfigReader.Exists(absolutePath) {
+		config, err = a.ConfigReader.Read(absolutePath)
 		if err != nil {
 			return ProjectResult{Error: err}
 		}
@@ -106,14 +106,14 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 	}
 
 	// check if terraform version is >= 0.9.0
-	terraformVersion := a.terraform.Version()
+	terraformVersion := a.Terraform.Version()
 	if config.TerraformVersion != nil {
 		terraformVersion = config.TerraformVersion
 	}
 	constraints, _ := version.NewConstraint(">= 0.9.0")
 	if constraints.Check(terraformVersion) {
 		ctx.Log.Info("determined that we are running terraform with version >= 0.9.0. Running version %s", terraformVersion)
-		_, err := a.terraform.RunInitAndEnv(ctx.Log, absolutePath, tfEnv, config.GetExtraArguments("init"), terraformVersion)
+		_, err := a.Terraform.RunInitAndEnv(ctx.Log, absolutePath, tfEnv, config.GetExtraArguments("init"), terraformVersion)
 		if err != nil {
 			return ProjectResult{Error: err}
 		}
@@ -121,14 +121,14 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 
 	// if there are pre apply commands then run them
 	if len(config.PreApply.Commands) > 0 {
-		_, err := a.run.Execute(ctx.Log, config.PreApply.Commands, absolutePath, tfEnv, terraformVersion, "pre_apply")
+		_, err := a.Run.Execute(ctx.Log, config.PreApply.Commands, absolutePath, tfEnv, terraformVersion, "pre_apply")
 		if err != nil {
 			return ProjectResult{Error: errors.Wrap(err, "running pre apply commands")}
 		}
 	}
 
 	tfApplyCmd := append(append(append([]string{"apply", "-no-color"}, applyExtraArgs...), ctx.Command.Flags...), plan.LocalPath)
-	output, err := a.terraform.RunCommandWithVersion(ctx.Log, absolutePath, tfApplyCmd, terraformVersion, tfEnv)
+	output, err := a.Terraform.RunCommandWithVersion(ctx.Log, absolutePath, tfApplyCmd, terraformVersion, tfEnv)
 	if err != nil {
 		return ProjectResult{Error: fmt.Errorf("%s\n%s", err.Error(), output)}
 	}
@@ -136,7 +136,7 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 
 	// if there are post apply commands then run them
 	if len(config.PostApply.Commands) > 0 {
-		_, err := a.run.Execute(ctx.Log, config.PostApply.Commands, absolutePath, tfEnv, terraformVersion, "post_apply")
+		_, err := a.Run.Execute(ctx.Log, config.PostApply.Commands, absolutePath, tfEnv, terraformVersion, "post_apply")
 		if err != nil {
 			return ProjectResult{Error: errors.Wrap(err, "running post apply commands")}
 		}

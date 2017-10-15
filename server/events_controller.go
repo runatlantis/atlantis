@@ -7,13 +7,14 @@ import (
 
 	gh "github.com/google/go-github/github"
 	"github.com/hootsuite/atlantis/server/logging"
+	"github.com/hootsuite/atlantis/server/events"
 )
 
 type EventsController struct {
-	commandHandler      *CommandHandler
-	pullClosedExecutor  *PullClosedExecutor
+	commandHandler      *events.CommandHandler
+	pullClosedExecutor  *events.PullClosedExecutor
 	logger              *logging.SimpleLogger
-	parser              EventParsing
+	parser              events.EventParsing
 	githubWebHookSecret []byte
 }
 
@@ -67,7 +68,7 @@ func (e *EventsController) HandleCommentEvent(w http.ResponseWriter, event *gh.I
 		return
 	}
 
-	ctx := &CommandContext{}
+	ctx := &events.CommandContext{}
 	command, err := e.parser.DetermineCommand(event)
 	if err != nil {
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring: %s %s", err, githubReqID)

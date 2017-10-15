@@ -1,4 +1,4 @@
-package server
+package events
 
 import (
 	"os"
@@ -22,7 +22,7 @@ type Workspace interface {
 }
 
 type FileWorkspace struct {
-	dataDir string
+	DataDir string
 	sshKey  string
 }
 
@@ -76,7 +76,7 @@ func (w *FileWorkspace) Delete(r models.Repo, p models.PullRequest) error {
 }
 
 func (w *FileWorkspace) repoPullDir(r models.Repo, p models.PullRequest) string {
-	return filepath.Join(w.dataDir, workspacePrefix, r.FullName, strconv.Itoa(p.Num))
+	return filepath.Join(w.DataDir, workspacePrefix, r.FullName, strconv.Itoa(p.Num))
 }
 
 func (w *FileWorkspace) cloneDir(r models.Repo, p models.PullRequest, env string) string {

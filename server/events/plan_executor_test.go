@@ -1,12 +1,13 @@
-package server
+package events_test
 
 import (
 	"testing"
 
 	. "github.com/hootsuite/atlantis/testing_util"
+	"github.com/hootsuite/atlantis/server/events"
 )
 
-var p PlanExecutor
+var p events.PlanExecutor
 
 func TestModifiedProjects(t *testing.T) {
 	runTest(t, "should handle no files modified", []string{}, []string{})

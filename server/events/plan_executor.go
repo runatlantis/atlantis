@@ -1,4 +1,4 @@
-package server
+package events
 
 import (
 	"fmt"
@@ -27,16 +27,20 @@ type Planner interface {
 	SetLockURL(func(id string) (url string))
 }
 
+// atlantisUserTFVar is the name of the variable we execute terraform
+// with containing the github username of who is running the command
+const atlantisUserTFVar = "atlantis_user"
+
 // PlanExecutor handles everything related to running terraform plan
 // including integration with S3, Terraform, and GitHub
 type PlanExecutor struct {
-	github       github.Client
-	terraform    *terraform.Client
-	locker       locking.Locker
-	lockURL      func(id string) (url string)
-	run          *run.Run
-	configReader *ConfigReader
-	workspace    Workspace
+	Github       github.Client
+	Terraform    *terraform.Client
+	Locker       locking.Locker
+	LockURL      func(id string) (url string)
+	Run          *run.Run
+	ConfigReader *ConfigReader
+	Workspace    Workspace
 }
 
 type PlanSuccess struct {
@@ -45,12 +49,12 @@ type PlanSuccess struct {
 }
 
 func (p *PlanExecutor) SetLockURL(f func(id string) (url string)) {
-	p.lockURL = f
+	p.LockURL = f
 }
 
 func (p *PlanExecutor) Execute(ctx *CommandContext) CommandResponse {
 	// figure out what projects have been modified so we know where to run plan
-	modifiedFiles, err := p.github.GetModifiedFiles(ctx.BaseRepo, ctx.Pull)
+	modifiedFiles, err := p.Github.GetModifiedFiles(ctx.BaseRepo, ctx.Pull)
 	if err != nil {
 		return CommandResponse{Error: errors.Wrap(err, "getting modified files")}
 	}
@@ -69,7 +73,7 @@ func (p *PlanExecutor) Execute(ctx *CommandContext) CommandResponse {
 	}
 	ctx.Log.Info("based on files modified, determined we have %d modified project(s) at path(s): %v", len(projects), strings.Join(paths, ", "))
 
-	cloneDir, err := p.workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, ctx.Command.Environment)
+	cloneDir, err := p.Workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, ctx.Command.Environment)
 	if err != nil {
 		return CommandResponse{Error: err}
 	}
@@ -88,7 +92,7 @@ func (p *PlanExecutor) Execute(ctx *CommandContext) CommandResponse {
 // and the GeneratePlanResponse struct will also contain the full log including the error
 func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.Project) ProjectResult {
 	tfEnv := ctx.Command.Environment
-	lockAttempt, err := p.locker.TryLock(project, tfEnv, ctx.Pull, ctx.User)
+	lockAttempt, err := p.Locker.TryLock(project, tfEnv, ctx.Pull, ctx.User)
 	if err != nil {
 		return ProjectResult{Error: errors.Wrap(err, "acquiring lock")}
 	}
@@ -103,8 +107,8 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 	var config ProjectConfig
 	absolutePath := filepath.Join(repoDir, project.Path)
 	var planExtraArgs []string
-	if p.configReader.Exists(absolutePath) {
-		config, err = p.configReader.Read(absolutePath)
+	if p.ConfigReader.Exists(absolutePath) {
+		config, err = p.ConfigReader.Read(absolutePath)
 		if err != nil {
 			return ProjectResult{Error: err}
 		}
@@ -113,21 +117,21 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 	}
 
 	// check if terraform version is >= 0.9.0
-	terraformVersion := p.terraform.Version()
+	terraformVersion := p.Terraform.Version()
 	if config.TerraformVersion != nil {
 		terraformVersion = config.TerraformVersion
 	}
 	constraints, _ := version.NewConstraint(">= 0.9.0")
 	if constraints.Check(terraformVersion) {
 		ctx.Log.Info("determined that we are running terraform with version >= 0.9.0. Running version %s", terraformVersion)
-		_, err := p.terraform.RunInitAndEnv(ctx.Log, absolutePath, tfEnv, config.GetExtraArguments("init"), terraformVersion)
+		_, err := p.Terraform.RunInitAndEnv(ctx.Log, absolutePath, tfEnv, config.GetExtraArguments("init"), terraformVersion)
 		if err != nil {
 			return ProjectResult{Error: err}
 		}
 	} else {
 		ctx.Log.Info("determined that we are running terraform with version < 0.9.0. Running version %s", terraformVersion)
 		terraformGetCmd := append([]string{"get", "-no-color"}, config.GetExtraArguments("get")...)
-		_, err := p.terraform.RunCommandWithVersion(ctx.Log, absolutePath, terraformGetCmd, terraformVersion, tfEnv)
+		_, err := p.Terraform.RunCommandWithVersion(ctx.Log, absolutePath, terraformGetCmd, terraformVersion, tfEnv)
 		if err != nil {
 			return ProjectResult{Error: err}
 		}
@@ -135,7 +139,7 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 
 	// if there are pre plan commands then run them
 	if len(config.PrePlan.Commands) > 0 {
-		_, err := p.run.Execute(ctx.Log, config.PrePlan.Commands, absolutePath, tfEnv, terraformVersion, "pre_plan")
+		_, err := p.Run.Execute(ctx.Log, config.PrePlan.Commands, absolutePath, tfEnv, terraformVersion, "pre_plan")
 		if err != nil {
 			return ProjectResult{Error: errors.Wrap(err, "running pre plan commands")}
 		}
@@ -151,10 +155,10 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 	if _, err := os.Stat(filepath.Join(repoDir, project.Path, tfEnvFileName)); err == nil {
 		tfPlanCmd = append(tfPlanCmd, "-var-file", tfEnvFileName)
 	}
-	output, err := p.terraform.RunCommandWithVersion(ctx.Log, filepath.Join(repoDir, project.Path), tfPlanCmd, terraformVersion, tfEnv)
+	output, err := p.Terraform.RunCommandWithVersion(ctx.Log, filepath.Join(repoDir, project.Path), tfPlanCmd, terraformVersion, tfEnv)
 	if err != nil {
 		// plan failed so unlock the state
-		if _, err := p.locker.Unlock(lockAttempt.LockKey); err != nil {
+		if _, err := p.Locker.Unlock(lockAttempt.LockKey); err != nil {
 			ctx.Log.Err("error unlocking state: %v", err)
 		}
 		return ProjectResult{Error: fmt.Errorf("%s\n%s", err.Error(), output)}
@@ -163,7 +167,7 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 
 	// if there are post plan commands then run them
 	if len(config.PostPlan.Commands) > 0 {
-		_, err := p.run.Execute(ctx.Log, config.PostPlan.Commands, absolutePath, tfEnv, terraformVersion, "post_plan")
+		_, err := p.Run.Execute(ctx.Log, config.PostPlan.Commands, absolutePath, tfEnv, terraformVersion, "post_plan")
 		if err != nil {
 			return ProjectResult{Error: errors.Wrap(err, "running post plan commands")}
 		}
@@ -172,7 +176,7 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 	return ProjectResult{
 		PlanSuccess: &PlanSuccess{
 			TerraformOutput: output,
-			LockURL:         p.lockURL(lockAttempt.LockKey),
+			LockURL:         p.LockURL(lockAttempt.LockKey),
 		},
 	}
 }

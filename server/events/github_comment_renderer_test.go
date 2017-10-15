@@ -1,38 +1,38 @@
-package server_test
+package events_test
 
-import (
-	"errors"
+	import (
+		"errors"
 	"testing"
 
-	"github.com/hootsuite/atlantis/server"
 	. "github.com/hootsuite/atlantis/testing_util"
+	"github.com/hootsuite/atlantis/server/events"
 )
 
 func TestRenderErr(t *testing.T) {
 	err := errors.New("err")
 	cases := []struct {
 		Description string
-		Command     server.CommandName
+		Command     events.CommandName
 		Error       error
 		Expected    string
 	}{
 		{
 			"apply error",
-			server.Apply,
+			events.Apply,
 			err,
 			"**Apply Error**\n```\nerr\n```\n\n",
 		},
 		{
 			"plan error",
-			server.Plan,
+			events.Plan,
 			err,
 			"**Plan Error**\n```\nerr\n```\n\n",
 		},
 	}
 
-	r := server.GithubCommentRenderer{}
+	r := events.GithubCommentRenderer{}
 	for _, c := range cases {
-		res := server.CommandResponse{
+		res := events.CommandResponse{
 			Error: c.Error,
 		}
 		for _, verbose := range []bool{true, false} {
@@ -50,27 +50,27 @@ func TestRenderErr(t *testing.T) {
 func TestRenderFailure(t *testing.T) {
 	cases := []struct {
 		Description string
-		Command     server.CommandName
+		Command     events.CommandName
 		Failure     string
 		Expected    string
 	}{
 		{
 			"apply failure",
-			server.Apply,
+			events.Apply,
 			"failure",
 			"**Apply Failed**: failure\n\n",
 		},
 		{
 			"plan failure",
-			server.Plan,
+			events.Plan,
 			"failure",
 			"**Plan Failed**: failure\n\n",
 		},
 	}
 
-	r := server.GithubCommentRenderer{}
+	r := events.GithubCommentRenderer{}
 	for _, c := range cases {
-		res := server.CommandResponse{
+		res := events.CommandResponse{
 			Failure: c.Failure,
 		}
 		for _, verbose := range []bool{true, false} {
@@ -87,28 +87,28 @@ func TestRenderFailure(t *testing.T) {
 
 func TestRenderErrAndFailure(t *testing.T) {
 	t.Log("if there is an error and a failure, the error should be printed")
-	r := server.GithubCommentRenderer{}
-	res := server.CommandResponse{
+	r := events.GithubCommentRenderer{}
+	res := events.CommandResponse{
 		Error:   errors.New("error"),
 		Failure: "failure",
 	}
-	s := r.Render(res, server.Plan, "", false)
+	s := r.Render(res, events.Plan, "", false)
 	Equals(t, "**Plan Error**\n```\nerror\n```\n\n", s)
 }
 
 func TestRenderProjectResults(t *testing.T) {
 	cases := []struct {
 		Description    string
-		Command        server.CommandName
-		ProjectResults []server.ProjectResult
+		Command        events.CommandName
+		ProjectResults []events.ProjectResult
 		Expected       string
 	}{
 		{
 			"single successful plan",
-			server.Plan,
-			[]server.ProjectResult{
+			events.Plan,
+			[]events.ProjectResult{
 				{
-					PlanSuccess: &server.PlanSuccess{
+					PlanSuccess: &events.PlanSuccess{
 						"terraform-output",
 						"lock-url",
 					},
@@ -118,8 +118,8 @@ func TestRenderProjectResults(t *testing.T) {
 		},
 		{
 			"single successful apply",
-			server.Apply,
-			[]server.ProjectResult{
+			events.Apply,
+			[]events.ProjectResult{
 				{
 					ApplySuccess: "success",
 				},
@@ -128,18 +128,18 @@ func TestRenderProjectResults(t *testing.T) {
 		},
 		{
 			"multiple successful plans",
-			server.Plan,
-			[]server.ProjectResult{
+			events.Plan,
+			[]events.ProjectResult{
 				{
 					Path: "path",
-					PlanSuccess: &server.PlanSuccess{
+					PlanSuccess: &events.PlanSuccess{
 						"terraform-output",
 						"lock-url",
 					},
 				},
 				{
 					Path: "path2",
-					PlanSuccess: &server.PlanSuccess{
+					PlanSuccess: &events.PlanSuccess{
 						"terraform-output2",
 						"lock-url2",
 					},
@@ -149,8 +149,8 @@ func TestRenderProjectResults(t *testing.T) {
 		},
 		{
 			"multiple successful applies",
-			server.Apply,
-			[]server.ProjectResult{
+			events.Apply,
+			[]events.ProjectResult{
 				{
 					Path:         "path",
 					ApplySuccess: "success",
@@ -164,8 +164,8 @@ func TestRenderProjectResults(t *testing.T) {
 		},
 		{
 			"single errored plan",
-			server.Plan,
-			[]server.ProjectResult{
+			events.Plan,
+			[]events.ProjectResult{
 				{
 					Error: errors.New("error"),
 				},
@@ -174,8 +174,8 @@ func TestRenderProjectResults(t *testing.T) {
 		},
 		{
 			"single failed plan",
-			server.Plan,
-			[]server.ProjectResult{
+			events.Plan,
+			[]events.ProjectResult{
 				{
 					Failure: "failure",
 				},
@@ -184,11 +184,11 @@ func TestRenderProjectResults(t *testing.T) {
 		},
 		{
 			"successful, failed, and errored plan",
-			server.Plan,
-			[]server.ProjectResult{
+			events.Plan,
+			[]events.ProjectResult{
 				{
 					Path: "path",
-					PlanSuccess: &server.PlanSuccess{
+					PlanSuccess: &events.PlanSuccess{
 						"terraform-output",
 						"lock-url",
 					},
@@ -206,8 +206,8 @@ func TestRenderProjectResults(t *testing.T) {
 		},
 		{
 			"successful, failed, and errored apply",
-			server.Apply,
-			[]server.ProjectResult{
+			events.Apply,
+			[]events.ProjectResult{
 				{
 					Path:         "path",
 					ApplySuccess: "success",
@@ -225,9 +225,9 @@ func TestRenderProjectResults(t *testing.T) {
 		},
 	}
 
-	r := server.GithubCommentRenderer{}
+	r := events.GithubCommentRenderer{}
 	for _, c := range cases {
-		res := server.CommandResponse{
+		res := events.CommandResponse{
 			ProjectResults: c.ProjectResults,
 		}
 		for _, verbose := range []bool{true, false} {

@@ -1,4 +1,4 @@
-package server_test
+package events_test
 
 import (
 	"testing"
@@ -7,14 +7,14 @@ import (
 	"strings"
 
 	"github.com/google/go-github/github"
-	"github.com/hootsuite/atlantis/server"
 	. "github.com/hootsuite/atlantis/server/github/fixtures"
 	"github.com/hootsuite/atlantis/server/models"
 	. "github.com/hootsuite/atlantis/testing_util"
 	"github.com/mohae/deepcopy"
+	"github.com/hootsuite/atlantis/server/events"
 )
 
-var parser = server.EventParser{"user", "token"}
+var parser = events.EventParser{"user", "token"}
 
 func TestDetermineCommandNoBody(t *testing.T) {
 	_, err := parser.DetermineCommand(&github.IssueCommentEvent{})
@@ -53,13 +53,13 @@ func TestDetermineCommandHelp(t *testing.T) {
 	for _, c := range comments {
 		command, e := parser.DetermineCommand(buildComment(c))
 		Ok(t, e)
-		Equals(t, server.Help, command.Name)
+		Equals(t, events.Help, command.Name)
 	}
 }
 
 func TestDetermineCommandPermutations(t *testing.T) {
 	execNames := []string{"run", "atlantis", "@user"}
-	commandNames := []server.CommandName{server.Plan, server.Apply}
+	commandNames := []events.CommandName{events.Plan, events.Apply}
 	envs := []string{"", "default", "env", "env-dash", "env_underscore", "camelEnv"}
 	flagCases := [][]string{
 		{},
@@ -158,7 +158,7 @@ func TestExtractCommentData(t *testing.T) {
 			User: &github.User{Login: github.String("comment_user")},
 		},
 	}
-	ctx := server.CommandContext{}
+	ctx := events.CommandContext{}
 
 	testComment := deepcopy.Copy(comment).(github.IssueCommentEvent)
 	testComment.Repo = nil

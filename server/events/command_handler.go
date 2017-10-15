@@ -1,4 +1,4 @@
-package server
+package events
 
 import (
 	"fmt"
@@ -19,12 +19,6 @@ type CommandHandler struct {
 	EnvLocker         EnvLocker
 	GHCommentRenderer *GithubCommentRenderer
 	Logger            *logging.SimpleLogger
-}
-
-type CommandResponse struct {
-	Error          error
-	Failure        string
-	ProjectResults []ProjectResult
 }
 
 func (c *CommandHandler) ExecuteCommand(ctx *CommandContext) {

@@ -1,4 +1,4 @@
-package server
+package events
 
 type ProjectResult struct {
 	Path         string

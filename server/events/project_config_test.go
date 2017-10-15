@@ -1,4 +1,4 @@
-package server
+package events_test
 
 import (
 	"io/ioutil"
@@ -6,9 +6,10 @@ import (
 	"testing"
 
 	. "github.com/hootsuite/atlantis/testing_util"
+	"github.com/hootsuite/atlantis/server/events"
 )
 
-var tempConfigFile = "/tmp/" + ProjectConfigFile
+var tempConfigFile = "/tmp/" + events.ProjectConfigFile
 var projectConfigFileStr = `
 ---
 terraform_version: "0.0.1"
@@ -30,19 +31,19 @@ extra_arguments:
 `
 
 func TestConfigFileExists_invalid_path(t *testing.T) {
-	var c ConfigReader
+	var c events.ConfigReader
 	Equals(t, c.Exists("/invalid/path"), false)
 }
 
 func TestConfigFileExists_valid_path(t *testing.T) {
-	var c ConfigReader
+	var c events.ConfigReader
 	writeAtlantisConfigFile([]byte(projectConfigFileStr))
 	defer os.Remove(tempConfigFile)
 	Equals(t, c.Exists("/tmp"), true)
 }
 
 func TestConfigFileRead_invalid_config(t *testing.T) {
-	var c ConfigReader
+	var c events.ConfigReader
 	str := []byte(`---invalid`)
 	writeAtlantisConfigFile(str)
 	defer os.Remove(tempConfigFile)
@@ -51,7 +52,7 @@ func TestConfigFileRead_invalid_config(t *testing.T) {
 }
 
 func TestConfigFileRead_valid_config(t *testing.T) {
-	var c ConfigReader
+	var c events.ConfigReader
 	writeAtlantisConfigFile([]byte(projectConfigFileStr))
 	defer os.Remove(tempConfigFile)
 	_, err := c.Read("/tmp")
