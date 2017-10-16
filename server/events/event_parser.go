@@ -21,7 +21,7 @@ type Command struct {
 
 type EventParsing interface {
 	DetermineCommand(comment *github.IssueCommentEvent) (*Command, error)
-	ExtractCommentData(comment *github.IssueCommentEvent, ctx *CommandContext) error
+	ExtractCommentData(comment *github.IssueCommentEvent) (baseRepo models.Repo, user models.User, pull models.PullRequest, err error)
 	ExtractPullData(pull *github.PullRequest) (models.PullRequest, models.Repo, error)
 	ExtractRepoData(ghRepo *github.Repository) (models.Repo, error)
 }
@@ -100,35 +100,38 @@ func (e *EventParser) DetermineCommand(comment *github.IssueCommentEvent) (*Comm
 	return c, nil
 }
 
-func (e *EventParser) ExtractCommentData(comment *github.IssueCommentEvent, ctx *CommandContext) error {
-	repo, err := e.ExtractRepoData(comment.Repo)
+func (e *EventParser) ExtractCommentData(comment *github.IssueCommentEvent) (baseRepo models.Repo, user models.User, pull models.PullRequest, err error) {
+	baseRepo, err = e.ExtractRepoData(comment.Repo)
 	if err != nil {
-		return err
+		return
 	}
 	pullNum := comment.Issue.GetNumber()
 	if pullNum == 0 {
-		return errors.New("issue.number is null")
+		err = errors.New("issue.number is null")
+		return
 	}
 	pullCreator := comment.Issue.User.GetLogin()
 	if pullCreator == "" {
-		return errors.New("issue.user.login is null")
+		err = errors.New("issue.user.login is null")
+		return
 	}
 	htmlURL := comment.Issue.GetHTMLURL()
 	if htmlURL == "" {
-		return errors.New("issue.html_url is null")
+		err = errors.New("issue.html_url is null")
+		return
 	}
 	commentorUsername := comment.Comment.User.GetLogin()
 	if commentorUsername == "" {
-		return errors.New("comment.user.login is null")
+		err = errors.New("comment.user.login is null")
+		return
 	}
-	ctx.BaseRepo = repo
-	ctx.User = models.User{
+	user = models.User{
 		Username: commentorUsername,
 	}
-	ctx.Pull = models.PullRequest{
+	pull = models.PullRequest{
 		Num: pullNum,
 	}
-	return nil
+	return
 }
 
 func (e *EventParser) ExtractPullData(pull *github.PullRequest) (models.PullRequest, models.Repo, error) {

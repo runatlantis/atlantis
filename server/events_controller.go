@@ -44,7 +44,16 @@ func (e *EventsController) HandleCommentEvent(w http.ResponseWriter, event *gith
 		return
 	}
 
+	baseRepo, user, pull, err := e.Parser.ExtractCommentData(event)
+	if err != nil {
+		e.respond(w, logging.Error, http.StatusBadRequest, "Failed parsing event: %v %s", err, githubReqID)
+		return
+	}
 	ctx := &events.CommandContext{}
+	ctx.BaseRepo = baseRepo
+	ctx.User = user
+	ctx.Pull = pull
+
 	command, err := e.Parser.DetermineCommand(event)
 	if err != nil {
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring: %s %s", err, githubReqID)
@@ -52,10 +61,6 @@ func (e *EventsController) HandleCommentEvent(w http.ResponseWriter, event *gith
 	}
 	ctx.Command = command
 
-	if err = e.Parser.ExtractCommentData(event, ctx); err != nil {
-		e.respond(w, logging.Error, http.StatusInternalServerError, "Failed parsing event: %v %s", err, githubReqID)
-		return
-	}
 	// Respond with success and then actually execute the command asynchronously.
 	// We use a goroutine so that this function returns and the connection is
 	// closed.
@@ -81,7 +86,7 @@ func (e *EventsController) HandlePullRequestEvent(w http.ResponseWriter, pullEve
 	}
 
 	if err := e.PullClosedExecutor.CleanUpPull(repo, pull); err != nil {
-		e.respond(w, logging.Error, http.StatusInternalServerError, "Error cleaning pull request: %s", err)
+		e.respond(w, logging.Error, http.StatusServiceUnavailable, "Error cleaning pull request: %s", err)
 		return
 	}
 	e.Logger.Info("deleted locks and workspace for repo %s, pull %d", repo.FullName, pull.Num)

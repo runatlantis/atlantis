@@ -9,6 +9,8 @@ import (
 	"github.com/google/go-github/github"
 )
 
+//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_gh_request_validation.go GHRequestValidator
+
 // GHRequestValidator validates GitHub requests.
 type GHRequestValidator interface {
 	// Validate returns the JSON payload of the request.

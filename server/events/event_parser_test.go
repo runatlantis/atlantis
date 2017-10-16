@@ -158,35 +158,33 @@ func TestExtractCommentData(t *testing.T) {
 			User: &github.User{Login: github.String("comment_user")},
 		},
 	}
-	ctx := events.CommandContext{}
-
 	testComment := deepcopy.Copy(comment).(github.IssueCommentEvent)
 	testComment.Repo = nil
-	err := parser.ExtractCommentData(&testComment, &ctx)
+	_, _, _, err := parser.ExtractCommentData(&testComment)
 	Equals(t, errors.New("repository.full_name is null"), err)
 
 	testComment = deepcopy.Copy(comment).(github.IssueCommentEvent)
 	testComment.Issue = nil
-	err = parser.ExtractCommentData(&testComment, &ctx)
+	_, _, _, err = parser.ExtractCommentData(&testComment)
 	Equals(t, errors.New("issue.number is null"), err)
 
 	testComment = deepcopy.Copy(comment).(github.IssueCommentEvent)
 	testComment.Issue.User = nil
-	err = parser.ExtractCommentData(&testComment, &ctx)
+	_, _, _, err = parser.ExtractCommentData(&testComment)
 	Equals(t, errors.New("issue.user.login is null"), err)
 
 	testComment = deepcopy.Copy(comment).(github.IssueCommentEvent)
 	testComment.Issue.HTMLURL = nil
-	err = parser.ExtractCommentData(&testComment, &ctx)
+	_, _, _, err = parser.ExtractCommentData(&testComment)
 	Equals(t, errors.New("issue.html_url is null"), err)
 
 	testComment = deepcopy.Copy(comment).(github.IssueCommentEvent)
 	testComment.Comment.User.Login = nil
-	err = parser.ExtractCommentData(&testComment, &ctx)
+	_, _, _, err = parser.ExtractCommentData(&testComment)
 	Equals(t, errors.New("comment.user.login is null"), err)
 
 	// this should be successful
-	err = parser.ExtractCommentData(&comment, &ctx)
+	repo, user, pull, err := parser.ExtractCommentData(&comment)
 	Ok(t, err)
 	Equals(t, models.Repo{
 		Owner:             *comment.Repo.Owner.Login,
@@ -194,13 +192,13 @@ func TestExtractCommentData(t *testing.T) {
 		CloneURL:          "https://user:token@github.com/lkysow/atlantis-example.git",
 		SanitizedCloneURL: *comment.Repo.CloneURL,
 		Name:              "repo",
-	}, ctx.BaseRepo)
+	}, repo)
 	Equals(t, models.User{
 		Username: *comment.Comment.User.Login,
-	}, ctx.User)
+	}, user)
 	Equals(t, models.PullRequest{
 		Num: *comment.Issue.Number,
-	}, ctx.Pull)
+	}, pull)
 }
 
 func TestExtractPullData(t *testing.T) {

@@ -35,16 +35,28 @@ func (mock *MockEventParsing) DetermineCommand(comment *github.IssueCommentEvent
 	return ret0, ret1
 }
 
-func (mock *MockEventParsing) ExtractCommentData(comment *github.IssueCommentEvent, ctx *events.CommandContext) error {
-	params := []pegomock.Param{comment, ctx}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("ExtractCommentData", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 error
+func (mock *MockEventParsing) ExtractCommentData(comment *github.IssueCommentEvent) (models.Repo, models.User, models.PullRequest, error) {
+	params := []pegomock.Param{comment}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ExtractCommentData", params, []reflect.Type{reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.User)(nil)).Elem(), reflect.TypeOf((*models.PullRequest)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 models.Repo
+	var ret1 models.User
+	var ret2 models.PullRequest
+	var ret3 error
 	if len(result) != 0 {
 		if result[0] != nil {
-			ret0 = result[0].(error)
+			ret0 = result[0].(models.Repo)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(models.User)
+		}
+		if result[2] != nil {
+			ret2 = result[2].(models.PullRequest)
+		}
+		if result[3] != nil {
+			ret3 = result[3].(error)
 		}
 	}
-	return ret0
+	return ret0, ret1, ret2, ret3
 }
 
 func (mock *MockEventParsing) ExtractPullData(pull *github.PullRequest) (models.PullRequest, models.Repo, error) {
@@ -128,8 +140,8 @@ func (c *EventParsing_DetermineCommand_OngoingVerification) GetAllCapturedArgume
 	return
 }
 
-func (verifier *VerifierEventParsing) ExtractCommentData(comment *github.IssueCommentEvent, ctx *events.CommandContext) *EventParsing_ExtractCommentData_OngoingVerification {
-	params := []pegomock.Param{comment, ctx}
+func (verifier *VerifierEventParsing) ExtractCommentData(comment *github.IssueCommentEvent) *EventParsing_ExtractCommentData_OngoingVerification {
+	params := []pegomock.Param{comment}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ExtractCommentData", params)
 	return &EventParsing_ExtractCommentData_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -139,21 +151,17 @@ type EventParsing_ExtractCommentData_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *EventParsing_ExtractCommentData_OngoingVerification) GetCapturedArguments() (*github.IssueCommentEvent, *events.CommandContext) {
-	comment, ctx := c.GetAllCapturedArguments()
-	return comment[len(comment)-1], ctx[len(ctx)-1]
+func (c *EventParsing_ExtractCommentData_OngoingVerification) GetCapturedArguments() *github.IssueCommentEvent {
+	comment := c.GetAllCapturedArguments()
+	return comment[len(comment)-1]
 }
 
-func (c *EventParsing_ExtractCommentData_OngoingVerification) GetAllCapturedArguments() (_param0 []*github.IssueCommentEvent, _param1 []*events.CommandContext) {
+func (c *EventParsing_ExtractCommentData_OngoingVerification) GetAllCapturedArguments() (_param0 []*github.IssueCommentEvent) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]*github.IssueCommentEvent, len(params[0]))
 		for u, param := range params[0] {
 			_param0[u] = param.(*github.IssueCommentEvent)
-		}
-		_param1 = make([]*events.CommandContext, len(params[1]))
-		for u, param := range params[1] {
-			_param1[u] = param.(*events.CommandContext)
 		}
 	}
 	return
