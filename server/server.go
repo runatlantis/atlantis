@@ -128,11 +128,12 @@ func NewServer(config ServerConfig) (*Server, error) {
 		Logger:            logger,
 	}
 	eventsController := &EventsController{
-		commandHandler:      commandHandler,
-		pullClosedExecutor:  pullClosedExecutor,
-		parser:              eventParser,
-		logger:              logger,
-		githubWebHookSecret: []byte(config.GithubWebHookSecret),
+		CommandHandler:      commandHandler,
+		PullClosedExecutor:  pullClosedExecutor,
+		Parser:              eventParser,
+		Logger:              logger,
+		GithubWebHookSecret: []byte(config.GithubWebHookSecret),
+		Validator:           &GHRequestValidation{},
 	}
 	router := mux.NewRouter()
 	return &Server{
