@@ -10,10 +10,13 @@ import (
 )
 
 type EventsController struct {
-	CommandHandler      *events.CommandHandler
-	PullClosedExecutor  *events.PullClosedExecutor
-	Logger              *logging.SimpleLogger
-	Parser              events.EventParsing
+	CommandRunner      events.CommandRunner
+	PullClosedExecutor *events.PullClosedExecutor
+	Logger             *logging.SimpleLogger
+	Parser             events.EventParsing
+	// GithubWebHookSecret is the secret added to this webhook via the GitHub
+	// UI that identifies this call as coming from GitHub. If empty, no
+	// request validation is done.
 	GithubWebHookSecret []byte
 	Validator           GHRequestValidator
 }
@@ -65,7 +68,7 @@ func (e *EventsController) HandleCommentEvent(w http.ResponseWriter, event *gith
 	// We use a goroutine so that this function returns and the connection is
 	// closed.
 	fmt.Fprintln(w, "Processing...")
-	go e.CommandHandler.ExecuteCommand(ctx)
+	go e.CommandRunner.ExecuteCommand(ctx)
 }
 
 // HandlePullRequestEvent will delete any locks associated with the pull request

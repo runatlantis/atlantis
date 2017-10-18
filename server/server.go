@@ -128,7 +128,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 		Logger:            logger,
 	}
 	eventsController := &EventsController{
-		CommandHandler:      commandHandler,
+		CommandRunner:       commandHandler,
 		PullClosedExecutor:  pullClosedExecutor,
 		Parser:              eventParser,
 		Logger:              logger,

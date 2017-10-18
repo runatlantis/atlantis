@@ -8,6 +8,11 @@ import (
 	"github.com/hootsuite/atlantis/server/recovery"
 )
 
+//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_command_runner.go CommandRunner
+type CommandRunner interface {
+	ExecuteCommand(ctx *CommandContext)
+}
+
 // CommandHandler is the first step when processing a comment command.
 type CommandHandler struct {
 	PlanExecutor      Executor
