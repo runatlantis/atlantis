@@ -21,7 +21,7 @@ import (
 // todo: would like to use the Executor interface but need to find a way
 // to deal with the SetLockURL function
 type Planner interface {
-	Execute(ctx *CommandContext)
+	Execute(ctx *CommandContext) CommandResponse
 	// SetLockURL takes a function that given a lock id, will return a url
 	// to view that lock
 	SetLockURL(func(id string) (url string))
@@ -30,17 +30,13 @@ type Planner interface {
 // PlanExecutor handles everything related to running terraform plan
 // including integration with S3, Terraform, and GitHub
 type PlanExecutor struct {
-	github                github.Client
-	githubStatus          *GithubStatus
-	s3Bucket              string
-	terraform             *terraform.Client
-	githubCommentRenderer *GithubCommentRenderer
-	locker                locking.Locker
-	lockURL               func(id string) (url string)
-	run                   *run.Run
-	configReader          *ConfigReader
-	concurrentRunLocker   *ConcurrentRunLocker
-	workspace             Workspace
+	github       github.Client
+	terraform    *terraform.Client
+	locker       locking.Locker
+	lockURL      func(id string) (url string)
+	run          *run.Run
+	configReader *ConfigReader
+	workspace    Workspace
 }
 
 type PlanSuccess struct {
@@ -48,35 +44,21 @@ type PlanSuccess struct {
 	LockURL         string
 }
 
-func (p *PlanExecutor) Execute(ctx *CommandContext) {
-	p.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Pending, PlanStep)
-	res := p.setupAndPlan(ctx)
-	res.Command = Plan
-	comment := p.githubCommentRenderer.Render(res, ctx.Log.History.String(), ctx.Command.Verbose)
-	p.github.CreateComment(ctx.BaseRepo, ctx.Pull, comment)
-}
-
 func (p *PlanExecutor) SetLockURL(f func(id string) (url string)) {
 	p.lockURL = f
 }
 
-func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) CommandResponse {
-	if p.concurrentRunLocker.TryLock(ctx.BaseRepo.FullName, ctx.Command.Environment, ctx.Pull.Num) != true {
-		return p.failureResponse(ctx,
-			fmt.Sprintf("The %s environment is currently locked by another command that is running for this pull request. Wait until command is complete and try again.", ctx.Command.Environment))
-	}
-	defer p.concurrentRunLocker.Unlock(ctx.BaseRepo.FullName, ctx.Command.Environment, ctx.Pull.Num)
-
+func (p *PlanExecutor) Execute(ctx *CommandContext) CommandResponse {
 	// figure out what projects have been modified so we know where to run plan
 	modifiedFiles, err := p.github.GetModifiedFiles(ctx.BaseRepo, ctx.Pull)
 	if err != nil {
-		return p.errorResponse(ctx, errors.Wrap(err, "getting modified files"))
+		return CommandResponse{Error: errors.Wrap(err, "getting modified files")}
 	}
 	ctx.Log.Info("found %d files modified in this pull request", len(modifiedFiles))
 
 	modifiedTerraformFiles := p.filterToTerraform(modifiedFiles)
 	if len(modifiedTerraformFiles) == 0 {
-		return p.failureResponse(ctx, "No Terraform files were modified.")
+		return CommandResponse{Failure: "No Terraform files were modified."}
 	}
 	ctx.Log.Info("filtered modified files to %d non-module .tf files: %v", len(modifiedTerraformFiles), modifiedTerraformFiles)
 
@@ -89,7 +71,7 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) CommandResponse {
 
 	cloneDir, err := p.workspace.Clone(ctx)
 	if err != nil {
-		return p.errorResponse(ctx, err)
+		return CommandResponse{Error: err}
 	}
 
 	results := []ProjectResult{}
@@ -99,7 +81,6 @@ func (p *PlanExecutor) setupAndPlan(ctx *CommandContext) CommandResponse {
 		result.Path = project.Path
 		results = append(results, result)
 	}
-	p.githubStatus.UpdateProjectResult(ctx, results)
 	return CommandResponse{ProjectResults: results}
 }
 
@@ -235,16 +216,4 @@ func (p *PlanExecutor) getProjectPath(modifiedFilePath string) string {
 		return path.Dir(dir)
 	}
 	return dir
-}
-
-func (p *PlanExecutor) failureResponse(ctx *CommandContext, msg string) CommandResponse {
-	ctx.Log.Warn(msg)
-	p.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Failure, PlanStep)
-	return CommandResponse{Failure: msg}
-}
-
-func (p *PlanExecutor) errorResponse(ctx *CommandContext, err error) CommandResponse {
-	ctx.Log.Err(err.Error())
-	p.githubStatus.Update(ctx.BaseRepo, ctx.Pull, Error, PlanStep)
-	return CommandResponse{Error: err}
 }

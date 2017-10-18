@@ -17,9 +17,16 @@ func NewMockExecutor() *MockExecutor {
 	return &MockExecutor{fail: pegomock.GlobalFailHandler}
 }
 
-func (mock *MockExecutor) Execute(ctx *server.CommandContext) {
+func (mock *MockExecutor) Execute(ctx *server.CommandContext) server.CommandResponse {
 	params := []pegomock.Param{ctx}
-	pegomock.GetGenericMockFrom(mock).Invoke("Execute", params, []reflect.Type{})
+	result := pegomock.GetGenericMockFrom(mock).Invoke("Execute", params, []reflect.Type{reflect.TypeOf((*server.CommandResponse)(nil)).Elem()})
+	var ret0 server.CommandResponse
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(server.CommandResponse)
+		}
+	}
+	return ret0
 }
 
 func (mock *MockExecutor) VerifyWasCalledOnce() *VerifierExecutor {

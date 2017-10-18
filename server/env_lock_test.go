@@ -11,7 +11,7 @@ var repo = "repo/owner"
 var env = "default"
 
 func TestTryLock(t *testing.T) {
-	locker := server.NewConcurrentRunLocker()
+	locker := server.NewEnvLock()
 
 	t.Log("the first lock should succeed")
 	Equals(t, true, locker.TryLock(repo, env, 1))
@@ -21,7 +21,7 @@ func TestTryLock(t *testing.T) {
 }
 
 func TestTryLockDifferentEnv(t *testing.T) {
-	locker := server.NewConcurrentRunLocker()
+	locker := server.NewEnvLock()
 
 	t.Log("a lock for the same repo and pull but different env should succeed")
 	Equals(t, true, locker.TryLock(repo, env, 1))
@@ -33,7 +33,7 @@ func TestTryLockDifferentEnv(t *testing.T) {
 }
 
 func TestTryLockDifferentRepo(t *testing.T) {
-	locker := server.NewConcurrentRunLocker()
+	locker := server.NewEnvLock()
 
 	t.Log("a lock for a different repo but the same env and pull should succeed")
 	Equals(t, true, locker.TryLock(repo, env, 1))
@@ -46,7 +46,7 @@ func TestTryLockDifferentRepo(t *testing.T) {
 }
 
 func TestTryLockDifferent1(t *testing.T) {
-	locker := server.NewConcurrentRunLocker()
+	locker := server.NewEnvLock()
 
 	t.Log("a lock for a different pull but the same repo and env should succeed")
 	Equals(t, true, locker.TryLock(repo, env, 1))
@@ -59,7 +59,7 @@ func TestTryLockDifferent1(t *testing.T) {
 }
 
 func TestUnlock(t *testing.T) {
-	locker := server.NewConcurrentRunLocker()
+	locker := server.NewEnvLock()
 
 	t.Log("unlocking should work")
 	Equals(t, true, locker.TryLock(repo, env, 1))
@@ -68,7 +68,7 @@ func TestUnlock(t *testing.T) {
 }
 
 func TestUnlockDifferentEnvs(t *testing.T) {
-	locker := server.NewConcurrentRunLocker()
+	locker := server.NewEnvLock()
 	t.Log("unlocking should work for different envs")
 	Equals(t, true, locker.TryLock(repo, env, 1))
 	Equals(t, true, locker.TryLock(repo, "new-env", 1))
@@ -79,7 +79,7 @@ func TestUnlockDifferentEnvs(t *testing.T) {
 }
 
 func TestUnlockDifferentRepos(t *testing.T) {
-	locker := server.NewConcurrentRunLocker()
+	locker := server.NewEnvLock()
 	t.Log("unlocking should work for different repos")
 	Equals(t, true, locker.TryLock(repo, env, 1))
 	newRepo := "owner/newrepo"
@@ -91,7 +91,7 @@ func TestUnlockDifferentRepos(t *testing.T) {
 }
 
 func TestUnlockDifferentPulls(t *testing.T) {
-	locker := server.NewConcurrentRunLocker()
+	locker := server.NewEnvLock()
 	t.Log("unlocking should work for different 1s")
 	Equals(t, true, locker.TryLock(repo, env, 1))
 	new1 := 2

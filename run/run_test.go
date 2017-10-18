@@ -1,8 +1,6 @@
 package run
 
 import (
-	"log"
-	"os"
 	"testing"
 
 	version "github.com/hashicorp/go-version"
@@ -10,7 +8,7 @@ import (
 	. "github.com/hootsuite/atlantis/testing_util"
 )
 
-var logger = logging.NewSimpleLogger("", log.New(os.Stderr, "", log.LstdFlags), false, logging.Debug)
+var logger = logging.NewNoopLogger()
 var run = &Run{}
 
 func TestRunCreateScript_valid(t *testing.T) {

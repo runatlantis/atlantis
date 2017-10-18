@@ -99,36 +99,28 @@ func NewServer(config ServerConfig) (*Server, error) {
 	lockingClient := locking.NewClient(boltdb)
 	run := &run.Run{}
 	configReader := &ConfigReader{}
-	concurrentRunLocker := NewConcurrentRunLocker()
+	concurrentRunLocker := NewEnvLock()
 	workspace := &FileWorkspace{
 		dataDir: config.DataDir,
 	}
 	applyExecutor := &ApplyExecutor{
-		github:                githubClient,
-		githubStatus:          githubStatus,
-		terraform:             terraformClient,
-		githubCommentRenderer: githubComments,
-		locker:                lockingClient,
-		requireApproval:       config.RequireApproval,
-		run:                   run,
-		configReader:          configReader,
-		concurrentRunLocker:   concurrentRunLocker,
-		workspace:             workspace,
+		github:          githubClient,
+		terraform:       terraformClient,
+		locker:          lockingClient,
+		requireApproval: config.RequireApproval,
+		run:             run,
+		configReader:    configReader,
+		workspace:       workspace,
 	}
 	planExecutor := &PlanExecutor{
-		github:                githubClient,
-		githubStatus:          githubStatus,
-		terraform:             terraformClient,
-		githubCommentRenderer: githubComments,
-		locker:                lockingClient,
-		run:                   run,
-		configReader:          configReader,
-		concurrentRunLocker:   concurrentRunLocker,
-		workspace:             workspace,
+		github:       githubClient,
+		terraform:    terraformClient,
+		locker:       lockingClient,
+		run:          run,
+		configReader: configReader,
+		workspace:    workspace,
 	}
-	helpExecutor := &HelpExecutor{
-		Github: githubClient,
-	}
+	helpExecutor := &HelpExecutor{}
 	pullClosedExecutor := &PullClosedExecutor{
 		Github:    githubClient,
 		Locker:    lockingClient,
@@ -140,12 +132,15 @@ func NewServer(config ServerConfig) (*Server, error) {
 		GithubToken: config.GithubToken,
 	}
 	commandHandler := &CommandHandler{
-		ApplyExecutor: applyExecutor,
-		PlanExecutor:  planExecutor,
-		HelpExecutor:  helpExecutor,
-		EventParser:   eventParser,
-		GithubClient:  githubClient,
-		Logger:        logger,
+		ApplyExecutor:     applyExecutor,
+		PlanExecutor:      planExecutor,
+		HelpExecutor:      helpExecutor,
+		EventParser:       eventParser,
+		GHClient:          githubClient,
+		GHStatus:          githubStatus,
+		EnvLocker:         concurrentRunLocker,
+		GHCommentRenderer: githubComments,
+		Logger:            logger,
 	}
 	router := mux.NewRouter()
 	return &Server{
@@ -377,7 +372,9 @@ func (s *Server) handleCommentEvent(w http.ResponseWriter, event *gh.IssueCommen
 		s.respond(w, logging.Error, http.StatusInternalServerError, "Failed parsing event: %v %s", err, githubReqID)
 		return
 	}
-	// respond with success and then actually execute the command asynchronously
+	// Respond with success and then actually execute the command asynchronously.
+	// We use a goroutine so that this function returns and the connection is
+	// closed.
 	fmt.Fprintln(w, "Processing...")
 	go s.commandHandler.ExecuteCommand(ctx)
 }

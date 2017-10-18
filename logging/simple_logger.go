@@ -4,7 +4,9 @@ package logging
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"os"
 	"unicode"
 )
 
@@ -48,6 +50,19 @@ func NewSimpleLogger(source string, logger *log.Logger, keepHistory bool, level 
 		Logger:      logger,
 		Level:       level,
 		KeepHistory: keepHistory,
+	}
+}
+
+// NewNoopLogger creates a logger instance that discards all logs and never
+// writes them. Used for testing.
+func NewNoopLogger() *SimpleLogger {
+	logger := log.New(os.Stderr, "", 0)
+	logger.SetOutput(ioutil.Discard)
+	return &SimpleLogger{
+		Source:      "",
+		Logger:      logger,
+		Level:       Info,
+		KeepHistory: false,
 	}
 }
 
