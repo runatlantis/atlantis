@@ -10,6 +10,7 @@ import (
 	"github.com/hootsuite/atlantis/server/events/locking"
 	"github.com/hootsuite/atlantis/server/events/models"
 	"github.com/pkg/errors"
+	"sort"
 )
 
 type PullClosedExecutor struct {
@@ -65,10 +66,18 @@ func (p *PullClosedExecutor) buildTemplateData(locks []models.ProjectLock) []tem
 		envsByPath[path] = append(envsByPath[path], l.Env)
 	}
 
+	// sort keys so we can write deterministic tests
+	var sortedPaths []string
+	for p := range envsByPath {
+		sortedPaths = append(sortedPaths, p)
+	}
+	sort.Strings(sortedPaths)
+
 	var projects []templatedProject
-	for p, e := range envsByPath {
-		envsStr := fmt.Sprintf("`%s`", strings.Join(e, "`, `"))
-		if len(e) == 1 {
+	for _, p := range sortedPaths {
+		env := envsByPath[p]
+		envsStr := fmt.Sprintf("`%s`", strings.Join(env, "`, `"))
+		if len(env) == 1 {
 			projects = append(projects, templatedProject{
 				Path: p,
 				Envs: "environment: " + envsStr,

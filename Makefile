@@ -28,7 +28,7 @@ build-service: ## Build the main Go service
 go-generate: ## Run go generate in all packages
 	go generate $(PKG)
 
-test: ## Run tests, coverage reports, and clean (coverage taints the compiled code)
+test: ## Run tests
 	go test $(PKG)
 
 test-coverage:
