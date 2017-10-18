@@ -6,12 +6,18 @@ import (
 	"strings"
 	"text/template"
 
+	"sort"
+
 	"github.com/hootsuite/atlantis/server/events/github"
 	"github.com/hootsuite/atlantis/server/events/locking"
 	"github.com/hootsuite/atlantis/server/events/models"
 	"github.com/pkg/errors"
-	"sort"
 )
+
+//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_pull_cleaner.go PullCleaner
+type PullCleaner interface {
+	CleanUpPull(repo models.Repo, pull models.PullRequest) error
+}
 
 type PullClosedExecutor struct {
 	Locker    locking.Locker

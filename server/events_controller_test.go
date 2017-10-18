@@ -1,24 +1,25 @@
 package server_test
 
 import (
+	"bytes"
+	"errors"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"reflect"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/google/go-github/github"
+	"github.com/hootsuite/atlantis/server"
+	"github.com/hootsuite/atlantis/server/events"
+	emocks "github.com/hootsuite/atlantis/server/events/mocks"
+	"github.com/hootsuite/atlantis/server/events/models"
+	"github.com/hootsuite/atlantis/server/logging"
+	"github.com/hootsuite/atlantis/server/mocks"
 	. "github.com/hootsuite/atlantis/testing_util"
 	. "github.com/petergtz/pegomock"
-	"github.com/hootsuite/atlantis/server"
-	"github.com/hootsuite/atlantis/server/logging"
-	"net/http"
-	"bytes"
-	"github.com/hootsuite/atlantis/server/mocks"
-	emocks "github.com/hootsuite/atlantis/server/events/mocks"
-	"net/http/httptest"
-	"errors"
-	"strings"
-	"io/ioutil"
-	"reflect"
-	"github.com/google/go-github/github"
-	"github.com/hootsuite/atlantis/server/events/models"
-	"github.com/hootsuite/atlantis/server/events"
-	"time"
 )
 
 func TestPost_InvalidSecret(t *testing.T) {
@@ -90,7 +91,7 @@ func TestPost_CommentInvalidComment(t *testing.T) {
 	e := server.EventsController{
 		Logger:    logging.NewNoopLogger(),
 		Validator: v,
-		Parser: p,
+		Parser:    p,
 	}
 	req, err := http.NewRequest("GET", "http://localhost/event", bytes.NewBuffer(nil))
 	req.Header.Set("X-Github-Event", "issue_comment")
@@ -115,7 +116,7 @@ func TestPost_CommentInvalidCommand(t *testing.T) {
 	e := server.EventsController{
 		Logger:    logging.NewNoopLogger(),
 		Validator: v,
-		Parser: p,
+		Parser:    p,
 	}
 	req, err := http.NewRequest("GET", "http://localhost/event", bytes.NewBuffer(nil))
 	req.Header.Set("X-Github-Event", "issue_comment")
@@ -176,31 +177,153 @@ func TestPost_CommentSuccess(t *testing.T) {
 func TestPost_PullRequestNotClosed(t *testing.T) {
 	t.Log("when the event is pull reuqest but it's not a closed event we ignore it")
 	RegisterMockTestingT(t)
+	v := mocks.NewMockGHRequestValidator()
+	p := emocks.NewMockEventParsing()
+	e := server.EventsController{
+		Logger:    logging.NewNoopLogger(),
+		Validator: v,
+		Parser:    p,
+	}
+	req, err := http.NewRequest("GET", "http://localhost/event", bytes.NewBuffer(nil))
+	req.Header.Set("X-Github-Event", "pull_request")
+	Ok(t, err)
+
+	event := `{"action": "opened"}`
+	When(v.Validate(req, nil)).ThenReturn([]byte(event), nil)
+	w := httptest.NewRecorder()
+	e.Post(w, req)
+
+	Equals(t, http.StatusOK, w.Result().StatusCode)
+	body, _ := ioutil.ReadAll(w.Result().Body)
+	Assert(t, strings.Contains(string(body), "Ignoring pull request event since action was not closed"), "was: %s", string(body))
 }
 
 func TestPost_PullRequestInvalid(t *testing.T) {
-	t.Log("when the event is pull reuqest with invalid data we return a 400")
+	t.Log("when the event is pull request with invalid data we return a 400")
 	RegisterMockTestingT(t)
+	v := mocks.NewMockGHRequestValidator()
+	p := emocks.NewMockEventParsing()
+	e := server.EventsController{
+		Logger:    logging.NewNoopLogger(),
+		Validator: v,
+		Parser:    p,
+	}
+	req, err := http.NewRequest("GET", "http://localhost/event", bytes.NewBuffer(nil))
+	req.Header.Set("X-Github-Event", "pull_request")
+	Ok(t, err)
+
+	event := `{"action": "closed"}`
+	When(v.Validate(req, nil)).ThenReturn([]byte(event), nil)
+	When(p.ExtractPullData(AnyPull())).ThenReturn(models.PullRequest{}, models.Repo{}, errors.New("err"))
+	w := httptest.NewRecorder()
+	e.Post(w, req)
+
+	Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	body, _ := ioutil.ReadAll(w.Result().Body)
+	Equals(t, "Error parsing pull data: err\n", string(body))
 }
 
 func TestPost_PullRequestInvalidRepo(t *testing.T) {
 	t.Log("when the event is pull reuqest with invalid repo data we return a 400")
 	RegisterMockTestingT(t)
+	v := mocks.NewMockGHRequestValidator()
+	p := emocks.NewMockEventParsing()
+	e := server.EventsController{
+		Logger:    logging.NewNoopLogger(),
+		Validator: v,
+		Parser:    p,
+	}
+	req, err := http.NewRequest("GET", "http://localhost/event", bytes.NewBuffer(nil))
+	req.Header.Set("X-Github-Event", "pull_request")
+	Ok(t, err)
+
+	event := `{"action": "closed"}`
+	When(v.Validate(req, nil)).ThenReturn([]byte(event), nil)
+	When(p.ExtractPullData(AnyPull())).ThenReturn(models.PullRequest{}, models.Repo{}, nil)
+	When(p.ExtractRepoData(AnyRepo())).ThenReturn(models.Repo{}, errors.New("err"))
+	w := httptest.NewRecorder()
+	e.Post(w, req)
+
+	Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	body, _ := ioutil.ReadAll(w.Result().Body)
+	Equals(t, "Error parsing repo data: err\n", string(body))
 }
 
 func TestPost_PullRequestErrCleaningPull(t *testing.T) {
 	t.Log("when the event is a pull request and we have an error calling CleanUpPull we return a 503")
 	RegisterMockTestingT(t)
+	v := mocks.NewMockGHRequestValidator()
+	p := emocks.NewMockEventParsing()
+	c := emocks.NewMockPullCleaner()
+	e := server.EventsController{
+		Logger:      logging.NewNoopLogger(),
+		Validator:   v,
+		Parser:      p,
+		PullCleaner: c,
+	}
+	req, err := http.NewRequest("GET", "http://localhost/event", bytes.NewBuffer(nil))
+	req.Header.Set("X-Github-Event", "pull_request")
+	Ok(t, err)
+
+	event := `{"action": "closed"}`
+	When(v.Validate(req, nil)).ThenReturn([]byte(event), nil)
+	repo := models.Repo{}
+	pull := models.PullRequest{}
+	When(p.ExtractPullData(AnyPull())).ThenReturn(pull, repo, nil)
+	When(p.ExtractRepoData(AnyRepo())).ThenReturn(repo, nil)
+	When(c.CleanUpPull(repo, pull)).ThenReturn(errors.New("cleanup err"))
+	w := httptest.NewRecorder()
+	e.Post(w, req)
+
+	Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	body, _ := ioutil.ReadAll(w.Result().Body)
+	Equals(t, "Error cleaning pull request: cleanup err\n", string(body))
 }
 
 func TestPost_PullRequestSuccess(t *testing.T) {
 	t.Log("when the event is a pull request and everything works we return a 200")
 	RegisterMockTestingT(t)
+	v := mocks.NewMockGHRequestValidator()
+	p := emocks.NewMockEventParsing()
+	c := emocks.NewMockPullCleaner()
+	e := server.EventsController{
+		Logger:      logging.NewNoopLogger(),
+		Validator:   v,
+		Parser:      p,
+		PullCleaner: c,
+	}
+	req, err := http.NewRequest("GET", "http://localhost/event", bytes.NewBuffer(nil))
+	req.Header.Set("X-Github-Event", "pull_request")
+	Ok(t, err)
+
+	event := `{"action": "closed"}`
+	When(v.Validate(req, nil)).ThenReturn([]byte(event), nil)
+	repo := models.Repo{}
+	pull := models.PullRequest{}
+	When(p.ExtractPullData(AnyPull())).ThenReturn(pull, repo, nil)
+	When(p.ExtractRepoData(AnyRepo())).ThenReturn(repo, nil)
+	When(c.CleanUpPull(repo, pull)).ThenReturn(nil)
+	w := httptest.NewRecorder()
+	e.Post(w, req)
+
+	Equals(t, http.StatusOK, w.Result().StatusCode)
+	body, _ := ioutil.ReadAll(w.Result().Body)
+	Equals(t, "Pull request cleaned successfully\n", string(body))
 }
 
 func AnyComment() *github.IssueCommentEvent {
 	RegisterMatcher(NewAnyMatcher(reflect.TypeOf(&github.IssueCommentEvent{})))
 	return &github.IssueCommentEvent{}
+}
+
+func AnyPull() *github.PullRequest {
+	RegisterMatcher(NewAnyMatcher(reflect.TypeOf(&github.PullRequest{})))
+	return &github.PullRequest{}
+}
+
+func AnyRepo() *github.Repository {
+	RegisterMatcher(NewAnyMatcher(reflect.TypeOf(&github.Repository{})))
+	return &github.Repository{}
 }
 
 func AnyCommandContext() *events.CommandContext {

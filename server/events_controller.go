@@ -10,10 +10,10 @@ import (
 )
 
 type EventsController struct {
-	CommandRunner      events.CommandRunner
-	PullClosedExecutor *events.PullClosedExecutor
-	Logger             *logging.SimpleLogger
-	Parser             events.EventParsing
+	CommandRunner events.CommandRunner
+	PullCleaner   events.PullCleaner
+	Logger        *logging.SimpleLogger
+	Parser        events.EventParsing
 	// GithubWebHookSecret is the secret added to this webhook via the GitHub
 	// UI that identifies this call as coming from GitHub. If empty, no
 	// request validation is done.
@@ -88,12 +88,12 @@ func (e *EventsController) HandlePullRequestEvent(w http.ResponseWriter, pullEve
 		return
 	}
 
-	if err := e.PullClosedExecutor.CleanUpPull(repo, pull); err != nil {
-		e.respond(w, logging.Error, http.StatusServiceUnavailable, "Error cleaning pull request: %s", err)
+	if err := e.PullCleaner.CleanUpPull(repo, pull); err != nil {
+		e.respond(w, logging.Error, http.StatusInternalServerError, "Error cleaning pull request: %s", err)
 		return
 	}
 	e.Logger.Info("deleted locks and workspace for repo %s, pull %d", repo.FullName, pull.Num)
-	fmt.Fprint(w, "Pull request cleaned successfully")
+	fmt.Fprintln(w, "Pull request cleaned successfully")
 }
 
 func (e *EventsController) respond(w http.ResponseWriter, lvl logging.LogLevel, code int, format string, args ...interface{}) {

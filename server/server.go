@@ -129,7 +129,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 	}
 	eventsController := &EventsController{
 		CommandRunner:       commandHandler,
-		PullClosedExecutor:  pullClosedExecutor,
+		PullCleaner:         pullClosedExecutor,
 		Parser:              eventParser,
 		Logger:              logger,
 		GithubWebHookSecret: []byte(config.GithubWebHookSecret),
