@@ -87,22 +87,27 @@ func NewServer(config ServerConfig) (*Server, error) {
 	workspace := &events.FileWorkspace{
 		DataDir: config.DataDir,
 	}
+	projectPreExecute := &events.ProjectPreExecute{
+		Locker:          lockingClient,
+		Run:             run,
+		ConfigReader:    configReader,
+		Terraform:       terraformClient,
+	}
 	applyExecutor := &events.ApplyExecutor{
 		Github:          githubClient,
 		Terraform:       terraformClient,
-		Locker:          lockingClient,
 		RequireApproval: config.RequireApproval,
 		Run:             run,
-		ConfigReader:    configReader,
 		Workspace:       workspace,
+		ProjectPreExecute: projectPreExecute,
 	}
 	planExecutor := &events.PlanExecutor{
 		Github:       githubClient,
 		Terraform:    terraformClient,
-		Locker:       lockingClient,
 		Run:          run,
-		ConfigReader: configReader,
 		Workspace:    workspace,
+		ProjectPreExecute: projectPreExecute,
+		Locker:    lockingClient,
 	}
 	helpExecutor := &events.HelpExecutor{}
 	pullClosedExecutor := &events.PullClosedExecutor{

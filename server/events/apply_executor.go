@@ -8,9 +8,7 @@ import (
 
 	"path/filepath"
 
-	version "github.com/hashicorp/go-version"
 	"github.com/hootsuite/atlantis/server/events/github"
-	"github.com/hootsuite/atlantis/server/events/locking"
 	"github.com/hootsuite/atlantis/server/events/models"
 	"github.com/hootsuite/atlantis/server/events/run"
 	"github.com/hootsuite/atlantis/server/events/terraform"
@@ -19,11 +17,10 @@ import (
 type ApplyExecutor struct {
 	Github          github.Client
 	Terraform       *terraform.Client
-	Locker          locking.Locker
 	RequireApproval bool
 	Run             *run.Run
-	ConfigReader    *ConfigReader
 	Workspace       Workspace
+	ProjectPreExecute *ProjectPreExecute
 }
 
 func (a *ApplyExecutor) Execute(ctx *CommandContext) CommandResponse {
@@ -80,63 +77,25 @@ func (a *ApplyExecutor) Execute(ctx *CommandContext) CommandResponse {
 }
 
 func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.Plan) ProjectResult {
-	tfEnv := ctx.Command.Environment
-	lockAttempt, err := a.Locker.TryLock(plan.Project, tfEnv, ctx.Pull, ctx.User)
-	if err != nil {
-		return ProjectResult{Error: errors.Wrap(err, "acquiring lock")}
+	preExecute := a.ProjectPreExecute.Execute(ctx, repoDir, plan.Project)
+	if preExecute.ProjectResult != (ProjectResult{}) {
+		return preExecute.ProjectResult
 	}
-	if lockAttempt.LockAcquired != true && lockAttempt.CurrLock.Pull.Num != ctx.Pull.Num {
-		return ProjectResult{Failure: fmt.Sprintf(
-			"This project is currently locked by #%d. The locking plan must be applied or discarded before future plans can execute.",
-			lockAttempt.CurrLock.Pull.Num)}
-	}
-	ctx.Log.Info("acquired lock with id %q", lockAttempt.LockKey)
+	config := preExecute.ProjectConfig
+	terraformVersion := preExecute.TerraformVersion
 
-	// check if config file is found, if not we continue the run
-	absolutePath := filepath.Dir(plan.LocalPath)
-	var applyExtraArgs []string
-	var config ProjectConfig
-	if a.ConfigReader.Exists(absolutePath) {
-		config, err = a.ConfigReader.Read(absolutePath)
-		if err != nil {
-			return ProjectResult{Error: err}
-		}
-		ctx.Log.Info("parsed atlantis config file in %q", absolutePath)
-		applyExtraArgs = config.GetExtraArguments(ctx.Command.Name.String())
-	}
-
-	// check if terraform version is >= 0.9.0
-	terraformVersion := a.Terraform.Version()
-	if config.TerraformVersion != nil {
-		terraformVersion = config.TerraformVersion
-	}
-	constraints, _ := version.NewConstraint(">= 0.9.0")
-	if constraints.Check(terraformVersion) {
-		ctx.Log.Info("determined that we are running terraform with version >= 0.9.0. Running version %s", terraformVersion)
-		_, err := a.Terraform.RunInitAndEnv(ctx.Log, absolutePath, tfEnv, config.GetExtraArguments("init"), terraformVersion)
-		if err != nil {
-			return ProjectResult{Error: err}
-		}
-	}
-
-	// if there are pre apply commands then run them
-	if len(config.PreApply.Commands) > 0 {
-		_, err := a.Run.Execute(ctx.Log, config.PreApply.Commands, absolutePath, tfEnv, terraformVersion, "pre_apply")
-		if err != nil {
-			return ProjectResult{Error: errors.Wrap(err, "running pre apply commands")}
-		}
-	}
-
+	applyExtraArgs := config.GetExtraArguments(ctx.Command.Name.String())
+	absolutePath := filepath.Join(repoDir, plan.Project.Path)
+	env := ctx.Command.Environment
 	tfApplyCmd := append(append(append([]string{"apply", "-no-color"}, applyExtraArgs...), ctx.Command.Flags...), plan.LocalPath)
-	output, err := a.Terraform.RunCommandWithVersion(ctx.Log, absolutePath, tfApplyCmd, terraformVersion, tfEnv)
+	output, err := a.Terraform.RunCommandWithVersion(ctx.Log, absolutePath, tfApplyCmd, terraformVersion, env)
 	if err != nil {
 		return ProjectResult{Error: fmt.Errorf("%s\n%s", err.Error(), output)}
 	}
 	ctx.Log.Info("apply succeeded")
 
-	// if there are post apply commands then run them
 	if len(config.PostApply.Commands) > 0 {
-		_, err := a.Run.Execute(ctx.Log, config.PostApply.Commands, absolutePath, tfEnv, terraformVersion, "post_apply")
+		_, err := a.Run.Execute(ctx.Log, config.PostApply.Commands, absolutePath, env, terraformVersion, "post_apply")
 		if err != nil {
 			return ProjectResult{Error: errors.Wrap(err, "running post apply commands")}
 		}
