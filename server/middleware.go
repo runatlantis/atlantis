@@ -5,7 +5,7 @@ import (
 
 	"strings"
 
-	"github.com/hootsuite/atlantis/logging"
+	"github.com/hootsuite/atlantis/server/logging"
 	"github.com/urfave/negroni"
 )
 

@@ -25,7 +25,10 @@ deps: ## Download dependencies
 build-service: ## Build the main Go service
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o atlantis .
 
-test: ## Run tests, coverage reports, and clean (coverage taints the compiled code)
+go-generate: ## Run go generate in all packages
+	go generate $(PKG)
+
+test: ## Run tests
 	go test $(PKG)
 
 test-coverage:
@@ -36,13 +39,13 @@ test-coverage-html:
 	go tool cover -html .cover/cover.out
 
 dist: ## Package up everything in static/ using go-bindata-assetfs so it can be served by a single binary
-	go-bindata-assetfs -pkg static static/... && mv bindata_assetfs.go static
+	rm -f server/static/bindata_assetfs.go && go-bindata-assetfs -pkg static -prefix server server/static/... && mv bindata_assetfs.go server/static
 
 release: ## Create packages for a release
 	./scripts/binary-release.sh
 
 fmt: ## Run goimports (which also formats)
-	goimports -w $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "./static/bindata_assetfs.go" ! -path "**/mocks/*")
+	goimports -w $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "./server/static/bindata_assetfs.go" ! -path "**/mocks/*")
 
 end-to-end-deps: ## Install e2e dependencies
 	./scripts/e2e-deps.sh
