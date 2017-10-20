@@ -8,11 +8,11 @@ import (
 	"strings"
 
 	"github.com/hootsuite/atlantis/server/events/github"
+	"github.com/hootsuite/atlantis/server/events/locking"
 	"github.com/hootsuite/atlantis/server/events/models"
 	"github.com/hootsuite/atlantis/server/events/run"
 	"github.com/hootsuite/atlantis/server/events/terraform"
 	"github.com/pkg/errors"
-	"github.com/hootsuite/atlantis/server/events/locking"
 )
 
 //go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_lock_url_generator.go LockURLGenerator
@@ -30,12 +30,12 @@ const atlantisUserTFVar = "atlantis_user"
 // PlanExecutor handles everything related to running terraform plan
 // including integration with S3, Terraform, and GitHub
 type PlanExecutor struct {
-	Github       github.Client
-	Terraform    *terraform.Client
-	Locker       locking.Locker
-	LockURL      func(id string) (url string)
-	Run          *run.Run
-	Workspace    Workspace
+	Github            github.Client
+	Terraform         *terraform.Client
+	Locker            locking.Locker
+	LockURL           func(id string) (url string)
+	Run               *run.Run
+	Workspace         Workspace
 	ProjectPreExecute *ProjectPreExecute
 }
 

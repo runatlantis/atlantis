@@ -28,7 +28,13 @@ type PostApply struct {
 	Commands []string `yaml:"commands"`
 }
 
-type ConfigReader struct{}
+//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_project_config_reader.go ProjectConfigReader
+type ProjectConfigReader interface {
+	Exists(execPath string) bool
+	Read(execPath string) (ProjectConfig, error)
+}
+
+type ProjectConfigManager struct{}
 
 type ProjectConfigYaml struct {
 	PrePlan          PrePlan                 `yaml:"pre_plan"`
@@ -54,13 +60,13 @@ type CommandExtraArguments struct {
 	Arguments []string `yaml:"arguments"`
 }
 
-func (c *ConfigReader) Exists(execPath string) bool {
+func (c *ProjectConfigManager) Exists(execPath string) bool {
 	// Check if config file exists
 	_, err := os.Stat(filepath.Join(execPath, ProjectConfigFile))
 	return err == nil
 }
 
-func (c *ConfigReader) Read(execPath string) (ProjectConfig, error) {
+func (c *ProjectConfigManager) Read(execPath string) (ProjectConfig, error) {
 	var pc ProjectConfig
 	filename := filepath.Join(execPath, ProjectConfigFile)
 	raw, err := ioutil.ReadFile(filename)

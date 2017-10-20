@@ -31,19 +31,19 @@ extra_arguments:
 `
 
 func TestConfigFileExists_invalid_path(t *testing.T) {
-	var c events.ConfigReader
+	var c events.ProjectConfigManager
 	Equals(t, c.Exists("/invalid/path"), false)
 }
 
 func TestConfigFileExists_valid_path(t *testing.T) {
-	var c events.ConfigReader
+	var c events.ProjectConfigManager
 	writeAtlantisConfigFile([]byte(projectConfigFileStr))
 	defer os.Remove(tempConfigFile)
 	Equals(t, c.Exists("/tmp"), true)
 }
 
 func TestConfigFileRead_invalid_config(t *testing.T) {
-	var c events.ConfigReader
+	var c events.ProjectConfigManager
 	str := []byte(`---invalid`)
 	writeAtlantisConfigFile(str)
 	defer os.Remove(tempConfigFile)
@@ -52,7 +52,7 @@ func TestConfigFileRead_invalid_config(t *testing.T) {
 }
 
 func TestConfigFileRead_valid_config(t *testing.T) {
-	var c events.ConfigReader
+	var c events.ProjectConfigManager
 	writeAtlantisConfigFile([]byte(projectConfigFileStr))
 	defer os.Remove(tempConfigFile)
 	_, err := c.Read("/tmp")

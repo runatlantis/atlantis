@@ -1,29 +1,30 @@
 package events
 
 import (
-	"path/filepath"
 	"fmt"
-	"github.com/hootsuite/atlantis/server/events/locking"
-	"github.com/pkg/errors"
-	"github.com/hootsuite/atlantis/server/events/models"
-	"github.com/hootsuite/atlantis/server/events/terraform"
-	"github.com/hashicorp/go-version"
-	"github.com/hootsuite/atlantis/server/events/run"
+	"path/filepath"
 	"strings"
+
+	"github.com/hashicorp/go-version"
+	"github.com/hootsuite/atlantis/server/events/locking"
+	"github.com/hootsuite/atlantis/server/events/models"
+	"github.com/hootsuite/atlantis/server/events/run"
+	"github.com/hootsuite/atlantis/server/events/terraform"
+	"github.com/pkg/errors"
 )
 
 type ProjectPreExecute struct {
-	Locker          locking.Locker
-	ConfigReader *ConfigReader
-	Terraform    *terraform.Client
-	Run          *run.Run
+	Locker       locking.Locker
+	ConfigReader ProjectConfigReader
+	Terraform    terraform.Runner
+	Run          run.Runner
 }
 
 type PreExecuteResult struct {
-	ProjectResult ProjectResult
-	ProjectConfig ProjectConfig
+	ProjectResult    ProjectResult
+	ProjectConfig    ProjectConfig
 	TerraformVersion *version.Version
-	LockResponse locking.TryLockResponse
+	LockResponse     locking.TryLockResponse
 }
 
 func (p *ProjectPreExecute) Execute(ctx *CommandContext, repoDir string, project models.Project) PreExecuteResult {
@@ -81,7 +82,7 @@ func (p *ProjectPreExecute) Execute(ctx *CommandContext, repoDir string, project
 	if len(commands) > 0 {
 		_, err := p.Run.Execute(ctx.Log, commands, absolutePath, tfEnv, terraformVersion, stage)
 		if err != nil {
-			return PreExecuteResult{ProjectResult: ProjectResult{Error: errors.Wrapf(err, "running pre %s commands", stage)}}
+			return PreExecuteResult{ProjectResult: ProjectResult{Error: errors.Wrapf(err, "running %s commands", stage)}}
 		}
 	}
 	return PreExecuteResult{ProjectConfig: config, TerraformVersion: terraformVersion, LockResponse: lockAttempt}

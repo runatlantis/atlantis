@@ -82,32 +82,32 @@ func NewServer(config ServerConfig) (*Server, error) {
 	}
 	lockingClient := locking.NewClient(boltdb)
 	run := &run.Run{}
-	configReader := &events.ConfigReader{}
+	configReader := &events.ProjectConfigManager{}
 	concurrentRunLocker := events.NewEnvLock()
 	workspace := &events.FileWorkspace{
 		DataDir: config.DataDir,
 	}
 	projectPreExecute := &events.ProjectPreExecute{
-		Locker:          lockingClient,
-		Run:             run,
-		ConfigReader:    configReader,
-		Terraform:       terraformClient,
+		Locker:       lockingClient,
+		Run:          run,
+		ConfigReader: configReader,
+		Terraform:    terraformClient,
 	}
 	applyExecutor := &events.ApplyExecutor{
-		Github:          githubClient,
-		Terraform:       terraformClient,
-		RequireApproval: config.RequireApproval,
-		Run:             run,
-		Workspace:       workspace,
+		Github:            githubClient,
+		Terraform:         terraformClient,
+		RequireApproval:   config.RequireApproval,
+		Run:               run,
+		Workspace:         workspace,
 		ProjectPreExecute: projectPreExecute,
 	}
 	planExecutor := &events.PlanExecutor{
-		Github:       githubClient,
-		Terraform:    terraformClient,
-		Run:          run,
-		Workspace:    workspace,
+		Github:            githubClient,
+		Terraform:         terraformClient,
+		Run:               run,
+		Workspace:         workspace,
 		ProjectPreExecute: projectPreExecute,
-		Locker:    lockingClient,
+		Locker:            lockingClient,
 	}
 	helpExecutor := &events.HelpExecutor{}
 	pullClosedExecutor := &events.PullClosedExecutor{

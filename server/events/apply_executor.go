@@ -15,11 +15,11 @@ import (
 )
 
 type ApplyExecutor struct {
-	Github          github.Client
-	Terraform       *terraform.Client
-	RequireApproval bool
-	Run             *run.Run
-	Workspace       Workspace
+	Github            github.Client
+	Terraform         *terraform.Client
+	RequireApproval   bool
+	Run               *run.Run
+	Workspace         Workspace
 	ProjectPreExecute *ProjectPreExecute
 }
 
