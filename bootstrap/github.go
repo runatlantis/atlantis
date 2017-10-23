@@ -53,11 +53,7 @@ func (g *Client) CreateWebhook(ownerName string, repoName string, hookURL string
 		Active: github.Bool(true),
 	}
 	_, _, err := g.client.Repositories.CreateHook(g.ctx, ownerName, repoName, atlantisHook)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // CreatePullRequest creates a github pull request with custom title and description.

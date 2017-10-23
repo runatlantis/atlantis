@@ -37,11 +37,8 @@ func downloadFile(url string, path string) error {
 	}
 	defer response.Body.Close()
 
-	if _, err := io.Copy(output, response.Body); err != nil {
-		return err
-	}
-
-	return nil
+	 _, err = io.Copy(output, response.Body);
+	return err
 }
 
 func unzip(archive, target string) error {

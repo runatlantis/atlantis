@@ -163,6 +163,9 @@ func (b BoltLocker) UnlockByPull(repoFullName string, pullNum int) ([]models.Pro
 		}
 		return nil
 	})
+	if err != nil {
+		return locks, err
+	}
 
 	// delete the locks
 	for _, lock := range locks {

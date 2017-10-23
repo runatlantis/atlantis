@@ -21,7 +21,7 @@ var pull = models.PullRequest{}
 var user = models.User{}
 var expectedErr = errors.New("err")
 var timeNow = time.Now().Local()
-var pl = models.ProjectLock{project, pull, user, env, timeNow}
+var pl = models.ProjectLock{Project: project, Pull: pull, User: user, Env: env, Time: timeNow}
 
 func TestTryLock_Err(t *testing.T) {
 	RegisterMockTestingT(t)
@@ -41,7 +41,7 @@ func TestTryLock_Success(t *testing.T) {
 	l := locking.NewClient(backend)
 	r, err := l.TryLock(project, env, pull, user)
 	Ok(t, err)
-	Equals(t, locking.TryLockResponse{true, currLock, "owner/repo/path/env"}, r)
+	Equals(t, locking.TryLockResponse{LockAcquired: true, CurrLock: currLock, LockKey: "owner/repo/path/env"}, r)
 }
 
 func TestUnlock_InvalidKey(t *testing.T) {

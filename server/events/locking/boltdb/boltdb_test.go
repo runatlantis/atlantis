@@ -81,7 +81,7 @@ func TestListMultipleLocks(t *testing.T) {
 				found = true
 			}
 		}
-		Assert(t, found == true, "expected %s in %v", r, ls)
+		Assert(t, found, "expected %s in %v", r, ls)
 	}
 }
 

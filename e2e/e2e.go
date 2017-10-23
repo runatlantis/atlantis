@@ -82,7 +82,7 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	commitCmd := exec.Command("git", "commit", "-am", "test commit")
 	commitCmd.Dir = cloneDir
 	if output, err := commitCmd.CombinedOutput(); err != nil {
-		return e2eResult, fmt.Errorf("failed to run git commit in %q: %v", cloneDir, err, string(output))
+		return e2eResult, fmt.Errorf("failed to run git commit in %q: %v: %v", cloneDir, err, string(output))
 	}
 
 	// push the branch to remote

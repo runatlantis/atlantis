@@ -14,7 +14,10 @@ import (
 	"github.com/mohae/deepcopy"
 )
 
-var parser = events.EventParser{"user", "token"}
+var parser = events.EventParser{
+	GithubUser:  "user",
+	GithubToken: "token",
+}
 
 func TestDetermineCommandNoBody(t *testing.T) {
 	_, err := parser.DetermineCommand(&github.IssueCommentEvent{})
@@ -238,6 +241,7 @@ func TestExtractPullData(t *testing.T) {
 	Equals(t, errors.New("repository.full_name is null"), err)
 
 	PullRes, repoRes, err := parser.ExtractPullData(&Pull)
+	Ok(t, err)
 	Equals(t, models.PullRequest{
 		BaseCommit: Pull.Base.GetSHA(),
 		URL:        Pull.GetHTMLURL(),

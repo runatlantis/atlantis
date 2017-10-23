@@ -24,7 +24,6 @@ type Workspace interface {
 
 type FileWorkspace struct {
 	DataDir string
-	sshKey  string
 }
 
 func (w *FileWorkspace) Clone(

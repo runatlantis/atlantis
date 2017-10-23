@@ -61,7 +61,7 @@ func (c *CommandHandler) SetLockURL(f func(id string) (url string)) {
 
 func (c *CommandHandler) run(ctx *CommandContext) {
 	c.GHStatus.Update(ctx.BaseRepo, ctx.Pull, Pending, ctx.Command)
-	if c.EnvLocker.TryLock(ctx.BaseRepo.FullName, ctx.Command.Environment, ctx.Pull.Num) != true {
+	if !c.EnvLocker.TryLock(ctx.BaseRepo.FullName, ctx.Command.Environment, ctx.Pull.Num) {
 		errMsg := fmt.Sprintf(
 			"The %s environment is currently locked by another"+
 				" command that is running for this pull request."+

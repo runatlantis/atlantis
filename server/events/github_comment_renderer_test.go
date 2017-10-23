@@ -109,8 +109,8 @@ func TestRenderProjectResults(t *testing.T) {
 			[]events.ProjectResult{
 				{
 					PlanSuccess: &events.PlanSuccess{
-						"terraform-output",
-						"lock-url",
+						TerraformOutput: "terraform-output",
+						LockURL:         "lock-url",
 					},
 				},
 			},
@@ -133,15 +133,15 @@ func TestRenderProjectResults(t *testing.T) {
 				{
 					Path: "path",
 					PlanSuccess: &events.PlanSuccess{
-						"terraform-output",
-						"lock-url",
+						TerraformOutput: "terraform-output",
+						LockURL:         "lock-url",
 					},
 				},
 				{
 					Path: "path2",
 					PlanSuccess: &events.PlanSuccess{
-						"terraform-output2",
-						"lock-url2",
+						TerraformOutput: "terraform-output2",
+						LockURL:         "lock-url2",
 					},
 				},
 			},
@@ -189,8 +189,8 @@ func TestRenderProjectResults(t *testing.T) {
 				{
 					Path: "path",
 					PlanSuccess: &events.PlanSuccess{
-						"terraform-output",
-						"lock-url",
+						TerraformOutput: "terraform-output",
+						LockURL:         "lock-url",
 					},
 				},
 				{

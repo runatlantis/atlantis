@@ -33,7 +33,7 @@ func (p *ProjectPreExecute) Execute(ctx *CommandContext, repoDir string, project
 	if err != nil {
 		return PreExecuteResult{ProjectResult: ProjectResult{Error: errors.Wrap(err, "acquiring lock")}}
 	}
-	if lockAttempt.LockAcquired == false && lockAttempt.CurrLock.Pull.Num != ctx.Pull.Num {
+	if !lockAttempt.LockAcquired && lockAttempt.CurrLock.Pull.Num != ctx.Pull.Num {
 		return PreExecuteResult{ProjectResult: ProjectResult{Failure: fmt.Sprintf(
 			"This project is currently locked by #%d. The locking plan must be applied or discarded before future plans can execute.",
 			lockAttempt.CurrLock.Pull.Num)}}

@@ -117,6 +117,7 @@ func (c *Client) RunInitAndEnv(log *logging.SimpleLogger, path string, env strin
 		// if terraform env select fails we will run terraform env new
 		// to create a new environment
 		output, err = c.RunCommandWithVersion(log, path, []string{"env", "new", "-no-color", env}, version, env)
+		outputs = append(outputs, output)
 		if err != nil {
 			return outputs, err
 		}
