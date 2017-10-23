@@ -94,8 +94,8 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 	}
 	ctx.Log.Info("apply succeeded")
 
-	if len(config.PostApply.Commands) > 0 {
-		_, err := a.Run.Execute(ctx.Log, config.PostApply.Commands, absolutePath, env, terraformVersion, "post_apply")
+	if len(config.PostApply) > 0 {
+		_, err := a.Run.Execute(ctx.Log, config.PostApply, absolutePath, env, terraformVersion, "post_apply")
 		if err != nil {
 			return ProjectResult{Error: errors.Wrap(err, "running post apply commands")}
 		}

@@ -62,6 +62,24 @@ func TestExecute_ConfigErr(t *testing.T) {
 	Equals(t, "err", res.ProjectResult.Error.Error())
 }
 
+func TestExecute_PreInitErr(t *testing.T) {
+	t.Log("when the project is on tf >= 0.9 and we run a `pre_init` that returns an error we return it")
+	p, l, _, tm, r := setupPreExecuteTest(t)
+	When(l.TryLock(project, "", ctx.Pull, ctx.User)).ThenReturn(locking.TryLockResponse{
+		LockAcquired: true,
+	}, nil)
+	When(p.ConfigReader.Exists("")).ThenReturn(true)
+	When(p.ConfigReader.Read("")).ThenReturn(events.ProjectConfig{
+		PreInit: []string{"pre-init"},
+	}, nil)
+	tfVersion, _ := version.NewVersion("0.9.0")
+	When(tm.Version()).ThenReturn(tfVersion)
+	When(r.Execute(ctx.Log, []string{"pre-init"}, "", "", tfVersion, "pre_init")).ThenReturn("", errors.New("err"))
+
+	res := p.Execute(&ctx, "", project)
+	Equals(t, "running pre_init commands: err", res.ProjectResult.Error.Error())
+}
+
 func TestExecute_InitErr(t *testing.T) {
 	t.Log("when the project is on tf >= 0.9 and we run `init` that returns an error we return it")
 	p, l, _, tm, _ := setupPreExecuteTest(t)
@@ -76,6 +94,24 @@ func TestExecute_InitErr(t *testing.T) {
 
 	res := p.Execute(&ctx, "", project)
 	Equals(t, "err", res.ProjectResult.Error.Error())
+}
+
+func TestExecute_PreGetErr(t *testing.T) {
+	t.Log("when the project is on tf < 0.9 and we run a `pre_get` that returns an error we return it")
+	p, l, _, tm, r := setupPreExecuteTest(t)
+	When(l.TryLock(project, "", ctx.Pull, ctx.User)).ThenReturn(locking.TryLockResponse{
+		LockAcquired: true,
+	}, nil)
+	When(p.ConfigReader.Exists("")).ThenReturn(true)
+	When(p.ConfigReader.Read("")).ThenReturn(events.ProjectConfig{
+		PreGet: []string{"pre-get"},
+	}, nil)
+	tfVersion, _ := version.NewVersion("0.8")
+	When(tm.Version()).ThenReturn(tfVersion)
+	When(r.Execute(ctx.Log, []string{"pre-get"}, "", "", tfVersion, "pre_get")).ThenReturn("", errors.New("err"))
+
+	res := p.Execute(&ctx, "", project)
+	Equals(t, "running pre_get commands: err", res.ProjectResult.Error.Error())
 }
 
 func TestExecute_GetErr(t *testing.T) {
@@ -102,7 +138,7 @@ func TestExecute_PreCommandErr(t *testing.T) {
 	}, nil)
 	When(p.ConfigReader.Exists("")).ThenReturn(true)
 	When(p.ConfigReader.Read("")).ThenReturn(events.ProjectConfig{
-		PrePlan: events.PrePlan{Commands: []string{"command"}},
+		PrePlan: []string{"command"},
 	}, nil)
 	tfVersion, _ := version.NewVersion("0.9")
 	When(tm.Version()).ThenReturn(tfVersion)
@@ -115,45 +151,53 @@ func TestExecute_PreCommandErr(t *testing.T) {
 
 func TestExecute_SuccessTF9(t *testing.T) {
 	t.Log("when the project is on tf >= 0.9 it should be successful")
-	p, l, _, tm, _ := setupPreExecuteTest(t)
+	p, l, _, tm, r := setupPreExecuteTest(t)
 	lockResponse := locking.TryLockResponse{
 		LockAcquired: true,
 	}
 	When(l.TryLock(project, "", ctx.Pull, ctx.User)).ThenReturn(lockResponse, nil)
 	When(p.ConfigReader.Exists("")).ThenReturn(true)
-	When(p.ConfigReader.Read("")).ThenReturn(events.ProjectConfig{}, nil)
+	config := events.ProjectConfig{
+		PreInit: []string{"pre-init"},
+	}
+	When(p.ConfigReader.Read("")).ThenReturn(config, nil)
 	tfVersion, _ := version.NewVersion("0.9")
 	When(tm.Version()).ThenReturn(tfVersion)
 	When(tm.RunInitAndEnv(ctx.Log, "", "", nil, tfVersion)).ThenReturn(nil, nil)
 
 	res := p.Execute(&ctx, "", project)
 	Equals(t, events.PreExecuteResult{
-		ProjectConfig:    events.ProjectConfig{},
+		ProjectConfig:    config,
 		TerraformVersion: tfVersion,
 		LockResponse:     lockResponse,
 	}, res)
 	tm.VerifyWasCalledOnce().RunInitAndEnv(ctx.Log, "", "", nil, tfVersion)
+	r.VerifyWasCalledOnce().Execute(ctx.Log, []string{"pre-init"}, "", "", tfVersion, "pre_init")
 }
 
 func TestExecute_SuccessTF8(t *testing.T) {
 	t.Log("when the project is on tf < 0.9 it should be successful")
-	p, l, _, tm, _ := setupPreExecuteTest(t)
+	p, l, _, tm, r := setupPreExecuteTest(t)
 	lockResponse := locking.TryLockResponse{
 		LockAcquired: true,
 	}
 	When(l.TryLock(project, "", ctx.Pull, ctx.User)).ThenReturn(lockResponse, nil)
 	When(p.ConfigReader.Exists("")).ThenReturn(true)
-	When(p.ConfigReader.Read("")).ThenReturn(events.ProjectConfig{}, nil)
+	config := events.ProjectConfig{
+		PreGet: []string{"pre-get"},
+	}
+	When(p.ConfigReader.Read("")).ThenReturn(config, nil)
 	tfVersion, _ := version.NewVersion("0.8")
 	When(tm.Version()).ThenReturn(tfVersion)
 
 	res := p.Execute(&ctx, "", project)
 	Equals(t, events.PreExecuteResult{
-		ProjectConfig:    events.ProjectConfig{},
+		ProjectConfig:    config,
 		TerraformVersion: tfVersion,
 		LockResponse:     lockResponse,
 	}, res)
 	tm.VerifyWasCalledOnce().RunCommandWithVersion(ctx.Log, "", []string{"get", "-no-color"}, tfVersion, "")
+	r.VerifyWasCalledOnce().Execute(ctx.Log, []string{"pre-get"}, "", "", tfVersion, "pre_get")
 }
 
 func TestExecute_SuccessPrePlan(t *testing.T) {
@@ -165,7 +209,7 @@ func TestExecute_SuccessPrePlan(t *testing.T) {
 	When(l.TryLock(project, "", ctx.Pull, ctx.User)).ThenReturn(lockResponse, nil)
 	When(p.ConfigReader.Exists("")).ThenReturn(true)
 	config := events.ProjectConfig{
-		PrePlan: events.PrePlan{Commands: []string{"command"}},
+		PrePlan: []string{"command"},
 	}
 	When(p.ConfigReader.Read("")).ThenReturn(config, nil)
 	tfVersion, _ := version.NewVersion("0.9")
@@ -189,7 +233,7 @@ func TestExecute_SuccessPreApply(t *testing.T) {
 	When(l.TryLock(project, "", ctx.Pull, ctx.User)).ThenReturn(lockResponse, nil)
 	When(p.ConfigReader.Exists("")).ThenReturn(true)
 	config := events.ProjectConfig{
-		PreApply: events.PreApply{Commands: []string{"command"}},
+		PreApply: []string{"command"},
 	}
 	When(p.ConfigReader.Read("")).ThenReturn(config, nil)
 	tfVersion, _ := version.NewVersion("0.9")
