@@ -117,9 +117,9 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 	ctx.Log.Info("plan succeeded")
 
 	// if there are post plan commands then run them
-	if len(config.PostPlan.Commands) > 0 {
+	if len(config.PostPlan) > 0 {
 		absolutePath := filepath.Join(repoDir, project.Path)
-		_, err := p.Run.Execute(ctx.Log, config.PostPlan.Commands, absolutePath, tfEnv, terraformVersion, "post_plan")
+		_, err := p.Run.Execute(ctx.Log, config.PostPlan, absolutePath, tfEnv, terraformVersion, "post_plan")
 		if err != nil {
 			return ProjectResult{Error: errors.Wrap(err, "running post plan commands")}
 		}

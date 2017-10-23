@@ -59,12 +59,24 @@ func (p *ProjectPreExecute) Execute(ctx *CommandContext, repoDir string, project
 	constraints, _ := version.NewConstraint(">= 0.9.0")
 	if constraints.Check(terraformVersion) {
 		ctx.Log.Info("determined that we are running terraform with version >= 0.9.0. Running version %s", terraformVersion)
+		if len(config.PreInit) > 0 {
+			_, err := p.Run.Execute(ctx.Log, config.PreInit, absolutePath, tfEnv, terraformVersion, "pre_init")
+			if err != nil {
+				return PreExecuteResult{ProjectResult: ProjectResult{Error: errors.Wrapf(err, "running %s commands", "pre_init")}}
+			}
+		}
 		_, err := p.Terraform.RunInitAndEnv(ctx.Log, absolutePath, tfEnv, config.GetExtraArguments("init"), terraformVersion)
 		if err != nil {
 			return PreExecuteResult{ProjectResult: ProjectResult{Error: err}}
 		}
 	} else {
 		ctx.Log.Info("determined that we are running terraform with version < 0.9.0. Running version %s", terraformVersion)
+		if len(config.PreGet) > 0 {
+			_, err := p.Run.Execute(ctx.Log, config.PreGet, absolutePath, tfEnv, terraformVersion, "pre_get")
+			if err != nil {
+				return PreExecuteResult{ProjectResult: ProjectResult{Error: errors.Wrapf(err, "running %s commands", "pre_get")}}
+			}
+		}
 		terraformGetCmd := append([]string{"get", "-no-color"}, config.GetExtraArguments("get")...)
 		_, err := p.Terraform.RunCommandWithVersion(ctx.Log, absolutePath, terraformGetCmd, terraformVersion, tfEnv)
 		if err != nil {
@@ -75,9 +87,9 @@ func (p *ProjectPreExecute) Execute(ctx *CommandContext, repoDir string, project
 	stage := fmt.Sprintf("pre_%s", strings.ToLower(ctx.Command.Name.String()))
 	var commands []string
 	if ctx.Command.Name == Plan {
-		commands = config.PrePlan.Commands
+		commands = config.PrePlan
 	} else {
-		commands = config.PreApply.Commands
+		commands = config.PreApply
 	}
 	if len(commands) > 0 {
 		_, err := p.Run.Execute(ctx.Log, commands, absolutePath, tfEnv, terraformVersion, stage)
