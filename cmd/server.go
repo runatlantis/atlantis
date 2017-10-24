@@ -100,6 +100,26 @@ type boolFlag struct {
 	value       bool
 }
 
+type ServerCmd struct {
+	ServerCreator ServerCreator
+	Cmd           *cobra.Command
+}
+
+type ServerCreator interface {
+	NewServer(config server.ServerConfig) (*server.Server, error)
+}
+type DefaultServerCreator struct {}
+func (d *DefaultServerCreator) NewServer(config server.ServerConfig) (*server.Server, error) {
+	return server.NewServer(config)
+}
+
+func NewServerCmd() ServerCmd {
+	return ServerCmd{
+		ServerCreator: &DefaultServerCreator{},
+		Cmd: serverCmd,
+	}
+}
+
 var serverCmd = &cobra.Command{
 	Use:   "server",
 	Short: "Start the atlantis server",
@@ -169,8 +189,6 @@ func init() {
 		serverCmd.Flags().Bool(f.name, f.value, f.description)
 		viper.BindPFlag(f.name, serverCmd.Flags().Lookup(f.name))
 	}
-
-	RootCmd.AddCommand(serverCmd)
 }
 
 func validate(config server.ServerConfig) error {

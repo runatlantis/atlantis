@@ -7,14 +7,10 @@ import (
 	"github.com/spf13/viper"
 )
 
-var versionCmd = &cobra.Command{
+var VersionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print the current Atlantis version",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Printf("atlantis %s\n", viper.Get("version"))
 	},
-}
-
-func init() {
-	RootCmd.AddCommand(versionCmd)
 }
