@@ -15,6 +15,7 @@
 package watch_test
 
 import (
+	"go/build"
 	"os"
 	"path/filepath"
 	"testing"
@@ -36,15 +37,17 @@ func TestWatchCommand(t *testing.T) {
 
 var _ = Describe("NewMockFileUpdater", func() {
 	var (
-		packageDir, subPackageDir string
-		origWorkingDir            string
+		packageDir, subPackageDir, vendorPackageDir string
+		origWorkingDir                              string
 	)
 
 	BeforeEach(func() {
-		packageDir = joinPath(os.Getenv("GOPATH"), "src", "pegomocktest")
+		packageDir = joinPath(build.Default.GOPATH, "src", "pegomocktest")
 		Expect(os.MkdirAll(packageDir, 0755)).To(Succeed())
 		subPackageDir = joinPath(packageDir, "subpackage")
 		Expect(os.MkdirAll(subPackageDir, 0755)).To(Succeed())
+		vendorPackageDir = joinPath(packageDir, "vendor", "github.com", "petergtz", "vendored_package")
+		Expect(os.MkdirAll(vendorPackageDir, 0755)).To(Succeed())
 
 		var e error
 		origWorkingDir, e = os.Getwd()
@@ -55,6 +58,12 @@ var _ = Describe("NewMockFileUpdater", func() {
 			"package pegomocktest; type MyDisplay interface {  Show() }")
 		WriteFile(joinPath(subPackageDir, "subdisplay.go"),
 			"package subpackage; type SubDisplay interface {  ShowMe() }")
+		WriteFile(joinPath(vendorPackageDir, "iface.go"),
+			`package vendored_package; type Interface interface{ Foobar() }`)
+		WriteFile(joinPath(packageDir, "vendordisplay.go"), `package pegomocktest
+			import ( "github.com/petergtz/vendored_package" )
+			type VendorDisplay interface { Show(something vendored_package.Interface) }`)
+
 	})
 
 	AfterEach(func() {
@@ -94,6 +103,19 @@ var _ = Describe("NewMockFileUpdater", func() {
 				Eventually(joinPath(packageDir, "mock_mydisplay_test.go"), "3s").Should(SatisfyAll(
 					BeAnExistingFile(),
 					BeAFileContainingSubString("package the_overriden_test_package")))
+			})
+		})
+
+		Context(`and specifying the vendor path`, func() {
+
+			It(`Eventually creates a file containing the import ( vendored_package "github.com/petergtz/vendored_package" )'`, func() {
+				WriteFile(joinPath(packageDir, "interfaces_to_mock"), "VendorDisplay")
+
+				watch.NewMockFileUpdater([]string{packageDir}, false).Update()
+
+				Expect(joinPath(packageDir, "mock_vendordisplay_test.go")).To(SatisfyAll(
+					BeAnExistingFile(),
+					BeAFileContainingSubString(`vendored_package "github.com/petergtz/vendored_package"`)))
 			})
 		})
 

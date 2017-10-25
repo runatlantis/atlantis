@@ -3,6 +3,7 @@ package util
 import (
 	"errors"
 	"fmt"
+	"go/build"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,7 +34,7 @@ func SourceArgs(args []string) ([]string, error) {
 		if e != nil {
 			panic(e)
 		}
-		packagePath, err := packagePathFromDirectory(os.Getenv("GOPATH"), workingDir)
+		packagePath, err := packagePathFromDirectory(build.Default.GOPATH, workingDir)
 		if err != nil {
 			return nil, fmt.Errorf("Couldn't determine package path from directory: %v", err)
 		}
