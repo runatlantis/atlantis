@@ -17,6 +17,7 @@ package main_test
 import (
 	"bytes"
 	"os"
+	"go/build"
 	"path/filepath"
 	"strings"
 
@@ -42,17 +43,19 @@ func TestPegomock(t *testing.T) {
 var _ = Describe("CLI", func() {
 
 	var (
-		packageDir, subPackageDir string
-		app                       *kingpin.Application
-		origWorkingDir            string
-		done                      chan bool = make(chan bool)
+		packageDir, subPackageDir, vendorPackageDir string
+		app                                         *kingpin.Application
+		origWorkingDir                              string
+		done                                        chan bool = make(chan bool)
 	)
 
 	BeforeEach(func() {
-		packageDir = joinPath(os.Getenv("GOPATH"), "src", "pegomocktest")
+		packageDir = joinPath(build.Default.GOPATH, "src", "pegomocktest")
 		Expect(os.MkdirAll(packageDir, 0755)).To(Succeed())
 		subPackageDir = joinPath(packageDir, "subpackage")
 		Expect(os.MkdirAll(subPackageDir, 0755)).To(Succeed())
+		vendorPackageDir = joinPath(packageDir, "vendor", "github.com", "petergtz", "vendored_package")
+		Expect(os.MkdirAll(vendorPackageDir, 0755)).To(Succeed())
 
 		var e error
 		origWorkingDir, e = os.Getwd()
@@ -63,6 +66,11 @@ var _ = Describe("CLI", func() {
 			"package pegomocktest; type MyDisplay interface {  Show(something string) }")
 		WriteFile(joinPath(subPackageDir, "subdisplay.go"),
 			"package subpackage; type SubDisplay interface {  ShowMe() }")
+		WriteFile(joinPath(vendorPackageDir, "iface.go"),
+			`package vendored_package; type Interface interface{ Foobar() }`)
+		WriteFile(joinPath(packageDir, "vendordisplay.go"), `package pegomocktest
+			import ( "github.com/petergtz/vendored_package" )
+			type VendorDisplay interface { Show(something vendored_package.Interface) }`)
 
 		app = kingpin.New("pegomock", "Generates mocks based on interfaces.")
 		app.Terminate(func(int) { panic("Unexpected terminate") })
@@ -89,6 +97,17 @@ var _ = Describe("CLI", func() {
 				Expect(joinPath(packageDir, "mock_mydisplay_test.go")).To(SatisfyAll(
 					BeAnExistingFile(),
 					BeAFileContainingSubString("package pegomocktest_test")))
+			})
+		})
+
+		Context(`with args "VendorDisplay""`, func() {
+
+			It(`generates a file mock_vendordisplay_test.go that contains 'import ( vendored_package "github.com/petergtz/vendored_package" )'`, func() {
+
+				main.Run(cmd("pegomock generate VendorDisplay"), os.Stdout, app, done)
+				Expect(joinPath(packageDir, "mock_vendordisplay_test.go")).To(SatisfyAll(
+					BeAnExistingFile(),
+					BeAFileContainingSubString(`vendored_package "github.com/petergtz/vendored_package"`)))
 			})
 		})
 

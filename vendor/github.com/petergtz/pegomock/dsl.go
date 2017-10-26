@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/onsi/gomega/format"
@@ -107,19 +108,18 @@ func (genericMock *GenericMock) Verify(
 		}
 	}
 	if !invocationCountMatcher.Matches(len(methodInvocations)) {
-		if len(globalArgMatchers) == 0 {
-			GlobalFailHandler(fmt.Sprintf(
-				"Mock invocation count for method \"%s\" with params %v does not match expectation.\n\n\t%v",
-				methodName, params, invocationCountMatcher.FailureMessage()))
-		} else {
-			GlobalFailHandler(fmt.Sprintf(
-				"Mock invocation count for method \"%s\" with params %v does not match expectation.\n\n\t%v",
-				methodName, globalArgMatchers, invocationCountMatcher.FailureMessage()))
+		var paramsOrMatchers interface{} = params
+		if len(globalArgMatchers) != 0 {
+			paramsOrMatchers = globalArgMatchers
 		}
+		GlobalFailHandler(fmt.Sprintf(
+			"Mock invocation count for method \"%s\" with params %v does not match expectation.\n\n\t%v\n\n\t%v",
+			methodName, paramsOrMatchers, invocationCountMatcher.FailureMessage(), formatInteractions(genericMock.allInteractions())))
 	}
 	return methodInvocations
 }
 
+// TODO this doesn't need to be a method, can be a free function
 func (genericMock *GenericMock) GetInvocationParams(methodInvocations []MethodInvocation) [][]Param {
 	if len(methodInvocations) == 0 {
 		return nil
@@ -148,6 +148,55 @@ func (genericMock *GenericMock) methodInvocations(methodName string, params []Pa
 		}
 	}
 	return invocations
+}
+
+func formatInteractions(interactions map[string][]MethodInvocation) string {
+	if len(interactions) == 0 {
+		return "There were no other interactions with this mock"
+	}
+	result := "But other interactions with this mock were:\n"
+	for _, methodName := range sortedMethodNames(interactions) {
+		result += formatInvocations(methodName, interactions[methodName])
+	}
+	return result
+}
+
+func formatInvocations(methodName string, invocations []MethodInvocation) (result string) {
+	for _, invocation := range invocations {
+		result += "\t" + methodName + "(" + formatParams(invocation.params) + ")\n"
+	}
+	return
+}
+
+func formatParams(params []Param) (result string) {
+	for i, param := range params {
+		if i > 0 {
+			result += ", "
+		}
+		result += fmt.Sprint(param)
+	}
+	return
+}
+
+func sortedMethodNames(interactions map[string][]MethodInvocation) []string {
+	methodNames := make([]string, len(interactions))
+	i := 0
+	for key := range interactions {
+		methodNames[i] = key
+		i++
+	}
+	sort.Strings(methodNames)
+	return methodNames
+}
+
+func (genericMock *GenericMock) allInteractions() map[string][]MethodInvocation {
+	interactions := make(map[string][]MethodInvocation)
+	for methodName := range genericMock.mockedMethods {
+		for _, invocation := range genericMock.mockedMethods[methodName].invocations {
+			interactions[methodName] = append(interactions[methodName], invocation)
+		}
+	}
+	return interactions
 }
 
 type mockedMethod struct {

@@ -10,7 +10,6 @@ import (
 )
 
 //go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_event_parsing.go EventParsing
-//go:generate sed -i "" -e "s#github.com/hootsuite/atlantis/vendor/github.com/google/go-github/github#github.com/google/go-github/github#" mocks/mock_event_parsing.go
 
 type Command struct {
 	Name        CommandName
