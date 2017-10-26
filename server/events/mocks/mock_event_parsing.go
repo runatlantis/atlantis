@@ -4,9 +4,9 @@
 package mocks
 
 import (
+	github "github.com/google/go-github/github"
 	events "github.com/hootsuite/atlantis/server/events"
 	models "github.com/hootsuite/atlantis/server/events/models"
-	github "github.com/google/go-github/github"
 	pegomock "github.com/petergtz/pegomock"
 	"reflect"
 )

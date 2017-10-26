@@ -18,7 +18,6 @@ import (
 const inlineShebang = "#!/bin/sh -e"
 
 //go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_runner.go Runner
-//go:generate sed -i "" -e "s#go_version \"github.com/hootsuite/atlantis/vendor/github.com/hashicorp/go-version\"#go_version \"github.com/hashicorp/go-version\"#" mocks/mock_runner.go
 type Runner interface {
 	Execute(log *logging.SimpleLogger, commands []string, path string, environment string, terraformVersion *version.Version, stage string) (string, error)
 }

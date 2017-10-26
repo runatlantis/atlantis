@@ -17,8 +17,8 @@ func NewMockProjectConfigReader() *MockProjectConfigReader {
 	return &MockProjectConfigReader{fail: pegomock.GlobalFailHandler}
 }
 
-func (mock *MockProjectConfigReader) Exists(execPath string) bool {
-	params := []pegomock.Param{execPath}
+func (mock *MockProjectConfigReader) Exists(projectPath string) bool {
+	params := []pegomock.Param{projectPath}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Exists", params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem()})
 	var ret0 bool
 	if len(result) != 0 {
@@ -29,8 +29,8 @@ func (mock *MockProjectConfigReader) Exists(execPath string) bool {
 	return ret0
 }
 
-func (mock *MockProjectConfigReader) Read(execPath string) (events.ProjectConfig, error) {
-	params := []pegomock.Param{execPath}
+func (mock *MockProjectConfigReader) Read(projectPath string) (events.ProjectConfig, error) {
+	params := []pegomock.Param{projectPath}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Read", params, []reflect.Type{reflect.TypeOf((*events.ProjectConfig)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 events.ProjectConfig
 	var ret1 error
@@ -63,8 +63,8 @@ type VerifierProjectConfigReader struct {
 	inOrderContext         *pegomock.InOrderContext
 }
 
-func (verifier *VerifierProjectConfigReader) Exists(execPath string) *ProjectConfigReader_Exists_OngoingVerification {
-	params := []pegomock.Param{execPath}
+func (verifier *VerifierProjectConfigReader) Exists(projectPath string) *ProjectConfigReader_Exists_OngoingVerification {
+	params := []pegomock.Param{projectPath}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Exists", params)
 	return &ProjectConfigReader_Exists_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -75,8 +75,8 @@ type ProjectConfigReader_Exists_OngoingVerification struct {
 }
 
 func (c *ProjectConfigReader_Exists_OngoingVerification) GetCapturedArguments() string {
-	execPath := c.GetAllCapturedArguments()
-	return execPath[len(execPath)-1]
+	projectPath := c.GetAllCapturedArguments()
+	return projectPath[len(projectPath)-1]
 }
 
 func (c *ProjectConfigReader_Exists_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
@@ -90,8 +90,8 @@ func (c *ProjectConfigReader_Exists_OngoingVerification) GetAllCapturedArguments
 	return
 }
 
-func (verifier *VerifierProjectConfigReader) Read(execPath string) *ProjectConfigReader_Read_OngoingVerification {
-	params := []pegomock.Param{execPath}
+func (verifier *VerifierProjectConfigReader) Read(projectPath string) *ProjectConfigReader_Read_OngoingVerification {
+	params := []pegomock.Param{projectPath}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Read", params)
 	return &ProjectConfigReader_Read_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -102,8 +102,8 @@ type ProjectConfigReader_Read_OngoingVerification struct {
 }
 
 func (c *ProjectConfigReader_Read_OngoingVerification) GetCapturedArguments() string {
-	execPath := c.GetAllCapturedArguments()
-	return execPath[len(execPath)-1]
+	projectPath := c.GetAllCapturedArguments()
+	return projectPath[len(projectPath)-1]
 }
 
 func (c *ProjectConfigReader_Read_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {

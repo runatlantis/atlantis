@@ -15,7 +15,6 @@ import (
 )
 
 //go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_runner.go Runner
-//go:generate sed -i "" -e "s#go_version \"github.com/hootsuite/atlantis/vendor/github.com/hashicorp/go-version\"#go_version \"github.com/hashicorp/go-version\"#" mocks/mock_runner.go
 type Runner interface {
 	Version() *version.Version
 	RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version, env string) (string, error)
