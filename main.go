@@ -6,10 +6,17 @@ import (
 )
 
 func main() {
-	viper.Set("version", "0.1.2")
-	serverCmd := cmd.NewServerCmd()
-	cmd.RootCmd.AddCommand(serverCmd.Cmd)
-	cmd.RootCmd.AddCommand(cmd.VersionCmd)
-	cmd.RootCmd.AddCommand(cmd.BootstrapCmd)
+	v := viper.New()
+	v.Set("version", "0.1.2")
+
+	server := &cmd.ServerCmd{
+		ServerCreator: &cmd.DefaultServerCreator{},
+		Viper: v,
+	}
+	version := &cmd.VersionCmd{Viper: v}
+	bootstrap := &cmd.BootstrapCmd{}
+	cmd.RootCmd.AddCommand(server.Init())
+	cmd.RootCmd.AddCommand(version.Init())
+	cmd.RootCmd.AddCommand(bootstrap.Init())
 	cmd.Execute()
 }
