@@ -11,7 +11,7 @@ func main() {
 
 	server := &cmd.ServerCmd{
 		ServerCreator: &cmd.DefaultServerCreator{},
-		Viper: v,
+		Viper:         v,
 	}
 	version := &cmd.VersionCmd{Viper: v}
 	bootstrap := &cmd.BootstrapCmd{}

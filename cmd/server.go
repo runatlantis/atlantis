@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/hootsuite/atlantis/server"
+	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -104,7 +105,7 @@ type boolFlag struct {
 // us to mock out starting the actual server.
 type ServerCmd struct {
 	ServerCreator ServerCreator
-	Viper *viper.Viper
+	Viper         *viper.Viper
 	// SilenceOutput set to true means nothing gets printed.
 	// Useful for testing to keep the logs clean.
 	SilenceOutput bool
@@ -140,6 +141,7 @@ func (s *ServerCmd) Init() *cobra.Command {
 Flags can also be set in a yaml config file (see --` + ConfigFlag + `).
 Config file values are overridden by environment variables which in turn are overridden by flags.`,
 		SilenceErrors: true,
+		SilenceUsage:  s.SilenceOutput,
 		PreRunE: s.withErrPrint(func(cmd *cobra.Command, args []string) error {
 			return s.preRun()
 		}),
@@ -201,6 +203,9 @@ func (s *ServerCmd) run() error {
 	if err := setAtlantisURL(&config); err != nil {
 		return err
 	}
+	if err := setDataDir(&config); err != nil {
+		return err
+	}
 	sanitizeGithubUser(&config)
 
 	// config looks good, start the server
@@ -233,6 +238,20 @@ func setAtlantisURL(config *server.ServerConfig) error {
 			return fmt.Errorf("Failed to determine hostname: %v", err)
 		}
 		config.AtlantisURL = fmt.Sprintf("http://%s:%d", hostname, config.Port)
+	}
+	return nil
+}
+
+// setDataDir checks if ~ was used in data-dir and converts it to the actual
+// home directory. If we don't do this, we'll create a directory called "~"
+// instead of actually using home.
+func setDataDir(config *server.ServerConfig) error {
+	if strings.HasPrefix(config.DataDir, "~/") {
+		expanded, err := homedir.Expand(config.DataDir)
+		if err != nil {
+			return errors.Wrap(err, "determining home directory")
+		}
+		config.DataDir = expanded
 	}
 	return nil
 }

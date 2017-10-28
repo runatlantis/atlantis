@@ -21,7 +21,6 @@ import (
 	"github.com/hootsuite/atlantis/server/events/terraform"
 	"github.com/hootsuite/atlantis/server/logging"
 	"github.com/hootsuite/atlantis/server/static"
-	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	"github.com/urfave/negroni"
@@ -55,16 +54,6 @@ type ServerConfig struct {
 }
 
 func NewServer(config ServerConfig) (*Server, error) {
-	// if ~ was used in data-dir convert that to actual home directory otherwise we'll
-	// create a directory call "~" instead of actually using home
-	if strings.HasPrefix(config.DataDir, "~/") {
-		expanded, err := homedir.Expand(config.DataDir)
-		if err != nil {
-			return nil, errors.Wrap(err, "determining home directory")
-		}
-		config.DataDir = expanded
-	}
-
 	githubClient, err := github.NewClient(config.GithubHostname, config.GithubUser, config.GithubToken)
 	if err != nil {
 		return nil, err

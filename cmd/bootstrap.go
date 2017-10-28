@@ -1,10 +1,11 @@
 package cmd
 
 import (
-	"github.com/hootsuite/atlantis/bootstrap"
-	"github.com/spf13/cobra"
 	"fmt"
 	"os"
+
+	"github.com/hootsuite/atlantis/bootstrap"
+	"github.com/spf13/cobra"
 )
 
 // BootstrapCmd starts the bootstrap process for testing out Atlantis.
