@@ -3,6 +3,8 @@ package cmd
 import (
 	"github.com/hootsuite/atlantis/bootstrap"
 	"github.com/spf13/cobra"
+	"fmt"
+	"os"
 )
 
 // BootstrapCmd starts the bootstrap process for testing out Atlantis.
@@ -13,8 +15,10 @@ func (b *BootstrapCmd) Init() *cobra.Command {
 	return &cobra.Command{
 		Use:   "bootstrap",
 		Short: "Start a guided tour of Atlantis",
-		RunE: withErrPrint(func(cmd *cobra.Command, args []string) error {
-			return bootstrap.Start()
-		}),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			err := bootstrap.Start()
+			fmt.Fprintf(os.Stderr, "\033[31mError: %s\033[39m\n\n", err.Error())
+			return err
+		},
 	}
 }

@@ -105,6 +105,9 @@ type boolFlag struct {
 type ServerCmd struct {
 	ServerCreator ServerCreator
 	Viper *viper.Viper
+	// SilenceOutput set to true means nothing gets printed.
+	// Useful for testing to keep the logs clean.
+	SilenceOutput bool
 }
 
 // ServerCreator creates servers.
@@ -137,10 +140,10 @@ func (s *ServerCmd) Init() *cobra.Command {
 Flags can also be set in a yaml config file (see --` + ConfigFlag + `).
 Config file values are overridden by environment variables which in turn are overridden by flags.`,
 		SilenceErrors: true,
-		PreRunE: withErrPrint(func(cmd *cobra.Command, args []string) error {
+		PreRunE: s.withErrPrint(func(cmd *cobra.Command, args []string) error {
 			return s.preRun()
 		}),
-		RunE: withErrPrint(func(cmd *cobra.Command, args []string) error {
+		RunE: s.withErrPrint(func(cmd *cobra.Command, args []string) error {
 			return s.run()
 		}),
 	}
@@ -240,12 +243,12 @@ func sanitizeGithubUser(config *server.ServerConfig) {
 }
 
 // withErrPrint prints out any errors to a terminal in red.
-func withErrPrint(f func(*cobra.Command, []string) error) func(*cobra.Command, []string) error {
+func (s *ServerCmd) withErrPrint(f func(*cobra.Command, []string) error) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		if err := f(cmd, args); err != nil {
+		err := f(cmd, args)
+		if err != nil && !s.SilenceOutput {
 			fmt.Fprintf(os.Stderr, "\033[31mError: %s\033[39m\n\n", err.Error())
-			return err
 		}
-		return nil
+		return err
 	}
 }
