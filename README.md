@@ -24,13 +24,23 @@ Read about [Why We Built Atlantis](https://www.atlantis.run/blog/atlantis-releas
 * [Locking](#locking)
 * [Approvals](#approvals)
 * [Production-Ready Deployment](#production-ready-deployment)
+    * [Install Terraform](#install-terraform)
+    * [Hosting Atlantis](#hosting-atlantis)
+    * [Add GitHub Webhook](#add-github-webhook)
+    * [Create a GitHub Token](#create-a-github-token)
+    * [Start Atlantis](#start-atlantis)
     * [Docker](#docker)
+    * [Testing Out Atlantis](#testing-out-atlantis)
 * [Server Configuration](#server-configuration)
 * [AWS Credentials](#aws-credentials)
+    * [Multiple AWS Accounts](#multiple-aws-accounts)
+    * [Assume Role Session Names](#assume-role-session-names)
 * [Glossary](#glossary)
     * [Project](#project)
     * [Environment](#environment)
 * [FAQ](#faq)
+* [Contributing](#contributing)
+* [Credits](#credits)
 
 ## Features
 ➜ Collaborate on Terraform with your team
