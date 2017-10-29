@@ -37,7 +37,7 @@ func downloadFile(url string, path string) error {
 	}
 	defer response.Body.Close()
 
-	 _, err = io.Copy(output, response.Body);
+	_, err = io.Copy(output, response.Body)
 	return err
 }
 

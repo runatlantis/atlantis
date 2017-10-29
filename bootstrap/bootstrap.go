@@ -194,7 +194,7 @@ Follow these instructions to create a token (we don't store any tokens):
 	// wait for sigterm or siginit signal
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
-	<- signalChan
+	<-signalChan
 	colorstring.Println("\n[red]shutdown signal received, exiting....")
 	colorstring.Println("\n[green]Thank you for using atlantis :) \n[white]For more information about how to use atlantis in production go to: https://github.com/hootsuite/atlantis")
 	return nil
