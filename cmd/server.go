@@ -13,10 +13,10 @@ import (
 	"github.com/spf13/viper"
 )
 
-// To add a new flag you must
-// 1. Add a const with the flag name (in alphabetic order)
-// 2. Add a new field to server.ServerConfig and set the mapstructure tag equal to the flag name
-// 3. Add your flag's description etc. to the stringFlags, intFlags, or boolFlags slices
+// To add a new flag you must:
+// 1. Add a const with the flag name (in alphabetic order).
+// 2. Add a new field to server.ServerConfig and set the mapstructure tag equal to the flag name.
+// 3. Add your flag's description etc. to the stringFlags, intFlags, or boolFlags slices.
 const (
 	AtlantisURLFlag     = "atlantis-url"
 	ConfigFlag          = "config"
@@ -150,13 +150,13 @@ Config file values are overridden by environment variables which in turn are ove
 		}),
 	}
 
-	// if a user passes in an invalid flag, tell them what the flag was
+	// If a user passes in an invalid flag, tell them what the flag was.
 	c.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
 		fmt.Fprintf(os.Stderr, "\033[31mError: %s\033[39m\n\n", err.Error())
 		return err
 	})
 
-	// set string flags
+	// Set string flags.
 	for _, f := range stringFlags {
 		c.Flags().String(f.name, f.value, f.description)
 		if f.env != "" {
@@ -165,13 +165,13 @@ Config file values are overridden by environment variables which in turn are ove
 		s.Viper.BindPFlag(f.name, c.Flags().Lookup(f.name))
 	}
 
-	// set int flags
+	// Set int flags.
 	for _, f := range intFlags {
 		c.Flags().Int(f.name, f.value, f.description)
 		s.Viper.BindPFlag(f.name, c.Flags().Lookup(f.name))
 	}
 
-	// set bool flags
+	// Set bool flags.
 	for _, f := range boolFlags {
 		c.Flags().Bool(f.name, f.value, f.description)
 		s.Viper.BindPFlag(f.name, c.Flags().Lookup(f.name))
@@ -181,7 +181,7 @@ Config file values are overridden by environment variables which in turn are ove
 }
 
 func (s *ServerCmd) preRun() error {
-	// if passed a config file then try and load it
+	// If passed a config file then try and load it.
 	configFile := s.Viper.GetString(ConfigFlag)
 	if configFile != "" {
 		s.Viper.SetConfigFile(configFile)
@@ -208,7 +208,7 @@ func (s *ServerCmd) run() error {
 	}
 	sanitizeGithubUser(&config)
 
-	// config looks good, start the server
+	// Config looks good. Start the server.
 	server, err := s.ServerCreator.NewServer(config)
 	if err != nil {
 		return errors.Wrap(err, "initializing server")

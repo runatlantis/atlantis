@@ -32,7 +32,7 @@ func (s *ServerStarterMock) Start() error {
 }
 
 func TestExecute_NoConfigFlag(t *testing.T) {
-	t.Log("If there is no config flag specified Execute should return nil")
+	t.Log("If there is no config flag specified Execute should return nil.")
 	c := setup(map[string]interface{}{
 		cmd.ConfigFlag:  "",
 		cmd.GHUserFlag:  "user",
@@ -43,7 +43,7 @@ func TestExecute_NoConfigFlag(t *testing.T) {
 }
 
 func TestExecute_ConfigFileExtension(t *testing.T) {
-	t.Log("If the config file doesn't have an extension then error")
+	t.Log("If the config file doesn't have an extension then error.")
 	c := setup(map[string]interface{}{
 		cmd.ConfigFlag:  "does-not-exist",
 		cmd.GHUserFlag:  "user",
@@ -54,7 +54,7 @@ func TestExecute_ConfigFileExtension(t *testing.T) {
 }
 
 func TestExecute_ConfigFileMissing(t *testing.T) {
-	t.Log("If the config file doesn't exist then error")
+	t.Log("If the config file doesn't exist then error.")
 	c := setup(map[string]interface{}{
 		cmd.ConfigFlag:  "does-not-exist.yaml",
 		cmd.GHUserFlag:  "user",
@@ -65,7 +65,7 @@ func TestExecute_ConfigFileMissing(t *testing.T) {
 }
 
 func TestExecute_ConfigFileExists(t *testing.T) {
-	t.Log("If the config file exists then there should be no error")
+	t.Log("If the config file exists then there should be no error.")
 	tmpFile := tempFile(t, "")
 	defer os.Remove(tmpFile)
 	c := setup(map[string]interface{}{
@@ -78,7 +78,7 @@ func TestExecute_ConfigFileExists(t *testing.T) {
 }
 
 func TestExecute_InvalidConfig(t *testing.T) {
-	t.Log("If the config file contains invalid yaml there should be an error")
+	t.Log("If the config file contains invalid yaml there should be an error.")
 	tmpFile := tempFile(t, "invalidyaml")
 	defer os.Remove(tmpFile)
 	c := setup(map[string]interface{}{
@@ -97,7 +97,7 @@ func TestExecute_Validation(t *testing.T) {
 		expErr      string
 	}{
 		{
-			"should validate log level",
+			"Should validate log level.",
 			map[string]interface{}{
 				cmd.LogLevelFlag: "invalid",
 				cmd.GHUserFlag:   "user",
@@ -106,14 +106,14 @@ func TestExecute_Validation(t *testing.T) {
 			"invalid log level: not one of debug, info, warn, error",
 		},
 		{
-			"should ensure github user is set",
+			"Should ensure github user is set.",
 			map[string]interface{}{
 				cmd.GHTokenFlag: "token",
 			},
 			"--gh-user must be set",
 		},
 		{
-			"should ensure github token is set",
+			"Should ensure github token is set.",
 			map[string]interface{}{
 				cmd.GHUserFlag: "user",
 			},
@@ -130,7 +130,7 @@ func TestExecute_Validation(t *testing.T) {
 }
 
 func TestExecute_Defaults(t *testing.T) {
-	t.Log("should set the defaults for all unspecified flags")
+	t.Log("Should set the defaults for all unspecified flags.")
 	c := setup(map[string]interface{}{
 		cmd.GHUserFlag:  "user",
 		cmd.GHTokenFlag: "token",
@@ -157,7 +157,7 @@ func TestExecute_Defaults(t *testing.T) {
 }
 
 func TestExecute_ExpandHomeDir(t *testing.T) {
-	t.Log("should expand the ~ in the home dir to the actual home dir")
+	t.Log("Should expand the ~ in the home dir to the actual home dir.")
 	c := setup(map[string]interface{}{
 		cmd.GHUserFlag:  "user",
 		cmd.GHTokenFlag: "token",
@@ -172,7 +172,7 @@ func TestExecute_ExpandHomeDir(t *testing.T) {
 }
 
 func TestExecute_GithubUser(t *testing.T) {
-	t.Log("should remove the @ from the github username if it's passed")
+	t.Log("Should remove the @ from the github username if it's passed.")
 	c := setup(map[string]interface{}{
 		cmd.GHUserFlag:  "@user",
 		cmd.GHTokenFlag: "token",
@@ -184,7 +184,7 @@ func TestExecute_GithubUser(t *testing.T) {
 }
 
 func TestExecute_Flags(t *testing.T) {
-	t.Log("should use all flags that are set")
+	t.Log("Should use all flags that are set.")
 	c := setup(map[string]interface{}{
 		cmd.AtlantisURLFlag:     "url",
 		cmd.DataDirFlag:         "path",
@@ -211,7 +211,7 @@ func TestExecute_Flags(t *testing.T) {
 }
 
 func TestExecute_ConfigFile(t *testing.T) {
-	t.Log("Should use all the values from the config file")
+	t.Log("Should use all the values from the config file.")
 	tmpFile := tempFile(t, `---
 atlantis-url: "url"
 data-dir: "path"
@@ -241,7 +241,7 @@ require-approval: true`)
 }
 
 func TestExecute_EnvironmentOverride(t *testing.T) {
-	t.Log("Environment variables should override config file flags")
+	t.Log("Environment variables should override config file flags.")
 	tmpFile := tempFile(t, "gh-user: config\ngh-token: config2")
 	defer os.Remove(tmpFile)
 	os.Setenv("ATLANTIS_GH_TOKEN", "override")
@@ -254,7 +254,7 @@ func TestExecute_EnvironmentOverride(t *testing.T) {
 }
 
 func TestExecute_FlagConfigOverride(t *testing.T) {
-	t.Log("Flags should override config file flags")
+	t.Log("Flags should override config file flags.")
 	os.Setenv("ATLANTIS_GH_TOKEN", "env-var")
 	c := setup(map[string]interface{}{
 		cmd.GHUserFlag:  "user",
@@ -266,7 +266,7 @@ func TestExecute_FlagConfigOverride(t *testing.T) {
 }
 
 func TestExecute_FlagEnvVarOverride(t *testing.T) {
-	t.Log("Flags should override environment variables")
+	t.Log("Flags should override environment variables.")
 	tmpFile := tempFile(t, "gh-user: config\ngh-token: config2")
 	defer os.Remove(tmpFile)
 	c := setup(map[string]interface{}{
