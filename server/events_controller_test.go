@@ -3,11 +3,9 @@ package server_test
 import (
 	"bytes"
 	"errors"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 
@@ -195,12 +193,6 @@ func setup(t *testing.T) (server.EventsController, *mocks.MockGHRequestValidator
 		GithubWebHookSecret: []byte(secret),
 	}
 	return e, v, p, cr, c
-}
-
-func responseContains(t *testing.T, r *httptest.ResponseRecorder, status int, bodySubstr string) {
-	Equals(t, status, r.Result().StatusCode)
-	body, _ := ioutil.ReadAll(r.Result().Body)
-	Assert(t, strings.Contains(string(body), bodySubstr), "no: %s in: %s", bodySubstr, string(body))
 }
 
 func AnyComment() *github.IssueCommentEvent {
