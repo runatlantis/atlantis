@@ -1,3 +1,40 @@
+# Developing
+
+## Running Atlantis Locally
+- Get the source code:
+```
+go get github.com/hootsuite/atlantis
+```
+This will clone Atlantis into `$GOPATH/src/github.com/hootsuite/atlantis` (where `$GOPATH` defaults to `~/go`).
+- Go to that directory:
+```
+cd $GOPATH/src/github.com/hootsuite/atlantis
+```
+- Compile Atlantis:
+```
+go install
+```
+- Run Atlantis:
+```
+atlantis server --gh-user <your username> --gh-token <your token> --log-level debug
+```
+If you get an error like `command not found: atlantis`, ensure that `$GOPATH/bin` is in your `$PATH`.
+
+## Calling Your Local Atlantis From GitHub
+- Create a test terraform repository in your GitHub.
+- Create a personal access token for Atlantis. See [Create a GitHub token](https://github.com/hootsuite/atlantis#create-a-github-token).
+- Start Atlantis in server mode using that token:
+```
+atlantis server --gh-user <your username> --gh-token <your token> --log-level debug
+```
+- Download ngrok from https://ngrok.com/download. This will enable you to expose Atlantis running on your laptop to the internet so GitHub can call it.
+- When you've downloaded and extracted ngrok, run it on port `4141`:
+```
+ngrok http 4141
+```
+- Create a WebHook in your repo and use the `https` url that `ngrok` printed out after running `ngrok http 4141`. Be sure to append `/events` so your webhook url looks something like `https://efce3bcd.ngrok.io/events`. See [Add GitHub Webhook](https://github.com/hootsuite/atlantis#add-github-webhook).
+- Create a pull request and type `atlantis help`. You should see the request in the `ngrok` and Atlantis logs and you should also see Atlantis comment back.
+
 # Code Style
 
 ## Logging
