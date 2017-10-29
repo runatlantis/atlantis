@@ -173,7 +173,7 @@ func formatParams(params []Param) (result string) {
 		if i > 0 {
 			result += ", "
 		}
-		result += fmt.Sprint(param)
+		result += fmt.Sprintf("%#v", param)
 	}
 	return
 }
