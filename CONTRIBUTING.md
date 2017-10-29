@@ -1,20 +1,23 @@
 # Developing
 
 ## Running Atlantis Locally
-- Get the source code:
+Get the source code:
 ```
 go get github.com/hootsuite/atlantis
 ```
 This will clone Atlantis into `$GOPATH/src/github.com/hootsuite/atlantis` (where `$GOPATH` defaults to `~/go`).
-- Go to that directory:
+
+Go to that directory:
 ```
 cd $GOPATH/src/github.com/hootsuite/atlantis
 ```
-- Compile Atlantis:
+
+Compile Atlantis:
 ```
 go install
 ```
-- Run Atlantis:
+
+Run Atlantis:
 ```
 atlantis server --gh-user <your username> --gh-token <your token> --log-level debug
 ```
@@ -35,9 +38,8 @@ ngrok http 4141
 - Create a WebHook in your repo and use the `https` url that `ngrok` printed out after running `ngrok http 4141`. Be sure to append `/events` so your webhook url looks something like `https://efce3bcd.ngrok.io/events`. See [Add GitHub Webhook](https://github.com/hootsuite/atlantis#add-github-webhook).
 - Create a pull request and type `atlantis help`. You should see the request in the `ngrok` and Atlantis logs and you should also see Atlantis comment back.
 
-# Code Style
-
-## Logging
+## Code Style
+### Logging
 - `ctx.Log` should be available in most methods. If not, pass it down.
 - levels:
     - debug is for developers of atlantis
@@ -49,7 +51,7 @@ ngrok http 4141
 - **NEVER** use colons "`:`" in a log since that's used to separate error descriptions and causes
   - if you need to have a break in your log, either use `-` or `,` ex. `failed to clean directory, continuing regardless`
 
-## Errors
+### Errors
 - **ALWAYS** use lowercase unless the word requires it
 - **ALWAYS** use `errors.Wrap(err, "additional context...")"` instead of `fmt.Errorf("additional context: %s", err)`
 because it is less likely to result in mistakes and gives us the ability to trace call stacks
@@ -65,7 +67,7 @@ Error: setting up workspace: running git clone: no executable "git"
 ```
 This is easier to read and more consistent
 
-## Testing
+### Testing
 - place tests under `{package under test}_test` to enforce testing the external interfaces
 - if you need to test internally i.e. access non-exported stuff, call the file `{file under test}_internal_test.go`
 - use `testing_util` for easier-to-read assertions: `import . "github.com/hootsuite/atlantis/testing_util"`
