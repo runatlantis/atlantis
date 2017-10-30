@@ -1,6 +1,45 @@
-# Code Style
+# Developing
 
-## Logging
+## Running Atlantis Locally
+Get the source code:
+```
+go get github.com/hootsuite/atlantis
+```
+This will clone Atlantis into `$GOPATH/src/github.com/hootsuite/atlantis` (where `$GOPATH` defaults to `~/go`).
+
+Go to that directory:
+```
+cd $GOPATH/src/github.com/hootsuite/atlantis
+```
+
+Compile Atlantis:
+```
+go install
+```
+
+Run Atlantis:
+```
+atlantis server --gh-user <your username> --gh-token <your token> --log-level debug
+```
+If you get an error like `command not found: atlantis`, ensure that `$GOPATH/bin` is in your `$PATH`.
+
+## Calling Your Local Atlantis From GitHub
+- Create a test terraform repository in your GitHub.
+- Create a personal access token for Atlantis. See [Create a GitHub token](https://github.com/hootsuite/atlantis#create-a-github-token).
+- Start Atlantis in server mode using that token:
+```
+atlantis server --gh-user <your username> --gh-token <your token> --log-level debug
+```
+- Download ngrok from https://ngrok.com/download. This will enable you to expose Atlantis running on your laptop to the internet so GitHub can call it.
+- When you've downloaded and extracted ngrok, run it on port `4141`:
+```
+ngrok http 4141
+```
+- Create a WebHook in your repo and use the `https` url that `ngrok` printed out after running `ngrok http 4141`. Be sure to append `/events` so your webhook url looks something like `https://efce3bcd.ngrok.io/events`. See [Add GitHub Webhook](https://github.com/hootsuite/atlantis#add-github-webhook).
+- Create a pull request and type `atlantis help`. You should see the request in the `ngrok` and Atlantis logs and you should also see Atlantis comment back.
+
+## Code Style
+### Logging
 - `ctx.Log` should be available in most methods. If not, pass it down.
 - levels:
     - debug is for developers of atlantis
@@ -12,7 +51,7 @@
 - **NEVER** use colons "`:`" in a log since that's used to separate error descriptions and causes
   - if you need to have a break in your log, either use `-` or `,` ex. `failed to clean directory, continuing regardless`
 
-## Errors
+### Errors
 - **ALWAYS** use lowercase unless the word requires it
 - **ALWAYS** use `errors.Wrap(err, "additional context...")"` instead of `fmt.Errorf("additional context: %s", err)`
 because it is less likely to result in mistakes and gives us the ability to trace call stacks
@@ -28,7 +67,7 @@ Error: setting up workspace: running git clone: no executable "git"
 ```
 This is easier to read and more consistent
 
-## Testing
+### Testing
 - place tests under `{package under test}_test` to enforce testing the external interfaces
 - if you need to test internally i.e. access non-exported stuff, call the file `{file under test}_internal_test.go`
 - use `testing_util` for easier-to-read assertions: `import . "github.com/hootsuite/atlantis/testing_util"`

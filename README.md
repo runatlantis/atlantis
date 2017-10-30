@@ -31,6 +31,8 @@ Read about [Why We Built Atlantis](https://www.atlantis.run/blog/atlantis-releas
     * [Project](#project)
     * [Environment](#environment)
 * [FAQ](#faq)
+* [Contributing](#contributing)
+* [Credits](#credits)
 
 ## Features
 ➜ Collaborate on Terraform with your team
@@ -446,6 +448,8 @@ However, if you were to lose the data, all you would need to do is run `atlantis
 A: Atlantis currently only supports HTTP. In order to add SSL you will need to front Atlantis server with NGINX or HAProxy. Follow the document [here](./docs/nginx-ssl-proxy.md) to use configure NGINX with SSL as a reverse proxy.
 
 
+## Contributing
+Want to contribute? Check out [CONTRIBUTING](https://github.com/hootsuite/atlantis/blob/master/CONTRIBUTING.md).
 
 ## Credits
 * Atlantis Logo: Icon made by [freepik](https://www.flaticon.com/authors/freepik) from www.flaticon.com
