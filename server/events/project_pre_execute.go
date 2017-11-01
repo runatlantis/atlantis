@@ -13,6 +13,12 @@ import (
 	"github.com/pkg/errors"
 )
 
+//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_project_pre_executor.go ProjectPreExecutor
+
+type ProjectPreExecutor interface {
+	Execute(ctx *CommandContext, repoDir string, project models.Project) PreExecuteResult
+}
+
 type ProjectPreExecute struct {
 	Locker       locking.Locker
 	ConfigReader ProjectConfigReader

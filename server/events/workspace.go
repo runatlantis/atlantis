@@ -17,6 +17,8 @@ const workspacePrefix = "repos"
 //go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_workspace.go Workspace
 
 type Workspace interface {
+	// Clone git clones headRepo, checks out the branch and then returns the absolute
+	// path to the root of the cloned repo.
 	Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, env string) (string, error)
 	GetWorkspace(r models.Repo, p models.PullRequest, env string) (string, error)
 	Delete(r models.Repo, p models.PullRequest) error
@@ -26,6 +28,8 @@ type FileWorkspace struct {
 	DataDir string
 }
 
+// Clone git clones headRepo, checks out the branch and then returns the absolute
+// path to the root of the cloned repo.
 func (w *FileWorkspace) Clone(
 	log *logging.SimpleLogger,
 	baseRepo models.Repo,
