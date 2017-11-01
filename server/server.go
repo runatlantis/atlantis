@@ -207,7 +207,7 @@ func (s *Server) GetLockRoute(w http.ResponseWriter, r *http.Request) {
 
 // GetLock handles a lock detail page view. getLockRoute is expected to
 // be called before. This function was extracted to make it testable.
-func (s *Server) GetLock(w http.ResponseWriter, r *http.Request, id string) {
+func (s *Server) GetLock(w http.ResponseWriter, _ *http.Request, id string) {
 	// get details for lock id
 	idUnencoded, err := url.QueryUnescape(id)
 	if err != nil {
@@ -254,7 +254,7 @@ func (s *Server) DeleteLockRoute(w http.ResponseWriter, r *http.Request) {
 	s.DeleteLock(w, r, id)
 }
 
-func (s *Server) DeleteLock(w http.ResponseWriter, r *http.Request, id string) {
+func (s *Server) DeleteLock(w http.ResponseWriter, _ *http.Request, id string) {
 	idUnencoded, err := url.PathUnescape(id)
 	if err != nil {
 		s.respond(w, logging.Warn, http.StatusBadRequest, "Invalid lock id: %s", err)

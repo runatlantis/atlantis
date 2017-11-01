@@ -28,9 +28,9 @@ func TestIndex_LockErr(t *testing.T) {
 	s := server.Server{
 		Locker: l,
 	}
-	req, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
-	s.Index(w, req)
+	s.Index(w, eventsReq)
 	responseContains(t, w, 503, "Could not retrieve locks: err")
 }
 
@@ -61,9 +61,9 @@ func TestIndex_Success(t *testing.T) {
 		IndexTemplate: it,
 		Router:        r,
 	}
-	req, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
-	s.Index(w, req)
+	s.Index(w, eventsReq)
 	it.VerifyWasCalledOnce().Execute(w, []server.LockIndexData{
 		{
 			LockURL:      "",
@@ -77,19 +77,19 @@ func TestIndex_Success(t *testing.T) {
 
 func TestGetLockRoute_NoLockID(t *testing.T) {
 	t.Log("If there is no lock ID in the request then we should get a 400")
-	req, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
 	s := server.Server{}
-	s.GetLockRoute(w, req)
+	s.GetLockRoute(w, eventsReq)
 	responseContains(t, w, http.StatusBadRequest, "No lock id in request")
 }
 
 func TestGetLock_InvalidLockID(t *testing.T) {
 	t.Log("If the lock ID is invalid then we should get a 400")
 	s := server.Server{}
-	req, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
-	s.GetLock(w, req, "%A@")
+	s.GetLock(w, eventsReq, "%A@")
 	responseContains(t, w, http.StatusBadRequest, "Invalid lock id")
 }
 
@@ -101,9 +101,9 @@ func TestGetLock_LockerErr(t *testing.T) {
 	s := server.Server{
 		Locker: l,
 	}
-	req, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
-	s.GetLock(w, req, "id")
+	s.GetLock(w, eventsReq, "id")
 	responseContains(t, w, http.StatusInternalServerError, "err")
 }
 
@@ -115,9 +115,9 @@ func TestGetLock_None(t *testing.T) {
 	s := server.Server{
 		Locker: l,
 	}
-	req, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
-	s.GetLock(w, req, "id")
+	s.GetLock(w, eventsReq, "id")
 	responseContains(t, w, http.StatusNotFound, "No lock found at that id")
 }
 
@@ -135,9 +135,9 @@ func TestGetLock_Success(t *testing.T) {
 		Locker:             l,
 		LockDetailTemplate: tmpl,
 	}
-	req, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
-	s.GetLock(w, req, "id")
+	s.GetLock(w, eventsReq, "id")
 	tmpl.VerifyWasCalledOnce().Execute(w, server.LockDetailData{
 		LockKeyEncoded:  "id",
 		LockKey:         "id",
@@ -152,19 +152,19 @@ func TestGetLock_Success(t *testing.T) {
 
 func TestDeleteLockRoute_NoLockID(t *testing.T) {
 	t.Log("If there is no lock ID in the request then we should get a 400")
-	req, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
 	s := server.Server{Logger: logging.NewNoopLogger()}
-	s.DeleteLockRoute(w, req)
+	s.DeleteLockRoute(w, eventsReq)
 	responseContains(t, w, http.StatusBadRequest, "No lock id in request")
 }
 
 func TestDeleteLock_InvalidLockID(t *testing.T) {
 	t.Log("If the lock ID is invalid then we should get a 400")
 	s := server.Server{Logger: logging.NewNoopLogger()}
-	req, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
-	s.DeleteLock(w, req, "%A@")
+	s.DeleteLock(w, eventsReq, "%A@")
 	responseContains(t, w, http.StatusBadRequest, "Invalid lock id")
 }
 
@@ -177,9 +177,9 @@ func TestDeleteLock_LockerErr(t *testing.T) {
 		Locker: l,
 		Logger: logging.NewNoopLogger(),
 	}
-	req, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
-	s.DeleteLock(w, req, "id")
+	s.DeleteLock(w, eventsReq, "id")
 	responseContains(t, w, http.StatusInternalServerError, "err")
 }
 
@@ -192,9 +192,9 @@ func TestDeleteLock_None(t *testing.T) {
 		Locker: l,
 		Logger: logging.NewNoopLogger(),
 	}
-	req, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
-	s.DeleteLock(w, req, "id")
+	s.DeleteLock(w, eventsReq, "id")
 	responseContains(t, w, http.StatusNotFound, "No lock found at that id")
 }
 
@@ -207,9 +207,9 @@ func TestDeleteLock_Success(t *testing.T) {
 		Locker: l,
 		Logger: logging.NewNoopLogger(),
 	}
-	req, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
-	s.DeleteLock(w, req, "id")
+	s.DeleteLock(w, eventsReq, "id")
 	responseContains(t, w, http.StatusOK, "Deleted lock id id")
 }
 
