@@ -8,7 +8,7 @@ import (
 
 	"github.com/hootsuite/atlantis/cmd"
 	"github.com/hootsuite/atlantis/server"
-	. "github.com/hootsuite/atlantis/testing_util"
+	. "github.com/hootsuite/atlantis/testing"
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -16,11 +16,11 @@ import (
 
 // passedConfig is set to whatever config ended up being passed to NewServer.
 // Used for testing.
-var passedConfig server.ServerConfig
+var passedConfig server.Config
 
 type ServerCreatorMock struct{}
 
-func (s *ServerCreatorMock) NewServer(config server.ServerConfig) (cmd.ServerStarter, error) {
+func (s *ServerCreatorMock) NewServer(config server.Config) (cmd.ServerStarter, error) {
 	passedConfig = config
 	return &ServerStarterMock{}, nil
 }
@@ -67,7 +67,7 @@ func TestExecute_ConfigFileMissing(t *testing.T) {
 func TestExecute_ConfigFileExists(t *testing.T) {
 	t.Log("If the config file exists then there should be no error.")
 	tmpFile := tempFile(t, "")
-	defer os.Remove(tmpFile)
+	defer os.Remove(tmpFile) // nolint: errcheck
 	c := setup(map[string]interface{}{
 		cmd.ConfigFlag:  tmpFile,
 		cmd.GHUserFlag:  "user",
@@ -80,7 +80,7 @@ func TestExecute_ConfigFileExists(t *testing.T) {
 func TestExecute_InvalidConfig(t *testing.T) {
 	t.Log("If the config file contains invalid yaml there should be an error.")
 	tmpFile := tempFile(t, "invalidyaml")
-	defer os.Remove(tmpFile)
+	defer os.Remove(tmpFile) // nolint: errcheck
 	c := setup(map[string]interface{}{
 		cmd.ConfigFlag:  tmpFile,
 		cmd.GHUserFlag:  "user",
@@ -222,7 +222,7 @@ gh-webhook-secret: "secret"
 log-level: "debug"
 port: 8181
 require-approval: true`)
-	defer os.Remove(tmpFile)
+	defer os.Remove(tmpFile) // nolint: errcheck
 	c := setup(map[string]interface{}{
 		cmd.ConfigFlag: tmpFile,
 	})
@@ -243,8 +243,8 @@ require-approval: true`)
 func TestExecute_EnvironmentOverride(t *testing.T) {
 	t.Log("Environment variables should override config file flags.")
 	tmpFile := tempFile(t, "gh-user: config\ngh-token: config2")
-	defer os.Remove(tmpFile)
-	os.Setenv("ATLANTIS_GH_TOKEN", "override")
+	defer os.Remove(tmpFile)                   // nolint: errcheck
+	os.Setenv("ATLANTIS_GH_TOKEN", "override") // nolint: errcheck
 	c := setup(map[string]interface{}{
 		cmd.ConfigFlag: tmpFile,
 	})
@@ -255,7 +255,7 @@ func TestExecute_EnvironmentOverride(t *testing.T) {
 
 func TestExecute_FlagConfigOverride(t *testing.T) {
 	t.Log("Flags should override config file flags.")
-	os.Setenv("ATLANTIS_GH_TOKEN", "env-var")
+	os.Setenv("ATLANTIS_GH_TOKEN", "env-var") // nolint: errcheck
 	c := setup(map[string]interface{}{
 		cmd.GHUserFlag:  "user",
 		cmd.GHTokenFlag: "override",
@@ -268,7 +268,7 @@ func TestExecute_FlagConfigOverride(t *testing.T) {
 func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	t.Log("Flags should override environment variables.")
 	tmpFile := tempFile(t, "gh-user: config\ngh-token: config2")
-	defer os.Remove(tmpFile)
+	defer os.Remove(tmpFile) // nolint: errcheck
 	c := setup(map[string]interface{}{
 		cmd.ConfigFlag:  tmpFile,
 		cmd.GHTokenFlag: "override",
@@ -298,6 +298,6 @@ func tempFile(t *testing.T, contents string) string {
 	newName := f.Name() + ".yaml"
 	err = os.Rename(f.Name(), newName)
 	Ok(t, err)
-	ioutil.WriteFile(newName, []byte(contents), 0644)
+	ioutil.WriteFile(newName, []byte(contents), 0644) // nolint: errcheck
 	return newName
 }

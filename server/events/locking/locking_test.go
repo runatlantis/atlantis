@@ -11,7 +11,7 @@ import (
 	"github.com/hootsuite/atlantis/server/events/locking"
 	"github.com/hootsuite/atlantis/server/events/locking/mocks"
 	"github.com/hootsuite/atlantis/server/events/models"
-	. "github.com/hootsuite/atlantis/testing_util"
+	. "github.com/hootsuite/atlantis/testing"
 	. "github.com/petergtz/pegomock"
 )
 

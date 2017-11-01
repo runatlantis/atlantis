@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/hootsuite/atlantis/server"
-	. "github.com/hootsuite/atlantis/testing_util"
+	. "github.com/hootsuite/atlantis/testing"
 	. "github.com/petergtz/pegomock"
 )
 

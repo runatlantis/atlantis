@@ -17,10 +17,10 @@ import (
 var hashicorpReleasesURL = "https://releases.hashicorp.com"
 var terraformVersion = "0.9.11"
 var ngrokDownloadURL = "https://bin.equinox.io/c/4VmDzA7iaHb"
-var ngrokApiURL = "http://localhost:4040"
+var ngrokAPIURL = "http://localhost:4040"
 
 func readPassword() (string, error) {
-	password, err := terminal.ReadPassword(int(syscall.Stdin))
+	password, err := terminal.ReadPassword(syscall.Stdin)
 	return string(password), err
 }
 
@@ -29,13 +29,13 @@ func downloadFile(url string, path string) error {
 	if err != nil {
 		return err
 	}
-	defer output.Close()
+	defer output.Close() // nolint: errcheck
 
 	response, err := http.Get(url)
 	if err != nil {
 		return err
 	}
-	defer response.Body.Close()
+	defer response.Body.Close() // nolint: errcheck
 
 	_, err = io.Copy(output, response.Body)
 	return err
@@ -50,7 +50,9 @@ func unzip(archive, target string) error {
 	for _, file := range reader.File {
 		path := filepath.Join(target, file.Name)
 		if file.FileInfo().IsDir() {
-			os.MkdirAll(path, file.Mode())
+			if err := os.MkdirAll(path, file.Mode()); err != nil {
+				return err
+			}
 			continue
 		}
 
@@ -58,13 +60,13 @@ func unzip(archive, target string) error {
 		if err != nil {
 			return err
 		}
-		defer fileReader.Close()
+		defer fileReader.Close() // nolint: errcheck
 
 		targetFile, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
 		if err != nil {
 			return err
 		}
-		defer targetFile.Close()
+		defer targetFile.Close() // nolint: errcheck
 
 		if _, err := io.Copy(targetFile, fileReader); err != nil {
 			return err
@@ -75,11 +77,11 @@ func unzip(archive, target string) error {
 }
 
 func getTunnelAddr() (string, error) {
-	response, err := http.Get(fmt.Sprintf("%s/api/tunnels", ngrokApiURL))
+	response, err := http.Get(fmt.Sprintf("%s/api/tunnels", ngrokAPIURL))
 	if err != nil {
 		return "", err
 	}
-	defer response.Body.Close()
+	defer response.Body.Close() // nolint: errcheck
 
 	type tunnel struct {
 		Name      string `json:"name"`
@@ -106,6 +108,7 @@ func getTunnelAddr() (string, error) {
 	return t.Tunnels[1].PublicURL, nil
 }
 
+// nolint: unparam
 func downloadAndUnzip(url string, path string, target string) error {
 	if err := downloadFile(url, path); err != nil {
 		return err

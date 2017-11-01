@@ -15,7 +15,7 @@ import (
 	"github.com/hootsuite/atlantis/server/events/mocks"
 	"github.com/hootsuite/atlantis/server/events/models/fixtures"
 	"github.com/hootsuite/atlantis/server/logging"
-	. "github.com/hootsuite/atlantis/testing_util"
+	. "github.com/hootsuite/atlantis/testing"
 	"github.com/mohae/deepcopy"
 	. "github.com/petergtz/pegomock"
 )

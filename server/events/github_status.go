@@ -23,6 +23,7 @@ const (
 )
 
 //go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_github_status.go GHStatusUpdater
+
 type GHStatusUpdater interface {
 	Update(repo models.Repo, pull models.PullRequest, status Status, cmd *Command) error
 	UpdateProjectResult(ctx *CommandContext, res CommandResponse) error

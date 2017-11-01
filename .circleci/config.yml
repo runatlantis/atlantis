@@ -13,8 +13,7 @@ jobs:
       - run: make deps
       - run: make test-coverage
       - run: make check-fmt
-      - run: make check-govet
-      - run: make megacheck
+      - run: make check-gometalint
       - run:
           name: post coverage to codecov.io
           command: bash <(curl -s https://codecov.io/bash)

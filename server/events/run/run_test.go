@@ -5,7 +5,7 @@ import (
 
 	version "github.com/hashicorp/go-version"
 	"github.com/hootsuite/atlantis/server/logging"
-	. "github.com/hootsuite/atlantis/testing_util"
+	. "github.com/hootsuite/atlantis/testing"
 )
 
 var logger = logging.NewNoopLogger()

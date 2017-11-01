@@ -38,7 +38,7 @@ func New(dataDir string) (*BoltLocker, error) {
 		return nil, errors.Wrap(err, "starting BoltDB")
 	}
 	err = db.Update(func(tx *bolt.Tx) error {
-		if _, err := tx.CreateBucketIfNotExists([]byte(bucketName)); err != nil {
+		if _, err = tx.CreateBucketIfNotExists([]byte(bucketName)); err != nil {
 			return errors.Wrapf(err, "creating %q bucketName", bucketName)
 		}
 		return nil
@@ -70,7 +70,8 @@ func (b *BoltLocker) TryLock(newLock models.ProjectLock) (bool, models.ProjectLo
 		// if there is no run at that key then we're free to create the lock
 		currLockSerialized := bucket.Get([]byte(key))
 		if currLockSerialized == nil {
-			bucket.Put([]byte(key), newLockSerialized) // not a readonly bucketName so okay to ignore error
+			// This will only error on readonly buckets, it's okay to ignore.
+			bucket.Put([]byte(key), newLockSerialized) // nolint: errcheck
 			lockAcquired = true
 			currLock = newLock
 			return nil

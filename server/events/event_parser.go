@@ -217,6 +217,7 @@ func (e *EventParser) stringInSlice(a string, list []string) bool {
 	return false
 }
 
+// nolint: unparam
 func (e *EventParser) removeOccurrences(a string, list []string) []string {
 	var out []string
 	for _, b := range list {

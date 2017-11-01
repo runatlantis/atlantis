@@ -1,4 +1,4 @@
-package testing_util
+package testing
 
 // taken from https://github.com/benbjohnson/testing
 

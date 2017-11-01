@@ -9,7 +9,7 @@ import (
 	"github.com/hootsuite/atlantis/server/events"
 	"github.com/hootsuite/atlantis/server/events/github/mocks"
 	"github.com/hootsuite/atlantis/server/events/models"
-	. "github.com/hootsuite/atlantis/testing_util"
+	. "github.com/hootsuite/atlantis/testing"
 	. "github.com/petergtz/pegomock"
 )
 
@@ -50,7 +50,8 @@ func TestUpdateProjectResult_Error(t *testing.T) {
 	}
 	client := mocks.NewMockClient()
 	s := events.GithubStatus{Client: client}
-	s.UpdateProjectResult(ctx, events.CommandResponse{Error: errors.New("err")})
+	err := s.UpdateProjectResult(ctx, events.CommandResponse{Error: errors.New("err")})
+	Ok(t, err)
 	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, events.Error.String(), "Plan Error", "Atlantis")
 }
 
@@ -63,7 +64,8 @@ func TestUpdateProjectResult_Failure(t *testing.T) {
 	}
 	client := mocks.NewMockClient()
 	s := events.GithubStatus{Client: client}
-	s.UpdateProjectResult(ctx, events.CommandResponse{Failure: "failure"})
+	err := s.UpdateProjectResult(ctx, events.CommandResponse{Failure: "failure"})
+	Ok(t, err)
 	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, events.Failure.String(), "Plan Failure", "Atlantis")
 }
 
@@ -121,7 +123,8 @@ func TestUpdateProjectResult(t *testing.T) {
 
 		client := mocks.NewMockClient()
 		s := events.GithubStatus{Client: client}
-		s.UpdateProjectResult(ctx, resp)
+		err := s.UpdateProjectResult(ctx, resp)
+		Ok(t, err)
 		client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, c.Expected, "Plan "+strings.Title(c.Expected), "Atlantis")
 	}
 }

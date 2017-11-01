@@ -49,7 +49,7 @@ func main() {
 		repoName = "atlantis-tests"
 	}
 	// using https to clone the repo
-	repoUrl := fmt.Sprintf("https://%s:%s@github.com/%s/%s.git", githubUsername, githubToken, ownerName, repoName)
+	repoURL := fmt.Sprintf("https://%s:%s@github.com/%s/%s.git", githubUsername, githubToken, ownerName, repoName)
 	cloneDirRoot := os.Getenv("CLONE_DIR")
 	if cloneDirRoot == "" {
 		cloneDirRoot = "/tmp/atlantis-tests"
@@ -81,7 +81,7 @@ func main() {
 	// create e2e test
 	e2e := E2ETester{
 		githubClient: githubClient,
-		repoUrl:      repoUrl,
+		repoURL:      repoURL,
 		ownerName:    ownerName,
 		repoName:     repoName,
 		hookID:       hookID,
@@ -125,6 +125,7 @@ func createAtlantisWebhook(g *GithubClient, ownerName string, repoName string, h
 	return hook.GetID(), nil
 }
 
+// nolint: unparam
 func deleteAtlantisHook(g *GithubClient, ownerName string, repoName string, hookID int) error {
 	_, err := g.client.Repositories.DeleteHook(g.ctx, ownerName, repoName, hookID)
 	if err != nil {
@@ -143,7 +144,7 @@ func startTests(e2e E2ETester) ([]*E2EResult, error) {
 	var testResults []*E2EResult
 	var testErrors *multierror.Error
 	// delete webhook when we are done running tests
-	defer deleteAtlantisHook(e2e.githubClient, e2e.ownerName, e2e.repoName, e2e.hookID)
+	defer deleteAtlantisHook(e2e.githubClient, e2e.ownerName, e2e.repoName, e2e.hookID) // nolint: errcheck
 
 	for _, projectType := range projectTypes {
 		log.Printf("starting e2e test for project type %q", projectType.Name)

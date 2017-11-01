@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/hootsuite/atlantis/server/events"
-	. "github.com/hootsuite/atlantis/testing_util"
+	. "github.com/hootsuite/atlantis/testing"
 )
 
 var tempConfigFile = "/tmp/" + events.ProjectConfigFile
@@ -57,24 +57,24 @@ func TestExists_InvalidPath(t *testing.T) {
 
 func TestExists_ValidPath(t *testing.T) {
 	t.Log("given a path to a directory with an atlantis config file, Exists returns true")
-	writeAtlantisConfigFile([]byte(projectConfigFileStr))
-	defer os.Remove(tempConfigFile)
+	writeAtlantisConfigFile(t, []byte(projectConfigFileStr))
+	defer os.Remove(tempConfigFile) // nolint: errcheck
 	Equals(t, c.Exists("/tmp"), true)
 }
 
 func TestRead_InvalidConfig(t *testing.T) {
 	t.Log("when the config file has invalid yaml, we expect an error")
 	str := []byte(`---invalid`)
-	writeAtlantisConfigFile(str)
-	defer os.Remove(tempConfigFile)
+	writeAtlantisConfigFile(t, str)
+	defer os.Remove(tempConfigFile) // nolint: errcheck
 	_, err := c.Read("/tmp")
 	Assert(t, err != nil, "expect an error")
 }
 
 func TestRead_ValidConfig(t *testing.T) {
 	t.Log("when the config file has valid yaml, it should be parsed")
-	writeAtlantisConfigFile([]byte(projectConfigFileStr))
-	defer os.Remove(tempConfigFile)
+	writeAtlantisConfigFile(t, []byte(projectConfigFileStr))
+	defer os.Remove(tempConfigFile) // nolint: errcheck
 	config, err := c.Read("/tmp")
 	Ok(t, err)
 	Equals(t, []string{"echo", "pre_init"}, config.PreInit)
@@ -90,6 +90,7 @@ func TestRead_ValidConfig(t *testing.T) {
 	Equals(t, 0, len(config.GetExtraArguments("not-specified")))
 }
 
-func writeAtlantisConfigFile(s []byte) error {
-	return ioutil.WriteFile(tempConfigFile, s, 0644)
+func writeAtlantisConfigFile(t *testing.T, s []byte) {
+	err := ioutil.WriteFile(tempConfigFile, s, 0644)
+	Ok(t, err)
 }

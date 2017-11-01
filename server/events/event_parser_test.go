@@ -10,7 +10,7 @@ import (
 	"github.com/hootsuite/atlantis/server/events"
 	. "github.com/hootsuite/atlantis/server/events/github/fixtures"
 	"github.com/hootsuite/atlantis/server/events/models"
-	. "github.com/hootsuite/atlantis/testing_util"
+	. "github.com/hootsuite/atlantis/testing"
 	"github.com/mohae/deepcopy"
 )
 
@@ -94,7 +94,7 @@ func TestDetermineCommandPermutations(t *testing.T) {
 						} else {
 							Equals(t, env, c.Environment)
 						}
-						Equals(t, stringInSlice("--verbose", flags), c.Verbose)
+						Equals(t, containsVerbose(flags), c.Verbose)
 
 						// ensure --verbose never shows up in flags
 						for _, f := range c.Flags {
@@ -268,9 +268,9 @@ func buildComment(c string) *github.IssueCommentEvent {
 	}
 }
 
-func stringInSlice(a string, list []string) bool {
+func containsVerbose(list []string) bool {
 	for _, b := range list {
-		if b == a {
+		if b == "--verbose" {
 			return true
 		}
 	}

@@ -43,7 +43,7 @@ func (a *ApplyExecutor) Execute(ctx *CommandContext) CommandResponse {
 
 	// plans are stored at project roots by their environment names. We just need to find them
 	var plans []models.Plan
-	filepath.Walk(repoDir, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(repoDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -57,6 +57,9 @@ func (a *ApplyExecutor) Execute(ctx *CommandContext) CommandResponse {
 		}
 		return nil
 	})
+	if err != nil {
+		return CommandResponse{Error: errors.Wrap(err, "finding plans")}
+	}
 	if len(plans) == 0 {
 		return CommandResponse{Failure: "No plans found for that environment."}
 	}

@@ -9,6 +9,7 @@ import (
 )
 
 //go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_command_runner.go CommandRunner
+
 type CommandRunner interface {
 	ExecuteCommand(ctx *CommandContext)
 }
@@ -42,7 +43,7 @@ func (c *CommandHandler) ExecuteCommand(ctx *CommandContext) {
 	}
 	if ghPull.GetState() != "open" {
 		ctx.Log.Info("command was run on closed pull request")
-		c.GHClient.CreateComment(ctx.BaseRepo, ctx.Pull, "Atlantis commands can't be run on closed pull requests")
+		c.GHClient.CreateComment(ctx.BaseRepo, ctx.Pull, "Atlantis commands can't be run on closed pull requests") // nolint: errcheck
 		return
 	}
 	pull, headRepo, err := c.EventParser.ExtractPullData(ghPull)
@@ -60,7 +61,7 @@ func (c *CommandHandler) SetLockURL(f func(id string) (url string)) {
 }
 
 func (c *CommandHandler) run(ctx *CommandContext) {
-	c.GHStatus.Update(ctx.BaseRepo, ctx.Pull, Pending, ctx.Command)
+	c.GHStatus.Update(ctx.BaseRepo, ctx.Pull, Pending, ctx.Command) // nolint: errcheck
 	if !c.EnvLocker.TryLock(ctx.BaseRepo.FullName, ctx.Command.Environment, ctx.Pull.Num) {
 		errMsg := fmt.Sprintf(
 			"The %s environment is currently locked by another"+
@@ -96,16 +97,16 @@ func (c *CommandHandler) updatePull(ctx *CommandContext, res CommandResponse) {
 	}
 
 	// Update the pull request's status icon and comment back.
-	c.GHStatus.UpdateProjectResult(ctx, res)
+	c.GHStatus.UpdateProjectResult(ctx, res) // nolint: errcheck
 	comment := c.GHCommentRenderer.Render(res, ctx.Command.Name, ctx.Log.History.String(), ctx.Command.Verbose)
-	c.GHClient.CreateComment(ctx.BaseRepo, ctx.Pull, comment)
+	c.GHClient.CreateComment(ctx.BaseRepo, ctx.Pull, comment) // nolint: errcheck
 }
 
 // logPanics logs and creates a comment on the pull request for panics
 func (c *CommandHandler) logPanics(ctx *CommandContext) {
 	if err := recover(); err != nil {
 		stack := recovery.Stack(3)
-		c.GHClient.CreateComment(ctx.BaseRepo, ctx.Pull,
+		c.GHClient.CreateComment(ctx.BaseRepo, ctx.Pull, // nolint: errcheck
 			fmt.Sprintf("**Error: goroutine panic. This is a bug.**\n```\n%s\n%s```", err, stack))
 		ctx.Log.Err("PANIC: %s\n%s", err, stack)
 	}

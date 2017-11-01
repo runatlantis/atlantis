@@ -109,8 +109,8 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 	output, err := p.Terraform.RunCommandWithVersion(ctx.Log, filepath.Join(repoDir, project.Path), tfPlanCmd, terraformVersion, tfEnv)
 	if err != nil {
 		// plan failed so unlock the state
-		if _, err := p.Locker.Unlock(preExecute.LockResponse.LockKey); err != nil {
-			ctx.Log.Err("error unlocking state: %v", err)
+		if _, unlockErr := p.Locker.Unlock(preExecute.LockResponse.LockKey); unlockErr != nil {
+			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
 		}
 		return ProjectResult{Error: fmt.Errorf("%s\n%s", err.Error(), output)}
 	}

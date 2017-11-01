@@ -87,6 +87,8 @@ type ResultData struct {
 	CommonData
 }
 
+// Render formats the data into a string that can be commented back to GitHub.
+// nolint: interfacer
 func (g *GithubCommentRenderer) Render(res CommandResponse, cmdName CommandName, log string, verbose bool) string {
 	if cmdName == Help {
 		return g.renderTemplate(helpTmpl, nil)

@@ -18,6 +18,7 @@ import (
 const inlineShebang = "#!/bin/sh -e"
 
 //go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_runner.go Runner
+
 type Runner interface {
 	Execute(log *logging.SimpleLogger, commands []string, path string, environment string, terraformVersion *version.Version, stage string) (string, error)
 }
@@ -42,16 +43,16 @@ func (p *Run) Execute(
 	if err != nil {
 		return "", err
 	}
-	defer os.Remove(s)
+	defer os.Remove(s) // nolint: errcheck
 
 	log.Info("running %s commands: %v", stage, commands)
 
 	// set environment variable for the run.
 	// this is to support scripts to use the ENVIRONMENT, ATLANTIS_TERRAFORM_VERSION
 	// and WORKSPACE variables in their scripts
-	os.Setenv("ENVIRONMENT", environment)
-	os.Setenv("ATLANTIS_TERRAFORM_VERSION", terraformVersion.String())
-	os.Setenv("WORKSPACE", path)
+	os.Setenv("ENVIRONMENT", environment)                              // nolint: errcheck
+	os.Setenv("ATLANTIS_TERRAFORM_VERSION", terraformVersion.String()) // nolint: errcheck
+	os.Setenv("WORKSPACE", path)                                       // nolint: errcheck
 	return execute(s)
 }
 
@@ -65,7 +66,9 @@ func createScript(cmds []string, stage string) (string, error) {
 
 	// Write our contents to it
 	writer := bufio.NewWriter(tmp)
-	writer.WriteString(fmt.Sprintf("%s\n", inlineShebang))
+	if _, err = writer.WriteString(fmt.Sprintf("%s\n", inlineShebang)); err != nil {
+		return "", errors.Wrapf(err, "writing to %q", tmp.Name())
+	}
 	cmdsJoined := strings.Join(cmds, "\n")
 	if _, err := writer.WriteString(cmdsJoined); err != nil {
 		return "", errors.Wrapf(err, "preparing %s", stage)
@@ -74,7 +77,7 @@ func createScript(cmds []string, stage string) (string, error) {
 	if err := writer.Flush(); err != nil {
 		return "", errors.Wrap(err, "flushing contents to file")
 	}
-	tmp.Close()
+	tmp.Close() // nolint: errcheck
 
 	if err := os.Chmod(scriptName, 0755); err != nil {
 		return "", errors.Wrapf(err, "making %s script executable", stage)

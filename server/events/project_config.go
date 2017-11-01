@@ -96,7 +96,7 @@ func (c *ProjectConfigManager) Read(execPath string) (ProjectConfig, error) {
 		return pc, errors.Wrapf(err, "reading %s", ProjectConfigFile)
 	}
 	var pcYaml projectConfigYAML
-	if err := yaml.Unmarshal(raw, &pcYaml); err != nil {
+	if err = yaml.Unmarshal(raw, &pcYaml); err != nil {
 		return pc, errors.Wrapf(err, "parsing %s", ProjectConfigFile)
 	}
 

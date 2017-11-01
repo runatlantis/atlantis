@@ -1,7 +1,7 @@
 package boltdb_test
 
 import (
-	. "github.com/hootsuite/atlantis/testing_util"
+	. "github.com/hootsuite/atlantis/testing"
 
 	"io/ioutil"
 	"os"
@@ -91,7 +91,8 @@ func TestListAddRemove(t *testing.T) {
 	defer cleanupDB(db)
 	_, _, err := b.TryLock(lock)
 	Ok(t, err)
-	b.Unlock(project, env)
+	_, err = b.Unlock(project, env)
+	Ok(t, err)
 
 	ls, err := b.List()
 	Ok(t, err)
@@ -170,8 +171,9 @@ func TestUnlocking(t *testing.T) {
 	db, b := newTestDB()
 	defer cleanupDB(db)
 
-	b.TryLock(lock)
-	_, err := b.Unlock(project, env)
+	_, _, err := b.TryLock(lock)
+	Ok(t, err)
+	_, err = b.Unlock(project, env)
 	Ok(t, err)
 
 	// should be no locks listed
@@ -193,22 +195,26 @@ func TestUnlockingMultiple(t *testing.T) {
 	db, b := newTestDB()
 	defer cleanupDB(db)
 
-	b.TryLock(lock)
+	_, _, err := b.TryLock(lock)
+	Ok(t, err)
 
 	new := lock
 	new.Project.RepoFullName = "new/repo"
-	b.TryLock(new)
+	_, _, err = b.TryLock(new)
+	Ok(t, err)
 
 	new2 := lock
 	new2.Project.Path = "new/path"
-	b.TryLock(new2)
+	_, _, err = b.TryLock(new2)
+	Ok(t, err)
 
 	new3 := lock
 	new3.Env = "new-env"
-	b.TryLock(new3)
+	_, _, err = b.TryLock(new3)
+	Ok(t, err)
 
 	// now try and unlock them
-	_, err := b.Unlock(new3.Project, new3.Env)
+	_, err = b.Unlock(new3.Project, new3.Env)
 	Ok(t, err)
 	_, err = b.Unlock(new2.Project, env)
 	Ok(t, err)
@@ -344,7 +350,7 @@ func newTestDB() (*bolt.DB, *boltdb.BoltLocker) {
 		panic(errors.Wrap(err, "failed to create temp file"))
 	}
 	path := f.Name()
-	f.Close()
+	f.Close() // nolint: errcheck
 
 	// Open the database.
 	db, err := bolt.Open(path, 0600, nil)
@@ -364,6 +370,6 @@ func newTestDB() (*bolt.DB, *boltdb.BoltLocker) {
 }
 
 func cleanupDB(db *bolt.DB) {
-	os.Remove(db.Path())
-	db.Close()
+	os.Remove(db.Path()) // nolint: errcheck
+	db.Close()           // nolint: errcheck
 }

@@ -13,7 +13,7 @@ import (
 
 type E2ETester struct {
 	githubClient *GithubClient
-	repoUrl      string
+	repoURL      string
 	ownerName    string
 	repoName     string
 	hookID       int
@@ -45,7 +45,7 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 		return e2eResult, fmt.Errorf("failed to create dir %q prior to cloning, attempting to continue: %v", cloneDir, err)
 	}
 
-	cloneCmd := exec.Command("git", "clone", t.repoUrl, cloneDir)
+	cloneCmd := exec.Command("git", "clone", t.repoURL, cloneDir)
 	// git clone the repo
 	log.Printf("git cloning into %q", cloneDir)
 	if output, err := cloneCmd.CombinedOutput(); err != nil {
@@ -73,7 +73,7 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	log.Printf("git add file %q", filePath)
 	addCmd := exec.Command("git", "add", filePath)
 	addCmd.Dir = cloneDir
-	if err := addCmd.Run(); err != nil {
+	if err = addCmd.Run(); err != nil {
 		return e2eResult, fmt.Errorf("failed to git add file %q: %v", filePath, err)
 	}
 
@@ -81,7 +81,8 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	log.Printf("git commit file %q", filePath)
 	commitCmd := exec.Command("git", "commit", "-am", "test commit")
 	commitCmd.Dir = cloneDir
-	if output, err := commitCmd.CombinedOutput(); err != nil {
+	var output []byte
+	if output, err = commitCmd.CombinedOutput(); err != nil {
 		return e2eResult, fmt.Errorf("failed to run git commit in %q: %v: %v", cloneDir, err, string(output))
 	}
 
@@ -89,7 +90,7 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	log.Printf("git push branch %q", branchName)
 	pushCmd := exec.Command("git", "push", "origin", branchName)
 	pushCmd.Dir = cloneDir
-	if err := pushCmd.Run(); err != nil {
+	if err = pushCmd.Run(); err != nil {
 		return e2eResult, fmt.Errorf("failed to git push branch %q: %v", branchName, err)
 	}
 
@@ -111,7 +112,7 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	log.Printf("created pull request %s", pull.GetHTMLURL())
 
 	// defer closing pull request and delete remote branch
-	defer cleanUp(t, pull.GetNumber(), branchName)
+	defer cleanUp(t, pull.GetNumber(), branchName) // nolint: errcheck
 
 	// create run plan comment
 	log.Printf("creating plan comment: %q", t.projectType.PlanCommand)
@@ -150,6 +151,7 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	return e2eResult, nil
 }
 
+// nolint: unparam
 func getAtlantisStatus(t *E2ETester, branchName string) (string, error) {
 	// check repo status
 	combinedStatus, _, err := t.githubClient.client.Repositories.GetCombinedStatus(t.githubClient.ctx, t.ownerName, t.repoName, branchName, nil)
@@ -175,6 +177,7 @@ func checkStatus(state string) bool {
 	return true
 }
 
+// nolint: unparam
 func cleanUp(t *E2ETester, pullRequestNumber int, branchName string) error {
 	// clean up
 	pullClosed, _, err := t.githubClient.client.PullRequests.Edit(t.githubClient.ctx, t.ownerName, t.repoName, pullRequestNumber, &github.PullRequest{State: github.String("closed")})

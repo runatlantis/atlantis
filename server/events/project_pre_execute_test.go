@@ -13,7 +13,7 @@ import (
 	rmocks "github.com/hootsuite/atlantis/server/events/run/mocks"
 	tmocks "github.com/hootsuite/atlantis/server/events/terraform/mocks"
 	"github.com/hootsuite/atlantis/server/logging"
-	. "github.com/hootsuite/atlantis/testing_util"
+	. "github.com/hootsuite/atlantis/testing"
 	"github.com/mohae/deepcopy"
 	. "github.com/petergtz/pegomock"
 )
@@ -28,7 +28,7 @@ var project = models.Project{}
 
 func TestExecute_LockErr(t *testing.T) {
 	t.Log("when there is an error returned from TryLock we return it")
-	p, l, _, _, _ := setupPreExecuteTest(t)
+	p, l, _, _ := setupPreExecuteTest(t)
 	When(l.TryLock(project, "", ctx.Pull, ctx.User)).ThenReturn(locking.TryLockResponse{}, errors.New("err"))
 
 	res := p.Execute(&ctx, "", project)
@@ -37,7 +37,7 @@ func TestExecute_LockErr(t *testing.T) {
 
 func TestExecute_LockFailed(t *testing.T) {
 	t.Log("when we can't acquire a lock for this project and the lock is owned by a different pull, we get an error")
-	p, l, _, _, _ := setupPreExecuteTest(t)
+	p, l, _, _ := setupPreExecuteTest(t)
 	// The response has LockAcquired: false and the pull request is a number
 	// different than the current pull.
 	When(l.TryLock(project, "", ctx.Pull, ctx.User)).ThenReturn(locking.TryLockResponse{
@@ -51,7 +51,7 @@ func TestExecute_LockFailed(t *testing.T) {
 
 func TestExecute_ConfigErr(t *testing.T) {
 	t.Log("when there is an error loading config, we return it")
-	p, l, _, _, _ := setupPreExecuteTest(t)
+	p, l, _, _ := setupPreExecuteTest(t)
 	When(l.TryLock(project, "", ctx.Pull, ctx.User)).ThenReturn(locking.TryLockResponse{
 		LockAcquired: true,
 	}, nil)
@@ -64,7 +64,7 @@ func TestExecute_ConfigErr(t *testing.T) {
 
 func TestExecute_PreInitErr(t *testing.T) {
 	t.Log("when the project is on tf >= 0.9 and we run a `pre_init` that returns an error we return it")
-	p, l, _, tm, r := setupPreExecuteTest(t)
+	p, l, tm, r := setupPreExecuteTest(t)
 	When(l.TryLock(project, "", ctx.Pull, ctx.User)).ThenReturn(locking.TryLockResponse{
 		LockAcquired: true,
 	}, nil)
@@ -82,7 +82,7 @@ func TestExecute_PreInitErr(t *testing.T) {
 
 func TestExecute_InitErr(t *testing.T) {
 	t.Log("when the project is on tf >= 0.9 and we run `init` that returns an error we return it")
-	p, l, _, tm, _ := setupPreExecuteTest(t)
+	p, l, tm, _ := setupPreExecuteTest(t)
 	When(l.TryLock(project, "", ctx.Pull, ctx.User)).ThenReturn(locking.TryLockResponse{
 		LockAcquired: true,
 	}, nil)
@@ -98,7 +98,7 @@ func TestExecute_InitErr(t *testing.T) {
 
 func TestExecute_PreGetErr(t *testing.T) {
 	t.Log("when the project is on tf < 0.9 and we run a `pre_get` that returns an error we return it")
-	p, l, _, tm, r := setupPreExecuteTest(t)
+	p, l, tm, r := setupPreExecuteTest(t)
 	When(l.TryLock(project, "", ctx.Pull, ctx.User)).ThenReturn(locking.TryLockResponse{
 		LockAcquired: true,
 	}, nil)
@@ -116,7 +116,7 @@ func TestExecute_PreGetErr(t *testing.T) {
 
 func TestExecute_GetErr(t *testing.T) {
 	t.Log("when the project is on tf < 0.9 and we run `get` that returns an error we return it")
-	p, l, _, tm, _ := setupPreExecuteTest(t)
+	p, l, tm, _ := setupPreExecuteTest(t)
 	When(l.TryLock(project, "", ctx.Pull, ctx.User)).ThenReturn(locking.TryLockResponse{
 		LockAcquired: true,
 	}, nil)
@@ -132,7 +132,7 @@ func TestExecute_GetErr(t *testing.T) {
 
 func TestExecute_PreCommandErr(t *testing.T) {
 	t.Log("when we get an error running pre commands we return it")
-	p, l, _, tm, r := setupPreExecuteTest(t)
+	p, l, tm, r := setupPreExecuteTest(t)
 	When(l.TryLock(project, "", ctx.Pull, ctx.User)).ThenReturn(locking.TryLockResponse{
 		LockAcquired: true,
 	}, nil)
@@ -151,7 +151,7 @@ func TestExecute_PreCommandErr(t *testing.T) {
 
 func TestExecute_SuccessTF9(t *testing.T) {
 	t.Log("when the project is on tf >= 0.9 it should be successful")
-	p, l, _, tm, r := setupPreExecuteTest(t)
+	p, l, tm, r := setupPreExecuteTest(t)
 	lockResponse := locking.TryLockResponse{
 		LockAcquired: true,
 	}
@@ -177,7 +177,7 @@ func TestExecute_SuccessTF9(t *testing.T) {
 
 func TestExecute_SuccessTF8(t *testing.T) {
 	t.Log("when the project is on tf < 0.9 it should be successful")
-	p, l, _, tm, r := setupPreExecuteTest(t)
+	p, l, tm, r := setupPreExecuteTest(t)
 	lockResponse := locking.TryLockResponse{
 		LockAcquired: true,
 	}
@@ -202,7 +202,7 @@ func TestExecute_SuccessTF8(t *testing.T) {
 
 func TestExecute_SuccessPrePlan(t *testing.T) {
 	t.Log("when there are pre_plan commands they are run")
-	p, l, _, tm, r := setupPreExecuteTest(t)
+	p, l, tm, r := setupPreExecuteTest(t)
 	lockResponse := locking.TryLockResponse{
 		LockAcquired: true,
 	}
@@ -226,7 +226,7 @@ func TestExecute_SuccessPrePlan(t *testing.T) {
 
 func TestExecute_SuccessPreApply(t *testing.T) {
 	t.Log("when there are pre_apply commands they are run")
-	p, l, _, tm, r := setupPreExecuteTest(t)
+	p, l, tm, r := setupPreExecuteTest(t)
 	lockResponse := locking.TryLockResponse{
 		LockAcquired: true,
 	}
@@ -254,7 +254,7 @@ func TestExecute_SuccessPreApply(t *testing.T) {
 	r.VerifyWasCalledOnce().Execute(cpCtx.Log, []string{"command"}, "", "", tfVersion, "pre_apply")
 }
 
-func setupPreExecuteTest(t *testing.T) (*events.ProjectPreExecute, *lmocks.MockLocker, *mocks.MockProjectConfigReader, *tmocks.MockRunner, *rmocks.MockRunner) {
+func setupPreExecuteTest(t *testing.T) (*events.ProjectPreExecute, *lmocks.MockLocker, *tmocks.MockRunner, *rmocks.MockRunner) {
 	RegisterMockTestingT(t)
 	l := lmocks.NewMockLocker()
 	cr := mocks.NewMockProjectConfigReader()
@@ -265,5 +265,5 @@ func setupPreExecuteTest(t *testing.T) (*events.ProjectPreExecute, *lmocks.MockL
 		ConfigReader: cr,
 		Terraform:    tm,
 		Run:          r,
-	}, l, cr, tm, r
+	}, l, tm, r
 }

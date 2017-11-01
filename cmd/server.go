@@ -15,7 +15,7 @@ import (
 
 // To add a new flag you must:
 // 1. Add a const with the flag name (in alphabetic order).
-// 2. Add a new field to server.ServerConfig and set the mapstructure tag equal to the flag name.
+// 2. Add a new field to server.Config and set the mapstructure tag equal to the flag name.
 // 3. Add your flag's description etc. to the stringFlags, intFlags, or boolFlags slices.
 const (
 	AtlantisURLFlag     = "atlantis-url"
@@ -114,7 +114,7 @@ type ServerCmd struct {
 // ServerCreator creates servers.
 // It's an abstraction to help us test.
 type ServerCreator interface {
-	NewServer(config server.ServerConfig) (ServerStarter, error)
+	NewServer(config server.Config) (ServerStarter, error)
 }
 
 // DefaultServerCreator is the concrete implementation of ServerCreator.
@@ -127,7 +127,7 @@ type ServerStarter interface {
 }
 
 // NewServer returns the real Atlantis server object.
-func (d *DefaultServerCreator) NewServer(config server.ServerConfig) (ServerStarter, error) {
+func (d *DefaultServerCreator) NewServer(config server.Config) (ServerStarter, error) {
 	return server.NewServer(config)
 }
 
@@ -160,21 +160,21 @@ Config file values are overridden by environment variables which in turn are ove
 	for _, f := range stringFlags {
 		c.Flags().String(f.name, f.value, f.description)
 		if f.env != "" {
-			s.Viper.BindEnv(f.name, f.env)
+			s.Viper.BindEnv(f.name, f.env) // nolint: errcheck
 		}
-		s.Viper.BindPFlag(f.name, c.Flags().Lookup(f.name))
+		s.Viper.BindPFlag(f.name, c.Flags().Lookup(f.name)) // nolint: errcheck
 	}
 
 	// Set int flags.
 	for _, f := range intFlags {
 		c.Flags().Int(f.name, f.value, f.description)
-		s.Viper.BindPFlag(f.name, c.Flags().Lookup(f.name))
+		s.Viper.BindPFlag(f.name, c.Flags().Lookup(f.name)) // nolint: errcheck
 	}
 
 	// Set bool flags.
 	for _, f := range boolFlags {
 		c.Flags().Bool(f.name, f.value, f.description)
-		s.Viper.BindPFlag(f.name, c.Flags().Lookup(f.name))
+		s.Viper.BindPFlag(f.name, c.Flags().Lookup(f.name)) // nolint: errcheck
 	}
 
 	return c
@@ -193,7 +193,7 @@ func (s *ServerCmd) preRun() error {
 }
 
 func (s *ServerCmd) run() error {
-	var config server.ServerConfig
+	var config server.Config
 	if err := s.Viper.Unmarshal(&config); err != nil {
 		return err
 	}
@@ -216,7 +216,7 @@ func (s *ServerCmd) run() error {
 	return server.Start()
 }
 
-func validate(config server.ServerConfig) error {
+func validate(config server.Config) error {
 	logLevel := config.LogLevel
 	if logLevel != "debug" && logLevel != "info" && logLevel != "warn" && logLevel != "error" {
 		return errors.New("invalid log level: not one of debug, info, warn, error")
@@ -231,7 +231,7 @@ func validate(config server.ServerConfig) error {
 }
 
 // setAtlantisURL sets the externally accessible URL for atlantis.
-func setAtlantisURL(config *server.ServerConfig) error {
+func setAtlantisURL(config *server.Config) error {
 	if config.AtlantisURL == "" {
 		hostname, err := os.Hostname()
 		if err != nil {
@@ -245,7 +245,7 @@ func setAtlantisURL(config *server.ServerConfig) error {
 // setDataDir checks if ~ was used in data-dir and converts it to the actual
 // home directory. If we don't do this, we'll create a directory called "~"
 // instead of actually using home.
-func setDataDir(config *server.ServerConfig) error {
+func setDataDir(config *server.Config) error {
 	if strings.HasPrefix(config.DataDir, "~/") {
 		expanded, err := homedir.Expand(config.DataDir)
 		if err != nil {
@@ -257,7 +257,7 @@ func setDataDir(config *server.ServerConfig) error {
 }
 
 // sanitizeGithubUser trims @ from the front of the github username if it exists.
-func sanitizeGithubUser(config *server.ServerConfig) {
+func sanitizeGithubUser(config *server.Config) {
 	config.GithubUser = strings.TrimPrefix(config.GithubUser, "@")
 }
 

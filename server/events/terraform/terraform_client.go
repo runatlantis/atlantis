@@ -15,6 +15,7 @@ import (
 )
 
 //go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_runner.go Runner
+
 type Runner interface {
 	Version() *version.Version
 	RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version, env string) (string, error)
@@ -89,7 +90,7 @@ func (c *Client) RunCommandWithVersion(log *logging.SimpleLogger, path string, a
 	out, err := terraformCmd.CombinedOutput()
 	commandStr := strings.Join(terraformCmd.Args, " ")
 	if err != nil {
-		err := fmt.Errorf("%s: running %q in %q: \n%s", err, commandStr, path, out)
+		err = fmt.Errorf("%s: running %q in %q: \n%s", err, commandStr, path, out)
 		log.Debug("error: %s", err)
 		return string(out), err
 	}

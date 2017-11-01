@@ -38,6 +38,8 @@ var pullRequestBody = "In this pull request we will learn how to use atlantis. T
 	"* Now lets apply that plan. Type `atlantis apply` in the comments. This will run a `terraform apply`.\n" +
 	"\nThank you for trying out atlantis. For more info on running atlantis in production see https://github.com/hootsuite/atlantis"
 
+// Start begins the bootstrap process
+// nolint: errcheck
 func Start() error {
 	s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
 	colorstring.Println(bootstrapDescription)
@@ -88,13 +90,14 @@ Follow these instructions to create a token (we don't store any tokens):
 		colorstring.Printf("[white]=> downloading terraform ")
 		s.Start()
 		terraformDownloadURL := fmt.Sprintf("%s/terraform/%s/terraform_%s_%s_%s.zip", hashicorpReleasesURL, terraformVersion, terraformVersion, runtime.GOOS, runtime.GOARCH)
-		if err := downloadAndUnzip(terraformDownloadURL, "/tmp/terraform.zip", "/tmp"); err != nil {
+		if err = downloadAndUnzip(terraformDownloadURL, "/tmp/terraform.zip", "/tmp"); err != nil {
 			return errors.Wrapf(err, "downloading and unzipping terraform")
 		}
 		colorstring.Println("\n[green]=> downloaded terraform successfully!")
 		s.Stop()
 
-		terraformCmd, err := executeCmd("mv", []string{"/tmp/terraform", "/usr/local/bin/"})
+		var terraformCmd *exec.Cmd
+		terraformCmd, err = executeCmd("mv", []string{"/tmp/terraform", "/usr/local/bin/"})
 		if err != nil {
 			return errors.Wrapf(err, "moving terraform binary into /usr/local/bin")
 		}
@@ -108,7 +111,7 @@ Follow these instructions to create a token (we don't store any tokens):
 	colorstring.Printf("[white]=> downloading ngrok  ")
 	s.Start()
 	ngrokURL := fmt.Sprintf("%s/ngrok-stable-%s-%s.zip", ngrokDownloadURL, runtime.GOOS, runtime.GOARCH)
-	if err := downloadAndUnzip(ngrokURL, "/tmp/ngrok.zip", "/tmp"); err != nil {
+	if err = downloadAndUnzip(ngrokURL, "/tmp/ngrok.zip", "/tmp"); err != nil {
 		return errors.Wrapf(err, "downloading and unzipping ngrok")
 	}
 	s.Stop()

@@ -70,7 +70,7 @@ This is easier to read and more consistent
 ### Testing
 - place tests under `{package under test}_test` to enforce testing the external interfaces
 - if you need to test internally i.e. access non-exported stuff, call the file `{file under test}_internal_test.go`
-- use `testing_util` for easier-to-read assertions: `import . "github.com/hootsuite/atlantis/testing_util"`
+- use our testing utility for easier-to-read assertions: `import . "github.com/hootsuite/atlantis/testing"` and then use `Assert()`, `Equals()` and `Ok()`
 - don't try to describe the whole test by its function name. Instead use `t.Log` statements:
 ```go
 // don't do this

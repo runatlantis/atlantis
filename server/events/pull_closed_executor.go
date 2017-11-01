@@ -15,6 +15,7 @@ import (
 )
 
 //go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_pull_cleaner.go PullCleaner
+
 type PullCleaner interface {
 	CleanUpPull(repo models.Repo, pull models.PullRequest) error
 }

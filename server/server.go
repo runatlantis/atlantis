@@ -40,8 +40,10 @@ type Server struct {
 	eventsController *EventsController
 }
 
-// the mapstructure tags correspond to flags in cmd/server.go
-type ServerConfig struct {
+// Config configures Server.
+// The mapstructure tags correspond to flags in cmd/server.go and are used when
+// the config is parsed from a YAML file.
+type Config struct {
 	AtlantisURL         string `mapstructure:"atlantis-url"`
 	DataDir             string `mapstructure:"data-dir"`
 	GithubHostname      string `mapstructure:"gh-hostname"`
@@ -53,7 +55,7 @@ type ServerConfig struct {
 	RequireApproval     bool   `mapstructure:"require-approval"`
 }
 
-func NewServer(config ServerConfig) (*Server, error) {
+func NewServer(config Config) (*Server, error) {
 	githubClient, err := github.NewClient(config.GithubHostname, config.GithubUser, config.GithubToken)
 	if err != nil {
 		return nil, err
@@ -168,7 +170,7 @@ func (s *Server) Start() error {
 	return cli.NewExitError(http.ListenAndServe(fmt.Sprintf(":%d", s.port), n), 1)
 }
 
-func (s *Server) index(w http.ResponseWriter, r *http.Request) {
+func (s *Server) index(w http.ResponseWriter, _ *http.Request) {
 	locks, err := s.locker.List()
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -184,15 +186,15 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 	}
 	var results []lock
 	for id, v := range locks {
-		url, _ := s.router.Get(lockRoute).URL("id", url.QueryEscape(id))
+		lockURL, _ := s.router.Get(lockRoute).URL("id", url.QueryEscape(id))
 		results = append(results, lock{
-			LockURL:      url.String(),
+			LockURL:      lockURL.String(),
 			RepoFullName: v.Project.RepoFullName,
 			PullNum:      v.Pull.Num,
 			Time:         v.Time,
 		})
 	}
-	indexTemplate.Execute(w, results)
+	indexTemplate.Execute(w, results) // nolint: errcheck
 }
 
 func (s *Server) getLock(w http.ResponseWriter, r *http.Request) {
@@ -244,7 +246,7 @@ func (s *Server) getLock(w http.ResponseWriter, r *http.Request) {
 		Environment:     lock.Env,
 	}
 
-	lockTemplate.Execute(w, l)
+	lockTemplate.Execute(w, l) // nolint: errcheck
 }
 
 func (s *Server) deleteLock(w http.ResponseWriter, r *http.Request) {
