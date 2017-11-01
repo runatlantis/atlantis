@@ -35,7 +35,7 @@ type PlanExecutor struct {
 	Run               run.Runner
 	Workspace         Workspace
 	ProjectPreExecute ProjectPreExecutor
-	ModifiedProject   ModifiedProjectDetector
+	ModifiedProject   ModifiedProjectFinder
 }
 
 type PlanSuccess struct {
@@ -54,7 +54,7 @@ func (p *PlanExecutor) Execute(ctx *CommandContext) CommandResponse {
 		return CommandResponse{Error: errors.Wrap(err, "getting modified files")}
 	}
 	ctx.Log.Info("found %d files modified in this pull request", len(modifiedFiles))
-	projects := p.ModifiedProject.GetModified(ctx.Log, modifiedFiles, ctx.BaseRepo.FullName)
+	projects := p.ModifiedProject.FindModified(ctx.Log, modifiedFiles, ctx.BaseRepo.FullName)
 	if len(projects) == 0 {
 		return CommandResponse{Failure: "No Terraform files were modified."}
 	}

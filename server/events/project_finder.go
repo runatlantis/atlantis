@@ -8,22 +8,25 @@ import (
 	"github.com/hootsuite/atlantis/server/logging"
 )
 
-//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_modified_project_detector.go ModifiedProjectDetector
+//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_modified_project_finder.go ModifiedProjectFinder
 
-type ModifiedProjectDetector interface {
-	GetModified(log *logging.SimpleLogger, modifiedFiles []string, repoFullName string) []models.Project
+type ModifiedProjectFinder interface {
+	// FindModified returns the list of projects that were modified based on
+	// the modifiedFiles. The list will be de-duplicated.
+	FindModified(log *logging.SimpleLogger, modifiedFiles []string, repoFullName string) []models.Project
 }
 
-// ModifiedProject handles figuring out which projects were modified in a pull
-// request.
-type ModifiedProject struct{}
+// ProjectFinder identifies projects in a repo.
+type ProjectFinder struct{}
 
 var excludeList = []string{"terraform.tfstate", "terraform.tfstate.backup", "_modules", "modules"}
 
-func (m *ModifiedProject) GetModified(log *logging.SimpleLogger, modifiedFiles []string, repoFullName string) []models.Project {
+// FindModified returns the list of projects that were modified based on
+// the modifiedFiles. The list will be de-duplicated.
+func (p *ProjectFinder) FindModified(log *logging.SimpleLogger, modifiedFiles []string, repoFullName string) []models.Project {
 	var projects []models.Project
 
-	modifiedTerraformFiles := m.filterToTerraform(modifiedFiles)
+	modifiedTerraformFiles := p.filterToTerraform(modifiedFiles)
 	if len(modifiedTerraformFiles) == 0 {
 		return projects
 	}
@@ -32,9 +35,9 @@ func (m *ModifiedProject) GetModified(log *logging.SimpleLogger, modifiedFiles [
 
 	var paths []string
 	for _, modifiedFile := range modifiedFiles {
-		paths = append(paths, m.getProjectPath(modifiedFile))
+		paths = append(paths, p.getProjectPath(modifiedFile))
 	}
-	uniquePaths := m.unique(paths)
+	uniquePaths := p.unique(paths)
 	for _, uniquePath := range uniquePaths {
 		projects = append(projects, models.NewProject(repoFullName, uniquePath))
 	}
@@ -43,17 +46,17 @@ func (m *ModifiedProject) GetModified(log *logging.SimpleLogger, modifiedFiles [
 	return projects
 }
 
-func (m *ModifiedProject) filterToTerraform(files []string) []string {
+func (p *ProjectFinder) filterToTerraform(files []string) []string {
 	var filtered []string
 	for _, fileName := range files {
-		if !m.isInExcludeList(fileName) && strings.Contains(fileName, ".tf") {
+		if !p.isInExcludeList(fileName) && strings.Contains(fileName, ".tf") {
 			filtered = append(filtered, fileName)
 		}
 	}
 	return filtered
 }
 
-func (m *ModifiedProject) isInExcludeList(fileName string) bool {
+func (p *ProjectFinder) isInExcludeList(fileName string) bool {
 	for _, s := range excludeList {
 		if strings.Contains(fileName, s) {
 			return true
@@ -64,7 +67,7 @@ func (m *ModifiedProject) isInExcludeList(fileName string) bool {
 
 // getProjectPath returns the path to the project relative to the repo root
 // if the project is at the root returns "."
-func (m *ModifiedProject) getProjectPath(modifiedFilePath string) string {
+func (p *ProjectFinder) getProjectPath(modifiedFilePath string) string {
 	dir := path.Dir(modifiedFilePath)
 	if path.Base(dir) == "env" {
 		// if the modified file was inside an env/ directory, we treat this specially and
@@ -74,7 +77,7 @@ func (m *ModifiedProject) getProjectPath(modifiedFilePath string) string {
 	return dir
 }
 
-func (m *ModifiedProject) unique(strs []string) []string {
+func (p *ProjectFinder) unique(strs []string) []string {
 	hash := make(map[string]bool)
 	var unique []string
 	for _, s := range strs {
