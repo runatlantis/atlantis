@@ -33,7 +33,6 @@ type Server struct {
 	Port               int
 	CommandHandler     *events.CommandHandler
 	Logger             *logging.SimpleLogger
-	EventParser        *events.EventParser
 	Locker             locking.Locker
 	AtlantisURL        string
 	EventsController   *EventsController
@@ -67,7 +66,6 @@ func NewServer(config Config) (*Server, error) {
 		return nil, errors.Wrap(err, "initializing terraform")
 	}
 	githubComments := &events.GithubCommentRenderer{}
-
 	boltdb, err := boltdb.New(config.DataDir)
 	if err != nil {
 		return nil, err
@@ -138,7 +136,6 @@ func NewServer(config Config) (*Server, error) {
 		Router:             router,
 		Port:               config.Port,
 		CommandHandler:     commandHandler,
-		EventParser:        eventParser,
 		Logger:             logger,
 		Locker:             lockingClient,
 		AtlantisURL:        config.AtlantisURL,
