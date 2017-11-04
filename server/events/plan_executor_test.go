@@ -14,8 +14,8 @@ import (
 	rmocks "github.com/hootsuite/atlantis/server/events/run/mocks"
 	tmocks "github.com/hootsuite/atlantis/server/events/terraform/mocks"
 	"github.com/hootsuite/atlantis/server/logging"
-	. "github.com/petergtz/pegomock"
 	. "github.com/hootsuite/atlantis/testing"
+	. "github.com/petergtz/pegomock"
 )
 
 var planCtx = events.CommandContext{
@@ -182,7 +182,7 @@ func setupPlanExecutorTest(t *testing.T) (*events.PlanExecutor, *tmocks.MockRunn
 	run := rmocks.NewMockRunner()
 	p := events.PlanExecutor{
 		Github:            gh,
-		ModifiedProject:   &events.ModifiedProject{},
+		ModifiedProject:   &events.ProjectFinder{},
 		Workspace:         w,
 		ProjectPreExecute: ppe,
 		Terraform:         runner,

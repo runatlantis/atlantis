@@ -10,7 +10,7 @@ import (
 
 var log = logging.NewNoopLogger()
 var modifiedRepo = "owner/repo"
-var m = events.ModifiedProject{}
+var m = events.ProjectFinder{}
 
 func TestGetModified_NoFiles(t *testing.T) {
 	cases := []struct {
@@ -66,7 +66,7 @@ func TestGetModified_NoFiles(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Log(c.description)
-		projects := m.GetModified(log, c.files, modifiedRepo)
+		projects := m.FindModified(log, c.files, modifiedRepo)
 
 		// Extract the paths from the projects. We use a slice here instead of a
 		// map so we can test whether there are duplicates returned.
