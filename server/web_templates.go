@@ -2,7 +2,21 @@ package server
 
 import (
 	"html/template"
+	"io"
+	"time"
 )
+
+//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_template_writer.go TemplateWriter
+type TemplateWriter interface {
+	Execute(wr io.Writer, data interface{}) error
+}
+
+type LockIndexData struct {
+	LockURL      string
+	RepoFullName string
+	PullNum      int ``
+	Time         time.Time
+}
 
 var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
 <!DOCTYPE html>
@@ -60,6 +74,18 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
 </body>
 </html>
 `))
+
+type LockDetailData struct {
+	UnlockURL       string
+	LockKeyEncoded  string
+	LockKey         string
+	RepoOwner       string
+	RepoName        string
+	PullRequestLink string
+	LockedBy        string
+	Environment     string
+	Time            time.Time
+}
 
 var lockTemplate = template.Must(template.New("lock.html.tmpl").Parse(`
 <!DOCTYPE html>

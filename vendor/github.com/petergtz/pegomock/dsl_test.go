@@ -556,8 +556,8 @@ var _ = Describe("MockDisplay", func() {
 				"Mock invocation count for method \"Flash\" with params [wrong string -987] " +
 					"does not match expectation.\n\n\tExpected: 1; but got: 0\n\n" +
 					"\tBut other interactions with this mock were:\n" +
-					"\tFlash(Hello, 123)\n" +
-					"\tFlash(Again, 456)\n",
+					"\tFlash(\"Hello\", 123)\n" +
+					"\tFlash(\"Again\", 456)\n",
 			))
 		})
 
@@ -569,9 +569,22 @@ var _ = Describe("MockDisplay", func() {
 				"Mock invocation count for method \"Flash\" with params [wrong string -987] " +
 					"does not match expectation.\n\n\tExpected: 1; but got: 0\n\n" +
 					"\tBut other interactions with this mock were:\n" +
-					"\tFlash(Hello, 123)\n" +
-					"\tShow(Again)\n"),
+					"\tFlash(\"Hello\", 123)\n" +
+					"\tShow(\"Again\")\n"),
 			)
+		})
+
+		It("formats params in interactions with Go syntax for better readability", func() {
+			display.NetHttpRequestParam(http.Request{Host: "x.com"})
+			Expect(func() { display.VerifyWasCalledOnce().NetHttpRequestParam(http.Request{Host: "y.com"}) }).To(PanicWith(
+				`Mock invocation count for method "NetHttpRequestParam" with params [{ <nil>  0 0 map[] <nil> <nil> 0 [] false y.com map[] map[] <nil> map[]   <nil> <nil> <nil> <nil>}] does not match expectation.
+
+	Expected: 1; but got: 0
+
+	But other interactions with this mock were:
+	NetHttpRequestParam(http.Request{Method:"", URL:(*url.URL)(nil), Proto:"", ProtoMajor:0, ProtoMinor:0, Header:http.Header(nil), Body:io.ReadCloser(nil), GetBody:(func() (io.ReadCloser, error))(nil), ContentLength:0, TransferEncoding:[]string(nil), Close:false, Host:"x.com", Form:url.Values(nil), PostForm:url.Values(nil), MultipartForm:(*multipart.Form)(nil), Trailer:http.Header(nil), RemoteAddr:"", RequestURI:"", TLS:(*tls.ConnectionState)(nil), Cancel:(<-chan struct {})(nil), Response:(*http.Response)(nil), ctx:context.Context(nil)})
+`,
+			))
 		})
 
 		It("shows no interactions if there were none", func() {
