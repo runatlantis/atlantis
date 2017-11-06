@@ -18,7 +18,9 @@ func (b *BootstrapCmd) Init() *cobra.Command {
 		Short: "Start a guided tour of Atlantis",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			err := bootstrap.Start()
-			fmt.Fprintf(os.Stderr, "\033[31mError: %s\033[39m\n\n", err.Error())
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "\033[31mError: %s\033[39m\n\n", err.Error())
+			}
 			return err
 		},
 	}
