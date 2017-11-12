@@ -106,7 +106,7 @@ func NewServer(config Config) (*Server, error) {
 		Locker:    lockingClient,
 		Workspace: workspace,
 	}
-	logger := logging.NewSimpleLogger("server", log.New(os.Stderr, "", log.LstdFlags), false, logging.ToLogLevel(config.LogLevel))
+	logger := logging.NewSimpleLogger("server", nil, false, logging.ToLogLevel(config.LogLevel))
 	eventParser := &events.EventParser{
 		GithubUser:  config.GithubUser,
 		GithubToken: config.GithubToken,

@@ -39,12 +39,21 @@ const (
 // NewSimpleLogger creates a new logger.
 // - source is added as a prefix to each log entry. It's useful if you want to trace a log entry back to a
 //   context, for example a pull request id.
-// - logger is the underlying logger.
+// - logger is the underlying logger. If nil will create a logger from stdlib.
 // - keepHistory set to true will store all log entries written using this logger.
 // - level will set the level at which logs >= than that level will be written.
 //   If keepHistory is set to true, we'll store logs at all levels, regardless of what level
 //   is set to.
 func NewSimpleLogger(source string, logger *log.Logger, keepHistory bool, level LogLevel) *SimpleLogger {
+	if logger == nil {
+		flags := log.LstdFlags
+		if level == Debug {
+			// If we're using debug logging, we also have the logger print the
+			// filename the log comes from with log.Lshortfile.
+			flags = log.LstdFlags | log.Lshortfile
+		}
+		logger = log.New(os.Stderr, "", flags)
+	}
 	return &SimpleLogger{
 		Source:      source,
 		Logger:      logger,
@@ -105,7 +114,10 @@ func (l *SimpleLogger) Log(level LogLevel, format string, a ...interface{}) {
 
 	// only log this message if configured to log at this level
 	if l.Level <= level {
-		l.Logger.Printf("[%s] %s: %s\n", levelStr, l.Source, msg)
+		// Calling .Output instead of Printf so we can change the calldepth param
+		// to 3. The default is 2 which would identify the log as coming from
+		// this file and line every time instead of our caller's.
+		l.Logger.Output(3, fmt.Sprintf("[%s] %s: %s\n", levelStr, l.Source, msg)) // nolint: errcheck
 	}
 
 	// keep history at all log levels
