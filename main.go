@@ -7,7 +7,7 @@ import (
 
 func main() {
 	v := viper.New()
-	v.Set("version", "0.1.2")
+	v.Set("version", "0.1.3")
 
 	server := &cmd.ServerCmd{
 		ServerCreator: &cmd.DefaultServerCreator{},
