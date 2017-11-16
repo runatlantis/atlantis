@@ -4,10 +4,11 @@
 package mocks
 
 import (
+	"reflect"
+
 	models "github.com/hootsuite/atlantis/server/events/models"
 	logging "github.com/hootsuite/atlantis/server/logging"
 	pegomock "github.com/petergtz/pegomock"
-	"reflect"
 )
 
 type MockWorkspace struct {

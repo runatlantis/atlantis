@@ -4,9 +4,10 @@
 package mocks
 
 import (
+	"reflect"
+
 	events "github.com/hootsuite/atlantis/server/events"
 	pegomock "github.com/petergtz/pegomock"
-	"reflect"
 )
 
 type MockProjectConfigReader struct {

@@ -8,7 +8,6 @@ var Pull = models.PullRequest{
 	Branch:     "branch",
 	Author:     "lkysow",
 	URL:        "url",
-	BaseCommit: "8ed0280678d49d42cd286610aabcfceb5bb673c6",
 }
 
 var Repo = models.Repo{

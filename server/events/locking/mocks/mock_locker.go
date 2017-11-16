@@ -4,10 +4,11 @@
 package mocks
 
 import (
+	"reflect"
+
 	locking "github.com/hootsuite/atlantis/server/events/locking"
 	models "github.com/hootsuite/atlantis/server/events/models"
 	pegomock "github.com/petergtz/pegomock"
-	"reflect"
 )
 
 type MockLocker struct {

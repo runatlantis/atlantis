@@ -10,9 +10,23 @@ import (
 	"unicode"
 )
 
+//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_simple_logging.go SimpleLogging
+
+type SimpleLogging interface {
+	Debug(format string, a ...interface{})
+	Info(format string, a ...interface{})
+	Warn(format string, a ...interface{})
+	Err(format string, a ...interface{})
+	Log(level LogLevel, format string, a ...interface{})
+	// Underlying returns the underlying logger.
+	Underlying() *log.Logger
+	// GetLevel returns the current log level.
+	GetLevel() LogLevel
+}
+
 // SimpleLogger wraps the standard logger with leveled logging
 // and the ability to store log history for later adding it
-// to a GitHub comment.
+// to a VCS comment.
 type SimpleLogger struct {
 	// Source is added as a prefix to each log entry.
 	// It's useful if you want to trace a log entry back to a
@@ -124,6 +138,14 @@ func (l *SimpleLogger) Log(level LogLevel, format string, a ...interface{}) {
 	if l.KeepHistory {
 		l.saveToHistory(levelStr, msg)
 	}
+}
+
+func (l *SimpleLogger) Underlying() *log.Logger {
+	return l.Logger
+}
+
+func (l *SimpleLogger) GetLevel() LogLevel {
+	return l.Level
 }
 
 func (l *SimpleLogger) saveToHistory(level string, msg string) {

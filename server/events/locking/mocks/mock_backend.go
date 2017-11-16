@@ -4,9 +4,10 @@
 package mocks
 
 import (
+	"reflect"
+
 	models "github.com/hootsuite/atlantis/server/events/models"
 	pegomock "github.com/petergtz/pegomock"
-	"reflect"
 )
 
 type MockBackend struct {

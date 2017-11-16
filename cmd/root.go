@@ -1,5 +1,5 @@
 // Package cmd holds all our cli commands.
-// These are different from the commands that get run via GitHub comments
+// These are different from the commands that get run via pull request comments.
 package cmd
 
 import (

@@ -90,50 +90,121 @@ func TestExecute_InvalidConfig(t *testing.T) {
 	Assert(t, strings.Contains(err.Error(), "unmarshal errors"), "should be an unmarshal error")
 }
 
-func TestExecute_Validation(t *testing.T) {
+func TestExecute_ValidateLogLevel(t *testing.T) {
+	t.Log("Should validate log level.")
+	c := setup(map[string]interface{}{
+		cmd.LogLevelFlag: "invalid",
+		cmd.GHUserFlag:   "user",
+		cmd.GHTokenFlag:  "token",
+	})
+	err := c.Execute()
+	Assert(t, err != nil, "should be an error")
+	Equals(t, "invalid log level: not one of debug, info, warn, error", err.Error())
+}
+
+func TestExecute_ValidateVCSConfig(t *testing.T) {
+	expErr := "--gh-user/--gh-token or --gitlab-user/--gitlab-token must be set"
 	cases := []struct {
 		description string
 		flags       map[string]interface{}
-		expErr      string
+		expectError bool
 	}{
 		{
-			"Should validate log level.",
-			map[string]interface{}{
-				cmd.LogLevelFlag: "invalid",
-				cmd.GHUserFlag:   "user",
-				cmd.GHTokenFlag:  "token",
-			},
-			"invalid log level: not one of debug, info, warn, error",
+			"no config set",
+			nil,
+			true,
 		},
 		{
-			"Should ensure github user is set.",
+			"just github token set",
 			map[string]interface{}{
 				cmd.GHTokenFlag: "token",
 			},
-			"--gh-user must be set",
+			true,
 		},
 		{
-			"Should ensure github token is set.",
+			"just gitlab token set",
+			map[string]interface{}{
+				cmd.GitlabTokenFlag: "token",
+			},
+			true,
+		},
+		{
+			"just github user set",
 			map[string]interface{}{
 				cmd.GHUserFlag: "user",
 			},
-			"--gh-token must be set",
+			true,
+		},
+		{
+			"just gitlab user set",
+			map[string]interface{}{
+				cmd.GitlabUserFlag: "user",
+			},
+			true,
+		},
+		{
+			"github user and gitlab token set",
+			map[string]interface{}{
+				cmd.GHUserFlag:      "user",
+				cmd.GitlabTokenFlag: "token",
+			},
+			true,
+		},
+		{
+			"gitlab user and github token set",
+			map[string]interface{}{
+				cmd.GitlabUserFlag: "user",
+				cmd.GHTokenFlag:    "token",
+			},
+			true,
+		},
+		{
+			"github user and github token set and should be successful",
+			map[string]interface{}{
+				cmd.GHUserFlag:  "user",
+				cmd.GHTokenFlag: "token",
+			},
+			false,
+		},
+		{
+			"gitlab user and gitlab token set and should be successful",
+			map[string]interface{}{
+				cmd.GitlabUserFlag:  "user",
+				cmd.GitlabTokenFlag: "token",
+			},
+			false,
+		},
+		{
+			"github and gitlab user and github and gitlab token set and should be successful",
+			map[string]interface{}{
+				cmd.GHUserFlag:      "user",
+				cmd.GHTokenFlag:     "token",
+				cmd.GitlabUserFlag:  "user",
+				cmd.GitlabTokenFlag: "token",
+			},
+			false,
 		},
 	}
 	for _, testCase := range cases {
-		t.Log(testCase.description)
+		t.Log("Should validate vcs config when " + testCase.description)
 		c := setup(testCase.flags)
 		err := c.Execute()
-		Assert(t, err != nil, "should be an error")
-		Equals(t, testCase.expErr, err.Error())
+		if testCase.expectError {
+			Assert(t, err != nil, "should be an error")
+			Equals(t, expErr, err.Error())
+		} else {
+			Ok(t, err)
+		}
 	}
 }
 
 func TestExecute_Defaults(t *testing.T) {
 	t.Log("Should set the defaults for all unspecified flags.")
 	c := setup(map[string]interface{}{
-		cmd.GHUserFlag:  "user",
-		cmd.GHTokenFlag: "token",
+		cmd.GHUserFlag:      "user",
+		cmd.GHTokenFlag:     "token",
+		cmd.GitlabUserFlag:  "gitlab-user",
+		cmd.GitlabTokenFlag: "gitlab-token",
 	})
 	err := c.Execute()
 	Ok(t, err)
@@ -141,6 +212,9 @@ func TestExecute_Defaults(t *testing.T) {
 	Equals(t, "user", passedConfig.GithubUser)
 	Equals(t, "token", passedConfig.GithubToken)
 	Equals(t, "", passedConfig.GithubWebHookSecret)
+	Equals(t, "gitlab-user", passedConfig.GitlabUser)
+	Equals(t, "gitlab-token", passedConfig.GitlabToken)
+	Equals(t, "", passedConfig.GitlabWebHookSecret)
 	// Get our hostname since that's what gets defaulted to
 	hostname, err := os.Hostname()
 	Ok(t, err)
@@ -151,6 +225,7 @@ func TestExecute_Defaults(t *testing.T) {
 	Ok(t, err)
 	Equals(t, dataDir, passedConfig.DataDir)
 	Equals(t, "github.com", passedConfig.GithubHostname)
+	Equals(t, "gitlab.com", passedConfig.GitlabHostname)
 	Equals(t, "info", passedConfig.LogLevel)
 	Equals(t, false, passedConfig.RequireApproval)
 	Equals(t, 4141, passedConfig.Port)
@@ -183,6 +258,18 @@ func TestExecute_GithubUser(t *testing.T) {
 	Equals(t, "user", passedConfig.GithubUser)
 }
 
+func TestExecute_GitlabUser(t *testing.T) {
+	t.Log("Should remove the @ from the gitlab username if it's passed.")
+	c := setup(map[string]interface{}{
+		cmd.GitlabUserFlag:  "@user",
+		cmd.GitlabTokenFlag: "token",
+	})
+	err := c.Execute()
+	Ok(t, err)
+
+	Equals(t, "user", passedConfig.GitlabUser)
+}
+
 func TestExecute_Flags(t *testing.T) {
 	t.Log("Should use all flags that are set.")
 	c := setup(map[string]interface{}{
@@ -192,6 +279,10 @@ func TestExecute_Flags(t *testing.T) {
 		cmd.GHUserFlag:          "user",
 		cmd.GHTokenFlag:         "token",
 		cmd.GHWebHookSecret:     "secret",
+		cmd.GitlabHostnameFlag:  "gitlab-hostname",
+		cmd.GitlabUserFlag:      "gitlab-user",
+		cmd.GitlabTokenFlag:     "gitlab-token",
+		cmd.GitlabWebHookSecret: "gitlab-secret",
 		cmd.LogLevelFlag:        "debug",
 		cmd.PortFlag:            8181,
 		cmd.RequireApprovalFlag: true,
@@ -205,6 +296,10 @@ func TestExecute_Flags(t *testing.T) {
 	Equals(t, "user", passedConfig.GithubUser)
 	Equals(t, "token", passedConfig.GithubToken)
 	Equals(t, "secret", passedConfig.GithubWebHookSecret)
+	Equals(t, "gitlab-hostname", passedConfig.GitlabHostname)
+	Equals(t, "gitlab-user", passedConfig.GitlabUser)
+	Equals(t, "gitlab-token", passedConfig.GitlabToken)
+	Equals(t, "gitlab-secret", passedConfig.GitlabWebHookSecret)
 	Equals(t, "debug", passedConfig.LogLevel)
 	Equals(t, 8181, passedConfig.Port)
 	Equals(t, true, passedConfig.RequireApproval)
@@ -219,6 +314,10 @@ gh-hostname: "ghhostname"
 gh-user: "user"
 gh-token: "token"
 gh-webhook-secret: "secret"
+gitlab-hostname: "gitlab-hostname"
+gitlab-user: "gitlab-user"
+gitlab-token: "gitlab-token"
+gitlab-webhook-secret: "gitlab-secret"
 log-level: "debug"
 port: 8181
 require-approval: true`)
@@ -235,6 +334,10 @@ require-approval: true`)
 	Equals(t, "user", passedConfig.GithubUser)
 	Equals(t, "token", passedConfig.GithubToken)
 	Equals(t, "secret", passedConfig.GithubWebHookSecret)
+	Equals(t, "gitlab-hostname", passedConfig.GitlabHostname)
+	Equals(t, "gitlab-user", passedConfig.GitlabUser)
+	Equals(t, "gitlab-token", passedConfig.GitlabToken)
+	Equals(t, "gitlab-secret", passedConfig.GitlabWebHookSecret)
 	Equals(t, "debug", passedConfig.LogLevel)
 	Equals(t, 8181, passedConfig.Port)
 	Equals(t, true, passedConfig.RequireApproval)
@@ -277,6 +380,24 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	err := c.Execute()
 	Ok(t, err)
 	Equals(t, "override", passedConfig.GithubToken)
+}
+
+func TestExecute_EnvVars(t *testing.T) {
+	t.Log("Setting flags by env var should work.")
+	os.Setenv("ATLANTIS_GH_TOKEN", "gh-token")                    // nolint: errcheck
+	os.Setenv("ATLANTIS_GH_WEBHOOK_SECRET", "gh-webhook")         // nolint: errcheck
+	os.Setenv("ATLANTIS_GITLAB_TOKEN", "gitlab-token")            // nolint: errcheck
+	os.Setenv("ATLANTIS_GITLAB_WEBHOOK_SECRET", "gitlab-webhook") // nolint: errcheck
+	c := setup(map[string]interface{}{
+		cmd.GHUserFlag:     "user",
+		cmd.GitlabUserFlag: "user",
+	})
+	err := c.Execute()
+	Ok(t, err)
+	Equals(t, "gh-token", passedConfig.GithubToken)
+	Equals(t, "gh-webhook", passedConfig.GithubWebHookSecret)
+	Equals(t, "gitlab-token", passedConfig.GitlabToken)
+	Equals(t, "gitlab-webhook", passedConfig.GitlabWebHookSecret)
 }
 
 func setup(flags map[string]interface{}) *cobra.Command {

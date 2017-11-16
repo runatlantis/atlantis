@@ -13,21 +13,24 @@ import (
 	"github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
 	"github.com/hootsuite/atlantis/server/events"
-	"github.com/hootsuite/atlantis/server/events/github"
 	"github.com/hootsuite/atlantis/server/events/locking"
 	"github.com/hootsuite/atlantis/server/events/locking/boltdb"
 	"github.com/hootsuite/atlantis/server/events/run"
 	"github.com/hootsuite/atlantis/server/events/terraform"
+	"github.com/hootsuite/atlantis/server/events/vcs"
 	"github.com/hootsuite/atlantis/server/logging"
 	"github.com/hootsuite/atlantis/server/static"
+	"github.com/lkysow/go-gitlab"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	"github.com/urfave/negroni"
+	"flag"
 )
 
 const LockRouteName = "lock-detail"
 
-// Server listens for GitHub events and runs the necessary Atlantis command
+// Server runs the Atlantis web server. It's used for webhook requests and the
+// Atlantis UI.
 type Server struct {
 	Router             *mux.Router
 	Port               int
@@ -50,22 +53,43 @@ type Config struct {
 	GithubToken         string `mapstructure:"gh-token"`
 	GithubUser          string `mapstructure:"gh-user"`
 	GithubWebHookSecret string `mapstructure:"gh-webhook-secret"`
+	GitlabHostname      string `mapstructure:"gitlab-hostname"`
+	GitlabToken         string `mapstructure:"gitlab-token"`
+	GitlabUser          string `mapstructure:"gitlab-user"`
+	GitlabWebHookSecret string `mapstructure:"gitlab-webhook-secret"`
 	LogLevel            string `mapstructure:"log-level"`
 	Port                int    `mapstructure:"port"`
 	RequireApproval     bool   `mapstructure:"require-approval"`
 }
 
 func NewServer(config Config) (*Server, error) {
-	githubClient, err := github.NewClient(config.GithubHostname, config.GithubUser, config.GithubToken)
-	if err != nil {
-		return nil, err
+	var supportedVCSHosts []vcs.Host
+	var githubClient *vcs.GithubClient
+	var gitlabClient *vcs.GitlabClient
+	if config.GithubUser != "" {
+		supportedVCSHosts = append(supportedVCSHosts, vcs.Github)
+		var err error
+		githubClient, err = vcs.NewGithubClient(config.GithubHostname, config.GithubUser, config.GithubToken)
+		if err != nil {
+			return nil, err
+		}
 	}
-	githubStatus := &events.GithubStatus{Client: githubClient}
+	if config.GitlabUser != "" {
+		supportedVCSHosts = append(supportedVCSHosts, vcs.Gitlab)
+		gitlabClient = &vcs.GitlabClient{
+			Client: gitlab.NewClient(nil, config.GitlabToken),
+		}
+	}
+	vcsClient := vcs.NewDefaultClientProxy(githubClient, gitlabClient)
+	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient}
 	terraformClient, err := terraform.NewClient()
-	if err != nil {
+	// The flag.Lookup call is to detect if we're running in a unit test. If we
+	// are, then we don't error out because we don't have/want terraform
+	// installed on our CI system where the unit tests run.
+	if err != nil && flag.Lookup("test.v") == nil {
 		return nil, errors.Wrap(err, "initializing terraform")
 	}
-	githubComments := &events.GithubCommentRenderer{}
+	markdownRenderer := &events.MarkdownRenderer{}
 	boltdb, err := boltdb.New(config.DataDir)
 	if err != nil {
 		return nil, err
@@ -84,7 +108,7 @@ func NewServer(config Config) (*Server, error) {
 		Terraform:    terraformClient,
 	}
 	applyExecutor := &events.ApplyExecutor{
-		Github:            githubClient,
+		VCSClient:         vcsClient,
 		Terraform:         terraformClient,
 		RequireApproval:   config.RequireApproval,
 		Run:               run,
@@ -92,17 +116,17 @@ func NewServer(config Config) (*Server, error) {
 		ProjectPreExecute: projectPreExecute,
 	}
 	planExecutor := &events.PlanExecutor{
-		Github:            githubClient,
+		VCSClient:         vcsClient,
 		Terraform:         terraformClient,
 		Run:               run,
 		Workspace:         workspace,
 		ProjectPreExecute: projectPreExecute,
 		Locker:            lockingClient,
-		ModifiedProject:   &events.ProjectFinder{},
+		ProjectFinder:     &events.ProjectFinder{},
 	}
 	helpExecutor := &events.HelpExecutor{}
 	pullClosedExecutor := &events.PullClosedExecutor{
-		Github:    githubClient,
+		VCSClient: vcsClient,
 		Locker:    lockingClient,
 		Workspace: workspace,
 	}
@@ -110,26 +134,33 @@ func NewServer(config Config) (*Server, error) {
 	eventParser := &events.EventParser{
 		GithubUser:  config.GithubUser,
 		GithubToken: config.GithubToken,
+		GitlabUser:  config.GitlabUser,
+		GitlabToken: config.GitlabToken,
 	}
 	commandHandler := &events.CommandHandler{
-		ApplyExecutor:     applyExecutor,
-		PlanExecutor:      planExecutor,
-		HelpExecutor:      helpExecutor,
-		LockURLGenerator:  planExecutor,
-		EventParser:       eventParser,
-		GHClient:          githubClient,
-		GHStatus:          githubStatus,
-		EnvLocker:         concurrentRunLocker,
-		GHCommentRenderer: githubComments,
-		Logger:            logger,
+		ApplyExecutor:            applyExecutor,
+		PlanExecutor:             planExecutor,
+		HelpExecutor:             helpExecutor,
+		LockURLGenerator:         planExecutor,
+		EventParser:              eventParser,
+		VCSClient:                vcsClient,
+		GithubPullGetter:         githubClient,
+		GitlabMergeRequestGetter: gitlabClient,
+		CommitStatusUpdater:      commitStatusUpdater,
+		EnvLocker:                concurrentRunLocker,
+		MarkdownRenderer:         markdownRenderer,
+		Logger:                   logger,
 	}
 	eventsController := &EventsController{
-		CommandRunner:       commandHandler,
-		PullCleaner:         pullClosedExecutor,
-		Parser:              eventParser,
-		Logger:              logger,
-		GithubWebHookSecret: []byte(config.GithubWebHookSecret),
-		Validator:           &GHRequestValidation{},
+		CommandRunner:          commandHandler,
+		PullCleaner:            pullClosedExecutor,
+		Parser:                 eventParser,
+		Logger:                 logger,
+		GithubWebHookSecret:    []byte(config.GithubWebHookSecret),
+		GithubRequestValidator: &DefaultGithubRequestValidator{},
+		GitlabRequestParser:    &DefaultGitlabRequestParser{},
+		GitlabWebHookSecret:    []byte(config.GitlabWebHookSecret),
+		SupportedVCSHosts:      supportedVCSHosts,
 	}
 	router := mux.NewRouter()
 	return &Server{
@@ -270,7 +301,7 @@ func (s *Server) DeleteLock(w http.ResponseWriter, _ *http.Request, id string) {
 }
 
 // postEvents handles POST requests to our /events endpoint. These should be
-// GitHub webhook requests.
+// VCS webhook requests.
 func (s *Server) postEvents(w http.ResponseWriter, r *http.Request) {
 	s.EventsController.Post(w, r)
 }

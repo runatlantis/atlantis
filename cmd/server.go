@@ -25,6 +25,10 @@ const (
 	GHTokenFlag         = "gh-token"
 	GHUserFlag          = "gh-user"
 	GHWebHookSecret     = "gh-webhook-secret"
+	GitlabHostnameFlag  = "gitlab-hostname"
+	GitlabTokenFlag     = "gitlab-token"
+	GitlabUserFlag      = "gitlab-user"
+	GitlabWebHookSecret = "gitlab-webhook-secret"
 	LogLevelFlag        = "log-level"
 	PortFlag            = "port"
 	RequireApprovalFlag = "require-approval"
@@ -50,18 +54,41 @@ var stringFlags = []stringFlag{
 		value:       "github.com",
 	},
 	{
+		name:        GHUserFlag,
+		description: "GitHub username of API user.",
+	},
+	{
 		name:        GHTokenFlag,
-		description: "[REQUIRED] GitHub token of API user. Can also be specified via the ATLANTIS_GH_TOKEN environment variable.",
+		description: "GitHub token of API user. Can also be specified via the ATLANTIS_GH_TOKEN environment variable.",
 		env:         "ATLANTIS_GH_TOKEN",
 	},
 	{
-		name:        GHUserFlag,
-		description: "[REQUIRED] GitHub username of API user.",
+		name: GHWebHookSecret,
+		description: "Optional secret used to validate GitHub webhooks (see https://developer.github.com/webhooks/securing/)." +
+			" If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitHub. " +
+			"Can also be specified via the ATLANTIS_GH_WEBHOOK_SECRET environment variable.",
+		env: "ATLANTIS_GH_WEBHOOK_SECRET",
 	},
 	{
-		name:        GHWebHookSecret,
-		description: "Optional secret used for GitHub webhooks (see https://developer.github.com/webhooks/securing/). If not specified, Atlantis won't validate the incoming webhook call.",
-		env:         "ATLANTIS_GH_WEBHOOK_SECRET",
+		name:        GitlabHostnameFlag,
+		description: "Hostname of your GitLab Enterprise installation. If using gitlab.com, no need to set.",
+		value:       "gitlab.com",
+	},
+	{
+		name:        GitlabUserFlag,
+		description: "GitLab username of API user.",
+	},
+	{
+		name:        GitlabTokenFlag,
+		description: "GitLab token of API user. Can also be specified via the ATLANTIS_GITLAB_TOKEN environment variable.",
+		env:         "ATLANTIS_GITLAB_TOKEN",
+	},
+	{
+		name:        GitlabWebHookSecret,
+		description: "Optional secret used to validate GitLab webhooks." +
+			" If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitLab. " +
+			"Can also be specified via the ATLANTIS_GITLAB_WEBHOOK_SECRET environment variable.",
+		env: "ATLANTIS_GITLAB_WEBHOOK_SECRET",
 	},
 	{
 		name:        LogLevelFlag,
@@ -206,7 +233,7 @@ func (s *ServerCmd) run() error {
 	if err := setDataDir(&config); err != nil {
 		return err
 	}
-	sanitizeGithubUser(&config)
+	trimAtSymbolFromUsers(&config)
 
 	// Config looks good. Start the server.
 	server, err := s.ServerCreator.NewServer(config)
@@ -221,11 +248,23 @@ func validate(config server.Config) error {
 	if logLevel != "debug" && logLevel != "info" && logLevel != "warn" && logLevel != "error" {
 		return errors.New("invalid log level: not one of debug, info, warn, error")
 	}
-	if config.GithubUser == "" {
-		return fmt.Errorf("--%s must be set", GHUserFlag)
+	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GitlabUserFlag, GitlabTokenFlag)
+
+	// The following combinations are valid.
+	// 1. github user and token
+	// 2. gitlab user and token
+	// 3. all 4 set
+	// We validate using contradiction (I think).
+	if config.GithubUser != "" && config.GithubToken == "" || config.GithubToken != "" && config.GithubUser == "" {
+		return vcsErr
 	}
-	if config.GithubToken == "" {
-		return fmt.Errorf("--%s must be set", GHTokenFlag)
+	if config.GitlabUser != "" && config.GitlabToken == "" || config.GitlabToken != "" && config.GitlabUser == "" {
+		return vcsErr
+	}
+	// At this point, we know that there can't be a single user/token without
+	// its pair, but we haven't checked if any user/token is set at all.
+	if config.GithubUser == "" && config.GitlabUser == "" {
+		return vcsErr
 	}
 	return nil
 }
@@ -256,9 +295,10 @@ func setDataDir(config *server.Config) error {
 	return nil
 }
 
-// sanitizeGithubUser trims @ from the front of the github username if it exists.
-func sanitizeGithubUser(config *server.Config) {
+// trimAtSymbolFromUsers trims @ from the front of the github and gitlab usernames
+func trimAtSymbolFromUsers(config *server.Config) {
 	config.GithubUser = strings.TrimPrefix(config.GithubUser, "@")
+	config.GitlabUser = strings.TrimPrefix(config.GitlabUser, "@")
 }
 
 // withErrPrint prints out any errors to a terminal in red.

@@ -1,5 +1,7 @@
 package events
 
+import "github.com/hootsuite/atlantis/server/events/vcs"
+
 type ProjectResult struct {
 	Path         string
 	Error        error
@@ -8,12 +10,12 @@ type ProjectResult struct {
 	ApplySuccess string
 }
 
-func (p ProjectResult) Status() Status {
+func (p ProjectResult) Status() vcs.CommitStatus {
 	if p.Error != nil {
-		return Error
+		return vcs.Failed
 	}
 	if p.Failure != "" {
-		return Failure
+		return vcs.Failed
 	}
-	return Success
+	return vcs.Success
 }

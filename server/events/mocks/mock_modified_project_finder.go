@@ -19,7 +19,7 @@ func NewMockModifiedProjectFinder() *MockModifiedProjectFinder {
 	return &MockModifiedProjectFinder{fail: pegomock.GlobalFailHandler}
 }
 
-func (mock *MockModifiedProjectFinder) GetModified(log *logging.SimpleLogger, modifiedFiles []string, repoFullName string) []models.Project {
+func (mock *MockModifiedProjectFinder) FindModified(log *logging.SimpleLogger, modifiedFiles []string, repoFullName string) []models.Project {
 	params := []pegomock.Param{log, modifiedFiles, repoFullName}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("FindModified", params, []reflect.Type{reflect.TypeOf((*[]models.Project)(nil)).Elem()})
 	var ret0 []models.Project
@@ -49,23 +49,23 @@ type VerifierModifiedProjectFinder struct {
 	inOrderContext         *pegomock.InOrderContext
 }
 
-func (verifier *VerifierModifiedProjectFinder) GetModified(log *logging.SimpleLogger, modifiedFiles []string, repoFullName string) *ModifiedProjectFinder_GetModified_OngoingVerification {
+func (verifier *VerifierModifiedProjectFinder) FindModified(log *logging.SimpleLogger, modifiedFiles []string, repoFullName string) *ModifiedProjectFinder_FindModified_OngoingVerification {
 	params := []pegomock.Param{log, modifiedFiles, repoFullName}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "FindModified", params)
-	return &ModifiedProjectFinder_GetModified_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+	return &ModifiedProjectFinder_FindModified_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type ModifiedProjectFinder_GetModified_OngoingVerification struct {
+type ModifiedProjectFinder_FindModified_OngoingVerification struct {
 	mock              *MockModifiedProjectFinder
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *ModifiedProjectFinder_GetModified_OngoingVerification) GetCapturedArguments() (*logging.SimpleLogger, []string, string) {
+func (c *ModifiedProjectFinder_FindModified_OngoingVerification) GetCapturedArguments() (*logging.SimpleLogger, []string, string) {
 	log, modifiedFiles, repoFullName := c.GetAllCapturedArguments()
 	return log[len(log)-1], modifiedFiles[len(modifiedFiles)-1], repoFullName[len(repoFullName)-1]
 }
 
-func (c *ModifiedProjectFinder_GetModified_OngoingVerification) GetAllCapturedArguments() (_param0 []*logging.SimpleLogger, _param1 [][]string, _param2 []string) {
+func (c *ModifiedProjectFinder_FindModified_OngoingVerification) GetAllCapturedArguments() (_param0 []*logging.SimpleLogger, _param1 [][]string, _param2 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]*logging.SimpleLogger, len(params[0]))

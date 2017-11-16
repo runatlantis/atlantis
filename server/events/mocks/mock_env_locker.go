@@ -4,8 +4,9 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
 	"reflect"
+
+	pegomock "github.com/petergtz/pegomock"
 )
 
 type MockEnvLocker struct {

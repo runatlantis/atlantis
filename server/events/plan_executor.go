@@ -5,11 +5,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hootsuite/atlantis/server/events/github"
 	"github.com/hootsuite/atlantis/server/events/locking"
 	"github.com/hootsuite/atlantis/server/events/models"
 	"github.com/hootsuite/atlantis/server/events/run"
 	"github.com/hootsuite/atlantis/server/events/terraform"
+	"github.com/hootsuite/atlantis/server/events/vcs"
 	"github.com/pkg/errors"
 )
 
@@ -22,20 +22,19 @@ type LockURLGenerator interface {
 }
 
 // atlantisUserTFVar is the name of the variable we execute terraform
-// with containing the github username of who is running the command
+// with, containing the vcs username of who is running the command
 const atlantisUserTFVar = "atlantis_user"
 
-// PlanExecutor handles everything related to running terraform plan
-// including integration with S3, Terraform, and GitHub
+// PlanExecutor handles everything related to running terraform plan.
 type PlanExecutor struct {
-	Github            github.Client
+	VCSClient         vcs.ClientProxy
 	Terraform         terraform.Runner
 	Locker            locking.Locker
 	LockURL           func(id string) (url string)
 	Run               run.Runner
 	Workspace         Workspace
 	ProjectPreExecute ProjectPreExecutor
-	ModifiedProject   ModifiedProjectFinder
+	ProjectFinder     ModifiedProjectFinder
 }
 
 type PlanSuccess struct {
@@ -49,12 +48,12 @@ func (p *PlanExecutor) SetLockURL(f func(id string) (url string)) {
 
 func (p *PlanExecutor) Execute(ctx *CommandContext) CommandResponse {
 	// figure out what projects have been modified so we know where to run plan
-	modifiedFiles, err := p.Github.GetModifiedFiles(ctx.BaseRepo, ctx.Pull)
+	modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.BaseRepo, ctx.Pull, ctx.VCSHost)
 	if err != nil {
 		return CommandResponse{Error: errors.Wrap(err, "getting modified files")}
 	}
 	ctx.Log.Info("found %d files modified in this pull request", len(modifiedFiles))
-	projects := p.ModifiedProject.FindModified(ctx.Log, modifiedFiles, ctx.BaseRepo.FullName)
+	projects := p.ProjectFinder.FindModified(ctx.Log, modifiedFiles, ctx.BaseRepo.FullName)
 	if len(projects) == 0 {
 		return CommandResponse{Failure: "No Terraform files were modified."}
 	}

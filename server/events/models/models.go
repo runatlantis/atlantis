@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Repo is a GitHub repository.
+// Repo is a VCS repository.
 type Repo struct {
 	// FullName is the owner and repo name separated
 	// by a "/", ex. "hootsuite/atlantis".
@@ -25,26 +25,35 @@ type Repo struct {
 	SanitizedCloneURL string
 }
 
-// PullRequest is a GitHub pull request.
+// PullRequest is a VCS pull request.
+// GitLab calls these Merge Requests.
 type PullRequest struct {
 	// Num is the pull request number or ID.
 	Num int
 	// HeadCommit points to the head of the branch that is being
 	// pull requested into the base.
 	HeadCommit string
-	// BaseCommit points to the head of the branch that this
-	// pull request will be merged into.
-	BaseCommit string
 	// URL is the url of the pull request.
 	// ex. "https://github.com/hootsuite/atlantis/pull/1"
 	URL string
 	// Branch is the name of the head branch (not the base).
 	Branch string
-	// Author is the GitHub username of the pull request author.
+	// Author is the username of the pull request author.
 	Author string
+	// State will be one of Open or Closed.
+	// Gitlab supports an additional "merged" state but Github doesn't so we map
+	// merged to Closed.
+	State PullRequestState
 }
 
-// User is a GitHub user.
+type PullRequestState int
+
+const (
+	Open PullRequestState = iota
+	Closed
+)
+
+// User is a VCS user.
 type User struct {
 	Username string
 }
@@ -56,7 +65,7 @@ type ProjectLock struct {
 	// Pull is the pull request from which the command was run that
 	// created this lock.
 	Pull PullRequest
-	// User is the GitHub username of the user that ran the command
+	// User is the username of the user that ran the command
 	// that created this lock.
 	User User
 	// Env is the Terraform environment that this

@@ -20,6 +20,16 @@ import (
 	. "github.com/petergtz/pegomock"
 )
 
+func TestNewServer(t *testing.T) {
+	t.Log("Run through NewServer constructor")
+	tmpDir, err := ioutil.TempDir("", "")
+	Ok(t, err)
+	_, err = server.NewServer(server.Config{
+		DataDir: tmpDir,
+	})
+	Ok(t, err)
+}
+
 func TestIndex_LockErr(t *testing.T) {
 	t.Log("index should return a 503 if unable to list locks")
 	RegisterMockTestingT(t)

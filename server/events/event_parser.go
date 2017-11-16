@@ -7,7 +7,11 @@ import (
 
 	"github.com/google/go-github/github"
 	"github.com/hootsuite/atlantis/server/events/models"
+	"github.com/hootsuite/atlantis/server/events/vcs"
+	"github.com/lkysow/go-gitlab"
 )
+
+const gitlabPullOpened = "opened"
 
 //go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_event_parsing.go EventParsing
 
@@ -19,20 +23,25 @@ type Command struct {
 }
 
 type EventParsing interface {
-	DetermineCommand(comment *github.IssueCommentEvent) (*Command, error)
-	ExtractCommentData(comment *github.IssueCommentEvent) (baseRepo models.Repo, user models.User, pull models.PullRequest, err error)
-	ExtractPullData(pull *github.PullRequest) (models.PullRequest, models.Repo, error)
-	ExtractRepoData(ghRepo *github.Repository) (models.Repo, error)
+	DetermineCommand(comment string, vcsHost vcs.Host) (*Command, error)
+	ParseGithubIssueCommentEvent(comment *github.IssueCommentEvent) (baseRepo models.Repo, user models.User, pullNum int, err error)
+	ParseGithubPull(pull *github.PullRequest) (models.PullRequest, models.Repo, error)
+	ParseGithubRepo(ghRepo *github.Repository) (models.Repo, error)
+	ParseGitlabMergeEvent(event gitlab.MergeEvent) (models.PullRequest, models.Repo)
+	ParseGitlabMergeCommentEvent(event gitlab.MergeCommentEvent) (baseRepo models.Repo, headRepo models.Repo, user models.User)
+	ParseGitlabMergeRequest(mr *gitlab.MergeRequest) models.PullRequest
 }
 
 type EventParser struct {
 	GithubUser  string
 	GithubToken string
+	GitlabUser  string
+	GitlabToken string
 }
 
 // DetermineCommand parses the comment as an atlantis command. If it succeeds,
 // it returns the command. Otherwise it returns error.
-func (e *EventParser) DetermineCommand(comment *github.IssueCommentEvent) (*Command, error) {
+func (e *EventParser) DetermineCommand(comment string, vcsHost vcs.Host) (*Command, error) {
 	// valid commands contain:
 	// the initial "executable" name, 'run' or 'atlantis' or '@GithubUser' where GithubUser is the api user atlantis is running as
 	// then a command, either 'plan', 'apply', or 'help'
@@ -44,12 +53,8 @@ func (e *EventParser) DetermineCommand(comment *github.IssueCommentEvent) (*Comm
 	// @GithubUser plan staging
 	// atlantis plan staging --verbose
 	// atlantis plan staging --verbose -key=value -key2 value2
-	commentBody := comment.Comment.GetBody()
-	if commentBody == "" {
-		return nil, errors.New("comment.body is null")
-	}
 	err := errors.New("not an Atlantis command")
-	args := strings.Fields(commentBody)
+	args := strings.Fields(comment)
 	if len(args) < 2 {
 		return nil, err
 	}
@@ -58,7 +63,11 @@ func (e *EventParser) DetermineCommand(comment *github.IssueCommentEvent) (*Comm
 	verbose := false
 	var flags []string
 
-	if !e.stringInSlice(args[0], []string{"run", "atlantis", "@" + e.GithubUser}) {
+	vcsUser := e.GithubUser
+	if vcsHost == vcs.Gitlab {
+		vcsUser = e.GitlabUser
+	}
+	if !e.stringInSlice(args[0], []string{"run", "atlantis", "@" + vcsUser}) {
 		return nil, err
 	}
 	if !e.stringInSlice(args[1], []string{"plan", "apply", "help"}) {
@@ -99,51 +108,34 @@ func (e *EventParser) DetermineCommand(comment *github.IssueCommentEvent) (*Comm
 	return c, nil
 }
 
-func (e *EventParser) ExtractCommentData(comment *github.IssueCommentEvent) (baseRepo models.Repo, user models.User, pull models.PullRequest, err error) {
-	baseRepo, err = e.ExtractRepoData(comment.Repo)
+func (e *EventParser) ParseGithubIssueCommentEvent(comment *github.IssueCommentEvent) (baseRepo models.Repo, user models.User, pullNum int, err error) {
+	baseRepo, err = e.ParseGithubRepo(comment.Repo)
 	if err != nil {
 		return
 	}
-	pullNum := comment.Issue.GetNumber()
+	if comment.Comment == nil || comment.Comment.User.GetLogin() == "" {
+		err = errors.New("comment.user.login is null")
+		return
+	}
+	commentorUsername := comment.Comment.User.GetLogin()
+	user = models.User{
+		Username: commentorUsername,
+	}
+	pullNum = comment.Issue.GetNumber()
 	if pullNum == 0 {
 		err = errors.New("issue.number is null")
 		return
 	}
-	pullCreator := comment.Issue.User.GetLogin()
-	if pullCreator == "" {
-		err = errors.New("issue.user.login is null")
-		return
-	}
-	htmlURL := comment.Issue.GetHTMLURL()
-	if htmlURL == "" {
-		err = errors.New("issue.html_url is null")
-		return
-	}
-	commentorUsername := comment.Comment.User.GetLogin()
-	if commentorUsername == "" {
-		err = errors.New("comment.user.login is null")
-		return
-	}
-	user = models.User{
-		Username: commentorUsername,
-	}
-	pull = models.PullRequest{
-		Num: pullNum,
-	}
 	return
 }
 
-func (e *EventParser) ExtractPullData(pull *github.PullRequest) (models.PullRequest, models.Repo, error) {
+func (e *EventParser) ParseGithubPull(pull *github.PullRequest) (models.PullRequest, models.Repo, error) {
 	var pullModel models.PullRequest
 	var headRepoModel models.Repo
 
 	commit := pull.Head.GetSHA()
 	if commit == "" {
 		return pullModel, headRepoModel, errors.New("head.sha is null")
-	}
-	base := pull.Base.GetSHA()
-	if base == "" {
-		return pullModel, headRepoModel, errors.New("base.sha is null")
 	}
 	url := pull.GetHTMLURL()
 	if url == "" {
@@ -162,22 +154,27 @@ func (e *EventParser) ExtractPullData(pull *github.PullRequest) (models.PullRequ
 		return pullModel, headRepoModel, errors.New("number is null")
 	}
 
-	headRepoModel, err := e.ExtractRepoData(pull.Head.Repo)
+	headRepoModel, err := e.ParseGithubRepo(pull.Head.Repo)
 	if err != nil {
 		return pullModel, headRepoModel, err
 	}
 
+	pullState := models.Closed
+	if pull.GetState() == "open" {
+		pullState = models.Open
+	}
+
 	return models.PullRequest{
-		BaseCommit: base,
 		Author:     authorUsername,
 		Branch:     branch,
 		HeadCommit: commit,
 		URL:        url,
 		Num:        num,
+		State:      pullState,
 	}, headRepoModel, nil
 }
 
-func (e *EventParser) ExtractRepoData(ghRepo *github.Repository) (models.Repo, error) {
+func (e *EventParser) ParseGithubRepo(ghRepo *github.Repository) (models.Repo, error) {
 	var repo models.Repo
 	repoFullName := ghRepo.GetFullName()
 	if repoFullName == "" {
@@ -196,7 +193,7 @@ func (e *EventParser) ExtractRepoData(ghRepo *github.Repository) (models.Repo, e
 		return repo, errors.New("repository.clone_url is null")
 	}
 
-	// construct HTTPS repo clone url string with username and password
+	// Construct HTTPS repo clone url string with username and password.
 	repoCloneURL := strings.Replace(repoSanitizedCloneURL, "https://", fmt.Sprintf("https://%s:%s@", e.GithubUser, e.GithubToken), -1)
 
 	return models.Repo{
@@ -206,6 +203,100 @@ func (e *EventParser) ExtractRepoData(ghRepo *github.Repository) (models.Repo, e
 		SanitizedCloneURL: repoSanitizedCloneURL,
 		Name:              repoName,
 	}, nil
+}
+
+func (e *EventParser) ParseGitlabMergeEvent(event gitlab.MergeEvent) (models.PullRequest, models.Repo) {
+	modelState := models.Closed
+	if event.ObjectAttributes.State == gitlabPullOpened {
+		modelState = models.Open
+	}
+	// GitLab also has a "merged" state, but we map that to Closed so we don't
+	// need to check for it.
+
+	pull := models.PullRequest{
+		URL:        event.ObjectAttributes.URL,
+		Author:     event.User.Username,
+		Num:        event.ObjectAttributes.IID,
+		HeadCommit: event.ObjectAttributes.LastCommit.ID,
+		Branch:     event.ObjectAttributes.SourceBranch,
+		State:      modelState,
+	}
+
+	cloneURL := e.addGitlabAuth(event.Project.GitHTTPURL)
+	// Get owner and name from PathWithNamespace because the fields
+	// event.Project.Name and event.Project.Owner can have capitals.
+	owner, name := e.getOwnerAndName(event.Project.PathWithNamespace)
+	repo := models.Repo{
+		FullName:          event.Project.PathWithNamespace,
+		Name:              name,
+		SanitizedCloneURL: event.Project.GitHTTPURL,
+		Owner:             owner,
+		CloneURL:          cloneURL,
+	}
+	return pull, repo
+}
+
+// addGitlabAuth adds gitlab username/password to the cloneURL.
+// We support http and https URLs because GitLab's docs have http:// URLs whereas
+// their API responses have https://.
+// Ex. https://gitlab.com/owner/repo.git => https://uname:pass@gitlab.com/owner/repo.git
+func (e *EventParser) addGitlabAuth(cloneURL string) string {
+	httpsReplaced := strings.Replace(cloneURL, "https://", fmt.Sprintf("https://%s:%s@", e.GitlabUser, e.GitlabToken), -1)
+	return strings.Replace(httpsReplaced, "http://", fmt.Sprintf("http://%s:%s@", e.GitlabUser, e.GitlabToken), -1)
+}
+
+// getOwnerAndName takes pathWithNamespace that should look like "owner/repo"
+// and returns "owner", "repo"
+func (e *EventParser) getOwnerAndName(pathWithNamespace string) (string, string) {
+	pathSplit := strings.Split(pathWithNamespace, "/")
+	if len(pathSplit) > 1 {
+		return pathSplit[0], pathSplit[1]
+	}
+	return "", ""
+}
+
+// ParseGitlabMergeCommentEvent creates Atlantis models out of a GitLab event.
+func (e *EventParser) ParseGitlabMergeCommentEvent(event gitlab.MergeCommentEvent) (baseRepo models.Repo, headRepo models.Repo, user models.User) {
+	// Get owner and name from PathWithNamespace because the fields
+	// event.Project.Name and event.Project.Owner can have capitals.
+	owner, name := e.getOwnerAndName(event.Project.PathWithNamespace)
+	baseRepo = models.Repo{
+		FullName:          event.Project.PathWithNamespace,
+		Name:              name,
+		SanitizedCloneURL: event.Project.GitHTTPURL,
+		Owner:             owner,
+		CloneURL:          e.addGitlabAuth(event.Project.GitHTTPURL),
+	}
+	user = models.User{
+		Username: event.User.Username,
+	}
+	owner, name = e.getOwnerAndName(event.MergeRequest.Source.PathWithNamespace)
+	headRepo = models.Repo{
+		FullName:          event.MergeRequest.Source.PathWithNamespace,
+		Name:              name,
+		SanitizedCloneURL: event.MergeRequest.Source.GitHTTPURL,
+		Owner:             owner,
+		CloneURL:          e.addGitlabAuth(event.MergeRequest.Source.GitHTTPURL),
+	}
+	return
+}
+
+func (e *EventParser) ParseGitlabMergeRequest(mr *gitlab.MergeRequest) models.PullRequest {
+	pullState := models.Closed
+	if mr.State == gitlabPullOpened {
+		pullState = models.Open
+	}
+	// GitLab also has a "merged" state, but we map that to Closed so we don't
+	// need to check for it.
+
+	return models.PullRequest{
+		URL:        mr.WebURL,
+		Author:     mr.Author.Username,
+		Num:        mr.IID,
+		HeadCommit: mr.SHA,
+		Branch:     mr.SourceBranch,
+		State:      pullState,
+	}
 }
 
 func (e *EventParser) stringInSlice(a string, list []string) bool {

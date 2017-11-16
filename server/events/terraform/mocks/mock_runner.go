@@ -4,10 +4,11 @@
 package mocks
 
 import (
+	"reflect"
+
 	go_version "github.com/hashicorp/go-version"
 	logging "github.com/hootsuite/atlantis/server/logging"
 	pegomock "github.com/petergtz/pegomock"
-	"reflect"
 )
 
 type MockRunner struct {

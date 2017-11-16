@@ -4,11 +4,14 @@
 package mocks
 
 import (
+	"reflect"
+
 	github "github.com/google/go-github/github"
 	events "github.com/hootsuite/atlantis/server/events"
 	models "github.com/hootsuite/atlantis/server/events/models"
+	vcs "github.com/hootsuite/atlantis/server/events/vcs"
+	go_gitlab "github.com/lkysow/go-gitlab"
 	pegomock "github.com/petergtz/pegomock"
-	"reflect"
 )
 
 type MockEventParsing struct {
@@ -19,8 +22,8 @@ func NewMockEventParsing() *MockEventParsing {
 	return &MockEventParsing{fail: pegomock.GlobalFailHandler}
 }
 
-func (mock *MockEventParsing) DetermineCommand(comment *github.IssueCommentEvent) (*events.Command, error) {
-	params := []pegomock.Param{comment}
+func (mock *MockEventParsing) DetermineCommand(comment string, vcsHost vcs.Host) (*events.Command, error) {
+	params := []pegomock.Param{comment, vcsHost}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("DetermineCommand", params, []reflect.Type{reflect.TypeOf((**events.Command)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 *events.Command
 	var ret1 error
@@ -35,12 +38,12 @@ func (mock *MockEventParsing) DetermineCommand(comment *github.IssueCommentEvent
 	return ret0, ret1
 }
 
-func (mock *MockEventParsing) ExtractCommentData(comment *github.IssueCommentEvent) (models.Repo, models.User, models.PullRequest, error) {
+func (mock *MockEventParsing) ParseGithubIssueCommentEvent(comment *github.IssueCommentEvent) (models.Repo, models.User, int, error) {
 	params := []pegomock.Param{comment}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("ExtractCommentData", params, []reflect.Type{reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.User)(nil)).Elem(), reflect.TypeOf((*models.PullRequest)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseGithubIssueCommentEvent", params, []reflect.Type{reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.User)(nil)).Elem(), reflect.TypeOf((*int)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 models.Repo
 	var ret1 models.User
-	var ret2 models.PullRequest
+	var ret2 int
 	var ret3 error
 	if len(result) != 0 {
 		if result[0] != nil {
@@ -50,7 +53,7 @@ func (mock *MockEventParsing) ExtractCommentData(comment *github.IssueCommentEve
 			ret1 = result[1].(models.User)
 		}
 		if result[2] != nil {
-			ret2 = result[2].(models.PullRequest)
+			ret2 = result[2].(int)
 		}
 		if result[3] != nil {
 			ret3 = result[3].(error)
@@ -59,9 +62,9 @@ func (mock *MockEventParsing) ExtractCommentData(comment *github.IssueCommentEve
 	return ret0, ret1, ret2, ret3
 }
 
-func (mock *MockEventParsing) ExtractPullData(pull *github.PullRequest) (models.PullRequest, models.Repo, error) {
+func (mock *MockEventParsing) ParseGithubPull(pull *github.PullRequest) (models.PullRequest, models.Repo, error) {
 	params := []pegomock.Param{pull}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("ExtractPullData", params, []reflect.Type{reflect.TypeOf((*models.PullRequest)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseGithubPull", params, []reflect.Type{reflect.TypeOf((*models.PullRequest)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 models.PullRequest
 	var ret1 models.Repo
 	var ret2 error
@@ -79,9 +82,9 @@ func (mock *MockEventParsing) ExtractPullData(pull *github.PullRequest) (models.
 	return ret0, ret1, ret2
 }
 
-func (mock *MockEventParsing) ExtractRepoData(ghRepo *github.Repository) (models.Repo, error) {
+func (mock *MockEventParsing) ParseGithubRepo(ghRepo *github.Repository) (models.Repo, error) {
 	params := []pegomock.Param{ghRepo}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("ExtractRepoData", params, []reflect.Type{reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseGithubRepo", params, []reflect.Type{reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 models.Repo
 	var ret1 error
 	if len(result) != 0 {
@@ -93,6 +96,54 @@ func (mock *MockEventParsing) ExtractRepoData(ghRepo *github.Repository) (models
 		}
 	}
 	return ret0, ret1
+}
+
+func (mock *MockEventParsing) ParseGitlabMergeEvent(event go_gitlab.MergeEvent) (models.PullRequest, models.Repo) {
+	params := []pegomock.Param{event}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseGitlabMergeEvent", params, []reflect.Type{reflect.TypeOf((*models.PullRequest)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem()})
+	var ret0 models.PullRequest
+	var ret1 models.Repo
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(models.PullRequest)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(models.Repo)
+		}
+	}
+	return ret0, ret1
+}
+
+func (mock *MockEventParsing) ParseGitlabMergeCommentEvent(event go_gitlab.MergeCommentEvent) (models.Repo, models.Repo, models.User) {
+	params := []pegomock.Param{event}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseGitlabMergeCommentEvent", params, []reflect.Type{reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.User)(nil)).Elem()})
+	var ret0 models.Repo
+	var ret1 models.Repo
+	var ret2 models.User
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(models.Repo)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(models.Repo)
+		}
+		if result[2] != nil {
+			ret2 = result[2].(models.User)
+		}
+	}
+	return ret0, ret1, ret2
+}
+
+func (mock *MockEventParsing) ParseGitlabMergeRequest(mr *go_gitlab.MergeRequest) models.PullRequest {
+	params := []pegomock.Param{mr}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseGitlabMergeRequest", params, []reflect.Type{reflect.TypeOf((*models.PullRequest)(nil)).Elem()})
+	var ret0 models.PullRequest
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(models.PullRequest)
+		}
+	}
+	return ret0
 }
 
 func (mock *MockEventParsing) VerifyWasCalledOnce() *VerifierEventParsing {
@@ -113,8 +164,8 @@ type VerifierEventParsing struct {
 	inOrderContext         *pegomock.InOrderContext
 }
 
-func (verifier *VerifierEventParsing) DetermineCommand(comment *github.IssueCommentEvent) *EventParsing_DetermineCommand_OngoingVerification {
-	params := []pegomock.Param{comment}
+func (verifier *VerifierEventParsing) DetermineCommand(comment string, vcsHost vcs.Host) *EventParsing_DetermineCommand_OngoingVerification {
+	params := []pegomock.Param{comment, vcsHost}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "DetermineCommand", params)
 	return &EventParsing_DetermineCommand_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -124,39 +175,43 @@ type EventParsing_DetermineCommand_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *EventParsing_DetermineCommand_OngoingVerification) GetCapturedArguments() *github.IssueCommentEvent {
-	comment := c.GetAllCapturedArguments()
-	return comment[len(comment)-1]
+func (c *EventParsing_DetermineCommand_OngoingVerification) GetCapturedArguments() (string, vcs.Host) {
+	comment, vcsHost := c.GetAllCapturedArguments()
+	return comment[len(comment)-1], vcsHost[len(vcsHost)-1]
 }
 
-func (c *EventParsing_DetermineCommand_OngoingVerification) GetAllCapturedArguments() (_param0 []*github.IssueCommentEvent) {
+func (c *EventParsing_DetermineCommand_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []vcs.Host) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]*github.IssueCommentEvent, len(params[0]))
+		_param0 = make([]string, len(params[0]))
 		for u, param := range params[0] {
-			_param0[u] = param.(*github.IssueCommentEvent)
+			_param0[u] = param.(string)
+		}
+		_param1 = make([]vcs.Host, len(params[1]))
+		for u, param := range params[1] {
+			_param1[u] = param.(vcs.Host)
 		}
 	}
 	return
 }
 
-func (verifier *VerifierEventParsing) ExtractCommentData(comment *github.IssueCommentEvent) *EventParsing_ExtractCommentData_OngoingVerification {
+func (verifier *VerifierEventParsing) ParseGithubIssueCommentEvent(comment *github.IssueCommentEvent) *EventParsing_ParseGithubIssueCommentEvent_OngoingVerification {
 	params := []pegomock.Param{comment}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ExtractCommentData", params)
-	return &EventParsing_ExtractCommentData_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ParseGithubIssueCommentEvent", params)
+	return &EventParsing_ParseGithubIssueCommentEvent_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type EventParsing_ExtractCommentData_OngoingVerification struct {
+type EventParsing_ParseGithubIssueCommentEvent_OngoingVerification struct {
 	mock              *MockEventParsing
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *EventParsing_ExtractCommentData_OngoingVerification) GetCapturedArguments() *github.IssueCommentEvent {
+func (c *EventParsing_ParseGithubIssueCommentEvent_OngoingVerification) GetCapturedArguments() *github.IssueCommentEvent {
 	comment := c.GetAllCapturedArguments()
 	return comment[len(comment)-1]
 }
 
-func (c *EventParsing_ExtractCommentData_OngoingVerification) GetAllCapturedArguments() (_param0 []*github.IssueCommentEvent) {
+func (c *EventParsing_ParseGithubIssueCommentEvent_OngoingVerification) GetAllCapturedArguments() (_param0 []*github.IssueCommentEvent) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]*github.IssueCommentEvent, len(params[0]))
@@ -167,23 +222,23 @@ func (c *EventParsing_ExtractCommentData_OngoingVerification) GetAllCapturedArgu
 	return
 }
 
-func (verifier *VerifierEventParsing) ExtractPullData(pull *github.PullRequest) *EventParsing_ExtractPullData_OngoingVerification {
+func (verifier *VerifierEventParsing) ParseGithubPull(pull *github.PullRequest) *EventParsing_ParseGithubPull_OngoingVerification {
 	params := []pegomock.Param{pull}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ExtractPullData", params)
-	return &EventParsing_ExtractPullData_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ParseGithubPull", params)
+	return &EventParsing_ParseGithubPull_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type EventParsing_ExtractPullData_OngoingVerification struct {
+type EventParsing_ParseGithubPull_OngoingVerification struct {
 	mock              *MockEventParsing
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *EventParsing_ExtractPullData_OngoingVerification) GetCapturedArguments() *github.PullRequest {
+func (c *EventParsing_ParseGithubPull_OngoingVerification) GetCapturedArguments() *github.PullRequest {
 	pull := c.GetAllCapturedArguments()
 	return pull[len(pull)-1]
 }
 
-func (c *EventParsing_ExtractPullData_OngoingVerification) GetAllCapturedArguments() (_param0 []*github.PullRequest) {
+func (c *EventParsing_ParseGithubPull_OngoingVerification) GetAllCapturedArguments() (_param0 []*github.PullRequest) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]*github.PullRequest, len(params[0]))
@@ -194,28 +249,109 @@ func (c *EventParsing_ExtractPullData_OngoingVerification) GetAllCapturedArgumen
 	return
 }
 
-func (verifier *VerifierEventParsing) ExtractRepoData(ghRepo *github.Repository) *EventParsing_ExtractRepoData_OngoingVerification {
+func (verifier *VerifierEventParsing) ParseGithubRepo(ghRepo *github.Repository) *EventParsing_ParseGithubRepo_OngoingVerification {
 	params := []pegomock.Param{ghRepo}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ExtractRepoData", params)
-	return &EventParsing_ExtractRepoData_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ParseGithubRepo", params)
+	return &EventParsing_ParseGithubRepo_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type EventParsing_ExtractRepoData_OngoingVerification struct {
+type EventParsing_ParseGithubRepo_OngoingVerification struct {
 	mock              *MockEventParsing
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *EventParsing_ExtractRepoData_OngoingVerification) GetCapturedArguments() *github.Repository {
+func (c *EventParsing_ParseGithubRepo_OngoingVerification) GetCapturedArguments() *github.Repository {
 	ghRepo := c.GetAllCapturedArguments()
 	return ghRepo[len(ghRepo)-1]
 }
 
-func (c *EventParsing_ExtractRepoData_OngoingVerification) GetAllCapturedArguments() (_param0 []*github.Repository) {
+func (c *EventParsing_ParseGithubRepo_OngoingVerification) GetAllCapturedArguments() (_param0 []*github.Repository) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]*github.Repository, len(params[0]))
 		for u, param := range params[0] {
 			_param0[u] = param.(*github.Repository)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierEventParsing) ParseGitlabMergeEvent(event go_gitlab.MergeEvent) *EventParsing_ParseGitlabMergeEvent_OngoingVerification {
+	params := []pegomock.Param{event}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ParseGitlabMergeEvent", params)
+	return &EventParsing_ParseGitlabMergeEvent_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type EventParsing_ParseGitlabMergeEvent_OngoingVerification struct {
+	mock              *MockEventParsing
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *EventParsing_ParseGitlabMergeEvent_OngoingVerification) GetCapturedArguments() go_gitlab.MergeEvent {
+	event := c.GetAllCapturedArguments()
+	return event[len(event)-1]
+}
+
+func (c *EventParsing_ParseGitlabMergeEvent_OngoingVerification) GetAllCapturedArguments() (_param0 []go_gitlab.MergeEvent) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]go_gitlab.MergeEvent, len(params[0]))
+		for u, param := range params[0] {
+			_param0[u] = param.(go_gitlab.MergeEvent)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierEventParsing) ParseGitlabMergeCommentEvent(event go_gitlab.MergeCommentEvent) *EventParsing_ParseGitlabMergeCommentEvent_OngoingVerification {
+	params := []pegomock.Param{event}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ParseGitlabMergeCommentEvent", params)
+	return &EventParsing_ParseGitlabMergeCommentEvent_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type EventParsing_ParseGitlabMergeCommentEvent_OngoingVerification struct {
+	mock              *MockEventParsing
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *EventParsing_ParseGitlabMergeCommentEvent_OngoingVerification) GetCapturedArguments() go_gitlab.MergeCommentEvent {
+	event := c.GetAllCapturedArguments()
+	return event[len(event)-1]
+}
+
+func (c *EventParsing_ParseGitlabMergeCommentEvent_OngoingVerification) GetAllCapturedArguments() (_param0 []go_gitlab.MergeCommentEvent) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]go_gitlab.MergeCommentEvent, len(params[0]))
+		for u, param := range params[0] {
+			_param0[u] = param.(go_gitlab.MergeCommentEvent)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierEventParsing) ParseGitlabMergeRequest(mr *go_gitlab.MergeRequest) *EventParsing_ParseGitlabMergeRequest_OngoingVerification {
+	params := []pegomock.Param{mr}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ParseGitlabMergeRequest", params)
+	return &EventParsing_ParseGitlabMergeRequest_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type EventParsing_ParseGitlabMergeRequest_OngoingVerification struct {
+	mock              *MockEventParsing
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *EventParsing_ParseGitlabMergeRequest_OngoingVerification) GetCapturedArguments() *go_gitlab.MergeRequest {
+	mr := c.GetAllCapturedArguments()
+	return mr[len(mr)-1]
+}
+
+func (c *EventParsing_ParseGitlabMergeRequest_OngoingVerification) GetAllCapturedArguments() (_param0 []*go_gitlab.MergeRequest) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]*go_gitlab.MergeRequest, len(params[0]))
+		for u, param := range params[0] {
+			_param0[u] = param.(*go_gitlab.MergeRequest)
 		}
 	}
 	return

@@ -86,6 +86,12 @@
   version = "v1.0"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/lkysow/go-gitlab"
+  packages = ["."]
+  revision = "5aba7769280ffa5408f98e1b95290989cc1428c5"
+
+[[projects]]
   name = "github.com/magiconair/properties"
   packages = ["."]
   revision = "be5ece7dd465ab0765a9682137865547526d1dfb"
@@ -232,6 +238,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "ff26f498317e49b0c36b98f2ec0b91a1b7c9ccfb4b04777a3f1e8f7e143828b7"
+  inputs-digest = "ae2f51ff70354344e93c471a531b44a57822ea9dcc57dddbb8b476d0e1f1d3a8"
   solver-name = "gps-cdcl"
   solver-version = 1

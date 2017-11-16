@@ -8,21 +8,21 @@ import (
 
 	"sort"
 
-	"github.com/hootsuite/atlantis/server/events/github"
 	"github.com/hootsuite/atlantis/server/events/locking"
 	"github.com/hootsuite/atlantis/server/events/models"
+	"github.com/hootsuite/atlantis/server/events/vcs"
 	"github.com/pkg/errors"
 )
 
 //go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_pull_cleaner.go PullCleaner
 
 type PullCleaner interface {
-	CleanUpPull(repo models.Repo, pull models.PullRequest) error
+	CleanUpPull(repo models.Repo, pull models.PullRequest, host vcs.Host) error
 }
 
 type PullClosedExecutor struct {
 	Locker    locking.Locker
-	Github    github.Client
+	VCSClient vcs.ClientProxy
 	Workspace Workspace
 }
 
@@ -36,7 +36,7 @@ var pullClosedTemplate = template.Must(template.New("").Parse(
 		"{{ range . }}\n" +
 		"- path: `{{ .Path }}` {{ .Envs }}{{ end }}"))
 
-func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullRequest) error {
+func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullRequest, host vcs.Host) error {
 	// delete the workspace
 	if err := p.Workspace.Delete(repo, pull); err != nil {
 		return errors.Wrap(err, "cleaning workspace")
@@ -60,11 +60,11 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 	if err = pullClosedTemplate.Execute(&buf, templateData); err != nil {
 		return errors.Wrap(err, "rendering template for comment")
 	}
-	return p.Github.CreateComment(repo, pull, buf.String())
+	return p.VCSClient.CreateComment(repo, pull, buf.String(), host)
 }
 
 // buildTemplateData formats the lock data into a slice that can easily be templated
-// for the GitHub comment. We organize all the environments by their respective project paths
+// for the VCS comment. We organize all the environments by their respective project paths
 // so the comment can look like: path: {path}, environments: {all-envs}
 func (p *PullClosedExecutor) buildTemplateData(locks []models.ProjectLock) []templatedProject {
 	envsByPath := make(map[string][]string)

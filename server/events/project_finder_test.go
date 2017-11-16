@@ -8,7 +8,7 @@ import (
 	. "github.com/hootsuite/atlantis/testing"
 )
 
-var log = logging.NewNoopLogger()
+var noopLogger = logging.NewNoopLogger()
 var modifiedRepo = "owner/repo"
 var m = events.ProjectFinder{}
 
@@ -66,7 +66,7 @@ func TestGetModified_NoFiles(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Log(c.description)
-		projects := m.FindModified(log, c.files, modifiedRepo)
+		projects := m.FindModified(noopLogger, c.files, modifiedRepo)
 
 		// Extract the paths from the projects. We use a slice here instead of a
 		// map so we can test whether there are duplicates returned.
