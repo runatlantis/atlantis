@@ -29,9 +29,9 @@ func TestGetModified_NoFiles(t *testing.T) {
 			nil,
 		},
 		{
-			"Should ignore .tf files in a module directory and return an empty list",
-			[]string{"_modules/file.tf", "modules/file.tf", "parent/_modules/file.tf", "parent/modules/file.tf"},
-			nil,
+			"Should ignore .tf files in module directories",
+			[]string{"_modules/file.tf", "modules/file.tf", "parent/_modules/file.tf", "parent/modules/file.tf", "main.tf"},
+			[]string{"."},
 		},
 		{
 			"Should ignore tfstate files and return an empty list",
