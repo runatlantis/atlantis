@@ -34,7 +34,7 @@ func (p *ProjectFinder) FindModified(log *logging.SimpleLogger, modifiedFiles []
 		len(modifiedTerraformFiles), modifiedTerraformFiles)
 
 	var paths []string
-	for _, modifiedFile := range modifiedFiles {
+	for _, modifiedFile := range modifiedTerraformFiles {
 		paths = append(paths, p.getProjectPath(modifiedFile))
 	}
 	uniquePaths := p.unique(paths)
