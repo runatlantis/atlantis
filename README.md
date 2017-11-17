@@ -2,7 +2,7 @@
 
 <p align="center">
   <img src="./docs/atlantis-logo.png" alt="Atlantis Logo"/><br><br>
-  A unified workflow for collaborating on Terraform through GitHub
+  A unified workflow for collaborating on Terraform through GitHub and GitLab
 </p>
 
 ## Walkthrough Video
@@ -15,6 +15,7 @@ Read about [Why We Built Atlantis](https://www.atlantis.run/blog/atlantis-releas
 [![Slack Status](https://thawing-headland-22460.herokuapp.com/badge.svg)](https://thawing-headland-22460.herokuapp.com)
 
 * [Features](#features)
+* [Atlantis Works With](#atlantis-works-with)
 * [Getting Started](#getting-started)
 * [Pull Request Commands](#pull-request-commands)
 * [Project Structure](#project-structure)
@@ -40,16 +41,20 @@ Read about [Why We Built Atlantis](https://www.atlantis.run/blog/atlantis-releas
 - **Lock environments** until pull requests are merged to prevent concurrent modification and confusion
 
 ➜ Developers can write Terraform safely
-- **No need to distribute AWS credentials** to your whole team. Developers can submit Terraform changes and run `plan` and `apply` directly from the pull request
+- **No need to distribute AWS credentials** to your whole team. Developers can submit Terraform changes and run `plan` and `apply` directly from the pull/merge request
 - Optionally, require a **review and approval** prior to running `apply`
 
 ➜ Also
 - No more **copy-pasted code across environments**. Atlantis supports using an `env/{env}.tfvars` file per environment so you can write your base configuration once
 - Support **multiple versions of Terraform** with a simple project config file
 
+## Atlantis Works With
+* GitHub (public, private or enterprise) and GitLab (public, private or enterprise)
+* Any Terraform version (see [Terraform Versions](#terraform-version))
+* Can be run with a [single binary](https://github.com/hootsuite/atlantis/releases) or with our [Docker image](https://hub.docker.com/r/hootsuite/atlantis/)
 
 ## Getting Started
-Download from https://github.com/hootsuite/atlantis/releases
+Download from [https://github.com/hootsuite/atlantis/releases](https://github.com/hootsuite/atlantis/releases)
 
 Run
 ```
@@ -63,8 +68,8 @@ This will walk you through running Atlantis locally. It will
 
 If you're ready to permanently set up Atlantis see [Production-Ready Deployment](#production-ready-deployment)
 
-## Pull Request Commands
-Atlantis currently supports three commands that can be run via pull request comments:
+## Pull/Merge Request Commands
+Atlantis currently supports three commands that can be run via pull request comments (or merge request comments on GitLab):
 
 #### `atlantis help`
 View help
@@ -210,7 +215,7 @@ be the value of that argument. Else it will be `default`
 - `WORKSPACE`: absolute path to the root of the project on disk
 
 ## Locking
-When `plan` is run, the [project](#project) and [environment](#environment) are **Locked** until an `apply` succeeds **and** the pull request is merged.
+When `plan` is run, the [project](#project) and [environment](#environment) are **Locked** until an `apply` succeeds **and** the pull request/merge request is merged.
 This protects against concurrent modifications to the same set of infrastructure and prevents
 users from seeing a `plan` that will be invalid if another pull request is merged.
 
@@ -219,10 +224,12 @@ at the bottom of the plan comment to discard the plan and delete the lock.
 Once a plan is discarded, you'll need to run `plan` again prior to running `apply`.
 
 ## Approvals
-If you'd like to require pull requests to be approved prior to a user running `atlantis apply` simply run Atlantis with the `--require-approval` flag.
+If you'd like to require pull/merge requests to be approved prior to a user running `atlantis apply` simply run Atlantis with the `--require-approval` flag.
 By default, no approval is required.
 
-For more information on pull request reviews and approvals see: https://help.github.com/articles/about-pull-request-reviews/
+For more information on GitHub pull request reviews and approvals see: https://help.github.com/articles/about-pull-request-reviews/
+
+For more information on GitLab merge request reviews and approvals (only supported on GitLab Enterprise) see: https://docs.gitlab.com/ee/user/project/merge_requests/merge_request_approvals.html.
 
 ## Production-Ready Deployment
 ### Install Terraform
@@ -239,7 +246,7 @@ Terraform v0.10.0
 If you want to use a different version of Terraform see [Terraform Versions](#terraform-versions)
 
 ### Hosting Atlantis
-Atlantis needs to be hosted somewhere that github.com or your GitHub Enterprise installation can reach. Developers in your organization also need to be able to access Atlantis to view the UI and to delete locks.
+Atlantis needs to be hosted somewhere that github.com/gitlab.com or your GitHub/GitLab Enterprise installation can reach. Developers in your organization also need to be able to access Atlantis to view the UI and to delete locks.
 
 By default Atlantis runs on port `4141`. This can be changed with the `--port` flag.
 
@@ -265,32 +272,59 @@ If installing on a single repository, navigate to the repository home page and c
 - leave **Active** checked
 - click **Add webhook**
 
+### Add GitLab Webhook
+If you're using GitLab, navigate to your project's home page in GitLab
+- Click **Settings > Integrations** in the sidebar
+- set **URL** to `http://$URL/events` where `$URL` is where Atlantis is hosted. **Be sure to add `/events`**
+- leave **Secret Token** blank or set this to a random key (https://www.random.org/strings/). If you set it, you'll need to use the `--gitlab-webhook-secret` option when you start Atlantis
+- check the boxes
+    - **Push events**
+    - **Comments**
+    - **Merge Request events**
+- leave **Enable SSL verification** checked
+- click **Add webhook**
+
 ### Create a GitHub Token
-We recommend creating a new user in GitHub named **atlantis** that performs all API actions however you can use any user.
+We recommend creating a new user in GitHub named **atlantis** that performs all API actions, however you can use any user.
 Once you've created the user (or have decided to use an existing user) you need to create a personal access token.
 - follow [https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/#creating-a-token](https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/#creating-a-token)
 - copy the access token
 
+### Create a GitLab Token
+We recommend creating a new user in GitLab named **atlantis** that performs all API actions, however you can use any user.
+Once you've created the user (or have decided to use an existing user) you need to create a personal access token.
+- follow [https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#creating-a-personal-access-token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#creating-a-personal-access-token)
+- create a token with **api** scope
+- copy the access token
+
 ### Start Atlantis
-Now you're ready to start Atlantis! Run
+Now you're ready to start Atlantis!
+
+If you're using GitHub, run:
 ```
 $ atlantis server --atlantis-url $URL --gh-user $USERNAME --gh-token $TOKEN --gh-webhook-secret $SECRET
 2049/10/6 00:00:00 [WARN] server: Atlantis started - listening on port 4141
 ```
 
+If you're using GitLab, run:
+```
+$ atlantis server --atlantis-url $URL --gitlab-user $USERNAME --gitlab-token $TOKEN --gitlab-webhook-secret $SECRET
+2049/10/6 00:00:00 [WARN] server: Atlantis started - listening on port 4141
+```
+
 - `$URL` is the URL that Atlantis can be reached at
-- `$USERNAME` is the GitHub username you generated the token for
-- `$TOKEN` is the access token you created. If you don't want this to be passed in as an argument for security reasons you can specify it in a config file (see [Configuration](#configuration)) or as an environment variable: `ATLANTIS_GH_TOKEN`
-- `$SECRET` is the random key you used for the webhook secret. If you left the secret blank then don't specify this flag. If you don't want this to be passed in as an argument for security reasons you can specify it in a config file (see [Configuration](#configuration)) or as an environment variable: `ATLANTIS_GH_WEBHOOK_SECRET`
+- `$USERNAME` is the GitHub/GitLab username you generated the token for
+- `$TOKEN` is the access token you created. If you don't want this to be passed in as an argument for security reasons you can specify it in a config file (see [Configuration](#configuration)) or as an environment variable: `ATLANTIS_GH_TOKEN` or `ATLANTIS_GITLAB_TOKEN`
+- `$SECRET` is the random key you used for the webhook secret. If you left the secret blank then don't specify this flag. If you don't want this to be passed in as an argument for security reasons you can specify it in a config file (see [Configuration](#configuration)) or as an environment variable: `ATLANTIS_GH_WEBHOOK_SECRET` or `ATLANTIS_GITLAB_WEBHOOK_SECRET`
 
 Atlantis is now running!
 **We recommend running it under something like Systemd or Supervisord.**
 
 ### Docker
-Atlantis also ships inside a docker image with Terraform versions `0.8.8`, `0.9.11` and `0.10.0`. Run the docker image:
+Atlantis also ships inside a docker image. Run the docker image:
 
 ```bash
-docker run hootsuite/atlantis server --gh-user=GITHUB_USERNAME --gh-token=GITHUB_TOKEN
+docker run hootsuite/atlantis:latest server <required options>
 ```
 
 #### Usage
@@ -321,7 +355,7 @@ docker run {YOUR_DOCKER_ORG}/atlantis-custom server --gh-user=GITHUB_USERNAME --
 ```
 
 
-### Testing Out Atlantis
+### Testing Out Atlantis on GitHub
 
 If you'd like to test out Atlantis before running it on your own repositories you can fork our example repo.
 
@@ -339,7 +373,7 @@ If you'd like to test out Atlantis before running it on your own repositories yo
 
 ## Server Configuration
 Atlantis configuration can be specified via command line flags or a YAML config file.
-The `gh-token` flag can also be specified via an `ATLANTIS_GH_TOKEN` environment variable.
+The `gh-token` and `gitlab-token` flags can also be specified via the `ATLANTIS_GH_TOKEN` and `ATLANTIS_GITLAB_TOKEN` environment variables respectively.
 Config file values are overridden by environment variables which in turn are overridden by flags.
 
 To use a yaml config file, run atlantis with `--config /path/to/config.yaml`.
@@ -451,5 +485,17 @@ A: Atlantis currently only supports HTTP. In order to add SSL you will need to f
 ## Contributing
 Want to contribute? Check out [CONTRIBUTING](https://github.com/hootsuite/atlantis/blob/master/CONTRIBUTING.md).
 
+Thank you to these awesome contributors!
+- [@nicholas-wu-hs](https://github.com/nicholas-wu-hs)
+- [@nadavshatz](https://github.com/nadavshatz)
+- [@jwieringa](https://github.com/jwieringa)
+- [@suhussai](https://github.com/suhussai)
+- [@mootpt](https://github.com/mootpt)
+- [@codec](https://github.com/codec)
+- [@nick-hollingsworth-hs](https://github.com/nick-hollingsworth-hs)
+- [@mpmsimo](https://github.com/mpmsimo)
+- [@hussfelt](https://github.com/hussfelt)
+
 ## Credits
 * Atlantis Logo: Icon made by [freepik](https://www.flaticon.com/authors/freepik) from www.flaticon.com
+
