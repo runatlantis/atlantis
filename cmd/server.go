@@ -84,7 +84,7 @@ var stringFlags = []stringFlag{
 		env:         "ATLANTIS_GITLAB_TOKEN",
 	},
 	{
-		name:        GitlabWebHookSecret,
+		name: GitlabWebHookSecret,
 		description: "Optional secret used to validate GitLab webhooks." +
 			" If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitLab. " +
 			"Can also be specified via the ATLANTIS_GITLAB_WEBHOOK_SECRET environment variable.",

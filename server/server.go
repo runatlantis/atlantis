@@ -10,6 +10,8 @@ import (
 	"os"
 	"strings"
 
+	"flag"
+
 	"github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
 	"github.com/hootsuite/atlantis/server/events"
@@ -18,13 +20,13 @@ import (
 	"github.com/hootsuite/atlantis/server/events/run"
 	"github.com/hootsuite/atlantis/server/events/terraform"
 	"github.com/hootsuite/atlantis/server/events/vcs"
+	"github.com/hootsuite/atlantis/server/events/webhooks"
 	"github.com/hootsuite/atlantis/server/logging"
 	"github.com/hootsuite/atlantis/server/static"
 	"github.com/lkysow/go-gitlab"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	"github.com/urfave/negroni"
-	"flag"
 )
 
 const LockRouteName = "lock-detail"
@@ -47,19 +49,29 @@ type Server struct {
 // The mapstructure tags correspond to flags in cmd/server.go and are used when
 // the config is parsed from a YAML file.
 type Config struct {
-	AtlantisURL         string `mapstructure:"atlantis-url"`
-	DataDir             string `mapstructure:"data-dir"`
-	GithubHostname      string `mapstructure:"gh-hostname"`
-	GithubToken         string `mapstructure:"gh-token"`
-	GithubUser          string `mapstructure:"gh-user"`
-	GithubWebHookSecret string `mapstructure:"gh-webhook-secret"`
-	GitlabHostname      string `mapstructure:"gitlab-hostname"`
-	GitlabToken         string `mapstructure:"gitlab-token"`
-	GitlabUser          string `mapstructure:"gitlab-user"`
-	GitlabWebHookSecret string `mapstructure:"gitlab-webhook-secret"`
-	LogLevel            string `mapstructure:"log-level"`
-	Port                int    `mapstructure:"port"`
-	RequireApproval     bool   `mapstructure:"require-approval"`
+	AtlantisURL         string          `mapstructure:"atlantis-url"`
+	DataDir             string          `mapstructure:"data-dir"`
+	GithubHostname      string          `mapstructure:"gh-hostname"`
+	GithubToken         string          `mapstructure:"gh-token"`
+	GithubUser          string          `mapstructure:"gh-user"`
+	GithubWebHookSecret string          `mapstructure:"gh-webhook-secret"`
+	GitlabHostname      string          `mapstructure:"gitlab-hostname"`
+	GitlabToken         string          `mapstructure:"gitlab-token"`
+	GitlabUser          string          `mapstructure:"gitlab-user"`
+	GitlabWebHookSecret string          `mapstructure:"gitlab-webhook-secret"`
+	LogLevel            string          `mapstructure:"log-level"`
+	Port                int             `mapstructure:"port"`
+	RequireApproval     bool            `mapstructure:"require-approval"`
+	SlackToken          string          `mapstructure:"slack-token"`
+	Webhooks            []WebhookConfig `mapstructure:"webhooks"`
+}
+
+type WebhookConfig struct {
+	Event          string `mapstructure:"event"`
+	WorkspaceRegex string `mapstructure:"workspace-regex"`
+	Kind           string `mapstructure:"kind"`
+	// Slack specific
+	Channel string `mapstructure:"channel"`
 }
 
 func NewServer(config Config) (*Server, error) {
@@ -79,6 +91,20 @@ func NewServer(config Config) (*Server, error) {
 		gitlabClient = &vcs.GitlabClient{
 			Client: gitlab.NewClient(nil, config.GitlabToken),
 		}
+	}
+	var webhooksConfig []webhooks.Config
+	for _, c := range config.Webhooks {
+		config := webhooks.Config{
+			Channel:        c.Channel,
+			Event:          c.Event,
+			Kind:           c.Kind,
+			WorkspaceRegex: c.WorkspaceRegex,
+		}
+		webhooksConfig = append(webhooksConfig, config)
+	}
+	webhooksManager, err := webhooks.NewMultiWebhookSender(webhooksConfig, webhooks.NewSlackClient(config.SlackToken))
+	if err != nil {
+		return nil, errors.Wrap(err, "initializing webhooks")
 	}
 	vcsClient := vcs.NewDefaultClientProxy(githubClient, gitlabClient)
 	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient}
@@ -114,6 +140,7 @@ func NewServer(config Config) (*Server, error) {
 		Run:               run,
 		Workspace:         workspace,
 		ProjectPreExecute: projectPreExecute,
+		Webhooks:          webhooksManager,
 	}
 	planExecutor := &events.PlanExecutor{
 		VCSClient:         vcsClient,

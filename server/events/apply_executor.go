@@ -12,6 +12,7 @@ import (
 	"github.com/hootsuite/atlantis/server/events/run"
 	"github.com/hootsuite/atlantis/server/events/terraform"
 	"github.com/hootsuite/atlantis/server/events/vcs"
+	"github.com/hootsuite/atlantis/server/events/webhooks"
 )
 
 type ApplyExecutor struct {
@@ -21,6 +22,7 @@ type ApplyExecutor struct {
 	Run               *run.Run
 	Workspace         Workspace
 	ProjectPreExecute *ProjectPreExecute
+	Webhooks          webhooks.Sender
 }
 
 func (a *ApplyExecutor) Execute(ctx *CommandContext) CommandResponse {
@@ -92,6 +94,15 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 	env := ctx.Command.Environment
 	tfApplyCmd := append(append(append([]string{"apply", "-no-color"}, applyExtraArgs...), ctx.Command.Flags...), plan.LocalPath)
 	output, err := a.Terraform.RunCommandWithVersion(ctx.Log, absolutePath, tfApplyCmd, terraformVersion, env)
+
+	a.Webhooks.Send(ctx.Log, webhooks.ApplyResult{ // nolint: errcheck
+		Workspace: env,
+		User:      ctx.User,
+		Repo:      ctx.BaseRepo,
+		Pull:      ctx.Pull,
+		Success:   err == nil,
+	})
+
 	if err != nil {
 		return ProjectResult{Error: fmt.Errorf("%s\n%s", err.Error(), output)}
 	}

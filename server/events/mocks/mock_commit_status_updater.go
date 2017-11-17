@@ -4,11 +4,12 @@
 package mocks
 
 import (
+	"reflect"
+
 	events "github.com/hootsuite/atlantis/server/events"
 	models "github.com/hootsuite/atlantis/server/events/models"
 	vcs "github.com/hootsuite/atlantis/server/events/vcs"
 	pegomock "github.com/petergtz/pegomock"
-	"reflect"
 )
 
 type MockCommitStatusUpdater struct {

@@ -1,19 +1,19 @@
 package events_test
 
 import (
+	"errors"
 	"reflect"
+	"testing"
 
+	"github.com/hootsuite/atlantis/server/events"
+	lockmocks "github.com/hootsuite/atlantis/server/events/locking/mocks"
+	"github.com/hootsuite/atlantis/server/events/mocks"
 	"github.com/hootsuite/atlantis/server/events/models"
+	"github.com/hootsuite/atlantis/server/events/models/fixtures"
+	"github.com/hootsuite/atlantis/server/events/vcs"
+	vcsmocks "github.com/hootsuite/atlantis/server/events/vcs/mocks"
 	. "github.com/hootsuite/atlantis/testing"
 	. "github.com/petergtz/pegomock"
-	"testing"
-	"github.com/hootsuite/atlantis/server/events/mocks"
-	lockmocks "github.com/hootsuite/atlantis/server/events/locking/mocks"
-	vcsmocks "github.com/hootsuite/atlantis/server/events/vcs/mocks"
-	"github.com/hootsuite/atlantis/server/events"
-	"errors"
-	"github.com/hootsuite/atlantis/server/events/vcs"
-	"github.com/hootsuite/atlantis/server/events/models/fixtures"
 )
 
 func TestCleanUpPullWorkspaceErr(t *testing.T) {
@@ -155,4 +155,3 @@ func AnyPullRequest() models.PullRequest {
 	RegisterMatcher(NewAnyMatcher(reflect.TypeOf(models.PullRequest{})))
 	return models.PullRequest{}
 }
-

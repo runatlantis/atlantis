@@ -1,13 +1,14 @@
 package server_test
 
 import (
-	"testing"
-	"github.com/hootsuite/atlantis/server"
 	"bytes"
-	. "github.com/hootsuite/atlantis/testing"
-	. "github.com/petergtz/pegomock"
 	"net/http"
+	"testing"
+
+	"github.com/hootsuite/atlantis/server"
+	. "github.com/hootsuite/atlantis/testing"
 	"github.com/lkysow/go-gitlab"
+	. "github.com/petergtz/pegomock"
 )
 
 var parser = server.DefaultGitlabRequestParser{}
@@ -20,7 +21,7 @@ func TestValidate_InvalidSecret(t *testing.T) {
 	Ok(t, err)
 	req.Header.Set("X-Gitlab-Token", "does-not-match")
 	_, err = parser.Validate(req, []byte("secret"))
-	Assert(t, err != nil , "should be an error")
+	Assert(t, err != nil, "should be an error")
 	Equals(t, "header X-Gitlab-Token=does-not-match did not match expected secret", err.Error())
 }
 
@@ -58,7 +59,7 @@ func TestValidate_InvalidMergeEvent(t *testing.T) {
 	Ok(t, err)
 	req.Header.Set("X-Gitlab-Event", "Merge Request Hook")
 	_, err = parser.Validate(req, nil)
-	Assert(t, err != nil , "should be an error")
+	Assert(t, err != nil, "should be an error")
 	Equals(t, "unexpected end of JSON input", err.Error())
 }
 
@@ -70,7 +71,7 @@ func TestValidate_InvalidMergeCommentEvent(t *testing.T) {
 	Ok(t, err)
 	req.Header.Set("X-Gitlab-Event", "Note Hook")
 	_, err = parser.Validate(req, nil)
-	Assert(t, err != nil , "should be an error")
+	Assert(t, err != nil, "should be an error")
 	Equals(t, "unexpected end of JSON input", err.Error())
 }
 

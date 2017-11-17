@@ -4,9 +4,10 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
 	http "net/http"
 	"reflect"
+
+	pegomock "github.com/petergtz/pegomock"
 )
 
 type MockGitlabRequestParser struct {

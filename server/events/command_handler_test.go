@@ -57,7 +57,7 @@ func setup(t *testing.T) {
 		MarkdownRenderer:         &events.MarkdownRenderer{},
 		GithubPullGetter:         githubGetter,
 		GitlabMergeRequestGetter: gitlabGetter,
-		Logger:                   logger,
+		Logger: logger,
 	}
 }
 
