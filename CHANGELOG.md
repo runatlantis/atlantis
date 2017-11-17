@@ -1,3 +1,20 @@
+# v0.2.0
+## Features
+* GitLab is now supported! ([#190](https://github.com/hootsuite/atlantis/pull/190))
+* Slack notifications. ([#199](https://github.com/hootsuite/atlantis/pull/199))
+
+## Bug Fixes
+None
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.0/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.0/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.0/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.0/atlantis_linux_arm.zip)
+
+## Backwards Incompatibilities / Notes:
+None
+
 # v0.1.3
 ## Features
 * Environment variables are passed through to `extra_arguments`. ([#150](https://github.com/hootsuite/atlantis/pull/150))
