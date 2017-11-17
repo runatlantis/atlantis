@@ -10,7 +10,6 @@ jobs:
       - checkout
       - setup_remote_docker:
           reusable: true
-      - run: make deps
       - run: make test-coverage
       - run: make check-fmt
       - run: make check-gometalint
