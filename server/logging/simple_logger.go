@@ -12,6 +12,8 @@ import (
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_simple_logging.go SimpleLogging
 
+// SimpleLogging is the interface that our SimpleLogger implements.
+// It's really only used for mocking when we need to test what's being logged.
 type SimpleLogging interface {
 	Debug(format string, a ...interface{})
 	Info(format string, a ...interface{})
@@ -51,20 +53,20 @@ const (
 )
 
 // NewSimpleLogger creates a new logger.
-// - source is added as a prefix to each log entry. It's useful if you want to trace a log entry back to a
-//   context, for example a pull request id.
-// - logger is the underlying logger. If nil will create a logger from stdlib.
-// - keepHistory set to true will store all log entries written using this logger.
-// - level will set the level at which logs >= than that level will be written.
-//   If keepHistory is set to true, we'll store logs at all levels, regardless of what level
-//   is set to.
+// source is added as a prefix to each log entry. It's useful if you want to
+// trace a log entry back to a specific context, for example a pull request id.
+// logger is the underlying logger. If nil will create a logger from stdlib.
+// keepHistory set to true will store all log entries written using this logger.
+// level will set the level at which logs >= than that level will be written.
+// If keepHistory is set to true, we'll store logs at all levels, regardless of
+// what level is set to.
 func NewSimpleLogger(source string, logger *log.Logger, keepHistory bool, level LogLevel) *SimpleLogger {
 	if logger == nil {
 		flags := log.LstdFlags
 		if level == Debug {
 			// If we're using debug logging, we also have the logger print the
 			// filename the log comes from with log.Lshortfile.
-			flags = log.LstdFlags | log.Lshortfile
+			flags = flags | log.Lshortfile
 		}
 		logger = log.New(os.Stderr, "", flags)
 	}
@@ -89,9 +91,8 @@ func NewNoopLogger() *SimpleLogger {
 	}
 }
 
-// ToLogLevel converts a log level string to a valid
-// LogLevel object. If the string doesn't match a level,
-// it will return Info.
+// ToLogLevel converts a log level string to a valid LogLevel object.
+// If the string doesn't match a level, it will return Info.
 func ToLogLevel(levelStr string) LogLevel {
 	switch levelStr {
 	case "debug":
@@ -106,44 +107,51 @@ func ToLogLevel(levelStr string) LogLevel {
 	return Info
 }
 
+// Debug logs at debug level.
 func (l *SimpleLogger) Debug(format string, a ...interface{}) {
 	l.Log(Debug, format, a...)
 }
 
+// Info logs at info level.
 func (l *SimpleLogger) Info(format string, a ...interface{}) {
 	l.Log(Info, format, a...)
 }
 
+// Warn logs at warn level.
 func (l *SimpleLogger) Warn(format string, a ...interface{}) {
 	l.Log(Warn, format, a...)
 }
 
+// Err logs at error level.
 func (l *SimpleLogger) Err(format string, a ...interface{}) {
 	l.Log(Error, format, a...)
 }
 
+// Log writes the log at level.
 func (l *SimpleLogger) Log(level LogLevel, format string, a ...interface{}) {
 	levelStr := l.levelToString(level)
 	msg := l.capitalizeFirstLetter(fmt.Sprintf(format, a...))
 
-	// only log this message if configured to log at this level
+	// Only log this message if configured to log at this level.
 	if l.Level <= level {
-		// Calling .Output instead of Printf so we can change the calldepth param
-		// to 3. The default is 2 which would identify the log as coming from
-		// this file and line every time instead of our caller's.
+		// Calling .Output instead of Printf so we can change the calldepth
+		// param to 3. The default is 2 which would identify the log as coming
+		// from this file and line every time instead of our caller's.
 		l.Logger.Output(3, fmt.Sprintf("[%s] %s: %s\n", levelStr, l.Source, msg)) // nolint: errcheck
 	}
 
-	// keep history at all log levels
+	// Keep history at all log levels.
 	if l.KeepHistory {
 		l.saveToHistory(levelStr, msg)
 	}
 }
 
+// Underlying returns the underlying logger.
 func (l *SimpleLogger) Underlying() *log.Logger {
 	return l.Logger
 }
 
+// GetLevel returns the current log level of the logger.
 func (l *SimpleLogger) GetLevel() LogLevel {
 	return l.Level
 }

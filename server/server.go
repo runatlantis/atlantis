@@ -1,16 +1,15 @@
-// Package server is the main package for Atlantis. It handles the web server
-// and executing commands that come in via pull request comments.
+// Package server handles the web server and executing commands that come in
+// via webhooks.
 package server
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
-
-	"flag"
 
 	"github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
@@ -31,8 +30,7 @@ import (
 
 const LockRouteName = "lock-detail"
 
-// Server runs the Atlantis web server. It's used for webhook requests and the
-// Atlantis UI.
+// Server runs the Atlantis web server.
 type Server struct {
 	Router             *mux.Router
 	Port               int
@@ -49,31 +47,43 @@ type Server struct {
 // The mapstructure tags correspond to flags in cmd/server.go and are used when
 // the config is parsed from a YAML file.
 type Config struct {
-	AtlantisURL         string          `mapstructure:"atlantis-url"`
-	DataDir             string          `mapstructure:"data-dir"`
-	GithubHostname      string          `mapstructure:"gh-hostname"`
-	GithubToken         string          `mapstructure:"gh-token"`
-	GithubUser          string          `mapstructure:"gh-user"`
-	GithubWebHookSecret string          `mapstructure:"gh-webhook-secret"`
-	GitlabHostname      string          `mapstructure:"gitlab-hostname"`
-	GitlabToken         string          `mapstructure:"gitlab-token"`
-	GitlabUser          string          `mapstructure:"gitlab-user"`
-	GitlabWebHookSecret string          `mapstructure:"gitlab-webhook-secret"`
-	LogLevel            string          `mapstructure:"log-level"`
-	Port                int             `mapstructure:"port"`
-	RequireApproval     bool            `mapstructure:"require-approval"`
-	SlackToken          string          `mapstructure:"slack-token"`
-	Webhooks            []WebhookConfig `mapstructure:"webhooks"`
+	AtlantisURL         string `mapstructure:"atlantis-url"`
+	DataDir             string `mapstructure:"data-dir"`
+	GithubHostname      string `mapstructure:"gh-hostname"`
+	GithubToken         string `mapstructure:"gh-token"`
+	GithubUser          string `mapstructure:"gh-user"`
+	GithubWebHookSecret string `mapstructure:"gh-webhook-secret"`
+	GitlabHostname      string `mapstructure:"gitlab-hostname"`
+	GitlabToken         string `mapstructure:"gitlab-token"`
+	GitlabUser          string `mapstructure:"gitlab-user"`
+	GitlabWebHookSecret string `mapstructure:"gitlab-webhook-secret"`
+	LogLevel            string `mapstructure:"log-level"`
+	Port                int    `mapstructure:"port"`
+	// RequireApproval is whether to require pull request approval before
+	// allowing terraform apply's to be run.
+	RequireApproval bool            `mapstructure:"require-approval"`
+	SlackToken      string          `mapstructure:"slack-token"`
+	Webhooks        []WebhookConfig `mapstructure:"webhooks"`
 }
 
+// WebhookConfig is nested within Config. It's used to configure webhooks.
 type WebhookConfig struct {
-	Event          string `mapstructure:"event"`
+	// Event is the type of event we should send this webhook for, ex. apply.
+	Event string `mapstructure:"event"`
+	// WorkspaceRegex is a regex that is used to match against the workspace
+	// that is being modified for this event. If the regex matches, we'll
+	// send the webhook, ex. "production.*".
 	WorkspaceRegex string `mapstructure:"workspace-regex"`
-	Kind           string `mapstructure:"kind"`
-	// Slack specific
+	// Kind is the type of webhook we should send, ex. slack.
+	Kind string `mapstructure:"kind"`
+	// Channel is the channel to send this webhook to. It only applies to
+	// slack webhooks. Should be without '#'.
 	Channel string `mapstructure:"channel"`
 }
 
+// NewServer returns a new server. If there are issues starting the server or
+// its dependencies an error will be returned. This is like the main() function
+// for the server CLI command because it injects all the dependencies.
 func NewServer(config Config) (*Server, error) {
 	var supportedVCSHosts []vcs.Host
 	var githubClient *vcs.GithubClient
@@ -123,11 +133,11 @@ func NewServer(config Config) (*Server, error) {
 	lockingClient := locking.NewClient(boltdb)
 	run := &run.Run{}
 	configReader := &events.ProjectConfigManager{}
-	concurrentRunLocker := events.NewEnvLock()
+	concurrentRunLocker := events.NewDefaultWorkspaceLocker()
 	workspace := &events.FileWorkspace{
 		DataDir: config.DataDir,
 	}
-	projectPreExecute := &events.ProjectPreExecute{
+	projectPreExecute := &events.DefaultProjectPreExecutor{
 		Locker:       lockingClient,
 		Run:          run,
 		ConfigReader: configReader,
@@ -149,7 +159,7 @@ func NewServer(config Config) (*Server, error) {
 		Workspace:         workspace,
 		ProjectPreExecute: projectPreExecute,
 		Locker:            lockingClient,
-		ProjectFinder:     &events.ProjectFinder{},
+		ProjectFinder:     &events.DefaultProjectFinder{},
 	}
 	helpExecutor := &events.HelpExecutor{}
 	pullClosedExecutor := &events.PullClosedExecutor{
@@ -174,7 +184,7 @@ func NewServer(config Config) (*Server, error) {
 		GithubPullGetter:         githubClient,
 		GitlabMergeRequestGetter: gitlabClient,
 		CommitStatusUpdater:      commitStatusUpdater,
-		EnvLocker:                concurrentRunLocker,
+		WorkspaceLocker:          concurrentRunLocker,
 		MarkdownRenderer:         markdownRenderer,
 		Logger:                   logger,
 	}
@@ -203,6 +213,7 @@ func NewServer(config Config) (*Server, error) {
 	}, nil
 }
 
+// Start creates the routes and starts serving traffic.
 func (s *Server) Start() error {
 	s.Router.HandleFunc("/", s.Index).Methods("GET").MatcherFunc(func(r *http.Request, rm *mux.RouteMatch) bool {
 		return r.URL.Path == "/" || r.URL.Path == "/index.html"
@@ -229,6 +240,7 @@ func (s *Server) Start() error {
 	return cli.NewExitError(http.ListenAndServe(fmt.Sprintf(":%d", s.Port), n), 1)
 }
 
+// Index is the / route.
 func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	locks, err := s.Locker.List()
 	if err != nil {
@@ -250,6 +262,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	s.IndexTemplate.Execute(w, results) // nolint: errcheck
 }
 
+// GetLockRoute is the GET /locks/{id} route. It renders the lock detail view.
 func (s *Server) GetLockRoute(w http.ResponseWriter, r *http.Request) {
 	id, ok := mux.Vars(r)["id"]
 	if !ok {
@@ -263,7 +276,6 @@ func (s *Server) GetLockRoute(w http.ResponseWriter, r *http.Request) {
 // GetLock handles a lock detail page view. getLockRoute is expected to
 // be called before. This function was extracted to make it testable.
 func (s *Server) GetLock(w http.ResponseWriter, _ *http.Request, id string) {
-	// get details for lock id
 	idUnencoded, err := url.QueryUnescape(id)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -271,7 +283,6 @@ func (s *Server) GetLock(w http.ResponseWriter, _ *http.Request, id string) {
 		return
 	}
 
-	// for the given lock key get lock data
 	lock, err := s.Locker.GetLock(idUnencoded)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -284,7 +295,7 @@ func (s *Server) GetLock(w http.ResponseWriter, _ *http.Request, id string) {
 		return
 	}
 
-	// extract the repo owner and repo name
+	// Extract the repo owner and repo name.
 	repo := strings.Split(lock.Project.RepoFullName, "/")
 
 	l := LockDetailData{
@@ -300,6 +311,7 @@ func (s *Server) GetLock(w http.ResponseWriter, _ *http.Request, id string) {
 	s.LockDetailTemplate.Execute(w, l) // nolint: errcheck
 }
 
+// DeleteLockRoute handles deleting the lock at id.
 func (s *Server) DeleteLockRoute(w http.ResponseWriter, r *http.Request) {
 	id, ok := mux.Vars(r)["id"]
 	if !ok || id == "" {
@@ -309,6 +321,8 @@ func (s *Server) DeleteLockRoute(w http.ResponseWriter, r *http.Request) {
 	s.DeleteLock(w, r, id)
 }
 
+// DeleteLock deletes the lock. DeleteLockRoute should be called first.
+// This method is split out to make this route testable.
 func (s *Server) DeleteLock(w http.ResponseWriter, _ *http.Request, id string) {
 	idUnencoded, err := url.PathUnescape(id)
 	if err != nil {
@@ -332,6 +346,9 @@ func (s *Server) DeleteLock(w http.ResponseWriter, _ *http.Request, id string) {
 func (s *Server) postEvents(w http.ResponseWriter, r *http.Request) {
 	s.EventsController.Post(w, r)
 }
+
+// respond is a helper function to respond and log the response. lvl is the log
+// level to log at, code is the HTTP response code.
 func (s *Server) respond(w http.ResponseWriter, lvl logging.LogLevel, code int, format string, args ...interface{}) {
 	response := fmt.Sprintf(format, args...)
 	s.Logger.Log(lvl, response)

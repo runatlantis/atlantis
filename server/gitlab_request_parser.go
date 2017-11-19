@@ -18,7 +18,7 @@ type GitlabRequestParser interface {
 	// Validate validates that the request has a token header matching secret.
 	// If the secret does not match it returns an error.
 	// If secret is empty it does not check the token header.
-	// It then parses the request as a gitlab object depending on the header
+	// It then parses the request as a GitLab object depending on the header
 	// provided by GitLab identifying the webhook type. If the webhook type
 	// is not recognized it will return nil but will not return an error.
 	// Usage:
@@ -37,13 +37,11 @@ type GitlabRequestParser interface {
 	Validate(r *http.Request, secret []byte) (interface{}, error)
 }
 
-// DefaultGitlabRequestParser parses GitLab requests.
+// DefaultGitlabRequestParser parses and validates GitLab requests.
 type DefaultGitlabRequestParser struct{}
 
 // Validate returns the JSON payload of the request.
-// If secret is not empty, it checks that the request was signed
-// by secret and returns an error if it was not.
-// If secret is empty, it does not check if the request was signed.
+// See GitlabRequestParser.Validate()
 func (d *DefaultGitlabRequestParser) Validate(r *http.Request, secret []byte) (interface{}, error) {
 	const mergeEventHeader = "Merge Request Hook"
 	const noteEventHeader = "Note Hook"

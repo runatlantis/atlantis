@@ -41,6 +41,7 @@ type EventParser struct {
 
 // DetermineCommand parses the comment as an atlantis command. If it succeeds,
 // it returns the command. Otherwise it returns error.
+// nolint: gocyclo
 func (e *EventParser) DetermineCommand(comment string, vcsHost vcs.Host) (*Command, error) {
 	// valid commands contain:
 	// the initial "executable" name, 'run' or 'atlantis' or '@GithubUser' where GithubUser is the api user atlantis is running as

@@ -10,6 +10,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// ProjectConfigFile is the filename of Atlantis project config.
 const ProjectConfigFile = "atlantis.yaml"
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_config_reader.go ProjectConfigReader
@@ -19,7 +20,8 @@ type ProjectConfigReader interface {
 	// Exists returns true if a project config file exists at projectPath.
 	Exists(projectPath string) bool
 	// Read attempts to read the project config file for the project at projectPath.
-	// NOTE: projectPath is not the path to the actual config file.
+	// NOTE: projectPath is not the path to the actual config file, just to the
+	// project root.
 	// Returns the parsed ProjectConfig or error if unable to read.
 	Read(projectPath string) (ProjectConfig, error)
 }

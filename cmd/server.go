@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-
 	"strings"
 
 	"github.com/hootsuite/atlantis/server"
@@ -224,16 +223,16 @@ func (s *ServerCmd) run() error {
 	if err := s.Viper.Unmarshal(&config); err != nil {
 		return err
 	}
-	if err := validate(config); err != nil {
+	if err := s.validate(config); err != nil {
 		return err
 	}
-	if err := setAtlantisURL(&config); err != nil {
+	if err := s.setAtlantisURL(&config); err != nil {
 		return err
 	}
-	if err := setDataDir(&config); err != nil {
+	if err := s.setDataDir(&config); err != nil {
 		return err
 	}
-	trimAtSymbolFromUsers(&config)
+	s.trimAtSymbolFromUsers(&config)
 
 	// Config looks good. Start the server.
 	server, err := s.ServerCreator.NewServer(config)
@@ -243,7 +242,8 @@ func (s *ServerCmd) run() error {
 	return server.Start()
 }
 
-func validate(config server.Config) error {
+// nolint: gocyclo
+func (s *ServerCmd) validate(config server.Config) error {
 	logLevel := config.LogLevel
 	if logLevel != "debug" && logLevel != "info" && logLevel != "warn" && logLevel != "error" {
 		return errors.New("invalid log level: not one of debug, info, warn, error")
@@ -270,7 +270,7 @@ func validate(config server.Config) error {
 }
 
 // setAtlantisURL sets the externally accessible URL for atlantis.
-func setAtlantisURL(config *server.Config) error {
+func (s *ServerCmd) setAtlantisURL(config *server.Config) error {
 	if config.AtlantisURL == "" {
 		hostname, err := os.Hostname()
 		if err != nil {
@@ -284,7 +284,7 @@ func setAtlantisURL(config *server.Config) error {
 // setDataDir checks if ~ was used in data-dir and converts it to the actual
 // home directory. If we don't do this, we'll create a directory called "~"
 // instead of actually using home.
-func setDataDir(config *server.Config) error {
+func (s *ServerCmd) setDataDir(config *server.Config) error {
 	if strings.HasPrefix(config.DataDir, "~/") {
 		expanded, err := homedir.Expand(config.DataDir)
 		if err != nil {
@@ -296,7 +296,7 @@ func setDataDir(config *server.Config) error {
 }
 
 // trimAtSymbolFromUsers trims @ from the front of the github and gitlab usernames
-func trimAtSymbolFromUsers(config *server.Config) {
+func (s *ServerCmd) trimAtSymbolFromUsers(config *server.Config) {
 	config.GithubUser = strings.TrimPrefix(config.GithubUser, "@")
 	config.GitlabUser = strings.TrimPrefix(config.GitlabUser, "@")
 }

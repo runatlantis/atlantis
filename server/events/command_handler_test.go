@@ -28,7 +28,7 @@ var vcsClient *vcsmocks.MockClientProxy
 var ghStatus *mocks.MockCommitStatusUpdater
 var githubGetter *mocks.MockGithubPullGetter
 var gitlabGetter *mocks.MockGitlabMergeRequestGetter
-var envLocker *mocks.MockEnvLocker
+var workspaceLocker *mocks.MockWorkspaceLocker
 var ch events.CommandHandler
 var logBytes *bytes.Buffer
 
@@ -39,7 +39,7 @@ func setup(t *testing.T) {
 	planner = mocks.NewMockExecutor()
 	eventParsing = mocks.NewMockEventParsing()
 	ghStatus = mocks.NewMockCommitStatusUpdater()
-	envLocker = mocks.NewMockEnvLocker()
+	workspaceLocker = mocks.NewMockWorkspaceLocker()
 	vcsClient = vcsmocks.NewMockClientProxy()
 	githubGetter = mocks.NewMockGithubPullGetter()
 	gitlabGetter = mocks.NewMockGitlabMergeRequestGetter()
@@ -53,7 +53,7 @@ func setup(t *testing.T) {
 		VCSClient:                vcsClient,
 		CommitStatusUpdater:      ghStatus,
 		EventParser:              eventParsing,
-		EnvLocker:                envLocker,
+		WorkspaceLocker:          workspaceLocker,
 		MarkdownRenderer:         &events.MarkdownRenderer{},
 		GithubPullGetter:         githubGetter,
 		GitlabMergeRequestGetter: gitlabGetter,
@@ -141,7 +141,7 @@ func TestExecuteCommand_EnvLocked(t *testing.T) {
 
 	When(githubGetter.GetPullRequest(fixtures.Repo, fixtures.Pull.Num)).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(pull)).ThenReturn(fixtures.Pull, fixtures.Repo, nil)
-	When(envLocker.TryLock(fixtures.Repo.FullName, cmd.Environment, fixtures.Pull.Num)).ThenReturn(false)
+	When(workspaceLocker.TryLock(fixtures.Repo.FullName, cmd.Environment, fixtures.Pull.Num)).ThenReturn(false)
 	ch.ExecuteCommand(fixtures.Repo, fixtures.Repo, fixtures.User, fixtures.Pull.Num, &cmd, vcs.Github)
 
 	msg := "The env environment is currently locked by another" +
@@ -168,7 +168,7 @@ func TestExecuteCommand_FullRun(t *testing.T) {
 		}
 		When(githubGetter.GetPullRequest(fixtures.Repo, fixtures.Pull.Num)).ThenReturn(pull, nil)
 		When(eventParsing.ParseGithubPull(pull)).ThenReturn(fixtures.Pull, fixtures.Repo, nil)
-		When(envLocker.TryLock(fixtures.Repo.FullName, cmd.Environment, fixtures.Pull.Num)).ThenReturn(true)
+		When(workspaceLocker.TryLock(fixtures.Repo.FullName, cmd.Environment, fixtures.Pull.Num)).ThenReturn(true)
 		switch c {
 		case events.Help:
 			When(helper.Execute(matchers.AnyPtrToEventsCommandContext())).ThenReturn(cmdResponse)
@@ -184,6 +184,6 @@ func TestExecuteCommand_FullRun(t *testing.T) {
 		_, response := ghStatus.VerifyWasCalledOnce().UpdateProjectResult(matchers.AnyPtrToEventsCommandContext(), matchers.AnyEventsCommandResponse()).GetCapturedArguments()
 		Equals(t, cmdResponse, response)
 		vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString(), matchers.AnyVcsHost())
-		envLocker.VerifyWasCalledOnce().Unlock(fixtures.Repo.FullName, cmd.Environment, fixtures.Pull.Num)
+		workspaceLocker.VerifyWasCalledOnce().Unlock(fixtures.Repo.FullName, cmd.Environment, fixtures.Pull.Num)
 	}
 }

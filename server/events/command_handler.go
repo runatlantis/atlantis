@@ -14,19 +14,27 @@ import (
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_command_runner.go CommandRunner
 
+// CommandRunner is the first step after a command request has been parsed.
 type CommandRunner interface {
+	// ExecuteCommand is the first step after a command request has been parsed.
+	// It handles gathering additional information needed to execute the command
+	// and then calling the appropriate services to finish executing the command.
 	ExecuteCommand(baseRepo models.Repo, headRepo models.Repo, user models.User, pullNum int, cmd *Command, vcsHost vcs.Host)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_github_pull_getter.go GithubPullGetter
 
+// GithubPullGetter makes API calls to get pull requests.
 type GithubPullGetter interface {
+	// GetPullRequest gets the pull request with id pullNum for the repo.
 	GetPullRequest(repo models.Repo, pullNum int) (*github.PullRequest, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_gitlab_merge_request_getter.go GitlabMergeRequestGetter
 
+// GitlabMergeRequestGetter makes API calls to get merge requests.
 type GitlabMergeRequestGetter interface {
+	// GetMergeRequest gets the pull request with the id pullNum for the repo.
 	GetMergeRequest(repoFullName string, pullNum int) (*gitlab.MergeRequest, error)
 }
 
@@ -41,12 +49,12 @@ type CommandHandler struct {
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
 	CommitStatusUpdater      CommitStatusUpdater
 	EventParser              EventParsing
-	EnvLocker                EnvLocker
+	WorkspaceLocker          WorkspaceLocker
 	MarkdownRenderer         *MarkdownRenderer
 	Logger                   logging.SimpleLogging
 }
 
-// ExecuteCommand executes the command
+// ExecuteCommand executes the command.
 func (c *CommandHandler) ExecuteCommand(baseRepo models.Repo, headRepo models.Repo, user models.User, pullNum int, cmd *Command, vcsHost vcs.Host) {
 	var err error
 	var pull models.PullRequest
@@ -105,9 +113,11 @@ func (c *CommandHandler) buildLogger(repoFullName string, pullNum int) *logging.
 	return logging.NewSimpleLogger(src, c.Logger.Underlying(), true, c.Logger.GetLevel())
 }
 
+// SetLockURL sets a function that's used to return the URL for a lock.
 func (c *CommandHandler) SetLockURL(f func(id string) (url string)) {
 	c.LockURLGenerator.SetLockURL(f)
 }
+
 func (c *CommandHandler) run(ctx *CommandContext) {
 	log := c.buildLogger(ctx.BaseRepo.FullName, ctx.Pull.Num)
 	ctx.Log = log
@@ -120,7 +130,7 @@ func (c *CommandHandler) run(ctx *CommandContext) {
 	}
 
 	c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, vcs.Pending, ctx.Command, ctx.VCSHost) // nolint: errcheck
-	if !c.EnvLocker.TryLock(ctx.BaseRepo.FullName, ctx.Command.Environment, ctx.Pull.Num) {
+	if !c.WorkspaceLocker.TryLock(ctx.BaseRepo.FullName, ctx.Command.Environment, ctx.Pull.Num) {
 		errMsg := fmt.Sprintf(
 			"The %s environment is currently locked by another"+
 				" command that is running for this pull request."+
@@ -130,7 +140,7 @@ func (c *CommandHandler) run(ctx *CommandContext) {
 		c.updatePull(ctx, CommandResponse{Failure: errMsg})
 		return
 	}
-	defer c.EnvLocker.Unlock(ctx.BaseRepo.FullName, ctx.Command.Environment, ctx.Pull.Num)
+	defer c.WorkspaceLocker.Unlock(ctx.BaseRepo.FullName, ctx.Command.Environment, ctx.Pull.Num)
 
 	var cr CommandResponse
 	switch ctx.Command.Name {
@@ -160,7 +170,7 @@ func (c *CommandHandler) updatePull(ctx *CommandContext, res CommandResponse) {
 	c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull, comment, ctx.VCSHost) // nolint: errcheck
 }
 
-// logPanics logs and creates a comment on the pull request for panics
+// logPanics logs and creates a comment on the pull request for panics.
 func (c *CommandHandler) logPanics(ctx *CommandContext) {
 	if err := recover(); err != nil {
 		stack := recovery.Stack(3)

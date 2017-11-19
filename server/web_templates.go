@@ -7,14 +7,20 @@ import (
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_template_writer.go TemplateWriter
+
+// TemplateWriter is an interface over html/template that's used to enable
+// mocking.
 type TemplateWriter interface {
+	// Execute applies a parsed template to the specified data object,
+	// writing the output to wr.
 	Execute(wr io.Writer, data interface{}) error
 }
 
+// LockIndexData holds the fields needed to display the index view for locks.
 type LockIndexData struct {
 	LockURL      string
 	RepoFullName string
-	PullNum      int ``
+	PullNum      int
 	Time         time.Time
 }
 
@@ -75,6 +81,7 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
 </html>
 `))
 
+// LockDetailData holds the fields needed to display the lock detail view.
 type LockDetailData struct {
 	UnlockURL       string
 	LockKeyEncoded  string

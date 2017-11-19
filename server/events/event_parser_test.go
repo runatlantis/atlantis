@@ -61,6 +61,7 @@ func TestDetermineCommandHelp(t *testing.T) {
 	}
 }
 
+// nolint: gocyclo
 func TestDetermineCommandPermutations(t *testing.T) {
 	execNames := []string{"run", "atlantis", "@github-user", "@gitlab-user"}
 	commandNames := []events.CommandName{events.Plan, events.Apply}

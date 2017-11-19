@@ -2,10 +2,9 @@ package events
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
-
-	"os/exec"
 
 	"github.com/hootsuite/atlantis/server/events/models"
 	"github.com/hootsuite/atlantis/server/logging"
@@ -16,14 +15,18 @@ const workspacePrefix = "repos"
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_workspace.go Workspace
 
+// Workspace handles the workspace on disk for running commands.
 type Workspace interface {
-	// Clone git clones headRepo, checks out the branch and then returns the absolute
-	// path to the root of the cloned repo.
+	// Clone git clones headRepo, checks out the branch and then returns the
+	// absolute path to the root of the cloned repo.
 	Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, env string) (string, error)
+	// GetWorkspace returns the path to the workspace for this repo and pull.
 	GetWorkspace(r models.Repo, p models.PullRequest, env string) (string, error)
+	// Delete deletes the workspace for this repo and pull.
 	Delete(r models.Repo, p models.PullRequest) error
 }
 
+// FileWorkspace implements Workspace with the file system.
 type FileWorkspace struct {
 	DataDir string
 }
@@ -38,13 +41,14 @@ func (w *FileWorkspace) Clone(
 	env string) (string, error) {
 	cloneDir := w.cloneDir(baseRepo, p, env)
 
-	// this is safe to do because we lock runs on repo/pull/env so no one else is using this workspace
+	// This is safe to do because we lock runs on repo/pull/env so no one else
+	// is using this workspace.
 	log.Info("cleaning clone directory %q", cloneDir)
 	if err := os.RemoveAll(cloneDir); err != nil {
 		return "", errors.Wrap(err, "deleting old workspace")
 	}
 
-	// create the directory and parents if necessary
+	// Create the directory and parents if necessary.
 	log.Info("creating dir %q", cloneDir)
 	if err := os.MkdirAll(cloneDir, 0755); err != nil {
 		return "", errors.Wrap(err, "creating new workspace")
@@ -56,7 +60,7 @@ func (w *FileWorkspace) Clone(
 		return "", errors.Wrapf(err, "cloning %s: %s", headRepo.SanitizedCloneURL, string(output))
 	}
 
-	// check out the branch for this PR
+	// Check out the branch for this PR.
 	log.Info("checking out branch %q", p.Branch)
 	checkoutCmd := exec.Command("git", "checkout", p.Branch)
 	checkoutCmd.Dir = cloneDir
@@ -66,6 +70,7 @@ func (w *FileWorkspace) Clone(
 	return cloneDir, nil
 }
 
+// GetWorkspace returns the path to the workspace for this repo and pull.
 func (w *FileWorkspace) GetWorkspace(r models.Repo, p models.PullRequest, env string) (string, error) {
 	repoDir := w.cloneDir(r, p, env)
 	if _, err := os.Stat(repoDir); err != nil {
@@ -74,7 +79,7 @@ func (w *FileWorkspace) GetWorkspace(r models.Repo, p models.PullRequest, env st
 	return repoDir, nil
 }
 
-// Delete deletes the workspace for this repo and pull
+// Delete deletes the workspace for this repo and pull.
 func (w *FileWorkspace) Delete(r models.Repo, p models.PullRequest) error {
 	return os.RemoveAll(w.repoPullDir(r, p))
 }
