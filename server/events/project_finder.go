@@ -8,7 +8,7 @@ import (
 	"github.com/hootsuite/atlantis/server/logging"
 )
 
-//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_modified_project_finder.go ModifiedProjectFinder
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_modified_project_finder.go ModifiedProjectFinder
 
 type ModifiedProjectFinder interface {
 	// FindModified returns the list of projects that were modified based on

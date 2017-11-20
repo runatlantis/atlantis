@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -23,7 +24,8 @@ func GenerateMockFileInOutputDir(
 	selfPackage string,
 	debugParser bool,
 	out io.Writer,
-	useExperimentalModelGen bool) {
+	useExperimentalModelGen bool,
+	shouldGenerateMatchers bool) {
 	GenerateMockFile(
 		args,
 		OutputFilePath(args, outputDirPath, outputFilePathOverride),
@@ -31,7 +33,8 @@ func GenerateMockFileInOutputDir(
 		selfPackage,
 		debugParser,
 		out,
-		useExperimentalModelGen)
+		useExperimentalModelGen,
+		shouldGenerateMatchers)
 }
 
 func OutputFilePath(args []string, outputDirPath string, outputFilePathOverride string) string {
@@ -44,16 +47,30 @@ func OutputFilePath(args []string, outputDirPath string, outputFilePathOverride 
 	}
 }
 
-func GenerateMockFile(args []string, outputFilePath string, packageOut string, selfPackage string, debugParser bool, out io.Writer, useExperimentalModelGen bool) {
-	output := GenerateMockSourceCode(args, packageOut, selfPackage, debugParser, out, useExperimentalModelGen)
+func GenerateMockFile(args []string, outputFilePath string, packageOut string, selfPackage string, debugParser bool, out io.Writer, useExperimentalModelGen bool, shouldGenerateMatchers bool) {
+	mockSourceCode, matcherSourceCodes := GenerateMockSourceCode(args, packageOut, selfPackage, debugParser, out, useExperimentalModelGen)
 
-	err := ioutil.WriteFile(outputFilePath, output, 0664)
+	err := ioutil.WriteFile(outputFilePath, mockSourceCode, 0664)
 	if err != nil {
 		panic(fmt.Errorf("Failed writing to destination: %v", err))
 	}
+
+	if shouldGenerateMatchers {
+		matchersPath := filepath.Join(filepath.Dir(outputFilePath), "matchers")
+		err = os.MkdirAll(matchersPath, 0755)
+		if err != nil {
+			panic(fmt.Errorf("Failed making dirs \"%v\": %v", matchersPath, err))
+		}
+		for matcherTypeName, matcherSourceCode := range matcherSourceCodes {
+			err := ioutil.WriteFile(filepath.Join(matchersPath, matcherTypeName+".go"), []byte(matcherSourceCode), 0664)
+			if err != nil {
+				panic(fmt.Errorf("Failed writing to destination: %v", err))
+			}
+		}
+	}
 }
 
-func GenerateMockSourceCode(args []string, packageOut string, selfPackage string, debugParser bool, out io.Writer, useExperimentalModelGen bool) []byte {
+func GenerateMockSourceCode(args []string, packageOut string, selfPackage string, debugParser bool, out io.Writer, useExperimentalModelGen bool) ([]byte, map[string]string) {
 	var err error
 
 	var ast *model.Package
@@ -81,9 +98,5 @@ func GenerateMockSourceCode(args []string, packageOut string, selfPackage string
 		ast.Print(out)
 	}
 
-	output, err := mockgen.GenerateOutput(ast, src, packageOut, selfPackage)
-	if err != nil {
-		panic(fmt.Errorf("Failed generating mock: %v", err))
-	}
-	return output
+	return mockgen.GenerateOutput(ast, src, packageOut, selfPackage)
 }

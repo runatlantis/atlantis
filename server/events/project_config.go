@@ -12,7 +12,7 @@ import (
 
 const ProjectConfigFile = "atlantis.yaml"
 
-//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_project_config_reader.go ProjectConfigReader
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_config_reader.go ProjectConfigReader
 
 // ProjectConfigReader implements reading project config.
 type ProjectConfigReader interface {

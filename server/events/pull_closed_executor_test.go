@@ -2,12 +2,12 @@ package events_test
 
 import (
 	"errors"
-	"reflect"
 	"testing"
 
 	"github.com/hootsuite/atlantis/server/events"
 	lockmocks "github.com/hootsuite/atlantis/server/events/locking/mocks"
 	"github.com/hootsuite/atlantis/server/events/mocks"
+	"github.com/hootsuite/atlantis/server/events/mocks/matchers"
 	"github.com/hootsuite/atlantis/server/events/models"
 	"github.com/hootsuite/atlantis/server/events/models/fixtures"
 	"github.com/hootsuite/atlantis/server/events/vcs"
@@ -58,7 +58,7 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 	When(l.UnlockByPull(fixtures.Repo.FullName, fixtures.Pull.Num)).ThenReturn(nil, nil)
 	err := pce.CleanUpPull(fixtures.Repo, fixtures.Pull, vcs.Github)
 	Ok(t, err)
-	cp.VerifyWasCalled(Never()).CreateComment(AnyRepo(), AnyPullRequest(), AnyString(), AnyVCSHost())
+	cp.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString(), matchers.AnyVcsHost())
 }
 
 func TestCleanUpPullComments(t *testing.T) {
@@ -139,19 +139,9 @@ func TestCleanUpPullComments(t *testing.T) {
 		When(l.UnlockByPull(fixtures.Repo.FullName, fixtures.Pull.Num)).ThenReturn(c.Locks, nil)
 		err := pce.CleanUpPull(fixtures.Repo, fixtures.Pull, vcs.Github)
 		Ok(t, err)
-		_, _, comment, _ := cp.VerifyWasCalledOnce().CreateComment(AnyRepo(), AnyPullRequest(), AnyString(), AnyVCSHost()).GetCapturedArguments()
+		_, _, comment, _ := cp.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString(), matchers.AnyVcsHost()).GetCapturedArguments()
 
 		expected := "Locks and plans deleted for the projects and environments modified in this pull request:\n\n" + c.Exp
 		Equals(t, expected, comment)
 	}
-}
-
-func AnyRepo() models.Repo {
-	RegisterMatcher(NewAnyMatcher(reflect.TypeOf(models.Repo{})))
-	return models.Repo{}
-}
-
-func AnyPullRequest() models.PullRequest {
-	RegisterMatcher(NewAnyMatcher(reflect.TypeOf(models.PullRequest{})))
-	return models.PullRequest{}
 }

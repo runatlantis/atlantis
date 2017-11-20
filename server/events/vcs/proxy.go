@@ -5,7 +5,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_proxy.go ClientProxy
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_proxy.go ClientProxy
 
 // ClientProxy proxies calls to the correct VCS client depending on which
 // VCS host is required.

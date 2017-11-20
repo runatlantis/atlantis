@@ -14,7 +14,7 @@ import (
 
 const workspacePrefix = "repos"
 
-//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_workspace.go Workspace
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_workspace.go Workspace
 
 type Workspace interface {
 	// Clone git clones headRepo, checks out the branch and then returns the absolute

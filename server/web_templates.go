@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_template_writer.go TemplateWriter
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_template_writer.go TemplateWriter
 type TemplateWriter interface {
 	Execute(wr io.Writer, data interface{}) error
 }

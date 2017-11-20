@@ -36,15 +36,16 @@ import (
 
 const mockFrameworkImportPath = "github.com/petergtz/pegomock"
 
-func GenerateOutput(ast *model.Package, source, packageOut, selfPackage string) ([]byte, error) {
-	g := new(generator)
+func GenerateOutput(ast *model.Package, source, packageOut, selfPackage string) ([]byte, map[string]string) {
+	g := generator{typesSet: make(map[string]string)}
 	g.generateCode(source, ast, packageOut, selfPackage)
-	return g.formattedOutput(), nil
+	return g.formattedOutput(), g.typesSet
 }
 
 type generator struct {
 	buf        bytes.Buffer
 	packageMap map[string]string // map from import path to package name
+	typesSet   map[string]string
 }
 
 func (g *generator) generateCode(source string, pkg *model.Package, pkgName, selfPackage string) {
@@ -96,13 +97,16 @@ func generateUniquePackageNamesFor(importPaths map[string]bool) (packageMap, non
 		packageMap[importPath] = packageName
 		packageNamesAlreadyUsed[packageName] = true
 
-		vendorParsedImportPath := importPath
-		if split := strings.Split(importPath, "/vendor/"); len(split) > 1 {
-			vendorParsedImportPath = split[1]
-		}
-		nonVendorPackageMap[vendorParsedImportPath] = packageName
+		nonVendorPackageMap[vendorCleaned(importPath)] = packageName
 	}
 	return
+}
+
+func vendorCleaned(importPath string) string {
+	if split := strings.Split(importPath, "/vendor/"); len(split) > 1 {
+		return split[1]
+	}
+	return importPath
 }
 
 // sanitize cleans up a string to make a suitable package name.
@@ -136,6 +140,9 @@ func (g *generator) generateMockFor(iface *model.Interface, selfPackage string) 
 	for _, method := range iface.Methods {
 		g.generateMockMethod(mockTypeName, method, selfPackage)
 		g.emptyLine()
+
+		addTypesFromMethodParamsTo(g.typesSet, method.In, g.packageMap)
+		addTypesFromMethodParamsTo(g.typesSet, method.Out, g.packageMap)
 	}
 	g.generateMockVerifyMethods(iface.Name)
 	g.generateVerifierType(iface.Name)
@@ -340,6 +347,112 @@ func argDataFor(method *model.Method, packageMap map[string]string, pkgOverride 
 		returnTypes[i] = ret.Type.String(packageMap, pkgOverride)
 	}
 	return
+}
+
+func addTypesFromMethodParamsTo(typesSet map[string]string, params []*model.Parameter, packageMap map[string]string) {
+	for _, param := range params {
+		switch typedType := param.Type.(type) {
+		case *model.NamedType, *model.PointerType, *model.ArrayType, *model.MapType, *model.ChanType:
+			if _, exists := typesSet[underscoreNameFor(typedType, packageMap)]; !exists {
+				typesSet[underscoreNameFor(typedType, packageMap)] = generateMatcherSourceCode(typedType, packageMap)
+			}
+		case *model.FuncType:
+			// matcher generation for funcs not supported yet
+			// TODO implement
+		case model.PredeclaredType:
+			// skip. These come as part of pegomock.
+		default:
+			panic("Should not get here")
+		}
+	}
+}
+
+func generateMatcherSourceCode(t model.Type, packageMap map[string]string) string {
+	return fmt.Sprintf(`package matchers
+
+import (
+	"reflect"
+	"github.com/petergtz/pegomock"
+	%v
+)
+
+func Any%v() %v {
+	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(%v))(nil)).Elem()))
+	var nullValue %v
+	return nullValue
+}
+
+func Eq%v(value %v) %v {
+	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
+	var nullValue %v
+	return nullValue
+}
+`,
+		optionalPackageOf(t, packageMap),
+		camelcaseNameFor(t, packageMap),
+		t.String(packageMap, ""),
+		t.String(packageMap, ""),
+		t.String(packageMap, ""),
+
+		camelcaseNameFor(t, packageMap),
+		t.String(packageMap, ""),
+		t.String(packageMap, ""),
+		t.String(packageMap, ""),
+	)
+}
+
+func optionalPackageOf(t model.Type, packageMap map[string]string) string {
+	switch typedType := t.(type) {
+	case model.PredeclaredType:
+		return ""
+	case *model.NamedType:
+		return fmt.Sprintf("%v \"%v\"", packageMap[typedType.Package], vendorCleaned(typedType.Package))
+	case *model.PointerType:
+		return optionalPackageOf(typedType.Type, packageMap)
+	case *model.ArrayType:
+		return optionalPackageOf(typedType.Type, packageMap)
+	case *model.MapType:
+		return optionalPackageOf(typedType.Key, packageMap) + "\n" + optionalPackageOf(typedType.Value, packageMap)
+	case *model.ChanType:
+		return optionalPackageOf(typedType.Type, packageMap)
+		// TODO:
+	// case *model.FuncType:
+	default:
+		panic(fmt.Sprintf("TODO implement optionalPackageOf for: %v\nis type of %T\n", typedType, typedType))
+	}
+}
+
+func spaceSeparatedNameFor(t model.Type, packageMap map[string]string) string {
+	switch typedType := t.(type) {
+	case model.PredeclaredType:
+		return typedType.String(packageMap, "")
+	case *model.NamedType:
+		return strings.Replace((typedType.String(packageMap, "")), ".", " ", -1)
+	case *model.PointerType:
+		return "ptr to " + spaceSeparatedNameFor(typedType.Type, packageMap)
+	case *model.ArrayType:
+		if typedType.Len == -1 {
+			return "slice of " + spaceSeparatedNameFor(typedType.Type, packageMap)
+		} else {
+			return "array of " + spaceSeparatedNameFor(typedType.Type, packageMap)
+		}
+	case *model.MapType:
+		return "map of " + spaceSeparatedNameFor(typedType.Key, packageMap) + " to " + spaceSeparatedNameFor(typedType.Value, packageMap)
+	case *model.ChanType:
+		return "chan of " + spaceSeparatedNameFor(typedType.Type, packageMap)
+	// TODO:
+	// case *model.FuncType:
+	default:
+		return fmt.Sprintf("TODO implement matcher for: %v\nis type of %T\n", typedType, typedType)
+	}
+}
+
+func camelcaseNameFor(t model.Type, packageMap map[string]string) string {
+	return strings.Replace(strings.Title(strings.Replace(spaceSeparatedNameFor(t, packageMap), "_", " ", -1)), " ", "", -1)
+}
+
+func underscoreNameFor(t model.Type, packageMap map[string]string) string {
+	return strings.ToLower(strings.Replace(spaceSeparatedNameFor(t, packageMap), " ", "_", -1))
 }
 
 func (g *generator) p(format string, args ...interface{}) *generator {

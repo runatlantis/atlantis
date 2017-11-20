@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"errors"
 	"log"
-	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/google/go-github/github"
 	"github.com/hootsuite/atlantis/server/events"
 	"github.com/hootsuite/atlantis/server/events/mocks"
+	"github.com/hootsuite/atlantis/server/events/mocks/matchers"
 	"github.com/hootsuite/atlantis/server/events/models"
 	"github.com/hootsuite/atlantis/server/events/models/fixtures"
 	"github.com/hootsuite/atlantis/server/events/vcs"
@@ -66,7 +66,7 @@ func TestExecuteCommand_LogPanics(t *testing.T) {
 	setup(t)
 	When(ghStatus.Update(fixtures.Repo, fixtures.Pull, vcs.Pending, nil, vcs.Github)).ThenPanic("panic")
 	ch.ExecuteCommand(fixtures.Repo, fixtures.Repo, fixtures.User, 1, nil, vcs.Github)
-	_, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(AnyRepo(), AnyPullRequest(), AnyString(), AnyVCSHost()).GetCapturedArguments()
+	_, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString(), matchers.AnyVcsHost()).GetCapturedArguments()
 	Assert(t, strings.Contains(comment, "Error: goroutine panic"), "comment should be about a goroutine panic")
 }
 
@@ -148,7 +148,7 @@ func TestExecuteCommand_EnvLocked(t *testing.T) {
 		" command that is running for this pull request." +
 		" Wait until the previous command is complete and try again."
 	ghStatus.VerifyWasCalledOnce().Update(fixtures.Repo, fixtures.Pull, vcs.Pending, &cmd, vcs.Github)
-	_, response := ghStatus.VerifyWasCalledOnce().UpdateProjectResult(AnyCommandContext(), AnyCommandResponse()).GetCapturedArguments()
+	_, response := ghStatus.VerifyWasCalledOnce().UpdateProjectResult(matchers.AnyPtrToEventsCommandContext(), matchers.AnyEventsCommandResponse()).GetCapturedArguments()
 	Equals(t, msg, response.Failure)
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.Repo, fixtures.Pull,
 		"**Plan Failed**: "+msg+"\n\n", vcs.Github)
@@ -171,34 +171,19 @@ func TestExecuteCommand_FullRun(t *testing.T) {
 		When(envLocker.TryLock(fixtures.Repo.FullName, cmd.Environment, fixtures.Pull.Num)).ThenReturn(true)
 		switch c {
 		case events.Help:
-			When(helper.Execute(AnyCommandContext())).ThenReturn(cmdResponse)
+			When(helper.Execute(matchers.AnyPtrToEventsCommandContext())).ThenReturn(cmdResponse)
 		case events.Plan:
-			When(planner.Execute(AnyCommandContext())).ThenReturn(cmdResponse)
+			When(planner.Execute(matchers.AnyPtrToEventsCommandContext())).ThenReturn(cmdResponse)
 		case events.Apply:
-			When(applier.Execute(AnyCommandContext())).ThenReturn(cmdResponse)
+			When(applier.Execute(matchers.AnyPtrToEventsCommandContext())).ThenReturn(cmdResponse)
 		}
 
 		ch.ExecuteCommand(fixtures.Repo, fixtures.Repo, fixtures.User, fixtures.Pull.Num, &cmd, vcs.Github)
 
 		ghStatus.VerifyWasCalledOnce().Update(fixtures.Repo, fixtures.Pull, vcs.Pending, &cmd, vcs.Github)
-		_, response := ghStatus.VerifyWasCalledOnce().UpdateProjectResult(AnyCommandContext(), AnyCommandResponse()).GetCapturedArguments()
+		_, response := ghStatus.VerifyWasCalledOnce().UpdateProjectResult(matchers.AnyPtrToEventsCommandContext(), matchers.AnyEventsCommandResponse()).GetCapturedArguments()
 		Equals(t, cmdResponse, response)
-		vcsClient.VerifyWasCalledOnce().CreateComment(AnyRepo(), AnyPullRequest(), AnyString(), AnyVCSHost())
+		vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString(), matchers.AnyVcsHost())
 		envLocker.VerifyWasCalledOnce().Unlock(fixtures.Repo.FullName, cmd.Environment, fixtures.Pull.Num)
 	}
-}
-
-func AnyCommandContext() *events.CommandContext {
-	RegisterMatcher(NewAnyMatcher(reflect.TypeOf(&events.CommandContext{})))
-	return &events.CommandContext{}
-}
-
-func AnyVCSHost() vcs.Host {
-	RegisterMatcher(NewAnyMatcher(reflect.TypeOf(vcs.Github)))
-	return vcs.Github
-}
-
-func AnyCommandResponse() events.CommandResponse {
-	RegisterMatcher(NewAnyMatcher(reflect.TypeOf(events.CommandResponse{})))
-	return events.CommandResponse{}
 }

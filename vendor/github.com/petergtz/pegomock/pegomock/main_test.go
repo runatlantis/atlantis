@@ -104,8 +104,11 @@ var _ = Describe("CLI", func() {
 
 			It(`generates a file mock_vendordisplay_test.go that contains 'import ( vendored_package "github.com/petergtz/vendored_package" )'`, func() {
 
-				main.Run(cmd("pegomock generate VendorDisplay"), os.Stdout, app, done)
+				main.Run(cmd("pegomock generate -m VendorDisplay"), os.Stdout, app, done)
 				Expect(joinPath(packageDir, "mock_vendordisplay_test.go")).To(SatisfyAll(
+					BeAnExistingFile(),
+					BeAFileContainingSubString(`vendored_package "github.com/petergtz/vendored_package"`)))
+				Expect(joinPath(packageDir, "matchers", "vendored_package_interface.go")).To(SatisfyAll(
 					BeAnExistingFile(),
 					BeAFileContainingSubString(`vendored_package "github.com/petergtz/vendored_package"`)))
 			})

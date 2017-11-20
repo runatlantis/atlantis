@@ -9,7 +9,7 @@ import (
 	"github.com/google/go-github/github"
 )
 
-//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_gh_request_validation.go GithubRequestValidator
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_gh_request_validation.go GithubRequestValidator
 
 // GithubRequestValidator validates GitHub requests.
 type GithubRequestValidator interface {

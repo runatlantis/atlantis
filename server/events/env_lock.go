@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_env_locker.go EnvLocker
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_env_locker.go EnvLocker
 
 type EnvLocker interface {
 	TryLock(repoFullName string, env string, pullNum int) bool

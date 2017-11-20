@@ -17,7 +17,7 @@ import (
 
 const inlineShebang = "#!/bin/sh -e"
 
-//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_runner.go Runner
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_runner.go Runner
 
 type Runner interface {
 	Execute(log *logging.SimpleLogger, commands []string, path string, environment string, terraformVersion *version.Version, stage string) (string, error)

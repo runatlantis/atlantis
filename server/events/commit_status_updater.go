@@ -8,7 +8,7 @@ import (
 	"github.com/hootsuite/atlantis/server/events/vcs"
 )
 
-//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_commit_status_updater.go CommitStatusUpdater
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_commit_status_updater.go CommitStatusUpdater
 
 type CommitStatusUpdater interface {
 	Update(repo models.Repo, pull models.PullRequest, status vcs.CommitStatus, cmd *Command, host vcs.Host) error

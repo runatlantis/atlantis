@@ -47,8 +47,10 @@ func Run(cliArgs []string, out io.Writer, app *kingpin.Application, done chan bo
 		// TODO: self_package was taken as is from GoMock.
 		//       Still don't understand what it's really there for.
 		//       So for now it's not tested.
-		selfPackage             = generateCmd.Flag("self_package", "If set, the package this mock will be part of.").String()
-		debugParser             = generateCmd.Flag("debug", "Print debug information.").Short('d').Bool()
+		selfPackage            = generateCmd.Flag("self_package", "If set, the package this mock will be part of.").String()
+		debugParser            = generateCmd.Flag("debug", "Print debug information.").Short('d').Bool()
+		shouldGenerateMatchers = generateCmd.Flag("generate-matchers", "Generate matchers for all non built-in types in a \"matchers\" "+
+			"directory in the same directory where the mock file gets generated.").Short('m').Default("false").Bool()
 		useExperimentalModelGen = generateCmd.Flag("use-experimental-model-gen", "pegomock includes a new experimental source parser based on "+
 			"golang.org/x/tools/go/loader. It's currently experimental, but should be more powerful "+
 			"than the current reflect-based modelgen. E.g. reflect cannot detect method parameter names,"+
@@ -81,7 +83,8 @@ func Run(cliArgs []string, out io.Writer, app *kingpin.Application, done chan bo
 			*selfPackage,
 			*debugParser,
 			out,
-			*useExperimentalModelGen)
+			*useExperimentalModelGen,
+			*shouldGenerateMatchers)
 
 	case watchCmd.FullCommand():
 		var targetPaths []string

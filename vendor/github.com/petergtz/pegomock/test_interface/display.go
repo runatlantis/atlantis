@@ -15,6 +15,7 @@
 package test_interface
 
 import "net/http"
+import "io"
 
 // Display is some sample interface to be mocked.
 type Display interface {
@@ -24,6 +25,7 @@ type Display interface {
 	MultipleValues() (string, int, float32)
 	MultipleParamsAndReturnValue(s string, i int) string
 	ArrayParam(array []string)
+	MapParam(m map[string]http.Request)
 	FloatParam(float32)
 	InterfaceParam(interface{})
 	InterfaceReturnValue() interface{}
@@ -34,4 +36,5 @@ type Display interface {
 	FuncReturnValue() func()
 	VariadicParam(v ...string)
 	NormalAndVariadicParam(s string, i int, v ...string)
+	CamelCaseTypeParam(camelCaseParam io.ReadCloser)
 }

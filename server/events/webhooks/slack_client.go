@@ -11,7 +11,7 @@ const (
 	slackFailureColour = "danger"
 )
 
-//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_slack_client.go SlackClient
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_slack_client.go SlackClient
 
 // SlackClient handles making API calls to Slack.
 type SlackClient interface {
@@ -21,7 +21,7 @@ type SlackClient interface {
 	PostMessage(channel string, applyResult ApplyResult) error
 }
 
-//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_underlying_slack_client.go UnderlyingSlackClient
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_underlying_slack_client.go UnderlyingSlackClient
 
 // UnderlyingSlackClient wraps the nlopes/slack.Client implementation so
 // we can mock it during tests.

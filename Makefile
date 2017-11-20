@@ -28,6 +28,12 @@ build-service: ## Build the main Go service
 go-generate: ## Run go generate in all packages
 	go generate $(PKG)
 
+regen-mocks: ## Delete all mocks and then run go generate to regen them
+	find . -type f | grep mocks/mock | grep -v vendor | xargs rm
+	@# not using $(PKG) here because that it includes directories that have now
+	@# been deleted, causing go generate to fail.
+	go generate $$(go list ./... | grep -v e2e | grep -v vendor | grep -v static)
+
 test: ## Run tests
 	go test $(PKG)
 

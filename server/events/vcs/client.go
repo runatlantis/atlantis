@@ -4,7 +4,7 @@ import (
 	"github.com/hootsuite/atlantis/server/events/models"
 )
 
-//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_client.go Client
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_client.go Client
 
 // Client is used to make API calls to a VCS host like GitHub or GitLab.
 type Client interface {

@@ -236,6 +236,9 @@ When(contactList.getContactByFullName(EqString("Dan"), AnyString())).thenReturn(
 ```
 
 ### Writing Your Own Argument Matchers
+
+**Important:** `Eq...` and `Any...` matchers for types used in mock methods, can now be _auto-generated_ while generating the mock. So writing your own argument matchers is not necessary for most use cases. See section [The Pegomock CLI](#generating-mocks) for more information.
+
 You can also write your own matchers for non-basic types. E.g. if you have a `struct MyType`, you can write an _Equals_ and _Any_ matcher like this:
 ```go
 func EqMyType(value MyType) MyType {
@@ -377,6 +380,8 @@ Flags can be any of the following:
 
 -	`--package`: Package of the generated code; defaults to the package from which pegomock was executed suffixed with _test
 
+- `--generate-matchers,-m`: This will auto-generate argument matchers and place them in a `matchers` directory alongside the mock source code itself.
+
 For more flags, run:
 
 ```
@@ -396,7 +401,7 @@ pegomock generate --use-experimental-model-gen [<flags>] [<packagepath>] <interf
 
 What are the benefits?
 - The current default uses the [reflect](https://golang.org/pkg/reflect/) package to introspect the interface for which a mock should be generated. But reflection cannot determine method parameter names, only types. This forces the generator to generate them based on a pattern. In a code editor with code assistence, those pattern-based names (such as `_param0`, `_param1`) are non-descriptive and provide less help while writing code. The new implementation properly parses the source (including *all* dependent packages) and subsequently uses the same names as used in the interface definition.
-- With the current default you cannot generate an interface that lives in the `main` package. It's due to the way this implementation works: it imports the interface's package into temporarily generated code that gets compiled on the fly. This compilation fails, because there are now two `main`functions.
+- With the current default you cannot generate an interface that lives in the `main` package. It's due to the way this implementation works: it imports the interface's package into temporarily generated code that gets compiled on the fly. This compilation fails, because there are now two `main` functions.
 - The new implementation is simpler and will probably become the default in the future, because it will be easier to maintain.
 
 What are the drawbacks?

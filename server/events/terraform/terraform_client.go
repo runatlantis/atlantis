@@ -14,7 +14,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_runner.go Runner
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_runner.go Runner
 
 type Runner interface {
 	Version() *version.Version

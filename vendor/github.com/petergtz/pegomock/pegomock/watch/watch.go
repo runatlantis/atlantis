@@ -91,7 +91,7 @@ func (updater *MockFileUpdater) updateMockFiles(targetPath string) {
 		sourceArgs, err := util.SourceArgs(*lineArgs)
 		util.PanicOnError(err)
 
-		generatedMockSourceCode := filehandling.GenerateMockSourceCode(sourceArgs, *packageOut, *selfPackage, false, os.Stdout, false)
+		generatedMockSourceCode, _ := filehandling.GenerateMockSourceCode(sourceArgs, *packageOut, *selfPackage, false, os.Stdout, false)
 		mockFilePath := filehandling.OutputFilePath(sourceArgs, ".", *destination)
 		hasChanged := util.WriteFileIfChanged(mockFilePath, generatedMockSourceCode)
 

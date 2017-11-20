@@ -13,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_lock_url_generator.go LockURLGenerator
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_lock_url_generator.go LockURLGenerator
 
 type LockURLGenerator interface {
 	// SetLockURL takes a function that given a lock id, will return a url

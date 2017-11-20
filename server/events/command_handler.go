@@ -12,19 +12,19 @@ import (
 	"github.com/pkg/errors"
 )
 
-//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_command_runner.go CommandRunner
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_command_runner.go CommandRunner
 
 type CommandRunner interface {
 	ExecuteCommand(baseRepo models.Repo, headRepo models.Repo, user models.User, pullNum int, cmd *Command, vcsHost vcs.Host)
 }
 
-//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_github_pull_getter.go GithubPullGetter
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_github_pull_getter.go GithubPullGetter
 
 type GithubPullGetter interface {
 	GetPullRequest(repo models.Repo, pullNum int) (*github.PullRequest, error)
 }
 
-//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_gitlab_merge_request_getter.go GitlabMergeRequestGetter
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_gitlab_merge_request_getter.go GitlabMergeRequestGetter
 
 type GitlabMergeRequestGetter interface {
 	GetMergeRequest(repoFullName string, pullNum int) (*gitlab.MergeRequest, error)

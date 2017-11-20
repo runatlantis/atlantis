@@ -161,7 +161,7 @@
   branch = "master"
   name = "github.com/petergtz/pegomock"
   packages = [".","internal/verify"]
-  revision = "b99e34d8f73c46cb5e7fef35963a0b0bb89887eb"
+  revision = "e34a58f05f9a8ea0cd71912e02a4b08e1128aa81"
 
 [[projects]]
   name = "github.com/pkg/errors"
