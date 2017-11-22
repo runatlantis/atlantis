@@ -98,7 +98,7 @@ func TestPostMessage_Success(t *testing.T) {
 			},
 		},
 	}}
-	expParams.AsUser = true
+	expParams.AsUser = false
 	expParams.EscapeText = false
 
 	channel := "somechannel"
@@ -137,7 +137,7 @@ func TestPostMessage_Error(t *testing.T) {
 			},
 		},
 	}}
-	expParams.AsUser = true
+	expParams.AsUser = false
 	expParams.EscapeText = false
 
 	channel := "somechannel"
