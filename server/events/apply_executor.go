@@ -3,9 +3,6 @@ package events
 import (
 	"fmt"
 	"os"
-
-	"github.com/pkg/errors"
-
 	"path/filepath"
 
 	"github.com/hootsuite/atlantis/server/events/models"
@@ -13,18 +10,21 @@ import (
 	"github.com/hootsuite/atlantis/server/events/terraform"
 	"github.com/hootsuite/atlantis/server/events/vcs"
 	"github.com/hootsuite/atlantis/server/events/webhooks"
+	"github.com/pkg/errors"
 )
 
+// ApplyExecutor handles executing terraform apply.
 type ApplyExecutor struct {
 	VCSClient         vcs.ClientProxy
 	Terraform         *terraform.Client
 	RequireApproval   bool
 	Run               *run.Run
 	Workspace         Workspace
-	ProjectPreExecute *ProjectPreExecute
+	ProjectPreExecute *DefaultProjectPreExecutor
 	Webhooks          webhooks.Sender
 }
 
+// Execute executes apply for the ctx.
 func (a *ApplyExecutor) Execute(ctx *CommandContext) CommandResponse {
 	if a.RequireApproval {
 		approved, err := a.VCSClient.PullIsApproved(ctx.BaseRepo, ctx.Pull, ctx.VCSHost)
@@ -43,13 +43,14 @@ func (a *ApplyExecutor) Execute(ctx *CommandContext) CommandResponse {
 	}
 	ctx.Log.Info("found workspace in %q", repoDir)
 
-	// plans are stored at project roots by their environment names. We just need to find them
+	// Plans are stored at project roots by their environment names. We just
+	// need to find them.
 	var plans []models.Plan
 	err = filepath.Walk(repoDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		// if the plan is for the right env,
+		// Check if the plan is for the right env,
 		if !info.IsDir() && info.Name() == ctx.Command.Environment+".tfplan" {
 			rel, _ := filepath.Rel(repoDir, filepath.Dir(path))
 			plans = append(plans, models.Plan{

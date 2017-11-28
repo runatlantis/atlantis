@@ -93,7 +93,7 @@ func TestExecute_Success(t *testing.T) {
 }
 
 func TestExecute_PreExecuteResult(t *testing.T) {
-	t.Log("If ProjectPreExecute.Execute returns a ProjectResult we should return it")
+	t.Log("If DefaultProjectPreExecutor.Execute returns a ProjectResult we should return it")
 	p, _, _ := setupPlanExecutorTest(t)
 	When(p.VCSClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyVcsHost())).ThenReturn([]string{"file.tf"}, nil)
 	When(p.Workspace.Clone(planCtx.Log, planCtx.BaseRepo, planCtx.HeadRepo, planCtx.Pull, "env")).
@@ -182,7 +182,7 @@ func setupPlanExecutorTest(t *testing.T) (*events.PlanExecutor, *tmocks.MockRunn
 	run := rmocks.NewMockRunner()
 	p := events.PlanExecutor{
 		VCSClient:         vcsProxy,
-		ProjectFinder:     &events.ProjectFinder{},
+		ProjectFinder:     &events.DefaultProjectFinder{},
 		Workspace:         w,
 		ProjectPreExecute: ppe,
 		Terraform:         runner,

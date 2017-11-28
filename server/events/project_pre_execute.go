@@ -15,17 +15,22 @@ import (
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_pre_executor.go ProjectPreExecutor
 
+// ProjectPreExecutor executes before the plan and apply executors. It handles
+// the setup tasks that are common to both plan and apply.
 type ProjectPreExecutor interface {
+	// Execute executes the pre plan/apply tasks.
 	Execute(ctx *CommandContext, repoDir string, project models.Project) PreExecuteResult
 }
 
-type ProjectPreExecute struct {
+// DefaultProjectPreExecutor implements ProjectPreExecutor.
+type DefaultProjectPreExecutor struct {
 	Locker       locking.Locker
 	ConfigReader ProjectConfigReader
 	Terraform    terraform.Runner
 	Run          run.Runner
 }
 
+// PreExecuteResult is the result of running the pre execute.
 type PreExecuteResult struct {
 	ProjectResult    ProjectResult
 	ProjectConfig    ProjectConfig
@@ -33,7 +38,8 @@ type PreExecuteResult struct {
 	LockResponse     locking.TryLockResponse
 }
 
-func (p *ProjectPreExecute) Execute(ctx *CommandContext, repoDir string, project models.Project) PreExecuteResult {
+// Execute executes the pre plan/apply tasks.
+func (p *DefaultProjectPreExecutor) Execute(ctx *CommandContext, repoDir string, project models.Project) PreExecuteResult {
 	tfEnv := ctx.Command.Environment
 	lockAttempt, err := p.Locker.TryLock(project, tfEnv, ctx.Pull, ctx.User)
 	if err != nil {
@@ -46,7 +52,7 @@ func (p *ProjectPreExecute) Execute(ctx *CommandContext, repoDir string, project
 	}
 	ctx.Log.Info("acquired lock with id %q", lockAttempt.LockKey)
 
-	// check if config file is found, if not we continue the run
+	// Check if config file is found, if not we continue the run.
 	var config ProjectConfig
 	absolutePath := filepath.Join(repoDir, project.Path)
 	if p.ConfigReader.Exists(absolutePath) {
@@ -57,7 +63,7 @@ func (p *ProjectPreExecute) Execute(ctx *CommandContext, repoDir string, project
 		ctx.Log.Info("parsed atlantis config file in %q", absolutePath)
 	}
 
-	// check if terraform version is >= 0.9.0
+	// Check if terraform version is >= 0.9.0.
 	terraformVersion := p.Terraform.Version()
 	if config.TerraformVersion != nil {
 		terraformVersion = config.TerraformVersion

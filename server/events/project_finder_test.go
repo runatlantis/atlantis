@@ -10,7 +10,7 @@ import (
 
 var noopLogger = logging.NewNoopLogger()
 var modifiedRepo = "owner/repo"
-var m = events.ProjectFinder{}
+var m = events.DefaultProjectFinder{}
 
 func TestGetModified_NoFiles(t *testing.T) {
 	cases := []struct {

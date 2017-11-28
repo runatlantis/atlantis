@@ -1,4 +1,4 @@
-// Package recovery is aken from
+// Package recovery is taken from
 // https://github.com/gin-gonic/gin/blob/master/recovery.go
 // License of source below:
 // Copyright 2014 Manu Martinez-Almeida.  All rights reserved.
@@ -20,7 +20,7 @@ var (
 	slash     = []byte("/")
 )
 
-// Stack returns a nicely formatted stack frame, skipping skip frames
+// Stack returns a nicely formatted stack frame, skipping skip frames.
 func Stack(skip int) []byte {
 	buf := new(bytes.Buffer) // the returned data
 	// As we loop, we open files and read them. These variables record the currently

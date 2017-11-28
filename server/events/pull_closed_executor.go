@@ -3,10 +3,9 @@ package events
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strings"
 	"text/template"
-
-	"sort"
 
 	"github.com/hootsuite/atlantis/server/events/locking"
 	"github.com/hootsuite/atlantis/server/events/models"
@@ -16,10 +15,15 @@ import (
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_pull_cleaner.go PullCleaner
 
+// PullCleaner cleans up pull requests after they're closed/merged.
 type PullCleaner interface {
+	// CleanUpPull deletes the workspaces used by the pull request on disk
+	// and deletes any locks associated with this pull request for all envs.
 	CleanUpPull(repo models.Repo, pull models.PullRequest, host vcs.Host) error
 }
 
+// PullClosedExecutor executes the tasks required to clean up a closed pull
+// request.
 type PullClosedExecutor struct {
 	Locker    locking.Locker
 	VCSClient vcs.ClientProxy
@@ -36,21 +40,21 @@ var pullClosedTemplate = template.Must(template.New("").Parse(
 		"{{ range . }}\n" +
 		"- path: `{{ .Path }}` {{ .Envs }}{{ end }}"))
 
+// CleanUpPull cleans up after a closed pull request.
 func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullRequest, host vcs.Host) error {
-	// delete the workspace
 	if err := p.Workspace.Delete(repo, pull); err != nil {
 		return errors.Wrap(err, "cleaning workspace")
 	}
 
-	// finally, delete locks. We do this last because when someone
+	// Finally, delete locks. We do this last because when someone
 	// unlocks a project, right now we don't actually delete the plan
-	// so we might have plans laying around but no locks
+	// so we might have plans laying around but no locks.
 	locks, err := p.Locker.UnlockByPull(repo.FullName, pull.Num)
 	if err != nil {
 		return errors.Wrap(err, "cleaning up locks")
 	}
 
-	// if there are no locks then there's no need to comment
+	// If there are no locks then there's no need to comment.
 	if len(locks) == 0 {
 		return nil
 	}
@@ -63,9 +67,10 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 	return p.VCSClient.CreateComment(repo, pull, buf.String(), host)
 }
 
-// buildTemplateData formats the lock data into a slice that can easily be templated
-// for the VCS comment. We organize all the environments by their respective project paths
-// so the comment can look like: path: {path}, environments: {all-envs}
+// buildTemplateData formats the lock data into a slice that can easily be
+// templated for the VCS comment. We organize all the environments by their
+// respective project paths so the comment can look like:
+// path: {path}, environments: {all-envs}
 func (p *PullClosedExecutor) buildTemplateData(locks []models.ProjectLock) []templatedProject {
 	envsByPath := make(map[string][]string)
 	for _, l := range locks {

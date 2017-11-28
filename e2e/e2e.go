@@ -32,6 +32,7 @@ resource "null_resource" "hello" {
 }
 `
 
+// nolint: gas
 func (t *E2ETester) Start() (*E2EResult, error) {
 	cloneDir := fmt.Sprintf("%s/%s-test", t.cloneDirRoot, t.projectType.Name)
 	branchName := fmt.Sprintf("%s-%s", t.projectType.Name, time.Now().Format("20060102150405"))
@@ -41,7 +42,7 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 
 	// create the directory and parents if necessary
 	log.Printf("creating dir %q", cloneDir)
-	if err := os.MkdirAll(cloneDir, 0755); err != nil {
+	if err := os.MkdirAll(cloneDir, 0700); err != nil {
 		return e2eResult, fmt.Errorf("failed to create dir %q prior to cloning, attempting to continue: %v", cloneDir, err)
 	}
 

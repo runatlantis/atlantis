@@ -79,7 +79,7 @@ func createScript(cmds []string, stage string) (string, error) {
 	}
 	tmp.Close() // nolint: errcheck
 
-	if err := os.Chmod(scriptName, 0755); err != nil {
+	if err := os.Chmod(scriptName, 0700); err != nil { // nolint: gas
 		return "", errors.Wrapf(err, "making %s script executable", stage)
 	}
 
@@ -87,7 +87,7 @@ func createScript(cmds []string, stage string) (string, error) {
 }
 
 func execute(script string) (string, error) {
-	localCmd := exec.Command("sh", "-c", script)
+	localCmd := exec.Command("sh", "-c", script) // #nosec
 	out, err := localCmd.CombinedOutput()
 	output := string(out)
 	if err != nil {

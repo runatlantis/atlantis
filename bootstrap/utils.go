@@ -15,7 +15,7 @@ import (
 )
 
 var hashicorpReleasesURL = "https://releases.hashicorp.com"
-var terraformVersion = "0.9.11"
+var terraformVersion = "0.10.8"
 var ngrokDownloadURL = "https://bin.equinox.io/c/4VmDzA7iaHb"
 var ngrokAPIURL = "http://localhost:4040"
 
@@ -117,7 +117,7 @@ func downloadAndUnzip(url string, path string, target string) error {
 }
 
 func executeCmd(cmd string, args []string) (*exec.Cmd, error) {
-	command := exec.Command(cmd, args...)
+	command := exec.Command(cmd, args...) // #nosec
 	err := command.Start()
 	if err != nil {
 		return nil, err

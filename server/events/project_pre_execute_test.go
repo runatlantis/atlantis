@@ -254,13 +254,13 @@ func TestExecute_SuccessPreApply(t *testing.T) {
 	r.VerifyWasCalledOnce().Execute(cpCtx.Log, []string{"command"}, "", "", tfVersion, "pre_apply")
 }
 
-func setupPreExecuteTest(t *testing.T) (*events.ProjectPreExecute, *lmocks.MockLocker, *tmocks.MockRunner, *rmocks.MockRunner) {
+func setupPreExecuteTest(t *testing.T) (*events.DefaultProjectPreExecutor, *lmocks.MockLocker, *tmocks.MockRunner, *rmocks.MockRunner) {
 	RegisterMockTestingT(t)
 	l := lmocks.NewMockLocker()
 	cr := mocks.NewMockProjectConfigReader()
 	tm := tmocks.NewMockRunner()
 	r := rmocks.NewMockRunner()
-	return &events.ProjectPreExecute{
+	return &events.DefaultProjectPreExecutor{
 		Locker:       l,
 		ConfigReader: cr,
 		Terraform:    tm,

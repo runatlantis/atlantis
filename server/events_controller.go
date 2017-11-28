@@ -15,6 +15,8 @@ import (
 const githubHeader = "X-Github-Event"
 const gitlabHeader = "X-Gitlab-Event"
 
+// EventsController handles all webhook requests which signify 'events' in the
+// VCS host, ex. GitHub. It's split out from Server to make testing easier.
 type EventsController struct {
 	CommandRunner events.CommandRunner
 	PullCleaner   events.PullCleaner
@@ -35,6 +37,7 @@ type EventsController struct {
 	SupportedVCSHosts []vcs.Host
 }
 
+// Post handles POST webhook requests.
 func (e *EventsController) Post(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get(githubHeader) != "" {
 		if !e.supportsHost(vcs.Github) {
@@ -52,33 +55,6 @@ func (e *EventsController) Post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request")
-}
-
-// supportsHost returns true if h is in e.SupportedVCSHosts and false otherwise
-func (e *EventsController) supportsHost(h vcs.Host) bool {
-	for _, supported := range e.SupportedVCSHosts {
-		if h == supported {
-			return true
-		}
-	}
-	return false
-}
-
-func (e *EventsController) handleGitlabPost(w http.ResponseWriter, r *http.Request) {
-	event, err := e.GitlabRequestParser.Validate(r, e.GitlabWebHookSecret)
-	if err != nil {
-		e.respond(w, logging.Warn, http.StatusBadRequest, err.Error())
-		return
-	}
-	switch event := event.(type) {
-	case gitlab.MergeCommentEvent:
-		e.HandleGitlabCommentEvent(w, event)
-	case gitlab.MergeEvent:
-		e.HandleGitlabMergeRequestEvent(w, event)
-	default:
-		e.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event")
-	}
-
 }
 
 func (e *EventsController) handleGithubPost(w http.ResponseWriter, r *http.Request) {
@@ -101,6 +77,8 @@ func (e *EventsController) handleGithubPost(w http.ResponseWriter, r *http.Reque
 	}
 }
 
+// HandleGithubCommentEvent handles comment events from GitHub where Atlantis
+// commands can come from. It's exported to make testing easier.
 func (e *EventsController) HandleGithubCommentEvent(w http.ResponseWriter, event *github.IssueCommentEvent, githubReqID string) {
 	if event.GetAction() != "created" {
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since action was not created %s", githubReqID)
@@ -126,37 +104,9 @@ func (e *EventsController) HandleGithubCommentEvent(w http.ResponseWriter, event
 	go e.CommandRunner.ExecuteCommand(baseRepo, models.Repo{}, user, pullNum, command, vcs.Github)
 }
 
-func (e *EventsController) HandleGitlabCommentEvent(w http.ResponseWriter, event gitlab.MergeCommentEvent) {
-	baseRepo, headRepo, user := e.Parser.ParseGitlabMergeCommentEvent(event)
-	command, err := e.Parser.DetermineCommand(event.ObjectAttributes.Note, vcs.Gitlab)
-	if err != nil {
-		e.respond(w, logging.Debug, http.StatusOK, "Ignoring: %s", err)
-		return
-	}
-
-	// Respond with success and then actually execute the command asynchronously.
-	// We use a goroutine so that this function returns and the connection is
-	// closed.
-	fmt.Fprintln(w, "Processing...")
-	go e.CommandRunner.ExecuteCommand(baseRepo, headRepo, user, event.MergeRequest.IID, command, vcs.Gitlab)
-}
-
-// HandleGitlabMergeRequestEvent will delete any locks associated with the merge request
-func (e *EventsController) HandleGitlabMergeRequestEvent(w http.ResponseWriter, event gitlab.MergeEvent) {
-	pull, repo := e.Parser.ParseGitlabMergeEvent(event)
-	if pull.State != models.Closed {
-		e.respond(w, logging.Debug, http.StatusOK, "Ignoring opened merge request event")
-		return
-	}
-	if err := e.PullCleaner.CleanUpPull(repo, pull, vcs.Gitlab); err != nil {
-		e.respond(w, logging.Error, http.StatusInternalServerError, "Error cleaning pull request: %s", err)
-		return
-	}
-	e.Logger.Info("deleted locks and workspace for repo %s, pull %d", repo.FullName, pull.Num)
-	fmt.Fprintln(w, "Merge request cleaned successfully")
-}
-
-// HandleGithubPullRequestEvent will delete any locks associated with the pull request
+// HandleGithubPullRequestEvent will delete any locks associated with the pull
+// request if the event is a pull request closed event. It's exported to make
+// testing easier.
 func (e *EventsController) HandleGithubPullRequestEvent(w http.ResponseWriter, pullEvent *github.PullRequestEvent, githubReqID string) {
 	if pullEvent.GetAction() != "closed" {
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring pull request event since action was not closed %s", githubReqID)
@@ -179,6 +129,67 @@ func (e *EventsController) HandleGithubPullRequestEvent(w http.ResponseWriter, p
 	}
 	e.Logger.Info("deleted locks and workspace for repo %s, pull %d", repo.FullName, pull.Num)
 	fmt.Fprintln(w, "Pull request cleaned successfully")
+}
+
+func (e *EventsController) handleGitlabPost(w http.ResponseWriter, r *http.Request) {
+	event, err := e.GitlabRequestParser.Validate(r, e.GitlabWebHookSecret)
+	if err != nil {
+		e.respond(w, logging.Warn, http.StatusBadRequest, err.Error())
+		return
+	}
+	switch event := event.(type) {
+	case gitlab.MergeCommentEvent:
+		e.HandleGitlabCommentEvent(w, event)
+	case gitlab.MergeEvent:
+		e.HandleGitlabMergeRequestEvent(w, event)
+	default:
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event")
+	}
+
+}
+
+// HandleGitlabCommentEvent handles comment events from GitLab where Atlantis
+// commands can come from. It's exported to make testing easier.
+func (e *EventsController) HandleGitlabCommentEvent(w http.ResponseWriter, event gitlab.MergeCommentEvent) {
+	baseRepo, headRepo, user := e.Parser.ParseGitlabMergeCommentEvent(event)
+	command, err := e.Parser.DetermineCommand(event.ObjectAttributes.Note, vcs.Gitlab)
+	if err != nil {
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring: %s", err)
+		return
+	}
+
+	// Respond with success and then actually execute the command asynchronously.
+	// We use a goroutine so that this function returns and the connection is
+	// closed.
+	fmt.Fprintln(w, "Processing...")
+	go e.CommandRunner.ExecuteCommand(baseRepo, headRepo, user, event.MergeRequest.IID, command, vcs.Gitlab)
+}
+
+// HandleGitlabMergeRequestEvent will delete any locks associated with the pull
+// request if the event is a merge request closed event. It's exported to make
+// testing easier.
+func (e *EventsController) HandleGitlabMergeRequestEvent(w http.ResponseWriter, event gitlab.MergeEvent) {
+	pull, repo := e.Parser.ParseGitlabMergeEvent(event)
+	if pull.State != models.Closed {
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring opened merge request event")
+		return
+	}
+	if err := e.PullCleaner.CleanUpPull(repo, pull, vcs.Gitlab); err != nil {
+		e.respond(w, logging.Error, http.StatusInternalServerError, "Error cleaning pull request: %s", err)
+		return
+	}
+	e.Logger.Info("deleted locks and workspace for repo %s, pull %d", repo.FullName, pull.Num)
+	fmt.Fprintln(w, "Merge request cleaned successfully")
+}
+
+// supportsHost returns true if h is in e.SupportedVCSHosts and false otherwise.
+func (e *EventsController) supportsHost(h vcs.Host) bool {
+	for _, supported := range e.SupportedVCSHosts {
+		if h == supported {
+			return true
+		}
+	}
+	return false
 }
 
 func (e *EventsController) respond(w http.ResponseWriter, lvl logging.LogLevel, code int, format string, args ...interface{}) {

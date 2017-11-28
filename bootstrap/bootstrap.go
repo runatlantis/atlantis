@@ -1,10 +1,13 @@
-// Package bootstrap is used to make getting started with atlantis easier
+// Package bootstrap is used by the bootstrap command as a quick-start of
+// Atlantis.
 package bootstrap
 
 import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"os/signal"
 	"runtime"
 	"strings"
 	"syscall"
@@ -14,14 +17,10 @@ import (
 	"github.com/google/go-github/github"
 	"github.com/mitchellh/colorstring"
 	"github.com/pkg/errors"
-
-	"os/exec"
-	"os/signal"
 )
 
 var terraformExampleRepoOwner = "hootsuite"
 var terraformExampleRepo = "atlantis-example"
-
 var bootstrapDescription = `[white]Welcome to Atlantis bootstrap!
 
 This mode walks you through setting up and using Atlantis. We will
@@ -38,7 +37,7 @@ var pullRequestBody = "In this pull request we will learn how to use atlantis. T
 	"* Now lets apply that plan. Type `atlantis apply` in the comments. This will run a `terraform apply`.\n" +
 	"\nThank you for trying out atlantis. For more info on running atlantis in production see https://github.com/hootsuite/atlantis"
 
-// Start begins the bootstrap process
+// Start begins the bootstrap process.
 // nolint: errcheck
 func Start() error {
 	s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
@@ -58,19 +57,16 @@ Follow these instructions to create a token (we don't store any tokens):
 - add "repo" scope
 - copy the access token
 `)
-	// read github token, check for error later
+	// Read github token, check for error later.
 	colorstring.Print("[white][bold]GitHub access token (will be hidden): ")
 	githubToken, _ = readPassword()
-
-	// create github client
 	tp := github.BasicAuthTransport{
 		Username: strings.TrimSpace(githubUsername),
 		Password: strings.TrimSpace(githubToken),
 	}
-
 	githubClient := &Client{client: github.NewClient(tp.Client()), ctx: context.Background()}
 
-	// fork terraform example repo
+	// Fork terraform example repo.
 	colorstring.Printf("\n[white]=> forking repo ")
 	s.Start()
 	if err := githubClient.CreateFork(terraformExampleRepoOwner, terraformExampleRepo); err != nil {
@@ -82,10 +78,9 @@ Follow these instructions to create a token (we don't store any tokens):
 	s.Stop()
 	colorstring.Println("\n[green]=> fork completed!")
 
-	// detect terraform
+	// Detect terraform and install it if not installed.
 	_, err := exec.LookPath("terraform")
 	if err != nil {
-		// download terraform
 		colorstring.Println("[yellow]=> terraform not found in $PATH.")
 		colorstring.Printf("[white]=> downloading terraform ")
 		s.Start()
@@ -107,7 +102,7 @@ Follow these instructions to create a token (we don't store any tokens):
 		colorstring.Println("[green]=> terraform found in $PATH!")
 	}
 
-	// download ngrok
+	// Download ngrok.
 	colorstring.Printf("[white]=> downloading ngrok  ")
 	s.Start()
 	ngrokURL := fmt.Sprintf("%s/ngrok-stable-%s-%s.zip", ngrokDownloadURL, runtime.GOOS, runtime.GOARCH)
@@ -117,7 +112,7 @@ Follow these instructions to create a token (we don't store any tokens):
 	s.Stop()
 	colorstring.Println("\n[green]=> downloaded ngrok successfully!")
 
-	// create ngrok tunnel
+	// Create ngrok tunnel.
 	colorstring.Printf("[white]=> creating secure tunnel ")
 	s.Start()
 	ngrokCmd, err := executeCmd("/tmp/ngrok", []string{"http", "4141"})
@@ -129,10 +124,10 @@ Follow these instructions to create a token (we don't store any tokens):
 	go func() {
 		ngrokErrChan <- ngrokCmd.Wait()
 	}()
-	// if this function returns ngrok tunnel should be stopped
+	// When this function returns, ngrok tunnel should be stopped.
 	defer ngrokCmd.Process.Kill()
 
-	// wait for the tunnel to be up
+	// Wait for the tunnel to be up.
 	time.Sleep(2 * time.Second)
 	s.Stop()
 	colorstring.Println("\n[green]=> started tunnel!")
@@ -142,7 +137,7 @@ Follow these instructions to create a token (we don't store any tokens):
 	}
 	s.Stop()
 
-	// start atlantis server
+	// Start atlantis server.
 	colorstring.Printf("[white]=> starting atlantis server ")
 	s.Start()
 	atlantisCmd, err := executeCmd(os.Args[0], []string{"server", "--gh-user", githubUsername, "--gh-token", githubToken, "--data-dir", "/tmp/atlantis/data", "--atlantis-url", tunnelURL})
@@ -154,12 +149,12 @@ Follow these instructions to create a token (we don't store any tokens):
 	go func() {
 		atlantisErrChan <- atlantisCmd.Wait()
 	}()
-	// if this function returns atlantis server should be stopped
+	// When this function returns atlantis server should be stopped.
 	defer atlantisCmd.Process.Kill()
 	colorstring.Printf("\n[green]=> atlantis server is now securely exposed at [bold][underline]%s", tunnelURL)
 	fmt.Println("")
 
-	// create atlantis webhook
+	// Create atlantis webhook.
 	colorstring.Printf("[white]=> creating atlantis webhook ")
 	s.Start()
 	err = githubClient.CreateWebhook(githubUsername, terraformExampleRepo, fmt.Sprintf("%s/events", tunnelURL))
@@ -169,7 +164,7 @@ Follow these instructions to create a token (we don't store any tokens):
 	s.Stop()
 	colorstring.Println("\n[green]=> atlantis webhook created!")
 
-	// create a new pr in the example repo
+	// Create a new pr in the example repo.
 	colorstring.Printf("[white]=> creating a new pull request ")
 	s.Start()
 	pullRequestURL, err := githubClient.CreatePullRequest(githubUsername, terraformExampleRepo, "example", "master")
@@ -179,7 +174,7 @@ Follow these instructions to create a token (we don't store any tokens):
 	s.Stop()
 	colorstring.Println("\n[green]=> pull request created!")
 
-	// open new pull request in the browser
+	// Open new pull request in the browser.
 	colorstring.Printf("[white]=> opening pull request ")
 	s.Start()
 	time.Sleep(2 * time.Second)
@@ -189,12 +184,13 @@ Follow these instructions to create a token (we don't store any tokens):
 	}
 	s.Stop()
 
-	// wait for ngrok and atlantis server process to finish
+	// Wait for ngrok and atlantis server process to finish.
 	colorstring.Printf("\n[_green_][light_green]atlantis is running ")
 	s.Start()
 	colorstring.Println("[green] [press Ctrl-c to exit]")
 
-	// wait for sigterm or siginit signal
+	// Wait for SIGINT or SIGTERM signals meaning the user has Ctrl-C'd the
+	// bootstrap process and want's to stop.
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 	<-signalChan

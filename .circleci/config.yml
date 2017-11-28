@@ -5,7 +5,7 @@ jobs:
     docker:
       - image: circleci/golang:1.8
         environment:
-          TERRAFORM_VERSION: 0.10.0
+          TERRAFORM_VERSION: 0.10.8
     steps:
       - checkout
       - setup_remote_docker:

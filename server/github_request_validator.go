@@ -9,9 +9,10 @@ import (
 	"github.com/google/go-github/github"
 )
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_gh_request_validation.go GithubRequestValidator
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_github_request_validator.go GithubRequestValidator
 
-// GithubRequestValidator validates GitHub requests.
+// GithubRequestValidator handles checking if GitHub requests are signed
+// properly by the secret.
 type GithubRequestValidator interface {
 	// Validate returns the JSON payload of the request.
 	// If secret is not empty, it checks that the request was signed
@@ -20,7 +21,8 @@ type GithubRequestValidator interface {
 	Validate(r *http.Request, secret []byte) ([]byte, error)
 }
 
-// DefaultGithubRequestValidator validates GitHub requests.
+// DefaultGithubRequestValidator handles checking if GitHub requests are signed
+// properly by the secret.
 type DefaultGithubRequestValidator struct{}
 
 // Validate returns the JSON payload of the request.
@@ -51,7 +53,7 @@ func (d *DefaultGithubRequestValidator) validateWithoutSecret(r *http.Request) (
 		}
 		return payload, nil
 	case "application/x-www-form-urlencoded":
-		// GitHub stores the json payload as a form value
+		// GitHub stores the json payload as a form value.
 		payloadForm := r.FormValue("payload")
 		if payloadForm == "" {
 			return nil, errors.New("webhook request did not contain expected 'payload' form value")
