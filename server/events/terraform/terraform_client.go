@@ -29,8 +29,9 @@ type Client struct {
 var versionRegex = regexp.MustCompile("Terraform v(.*)\n")
 
 func NewClient() (*Client, error) {
-	// may be use exec.LookPath?
-	versionCmdOutput, err := exec.Command("terraform", "version").CombinedOutput()
+	// todo: use exec.LookPath to find out if we even have terraform rather than
+	// parsing the error looking for a not found error.
+	versionCmdOutput, err := exec.Command("terraform", "version").CombinedOutput() // #nosec
 	output := string(versionCmdOutput)
 	if err != nil {
 		// exec.go line 35, Error() returns
@@ -84,7 +85,7 @@ func (c *Client) RunCommandWithVersion(log *logging.SimpleLogger, path string, a
 	// append terraform executable name with args
 	tfCmd := fmt.Sprintf("%s %s", tfExecutable, strings.Join(args, " "))
 
-	terraformCmd := exec.Command("sh", "-c", tfCmd)
+	terraformCmd := exec.Command("sh", "-c", tfCmd) // #nosec
 	terraformCmd.Dir = path
 	terraformCmd.Env = envVars
 	out, err := terraformCmd.CombinedOutput()

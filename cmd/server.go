@@ -23,7 +23,7 @@ const (
 	GHHostnameFlag      = "gh-hostname"
 	GHTokenFlag         = "gh-token"
 	GHUserFlag          = "gh-user"
-	GHWebHookSecret     = "gh-webhook-secret"
+	GHWebHookSecret     = "gh-webhook-secret" // nolint: gas
 	GitlabHostnameFlag  = "gitlab-hostname"
 	GitlabTokenFlag     = "gitlab-token"
 	GitlabUserFlag      = "gitlab-user"

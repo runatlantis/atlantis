@@ -50,19 +50,19 @@ func (w *FileWorkspace) Clone(
 
 	// Create the directory and parents if necessary.
 	log.Info("creating dir %q", cloneDir)
-	if err := os.MkdirAll(cloneDir, 0755); err != nil {
+	if err := os.MkdirAll(cloneDir, 0700); err != nil {
 		return "", errors.Wrap(err, "creating new workspace")
 	}
 
 	log.Info("git cloning %q into %q", headRepo.SanitizedCloneURL, cloneDir)
-	cloneCmd := exec.Command("git", "clone", headRepo.CloneURL, cloneDir)
+	cloneCmd := exec.Command("git", "clone", headRepo.CloneURL, cloneDir) // #nosec
 	if output, err := cloneCmd.CombinedOutput(); err != nil {
 		return "", errors.Wrapf(err, "cloning %s: %s", headRepo.SanitizedCloneURL, string(output))
 	}
 
 	// Check out the branch for this PR.
 	log.Info("checking out branch %q", p.Branch)
-	checkoutCmd := exec.Command("git", "checkout", p.Branch)
+	checkoutCmd := exec.Command("git", "checkout", p.Branch) // #nosec
 	checkoutCmd.Dir = cloneDir
 	if err := checkoutCmd.Run(); err != nil {
 		return "", errors.Wrapf(err, "checking out branch %s", p.Branch)

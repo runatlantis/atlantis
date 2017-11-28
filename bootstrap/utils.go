@@ -117,7 +117,7 @@ func downloadAndUnzip(url string, path string, target string) error {
 }
 
 func executeCmd(cmd string, args []string) (*exec.Cmd, error) {
-	command := exec.Command(cmd, args...)
+	command := exec.Command(cmd, args...) // #nosec
 	err := command.Start()
 	if err != nil {
 		return nil, err

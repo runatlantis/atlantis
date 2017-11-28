@@ -57,7 +57,7 @@ gometalint: ## Run every linter ever
 	# gotype and gotypex are disabled because they don't pass on CI and https://github.com/alecthomas/gometalinter/issues/206
 	# gocyclo is temporarily disabled because we don't pass it right now
 	# golint is temporarily disabled because we need to add comments everywhere first
-	gometalinter --disable gotype --disable gotypex --disable=gocyclo --disable golint --enable=megacheck --enable=unparam --deadline=300s --vendor -t --line-length=120 --skip server/static ./...
+	gometalinter --disable gotype --disable gotypex --disable=gocyclo --disable golint --enable=megacheck --enable=unparam --linter='gas:gas -exclude=G104 -fmt=csv:^(?P<path>.*?\.go),(?P<line>\d+),(?P<message>[^,]+,[^,]+,[^,]+)' --deadline=300s --vendor -t --line-length=120 --skip server/static ./...
 
 gometalint-install: ## Install gometalint
 	go get -u github.com/alecthomas/gometalinter

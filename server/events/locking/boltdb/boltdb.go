@@ -27,7 +27,7 @@ const bucketName = "runLocks"
 // New returns a valid locker. We need to be able to write to dataDir
 // since bolt stores its data as a file
 func New(dataDir string) (*BoltLocker, error) {
-	if err := os.MkdirAll(dataDir, 0755); err != nil {
+	if err := os.MkdirAll(dataDir, 0700); err != nil {
 		return nil, errors.Wrap(err, "creating data dir")
 	}
 	db, err := bolt.Open(path.Join(dataDir, "atlantis.db"), 0600, &bolt.Options{Timeout: 1 * time.Second})
