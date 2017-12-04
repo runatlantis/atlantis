@@ -3,7 +3,7 @@ package run
 import (
 	"testing"
 
-	version "github.com/hashicorp/go-version"
+	"github.com/hashicorp/go-version"
 	"github.com/hootsuite/atlantis/server/logging"
 	. "github.com/hootsuite/atlantis/testing"
 )
@@ -35,7 +35,7 @@ func TestRunExecuteScript_valid(t *testing.T) {
 
 func TestRun_valid(t *testing.T) {
 	cmds := []string{"echo", "date"}
-	version, _ := version.NewVersion("0.8.8")
-	_, err := run.Execute(logger, cmds, "/tmp/atlantis", "staging", version, "post_apply")
+	v, _ := version.NewVersion("0.8.8")
+	_, err := run.Execute(logger, cmds, "/tmp/atlantis", "staging", v, "post_apply")
 	Ok(t, err)
 }

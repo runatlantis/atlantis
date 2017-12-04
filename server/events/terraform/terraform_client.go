@@ -9,7 +9,7 @@ import (
 
 	"strings"
 
-	version "github.com/hashicorp/go-version"
+	"github.com/hashicorp/go-version"
 	"github.com/hootsuite/atlantis/server/logging"
 	"github.com/pkg/errors"
 )
@@ -45,13 +45,13 @@ func NewClient() (*Client, error) {
 	if len(match) <= 1 {
 		return nil, fmt.Errorf("could not parse terraform version from %s", output)
 	}
-	version, err := version.NewVersion(match[1])
+	v, err := version.NewVersion(match[1])
 	if err != nil {
 		return nil, errors.Wrap(err, "parsing terraform version")
 	}
 
 	return &Client{
-		defaultVersion: version,
+		defaultVersion: v,
 	}, nil
 }
 
