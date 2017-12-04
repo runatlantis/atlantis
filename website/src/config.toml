@@ -1,8 +1,8 @@
 baseURL = "http://atlantis.run"
 languageCode = "en-us"
-title = "Atlantis - A unified workflow for collaborating on Terraform through GitHub"
+title = "Atlantis - A unified workflow for collaborating on Terraform through GitHub and GitLab"
 theme = "kube"
-description = "A unified workflow for collaborating on Terraform through GitHub"
+description = "A unified workflow for collaborating on Terraform through GitHub and GitLab"
 Paginate = 4
 [[menu.main]]
     name = "Docs"
