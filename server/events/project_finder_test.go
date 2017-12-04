@@ -12,7 +12,7 @@ var noopLogger = logging.NewNoopLogger()
 var modifiedRepo = "owner/repo"
 var m = events.DefaultProjectFinder{}
 
-func TestGetModified_NoFiles(t *testing.T) {
+func TestGetModified(t *testing.T) {
 	cases := []struct {
 		description     string
 		files           []string
@@ -29,9 +29,19 @@ func TestGetModified_NoFiles(t *testing.T) {
 			nil,
 		},
 		{
-			"Should ignore .tf files in module directories",
-			[]string{"_modules/file.tf", "modules/file.tf", "parent/_modules/file.tf", "parent/modules/file.tf", "main.tf"},
+			"Should plan in the parent directory from modules",
+			[]string{"modules/file.tf"},
 			[]string{"."},
+		},
+		{
+			"Should plan in the parent directory from modules when module is in a subdir",
+			[]string{"modules/subdir/file.tf"},
+			[]string{"."},
+		},
+		{
+			"Should plan in the parent directory from modules when project is in its own dir",
+			[]string{"projectdir/modules/file.tf"},
+			[]string{"projectdir"},
 		},
 		{
 			"Should ignore tfstate files and return an empty list",

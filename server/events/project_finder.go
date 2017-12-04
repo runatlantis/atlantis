@@ -20,7 +20,7 @@ type ProjectFinder interface {
 // DefaultProjectFinder implements ProjectFinder.
 type DefaultProjectFinder struct{}
 
-var excludeList = []string{"terraform.tfstate", "terraform.tfstate.backup", "_modules", "modules"}
+var excludeList = []string{"terraform.tfstate", "terraform.tfstate.backup"}
 
 // FindModified returns the list of projects that were modified based on
 // the modifiedFiles. The list will be de-duplicated.
@@ -31,7 +31,7 @@ func (p *DefaultProjectFinder) FindModified(log *logging.SimpleLogger, modifiedF
 	if len(modifiedTerraformFiles) == 0 {
 		return projects
 	}
-	log.Info("filtered modified files to %d non-module .tf files: %v",
+	log.Info("filtered modified files to %d .tf files: %v",
 		len(modifiedTerraformFiles), modifiedTerraformFiles)
 
 	var paths []string
@@ -67,7 +67,7 @@ func (p *DefaultProjectFinder) isInExcludeList(fileName string) bool {
 }
 
 // getProjectPath returns the path to the project relative to the repo root
-// if the project is at the root returns "."
+// if the project is at the root returns ".".
 func (p *DefaultProjectFinder) getProjectPath(modifiedFilePath string) string {
 	dir := path.Dir(modifiedFilePath)
 	if path.Base(dir) == "env" {
@@ -75,7 +75,14 @@ func (p *DefaultProjectFinder) getProjectPath(modifiedFilePath string) string {
 		// specially and run plan one level up.
 		return path.Dir(dir)
 	}
-	return dir
+	// Need to add a trailing slash before splitting on modules/ because if
+	// the input was modules/file.tf then path.Dir will be "modules" and so our
+	// split on "modules/" will fail.
+	dirWithTrailingSlash := dir + "/"
+	// It's safe to do this split even if there is no modules/ in the path
+	// because SplitN will just return the original string.
+	modulesSplit := strings.SplitN(dirWithTrailingSlash, "modules/", 2)
+	return path.Clean(modulesSplit[0])
 }
 
 func (p *DefaultProjectFinder) unique(strs []string) []string {
