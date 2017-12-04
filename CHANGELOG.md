@@ -1,3 +1,19 @@
+# v0.2.1
+## Features
+* Don't ignore changes in `modules` directories anymore. ([#211](https://github.com/hootsuite/atlantis/pull/211))
+
+## Bug Fixes
+* Don't set `as_user` to true for Slack webhooks so we can integrate as a workspace app. ([#206](https://github.com/hootsuite/atlantis/pull/206))
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.1/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.1/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.1/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.1/atlantis_linux_arm.zip)
+
+## Backwards Incompatibilities / Notes:
+None
+
 # v0.2.0
 ## Features
 * GitLab is now supported! ([#190](https://github.com/hootsuite/atlantis/pull/190))
