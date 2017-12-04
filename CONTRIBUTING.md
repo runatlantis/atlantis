@@ -93,3 +93,16 @@ func TestLockingExisting(t *testing.T) {
 other runs being started for the same set of infrastructure and environment. We determine what infrastructure is being modified by combining the
 repository name, the directory in the repository at which the terraform commands need to be run, and the environment that's being modified
 * **Project Path**: The path relative to the repository's root at which terraform commands need to be executed for this Run
+
+# Creating a New Release
+1. Update version number in
+    1. `main.go`
+    1. `website/src/themes/kube/layouts/index.html`
+1. Update `CHANGELOG.md` with latest release number and information
+1. Create a pull request and merge to master
+1. Run `make release`
+1. Go to https://github.com/hootsuite/atlantis/releases and click "Draft a new release"
+    1. Prefix version with `v`
+    1. Description should just be `See CHANGELOG` with link to CHANGELOG at that release
+    1. Drag in binaries made with `make release`
+1. Run `make generate-website-html` and `make upload-website-html` to update website
