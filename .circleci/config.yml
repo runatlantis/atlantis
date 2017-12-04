@@ -3,7 +3,7 @@ jobs:
   build:
     working_directory: /go/src/github.com/hootsuite/atlantis
     docker:
-      - image: circleci/golang:1.8
+      - image: circleci/golang:1.9.2
         environment:
           TERRAFORM_VERSION: 0.10.8
     steps:
