@@ -3,13 +3,17 @@
 package server
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
@@ -236,8 +240,28 @@ func (s *Server) Start() error {
 		StackSize:  1024 * 8,
 	}, NewRequestLogger(s.Logger))
 	n.UseHandler(s.Router)
-	s.Logger.Warn("Atlantis started - listening on port %v", s.Port)
-	return cli.NewExitError(http.ListenAndServe(fmt.Sprintf(":%d", s.Port), n), 1)
+
+	// Ensure server gracefully drains connections when stopped.
+	stop := make(chan os.Signal, 1)
+	// Stop on SIGINTs and SIGTERMs.
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n}
+	go func() {
+		s.Logger.Warn("Atlantis started - listening on port %v", s.Port)
+		if err := server.ListenAndServe(); err != nil {
+			// When shutdown safely, there will be no error.
+			s.Logger.Err(err.Error())
+		}
+	}()
+	<-stop
+
+	s.Logger.Warn("Received interrupt. Safely shutting down")
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second) // nolint: vet
+	if err := server.Shutdown(ctx); err != nil {
+		return cli.NewExitError(fmt.Sprintf("while shutting down: %s", err), 1)
+	}
+	return nil
 }
 
 // Index is the / route.
