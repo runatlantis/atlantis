@@ -16,7 +16,7 @@ import (
 // ApplyExecutor handles executing terraform apply.
 type ApplyExecutor struct {
 	VCSClient         vcs.ClientProxy
-	Terraform         *terraform.Client
+	Terraform         *terraform.DefaultClient
 	RequireApproval   bool
 	Run               *run.Run
 	Workspace         Workspace

@@ -29,7 +29,7 @@ const atlantisUserTFVar = "atlantis_user"
 // PlanExecutor handles everything related to running terraform plan.
 type PlanExecutor struct {
 	VCSClient         vcs.ClientProxy
-	Terraform         terraform.Runner
+	Terraform         terraform.Client
 	Locker            locking.Locker
 	LockURL           func(id string) (url string)
 	Run               run.Runner

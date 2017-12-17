@@ -1,4 +1,4 @@
-// Package terraform handles the actual running of terraform commands
+// Package terraform handles the actual running of terraform commands.
 package terraform
 
 import (
@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
-
 	"strings"
 
 	"github.com/hashicorp/go-version"
@@ -14,21 +13,23 @@ import (
 	"github.com/pkg/errors"
 )
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_runner.go Runner
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_terraform_client.go Client
 
-type Runner interface {
+type Client interface {
 	Version() *version.Version
 	RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version, env string) (string, error)
-	RunInitAndEnv(log *logging.SimpleLogger, path string, env string, extraInitArgs []string, version *version.Version) ([]string, error)
+	Init(log *logging.SimpleLogger, path string, env string, extraInitArgs []string, version *version.Version) ([]string, error)
 }
 
-type Client struct {
+type DefaultClient struct {
 	defaultVersion *version.Version
 }
 
+// zeroPointNine constrains the version to be 0.9.*
+var zeroPointNine = MustConstraint(">=0.9,<0.10")
 var versionRegex = regexp.MustCompile("Terraform v(.*)\n")
 
-func NewClient() (*Client, error) {
+func NewClient() (*DefaultClient, error) {
 	// todo: use exec.LookPath to find out if we even have terraform rather than
 	// parsing the error looking for a not found error.
 	versionCmdOutput, err := exec.Command("terraform", "version").CombinedOutput() // #nosec
@@ -50,20 +51,20 @@ func NewClient() (*Client, error) {
 		return nil, errors.Wrap(err, "parsing terraform version")
 	}
 
-	return &Client{
+	return &DefaultClient{
 		defaultVersion: v,
 	}, nil
 }
 
 // Version returns the version of the terraform executable in our $PATH.
-func (c *Client) Version() *version.Version {
+func (c *DefaultClient) Version() *version.Version {
 	return c.defaultVersion
 }
 
 // RunCommandWithVersion executes the provided version of terraform with
 // the provided args in path. The variable "v" is the version of terraform executable to use and the variable "env" is the
 // environment specified by the user commenting "atlantis plan/apply {env}" which is set to "default" by default.
-func (c *Client) RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version, env string) (string, error) {
+func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version, env string) (string, error) {
 	tfExecutable := "terraform"
 	// if version is the same as the default, don't need to prepend the version name to the executable
 	if !v.Equal(c.defaultVersion) {
@@ -99,29 +100,50 @@ func (c *Client) RunCommandWithVersion(log *logging.SimpleLogger, path string, a
 	return string(out), nil
 }
 
-// RunInitAndEnv executes "terraform init" and "terraform env select" in path.
-// env is the environment to select and extraInitArgs are additional arguments
-// applied to the init command.
-func (c *Client) RunInitAndEnv(log *logging.SimpleLogger, path string, env string, extraInitArgs []string, version *version.Version) ([]string, error) {
+// Init executes "terraform init" and "terraform workspace select" in path.
+// workspace is the workspace to select and extraInitArgs are additional arguments
+// applied to the init command. version is the terraform version being executed.
+// Init is guaranteed to be called with version >= 0.9 since the init command
+// was only introduced in that version. It properly handles the renaming of the
+// env command to workspace since 0.10.
+//
+// Returns the string outputs of running each command.
+func (c *DefaultClient) Init(log *logging.SimpleLogger, path string, workspace string, extraInitArgs []string, version *version.Version) ([]string, error) {
 	var outputs []string
-	// run terraform init
-	output, err := c.RunCommandWithVersion(log, path, append([]string{"init", "-no-color"}, extraInitArgs...), version, env)
+
+	output, err := c.RunCommandWithVersion(log, path, append([]string{"init", "-no-color"}, extraInitArgs...), version, workspace)
 	outputs = append(outputs, output)
 	if err != nil {
 		return outputs, err
 	}
 
-	// run terraform env new and select
-	output, err = c.RunCommandWithVersion(log, path, []string{"env", "select", "-no-color", env}, version, env)
+	// In 0.10 the env command was renamed to workspace.
+	workspaceCommand := "workspace"
+	if zeroPointNine.Check(version) {
+		workspaceCommand = "env"
+	}
+
+	output, err = c.RunCommandWithVersion(log, path, []string{workspaceCommand, "select", "-no-color", workspace}, version, workspace)
 	outputs = append(outputs, output)
 	if err != nil {
-		// if terraform env select fails we will run terraform env new
-		// to create a new environment
-		output, err = c.RunCommandWithVersion(log, path, []string{"env", "new", "-no-color", env}, version, env)
+		// If terraform workspace select fails we run terraform workspace
+		// new to create a new workspace automatically.
+		output, err = c.RunCommandWithVersion(log, path, []string{workspaceCommand, "new", "-no-color", workspace}, version, workspace)
 		outputs = append(outputs, output)
 		if err != nil {
 			return outputs, err
 		}
 	}
 	return outputs, nil
+}
+
+// MustConstraint will parse one or more constraints from the given
+// constraint string. The string must be a comma-separated list of
+// constraints. It panics if there is an error.
+func MustConstraint(v string) version.Constraints {
+	c, err := version.NewConstraint(v)
+	if err != nil {
+		panic(err)
+	}
+	return c
 }

@@ -172,12 +172,12 @@ func TestExecute_PostPlanCommands(t *testing.T) {
 	Equals(t, "running post plan commands: err", result.Error.Error())
 }
 
-func setupPlanExecutorTest(t *testing.T) (*events.PlanExecutor, *tmocks.MockRunner, *lmocks.MockLocker) {
+func setupPlanExecutorTest(t *testing.T) (*events.PlanExecutor, *tmocks.MockClient, *lmocks.MockLocker) {
 	RegisterMockTestingT(t)
 	vcsProxy := vcsmocks.NewMockClientProxy()
 	w := mocks.NewMockWorkspace()
 	ppe := mocks.NewMockProjectPreExecutor()
-	runner := tmocks.NewMockRunner()
+	runner := tmocks.NewMockClient()
 	locker := lmocks.NewMockLocker()
 	run := rmocks.NewMockRunner()
 	p := events.PlanExecutor{

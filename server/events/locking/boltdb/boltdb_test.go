@@ -1,19 +1,16 @@
 package boltdb_test
 
 import (
-	. "github.com/hootsuite/atlantis/testing"
-
 	"io/ioutil"
 	"os"
 	"testing"
-
-	"github.com/boltdb/bolt"
-	"github.com/pkg/errors"
-
 	"time"
 
+	"github.com/boltdb/bolt"
 	"github.com/hootsuite/atlantis/server/events/locking/boltdb"
 	"github.com/hootsuite/atlantis/server/events/models"
+	. "github.com/hootsuite/atlantis/testing"
+	"github.com/pkg/errors"
 )
 
 var lockBucket = "bucket"

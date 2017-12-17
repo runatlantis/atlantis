@@ -26,7 +26,7 @@ type ProjectPreExecutor interface {
 type DefaultProjectPreExecutor struct {
 	Locker       locking.Locker
 	ConfigReader ProjectConfigReader
-	Terraform    terraform.Runner
+	Terraform    terraform.Client
 	Run          run.Runner
 }
 
@@ -77,7 +77,7 @@ func (p *DefaultProjectPreExecutor) Execute(ctx *CommandContext, repoDir string,
 				return PreExecuteResult{ProjectResult: ProjectResult{Error: errors.Wrapf(err, "running %s commands", "pre_init")}}
 			}
 		}
-		_, err := p.Terraform.RunInitAndEnv(ctx.Log, absolutePath, tfEnv, config.GetExtraArguments("init"), terraformVersion)
+		_, err := p.Terraform.Init(ctx.Log, absolutePath, tfEnv, config.GetExtraArguments("init"), terraformVersion)
 		if err != nil {
 			return PreExecuteResult{ProjectResult: ProjectResult{Error: err}}
 		}
