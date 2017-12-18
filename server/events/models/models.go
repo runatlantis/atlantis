@@ -68,9 +68,9 @@ type ProjectLock struct {
 	// User is the username of the user that ran the command
 	// that created this lock.
 	User User
-	// Env is the Terraform environment that this
+	// Workspace is the Terraform workspace that this
 	// lock is being held against.
-	Env string
+	Workspace string
 	// Time is the time at which the lock was first created.
 	Time time.Time
 }

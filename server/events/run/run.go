@@ -20,7 +20,7 @@ const inlineShebang = "#!/bin/sh -e"
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_runner.go Runner
 
 type Runner interface {
-	Execute(log *logging.SimpleLogger, commands []string, path string, environment string, terraformVersion *version.Version, stage string) (string, error)
+	Execute(log *logging.SimpleLogger, commands []string, path string, workspace string, terraformVersion *version.Version, stage string) (string, error)
 }
 
 type Run struct{}
@@ -31,7 +31,7 @@ func (p *Run) Execute(
 	log *logging.SimpleLogger,
 	commands []string,
 	path string,
-	environment string,
+	workspace string,
 	terraformVersion *version.Version,
 	stage string) (string, error) {
 	// we create a script from the commands provided
@@ -48,11 +48,11 @@ func (p *Run) Execute(
 	log.Info("running %s commands: %v", stage, commands)
 
 	// set environment variable for the run.
-	// this is to support scripts to use the ENVIRONMENT, ATLANTIS_TERRAFORM_VERSION
-	// and WORKSPACE variables in their scripts
-	os.Setenv("ENVIRONMENT", environment)                              // nolint: errcheck
+	// this is to support scripts to use the WORKSPACE, ATLANTIS_TERRAFORM_VERSION
+	// and DIR variables in their scripts
+	os.Setenv("WORKSPACE", workspace)                                  // nolint: errcheck
 	os.Setenv("ATLANTIS_TERRAFORM_VERSION", terraformVersion.String()) // nolint: errcheck
-	os.Setenv("WORKSPACE", path)                                       // nolint: errcheck
+	os.Setenv("DIR", path)                                             // nolint: errcheck
 	return execute(s)
 }
 

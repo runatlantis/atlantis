@@ -16,10 +16,10 @@ const gitlabPullOpened = "opened"
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_event_parsing.go EventParsing
 
 type Command struct {
-	Name        CommandName
-	Environment string
-	Verbose     bool
-	Flags       []string
+	Name      CommandName
+	Workspace string
+	Verbose   bool
+	Flags     []string
 }
 
 type EventParsing interface {
@@ -46,7 +46,7 @@ func (e *EventParser) DetermineCommand(comment string, vcsHost vcs.Host) (*Comma
 	// valid commands contain:
 	// the initial "executable" name, 'run' or 'atlantis' or '@GithubUser' where GithubUser is the api user atlantis is running as
 	// then a command, either 'plan', 'apply', or 'help'
-	// then an optional environment argument, an optional --verbose flag and any other flags
+	// then an optional workspace argument, an optional --verbose flag and any other flags
 	//
 	// examples:
 	// atlantis help
@@ -60,7 +60,7 @@ func (e *EventParser) DetermineCommand(comment string, vcsHost vcs.Host) (*Comma
 		return nil, err
 	}
 
-	env := "default"
+	workspace := "default"
 	verbose := false
 	var flags []string
 
@@ -82,10 +82,10 @@ func (e *EventParser) DetermineCommand(comment string, vcsHost vcs.Host) (*Comma
 	if len(args) > 2 {
 		flags = args[2:]
 
-		// if the third arg doesn't start with '-' then we assume it's an
-		// environment not a flag
+		// if the third arg doesn't start with '-' then we assume it's a
+		// workspace, not a flag
 		if !strings.HasPrefix(args[2], "-") {
-			env = args[2]
+			workspace = args[2]
 			flags = args[3:]
 		}
 
@@ -97,7 +97,7 @@ func (e *EventParser) DetermineCommand(comment string, vcsHost vcs.Host) (*Comma
 		}
 	}
 
-	c := &Command{Verbose: verbose, Environment: env, Flags: flags}
+	c := &Command{Verbose: verbose, Workspace: workspace, Flags: flags}
 	switch command {
 	case "plan":
 		c.Name = Plan

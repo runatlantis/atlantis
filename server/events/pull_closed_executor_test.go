@@ -19,7 +19,7 @@ import (
 func TestCleanUpPullWorkspaceErr(t *testing.T) {
 	t.Log("when workspace.Delete returns an error, we return it")
 	RegisterMockTestingT(t)
-	w := mocks.NewMockWorkspace()
+	w := mocks.NewMockAtlantisWorkspace()
 	pce := events.PullClosedExecutor{
 		Workspace: w,
 	}
@@ -32,7 +32,7 @@ func TestCleanUpPullWorkspaceErr(t *testing.T) {
 func TestCleanUpPullUnlockErr(t *testing.T) {
 	t.Log("when locker.UnlockByPull returns an error, we return it")
 	RegisterMockTestingT(t)
-	w := mocks.NewMockWorkspace()
+	w := mocks.NewMockAtlantisWorkspace()
 	l := lockmocks.NewMockLocker()
 	pce := events.PullClosedExecutor{
 		Locker:    l,
@@ -47,7 +47,7 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 func TestCleanUpPullNoLocks(t *testing.T) {
 	t.Log("when there are no locks to clean up, we don't comment")
 	RegisterMockTestingT(t)
-	w := mocks.NewMockWorkspace()
+	w := mocks.NewMockAtlantisWorkspace()
 	l := lockmocks.NewMockLocker()
 	cp := vcsmocks.NewMockClientProxy()
 	pce := events.PullClosedExecutor{
@@ -73,61 +73,61 @@ func TestCleanUpPullComments(t *testing.T) {
 			"single lock, empty path",
 			[]models.ProjectLock{
 				{
-					Project: models.NewProject("owner/repo", ""),
-					Env:     "default",
+					Project:   models.NewProject("owner/repo", ""),
+					Workspace: "default",
 				},
 			},
-			"- path: `owner/repo/.` environment: `default`",
+			"- path: `owner/repo/.` workspace: `default`",
 		},
 		{
 			"single lock, non-empty path",
 			[]models.ProjectLock{
 				{
-					Project: models.NewProject("owner/repo", "path"),
-					Env:     "default",
+					Project:   models.NewProject("owner/repo", "path"),
+					Workspace: "default",
 				},
 			},
-			"- path: `owner/repo/path` environment: `default`",
+			"- path: `owner/repo/path` workspace: `default`",
 		},
 		{
-			"single path, multiple environments",
+			"single path, multiple workspaces",
 			[]models.ProjectLock{
 				{
-					Project: models.NewProject("owner/repo", "path"),
-					Env:     "env1",
+					Project:   models.NewProject("owner/repo", "path"),
+					Workspace: "workspace1",
 				},
 				{
-					Project: models.NewProject("owner/repo", "path"),
-					Env:     "env2",
+					Project:   models.NewProject("owner/repo", "path"),
+					Workspace: "workspace2",
 				},
 			},
-			"- path: `owner/repo/path` environments: `env1`, `env2`",
+			"- path: `owner/repo/path` workspaces: `workspace1`, `workspace2`",
 		},
 		{
-			"multiple paths, multiple environments",
+			"multiple paths, multiple workspaces",
 			[]models.ProjectLock{
 				{
-					Project: models.NewProject("owner/repo", "path"),
-					Env:     "env1",
+					Project:   models.NewProject("owner/repo", "path"),
+					Workspace: "workspace1",
 				},
 				{
-					Project: models.NewProject("owner/repo", "path"),
-					Env:     "env2",
+					Project:   models.NewProject("owner/repo", "path"),
+					Workspace: "workspace2",
 				},
 				{
-					Project: models.NewProject("owner/repo", "path2"),
-					Env:     "env1",
+					Project:   models.NewProject("owner/repo", "path2"),
+					Workspace: "workspace1",
 				},
 				{
-					Project: models.NewProject("owner/repo", "path2"),
-					Env:     "env2",
+					Project:   models.NewProject("owner/repo", "path2"),
+					Workspace: "workspace2",
 				},
 			},
-			"- path: `owner/repo/path` environments: `env1`, `env2`\n- path: `owner/repo/path2` environments: `env1`, `env2`",
+			"- path: `owner/repo/path` workspaces: `workspace1`, `workspace2`\n- path: `owner/repo/path2` workspaces: `workspace1`, `workspace2`",
 		},
 	}
 	for _, c := range cases {
-		w := mocks.NewMockWorkspace()
+		w := mocks.NewMockAtlantisWorkspace()
 		cp := vcsmocks.NewMockClientProxy()
 		l := lockmocks.NewMockLocker()
 		pce := events.PullClosedExecutor{
@@ -141,7 +141,7 @@ func TestCleanUpPullComments(t *testing.T) {
 		Ok(t, err)
 		_, _, comment, _ := cp.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString(), matchers.AnyVcsHost()).GetCapturedArguments()
 
-		expected := "Locks and plans deleted for the projects and environments modified in this pull request:\n\n" + c.Exp
+		expected := "Locks and plans deleted for the projects and workspaces modified in this pull request:\n\n" + c.Exp
 		Equals(t, expected, comment)
 	}
 }

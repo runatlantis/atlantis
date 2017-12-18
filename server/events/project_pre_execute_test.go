@@ -90,7 +90,7 @@ func TestExecute_InitErr(t *testing.T) {
 	When(p.ConfigReader.Read("")).ThenReturn(events.ProjectConfig{}, nil)
 	tfVersion, _ := version.NewVersion("0.9.0")
 	When(tm.Version()).ThenReturn(tfVersion)
-	When(tm.RunInitAndEnv(ctx.Log, "", "", nil, tfVersion)).ThenReturn(nil, errors.New("err"))
+	When(tm.Init(ctx.Log, "", "", nil, tfVersion)).ThenReturn(nil, errors.New("err"))
 
 	res := p.Execute(&ctx, "", project)
 	Equals(t, "err", res.ProjectResult.Error.Error())
@@ -142,7 +142,7 @@ func TestExecute_PreCommandErr(t *testing.T) {
 	}, nil)
 	tfVersion, _ := version.NewVersion("0.9")
 	When(tm.Version()).ThenReturn(tfVersion)
-	When(tm.RunInitAndEnv(ctx.Log, "", "", nil, tfVersion)).ThenReturn(nil, nil)
+	When(tm.Init(ctx.Log, "", "", nil, tfVersion)).ThenReturn(nil, nil)
 	When(r.Execute(ctx.Log, []string{"command"}, "", "", tfVersion, "pre_plan")).ThenReturn("", errors.New("err"))
 
 	res := p.Execute(&ctx, "", project)
@@ -163,7 +163,7 @@ func TestExecute_SuccessTF9(t *testing.T) {
 	When(p.ConfigReader.Read("")).ThenReturn(config, nil)
 	tfVersion, _ := version.NewVersion("0.9")
 	When(tm.Version()).ThenReturn(tfVersion)
-	When(tm.RunInitAndEnv(ctx.Log, "", "", nil, tfVersion)).ThenReturn(nil, nil)
+	When(tm.Init(ctx.Log, "", "", nil, tfVersion)).ThenReturn(nil, nil)
 
 	res := p.Execute(&ctx, "", project)
 	Equals(t, events.PreExecuteResult{
@@ -171,7 +171,7 @@ func TestExecute_SuccessTF9(t *testing.T) {
 		TerraformVersion: tfVersion,
 		LockResponse:     lockResponse,
 	}, res)
-	tm.VerifyWasCalledOnce().RunInitAndEnv(ctx.Log, "", "", nil, tfVersion)
+	tm.VerifyWasCalledOnce().Init(ctx.Log, "", "", nil, tfVersion)
 	r.VerifyWasCalledOnce().Execute(ctx.Log, []string{"pre-init"}, "", "", tfVersion, "pre_init")
 }
 
@@ -254,11 +254,11 @@ func TestExecute_SuccessPreApply(t *testing.T) {
 	r.VerifyWasCalledOnce().Execute(cpCtx.Log, []string{"command"}, "", "", tfVersion, "pre_apply")
 }
 
-func setupPreExecuteTest(t *testing.T) (*events.DefaultProjectPreExecutor, *lmocks.MockLocker, *tmocks.MockRunner, *rmocks.MockRunner) {
+func setupPreExecuteTest(t *testing.T) (*events.DefaultProjectPreExecutor, *lmocks.MockLocker, *tmocks.MockClient, *rmocks.MockRunner) {
 	RegisterMockTestingT(t)
 	l := lmocks.NewMockLocker()
 	cr := mocks.NewMockProjectConfigReader()
-	tm := tmocks.NewMockRunner()
+	tm := tmocks.NewMockClient()
 	r := rmocks.NewMockRunner()
 	return &events.DefaultProjectPreExecutor{
 		Locker:       l,

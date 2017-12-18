@@ -1,24 +1,21 @@
 package boltdb_test
 
 import (
-	. "github.com/hootsuite/atlantis/testing"
-
 	"io/ioutil"
 	"os"
 	"testing"
-
-	"github.com/boltdb/bolt"
-	"github.com/pkg/errors"
-
 	"time"
 
+	"github.com/boltdb/bolt"
 	"github.com/hootsuite/atlantis/server/events/locking/boltdb"
 	"github.com/hootsuite/atlantis/server/events/models"
+	. "github.com/hootsuite/atlantis/testing"
+	"github.com/pkg/errors"
 )
 
 var lockBucket = "bucket"
 var project = models.NewProject("owner/repo", "parent/child")
-var env = "default"
+var workspace = "default"
 var pullNum = 1
 var lock = models.ProjectLock{
 	Pull: models.PullRequest{
@@ -27,9 +24,9 @@ var lock = models.ProjectLock{
 	User: models.User{
 		Username: "lkysow",
 	},
-	Env:     env,
-	Project: project,
-	Time:    time.Now(),
+	Workspace: workspace,
+	Project:   project,
+	Time:      time.Now(),
 }
 
 func TestListNoLocks(t *testing.T) {
@@ -91,7 +88,7 @@ func TestListAddRemove(t *testing.T) {
 	defer cleanupDB(db)
 	_, _, err := b.TryLock(lock)
 	Ok(t, err)
-	_, err = b.Unlock(project, env)
+	_, err = b.Unlock(project, workspace)
 	Ok(t, err)
 
 	ls, err := b.List()
@@ -126,10 +123,10 @@ func TestLockingExistingLock(t *testing.T) {
 		Equals(t, pullNum, currLock.Pull.Num)
 	}
 
-	t.Log("...succeed if the new project has a different environment")
+	t.Log("...succeed if the new project has a different workspace")
 	{
 		newLock := lock
-		newLock.Env = "different-env"
+		newLock.Workspace = "different-workspace"
 		acquired, currLock, err := b.TryLock(newLock)
 		Ok(t, err)
 		Equals(t, true, acquired)
@@ -161,7 +158,7 @@ func TestUnlockingNoLocks(t *testing.T) {
 	t.Log("unlocking with no locks should succeed")
 	db, b := newTestDB()
 	defer cleanupDB(db)
-	_, err := b.Unlock(project, env)
+	_, err := b.Unlock(project, workspace)
 
 	Ok(t, err)
 }
@@ -173,7 +170,7 @@ func TestUnlocking(t *testing.T) {
 
 	_, _, err := b.TryLock(lock)
 	Ok(t, err)
-	_, err = b.Unlock(project, env)
+	_, err = b.Unlock(project, workspace)
 	Ok(t, err)
 
 	// should be no locks listed
@@ -209,18 +206,18 @@ func TestUnlockingMultiple(t *testing.T) {
 	Ok(t, err)
 
 	new3 := lock
-	new3.Env = "new-env"
+	new3.Workspace = "new-workspace"
 	_, _, err = b.TryLock(new3)
 	Ok(t, err)
 
 	// now try and unlock them
-	_, err = b.Unlock(new3.Project, new3.Env)
+	_, err = b.Unlock(new3.Project, new3.Workspace)
 	Ok(t, err)
-	_, err = b.Unlock(new2.Project, env)
+	_, err = b.Unlock(new2.Project, workspace)
 	Ok(t, err)
-	_, err = b.Unlock(new.Project, env)
+	_, err = b.Unlock(new.Project, workspace)
 	Ok(t, err)
-	_, err = b.Unlock(project, env)
+	_, err = b.Unlock(project, workspace)
 	Ok(t, err)
 
 	// should be none left
@@ -277,7 +274,7 @@ func TestUnlockByPullAfterUnlock(t *testing.T) {
 	defer cleanupDB(db)
 	_, _, err := b.TryLock(lock)
 	Ok(t, err)
-	_, err = b.Unlock(project, env)
+	_, err = b.Unlock(project, workspace)
 	Ok(t, err)
 
 	_, err = b.UnlockByPull(project.RepoFullName, pullNum)
@@ -294,13 +291,13 @@ func TestUnlockByPullMatching(t *testing.T) {
 	_, _, err := b.TryLock(lock)
 	Ok(t, err)
 
-	// add additional locks with the same repo and pull num but different paths/envs
+	// add additional locks with the same repo and pull num but different paths/workspaces
 	new := lock
 	new.Project.Path = "dif/path"
 	_, _, err = b.TryLock(new)
 	Ok(t, err)
 	new2 := lock
-	new2.Env = "new-env"
+	new2.Workspace = "new-workspace"
 	_, _, err = b.TryLock(new2)
 	Ok(t, err)
 
@@ -321,7 +318,7 @@ func TestGetLockNotThere(t *testing.T) {
 	t.Log("getting a lock that doesn't exist should return a nil pointer")
 	db, b := newTestDB()
 	defer cleanupDB(db)
-	l, err := b.GetLock(project, env)
+	l, err := b.GetLock(project, workspace)
 	Ok(t, err)
 	Equals(t, (*models.ProjectLock)(nil), l)
 }
@@ -333,11 +330,11 @@ func TestGetLock(t *testing.T) {
 	_, _, err := b.TryLock(lock)
 	Ok(t, err)
 
-	l, err := b.GetLock(project, env)
+	l, err := b.GetLock(project, workspace)
 	Ok(t, err)
 	// can't compare against time so doing each field
 	Equals(t, lock.Project, l.Project)
-	Equals(t, lock.Env, l.Env)
+	Equals(t, lock.Workspace, l.Workspace)
 	Equals(t, lock.Pull, l.Pull)
 	Equals(t, lock.User, l.User)
 }

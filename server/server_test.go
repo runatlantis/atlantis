@@ -136,9 +136,9 @@ func TestGetLock_Success(t *testing.T) {
 	RegisterMockTestingT(t)
 	l := mocks.NewMockLocker()
 	When(l.GetLock("id")).ThenReturn(&models.ProjectLock{
-		Project: models.Project{RepoFullName: "owner/repo", Path: "path"},
-		Pull:    models.PullRequest{URL: "url", Author: "lkysow"},
-		Env:     "env",
+		Project:   models.Project{RepoFullName: "owner/repo", Path: "path"},
+		Pull:      models.PullRequest{URL: "url", Author: "lkysow"},
+		Workspace: "workspace",
 	}, nil)
 	tmpl := sMocks.NewMockTemplateWriter()
 	s := server.Server{
@@ -155,7 +155,7 @@ func TestGetLock_Success(t *testing.T) {
 		RepoName:        "repo",
 		PullRequestLink: "url",
 		LockedBy:        "lkysow",
-		Environment:     "env",
+		Workspace:       "workspace",
 	})
 	responseContains(t, w, http.StatusOK, "")
 }
