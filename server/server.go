@@ -152,7 +152,7 @@ func NewServer(config Config) (*Server, error) {
 		Terraform:         terraformClient,
 		RequireApproval:   config.RequireApproval,
 		Run:               run,
-		Workspace:         workspace,
+		AtlantisWorkspace: workspace,
 		ProjectPreExecute: projectPreExecute,
 		Webhooks:          webhooksManager,
 	}
