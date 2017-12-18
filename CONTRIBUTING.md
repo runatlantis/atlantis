@@ -90,7 +90,6 @@ func TestLockingExisting(t *testing.T) {
 # Creating a New Release
 1. Update version number in
     1. `main.go`
-    1. `website/src/themes/kube/layouts/index.html`
 1. Update `CHANGELOG.md` with latest release number and information
 1. Create a pull request and merge to master
 1. Run `make release`

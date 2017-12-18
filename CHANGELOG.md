@@ -1,3 +1,24 @@
+# v0.2.2
+## Features
+* Terraform 0.11 is now supported ([#219](https://github.com/hootsuite/atlantis/pull/219))
+
+## Bug Fixes
+None
+
+## Backwards Incompatibilities / Notes:
+* The environment variables available when executing commands have changed:
+  * `WORKSPACE` => `DIR` - this is the absolute path to the project directory on disk
+  * `ENVIRONMENT` => `WORKSPACE` - this is the name of the Terraform workspace that we're running in (ex. default)
+* The schema for storing locks changed. Any old locks will still be held but you will be unable to discard them in the UI.
+**To fix this, either merge all the open pull requests before upgrading OR delete the `~/.atlantis/atlantis.db` file.**
+This is safe to do because you'll just need to re-run `plan` to get your plan back.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.2/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.2/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.2/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.2/atlantis_linux_arm.zip)
+
 # v0.2.1
 ## Features
 * Don't ignore changes in `modules` directories anymore. ([#211](https://github.com/hootsuite/atlantis/pull/211))
