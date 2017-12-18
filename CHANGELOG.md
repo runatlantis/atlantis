@@ -1,6 +1,7 @@
 # v0.2.2
 ## Features
 * Terraform 0.11 is now supported ([#219](https://github.com/hootsuite/atlantis/pull/219))
+* Safe shutdown on `SIGTERM`/`SIGINT` ([#215](https://github.com/hootsuite/atlantis/pull/215))
 
 ## Bug Fixes
 None
