@@ -35,7 +35,7 @@ regen-mocks: ## Delete all mocks and then run go generate to regen them
 	go generate $$(go list ./... | grep -v e2e | grep -v vendor | grep -v static)
 
 test: ## Run tests
-	go test $(PKG)
+	@go test $(PKG)
 
 test-coverage:
 	./scripts/coverage.sh $(PKG)

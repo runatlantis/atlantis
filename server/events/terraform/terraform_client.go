@@ -17,8 +17,8 @@ import (
 
 type Client interface {
 	Version() *version.Version
-	RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version, env string) (string, error)
-	Init(log *logging.SimpleLogger, path string, env string, extraInitArgs []string, version *version.Version) ([]string, error)
+	RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (string, error)
+	Init(log *logging.SimpleLogger, path string, workspace string, extraInitArgs []string, version *version.Version) ([]string, error)
 }
 
 type DefaultClient struct {
@@ -62,9 +62,10 @@ func (c *DefaultClient) Version() *version.Version {
 }
 
 // RunCommandWithVersion executes the provided version of terraform with
-// the provided args in path. The variable "v" is the version of terraform executable to use and the variable "env" is the
-// environment specified by the user commenting "atlantis plan/apply {env}" which is set to "default" by default.
-func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version, env string) (string, error) {
+// the provided args in path. v is the version of terraform executable to use
+// and workspace is the workspace specified by the user commenting
+// "atlantis plan/apply {workspace}" which is set to "default" by default.
+func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (string, error) {
 	tfExecutable := "terraform"
 	// if version is the same as the default, don't need to prepend the version name to the executable
 	if !v.Equal(c.defaultVersion) {
@@ -72,14 +73,14 @@ func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path st
 	}
 
 	// set environment variables
-	// this is to support scripts to use the ENVIRONMENT, ATLANTIS_TERRAFORM_VERSION
-	// and WORKSPACE variables in their scripts
+	// this is to support scripts to use the WORKSPACE, ATLANTIS_TERRAFORM_VERSION
+	// and DIR variables in their scripts
 	// append current process's environment variables
 	// this is to prevent the $PATH variable being removed from the environment
 	envVars := []string{
-		fmt.Sprintf("ENVIRONMENT=%s", env),
+		fmt.Sprintf("WORKSPACE=%s", workspace),
 		fmt.Sprintf("ATLANTIS_TERRAFORM_VERSION=%s", v.String()),
-		fmt.Sprintf("WORKSPACE=%s", path),
+		fmt.Sprintf("DIR=%s", path),
 	}
 	envVars = append(envVars, os.Environ()...)
 
@@ -120,7 +121,7 @@ func (c *DefaultClient) Init(log *logging.SimpleLogger, path string, workspace s
 	// In 0.10 the env command was renamed to workspace.
 	workspaceCommand := "workspace"
 	if zeroPointNine.Check(version) {
-		workspaceCommand = "env"
+		workspaceCommand = "workspace"
 	}
 
 	output, err = c.RunCommandWithVersion(log, path, []string{workspaceCommand, "select", "-no-color", workspace}, version, workspace)

@@ -33,7 +33,7 @@ type PlanExecutor struct {
 	Locker            locking.Locker
 	LockURL           func(id string) (url string)
 	Run               run.Runner
-	Workspace         Workspace
+	Workspace         AtlantisWorkspace
 	ProjectPreExecute ProjectPreExecutor
 	ProjectFinder     ProjectFinder
 }
@@ -63,7 +63,7 @@ func (p *PlanExecutor) Execute(ctx *CommandContext) CommandResponse {
 		return CommandResponse{Failure: "No Terraform files were modified."}
 	}
 
-	cloneDir, err := p.Workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, ctx.Command.Environment)
+	cloneDir, err := p.Workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, ctx.Command.Workspace)
 	if err != nil {
 		return CommandResponse{Error: err}
 	}
@@ -85,20 +85,20 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 	}
 	config := preExecute.ProjectConfig
 	terraformVersion := preExecute.TerraformVersion
-	tfEnv := ctx.Command.Environment
+	workspace := ctx.Command.Workspace
 
 	// Run terraform plan.
-	planFile := filepath.Join(repoDir, project.Path, fmt.Sprintf("%s.tfplan", tfEnv))
+	planFile := filepath.Join(repoDir, project.Path, fmt.Sprintf("%s.tfplan", workspace))
 	userVar := fmt.Sprintf("%s=%s", atlantisUserTFVar, ctx.User.Username)
 	planExtraArgs := config.GetExtraArguments(ctx.Command.Name.String())
 	tfPlanCmd := append(append([]string{"plan", "-refresh", "-no-color", "-out", planFile, "-var", userVar}, planExtraArgs...), ctx.Command.Flags...)
 
-	// Check if env/{environment}.tfvars exist.
-	tfEnvFileName := filepath.Join("env", tfEnv+".tfvars")
-	if _, err := os.Stat(filepath.Join(repoDir, project.Path, tfEnvFileName)); err == nil {
-		tfPlanCmd = append(tfPlanCmd, "-var-file", tfEnvFileName)
+	// Check if env/{workspace}.tfvars exist.
+	envFileName := filepath.Join("env", workspace+".tfvars")
+	if _, err := os.Stat(filepath.Join(repoDir, project.Path, envFileName)); err == nil {
+		tfPlanCmd = append(tfPlanCmd, "-var-file", envFileName)
 	}
-	output, err := p.Terraform.RunCommandWithVersion(ctx.Log, filepath.Join(repoDir, project.Path), tfPlanCmd, terraformVersion, tfEnv)
+	output, err := p.Terraform.RunCommandWithVersion(ctx.Log, filepath.Join(repoDir, project.Path), tfPlanCmd, terraformVersion, workspace)
 	if err != nil {
 		// Plan failed so unlock the state.
 		if _, unlockErr := p.Locker.Unlock(preExecute.LockResponse.LockKey); unlockErr != nil {
@@ -111,7 +111,7 @@ func (p *PlanExecutor) plan(ctx *CommandContext, repoDir string, project models.
 	// If there are post plan commands then run them.
 	if len(config.PostPlan) > 0 {
 		absolutePath := filepath.Join(repoDir, project.Path)
-		_, err := p.Run.Execute(ctx.Log, config.PostPlan, absolutePath, tfEnv, terraformVersion, "post_plan")
+		_, err := p.Run.Execute(ctx.Log, config.PostPlan, absolutePath, workspace, terraformVersion, "post_plan")
 		if err != nil {
 			return ProjectResult{Error: errors.Wrap(err, "running post plan commands")}
 		}

@@ -16,12 +16,12 @@ import (
 )
 
 var project = models.NewProject("owner/repo", "path")
-var env = "env"
+var workspace = "workspace"
 var pull = models.PullRequest{}
 var user = models.User{}
 var expectedErr = errors.New("err")
 var timeNow = time.Now().Local()
-var pl = models.ProjectLock{Project: project, Pull: pull, User: user, Env: env, Time: timeNow}
+var pl = models.ProjectLock{Project: project, Pull: pull, User: user, Workspace: workspace, Time: timeNow}
 
 func TestTryLock_Err(t *testing.T) {
 	RegisterMockTestingT(t)
@@ -29,7 +29,7 @@ func TestTryLock_Err(t *testing.T) {
 	When(backend.TryLock(matchers.AnyModelsProjectLock())).ThenReturn(false, models.ProjectLock{}, expectedErr)
 	t.Log("when the backend returns an error, TryLock should return that error")
 	l := locking.NewClient(backend)
-	_, err := l.TryLock(project, env, pull, user)
+	_, err := l.TryLock(project, workspace, pull, user)
 	Equals(t, err, err)
 }
 
@@ -39,9 +39,9 @@ func TestTryLock_Success(t *testing.T) {
 	backend := mocks.NewMockBackend()
 	When(backend.TryLock(matchers.AnyModelsProjectLock())).ThenReturn(true, currLock, nil)
 	l := locking.NewClient(backend)
-	r, err := l.TryLock(project, env, pull, user)
+	r, err := l.TryLock(project, workspace, pull, user)
 	Ok(t, err)
-	Equals(t, locking.TryLockResponse{LockAcquired: true, CurrLock: currLock, LockKey: "owner/repo/path/env"}, r)
+	Equals(t, locking.TryLockResponse{LockAcquired: true, CurrLock: currLock, LockKey: "owner/repo/path/workspace"}, r)
 }
 
 func TestUnlock_InvalidKey(t *testing.T) {
@@ -59,9 +59,9 @@ func TestUnlock_Err(t *testing.T) {
 	backend := mocks.NewMockBackend()
 	When(backend.Unlock(matchers.AnyModelsProject(), AnyString())).ThenReturn(nil, expectedErr)
 	l := locking.NewClient(backend)
-	_, err := l.Unlock("owner/repo/path/env")
+	_, err := l.Unlock("owner/repo/path/workspace")
 	Equals(t, err, err)
-	backend.VerifyWasCalledOnce().Unlock(project, "env")
+	backend.VerifyWasCalledOnce().Unlock(project, "workspace")
 }
 
 func TestUnlock(t *testing.T) {
@@ -69,7 +69,7 @@ func TestUnlock(t *testing.T) {
 	backend := mocks.NewMockBackend()
 	When(backend.Unlock(matchers.AnyModelsProject(), AnyString())).ThenReturn(&pl, nil)
 	l := locking.NewClient(backend)
-	lock, err := l.Unlock("owner/repo/path/env")
+	lock, err := l.Unlock("owner/repo/path/workspace")
 	Ok(t, err)
 	Equals(t, &pl, lock)
 }
@@ -91,7 +91,7 @@ func TestList(t *testing.T) {
 	list, err := l.List()
 	Ok(t, err)
 	Equals(t, map[string]models.ProjectLock{
-		"owner/repo/path/env": pl,
+		"owner/repo/path/workspace": pl,
 	}, list)
 }
 
@@ -116,18 +116,18 @@ func TestGetLock_BadKey(t *testing.T) {
 func TestGetLock_Err(t *testing.T) {
 	RegisterMockTestingT(t)
 	backend := mocks.NewMockBackend()
-	When(backend.GetLock(project, env)).ThenReturn(nil, expectedErr)
+	When(backend.GetLock(project, workspace)).ThenReturn(nil, expectedErr)
 	l := locking.NewClient(backend)
-	_, err := l.GetLock("owner/repo/path/env")
+	_, err := l.GetLock("owner/repo/path/workspace")
 	Equals(t, expectedErr, err)
 }
 
 func TestGetLock(t *testing.T) {
 	RegisterMockTestingT(t)
 	backend := mocks.NewMockBackend()
-	When(backend.GetLock(project, env)).ThenReturn(&pl, nil)
+	When(backend.GetLock(project, workspace)).ThenReturn(&pl, nil)
 	l := locking.NewClient(backend)
-	lock, err := l.GetLock("owner/repo/path/env")
+	lock, err := l.GetLock("owner/repo/path/workspace")
 	Ok(t, err)
 	Equals(t, &pl, lock)
 }

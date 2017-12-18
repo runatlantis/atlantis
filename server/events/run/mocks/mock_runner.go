@@ -19,8 +19,8 @@ func NewMockRunner() *MockRunner {
 	return &MockRunner{fail: pegomock.GlobalFailHandler}
 }
 
-func (mock *MockRunner) Execute(log *logging.SimpleLogger, commands []string, path string, environment string, terraformVersion *go_version.Version, stage string) (string, error) {
-	params := []pegomock.Param{log, commands, path, environment, terraformVersion, stage}
+func (mock *MockRunner) Execute(log *logging.SimpleLogger, commands []string, path string, workspace string, terraformVersion *go_version.Version, stage string) (string, error) {
+	params := []pegomock.Param{log, commands, path, workspace, terraformVersion, stage}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Execute", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
 	var ret1 error
@@ -53,8 +53,8 @@ type VerifierRunner struct {
 	inOrderContext         *pegomock.InOrderContext
 }
 
-func (verifier *VerifierRunner) Execute(log *logging.SimpleLogger, commands []string, path string, environment string, terraformVersion *go_version.Version, stage string) *Runner_Execute_OngoingVerification {
-	params := []pegomock.Param{log, commands, path, environment, terraformVersion, stage}
+func (verifier *VerifierRunner) Execute(log *logging.SimpleLogger, commands []string, path string, workspace string, terraformVersion *go_version.Version, stage string) *Runner_Execute_OngoingVerification {
+	params := []pegomock.Param{log, commands, path, workspace, terraformVersion, stage}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Execute", params)
 	return &Runner_Execute_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -65,8 +65,8 @@ type Runner_Execute_OngoingVerification struct {
 }
 
 func (c *Runner_Execute_OngoingVerification) GetCapturedArguments() (*logging.SimpleLogger, []string, string, string, *go_version.Version, string) {
-	log, commands, path, environment, terraformVersion, stage := c.GetAllCapturedArguments()
-	return log[len(log)-1], commands[len(commands)-1], path[len(path)-1], environment[len(environment)-1], terraformVersion[len(terraformVersion)-1], stage[len(stage)-1]
+	log, commands, path, workspace, terraformVersion, stage := c.GetAllCapturedArguments()
+	return log[len(log)-1], commands[len(commands)-1], path[len(path)-1], workspace[len(workspace)-1], terraformVersion[len(terraformVersion)-1], stage[len(stage)-1]
 }
 
 func (c *Runner_Execute_OngoingVerification) GetAllCapturedArguments() (_param0 []*logging.SimpleLogger, _param1 [][]string, _param2 []string, _param3 []string, _param4 []*go_version.Version, _param5 []string) {

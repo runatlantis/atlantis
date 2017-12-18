@@ -62,7 +62,7 @@ func NewWithDB(db *bolt.DB, bucket string) (*BoltLocker, error) {
 func (b *BoltLocker) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, error) {
 	var lockAcquired bool
 	var currLock models.ProjectLock
-	key := b.key(newLock.Project, newLock.Env)
+	key := b.key(newLock.Project, newLock.Workspace)
 	newLockSerialized, _ := json.Marshal(newLock)
 	transactionErr := b.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(b.bucket)
@@ -92,14 +92,14 @@ func (b *BoltLocker) TryLock(newLock models.ProjectLock) (bool, models.ProjectLo
 	return lockAcquired, currLock, nil
 }
 
-// Unlock attempts to unlock the project and environment.
+// Unlock attempts to unlock the project and workspace.
 // If there is no lock, then it will return a nil pointer.
 // If there is a lock, then it will delete it, and then return a pointer
 // to the deleted lock.
-func (b BoltLocker) Unlock(p models.Project, env string) (*models.ProjectLock, error) {
+func (b BoltLocker) Unlock(p models.Project, workspace string) (*models.ProjectLock, error) {
 	var lock models.ProjectLock
 	foundLock := false
-	key := b.key(p, env)
+	key := b.key(p, workspace)
 	err := b.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(b.bucket)
 		serialized := bucket.Get([]byte(key))
@@ -170,17 +170,17 @@ func (b BoltLocker) UnlockByPull(repoFullName string, pullNum int) ([]models.Pro
 
 	// delete the locks
 	for _, lock := range locks {
-		if _, err = b.Unlock(lock.Project, lock.Env); err != nil {
-			return locks, errors.Wrapf(err, "unlocking repo %s, path %s, env %s", lock.Project.RepoFullName, lock.Project.Path, lock.Env)
+		if _, err = b.Unlock(lock.Project, lock.Workspace); err != nil {
+			return locks, errors.Wrapf(err, "unlocking repo %s, path %s, workspace %s", lock.Project.RepoFullName, lock.Project.Path, lock.Workspace)
 		}
 	}
 	return locks, nil
 }
 
-// GetLock returns a pointer to the lock for that project and env.
+// GetLock returns a pointer to the lock for that project and workspace.
 // If there is no lock, it returns a nil pointer.
-func (b BoltLocker) GetLock(p models.Project, env string) (*models.ProjectLock, error) {
-	key := b.key(p, env)
+func (b BoltLocker) GetLock(p models.Project, workspace string) (*models.ProjectLock, error) {
+	key := b.key(p, workspace)
 	var lockBytes []byte
 	err := b.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(b.bucket)
@@ -205,6 +205,6 @@ func (b BoltLocker) GetLock(p models.Project, env string) (*models.ProjectLock, 
 	return &lock, nil
 }
 
-func (b BoltLocker) key(p models.Project, env string) string {
-	return fmt.Sprintf("%s/%s/%s", p.RepoFullName, p.Path, env)
+func (b BoltLocker) key(p models.Project, workspace string) string {
+	return fmt.Sprintf("%s/%s/%s", p.RepoFullName, p.Path, workspace)
 }

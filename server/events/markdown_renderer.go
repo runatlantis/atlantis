@@ -101,7 +101,7 @@ var helpTmpl = template.Must(template.New("").Parse("```cmake\n" +
 	`atlantis - Terraform collaboration tool that enables you to collaborate on infrastructure
 safely and securely.
 
-Usage: atlantis <command> [environment] [--verbose]
+Usage: atlantis <command> [workspace] [--verbose]
 
 Commands:
 plan           Runs 'terraform plan' on the files changed in the pull request
@@ -110,13 +110,13 @@ help           Get help
 
 Examples:
 
-# Generates a plan for staging environment
+# Generates a plan for staging workspace
 atlantis plan staging
 
 # Generates a plan for a standalone terraform project
 atlantis plan
 
-# Applies a plan for staging environment
+# Applies a plan for staging workspace
 atlantis apply staging
 
 # Applies a plan for a standalone terraform project

@@ -13,20 +13,20 @@ import (
 
 const workspacePrefix = "repos"
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_workspace.go Workspace
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_atlantis_workspace.go AtlantisWorkspace
 
-// Workspace handles the workspace on disk for running commands.
-type Workspace interface {
+// AtlantisWorkspace handles the workspace on disk for running commands.
+type AtlantisWorkspace interface {
 	// Clone git clones headRepo, checks out the branch and then returns the
 	// absolute path to the root of the cloned repo.
-	Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, env string) (string, error)
+	Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, workspace string) (string, error)
 	// GetWorkspace returns the path to the workspace for this repo and pull.
-	GetWorkspace(r models.Repo, p models.PullRequest, env string) (string, error)
+	GetWorkspace(r models.Repo, p models.PullRequest, workspace string) (string, error)
 	// Delete deletes the workspace for this repo and pull.
 	Delete(r models.Repo, p models.PullRequest) error
 }
 
-// FileWorkspace implements Workspace with the file system.
+// FileWorkspace implements AtlantisWorkspace with the file system.
 type FileWorkspace struct {
 	DataDir string
 }
@@ -38,10 +38,10 @@ func (w *FileWorkspace) Clone(
 	baseRepo models.Repo,
 	headRepo models.Repo,
 	p models.PullRequest,
-	env string) (string, error) {
-	cloneDir := w.cloneDir(baseRepo, p, env)
+	workspace string) (string, error) {
+	cloneDir := w.cloneDir(baseRepo, p, workspace)
 
-	// This is safe to do because we lock runs on repo/pull/env so no one else
+	// This is safe to do because we lock runs on repo/pull/workspace so no one else
 	// is using this workspace.
 	log.Info("cleaning clone directory %q", cloneDir)
 	if err := os.RemoveAll(cloneDir); err != nil {
@@ -71,8 +71,8 @@ func (w *FileWorkspace) Clone(
 }
 
 // GetWorkspace returns the path to the workspace for this repo and pull.
-func (w *FileWorkspace) GetWorkspace(r models.Repo, p models.PullRequest, env string) (string, error) {
-	repoDir := w.cloneDir(r, p, env)
+func (w *FileWorkspace) GetWorkspace(r models.Repo, p models.PullRequest, workspace string) (string, error) {
+	repoDir := w.cloneDir(r, p, workspace)
 	if _, err := os.Stat(repoDir); err != nil {
 		return "", errors.Wrap(err, "checking if workspace exists")
 	}
@@ -88,6 +88,6 @@ func (w *FileWorkspace) repoPullDir(r models.Repo, p models.PullRequest) string 
 	return filepath.Join(w.DataDir, workspacePrefix, r.FullName, strconv.Itoa(p.Num))
 }
 
-func (w *FileWorkspace) cloneDir(r models.Repo, p models.PullRequest, env string) string {
-	return filepath.Join(w.repoPullDir(r, p), env)
+func (w *FileWorkspace) cloneDir(r models.Repo, p models.PullRequest, workspace string) string {
+	return filepath.Join(w.repoPullDir(r, p), workspace)
 }

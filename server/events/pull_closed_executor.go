@@ -18,7 +18,7 @@ import (
 // PullCleaner cleans up pull requests after they're closed/merged.
 type PullCleaner interface {
 	// CleanUpPull deletes the workspaces used by the pull request on disk
-	// and deletes any locks associated with this pull request for all envs.
+	// and deletes any locks associated with this pull request for all workspaces.
 	CleanUpPull(repo models.Repo, pull models.PullRequest, host vcs.Host) error
 }
 
@@ -27,18 +27,18 @@ type PullCleaner interface {
 type PullClosedExecutor struct {
 	Locker    locking.Locker
 	VCSClient vcs.ClientProxy
-	Workspace Workspace
+	Workspace AtlantisWorkspace
 }
 
 type templatedProject struct {
-	Path string
-	Envs string
+	Path       string
+	Workspaces string
 }
 
 var pullClosedTemplate = template.Must(template.New("").Parse(
-	"Locks and plans deleted for the projects and environments modified in this pull request:\n" +
+	"Locks and plans deleted for the projects and workspaces modified in this pull request:\n" +
 		"{{ range . }}\n" +
-		"- path: `{{ .Path }}` {{ .Envs }}{{ end }}"))
+		"- path: `{{ .Path }}` {{ .Workspaces }}{{ end }}"))
 
 // CleanUpPull cleans up after a closed pull request.
 func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullRequest, host vcs.Host) error {
@@ -68,36 +68,36 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 }
 
 // buildTemplateData formats the lock data into a slice that can easily be
-// templated for the VCS comment. We organize all the environments by their
+// templated for the VCS comment. We organize all the workspaces by their
 // respective project paths so the comment can look like:
-// path: {path}, environments: {all-envs}
+// path: {path}, workspaces: {all-workspaces}
 func (p *PullClosedExecutor) buildTemplateData(locks []models.ProjectLock) []templatedProject {
-	envsByPath := make(map[string][]string)
+	workspacesByPath := make(map[string][]string)
 	for _, l := range locks {
 		path := l.Project.RepoFullName + "/" + l.Project.Path
-		envsByPath[path] = append(envsByPath[path], l.Env)
+		workspacesByPath[path] = append(workspacesByPath[path], l.Workspace)
 	}
 
 	// sort keys so we can write deterministic tests
 	var sortedPaths []string
-	for p := range envsByPath {
+	for p := range workspacesByPath {
 		sortedPaths = append(sortedPaths, p)
 	}
 	sort.Strings(sortedPaths)
 
 	var projects []templatedProject
 	for _, p := range sortedPaths {
-		env := envsByPath[p]
-		envsStr := fmt.Sprintf("`%s`", strings.Join(env, "`, `"))
-		if len(env) == 1 {
+		workspace := workspacesByPath[p]
+		workspacesStr := fmt.Sprintf("`%s`", strings.Join(workspace, "`, `"))
+		if len(workspace) == 1 {
 			projects = append(projects, templatedProject{
-				Path: p,
-				Envs: "environment: " + envsStr,
+				Path:       p,
+				Workspaces: "workspace: " + workspacesStr,
 			})
 		} else {
 			projects = append(projects, templatedProject{
-				Path: p,
-				Envs: "environments: " + envsStr,
+				Path:       p,
+				Workspaces: "workspaces: " + workspacesStr,
 			})
 
 		}

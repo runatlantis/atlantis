@@ -49,7 +49,7 @@ type CommandHandler struct {
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
 	CommitStatusUpdater      CommitStatusUpdater
 	EventParser              EventParsing
-	WorkspaceLocker          WorkspaceLocker
+	AtlantisWorkspaceLocker  AtlantisWorkspaceLocker
 	MarkdownRenderer         *MarkdownRenderer
 	Logger                   logging.SimpleLogging
 }
@@ -130,17 +130,17 @@ func (c *CommandHandler) run(ctx *CommandContext) {
 	}
 
 	c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, vcs.Pending, ctx.Command, ctx.VCSHost) // nolint: errcheck
-	if !c.WorkspaceLocker.TryLock(ctx.BaseRepo.FullName, ctx.Command.Environment, ctx.Pull.Num) {
+	if !c.AtlantisWorkspaceLocker.TryLock(ctx.BaseRepo.FullName, ctx.Command.Workspace, ctx.Pull.Num) {
 		errMsg := fmt.Sprintf(
-			"The %s environment is currently locked by another"+
+			"The %s workspace is currently locked by another"+
 				" command that is running for this pull request."+
 				" Wait until the previous command is complete and try again.",
-			ctx.Command.Environment)
+			ctx.Command.Workspace)
 		ctx.Log.Warn(errMsg)
 		c.updatePull(ctx, CommandResponse{Failure: errMsg})
 		return
 	}
-	defer c.WorkspaceLocker.Unlock(ctx.BaseRepo.FullName, ctx.Command.Environment, ctx.Pull.Num)
+	defer c.AtlantisWorkspaceLocker.Unlock(ctx.BaseRepo.FullName, ctx.Command.Workspace, ctx.Pull.Num)
 
 	var cr CommandResponse
 	switch ctx.Command.Name {

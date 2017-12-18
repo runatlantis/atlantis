@@ -38,8 +38,8 @@ func (mock *MockBackend) TryLock(lock models.ProjectLock) (bool, models.ProjectL
 	return ret0, ret1, ret2
 }
 
-func (mock *MockBackend) Unlock(project models.Project, env string) (*models.ProjectLock, error) {
-	params := []pegomock.Param{project, env}
+func (mock *MockBackend) Unlock(project models.Project, workspace string) (*models.ProjectLock, error) {
+	params := []pegomock.Param{project, workspace}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Unlock", params, []reflect.Type{reflect.TypeOf((**models.ProjectLock)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 *models.ProjectLock
 	var ret1 error
@@ -70,8 +70,8 @@ func (mock *MockBackend) List() ([]models.ProjectLock, error) {
 	return ret0, ret1
 }
 
-func (mock *MockBackend) GetLock(project models.Project, env string) (*models.ProjectLock, error) {
-	params := []pegomock.Param{project, env}
+func (mock *MockBackend) GetLock(project models.Project, workspace string) (*models.ProjectLock, error) {
+	params := []pegomock.Param{project, workspace}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("GetLock", params, []reflect.Type{reflect.TypeOf((**models.ProjectLock)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 *models.ProjectLock
 	var ret1 error
@@ -147,8 +147,8 @@ func (c *Backend_TryLock_OngoingVerification) GetAllCapturedArguments() (_param0
 	return
 }
 
-func (verifier *VerifierBackend) Unlock(project models.Project, env string) *Backend_Unlock_OngoingVerification {
-	params := []pegomock.Param{project, env}
+func (verifier *VerifierBackend) Unlock(project models.Project, workspace string) *Backend_Unlock_OngoingVerification {
+	params := []pegomock.Param{project, workspace}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Unlock", params)
 	return &Backend_Unlock_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -159,8 +159,8 @@ type Backend_Unlock_OngoingVerification struct {
 }
 
 func (c *Backend_Unlock_OngoingVerification) GetCapturedArguments() (models.Project, string) {
-	project, env := c.GetAllCapturedArguments()
-	return project[len(project)-1], env[len(env)-1]
+	project, workspace := c.GetAllCapturedArguments()
+	return project[len(project)-1], workspace[len(workspace)-1]
 }
 
 func (c *Backend_Unlock_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Project, _param1 []string) {
@@ -195,8 +195,8 @@ func (c *Backend_List_OngoingVerification) GetCapturedArguments() {
 func (c *Backend_List_OngoingVerification) GetAllCapturedArguments() {
 }
 
-func (verifier *VerifierBackend) GetLock(project models.Project, env string) *Backend_GetLock_OngoingVerification {
-	params := []pegomock.Param{project, env}
+func (verifier *VerifierBackend) GetLock(project models.Project, workspace string) *Backend_GetLock_OngoingVerification {
+	params := []pegomock.Param{project, workspace}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetLock", params)
 	return &Backend_GetLock_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -207,8 +207,8 @@ type Backend_GetLock_OngoingVerification struct {
 }
 
 func (c *Backend_GetLock_OngoingVerification) GetCapturedArguments() (models.Project, string) {
-	project, env := c.GetAllCapturedArguments()
-	return project[len(project)-1], env[len(env)-1]
+	project, workspace := c.GetAllCapturedArguments()
+	return project[len(project)-1], workspace[len(workspace)-1]
 }
 
 func (c *Backend_GetLock_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Project, _param1 []string) {

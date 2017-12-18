@@ -65,7 +65,7 @@ func TestDetermineCommandHelp(t *testing.T) {
 func TestDetermineCommandPermutations(t *testing.T) {
 	execNames := []string{"run", "atlantis", "@github-user", "@gitlab-user"}
 	commandNames := []events.CommandName{events.Plan, events.Apply}
-	envs := []string{"", "default", "env", "env-dash", "env_underscore", "camelEnv"}
+	workspaces := []string{"", "default", "workspace", "workspace-dash", "workspace_underscore", "camelWorkspace"}
 	flagCases := [][]string{
 		{},
 		{"--verbose"},
@@ -81,12 +81,12 @@ func TestDetermineCommandPermutations(t *testing.T) {
 	// test all permutations
 	for _, exec := range execNames {
 		for _, name := range commandNames {
-			for _, env := range envs {
+			for _, workspace := range workspaces {
 				for _, flags := range flagCases {
 					// If github comments end in a newline they get \r\n appended.
 					// Ensure that we parse commands properly either way.
 					for _, lineEnding := range []string{"", "\r\n"} {
-						comment := strings.Join(append([]string{exec, name.String(), env}, flags...), " ") + lineEnding
+						comment := strings.Join(append([]string{exec, name.String(), workspace}, flags...), " ") + lineEnding
 						t.Log("testing comment: " + comment)
 
 						// In order to test gitlab without fully refactoring this test
@@ -99,10 +99,10 @@ func TestDetermineCommandPermutations(t *testing.T) {
 						c, err := parser.DetermineCommand(comment, vcsHost)
 						Ok(t, err)
 						Equals(t, name, c.Name)
-						if env == "" {
-							Equals(t, "default", c.Environment)
+						if workspace == "" {
+							Equals(t, "default", c.Workspace)
 						} else {
-							Equals(t, env, c.Environment)
+							Equals(t, workspace, c.Workspace)
 						}
 						Equals(t, containsVerbose(flags), c.Verbose)
 

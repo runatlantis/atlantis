@@ -28,7 +28,7 @@ var vcsClient *vcsmocks.MockClientProxy
 var ghStatus *mocks.MockCommitStatusUpdater
 var githubGetter *mocks.MockGithubPullGetter
 var gitlabGetter *mocks.MockGitlabMergeRequestGetter
-var workspaceLocker *mocks.MockWorkspaceLocker
+var workspaceLocker *mocks.MockAtlantisWorkspaceLocker
 var ch events.CommandHandler
 var logBytes *bytes.Buffer
 
@@ -39,7 +39,7 @@ func setup(t *testing.T) {
 	planner = mocks.NewMockExecutor()
 	eventParsing = mocks.NewMockEventParsing()
 	ghStatus = mocks.NewMockCommitStatusUpdater()
-	workspaceLocker = mocks.NewMockWorkspaceLocker()
+	workspaceLocker = mocks.NewMockAtlantisWorkspaceLocker()
 	vcsClient = vcsmocks.NewMockClientProxy()
 	githubGetter = mocks.NewMockGithubPullGetter()
 	gitlabGetter = mocks.NewMockGitlabMergeRequestGetter()
@@ -53,7 +53,7 @@ func setup(t *testing.T) {
 		VCSClient:                vcsClient,
 		CommitStatusUpdater:      ghStatus,
 		EventParser:              eventParsing,
-		WorkspaceLocker:          workspaceLocker,
+		AtlantisWorkspaceLocker:  workspaceLocker,
 		MarkdownRenderer:         &events.MarkdownRenderer{},
 		GithubPullGetter:         githubGetter,
 		GitlabMergeRequestGetter: gitlabGetter,
@@ -128,23 +128,23 @@ func TestExecuteCommand_ClosedPull(t *testing.T) {
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.Repo, modelPull, "Atlantis commands can't be run on closed pull requests", vcs.Github)
 }
 
-func TestExecuteCommand_EnvLocked(t *testing.T) {
-	t.Log("if the environment is locked, should comment back on the pull")
+func TestExecuteCommand_WorkspaceLocked(t *testing.T) {
+	t.Log("if the workspace is locked, should comment back on the pull")
 	setup(t)
 	pull := &github.PullRequest{
 		State: github.String("closed"),
 	}
 	cmd := events.Command{
-		Name:        events.Plan,
-		Environment: "env",
+		Name:      events.Plan,
+		Workspace: "workspace",
 	}
 
 	When(githubGetter.GetPullRequest(fixtures.Repo, fixtures.Pull.Num)).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(pull)).ThenReturn(fixtures.Pull, fixtures.Repo, nil)
-	When(workspaceLocker.TryLock(fixtures.Repo.FullName, cmd.Environment, fixtures.Pull.Num)).ThenReturn(false)
+	When(workspaceLocker.TryLock(fixtures.Repo.FullName, cmd.Workspace, fixtures.Pull.Num)).ThenReturn(false)
 	ch.ExecuteCommand(fixtures.Repo, fixtures.Repo, fixtures.User, fixtures.Pull.Num, &cmd, vcs.Github)
 
-	msg := "The env environment is currently locked by another" +
+	msg := "The workspace workspace is currently locked by another" +
 		" command that is running for this pull request." +
 		" Wait until the previous command is complete and try again."
 	ghStatus.VerifyWasCalledOnce().Update(fixtures.Repo, fixtures.Pull, vcs.Pending, &cmd, vcs.Github)
@@ -163,12 +163,12 @@ func TestExecuteCommand_FullRun(t *testing.T) {
 	for _, c := range []events.CommandName{events.Help, events.Plan, events.Apply} {
 		setup(t)
 		cmd := events.Command{
-			Name:        c,
-			Environment: "env",
+			Name:      c,
+			Workspace: "workspace",
 		}
 		When(githubGetter.GetPullRequest(fixtures.Repo, fixtures.Pull.Num)).ThenReturn(pull, nil)
 		When(eventParsing.ParseGithubPull(pull)).ThenReturn(fixtures.Pull, fixtures.Repo, nil)
-		When(workspaceLocker.TryLock(fixtures.Repo.FullName, cmd.Environment, fixtures.Pull.Num)).ThenReturn(true)
+		When(workspaceLocker.TryLock(fixtures.Repo.FullName, cmd.Workspace, fixtures.Pull.Num)).ThenReturn(true)
 		switch c {
 		case events.Help:
 			When(helper.Execute(matchers.AnyPtrToEventsCommandContext())).ThenReturn(cmdResponse)
@@ -184,6 +184,6 @@ func TestExecuteCommand_FullRun(t *testing.T) {
 		_, response := ghStatus.VerifyWasCalledOnce().UpdateProjectResult(matchers.AnyPtrToEventsCommandContext(), matchers.AnyEventsCommandResponse()).GetCapturedArguments()
 		Equals(t, cmdResponse, response)
 		vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString(), matchers.AnyVcsHost())
-		workspaceLocker.VerifyWasCalledOnce().Unlock(fixtures.Repo.FullName, cmd.Environment, fixtures.Pull.Num)
+		workspaceLocker.VerifyWasCalledOnce().Unlock(fixtures.Repo.FullName, cmd.Workspace, fixtures.Pull.Num)
 	}
 }

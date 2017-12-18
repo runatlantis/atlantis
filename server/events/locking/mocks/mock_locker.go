@@ -19,8 +19,8 @@ func NewMockLocker() *MockLocker {
 	return &MockLocker{fail: pegomock.GlobalFailHandler}
 }
 
-func (mock *MockLocker) TryLock(p models.Project, env string, pull models.PullRequest, user models.User) (locking.TryLockResponse, error) {
-	params := []pegomock.Param{p, env, pull, user}
+func (mock *MockLocker) TryLock(p models.Project, workspace string, pull models.PullRequest, user models.User) (locking.TryLockResponse, error) {
+	params := []pegomock.Param{p, workspace, pull, user}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("TryLock", params, []reflect.Type{reflect.TypeOf((*locking.TryLockResponse)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 locking.TryLockResponse
 	var ret1 error
@@ -117,8 +117,8 @@ type VerifierLocker struct {
 	inOrderContext         *pegomock.InOrderContext
 }
 
-func (verifier *VerifierLocker) TryLock(p models.Project, env string, pull models.PullRequest, user models.User) *Locker_TryLock_OngoingVerification {
-	params := []pegomock.Param{p, env, pull, user}
+func (verifier *VerifierLocker) TryLock(p models.Project, workspace string, pull models.PullRequest, user models.User) *Locker_TryLock_OngoingVerification {
+	params := []pegomock.Param{p, workspace, pull, user}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "TryLock", params)
 	return &Locker_TryLock_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -129,8 +129,8 @@ type Locker_TryLock_OngoingVerification struct {
 }
 
 func (c *Locker_TryLock_OngoingVerification) GetCapturedArguments() (models.Project, string, models.PullRequest, models.User) {
-	p, env, pull, user := c.GetAllCapturedArguments()
-	return p[len(p)-1], env[len(env)-1], pull[len(pull)-1], user[len(user)-1]
+	p, workspace, pull, user := c.GetAllCapturedArguments()
+	return p[len(p)-1], workspace[len(workspace)-1], pull[len(pull)-1], user[len(user)-1]
 }
 
 func (c *Locker_TryLock_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Project, _param1 []string, _param2 []models.PullRequest, _param3 []models.User) {

@@ -61,7 +61,7 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
   <div class="navbar-spacer"></div>
   <br>
   <section>
-    <p class="title-heading small"><strong>Environments</strong></p>
+    <p class="title-heading small"><strong>Locks</strong></p>
     {{ if . }}
     {{ range . }}
       <a href="{{.LockURL}}">
@@ -73,7 +73,7 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
       </a>
     {{ end }}
     {{ else }}
-    <p class="placeholder">No environments found.</p>
+    <p class="placeholder">No locks found.</p>
     {{ end }}
   </section>
 </div>
@@ -90,7 +90,7 @@ type LockDetailData struct {
 	RepoName        string
 	PullRequestLink string
 	LockedBy        string
-	Environment     string
+	Workspace       string
 	Time            time.Time
 }
 
@@ -124,7 +124,7 @@ var lockTemplate = template.Must(template.New("lock.html.tmpl").Parse(`
         <h6><code>Repo Name</code>: <strong>{{.RepoName}}</strong></h6>
         <h6><code>Pull Request Link</code>: <a href="{{.PullRequestLink}}" target="_blank"><strong>{{.PullRequestLink}}</strong></a></h6>
         <h6><code>Locked By</code>: <strong>{{.LockedBy}}</strong></h6>
-        <h6><code>Environment</code>: <strong>{{.Environment}}</strong></h6>
+        <h6><code>Workspace</code>: <strong>{{.Workspace}}</strong></h6>
         <br>
       </div>
       <div class="four columns">

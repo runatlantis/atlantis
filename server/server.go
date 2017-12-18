@@ -137,7 +137,7 @@ func NewServer(config Config) (*Server, error) {
 	lockingClient := locking.NewClient(boltdb)
 	run := &run.Run{}
 	configReader := &events.ProjectConfigManager{}
-	concurrentRunLocker := events.NewDefaultWorkspaceLocker()
+	workspaceLocker := events.NewDefaultAtlantisWorkspaceLocker()
 	workspace := &events.FileWorkspace{
 		DataDir: config.DataDir,
 	}
@@ -188,7 +188,7 @@ func NewServer(config Config) (*Server, error) {
 		GithubPullGetter:         githubClient,
 		GitlabMergeRequestGetter: gitlabClient,
 		CommitStatusUpdater:      commitStatusUpdater,
-		WorkspaceLocker:          concurrentRunLocker,
+		AtlantisWorkspaceLocker:  workspaceLocker,
 		MarkdownRenderer:         markdownRenderer,
 		Logger:                   logger,
 	}
@@ -329,7 +329,7 @@ func (s *Server) GetLock(w http.ResponseWriter, _ *http.Request, id string) {
 		RepoName:        repo[1],
 		PullRequestLink: lock.Pull.URL,
 		LockedBy:        lock.Pull.Author,
-		Environment:     lock.Env,
+		Workspace:       lock.Workspace,
 	}
 
 	s.LockDetailTemplate.Execute(w, l) // nolint: errcheck

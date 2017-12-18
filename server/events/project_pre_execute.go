@@ -40,8 +40,8 @@ type PreExecuteResult struct {
 
 // Execute executes the pre plan/apply tasks.
 func (p *DefaultProjectPreExecutor) Execute(ctx *CommandContext, repoDir string, project models.Project) PreExecuteResult {
-	tfEnv := ctx.Command.Environment
-	lockAttempt, err := p.Locker.TryLock(project, tfEnv, ctx.Pull, ctx.User)
+	workspace := ctx.Command.Workspace
+	lockAttempt, err := p.Locker.TryLock(project, workspace, ctx.Pull, ctx.User)
 	if err != nil {
 		return PreExecuteResult{ProjectResult: ProjectResult{Error: errors.Wrap(err, "acquiring lock")}}
 	}
@@ -72,25 +72,25 @@ func (p *DefaultProjectPreExecutor) Execute(ctx *CommandContext, repoDir string,
 	if constraints.Check(terraformVersion) {
 		ctx.Log.Info("determined that we are running terraform with version >= 0.9.0. Running version %s", terraformVersion)
 		if len(config.PreInit) > 0 {
-			_, err := p.Run.Execute(ctx.Log, config.PreInit, absolutePath, tfEnv, terraformVersion, "pre_init")
+			_, err := p.Run.Execute(ctx.Log, config.PreInit, absolutePath, workspace, terraformVersion, "pre_init")
 			if err != nil {
 				return PreExecuteResult{ProjectResult: ProjectResult{Error: errors.Wrapf(err, "running %s commands", "pre_init")}}
 			}
 		}
-		_, err := p.Terraform.Init(ctx.Log, absolutePath, tfEnv, config.GetExtraArguments("init"), terraformVersion)
+		_, err := p.Terraform.Init(ctx.Log, absolutePath, workspace, config.GetExtraArguments("init"), terraformVersion)
 		if err != nil {
 			return PreExecuteResult{ProjectResult: ProjectResult{Error: err}}
 		}
 	} else {
 		ctx.Log.Info("determined that we are running terraform with version < 0.9.0. Running version %s", terraformVersion)
 		if len(config.PreGet) > 0 {
-			_, err := p.Run.Execute(ctx.Log, config.PreGet, absolutePath, tfEnv, terraformVersion, "pre_get")
+			_, err := p.Run.Execute(ctx.Log, config.PreGet, absolutePath, workspace, terraformVersion, "pre_get")
 			if err != nil {
 				return PreExecuteResult{ProjectResult: ProjectResult{Error: errors.Wrapf(err, "running %s commands", "pre_get")}}
 			}
 		}
 		terraformGetCmd := append([]string{"get", "-no-color"}, config.GetExtraArguments("get")...)
-		_, err := p.Terraform.RunCommandWithVersion(ctx.Log, absolutePath, terraformGetCmd, terraformVersion, tfEnv)
+		_, err := p.Terraform.RunCommandWithVersion(ctx.Log, absolutePath, terraformGetCmd, terraformVersion, workspace)
 		if err != nil {
 			return PreExecuteResult{ProjectResult: ProjectResult{Error: err}}
 		}
@@ -104,7 +104,7 @@ func (p *DefaultProjectPreExecutor) Execute(ctx *CommandContext, repoDir string,
 		commands = config.PreApply
 	}
 	if len(commands) > 0 {
-		_, err := p.Run.Execute(ctx.Log, commands, absolutePath, tfEnv, terraformVersion, stage)
+		_, err := p.Run.Execute(ctx.Log, commands, absolutePath, workspace, terraformVersion, stage)
 		if err != nil {
 			return PreExecuteResult{ProjectResult: ProjectResult{Error: errors.Wrapf(err, "running %s commands", stage)}}
 		}

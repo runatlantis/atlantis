@@ -15,9 +15,9 @@ import (
 // Backend is an implementation of the locking API we require.
 type Backend interface {
 	TryLock(lock models.ProjectLock) (bool, models.ProjectLock, error)
-	Unlock(project models.Project, env string) (*models.ProjectLock, error)
+	Unlock(project models.Project, workspace string) (*models.ProjectLock, error)
 	List() ([]models.ProjectLock, error)
-	GetLock(project models.Project, env string) (*models.ProjectLock, error)
+	GetLock(project models.Project, workspace string) (*models.ProjectLock, error)
 	UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error)
 }
 
@@ -39,7 +39,7 @@ type Client struct {
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_locker.go Locker
 
 type Locker interface {
-	TryLock(p models.Project, env string, pull models.PullRequest, user models.User) (TryLockResponse, error)
+	TryLock(p models.Project, workspace string, pull models.PullRequest, user models.User) (TryLockResponse, error)
 	Unlock(key string) (*models.ProjectLock, error)
 	List() (map[string]models.ProjectLock, error)
 	UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error)
@@ -53,35 +53,35 @@ func NewClient(backend Backend) *Client {
 	}
 }
 
-// keyRegex matches and captures {repoFullName}/{path}/{env} where path can have multiple /'s in it.
+// keyRegex matches and captures {repoFullName}/{path}/{workspace} where path can have multiple /'s in it.
 var keyRegex = regexp.MustCompile(`^(.*?\/.*?)\/(.*)\/(.*)$`)
 
-// TryLock attempts to acquire a lock to a project and environment.
-func (c *Client) TryLock(p models.Project, env string, pull models.PullRequest, user models.User) (TryLockResponse, error) {
+// TryLock attempts to acquire a lock to a project and workspace.
+func (c *Client) TryLock(p models.Project, workspace string, pull models.PullRequest, user models.User) (TryLockResponse, error) {
 	lock := models.ProjectLock{
-		Env:     env,
-		Time:    time.Now().Local(),
-		Project: p,
-		User:    user,
-		Pull:    pull,
+		Workspace: workspace,
+		Time:      time.Now().Local(),
+		Project:   p,
+		User:      user,
+		Pull:      pull,
 	}
 	lockAcquired, currLock, err := c.backend.TryLock(lock)
 	if err != nil {
 		return TryLockResponse{}, err
 	}
-	return TryLockResponse{lockAcquired, currLock, c.key(p, env)}, nil
+	return TryLockResponse{lockAcquired, currLock, c.key(p, workspace)}, nil
 }
 
-// Unlock attempts to unlock a project and environment. If successful,
+// Unlock attempts to unlock a project and workspace. If successful,
 // a pointer to the now deleted lock will be returned. Else, that
 // pointer will be nil. An error will only be returned if there was
 // an error deleting the lock (i.e. not if there was no lock).
 func (c *Client) Unlock(key string) (*models.ProjectLock, error) {
-	project, env, err := c.lockKeyToProjectEnv(key)
+	project, workspace, err := c.lockKeyToProjectWorkspace(key)
 	if err != nil {
 		return nil, err
 	}
-	return c.backend.Unlock(project, env)
+	return c.backend.Unlock(project, workspace)
 }
 
 // List returns a map of all locks with their lock key as the map key.
@@ -93,7 +93,7 @@ func (c *Client) List() (map[string]models.ProjectLock, error) {
 		return m, err
 	}
 	for _, lock := range locks {
-		m[c.key(lock.Project, lock.Env)] = lock
+		m[c.key(lock.Project, lock.Workspace)] = lock
 	}
 	return m, nil
 }
@@ -108,12 +108,12 @@ func (c *Client) UnlockByPull(repoFullName string, pullNum int) ([]models.Projec
 // An error will only be returned if there was an error getting the lock
 // (i.e. not if there was no lock).
 func (c *Client) GetLock(key string) (*models.ProjectLock, error) {
-	project, env, err := c.lockKeyToProjectEnv(key)
+	project, workspace, err := c.lockKeyToProjectWorkspace(key)
 	if err != nil {
 		return nil, err
 	}
 
-	projectLock, err := c.backend.GetLock(project, env)
+	projectLock, err := c.backend.GetLock(project, workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -121,11 +121,11 @@ func (c *Client) GetLock(key string) (*models.ProjectLock, error) {
 	return projectLock, nil
 }
 
-func (c *Client) key(p models.Project, env string) string {
-	return fmt.Sprintf("%s/%s/%s", p.RepoFullName, p.Path, env)
+func (c *Client) key(p models.Project, workspace string) string {
+	return fmt.Sprintf("%s/%s/%s", p.RepoFullName, p.Path, workspace)
 }
 
-func (c *Client) lockKeyToProjectEnv(key string) (models.Project, string, error) {
+func (c *Client) lockKeyToProjectWorkspace(key string) (models.Project, string, error) {
 	matches := keyRegex.FindStringSubmatch(key)
 	if len(matches) != 4 {
 		return models.Project{}, "", errors.New("invalid key format")

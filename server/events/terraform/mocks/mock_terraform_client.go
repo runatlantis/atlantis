@@ -31,8 +31,8 @@ func (mock *MockClient) Version() *go_version.Version {
 	return ret0
 }
 
-func (mock *MockClient) RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *go_version.Version, env string) (string, error) {
-	params := []pegomock.Param{log, path, args, v, env}
+func (mock *MockClient) RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *go_version.Version, workspace string) (string, error) {
+	params := []pegomock.Param{log, path, args, v, workspace}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("RunCommandWithVersion", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
 	var ret1 error
@@ -47,8 +47,8 @@ func (mock *MockClient) RunCommandWithVersion(log *logging.SimpleLogger, path st
 	return ret0, ret1
 }
 
-func (mock *MockClient) Init(log *logging.SimpleLogger, path string, env string, extraInitArgs []string, version *go_version.Version) ([]string, error) {
-	params := []pegomock.Param{log, path, env, extraInitArgs, version}
+func (mock *MockClient) Init(log *logging.SimpleLogger, path string, workspace string, extraInitArgs []string, version *go_version.Version) ([]string, error) {
+	params := []pegomock.Param{log, path, workspace, extraInitArgs, version}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Init", params, []reflect.Type{reflect.TypeOf((*[]string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 []string
 	var ret1 error
@@ -98,8 +98,8 @@ func (c *Client_Version_OngoingVerification) GetCapturedArguments() {
 func (c *Client_Version_OngoingVerification) GetAllCapturedArguments() {
 }
 
-func (verifier *VerifierClient) RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *go_version.Version, env string) *Client_RunCommandWithVersion_OngoingVerification {
-	params := []pegomock.Param{log, path, args, v, env}
+func (verifier *VerifierClient) RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *go_version.Version, workspace string) *Client_RunCommandWithVersion_OngoingVerification {
+	params := []pegomock.Param{log, path, args, v, workspace}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "RunCommandWithVersion", params)
 	return &Client_RunCommandWithVersion_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -110,8 +110,8 @@ type Client_RunCommandWithVersion_OngoingVerification struct {
 }
 
 func (c *Client_RunCommandWithVersion_OngoingVerification) GetCapturedArguments() (*logging.SimpleLogger, string, []string, *go_version.Version, string) {
-	log, path, args, v, env := c.GetAllCapturedArguments()
-	return log[len(log)-1], path[len(path)-1], args[len(args)-1], v[len(v)-1], env[len(env)-1]
+	log, path, args, v, workspace := c.GetAllCapturedArguments()
+	return log[len(log)-1], path[len(path)-1], args[len(args)-1], v[len(v)-1], workspace[len(workspace)-1]
 }
 
 func (c *Client_RunCommandWithVersion_OngoingVerification) GetAllCapturedArguments() (_param0 []*logging.SimpleLogger, _param1 []string, _param2 [][]string, _param3 []*go_version.Version, _param4 []string) {
@@ -141,8 +141,8 @@ func (c *Client_RunCommandWithVersion_OngoingVerification) GetAllCapturedArgumen
 	return
 }
 
-func (verifier *VerifierClient) Init(log *logging.SimpleLogger, path string, env string, extraInitArgs []string, version *go_version.Version) *Client_Init_OngoingVerification {
-	params := []pegomock.Param{log, path, env, extraInitArgs, version}
+func (verifier *VerifierClient) Init(log *logging.SimpleLogger, path string, workspace string, extraInitArgs []string, version *go_version.Version) *Client_Init_OngoingVerification {
+	params := []pegomock.Param{log, path, workspace, extraInitArgs, version}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Init", params)
 	return &Client_Init_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -153,8 +153,8 @@ type Client_Init_OngoingVerification struct {
 }
 
 func (c *Client_Init_OngoingVerification) GetCapturedArguments() (*logging.SimpleLogger, string, string, []string, *go_version.Version) {
-	log, path, env, extraInitArgs, version := c.GetAllCapturedArguments()
-	return log[len(log)-1], path[len(path)-1], env[len(env)-1], extraInitArgs[len(extraInitArgs)-1], version[len(version)-1]
+	log, path, workspace, extraInitArgs, version := c.GetAllCapturedArguments()
+	return log[len(log)-1], path[len(path)-1], workspace[len(workspace)-1], extraInitArgs[len(extraInitArgs)-1], version[len(version)-1]
 }
 
 func (c *Client_Init_OngoingVerification) GetAllCapturedArguments() (_param0 []*logging.SimpleLogger, _param1 []string, _param2 []string, _param3 [][]string, _param4 []*go_version.Version) {

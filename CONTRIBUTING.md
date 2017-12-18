@@ -87,13 +87,6 @@ func TestLockingExisting(t *testing.T) {
 ```
 - each test should have a `t.Log` that describes what the current state is and what should happen (like a behavioural test)
 
-# Glossary
-* **Run**: Encompasses the two steps (plan and apply) for modifying infrastructure in a specific environment
-* **Project Lock**: When a run has started but is not yet completed, the infrastructure and environment that's being modified is "locked" against
-other runs being started for the same set of infrastructure and environment. We determine what infrastructure is being modified by combining the
-repository name, the directory in the repository at which the terraform commands need to be run, and the environment that's being modified
-* **Project Path**: The path relative to the repository's root at which terraform commands need to be executed for this Run
-
 # Creating a New Release
 1. Update version number in
     1. `main.go`

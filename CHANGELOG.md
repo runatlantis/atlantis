@@ -5,14 +5,14 @@
 ## Bug Fixes
 * Don't set `as_user` to true for Slack webhooks so we can integrate as a workspace app. ([#206](https://github.com/hootsuite/atlantis/pull/206))
 
+## Backwards Incompatibilities / Notes:
+None
+
 ## Downloads
 * [atlantis_darwin_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.1/atlantis_darwin_amd64.zip)
 * [atlantis_linux_386.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.1/atlantis_linux_386.zip)
 * [atlantis_linux_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.1/atlantis_linux_amd64.zip)
 * [atlantis_linux_arm.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.1/atlantis_linux_arm.zip)
-
-## Backwards Incompatibilities / Notes:
-None
 
 # v0.2.0
 ## Features
@@ -22,14 +22,14 @@ None
 ## Bug Fixes
 None
 
+## Backwards Incompatibilities / Notes:
+None
+
 ## Downloads
 * [atlantis_darwin_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.0/atlantis_darwin_amd64.zip)
 * [atlantis_linux_386.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.0/atlantis_linux_386.zip)
 * [atlantis_linux_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.0/atlantis_linux_amd64.zip)
 * [atlantis_linux_arm.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.0/atlantis_linux_arm.zip)
-
-## Backwards Incompatibilities / Notes:
-None
 
 # v0.1.3
 ## Features
@@ -40,16 +40,16 @@ None
 * Modules in list of changed files weren't being filtered. ([#193](https://github.com/hootsuite/atlantis/pull/193))
 * Nil pointer error in bootstrap mode. ([#181](https://github.com/hootsuite/atlantis/pull/181))
 
+## Backwards Incompatibilities / Notes:
+None
+
 ## Downloads
 * [atlantis_darwin_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.1.3/atlantis_darwin_amd64.zip)
 * [atlantis_linux_386.zip](https://github.com/hootsuite/atlantis/releases/download/v0.1.3/atlantis_linux_386.zip)
 * [atlantis_linux_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.1.3/atlantis_linux_amd64.zip)
 * [atlantis_linux_arm.zip](https://github.com/hootsuite/atlantis/releases/download/v0.1.3/atlantis_linux_arm.zip)
 
-## Backwards Incompatibilities / Notes:
-None
-
-# v0.1.2 
+# v0.1.2
 ## Features
 * all flags passed to `atlantis plan` or `atlantis apply` will now be passed through to `terraform`. ([#131](https://github.com/hootsuite/atlantis/pull/131))
 
