@@ -19,7 +19,7 @@ type ApplyExecutor struct {
 	Terraform         *terraform.DefaultClient
 	RequireApproval   bool
 	Run               *run.Run
-	Workspace         AtlantisWorkspace
+	AtlantisWorkspace AtlantisWorkspace
 	ProjectPreExecute *DefaultProjectPreExecutor
 	Webhooks          webhooks.Sender
 }
@@ -37,7 +37,7 @@ func (a *ApplyExecutor) Execute(ctx *CommandContext) CommandResponse {
 		ctx.Log.Info("confirmed pull request was approved")
 	}
 
-	repoDir, err := a.Workspace.GetWorkspace(ctx.BaseRepo, ctx.Pull, ctx.Command.Workspace)
+	repoDir, err := a.AtlantisWorkspace.GetWorkspace(ctx.BaseRepo, ctx.Pull, ctx.Command.Workspace)
 	if err != nil {
 		return CommandResponse{Failure: "No workspace found. Did you run plan?"}
 	}
