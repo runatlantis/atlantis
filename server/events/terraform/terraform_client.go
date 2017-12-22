@@ -118,10 +118,10 @@ func (c *DefaultClient) Init(log *logging.SimpleLogger, path string, workspace s
 		return outputs, err
 	}
 
-	// In 0.10 the env command was renamed to workspace.
 	workspaceCommand := "workspace"
 	if zeroPointNine.Check(version) {
-		workspaceCommand = "workspace"
+		// In 0.9.* `env` was used instead of `workspace`
+		workspaceCommand = "env"
 	}
 
 	output, err = c.RunCommandWithVersion(log, path, []string{workspaceCommand, "select", "-no-color", workspace}, version, workspace)
