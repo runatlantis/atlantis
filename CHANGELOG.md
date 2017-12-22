@@ -1,3 +1,19 @@
+# v0.2.3
+## Features
+None
+
+## Bug Fixes
+* Use `env` instead of `workspace` for Terraform 0.9.*
+
+## Backwards Incompatibilities / Notes:
+None
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.3/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.3/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.3/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.3/atlantis_linux_arm.zip)
+
 # v0.2.2
 ## Features
 * Terraform 0.11 is now supported ([#219](https://github.com/hootsuite/atlantis/pull/219))

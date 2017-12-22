@@ -8,7 +8,7 @@ import (
 
 func main() {
 	v := viper.New()
-	v.Set("version", "0.2.2")
+	v.Set("version", "0.2.3")
 
 	// We're creating commands manually here rather than using init() functions
 	// (as recommended by cobra) because it makes testing easier.
