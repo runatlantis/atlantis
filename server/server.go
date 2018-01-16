@@ -105,6 +105,21 @@ func NewServer(config Config) (*Server, error) {
 		gitlabClient = &vcs.GitlabClient{
 			Client: gitlab.NewClient(nil, config.GitlabToken),
 		}
+		// If not using gitlab.com we need to set the URL to the API.
+		if config.GitlabHostname != "gitlab.com" {
+			// Check if they've also provided a scheme so we don't prepend it
+			// again.
+			scheme := "https"
+			schemeSplit := strings.Split(config.GitlabHostname, "://")
+			if len(schemeSplit) > 1 {
+				scheme = schemeSplit[0]
+				config.GitlabHostname = schemeSplit[1]
+			}
+			apiURL := fmt.Sprintf("%s://%s/api/v4/", scheme, config.GitlabHostname)
+			if err := gitlabClient.Client.SetBaseURL(apiURL); err != nil {
+				return nil, errors.Wrapf(err, "setting GitLab API URL: %s", apiURL)
+			}
+		}
 	}
 	var webhooksConfig []webhooks.Config
 	for _, c := range config.Webhooks {
