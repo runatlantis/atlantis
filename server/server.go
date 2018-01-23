@@ -45,6 +45,8 @@ type Server struct {
 	EventsController   *EventsController
 	IndexTemplate      TemplateWriter
 	LockDetailTemplate TemplateWriter
+	SSLCertFile        string
+	SSLKeyFile         string
 }
 
 // Config configures Server.
@@ -67,6 +69,8 @@ type Config struct {
 	// allowing terraform apply's to be run.
 	RequireApproval bool            `mapstructure:"require-approval"`
 	SlackToken      string          `mapstructure:"slack-token"`
+	SSLCertFile     string          `mapstructure:"ssl-cert-file"`
+	SSLKeyFile      string          `mapstructure:"ssl-key-file"`
 	Webhooks        []WebhookConfig `mapstructure:"webhooks"`
 }
 
@@ -229,6 +233,8 @@ func NewServer(config Config) (*Server, error) {
 		EventsController:   eventsController,
 		IndexTemplate:      indexTemplate,
 		LockDetailTemplate: lockTemplate,
+		SSLKeyFile:         config.SSLKeyFile,
+		SSLCertFile:        config.SSLCertFile,
 	}, nil
 }
 
@@ -264,7 +270,15 @@ func (s *Server) Start() error {
 	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n}
 	go func() {
 		s.Logger.Warn("Atlantis started - listening on port %v", s.Port)
-		if err := server.ListenAndServe(); err != nil {
+
+		var err error
+		if s.SSLCertFile != "" && s.SSLKeyFile != "" {
+			err = server.ListenAndServeTLS(s.SSLCertFile, s.SSLKeyFile)
+		} else {
+			err = server.ListenAndServe()
+		}
+
+		if err != nil {
 			// When shutdown safely, there will be no error.
 			s.Logger.Err(err.Error())
 		}

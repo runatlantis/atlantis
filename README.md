@@ -481,7 +481,9 @@ However, if you were to lose the data, all you would need to do is run `atlantis
 
 **Q: How to add SSL to Atlantis server?**
 
-A: Atlantis currently only supports HTTP. In order to add SSL you will need to front Atlantis server with NGINX or HAProxy. Follow the document [here](./docs/nginx-ssl-proxy.md) to use configure NGINX with SSL as a reverse proxy.
+A: First, you'll need to get a public/private key pair to serve over SSL.
+These need to be in a directory accessible by Atlantis. Then start `atlantis server` with the `--ssl-cert-file` and `--ssl-key-file` flags.
+See `atlantis server --help` for more information.
 
 
 ## Contributing

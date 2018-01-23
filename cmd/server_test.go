@@ -102,6 +102,58 @@ func TestExecute_ValidateLogLevel(t *testing.T) {
 	Equals(t, "invalid log level: not one of debug, info, warn, error", err.Error())
 }
 
+func TestExecute_ValidateSSLConfig(t *testing.T) {
+	expErr := "--ssl-key-file and --ssl-cert-file are both required for ssl"
+	cases := []struct {
+		description string
+		flags       map[string]interface{}
+		expectError bool
+	}{
+		{
+			"neither option set",
+			make(map[string]interface{}),
+			false,
+		},
+		{
+			"just ssl-key-file set",
+			map[string]interface{}{
+				cmd.SSLKeyFileFlag: "file",
+			},
+			true,
+		},
+		{
+			"just ssl-cert-file set",
+			map[string]interface{}{
+				cmd.SSLCertFileFlag: "flag",
+			},
+			true,
+		},
+		{
+			"both flags set",
+			map[string]interface{}{
+				cmd.SSLCertFileFlag: "cert",
+				cmd.SSLKeyFileFlag:  "key",
+			},
+			false,
+		},
+	}
+	for _, testCase := range cases {
+		t.Log("Should validate ssl config when " + testCase.description)
+		// Add in required flags.
+		testCase.flags[cmd.GHUserFlag] = "user"
+		testCase.flags[cmd.GHTokenFlag] = "token"
+
+		c := setup(testCase.flags)
+		err := c.Execute()
+		if testCase.expectError {
+			Assert(t, err != nil, "should be an error")
+			Equals(t, expErr, err.Error())
+		} else {
+			Ok(t, err)
+		}
+	}
+}
+
 func TestExecute_ValidateVCSConfig(t *testing.T) {
 	expErr := "--gh-user/--gh-token or --gitlab-user/--gitlab-token must be set"
 	cases := []struct {
