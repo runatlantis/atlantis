@@ -209,10 +209,10 @@ extra_arguments:
 ```
 
 When running the `pre_plan`, `post_plan`, `pre_apply`, and `post_apply` commands the following environment variables are available
-- `ENVIRONMENT`: if an environment argument is supplied to `atlantis plan` or `atlantis apply` this will
+- `WORKSPACE`: if a workspace argument is supplied to `atlantis plan` or `atlantis apply`, ex `atlantis plan staging`, this will
 be the value of that argument. Else it will be `default`
 - `ATLANTIS_TERRAFORM_VERSION`: local version of `terraform` or the version from `terraform_version` if specified, ex. `0.10.0`
-- `WORKSPACE`: absolute path to the root of the project on disk
+- `DIR`: absolute path to the root of the project on disk
 
 ## Locking
 When `plan` is run, the [project](#project) and [workspace](#workspaceenvironment) are **Locked** until an `apply` succeeds **and** the pull request/merge request is merged.
