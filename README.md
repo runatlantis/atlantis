@@ -330,7 +330,7 @@ docker run hootsuite/atlantis:latest server <required options>
 ```
 
 #### Usage
-If you would like to add things like [AWS credential files](http://docs.aws.amazon.com/cli/latest/userguide/cli-config-files.html) to the docker image, you can do something like this:
+If you need to modify the Docker image that we provide, for instance to add a specific version of Terraform, you can do something like this:
 
 * Create a custom docker file
 ```bash
@@ -340,8 +340,8 @@ vim Dockerfile-custom
 ```dockerfile
 FROM hootsuite/atlantis
 
-# copy aws credentials
-COPY credentials /home/atlantis/.aws/credentials
+# copy a terraform binary of the version you need
+COPY terraform /usr/local/bin/terraform
 ```
 
 * Build docker image
