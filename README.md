@@ -17,7 +17,7 @@ Read about [Why We Built Atlantis](https://www.atlantis.run/blog/atlantis-releas
 * [Features](#features)
 * [Atlantis Works With](#atlantis-works-with)
 * [Getting Started](#getting-started)
-* [Pull Request Commands](#pull-request-commands)
+* [Pull/Merge Request Commands](#pullmerge-request-commands)
 * [Project Structure](#project-structure)
 * [Workspaces/Environments](#workspacesenvironments)
 * [Terraform Versions](#terraform-versions)
