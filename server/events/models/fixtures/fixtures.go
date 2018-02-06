@@ -1,6 +1,6 @@
 package fixtures
 
-import "github.com/hootsuite/atlantis/server/events/models"
+import "github.com/atlantisnorth/atlantis/server/events/models"
 
 var Pull = models.PullRequest{
 	Num:        1,
@@ -11,10 +11,10 @@ var Pull = models.PullRequest{
 }
 
 var Repo = models.Repo{
-	CloneURL:          "https://user:password@github.com/hootsuite/atlantis.git",
-	FullName:          "hootsuite/atlantis",
-	Owner:             "hootsuite",
-	SanitizedCloneURL: "https://github.com/hootsuite/atlantis.git",
+	CloneURL:          "https://user:password@github.com/atlantisnorth/atlantis.git",
+	FullName:          "atlantisnorth/atlantis",
+	Owner:             "atlantisnorth",
+	SanitizedCloneURL: "https://github.com/atlantisnorth/atlantis.git",
 	Name:              "atlantis",
 }
 

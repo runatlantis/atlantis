@@ -11,8 +11,8 @@ import (
 	"path"
 	"time"
 
+	"github.com/atlantisnorth/atlantis/server/events/models"
 	"github.com/boltdb/bolt"
-	"github.com/hootsuite/atlantis/server/events/models"
 	"github.com/pkg/errors"
 )
 

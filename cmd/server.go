@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/hootsuite/atlantis/server"
+	"github.com/atlantisnorth/atlantis/server"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"

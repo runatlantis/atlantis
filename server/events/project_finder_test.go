@@ -3,9 +3,9 @@ package events_test
 import (
 	"testing"
 
-	"github.com/hootsuite/atlantis/server/events"
-	"github.com/hootsuite/atlantis/server/logging"
-	. "github.com/hootsuite/atlantis/testing"
+	"github.com/atlantisnorth/atlantis/server/events"
+	"github.com/atlantisnorth/atlantis/server/logging"
+	. "github.com/atlantisnorth/atlantis/testing"
 )
 
 var noopLogger = logging.NewNoopLogger()

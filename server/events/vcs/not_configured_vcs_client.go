@@ -3,7 +3,7 @@ package vcs
 import (
 	"fmt"
 
-	"github.com/hootsuite/atlantis/server/events/models"
+	"github.com/atlantisnorth/atlantis/server/events/models"
 )
 
 // NotConfiguredVCSClient is used as a placeholder when Atlantis isn't configured

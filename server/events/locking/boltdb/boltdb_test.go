@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/atlantisnorth/atlantis/server/events/locking/boltdb"
+	"github.com/atlantisnorth/atlantis/server/events/models"
+	. "github.com/atlantisnorth/atlantis/testing"
 	"github.com/boltdb/bolt"
-	"github.com/hootsuite/atlantis/server/events/locking/boltdb"
-	"github.com/hootsuite/atlantis/server/events/models"
-	. "github.com/hootsuite/atlantis/testing"
 	"github.com/pkg/errors"
 )
 

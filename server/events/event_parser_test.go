@@ -8,12 +8,12 @@ import (
 
 	"encoding/json"
 
+	"github.com/atlantisnorth/atlantis/server/events"
+	"github.com/atlantisnorth/atlantis/server/events/models"
+	"github.com/atlantisnorth/atlantis/server/events/vcs"
+	. "github.com/atlantisnorth/atlantis/server/events/vcs/fixtures"
+	. "github.com/atlantisnorth/atlantis/testing"
 	"github.com/google/go-github/github"
-	"github.com/hootsuite/atlantis/server/events"
-	"github.com/hootsuite/atlantis/server/events/models"
-	"github.com/hootsuite/atlantis/server/events/vcs"
-	. "github.com/hootsuite/atlantis/server/events/vcs/fixtures"
-	. "github.com/hootsuite/atlantis/testing"
 	"github.com/lkysow/go-gitlab"
 	"github.com/mohae/deepcopy"
 )
@@ -165,7 +165,7 @@ func TestParseGithubIssueCommentEvent(t *testing.T) {
 		Issue: &github.Issue{
 			Number:  github.Int(1),
 			User:    &github.User{Login: github.String("issue_user")},
-			HTMLURL: github.String("https://github.com/hootsuite/atlantis/issues/1"),
+			HTMLURL: github.String("https://github.com/atlantisnorth/atlantis/issues/1"),
 		},
 		Comment: &github.IssueComment{
 			User: &github.User{Login: github.String("comment_user")},

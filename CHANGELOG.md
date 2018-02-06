@@ -9,10 +9,10 @@
 None
 
 ## Downloads
-* [atlantis_darwin_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.4/atlantis_darwin_amd64.zip)
-* [atlantis_linux_386.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.4/atlantis_linux_386.zip)
-* [atlantis_linux_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.4/atlantis_linux_amd64.zip)
-* [atlantis_linux_arm.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.4/atlantis_linux_arm.zip)
+* [atlantis_darwin_amd64.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.2.4/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.2.4/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.2.4/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.2.4/atlantis_linux_arm.zip)
 
 # v0.2.3
 ## Features
@@ -25,10 +25,10 @@ None
 None
 
 ## Downloads
-* [atlantis_darwin_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.3/atlantis_darwin_amd64.zip)
-* [atlantis_linux_386.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.3/atlantis_linux_386.zip)
-* [atlantis_linux_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.3/atlantis_linux_amd64.zip)
-* [atlantis_linux_arm.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.3/atlantis_linux_arm.zip)
+* [atlantis_darwin_amd64.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.2.3/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.2.3/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.2.3/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.2.3/atlantis_linux_arm.zip)
 
 # v0.2.2
 ## Features
@@ -47,10 +47,10 @@ None
 This is safe to do because you'll just need to re-run `plan` to get your plan back.
 
 ## Downloads
-* [atlantis_darwin_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.2/atlantis_darwin_amd64.zip)
-* [atlantis_linux_386.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.2/atlantis_linux_386.zip)
-* [atlantis_linux_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.2/atlantis_linux_amd64.zip)
-* [atlantis_linux_arm.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.2/atlantis_linux_arm.zip)
+* [atlantis_darwin_amd64.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.2.2/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.2.2/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.2.2/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.2.2/atlantis_linux_arm.zip)
 
 # v0.2.1
 ## Features
@@ -63,10 +63,10 @@ This is safe to do because you'll just need to re-run `plan` to get your plan ba
 None
 
 ## Downloads
-* [atlantis_darwin_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.1/atlantis_darwin_amd64.zip)
-* [atlantis_linux_386.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.1/atlantis_linux_386.zip)
-* [atlantis_linux_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.1/atlantis_linux_amd64.zip)
-* [atlantis_linux_arm.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.1/atlantis_linux_arm.zip)
+* [atlantis_darwin_amd64.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.2.1/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.2.1/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.2.1/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.2.1/atlantis_linux_arm.zip)
 
 # v0.2.0
 ## Features
@@ -80,10 +80,10 @@ None
 None
 
 ## Downloads
-* [atlantis_darwin_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.0/atlantis_darwin_amd64.zip)
-* [atlantis_linux_386.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.0/atlantis_linux_386.zip)
-* [atlantis_linux_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.0/atlantis_linux_amd64.zip)
-* [atlantis_linux_arm.zip](https://github.com/hootsuite/atlantis/releases/download/v0.2.0/atlantis_linux_arm.zip)
+* [atlantis_darwin_amd64.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.2.0/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.2.0/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.2.0/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.2.0/atlantis_linux_arm.zip)
 
 # v0.1.3
 ## Features
@@ -98,10 +98,10 @@ None
 None
 
 ## Downloads
-* [atlantis_darwin_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.1.3/atlantis_darwin_amd64.zip)
-* [atlantis_linux_386.zip](https://github.com/hootsuite/atlantis/releases/download/v0.1.3/atlantis_linux_386.zip)
-* [atlantis_linux_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.1.3/atlantis_linux_amd64.zip)
-* [atlantis_linux_arm.zip](https://github.com/hootsuite/atlantis/releases/download/v0.1.3/atlantis_linux_arm.zip)
+* [atlantis_darwin_amd64.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.1.3/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.1.3/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.1.3/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.1.3/atlantis_linux_arm.zip)
 
 # v0.1.2
 ## Features
@@ -112,10 +112,10 @@ None
 * Plan and Apply outputs are shown in new line. ([#132](https://github.com/hootsuite/atlantis/pull/132))
 
 ## Downloads
-* [atlantis_darwin_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.1.2/atlantis_darwin_amd64.zip)
-* [atlantis_linux_386.zip](https://github.com/hootsuite/atlantis/releases/download/v0.1.2/atlantis_linux_386.zip)
-* [atlantis_linux_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.1.2/atlantis_linux_amd64.zip)
-* [atlantis_linux_arm.zip](https://github.com/hootsuite/atlantis/releases/download/v0.1.2/atlantis_linux_arm.zip)
+* [atlantis_darwin_amd64.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.1.2/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.1.2/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.1.2/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.1.2/atlantis_linux_arm.zip)
 
 # v0.1.1
 ## Backwards Incompatibilities / Notes:
@@ -123,11 +123,11 @@ None
 assume role session with the GitHub username of the user running the Atlantis command
 use the `atlantis_user` terraform variable alongside Terraform's
 [built-in support](https://www.terraform.io/docs/providers/aws/#assume-role) for assume role
-(see https://github.com/hootsuite/atlantis/blob/master/README.md#assume-role-session-names)
+(see https://github.com/atlantisnorth/atlantis/blob/master/README.md#assume-role-session-names)
 * Atlantis has a docker image now ([#123](https://github.com/hootsuite/atlantis/pull/123)). Here is how you can try it out:
 
 ```bash
-docker run hootsuite/atlantis:v0.1.1 server --gh-user=GITHUB_USERNAME --gh-token=GITHUB_TOKEN
+docker run atlantisnorth/atlantis:v0.1.1 server --gh-user=GITHUB_USERNAME --gh-token=GITHUB_TOKEN
 ```
 
 ## Improvements
@@ -137,7 +137,7 @@ docker run hootsuite/atlantis:v0.1.1 server --gh-user=GITHUB_USERNAME --gh-token
 
 ## Downloads
 
-* [atlantis_darwin_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.1.1/atlantis_darwin_amd64.zip)
-* [atlantis_linux_386.zip](https://github.com/hootsuite/atlantis/releases/download/v0.1.1/atlantis_linux_386.zip)
-* [atlantis_linux_amd64.zip](https://github.com/hootsuite/atlantis/releases/download/v0.1.1/atlantis_linux_amd64.zip)
-* [atlantis_linux_arm.zip](https://github.com/hootsuite/atlantis/releases/download/v0.1.1/atlantis_linux_arm.zip)
+* [atlantis_darwin_amd64.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.1.1/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.1.1/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.1.1/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/atlantisnorth/atlantis/releases/download/v0.1.1/atlantis_linux_arm.zip)

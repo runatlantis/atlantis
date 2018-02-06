@@ -3,7 +3,7 @@ package matchers
 import (
 	"reflect"
 
-	webhooks "github.com/hootsuite/atlantis/server/events/webhooks"
+	webhooks "github.com/atlantisnorth/atlantis/server/events/webhooks"
 	"github.com/petergtz/pegomock"
 )
 

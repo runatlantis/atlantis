@@ -5,8 +5,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/hootsuite/atlantis/server/events"
-	. "github.com/hootsuite/atlantis/testing"
+	"github.com/atlantisnorth/atlantis/server/events"
+	. "github.com/atlantisnorth/atlantis/testing"
 )
 
 var tempConfigFile = "/tmp/" + events.ProjectConfigFile

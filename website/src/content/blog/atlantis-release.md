@@ -7,7 +7,7 @@ draft = false
 toc = true
 +++
 
-We're very excited to announce the [open source](https://github.com/hootsuite/atlantis) release of Atlantis! Atlantis is a tool for collaborating on Terraform that's been in use at [Hootsuite](https://hootsuite.com) for over a year. The core functionality of Atlantis enables developers and operators to run `terraform plan` and `apply` directly from Terraform pull requests. Atlantis then comments back on the pull request with the output of the commands:
+We're very excited to announce the [open source](https://github.com/atlantisnorth/atlantis) release of Atlantis! Atlantis is a tool for collaborating on Terraform that's been in use at [Hootsuite](https://hootsuite.com) for over a year. The core functionality of Atlantis enables developers and operators to run `terraform plan` and `apply` directly from Terraform pull requests. Atlantis then comments back on the pull request with the output of the commands:
 
 <img src="/img/demo-large.gif">
 
@@ -88,8 +88,8 @@ Since the introduction of Atlantis at Hootsuite, we've had **78** contributors t
 Since the introduction of Atlantis at Hootsuite we've grown to 144 Terraform repositories[^1] that manage thousands of Amazon resources. Atlantis is used for every single Terraform change throughout our organization.
 
 ## Getting started with Atlantis
-If you'd like to try out Atlantis for your team you can download the latest release from https://github.com/hootsuite/atlantis/releases. If you run `atlantis bootstrap` you can get started in less than 5 minutes.
-To read more about Atlantis go to https://github.com/hootsuite/atlantis.
+If you'd like to try out Atlantis for your team you can download the latest release from https://github.com/atlantisnorth/atlantis/releases. If you run `atlantis bootstrap` you can get started in less than 5 minutes.
+To read more about Atlantis go to https://github.com/atlantisnorth/atlantis.
 
 Check out our video for more information:
 {{< youtube TmIPWda0IKg >}}

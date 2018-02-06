@@ -7,16 +7,16 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/atlantisnorth/atlantis/server/events"
+	"github.com/atlantisnorth/atlantis/server/events/mocks"
+	"github.com/atlantisnorth/atlantis/server/events/mocks/matchers"
+	"github.com/atlantisnorth/atlantis/server/events/models"
+	"github.com/atlantisnorth/atlantis/server/events/models/fixtures"
+	"github.com/atlantisnorth/atlantis/server/events/vcs"
+	vcsmocks "github.com/atlantisnorth/atlantis/server/events/vcs/mocks"
+	logmocks "github.com/atlantisnorth/atlantis/server/logging/mocks"
+	. "github.com/atlantisnorth/atlantis/testing"
 	"github.com/google/go-github/github"
-	"github.com/hootsuite/atlantis/server/events"
-	"github.com/hootsuite/atlantis/server/events/mocks"
-	"github.com/hootsuite/atlantis/server/events/mocks/matchers"
-	"github.com/hootsuite/atlantis/server/events/models"
-	"github.com/hootsuite/atlantis/server/events/models/fixtures"
-	"github.com/hootsuite/atlantis/server/events/vcs"
-	vcsmocks "github.com/hootsuite/atlantis/server/events/vcs/mocks"
-	logmocks "github.com/hootsuite/atlantis/server/logging/mocks"
-	. "github.com/hootsuite/atlantis/testing"
 	. "github.com/petergtz/pegomock"
 )
 
@@ -75,7 +75,7 @@ func TestExecuteCommand_NoGithubPullGetter(t *testing.T) {
 	setup(t)
 	ch.GithubPullGetter = nil
 	ch.ExecuteCommand(fixtures.Repo, fixtures.Repo, fixtures.User, 1, nil, vcs.Github)
-	Equals(t, "[ERROR] hootsuite/atlantis#1: Atlantis not configured to support GitHub\n", logBytes.String())
+	Equals(t, "[ERROR] atlantisnorth/atlantis#1: Atlantis not configured to support GitHub\n", logBytes.String())
 }
 
 func TestExecuteCommand_NoGitlabMergeGetter(t *testing.T) {
@@ -83,7 +83,7 @@ func TestExecuteCommand_NoGitlabMergeGetter(t *testing.T) {
 	setup(t)
 	ch.GitlabMergeRequestGetter = nil
 	ch.ExecuteCommand(fixtures.Repo, fixtures.Repo, fixtures.User, 1, nil, vcs.Gitlab)
-	Equals(t, "[ERROR] hootsuite/atlantis#1: Atlantis not configured to support GitLab\n", logBytes.String())
+	Equals(t, "[ERROR] atlantisnorth/atlantis#1: Atlantis not configured to support GitLab\n", logBytes.String())
 }
 
 func TestExecuteCommand_GithubPullErr(t *testing.T) {
@@ -91,7 +91,7 @@ func TestExecuteCommand_GithubPullErr(t *testing.T) {
 	setup(t)
 	When(githubGetter.GetPullRequest(fixtures.Repo, fixtures.Pull.Num)).ThenReturn(nil, errors.New("err"))
 	ch.ExecuteCommand(fixtures.Repo, fixtures.Repo, fixtures.User, fixtures.Pull.Num, nil, vcs.Github)
-	Equals(t, "[ERROR] hootsuite/atlantis#1: Making pull request API call to GitHub: err\n", logBytes.String())
+	Equals(t, "[ERROR] atlantisnorth/atlantis#1: Making pull request API call to GitHub: err\n", logBytes.String())
 }
 
 func TestExecuteCommand_GitlabMergeRequestErr(t *testing.T) {
@@ -99,7 +99,7 @@ func TestExecuteCommand_GitlabMergeRequestErr(t *testing.T) {
 	setup(t)
 	When(gitlabGetter.GetMergeRequest(fixtures.Repo.FullName, fixtures.Pull.Num)).ThenReturn(nil, errors.New("err"))
 	ch.ExecuteCommand(fixtures.Repo, fixtures.Repo, fixtures.User, fixtures.Pull.Num, nil, vcs.Gitlab)
-	Equals(t, "[ERROR] hootsuite/atlantis#1: Making merge request API call to GitLab: err\n", logBytes.String())
+	Equals(t, "[ERROR] atlantisnorth/atlantis#1: Making merge request API call to GitLab: err\n", logBytes.String())
 }
 
 func TestExecuteCommand_GithubPullParseErr(t *testing.T) {
@@ -110,7 +110,7 @@ func TestExecuteCommand_GithubPullParseErr(t *testing.T) {
 	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(fixtures.Pull, fixtures.Repo, errors.New("err"))
 
 	ch.ExecuteCommand(fixtures.Repo, fixtures.Repo, fixtures.User, fixtures.Pull.Num, nil, vcs.Github)
-	Equals(t, "[ERROR] hootsuite/atlantis#1: Extracting required fields from comment data: err\n", logBytes.String())
+	Equals(t, "[ERROR] atlantisnorth/atlantis#1: Extracting required fields from comment data: err\n", logBytes.String())
 }
 
 func TestExecuteCommand_ClosedPull(t *testing.T) {

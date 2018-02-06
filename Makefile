@@ -1,7 +1,7 @@
 BUILD_ID := $(shell git rev-parse --short HEAD 2>/dev/null || echo no-commit-id)
 WORKSPACE := $(shell pwd)
 PKG := $(shell go list ./... | grep -v e2e | grep -v vendor | grep -v static)
-IMAGE_NAME := hootsuite/atlantis
+IMAGE_NAME := atlantisnorth/atlantis
 
 .PHONY: test
 

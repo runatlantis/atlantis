@@ -4,8 +4,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/hootsuite/atlantis/server/events/models"
-	"github.com/hootsuite/atlantis/server/logging"
+	"github.com/atlantisnorth/atlantis/server/events/models"
+	"github.com/atlantisnorth/atlantis/server/logging"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_finder.go ProjectFinder

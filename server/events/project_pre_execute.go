@@ -5,11 +5,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/atlantisnorth/atlantis/server/events/locking"
+	"github.com/atlantisnorth/atlantis/server/events/models"
+	"github.com/atlantisnorth/atlantis/server/events/run"
+	"github.com/atlantisnorth/atlantis/server/events/terraform"
 	"github.com/hashicorp/go-version"
-	"github.com/hootsuite/atlantis/server/events/locking"
-	"github.com/hootsuite/atlantis/server/events/models"
-	"github.com/hootsuite/atlantis/server/events/run"
-	"github.com/hootsuite/atlantis/server/events/terraform"
 	"github.com/pkg/errors"
 )
 

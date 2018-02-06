@@ -1,6 +1,5 @@
 FROM alpine:3.6
 LABEL authors="Anubhav Mishra, Luke Kysow"
-LABEL maintainer="anubhav.mishra@hootsuite.com,luke.kysow@hootsuite.com" 
 
 # create atlantis user
 RUN addgroup atlantis && \

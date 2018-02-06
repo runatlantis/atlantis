@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/atlantisnorth/atlantis/server"
+	"github.com/atlantisnorth/atlantis/server/events/locking/mocks"
+	"github.com/atlantisnorth/atlantis/server/events/models"
+	"github.com/atlantisnorth/atlantis/server/logging"
+	sMocks "github.com/atlantisnorth/atlantis/server/mocks"
+	. "github.com/atlantisnorth/atlantis/testing"
 	"github.com/gorilla/mux"
-	"github.com/hootsuite/atlantis/server"
-	"github.com/hootsuite/atlantis/server/events/locking/mocks"
-	"github.com/hootsuite/atlantis/server/events/models"
-	"github.com/hootsuite/atlantis/server/logging"
-	sMocks "github.com/hootsuite/atlantis/server/mocks"
-	. "github.com/hootsuite/atlantis/testing"
 	. "github.com/petergtz/pegomock"
 )
 

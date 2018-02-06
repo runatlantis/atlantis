@@ -6,7 +6,7 @@
 # with multiple packages, see https://code.google.com/p/go/issues/detail?id=6909
 #
 # Usage: coverage.sh packages...
-# Example: coverage.sh github.com/hootsuite/atlantis github.com/hootsuite/atlantis/bootstrap
+# Example: coverage.sh github.com/atlantisnorth/atlantis github.com/atlantisnorth/atlantis/bootstrap
 #
 
 set -e

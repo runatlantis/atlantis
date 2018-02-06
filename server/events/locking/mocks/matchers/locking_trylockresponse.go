@@ -3,7 +3,7 @@ package matchers
 import (
 	"reflect"
 
-	locking "github.com/hootsuite/atlantis/server/events/locking"
+	locking "github.com/atlantisnorth/atlantis/server/events/locking"
 	"github.com/petergtz/pegomock"
 )
 

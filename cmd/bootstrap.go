@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/hootsuite/atlantis/bootstrap"
+	"github.com/atlantisnorth/atlantis/bootstrap"
 	"github.com/spf13/cobra"
 )
 

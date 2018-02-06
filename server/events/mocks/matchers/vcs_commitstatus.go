@@ -3,7 +3,7 @@ package matchers
 import (
 	"reflect"
 
-	vcs "github.com/hootsuite/atlantis/server/events/vcs"
+	vcs "github.com/atlantisnorth/atlantis/server/events/vcs"
 	"github.com/petergtz/pegomock"
 )
 
