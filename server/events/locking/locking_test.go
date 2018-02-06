@@ -7,11 +7,11 @@ import (
 
 	"strings"
 
-	"github.com/hootsuite/atlantis/server/events/locking"
-	"github.com/hootsuite/atlantis/server/events/locking/mocks"
-	"github.com/hootsuite/atlantis/server/events/locking/mocks/matchers"
-	"github.com/hootsuite/atlantis/server/events/models"
-	. "github.com/hootsuite/atlantis/testing"
+	"github.com/atlantisnorth/atlantis/server/events/locking"
+	"github.com/atlantisnorth/atlantis/server/events/locking/mocks"
+	"github.com/atlantisnorth/atlantis/server/events/locking/mocks/matchers"
+	"github.com/atlantisnorth/atlantis/server/events/models"
+	. "github.com/atlantisnorth/atlantis/testing"
 	. "github.com/petergtz/pegomock"
 )
 

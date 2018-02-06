@@ -3,8 +3,8 @@ package events_test
 import (
 	"testing"
 
-	"github.com/hootsuite/atlantis/server/events"
-	. "github.com/hootsuite/atlantis/testing"
+	"github.com/atlantisnorth/atlantis/server/events"
+	. "github.com/atlantisnorth/atlantis/testing"
 )
 
 var repo = "repo/owner"

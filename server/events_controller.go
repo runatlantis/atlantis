@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/atlantisnorth/atlantis/server/events"
+	"github.com/atlantisnorth/atlantis/server/events/models"
+	"github.com/atlantisnorth/atlantis/server/events/vcs"
+	"github.com/atlantisnorth/atlantis/server/logging"
 	"github.com/google/go-github/github"
-	"github.com/hootsuite/atlantis/server/events"
-	"github.com/hootsuite/atlantis/server/events/models"
-	"github.com/hootsuite/atlantis/server/events/vcs"
-	"github.com/hootsuite/atlantis/server/logging"
 	"github.com/lkysow/go-gitlab"
 )
 

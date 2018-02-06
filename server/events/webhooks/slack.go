@@ -5,7 +5,7 @@ import (
 
 	"fmt"
 
-	"github.com/hootsuite/atlantis/server/logging"
+	"github.com/atlantisnorth/atlantis/server/logging"
 	"github.com/pkg/errors"
 )
 

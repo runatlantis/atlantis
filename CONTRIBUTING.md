@@ -3,13 +3,13 @@
 ## Running Atlantis Locally
 Get the source code:
 ```
-go get github.com/hootsuite/atlantis
+go get github.com/atlantisnorth/atlantis
 ```
-This will clone Atlantis into `$GOPATH/src/github.com/hootsuite/atlantis` (where `$GOPATH` defaults to `~/go`).
+This will clone Atlantis into `$GOPATH/src/github.com/atlantisnorth/atlantis` (where `$GOPATH` defaults to `~/go`).
 
 Go to that directory:
 ```
-cd $GOPATH/src/github.com/hootsuite/atlantis
+cd $GOPATH/src/github.com/atlantisnorth/atlantis
 ```
 
 Compile Atlantis:
@@ -25,7 +25,7 @@ If you get an error like `command not found: atlantis`, ensure that `$GOPATH/bin
 
 ## Calling Your Local Atlantis From GitHub
 - Create a test terraform repository in your GitHub.
-- Create a personal access token for Atlantis. See [Create a GitHub token](https://github.com/hootsuite/atlantis#create-a-github-token).
+- Create a personal access token for Atlantis. See [Create a GitHub token](https://github.com/atlantisnorth/atlantis#create-a-github-token).
 - Start Atlantis in server mode using that token:
 ```
 atlantis server --gh-user <your username> --gh-token <your token> --log-level debug
@@ -35,7 +35,7 @@ atlantis server --gh-user <your username> --gh-token <your token> --log-level de
 ```
 ngrok http 4141
 ```
-- Create a WebHook in your repo and use the `https` url that `ngrok` printed out after running `ngrok http 4141`. Be sure to append `/events` so your webhook url looks something like `https://efce3bcd.ngrok.io/events`. See [Add GitHub Webhook](https://github.com/hootsuite/atlantis#add-github-webhook).
+- Create a WebHook in your repo and use the `https` url that `ngrok` printed out after running `ngrok http 4141`. Be sure to append `/events` so your webhook url looks something like `https://efce3bcd.ngrok.io/events`. See [Add GitHub Webhook](https://github.com/atlantisnorth/atlantis#add-github-webhook).
 - Create a pull request and type `atlantis help`. You should see the request in the `ngrok` and Atlantis logs and you should also see Atlantis comment back.
 
 ## Code Style
@@ -70,7 +70,7 @@ This is easier to read and more consistent
 ### Testing
 - place tests under `{package under test}_test` to enforce testing the external interfaces
 - if you need to test internally i.e. access non-exported stuff, call the file `{file under test}_internal_test.go`
-- use our testing utility for easier-to-read assertions: `import . "github.com/hootsuite/atlantis/testing"` and then use `Assert()`, `Equals()` and `Ok()`
+- use our testing utility for easier-to-read assertions: `import . "github.com/atlantisnorth/atlantis/testing"` and then use `Assert()`, `Equals()` and `Ok()`
 - don't try to describe the whole test by its function name. Instead use `t.Log` statements:
 ```go
 // don't do this
@@ -94,7 +94,7 @@ func TestLockingExisting(t *testing.T) {
 1. Create a pull request and merge to master
 1. Check out master and fetch latest
 1. Run `make release`
-1. Go to https://github.com/hootsuite/atlantis/releases and click "Draft a new release"
+1. Go to https://github.com/atlantisnorth/atlantis/releases and click "Draft a new release"
     1. Prefix version with `v`
     1. The title of the release is the same as the tag (ex. v0.2.2)
     1. Description should just be `See CHANGELOG` with link to CHANGELOG at that release, ex: `See [CHANGELOG](CHANGELOG.md#v022)`

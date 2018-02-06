@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hootsuite/atlantis/cmd"
-	"github.com/hootsuite/atlantis/server"
-	. "github.com/hootsuite/atlantis/testing"
+	"github.com/atlantisnorth/atlantis/cmd"
+	"github.com/atlantisnorth/atlantis/server"
+	. "github.com/atlantisnorth/atlantis/testing"
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"

@@ -3,7 +3,7 @@ package matchers
 import (
 	"reflect"
 
-	logging "github.com/hootsuite/atlantis/server/logging"
+	logging "github.com/atlantisnorth/atlantis/server/logging"
 	"github.com/petergtz/pegomock"
 )
 

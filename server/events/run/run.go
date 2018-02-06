@@ -10,8 +10,8 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/atlantisnorth/atlantis/server/logging"
 	"github.com/hashicorp/go-version"
-	"github.com/hootsuite/atlantis/server/logging"
 	"github.com/pkg/errors"
 )
 

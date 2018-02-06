@@ -10,7 +10,7 @@
 
 Read about [Why We Built Atlantis](https://www.atlantis.run/blog/atlantis-release/)
 
-[![CircleCI](https://circleci.com/gh/hootsuite/atlantis/tree/master.svg?style=shield&circle-token=08bf5b34233b0e168a9dd73e01cafdcf7dc4bf16)](https://circleci.com/gh/hootsuite/atlantis/tree/master)
+[![CircleCI](https://circleci.com/gh/atlantisnorth/atlantis/tree/master.svg?style=shield)](https://circleci.com/gh/atlantisnorth/atlantis/tree/master)
 [![SuperDopeBadge](https://img.shields.io/badge/Hightower-extra%20dope-b9f2ff.svg)](https://twitter.com/kelseyhightower/status/893260922222813184)
 [![Slack Status](https://thawing-headland-22460.herokuapp.com/badge.svg)](https://thawing-headland-22460.herokuapp.com)
 
@@ -51,10 +51,10 @@ Read about [Why We Built Atlantis](https://www.atlantis.run/blog/atlantis-releas
 ## Atlantis Works With
 * GitHub (public, private or enterprise) and GitLab (public, private or enterprise)
 * Any Terraform version (see [Terraform Versions](#terraform-version))
-* Can be run with a [single binary](https://github.com/hootsuite/atlantis/releases) or with our [Docker image](https://hub.docker.com/r/hootsuite/atlantis/)
+* Can be run with a [single binary](https://github.com/atlantisnorth/atlantis/releases) or with our [Docker image](https://hub.docker.com/r/atlantisnorth/atlantis/)
 
 ## Getting Started
-Download from [https://github.com/hootsuite/atlantis/releases](https://github.com/hootsuite/atlantis/releases)
+Download from [https://github.com/atlantisnorth/atlantis/releases](https://github.com/atlantisnorth/atlantis/releases)
 
 Run
 ```
@@ -326,7 +326,7 @@ Atlantis is now running!
 Atlantis also ships inside a docker image. Run the docker image:
 
 ```bash
-docker run hootsuite/atlantis:latest server <required options>
+docker run atlantisnorth/atlantis:latest server <required options>
 ```
 
 #### Usage
@@ -338,7 +338,7 @@ vim Dockerfile-custom
 ```
 
 ```dockerfile
-FROM hootsuite/atlantis
+FROM atlantisnorth/atlantis
 
 # copy a terraform binary of the version you need
 COPY terraform /usr/local/bin/terraform
@@ -361,7 +361,7 @@ docker run {YOUR_DOCKER_ORG}/atlantis-custom server --gh-user=GITHUB_USERNAME --
 
 If you'd like to test out Atlantis before running it on your own repositories you can fork our example repo.
 
-- Fork https://github.com/hootsuite/atlantis-example
+- Fork https://github.com/atlantisnorth/atlantis-example
 - If you didn't add the Webhook as to your organization add Atlantis as a Webhook to the forked repo (see [Add GitHub Webhook](#add-github-webhook))
 - Now that Atlantis can receive events you should be able to comment on a pull request to trigger Atlantis. Create a pull request
 	- Click **Branches** on your forked repo's homepage
@@ -487,7 +487,7 @@ See `atlantis server --help` for more information.
 
 
 ## Contributing
-Want to contribute? Check out [CONTRIBUTING](https://github.com/hootsuite/atlantis/blob/master/CONTRIBUTING.md).
+Want to contribute? Check out [CONTRIBUTING](https://github.com/atlantisnorth/atlantis/blob/master/CONTRIBUTING.md).
 
 Thank you to these awesome contributors!
 - [@nicholas-wu-hs](https://github.com/nicholas-wu-hs)

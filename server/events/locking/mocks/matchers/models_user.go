@@ -3,7 +3,7 @@ package matchers
 import (
 	"reflect"
 
-	models "github.com/hootsuite/atlantis/server/events/models"
+	models "github.com/atlantisnorth/atlantis/server/events/models"
 	"github.com/petergtz/pegomock"
 )
 

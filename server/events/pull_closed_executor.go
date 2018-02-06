@@ -7,9 +7,9 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/hootsuite/atlantis/server/events/locking"
-	"github.com/hootsuite/atlantis/server/events/models"
-	"github.com/hootsuite/atlantis/server/events/vcs"
+	"github.com/atlantisnorth/atlantis/server/events/locking"
+	"github.com/atlantisnorth/atlantis/server/events/models"
+	"github.com/atlantisnorth/atlantis/server/events/vcs"
 	"github.com/pkg/errors"
 )
 

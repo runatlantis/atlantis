@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/hootsuite/atlantis/server/events/models"
+	"github.com/atlantisnorth/atlantis/server/events/models"
 	"github.com/lkysow/go-gitlab"
 )
 

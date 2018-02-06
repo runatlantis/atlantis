@@ -1,7 +1,7 @@
 package vcs
 
 import (
-	"github.com/hootsuite/atlantis/server/events/models"
+	"github.com/atlantisnorth/atlantis/server/events/models"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_client.go Client

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/atlantisnorth/atlantis/server/events/models"
+	"github.com/atlantisnorth/atlantis/server/events/vcs"
 	"github.com/google/go-github/github"
-	"github.com/hootsuite/atlantis/server/events/models"
-	"github.com/hootsuite/atlantis/server/events/vcs"
 	"github.com/lkysow/go-gitlab"
 )
 

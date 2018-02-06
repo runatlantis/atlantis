@@ -11,9 +11,9 @@ import (
 // Repo is a VCS repository.
 type Repo struct {
 	// FullName is the owner and repo name separated
-	// by a "/", ex. "hootsuite/atlantis".
+	// by a "/", ex. "atlantisnorth/atlantis".
 	FullName string
-	// Owner is just the repo owner, ex. "hootsuite".
+	// Owner is just the repo owner, ex. "atlantisnorth".
 	Owner string
 	// Name is just the repo name, ex. "atlantis".
 	Name string
@@ -34,7 +34,7 @@ type PullRequest struct {
 	// pull requested into the base.
 	HeadCommit string
 	// URL is the url of the pull request.
-	// ex. "https://github.com/hootsuite/atlantis/pull/1"
+	// ex. "https://github.com/atlantisnorth/atlantis/pull/1"
 	URL string
 	// Branch is the name of the head branch (not the base).
 	Branch string
@@ -79,7 +79,7 @@ type ProjectLock struct {
 // Terraform projects in a single repo we also include Path to the project
 // root relative to the repo root.
 type Project struct {
-	// RepoFullName is the owner and repo name, ex. "hootsuite/atlantis"
+	// RepoFullName is the owner and repo name, ex. "atlantisnorth/atlantis"
 	RepoFullName string
 	// Path to project root in the repo.
 	// If "." then project is at root.

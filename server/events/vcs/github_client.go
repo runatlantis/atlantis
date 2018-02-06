@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/atlantisnorth/atlantis/server/events/models"
 	"github.com/google/go-github/github"
-	"github.com/hootsuite/atlantis/server/events/models"
 	"github.com/pkg/errors"
 )
 

@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/hootsuite/atlantis/server/events"
-	. "github.com/hootsuite/atlantis/testing"
+	"github.com/atlantisnorth/atlantis/server/events"
+	. "github.com/atlantisnorth/atlantis/testing"
 )
 
 func TestRenderErr(t *testing.T) {

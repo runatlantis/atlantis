@@ -5,11 +5,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hootsuite/atlantis/server/events/locking"
-	"github.com/hootsuite/atlantis/server/events/models"
-	"github.com/hootsuite/atlantis/server/events/run"
-	"github.com/hootsuite/atlantis/server/events/terraform"
-	"github.com/hootsuite/atlantis/server/events/vcs"
+	"github.com/atlantisnorth/atlantis/server/events/locking"
+	"github.com/atlantisnorth/atlantis/server/events/models"
+	"github.com/atlantisnorth/atlantis/server/events/run"
+	"github.com/atlantisnorth/atlantis/server/events/terraform"
+	"github.com/atlantisnorth/atlantis/server/events/vcs"
 	"github.com/pkg/errors"
 )
 

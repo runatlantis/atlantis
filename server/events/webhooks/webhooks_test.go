@@ -4,10 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hootsuite/atlantis/server/events/webhooks"
-	"github.com/hootsuite/atlantis/server/events/webhooks/mocks"
-	"github.com/hootsuite/atlantis/server/logging"
-	. "github.com/hootsuite/atlantis/testing"
+	"github.com/atlantisnorth/atlantis/server/events/webhooks"
+	"github.com/atlantisnorth/atlantis/server/events/webhooks/mocks"
+	"github.com/atlantisnorth/atlantis/server/logging"
+	. "github.com/atlantisnorth/atlantis/testing"
 	. "github.com/petergtz/pegomock"
 )
 

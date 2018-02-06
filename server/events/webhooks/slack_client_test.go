@@ -5,12 +5,12 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/hootsuite/atlantis/server/events/models"
-	"github.com/hootsuite/atlantis/server/events/webhooks"
-	"github.com/hootsuite/atlantis/server/events/webhooks/mocks"
+	"github.com/atlantisnorth/atlantis/server/events/models"
+	"github.com/atlantisnorth/atlantis/server/events/webhooks"
+	"github.com/atlantisnorth/atlantis/server/events/webhooks/mocks"
 	"github.com/nlopes/slack"
 
-	. "github.com/hootsuite/atlantis/testing"
+	. "github.com/atlantisnorth/atlantis/testing"
 	. "github.com/petergtz/pegomock"
 )
 
@@ -84,7 +84,7 @@ func TestPostMessage_Success(t *testing.T) {
 	expParams := slack.NewPostMessageParameters()
 	expParams.Attachments = []slack.Attachment{{
 		Color: "good",
-		Text:  "Apply succeeded for <url|hootsuite/atlantis>",
+		Text:  "Apply succeeded for <url|atlantisnorth/atlantis>",
 		Fields: []slack.AttachmentField{
 			{
 				Title: "Workspace",
@@ -109,7 +109,7 @@ func TestPostMessage_Success(t *testing.T) {
 	t.Log("When apply fails, function should succeed and indicate failure")
 	result.Success = false
 	expParams.Attachments[0].Color = "danger"
-	expParams.Attachments[0].Text = "Apply failed for <url|hootsuite/atlantis>"
+	expParams.Attachments[0].Text = "Apply failed for <url|atlantisnorth/atlantis>"
 
 	err = client.PostMessage(channel, result)
 	Ok(t, err)
@@ -123,7 +123,7 @@ func TestPostMessage_Error(t *testing.T) {
 	expParams := slack.NewPostMessageParameters()
 	expParams.Attachments = []slack.Attachment{{
 		Color: "good",
-		Text:  "Apply succeeded for <url|hootsuite/atlantis>",
+		Text:  "Apply succeeded for <url|atlantisnorth/atlantis>",
 		Fields: []slack.AttachmentField{
 			{
 				Title: "Workspace",
@@ -157,7 +157,7 @@ func setup(t *testing.T) {
 	result = webhooks.ApplyResult{
 		Workspace: "production",
 		Repo: models.Repo{
-			FullName: "hootsuite/atlantis",
+			FullName: "atlantisnorth/atlantis",
 		},
 		Pull: models.PullRequest{
 			Num: 1,

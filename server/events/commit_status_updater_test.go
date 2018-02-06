@@ -5,11 +5,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hootsuite/atlantis/server/events"
-	"github.com/hootsuite/atlantis/server/events/models"
-	"github.com/hootsuite/atlantis/server/events/vcs"
-	"github.com/hootsuite/atlantis/server/events/vcs/mocks"
-	. "github.com/hootsuite/atlantis/testing"
+	"github.com/atlantisnorth/atlantis/server/events"
+	"github.com/atlantisnorth/atlantis/server/events/models"
+	"github.com/atlantisnorth/atlantis/server/events/vcs"
+	"github.com/atlantisnorth/atlantis/server/events/vcs/mocks"
+	. "github.com/atlantisnorth/atlantis/testing"
 	. "github.com/petergtz/pegomock"
 )
 

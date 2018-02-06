@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/hootsuite/atlantis/server"
-	. "github.com/hootsuite/atlantis/testing"
+	"github.com/atlantisnorth/atlantis/server"
+	. "github.com/atlantisnorth/atlantis/testing"
 	"github.com/lkysow/go-gitlab"
 	. "github.com/petergtz/pegomock"
 )
