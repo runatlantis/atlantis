@@ -19,7 +19,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-var terraformExampleRepoOwner = "atlantis-north"
+var terraformExampleRepoOwner = "atlantisnorth"
 var terraformExampleRepo = "atlantis-example"
 var bootstrapDescription = `[white]Welcome to Atlantis bootstrap!
 
