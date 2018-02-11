@@ -1,5 +1,5 @@
 +++
-title = "Moving Atlantis To atlantisnorth/atlantis"
+title = "Moving Atlantis To atlantisnorth"
 date = "2018-02-07T14:01:11-08:00"
 draft = false
 weight = 20
