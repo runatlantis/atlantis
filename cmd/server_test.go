@@ -3,6 +3,7 @@ package cmd_test
 import (
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -283,8 +284,8 @@ func TestExecute_Defaults(t *testing.T) {
 	Equals(t, 4141, passedConfig.Port)
 }
 
-func TestExecute_ExpandHomeDir(t *testing.T) {
-	t.Log("Should expand the ~ in the home dir to the actual home dir.")
+func TestExecute_ExpandHomeInDataDir(t *testing.T) {
+	t.Log("If ~ is used as a data-dir path, should expand to absolute home path")
 	c := setup(map[string]interface{}{
 		cmd.GHUserFlag:  "user",
 		cmd.GHTokenFlag: "token",
@@ -296,6 +297,23 @@ func TestExecute_ExpandHomeDir(t *testing.T) {
 	home, err := homedir.Dir()
 	Ok(t, err)
 	Equals(t, home+"/this/is/a/path", passedConfig.DataDir)
+}
+
+func TestExecute_RelativeDataDir(t *testing.T) {
+	t.Log("Should convert relative dir to absolute.")
+	c := setup(map[string]interface{}{
+		cmd.GHUserFlag:  "user",
+		cmd.GHTokenFlag: "token",
+		cmd.DataDirFlag: "../",
+	})
+
+	// Figure out what ../ should be as an absolute path.
+	expectedAbsolutePath, err := filepath.Abs("../")
+	Ok(t, err)
+
+	err = c.Execute()
+	Ok(t, err)
+	Equals(t, expectedAbsolutePath, passedConfig.DataDir)
 }
 
 func TestExecute_GithubUser(t *testing.T) {
@@ -326,7 +344,7 @@ func TestExecute_Flags(t *testing.T) {
 	t.Log("Should use all flags that are set.")
 	c := setup(map[string]interface{}{
 		cmd.AtlantisURLFlag:     "url",
-		cmd.DataDirFlag:         "path",
+		cmd.DataDirFlag:         "/path",
 		cmd.GHHostnameFlag:      "ghhostname",
 		cmd.GHUserFlag:          "user",
 		cmd.GHTokenFlag:         "token",
@@ -343,7 +361,7 @@ func TestExecute_Flags(t *testing.T) {
 	Ok(t, err)
 
 	Equals(t, "url", passedConfig.AtlantisURL)
-	Equals(t, "path", passedConfig.DataDir)
+	Equals(t, "/path", passedConfig.DataDir)
 	Equals(t, "ghhostname", passedConfig.GithubHostname)
 	Equals(t, "user", passedConfig.GithubUser)
 	Equals(t, "token", passedConfig.GithubToken)
@@ -361,7 +379,7 @@ func TestExecute_ConfigFile(t *testing.T) {
 	t.Log("Should use all the values from the config file.")
 	tmpFile := tempFile(t, `---
 atlantis-url: "url"
-data-dir: "path"
+data-dir: "/path"
 gh-hostname: "ghhostname"
 gh-user: "user"
 gh-token: "token"
@@ -381,7 +399,7 @@ require-approval: true`)
 	err := c.Execute()
 	Ok(t, err)
 	Equals(t, "url", passedConfig.AtlantisURL)
-	Equals(t, "path", passedConfig.DataDir)
+	Equals(t, "/path", passedConfig.DataDir)
 	Equals(t, "ghhostname", passedConfig.GithubHostname)
 	Equals(t, "user", passedConfig.GithubUser)
 	Equals(t, "token", passedConfig.GithubToken)
