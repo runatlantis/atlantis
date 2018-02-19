@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/mitchellh/go-homedir"
@@ -293,15 +294,25 @@ func (s *ServerCmd) setAtlantisURL(config *server.Config) error {
 
 // setDataDir checks if ~ was used in data-dir and converts it to the actual
 // home directory. If we don't do this, we'll create a directory called "~"
-// instead of actually using home.
+// instead of actually using home. It also converts relative paths to absolute.
 func (s *ServerCmd) setDataDir(config *server.Config) error {
-	if strings.HasPrefix(config.DataDir, "~/") {
-		expanded, err := homedir.Expand(config.DataDir)
+	finalPath := config.DataDir
+
+	// Convert ~ to the actual home dir.
+	if strings.HasPrefix(finalPath, "~/") {
+		var err error
+		finalPath, err = homedir.Expand(finalPath)
 		if err != nil {
 			return errors.Wrap(err, "determining home directory")
 		}
-		config.DataDir = expanded
 	}
+
+	// Convert relative paths to absolute.
+	finalPath, err := filepath.Abs(finalPath)
+	if err != nil {
+		return errors.Wrap(err, "making data-dir absolute")
+	}
+	config.DataDir = finalPath
 	return nil
 }
 
