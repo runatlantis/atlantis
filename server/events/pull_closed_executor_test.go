@@ -4,16 +4,16 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/atlantisnorth/atlantis/server/events"
-	lockmocks "github.com/atlantisnorth/atlantis/server/events/locking/mocks"
-	"github.com/atlantisnorth/atlantis/server/events/mocks"
-	"github.com/atlantisnorth/atlantis/server/events/mocks/matchers"
-	"github.com/atlantisnorth/atlantis/server/events/models"
-	"github.com/atlantisnorth/atlantis/server/events/models/fixtures"
-	"github.com/atlantisnorth/atlantis/server/events/vcs"
-	vcsmocks "github.com/atlantisnorth/atlantis/server/events/vcs/mocks"
-	. "github.com/atlantisnorth/atlantis/testing"
 	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/events"
+	lockmocks "github.com/runatlantis/atlantis/server/events/locking/mocks"
+	"github.com/runatlantis/atlantis/server/events/mocks"
+	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
+	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/models/fixtures"
+	"github.com/runatlantis/atlantis/server/events/vcs"
+	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
+	. "github.com/runatlantis/atlantis/testing"
 )
 
 func TestCleanUpPullWorkspaceErr(t *testing.T) {

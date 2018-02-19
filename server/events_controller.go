@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/atlantisnorth/atlantis/server/events"
-	"github.com/atlantisnorth/atlantis/server/events/models"
-	"github.com/atlantisnorth/atlantis/server/events/vcs"
-	"github.com/atlantisnorth/atlantis/server/logging"
 	"github.com/google/go-github/github"
 	"github.com/lkysow/go-gitlab"
+	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 const githubHeader = "X-Github-Event"

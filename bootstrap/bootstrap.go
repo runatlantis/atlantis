@@ -19,7 +19,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-var terraformExampleRepoOwner = "atlantisnorth"
+var terraformExampleRepoOwner = "runatlantis"
 var terraformExampleRepo = "atlantis-example"
 var bootstrapDescription = `[white]Welcome to Atlantis bootstrap!
 
@@ -35,7 +35,7 @@ var pullRequestBody = "In this pull request we will learn how to use atlantis. T
 	"* Start by typing `atlantis help` in the comments.\n" +
 	"* Next, lets plan by typing `atlantis plan` in the comments. That will run a `terraform plan`.\n" +
 	"* Now lets apply that plan. Type `atlantis apply` in the comments. This will run a `terraform apply`.\n" +
-	"\nThank you for trying out atlantis. For more info on running atlantis in production see https://github.com/atlantisnorth/atlantis"
+	"\nThank you for trying out atlantis. For more info on running atlantis in production see https://github.com/runatlantis/atlantis"
 
 // Start begins the bootstrap process.
 // nolint: errcheck
@@ -195,6 +195,6 @@ Follow these instructions to create a token (we don't store any tokens):
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 	<-signalChan
 	colorstring.Println("\n[red]shutdown signal received, exiting....")
-	colorstring.Println("\n[green]Thank you for using atlantis :) \n[white]For more information about how to use atlantis in production go to: https://github.com/atlantisnorth/atlantis")
+	colorstring.Println("\n[green]Thank you for using atlantis :) \n[white]For more information about how to use atlantis in production go to: https://github.com/runatlantis/atlantis")
 	return nil
 }

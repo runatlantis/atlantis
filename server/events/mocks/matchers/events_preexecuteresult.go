@@ -3,8 +3,8 @@ package matchers
 import (
 	"reflect"
 
-	events "github.com/atlantisnorth/atlantis/server/events"
 	"github.com/petergtz/pegomock"
+	events "github.com/runatlantis/atlantis/server/events"
 )
 
 func AnyEventsPreExecuteResult() events.PreExecuteResult {

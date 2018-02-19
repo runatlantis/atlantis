@@ -1,6 +1,6 @@
 package events
 
-import "github.com/atlantisnorth/atlantis/server/events/vcs"
+import "github.com/runatlantis/atlantis/server/events/vcs"
 
 // ProjectResult is the result of executing a plan/apply for a project.
 type ProjectResult struct {

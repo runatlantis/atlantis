@@ -3,8 +3,8 @@ package matchers
 import (
 	"reflect"
 
-	models "github.com/atlantisnorth/atlantis/server/events/models"
 	"github.com/petergtz/pegomock"
+	models "github.com/runatlantis/atlantis/server/events/models"
 )
 
 func AnyModelsUser() models.User {

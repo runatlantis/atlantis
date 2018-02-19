@@ -1,9 +1,9 @@
 package events
 
 import (
-	"github.com/atlantisnorth/atlantis/server/events/models"
-	"github.com/atlantisnorth/atlantis/server/events/vcs"
-	"github.com/atlantisnorth/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 // CommandContext represents the context of a command that came from a comment

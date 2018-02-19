@@ -5,12 +5,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/atlantisnorth/atlantis/server/events"
-	"github.com/atlantisnorth/atlantis/server/events/models"
-	"github.com/atlantisnorth/atlantis/server/events/vcs"
-	"github.com/atlantisnorth/atlantis/server/events/vcs/mocks"
-	. "github.com/atlantisnorth/atlantis/testing"
 	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/vcs/mocks"
+	. "github.com/runatlantis/atlantis/testing"
 )
 
 var repoModel = models.Repo{}

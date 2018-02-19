@@ -5,7 +5,7 @@ import (
 
 	"github.com/petergtz/pegomock"
 
-	models "github.com/atlantisnorth/atlantis/server/events/models"
+	models "github.com/runatlantis/atlantis/server/events/models"
 )
 
 func AnyMapOfStringToModelsProjectLock() map[string]models.ProjectLock {

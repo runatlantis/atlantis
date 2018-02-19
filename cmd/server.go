@@ -5,9 +5,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/atlantisnorth/atlantis/server"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

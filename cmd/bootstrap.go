@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/atlantisnorth/atlantis/bootstrap"
+	"github.com/runatlantis/atlantis/bootstrap"
 	"github.com/spf13/cobra"
 )
 

@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/atlantisnorth/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_backend.go Backend

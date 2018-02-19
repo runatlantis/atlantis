@@ -3,8 +3,8 @@ package matchers
 import (
 	"reflect"
 
-	webhooks "github.com/atlantisnorth/atlantis/server/events/webhooks"
 	"github.com/petergtz/pegomock"
+	webhooks "github.com/runatlantis/atlantis/server/events/webhooks"
 )
 
 func AnyWebhooksApplyResult() webhooks.ApplyResult {
