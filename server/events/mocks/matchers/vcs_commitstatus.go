@@ -3,8 +3,8 @@ package matchers
 import (
 	"reflect"
 
-	vcs "github.com/atlantisnorth/atlantis/server/events/vcs"
 	"github.com/petergtz/pegomock"
+	vcs "github.com/runatlantis/atlantis/server/events/vcs"
 )
 
 func AnyVcsCommitStatus() vcs.CommitStatus {

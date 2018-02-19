@@ -11,9 +11,9 @@ import (
 	"path"
 	"time"
 
-	"github.com/atlantisnorth/atlantis/server/events/models"
 	"github.com/boltdb/bolt"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 // BoltLocker is a locking backend using BoltDB

@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/atlantisnorth/atlantis/server/events/models"
-	"github.com/atlantisnorth/atlantis/server/events/vcs"
 	"github.com/google/go-github/github"
 	"github.com/lkysow/go-gitlab"
+	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
 const gitlabPullOpened = "opened"

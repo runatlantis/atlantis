@@ -3,13 +3,13 @@ package events
 import (
 	"fmt"
 
-	"github.com/atlantisnorth/atlantis/server/events/models"
-	"github.com/atlantisnorth/atlantis/server/events/vcs"
-	"github.com/atlantisnorth/atlantis/server/logging"
-	"github.com/atlantisnorth/atlantis/server/recovery"
 	"github.com/google/go-github/github"
 	"github.com/lkysow/go-gitlab"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/recovery"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_command_runner.go CommandRunner

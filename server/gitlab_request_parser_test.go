@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/atlantisnorth/atlantis/server"
-	. "github.com/atlantisnorth/atlantis/testing"
 	"github.com/lkysow/go-gitlab"
 	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server"
+	. "github.com/runatlantis/atlantis/testing"
 )
 
 var parser = server.DefaultGitlabRequestParser{}

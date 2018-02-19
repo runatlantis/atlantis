@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/atlantisnorth/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/urfave/negroni"
 )
 

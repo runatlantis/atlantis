@@ -2,7 +2,7 @@
 package main
 
 import (
-	"github.com/atlantisnorth/atlantis/cmd"
+	"github.com/runatlantis/atlantis/cmd"
 	"github.com/spf13/viper"
 )
 

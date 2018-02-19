@@ -1,7 +1,7 @@
 version: 2
 jobs:
   build:
-    working_directory: /go/src/github.com/atlantisnorth/atlantis
+    working_directory: /go/src/github.com/runatlantis/atlantis
     docker:
       - image: circleci/golang:1.9.2
         environment:
@@ -38,14 +38,14 @@ jobs:
           name: Build image
           command: |
             if [ "${CIRCLE_BRANCH}" == "master" ]; then
-              docker build -t atlantisnorth/atlantis:latest .
+              docker build -t runatlantis/atlantis:latest .
             fi
       - run:
           name: Push image
           command: |
             if [ "${CIRCLE_BRANCH}" == "master" ]; then
               docker login -u "$DOCKER_USER" -p "$DOCKER_PASSWORD"
-              docker push atlantisnorth/atlantis:latest
+              docker push runatlantis/atlantis:latest
             fi
       - run:
           name: Tag and push version if exists
@@ -54,7 +54,7 @@ jobs:
           command: |
             if [ "${CIRCLE_BRANCH}" == "master" ]; then
               for TAG in $(git tag --contains $CIRCLE_SHA1); do
-                docker tag atlantisnorth/atlantis:latest atlantisnorth/atlantis:$TAG
-                docker push atlantisnorth/atlantis:$TAG
+                docker tag runatlantis/atlantis:latest runatlantis/atlantis:$TAG
+                docker push runatlantis/atlantis:$TAG
               done
             fi

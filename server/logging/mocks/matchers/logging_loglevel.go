@@ -3,8 +3,8 @@ package matchers
 import (
 	"reflect"
 
-	logging "github.com/atlantisnorth/atlantis/server/logging"
 	"github.com/petergtz/pegomock"
+	logging "github.com/runatlantis/atlantis/server/logging"
 )
 
 func AnyLoggingLogLevel() logging.LogLevel {

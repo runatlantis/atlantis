@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/atlantisnorth/atlantis/server/events/locking/boltdb"
-	"github.com/atlantisnorth/atlantis/server/events/models"
-	. "github.com/atlantisnorth/atlantis/testing"
 	"github.com/boltdb/bolt"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/locking/boltdb"
+	"github.com/runatlantis/atlantis/server/events/models"
+	. "github.com/runatlantis/atlantis/testing"
 )
 
 var lockBucket = "bucket"

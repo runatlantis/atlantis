@@ -6,9 +6,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/atlantisnorth/atlantis/server/events/models"
 	"github.com/google/go-github/github"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 // GithubClient is used to perform GitHub actions.

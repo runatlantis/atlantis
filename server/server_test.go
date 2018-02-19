@@ -10,14 +10,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/atlantisnorth/atlantis/server"
-	"github.com/atlantisnorth/atlantis/server/events/locking/mocks"
-	"github.com/atlantisnorth/atlantis/server/events/models"
-	"github.com/atlantisnorth/atlantis/server/logging"
-	sMocks "github.com/atlantisnorth/atlantis/server/mocks"
-	. "github.com/atlantisnorth/atlantis/testing"
 	"github.com/gorilla/mux"
 	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server"
+	"github.com/runatlantis/atlantis/server/events/locking/mocks"
+	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/logging"
+	sMocks "github.com/runatlantis/atlantis/server/mocks"
+	. "github.com/runatlantis/atlantis/testing"
 )
 
 func TestNewServer(t *testing.T) {

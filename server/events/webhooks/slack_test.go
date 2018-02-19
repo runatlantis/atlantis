@@ -4,11 +4,11 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/atlantisnorth/atlantis/server/events/webhooks"
-	"github.com/atlantisnorth/atlantis/server/events/webhooks/mocks"
-	"github.com/atlantisnorth/atlantis/server/logging"
-	. "github.com/atlantisnorth/atlantis/testing"
 	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/events/webhooks"
+	"github.com/runatlantis/atlantis/server/events/webhooks/mocks"
+	"github.com/runatlantis/atlantis/server/logging"
+	. "github.com/runatlantis/atlantis/testing"
 )
 
 func TestSend_PostMessage(t *testing.T) {

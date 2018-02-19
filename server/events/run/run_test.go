@@ -3,9 +3,9 @@ package run
 import (
 	"testing"
 
-	"github.com/atlantisnorth/atlantis/server/logging"
-	. "github.com/atlantisnorth/atlantis/testing"
 	"github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/logging"
+	. "github.com/runatlantis/atlantis/testing"
 )
 
 var logger = logging.NewNoopLogger()

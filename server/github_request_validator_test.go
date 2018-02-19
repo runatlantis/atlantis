@@ -6,9 +6,9 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/atlantisnorth/atlantis/server"
-	. "github.com/atlantisnorth/atlantis/testing"
 	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server"
+	. "github.com/runatlantis/atlantis/testing"
 )
 
 func TestValidate_WithSecretErr(t *testing.T) {

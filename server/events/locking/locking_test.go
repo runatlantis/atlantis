@@ -7,12 +7,12 @@ import (
 
 	"strings"
 
-	"github.com/atlantisnorth/atlantis/server/events/locking"
-	"github.com/atlantisnorth/atlantis/server/events/locking/mocks"
-	"github.com/atlantisnorth/atlantis/server/events/locking/mocks/matchers"
-	"github.com/atlantisnorth/atlantis/server/events/models"
-	. "github.com/atlantisnorth/atlantis/testing"
 	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/events/locking"
+	"github.com/runatlantis/atlantis/server/events/locking/mocks"
+	"github.com/runatlantis/atlantis/server/events/locking/mocks/matchers"
+	"github.com/runatlantis/atlantis/server/events/models"
+	. "github.com/runatlantis/atlantis/testing"
 )
 
 var project = models.NewProject("owner/repo", "path")

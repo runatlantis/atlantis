@@ -3,9 +3,9 @@ package events_test
 import (
 	"testing"
 
-	"github.com/atlantisnorth/atlantis/server/events"
-	"github.com/atlantisnorth/atlantis/server/logging"
-	. "github.com/atlantisnorth/atlantis/testing"
+	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/logging"
+	. "github.com/runatlantis/atlantis/testing"
 )
 
 var noopLogger = logging.NewNoopLogger()

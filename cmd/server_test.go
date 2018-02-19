@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/atlantisnorth/atlantis/cmd"
-	"github.com/atlantisnorth/atlantis/server"
-	. "github.com/atlantisnorth/atlantis/testing"
 	"github.com/mitchellh/go-homedir"
+	"github.com/runatlantis/atlantis/cmd"
+	"github.com/runatlantis/atlantis/server"
+	. "github.com/runatlantis/atlantis/testing"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
