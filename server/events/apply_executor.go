@@ -72,7 +72,7 @@ func (a *ApplyExecutor) Execute(ctx *CommandContext) CommandResponse {
 	}
 	ctx.Log.Info("found %d plan(s) in our workspace: %v", len(plans), paths)
 
-	results := []ProjectResult{}
+	var results []ProjectResult
 	for _, plan := range plans {
 		ctx.Log.Info("running apply for project at path %q", plan.Project.Path)
 		result := a.apply(ctx, repoDir, plan)

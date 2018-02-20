@@ -57,15 +57,16 @@ func (p *PlanExecutor) Execute(ctx *CommandContext) CommandResponse {
 	if err != nil {
 		return CommandResponse{Error: errors.Wrap(err, "getting modified files")}
 	}
-	ctx.Log.Info("found %d files modified in this pull request", len(modifiedFiles))
-	projects := p.ProjectFinder.FindModified(ctx.Log, modifiedFiles, ctx.BaseRepo.FullName)
-	if len(projects) == 0 {
-		return CommandResponse{Failure: "No Terraform files were modified."}
-	}
 
 	cloneDir, err := p.Workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, ctx.Command.Workspace)
 	if err != nil {
 		return CommandResponse{Error: err}
+	}
+
+	ctx.Log.Info("found %d files modified in this pull request", len(modifiedFiles))
+	projects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.BaseRepo.FullName, cloneDir)
+	if len(projects) == 0 {
+		return CommandResponse{Failure: "No Terraform files were modified."}
 	}
 
 	var results []ProjectResult
