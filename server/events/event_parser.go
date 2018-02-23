@@ -9,6 +9,7 @@ import (
 	"github.com/lkysow/go-gitlab"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/spf13/pflag"
 )
 
 const gitlabPullOpened = "opened"
@@ -20,6 +21,7 @@ type Command struct {
 	Workspace string
 	Verbose   bool
 	Flags     []string
+	Dir       string
 }
 
 type EventParsing interface {
@@ -60,10 +62,6 @@ func (e *EventParser) DetermineCommand(comment string, vcsHost vcs.Host) (*Comma
 		return nil, err
 	}
 
-	workspace := "default"
-	verbose := false
-	var flags []string
-
 	vcsUser := e.GithubUser
 	if vcsHost == vcs.Gitlab {
 		vcsUser = e.GitlabUser
@@ -71,41 +69,56 @@ func (e *EventParser) DetermineCommand(comment string, vcsHost vcs.Host) (*Comma
 	if !e.stringInSlice(args[0], []string{"run", "atlantis", "@" + vcsUser}) {
 		return nil, err
 	}
-	if !e.stringInSlice(args[1], []string{"plan", "apply", "help"}) {
+	if !e.stringInSlice(args[1], []string{"plan", "apply", "help", "-help", "--help"}) {
 		return nil, err
 	}
-	if args[1] == "help" {
+
+	command := args[1]
+	if command == "help" || command == "-help" || command == "--help" {
 		return &Command{Name: Help}, nil
 	}
-	command := args[1]
 
-	if len(args) > 2 {
-		flags = args[2:]
+	var workspace string
+	var dir string
+	var verbose bool
+	var extraArgs []string
+	var flagSet *pflag.FlagSet
+	var name CommandName
 
-		// if the third arg doesn't start with '-' then we assume it's a
-		// workspace, not a flag
-		if !strings.HasPrefix(args[2], "-") {
-			workspace = args[2]
-			flags = args[3:]
-		}
+	// Set up the flag parsing depending on the command.
+	if command == "plan" {
+		name = Plan
+		flagSet = pflag.NewFlagSet("plan", pflag.ContinueOnError)
+		flagSet.StringVarP(&workspace, "workspace", "w", "default", "Switch to this Terraform workspace before planning.")
+		flagSet.StringVarP(&dir, "dir", "d", ".", "Which directory to run plan in. Defaults to the root of the repo.")
+		flagSet.BoolVarP(&verbose, "verbose", "", false, "Append Atlantis log to comment.")
+	} else if command == "apply" {
+		name = Apply
+		flagSet = pflag.NewFlagSet("apply", pflag.ContinueOnError)
+		flagSet.StringVarP(&workspace, "workspace", "w", "default", "Apply the plan for this Terraform workspace.")
+		flagSet.StringVarP(&dir, "dir", "d", ".", "Run apply in this directory. Defaults to the root of the repo.")
+		flagSet.BoolVarP(&verbose, "verbose", "", false, "Append Atlantis log to comment.")
 
-		// check for --verbose specially and then remove any additional
-		// occurrences
-		if e.stringInSlice("--verbose", flags) {
-			verbose = true
-			flags = e.removeOccurrences("--verbose", flags)
-		}
+	} else {
+		return nil, fmt.Errorf("unknown command %q – this is a bug", command)
 	}
 
-	c := &Command{Verbose: verbose, Workspace: workspace, Flags: flags}
-	switch command {
-	case "plan":
-		c.Name = Plan
-	case "apply":
-		c.Name = Apply
-	default:
-		return nil, fmt.Errorf("something went wrong parsing the command, the command we parsed %q was not apply or plan", command)
+	// Now parse the flags.
+	if err := flagSet.Parse(args[2:]); err != nil {
+		return nil, err
 	}
+	// We only use the extra args after the --. For example given a comment:
+	// "atlantis plan -bad-option -- -target=hi"
+	// we only append "-target=hi" to the eventual command.
+	// todo: keep track of the args we're discarding and include that with
+	//       comment as a warning.
+	if flagSet.ArgsLenAtDash() != -1 {
+		extraArgs = flagSet.Args()[flagSet.ArgsLenAtDash():]
+	}
+
+	// todo: validate args
+
+	c := &Command{Name: name, Verbose: verbose, Workspace: workspace, Dir: dir, Flags: extraArgs}
 	return c, nil
 }
 
