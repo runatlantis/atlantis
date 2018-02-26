@@ -46,22 +46,39 @@ func (a *ApplyExecutor) Execute(ctx *CommandContext) CommandResponse {
 	// Plans are stored at project roots by their workspace names. We just
 	// need to find them.
 	var plans []models.Plan
-	err = filepath.Walk(repoDir, func(path string, info os.FileInfo, err error) error {
+	// If they didn't specify a directory, we apply all plans we can find for
+	// this workspace.
+	if ctx.Command.Dir == "" {
+		err = filepath.Walk(repoDir, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			// Check if the plan is for the right workspace,
+			if !info.IsDir() && info.Name() == ctx.Command.Workspace+".tfplan" {
+				rel, _ := filepath.Rel(repoDir, filepath.Dir(path))
+				plans = append(plans, models.Plan{
+					Project:   models.NewProject(ctx.BaseRepo.FullName, rel),
+					LocalPath: path,
+				})
+			}
+			return nil
+		})
 		if err != nil {
-			return err
+			return CommandResponse{Error: errors.Wrap(err, "finding plans")}
 		}
-		// Check if the plan is for the right workspace,
-		if !info.IsDir() && info.Name() == ctx.Command.Workspace+".tfplan" {
-			rel, _ := filepath.Rel(repoDir, filepath.Dir(path))
-			plans = append(plans, models.Plan{
-				Project:   models.NewProject(ctx.BaseRepo.FullName, rel),
-				LocalPath: path,
-			})
+	} else {
+		// If they did specify a dir, we apply just the plan in that directory
+		// for this workspace.
+		path := filepath.Join(repoDir, ctx.Command.Dir, ctx.Command.Workspace+".tfplan")
+		stat, err := os.Stat(path)
+		if err != nil || stat.IsDir() {
+			return CommandResponse{Error: errors.Wrapf(err, "finding plan for dir %q and workspace %q", ctx.Command.Dir, ctx.Command.Workspace)}
 		}
-		return nil
-	})
-	if err != nil {
-		return CommandResponse{Error: errors.Wrap(err, "finding plans")}
+		rel, _ := filepath.Rel(repoDir, filepath.Dir(path))
+		plans = append(plans, models.Plan{
+			Project:   models.NewProject(ctx.BaseRepo.FullName, filepath.Dir(rel)),
+			LocalPath: path,
+		})
 	}
 	if len(plans) == 0 {
 		return CommandResponse{Failure: "No plans found for that workspace."}

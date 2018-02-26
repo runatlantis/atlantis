@@ -3,6 +3,7 @@ package events
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/google/go-github/github"
@@ -21,7 +22,10 @@ type Command struct {
 	Workspace string
 	Verbose   bool
 	Flags     []string
-	Dir       string
+	// Dir is the path relative to the repo root to run the command in.
+	// If empty string then it wasn't specified. "." is the root of the repo.
+	// Dir will never end in "/".
+	Dir string
 }
 
 type EventParsing interface {
@@ -86,19 +90,19 @@ func (e *EventParser) DetermineCommand(comment string, vcsHost vcs.Host) (*Comma
 	var name CommandName
 
 	// Set up the flag parsing depending on the command.
+	const defaultWorkspace = "default"
 	if command == "plan" {
 		name = Plan
 		flagSet = pflag.NewFlagSet("plan", pflag.ContinueOnError)
-		flagSet.StringVarP(&workspace, "workspace", "w", "default", "Switch to this Terraform workspace before planning.")
-		flagSet.StringVarP(&dir, "dir", "d", ".", "Which directory to run plan in. Defaults to the root of the repo.")
+		flagSet.StringVarP(&workspace, "workspace", "w", defaultWorkspace, fmt.Sprintf("Switch to this Terraform workspace before planning. Defaults to '%s'", defaultWorkspace))
+		flagSet.StringVarP(&dir, "dir", "d", "", "Which directory to run plan in relative to root of repo. Use '.' for root. If not specified, will attempt to run plan for all Terraform projects we think were modified in this changeset.")
 		flagSet.BoolVarP(&verbose, "verbose", "", false, "Append Atlantis log to comment.")
 	} else if command == "apply" {
 		name = Apply
 		flagSet = pflag.NewFlagSet("apply", pflag.ContinueOnError)
-		flagSet.StringVarP(&workspace, "workspace", "w", "default", "Apply the plan for this Terraform workspace.")
-		flagSet.StringVarP(&dir, "dir", "d", ".", "Run apply in this directory. Defaults to the root of the repo.")
+		flagSet.StringVarP(&workspace, "workspace", "w", defaultWorkspace, fmt.Sprintf("Apply the plan for this Terraform workspace. Defaults to '%s'", defaultWorkspace))
+		flagSet.StringVarP(&dir, "dir", "d", "", "Run apply in this directory relative to root of repo. Use '.' for root. If not specified, will run apply against all plans created for this workspace.")
 		flagSet.BoolVarP(&verbose, "verbose", "", false, "Append Atlantis log to comment.")
-
 	} else {
 		return nil, fmt.Errorf("unknown command %q – this is a bug", command)
 	}
@@ -116,7 +120,26 @@ func (e *EventParser) DetermineCommand(comment string, vcsHost vcs.Host) (*Comma
 		extraArgs = flagSet.Args()[flagSet.ArgsLenAtDash():]
 	}
 
-	// todo: validate args
+	// If dir is specified, must ensure it's a valid path.
+	if dir != "" {
+		validatedDir := filepath.Clean(dir)
+		// Join with . so the path is relative. This helps us if they use '/',
+		// and is safe to do if their path is relative since it's a no-op.
+		validatedDir = filepath.Join(".", validatedDir)
+		// Need to clean again to resolve relative validatedDirs.
+		validatedDir = filepath.Clean(validatedDir)
+		// Detect relative dirs since they're not allowed.
+		if strings.HasPrefix(validatedDir, "..") {
+			return nil, fmt.Errorf("relative path %q not allowed", dir)
+		}
+
+		dir = validatedDir
+	}
+	// Because we use the workspace name as a file, need to make sure it's
+	// not doing something weird like being a relative dir.
+	if strings.Contains(workspace, "..") {
+		return nil, errors.New("workspace can't contain '..'")
+	}
 
 	c := &Command{Name: name, Verbose: verbose, Workspace: workspace, Dir: dir, Flags: extraArgs}
 	return c, nil
@@ -320,15 +343,4 @@ func (e *EventParser) stringInSlice(a string, list []string) bool {
 		}
 	}
 	return false
-}
-
-// nolint: unparam
-func (e *EventParser) removeOccurrences(a string, list []string) []string {
-	var out []string
-	for _, b := range list {
-		if b != a {
-			out = append(out, b)
-		}
-	}
-	return out
 }

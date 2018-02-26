@@ -52,21 +52,29 @@ func (p *PlanExecutor) SetLockURL(f func(id string) (url string)) {
 
 // Execute executes terraform plan for the ctx.
 func (p *PlanExecutor) Execute(ctx *CommandContext) CommandResponse {
-	// Figure out what projects have been modified so we know where to run plan.
-	modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.BaseRepo, ctx.Pull, ctx.VCSHost)
-	if err != nil {
-		return CommandResponse{Error: errors.Wrap(err, "getting modified files")}
-	}
-
 	cloneDir, err := p.Workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, ctx.Command.Workspace)
 	if err != nil {
 		return CommandResponse{Error: err}
 	}
 
-	ctx.Log.Info("found %d files modified in this pull request", len(modifiedFiles))
-	projects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.BaseRepo.FullName, cloneDir)
-	if len(projects) == 0 {
-		return CommandResponse{Failure: "No Terraform files were modified."}
+	var projects []models.Project
+	if ctx.Command.Dir == "" {
+		// If they didn't specify a directory to plan in, figure out what
+		// projects have been modified so we know where to run plan.
+		modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.BaseRepo, ctx.Pull, ctx.VCSHost)
+		if err != nil {
+			return CommandResponse{Error: errors.Wrap(err, "getting modified files")}
+		}
+		ctx.Log.Info("found %d files modified in this pull request", len(modifiedFiles))
+		projects = p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.BaseRepo.FullName, cloneDir)
+		if len(projects) == 0 {
+			return CommandResponse{Failure: "No Terraform files were modified."}
+		}
+	} else {
+		projects = []models.Project{{
+			Path:         ctx.Command.Dir,
+			RepoFullName: ctx.BaseRepo.FullName,
+		}}
 	}
 
 	var results []ProjectResult

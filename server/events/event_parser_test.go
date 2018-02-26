@@ -36,6 +36,15 @@ func TestDetermineCommandInvalid(t *testing.T) {
 		"atlantis slkjd",
 		"@github-user slkjd",
 		"atlantis plans",
+		// relative dirs
+		"atlantis plan -d ..",
+		"atlantis plan -d ../",
+		"atlantis plan -d a/../../",
+		// using .. in workspace
+		"atlantis plan -w a..",
+		"atlantis plan -w ../",
+		"atlantis plan -w ..",
+		"atlantis plan -w a/../b",
 		// misc
 		"related comment mentioning atlantis",
 	}
@@ -94,7 +103,7 @@ func TestDetermineCommand_Parsing(t *testing.T) {
 		{
 			"",
 			"default",
-			".",
+			"",
 			false,
 			"",
 		},
@@ -102,7 +111,7 @@ func TestDetermineCommand_Parsing(t *testing.T) {
 		{
 			"-w workspace",
 			"workspace",
-			".",
+			"",
 			false,
 			"",
 		},
@@ -116,7 +125,7 @@ func TestDetermineCommand_Parsing(t *testing.T) {
 		{
 			"--verbose",
 			"default",
-			".",
+			"",
 			true,
 			"",
 		},
@@ -153,7 +162,7 @@ func TestDetermineCommand_Parsing(t *testing.T) {
 		{
 			"-w workspace -- -d dir --verbose",
 			"workspace",
-			".",
+			"",
 			false,
 			"-d dir --verbose",
 		},
@@ -161,7 +170,7 @@ func TestDetermineCommand_Parsing(t *testing.T) {
 		{
 			"-w -d dir --verbose",
 			"-d",
-			".",
+			"",
 			true,
 			"",
 		},
@@ -169,14 +178,14 @@ func TestDetermineCommand_Parsing(t *testing.T) {
 		{
 			"--",
 			"default",
-			".",
+			"",
 			false,
 			"",
 		},
 		{
 			"abc --",
 			"default",
-			".",
+			"",
 			false,
 			"",
 		},
@@ -201,6 +210,42 @@ func TestDetermineCommand_Parsing(t *testing.T) {
 			"dir",
 			true,
 			"arg one -two --three &&",
+		},
+		// Test that the dir string is normalized.
+		{
+			"-d /",
+			"default",
+			".",
+			false,
+			"",
+		},
+		{
+			"-d /adir",
+			"default",
+			"adir",
+			false,
+			"",
+		},
+		{
+			"-d .",
+			"default",
+			".",
+			false,
+			"",
+		},
+		{
+			"-d ./",
+			"default",
+			".",
+			false,
+			"",
+		},
+		{
+			"-d ./adir",
+			"default",
+			"adir",
+			false,
+			"",
 		},
 	}
 	for _, test := range cases {
@@ -435,15 +480,6 @@ func TestParseGitlabMergeCommentEvent(t *testing.T) {
 	Equals(t, models.User{
 		Username: "root",
 	}, user)
-}
-
-func containsVerbose(list []string) bool {
-	for _, b := range list {
-		if b == "--verbose" {
-			return true
-		}
-	}
-	return false
 }
 
 var mergeEventJSON = `{
