@@ -72,12 +72,11 @@ If you're ready to permanently set up Atlantis see [Production-Ready Deployment]
 Atlantis currently supports three commands that can be run via pull request comments (or merge request comments on GitLab):
 
 ![Help Command](./docs/pr-comment-help.png)
-![Plan Command](./docs/pr-comment-plan.png)
-![Apply Command](./docs/pr-comment-apply.png)
-
 #### `atlantis help`
 View help
 
+---
+![Plan Command](./docs/pr-comment-plan.png)
 #### `atlantis plan [options] -- [terraform plan flags]`
 Runs `terraform plan` for the changes in this pull request.
 
@@ -95,7 +94,9 @@ atlantis plan -d dir -- -var 'foo=bar'
 ```
 If you always need to append a certain flag, see [Project-Specific Customization](#project-specific-customization).
 
-#### `atlantis apply [options] -- [terraform plan flags]`
+---
+![Apply Command](./docs/pr-comment-apply.png)
+#### `atlantis apply [options] -- [terraform apply flags]`
 Runs `terraform plan` for the changes in this pull request.
 
 Options:
