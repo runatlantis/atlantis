@@ -1,12 +1,11 @@
 package events_test
 
 import (
-	"testing"
-
-	"errors"
-	"strings"
-
 	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+	"testing"
 
 	"github.com/google/go-github/github"
 	"github.com/lkysow/go-gitlab"
@@ -26,7 +25,7 @@ var parser = events.EventParser{
 }
 
 func TestDetermineCommandInvalid(t *testing.T) {
-	t.Log("given a comment that does not match the regex should return an error")
+	t.Log("given an invalid comment, should return an error")
 	comments := []string{
 		// just the executable, no command
 		"run",
@@ -37,6 +36,15 @@ func TestDetermineCommandInvalid(t *testing.T) {
 		"atlantis slkjd",
 		"@github-user slkjd",
 		"atlantis plans",
+		// relative dirs
+		"atlantis plan -d ..",
+		"atlantis plan -d ../",
+		"atlantis plan -d a/../../",
+		// using .. in workspace
+		"atlantis plan -w a..",
+		"atlantis plan -w ../",
+		"atlantis plan -w ..",
+		"atlantis plan -w a/../b",
 		// misc
 		"related comment mentioning atlantis",
 	}
@@ -46,79 +54,215 @@ func TestDetermineCommandInvalid(t *testing.T) {
 	}
 }
 
-func TestDetermineCommandHelp(t *testing.T) {
+func TestDetermineCommand_ExecutableNames(t *testing.T) {
+	t.Log("should be allowed to use different executable names in the comments")
+	parsed, err := parser.DetermineCommand("atlantis plan", vcs.Github)
+	Ok(t, err)
+	Equals(t, events.Plan, parsed.Name)
+
+	parsed, err = parser.DetermineCommand("run plan", vcs.Github)
+	Ok(t, err)
+	Equals(t, events.Plan, parsed.Name)
+
+	parsed, err = parser.DetermineCommand("@github-user plan", vcs.Github)
+	Ok(t, err)
+	Equals(t, events.Plan, parsed.Name)
+
+	parsed, err = parser.DetermineCommand("@gitlab-user plan", vcs.Gitlab)
+	Ok(t, err)
+	Equals(t, events.Plan, parsed.Name)
+}
+
+func TestDetermineCommand_Help(t *testing.T) {
 	t.Log("given a help comment, should match")
-	comments := []string{
-		"run help",
-		"atlantis help",
-		"@github-user help",
-		"atlantis help --verbose",
+	helpArgs := []string{
+		"help",
+		"-help",
+		"--help",
+		"help -verbose",
+		"help --hi",
+		"help somethingelse",
 	}
-	for _, c := range comments {
-		command, e := parser.DetermineCommand(c, vcs.Github)
-		Ok(t, e)
-		Equals(t, events.Help, command.Name)
+	for _, arg := range helpArgs {
+		comment := fmt.Sprintf("atlantis %s", arg)
+		command, err := parser.DetermineCommand(comment, vcs.Github)
+		Assert(t, err == nil, "did not parse comment %q as help command, got err: %s", comment, err)
+		Assert(t, command.Name == events.Help, "did not parse comment %q as help command", comment)
 	}
 }
 
-// nolint: gocyclo
-func TestDetermineCommandPermutations(t *testing.T) {
-	execNames := []string{"run", "atlantis", "@github-user", "@gitlab-user"}
-	commandNames := []events.CommandName{events.Plan, events.Apply}
-	workspaces := []string{"", "default", "workspace", "workspace-dash", "workspace_underscore", "camelWorkspace"}
-	flagCases := [][]string{
-		{},
-		{"--verbose"},
-		{"-key=value"},
-		{"-key", "value"},
-		{"-key1=value1", "-key2=value2"},
-		{"-key1=value1", "-key2", "value2"},
-		{"-key1", "value1", "-key2=value2"},
-		{"--verbose", "key2=value2"},
-		{"-key1=value1", "--verbose"},
+func TestDetermineCommand_Parsing(t *testing.T) {
+	cases := []struct {
+		flags        string
+		expWorkspace string
+		expDir       string
+		expVerbose   bool
+		expExtraArgs string
+	}{
+		// Test defaults.
+		{
+			"",
+			"default",
+			"",
+			false,
+			"",
+		},
+		// Test each flag individually.
+		{
+			"-w workspace",
+			"workspace",
+			"",
+			false,
+			"",
+		},
+		{
+			"-d dir",
+			"default",
+			"dir",
+			false,
+			"",
+		},
+		{
+			"--verbose",
+			"default",
+			"",
+			true,
+			"",
+		},
+		// Test all of them with different permutations.
+		{
+			"-w workspace -d dir --verbose",
+			"workspace",
+			"dir",
+			true,
+			"",
+		},
+		{
+			"-d dir -w workspace --verbose",
+			"workspace",
+			"dir",
+			true,
+			"",
+		},
+		{
+			"--verbose -w workspace -d dir",
+			"workspace",
+			"dir",
+			true,
+			"",
+		},
+		// Test that flags after -- are ignored
+		{
+			"-w workspace -d dir -- --verbose",
+			"workspace",
+			"dir",
+			false,
+			"--verbose",
+		},
+		{
+			"-w workspace -- -d dir --verbose",
+			"workspace",
+			"",
+			false,
+			"-d dir --verbose",
+		},
+		// Test missing arguments.
+		{
+			"-w -d dir --verbose",
+			"-d",
+			"",
+			true,
+			"",
+		},
+		// Test the extra args parsing.
+		{
+			"--",
+			"default",
+			"",
+			false,
+			"",
+		},
+		{
+			"abc --",
+			"default",
+			"",
+			false,
+			"",
+		},
+		{
+			"-w workspace -d dir --verbose -- arg one -two --three &&",
+			"workspace",
+			"dir",
+			true,
+			"arg one -two --three &&",
+		},
+		// Test whitespace.
+		{
+			"\t-w\tworkspace\t-d\tdir\t--verbose\t--\targ\tone\t-two\t--three\t&&",
+			"workspace",
+			"dir",
+			true,
+			"arg one -two --three &&",
+		},
+		{
+			"   -w   workspace   -d   dir   --verbose   --   arg   one   -two   --three   &&",
+			"workspace",
+			"dir",
+			true,
+			"arg one -two --three &&",
+		},
+		// Test that the dir string is normalized.
+		{
+			"-d /",
+			"default",
+			".",
+			false,
+			"",
+		},
+		{
+			"-d /adir",
+			"default",
+			"adir",
+			false,
+			"",
+		},
+		{
+			"-d .",
+			"default",
+			".",
+			false,
+			"",
+		},
+		{
+			"-d ./",
+			"default",
+			".",
+			false,
+			"",
+		},
+		{
+			"-d ./adir",
+			"default",
+			"adir",
+			false,
+			"",
+		},
 	}
-
-	// test all permutations
-	for _, exec := range execNames {
-		for _, name := range commandNames {
-			for _, workspace := range workspaces {
-				for _, flags := range flagCases {
-					// If github comments end in a newline they get \r\n appended.
-					// Ensure that we parse commands properly either way.
-					for _, lineEnding := range []string{"", "\r\n"} {
-						comment := strings.Join(append([]string{exec, name.String(), workspace}, flags...), " ") + lineEnding
-						t.Log("testing comment: " + comment)
-
-						// In order to test gitlab without fully refactoring this test
-						// we're just detecting if we're using the gitlab user as the
-						// exec name.
-						vcsHost := vcs.Github
-						if exec == "@gitlab-user" {
-							vcsHost = vcs.Gitlab
-						}
-						c, err := parser.DetermineCommand(comment, vcsHost)
-						Ok(t, err)
-						Equals(t, name, c.Name)
-						if workspace == "" {
-							Equals(t, "default", c.Workspace)
-						} else {
-							Equals(t, workspace, c.Workspace)
-						}
-						Equals(t, containsVerbose(flags), c.Verbose)
-
-						// ensure --verbose never shows up in flags
-						for _, f := range c.Flags {
-							Assert(t, f != "--verbose", "Should not pass on the --verbose flag: %v", flags)
-						}
-
-						// check all flags are present
-						for _, f := range flags {
-							if f != "--verbose" {
-								Contains(t, f, c.Flags)
-							}
-						}
-					}
-				}
+	for _, test := range cases {
+		for _, cmdName := range []string{"plan", "apply"} {
+			comment := fmt.Sprintf("atlantis %s %s", cmdName, test.flags)
+			t.Logf("testing comment: %s", comment)
+			cmd, err := parser.DetermineCommand(comment, vcs.Github)
+			Assert(t, err == nil, "unexpected err parsing %q: %s", comment, err)
+			Equals(t, test.expDir, cmd.Dir)
+			Equals(t, test.expWorkspace, cmd.Workspace)
+			Equals(t, test.expVerbose, cmd.Verbose)
+			Equals(t, test.expExtraArgs, strings.Join(cmd.Flags, " "))
+			if cmdName == "plan" {
+				Assert(t, cmd.Name == events.Plan, "did not parse comment %q as plan command", comment)
+			}
+			if cmdName == "apply" {
+				Assert(t, cmd.Name == events.Apply, "did not parse comment %q as apply command", comment)
 			}
 		}
 	}
@@ -336,15 +480,6 @@ func TestParseGitlabMergeCommentEvent(t *testing.T) {
 	Equals(t, models.User{
 		Username: "root",
 	}, user)
-}
-
-func containsVerbose(list []string) bool {
-	for _, b := range list {
-		if b == "--verbose" {
-			return true
-		}
-	}
-	return false
 }
 
 var mergeEventJSON = `{

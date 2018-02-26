@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/mohae/deepcopy"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/locking"
@@ -22,6 +23,7 @@ var planCtx = events.CommandContext{
 	Command: &events.Command{
 		Name:      events.Plan,
 		Workspace: "workspace",
+		Dir:       "",
 	},
 	Log:      logging.NewNoopLogger(),
 	BaseRepo: models.Repo{},
@@ -61,6 +63,38 @@ func TestExecute_CloneErr(t *testing.T) {
 
 	Assert(t, r.Error != nil, "exp .Error to be set")
 	Equals(t, "err", r.Error.Error())
+}
+
+func TestExecute_DirectoryAndWorkspaceSet(t *testing.T) {
+	t.Log("Test that we run plan in the right directory and workspace if they're set")
+	p, runner, _ := setupPlanExecutorTest(t)
+	ctx := deepcopy.Copy(planCtx).(events.CommandContext)
+	ctx.Log = logging.NewNoopLogger()
+	ctx.Command.Dir = "dir1/dir2"
+	ctx.Command.Workspace = "workspace-flag"
+
+	When(p.Workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, "workspace-flag")).
+		ThenReturn("/tmp/clone-repo", nil)
+	When(p.ProjectPreExecute.Execute(&ctx, "/tmp/clone-repo", models.Project{RepoFullName: "", Path: "dir1/dir2"})).
+		ThenReturn(events.PreExecuteResult{
+			LockResponse: locking.TryLockResponse{
+				LockKey: "key",
+			},
+		})
+	r := p.Execute(&ctx)
+
+	runner.VerifyWasCalledOnce().RunCommandWithVersion(
+		ctx.Log,
+		"/tmp/clone-repo/dir1/dir2",
+		[]string{"plan", "-refresh", "-no-color", "-out", "/tmp/clone-repo/dir1/dir2/workspace-flag.tfplan", "-var", "atlantis_user=anubhavmishra"},
+		nil,
+		"workspace-flag",
+	)
+	Assert(t, len(r.ProjectResults) == 1, "exp one project result")
+	result := r.ProjectResults[0]
+	Assert(t, result.PlanSuccess != nil, "exp plan success to not be nil")
+	Equals(t, "", result.PlanSuccess.TerraformOutput)
+	Equals(t, "lockurl-key", result.PlanSuccess.LockURL)
 }
 
 func TestExecute_Success(t *testing.T) {

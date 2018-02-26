@@ -3,12 +3,14 @@ package events
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/google/go-github/github"
 	"github.com/lkysow/go-gitlab"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/spf13/pflag"
 )
 
 const gitlabPullOpened = "opened"
@@ -20,6 +22,10 @@ type Command struct {
 	Workspace string
 	Verbose   bool
 	Flags     []string
+	// Dir is the path relative to the repo root to run the command in.
+	// If empty string then it wasn't specified. "." is the root of the repo.
+	// Dir will never end in "/".
+	Dir string
 }
 
 type EventParsing interface {
@@ -60,10 +66,6 @@ func (e *EventParser) DetermineCommand(comment string, vcsHost vcs.Host) (*Comma
 		return nil, err
 	}
 
-	workspace := "default"
-	verbose := false
-	var flags []string
-
 	vcsUser := e.GithubUser
 	if vcsHost == vcs.Gitlab {
 		vcsUser = e.GitlabUser
@@ -71,41 +73,75 @@ func (e *EventParser) DetermineCommand(comment string, vcsHost vcs.Host) (*Comma
 	if !e.stringInSlice(args[0], []string{"run", "atlantis", "@" + vcsUser}) {
 		return nil, err
 	}
-	if !e.stringInSlice(args[1], []string{"plan", "apply", "help"}) {
+	if !e.stringInSlice(args[1], []string{"plan", "apply", "help", "-help", "--help"}) {
 		return nil, err
 	}
-	if args[1] == "help" {
+
+	command := args[1]
+	if command == "help" || command == "-help" || command == "--help" {
 		return &Command{Name: Help}, nil
 	}
-	command := args[1]
 
-	if len(args) > 2 {
-		flags = args[2:]
+	var workspace string
+	var dir string
+	var verbose bool
+	var extraArgs []string
+	var flagSet *pflag.FlagSet
+	var name CommandName
 
-		// if the third arg doesn't start with '-' then we assume it's a
-		// workspace, not a flag
-		if !strings.HasPrefix(args[2], "-") {
-			workspace = args[2]
-			flags = args[3:]
-		}
-
-		// check for --verbose specially and then remove any additional
-		// occurrences
-		if e.stringInSlice("--verbose", flags) {
-			verbose = true
-			flags = e.removeOccurrences("--verbose", flags)
-		}
+	// Set up the flag parsing depending on the command.
+	const defaultWorkspace = "default"
+	if command == "plan" {
+		name = Plan
+		flagSet = pflag.NewFlagSet("plan", pflag.ContinueOnError)
+		flagSet.StringVarP(&workspace, "workspace", "w", defaultWorkspace, fmt.Sprintf("Switch to this Terraform workspace before planning. Defaults to '%s'", defaultWorkspace))
+		flagSet.StringVarP(&dir, "dir", "d", "", "Which directory to run plan in relative to root of repo. Use '.' for root. If not specified, will attempt to run plan for all Terraform projects we think were modified in this changeset.")
+		flagSet.BoolVarP(&verbose, "verbose", "", false, "Append Atlantis log to comment.")
+	} else if command == "apply" {
+		name = Apply
+		flagSet = pflag.NewFlagSet("apply", pflag.ContinueOnError)
+		flagSet.StringVarP(&workspace, "workspace", "w", defaultWorkspace, fmt.Sprintf("Apply the plan for this Terraform workspace. Defaults to '%s'", defaultWorkspace))
+		flagSet.StringVarP(&dir, "dir", "d", "", "Apply the plan for this directory, relative to root of repo. Use '.' for root. If not specified, will run apply against all plans created for this workspace.")
+		flagSet.BoolVarP(&verbose, "verbose", "", false, "Append Atlantis log to comment.")
+	} else {
+		return nil, fmt.Errorf("unknown command %q – this is a bug", command)
 	}
 
-	c := &Command{Verbose: verbose, Workspace: workspace, Flags: flags}
-	switch command {
-	case "plan":
-		c.Name = Plan
-	case "apply":
-		c.Name = Apply
-	default:
-		return nil, fmt.Errorf("something went wrong parsing the command, the command we parsed %q was not apply or plan", command)
+	// Now parse the flags.
+	if err := flagSet.Parse(args[2:]); err != nil {
+		return nil, err
 	}
+	// We only use the extra args after the --. For example given a comment:
+	// "atlantis plan -bad-option -- -target=hi"
+	// we only append "-target=hi" to the eventual command.
+	// todo: keep track of the args we're discarding and include that with
+	//       comment as a warning.
+	if flagSet.ArgsLenAtDash() != -1 {
+		extraArgs = flagSet.Args()[flagSet.ArgsLenAtDash():]
+	}
+
+	// If dir is specified, must ensure it's a valid path.
+	if dir != "" {
+		validatedDir := filepath.Clean(dir)
+		// Join with . so the path is relative. This helps us if they use '/',
+		// and is safe to do if their path is relative since it's a no-op.
+		validatedDir = filepath.Join(".", validatedDir)
+		// Need to clean again to resolve relative validatedDirs.
+		validatedDir = filepath.Clean(validatedDir)
+		// Detect relative dirs since they're not allowed.
+		if strings.HasPrefix(validatedDir, "..") {
+			return nil, fmt.Errorf("relative path %q not allowed", dir)
+		}
+
+		dir = validatedDir
+	}
+	// Because we use the workspace name as a file, need to make sure it's
+	// not doing something weird like being a relative dir.
+	if strings.Contains(workspace, "..") {
+		return nil, errors.New("workspace can't contain '..'")
+	}
+
+	c := &Command{Name: name, Verbose: verbose, Workspace: workspace, Dir: dir, Flags: extraArgs}
 	return c, nil
 }
 
@@ -307,15 +343,4 @@ func (e *EventParser) stringInSlice(a string, list []string) bool {
 		}
 	}
 	return false
-}
-
-// nolint: unparam
-func (e *EventParser) removeOccurrences(a string, list []string) []string {
-	var out []string
-	for _, b := range list {
-		if b != a {
-			out = append(out, b)
-		}
-	}
-	return out
 }

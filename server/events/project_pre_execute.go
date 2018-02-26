@@ -51,14 +51,28 @@ func (p *DefaultProjectPreExecutor) Execute(ctx *CommandContext, repoDir string,
 			lockAttempt.CurrLock.Pull.Num)}}
 	}
 	ctx.Log.Info("acquired lock with id %q", lockAttempt.LockKey)
+	config, tfVersion, err := p.executeWithLock(ctx, repoDir, project)
+	if err != nil {
+		p.Locker.Unlock(lockAttempt.LockKey) // nolint: errcheck
+		return PreExecuteResult{ProjectResult: ProjectResult{Error: err}}
+	}
+	return PreExecuteResult{ProjectConfig: config, TerraformVersion: tfVersion, LockResponse: lockAttempt}
+}
+
+// executeWithLock executes the pre plan/apply tasks after the lock has been
+// acquired. This helper func makes revoking the lock on error easier.
+// Returns the project config, terraform version, or an error.
+func (p *DefaultProjectPreExecutor) executeWithLock(ctx *CommandContext, repoDir string, project models.Project) (ProjectConfig, *version.Version, error) {
+	workspace := ctx.Command.Workspace
 
 	// Check if config file is found, if not we continue the run.
 	var config ProjectConfig
 	absolutePath := filepath.Join(repoDir, project.Path)
 	if p.ConfigReader.Exists(absolutePath) {
+		var err error
 		config, err = p.ConfigReader.Read(absolutePath)
 		if err != nil {
-			return PreExecuteResult{ProjectResult: ProjectResult{Error: err}}
+			return config, nil, err
 		}
 		ctx.Log.Info("parsed atlantis config file in %q", absolutePath)
 	}
@@ -74,25 +88,25 @@ func (p *DefaultProjectPreExecutor) Execute(ctx *CommandContext, repoDir string,
 		if len(config.PreInit) > 0 {
 			_, err := p.Run.Execute(ctx.Log, config.PreInit, absolutePath, workspace, terraformVersion, "pre_init")
 			if err != nil {
-				return PreExecuteResult{ProjectResult: ProjectResult{Error: errors.Wrapf(err, "running %s commands", "pre_init")}}
+				return config, nil, errors.Wrapf(err, "running %s commands", "pre_init")
 			}
 		}
 		_, err := p.Terraform.Init(ctx.Log, absolutePath, workspace, config.GetExtraArguments("init"), terraformVersion)
 		if err != nil {
-			return PreExecuteResult{ProjectResult: ProjectResult{Error: err}}
+			return config, nil, err
 		}
 	} else {
 		ctx.Log.Info("determined that we are running terraform with version < 0.9.0. Running version %s", terraformVersion)
 		if len(config.PreGet) > 0 {
 			_, err := p.Run.Execute(ctx.Log, config.PreGet, absolutePath, workspace, terraformVersion, "pre_get")
 			if err != nil {
-				return PreExecuteResult{ProjectResult: ProjectResult{Error: errors.Wrapf(err, "running %s commands", "pre_get")}}
+				return config, nil, errors.Wrapf(err, "running %s commands", "pre_get")
 			}
 		}
 		terraformGetCmd := append([]string{"get", "-no-color"}, config.GetExtraArguments("get")...)
 		_, err := p.Terraform.RunCommandWithVersion(ctx.Log, absolutePath, terraformGetCmd, terraformVersion, workspace)
 		if err != nil {
-			return PreExecuteResult{ProjectResult: ProjectResult{Error: err}}
+			return config, nil, err
 		}
 	}
 
@@ -106,8 +120,8 @@ func (p *DefaultProjectPreExecutor) Execute(ctx *CommandContext, repoDir string,
 	if len(commands) > 0 {
 		_, err := p.Run.Execute(ctx.Log, commands, absolutePath, workspace, terraformVersion, stage)
 		if err != nil {
-			return PreExecuteResult{ProjectResult: ProjectResult{Error: errors.Wrapf(err, "running %s commands", stage)}}
+			return config, nil, errors.Wrapf(err, "running %s commands", stage)
 		}
 	}
-	return PreExecuteResult{ProjectConfig: config, TerraformVersion: terraformVersion, LockResponse: lockAttempt}
+	return config, terraformVersion, nil
 }
