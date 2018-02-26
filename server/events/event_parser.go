@@ -101,7 +101,7 @@ func (e *EventParser) DetermineCommand(comment string, vcsHost vcs.Host) (*Comma
 		name = Apply
 		flagSet = pflag.NewFlagSet("apply", pflag.ContinueOnError)
 		flagSet.StringVarP(&workspace, "workspace", "w", defaultWorkspace, fmt.Sprintf("Apply the plan for this Terraform workspace. Defaults to '%s'", defaultWorkspace))
-		flagSet.StringVarP(&dir, "dir", "d", "", "Run apply in this directory relative to root of repo. Use '.' for root. If not specified, will run apply against all plans created for this workspace.")
+		flagSet.StringVarP(&dir, "dir", "d", "", "Apply the plan for this directory, relative to root of repo. Use '.' for root. If not specified, will run apply against all plans created for this workspace.")
 		flagSet.BoolVarP(&verbose, "verbose", "", false, "Append Atlantis log to comment.")
 	} else {
 		return nil, fmt.Errorf("unknown command %q – this is a bug", command)
