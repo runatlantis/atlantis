@@ -8,7 +8,7 @@
 ## Walkthrough Video
 [![Atlantis Walkthrough](./docs/atlantis-walkthrough-icon.png)](https://www.youtube.com/watch?v=TmIPWda0IKg)
 
-Read about [Why We Built Atlantis](https://www.atlantis.run/blog/atlantis-release/)
+Read about [Why We Built Atlantis](https://medium.com/runatlantis/introducing-atlantis-6570d6de7281)
 
 [![CircleCI](https://circleci.com/gh/runatlantis/atlantis/tree/master.svg?style=shield)](https://circleci.com/gh/runatlantis/atlantis/tree/master)
 [![SuperDopeBadge](https://img.shields.io/badge/Hightower-extra%20dope-b9f2ff.svg)](https://twitter.com/kelseyhightower/status/893260922222813184)
