@@ -125,7 +125,7 @@ func (c *CommandHandler) run(ctx *CommandContext) {
 
 	if ctx.Pull.State != models.Open {
 		ctx.Log.Info("command was run on closed pull request")
-		c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull, "Atlantis commands can't be run on closed pull requests", ctx.VCSHost) // nolint: errcheck
+		c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, "Atlantis commands can't be run on closed pull requests", ctx.VCSHost) // nolint: errcheck
 		return
 	}
 
@@ -167,14 +167,14 @@ func (c *CommandHandler) updatePull(ctx *CommandContext, res CommandResponse) {
 	// Update the pull request's status icon and comment back.
 	c.CommitStatusUpdater.UpdateProjectResult(ctx, res) // nolint: errcheck
 	comment := c.MarkdownRenderer.Render(res, ctx.Command.Name, ctx.Log.History.String(), ctx.Command.Verbose)
-	c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull, comment, ctx.VCSHost) // nolint: errcheck
+	c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, comment, ctx.VCSHost) // nolint: errcheck
 }
 
 // logPanics logs and creates a comment on the pull request for panics.
 func (c *CommandHandler) logPanics(ctx *CommandContext) {
 	if err := recover(); err != nil {
 		stack := recovery.Stack(3)
-		c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull, // nolint: errcheck
+		c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, // nolint: errcheck
 			fmt.Sprintf("**Error: goroutine panic. This is a bug.**\n```\n%s\n%s```", err, stack), ctx.VCSHost)
 		ctx.Log.Err("PANIC: %s\n%s", err, stack)
 	}

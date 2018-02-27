@@ -66,7 +66,7 @@ func TestExecuteCommand_LogPanics(t *testing.T) {
 	setup(t)
 	When(ghStatus.Update(fixtures.Repo, fixtures.Pull, vcs.Pending, nil, vcs.Github)).ThenPanic("panic")
 	ch.ExecuteCommand(fixtures.Repo, fixtures.Repo, fixtures.User, 1, nil, vcs.Github)
-	_, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString(), matchers.AnyVcsHost()).GetCapturedArguments()
+	_, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), matchers.AnyVcsHost()).GetCapturedArguments()
 	Assert(t, strings.Contains(comment, "Error: goroutine panic"), "comment should be about a goroutine panic")
 }
 
@@ -125,7 +125,7 @@ func TestExecuteCommand_ClosedPull(t *testing.T) {
 	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, fixtures.Repo, nil)
 
 	ch.ExecuteCommand(fixtures.Repo, fixtures.Repo, fixtures.User, fixtures.Pull.Num, nil, vcs.Github)
-	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.Repo, modelPull, "Atlantis commands can't be run on closed pull requests", vcs.Github)
+	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.Repo, modelPull.Num, "Atlantis commands can't be run on closed pull requests", vcs.Github)
 }
 
 func TestExecuteCommand_WorkspaceLocked(t *testing.T) {
@@ -150,7 +150,7 @@ func TestExecuteCommand_WorkspaceLocked(t *testing.T) {
 	ghStatus.VerifyWasCalledOnce().Update(fixtures.Repo, fixtures.Pull, vcs.Pending, &cmd, vcs.Github)
 	_, response := ghStatus.VerifyWasCalledOnce().UpdateProjectResult(matchers.AnyPtrToEventsCommandContext(), matchers.AnyEventsCommandResponse()).GetCapturedArguments()
 	Equals(t, msg, response.Failure)
-	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.Repo, fixtures.Pull,
+	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.Repo, fixtures.Pull.Num,
 		"**Plan Failed**: "+msg+"\n\n", vcs.Github)
 }
 
@@ -183,7 +183,7 @@ func TestExecuteCommand_FullRun(t *testing.T) {
 		ghStatus.VerifyWasCalledOnce().Update(fixtures.Repo, fixtures.Pull, vcs.Pending, &cmd, vcs.Github)
 		_, response := ghStatus.VerifyWasCalledOnce().UpdateProjectResult(matchers.AnyPtrToEventsCommandContext(), matchers.AnyEventsCommandResponse()).GetCapturedArguments()
 		Equals(t, cmdResponse, response)
-		vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString(), matchers.AnyVcsHost())
+		vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), matchers.AnyVcsHost())
 		workspaceLocker.VerifyWasCalledOnce().Unlock(fixtures.Repo.FullName, cmd.Workspace, fixtures.Pull.Num)
 	}
 }

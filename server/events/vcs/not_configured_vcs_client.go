@@ -16,7 +16,7 @@ type NotConfiguredVCSClient struct {
 func (a *NotConfiguredVCSClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	return nil, a.err()
 }
-func (a *NotConfiguredVCSClient) CreateComment(repo models.Repo, pull models.PullRequest, comment string) error {
+func (a *NotConfiguredVCSClient) CreateComment(repo models.Repo, pullNum int, comment string) error {
 	return a.err()
 }
 func (a *NotConfiguredVCSClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
