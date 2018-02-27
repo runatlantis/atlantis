@@ -97,7 +97,7 @@ If you always need to append a certain flag, see [Project-Specific Customization
 ---
 ![Apply Command](./docs/pr-comment-apply.png)
 #### `atlantis apply [options] -- [terraform apply flags]`
-Runs `terraform plan` for the changes in this pull request.
+Runs `terraform apply` for the plans that match the directory and workspace.
 
 Options:
 * `-d directory` Apply the plan for this directory, relative to root of repo. Use `.` for root. If not specified, will run apply against all plans created for this workspace.
