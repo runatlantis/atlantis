@@ -11,7 +11,7 @@ Paginate = 4
 [[menu.main]]
     name = "Blog"
     weight = -100
-    url = "/blog/"
+    url = "https://medium.com/runatlantis"
 [[menu.main]]
     name = "FAQ"
     weight = -100
