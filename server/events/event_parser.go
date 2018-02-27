@@ -117,7 +117,12 @@ func (e *EventParser) DetermineCommand(comment string, vcsHost vcs.Host) (*Comma
 	// todo: keep track of the args we're discarding and include that with
 	//       comment as a warning.
 	if flagSet.ArgsLenAtDash() != -1 {
-		extraArgs = flagSet.Args()[flagSet.ArgsLenAtDash():]
+		extraArgsUnsafe := flagSet.Args()[flagSet.ArgsLenAtDash():]
+		// Quote all extra args so there isn't a security issue when we append
+		// them to the terraform commands, ex. "; cat /etc/passwd"
+		for _, arg := range extraArgsUnsafe {
+			extraArgs = append(extraArgs, fmt.Sprintf(`"%s"`, arg))
+		}
 	}
 
 	// If dir is specified, must ensure it's a valid path.

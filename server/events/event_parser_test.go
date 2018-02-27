@@ -157,14 +157,14 @@ func TestDetermineCommand_Parsing(t *testing.T) {
 			"workspace",
 			"dir",
 			false,
-			"--verbose",
+			"\"--verbose\"",
 		},
 		{
 			"-w workspace -- -d dir --verbose",
 			"workspace",
 			"",
 			false,
-			"-d dir --verbose",
+			"\"-d\" \"dir\" \"--verbose\"",
 		},
 		// Test missing arguments.
 		{
@@ -194,7 +194,7 @@ func TestDetermineCommand_Parsing(t *testing.T) {
 			"workspace",
 			"dir",
 			true,
-			"arg one -two --three &&",
+			"\"arg\" \"one\" \"-two\" \"--three\" \"&&\"",
 		},
 		// Test whitespace.
 		{
@@ -202,14 +202,14 @@ func TestDetermineCommand_Parsing(t *testing.T) {
 			"workspace",
 			"dir",
 			true,
-			"arg one -two --three &&",
+			"\"arg\" \"one\" \"-two\" \"--three\" \"&&\"",
 		},
 		{
 			"   -w   workspace   -d   dir   --verbose   --   arg   one   -two   --three   &&",
 			"workspace",
 			"dir",
 			true,
-			"arg one -two --three &&",
+			"\"arg\" \"one\" \"-two\" \"--three\" \"&&\"",
 		},
 		// Test that the dir string is normalized.
 		{

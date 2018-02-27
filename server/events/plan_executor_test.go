@@ -97,6 +97,54 @@ func TestExecute_DirectoryAndWorkspaceSet(t *testing.T) {
 	Equals(t, "lockurl-key", result.PlanSuccess.LockURL)
 }
 
+func TestExecute_AddedArgs(t *testing.T) {
+	t.Log("Test that we include extra-args added to the comment in the plan command")
+	p, runner, _ := setupPlanExecutorTest(t)
+	ctx := deepcopy.Copy(planCtx).(events.CommandContext)
+	ctx.Log = logging.NewNoopLogger()
+	ctx.Command.Flags = []string{"\"-target=resource\"", "\"-var\"", "\"a=b\"", "\";\"", "\"echo\"", "\"hi\""}
+
+	When(p.VCSClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyVcsHost())).ThenReturn([]string{"file.tf"}, nil)
+	When(p.Workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, "workspace")).
+		ThenReturn("/tmp/clone-repo", nil)
+	When(p.ProjectPreExecute.Execute(&ctx, "/tmp/clone-repo", models.Project{RepoFullName: "", Path: "."})).
+		ThenReturn(events.PreExecuteResult{
+			LockResponse: locking.TryLockResponse{
+				LockKey: "key",
+			},
+		})
+	r := p.Execute(&ctx)
+
+	runner.VerifyWasCalledOnce().RunCommandWithVersion(
+		ctx.Log,
+		"/tmp/clone-repo",
+		[]string{
+			"plan",
+			"-refresh",
+			"-no-color",
+			"-out",
+			"/tmp/clone-repo/workspace.tfplan",
+			"-var",
+			"atlantis_user=anubhavmishra",
+			// NOTE: extra args should be quoted to prevent an attacker from
+			// appending malicious commands.
+			"\"-target=resource\"",
+			"\"-var\"",
+			"\"a=b\"",
+			"\";\"",
+			"\"echo\"",
+			"\"hi\"",
+		},
+		nil,
+		"workspace",
+	)
+	Assert(t, len(r.ProjectResults) == 1, "exp one project result")
+	result := r.ProjectResults[0]
+	Assert(t, result.PlanSuccess != nil, "exp plan success to not be nil")
+	Equals(t, "", result.PlanSuccess.TerraformOutput)
+	Equals(t, "lockurl-key", result.PlanSuccess.LockURL)
+}
+
 func TestExecute_Success(t *testing.T) {
 	t.Log("If there are no errors, the plan should be returned")
 	p, runner, _ := setupPlanExecutorTest(t)
