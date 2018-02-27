@@ -82,7 +82,7 @@ Runs `terraform plan` for the changes in this pull request.
 
 Options:
 * `-d directory` Which directory to run plan in relative to root of repo. Use '.' for root. If not specified, will attempt to run plan for all Terraform projects we think were modified in this changeset.
-* -w workspace` Switch to this [Terraform workspace](https://www.terraform.io/docs/state/workspaces.html) before planning. Defaults to 'default'. If not using Terraform workspaces you can ignore this.
+* `-w workspace` Switch to this [Terraform workspace](https://www.terraform.io/docs/state/workspaces.html) before planning. Defaults to 'default'. If not using Terraform workspaces you can ignore this.
 * `--verbose` Append Atlantis log to comment.
 
 Additional Terraform flags:
@@ -101,7 +101,7 @@ Runs `terraform plan` for the changes in this pull request.
 
 Options:
 * `-d directory` Apply the plan for this directory, relative to root of repo. Use '.' for root. If not specified, will run apply against all plans created for this workspace.
-* -w workspace` Apply the plan for this [Terraform workspace](https://www.terraform.io/docs/state/workspaces.html). Defaults to 'default'. If not using Terraform workspaces you can ignore this.
+* `-w workspace` Apply the plan for this [Terraform workspace](https://www.terraform.io/docs/state/workspaces.html). Defaults to 'default'. If not using Terraform workspaces you can ignore this.
 * `--verbose` Append Atlantis log to comment.
 
 Additional Terraform flags:
