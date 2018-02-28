@@ -9,9 +9,7 @@ import (
 	github "github.com/google/go-github/github"
 	go_gitlab "github.com/lkysow/go-gitlab"
 	pegomock "github.com/petergtz/pegomock"
-	events "github.com/runatlantis/atlantis/server/events"
 	models "github.com/runatlantis/atlantis/server/events/models"
-	vcs "github.com/runatlantis/atlantis/server/events/vcs"
 )
 
 type MockEventParsing struct {
@@ -20,22 +18,6 @@ type MockEventParsing struct {
 
 func NewMockEventParsing() *MockEventParsing {
 	return &MockEventParsing{fail: pegomock.GlobalFailHandler}
-}
-
-func (mock *MockEventParsing) DetermineCommand(comment string, vcsHost vcs.Host) (*events.Command, error) {
-	params := []pegomock.Param{comment, vcsHost}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("DetermineCommand", params, []reflect.Type{reflect.TypeOf((**events.Command)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 *events.Command
-	var ret1 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(*events.Command)
-		}
-		if result[1] != nil {
-			ret1 = result[1].(error)
-		}
-	}
-	return ret0, ret1
 }
 
 func (mock *MockEventParsing) ParseGithubIssueCommentEvent(comment *github.IssueCommentEvent) (models.Repo, models.User, int, error) {
@@ -162,37 +144,6 @@ type VerifierEventParsing struct {
 	mock                   *MockEventParsing
 	invocationCountMatcher pegomock.Matcher
 	inOrderContext         *pegomock.InOrderContext
-}
-
-func (verifier *VerifierEventParsing) DetermineCommand(comment string, vcsHost vcs.Host) *EventParsing_DetermineCommand_OngoingVerification {
-	params := []pegomock.Param{comment, vcsHost}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "DetermineCommand", params)
-	return &EventParsing_DetermineCommand_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
-}
-
-type EventParsing_DetermineCommand_OngoingVerification struct {
-	mock              *MockEventParsing
-	methodInvocations []pegomock.MethodInvocation
-}
-
-func (c *EventParsing_DetermineCommand_OngoingVerification) GetCapturedArguments() (string, vcs.Host) {
-	comment, vcsHost := c.GetAllCapturedArguments()
-	return comment[len(comment)-1], vcsHost[len(vcsHost)-1]
-}
-
-func (c *EventParsing_DetermineCommand_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []vcs.Host) {
-	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(params) > 0 {
-		_param0 = make([]string, len(params[0]))
-		for u, param := range params[0] {
-			_param0[u] = param.(string)
-		}
-		_param1 = make([]vcs.Host, len(params[1]))
-		for u, param := range params[1] {
-			_param1[u] = param.(vcs.Host)
-		}
-	}
-	return
 }
 
 func (verifier *VerifierEventParsing) ParseGithubIssueCommentEvent(comment *github.IssueCommentEvent) *EventParsing_ParseGithubIssueCommentEvent_OngoingVerification {

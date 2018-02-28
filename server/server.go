@@ -184,7 +184,6 @@ func NewServer(config Config) (*Server, error) {
 		Locker:            lockingClient,
 		ProjectFinder:     &events.DefaultProjectFinder{},
 	}
-	helpExecutor := &events.HelpExecutor{}
 	pullClosedExecutor := &events.PullClosedExecutor{
 		VCSClient: vcsClient,
 		Locker:    lockingClient,
@@ -197,10 +196,15 @@ func NewServer(config Config) (*Server, error) {
 		GitlabUser:  config.GitlabUser,
 		GitlabToken: config.GitlabToken,
 	}
+	commentParser := &events.CommentParser{
+		GithubUser:  config.GithubUser,
+		GithubToken: config.GithubToken,
+		GitlabUser:  config.GitlabUser,
+		GitlabToken: config.GitlabToken,
+	}
 	commandHandler := &events.CommandHandler{
 		ApplyExecutor:            applyExecutor,
 		PlanExecutor:             planExecutor,
-		HelpExecutor:             helpExecutor,
 		LockURLGenerator:         planExecutor,
 		EventParser:              eventParser,
 		VCSClient:                vcsClient,
@@ -215,12 +219,14 @@ func NewServer(config Config) (*Server, error) {
 		CommandRunner:          commandHandler,
 		PullCleaner:            pullClosedExecutor,
 		Parser:                 eventParser,
+		CommentParser:          commentParser,
 		Logger:                 logger,
 		GithubWebHookSecret:    []byte(config.GithubWebHookSecret),
 		GithubRequestValidator: &DefaultGithubRequestValidator{},
 		GitlabRequestParser:    &DefaultGitlabRequestParser{},
 		GitlabWebHookSecret:    []byte(config.GitlabWebHookSecret),
 		SupportedVCSHosts:      supportedVCSHosts,
+		VCSClient:              vcsClient,
 	}
 	router := mux.NewRouter()
 	return &Server{

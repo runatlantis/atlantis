@@ -3,17 +3,20 @@ package events
 import (
 	"errors"
 	"fmt"
-	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/google/go-github/github"
 	"github.com/lkysow/go-gitlab"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/vcs"
-	"github.com/spf13/pflag"
 )
 
 const gitlabPullOpened = "opened"
+const usagesCols = 90
+
+// multiLineRegex is used to ignore multi-line comments since those aren't valid
+// Atlantis commands.
+var multiLineRegex = regexp.MustCompile(`.*\r?\n.+`)
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_event_parsing.go EventParsing
 
@@ -29,7 +32,6 @@ type Command struct {
 }
 
 type EventParsing interface {
-	DetermineCommand(comment string, vcsHost vcs.Host) (*Command, error)
 	ParseGithubIssueCommentEvent(comment *github.IssueCommentEvent) (baseRepo models.Repo, user models.User, pullNum int, err error)
 	ParseGithubPull(pull *github.PullRequest) (models.PullRequest, models.Repo, error)
 	ParseGithubRepo(ghRepo *github.Repository) (models.Repo, error)
@@ -43,106 +45,6 @@ type EventParser struct {
 	GithubToken string
 	GitlabUser  string
 	GitlabToken string
-}
-
-// DetermineCommand parses the comment as an atlantis command. If it succeeds,
-// it returns the command. Otherwise it returns error.
-// nolint: gocyclo
-func (e *EventParser) DetermineCommand(comment string, vcsHost vcs.Host) (*Command, error) {
-	// valid commands contain:
-	// the initial "executable" name, 'run' or 'atlantis' or '@GithubUser' where GithubUser is the api user atlantis is running as
-	// then a command, either 'plan', 'apply', or 'help'
-	// then an optional workspace argument, an optional --verbose flag and any other flags
-	//
-	// examples:
-	// atlantis help
-	// run plan
-	// @GithubUser plan staging
-	// atlantis plan staging --verbose
-	// atlantis plan staging --verbose -key=value -key2 value2
-	err := errors.New("not an Atlantis command")
-	args := strings.Fields(comment)
-	if len(args) < 2 {
-		return nil, err
-	}
-
-	vcsUser := e.GithubUser
-	if vcsHost == vcs.Gitlab {
-		vcsUser = e.GitlabUser
-	}
-	if !e.stringInSlice(args[0], []string{"run", "atlantis", "@" + vcsUser}) {
-		return nil, err
-	}
-	if !e.stringInSlice(args[1], []string{"plan", "apply", "help", "-help", "--help"}) {
-		return nil, err
-	}
-
-	command := args[1]
-	if command == "help" || command == "-help" || command == "--help" {
-		return &Command{Name: Help}, nil
-	}
-
-	var workspace string
-	var dir string
-	var verbose bool
-	var extraArgs []string
-	var flagSet *pflag.FlagSet
-	var name CommandName
-
-	// Set up the flag parsing depending on the command.
-	const defaultWorkspace = "default"
-	if command == "plan" {
-		name = Plan
-		flagSet = pflag.NewFlagSet("plan", pflag.ContinueOnError)
-		flagSet.StringVarP(&workspace, "workspace", "w", defaultWorkspace, fmt.Sprintf("Switch to this Terraform workspace before planning. Defaults to '%s'", defaultWorkspace))
-		flagSet.StringVarP(&dir, "dir", "d", "", "Which directory to run plan in relative to root of repo. Use '.' for root. If not specified, will attempt to run plan for all Terraform projects we think were modified in this changeset.")
-		flagSet.BoolVarP(&verbose, "verbose", "", false, "Append Atlantis log to comment.")
-	} else if command == "apply" {
-		name = Apply
-		flagSet = pflag.NewFlagSet("apply", pflag.ContinueOnError)
-		flagSet.StringVarP(&workspace, "workspace", "w", defaultWorkspace, fmt.Sprintf("Apply the plan for this Terraform workspace. Defaults to '%s'", defaultWorkspace))
-		flagSet.StringVarP(&dir, "dir", "d", "", "Apply the plan for this directory, relative to root of repo. Use '.' for root. If not specified, will run apply against all plans created for this workspace.")
-		flagSet.BoolVarP(&verbose, "verbose", "", false, "Append Atlantis log to comment.")
-	} else {
-		return nil, fmt.Errorf("unknown command %q – this is a bug", command)
-	}
-
-	// Now parse the flags.
-	if err := flagSet.Parse(args[2:]); err != nil {
-		return nil, err
-	}
-	// We only use the extra args after the --. For example given a comment:
-	// "atlantis plan -bad-option -- -target=hi"
-	// we only append "-target=hi" to the eventual command.
-	// todo: keep track of the args we're discarding and include that with
-	//       comment as a warning.
-	if flagSet.ArgsLenAtDash() != -1 {
-		extraArgs = flagSet.Args()[flagSet.ArgsLenAtDash():]
-	}
-
-	// If dir is specified, must ensure it's a valid path.
-	if dir != "" {
-		validatedDir := filepath.Clean(dir)
-		// Join with . so the path is relative. This helps us if they use '/',
-		// and is safe to do if their path is relative since it's a no-op.
-		validatedDir = filepath.Join(".", validatedDir)
-		// Need to clean again to resolve relative validatedDirs.
-		validatedDir = filepath.Clean(validatedDir)
-		// Detect relative dirs since they're not allowed.
-		if strings.HasPrefix(validatedDir, "..") {
-			return nil, fmt.Errorf("relative path %q not allowed", dir)
-		}
-
-		dir = validatedDir
-	}
-	// Because we use the workspace name as a file, need to make sure it's
-	// not doing something weird like being a relative dir.
-	if strings.Contains(workspace, "..") {
-		return nil, errors.New("workspace can't contain '..'")
-	}
-
-	c := &Command{Name: name, Verbose: verbose, Workspace: workspace, Dir: dir, Flags: extraArgs}
-	return c, nil
 }
 
 func (e *EventParser) ParseGithubIssueCommentEvent(comment *github.IssueCommentEvent) (baseRepo models.Repo, user models.User, pullNum int, err error) {
@@ -334,13 +236,4 @@ func (e *EventParser) ParseGitlabMergeRequest(mr *gitlab.MergeRequest) models.Pu
 		Branch:     mr.SourceBranch,
 		State:      pullState,
 	}
-}
-
-func (e *EventParser) stringInSlice(a string, list []string) bool {
-	for _, b := range list {
-		if b == a {
-			return true
-		}
-	}
-	return false
 }

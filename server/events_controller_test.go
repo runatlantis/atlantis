@@ -16,6 +16,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/mocks"
 )
@@ -28,7 +29,7 @@ var eventsReq *http.Request
 
 func TestPost_NotGithubOrGitlab(t *testing.T) {
 	t.Log("when the request is not for gitlab or github a 400 is returned")
-	e, _, _, _, _, _ := setup(t)
+	e, _, _, _, _, _, _, _ := setup(t)
 	w := httptest.NewRecorder()
 	e.Post(w, eventsReq)
 	responseContains(t, w, http.StatusBadRequest, "Ignoring request")
@@ -36,7 +37,7 @@ func TestPost_NotGithubOrGitlab(t *testing.T) {
 
 func TestPost_UnsupportedVCSGithub(t *testing.T) {
 	t.Log("when the request is for an unsupported vcs a 400 is returned")
-	e, _, _, _, _, _ := setup(t)
+	e, _, _, _, _, _, _, _ := setup(t)
 	e.SupportedVCSHosts = nil
 	eventsReq.Header.Set(githubHeader, "value")
 	w := httptest.NewRecorder()
@@ -46,7 +47,7 @@ func TestPost_UnsupportedVCSGithub(t *testing.T) {
 
 func TestPost_UnsupportedVCSGitlab(t *testing.T) {
 	t.Log("when the request is for an unsupported vcs a 400 is returned")
-	e, _, _, _, _, _ := setup(t)
+	e, _, _, _, _, _, _, _ := setup(t)
 	e.SupportedVCSHosts = nil
 	eventsReq.Header.Set(gitlabHeader, "value")
 	w := httptest.NewRecorder()
@@ -56,7 +57,7 @@ func TestPost_UnsupportedVCSGitlab(t *testing.T) {
 
 func TestPost_InvalidGithubSecret(t *testing.T) {
 	t.Log("when the github payload can't be validated a 400 is returned")
-	e, v, _, _, _, _ := setup(t)
+	e, v, _, _, _, _, _, _ := setup(t)
 	w := httptest.NewRecorder()
 	eventsReq.Header.Set(githubHeader, "value")
 	When(v.Validate(eventsReq, secret)).ThenReturn(nil, errors.New("err"))
@@ -66,7 +67,7 @@ func TestPost_InvalidGithubSecret(t *testing.T) {
 
 func TestPost_InvalidGitlabSecret(t *testing.T) {
 	t.Log("when the gitlab payload can't be validated a 400 is returned")
-	e, _, gl, _, _, _ := setup(t)
+	e, _, gl, _, _, _, _, _ := setup(t)
 	w := httptest.NewRecorder()
 	eventsReq.Header.Set(gitlabHeader, "value")
 	When(gl.Validate(eventsReq, secret)).ThenReturn(nil, errors.New("err"))
@@ -76,7 +77,7 @@ func TestPost_InvalidGitlabSecret(t *testing.T) {
 
 func TestPost_UnsupportedGithubEvent(t *testing.T) {
 	t.Log("when the event type is an unsupported github event we ignore it")
-	e, v, _, _, _, _ := setup(t)
+	e, v, _, _, _, _, _, _ := setup(t)
 	w := httptest.NewRecorder()
 	eventsReq.Header.Set(githubHeader, "value")
 	When(v.Validate(eventsReq, nil)).ThenReturn([]byte(`{"not an event": ""}`), nil)
@@ -86,7 +87,7 @@ func TestPost_UnsupportedGithubEvent(t *testing.T) {
 
 func TestPost_UnsupportedGitlabEvent(t *testing.T) {
 	t.Log("when the event type is an unsupported gitlab event we ignore it")
-	e, _, gl, _, _, _ := setup(t)
+	e, _, gl, _, _, _, _, _ := setup(t)
 	w := httptest.NewRecorder()
 	eventsReq.Header.Set(gitlabHeader, "value")
 	When(gl.Validate(eventsReq, secret)).ThenReturn([]byte(`{"not an event": ""}`), nil)
@@ -96,7 +97,7 @@ func TestPost_UnsupportedGitlabEvent(t *testing.T) {
 
 func TestPost_GithubCommentNotCreated(t *testing.T) {
 	t.Log("when the event is a github comment but it's not a created event we ignore it")
-	e, v, _, _, _, _ := setup(t)
+	e, v, _, _, _, _, _, _ := setup(t)
 	eventsReq.Header.Set(githubHeader, "issue_comment")
 	// comment action is deleted, not created
 	event := `{"action": "deleted"}`
@@ -108,7 +109,7 @@ func TestPost_GithubCommentNotCreated(t *testing.T) {
 
 func TestPost_GithubInvalidComment(t *testing.T) {
 	t.Log("when the event is a github comment without all expected data we return a 400")
-	e, v, _, p, _, _ := setup(t)
+	e, v, _, p, _, _, _, _ := setup(t)
 	eventsReq.Header.Set(githubHeader, "issue_comment")
 	event := `{"action": "created"}`
 	When(v.Validate(eventsReq, secret)).ThenReturn([]byte(event), nil)
@@ -120,31 +121,60 @@ func TestPost_GithubInvalidComment(t *testing.T) {
 
 func TestPost_GitlabCommentInvalidCommand(t *testing.T) {
 	t.Log("when the event is a gitlab comment with an invalid command we ignore it")
-	e, _, gl, p, _, _ := setup(t)
+	e, _, gl, _, _, _, _, cp := setup(t)
 	eventsReq.Header.Set(gitlabHeader, "value")
 	When(gl.Validate(eventsReq, secret)).ThenReturn(gitlab.MergeCommentEvent{}, nil)
-	When(p.DetermineCommand("", vcs.Gitlab)).ThenReturn(nil, errors.New("err"))
+	When(cp.Parse("", vcs.Gitlab)).ThenReturn(events.CommentParseResult{Ignore: true})
 	w := httptest.NewRecorder()
 	e.Post(w, eventsReq)
-	responseContains(t, w, http.StatusOK, "Ignoring: err")
+	responseContains(t, w, http.StatusOK, "Ignoring non-command comment: \"\"")
 }
 
 func TestPost_GithubCommentInvalidCommand(t *testing.T) {
 	t.Log("when the event is a github comment with an invalid command we ignore it")
-	e, v, _, p, _, _ := setup(t)
+	e, v, _, p, _, _, _, cp := setup(t)
 	eventsReq.Header.Set(githubHeader, "issue_comment")
 	event := `{"action": "created"}`
 	When(v.Validate(eventsReq, secret)).ThenReturn([]byte(event), nil)
 	When(p.ParseGithubIssueCommentEvent(matchers.AnyPtrToGithubIssueCommentEvent())).ThenReturn(models.Repo{}, models.User{}, 1, nil)
-	When(p.DetermineCommand("", vcs.Github)).ThenReturn(nil, errors.New("err"))
+	When(cp.Parse("", vcs.Github)).ThenReturn(events.CommentParseResult{Ignore: true})
 	w := httptest.NewRecorder()
 	e.Post(w, eventsReq)
-	responseContains(t, w, http.StatusOK, "Ignoring: err")
+	responseContains(t, w, http.StatusOK, "Ignoring non-command comment: \"\"")
+}
+
+func TestPost_GitlabCommentResponse(t *testing.T) {
+	t.Log("when the event is a gitlab comment that warrants a comment response we comment back")
+	e, _, gl, _, _, _, vcsClient, cp := setup(t)
+	eventsReq.Header.Set(gitlabHeader, "value")
+	When(gl.Validate(eventsReq, secret)).ThenReturn(gitlab.MergeCommentEvent{}, nil)
+	When(cp.Parse("", vcs.Gitlab)).ThenReturn(events.CommentParseResult{CommentResponse: "a comment"})
+	w := httptest.NewRecorder()
+	e.Post(w, eventsReq)
+	vcsClient.VerifyWasCalledOnce().CreateComment(models.Repo{}, 0, "a comment", vcs.Gitlab)
+	responseContains(t, w, http.StatusOK, "Commenting back on pull request")
+}
+
+func TestPost_GithubCommentResponse(t *testing.T) {
+	t.Log("when the event is a github comment that warrants a comment response we comment back")
+	e, v, _, p, _, _, vcsClient, cp := setup(t)
+	eventsReq.Header.Set(githubHeader, "issue_comment")
+	event := `{"action": "created"}`
+	When(v.Validate(eventsReq, secret)).ThenReturn([]byte(event), nil)
+	baseRepo := models.Repo{}
+	user := models.User{}
+	When(p.ParseGithubIssueCommentEvent(matchers.AnyPtrToGithubIssueCommentEvent())).ThenReturn(baseRepo, user, 1, nil)
+	When(cp.Parse("", vcs.Github)).ThenReturn(events.CommentParseResult{CommentResponse: "a comment"})
+	w := httptest.NewRecorder()
+
+	e.Post(w, eventsReq)
+	vcsClient.VerifyWasCalledOnce().CreateComment(baseRepo, 1, "a comment", vcs.Github)
+	responseContains(t, w, http.StatusOK, "Commenting back on pull request")
 }
 
 func TestPost_GitlabCommentSuccess(t *testing.T) {
 	t.Log("when the event is a gitlab comment with a valid command we call the command handler")
-	e, _, gl, _, cr, _ := setup(t)
+	e, _, gl, _, cr, _, _, _ := setup(t)
 	eventsReq.Header.Set(gitlabHeader, "value")
 	When(gl.Validate(eventsReq, secret)).ThenReturn(gitlab.MergeCommentEvent{}, nil)
 	w := httptest.NewRecorder()
@@ -158,7 +188,7 @@ func TestPost_GitlabCommentSuccess(t *testing.T) {
 
 func TestPost_GithubCommentSuccess(t *testing.T) {
 	t.Log("when the event is a github comment with a valid command we call the command handler")
-	e, v, _, p, cr, _ := setup(t)
+	e, v, _, p, cr, _, _, cp := setup(t)
 	eventsReq.Header.Set(githubHeader, "issue_comment")
 	event := `{"action": "created"}`
 	When(v.Validate(eventsReq, secret)).ThenReturn([]byte(event), nil)
@@ -166,7 +196,7 @@ func TestPost_GithubCommentSuccess(t *testing.T) {
 	user := models.User{}
 	cmd := events.Command{}
 	When(p.ParseGithubIssueCommentEvent(matchers.AnyPtrToGithubIssueCommentEvent())).ThenReturn(baseRepo, user, 1, nil)
-	When(p.DetermineCommand("", vcs.Github)).ThenReturn(&cmd, nil)
+	When(cp.Parse("", vcs.Github)).ThenReturn(events.CommentParseResult{Command: &cmd})
 	w := httptest.NewRecorder()
 	e.Post(w, eventsReq)
 	responseContains(t, w, http.StatusOK, "Processing...")
@@ -178,7 +208,7 @@ func TestPost_GithubCommentSuccess(t *testing.T) {
 
 func TestPost_GithubPullRequestNotClosed(t *testing.T) {
 	t.Log("when the event is a github pull reuqest but it's not a closed event we ignore it")
-	e, v, _, _, _, _ := setup(t)
+	e, v, _, _, _, _, _, _ := setup(t)
 	eventsReq.Header.Set(githubHeader, "pull_request")
 	event := `{"action": "opened"}`
 	When(v.Validate(eventsReq, secret)).ThenReturn([]byte(event), nil)
@@ -189,7 +219,7 @@ func TestPost_GithubPullRequestNotClosed(t *testing.T) {
 
 func TestPost_GitlabMergeRequestNotClosed(t *testing.T) {
 	t.Log("when the event is a gitlab merge request but it's not a closed event we ignore it")
-	e, _, gl, p, _, _ := setup(t)
+	e, _, gl, p, _, _, _, _ := setup(t)
 	eventsReq.Header.Set(gitlabHeader, "value")
 	event := gitlab.MergeEvent{}
 	When(gl.Validate(eventsReq, secret)).ThenReturn(event, nil)
@@ -201,7 +231,7 @@ func TestPost_GitlabMergeRequestNotClosed(t *testing.T) {
 
 func TestPost_GithubPullRequestInvalid(t *testing.T) {
 	t.Log("when the event is a github pull request with invalid data we return a 400")
-	e, v, _, p, _, _ := setup(t)
+	e, v, _, p, _, _, _, _ := setup(t)
 	eventsReq.Header.Set(githubHeader, "pull_request")
 
 	event := `{"action": "closed"}`
@@ -214,7 +244,7 @@ func TestPost_GithubPullRequestInvalid(t *testing.T) {
 
 func TestPost_GithubPullRequestInvalidRepo(t *testing.T) {
 	t.Log("when the event is a github pull request with invalid repo data we return a 400")
-	e, v, _, p, _, _ := setup(t)
+	e, v, _, p, _, _, _, _ := setup(t)
 	eventsReq.Header.Set(githubHeader, "pull_request")
 
 	event := `{"action": "closed"}`
@@ -229,7 +259,7 @@ func TestPost_GithubPullRequestInvalidRepo(t *testing.T) {
 func TestPost_GithubPullRequestErrCleaningPull(t *testing.T) {
 	t.Log("when the event is a pull request and we have an error calling CleanUpPull we return a 503")
 	RegisterMockTestingT(t)
-	e, v, _, p, _, c := setup(t)
+	e, v, _, p, _, c, _, _ := setup(t)
 	eventsReq.Header.Set(githubHeader, "pull_request")
 
 	event := `{"action": "closed"}`
@@ -246,7 +276,7 @@ func TestPost_GithubPullRequestErrCleaningPull(t *testing.T) {
 
 func TestPost_GitlabMergeRequestErrCleaningPull(t *testing.T) {
 	t.Log("when the event is a gitlab merge request and an error occurs calling CleanUpPull we return a 503")
-	e, _, gl, p, _, c := setup(t)
+	e, _, gl, p, _, c, _, _ := setup(t)
 	eventsReq.Header.Set(gitlabHeader, "value")
 	event := gitlab.MergeEvent{}
 	When(gl.Validate(eventsReq, secret)).ThenReturn(event, nil)
@@ -261,7 +291,7 @@ func TestPost_GitlabMergeRequestErrCleaningPull(t *testing.T) {
 
 func TestPost_GithubPullRequestSuccess(t *testing.T) {
 	t.Log("when the event is a pull request and everything works we return a 200")
-	e, v, _, p, _, c := setup(t)
+	e, v, _, p, _, c, _, _ := setup(t)
 	eventsReq.Header.Set(githubHeader, "pull_request")
 
 	event := `{"action": "closed"}`
@@ -278,7 +308,7 @@ func TestPost_GithubPullRequestSuccess(t *testing.T) {
 
 func TestPost_GitlabMergeRequestSuccess(t *testing.T) {
 	t.Log("when the event is a gitlab merge request and the cleanup works we return a 200")
-	e, _, gl, p, _, _ := setup(t)
+	e, _, gl, p, _, _, _, _ := setup(t)
 	eventsReq.Header.Set(gitlabHeader, "value")
 	event := gitlab.MergeEvent{}
 	When(gl.Validate(eventsReq, secret)).ThenReturn(event, nil)
@@ -290,24 +320,28 @@ func TestPost_GitlabMergeRequestSuccess(t *testing.T) {
 	responseContains(t, w, http.StatusOK, "Merge request cleaned successfully")
 }
 
-func setup(t *testing.T) (server.EventsController, *mocks.MockGithubRequestValidator, *mocks.MockGitlabRequestParser, *emocks.MockEventParsing, *emocks.MockCommandRunner, *emocks.MockPullCleaner) {
+func setup(t *testing.T) (server.EventsController, *mocks.MockGithubRequestValidator, *mocks.MockGitlabRequestParser, *emocks.MockEventParsing, *emocks.MockCommandRunner, *emocks.MockPullCleaner, *vcsmocks.MockClientProxy, *emocks.MockCommentParsing) {
 	RegisterMockTestingT(t)
 	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	v := mocks.NewMockGithubRequestValidator()
 	gl := mocks.NewMockGitlabRequestParser()
 	p := emocks.NewMockEventParsing()
+	cp := emocks.NewMockCommentParsing()
 	cr := emocks.NewMockCommandRunner()
 	c := emocks.NewMockPullCleaner()
+	vcsmock := vcsmocks.NewMockClientProxy()
 	e := server.EventsController{
 		Logger:                 logging.NewNoopLogger(),
 		GithubRequestValidator: v,
 		Parser:                 p,
+		CommentParser:          cp,
 		CommandRunner:          cr,
 		PullCleaner:            c,
 		GithubWebHookSecret:    secret,
 		SupportedVCSHosts:      []vcs.Host{vcs.Github, vcs.Gitlab},
 		GitlabWebHookSecret:    secret,
 		GitlabRequestParser:    gl,
+		VCSClient:              vcsmock,
 	}
-	return e, v, gl, p, cr, c
+	return e, v, gl, p, cr, c, vcsmock, cp
 }

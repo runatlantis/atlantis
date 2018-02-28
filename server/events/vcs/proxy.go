@@ -11,7 +11,7 @@ import (
 // VCS host is required.
 type ClientProxy interface {
 	GetModifiedFiles(repo models.Repo, pull models.PullRequest, host Host) ([]string, error)
-	CreateComment(repo models.Repo, pull models.PullRequest, comment string, host Host) error
+	CreateComment(repo models.Repo, pullNum int, comment string, host Host) error
 	PullIsApproved(repo models.Repo, pull models.PullRequest, host Host) (bool, error)
 	UpdateStatus(repo models.Repo, pull models.PullRequest, state CommitStatus, description string, host Host) error
 }
@@ -48,12 +48,12 @@ func (d *DefaultClientProxy) GetModifiedFiles(repo models.Repo, pull models.Pull
 	return nil, invalidVCSErr
 }
 
-func (d *DefaultClientProxy) CreateComment(repo models.Repo, pull models.PullRequest, comment string, host Host) error {
+func (d *DefaultClientProxy) CreateComment(repo models.Repo, pullNum int, comment string, host Host) error {
 	switch host {
 	case Github:
-		return d.GithubClient.CreateComment(repo, pull, comment)
+		return d.GithubClient.CreateComment(repo, pullNum, comment)
 	case Gitlab:
-		return d.GitlabClient.CreateComment(repo, pull, comment)
+		return d.GitlabClient.CreateComment(repo, pullNum, comment)
 	}
 	return invalidVCSErr
 }

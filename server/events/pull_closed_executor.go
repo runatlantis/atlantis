@@ -64,7 +64,7 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 	if err = pullClosedTemplate.Execute(&buf, templateData); err != nil {
 		return errors.Wrap(err, "rendering template for comment")
 	}
-	return p.VCSClient.CreateComment(repo, pull, buf.String(), host)
+	return p.VCSClient.CreateComment(repo, pull.Num, buf.String(), host)
 }
 
 // buildTemplateData formats the lock data into a slice that can easily be

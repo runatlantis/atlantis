@@ -70,8 +70,8 @@ func (g *GithubClient) GetModifiedFiles(repo models.Repo, pull models.PullReques
 }
 
 // CreateComment creates a comment on the pull request.
-func (g *GithubClient) CreateComment(repo models.Repo, pull models.PullRequest, comment string) error {
-	_, _, err := g.client.Issues.CreateComment(g.ctx, repo.Owner, repo.Name, pull.Num, &github.IssueComment{Body: &comment})
+func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment string) error {
+	_, _, err := g.client.Issues.CreateComment(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueComment{Body: &comment})
 	return err
 }
 
