@@ -12,10 +12,14 @@ import (
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_comment_parsing.go CommentParsing
 
+// CommentParsing handles parsing pull request comments.
 type CommentParsing interface {
-	DetermineCommand(comment string, vcsHost vcs.Host) CommentParseResult
+	// Parse attempts to parse a pull request comment to see if it's an Atlantis
+	// commmand.
+	Parse(comment string, vcsHost vcs.Host) CommentParseResult
 }
 
+// CommentParser implements CommentParsing
 type CommentParser struct {
 	GithubUser  string
 	GithubToken string
@@ -35,7 +39,7 @@ type CommentParseResult struct {
 	Ignore bool
 }
 
-// DetermineCommand parses the comment as an Atlantis command.
+// Parse parses the comment as an Atlantis command.
 //
 // Valid commands contain:
 // - The initial "executable" name, 'run' or 'atlantis' or '@GithubUser'
@@ -52,7 +56,7 @@ type CommentParseResult struct {
 // - atlantis plan --verbose -- -key=value -key2 value2
 //
 // nolint: gocyclo
-func (e *CommentParser) DetermineCommand(comment string, vcsHost vcs.Host) CommentParseResult {
+func (e *CommentParser) Parse(comment string, vcsHost vcs.Host) CommentParseResult {
 	if multiLineRegex.MatchString(comment) {
 		return CommentParseResult{Ignore: true}
 	}
@@ -137,6 +141,7 @@ func (e *CommentParser) DetermineCommand(comment string, vcsHost vcs.Host) Comme
 	if err != nil {
 		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: %s.\nUsage of %s:\n%s\n```", err.Error(), command, flagSet.FlagUsagesWrapped(usagesCols))}
 	}
+
 	// We only use the extra args after the --. For example given a comment:
 	// "atlantis plan -bad-option -- -target=hi"
 	// we only append "-target=hi" to the eventual command.
@@ -152,21 +157,11 @@ func (e *CommentParser) DetermineCommand(comment string, vcsHost vcs.Host) Comme
 		}
 	}
 
-	// If dir is specified, must ensure it's a valid path.
-	if dir != "" {
-		validatedDir := filepath.Clean(dir)
-		// Join with . so the path is relative. This helps us if they use '/',
-		// and is safe to do if their path is relative since it's a no-op.
-		validatedDir = filepath.Join(".", validatedDir)
-		// Need to clean again to resolve relative validatedDirs.
-		validatedDir = filepath.Clean(validatedDir)
-		// Detect relative dirs since they're not allowed.
-		if strings.HasPrefix(validatedDir, "..") {
-			return CommentParseResult{CommentResponse: fmt.Sprintf("Error: Using a relative path %q with -d/--dir is not allowed", dir)}
-		}
-
-		dir = validatedDir
+	dir, err = e.validateDir(dir)
+	if err != nil {
+		return CommentParseResult{CommentResponse: err.Error()}
 	}
+
 	// Because we use the workspace name as a file, need to make sure it's
 	// not doing something weird like being a relative dir.
 	if strings.Contains(workspace, "..") {
@@ -176,6 +171,24 @@ func (e *CommentParser) DetermineCommand(comment string, vcsHost vcs.Host) Comme
 	return CommentParseResult{
 		Command: &Command{Name: name, Verbose: verbose, Workspace: workspace, Dir: dir, Flags: extraArgs},
 	}
+}
+
+func (e *CommentParser) validateDir(dir string) (string, error) {
+	if dir == "" {
+		return dir, nil
+	}
+	validatedDir := filepath.Clean(dir)
+	// Join with . so the path is relative. This helps us if they use '/',
+	// and is safe to do if their path is relative since it's a no-op.
+	validatedDir = filepath.Join(".", validatedDir)
+	// Need to clean again to resolve relative validatedDirs.
+	validatedDir = filepath.Clean(validatedDir)
+	// Detect relative dirs since they're not allowed.
+	if strings.HasPrefix(validatedDir, "..") {
+		return "", fmt.Errorf("Error: Using a relative path %q with -d/--dir is not allowed", dir)
+	}
+
+	return validatedDir, nil
 }
 
 func (e *CommentParser) stringInSlice(a string, list []string) bool {

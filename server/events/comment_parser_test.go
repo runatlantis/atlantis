@@ -17,7 +17,7 @@ var commentParser = events.CommentParser{
 	GitlabToken: "gitlab-token",
 }
 
-func TestDetermineCommand_Ignored(t *testing.T) {
+func TestParse_Ignored(t *testing.T) {
 	t.Log("given a comment that should be ignored we should set " +
 		"CommentParseResult.Ignore to true")
 	ignoreComments := []string{
@@ -28,12 +28,12 @@ func TestDetermineCommand_Ignored(t *testing.T) {
 		"terraform plan\nbut with newlines",
 	}
 	for _, c := range ignoreComments {
-		r := commentParser.DetermineCommand(c, vcs.Github)
+		r := commentParser.Parse(c, vcs.Github)
 		Assert(t, r.Ignore, "expected Ignore to be true for comment %q", c)
 	}
 }
 
-func TestDetermineCommand_HelpResponse(t *testing.T) {
+func TestParse_HelpResponse(t *testing.T) {
 	t.Log("given a comment that should result in help output we " +
 		"should set CommentParseResult.CommentResult")
 	helpComments := []string{
@@ -47,12 +47,12 @@ func TestDetermineCommand_HelpResponse(t *testing.T) {
 		"atlantis help plan",
 	}
 	for _, c := range helpComments {
-		r := commentParser.DetermineCommand(c, vcs.Github)
+		r := commentParser.Parse(c, vcs.Github)
 		Equals(t, events.HelpComment, r.CommentResponse)
 	}
 }
 
-func TestDetermineCommand_DidYouMeanAtlantis(t *testing.T) {
+func TestParse_DidYouMeanAtlantis(t *testing.T) {
 	t.Log("given a comment that should result in a 'did you mean atlantis'" +
 		"response, should set CommentParseResult.CommentResult")
 	comments := []string{
@@ -65,13 +65,13 @@ func TestDetermineCommand_DidYouMeanAtlantis(t *testing.T) {
 		"terraform plan -w workspace -d . -- test",
 	}
 	for _, c := range comments {
-		r := commentParser.DetermineCommand(c, vcs.Github)
+		r := commentParser.Parse(c, vcs.Github)
 		Assert(t, r.CommentResponse == events.DidYouMeanAtlantisComment,
 			"For comment %q expected CommentResponse==%q but got %q", c, events.DidYouMeanAtlantisComment, r.CommentResponse)
 	}
 }
 
-func TestDetermineCommand_InvalidCommand(t *testing.T) {
+func TestParse_InvalidCommand(t *testing.T) {
 	t.Log("given a comment with an invalid atlantis command, should return " +
 		"a warning.")
 	comments := []string{
@@ -80,14 +80,14 @@ func TestDetermineCommand_InvalidCommand(t *testing.T) {
 		"atlantis appely apply",
 	}
 	for _, c := range comments {
-		r := commentParser.DetermineCommand(c, vcs.Github)
+		r := commentParser.Parse(c, vcs.Github)
 		exp := fmt.Sprintf("```\nError: unknown command %q.\nRun 'atlantis --help' for usage.\n```", strings.Fields(c)[1])
 		Assert(t, r.CommentResponse == exp,
 			"For comment %q expected CommentResponse==%q but got %q", c, exp, r.CommentResponse)
 	}
 }
 
-func TestDetermineCommand_SubcommandUsage(t *testing.T) {
+func TestParse_SubcommandUsage(t *testing.T) {
 	t.Log("given a comment asking for the usage of a subcommand should " +
 		"return help")
 	comments := []string{
@@ -97,7 +97,7 @@ func TestDetermineCommand_SubcommandUsage(t *testing.T) {
 		"atlantis apply --help",
 	}
 	for _, c := range comments {
-		r := commentParser.DetermineCommand(c, vcs.Github)
+		r := commentParser.Parse(c, vcs.Github)
 		exp := "Usage of " + strings.Fields(c)[1]
 		Assert(t, strings.Contains(r.CommentResponse, exp),
 			"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
@@ -106,7 +106,7 @@ func TestDetermineCommand_SubcommandUsage(t *testing.T) {
 	}
 }
 
-func TestDetermineCommand_InvalidFlags(t *testing.T) {
+func TestParse_InvalidFlags(t *testing.T) {
 	t.Log("given a comment with a valid atlantis command but invalid" +
 		" flags, should return a warning and the proper usage")
 	cases := []struct {
@@ -131,7 +131,7 @@ func TestDetermineCommand_InvalidFlags(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		r := commentParser.DetermineCommand(c.comment, vcs.Github)
+		r := commentParser.Parse(c.comment, vcs.Github)
 		Assert(t, strings.Contains(r.CommentResponse, c.exp),
 			"For comment %q expected CommentResponse %q to contain %q", c.comment, r.CommentResponse, c.exp)
 		Assert(t, strings.Contains(r.CommentResponse, "Usage of "),
@@ -139,7 +139,7 @@ func TestDetermineCommand_InvalidFlags(t *testing.T) {
 	}
 }
 
-func TestDetermineCommand_RelativeDirPath(t *testing.T) {
+func TestParse_RelativeDirPath(t *testing.T) {
 	t.Log("if -d is used with a relative path, should return an error")
 	comments := []string{
 		"atlantis plan -d ..",
@@ -153,14 +153,14 @@ func TestDetermineCommand_RelativeDirPath(t *testing.T) {
 		"atlantis apply -d a/../..",
 	}
 	for _, c := range comments {
-		r := commentParser.DetermineCommand(c, vcs.Github)
+		r := commentParser.Parse(c, vcs.Github)
 		exp := "Error: Using a relative path"
 		Assert(t, strings.Contains(r.CommentResponse, exp),
 			"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
 	}
 }
 
-func TestDetermineCommand_InvalidWorkspace(t *testing.T) {
+func TestParse_InvalidWorkspace(t *testing.T) {
 	t.Log("if -w is used with '..', should return an error")
 	comments := []string{
 		"atlantis plan -w ..",
@@ -171,14 +171,14 @@ func TestDetermineCommand_InvalidWorkspace(t *testing.T) {
 		"atlantis apply -w ../../../etc/passwd",
 	}
 	for _, c := range comments {
-		r := commentParser.DetermineCommand(c, vcs.Github)
+		r := commentParser.Parse(c, vcs.Github)
 		exp := "Error: Value for -w/--workspace can't contain '..'"
 		Assert(t, r.CommentResponse == exp,
 			"For comment %q expected CommentResponse %q to be %q", c, r.CommentResponse, exp)
 	}
 }
 
-func TestDetermineCommand_Parsing(t *testing.T) {
+func TestParse_Parsing(t *testing.T) {
 	cases := []struct {
 		flags        string
 		expWorkspace string
@@ -346,7 +346,7 @@ func TestDetermineCommand_Parsing(t *testing.T) {
 	for _, test := range cases {
 		for _, cmdName := range []string{"plan", "apply"} {
 			comment := fmt.Sprintf("atlantis %s %s", cmdName, test.flags)
-			r := commentParser.DetermineCommand(comment, vcs.Github)
+			r := commentParser.Parse(comment, vcs.Github)
 			Assert(t, r.CommentResponse == "", "CommentResponse should have been empty but was %q for comment %q", r.CommentResponse, comment)
 			Assert(t, test.expDir == r.Command.Dir, "exp dir to equal %q but was %q for comment %q", test.expDir, r.Command.Dir, comment)
 			Assert(t, test.expWorkspace == r.Command.Workspace, "exp workspace to equal %q but was %q for comment %q", test.expWorkspace, r.Command.Workspace, comment)
