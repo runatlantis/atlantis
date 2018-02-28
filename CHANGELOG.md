@@ -1,3 +1,29 @@
+# v0.3.0
+## Features
+* Fix security issue where Atlantis wasn't escaping the optional "extra args" that could be appended to comments ([#16](https://github.com/runatlantis/atlantis/pull/16))
+  * example exploit: `atlantis plan ; cat /etc/passwd`
+* Atlantis moved to new repo: `atlantisrun/atlantis`. Read why [here](https://medium.com/runatlantis/moving-atlantis-to-runatlantis-atlantis-on-github-4efc025bb05f)
+* New -w/--workspace and -d/--dir flags in comments ([#14](https://github.com/runatlantis/atlantis/pull/14))
+  * You can now specify which directory to plan/apply in, ex. `atlantis plan -d dir1/dir2`
+* Better feedback from atlantis when asking for help via comments, ex. `atlantis plan -h`
+
+## Bug Fixes
+* Convert `--data-dir` paths to absolute from relative. Fixes ([#245](https://github.com/hootsuite/atlantis/issues/245))
+* Don't run plan in the parent of `modules/` unless there's a `main.tf` present. Fixes ([#12](https://github.com/runatlantis/atlantis/issues/12))
+
+## Backwards Incompatibilities / Notes:
+* You must use the `-w` flag to specify a workspace when commenting now
+  * Previously: `atlantis plan staging`, now: `atlantis plan -w staging`
+* You must use a double-dash between Atlantis flags and extra args to be appended to the terraform command
+  * Previously: `atlantis plan -target=resource`, now: `atlantis plan -- -target=resource`
+* Atlantis will no longer run `plan` in the parent directory of `modules/` unless there is a `main.tf` in that directory.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.0/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.0/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.0/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.0/atlantis_linux_arm.zip)
+
 # v0.2.4
 ## Features
 * SSL support added ([#233](https://github.com/hootsuite/atlantis/pull/233))
