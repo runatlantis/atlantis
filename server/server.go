@@ -196,6 +196,12 @@ func NewServer(config Config) (*Server, error) {
 		GitlabUser:  config.GitlabUser,
 		GitlabToken: config.GitlabToken,
 	}
+	commentParser := &events.CommentParser{
+		GithubUser:  config.GithubUser,
+		GithubToken: config.GithubToken,
+		GitlabUser:  config.GitlabUser,
+		GitlabToken: config.GitlabToken,
+	}
 	commandHandler := &events.CommandHandler{
 		ApplyExecutor:            applyExecutor,
 		PlanExecutor:             planExecutor,
@@ -213,6 +219,7 @@ func NewServer(config Config) (*Server, error) {
 		CommandRunner:          commandHandler,
 		PullCleaner:            pullClosedExecutor,
 		Parser:                 eventParser,
+		CommentParser:          commentParser,
 		Logger:                 logger,
 		GithubWebHookSecret:    []byte(config.GithubWebHookSecret),
 		GithubRequestValidator: &DefaultGithubRequestValidator{},

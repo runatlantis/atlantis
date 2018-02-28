@@ -22,6 +22,7 @@ type EventsController struct {
 	PullCleaner   events.PullCleaner
 	Logger        *logging.SimpleLogger
 	Parser        events.EventParsing
+	CommentParser events.CommentParsing
 	// GithubWebHookSecret is the secret added to this webhook via the GitHub
 	// UI that identifies this call as coming from GitHub. If empty, no
 	// request validation is done.
@@ -151,7 +152,7 @@ func (e *EventsController) HandleGitlabCommentEvent(w http.ResponseWriter, event
 }
 
 func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo models.Repo, headRepo models.Repo, user models.User, pullNum int, comment string, vcsHost vcs.Host) {
-	parseResult := e.Parser.DetermineCommand(comment, vcsHost)
+	parseResult := e.CommentParser.DetermineCommand(comment, vcsHost)
 	if parseResult.Ignore {
 		truncated := comment
 		if len(truncated) > 40 {
