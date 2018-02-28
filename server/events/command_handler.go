@@ -42,7 +42,6 @@ type GitlabMergeRequestGetter interface {
 type CommandHandler struct {
 	PlanExecutor             Executor
 	ApplyExecutor            Executor
-	HelpExecutor             Executor
 	LockURLGenerator         LockURLGenerator
 	VCSClient                vcs.ClientProxy
 	GithubPullGetter         GithubPullGetter
@@ -148,8 +147,6 @@ func (c *CommandHandler) run(ctx *CommandContext) {
 		cr = c.PlanExecutor.Execute(ctx)
 	case Apply:
 		cr = c.ApplyExecutor.Execute(ctx)
-	case Help:
-		cr = c.HelpExecutor.Execute(ctx)
 	default:
 		ctx.Log.Err("failed to determine desired command, neither plan nor apply")
 	}

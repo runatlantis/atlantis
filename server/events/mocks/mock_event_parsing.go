@@ -22,20 +22,16 @@ func NewMockEventParsing() *MockEventParsing {
 	return &MockEventParsing{fail: pegomock.GlobalFailHandler}
 }
 
-func (mock *MockEventParsing) DetermineCommand(comment string, vcsHost vcs.Host) (*events.Command, error) {
+func (mock *MockEventParsing) DetermineCommand(comment string, vcsHost vcs.Host) events.CommandParseResult {
 	params := []pegomock.Param{comment, vcsHost}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("DetermineCommand", params, []reflect.Type{reflect.TypeOf((**events.Command)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 *events.Command
-	var ret1 error
+	result := pegomock.GetGenericMockFrom(mock).Invoke("DetermineCommand", params, []reflect.Type{reflect.TypeOf((*events.CommandParseResult)(nil)).Elem()})
+	var ret0 events.CommandParseResult
 	if len(result) != 0 {
 		if result[0] != nil {
-			ret0 = result[0].(*events.Command)
-		}
-		if result[1] != nil {
-			ret1 = result[1].(error)
+			ret0 = result[0].(events.CommandParseResult)
 		}
 	}
-	return ret0, ret1
+	return ret0
 }
 
 func (mock *MockEventParsing) ParseGithubIssueCommentEvent(comment *github.IssueCommentEvent) (models.Repo, models.User, int, error) {

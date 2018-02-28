@@ -35,6 +35,7 @@ type EventsController struct {
 	// SupportedVCSHosts is which VCS hosts Atlantis was configured upon
 	// startup to support.
 	SupportedVCSHosts []vcs.Host
+	VCSClient         vcs.ClientProxy
 }
 
 // Post handles POST webhook requests.
@@ -91,17 +92,11 @@ func (e *EventsController) HandleGithubCommentEvent(w http.ResponseWriter, event
 		return
 	}
 
-	command, err := e.Parser.DetermineCommand(event.Comment.GetBody(), vcs.Github)
-	if err != nil {
-		e.respond(w, logging.Debug, http.StatusOK, "Ignoring: %s %s", err, githubReqID)
-		return
-	}
-
-	// Respond with success and then actually execute the command asynchronously.
-	// We use a goroutine so that this function returns and the connection is
-	// closed.
-	fmt.Fprintln(w, "Processing...")
-	go e.CommandRunner.ExecuteCommand(baseRepo, models.Repo{}, user, pullNum, command, vcs.Github)
+	// We pass in an empty models.Repo for headRepo because we need to do additional
+	// calls to get that information but we need this code path to be generic.
+	// Later on in CommandHandler we detect that this is a GitHub event and
+	// make the necessary calls to get the headRepo.
+	e.handleCommentEvent(w, baseRepo, models.Repo{}, user, pullNum, event.Comment.GetBody(), vcs.Github)
 }
 
 // HandleGithubPullRequestEvent will delete any locks associated with the pull
@@ -152,9 +147,29 @@ func (e *EventsController) handleGitlabPost(w http.ResponseWriter, r *http.Reque
 // commands can come from. It's exported to make testing easier.
 func (e *EventsController) HandleGitlabCommentEvent(w http.ResponseWriter, event gitlab.MergeCommentEvent) {
 	baseRepo, headRepo, user := e.Parser.ParseGitlabMergeCommentEvent(event)
-	command, err := e.Parser.DetermineCommand(event.ObjectAttributes.Note, vcs.Gitlab)
-	if err != nil {
-		e.respond(w, logging.Debug, http.StatusOK, "Ignoring: %s", err)
+	e.handleCommentEvent(w, baseRepo, headRepo, user, event.MergeRequest.IID, event.ObjectAttributes.Note, vcs.Gitlab)
+}
+
+func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo models.Repo, headRepo models.Repo, user models.User, pullNum int, comment string, vcsHost vcs.Host) {
+	parseResult := e.Parser.DetermineCommand(comment, vcsHost)
+	if parseResult.Ignore {
+		truncated := comment
+		if len(truncated) > 40 {
+			truncated = comment[:40] + "..."
+		}
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring non-command comment: %q", truncated)
+		return
+	}
+
+	// If the command isn't valid or doesn't require processing, ex.
+	// "atlantis help" then we just comment back immediately.
+	// We do this here rather than earlier because we need access to the pull
+	// variable to comment back on the pull request.
+	if parseResult.CommentResponse != "" {
+		if err := e.VCSClient.CreateComment(baseRepo, pullNum, parseResult.CommentResponse, vcsHost); err != nil {
+			e.Logger.Err("unable to comment on pull request: %s", err)
+		}
+		e.respond(w, logging.Info, http.StatusOK, "Commenting back on pull request")
 		return
 	}
 
@@ -162,7 +177,7 @@ func (e *EventsController) HandleGitlabCommentEvent(w http.ResponseWriter, event
 	// We use a goroutine so that this function returns and the connection is
 	// closed.
 	fmt.Fprintln(w, "Processing...")
-	go e.CommandRunner.ExecuteCommand(baseRepo, headRepo, user, event.MergeRequest.IID, command, vcs.Gitlab)
+	go e.CommandRunner.ExecuteCommand(baseRepo, headRepo, user, pullNum, parseResult.Command, vcsHost)
 }
 
 // HandleGitlabMergeRequestEvent will delete any locks associated with the pull

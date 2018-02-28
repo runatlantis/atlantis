@@ -24,70 +24,164 @@ var parser = events.EventParser{
 	GitlabToken: "gitlab-token",
 }
 
-func TestDetermineCommandInvalid(t *testing.T) {
-	t.Log("given an invalid comment, should return an error")
-	comments := []string{
-		// just the executable, no command
+func TestDetermineCommand_Ignored(t *testing.T) {
+	t.Log("given a comment that should be ignored we should set " +
+		"CommandParseResult.Ignore to true")
+	ignoreComments := []string{
+		"",
+		"a",
+		"abc",
+		"atlantis plan\nbut with newlines",
+		"terraform plan\nbut with newlines",
+	}
+	for _, c := range ignoreComments {
+		r := parser.DetermineCommand(c, vcs.Github)
+		Assert(t, r.Ignore, "expected Ignore to be true for comment %q", c)
+	}
+}
+
+func TestDetermineCommand_HelpResponse(t *testing.T) {
+	t.Log("given a comment that should result in help output we " +
+		"should set CommandParseResult.CommentResult")
+	helpComments := []string{
 		"run",
 		"atlantis",
 		"@github-user",
-		// invalid command
-		"run slkjd",
-		"atlantis slkjd",
-		"@github-user slkjd",
-		"atlantis plans",
-		// relative dirs
-		"atlantis plan -d ..",
-		"atlantis plan -d ../",
-		"atlantis plan -d a/../../",
-		// using .. in workspace
-		"atlantis plan -w a..",
-		"atlantis plan -w ../",
-		"atlantis plan -w ..",
-		"atlantis plan -w a/../b",
-		// misc
-		"related comment mentioning atlantis",
+		"atlantis help",
+		"atlantis --help",
+		"atlantis -h",
+		"atlantis help something else",
+		"atlantis help plan",
+	}
+	for _, c := range helpComments {
+		r := parser.DetermineCommand(c, vcs.Github)
+		Equals(t, events.HelpComment, r.CommentResponse)
+	}
+}
+
+func TestDetermineCommand_DidYouMeanAtlantis(t *testing.T) {
+	t.Log("given a comment that should result in a 'did you mean atlantis'" +
+		"response, should set CommandParseResult.CommentResult")
+	comments := []string{
+		"terraform",
+		"terraform help",
+		"terraform --help",
+		"terraform -h",
+		"terraform plan",
+		"terraform apply",
+		"terraform plan -w workspace -d . -- test",
 	}
 	for _, c := range comments {
-		_, e := parser.DetermineCommand(c, vcs.Github)
-		Assert(t, e != nil, "expected error for comment: "+c)
+		r := parser.DetermineCommand(c, vcs.Github)
+		Assert(t, r.CommentResponse == events.DidYouMeanAtlantisComment,
+			"For comment %q expected CommentResponse==%q but got %q", c, events.DidYouMeanAtlantisComment, r.CommentResponse)
 	}
 }
 
-func TestDetermineCommand_ExecutableNames(t *testing.T) {
-	t.Log("should be allowed to use different executable names in the comments")
-	parsed, err := parser.DetermineCommand("atlantis plan", vcs.Github)
-	Ok(t, err)
-	Equals(t, events.Plan, parsed.Name)
-
-	parsed, err = parser.DetermineCommand("run plan", vcs.Github)
-	Ok(t, err)
-	Equals(t, events.Plan, parsed.Name)
-
-	parsed, err = parser.DetermineCommand("@github-user plan", vcs.Github)
-	Ok(t, err)
-	Equals(t, events.Plan, parsed.Name)
-
-	parsed, err = parser.DetermineCommand("@gitlab-user plan", vcs.Gitlab)
-	Ok(t, err)
-	Equals(t, events.Plan, parsed.Name)
+func TestDetermineCommand_InvalidCommand(t *testing.T) {
+	t.Log("given a comment with an invalid atlantis command, should return " +
+		"a warning.")
+	comments := []string{
+		"atlantis paln",
+		"atlantis Plan",
+		"atlantis appely apply",
+	}
+	for _, c := range comments {
+		r := parser.DetermineCommand(c, vcs.Github)
+		exp := fmt.Sprintf("```\nError: unknown command %q.\nRun 'atlantis --help' for usage.\n```", strings.Fields(c)[1])
+		Assert(t, r.CommentResponse == exp,
+			"For comment %q expected CommentResponse==%q but got %q", c, exp, r.CommentResponse)
+	}
 }
 
-func TestDetermineCommand_Help(t *testing.T) {
-	t.Log("given a help comment, should match")
-	helpArgs := []string{
-		"help",
-		"-help",
-		"--help",
-		"help -verbose",
-		"help --hi",
-		"help somethingelse",
+func TestDetermineCommand_SubcommandUsage(t *testing.T) {
+	t.Log("given a comment asking for the usage of a subcommand should " +
+		"return help")
+	comments := []string{
+		"atlantis plan -h",
+		"atlantis plan --help",
+		"atlantis apply -h",
+		"atlantis apply --help",
 	}
-	for _, arg := range helpArgs {
-		comment := fmt.Sprintf("atlantis %s", arg)
-		command, err := parser.DetermineCommand(comment, vcs.Github)
-		Assert(t, err == nil, "did not parse comment %q as help command, got err: %s", comment, err)
-		Assert(t, command.Name == events.Help, "did not parse comment %q as help command", comment)
+	for _, c := range comments {
+		r := parser.DetermineCommand(c, vcs.Github)
+		exp := "Usage of " + strings.Fields(c)[1]
+		Assert(t, strings.Contains(r.CommentResponse, exp),
+			"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
+		Assert(t, !strings.Contains(r.CommentResponse, "Error:"),
+			"For comment %q expected CommentResponse %q to not contain %q", c, r.CommentResponse, "Error: ")
+	}
+}
+
+func TestDetermineCommand_InvalidFlags(t *testing.T) {
+	t.Log("given a comment with a valid atlantis command but invalid" +
+		" flags, should return a warning and the proper usage")
+	cases := []struct {
+		comment string
+		exp     string
+	}{
+		{
+			"atlantis plan -e",
+			"Error: unknown shorthand flag: 'e' in -e",
+		},
+		{
+			"atlantis plan --abc",
+			"Error: unknown flag: --abc",
+		},
+		{
+			"atlantis apply -e",
+			"Error: unknown shorthand flag: 'e' in -e",
+		},
+		{
+			"atlantis apply --abc",
+			"Error: unknown flag: --abc",
+		},
+	}
+	for _, c := range cases {
+		r := parser.DetermineCommand(c.comment, vcs.Github)
+		Assert(t, strings.Contains(r.CommentResponse, c.exp),
+			"For comment %q expected CommentResponse %q to contain %q", c.comment, r.CommentResponse, c.exp)
+		Assert(t, strings.Contains(r.CommentResponse, "Usage of "),
+			"For comment %q expected CommentResponse %q to contain %q", c.comment, r.CommentResponse, "Usage of ")
+	}
+}
+
+func TestDetermineCommand_RelativeDirPath(t *testing.T) {
+	t.Log("if -d is used with a relative path, should return an error")
+	comments := []string{
+		"atlantis plan -d ..",
+		"atlantis apply -d ..",
+		// These won't return an error because we prepend with . when parsing.
+		//"atlantis plan -d /..",
+		//"atlantis apply -d /..",
+		"atlantis plan -d ./..",
+		"atlantis apply -d ./..",
+		"atlantis plan -d a/b/../../..",
+		"atlantis apply -d a/../..",
+	}
+	for _, c := range comments {
+		r := parser.DetermineCommand(c, vcs.Github)
+		exp := "Error: Using a relative path"
+		Assert(t, strings.Contains(r.CommentResponse, exp),
+			"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
+	}
+}
+
+func TestDetermineCommand_InvalidWorkspace(t *testing.T) {
+	t.Log("if -w is used with '..', should return an error")
+	comments := []string{
+		"atlantis plan -w ..",
+		"atlantis apply -w ..",
+		"atlantis plan -w ..abc",
+		"atlantis apply -w abc..",
+		"atlantis plan -w abc..abc",
+		"atlantis apply -w ../../../etc/passwd",
+	}
+	for _, c := range comments {
+		r := parser.DetermineCommand(c, vcs.Github)
+		exp := "Error: Value for -w/--workspace can't contain '..'"
+		Assert(t, r.CommentResponse == exp,
+			"For comment %q expected CommentResponse %q to be %q", c, r.CommentResponse, exp)
 	}
 }
 
@@ -251,18 +345,18 @@ func TestDetermineCommand_Parsing(t *testing.T) {
 	for _, test := range cases {
 		for _, cmdName := range []string{"plan", "apply"} {
 			comment := fmt.Sprintf("atlantis %s %s", cmdName, test.flags)
-			t.Logf("testing comment: %s", comment)
-			cmd, err := parser.DetermineCommand(comment, vcs.Github)
-			Assert(t, err == nil, "unexpected err parsing %q: %s", comment, err)
-			Equals(t, test.expDir, cmd.Dir)
-			Equals(t, test.expWorkspace, cmd.Workspace)
-			Equals(t, test.expVerbose, cmd.Verbose)
-			Equals(t, test.expExtraArgs, strings.Join(cmd.Flags, " "))
+			r := parser.DetermineCommand(comment, vcs.Github)
+			Assert(t, r.CommentResponse == "", "CommentResponse should have been empty but was %q for comment %q", r.CommentResponse, comment)
+			Assert(t, test.expDir == r.Command.Dir, "exp dir to equal %q but was %q for comment %q", test.expDir, r.Command.Dir, comment)
+			Assert(t, test.expWorkspace == r.Command.Workspace, "exp workspace to equal %q but was %q for comment %q", test.expWorkspace, r.Command.Workspace, comment)
+			Assert(t, test.expVerbose == r.Command.Verbose, "exp verbose to equal %v but was %v for comment %q", test.expVerbose, r.Command.Verbose, comment)
+			actExtraArgs := strings.Join(r.Command.Flags, " ")
+			Assert(t, test.expExtraArgs == actExtraArgs, "exp extra args to equal %v but got %v for comment %q", test.expExtraArgs, actExtraArgs, comment)
 			if cmdName == "plan" {
-				Assert(t, cmd.Name == events.Plan, "did not parse comment %q as plan command", comment)
+				Assert(t, r.Command.Name == events.Plan, "did not parse comment %q as plan command", comment)
 			}
 			if cmdName == "apply" {
-				Assert(t, cmd.Name == events.Apply, "did not parse comment %q as apply command", comment)
+				Assert(t, r.Command.Name == events.Apply, "did not parse comment %q as apply command", comment)
 			}
 		}
 	}

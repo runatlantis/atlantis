@@ -3,7 +3,9 @@ package events
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/google/go-github/github"
@@ -14,6 +16,11 @@ import (
 )
 
 const gitlabPullOpened = "opened"
+const usagesCols = 90
+
+// multiLineRegex is used to ignore multi-line comments since those aren't valid
+// Atlantis commands.
+var multiLineRegex = regexp.MustCompile(`.*\r?\n.+`)
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_event_parsing.go EventParsing
 
@@ -29,7 +36,7 @@ type Command struct {
 }
 
 type EventParsing interface {
-	DetermineCommand(comment string, vcsHost vcs.Host) (*Command, error)
+	DetermineCommand(comment string, vcsHost vcs.Host) CommandParseResult
 	ParseGithubIssueCommentEvent(comment *github.IssueCommentEvent) (baseRepo models.Repo, user models.User, pullNum int, err error)
 	ParseGithubPull(pull *github.PullRequest) (models.PullRequest, models.Repo, error)
 	ParseGithubRepo(ghRepo *github.Repository) (models.Repo, error)
@@ -45,41 +52,81 @@ type EventParser struct {
 	GitlabToken string
 }
 
-// DetermineCommand parses the comment as an atlantis command. If it succeeds,
-// it returns the command. Otherwise it returns error.
+// CommandParseResult describes the result of parsing a comment as a command.
+type CommandParseResult struct {
+	// Command is the successfully parsed command. Will be nil if
+	// CommentResponse or Ignore is set.
+	Command *Command
+	// CommentResponse is set when we should respond immediately to the command
+	// for example for atlantis help.
+	CommentResponse string
+	// Ignore is set to true when we should just ignore this comment.
+	Ignore bool
+}
+
+// DetermineCommand parses the comment as an Atlantis command.
+//
+// Valid commands contain:
+// - The initial "executable" name, 'run' or 'atlantis' or '@GithubUser'
+//   where GithubUser is the API user Atlantis is running as.
+// - Then a command, either 'plan', 'apply', or 'help'.
+// - Then optional flags, then an optional separator '--' followed by optional
+//   extra flags to be appended to the terraform plan/apply command.
+//
+// Examples:
+// - atlantis help
+// - run plan
+// - @GithubUser plan -w staging
+// - atlantis plan -w staging -d dir --verbose
+// - atlantis plan --verbose -- -key=value -key2 value2
+//
 // nolint: gocyclo
-func (e *EventParser) DetermineCommand(comment string, vcsHost vcs.Host) (*Command, error) {
-	// valid commands contain:
-	// the initial "executable" name, 'run' or 'atlantis' or '@GithubUser' where GithubUser is the api user atlantis is running as
-	// then a command, either 'plan', 'apply', or 'help'
-	// then an optional workspace argument, an optional --verbose flag and any other flags
-	//
-	// examples:
-	// atlantis help
-	// run plan
-	// @GithubUser plan staging
-	// atlantis plan staging --verbose
-	// atlantis plan staging --verbose -key=value -key2 value2
-	err := errors.New("not an Atlantis command")
-	args := strings.Fields(comment)
-	if len(args) < 2 {
-		return nil, err
+func (e *EventParser) DetermineCommand(comment string, vcsHost vcs.Host) CommandParseResult {
+	if multiLineRegex.MatchString(comment) {
+		return CommandParseResult{Ignore: true}
 	}
 
+	// strings.Fields strips out newlines but that's okay since we've removed
+	// multiline strings above.
+	args := strings.Fields(comment)
+	if len(args) < 1 {
+		return CommandParseResult{Ignore: true}
+	}
+
+	// Helpfully warn the user if they're using "terraform" instead of "atlantis"
+	if args[0] == "terraform" {
+		return CommandParseResult{CommentResponse: DidYouMeanAtlantisComment}
+	}
+
+	// Atlantis can be invoked using the name of the VCS host user we're
+	// running under. Need to be able to match against that user.
 	vcsUser := e.GithubUser
 	if vcsHost == vcs.Gitlab {
 		vcsUser = e.GitlabUser
 	}
-	if !e.stringInSlice(args[0], []string{"run", "atlantis", "@" + vcsUser}) {
-		return nil, err
-	}
-	if !e.stringInSlice(args[1], []string{"plan", "apply", "help", "-help", "--help"}) {
-		return nil, err
+	executableNames := []string{"run", "atlantis", "@" + vcsUser}
+
+	// If the comment doesn't start with the name of our 'executable' then
+	// ignore it.
+	if !e.stringInSlice(args[0], executableNames) {
+		return CommandParseResult{Ignore: true}
 	}
 
+	// If they've just typed the name of the executable then give them the help
+	// output.
+	if len(args) == 1 {
+		return CommandParseResult{CommentResponse: HelpComment}
+	}
 	command := args[1]
-	if command == "help" || command == "-help" || command == "--help" {
-		return &Command{Name: Help}, nil
+
+	// Help output.
+	if e.stringInSlice(command, []string{"help", "-h", "--help"}) {
+		return CommandParseResult{CommentResponse: HelpComment}
+	}
+
+	// Need to have a plan or apply at this point.
+	if !e.stringInSlice(command, []string{"plan", "apply"}) {
+		return CommandParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown command %q.\nRun 'atlantis --help' for usage.\n```", command)}
 	}
 
 	var workspace string
@@ -91,25 +138,33 @@ func (e *EventParser) DetermineCommand(comment string, vcsHost vcs.Host) (*Comma
 
 	// Set up the flag parsing depending on the command.
 	const defaultWorkspace = "default"
-	if command == "plan" {
+	switch command {
+	case "plan":
 		name = Plan
 		flagSet = pflag.NewFlagSet("plan", pflag.ContinueOnError)
-		flagSet.StringVarP(&workspace, "workspace", "w", defaultWorkspace, fmt.Sprintf("Switch to this Terraform workspace before planning. Defaults to '%s'", defaultWorkspace))
+		flagSet.SetOutput(ioutil.Discard)
+		flagSet.StringVarP(&workspace, "workspace", "w", defaultWorkspace, "Switch to this Terraform workspace before planning.")
 		flagSet.StringVarP(&dir, "dir", "d", "", "Which directory to run plan in relative to root of repo. Use '.' for root. If not specified, will attempt to run plan for all Terraform projects we think were modified in this changeset.")
 		flagSet.BoolVarP(&verbose, "verbose", "", false, "Append Atlantis log to comment.")
-	} else if command == "apply" {
+	case "apply":
 		name = Apply
 		flagSet = pflag.NewFlagSet("apply", pflag.ContinueOnError)
-		flagSet.StringVarP(&workspace, "workspace", "w", defaultWorkspace, fmt.Sprintf("Apply the plan for this Terraform workspace. Defaults to '%s'", defaultWorkspace))
+		flagSet.SetOutput(ioutil.Discard)
+		flagSet.StringVarP(&workspace, "workspace", "w", defaultWorkspace, "Apply the plan for this Terraform workspace.")
 		flagSet.StringVarP(&dir, "dir", "d", "", "Apply the plan for this directory, relative to root of repo. Use '.' for root. If not specified, will run apply against all plans created for this workspace.")
 		flagSet.BoolVarP(&verbose, "verbose", "", false, "Append Atlantis log to comment.")
-	} else {
-		return nil, fmt.Errorf("unknown command %q – this is a bug", command)
+	default:
+		return CommandParseResult{CommentResponse: fmt.Sprintf("Error: unknown command %q – this is a bug", command)}
 	}
 
 	// Now parse the flags.
-	if err := flagSet.Parse(args[2:]); err != nil {
-		return nil, err
+	// It's safe to use [2:] because we know there's at least 2 elements in args.
+	err := flagSet.Parse(args[2:])
+	if err == pflag.ErrHelp {
+		return CommandParseResult{CommentResponse: fmt.Sprintf("```\nUsage of %s:\n%s\n```", command, flagSet.FlagUsagesWrapped(usagesCols))}
+	}
+	if err != nil {
+		return CommandParseResult{CommentResponse: fmt.Sprintf("```\nError: %s.\nUsage of %s:\n%s\n```", err.Error(), command, flagSet.FlagUsagesWrapped(usagesCols))}
 	}
 	// We only use the extra args after the --. For example given a comment:
 	// "atlantis plan -bad-option -- -target=hi"
@@ -135,7 +190,7 @@ func (e *EventParser) DetermineCommand(comment string, vcsHost vcs.Host) (*Comma
 		validatedDir = filepath.Clean(validatedDir)
 		// Detect relative dirs since they're not allowed.
 		if strings.HasPrefix(validatedDir, "..") {
-			return nil, fmt.Errorf("relative path %q not allowed", dir)
+			return CommandParseResult{CommentResponse: fmt.Sprintf("Error: Using a relative path %q with -d/--dir is not allowed", dir)}
 		}
 
 		dir = validatedDir
@@ -143,11 +198,12 @@ func (e *EventParser) DetermineCommand(comment string, vcsHost vcs.Host) (*Comma
 	// Because we use the workspace name as a file, need to make sure it's
 	// not doing something weird like being a relative dir.
 	if strings.Contains(workspace, "..") {
-		return nil, errors.New("workspace can't contain '..'")
+		return CommandParseResult{CommentResponse: "Error: Value for -w/--workspace can't contain '..'"}
 	}
 
-	c := &Command{Name: name, Verbose: verbose, Workspace: workspace, Dir: dir, Flags: extraArgs}
-	return c, nil
+	return CommandParseResult{
+		Command: &Command{Name: name, Verbose: verbose, Workspace: workspace, Dir: dir, Flags: extraArgs},
+	}
 }
 
 func (e *EventParser) ParseGithubIssueCommentEvent(comment *github.IssueCommentEvent) (baseRepo models.Repo, user models.User, pullNum int, err error) {
@@ -349,3 +405,23 @@ func (e *EventParser) stringInSlice(a string, list []string) bool {
 	}
 	return false
 }
+
+var HelpComment = "```cmake\n" +
+	`atlantis
+Terraform automation and collaboration for your team
+
+Usage:
+  atlantis <command> [options]
+
+Commands:
+  plan   Runs 'terraform plan' for the changes in this pull request.
+  apply  Runs 'terraform apply' on the plans generated by 'atlantis plan'.
+  help   View help.
+
+Flags:
+  -h, --help   help for atlantis
+
+Use "atlantis [command] --help" for more information about a command.
+`
+
+var DidYouMeanAtlantisComment = "Did you mean to use `atlantis` instead of `terraform`?"

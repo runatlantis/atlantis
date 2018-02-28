@@ -21,7 +21,6 @@ import (
 )
 
 var applier *mocks.MockExecutor
-var helper *mocks.MockExecutor
 var planner *mocks.MockExecutor
 var eventParsing *mocks.MockEventParsing
 var vcsClient *vcsmocks.MockClientProxy
@@ -35,7 +34,6 @@ var logBytes *bytes.Buffer
 func setup(t *testing.T) {
 	RegisterMockTestingT(t)
 	applier = mocks.NewMockExecutor()
-	helper = mocks.NewMockExecutor()
 	planner = mocks.NewMockExecutor()
 	eventParsing = mocks.NewMockEventParsing()
 	ghStatus = mocks.NewMockCommitStatusUpdater()
@@ -49,7 +47,6 @@ func setup(t *testing.T) {
 	ch = events.CommandHandler{
 		PlanExecutor:             planner,
 		ApplyExecutor:            applier,
-		HelpExecutor:             helper,
 		VCSClient:                vcsClient,
 		CommitStatusUpdater:      ghStatus,
 		EventParser:              eventParsing,
@@ -155,12 +152,12 @@ func TestExecuteCommand_WorkspaceLocked(t *testing.T) {
 }
 
 func TestExecuteCommand_FullRun(t *testing.T) {
-	t.Log("when running a plan, apply or help should comment")
+	t.Log("when running a plan, apply should comment")
 	pull := &github.PullRequest{
 		State: github.String("closed"),
 	}
 	cmdResponse := events.CommandResponse{}
-	for _, c := range []events.CommandName{events.Help, events.Plan, events.Apply} {
+	for _, c := range []events.CommandName{events.Plan, events.Apply} {
 		setup(t)
 		cmd := events.Command{
 			Name:      c,
@@ -170,8 +167,6 @@ func TestExecuteCommand_FullRun(t *testing.T) {
 		When(eventParsing.ParseGithubPull(pull)).ThenReturn(fixtures.Pull, fixtures.Repo, nil)
 		When(workspaceLocker.TryLock(fixtures.Repo.FullName, cmd.Workspace, fixtures.Pull.Num)).ThenReturn(true)
 		switch c {
-		case events.Help:
-			When(helper.Execute(matchers.AnyPtrToEventsCommandContext())).ThenReturn(cmdResponse)
 		case events.Plan:
 			When(planner.Execute(matchers.AnyPtrToEventsCommandContext())).ThenReturn(cmdResponse)
 		case events.Apply:

@@ -184,7 +184,6 @@ func NewServer(config Config) (*Server, error) {
 		Locker:            lockingClient,
 		ProjectFinder:     &events.DefaultProjectFinder{},
 	}
-	helpExecutor := &events.HelpExecutor{}
 	pullClosedExecutor := &events.PullClosedExecutor{
 		VCSClient: vcsClient,
 		Locker:    lockingClient,
@@ -200,7 +199,6 @@ func NewServer(config Config) (*Server, error) {
 	commandHandler := &events.CommandHandler{
 		ApplyExecutor:            applyExecutor,
 		PlanExecutor:             planExecutor,
-		HelpExecutor:             helpExecutor,
 		LockURLGenerator:         planExecutor,
 		EventParser:              eventParser,
 		VCSClient:                vcsClient,
@@ -221,6 +219,7 @@ func NewServer(config Config) (*Server, error) {
 		GitlabRequestParser:    &DefaultGitlabRequestParser{},
 		GitlabWebHookSecret:    []byte(config.GitlabWebHookSecret),
 		SupportedVCSHosts:      supportedVCSHosts,
+		VCSClient:              vcsClient,
 	}
 	router := mux.NewRouter()
 	return &Server{
