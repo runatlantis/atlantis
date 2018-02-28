@@ -276,6 +276,14 @@ func TestDetermineCommand_Parsing(t *testing.T) {
 			false,
 			"",
 		},
+		// Test trying to escape quoting
+		{
+			"abc -- \";echo \"hi",
+			"default",
+			"",
+			false,
+			`"\";echo" "\"hi"`,
+		},
 		{
 			"-w workspace -d dir --verbose -- arg one -two --three &&",
 			"workspace",

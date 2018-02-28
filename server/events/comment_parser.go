@@ -147,7 +147,8 @@ func (e *CommentParser) DetermineCommand(comment string, vcsHost vcs.Host) Comme
 		// Quote all extra args so there isn't a security issue when we append
 		// them to the terraform commands, ex. "; cat /etc/passwd"
 		for _, arg := range extraArgsUnsafe {
-			extraArgs = append(extraArgs, fmt.Sprintf(`"%s"`, arg))
+			quotesEscaped := strings.Replace(arg, `"`, `\"`, -1)
+			extraArgs = append(extraArgs, fmt.Sprintf(`"%s"`, quotesEscaped))
 		}
 	}
 
