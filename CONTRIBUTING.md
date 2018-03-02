@@ -97,6 +97,6 @@ func TestLockingExisting(t *testing.T) {
 1. Go to https://github.com/runatlantis/atlantis/releases and click "Draft a new release"
     1. Prefix version with `v`
     1. The title of the release is the same as the tag (ex. v0.2.2)
-    1. Description should just be `See CHANGELOG` with link to CHANGELOG at that release, ex: `See [CHANGELOG](CHANGELOG.md#v022)`
+    1. Fill in description by copying from the CHANGELOG just without the Downloads section
     1. Drag in binaries made with `make release`
-1. Run `make generate-website-html` and `make upload-website-html` to update website
+1. Re-run master branch build to ensure tag gets pushed to Docker hub: https://hub.docker.com/r/runatlantis/atlantis/tags/
