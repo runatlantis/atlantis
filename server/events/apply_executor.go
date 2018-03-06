@@ -69,15 +69,15 @@ func (a *ApplyExecutor) Execute(ctx *CommandContext) CommandResponse {
 	} else {
 		// If they did specify a dir, we apply just the plan in that directory
 		// for this workspace.
-		path := filepath.Join(repoDir, ctx.Command.Dir, ctx.Command.Workspace+".tfplan")
-		stat, err := os.Stat(path)
+		planPath := filepath.Join(repoDir, ctx.Command.Dir, ctx.Command.Workspace+".tfplan")
+		stat, err := os.Stat(planPath)
 		if err != nil || stat.IsDir() {
-			return CommandResponse{Error: errors.Wrapf(err, "finding plan for dir %q and workspace %q", ctx.Command.Dir, ctx.Command.Workspace)}
+			return CommandResponse{Error: fmt.Errorf("no plan found at path %q and workspace %q–did you run plan?", ctx.Command.Dir, ctx.Command.Workspace)}
 		}
-		rel, _ := filepath.Rel(repoDir, filepath.Dir(path))
+		relProjectPath, _ := filepath.Rel(repoDir, filepath.Dir(planPath))
 		plans = append(plans, models.Plan{
-			Project:   models.NewProject(ctx.BaseRepo.FullName, filepath.Dir(rel)),
-			LocalPath: path,
+			Project:   models.NewProject(ctx.BaseRepo.FullName, relProjectPath),
+			LocalPath: planPath,
 		})
 	}
 	if len(plans) == 0 {
