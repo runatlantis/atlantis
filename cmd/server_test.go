@@ -156,7 +156,7 @@ func TestExecute_ValidateSSLConfig(t *testing.T) {
 }
 
 func TestExecute_ValidateVCSConfig(t *testing.T) {
-	expErr := "--gh-user/--gh-token or --gitlab-user/--gitlab-token must be set"
+	expErr := "--gh-user and --gh-token or --gitlab-user and --gitlab-token must be set"
 	cases := []struct {
 		description string
 		flags       map[string]interface{}

@@ -36,6 +36,9 @@ const (
 	SSLKeyFileFlag      = "ssl-key-file"
 )
 
+const RedTermStart = "\033[31m"
+const RedTermEnd = "\033[39m"
+
 var stringFlags = []stringFlag{
 	{
 		name:        AtlantisURLFlag,
@@ -66,9 +69,10 @@ var stringFlags = []stringFlag{
 	},
 	{
 		name: GHWebHookSecret,
-		description: "Optional secret used to validate GitHub webhooks (see https://developer.github.com/webhooks/securing/)." +
-			" If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitHub. " +
-			"Can also be specified via the ATLANTIS_GH_WEBHOOK_SECRET environment variable.",
+		description: "Secret used to validate GitHub webhooks (see https://developer.github.com/webhooks/securing/)." +
+			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitHub. " +
+			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
+			"Should be specified via the ATLANTIS_GH_WEBHOOK_SECRET environment variable.",
 		env: "ATLANTIS_GH_WEBHOOK_SECRET",
 	},
 	{
@@ -88,8 +92,9 @@ var stringFlags = []stringFlag{
 	{
 		name: GitlabWebHookSecret,
 		description: "Optional secret used to validate GitLab webhooks." +
-			" If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitLab. " +
-			"Can also be specified via the ATLANTIS_GITLAB_WEBHOOK_SECRET environment variable.",
+			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitLab. " +
+			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
+			"Should be specified via the ATLANTIS_GITLAB_WEBHOOK_SECRET environment variable.",
 		env: "ATLANTIS_GITLAB_WEBHOOK_SECRET",
 	},
 	{
@@ -243,6 +248,7 @@ func (s *ServerCmd) run() error {
 	if err := s.setDataDir(&config); err != nil {
 		return err
 	}
+	s.securityWarnings(&config)
 	s.trimAtSymbolFromUsers(&config)
 
 	// Config looks good. Start the server.
@@ -268,7 +274,7 @@ func (s *ServerCmd) validate(config server.Config) error {
 	// 1. github user and token set
 	// 2. gitlab user and token set
 	// 3. all 4 set
-	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GitlabUserFlag, GitlabTokenFlag)
+	vcsErr := fmt.Errorf("--%s and --%s or --%s and --%s must be set", GHUserFlag, GHTokenFlag, GitlabUserFlag, GitlabTokenFlag)
 	if ((config.GithubUser == "") != (config.GithubToken == "")) || ((config.GitlabUser == "") != (config.GitlabToken == "")) {
 		return vcsErr
 	}
@@ -322,12 +328,21 @@ func (s *ServerCmd) trimAtSymbolFromUsers(config *server.Config) {
 	config.GitlabUser = strings.TrimPrefix(config.GitlabUser, "@")
 }
 
+func (s *ServerCmd) securityWarnings(config *server.Config) {
+	if config.GithubUser != "" && config.GithubWebHookSecret == "" {
+		fmt.Fprintf(os.Stderr, "%s[WARN] No GitHub webhook secret set. This could allow attackers to spoof requests from GitHub. See https://git.io/vAF3t%s\n", RedTermStart, RedTermEnd)
+	}
+	if config.GitlabUser != "" && config.GitlabWebHookSecret == "" {
+		fmt.Fprintf(os.Stderr, "%s[WARN] No GitLab webhook secret set. This could allow attackers to spoof requests from GitLab. See https://git.io/vAF3t%s\n", RedTermStart, RedTermEnd)
+	}
+}
+
 // withErrPrint prints out any errors to a terminal in red.
 func (s *ServerCmd) withErrPrint(f func(*cobra.Command, []string) error) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		err := f(cmd, args)
 		if err != nil && !s.SilenceOutput {
-			fmt.Fprintf(os.Stderr, "\033[31mError: %s\033[39m\n\n", err.Error())
+			fmt.Fprintf(os.Stderr, "%s[ERROR] %s%s\n\n", RedTermStart, err.Error(), RedTermEnd)
 		}
 		return err
 	}
