@@ -197,6 +197,10 @@ Config file values are overridden by environment variables which in turn are ove
 			return s.run()
 		}),
 	}
+	// Replace the call in their template to use the usage function that wraps
+	// columns to make for a nicer output.
+	usageWithWrappedCols := strings.Replace(c.UsageTemplate(), ".FlagUsages", ".FlagUsagesWrapped 120", -1)
+	c.SetUsageTemplate(usageWithWrappedCols)
 
 	// If a user passes in an invalid flag, tell them what the flag was.
 	c.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
@@ -206,7 +210,7 @@ Config file values are overridden by environment variables which in turn are ove
 
 	// Set string flags.
 	for _, f := range stringFlags {
-		c.Flags().String(f.name, f.value, f.description)
+		c.Flags().String(f.name, f.value, "> "+f.description)
 		if f.env != "" {
 			s.Viper.BindEnv(f.name, f.env) // nolint: errcheck
 		}
@@ -215,13 +219,13 @@ Config file values are overridden by environment variables which in turn are ove
 
 	// Set int flags.
 	for _, f := range intFlags {
-		c.Flags().Int(f.name, f.value, f.description)
+		c.Flags().Int(f.name, f.value, "> "+f.description)
 		s.Viper.BindPFlag(f.name, c.Flags().Lookup(f.name)) // nolint: errcheck
 	}
 
 	// Set bool flags.
 	for _, f := range boolFlags {
-		c.Flags().Bool(f.name, f.value, f.description)
+		c.Flags().Bool(f.name, f.value, "> "+f.description)
 		s.Viper.BindPFlag(f.name, c.Flags().Lookup(f.name)) // nolint: errcheck
 	}
 
