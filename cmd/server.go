@@ -19,6 +19,7 @@ import (
 // 3. Add your flag's description etc. to the stringFlags, intFlags, or boolFlags slices.
 const (
 	AtlantisURLFlag     = "atlantis-url"
+	AllowForkPRsFlag    = "allow-fork-prs"
 	ConfigFlag          = "config"
 	DataDirFlag         = "data-dir"
 	GHHostnameFlag      = "gh-hostname"
@@ -113,6 +114,11 @@ var stringFlags = []stringFlag{
 }
 var boolFlags = []boolFlag{
 	{
+		name:        AllowForkPRsFlag,
+		description: "Allow Atlantis to run on pull requests from forks. A security issue for public repos.",
+		value:       false,
+	},
+	{
 		name:        RequireApprovalFlag,
 		description: "Require pull requests to be \"Approved\" before allowing the apply command to be run.",
 		value:       false,
@@ -156,7 +162,7 @@ type ServerCmd struct {
 // ServerCreator creates servers.
 // It's an abstraction to help us test.
 type ServerCreator interface {
-	NewServer(config server.Config) (ServerStarter, error)
+	NewServer(config server.Config, flagNames server.FlagNames) (ServerStarter, error)
 }
 
 // DefaultServerCreator is the concrete implementation of ServerCreator.
@@ -169,8 +175,8 @@ type ServerStarter interface {
 }
 
 // NewServer returns the real Atlantis server object.
-func (d *DefaultServerCreator) NewServer(config server.Config) (ServerStarter, error) {
-	return server.NewServer(config)
+func (d *DefaultServerCreator) NewServer(config server.Config, flagNames server.FlagNames) (ServerStarter, error) {
+	return server.NewServer(config, flagNames)
 }
 
 // Init returns the runnable cobra command.
@@ -252,7 +258,9 @@ func (s *ServerCmd) run() error {
 	s.trimAtSymbolFromUsers(&config)
 
 	// Config looks good. Start the server.
-	server, err := s.ServerCreator.NewServer(config)
+	server, err := s.ServerCreator.NewServer(config, server.FlagNames{
+		AllowForkPRsFlag: AllowForkPRsFlag,
+	})
 	if err != nil {
 		return errors.Wrap(err, "initializing server")
 	}

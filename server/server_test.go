@@ -26,7 +26,7 @@ func TestNewServer(t *testing.T) {
 	Ok(t, err)
 	_, err = server.NewServer(server.Config{
 		DataDir: tmpDir,
-	})
+	}, server.FlagNames{})
 	Ok(t, err)
 }
 

@@ -21,7 +21,7 @@ var passedConfig server.Config
 
 type ServerCreatorMock struct{}
 
-func (s *ServerCreatorMock) NewServer(config server.Config) (cmd.ServerStarter, error) {
+func (s *ServerCreatorMock) NewServer(config server.Config, flagNames server.FlagNames) (cmd.ServerStarter, error) {
 	passedConfig = config
 	return &ServerStarterMock{}, nil
 }

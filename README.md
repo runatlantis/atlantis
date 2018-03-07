@@ -284,8 +284,8 @@ resource "null_resource" "null" {
 #### Don't Use On Public Repos
 Because anyone can comment on public pull requests, even with all the security mitigations available, it's still dangerous to run Atlantis on public repos until Atlantis gets an authentication system.
 
-#### Don't Use `--allow-fork-prs=true`
-If you're running on a public repo (which isn't recommended, see above) you shouldn't set `--allow-fork-prs=true` (defaults to false)
+#### Don't Use `--allow-fork-prs`
+If you're running on a public repo (which isn't recommended, see above) you shouldn't set `--allow-fork-prs` (defaults to false)
 because anyone can open up a pull request from their fork to your repo.
 
 #### Webhook Secrets

@@ -51,9 +51,19 @@ type CommandHandler struct {
 	AtlantisWorkspaceLocker  AtlantisWorkspaceLocker
 	MarkdownRenderer         *MarkdownRenderer
 	Logger                   logging.SimpleLogging
+	// AllowForkPRs controls whether we operate on pull requests from forks.
+	AllowForkPRs bool
+	// AllowForkPRsFlag is the name of the flag that controls fork PR's. We use
+	// this in our error message back to the user on a forked PR so they know
+	// how to enable this functionality.
+	AllowForkPRsFlag string
 }
 
 // ExecuteCommand executes the command.
+// If vcsHost is GitHub, we don't use headRepo and instead make an API call
+// to get the headRepo. This is because the caller is unable to pass in a
+// headRepo since there's not enough data available on the initial webhook
+// payload.
 func (c *CommandHandler) ExecuteCommand(baseRepo models.Repo, headRepo models.Repo, user models.User, pullNum int, cmd *Command, vcsHost vcs.Host) {
 	var err error
 	var pull models.PullRequest
@@ -121,6 +131,12 @@ func (c *CommandHandler) run(ctx *CommandContext) {
 	log := c.buildLogger(ctx.BaseRepo.FullName, ctx.Pull.Num)
 	ctx.Log = log
 	defer c.logPanics(ctx)
+
+	if !c.AllowForkPRs && ctx.HeadRepo.Owner != ctx.BaseRepo.Owner {
+		ctx.Log.Info("command was run on a fork pull request which is disallowed")
+		c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, fmt.Sprintf("Atlantis commands can't be run on fork pull requests. To enable, set --%s", c.AllowForkPRsFlag), ctx.VCSHost) // nolint: errcheck
+		return
+	}
 
 	if ctx.Pull.State != models.Open {
 		ctx.Log.Info("command was run on closed pull request")

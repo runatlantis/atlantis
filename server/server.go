@@ -53,6 +53,7 @@ type Server struct {
 // The mapstructure tags correspond to flags in cmd/server.go and are used when
 // the config is parsed from a YAML file.
 type Config struct {
+	AllowForkPRs        bool   `mapstructure:"allow-fork-prs"`
 	AtlantisURL         string `mapstructure:"atlantis-url"`
 	DataDir             string `mapstructure:"data-dir"`
 	GithubHostname      string `mapstructure:"gh-hostname"`
@@ -74,6 +75,13 @@ type Config struct {
 	Webhooks        []WebhookConfig `mapstructure:"webhooks"`
 }
 
+// FlagNames contains the names of the flags available to atlantis server.
+// They're useful because sometimes we comment back asking the user to enable
+// a certain flag.
+type FlagNames struct {
+	AllowForkPRsFlag string
+}
+
 // WebhookConfig is nested within Config. It's used to configure webhooks.
 type WebhookConfig struct {
 	// Event is the type of event we should send this webhook for, ex. apply.
@@ -92,7 +100,7 @@ type WebhookConfig struct {
 // NewServer returns a new server. If there are issues starting the server or
 // its dependencies an error will be returned. This is like the main() function
 // for the server CLI command because it injects all the dependencies.
-func NewServer(config Config) (*Server, error) {
+func NewServer(config Config, flagNames FlagNames) (*Server, error) {
 	var supportedVCSHosts []vcs.Host
 	var githubClient *vcs.GithubClient
 	var gitlabClient *vcs.GitlabClient
@@ -214,6 +222,8 @@ func NewServer(config Config) (*Server, error) {
 		AtlantisWorkspaceLocker:  workspaceLocker,
 		MarkdownRenderer:         markdownRenderer,
 		Logger:                   logger,
+		AllowForkPRs:             config.AllowForkPRs,
+		AllowForkPRsFlag:         flagNames.AllowForkPRsFlag,
 	}
 	eventsController := &EventsController{
 		CommandRunner:          commandHandler,
