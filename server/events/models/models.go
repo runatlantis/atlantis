@@ -4,8 +4,13 @@
 package models
 
 import (
+	"fmt"
+	"net/url"
 	paths "path"
+	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 // Repo is a VCS repository.
@@ -23,6 +28,52 @@ type Repo struct {
 	// SanitizedCloneURL is the full HTTPS url for cloning without the username and password.
 	// ex. "https://github.com/atlantis/atlantis.git".
 	SanitizedCloneURL string
+	// Hostname of the VCS provider this repo is hosted on.
+	Hostname string
+}
+
+func NewRepo(repoFullName string, cloneURL string, vcsUser string, vcsToken string) (Repo, error) {
+	if repoFullName == "" {
+		return Repo{}, errors.New("repoFullName can't be empty")
+	}
+	if cloneURL == "" {
+		return Repo{}, errors.New("cloneURL can't be empty")
+	}
+
+	// Ensure the Clone URL is for the same repo to avoid something malicious.
+	cloneURLParsed, err := url.Parse(cloneURL)
+	if err != nil {
+		return Repo{}, errors.Wrap(err, "invalid clone url")
+	}
+	expClonePath := fmt.Sprintf("/%s.git", repoFullName)
+	if expClonePath != cloneURLParsed.Path {
+		return Repo{}, fmt.Errorf("expected clone url to have path %q but had %q", expClonePath, cloneURLParsed.Path)
+	}
+
+	// Construct clone urls with http auth. Need to do both https and http
+	// because in GitLab's docs they have some http urls.
+	auth := fmt.Sprintf("%s:%s@", vcsUser, vcsToken)
+	authedCloneURL := strings.Replace(cloneURL, "https://", "https://"+auth, -1)
+	authedCloneURL = strings.Replace(authedCloneURL, "http://", "http://"+auth, -1)
+
+	// Get the owner and repo names from the full name.
+	var owner string
+	var repo string
+	pathSplit := strings.Split(repoFullName, "/")
+	if len(pathSplit) != 2 || pathSplit[0] == "" || pathSplit[1] == "" {
+		return Repo{}, fmt.Errorf("invalid repo format %q", repoFullName)
+	}
+	owner = pathSplit[0]
+	repo = pathSplit[1]
+
+	return Repo{
+		FullName:          repoFullName,
+		Owner:             owner,
+		Name:              repo,
+		CloneURL:          authedCloneURL,
+		SanitizedCloneURL: cloneURL,
+		Hostname:          cloneURLParsed.Hostname(),
+	}, nil
 }
 
 // PullRequest is a VCS pull request.
