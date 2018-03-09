@@ -227,7 +227,9 @@ func NewServer(config Config, flagNames FlagNames) (*Server, error) {
 		AllowForkPRs:             config.AllowForkPRs,
 		AllowForkPRsFlag:         flagNames.AllowForkPRsFlag,
 	}
-	repoWhitelist := &events.RepoWhitelist{}
+	repoWhitelist := &events.RepoWhitelist{
+		Whitelist: config.RepoWhitelist,
+	}
 	eventsController := &EventsController{
 		CommandRunner:          commandHandler,
 		PullCleaner:            pullClosedExecutor,

@@ -140,7 +140,7 @@ Follow these instructions to create a token (we don't store any tokens):
 	// Start atlantis server.
 	colorstring.Printf("[white]=> starting atlantis server ")
 	s.Start()
-	atlantisCmd, err := executeCmd(os.Args[0], []string{"server", "--gh-user", githubUsername, "--gh-token", githubToken, "--data-dir", "/tmp/atlantis/data", "--atlantis-url", tunnelURL})
+	atlantisCmd, err := executeCmd(os.Args[0], []string{"server", "--gh-user", githubUsername, "--gh-token", githubToken, "--data-dir", "/tmp/atlantis/data", "--atlantis-url", tunnelURL, "--repo-whitelist", fmt.Sprintf("github.com/%s/%s", githubUsername, terraformExampleRepo)})
 	if err != nil {
 		return errors.Wrapf(err, "creating atlantis server")
 	}
