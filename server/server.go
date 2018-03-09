@@ -66,6 +66,7 @@ type Config struct {
 	GitlabWebHookSecret string `mapstructure:"gitlab-webhook-secret"`
 	LogLevel            string `mapstructure:"log-level"`
 	Port                int    `mapstructure:"port"`
+	RepoWhitelist       string `mapstructure:"repo-whitelist"`
 	// RequireApproval is whether to require pull request approval before
 	// allowing terraform apply's to be run.
 	RequireApproval bool            `mapstructure:"require-approval"`
@@ -79,7 +80,8 @@ type Config struct {
 // They're useful because sometimes we comment back asking the user to enable
 // a certain flag.
 type FlagNames struct {
-	AllowForkPRsFlag string
+	AllowForkPRsFlag  string
+	RepoWhitelistFlag string
 }
 
 // WebhookConfig is nested within Config. It's used to configure webhooks.
@@ -225,6 +227,7 @@ func NewServer(config Config, flagNames FlagNames) (*Server, error) {
 		AllowForkPRs:             config.AllowForkPRs,
 		AllowForkPRsFlag:         flagNames.AllowForkPRsFlag,
 	}
+	repoWhitelist := &events.RepoWhitelist{}
 	eventsController := &EventsController{
 		CommandRunner:          commandHandler,
 		PullCleaner:            pullClosedExecutor,
@@ -235,6 +238,7 @@ func NewServer(config Config, flagNames FlagNames) (*Server, error) {
 		GithubRequestValidator: &DefaultGithubRequestValidator{},
 		GitlabRequestParser:    &DefaultGitlabRequestParser{},
 		GitlabWebHookSecret:    []byte(config.GitlabWebHookSecret),
+		RepoWhitelist:          repoWhitelist,
 		SupportedVCSHosts:      supportedVCSHosts,
 		VCSClient:              vcsClient,
 	}

@@ -34,10 +34,8 @@ func (s *ServerStarterMock) Start() error {
 
 func TestExecute_NoConfigFlag(t *testing.T) {
 	t.Log("If there is no config flag specified Execute should return nil.")
-	c := setup(map[string]interface{}{
-		cmd.ConfigFlag:  "",
-		cmd.GHUserFlag:  "user",
-		cmd.GHTokenFlag: "token",
+	c := setupWithDefaults(map[string]interface{}{
+		cmd.ConfigFlag: "",
 	})
 	err := c.Execute()
 	Ok(t, err)
@@ -45,10 +43,8 @@ func TestExecute_NoConfigFlag(t *testing.T) {
 
 func TestExecute_ConfigFileExtension(t *testing.T) {
 	t.Log("If the config file doesn't have an extension then error.")
-	c := setup(map[string]interface{}{
-		cmd.ConfigFlag:  "does-not-exist",
-		cmd.GHUserFlag:  "user",
-		cmd.GHTokenFlag: "token",
+	c := setupWithDefaults(map[string]interface{}{
+		cmd.ConfigFlag: "does-not-exist",
 	})
 	err := c.Execute()
 	Equals(t, "invalid config: reading does-not-exist: Unsupported Config Type \"\"", err.Error())
@@ -56,10 +52,8 @@ func TestExecute_ConfigFileExtension(t *testing.T) {
 
 func TestExecute_ConfigFileMissing(t *testing.T) {
 	t.Log("If the config file doesn't exist then error.")
-	c := setup(map[string]interface{}{
-		cmd.ConfigFlag:  "does-not-exist.yaml",
-		cmd.GHUserFlag:  "user",
-		cmd.GHTokenFlag: "token",
+	c := setupWithDefaults(map[string]interface{}{
+		cmd.ConfigFlag: "does-not-exist.yaml",
 	})
 	err := c.Execute()
 	Equals(t, "invalid config: reading does-not-exist.yaml: open does-not-exist.yaml: no such file or directory", err.Error())
@@ -69,10 +63,8 @@ func TestExecute_ConfigFileExists(t *testing.T) {
 	t.Log("If the config file exists then there should be no error.")
 	tmpFile := tempFile(t, "")
 	defer os.Remove(tmpFile) // nolint: errcheck
-	c := setup(map[string]interface{}{
-		cmd.ConfigFlag:  tmpFile,
-		cmd.GHUserFlag:  "user",
-		cmd.GHTokenFlag: "token",
+	c := setupWithDefaults(map[string]interface{}{
+		cmd.ConfigFlag: tmpFile,
 	})
 	err := c.Execute()
 	Ok(t, err)
@@ -82,21 +74,28 @@ func TestExecute_InvalidConfig(t *testing.T) {
 	t.Log("If the config file contains invalid yaml there should be an error.")
 	tmpFile := tempFile(t, "invalidyaml")
 	defer os.Remove(tmpFile) // nolint: errcheck
-	c := setup(map[string]interface{}{
-		cmd.ConfigFlag:  tmpFile,
-		cmd.GHUserFlag:  "user",
-		cmd.GHTokenFlag: "token",
+	c := setupWithDefaults(map[string]interface{}{
+		cmd.ConfigFlag: tmpFile,
 	})
 	err := c.Execute()
 	Assert(t, strings.Contains(err.Error(), "unmarshal errors"), "should be an unmarshal error")
 }
 
+func TestExecute_RequireRepoWhitelist(t *testing.T) {
+	t.Log("If no repo whitelist set should error.")
+	c := setup(map[string]interface{}{
+		cmd.GHUserFlag:  "user",
+		cmd.GHTokenFlag: "token",
+	})
+	err := c.Execute()
+	Assert(t, err != nil, "should be an error")
+	Equals(t, "--repo-whitelist must be set for security purposes", err.Error())
+}
+
 func TestExecute_ValidateLogLevel(t *testing.T) {
 	t.Log("Should validate log level.")
-	c := setup(map[string]interface{}{
+	c := setupWithDefaults(map[string]interface{}{
 		cmd.LogLevelFlag: "invalid",
-		cmd.GHUserFlag:   "user",
-		cmd.GHTokenFlag:  "token",
 	})
 	err := c.Execute()
 	Assert(t, err != nil, "should be an error")
@@ -140,11 +139,7 @@ func TestExecute_ValidateSSLConfig(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Log("Should validate ssl config when " + testCase.description)
-		// Add in required flags.
-		testCase.flags[cmd.GHUserFlag] = "user"
-		testCase.flags[cmd.GHTokenFlag] = "token"
-
-		c := setup(testCase.flags)
+		c := setupWithDefaults(testCase.flags)
 		err := c.Execute()
 		if testCase.expectError {
 			Assert(t, err != nil, "should be an error")
@@ -164,7 +159,7 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 	}{
 		{
 			"no config set",
-			nil,
+			make(map[string]interface{}),
 			true,
 		},
 		{
@@ -240,6 +235,8 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Log("Should validate vcs config when " + testCase.description)
+		testCase.flags[cmd.RepoWhitelistFlag] = "*"
+
 		c := setup(testCase.flags)
 		err := c.Execute()
 		if testCase.expectError {
@@ -254,10 +251,11 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 func TestExecute_Defaults(t *testing.T) {
 	t.Log("Should set the defaults for all unspecified flags.")
 	c := setup(map[string]interface{}{
-		cmd.GHUserFlag:      "user",
-		cmd.GHTokenFlag:     "token",
-		cmd.GitlabUserFlag:  "gitlab-user",
-		cmd.GitlabTokenFlag: "gitlab-token",
+		cmd.GHUserFlag:        "user",
+		cmd.GHTokenFlag:       "token",
+		cmd.GitlabUserFlag:    "gitlab-user",
+		cmd.GitlabTokenFlag:   "gitlab-token",
+		cmd.RepoWhitelistFlag: "*",
 	})
 	err := c.Execute()
 	Ok(t, err)
@@ -287,9 +285,10 @@ func TestExecute_Defaults(t *testing.T) {
 func TestExecute_ExpandHomeInDataDir(t *testing.T) {
 	t.Log("If ~ is used as a data-dir path, should expand to absolute home path")
 	c := setup(map[string]interface{}{
-		cmd.GHUserFlag:  "user",
-		cmd.GHTokenFlag: "token",
-		cmd.DataDirFlag: "~/this/is/a/path",
+		cmd.GHUserFlag:        "user",
+		cmd.GHTokenFlag:       "token",
+		cmd.RepoWhitelistFlag: "*",
+		cmd.DataDirFlag:       "~/this/is/a/path",
 	})
 	err := c.Execute()
 	Ok(t, err)
@@ -301,9 +300,7 @@ func TestExecute_ExpandHomeInDataDir(t *testing.T) {
 
 func TestExecute_RelativeDataDir(t *testing.T) {
 	t.Log("Should convert relative dir to absolute.")
-	c := setup(map[string]interface{}{
-		cmd.GHUserFlag:  "user",
-		cmd.GHTokenFlag: "token",
+	c := setupWithDefaults(map[string]interface{}{
 		cmd.DataDirFlag: "../",
 	})
 
@@ -319,8 +316,9 @@ func TestExecute_RelativeDataDir(t *testing.T) {
 func TestExecute_GithubUser(t *testing.T) {
 	t.Log("Should remove the @ from the github username if it's passed.")
 	c := setup(map[string]interface{}{
-		cmd.GHUserFlag:  "@user",
-		cmd.GHTokenFlag: "token",
+		cmd.GHUserFlag:        "@user",
+		cmd.GHTokenFlag:       "token",
+		cmd.RepoWhitelistFlag: "*",
 	})
 	err := c.Execute()
 	Ok(t, err)
@@ -331,8 +329,9 @@ func TestExecute_GithubUser(t *testing.T) {
 func TestExecute_GitlabUser(t *testing.T) {
 	t.Log("Should remove the @ from the gitlab username if it's passed.")
 	c := setup(map[string]interface{}{
-		cmd.GitlabUserFlag:  "@user",
-		cmd.GitlabTokenFlag: "token",
+		cmd.GitlabUserFlag:    "@user",
+		cmd.GitlabTokenFlag:   "token",
+		cmd.RepoWhitelistFlag: "*",
 	})
 	err := c.Execute()
 	Ok(t, err)
@@ -356,6 +355,7 @@ func TestExecute_Flags(t *testing.T) {
 		cmd.LogLevelFlag:        "debug",
 		cmd.PortFlag:            8181,
 		cmd.RequireApprovalFlag: true,
+		cmd.RepoWhitelistFlag:   "github.com/runatlantis/atlantis",
 	})
 	err := c.Execute()
 	Ok(t, err)
@@ -373,6 +373,7 @@ func TestExecute_Flags(t *testing.T) {
 	Equals(t, "debug", passedConfig.LogLevel)
 	Equals(t, 8181, passedConfig.Port)
 	Equals(t, true, passedConfig.RequireApproval)
+	Equals(t, "github.com/runatlantis/atlantis", passedConfig.RepoWhitelist)
 }
 
 func TestExecute_ConfigFile(t *testing.T) {
@@ -390,7 +391,8 @@ gitlab-token: "gitlab-token"
 gitlab-webhook-secret: "gitlab-secret"
 log-level: "debug"
 port: 8181
-require-approval: true`)
+require-approval: true
+repo-whitelist: "github.com/runatlantis/atlantis"`)
 	defer os.Remove(tmpFile) // nolint: errcheck
 	c := setup(map[string]interface{}{
 		cmd.ConfigFlag: tmpFile,
@@ -411,6 +413,7 @@ require-approval: true`)
 	Equals(t, "debug", passedConfig.LogLevel)
 	Equals(t, 8181, passedConfig.Port)
 	Equals(t, true, passedConfig.RequireApproval)
+	Equals(t, "github.com/runatlantis/atlantis", passedConfig.RepoWhitelist)
 }
 
 func TestExecute_EnvironmentOverride(t *testing.T) {
@@ -419,7 +422,8 @@ func TestExecute_EnvironmentOverride(t *testing.T) {
 	defer os.Remove(tmpFile)                   // nolint: errcheck
 	os.Setenv("ATLANTIS_GH_TOKEN", "override") // nolint: errcheck
 	c := setup(map[string]interface{}{
-		cmd.ConfigFlag: tmpFile,
+		cmd.ConfigFlag:        tmpFile,
+		cmd.RepoWhitelistFlag: "*",
 	})
 	err := c.Execute()
 	Ok(t, err)
@@ -430,8 +434,9 @@ func TestExecute_FlagConfigOverride(t *testing.T) {
 	t.Log("Flags should override config file flags.")
 	os.Setenv("ATLANTIS_GH_TOKEN", "env-var") // nolint: errcheck
 	c := setup(map[string]interface{}{
-		cmd.GHUserFlag:  "user",
-		cmd.GHTokenFlag: "override",
+		cmd.GHUserFlag:        "user",
+		cmd.GHTokenFlag:       "override",
+		cmd.RepoWhitelistFlag: "*",
 	})
 	err := c.Execute()
 	Ok(t, err)
@@ -443,8 +448,9 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	tmpFile := tempFile(t, "gh-user: config\ngh-token: config2")
 	defer os.Remove(tmpFile) // nolint: errcheck
 	c := setup(map[string]interface{}{
-		cmd.ConfigFlag:  tmpFile,
-		cmd.GHTokenFlag: "override",
+		cmd.ConfigFlag:        tmpFile,
+		cmd.GHTokenFlag:       "override",
+		cmd.RepoWhitelistFlag: "*",
 	})
 
 	err := c.Execute()
@@ -459,8 +465,9 @@ func TestExecute_EnvVars(t *testing.T) {
 	os.Setenv("ATLANTIS_GITLAB_TOKEN", "gitlab-token")            // nolint: errcheck
 	os.Setenv("ATLANTIS_GITLAB_WEBHOOK_SECRET", "gitlab-webhook") // nolint: errcheck
 	c := setup(map[string]interface{}{
-		cmd.GHUserFlag:     "user",
-		cmd.GitlabUserFlag: "user",
+		cmd.GHUserFlag:        "user",
+		cmd.GitlabUserFlag:    "user",
+		cmd.RepoWhitelistFlag: "*",
 	})
 	err := c.Execute()
 	Ok(t, err)
@@ -472,6 +479,23 @@ func TestExecute_EnvVars(t *testing.T) {
 
 func setup(flags map[string]interface{}) *cobra.Command {
 	viper := viper.New()
+	for k, v := range flags {
+		viper.Set(k, v)
+	}
+	c := &cmd.ServerCmd{
+		ServerCreator: &ServerCreatorMock{},
+		Viper:         viper,
+		SilenceOutput: true,
+	}
+	return c.Init()
+}
+
+func setupWithDefaults(flags map[string]interface{}) *cobra.Command {
+	viper := viper.New()
+	flags[cmd.GHUserFlag] = "user"
+	flags[cmd.GHTokenFlag] = "token"
+	flags[cmd.RepoWhitelistFlag] = "*"
+
 	for k, v := range flags {
 		viper.Set(k, v)
 	}

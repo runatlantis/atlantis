@@ -33,6 +33,7 @@ type EventsController struct {
 	// UI that identifies this call as coming from GitLab. If empty, no
 	// request validation is done.
 	GitlabWebHookSecret []byte
+	RepoWhitelist       *events.RepoWhitelist
 	// SupportedVCSHosts is which VCS hosts Atlantis was configured upon
 	// startup to support.
 	SupportedVCSHosts []vcs.Host
@@ -119,6 +120,10 @@ func (e *EventsController) HandleGithubPullRequestEvent(w http.ResponseWriter, p
 		return
 	}
 
+	if !e.RepoWhitelist.IsWhitelisted(repo.FullName, repo.Hostname) {
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring pull request event from non-whitelisted repo")
+		return
+	}
 	if err := e.PullCleaner.CleanUpPull(repo, pull, vcs.Github); err != nil {
 		e.respond(w, logging.Error, http.StatusInternalServerError, "Error cleaning pull request: %s", err)
 		return
@@ -147,7 +152,11 @@ func (e *EventsController) handleGitlabPost(w http.ResponseWriter, r *http.Reque
 // HandleGitlabCommentEvent handles comment events from GitLab where Atlantis
 // commands can come from. It's exported to make testing easier.
 func (e *EventsController) HandleGitlabCommentEvent(w http.ResponseWriter, event gitlab.MergeCommentEvent) {
-	baseRepo, headRepo, user := e.Parser.ParseGitlabMergeCommentEvent(event)
+	baseRepo, headRepo, user, err := e.Parser.ParseGitlabMergeCommentEvent(event)
+	if err != nil {
+		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing webhook: %s", err)
+		return
+	}
 	e.handleCommentEvent(w, baseRepo, headRepo, user, event.MergeRequest.IID, event.ObjectAttributes.Note, vcs.Gitlab)
 }
 
@@ -155,10 +164,22 @@ func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo mo
 	parseResult := e.CommentParser.Parse(comment, vcsHost)
 	if parseResult.Ignore {
 		truncated := comment
-		if len(truncated) > 40 {
-			truncated = comment[:40] + "..."
+		truncateLen := 40
+		if len(truncated) > truncateLen {
+			truncated = comment[:truncateLen] + "..."
 		}
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring non-command comment: %q", truncated)
+		return
+	}
+
+	// At this point we know it's a command we're not supposed to ignore, so now
+	// we check if this repo is allowed to run commands in the first place.
+	if !e.RepoWhitelist.IsWhitelisted(baseRepo.FullName, baseRepo.Hostname) {
+		errMsg := "```\nError: This repo is not whitelisted for Atlantis.\n```"
+		if err := e.VCSClient.CreateComment(baseRepo, pullNum, errMsg, vcsHost); err != nil {
+			e.Logger.Err("unable to comment on pull request: %s", err)
+		}
+		e.respond(w, logging.Warn, http.StatusBadRequest, "Repo not whitelisted")
 		return
 	}
 
@@ -185,7 +206,17 @@ func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo mo
 // request if the event is a merge request closed event. It's exported to make
 // testing easier.
 func (e *EventsController) HandleGitlabMergeRequestEvent(w http.ResponseWriter, event gitlab.MergeEvent) {
-	pull, repo := e.Parser.ParseGitlabMergeEvent(event)
+	pull, repo, err := e.Parser.ParseGitlabMergeEvent(event)
+	if err != nil {
+		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing webhook: %s", err)
+		return
+	}
+
+	if !e.RepoWhitelist.IsWhitelisted(repo.FullName, repo.Hostname) {
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring merge request event from non-whitelisted repo")
+		return
+	}
+
 	if pull.State != models.Closed {
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring opened merge request event")
 		return

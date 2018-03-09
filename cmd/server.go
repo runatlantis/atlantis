@@ -32,6 +32,7 @@ const (
 	GitlabWebHookSecret = "gitlab-webhook-secret"
 	LogLevelFlag        = "log-level"
 	PortFlag            = "port"
+	RepoWhitelistFlag   = "repo-whitelist"
 	RequireApprovalFlag = "require-approval"
 	SSLCertFileFlag     = "ssl-cert-file"
 	SSLKeyFileFlag      = "ssl-key-file"
@@ -102,6 +103,12 @@ var stringFlags = []stringFlag{
 		name:        LogLevelFlag,
 		description: "Log level. Either debug, info, warn, or error.",
 		value:       "info",
+	},
+	{
+		name: RepoWhitelistFlag,
+		description: "Comma separated list of repositories that Atlantis will operate on, ex. 'github.com/runatlantis/*'. " +
+			"The format is {hostname}/{owner}/{repo}. '*' denotes any string until the next comma and can be used to whitelist " +
+			"all repos: '*' (not recommended), an entire hostname: 'internalgithub.com/*' or an organization: 'github.com/runatlantis/*'.",
 	},
 	{
 		name:        SSLCertFileFlag,
@@ -295,6 +302,11 @@ func (s *ServerCmd) validate(config server.Config) error {
 	if config.GithubUser == "" && config.GitlabUser == "" {
 		return vcsErr
 	}
+
+	if config.RepoWhitelist == "" {
+		return fmt.Errorf("--%s must be set for security purposes", RepoWhitelistFlag)
+	}
+
 	return nil
 }
 
@@ -341,10 +353,10 @@ func (s *ServerCmd) trimAtSymbolFromUsers(config *server.Config) {
 }
 
 func (s *ServerCmd) securityWarnings(config *server.Config) {
-	if config.GithubUser != "" && config.GithubWebHookSecret == "" {
+	if config.GithubUser != "" && config.GithubWebHookSecret == "" && !s.SilenceOutput {
 		fmt.Fprintf(os.Stderr, "%s[WARN] No GitHub webhook secret set. This could allow attackers to spoof requests from GitHub. See https://git.io/vAF3t%s\n", RedTermStart, RedTermEnd)
 	}
-	if config.GitlabUser != "" && config.GitlabWebHookSecret == "" {
+	if config.GitlabUser != "" && config.GitlabWebHookSecret == "" && !s.SilenceOutput {
 		fmt.Fprintf(os.Stderr, "%s[WARN] No GitLab webhook secret set. This could allow attackers to spoof requests from GitLab. See https://git.io/vAF3t%s\n", RedTermStart, RedTermEnd)
 	}
 }
