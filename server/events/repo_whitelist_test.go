@@ -58,6 +58,20 @@ func TestIsWhitelisted(t *testing.T) {
 			true,
 		},
 		{
+			"github.com/owner/rep* should not match",
+			"github.com/owner/rep*",
+			"owner/re",
+			"github.com",
+			false,
+		},
+		{
+			"github.com/owner/rep* should match",
+			"github.com/owner/rep*",
+			"owner/rep",
+			"github.com",
+			true,
+		},
+		{
 			"github.com/o* should not match",
 			"github.com/o*",
 			"somethingelse/repo",

@@ -33,10 +33,10 @@ func (r *RepoWhitelist) matchesRule(rule string, candidate string) bool {
 	}
 
 	// If the candidate length is less than where we found the wildcard
-	// + 1, then it can't be equal. For example:
+	// then it can't be equal. For example:
 	//   rule: abc*
 	//   candidate: ab
-	if len(candidate) < wildcardIdx-1 {
+	if len(candidate) < wildcardIdx {
 		return false
 	}
 
