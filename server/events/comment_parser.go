@@ -142,11 +142,16 @@ func (e *CommentParser) Parse(comment string, vcsHost vcs.Host) CommentParseResu
 		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: %s.\nUsage of %s:\n%s\n```", err.Error(), command, flagSet.FlagUsagesWrapped(usagesCols))}
 	}
 
-	// We only use the extra args after the --. For example given a comment:
-	// "atlantis plan -bad-option -- -target=hi"
-	// we only append "-target=hi" to the eventual command.
-	// todo: keep track of the args we're discarding and include that with
-	//       comment as a warning.
+	var unusedArgs []string
+	if flagSet.ArgsLenAtDash() == -1 {
+		unusedArgs = flagSet.Args()
+	} else {
+		unusedArgs = flagSet.Args()[0:flagSet.ArgsLenAtDash()]
+	}
+	if len(unusedArgs) > 0 {
+		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown argument(s) – %s\n```", strings.Join(unusedArgs, " "))}
+	}
+
 	if flagSet.ArgsLenAtDash() != -1 {
 		extraArgsUnsafe := flagSet.Args()[flagSet.ArgsLenAtDash():]
 		// Quote all extra args so there isn't a security issue when we append
@@ -205,7 +210,14 @@ var HelpComment = "```cmake\n" +
 Terraform automation and collaboration for your team
 
 Usage:
-  atlantis <command> [options]
+  atlantis <command> [options] -- [terraform options]
+
+Examples:
+  # run plan in the root directory passing the -target flag to terraform
+  atlantis plan -d . -- -target=resource
+
+  # apply the plan generated
+  atlantis apply -d .
 
 Commands:
   plan   Runs 'terraform plan' for the changes in this pull request.

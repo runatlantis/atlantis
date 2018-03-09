@@ -52,6 +52,57 @@ func TestParse_HelpResponse(t *testing.T) {
 	}
 }
 
+func TestParse_UnusedArguments(t *testing.T) {
+	t.Log("if there are unused flags we return an error")
+	cases := []struct {
+		Command string
+		Unused  string
+	}{
+		{
+			"atlantis plan -d . arg",
+			"arg",
+		},
+		{
+			"atlantis plan arg -d .",
+			"arg",
+		},
+		{
+			"atlantis plan arg",
+			"arg",
+		},
+		{
+			"atlantis plan arg arg2",
+			"arg arg2",
+		},
+		{
+			"atlantis plan -d . arg -w kjj arg2",
+			"arg arg2",
+		},
+		{
+			"atlantis apply -d . arg",
+			"arg",
+		},
+		{
+			"atlantis apply arg arg2",
+			"arg arg2",
+		},
+		{
+			"atlantis apply arg arg2 -- useful",
+			"arg arg2",
+		},
+		{
+			"atlantis apply arg arg2 --",
+			"arg arg2",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.Command, func(t *testing.T) {
+			r := commentParser.Parse(c.Command, vcs.Github)
+			Equals(t, fmt.Sprintf("```\nError: unknown argument(s) – %s\n```", c.Unused), r.CommentResponse)
+		})
+	}
+}
+
 func TestParse_DidYouMeanAtlantis(t *testing.T) {
 	t.Log("given a comment that should result in a 'did you mean atlantis'" +
 		"response, should set CommentParseResult.CommentResult")
@@ -253,14 +304,6 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"\"-d\" \"dir\" \"--verbose\"",
 		},
-		// Test missing arguments.
-		{
-			"-w -d dir --verbose",
-			"-d",
-			"",
-			true,
-			"",
-		},
 		// Test the extra args parsing.
 		{
 			"--",
@@ -269,16 +312,9 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 		},
-		{
-			"abc --",
-			"default",
-			"",
-			false,
-			"",
-		},
 		// Test trying to escape quoting
 		{
-			"abc -- \";echo \"hi",
+			"-- \";echo \"hi",
 			"default",
 			"",
 			false,
