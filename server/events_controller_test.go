@@ -164,10 +164,10 @@ func TestPost_GitlabCommentNotWhitelisted(t *testing.T) {
 	}
 	requestJSON, err := ioutil.ReadFile(filepath.Join("testfixtures", "gitlabMergeCommentEvent_notWhitelisted.json"))
 	Ok(t, err)
-	eventsReq, _ := http.NewRequest("GET", "", bytes.NewBuffer(requestJSON))
-	eventsReq.Header.Set(gitlabHeader, "Note Hook")
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(requestJSON))
+	req.Header.Set(gitlabHeader, "Note Hook")
 	w := httptest.NewRecorder()
-	e.Post(w, eventsReq)
+	e.Post(w, req)
 
 	Equals(t, http.StatusBadRequest, w.Result().StatusCode)
 	body, _ := ioutil.ReadAll(w.Result().Body)
@@ -192,11 +192,11 @@ func TestPost_GithubCommentNotWhitelisted(t *testing.T) {
 	}
 	requestJSON, err := ioutil.ReadFile(filepath.Join("testfixtures", "githubIssueCommentEvent_notWhitelisted.json"))
 	Ok(t, err)
-	eventsReq, _ := http.NewRequest("GET", "", bytes.NewBuffer(requestJSON))
-	eventsReq.Header.Set("Content-Type", "application/json")
-	eventsReq.Header.Set(githubHeader, "issue_comment")
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(requestJSON))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(githubHeader, "issue_comment")
 	w := httptest.NewRecorder()
-	e.Post(w, eventsReq)
+	e.Post(w, req)
 
 	Equals(t, http.StatusBadRequest, w.Result().StatusCode)
 	body, _ := ioutil.ReadAll(w.Result().Body)

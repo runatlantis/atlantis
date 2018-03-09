@@ -478,30 +478,30 @@ func TestExecute_EnvVars(t *testing.T) {
 }
 
 func setup(flags map[string]interface{}) *cobra.Command {
-	viper := viper.New()
+	vipr := viper.New()
 	for k, v := range flags {
-		viper.Set(k, v)
+		vipr.Set(k, v)
 	}
 	c := &cmd.ServerCmd{
 		ServerCreator: &ServerCreatorMock{},
-		Viper:         viper,
+		Viper:         vipr,
 		SilenceOutput: true,
 	}
 	return c.Init()
 }
 
 func setupWithDefaults(flags map[string]interface{}) *cobra.Command {
-	viper := viper.New()
+	vipr := viper.New()
 	flags[cmd.GHUserFlag] = "user"
 	flags[cmd.GHTokenFlag] = "token"
 	flags[cmd.RepoWhitelistFlag] = "*"
 
 	for k, v := range flags {
-		viper.Set(k, v)
+		vipr.Set(k, v)
 	}
 	c := &cmd.ServerCmd{
 		ServerCreator: &ServerCreatorMock{},
-		Viper:         viper,
+		Viper:         vipr,
 		SilenceOutput: true,
 	}
 	return c.Init()

@@ -274,11 +274,8 @@ resource "null_resource" "null" {
   }
 }
 ```
-  * This could happen if you're not using Webhook Secrets or a Repo Whitelist.
-* Running malicious hook commands specified in the `atlantis.yaml` file.
-  * This could happen if you're not using Webhook Secrets or a Repo Whitelist.
+* Running malicious hook commands specified in a `atlantis.yaml` file.
 * Someone adding `atlantis plan/apply` comments on your valid pull requests.
-  * This could happen if you're running Atlantis on a public repository.
 
 ### Mitigations
 #### Don't Use On Public Repos
@@ -289,16 +286,16 @@ If you're running on a public repo (which isn't recommended, see above) you shou
 because anyone can open up a pull request from their fork to your repo.
 
 #### Webhook Secrets
-Atlantis should be run with Webhook secrets set via the `ATLANTIS_GH_WEBHOOK_SECRET`/`ATLANTIS_GITLAB_WEBHOOK_SECRET` environment variables.
+Atlantis should be run with Webhook secrets set via the `$ATLANTIS_GH_WEBHOOK_SECRET`/`$ATLANTIS_GITLAB_WEBHOOK_SECRET` environment variables.
 
 Webhook secrets are needed for Atlantis to ensure that a request originated from your configured Git host (GitHub or GitLab).
-If not set, anyone with access to Atlantis can make webhook requests. This is especially dangerous when using github.com or gitlab.com since
-that means Atlantis is exposed to the internet. By spoofing a webhook request, an attacker could trigger Atlantis to run on a malicious repo (`--repo-whitelist` can help).
+If not set, anyone with network access to Atlantis could make webhook requests. This is especially dangerous when using github.com or gitlab.com since
+that means Atlantis is exposed to the internet. By spoofing a webhook request, an attacker could trigger Atlantis to run on a malicious repo (`--repo-whitelist` can help, see below).
 
-#### Repo Whitelist
+#### `--repo-whitelist`
 If someone stole your webhook secret or you don't have any set, they could make Atlantis perform
 actions on their repository. To mitigate this, you can run Atlantis with `--repo-whitelist` and whitelist
-which repositories Atlantis acts on. See `atlantis server --help` for more details on that flag.
+which repositories Atlantis acts on. See `atlantis server --help` for more details.
 
 ## Production-Ready Deployment
 ### Install Terraform
