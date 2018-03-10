@@ -64,23 +64,28 @@ func TestIndex_Success(t *testing.T) {
 	When(l.List()).ThenReturn(locks, nil)
 	it := sMocks.NewMockTemplateWriter()
 	r := mux.NewRouter()
+	version := "0.3.1"
 	// Need to create a lock route since the server expects this route to exist.
 	r.NewRoute().Path("").Name(server.LockRouteName)
 	s := server.Server{
 		Locker:        l,
 		IndexTemplate: it,
 		Router:        r,
+		Version:       version,
 	}
 	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
 	s.Index(w, eventsReq)
-	it.VerifyWasCalledOnce().Execute(w, []server.LockIndexData{
-		{
-			LockURL:      "",
-			RepoFullName: "owner/repo",
-			PullNum:      9,
-			Time:         now,
+	it.VerifyWasCalledOnce().Execute(w, server.IndexData{
+		Locks: []server.LockIndexData{
+			{
+				LockURL:      "",
+				RepoFullName: "owner/repo",
+				PullNum:      9,
+				Time:         now,
+			},
 		},
+		Version: version,
 	})
 	responseContains(t, w, http.StatusOK, "")
 }

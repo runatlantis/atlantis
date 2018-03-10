@@ -36,6 +36,7 @@ const LockRouteName = "lock-detail"
 
 // Server runs the Atlantis web server.
 type Server struct {
+	Version            string
 	Router             *mux.Router
 	Port               int
 	CommandHandler     *events.CommandHandler
@@ -73,6 +74,7 @@ type Config struct {
 	SlackToken      string          `mapstructure:"slack-token"`
 	SSLCertFile     string          `mapstructure:"ssl-cert-file"`
 	SSLKeyFile      string          `mapstructure:"ssl-key-file"`
+	Version         string          `mapstructure:"version"`
 	Webhooks        []WebhookConfig `mapstructure:"webhooks"`
 }
 
@@ -246,6 +248,7 @@ func NewServer(config Config, flagNames FlagNames) (*Server, error) {
 	}
 	router := mux.NewRouter()
 	return &Server{
+		Version:            config.Version,
 		Router:             router,
 		Port:               config.Port,
 		CommandHandler:     commandHandler,
@@ -324,17 +327,20 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 
-	var results []LockIndexData
+	var lockResults []LockIndexData
 	for id, v := range locks {
 		lockURL, _ := s.Router.Get(LockRouteName).URL("id", url.QueryEscape(id))
-		results = append(results, LockIndexData{
+		lockResults = append(lockResults, LockIndexData{
 			LockURL:      lockURL.String(),
 			RepoFullName: v.Project.RepoFullName,
 			PullNum:      v.Pull.Num,
 			Time:         v.Time,
 		})
 	}
-	s.IndexTemplate.Execute(w, results) // nolint: errcheck
+	s.IndexTemplate.Execute(w, IndexData {
+		Locks: lockResults,
+		Version: s.Version,
+	}) // nolint: errcheck
 }
 
 // GetLockRoute is the GET /locks/{id} route. It renders the lock detail view.

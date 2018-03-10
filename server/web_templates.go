@@ -24,6 +24,11 @@ type LockIndexData struct {
 	Time         time.Time
 }
 
+type IndexData struct {
+	Locks []LockIndexData
+	Version string
+}
+
 var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
 <!DOCTYPE html>
 <html lang="en">
@@ -51,7 +56,7 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
 <div class="container">
   <section class="header">
     <a title="atlantis" href="/"><img src="/static/images/atlantis-icon.png"/></a>
-    <p class="title-heading">atlantis</p>
+    <p class="title-heading">atlantis {{ .Version }}</p>
     <p class="js-discard-success"><strong>Plan discarded and unlocked!</strong></p>
   </section>
   <nav class="navbar">
@@ -62,8 +67,8 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
   <br>
   <section>
     <p class="title-heading small"><strong>Locks</strong></p>
-    {{ if . }}
-    {{ range . }}
+    {{ if .Locks }}
+    {{ range .Locks }}
       <a href="{{.LockURL}}">
         <div class="twelve columns button content lock-row">
         <div class="list-title">{{.RepoFullName}} - <span class="heading-font-size">#{{.PullNum}}</span></div>
