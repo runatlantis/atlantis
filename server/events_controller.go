@@ -105,10 +105,6 @@ func (e *EventsController) HandleGithubCommentEvent(w http.ResponseWriter, event
 // request if the event is a pull request closed event. It's exported to make
 // testing easier.
 func (e *EventsController) HandleGithubPullRequestEvent(w http.ResponseWriter, pullEvent *github.PullRequestEvent, githubReqID string) {
-	if pullEvent.GetAction() != "closed" {
-		e.respond(w, logging.Debug, http.StatusOK, "Ignoring pull request event since action was not closed %s", githubReqID)
-		return
-	}
 	pull, _, err := e.Parser.ParseGithubPull(pullEvent.PullRequest)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s", err)
@@ -119,12 +115,19 @@ func (e *EventsController) HandleGithubPullRequestEvent(w http.ResponseWriter, p
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing repo data: %s", err)
 		return
 	}
+	e.handlePullRequestEvent(w, repo, pull, vcs.Github)
+}
 
+func (e *EventsController) handlePullRequestEvent(w http.ResponseWriter, repo models.Repo, pull models.PullRequest, vcs vcs.Host) {
 	if !e.RepoWhitelist.IsWhitelisted(repo.FullName, repo.Hostname) {
-		e.respond(w, logging.Debug, http.StatusOK, "Ignoring pull request event from non-whitelisted repo")
+		e.respond(w, logging.Debug, http.StatusForbidden, "Ignoring pull request event from non-whitelisted repo")
 		return
 	}
-	if err := e.PullCleaner.CleanUpPull(repo, pull, vcs.Github); err != nil {
+	if pull.State != models.Closed {
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring opened pull request event")
+		return
+	}
+	if err := e.PullCleaner.CleanUpPull(repo, pull, vcs); err != nil {
 		e.respond(w, logging.Error, http.StatusInternalServerError, "Error cleaning pull request: %s", err)
 		return
 	}
@@ -179,7 +182,7 @@ func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo mo
 		if err := e.VCSClient.CreateComment(baseRepo, pullNum, errMsg, vcsHost); err != nil {
 			e.Logger.Err("unable to comment on pull request: %s", err)
 		}
-		e.respond(w, logging.Warn, http.StatusBadRequest, "Repo not whitelisted")
+		e.respond(w, logging.Warn, http.StatusForbidden, "Repo not whitelisted")
 		return
 	}
 
@@ -211,22 +214,7 @@ func (e *EventsController) HandleGitlabMergeRequestEvent(w http.ResponseWriter, 
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing webhook: %s", err)
 		return
 	}
-
-	if !e.RepoWhitelist.IsWhitelisted(repo.FullName, repo.Hostname) {
-		e.respond(w, logging.Debug, http.StatusOK, "Ignoring merge request event from non-whitelisted repo")
-		return
-	}
-
-	if pull.State != models.Closed {
-		e.respond(w, logging.Debug, http.StatusOK, "Ignoring opened merge request event")
-		return
-	}
-	if err := e.PullCleaner.CleanUpPull(repo, pull, vcs.Gitlab); err != nil {
-		e.respond(w, logging.Error, http.StatusInternalServerError, "Error cleaning pull request: %s", err)
-		return
-	}
-	e.Logger.Info("deleted locks and workspace for repo %s, pull %d", repo.FullName, pull.Num)
-	fmt.Fprintln(w, "Merge request cleaned successfully")
+	e.handlePullRequestEvent(w, repo, pull, vcs.Gitlab)
 }
 
 // supportsHost returns true if h is in e.SupportedVCSHosts and false otherwise.

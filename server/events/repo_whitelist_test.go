@@ -113,6 +113,13 @@ func TestIsWhitelisted(t *testing.T) {
 			"github.com",
 			true,
 		},
+		{
+			"longer shouldn't match on exact",
+			"github.com/owner/repo",
+			"owner/repo-longer",
+			"github.com",
+			false,
+		},
 	}
 
 	for _, c := range cases {

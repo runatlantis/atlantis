@@ -3,15 +3,13 @@ package server_test
 import (
 	"bytes"
 	"errors"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
-
-	"io/ioutil"
-	"strings"
-
-	"path/filepath"
 
 	"github.com/lkysow/go-gitlab"
 	. "github.com/petergtz/pegomock"
@@ -169,7 +167,7 @@ func TestPost_GitlabCommentNotWhitelisted(t *testing.T) {
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 
-	Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	Equals(t, http.StatusForbidden, w.Result().StatusCode)
 	body, _ := ioutil.ReadAll(w.Result().Body)
 	exp := "Repo not whitelisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
@@ -198,7 +196,7 @@ func TestPost_GithubCommentNotWhitelisted(t *testing.T) {
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 
-	Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	Equals(t, http.StatusForbidden, w.Result().StatusCode)
 	body, _ := ioutil.ReadAll(w.Result().Body)
 	exp := "Repo not whitelisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
@@ -277,7 +275,7 @@ func TestPost_GithubPullRequestNotClosed(t *testing.T) {
 	When(v.Validate(eventsReq, secret)).ThenReturn([]byte(event), nil)
 	w := httptest.NewRecorder()
 	e.Post(w, eventsReq)
-	responseContains(t, w, http.StatusOK, "Ignoring pull request event since action was not closed")
+	responseContains(t, w, http.StatusOK, "Ignoring opened pull request event")
 }
 
 func TestPost_GitlabMergeRequestNotClosed(t *testing.T) {
@@ -289,7 +287,7 @@ func TestPost_GitlabMergeRequestNotClosed(t *testing.T) {
 	When(p.ParseGitlabMergeEvent(event)).ThenReturn(models.PullRequest{State: models.Open}, models.Repo{}, nil)
 	w := httptest.NewRecorder()
 	e.Post(w, eventsReq)
-	responseContains(t, w, http.StatusOK, "Ignoring opened merge request event")
+	responseContains(t, w, http.StatusOK, "Ignoring opened pull request event")
 }
 
 func TestPost_GithubPullRequestInvalid(t *testing.T) {
@@ -319,6 +317,21 @@ func TestPost_GithubPullRequestInvalidRepo(t *testing.T) {
 	responseContains(t, w, http.StatusBadRequest, "Error parsing repo data: err")
 }
 
+func TestPost_GithubPullRequestNotWhitelisted(t *testing.T) {
+	t.Log("when the event is a github pull request to a non-whitelisted repo we return a 400")
+	e, v, _, p, _, _, _, _ := setup(t)
+	e.RepoWhitelist = &events.RepoWhitelist{Whitelist: "github.com/nevermatch"}
+	eventsReq.Header.Set(githubHeader, "pull_request")
+
+	event := `{"action": "closed"}`
+	When(v.Validate(eventsReq, secret)).ThenReturn([]byte(event), nil)
+	When(p.ParseGithubPull(matchers.AnyPtrToGithubPullRequest())).ThenReturn(models.PullRequest{}, models.Repo{}, nil)
+	When(p.ParseGithubRepo(matchers.AnyPtrToGithubRepository())).ThenReturn(models.Repo{}, nil)
+	w := httptest.NewRecorder()
+	e.Post(w, eventsReq)
+	responseContains(t, w, http.StatusForbidden, "Ignoring pull request event from non-whitelisted repo")
+}
+
 func TestPost_GithubPullRequestErrCleaningPull(t *testing.T) {
 	t.Log("when the event is a pull request and we have an error calling CleanUpPull we return a 503")
 	RegisterMockTestingT(t)
@@ -328,7 +341,7 @@ func TestPost_GithubPullRequestErrCleaningPull(t *testing.T) {
 	event := `{"action": "closed"}`
 	When(v.Validate(eventsReq, secret)).ThenReturn([]byte(event), nil)
 	repo := models.Repo{}
-	pull := models.PullRequest{}
+	pull := models.PullRequest{State: models.Closed}
 	When(p.ParseGithubPull(matchers.AnyPtrToGithubPullRequest())).ThenReturn(pull, repo, nil)
 	When(p.ParseGithubRepo(matchers.AnyPtrToGithubRepository())).ThenReturn(repo, nil)
 	When(c.CleanUpPull(repo, pull, vcs.Github)).ThenReturn(errors.New("cleanup err"))
@@ -360,7 +373,7 @@ func TestPost_GithubPullRequestSuccess(t *testing.T) {
 	event := `{"action": "closed"}`
 	When(v.Validate(eventsReq, secret)).ThenReturn([]byte(event), nil)
 	repo := models.Repo{}
-	pull := models.PullRequest{}
+	pull := models.PullRequest{State: models.Closed}
 	When(p.ParseGithubPull(matchers.AnyPtrToGithubPullRequest())).ThenReturn(pull, repo, nil)
 	When(p.ParseGithubRepo(matchers.AnyPtrToGithubRepository())).ThenReturn(repo, nil)
 	When(c.CleanUpPull(repo, pull, vcs.Github)).ThenReturn(nil)
@@ -380,7 +393,7 @@ func TestPost_GitlabMergeRequestSuccess(t *testing.T) {
 	When(p.ParseGitlabMergeEvent(event)).ThenReturn(pullRequest, repo, nil)
 	w := httptest.NewRecorder()
 	e.Post(w, eventsReq)
-	responseContains(t, w, http.StatusOK, "Merge request cleaned successfully")
+	responseContains(t, w, http.StatusOK, "Pull request cleaned successfully")
 }
 
 func setup(t *testing.T) (server.EventsController, *mocks.MockGithubRequestValidator, *mocks.MockGitlabRequestParser, *emocks.MockEventParsing, *emocks.MockCommandRunner, *emocks.MockPullCleaner, *vcsmocks.MockClientProxy, *emocks.MockCommentParsing) {

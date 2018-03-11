@@ -5,8 +5,11 @@ import (
 	"strings"
 )
 
+// Wildcard matches 0-n of all characters except commas.
 const Wildcard = "*"
 
+// RepoWhitelist implements checking if repos are whitelisted to be used with
+// this Atlantis.
 type RepoWhitelist struct {
 	// Whitelist is a comma separated list of rules with wildcards '*' allowed.
 	Whitelist string

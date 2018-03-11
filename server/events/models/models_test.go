@@ -1,9 +1,8 @@
 package models_test
 
 import (
-	"testing"
-
 	"fmt"
+	"testing"
 
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/testing"
