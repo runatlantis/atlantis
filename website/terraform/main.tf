@@ -147,3 +147,36 @@ resource "aws_route53_record" "root" {
     evaluate_target_health = false
   }
 }
+
+// MailGun Records
+resource "aws_route53_record" "mailgun_txt_0" {
+  zone_id = "${aws_route53_zone.zone.zone_id}"
+  name    = ""
+  type    = "TXT"
+  ttl     = "300"
+  records = ["v=spf1 include:mailgun.org ~all"]
+}
+
+resource "aws_route53_record" "mailgun_txt_1" {
+  zone_id = "${aws_route53_zone.zone.zone_id}"
+  name    = "krs._domainkey"
+  type    = "TXT"
+  ttl     = "300"
+  records = ["k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDW6rVlC11aSUQuUia02QRPkW2C1wLU/23Mx1PZHATpYSgLMo91MhVip1V1uVsC/rhqsvLiR6l0Cv/x7dG0lNQf3UPfn8Ld1qnjY66+HGt6crnuBJ6kpWYNRSVOlUU8tJrp6I0yNqvxDV689lI+HflyxCA1JP2SR5A9bL1oYJH64QIDAQAB"]
+}
+
+resource "aws_route53_record" "mailgun_mx" {
+  zone_id = "${aws_route53_zone.zone.zone_id}"
+  name    = ""
+  type    = "MX"
+  ttl     = "300"
+  records = ["10 mxa.mailgun.org", "10 mxb.mailgun.org"]
+}
+
+resource "aws_route53_record" "mailgun_cname" {
+  zone_id = "${aws_route53_zone.zone.zone_id}"
+  name    = "email"
+  type    = "CNAME"
+  ttl     = "300"
+  records = ["mailgun.org"]
+}

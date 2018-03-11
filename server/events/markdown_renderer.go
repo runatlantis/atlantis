@@ -37,23 +37,23 @@ type ResultData struct {
 
 // Render formats the data into a markdown string.
 // nolint: interfacer
-func (g *MarkdownRenderer) Render(res CommandResponse, cmdName CommandName, log string, verbose bool) string {
+func (m *MarkdownRenderer) Render(res CommandResponse, cmdName CommandName, log string, verbose bool) string {
 	commandStr := strings.Title(cmdName.String())
 	common := CommonData{commandStr, verbose, log}
 	if res.Error != nil {
-		return g.renderTemplate(errWithLogTmpl, ErrData{res.Error.Error(), common})
+		return m.renderTemplate(errWithLogTmpl, ErrData{res.Error.Error(), common})
 	}
 	if res.Failure != "" {
-		return g.renderTemplate(failureWithLogTmpl, FailureData{res.Failure, common})
+		return m.renderTemplate(failureWithLogTmpl, FailureData{res.Failure, common})
 	}
-	return g.renderProjectResults(res.ProjectResults, common)
+	return m.renderProjectResults(res.ProjectResults, common)
 }
 
-func (g *MarkdownRenderer) renderProjectResults(pathResults []ProjectResult, common CommonData) string {
+func (m *MarkdownRenderer) renderProjectResults(pathResults []ProjectResult, common CommonData) string {
 	results := make(map[string]string)
 	for _, result := range pathResults {
 		if result.Error != nil {
-			results[result.Path] = g.renderTemplate(errTmpl, struct {
+			results[result.Path] = m.renderTemplate(errTmpl, struct {
 				Command string
 				Error   string
 			}{
@@ -61,7 +61,7 @@ func (g *MarkdownRenderer) renderProjectResults(pathResults []ProjectResult, com
 				Error:   result.Error.Error(),
 			})
 		} else if result.Failure != "" {
-			results[result.Path] = g.renderTemplate(failureTmpl, struct {
+			results[result.Path] = m.renderTemplate(failureTmpl, struct {
 				Command string
 				Failure string
 			}{
@@ -69,9 +69,9 @@ func (g *MarkdownRenderer) renderProjectResults(pathResults []ProjectResult, com
 				Failure: result.Failure,
 			})
 		} else if result.PlanSuccess != nil {
-			results[result.Path] = g.renderTemplate(planSuccessTmpl, *result.PlanSuccess)
+			results[result.Path] = m.renderTemplate(planSuccessTmpl, *result.PlanSuccess)
 		} else if result.ApplySuccess != "" {
-			results[result.Path] = g.renderTemplate(applySuccessTmpl, struct{ Output string }{result.ApplySuccess})
+			results[result.Path] = m.renderTemplate(applySuccessTmpl, struct{ Output string }{result.ApplySuccess})
 		} else {
 			results[result.Path] = "Found no template. This is a bug!"
 		}
@@ -83,10 +83,10 @@ func (g *MarkdownRenderer) renderProjectResults(pathResults []ProjectResult, com
 	} else {
 		tmpl = multiProjectTmpl
 	}
-	return g.renderTemplate(tmpl, ResultData{results, common})
+	return m.renderTemplate(tmpl, ResultData{results, common})
 }
 
-func (g *MarkdownRenderer) renderTemplate(tmpl *template.Template, data interface{}) string {
+func (m *MarkdownRenderer) renderTemplate(tmpl *template.Template, data interface{}) string {
 	buf := &bytes.Buffer{}
 	if err := tmpl.Execute(buf, data); err != nil {
 		return fmt.Sprintf("Failed to render template, this is a bug: %v", err)

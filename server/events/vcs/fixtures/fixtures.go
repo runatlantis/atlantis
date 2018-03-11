@@ -23,5 +23,5 @@ var Repo = github.Repository{
 	FullName: github.String("owner/repo"),
 	Owner:    &github.User{Login: github.String("owner")},
 	Name:     github.String("repo"),
-	CloneURL: github.String("https://github.com/lkysow/atlantis-example.git"),
+	CloneURL: github.String("https://github.com/owner/repo.git"),
 }

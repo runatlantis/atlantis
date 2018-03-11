@@ -1,13 +1,11 @@
 package events
 
 import (
-	"errors"
-	"fmt"
 	"regexp"
-	"strings"
 
 	"github.com/google/go-github/github"
 	"github.com/lkysow/go-gitlab"
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
@@ -35,8 +33,8 @@ type EventParsing interface {
 	ParseGithubIssueCommentEvent(comment *github.IssueCommentEvent) (baseRepo models.Repo, user models.User, pullNum int, err error)
 	ParseGithubPull(pull *github.PullRequest) (models.PullRequest, models.Repo, error)
 	ParseGithubRepo(ghRepo *github.Repository) (models.Repo, error)
-	ParseGitlabMergeEvent(event gitlab.MergeEvent) (models.PullRequest, models.Repo)
-	ParseGitlabMergeCommentEvent(event gitlab.MergeCommentEvent) (baseRepo models.Repo, headRepo models.Repo, user models.User)
+	ParseGitlabMergeEvent(event gitlab.MergeEvent) (models.PullRequest, models.Repo, error)
+	ParseGitlabMergeCommentEvent(event gitlab.MergeCommentEvent) (baseRepo models.Repo, headRepo models.Repo, user models.User, err error)
 	ParseGitlabMergeRequest(mr *gitlab.MergeRequest) models.PullRequest
 }
 
@@ -114,37 +112,10 @@ func (e *EventParser) ParseGithubPull(pull *github.PullRequest) (models.PullRequ
 }
 
 func (e *EventParser) ParseGithubRepo(ghRepo *github.Repository) (models.Repo, error) {
-	var repo models.Repo
-	repoFullName := ghRepo.GetFullName()
-	if repoFullName == "" {
-		return repo, errors.New("repository.full_name is null")
-	}
-	repoOwner := ghRepo.Owner.GetLogin()
-	if repoOwner == "" {
-		return repo, errors.New("repository.owner.login is null")
-	}
-	repoName := ghRepo.GetName()
-	if repoName == "" {
-		return repo, errors.New("repository.name is null")
-	}
-	repoSanitizedCloneURL := ghRepo.GetCloneURL()
-	if repoSanitizedCloneURL == "" {
-		return repo, errors.New("repository.clone_url is null")
-	}
-
-	// Construct HTTPS repo clone url string with username and password.
-	repoCloneURL := strings.Replace(repoSanitizedCloneURL, "https://", fmt.Sprintf("https://%s:%s@", e.GithubUser, e.GithubToken), -1)
-
-	return models.Repo{
-		Owner:             repoOwner,
-		FullName:          repoFullName,
-		CloneURL:          repoCloneURL,
-		SanitizedCloneURL: repoSanitizedCloneURL,
-		Name:              repoName,
-	}, nil
+	return models.NewRepo(ghRepo.GetFullName(), ghRepo.GetCloneURL(), e.GithubUser, e.GithubToken)
 }
 
-func (e *EventParser) ParseGitlabMergeEvent(event gitlab.MergeEvent) (models.PullRequest, models.Repo) {
+func (e *EventParser) ParseGitlabMergeEvent(event gitlab.MergeEvent) (models.PullRequest, models.Repo, error) {
 	modelState := models.Closed
 	if event.ObjectAttributes.State == gitlabPullOpened {
 		modelState = models.Open
@@ -161,62 +132,27 @@ func (e *EventParser) ParseGitlabMergeEvent(event gitlab.MergeEvent) (models.Pul
 		State:      modelState,
 	}
 
-	cloneURL := e.addGitlabAuth(event.Project.GitHTTPURL)
-	// Get owner and name from PathWithNamespace because the fields
-	// event.Project.Name and event.Project.Owner can have capitals.
-	owner, name := e.getOwnerAndName(event.Project.PathWithNamespace)
-	repo := models.Repo{
-		FullName:          event.Project.PathWithNamespace,
-		Name:              name,
-		SanitizedCloneURL: event.Project.GitHTTPURL,
-		Owner:             owner,
-		CloneURL:          cloneURL,
-	}
-	return pull, repo
-}
-
-// addGitlabAuth adds gitlab username/password to the cloneURL.
-// We support http and https URLs because GitLab's docs have http:// URLs whereas
-// their API responses have https://.
-// Ex. https://gitlab.com/owner/repo.git => https://uname:pass@gitlab.com/owner/repo.git
-func (e *EventParser) addGitlabAuth(cloneURL string) string {
-	httpsReplaced := strings.Replace(cloneURL, "https://", fmt.Sprintf("https://%s:%s@", e.GitlabUser, e.GitlabToken), -1)
-	return strings.Replace(httpsReplaced, "http://", fmt.Sprintf("http://%s:%s@", e.GitlabUser, e.GitlabToken), -1)
-}
-
-// getOwnerAndName takes pathWithNamespace that should look like "owner/repo"
-// and returns "owner", "repo"
-func (e *EventParser) getOwnerAndName(pathWithNamespace string) (string, string) {
-	pathSplit := strings.Split(pathWithNamespace, "/")
-	if len(pathSplit) > 1 {
-		return pathSplit[0], pathSplit[1]
-	}
-	return "", ""
+	repo, err := models.NewRepo(event.Project.PathWithNamespace, event.Project.GitHTTPURL, e.GitlabUser, e.GitlabToken)
+	return pull, repo, err
 }
 
 // ParseGitlabMergeCommentEvent creates Atlantis models out of a GitLab event.
-func (e *EventParser) ParseGitlabMergeCommentEvent(event gitlab.MergeCommentEvent) (baseRepo models.Repo, headRepo models.Repo, user models.User) {
-	// Get owner and name from PathWithNamespace because the fields
-	// event.Project.Name and event.Project.Owner can have capitals.
-	owner, name := e.getOwnerAndName(event.Project.PathWithNamespace)
-	baseRepo = models.Repo{
-		FullName:          event.Project.PathWithNamespace,
-		Name:              name,
-		SanitizedCloneURL: event.Project.GitHTTPURL,
-		Owner:             owner,
-		CloneURL:          e.addGitlabAuth(event.Project.GitHTTPURL),
+func (e *EventParser) ParseGitlabMergeCommentEvent(event gitlab.MergeCommentEvent) (baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
+	// Parse the base repo first.
+	repoFullName := event.Project.PathWithNamespace
+	cloneURL := event.Project.GitHTTPURL
+	baseRepo, err = models.NewRepo(repoFullName, cloneURL, e.GitlabUser, e.GitlabToken)
+	if err != nil {
+		return
 	}
 	user = models.User{
 		Username: event.User.Username,
 	}
-	owner, name = e.getOwnerAndName(event.MergeRequest.Source.PathWithNamespace)
-	headRepo = models.Repo{
-		FullName:          event.MergeRequest.Source.PathWithNamespace,
-		Name:              name,
-		SanitizedCloneURL: event.MergeRequest.Source.GitHTTPURL,
-		Owner:             owner,
-		CloneURL:          e.addGitlabAuth(event.MergeRequest.Source.GitHTTPURL),
-	}
+
+	// Now parse the head repo.
+	headRepoFullName := event.MergeRequest.Source.PathWithNamespace
+	headCloneURL := event.MergeRequest.Source.GitHTTPURL
+	headRepo, err = models.NewRepo(headRepoFullName, headCloneURL, e.GitlabUser, e.GitlabToken)
 	return
 }
 

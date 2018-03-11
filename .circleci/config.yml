@@ -3,7 +3,7 @@ jobs:
   build:
     working_directory: /go/src/github.com/runatlantis/atlantis
     docker:
-      - image: circleci/golang:1.9.2
+      - image: circleci/golang:1.10
         environment:
           TERRAFORM_VERSION: 0.10.8
     steps:
@@ -22,7 +22,7 @@ jobs:
           command: make end-to-end-deps
       - run:
           name: Starting atlantis server in the background
-          command: cd "${CIRCLE_WORKING_DIRECTORY}/e2e" && ./atlantis server --gh-user="$GITHUB_USERNAME" --gh-token="$GITHUB_PASSWORD" --data-dir="/tmp" --log-level="debug" &> /tmp/atlantis-server.log
+          command: cd "${CIRCLE_WORKING_DIRECTORY}/e2e" && ./atlantis server --gh-user="$GITHUB_USERNAME" --gh-token="$GITHUB_PASSWORD" --data-dir="/tmp" --log-level="debug" --repo-whitelist="github.com/runatlantis/atlantis-tests" &> /tmp/atlantis-server.log
           background: true
       - run: sleep 2
       - run:

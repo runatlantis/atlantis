@@ -19,6 +19,7 @@ import (
 // 3. Add your flag's description etc. to the stringFlags, intFlags, or boolFlags slices.
 const (
 	AtlantisURLFlag     = "atlantis-url"
+	AllowForkPRsFlag    = "allow-fork-prs"
 	ConfigFlag          = "config"
 	DataDirFlag         = "data-dir"
 	GHHostnameFlag      = "gh-hostname"
@@ -31,10 +32,14 @@ const (
 	GitlabWebHookSecret = "gitlab-webhook-secret"
 	LogLevelFlag        = "log-level"
 	PortFlag            = "port"
+	RepoWhitelistFlag   = "repo-whitelist"
 	RequireApprovalFlag = "require-approval"
 	SSLCertFileFlag     = "ssl-cert-file"
 	SSLKeyFileFlag      = "ssl-key-file"
 )
+
+const RedTermStart = "\033[31m"
+const RedTermEnd = "\033[39m"
 
 var stringFlags = []stringFlag{
 	{
@@ -66,9 +71,10 @@ var stringFlags = []stringFlag{
 	},
 	{
 		name: GHWebHookSecret,
-		description: "Optional secret used to validate GitHub webhooks (see https://developer.github.com/webhooks/securing/)." +
-			" If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitHub. " +
-			"Can also be specified via the ATLANTIS_GH_WEBHOOK_SECRET environment variable.",
+		description: "Secret used to validate GitHub webhooks (see https://developer.github.com/webhooks/securing/)." +
+			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitHub. " +
+			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
+			"Should be specified via the ATLANTIS_GH_WEBHOOK_SECRET environment variable.",
 		env: "ATLANTIS_GH_WEBHOOK_SECRET",
 	},
 	{
@@ -88,14 +94,21 @@ var stringFlags = []stringFlag{
 	{
 		name: GitlabWebHookSecret,
 		description: "Optional secret used to validate GitLab webhooks." +
-			" If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitLab. " +
-			"Can also be specified via the ATLANTIS_GITLAB_WEBHOOK_SECRET environment variable.",
+			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitLab. " +
+			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
+			"Should be specified via the ATLANTIS_GITLAB_WEBHOOK_SECRET environment variable.",
 		env: "ATLANTIS_GITLAB_WEBHOOK_SECRET",
 	},
 	{
 		name:        LogLevelFlag,
 		description: "Log level. Either debug, info, warn, or error.",
 		value:       "info",
+	},
+	{
+		name: RepoWhitelistFlag,
+		description: "Comma separated list of repositories that Atlantis will operate on. " +
+			"The format is {hostname}/{owner}/{repo}, ex. github.com/runatlantis/atlantis. '*' matches any characters until the next comma and can be used for example to whitelist " +
+			"all repos: '*' (not recommended), an entire hostname: 'internalgithub.com/*' or an organization: 'github.com/runatlantis/*'.",
 	},
 	{
 		name:        SSLCertFileFlag,
@@ -107,6 +120,11 @@ var stringFlags = []stringFlag{
 	},
 }
 var boolFlags = []boolFlag{
+	{
+		name:        AllowForkPRsFlag,
+		description: "Allow Atlantis to run on pull requests from forks. A security issue for public repos.",
+		value:       false,
+	},
 	{
 		name:        RequireApprovalFlag,
 		description: "Require pull requests to be \"Approved\" before allowing the apply command to be run.",
@@ -151,7 +169,7 @@ type ServerCmd struct {
 // ServerCreator creates servers.
 // It's an abstraction to help us test.
 type ServerCreator interface {
-	NewServer(config server.Config) (ServerStarter, error)
+	NewServer(config server.Config, flagNames server.FlagNames) (ServerStarter, error)
 }
 
 // DefaultServerCreator is the concrete implementation of ServerCreator.
@@ -164,8 +182,8 @@ type ServerStarter interface {
 }
 
 // NewServer returns the real Atlantis server object.
-func (d *DefaultServerCreator) NewServer(config server.Config) (ServerStarter, error) {
-	return server.NewServer(config)
+func (d *DefaultServerCreator) NewServer(config server.Config, flagNames server.FlagNames) (ServerStarter, error) {
+	return server.NewServer(config, flagNames)
 }
 
 // Init returns the runnable cobra command.
@@ -186,6 +204,10 @@ Config file values are overridden by environment variables which in turn are ove
 			return s.run()
 		}),
 	}
+	// Replace the call in their template to use the usage function that wraps
+	// columns to make for a nicer output.
+	usageWithWrappedCols := strings.Replace(c.UsageTemplate(), ".FlagUsages", ".FlagUsagesWrapped 120", -1)
+	c.SetUsageTemplate(usageWithWrappedCols)
 
 	// If a user passes in an invalid flag, tell them what the flag was.
 	c.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
@@ -195,7 +217,7 @@ Config file values are overridden by environment variables which in turn are ove
 
 	// Set string flags.
 	for _, f := range stringFlags {
-		c.Flags().String(f.name, f.value, f.description)
+		c.Flags().String(f.name, f.value, "> "+f.description)
 		if f.env != "" {
 			s.Viper.BindEnv(f.name, f.env) // nolint: errcheck
 		}
@@ -204,13 +226,13 @@ Config file values are overridden by environment variables which in turn are ove
 
 	// Set int flags.
 	for _, f := range intFlags {
-		c.Flags().Int(f.name, f.value, f.description)
+		c.Flags().Int(f.name, f.value, "> "+f.description)
 		s.Viper.BindPFlag(f.name, c.Flags().Lookup(f.name)) // nolint: errcheck
 	}
 
 	// Set bool flags.
 	for _, f := range boolFlags {
-		c.Flags().Bool(f.name, f.value, f.description)
+		c.Flags().Bool(f.name, f.value, "> "+f.description)
 		s.Viper.BindPFlag(f.name, c.Flags().Lookup(f.name)) // nolint: errcheck
 	}
 
@@ -243,10 +265,13 @@ func (s *ServerCmd) run() error {
 	if err := s.setDataDir(&config); err != nil {
 		return err
 	}
+	s.securityWarnings(&config)
 	s.trimAtSymbolFromUsers(&config)
 
 	// Config looks good. Start the server.
-	server, err := s.ServerCreator.NewServer(config)
+	server, err := s.ServerCreator.NewServer(config, server.FlagNames{
+		AllowForkPRsFlag: AllowForkPRsFlag,
+	})
 	if err != nil {
 		return errors.Wrap(err, "initializing server")
 	}
@@ -268,7 +293,7 @@ func (s *ServerCmd) validate(config server.Config) error {
 	// 1. github user and token set
 	// 2. gitlab user and token set
 	// 3. all 4 set
-	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GitlabUserFlag, GitlabTokenFlag)
+	vcsErr := fmt.Errorf("--%s and --%s or --%s and --%s must be set", GHUserFlag, GHTokenFlag, GitlabUserFlag, GitlabTokenFlag)
 	if ((config.GithubUser == "") != (config.GithubToken == "")) || ((config.GitlabUser == "") != (config.GitlabToken == "")) {
 		return vcsErr
 	}
@@ -277,6 +302,11 @@ func (s *ServerCmd) validate(config server.Config) error {
 	if config.GithubUser == "" && config.GitlabUser == "" {
 		return vcsErr
 	}
+
+	if config.RepoWhitelist == "" {
+		return fmt.Errorf("--%s must be set for security purposes", RepoWhitelistFlag)
+	}
+
 	return nil
 }
 
@@ -322,12 +352,21 @@ func (s *ServerCmd) trimAtSymbolFromUsers(config *server.Config) {
 	config.GitlabUser = strings.TrimPrefix(config.GitlabUser, "@")
 }
 
+func (s *ServerCmd) securityWarnings(config *server.Config) {
+	if config.GithubUser != "" && config.GithubWebHookSecret == "" && !s.SilenceOutput {
+		fmt.Fprintf(os.Stderr, "%s[WARN] No GitHub webhook secret set. This could allow attackers to spoof requests from GitHub. See https://git.io/vAF3t%s\n", RedTermStart, RedTermEnd)
+	}
+	if config.GitlabUser != "" && config.GitlabWebHookSecret == "" && !s.SilenceOutput {
+		fmt.Fprintf(os.Stderr, "%s[WARN] No GitLab webhook secret set. This could allow attackers to spoof requests from GitLab. See https://git.io/vAF3t%s\n", RedTermStart, RedTermEnd)
+	}
+}
+
 // withErrPrint prints out any errors to a terminal in red.
 func (s *ServerCmd) withErrPrint(f func(*cobra.Command, []string) error) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		err := f(cmd, args)
 		if err != nil && !s.SilenceOutput {
-			fmt.Fprintf(os.Stderr, "\033[31mError: %s\033[39m\n\n", err.Error())
+			fmt.Fprintf(os.Stderr, "%s[ERROR] %s%s\n\n", RedTermStart, err.Error(), RedTermEnd)
 		}
 		return err
 	}

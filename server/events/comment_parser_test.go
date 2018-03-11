@@ -52,6 +52,72 @@ func TestParse_HelpResponse(t *testing.T) {
 	}
 }
 
+func TestParse_UnusedArguments(t *testing.T) {
+	t.Log("if there are unused flags we return an error")
+	cases := []struct {
+		Command events.CommandName
+		Args    string
+		Unused  string
+	}{
+		{
+			events.Plan,
+			"-d . arg",
+			"arg",
+		},
+		{
+			events.Plan,
+			"arg -d .",
+			"arg",
+		},
+		{
+			events.Plan,
+			"arg",
+			"arg",
+		},
+		{
+			events.Plan,
+			"arg arg2",
+			"arg arg2",
+		},
+		{
+			events.Plan,
+			"-d . arg -w kjj arg2",
+			"arg arg2",
+		},
+		{
+			events.Apply,
+			"-d . arg",
+			"arg",
+		},
+		{
+			events.Apply,
+			"arg arg2",
+			"arg arg2",
+		},
+		{
+			events.Apply,
+			"arg arg2 -- useful",
+			"arg arg2",
+		},
+		{
+			events.Apply,
+			"arg arg2 --",
+			"arg arg2",
+		},
+	}
+	for _, c := range cases {
+		comment := fmt.Sprintf("atlantis %s %s", c.Command.String(), c.Args)
+		t.Run(comment, func(t *testing.T) {
+			r := commentParser.Parse(comment, vcs.Github)
+			usage := PlanUsage
+			if c.Command == events.Apply {
+				usage = ApplyUsage
+			}
+			Equals(t, fmt.Sprintf("```\nError: unknown argument(s) – %s.\n%s```", c.Unused, usage), r.CommentResponse)
+		})
+	}
+}
+
 func TestParse_DidYouMeanAtlantis(t *testing.T) {
 	t.Log("given a comment that should result in a 'did you mean atlantis'" +
 		"response, should set CommentParseResult.CommentResult")
@@ -154,7 +220,7 @@ func TestParse_RelativeDirPath(t *testing.T) {
 	}
 	for _, c := range comments {
 		r := commentParser.Parse(c, vcs.Github)
-		exp := "Error: Using a relative path"
+		exp := "Error: using a relative path"
 		Assert(t, strings.Contains(r.CommentResponse, exp),
 			"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
 	}
@@ -172,9 +238,9 @@ func TestParse_InvalidWorkspace(t *testing.T) {
 	}
 	for _, c := range comments {
 		r := commentParser.Parse(c, vcs.Github)
-		exp := "Error: Value for -w/--workspace can't contain '..'"
-		Assert(t, r.CommentResponse == exp,
-			"For comment %q expected CommentResponse %q to be %q", c, r.CommentResponse, exp)
+		exp := "Error: value for -w/--workspace can't contain '..'"
+		Assert(t, strings.Contains(r.CommentResponse, exp),
+			"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
 	}
 }
 
@@ -253,14 +319,6 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"\"-d\" \"dir\" \"--verbose\"",
 		},
-		// Test missing arguments.
-		{
-			"-w -d dir --verbose",
-			"-d",
-			"",
-			true,
-			"",
-		},
 		// Test the extra args parsing.
 		{
 			"--",
@@ -269,16 +327,9 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 		},
-		{
-			"abc --",
-			"default",
-			"",
-			false,
-			"",
-		},
 		// Test trying to escape quoting
 		{
-			"abc -- \";echo \"hi",
+			"-- \";echo \"hi",
 			"default",
 			"",
 			false,
@@ -362,3 +413,22 @@ func TestParse_Parsing(t *testing.T) {
 		}
 	}
 }
+
+var PlanUsage = `Usage of plan:
+  -d, --dir string         Which directory to run plan in relative to root of repo.
+                           Use '.' for root. If not specified, will attempt to run
+                           plan for all Terraform projects we think were modified in
+                           this changeset.
+      --verbose            Append Atlantis log to comment.
+  -w, --workspace string   Switch to this Terraform workspace before planning.
+                           (default "default")
+`
+
+var ApplyUsage = `Usage of apply:
+  -d, --dir string         Apply the plan for this directory, relative to root of
+                           repo. Use '.' for root. If not specified, will run apply
+                           against all plans created for this workspace.
+      --verbose            Append Atlantis log to comment.
+  -w, --workspace string   Apply the plan for this Terraform workspace. (default
+                           "default")
+`

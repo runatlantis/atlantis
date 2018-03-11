@@ -1,3 +1,17 @@
+# Topics
+* [Reporting Issues](#reporting-issues)
+* [Reporting Security Issues](#reporting-security-issues)
+* [Developing](#developing)
+* [Releasing](#creating-a-new-release)
+
+# Reporting Issues
+* When reporting issues, please include the output of `atlantis version`.
+* Also include the steps required to reproduce the problem if possible and applicable. This information will help us review and fix your issue faster.
+* When sending lengthy log-files, consider posting them as a gist (https://gist.github.com). Don't forget to remove sensitive data from your logfiles before posting (you can replace those parts with "REDACTED").
+
+# Reporting Security Issues
+We take security issues seriously. Please email us directly at security [at] runatlantis.io instead of opening an issue.
+
 # Developing
 
 ## Running Atlantis Locally

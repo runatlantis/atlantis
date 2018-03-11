@@ -37,6 +37,17 @@ func Equals(tb testing.TB, exp, act interface{}) {
 	}
 }
 
+// ErrEquals fails the test if act is nil or act.Error() != exp
+func ErrEquals(tb testing.TB, exp string, act error) {
+	tb.Helper()
+	if act == nil {
+		tb.Errorf("exp err %q but err was nil", exp)
+	}
+	if act.Error() != exp {
+		tb.Errorf("exp err: %q but got: %q", exp, act.Error())
+	}
+}
+
 // Contains fails the test if the slice doesn't contain the expected element
 func Contains(tb testing.TB, exp interface{}, slice []string) {
 	for _, v := range slice {

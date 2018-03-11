@@ -80,11 +80,12 @@ func (mock *MockEventParsing) ParseGithubRepo(ghRepo *github.Repository) (models
 	return ret0, ret1
 }
 
-func (mock *MockEventParsing) ParseGitlabMergeEvent(event go_gitlab.MergeEvent) (models.PullRequest, models.Repo) {
+func (mock *MockEventParsing) ParseGitlabMergeEvent(event go_gitlab.MergeEvent) (models.PullRequest, models.Repo, error) {
 	params := []pegomock.Param{event}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseGitlabMergeEvent", params, []reflect.Type{reflect.TypeOf((*models.PullRequest)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem()})
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseGitlabMergeEvent", params, []reflect.Type{reflect.TypeOf((*models.PullRequest)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 models.PullRequest
 	var ret1 models.Repo
+	var ret2 error
 	if len(result) != 0 {
 		if result[0] != nil {
 			ret0 = result[0].(models.PullRequest)
@@ -92,16 +93,20 @@ func (mock *MockEventParsing) ParseGitlabMergeEvent(event go_gitlab.MergeEvent) 
 		if result[1] != nil {
 			ret1 = result[1].(models.Repo)
 		}
+		if result[2] != nil {
+			ret2 = result[2].(error)
+		}
 	}
-	return ret0, ret1
+	return ret0, ret1, ret2
 }
 
-func (mock *MockEventParsing) ParseGitlabMergeCommentEvent(event go_gitlab.MergeCommentEvent) (models.Repo, models.Repo, models.User) {
+func (mock *MockEventParsing) ParseGitlabMergeCommentEvent(event go_gitlab.MergeCommentEvent) (models.Repo, models.Repo, models.User, error) {
 	params := []pegomock.Param{event}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseGitlabMergeCommentEvent", params, []reflect.Type{reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.User)(nil)).Elem()})
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseGitlabMergeCommentEvent", params, []reflect.Type{reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.User)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 models.Repo
 	var ret1 models.Repo
 	var ret2 models.User
+	var ret3 error
 	if len(result) != 0 {
 		if result[0] != nil {
 			ret0 = result[0].(models.Repo)
@@ -112,8 +117,11 @@ func (mock *MockEventParsing) ParseGitlabMergeCommentEvent(event go_gitlab.Merge
 		if result[2] != nil {
 			ret2 = result[2].(models.User)
 		}
+		if result[3] != nil {
+			ret3 = result[3].(error)
+		}
 	}
-	return ret0, ret1, ret2
+	return ret0, ret1, ret2, ret3
 }
 
 func (mock *MockEventParsing) ParseGitlabMergeRequest(mr *go_gitlab.MergeRequest) models.PullRequest {

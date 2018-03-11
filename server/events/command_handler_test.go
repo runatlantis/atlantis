@@ -54,13 +54,17 @@ func setup(t *testing.T) {
 		MarkdownRenderer:         &events.MarkdownRenderer{},
 		GithubPullGetter:         githubGetter,
 		GitlabMergeRequestGetter: gitlabGetter,
-		Logger: logger,
+		Logger:           logger,
+		AllowForkPRs:     false,
+		AllowForkPRsFlag: "allow-fork-prs-flag",
 	}
 }
 
 func TestExecuteCommand_LogPanics(t *testing.T) {
 	t.Log("if there is a panic it is commented back on the pull request")
 	setup(t)
+	ch.AllowForkPRs = true // Lets us get to the panic code.
+	defer func() { ch.AllowForkPRs = false }()
 	When(ghStatus.Update(fixtures.Repo, fixtures.Pull, vcs.Pending, nil, vcs.Github)).ThenPanic("panic")
 	ch.ExecuteCommand(fixtures.Repo, fixtures.Repo, fixtures.User, 1, nil, vcs.Github)
 	_, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), matchers.AnyVcsHost()).GetCapturedArguments()
@@ -108,6 +112,24 @@ func TestExecuteCommand_GithubPullParseErr(t *testing.T) {
 
 	ch.ExecuteCommand(fixtures.Repo, fixtures.Repo, fixtures.User, fixtures.Pull.Num, nil, vcs.Github)
 	Equals(t, "[ERROR] runatlantis/atlantis#1: Extracting required fields from comment data: err\n", logBytes.String())
+}
+
+func TestExecuteCommand_ForkPRDisabled(t *testing.T) {
+	t.Log("if a command is run on a forked pull request and this is disabled atlantis should" +
+		" comment saying that this is not allowed")
+	setup(t)
+	ch.AllowForkPRs = false // by default it's false so don't need to reset
+	var pull github.PullRequest
+	modelPull := models.PullRequest{State: models.Open}
+	When(githubGetter.GetPullRequest(fixtures.Repo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
+
+	headRepo := fixtures.Repo
+	headRepo.FullName = "forkrepo/atlantis"
+	headRepo.Owner = "forkrepo"
+	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, headRepo, nil)
+
+	ch.ExecuteCommand(fixtures.Repo, models.Repo{} /* this isn't used */, fixtures.User, fixtures.Pull.Num, nil, vcs.Github)
+	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.Repo, modelPull.Num, "Atlantis commands can't be run on fork pull requests. To enable, set --"+ch.AllowForkPRsFlag, vcs.Github)
 }
 
 func TestExecuteCommand_ClosedPull(t *testing.T) {
@@ -181,4 +203,35 @@ func TestExecuteCommand_FullRun(t *testing.T) {
 		vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), matchers.AnyVcsHost())
 		workspaceLocker.VerifyWasCalledOnce().Unlock(fixtures.Repo.FullName, cmd.Workspace, fixtures.Pull.Num)
 	}
+}
+
+func TestExecuteCommand_ForkPREnabled(t *testing.T) {
+	t.Log("when running a plan on a fork PR, it should succeed")
+	setup(t)
+
+	// Enable forked PRs.
+	ch.AllowForkPRs = true
+	defer func() { ch.AllowForkPRs = false }() // Reset after test.
+
+	var pull github.PullRequest
+	cmdResponse := events.CommandResponse{}
+	cmd := events.Command{
+		Name:      events.Plan,
+		Workspace: "workspace",
+	}
+	When(githubGetter.GetPullRequest(fixtures.Repo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
+	headRepo := fixtures.Repo
+	headRepo.FullName = "forkrepo/atlantis"
+	headRepo.Owner = "forkrepo"
+	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(fixtures.Pull, headRepo, nil)
+	When(workspaceLocker.TryLock(fixtures.Repo.FullName, cmd.Workspace, fixtures.Pull.Num)).ThenReturn(true)
+	When(planner.Execute(matchers.AnyPtrToEventsCommandContext())).ThenReturn(cmdResponse)
+
+	ch.ExecuteCommand(fixtures.Repo, models.Repo{} /* this isn't used */, fixtures.User, fixtures.Pull.Num, &cmd, vcs.Github)
+
+	ghStatus.VerifyWasCalledOnce().Update(fixtures.Repo, fixtures.Pull, vcs.Pending, &cmd, vcs.Github)
+	_, response := ghStatus.VerifyWasCalledOnce().UpdateProjectResult(matchers.AnyPtrToEventsCommandContext(), matchers.AnyEventsCommandResponse()).GetCapturedArguments()
+	Equals(t, cmdResponse, response)
+	vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), matchers.AnyVcsHost())
+	workspaceLocker.VerifyWasCalledOnce().Unlock(fixtures.Repo.FullName, cmd.Workspace, fixtures.Pull.Num)
 }
