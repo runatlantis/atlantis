@@ -24,9 +24,9 @@ func TestNewServer(t *testing.T) {
 	t.Log("Run through NewServer constructor")
 	tmpDir, err := ioutil.TempDir("", "")
 	Ok(t, err)
-	_, err = server.NewServer(server.Config{
+	_, err = server.NewServer(server.UserConfig{
 		DataDir: tmpDir,
-	}, server.FlagNames{})
+	}, server.Config{})
 	Ok(t, err)
 }
 
@@ -64,14 +64,14 @@ func TestIndex_Success(t *testing.T) {
 	When(l.List()).ThenReturn(locks, nil)
 	it := sMocks.NewMockTemplateWriter()
 	r := mux.NewRouter()
-	version := "0.3.1"
+	atlantisVersion := "0.3.1"
 	// Need to create a lock route since the server expects this route to exist.
 	r.NewRoute().Path("").Name(server.LockRouteName)
 	s := server.Server{
-		Locker:        l,
-		IndexTemplate: it,
-		Router:        r,
-		Version:       version,
+		Locker:          l,
+		IndexTemplate:   it,
+		Router:          r,
+		AtlantisVersion: atlantisVersion,
 	}
 	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
@@ -85,7 +85,7 @@ func TestIndex_Success(t *testing.T) {
 				Time:         now,
 			},
 		},
-		Version: version,
+		AtlantisVersion: atlantisVersion,
 	})
 	responseContains(t, w, http.StatusOK, "")
 }

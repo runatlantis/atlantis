@@ -24,9 +24,10 @@ type LockIndexData struct {
 	Time         time.Time
 }
 
+// IndexData holds the data for rendering the index page
 type IndexData struct {
 	Locks []LockIndexData
-	Version string
+	AtlantisVersion string
 }
 
 var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
@@ -56,7 +57,7 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
 <div class="container">
   <section class="header">
     <a title="atlantis" href="/"><img src="/static/images/atlantis-icon.png"/></a>
-    <p class="title-heading">atlantis {{ .Version }}</p>
+    <p class="title-heading">atlantis {{ .AtlantisVersion }}</p>
     <p class="js-discard-success"><strong>Plan discarded and unlocked!</strong></p>
   </section>
   <nav class="navbar">
