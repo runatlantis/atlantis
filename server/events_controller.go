@@ -107,12 +107,12 @@ func (e *EventsController) HandleGithubCommentEvent(w http.ResponseWriter, event
 func (e *EventsController) HandleGithubPullRequestEvent(w http.ResponseWriter, pullEvent *github.PullRequestEvent, githubReqID string) {
 	pull, _, err := e.Parser.ParseGithubPull(pullEvent.PullRequest)
 	if err != nil {
-		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s", err)
+		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s", err, githubReqID)
 		return
 	}
 	repo, err := e.Parser.ParseGithubRepo(pullEvent.Repo)
 	if err != nil {
-		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing repo data: %s", err)
+		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing repo data: %s %s", err, githubReqID)
 		return
 	}
 	e.handlePullRequestEvent(w, repo, pull, vcs.Github)
