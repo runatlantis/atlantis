@@ -1,3 +1,33 @@
+# v0.3.2
+
+## Description
+This release focused on some security issues reported by @eriksw, thanks Erik!
+By default, Atlantis will be more secure now and you'll have to specify which repositories
+you want it to work on.
+
+## Features
+* New flag `--allow-fork-prs` added to `atlantis server` controls whether Atlantis will operate on pull requests from forks. Defaults to `false`.
+This flag was added because on a public repository anyone could open up a pull request to your repo and use your Atlantis
+install.
+* New mandatory flag `--repo-whitelist` added to `atlantis server` controls which repos Atlantis will operate on. This flag was added
+so that if a webhook secret is compromised (or you're not using webhook secrets) Atlantis won't be used on repos you don't control.
+* Warn if running `atlantis server` without any webhook secrets set. This is dangerous because without a webhook secret, an attacker
+could spoof requests to Atlantis.
+* Make CLI output more readable by setting a fixed column width.
+
+## Bug Fixes
+* None
+
+## Backwards Incompatibilities / Notes:
+* Must set `--allow-fork-prs` now if you want to run Atlantis on pull requests from forked repos.
+* Must set `--repo-whitelist` in order to start `atlantis server`. See `atlantis server --help` for how that flag works.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.2/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.2/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.2/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.2/atlantis_linux_arm.zip)
+
 # v0.3.1
 ## Features
 * None
