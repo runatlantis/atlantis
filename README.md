@@ -275,7 +275,7 @@ resource "null_resource" "null" {
 }
 ```
 * Running malicious hook commands specified in a `atlantis.yaml` file.
-* Someone adding `atlantis plan/apply` comments on your valid pull requests.
+* Someone adding `atlantis plan/apply` comments on your valid pull requests causing terraform to run when you don't want it to.
 
 ### Mitigations
 #### Don't Use On Public Repos

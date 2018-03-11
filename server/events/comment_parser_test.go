@@ -55,50 +55,65 @@ func TestParse_HelpResponse(t *testing.T) {
 func TestParse_UnusedArguments(t *testing.T) {
 	t.Log("if there are unused flags we return an error")
 	cases := []struct {
-		Command string
+		Command events.CommandName
+		Args    string
 		Unused  string
 	}{
 		{
-			"atlantis plan -d . arg",
+			events.Plan,
+			"-d . arg",
 			"arg",
 		},
 		{
-			"atlantis plan arg -d .",
+			events.Plan,
+			"arg -d .",
 			"arg",
 		},
 		{
-			"atlantis plan arg",
+			events.Plan,
+			"arg",
 			"arg",
 		},
 		{
-			"atlantis plan arg arg2",
+			events.Plan,
+			"arg arg2",
 			"arg arg2",
 		},
 		{
-			"atlantis plan -d . arg -w kjj arg2",
+			events.Plan,
+			"-d . arg -w kjj arg2",
 			"arg arg2",
 		},
 		{
-			"atlantis apply -d . arg",
+			events.Apply,
+			"-d . arg",
 			"arg",
 		},
 		{
-			"atlantis apply arg arg2",
+			events.Apply,
+			"arg arg2",
 			"arg arg2",
 		},
 		{
-			"atlantis apply arg arg2 -- useful",
+			events.Apply,
+			"arg arg2 -- useful",
 			"arg arg2",
 		},
 		{
-			"atlantis apply arg arg2 --",
+			events.Apply,
+			"arg arg2 --",
 			"arg arg2",
 		},
 	}
 	for _, c := range cases {
-		t.Run(c.Command, func(t *testing.T) {
-			r := commentParser.Parse(c.Command, vcs.Github)
-			Equals(t, fmt.Sprintf("```\nError: unknown argument(s) – %s\n```", c.Unused), r.CommentResponse)
+		comment := fmt.Sprintf("atlantis %s %s", c.Command.String(), c.Args)
+		t.Run(comment, func(t *testing.T) {
+			r := commentParser.Parse(comment, vcs.Github)
+			usage := PlanUsage
+			if c.Command == events.Apply {
+				usage = ApplyUsage
+			}
+			Equals(t, fmt.Sprintf("```\nError: unknown argument(s) – %s.\n%s```", c.Unused, usage), r.CommentResponse)
 		})
 	}
 }
@@ -205,7 +220,7 @@ func TestParse_RelativeDirPath(t *testing.T) {
 	}
 	for _, c := range comments {
 		r := commentParser.Parse(c, vcs.Github)
-		exp := "Error: Using a relative path"
+		exp := "Error: using a relative path"
 		Assert(t, strings.Contains(r.CommentResponse, exp),
 			"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
 	}
@@ -223,9 +238,9 @@ func TestParse_InvalidWorkspace(t *testing.T) {
 	}
 	for _, c := range comments {
 		r := commentParser.Parse(c, vcs.Github)
-		exp := "Error: Value for -w/--workspace can't contain '..'"
-		Assert(t, r.CommentResponse == exp,
-			"For comment %q expected CommentResponse %q to be %q", c, r.CommentResponse, exp)
+		exp := "Error: value for -w/--workspace can't contain '..'"
+		Assert(t, strings.Contains(r.CommentResponse, exp),
+			"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
 	}
 }
 
@@ -398,3 +413,22 @@ func TestParse_Parsing(t *testing.T) {
 		}
 	}
 }
+
+var PlanUsage = `Usage of plan:
+  -d, --dir string         Which directory to run plan in relative to root of repo.
+                           Use '.' for root. If not specified, will attempt to run
+                           plan for all Terraform projects we think were modified in
+                           this changeset.
+      --verbose            Append Atlantis log to comment.
+  -w, --workspace string   Switch to this Terraform workspace before planning.
+                           (default "default")
+`
+
+var ApplyUsage = `Usage of apply:
+  -d, --dir string         Apply the plan for this directory, relative to root of
+                           repo. Use '.' for root. If not specified, will run apply
+                           against all plans created for this workspace.
+      --verbose            Append Atlantis log to comment.
+  -w, --workspace string   Apply the plan for this Terraform workspace. (default
+                           "default")
+`

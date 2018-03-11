@@ -106,8 +106,8 @@ var stringFlags = []stringFlag{
 	},
 	{
 		name: RepoWhitelistFlag,
-		description: "Comma separated list of repositories that Atlantis will operate on, ex. 'github.com/runatlantis/*'. " +
-			"The format is {hostname}/{owner}/{repo}. '*' denotes any string until the next comma and can be used to whitelist " +
+		description: "Comma separated list of repositories that Atlantis will operate on. " +
+			"The format is {hostname}/{owner}/{repo}, ex. github.com/runatlantis/atlantis. '*' matches any characters until the next comma and can be used for example to whitelist " +
 			"all repos: '*' (not recommended), an entire hostname: 'internalgithub.com/*' or an organization: 'github.com/runatlantis/*'.",
 	},
 	{

@@ -10,6 +10,15 @@ import (
 	"github.com/spf13/pflag"
 )
 
+const (
+	WorkspaceFlagLong  = "workspace"
+	WorkspaceFlagShort = "w"
+	DirFlagLong        = "dir"
+	DirFlagShort       = "d"
+	VerboseFlagLong    = "verbose"
+	VerboseFlagShort   = ""
+)
+
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_comment_parsing.go CommentParsing
 
 // CommentParsing handles parsing pull request comments.
@@ -100,7 +109,7 @@ func (e *CommentParser) Parse(comment string, vcsHost vcs.Host) CommentParseResu
 	}
 
 	// Need to have a plan or apply at this point.
-	if !e.stringInSlice(command, []string{"plan", "apply"}) {
+	if !e.stringInSlice(command, []string{Plan.String(), Apply.String()}) {
 		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown command %q.\nRun 'atlantis --help' for usage.\n```", command)}
 	}
 
@@ -114,20 +123,20 @@ func (e *CommentParser) Parse(comment string, vcsHost vcs.Host) CommentParseResu
 	// Set up the flag parsing depending on the command.
 	const defaultWorkspace = "default"
 	switch command {
-	case "plan":
+	case Plan.String():
 		name = Plan
-		flagSet = pflag.NewFlagSet("plan", pflag.ContinueOnError)
+		flagSet = pflag.NewFlagSet(Plan.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(ioutil.Discard)
-		flagSet.StringVarP(&workspace, "workspace", "w", defaultWorkspace, "Switch to this Terraform workspace before planning.")
-		flagSet.StringVarP(&dir, "dir", "d", "", "Which directory to run plan in relative to root of repo. Use '.' for root. If not specified, will attempt to run plan for all Terraform projects we think were modified in this changeset.")
-		flagSet.BoolVarP(&verbose, "verbose", "", false, "Append Atlantis log to comment.")
-	case "apply":
+		flagSet.StringVarP(&workspace, WorkspaceFlagLong, WorkspaceFlagShort, defaultWorkspace, "Switch to this Terraform workspace before planning.")
+		flagSet.StringVarP(&dir, DirFlagLong, DirFlagShort, "", "Which directory to run plan in relative to root of repo. Use '.' for root. If not specified, will attempt to run plan for all Terraform projects we think were modified in this changeset.")
+		flagSet.BoolVarP(&verbose, VerboseFlagLong, VerboseFlagShort, false, "Append Atlantis log to comment.")
+	case Apply.String():
 		name = Apply
-		flagSet = pflag.NewFlagSet("apply", pflag.ContinueOnError)
+		flagSet = pflag.NewFlagSet(Apply.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(ioutil.Discard)
-		flagSet.StringVarP(&workspace, "workspace", "w", defaultWorkspace, "Apply the plan for this Terraform workspace.")
-		flagSet.StringVarP(&dir, "dir", "d", "", "Apply the plan for this directory, relative to root of repo. Use '.' for root. If not specified, will run apply against all plans created for this workspace.")
-		flagSet.BoolVarP(&verbose, "verbose", "", false, "Append Atlantis log to comment.")
+		flagSet.StringVarP(&workspace, WorkspaceFlagLong, WorkspaceFlagShort, defaultWorkspace, "Apply the plan for this Terraform workspace.")
+		flagSet.StringVarP(&dir, DirFlagLong, DirFlagShort, "", "Apply the plan for this directory, relative to root of repo. Use '.' for root. If not specified, will run apply against all plans created for this workspace.")
+		flagSet.BoolVarP(&verbose, VerboseFlagLong, VerboseFlagShort, false, "Append Atlantis log to comment.")
 	default:
 		return CommentParseResult{CommentResponse: fmt.Sprintf("Error: unknown command %q – this is a bug", command)}
 	}
@@ -139,7 +148,7 @@ func (e *CommentParser) Parse(comment string, vcsHost vcs.Host) CommentParseResu
 		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nUsage of %s:\n%s\n```", command, flagSet.FlagUsagesWrapped(usagesCols))}
 	}
 	if err != nil {
-		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: %s.\nUsage of %s:\n%s\n```", err.Error(), command, flagSet.FlagUsagesWrapped(usagesCols))}
+		return CommentParseResult{CommentResponse: e.errMarkdown(err.Error(), command, flagSet)}
 	}
 
 	var unusedArgs []string
@@ -149,7 +158,7 @@ func (e *CommentParser) Parse(comment string, vcsHost vcs.Host) CommentParseResu
 		unusedArgs = flagSet.Args()[0:flagSet.ArgsLenAtDash()]
 	}
 	if len(unusedArgs) > 0 {
-		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown argument(s) – %s\n```", strings.Join(unusedArgs, " "))}
+		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("unknown argument(s) – %s", strings.Join(unusedArgs, " ")), command, flagSet)}
 	}
 
 	if flagSet.ArgsLenAtDash() != -1 {
@@ -164,13 +173,13 @@ func (e *CommentParser) Parse(comment string, vcsHost vcs.Host) CommentParseResu
 
 	dir, err = e.validateDir(dir)
 	if err != nil {
-		return CommentParseResult{CommentResponse: err.Error()}
+		return CommentParseResult{CommentResponse: e.errMarkdown(err.Error(), command, flagSet)}
 	}
 
 	// Because we use the workspace name as a file, need to make sure it's
 	// not doing something weird like being a relative dir.
 	if strings.Contains(workspace, "..") {
-		return CommentParseResult{CommentResponse: "Error: Value for -w/--workspace can't contain '..'"}
+		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("value for -%s/--%s can't contain '..'", WorkspaceFlagShort, WorkspaceFlagLong), command, flagSet)}
 	}
 
 	return CommentParseResult{
@@ -190,7 +199,7 @@ func (e *CommentParser) validateDir(dir string) (string, error) {
 	validatedDir = filepath.Clean(validatedDir)
 	// Detect relative dirs since they're not allowed.
 	if strings.HasPrefix(validatedDir, "..") {
-		return "", fmt.Errorf("Error: Using a relative path %q with -d/--dir is not allowed", dir)
+		return "", fmt.Errorf("using a relative path %q with -%s/--%s is not allowed", dir, DirFlagShort, DirFlagLong)
 	}
 
 	return validatedDir, nil
@@ -203,6 +212,10 @@ func (e *CommentParser) stringInSlice(a string, list []string) bool {
 		}
 	}
 	return false
+}
+
+func (e *CommentParser) errMarkdown(errMsg string, command string, flagSet *pflag.FlagSet) string {
+	return fmt.Sprintf("```\nError: %s.\nUsage of %s:\n%s```", errMsg, command, flagSet.FlagUsagesWrapped(usagesCols))
 }
 
 var HelpComment = "```cmake\n" +
