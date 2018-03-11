@@ -17,7 +17,7 @@ RUN apk add --no-cache ca-certificates gnupg curl git unzip bash openssh libcap 
     cd /tmp/build && \
     wget -O gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-amd64" && \
     wget -O gosu.asc "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-amd64.asc" && \
-    gpg --keyserver ha.pool.sks-keyservers.net --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4 && \
+    gpg --keyserver ipv4.pool.sks-keyservers.net --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4 && \
     gpg --batch --verify gosu.asc gosu && \
     chmod +x gosu && \
     cp gosu /bin && \
