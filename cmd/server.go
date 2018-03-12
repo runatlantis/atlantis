@@ -194,7 +194,7 @@ func (s *ServerCmd) Init() *cobra.Command {
 		Long: `Start the atlantis server
 
 Flags can also be set in a yaml config file (see --` + ConfigFlag + `).
-UserConfig file values are overridden by environment variables which in turn are overridden by flags.`,
+Config file values are overridden by environment variables which in turn are overridden by flags.`,
 		SilenceErrors: true,
 		SilenceUsage:  s.SilenceOutput,
 		PreRunE: s.withErrPrint(func(cmd *cobra.Command, args []string) error {
@@ -268,7 +268,7 @@ func (s *ServerCmd) run() error {
 	s.securityWarnings(&userConfig)
 	s.trimAtSymbolFromUsers(&userConfig)
 
-	// UserConfig looks good. Start the server.
+	// Config looks good. Start the server.
 	server, err := s.ServerCreator.NewServer(userConfig, server.Config{
 		AllowForkPRsFlag: AllowForkPRsFlag,
 		AtlantisVersion:  s.Viper.Get("version").(string),
