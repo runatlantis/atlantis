@@ -50,7 +50,7 @@ type Server struct {
 	SSLKeyFile         string
 }
 
-// UserConfig configures Server.
+// UserConfig holds config values passed in by the user.
 // The mapstructure tags correspond to flags in cmd/server.go and are used when
 // the config is parsed from a YAML file.
 type UserConfig struct {
@@ -77,13 +77,10 @@ type UserConfig struct {
 	Webhooks        []WebhookConfig `mapstructure:"webhooks"`
 }
 
-// Config contains the names of the flags available to atlantis server.
-// They're useful because sometimes we comment back asking the user to enable
-// a certain flag.
+// Config holds config for server that isn't passed in by the user.
 type Config struct {
-	AllowForkPRsFlag  string
-	RepoWhitelistFlag string
-	AtlantisVersion   string
+	AllowForkPRsFlag string
+	AtlantisVersion  string
 }
 
 // WebhookConfig is nested within UserConfig. It's used to configure webhooks.
@@ -337,8 +334,8 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 			Time:         v.Time,
 		})
 	}
-	s.IndexTemplate.Execute(w, IndexData {
-		Locks: lockResults,
+	s.IndexTemplate.Execute(w, IndexData{
+		Locks:           lockResults,
 		AtlantisVersion: s.AtlantisVersion,
 	}) // nolint: errcheck
 }

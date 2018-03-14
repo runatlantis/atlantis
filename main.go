@@ -6,17 +6,19 @@ import (
 	"github.com/spf13/viper"
 )
 
+const atlantisVersion = "0.3.2"
+
 func main() {
 	v := viper.New()
-	v.Set("version", "0.3.2")
 
 	// We're creating commands manually here rather than using init() functions
 	// (as recommended by cobra) because it makes testing easier.
 	server := &cmd.ServerCmd{
-		ServerCreator: &cmd.DefaultServerCreator{},
-		Viper:         v,
+		ServerCreator:   &cmd.DefaultServerCreator{},
+		Viper:           v,
+		AtlantisVersion: atlantisVersion,
 	}
-	version := &cmd.VersionCmd{Viper: v}
+	version := &cmd.VersionCmd{AtlantisVersion: atlantisVersion}
 	bootstrap := &cmd.BootstrapCmd{}
 	cmd.RootCmd.AddCommand(server.Init())
 	cmd.RootCmd.AddCommand(version.Init())

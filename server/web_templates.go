@@ -26,7 +26,7 @@ type LockIndexData struct {
 
 // IndexData holds the data for rendering the index page
 type IndexData struct {
-	Locks []LockIndexData
+	Locks           []LockIndexData
 	AtlantisVersion string
 }
 

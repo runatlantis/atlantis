@@ -163,7 +163,8 @@ type ServerCmd struct {
 	Viper         *viper.Viper
 	// SilenceOutput set to true means nothing gets printed.
 	// Useful for testing to keep the logs clean.
-	SilenceOutput bool
+	SilenceOutput   bool
+	AtlantisVersion string
 }
 
 // ServerCreator creates servers.
@@ -271,7 +272,7 @@ func (s *ServerCmd) run() error {
 	// Config looks good. Start the server.
 	server, err := s.ServerCreator.NewServer(userConfig, server.Config{
 		AllowForkPRsFlag: AllowForkPRsFlag,
-		AtlantisVersion:  s.Viper.Get("version").(string),
+		AtlantisVersion:  s.AtlantisVersion,
 	})
 	if err != nil {
 		return errors.Wrap(err, "initializing server")
