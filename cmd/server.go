@@ -15,7 +15,7 @@ import (
 
 // To add a new flag you must:
 // 1. Add a const with the flag name (in alphabetic order).
-// 2. Add a new field to server.Config and set the mapstructure tag equal to the flag name.
+// 2. Add a new field to server.UserConfig and set the mapstructure tag equal to the flag name.
 // 3. Add your flag's description etc. to the stringFlags, intFlags, or boolFlags slices.
 const (
 	AtlantisURLFlag     = "atlantis-url"
@@ -169,7 +169,7 @@ type ServerCmd struct {
 // ServerCreator creates servers.
 // It's an abstraction to help us test.
 type ServerCreator interface {
-	NewServer(config server.Config, flagNames server.FlagNames) (ServerStarter, error)
+	NewServer(userConfig server.UserConfig, config server.Config) (ServerStarter, error)
 }
 
 // DefaultServerCreator is the concrete implementation of ServerCreator.
@@ -182,8 +182,8 @@ type ServerStarter interface {
 }
 
 // NewServer returns the real Atlantis server object.
-func (d *DefaultServerCreator) NewServer(config server.Config, flagNames server.FlagNames) (ServerStarter, error) {
-	return server.NewServer(config, flagNames)
+func (d *DefaultServerCreator) NewServer(userConfig server.UserConfig, config server.Config) (ServerStarter, error) {
+	return server.NewServer(userConfig, config)
 }
 
 // Init returns the runnable cobra command.
@@ -252,25 +252,26 @@ func (s *ServerCmd) preRun() error {
 }
 
 func (s *ServerCmd) run() error {
-	var config server.Config
-	if err := s.Viper.Unmarshal(&config); err != nil {
+	var userConfig server.UserConfig
+	if err := s.Viper.Unmarshal(&userConfig); err != nil {
 		return err
 	}
-	if err := s.validate(config); err != nil {
+	if err := s.validate(userConfig); err != nil {
 		return err
 	}
-	if err := s.setAtlantisURL(&config); err != nil {
+	if err := s.setAtlantisURL(&userConfig); err != nil {
 		return err
 	}
-	if err := s.setDataDir(&config); err != nil {
+	if err := s.setDataDir(&userConfig); err != nil {
 		return err
 	}
-	s.securityWarnings(&config)
-	s.trimAtSymbolFromUsers(&config)
+	s.securityWarnings(&userConfig)
+	s.trimAtSymbolFromUsers(&userConfig)
 
 	// Config looks good. Start the server.
-	server, err := s.ServerCreator.NewServer(config, server.FlagNames{
+	server, err := s.ServerCreator.NewServer(userConfig, server.Config{
 		AllowForkPRsFlag: AllowForkPRsFlag,
+		AtlantisVersion:  s.Viper.Get("version").(string),
 	})
 	if err != nil {
 		return errors.Wrap(err, "initializing server")
@@ -279,13 +280,13 @@ func (s *ServerCmd) run() error {
 }
 
 // nolint: gocyclo
-func (s *ServerCmd) validate(config server.Config) error {
-	logLevel := config.LogLevel
+func (s *ServerCmd) validate(userConfig server.UserConfig) error {
+	logLevel := userConfig.LogLevel
 	if logLevel != "debug" && logLevel != "info" && logLevel != "warn" && logLevel != "error" {
 		return errors.New("invalid log level: not one of debug, info, warn, error")
 	}
 
-	if (config.SSLKeyFile == "") != (config.SSLCertFile == "") {
+	if (userConfig.SSLKeyFile == "") != (userConfig.SSLCertFile == "") {
 		return fmt.Errorf("--%s and --%s are both required for ssl", SSLKeyFileFlag, SSLCertFileFlag)
 	}
 
@@ -294,16 +295,16 @@ func (s *ServerCmd) validate(config server.Config) error {
 	// 2. gitlab user and token set
 	// 3. all 4 set
 	vcsErr := fmt.Errorf("--%s and --%s or --%s and --%s must be set", GHUserFlag, GHTokenFlag, GitlabUserFlag, GitlabTokenFlag)
-	if ((config.GithubUser == "") != (config.GithubToken == "")) || ((config.GitlabUser == "") != (config.GitlabToken == "")) {
+	if ((userConfig.GithubUser == "") != (userConfig.GithubToken == "")) || ((userConfig.GitlabUser == "") != (userConfig.GitlabToken == "")) {
 		return vcsErr
 	}
 	// At this point, we know that there can't be a single user/token without
 	// its partner, but we haven't checked if any user/token is set at all.
-	if config.GithubUser == "" && config.GitlabUser == "" {
+	if userConfig.GithubUser == "" && userConfig.GitlabUser == "" {
 		return vcsErr
 	}
 
-	if config.RepoWhitelist == "" {
+	if userConfig.RepoWhitelist == "" {
 		return fmt.Errorf("--%s must be set for security purposes", RepoWhitelistFlag)
 	}
 
@@ -311,13 +312,13 @@ func (s *ServerCmd) validate(config server.Config) error {
 }
 
 // setAtlantisURL sets the externally accessible URL for atlantis.
-func (s *ServerCmd) setAtlantisURL(config *server.Config) error {
-	if config.AtlantisURL == "" {
+func (s *ServerCmd) setAtlantisURL(userConfig *server.UserConfig) error {
+	if userConfig.AtlantisURL == "" {
 		hostname, err := os.Hostname()
 		if err != nil {
 			return fmt.Errorf("Failed to determine hostname: %v", err)
 		}
-		config.AtlantisURL = fmt.Sprintf("http://%s:%d", hostname, config.Port)
+		userConfig.AtlantisURL = fmt.Sprintf("http://%s:%d", hostname, userConfig.Port)
 	}
 	return nil
 }
@@ -325,8 +326,8 @@ func (s *ServerCmd) setAtlantisURL(config *server.Config) error {
 // setDataDir checks if ~ was used in data-dir and converts it to the actual
 // home directory. If we don't do this, we'll create a directory called "~"
 // instead of actually using home. It also converts relative paths to absolute.
-func (s *ServerCmd) setDataDir(config *server.Config) error {
-	finalPath := config.DataDir
+func (s *ServerCmd) setDataDir(userConfig *server.UserConfig) error {
+	finalPath := userConfig.DataDir
 
 	// Convert ~ to the actual home dir.
 	if strings.HasPrefix(finalPath, "~/") {
@@ -342,21 +343,21 @@ func (s *ServerCmd) setDataDir(config *server.Config) error {
 	if err != nil {
 		return errors.Wrap(err, "making data-dir absolute")
 	}
-	config.DataDir = finalPath
+	userConfig.DataDir = finalPath
 	return nil
 }
 
 // trimAtSymbolFromUsers trims @ from the front of the github and gitlab usernames
-func (s *ServerCmd) trimAtSymbolFromUsers(config *server.Config) {
-	config.GithubUser = strings.TrimPrefix(config.GithubUser, "@")
-	config.GitlabUser = strings.TrimPrefix(config.GitlabUser, "@")
+func (s *ServerCmd) trimAtSymbolFromUsers(userConfig *server.UserConfig) {
+	userConfig.GithubUser = strings.TrimPrefix(userConfig.GithubUser, "@")
+	userConfig.GitlabUser = strings.TrimPrefix(userConfig.GitlabUser, "@")
 }
 
-func (s *ServerCmd) securityWarnings(config *server.Config) {
-	if config.GithubUser != "" && config.GithubWebHookSecret == "" && !s.SilenceOutput {
+func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
+	if userConfig.GithubUser != "" && userConfig.GithubWebHookSecret == "" && !s.SilenceOutput {
 		fmt.Fprintf(os.Stderr, "%s[WARN] No GitHub webhook secret set. This could allow attackers to spoof requests from GitHub. See https://git.io/vAF3t%s\n", RedTermStart, RedTermEnd)
 	}
-	if config.GitlabUser != "" && config.GitlabWebHookSecret == "" && !s.SilenceOutput {
+	if userConfig.GitlabUser != "" && userConfig.GitlabWebHookSecret == "" && !s.SilenceOutput {
 		fmt.Fprintf(os.Stderr, "%s[WARN] No GitLab webhook secret set. This could allow attackers to spoof requests from GitLab. See https://git.io/vAF3t%s\n", RedTermStart, RedTermEnd)
 	}
 }

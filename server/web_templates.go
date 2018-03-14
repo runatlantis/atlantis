@@ -24,6 +24,12 @@ type LockIndexData struct {
 	Time         time.Time
 }
 
+// IndexData holds the data for rendering the index page
+type IndexData struct {
+	Locks []LockIndexData
+	AtlantisVersion string
+}
+
 var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
 <!DOCTYPE html>
 <html lang="en">
@@ -62,8 +68,8 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
   <br>
   <section>
     <p class="title-heading small"><strong>Locks</strong></p>
-    {{ if . }}
-    {{ range . }}
+    {{ if .Locks }}
+    {{ range .Locks }}
       <a href="{{.LockURL}}">
         <div class="twelve columns button content lock-row">
         <div class="list-title">{{.RepoFullName}} - <span class="heading-font-size">#{{.PullNum}}</span></div>

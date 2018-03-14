@@ -17,12 +17,12 @@ import (
 
 // passedConfig is set to whatever config ended up being passed to NewServer.
 // Used for testing.
-var passedConfig server.Config
+var passedConfig server.UserConfig
 
 type ServerCreatorMock struct{}
 
-func (s *ServerCreatorMock) NewServer(config server.Config, flagNames server.FlagNames) (cmd.ServerStarter, error) {
-	passedConfig = config
+func (s *ServerCreatorMock) NewServer(userConfig server.UserConfig, config server.Config) (cmd.ServerStarter, error) {
+	passedConfig = userConfig
 	return &ServerStarterMock{}, nil
 }
 
@@ -47,7 +47,7 @@ func TestExecute_ConfigFileExtension(t *testing.T) {
 		cmd.ConfigFlag: "does-not-exist",
 	})
 	err := c.Execute()
-	Equals(t, "invalid config: reading does-not-exist: Unsupported Config Type \"\"", err.Error())
+	Equals(t, "invalid config: reading does-not-exist: Unsupported UserConfig Type \"\"", err.Error())
 }
 
 func TestExecute_ConfigFileMissing(t *testing.T) {

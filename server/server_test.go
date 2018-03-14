@@ -24,9 +24,9 @@ func TestNewServer(t *testing.T) {
 	t.Log("Run through NewServer constructor")
 	tmpDir, err := ioutil.TempDir("", "")
 	Ok(t, err)
-	_, err = server.NewServer(server.Config{
+	_, err = server.NewServer(server.UserConfig{
 		DataDir: tmpDir,
-	}, server.FlagNames{})
+	}, server.Config{})
 	Ok(t, err)
 }
 
@@ -64,23 +64,28 @@ func TestIndex_Success(t *testing.T) {
 	When(l.List()).ThenReturn(locks, nil)
 	it := sMocks.NewMockTemplateWriter()
 	r := mux.NewRouter()
+	atlantisVersion := "0.3.1"
 	// Need to create a lock route since the server expects this route to exist.
 	r.NewRoute().Path("").Name(server.LockRouteName)
 	s := server.Server{
-		Locker:        l,
-		IndexTemplate: it,
-		Router:        r,
+		Locker:          l,
+		IndexTemplate:   it,
+		Router:          r,
+		AtlantisVersion: atlantisVersion,
 	}
 	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
 	s.Index(w, eventsReq)
-	it.VerifyWasCalledOnce().Execute(w, []server.LockIndexData{
-		{
-			LockURL:      "",
-			RepoFullName: "owner/repo",
-			PullNum:      9,
-			Time:         now,
+	it.VerifyWasCalledOnce().Execute(w, server.IndexData{
+		Locks: []server.LockIndexData{
+			{
+				LockURL:      "",
+				RepoFullName: "owner/repo",
+				PullNum:      9,
+				Time:         now,
+			},
 		},
+		AtlantisVersion: atlantisVersion,
 	})
 	responseContains(t, w, http.StatusOK, "")
 }

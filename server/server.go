@@ -36,6 +36,7 @@ const LockRouteName = "lock-detail"
 
 // Server runs the Atlantis web server.
 type Server struct {
+	AtlantisVersion    string
 	Router             *mux.Router
 	Port               int
 	CommandHandler     *events.CommandHandler
@@ -49,10 +50,10 @@ type Server struct {
 	SSLKeyFile         string
 }
 
-// Config configures Server.
+// UserConfig configures Server.
 // The mapstructure tags correspond to flags in cmd/server.go and are used when
 // the config is parsed from a YAML file.
-type Config struct {
+type UserConfig struct {
 	AllowForkPRs        bool   `mapstructure:"allow-fork-prs"`
 	AtlantisURL         string `mapstructure:"atlantis-url"`
 	DataDir             string `mapstructure:"data-dir"`
@@ -76,15 +77,16 @@ type Config struct {
 	Webhooks        []WebhookConfig `mapstructure:"webhooks"`
 }
 
-// FlagNames contains the names of the flags available to atlantis server.
+// Config contains the names of the flags available to atlantis server.
 // They're useful because sometimes we comment back asking the user to enable
 // a certain flag.
-type FlagNames struct {
+type Config struct {
 	AllowForkPRsFlag  string
 	RepoWhitelistFlag string
+	AtlantisVersion   string
 }
 
-// WebhookConfig is nested within Config. It's used to configure webhooks.
+// WebhookConfig is nested within UserConfig. It's used to configure webhooks.
 type WebhookConfig struct {
 	// Event is the type of event we should send this webhook for, ex. apply.
 	Event string `mapstructure:"event"`
@@ -102,41 +104,41 @@ type WebhookConfig struct {
 // NewServer returns a new server. If there are issues starting the server or
 // its dependencies an error will be returned. This is like the main() function
 // for the server CLI command because it injects all the dependencies.
-func NewServer(config Config, flagNames FlagNames) (*Server, error) {
+func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var supportedVCSHosts []vcs.Host
 	var githubClient *vcs.GithubClient
 	var gitlabClient *vcs.GitlabClient
-	if config.GithubUser != "" {
+	if userConfig.GithubUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, vcs.Github)
 		var err error
-		githubClient, err = vcs.NewGithubClient(config.GithubHostname, config.GithubUser, config.GithubToken)
+		githubClient, err = vcs.NewGithubClient(userConfig.GithubHostname, userConfig.GithubUser, userConfig.GithubToken)
 		if err != nil {
 			return nil, err
 		}
 	}
-	if config.GitlabUser != "" {
+	if userConfig.GitlabUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, vcs.Gitlab)
 		gitlabClient = &vcs.GitlabClient{
-			Client: gitlab.NewClient(nil, config.GitlabToken),
+			Client: gitlab.NewClient(nil, userConfig.GitlabToken),
 		}
 		// If not using gitlab.com we need to set the URL to the API.
-		if config.GitlabHostname != "gitlab.com" {
+		if userConfig.GitlabHostname != "gitlab.com" {
 			// Check if they've also provided a scheme so we don't prepend it
 			// again.
 			scheme := "https"
-			schemeSplit := strings.Split(config.GitlabHostname, "://")
+			schemeSplit := strings.Split(userConfig.GitlabHostname, "://")
 			if len(schemeSplit) > 1 {
 				scheme = schemeSplit[0]
-				config.GitlabHostname = schemeSplit[1]
+				userConfig.GitlabHostname = schemeSplit[1]
 			}
-			apiURL := fmt.Sprintf("%s://%s/api/v4/", scheme, config.GitlabHostname)
+			apiURL := fmt.Sprintf("%s://%s/api/v4/", scheme, userConfig.GitlabHostname)
 			if err := gitlabClient.Client.SetBaseURL(apiURL); err != nil {
 				return nil, errors.Wrapf(err, "setting GitLab API URL: %s", apiURL)
 			}
 		}
 	}
 	var webhooksConfig []webhooks.Config
-	for _, c := range config.Webhooks {
+	for _, c := range userConfig.Webhooks {
 		config := webhooks.Config{
 			Channel:        c.Channel,
 			Event:          c.Event,
@@ -145,7 +147,7 @@ func NewServer(config Config, flagNames FlagNames) (*Server, error) {
 		}
 		webhooksConfig = append(webhooksConfig, config)
 	}
-	webhooksManager, err := webhooks.NewMultiWebhookSender(webhooksConfig, webhooks.NewSlackClient(config.SlackToken))
+	webhooksManager, err := webhooks.NewMultiWebhookSender(webhooksConfig, webhooks.NewSlackClient(userConfig.SlackToken))
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing webhooks")
 	}
@@ -159,7 +161,7 @@ func NewServer(config Config, flagNames FlagNames) (*Server, error) {
 		return nil, errors.Wrap(err, "initializing terraform")
 	}
 	markdownRenderer := &events.MarkdownRenderer{}
-	boltdb, err := boltdb.New(config.DataDir)
+	boltdb, err := boltdb.New(userConfig.DataDir)
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +170,7 @@ func NewServer(config Config, flagNames FlagNames) (*Server, error) {
 	configReader := &events.ProjectConfigManager{}
 	workspaceLocker := events.NewDefaultAtlantisWorkspaceLocker()
 	workspace := &events.FileWorkspace{
-		DataDir: config.DataDir,
+		DataDir: userConfig.DataDir,
 	}
 	projectPreExecute := &events.DefaultProjectPreExecutor{
 		Locker:       lockingClient,
@@ -179,7 +181,7 @@ func NewServer(config Config, flagNames FlagNames) (*Server, error) {
 	applyExecutor := &events.ApplyExecutor{
 		VCSClient:         vcsClient,
 		Terraform:         terraformClient,
-		RequireApproval:   config.RequireApproval,
+		RequireApproval:   userConfig.RequireApproval,
 		Run:               run,
 		AtlantisWorkspace: workspace,
 		ProjectPreExecute: projectPreExecute,
@@ -199,18 +201,18 @@ func NewServer(config Config, flagNames FlagNames) (*Server, error) {
 		Locker:    lockingClient,
 		Workspace: workspace,
 	}
-	logger := logging.NewSimpleLogger("server", nil, false, logging.ToLogLevel(config.LogLevel))
+	logger := logging.NewSimpleLogger("server", nil, false, logging.ToLogLevel(userConfig.LogLevel))
 	eventParser := &events.EventParser{
-		GithubUser:  config.GithubUser,
-		GithubToken: config.GithubToken,
-		GitlabUser:  config.GitlabUser,
-		GitlabToken: config.GitlabToken,
+		GithubUser:  userConfig.GithubUser,
+		GithubToken: userConfig.GithubToken,
+		GitlabUser:  userConfig.GitlabUser,
+		GitlabToken: userConfig.GitlabToken,
 	}
 	commentParser := &events.CommentParser{
-		GithubUser:  config.GithubUser,
-		GithubToken: config.GithubToken,
-		GitlabUser:  config.GitlabUser,
-		GitlabToken: config.GitlabToken,
+		GithubUser:  userConfig.GithubUser,
+		GithubToken: userConfig.GithubToken,
+		GitlabUser:  userConfig.GitlabUser,
+		GitlabToken: userConfig.GitlabToken,
 	}
 	commandHandler := &events.CommandHandler{
 		ApplyExecutor:            applyExecutor,
@@ -224,11 +226,11 @@ func NewServer(config Config, flagNames FlagNames) (*Server, error) {
 		AtlantisWorkspaceLocker:  workspaceLocker,
 		MarkdownRenderer:         markdownRenderer,
 		Logger:                   logger,
-		AllowForkPRs:             config.AllowForkPRs,
-		AllowForkPRsFlag:         flagNames.AllowForkPRsFlag,
+		AllowForkPRs:             userConfig.AllowForkPRs,
+		AllowForkPRsFlag:         config.AllowForkPRsFlag,
 	}
 	repoWhitelist := &events.RepoWhitelist{
-		Whitelist: config.RepoWhitelist,
+		Whitelist: userConfig.RepoWhitelist,
 	}
 	eventsController := &EventsController{
 		CommandRunner:          commandHandler,
@@ -236,27 +238,28 @@ func NewServer(config Config, flagNames FlagNames) (*Server, error) {
 		Parser:                 eventParser,
 		CommentParser:          commentParser,
 		Logger:                 logger,
-		GithubWebHookSecret:    []byte(config.GithubWebHookSecret),
+		GithubWebHookSecret:    []byte(userConfig.GithubWebHookSecret),
 		GithubRequestValidator: &DefaultGithubRequestValidator{},
 		GitlabRequestParser:    &DefaultGitlabRequestParser{},
-		GitlabWebHookSecret:    []byte(config.GitlabWebHookSecret),
+		GitlabWebHookSecret:    []byte(userConfig.GitlabWebHookSecret),
 		RepoWhitelist:          repoWhitelist,
 		SupportedVCSHosts:      supportedVCSHosts,
 		VCSClient:              vcsClient,
 	}
 	router := mux.NewRouter()
 	return &Server{
+		AtlantisVersion:    config.AtlantisVersion,
 		Router:             router,
-		Port:               config.Port,
+		Port:               userConfig.Port,
 		CommandHandler:     commandHandler,
 		Logger:             logger,
 		Locker:             lockingClient,
-		AtlantisURL:        config.AtlantisURL,
+		AtlantisURL:        userConfig.AtlantisURL,
 		EventsController:   eventsController,
 		IndexTemplate:      indexTemplate,
 		LockDetailTemplate: lockTemplate,
-		SSLKeyFile:         config.SSLKeyFile,
-		SSLCertFile:        config.SSLCertFile,
+		SSLKeyFile:         userConfig.SSLKeyFile,
+		SSLCertFile:        userConfig.SSLCertFile,
 	}, nil
 }
 
@@ -324,17 +327,20 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 
-	var results []LockIndexData
+	var lockResults []LockIndexData
 	for id, v := range locks {
 		lockURL, _ := s.Router.Get(LockRouteName).URL("id", url.QueryEscape(id))
-		results = append(results, LockIndexData{
+		lockResults = append(lockResults, LockIndexData{
 			LockURL:      lockURL.String(),
 			RepoFullName: v.Project.RepoFullName,
 			PullNum:      v.Pull.Num,
 			Time:         v.Time,
 		})
 	}
-	s.IndexTemplate.Execute(w, results) // nolint: errcheck
+	s.IndexTemplate.Execute(w, IndexData {
+		Locks: lockResults,
+		AtlantisVersion: s.AtlantisVersion,
+	}) // nolint: errcheck
 }
 
 // GetLockRoute is the GET /locks/{id} route. It renders the lock detail view.
