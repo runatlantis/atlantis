@@ -47,7 +47,7 @@ func TestExecute_ConfigFileExtension(t *testing.T) {
 		cmd.ConfigFlag: "does-not-exist",
 	})
 	err := c.Execute()
-	Equals(t, "invalid config: reading does-not-exist: Unsupported UserConfig Type \"\"", err.Error())
+	Equals(t, "invalid config: reading does-not-exist: Unsupported Config Type \"\"", err.Error())
 }
 
 func TestExecute_ConfigFileMissing(t *testing.T) {
