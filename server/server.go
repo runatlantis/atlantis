@@ -334,10 +334,11 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 			Time:         v.Time,
 		})
 	}
+	// nolint: errcheck
 	s.IndexTemplate.Execute(w, IndexData{
 		Locks:           lockResults,
 		AtlantisVersion: s.AtlantisVersion,
-	}) // nolint: errcheck
+	})
 }
 
 // GetLockRoute is the GET /locks/{id} route. It renders the lock detail view.

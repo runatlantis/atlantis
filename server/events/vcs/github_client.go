@@ -3,6 +3,7 @@ package vcs
 import (
 	"context"
 	"fmt"
+	"math"
 	"net/url"
 	"strings"
 
@@ -70,9 +71,20 @@ func (g *GithubClient) GetModifiedFiles(repo models.Repo, pull models.PullReques
 }
 
 // CreateComment creates a comment on the pull request.
+// If comment length is greater than the max comment length we split into
+// multiple comments.
 func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment string) error {
-	_, _, err := g.client.Issues.CreateComment(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueComment{Body: &comment})
-	return err
+	// maxCommentBodySize is derived from the error message when you go over
+	// this limit.
+	const maxCommentBodySize = 65536
+	comments := g.splitAtMaxChars(comment, maxCommentBodySize, "\ncontinued...\n")
+	for _, c := range comments {
+		_, _, err := g.client.Issues.CreateComment(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueComment{Body: &c})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // PullIsApproved returns true if the pull request was approved.
@@ -114,4 +126,40 @@ func (g *GithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 		Context:     github.String(statusContext)}
 	_, _, err := g.client.Repositories.CreateStatus(g.ctx, repo.Owner, repo.Name, pull.HeadCommit, status)
 	return err
+}
+
+// splitAtMaxChars splits comment into a slice with string up to max
+// len separated by join which gets appended to the ends of the middle strings.
+// If max <= len(join) we return an empty slice since this is an edge case we
+// don't want to handle.
+func (g *GithubClient) splitAtMaxChars(comment string, max int, join string) []string {
+	// If we're under the limit then no need to split.
+	if len(comment) <= max {
+		return []string{comment}
+	}
+
+	// If we can't fit the joining string in then this doesn't make sense.
+	if max <= len(join) {
+		return nil
+	}
+
+	var comments []string
+	maxSize := max - len(join)
+	numComments := int(math.Ceil(float64(len(comment)) / float64(maxSize)))
+	for i := 0; i < numComments; i++ {
+		upTo := g.min(len(comment), (i+1)*maxSize)
+		portion := comment[i*maxSize : upTo]
+		if i < numComments-1 {
+			portion += join
+		}
+		comments = append(comments, portion)
+	}
+	return comments
+}
+
+func (g *GithubClient) min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
