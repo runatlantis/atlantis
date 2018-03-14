@@ -568,6 +568,7 @@ Thank you to these awesome contributors!
 - [@nick-hollingsworth-hs](https://github.com/nick-hollingsworth-hs)
 - [@mpmsimo](https://github.com/mpmsimo)
 - [@hussfelt](https://github.com/hussfelt)
+- [@psalaberria002](https://github.com/psalaberria002)
 
 * Atlantis Logo: Icon made by [freepik](https://www.flaticon.com/authors/freepik) from www.flaticon.com
 
