@@ -83,6 +83,9 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
     {{ end }}
   </section>
 </div>
+<footer>
+v{{ .AtlantisVersion }}
+</footer>
 </body>
 </html>
 `))
@@ -98,6 +101,7 @@ type LockDetailData struct {
 	LockedBy        string
 	Workspace       string
 	Time            time.Time
+	AtlantisVersion string
 }
 
 var lockTemplate = template.Must(template.New("lock.html.tmpl").Parse(`
@@ -151,6 +155,9 @@ var lockTemplate = template.Must(template.New("lock.html.tmpl").Parse(`
       </div>
     </div>
   </div>
+<footer>
+v{{ .AtlantisVersion }}
+</footer>
 <script>
   // Get the modal
   var modal = $("#discardMessageModal");

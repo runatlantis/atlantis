@@ -384,6 +384,7 @@ func (s *Server) GetLock(w http.ResponseWriter, _ *http.Request, id string) {
 		PullRequestLink: lock.Pull.URL,
 		LockedBy:        lock.Pull.Author,
 		Workspace:       lock.Workspace,
+		AtlantisVersion: s.AtlantisVersion,
 	}
 
 	s.LockDetailTemplate.Execute(w, l) // nolint: errcheck
