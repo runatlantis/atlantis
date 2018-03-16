@@ -17,7 +17,13 @@ RUN apk add --no-cache ca-certificates gnupg curl git unzip bash openssh libcap 
     cd /tmp/build && \
     wget -O gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-amd64" && \
     wget -O gosu.asc "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-amd64.asc" && \
-    gpg --keyserver ipv4.pool.sks-keyservers.net --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4 && \
+    for server in $(shuf -e ipv4.pool.sks-keyservers.net \
+                            hkp://p80.pool.sks-keyservers.net:80 \
+                            keyserver.ubuntu.com \
+                            hkp://keyserver.ubuntu.com:80 \
+                            pgp.mit.edu) ; do \
+        gpg --keyserver "$server" --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4 && break || : ; \
+    done && \
     gpg --batch --verify gosu.asc gosu && \
     chmod +x gosu && \
     cp gosu /bin && \
@@ -27,7 +33,7 @@ RUN apk add --no-cache ca-certificates gnupg curl git unzip bash openssh libcap 
         rm -rf /root/.gnupg && rm -rf /var/cache/apk/*
 
 # install terraform binaries
-ENV DEFAULT_TERRAFORM_VERSION=0.11.3
+ENV DEFAULT_TERRAFORM_VERSION=0.11.4
 
 # In the official Atlantis image we only have the latest of each Terrafrom version.
 RUN AVAILABLE_TERRAFORM_VERSIONS="0.8.8 0.9.11 0.10.8 ${DEFAULT_TERRAFORM_VERSION}" && \
