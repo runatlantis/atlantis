@@ -234,7 +234,7 @@ post_apply:
 extra_arguments:
   - command_name: plan
     arguments:
-    - "-var-file=myvars.tfvars"
+    - "-var-file=terraform.tfvars"
 ```
 
 When running the `pre_plan`, `post_plan`, `pre_apply`, and `post_apply` commands the following environment variables are available
