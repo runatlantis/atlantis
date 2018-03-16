@@ -5,7 +5,7 @@ jobs:
     docker:
       - image: circleci/golang:1.10
         environment:
-          TERRAFORM_VERSION: 0.10.8
+          TERRAFORM_VERSION: 0.11.4
     steps:
       - checkout
       - setup_remote_docker:
@@ -17,23 +17,8 @@ jobs:
           name: post coverage to codecov.io
           command: bash <(curl -s https://codecov.io/bash)
       - run: make build-service
-      - run:
-          name: Install e2e dependencies
-          command: make end-to-end-deps
-      - run:
-          name: Starting atlantis server in the background
-          command: cd "${CIRCLE_WORKING_DIRECTORY}/e2e" && ./atlantis server --gh-user="$GITHUB_USERNAME" --gh-token="$GITHUB_PASSWORD" --data-dir="/tmp" --log-level="debug" --repo-whitelist="github.com/runatlantis/atlantis-tests" &> /tmp/atlantis-server.log
-          background: true
-      - run: sleep 2
-      - run:
-          name: Starting ngrok
-          command: cd "${CIRCLE_WORKING_DIRECTORY}/e2e" && ./ngrok http 4141 > /tmp/ngrok.log
-          background: true
-      - run: sleep 2
-      - run: echo "export ATLANTIS_URL=$(curl -s 'http://localhost:4040/api/tunnels' | jq -r '.tunnels[] | select(.proto=="http") | .public_url')" >> $BASH_ENV
-      - run:
-          name: Run e2e tests
-          command: make end-to-end-tests
+      # We don't run e2e tests on fork PRs because they don't have access to the secret env vars.
+      - run: if [ -z "${CIRCLE_PR_REPONAME}" ]; then ./scripts/e2e.sh; fi
       - run:
           name: Build image
           command: |
