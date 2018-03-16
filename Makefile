@@ -58,7 +58,8 @@ gometalint: ## Run every linter ever
 	# maligned is disabled because I'd rather have alphabetical struct fields than save a few bytes
 	# gocyclo is temporarily disabled because we don't pass it right now
 	# golint is temporarily disabled because we need to add comments everywhere first
-	gometalinter --disable gotype --disable gotypex --disable maligned --disable gocyclo --disable golint --enable=megacheck --enable=unparam --linter='gas:gas -exclude=G104 -fmt=csv:^(?P<path>.*?\.go),(?P<line>\d+),(?P<message>[^,]+,[^,]+,[^,]+)' --deadline=300s --vendor -t --line-length=120 --skip server/static ./...
+	# CGO_ENABLED=0 is attempted workaround for https://github.com/alecthomas/gometalinter/issues/149
+	CGO_ENABLED=0 gometalinter --disable gotype --disable gotypex --disable maligned --disable gocyclo --disable golint --enable=megacheck --enable=unparam --linter='gas:gas -exclude=G104 -fmt=csv:^(?P<path>.*?\.go),(?P<line>\d+),(?P<message>[^,]+,[^,]+,[^,]+)' --deadline=300s --vendor -t --line-length=120 --skip server/static ./...
 
 gometalint-install: ## Install gometalint
 	go get -u github.com/alecthomas/gometalinter
