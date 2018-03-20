@@ -36,5 +36,6 @@ func (b *BootstrapCmd) Init() *cobra.Command {
 			}
 			return err
 		},
+		SilenceErrors: true,
 	}
 }

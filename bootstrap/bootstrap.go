@@ -18,6 +18,7 @@ package bootstrap
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -80,7 +81,7 @@ Follow these instructions to create a token (we don't store any tokens):
 	githubClient := &Client{client: github.NewClient(tp.Client()), ctx: context.Background()}
 
 	// Fork terraform example repo.
-	colorstring.Printf("\n[white]=> forking repo ")
+	colorstring.Println("\n[white]=> forking repo ")
 	s.Start()
 	if err := githubClient.CreateFork(terraformExampleRepoOwner, terraformExampleRepo); err != nil {
 		return errors.Wrapf(err, "forking repo %s/%s", terraformExampleRepoOwner, terraformExampleRepo)
@@ -89,19 +90,19 @@ Follow these instructions to create a token (we don't store any tokens):
 		return fmt.Errorf("didn't find forked repo %s/%s. fork unsuccessful", terraformExampleRepoOwner, terraformExampleRepoOwner)
 	}
 	s.Stop()
-	colorstring.Println("\n[green]=> fork completed!")
+	colorstring.Println("[green]=> fork completed!")
 
 	// Detect terraform and install it if not installed.
 	_, err := exec.LookPath("terraform")
 	if err != nil {
 		colorstring.Println("[yellow]=> terraform not found in $PATH.")
-		colorstring.Printf("[white]=> downloading terraform ")
+		colorstring.Println("[white]=> downloading terraform ")
 		s.Start()
 		terraformDownloadURL := fmt.Sprintf("%s/terraform/%s/terraform_%s_%s_%s.zip", hashicorpReleasesURL, terraformVersion, terraformVersion, runtime.GOOS, runtime.GOARCH)
 		if err = downloadAndUnzip(terraformDownloadURL, "/tmp/terraform.zip", "/tmp"); err != nil {
 			return errors.Wrapf(err, "downloading and unzipping terraform")
 		}
-		colorstring.Println("\n[green]=> downloaded terraform successfully!")
+		colorstring.Println("[green]=> downloaded terraform successfully!")
 		s.Stop()
 
 		var terraformCmd *exec.Cmd
@@ -116,18 +117,27 @@ Follow these instructions to create a token (we don't store any tokens):
 	}
 
 	// Download ngrok.
-	colorstring.Printf("[white]=> downloading ngrok  ")
+	colorstring.Println("[white]=> downloading ngrok  ")
 	s.Start()
 	ngrokURL := fmt.Sprintf("%s/ngrok-stable-%s-%s.zip", ngrokDownloadURL, runtime.GOOS, runtime.GOARCH)
 	if err = downloadAndUnzip(ngrokURL, "/tmp/ngrok.zip", "/tmp"); err != nil {
 		return errors.Wrapf(err, "downloading and unzipping ngrok")
 	}
 	s.Stop()
-	colorstring.Println("\n[green]=> downloaded ngrok successfully!")
+	colorstring.Println("[green]=> downloaded ngrok successfully!")
 
 	// Create ngrok tunnel.
-	colorstring.Printf("[white]=> creating secure tunnel ")
+	colorstring.Println("[white]=> creating secure tunnel")
 	s.Start()
+	// Check if there is already an ngrok running by seeing if there's already
+	// something bound to its API port.
+	conn, err := net.Dial("tcp", ngrokAPIURL)
+	// We expect an error.
+	if err == nil {
+		conn.Close() // nolint: errcheck
+		return errors.New("unable to start ngrok because there is already something bound to its API port: " + ngrokAPIURL)
+	}
+
 	ngrokCmd, err := executeCmd("/tmp/ngrok", []string{"http", "4141"})
 	if err != nil {
 		return errors.Wrapf(err, "creating ngrok tunnel")
@@ -143,7 +153,7 @@ Follow these instructions to create a token (we don't store any tokens):
 	// Wait for the tunnel to be up.
 	time.Sleep(2 * time.Second)
 	s.Stop()
-	colorstring.Println("\n[green]=> started tunnel!")
+	colorstring.Println("[green]=> started tunnel!")
 	tunnelURL, err := getTunnelAddr()
 	if err != nil {
 		return errors.Wrapf(err, "getting tunnel url")
@@ -151,7 +161,7 @@ Follow these instructions to create a token (we don't store any tokens):
 	s.Stop()
 
 	// Start atlantis server.
-	colorstring.Printf("[white]=> starting atlantis server ")
+	colorstring.Println("[white]=> starting atlantis server")
 	s.Start()
 	atlantisCmd, err := executeCmd(os.Args[0], []string{"server", "--gh-user", githubUsername, "--gh-token", githubToken, "--data-dir", "/tmp/atlantis/data", "--atlantis-url", tunnelURL, "--repo-whitelist", fmt.Sprintf("github.com/%s/%s", githubUsername, terraformExampleRepo)})
 	if err != nil {
@@ -164,31 +174,31 @@ Follow these instructions to create a token (we don't store any tokens):
 	}()
 	// When this function returns atlantis server should be stopped.
 	defer atlantisCmd.Process.Kill()
-	colorstring.Printf("\n[green]=> atlantis server is now securely exposed at [bold][underline]%s", tunnelURL)
+	colorstring.Printf("[green]=> atlantis server is now securely exposed at [bold][underline]%s\n", tunnelURL)
 	fmt.Println("")
 
 	// Create atlantis webhook.
-	colorstring.Printf("[white]=> creating atlantis webhook ")
+	colorstring.Println("[white]=> creating atlantis webhook")
 	s.Start()
 	err = githubClient.CreateWebhook(githubUsername, terraformExampleRepo, fmt.Sprintf("%s/events", tunnelURL))
 	if err != nil {
 		return errors.Wrapf(err, "creating atlantis webhook")
 	}
 	s.Stop()
-	colorstring.Println("\n[green]=> atlantis webhook created!")
+	colorstring.Println("[green]=> atlantis webhook created!")
 
 	// Create a new pr in the example repo.
-	colorstring.Printf("[white]=> creating a new pull request ")
+	colorstring.Println("[white]=> creating a new pull request")
 	s.Start()
 	pullRequestURL, err := githubClient.CreatePullRequest(githubUsername, terraformExampleRepo, "example", "master")
 	if err != nil {
 		return errors.Wrapf(err, "creating new pull request for repo %s/%s", githubUsername, terraformExampleRepo)
 	}
 	s.Stop()
-	colorstring.Println("\n[green]=> pull request created!")
+	colorstring.Println("[green]=> pull request created!")
 
 	// Open new pull request in the browser.
-	colorstring.Printf("[white]=> opening pull request ")
+	colorstring.Println("[white]=> opening pull request")
 	s.Start()
 	time.Sleep(2 * time.Second)
 	_, err = executeCmd("open", []string{pullRequestURL})
@@ -198,7 +208,7 @@ Follow these instructions to create a token (we don't store any tokens):
 	s.Stop()
 
 	// Wait for ngrok and atlantis server process to finish.
-	colorstring.Printf("\n[_green_][light_green]atlantis is running ")
+	colorstring.Println("[_green_][light_green]atlantis is running ")
 	s.Start()
 	colorstring.Println("[green] [press Ctrl-c to exit]")
 
