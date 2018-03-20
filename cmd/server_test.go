@@ -273,26 +273,30 @@ func TestExecute_Defaults(t *testing.T) {
 	err := c.Execute()
 	Ok(t, err)
 
-	Equals(t, "user", passedConfig.GithubUser)
-	Equals(t, "token", passedConfig.GithubToken)
-	Equals(t, "", passedConfig.GithubWebHookSecret)
-	Equals(t, "gitlab-user", passedConfig.GitlabUser)
-	Equals(t, "gitlab-token", passedConfig.GitlabToken)
-	Equals(t, "", passedConfig.GitlabWebHookSecret)
 	// Get our hostname since that's what gets defaulted to
 	hostname, err := os.Hostname()
 	Ok(t, err)
 	Equals(t, "http://"+hostname+":4141", passedConfig.AtlantisURL)
+	Equals(t, false, passedConfig.AllowForkPRs)
 
 	// Get our home dir since that's what gets defaulted to
 	dataDir, err := homedir.Expand("~/.atlantis")
 	Ok(t, err)
 	Equals(t, dataDir, passedConfig.DataDir)
+
 	Equals(t, "github.com", passedConfig.GithubHostname)
+	Equals(t, "token", passedConfig.GithubToken)
+	Equals(t, "user", passedConfig.GithubUser)
+	Equals(t, "", passedConfig.GithubWebHookSecret)
 	Equals(t, "gitlab.com", passedConfig.GitlabHostname)
+	Equals(t, "gitlab-token", passedConfig.GitlabToken)
+	Equals(t, "gitlab-user", passedConfig.GitlabUser)
+	Equals(t, "", passedConfig.GitlabWebHookSecret)
 	Equals(t, "info", passedConfig.LogLevel)
-	Equals(t, false, passedConfig.RequireApproval)
 	Equals(t, 4141, passedConfig.Port)
+	Equals(t, false, passedConfig.RequireApproval)
+	Equals(t, "", passedConfig.SSLCertFile)
+	Equals(t, "", passedConfig.SSLKeyFile)
 }
 
 func TestExecute_ExpandHomeInDataDir(t *testing.T) {
@@ -356,56 +360,66 @@ func TestExecute_Flags(t *testing.T) {
 	t.Log("Should use all flags that are set.")
 	c := setup(map[string]interface{}{
 		cmd.AtlantisURLFlag:     "url",
+		cmd.AllowForkPRsFlag:    true,
 		cmd.DataDirFlag:         "/path",
 		cmd.GHHostnameFlag:      "ghhostname",
-		cmd.GHUserFlag:          "user",
 		cmd.GHTokenFlag:         "token",
+		cmd.GHUserFlag:          "user",
 		cmd.GHWebHookSecret:     "secret",
 		cmd.GitlabHostnameFlag:  "gitlab-hostname",
-		cmd.GitlabUserFlag:      "gitlab-user",
 		cmd.GitlabTokenFlag:     "gitlab-token",
+		cmd.GitlabUserFlag:      "gitlab-user",
 		cmd.GitlabWebHookSecret: "gitlab-secret",
 		cmd.LogLevelFlag:        "debug",
 		cmd.PortFlag:            8181,
-		cmd.RequireApprovalFlag: true,
 		cmd.RepoWhitelistFlag:   "github.com/runatlantis/atlantis",
+		cmd.RequireApprovalFlag: true,
+		cmd.SSLCertFileFlag:     "cert-file",
+		cmd.SSLKeyFileFlag:      "key-file",
 	})
 	err := c.Execute()
 	Ok(t, err)
 
 	Equals(t, "url", passedConfig.AtlantisURL)
+	Equals(t, true, passedConfig.AllowForkPRs)
 	Equals(t, "/path", passedConfig.DataDir)
 	Equals(t, "ghhostname", passedConfig.GithubHostname)
-	Equals(t, "user", passedConfig.GithubUser)
 	Equals(t, "token", passedConfig.GithubToken)
+	Equals(t, "user", passedConfig.GithubUser)
 	Equals(t, "secret", passedConfig.GithubWebHookSecret)
 	Equals(t, "gitlab-hostname", passedConfig.GitlabHostname)
-	Equals(t, "gitlab-user", passedConfig.GitlabUser)
 	Equals(t, "gitlab-token", passedConfig.GitlabToken)
+	Equals(t, "gitlab-user", passedConfig.GitlabUser)
 	Equals(t, "gitlab-secret", passedConfig.GitlabWebHookSecret)
 	Equals(t, "debug", passedConfig.LogLevel)
 	Equals(t, 8181, passedConfig.Port)
-	Equals(t, true, passedConfig.RequireApproval)
 	Equals(t, "github.com/runatlantis/atlantis", passedConfig.RepoWhitelist)
+	Equals(t, true, passedConfig.RequireApproval)
+	Equals(t, "cert-file", passedConfig.SSLCertFile)
+	Equals(t, "key-file", passedConfig.SSLKeyFile)
 }
 
 func TestExecute_ConfigFile(t *testing.T) {
 	t.Log("Should use all the values from the config file.")
 	tmpFile := tempFile(t, `---
 atlantis-url: "url"
+allow-fork-prs: true
 data-dir: "/path"
 gh-hostname: "ghhostname"
-gh-user: "user"
 gh-token: "token"
+gh-user: "user"
 gh-webhook-secret: "secret"
 gitlab-hostname: "gitlab-hostname"
-gitlab-user: "gitlab-user"
 gitlab-token: "gitlab-token"
+gitlab-user: "gitlab-user"
 gitlab-webhook-secret: "gitlab-secret"
 log-level: "debug"
 port: 8181
+repo-whitelist: "github.com/runatlantis/atlantis"
 require-approval: true
-repo-whitelist: "github.com/runatlantis/atlantis"`)
+ssl-cert-file: cert-file
+ssl-key-file: key-file
+`)
 	defer os.Remove(tmpFile) // nolint: errcheck
 	c := setup(map[string]interface{}{
 		cmd.ConfigFlag: tmpFile,
@@ -414,80 +428,220 @@ repo-whitelist: "github.com/runatlantis/atlantis"`)
 	err := c.Execute()
 	Ok(t, err)
 	Equals(t, "url", passedConfig.AtlantisURL)
+	Equals(t, true, passedConfig.AllowForkPRs)
 	Equals(t, "/path", passedConfig.DataDir)
 	Equals(t, "ghhostname", passedConfig.GithubHostname)
-	Equals(t, "user", passedConfig.GithubUser)
 	Equals(t, "token", passedConfig.GithubToken)
+	Equals(t, "user", passedConfig.GithubUser)
 	Equals(t, "secret", passedConfig.GithubWebHookSecret)
 	Equals(t, "gitlab-hostname", passedConfig.GitlabHostname)
-	Equals(t, "gitlab-user", passedConfig.GitlabUser)
 	Equals(t, "gitlab-token", passedConfig.GitlabToken)
+	Equals(t, "gitlab-user", passedConfig.GitlabUser)
 	Equals(t, "gitlab-secret", passedConfig.GitlabWebHookSecret)
 	Equals(t, "debug", passedConfig.LogLevel)
 	Equals(t, 8181, passedConfig.Port)
-	Equals(t, true, passedConfig.RequireApproval)
 	Equals(t, "github.com/runatlantis/atlantis", passedConfig.RepoWhitelist)
+	Equals(t, true, passedConfig.RequireApproval)
+	Equals(t, "cert-file", passedConfig.SSLCertFile)
+	Equals(t, "key-file", passedConfig.SSLKeyFile)
 }
 
 func TestExecute_EnvironmentOverride(t *testing.T) {
 	t.Log("Environment variables should override config file flags.")
-	tmpFile := tempFile(t, "gh-user: config\ngh-token: config2")
-	defer os.Remove(tmpFile)                   // nolint: errcheck
-	os.Setenv("ATLANTIS_GH_TOKEN", "override") // nolint: errcheck
+	tmpFile := tempFile(t, `---
+atlantis-url: "url"
+allow-fork-prs: true
+data-dir: "/path"
+gh-hostname: "ghhostname"
+gh-token: "token"
+gh-user: "user"
+gh-webhook-secret: "secret"
+gitlab-hostname: "gitlab-hostname"
+gitlab-token: "gitlab-token"
+gitlab-user: "gitlab-user"
+gitlab-webhook-secret: "gitlab-secret"
+log-level: "debug"
+port: 8181
+repo-whitelist: "github.com/runatlantis/atlantis"
+require-approval: true
+ssl-cert-file: cert-file
+ssl-key-file: key-file
+`)
+	defer os.Remove(tmpFile) // nolint: errcheck
+
+	// NOTE: We add the ATLANTIS_ prefix below.
+	for name, value := range map[string]string{
+		"ATLANTIS_URL":          "override-url",
+		"ALLOW_FORK_PRS":        "false",
+		"DATA_DIR":              "/override-path",
+		"GH_HOSTNAME":           "override-gh-hostname",
+		"GH_TOKEN":              "override-gh-token",
+		"GH_USER":               "override-gh-user",
+		"GH_WEBHOOK_SECRET":     "override-gh-webhook-secret",
+		"GITLAB_HOSTNAME":       "override-gitlab-hostname",
+		"GITLAB_TOKEN":          "override-gitlab-token",
+		"GITLAB_USER":           "override-gitlab-user",
+		"GITLAB_WEBHOOK_SECRET": "override-gitlab-webhook-secret",
+		"LOG_LEVEL":             "info",
+		"PORT":                  "8282",
+		"REPO_WHITELIST":        "override,override",
+		"REQUIRE_APPROVAL":      "false",
+		"SSL_CERT_FILE":         "override-cert-file",
+		"SSL_KEY_FILE":          "override-key-file",
+	} {
+		os.Setenv("ATLANTIS_"+name, value) // nolint: errcheck
+	}
 	c := setup(map[string]interface{}{
-		cmd.ConfigFlag:        tmpFile,
-		cmd.RepoWhitelistFlag: "*",
+		cmd.ConfigFlag: tmpFile,
 	})
 	err := c.Execute()
 	Ok(t, err)
-	Equals(t, "override", passedConfig.GithubToken)
+	Equals(t, "override-url", passedConfig.AtlantisURL)
+	Equals(t, false, passedConfig.AllowForkPRs)
+	Equals(t, "/override-path", passedConfig.DataDir)
+	Equals(t, "override-gh-hostname", passedConfig.GithubHostname)
+	Equals(t, "override-gh-token", passedConfig.GithubToken)
+	Equals(t, "override-gh-user", passedConfig.GithubUser)
+	Equals(t, "override-gh-webhook-secret", passedConfig.GithubWebHookSecret)
+	Equals(t, "override-gitlab-hostname", passedConfig.GitlabHostname)
+	Equals(t, "override-gitlab-token", passedConfig.GitlabToken)
+	Equals(t, "override-gitlab-user", passedConfig.GitlabUser)
+	Equals(t, "override-gitlab-webhook-secret", passedConfig.GitlabWebHookSecret)
+	Equals(t, "info", passedConfig.LogLevel)
+	Equals(t, 8282, passedConfig.Port)
+	Equals(t, "override,override", passedConfig.RepoWhitelist)
+	Equals(t, false, passedConfig.RequireApproval)
+	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
+	Equals(t, "override-key-file", passedConfig.SSLKeyFile)
 }
 
 func TestExecute_FlagConfigOverride(t *testing.T) {
 	t.Log("Flags should override config file flags.")
-	os.Setenv("ATLANTIS_GH_TOKEN", "env-var") // nolint: errcheck
+	tmpFile := tempFile(t, `---
+atlantis-url: "url"
+allow-fork-prs: true
+data-dir: "/path"
+gh-hostname: "ghhostname"
+gh-token: "token"
+gh-user: "user"
+gh-webhook-secret: "secret"
+gitlab-hostname: "gitlab-hostname"
+gitlab-token: "gitlab-token"
+gitlab-user: "gitlab-user"
+gitlab-webhook-secret: "gitlab-secret"
+log-level: "debug"
+port: 8181
+repo-whitelist: "github.com/runatlantis/atlantis"
+require-approval: true
+ssl-cert-file: cert-file
+ssl-key-file: key-file
+`)
+
+	defer os.Remove(tmpFile) // nolint: errcheck
 	c := setup(map[string]interface{}{
-		cmd.GHUserFlag:        "user",
-		cmd.GHTokenFlag:       "override",
-		cmd.RepoWhitelistFlag: "*",
+		cmd.AtlantisURLFlag:     "override-url",
+		cmd.AllowForkPRsFlag:    false,
+		cmd.DataDirFlag:         "/override-path",
+		cmd.GHHostnameFlag:      "override-gh-hostname",
+		cmd.GHTokenFlag:         "override-gh-token",
+		cmd.GHUserFlag:          "override-gh-user",
+		cmd.GHWebHookSecret:     "override-gh-webhook-secret",
+		cmd.GitlabHostnameFlag:  "override-gitlab-hostname",
+		cmd.GitlabTokenFlag:     "override-gitlab-token",
+		cmd.GitlabUserFlag:      "override-gitlab-user",
+		cmd.GitlabWebHookSecret: "override-gitlab-webhook-secret",
+		cmd.LogLevelFlag:        "info",
+		cmd.PortFlag:            8282,
+		cmd.RepoWhitelistFlag:   "override,override",
+		cmd.RequireApprovalFlag: false,
+		cmd.SSLCertFileFlag:     "override-cert-file",
+		cmd.SSLKeyFileFlag:      "override-key-file",
 	})
 	err := c.Execute()
 	Ok(t, err)
-	Equals(t, "override", passedConfig.GithubToken)
+	Equals(t, "override-url", passedConfig.AtlantisURL)
+	Equals(t, false, passedConfig.AllowForkPRs)
+	Equals(t, "/override-path", passedConfig.DataDir)
+	Equals(t, "override-gh-hostname", passedConfig.GithubHostname)
+	Equals(t, "override-gh-token", passedConfig.GithubToken)
+	Equals(t, "override-gh-user", passedConfig.GithubUser)
+	Equals(t, "override-gh-webhook-secret", passedConfig.GithubWebHookSecret)
+	Equals(t, "override-gitlab-hostname", passedConfig.GitlabHostname)
+	Equals(t, "override-gitlab-token", passedConfig.GitlabToken)
+	Equals(t, "override-gitlab-user", passedConfig.GitlabUser)
+	Equals(t, "override-gitlab-webhook-secret", passedConfig.GitlabWebHookSecret)
+	Equals(t, "info", passedConfig.LogLevel)
+	Equals(t, 8282, passedConfig.Port)
+	Equals(t, "override,override", passedConfig.RepoWhitelist)
+	Equals(t, false, passedConfig.RequireApproval)
+	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
+	Equals(t, "override-key-file", passedConfig.SSLKeyFile)
 }
 
 func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	t.Log("Flags should override environment variables.")
-	tmpFile := tempFile(t, "gh-user: config\ngh-token: config2")
-	defer os.Remove(tmpFile) // nolint: errcheck
-	c := setup(map[string]interface{}{
-		cmd.ConfigFlag:        tmpFile,
-		cmd.GHTokenFlag:       "override",
-		cmd.RepoWhitelistFlag: "*",
-	})
 
+	for name, value := range map[string]string{
+		"ATLANTIS_URL":          "url",
+		"ALLOW_FORK_PRS":        "true",
+		"DATA_DIR":              "/path",
+		"GH_HOSTNAME":           "gh-hostname",
+		"GH_TOKEN":              "gh-token",
+		"GH_USER":               "gh-user",
+		"GH_WEBHOOK_SECRET":     "gh-webhook-secret",
+		"GITLAB_HOSTNAME":       "gitlab-hostname",
+		"GITLAB_TOKEN":          "gitlab-token",
+		"GITLAB_USER":           "gitlab-user",
+		"GITLAB_WEBHOOK_SECRET": "gitlab-webhook-secret",
+		"LOG_LEVEL":             "debug",
+		"PORT":                  "8181",
+		"REPO_WHITELIST":        "*",
+		"REQUIRE_APPROVAL":      "true",
+		"SSL_CERT_FILE":         "cert-file",
+		"SSL_KEY_FILE":          "key-file",
+	} {
+		os.Setenv("ATLANTIS_"+name, value) // nolint: errcheck
+	}
+
+	c := setup(map[string]interface{}{
+		cmd.AtlantisURLFlag:     "override-url",
+		cmd.AllowForkPRsFlag:    false,
+		cmd.DataDirFlag:         "/override-path",
+		cmd.GHHostnameFlag:      "override-gh-hostname",
+		cmd.GHTokenFlag:         "override-gh-token",
+		cmd.GHUserFlag:          "override-gh-user",
+		cmd.GHWebHookSecret:     "override-gh-webhook-secret",
+		cmd.GitlabHostnameFlag:  "override-gitlab-hostname",
+		cmd.GitlabTokenFlag:     "override-gitlab-token",
+		cmd.GitlabUserFlag:      "override-gitlab-user",
+		cmd.GitlabWebHookSecret: "override-gitlab-webhook-secret",
+		cmd.LogLevelFlag:        "info",
+		cmd.PortFlag:            8282,
+		cmd.RepoWhitelistFlag:   "override,override",
+		cmd.RequireApprovalFlag: false,
+		cmd.SSLCertFileFlag:     "override-cert-file",
+		cmd.SSLKeyFileFlag:      "override-key-file",
+	})
 	err := c.Execute()
 	Ok(t, err)
-	Equals(t, "override", passedConfig.GithubToken)
-}
 
-func TestExecute_EnvVars(t *testing.T) {
-	t.Log("Setting flags by env var should work.")
-	os.Setenv("ATLANTIS_GH_TOKEN", "gh-token")                    // nolint: errcheck
-	os.Setenv("ATLANTIS_GH_WEBHOOK_SECRET", "gh-webhook")         // nolint: errcheck
-	os.Setenv("ATLANTIS_GITLAB_TOKEN", "gitlab-token")            // nolint: errcheck
-	os.Setenv("ATLANTIS_GITLAB_WEBHOOK_SECRET", "gitlab-webhook") // nolint: errcheck
-	c := setup(map[string]interface{}{
-		cmd.GHUserFlag:        "user",
-		cmd.GitlabUserFlag:    "user",
-		cmd.RepoWhitelistFlag: "*",
-	})
-	err := c.Execute()
-	Ok(t, err)
-	Equals(t, "gh-token", passedConfig.GithubToken)
-	Equals(t, "gh-webhook", passedConfig.GithubWebHookSecret)
-	Equals(t, "gitlab-token", passedConfig.GitlabToken)
-	Equals(t, "gitlab-webhook", passedConfig.GitlabWebHookSecret)
+	Equals(t, "override-url", passedConfig.AtlantisURL)
+	Equals(t, false, passedConfig.AllowForkPRs)
+	Equals(t, "/override-path", passedConfig.DataDir)
+	Equals(t, "override-gh-hostname", passedConfig.GithubHostname)
+	Equals(t, "override-gh-token", passedConfig.GithubToken)
+	Equals(t, "override-gh-user", passedConfig.GithubUser)
+	Equals(t, "override-gh-webhook-secret", passedConfig.GithubWebHookSecret)
+	Equals(t, "override-gitlab-hostname", passedConfig.GitlabHostname)
+	Equals(t, "override-gitlab-token", passedConfig.GitlabToken)
+	Equals(t, "override-gitlab-user", passedConfig.GitlabUser)
+	Equals(t, "override-gitlab-webhook-secret", passedConfig.GitlabWebHookSecret)
+	Equals(t, "info", passedConfig.LogLevel)
+	Equals(t, 8282, passedConfig.Port)
+	Equals(t, "override,override", passedConfig.RepoWhitelist)
+	Equals(t, false, passedConfig.RequireApproval)
+	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
+	Equals(t, "override-key-file", passedConfig.SSLKeyFile)
 }
 
 func setup(flags map[string]interface{}) *cobra.Command {

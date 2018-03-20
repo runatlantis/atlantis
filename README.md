@@ -442,10 +442,10 @@ If you'd like to test out Atlantis before running it on your own repositories yo
 	- `atlantis apply` will run `terraform apply`. Since our pull request creates a `null_resource` (which does nothing) this is safe to do.
 
 ## Server Configuration
-Atlantis configuration can be specified via command line flags or a YAML config file.
-The `gh-token` and `gitlab-token` flags can also be specified via the `ATLANTIS_GH_TOKEN` and `ATLANTIS_GITLAB_TOKEN` environment variables respectively.
+Configuration for `atlantis server` can be specified via command line flags, environment variables or a YAML config file.
 Config file values are overridden by environment variables which in turn are overridden by flags.
 
+### YAML
 To use a yaml config file, run atlantis with `--config /path/to/config.yaml`.
 The keys of your config file should be the same as the flag, ex.
 ```yaml
@@ -453,6 +453,10 @@ The keys of your config file should be the same as the flag, ex.
 gh-token: ...
 log-level: ...
 ```
+
+### Environment Variables
+All flags can be specified as environment variables. You need to convert the flag's `-`'s to `_`'s, uppercase all the letters and prefix with `ATLANTIS_`.
+For example, `--gh-user` can be set via the environment variable `ATLANTIS_GH_USER`.
 
 To see a list of all flags and their descriptions run `atlantis server --help`
 
