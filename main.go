@@ -17,18 +17,12 @@ package main
 import (
 	"github.com/runatlantis/atlantis/cmd"
 	"github.com/spf13/viper"
-	"strings"
 )
 
 const atlantisVersion = "0.3.3"
 
 func main() {
 	v := viper.New()
-	// Get environment variables with ATLANTIS prefix
-	v.SetEnvPrefix("ATLANTIS")
-	replacer := strings.NewReplacer("-","_")
-	v.SetEnvKeyReplacer(replacer)
-	v.AutomaticEnv()
 
 	// We're creating commands manually here rather than using init() functions
 	// (as recommended by cobra) because it makes testing easier.

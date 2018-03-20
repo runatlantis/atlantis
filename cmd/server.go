@@ -61,7 +61,7 @@ var stringFlags = []stringFlag{
 	},
 	{
 		name:        ConfigFlag,
-		description: "Path to config file.",
+		description: "Path to config file. All flags can be set in a YAML config file instead.",
 	},
 	{
 		name:        DataDirFlag,
@@ -80,7 +80,6 @@ var stringFlags = []stringFlag{
 	{
 		name:        GHTokenFlag,
 		description: "GitHub token of API user. Can also be specified via the ATLANTIS_GH_TOKEN environment variable.",
-		env:         "ATLANTIS_GH_TOKEN",
 	},
 	{
 		name: GHWebHookSecret,
@@ -88,7 +87,6 @@ var stringFlags = []stringFlag{
 			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitHub. " +
 			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
 			"Should be specified via the ATLANTIS_GH_WEBHOOK_SECRET environment variable.",
-		env: "ATLANTIS_GH_WEBHOOK_SECRET",
 	},
 	{
 		name:        GitlabHostnameFlag,
@@ -102,7 +100,6 @@ var stringFlags = []stringFlag{
 	{
 		name:        GitlabTokenFlag,
 		description: "GitLab token of API user. Can also be specified via the ATLANTIS_GITLAB_TOKEN environment variable.",
-		env:         "ATLANTIS_GITLAB_TOKEN",
 	},
 	{
 		name: GitlabWebHookSecret,
@@ -110,7 +107,6 @@ var stringFlags = []stringFlag{
 			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitLab. " +
 			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
 			"Should be specified via the ATLANTIS_GITLAB_WEBHOOK_SECRET environment variable.",
-		env: "ATLANTIS_GITLAB_WEBHOOK_SECRET",
 	},
 	{
 		name:        LogLevelFlag,
@@ -156,7 +152,6 @@ type stringFlag struct {
 	name        string
 	description string
 	value       string
-	env         string
 }
 type intFlag struct {
 	name        string
@@ -203,12 +198,9 @@ func (d *DefaultServerCreator) NewServer(userConfig server.UserConfig, config se
 // Init returns the runnable cobra command.
 func (s *ServerCmd) Init() *cobra.Command {
 	c := &cobra.Command{
-		Use:   "server",
-		Short: "Start the atlantis server",
-		Long: `Start the atlantis server
-
-Flags can also be set in a yaml config file (see --` + ConfigFlag + `).
-Config file values are overridden by environment variables which in turn are overridden by flags.`,
+		Use:           "server",
+		Short:         "Start the atlantis server",
+		Long:          `Start the atlantis server and listen for webhook calls.`,
 		SilenceErrors: true,
 		SilenceUsage:  s.SilenceOutput,
 		PreRunE: s.withErrPrint(func(cmd *cobra.Command, args []string) error {
@@ -218,6 +210,14 @@ Config file values are overridden by environment variables which in turn are ove
 			return s.run()
 		}),
 	}
+
+	// Configure viper to accept env vars prefixed with ATLANTIS_ that can be
+	// used instead of flags.
+	s.Viper.SetEnvPrefix("ATLANTIS")
+	s.Viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+	s.Viper.AutomaticEnv()
+	s.Viper.SetTypeByDefaultValue(true)
+
 	// Replace the call in their template to use the usage function that wraps
 	// columns to make for a nicer output.
 	usageWithWrappedCols := strings.Replace(c.UsageTemplate(), ".FlagUsages", ".FlagUsagesWrapped 120", -1)
@@ -232,9 +232,6 @@ Config file values are overridden by environment variables which in turn are ove
 	// Set string flags.
 	for _, f := range stringFlags {
 		c.Flags().String(f.name, f.value, "> "+f.description)
-		if f.env != "" {
-			s.Viper.BindEnv(f.name, f.env) // nolint: errcheck
-		}
 		s.Viper.BindPFlag(f.name, c.Flags().Lookup(f.name)) // nolint: errcheck
 	}
 
