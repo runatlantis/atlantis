@@ -240,10 +240,12 @@ func TestParse_RelativeDirPath(t *testing.T) {
 }
 
 func TestParse_InvalidWorkspace(t *testing.T) {
-	t.Log("if -w is used with '..', should return an error")
+	t.Log("if -w is used with '..' or '/', should return an error")
 	comments := []string{
 		"atlantis plan -w ..",
 		"atlantis apply -w ..",
+		"atlantis plan -w /",
+		"atlantis apply -w /",
 		"atlantis plan -w ..abc",
 		"atlantis apply -w abc..",
 		"atlantis plan -w abc..abc",
@@ -251,7 +253,7 @@ func TestParse_InvalidWorkspace(t *testing.T) {
 	}
 	for _, c := range comments {
 		r := commentParser.Parse(c, vcs.Github)
-		exp := "Error: value for -w/--workspace can't contain '..'"
+		exp := "Error: invalid workspace"
 		Assert(t, strings.Contains(r.CommentResponse, exp),
 			"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
 	}
