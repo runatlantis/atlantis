@@ -30,7 +30,7 @@ import (
 var hashicorpReleasesURL = "https://releases.hashicorp.com"
 var terraformVersion = "0.10.8"
 var ngrokDownloadURL = "https://bin.equinox.io/c/4VmDzA7iaHb"
-var ngrokAPIURL = "http://localhost:4040"
+var ngrokAPIURL = "localhost:4040"
 
 func readPassword() (string, error) {
 	password, err := terminal.ReadPassword(syscall.Stdin)
@@ -90,7 +90,7 @@ func unzip(archive, target string) error {
 }
 
 func getTunnelAddr() (string, error) {
-	response, err := http.Get(fmt.Sprintf("%s/api/tunnels", ngrokAPIURL))
+	response, err := http.Get(fmt.Sprintf("http://%s/api/tunnels", ngrokAPIURL))
 	if err != nil {
 		return "", err
 	}
