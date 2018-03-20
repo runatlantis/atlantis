@@ -16,6 +16,7 @@ package events
 import (
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"path/filepath"
 	"strings"
 
@@ -189,10 +190,11 @@ func (e *CommentParser) Parse(comment string, vcsHost vcs.Host) CommentParseResu
 		return CommentParseResult{CommentResponse: e.errMarkdown(err.Error(), command, flagSet)}
 	}
 
-	// Because we use the workspace name as a file, need to make sure it's
-	// not doing something weird like being a relative dir.
-	if strings.Contains(workspace, "..") {
-		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("value for -%s/--%s can't contain '..'", WorkspaceFlagShort, WorkspaceFlagLong), command, flagSet)}
+	// Use the same validation that Terraform uses: https://git.io/vxGhU. Plus
+	// we also don't allow '..'. We don't want the workspace to contain a path
+	// since we create files based on the name.
+	if workspace != url.PathEscape(workspace) || strings.Contains(workspace, "..") {
+		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("invalid workspace: %q", workspace), command, flagSet)}
 	}
 
 	return CommentParseResult{
