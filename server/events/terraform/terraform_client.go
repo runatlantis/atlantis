@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -35,14 +36,17 @@ type Client interface {
 }
 
 type DefaultClient struct {
-	defaultVersion *version.Version
+	defaultVersion          *version.Version
+	terraformPluginCacheDir string
 }
+
+const terraformPluginCacheDirName = "plugin-cache"
 
 // zeroPointNine constrains the version to be 0.9.*
 var zeroPointNine = MustConstraint(">=0.9,<0.10")
 var versionRegex = regexp.MustCompile("Terraform v(.*)\n")
 
-func NewClient() (*DefaultClient, error) {
+func NewClient(dataDir string) (*DefaultClient, error) {
 	// todo: use exec.LookPath to find out if we even have terraform rather than
 	// parsing the error looking for a not found error.
 	versionCmdOutput, err := exec.Command("terraform", "version").CombinedOutput() // #nosec
@@ -64,8 +68,16 @@ func NewClient() (*DefaultClient, error) {
 		return nil, errors.Wrap(err, "parsing terraform version")
 	}
 
+	// We will run terraform with the TF_PLUGIN_CACHE_DIR env var set to this
+	// directory inside our data dir.
+	cacheDir := filepath.Join(dataDir, terraformPluginCacheDirName)
+	if err := os.MkdirAll(cacheDir, 0700); err != nil {
+		return nil, errors.Wrapf(err, "unable to create terraform plugin cache directory at %q", terraformPluginCacheDirName)
+	}
+
 	return &DefaultClient{
-		defaultVersion: v,
+		defaultVersion:          v,
+		terraformPluginCacheDir: cacheDir,
 	}, nil
 }
 
@@ -91,6 +103,10 @@ func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path st
 	// append current process's environment variables
 	// this is to prevent the $PATH variable being removed from the environment
 	envVars := []string{
+		// Will de-emphasize specific commands to run in output.
+		"TF_IN_AUTOMATION=true",
+		// Cache plugins so terraform init runs faster.
+		fmt.Sprintf("TF_PLUGIN_CACHE_DIR=%s", c.terraformPluginCacheDir),
 		fmt.Sprintf("WORKSPACE=%s", workspace),
 		fmt.Sprintf("ATLANTIS_TERRAFORM_VERSION=%s", v.String()),
 		fmt.Sprintf("DIR=%s", path),
@@ -132,9 +148,24 @@ func (c *DefaultClient) Init(log *logging.SimpleLogger, path string, workspace s
 	}
 
 	workspaceCommand := "workspace"
-	if zeroPointNine.Check(version) {
+	runningZeroPointNine := zeroPointNine.Check(version)
+	if runningZeroPointNine {
 		// In 0.9.* `env` was used instead of `workspace`
 		workspaceCommand = "env"
+	}
+
+	// Use `workspace show` to find out what workspace we're in now. If we're
+	// already in the right workspace then no need to switch. This will save us
+	// about ten seconds. This command is only available in > 0.10.
+	if !runningZeroPointNine {
+		workspaceShowOutput, err := c.RunCommandWithVersion(log, path, []string{workspaceCommand, "show"}, version, workspace) // nolint:vetshadow
+		outputs = append(outputs, workspaceShowOutput)
+		if err != nil {
+			return outputs, err
+		}
+		if strings.TrimSpace(workspaceShowOutput) == workspace {
+			return outputs, nil
+		}
 	}
 
 	output, err = c.RunCommandWithVersion(log, path, []string{workspaceCommand, "select", "-no-color", workspace}, version, workspace)

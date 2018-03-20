@@ -163,7 +163,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	vcsClient := vcs.NewDefaultClientProxy(githubClient, gitlabClient)
 	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient}
-	terraformClient, err := terraform.NewClient()
+	terraformClient, err := terraform.NewClient(userConfig.DataDir)
 	// The flag.Lookup call is to detect if we're running in a unit test. If we
 	// are, then we don't error out because we don't have/want terraform
 	// installed on our CI system where the unit tests run.
