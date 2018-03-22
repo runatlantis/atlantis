@@ -107,6 +107,13 @@ func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path st
 		"TF_IN_AUTOMATION=true",
 		// Cache plugins so terraform init runs faster.
 		fmt.Sprintf("TF_PLUGIN_CACHE_DIR=%s", c.terraformPluginCacheDir),
+		// Terraform will run all commands in this workspace. We should have
+		// already selected this workspace but this is a fail-safe to ensure
+		// we're operating in the right workspace.
+		fmt.Sprintf("TF_WORKSPACE=%s", workspace),
+		// We're keeping this variable even though it duplicates TF_WORKSPACE
+		// because it's probably safer for users to rely on it. Terraform might
+		// change the way TF_WORKSPACE works in the future.
 		fmt.Sprintf("WORKSPACE=%s", workspace),
 		fmt.Sprintf("ATLANTIS_TERRAFORM_VERSION=%s", v.String()),
 		fmt.Sprintf("DIR=%s", path),
