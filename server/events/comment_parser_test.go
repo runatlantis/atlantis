@@ -31,8 +31,6 @@ var commentParser = events.CommentParser{
 }
 
 func TestParse_Ignored(t *testing.T) {
-	t.Log("given a comment that should be ignored we should set " +
-		"CommentParseResult.Ignore to true")
 	ignoreComments := []string{
 		"",
 		"a",
@@ -47,8 +45,6 @@ func TestParse_Ignored(t *testing.T) {
 }
 
 func TestParse_HelpResponse(t *testing.T) {
-	t.Log("given a comment that should result in help output we " +
-		"should set CommentParseResult.CommentResult")
 	helpComments := []string{
 		"run",
 		"atlantis",
@@ -271,7 +267,7 @@ func TestParse_Parsing(t *testing.T) {
 		{
 			"",
 			"default",
-			"",
+			".",
 			false,
 			"",
 		},
@@ -279,7 +275,7 @@ func TestParse_Parsing(t *testing.T) {
 		{
 			"-w workspace",
 			"workspace",
-			"",
+			".",
 			false,
 			"",
 		},
@@ -293,7 +289,7 @@ func TestParse_Parsing(t *testing.T) {
 		{
 			"--verbose",
 			"default",
-			"",
+			".",
 			true,
 			"",
 		},
@@ -330,7 +326,7 @@ func TestParse_Parsing(t *testing.T) {
 		{
 			"-w workspace -- -d dir --verbose",
 			"workspace",
-			"",
+			".",
 			false,
 			"\"-d\" \"dir\" \"--verbose\"",
 		},
@@ -338,7 +334,7 @@ func TestParse_Parsing(t *testing.T) {
 		{
 			"--",
 			"default",
-			"",
+			".",
 			false,
 			"",
 		},
@@ -346,7 +342,7 @@ func TestParse_Parsing(t *testing.T) {
 		{
 			"-- \";echo \"hi",
 			"default",
-			"",
+			".",
 			false,
 			`"\";echo" "\"hi"`,
 		},
@@ -430,10 +426,8 @@ func TestParse_Parsing(t *testing.T) {
 }
 
 var PlanUsage = `Usage of plan:
-  -d, --dir string         Which directory to run plan in relative to root of repo.
-                           Use '.' for root. If not specified, will attempt to run
-                           plan for all Terraform projects we think were modified in
-                           this changeset.
+  -d, --dir string         Which directory to run plan in relative to root of repo,
+                           ex. 'child/dir'. (default ".")
       --verbose            Append Atlantis log to comment.
   -w, --workspace string   Switch to this Terraform workspace before planning.
                            (default "default")
@@ -441,8 +435,7 @@ var PlanUsage = `Usage of plan:
 
 var ApplyUsage = `Usage of apply:
   -d, --dir string         Apply the plan for this directory, relative to root of
-                           repo. Use '.' for root. If not specified, will run apply
-                           against all plans created for this workspace.
+                           repo, ex. 'child/dir'. (default ".")
       --verbose            Append Atlantis log to comment.
   -w, --workspace string   Apply the plan for this Terraform workspace. (default
                            "default")

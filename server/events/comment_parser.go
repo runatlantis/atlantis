@@ -31,6 +31,8 @@ const (
 	DirFlagShort       = "d"
 	VerboseFlagLong    = "verbose"
 	VerboseFlagShort   = ""
+	DefaultWorkspace   = "default"
+	DefaultDir         = "."
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_comment_parsing.go CommentParsing
@@ -135,21 +137,20 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	var name CommandName
 
 	// Set up the flag parsing depending on the command.
-	const defaultWorkspace = "default"
 	switch command {
 	case Plan.String():
 		name = Plan
 		flagSet = pflag.NewFlagSet(Plan.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(ioutil.Discard)
-		flagSet.StringVarP(&workspace, WorkspaceFlagLong, WorkspaceFlagShort, defaultWorkspace, "Switch to this Terraform workspace before planning.")
-		flagSet.StringVarP(&dir, DirFlagLong, DirFlagShort, "", "Which directory to run plan in relative to root of repo. Use '.' for root. If not specified, will attempt to run plan for all Terraform projects we think were modified in this changeset.")
+		flagSet.StringVarP(&workspace, WorkspaceFlagLong, WorkspaceFlagShort, DefaultWorkspace, "Switch to this Terraform workspace before planning.")
+		flagSet.StringVarP(&dir, DirFlagLong, DirFlagShort, DefaultDir, "Which directory to run plan in relative to root of repo, ex. 'child/dir'.")
 		flagSet.BoolVarP(&verbose, VerboseFlagLong, VerboseFlagShort, false, "Append Atlantis log to comment.")
 	case Apply.String():
 		name = Apply
 		flagSet = pflag.NewFlagSet(Apply.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(ioutil.Discard)
-		flagSet.StringVarP(&workspace, WorkspaceFlagLong, WorkspaceFlagShort, defaultWorkspace, "Apply the plan for this Terraform workspace.")
-		flagSet.StringVarP(&dir, DirFlagLong, DirFlagShort, "", "Apply the plan for this directory, relative to root of repo. Use '.' for root. If not specified, will run apply against all plans created for this workspace.")
+		flagSet.StringVarP(&workspace, WorkspaceFlagLong, WorkspaceFlagShort, DefaultWorkspace, "Apply the plan for this Terraform workspace.")
+		flagSet.StringVarP(&dir, DirFlagLong, DirFlagShort, DefaultDir, "Apply the plan for this directory, relative to root of repo, ex. 'child/dir'.")
 		flagSet.BoolVarP(&verbose, VerboseFlagLong, VerboseFlagShort, false, "Append Atlantis log to comment.")
 	default:
 		return CommentParseResult{CommentResponse: fmt.Sprintf("Error: unknown command %q – this is a bug", command)}
@@ -198,7 +199,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	}
 
 	return CommentParseResult{
-		Command: &Command{Name: name, Verbose: verbose, Workspace: workspace, Dir: dir, Flags: extraArgs},
+		Command: NewCommand(dir, extraArgs, name, verbose, workspace),
 	}
 }
 

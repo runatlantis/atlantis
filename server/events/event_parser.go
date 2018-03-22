@@ -14,6 +14,7 @@
 package events
 
 import (
+	"path"
 	"regexp"
 
 	"github.com/google/go-github/github"
@@ -32,14 +33,34 @@ var multiLineRegex = regexp.MustCompile(`.*\r?\n.+`)
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_event_parsing.go EventParsing
 
 type Command struct {
-	Name      CommandName
-	Workspace string
-	Verbose   bool
-	Flags     []string
 	// Dir is the path relative to the repo root to run the command in.
-	// If empty string then it wasn't specified. "." is the root of the repo.
-	// Dir will never end in "/".
+	// Will never be an empty string and will never end in "/".
 	Dir string
+	// Flags are the extra arguments appended to comment,
+	// ex. atlantis plan -- -target=resource
+	Flags     []string
+	Name      CommandName
+	Verbose   bool
+	Workspace string
+}
+
+// NewCommand constructs a Command, setting all missing fields to defaults.
+func NewCommand(dir string, flags []string, name CommandName, verbose bool, workspace string) *Command {
+	// If dir was an empty string, this will return '.'.
+	validDir := path.Clean(dir)
+	if validDir == "/" {
+		validDir = "."
+	}
+	if workspace == "" {
+		workspace = DefaultWorkspace
+	}
+	return &Command{
+		Dir:       validDir,
+		Flags:     flags,
+		Name:      name,
+		Verbose:   verbose,
+		Workspace: workspace,
+	}
 }
 
 type EventParsing interface {

@@ -257,6 +257,54 @@ func TestParseGitlabMergeCommentEvent(t *testing.T) {
 	}, user)
 }
 
+func TestNewCommand_CleansDir(t *testing.T) {
+	cases := []struct {
+		Dir    string
+		ExpDir string
+	}{
+		{
+			"",
+			".",
+		},
+		{
+			"/",
+			".",
+		},
+		{
+			"./",
+			".",
+		},
+		// We rely on our callers to not pass in relative dirs.
+		{
+			"..",
+			"..",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.Dir, func(t *testing.T) {
+			cmd := events.NewCommand(c.Dir, nil, events.Plan, false, "workspace")
+			Equals(t, c.ExpDir, cmd.Dir)
+		})
+	}
+}
+
+func TestNewCommand_EmptyWorkspace(t *testing.T) {
+	cmd := events.NewCommand("dir", nil, events.Plan, false, "")
+	Equals(t, "default", cmd.Workspace)
+}
+
+func TestNewCommand_AllFieldsSet(t *testing.T) {
+	cmd := events.NewCommand("dir", []string{"a", "b"}, events.Plan, true, "workspace")
+	Equals(t, events.Command{
+		Workspace: "workspace",
+		Dir:       "dir",
+		Verbose:   true,
+		Flags:     []string{"a", "b"},
+		Name:      events.Plan,
+	}, *cmd)
+}
+
 var mergeEventJSON = `{
   "object_kind": "merge_request",
   "user": {
