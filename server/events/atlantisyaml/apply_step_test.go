@@ -31,7 +31,7 @@ func TestRun_NoDir(t *testing.T) {
 }
 
 func TestRun_NoPlanFile(t *testing.T) {
-	tmpDir, cleanup := applyTestTmpDir(t)
+	tmpDir, cleanup := tmpDir_stepTests(t)
 	defer cleanup()
 
 	s := atlantisyaml.ApplyStep{
@@ -49,7 +49,7 @@ func TestRun_NoPlanFile(t *testing.T) {
 }
 
 func TestRun_Success(t *testing.T) {
-	tmpDir, cleanup := applyTestTmpDir(t)
+	tmpDir, cleanup := tmpDir_stepTests(t)
 	defer cleanup()
 	planPath := filepath.Join(tmpDir, "workspace.tfplan")
 	err := ioutil.WriteFile(planPath, nil, 0644)
@@ -80,9 +80,9 @@ func TestRun_Success(t *testing.T) {
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, tmpDir, []string{"apply", "-no-color", "extra", "args", "comment", "args", planPath}, tfVersion, "workspace")
 }
 
-// applyTestTmpDir creates a temporary directory and returns its path along
+// tmpDir_stepTests creates a temporary directory and returns its path along
 // with a cleanup function to be called via defer.
-func applyTestTmpDir(t *testing.T) (string, func()) {
+func tmpDir_stepTests(t *testing.T) (string, func()) {
 	tmpDir, err := ioutil.TempDir("", "")
 	Ok(t, err)
 	return tmpDir, func() { os.RemoveAll(tmpDir) }
