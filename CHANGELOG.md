@@ -1,3 +1,17 @@
+# v0.3.5
+
+## Features
+* Log a warning if unable to update commit status. ([#84](https://github.com/runatlantis/atlantis/issues/84))
+
+## Backwards Incompatibilities / Notes:
+* None
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.5/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.5/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.5/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.5/atlantis_linux_arm.zip)
+
 # v0.3.4
 ## Description
 This release delivers some speed improvements through caching plugins and
