@@ -157,7 +157,9 @@ func (c *CommandHandler) run(ctx *CommandContext) {
 		return
 	}
 
-	c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, vcs.Pending, ctx.Command, ctx.VCSHost) // nolint: errcheck
+	if err := c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, vcs.Pending, ctx.Command, ctx.VCSHost); err != nil {
+		ctx.Log.Warn("unable to update commit status: %s", err)
+	}
 	if !c.AtlantisWorkspaceLocker.TryLock(ctx.BaseRepo.FullName, ctx.Command.Workspace, ctx.Pull.Num) {
 		errMsg := fmt.Sprintf(
 			"The %s workspace is currently locked by another"+
@@ -191,7 +193,9 @@ func (c *CommandHandler) updatePull(ctx *CommandContext, res CommandResponse) {
 	}
 
 	// Update the pull request's status icon and comment back.
-	c.CommitStatusUpdater.UpdateProjectResult(ctx, res) // nolint: errcheck
+	if err := c.CommitStatusUpdater.UpdateProjectResult(ctx, res); err != nil {
+		ctx.Log.Warn("unable to update commit status: %s", err)
+	}
 	comment := c.MarkdownRenderer.Render(res, ctx.Command.Name, ctx.Log.History.String(), ctx.Command.Verbose)
 	c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, comment, ctx.VCSHost) // nolint: errcheck
 }
