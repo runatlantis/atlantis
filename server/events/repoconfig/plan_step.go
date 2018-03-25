@@ -1,4 +1,4 @@
-package atlantisyaml
+package repoconfig
 
 import (
 	"fmt"
@@ -14,9 +14,8 @@ const defaultWorkspace = "default"
 
 // PlanStep runs `terraform plan`.
 type PlanStep struct {
-	ExtraArgs         []string
-	TerraformExecutor TerraformExec
-	Meta              StepMeta
+	ExtraArgs []string
+	Meta      StepMeta
 }
 
 func (p *PlanStep) Run() (string, error) {
@@ -42,7 +41,7 @@ func (p *PlanStep) Run() (string, error) {
 		tfPlanCmd = append(tfPlanCmd, "-var-file", optionalEnvFile)
 	}
 
-	return p.TerraformExecutor.RunCommandWithVersion(p.Meta.Log, filepath.Join(p.Meta.AbsolutePath), tfPlanCmd, p.Meta.TerraformVersion, p.Meta.Workspace)
+	return p.Meta.TerraformExecutor.RunCommandWithVersion(p.Meta.Log, filepath.Join(p.Meta.AbsolutePath), tfPlanCmd, p.Meta.TerraformVersion, p.Meta.Workspace)
 }
 
 // switchWorkspace changes the terraform workspace if necessary and will create
@@ -68,7 +67,7 @@ func (p *PlanStep) switchWorkspace() error {
 	// already in the right workspace then no need to switch. This will save us
 	// about ten seconds. This command is only available in > 0.10.
 	if !runningZeroPointNine {
-		workspaceShowOutput, err := p.TerraformExecutor.RunCommandWithVersion(p.Meta.Log, p.Meta.AbsolutePath, []string{workspaceCmd, "show"}, p.Meta.TerraformVersion, p.Meta.Workspace)
+		workspaceShowOutput, err := p.Meta.TerraformExecutor.RunCommandWithVersion(p.Meta.Log, p.Meta.AbsolutePath, []string{workspaceCmd, "show"}, p.Meta.TerraformVersion, p.Meta.Workspace)
 		if err != nil {
 			return err
 		}
@@ -83,11 +82,11 @@ func (p *PlanStep) switchWorkspace() error {
 	// we can create it if it doesn't. To do this we can either select and catch
 	// the error or use list and then look for the workspace. Both commands take
 	// the same amount of time so that's why we're running select here.
-	_, err := p.TerraformExecutor.RunCommandWithVersion(p.Meta.Log, p.Meta.AbsolutePath, []string{workspaceCmd, "select", "-no-color", p.Meta.Workspace}, p.Meta.TerraformVersion, p.Meta.Workspace)
+	_, err := p.Meta.TerraformExecutor.RunCommandWithVersion(p.Meta.Log, p.Meta.AbsolutePath, []string{workspaceCmd, "select", "-no-color", p.Meta.Workspace}, p.Meta.TerraformVersion, p.Meta.Workspace)
 	if err != nil {
 		// If terraform workspace select fails we run terraform workspace
 		// new to create a new workspace automatically.
-		_, err = p.TerraformExecutor.RunCommandWithVersion(p.Meta.Log, p.Meta.AbsolutePath, []string{workspaceCmd, "new", "-no-color", p.Meta.Workspace}, p.Meta.TerraformVersion, p.Meta.Workspace)
+		_, err = p.Meta.TerraformExecutor.RunCommandWithVersion(p.Meta.Log, p.Meta.AbsolutePath, []string{workspaceCmd, "new", "-no-color", p.Meta.Workspace}, p.Meta.TerraformVersion, p.Meta.Workspace)
 		return err
 	}
 	return nil

@@ -1,4 +1,4 @@
-package atlantisyaml_test
+package repoconfig_test
 
 import (
 	"errors"
@@ -9,8 +9,8 @@ import (
 
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
-	"github.com/runatlantis/atlantis/server/events/atlantisyaml"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
+	"github.com/runatlantis/atlantis/server/events/repoconfig"
 	matchers2 "github.com/runatlantis/atlantis/server/events/run/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -25,18 +25,18 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 	tfVersion, _ := version.NewVersion("0.8")
 	logger := logging.NewNoopLogger()
 	workspace := "default"
-	s := atlantisyaml.PlanStep{
-		Meta: atlantisyaml.StepMeta{
+	s := repoconfig.PlanStep{
+		Meta: repoconfig.StepMeta{
 			Log:                   logger,
 			Workspace:             workspace,
 			AbsolutePath:          "/path",
 			DirRelativeToRepoRoot: ".",
+			TerraformExecutor:     terraform,
 			TerraformVersion:      tfVersion,
 			ExtraCommentArgs:      []string{"comment", "args"},
 			Username:              "username",
 		},
-		ExtraArgs:         []string{"extra", "args"},
-		TerraformExecutor: terraform,
+		ExtraArgs: []string{"extra", "args"},
 	}
 
 	When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
@@ -61,18 +61,18 @@ func TestRun_ErrWorkspaceIn08(t *testing.T) {
 	tfVersion, _ := version.NewVersion("0.8")
 	logger := logging.NewNoopLogger()
 	workspace := "notdefault"
-	s := atlantisyaml.PlanStep{
-		Meta: atlantisyaml.StepMeta{
+	s := repoconfig.PlanStep{
+		Meta: repoconfig.StepMeta{
 			Log:                   logger,
 			Workspace:             workspace,
 			AbsolutePath:          "/path",
 			DirRelativeToRepoRoot: ".",
+			TerraformExecutor:     terraform,
 			TerraformVersion:      tfVersion,
 			ExtraCommentArgs:      []string{"comment", "args"},
 			Username:              "username",
 		},
-		ExtraArgs:         []string{"extra", "args"},
-		TerraformExecutor: terraform,
+		ExtraArgs: []string{"extra", "args"},
 	}
 
 	When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
@@ -112,18 +112,18 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 
 			tfVersion, _ := version.NewVersion(c.tfVersion)
 			logger := logging.NewNoopLogger()
-			s := atlantisyaml.PlanStep{
-				Meta: atlantisyaml.StepMeta{
+			s := repoconfig.PlanStep{
+				Meta: repoconfig.StepMeta{
 					Log:                   logger,
 					Workspace:             "workspace",
 					AbsolutePath:          "/path",
 					DirRelativeToRepoRoot: ".",
+					TerraformExecutor:     terraform,
 					TerraformVersion:      tfVersion,
 					ExtraCommentArgs:      []string{"comment", "args"},
 					Username:              "username",
 				},
-				ExtraArgs:         []string{"extra", "args"},
-				TerraformExecutor: terraform,
+				ExtraArgs: []string{"extra", "args"},
 			}
 
 			When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
@@ -170,18 +170,18 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 			terraform := mocks.NewMockClient()
 			tfVersion, _ := version.NewVersion(c.tfVersion)
 			logger := logging.NewNoopLogger()
-			s := atlantisyaml.PlanStep{
-				Meta: atlantisyaml.StepMeta{
+			s := repoconfig.PlanStep{
+				Meta: repoconfig.StepMeta{
 					Log:                   logger,
 					Workspace:             "workspace",
 					AbsolutePath:          "/path",
 					DirRelativeToRepoRoot: ".",
+					TerraformExecutor:     terraform,
 					TerraformVersion:      tfVersion,
 					ExtraCommentArgs:      []string{"comment", "args"},
 					Username:              "username",
 				},
-				ExtraArgs:         []string{"extra", "args"},
-				TerraformExecutor: terraform,
+				ExtraArgs: []string{"extra", "args"},
 			}
 
 			// Ensure that we actually try to switch workspaces by making the
@@ -212,18 +212,18 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 	terraform := mocks.NewMockClient()
 	tfVersion, _ := version.NewVersion("0.10.0")
 	logger := logging.NewNoopLogger()
-	s := atlantisyaml.PlanStep{
-		Meta: atlantisyaml.StepMeta{
+	s := repoconfig.PlanStep{
+		Meta: repoconfig.StepMeta{
 			Log:                   logger,
 			Workspace:             "workspace",
 			AbsolutePath:          "/path",
 			DirRelativeToRepoRoot: ".",
+			TerraformExecutor:     terraform,
 			TerraformVersion:      tfVersion,
 			ExtraCommentArgs:      []string{"comment", "args"},
 			Username:              "username",
 		},
-		ExtraArgs:         []string{"extra", "args"},
-		TerraformExecutor: terraform,
+		ExtraArgs: []string{"extra", "args"},
 	}
 
 	When(terraform.RunCommandWithVersion(logger, "/path", []string{"workspace", "show"}, tfVersion, "workspace")).ThenReturn("workspace\n", nil)
@@ -247,7 +247,7 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 	terraform := mocks.NewMockClient()
 
 	// Create the env/workspace.tfvars file.
-	tmpDir, cleanup := tmpDir_stepTests(t)
+	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
 	err := os.MkdirAll(filepath.Join(tmpDir, "env"), 0700)
 	Ok(t, err)
@@ -258,18 +258,18 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 	// Using version >= 0.10 here so we don't expect any env commands.
 	tfVersion, _ := version.NewVersion("0.10.0")
 	logger := logging.NewNoopLogger()
-	s := atlantisyaml.PlanStep{
-		Meta: atlantisyaml.StepMeta{
+	s := repoconfig.PlanStep{
+		Meta: repoconfig.StepMeta{
 			Log:                   logger,
 			Workspace:             "workspace",
 			AbsolutePath:          tmpDir,
 			DirRelativeToRepoRoot: ".",
+			TerraformExecutor:     terraform,
 			TerraformVersion:      tfVersion,
 			ExtraCommentArgs:      []string{"comment", "args"},
 			Username:              "username",
 		},
-		ExtraArgs:         []string{"extra", "args"},
-		TerraformExecutor: terraform,
+		ExtraArgs: []string{"extra", "args"},
 	}
 
 	expPlanArgs := []string{"plan", "-refresh", "-no-color", "-out", filepath.Join(tmpDir, "workspace.tfplan"), "-var", "atlantis_user=username", "extra", "args", "comment", "args", "-var-file", envVarsFile}
