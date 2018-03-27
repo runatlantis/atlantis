@@ -50,7 +50,7 @@ var planCtx = events.CommandContext{
 func TestExecute_ModifiedFilesErr(t *testing.T) {
 	t.Log("If GetModifiedFiles returns an error we return an error")
 	p, _, _ := setupPlanExecutorTest(t)
-	When(p.VCSClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyVcsHost())).ThenReturn(nil, errors.New("err"))
+	When(p.VCSClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(nil, errors.New("err"))
 	r := p.Execute(&planCtx)
 
 	Assert(t, r.Error != nil, "exp .Error to be set")
@@ -70,7 +70,7 @@ func TestExecute_NoModifiedProjects(t *testing.T) {
 func TestExecute_CloneErr(t *testing.T) {
 	t.Log("If AtlantisWorkspace.Clone returns an error we return an error")
 	p, _, _ := setupPlanExecutorTest(t)
-	When(p.VCSClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyVcsHost())).ThenReturn([]string{"file.tf"}, nil)
+	When(p.VCSClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"file.tf"}, nil)
 	When(p.Workspace.Clone(planCtx.Log, planCtx.BaseRepo, planCtx.HeadRepo, planCtx.Pull, "workspace")).ThenReturn("", errors.New("err"))
 	r := p.Execute(&planCtx)
 
@@ -117,7 +117,7 @@ func TestExecute_AddedArgs(t *testing.T) {
 	ctx.Log = logging.NewNoopLogger()
 	ctx.Command.Flags = []string{"\"-target=resource\"", "\"-var\"", "\"a=b\"", "\";\"", "\"echo\"", "\"hi\""}
 
-	When(p.VCSClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyVcsHost())).ThenReturn([]string{"file.tf"}, nil)
+	When(p.VCSClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"file.tf"}, nil)
 	When(p.Workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, "workspace")).
 		ThenReturn("/tmp/clone-repo", nil)
 	When(p.ProjectPreExecute.Execute(&ctx, "/tmp/clone-repo", models.Project{RepoFullName: "", Path: "."})).
@@ -161,7 +161,7 @@ func TestExecute_AddedArgs(t *testing.T) {
 func TestExecute_Success(t *testing.T) {
 	t.Log("If there are no errors, the plan should be returned")
 	p, runner, _ := setupPlanExecutorTest(t)
-	When(p.VCSClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyVcsHost())).ThenReturn([]string{"file.tf"}, nil)
+	When(p.VCSClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"file.tf"}, nil)
 	When(p.Workspace.Clone(planCtx.Log, planCtx.BaseRepo, planCtx.HeadRepo, planCtx.Pull, "workspace")).
 		ThenReturn("/tmp/clone-repo", nil)
 	When(p.ProjectPreExecute.Execute(&planCtx, "/tmp/clone-repo", models.Project{RepoFullName: "", Path: "."})).
@@ -190,7 +190,7 @@ func TestExecute_Success(t *testing.T) {
 func TestExecute_PreExecuteResult(t *testing.T) {
 	t.Log("If DefaultProjectPreExecutor.Execute returns a ProjectResult we should return it")
 	p, _, _ := setupPlanExecutorTest(t)
-	When(p.VCSClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyVcsHost())).ThenReturn([]string{"file.tf"}, nil)
+	When(p.VCSClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"file.tf"}, nil)
 	When(p.Workspace.Clone(planCtx.Log, planCtx.BaseRepo, planCtx.HeadRepo, planCtx.Pull, "workspace")).
 		ThenReturn("/tmp/clone-repo", nil)
 	projectResult := events.ProjectResult{
@@ -209,7 +209,7 @@ func TestExecute_MultiProjectFailure(t *testing.T) {
 	t.Log("If is an error planning in one project it should be returned. It shouldn't affect another project though.")
 	p, runner, locker := setupPlanExecutorTest(t)
 	// Two projects have been modified so we should run plan in two paths.
-	When(p.VCSClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyVcsHost())).ThenReturn([]string{"path1/file.tf", "path2/file.tf"}, nil)
+	When(p.VCSClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"path1/file.tf", "path2/file.tf"}, nil)
 	When(p.Workspace.Clone(planCtx.Log, planCtx.BaseRepo, planCtx.HeadRepo, planCtx.Pull, "workspace")).
 		ThenReturn("/tmp/clone-repo", nil)
 
@@ -249,7 +249,7 @@ func TestExecute_MultiProjectFailure(t *testing.T) {
 func TestExecute_PostPlanCommands(t *testing.T) {
 	t.Log("Should execute post-plan commands and return if there is an error")
 	p, _, _ := setupPlanExecutorTest(t)
-	When(p.VCSClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), matchers.AnyVcsHost())).ThenReturn([]string{"file.tf"}, nil)
+	When(p.VCSClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"file.tf"}, nil)
 	When(p.Workspace.Clone(planCtx.Log, planCtx.BaseRepo, planCtx.HeadRepo, planCtx.Pull, "workspace")).
 		ThenReturn("/tmp/clone-repo", nil)
 	When(p.ProjectPreExecute.Execute(&planCtx, "/tmp/clone-repo", models.Project{RepoFullName: "", Path: "."})).

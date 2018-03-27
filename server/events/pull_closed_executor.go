@@ -32,7 +32,7 @@ import (
 type PullCleaner interface {
 	// CleanUpPull deletes the workspaces used by the pull request on disk
 	// and deletes any locks associated with this pull request for all workspaces.
-	CleanUpPull(repo models.Repo, pull models.PullRequest, host vcs.Host) error
+	CleanUpPull(repo models.Repo, pull models.PullRequest) error
 }
 
 // PullClosedExecutor executes the tasks required to clean up a closed pull
@@ -54,7 +54,7 @@ var pullClosedTemplate = template.Must(template.New("").Parse(
 		"- path: `{{ .Path }}` {{ .Workspaces }}{{ end }}"))
 
 // CleanUpPull cleans up after a closed pull request.
-func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullRequest, host vcs.Host) error {
+func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullRequest) error {
 	if err := p.Workspace.Delete(repo, pull); err != nil {
 		return errors.Wrap(err, "cleaning workspace")
 	}
@@ -77,7 +77,7 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 	if err = pullClosedTemplate.Execute(&buf, templateData); err != nil {
 		return errors.Wrap(err, "rendering template for comment")
 	}
-	return p.VCSClient.CreateComment(repo, pull.Num, buf.String(), host)
+	return p.VCSClient.CreateComment(repo, pull.Num, buf.String())
 }
 
 // buildTemplateData formats the lock data into a slice that can easily be

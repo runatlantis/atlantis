@@ -20,8 +20,8 @@ func NewMockCommitStatusUpdater() *MockCommitStatusUpdater {
 	return &MockCommitStatusUpdater{fail: pegomock.GlobalFailHandler}
 }
 
-func (mock *MockCommitStatusUpdater) Update(repo models.Repo, pull models.PullRequest, status vcs.CommitStatus, cmd *events.Command, host vcs.Host) error {
-	params := []pegomock.Param{repo, pull, status, cmd, host}
+func (mock *MockCommitStatusUpdater) Update(repo models.Repo, pull models.PullRequest, status vcs.CommitStatus, cmd *events.Command) error {
+	params := []pegomock.Param{repo, pull, status, cmd}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Update", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
 	if len(result) != 0 {
@@ -62,8 +62,8 @@ type VerifierCommitStatusUpdater struct {
 	inOrderContext         *pegomock.InOrderContext
 }
 
-func (verifier *VerifierCommitStatusUpdater) Update(repo models.Repo, pull models.PullRequest, status vcs.CommitStatus, cmd *events.Command, host vcs.Host) *CommitStatusUpdater_Update_OngoingVerification {
-	params := []pegomock.Param{repo, pull, status, cmd, host}
+func (verifier *VerifierCommitStatusUpdater) Update(repo models.Repo, pull models.PullRequest, status vcs.CommitStatus, cmd *events.Command) *CommitStatusUpdater_Update_OngoingVerification {
+	params := []pegomock.Param{repo, pull, status, cmd}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Update", params)
 	return &CommitStatusUpdater_Update_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -73,12 +73,12 @@ type CommitStatusUpdater_Update_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *CommitStatusUpdater_Update_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, vcs.CommitStatus, *events.Command, vcs.Host) {
-	repo, pull, status, cmd, host := c.GetAllCapturedArguments()
-	return repo[len(repo)-1], pull[len(pull)-1], status[len(status)-1], cmd[len(cmd)-1], host[len(host)-1]
+func (c *CommitStatusUpdater_Update_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, vcs.CommitStatus, *events.Command) {
+	repo, pull, status, cmd := c.GetAllCapturedArguments()
+	return repo[len(repo)-1], pull[len(pull)-1], status[len(status)-1], cmd[len(cmd)-1]
 }
 
-func (c *CommitStatusUpdater_Update_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []vcs.CommitStatus, _param3 []*events.Command, _param4 []vcs.Host) {
+func (c *CommitStatusUpdater_Update_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []vcs.CommitStatus, _param3 []*events.Command) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.Repo, len(params[0]))
@@ -96,10 +96,6 @@ func (c *CommitStatusUpdater_Update_OngoingVerification) GetAllCapturedArguments
 		_param3 = make([]*events.Command, len(params[3]))
 		for u, param := range params[3] {
 			_param3[u] = param.(*events.Command)
-		}
-		_param4 = make([]vcs.Host, len(params[4]))
-		for u, param := range params[4] {
-			_param4[u] = param.(vcs.Host)
 		}
 	}
 	return

@@ -42,7 +42,10 @@ func TestParseGithubRepo(t *testing.T) {
 		CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",
 		SanitizedCloneURL: Repo.GetCloneURL(),
 		Name:              "repo",
-		Hostname:          "github.com",
+		VCSHost: models.VCSHost{
+			Hostname: "github.com",
+			Type:     models.Github,
+		},
 	}, r)
 }
 
@@ -88,7 +91,10 @@ func TestParseGithubIssueCommentEvent(t *testing.T) {
 		CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",
 		SanitizedCloneURL: *comment.Repo.CloneURL,
 		Name:              "repo",
-		Hostname:          "github.com",
+		VCSHost: models.VCSHost{
+			Hostname: "github.com",
+			Type:     models.Github,
+		},
 	}, repo)
 	Equals(t, models.User{
 		Username: *comment.Comment.User.Login,
@@ -139,7 +145,10 @@ func TestParseGithubPull(t *testing.T) {
 		CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",
 		SanitizedCloneURL: Repo.GetCloneURL(),
 		Name:              "repo",
-		Hostname:          "github.com",
+		VCSHost: models.VCSHost{
+			Hostname: "github.com",
+			Type:     models.Github,
+		},
 	}, repoRes)
 }
 
@@ -165,7 +174,10 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 		SanitizedCloneURL: "https://example.com/gitlabhq/gitlab-test.git",
 		Owner:             "gitlabhq",
 		CloneURL:          "https://gitlab-user:gitlab-token@example.com/gitlabhq/gitlab-test.git",
-		Hostname:          "example.com",
+		VCSHost: models.VCSHost{
+			Hostname: "example.com",
+			Type:     models.Gitlab,
+		},
 	}, repo)
 
 	t.Log("If the state is closed, should set field correctly.")
@@ -209,7 +221,10 @@ func TestParseGitlabMergeCommentEvent(t *testing.T) {
 		SanitizedCloneURL: "https://example.com/gitlabhq/gitlab-test.git",
 		Owner:             "gitlabhq",
 		CloneURL:          "https://gitlab-user:gitlab-token@example.com/gitlabhq/gitlab-test.git",
-		Hostname:          "example.com",
+		VCSHost: models.VCSHost{
+			Hostname: "example.com",
+			Type:     models.Gitlab,
+		},
 	}, baseRepo)
 	Equals(t, models.Repo{
 		FullName:          "gitlab-org/gitlab-test",
@@ -217,7 +232,10 @@ func TestParseGitlabMergeCommentEvent(t *testing.T) {
 		SanitizedCloneURL: "https://example.com/gitlab-org/gitlab-test.git",
 		Owner:             "gitlab-org",
 		CloneURL:          "https://gitlab-user:gitlab-token@example.com/gitlab-org/gitlab-test.git",
-		Hostname:          "example.com",
+		VCSHost: models.VCSHost{
+			Hostname: "example.com",
+			Type:     models.Gitlab,
+		},
 	}, headRepo)
 	Equals(t, models.User{
 		Username: "root",

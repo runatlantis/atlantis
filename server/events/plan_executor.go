@@ -74,7 +74,7 @@ func (p *PlanExecutor) Execute(ctx *CommandContext) CommandResponse {
 	if ctx.Command.Dir == "" {
 		// If they didn't specify a directory to plan in, figure out what
 		// projects have been modified so we know where to run plan.
-		modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.BaseRepo, ctx.Pull, ctx.VCSHost)
+		modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.BaseRepo, ctx.Pull)
 		if err != nil {
 			return CommandResponse{Error: errors.Wrap(err, "getting modified files")}
 		}

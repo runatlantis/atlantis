@@ -23,7 +23,7 @@ import (
 // on startup to support a certain VCS host. For example, if there is no GitHub
 // config then this client will be used which will error if it's ever called.
 type NotConfiguredVCSClient struct {
-	Host Host
+	Host models.VCSHostType
 }
 
 func (a *NotConfiguredVCSClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {

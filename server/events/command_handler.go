@@ -32,7 +32,7 @@ type CommandRunner interface {
 	// ExecuteCommand is the first step after a command request has been parsed.
 	// It handles gathering additional information needed to execute the command
 	// and then calling the appropriate services to finish executing the command.
-	ExecuteCommand(baseRepo models.Repo, headRepo models.Repo, user models.User, pullNum int, cmd *Command, vcsHost vcs.Host)
+	ExecuteCommand(baseRepo models.Repo, headRepo models.Repo, user models.User, pullNum int, cmd *Command)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_github_pull_getter.go GithubPullGetter
@@ -73,20 +73,23 @@ type CommandHandler struct {
 }
 
 // ExecuteCommand executes the command.
-// If vcsHost is GitHub, we don't use headRepo and instead make an API call
+// If the repo is from GitHub, we don't use headRepo and instead make an API call
 // to get the headRepo. This is because the caller is unable to pass in a
 // headRepo since there's not enough data available on the initial webhook
 // payload.
-func (c *CommandHandler) ExecuteCommand(baseRepo models.Repo, headRepo models.Repo, user models.User, pullNum int, cmd *Command, vcsHost vcs.Host) {
+func (c *CommandHandler) ExecuteCommand(baseRepo models.Repo, headRepo models.Repo, user models.User, pullNum int, cmd *Command) {
+	log := c.buildLogger(baseRepo.FullName, pullNum)
+
 	var err error
 	var pull models.PullRequest
-	if vcsHost == vcs.Github {
+	switch baseRepo.VCSHost.Type {
+	case models.Github:
 		pull, headRepo, err = c.getGithubData(baseRepo, pullNum)
-	} else if vcsHost == vcs.Gitlab {
+	case models.Gitlab:
 		pull, err = c.getGitlabData(baseRepo.FullName, pullNum)
+	default:
+		err = errors.New("Unknown VCS type, this is a bug!")
 	}
-
-	log := c.buildLogger(baseRepo.FullName, pullNum)
 	if err != nil {
 		log.Err(err.Error())
 		return
@@ -97,7 +100,6 @@ func (c *CommandHandler) ExecuteCommand(baseRepo models.Repo, headRepo models.Re
 		Pull:     pull,
 		HeadRepo: headRepo,
 		Command:  cmd,
-		VCSHost:  vcsHost,
 		BaseRepo: baseRepo,
 	}
 	c.run(ctx)
@@ -147,17 +149,17 @@ func (c *CommandHandler) run(ctx *CommandContext) {
 
 	if !c.AllowForkPRs && ctx.HeadRepo.Owner != ctx.BaseRepo.Owner {
 		ctx.Log.Info("command was run on a fork pull request which is disallowed")
-		c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, fmt.Sprintf("Atlantis commands can't be run on fork pull requests. To enable, set --%s", c.AllowForkPRsFlag), ctx.VCSHost) // nolint: errcheck
+		c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, fmt.Sprintf("Atlantis commands can't be run on fork pull requests. To enable, set --%s", c.AllowForkPRsFlag)) // nolint: errcheck
 		return
 	}
 
 	if ctx.Pull.State != models.Open {
 		ctx.Log.Info("command was run on closed pull request")
-		c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, "Atlantis commands can't be run on closed pull requests", ctx.VCSHost) // nolint: errcheck
+		c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, "Atlantis commands can't be run on closed pull requests") // nolint: errcheck
 		return
 	}
 
-	if err := c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, vcs.Pending, ctx.Command, ctx.VCSHost); err != nil {
+	if err := c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, vcs.Pending, ctx.Command); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 	if !c.AtlantisWorkspaceLocker.TryLock(ctx.BaseRepo.FullName, ctx.Command.Workspace, ctx.Pull.Num) {
@@ -197,7 +199,7 @@ func (c *CommandHandler) updatePull(ctx *CommandContext, res CommandResponse) {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 	comment := c.MarkdownRenderer.Render(res, ctx.Command.Name, ctx.Log.History.String(), ctx.Command.Verbose)
-	c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, comment, ctx.VCSHost) // nolint: errcheck
+	c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, comment) // nolint: errcheck
 }
 
 // logPanics logs and creates a comment on the pull request for panics.
@@ -205,7 +207,7 @@ func (c *CommandHandler) logPanics(ctx *CommandContext) {
 	if err := recover(); err != nil {
 		stack := recovery.Stack(3)
 		c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, // nolint: errcheck
-			fmt.Sprintf("**Error: goroutine panic. This is a bug.**\n```\n%s\n%s```", err, stack), ctx.VCSHost)
+			fmt.Sprintf("**Error: goroutine panic. This is a bug.**\n```\n%s\n%s```", err, stack))
 		ctx.Log.Err("PANIC: %s\n%s", err, stack)
 	}
 }

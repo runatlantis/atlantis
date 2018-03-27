@@ -48,9 +48,9 @@ func TestUpdate(t *testing.T) {
 	RegisterMockTestingT(t)
 	client := mocks.NewMockClientProxy()
 	s := events.DefaultCommitStatusUpdater{Client: client}
-	err := s.Update(repoModel, pullModel, status, &cmd, vcs.Github)
+	err := s.Update(repoModel, pullModel, status, &cmd)
 	Ok(t, err)
-	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, status, "Plan Success", vcs.Github)
+	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, status, "Plan Success")
 }
 
 func TestUpdateProjectResult_Error(t *testing.T) {
@@ -59,13 +59,12 @@ func TestUpdateProjectResult_Error(t *testing.T) {
 		BaseRepo: repoModel,
 		Pull:     pullModel,
 		Command:  &events.Command{Name: events.Plan},
-		VCSHost:  vcs.Github,
 	}
 	client := mocks.NewMockClientProxy()
 	s := events.DefaultCommitStatusUpdater{Client: client}
 	err := s.UpdateProjectResult(ctx, events.CommandResponse{Error: errors.New("err")})
 	Ok(t, err)
-	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, vcs.Failed, "Plan Failed", vcs.Github)
+	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, vcs.Failed, "Plan Failed")
 }
 
 func TestUpdateProjectResult_Failure(t *testing.T) {
@@ -74,13 +73,12 @@ func TestUpdateProjectResult_Failure(t *testing.T) {
 		BaseRepo: repoModel,
 		Pull:     pullModel,
 		Command:  &events.Command{Name: events.Plan},
-		VCSHost:  vcs.Github,
 	}
 	client := mocks.NewMockClientProxy()
 	s := events.DefaultCommitStatusUpdater{Client: client}
 	err := s.UpdateProjectResult(ctx, events.CommandResponse{Failure: "failure"})
 	Ok(t, err)
-	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, vcs.Failed, "Plan Failed", vcs.Github)
+	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, vcs.Failed, "Plan Failed")
 }
 
 func TestUpdateProjectResult(t *testing.T) {
@@ -91,7 +89,6 @@ func TestUpdateProjectResult(t *testing.T) {
 		BaseRepo: repoModel,
 		Pull:     pullModel,
 		Command:  &events.Command{Name: events.Plan},
-		VCSHost:  vcs.Github,
 	}
 
 	cases := []struct {
@@ -148,6 +145,6 @@ func TestUpdateProjectResult(t *testing.T) {
 		s := events.DefaultCommitStatusUpdater{Client: client}
 		err := s.UpdateProjectResult(ctx, resp)
 		Ok(t, err)
-		client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, c.Expected, "Plan "+strings.Title(c.Expected.String()), vcs.Github)
+		client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, c.Expected, "Plan "+strings.Title(c.Expected.String()))
 	}
 }

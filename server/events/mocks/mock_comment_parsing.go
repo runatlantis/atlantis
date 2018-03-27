@@ -8,7 +8,7 @@ import (
 
 	pegomock "github.com/petergtz/pegomock"
 	events "github.com/runatlantis/atlantis/server/events"
-	vcs "github.com/runatlantis/atlantis/server/events/vcs"
+	models "github.com/runatlantis/atlantis/server/events/models"
 )
 
 type MockCommentParsing struct {
@@ -19,7 +19,7 @@ func NewMockCommentParsing() *MockCommentParsing {
 	return &MockCommentParsing{fail: pegomock.GlobalFailHandler}
 }
 
-func (mock *MockCommentParsing) Parse(comment string, vcsHost vcs.Host) events.CommentParseResult {
+func (mock *MockCommentParsing) Parse(comment string, vcsHost models.VCSHostType) events.CommentParseResult {
 	params := []pegomock.Param{comment, vcsHost}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Parse", params, []reflect.Type{reflect.TypeOf((*events.CommentParseResult)(nil)).Elem()})
 	var ret0 events.CommentParseResult
@@ -49,7 +49,7 @@ type VerifierCommentParsing struct {
 	inOrderContext         *pegomock.InOrderContext
 }
 
-func (verifier *VerifierCommentParsing) Parse(comment string, vcsHost vcs.Host) *CommentParsing_Parse_OngoingVerification {
+func (verifier *VerifierCommentParsing) Parse(comment string, vcsHost models.VCSHostType) *CommentParsing_Parse_OngoingVerification {
 	params := []pegomock.Param{comment, vcsHost}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Parse", params)
 	return &CommentParsing_Parse_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
@@ -60,21 +60,21 @@ type CommentParsing_Parse_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *CommentParsing_Parse_OngoingVerification) GetCapturedArguments() (string, vcs.Host) {
+func (c *CommentParsing_Parse_OngoingVerification) GetCapturedArguments() (string, models.VCSHostType) {
 	comment, vcsHost := c.GetAllCapturedArguments()
 	return comment[len(comment)-1], vcsHost[len(vcsHost)-1]
 }
 
-func (c *CommentParsing_Parse_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []vcs.Host) {
+func (c *CommentParsing_Parse_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []models.VCSHostType) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]string, len(params[0]))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
 		}
-		_param1 = make([]vcs.Host, len(params[1]))
+		_param1 = make([]models.VCSHostType, len(params[1]))
 		for u, param := range params[1] {
-			_param1[u] = param.(vcs.Host)
+			_param1[u] = param.(models.VCSHostType)
 		}
 	}
 	return

@@ -35,6 +35,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/locking/boltdb"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/run"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -115,11 +116,11 @@ type WebhookConfig struct {
 // its dependencies an error will be returned. This is like the main() function
 // for the server CLI command because it injects all the dependencies.
 func NewServer(userConfig UserConfig, config Config) (*Server, error) {
-	var supportedVCSHosts []vcs.Host
+	var supportedVCSHosts []models.VCSHostType
 	var githubClient *vcs.GithubClient
 	var gitlabClient *vcs.GitlabClient
 	if userConfig.GithubUser != "" {
-		supportedVCSHosts = append(supportedVCSHosts, vcs.Github)
+		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		var err error
 		githubClient, err = vcs.NewGithubClient(userConfig.GithubHostname, userConfig.GithubUser, userConfig.GithubToken)
 		if err != nil {
@@ -127,7 +128,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 	}
 	if userConfig.GitlabUser != "" {
-		supportedVCSHosts = append(supportedVCSHosts, vcs.Gitlab)
+		supportedVCSHosts = append(supportedVCSHosts, models.Gitlab)
 		gitlabClient = &vcs.GitlabClient{
 			Client: gitlab.NewClient(nil, userConfig.GitlabToken),
 		}
