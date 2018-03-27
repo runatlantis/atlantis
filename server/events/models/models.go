@@ -41,11 +41,11 @@ type Repo struct {
 	// SanitizedCloneURL is the full HTTPS url for cloning without the username and password.
 	// ex. "https://github.com/atlantis/atlantis.git".
 	SanitizedCloneURL string
-	// Hostname of the VCS provider this repo is hosted on.
-	Hostname string
+	// VCSHost is where this repo is hosted.
+	VCSHost VCSHost
 }
 
-func NewRepo(repoFullName string, cloneURL string, vcsUser string, vcsToken string) (Repo, error) {
+func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsUser string, vcsToken string) (Repo, error) {
 	if repoFullName == "" {
 		return Repo{}, errors.New("repoFullName can't be empty")
 	}
@@ -85,7 +85,10 @@ func NewRepo(repoFullName string, cloneURL string, vcsUser string, vcsToken stri
 		Name:              repo,
 		CloneURL:          authedCloneURL,
 		SanitizedCloneURL: cloneURL,
-		Hostname:          cloneURLParsed.Hostname(),
+		VCSHost: VCSHost{
+			Type:     vcsHostType,
+			Hostname: cloneURLParsed.Hostname(),
+		},
 	}, nil
 }
 
@@ -172,4 +175,31 @@ func NewProject(repoFullName string, path string) Project {
 		RepoFullName: repoFullName,
 		Path:         path,
 	}
+}
+
+// VCSHost is a Git hosting provider, for example GitHub.
+type VCSHost struct {
+	// Hostname is the hostname of the VCS provider, ex. "github.com" or
+	// "github-enterprise.example.com".
+	Hostname string
+
+	// Type is which type of VCS host this is, ex. GitHub or GitLab.
+	Type VCSHostType
+}
+
+type VCSHostType int
+
+const (
+	Github VCSHostType = iota
+	Gitlab
+)
+
+func (h VCSHostType) String() string {
+	switch h {
+	case Github:
+		return "Github"
+	case Gitlab:
+		return "Gitlab"
+	}
+	return "<missing String() implementation>"
 }
