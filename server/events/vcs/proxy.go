@@ -23,10 +23,10 @@ import (
 // ClientProxy proxies calls to the correct VCS client depending on which
 // VCS host is required.
 type ClientProxy interface {
-	GetModifiedFiles(repo models.Repo, pull models.PullRequest, host Host) ([]string, error)
-	CreateComment(repo models.Repo, pullNum int, comment string, host Host) error
-	PullIsApproved(repo models.Repo, pull models.PullRequest, host Host) (bool, error)
-	UpdateStatus(repo models.Repo, pull models.PullRequest, state CommitStatus, description string, host Host) error
+	GetModifiedFiles(repo models.Repo, pull models.PullRequest, host models.Host) ([]string, error)
+	CreateComment(repo models.Repo, pullNum int, comment string, host models.Host) error
+	PullIsApproved(repo models.Repo, pull models.PullRequest, host models.Host) (bool, error)
+	UpdateStatus(repo models.Repo, pull models.PullRequest, state CommitStatus, description string, host models.Host) error
 }
 
 // DefaultClientProxy proxies calls to the correct VCS client depending on which
@@ -49,43 +49,43 @@ func NewDefaultClientProxy(githubClient Client, gitlabClient Client) *DefaultCli
 	}
 }
 
-var invalidVCSErr = errors.New("Invalid VCS Host. This is a bug!")
+var invalidVCSErr = errors.New("Invalid VCS models.Host. This is a bug!")
 
-func (d *DefaultClientProxy) GetModifiedFiles(repo models.Repo, pull models.PullRequest, host Host) ([]string, error) {
+func (d *DefaultClientProxy) GetModifiedFiles(repo models.Repo, pull models.PullRequest, host models.Host) ([]string, error) {
 	switch host {
-	case Github:
+	case models.Github:
 		return d.GithubClient.GetModifiedFiles(repo, pull)
-	case Gitlab:
+	case models.Gitlab:
 		return d.GitlabClient.GetModifiedFiles(repo, pull)
 	}
 	return nil, invalidVCSErr
 }
 
-func (d *DefaultClientProxy) CreateComment(repo models.Repo, pullNum int, comment string, host Host) error {
+func (d *DefaultClientProxy) CreateComment(repo models.Repo, pullNum int, comment string, host models.Host) error {
 	switch host {
-	case Github:
+	case models.Github:
 		return d.GithubClient.CreateComment(repo, pullNum, comment)
-	case Gitlab:
+	case models.Gitlab:
 		return d.GitlabClient.CreateComment(repo, pullNum, comment)
 	}
 	return invalidVCSErr
 }
 
-func (d *DefaultClientProxy) PullIsApproved(repo models.Repo, pull models.PullRequest, host Host) (bool, error) {
+func (d *DefaultClientProxy) PullIsApproved(repo models.Repo, pull models.PullRequest, host models.Host) (bool, error) {
 	switch host {
-	case Github:
+	case models.Github:
 		return d.GithubClient.PullIsApproved(repo, pull)
-	case Gitlab:
+	case models.Gitlab:
 		return d.GitlabClient.PullIsApproved(repo, pull)
 	}
 	return false, invalidVCSErr
 }
 
-func (d *DefaultClientProxy) UpdateStatus(repo models.Repo, pull models.PullRequest, state CommitStatus, description string, host Host) error {
+func (d *DefaultClientProxy) UpdateStatus(repo models.Repo, pull models.PullRequest, state CommitStatus, description string, host models.Host) error {
 	switch host {
-	case Github:
+	case models.Github:
 		return d.GithubClient.UpdateStatus(repo, pull, state, description)
-	case Gitlab:
+	case models.Gitlab:
 		return d.GitlabClient.UpdateStatus(repo, pull, state, description)
 	}
 	return invalidVCSErr

@@ -15,7 +15,6 @@ package events
 
 import (
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -35,5 +34,5 @@ type CommandContext struct {
 	Command *Command
 	Log     *logging.SimpleLogger
 	// VCSHost is the host that the command came from.
-	VCSHost vcs.Host
+	VCSHost models.Host
 }

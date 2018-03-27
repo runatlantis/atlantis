@@ -32,7 +32,7 @@ type CommandRunner interface {
 	// ExecuteCommand is the first step after a command request has been parsed.
 	// It handles gathering additional information needed to execute the command
 	// and then calling the appropriate services to finish executing the command.
-	ExecuteCommand(baseRepo models.Repo, headRepo models.Repo, user models.User, pullNum int, cmd *Command, vcsHost vcs.Host)
+	ExecuteCommand(baseRepo models.Repo, headRepo models.Repo, user models.User, pullNum int, cmd *Command, vcsHost models.Host)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_github_pull_getter.go GithubPullGetter
@@ -77,12 +77,12 @@ type CommandHandler struct {
 // to get the headRepo. This is because the caller is unable to pass in a
 // headRepo since there's not enough data available on the initial webhook
 // payload.
-func (c *CommandHandler) ExecuteCommand(baseRepo models.Repo, headRepo models.Repo, user models.User, pullNum int, cmd *Command, vcsHost vcs.Host) {
+func (c *CommandHandler) ExecuteCommand(baseRepo models.Repo, headRepo models.Repo, user models.User, pullNum int, cmd *Command, vcsHost models.Host) {
 	var err error
 	var pull models.PullRequest
-	if vcsHost == vcs.Github {
+	if vcsHost == models.Github {
 		pull, headRepo, err = c.getGithubData(baseRepo, pullNum)
-	} else if vcsHost == vcs.Gitlab {
+	} else if vcsHost == models.Gitlab {
 		pull, err = c.getGitlabData(baseRepo.FullName, pullNum)
 	}
 

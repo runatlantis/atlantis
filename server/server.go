@@ -35,6 +35,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/locking/boltdb"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/run"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -57,6 +58,7 @@ type Server struct {
 	Locker             locking.Locker
 	AtlantisURL        string
 	EventsController   *EventsController
+	LockController     *LockController
 	IndexTemplate      TemplateWriter
 	LockDetailTemplate TemplateWriter
 	SSLCertFile        string
@@ -115,11 +117,11 @@ type WebhookConfig struct {
 // its dependencies an error will be returned. This is like the main() function
 // for the server CLI command because it injects all the dependencies.
 func NewServer(userConfig UserConfig, config Config) (*Server, error) {
-	var supportedVCSHosts []vcs.Host
+	var supportedVCSHosts []models.Host
 	var githubClient *vcs.GithubClient
 	var gitlabClient *vcs.GitlabClient
 	if userConfig.GithubUser != "" {
-		supportedVCSHosts = append(supportedVCSHosts, vcs.Github)
+		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		var err error
 		githubClient, err = vcs.NewGithubClient(userConfig.GithubHostname, userConfig.GithubUser, userConfig.GithubToken)
 		if err != nil {
@@ -127,7 +129,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 	}
 	if userConfig.GitlabUser != "" {
-		supportedVCSHosts = append(supportedVCSHosts, vcs.Gitlab)
+		supportedVCSHosts = append(supportedVCSHosts, models.Gitlab)
 		gitlabClient = &vcs.GitlabClient{
 			Client: gitlab.NewClient(nil, userConfig.GitlabToken),
 		}
@@ -256,6 +258,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		SupportedVCSHosts:      supportedVCSHosts,
 		VCSClient:              vcsClient,
 	}
+	lockController := &LockController{
+		AtlantisVersion:    config.AtlantisVersion,
+		Locker:             lockingClient,
+		Logger:             logger,
+		VCSClient:          vcsClient,
+		LockDetailTemplate: lockTemplate,
+	}
 	router := mux.NewRouter()
 	return &Server{
 		AtlantisVersion:    config.AtlantisVersion,
@@ -266,6 +275,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Locker:             lockingClient,
 		AtlantisURL:        userConfig.AtlantisURL,
 		EventsController:   eventsController,
+		LockController:     lockController,
 		IndexTemplate:      indexTemplate,
 		LockDetailTemplate: lockTemplate,
 		SSLKeyFile:         userConfig.SSLKeyFile,
@@ -280,8 +290,10 @@ func (s *Server) Start() error {
 	})
 	s.Router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: static.Asset, AssetDir: static.AssetDir, AssetInfo: static.AssetInfo}))
 	s.Router.HandleFunc("/events", s.postEvents).Methods("POST")
-	s.Router.HandleFunc("/locks", s.DeleteLockRoute).Methods("DELETE").Queries("id", "{id:.*}")
-	lockRoute := s.Router.HandleFunc("/lock", s.GetLockRoute).Methods("GET").Queries("id", "{id}").Name(LockRouteName)
+
+	s.Router.HandleFunc("/locks", s.deleteEvents).Methods("DELETE").Queries("id", "{id:.*}")
+	lockRoute := s.Router.HandleFunc("/lock", s.getEvents).Methods("GET").Queries("id", "{id}").Name(LockRouteName)
+
 	// function that planExecutor can use to construct detail view url
 	// injecting this here because this is the earliest routes are created
 	s.CommandHandler.SetLockURL(func(lockID string) string {
@@ -438,6 +450,14 @@ func (s *Server) DeleteLock(w http.ResponseWriter, _ *http.Request, id string) {
 // VCS webhook requests.
 func (s *Server) postEvents(w http.ResponseWriter, r *http.Request) {
 	s.EventsController.Post(w, r)
+}
+
+func (s *Server) getEvents(w http.ResponseWriter, r *http.Request) {
+	s.LockController.GetLockRoute(w, r)
+}
+
+func (s *Server) deleteEvents(w http.ResponseWriter, r *http.Request) {
+	s.LockController.DeleteLockRoute(w, r)
 }
 
 // respond is a helper function to respond and log the response. lvl is the log

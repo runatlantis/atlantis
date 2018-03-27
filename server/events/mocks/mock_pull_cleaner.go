@@ -8,7 +8,6 @@ import (
 
 	pegomock "github.com/petergtz/pegomock"
 	models "github.com/runatlantis/atlantis/server/events/models"
-	vcs "github.com/runatlantis/atlantis/server/events/vcs"
 )
 
 type MockPullCleaner struct {
@@ -19,7 +18,7 @@ func NewMockPullCleaner() *MockPullCleaner {
 	return &MockPullCleaner{fail: pegomock.GlobalFailHandler}
 }
 
-func (mock *MockPullCleaner) CleanUpPull(repo models.Repo, pull models.PullRequest, host vcs.Host) error {
+func (mock *MockPullCleaner) CleanUpPull(repo models.Repo, pull models.PullRequest, host models.Host) error {
 	params := []pegomock.Param{repo, pull, host}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("CleanUpPull", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
@@ -49,7 +48,7 @@ type VerifierPullCleaner struct {
 	inOrderContext         *pegomock.InOrderContext
 }
 
-func (verifier *VerifierPullCleaner) CleanUpPull(repo models.Repo, pull models.PullRequest, host vcs.Host) *PullCleaner_CleanUpPull_OngoingVerification {
+func (verifier *VerifierPullCleaner) CleanUpPull(repo models.Repo, pull models.PullRequest, host models.Host) *PullCleaner_CleanUpPull_OngoingVerification {
 	params := []pegomock.Param{repo, pull, host}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "CleanUpPull", params)
 	return &PullCleaner_CleanUpPull_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
@@ -60,12 +59,12 @@ type PullCleaner_CleanUpPull_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *PullCleaner_CleanUpPull_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, vcs.Host) {
+func (c *PullCleaner_CleanUpPull_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, models.Host) {
 	repo, pull, host := c.GetAllCapturedArguments()
 	return repo[len(repo)-1], pull[len(pull)-1], host[len(host)-1]
 }
 
-func (c *PullCleaner_CleanUpPull_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []vcs.Host) {
+func (c *PullCleaner_CleanUpPull_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []models.Host) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.Repo, len(params[0]))
@@ -76,9 +75,9 @@ func (c *PullCleaner_CleanUpPull_OngoingVerification) GetAllCapturedArguments() 
 		for u, param := range params[1] {
 			_param1[u] = param.(models.PullRequest)
 		}
-		_param2 = make([]vcs.Host, len(params[2]))
+		_param2 = make([]models.Host, len(params[2]))
 		for u, param := range params[2] {
-			_param2[u] = param.(vcs.Host)
+			_param2[u] = param.(models.Host)
 		}
 	}
 	return

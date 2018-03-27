@@ -4,17 +4,17 @@ import (
 	"reflect"
 
 	"github.com/petergtz/pegomock"
-	vcs "github.com/runatlantis/atlantis/server/events/vcs"
+	models "github.com/runatlantis/atlantis/server/events/models"
 )
 
-func AnyVcsHost() vcs.Host {
-	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(vcs.Host))(nil)).Elem()))
-	var nullValue vcs.Host
+func AnyVcsHost() models.Host {
+	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(models.Host))(nil)).Elem()))
+	var nullValue models.Host
 	return nullValue
 }
 
-func EqVcsHost(value vcs.Host) vcs.Host {
+func EqVcsHost(value models.Host) models.Host {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
-	var nullValue vcs.Host
+	var nullValue models.Host
 	return nullValue
 }

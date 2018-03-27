@@ -19,7 +19,7 @@ import (
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events"
-	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -41,7 +41,7 @@ func TestParse_Ignored(t *testing.T) {
 		"terraform plan\nbut with newlines",
 	}
 	for _, c := range ignoreComments {
-		r := commentParser.Parse(c, vcs.Github)
+		r := commentParser.Parse(c, models.Github)
 		Assert(t, r.Ignore, "expected Ignore to be true for comment %q", c)
 	}
 }
@@ -60,7 +60,7 @@ func TestParse_HelpResponse(t *testing.T) {
 		"atlantis help plan",
 	}
 	for _, c := range helpComments {
-		r := commentParser.Parse(c, vcs.Github)
+		r := commentParser.Parse(c, models.Github)
 		Equals(t, events.HelpComment, r.CommentResponse)
 	}
 }
@@ -121,7 +121,7 @@ func TestParse_UnusedArguments(t *testing.T) {
 	for _, c := range cases {
 		comment := fmt.Sprintf("atlantis %s %s", c.Command.String(), c.Args)
 		t.Run(comment, func(t *testing.T) {
-			r := commentParser.Parse(comment, vcs.Github)
+			r := commentParser.Parse(comment, models.Github)
 			usage := PlanUsage
 			if c.Command == events.Apply {
 				usage = ApplyUsage
@@ -144,7 +144,7 @@ func TestParse_DidYouMeanAtlantis(t *testing.T) {
 		"terraform plan -w workspace -d . -- test",
 	}
 	for _, c := range comments {
-		r := commentParser.Parse(c, vcs.Github)
+		r := commentParser.Parse(c, models.Github)
 		Assert(t, r.CommentResponse == events.DidYouMeanAtlantisComment,
 			"For comment %q expected CommentResponse==%q but got %q", c, events.DidYouMeanAtlantisComment, r.CommentResponse)
 	}
@@ -159,7 +159,7 @@ func TestParse_InvalidCommand(t *testing.T) {
 		"atlantis appely apply",
 	}
 	for _, c := range comments {
-		r := commentParser.Parse(c, vcs.Github)
+		r := commentParser.Parse(c, models.Github)
 		exp := fmt.Sprintf("```\nError: unknown command %q.\nRun 'atlantis --help' for usage.\n```", strings.Fields(c)[1])
 		Assert(t, r.CommentResponse == exp,
 			"For comment %q expected CommentResponse==%q but got %q", c, exp, r.CommentResponse)
@@ -176,7 +176,7 @@ func TestParse_SubcommandUsage(t *testing.T) {
 		"atlantis apply --help",
 	}
 	for _, c := range comments {
-		r := commentParser.Parse(c, vcs.Github)
+		r := commentParser.Parse(c, models.Github)
 		exp := "Usage of " + strings.Fields(c)[1]
 		Assert(t, strings.Contains(r.CommentResponse, exp),
 			"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
@@ -210,7 +210,7 @@ func TestParse_InvalidFlags(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		r := commentParser.Parse(c.comment, vcs.Github)
+		r := commentParser.Parse(c.comment, models.Github)
 		Assert(t, strings.Contains(r.CommentResponse, c.exp),
 			"For comment %q expected CommentResponse %q to contain %q", c.comment, r.CommentResponse, c.exp)
 		Assert(t, strings.Contains(r.CommentResponse, "Usage of "),
@@ -232,7 +232,7 @@ func TestParse_RelativeDirPath(t *testing.T) {
 		"atlantis apply -d a/../..",
 	}
 	for _, c := range comments {
-		r := commentParser.Parse(c, vcs.Github)
+		r := commentParser.Parse(c, models.Github)
 		exp := "Error: using a relative path"
 		Assert(t, strings.Contains(r.CommentResponse, exp),
 			"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
@@ -252,7 +252,7 @@ func TestParse_InvalidWorkspace(t *testing.T) {
 		"atlantis apply -w ../../../etc/passwd",
 	}
 	for _, c := range comments {
-		r := commentParser.Parse(c, vcs.Github)
+		r := commentParser.Parse(c, models.Github)
 		exp := "Error: invalid workspace"
 		Assert(t, strings.Contains(r.CommentResponse, exp),
 			"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
@@ -412,7 +412,7 @@ func TestParse_Parsing(t *testing.T) {
 	for _, test := range cases {
 		for _, cmdName := range []string{"plan", "apply"} {
 			comment := fmt.Sprintf("atlantis %s %s", cmdName, test.flags)
-			r := commentParser.Parse(comment, vcs.Github)
+			r := commentParser.Parse(comment, models.Github)
 			Assert(t, r.CommentResponse == "", "CommentResponse should have been empty but was %q for comment %q", r.CommentResponse, comment)
 			Assert(t, test.expDir == r.Command.Dir, "exp dir to equal %q but was %q for comment %q", test.expDir, r.Command.Dir, comment)
 			Assert(t, test.expWorkspace == r.Command.Workspace, "exp workspace to equal %q but was %q for comment %q", test.expWorkspace, r.Command.Workspace, comment)
