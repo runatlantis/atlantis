@@ -108,6 +108,9 @@ type PullRequest struct {
 	// Gitlab supports an additional "merged" state but Github doesn't so we map
 	// merged to Closed.
 	State PullRequestState
+
+	// The repository the pull request is for
+	Repo Repo
 }
 
 type PullRequestState int
@@ -172,4 +175,21 @@ func NewProject(repoFullName string, path string) Project {
 		RepoFullName: repoFullName,
 		Path:         path,
 	}
+}
+
+type Host int
+
+const (
+	Github Host = iota
+	Gitlab
+)
+
+func (h Host) String() string {
+	switch h {
+	case Github:
+		return "Github"
+	case Gitlab:
+		return "Gitlab"
+	}
+	return "<missing String() implementation>"
 }

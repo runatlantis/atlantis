@@ -24,7 +24,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/fixtures"
-	"github.com/runatlantis/atlantis/server/events/vcs"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -38,7 +37,7 @@ func TestCleanUpPullWorkspaceErr(t *testing.T) {
 	}
 	err := errors.New("err")
 	When(w.Delete(fixtures.Repo, fixtures.Pull)).ThenReturn(err)
-	actualErr := pce.CleanUpPull(fixtures.Repo, fixtures.Pull, vcs.Github)
+	actualErr := pce.CleanUpPull(fixtures.Repo, fixtures.Pull, models.Github)
 	Equals(t, "cleaning workspace: err", actualErr.Error())
 }
 
@@ -53,7 +52,7 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 	}
 	err := errors.New("err")
 	When(l.UnlockByPull(fixtures.Repo.FullName, fixtures.Pull.Num)).ThenReturn(nil, err)
-	actualErr := pce.CleanUpPull(fixtures.Repo, fixtures.Pull, vcs.Github)
+	actualErr := pce.CleanUpPull(fixtures.Repo, fixtures.Pull, models.Github)
 	Equals(t, "cleaning up locks: err", actualErr.Error())
 }
 
@@ -69,7 +68,7 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 		Workspace: w,
 	}
 	When(l.UnlockByPull(fixtures.Repo.FullName, fixtures.Pull.Num)).ThenReturn(nil, nil)
-	err := pce.CleanUpPull(fixtures.Repo, fixtures.Pull, vcs.Github)
+	err := pce.CleanUpPull(fixtures.Repo, fixtures.Pull, models.Github)
 	Ok(t, err)
 	cp.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), matchers.AnyVcsHost())
 }
@@ -150,7 +149,7 @@ func TestCleanUpPullComments(t *testing.T) {
 		}
 		t.Log("testing: " + c.Description)
 		When(l.UnlockByPull(fixtures.Repo.FullName, fixtures.Pull.Num)).ThenReturn(c.Locks, nil)
-		err := pce.CleanUpPull(fixtures.Repo, fixtures.Pull, vcs.Github)
+		err := pce.CleanUpPull(fixtures.Repo, fixtures.Pull, models.Github)
 		Ok(t, err)
 		_, _, comment, _ := cp.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), matchers.AnyVcsHost()).GetCapturedArguments()
 

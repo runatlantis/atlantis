@@ -19,7 +19,7 @@ func NewMockClientProxy() *MockClientProxy {
 	return &MockClientProxy{fail: pegomock.GlobalFailHandler}
 }
 
-func (mock *MockClientProxy) GetModifiedFiles(repo models.Repo, pull models.PullRequest, host vcs.Host) ([]string, error) {
+func (mock *MockClientProxy) GetModifiedFiles(repo models.Repo, pull models.PullRequest, host models.Host) ([]string, error) {
 	params := []pegomock.Param{repo, pull, host}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("GetModifiedFiles", params, []reflect.Type{reflect.TypeOf((*[]string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 []string
@@ -35,7 +35,7 @@ func (mock *MockClientProxy) GetModifiedFiles(repo models.Repo, pull models.Pull
 	return ret0, ret1
 }
 
-func (mock *MockClientProxy) CreateComment(repo models.Repo, pullNum int, comment string, host vcs.Host) error {
+func (mock *MockClientProxy) CreateComment(repo models.Repo, pullNum int, comment string, host models.Host) error {
 	params := []pegomock.Param{repo, pullNum, comment, host}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("CreateComment", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
@@ -47,7 +47,7 @@ func (mock *MockClientProxy) CreateComment(repo models.Repo, pullNum int, commen
 	return ret0
 }
 
-func (mock *MockClientProxy) PullIsApproved(repo models.Repo, pull models.PullRequest, host vcs.Host) (bool, error) {
+func (mock *MockClientProxy) PullIsApproved(repo models.Repo, pull models.PullRequest, host models.Host) (bool, error) {
 	params := []pegomock.Param{repo, pull, host}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("PullIsApproved", params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 bool
@@ -63,7 +63,7 @@ func (mock *MockClientProxy) PullIsApproved(repo models.Repo, pull models.PullRe
 	return ret0, ret1
 }
 
-func (mock *MockClientProxy) UpdateStatus(repo models.Repo, pull models.PullRequest, state vcs.CommitStatus, description string, host vcs.Host) error {
+func (mock *MockClientProxy) UpdateStatus(repo models.Repo, pull models.PullRequest, state vcs.CommitStatus, description string, host models.Host) error {
 	params := []pegomock.Param{repo, pull, state, description, host}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("UpdateStatus", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
@@ -93,7 +93,7 @@ type VerifierClientProxy struct {
 	inOrderContext         *pegomock.InOrderContext
 }
 
-func (verifier *VerifierClientProxy) GetModifiedFiles(repo models.Repo, pull models.PullRequest, host vcs.Host) *ClientProxy_GetModifiedFiles_OngoingVerification {
+func (verifier *VerifierClientProxy) GetModifiedFiles(repo models.Repo, pull models.PullRequest, host models.Host) *ClientProxy_GetModifiedFiles_OngoingVerification {
 	params := []pegomock.Param{repo, pull, host}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetModifiedFiles", params)
 	return &ClientProxy_GetModifiedFiles_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
@@ -104,12 +104,12 @@ type ClientProxy_GetModifiedFiles_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *ClientProxy_GetModifiedFiles_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, vcs.Host) {
+func (c *ClientProxy_GetModifiedFiles_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, models.Host) {
 	repo, pull, host := c.GetAllCapturedArguments()
 	return repo[len(repo)-1], pull[len(pull)-1], host[len(host)-1]
 }
 
-func (c *ClientProxy_GetModifiedFiles_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []vcs.Host) {
+func (c *ClientProxy_GetModifiedFiles_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []models.Host) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.Repo, len(params[0]))
@@ -120,15 +120,15 @@ func (c *ClientProxy_GetModifiedFiles_OngoingVerification) GetAllCapturedArgumen
 		for u, param := range params[1] {
 			_param1[u] = param.(models.PullRequest)
 		}
-		_param2 = make([]vcs.Host, len(params[2]))
+		_param2 = make([]models.Host, len(params[2]))
 		for u, param := range params[2] {
-			_param2[u] = param.(vcs.Host)
+			_param2[u] = param.(models.Host)
 		}
 	}
 	return
 }
 
-func (verifier *VerifierClientProxy) CreateComment(repo models.Repo, pullNum int, comment string, host vcs.Host) *ClientProxy_CreateComment_OngoingVerification {
+func (verifier *VerifierClientProxy) CreateComment(repo models.Repo, pullNum int, comment string, host models.Host) *ClientProxy_CreateComment_OngoingVerification {
 	params := []pegomock.Param{repo, pullNum, comment, host}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "CreateComment", params)
 	return &ClientProxy_CreateComment_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
@@ -139,12 +139,12 @@ type ClientProxy_CreateComment_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *ClientProxy_CreateComment_OngoingVerification) GetCapturedArguments() (models.Repo, int, string, vcs.Host) {
+func (c *ClientProxy_CreateComment_OngoingVerification) GetCapturedArguments() (models.Repo, int, string, models.Host) {
 	repo, pullNum, comment, host := c.GetAllCapturedArguments()
 	return repo[len(repo)-1], pullNum[len(pullNum)-1], comment[len(comment)-1], host[len(host)-1]
 }
 
-func (c *ClientProxy_CreateComment_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []int, _param2 []string, _param3 []vcs.Host) {
+func (c *ClientProxy_CreateComment_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []int, _param2 []string, _param3 []models.Host) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.Repo, len(params[0]))
@@ -159,15 +159,15 @@ func (c *ClientProxy_CreateComment_OngoingVerification) GetAllCapturedArguments(
 		for u, param := range params[2] {
 			_param2[u] = param.(string)
 		}
-		_param3 = make([]vcs.Host, len(params[3]))
+		_param3 = make([]models.Host, len(params[3]))
 		for u, param := range params[3] {
-			_param3[u] = param.(vcs.Host)
+			_param3[u] = param.(models.Host)
 		}
 	}
 	return
 }
 
-func (verifier *VerifierClientProxy) PullIsApproved(repo models.Repo, pull models.PullRequest, host vcs.Host) *ClientProxy_PullIsApproved_OngoingVerification {
+func (verifier *VerifierClientProxy) PullIsApproved(repo models.Repo, pull models.PullRequest, host models.Host) *ClientProxy_PullIsApproved_OngoingVerification {
 	params := []pegomock.Param{repo, pull, host}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "PullIsApproved", params)
 	return &ClientProxy_PullIsApproved_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
@@ -178,12 +178,12 @@ type ClientProxy_PullIsApproved_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *ClientProxy_PullIsApproved_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, vcs.Host) {
+func (c *ClientProxy_PullIsApproved_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, models.Host) {
 	repo, pull, host := c.GetAllCapturedArguments()
 	return repo[len(repo)-1], pull[len(pull)-1], host[len(host)-1]
 }
 
-func (c *ClientProxy_PullIsApproved_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []vcs.Host) {
+func (c *ClientProxy_PullIsApproved_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []models.Host) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.Repo, len(params[0]))
@@ -194,15 +194,15 @@ func (c *ClientProxy_PullIsApproved_OngoingVerification) GetAllCapturedArguments
 		for u, param := range params[1] {
 			_param1[u] = param.(models.PullRequest)
 		}
-		_param2 = make([]vcs.Host, len(params[2]))
+		_param2 = make([]models.Host, len(params[2]))
 		for u, param := range params[2] {
-			_param2[u] = param.(vcs.Host)
+			_param2[u] = param.(models.Host)
 		}
 	}
 	return
 }
 
-func (verifier *VerifierClientProxy) UpdateStatus(repo models.Repo, pull models.PullRequest, state vcs.CommitStatus, description string, host vcs.Host) *ClientProxy_UpdateStatus_OngoingVerification {
+func (verifier *VerifierClientProxy) UpdateStatus(repo models.Repo, pull models.PullRequest, state vcs.CommitStatus, description string, host models.Host) *ClientProxy_UpdateStatus_OngoingVerification {
 	params := []pegomock.Param{repo, pull, state, description, host}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "UpdateStatus", params)
 	return &ClientProxy_UpdateStatus_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
@@ -213,12 +213,12 @@ type ClientProxy_UpdateStatus_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *ClientProxy_UpdateStatus_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, vcs.CommitStatus, string, vcs.Host) {
+func (c *ClientProxy_UpdateStatus_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, vcs.CommitStatus, string, models.Host) {
 	repo, pull, state, description, host := c.GetAllCapturedArguments()
 	return repo[len(repo)-1], pull[len(pull)-1], state[len(state)-1], description[len(description)-1], host[len(host)-1]
 }
 
-func (c *ClientProxy_UpdateStatus_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []vcs.CommitStatus, _param3 []string, _param4 []vcs.Host) {
+func (c *ClientProxy_UpdateStatus_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []vcs.CommitStatus, _param3 []string, _param4 []models.Host) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.Repo, len(params[0]))
@@ -237,9 +237,9 @@ func (c *ClientProxy_UpdateStatus_OngoingVerification) GetAllCapturedArguments()
 		for u, param := range params[3] {
 			_param3[u] = param.(string)
 		}
-		_param4 = make([]vcs.Host, len(params[4]))
+		_param4 = make([]models.Host, len(params[4]))
 		for u, param := range params[4] {
-			_param4[u] = param.(vcs.Host)
+			_param4[u] = param.(models.Host)
 		}
 	}
 	return

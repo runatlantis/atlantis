@@ -27,7 +27,7 @@ import (
 // the status to signify whether the plan/apply succeeds.
 type CommitStatusUpdater interface {
 	// Update updates the status of the head commit of pull.
-	Update(repo models.Repo, pull models.PullRequest, status vcs.CommitStatus, cmd *Command, host vcs.Host) error
+	Update(repo models.Repo, pull models.PullRequest, status vcs.CommitStatus, cmd *Command, host models.Host) error
 	// UpdateProjectResult updates the status of the head commit given the
 	// state of response.
 	UpdateProjectResult(ctx *CommandContext, res CommandResponse) error
@@ -39,7 +39,7 @@ type DefaultCommitStatusUpdater struct {
 }
 
 // Update updates the commit status.
-func (d *DefaultCommitStatusUpdater) Update(repo models.Repo, pull models.PullRequest, status vcs.CommitStatus, cmd *Command, host vcs.Host) error {
+func (d *DefaultCommitStatusUpdater) Update(repo models.Repo, pull models.PullRequest, status vcs.CommitStatus, cmd *Command, host models.Host) error {
 	description := fmt.Sprintf("%s %s", strings.Title(cmd.Name.String()), strings.Title(status.String()))
 	return d.Client.UpdateStatus(repo, pull, status, description, host)
 }

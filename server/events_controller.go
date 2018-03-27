@@ -49,21 +49,21 @@ type EventsController struct {
 	RepoWhitelist       *events.RepoWhitelist
 	// SupportedVCSHosts is which VCS hosts Atlantis was configured upon
 	// startup to support.
-	SupportedVCSHosts []vcs.Host
+	SupportedVCSHosts []models.Host
 	VCSClient         vcs.ClientProxy
 }
 
 // Post handles POST webhook requests.
 func (e *EventsController) Post(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get(githubHeader) != "" {
-		if !e.supportsHost(vcs.Github) {
+		if !e.supportsHost(models.Github) {
 			e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support GitHub")
 			return
 		}
 		e.handleGithubPost(w, r)
 		return
 	} else if r.Header.Get(gitlabHeader) != "" {
-		if !e.supportsHost(vcs.Gitlab) {
+		if !e.supportsHost(models.Gitlab) {
 			e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support GitLab")
 			return
 		}
@@ -111,7 +111,7 @@ func (e *EventsController) HandleGithubCommentEvent(w http.ResponseWriter, event
 	// calls to get that information but we need this code path to be generic.
 	// Later on in CommandHandler we detect that this is a GitHub event and
 	// make the necessary calls to get the headRepo.
-	e.handleCommentEvent(w, baseRepo, models.Repo{}, user, pullNum, event.Comment.GetBody(), vcs.Github)
+	e.handleCommentEvent(w, baseRepo, models.Repo{}, user, pullNum, event.Comment.GetBody(), models.Github)
 }
 
 // HandleGithubPullRequestEvent will delete any locks associated with the pull
@@ -128,10 +128,10 @@ func (e *EventsController) HandleGithubPullRequestEvent(w http.ResponseWriter, p
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing repo data: %s %s", err, githubReqID)
 		return
 	}
-	e.handlePullRequestEvent(w, repo, pull, vcs.Github)
+	e.handlePullRequestEvent(w, repo, pull, models.Github)
 }
 
-func (e *EventsController) handlePullRequestEvent(w http.ResponseWriter, repo models.Repo, pull models.PullRequest, vcs vcs.Host) {
+func (e *EventsController) handlePullRequestEvent(w http.ResponseWriter, repo models.Repo, pull models.PullRequest, vcs models.Host) {
 	if !e.RepoWhitelist.IsWhitelisted(repo.FullName, repo.Hostname) {
 		e.respond(w, logging.Debug, http.StatusForbidden, "Ignoring pull request event from non-whitelisted repo")
 		return
@@ -173,10 +173,10 @@ func (e *EventsController) HandleGitlabCommentEvent(w http.ResponseWriter, event
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing webhook: %s", err)
 		return
 	}
-	e.handleCommentEvent(w, baseRepo, headRepo, user, event.MergeRequest.IID, event.ObjectAttributes.Note, vcs.Gitlab)
+	e.handleCommentEvent(w, baseRepo, headRepo, user, event.MergeRequest.IID, event.ObjectAttributes.Note, models.Gitlab)
 }
 
-func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo models.Repo, headRepo models.Repo, user models.User, pullNum int, comment string, vcsHost vcs.Host) {
+func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo models.Repo, headRepo models.Repo, user models.User, pullNum int, comment string, vcsHost models.Host) {
 	parseResult := e.CommentParser.Parse(comment, vcsHost)
 	if parseResult.Ignore {
 		truncated := comment
@@ -227,11 +227,11 @@ func (e *EventsController) HandleGitlabMergeRequestEvent(w http.ResponseWriter, 
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing webhook: %s", err)
 		return
 	}
-	e.handlePullRequestEvent(w, repo, pull, vcs.Gitlab)
+	e.handlePullRequestEvent(w, repo, pull, models.Gitlab)
 }
 
 // supportsHost returns true if h is in e.SupportedVCSHosts and false otherwise.
-func (e *EventsController) supportsHost(h vcs.Host) bool {
+func (e *EventsController) supportsHost(h models.Host) bool {
 	for _, supported := range e.SupportedVCSHosts {
 		if h == supported {
 			return true
