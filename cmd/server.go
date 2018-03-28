@@ -31,6 +31,7 @@ import (
 // 2. Add a new field to server.UserConfig and set the mapstructure tag equal to the flag name.
 // 3. Add your flag's description etc. to the stringFlags, intFlags, or boolFlags slices.
 const (
+	// Flag names.
 	AtlantisURLFlag     = "atlantis-url"
 	AllowForkPRsFlag    = "allow-fork-prs"
 	ConfigFlag          = "config"
@@ -49,6 +50,13 @@ const (
 	RequireApprovalFlag = "require-approval"
 	SSLCertFileFlag     = "ssl-cert-file"
 	SSLKeyFileFlag      = "ssl-key-file"
+
+	// Flag defaults.
+	DefaultDataDir        = "~/.atlantis"
+	DefaultGHHostname     = "github.com"
+	DefaultGitlabHostname = "gitlab.com"
+	DefaultLogLevel       = "info"
+	DefaultPort           = 4141
 )
 
 const RedTermStart = "\033[31m"
@@ -64,14 +72,14 @@ var stringFlags = []stringFlag{
 		description: "Path to config file. All flags can be set in a YAML config file instead.",
 	},
 	{
-		name:        DataDirFlag,
-		description: "Path to directory to store Atlantis data.",
-		value:       "~/.atlantis",
+		name:         DataDirFlag,
+		description:  "Path to directory to store Atlantis data.",
+		defaultValue: DefaultDataDir,
 	},
 	{
-		name:        GHHostnameFlag,
-		description: "Hostname of your Github Enterprise installation. If using github.com, no need to set.",
-		value:       "github.com",
+		name:         GHHostnameFlag,
+		description:  "Hostname of your Github Enterprise installation. If using github.com, no need to set.",
+		defaultValue: DefaultGHHostname,
 	},
 	{
 		name:        GHUserFlag,
@@ -89,9 +97,9 @@ var stringFlags = []stringFlag{
 			"Should be specified via the ATLANTIS_GH_WEBHOOK_SECRET environment variable.",
 	},
 	{
-		name:        GitlabHostnameFlag,
-		description: "Hostname of your GitLab Enterprise installation. If using gitlab.com, no need to set.",
-		value:       "gitlab.com",
+		name:         GitlabHostnameFlag,
+		description:  "Hostname of your GitLab Enterprise installation. If using gitlab.com, no need to set.",
+		defaultValue: DefaultGitlabHostname,
 	},
 	{
 		name:        GitlabUserFlag,
@@ -109,9 +117,9 @@ var stringFlags = []stringFlag{
 			"Should be specified via the ATLANTIS_GITLAB_WEBHOOK_SECRET environment variable.",
 	},
 	{
-		name:        LogLevelFlag,
-		description: "Log level. Either debug, info, warn, or error.",
-		value:       "info",
+		name:         LogLevelFlag,
+		description:  "Log level. Either debug, info, warn, or error.",
+		defaultValue: DefaultLogLevel,
 	},
 	{
 		name: RepoWhitelistFlag,
@@ -130,38 +138,38 @@ var stringFlags = []stringFlag{
 }
 var boolFlags = []boolFlag{
 	{
-		name:        AllowForkPRsFlag,
-		description: "Allow Atlantis to run on pull requests from forks. A security issue for public repos.",
-		value:       false,
+		name:         AllowForkPRsFlag,
+		description:  "Allow Atlantis to run on pull requests from forks. A security issue for public repos.",
+		defaultValue: false,
 	},
 	{
-		name:        RequireApprovalFlag,
-		description: "Require pull requests to be \"Approved\" before allowing the apply command to be run.",
-		value:       false,
+		name:         RequireApprovalFlag,
+		description:  "Require pull requests to be \"Approved\" before allowing the apply command to be run.",
+		defaultValue: false,
 	},
 }
 var intFlags = []intFlag{
 	{
-		name:        PortFlag,
-		description: "Port to bind to.",
-		value:       4141,
+		name:         PortFlag,
+		description:  "Port to bind to.",
+		defaultValue: DefaultPort,
 	},
 }
 
 type stringFlag struct {
-	name        string
-	description string
-	value       string
+	name         string
+	description  string
+	defaultValue string
 }
 type intFlag struct {
-	name        string
-	description string
-	value       int
+	name         string
+	description  string
+	defaultValue int
 }
 type boolFlag struct {
-	name        string
-	description string
-	value       bool
+	name         string
+	description  string
+	defaultValue bool
 }
 
 // ServerCmd is an abstraction that helps us test. It allows
@@ -231,19 +239,27 @@ func (s *ServerCmd) Init() *cobra.Command {
 
 	// Set string flags.
 	for _, f := range stringFlags {
-		c.Flags().String(f.name, f.value, "> "+f.description)
+		usage := f.description
+		if f.defaultValue != "" {
+			usage = fmt.Sprintf("%s (default \"%s\")", usage, f.defaultValue)
+		}
+		c.Flags().String(f.name, "", usage+"\n")
 		s.Viper.BindPFlag(f.name, c.Flags().Lookup(f.name)) // nolint: errcheck
 	}
 
 	// Set int flags.
 	for _, f := range intFlags {
-		c.Flags().Int(f.name, f.value, "> "+f.description)
+		usage := f.description
+		if f.defaultValue != 0 {
+			usage = fmt.Sprintf("%s (default %d)", usage, f.defaultValue)
+		}
+		c.Flags().Int(f.name, 0, usage+"\n")
 		s.Viper.BindPFlag(f.name, c.Flags().Lookup(f.name)) // nolint: errcheck
 	}
 
 	// Set bool flags.
 	for _, f := range boolFlags {
-		c.Flags().Bool(f.name, f.value, "> "+f.description)
+		c.Flags().Bool(f.name, f.defaultValue, f.description+"\n")
 		s.Viper.BindPFlag(f.name, c.Flags().Lookup(f.name)) // nolint: errcheck
 	}
 
@@ -267,6 +283,7 @@ func (s *ServerCmd) run() error {
 	if err := s.Viper.Unmarshal(&userConfig); err != nil {
 		return err
 	}
+	s.setDefaults(&userConfig)
 	if err := s.validate(userConfig); err != nil {
 		return err
 	}
@@ -288,6 +305,24 @@ func (s *ServerCmd) run() error {
 		return errors.Wrap(err, "initializing server")
 	}
 	return server.Start()
+}
+
+func (s *ServerCmd) setDefaults(c *server.UserConfig) {
+	if c.DataDir == "" {
+		c.DataDir = DefaultDataDir
+	}
+	if c.GithubHostname == "" {
+		c.GithubHostname = DefaultGHHostname
+	}
+	if c.GitlabHostname == "" {
+		c.GitlabHostname = DefaultGitlabHostname
+	}
+	if c.LogLevel == "" {
+		c.LogLevel = DefaultLogLevel
+	}
+	if c.Port == 0 {
+		c.Port = DefaultPort
+	}
 }
 
 // nolint: gocyclo
