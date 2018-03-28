@@ -143,22 +143,3 @@ func (l *LockController) respond(w http.ResponseWriter, lvl logging.LogLevel, co
 	w.WriteHeader(code)
 	fmt.Fprintln(w, response)
 }
-
-func getRepoInfo(repoFullName string) (*models.Repo, error) {
-	// Get the owner and repo names from the full name.
-	var owner string
-	var repo string
-	pathSplit := strings.Split(repoFullName, "/")
-	if len(pathSplit) != 2 || pathSplit[0] == "" || pathSplit[1] == "" {
-		return &models.Repo{}, fmt.Errorf("invalid repo format %q", repoFullName)
-	}
-	owner = pathSplit[0]
-	repo = pathSplit[1]
-
-	return &models.Repo{
-		FullName: repoFullName,
-		Owner:    owner,
-		Name:     repo,
-	}, nil
-
-}
