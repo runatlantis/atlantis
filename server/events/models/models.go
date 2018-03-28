@@ -111,6 +111,8 @@ type PullRequest struct {
 	// Gitlab supports an additional "merged" state but Github doesn't so we map
 	// merged to Closed.
 	State PullRequestState
+
+	Repo Repo
 }
 
 type PullRequestState int

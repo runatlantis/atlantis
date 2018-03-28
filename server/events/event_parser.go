@@ -121,6 +121,7 @@ func (e *EventParser) ParseGithubPull(pull *github.PullRequest) (models.PullRequ
 		URL:        url,
 		Num:        num,
 		State:      pullState,
+		Repo:       headRepoModel,
 	}, headRepoModel, nil
 }
 

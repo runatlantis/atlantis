@@ -58,6 +58,7 @@ type Server struct {
 	Locker             locking.Locker
 	AtlantisURL        string
 	EventsController   *EventsController
+	LockController     *LockController
 	IndexTemplate      TemplateWriter
 	LockDetailTemplate TemplateWriter
 	SSLCertFile        string
@@ -243,6 +244,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	repoWhitelist := &events.RepoWhitelist{
 		Whitelist: userConfig.RepoWhitelist,
 	}
+	lockController := &LockController{
+		AtlantisVersion:    config.AtlantisVersion,
+		Locker:             lockingClient,
+		Logger:             logger,
+		VCSClient:          vcsClient,
+		LockDetailTemplate: lockTemplate,
+	}
 	eventsController := &EventsController{
 		CommandRunner:          commandHandler,
 		PullCleaner:            pullClosedExecutor,
@@ -267,6 +275,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Locker:             lockingClient,
 		AtlantisURL:        userConfig.AtlantisURL,
 		EventsController:   eventsController,
+		LockController:     lockController,
 		IndexTemplate:      indexTemplate,
 		LockDetailTemplate: lockTemplate,
 		SSLKeyFile:         userConfig.SSLKeyFile,
@@ -281,8 +290,8 @@ func (s *Server) Start() error {
 	})
 	s.Router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: static.Asset, AssetDir: static.AssetDir, AssetInfo: static.AssetInfo}))
 	s.Router.HandleFunc("/events", s.postEvents).Methods("POST")
-	s.Router.HandleFunc("/locks", s.DeleteLockRoute).Methods("DELETE").Queries("id", "{id:.*}")
-	lockRoute := s.Router.HandleFunc("/lock", s.GetLockRoute).Methods("GET").Queries("id", "{id}").Name(LockRouteName)
+	s.Router.HandleFunc("/locks", s.deleteEvents).Methods("DELETE").Queries("id", "{id:.*}")
+	lockRoute := s.Router.HandleFunc("/lock", s.getEvents).Methods("GET").Queries("id", "{id}").Name(LockRouteName)
 	// function that planExecutor can use to construct detail view url
 	// injecting this here because this is the earliest routes are created
 	s.CommandHandler.SetLockURL(func(lockID string) string {
@@ -439,6 +448,14 @@ func (s *Server) DeleteLock(w http.ResponseWriter, _ *http.Request, id string) {
 // VCS webhook requests.
 func (s *Server) postEvents(w http.ResponseWriter, r *http.Request) {
 	s.EventsController.Post(w, r)
+}
+
+func (s *Server) getEvents(w http.ResponseWriter, r *http.Request) {
+	s.LockController.GetLockRoute(w, r)
+}
+
+func (s *Server) deleteEvents(w http.ResponseWriter, r *http.Request) {
+	s.LockController.DeleteLockRoute(w, r)
 }
 
 // respond is a helper function to respond and log the response. lvl is the log
