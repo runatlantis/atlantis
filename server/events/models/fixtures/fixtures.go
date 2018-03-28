@@ -23,12 +23,28 @@ var Pull = models.PullRequest{
 	URL:        "url",
 }
 
-var Repo = models.Repo{
+var GithubRepo = models.Repo{
 	CloneURL:          "https://user:password@github.com/runatlantis/atlantis.git",
 	FullName:          "runatlantis/atlantis",
 	Owner:             "runatlantis",
 	SanitizedCloneURL: "https://github.com/runatlantis/atlantis.git",
 	Name:              "atlantis",
+	VCSHost: models.VCSHost{
+		Hostname: "github.com",
+		Type:     models.Github,
+	},
+}
+
+var GitlabRepo = models.Repo{
+	CloneURL:          "https://user:password@github.com/runatlantis/atlantis.git",
+	FullName:          "runatlantis/atlantis",
+	Owner:             "runatlantis",
+	SanitizedCloneURL: "https://gitlab.com/runatlantis/atlantis.git",
+	Name:              "atlantis",
+	VCSHost: models.VCSHost{
+		Hostname: "gitlab.com",
+		Type:     models.Gitlab,
+	},
 }
 
 var User = models.User{

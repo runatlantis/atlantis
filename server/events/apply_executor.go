@@ -40,7 +40,7 @@ type ApplyExecutor struct {
 // Execute executes apply for the ctx.
 func (a *ApplyExecutor) Execute(ctx *CommandContext) CommandResponse {
 	if a.RequireApproval {
-		approved, err := a.VCSClient.PullIsApproved(ctx.BaseRepo, ctx.Pull, ctx.VCSHost)
+		approved, err := a.VCSClient.PullIsApproved(ctx.BaseRepo, ctx.Pull)
 		if err != nil {
 			return CommandResponse{Error: errors.Wrap(err, "checking if pull request was approved")}
 		}

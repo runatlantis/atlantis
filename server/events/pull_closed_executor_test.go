@@ -24,7 +24,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/fixtures"
-	"github.com/runatlantis/atlantis/server/events/vcs"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -37,8 +36,8 @@ func TestCleanUpPullWorkspaceErr(t *testing.T) {
 		Workspace: w,
 	}
 	err := errors.New("err")
-	When(w.Delete(fixtures.Repo, fixtures.Pull)).ThenReturn(err)
-	actualErr := pce.CleanUpPull(fixtures.Repo, fixtures.Pull, vcs.Github)
+	When(w.Delete(fixtures.GithubRepo, fixtures.Pull)).ThenReturn(err)
+	actualErr := pce.CleanUpPull(fixtures.GithubRepo, fixtures.Pull)
 	Equals(t, "cleaning workspace: err", actualErr.Error())
 }
 
@@ -52,8 +51,8 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 		Workspace: w,
 	}
 	err := errors.New("err")
-	When(l.UnlockByPull(fixtures.Repo.FullName, fixtures.Pull.Num)).ThenReturn(nil, err)
-	actualErr := pce.CleanUpPull(fixtures.Repo, fixtures.Pull, vcs.Github)
+	When(l.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(nil, err)
+	actualErr := pce.CleanUpPull(fixtures.GithubRepo, fixtures.Pull)
 	Equals(t, "cleaning up locks: err", actualErr.Error())
 }
 
@@ -68,10 +67,10 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 		VCSClient: cp,
 		Workspace: w,
 	}
-	When(l.UnlockByPull(fixtures.Repo.FullName, fixtures.Pull.Num)).ThenReturn(nil, nil)
-	err := pce.CleanUpPull(fixtures.Repo, fixtures.Pull, vcs.Github)
+	When(l.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(nil, nil)
+	err := pce.CleanUpPull(fixtures.GithubRepo, fixtures.Pull)
 	Ok(t, err)
-	cp.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), matchers.AnyVcsHost())
+	cp.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString())
 }
 
 func TestCleanUpPullComments(t *testing.T) {
@@ -149,10 +148,10 @@ func TestCleanUpPullComments(t *testing.T) {
 			Workspace: w,
 		}
 		t.Log("testing: " + c.Description)
-		When(l.UnlockByPull(fixtures.Repo.FullName, fixtures.Pull.Num)).ThenReturn(c.Locks, nil)
-		err := pce.CleanUpPull(fixtures.Repo, fixtures.Pull, vcs.Github)
+		When(l.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(c.Locks, nil)
+		err := pce.CleanUpPull(fixtures.GithubRepo, fixtures.Pull)
 		Ok(t, err)
-		_, _, comment, _ := cp.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), matchers.AnyVcsHost()).GetCapturedArguments()
+		_, _, comment := cp.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString()).GetCapturedArguments()
 
 		expected := "Locks and plans deleted for the projects and workspaces modified in this pull request:\n\n" + c.Exp
 		Equals(t, expected, comment)

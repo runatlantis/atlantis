@@ -9,7 +9,6 @@ import (
 	pegomock "github.com/petergtz/pegomock"
 	events "github.com/runatlantis/atlantis/server/events"
 	models "github.com/runatlantis/atlantis/server/events/models"
-	vcs "github.com/runatlantis/atlantis/server/events/vcs"
 )
 
 type MockCommandRunner struct {
@@ -20,8 +19,8 @@ func NewMockCommandRunner() *MockCommandRunner {
 	return &MockCommandRunner{fail: pegomock.GlobalFailHandler}
 }
 
-func (mock *MockCommandRunner) ExecuteCommand(baseRepo models.Repo, headRepo models.Repo, user models.User, pullNum int, cmd *events.Command, vcsHost vcs.Host) {
-	params := []pegomock.Param{baseRepo, headRepo, user, pullNum, cmd, vcsHost}
+func (mock *MockCommandRunner) ExecuteCommand(baseRepo models.Repo, headRepo models.Repo, user models.User, pullNum int, cmd *events.Command) {
+	params := []pegomock.Param{baseRepo, headRepo, user, pullNum, cmd}
 	pegomock.GetGenericMockFrom(mock).Invoke("ExecuteCommand", params, []reflect.Type{})
 }
 
@@ -43,8 +42,8 @@ type VerifierCommandRunner struct {
 	inOrderContext         *pegomock.InOrderContext
 }
 
-func (verifier *VerifierCommandRunner) ExecuteCommand(baseRepo models.Repo, headRepo models.Repo, user models.User, pullNum int, cmd *events.Command, vcsHost vcs.Host) *CommandRunner_ExecuteCommand_OngoingVerification {
-	params := []pegomock.Param{baseRepo, headRepo, user, pullNum, cmd, vcsHost}
+func (verifier *VerifierCommandRunner) ExecuteCommand(baseRepo models.Repo, headRepo models.Repo, user models.User, pullNum int, cmd *events.Command) *CommandRunner_ExecuteCommand_OngoingVerification {
+	params := []pegomock.Param{baseRepo, headRepo, user, pullNum, cmd}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ExecuteCommand", params)
 	return &CommandRunner_ExecuteCommand_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -54,12 +53,12 @@ type CommandRunner_ExecuteCommand_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *CommandRunner_ExecuteCommand_OngoingVerification) GetCapturedArguments() (models.Repo, models.Repo, models.User, int, *events.Command, vcs.Host) {
-	baseRepo, headRepo, user, pullNum, cmd, vcsHost := c.GetAllCapturedArguments()
-	return baseRepo[len(baseRepo)-1], headRepo[len(headRepo)-1], user[len(user)-1], pullNum[len(pullNum)-1], cmd[len(cmd)-1], vcsHost[len(vcsHost)-1]
+func (c *CommandRunner_ExecuteCommand_OngoingVerification) GetCapturedArguments() (models.Repo, models.Repo, models.User, int, *events.Command) {
+	baseRepo, headRepo, user, pullNum, cmd := c.GetAllCapturedArguments()
+	return baseRepo[len(baseRepo)-1], headRepo[len(headRepo)-1], user[len(user)-1], pullNum[len(pullNum)-1], cmd[len(cmd)-1]
 }
 
-func (c *CommandRunner_ExecuteCommand_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.Repo, _param2 []models.User, _param3 []int, _param4 []*events.Command, _param5 []vcs.Host) {
+func (c *CommandRunner_ExecuteCommand_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.Repo, _param2 []models.User, _param3 []int, _param4 []*events.Command) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.Repo, len(params[0]))
@@ -81,10 +80,6 @@ func (c *CommandRunner_ExecuteCommand_OngoingVerification) GetAllCapturedArgumen
 		_param4 = make([]*events.Command, len(params[4]))
 		for u, param := range params[4] {
 			_param4[u] = param.(*events.Command)
-		}
-		_param5 = make([]vcs.Host, len(params[5]))
-		for u, param := range params[5] {
-			_param5[u] = param.(vcs.Host)
 		}
 	}
 	return

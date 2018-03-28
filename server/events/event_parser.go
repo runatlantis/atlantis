@@ -125,7 +125,7 @@ func (e *EventParser) ParseGithubPull(pull *github.PullRequest) (models.PullRequ
 }
 
 func (e *EventParser) ParseGithubRepo(ghRepo *github.Repository) (models.Repo, error) {
-	return models.NewRepo(ghRepo.GetFullName(), ghRepo.GetCloneURL(), e.GithubUser, e.GithubToken)
+	return models.NewRepo(models.Github, ghRepo.GetFullName(), ghRepo.GetCloneURL(), e.GithubUser, e.GithubToken)
 }
 
 func (e *EventParser) ParseGitlabMergeEvent(event gitlab.MergeEvent) (models.PullRequest, models.Repo, error) {
@@ -145,7 +145,7 @@ func (e *EventParser) ParseGitlabMergeEvent(event gitlab.MergeEvent) (models.Pul
 		State:      modelState,
 	}
 
-	repo, err := models.NewRepo(event.Project.PathWithNamespace, event.Project.GitHTTPURL, e.GitlabUser, e.GitlabToken)
+	repo, err := models.NewRepo(models.Gitlab, event.Project.PathWithNamespace, event.Project.GitHTTPURL, e.GitlabUser, e.GitlabToken)
 	return pull, repo, err
 }
 
@@ -154,7 +154,7 @@ func (e *EventParser) ParseGitlabMergeCommentEvent(event gitlab.MergeCommentEven
 	// Parse the base repo first.
 	repoFullName := event.Project.PathWithNamespace
 	cloneURL := event.Project.GitHTTPURL
-	baseRepo, err = models.NewRepo(repoFullName, cloneURL, e.GitlabUser, e.GitlabToken)
+	baseRepo, err = models.NewRepo(models.Gitlab, repoFullName, cloneURL, e.GitlabUser, e.GitlabToken)
 	if err != nil {
 		return
 	}
@@ -165,7 +165,7 @@ func (e *EventParser) ParseGitlabMergeCommentEvent(event gitlab.MergeCommentEven
 	// Now parse the head repo.
 	headRepoFullName := event.MergeRequest.Source.PathWithNamespace
 	headCloneURL := event.MergeRequest.Source.GitHTTPURL
-	headRepo, err = models.NewRepo(headRepoFullName, headCloneURL, e.GitlabUser, e.GitlabToken)
+	headRepo, err = models.NewRepo(models.Gitlab, headRepoFullName, headCloneURL, e.GitlabUser, e.GitlabToken)
 	return
 }
 

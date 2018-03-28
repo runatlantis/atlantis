@@ -78,9 +78,9 @@ func TestExecuteCommand_LogPanics(t *testing.T) {
 	setup(t)
 	ch.AllowForkPRs = true // Lets us get to the panic code.
 	defer func() { ch.AllowForkPRs = false }()
-	When(ghStatus.Update(fixtures.Repo, fixtures.Pull, vcs.Pending, nil, vcs.Github)).ThenPanic("panic")
-	ch.ExecuteCommand(fixtures.Repo, fixtures.Repo, fixtures.User, 1, nil, vcs.Github)
-	_, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), matchers.AnyVcsHost()).GetCapturedArguments()
+	When(ghStatus.Update(fixtures.GithubRepo, fixtures.Pull, vcs.Pending, nil)).ThenPanic("panic")
+	ch.ExecuteCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.User, 1, nil)
+	_, _, comment := vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString()).GetCapturedArguments()
 	Assert(t, strings.Contains(comment, "Error: goroutine panic"), "comment should be about a goroutine panic")
 }
 
@@ -88,7 +88,7 @@ func TestExecuteCommand_NoGithubPullGetter(t *testing.T) {
 	t.Log("if CommandHandler was constructed with a nil GithubPullGetter an error should be logged")
 	setup(t)
 	ch.GithubPullGetter = nil
-	ch.ExecuteCommand(fixtures.Repo, fixtures.Repo, fixtures.User, 1, nil, vcs.Github)
+	ch.ExecuteCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.User, 1, nil)
 	Equals(t, "[ERROR] runatlantis/atlantis#1: Atlantis not configured to support GitHub\n", logBytes.String())
 }
 
@@ -96,23 +96,23 @@ func TestExecuteCommand_NoGitlabMergeGetter(t *testing.T) {
 	t.Log("if CommandHandler was constructed with a nil GitlabMergeRequestGetter an error should be logged")
 	setup(t)
 	ch.GitlabMergeRequestGetter = nil
-	ch.ExecuteCommand(fixtures.Repo, fixtures.Repo, fixtures.User, 1, nil, vcs.Gitlab)
+	ch.ExecuteCommand(fixtures.GitlabRepo, fixtures.GitlabRepo, fixtures.User, 1, nil)
 	Equals(t, "[ERROR] runatlantis/atlantis#1: Atlantis not configured to support GitLab\n", logBytes.String())
 }
 
 func TestExecuteCommand_GithubPullErr(t *testing.T) {
 	t.Log("if getting the github pull request fails an error should be logged")
 	setup(t)
-	When(githubGetter.GetPullRequest(fixtures.Repo, fixtures.Pull.Num)).ThenReturn(nil, errors.New("err"))
-	ch.ExecuteCommand(fixtures.Repo, fixtures.Repo, fixtures.User, fixtures.Pull.Num, nil, vcs.Github)
+	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(nil, errors.New("err"))
+	ch.ExecuteCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.User, fixtures.Pull.Num, nil)
 	Equals(t, "[ERROR] runatlantis/atlantis#1: Making pull request API call to GitHub: err\n", logBytes.String())
 }
 
 func TestExecuteCommand_GitlabMergeRequestErr(t *testing.T) {
 	t.Log("if getting the gitlab merge request fails an error should be logged")
 	setup(t)
-	When(gitlabGetter.GetMergeRequest(fixtures.Repo.FullName, fixtures.Pull.Num)).ThenReturn(nil, errors.New("err"))
-	ch.ExecuteCommand(fixtures.Repo, fixtures.Repo, fixtures.User, fixtures.Pull.Num, nil, vcs.Gitlab)
+	When(gitlabGetter.GetMergeRequest(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(nil, errors.New("err"))
+	ch.ExecuteCommand(fixtures.GitlabRepo, fixtures.GitlabRepo, fixtures.User, fixtures.Pull.Num, nil)
 	Equals(t, "[ERROR] runatlantis/atlantis#1: Making merge request API call to GitLab: err\n", logBytes.String())
 }
 
@@ -120,10 +120,10 @@ func TestExecuteCommand_GithubPullParseErr(t *testing.T) {
 	t.Log("if parsing the returned github pull request fails an error should be logged")
 	setup(t)
 	var pull github.PullRequest
-	When(githubGetter.GetPullRequest(fixtures.Repo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
-	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(fixtures.Pull, fixtures.Repo, errors.New("err"))
+	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
+	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(fixtures.Pull, fixtures.GithubRepo, errors.New("err"))
 
-	ch.ExecuteCommand(fixtures.Repo, fixtures.Repo, fixtures.User, fixtures.Pull.Num, nil, vcs.Github)
+	ch.ExecuteCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.User, fixtures.Pull.Num, nil)
 	Equals(t, "[ERROR] runatlantis/atlantis#1: Extracting required fields from comment data: err\n", logBytes.String())
 }
 
@@ -134,15 +134,15 @@ func TestExecuteCommand_ForkPRDisabled(t *testing.T) {
 	ch.AllowForkPRs = false // by default it's false so don't need to reset
 	var pull github.PullRequest
 	modelPull := models.PullRequest{State: models.Open}
-	When(githubGetter.GetPullRequest(fixtures.Repo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
+	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
 
-	headRepo := fixtures.Repo
+	headRepo := fixtures.GithubRepo
 	headRepo.FullName = "forkrepo/atlantis"
 	headRepo.Owner = "forkrepo"
 	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, headRepo, nil)
 
-	ch.ExecuteCommand(fixtures.Repo, models.Repo{} /* this isn't used */, fixtures.User, fixtures.Pull.Num, nil, vcs.Github)
-	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.Repo, modelPull.Num, "Atlantis commands can't be run on fork pull requests. To enable, set --"+ch.AllowForkPRsFlag, vcs.Github)
+	ch.ExecuteCommand(fixtures.GithubRepo, models.Repo{} /* this isn't used */, fixtures.User, fixtures.Pull.Num, nil)
+	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "Atlantis commands can't be run on fork pull requests. To enable, set --"+ch.AllowForkPRsFlag)
 }
 
 func TestExecuteCommand_ClosedPull(t *testing.T) {
@@ -153,11 +153,11 @@ func TestExecuteCommand_ClosedPull(t *testing.T) {
 		State: github.String("closed"),
 	}
 	modelPull := models.PullRequest{State: models.Closed}
-	When(githubGetter.GetPullRequest(fixtures.Repo, fixtures.Pull.Num)).ThenReturn(pull, nil)
-	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, fixtures.Repo, nil)
+	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
+	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, fixtures.GithubRepo, nil)
 
-	ch.ExecuteCommand(fixtures.Repo, fixtures.Repo, fixtures.User, fixtures.Pull.Num, nil, vcs.Github)
-	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.Repo, modelPull.Num, "Atlantis commands can't be run on closed pull requests", vcs.Github)
+	ch.ExecuteCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.User, fixtures.Pull.Num, nil)
+	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "Atlantis commands can't be run on closed pull requests")
 }
 
 func TestExecuteCommand_WorkspaceLocked(t *testing.T) {
@@ -171,19 +171,19 @@ func TestExecuteCommand_WorkspaceLocked(t *testing.T) {
 		Workspace: "workspace",
 	}
 
-	When(githubGetter.GetPullRequest(fixtures.Repo, fixtures.Pull.Num)).ThenReturn(pull, nil)
-	When(eventParsing.ParseGithubPull(pull)).ThenReturn(fixtures.Pull, fixtures.Repo, nil)
-	When(workspaceLocker.TryLock(fixtures.Repo.FullName, cmd.Workspace, fixtures.Pull.Num)).ThenReturn(false)
-	ch.ExecuteCommand(fixtures.Repo, fixtures.Repo, fixtures.User, fixtures.Pull.Num, &cmd, vcs.Github)
+	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
+	When(eventParsing.ParseGithubPull(pull)).ThenReturn(fixtures.Pull, fixtures.GithubRepo, nil)
+	When(workspaceLocker.TryLock(fixtures.GithubRepo.FullName, cmd.Workspace, fixtures.Pull.Num)).ThenReturn(false)
+	ch.ExecuteCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.User, fixtures.Pull.Num, &cmd)
 
 	msg := "The workspace workspace is currently locked by another" +
 		" command that is running for this pull request." +
 		" Wait until the previous command is complete and try again."
-	ghStatus.VerifyWasCalledOnce().Update(fixtures.Repo, fixtures.Pull, vcs.Pending, &cmd, vcs.Github)
+	ghStatus.VerifyWasCalledOnce().Update(fixtures.GithubRepo, fixtures.Pull, vcs.Pending, &cmd)
 	_, response := ghStatus.VerifyWasCalledOnce().UpdateProjectResult(matchers.AnyPtrToEventsCommandContext(), matchers.AnyEventsCommandResponse()).GetCapturedArguments()
 	Equals(t, msg, response.Failure)
-	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.Repo, fixtures.Pull.Num,
-		"**Plan Failed**: "+msg+"\n\n", vcs.Github)
+	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, fixtures.Pull.Num,
+		"**Plan Failed**: "+msg+"\n\n")
 }
 
 func TestExecuteCommand_FullRun(t *testing.T) {
@@ -198,9 +198,9 @@ func TestExecuteCommand_FullRun(t *testing.T) {
 			Name:      c,
 			Workspace: "workspace",
 		}
-		When(githubGetter.GetPullRequest(fixtures.Repo, fixtures.Pull.Num)).ThenReturn(pull, nil)
-		When(eventParsing.ParseGithubPull(pull)).ThenReturn(fixtures.Pull, fixtures.Repo, nil)
-		When(workspaceLocker.TryLock(fixtures.Repo.FullName, cmd.Workspace, fixtures.Pull.Num)).ThenReturn(true)
+		When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
+		When(eventParsing.ParseGithubPull(pull)).ThenReturn(fixtures.Pull, fixtures.GithubRepo, nil)
+		When(workspaceLocker.TryLock(fixtures.GithubRepo.FullName, cmd.Workspace, fixtures.Pull.Num)).ThenReturn(true)
 		switch c {
 		case events.Plan:
 			When(planner.Execute(matchers.AnyPtrToEventsCommandContext())).ThenReturn(cmdResponse)
@@ -208,13 +208,13 @@ func TestExecuteCommand_FullRun(t *testing.T) {
 			When(applier.Execute(matchers.AnyPtrToEventsCommandContext())).ThenReturn(cmdResponse)
 		}
 
-		ch.ExecuteCommand(fixtures.Repo, fixtures.Repo, fixtures.User, fixtures.Pull.Num, &cmd, vcs.Github)
+		ch.ExecuteCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.User, fixtures.Pull.Num, &cmd)
 
-		ghStatus.VerifyWasCalledOnce().Update(fixtures.Repo, fixtures.Pull, vcs.Pending, &cmd, vcs.Github)
+		ghStatus.VerifyWasCalledOnce().Update(fixtures.GithubRepo, fixtures.Pull, vcs.Pending, &cmd)
 		_, response := ghStatus.VerifyWasCalledOnce().UpdateProjectResult(matchers.AnyPtrToEventsCommandContext(), matchers.AnyEventsCommandResponse()).GetCapturedArguments()
 		Equals(t, cmdResponse, response)
-		vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), matchers.AnyVcsHost())
-		workspaceLocker.VerifyWasCalledOnce().Unlock(fixtures.Repo.FullName, cmd.Workspace, fixtures.Pull.Num)
+		vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString())
+		workspaceLocker.VerifyWasCalledOnce().Unlock(fixtures.GithubRepo.FullName, cmd.Workspace, fixtures.Pull.Num)
 	}
 }
 
@@ -232,19 +232,19 @@ func TestExecuteCommand_ForkPREnabled(t *testing.T) {
 		Name:      events.Plan,
 		Workspace: "workspace",
 	}
-	When(githubGetter.GetPullRequest(fixtures.Repo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
-	headRepo := fixtures.Repo
+	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
+	headRepo := fixtures.GithubRepo
 	headRepo.FullName = "forkrepo/atlantis"
 	headRepo.Owner = "forkrepo"
 	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(fixtures.Pull, headRepo, nil)
-	When(workspaceLocker.TryLock(fixtures.Repo.FullName, cmd.Workspace, fixtures.Pull.Num)).ThenReturn(true)
+	When(workspaceLocker.TryLock(fixtures.GithubRepo.FullName, cmd.Workspace, fixtures.Pull.Num)).ThenReturn(true)
 	When(planner.Execute(matchers.AnyPtrToEventsCommandContext())).ThenReturn(cmdResponse)
 
-	ch.ExecuteCommand(fixtures.Repo, models.Repo{} /* this isn't used */, fixtures.User, fixtures.Pull.Num, &cmd, vcs.Github)
+	ch.ExecuteCommand(fixtures.GithubRepo, models.Repo{} /* this isn't used */, fixtures.User, fixtures.Pull.Num, &cmd)
 
-	ghStatus.VerifyWasCalledOnce().Update(fixtures.Repo, fixtures.Pull, vcs.Pending, &cmd, vcs.Github)
+	ghStatus.VerifyWasCalledOnce().Update(fixtures.GithubRepo, fixtures.Pull, vcs.Pending, &cmd)
 	_, response := ghStatus.VerifyWasCalledOnce().UpdateProjectResult(matchers.AnyPtrToEventsCommandContext(), matchers.AnyEventsCommandResponse()).GetCapturedArguments()
 	Equals(t, cmdResponse, response)
-	vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), matchers.AnyVcsHost())
-	workspaceLocker.VerifyWasCalledOnce().Unlock(fixtures.Repo.FullName, cmd.Workspace, fixtures.Pull.Num)
+	vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString())
+	workspaceLocker.VerifyWasCalledOnce().Unlock(fixtures.GithubRepo.FullName, cmd.Workspace, fixtures.Pull.Num)
 }
