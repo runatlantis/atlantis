@@ -24,13 +24,15 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-var hashicorpReleasesURL = "https://releases.hashicorp.com"
-var terraformVersion = "0.10.8"
-var ngrokDownloadURL = "https://bin.equinox.io/c/4VmDzA7iaHb"
-var ngrokAPIURL = "localhost:4040"
+const hashicorpReleasesURL = "https://releases.hashicorp.com"
+const terraformVersion = "0.10.8"
+const ngrokDownloadURL = "https://bin.equinox.io/c/4VmDzA7iaHb"
+const ngrokAPIURL = "localhost:41414" // We hope this isn't used.
+const atlantisPort = 4141
 
 func readPassword() (string, error) {
 	password, err := terminal.ReadPassword(syscall.Stdin)
@@ -90,35 +92,38 @@ func unzip(archive, target string) error {
 }
 
 func getTunnelAddr() (string, error) {
-	response, err := http.Get(fmt.Sprintf("http://%s/api/tunnels", ngrokAPIURL))
+	tunAPI := fmt.Sprintf("http://%s/api/tunnels", ngrokAPIURL)
+	response, err := http.Get(tunAPI)
 	if err != nil {
 		return "", err
 	}
 	defer response.Body.Close() // nolint: errcheck
 
-	type tunnel struct {
-		Name      string `json:"name"`
-		URI       string `json:"uri"`
-		PublicURL string `json:"public_url"`
-		Proto     string `json:"http"`
-	}
-
 	type tunnels struct {
-		Tunnels []tunnel
+		Tunnels []struct {
+			PublicURL string `json:"public_url"`
+			Proto     string `json:"proto"`
+			Config    struct {
+				Addr string `json:"addr"`
+			} `json:"config"`
+		} `json:"tunnels"`
 	}
 
 	var t tunnels
 
-	err = json.NewDecoder(response.Body).Decode(&t)
-	if err != nil {
-		return "", err
+	if err = json.NewDecoder(response.Body).Decode(&t); err != nil {
+		return "", errors.Wrapf(err, "parsing ngrok api at %s", tunAPI)
 	}
 
-	if len(t.Tunnels) != 2 {
-		return "", fmt.Errorf("didn't find tunnels that were expected to be created")
+	// Find the tunnel we just created.
+	expAtlantisURL := fmt.Sprintf("localhost:%d", atlantisPort)
+	for _, tun := range t.Tunnels {
+		if tun.Proto == "https" && tun.Config.Addr == expAtlantisURL {
+			return tun.PublicURL, nil
+		}
 	}
 
-	return t.Tunnels[1].PublicURL, nil
+	return "", fmt.Errorf("did not find ngrok tunnel with proto 'https' and config.addr '%s' in list of tunnels at %s", expAtlantisURL, tunAPI)
 }
 
 // nolint: unparam
