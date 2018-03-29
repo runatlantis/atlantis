@@ -18,7 +18,7 @@ package bootstrap
 import (
 	"context"
 	"fmt"
-	"net"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -129,16 +129,30 @@ Follow these instructions to create a token (we don't store any tokens):
 	// Create ngrok tunnel.
 	colorstring.Println("[white]=> creating secure tunnel")
 	s.Start()
-	// Check if there is already an ngrok running by seeing if there's already
-	// something bound to its API port.
-	conn, err := net.Dial("tcp", ngrokAPIURL)
-	// We expect an error.
-	if err == nil {
-		conn.Close() // nolint: errcheck
-		return errors.New("unable to start ngrok because there is already something bound to its API port: " + ngrokAPIURL)
+
+	// We use a config file so we can set ngrok's API port (web_addr). We use
+	// the API to get the public URL and if there's already ngrok running, it
+	// will just choose a random API port and we won't be able to get the right
+	// url.
+	ngrokConfig := fmt.Sprintf(`
+web_addr: %s
+tunnels:
+  atlantis:
+    addr: %d
+    bind_tls: true
+    proto: http
+`, ngrokAPIURL, atlantisPort)
+
+	ngrokConfigFile, err := ioutil.TempFile("", "")
+	if err != nil {
+		return errors.Wrap(err, "creating ngrok config file")
+	}
+	err = ioutil.WriteFile(ngrokConfigFile.Name(), []byte(ngrokConfig), 0600)
+	if err != nil {
+		return errors.Wrap(err, "writing ngrok config file")
 	}
 
-	ngrokCmd, err := executeCmd("/tmp/ngrok", []string{"http", "4141"})
+	ngrokCmd, err := executeCmd("/tmp/ngrok", []string{"start", "atlantis", "--config", ngrokConfigFile.Name()})
 	if err != nil {
 		return errors.Wrapf(err, "creating ngrok tunnel")
 	}
