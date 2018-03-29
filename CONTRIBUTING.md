@@ -104,7 +104,7 @@ func TestLockingExisting(t *testing.T) {
 # Creating a New Release
 1. Update version number in
     1. `main.go`
-1. Update `CHANGELOG.md` with latest release number and information
+1. Update `CHANGELOG.md` with latest release number and information (this URL might be useful: https://github.com/runatlantis/atlantis/compare/v0.3.5...master)
 1. Create a pull request and merge to master
 1. Check out master and fetch latest
 1. Run `make release`
