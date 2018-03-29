@@ -1,3 +1,21 @@
+# v0.3.6
+
+## Features
+* `atlantis server -h` has newlines between flags so it's easier to read ([#91](https://github.com/runatlantis/atlantis/issues/91)).
+
+## Bugfixes
+* `atlantis bootstrap` uses a custom ngrok config file so it should work even
+if the user is already running another ngrok tunnel ([#93](https://github.com/runatlantis/atlantis/issues/93)).
+
+## Backwards Incompatibilities / Notes:
+* None
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.6/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.6/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.6/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.6/atlantis_linux_arm.zip)
+
 # v0.3.5
 
 ## Features
