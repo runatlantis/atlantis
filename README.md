@@ -356,6 +356,10 @@ If you're using GitLab, navigate to your project's home page in GitLab
 
 ### Create a GitHub Token
 We recommend creating a new user in GitHub named **atlantis** that performs all API actions, however you can use any user.
+
+**NOTE: The Atlantis user must have "Write permissions" (for repos in an organization) or be a "Collaborator" (for repos in a user account) to be able to set commit statuses:**
+![Atlantis status](./docs/status.png)
+
 Once you've created the user (or have decided to use an existing user) you need to create a personal access token.
 - follow [https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/#creating-a-token](https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/#creating-a-token)
 - copy the access token
