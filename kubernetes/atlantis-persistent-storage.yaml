@@ -22,7 +22,7 @@ spec:
         fsGroup: 1000 # atlantis group (1000) read/write access to volumes
       containers:
       - name: atlantis
-        image: runatlantis/atlantis:v0.3.5
+        image: runatlantis/atlantis:latest
         env:
         - name: ATLANTIS_PORT
           value: "4141"

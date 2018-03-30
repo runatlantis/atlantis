@@ -17,14 +17,14 @@ spec:
     spec:
       containers:
       - name: atlantis
-        image: runatlantis/atlantis:v0.3.5
+        image: runatlantis/atlantis:latest
         env:
+        - name: ATLANTIS_ATLANTIS_URL
+          value: atlantis.yourdomain.com
         - name: ATLANTIS_PORT
           value: "4141"
         - name: ATLANTIS_GH_USER
           value: your-cicd-user
-        - name: ATLANTIS_LOG_LEVEL
-          value: debug
         - name: ATLANTIS_GH_TOKEN
           valueFrom:
             secretKeyRef:
@@ -37,9 +37,14 @@ spec:
               key: webhook-secret
         - name: ATLANTIS_REPO_WHITELIST
           value: github.com/yourorg/terraform-*
+        - name: ATLANTIS_SSL_CERT_FILE
+          value: /etc/tls/atlantis-cert.pem
+        - name: ATLANTIS_SSL_KEY_FILE
+          value: /etc/tls/atlantis-key.pem
         volumeMounts:
-        - name: atlantis-storage
-          mountPath: /atlantis
+        - name: atlantis-yourdomain-com-tls
+          mountPath: /etc/tls
+          readOnly: true
         ports:
         - name: atlantis
           containerPort: 4141
@@ -54,7 +59,10 @@ spec:
           httpGet:
             path: /
             port: 4141
-            scheme: HTTP
+            scheme: HTTPS
+            httpHeaders:
+            - name: Host
+              value: atlantis.yourdomain.com
           periodSeconds: 5
           successThreshold: 1
           failureThreshold: 3
@@ -63,22 +71,38 @@ spec:
           httpGet:
             path: /
             port: 4141
-            scheme: HTTP
+            scheme: HTTPS
+            httpHeaders:
+            - name: Host
+              value: atlantis.yourdomain.com
           initialDelaySeconds: 10
           periodSeconds: 10
           successThreshold: 1
           failureThreshold: 3
           timeoutSeconds: 3
+      volumes:
+        - name: atlantis-yourdomain-com-tls
+          secret:
+            secretName: atlantis-yourdomain-com-tls
+            items:
+              - key: key.pem
+                path: atlantis-key.pem
+              - key: fullchain.pem
+                path: atlantis-cert.pem
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: atlantis
+  annotations:
+    # Setup dns. See https://github.com/kubernetes-incubator/external-dns
+    external-dns.alpha.kubernetes.io/hostname: atlantis.yourdomain.com.
+    # Get letsencrypt SSL certs, See https://github.com/tazjin/kubernetes-letsencrypt
+    acme/certificate: atlantis.yourdomain.com
 spec:
   ports:
   - name: atlantis
-    port: 80
+    port: 443
     targetPort: 4141
   selector:
     app: atlantis
-
