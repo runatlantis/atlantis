@@ -133,6 +133,20 @@ func TestIsWhitelisted(t *testing.T) {
 			"github.com",
 			false,
 		},
+		{
+			"should be case insensitive",
+			"github.com/owner/repo",
+			"OwNeR/rEpO",
+			"github.com",
+			true,
+		},
+		{
+			"should be case insensitive for wildcards",
+			"github.com/owner/*",
+			"OwNeR/rEpO",
+			"github.com",
+			true,
+		},
 	}
 
 	for _, c := range cases {
