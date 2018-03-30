@@ -42,6 +42,10 @@ func (r *RepoWhitelist) IsWhitelisted(repoFullName string, vcsHostname string) b
 }
 
 func (r *RepoWhitelist) matchesRule(rule string, candidate string) bool {
+	// Case insensitive compare.
+	rule = strings.ToLower(rule)
+	candidate = strings.ToLower(candidate)
+
 	wildcardIdx := strings.Index(rule, Wildcard)
 	if wildcardIdx == -1 {
 		// No wildcard so can do a straight up match.
