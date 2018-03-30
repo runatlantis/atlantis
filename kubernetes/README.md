@@ -7,7 +7,7 @@ or as a [Statefulset](https://kubernetes.io/docs/concepts/workloads/controllers/
 ## Statefulset vs deployment
 
 For production it is recommended to deploy it as a statefulset
-with a persistent disk. See [atlantis-persistent-disk.yaml](atlantis-persistent-disk.yaml)
+with a persistent disk. See [atlantis-persistent-storage.yaml](atlantis-persistent-storage.yaml)
 for an example.
 
 If you do not want persistent storage,
