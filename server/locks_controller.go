@@ -28,24 +28,23 @@ type LockController struct {
 
 var lockDeletedTemplate = template.Must(template.New("").Parse(
 	"The following Locks and plans deleted were deleted via the Atlantis UI:\n" +
-		"{{ $data:=.}}\n" +
-		"- path: `{{ $data.Path }}` {{ $data.Workspace }}"))
+		"- path: `{{ .Path	}}` {{ .Workspace }}"))
 
 func (l *LockController) GetLockRoute(w http.ResponseWriter, r *http.Request) {
 	id, ok := mux.Vars(r)["id"]
 	if !ok {
-		l.respond(w, logging.Warn, http.StatusBadRequest, "No lock id in request")
+		l.respond(w, "No lock id in request")
 		return
 	}
 	idUnencoded, err := url.QueryUnescape(id)
 	if err != nil {
-		l.respond(w, logging.Warn, http.StatusBadRequest, "Invalid lock id", err)
+		l.respond(w, "Invalid lock id", err)
 		return
 	}
 	lock, err := l.GetLock(idUnencoded)
 	t := l.GetLockTemplate(lock, id, idUnencoded)
 	if err != nil {
-		l.respond(w, logging.Warn, http.StatusBadRequest, "Invalid lock id", err)
+		l.respond(w, "Invalid lock id", err)
 		return
 	}
 	err = l.LockDetailTemplate.Execute(w, t) // nolint: errcheck
@@ -87,20 +86,20 @@ func (l *LockController) GetLockTemplate(lock *models.ProjectLock, id string, id
 func (l *LockController) DeleteLockRoute(w http.ResponseWriter, r *http.Request) error {
 	id, ok := mux.Vars(r)["id"]
 	if !ok || id == "" {
-		l.respond(w, logging.Warn, http.StatusBadRequest, "No lock id in request")
+		l.respond(w, "No lock id in request")
 		return nil
 	}
 	idUnencoded, err := url.PathUnescape(id)
 	if err != nil {
-		l.respond(w, logging.Warn, http.StatusBadRequest, "Invalid lock id: %s. Failed with %s", id, err)
+		l.respond(w, "Invalid lock id: %s. Failed with %s", id, err)
 		return nil
 	}
 	err = l.DeleteLock(idUnencoded)
 	if err != nil {
-		l.respond(w, logging.Warn, http.StatusBadRequest, "Failed to delete lock id: %s. Failed with %s", idUnencoded, err)
+		l.respond(w, "Failed to delete lock id: %s. Failed with %s", idUnencoded, err)
 		return nil
 	}
-	return nil
+	return err
 }
 
 func (l *LockController) DeleteLock(id string) error {
@@ -137,9 +136,9 @@ func (l *LockController) CommentOnPullRequest(lock *models.ProjectLock) error {
 	return l.VCSClient.CreateComment(lock.Pull.Repo, lock.Pull.Num, buf.String())
 }
 
-func (l *LockController) respond(w http.ResponseWriter, lvl logging.LogLevel, code int, format string, args ...interface{}) {
+func (l *LockController) respond(w http.ResponseWriter, format string, args ...interface{}) {
 	response := fmt.Sprintf(format, args...)
-	l.Logger.Log(lvl, response)
-	w.WriteHeader(code)
+	l.Logger.Log(logging.Warn, response)
+	w.WriteHeader(http.StatusBadRequest)
 	fmt.Fprintln(w, response)
 }
