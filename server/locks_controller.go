@@ -83,23 +83,22 @@ func (l *LockController) GetLockTemplate(lock *models.ProjectLock, id string, id
 	}
 }
 
-func (l *LockController) DeleteLockRoute(w http.ResponseWriter, r *http.Request) error {
+func (l *LockController) DeleteLockRoute(w http.ResponseWriter, r *http.Request) {
 	id, ok := mux.Vars(r)["id"]
 	if !ok || id == "" {
 		l.respond(w, "No lock id in request")
-		return nil
+		return
 	}
 	idUnencoded, err := url.PathUnescape(id)
 	if err != nil {
 		l.respond(w, "Invalid lock id: %s. Failed with %s", id, err)
-		return nil
+		return
 	}
 	err = l.DeleteLock(idUnencoded)
 	if err != nil {
 		l.respond(w, "Failed to delete lock id: %s. Failed with %s", idUnencoded, err)
-		return nil
+		return
 	}
-	return err
 }
 
 func (l *LockController) DeleteLock(id string) error {
