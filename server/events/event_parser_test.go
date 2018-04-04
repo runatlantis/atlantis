@@ -128,7 +128,7 @@ func TestParseGithubPull(t *testing.T) {
 	_, _, err = parser.ParseGithubPull(&testPull)
 	ErrEquals(t, "number is null", err)
 
-	pullRes, repoRes, err := parser.ParseGithubPull(&Pull)
+	pullRes, _, err := parser.ParseGithubPull(&Pull)
 	Ok(t, err)
 	Equals(t, models.PullRequest{
 		URL:        Pull.GetHTMLURL(),
@@ -137,19 +137,18 @@ func TestParseGithubPull(t *testing.T) {
 		HeadCommit: Pull.Head.GetSHA(),
 		Num:        Pull.GetNumber(),
 		State:      models.Open,
-	}, pullRes)
-
-	Equals(t, models.Repo{
-		Owner:             "owner",
-		FullName:          "owner/repo",
-		CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",
-		SanitizedCloneURL: Repo.GetCloneURL(),
-		Name:              "repo",
-		VCSHost: models.VCSHost{
-			Hostname: "github.com",
-			Type:     models.Github,
+		Repo: models.Repo{
+			Owner:             "owner",
+			FullName:          "owner/repo",
+			CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",
+			SanitizedCloneURL: Repo.GetCloneURL(),
+			Name:              "repo",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
 		},
-	}, repoRes)
+	}, pullRes)
 }
 
 func TestParseGitlabMergeEvent(t *testing.T) {
