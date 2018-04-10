@@ -137,7 +137,7 @@ func TestParseGithubPull(t *testing.T) {
 		HeadCommit: Pull.Head.GetSHA(),
 		Num:        Pull.GetNumber(),
 		State:      models.Open,
-		Repo: models.Repo{
+		HeadRepo: models.Repo{
 			Owner:             "owner",
 			FullName:          "owner/repo",
 			CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",

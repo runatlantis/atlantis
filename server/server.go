@@ -58,7 +58,7 @@ type Server struct {
 	Locker             locking.Locker
 	AtlantisURL        string
 	EventsController   *EventsController
-	LockController     *LockController
+	LocksController    *LocksController
 	IndexTemplate      TemplateWriter
 	LockDetailTemplate TemplateWriter
 	SSLCertFile        string
@@ -72,6 +72,7 @@ type UserConfig struct {
 	AllowForkPRs        bool   `mapstructure:"allow-fork-prs"`
 	AtlantisURL         string `mapstructure:"atlantis-url"`
 	DataDir             string `mapstructure:"data-dir"`
+	DisableLocking      string `mapstructure:"disable-locking"`
 	GithubHostname      string `mapstructure:"gh-hostname"`
 	GithubToken         string `mapstructure:"gh-token"`
 	GithubUser          string `mapstructure:"gh-user"`
@@ -244,7 +245,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	repoWhitelist := &events.RepoWhitelist{
 		Whitelist: userConfig.RepoWhitelist,
 	}
-	lockController := &LockController{
+	locksController := &LocksController{
 		AtlantisVersion:    config.AtlantisVersion,
 		Locker:             lockingClient,
 		Logger:             logger,
@@ -275,7 +276,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Locker:             lockingClient,
 		AtlantisURL:        userConfig.AtlantisURL,
 		EventsController:   eventsController,
-		LockController:     lockController,
+		LocksController:    locksController,
 		IndexTemplate:      indexTemplate,
 		LockDetailTemplate: lockTemplate,
 		SSLKeyFile:         userConfig.SSLKeyFile,
@@ -290,8 +291,8 @@ func (s *Server) Start() error {
 	})
 	s.Router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: static.Asset, AssetDir: static.AssetDir, AssetInfo: static.AssetInfo}))
 	s.Router.HandleFunc("/events", s.postEvents).Methods("POST")
-	s.Router.HandleFunc("/locks", s.deleteEvents).Methods("DELETE").Queries("id", "{id:.*}")
-	lockRoute := s.Router.HandleFunc("/lock", s.getEvents).Methods("GET").Queries("id", "{id}").Name(LockRouteName)
+	s.Router.HandleFunc("/locks", s.LocksController.DeleteLockRoute).Methods("DELETE").Queries("id", "{id:.*}")
+	lockRoute := s.Router.HandleFunc("/lock", s.LocksController.GetLockRoute).Methods("GET").Queries("id", "{id}").Name(LockRouteName)
 	// function that planExecutor can use to construct detail view url
 	// injecting this here because this is the earliest routes are created
 	s.CommandHandler.SetLockURL(func(lockID string) string {
@@ -364,98 +365,10 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-// GetLockRoute is the GET /locks/{id} route. It renders the lock detail view.
-func (s *Server) GetLockRoute(w http.ResponseWriter, r *http.Request) {
-	id, ok := mux.Vars(r)["id"]
-	if !ok {
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, "No lock id in request")
-		return
-	}
-	s.GetLock(w, r, id)
-}
-
-// GetLock handles a lock detail page view. getLockRoute is expected to
-// be called before. This function was extracted to make it testable.
-func (s *Server) GetLock(w http.ResponseWriter, _ *http.Request, id string) {
-	idUnencoded, err := url.QueryUnescape(id)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, "Invalid lock id")
-		return
-	}
-
-	lock, err := s.Locker.GetLock(idUnencoded)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprint(w, err.Error())
-		return
-	}
-	if lock == nil {
-		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprint(w, "No lock found at that id")
-		return
-	}
-
-	// Extract the repo owner and repo name.
-	repo := strings.Split(lock.Project.RepoFullName, "/")
-
-	l := LockDetailData{
-		LockKeyEncoded:  id,
-		LockKey:         idUnencoded,
-		RepoOwner:       repo[0],
-		RepoName:        repo[1],
-		PullRequestLink: lock.Pull.URL,
-		LockedBy:        lock.Pull.Author,
-		Workspace:       lock.Workspace,
-		AtlantisVersion: s.AtlantisVersion,
-	}
-
-	s.LockDetailTemplate.Execute(w, l) // nolint: errcheck
-}
-
-// DeleteLockRoute handles deleting the lock at id.
-func (s *Server) DeleteLockRoute(w http.ResponseWriter, r *http.Request) {
-	id, ok := mux.Vars(r)["id"]
-	if !ok || id == "" {
-		s.respond(w, logging.Warn, http.StatusBadRequest, "No lock id in request")
-		return
-	}
-	s.DeleteLock(w, r, id)
-}
-
-// DeleteLock deletes the lock. DeleteLockRoute should be called first.
-// This method is split out to make this route testable.
-func (s *Server) DeleteLock(w http.ResponseWriter, _ *http.Request, id string) {
-	idUnencoded, err := url.PathUnescape(id)
-	if err != nil {
-		s.respond(w, logging.Warn, http.StatusBadRequest, "Invalid lock id: %s", err)
-		return
-	}
-	lock, err := s.Locker.Unlock(idUnencoded)
-	if err != nil {
-		s.respond(w, logging.Error, http.StatusInternalServerError, "Failed to delete lock %s: %s", idUnencoded, err)
-		return
-	}
-	if lock == nil {
-		s.respond(w, logging.Warn, http.StatusNotFound, "No lock found at that id", idUnencoded)
-		return
-	}
-	s.respond(w, logging.Info, http.StatusOK, "Deleted lock id %s", idUnencoded)
-}
-
 // postEvents handles POST requests to our /events endpoint. These should be
 // VCS webhook requests.
 func (s *Server) postEvents(w http.ResponseWriter, r *http.Request) {
 	s.EventsController.Post(w, r)
-}
-
-func (s *Server) getEvents(w http.ResponseWriter, r *http.Request) {
-	s.LockController.GetLockRoute(w, r)
-}
-
-func (s *Server) deleteEvents(w http.ResponseWriter, r *http.Request) {
-	s.LockController.DeleteLockRoute(w, r)
 }
 
 // respond is a helper function to respond and log the response. lvl is the log

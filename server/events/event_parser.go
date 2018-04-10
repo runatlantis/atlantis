@@ -81,7 +81,7 @@ func (e *EventParser) ParseGithubIssueCommentEvent(comment *github.IssueCommentE
 
 func (e *EventParser) ParseGithubPull(pull *github.PullRequest) (models.PullRequest, models.Repo, error) {
 	var pullModel models.PullRequest
-	var headRepoModel models.Repo
+	var headRepoModel, baseRepoModel models.Repo
 
 	commit := pull.Head.GetSHA()
 	if commit == "" {
@@ -109,6 +109,11 @@ func (e *EventParser) ParseGithubPull(pull *github.PullRequest) (models.PullRequ
 		return pullModel, headRepoModel, err
 	}
 
+	baseRepoModel, err = e.ParseGithubRepo(pull.Base.Repo)
+	if err != nil {
+		return pullModel, headRepoModel, err
+	}
+
 	pullState := models.Closed
 	if pull.GetState() == "open" {
 		pullState = models.Open
@@ -121,7 +126,8 @@ func (e *EventParser) ParseGithubPull(pull *github.PullRequest) (models.PullRequ
 		URL:        url,
 		Num:        num,
 		State:      pullState,
-		Repo:       headRepoModel,
+		HeadRepo:   headRepoModel,
+		BaseRepo:   baseRepoModel,
 	}, headRepoModel, nil
 }
 
