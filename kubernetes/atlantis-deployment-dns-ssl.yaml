@@ -55,18 +55,6 @@ spec:
           limits:
             memory: 300Mi
             cpu: 1000m
-        readinessProbe:
-          httpGet:
-            path: /
-            port: 4141
-            scheme: HTTPS
-            httpHeaders:
-            - name: Host
-              value: atlantis.yourdomain.com
-          periodSeconds: 5
-          successThreshold: 1
-          failureThreshold: 3
-          timeoutSeconds: 3
         livenessProbe:
           httpGet:
             path: /
