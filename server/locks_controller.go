@@ -43,7 +43,7 @@ func (l *LocksController) GetLockRoute(w http.ResponseWriter, r *http.Request) {
 
 // GetLock handles a lock detail page view. getLockRoute is expected to
 // be called before. This function was extracted to make it testable.
-func (l *LocksController) GetLock(w http.ResponseWriter, r *http.Request, id string) {
+func (l *LocksController) GetLock(w http.ResponseWriter, _ *http.Request, id string) {
 	idUnencoded, err := url.QueryUnescape(id)
 	if err != nil {
 		l.respond(w, http.StatusBadRequest, "Invalid lock id", err)
@@ -97,7 +97,7 @@ func (l *LocksController) DeleteLockRoute(w http.ResponseWriter, r *http.Request
 
 // DeleteLock deletes the lock
 // DeleteLockRoute should be called first. This method is split out to make this route testable.
-func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request, id string) *models.ProjectLock {
+func (l *LocksController) DeleteLock(w http.ResponseWriter, _ *http.Request, id string) *models.ProjectLock {
 	idUnencoded, err := url.PathUnescape(id)
 	if err != nil {
 		l.respond(w, http.StatusBadRequest, "Invalid lock id: %s. Failed with error: %s", err)

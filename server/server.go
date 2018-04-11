@@ -370,12 +370,3 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 func (s *Server) postEvents(w http.ResponseWriter, r *http.Request) {
 	s.EventsController.Post(w, r)
 }
-
-// respond is a helper function to respond and log the response. lvl is the log
-// level to log at, code is the HTTP response code.
-func (s *Server) respond(w http.ResponseWriter, lvl logging.LogLevel, code int, format string, args ...interface{}) {
-	response := fmt.Sprintf(format, args...)
-	s.Logger.Log(lvl, response)
-	w.WriteHeader(code)
-	fmt.Fprintln(w, response)
-}
