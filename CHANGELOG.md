@@ -1,3 +1,12 @@
+# v0.3.8 (Unreleased)
+
+## Bugfixes
+* None
+
+## Backwards Incompatibilities / Notes:
+* Docker image now contains latest Terraform 0.11.7
+* Docker image now does checksum verification for Terraform binaries during build
+
 # v0.3.7
 
 ## Bugfixes
