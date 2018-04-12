@@ -33,7 +33,7 @@ RUN apk add --no-cache ca-certificates gnupg curl git unzip bash openssh libcap 
         rm -rf /root/.gnupg && rm -rf /var/cache/apk/*
 
 # install terraform binaries
-ENV DEFAULT_TERRAFORM_VERSION=0.11.5
+ENV DEFAULT_TERRAFORM_VERSION=0.11.7
 
 # In the official Atlantis image we only have the latest of each Terrafrom version.
 RUN AVAILABLE_TERRAFORM_VERSIONS="0.8.8 0.9.11 0.10.8 ${DEFAULT_TERRAFORM_VERSION}" && \
