@@ -1,11 +1,20 @@
-# v0.3.8 (Unreleased)
+# v0.3.8
+
+## Features
+* Terraform 0.11.7 in Docker image
+* Docker build now verifies terraform install via checksum
 
 ## Bugfixes
 * None
 
 ## Backwards Incompatibilities / Notes:
-* Docker image now contains latest Terraform 0.11.7
-* Docker image now does checksum verification for Terraform binaries during build
+* None
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.8/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.8/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.8/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.8/atlantis_linux_arm.zip)
 
 # v0.3.7
 
