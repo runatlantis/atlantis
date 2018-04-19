@@ -174,7 +174,7 @@ atlantis plan -w staging
 
 If a workspace is specified, Atlantis will use `terraform workspace select {workspace}` prior to running `terraform plan` or `terraform apply`.
 
-If you're using the `env/{env}.tfvars` [project structure](#project-structure) we will also append `-tfvars=env/{env}.tfvars` to `plan` and `apply`.
+If you're using the `env/{env}.tfvars` [project structure](#project-structure) we will also append `-var-file=env/{env}.tfvars` to `plan` and `apply`.
 
 If no workspace is specified, we'll use the `default` workspace by default.
 This replicates Terraform's default behaviour which also uses the `default` workspace.
