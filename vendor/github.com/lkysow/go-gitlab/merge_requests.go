@@ -114,7 +114,7 @@ type MergeRequestApprovals struct {
 	UpdatedAt         *time.Time `json:"updated_at"`
 	MergeStatus       string     `json:"merge_status"`
 	ApprovalsRequired int        `json:"approvals_required"`
-	ApprovalsMissing  int        `json:"approvals_missing"`
+	ApprovalsLeft     int        `json:"approvals_left"`
 	ApprovedBy        []struct {
 		User struct {
 			Name      string `json:"name"`

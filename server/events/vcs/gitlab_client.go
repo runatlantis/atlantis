@@ -72,7 +72,7 @@ func (g *GitlabClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 	if err != nil {
 		return false, err
 	}
-	if approvals.ApprovalsMissing > 0 {
+	if approvals.ApprovalsLeft > 0 {
 		return false, nil
 	}
 	return true, nil
