@@ -99,7 +99,7 @@
   branch = "master"
   name = "github.com/lkysow/go-gitlab"
   packages = ["."]
-  revision = "5aba7769280ffa5408f98e1b95290989cc1428c5"
+  revision = "fcd13266e57eb071cbedfe8efc7969a7bc4c8f22"
 
 [[projects]]
   name = "github.com/magiconair/properties"
