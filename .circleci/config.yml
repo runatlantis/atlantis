@@ -32,6 +32,7 @@ jobs:
     steps:
     - checkout
     - run: make build-service
+    - setup_remote_docker
     - run:
         name: Build image
         command: |
@@ -54,6 +55,7 @@ jobs:
     steps:
     - checkout
     - run: make build-service
+    - setup_remote_docker
     - run:
         name: Build and tag
         command: |
