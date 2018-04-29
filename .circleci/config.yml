@@ -1,45 +1,84 @@
 version: 2
 jobs:
-  build:
+  test:
     working_directory: /go/src/github.com/runatlantis/atlantis
     docker:
-      - image: circleci/golang:1.10
-        environment:
-          TERRAFORM_VERSION: 0.11.4
+    - image: circleci/golang:1.10
     steps:
-      - checkout
-      - setup_remote_docker:
-          reusable: true
-      - run: make test-coverage
-      - run: make check-fmt
-      - run: make check-gometalint
-      - run:
-          name: post coverage to codecov.io
-          command: bash <(curl -s https://codecov.io/bash)
-      - run: make build-service
-      # We don't run e2e tests on fork PRs because they don't have access to the secret env vars.
-      - run: if [ -z "${CIRCLE_PR_REPONAME}" ]; then ./scripts/e2e.sh; fi
-      - run:
-          name: Build image
-          command: |
-            if [ "${CIRCLE_BRANCH}" == "master" ]; then
-              docker build -t runatlantis/atlantis:latest .
-            fi
-      - run:
-          name: Push image
-          command: |
-            if [ "${CIRCLE_BRANCH}" == "master" ]; then
-              docker login -u "$DOCKER_USER" -p "$DOCKER_PASSWORD"
-              docker push runatlantis/atlantis:latest
-            fi
-      - run:
-          name: Tag and push version if exists
-          # work around until tags are properly supported
-          # https://discuss.circleci.com/t/git-tag-deploys-in-2-0/9493/6
-          command: |
-            if [ "${CIRCLE_BRANCH}" == "master" ]; then
-              for TAG in $(git tag --contains $CIRCLE_SHA1); do
-                docker tag runatlantis/atlantis:latest runatlantis/atlantis:$TAG
-                docker push runatlantis/atlantis:$TAG
-              done
-            fi
+    - checkout
+    - run: make test-coverage
+    - run: make check-fmt
+    - run: make check-gometalint
+    - run:
+        name: post coverage to codecov.io
+        command: bash <(curl -s https://codecov.io/bash)
+  e2e:
+    working_directory: /go/src/github.com/runatlantis/atlantis
+    docker:
+    - image: circleci/golang:1.10
+      environment:
+        TERRAFORM_VERSION: 0.11.7
+    steps:
+    - checkout
+    - run: make build-service
+    # We don't run e2e tests on fork PRs because they don't have access to the secret env vars.
+    - run: if [ -z "${CIRCLE_PR_REPONAME}" ]; then ./scripts/e2e.sh; fi
+
+  # Build and push 'latest' Docker tag.
+  docker_master:
+    working_directory: /go/src/github.com/runatlantis/atlantis
+    docker:
+    - image: circleci/golang:1.10
+    steps:
+    - checkout
+    - run: make build-service
+    - run:
+        name: Build image
+        command: |
+          if [ "${CIRCLE_BRANCH}" == "master" ]; then
+            docker build -t runatlantis/atlantis:latest .
+          fi
+    - run:
+        name: Push image
+        command: |
+          if [ "${CIRCLE_BRANCH}" == "master" ]; then
+            docker login -u "$DOCKER_USER" -p "$DOCKER_PASSWORD"
+            docker push runatlantis/atlantis:latest
+          fi
+
+  # Build and push Docker tag.
+  docker_tag:
+    working_directory: /go/src/github.com/runatlantis/atlantis
+    docker:
+    - image: circleci/golang:1.10
+    steps:
+    - checkout
+    - run: make build-service
+    - run:
+        name: Build and tag
+        command: |
+          if [ -n "${CIRCLE_TAG}" ]; then
+            docker build -t "runatlantis/atlantis:${CIRCLE_TAG}" .
+            docker login -u "$DOCKER_USER" -p "$DOCKER_PASSWORD"
+            docker push "runatlantis/atlantis:${CIRCLE_TAG}"
+          fi
+workflows:
+  version: 2
+  branch:
+    jobs:
+    - test
+    - e2e:
+        requires: [test]
+    - docker_master:
+        requires: [e2e]
+        filters:
+          branches:
+            only: master
+  tag:
+    jobs:
+    - docker_tag:
+        filters:
+          branches:
+            ignore: /.*/
+          tags:
+            only: /^v.*/
