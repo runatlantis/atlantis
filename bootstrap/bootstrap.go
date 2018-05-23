@@ -153,7 +153,7 @@ tunnels:
 	cancelNgrok, ngrokErrors := executeBackgroundCmd("/tmp/ngrok", []string{"start", "atlantis", "--config", ngrokConfigFile.Name()})
 	// Check if we got a fast error. Move on if we haven't (the command is still running).
 	select {
-	case err := <-ngrokErrors:
+	case err = <-ngrokErrors:
 		return errors.Wrap(err, "creating ngrok tunnel")
 	default:
 	}
@@ -178,7 +178,7 @@ tunnels:
 
 	// Check if we got a fast error. Move on if we haven't (the command is still running).
 	select {
-	case err := <-atlantisErrors:
+	case err = <-atlantisErrors:
 		return errors.Wrap(err, "creating atlantis server")
 	default:
 	}
