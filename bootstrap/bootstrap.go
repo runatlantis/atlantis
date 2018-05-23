@@ -220,7 +220,7 @@ tunnels:
 	time.Sleep(2 * time.Second)
 	_, err = executeCmd("open", []string{pullRequestURL})
 	if err != nil {
-		colorstring.Printf("[red]=> opening pull request failed. please go to: %s on the browser", pullRequestURL)
+		colorstring.Printf("[red]=> opening pull request failed. please go to: %s on the browser\n", pullRequestURL)
 	}
 	s.Stop()
 
