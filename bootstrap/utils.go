@@ -137,7 +137,7 @@ func downloadAndUnzip(url string, path string, target string) error {
 
 // Executes a command, waits for it to finish and returns any errors.
 func executeCmd(cmd string, args []string) error {
-	command := exec.Command(cmd, args...)
+	command := exec.Command(cmd, args...) // #nosec
 	return command.Run()
 }
 
