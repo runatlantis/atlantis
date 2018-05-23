@@ -110,7 +110,10 @@ Follow these instructions to create a token (we don't store any tokens):
 		if err != nil {
 			return errors.Wrapf(err, "moving terraform binary into /usr/local/bin")
 		}
-		terraformCmd.Wait()
+		err = terraformCmd.Wait()
+		if err != nil {
+			return errors.Wrapf(err, "moving terraform binary into /usr/local/bin")
+		}
 		colorstring.Println("[green]=> installed terraform successfully at /usr/local/bin")
 	} else {
 		colorstring.Println("[green]=> terraform found in $PATH!")
