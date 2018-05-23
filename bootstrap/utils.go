@@ -15,6 +15,7 @@ package bootstrap
 
 import (
 	"archive/zip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -134,11 +135,23 @@ func downloadAndUnzip(url string, path string, target string) error {
 	return unzip(path, target)
 }
 
-func executeCmd(cmd string, args []string) (*exec.Cmd, error) {
-	command := exec.Command(cmd, args...) // #nosec
-	err := command.Start()
-	if err != nil {
-		return nil, err
-	}
-	return command, nil
+// Executes a command, waits for it to finish and returns any errors.
+func executeCmd(cmd string, args []string) error {
+	command := exec.Command(cmd, args...)
+	return command.Run()
+}
+
+// Executes a command in the background. Returns a context so that the caller may cancel the
+// command prematurely if necessary, as well as an errors channel.
+func executeBackgroundCmd(cmd string, args []string) (context.CancelFunc, <-chan error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	command := exec.CommandContext(ctx, cmd, args...) // #nosec
+
+	errChan := make(chan error, 1)
+	go func() {
+		err := command.Run()
+		errChan <- err
+	}()
+
+	return cancel, errChan
 }
