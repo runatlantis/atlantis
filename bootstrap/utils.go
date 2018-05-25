@@ -138,7 +138,11 @@ func downloadAndUnzip(url string, path string, target string) error {
 // executeCmd executes a command, waits for it to finish and returns any errors.
 func executeCmd(cmd string, args []string) error {
 	command := exec.Command(cmd, args...) // #nosec
-	return command.Run()
+	bytes, err := command.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s: %s", err, bytes)
+	}
+	return nil
 }
 
 // executeBackgroundCmd executes a command in the background. The function returns a context so
