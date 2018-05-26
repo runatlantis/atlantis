@@ -146,19 +146,28 @@ func executeCmd(cmd string, args ...string) error {
 	return nil
 }
 
-// executeBackgroundCmd executes a command in the background. The function returns a context so
-// that the caller may cancel the command prematurely if necessary, as well as an errors channel.
-func executeBackgroundCmd(wg *sync.WaitGroup, cmd string, args ...string) (context.CancelFunc, <-chan error) {
+// executeBackgroundCmd executes a long-running command in the background. The function returns a
+// context so that the caller may cancel the command prematurely if necessary, as well as an errors
+// channel.
+//
+// The function returns an error if the command could not start successfully.
+func executeBackgroundCmd(wg *sync.WaitGroup, cmd string, args ...string) (context.CancelFunc, <-chan error, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	command := exec.CommandContext(ctx, cmd, args...) // #nosec
 
 	errChan := make(chan error, 1)
+
+	err := command.Start()
+	if err != nil {
+		return cancel, errChan, fmt.Errorf("starting command: %v", err)
+	}
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := command.Run()
+		err := command.Wait()
 		errChan <- err
 	}()
 
-	return cancel, errChan
+	return cancel, errChan, nil
 }

@@ -155,14 +155,11 @@ tunnels:
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
-	cancelNgrok, ngrokErrors := executeBackgroundCmd(&wg, "/tmp/ngrok", "start", "atlantis", "--config", ngrokConfigFile.Name())
+	cancelNgrok, ngrokErrors, err := executeBackgroundCmd(&wg, "/tmp/ngrok", "start", "atlantis", "--config", ngrokConfigFile.Name())
 	// Check if we got a fast error. Move on if we haven't (the command is still running).
-	select {
-	case err = <-ngrokErrors:
+	if err != nil {
 		return errors.Wrap(err, "creating ngrok tunnel")
-	default:
 	}
-
 	// When this function returns, ngrok tunnel should be stopped.
 	defer cancelNgrok()
 
@@ -179,13 +176,10 @@ tunnels:
 	// Start atlantis server.
 	colorstring.Println("[white]=> starting atlantis server")
 	s.Start()
-	cancelAtlantis, atlantisErrors := executeBackgroundCmd(&wg, os.Args[0], "server", "--gh-user", githubUsername, "--gh-token", githubToken, "--data-dir", "/tmp/atlantis/data", "--atlantis-url", tunnelURL, "--repo-whitelist", fmt.Sprintf("github.com/%s/%s", githubUsername, terraformExampleRepo))
-
+	cancelAtlantis, atlantisErrors, err := executeBackgroundCmd(&wg, os.Args[0], "server", "--gh-user", githubUsername, "--gh-token", githubToken, "--data-dir", "/tmp/atlantis/data", "--atlantis-url", tunnelURL, "--repo-whitelist", fmt.Sprintf("github.com/%s/%s", githubUsername, terraformExampleRepo))
 	// Check if we got a fast error. Move on if we haven't (the command is still running).
-	select {
-	case err = <-atlantisErrors:
+	if err != nil {
 		return errors.Wrap(err, "creating atlantis server")
-	default:
 	}
 	// When this function returns atlantis server should be stopped.
 	defer cancelAtlantis()
