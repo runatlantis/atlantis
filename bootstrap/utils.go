@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"syscall"
 
 	"github.com/pkg/errors"
@@ -136,7 +137,7 @@ func downloadAndUnzip(url string, path string, target string) error {
 }
 
 // executeCmd executes a command, waits for it to finish and returns any errors.
-func executeCmd(cmd string, args []string) error {
+func executeCmd(cmd string, args ...string) error {
 	command := exec.Command(cmd, args...) // #nosec
 	bytes, err := command.CombinedOutput()
 	if err != nil {
@@ -147,12 +148,14 @@ func executeCmd(cmd string, args []string) error {
 
 // executeBackgroundCmd executes a command in the background. The function returns a context so
 // that the caller may cancel the command prematurely if necessary, as well as an errors channel.
-func executeBackgroundCmd(cmd string, args []string) (context.CancelFunc, <-chan error) {
+func executeBackgroundCmd(wg *sync.WaitGroup, cmd string, args ...string) (context.CancelFunc, <-chan error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	command := exec.CommandContext(ctx, cmd, args...) // #nosec
 
 	errChan := make(chan error, 1)
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		err := command.Run()
 		errChan <- err
 	}()

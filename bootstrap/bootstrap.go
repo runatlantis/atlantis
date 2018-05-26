@@ -24,6 +24,7 @@ import (
 	"os/signal"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -105,7 +106,7 @@ Follow these instructions to create a token (we don't store any tokens):
 		colorstring.Println("[green]=> downloaded terraform successfully!")
 		s.Stop()
 
-		err = executeCmd("mv", []string{"/tmp/terraform", "/usr/local/bin/"})
+		err = executeCmd("mv", "/tmp/terraform", "/usr/local/bin/")
 		if err != nil {
 			return errors.Wrapf(err, "moving terraform binary into /usr/local/bin")
 		}
@@ -150,7 +151,11 @@ tunnels:
 		return errors.Wrap(err, "writing ngrok config file")
 	}
 
-	cancelNgrok, ngrokErrors := executeBackgroundCmd("/tmp/ngrok", []string{"start", "atlantis", "--config", ngrokConfigFile.Name()})
+	// Used to ensure proper termination of all background commands.
+	var wg sync.WaitGroup
+	defer wg.Wait()
+
+	cancelNgrok, ngrokErrors := executeBackgroundCmd(&wg, "/tmp/ngrok", "start", "atlantis", "--config", ngrokConfigFile.Name())
 	// Check if we got a fast error. Move on if we haven't (the command is still running).
 	select {
 	case err = <-ngrokErrors:
@@ -174,7 +179,7 @@ tunnels:
 	// Start atlantis server.
 	colorstring.Println("[white]=> starting atlantis server")
 	s.Start()
-	cancelAtlantis, atlantisErrors := executeBackgroundCmd(os.Args[0], []string{"server", "--gh-user", githubUsername, "--gh-token", githubToken, "--data-dir", "/tmp/atlantis/data", "--atlantis-url", tunnelURL, "--repo-whitelist", fmt.Sprintf("github.com/%s/%s", githubUsername, terraformExampleRepo)})
+	cancelAtlantis, atlantisErrors := executeBackgroundCmd(&wg, os.Args[0], "server", "--gh-user", githubUsername, "--gh-token", githubToken, "--data-dir", "/tmp/atlantis/data", "--atlantis-url", tunnelURL, "--repo-whitelist", fmt.Sprintf("github.com/%s/%s", githubUsername, terraformExampleRepo))
 
 	// Check if we got a fast error. Move on if we haven't (the command is still running).
 	select {
@@ -212,7 +217,7 @@ tunnels:
 	colorstring.Println("[white]=> opening pull request")
 	s.Start()
 	time.Sleep(2 * time.Second)
-	err = executeCmd("open", []string{pullRequestURL})
+	err = executeCmd("open", pullRequestURL)
 	if err != nil {
 		colorstring.Printf("[red]=> opening pull request failed. please go to: %s on the browser\n", pullRequestURL)
 	}
