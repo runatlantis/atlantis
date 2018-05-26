@@ -487,7 +487,7 @@ spec:
         fsGroup: 1000 # Atlantis group (1000) read/write access to volumes.
       containers:
       - name: atlantis
-        image: runatlantis/atlantis:<VERSION> # 1. Replace <VERSION> with the most recent release.
+        image: runatlantis/atlantis:v<VERSION> # 1. Replace <VERSION> with the most recent release.
         env:
         - name: ATLANTIS_REPO_WHITELIST
           value: github.com/yourorg/* # 2. Replace this with your own repo whitelist.
@@ -522,6 +522,8 @@ spec:
 
         - name: ATLANTIS_DATA_DIR
           value: /atlantis
+        - name: ATLANTIS_PORT
+          value: "4141" # Kubernetes sets an ATLANTIS_PORT variable so we need to override.
         volumeMounts:
         - name: atlantis-data
           mountPath: /atlantis
@@ -584,7 +586,7 @@ spec:
     spec:
       containers:
       - name: atlantis
-        image: runatlantis/atlantis:<VERSION> # 1. Replace <VERSION> with the most recent release.
+        image: runatlantis/atlantis:v<VERSION> # 1. Replace <VERSION> with the most recent release.
         env:
         - name: ATLANTIS_REPO_WHITELIST
           value: github.com/yourorg/* # 2. Replace this with your own repo whitelist.
@@ -616,6 +618,8 @@ spec:
             secretKeyRef:
               name: atlantis-vcs
               key: webhook-secret
+        - name: ATLANTIS_PORT
+          value: "4141" # Kubernetes sets an ATLANTIS_PORT variable so we need to override.
         ports:
         - name: atlantis
           containerPort: 4141
