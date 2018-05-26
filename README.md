@@ -28,6 +28,7 @@ Read about [Why We Built Atlantis](https://medium.com/runatlantis/introducing-at
 * [Security](#security)
 * [Production-Ready Deployment](#production-ready-deployment)
     * [Docker](#docker)
+    * [Kubernetes](#kubernetes)
 * [Server Configuration](#server-configuration)
 * [AWS Credentials](#aws-credentials)
 * [Glossary](#glossary)
@@ -423,6 +424,227 @@ docker build -t {YOUR_DOCKER_ORG}/atlantis-custom -f Dockerfile-custom .
 ```bash
 docker run {YOUR_DOCKER_ORG}/atlantis-custom server --gh-user=GITHUB_USERNAME --gh-token=GITHUB_TOKEN
 ```
+
+### Kubernetes
+Atlantis can be deployed into Kubernetes as a
+[Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)
+or as a [Statefulset](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) with persistent storage.
+
+StatefulSet is recommended because Atlantis stores its data on disk and so if your Pod dies
+or you upgrade Atlantis, you won't lose the data. On the other hand, the only data that
+Atlantis has right now is any plans that haven't been applied and Atlantis locks. If
+Atlantis loses that data, you just need to run `atlantis plan` again so it's not the end of the world.
+
+Regardless of whether you choose a Deployment or StatefulSet, first create a Secret with the webhook secret and access token:
+```
+echo -n "yourtoken" > token
+echo -n "yoursecret" > webhook-secret
+kubectl create secret generic atlantis-vcs --from-file=token --from-file=webhook-secret
+```
+
+Next, edit the manifests below as follows:
+1. Replace `<VERSION>` in `image: runatlantis/atlantis:<VERSION>` with the most recent version from https://github.com/runatlantis/atlantis/releases/latest.
+    * NOTE: You never want to run with `:latest` because if your Pod moves to a new node, Kubernetes will pull the latest image and you might end
+up upgrading Atlantis by accident!
+2. Replace `value: github.com/yourorg/*` under `name: ATLANTIS_REPO_WHITELIST` with the whitelist pattern
+for your Terraform repos. See [--repo-whitelist](#--repo-whitelist) for more details.
+3. If you're using GitHub:
+    1. Replace `<YOUR_GITHUB_USER>` with the username of your Atlantis GitHub user without the `@`.
+    2. Delete all the `ATLANTIS_GITLAB_*` environment variables.
+4. If you're using GitLab:
+    1. Replace `<YOUR_GITLAB_USER>` with the username of your Atlantis GitLab user without the `@`.
+    2. Delete all the `ATLANTIS_GH_*` environment variables.
+
+#### StatefulSet Manifest
+<details>
+ <summary>Expand...</summary>
+
+```yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: atlantis
+spec:
+  serviceName: atlantis
+  replicas: 1
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      partition: 0
+  selector:
+    matchLabels:
+      app: atlantis
+  template:
+    metadata:
+      labels:
+        app: atlantis
+    spec:
+      securityContext:
+        fsGroup: 1000 # Atlantis group (1000) read/write access to volumes.
+      containers:
+      - name: atlantis
+        image: runatlantis/atlantis:<VERSION> # 1. Replace <VERSION> with the most recent release.
+        env:
+        - name: ATLANTIS_REPO_WHITELIST
+          value: github.com/yourorg/* # 2. Replace this with your own repo whitelist.
+
+        ### GitHub Config ###
+        - name: ATLANTIS_GH_USER
+          value: <YOUR_GITHUB_USER> # 3i. If you're using GitHub replace <YOUR_GITHUB_USER> with the username of your Atlantis GitHub user without the `@`.
+        - name: ATLANTIS_GH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: token
+        - name: ATLANTIS_GH_WEBHOOK_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: webhook-secret
+
+        ### GitLab Config ###
+        - name: ATLANTIS_GITLAB_USER
+          value: <YOUR_GITLAB_USER> # 4i. If you're using GitLab replace <YOUR_GITLAB_USER> with the username of your Atlantis GitLab user without the `@`.
+        - name: ATLANTIS_GITLAB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: token
+        - name: ATLANTIS_GITLAB_WEBHOOK_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: webhook-secret
+
+        - name: ATLANTIS_DATA_DIR
+          value: /atlantis
+        volumeMounts:
+        - name: atlantis-data
+          mountPath: /atlantis
+        ports:
+        - name: atlantis
+          containerPort: 4141
+        resources:
+          requests:
+            memory: 256Mi
+            cpu: 100m
+          limits:
+            memory: 256Mi
+            cpu: 100m
+  volumeClaimTemplates:
+  - metadata:
+      name: atlantis-data
+    spec:
+      accessModes: ["ReadWriteOnce"] # Volume should not be shared by multiple nodes.
+      resources:
+        requests:
+          # The biggest thing Atlantis stores is the Git repo when it checks it out.
+          # It deletes the repo after the pull request is merged.
+          storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: atlantis
+spec:
+  ports:
+  - name: atlantis
+    port: 80
+    targetPort: 4141
+  selector:
+    app: atlantis
+```
+</details>
+
+
+#### Deployment Manifest
+<details>
+ <summary>Expand...</summary>
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atlantis
+  labels:
+    app: atlantis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: atlantis
+  template:
+    metadata:
+      labels:
+        app: atlantis
+    spec:
+      containers:
+      - name: atlantis
+        image: runatlantis/atlantis:<VERSION> # 1. Replace <VERSION> with the most recent release.
+        env:
+        - name: ATLANTIS_REPO_WHITELIST
+          value: github.com/yourorg/* # 2. Replace this with your own repo whitelist.
+
+        ### GitHub Config ###
+        - name: ATLANTIS_GH_USER
+          value: <YOUR_GITHUB_USER> # 3i. If you're using GitHub replace <YOUR_GITHUB_USER> with the username of your Atlantis GitHub user without the `@`.
+        - name: ATLANTIS_GH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: token
+        - name: ATLANTIS_GH_WEBHOOK_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: webhook-secret
+
+        ### GitLab Config ###
+        - name: ATLANTIS_GITLAB_USER
+          value: <YOUR_GITLAB_USER> # 4i. If you're using GitLab replace <YOUR_GITLAB_USER> with the username of your Atlantis GitLab user without the `@`.
+        - name: ATLANTIS_GITLAB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: token
+        - name: ATLANTIS_GITLAB_WEBHOOK_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: webhook-secret
+        ports:
+        - name: atlantis
+          containerPort: 4141
+        resources:
+          requests:
+            memory: 256Mi
+            cpu: 100m
+          limits:
+            memory: 256Mi
+            cpu: 100m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: atlantis
+spec:
+  ports:
+  - name: atlantis
+    port: 80
+    targetPort: 4141
+  selector:
+    app: atlantis
+```
+</details>
+
+#### Routing and SSL
+The manifests above create a Kubernetes `Service` of type `ClusterIP` which isn't accessible outside your cluster.
+Depending on how you're doing routing into Kubernetes, you may want to use a `LoadBalancer` so that Atlantis is accessible
+to GitHub/GitLab and your internal users.
+
+If you want to add SSL you can use something like https://github.com/jetstack/cert-manager to generate SSL
+certs and mount them into the Pod. Then set the `ATLANTIS_SSL_CERT_FILE` and `ATLANTIS_SSL_KEY_FILE` environment variables to enable SSL.
+You could also set up SSL at your LoadBalancer.
 
 
 ### Testing Out Atlantis on GitHub
