@@ -15,6 +15,7 @@ package bootstrap
 
 import (
 	"archive/zip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -22,6 +23,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"syscall"
 
 	"github.com/pkg/errors"
@@ -134,11 +136,38 @@ func downloadAndUnzip(url string, path string, target string) error {
 	return unzip(path, target)
 }
 
-func executeCmd(cmd string, args []string) (*exec.Cmd, error) {
+// executeCmd executes a command, waits for it to finish and returns any errors.
+func executeCmd(cmd string, args ...string) error {
 	command := exec.Command(cmd, args...) // #nosec
+	bytes, err := command.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s: %s", err, bytes)
+	}
+	return nil
+}
+
+// executeBackgroundCmd executes a long-running command in the background. The function returns a
+// context so that the caller may cancel the command prematurely if necessary, as well as an errors
+// channel.
+//
+// The function returns an error if the command could not start successfully.
+func executeBackgroundCmd(wg *sync.WaitGroup, cmd string, args ...string) (context.CancelFunc, <-chan error, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	command := exec.CommandContext(ctx, cmd, args...) // #nosec
+
+	errChan := make(chan error, 1)
+
 	err := command.Start()
 	if err != nil {
-		return nil, err
+		return cancel, errChan, fmt.Errorf("starting command: %v", err)
 	}
-	return command, nil
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err := command.Wait()
+		errChan <- err
+	}()
+
+	return cancel, errChan, nil
 }
