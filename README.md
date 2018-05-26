@@ -69,7 +69,7 @@ This will walk you through running Atlantis locally. It will
 - install ngrok so we can expose Atlantis to GitHub
 - start Atlantis
 
-If you're ready to permanently set up Atlantis see [Production-Ready Deployment](#production-ready-deployment)
+If you're ready to permanently set up Atlantis see [Production-Ready Deployment](#production-ready-deployment) and check out [repository terraform-aws-atlantis](https://github.com/terraform-aws-modules/terraform-aws-atlantis) where complete Terraform configurations for running Atlantis on AWS Fargate are hosted.
 
 ## Pull/Merge Request Commands
 Atlantis currently supports three commands that can be run via pull request comments (or merge request comments on GitLab):
@@ -787,6 +787,9 @@ A: First, you'll need to get a public/private key pair to serve over SSL.
 These need to be in a directory accessible by Atlantis. Then start `atlantis server` with the `--ssl-cert-file` and `--ssl-key-file` flags.
 See `atlantis server --help` for more information.
 
+**Q: How can I get Atlantis up and running on AWS?**
+
+A: There is [terraform-aws-atlantis](https://github.com/terraform-aws-modules/terraform-aws-atlantis) project where complete Terraform configurations for running Atlantis on AWS Fargate are hosted. Tested, maintained, and free.
 
 ## Contributing
 Want to contribute? Check out [CONTRIBUTING](https://github.com/runatlantis/atlantis/blob/master/CONTRIBUTING.md).
