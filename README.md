@@ -29,6 +29,7 @@ Read about [Why We Built Atlantis](https://medium.com/runatlantis/introducing-at
 * [Production-Ready Deployment](#production-ready-deployment)
     * [Docker](#docker)
     * [Kubernetes](#kubernetes)
+    * [AWS Fargate](#aws-fargate)
 * [Server Configuration](#server-configuration)
 * [AWS Credentials](#aws-credentials)
 * [Glossary](#glossary)
@@ -69,7 +70,7 @@ This will walk you through running Atlantis locally. It will
 - install ngrok so we can expose Atlantis to GitHub
 - start Atlantis
 
-If you're ready to permanently set up Atlantis see [Production-Ready Deployment](#production-ready-deployment) and check out [repository terraform-aws-atlantis](https://github.com/terraform-aws-modules/terraform-aws-atlantis) where complete Terraform configurations for running Atlantis on AWS Fargate are hosted.
+If you're ready to permanently set up Atlantis see [Production-Ready Deployment](#production-ready-deployment).
 
 ## Pull/Merge Request Commands
 Atlantis currently supports three commands that can be run via pull request comments (or merge request comments on GitLab):
@@ -654,6 +655,9 @@ If you want to add SSL you can use something like https://github.com/jetstack/ce
 certs and mount them into the Pod. Then set the `ATLANTIS_SSL_CERT_FILE` and `ATLANTIS_SSL_KEY_FILE` environment variables to enable SSL.
 You could also set up SSL at your LoadBalancer.
 
+### AWS Fargate
+
+If you'd like to run Atlantis on [AWS Fargate](https://aws.amazon.com/fargate/) check out the Atlantis module on the Terraform Module Registry: https://registry.terraform.io/modules/terraform-aws-modules/atlantis/aws
 
 ### Testing Out Atlantis on GitHub
 
@@ -789,7 +793,7 @@ See `atlantis server --help` for more information.
 
 **Q: How can I get Atlantis up and running on AWS?**
 
-A: There is [terraform-aws-atlantis](https://github.com/terraform-aws-modules/terraform-aws-atlantis) project where complete Terraform configurations for running Atlantis on AWS Fargate are hosted. Tested, maintained, and free.
+A: There is [terraform-aws-atlantis](https://github.com/terraform-aws-modules/terraform-aws-atlantis) project where complete Terraform configurations for running Atlantis on AWS Fargate are hosted. Tested and maintained.
 
 ## Contributing
 Want to contribute? Check out [CONTRIBUTING](https://github.com/runatlantis/atlantis/blob/master/CONTRIBUTING.md).
