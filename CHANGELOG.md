@@ -1,3 +1,29 @@
+# v0.3.10
+
+## Features
+* Rename `atlantis bootstrap` to `atlantis testdrive` to make it clearer that it
+doesn't set up Atlantis for you. Fixes ([#129](https://github.com/runatlantis/atlantis/issues/129)).
+* Atlantis will now comment on a pull request when a plan/lock is discarded from
+the Atlantis UI. Fixes ([#27](https://github.com/runatlantis/atlantis/issues/27)).
+
+## Bugfixes
+* Fix issue during `atlantis bootstrap` where ngrok tunnel took a long time to start.
+Atlantis will now wait until it sees the expected log entry before continuing.
+Fixes ([#92](https://github.com/runatlantis/atlantis/issues/92)).
+* Fix missing error checking during `atlantis bootstrap`. ([#130](https://github.com/runatlantis/atlantis/pulls/130)).
+
+## Backwards Incompatibilities / Notes:
+* `atlantis bootstrap` renamed to `atlantis testdrive`
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.10/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.10/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.10/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.10/atlantis_linux_arm.zip)
+
+## Docker
+`runatlantis/atlantis:v0.3.10`
+
 # v0.3.9
 
 ## Features
