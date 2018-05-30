@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/gorilla/mux"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events/locking/mocks"
@@ -24,12 +25,12 @@ func AnyRepo() models.Repo {
 
 func TestGetLockRoute_NoLockID(t *testing.T) {
 	t.Log("If there is no lock ID in the request then we should get a 400")
-	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
 	lc := server.LocksController{
 		Logger: logging.NewNoopLogger(),
 	}
-	lc.GetLockRoute(w, eventsReq)
+	lc.GetLock(w, req)
 	responseContains(t, w, http.StatusBadRequest, "No lock id in request")
 }
 
@@ -38,9 +39,10 @@ func TestGetLock_InvalidLockID(t *testing.T) {
 	lc := server.LocksController{
 		Logger: logging.NewNoopLogger(),
 	}
-	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req = mux.SetURLVars(req, map[string]string{"id": "%A@"})
 	w := httptest.NewRecorder()
-	lc.GetLock(w, "%A@")
+	lc.GetLock(w, req)
 	responseContains(t, w, http.StatusBadRequest, "Invalid lock id")
 }
 
@@ -53,9 +55,10 @@ func TestGetLock_LockerErr(t *testing.T) {
 		Logger: logging.NewNoopLogger(),
 		Locker: l,
 	}
-	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
-	lc.GetLock(w, "id")
+	lc.GetLock(w, req)
 	responseContains(t, w, http.StatusInternalServerError, "err")
 }
 
@@ -68,9 +71,10 @@ func TestGetLock_None(t *testing.T) {
 		Logger: logging.NewNoopLogger(),
 		Locker: l,
 	}
-	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
-	lc.GetLock(w, "id")
+	lc.GetLock(w, req)
 	responseContains(t, w, http.StatusNotFound, "No lock found at id \"id\"")
 }
 
@@ -90,10 +94,10 @@ func TestGetLock_Success(t *testing.T) {
 		LockDetailTemplate: tmpl,
 		AtlantisVersion:    "1300135",
 	}
-	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
-	lc.GetLock(w, "id")
-	t.Log(w.Code)
+	lc.GetLock(w, req)
 	tmpl.VerifyWasCalledOnce().Execute(w, server.LockDetailData{
 		LockKeyEncoded:  "id",
 		LockKey:         "id",
@@ -107,21 +111,22 @@ func TestGetLock_Success(t *testing.T) {
 	responseContains(t, w, http.StatusOK, "")
 }
 
-func TestDeleteLockRoute_NoLockID(t *testing.T) {
+func TestDeleteLock_NoLockID(t *testing.T) {
 	t.Log("If there is no lock ID in the request then we should get a 400")
-	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
 	lc := server.LocksController{Logger: logging.NewNoopLogger()}
-	lc.DeleteLockRoute(w, eventsReq)
+	lc.DeleteLock(w, req)
 	responseContains(t, w, http.StatusBadRequest, "No lock id in request")
 }
 
 func TestDeleteLock_InvalidLockID(t *testing.T) {
 	t.Log("If the lock ID is invalid then we should get a 400")
 	lc := server.LocksController{Logger: logging.NewNoopLogger()}
-	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req = mux.SetURLVars(req, map[string]string{"id": "%A@"})
 	w := httptest.NewRecorder()
-	lc.DeleteLock(w, "%A@")
+	lc.DeleteLock(w, req)
 	responseContains(t, w, http.StatusBadRequest, "Invalid lock id \"%A@\"")
 }
 
@@ -134,9 +139,10 @@ func TestDeleteLock_LockerErr(t *testing.T) {
 		Locker: l,
 		Logger: logging.NewNoopLogger(),
 	}
-	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
-	lc.DeleteLock(w, "id")
+	lc.DeleteLock(w, req)
 	responseContains(t, w, http.StatusInternalServerError, "err")
 }
 
@@ -149,9 +155,10 @@ func TestDeleteLock_None(t *testing.T) {
 		Locker: l,
 		Logger: logging.NewNoopLogger(),
 	}
-	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
-	lc.DeleteLock(w, "id")
+	lc.DeleteLock(w, req)
 	responseContains(t, w, http.StatusNotFound, "No lock found at id \"id\"")
 }
 
@@ -167,9 +174,10 @@ func TestDeleteLock_OldFormat(t *testing.T) {
 		Logger:    logging.NewNoopLogger(),
 		VCSClient: cp,
 	}
-	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
-	lc.DeleteLock(w, "id")
+	lc.DeleteLock(w, req)
 	responseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
 	cp.VerifyWasCalled(Never()).CreateComment(AnyRepo(), AnyInt(), AnyString())
 }
@@ -191,9 +199,10 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 		Logger:    logging.NewNoopLogger(),
 		VCSClient: cp,
 	}
-	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
-	lc.DeleteLock(w, "id")
+	lc.DeleteLock(w, req)
 	responseContains(t, w, http.StatusInternalServerError, "Failed commenting on pull request: err")
 }
 
@@ -219,9 +228,10 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 		Logger:    logging.NewNoopLogger(),
 		VCSClient: cp,
 	}
-	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
-	lc.DeleteLock(w, "id")
+	lc.DeleteLock(w, req)
 	responseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
 	cp.VerifyWasCalled(Once()).CreateComment(pull.BaseRepo, pull.Num,
 		"**Warning**: The plan for path: `path` workspace: `workspace` was **discarded** via the Atlantis UI.\n\n"+

@@ -22,20 +22,14 @@ type LocksController struct {
 	LockDetailTemplate TemplateWriter
 }
 
-// GetLockRoute is the GET /locks/{id} route. It renders the lock detail view.
-func (l *LocksController) GetLockRoute(w http.ResponseWriter, r *http.Request) {
+// GetLock is the GET /locks/{id} route. It renders the lock detail view.
+func (l *LocksController) GetLock(w http.ResponseWriter, r *http.Request) {
 	id, ok := mux.Vars(r)["id"]
 	if !ok {
 		l.respond(w, logging.Warn, http.StatusBadRequest, "No lock id in request")
 		return
 	}
 
-	l.GetLock(w, id)
-}
-
-// GetLock handles a lock detail page view. GetLockRoute is expected to
-// be called before. This function was extracted to make it testable.
-func (l *LocksController) GetLock(w http.ResponseWriter, id string) {
 	idUnencoded, err := url.QueryUnescape(id)
 	if err != nil {
 		l.respond(w, logging.Warn, http.StatusBadRequest, "Invalid lock id: %s", err)
@@ -66,20 +60,15 @@ func (l *LocksController) GetLock(w http.ResponseWriter, id string) {
 	l.LockDetailTemplate.Execute(w, viewData) // nolint: errcheck
 }
 
-// DeleteLockRoute handles deleting the lock at id.
-func (l *LocksController) DeleteLockRoute(w http.ResponseWriter, r *http.Request) {
+// DeleteLock handles deleting the lock at id and commenting back on the
+// pull request that the lock has been deleted.
+func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 	id, ok := mux.Vars(r)["id"]
 	if !ok || id == "" {
 		l.respond(w, logging.Warn, http.StatusBadRequest, "No lock id in request")
 		return
 	}
-	l.DeleteLock(w, id)
-}
 
-// DeleteLock deletes the lock and comments back on the pull request that the
-// lock has been deleted.
-// DeleteLockRoute should be called first. This method is split out to make this route testable.
-func (l *LocksController) DeleteLock(w http.ResponseWriter, id string) {
 	idUnencoded, err := url.PathUnescape(id)
 	if err != nil {
 		l.respond(w, logging.Warn, http.StatusBadRequest, "Invalid lock id %q. Failed with error: %s", id, err)
