@@ -62,9 +62,9 @@ Download from [https://github.com/runatlantis/atlantis/releases](https://github.
 
 Run
 ```
-./atlantis bootstrap
+./atlantis testdrive
 ```
-This will walk you through running Atlantis locally. It will
+This mode sets up Atlantis on a test repo so you can try it out. It will
 - fork an example terraform project
 - install terraform (if not already in your PATH)
 - install ngrok so we can expose Atlantis to GitHub

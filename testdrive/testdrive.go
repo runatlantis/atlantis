@@ -11,9 +11,9 @@
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
 //
-// Package bootstrap is used by the bootstrap command as a quick-start of
+// Package testdrive is used by the testdrive command as a quick-start of
 // Atlantis.
-package bootstrap
+package testdrive
 
 import (
 	"context"
@@ -37,9 +37,9 @@ import (
 
 var terraformExampleRepoOwner = "runatlantis"
 var terraformExampleRepo = "atlantis-example"
-var bootstrapDescription = `[white]Welcome to Atlantis bootstrap!
+var bootstrapDescription = `[white]Welcome to Atlantis testdrive!
 
-This mode walks you through setting up and using Atlantis. We will
+This mode sets up Atlantis on a test repo so you can try it out. We will
 - fork an example terraform project to your username
 - install terraform (if not already in your PATH)
 - install ngrok so we can expose Atlantis to GitHub
@@ -53,12 +53,12 @@ var pullRequestBody = "In this pull request we will learn how to use atlantis. T
 	"* Now lets apply that plan. Type `atlantis apply` in the comments. This will run a `terraform apply`.\n" +
 	"\nThank you for trying out atlantis. For more info on running atlantis in production see https://github.com/runatlantis/atlantis"
 
-// Start begins the bootstrap process.
+// Start begins the testdrive process.
 // nolint: errcheck
 func Start() error {
 	s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
 	colorstring.Println(bootstrapDescription)
-	colorstring.Print("\n[white][bold]GitHub username: ")
+	colorstring.Print("\n[white][bold]github.com username: ")
 	fmt.Scanln(&githubUsername)
 	if githubUsername == "" {
 		return fmt.Errorf("please enter a valid github username")
@@ -231,7 +231,7 @@ tunnels:
 	colorstring.Println("[green] [press Ctrl-c to exit]")
 
 	// Wait for SIGINT or SIGTERM signals meaning the user has Ctrl-C'd the
-	// bootstrap process and want's to stop.
+	// testdrive process and want's to stop.
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
