@@ -38,7 +38,7 @@ const (
 // CommentParsing handles parsing pull request comments.
 type CommentParsing interface {
 	// Parse attempts to parse a pull request comment to see if it's an Atlantis
-	// commmand.
+	// command.
 	Parse(comment string, vcsHost models.VCSHostType) CommentParseResult
 }
 
