@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -155,28 +156,35 @@ tunnels:
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
-	cancelNgrok, ngrokErrors, err := executeBackgroundCmd(&wg, "/tmp/ngrok", "start", "atlantis", "--config", ngrokConfigFile.Name())
+	tunnelReadyLog := regexp.MustCompile("client session established")
+	tunnelTimeout := 20 * time.Second
+	cancelNgrok, ngrokErrors, err := execAndWaitForStderr(&wg, tunnelReadyLog, tunnelTimeout,
+		"/tmp/ngrok", "start", "atlantis", "--config", ngrokConfigFile.Name(), "--log", "stderr", "--log-format", "term")
 	// Check if we got a fast error. Move on if we haven't (the command is still running).
 	if err != nil {
+		s.Stop()
 		return errors.Wrap(err, "creating ngrok tunnel")
 	}
 	// When this function returns, ngrok tunnel should be stopped.
 	defer cancelNgrok()
 
-	// Wait for the tunnel to be up.
-	time.Sleep(2 * time.Second)
+	// The tunnel is up!
 	s.Stop()
 	colorstring.Println("[green]=> started tunnel!")
+	// There's a 1s delay between tunnel starting and API being up.
+	time.Sleep(1 * time.Second)
 	tunnelURL, err := getTunnelAddr()
 	if err != nil {
 		return errors.Wrapf(err, "getting tunnel url")
 	}
-	s.Stop()
 
 	// Start atlantis server.
 	colorstring.Println("[white]=> starting atlantis server")
 	s.Start()
-	cancelAtlantis, atlantisErrors, err := executeBackgroundCmd(&wg, os.Args[0], "server", "--gh-user", githubUsername, "--gh-token", githubToken, "--data-dir", "/tmp/atlantis/data", "--atlantis-url", tunnelURL, "--repo-whitelist", fmt.Sprintf("github.com/%s/%s", githubUsername, terraformExampleRepo))
+	serverReadyLog := regexp.MustCompile("Atlantis started - listening on port 4141")
+	serverReadyTimeout := 5 * time.Second
+	cancelAtlantis, atlantisErrors, err := execAndWaitForStderr(&wg, serverReadyLog, serverReadyTimeout,
+		os.Args[0], "server", "--gh-user", githubUsername, "--gh-token", githubToken, "--data-dir", "/tmp/atlantis/data", "--atlantis-url", tunnelURL, "--repo-whitelist", fmt.Sprintf("github.com/%s/%s", githubUsername, terraformExampleRepo))
 	// Check if we got a fast error. Move on if we haven't (the command is still running).
 	if err != nil {
 		return errors.Wrap(err, "creating atlantis server")

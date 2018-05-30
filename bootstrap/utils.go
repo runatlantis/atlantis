@@ -15,16 +15,20 @@ package bootstrap
 
 import (
 	"archive/zip"
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh/terminal"
@@ -113,8 +117,12 @@ func getTunnelAddr() (string, error) {
 
 	var t tunnels
 
-	if err = json.NewDecoder(response.Body).Decode(&t); err != nil {
-		return "", errors.Wrapf(err, "parsing ngrok api at %s", tunAPI)
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return "", errors.Wrap(err, "reading ngrok api")
+	}
+	if err = json.Unmarshal(body, &t); err != nil {
+		return "", errors.Wrapf(err, "parsing ngrok api: %s", string(body))
 	}
 
 	// Find the tunnel we just created.
@@ -125,7 +133,7 @@ func getTunnelAddr() (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("did not find ngrok tunnel with proto 'https' and config.addr '%s' in list of tunnels at %s", expAtlantisURL, tunAPI)
+	return "", fmt.Errorf("did not find ngrok tunnel with proto 'https' and config.addr '%s' in list of tunnels at %s\n%s", expAtlantisURL, tunAPI, string(body))
 }
 
 // nolint: unparam
@@ -146,22 +154,65 @@ func executeCmd(cmd string, args ...string) error {
 	return nil
 }
 
-// executeBackgroundCmd executes a long-running command in the background. The function returns a
-// context so that the caller may cancel the command prematurely if necessary, as well as an errors
-// channel.
-//
-// The function returns an error if the command could not start successfully.
-func executeBackgroundCmd(wg *sync.WaitGroup, cmd string, args ...string) (context.CancelFunc, <-chan error, error) {
+// execAndWaitForStderr executes a command with name and args. It waits until
+// timeout for the stderr output of the command to match stderrMatch. If the
+// timeout comes first, then it cancels the command and returns the error as
+// error (not on the channel). Otherwise the function returns and the command
+// continues to run in the background. Any errors after this point are passed
+// onto the error channel and the command is stopped. We increment the wg
+// so that callers can wait until command is killed before exiting.
+// The cancelFunc can be used to stop the command but callers should still wait
+// for the wg to be Done to ensure the command completes its cancellation
+// process.
+func execAndWaitForStderr(wg *sync.WaitGroup, stderrMatch *regexp.Regexp, timeout time.Duration, name string, args ...string) (context.CancelFunc, <-chan error, error) {
 	ctx, cancel := context.WithCancel(context.Background())
-	command := exec.CommandContext(ctx, cmd, args...) // #nosec
-
 	errChan := make(chan error, 1)
 
-	err := command.Start()
+	// Set up the command and stderr pipe.
+	command := exec.CommandContext(ctx, name, args...) // #nosec
+	stderr, err := command.StderrPipe()
+	if err != nil {
+		return cancel, errChan, errors.Wrap(err, "creating stderr pipe")
+	}
+
+	// Start the command in the background. This will only return error if the
+	// command is not executable.
+	err = command.Start()
 	if err != nil {
 		return cancel, errChan, fmt.Errorf("starting command: %v", err)
 	}
 
+	// Wait until we see the desired output or time out.
+	foundLine := make(chan bool, 1)
+	scanner := bufio.NewScanner(stderr)
+	var log string
+
+	// This goroutine watches the process stderr and sends true along the
+	// foundLine channel if a line matches.
+	go func() {
+		for scanner.Scan() {
+			text := scanner.Text()
+			log += text + "\n"
+			if stderrMatch.MatchString(text) {
+				foundLine <- true
+				break
+			}
+		}
+	}()
+
+	// Block on either finding a matching line or timeout.
+	select {
+	case <-foundLine:
+		// If we find the line, continue.
+	case <-time.After(timeout):
+		// If it's a timeout we cancel the command ourselves.
+		cancel()
+		// We still need to wait for the command to finish.
+		command.Wait() // nolint: errcheck
+		return cancel, errChan, fmt.Errorf("timeout, logs:\n%s\n", log)
+	}
+
+	// Increment the wait group so callers can wait for the command to finish.
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
