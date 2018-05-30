@@ -72,7 +72,6 @@ type UserConfig struct {
 	AllowForkPRs        bool   `mapstructure:"allow-fork-prs"`
 	AtlantisURL         string `mapstructure:"atlantis-url"`
 	DataDir             string `mapstructure:"data-dir"`
-	DisableLocking      string `mapstructure:"disable-locking"`
 	GithubHostname      string `mapstructure:"gh-hostname"`
 	GithubToken         string `mapstructure:"gh-token"`
 	GithubUser          string `mapstructure:"gh-user"`

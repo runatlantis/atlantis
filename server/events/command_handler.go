@@ -86,7 +86,7 @@ func (c *CommandHandler) ExecuteCommand(baseRepo models.Repo, headRepo models.Re
 	case models.Github:
 		pull, headRepo, err = c.getGithubData(baseRepo, pullNum)
 	case models.Gitlab:
-		pull, err = c.getGitlabData(baseRepo.FullName, pullNum)
+		pull, err = c.getGitlabData(baseRepo, pullNum)
 	default:
 		err = errors.New("Unknown VCS type, this is a bug!")
 	}
@@ -120,15 +120,15 @@ func (c *CommandHandler) getGithubData(baseRepo models.Repo, pullNum int) (model
 	return pull, repo, nil
 }
 
-func (c *CommandHandler) getGitlabData(repoFullName string, pullNum int) (models.PullRequest, error) {
+func (c *CommandHandler) getGitlabData(baseRepo models.Repo, pullNum int) (models.PullRequest, error) {
 	if c.GitlabMergeRequestGetter == nil {
 		return models.PullRequest{}, errors.New("Atlantis not configured to support GitLab")
 	}
-	mr, err := c.GitlabMergeRequestGetter.GetMergeRequest(repoFullName, pullNum)
+	mr, err := c.GitlabMergeRequestGetter.GetMergeRequest(baseRepo.FullName, pullNum)
 	if err != nil {
 		return models.PullRequest{}, errors.Wrap(err, "making merge request API call to GitLab")
 	}
-	pull := c.EventParser.ParseGitlabMergeRequest(mr)
+	pull := c.EventParser.ParseGitlabMergeRequest(mr, baseRepo)
 	return pull, nil
 }
 

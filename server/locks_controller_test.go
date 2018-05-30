@@ -15,7 +15,6 @@ import (
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	sMocks "github.com/runatlantis/atlantis/server/mocks"
-	. "github.com/runatlantis/atlantis/testing"
 )
 
 func AnyRepo() models.Repo {
@@ -41,7 +40,7 @@ func TestGetLock_InvalidLockID(t *testing.T) {
 	}
 	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
-	lc.GetLock(w, eventsReq, "%A@")
+	lc.GetLock(w, "%A@")
 	responseContains(t, w, http.StatusBadRequest, "Invalid lock id")
 }
 
@@ -56,7 +55,7 @@ func TestGetLock_LockerErr(t *testing.T) {
 	}
 	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
-	lc.GetLock(w, eventsReq, "id")
+	lc.GetLock(w, "id")
 	responseContains(t, w, http.StatusInternalServerError, "err")
 }
 
@@ -71,8 +70,8 @@ func TestGetLock_None(t *testing.T) {
 	}
 	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
-	lc.GetLock(w, eventsReq, "id")
-	responseContains(t, w, http.StatusNotFound, "no corresponding lock for given id")
+	lc.GetLock(w, "id")
+	responseContains(t, w, http.StatusNotFound, "No lock found at id \"id\"")
 }
 
 func TestGetLock_Success(t *testing.T) {
@@ -93,7 +92,7 @@ func TestGetLock_Success(t *testing.T) {
 	}
 	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
-	lc.GetLock(w, eventsReq, "id")
+	lc.GetLock(w, "id")
 	t.Log(w.Code)
 	tmpl.VerifyWasCalledOnce().Execute(w, server.LockDetailData{
 		LockKeyEncoded:  "id",
@@ -122,8 +121,8 @@ func TestDeleteLock_InvalidLockID(t *testing.T) {
 	lc := server.LocksController{Logger: logging.NewNoopLogger()}
 	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
-	lc.DeleteLock(w, eventsReq, "%A@")
-	responseContains(t, w, http.StatusBadRequest, "Invalid lock id")
+	lc.DeleteLock(w, "%A@")
+	responseContains(t, w, http.StatusBadRequest, "Invalid lock id \"%A@\"")
 }
 
 func TestDeleteLock_LockerErr(t *testing.T) {
@@ -137,7 +136,7 @@ func TestDeleteLock_LockerErr(t *testing.T) {
 	}
 	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
-	lc.DeleteLock(w, eventsReq, "id")
+	lc.DeleteLock(w, "id")
 	responseContains(t, w, http.StatusInternalServerError, "err")
 }
 
@@ -152,14 +151,15 @@ func TestDeleteLock_None(t *testing.T) {
 	}
 	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
-	lc.DeleteLock(w, eventsReq, "id")
-	responseContains(t, w, http.StatusNotFound, "no corresponding lock for given id")
+	lc.DeleteLock(w, "id")
+	responseContains(t, w, http.StatusNotFound, "No lock found at id \"id\"")
 }
 
-func TestDeleteLock_Success(t *testing.T) {
-	t.Log("If the lock is deleted successfully we get a 200")
-	cp := vcsmocks.NewMockClientProxy()
+func TestDeleteLock_OldFormat(t *testing.T) {
+	t.Log("If the lock doesn't have BaseRepo set it is deleted successfully")
 	RegisterMockTestingT(t)
+
+	cp := vcsmocks.NewMockClientProxy()
 	l := mocks.NewMockLocker()
 	When(l.Unlock("id")).ThenReturn(&models.ProjectLock{}, nil)
 	lc := server.LocksController{
@@ -169,20 +169,61 @@ func TestDeleteLock_Success(t *testing.T) {
 	}
 	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
-	lock := lc.DeleteLock(w, eventsReq, "id")
-	Equals(t, &models.ProjectLock{}, lock)
+	lc.DeleteLock(w, "id")
+	responseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
+	cp.VerifyWasCalled(Never()).CreateComment(AnyRepo(), AnyInt(), AnyString())
 }
 
 func TestDeleteLock_CommentFailed(t *testing.T) {
-	t.Log("If the lock is deleted successfully we get a 200")
-	cp := vcsmocks.NewMockClientProxy()
+	t.Log("If the commenting fails we return an error")
 	RegisterMockTestingT(t)
-	When(cp.CreateComment(AnyRepo(), AnyInt(), AnyString())).ThenReturn(nil)
+
+	cp := vcsmocks.NewMockClientProxy()
+	When(cp.CreateComment(AnyRepo(), AnyInt(), AnyString())).ThenReturn(errors.New("err"))
+	l := mocks.NewMockLocker()
+	When(l.Unlock("id")).ThenReturn(&models.ProjectLock{
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{FullName: "owner/repo"},
+		},
+	}, nil)
 	lc := server.LocksController{
+		Locker:    l,
 		Logger:    logging.NewNoopLogger(),
 		VCSClient: cp,
 	}
-	lock := &models.ProjectLock{}
-	err := lc.CommentOnPullRequest(lock)
-	Equals(t, err, nil)
+	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	w := httptest.NewRecorder()
+	lc.DeleteLock(w, "id")
+	responseContains(t, w, http.StatusInternalServerError, "Failed commenting on pull request: err")
+}
+
+func TestDeleteLock_CommentSuccess(t *testing.T) {
+	t.Log("We should comment back on the pull request if the lock is deleted")
+	RegisterMockTestingT(t)
+
+	cp := vcsmocks.NewMockClientProxy()
+	l := mocks.NewMockLocker()
+	pull := models.PullRequest{
+		BaseRepo: models.Repo{FullName: "owner/repo"},
+	}
+	When(l.Unlock("id")).ThenReturn(&models.ProjectLock{
+		Pull:      pull,
+		Workspace: "workspace",
+		Project: models.Project{
+			Path:         "path",
+			RepoFullName: "owner/repo",
+		},
+	}, nil)
+	lc := server.LocksController{
+		Locker:    l,
+		Logger:    logging.NewNoopLogger(),
+		VCSClient: cp,
+	}
+	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	w := httptest.NewRecorder()
+	lc.DeleteLock(w, "id")
+	responseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
+	cp.VerifyWasCalled(Once()).CreateComment(pull.BaseRepo, pull.Num,
+		"**Warning**: The plan for path: `path` workspace: `workspace` was **discarded** via the Atlantis UI.\n\n"+
+			"To `apply` you must run `plan` again.")
 }

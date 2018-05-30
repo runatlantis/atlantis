@@ -113,11 +113,6 @@ type PullRequest struct {
 	State PullRequestState
 	// BaseRepo is the repository that the pull request will be merged into.
 	BaseRepo Repo
-	// HeadRepo is the repository that is getting merged into the BaseRepo.
-	// If the pull request branch is from the same repository then HeadRepo will
-	// be the same as BaseRepo.
-	// See https://help.github.com/articles/about-pull-request-merges/.
-	HeadRepo Repo
 }
 
 type PullRequestState int

@@ -137,7 +137,7 @@ func TestParseGithubPull(t *testing.T) {
 		HeadCommit: Pull.Head.GetSHA(),
 		Num:        Pull.GetNumber(),
 		State:      models.Open,
-		HeadRepo: models.Repo{
+		BaseRepo: models.Repo{
 			Owner:             "owner",
 			FullName:          "owner/repo",
 			CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",
@@ -158,16 +158,8 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 	Ok(t, err)
 	pull, repo, err := parser.ParseGitlabMergeEvent(*event)
 	Ok(t, err)
-	Equals(t, models.PullRequest{
-		URL:        "http://example.com/diaspora/merge_requests/1",
-		Author:     "root",
-		Num:        1,
-		HeadCommit: "da1560886d4f094c3e6c9ef40349f7d38b5d27d7",
-		Branch:     "ms-viewport",
-		State:      models.Open,
-	}, pull)
 
-	Equals(t, models.Repo{
+	expRepo := models.Repo{
 		FullName:          "gitlabhq/gitlab-test",
 		Name:              "gitlab-test",
 		SanitizedCloneURL: "https://example.com/gitlabhq/gitlab-test.git",
@@ -177,7 +169,19 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 			Hostname: "example.com",
 			Type:     models.Gitlab,
 		},
-	}, repo)
+	}
+
+	Equals(t, models.PullRequest{
+		URL:        "http://example.com/diaspora/merge_requests/1",
+		Author:     "root",
+		Num:        1,
+		HeadCommit: "da1560886d4f094c3e6c9ef40349f7d38b5d27d7",
+		Branch:     "ms-viewport",
+		State:      models.Open,
+		BaseRepo:   expRepo,
+	}, pull)
+
+	Equals(t, expRepo, repo)
 
 	t.Log("If the state is closed, should set field correctly.")
 	event.ObjectAttributes.State = "closed"
@@ -191,7 +195,18 @@ func TestParseGitlabMergeRequest(t *testing.T) {
 	var event *gitlab.MergeRequest
 	err := json.Unmarshal([]byte(mergeRequestJSON), &event)
 	Ok(t, err)
-	pull := parser.ParseGitlabMergeRequest(event)
+	repo := models.Repo{
+		FullName:          "gitlabhq/gitlab-test",
+		Name:              "gitlab-test",
+		SanitizedCloneURL: "https://example.com/gitlabhq/gitlab-test.git",
+		Owner:             "gitlabhq",
+		CloneURL:          "https://gitlab-user:gitlab-token@example.com/gitlabhq/gitlab-test.git",
+		VCSHost: models.VCSHost{
+			Hostname: "example.com",
+			Type:     models.Gitlab,
+		},
+	}
+	pull := parser.ParseGitlabMergeRequest(event, repo)
 	Equals(t, models.PullRequest{
 		URL:        "https://gitlab.com/lkysow/atlantis-example/merge_requests/8",
 		Author:     "lkysow",
@@ -199,11 +214,12 @@ func TestParseGitlabMergeRequest(t *testing.T) {
 		HeadCommit: "0b4ac85ea3063ad5f2974d10cd68dd1f937aaac2",
 		Branch:     "abc",
 		State:      models.Open,
+		BaseRepo:   repo,
 	}, pull)
 
 	t.Log("If the state is closed, should set field correctly.")
 	event.State = "closed"
-	pull = parser.ParseGitlabMergeRequest(event)
+	pull = parser.ParseGitlabMergeRequest(event, repo)
 	Equals(t, models.Closed, pull.State)
 }
 

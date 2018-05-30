@@ -124,8 +124,8 @@ func (mock *MockEventParsing) ParseGitlabMergeCommentEvent(event go_gitlab.Merge
 	return ret0, ret1, ret2, ret3
 }
 
-func (mock *MockEventParsing) ParseGitlabMergeRequest(mr *go_gitlab.MergeRequest) models.PullRequest {
-	params := []pegomock.Param{mr}
+func (mock *MockEventParsing) ParseGitlabMergeRequest(mr *go_gitlab.MergeRequest, baseRepo models.Repo) models.PullRequest {
+	params := []pegomock.Param{mr, baseRepo}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseGitlabMergeRequest", params, []reflect.Type{reflect.TypeOf((*models.PullRequest)(nil)).Elem()})
 	var ret0 models.PullRequest
 	if len(result) != 0 {
@@ -289,8 +289,8 @@ func (c *EventParsing_ParseGitlabMergeCommentEvent_OngoingVerification) GetAllCa
 	return
 }
 
-func (verifier *VerifierEventParsing) ParseGitlabMergeRequest(mr *go_gitlab.MergeRequest) *EventParsing_ParseGitlabMergeRequest_OngoingVerification {
-	params := []pegomock.Param{mr}
+func (verifier *VerifierEventParsing) ParseGitlabMergeRequest(mr *go_gitlab.MergeRequest, baseRepo models.Repo) *EventParsing_ParseGitlabMergeRequest_OngoingVerification {
+	params := []pegomock.Param{mr, baseRepo}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ParseGitlabMergeRequest", params)
 	return &EventParsing_ParseGitlabMergeRequest_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -300,17 +300,21 @@ type EventParsing_ParseGitlabMergeRequest_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *EventParsing_ParseGitlabMergeRequest_OngoingVerification) GetCapturedArguments() *go_gitlab.MergeRequest {
-	mr := c.GetAllCapturedArguments()
-	return mr[len(mr)-1]
+func (c *EventParsing_ParseGitlabMergeRequest_OngoingVerification) GetCapturedArguments() (*go_gitlab.MergeRequest, models.Repo) {
+	mr, baseRepo := c.GetAllCapturedArguments()
+	return mr[len(mr)-1], baseRepo[len(baseRepo)-1]
 }
 
-func (c *EventParsing_ParseGitlabMergeRequest_OngoingVerification) GetAllCapturedArguments() (_param0 []*go_gitlab.MergeRequest) {
+func (c *EventParsing_ParseGitlabMergeRequest_OngoingVerification) GetAllCapturedArguments() (_param0 []*go_gitlab.MergeRequest, _param1 []models.Repo) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]*go_gitlab.MergeRequest, len(params[0]))
 		for u, param := range params[0] {
 			_param0[u] = param.(*go_gitlab.MergeRequest)
+		}
+		_param1 = make([]models.Repo, len(params[1]))
+		for u, param := range params[1] {
+			_param1[u] = param.(models.Repo)
 		}
 	}
 	return

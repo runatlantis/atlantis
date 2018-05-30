@@ -22,7 +22,8 @@ var Pull = github.PullRequest{
 		Repo: &Repo,
 	},
 	Base: &github.PullRequestBranch{
-		SHA: github.String("sha256"),
+		SHA:  github.String("sha256"),
+		Repo: &Repo,
 	},
 	HTMLURL: github.String("html-url"),
 	User: &github.User{
