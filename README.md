@@ -337,10 +337,10 @@ If installing on a single repository, navigate to the repository home page and c
 - leave **Secret** blank or set this to a random key (https://www.random.org/strings/). If you set it, you'll need to use the `--gh-webhook-secret` option when you start Atlantis
 - select **Let me select individual events**
 - check the boxes
-	- **Pull request review**
-	- **Push**
-	- **Issue comment**
-	- **Pull request**
+	- **Pull request reviews**
+	- **Pushes**
+	- **Issue comments**
+	- **Pull requests**
 - leave **Active** checked
 - click **Add webhook**
 
