@@ -334,13 +334,13 @@ If installing on a single repository, navigate to the repository home page and c
 - Click **Add webhook**
 - set **Payload URL** to `http://$URL/events` where `$URL` is where Atlantis is hosted. **Be sure to add `/events`**
 - set **Content type** to `application/json`
-- leave **Secret** blank or set this to a random key (https://www.random.org/strings/). If you set it, you'll need to use the `--gh-webhook-secret` option when you start Atlantis
+- set **Secret** to a random key (https://www.random.org/strings/). You'll need to pass this value to the `--gh-webhook-secret` option when you start Atlantis
 - select **Let me select individual events**
 - check the boxes
-	- **Pull request review**
-	- **Push**
-	- **Issue comment**
-	- **Pull request**
+	- **Pull request reviews**
+	- **Pushes**
+	- **Issue comments**
+	- **Pull requests**
 - leave **Active** checked
 - click **Add webhook**
 
@@ -773,13 +773,13 @@ A: No. Atlantis does not interfere with Terraform remote state in any way. Under
 
 **Q: How does Atlantis locking interact with Terraform [locking](https://www.terraform.io/docs/state/locking.html)?**
 
-A: Atlantis provides locking of pull requests that prevents concurrent modification of the same infrastructure (Terraform project) whereas Terraform locking only prevents two concurrent `terraform apply`'s from happening. 
+A: Atlantis provides locking of pull requests that prevents concurrent modification of the same infrastructure (Terraform project) whereas Terraform locking only prevents two concurrent `terraform apply`'s from happening.
 
 Terraform locking can be used alongside Atlantis locking since Atlantis is simply executing terraform commands.
 
 **Q: How to run Atlantis in high availability mode? Does it need to be?**
 
-A: Atlantis server can easily be run under the supervision of a init system like `upstart` or `systemd` to make sure `atlantis server` is always running. 
+A: Atlantis server can easily be run under the supervision of a init system like `upstart` or `systemd` to make sure `atlantis server` is always running.
 
 Atlantis currently stores all locking and Terraform plans locally on disk under the `--data-dir` directory (defaults to `~/.atlantis`). Because of this there is currently no way to run two or more Atlantis instances concurrently.
 
