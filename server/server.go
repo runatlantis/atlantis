@@ -289,9 +289,9 @@ func (s *Server) Start() error {
 		return r.URL.Path == "/" || r.URL.Path == "/index.html"
 	})
 	s.Router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: static.Asset, AssetDir: static.AssetDir, AssetInfo: static.AssetInfo}))
-	s.Router.HandleFunc("/events", s.postEvents).Methods("POST")
-	s.Router.HandleFunc("/locks", s.LocksController.DeleteLockRoute).Methods("DELETE").Queries("id", "{id:.*}")
-	lockRoute := s.Router.HandleFunc("/lock", s.LocksController.GetLockRoute).Methods("GET").Queries("id", "{id}").Name(LockRouteName)
+	s.Router.HandleFunc("/events", s.EventsController.Post).Methods("POST")
+	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
+	lockRoute := s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").Queries("id", "{id}").Name(LockRouteName)
 	// function that planExecutor can use to construct detail view url
 	// injecting this here because this is the earliest routes are created
 	s.CommandHandler.SetLockURL(func(lockID string) string {
@@ -362,10 +362,4 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 		Locks:           lockResults,
 		AtlantisVersion: s.AtlantisVersion,
 	})
-}
-
-// postEvents handles POST requests to our /events endpoint. These should be
-// VCS webhook requests.
-func (s *Server) postEvents(w http.ResponseWriter, r *http.Request) {
-	s.EventsController.Post(w, r)
 }

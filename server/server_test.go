@@ -50,9 +50,9 @@ func TestIndex_LockErr(t *testing.T) {
 	s := server.Server{
 		Locker: l,
 	}
-	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
-	s.Index(w, eventsReq)
+	s.Index(w, req)
 	responseContains(t, w, 503, "Could not retrieve locks: err")
 }
 
@@ -85,9 +85,9 @@ func TestIndex_Success(t *testing.T) {
 		Router:          r,
 		AtlantisVersion: atlantisVersion,
 	}
-	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
-	s.Index(w, eventsReq)
+	s.Index(w, req)
 	it.VerifyWasCalledOnce().Execute(w, server.IndexData{
 		Locks: []server.LockIndexData{
 			{
