@@ -33,7 +33,7 @@ go install
 
 Run Atlantis:
 ```
-atlantis server --gh-user <your username> --gh-token <your token> --log-level debug
+atlantis server --gh-user <your username> --gh-token <your token> --repo-whitelist <your repo> --log-level debug
 ```
 If you get an error like `command not found: atlantis`, ensure that `$GOPATH/bin` is in your `$PATH`.
 
