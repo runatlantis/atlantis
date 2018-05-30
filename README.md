@@ -334,7 +334,7 @@ If installing on a single repository, navigate to the repository home page and c
 - Click **Add webhook**
 - set **Payload URL** to `http://$URL/events` where `$URL` is where Atlantis is hosted. **Be sure to add `/events`**
 - set **Content type** to `application/json`
-- leave **Secret** blank or set this to a random key (https://www.random.org/strings/). If you set it, you'll need to use the `--gh-webhook-secret` option when you start Atlantis
+- set **Secret** to a random key (https://www.random.org/strings/). You'll need to pass this value to the `--gh-webhook-secret` option when you start Atlantis
 - select **Let me select individual events**
 - check the boxes
 	- **Pull request reviews**
