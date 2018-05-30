@@ -48,7 +48,7 @@ type EventParsing interface {
 	ParseGithubRepo(ghRepo *github.Repository) (models.Repo, error)
 	ParseGitlabMergeEvent(event gitlab.MergeEvent) (models.PullRequest, models.Repo, error)
 	ParseGitlabMergeCommentEvent(event gitlab.MergeCommentEvent) (baseRepo models.Repo, headRepo models.Repo, user models.User, err error)
-	ParseGitlabMergeRequest(mr *gitlab.MergeRequest) models.PullRequest
+	ParseGitlabMergeRequest(mr *gitlab.MergeRequest, baseRepo models.Repo) models.PullRequest
 }
 
 type EventParser struct {
@@ -104,7 +104,11 @@ func (e *EventParser) ParseGithubPull(pull *github.PullRequest) (models.PullRequ
 		return pullModel, headRepoModel, errors.New("number is null")
 	}
 
-	headRepoModel, err := e.ParseGithubRepo(pull.Head.Repo)
+	baseRepoModel, err := e.ParseGithubRepo(pull.Base.Repo)
+	if err != nil {
+		return pullModel, headRepoModel, err
+	}
+	headRepoModel, err = e.ParseGithubRepo(pull.Head.Repo)
 	if err != nil {
 		return pullModel, headRepoModel, err
 	}
@@ -121,6 +125,7 @@ func (e *EventParser) ParseGithubPull(pull *github.PullRequest) (models.PullRequ
 		URL:        url,
 		Num:        num,
 		State:      pullState,
+		BaseRepo:   baseRepoModel,
 	}, headRepoModel, nil
 }
 
@@ -136,6 +141,7 @@ func (e *EventParser) ParseGitlabMergeEvent(event gitlab.MergeEvent) (models.Pul
 	// GitLab also has a "merged" state, but we map that to Closed so we don't
 	// need to check for it.
 
+	repo, err := models.NewRepo(models.Gitlab, event.Project.PathWithNamespace, event.Project.GitHTTPURL, e.GitlabUser, e.GitlabToken)
 	pull := models.PullRequest{
 		URL:        event.ObjectAttributes.URL,
 		Author:     event.User.Username,
@@ -143,9 +149,9 @@ func (e *EventParser) ParseGitlabMergeEvent(event gitlab.MergeEvent) (models.Pul
 		HeadCommit: event.ObjectAttributes.LastCommit.ID,
 		Branch:     event.ObjectAttributes.SourceBranch,
 		State:      modelState,
+		BaseRepo:   repo,
 	}
 
-	repo, err := models.NewRepo(models.Gitlab, event.Project.PathWithNamespace, event.Project.GitHTTPURL, e.GitlabUser, e.GitlabToken)
 	return pull, repo, err
 }
 
@@ -169,7 +175,11 @@ func (e *EventParser) ParseGitlabMergeCommentEvent(event gitlab.MergeCommentEven
 	return
 }
 
-func (e *EventParser) ParseGitlabMergeRequest(mr *gitlab.MergeRequest) models.PullRequest {
+// ParseGitlabMergeRequest parses the merge requests and returns a pull request
+// model. We require passing in baseRepo because although can't get this information
+// from the merge request, the only caller of this function already has that
+// data. This means we can construct the pull request object correctly.
+func (e *EventParser) ParseGitlabMergeRequest(mr *gitlab.MergeRequest, baseRepo models.Repo) models.PullRequest {
 	pullState := models.Closed
 	if mr.State == gitlabPullOpened {
 		pullState = models.Open
@@ -184,5 +194,6 @@ func (e *EventParser) ParseGitlabMergeRequest(mr *gitlab.MergeRequest) models.Pu
 		HeadCommit: mr.SHA,
 		Branch:     mr.SourceBranch,
 		State:      pullState,
+		BaseRepo:   baseRepo,
 	}
 }
