@@ -102,6 +102,20 @@ func TestIndex_Success(t *testing.T) {
 	responseContains(t, w, http.StatusOK, "")
 }
 
+func TestHealthz(t *testing.T) {
+	s := server.Server{}
+	req, _ := http.NewRequest("GET", "/healthz", bytes.NewBuffer(nil))
+	w := httptest.NewRecorder()
+	s.Healthz(w, req)
+	Equals(t, http.StatusOK, w.Result().StatusCode)
+	body, _ := ioutil.ReadAll(w.Result().Body)
+	Equals(t, "application/json", w.Result().Header["Content-Type"][0])
+	Equals(t,
+		`{
+  "status": "ok"
+}`, string(body))
+}
+
 func responseContains(t *testing.T, r *httptest.ResponseRecorder, status int, bodySubstr string) {
 	t.Helper()
 	Equals(t, status, r.Result().StatusCode)

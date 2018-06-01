@@ -201,7 +201,7 @@ spec:
         - name: ATLANTIS_REPO_WHITELIST
           value: github.com/yourorg/* # 2. Replace this with your own repo whitelist.
 
-        ## GitHub Config ###
+        ### GitHub Config ###
         - name: ATLANTIS_GH_USER
           value: <YOUR_GITHUB_USER> # 3i. If you're using GitHub replace <YOUR_GITHUB_USER> with the username of your Atlantis GitHub user without the `@`.
         - name: ATLANTIS_GH_TOKEN
@@ -215,7 +215,7 @@ spec:
               name: atlantis-vcs
               key: webhook-secret
 
-        ## GitLab Config ###
+        ### GitLab Config ###
         - name: ATLANTIS_GITLAB_USER
           value: <YOUR_GITLAB_USER> # 4i. If you're using GitLab replace <YOUR_GITLAB_USER> with the username of your Atlantis GitLab user without the `@`.
         - name: ATLANTIS_GITLAB_TOKEN
@@ -246,6 +246,22 @@ spec:
           limits:
             memory: 256Mi
             cpu: 100m
+        livenessProbe:
+          # We only need to check every 60s since Atlantis is not a
+          # high-throughput service.
+          periodSeconds: 60
+          httpGet:
+            path: /healthz
+            port: 4141
+            # If using https, change this.
+            scheme: http
+        readinessProbe:
+          periodSeconds: 60
+          httpGet:
+            path: /healthz
+            port: 4141
+            # If using https, change this.
+            scheme: http
   volumeClaimTemplates:
   - metadata:
       name: atlantis-data
@@ -300,7 +316,7 @@ spec:
         - name: ATLANTIS_REPO_WHITELIST
           value: github.com/yourorg/* # 2. Replace this with your own repo whitelist.
 
-        ## GitHub Config ###
+        ### GitHub Config ###
         - name: ATLANTIS_GH_USER
           value: <YOUR_GITHUB_USER> # 3i. If you're using GitHub replace <YOUR_GITHUB_USER> with the username of your Atlantis GitHub user without the `@`.
         - name: ATLANTIS_GH_TOKEN
@@ -314,7 +330,7 @@ spec:
               name: atlantis-vcs
               key: webhook-secret
 
-        ## GitLab Config ###
+        ### GitLab Config ###
         - name: ATLANTIS_GITLAB_USER
           value: <YOUR_GITLAB_USER> # 4i. If you're using GitLab replace <YOUR_GITLAB_USER> with the username of your Atlantis GitLab user without the `@`.
         - name: ATLANTIS_GITLAB_TOKEN
@@ -339,6 +355,22 @@ spec:
           limits:
             memory: 256Mi
             cpu: 100m
+        livenessProbe:
+          # We only need to check every 60s since Atlantis is not a
+          # high-throughput service.
+          periodSeconds: 60
+          httpGet:
+            path: /healthz
+            port: 4141
+            # If using https, change this.
+            scheme: http
+        readinessProbe:
+          periodSeconds: 60
+          httpGet:
+            path: /healthz
+            port: 4141
+            # If using https, change this.
+            scheme: http
 ---
 apiVersion: v1
 kind: Service
