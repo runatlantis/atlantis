@@ -1,0 +1,8 @@
+coverage:
+  status:
+    # This disables the GitHub statuses from CodeCov. I found that many of the
+    # PRs I wanted to merge failed the status checks because often some code
+    # isn't testable or testing it isn't the highest priority. The comment with
+    # the code coverage is all that is needed right now.
+    project: off
+    patch: off
