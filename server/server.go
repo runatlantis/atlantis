@@ -36,6 +36,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/locking/boltdb"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/repoconfig"
 	"github.com/runatlantis/atlantis/server/events/run"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -46,7 +47,16 @@ import (
 	"github.com/urfave/negroni"
 )
 
-const LockRouteName = "lock-detail"
+const (
+	// LockViewRouteName is the named route in mux.Router for the lock view.
+	// The route can be retrieved by this name, ex:
+	//   mux.Router.Get(LockViewRouteName)
+	LockViewRouteName = "lock-detail"
+	// LockViewRouteIDQueryParam is the query parameter needed to construct the lock view
+	// route. ex:
+	//   mux.Router.Get(LockViewRouteName).URL(LockViewRouteIDQueryParam, "my id")
+	LockViewRouteIDQueryParam = "id"
+)
 
 // Server runs the Atlantis web server.
 type Server struct {
@@ -184,11 +194,23 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	workspace := &events.FileWorkspace{
 		DataDir: userConfig.DataDir,
 	}
-	projectPreExecute := &events.DefaultProjectPreExecutor{
+	projectLocker := &events.DefaultProjectLocker{
 		Locker:       lockingClient,
 		Run:          run,
 		ConfigReader: configReader,
 		Terraform:    terraformClient,
+	}
+	executionPlanner := &repoconfig.ExecutionPlanner{
+		ConfigReader:      &repoconfig.Reader{},
+		DefaultTFVersion:  terraformClient.Version(),
+		TerraformExecutor: terraformClient,
+	}
+	underlyingRouter := mux.NewRouter()
+	router := &Router{
+		AtlantisURL:               userConfig.AtlantisURL,
+		LockViewRouteIDQueryParam: LockViewRouteIDQueryParam,
+		LockViewRouteName:         LockViewRouteName,
+		Underlying:                underlyingRouter,
 	}
 	applyExecutor := &events.ApplyExecutor{
 		VCSClient:         vcsClient,
@@ -196,17 +218,20 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		RequireApproval:   userConfig.RequireApproval,
 		Run:               run,
 		AtlantisWorkspace: workspace,
-		ProjectPreExecute: projectPreExecute,
+		ProjectLocker:     projectLocker,
+		ExecutionPlanner:  executionPlanner,
 		Webhooks:          webhooksManager,
 	}
 	planExecutor := &events.PlanExecutor{
-		VCSClient:         vcsClient,
-		Terraform:         terraformClient,
-		Run:               run,
-		Workspace:         workspace,
-		ProjectPreExecute: projectPreExecute,
-		Locker:            lockingClient,
-		ProjectFinder:     &events.DefaultProjectFinder{},
+		VCSClient:        vcsClient,
+		Terraform:        terraformClient,
+		Run:              run,
+		Workspace:        workspace,
+		ProjectLocker:    projectLocker,
+		Locker:           lockingClient,
+		ProjectFinder:    &events.DefaultProjectFinder{},
+		ExecutionPlanner: executionPlanner,
+		LockURLGenerator: router,
 	}
 	pullClosedExecutor := &events.PullClosedExecutor{
 		VCSClient: vcsClient,
@@ -229,7 +254,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	commandHandler := &events.CommandHandler{
 		ApplyExecutor:            applyExecutor,
 		PlanExecutor:             planExecutor,
-		LockURLGenerator:         planExecutor,
 		EventParser:              eventParser,
 		VCSClient:                vcsClient,
 		GithubPullGetter:         githubClient,
@@ -265,10 +289,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		SupportedVCSHosts:      supportedVCSHosts,
 		VCSClient:              vcsClient,
 	}
-	router := mux.NewRouter()
 	return &Server{
 		AtlantisVersion:    config.AtlantisVersion,
-		Router:             router,
+		Router:             underlyingRouter,
 		Port:               userConfig.Port,
 		CommandHandler:     commandHandler,
 		Logger:             logger,
@@ -291,14 +314,7 @@ func (s *Server) Start() error {
 	s.Router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: static.Asset, AssetDir: static.AssetDir, AssetInfo: static.AssetInfo}))
 	s.Router.HandleFunc("/events", s.EventsController.Post).Methods("POST")
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
-	lockRoute := s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").Queries("id", "{id}").Name(LockRouteName)
-	// function that planExecutor can use to construct detail view url
-	// injecting this here because this is the earliest routes are created
-	s.CommandHandler.SetLockURL(func(lockID string) string {
-		// ignoring error since guaranteed to succeed if "id" is specified
-		u, _ := lockRoute.URL("id", url.QueryEscape(lockID))
-		return s.AtlantisURL + u.RequestURI()
-	})
+	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").Queries(LockViewRouteIDQueryParam, "{id}").Name(LockViewRouteName)
 	n := negroni.New(&negroni.Recovery{
 		Logger:     log.New(os.Stdout, "", log.LstdFlags),
 		PrintStack: false,
@@ -349,7 +365,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 
 	var lockResults []LockIndexData
 	for id, v := range locks {
-		lockURL, _ := s.Router.Get(LockRouteName).URL("id", url.QueryEscape(id))
+		lockURL, _ := s.Router.Get(LockViewRouteName).URL("id", url.QueryEscape(id))
 		lockResults = append(lockResults, LockIndexData{
 			LockURL:      lockURL.String(),
 			RepoFullName: v.Project.RepoFullName,

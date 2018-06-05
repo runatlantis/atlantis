@@ -78,7 +78,7 @@ func TestIndex_Success(t *testing.T) {
 	r := mux.NewRouter()
 	atlantisVersion := "0.3.1"
 	// Need to create a lock route since the server expects this route to exist.
-	r.NewRoute().Path("").Name(server.LockRouteName)
+	r.NewRoute().Path("").Name(server.LockViewRouteName)
 	s := server.Server{
 		Locker:          l,
 		IndexTemplate:   it,

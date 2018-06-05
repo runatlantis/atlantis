@@ -284,8 +284,5 @@ func setupPlanExecutorTest(t *testing.T) (*events.PlanExecutor, *tmocks.MockClie
 		Locker:            locker,
 		Run:               run,
 	}
-	p.LockURL = func(id string) (url string) {
-		return "lockurl-" + id
-	}
 	return &p, runner, locker
 }

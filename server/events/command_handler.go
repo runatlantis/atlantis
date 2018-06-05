@@ -55,7 +55,6 @@ type GitlabMergeRequestGetter interface {
 type CommandHandler struct {
 	PlanExecutor             Executor
 	ApplyExecutor            Executor
-	LockURLGenerator         LockURLGenerator
 	VCSClient                vcs.ClientProxy
 	GithubPullGetter         GithubPullGetter
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
@@ -135,11 +134,6 @@ func (c *CommandHandler) getGitlabData(baseRepo models.Repo, pullNum int) (model
 func (c *CommandHandler) buildLogger(repoFullName string, pullNum int) *logging.SimpleLogger {
 	src := fmt.Sprintf("%s#%d", repoFullName, pullNum)
 	return logging.NewSimpleLogger(src, c.Logger.Underlying(), true, c.Logger.GetLevel())
-}
-
-// SetLockURL sets a function that's used to return the URL for a lock.
-func (c *CommandHandler) SetLockURL(f func(id string) (url string)) {
-	c.LockURLGenerator.SetLockURL(f)
 }
 
 func (c *CommandHandler) run(ctx *CommandContext) {
