@@ -73,7 +73,7 @@ func ErrContains(tb testing.TB, substr string, act error) {
 		tb.Fatalf("exp err to contain %q but err was nil", substr)
 	}
 	if !strings.Contains(act.Error(), substr) {
-		tb.Fatalf("exp err %q to contain $q", act.Error(), substr)
+		tb.Fatalf("exp err %q to contain %q", act.Error(), substr)
 	}
 }
 
