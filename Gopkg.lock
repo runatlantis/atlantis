@@ -26,6 +26,12 @@
   version = "v1.5.0"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/flynn-archive/go-shlex"
+  packages = ["."]
+  revision = "3f9db97f856818214da2e1057f8ad84803971cff"
+
+[[projects]]
   name = "github.com/fsnotify/fsnotify"
   packages = ["."]
   revision = "629574ca2a5df945712d3079857300b5e4da0236"
@@ -282,6 +288,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "4e5fea92b65446bbdeccbdedfb28fb9c2ea21325b0335b3a4e7b98b60d47ccd6"
+  inputs-digest = "6e38170b3ac78890d7f3af87171bc9ccf81083b5196342b2f5acea10125872bd"
   solver-name = "gps-cdcl"
   solver-version = 1

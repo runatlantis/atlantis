@@ -1,6 +1,11 @@
 package repoconfig
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/flynn-archive/go-shlex"
+	"github.com/pkg/errors"
+)
 
 type RepoConfig struct {
 	Version   int                 `yaml:"version"`
@@ -61,6 +66,16 @@ type Workflow struct {
 }
 
 func (p *Workflow) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	// Check if they forgot to set the "steps" key.
+	type MissingSteps struct {
+		Apply []interface{}
+		Plan  []interface{}
+	}
+	var missingSteps MissingSteps
+	if err := unmarshal(&missingSteps); err == nil {
+		return errors.New("missing \"steps\" key")
+	}
+
 	// Use a type alias so unmarshal doesn't get into an infinite loop.
 	type alias Workflow
 	var tmp alias
@@ -103,6 +118,9 @@ type Stage struct {
 type StepConfig struct {
 	StepType  string
 	ExtraArgs []string
+	// Run will be set if the StepType is "run". This is for custom commands.
+	// Ex. if the key is `run: echo hi` then Run will be "echo hi".
+	Run []string
 }
 
 func (s *StepConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
@@ -174,15 +192,20 @@ func (s *StepConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		return validateBuiltIn("apply", applyStep.Apply)
 	}
 
-	// todo: run step
 	// Try to unmarshal as a custom run step, ex.
 	// steps:
 	// - run: my command
-	//var runStep struct {
-	//	Run string `yaml:"run"`
-	//}
-	//if err = unmarshal(&runStep); err == nil {
-	//
-	//}
+	var runStep struct {
+		Run string `yaml:"run"`
+	}
+	if err = unmarshal(&runStep); err == nil {
+		s.StepType = "run"
+		parts, err := shlex.Split(runStep.Run)
+		if err != nil {
+			return err
+		}
+		s.Run = parts
+	}
+
 	return err
 }

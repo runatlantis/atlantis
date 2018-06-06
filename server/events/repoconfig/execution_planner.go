@@ -85,8 +85,12 @@ func (s *ExecutionPlanner) buildStage(stageName string, log *logging.SimpleLogge
 						Meta:      meta,
 						ExtraArgs: stepConfig.ExtraArgs,
 					}
+				case "run":
+					step = &RunStep{
+						Meta:     meta,
+						Commands: stepConfig.Run,
+					}
 				}
-				// todo: custom step
 				steps = append(steps, step)
 			}
 			return steps, nil

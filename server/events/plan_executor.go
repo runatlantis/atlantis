@@ -30,7 +30,7 @@ type LockURLGenerator interface {
 	GenerateLockURL(lockID string) string
 }
 
-/**/ // PlanExecutor handles everything related to running terraform plan.
+// PlanExecutor handles everything related to running terraform plan.
 type PlanExecutor struct {
 	VCSClient        vcs.ClientProxy
 	Terraform        terraform.Client

@@ -161,7 +161,6 @@ projects:
 - unknown: value`,
 			expErr: "yaml: unmarshal errors:\n  line 4: field unknown not found in struct repoconfig.alias",
 		},
-		// todo: more test cases
 
 		// project workflow doesn't exist
 		// workflow has plan and apply keys (otherwise no point specifying it)
@@ -279,6 +278,33 @@ workflows:
           extra_args: arg
 `,
 			expErr: "expected array of strings as value of extra_args, not \"arg\"",
+		},
+		{
+			description: "invalid step type",
+			input: `
+version: 2
+projects:
+- dir: "."
+workflows:
+  default:
+    plan:
+      steps:
+      - rn: echo should fail
+`,
+			expErr: "yaml: unmarshal errors:\n  line 9: field rn not found in struct struct { Run string \"yaml:\\\"run\\\"\" }",
+		},
+		{
+			description: "missed the steps key and just set an array directly",
+			input: `
+version: 2
+projects:
+- dir: "."
+workflows:
+  default:
+    plan:
+      - init
+`,
+			expErr: "missing \"steps\" key",
 		},
 	}
 
@@ -440,71 +466,6 @@ workflows:
 			},
 		},
 		{
-			description: "if a plan or apply has no steps defined then we use the defaults",
-			input: `
-version: 2
-projects:
-- dir: "."
-workflows:
-  default:
-    plan:
-    apply:
-`,
-			expOutput: repoconfig.RepoConfig{
-				Version:  2,
-				Projects: basicProjects,
-				Workflows: map[string]repoconfig.Workflow{
-					"default": {
-						Plan: &repoconfig.Stage{
-							Steps: []repoconfig.StepConfig{
-								{
-									StepType: "init",
-								},
-								{
-									StepType: "plan",
-								},
-							},
-						},
-						Apply: &repoconfig.Stage{
-							Steps: []repoconfig.StepConfig{
-								{
-									StepType: "apply",
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			description: "if a plan or apply explicitly defines an empty steps key then there are no steps",
-			input: `
-version: 2
-projects:
-- dir: "."
-workflows:
-  default:
-    plan:
-      steps:
-    apply:
-      steps:
-`,
-			expOutput: repoconfig.RepoConfig{
-				Version:  2,
-				Projects: basicProjects,
-				Workflows: map[string]repoconfig.Workflow{
-					"default": {
-						Plan: &repoconfig.Stage{
-							Steps: nil,
-						},
-						Apply: &repoconfig.Stage{
-							Steps: nil,
-						},
-					},
-				},
-			},
-		},
-		{
 			description: "if a plan or apply explicitly defines an empty steps key then there are no steps",
 			input: `
 version: 2
@@ -543,9 +504,11 @@ workflows:
     plan:
       steps:
       - init
+      - plan
     apply:
       steps:
       - plan # we don't validate if they make sense
+      - apply
 `,
 			expOutput: repoconfig.RepoConfig{
 				Version:  2,
@@ -557,12 +520,18 @@ workflows:
 								{
 									StepType: "init",
 								},
+								{
+									StepType: "plan",
+								},
 							},
 						},
 						Apply: &repoconfig.Stage{
 							Steps: []repoconfig.StepConfig{
 								{
 									StepType: "plan",
+								},
+								{
+									StepType: "apply",
 								},
 							},
 						},
@@ -582,9 +551,15 @@ workflows:
       steps:
       - init:
           extra_args: []
+      - plan:
+          extra_args:
+          - arg1
+          - arg2
     apply:
       steps:
       - plan:
+          extra_args: [a, b]
+      - apply:
           extra_args: ["a", "b"]
 `,
 			expOutput: repoconfig.RepoConfig{
@@ -598,6 +573,10 @@ workflows:
 									StepType:  "init",
 									ExtraArgs: nil,
 								},
+								{
+									StepType:  "plan",
+									ExtraArgs: []string{"arg1", "arg2"},
+								},
 							},
 						},
 						Apply: &repoconfig.Stage{
@@ -605,6 +584,52 @@ workflows:
 								{
 									StepType:  "plan",
 									ExtraArgs: []string{"a", "b"},
+								},
+								{
+									StepType:  "apply",
+									ExtraArgs: []string{"a", "b"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "custom steps are parsed",
+			input: `
+version: 2
+projects:
+- dir: "."
+workflows:
+  default:
+    plan:
+      steps:
+      - run: "echo \"plan hi\""
+    apply:
+      steps:
+      - run: echo apply "arg 2"
+`,
+			expOutput: repoconfig.RepoConfig{
+				Version:  2,
+				Projects: basicProjects,
+				Workflows: map[string]repoconfig.Workflow{
+					"default": {
+						Plan: &repoconfig.Stage{
+							Steps: []repoconfig.StepConfig{
+								{
+									StepType:  "run",
+									ExtraArgs: nil,
+									Run:       []string{"echo", "plan hi"},
+								},
+							},
+						},
+						Apply: &repoconfig.Stage{
+							Steps: []repoconfig.StepConfig{
+								{
+									StepType:  "run",
+									ExtraArgs: nil,
+									Run:       []string{"echo", "apply", "arg 2"},
 								},
 							},
 						},
