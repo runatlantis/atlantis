@@ -18,8 +18,7 @@ const ApplyStageName = "apply"
 type Reader struct{}
 
 // ReadConfig returns the parsed and validated config for repoDir.
-// If there was no config, it returns a nil pointer. If there was an error
-// in parsing it returns the error.
+// If there was no config, it returns a nil pointer.
 func (r *Reader) ReadConfig(repoDir string) (*RepoConfig, error) {
 	configFile := filepath.Join(repoDir, AtlantisYAMLFilename)
 	configData, err := ioutil.ReadFile(configFile)

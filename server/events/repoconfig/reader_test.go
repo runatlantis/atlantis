@@ -80,14 +80,16 @@ func TestReadConfig_Invalid(t *testing.T) {
 		// Invalid version.
 		{
 			description: "no version",
-			input: `projects:
+			input: `
+projects:
 - dir: "."
 `,
 			expErr: "unknown version: must have \"version: 2\" set",
 		},
 		{
 			description: "unsupported version",
-			input: `version: 0
+			input: `
+version: 0
 projects:
 - dir: "."
 `,
@@ -95,7 +97,8 @@ projects:
 		},
 		{
 			description: "empty version",
-			input: `version: ~
+			input: `
+version: ~
 projects:
 - dir: "."
 `,
@@ -110,7 +113,8 @@ projects:
 		},
 		{
 			description: "empty projects list",
-			input: `version: 2
+			input: `
+version: 2
 projects:`,
 			expErr: "'projects' key must exist and contain at least one element",
 		},
@@ -118,41 +122,45 @@ projects:`,
 		// Project must have dir set.
 		{
 			description: "project with no config",
-			input: `version: 2
+			input: `
+version: 2
 projects:
 -`,
 			expErr: "project at index 0 invalid: dir key must be set and non-empty",
 		},
 		{
 			description: "project without dir set",
-			input: `version: 2
+			input: `
+version: 2
 projects:
 - workspace: "staging"`,
 			expErr: "project at index 0 invalid: dir key must be set and non-empty",
 		},
 		{
 			description: "project with dir set to empty string",
-			input: `version: 2
+			input: `
+version: 2
 projects:
 - dir: ""`,
 			expErr: "project at index 0 invalid: dir key must be set and non-empty",
 		},
 		{
 			description: "project with no config at index 1",
-			input: `version: 2
+			input: `
+version: 2
 projects:
 - dir: "."
 -`,
 			expErr: "project at index 1 invalid: dir key must be set and non-empty",
 		},
-		//		{
-		//			"project with unknown key",
-		//			`version: 2
-		//projects:
-		//- unknown: value`,
-		//			// todo: fix this test case
-		//			"project at index 1 invalid: dir key must be set and non-empty",
-		//		},
+		{
+			description: "project with unknown key",
+			input: `
+version: 2
+projects:
+- unknown: value`,
+			expErr: "yaml: unmarshal errors:\n  line 4: field unknown not found in struct repoconfig.alias",
+		},
 		// todo: more test cases
 
 		// project workflow doesn't exist
@@ -311,7 +319,8 @@ func TestReadConfig_Successes(t *testing.T) {
 	}{
 		{
 			description: "uses project defaults",
-			input: `version: 2
+			input: `
+version: 2
 projects:
 - dir: "."`,
 			expOutput: repoconfig.RepoConfig{
@@ -321,7 +330,8 @@ projects:
 		},
 		{
 			description: "autoplan is enabled by default",
-			input: `version: 2
+			input: `
+version: 2
 projects:
 - dir: "."
   auto_plan:
@@ -334,7 +344,8 @@ projects:
 		},
 		{
 			description: "if workflows not defined, there are none",
-			input: `version: 2
+			input: `
+version: 2
 projects:
 - dir: "."
 `,
@@ -345,7 +356,8 @@ projects:
 		},
 		{
 			description: "if workflows key set but with no workflows there are none",
-			input: `version: 2
+			input: `
+version: 2
 projects:
 - dir: "."
 workflows: ~
@@ -357,7 +369,8 @@ workflows: ~
 		},
 		{
 			description: "if a workflow is defined but set to null we use the defaults",
-			input: `version: 2
+			input: `
+version: 2
 projects:
 - dir: "."
 workflows:
@@ -391,7 +404,8 @@ workflows:
 		},
 		{
 			description: "if a plan or apply has no steps defined then we use the defaults",
-			input: `version: 2
+			input: `
+version: 2
 projects:
 - dir: "."
 workflows:
@@ -427,7 +441,8 @@ workflows:
 		},
 		{
 			description: "if a plan or apply has no steps defined then we use the defaults",
-			input: `version: 2
+			input: `
+version: 2
 projects:
 - dir: "."
 workflows:
@@ -463,7 +478,8 @@ workflows:
 		},
 		{
 			description: "if a plan or apply explicitly defines an empty steps key then there are no steps",
-			input: `version: 2
+			input: `
+version: 2
 projects:
 - dir: "."
 workflows:
@@ -490,7 +506,8 @@ workflows:
 		},
 		{
 			description: "if a plan or apply explicitly defines an empty steps key then there are no steps",
-			input: `version: 2
+			input: `
+version: 2
 projects:
 - dir: "."
 workflows:
@@ -517,7 +534,8 @@ workflows:
 		},
 		{
 			description: "if steps are set then we parse them properly",
-			input: `version: 2
+			input: `
+version: 2
 projects:
 - dir: "."
 workflows:
@@ -554,7 +572,8 @@ workflows:
 		},
 		{
 			description: "we parse extra_args for the steps",
-			input: `version: 2
+			input: `
+version: 2
 projects:
 - dir: "."
 workflows:
