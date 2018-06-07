@@ -1,4 +1,4 @@
-package repoconfig
+package yaml
 
 import (
 	"fmt"
@@ -46,8 +46,8 @@ func (r *Reader) parseAndValidate(configData []byte) (RepoConfig, error) {
 	if err := yaml.UnmarshalStrict(configData, &repoConfig); err != nil {
 		// Unmarshal error messages aren't fit for user output. We need to
 		// massage them.
-		// todo: fix "field autoplan not found in struct repoconfig.alias" errors
-		return repoConfig, errors.New(strings.Replace(err.Error(), " into repoconfig.RepoConfig", "", -1))
+		// todo: fix "field autoplan not found in struct yaml.alias" errors
+		return repoConfig, errors.New(strings.Replace(err.Error(), " into yaml.RepoConfig", "", -1))
 	}
 
 	// Validate version.

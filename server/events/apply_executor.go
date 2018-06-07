@@ -15,11 +15,11 @@ package events
 
 import (
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/repoconfig"
 	"github.com/runatlantis/atlantis/server/events/run"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
+	"github.com/runatlantis/atlantis/server/events/yaml"
 )
 
 // ApplyExecutor handles executing terraform apply.
@@ -31,7 +31,7 @@ type ApplyExecutor struct {
 	AtlantisWorkspace AtlantisWorkspace
 	ProjectLocker     *DefaultProjectLocker
 	Webhooks          webhooks.Sender
-	ExecutionPlanner  *repoconfig.ExecutionPlanner
+	ExecutionPlanner  *yaml.ExecutionPlanner
 }
 
 // Execute executes apply for the ctx.

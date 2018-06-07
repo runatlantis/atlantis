@@ -1,4 +1,4 @@
-package repoconfig
+package yaml
 
 import (
 	"fmt"
@@ -96,7 +96,9 @@ func (s *ExecutionPlanner) buildStage(stageName string, log *logging.SimpleLogge
 			return steps, nil
 		}
 	}
-	return nil, fmt.Errorf("no project with dir %q and workspace %q defined", relProjectPath, workspace)
+	// They haven't defined this project, use the default workflow.
+	log.Info("no project with dir %q and workspace %q defined; continuing with defaults", relProjectPath, workspace)
+	return defaults, nil
 }
 
 func (s *ExecutionPlanner) BuildApplyStage(log *logging.SimpleLogger, repoDir string, workspace string, relProjectPath string, extraCommentArgs []string, username string) (*ApplyStage, error) {

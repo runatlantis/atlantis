@@ -1,4 +1,4 @@
-package repoconfig
+package yaml
 
 import (
 	"fmt"

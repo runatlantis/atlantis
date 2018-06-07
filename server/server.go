@@ -36,11 +36,11 @@ import (
 	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/locking/boltdb"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/repoconfig"
 	"github.com/runatlantis/atlantis/server/events/run"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
+	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/static"
 	"github.com/urfave/cli"
@@ -200,8 +200,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		ConfigReader: configReader,
 		Terraform:    terraformClient,
 	}
-	executionPlanner := &repoconfig.ExecutionPlanner{
-		ConfigReader:      &repoconfig.Reader{},
+	executionPlanner := &yaml.ExecutionPlanner{
+		ConfigReader:      &yaml.Reader{},
 		DefaultTFVersion:  terraformClient.Version(),
 		TerraformExecutor: terraformClient,
 	}

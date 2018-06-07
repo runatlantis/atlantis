@@ -1,4 +1,4 @@
-package repoconfig_test
+package yaml_test
 
 import (
 	"testing"
@@ -6,9 +6,9 @@ import (
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
-	"github.com/runatlantis/atlantis/server/events/repoconfig"
 	matchers2 "github.com/runatlantis/atlantis/server/events/run/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
+	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -43,8 +43,8 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 
 			tfVersion, _ := version.NewVersion(c.version)
 			logger := logging.NewNoopLogger()
-			s := repoconfig.InitStep{
-				Meta: repoconfig.StepMeta{
+			s := yaml.InitStep{
+				Meta: yaml.StepMeta{
 					Log:                   logger,
 					Workspace:             "workspace",
 					AbsolutePath:          "/path",

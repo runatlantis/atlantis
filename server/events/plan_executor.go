@@ -18,10 +18,10 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/repoconfig"
 	"github.com/runatlantis/atlantis/server/events/run"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/yaml"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_lock_url_generator.go LockURLGenerator
@@ -39,7 +39,7 @@ type PlanExecutor struct {
 	Workspace        AtlantisWorkspace
 	ProjectFinder    ProjectFinder
 	ProjectLocker    ProjectLocker
-	ExecutionPlanner *repoconfig.ExecutionPlanner
+	ExecutionPlanner *yaml.ExecutionPlanner
 	LockURLGenerator LockURLGenerator
 }
 

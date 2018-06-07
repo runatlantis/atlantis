@@ -1,4 +1,4 @@
-package repoconfig
+package yaml
 
 import (
 	"github.com/hashicorp/go-version"

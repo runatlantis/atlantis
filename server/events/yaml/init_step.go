@@ -1,4 +1,4 @@
-package repoconfig
+package yaml
 
 // InitStep runs `terraform init`.
 type InitStep struct {

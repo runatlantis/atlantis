@@ -1,16 +1,16 @@
-package repoconfig_test
+package yaml_test
 
 import (
 	"io/ioutil"
 	"path/filepath"
 	"testing"
 
-	"github.com/runatlantis/atlantis/server/events/repoconfig"
+	"github.com/runatlantis/atlantis/server/events/yaml"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 func TestReadConfig_DirDoesNotExist(t *testing.T) {
-	r := repoconfig.Reader{}
+	r := yaml.Reader{}
 	conf, err := r.ReadConfig("/not/exist")
 	Ok(t, err)
 	Assert(t, conf == nil, "exp nil ptr")
@@ -20,7 +20,7 @@ func TestReadConfig_FileDoesNotExist(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
 
-	r := repoconfig.Reader{}
+	r := yaml.Reader{}
 	conf, err := r.ReadConfig(tmpDir)
 	Ok(t, err)
 	Assert(t, conf == nil, "exp nil ptr")
@@ -32,7 +32,7 @@ func TestReadConfig_BadPermissions(t *testing.T) {
 	err := ioutil.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), nil, 0000)
 	Ok(t, err)
 
-	r := repoconfig.Reader{}
+	r := yaml.Reader{}
 	_, err = r.ReadConfig(tmpDir)
 	ErrContains(t, "unable to read atlantis.yaml file: ", err)
 }
@@ -64,7 +64,7 @@ func TestReadConfig_UnmarshalErrors(t *testing.T) {
 		t.Run(c.description, func(t *testing.T) {
 			err := ioutil.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(c.input), 0600)
 			Ok(t, err)
-			r := repoconfig.Reader{}
+			r := yaml.Reader{}
 			_, err = r.ReadConfig(tmpDir)
 			ErrEquals(t, c.expErr, err)
 		})
@@ -159,7 +159,7 @@ projects:
 version: 2
 projects:
 - unknown: value`,
-			expErr: "yaml: unmarshal errors:\n  line 4: field unknown not found in struct repoconfig.alias",
+			expErr: "yaml: unmarshal errors:\n  line 4: field unknown not found in struct yaml.alias",
 		},
 
 		// project workflow doesn't exist
@@ -306,6 +306,30 @@ workflows:
 `,
 			expErr: "missing \"steps\" key",
 		},
+		{
+			description: "no value after plan:",
+			input: `
+version: 2
+projects:
+- dir: "."
+workflows:
+  default:
+    plan:
+`,
+			expErr: "missing \"steps\" key",
+		},
+		{
+			description: "no value after apply:",
+			input: `
+version: 2
+projects:
+- dir: "."
+workflows:
+  default:
+    plan:
+`,
+			expErr: "missing \"steps\" key",
+		},
 	}
 
 	tmpDir, cleanup := TempDir(t)
@@ -316,7 +340,7 @@ workflows:
 			err := ioutil.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(c.input), 0600)
 			Ok(t, err)
 
-			r := repoconfig.Reader{}
+			r := yaml.Reader{}
 			_, err = r.ReadConfig(tmpDir)
 			ErrEquals(t, "parsing atlantis.yaml: "+c.expErr, err)
 		})
@@ -324,9 +348,9 @@ workflows:
 }
 
 func TestReadConfig_Successes(t *testing.T) {
-	basicProjects := []repoconfig.Project{
+	basicProjects := []yaml.Project{
 		{
-			AutoPlan: &repoconfig.AutoPlan{
+			AutoPlan: &yaml.AutoPlan{
 				Enabled:      true,
 				WhenModified: []string{"**/*.tf"},
 			},
@@ -341,7 +365,7 @@ func TestReadConfig_Successes(t *testing.T) {
 	cases := []struct {
 		description string
 		input       string
-		expOutput   repoconfig.RepoConfig
+		expOutput   yaml.RepoConfig
 	}{
 		{
 			description: "uses project defaults",
@@ -349,7 +373,7 @@ func TestReadConfig_Successes(t *testing.T) {
 version: 2
 projects:
 - dir: "."`,
-			expOutput: repoconfig.RepoConfig{
+			expOutput: yaml.RepoConfig{
 				Version:  2,
 				Projects: basicProjects,
 			},
@@ -363,7 +387,7 @@ projects:
   auto_plan:
     when_modified: ["**/*.tf"]
 `,
-			expOutput: repoconfig.RepoConfig{
+			expOutput: yaml.RepoConfig{
 				Version:  2,
 				Projects: basicProjects,
 			},
@@ -375,7 +399,7 @@ version: 2
 projects:
 - dir: "."
 `,
-			expOutput: repoconfig.RepoConfig{
+			expOutput: yaml.RepoConfig{
 				Version:  2,
 				Projects: basicProjects,
 			},
@@ -388,7 +412,7 @@ projects:
 - dir: "."
 workflows: ~
 `,
-			expOutput: repoconfig.RepoConfig{
+			expOutput: yaml.RepoConfig{
 				Version:  2,
 				Projects: basicProjects,
 			},
@@ -402,13 +426,13 @@ projects:
 workflows:
   default: ~
 `,
-			expOutput: repoconfig.RepoConfig{
+			expOutput: yaml.RepoConfig{
 				Version:  2,
 				Projects: basicProjects,
-				Workflows: map[string]repoconfig.Workflow{
+				Workflows: map[string]yaml.Workflow{
 					"default": {
-						Plan: &repoconfig.Stage{
-							Steps: []repoconfig.StepConfig{
+						Plan: &yaml.Stage{
+							Steps: []yaml.StepConfig{
 								{
 									StepType: "init",
 								},
@@ -417,8 +441,8 @@ workflows:
 								},
 							},
 						},
-						Apply: &repoconfig.Stage{
-							Steps: []repoconfig.StepConfig{
+						Apply: &yaml.Stage{
+							Steps: []yaml.StepConfig{
 								{
 									StepType: "apply",
 								},
@@ -439,13 +463,13 @@ workflows:
     plan:
     apply:
 `,
-			expOutput: repoconfig.RepoConfig{
+			expOutput: yaml.RepoConfig{
 				Version:  2,
 				Projects: basicProjects,
-				Workflows: map[string]repoconfig.Workflow{
+				Workflows: map[string]yaml.Workflow{
 					"default": {
-						Plan: &repoconfig.Stage{
-							Steps: []repoconfig.StepConfig{
+						Plan: &yaml.Stage{
+							Steps: []yaml.StepConfig{
 								{
 									StepType: "init",
 								},
@@ -454,8 +478,8 @@ workflows:
 								},
 							},
 						},
-						Apply: &repoconfig.Stage{
-							Steps: []repoconfig.StepConfig{
+						Apply: &yaml.Stage{
+							Steps: []yaml.StepConfig{
 								{
 									StepType: "apply",
 								},
@@ -478,15 +502,15 @@ workflows:
     apply:
       steps:
 `,
-			expOutput: repoconfig.RepoConfig{
+			expOutput: yaml.RepoConfig{
 				Version:  2,
 				Projects: basicProjects,
-				Workflows: map[string]repoconfig.Workflow{
+				Workflows: map[string]yaml.Workflow{
 					"default": {
-						Plan: &repoconfig.Stage{
+						Plan: &yaml.Stage{
 							Steps: nil,
 						},
-						Apply: &repoconfig.Stage{
+						Apply: &yaml.Stage{
 							Steps: nil,
 						},
 					},
@@ -510,13 +534,13 @@ workflows:
       - plan # we don't validate if they make sense
       - apply
 `,
-			expOutput: repoconfig.RepoConfig{
+			expOutput: yaml.RepoConfig{
 				Version:  2,
 				Projects: basicProjects,
-				Workflows: map[string]repoconfig.Workflow{
+				Workflows: map[string]yaml.Workflow{
 					"default": {
-						Plan: &repoconfig.Stage{
-							Steps: []repoconfig.StepConfig{
+						Plan: &yaml.Stage{
+							Steps: []yaml.StepConfig{
 								{
 									StepType: "init",
 								},
@@ -525,8 +549,8 @@ workflows:
 								},
 							},
 						},
-						Apply: &repoconfig.Stage{
-							Steps: []repoconfig.StepConfig{
+						Apply: &yaml.Stage{
+							Steps: []yaml.StepConfig{
 								{
 									StepType: "plan",
 								},
@@ -562,13 +586,13 @@ workflows:
       - apply:
           extra_args: ["a", "b"]
 `,
-			expOutput: repoconfig.RepoConfig{
+			expOutput: yaml.RepoConfig{
 				Version:  2,
 				Projects: basicProjects,
-				Workflows: map[string]repoconfig.Workflow{
+				Workflows: map[string]yaml.Workflow{
 					"default": {
-						Plan: &repoconfig.Stage{
-							Steps: []repoconfig.StepConfig{
+						Plan: &yaml.Stage{
+							Steps: []yaml.StepConfig{
 								{
 									StepType:  "init",
 									ExtraArgs: nil,
@@ -579,8 +603,8 @@ workflows:
 								},
 							},
 						},
-						Apply: &repoconfig.Stage{
-							Steps: []repoconfig.StepConfig{
+						Apply: &yaml.Stage{
+							Steps: []yaml.StepConfig{
 								{
 									StepType:  "plan",
 									ExtraArgs: []string{"a", "b"},
@@ -610,13 +634,13 @@ workflows:
       steps:
       - run: echo apply "arg 2"
 `,
-			expOutput: repoconfig.RepoConfig{
+			expOutput: yaml.RepoConfig{
 				Version:  2,
 				Projects: basicProjects,
-				Workflows: map[string]repoconfig.Workflow{
+				Workflows: map[string]yaml.Workflow{
 					"default": {
-						Plan: &repoconfig.Stage{
-							Steps: []repoconfig.StepConfig{
+						Plan: &yaml.Stage{
+							Steps: []yaml.StepConfig{
 								{
 									StepType:  "run",
 									ExtraArgs: nil,
@@ -624,8 +648,8 @@ workflows:
 								},
 							},
 						},
-						Apply: &repoconfig.Stage{
-							Steps: []repoconfig.StepConfig{
+						Apply: &yaml.Stage{
+							Steps: []yaml.StepConfig{
 								{
 									StepType:  "run",
 									ExtraArgs: nil,
@@ -647,7 +671,7 @@ workflows:
 			err := ioutil.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(c.input), 0600)
 			Ok(t, err)
 
-			r := repoconfig.Reader{}
+			r := yaml.Reader{}
 			act, err := r.ReadConfig(tmpDir)
 			Ok(t, err)
 			Equals(t, &c.expOutput, act)
