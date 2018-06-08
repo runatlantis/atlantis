@@ -365,7 +365,7 @@ func TestReadConfig_Successes(t *testing.T) {
 	cases := []struct {
 		description string
 		input       string
-		expOutput   yaml.RepoConfig
+		expOutput   yaml.Config
 	}{
 		{
 			description: "uses project defaults",
@@ -373,7 +373,7 @@ func TestReadConfig_Successes(t *testing.T) {
 version: 2
 projects:
 - dir: "."`,
-			expOutput: yaml.RepoConfig{
+			expOutput: yaml.Config{
 				Version:  2,
 				Projects: basicProjects,
 			},
@@ -387,7 +387,7 @@ projects:
   auto_plan:
     when_modified: ["**/*.tf"]
 `,
-			expOutput: yaml.RepoConfig{
+			expOutput: yaml.Config{
 				Version:  2,
 				Projects: basicProjects,
 			},
@@ -399,7 +399,7 @@ version: 2
 projects:
 - dir: "."
 `,
-			expOutput: yaml.RepoConfig{
+			expOutput: yaml.Config{
 				Version:  2,
 				Projects: basicProjects,
 			},
@@ -412,7 +412,7 @@ projects:
 - dir: "."
 workflows: ~
 `,
-			expOutput: yaml.RepoConfig{
+			expOutput: yaml.Config{
 				Version:  2,
 				Projects: basicProjects,
 			},
@@ -426,7 +426,7 @@ projects:
 workflows:
   default: ~
 `,
-			expOutput: yaml.RepoConfig{
+			expOutput: yaml.Config{
 				Version:  2,
 				Projects: basicProjects,
 				Workflows: map[string]yaml.Workflow{
@@ -463,7 +463,7 @@ workflows:
     plan:
     apply:
 `,
-			expOutput: yaml.RepoConfig{
+			expOutput: yaml.Config{
 				Version:  2,
 				Projects: basicProjects,
 				Workflows: map[string]yaml.Workflow{
@@ -502,7 +502,7 @@ workflows:
     apply:
       steps:
 `,
-			expOutput: yaml.RepoConfig{
+			expOutput: yaml.Config{
 				Version:  2,
 				Projects: basicProjects,
 				Workflows: map[string]yaml.Workflow{
@@ -534,7 +534,7 @@ workflows:
       - plan # we don't validate if they make sense
       - apply
 `,
-			expOutput: yaml.RepoConfig{
+			expOutput: yaml.Config{
 				Version:  2,
 				Projects: basicProjects,
 				Workflows: map[string]yaml.Workflow{
@@ -586,7 +586,7 @@ workflows:
       - apply:
           extra_args: ["a", "b"]
 `,
-			expOutput: yaml.RepoConfig{
+			expOutput: yaml.Config{
 				Version:  2,
 				Projects: basicProjects,
 				Workflows: map[string]yaml.Workflow{
@@ -634,7 +634,7 @@ workflows:
       steps:
       - run: echo apply "arg 2"
 `,
-			expOutput: yaml.RepoConfig{
+			expOutput: yaml.Config{
 				Version:  2,
 				Projects: basicProjects,
 				Workflows: map[string]yaml.Workflow{
