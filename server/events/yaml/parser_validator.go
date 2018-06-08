@@ -5,49 +5,46 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 )
 
+// AtlantisYAMLFilename is the name of the config file for each repo.
 const AtlantisYAMLFilename = "atlantis.yaml"
-const PlanStageName = "plan"
-const ApplyStageName = "apply"
 
-type Reader struct{}
+type ParserValidator struct{}
 
-// ReadConfig returns the parsed and validated config for repoDir.
-// If there was no config, it returns a nil pointer.
-func (r *Reader) ReadConfig(repoDir string) (*Config, error) {
+// ReadConfig returns the parsed and validated atlantis.yaml config for repoDir.
+// If there was no config file, then this can be detected by checking the type
+// of error: os.IsNotExist(error).
+func (r *ParserValidator) ReadConfig(repoDir string) (Config, error) {
 	configFile := filepath.Join(repoDir, AtlantisYAMLFilename)
 	configData, err := ioutil.ReadFile(configFile)
 
-	// If the file doesn't exist return nil.
+	// NOTE: the error we return here must also be os.IsNotExist since that's
+	// what our callers use to detect a missing config file.
 	if err != nil && os.IsNotExist(err) {
-		return nil, nil
+		return Config{}, err
 	}
 
 	// If it exists but we couldn't read it return an error.
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to read %s file", AtlantisYAMLFilename)
+		return Config{}, errors.Wrapf(err, "unable to read %s file", AtlantisYAMLFilename)
 	}
 
 	// If the config file exists, parse it.
 	config, err := r.parseAndValidate(configData)
 	if err != nil {
-		return nil, errors.Wrapf(err, "parsing %s", AtlantisYAMLFilename)
+		return Config{}, errors.Wrapf(err, "parsing %s", AtlantisYAMLFilename)
 	}
-	return &config, err
+	return config, err
 }
 
-func (r *Reader) parseAndValidate(configData []byte) (Config, error) {
+func (r *ParserValidator) parseAndValidate(configData []byte) (Config, error) {
 	var repoConfig Config
 	if err := yaml.UnmarshalStrict(configData, &repoConfig); err != nil {
-		// Unmarshal error messages aren't fit for user output. We need to
-		// massage them.
-		// todo: fix "field autoplan not found in struct yaml.alias" errors
-		return repoConfig, errors.New(strings.Replace(err.Error(), " into yaml.Config", "", -1))
+		return repoConfig, err
 	}
 
 	// Validate version.

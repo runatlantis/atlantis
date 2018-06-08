@@ -1,17 +1,23 @@
-package yaml
+package runtime
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/runatlantis/atlantis/server/logging"
 )
+
+const PlanStageName = "plan"
+const ApplyStageName = "apply"
+const AtlantisYAMLFilename = "atlantis.yaml"
 
 type ExecutionPlanner struct {
 	TerraformExecutor TerraformExec
 	DefaultTFVersion  *version.Version
-	ConfigReader      *Reader
+	ParserValidator   *yaml.ParserValidator
 }
 
 type TerraformExec interface {
@@ -30,15 +36,16 @@ func (s *ExecutionPlanner) BuildPlanStage(log *logging.SimpleLogger, repoDir str
 }
 
 func (s *ExecutionPlanner) buildStage(stageName string, log *logging.SimpleLogger, repoDir string, workspace string, relProjectPath string, extraCommentArgs []string, username string, defaults []Step) ([]Step, error) {
-	config, err := s.ConfigReader.ReadConfig(repoDir)
-	if err != nil {
-		return nil, err
-	}
+	config, err := s.ParserValidator.ReadConfig(repoDir)
 
 	// If there's no config file, use defaults.
-	if config == nil {
+	if os.IsNotExist(err) {
 		log.Info("no %s file found––continuing with defaults", AtlantisYAMLFilename)
 		return defaults, nil
+	}
+
+	if err != nil {
+		return nil, err
 	}
 
 	// Get this project's configuration.
@@ -61,7 +68,7 @@ func (s *ExecutionPlanner) buildStage(stageName string, log *logging.SimpleLogge
 			// We have a workflow defined, so now we need to build it.
 			meta := s.buildMeta(log, repoDir, workspace, relProjectPath, extraCommentArgs, username)
 			var steps []Step
-			var stepsConfig []StepConfig
+			var stepsConfig []yaml.StepConfig
 			if stageName == PlanStageName {
 				stepsConfig = workflow.Plan.Steps
 			} else {

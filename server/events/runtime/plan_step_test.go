@@ -1,4 +1,4 @@
-package yaml_test
+package runtime_test
 
 import (
 	"errors"
@@ -11,8 +11,8 @@ import (
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	matchers2 "github.com/runatlantis/atlantis/server/events/run/mocks/matchers"
+	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
-	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -25,8 +25,8 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 	tfVersion, _ := version.NewVersion("0.8")
 	logger := logging.NewNoopLogger()
 	workspace := "default"
-	s := yaml.PlanStep{
-		Meta: yaml.StepMeta{
+	s := runtime.PlanStep{
+		Meta: runtime.StepMeta{
 			Log:                   logger,
 			Workspace:             workspace,
 			AbsolutePath:          "/path",
@@ -61,8 +61,8 @@ func TestRun_ErrWorkspaceIn08(t *testing.T) {
 	tfVersion, _ := version.NewVersion("0.8")
 	logger := logging.NewNoopLogger()
 	workspace := "notdefault"
-	s := yaml.PlanStep{
-		Meta: yaml.StepMeta{
+	s := runtime.PlanStep{
+		Meta: runtime.StepMeta{
 			Log:                   logger,
 			Workspace:             workspace,
 			AbsolutePath:          "/path",
@@ -112,8 +112,8 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 
 			tfVersion, _ := version.NewVersion(c.tfVersion)
 			logger := logging.NewNoopLogger()
-			s := yaml.PlanStep{
-				Meta: yaml.StepMeta{
+			s := runtime.PlanStep{
+				Meta: runtime.StepMeta{
 					Log:                   logger,
 					Workspace:             "workspace",
 					AbsolutePath:          "/path",
@@ -170,8 +170,8 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 			terraform := mocks.NewMockClient()
 			tfVersion, _ := version.NewVersion(c.tfVersion)
 			logger := logging.NewNoopLogger()
-			s := yaml.PlanStep{
-				Meta: yaml.StepMeta{
+			s := runtime.PlanStep{
+				Meta: runtime.StepMeta{
 					Log:                   logger,
 					Workspace:             "workspace",
 					AbsolutePath:          "/path",
@@ -212,8 +212,8 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 	terraform := mocks.NewMockClient()
 	tfVersion, _ := version.NewVersion("0.10.0")
 	logger := logging.NewNoopLogger()
-	s := yaml.PlanStep{
-		Meta: yaml.StepMeta{
+	s := runtime.PlanStep{
+		Meta: runtime.StepMeta{
 			Log:                   logger,
 			Workspace:             "workspace",
 			AbsolutePath:          "/path",
@@ -258,8 +258,8 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 	// Using version >= 0.10 here so we don't expect any env commands.
 	tfVersion, _ := version.NewVersion("0.10.0")
 	logger := logging.NewNoopLogger()
-	s := yaml.PlanStep{
-		Meta: yaml.StepMeta{
+	s := runtime.PlanStep{
+		Meta: runtime.StepMeta{
 			Log:                   logger,
 			Workspace:             "workspace",
 			AbsolutePath:          tmpDir,

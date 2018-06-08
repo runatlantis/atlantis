@@ -1,4 +1,4 @@
-package yaml
+package runtime
 
 // InitStep runs `terraform init`.
 type InitStep struct {

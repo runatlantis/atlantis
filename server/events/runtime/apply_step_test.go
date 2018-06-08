@@ -1,4 +1,4 @@
-package yaml_test
+package runtime_test
 
 import (
 	"io/ioutil"
@@ -9,14 +9,14 @@ import (
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	matchers2 "github.com/runatlantis/atlantis/server/events/run/mocks/matchers"
+	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
-	"github.com/runatlantis/atlantis/server/events/yaml"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 func TestRun_NoDir(t *testing.T) {
-	s := yaml.ApplyStep{
-		Meta: yaml.StepMeta{
+	s := runtime.ApplyStep{
+		Meta: runtime.StepMeta{
 			Workspace:             "workspace",
 			AbsolutePath:          "nonexistent/path",
 			DirRelativeToRepoRoot: ".",
@@ -33,8 +33,8 @@ func TestRun_NoPlanFile(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
 
-	s := yaml.ApplyStep{
-		Meta: yaml.StepMeta{
+	s := runtime.ApplyStep{
+		Meta: runtime.StepMeta{
 			Workspace:             "workspace",
 			AbsolutePath:          tmpDir,
 			DirRelativeToRepoRoot: ".",
@@ -58,8 +58,8 @@ func TestRun_Success(t *testing.T) {
 	terraform := mocks.NewMockClient()
 
 	tfVersion, _ := version.NewVersion("0.11.4")
-	s := yaml.ApplyStep{
-		Meta: yaml.StepMeta{
+	s := runtime.ApplyStep{
+		Meta: runtime.StepMeta{
 			Workspace:             "workspace",
 			AbsolutePath:          tmpDir,
 			DirRelativeToRepoRoot: ".",

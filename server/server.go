@@ -37,6 +37,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/locking/boltdb"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/run"
+	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
@@ -200,8 +201,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		ConfigReader: configReader,
 		Terraform:    terraformClient,
 	}
-	executionPlanner := &yaml.ExecutionPlanner{
-		ConfigReader:      &yaml.Reader{},
+	executionPlanner := &runtime.ExecutionPlanner{
+		ParserValidator:   &yaml.ParserValidator{},
 		DefaultTFVersion:  terraformClient.Version(),
 		TerraformExecutor: terraformClient,
 	}

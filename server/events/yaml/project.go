@@ -9,12 +9,14 @@ type Project struct {
 	ApplyRequirements []string  `yaml:"apply_requirements"`
 }
 
+const DefaultWorkspace = "default"
+
 func (p *Project) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	// Use a type alias so unmarshal doesn't get into an infinite loop.
 	type alias Project
 	// Set up defaults.
 	defaults := alias{
-		Workspace: defaultWorkspace,
+		Workspace: DefaultWorkspace,
 		AutoPlan: &AutoPlan{
 			Enabled:      true,
 			WhenModified: []string{"**/*.tf"},

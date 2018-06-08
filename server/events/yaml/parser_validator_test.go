@@ -2,6 +2,7 @@ package yaml_test
 
 import (
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -10,20 +11,18 @@ import (
 )
 
 func TestReadConfig_DirDoesNotExist(t *testing.T) {
-	r := yaml.Reader{}
-	conf, err := r.ReadConfig("/not/exist")
-	Ok(t, err)
-	Assert(t, conf == nil, "exp nil ptr")
+	r := yaml.ParserValidator{}
+	_, err := r.ReadConfig("/not/exist")
+	Assert(t, os.IsNotExist(err), "exp nil ptr")
 }
 
 func TestReadConfig_FileDoesNotExist(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
 
-	r := yaml.Reader{}
-	conf, err := r.ReadConfig(tmpDir)
-	Ok(t, err)
-	Assert(t, conf == nil, "exp nil ptr")
+	r := yaml.ParserValidator{}
+	_, err := r.ReadConfig(tmpDir)
+	Assert(t, os.IsNotExist(err), "exp nil ptr")
 }
 
 func TestReadConfig_BadPermissions(t *testing.T) {
@@ -32,7 +31,7 @@ func TestReadConfig_BadPermissions(t *testing.T) {
 	err := ioutil.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), nil, 0000)
 	Ok(t, err)
 
-	r := yaml.Reader{}
+	r := yaml.ParserValidator{}
 	_, err = r.ReadConfig(tmpDir)
 	ErrContains(t, "unable to read atlantis.yaml file: ", err)
 }
@@ -48,7 +47,7 @@ func TestReadConfig_UnmarshalErrors(t *testing.T) {
 		{
 			"random characters",
 			"slkjds",
-			"parsing atlantis.yaml: yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `slkjds`",
+			"parsing atlantis.yaml: yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `slkjds` into yaml.Config",
 		},
 		{
 			"just a colon",
@@ -64,7 +63,7 @@ func TestReadConfig_UnmarshalErrors(t *testing.T) {
 		t.Run(c.description, func(t *testing.T) {
 			err := ioutil.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(c.input), 0600)
 			Ok(t, err)
-			r := yaml.Reader{}
+			r := yaml.ParserValidator{}
 			_, err = r.ReadConfig(tmpDir)
 			ErrEquals(t, c.expErr, err)
 		})
@@ -161,175 +160,6 @@ projects:
 - unknown: value`,
 			expErr: "yaml: unmarshal errors:\n  line 4: field unknown not found in struct yaml.alias",
 		},
-
-		// project workflow doesn't exist
-		// workflow has plan and apply keys (otherwise no point specifying it)
-		// plan/apply stages must have non-empty steps key
-
-		// Test the steps key.
-		{
-			description: "unsupported step type",
-			input: `
-version: 2
-projects:
-- dir: "."
-workflows:
-  default:
-    plan:
-      steps:
-      - unsupported`,
-			expErr: "unsupported step type: \"unsupported\"",
-		},
-
-		// Init step.
-		{
-			description: "unsupported arg to init step",
-			input: `
-version: 2
-projects:
-- dir: "."
-workflows:
-  default:
-    plan:
-      steps:
-      - init:
-          extra_args: ["hi"]
-          hi: bye
-`,
-			expErr: "unsupported key \"hi\" for step init – the only supported key is extra_args",
-		},
-		{
-			description: "invalid value type to init step's extra_args",
-			input: `
-version: 2
-projects:
-- dir: "."
-workflows:
-  default:
-    plan:
-      steps:
-      - init:
-          extra_args: arg
-`,
-			expErr: "expected array of strings as value of extra_args, not \"arg\"",
-		},
-
-		// Plan step.
-		{
-			description: "unsupported arg to plan step",
-			input: `
-version: 2
-projects:
-- dir: "."
-workflows:
-  default:
-    plan:
-      steps:
-      - plan:
-          extra_args: ["hi"]
-          hi: bye
-`,
-			expErr: "unsupported key \"hi\" for step plan – the only supported key is extra_args",
-		},
-		{
-			description: "invalid value type to plan step's extra_args",
-			input: `
-version: 2
-projects:
-- dir: "."
-workflows:
-  default:
-    plan:
-      steps:
-      - plan:
-          extra_args: arg
-`,
-			expErr: "expected array of strings as value of extra_args, not \"arg\"",
-		},
-
-		// Apply step.
-		{
-			description: "unsupported arg to apply step",
-			input: `
-version: 2
-projects:
-- dir: "."
-workflows:
-  default:
-    plan:
-      steps:
-      - apply:
-          extra_args: ["hi"]
-          hi: bye
-`,
-			expErr: "unsupported key \"hi\" for step apply – the only supported key is extra_args",
-		},
-		{
-			description: "invalid value type to apply step's extra_args",
-			input: `
-version: 2
-projects:
-- dir: "."
-workflows:
-  default:
-    plan:
-      steps:
-      - apply:
-          extra_args: arg
-`,
-			expErr: "expected array of strings as value of extra_args, not \"arg\"",
-		},
-		{
-			description: "invalid step type",
-			input: `
-version: 2
-projects:
-- dir: "."
-workflows:
-  default:
-    plan:
-      steps:
-      - rn: echo should fail
-`,
-			expErr: "yaml: unmarshal errors:\n  line 9: field rn not found in struct struct { Run string \"yaml:\\\"run\\\"\" }",
-		},
-		{
-			description: "missed the steps key and just set an array directly",
-			input: `
-version: 2
-projects:
-- dir: "."
-workflows:
-  default:
-    plan:
-      - init
-`,
-			expErr: "missing \"steps\" key",
-		},
-		{
-			description: "no value after plan:",
-			input: `
-version: 2
-projects:
-- dir: "."
-workflows:
-  default:
-    plan:
-`,
-			expErr: "missing \"steps\" key",
-		},
-		{
-			description: "no value after apply:",
-			input: `
-version: 2
-projects:
-- dir: "."
-workflows:
-  default:
-    plan:
-`,
-			expErr: "missing \"steps\" key",
-		},
 	}
 
 	tmpDir, cleanup := TempDir(t)
@@ -340,7 +170,7 @@ workflows:
 			err := ioutil.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(c.input), 0600)
 			Ok(t, err)
 
-			r := yaml.Reader{}
+			r := yaml.ParserValidator{}
 			_, err = r.ReadConfig(tmpDir)
 			ErrEquals(t, "parsing atlantis.yaml: "+c.expErr, err)
 		})
@@ -595,7 +425,7 @@ workflows:
 							Steps: []yaml.StepConfig{
 								{
 									StepType:  "init",
-									ExtraArgs: nil,
+									ExtraArgs: []string{},
 								},
 								{
 									StepType:  "plan",
@@ -642,18 +472,16 @@ workflows:
 						Plan: &yaml.Stage{
 							Steps: []yaml.StepConfig{
 								{
-									StepType:  "run",
-									ExtraArgs: nil,
-									Run:       []string{"echo", "plan hi"},
+									StepType: "run",
+									Run:      []string{"echo", "plan hi"},
 								},
 							},
 						},
 						Apply: &yaml.Stage{
 							Steps: []yaml.StepConfig{
 								{
-									StepType:  "run",
-									ExtraArgs: nil,
-									Run:       []string{"echo", "apply", "arg 2"},
+									StepType: "run",
+									Run:      []string{"echo", "apply", "arg 2"},
 								},
 							},
 						},
@@ -671,10 +499,10 @@ workflows:
 			err := ioutil.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(c.input), 0600)
 			Ok(t, err)
 
-			r := yaml.Reader{}
+			r := yaml.ParserValidator{}
 			act, err := r.ReadConfig(tmpDir)
 			Ok(t, err)
-			Equals(t, &c.expOutput, act)
+			Equals(t, c.expOutput, act)
 		})
 	}
 }

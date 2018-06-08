@@ -55,8 +55,8 @@ package events_test
 //	When(l.TryLock(project, "", ctx.Pull, ctx.User)).ThenReturn(locking.TryLockResponse{
 //		LockAcquired: true,
 //	}, nil)
-//	When(p.ConfigReader.Exists("")).ThenReturn(true)
-//	When(p.ConfigReader.Read("")).ThenReturn(events.ProjectConfig{}, errors.New("err"))
+//	When(p.ParserValidator.Exists("")).ThenReturn(true)
+//	When(p.ParserValidator.Read("")).ThenReturn(events.ProjectConfig{}, errors.New("err"))
 //
 //	res := p.Execute(&ctx, "", project)
 //	Equals(t, "err", res.ProjectResult.Error.Error())
@@ -68,8 +68,8 @@ package events_test
 //	When(l.TryLock(project, "", ctx.Pull, ctx.User)).ThenReturn(locking.TryLockResponse{
 //		LockAcquired: true,
 //	}, nil)
-//	When(p.ConfigReader.Exists("")).ThenReturn(true)
-//	When(p.ConfigReader.Read("")).ThenReturn(events.ProjectConfig{
+//	When(p.ParserValidator.Exists("")).ThenReturn(true)
+//	When(p.ParserValidator.Read("")).ThenReturn(events.ProjectConfig{
 //		PreInit: []string{"pre-init"},
 //	}, nil)
 //	tfVersion, _ := version.NewVersion("0.9.0")
@@ -86,8 +86,8 @@ package events_test
 //	When(l.TryLock(project, "", ctx.Pull, ctx.User)).ThenReturn(locking.TryLockResponse{
 //		LockAcquired: true,
 //	}, nil)
-//	When(p.ConfigReader.Exists("")).ThenReturn(true)
-//	When(p.ConfigReader.Read("")).ThenReturn(events.ProjectConfig{}, nil)
+//	When(p.ParserValidator.Exists("")).ThenReturn(true)
+//	When(p.ParserValidator.Read("")).ThenReturn(events.ProjectConfig{}, nil)
 //	tfVersion, _ := version.NewVersion("0.9.0")
 //	When(tm.Version()).ThenReturn(tfVersion)
 //	When(tm.Init(ctx.Log, "", "", nil, tfVersion)).ThenReturn(nil, errors.New("err"))
@@ -102,8 +102,8 @@ package events_test
 //	When(l.TryLock(project, "", ctx.Pull, ctx.User)).ThenReturn(locking.TryLockResponse{
 //		LockAcquired: true,
 //	}, nil)
-//	When(p.ConfigReader.Exists("")).ThenReturn(true)
-//	When(p.ConfigReader.Read("")).ThenReturn(events.ProjectConfig{
+//	When(p.ParserValidator.Exists("")).ThenReturn(true)
+//	When(p.ParserValidator.Read("")).ThenReturn(events.ProjectConfig{
 //		PreGet: []string{"pre-get"},
 //	}, nil)
 //	tfVersion, _ := version.NewVersion("0.8")
@@ -120,8 +120,8 @@ package events_test
 //	When(l.TryLock(project, "", ctx.Pull, ctx.User)).ThenReturn(locking.TryLockResponse{
 //		LockAcquired: true,
 //	}, nil)
-//	When(p.ConfigReader.Exists("")).ThenReturn(true)
-//	When(p.ConfigReader.Read("")).ThenReturn(events.ProjectConfig{}, nil)
+//	When(p.ParserValidator.Exists("")).ThenReturn(true)
+//	When(p.ParserValidator.Read("")).ThenReturn(events.ProjectConfig{}, nil)
 //	tfVersion, _ := version.NewVersion("0.8")
 //	When(tm.Version()).ThenReturn(tfVersion)
 //	When(tm.RunCommandWithVersion(ctx.Log, "", []string{"get", "-no-color"}, tfVersion, "")).ThenReturn("", errors.New("err"))
@@ -136,8 +136,8 @@ package events_test
 //	When(l.TryLock(project, "", ctx.Pull, ctx.User)).ThenReturn(locking.TryLockResponse{
 //		LockAcquired: true,
 //	}, nil)
-//	When(p.ConfigReader.Exists("")).ThenReturn(true)
-//	When(p.ConfigReader.Read("")).ThenReturn(events.ProjectConfig{
+//	When(p.ParserValidator.Exists("")).ThenReturn(true)
+//	When(p.ParserValidator.Read("")).ThenReturn(events.ProjectConfig{
 //		PrePlan: []string{"command"},
 //	}, nil)
 //	tfVersion, _ := version.NewVersion("0.9")
@@ -156,11 +156,11 @@ package events_test
 //		LockAcquired: true,
 //	}
 //	When(l.TryLock(project, "", ctx.Pull, ctx.User)).ThenReturn(lockResponse, nil)
-//	When(p.ConfigReader.Exists("")).ThenReturn(true)
+//	When(p.ParserValidator.Exists("")).ThenReturn(true)
 //	config := events.ProjectConfig{
 //		PreInit: []string{"pre-init"},
 //	}
-//	When(p.ConfigReader.Read("")).ThenReturn(config, nil)
+//	When(p.ParserValidator.Read("")).ThenReturn(config, nil)
 //	tfVersion, _ := version.NewVersion("0.9")
 //	When(tm.Version()).ThenReturn(tfVersion)
 //	When(tm.Init(ctx.Log, "", "", nil, tfVersion)).ThenReturn(nil, nil)
@@ -182,11 +182,11 @@ package events_test
 //		LockAcquired: true,
 //	}
 //	When(l.TryLock(project, "", ctx.Pull, ctx.User)).ThenReturn(lockResponse, nil)
-//	When(p.ConfigReader.Exists("")).ThenReturn(true)
+//	When(p.ParserValidator.Exists("")).ThenReturn(true)
 //	config := events.ProjectConfig{
 //		PreGet: []string{"pre-get"},
 //	}
-//	When(p.ConfigReader.Read("")).ThenReturn(config, nil)
+//	When(p.ParserValidator.Read("")).ThenReturn(config, nil)
 //	tfVersion, _ := version.NewVersion("0.8")
 //	When(tm.Version()).ThenReturn(tfVersion)
 //
@@ -207,11 +207,11 @@ package events_test
 //		LockAcquired: true,
 //	}
 //	When(l.TryLock(project, "", ctx.Pull, ctx.User)).ThenReturn(lockResponse, nil)
-//	When(p.ConfigReader.Exists("")).ThenReturn(true)
+//	When(p.ParserValidator.Exists("")).ThenReturn(true)
 //	config := events.ProjectConfig{
 //		PrePlan: []string{"command"},
 //	}
-//	When(p.ConfigReader.Read("")).ThenReturn(config, nil)
+//	When(p.ParserValidator.Read("")).ThenReturn(config, nil)
 //	tfVersion, _ := version.NewVersion("0.9")
 //	When(tm.Version()).ThenReturn(tfVersion)
 //
@@ -231,11 +231,11 @@ package events_test
 //		LockAcquired: true,
 //	}
 //	When(l.TryLock(project, "", ctx.Pull, ctx.User)).ThenReturn(lockResponse, nil)
-//	When(p.ConfigReader.Exists("")).ThenReturn(true)
+//	When(p.ParserValidator.Exists("")).ThenReturn(true)
 //	config := events.ProjectConfig{
 //		PreApply: []string{"command"},
 //	}
-//	When(p.ConfigReader.Read("")).ThenReturn(config, nil)
+//	When(p.ParserValidator.Read("")).ThenReturn(config, nil)
 //	tfVersion, _ := version.NewVersion("0.9")
 //	When(tm.Version()).ThenReturn(tfVersion)
 //
@@ -262,7 +262,7 @@ package events_test
 //	r := rmocks.NewMockRunner()
 //	return &events.DefaultProjectLocker{
 //		Locker:       l,
-//		ConfigReader: cr,
+//		ParserValidator: cr,
 //		Terraform:    tm,
 //		Run:          r,
 //	}, l, tm, r

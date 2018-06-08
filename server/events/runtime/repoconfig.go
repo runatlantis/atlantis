@@ -1,4 +1,4 @@
-package yaml
+package runtime
 
 import (
 	"github.com/hashicorp/go-version"
