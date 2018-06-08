@@ -35,6 +35,17 @@ func (s *ExecutionPlanner) BuildPlanStage(log *logging.SimpleLogger, repoDir str
 	}, nil
 }
 
+func (s *ExecutionPlanner) BuildApplyStage(log *logging.SimpleLogger, repoDir string, workspace string, relProjectPath string, extraCommentArgs []string, username string) (*ApplyStage, error) {
+	defaults := s.defaultApplySteps(log, repoDir, workspace, relProjectPath, extraCommentArgs, username)
+	steps, err := s.buildStage(ApplyStageName, log, repoDir, workspace, relProjectPath, extraCommentArgs, username, defaults)
+	if err != nil {
+		return nil, err
+	}
+	return &ApplyStage{
+		Steps: steps,
+	}, nil
+}
+
 func (s *ExecutionPlanner) buildStage(stageName string, log *logging.SimpleLogger, repoDir string, workspace string, relProjectPath string, extraCommentArgs []string, username string, defaults []Step) ([]Step, error) {
 	config, err := s.ParserValidator.ReadConfig(repoDir)
 
@@ -106,17 +117,6 @@ func (s *ExecutionPlanner) buildStage(stageName string, log *logging.SimpleLogge
 	// They haven't defined this project, use the default workflow.
 	log.Info("no project with dir %q and workspace %q defined; continuing with defaults", relProjectPath, workspace)
 	return defaults, nil
-}
-
-func (s *ExecutionPlanner) BuildApplyStage(log *logging.SimpleLogger, repoDir string, workspace string, relProjectPath string, extraCommentArgs []string, username string) (*ApplyStage, error) {
-	defaults := s.defaultApplySteps(log, repoDir, workspace, relProjectPath, extraCommentArgs, username)
-	steps, err := s.buildStage(ApplyStageName, log, repoDir, workspace, relProjectPath, extraCommentArgs, username, defaults)
-	if err != nil {
-		return nil, err
-	}
-	return &ApplyStage{
-		Steps: steps,
-	}, nil
 }
 
 func (s *ExecutionPlanner) buildMeta(log *logging.SimpleLogger, repoDir string, workspace string, relProjectPath string, extraCommentArgs []string, username string) StepMeta {
