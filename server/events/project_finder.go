@@ -49,19 +49,26 @@ func (p *DefaultProjectFinder) DetermineProjects(log *logging.SimpleLogger, modi
 	log.Info("filtered modified files to %d .tf files: %v",
 		len(modifiedTerraformFiles), modifiedTerraformFiles)
 
-	var paths []string
+	var dirs []string
 	for _, modifiedFile := range modifiedTerraformFiles {
-		projectPath := p.getProjectPath(modifiedFile, repoDir)
-		if projectPath != "" {
-			paths = append(paths, projectPath)
+		projectDir := p.getProjectDir(modifiedFile, repoDir)
+		if projectDir != "" {
+			dirs = append(dirs, projectDir)
 		}
 	}
-	uniquePaths := p.unique(paths)
-	for _, uniquePath := range uniquePaths {
-		projects = append(projects, models.NewProject(repoFullName, uniquePath))
+	uniqueDirs := p.unique(dirs)
+
+	// The list of modified files will include files that were deleted. We still
+	// want to run plan if a file was deleted since that often results in a
+	// change however we want to remove directories that have been completely
+	// deleted.
+	exists := p.filterToDirExists(uniqueDirs, repoDir)
+
+	for _, p := range exists {
+		projects = append(projects, models.NewProject(repoFullName, p))
 	}
 	log.Info("there are %d modified project(s) at path(s): %v",
-		len(projects), strings.Join(uniquePaths, ", "))
+		len(projects), strings.Join(exists, ", "))
 	return projects
 }
 
@@ -84,12 +91,12 @@ func (p *DefaultProjectFinder) isInExcludeList(fileName string) bool {
 	return false
 }
 
-// getProjectPath attempts to determine based on the location of a modified
+// getProjectDir attempts to determine based on the location of a modified
 // file, where the root of the Terraform project is. It also attempts to verify
 // if the root is valid by looking for a main.tf file. It returns a relative
-// path. If the project is at the root returns ".". If modified file doesn't
-// lead to a valid project path, returns an empty string.
-func (p *DefaultProjectFinder) getProjectPath(modifiedFilePath string, repoDir string) string {
+// path to the repo. If the project is at the root returns ".". If modified file
+// doesn't lead to a valid project path, returns an empty string.
+func (p *DefaultProjectFinder) getProjectDir(modifiedFilePath string, repoDir string) string {
 	dir := path.Dir(modifiedFilePath)
 	if path.Base(dir) == "env" {
 		// If the modified file was inside an env/ directory, we treat this
@@ -158,4 +165,15 @@ func (p *DefaultProjectFinder) unique(strs []string) []string {
 		}
 	}
 	return unique
+}
+
+func (p *DefaultProjectFinder) filterToDirExists(relativePaths []string, repoDir string) []string {
+	var filtered []string
+	for _, pth := range relativePaths {
+		absPath := filepath.Join(repoDir, pth)
+		if _, err := os.Stat(absPath); !os.IsNotExist(err) {
+			filtered = append(filtered, pth)
+		}
+	}
+	return filtered
 }
