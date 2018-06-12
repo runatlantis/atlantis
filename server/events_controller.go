@@ -51,6 +51,10 @@ type EventsController struct {
 	// startup to support.
 	SupportedVCSHosts []models.VCSHostType
 	VCSClient         vcs.ClientProxy
+	// AtlantisGithubUser is the user that atlantis is running as for Github.
+	AtlantisGithubUser models.User
+	// AtlantisGitlabUser is the user that atlantis is running as for Gitlab.
+	AtlantisGitlabUser models.User
 }
 
 // Post handles POST webhook requests.
@@ -118,34 +122,76 @@ func (e *EventsController) HandleGithubCommentEvent(w http.ResponseWriter, event
 // request if the event is a pull request closed event. It's exported to make
 // testing easier.
 func (e *EventsController) HandleGithubPullRequestEvent(w http.ResponseWriter, pullEvent *github.PullRequestEvent, githubReqID string) {
-	pull, _, err := e.Parser.ParseGithubPull(pullEvent.PullRequest)
+	pull, headRepo, err := e.Parser.ParseGithubPull(pullEvent.PullRequest)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s", err, githubReqID)
 		return
 	}
-	repo, err := e.Parser.ParseGithubRepo(pullEvent.Repo)
+	baseRepo, err := e.Parser.ParseGithubRepo(pullEvent.Repo)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing repo data: %s %s", err, githubReqID)
 		return
 	}
-	e.handlePullRequestEvent(w, repo, pull)
+	var eventType string
+	switch pullEvent.GetAction() {
+	case "opened":
+		eventType = OpenPullEvent
+	case "synchronize":
+		eventType = UpdatedPullEvent
+	case "closed":
+		eventType = ClosedPullEvent
+	default:
+		eventType = OtherPullEvent
+	}
+	e.handlePullRequestEvent(w, baseRepo, headRepo, pull, e.AtlantisGithubUser, eventType)
 }
 
-func (e *EventsController) handlePullRequestEvent(w http.ResponseWriter, repo models.Repo, pull models.PullRequest) {
-	if !e.RepoWhitelist.IsWhitelisted(repo.FullName, repo.VCSHost.Hostname) {
+const OpenPullEvent = "opened"
+const UpdatedPullEvent = "updated"
+const ClosedPullEvent = "closed"
+const OtherPullEvent = "other"
+
+func (e *EventsController) handlePullRequestEvent(w http.ResponseWriter, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, eventType string) {
+	if !e.RepoWhitelist.IsWhitelisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
+		// If the repo isn't whitelisted and we receive an opened pull request
+		// event we comment back on the pull request that the repo isn't
+		// whitelisted. This is because the user might be expecting Atlantis to
+		// autoplan. For other events, we just ignore them.
+		if eventType == OpenPullEvent {
+			e.commentNotWhitelisted(w, baseRepo, pull.Num)
+		}
 		e.respond(w, logging.Debug, http.StatusForbidden, "Ignoring pull request event from non-whitelisted repo")
 		return
 	}
-	if pull.State != models.Closed {
+
+	switch eventType {
+	case OpenPullEvent, UpdatedPullEvent:
+		// If the pull request was opened or updated, we will try to autoplan.
+
+		// Respond with success and then actually execute the command asynchronously.
+		// We use a goroutine so that this function returns and the connection is
+		// closed.
+		fmt.Fprintln(w, "Processing...")
+		// We use a Command to represent autoplanning but we set dir and
+		// workspace to '*' to indicate that all applicable dirs and workspaces
+		// should be planned.
+		autoplanCmd := events.NewCommand("*", nil, events.Plan, false, "*", true)
+		go e.CommandRunner.ExecuteCommand(baseRepo, headRepo, user, pull.Num, autoplanCmd)
+		return
+	case ClosedPullEvent:
+		// If the pull request was closed, we delete locks.
+		if err := e.PullCleaner.CleanUpPull(baseRepo, pull); err != nil {
+			e.respond(w, logging.Error, http.StatusInternalServerError, "Error cleaning pull request: %s", err)
+			return
+		}
+		e.Logger.Info("deleted locks and workspace for repo %s, pull %d", baseRepo.FullName, pull.Num)
+		fmt.Fprintln(w, "Pull request cleaned successfully")
+		return
+	case OtherPullEvent:
+		// Else we ignore the event.
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring opened pull request event")
 		return
 	}
-	if err := e.PullCleaner.CleanUpPull(repo, pull); err != nil {
-		e.respond(w, logging.Error, http.StatusInternalServerError, "Error cleaning pull request: %s", err)
-		return
-	}
-	e.Logger.Info("deleted locks and workspace for repo %s, pull %d", repo.FullName, pull.Num)
-	fmt.Fprintln(w, "Pull request cleaned successfully")
 }
 
 func (e *EventsController) handleGitlabPost(w http.ResponseWriter, r *http.Request) {
@@ -191,10 +237,7 @@ func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo mo
 	// At this point we know it's a command we're not supposed to ignore, so now
 	// we check if this repo is allowed to run commands in the first place.
 	if !e.RepoWhitelist.IsWhitelisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
-		errMsg := "```\nError: This repo is not whitelisted for Atlantis.\n```"
-		if err := e.VCSClient.CreateComment(baseRepo, pullNum, errMsg); err != nil {
-			e.Logger.Err("unable to comment on pull request: %s", err)
-		}
+		e.commentNotWhitelisted(w, baseRepo, pullNum)
 		e.respond(w, logging.Warn, http.StatusForbidden, "Repo not whitelisted")
 		return
 	}
@@ -222,12 +265,23 @@ func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo mo
 // request if the event is a merge request closed event. It's exported to make
 // testing easier.
 func (e *EventsController) HandleGitlabMergeRequestEvent(w http.ResponseWriter, event gitlab.MergeEvent) {
-	pull, repo, err := e.Parser.ParseGitlabMergeEvent(event)
+	pull, baseRepo, headRepo, err := e.Parser.ParseGitlabMergeEvent(event)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing webhook: %s", err)
 		return
 	}
-	e.handlePullRequestEvent(w, repo, pull)
+	var eventType string
+	switch event.ObjectAttributes.Action {
+	case "open":
+		eventType = OpenPullEvent
+	case "update":
+		eventType = UpdatedPullEvent
+	case "merge", "close":
+		eventType = ClosedPullEvent
+	default:
+		eventType = OtherPullEvent
+	}
+	e.handlePullRequestEvent(w, baseRepo, headRepo, pull, e.AtlantisGitlabUser, eventType)
 }
 
 // supportsHost returns true if h is in e.SupportedVCSHosts and false otherwise.
@@ -245,4 +299,13 @@ func (e *EventsController) respond(w http.ResponseWriter, lvl logging.LogLevel, 
 	e.Logger.Log(lvl, response)
 	w.WriteHeader(code)
 	fmt.Fprintln(w, response)
+}
+
+// commentNotWhitelisted comments on the pull request that the repo is not
+// whitelisted.
+func (e *EventsController) commentNotWhitelisted(w http.ResponseWriter, baseRepo models.Repo, pullNum int) {
+	errMsg := "```\nError: This repo is not whitelisted for Atlantis.\n```"
+	if err := e.VCSClient.CreateComment(baseRepo, pullNum, errMsg); err != nil {
+		e.Logger.Err("unable to comment on pull request: %s", err)
+	}
 }

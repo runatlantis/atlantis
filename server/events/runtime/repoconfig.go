@@ -5,6 +5,10 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
+type TerraformExec interface {
+	RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (string, error)
+}
+
 type ApplyRequirement interface {
 	// IsMet returns true if the requirement is met and false if not.
 	// If it returns false, it also returns a string describing why not.
@@ -12,7 +16,9 @@ type ApplyRequirement interface {
 }
 
 type PlanStage struct {
-	Steps []Step
+	Steps       []Step
+	Workspace   string
+	ProjectPath string
 }
 
 type ApplyStage struct {

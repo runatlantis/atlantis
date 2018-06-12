@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"strings"
 	"text/template"
+
+	"github.com/Masterminds/sprig"
 )
 
 // MarkdownRenderer renders responses as markdown.
@@ -44,8 +46,14 @@ type FailureData struct {
 
 // ResultData is data about a successful response.
 type ResultData struct {
-	Results map[string]string
+	Results []ProjectResultTmplData
 	CommonData
+}
+
+type ProjectResultTmplData struct {
+	Workspace string
+	Dir       string
+	Rendered  string
 }
 
 // Render formats the data into a markdown string.
@@ -63,10 +71,15 @@ func (m *MarkdownRenderer) Render(res CommandResponse, cmdName CommandName, log 
 }
 
 func (m *MarkdownRenderer) renderProjectResults(pathResults []ProjectResult, common CommonData) string {
-	results := make(map[string]string)
+	var resultsTmplData []ProjectResultTmplData
+
 	for _, result := range pathResults {
+		resultData := ProjectResultTmplData{
+			Workspace: result.Workspace,
+			Dir:       result.Path,
+		}
 		if result.Error != nil {
-			results[result.Path] = m.renderTemplate(errTmpl, struct {
+			resultData.Rendered = m.renderTemplate(errTmpl, struct {
 				Command string
 				Error   string
 			}{
@@ -74,7 +87,7 @@ func (m *MarkdownRenderer) renderProjectResults(pathResults []ProjectResult, com
 				Error:   result.Error.Error(),
 			})
 		} else if result.Failure != "" {
-			results[result.Path] = m.renderTemplate(failureTmpl, struct {
+			resultData.Rendered = m.renderTemplate(failureTmpl, struct {
 				Command string
 				Failure string
 			}{
@@ -82,21 +95,22 @@ func (m *MarkdownRenderer) renderProjectResults(pathResults []ProjectResult, com
 				Failure: result.Failure,
 			})
 		} else if result.PlanSuccess != nil {
-			results[result.Path] = m.renderTemplate(planSuccessTmpl, *result.PlanSuccess)
+			resultData.Rendered = m.renderTemplate(planSuccessTmpl, *result.PlanSuccess)
 		} else if result.ApplySuccess != "" {
-			results[result.Path] = m.renderTemplate(applySuccessTmpl, struct{ Output string }{result.ApplySuccess})
+			resultData.Rendered = m.renderTemplate(applySuccessTmpl, struct{ Output string }{result.ApplySuccess})
 		} else {
-			results[result.Path] = "Found no template. This is a bug!"
+			resultData.Rendered = "Found no template. This is a bug!"
 		}
+		resultsTmplData = append(resultsTmplData, resultData)
 	}
 
 	var tmpl *template.Template
-	if len(results) == 1 {
+	if len(resultsTmplData) == 1 {
 		tmpl = singleProjectTmpl
 	} else {
 		tmpl = multiProjectTmpl
 	}
-	return m.renderTemplate(tmpl, ResultData{results, common})
+	return m.renderTemplate(tmpl, ResultData{resultsTmplData, common})
 }
 
 func (m *MarkdownRenderer) renderTemplate(tmpl *template.Template, data interface{}) string {
@@ -107,15 +121,15 @@ func (m *MarkdownRenderer) renderTemplate(tmpl *template.Template, data interfac
 	return buf.String()
 }
 
-var singleProjectTmpl = template.Must(template.New("").Parse("{{ range $result := .Results }}{{$result}}{{end}}\n" + logTmpl))
-var multiProjectTmpl = template.Must(template.New("").Parse(
-	"Ran {{.Command}} in {{ len .Results }} directories:\n" +
-		"{{ range $path, $result := .Results }}" +
-		" * `{{$path}}`\n" +
+var singleProjectTmpl = template.Must(template.New("").Parse("{{$result := index .Results 0}}Ran {{.Command}} in dir: `{{$result.Dir}}` workspace: `{{$result.Workspace}}`\n{{$result.Rendered}}\n" + logTmpl))
+var multiProjectTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
+	"Ran {{.Command}} for {{ len .Results }} projects:\n" +
+		"{{ range $result := .Results }}" +
+		"1. path: `{{$result.Dir}} workspace: `{{$result.Workspace}}`\n" +
 		"{{end}}\n" +
-		"{{ range $path, $result := .Results }}" +
-		"## {{$path}}/\n" +
-		"{{$result}}\n" +
+		"{{ range $i, $result := .Results }}" +
+		"### {{add $i 1}}. workspace: `{{$result.Workspace}}` path: `{{$result.Dir}}`\n" +
+		"{{$result.Rendered}}\n" +
 		"---\n{{end}}" +
 		logTmpl))
 var planSuccessTmpl = template.Must(template.New("").Parse(

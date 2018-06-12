@@ -18,6 +18,7 @@ import "github.com/runatlantis/atlantis/server/events/vcs"
 // ProjectResult is the result of executing a plan/apply for a project.
 type ProjectResult struct {
 	Path         string
+	Workspace    string
 	Error        error
 	Failure      string
 	PlanSuccess  *PlanSuccess

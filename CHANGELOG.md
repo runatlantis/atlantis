@@ -1,3 +1,17 @@
+# v0.4.0-alpha
+
+## Features
+
+## Bugfixes
+* Won't attempt to run plan in a directory that was deleted.
+
+## Backwards Incompatibilities / Notes:
+
+## Downloads
+
+## Docker
+
+
 # v0.3.10
 
 ## Features

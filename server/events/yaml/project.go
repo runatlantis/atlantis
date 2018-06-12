@@ -1,12 +1,12 @@
 package yaml
 
 type Project struct {
-	Dir               string    `yaml:"dir"`
-	Workspace         string    `yaml:"workspace"`
-	Workflow          string    `yaml:"workflow"`
-	TerraformVersion  string    `yaml:"terraform_version"`
-	AutoPlan          *AutoPlan `yaml:"auto_plan,omitempty"`
-	ApplyRequirements []string  `yaml:"apply_requirements"`
+	Dir               string   `yaml:"dir"`
+	Workspace         string   `yaml:"workspace"`
+	Workflow          string   `yaml:"workflow"`
+	TerraformVersion  string   `yaml:"terraform_version"`
+	AutoPlan          AutoPlan `yaml:"auto_plan,omitempty"`
+	ApplyRequirements []string `yaml:"apply_requirements"`
 }
 
 const DefaultWorkspace = "default"
@@ -17,7 +17,7 @@ func (p *Project) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	// Set up defaults.
 	defaults := alias{
 		Workspace: DefaultWorkspace,
-		AutoPlan: &AutoPlan{
+		AutoPlan: AutoPlan{
 			Enabled:      true,
 			WhenModified: []string{"**/*.tf"},
 		},

@@ -156,7 +156,7 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 	var event *gitlab.MergeEvent
 	err := json.Unmarshal([]byte(mergeEventJSON), &event)
 	Ok(t, err)
-	pull, repo, err := parser.ParseGitlabMergeEvent(*event)
+	pull, repo, _, err := parser.ParseGitlabMergeEvent(*event)
 	Ok(t, err)
 
 	expRepo := models.Repo{
@@ -185,7 +185,7 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 
 	t.Log("If the state is closed, should set field correctly.")
 	event.ObjectAttributes.State = "closed"
-	pull, _, err = parser.ParseGitlabMergeEvent(*event)
+	pull, _, _, err = parser.ParseGitlabMergeEvent(*event)
 	Ok(t, err)
 	Equals(t, models.Closed, pull.State)
 }
@@ -283,19 +283,19 @@ func TestNewCommand_CleansDir(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Dir, func(t *testing.T) {
-			cmd := events.NewCommand(c.Dir, nil, events.Plan, false, "workspace")
+			cmd := events.NewCommand(c.Dir, nil, events.Plan, false, "workspace", false)
 			Equals(t, c.ExpDir, cmd.Dir)
 		})
 	}
 }
 
 func TestNewCommand_EmptyWorkspace(t *testing.T) {
-	cmd := events.NewCommand("dir", nil, events.Plan, false, "")
+	cmd := events.NewCommand("dir", nil, events.Plan, false, "", false)
 	Equals(t, "default", cmd.Workspace)
 }
 
 func TestNewCommand_AllFieldsSet(t *testing.T) {
-	cmd := events.NewCommand("dir", []string{"a", "b"}, events.Plan, true, "workspace")
+	cmd := events.NewCommand("dir", []string{"a", "b"}, events.Plan, true, "workspace", false)
 	Equals(t, events.Command{
 		Workspace: "workspace",
 		Dir:       "dir",

@@ -26,6 +26,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+// DefaultWorkspace is the default Terraform workspace for both Atlantis and
+// Terraform.
+const DefaultWorkspace = "default"
+
 // Repo is a VCS repository.
 type Repo struct {
 	// FullName is the owner and repo name separated
@@ -123,6 +127,7 @@ const (
 )
 
 // User is a VCS user.
+// During an autoplan, the user will be the Atlantis API user.
 type User struct {
 	Username string
 }

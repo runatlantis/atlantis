@@ -42,10 +42,13 @@ type Command struct {
 	Name      CommandName
 	Verbose   bool
 	Workspace string
+	// Autoplan is true if the command is a plan command being executed in an
+	// attempt to automatically run plan.
+	Autoplan bool
 }
 
 // NewCommand constructs a Command, setting all missing fields to defaults.
-func NewCommand(dir string, flags []string, name CommandName, verbose bool, workspace string) *Command {
+func NewCommand(dir string, flags []string, name CommandName, verbose bool, workspace string, autoplan bool) *Command {
 	// If dir was an empty string, this will return '.'.
 	validDir := path.Clean(dir)
 	if validDir == "/" {
@@ -60,14 +63,17 @@ func NewCommand(dir string, flags []string, name CommandName, verbose bool, work
 		Name:      name,
 		Verbose:   verbose,
 		Workspace: workspace,
+		Autoplan:  autoplan,
 	}
 }
 
 type EventParsing interface {
 	ParseGithubIssueCommentEvent(comment *github.IssueCommentEvent) (baseRepo models.Repo, user models.User, pullNum int, err error)
+	// ParseGithubPull returns the pull request and head repo.
 	ParseGithubPull(pull *github.PullRequest) (models.PullRequest, models.Repo, error)
 	ParseGithubRepo(ghRepo *github.Repository) (models.Repo, error)
-	ParseGitlabMergeEvent(event gitlab.MergeEvent) (models.PullRequest, models.Repo, error)
+	// ParseGitlabMergeEvent returns the pull request, base repo and head repo.
+	ParseGitlabMergeEvent(event gitlab.MergeEvent) (models.PullRequest, models.Repo, models.Repo, error)
 	ParseGitlabMergeCommentEvent(event gitlab.MergeCommentEvent) (baseRepo models.Repo, headRepo models.Repo, user models.User, err error)
 	ParseGitlabMergeRequest(mr *gitlab.MergeRequest, baseRepo models.Repo) models.PullRequest
 }
@@ -154,7 +160,7 @@ func (e *EventParser) ParseGithubRepo(ghRepo *github.Repository) (models.Repo, e
 	return models.NewRepo(models.Github, ghRepo.GetFullName(), ghRepo.GetCloneURL(), e.GithubUser, e.GithubToken)
 }
 
-func (e *EventParser) ParseGitlabMergeEvent(event gitlab.MergeEvent) (models.PullRequest, models.Repo, error) {
+func (e *EventParser) ParseGitlabMergeEvent(event gitlab.MergeEvent) (models.PullRequest, models.Repo, models.Repo, error) {
 	modelState := models.Closed
 	if event.ObjectAttributes.State == gitlabPullOpened {
 		modelState = models.Open
@@ -162,7 +168,15 @@ func (e *EventParser) ParseGitlabMergeEvent(event gitlab.MergeEvent) (models.Pul
 	// GitLab also has a "merged" state, but we map that to Closed so we don't
 	// need to check for it.
 
-	repo, err := models.NewRepo(models.Gitlab, event.Project.PathWithNamespace, event.Project.GitHTTPURL, e.GitlabUser, e.GitlabToken)
+	baseRepo, err := models.NewRepo(models.Gitlab, event.Project.PathWithNamespace, event.Project.GitHTTPURL, e.GitlabUser, e.GitlabToken)
+	if err != nil {
+		return models.PullRequest{}, models.Repo{}, models.Repo{}, err
+	}
+	headRepo, err := models.NewRepo(models.Gitlab, event.ObjectAttributes.Source.PathWithNamespace, event.ObjectAttributes.Source.GitHTTPURL, e.GitlabUser, e.GitlabToken)
+	if err != nil {
+		return models.PullRequest{}, models.Repo{}, models.Repo{}, err
+	}
+
 	pull := models.PullRequest{
 		URL:        event.ObjectAttributes.URL,
 		Author:     event.User.Username,
@@ -170,10 +184,10 @@ func (e *EventParser) ParseGitlabMergeEvent(event gitlab.MergeEvent) (models.Pul
 		HeadCommit: event.ObjectAttributes.LastCommit.ID,
 		Branch:     event.ObjectAttributes.SourceBranch,
 		State:      modelState,
-		BaseRepo:   repo,
+		BaseRepo:   baseRepo,
 	}
 
-	return pull, repo, err
+	return pull, baseRepo, headRepo, err
 }
 
 // ParseGitlabMergeCommentEvent creates Atlantis models out of a GitLab event.

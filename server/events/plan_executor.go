@@ -16,8 +16,8 @@ package events
 import (
 	"fmt"
 
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/locking"
-	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/run"
 	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/terraform"
@@ -39,7 +39,7 @@ type PlanExecutor struct {
 	Workspace        AtlantisWorkspace
 	ProjectFinder    ProjectFinder
 	ProjectLocker    ProjectLocker
-	ExecutionPlanner *runtime.ExecutionPlanner
+	ExecutionPlanner *ExecutionPlanner
 	LockURLGenerator LockURLGenerator
 }
 
@@ -56,32 +56,54 @@ func (p *PlanExecutor) Execute(ctx *CommandContext) CommandResponse {
 		return CommandResponse{Error: err}
 	}
 
-	stage, err := p.ExecutionPlanner.BuildPlanStage(ctx.Log, cloneDir, ctx.Command.Workspace, ctx.Command.Dir, ctx.Command.Flags, ctx.User.Username)
-	if err != nil {
-		return CommandResponse{Error: err}
-	}
-
-	tryLockResponse, err := p.ProjectLocker.TryLock(ctx, models.NewProject(ctx.BaseRepo.FullName, ctx.Command.Dir))
-	if err != nil {
-		return CommandResponse{ProjectResults: []ProjectResult{{Error: err}}}
-	}
-	if !tryLockResponse.LockAcquired {
-		return CommandResponse{ProjectResults: []ProjectResult{{Failure: tryLockResponse.LockFailureReason}}}
-	}
-
-	out, err := stage.Run()
-	if err != nil {
-		// Plan failed so unlock the state.
-		if unlockErr := tryLockResponse.UnlockFn(); unlockErr != nil {
-			ctx.Log.Err("error unlocking state after plan error: %s", unlockErr)
+	var stages []runtime.PlanStage
+	if ctx.Command.Autoplan {
+		modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.BaseRepo, ctx.Pull)
+		if err != nil {
+			return CommandResponse{Error: errors.Wrap(err, "getting modified files")}
 		}
-		return CommandResponse{ProjectResults: []ProjectResult{{Error: fmt.Errorf("%s\n%s", err.Error(), out)}}}
+		stages, err = p.ExecutionPlanner.BuildAutoplanStages(ctx.Log, ctx.BaseRepo.FullName, cloneDir, ctx.User.Username, modifiedFiles)
+		if err != nil {
+			return CommandResponse{Error: err}
+		}
+	} else {
+		stage, err := p.ExecutionPlanner.BuildPlanStage(ctx.Log, cloneDir, ctx.Command.Workspace, ctx.Command.Dir, ctx.Command.Flags, ctx.User.Username)
+		if err != nil {
+			return CommandResponse{Error: err}
+		}
+		stages = append(stages, stage)
 	}
 
-	return CommandResponse{ProjectResults: []ProjectResult{{
-		PlanSuccess: &PlanSuccess{
-			TerraformOutput: out,
-			LockURL:         p.LockURLGenerator.GenerateLockURL(tryLockResponse.LockKey),
-		},
-	}}}
+	var projectResults []ProjectResult
+	for _, stage := range stages {
+		projectResult := ProjectResult{
+			Path:      stage.ProjectPath,
+			Workspace: stage.Workspace,
+		}
+
+		// todo: this should be moved into the plan stage
+		//tryLockResponse, err := p.ProjectLocker.TryLock(ctx, models.NewProject(ctx.BaseRepo.FullName, ctx.Command.Dir))
+		//if err != nil {
+		//	return CommandResponse{ProjectResults: []ProjectResult{{Error: err}}}
+		//}
+		//if !tryLockResponse.LockAcquired {
+		//	return CommandResponse{ProjectResults: []ProjectResult{{Failure: tryLockResponse.LockFailureReason}}}
+		//}
+		// todo: endtodo
+
+		out, err := stage.Run()
+		if err != nil {
+			//if unlockErr := tryLockResponse.UnlockFn(); unlockErr != nil {
+			//	ctx.Log.Err("error unlocking state after plan error: %s", unlockErr)
+			//}
+			projectResult.Error = fmt.Errorf("%s\n%s", err.Error(), out)
+		} else {
+			projectResult.PlanSuccess = &PlanSuccess{
+				TerraformOutput: out,
+				//LockURL:         p.LockURLGenerator.GenerateLockURL(tryLockResponse.LockKey),
+			}
+		}
+		projectResults = append(projectResults, projectResult)
+	}
+	return CommandResponse{ProjectResults: projectResults}
 }

@@ -1,4 +1,4 @@
-package runtime_test
+package events_test
 
 import (
 	"io/ioutil"
@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -15,7 +16,7 @@ import (
 func TestBuildStage_NoConfigFile(t *testing.T) {
 	var defaultTFVersion *version.Version
 	var terraformExecutor runtime.TerraformExec
-	e := runtime.ExecutionPlanner{
+	e := events.ExecutionPlanner{
 		DefaultTFVersion:  defaultTFVersion,
 		TerraformExecutor: terraformExecutor,
 	}
@@ -50,7 +51,7 @@ func TestBuildStage_NoConfigFile(t *testing.T) {
 					Meta: meta,
 				},
 			},
-		}, *planStage)
+		}, planStage)
 	})
 
 	// Then the apply stage.
@@ -70,7 +71,7 @@ func TestBuildStage_NoConfigFile(t *testing.T) {
 func TestBuildStage(t *testing.T) {
 	var defaultTFVersion *version.Version
 	var terraformExecutor runtime.TerraformExec
-	e := runtime.ExecutionPlanner{
+	e := events.ExecutionPlanner{
 		DefaultTFVersion:  defaultTFVersion,
 		TerraformExecutor: terraformExecutor,
 	}
@@ -131,7 +132,7 @@ workflows:
 					Meta: meta,
 				},
 			},
-		}, *planStage)
+		}, planStage)
 	})
 
 	t.Run("apply stage for project without config", func(t *testing.T) {
@@ -171,7 +172,7 @@ workflows:
 					Commands: []string{"echo", "hi"},
 				},
 			},
-		}, *planStage)
+		}, planStage)
 	})
 
 	t.Run("apply stage for custom config", func(t *testing.T) {

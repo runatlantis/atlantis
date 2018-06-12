@@ -1,4 +1,4 @@
-package runtime
+package events
 
 import (
 	"fmt"
@@ -6,7 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/hashicorp/go-version"
-	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -19,25 +20,27 @@ type ExecutionPlanner struct {
 	TerraformExecutor TerraformExec
 	DefaultTFVersion  *version.Version
 	ParserValidator   *yaml.ParserValidator
-	ProjectFinder     events.ProjectFinder
+	ProjectFinder     ProjectFinder
 }
 
 type TerraformExec interface {
 	RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (string, error)
 }
 
-func (s *ExecutionPlanner) BuildPlanStage(log *logging.SimpleLogger, repoDir string, workspace string, relProjectPath string, extraCommentArgs []string, username string) (PlanStage, error) {
+func (s *ExecutionPlanner) BuildPlanStage(log *logging.SimpleLogger, repoDir string, workspace string, relProjectPath string, extraCommentArgs []string, username string) (runtime.PlanStage, error) {
 	defaults := s.defaultPlanSteps(log, repoDir, workspace, relProjectPath, extraCommentArgs, username)
 	steps, err := s.buildStage(PlanStageName, log, repoDir, workspace, relProjectPath, extraCommentArgs, username, defaults)
 	if err != nil {
-		return nil, err
+		return runtime.PlanStage{}, err
 	}
-	return &PlanStage{
-		Steps: steps,
+	return runtime.PlanStage{
+		Steps:       steps,
+		Workspace:   workspace,
+		ProjectPath: relProjectPath,
 	}, nil
 }
 
-func (s *ExecutionPlanner) BuildAutoplanStages(log *logging.SimpleLogger, repoFullName string, repoDir string, username string, modifiedFiles []string) ([]PlanStage, error) {
+func (s *ExecutionPlanner) BuildAutoplanStages(log *logging.SimpleLogger, repoFullName string, repoDir string, username string, modifiedFiles []string) ([]runtime.PlanStage, error) {
 	// If there is an atlantis.yaml
 	// -> Get modified files from pull request.
 	// -> For each project, if autoplan == true && files match
@@ -54,21 +57,23 @@ func (s *ExecutionPlanner) BuildAutoplanStages(log *logging.SimpleLogger, repoFu
 	// was modified in the pull request.
 	if os.IsNotExist(err) {
 		projects := s.ProjectFinder.DetermineProjects(log, modifiedFiles, repoFullName, repoDir)
-		var stages []PlanStage
+		var stages []runtime.PlanStage
 		for _, p := range projects {
 			// NOTE: we use the default workspace because we don't know about
 			// other workspaces. If users want to plan for other workspaces they
 			// need to use a config file.
-			steps := s.defaultPlanSteps(log, repoDir, defaultWorkspace, p.Path, nil, username)
-			stages = append(stages, PlanStage{
-				Steps: steps,
+			steps := s.defaultPlanSteps(log, repoDir, models.DefaultWorkspace, p.Path, nil, username)
+			stages = append(stages, runtime.PlanStage{
+				Steps:       steps,
+				Workspace:   models.DefaultWorkspace,
+				ProjectPath: p.Path,
 			})
 		}
 		return stages, nil
 	}
 
 	// Else we run plan according to the config file.
-	var stages []PlanStage
+	var stages []runtime.PlanStage
 	for _, p := range config.Projects {
 		if s.shouldAutoplan(p.AutoPlan, modifiedFiles) {
 			// todo
@@ -79,25 +84,25 @@ func (s *ExecutionPlanner) BuildAutoplanStages(log *logging.SimpleLogger, repoFu
 }
 
 func (s *ExecutionPlanner) shouldAutoplan(autoplan yaml.AutoPlan, modifiedFiles []string) bool {
-
+	return true
 }
 
 func (s *ExecutionPlanner) getSteps() {
 
 }
 
-func (s *ExecutionPlanner) BuildApplyStage(log *logging.SimpleLogger, repoDir string, workspace string, relProjectPath string, extraCommentArgs []string, username string) (*ApplyStage, error) {
+func (s *ExecutionPlanner) BuildApplyStage(log *logging.SimpleLogger, repoDir string, workspace string, relProjectPath string, extraCommentArgs []string, username string) (*runtime.ApplyStage, error) {
 	defaults := s.defaultApplySteps(log, repoDir, workspace, relProjectPath, extraCommentArgs, username)
 	steps, err := s.buildStage(ApplyStageName, log, repoDir, workspace, relProjectPath, extraCommentArgs, username, defaults)
 	if err != nil {
 		return nil, err
 	}
-	return &ApplyStage{
+	return &runtime.ApplyStage{
 		Steps: steps,
 	}, nil
 }
 
-func (s *ExecutionPlanner) buildStage(stageName string, log *logging.SimpleLogger, repoDir string, workspace string, relProjectPath string, extraCommentArgs []string, username string, defaults []Step) ([]Step, error) {
+func (s *ExecutionPlanner) buildStage(stageName string, log *logging.SimpleLogger, repoDir string, workspace string, relProjectPath string, extraCommentArgs []string, username string, defaults []runtime.Step) ([]runtime.Step, error) {
 	config, err := s.ParserValidator.ReadConfig(repoDir)
 
 	// If there's no config file, use defaults.
@@ -129,7 +134,7 @@ func (s *ExecutionPlanner) buildStage(stageName string, log *logging.SimpleLogge
 
 			// We have a workflow defined, so now we need to build it.
 			meta := s.buildMeta(log, repoDir, workspace, relProjectPath, extraCommentArgs, username)
-			var steps []Step
+			var steps []runtime.Step
 			var stepsConfig []yaml.StepConfig
 			if stageName == PlanStageName {
 				stepsConfig = workflow.Plan.Steps
@@ -137,25 +142,25 @@ func (s *ExecutionPlanner) buildStage(stageName string, log *logging.SimpleLogge
 				stepsConfig = workflow.Apply.Steps
 			}
 			for _, stepConfig := range stepsConfig {
-				var step Step
+				var step runtime.Step
 				switch stepConfig.StepType {
 				case "init":
-					step = &InitStep{
+					step = &runtime.InitStep{
 						Meta:      meta,
 						ExtraArgs: stepConfig.ExtraArgs,
 					}
 				case "plan":
-					step = &PlanStep{
+					step = &runtime.PlanStep{
 						Meta:      meta,
 						ExtraArgs: stepConfig.ExtraArgs,
 					}
 				case "apply":
-					step = &ApplyStep{
+					step = &runtime.ApplyStep{
 						Meta:      meta,
 						ExtraArgs: stepConfig.ExtraArgs,
 					}
 				case "run":
-					step = &RunStep{
+					step = &runtime.RunStep{
 						Meta:     meta,
 						Commands: stepConfig.Run,
 					}
@@ -170,8 +175,8 @@ func (s *ExecutionPlanner) buildStage(stageName string, log *logging.SimpleLogge
 	return defaults, nil
 }
 
-func (s *ExecutionPlanner) buildMeta(log *logging.SimpleLogger, repoDir string, workspace string, relProjectPath string, extraCommentArgs []string, username string) StepMeta {
-	return StepMeta{
+func (s *ExecutionPlanner) buildMeta(log *logging.SimpleLogger, repoDir string, workspace string, relProjectPath string, extraCommentArgs []string, username string) runtime.StepMeta {
+	return runtime.StepMeta{
 		Log:                   log,
 		Workspace:             workspace,
 		AbsolutePath:          filepath.Join(repoDir, relProjectPath),
@@ -184,23 +189,23 @@ func (s *ExecutionPlanner) buildMeta(log *logging.SimpleLogger, repoDir string, 
 	}
 }
 
-func (s *ExecutionPlanner) defaultPlanSteps(log *logging.SimpleLogger, repoDir string, workspace string, relProjectPath string, extraCommentArgs []string, username string) []Step {
+func (s *ExecutionPlanner) defaultPlanSteps(log *logging.SimpleLogger, repoDir string, workspace string, relProjectPath string, extraCommentArgs []string, username string) []runtime.Step {
 	meta := s.buildMeta(log, repoDir, workspace, relProjectPath, extraCommentArgs, username)
-	return []Step{
-		&InitStep{
+	return []runtime.Step{
+		&runtime.InitStep{
 			ExtraArgs: nil,
 			Meta:      meta,
 		},
-		&PlanStep{
+		&runtime.PlanStep{
 			ExtraArgs: nil,
 			Meta:      meta,
 		},
 	}
 }
-func (s *ExecutionPlanner) defaultApplySteps(log *logging.SimpleLogger, repoDir string, workspace string, relProjectPath string, extraCommentArgs []string, username string) []Step {
+func (s *ExecutionPlanner) defaultApplySteps(log *logging.SimpleLogger, repoDir string, workspace string, relProjectPath string, extraCommentArgs []string, username string) []runtime.Step {
 	meta := s.buildMeta(log, repoDir, workspace, relProjectPath, extraCommentArgs, username)
-	return []Step{
-		&ApplyStep{
+	return []runtime.Step{
+		&runtime.ApplyStep{
 			ExtraArgs: nil,
 			Meta:      meta,
 		},

@@ -137,8 +137,6 @@ func (c *CommandHandler) buildLogger(repoFullName string, pullNum int) *logging.
 }
 
 func (c *CommandHandler) run(ctx *CommandContext) {
-	log := c.buildLogger(ctx.BaseRepo.FullName, ctx.Pull.Num)
-	ctx.Log = log
 	defer c.logPanics(ctx)
 
 	if !c.AllowForkPRs && ctx.HeadRepo.Owner != ctx.BaseRepo.Owner {
