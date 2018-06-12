@@ -15,23 +15,19 @@ func TestProject_UnmarshalYAML(t *testing.T) {
 		exp         yaml.Project
 	}{
 		{
-			description: "should use defaults",
-			input: `
-dir: .`,
+			description: "omit unset fields",
+			input:       "",
 			exp: yaml.Project{
-				Dir:              ".",
-				Workspace:        "default",
-				Workflow:         "",
-				TerraformVersion: "",
-				AutoPlan: &yaml.AutoPlan{
-					WhenModified: []string{"**/*.tf"},
-					Enabled:      true,
-				},
+				Dir:               nil,
+				Workspace:         nil,
+				Workflow:          nil,
+				TerraformVersion:  nil,
+				AutoPlan:          nil,
 				ApplyRequirements: nil,
 			},
 		},
 		{
-			description: "should use all set fields",
+			description: "all fields set",
 			input: `
 dir: mydir
 workspace: workspace
@@ -43,13 +39,13 @@ auto_plan:
 apply_requirements:
 - mergeable`,
 			exp: yaml.Project{
-				Dir:              "mydir",
-				Workspace:        "workspace",
-				Workflow:         "workflow",
-				TerraformVersion: "v0.11.0",
+				Dir:              String("mydir"),
+				Workspace:        String("workspace"),
+				Workflow:         String("workflow"),
+				TerraformVersion: String("v0.11.0"),
 				AutoPlan: &yaml.AutoPlan{
 					WhenModified: []string{},
-					Enabled:      false,
+					Enabled:      Bool(false),
 				},
 				ApplyRequirements: []string{"mergeable"},
 			},
@@ -59,7 +55,7 @@ apply_requirements:
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			var p yaml.Project
-			err := yamlv2.Unmarshal([]byte(c.input), &p)
+			err := yamlv2.UnmarshalStrict([]byte(c.input), &p)
 			Ok(t, err)
 			Equals(t, c.exp, p)
 		})

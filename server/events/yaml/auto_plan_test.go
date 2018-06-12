@@ -15,23 +15,45 @@ func TestAutoPlan_UnmarshalYAML(t *testing.T) {
 		exp         yaml.AutoPlan
 	}{
 		{
-			description: "should use defaults",
-			input: `
-`,
+			description: "omit unset fields",
+			input:       "",
 			exp: yaml.AutoPlan{
-				Enabled:      false,
+				Enabled:      nil,
 				WhenModified: nil,
 			},
 		},
 		{
-			description: "should use all set fields",
+			description: "all fields set",
 			input: `
 enabled: true
 when_modified: ["something-else"]
 `,
 			exp: yaml.AutoPlan{
-				Enabled:      true,
+				Enabled:      Bool(true),
 				WhenModified: []string{"something-else"},
+			},
+		},
+		{
+			description: "enabled false",
+			input: `
+enabled: false
+when_modified: ["something-else"]
+`,
+			exp: yaml.AutoPlan{
+				Enabled:      Bool(false),
+				WhenModified: []string{"something-else"},
+			},
+		},
+		{
+			description: "modified elem empty",
+			input: `
+enabled: false
+when_modified:
+-
+`,
+			exp: yaml.AutoPlan{
+				Enabled:      Bool(false),
+				WhenModified: []string{""},
 			},
 		},
 	}
@@ -39,7 +61,7 @@ when_modified: ["something-else"]
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			var a yaml.AutoPlan
-			err := yamlv2.Unmarshal([]byte(c.input), &a)
+			err := yamlv2.UnmarshalStrict([]byte(c.input), &a)
 			Ok(t, err)
 			Equals(t, c.exp, a)
 		})

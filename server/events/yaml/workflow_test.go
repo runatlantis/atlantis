@@ -16,102 +16,70 @@ func TestWorkflow_UnmarshalYAML(t *testing.T) {
 		expErr      string
 	}{
 		{
-			description: "should use defaults if set to null",
+			description: "empty",
+			input:       ``,
+			exp: yaml.Workflow{
+				Apply: nil,
+				Plan:  nil,
+			},
+		},
+		{
+			description: "yaml null",
 			input:       `~`,
 			exp: yaml.Workflow{
-				Apply: &yaml.Stage{
-					Steps: []yaml.StepConfig{
-						{
-							StepType: "apply",
-						},
-					},
-				},
-				Plan: &yaml.Stage{
-					Steps: []yaml.StepConfig{
-						{
-							StepType: "init",
-						},
-						{
-							StepType: "plan",
-						},
-					},
-				},
+				Apply: nil,
+				Plan:  nil,
 			},
 		},
 		{
-			description: "should use set values",
+			description: "only plan/apply set",
 			input: `
 plan:
-  steps:
-  - plan
 apply:
-  steps: []
 `,
 			exp: yaml.Workflow{
-				Apply: &yaml.Stage{
-					Steps: []yaml.StepConfig{},
-				},
-				Plan: &yaml.Stage{
-					Steps: []yaml.StepConfig{
-						{
-							StepType: "plan",
-						},
-					},
-				},
+				Apply: nil,
+				Plan:  nil,
 			},
 		},
 		{
-			description: "should use defaults for apply if only plan set",
+			description: "steps set to null",
 			input: `
 plan:
-  steps: []`,
+  steps: ~
+apply:
+  steps: ~`,
 			exp: yaml.Workflow{
-				Apply: &yaml.Stage{
-					Steps: []yaml.StepConfig{
-						{
-							StepType: "apply",
-						},
-					},
-				},
 				Plan: &yaml.Stage{
-					Steps: []yaml.StepConfig{},
+					Steps: nil,
+				},
+				Apply: &yaml.Stage{
+					Steps: nil,
 				},
 			},
 		},
 		{
-			description: "should use defaults for plan if only apply set",
+			description: "steps set to empty slice",
 			input: `
+plan:
+  steps: []
 apply:
   steps: []`,
 			exp: yaml.Workflow{
-				Apply: &yaml.Stage{
-					Steps: []yaml.StepConfig{},
-				},
 				Plan: &yaml.Stage{
-					Steps: []yaml.StepConfig{
-						{
-							StepType: "init",
-						},
-						{
-							StepType: "plan",
-						},
-					},
+					Steps: []yaml.Step{},
+				},
+				Apply: &yaml.Stage{
+					Steps: []yaml.Step{},
 				},
 			},
-		},
-		{
-			description: "should error if no steps key specified",
-			input: `
-apply:
-- apply`,
-			expErr: "missing \"steps\" key",
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			var w yaml.Workflow
-			err := yamlv2.Unmarshal([]byte(c.input), &w)
+			err := yamlv2.UnmarshalStrict([]byte(c.input), &w)
 			if c.expErr != "" {
 				ErrEquals(t, c.expErr, err)
 				return

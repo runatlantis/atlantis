@@ -20,6 +20,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/go-test/deep"
 )
 
@@ -49,8 +50,7 @@ func Equals(tb testing.TB, exp, act interface{}) {
 	tb.Helper()
 	if diff := deep.Equal(exp, act); diff != nil {
 		_, file, line, _ := runtime.Caller(1)
-		fmt.Printf("\033[31m%s:%d:\n\n\texp: %#v\n\n\tgot: %#v\033[39m\n\n", filepath.Base(file), line, exp, act)
-		tb.Fatal(diff)
+		tb.Fatalf("\033[31m%s:%d: %s\n\nexp: %s******\ngot: %s\033[39m\n", filepath.Base(file), line, diff, spew.Sdump(exp), spew.Sdump(act))
 	}
 }
 
@@ -58,10 +58,10 @@ func Equals(tb testing.TB, exp, act interface{}) {
 func ErrEquals(tb testing.TB, exp string, act error) {
 	tb.Helper()
 	if act == nil {
-		tb.Fatalf("exp err %q but err was nil", exp)
+		tb.Fatalf("exp err %q but err was nil\n", exp)
 	}
 	if act.Error() != exp {
-		tb.Fatalf("exp err: %q but got: %q", exp, act.Error())
+		tb.Fatalf("exp err: %q but got: %q\n", exp, act.Error())
 	}
 }
 

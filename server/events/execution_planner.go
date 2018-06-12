@@ -135,7 +135,7 @@ func (s *ExecutionPlanner) buildStage(stageName string, log *logging.SimpleLogge
 			// We have a workflow defined, so now we need to build it.
 			meta := s.buildMeta(log, repoDir, workspace, relProjectPath, extraCommentArgs, username)
 			var steps []runtime.Step
-			var stepsConfig []yaml.StepConfig
+			var stepsConfig []yaml.Step
 			if stageName == PlanStageName {
 				stepsConfig = workflow.Plan.Steps
 			} else {
@@ -143,7 +143,7 @@ func (s *ExecutionPlanner) buildStage(stageName string, log *logging.SimpleLogge
 			}
 			for _, stepConfig := range stepsConfig {
 				var step runtime.Step
-				switch stepConfig.StepType {
+				switch stepConfig.Key {
 				case "init":
 					step = &runtime.InitStep{
 						Meta:      meta,
@@ -162,7 +162,7 @@ func (s *ExecutionPlanner) buildStage(stageName string, log *logging.SimpleLogge
 				case "run":
 					step = &runtime.RunStep{
 						Meta:     meta,
-						Commands: stepConfig.Run,
+						Commands: stepConfig.StringVal,
 					}
 				}
 				steps = append(steps, step)
