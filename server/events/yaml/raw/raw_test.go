@@ -1,4 +1,4 @@
-package yaml_test
+package raw_test
 
 // Bool is a helper routine that allocates a new bool value
 // to store v and returns a pointer to it.

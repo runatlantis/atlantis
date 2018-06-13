@@ -125,7 +125,7 @@ var singleProjectTmpl = template.Must(template.New("").Parse("{{$result := index
 var multiProjectTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
 	"Ran {{.Command}} for {{ len .Results }} projects:\n" +
 		"{{ range $result := .Results }}" +
-		"1. path: `{{$result.Dir}} workspace: `{{$result.Workspace}}`\n" +
+		"1. workspace: `{{$result.Workspace}}` path: `{{$result.Dir}}`\n" +
 		"{{end}}\n" +
 		"{{ range $i, $result := .Results }}" +
 		"### {{add $i 1}}. workspace: `{{$result.Workspace}}` path: `{{$result.Dir}}`\n" +

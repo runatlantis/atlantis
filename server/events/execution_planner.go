@@ -9,6 +9,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/yaml"
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -75,7 +76,7 @@ func (s *ExecutionPlanner) BuildAutoplanStages(log *logging.SimpleLogger, repoFu
 	// Else we run plan according to the config file.
 	var stages []runtime.PlanStage
 	for _, p := range config.Projects {
-		if s.shouldAutoplan(p.AutoPlan, modifiedFiles) {
+		if s.shouldAutoplan(p.Autoplan, modifiedFiles) {
 			// todo
 			stages = append(stages)
 		}
@@ -83,7 +84,7 @@ func (s *ExecutionPlanner) BuildAutoplanStages(log *logging.SimpleLogger, repoFu
 	return stages, nil
 }
 
-func (s *ExecutionPlanner) shouldAutoplan(autoplan yaml.AutoPlan, modifiedFiles []string) bool {
+func (s *ExecutionPlanner) shouldAutoplan(autoplan valid.Autoplan, modifiedFiles []string) bool {
 	return true
 }
 
@@ -118,15 +119,16 @@ func (s *ExecutionPlanner) buildStage(stageName string, log *logging.SimpleLogge
 	// Get this project's configuration.
 	for _, p := range config.Projects {
 		if p.Dir == relProjectPath && p.Workspace == workspace {
-			workflowName := p.Workflow
+			workflowNamePtr := p.Workflow
 
 			// If they didn't specify a workflow, use the default.
-			if workflowName == "" {
+			if workflowNamePtr == nil {
 				log.Info("no %s workflow set––continuing with defaults", AtlantisYAMLFilename)
 				return defaults, nil
 			}
 
 			// If they did specify a workflow, find it.
+			workflowName := *workflowNamePtr
 			workflow, exists := config.Workflows[workflowName]
 			if !exists {
 				return nil, fmt.Errorf("no workflow with key %q defined", workflowName)
@@ -135,7 +137,7 @@ func (s *ExecutionPlanner) buildStage(stageName string, log *logging.SimpleLogge
 			// We have a workflow defined, so now we need to build it.
 			meta := s.buildMeta(log, repoDir, workspace, relProjectPath, extraCommentArgs, username)
 			var steps []runtime.Step
-			var stepsConfig []yaml.Step
+			var stepsConfig []valid.Step
 			if stageName == PlanStageName {
 				stepsConfig = workflow.Plan.Steps
 			} else {
@@ -143,7 +145,7 @@ func (s *ExecutionPlanner) buildStage(stageName string, log *logging.SimpleLogge
 			}
 			for _, stepConfig := range stepsConfig {
 				var step runtime.Step
-				switch stepConfig.Key {
+				switch stepConfig.StepName {
 				case "init":
 					step = &runtime.InitStep{
 						Meta:      meta,
@@ -162,7 +164,7 @@ func (s *ExecutionPlanner) buildStage(stageName string, log *logging.SimpleLogge
 				case "run":
 					step = &runtime.RunStep{
 						Meta:     meta,
-						Commands: stepConfig.StringVal,
+						Commands: stepConfig.RunCommand,
 					}
 				}
 				steps = append(steps, step)
