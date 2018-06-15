@@ -33,8 +33,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-var applier *mocks.MockExecutor
-var planner *mocks.MockExecutor
+var operator *mocks.MockPullRequestOperator
 var eventParsing *mocks.MockEventParsing
 var vcsClient *vcsmocks.MockClientProxy
 var ghStatus *mocks.MockCommitStatusUpdater
@@ -46,8 +45,7 @@ var logBytes *bytes.Buffer
 
 func setup(t *testing.T) {
 	RegisterMockTestingT(t)
-	applier = mocks.NewMockExecutor()
-	planner = mocks.NewMockExecutor()
+	operator = mocks.NewMockPullRequestOperator()
 	eventParsing = mocks.NewMockEventParsing()
 	ghStatus = mocks.NewMockCommitStatusUpdater()
 	workspaceLocker = mocks.NewMockAtlantisWorkspaceLocker()
@@ -58,8 +56,6 @@ func setup(t *testing.T) {
 	logBytes = new(bytes.Buffer)
 	When(logger.Underlying()).ThenReturn(log.New(logBytes, "", 0))
 	ch = events.CommandHandler{
-		PlanExecutor:             planner,
-		ApplyExecutor:            applier,
 		VCSClient:                vcsClient,
 		CommitStatusUpdater:      ghStatus,
 		EventParser:              eventParsing,
@@ -67,9 +63,10 @@ func setup(t *testing.T) {
 		MarkdownRenderer:         &events.MarkdownRenderer{},
 		GithubPullGetter:         githubGetter,
 		GitlabMergeRequestGetter: gitlabGetter,
-		Logger:           logger,
-		AllowForkPRs:     false,
-		AllowForkPRsFlag: "allow-fork-prs-flag",
+		Logger:              logger,
+		AllowForkPRs:        false,
+		AllowForkPRsFlag:    "allow-fork-prs-flag",
+		PullRequestOperator: operator,
 	}
 }
 
@@ -203,9 +200,9 @@ func TestExecuteCommand_FullRun(t *testing.T) {
 		When(workspaceLocker.TryLock(fixtures.GithubRepo.FullName, cmd.Workspace, fixtures.Pull.Num)).ThenReturn(true)
 		switch c {
 		case events.Plan:
-			When(planner.Execute(matchers.AnyPtrToEventsCommandContext())).ThenReturn(cmdResponse)
+			When(operator.PlanViaComment(matchers.AnyPtrToEventsCommandContext())).ThenReturn(cmdResponse)
 		case events.Apply:
-			When(applier.Execute(matchers.AnyPtrToEventsCommandContext())).ThenReturn(cmdResponse)
+			When(operator.ApplyViaComment(matchers.AnyPtrToEventsCommandContext())).ThenReturn(cmdResponse)
 		}
 
 		ch.ExecuteCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.User, fixtures.Pull.Num, &cmd)
@@ -238,7 +235,7 @@ func TestExecuteCommand_ForkPREnabled(t *testing.T) {
 	headRepo.Owner = "forkrepo"
 	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(fixtures.Pull, headRepo, nil)
 	When(workspaceLocker.TryLock(fixtures.GithubRepo.FullName, cmd.Workspace, fixtures.Pull.Num)).ThenReturn(true)
-	When(planner.Execute(matchers.AnyPtrToEventsCommandContext())).ThenReturn(cmdResponse)
+	When(operator.PlanViaComment(matchers.AnyPtrToEventsCommandContext())).ThenReturn(cmdResponse)
 
 	ch.ExecuteCommand(fixtures.GithubRepo, models.Repo{} /* this isn't used */, fixtures.User, fixtures.Pull.Num, &cmd)
 

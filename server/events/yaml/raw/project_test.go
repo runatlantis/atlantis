@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/go-ozzo/ozzo-validation"
+	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/yaml/raw"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	. "github.com/runatlantis/atlantis/testing"
@@ -107,6 +108,30 @@ func TestProject_Validate(t *testing.T) {
 			},
 			expErr: "",
 		},
+		{
+			description: "empty tf version string",
+			input: raw.Project{
+				Dir:              String("."),
+				TerraformVersion: String(""),
+			},
+			expErr: "terraform_version: version \"\" could not be parsed: Malformed version: .",
+		},
+		{
+			description: "tf version with v prepended",
+			input: raw.Project{
+				Dir:              String("."),
+				TerraformVersion: String("v1"),
+			},
+			expErr: "",
+		},
+		{
+			description: "tf version without prepended",
+			input: raw.Project{
+				Dir:              String("."),
+				TerraformVersion: String("1"),
+			},
+			expErr: "",
+		},
 	}
 	validation.ErrorTag = "yaml"
 	for _, c := range cases {
@@ -122,6 +147,7 @@ func TestProject_Validate(t *testing.T) {
 }
 
 func TestProject_ToValid(t *testing.T) {
+	tfVersionPointEleven, _ := version.NewVersion("v0.11.0")
 	cases := []struct {
 		description string
 		input       raw.Project
@@ -161,12 +187,28 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:              ".",
 				Workspace:        "myworkspace",
 				Workflow:         String("myworkflow"),
-				TerraformVersion: String("v0.11.0"),
+				TerraformVersion: tfVersionPointEleven,
 				Autoplan: valid.Autoplan{
 					WhenModified: []string{"hi"},
 					Enabled:      false,
 				},
 				ApplyRequirements: []string{"approved"},
+			},
+		},
+		{
+			description: "tf version without 'v'",
+			input: raw.Project{
+				Dir:              String("."),
+				TerraformVersion: String("0.11.0"),
+			},
+			exp: valid.Project{
+				Dir:              ".",
+				Workspace:        "default",
+				TerraformVersion: tfVersionPointEleven,
+				Autoplan: valid.Autoplan{
+					WhenModified: []string{"**/*.tf"},
+					Enabled:      true,
+				},
 			},
 		},
 	}

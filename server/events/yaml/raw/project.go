@@ -1,12 +1,12 @@
 package raw
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/go-ozzo/ozzo-validation"
 	"github.com/hashicorp/go-version"
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 )
 
@@ -41,11 +41,12 @@ func (p Project) Validate() error {
 		return nil
 	}
 	validTFVersion := func(value interface{}) error {
-		// Safe to dereference because this is only called if the pointer is
-		// not nil.
-		versionStr := *value.(*string)
-		_, err := version.NewVersion(versionStr)
-		return err
+		strPtr := value.(*string)
+		if strPtr == nil {
+			return nil
+		}
+		_, err := version.NewVersion(*strPtr)
+		return errors.Wrapf(err, "version %q could not be parsed", *strPtr)
 	}
 	return validation.ValidateStruct(&p,
 		validation.Field(&p.Dir, validation.Required, validation.By(hasDotDot)),

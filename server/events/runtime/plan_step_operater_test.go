@@ -1,7 +1,6 @@
 package runtime_test
 
 import (
-	"errors"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -9,7 +8,9 @@ import (
 
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
+	"github.com/runatlantis/atlantis/server/events/models"
 	matchers2 "github.com/runatlantis/atlantis/server/events/run/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
@@ -25,23 +26,20 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 	tfVersion, _ := version.NewVersion("0.8")
 	logger := logging.NewNoopLogger()
 	workspace := "default"
-	s := runtime.PlanStep{
-		Meta: runtime.StepMeta{
-			Log:                   logger,
-			Workspace:             workspace,
-			AbsolutePath:          "/path",
-			DirRelativeToRepoRoot: ".",
-			TerraformExecutor:     terraform,
-			TerraformVersion:      tfVersion,
-			ExtraCommentArgs:      []string{"comment", "args"},
-			Username:              "username",
-		},
-		ExtraArgs: []string{"extra", "args"},
+	s := runtime.PlanStepOperator{
+		DefaultTFVersion:  tfVersion,
+		TerraformExecutor: terraform,
 	}
 
 	When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
-	output, err := s.Run()
+	output, err := s.Run(models.ProjectCommandContext{
+		Log:         logger,
+		CommentArgs: []string{"comment", "args"},
+		Workspace:   workspace,
+		RepoRelPath: ".",
+		User:        models.User{Username: "username"},
+	}, []string{"extra", "args"}, "/path")
 	Ok(t, err)
 
 	Equals(t, "output", output)
@@ -61,23 +59,19 @@ func TestRun_ErrWorkspaceIn08(t *testing.T) {
 	tfVersion, _ := version.NewVersion("0.8")
 	logger := logging.NewNoopLogger()
 	workspace := "notdefault"
-	s := runtime.PlanStep{
-		Meta: runtime.StepMeta{
-			Log:                   logger,
-			Workspace:             workspace,
-			AbsolutePath:          "/path",
-			DirRelativeToRepoRoot: ".",
-			TerraformExecutor:     terraform,
-			TerraformVersion:      tfVersion,
-			ExtraCommentArgs:      []string{"comment", "args"},
-			Username:              "username",
-		},
-		ExtraArgs: []string{"extra", "args"},
+	s := runtime.PlanStepOperator{
+		TerraformExecutor: terraform,
+		DefaultTFVersion:  tfVersion,
 	}
 
 	When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
-	_, err := s.Run()
+	_, err := s.Run(models.ProjectCommandContext{
+		Log:         logger,
+		Workspace:   workspace,
+		RepoRelPath: ".",
+		User:        models.User{Username: "username"},
+	}, []string{"extra", "args"}, "/path")
 	ErrEquals(t, "terraform version 0.8.0 does not support workspaces", err)
 }
 
@@ -112,23 +106,21 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 
 			tfVersion, _ := version.NewVersion(c.tfVersion)
 			logger := logging.NewNoopLogger()
-			s := runtime.PlanStep{
-				Meta: runtime.StepMeta{
-					Log:                   logger,
-					Workspace:             "workspace",
-					AbsolutePath:          "/path",
-					DirRelativeToRepoRoot: ".",
-					TerraformExecutor:     terraform,
-					TerraformVersion:      tfVersion,
-					ExtraCommentArgs:      []string{"comment", "args"},
-					Username:              "username",
-				},
-				ExtraArgs: []string{"extra", "args"},
+
+			s := runtime.PlanStepOperator{
+				TerraformExecutor: terraform,
+				DefaultTFVersion:  tfVersion,
 			}
 
 			When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 				ThenReturn("output", nil)
-			output, err := s.Run()
+			output, err := s.Run(models.ProjectCommandContext{
+				Log:         logger,
+				Workspace:   "workspace",
+				RepoRelPath: ".",
+				User:        models.User{Username: "username"},
+				CommentArgs: []string{"comment", "args"},
+			}, []string{"extra", "args"}, "/path")
 			Ok(t, err)
 
 			Equals(t, "output", output)
@@ -170,18 +162,9 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 			terraform := mocks.NewMockClient()
 			tfVersion, _ := version.NewVersion(c.tfVersion)
 			logger := logging.NewNoopLogger()
-			s := runtime.PlanStep{
-				Meta: runtime.StepMeta{
-					Log:                   logger,
-					Workspace:             "workspace",
-					AbsolutePath:          "/path",
-					DirRelativeToRepoRoot: ".",
-					TerraformExecutor:     terraform,
-					TerraformVersion:      tfVersion,
-					ExtraCommentArgs:      []string{"comment", "args"},
-					Username:              "username",
-				},
-				ExtraArgs: []string{"extra", "args"},
+			s := runtime.PlanStepOperator{
+				TerraformExecutor: terraform,
+				DefaultTFVersion:  tfVersion,
 			}
 
 			// Ensure that we actually try to switch workspaces by making the
@@ -194,7 +177,13 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 			expPlanArgs := []string{"plan", "-refresh", "-no-color", "-out", "/path/workspace.tfplan", "-var", "atlantis_user=username", "extra", "args", "comment", "args"}
 			When(terraform.RunCommandWithVersion(logger, "/path", expPlanArgs, tfVersion, "workspace")).ThenReturn("output", nil)
 
-			output, err := s.Run()
+			output, err := s.Run(models.ProjectCommandContext{
+				Log:         logger,
+				Workspace:   "workspace",
+				RepoRelPath: ".",
+				User:        models.User{Username: "username"},
+				CommentArgs: []string{"comment", "args"},
+			}, []string{"extra", "args"}, "/path")
 			Ok(t, err)
 
 			Equals(t, "output", output)
@@ -212,26 +201,22 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 	terraform := mocks.NewMockClient()
 	tfVersion, _ := version.NewVersion("0.10.0")
 	logger := logging.NewNoopLogger()
-	s := runtime.PlanStep{
-		Meta: runtime.StepMeta{
-			Log:                   logger,
-			Workspace:             "workspace",
-			AbsolutePath:          "/path",
-			DirRelativeToRepoRoot: ".",
-			TerraformExecutor:     terraform,
-			TerraformVersion:      tfVersion,
-			ExtraCommentArgs:      []string{"comment", "args"},
-			Username:              "username",
-		},
-		ExtraArgs: []string{"extra", "args"},
+	s := runtime.PlanStepOperator{
+		TerraformExecutor: terraform,
+		DefaultTFVersion:  tfVersion,
 	}
-
 	When(terraform.RunCommandWithVersion(logger, "/path", []string{"workspace", "show"}, tfVersion, "workspace")).ThenReturn("workspace\n", nil)
 
 	expPlanArgs := []string{"plan", "-refresh", "-no-color", "-out", "/path/workspace.tfplan", "-var", "atlantis_user=username", "extra", "args", "comment", "args"}
 	When(terraform.RunCommandWithVersion(logger, "/path", expPlanArgs, tfVersion, "workspace")).ThenReturn("output", nil)
 
-	output, err := s.Run()
+	output, err := s.Run(models.ProjectCommandContext{
+		Log:         logger,
+		Workspace:   "workspace",
+		RepoRelPath: ".",
+		User:        models.User{Username: "username"},
+		CommentArgs: []string{"comment", "args"},
+	}, []string{"extra", "args"}, "/path")
 	Ok(t, err)
 
 	Equals(t, "output", output)
@@ -258,28 +243,25 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 	// Using version >= 0.10 here so we don't expect any env commands.
 	tfVersion, _ := version.NewVersion("0.10.0")
 	logger := logging.NewNoopLogger()
-	s := runtime.PlanStep{
-		Meta: runtime.StepMeta{
-			Log:                   logger,
-			Workspace:             "workspace",
-			AbsolutePath:          tmpDir,
-			DirRelativeToRepoRoot: ".",
-			TerraformExecutor:     terraform,
-			TerraformVersion:      tfVersion,
-			ExtraCommentArgs:      []string{"comment", "args"},
-			Username:              "username",
-		},
-		ExtraArgs: []string{"extra", "args"},
+	s := runtime.PlanStepOperator{
+		TerraformExecutor: terraform,
+		DefaultTFVersion:  tfVersion,
 	}
 
 	expPlanArgs := []string{"plan", "-refresh", "-no-color", "-out", filepath.Join(tmpDir, "workspace.tfplan"), "-var", "atlantis_user=username", "extra", "args", "comment", "args", "-var-file", envVarsFile}
 	When(terraform.RunCommandWithVersion(logger, tmpDir, expPlanArgs, tfVersion, "workspace")).ThenReturn("output", nil)
 
-	output, err := s.Run()
+	output, err := s.Run(models.ProjectCommandContext{
+		Log:         logger,
+		Workspace:   "workspace",
+		RepoRelPath: ".",
+		User:        models.User{Username: "username"},
+		CommentArgs: []string{"comment", "args"},
+	}, []string{"extra", "args"}, tmpDir)
 	Ok(t, err)
 
-	Equals(t, "output", output)
 	// Verify that env select was never called since we're in version >= 0.10
 	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(logger, tmpDir, []string{"env", "select", "-no-color", "workspace"}, tfVersion, "workspace")
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, tmpDir, expPlanArgs, tfVersion, "workspace")
+	Equals(t, "output", output)
 }

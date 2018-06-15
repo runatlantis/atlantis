@@ -125,9 +125,11 @@ func TestRenderProjectResults(t *testing.T) {
 						TerraformOutput: "terraform-output",
 						LockURL:         "lock-url",
 					},
+					Workspace: "workspace",
+					Path:      "path",
 				},
 			},
-			"```diff\nterraform-output\n```\n\n* To **discard** this plan click [here](lock-url).\n\n",
+			"Ran Plan in dir: `path` workspace: `workspace`\n```diff\nterraform-output\n```\n\n* To **discard** this plan click [here](lock-url).\n\n",
 		},
 		{
 			"single successful apply",
@@ -135,30 +137,34 @@ func TestRenderProjectResults(t *testing.T) {
 			[]events.ProjectResult{
 				{
 					ApplySuccess: "success",
+					Workspace:    "workspace",
+					Path:         "path",
 				},
 			},
-			"```diff\nsuccess\n```\n\n",
+			"Ran Apply in dir: `path` workspace: `workspace`\n```diff\nsuccess\n```\n\n",
 		},
 		{
 			"multiple successful plans",
 			events.Plan,
 			[]events.ProjectResult{
 				{
-					Path: "path",
+					Workspace: "workspace",
+					Path:      "path",
 					PlanSuccess: &events.PlanSuccess{
 						TerraformOutput: "terraform-output",
 						LockURL:         "lock-url",
 					},
 				},
 				{
-					Path: "path2",
+					Workspace: "workspace",
+					Path:      "path2",
 					PlanSuccess: &events.PlanSuccess{
 						TerraformOutput: "terraform-output2",
 						LockURL:         "lock-url2",
 					},
 				},
 			},
-			"Ran Plan in 2 directories:\n * `path`\n * `path2`\n\n## path/\n```diff\nterraform-output\n```\n\n* To **discard** this plan click [here](lock-url).\n---\n## path2/\n```diff\nterraform-output2\n```\n\n* To **discard** this plan click [here](lock-url2).\n---\n\n",
+			"Ran Plan for 2 projects:\n1. workspace: `workspace` path: `path`\n1. workspace: `workspace` path: `path2`\n\n### 1. workspace: `workspace` path: `path`\n```diff\nterraform-output\n```\n\n* To **discard** this plan click [here](lock-url).\n---\n### 2. workspace: `workspace` path: `path2`\n```diff\nterraform-output2\n```\n\n* To **discard** this plan click [here](lock-url2).\n---\n\n",
 		},
 		{
 			"multiple successful applies",
@@ -166,75 +172,87 @@ func TestRenderProjectResults(t *testing.T) {
 			[]events.ProjectResult{
 				{
 					Path:         "path",
+					Workspace:    "workspace",
 					ApplySuccess: "success",
 				},
 				{
 					Path:         "path2",
+					Workspace:    "workspace",
 					ApplySuccess: "success2",
 				},
 			},
-			"Ran Apply in 2 directories:\n * `path`\n * `path2`\n\n## path/\n```diff\nsuccess\n```\n---\n## path2/\n```diff\nsuccess2\n```\n---\n\n",
+			"Ran Apply for 2 projects:\n1. workspace: `workspace` path: `path`\n1. workspace: `workspace` path: `path2`\n\n### 1. workspace: `workspace` path: `path`\n```diff\nsuccess\n```\n---\n### 2. workspace: `workspace` path: `path2`\n```diff\nsuccess2\n```\n---\n\n",
 		},
 		{
 			"single errored plan",
 			events.Plan,
 			[]events.ProjectResult{
 				{
-					Error: errors.New("error"),
+					Error:     errors.New("error"),
+					Path:      "path",
+					Workspace: "workspace",
 				},
 			},
-			"**Plan Error**\n```\nerror\n```\n\n\n",
+			"Ran Plan in dir: `path` workspace: `workspace`\n**Plan Error**\n```\nerror\n```\n\n\n",
 		},
 		{
 			"single failed plan",
 			events.Plan,
 			[]events.ProjectResult{
 				{
-					Failure: "failure",
+					Path:      "path",
+					Workspace: "workspace",
+					Failure:   "failure",
 				},
 			},
-			"**Plan Failed**: failure\n\n\n",
+			"Ran Plan in dir: `path` workspace: `workspace`\n**Plan Failed**: failure\n\n\n",
 		},
 		{
 			"successful, failed, and errored plan",
 			events.Plan,
 			[]events.ProjectResult{
 				{
-					Path: "path",
+					Workspace: "workspace",
+					Path:      "path",
 					PlanSuccess: &events.PlanSuccess{
 						TerraformOutput: "terraform-output",
 						LockURL:         "lock-url",
 					},
 				},
 				{
-					Path:    "path2",
-					Failure: "failure",
+					Workspace: "workspace",
+					Path:      "path2",
+					Failure:   "failure",
 				},
 				{
-					Path:  "path3",
-					Error: errors.New("error"),
+					Workspace: "workspace",
+					Path:      "path3",
+					Error:     errors.New("error"),
 				},
 			},
-			"Ran Plan in 3 directories:\n * `path`\n * `path2`\n * `path3`\n\n## path/\n```diff\nterraform-output\n```\n\n* To **discard** this plan click [here](lock-url).\n---\n## path2/\n**Plan Failed**: failure\n\n---\n## path3/\n**Plan Error**\n```\nerror\n```\n\n---\n\n",
+			"Ran Plan for 3 projects:\n1. workspace: `workspace` path: `path`\n1. workspace: `workspace` path: `path2`\n1. workspace: `workspace` path: `path3`\n\n### 1. workspace: `workspace` path: `path`\n```diff\nterraform-output\n```\n\n* To **discard** this plan click [here](lock-url).\n---\n### 2. workspace: `workspace` path: `path2`\n**Plan Failed**: failure\n\n---\n### 3. workspace: `workspace` path: `path3`\n**Plan Error**\n```\nerror\n```\n\n---\n\n",
 		},
 		{
 			"successful, failed, and errored apply",
 			events.Apply,
 			[]events.ProjectResult{
 				{
+					Workspace:    "workspace",
 					Path:         "path",
 					ApplySuccess: "success",
 				},
 				{
-					Path:    "path2",
-					Failure: "failure",
+					Workspace: "workspace",
+					Path:      "path2",
+					Failure:   "failure",
 				},
 				{
-					Path:  "path3",
-					Error: errors.New("error"),
+					Workspace: "workspace",
+					Path:      "path3",
+					Error:     errors.New("error"),
 				},
 			},
-			"Ran Apply in 3 directories:\n * `path`\n * `path2`\n * `path3`\n\n## path/\n```diff\nsuccess\n```\n---\n## path2/\n**Apply Failed**: failure\n\n---\n## path3/\n**Apply Error**\n```\nerror\n```\n\n---\n\n",
+			"Ran Apply for 3 projects:\n1. workspace: `workspace` path: `path`\n1. workspace: `workspace` path: `path2`\n1. workspace: `workspace` path: `path3`\n\n### 1. workspace: `workspace` path: `path`\n```diff\nsuccess\n```\n---\n### 2. workspace: `workspace` path: `path2`\n**Apply Failed**: failure\n\n---\n### 3. workspace: `workspace` path: `path3`\n**Apply Error**\n```\nerror\n```\n\n---\n\n",
 		},
 	}
 
@@ -244,13 +262,14 @@ func TestRenderProjectResults(t *testing.T) {
 			ProjectResults: c.ProjectResults,
 		}
 		for _, verbose := range []bool{true, false} {
-			t.Log("testing " + c.Description)
-			s := r.Render(res, c.Command, "log", verbose)
-			if !verbose {
-				Equals(t, c.Expected, s)
-			} else {
-				Equals(t, c.Expected+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
-			}
+			t.Run(c.Description, func(t *testing.T) {
+				s := r.Render(res, c.Command, "log", verbose)
+				if !verbose {
+					Equals(t, c.Expected, s)
+				} else {
+					Equals(t, c.Expected+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
+				}
+			})
 		}
 	}
 }

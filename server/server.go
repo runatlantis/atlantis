@@ -232,7 +232,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Logger:                   logger,
 		AllowForkPRs:             userConfig.AllowForkPRs,
 		AllowForkPRsFlag:         config.AllowForkPRsFlag,
-		PullRequestOperator: events.PullRequestOperator{
+		PullRequestOperator: &events.DefaultPullRequestOperator{
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTfVersion,
 			ParserValidator:   &yaml.ParserValidator{},

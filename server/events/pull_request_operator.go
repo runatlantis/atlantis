@@ -12,7 +12,15 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-type PullRequestOperator struct {
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_pull_request_operator.go PullRequestOperator
+
+type PullRequestOperator interface {
+	Autoplan(ctx *CommandContext) CommandResponse
+	PlanViaComment(ctx *CommandContext) CommandResponse
+	ApplyViaComment(ctx *CommandContext) CommandResponse
+}
+
+type DefaultPullRequestOperator struct {
 	TerraformExecutor TerraformExec
 	DefaultTFVersion  *version.Version
 	ParserValidator   *yaml.ParserValidator
@@ -26,7 +34,7 @@ type TerraformExec interface {
 	RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (string, error)
 }
 
-func (p *PullRequestOperator) Autoplan(ctx *CommandContext) CommandResponse {
+func (p *DefaultPullRequestOperator) Autoplan(ctx *CommandContext) CommandResponse {
 	// check out repo to parse atlantis.yaml
 	// this will check out the repo to a * dir
 	repoDir, err := p.Workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, ctx.Command.Workspace)
@@ -99,7 +107,7 @@ func (p *PullRequestOperator) Autoplan(ctx *CommandContext) CommandResponse {
 	return CommandResponse{ProjectResults: results}
 }
 
-func (p *PullRequestOperator) PlanViaComment(ctx *CommandContext) CommandResponse {
+func (p *DefaultPullRequestOperator) PlanViaComment(ctx *CommandContext) CommandResponse {
 	repoDir, err := p.Workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, ctx.Command.Workspace)
 	if err != nil {
 		return CommandResponse{Error: err}
@@ -141,7 +149,7 @@ func (p *PullRequestOperator) PlanViaComment(ctx *CommandContext) CommandRespons
 	}
 }
 
-func (p *PullRequestOperator) ApplyViaComment(ctx *CommandContext) CommandResponse {
+func (p *DefaultPullRequestOperator) ApplyViaComment(ctx *CommandContext) CommandResponse {
 	repoDir, err := p.Workspace.GetWorkspace(ctx.BaseRepo, ctx.Pull, ctx.Command.Workspace)
 	if err != nil {
 		return CommandResponse{Failure: "No workspace found. Did you run plan?"}
@@ -185,7 +193,7 @@ func (p *PullRequestOperator) ApplyViaComment(ctx *CommandContext) CommandRespon
 
 // matchingProjects returns the list of projects whose WhenModified fields match
 // any of the modifiedFiles.
-func (p *PullRequestOperator) matchingProjects(modifiedFiles []string, config valid.Spec) []valid.Project {
+func (p *DefaultPullRequestOperator) matchingProjects(modifiedFiles []string, config valid.Spec) []valid.Project {
 	//todo
 	// match the modified files against the config
 	// remember the modified_files paths are relative to the project paths

@@ -3,9 +3,10 @@ package runtime_test
 import (
 	"testing"
 
-	"github.com/hashicorp/go-version"
+	version "github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
+	"github.com/runatlantis/atlantis/server/events/models"
 	matchers2 "github.com/runatlantis/atlantis/server/events/run/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
@@ -45,15 +46,16 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 			logger := logging.NewNoopLogger()
 			iso := runtime.InitStepOperator{
 				TerraformExecutor: terraform,
+				DefaultTFVersion:  tfVersion,
 			}
 			When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 				ThenReturn("output", nil)
-			output, err := iso.Run(runtime.ProjectCommandContext{
+
+			output, err := iso.Run(models.ProjectCommandContext{
 				Log:         logger,
 				Workspace:   "workspace",
-				AbsPath:     "/path",
 				RepoRelPath: ".",
-			}, []string{"extra", "args"})
+			}, []string{"extra", "args"}, "/path")
 			Ok(t, err)
 			// Shouldn't return output since we don't print init output to PR.
 			Equals(t, "", output)

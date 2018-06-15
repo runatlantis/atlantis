@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	. "github.com/runatlantis/atlantis/testing"
@@ -72,6 +73,7 @@ func TestReadConfig_UnmarshalErrors(t *testing.T) {
 }
 
 func TestReadConfig(t *testing.T) {
+	tfVersion, _ := version.NewVersion("v0.11.0")
 	cases := []struct {
 		description string
 		input       string
@@ -169,7 +171,7 @@ workflows:
 						Dir:              ".",
 						Workspace:        "myworkspace",
 						Workflow:         String("myworkflow"),
-						TerraformVersion: String("v0.11.0"),
+						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
 							WhenModified: []string{"**/*.tf"},
 							Enabled:      true,
@@ -203,7 +205,7 @@ workflows:
 						Dir:              ".",
 						Workspace:        "myworkspace",
 						Workflow:         String("myworkflow"),
-						TerraformVersion: String("v0.11.0"),
+						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
 							WhenModified: []string{"**/*.tf"},
 							Enabled:      false,
