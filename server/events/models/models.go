@@ -24,6 +24,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 // DefaultWorkspace is the default Terraform workspace for both Atlantis and
@@ -209,4 +211,26 @@ func (h VCSHostType) String() string {
 		return "Gitlab"
 	}
 	return "<missing String() implementation>"
+}
+
+type ProjectCommandContext struct {
+	// BaseRepo is the repository that the pull request will be merged into.
+	BaseRepo Repo
+	// HeadRepo is the repository that is getting merged into the BaseRepo.
+	// If the pull request branch is from the same repository then HeadRepo will
+	// be the same as BaseRepo.
+	// See https://help.github.com/articles/about-pull-request-merges/.
+	HeadRepo Repo
+	Pull     PullRequest
+	// User is the user that triggered this command.
+	User          User
+	Log           *logging.SimpleLogger
+	RepoRelPath   string
+	ProjectConfig *valid.Project
+	GlobalConfig  *valid.Spec
+
+	// CommentArgs are the extra arguments appended to comment,
+	// ex. atlantis plan -- -target=resource
+	CommentArgs []string
+	Workspace   string
 }

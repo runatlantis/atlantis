@@ -87,14 +87,17 @@ func (c *DefaultClient) Version() *version.Version {
 }
 
 // RunCommandWithVersion executes the provided version of terraform with
-// the provided args in path. v is the version of terraform executable to use
-// and workspace is the workspace specified by the user commenting
-// "atlantis plan/apply {workspace}" which is set to "default" by default.
+// the provided args in path. v is the version of terraform executable to use.
+// If v is nil, will use the default version.
+// Workspace is the terraform workspace to run in. We won't switch workspaces
+// but will set the TERRAFORM_WORKSPACE environment variable.
 func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (string, error) {
 	tfExecutable := "terraform"
+	tfVersionStr := c.defaultVersion.String()
 	// if version is the same as the default, don't need to prepend the version name to the executable
-	if !v.Equal(c.defaultVersion) {
+	if v != nil && !v.Equal(c.defaultVersion) {
 		tfExecutable = fmt.Sprintf("%s%s", tfExecutable, v.String())
+		tfVersionStr = v.String()
 	}
 
 	// set environment variables
@@ -115,7 +118,7 @@ func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path st
 		// because it's probably safer for users to rely on it. Terraform might
 		// change the way TF_WORKSPACE works in the future.
 		fmt.Sprintf("WORKSPACE=%s", workspace),
-		fmt.Sprintf("ATLANTIS_TERRAFORM_VERSION=%s", v.String()),
+		fmt.Sprintf("ATLANTIS_TERRAFORM_VERSION=%s", tfVersionStr),
 		fmt.Sprintf("DIR=%s", path),
 	}
 	envVars = append(envVars, os.Environ()...)

@@ -1,5 +1,7 @@
 package valid
 
+import "github.com/hashicorp/go-version"
+
 // Spec is the atlantis yaml spec after it's been parsed and validated.
 // The raw.Spec is transformed into the ValidSpec which is then used by the
 // rest of Atlantis.
@@ -11,11 +13,38 @@ type Spec struct {
 	Workflows map[string]Workflow
 }
 
+func (s Spec) GetPlanStage(workflowName string) *Stage {
+	for name, flow := range s.Workflows {
+		if name == workflowName {
+			return flow.Plan
+		}
+	}
+	return nil
+}
+
+func (s Spec) GetApplyStage(workflowName string) *Stage {
+	for name, flow := range s.Workflows {
+		if name == workflowName {
+			return flow.Apply
+		}
+	}
+	return nil
+}
+
+func (s Spec) FindProject(dir string, workspace string) *Project {
+	for _, p := range s.Projects {
+		if p.Dir == dir && p.Workspace == workspace {
+			return &p
+		}
+	}
+	return nil
+}
+
 type Project struct {
 	Dir               string
 	Workspace         string
 	Workflow          *string
-	TerraformVersion  *string
+	TerraformVersion  *version.Version
 	Autoplan          Autoplan
 	ApplyRequirements []string
 }

@@ -36,7 +36,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/locking/boltdb"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/run"
+	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
@@ -188,23 +188,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, err
 	}
 	lockingClient := locking.NewClient(boltdb)
-	run := &run.Run{}
-	configReader := &events.ProjectConfigManager{}
 	workspaceLocker := events.NewDefaultAtlantisWorkspaceLocker()
 	workspace := &events.FileWorkspace{
 		DataDir: userConfig.DataDir,
 	}
 	projectLocker := &events.DefaultProjectLocker{
-		Locker:       lockingClient,
-		Run:          run,
-		ConfigReader: configReader,
-		Terraform:    terraformClient,
-	}
-	executionPlanner := &events.ExecutionPlanner{
-		ParserValidator:   &yaml.ParserValidator{},
-		DefaultTFVersion:  terraformClient.Version(),
-		TerraformExecutor: terraformClient,
-		ProjectFinder:     &events.DefaultProjectFinder{},
+		Locker: lockingClient,
 	}
 	underlyingRouter := mux.NewRouter()
 	router := &Router{
@@ -212,27 +201,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		LockViewRouteIDQueryParam: LockViewRouteIDQueryParam,
 		LockViewRouteName:         LockViewRouteName,
 		Underlying:                underlyingRouter,
-	}
-	applyExecutor := &events.ApplyExecutor{
-		VCSClient:         vcsClient,
-		Terraform:         terraformClient,
-		RequireApproval:   userConfig.RequireApproval,
-		Run:               run,
-		AtlantisWorkspace: workspace,
-		ProjectLocker:     projectLocker,
-		ExecutionPlanner:  executionPlanner,
-		Webhooks:          webhooksManager,
-	}
-	planExecutor := &events.PlanExecutor{
-		VCSClient:        vcsClient,
-		Terraform:        terraformClient,
-		Run:              run,
-		Workspace:        workspace,
-		ProjectLocker:    projectLocker,
-		Locker:           lockingClient,
-		ProjectFinder:    &events.DefaultProjectFinder{},
-		ExecutionPlanner: executionPlanner,
-		LockURLGenerator: router,
 	}
 	pullClosedExecutor := &events.PullClosedExecutor{
 		VCSClient: vcsClient,
@@ -252,9 +220,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GitlabUser:  userConfig.GitlabUser,
 		GitlabToken: userConfig.GitlabToken,
 	}
+	defaultTfVersion := terraformClient.Version()
 	commandHandler := &events.CommandHandler{
-		ApplyExecutor:            applyExecutor,
-		PlanExecutor:             planExecutor,
 		EventParser:              eventParser,
 		VCSClient:                vcsClient,
 		GithubPullGetter:         githubClient,
@@ -265,6 +232,35 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Logger:                   logger,
 		AllowForkPRs:             userConfig.AllowForkPRs,
 		AllowForkPRsFlag:         config.AllowForkPRsFlag,
+		PullRequestOperator: events.PullRequestOperator{
+			TerraformExecutor: terraformClient,
+			DefaultTFVersion:  defaultTfVersion,
+			ParserValidator:   &yaml.ParserValidator{},
+			ProjectFinder:     &events.DefaultProjectFinder{},
+			VCSClient:         vcsClient,
+			Workspace:         workspace,
+			ProjectOperator: events.ProjectOperator{
+				Locker:           projectLocker,
+				LockURLGenerator: router,
+				InitStepOperator: runtime.InitStepOperator{
+					TerraformExecutor: terraformClient,
+					DefaultTFVersion:  defaultTfVersion,
+				},
+				PlanStepOperator: runtime.PlanStepOperator{
+					TerraformExecutor: terraformClient,
+					DefaultTFVersion:  defaultTfVersion,
+				},
+				ApplyStepOperator: runtime.ApplyStepOperator{
+					TerraformExecutor: terraformClient,
+				},
+				RunStepOperator: runtime.RunStepOperator{},
+				ApprovalOperator: runtime.ApprovalOperator{
+					VCSClient: vcsClient,
+				},
+				Workspace: workspace,
+				Webhooks:  webhooksManager,
+			},
+		},
 	}
 	repoWhitelist := &events.RepoWhitelist{
 		Whitelist: userConfig.RepoWhitelist,

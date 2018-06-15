@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/go-ozzo/ozzo-validation"
+	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 )
 
@@ -39,9 +40,17 @@ func (p Project) Validate() error {
 		}
 		return nil
 	}
+	validTFVersion := func(value interface{}) error {
+		// Safe to dereference because this is only called if the pointer is
+		// not nil.
+		versionStr := *value.(*string)
+		_, err := version.NewVersion(versionStr)
+		return err
+	}
 	return validation.ValidateStruct(&p,
 		validation.Field(&p.Dir, validation.Required, validation.By(hasDotDot)),
 		validation.Field(&p.ApplyRequirements, validation.By(validApplyReq)),
+		validation.Field(&p.TerraformVersion, validation.By(validTFVersion)),
 	)
 }
 
@@ -56,7 +65,9 @@ func (p Project) ToValid() valid.Project {
 	}
 
 	v.Workflow = p.Workflow
-	v.TerraformVersion = p.TerraformVersion
+	if p.TerraformVersion != nil {
+		v.TerraformVersion, _ = version.NewVersion(*p.TerraformVersion)
+	}
 	if p.Autoplan == nil {
 		v.Autoplan = DefaultAutoPlan()
 	} else {

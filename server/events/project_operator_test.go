@@ -116,7 +116,7 @@ package events_test
 //	p, runner, _ := setupPlanExecutorTest(t)
 //	ctx := deepcopy.Copy(planCtx).(events.CommandContext)
 //	ctx.Log = logging.NewNoopLogger()
-//	ctx.Command.Flags = []string{"\"-target=resource\"", "\"-var\"", "\"a=b\"", "\";\"", "\"echo\"", "\"hi\""}
+//	ctx.Command.CommentArgs = []string{"\"-target=resource\"", "\"-var\"", "\"a=b\"", "\";\"", "\"echo\"", "\"hi\""}
 //
 //	When(p.VCSClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"file.tf"}, nil)
 //	When(p.Workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, "workspace")).

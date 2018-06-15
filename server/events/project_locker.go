@@ -18,8 +18,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/run"
-	"github.com/runatlantis/atlantis/server/events/terraform"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_lock.go ProjectLocker
@@ -33,15 +32,12 @@ type ProjectLocker interface {
 	// The third return value is a function that can be called to unlock the
 	// lock. It will only be set if the lock was acquired. Any errors will set
 	// error.
-	TryLock(ctx *CommandContext, project models.Project) (*TryLockResponse, error)
+	TryLock(log *logging.SimpleLogger, pull models.PullRequest, user models.User, workspace string, project models.Project) (*TryLockResponse, error)
 }
 
 // DefaultProjectLocker implements ProjectLocker.
 type DefaultProjectLocker struct {
-	Locker       locking.Locker
-	ConfigReader ProjectConfigReader
-	Terraform    terraform.Client
-	Run          run.Runner
+	Locker locking.Locker
 }
 
 // TryLockResponse is the result of trying to lock a project.
@@ -60,13 +56,12 @@ type TryLockResponse struct {
 }
 
 // TryLock implements ProjectLocker.TryLock.
-func (p *DefaultProjectLocker) TryLock(ctx *CommandContext, project models.Project) (*TryLockResponse, error) {
-	workspace := ctx.Command.Workspace
-	lockAttempt, err := p.Locker.TryLock(project, workspace, ctx.Pull, ctx.User)
+func (p *DefaultProjectLocker) TryLock(log *logging.SimpleLogger, pull models.PullRequest, user models.User, workspace string, project models.Project) (*TryLockResponse, error) {
+	lockAttempt, err := p.Locker.TryLock(project, workspace, pull, user)
 	if err != nil {
 		return nil, err
 	}
-	if !lockAttempt.LockAcquired && lockAttempt.CurrLock.Pull.Num != ctx.Pull.Num {
+	if !lockAttempt.LockAcquired && lockAttempt.CurrLock.Pull.Num != pull.Num {
 		failureMsg := fmt.Sprintf(
 			"This project is currently locked by #%d. The locking plan must be applied or discarded before future plans can execute.",
 			lockAttempt.CurrLock.Pull.Num)
@@ -75,7 +70,7 @@ func (p *DefaultProjectLocker) TryLock(ctx *CommandContext, project models.Proje
 			LockFailureReason: failureMsg,
 		}, nil
 	}
-	ctx.Log.Info("acquired lock with id %q", lockAttempt.LockKey)
+	log.Info("acquired lock with id %q", lockAttempt.LockKey)
 	return &TryLockResponse{
 		LockAcquired: true,
 		UnlockFn: func() error {

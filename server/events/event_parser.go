@@ -36,7 +36,7 @@ type Command struct {
 	// Dir is the path relative to the repo root to run the command in.
 	// Will never be an empty string and will never end in "/".
 	Dir string
-	// Flags are the extra arguments appended to comment,
+	// CommentArgs are the extra arguments appended to comment,
 	// ex. atlantis plan -- -target=resource
 	Flags     []string
 	Name      CommandName

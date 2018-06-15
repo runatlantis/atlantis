@@ -43,23 +43,17 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 
 			tfVersion, _ := version.NewVersion(c.version)
 			logger := logging.NewNoopLogger()
-			s := runtime.InitStep{
-				Meta: runtime.StepMeta{
-					Log:                   logger,
-					Workspace:             "workspace",
-					AbsolutePath:          "/path",
-					DirRelativeToRepoRoot: ".",
-					TerraformVersion:      tfVersion,
-					TerraformExecutor:     terraform,
-					ExtraCommentArgs:      []string{"comment", "args"},
-					Username:              "username",
-				},
-				ExtraArgs: []string{"extra", "args"},
+			iso := runtime.InitStepOperator{
+				TerraformExecutor: terraform,
 			}
-
 			When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 				ThenReturn("output", nil)
-			output, err := s.Run()
+			output, err := iso.Run(runtime.ProjectCommandContext{
+				Log:         logger,
+				Workspace:   "workspace",
+				AbsPath:     "/path",
+				RepoRelPath: ".",
+			}, []string{"extra", "args"})
 			Ok(t, err)
 			// Shouldn't return output since we don't print init output to PR.
 			Equals(t, "", output)

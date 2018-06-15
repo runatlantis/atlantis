@@ -53,8 +53,6 @@ type GitlabMergeRequestGetter interface {
 
 // CommandHandler is the first step when processing a comment command.
 type CommandHandler struct {
-	PlanExecutor             Executor
-	ApplyExecutor            Executor
 	VCSClient                vcs.ClientProxy
 	GithubPullGetter         GithubPullGetter
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
@@ -68,7 +66,8 @@ type CommandHandler struct {
 	// AllowForkPRsFlag is the name of the flag that controls fork PR's. We use
 	// this in our error message back to the user on a forked PR so they know
 	// how to enable this functionality.
-	AllowForkPRsFlag string
+	AllowForkPRsFlag    string
+	PullRequestOperator PullRequestOperator
 }
 
 // ExecuteCommand executes the command.
@@ -169,9 +168,13 @@ func (c *CommandHandler) run(ctx *CommandContext) {
 	var cr CommandResponse
 	switch ctx.Command.Name {
 	case Plan:
-		cr = c.PlanExecutor.Execute(ctx)
+		if ctx.Command.Autoplan {
+			cr = c.PullRequestOperator.Autoplan(ctx)
+		} else {
+			cr = c.PullRequestOperator.PlanViaComment(ctx)
+		}
 	case Apply:
-		cr = c.ApplyExecutor.Execute(ctx)
+		cr = c.PullRequestOperator.ApplyViaComment(ctx)
 	default:
 		ctx.Log.Err("failed to determine desired command, neither plan nor apply")
 	}

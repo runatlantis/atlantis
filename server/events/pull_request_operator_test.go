@@ -16,7 +16,7 @@ import (
 func TestBuildStage_NoConfigFile(t *testing.T) {
 	var defaultTFVersion *version.Version
 	var terraformExecutor runtime.TerraformExec
-	e := events.ExecutionPlanner{
+	e := events.PullRequestOperator{
 		DefaultTFVersion:  defaultTFVersion,
 		TerraformExecutor: terraformExecutor,
 	}
@@ -71,7 +71,7 @@ func TestBuildStage_NoConfigFile(t *testing.T) {
 func TestBuildStage(t *testing.T) {
 	var defaultTFVersion *version.Version
 	var terraformExecutor runtime.TerraformExec
-	e := events.ExecutionPlanner{
+	e := events.PullRequestOperator{
 		DefaultTFVersion:  defaultTFVersion,
 		TerraformExecutor: terraformExecutor,
 	}
