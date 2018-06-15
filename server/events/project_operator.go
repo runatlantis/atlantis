@@ -22,12 +22,17 @@ import (
 	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_lock_url_generator.go LockURLGenerator
 
 type LockURLGenerator interface {
 	GenerateLockURL(lockID string) string
+}
+
+type WebhooksSender interface {
+	Send(log *logging.SimpleLogger, result webhooks.ApplyResult) error
 }
 
 // PlanSuccess is the result of a successful plan.
@@ -45,7 +50,7 @@ type ProjectOperator struct {
 	RunStepOperator   runtime.RunStepOperator
 	ApprovalOperator  runtime.ApprovalOperator
 	Workspace         AtlantisWorkspace
-	Webhooks          *webhooks.MultiWebhookSender
+	Webhooks          WebhooksSender
 }
 
 func (p *ProjectOperator) Plan(ctx models.ProjectCommandContext, projAbsPathPtr *string) ProjectResult {

@@ -55,6 +55,7 @@ type EventsController struct {
 	AtlantisGithubUser models.User
 	// AtlantisGitlabUser is the user that atlantis is running as for Gitlab.
 	AtlantisGitlabUser models.User
+	TestingMode        bool
 }
 
 // Post handles POST webhook requests.
@@ -254,11 +255,16 @@ func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo mo
 		return
 	}
 
-	// Respond with success and then actually execute the command asynchronously.
-	// We use a goroutine so that this function returns and the connection is
-	// closed.
 	fmt.Fprintln(w, "Processing...")
-	go e.CommandRunner.ExecuteCommand(baseRepo, headRepo, user, pullNum, parseResult.Command)
+	if !e.TestingMode {
+		// Respond with success and then actually execute the command asynchronously.
+		// We use a goroutine so that this function returns and the connection is
+		// closed.
+		go e.CommandRunner.ExecuteCommand(baseRepo, headRepo, user, pullNum, parseResult.Command)
+	} else {
+		// When testing we want to wait for everything to complete.
+		e.CommandRunner.ExecuteCommand(baseRepo, headRepo, user, pullNum, parseResult.Command)
+	}
 }
 
 // HandleGitlabMergeRequestEvent will delete any locks associated with the pull
