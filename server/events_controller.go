@@ -177,7 +177,12 @@ func (e *EventsController) handlePullRequestEvent(w http.ResponseWriter, baseRep
 		// workspace to '*' to indicate that all applicable dirs and workspaces
 		// should be planned.
 		autoplanCmd := events.NewCommand("*", nil, events.Plan, false, "*", true)
-		go e.CommandRunner.ExecuteCommand(baseRepo, headRepo, user, pull.Num, autoplanCmd)
+		if !e.TestingMode {
+			go e.CommandRunner.ExecuteCommand(baseRepo, headRepo, user, pull.Num, autoplanCmd)
+		} else {
+			// When testing we want to wait for everything to complete.
+			e.CommandRunner.ExecuteCommand(baseRepo, headRepo, user, pull.Num, autoplanCmd)
+		}
 		return
 	case ClosedPullEvent:
 		// If the pull request was closed, we delete locks.

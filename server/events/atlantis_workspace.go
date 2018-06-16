@@ -42,6 +42,9 @@ type AtlantisWorkspace interface {
 // FileWorkspace implements AtlantisWorkspace with the file system.
 type FileWorkspace struct {
 	DataDir string
+	// TestingOverrideCloneURL can be used during testing to override the URL
+	// that is cloned. If it's empty then we clone normally.
+	TestingOverrideCloneURL string
 }
 
 // Clone git clones headRepo, checks out the branch and then returns the absolute
@@ -68,7 +71,11 @@ func (w *FileWorkspace) Clone(
 	}
 
 	log.Info("git cloning %q into %q", headRepo.SanitizedCloneURL, cloneDir)
-	cloneCmd := exec.Command("git", "clone", headRepo.CloneURL, cloneDir) // #nosec
+	cloneURL := headRepo.CloneURL
+	if w.TestingOverrideCloneURL != "" {
+		cloneURL = w.TestingOverrideCloneURL
+	}
+	cloneCmd := exec.Command("git", "clone", cloneURL, cloneDir) // #nosec
 	if output, err := cloneCmd.CombinedOutput(); err != nil {
 		return "", errors.Wrapf(err, "cloning %s: %s", headRepo.SanitizedCloneURL, string(output))
 	}

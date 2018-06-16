@@ -6,8 +6,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -29,20 +29,111 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-func Test(t *testing.T) {
+/*
+flows:
+- pull request opened autoplan
+- comment to apply
+
+github/gitlab
+
+locking
+
+merging pull requests
+
+different repo organizations
+
+atlantis.yaml
+
+*/
+func TestGitHubWorkflow(t *testing.T) {
 	RegisterMockTestingT(t)
 
-	// Config.
+	cases := []struct {
+		Description string
+		// RepoDir is relative to testfixtures/test-repos.
+		RepoDir                string
+		ModifiedFiles          []string
+		ExpAutoplanCommentFile string
+		ExpMergeCommentFile    string
+		CommentAndReplies      []string
+	}{
+		{
+			Description:            "simple",
+			RepoDir:                "simple",
+			ModifiedFiles:          []string{"main.tf"},
+			ExpAutoplanCommentFile: "exp-output-autoplan.txt",
+			CommentAndReplies: []string{
+				"atlantis apply", "exp-output-apply.txt",
+			},
+			ExpMergeCommentFile: "exp-output-merge.txt",
+		},
+	}
+	for _, c := range cases {
+		ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t)
+		t.Run(c.Description, func(t *testing.T) {
+			// Set the repo to be cloned through the testing backdoor.
+			repoDir, err := filepath.Abs(filepath.Join("testfixtures", "test-repos", c.RepoDir))
+			Ok(t, err)
+			atlantisWorkspace.TestingOverrideCloneURL = fmt.Sprintf("file://%s", repoDir)
+
+			// Setup test dependencies.
+			w := httptest.NewRecorder()
+			When(githubGetter.GetPullRequest(AnyRepo(), AnyInt())).ThenReturn(GitHubPullRequestParsed(), nil)
+			When(vcsClient.GetModifiedFiles(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
+
+			// First, send the open pull request event and trigger an autoplan.
+			pullOpenedReq := GitHubPullRequestOpenedEvent(t)
+			ctrl.Post(w, pullOpenedReq)
+			responseContains(t, w, 200, "Processing...")
+			_, _, autoplanComment := vcsClient.VerifyWasCalledOnce().CreateComment(AnyRepo(), AnyInt(), AnyString()).GetCapturedArguments()
+			exp, err := ioutil.ReadFile(filepath.Join(repoDir, c.ExpAutoplanCommentFile))
+			Ok(t, err)
+			Equals(t, string(exp), autoplanComment)
+
+			// Now send any other comments.
+			for i := 0; i < len(c.CommentAndReplies); i += 2 {
+				comment := c.CommentAndReplies[i]
+				expOutputFile := c.CommentAndReplies[i+1]
+
+				commentReq := GitHubCommentEvent(t, comment)
+				w = httptest.NewRecorder()
+				ctrl.Post(w, commentReq)
+				responseContains(t, w, 200, "Processing...")
+				_, _, autoplanComment = vcsClient.VerifyWasCalled(Twice()).CreateComment(AnyRepo(), AnyInt(), AnyString()).GetCapturedArguments()
+
+				exp, err = ioutil.ReadFile(filepath.Join(repoDir, expOutputFile))
+				Ok(t, err)
+				// Replace all 'ID: 1111818181' strings with * so we can do a comparison.
+				idRegex := regexp.MustCompile(`\(ID: [0-9]+\)`)
+				autoplanComment = idRegex.ReplaceAllString(autoplanComment, "(ID: ******************)")
+				Equals(t, string(exp), autoplanComment)
+			}
+
+			// Finally, send the pull request merged event.
+			pullClosedReq := GitHubPullRequestClosedEvent(t)
+			w = httptest.NewRecorder()
+			ctrl.Post(w, pullClosedReq)
+			responseContains(t, w, 200, "Pull request cleaned successfully")
+			_, _, pullClosedComment := vcsClient.VerifyWasCalled(Times(3)).CreateComment(AnyRepo(), AnyInt(), AnyString()).GetCapturedArguments()
+			exp, err = ioutil.ReadFile(filepath.Join(repoDir, c.ExpMergeCommentFile))
+			Ok(t, err)
+			Equals(t, string(exp), pullClosedComment)
+		})
+	}
+}
+
+func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClientProxy, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
 	allowForkPRs := false
 	dataDir, cleanup := TempDir(t)
 	defer cleanup()
+	testRepoDir, err := filepath.Abs("testfixtures/test-repos/simple")
+	Ok(t, err)
 
 	// Mocks.
 	e2eVCSClient := vcsmocks.NewMockClientProxy()
 	e2eStatusUpdater := mocks.NewMockCommitStatusUpdater()
 	e2eGithubGetter := mocks.NewMockGithubPullGetter()
 	e2eGitlabGetter := mocks.NewMockGitlabMergeRequestGetter()
-	e2eWorkspace := mocks.NewMockAtlantisWorkspace()
 
 	// Real dependencies.
 	logger := logging.NewSimpleLogger("server", nil, true, logging.Debug)
@@ -66,6 +157,10 @@ func Test(t *testing.T) {
 	projectLocker := &events.DefaultProjectLocker{
 		Locker: lockingClient,
 	}
+	atlantisWorkspace := &events.FileWorkspace{
+		DataDir:                 dataDir,
+		TestingOverrideCloneURL: testRepoDir,
+	}
 
 	defaultTFVersion := terraformClient.Version()
 	commandHandler := &events.CommandHandler{
@@ -85,7 +180,7 @@ func Test(t *testing.T) {
 			ParserValidator:   &yaml.ParserValidator{},
 			ProjectFinder:     &events.DefaultProjectFinder{},
 			VCSClient:         e2eVCSClient,
-			Workspace:         e2eWorkspace,
+			Workspace:         atlantisWorkspace,
 			ProjectOperator: events.ProjectOperator{
 				Locker:           projectLocker,
 				LockURLGenerator: &mockLockURLGenerator{},
@@ -104,16 +199,20 @@ func Test(t *testing.T) {
 				ApprovalOperator: runtime.ApprovalOperator{
 					VCSClient: e2eVCSClient,
 				},
-				Workspace: e2eWorkspace,
+				Workspace: atlantisWorkspace,
 				Webhooks:  &mockWebhookSender{},
 			},
 		},
 	}
 
 	ctrl := server.EventsController{
-		TestingMode:            true,
-		CommandRunner:          commandHandler,
-		PullCleaner:            nil,
+		TestingMode:   true,
+		CommandRunner: commandHandler,
+		PullCleaner: &events.PullClosedExecutor{
+			Locker:    lockingClient,
+			VCSClient: e2eVCSClient,
+			Workspace: atlantisWorkspace,
+		},
 		Logger:                 logger,
 		Parser:                 eventParser,
 		CommentParser:          commentParser,
@@ -133,32 +232,7 @@ func Test(t *testing.T) {
 			Username: "atlantisbot",
 		},
 	}
-
-	// Test GitHub Post
-	req := GitHubCommentEvent(t, "atlantis plan")
-	w := httptest.NewRecorder()
-	When(e2eGithubGetter.GetPullRequest(AnyRepo(), AnyInt())).ThenReturn(GitHubPullRequestParsed(), nil)
-	testRepoDir, err := filepath.Abs("testfixtures/test-repos/simple")
-	Ok(t, err)
-	When(e2eWorkspace.Clone(matchers.AnyPtrToLoggingSimpleLogger(), AnyRepo(), AnyRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(testRepoDir, nil)
-	// Clean up .terraform and plan files when we're done.
-	defer func() {
-		os.RemoveAll(filepath.Join(testRepoDir, ".terraform"))
-		planFiles, _ := filepath.Glob(testRepoDir + "/*.tfplan")
-		for _, file := range planFiles {
-			os.Remove(file)
-		}
-	}()
-
-	ctrl.Post(w, req)
-	responseContains(t, w, 200, "Processing...")
-	_, _, comment := e2eVCSClient.VerifyWasCalledOnce().CreateComment(AnyRepo(), AnyInt(), AnyString()).GetCapturedArguments()
-
-	exp, err := ioutil.ReadFile(filepath.Join(testRepoDir, "exp-output-atlantis-plan.txt"))
-	fmt.Println((string(exp)))
-	Ok(t, err)
-
-	Equals(t, string(exp), comment)
+	return ctrl, e2eVCSClient, e2eGithubGetter, atlantisWorkspace
 }
 
 type mockLockURLGenerator struct{}
@@ -181,6 +255,26 @@ func GitHubCommentEvent(t *testing.T, comment string) *http.Request {
 	Ok(t, err)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(githubHeader, "issue_comment")
+	return req
+}
+
+func GitHubPullRequestOpenedEvent(t *testing.T) *http.Request {
+	requestJSON, err := ioutil.ReadFile(filepath.Join("testfixtures", "githubPullRequestOpenedEvent.json"))
+	Ok(t, err)
+	req, err := http.NewRequest("POST", "/events", bytes.NewBuffer(requestJSON))
+	Ok(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(githubHeader, "pull_request")
+	return req
+}
+
+func GitHubPullRequestClosedEvent(t *testing.T) *http.Request {
+	requestJSON, err := ioutil.ReadFile(filepath.Join("testfixtures", "githubPullRequestClosedEvent.json"))
+	Ok(t, err)
+	req, err := http.NewRequest("POST", "/events", bytes.NewBuffer(requestJSON))
+	Ok(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(githubHeader, "pull_request")
 	return req
 }
 
