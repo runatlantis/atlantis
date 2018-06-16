@@ -372,6 +372,7 @@ func TestExecute_Flags(t *testing.T) {
 		cmd.GitlabWebHookSecret: "gitlab-secret",
 		cmd.LogLevelFlag:        "debug",
 		cmd.PortFlag:            8181,
+		cmd.RepoSubdirFlag:      "/dir",
 		cmd.RepoWhitelistFlag:   "github.com/runatlantis/atlantis",
 		cmd.RequireApprovalFlag: true,
 		cmd.SSLCertFileFlag:     "cert-file",
@@ -393,6 +394,7 @@ func TestExecute_Flags(t *testing.T) {
 	Equals(t, "gitlab-secret", passedConfig.GitlabWebHookSecret)
 	Equals(t, "debug", passedConfig.LogLevel)
 	Equals(t, 8181, passedConfig.Port)
+	Equals(t, "/dir", passedConfig.RepoSubdir)
 	Equals(t, "github.com/runatlantis/atlantis", passedConfig.RepoWhitelist)
 	Equals(t, true, passedConfig.RequireApproval)
 	Equals(t, "cert-file", passedConfig.SSLCertFile)
@@ -531,6 +533,7 @@ gitlab-user: "gitlab-user"
 gitlab-webhook-secret: "gitlab-secret"
 log-level: "debug"
 port: 8181
+repo-subdir: 8181
 repo-whitelist: "github.com/runatlantis/atlantis"
 require-approval: true
 ssl-cert-file: cert-file
@@ -552,6 +555,7 @@ ssl-key-file: key-file
 		cmd.GitlabWebHookSecret: "override-gitlab-webhook-secret",
 		cmd.LogLevelFlag:        "info",
 		cmd.PortFlag:            8282,
+		cmd.RepoSubdirFlag:      "/override-dir",
 		cmd.RepoWhitelistFlag:   "override,override",
 		cmd.RequireApprovalFlag: false,
 		cmd.SSLCertFileFlag:     "override-cert-file",
@@ -572,6 +576,7 @@ ssl-key-file: key-file
 	Equals(t, "override-gitlab-webhook-secret", passedConfig.GitlabWebHookSecret)
 	Equals(t, "info", passedConfig.LogLevel)
 	Equals(t, 8282, passedConfig.Port)
+	Equals(t, "/override-dir", passedConfig.RepoSubdir)
 	Equals(t, "override,override", passedConfig.RepoWhitelist)
 	Equals(t, false, passedConfig.RequireApproval)
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
@@ -595,6 +600,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		"GITLAB_WEBHOOK_SECRET": "gitlab-webhook-secret",
 		"LOG_LEVEL":             "debug",
 		"PORT":                  "8181",
+		"REPO_SUBDIR":           "/dir",
 		"REPO_WHITELIST":        "*",
 		"REQUIRE_APPROVAL":      "true",
 		"SSL_CERT_FILE":         "cert-file",
@@ -617,6 +623,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		cmd.GitlabWebHookSecret: "override-gitlab-webhook-secret",
 		cmd.LogLevelFlag:        "info",
 		cmd.PortFlag:            8282,
+		cmd.RepoSubdirFlag:      "/override-dir",
 		cmd.RepoWhitelistFlag:   "override,override",
 		cmd.RequireApprovalFlag: false,
 		cmd.SSLCertFileFlag:     "override-cert-file",
@@ -638,6 +645,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	Equals(t, "override-gitlab-webhook-secret", passedConfig.GitlabWebHookSecret)
 	Equals(t, "info", passedConfig.LogLevel)
 	Equals(t, 8282, passedConfig.Port)
+	Equals(t, "/override-dir", passedConfig.RepoSubdir)
 	Equals(t, "override,override", passedConfig.RepoWhitelist)
 	Equals(t, false, passedConfig.RequireApproval)
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
