@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -72,8 +73,8 @@ func TestGitHubWorkflow(t *testing.T) {
 		ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t)
 		t.Run(c.Description, func(t *testing.T) {
 			// Set the repo to be cloned through the testing backdoor.
-			repoDir, err := filepath.Abs(filepath.Join("testfixtures", "test-repos", c.RepoDir))
-			Ok(t, err)
+			repoDir, cleanup := initializeRepo(t, c.RepoDir)
+			defer cleanup()
 			atlantisWorkspace.TestingOverrideCloneURL = fmt.Sprintf("file://%s", repoDir)
 
 			// Setup test dependencies.
@@ -99,14 +100,14 @@ func TestGitHubWorkflow(t *testing.T) {
 				w = httptest.NewRecorder()
 				ctrl.Post(w, commentReq)
 				responseContains(t, w, 200, "Processing...")
-				_, _, autoplanComment = vcsClient.VerifyWasCalled(Twice()).CreateComment(AnyRepo(), AnyInt(), AnyString()).GetCapturedArguments()
+				_, _, atlantisComment := vcsClient.VerifyWasCalled(Twice()).CreateComment(AnyRepo(), AnyInt(), AnyString()).GetCapturedArguments()
 
 				exp, err = ioutil.ReadFile(filepath.Join(repoDir, expOutputFile))
 				Ok(t, err)
 				// Replace all 'ID: 1111818181' strings with * so we can do a comparison.
 				idRegex := regexp.MustCompile(`\(ID: [0-9]+\)`)
-				autoplanComment = idRegex.ReplaceAllString(autoplanComment, "(ID: ******************)")
-				Equals(t, string(exp), autoplanComment)
+				atlantisComment = idRegex.ReplaceAllString(atlantisComment, "(ID: ******************)")
+				Equals(t, string(exp), atlantisComment)
 			}
 
 			// Finally, send the pull request merged event.
@@ -301,4 +302,36 @@ func GitHubPullRequestParsed() *github.PullRequest {
 			Login: github.String("atlantisbot"),
 		},
 	}
+}
+
+// initializeRepo copies the repo data from testfixtures and initializes a new
+// git repo in a temp directory. It returns that directory and a function
+// to run in a defer that will delete the dir.
+// The purpose of this function is to create a real git repository with a branch
+// called 'branch' from the files under repoDir. This is so we can check in
+// those files normally without needing a .git directory.
+func initializeRepo(t *testing.T, repoDir string) (string, func()) {
+	originRepo, err := filepath.Abs(filepath.Join("testfixtures", "test-repos", repoDir))
+	Ok(t, err)
+
+	// Copy the files to the temp dir.
+	destDir, cleanup := TempDir(t)
+	runCmd(t, "", "cp", "-r", fmt.Sprintf("%s/.", originRepo), destDir)
+
+	// Initialize the git repo.
+	runCmd(t, destDir, "git", "init")
+	runCmd(t, destDir, "git", "add", ".gitkeep")
+	runCmd(t, destDir, "git", "commit", "-m", "initial commit")
+	runCmd(t, destDir, "git", "checkout", "-b", "branch")
+	runCmd(t, destDir, "git", "add", ".")
+	runCmd(t, destDir, "git", "commit", "-am", "branch commit")
+
+	return destDir, cleanup
+}
+
+func runCmd(t *testing.T, dir string, name string, args ...string) {
+	cpCmd := exec.Command(name, args...)
+	cpCmd.Dir = dir
+	cpOut, err := cpCmd.CombinedOutput()
+	Assert(t, err == nil, "err running %q: %s", strings.Join(append([]string{name}, args...), " "), cpOut)
 }
