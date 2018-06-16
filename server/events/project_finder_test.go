@@ -81,11 +81,13 @@ func TestDetermineProjects(t *testing.T) {
 		files           []string
 		expProjectPaths []string
 		repoDir         string
+		restricPath     string
 	}{
 		{
 			"If no files were modified then should return an empty list",
 			nil,
 			nil,
+			"",
 			"",
 		},
 		{
@@ -93,47 +95,55 @@ func TestDetermineProjects(t *testing.T) {
 			[]string{"non-tf"},
 			nil,
 			"",
+			"",
 		},
 		{
 			"Should plan in the parent directory from modules if that dir has a main.tf",
 			[]string{"project1/modules/main.tf"},
 			[]string{"project1"},
 			nestedModules1,
+			"",
 		},
 		{
 			"Should plan in the parent directory from modules if that dir has a main.tf",
 			[]string{"modules/main.tf"},
 			[]string{"."},
 			nestedModules2,
+			"",
 		},
 		{
 			"Should plan in the parent directory from modules when module is in a subdir if that dir has a main.tf",
 			[]string{"modules/subdir/main.tf"},
 			[]string{"."},
 			nestedModules2,
+			"",
 		},
 		{
 			"Should not plan in the parent directory from modules if that dir does not have a main.tf",
 			[]string{"modules/main.tf"},
 			[]string{},
 			topLevelModules,
+			"",
 		},
 		{
 			"Should not plan in the parent directory from modules if that dir does not have a main.tf",
 			[]string{"modules/main.tf", "project1/main.tf"},
 			[]string{"project1"},
 			topLevelModules,
-		},
-		{
-			"Should ignore tfstate files and return an empty list",
-			[]string{"terraform.tfstate", "terraform.tfstate.backup", "parent/terraform.tfstate", "parent/terraform.tfstate.backup"},
-			nil,
 			"",
 		},
 		{
 			"Should ignore tfstate files and return an empty list",
 			[]string{"terraform.tfstate", "terraform.tfstate.backup", "parent/terraform.tfstate", "parent/terraform.tfstate.backup"},
 			nil,
+			"",
+			"",
+		},
+		{
+			"Should ignore tfstate files and return an empty list",
+			[]string{"terraform.tfstate", "terraform.tfstate.backup", "parent/terraform.tfstate", "parent/terraform.tfstate.backup"},
+			nil,
+			"",
 			"",
 		},
 		{
@@ -141,11 +151,13 @@ func TestDetermineProjects(t *testing.T) {
 			[]string{"a.tf"},
 			[]string{"."},
 			"",
+			"",
 		},
 		{
 			"Should return directory when changed file is in a dir",
 			[]string{"parent/a.tf"},
 			[]string{"parent"},
+			"",
 			"",
 		},
 		{
@@ -153,17 +165,26 @@ func TestDetermineProjects(t *testing.T) {
 			[]string{"env/a.tfvars"},
 			[]string{"."},
 			"",
+			"",
 		},
 		{
 			"Should de-duplicate when multiple files changed in the same dir",
 			[]string{"root.tf", "env/env.tfvars", "parent/parent.tf", "parent/parent2.tf", "parent/child/child.tf", "parent/child/env/env.tfvars"},
 			[]string{".", "parent", "parent/child"},
 			"",
+			"",
+		},
+		{
+			"Should de-duplicate when multiple files changed in the same dir",
+			[]string{"outscope/main.tf", "filter/child/main.tf", "filter/child1/main.tf", "filter/child2/main.tf", "filter/childout/main.tf"},
+			[]string{"filter/child1", "filter/child2"},
+			"",
+			"filter/(child1)|(child2)",
 		},
 	}
 	for _, c := range cases {
 		t.Log(c.description)
-		projects := m.DetermineProjects(noopLogger, c.files, modifiedRepo, c.repoDir)
+		projects := m.DetermineProjects(noopLogger, c.files, c.restricPath, modifiedRepo, c.repoDir)
 
 		// Extract the paths from the projects. We use a slice here instead of a
 		// map so we can test whether there are duplicates returned.

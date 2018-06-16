@@ -46,6 +46,7 @@ const (
 	GitlabWebHookSecret = "gitlab-webhook-secret"
 	LogLevelFlag        = "log-level"
 	PortFlag            = "port"
+	RepoSubdirFlag      = "repo-subdir"
 	RepoWhitelistFlag   = "repo-whitelist"
 	RequireApprovalFlag = "require-approval"
 	SSLCertFileFlag     = "ssl-cert-file"
@@ -126,6 +127,11 @@ var stringFlags = []stringFlag{
 		description: "Comma separated list of repositories that Atlantis will operate on. " +
 			"The format is {hostname}/{owner}/{repo}, ex. github.com/runatlantis/atlantis. '*' matches any characters until the next comma and can be used for example to whitelist " +
 			"all repos: '*' (not recommended), an entire hostname: 'internalgithub.com/*' or an organization: 'github.com/runatlantis/*'.",
+	},
+	{
+		name:         RepoSubdirFlag,
+		description:  "Optional subdirectory inside the repository. to filter the modifications only from this particular subdirectory. It supports regular expression syntax.",
+		defaultValue: "",
 	},
 	{
 		name:        SSLCertFileFlag,

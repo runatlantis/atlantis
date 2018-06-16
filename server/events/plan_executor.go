@@ -45,6 +45,7 @@ type PlanExecutor struct {
 	Terraform         terraform.Client
 	Locker            locking.Locker
 	LockURL           func(id string) (url string)
+	RepoSubdir        string
 	Run               run.Runner
 	Workspace         AtlantisWorkspace
 	ProjectPreExecute ProjectPreExecutor
@@ -79,7 +80,7 @@ func (p *PlanExecutor) Execute(ctx *CommandContext) CommandResponse {
 			return CommandResponse{Error: errors.Wrap(err, "getting modified files")}
 		}
 		ctx.Log.Info("found %d files modified in this pull request", len(modifiedFiles))
-		projects = p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.BaseRepo.FullName, cloneDir)
+		projects = p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, p.RepoSubdir, ctx.BaseRepo.FullName, cloneDir)
 		if len(projects) == 0 {
 			return CommandResponse{Failure: "No Terraform files were modified."}
 		}

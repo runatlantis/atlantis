@@ -17,6 +17,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -29,7 +30,7 @@ import (
 type ProjectFinder interface {
 	// DetermineProjects returns the list of projects that were modified based on
 	// the modifiedFiles. The list will be de-duplicated.
-	DetermineProjects(log *logging.SimpleLogger, modifiedFiles []string, repoFullName string, repoDir string) []models.Project
+	DetermineProjects(log *logging.SimpleLogger, modifiedFiles []string, restrictSubDir string, repoFullName string, repoDir string) []models.Project
 }
 
 // DefaultProjectFinder implements ProjectFinder.
@@ -39,10 +40,10 @@ var excludeList = []string{"terraform.tfstate", "terraform.tfstate.backup"}
 
 // DetermineProjects returns the list of projects that were modified based on
 // the modifiedFiles. The list will be de-duplicated.
-func (p *DefaultProjectFinder) DetermineProjects(log *logging.SimpleLogger, modifiedFiles []string, repoFullName string, repoDir string) []models.Project {
+func (p *DefaultProjectFinder) DetermineProjects(log *logging.SimpleLogger, modifiedFiles []string, restrictSubDir string, repoFullName string, repoDir string) []models.Project {
 	var projects []models.Project
 
-	modifiedTerraformFiles := p.filterToTerraform(modifiedFiles)
+	modifiedTerraformFiles := p.filterToTerraform(modifiedFiles, restrictSubDir)
 	if len(modifiedTerraformFiles) == 0 {
 		return projects
 	}
@@ -65,11 +66,13 @@ func (p *DefaultProjectFinder) DetermineProjects(log *logging.SimpleLogger, modi
 	return projects
 }
 
-func (p *DefaultProjectFinder) filterToTerraform(files []string) []string {
+func (p *DefaultProjectFinder) filterToTerraform(files []string, restrictSubDir string) []string {
 	var filtered []string
 	for _, fileName := range files {
-		if !p.isInExcludeList(fileName) && strings.Contains(fileName, ".tf") {
-			filtered = append(filtered, fileName)
+		if matched, err := regexp.MatchString(restrictSubDir, fileName); matched && err == nil {
+			if !p.isInExcludeList(fileName) && strings.Contains(fileName, ".tf") {
+				filtered = append(filtered, fileName)
+			}
 		}
 	}
 	return filtered
