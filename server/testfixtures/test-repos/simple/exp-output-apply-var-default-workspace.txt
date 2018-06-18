@@ -7,7 +7,7 @@ Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
 
 Outputs:
 
-var = default
+var = default_workspace
 workspace = default
 
 ```

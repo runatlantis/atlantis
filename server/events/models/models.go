@@ -163,6 +163,10 @@ type Project struct {
 	Path string
 }
 
+func (p Project) String() string {
+	return fmt.Sprintf("repofullname=%s path=%s", p.RepoFullName, p.Path)
+}
+
 // Plan is the result of running an Atlantis plan command.
 // This model is used to represent a plan on disk.
 type Plan struct {

@@ -62,10 +62,12 @@ func (p *ProjectOperator) Plan(ctx models.ProjectCommandContext, projAbsPathPtr 
 	if !lockAttempt.LockAcquired {
 		return ProjectResult{Failure: lockAttempt.LockFailureReason}
 	}
+	ctx.Log.Debug("acquired lock for project")
 
 	// Ensure project has been cloned.
 	var projAbsPath string
 	if projAbsPathPtr == nil {
+		ctx.Log.Debug("project has not yet been cloned")
 		repoDir, err := p.Workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 		if err != nil {
 			if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
@@ -74,15 +76,19 @@ func (p *ProjectOperator) Plan(ctx models.ProjectCommandContext, projAbsPathPtr 
 			return ProjectResult{Error: err}
 		}
 		projAbsPath = filepath.Join(repoDir, ctx.RepoRelPath)
+		ctx.Log.Debug("project successfully cloned to %q", projAbsPath)
 	} else {
 		projAbsPath = *projAbsPathPtr
+		ctx.Log.Debug("project was already cloned to %q", projAbsPath)
 	}
 
 	// Use default stage unless another workflow is defined in config
 	stage := p.defaultPlanStage()
 	if ctx.ProjectConfig != nil && ctx.ProjectConfig.Workflow != nil {
+		ctx.Log.Debug("project configured to use workflow %q", *ctx.ProjectConfig.Workflow)
 		configuredStage := ctx.GlobalConfig.GetPlanStage(*ctx.ProjectConfig.Workflow)
 		if configuredStage != nil {
+			ctx.Log.Debug("project will use the configured stage for that workflow")
 			stage = *configuredStage
 		}
 	}

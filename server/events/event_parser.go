@@ -14,8 +14,10 @@
 package events
 
 import (
+	"fmt"
 	"path"
 	"regexp"
+	"strings"
 
 	"github.com/google/go-github/github"
 	"github.com/lkysow/go-gitlab"
@@ -45,6 +47,10 @@ type Command struct {
 	// Autoplan is true if the command is a plan command being executed in an
 	// attempt to automatically run plan.
 	Autoplan bool
+}
+
+func (c Command) String() string {
+	return fmt.Sprintf("command=%q verbose=%t dir=%q workspace=%q autoplan=%t flags=%q", c.Name.String(), c.Verbose, c.Dir, c.Workspace, c.Autoplan, strings.Join(c.Flags, ","))
 }
 
 // NewCommand constructs a Command, setting all missing fields to defaults.

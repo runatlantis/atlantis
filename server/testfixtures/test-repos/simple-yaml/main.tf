@@ -1,5 +1,5 @@
 resource "null_resource" "simple" {
-  count = 1
+  count = "1"
 }
 
 variable "var" {

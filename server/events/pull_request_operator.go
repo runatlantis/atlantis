@@ -4,7 +4,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/docker/docker/pkg/fileutils"
 	"github.com/hashicorp/go-version"
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/yaml"
@@ -43,17 +45,24 @@ func (p *DefaultPullRequestOperator) Autoplan(ctx *CommandContext) CommandRespon
 	}
 
 	// Parse config file if it exists.
+	ctx.Log.Debug("parsing config file")
 	config, err := p.ParserValidator.ReadConfig(repoDir)
 	if err != nil && !os.IsNotExist(err) {
 		return CommandResponse{Error: err}
 	}
 	noAtlantisYAML := os.IsNotExist(err)
+	if noAtlantisYAML {
+		ctx.Log.Info("found no %s file", yaml.AtlantisYAMLFilename)
+	} else {
+		ctx.Log.Info("successfully parsed %s file", yaml.AtlantisYAMLFilename)
+	}
 
 	// We'll need the list of modified files.
 	modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.BaseRepo, ctx.Pull)
 	if err != nil {
 		return CommandResponse{Error: err}
 	}
+	ctx.Log.Debug("%d files were modified in this pull request", len(modifiedFiles))
 
 	// Prepare the project contexts so the ProjectOperator can execute.
 	var projCtxs []models.ProjectCommandContext
@@ -62,6 +71,7 @@ func (p *DefaultPullRequestOperator) Autoplan(ctx *CommandContext) CommandRespon
 	// was modified in the pull request.
 	if noAtlantisYAML {
 		modifiedProjects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.BaseRepo.FullName, repoDir)
+		ctx.Log.Info("automatically determined that there were %d projects modified in this pull request: %s", len(modifiedProjects), modifiedProjects)
 		for _, mp := range modifiedProjects {
 			projCtxs = append(projCtxs, models.ProjectCommandContext{
 				BaseRepo:      ctx.BaseRepo,
@@ -79,8 +89,16 @@ func (p *DefaultPullRequestOperator) Autoplan(ctx *CommandContext) CommandRespon
 	} else {
 		// Otherwise, we use the projects that match the WhenModified fields
 		// in the config file.
-		matchingProjects := p.matchingProjects(modifiedFiles, config)
-		for _, mp := range matchingProjects {
+		matchingProjects, err := p.matchingProjects(ctx.Log, modifiedFiles, config)
+		if err != nil {
+			return CommandResponse{Error: err}
+		}
+		ctx.Log.Info("%d projects are to be autoplanned based on their when_modified config", len(matchingProjects))
+
+		// Use for i instead of range because need to get the pointer to the
+		// project config.
+		for i := 0; i < len(matchingProjects); i++ {
+			mp := matchingProjects[i]
 			projCtxs = append(projCtxs, models.ProjectCommandContext{
 				BaseRepo:      ctx.BaseRepo,
 				HeadRepo:      ctx.HeadRepo,
@@ -193,9 +211,41 @@ func (p *DefaultPullRequestOperator) ApplyViaComment(ctx *CommandContext) Comman
 
 // matchingProjects returns the list of projects whose WhenModified fields match
 // any of the modifiedFiles.
-func (p *DefaultPullRequestOperator) matchingProjects(modifiedFiles []string, config valid.Spec) []valid.Project {
-	//todo
-	// match the modified files against the config
-	// remember the modified_files paths are relative to the project paths
-	return nil
+func (p *DefaultPullRequestOperator) matchingProjects(log *logging.SimpleLogger, modifiedFiles []string, config valid.Spec) ([]valid.Project, error) {
+	var projects []valid.Project
+	for _, project := range config.Projects {
+		log.Debug("checking if project at dir %q workspace %q was modified", project.Dir, project.Workspace)
+		if !project.Autoplan.Enabled {
+			log.Debug("autoplan disabled, ignoring")
+			continue
+		}
+		// Prepend project dir to when modified patterns because the patterns
+		// are relative to the project dirs but our list of modified files is
+		// relative to the repo root.
+		var whenModifiedRelToRepoRoot []string
+		for _, wm := range project.Autoplan.WhenModified {
+			whenModifiedRelToRepoRoot = append(whenModifiedRelToRepoRoot, filepath.Join(project.Dir, wm))
+		}
+		pm, err := fileutils.NewPatternMatcher(whenModifiedRelToRepoRoot)
+		if err != nil {
+			return nil, errors.Wrapf(err, "matching modified files with patterns: %v", project.Autoplan.WhenModified)
+		}
+
+		// If any of the modified files matches the pattern then this project is
+		// considered modified.
+		for _, file := range modifiedFiles {
+			match, err := pm.Matches(file)
+			if err != nil {
+				log.Debug("match err for file %q: %s", file, err)
+				continue
+			}
+			if match {
+				log.Debug("file %q matched pattern", file)
+				projects = append(projects, project)
+				break
+			}
+		}
+	}
+	// todo: check if dir is deleted though
+	return projects, nil
 }

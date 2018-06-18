@@ -150,6 +150,7 @@ func (c *CommandHandler) run(ctx *CommandContext) {
 		return
 	}
 
+	ctx.Log.Debug("updating commit status to pending")
 	if err := c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, vcs.Pending, ctx.Command); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
@@ -163,6 +164,7 @@ func (c *CommandHandler) run(ctx *CommandContext) {
 		c.updatePull(ctx, CommandResponse{Failure: errMsg})
 		return
 	}
+	ctx.Log.Debug("successfully acquired workspace lock")
 	defer c.AtlantisWorkspaceLocker.Unlock(ctx.BaseRepo.FullName, ctx.Command.Workspace, ctx.Pull.Num)
 
 	var cr CommandResponse

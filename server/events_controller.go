@@ -65,6 +65,7 @@ func (e *EventsController) Post(w http.ResponseWriter, r *http.Request) {
 			e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support GitHub")
 			return
 		}
+		e.Logger.Debug("handling GitHub post")
 		e.handleGithubPost(w, r)
 		return
 	} else if r.Header.Get(gitlabHeader) != "" {
@@ -72,6 +73,7 @@ func (e *EventsController) Post(w http.ResponseWriter, r *http.Request) {
 			e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support GitLab")
 			return
 		}
+		e.Logger.Debug("handling GitLab post")
 		e.handleGitlabPost(w, r)
 		return
 	}
@@ -85,13 +87,16 @@ func (e *EventsController) handleGithubPost(w http.ResponseWriter, r *http.Reque
 		e.respond(w, logging.Warn, http.StatusBadRequest, err.Error())
 		return
 	}
+	e.Logger.Debug("request valid")
 
 	githubReqID := "X-Github-Delivery=" + r.Header.Get("X-Github-Delivery")
 	event, _ := github.ParseWebHook(github.WebHookType(r), payload)
 	switch event := event.(type) {
 	case *github.IssueCommentEvent:
+		e.Logger.Debug("handling as comment event")
 		e.HandleGithubCommentEvent(w, event, githubReqID)
 	case *github.PullRequestEvent:
+		e.Logger.Debug("handling as pull request event")
 		e.HandleGithubPullRequestEvent(w, event, githubReqID)
 	default:
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event %s", githubReqID)
@@ -144,6 +149,7 @@ func (e *EventsController) HandleGithubPullRequestEvent(w http.ResponseWriter, p
 	default:
 		eventType = OtherPullEvent
 	}
+	e.Logger.Info("identified event as type %q", eventType)
 	e.handlePullRequestEvent(w, baseRepo, headRepo, pull, e.AtlantisGithubUser, eventType)
 }
 
@@ -177,6 +183,7 @@ func (e *EventsController) handlePullRequestEvent(w http.ResponseWriter, baseRep
 		// workspace to '*' to indicate that all applicable dirs and workspaces
 		// should be planned.
 		autoplanCmd := events.NewCommand("*", nil, events.Plan, false, "*", true)
+		e.Logger.Info("executing command %s", autoplanCmd)
 		if !e.TestingMode {
 			go e.CommandRunner.ExecuteCommand(baseRepo, headRepo, user, pull.Num, autoplanCmd)
 		} else {
@@ -206,10 +213,14 @@ func (e *EventsController) handleGitlabPost(w http.ResponseWriter, r *http.Reque
 		e.respond(w, logging.Warn, http.StatusBadRequest, err.Error())
 		return
 	}
+	e.Logger.Debug("request valid")
+
 	switch event := event.(type) {
 	case gitlab.MergeCommentEvent:
+		e.Logger.Debug("handling as comment event")
 		e.HandleGitlabCommentEvent(w, event)
 	case gitlab.MergeEvent:
+		e.Logger.Debug("handling as pull request event")
 		e.HandleGitlabMergeRequestEvent(w, event)
 	default:
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event")
@@ -239,6 +250,7 @@ func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo mo
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring non-command comment: %q", truncated)
 		return
 	}
+	e.Logger.Info("parsed comment as %s", parseResult)
 
 	// At this point we know it's a command we're not supposed to ignore, so now
 	// we check if this repo is allowed to run commands in the first place.
@@ -260,6 +272,7 @@ func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo mo
 		return
 	}
 
+	e.Logger.Debug("executing command")
 	fmt.Fprintln(w, "Processing...")
 	if !e.TestingMode {
 		// Respond with success and then actually execute the command asynchronously.
@@ -292,6 +305,7 @@ func (e *EventsController) HandleGitlabMergeRequestEvent(w http.ResponseWriter, 
 	default:
 		eventType = OtherPullEvent
 	}
+	e.Logger.Info("identified event as type %q", eventType)
 	e.handlePullRequestEvent(w, baseRepo, headRepo, pull, e.AtlantisGitlabUser, eventType)
 }
 

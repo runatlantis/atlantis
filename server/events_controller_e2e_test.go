@@ -58,24 +58,48 @@ func TestGitHubWorkflow(t *testing.T) {
 		ExpMergeCommentFile    string
 		CommentAndReplies      []string
 	}{
+		//{
+		//	Description:            "simple",
+		//	RepoDir:                "simple",
+		//	ModifiedFiles:          []string{"main.tf"},
+		//	ExpAutoplanCommentFile: "exp-output-autoplan.txt",
+		//	CommentAndReplies: []string{
+		//		"atlantis apply", "exp-output-apply.txt",
+		//	},
+		//	ExpMergeCommentFile: "exp-output-merge.txt",
+		//},
+		//{
+		//	Description:            "simple with comment -var",
+		//	RepoDir:                "simple",
+		//	ModifiedFiles:          []string{"main.tf"},
+		//	ExpAutoplanCommentFile: "exp-output-autoplan.txt",
+		//	CommentAndReplies: []string{
+		//		"atlantis plan -- -var var=overridden", "exp-output-atlantis-plan.txt",
+		//		"atlantis apply", "exp-output-apply-var.txt",
+		//	},
+		//	ExpMergeCommentFile: "exp-output-merge.txt",
+		//},
+		//{
+		//	Description:            "simple with workspaces",
+		//	RepoDir:                "simple",
+		//	ModifiedFiles:          []string{"main.tf"},
+		//	ExpAutoplanCommentFile: "exp-output-autoplan.txt",
+		//	CommentAndReplies: []string{
+		//		"atlantis plan -- -var var=default_workspace", "exp-output-atlantis-plan.txt",
+		//		"atlantis plan -w new_workspace -- -var var=new_workspace", "exp-output-atlantis-plan-new-workspace.txt",
+		//		"atlantis apply", "exp-output-apply-var-default-workspace.txt",
+		//		"atlantis apply -w new_workspace", "exp-output-apply-var-new-workspace.txt",
+		//	},
+		//	ExpMergeCommentFile: "exp-output-merge-workspaces.txt",
+		//},
 		{
-			Description:            "simple",
-			RepoDir:                "simple",
+			Description:            "simple with atlantis.yaml",
+			RepoDir:                "simple-yaml",
 			ModifiedFiles:          []string{"main.tf"},
 			ExpAutoplanCommentFile: "exp-output-autoplan.txt",
 			CommentAndReplies: []string{
-				"atlantis apply", "exp-output-apply.txt",
-			},
-			ExpMergeCommentFile: "exp-output-merge.txt",
-		},
-		{
-			Description:            "simple with comment -var",
-			RepoDir:                "simple",
-			ModifiedFiles:          []string{"main.tf"},
-			ExpAutoplanCommentFile: "exp-output-autoplan.txt",
-			CommentAndReplies: []string{
-				"atlantis plan -- -var var=overridden", "exp-output-atlantis-plan-var.txt",
-				"atlantis apply", "exp-output-apply-var.txt",
+				"atlantis apply -w staging", "exp-output-apply-staging.txt",
+				"atlantis apply", "exp-output-apply-default.txt",
 			},
 			ExpMergeCommentFile: "exp-output-merge.txt",
 		},
@@ -118,6 +142,9 @@ func TestGitHubWorkflow(t *testing.T) {
 				// Replace all 'ID: 1111818181' strings with * so we can do a comparison.
 				idRegex := regexp.MustCompile(`\(ID: [0-9]+\)`)
 				atlantisComment = idRegex.ReplaceAllString(atlantisComment, "(ID: ******************)")
+				if string(exp) != atlantisComment {
+					t.Logf("comment: %s", comment)
+				}
 				Equals(t, string(exp), atlantisComment)
 			}
 
@@ -332,6 +359,7 @@ func initializeRepo(t *testing.T, repoDir string) (string, func()) {
 
 	// Initialize the git repo.
 	runCmd(t, destDir, "git", "init")
+	runCmd(t, destDir, "touch", ".gitkeep")
 	runCmd(t, destDir, "git", "add", ".gitkeep")
 	runCmd(t, destDir, "git", "commit", "-m", "initial commit")
 	runCmd(t, destDir, "git", "checkout", "-b", "branch")
