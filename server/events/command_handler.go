@@ -195,7 +195,7 @@ func (c *CommandHandler) updatePull(ctx *CommandContext, res CommandResponse) {
 	if err := c.CommitStatusUpdater.UpdateProjectResult(ctx, res); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
-	comment := c.MarkdownRenderer.Render(res, ctx.Command.Name, ctx.Log.History.String(), ctx.Command.Verbose)
+	comment := c.MarkdownRenderer.Render(res, ctx.Command.Name, ctx.Log.History.String(), ctx.Command.Verbose, ctx.Command.Autoplan)
 	c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, comment) // nolint: errcheck
 }
 

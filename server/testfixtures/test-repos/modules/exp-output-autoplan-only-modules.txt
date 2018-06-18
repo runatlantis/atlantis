@@ -1,0 +1,2 @@
+Ran `plan` in 0 projects because Atlantis detected no Terraform changes or could not determine where to run `plan`.
+

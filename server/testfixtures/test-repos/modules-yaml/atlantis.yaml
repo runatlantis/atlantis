@@ -1,0 +1,8 @@
+version: 2
+projects:
+- dir: staging
+  autoplan:
+    when_modified: ["**/*.tf", "../modules/null/*"]
+- dir: production
+  autoplan:
+    when_modified: ["**/*.tf", "../modules/null/*"]

@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -58,40 +59,40 @@ func TestGitHubWorkflow(t *testing.T) {
 		ExpMergeCommentFile    string
 		CommentAndReplies      []string
 	}{
-		//{
-		//	Description:            "simple",
-		//	RepoDir:                "simple",
-		//	ModifiedFiles:          []string{"main.tf"},
-		//	ExpAutoplanCommentFile: "exp-output-autoplan.txt",
-		//	CommentAndReplies: []string{
-		//		"atlantis apply", "exp-output-apply.txt",
-		//	},
-		//	ExpMergeCommentFile: "exp-output-merge.txt",
-		//},
-		//{
-		//	Description:            "simple with comment -var",
-		//	RepoDir:                "simple",
-		//	ModifiedFiles:          []string{"main.tf"},
-		//	ExpAutoplanCommentFile: "exp-output-autoplan.txt",
-		//	CommentAndReplies: []string{
-		//		"atlantis plan -- -var var=overridden", "exp-output-atlantis-plan.txt",
-		//		"atlantis apply", "exp-output-apply-var.txt",
-		//	},
-		//	ExpMergeCommentFile: "exp-output-merge.txt",
-		//},
-		//{
-		//	Description:            "simple with workspaces",
-		//	RepoDir:                "simple",
-		//	ModifiedFiles:          []string{"main.tf"},
-		//	ExpAutoplanCommentFile: "exp-output-autoplan.txt",
-		//	CommentAndReplies: []string{
-		//		"atlantis plan -- -var var=default_workspace", "exp-output-atlantis-plan.txt",
-		//		"atlantis plan -w new_workspace -- -var var=new_workspace", "exp-output-atlantis-plan-new-workspace.txt",
-		//		"atlantis apply", "exp-output-apply-var-default-workspace.txt",
-		//		"atlantis apply -w new_workspace", "exp-output-apply-var-new-workspace.txt",
-		//	},
-		//	ExpMergeCommentFile: "exp-output-merge-workspaces.txt",
-		//},
+		{
+			Description:            "simple",
+			RepoDir:                "simple",
+			ModifiedFiles:          []string{"main.tf"},
+			ExpAutoplanCommentFile: "exp-output-autoplan.txt",
+			CommentAndReplies: []string{
+				"atlantis apply", "exp-output-apply.txt",
+			},
+			ExpMergeCommentFile: "exp-output-merge.txt",
+		},
+		{
+			Description:            "simple with comment -var",
+			RepoDir:                "simple",
+			ModifiedFiles:          []string{"main.tf"},
+			ExpAutoplanCommentFile: "exp-output-autoplan.txt",
+			CommentAndReplies: []string{
+				"atlantis plan -- -var var=overridden", "exp-output-atlantis-plan.txt",
+				"atlantis apply", "exp-output-apply-var.txt",
+			},
+			ExpMergeCommentFile: "exp-output-merge.txt",
+		},
+		{
+			Description:            "simple with workspaces",
+			RepoDir:                "simple",
+			ModifiedFiles:          []string{"main.tf"},
+			ExpAutoplanCommentFile: "exp-output-autoplan.txt",
+			CommentAndReplies: []string{
+				"atlantis plan -- -var var=default_workspace", "exp-output-atlantis-plan.txt",
+				"atlantis plan -w new_workspace -- -var var=new_workspace", "exp-output-atlantis-plan-new-workspace.txt",
+				"atlantis apply", "exp-output-apply-var-default-workspace.txt",
+				"atlantis apply -w new_workspace", "exp-output-apply-var-new-workspace.txt",
+			},
+			ExpMergeCommentFile: "exp-output-merge-workspaces.txt",
+		},
 		{
 			Description:            "simple with atlantis.yaml",
 			RepoDir:                "simple-yaml",
@@ -103,18 +104,52 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpMergeCommentFile: "exp-output-merge.txt",
 		},
+		{
+			Description:            "modules staging only",
+			RepoDir:                "modules",
+			ModifiedFiles:          []string{"staging/main.tf"},
+			ExpAutoplanCommentFile: "exp-output-autoplan-only-staging.txt",
+			CommentAndReplies: []string{
+				"atlantis apply -d staging", "exp-output-apply-staging.txt",
+			},
+			ExpMergeCommentFile: "exp-output-merge-only-staging.txt",
+		},
+		{
+			Description:            "modules modules only",
+			RepoDir:                "modules",
+			ModifiedFiles:          []string{"modules/null/main.tf"},
+			ExpAutoplanCommentFile: "exp-output-autoplan-only-modules.txt",
+			CommentAndReplies: []string{
+				"atlantis plan -d staging", "exp-output-plan-staging.txt",
+				"atlantis plan -d production", "exp-output-plan-production.txt",
+				"atlantis apply -d staging", "exp-output-apply-staging.txt",
+				"atlantis apply -d production", "exp-output-apply-production.txt",
+			},
+			ExpMergeCommentFile: "exp-output-merge-all-dirs.txt",
+		},
+		{
+			Description:            "modules-yaml",
+			RepoDir:                "modules-yaml",
+			ModifiedFiles:          []string{"modules/null/main.tf"},
+			ExpAutoplanCommentFile: "exp-output-autoplan.txt",
+			CommentAndReplies: []string{
+				"atlantis apply -d staging", "exp-output-apply-staging.txt",
+				"atlantis apply -d production", "exp-output-apply-production.txt",
+			},
+			ExpMergeCommentFile: "exp-output-merge-all-dirs.txt",
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t)
 			// Set the repo to be cloned through the testing backdoor.
-			repoDir, cleanup := initializeRepo(t, c.RepoDir)
+			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
 			defer cleanup()
 			atlantisWorkspace.TestingOverrideCloneURL = fmt.Sprintf("file://%s", repoDir)
 
 			// Setup test dependencies.
 			w := httptest.NewRecorder()
-			When(githubGetter.GetPullRequest(AnyRepo(), AnyInt())).ThenReturn(GitHubPullRequestParsed(), nil)
+			When(githubGetter.GetPullRequest(AnyRepo(), AnyInt())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
 			When(vcsClient.GetModifiedFiles(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
 
 			// First, send the open pull request event and trigger an autoplan.
@@ -122,9 +157,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			ctrl.Post(w, pullOpenedReq)
 			responseContains(t, w, 200, "Processing...")
 			_, _, autoplanComment := vcsClient.VerifyWasCalledOnce().CreateComment(AnyRepo(), AnyInt(), AnyString()).GetCapturedArguments()
-			exp, err := ioutil.ReadFile(filepath.Join(repoDir, c.ExpAutoplanCommentFile))
-			Ok(t, err)
-			Equals(t, string(exp), autoplanComment)
+			assertCommentEquals(t, c.ExpAutoplanCommentFile, autoplanComment, c.RepoDir)
 
 			// Now send any other comments.
 			for i := 0; i < len(c.CommentAndReplies); i += 2 {
@@ -136,16 +169,7 @@ func TestGitHubWorkflow(t *testing.T) {
 				ctrl.Post(w, commentReq)
 				responseContains(t, w, 200, "Processing...")
 				_, _, atlantisComment := vcsClient.VerifyWasCalled(Times((i/2)+2)).CreateComment(AnyRepo(), AnyInt(), AnyString()).GetCapturedArguments()
-
-				exp, err = ioutil.ReadFile(filepath.Join(repoDir, expOutputFile))
-				Ok(t, err)
-				// Replace all 'ID: 1111818181' strings with * so we can do a comparison.
-				idRegex := regexp.MustCompile(`\(ID: [0-9]+\)`)
-				atlantisComment = idRegex.ReplaceAllString(atlantisComment, "(ID: ******************)")
-				if string(exp) != atlantisComment {
-					t.Logf("comment: %s", comment)
-				}
-				Equals(t, string(exp), atlantisComment)
+				assertCommentEquals(t, expOutputFile, atlantisComment, c.RepoDir)
 			}
 
 			// Finally, send the pull request merged event.
@@ -155,9 +179,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			responseContains(t, w, 200, "Pull request cleaned successfully")
 			numPrevComments := (len(c.CommentAndReplies) / 2) + 1
 			_, _, pullClosedComment := vcsClient.VerifyWasCalled(Times(numPrevComments+1)).CreateComment(AnyRepo(), AnyInt(), AnyString()).GetCapturedArguments()
-			exp, err = ioutil.ReadFile(filepath.Join(repoDir, c.ExpMergeCommentFile))
-			Ok(t, err)
-			Equals(t, string(exp), pullClosedComment)
+			assertCommentEquals(t, c.ExpMergeCommentFile, pullClosedComment, c.RepoDir)
 		})
 	}
 }
@@ -166,8 +188,6 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClientProxy,
 	allowForkPRs := false
 	dataDir, cleanup := TempDir(t)
 	defer cleanup()
-	testRepoDir, err := filepath.Abs("testfixtures/test-repos/simple")
-	Ok(t, err)
 
 	// Mocks.
 	e2eVCSClient := vcsmocks.NewMockClientProxy()
@@ -199,7 +219,7 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClientProxy,
 	}
 	atlantisWorkspace := &events.FileWorkspace{
 		DataDir:                 dataDir,
-		TestingOverrideCloneURL: testRepoDir,
+		TestingOverrideCloneURL: "override-me",
 	}
 
 	defaultTFVersion := terraformClient.Version()
@@ -318,7 +338,11 @@ func GitHubPullRequestClosedEvent(t *testing.T) *http.Request {
 	return req
 }
 
-func GitHubPullRequestParsed() *github.PullRequest {
+func GitHubPullRequestParsed(headSHA string) *github.PullRequest {
+	// headSHA can't be empty so default if not set.
+	if headSHA == "" {
+		headSHA = "13940d121be73f656e2132c6d7b4c8e87878ac8d"
+	}
 	return &github.PullRequest{
 		Number:  github.Int(1),
 		State:   github.String("open"),
@@ -328,7 +352,7 @@ func GitHubPullRequestParsed() *github.PullRequest {
 				FullName: github.String("runatlantis/atlantis-tests"),
 				CloneURL: github.String("/runatlantis/atlantis-tests.git"),
 			},
-			SHA: github.String("sha"),
+			SHA: github.String(headSHA),
 			Ref: github.String("branch"),
 		},
 		Base: &github.PullRequestBranch{
@@ -343,15 +367,21 @@ func GitHubPullRequestParsed() *github.PullRequest {
 	}
 }
 
+// absRepoPath returns the absolute path to the test repo under dir repoDir.
+func absRepoPath(t *testing.T, repoDir string) string {
+	path, err := filepath.Abs(filepath.Join("testfixtures", "test-repos", repoDir))
+	Ok(t, err)
+	return path
+}
+
 // initializeRepo copies the repo data from testfixtures and initializes a new
 // git repo in a temp directory. It returns that directory and a function
 // to run in a defer that will delete the dir.
 // The purpose of this function is to create a real git repository with a branch
 // called 'branch' from the files under repoDir. This is so we can check in
 // those files normally without needing a .git directory.
-func initializeRepo(t *testing.T, repoDir string) (string, func()) {
-	originRepo, err := filepath.Abs(filepath.Join("testfixtures", "test-repos", repoDir))
-	Ok(t, err)
+func initializeRepo(t *testing.T, repoDir string) (string, string, func()) {
+	originRepo := absRepoPath(t, repoDir)
 
 	// Copy the files to the temp dir.
 	destDir, cleanup := TempDir(t)
@@ -365,13 +395,37 @@ func initializeRepo(t *testing.T, repoDir string) (string, func()) {
 	runCmd(t, destDir, "git", "checkout", "-b", "branch")
 	runCmd(t, destDir, "git", "add", ".")
 	runCmd(t, destDir, "git", "commit", "-am", "branch commit")
+	headSHA := runCmd(t, destDir, "git", "rev-parse", "HEAD")
+	headSHA = strings.Trim(headSHA, "\n")
 
-	return destDir, cleanup
+	return destDir, headSHA, cleanup
 }
 
-func runCmd(t *testing.T, dir string, name string, args ...string) {
+func runCmd(t *testing.T, dir string, name string, args ...string) string {
 	cpCmd := exec.Command(name, args...)
 	cpCmd.Dir = dir
 	cpOut, err := cpCmd.CombinedOutput()
 	Assert(t, err == nil, "err running %q: %s", strings.Join(append([]string{name}, args...), " "), cpOut)
+	return string(cpOut)
+}
+
+func assertCommentEquals(t *testing.T, expFile string, act string, repoDir string) {
+	t.Helper()
+	exp, err := ioutil.ReadFile(filepath.Join(absRepoPath(t, repoDir), expFile))
+	Ok(t, err)
+
+	// Replace all 'ID: 1111818181' strings with * so we can do a comparison.
+	idRegex := regexp.MustCompile(`\(ID: [0-9]+\)`)
+	act = idRegex.ReplaceAllString(act, "(ID: ******************)")
+
+	if string(exp) != act {
+		actFile := filepath.Join(absRepoPath(t, repoDir), expFile+".act")
+		err := ioutil.WriteFile(actFile, []byte(act), 0600)
+		Ok(t, err)
+		cwd, err := os.Getwd()
+		Ok(t, err)
+		rel, err := filepath.Rel(cwd, actFile)
+		Ok(t, err)
+		t.Errorf("%q was different, wrote actual comment to %q", expFile, rel)
+	}
 }

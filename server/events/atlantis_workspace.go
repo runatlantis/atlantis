@@ -18,6 +18,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -48,7 +49,9 @@ type FileWorkspace struct {
 }
 
 // Clone git clones headRepo, checks out the branch and then returns the absolute
-// path to the root of the cloned repo.
+// path to the root of the cloned repo. If the repo already exists and is at
+// the right commit it does nothing. This is to support running commands in
+// multiple dirs of the same repo without deleting existing plans.
 func (w *FileWorkspace) Clone(
 	log *logging.SimpleLogger,
 	baseRepo models.Repo,
@@ -57,11 +60,27 @@ func (w *FileWorkspace) Clone(
 	workspace string) (string, error) {
 	cloneDir := w.cloneDir(baseRepo, p, workspace)
 
-	// This is safe to do because we lock runs on repo/pull/workspace so no one else
-	// is using this workspace.
-	log.Info("cleaning clone directory %q", cloneDir)
-	if err := os.RemoveAll(cloneDir); err != nil {
-		return "", errors.Wrap(err, "deleting old workspace")
+	// If the directory already exists, check if it's at the right commit.
+	// If so, then we do nothing.
+	if _, err := os.Stat(cloneDir); err == nil {
+		revParseCmd := exec.Command("git", "rev-parse", "HEAD") // #nosec
+		revParseCmd.Dir = cloneDir
+		output, err := revParseCmd.CombinedOutput()
+		if err != nil {
+			return "", errors.Wrapf(err, "running git rev-parse HEAD: %s", string(output))
+		}
+		currCommit := strings.Trim(string(output), "\n")
+		if string(currCommit) == p.HeadCommit {
+			log.Debug("repo is at correct commit %q so will not re-clone", p.HeadCommit)
+			return cloneDir, nil
+		}
+		log.Debug("repo was already cloned but is not at correct commit, wanted %q got %q", p.HeadCommit, string(currCommit))
+
+		// It's okay to delete all plans now since they're out of date.
+		log.Info("cleaning clone directory %q", cloneDir)
+		if err := os.RemoveAll(cloneDir); err != nil {
+			return "", errors.Wrap(err, "deleting old workspace")
+		}
 	}
 
 	// Create the directory and parents if necessary.
