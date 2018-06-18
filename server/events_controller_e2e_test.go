@@ -68,10 +68,21 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpMergeCommentFile: "exp-output-merge.txt",
 		},
+		{
+			Description:            "simple with comment -var",
+			RepoDir:                "simple",
+			ModifiedFiles:          []string{"main.tf"},
+			ExpAutoplanCommentFile: "exp-output-autoplan.txt",
+			CommentAndReplies: []string{
+				"atlantis plan -- -var var=overridden", "exp-output-atlantis-plan-var.txt",
+				"atlantis apply", "exp-output-apply-var.txt",
+			},
+			ExpMergeCommentFile: "exp-output-merge.txt",
+		},
 	}
 	for _, c := range cases {
-		ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t)
 		t.Run(c.Description, func(t *testing.T) {
+			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t)
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, cleanup := initializeRepo(t, c.RepoDir)
 			defer cleanup()
@@ -100,7 +111,7 @@ func TestGitHubWorkflow(t *testing.T) {
 				w = httptest.NewRecorder()
 				ctrl.Post(w, commentReq)
 				responseContains(t, w, 200, "Processing...")
-				_, _, atlantisComment := vcsClient.VerifyWasCalled(Twice()).CreateComment(AnyRepo(), AnyInt(), AnyString()).GetCapturedArguments()
+				_, _, atlantisComment := vcsClient.VerifyWasCalled(Times((i/2)+2)).CreateComment(AnyRepo(), AnyInt(), AnyString()).GetCapturedArguments()
 
 				exp, err = ioutil.ReadFile(filepath.Join(repoDir, expOutputFile))
 				Ok(t, err)
@@ -115,7 +126,8 @@ func TestGitHubWorkflow(t *testing.T) {
 			w = httptest.NewRecorder()
 			ctrl.Post(w, pullClosedReq)
 			responseContains(t, w, 200, "Pull request cleaned successfully")
-			_, _, pullClosedComment := vcsClient.VerifyWasCalled(Times(3)).CreateComment(AnyRepo(), AnyInt(), AnyString()).GetCapturedArguments()
+			numPrevComments := (len(c.CommentAndReplies) / 2) + 1
+			_, _, pullClosedComment := vcsClient.VerifyWasCalled(Times(numPrevComments+1)).CreateComment(AnyRepo(), AnyInt(), AnyString()).GetCapturedArguments()
 			exp, err = ioutil.ReadFile(filepath.Join(repoDir, c.ExpMergeCommentFile))
 			Ok(t, err)
 			Equals(t, string(exp), pullClosedComment)
