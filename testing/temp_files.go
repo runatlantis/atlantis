@@ -13,5 +13,7 @@ import (
 func TempDir(t *testing.T) (string, func()) {
 	tmpDir, err := ioutil.TempDir("", "")
 	Ok(t, err)
-	return tmpDir, func() { os.RemoveAll(tmpDir) }
+	return tmpDir, func() {
+		os.RemoveAll(tmpDir) // nolint: errcheck
+	}
 }

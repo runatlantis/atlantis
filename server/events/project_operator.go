@@ -68,12 +68,12 @@ func (p *ProjectOperator) Plan(ctx models.ProjectCommandContext, projAbsPathPtr 
 	var projAbsPath string
 	if projAbsPathPtr == nil {
 		ctx.Log.Debug("project has not yet been cloned")
-		repoDir, err := p.Workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
-		if err != nil {
+		repoDir, cloneErr := p.Workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+		if cloneErr != nil {
 			if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 				ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
 			}
-			return ProjectResult{Error: err}
+			return ProjectResult{Error: cloneErr}
 		}
 		projAbsPath = filepath.Join(repoDir, ctx.RepoRelPath)
 		ctx.Log.Debug("project successfully cloned to %q", projAbsPath)

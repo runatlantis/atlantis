@@ -47,6 +47,7 @@ func setupTmpRepos(t *testing.T) {
 	//     main.tf
 	var err error
 	nestedModules1, err = ioutil.TempDir("", "")
+	Ok(t, err)
 	err = os.MkdirAll(filepath.Join(nestedModules1, "project1/modules"), 0700)
 	Ok(t, err)
 	files := []string{

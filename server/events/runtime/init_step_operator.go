@@ -11,6 +11,7 @@ type InitStepOperator struct {
 	DefaultTFVersion  *version.Version
 }
 
+// nolint: unparam
 func (i *InitStepOperator) Run(ctx models.ProjectCommandContext, extraArgs []string, path string) (string, error) {
 	tfVersion := i.DefaultTFVersion
 	if ctx.ProjectConfig != nil && ctx.ProjectConfig.TerraformVersion != nil {

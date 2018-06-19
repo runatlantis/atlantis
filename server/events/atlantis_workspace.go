@@ -70,11 +70,11 @@ func (w *FileWorkspace) Clone(
 			return "", errors.Wrapf(err, "running git rev-parse HEAD: %s", string(output))
 		}
 		currCommit := strings.Trim(string(output), "\n")
-		if string(currCommit) == p.HeadCommit {
+		if currCommit == p.HeadCommit {
 			log.Debug("repo is at correct commit %q so will not re-clone", p.HeadCommit)
 			return cloneDir, nil
 		}
-		log.Debug("repo was already cloned but is not at correct commit, wanted %q got %q", p.HeadCommit, string(currCommit))
+		log.Debug("repo was already cloned but is not at correct commit, wanted %q got %q", p.HeadCommit, currCommit)
 
 		// It's okay to delete all plans now since they're out of date.
 		log.Info("cleaning clone directory %q", cloneDir)

@@ -154,6 +154,5 @@ var errWithLogTmpl = template.Must(template.New("").Parse(errTmplText + logTmpl)
 var failureTmplText = "**{{.Command}} Failed**: {{.Failure}}\n"
 var failureTmpl = template.Must(template.New("").Parse(failureTmplText))
 var failureWithLogTmpl = template.Must(template.New("").Parse(failureTmplText + logTmpl))
-var autoplanNoProjectsTmpl = template.Must(template.New("").Parse(autoplanNoProjectsTmplText))
 var autoplanNoProjectsWithLogTmpl = template.Must(template.New("").Parse(autoplanNoProjectsTmplText + logTmpl))
 var logTmpl = "{{if .Verbose}}\n<details><summary>Log</summary>\n  <p>\n\n```\n{{.Log}}```\n</p></details>{{end}}\n"
