@@ -237,4 +237,5 @@ type ProjectCommandContext struct {
 	// ex. atlantis plan -- -target=resource
 	CommentArgs []string
 	Workspace   string
+	ProjectName string
 }

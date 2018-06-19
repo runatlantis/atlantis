@@ -47,14 +47,17 @@ type Command struct {
 	// Autoplan is true if the command is a plan command being executed in an
 	// attempt to automatically run plan.
 	Autoplan bool
+	// ProjectName is the name of a project to run the command on. It refers to a
+	// project specified in an atlantis.yaml file.
+	ProjectName string
 }
 
 func (c Command) String() string {
-	return fmt.Sprintf("command=%q verbose=%t dir=%q workspace=%q autoplan=%t flags=%q", c.Name.String(), c.Verbose, c.Dir, c.Workspace, c.Autoplan, strings.Join(c.Flags, ","))
+	return fmt.Sprintf("command=%q verbose=%t dir=%q workspace=%q project=%q autoplan=%t flags=%q", c.Name.String(), c.Verbose, c.Dir, c.Workspace, c.ProjectName, c.Autoplan, strings.Join(c.Flags, ","))
 }
 
 // NewCommand constructs a Command, setting all missing fields to defaults.
-func NewCommand(dir string, flags []string, name CommandName, verbose bool, workspace string, autoplan bool) *Command {
+func NewCommand(dir string, flags []string, name CommandName, verbose bool, workspace string, project string, autoplan bool) *Command {
 	// If dir was an empty string, this will return '.'.
 	validDir := path.Clean(dir)
 	if validDir == "/" {
@@ -64,12 +67,13 @@ func NewCommand(dir string, flags []string, name CommandName, verbose bool, work
 		workspace = DefaultWorkspace
 	}
 	return &Command{
-		Dir:       validDir,
-		Flags:     flags,
-		Name:      name,
-		Verbose:   verbose,
-		Workspace: workspace,
-		Autoplan:  autoplan,
+		Dir:         validDir,
+		Flags:       flags,
+		Name:        name,
+		Verbose:     verbose,
+		Workspace:   workspace,
+		Autoplan:    autoplan,
+		ProjectName: project,
 	}
 }
 

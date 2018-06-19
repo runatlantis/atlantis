@@ -16,6 +16,7 @@ const (
 )
 
 type Project struct {
+	Name              *string   `yaml:"name,omitempty"`
 	Dir               *string   `yaml:"dir,omitempty"`
 	Workspace         *string   `yaml:"workspace,omitempty"`
 	Workflow          *string   `yaml:"workflow,omitempty"`
@@ -77,6 +78,8 @@ func (p Project) ToValid() valid.Project {
 
 	// There are no default apply requirements.
 	v.ApplyRequirements = p.ApplyRequirements
+
+	v.Name = p.Name
 
 	return v
 }

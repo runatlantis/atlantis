@@ -1,6 +1,7 @@
 package events
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -80,6 +81,7 @@ func (p *DefaultPullRequestOperator) Autoplan(ctx *CommandContext) CommandRespon
 				User:          ctx.User,
 				Log:           ctx.Log,
 				RepoRelPath:   mp.Path,
+				ProjectName:   "",
 				ProjectConfig: nil,
 				GlobalConfig:  nil,
 				CommentArgs:   nil,
@@ -99,6 +101,10 @@ func (p *DefaultPullRequestOperator) Autoplan(ctx *CommandContext) CommandRespon
 		// project config.
 		for i := 0; i < len(matchingProjects); i++ {
 			mp := matchingProjects[i]
+			var projectName string
+			if mp.Name != nil {
+				projectName = *mp.Name
+			}
 			projCtxs = append(projCtxs, models.ProjectCommandContext{
 				BaseRepo:      ctx.BaseRepo,
 				HeadRepo:      ctx.HeadRepo,
@@ -108,6 +114,7 @@ func (p *DefaultPullRequestOperator) Autoplan(ctx *CommandContext) CommandRespon
 				CommentArgs:   nil,
 				Workspace:     mp.Workspace,
 				RepoRelPath:   mp.Dir,
+				ProjectName:   projectName,
 				ProjectConfig: &mp,
 				GlobalConfig:  &config,
 			})
@@ -139,9 +146,23 @@ func (p *DefaultPullRequestOperator) PlanViaComment(ctx *CommandContext) Command
 	if err != nil && !os.IsNotExist(err) {
 		return CommandResponse{Error: err}
 	}
-	if !os.IsNotExist(err) {
-		projCfg = config.FindProject(ctx.Command.Dir, ctx.Command.Workspace)
+	hasAtlantisYAML := !os.IsNotExist(err)
+	if hasAtlantisYAML {
+		// If they've specified a project by name we look it up. Otherwise we
+		// use the dir and workspace.
+		if ctx.Command.ProjectName != "" {
+			projCfg = config.FindProjectByName(ctx.Command.ProjectName)
+			if projCfg == nil {
+				return CommandResponse{Error: fmt.Errorf("no project with name %q configured", ctx.Command.ProjectName)}
+			}
+		} else {
+			projCfg = config.FindProject(ctx.Command.Dir, ctx.Command.Workspace)
+		}
 		globalCfg = &config
+	}
+
+	if ctx.Command.ProjectName != "" && !hasAtlantisYAML {
+		return CommandResponse{Error: fmt.Errorf("cannot specify a project name unless an %s file exists to configure projects", yaml.AtlantisYAMLFilename)}
 	}
 
 	projCtx := models.ProjectCommandContext{
@@ -153,6 +174,7 @@ func (p *DefaultPullRequestOperator) PlanViaComment(ctx *CommandContext) Command
 		CommentArgs:   ctx.Command.Flags,
 		Workspace:     ctx.Command.Workspace,
 		RepoRelPath:   ctx.Command.Dir,
+		ProjectName:   ctx.Command.ProjectName,
 		ProjectConfig: projCfg,
 		GlobalConfig:  globalCfg,
 	}
@@ -182,9 +204,23 @@ func (p *DefaultPullRequestOperator) ApplyViaComment(ctx *CommandContext) Comman
 	if err != nil && !os.IsNotExist(err) {
 		return CommandResponse{Error: err}
 	}
-	if !os.IsNotExist(err) {
-		projCfg = config.FindProject(ctx.Command.Dir, ctx.Command.Workspace)
+	hasAtlantisYAML := !os.IsNotExist(err)
+	if hasAtlantisYAML {
+		// If they've specified a project by name we look it up. Otherwise we
+		// use the dir and workspace.
+		if ctx.Command.ProjectName != "" {
+			projCfg = config.FindProjectByName(ctx.Command.ProjectName)
+			if projCfg == nil {
+				return CommandResponse{Error: fmt.Errorf("no project with name %q configured", ctx.Command.ProjectName)}
+			}
+		} else {
+			projCfg = config.FindProject(ctx.Command.Dir, ctx.Command.Workspace)
+		}
 		globalCfg = &config
+	}
+
+	if ctx.Command.ProjectName != "" && !hasAtlantisYAML {
+		return CommandResponse{Error: fmt.Errorf("cannot specify a project name unless an %s file exists to configure projects", yaml.AtlantisYAMLFilename)}
 	}
 
 	projCtx := models.ProjectCommandContext{
@@ -196,6 +232,7 @@ func (p *DefaultPullRequestOperator) ApplyViaComment(ctx *CommandContext) Comman
 		CommentArgs:   ctx.Command.Flags,
 		Workspace:     ctx.Command.Workspace,
 		RepoRelPath:   ctx.Command.Dir,
+		ProjectName:   ctx.Command.ProjectName,
 		ProjectConfig: projCfg,
 		GlobalConfig:  globalCfg,
 	}

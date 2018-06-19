@@ -32,7 +32,12 @@ func (p *PlanStepOperator) Run(ctx models.ProjectCommandContext, extraArgs []str
 		return "", err
 	}
 
-	planFile := filepath.Join(path, fmt.Sprintf("%s.tfplan", ctx.Workspace))
+	// todo: move this to a common library
+	planFileName := fmt.Sprintf("%s.tfplan", ctx.Workspace)
+	if ctx.ProjectName != "" {
+		planFileName = fmt.Sprintf("%s-%s", ctx.ProjectName, planFileName)
+	}
+	planFile := filepath.Join(path, planFileName)
 	userVar := fmt.Sprintf("%s=%s", atlantisUserTFVar, ctx.User.Username)
 	tfPlanCmd := append(append([]string{"plan", "-refresh", "-no-color", "-out", planFile, "-var", userVar}, extraArgs...), ctx.CommentArgs...)
 

@@ -262,6 +262,78 @@ projects:
   workflow: undefined`,
 			expErr: "workflow \"undefined\" is not defined",
 		},
+		{
+			description: "two projects with same dir/workspace without names",
+			input: `
+version: 2
+projects:
+- dir: .
+  workspace: workspace
+- dir: .
+  workspace: workspace`,
+			expErr: "there are two or more projects with dir: \".\" workspace: \"workspace\" that are not all named; they must have a 'name' key so they can be targeted for apply's separately",
+		},
+		{
+			description: "two projects with same dir/workspace only one with name",
+			input: `
+version: 2
+projects:
+- name: myname
+  dir: .
+  workspace: workspace
+- dir: .
+  workspace: workspace`,
+			expErr: "there are two or more projects with dir: \".\" workspace: \"workspace\" that are not all named; they must have a 'name' key so they can be targeted for apply's separately",
+		},
+		{
+			description: "two projects with same dir/workspace both with same name",
+			input: `
+version: 2
+projects:
+- name: myname
+  dir: .
+  workspace: workspace
+- name: myname
+  dir: .
+  workspace: workspace`,
+			expErr: "found two or more projects with name \"myname\"; project names must be unique",
+		},
+		{
+			description: "two projects with same dir/workspace with different names",
+			input: `
+version: 2
+projects:
+- name: myname
+  dir: .
+  workspace: workspace
+- name: myname2
+  dir: .
+  workspace: workspace`,
+			exp: valid.Spec{
+				Version: 2,
+				Projects: []valid.Project{
+					{
+						Name:      String("myname"),
+						Dir:       ".",
+						Workspace: "workspace",
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf"},
+							Enabled:      true,
+						},
+					},
+					{
+						Name:      String("myname2"),
+						Dir:       ".",
+						Workspace: "workspace",
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf"},
+							Enabled:      true,
+						},
+					},
+				},
+				Workflows: map[string]valid.Workflow{},
+			},
+		},
 	}
 
 	tmpDir, cleanup := TempDir(t)

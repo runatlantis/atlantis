@@ -31,23 +31,10 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-/*
-flows:
-- pull request opened autoplan
-- comment to apply
-
-github/gitlab
-
-locking
-
-merging pull requests
-
-different repo organizations
-
-atlantis.yaml
-
-*/
 func TestGitHubWorkflow(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	RegisterMockTestingT(t)
 
 	cases := []struct {
@@ -136,7 +123,31 @@ func TestGitHubWorkflow(t *testing.T) {
 				"atlantis apply -d staging", "exp-output-apply-staging.txt",
 				"atlantis apply -d production", "exp-output-apply-production.txt",
 			},
-			ExpMergeCommentFile: "exp-output-merge-all-dirs.txt",
+			ExpMergeCommentFile: "exp-output-merge.txt",
+		},
+		{
+			Description:            "tfvars-yaml",
+			RepoDir:                "tfvars-yaml",
+			ModifiedFiles:          []string{"main.tf"},
+			ExpAutoplanCommentFile: "exp-output-autoplan.txt",
+			CommentAndReplies: []string{
+				"atlantis apply -p staging", "exp-output-apply-staging.txt",
+				"atlantis apply -p default", "exp-output-apply-default.txt",
+			},
+			ExpMergeCommentFile: "exp-output-merge.txt",
+		},
+		{
+			Description:            "tfvars no autoplan",
+			RepoDir:                "tfvars-yaml-no-autoplan",
+			ModifiedFiles:          []string{"main.tf"},
+			ExpAutoplanCommentFile: "",
+			CommentAndReplies: []string{
+				"atlantis plan -p staging", "exp-output-plan-staging.txt",
+				"atlantis plan -p default", "exp-output-plan-default.txt",
+				"atlantis apply -p staging", "exp-output-apply-staging.txt",
+				"atlantis apply -p default", "exp-output-apply-default.txt",
+			},
+			ExpMergeCommentFile: "exp-output-merge.txt",
 		},
 	}
 	for _, c := range cases {
@@ -156,8 +167,10 @@ func TestGitHubWorkflow(t *testing.T) {
 			pullOpenedReq := GitHubPullRequestOpenedEvent(t)
 			ctrl.Post(w, pullOpenedReq)
 			responseContains(t, w, 200, "Processing...")
-			_, _, autoplanComment := vcsClient.VerifyWasCalledOnce().CreateComment(AnyRepo(), AnyInt(), AnyString()).GetCapturedArguments()
-			assertCommentEquals(t, c.ExpAutoplanCommentFile, autoplanComment, c.RepoDir)
+			if c.ExpAutoplanCommentFile != "" {
+				_, _, autoplanComment := vcsClient.VerifyWasCalledOnce().CreateComment(AnyRepo(), AnyInt(), AnyString()).GetCapturedArguments()
+				assertCommentEquals(t, c.ExpAutoplanCommentFile, autoplanComment, c.RepoDir)
+			}
 
 			// Now send any other comments.
 			for i := 0; i < len(c.CommentAndReplies); i += 2 {
@@ -414,9 +427,10 @@ func assertCommentEquals(t *testing.T, expFile string, act string, repoDir strin
 	exp, err := ioutil.ReadFile(filepath.Join(absRepoPath(t, repoDir), expFile))
 	Ok(t, err)
 
-	// Replace all 'ID: 1111818181' strings with * so we can do a comparison.
-	idRegex := regexp.MustCompile(`\(ID: [0-9]+\)`)
-	act = idRegex.ReplaceAllString(act, "(ID: ******************)")
+	// Replace all 'Creation complete after 1s ID: 1111818181' strings with
+	// 'Creation complete after *s ID: **********' so we can do a comparison.
+	idRegex := regexp.MustCompile(`Creation complete after [0-9]+s \(ID: [0-9]+\)`)
+	act = idRegex.ReplaceAllString(act, "Creation complete after *s (ID: ******************)")
 
 	if string(exp) != act {
 		actFile := filepath.Join(absRepoPath(t, repoDir), expFile+".act")

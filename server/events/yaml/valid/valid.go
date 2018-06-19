@@ -40,9 +40,19 @@ func (s Spec) FindProject(dir string, workspace string) *Project {
 	return nil
 }
 
+func (s Spec) FindProjectByName(name string) *Project {
+	for _, p := range s.Projects {
+		if p.Name != nil && *p.Name == name {
+			return &p
+		}
+	}
+	return nil
+}
+
 type Project struct {
 	Dir               string
 	Workspace         string
+	Name              *string
 	Workflow          *string
 	TerraformVersion  *version.Version
 	Autoplan          Autoplan

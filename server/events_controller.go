@@ -182,7 +182,7 @@ func (e *EventsController) handlePullRequestEvent(w http.ResponseWriter, baseRep
 		// We use a Command to represent autoplanning but we set dir and
 		// workspace to '*' to indicate that all applicable dirs and workspaces
 		// should be planned.
-		autoplanCmd := events.NewCommand("*", nil, events.Plan, false, "*", true)
+		autoplanCmd := events.NewCommand("*", nil, events.Plan, false, "*", "", true)
 		e.Logger.Info("executing command %s", autoplanCmd)
 		if !e.TestingMode {
 			go e.CommandRunner.ExecuteCommand(baseRepo, headRepo, user, pull.Num, autoplanCmd)
@@ -250,7 +250,7 @@ func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo mo
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring non-command comment: %q", truncated)
 		return
 	}
-	e.Logger.Info("parsed comment as %s", parseResult)
+	e.Logger.Info("parsed comment as %s", parseResult.Command)
 
 	// At this point we know it's a command we're not supposed to ignore, so now
 	// we check if this repo is allowed to run commands in the first place.

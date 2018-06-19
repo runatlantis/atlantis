@@ -27,11 +27,13 @@ func TestProject_UnmarshalYAML(t *testing.T) {
 				TerraformVersion:  nil,
 				Autoplan:          nil,
 				ApplyRequirements: nil,
+				Name:              nil,
 			},
 		},
 		{
 			description: "all fields set",
 			input: `
+name: myname
 dir: mydir
 workspace: workspace
 workflow: workflow
@@ -42,6 +44,7 @@ autoplan:
 apply_requirements:
 - mergeable`,
 			exp: raw.Project{
+				Name:             String("myname"),
 				Dir:              String("mydir"),
 				Workspace:        String("workspace"),
 				Workflow:         String("workflow"),
@@ -168,6 +171,7 @@ func TestProject_ToValid(t *testing.T) {
 					Enabled:      true,
 				},
 				ApplyRequirements: nil,
+				Name:              nil,
 			},
 		},
 		{
@@ -182,6 +186,7 @@ func TestProject_ToValid(t *testing.T) {
 					Enabled:      Bool(false),
 				},
 				ApplyRequirements: []string{"approved"},
+				Name:              String("myname"),
 			},
 			exp: valid.Project{
 				Dir:              ".",
@@ -193,6 +198,7 @@ func TestProject_ToValid(t *testing.T) {
 					Enabled:      false,
 				},
 				ApplyRequirements: []string{"approved"},
+				Name:              String("myname"),
 			},
 		},
 		{

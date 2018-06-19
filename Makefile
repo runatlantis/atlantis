@@ -35,6 +35,9 @@ regen-mocks: ## Delete all mocks and then run go generate to regen them
 	go generate $$(go list ./... | grep -v e2e | grep -v vendor | grep -v static)
 
 test: ## Run tests
+	@go test -short $(PKG)
+
+test-all: ## Run tests including integration
 	@go test $(PKG)
 
 test-coverage:
