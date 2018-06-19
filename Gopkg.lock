@@ -2,6 +2,30 @@
 
 
 [[projects]]
+  name = "github.com/Masterminds/semver"
+  packages = ["."]
+  revision = "c7af12943936e8c39859482e61f0574c2fd7fc75"
+  version = "v1.4.2"
+
+[[projects]]
+  name = "github.com/Masterminds/sprig"
+  packages = ["."]
+  revision = "6b2a58267f6a8b1dc8e2eb5519b984008fa85e8c"
+  version = "v2.15.0"
+
+[[projects]]
+  name = "github.com/Sirupsen/logrus"
+  packages = ["."]
+  revision = "c155da19408a8799da419ed3eeb0cb5db0ad5dbc"
+  version = "v1.0.5"
+
+[[projects]]
+  name = "github.com/aokoli/goutils"
+  packages = ["."]
+  revision = "3391d3790d23d03408670993e957e8f408993c34"
+  version = "v1.0.1"
+
+[[projects]]
   name = "github.com/boltdb/bolt"
   packages = ["."]
   revision = "2f1ce7a837dcb8da3ec595b1dac9d0632f0f99e8"
@@ -12,6 +36,18 @@
   packages = ["."]
   revision = "48dbb65d7bd5c74ab50d53d04c949f20e3d14944"
   version = "1.0"
+
+[[projects]]
+  name = "github.com/davecgh/go-spew"
+  packages = ["spew"]
+  revision = "346938d642f2ec3594ed81d874461961cd0faa76"
+  version = "v1.1.0"
+
+[[projects]]
+  name = "github.com/docker/docker"
+  packages = ["pkg/fileutils"]
+  revision = "092cba3727bb9b4a2f0e922cd6c0f93ea270e363"
+  version = "v1.13.1"
 
 [[projects]]
   branch = "master"
@@ -38,6 +74,12 @@
   version = "v1.4.2"
 
 [[projects]]
+  name = "github.com/go-ozzo/ozzo-validation"
+  packages = ["."]
+  revision = "85dcd8368eba387e65a03488b003e233994e87e9"
+  version = "v3.3"
+
+[[projects]]
   name = "github.com/go-test/deep"
   packages = ["."]
   revision = "6592d9cc0a499ad2d5f574fde80a2b5c5cc3b4f5"
@@ -54,6 +96,12 @@
   name = "github.com/google/go-querystring"
   packages = ["query"]
   revision = "53e6ce116135b80d037921a7fdd5138cf32d7a8a"
+
+[[projects]]
+  name = "github.com/google/uuid"
+  packages = ["."]
+  revision = "064e2069ce9c359c118179501254f67d7d37ba24"
+  version = "0.2"
 
 [[projects]]
   name = "github.com/gorilla/context"
@@ -100,6 +148,18 @@
     "json/token"
   ]
   revision = "68e816d1c783414e79bc65b3994d9ab6b0a722ab"
+
+[[projects]]
+  name = "github.com/huandu/xstrings"
+  packages = ["."]
+  revision = "2bf18b218c51864a87384c06996e40ff9dcff8e1"
+  version = "v1.0.0"
+
+[[projects]]
+  name = "github.com/imdario/mergo"
+  packages = ["."]
+  revision = "9316a62528ac99aaecb4e47eadd6dc8aa6533d58"
+  version = "v0.3.5"
 
 [[projects]]
   name = "github.com/inconshreveable/mousetrap"
@@ -248,7 +308,11 @@
 [[projects]]
   branch = "master"
   name = "golang.org/x/crypto"
-  packages = ["ssh/terminal"]
+  packages = [
+    "pbkdf2",
+    "scrypt",
+    "ssh/terminal"
+  ]
   revision = "7d9177d70076375b9a59c8fde23d52d9c4a7ecd5"
 
 [[projects]]
@@ -288,6 +352,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "6e38170b3ac78890d7f3af87171bc9ccf81083b5196342b2f5acea10125872bd"
+  inputs-digest = "148489fcbc8e0f37944adc0eb2f9f187995790c5107188e9f4bebb79f7989434"
   solver-name = "gps-cdcl"
   solver-version = 1
