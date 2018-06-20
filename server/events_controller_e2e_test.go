@@ -404,6 +404,8 @@ func initializeRepo(t *testing.T, repoDir string) (string, string, func()) {
 	runCmd(t, destDir, "git", "init")
 	runCmd(t, destDir, "touch", ".gitkeep")
 	runCmd(t, destDir, "git", "add", ".gitkeep")
+	runCmd(t, destDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, destDir, "git", "config", "--local", "user.name", "atlantisbot")
 	runCmd(t, destDir, "git", "commit", "-m", "initial commit")
 	runCmd(t, destDir, "git", "checkout", "-b", "branch")
 	runCmd(t, destDir, "git", "add", ".")
