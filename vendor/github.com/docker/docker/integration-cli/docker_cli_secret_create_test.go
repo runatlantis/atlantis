@@ -8,67 +8,28 @@ import (
 	"strings"
 
 	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/pkg/integration/checker"
+	"github.com/docker/docker/integration-cli/checker"
 	"github.com/go-check/check"
 )
-
-func (s *DockerSwarmSuite) TestSecretCreate(c *check.C) {
-	d := s.AddDaemon(c, true, true)
-
-	testName := "test_secret"
-	id := d.createSecret(c, swarm.SecretSpec{
-		swarm.Annotations{
-			Name: testName,
-		},
-		[]byte("TESTINGDATA"),
-	})
-	c.Assert(id, checker.Not(checker.Equals), "", check.Commentf("secrets: %s", id))
-
-	secret := d.getSecret(c, id)
-	c.Assert(secret.Spec.Name, checker.Equals, testName)
-}
-
-func (s *DockerSwarmSuite) TestSecretCreateWithLabels(c *check.C) {
-	d := s.AddDaemon(c, true, true)
-
-	testName := "test_secret"
-	id := d.createSecret(c, swarm.SecretSpec{
-		swarm.Annotations{
-			Name: testName,
-			Labels: map[string]string{
-				"key1": "value1",
-				"key2": "value2",
-			},
-		},
-		[]byte("TESTINGDATA"),
-	})
-	c.Assert(id, checker.Not(checker.Equals), "", check.Commentf("secrets: %s", id))
-
-	secret := d.getSecret(c, id)
-	c.Assert(secret.Spec.Name, checker.Equals, testName)
-	c.Assert(len(secret.Spec.Labels), checker.Equals, 2)
-	c.Assert(secret.Spec.Labels["key1"], checker.Equals, "value1")
-	c.Assert(secret.Spec.Labels["key2"], checker.Equals, "value2")
-}
 
 // Test case for 28884
 func (s *DockerSwarmSuite) TestSecretCreateResolve(c *check.C) {
 	d := s.AddDaemon(c, true, true)
 
-	name := "foo"
-	id := d.createSecret(c, swarm.SecretSpec{
-		swarm.Annotations{
+	name := "test_secret"
+	id := d.CreateSecret(c, swarm.SecretSpec{
+		Annotations: swarm.Annotations{
 			Name: name,
 		},
-		[]byte("foo"),
+		Data: []byte("foo"),
 	})
 	c.Assert(id, checker.Not(checker.Equals), "", check.Commentf("secrets: %s", id))
 
-	fake := d.createSecret(c, swarm.SecretSpec{
-		swarm.Annotations{
+	fake := d.CreateSecret(c, swarm.SecretSpec{
+		Annotations: swarm.Annotations{
 			Name: id,
 		},
-		[]byte("fake foo"),
+		Data: []byte("fake foo"),
 	})
 	c.Assert(fake, checker.Not(checker.Equals), "", check.Commentf("secrets: %s", fake))
 
@@ -101,7 +62,7 @@ func (s *DockerSwarmSuite) TestSecretCreateResolve(c *check.C) {
 
 	// Remove based on ID prefix of the fake one should succeed
 	out, err = d.Cmd("secret", "rm", fake[:5])
-	c.Assert(out, checker.Contains, fake)
+	c.Assert(out, checker.Contains, fake[:5])
 	out, err = d.Cmd("secret", "ls")
 	c.Assert(err, checker.IsNil)
 	c.Assert(out, checker.Not(checker.Contains), name)
@@ -126,6 +87,6 @@ func (s *DockerSwarmSuite) TestSecretCreateWithFile(c *check.C) {
 	c.Assert(strings.TrimSpace(out), checker.Not(checker.Equals), "", check.Commentf(out))
 
 	id := strings.TrimSpace(out)
-	secret := d.getSecret(c, id)
+	secret := d.GetSecret(c, id)
 	c.Assert(secret.Spec.Name, checker.Equals, testName)
 }

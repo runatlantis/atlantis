@@ -1,25 +1,13 @@
-package network
+package network // import "github.com/docker/docker/api/server/router/network"
 
 import (
-	"fmt"
-
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/runconfig"
 )
 
-var (
-	// AcceptedFilters is an acceptable filters for validation
-	AcceptedFilters = map[string]bool{
-		"driver": true,
-		"type":   true,
-		"name":   true,
-		"id":     true,
-		"label":  true,
-	}
-)
-
-func filterNetworkByType(nws []types.NetworkResource, netType string) (retNws []types.NetworkResource, err error) {
+func filterNetworkByType(nws []types.NetworkResource, netType string) ([]types.NetworkResource, error) {
+	retNws := []types.NetworkResource{}
 	switch netType {
 	case "builtin":
 		for _, nw := range nws {
@@ -34,10 +22,18 @@ func filterNetworkByType(nws []types.NetworkResource, netType string) (retNws []
 			}
 		}
 	default:
-		return nil, fmt.Errorf("Invalid filter: 'type'='%s'", netType)
+		return nil, invalidFilter(netType)
 	}
 	return retNws, nil
 }
+
+type invalidFilter string
+
+func (e invalidFilter) Error() string {
+	return "Invalid filter: 'type'='" + string(e) + "'"
+}
+
+func (e invalidFilter) InvalidParameter() {}
 
 // filterNetworks filters network list according to user specified filter
 // and returns user chosen networks
@@ -47,37 +43,38 @@ func filterNetworks(nws []types.NetworkResource, filter filters.Args) ([]types.N
 		return nws, nil
 	}
 
-	if err := filter.Validate(AcceptedFilters); err != nil {
-		return nil, err
-	}
-
 	displayNet := []types.NetworkResource{}
 	for _, nw := range nws {
-		if filter.Include("driver") {
+		if filter.Contains("driver") {
 			if !filter.ExactMatch("driver", nw.Driver) {
 				continue
 			}
 		}
-		if filter.Include("name") {
+		if filter.Contains("name") {
 			if !filter.Match("name", nw.Name) {
 				continue
 			}
 		}
-		if filter.Include("id") {
+		if filter.Contains("id") {
 			if !filter.Match("id", nw.ID) {
 				continue
 			}
 		}
-		if filter.Include("label") {
+		if filter.Contains("label") {
 			if !filter.MatchKVList("label", nw.Labels) {
+				continue
+			}
+		}
+		if filter.Contains("scope") {
+			if !filter.ExactMatch("scope", nw.Scope) {
 				continue
 			}
 		}
 		displayNet = append(displayNet, nw)
 	}
 
-	if filter.Include("type") {
-		var typeNet []types.NetworkResource
+	if filter.Contains("type") {
+		typeNet := []types.NetworkResource{}
 		errFilter := filter.WalkValues("type", func(fval string) error {
 			passList, err := filterNetworkByType(displayNet, fval)
 			if err != nil {

@@ -2,31 +2,15 @@ package main
 
 import (
 	"os"
-	"os/exec"
 	"strings"
 
-	"github.com/docker/docker/pkg/integration/checker"
+	"github.com/docker/docker/integration-cli/checker"
 	"github.com/go-check/check"
+	"gotest.tools/icmd"
 )
 
-// export an image and try to import it into a new one
-func (s *DockerSuite) TestExportContainerAndImportImage(c *check.C) {
-	testRequires(c, DaemonIsLinux)
-	containerID := "testexportcontainerandimportimage"
-
-	dockerCmd(c, "run", "--name", containerID, "busybox", "true")
-
-	out, _ := dockerCmd(c, "export", containerID)
-
-	importCmd := exec.Command(dockerBinary, "import", "-", "repo/testexp:v1")
-	importCmd.Stdin = strings.NewReader(out)
-	out, _, err := runCommandWithOutput(importCmd)
-	c.Assert(err, checker.IsNil, check.Commentf("failed to import image repo/testexp:v1: %s", out))
-
-	cleanedImageID := strings.TrimSpace(out)
-	c.Assert(cleanedImageID, checker.Not(checker.Equals), "", check.Commentf("output should have been an image id"))
-}
-
+// TODO: Move this test to docker/cli, as it is essentially the same test
+// as TestExportContainerAndImportImage except output to a file.
 // Used to test output flag in the export command
 func (s *DockerSuite) TestExportContainerWithOutputAndImportImage(c *check.C) {
 	testRequires(c, DaemonIsLinux)
@@ -36,14 +20,15 @@ func (s *DockerSuite) TestExportContainerWithOutputAndImportImage(c *check.C) {
 	dockerCmd(c, "export", "--output=testexp.tar", containerID)
 	defer os.Remove("testexp.tar")
 
-	out, _, err := runCommandWithOutput(exec.Command("cat", "testexp.tar"))
-	c.Assert(err, checker.IsNil, check.Commentf(out))
+	resultCat := icmd.RunCommand("cat", "testexp.tar")
+	resultCat.Assert(c, icmd.Success)
 
-	importCmd := exec.Command(dockerBinary, "import", "-", "repo/testexp:v1")
-	importCmd.Stdin = strings.NewReader(out)
-	out, _, err = runCommandWithOutput(importCmd)
-	c.Assert(err, checker.IsNil, check.Commentf("failed to import image repo/testexp:v1: %s", out))
+	result := icmd.RunCmd(icmd.Cmd{
+		Command: []string{dockerBinary, "import", "-", "repo/testexp:v1"},
+		Stdin:   strings.NewReader(resultCat.Combined()),
+	})
+	result.Assert(c, icmd.Success)
 
-	cleanedImageID := strings.TrimSpace(out)
+	cleanedImageID := strings.TrimSpace(result.Combined())
 	c.Assert(cleanedImageID, checker.Not(checker.Equals), "", check.Commentf("output should have been an image id"))
 }

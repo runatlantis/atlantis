@@ -1,7 +1,8 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -10,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/docker/docker/api/types"
-	"golang.org/x/net/context"
 )
 
 func TestCheckpointListError(t *testing.T) {
@@ -53,5 +53,16 @@ func TestCheckpointList(t *testing.T) {
 	}
 	if len(checkpoints) != 1 {
 		t.Fatalf("expected 1 checkpoint, got %v", checkpoints)
+	}
+}
+
+func TestCheckpointListContainerNotFound(t *testing.T) {
+	client := &Client{
+		client: newMockClient(errorMock(http.StatusNotFound, "Server error")),
+	}
+
+	_, err := client.CheckpointList(context.Background(), "unknown", types.CheckpointListOptions{})
+	if err == nil || !IsErrNotFound(err) {
+		t.Fatalf("expected a containerNotFound error, got %v", err)
 	}
 }

@@ -1,21 +1,21 @@
-package httputils
+package httputils // import "github.com/docker/docker/api/server/httputils"
 
 import (
-	"fmt"
+	"context"
 	"io"
+	"mime"
 	"net/http"
 	"strings"
 
-	"golang.org/x/net/context"
-
-	"github.com/docker/docker/api"
+	"github.com/docker/docker/errdefs"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
-// APIVersionKey is the client's requested API version.
-const APIVersionKey = "api-version"
+type contextKey string
 
-// UAStringKey is used as key type for user-agent string in net/context struct
-const UAStringKey = "upstream-user-agent"
+// APIVersionKey is the client's requested API version.
+const APIVersionKey contextKey = "api-version"
 
 // APIFunc is an adapter to allow the use of ordinary functions as Docker API endpoints.
 // Any function that has the appropriate signature can be registered as an API endpoint (e.g. getVersion).
@@ -58,10 +58,10 @@ func CheckForJSON(r *http.Request) error {
 	}
 
 	// Otherwise it better be json
-	if api.MatchesContentType(ct, "application/json") {
+	if matchesContentType(ct, "application/json") {
 		return nil
 	}
-	return fmt.Errorf("Content-Type specified (%s) must be 'application/json'", ct)
+	return errdefs.InvalidParameter(errors.Errorf("Content-Type specified (%s) must be 'application/json'", ct))
 }
 
 // ParseForm ensures the request form is parsed even with invalid content types.
@@ -71,20 +71,30 @@ func ParseForm(r *http.Request) error {
 		return nil
 	}
 	if err := r.ParseForm(); err != nil && !strings.HasPrefix(err.Error(), "mime:") {
-		return err
+		return errdefs.InvalidParameter(err)
 	}
 	return nil
 }
 
 // VersionFromContext returns an API version from the context using APIVersionKey.
 // It panics if the context value does not have version.Version type.
-func VersionFromContext(ctx context.Context) (ver string) {
+func VersionFromContext(ctx context.Context) string {
 	if ctx == nil {
-		return
+		return ""
 	}
-	val := ctx.Value(APIVersionKey)
-	if val == nil {
-		return
+
+	if val := ctx.Value(APIVersionKey); val != nil {
+		return val.(string)
 	}
-	return val.(string)
+
+	return ""
+}
+
+// matchesContentType validates the content type against the expected one
+func matchesContentType(contentType, expectedType string) bool {
+	mimetype, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		logrus.Errorf("Error parsing media type: %s error: %v", contentType, err)
+	}
+	return err == nil && mimetype == expectedType
 }

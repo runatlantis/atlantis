@@ -1,7 +1,8 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -10,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/docker/docker/api/types"
-	"golang.org/x/net/context"
 )
 
 func TestContainerCommitError(t *testing.T) {
@@ -91,6 +91,6 @@ func TestContainerCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	if r.ID != "new_container_id" {
-		t.Fatalf("expected `container_id`, got %s", r.ID)
+		t.Fatalf("expected `new_container_id`, got %s", r.ID)
 	}
 }

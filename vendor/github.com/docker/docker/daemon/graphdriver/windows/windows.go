@@ -1,6 +1,6 @@
 //+build windows
 
-package windows
+package windows // import "github.com/docker/docker/daemon/graphdriver/windows"
 
 import (
 	"bufio"
@@ -24,14 +24,16 @@ import (
 	"github.com/Microsoft/go-winio/archive/tar"
 	"github.com/Microsoft/go-winio/backuptar"
 	"github.com/Microsoft/hcsshim"
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/daemon/graphdriver"
 	"github.com/docker/docker/pkg/archive"
+	"github.com/docker/docker/pkg/containerfs"
 	"github.com/docker/docker/pkg/idtools"
 	"github.com/docker/docker/pkg/ioutils"
 	"github.com/docker/docker/pkg/longpath"
 	"github.com/docker/docker/pkg/reexec"
+	"github.com/docker/docker/pkg/system"
 	units "github.com/docker/go-units"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
 )
 
@@ -93,6 +95,10 @@ func InitFilter(home string, options []string, uidMaps, gidMaps []idtools.IDMap)
 		return nil, fmt.Errorf("%s is on an ReFS volume - ReFS volumes are not supported", home)
 	}
 
+	if err := idtools.MkdirAllAndChown(home, 0700, idtools.IDPair{UID: 0, GID: 0}); err != nil {
+		return nil, fmt.Errorf("windowsfilter failed to create '%s': %v", home, err)
+	}
+
 	d := &Driver{
 		info: hcsshim.DriverInfo{
 			HomeDir: home,
@@ -119,7 +125,7 @@ func getFileSystemType(drive string) (fsType string, hr error) {
 		modkernel32              = windows.NewLazySystemDLL("kernel32.dll")
 		procGetVolumeInformation = modkernel32.NewProc("GetVolumeInformationW")
 		buf                      = make([]uint16, 255)
-		size                     = syscall.MAX_PATH + 1
+		size                     = windows.MAX_PATH + 1
 	)
 	if len(drive) != 1 {
 		hr = errors.New("getFileSystemType must be called with a drive letter")
@@ -127,11 +133,11 @@ func getFileSystemType(drive string) (fsType string, hr error) {
 	}
 	drive += `:\`
 	n := uintptr(unsafe.Pointer(nil))
-	r0, _, _ := syscall.Syscall9(procGetVolumeInformation.Addr(), 8, uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(drive))), n, n, n, n, n, uintptr(unsafe.Pointer(&buf[0])), uintptr(size), 0)
+	r0, _, _ := syscall.Syscall9(procGetVolumeInformation.Addr(), 8, uintptr(unsafe.Pointer(windows.StringToUTF16Ptr(drive))), n, n, n, n, n, uintptr(unsafe.Pointer(&buf[0])), uintptr(size), 0)
 	if int32(r0) < 0 {
 		hr = syscall.Errno(win32FromHresult(r0))
 	}
-	fsType = syscall.UTF16ToString(buf)
+	fsType = windows.UTF16ToString(buf)
 	return
 }
 
@@ -265,19 +271,35 @@ func (d *Driver) Remove(id string) error {
 	// it is a transient error. Retry until it succeeds.
 	var computeSystems []hcsshim.ContainerProperties
 	retryCount := 0
+	osv := system.GetOSVersion()
 	for {
-		// Get and terminate any template VMs that are currently using the layer
+		// Get and terminate any template VMs that are currently using the layer.
+		// Note: It is unfortunate that we end up in the graphdrivers Remove() call
+		// for both containers and images, but the logic for template VMs is only
+		// needed for images - specifically we are looking to see if a base layer
+		// is in use by a template VM as a result of having started a Hyper-V
+		// container at some point.
+		//
+		// We have a retry loop for ErrVmcomputeOperationInvalidState and
+		// ErrVmcomputeOperationAccessIsDenied as there is a race condition
+		// in RS1 and RS2 building during enumeration when a silo is going away
+		// for example under it, in HCS. AccessIsDenied added to fix 30278.
+		//
+		// TODO @jhowardmsft - For RS3, we can remove the retries. Also consider
+		// using platform APIs (if available) to get this more succinctly. Also
+		// consider enhancing the Remove() interface to have context of why
+		// the remove is being called - that could improve efficiency by not
+		// enumerating compute systems during a remove of a container as it's
+		// not required.
 		computeSystems, err = hcsshim.GetContainers(hcsshim.ComputeSystemQuery{})
 		if err != nil {
-			if err == hcsshim.ErrVmcomputeOperationInvalidState {
-				if retryCount >= 5 {
-					// If we are unable to get the list of containers
-					// go ahead and attempt to delete the layer anyway
-					// as it will most likely work.
+			if (osv.Build < 15139) &&
+				((err == hcsshim.ErrVmcomputeOperationInvalidState) || (err == hcsshim.ErrVmcomputeOperationAccessIsDenied)) {
+				if retryCount >= 500 {
 					break
 				}
 				retryCount++
-				time.Sleep(2 * time.Second)
+				time.Sleep(10 * time.Millisecond)
 				continue
 			}
 			return err
@@ -318,45 +340,53 @@ func (d *Driver) Remove(id string) error {
 	return nil
 }
 
+// GetLayerPath gets the layer path on host
+func (d *Driver) GetLayerPath(id string) (string, error) {
+	return d.dir(id), nil
+}
+
 // Get returns the rootfs path for the id. This will mount the dir at its given path.
-func (d *Driver) Get(id, mountLabel string) (string, error) {
+func (d *Driver) Get(id, mountLabel string) (containerfs.ContainerFS, error) {
 	logrus.Debugf("WindowsGraphDriver Get() id %s mountLabel %s", id, mountLabel)
 	var dir string
 
 	rID, err := d.resolveID(id)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if count := d.ctr.Increment(rID); count > 1 {
-		return d.cache[rID], nil
+		return containerfs.NewLocalContainerFS(d.cache[rID]), nil
 	}
 
 	// Getting the layer paths must be done outside of the lock.
 	layerChain, err := d.getLayerChain(rID)
 	if err != nil {
 		d.ctr.Decrement(rID)
-		return "", err
+		return nil, err
 	}
 
 	if err := hcsshim.ActivateLayer(d.info, rID); err != nil {
 		d.ctr.Decrement(rID)
-		return "", err
+		return nil, err
 	}
 	if err := hcsshim.PrepareLayer(d.info, rID, layerChain); err != nil {
 		d.ctr.Decrement(rID)
 		if err2 := hcsshim.DeactivateLayer(d.info, rID); err2 != nil {
 			logrus.Warnf("Failed to Deactivate %s: %s", id, err)
 		}
-		return "", err
+		return nil, err
 	}
 
 	mountPath, err := hcsshim.GetLayerMountPath(d.info, rID)
 	if err != nil {
 		d.ctr.Decrement(rID)
+		if err := hcsshim.UnprepareLayer(d.info, rID); err != nil {
+			logrus.Warnf("Failed to Unprepare %s: %s", id, err)
+		}
 		if err2 := hcsshim.DeactivateLayer(d.info, rID); err2 != nil {
 			logrus.Warnf("Failed to Deactivate %s: %s", id, err)
 		}
-		return "", err
+		return nil, err
 	}
 	d.cacheMu.Lock()
 	d.cache[rID] = mountPath
@@ -370,7 +400,7 @@ func (d *Driver) Get(id, mountLabel string) (string, error) {
 		dir = d.dir(id)
 	}
 
-	return dir, nil
+	return containerfs.NewLocalContainerFS(dir), nil
 }
 
 // Put adds a new layer to the driver.
@@ -385,8 +415,14 @@ func (d *Driver) Put(id string) error {
 		return nil
 	}
 	d.cacheMu.Lock()
+	_, exists := d.cache[rID]
 	delete(d.cache, rID)
 	d.cacheMu.Unlock()
+
+	// If the cache was not populated, then the layer was left unprepared and deactivated
+	if !exists {
+		return nil
+	}
 
 	if err := hcsshim.UnprepareLayer(d.info, rID); err != nil {
 		return err
@@ -395,7 +431,31 @@ func (d *Driver) Put(id string) error {
 }
 
 // Cleanup ensures the information the driver stores is properly removed.
+// We use this opportunity to cleanup any -removing folders which may be
+// still left if the daemon was killed while it was removing a layer.
 func (d *Driver) Cleanup() error {
+	items, err := ioutil.ReadDir(d.info.HomeDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	// Note we don't return an error below - it's possible the files
+	// are locked. However, next time around after the daemon exits,
+	// we likely will be able to to cleanup successfully. Instead we log
+	// warnings if there are errors.
+	for _, item := range items {
+		if item.IsDir() && strings.HasSuffix(item.Name(), "-removing") {
+			if err := hcsshim.DestroyLayer(d.info, item.Name()); err != nil {
+				logrus.Warnf("Failed to cleanup %s: %s", item.Name(), err)
+			} else {
+				logrus.Infof("Cleaned up %s", item.Name())
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -544,7 +604,7 @@ func (d *Driver) DiffSize(id, parent string) (size int64, err error) {
 	}
 	defer d.Put(id)
 
-	return archive.ChangesSize(layerFs, changes), nil
+	return archive.ChangesSize(layerFs.Path(), changes), nil
 }
 
 // GetMetadata returns custom driver information.
@@ -724,7 +784,7 @@ func writeLayerReexec() {
 }
 
 // writeLayer writes a layer from a tar file.
-func writeLayer(layerData io.Reader, home string, id string, parentLayerPaths ...string) (int64, error) {
+func writeLayer(layerData io.Reader, home string, id string, parentLayerPaths ...string) (size int64, retErr error) {
 	err := winio.EnableProcessPrivileges([]string{winio.SeBackupPrivilege, winio.SeRestorePrivilege})
 	if err != nil {
 		return 0, err
@@ -749,17 +809,17 @@ func writeLayer(layerData io.Reader, home string, id string, parentLayerPaths ..
 		return 0, err
 	}
 
-	size, err := writeLayerFromTar(layerData, w, filepath.Join(home, id))
-	if err != nil {
-		return 0, err
-	}
+	defer func() {
+		if err := w.Close(); err != nil {
+			// This error should not be discarded as a failure here
+			// could result in an invalid layer on disk
+			if retErr == nil {
+				retErr = err
+			}
+		}
+	}()
 
-	err = w.Close()
-	if err != nil {
-		return 0, err
-	}
-
-	return size, nil
+	return writeLayerFromTar(layerData, w, filepath.Join(home, id))
 }
 
 // resolveID computes the layerID information based on the given id.
@@ -775,11 +835,7 @@ func (d *Driver) resolveID(id string) (string, error) {
 
 // setID stores the layerId in disk.
 func (d *Driver) setID(id, altID string) error {
-	err := ioutil.WriteFile(filepath.Join(d.dir(id), "layerId"), []byte(altID), 0600)
-	if err != nil {
-		return err
-	}
-	return nil
+	return ioutil.WriteFile(filepath.Join(d.dir(id), "layerId"), []byte(altID), 0600)
 }
 
 // getLayerChain returns the layer chain information.
@@ -829,14 +885,16 @@ func (fg *fileGetCloserWithBackupPrivileges) Get(filename string) (io.ReadCloser
 	var f *os.File
 	// Open the file while holding the Windows backup privilege. This ensures that the
 	// file can be opened even if the caller does not actually have access to it according
-	// to the security descriptor.
+	// to the security descriptor. Also use sequential file access to avoid depleting the
+	// standby list - Microsoft VSO Bug Tracker #9900466
 	err := winio.RunWithPrivilege(winio.SeBackupPrivilege, func() error {
 		path := longpath.AddPrefix(filepath.Join(fg.path, filename))
-		p, err := syscall.UTF16FromString(path)
+		p, err := windows.UTF16FromString(path)
 		if err != nil {
 			return err
 		}
-		h, err := syscall.CreateFile(&p[0], syscall.GENERIC_READ, syscall.FILE_SHARE_READ, nil, syscall.OPEN_EXISTING, syscall.FILE_FLAG_BACKUP_SEMANTICS, 0)
+		const fileFlagSequentialScan = 0x08000000 // FILE_FLAG_SEQUENTIAL_SCAN
+		h, err := windows.CreateFile(&p[0], windows.GENERIC_READ, windows.FILE_SHARE_READ, nil, windows.OPEN_EXISTING, windows.FILE_FLAG_BACKUP_SEMANTICS|fileFlagSequentialScan, 0)
 		if err != nil {
 			return &os.PathError{Op: "open", Path: path, Err: err}
 		}
@@ -878,8 +936,6 @@ func parseStorageOpt(storageOpt map[string]string) (*storageOptions, error) {
 				return nil, err
 			}
 			options.size = uint64(size)
-		default:
-			return nil, fmt.Errorf("Unknown storage option: %s", key)
 		}
 	}
 	return &options, nil

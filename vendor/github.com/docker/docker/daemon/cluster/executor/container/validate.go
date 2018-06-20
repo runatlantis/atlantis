@@ -1,6 +1,7 @@
-package container
+package container // import "github.com/docker/docker/daemon/cluster/executor/container"
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 
@@ -29,7 +30,7 @@ func validateMounts(mounts []api.Mount) error {
 			}
 		case api.MountTypeTmpfs:
 			if mount.Source != "" {
-				return fmt.Errorf("invalid tmpfs source, source must be empty")
+				return errors.New("invalid tmpfs source, source must be empty")
 			}
 		default:
 			return fmt.Errorf("invalid mount type: %s", mount.Type)

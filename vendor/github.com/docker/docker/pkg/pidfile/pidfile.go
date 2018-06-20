@@ -1,7 +1,7 @@
 // Package pidfile provides structure and helper functions to create and remove
 // PID file. A PID file is usually a file used to store the process ID of a
 // running process.
-package pidfile
+package pidfile // import "github.com/docker/docker/pkg/pidfile"
 
 import (
 	"fmt"
@@ -37,7 +37,7 @@ func New(path string) (*PIDFile, error) {
 		return nil, err
 	}
 	// Note MkdirAll returns nil if a directory already exists
-	if err := system.MkdirAll(filepath.Dir(path), os.FileMode(0755)); err != nil {
+	if err := system.MkdirAll(filepath.Dir(path), os.FileMode(0755), ""); err != nil {
 		return nil, err
 	}
 	if err := ioutil.WriteFile(path, []byte(fmt.Sprintf("%d", os.Getpid())), 0644); err != nil {
@@ -49,8 +49,5 @@ func New(path string) (*PIDFile, error) {
 
 // Remove removes the PIDFile.
 func (file PIDFile) Remove() error {
-	if err := os.Remove(file.path); err != nil {
-		return err
-	}
-	return nil
+	return os.Remove(file.path)
 }

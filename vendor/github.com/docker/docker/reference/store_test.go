@@ -1,4 +1,4 @@
-package reference
+package reference // import "github.com/docker/docker/reference"
 
 import (
 	"bytes"
@@ -8,7 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docker/distribution/digest"
+	"github.com/docker/distribution/reference"
+	"github.com/opencontainers/go-digest"
+	"gotest.tools/assert"
+	is "gotest.tools/assert/cmp"
 )
 
 var (
@@ -45,7 +48,7 @@ func TestLoad(t *testing.T) {
 	}
 
 	for refStr, expectedID := range saveLoadTestCases {
-		ref, err := ParseNamed(refStr)
+		ref, err := reference.ParseNormalizedNamed(refStr)
 		if err != nil {
 			t.Fatalf("failed to parse reference: %v", err)
 		}
@@ -61,10 +64,10 @@ func TestLoad(t *testing.T) {
 
 func TestSave(t *testing.T) {
 	jsonFile, err := ioutil.TempFile("", "tag-store-test")
-	if err != nil {
-		t.Fatalf("error creating temp file: %v", err)
-	}
+	assert.NilError(t, err)
+
 	_, err = jsonFile.Write([]byte(`{}`))
+	assert.NilError(t, err)
 	jsonFile.Close()
 	defer os.RemoveAll(jsonFile.Name())
 
@@ -74,11 +77,11 @@ func TestSave(t *testing.T) {
 	}
 
 	for refStr, id := range saveLoadTestCases {
-		ref, err := ParseNamed(refStr)
+		ref, err := reference.ParseNormalizedNamed(refStr)
 		if err != nil {
 			t.Fatalf("failed to parse reference: %v", err)
 		}
-		if canonical, ok := ref.(Canonical); ok {
+		if canonical, ok := ref.(reference.Canonical); ok {
 			err = store.AddDigest(canonical, id, false)
 			if err != nil {
 				t.Fatalf("could not add digest reference %s: %v", refStr, err)
@@ -120,7 +123,7 @@ func TestAddDeleteGet(t *testing.T) {
 	testImageID3 := digest.Digest("sha256:9655aef5fd742a1b4e1b7b163aa9f1c76c186304bf39102283d80927c916ca9e")
 
 	// Try adding a reference with no tag or digest
-	nameOnly, err := WithName("username/repo")
+	nameOnly, err := reference.ParseNormalizedNamed("username/repo")
 	if err != nil {
 		t.Fatalf("could not parse reference: %v", err)
 	}
@@ -129,7 +132,7 @@ func TestAddDeleteGet(t *testing.T) {
 	}
 
 	// Add a few references
-	ref1, err := ParseNamed("username/repo1:latest")
+	ref1, err := reference.ParseNormalizedNamed("username/repo1:latest")
 	if err != nil {
 		t.Fatalf("could not parse reference: %v", err)
 	}
@@ -137,7 +140,7 @@ func TestAddDeleteGet(t *testing.T) {
 		t.Fatalf("error adding to store: %v", err)
 	}
 
-	ref2, err := ParseNamed("username/repo1:old")
+	ref2, err := reference.ParseNormalizedNamed("username/repo1:old")
 	if err != nil {
 		t.Fatalf("could not parse reference: %v", err)
 	}
@@ -145,7 +148,7 @@ func TestAddDeleteGet(t *testing.T) {
 		t.Fatalf("error adding to store: %v", err)
 	}
 
-	ref3, err := ParseNamed("username/repo1:alias")
+	ref3, err := reference.ParseNormalizedNamed("username/repo1:alias")
 	if err != nil {
 		t.Fatalf("could not parse reference: %v", err)
 	}
@@ -153,7 +156,7 @@ func TestAddDeleteGet(t *testing.T) {
 		t.Fatalf("error adding to store: %v", err)
 	}
 
-	ref4, err := ParseNamed("username/repo2:latest")
+	ref4, err := reference.ParseNormalizedNamed("username/repo2:latest")
 	if err != nil {
 		t.Fatalf("could not parse reference: %v", err)
 	}
@@ -161,11 +164,11 @@ func TestAddDeleteGet(t *testing.T) {
 		t.Fatalf("error adding to store: %v", err)
 	}
 
-	ref5, err := ParseNamed("username/repo3@sha256:58153dfb11794fad694460162bf0cb0a4fa710cfa3f60979c177d920813e267c")
+	ref5, err := reference.ParseNormalizedNamed("username/repo3@sha256:58153dfb11794fad694460162bf0cb0a4fa710cfa3f60979c177d920813e267c")
 	if err != nil {
 		t.Fatalf("could not parse reference: %v", err)
 	}
-	if err = store.AddDigest(ref5.(Canonical), testImageID2, false); err != nil {
+	if err = store.AddDigest(ref5.(reference.Canonical), testImageID2, false); err != nil {
 		t.Fatalf("error adding to store: %v", err)
 	}
 
@@ -228,7 +231,7 @@ func TestAddDeleteGet(t *testing.T) {
 	}
 
 	// Get should return ErrDoesNotExist for a nonexistent repo
-	nonExistRepo, err := ParseNamed("username/nonexistrepo:latest")
+	nonExistRepo, err := reference.ParseNormalizedNamed("username/nonexistrepo:latest")
 	if err != nil {
 		t.Fatalf("could not parse reference: %v", err)
 	}
@@ -237,7 +240,7 @@ func TestAddDeleteGet(t *testing.T) {
 	}
 
 	// Get should return ErrDoesNotExist for a nonexistent tag
-	nonExistTag, err := ParseNamed("username/repo1:nonexist")
+	nonExistTag, err := reference.ParseNormalizedNamed("username/repo1:nonexist")
 	if err != nil {
 		t.Fatalf("could not parse reference: %v", err)
 	}
@@ -263,7 +266,7 @@ func TestAddDeleteGet(t *testing.T) {
 	}
 
 	// Check ReferencesByName
-	repoName, err := WithName("username/repo1")
+	repoName, err := reference.ParseNormalizedNamed("username/repo1")
 	if err != nil {
 		t.Fatalf("could not parse reference: %v", err)
 	}
@@ -303,19 +306,19 @@ func TestAddDeleteGet(t *testing.T) {
 	}
 
 	// Delete a few references
-	if deleted, err := store.Delete(ref1); err != nil || deleted != true {
+	if deleted, err := store.Delete(ref1); err != nil || !deleted {
 		t.Fatal("Delete failed")
 	}
 	if _, err := store.Get(ref1); err != ErrDoesNotExist {
 		t.Fatal("Expected ErrDoesNotExist from Get")
 	}
-	if deleted, err := store.Delete(ref5); err != nil || deleted != true {
+	if deleted, err := store.Delete(ref5); err != nil || !deleted {
 		t.Fatal("Delete failed")
 	}
 	if _, err := store.Get(ref5); err != ErrDoesNotExist {
 		t.Fatal("Expected ErrDoesNotExist from Get")
 	}
-	if deleted, err := store.Delete(nameOnly); err != nil || deleted != true {
+	if deleted, err := store.Delete(nameOnly); err != nil || !deleted {
 		t.Fatal("Delete failed")
 	}
 	if _, err := store.Get(nameOnly); err != ErrDoesNotExist {
@@ -325,32 +328,23 @@ func TestAddDeleteGet(t *testing.T) {
 
 func TestInvalidTags(t *testing.T) {
 	tmpDir, err := ioutil.TempDir("", "tag-store-test")
+	assert.NilError(t, err)
 	defer os.RemoveAll(tmpDir)
 
 	store, err := NewReferenceStore(filepath.Join(tmpDir, "repositories.json"))
-	if err != nil {
-		t.Fatalf("error creating tag store: %v", err)
-	}
+	assert.NilError(t, err)
 	id := digest.Digest("sha256:470022b8af682154f57a2163d030eb369549549cba00edc69e1b99b46bb924d6")
 
 	// sha256 as repo name
-	ref, err := ParseNamed("sha256:abc")
-	if err != nil {
-		t.Fatal(err)
-	}
+	ref, err := reference.ParseNormalizedNamed("sha256:abc")
+	assert.NilError(t, err)
 	err = store.AddTag(ref, id, true)
-	if err == nil {
-		t.Fatalf("expected setting tag %q to fail", ref)
-	}
+	assert.Check(t, is.ErrorContains(err, ""))
 
 	// setting digest as a tag
-	ref, err = ParseNamed("registry@sha256:367eb40fd0330a7e464777121e39d2f5b3e8e23a1e159342e53ab05c9e4d94e6")
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = store.AddTag(ref, id, true)
-	if err == nil {
-		t.Fatalf("expected setting digest %q to fail", ref)
-	}
+	ref, err = reference.ParseNormalizedNamed("registry@sha256:367eb40fd0330a7e464777121e39d2f5b3e8e23a1e159342e53ab05c9e4d94e6")
+	assert.NilError(t, err)
 
+	err = store.AddTag(ref, id, true)
+	assert.Check(t, is.ErrorContains(err, ""))
 }

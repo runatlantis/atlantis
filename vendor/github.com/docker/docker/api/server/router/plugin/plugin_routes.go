@@ -1,20 +1,20 @@
-package plugin
+package plugin // import "github.com/docker/docker/api/server/router/plugin"
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
 
-	distreference "github.com/docker/distribution/reference"
+	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/server/httputils"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/pkg/ioutils"
 	"github.com/docker/docker/pkg/streamformatter"
-	"github.com/docker/docker/reference"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 )
 
 func parseHeaders(headers http.Header) (map[string][]string, *types.AuthConfig) {
@@ -46,39 +46,27 @@ func parseHeaders(headers http.Header) (map[string][]string, *types.AuthConfig) 
 // be returned.
 func parseRemoteRef(remote string) (reference.Named, string, error) {
 	// Parse remote reference, supporting remotes with name and tag
-	// NOTE: Using distribution reference to handle references
-	// containing both a name and digest
-	remoteRef, err := distreference.ParseNamed(remote)
+	remoteRef, err := reference.ParseNormalizedNamed(remote)
 	if err != nil {
 		return nil, "", err
 	}
 
-	var tag string
-	if t, ok := remoteRef.(distreference.Tagged); ok {
-		tag = t.Tag()
+	type canonicalWithTag interface {
+		reference.Canonical
+		Tag() string
 	}
 
-	// Convert distribution reference to docker reference
-	// TODO: remove when docker reference changes reconciled upstream
-	ref, err := reference.WithName(remoteRef.Name())
-	if err != nil {
-		return nil, "", err
-	}
-	if d, ok := remoteRef.(distreference.Digested); ok {
-		ref, err = reference.WithDigest(ref, d.Digest())
+	if canonical, ok := remoteRef.(canonicalWithTag); ok {
+		remoteRef, err = reference.WithDigest(reference.TrimNamed(remoteRef), canonical.Digest())
 		if err != nil {
 			return nil, "", err
 		}
-	} else if tag != "" {
-		ref, err = reference.WithTag(ref, tag)
-		if err != nil {
-			return nil, "", err
-		}
-	} else {
-		ref = reference.WithDefaultTag(ref)
+		return remoteRef, canonical.Tag(), nil
 	}
 
-	return ref, tag, nil
+	remoteRef = reference.TagNameOnly(remoteRef)
+
+	return remoteRef, "", nil
 }
 
 func (pr *pluginRouter) getPrivileges(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
@@ -133,7 +121,7 @@ func (pr *pluginRouter) upgradePlugin(ctx context.Context, w http.ResponseWriter
 		if !output.Flushed() {
 			return err
 		}
-		output.Write(streamformatter.NewJSONStreamFormatter().FormatError(err))
+		output.Write(streamformatter.FormatError(err))
 	}
 
 	return nil
@@ -172,7 +160,7 @@ func (pr *pluginRouter) pullPlugin(ctx context.Context, w http.ResponseWriter, r
 		if !output.Flushed() {
 			return err
 		}
-		output.Write(streamformatter.NewJSONStreamFormatter().FormatError(err))
+		output.Write(streamformatter.FormatError(err))
 	}
 
 	return nil
@@ -187,24 +175,24 @@ func getName(ref reference.Named, tag, name string) (string, error) {
 				if err != nil {
 					return "", err
 				}
-				name = nt.String()
+				name = reference.FamiliarString(nt)
 			} else {
-				name = reference.WithDefaultTag(trimmed).String()
+				name = reference.FamiliarString(reference.TagNameOnly(trimmed))
 			}
 		} else {
-			name = ref.String()
+			name = reference.FamiliarString(ref)
 		}
 	} else {
-		localRef, err := reference.ParseNamed(name)
+		localRef, err := reference.ParseNormalizedNamed(name)
 		if err != nil {
 			return "", err
 		}
 		if _, ok := localRef.(reference.Canonical); ok {
 			return "", errors.New("cannot use digest in plugin tag")
 		}
-		if distreference.IsNameOnly(localRef) {
+		if reference.IsNameOnly(localRef) {
 			// TODO: log change in name to out stream
-			name = reference.WithDefaultTag(localRef).String()
+			name = reference.FamiliarString(reference.TagNameOnly(localRef))
 		}
 	}
 	return name, nil
@@ -280,7 +268,7 @@ func (pr *pluginRouter) pushPlugin(ctx context.Context, w http.ResponseWriter, r
 		if !output.Flushed() {
 			return err
 		}
-		output.Write(streamformatter.NewJSONStreamFormatter().FormatError(err))
+		output.Write(streamformatter.FormatError(err))
 	}
 	return nil
 }
@@ -298,7 +286,15 @@ func (pr *pluginRouter) setPlugin(ctx context.Context, w http.ResponseWriter, r 
 }
 
 func (pr *pluginRouter) listPlugins(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	l, err := pr.backend.List()
+	if err := httputils.ParseForm(r); err != nil {
+		return err
+	}
+
+	pluginFilters, err := filters.FromJSON(r.Form.Get("filters"))
+	if err != nil {
+		return err
+	}
+	l, err := pr.backend.List(pluginFilters)
 	if err != nil {
 		return err
 	}

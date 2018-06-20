@@ -1,14 +1,13 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"testing"
-
-	"golang.org/x/net/context"
 
 	"github.com/docker/docker/api/types"
 )
@@ -21,7 +20,7 @@ func TestImagePullReferenceParseError(t *testing.T) {
 	}
 	// An empty reference is an invalid reference
 	_, err := client.ImagePull(context.Background(), "", types.ImagePullOptions{})
-	if err == nil || err.Error() != "repository name must have at least one component" {
+	if err == nil || !strings.Contains(err.Error(), "invalid reference format") {
 		t.Fatalf("expected an error, got %v", err)
 	}
 }

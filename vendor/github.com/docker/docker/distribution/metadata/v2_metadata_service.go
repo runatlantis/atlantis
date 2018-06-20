@@ -1,4 +1,4 @@
-package metadata
+package metadata // import "github.com/docker/docker/distribution/metadata"
 
 import (
 	"crypto/hmac"
@@ -7,9 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/docker/distribution/digest"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/layer"
+	"github.com/opencontainers/go-digest"
 )
 
 // V2MetadataService maps layer IDs to a set of known metadata for
@@ -38,7 +38,7 @@ type V2Metadata struct {
 	HMAC string
 }
 
-// CheckV2MetadataHMAC return true if the given "meta" is tagged with a hmac hashed by the given "key".
+// CheckV2MetadataHMAC returns true if the given "meta" is tagged with a hmac hashed by the given "key".
 func CheckV2MetadataHMAC(meta *V2Metadata, key []byte) bool {
 	if len(meta.HMAC) == 0 || len(key) == 0 {
 		return len(meta.HMAC) == 0 && len(key) == 0
@@ -84,7 +84,7 @@ func ComputeV2MetadataHMACKey(authConfig *types.AuthConfig) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []byte(digest.FromBytes([]byte(buf))), nil
+	return []byte(digest.FromBytes(buf)), nil
 }
 
 // authConfigKeyInput is a reduced AuthConfig structure holding just relevant credential data eligible for
@@ -203,7 +203,7 @@ func (serv *v2MetadataService) TagAndAdd(diffID layer.DiffID, hmacKey []byte, me
 	return serv.Add(diffID, meta)
 }
 
-// Remove unassociates a metadata entry from a layer DiffID.
+// Remove disassociates a metadata entry from a layer DiffID.
 func (serv *v2MetadataService) Remove(metadata V2Metadata) error {
 	if serv.store == nil {
 		// Support a service which has no backend storage, in this case

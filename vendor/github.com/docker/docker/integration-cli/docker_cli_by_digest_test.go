@@ -8,13 +8,16 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/docker/distribution/digest"
 	"github.com/docker/distribution/manifest/schema1"
 	"github.com/docker/distribution/manifest/schema2"
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/pkg/integration/checker"
-	"github.com/docker/docker/pkg/stringutils"
+	"github.com/docker/docker/integration-cli/checker"
+	"github.com/docker/docker/integration-cli/cli"
+	"github.com/docker/docker/integration-cli/cli/build"
 	"github.com/go-check/check"
+	"github.com/opencontainers/go-digest"
+	"gotest.tools/assert"
+	is "gotest.tools/assert/cmp"
 )
 
 var (
@@ -31,24 +34,23 @@ func setupImage(c *check.C) (digest.Digest, error) {
 func setupImageWithTag(c *check.C, tag string) (digest.Digest, error) {
 	containerName := "busyboxbydigest"
 
-	dockerCmd(c, "run", "-e", "digest=1", "--name", containerName, "busybox")
+	// new file is committed because this layer is used for detecting malicious
+	// changes. if this was committed as empty layer it would be skipped on pull
+	// and malicious changes would never be detected.
+	cli.DockerCmd(c, "run", "-e", "digest=1", "--name", containerName, "busybox", "touch", "anewfile")
 
 	// tag the image to upload it to the private registry
 	repoAndTag := repoName + ":" + tag
-	out, _, err := dockerCmdWithError("commit", containerName, repoAndTag)
-	c.Assert(err, checker.IsNil, check.Commentf("image tagging failed: %s", out))
+	cli.DockerCmd(c, "commit", containerName, repoAndTag)
 
 	// delete the container as we don't need it any more
-	err = deleteContainer(containerName)
-	c.Assert(err, checker.IsNil)
+	cli.DockerCmd(c, "rm", "-fv", containerName)
 
 	// push the image
-	out, _, err = dockerCmdWithError("push", repoAndTag)
-	c.Assert(err, checker.IsNil, check.Commentf("pushing the image to the private registry has failed: %s", out))
+	out := cli.DockerCmd(c, "push", repoAndTag).Combined()
 
 	// delete our local repo that we previously tagged
-	rmiout, _, err := dockerCmdWithError("rmi", repoAndTag)
-	c.Assert(err, checker.IsNil, check.Commentf("error deleting images prior to real test: %s", rmiout))
+	cli.DockerCmd(c, "rmi", repoAndTag)
 
 	matches := pushDigestRegex.FindStringSubmatch(out)
 	c.Assert(matches, checker.HasLen, 2, check.Commentf("unable to parse digest from push output: %s", out))
@@ -193,10 +195,9 @@ func (s *DockerRegistrySuite) TestBuildByDigest(c *check.C) {
 
 	// do the build
 	name := "buildbydigest"
-	_, err = buildImage(name, fmt.Sprintf(
+	buildImageSuccessfully(c, name, build.WithDockerfile(fmt.Sprintf(
 		`FROM %s
-     CMD ["/bin/echo", "Hello World"]`, imageReference),
-		true)
+     CMD ["/bin/echo", "Hello World"]`, imageReference)))
 	c.Assert(err, checker.IsNil)
 
 	// get the build's image id
@@ -403,10 +404,12 @@ func (s *DockerRegistrySuite) TestInspectImageWithDigests(c *check.C) {
 	c.Assert(err, checker.IsNil)
 	c.Assert(imageJSON, checker.HasLen, 1)
 	c.Assert(imageJSON[0].RepoDigests, checker.HasLen, 1)
-	c.Assert(stringutils.InSlice(imageJSON[0].RepoDigests, imageReference), checker.Equals, true)
+	assert.Check(c, is.Contains(imageJSON[0].RepoDigests, imageReference))
 }
 
 func (s *DockerRegistrySuite) TestPsListContainersFilterAncestorImageByDigest(c *check.C) {
+	existingContainers := ExistingContainerIDs(c)
+
 	digest, err := setupImage(c)
 	c.Assert(err, checker.IsNil, check.Commentf("error setting up image"))
 
@@ -417,20 +420,17 @@ func (s *DockerRegistrySuite) TestPsListContainersFilterAncestorImageByDigest(c 
 
 	// build an image from it
 	imageName1 := "images_ps_filter_test"
-	_, err = buildImage(imageName1, fmt.Sprintf(
+	buildImageSuccessfully(c, imageName1, build.WithDockerfile(fmt.Sprintf(
 		`FROM %s
-		 LABEL match me 1`, imageReference), true)
-	c.Assert(err, checker.IsNil)
+		 LABEL match me 1`, imageReference)))
 
 	// run a container based on that
 	dockerCmd(c, "run", "--name=test1", imageReference, "echo", "hello")
-	expectedID, err := getIDByName("test1")
-	c.Assert(err, check.IsNil)
+	expectedID := getIDByName(c, "test1")
 
 	// run a container based on the a descendant of that too
 	dockerCmd(c, "run", "--name=test2", imageName1, "echo", "hello")
-	expectedID1, err := getIDByName("test2")
-	c.Assert(err, check.IsNil)
+	expectedID1 := getIDByName(c, "test2")
 
 	expectedIDs := []string{expectedID, expectedID1}
 
@@ -441,7 +441,7 @@ func (s *DockerRegistrySuite) TestPsListContainersFilterAncestorImageByDigest(c 
 
 	// Valid imageReference
 	out, _ = dockerCmd(c, "ps", "-a", "-q", "--no-trunc", "--filter=ancestor="+imageReference)
-	checkPsAncestorFilterOutput(c, out, imageReference, expectedIDs)
+	checkPsAncestorFilterOutput(c, RemoveOutputForExistingElements(out, existingContainers), imageReference, expectedIDs)
 }
 
 func (s *DockerRegistrySuite) TestDeleteImageByIDOnlyPulledByDigest(c *check.C) {
@@ -533,7 +533,7 @@ func (s *DockerRegistrySuite) TestPullFailsWithAlteredManifest(c *check.C) {
 	c.Assert(err, checker.IsNil, check.Commentf("error setting up image"))
 
 	// Load the target manifest blob.
-	manifestBlob := s.reg.readBlobContents(c, manifestDigest)
+	manifestBlob := s.reg.ReadBlobContents(c, manifestDigest)
 
 	var imgManifest schema2.Manifest
 	err = json.Unmarshal(manifestBlob, &imgManifest)
@@ -544,13 +544,13 @@ func (s *DockerRegistrySuite) TestPullFailsWithAlteredManifest(c *check.C) {
 
 	// Move the existing data file aside, so that we can replace it with a
 	// malicious blob of data. NOTE: we defer the returned undo func.
-	undo := s.reg.tempMoveBlobData(c, manifestDigest)
+	undo := s.reg.TempMoveBlobData(c, manifestDigest)
 	defer undo()
 
 	alteredManifestBlob, err := json.MarshalIndent(imgManifest, "", "   ")
 	c.Assert(err, checker.IsNil, check.Commentf("unable to encode altered image manifest to JSON"))
 
-	s.reg.writeBlobContents(c, manifestDigest, alteredManifestBlob)
+	s.reg.WriteBlobContents(c, manifestDigest, alteredManifestBlob)
 
 	// Now try pulling that image by digest. We should get an error about
 	// digest verification for the manifest digest.
@@ -573,7 +573,7 @@ func (s *DockerSchema1RegistrySuite) TestPullFailsWithAlteredManifest(c *check.C
 	c.Assert(err, checker.IsNil, check.Commentf("error setting up image"))
 
 	// Load the target manifest blob.
-	manifestBlob := s.reg.readBlobContents(c, manifestDigest)
+	manifestBlob := s.reg.ReadBlobContents(c, manifestDigest)
 
 	var imgManifest schema1.Manifest
 	err = json.Unmarshal(manifestBlob, &imgManifest)
@@ -586,13 +586,13 @@ func (s *DockerSchema1RegistrySuite) TestPullFailsWithAlteredManifest(c *check.C
 
 	// Move the existing data file aside, so that we can replace it with a
 	// malicious blob of data. NOTE: we defer the returned undo func.
-	undo := s.reg.tempMoveBlobData(c, manifestDigest)
+	undo := s.reg.TempMoveBlobData(c, manifestDigest)
 	defer undo()
 
 	alteredManifestBlob, err := json.MarshalIndent(imgManifest, "", "   ")
 	c.Assert(err, checker.IsNil, check.Commentf("unable to encode altered image manifest to JSON"))
 
-	s.reg.writeBlobContents(c, manifestDigest, alteredManifestBlob)
+	s.reg.WriteBlobContents(c, manifestDigest, alteredManifestBlob)
 
 	// Now try pulling that image by digest. We should get an error about
 	// digest verification for the manifest digest.
@@ -615,7 +615,7 @@ func (s *DockerRegistrySuite) TestPullFailsWithAlteredLayer(c *check.C) {
 	c.Assert(err, checker.IsNil)
 
 	// Load the target manifest blob.
-	manifestBlob := s.reg.readBlobContents(c, manifestDigest)
+	manifestBlob := s.reg.ReadBlobContents(c, manifestDigest)
 
 	var imgManifest schema2.Manifest
 	err = json.Unmarshal(manifestBlob, &imgManifest)
@@ -626,17 +626,17 @@ func (s *DockerRegistrySuite) TestPullFailsWithAlteredLayer(c *check.C) {
 
 	// Move the existing data file aside, so that we can replace it with a
 	// malicious blob of data. NOTE: we defer the returned undo func.
-	undo := s.reg.tempMoveBlobData(c, targetLayerDigest)
+	undo := s.reg.TempMoveBlobData(c, targetLayerDigest)
 	defer undo()
 
 	// Now make a fake data blob in this directory.
-	s.reg.writeBlobContents(c, targetLayerDigest, []byte("This is not the data you are looking for."))
+	s.reg.WriteBlobContents(c, targetLayerDigest, []byte("This is not the data you are looking for."))
 
 	// Now try pulling that image by digest. We should get an error about
 	// digest verification for the target layer digest.
 
 	// Remove distribution cache to force a re-pull of the blobs
-	if err := os.RemoveAll(filepath.Join(dockerBasePath, "image", s.d.storageDriver, "distribution")); err != nil {
+	if err := os.RemoveAll(filepath.Join(testEnv.DaemonInfo.DockerRootDir, "image", s.d.StorageDriver(), "distribution")); err != nil {
 		c.Fatalf("error clearing distribution cache: %v", err)
 	}
 
@@ -658,7 +658,7 @@ func (s *DockerSchema1RegistrySuite) TestPullFailsWithAlteredLayer(c *check.C) {
 	c.Assert(err, checker.IsNil)
 
 	// Load the target manifest blob.
-	manifestBlob := s.reg.readBlobContents(c, manifestDigest)
+	manifestBlob := s.reg.ReadBlobContents(c, manifestDigest)
 
 	var imgManifest schema1.Manifest
 	err = json.Unmarshal(manifestBlob, &imgManifest)
@@ -669,17 +669,17 @@ func (s *DockerSchema1RegistrySuite) TestPullFailsWithAlteredLayer(c *check.C) {
 
 	// Move the existing data file aside, so that we can replace it with a
 	// malicious blob of data. NOTE: we defer the returned undo func.
-	undo := s.reg.tempMoveBlobData(c, targetLayerDigest)
+	undo := s.reg.TempMoveBlobData(c, targetLayerDigest)
 	defer undo()
 
 	// Now make a fake data blob in this directory.
-	s.reg.writeBlobContents(c, targetLayerDigest, []byte("This is not the data you are looking for."))
+	s.reg.WriteBlobContents(c, targetLayerDigest, []byte("This is not the data you are looking for."))
 
 	// Now try pulling that image by digest. We should get an error about
 	// digest verification for the target layer digest.
 
 	// Remove distribution cache to force a re-pull of the blobs
-	if err := os.RemoveAll(filepath.Join(dockerBasePath, "image", s.d.storageDriver, "distribution")); err != nil {
+	if err := os.RemoveAll(filepath.Join(testEnv.DaemonInfo.DockerRootDir, "image", s.d.StorageDriver(), "distribution")); err != nil {
 		c.Fatalf("error clearing distribution cache: %v", err)
 	}
 

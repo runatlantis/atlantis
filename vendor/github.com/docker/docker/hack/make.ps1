@@ -17,11 +17,12 @@
              development and Windows to Windows CI.
 
              Usage Examples (run from repo root):
-                "hack\make.ps1 -Binary" to build the binaries
-                "hack\make.ps1 -Client" to build just the client 64-bit binary
+                "hack\make.ps1 -Client" to build docker.exe client 64-bit binary (remote repo)
                 "hack\make.ps1 -TestUnit" to run unit tests
-                "hack\make.ps1 -Binary -TestUnit" to build the binaries and run unit tests
-                "hack\make.ps1 -All" to run everything this script knows about
+                "hack\make.ps1 -Daemon -TestUnit" to build the daemon and run unit tests
+                "hack\make.ps1 -All" to run everything this script knows about that can run in a container
+                "hack\make.ps1" to build the daemon binary (same as -Daemon)
+                "hack\make.ps1 -Binary" shortcut to -Client and -Daemon
 
 .PARAMETER Client
      Builds the client binaries.
@@ -30,7 +31,7 @@
      Builds the daemon binary.
 
 .PARAMETER Binary
-     Builds the client binaries and the daemon binary. A convenient shortcut to `make.ps1 -Client -Daemon`.
+     Builds the client and daemon binaries. A convenient shortcut to `make.ps1 -Client -Daemon`.
 
 .PARAMETER Race
      Use -race in go build and go test.
@@ -48,24 +49,23 @@
      Adds a custom string to be appended to the commit ID (spaces are stripped).
 
 .PARAMETER DCO
-     Runs the DCO (Developer Certificate Of Origin) test.
+     Runs the DCO (Developer Certificate Of Origin) test (must be run outside a container).
 
 .PARAMETER PkgImports
-     Runs the pkg\ directory imports test.
+     Runs the pkg\ directory imports test (must be run outside a container).
 
 .PARAMETER GoFormat
-     Runs the Go formatting test.
+     Runs the Go formatting test (must be run outside a container).
 
 .PARAMETER TestUnit
      Runs unit tests.
 
 .PARAMETER All
-     Runs everything this script knows about.
+     Runs everything this script knows about that can run in a container.
 
 
 TODO
 - Unify the head commit
-- Sort out the GITCOMMIT environment variable in the absense of a .git (longer term)
 - Add golint and other checks (swagger maybe?)
 
 #>
@@ -88,6 +88,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$ProgressPreference = "SilentlyContinue"
 $pushed=$False  # To restore the directory if we have temporarily pushed to one.
 
 # Utility function to get the commit ID of the repository
@@ -98,7 +99,7 @@ Function Get-GitCommit() {
         if ($env:DOCKER_GITCOMMIT.Length -eq 0) {
             Throw ".git directory missing and DOCKER_GITCOMMIT environment variable not specified."
         }
-        Write-Host "INFO: Git commit assumed from DOCKER_GITCOMMIT environment variable"
+        Write-Host "INFO: Git commit ($env:DOCKER_GITCOMMIT) assumed from DOCKER_GITCOMMIT environment variable"
         return $env:DOCKER_GITCOMMIT
     }
     $gitCommit=$(git rev-parse --short HEAD)
@@ -113,18 +114,31 @@ Function Get-GitCommit() {
     return $gitCommit
 }
 
-# Utility function to get get the current build version of docker
-Function Get-DockerVersion() {
-    if (-not (Test-Path ".\VERSION")) { Throw "VERSION file not found. Is this running from the root of a docker repository?" }
-    return $(Get-Content ".\VERSION" -raw).ToString().Replace("`n","").Trim()
-}
-
 # Utility function to determine if we are running in a container or not.
 # In Windows, we get this through an environment variable set in `Dockerfile.Windows`
 Function Check-InContainer() {
     if ($env:FROM_DOCKERFILE.Length -eq 0) {
         Write-Host ""
         Write-Warning "Not running in a container. The result might be an incorrect build."
+        Write-Host ""
+        return $False
+    }
+    return $True
+}
+
+# Utility function to warn if the version of go is correct. Used for local builds
+# outside of a container where it may be out of date with master.
+Function Verify-GoVersion() {
+    Try {
+        $goVersionDockerfile=(Get-Content ".\Dockerfile" | Select-String "ENV GO_VERSION").ToString().Split(" ")[2]
+        $goVersionInstalled=(go version).ToString().Split(" ")[2].SubString(2)
+    }
+    Catch [Exception] {
+        Throw "Failed to validate go version correctness: $_"
+    }
+    if (-not($goVersionInstalled -eq $goVersionDockerfile)) {
+        Write-Host ""
+        Write-Warning "Building with golang version $goVersionInstalled. You should update to $goVersionDockerfile"
         Write-Host ""
     }
 }
@@ -156,7 +170,7 @@ Function Execute-Build($type, $additionalBuildTags, $directory) {
     if ($Race)                      { Write-Warning "Using race detector"; $raceParm=" -race"}
     if ($ForceBuildAll)             { $allParm=" -a" }
     if ($NoOpt)                     { $optParm=" -gcflags "+""""+"-N -l"+"""" }
-    if ($addtionalBuildTags -ne "") { $buildTags += $(" " + $additionalBuildTags) }
+    if ($additionalBuildTags -ne "") { $buildTags += $(" " + $additionalBuildTags) }
 
     # Do the go build in the appropriate directory
     # Note -linkmode=internal is required to be able to debug on Windows.
@@ -184,7 +198,7 @@ Function Validate-DCO($headCommit, $upstreamCommit) {
     $usernameRegex='[a-zA-Z0-9][a-zA-Z0-9-]+'
 
     $dcoPrefix="Signed-off-by:"
-    $dcoRegex="^(Docker-DCO-1.1-)?$dcoPrefix ([^<]+) <([^<>@]+@[^<>]+)>( \\(github: ($usernameRegex)\\))?$"
+    $dcoRegex="^(Docker-DCO-1.1-)?$dcoPrefix ([^<]+) <([^<>@]+@[^<>]+)>( \(github: ($usernameRegex)\))?$"
 
     $counts = Invoke-Expression "git diff --numstat $upstreamCommit...$headCommit"
     if ($LASTEXITCODE -ne 0) { Throw "Failed git diff --numstat" }
@@ -237,10 +251,10 @@ Function Validate-PkgImports($headCommit, $upstreamCommit) {
         if ($LASTEXITCODE -ne 0) { Throw "Failed go list for dependencies on $file" }
         $imports = $imports -Replace "\[" -Replace "\]", "" -Split(" ") | Sort-Object | Get-Unique
         # Filter out what we are looking for
-        $imports = $imports -NotMatch "^github.com/docker/docker/pkg/" `
-                            -NotMatch "^github.com/docker/docker/vendor" `
-                            -Match "^github.com/docker/docker" `
-                            -Replace "`n", ""
+        $imports = @() + $imports -NotMatch "^github.com/docker/docker/pkg/" `
+                                  -NotMatch "^github.com/docker/docker/vendor" `
+                                  -Match "^github.com/docker/docker" `
+                                  -Replace "`n", ""
         $imports | % { $badFiles+="$file imports $_`n" }
     }
     if ($badFiles.Length -eq 0) {
@@ -261,7 +275,7 @@ Function Validate-GoFormat($headCommit, $upstreamCommit) {
 
     # Get a list of all go source-code files which have changed.  Ignore exit code on next call - always process regardless
     $files=@(); $files = Invoke-Expression "git diff $upstreamCommit...$headCommit --diff-filter=ACMR --name-only -- `'*.go`'"
-    $files = $files | Select-String -NotMatch "^vendor/" | Select-String -NotMatch "^cli/compose/schema/bindata.go"
+    $files = $files | Select-String -NotMatch "^vendor/"
     $badFiles=@(); $files | %{
         # Deliberately ignore error on next line - treat as failed
         $content=Invoke-Expression "git show $headCommit`:$_"
@@ -273,9 +287,10 @@ Function Validate-GoFormat($headCommit, $upstreamCommit) {
         $outputFile=[System.IO.Path]::GetTempFileName()
         if (Test-Path $outputFile) { Remove-Item $outputFile }
         [System.IO.File]::WriteAllText($outputFile, $content, (New-Object System.Text.UTF8Encoding($False)))
-        $valid=Invoke-Expression "gofmt -s -l $outputFile"
-        Write-Host "Checking $outputFile"
-        if ($valid.Length -ne 0) { $badFiles+=$_ }
+        $currentFile = $_ -Replace("/","\")
+        Write-Host Checking $currentFile
+        Invoke-Expression "gofmt -s -l $outputFile"
+        if ($LASTEXITCODE -ne 0) { $badFiles+=$currentFile }
         if (Test-Path $outputFile) { Remove-Item $outputFile }
     }
     if ($badFiles.Length -eq 0) {
@@ -298,7 +313,7 @@ Function Run-UnitTests() {
     $pkgList = $pkgList | Select-String -Pattern "github.com/docker/docker"
     $pkgList = $pkgList | Select-String -NotMatch "github.com/docker/docker/vendor"
     $pkgList = $pkgList | Select-String -NotMatch "github.com/docker/docker/man"
-    $pkgList = $pkgList | Select-String -NotMatch "github.com/docker/docker/integration-cli"
+    $pkgList = $pkgList | Select-String -NotMatch "github.com/docker/docker/integration"
     $pkgList = $pkgList -replace "`r`n", " "
     $goTestCommand = "go test" + $raceParm + " -cover -ldflags -w -tags """ + "autogen daemon" + """ -a """ + "-test.timeout=10m" + """ $pkgList"
     Invoke-Expression $goTestCommand
@@ -308,16 +323,21 @@ Function Run-UnitTests() {
 # Start of main code.
 Try {
     Write-Host -ForegroundColor Cyan "INFO: make.ps1 starting at $(Get-Date)"
-    $root=$(pwd)
+
+    # Get to the root of the repo
+    $root = $(Split-Path $MyInvocation.MyCommand.Definition -Parent | Split-Path -Parent)
+    Push-Location $root
 
     # Handle the "-All" shortcut to turn on all things we can handle.
-    if ($All) { $Client=$True; $Daemon=$True; $DCO=$True; $PkgImports=$True; $GoFormat=$True; $TestUnit=$True }
+    # Note we expressly only include the items which can run in a container - the validations tests cannot
+    # as they require the .git directory which is excluded from the image by .dockerignore
+    if ($All) { $Client=$True; $Daemon=$True; $TestUnit=$True }
 
     # Handle the "-Binary" shortcut to build both client and daemon.
     if ($Binary) { $Client = $True; $Daemon = $True }
 
-    # Make sure we have something to do
-    if (-not($Client) -and -not($Daemon) -and -not($DCO) -and -not($PkgImports) -and -not($GoFormat) -and -not($TestUnit)) { Throw 'Nothing to do. Try adding "-All" for everything I can do' }
+    # Default to building the daemon if not asked for anything explicitly.
+    if (-not($Client) -and -not($Daemon) -and -not($DCO) -and -not($PkgImports) -and -not($GoFormat) -and -not($TestUnit)) { $Daemon=$True }
 
     # Verify git is installed
     if ($(Get-Command git -ErrorAction SilentlyContinue) -eq $nil) { Throw "Git does not appear to be installed" }
@@ -329,12 +349,15 @@ Try {
     $gitCommit=Get-GitCommit
     if ($CommitSuffix -ne "") { $gitCommit += "-"+$CommitSuffix -Replace ' ', '' }
 
-    # Get the version of docker (eg 1.14.0-dev)
-    $dockerVersion=Get-DockerVersion
+    # Get the version of docker (eg 17.04.0-dev)
+    $dockerVersion="0.0.0-dev"
 
     # Give a warning if we are not running in a container and are building binaries or running unit tests.
     # Not relevant for validation tests as these are fine to run outside of a container.
-    if ($Client -or $Daemon -or $TestUnit) { Check-InContainer }
+    if ($Client -or $Daemon -or $TestUnit) { $inContainer=Check-InContainer }
+
+    # If we are not in a container, validate the version of GO that is installed.
+    if (-not $inContainer) { Verify-GoVersion }
 
     # Verify GOPATH is set
     if ($env:GOPATH.Length -eq 0) { Throw "Missing GOPATH environment variable. See https://golang.org/doc/code.html#GOPATH" }
@@ -342,7 +365,7 @@ Try {
     # Run autogen if building binaries or running unit tests.
     if ($Client -or $Daemon -or $TestUnit) {
         Write-Host "INFO: Invoking autogen..."
-        Try { .\hack\make\.go-autogen.ps1 -CommitString $gitCommit -DockerVersion $dockerVersion }
+        Try { .\hack\make\.go-autogen.ps1 -CommitString $gitCommit -DockerVersion $dockerVersion -Platform "$env:PLATFORM" }
         Catch [Exception] { Throw $_ }
     }
 
@@ -369,7 +392,32 @@ Try {
 
         # Perform the actual build
         if ($Daemon) { Execute-Build "daemon" "daemon" "dockerd" }
-        if ($Client) { Execute-Build "client" "" "docker" }
+        if ($Client) {
+            # Get the Docker channel and version from the environment, or use the defaults.
+            if (-not ($channel = $env:DOCKERCLI_CHANNEL)) { $channel = "edge" }
+            if (-not ($version = $env:DOCKERCLI_VERSION)) { $version = "17.06.0-ce" }
+
+            # Download the zip file and extract the client executable.
+            Write-Host "INFO: Downloading docker/cli version $version from $channel..."
+            $url = "https://download.docker.com/win/static/$channel/x86_64/docker-$version.zip"
+            Invoke-WebRequest $url -OutFile "docker.zip"
+            Try {
+                Add-Type -AssemblyName System.IO.Compression.FileSystem
+                $zip = [System.IO.Compression.ZipFile]::OpenRead("$PWD\docker.zip")
+                Try {
+                    if (-not ($entry = $zip.Entries | Where-Object { $_.Name -eq "docker.exe" })) {
+                        Throw "Cannot find docker.exe in $url"
+                    }
+                    [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, "$PWD\bundles\docker.exe", $true)
+                }
+                Finally {
+                    $zip.Dispose()
+                }
+            }
+            Finally {
+                Remove-Item -Force "docker.zip"
+            }
+        }
     }
 
     # Run unit tests
@@ -403,6 +451,7 @@ Catch [Exception] {
     Throw $_
 }
 Finally {
+    Pop-Location # As we pushed to the root of the repo as the very first thing
     if ($global:pushed) { Pop-Location }
     Write-Host -ForegroundColor Cyan "INFO: make.ps1 ended at $(Get-Date)"
 }

@@ -1,4 +1,4 @@
-package cluster
+package cluster // import "github.com/docker/docker/daemon/cluster"
 
 import (
 	"fmt"
@@ -45,22 +45,6 @@ func newListNodesFilters(filter filters.Args) (*swarmapi.ListNodesRequest_Filter
 	return f, nil
 }
 
-func newListServicesFilters(filter filters.Args) (*swarmapi.ListServicesRequest_Filters, error) {
-	accepted := map[string]bool{
-		"name":  true,
-		"id":    true,
-		"label": true,
-	}
-	if err := filter.Validate(accepted); err != nil {
-		return nil, err
-	}
-	return &swarmapi.ListServicesRequest_Filters{
-		NamePrefixes: filter.Get("name"),
-		IDPrefixes:   filter.Get("id"),
-		Labels:       runconfigopts.ConvertKVStringsToMap(filter.Get("label")),
-	}, nil
-}
-
 func newListTasksFilters(filter filters.Args, transformFunc func(filters.Args) error) (*swarmapi.ListTasksRequest_Filters, error) {
 	accepted := map[string]bool{
 		"name":          true,
@@ -69,6 +53,11 @@ func newListTasksFilters(filter filters.Args, transformFunc func(filters.Args) e
 		"service":       true,
 		"node":          true,
 		"desired-state": true,
+		// UpToDate is not meant to be exposed to users. It's for
+		// internal use in checking create/update progress. Therefore,
+		// we prefix it with a '_'.
+		"_up-to-date": true,
+		"runtime":     true,
 	}
 	if err := filter.Validate(accepted); err != nil {
 		return nil, err
@@ -84,6 +73,8 @@ func newListTasksFilters(filter filters.Args, transformFunc func(filters.Args) e
 		Labels:       runconfigopts.ConvertKVStringsToMap(filter.Get("label")),
 		ServiceIDs:   filter.Get("service"),
 		NodeIDs:      filter.Get("node"),
+		UpToDate:     len(filter.Get("_up-to-date")) != 0,
+		Runtimes:     filter.Get("runtime"),
 	}
 
 	for _, s := range filter.Get("desired-state") {
@@ -109,6 +100,22 @@ func newListSecretsFilters(filter filters.Args) (*swarmapi.ListSecretsRequest_Fi
 	}
 	return &swarmapi.ListSecretsRequest_Filters{
 		Names:        filter.Get("names"),
+		NamePrefixes: filter.Get("name"),
+		IDPrefixes:   filter.Get("id"),
+		Labels:       runconfigopts.ConvertKVStringsToMap(filter.Get("label")),
+	}, nil
+}
+
+func newListConfigsFilters(filter filters.Args) (*swarmapi.ListConfigsRequest_Filters, error) {
+	accepted := map[string]bool{
+		"name":  true,
+		"id":    true,
+		"label": true,
+	}
+	if err := filter.Validate(accepted); err != nil {
+		return nil, err
+	}
+	return &swarmapi.ListConfigsRequest_Filters{
 		NamePrefixes: filter.Get("name"),
 		IDPrefixes:   filter.Get("id"),
 		Labels:       runconfigopts.ConvertKVStringsToMap(filter.Get("label")),

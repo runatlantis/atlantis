@@ -1,4 +1,4 @@
-package filenotify
+package filenotify // import "github.com/docker/docker/pkg/filenotify"
 
 import (
 	"fmt"
@@ -61,7 +61,7 @@ func TestPollerEvent(t *testing.T) {
 	default:
 	}
 
-	if err := ioutil.WriteFile(f.Name(), []byte("hello"), 644); err != nil {
+	if err := ioutil.WriteFile(f.Name(), []byte("hello"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	if err := assertEvent(w, fsnotify.Write); err != nil {
@@ -108,7 +108,7 @@ func assertEvent(w FileWatcher, eType fsnotify.Op) error {
 	select {
 	case e := <-w.Events():
 		if e.Op != eType {
-			err = fmt.Errorf("got wrong event type, expected %q: %v", eType, e)
+			err = fmt.Errorf("got wrong event type, expected %q: %v", eType, e.Op)
 		}
 	case e := <-w.Errors():
 		err = fmt.Errorf("got unexpected error waiting for events %v: %v", eType, e)

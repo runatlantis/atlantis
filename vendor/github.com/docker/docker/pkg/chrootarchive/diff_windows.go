@@ -1,4 +1,4 @@
-package chrootarchive
+package chrootarchive // import "github.com/docker/docker/pkg/chrootarchive"
 
 import (
 	"fmt"
@@ -38,7 +38,7 @@ func applyLayerHandler(dest string, layer io.Reader, options *archive.TarOptions
 	s, err := archive.UnpackLayer(dest, layer, nil)
 	os.RemoveAll(tmpDir)
 	if err != nil {
-		return 0, fmt.Errorf("ApplyLayer %s failed UnpackLayer to %s", err, dest)
+		return 0, fmt.Errorf("ApplyLayer %s failed UnpackLayer to %s: %s", layer, dest, err)
 	}
 
 	return s, nil

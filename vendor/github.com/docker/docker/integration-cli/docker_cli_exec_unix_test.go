@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/pkg/integration/checker"
+	"github.com/docker/docker/integration-cli/checker"
 	"github.com/go-check/check"
 	"github.com/kr/pty"
 )
@@ -25,7 +25,6 @@ func (s *DockerSuite) TestExecInteractiveStdinClose(c *check.C) {
 	c.Assert(err, checker.IsNil)
 
 	b := bytes.NewBuffer(nil)
-	go io.Copy(b, p)
 
 	ch := make(chan error)
 	go func() { ch <- cmd.Wait() }()
@@ -33,9 +32,14 @@ func (s *DockerSuite) TestExecInteractiveStdinClose(c *check.C) {
 	select {
 	case err := <-ch:
 		c.Assert(err, checker.IsNil)
-		output := b.String()
+		io.Copy(b, p)
+		p.Close()
+		bs := b.Bytes()
+		bs = bytes.Trim(bs, "\x00")
+		output := string(bs[:])
 		c.Assert(strings.TrimSpace(output), checker.Equals, "hello")
 	case <-time.After(5 * time.Second):
+		p.Close()
 		c.Fatal("timed out running docker exec")
 	}
 }
@@ -69,7 +73,7 @@ func (s *DockerSuite) TestExecTTY(c *check.C) {
 	c.Assert(bytes.Contains(buf, []byte("hello")), checker.Equals, true, check.Commentf(string(buf[:read])))
 }
 
-// Test the the TERM env var is set when -t is provided on exec
+// Test the TERM env var is set when -t is provided on exec
 func (s *DockerSuite) TestExecWithTERM(c *check.C) {
 	testRequires(c, DaemonIsLinux, SameHostDaemon)
 	out, _ := dockerCmd(c, "run", "-id", "busybox", "/bin/cat")

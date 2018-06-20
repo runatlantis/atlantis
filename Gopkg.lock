@@ -14,12 +14,6 @@
   version = "v2.15.0"
 
 [[projects]]
-  name = "github.com/Sirupsen/logrus"
-  packages = ["."]
-  revision = "c155da19408a8799da419ed3eeb0cb5db0ad5dbc"
-  version = "v1.0.5"
-
-[[projects]]
   name = "github.com/aokoli/goutils"
   packages = ["."]
   revision = "3391d3790d23d03408670993e957e8f408993c34"
@@ -44,10 +38,10 @@
   version = "v1.1.0"
 
 [[projects]]
+  branch = "master"
   name = "github.com/docker/docker"
   packages = ["pkg/fileutils"]
-  revision = "092cba3727bb9b4a2f0e922cd6c0f93ea270e363"
-  version = "v1.13.1"
+  revision = "e2593239d949eee454935daea7a5fe025477322f"
 
 [[projects]]
   branch = "master"
@@ -255,6 +249,12 @@
   version = "v0.8.0"
 
 [[projects]]
+  name = "github.com/sirupsen/logrus"
+  packages = ["."]
+  revision = "c155da19408a8799da419ed3eeb0cb5db0ad5dbc"
+  version = "v1.0.5"
+
+[[projects]]
   branch = "master"
   name = "github.com/spf13/afero"
   packages = [
@@ -352,6 +352,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "41fa7bc4fc730240930807e113d19be175d2a8dfbca5cdf084e8285a3a150e43"
+  inputs-digest = "0afba7ec3d45c8cf6aea549a9ff30c674c2106f10c8f2865aee452376dcbfbe6"
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -1,6 +1,6 @@
 // +build !windows
 
-package hack
+package hack // import "github.com/docker/docker/cmd/dockerd/hack"
 
 import "net"
 
@@ -111,7 +111,7 @@ func (l *MalformedHostHeaderOverrideConn) Read(b []byte) (n int, err error) {
 }
 
 // Accept makes the listener accepts connections and wraps the connection
-// in a MalformedHostHeaderOverrideConn initilizing first to true.
+// in a MalformedHostHeaderOverrideConn initializing first to true.
 func (l *MalformedHostHeaderOverride) Accept() (net.Conn, error) {
 	c, err := l.Listener.Accept()
 	if err != nil {

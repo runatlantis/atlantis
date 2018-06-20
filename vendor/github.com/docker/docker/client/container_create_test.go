@@ -1,7 +1,8 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -10,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/docker/docker/api/types/container"
-	"golang.org/x/net/context"
 )
 
 func TestContainerCreateError(t *testing.T) {
@@ -22,7 +22,7 @@ func TestContainerCreateError(t *testing.T) {
 		t.Fatalf("expected a Server Error while testing StatusInternalServerError, got %v", err)
 	}
 
-	// 404 doesn't automagitally means an unknown image
+	// 404 doesn't automatically means an unknown image
 	client = &Client{
 		client: newMockClient(errorMock(http.StatusNotFound, "Server error")),
 	}
@@ -37,7 +37,7 @@ func TestContainerCreateImageNotFound(t *testing.T) {
 		client: newMockClient(errorMock(http.StatusNotFound, "No such image")),
 	}
 	_, err := client.ContainerCreate(context.Background(), &container.Config{Image: "unknown_image"}, nil, nil, "unknown")
-	if err == nil || !IsErrImageNotFound(err) {
+	if err == nil || !IsErrNotFound(err) {
 		t.Fatalf("expected an imageNotFound error, got %v", err)
 	}
 }
@@ -72,5 +72,47 @@ func TestContainerCreateWithName(t *testing.T) {
 	}
 	if r.ID != "container_id" {
 		t.Fatalf("expected `container_id`, got %s", r.ID)
+	}
+}
+
+// TestContainerCreateAutoRemove validates that a client using API 1.24 always disables AutoRemove. When using API 1.25
+// or up, AutoRemove should not be disabled.
+func TestContainerCreateAutoRemove(t *testing.T) {
+	autoRemoveValidator := func(expectedValue bool) func(req *http.Request) (*http.Response, error) {
+		return func(req *http.Request) (*http.Response, error) {
+			var config configWrapper
+
+			if err := json.NewDecoder(req.Body).Decode(&config); err != nil {
+				return nil, err
+			}
+			if config.HostConfig.AutoRemove != expectedValue {
+				return nil, fmt.Errorf("expected AutoRemove to be %v, got %v", expectedValue, config.HostConfig.AutoRemove)
+			}
+			b, err := json.Marshal(container.ContainerCreateCreatedBody{
+				ID: "container_id",
+			})
+			if err != nil {
+				return nil, err
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       ioutil.NopCloser(bytes.NewReader(b)),
+			}, nil
+		}
+	}
+
+	client := &Client{
+		client:  newMockClient(autoRemoveValidator(false)),
+		version: "1.24",
+	}
+	if _, err := client.ContainerCreate(context.Background(), nil, &container.HostConfig{AutoRemove: true}, nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	client = &Client{
+		client:  newMockClient(autoRemoveValidator(true)),
+		version: "1.25",
+	}
+	if _, err := client.ContainerCreate(context.Background(), nil, &container.HostConfig{AutoRemove: true}, nil, ""); err != nil {
+		t.Fatal(err)
 	}
 }

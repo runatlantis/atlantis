@@ -1,26 +1,21 @@
-package logger
+package logger // import "github.com/docker/docker/daemon/logger"
 
 import (
-	"reflect"
-	"testing"
-	"time"
+	"github.com/docker/docker/api/types/backend"
 )
 
-func TestCopyMessage(t *testing.T) {
+func (m *Message) copy() *Message {
 	msg := &Message{
-		Line:      []byte("test line."),
-		Source:    "stdout",
-		Timestamp: time.Now(),
-		Attrs: LogAttributes{
-			"key1": "val1",
-			"key2": "val2",
-			"key3": "val3",
-		},
-		Partial: true,
+		Source:       m.Source,
+		PLogMetaData: m.PLogMetaData,
+		Timestamp:    m.Timestamp,
 	}
 
-	m := CopyMessage(msg)
-	if !reflect.DeepEqual(m, msg) {
-		t.Fatalf("CopyMessage failed to copy message")
+	if m.Attrs != nil {
+		msg.Attrs = make([]backend.LogAttr, len(m.Attrs))
+		copy(msg.Attrs, m.Attrs)
 	}
+
+	msg.Line = append(make([]byte, 0, len(m.Line)), m.Line...)
+	return msg
 }

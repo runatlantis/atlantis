@@ -1,19 +1,23 @@
-package distribution
+package distribution // import "github.com/docker/docker/distribution"
 
 import (
+	"context"
 	"net/http"
+	"net/url"
 	"reflect"
 	"testing"
 
 	"github.com/docker/distribution"
-	"github.com/docker/distribution/context"
-	"github.com/docker/distribution/digest"
 	"github.com/docker/distribution/manifest/schema2"
-	distreference "github.com/docker/distribution/reference"
+	"github.com/docker/distribution/reference"
+	"github.com/docker/distribution/registry/api/errcode"
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/distribution/metadata"
 	"github.com/docker/docker/layer"
 	"github.com/docker/docker/pkg/progress"
-	"github.com/docker/docker/reference"
+	refstore "github.com/docker/docker/reference"
+	"github.com/docker/docker/registry"
+	"github.com/opencontainers/go-digest"
 )
 
 func TestGetRepositoryMountCandidates(t *testing.T) {
@@ -43,8 +47,8 @@ func TestGetRepositoryMountCandidates(t *testing.T) {
 			name:          "one item matching",
 			targetRepo:    "busybox",
 			maxCandidates: -1,
-			metadata:      []metadata.V2Metadata{taggedMetadata("hash", "1", "hello-world")},
-			candidates:    []metadata.V2Metadata{taggedMetadata("hash", "1", "hello-world")},
+			metadata:      []metadata.V2Metadata{taggedMetadata("hash", "1", "docker.io/library/hello-world")},
+			candidates:    []metadata.V2Metadata{taggedMetadata("hash", "1", "docker.io/library/hello-world")},
 		},
 		{
 			name:          "allow missing SourceRepository",
@@ -63,13 +67,13 @@ func TestGetRepositoryMountCandidates(t *testing.T) {
 			maxCandidates: -1,
 			metadata: []metadata.V2Metadata{
 				{Digest: digest.Digest("1"), SourceRepository: "docker.io/user/foo"},
-				{Digest: digest.Digest("3"), SourceRepository: "user/bar"},
-				{Digest: digest.Digest("2"), SourceRepository: "app"},
+				{Digest: digest.Digest("3"), SourceRepository: "docker.io/user/bar"},
+				{Digest: digest.Digest("2"), SourceRepository: "docker.io/library/app"},
 			},
 			candidates: []metadata.V2Metadata{
-				{Digest: digest.Digest("3"), SourceRepository: "user/bar"},
+				{Digest: digest.Digest("3"), SourceRepository: "docker.io/user/bar"},
 				{Digest: digest.Digest("1"), SourceRepository: "docker.io/user/foo"},
-				{Digest: digest.Digest("2"), SourceRepository: "app"},
+				{Digest: digest.Digest("2"), SourceRepository: "docker.io/library/app"},
 			},
 		},
 		{
@@ -78,10 +82,10 @@ func TestGetRepositoryMountCandidates(t *testing.T) {
 			targetRepo:    "127.0.0.1/foo/bar",
 			maxCandidates: -1,
 			metadata: []metadata.V2Metadata{
-				taggedMetadata("hash", "1", "hello-world"),
+				taggedMetadata("hash", "1", "docker.io/library/hello-world"),
 				taggedMetadata("efgh", "2", "127.0.0.1/hello-world"),
-				taggedMetadata("abcd", "3", "busybox"),
-				taggedMetadata("hash", "4", "busybox"),
+				taggedMetadata("abcd", "3", "docker.io/library/busybox"),
+				taggedMetadata("hash", "4", "docker.io/library/busybox"),
 				taggedMetadata("hash", "5", "127.0.0.1/foo"),
 				taggedMetadata("hash", "6", "127.0.0.1/bar"),
 				taggedMetadata("efgh", "7", "127.0.0.1/foo/bar"),
@@ -105,23 +109,25 @@ func TestGetRepositoryMountCandidates(t *testing.T) {
 			targetRepo:    "user/app",
 			maxCandidates: 3,
 			metadata: []metadata.V2Metadata{
-				taggedMetadata("abcd", "1", "user/app1"),
-				taggedMetadata("abcd", "2", "user/app/base"),
-				taggedMetadata("hash", "3", "user/app"),
+				taggedMetadata("abcd", "1", "docker.io/user/app1"),
+				taggedMetadata("abcd", "2", "docker.io/user/app/base"),
+				taggedMetadata("hash", "3", "docker.io/user/app"),
 				taggedMetadata("abcd", "4", "127.0.0.1/user/app"),
-				taggedMetadata("hash", "5", "user/foo"),
-				taggedMetadata("hash", "6", "app/bar"),
+				taggedMetadata("hash", "5", "docker.io/user/foo"),
+				taggedMetadata("hash", "6", "docker.io/app/bar"),
 			},
 			candidates: []metadata.V2Metadata{
 				// first by matching hash
-				taggedMetadata("abcd", "2", "user/app/base"),
-				taggedMetadata("abcd", "1", "user/app1"),
+				taggedMetadata("abcd", "2", "docker.io/user/app/base"),
+				taggedMetadata("abcd", "1", "docker.io/user/app1"),
 				// then by longest matching prefix
-				taggedMetadata("hash", "3", "user/app"),
+				// "docker.io/usr/app" is excluded since candidates must
+				// be from a different repository
+				taggedMetadata("hash", "5", "docker.io/user/foo"),
 			},
 		},
 	} {
-		repoInfo, err := reference.ParseNamed(tc.targetRepo)
+		repoInfo, err := reference.ParseNormalizedNamed(tc.targetRepo)
 		if err != nil {
 			t.Fatalf("[%s] failed to parse reference name: %v", tc.name, err)
 		}
@@ -184,7 +190,7 @@ func TestLayerAlreadyExists(t *testing.T) {
 			expectedRequests:   []string{"apple"},
 		},
 		{
-			name:               "not matching reposies",
+			name:               "not matching repositories",
 			targetRepo:         "busybox",
 			maxExistenceChecks: 3,
 			metadata: []metadata.V2Metadata{
@@ -202,12 +208,15 @@ func TestLayerAlreadyExists(t *testing.T) {
 			checkOtherRepositories: true,
 			metadata: []metadata.V2Metadata{
 				{Digest: digest.Digest("apple"), SourceRepository: "docker.io/library/hello-world"},
-				{Digest: digest.Digest("orange"), SourceRepository: "docker.io/library/busybox/subapp"},
+				{Digest: digest.Digest("orange"), SourceRepository: "docker.io/busybox/subapp"},
 				{Digest: digest.Digest("pear"), SourceRepository: "docker.io/busybox"},
-				{Digest: digest.Digest("plum"), SourceRepository: "busybox"},
+				{Digest: digest.Digest("plum"), SourceRepository: "docker.io/library/busybox"},
 				{Digest: digest.Digest("banana"), SourceRepository: "127.0.0.1/busybox"},
 			},
-			expectedRequests: []string{"plum", "pear", "apple", "orange", "banana"},
+			expectedRequests: []string{"plum", "apple", "pear", "orange", "banana"},
+			expectedRemovals: []metadata.V2Metadata{
+				{Digest: digest.Digest("plum"), SourceRepository: "docker.io/library/busybox"},
+			},
 		},
 		{
 			name:               "find existing blob",
@@ -374,7 +383,7 @@ func TestLayerAlreadyExists(t *testing.T) {
 			},
 		},
 	} {
-		repoInfo, err := reference.ParseNamed(tc.targetRepo)
+		repoInfo, err := reference.ParseNormalizedNamed(tc.targetRepo)
 		if err != nil {
 			t.Fatalf("[%s] failed to parse reference name: %v", tc.name, err)
 		}
@@ -457,6 +466,158 @@ func TestLayerAlreadyExists(t *testing.T) {
 	}
 }
 
+type mockReferenceStore struct {
+}
+
+func (s *mockReferenceStore) References(id digest.Digest) []reference.Named {
+	return []reference.Named{}
+}
+func (s *mockReferenceStore) ReferencesByName(ref reference.Named) []refstore.Association {
+	return []refstore.Association{}
+}
+func (s *mockReferenceStore) AddTag(ref reference.Named, id digest.Digest, force bool) error {
+	return nil
+}
+func (s *mockReferenceStore) AddDigest(ref reference.Canonical, id digest.Digest, force bool) error {
+	return nil
+}
+func (s *mockReferenceStore) Delete(ref reference.Named) (bool, error) {
+	return true, nil
+}
+func (s *mockReferenceStore) Get(ref reference.Named) (digest.Digest, error) {
+	return "", nil
+}
+
+func TestWhenEmptyAuthConfig(t *testing.T) {
+	for _, authInfo := range []struct {
+		username      string
+		password      string
+		registryToken string
+		expected      bool
+	}{
+		{
+			username:      "",
+			password:      "",
+			registryToken: "",
+			expected:      false,
+		},
+		{
+			username:      "username",
+			password:      "password",
+			registryToken: "",
+			expected:      true,
+		},
+		{
+			username:      "",
+			password:      "",
+			registryToken: "token",
+			expected:      true,
+		},
+	} {
+		imagePushConfig := &ImagePushConfig{}
+		imagePushConfig.AuthConfig = &types.AuthConfig{
+			Username:      authInfo.username,
+			Password:      authInfo.password,
+			RegistryToken: authInfo.registryToken,
+		}
+		imagePushConfig.ReferenceStore = &mockReferenceStore{}
+		repoInfo, _ := reference.ParseNormalizedNamed("xujihui1985/test.img")
+		pusher := &v2Pusher{
+			config: imagePushConfig,
+			repoInfo: &registry.RepositoryInfo{
+				Name: repoInfo,
+			},
+			endpoint: registry.APIEndpoint{
+				URL: &url.URL{
+					Scheme: "https",
+					Host:   "index.docker.io",
+				},
+				Version:      registry.APIVersion1,
+				TrimHostname: true,
+			},
+		}
+		pusher.Push(context.Background())
+		if pusher.pushState.hasAuthInfo != authInfo.expected {
+			t.Errorf("hasAuthInfo does not match expected: %t != %t", authInfo.expected, pusher.pushState.hasAuthInfo)
+		}
+	}
+}
+
+type mockBlobStoreWithCreate struct {
+	mockBlobStore
+	repo *mockRepoWithBlob
+}
+
+func (blob *mockBlobStoreWithCreate) Create(ctx context.Context, options ...distribution.BlobCreateOption) (distribution.BlobWriter, error) {
+	return nil, errcode.Errors(append([]error{errcode.ErrorCodeUnauthorized.WithMessage("unauthorized")}))
+}
+
+type mockRepoWithBlob struct {
+	mockRepo
+}
+
+func (m *mockRepoWithBlob) Blobs(ctx context.Context) distribution.BlobStore {
+	blob := &mockBlobStoreWithCreate{}
+	blob.mockBlobStore.repo = &m.mockRepo
+	blob.repo = m
+	return blob
+}
+
+type mockMetadataService struct {
+	mockV2MetadataService
+}
+
+func (m *mockMetadataService) GetMetadata(diffID layer.DiffID) ([]metadata.V2Metadata, error) {
+	return []metadata.V2Metadata{
+		taggedMetadata("abcd", "sha256:ff3a5c916c92643ff77519ffa742d3ec61b7f591b6b7504599d95a4a41134e28", "docker.io/user/app1"),
+		taggedMetadata("abcd", "sha256:ff3a5c916c92643ff77519ffa742d3ec61b7f591b6b7504599d95a4a41134e22", "docker.io/user/app/base"),
+		taggedMetadata("hash", "sha256:ff3a5c916c92643ff77519ffa742d3ec61b7f591b6b7504599d95a4a41134e23", "docker.io/user/app"),
+		taggedMetadata("abcd", "sha256:ff3a5c916c92643ff77519ffa742d3ec61b7f591b6b7504599d95a4a41134e24", "127.0.0.1/user/app"),
+		taggedMetadata("hash", "sha256:ff3a5c916c92643ff77519ffa742d3ec61b7f591b6b7504599d95a4a41134e25", "docker.io/user/foo"),
+		taggedMetadata("hash", "sha256:ff3a5c916c92643ff77519ffa742d3ec61b7f591b6b7504599d95a4a41134e26", "docker.io/app/bar"),
+	}, nil
+}
+
+var removeMetadata bool
+
+func (m *mockMetadataService) Remove(metadata metadata.V2Metadata) error {
+	removeMetadata = true
+	return nil
+}
+
+func TestPushRegistryWhenAuthInfoEmpty(t *testing.T) {
+	repoInfo, _ := reference.ParseNormalizedNamed("user/app")
+	ms := &mockMetadataService{}
+	remoteErrors := map[digest.Digest]error{digest.Digest("sha256:apple"): distribution.ErrAccessDenied}
+	remoteBlobs := map[digest.Digest]distribution.Descriptor{digest.Digest("sha256:apple"): {Digest: digest.Digest("shar256:apple")}}
+	repo := &mockRepoWithBlob{
+		mockRepo: mockRepo{
+			t:        t,
+			errors:   remoteErrors,
+			blobs:    remoteBlobs,
+			requests: []string{},
+		},
+	}
+	pd := &v2PushDescriptor{
+		hmacKey:  []byte("abcd"),
+		repoInfo: repoInfo,
+		layer: &storeLayer{
+			Layer: layer.EmptyLayer,
+		},
+		repo:              repo,
+		v2MetadataService: ms,
+		pushState: &pushState{
+			remoteLayers: make(map[layer.DiffID]distribution.Descriptor),
+			hasAuthInfo:  false,
+		},
+		checkedDigests: make(map[digest.Digest]struct{}),
+	}
+	pd.Upload(context.Background(), &progressSink{t})
+	if removeMetadata {
+		t.Fatalf("expect remove not be called but called")
+	}
+}
+
 func taggedMetadata(key string, dgst string, sourceRepo string) metadata.V2Metadata {
 	meta := metadata.V2Metadata{
 		Digest:           digest.Digest(dgst),
@@ -476,7 +637,7 @@ type mockRepo struct {
 
 var _ distribution.Repository = &mockRepo{}
 
-func (m *mockRepo) Named() distreference.Named {
+func (m *mockRepo) Named() reference.Named {
 	m.t.Fatalf("Named() not implemented")
 	return nil
 }

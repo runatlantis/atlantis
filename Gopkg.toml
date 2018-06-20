@@ -98,5 +98,5 @@
   name = "github.com/flynn-archive/go-shlex"
 
 [[constraint]]
+  branch = "master"
   name = "github.com/docker/docker"
-  version = "1.13.1"

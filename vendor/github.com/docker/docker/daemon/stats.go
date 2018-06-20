@@ -1,13 +1,11 @@
-package daemon
+package daemon // import "github.com/docker/docker/daemon"
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"runtime"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/backend"
@@ -20,9 +18,6 @@ import (
 // ContainerStats writes information about the container to the stream
 // given in the config object.
 func (daemon *Daemon) ContainerStats(ctx context.Context, prefixOrName string, config *backend.ContainerStatsConfig) error {
-	if runtime.GOOS == "solaris" {
-		return fmt.Errorf("%+v does not support stats", runtime.GOOS)
-	}
 	// Engine API version (used for backwards compatibility)
 	apiVersion := config.Version
 
@@ -33,7 +28,9 @@ func (daemon *Daemon) ContainerStats(ctx context.Context, prefixOrName string, c
 
 	// If the container is either not running or restarting and requires no stream, return an empty stats.
 	if (!container.IsRunning() || container.IsRestarting()) && !config.Stream {
-		return json.NewEncoder(config.OutStream).Encode(&types.Stats{})
+		return json.NewEncoder(config.OutStream).Encode(&types.StatsJSON{
+			Name: container.Name,
+			ID:   container.ID})
 	}
 
 	outStream := config.OutStream
@@ -133,11 +130,11 @@ func (daemon *Daemon) ContainerStats(ctx context.Context, prefixOrName string, c
 }
 
 func (daemon *Daemon) subscribeToContainerStats(c *container.Container) chan interface{} {
-	return daemon.statsCollector.collect(c)
+	return daemon.statsCollector.Collect(c)
 }
 
 func (daemon *Daemon) unsubscribeToContainerStats(c *container.Container, ch chan interface{}) {
-	daemon.statsCollector.unsubscribe(c, ch)
+	daemon.statsCollector.Unsubscribe(c, ch)
 }
 
 // GetContainerStats collects all the stats published by a container

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/docker/pkg/integration/checker"
+	"github.com/docker/docker/integration-cli/checker"
 	"github.com/go-check/check"
 )
 
@@ -14,11 +14,11 @@ func (s *DockerSwarmSuite) TestServiceScale(c *check.C) {
 	d := s.AddDaemon(c, true, true)
 
 	service1Name := "TestService1"
-	service1Args := append([]string{"service", "create", "--name", service1Name, defaultSleepImage}, sleepCommandForDaemonPlatform()...)
+	service1Args := append([]string{"service", "create", "--detach", "--no-resolve-image", "--name", service1Name, defaultSleepImage}, sleepCommandForDaemonPlatform()...)
 
 	// global mode
 	service2Name := "TestService2"
-	service2Args := append([]string{"service", "create", "--name", service2Name, "--mode=global", defaultSleepImage}, sleepCommandForDaemonPlatform()...)
+	service2Args := append([]string{"service", "create", "--detach", "--no-resolve-image", "--name", service2Name, "--mode=global", defaultSleepImage}, sleepCommandForDaemonPlatform()...)
 
 	// Create services
 	out, err := d.Cmd(service1Args...)

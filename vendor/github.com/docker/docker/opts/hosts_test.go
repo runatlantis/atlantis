@@ -1,7 +1,8 @@
-package opts
+package opts // import "github.com/docker/docker/opts"
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -82,12 +83,12 @@ func TestParseDockerDaemonHost(t *testing.T) {
 		"localhost:5555/path":     "tcp://localhost:5555/path",
 	}
 	for invalidAddr, expectedError := range invalids {
-		if addr, err := parseDockerDaemonHost(invalidAddr); err == nil || err.Error() != expectedError {
+		if addr, err := parseDaemonHost(invalidAddr); err == nil || err.Error() != expectedError {
 			t.Errorf("tcp %v address expected error %q return, got %q and addr %v", invalidAddr, expectedError, err, addr)
 		}
 	}
 	for validAddr, expectedAddr := range valids {
-		if addr, err := parseDockerDaemonHost(validAddr); err != nil || addr != expectedAddr {
+		if addr, err := parseDaemonHost(validAddr); err != nil || addr != expectedAddr {
 			t.Errorf("%v -> expected %v, got (%v) addr (%v)", validAddr, expectedAddr, err, addr)
 		}
 	}
@@ -144,5 +145,37 @@ func TestParseInvalidUnixAddrInvalid(t *testing.T) {
 	}
 	if v, err := parseSimpleProtoAddr("unix", "", "/var/run/docker.sock"); err != nil || v != "unix:///var/run/docker.sock" {
 		t.Fatalf("Expected an %v, got %v", v, "unix:///var/run/docker.sock")
+	}
+}
+
+func TestValidateExtraHosts(t *testing.T) {
+	valid := []string{
+		`myhost:192.168.0.1`,
+		`thathost:10.0.2.1`,
+		`anipv6host:2003:ab34:e::1`,
+		`ipv6local:::1`,
+	}
+
+	invalid := map[string]string{
+		`myhost:192.notanipaddress.1`:  `invalid IP`,
+		`thathost-nosemicolon10.0.0.1`: `bad format`,
+		`anipv6host:::::1`:             `invalid IP`,
+		`ipv6local:::0::`:              `invalid IP`,
+	}
+
+	for _, extrahost := range valid {
+		if _, err := ValidateExtraHost(extrahost); err != nil {
+			t.Fatalf("ValidateExtraHost(`"+extrahost+"`) should succeed: error %v", err)
+		}
+	}
+
+	for extraHost, expectedError := range invalid {
+		if _, err := ValidateExtraHost(extraHost); err == nil {
+			t.Fatalf("ValidateExtraHost(`%q`) should have failed validation", extraHost)
+		} else {
+			if !strings.Contains(err.Error(), expectedError) {
+				t.Fatalf("ValidateExtraHost(`%q`) error should contain %q", extraHost, expectedError)
+			}
+		}
 	}
 }

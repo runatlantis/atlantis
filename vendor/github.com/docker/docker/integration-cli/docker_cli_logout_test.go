@@ -8,11 +8,13 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/docker/docker/pkg/integration/checker"
+	"github.com/docker/docker/integration-cli/checker"
 	"github.com/go-check/check"
 )
 
 func (s *DockerRegistryAuthHtpasswdSuite) TestLogoutWithExternalAuth(c *check.C) {
+	s.d.StartWithBusybox(c)
+
 	osPath := os.Getenv("PATH")
 	defer os.Setenv("PATH", osPath)
 
@@ -28,6 +30,7 @@ func (s *DockerRegistryAuthHtpasswdSuite) TestLogoutWithExternalAuth(c *check.C)
 
 	tmp, err := ioutil.TempDir("", "integration-cli-")
 	c.Assert(err, checker.IsNil)
+	defer os.RemoveAll(tmp)
 
 	externalAuthConfig := `{ "credsStore": "shell-test" }`
 
@@ -35,26 +38,29 @@ func (s *DockerRegistryAuthHtpasswdSuite) TestLogoutWithExternalAuth(c *check.C)
 	err = ioutil.WriteFile(configPath, []byte(externalAuthConfig), 0644)
 	c.Assert(err, checker.IsNil)
 
-	dockerCmd(c, "--config", tmp, "login", "-u", s.reg.username, "-p", s.reg.password, privateRegistryURL)
+	_, err = s.d.Cmd("--config", tmp, "login", "-u", s.reg.Username(), "-p", s.reg.Password(), privateRegistryURL)
+	c.Assert(err, checker.IsNil)
 
 	b, err := ioutil.ReadFile(configPath)
 	c.Assert(err, checker.IsNil)
 	c.Assert(string(b), checker.Not(checker.Contains), "\"auth\":")
 	c.Assert(string(b), checker.Contains, privateRegistryURL)
 
-	dockerCmd(c, "--config", tmp, "tag", "busybox", repoName)
-	dockerCmd(c, "--config", tmp, "push", repoName)
-
-	dockerCmd(c, "--config", tmp, "logout", privateRegistryURL)
+	_, err = s.d.Cmd("--config", tmp, "tag", "busybox", repoName)
+	c.Assert(err, checker.IsNil)
+	_, err = s.d.Cmd("--config", tmp, "push", repoName)
+	c.Assert(err, checker.IsNil)
+	_, err = s.d.Cmd("--config", tmp, "logout", privateRegistryURL)
+	c.Assert(err, checker.IsNil)
 
 	b, err = ioutil.ReadFile(configPath)
 	c.Assert(err, checker.IsNil)
 	c.Assert(string(b), checker.Not(checker.Contains), privateRegistryURL)
 
 	// check I cannot pull anymore
-	out, _, err := dockerCmdWithError("--config", tmp, "pull", repoName)
+	out, err := s.d.Cmd("--config", tmp, "pull", repoName)
 	c.Assert(err, check.NotNil, check.Commentf(out))
-	c.Assert(out, checker.Contains, "Error: image dockercli/busybox:authtest not found")
+	c.Assert(out, checker.Contains, "no basic auth credentials")
 }
 
 // #23100
@@ -71,7 +77,7 @@ func (s *DockerRegistryAuthHtpasswdSuite) TestLogoutWithWrongHostnamesStored(c *
 	os.Setenv("PATH", testPath)
 
 	cmd := exec.Command("docker-credential-shell-test", "store")
-	stdin := bytes.NewReader([]byte(fmt.Sprintf(`{"ServerURL": "https://%s", "Username": "%s", "Secret": "%s"}`, privateRegistryURL, s.reg.username, s.reg.password)))
+	stdin := bytes.NewReader([]byte(fmt.Sprintf(`{"ServerURL": "https://%s", "Username": "%s", "Secret": "%s"}`, privateRegistryURL, s.reg.Username(), s.reg.Password())))
 	cmd.Stdin = stdin
 	c.Assert(cmd.Run(), checker.IsNil)
 
@@ -84,7 +90,7 @@ func (s *DockerRegistryAuthHtpasswdSuite) TestLogoutWithWrongHostnamesStored(c *
 	err = ioutil.WriteFile(configPath, []byte(externalAuthConfig), 0644)
 	c.Assert(err, checker.IsNil)
 
-	dockerCmd(c, "--config", tmp, "login", "-u", s.reg.username, "-p", s.reg.password, privateRegistryURL)
+	dockerCmd(c, "--config", tmp, "login", "-u", s.reg.Username(), "-p", s.reg.Password(), privateRegistryURL)
 
 	b, err := ioutil.ReadFile(configPath)
 	c.Assert(err, checker.IsNil)

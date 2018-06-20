@@ -1,6 +1,6 @@
-package daemon
+package daemon // import "github.com/docker/docker/daemon"
 
-// ContainerCreateWorkdir creates the working directory. This is solves the
+// ContainerCreateWorkdir creates the working directory. This solves the
 // issue arising from https://github.com/docker/docker/issues/27545,
 // which was initially fixed by https://github.com/docker/docker/pull/27884. But that fix
 // was too expensive in terms of performance on Windows. Instead,
@@ -16,6 +16,5 @@ func (daemon *Daemon) ContainerCreateWorkdir(cID string) error {
 		return err
 	}
 	defer daemon.Unmount(container)
-	rootUID, rootGID := daemon.GetRemappedUIDGID()
-	return container.SetupWorkingDirectory(rootUID, rootGID)
+	return container.SetupWorkingDirectory(daemon.idMappings.RootPair())
 }

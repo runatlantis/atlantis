@@ -1,22 +1,39 @@
-package plugingetter
+package plugingetter // import "github.com/docker/docker/pkg/plugingetter"
 
-import "github.com/docker/docker/pkg/plugins"
+import (
+	"net"
+	"time"
 
-const (
-	// LOOKUP doesn't update RefCount
-	LOOKUP = 0
-	// ACQUIRE increments RefCount
-	ACQUIRE = 1
-	// RELEASE decrements RefCount
-	RELEASE = -1
+	"github.com/docker/docker/pkg/plugins"
 )
 
-// CompatPlugin is a abstraction to handle both v2(new) and v1(legacy) plugins.
+const (
+	// Lookup doesn't update RefCount
+	Lookup = 0
+	// Acquire increments RefCount
+	Acquire = 1
+	// Release decrements RefCount
+	Release = -1
+)
+
+// CompatPlugin is an abstraction to handle both v2(new) and v1(legacy) plugins.
 type CompatPlugin interface {
-	Client() *plugins.Client
 	Name() string
-	BasePath() string
+	ScopedPath(string) string
 	IsV1() bool
+	PluginWithV1Client
+}
+
+// PluginWithV1Client is a plugin that directly utilizes the v1/http plugin client
+type PluginWithV1Client interface {
+	Client() *plugins.Client
+}
+
+// PluginAddr is a plugin that exposes the socket address for creating custom clients rather than the built-in `*plugins.Client`
+type PluginAddr interface {
+	Addr() net.Addr
+	Timeout() time.Duration
+	Protocol() string
 }
 
 // CountedPlugin is a plugin which is reference counted.

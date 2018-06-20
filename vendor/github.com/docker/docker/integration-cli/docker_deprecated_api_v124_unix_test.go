@@ -5,7 +5,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/docker/docker/pkg/integration/checker"
+	"github.com/docker/docker/integration-cli/checker"
+	"github.com/docker/docker/internal/test/request"
 	"github.com/go-check/check"
 )
 
@@ -21,7 +22,7 @@ func (s *DockerNetworkSuite) TestDeprecatedDockerNetworkStartAPIWithHostconfig(c
 			"NetworkMode": netName,
 		},
 	}
-	_, _, err := sockRequest("POST", formatV123StartAPIURL("/containers/"+conName+"/start"), config)
+	_, _, err := request.Post(formatV123StartAPIURL("/containers/"+conName+"/start"), request.JSONBody(config))
 	c.Assert(err, checker.IsNil)
 	c.Assert(waitRun(conName), checker.IsNil)
 	networks := inspectField(c, conName, "NetworkSettings.Networks")

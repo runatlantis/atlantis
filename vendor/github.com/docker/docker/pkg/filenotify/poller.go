@@ -1,4 +1,4 @@
-package filenotify
+package filenotify // import "github.com/docker/docker/pkg/filenotify"
 
 import (
 	"errors"
@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/fsnotify/fsnotify"
 )
@@ -15,8 +15,8 @@ import (
 var (
 	// errPollerClosed is returned when the poller is closed
 	errPollerClosed = errors.New("poller is closed")
-	// errNoSuchPoller is returned when trying to remove a watch that doesn't exist
-	errNoSuchWatch = errors.New("poller does not exist")
+	// errNoSuchWatch is returned when trying to remove a watch that doesn't exist
+	errNoSuchWatch = errors.New("watch does not exist")
 )
 
 // watchWaitTime is the time to wait between file poll loops
@@ -44,7 +44,7 @@ func (w *filePoller) Add(name string) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	if w.closed == true {
+	if w.closed {
 		return errPollerClosed
 	}
 
@@ -78,7 +78,7 @@ func (w *filePoller) Remove(name string) error {
 }
 
 func (w *filePoller) remove(name string) error {
-	if w.closed == true {
+	if w.closed {
 		return errPollerClosed
 	}
 
