@@ -177,10 +177,10 @@ func TestPost_GitlabCommentNotWhitelisted(t *testing.T) {
 		Logger:                       logging.NewNoopLogger(),
 		CommentParser:                &events.CommentParser{},
 		GitlabRequestParserValidator: &server.DefaultGitlabRequestParserValidator{},
-		Parser:            &events.EventParser{},
-		SupportedVCSHosts: []models.VCSHostType{models.Gitlab},
-		RepoWhitelist:     &events.RepoWhitelist{},
-		VCSClient:         vcsClient,
+		Parser:               &events.EventParser{},
+		SupportedVCSHosts:    []models.VCSHostType{models.Gitlab},
+		RepoWhitelistChecker: &events.RepoWhitelistChecker{},
+		VCSClient:            vcsClient,
 	}
 	requestJSON, err := ioutil.ReadFile(filepath.Join("testfixtures", "gitlabMergeCommentEvent_notWhitelisted.json"))
 	Ok(t, err)
@@ -207,7 +207,7 @@ func TestPost_GithubCommentNotWhitelisted(t *testing.T) {
 		CommentParser:          &events.CommentParser{},
 		Parser:                 &events.EventParser{},
 		SupportedVCSHosts:      []models.VCSHostType{models.Github},
-		RepoWhitelist:          &events.RepoWhitelist{},
+		RepoWhitelistChecker:   &events.RepoWhitelistChecker{},
 		VCSClient:              vcsClient,
 	}
 	requestJSON, err := ioutil.ReadFile(filepath.Join("testfixtures", "githubIssueCommentEvent_notWhitelisted.json"))
@@ -325,7 +325,7 @@ func TestPost_GithubPullRequestInvalidRepo(t *testing.T) {
 func TestPost_GithubPullRequestNotWhitelisted(t *testing.T) {
 	t.Log("when the event is a github pull request to a non-whitelisted repo we return a 400")
 	e, v, _, p, _, _, _, _ := setup(t)
-	e.RepoWhitelist = &events.RepoWhitelist{Whitelist: "github.com/nevermatch"}
+	e.RepoWhitelistChecker = &events.RepoWhitelistChecker{Whitelist: "github.com/nevermatch"}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(githubHeader, "pull_request")
 
@@ -424,7 +424,7 @@ func setup(t *testing.T) (server.EventsController, *mocks.MockGithubRequestValid
 		SupportedVCSHosts:            []models.VCSHostType{models.Github, models.Gitlab},
 		GitlabWebHookSecret:          secret,
 		GitlabRequestParserValidator: gl,
-		RepoWhitelist: &events.RepoWhitelist{
+		RepoWhitelistChecker: &events.RepoWhitelistChecker{
 			Whitelist: "*",
 		},
 		VCSClient: vcsmock,

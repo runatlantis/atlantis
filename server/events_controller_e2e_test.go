@@ -293,7 +293,7 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClientProxy,
 		GithubRequestValidator:       &server.DefaultGithubRequestValidator{},
 		GitlabRequestParserValidator: &server.DefaultGitlabRequestParserValidator{},
 		GitlabWebHookSecret:          nil,
-		RepoWhitelist: &events.RepoWhitelist{
+		RepoWhitelistChecker: &events.RepoWhitelistChecker{
 			Whitelist: "*",
 		},
 		SupportedVCSHosts: []models.VCSHostType{models.Gitlab, models.Github},

@@ -45,8 +45,8 @@ type EventsController struct {
 	// GitlabWebHookSecret is the secret added to this webhook via the GitLab
 	// UI that identifies this call as coming from GitLab. If empty, no
 	// request validation is done.
-	GitlabWebHookSecret []byte
-	RepoWhitelist       *events.RepoWhitelist
+	GitlabWebHookSecret  []byte
+	RepoWhitelistChecker *events.RepoWhitelistChecker
 	// SupportedVCSHosts is which VCS hosts Atlantis was configured upon
 	// startup to support.
 	SupportedVCSHosts []models.VCSHostType
@@ -159,7 +159,7 @@ const ClosedPullEvent = "closed"
 const OtherPullEvent = "other"
 
 func (e *EventsController) handlePullRequestEvent(w http.ResponseWriter, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, eventType string) {
-	if !e.RepoWhitelist.IsWhitelisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
+	if !e.RepoWhitelistChecker.IsWhitelisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
 		// If the repo isn't whitelisted and we receive an opened pull request
 		// event we comment back on the pull request that the repo isn't
 		// whitelisted. This is because the user might be expecting Atlantis to
@@ -254,7 +254,7 @@ func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo mo
 
 	// At this point we know it's a command we're not supposed to ignore, so now
 	// we check if this repo is allowed to run commands in the first place.
-	if !e.RepoWhitelist.IsWhitelisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
+	if !e.RepoWhitelistChecker.IsWhitelisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
 		e.commentNotWhitelisted(baseRepo, pullNum)
 		e.respond(w, logging.Warn, http.StatusForbidden, "Repo not whitelisted")
 		return

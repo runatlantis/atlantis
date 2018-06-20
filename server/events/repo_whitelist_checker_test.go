@@ -20,7 +20,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-func TestIsWhitelisted(t *testing.T) {
+func TestRepoWhitelistChecker_IsWhitelisted(t *testing.T) {
 	cases := []struct {
 		Description  string
 		Whitelist    string
@@ -151,7 +151,7 @@ func TestIsWhitelisted(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
-			w := events.RepoWhitelist{Whitelist: c.Whitelist}
+			w := events.RepoWhitelistChecker{Whitelist: c.Whitelist}
 			Equals(t, c.Exp, w.IsWhitelisted(c.RepoFullName, c.Hostname))
 		})
 	}

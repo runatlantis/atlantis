@@ -9,7 +9,7 @@ import (
 
 // Router can be used to retrieve Atlantis URLs. It acts as an intermediary
 // between the underlying router and the rest of Atlantis that might need to
-// know URLs to different resources.
+// construct URLs to different resources.
 type Router struct {
 	// Underlying is the router that the routes have been constructed on.
 	Underlying *mux.Router

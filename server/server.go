@@ -262,7 +262,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			},
 		},
 	}
-	repoWhitelist := &events.RepoWhitelist{
+	repoWhitelist := &events.RepoWhitelistChecker{
 		Whitelist: userConfig.RepoWhitelist,
 	}
 	locksController := &LocksController{
@@ -282,7 +282,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubRequestValidator:       &DefaultGithubRequestValidator{},
 		GitlabRequestParserValidator: &DefaultGitlabRequestParserValidator{},
 		GitlabWebHookSecret:          []byte(userConfig.GitlabWebHookSecret),
-		RepoWhitelist:                repoWhitelist,
+		RepoWhitelistChecker:         repoWhitelist,
 		SupportedVCSHosts:            supportedVCSHosts,
 		VCSClient:                    vcsClient,
 		AtlantisGithubUser:           models.User{Username: userConfig.GithubUser},

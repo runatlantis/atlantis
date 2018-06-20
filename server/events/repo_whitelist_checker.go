@@ -21,16 +21,16 @@ import (
 // Wildcard matches 0-n of all characters except commas.
 const Wildcard = "*"
 
-// RepoWhitelist implements checking if repos are whitelisted to be used with
+// RepoWhitelistChecker implements checking if repos are whitelisted to be used with
 // this Atlantis.
-type RepoWhitelist struct {
+type RepoWhitelistChecker struct {
 	// Whitelist is a comma separated list of rules with wildcards '*' allowed.
 	Whitelist string
 }
 
 // IsWhitelisted returns true if this repo is in our whitelist and false
 // otherwise.
-func (r *RepoWhitelist) IsWhitelisted(repoFullName string, vcsHostname string) bool {
+func (r *RepoWhitelistChecker) IsWhitelisted(repoFullName string, vcsHostname string) bool {
 	candidate := fmt.Sprintf("%s/%s", vcsHostname, repoFullName)
 	rules := strings.Split(r.Whitelist, ",")
 	for _, rule := range rules {
@@ -41,7 +41,7 @@ func (r *RepoWhitelist) IsWhitelisted(repoFullName string, vcsHostname string) b
 	return false
 }
 
-func (r *RepoWhitelist) matchesRule(rule string, candidate string) bool {
+func (r *RepoWhitelistChecker) matchesRule(rule string, candidate string) bool {
 	// Case insensitive compare.
 	rule = strings.ToLower(rule)
 	candidate = strings.ToLower(candidate)
