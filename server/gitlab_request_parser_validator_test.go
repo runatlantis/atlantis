@@ -24,7 +24,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-var parser = server.DefaultGitlabRequestParser{}
+var parser = server.DefaultGitlabRequestParserValidator{}
 
 func TestValidate_InvalidSecret(t *testing.T) {
 	t.Log("If the secret header is set and doesn't match expected an error is returned")
@@ -33,7 +33,7 @@ func TestValidate_InvalidSecret(t *testing.T) {
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
 	Ok(t, err)
 	req.Header.Set("X-Gitlab-Token", "does-not-match")
-	_, err = parser.Validate(req, []byte("secret"))
+	_, err = parser.ParseAndValidate(req, []byte("secret"))
 	Assert(t, err != nil, "should be an error")
 	Equals(t, "header X-Gitlab-Token=does-not-match did not match expected secret", err.Error())
 }
@@ -46,7 +46,7 @@ func TestValidate_ValidSecret(t *testing.T) {
 	Ok(t, err)
 	req.Header.Set("X-Gitlab-Token", "secret")
 	req.Header.Set("X-Gitlab-Event", "Merge Request Hook")
-	b, err := parser.Validate(req, []byte("secret"))
+	b, err := parser.ParseAndValidate(req, []byte("secret"))
 	Ok(t, err)
 	Equals(t, "Gitlab Test", b.(gitlab.MergeEvent).Project.Name)
 }
@@ -59,7 +59,7 @@ func TestValidate_NoSecret(t *testing.T) {
 	Ok(t, err)
 	req.Header.Set("X-Gitlab-Token", "random secret")
 	req.Header.Set("X-Gitlab-Event", "Merge Request Hook")
-	b, err := parser.Validate(req, nil)
+	b, err := parser.ParseAndValidate(req, nil)
 	Ok(t, err)
 	Equals(t, "Gitlab Test", b.(gitlab.MergeEvent).Project.Name)
 }
@@ -71,7 +71,7 @@ func TestValidate_InvalidMergeEvent(t *testing.T) {
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
 	Ok(t, err)
 	req.Header.Set("X-Gitlab-Event", "Merge Request Hook")
-	_, err = parser.Validate(req, nil)
+	_, err = parser.ParseAndValidate(req, nil)
 	Assert(t, err != nil, "should be an error")
 	Equals(t, "unexpected end of JSON input", err.Error())
 }
@@ -83,7 +83,7 @@ func TestValidate_InvalidMergeCommentEvent(t *testing.T) {
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
 	Ok(t, err)
 	req.Header.Set("X-Gitlab-Event", "Note Hook")
-	_, err = parser.Validate(req, nil)
+	_, err = parser.ParseAndValidate(req, nil)
 	Assert(t, err != nil, "should be an error")
 	Equals(t, "unexpected end of JSON input", err.Error())
 }
@@ -95,7 +95,7 @@ func TestValidate_UnrecognizedEvent(t *testing.T) {
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
 	Ok(t, err)
 	req.Header.Set("X-Gitlab-Event", "Random Event")
-	event, err := parser.Validate(req, nil)
+	event, err := parser.ParseAndValidate(req, nil)
 	Ok(t, err)
 	Equals(t, nil, event)
 }
@@ -107,7 +107,7 @@ func TestValidate_ValidMergeEvent(t *testing.T) {
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
 	Ok(t, err)
 	req.Header.Set("X-Gitlab-Event", "Merge Request Hook")
-	b, err := parser.Validate(req, nil)
+	b, err := parser.ParseAndValidate(req, nil)
 	Ok(t, err)
 	Equals(t, "Gitlab Test", b.(gitlab.MergeEvent).Project.Name)
 	RegisterMockTestingT(t)
@@ -120,7 +120,7 @@ func TestValidate_ValidMergeCommentEvent(t *testing.T) {
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
 	Ok(t, err)
 	req.Header.Set("X-Gitlab-Event", "Note Hook")
-	b, err := parser.Validate(req, nil)
+	b, err := parser.ParseAndValidate(req, nil)
 	Ok(t, err)
 	Equals(t, "Gitlab Test", b.(gitlab.MergeCommentEvent).Project.Name)
 	RegisterMockTestingT(t)

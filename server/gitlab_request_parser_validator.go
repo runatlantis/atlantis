@@ -24,18 +24,18 @@ import (
 
 const secretHeader = "X-Gitlab-Token" // #nosec
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_gitlab_request_parser.go GitlabRequestParser
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_gitlab_request_parser_validator.go GitlabRequestParserValidator
 
-// GitlabRequestParser parses and validates GitLab requests.
-type GitlabRequestParser interface {
-	// Validate validates that the request has a token header matching secret.
+// GitlabRequestParserValidator parses and validates GitLab requests.
+type GitlabRequestParserValidator interface {
+	// ParseAndValidate validates that the request has a token header matching secret.
 	// If the secret does not match it returns an error.
 	// If secret is empty it does not check the token header.
 	// It then parses the request as a GitLab object depending on the header
 	// provided by GitLab identifying the webhook type. If the webhook type
 	// is not recognized it will return nil but will not return an error.
 	// Usage:
-	//	event, err := GitlabRequestParser.Validate(r, secret)
+	//	event, err := GitlabRequestParserValidator.ParseAndValidate(r, secret)
 	//	if err != nil {
 	//		return
 	//	}
@@ -47,15 +47,15 @@ type GitlabRequestParser interface {
 	//	default:
 	//		// unsupported event
 	//	}
-	Validate(r *http.Request, secret []byte) (interface{}, error)
+	ParseAndValidate(r *http.Request, secret []byte) (interface{}, error)
 }
 
-// DefaultGitlabRequestParser parses and validates GitLab requests.
-type DefaultGitlabRequestParser struct{}
+// DefaultGitlabRequestParserValidator parses and validates GitLab requests.
+type DefaultGitlabRequestParserValidator struct{}
 
-// Validate returns the JSON payload of the request.
-// See GitlabRequestParser.Validate()
-func (d *DefaultGitlabRequestParser) Validate(r *http.Request, secret []byte) (interface{}, error) {
+// ParseAndValidate returns the JSON payload of the request.
+// See GitlabRequestParserValidator.ParseAndValidate().
+func (d *DefaultGitlabRequestParserValidator) ParseAndValidate(r *http.Request, secret []byte) (interface{}, error) {
 	const mergeEventHeader = "Merge Request Hook"
 	const noteEventHeader = "Note Hook"
 

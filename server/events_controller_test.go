@@ -90,7 +90,7 @@ func TestPost_InvalidGitlabSecret(t *testing.T) {
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(gitlabHeader, "value")
-	When(gl.Validate(req, secret)).ThenReturn(nil, errors.New("err"))
+	When(gl.ParseAndValidate(req, secret)).ThenReturn(nil, errors.New("err"))
 	e.Post(w, req)
 	responseContains(t, w, http.StatusBadRequest, "err")
 }
@@ -112,7 +112,7 @@ func TestPost_UnsupportedGitlabEvent(t *testing.T) {
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(gitlabHeader, "value")
-	When(gl.Validate(req, secret)).ThenReturn([]byte(`{"not an event": ""}`), nil)
+	When(gl.ParseAndValidate(req, secret)).ThenReturn([]byte(`{"not an event": ""}`), nil)
 	e.Post(w, req)
 	responseContains(t, w, http.StatusOK, "Ignoring unsupported event")
 }
@@ -148,7 +148,7 @@ func TestPost_GitlabCommentInvalidCommand(t *testing.T) {
 	e, _, gl, _, _, _, _, cp := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(gitlabHeader, "value")
-	When(gl.Validate(req, secret)).ThenReturn(gitlab.MergeCommentEvent{}, nil)
+	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlab.MergeCommentEvent{}, nil)
 	When(cp.Parse("", models.Gitlab)).ThenReturn(events.CommentParseResult{Ignore: true})
 	w := httptest.NewRecorder()
 	e.Post(w, req)
@@ -174,13 +174,13 @@ func TestPost_GitlabCommentNotWhitelisted(t *testing.T) {
 	RegisterMockTestingT(t)
 	vcsClient := vcsmocks.NewMockClientProxy()
 	e := server.EventsController{
-		Logger:              logging.NewNoopLogger(),
-		CommentParser:       &events.CommentParser{},
-		GitlabRequestParser: &server.DefaultGitlabRequestParser{},
-		Parser:              &events.EventParser{},
-		SupportedVCSHosts:   []models.VCSHostType{models.Gitlab},
-		RepoWhitelist:       &events.RepoWhitelist{},
-		VCSClient:           vcsClient,
+		Logger:                       logging.NewNoopLogger(),
+		CommentParser:                &events.CommentParser{},
+		GitlabRequestParserValidator: &server.DefaultGitlabRequestParserValidator{},
+		Parser:            &events.EventParser{},
+		SupportedVCSHosts: []models.VCSHostType{models.Gitlab},
+		RepoWhitelist:     &events.RepoWhitelist{},
+		VCSClient:         vcsClient,
 	}
 	requestJSON, err := ioutil.ReadFile(filepath.Join("testfixtures", "gitlabMergeCommentEvent_notWhitelisted.json"))
 	Ok(t, err)
@@ -231,7 +231,7 @@ func TestPost_GitlabCommentResponse(t *testing.T) {
 	e, _, gl, _, _, _, vcsClient, cp := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(gitlabHeader, "value")
-	When(gl.Validate(req, secret)).ThenReturn(gitlab.MergeCommentEvent{}, nil)
+	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlab.MergeCommentEvent{}, nil)
 	When(cp.Parse("", models.Gitlab)).ThenReturn(events.CommentParseResult{CommentResponse: "a comment"})
 	w := httptest.NewRecorder()
 	e.Post(w, req)
@@ -262,7 +262,7 @@ func TestPost_GitlabCommentSuccess(t *testing.T) {
 	e, _, gl, _, cr, _, _, _ := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(gitlabHeader, "value")
-	When(gl.Validate(req, secret)).ThenReturn(gitlab.MergeCommentEvent{}, nil)
+	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlab.MergeCommentEvent{}, nil)
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	responseContains(t, w, http.StatusOK, "Processing...")
@@ -362,7 +362,7 @@ func TestPost_GitlabMergeRequestErrCleaningPull(t *testing.T) {
 	e, _, gl, p, _, c, _, _ := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(gitlabHeader, "value")
-	When(gl.Validate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
+	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
 	repo := models.Repo{}
 	pullRequest := models.PullRequest{State: models.Closed}
 	When(p.ParseGitlabMergeEvent(gitlabMergeEvent)).ThenReturn(pullRequest, repo, repo, nil)
@@ -395,7 +395,7 @@ func TestPost_GitlabMergeRequestSuccess(t *testing.T) {
 	e, _, gl, p, _, _, _, _ := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(gitlabHeader, "value")
-	When(gl.Validate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
+	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
 	repo := models.Repo{}
 	pullRequest := models.PullRequest{State: models.Closed}
 	When(p.ParseGitlabMergeEvent(gitlabMergeEvent)).ThenReturn(pullRequest, repo, repo, nil)
@@ -404,26 +404,26 @@ func TestPost_GitlabMergeRequestSuccess(t *testing.T) {
 	responseContains(t, w, http.StatusOK, "Pull request cleaned successfully")
 }
 
-func setup(t *testing.T) (server.EventsController, *mocks.MockGithubRequestValidator, *mocks.MockGitlabRequestParser, *emocks.MockEventParsing, *emocks.MockCommandRunner, *emocks.MockPullCleaner, *vcsmocks.MockClientProxy, *emocks.MockCommentParsing) {
+func setup(t *testing.T) (server.EventsController, *mocks.MockGithubRequestValidator, *mocks.MockGitlabRequestParserValidator, *emocks.MockEventParsing, *emocks.MockCommandRunner, *emocks.MockPullCleaner, *vcsmocks.MockClientProxy, *emocks.MockCommentParsing) {
 	RegisterMockTestingT(t)
 	v := mocks.NewMockGithubRequestValidator()
-	gl := mocks.NewMockGitlabRequestParser()
+	gl := mocks.NewMockGitlabRequestParserValidator()
 	p := emocks.NewMockEventParsing()
 	cp := emocks.NewMockCommentParsing()
 	cr := emocks.NewMockCommandRunner()
 	c := emocks.NewMockPullCleaner()
 	vcsmock := vcsmocks.NewMockClientProxy()
 	e := server.EventsController{
-		Logger:                 logging.NewNoopLogger(),
-		GithubRequestValidator: v,
-		Parser:                 p,
-		CommentParser:          cp,
-		CommandRunner:          cr,
-		PullCleaner:            c,
-		GithubWebHookSecret:    secret,
-		SupportedVCSHosts:      []models.VCSHostType{models.Github, models.Gitlab},
-		GitlabWebHookSecret:    secret,
-		GitlabRequestParser:    gl,
+		Logger:                       logging.NewNoopLogger(),
+		GithubRequestValidator:       v,
+		Parser:                       p,
+		CommentParser:                cp,
+		CommandRunner:                cr,
+		PullCleaner:                  c,
+		GithubWebHookSecret:          secret,
+		SupportedVCSHosts:            []models.VCSHostType{models.Github, models.Gitlab},
+		GitlabWebHookSecret:          secret,
+		GitlabRequestParserValidator: gl,
 		RepoWhitelist: &events.RepoWhitelist{
 			Whitelist: "*",
 		},
