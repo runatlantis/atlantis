@@ -23,6 +23,8 @@ import (
 	"unicode"
 )
 
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_simple_logging.go SimpleLogging
+
 // SimpleLogging is the interface that our SimpleLogger implements.
 // It's really only used for mocking when we need to test what's being logged.
 type SimpleLogging interface {
