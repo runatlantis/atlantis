@@ -65,6 +65,33 @@ func TestRun_Success(t *testing.T) {
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, tmpDir, []string{"apply", "-no-color", "extra", "args", "comment", "args", planPath}, nil, "workspace")
 }
 
+func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
+	// When running for a project, the planfile has a different name.
+	tmpDir, cleanup := TempDir(t)
+	defer cleanup()
+	planPath := filepath.Join(tmpDir, "projectname-default.tfplan")
+	err := ioutil.WriteFile(planPath, nil, 0644)
+	Ok(t, err)
+
+	RegisterMockTestingT(t)
+	terraform := mocks.NewMockClient()
+	o := runtime.ApplyStepRunner{
+		TerraformExecutor: terraform,
+	}
+
+	When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+		ThenReturn("output", nil)
+	output, err := o.Run(models.ProjectCommandContext{
+		Workspace:   "default",
+		RepoRelPath: ".",
+		ProjectName: "projectname",
+		CommentArgs: []string{"comment", "args"},
+	}, []string{"extra", "args"}, tmpDir)
+	Ok(t, err)
+	Equals(t, "output", output)
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, tmpDir, []string{"apply", "-no-color", "extra", "args", "comment", "args", planPath}, nil, "default")
+}
+
 func TestRun_UsesConfiguredTFVersion(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()

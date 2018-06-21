@@ -251,10 +251,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			ApplyStepRunner: runtime.ApplyStepRunner{
 				TerraformExecutor: terraformClient,
 			},
-			RunStepRunner: runtime.RunStepRunner{},
-			PullApprovedChecker: runtime.PullApprovedChecker{
-				VCSClient: vcsClient,
-			},
+			RunStepRunner:           runtime.RunStepRunner{},
+			PullApprovedChecker:     vcsClient,
 			Workspace:               workspace,
 			Webhooks:                webhooksManager,
 			AtlantisWorkspaceLocker: workspaceLocker,

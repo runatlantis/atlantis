@@ -252,10 +252,8 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClientProxy,
 			ApplyStepRunner: runtime.ApplyStepRunner{
 				TerraformExecutor: terraformClient,
 			},
-			RunStepRunner: runtime.RunStepRunner{},
-			PullApprovedChecker: runtime.PullApprovedChecker{
-				VCSClient: e2eVCSClient,
-			},
+			RunStepRunner:           runtime.RunStepRunner{},
+			PullApprovedChecker:     e2eVCSClient,
 			Workspace:               atlantisWorkspace,
 			Webhooks:                &mockWebhookSender{},
 			AtlantisWorkspaceLocker: locker,
