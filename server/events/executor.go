@@ -18,5 +18,5 @@ package events
 // Executor is the generic interface implemented by each command type:
 // help, plan, and apply.
 type Executor interface {
-	Execute(ctx *CommandContext) CommandResponse
+	Execute(ctx *CommandContext) CommandResult
 }

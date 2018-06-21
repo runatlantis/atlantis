@@ -102,34 +102,40 @@ func TestParseGithubIssueCommentEvent(t *testing.T) {
 	Equals(t, *comment.Issue.Number, pullNum)
 }
 
-func TestParseGithubPull(t *testing.T) {
-	testPull := deepcopy.Copy(Pull).(github.PullRequest)
-	testPull.Head.SHA = nil
-	_, _, err := parser.ParseGithubPull(&testPull)
-	ErrEquals(t, "head.sha is null", err)
+func TestParseGithubPullEvent(t *testing.T) {
+	_, _, _, _, err := parser.ParseGithubPullEvent(&github.PullRequestEvent{})
+	ErrEquals(t, "pull_request is null", err)
 
-	testPull = deepcopy.Copy(Pull).(github.PullRequest)
-	testPull.HTMLURL = nil
-	_, _, err = parser.ParseGithubPull(&testPull)
+	testEvent := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
+	testEvent.PullRequest.HTMLURL = nil
+	_, _, _, _, err = parser.ParseGithubPullEvent(&testEvent)
 	ErrEquals(t, "html_url is null", err)
 
-	testPull = deepcopy.Copy(Pull).(github.PullRequest)
-	testPull.Head.Ref = nil
-	_, _, err = parser.ParseGithubPull(&testPull)
-	ErrEquals(t, "head.ref is null", err)
+	testEvent = deepcopy.Copy(PullEvent).(github.PullRequestEvent)
+	testEvent.Sender = nil
+	_, _, _, _, err = parser.ParseGithubPullEvent(&testEvent)
+	ErrEquals(t, "sender is null", err)
 
-	testPull = deepcopy.Copy(Pull).(github.PullRequest)
-	testPull.User.Login = nil
-	_, _, err = parser.ParseGithubPull(&testPull)
-	ErrEquals(t, "user.login is null", err)
+	testEvent = deepcopy.Copy(PullEvent).(github.PullRequestEvent)
+	testEvent.Sender.Login = nil
+	_, _, _, _, err = parser.ParseGithubPullEvent(&testEvent)
+	ErrEquals(t, "sender.login is null", err)
 
-	testPull = deepcopy.Copy(Pull).(github.PullRequest)
-	testPull.Number = nil
-	_, _, err = parser.ParseGithubPull(&testPull)
-	ErrEquals(t, "number is null", err)
-
-	pullRes, _, err := parser.ParseGithubPull(&Pull)
+	actPull, actBaseRepo, actHeadRepo, actUser, err := parser.ParseGithubPullEvent(&PullEvent)
 	Ok(t, err)
+	expBaseRepo := models.Repo{
+		Owner:             "owner",
+		FullName:          "owner/repo",
+		CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",
+		SanitizedCloneURL: Repo.GetCloneURL(),
+		Name:              "repo",
+		VCSHost: models.VCSHost{
+			Hostname: "github.com",
+			Type:     models.Github,
+		},
+	}
+	Equals(t, expBaseRepo, actBaseRepo)
+	Equals(t, expBaseRepo, actHeadRepo)
 	Equals(t, models.PullRequest{
 		URL:        Pull.GetHTMLURL(),
 		Author:     Pull.User.GetLogin(),
@@ -137,18 +143,61 @@ func TestParseGithubPull(t *testing.T) {
 		HeadCommit: Pull.Head.GetSHA(),
 		Num:        Pull.GetNumber(),
 		State:      models.Open,
-		BaseRepo: models.Repo{
-			Owner:             "owner",
-			FullName:          "owner/repo",
-			CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",
-			SanitizedCloneURL: Repo.GetCloneURL(),
-			Name:              "repo",
-			VCSHost: models.VCSHost{
-				Hostname: "github.com",
-				Type:     models.Github,
-			},
+		BaseRepo:   expBaseRepo,
+	}, actPull)
+	Equals(t, models.User{Username: "user"}, actUser)
+}
+
+func TestParseGithubPull(t *testing.T) {
+	testPull := deepcopy.Copy(Pull).(github.PullRequest)
+	testPull.Head.SHA = nil
+	_, _, _, err := parser.ParseGithubPull(&testPull)
+	ErrEquals(t, "head.sha is null", err)
+
+	testPull = deepcopy.Copy(Pull).(github.PullRequest)
+	testPull.HTMLURL = nil
+	_, _, _, err = parser.ParseGithubPull(&testPull)
+	ErrEquals(t, "html_url is null", err)
+
+	testPull = deepcopy.Copy(Pull).(github.PullRequest)
+	testPull.Head.Ref = nil
+	_, _, _, err = parser.ParseGithubPull(&testPull)
+	ErrEquals(t, "head.ref is null", err)
+
+	testPull = deepcopy.Copy(Pull).(github.PullRequest)
+	testPull.User.Login = nil
+	_, _, _, err = parser.ParseGithubPull(&testPull)
+	ErrEquals(t, "user.login is null", err)
+
+	testPull = deepcopy.Copy(Pull).(github.PullRequest)
+	testPull.Number = nil
+	_, _, _, err = parser.ParseGithubPull(&testPull)
+	ErrEquals(t, "number is null", err)
+
+	pullRes, actBaseRepo, actHeadRepo, err := parser.ParseGithubPull(&Pull)
+	Ok(t, err)
+	expBaseRepo := models.Repo{
+		Owner:             "owner",
+		FullName:          "owner/repo",
+		CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",
+		SanitizedCloneURL: Repo.GetCloneURL(),
+		Name:              "repo",
+		VCSHost: models.VCSHost{
+			Hostname: "github.com",
+			Type:     models.Github,
 		},
+	}
+	Equals(t, models.PullRequest{
+		URL:        Pull.GetHTMLURL(),
+		Author:     Pull.User.GetLogin(),
+		Branch:     Pull.Head.GetRef(),
+		HeadCommit: Pull.Head.GetSHA(),
+		Num:        Pull.GetNumber(),
+		State:      models.Open,
+		BaseRepo:   expBaseRepo,
 	}, pullRes)
+	Equals(t, expBaseRepo, actBaseRepo)
+	Equals(t, expBaseRepo, actHeadRepo)
 }
 
 func TestParseGitlabMergeEvent(t *testing.T) {
@@ -156,10 +205,10 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 	var event *gitlab.MergeEvent
 	err := json.Unmarshal([]byte(mergeEventJSON), &event)
 	Ok(t, err)
-	pull, repo, _, err := parser.ParseGitlabMergeEvent(*event)
+	pull, actBaseRepo, actHeadRepo, actUser, err := parser.ParseGitlabMergeEvent(*event)
 	Ok(t, err)
 
-	expRepo := models.Repo{
+	expBaseRepo := models.Repo{
 		FullName:          "gitlabhq/gitlab-test",
 		Name:              "gitlab-test",
 		SanitizedCloneURL: "https://example.com/gitlabhq/gitlab-test.git",
@@ -178,14 +227,26 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 		HeadCommit: "da1560886d4f094c3e6c9ef40349f7d38b5d27d7",
 		Branch:     "ms-viewport",
 		State:      models.Open,
-		BaseRepo:   expRepo,
+		BaseRepo:   expBaseRepo,
 	}, pull)
 
-	Equals(t, expRepo, repo)
+	Equals(t, expBaseRepo, actBaseRepo)
+	Equals(t, models.Repo{
+		FullName:          "awesome_space/awesome_project",
+		Name:              "awesome_project",
+		SanitizedCloneURL: "http://example.com/awesome_space/awesome_project.git",
+		Owner:             "awesome_space",
+		CloneURL:          "http://gitlab-user:gitlab-token@example.com/awesome_space/awesome_project.git",
+		VCSHost: models.VCSHost{
+			Hostname: "example.com",
+			Type:     models.Gitlab,
+		},
+	}, actHeadRepo)
+	Equals(t, models.User{Username: "root"}, actUser)
 
 	t.Log("If the state is closed, should set field correctly.")
 	event.ObjectAttributes.State = "closed"
-	pull, _, _, err = parser.ParseGitlabMergeEvent(*event)
+	pull, _, _, _, err = parser.ParseGitlabMergeEvent(*event)
 	Ok(t, err)
 	Equals(t, models.Closed, pull.State)
 }
@@ -283,20 +344,20 @@ func TestNewCommand_CleansDir(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Dir, func(t *testing.T) {
-			cmd := events.NewCommand(c.Dir, nil, events.Plan, false, "workspace", "", false)
+			cmd := events.NewCommand(c.Dir, nil, events.Plan, false, "workspace", "")
 			Equals(t, c.ExpDir, cmd.Dir)
 		})
 	}
 }
 
 func TestNewCommand_EmptyWorkspace(t *testing.T) {
-	cmd := events.NewCommand("dir", nil, events.Plan, false, "", "", false)
+	cmd := events.NewCommand("dir", nil, events.Plan, false, "", "")
 	Equals(t, "default", cmd.Workspace)
 }
 
 func TestNewCommand_AllFieldsSet(t *testing.T) {
-	cmd := events.NewCommand("dir", []string{"a", "b"}, events.Plan, true, "workspace", "project", false)
-	Equals(t, events.Command{
+	cmd := events.NewCommand("dir", []string{"a", "b"}, events.Plan, true, "workspace", "project")
+	Equals(t, events.CommentCommand{
 		Workspace:   "workspace",
 		Dir:         "dir",
 		Verbose:     true,
@@ -304,6 +365,52 @@ func TestNewCommand_AllFieldsSet(t *testing.T) {
 		Name:        events.Plan,
 		ProjectName: "project",
 	}, *cmd)
+}
+
+func TestAutoplanCommand_CommandName(t *testing.T) {
+	Equals(t, events.Plan, (events.AutoplanCommand{}).CommandName())
+}
+
+func TestAutoplanCommand_IsVerbose(t *testing.T) {
+	Equals(t, false, (events.AutoplanCommand{}).IsVerbose())
+}
+
+func TestAutoplanCommand_IsAutoplan(t *testing.T) {
+	Equals(t, true, (events.AutoplanCommand{}).IsAutoplan())
+}
+
+func TestCommentCommand_CommandName(t *testing.T) {
+	Equals(t, events.Plan, (events.CommentCommand{
+		Name: events.Plan,
+	}).CommandName())
+	Equals(t, events.Apply, (events.CommentCommand{
+		Name: events.Apply,
+	}).CommandName())
+}
+
+func TestCommentCommand_IsVerbose(t *testing.T) {
+	Equals(t, false, (events.CommentCommand{
+		Verbose: false,
+	}).IsVerbose())
+	Equals(t, true, (events.CommentCommand{
+		Verbose: true,
+	}).IsVerbose())
+}
+
+func TestCommentCommand_IsAutoplan(t *testing.T) {
+	Equals(t, false, (events.CommentCommand{}).IsAutoplan())
+}
+
+func TestCommentCommand_String(t *testing.T) {
+	exp := `command="plan" verbose=true dir="mydir" workspace="myworkspace" project="myproject" flags="flag1,flag2"`
+	Equals(t, exp, (events.CommentCommand{
+		Dir:         "mydir",
+		Flags:       []string{"flag1", "flag2"},
+		Name:        events.Plan,
+		Verbose:     true,
+		Workspace:   "myworkspace",
+		ProjectName: "myproject",
+	}).String())
 }
 
 var mergeEventJSON = `{

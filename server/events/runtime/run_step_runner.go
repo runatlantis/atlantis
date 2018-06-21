@@ -9,11 +9,11 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-// RunStepOperator runs custom commands.
-type RunStepOperator struct {
+// RunStepRunner runs custom commands.
+type RunStepRunner struct {
 }
 
-func (r *RunStepOperator) Run(ctx models.ProjectCommandContext, command []string, path string) (string, error) {
+func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command []string, path string) (string, error) {
 	if len(command) < 1 {
 		return "", errors.New("no commands for run step")
 	}

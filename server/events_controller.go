@@ -29,7 +29,7 @@ const githubHeader = "X-Github-Event"
 const gitlabHeader = "X-Gitlab-Event"
 
 // EventsController handles all webhook requests which signify 'events' in the
-// VCS host, ex. GitHub. It's split out from Server to make testing easier.
+// VCS host, ex. GitHub.
 type EventsController struct {
 	CommandRunner events.CommandRunner
 	PullCleaner   events.PullCleaner
@@ -51,11 +51,7 @@ type EventsController struct {
 	// startup to support.
 	SupportedVCSHosts []models.VCSHostType
 	VCSClient         vcs.ClientProxy
-	// AtlantisGithubUser is the user that atlantis is running as for Github.
-	AtlantisGithubUser models.User
-	// AtlantisGitlabUser is the user that atlantis is running as for Gitlab.
-	AtlantisGitlabUser models.User
-	TestingMode        bool
+	TestingMode       bool
 }
 
 // Post handles POST webhook requests.
@@ -117,25 +113,18 @@ func (e *EventsController) HandleGithubCommentEvent(w http.ResponseWriter, event
 		return
 	}
 
-	// We pass in an empty models.Repo for headRepo because we need to do additional
-	// calls to get that information but we need this code path to be generic.
-	// Later on in CommandHandler we detect that this is a GitHub event and
-	// make the necessary calls to get the headRepo.
-	e.handleCommentEvent(w, baseRepo, models.Repo{}, user, pullNum, event.Comment.GetBody(), models.Github)
+	// We pass in nil for maybeHeadRepo because the head repo data isn't
+	// available in the GithubIssueComment event.
+	e.handleCommentEvent(w, baseRepo, nil, user, pullNum, event.Comment.GetBody(), models.Github)
 }
 
 // HandleGithubPullRequestEvent will delete any locks associated with the pull
 // request if the event is a pull request closed event. It's exported to make
 // testing easier.
 func (e *EventsController) HandleGithubPullRequestEvent(w http.ResponseWriter, pullEvent *github.PullRequestEvent, githubReqID string) {
-	pull, headRepo, err := e.Parser.ParseGithubPull(pullEvent.PullRequest)
+	pull, baseRepo, headRepo, user, err := e.Parser.ParseGithubPullEvent(pullEvent)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s", err, githubReqID)
-		return
-	}
-	baseRepo, err := e.Parser.ParseGithubRepo(pullEvent.Repo)
-	if err != nil {
-		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing repo data: %s %s", err, githubReqID)
 		return
 	}
 	var eventType string
@@ -150,7 +139,7 @@ func (e *EventsController) HandleGithubPullRequestEvent(w http.ResponseWriter, p
 		eventType = OtherPullEvent
 	}
 	e.Logger.Info("identified event as type %q", eventType)
-	e.handlePullRequestEvent(w, baseRepo, headRepo, pull, e.AtlantisGithubUser, eventType)
+	e.handlePullRequestEvent(w, baseRepo, headRepo, pull, user, eventType)
 }
 
 const OpenPullEvent = "opened"
@@ -179,16 +168,13 @@ func (e *EventsController) handlePullRequestEvent(w http.ResponseWriter, baseRep
 		// We use a goroutine so that this function returns and the connection is
 		// closed.
 		fmt.Fprintln(w, "Processing...")
-		// We use a Command to represent autoplanning but we set dir and
-		// workspace to '*' to indicate that all applicable dirs and workspaces
-		// should be planned.
-		autoplanCmd := events.NewCommand("*", nil, events.Plan, false, "*", "", true)
-		e.Logger.Info("executing command %s", autoplanCmd)
+
+		e.Logger.Info("executing autoplan")
 		if !e.TestingMode {
-			go e.CommandRunner.ExecuteCommand(baseRepo, headRepo, user, pull.Num, autoplanCmd)
+			go e.CommandRunner.RunAutoplanCommand(baseRepo, headRepo, pull, user)
 		} else {
 			// When testing we want to wait for everything to complete.
-			e.CommandRunner.ExecuteCommand(baseRepo, headRepo, user, pull.Num, autoplanCmd)
+			e.CommandRunner.RunAutoplanCommand(baseRepo, headRepo, pull, user)
 		}
 		return
 	case ClosedPullEvent:
@@ -202,7 +188,7 @@ func (e *EventsController) handlePullRequestEvent(w http.ResponseWriter, baseRep
 		return
 	case OtherPullEvent:
 		// Else we ignore the event.
-		e.respond(w, logging.Debug, http.StatusOK, "Ignoring opened pull request event")
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring non-actionable pull request event")
 		return
 	}
 }
@@ -236,10 +222,10 @@ func (e *EventsController) HandleGitlabCommentEvent(w http.ResponseWriter, event
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing webhook: %s", err)
 		return
 	}
-	e.handleCommentEvent(w, baseRepo, headRepo, user, event.MergeRequest.IID, event.ObjectAttributes.Note, models.Gitlab)
+	e.handleCommentEvent(w, baseRepo, &headRepo, user, event.MergeRequest.IID, event.ObjectAttributes.Note, models.Gitlab)
 }
 
-func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo models.Repo, headRepo models.Repo, user models.User, pullNum int, comment string, vcsHost models.VCSHostType) {
+func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo models.Repo, maybeHeadRepo *models.Repo, user models.User, pullNum int, comment string, vcsHost models.VCSHostType) {
 	parseResult := e.CommentParser.Parse(comment, vcsHost)
 	if parseResult.Ignore {
 		truncated := comment
@@ -278,10 +264,10 @@ func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo mo
 		// Respond with success and then actually execute the command asynchronously.
 		// We use a goroutine so that this function returns and the connection is
 		// closed.
-		go e.CommandRunner.ExecuteCommand(baseRepo, headRepo, user, pullNum, parseResult.Command)
+		go e.CommandRunner.RunCommentCommand(baseRepo, maybeHeadRepo, user, pullNum, parseResult.Command)
 	} else {
 		// When testing we want to wait for everything to complete.
-		e.CommandRunner.ExecuteCommand(baseRepo, headRepo, user, pullNum, parseResult.Command)
+		e.CommandRunner.RunCommentCommand(baseRepo, maybeHeadRepo, user, pullNum, parseResult.Command)
 	}
 }
 
@@ -289,7 +275,7 @@ func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo mo
 // request if the event is a merge request closed event. It's exported to make
 // testing easier.
 func (e *EventsController) HandleGitlabMergeRequestEvent(w http.ResponseWriter, event gitlab.MergeEvent) {
-	pull, baseRepo, headRepo, err := e.Parser.ParseGitlabMergeEvent(event)
+	pull, baseRepo, headRepo, user, err := e.Parser.ParseGitlabMergeEvent(event)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing webhook: %s", err)
 		return
@@ -306,7 +292,7 @@ func (e *EventsController) HandleGitlabMergeRequestEvent(w http.ResponseWriter, 
 		eventType = OtherPullEvent
 	}
 	e.Logger.Info("identified event as type %q", eventType)
-	e.handlePullRequestEvent(w, baseRepo, headRepo, pull, e.AtlantisGitlabUser, eventType)
+	e.handlePullRequestEvent(w, baseRepo, headRepo, pull, user, eventType)
 }
 
 // supportsHost returns true if h is in e.SupportedVCSHosts and false otherwise.

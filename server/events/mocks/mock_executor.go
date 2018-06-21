@@ -18,13 +18,13 @@ func NewMockExecutor() *MockExecutor {
 	return &MockExecutor{fail: pegomock.GlobalFailHandler}
 }
 
-func (mock *MockExecutor) Execute(ctx *events.CommandContext) events.CommandResponse {
+func (mock *MockExecutor) Execute(ctx *events.CommandContext) events.CommandResult {
 	params := []pegomock.Param{ctx}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("Execute", params, []reflect.Type{reflect.TypeOf((*events.CommandResponse)(nil)).Elem()})
-	var ret0 events.CommandResponse
+	result := pegomock.GetGenericMockFrom(mock).Invoke("Execute", params, []reflect.Type{reflect.TypeOf((*events.CommandResult)(nil)).Elem()})
+	var ret0 events.CommandResult
 	if len(result) != 0 {
 		if result[0] != nil {
-			ret0 = result[0].(events.CommandResponse)
+			ret0 = result[0].(events.CommandResult)
 		}
 	}
 	return ret0

@@ -14,6 +14,7 @@
 package events
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -41,46 +42,48 @@ type PlanSuccess struct {
 	LockURL         string
 }
 
-type ProjectOperator struct {
-	Locker            ProjectLocker
-	LockURLGenerator  LockURLGenerator
-	InitStepOperator  runtime.InitStepOperator
-	PlanStepOperator  runtime.PlanStepOperator
-	ApplyStepOperator runtime.ApplyStepOperator
-	RunStepOperator   runtime.RunStepOperator
-	ApprovalOperator  runtime.ApprovalOperator
-	Workspace         AtlantisWorkspace
-	Webhooks          WebhooksSender
+type ProjectCommandRunner struct {
+	Locker                  ProjectLocker
+	LockURLGenerator        LockURLGenerator
+	InitStepRunner          runtime.InitStepRunner
+	PlanStepRunner          runtime.PlanStepRunner
+	ApplyStepRunner         runtime.ApplyStepRunner
+	RunStepRunner           runtime.RunStepRunner
+	PullApprovedChecker     runtime.PullApprovedChecker
+	Workspace               AtlantisWorkspace
+	Webhooks                WebhooksSender
+	AtlantisWorkspaceLocker AtlantisWorkspaceLocker
 }
 
-func (p *ProjectOperator) Plan(ctx models.ProjectCommandContext, projAbsPathPtr *string) ProjectResult {
+func (p *ProjectCommandRunner) Plan(ctx models.ProjectCommandContext) ProjectCommandResult {
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.BaseRepo.FullName, ctx.RepoRelPath))
 	if err != nil {
-		return ProjectResult{Error: errors.Wrap(err, "acquiring lock")}
+		return ProjectCommandResult{
+			Error: errors.Wrap(err, "acquiring lock"),
+		}
 	}
 	if !lockAttempt.LockAcquired {
-		return ProjectResult{Failure: lockAttempt.LockFailureReason}
+		return ProjectCommandResult{Failure: lockAttempt.LockFailureReason}
 	}
 	ctx.Log.Debug("acquired lock for project")
 
-	// Ensure project has been cloned.
-	var projAbsPath string
-	if projAbsPathPtr == nil {
-		ctx.Log.Debug("project has not yet been cloned")
-		repoDir, cloneErr := p.Workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
-		if cloneErr != nil {
-			if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-				ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
-			}
-			return ProjectResult{Error: cloneErr}
-		}
-		projAbsPath = filepath.Join(repoDir, ctx.RepoRelPath)
-		ctx.Log.Debug("project successfully cloned to %q", projAbsPath)
-	} else {
-		projAbsPath = *projAbsPathPtr
-		ctx.Log.Debug("project was already cloned to %q", projAbsPath)
+	// Acquire internal lock for the directory we're going to operate in.
+	unlockFn, err := p.AtlantisWorkspaceLocker.TryLock2(ctx.BaseRepo.FullName, ctx.Workspace, ctx.Pull.Num)
+	if err != nil {
+		return ProjectCommandResult{Error: err}
 	}
+	defer unlockFn()
+
+	// Clone is idempotent so okay to run even if the repo was already cloned.
+	repoDir, cloneErr := p.Workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	if cloneErr != nil {
+		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
+			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+		}
+		return ProjectCommandResult{Error: cloneErr}
+	}
+	projAbsPath := filepath.Join(repoDir, ctx.RepoRelPath)
 
 	// Use default stage unless another workflow is defined in config
 	stage := p.defaultPlanStage()
@@ -98,10 +101,10 @@ func (p *ProjectOperator) Plan(ctx models.ProjectCommandContext, projAbsPathPtr 
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
 		}
 		// todo: include output from other steps.
-		return ProjectResult{Error: err}
+		return ProjectCommandResult{Error: err}
 	}
 
-	return ProjectResult{
+	return ProjectCommandResult{
 		PlanSuccess: &PlanSuccess{
 			LockURL:         p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
 			TerraformOutput: strings.Join(outputs, "\n"),
@@ -109,20 +112,20 @@ func (p *ProjectOperator) Plan(ctx models.ProjectCommandContext, projAbsPathPtr 
 	}
 }
 
-func (p *ProjectOperator) runSteps(steps []valid.Step, ctx models.ProjectCommandContext, absPath string) ([]string, error) {
+func (p *ProjectCommandRunner) runSteps(steps []valid.Step, ctx models.ProjectCommandContext, absPath string) ([]string, error) {
 	var outputs []string
 	for _, step := range steps {
 		var out string
 		var err error
 		switch step.StepName {
 		case "init":
-			out, err = p.InitStepOperator.Run(ctx, step.ExtraArgs, absPath)
+			out, err = p.InitStepRunner.Run(ctx, step.ExtraArgs, absPath)
 		case "plan":
-			out, err = p.PlanStepOperator.Run(ctx, step.ExtraArgs, absPath)
+			out, err = p.PlanStepRunner.Run(ctx, step.ExtraArgs, absPath)
 		case "apply":
-			out, err = p.ApplyStepOperator.Run(ctx, step.ExtraArgs, absPath)
+			out, err = p.ApplyStepRunner.Run(ctx, step.ExtraArgs, absPath)
 		case "run":
-			out, err = p.RunStepOperator.Run(ctx, step.RunCommand, absPath)
+			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath)
 		}
 
 		if err != nil {
@@ -136,21 +139,36 @@ func (p *ProjectOperator) runSteps(steps []valid.Step, ctx models.ProjectCommand
 	return outputs, nil
 }
 
-func (p *ProjectOperator) Apply(ctx models.ProjectCommandContext, absPath string) ProjectResult {
+func (p *ProjectCommandRunner) Apply(ctx models.ProjectCommandContext) ProjectCommandResult {
+	repoDir, err := p.Workspace.GetWorkspace(ctx.BaseRepo, ctx.Pull, ctx.Workspace)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return ProjectCommandResult{Error: errors.New("project has not been cloned–did you run plan?")}
+		}
+		return ProjectCommandResult{Error: err}
+	}
+	absPath := filepath.Join(repoDir, ctx.RepoRelPath)
+
 	if ctx.ProjectConfig != nil {
 		for _, req := range ctx.ProjectConfig.ApplyRequirements {
 			switch req {
 			case "approved":
-				approved, err := p.ApprovalOperator.IsApproved(ctx.BaseRepo, ctx.Pull)
+				approved, err := p.PullApprovedChecker.IsApproved(ctx.BaseRepo, ctx.Pull)
 				if err != nil {
-					return ProjectResult{Error: errors.Wrap(err, "checking if pull request was approved")}
+					return ProjectCommandResult{Error: errors.Wrap(err, "checking if pull request was approved")}
 				}
 				if !approved {
-					return ProjectResult{Failure: "Pull request must be approved before running apply."}
+					return ProjectCommandResult{Failure: "Pull request must be approved before running apply."}
 				}
 			}
 		}
 	}
+	// Acquire internal lock for the directory we're going to operate in.
+	unlockFn, err := p.AtlantisWorkspaceLocker.TryLock2(ctx.BaseRepo.FullName, ctx.Workspace, ctx.Pull.Num)
+	if err != nil {
+		return ProjectCommandResult{Error: err}
+	}
+	defer unlockFn()
 
 	// Use default stage unless another workflow is defined in config
 	stage := p.defaultApplyStage()
@@ -170,14 +188,14 @@ func (p *ProjectOperator) Apply(ctx models.ProjectCommandContext, absPath string
 	})
 	if err != nil {
 		// todo: include output from other steps.
-		return ProjectResult{Error: err}
+		return ProjectCommandResult{Error: err}
 	}
-	return ProjectResult{
+	return ProjectCommandResult{
 		ApplySuccess: strings.Join(outputs, "\n"),
 	}
 }
 
-func (p ProjectOperator) defaultPlanStage() valid.Stage {
+func (p ProjectCommandRunner) defaultPlanStage() valid.Stage {
 	return valid.Stage{
 		Steps: []valid.Step{
 			{
@@ -190,7 +208,7 @@ func (p ProjectOperator) defaultPlanStage() valid.Stage {
 	}
 }
 
-func (p ProjectOperator) defaultApplyStage() valid.Stage {
+func (p ProjectCommandRunner) defaultApplyStage() valid.Stage {
 	return valid.Stage{
 		Steps: []valid.Step{
 			{

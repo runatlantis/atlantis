@@ -12,7 +12,7 @@
     "number": 2,
     "state": "open",
     "locked": false,
-    "title": "Noyaml",
+    "title": "branch",
     "user": {
       "login": "runatlantis",
       "id": 1034429,
@@ -59,8 +59,8 @@
     "comments_url": "https://api.github.com/repos/runatlantis/atlantis-tests/issues/2/comments",
     "statuses_url": "https://api.github.com/repos/runatlantis/atlantis-tests/statuses/c31fd9ea6f557ad2ea659944c3844a059b83bc5d",
     "head": {
-      "label": "runatlantis:noyaml",
-      "ref": "noyaml",
+      "label": "runatlantis:branch",
+      "ref": "branch",
       "sha": "c31fd9ea6f557ad2ea659944c3844a059b83bc5d",
       "user": {
         "login": "runatlantis",

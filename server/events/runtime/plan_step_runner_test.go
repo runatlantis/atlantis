@@ -26,7 +26,7 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 	tfVersion, _ := version.NewVersion("0.8")
 	logger := logging.NewNoopLogger()
 	workspace := "default"
-	s := runtime.PlanStepOperator{
+	s := runtime.PlanStepRunner{
 		DefaultTFVersion:  tfVersion,
 		TerraformExecutor: terraform,
 	}
@@ -59,7 +59,7 @@ func TestRun_ErrWorkspaceIn08(t *testing.T) {
 	tfVersion, _ := version.NewVersion("0.8")
 	logger := logging.NewNoopLogger()
 	workspace := "notdefault"
-	s := runtime.PlanStepOperator{
+	s := runtime.PlanStepRunner{
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
 	}
@@ -107,7 +107,7 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 			tfVersion, _ := version.NewVersion(c.tfVersion)
 			logger := logging.NewNoopLogger()
 
-			s := runtime.PlanStepOperator{
+			s := runtime.PlanStepRunner{
 				TerraformExecutor: terraform,
 				DefaultTFVersion:  tfVersion,
 			}
@@ -162,7 +162,7 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 			terraform := mocks.NewMockClient()
 			tfVersion, _ := version.NewVersion(c.tfVersion)
 			logger := logging.NewNoopLogger()
-			s := runtime.PlanStepOperator{
+			s := runtime.PlanStepRunner{
 				TerraformExecutor: terraform,
 				DefaultTFVersion:  tfVersion,
 			}
@@ -201,7 +201,7 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 	terraform := mocks.NewMockClient()
 	tfVersion, _ := version.NewVersion("0.10.0")
 	logger := logging.NewNoopLogger()
-	s := runtime.PlanStepOperator{
+	s := runtime.PlanStepRunner{
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
 	}
@@ -243,7 +243,7 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 	// Using version >= 0.10 here so we don't expect any env commands.
 	tfVersion, _ := version.NewVersion("0.10.0")
 	logger := logging.NewNoopLogger()
-	s := runtime.PlanStepOperator{
+	s := runtime.PlanStepRunner{
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
 	}
@@ -263,5 +263,33 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 	// Verify that env select was never called since we're in version >= 0.10
 	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(logger, tmpDir, []string{"env", "select", "-no-color", "workspace"}, tfVersion, "workspace")
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, tmpDir, expPlanArgs, tfVersion, "workspace")
+	Equals(t, "output", output)
+}
+
+func TestRun_UsesDiffPathForProject(t *testing.T) {
+	// Test that if running for a project, uses a different path for the plan
+	// file.
+	RegisterMockTestingT(t)
+	terraform := mocks.NewMockClient()
+	tfVersion, _ := version.NewVersion("0.10.0")
+	logger := logging.NewNoopLogger()
+	s := runtime.PlanStepRunner{
+		TerraformExecutor: terraform,
+		DefaultTFVersion:  tfVersion,
+	}
+	When(terraform.RunCommandWithVersion(logger, "/path", []string{"workspace", "show"}, tfVersion, "workspace")).ThenReturn("workspace\n", nil)
+
+	expPlanArgs := []string{"plan", "-refresh", "-no-color", "-out", "/path/projectname-default.tfplan", "-var", "atlantis_user=username", "extra", "args", "comment", "args"}
+	When(terraform.RunCommandWithVersion(logger, "/path", expPlanArgs, tfVersion, "default")).ThenReturn("output", nil)
+
+	output, err := s.Run(models.ProjectCommandContext{
+		Log:         logger,
+		Workspace:   "default",
+		RepoRelPath: ".",
+		ProjectName: "projectname",
+		User:        models.User{Username: "username"},
+		CommentArgs: []string{"comment", "args"},
+	}, []string{"extra", "args"}, "/path")
+	Ok(t, err)
 	Equals(t, "output", output)
 }

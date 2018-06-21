@@ -44,7 +44,7 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 
 			tfVersion, _ := version.NewVersion(c.version)
 			logger := logging.NewNoopLogger()
-			iso := runtime.InitStepOperator{
+			iso := runtime.InitStepRunner{
 				TerraformExecutor: terraform,
 				DefaultTFVersion:  tfVersion,
 			}

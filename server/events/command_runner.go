@@ -29,10 +29,11 @@ import (
 
 // CommandRunner is the first step after a command request has been parsed.
 type CommandRunner interface {
-	// ExecuteCommand is the first step after a command request has been parsed.
+	// RunCommentCommand is the first step after a command request has been parsed.
 	// It handles gathering additional information needed to execute the command
 	// and then calling the appropriate services to finish executing the command.
-	ExecuteCommand(baseRepo models.Repo, headRepo models.Repo, user models.User, pullNum int, cmd *Command)
+	RunCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, user models.User, pullNum int, cmd *CommentCommand)
+	RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_github_pull_getter.go GithubPullGetter
@@ -51,14 +52,13 @@ type GitlabMergeRequestGetter interface {
 	GetMergeRequest(repoFullName string, pullNum int) (*gitlab.MergeRequest, error)
 }
 
-// CommandHandler is the first step when processing a comment command.
-type CommandHandler struct {
+// DefaultCommandRunner is the first step when processing a comment command.
+type DefaultCommandRunner struct {
 	VCSClient                vcs.ClientProxy
 	GithubPullGetter         GithubPullGetter
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
 	CommitStatusUpdater      CommitStatusUpdater
 	EventParser              EventParsing
-	AtlantisWorkspaceLocker  AtlantisWorkspaceLocker
 	MarkdownRenderer         *MarkdownRenderer
 	Logger                   logging.SimpleLogging
 	// AllowForkPRs controls whether we operate on pull requests from forks.
@@ -66,17 +66,50 @@ type CommandHandler struct {
 	// AllowForkPRsFlag is the name of the flag that controls fork PR's. We use
 	// this in our error message back to the user on a forked PR so they know
 	// how to enable this functionality.
-	AllowForkPRsFlag    string
-	PullRequestOperator PullRequestOperator
+	AllowForkPRsFlag      string
+	ProjectCommandBuilder ProjectCommandBuilder
+	ProjectCommandRunner  *ProjectCommandRunner
 }
 
-// ExecuteCommand executes the command.
-// If the repo is from GitHub, we don't use headRepo and instead make an API call
-// to get the headRepo. This is because the caller is unable to pass in a
-// headRepo since there's not enough data available on the initial webhook
-// payload.
-func (c *CommandHandler) ExecuteCommand(baseRepo models.Repo, headRepo models.Repo, user models.User, pullNum int, cmd *Command) {
+func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) {
+	log := c.buildLogger(baseRepo.FullName, pull.Num)
+	ctx := &CommandContext{
+		User:     user,
+		Log:      log,
+		Pull:     pull,
+		HeadRepo: headRepo,
+		BaseRepo: baseRepo,
+	}
+	runFn := func() ([]ProjectResult, error) {
+		projectCmds, err := c.ProjectCommandBuilder.BuildAutoplanCommands(ctx)
+		if err != nil {
+			return nil, err
+		}
+		var results []ProjectResult
+		for _, cmd := range projectCmds {
+			res := c.ProjectCommandRunner.Plan(cmd)
+			results = append(results, ProjectResult{
+				ProjectCommandResult: res,
+				Path:                 cmd.RepoRelPath,
+				Workspace:            cmd.Workspace,
+			})
+		}
+		return results, nil
+	}
+	c.run(ctx, AutoplanCommand{}, runFn)
+}
+
+// RunCommentCommand executes the command.
+// We take in a pointer for maybeHeadRepo because for some events there isn't
+// enough data to construct the Repo model and callers might want to wait until
+// the event is further validated before making an additional (potentially
+// wasteful) call to get the necessary data.
+func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, user models.User, pullNum int, cmd *CommentCommand) {
 	log := c.buildLogger(baseRepo.FullName, pullNum)
+	var headRepo models.Repo
+	if maybeHeadRepo != nil {
+		headRepo = *maybeHeadRepo
+	}
 
 	var err error
 	var pull models.PullRequest
@@ -97,13 +130,38 @@ func (c *CommandHandler) ExecuteCommand(baseRepo models.Repo, headRepo models.Re
 		Log:      log,
 		Pull:     pull,
 		HeadRepo: headRepo,
-		Command:  cmd,
 		BaseRepo: baseRepo,
 	}
-	c.run(ctx)
+
+	runFn := func() ([]ProjectResult, error) {
+		var result ProjectCommandResult
+		switch cmd.Name {
+		case Plan:
+			projectCmd, err := c.ProjectCommandBuilder.BuildPlanCommand(ctx, cmd)
+			if err != nil {
+				return nil, err
+			}
+			result = c.ProjectCommandRunner.Plan(projectCmd)
+		case Apply:
+			projectCmd, err := c.ProjectCommandBuilder.BuildApplyCommand(ctx, cmd)
+			if err != nil {
+				return nil, err
+			}
+			result = c.ProjectCommandRunner.Apply(projectCmd)
+		default:
+			ctx.Log.Err("failed to determine desired command, neither plan nor apply")
+		}
+		return []ProjectResult{{
+			Path:                 cmd.Dir,
+			Workspace:            cmd.Workspace,
+			ProjectCommandResult: result,
+		}}, nil
+	}
+
+	c.run(ctx, cmd, runFn)
 }
 
-func (c *CommandHandler) getGithubData(baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {
+func (c *DefaultCommandRunner) getGithubData(baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {
 	if c.GithubPullGetter == nil {
 		return models.PullRequest{}, models.Repo{}, errors.New("Atlantis not configured to support GitHub")
 	}
@@ -111,14 +169,14 @@ func (c *CommandHandler) getGithubData(baseRepo models.Repo, pullNum int) (model
 	if err != nil {
 		return models.PullRequest{}, models.Repo{}, errors.Wrap(err, "making pull request API call to GitHub")
 	}
-	pull, repo, err := c.EventParser.ParseGithubPull(ghPull)
+	pull, _, headRepo, err := c.EventParser.ParseGithubPull(ghPull)
 	if err != nil {
-		return pull, repo, errors.Wrap(err, "extracting required fields from comment data")
+		return pull, headRepo, errors.Wrap(err, "extracting required fields from comment data")
 	}
-	return pull, repo, nil
+	return pull, headRepo, nil
 }
 
-func (c *CommandHandler) getGitlabData(baseRepo models.Repo, pullNum int) (models.PullRequest, error) {
+func (c *DefaultCommandRunner) getGitlabData(baseRepo models.Repo, pullNum int) (models.PullRequest, error) {
 	if c.GitlabMergeRequestGetter == nil {
 		return models.PullRequest{}, errors.New("Atlantis not configured to support GitLab")
 	}
@@ -130,60 +188,47 @@ func (c *CommandHandler) getGitlabData(baseRepo models.Repo, pullNum int) (model
 	return pull, nil
 }
 
-func (c *CommandHandler) buildLogger(repoFullName string, pullNum int) *logging.SimpleLogger {
+func (c *DefaultCommandRunner) buildLogger(repoFullName string, pullNum int) *logging.SimpleLogger {
 	src := fmt.Sprintf("%s#%d", repoFullName, pullNum)
 	return logging.NewSimpleLogger(src, c.Logger.Underlying(), true, c.Logger.GetLevel())
 }
 
-func (c *CommandHandler) run(ctx *CommandContext) {
-	defer c.logPanics(ctx)
-
+func (c *DefaultCommandRunner) validateCtxAndComment(ctx *CommandContext) bool {
 	if !c.AllowForkPRs && ctx.HeadRepo.Owner != ctx.BaseRepo.Owner {
 		ctx.Log.Info("command was run on a fork pull request which is disallowed")
 		c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, fmt.Sprintf("Atlantis commands can't be run on fork pull requests. To enable, set --%s", c.AllowForkPRsFlag)) // nolint: errcheck
-		return
+		return false
 	}
 
 	if ctx.Pull.State != models.Open {
 		ctx.Log.Info("command was run on closed pull request")
 		c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, "Atlantis commands can't be run on closed pull requests") // nolint: errcheck
+		return false
+	}
+	return true
+}
+
+func (c *DefaultCommandRunner) run(ctx *CommandContext, command CommandInterface, commandRunner func() ([]ProjectResult, error)) {
+	defer c.logPanics(ctx)
+
+	if !c.validateCtxAndComment(ctx) {
 		return
 	}
 
 	ctx.Log.Debug("updating commit status to pending")
-	if err := c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, vcs.Pending, ctx.Command); err != nil {
+	if err := c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, vcs.Pending, command.CommandName()); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
-	if !c.AtlantisWorkspaceLocker.TryLock(ctx.BaseRepo.FullName, ctx.Command.Workspace, ctx.Pull.Num) {
-		errMsg := fmt.Sprintf(
-			"The %s workspace is currently locked by another"+
-				" command that is running for this pull request."+
-				" Wait until the previous command is complete and try again.",
-			ctx.Command.Workspace)
-		ctx.Log.Warn(errMsg)
-		c.updatePull(ctx, CommandResponse{Failure: errMsg})
+
+	results, err := commandRunner()
+	if err != nil {
+		c.updatePull(ctx, command, CommandResult{Error: err})
 		return
 	}
-	ctx.Log.Debug("successfully acquired workspace lock")
-	defer c.AtlantisWorkspaceLocker.Unlock(ctx.BaseRepo.FullName, ctx.Command.Workspace, ctx.Pull.Num)
-
-	var cr CommandResponse
-	switch ctx.Command.Name {
-	case Plan:
-		if ctx.Command.Autoplan {
-			cr = c.PullRequestOperator.Autoplan(ctx)
-		} else {
-			cr = c.PullRequestOperator.PlanViaComment(ctx)
-		}
-	case Apply:
-		cr = c.PullRequestOperator.ApplyViaComment(ctx)
-	default:
-		ctx.Log.Err("failed to determine desired command, neither plan nor apply")
-	}
-	c.updatePull(ctx, cr)
+	c.updatePull(ctx, command, CommandResult{ProjectResults: results})
 }
 
-func (c *CommandHandler) updatePull(ctx *CommandContext, res CommandResponse) {
+func (c *DefaultCommandRunner) updatePull(ctx *CommandContext, command CommandInterface, res CommandResult) {
 	// Log if we got any errors or failures.
 	if res.Error != nil {
 		ctx.Log.Err(res.Error.Error())
@@ -192,15 +237,15 @@ func (c *CommandHandler) updatePull(ctx *CommandContext, res CommandResponse) {
 	}
 
 	// Update the pull request's status icon and comment back.
-	if err := c.CommitStatusUpdater.UpdateProjectResult(ctx, res); err != nil {
+	if err := c.CommitStatusUpdater.UpdateProjectResult(ctx, command.CommandName(), res); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
-	comment := c.MarkdownRenderer.Render(res, ctx.Command.Name, ctx.Log.History.String(), ctx.Command.Verbose, ctx.Command.Autoplan)
+	comment := c.MarkdownRenderer.Render(res, command.CommandName(), ctx.Log.History.String(), command.IsVerbose(), command.IsAutoplan())
 	c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, comment) // nolint: errcheck
 }
 
 // logPanics logs and creates a comment on the pull request for panics.
-func (c *CommandHandler) logPanics(ctx *CommandContext) {
+func (c *DefaultCommandRunner) logPanics(ctx *CommandContext) {
 	if err := recover(); err != nil {
 		stack := recovery.Stack(3)
 		c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, // nolint: errcheck

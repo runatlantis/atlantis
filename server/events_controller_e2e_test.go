@@ -164,7 +164,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			When(vcsClient.GetModifiedFiles(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
 
 			// First, send the open pull request event and trigger an autoplan.
-			pullOpenedReq := GitHubPullRequestOpenedEvent(t)
+			pullOpenedReq := GitHubPullRequestOpenedEvent(t, headSHA)
 			ctrl.Post(w, pullOpenedReq)
 			responseContains(t, w, 200, "Processing...")
 			if c.ExpAutoplanCommentFile != "" {
@@ -236,51 +236,51 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClientProxy,
 	}
 
 	defaultTFVersion := terraformClient.Version()
-	commandHandler := &events.CommandHandler{
+	locker := events.NewDefaultAtlantisWorkspaceLocker()
+	commandRunner := &events.DefaultCommandRunner{
+		ProjectCommandRunner: &events.ProjectCommandRunner{
+			Locker:           projectLocker,
+			LockURLGenerator: &mockLockURLGenerator{},
+			InitStepRunner: runtime.InitStepRunner{
+				TerraformExecutor: terraformClient,
+				DefaultTFVersion:  defaultTFVersion,
+			},
+			PlanStepRunner: runtime.PlanStepRunner{
+				TerraformExecutor: terraformClient,
+				DefaultTFVersion:  defaultTFVersion,
+			},
+			ApplyStepRunner: runtime.ApplyStepRunner{
+				TerraformExecutor: terraformClient,
+			},
+			RunStepRunner: runtime.RunStepRunner{},
+			PullApprovedChecker: runtime.PullApprovedChecker{
+				VCSClient: e2eVCSClient,
+			},
+			Workspace:               atlantisWorkspace,
+			Webhooks:                &mockWebhookSender{},
+			AtlantisWorkspaceLocker: locker,
+		},
 		EventParser:              eventParser,
 		VCSClient:                e2eVCSClient,
 		GithubPullGetter:         e2eGithubGetter,
 		GitlabMergeRequestGetter: e2eGitlabGetter,
 		CommitStatusUpdater:      e2eStatusUpdater,
-		AtlantisWorkspaceLocker:  events.NewDefaultAtlantisWorkspaceLocker(),
 		MarkdownRenderer:         &events.MarkdownRenderer{},
 		Logger:                   logger,
 		AllowForkPRs:             allowForkPRs,
 		AllowForkPRsFlag:         "allow-fork-prs",
-		PullRequestOperator: &events.DefaultPullRequestOperator{
-			TerraformExecutor: terraformClient,
-			DefaultTFVersion:  defaultTFVersion,
-			ParserValidator:   &yaml.ParserValidator{},
-			ProjectFinder:     &events.DefaultProjectFinder{},
-			VCSClient:         e2eVCSClient,
-			Workspace:         atlantisWorkspace,
-			ProjectOperator: events.ProjectOperator{
-				Locker:           projectLocker,
-				LockURLGenerator: &mockLockURLGenerator{},
-				InitStepOperator: runtime.InitStepOperator{
-					TerraformExecutor: terraformClient,
-					DefaultTFVersion:  defaultTFVersion,
-				},
-				PlanStepOperator: runtime.PlanStepOperator{
-					TerraformExecutor: terraformClient,
-					DefaultTFVersion:  defaultTFVersion,
-				},
-				ApplyStepOperator: runtime.ApplyStepOperator{
-					TerraformExecutor: terraformClient,
-				},
-				RunStepOperator: runtime.RunStepOperator{},
-				ApprovalOperator: runtime.ApprovalOperator{
-					VCSClient: e2eVCSClient,
-				},
-				Workspace: atlantisWorkspace,
-				Webhooks:  &mockWebhookSender{},
-			},
+		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
+			ParserValidator:         &yaml.ParserValidator{},
+			ProjectFinder:           &events.DefaultProjectFinder{},
+			VCSClient:               e2eVCSClient,
+			Workspace:               atlantisWorkspace,
+			AtlantisWorkspaceLocker: locker,
 		},
 	}
 
 	ctrl := server.EventsController{
 		TestingMode:   true,
-		CommandRunner: commandHandler,
+		CommandRunner: commandRunner,
 		PullCleaner: &events.PullClosedExecutor{
 			Locker:    lockingClient,
 			VCSClient: e2eVCSClient,
@@ -298,12 +298,6 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClientProxy,
 		},
 		SupportedVCSHosts: []models.VCSHostType{models.Gitlab, models.Github},
 		VCSClient:         e2eVCSClient,
-		AtlantisGithubUser: models.User{
-			Username: "atlantisbot",
-		},
-		AtlantisGitlabUser: models.User{
-			Username: "atlantisbot",
-		},
 	}
 	return ctrl, e2eVCSClient, e2eGithubGetter, atlantisWorkspace
 }
@@ -331,10 +325,12 @@ func GitHubCommentEvent(t *testing.T, comment string) *http.Request {
 	return req
 }
 
-func GitHubPullRequestOpenedEvent(t *testing.T) *http.Request {
+func GitHubPullRequestOpenedEvent(t *testing.T, headSHA string) *http.Request {
 	requestJSON, err := ioutil.ReadFile(filepath.Join("testfixtures", "githubPullRequestOpenedEvent.json"))
 	Ok(t, err)
-	req, err := http.NewRequest("POST", "/events", bytes.NewBuffer(requestJSON))
+	// Replace sha with expected sha.
+	requestJSONStr := strings.Replace(string(requestJSON), "c31fd9ea6f557ad2ea659944c3844a059b83bc5d", headSHA, -1)
+	req, err := http.NewRequest("POST", "/events", bytes.NewBuffer([]byte(requestJSONStr)))
 	Ok(t, err)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(githubHeader, "pull_request")
@@ -357,7 +353,7 @@ func GitHubPullRequestParsed(headSHA string) *github.PullRequest {
 		headSHA = "13940d121be73f656e2132c6d7b4c8e87878ac8d"
 	}
 	return &github.PullRequest{
-		Number:  github.Int(1),
+		Number:  github.Int(2),
 		State:   github.String("open"),
 		HTMLURL: github.String("htmlurl"),
 		Head: &github.PullRequestBranch{

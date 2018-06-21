@@ -17,7 +17,7 @@ import (
 )
 
 func TestRun_NoDir(t *testing.T) {
-	o := runtime.ApplyStepOperator{
+	o := runtime.ApplyStepRunner{
 		TerraformExecutor: nil,
 	}
 	_, err := o.Run(models.ProjectCommandContext{
@@ -30,7 +30,7 @@ func TestRun_NoDir(t *testing.T) {
 func TestRun_NoPlanFile(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
-	o := runtime.ApplyStepOperator{
+	o := runtime.ApplyStepRunner{
 		TerraformExecutor: nil,
 	}
 	_, err := o.Run(models.ProjectCommandContext{
@@ -49,7 +49,7 @@ func TestRun_Success(t *testing.T) {
 
 	RegisterMockTestingT(t)
 	terraform := mocks.NewMockClient()
-	o := runtime.ApplyStepOperator{
+	o := runtime.ApplyStepRunner{
 		TerraformExecutor: terraform,
 	}
 
@@ -74,7 +74,7 @@ func TestRun_UsesConfiguredTFVersion(t *testing.T) {
 
 	RegisterMockTestingT(t)
 	terraform := mocks.NewMockClient()
-	o := runtime.ApplyStepOperator{
+	o := runtime.ApplyStepRunner{
 		TerraformExecutor: terraform,
 	}
 	tfVersion, _ := version.NewVersion("0.11.0")

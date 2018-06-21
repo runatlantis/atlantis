@@ -7,13 +7,13 @@ import (
 	events "github.com/runatlantis/atlantis/server/events"
 )
 
-func AnyPtrToEventsCommand() *events.CommentCommand {
+func AnyPtrToEventsCommentCommand() *events.CommentCommand {
 	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(*events.CommentCommand))(nil)).Elem()))
 	var nullValue *events.CommentCommand
 	return nullValue
 }
 
-func EqPtrToEventsCommand(value *events.CommentCommand) *events.CommentCommand {
+func EqPtrToEventsCommentCommand(value *events.CommentCommand) *events.CommentCommand {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
 	var nullValue *events.CommentCommand
 	return nullValue

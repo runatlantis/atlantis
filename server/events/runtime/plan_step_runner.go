@@ -15,12 +15,12 @@ import (
 const atlantisUserTFVar = "atlantis_user"
 const defaultWorkspace = "default"
 
-type PlanStepOperator struct {
+type PlanStepRunner struct {
 	TerraformExecutor TerraformExec
 	DefaultTFVersion  *version.Version
 }
 
-func (p *PlanStepOperator) Run(ctx models.ProjectCommandContext, extraArgs []string, path string) (string, error) {
+func (p *PlanStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string) (string, error) {
 	tfVersion := p.DefaultTFVersion
 	if ctx.ProjectConfig != nil && ctx.ProjectConfig.TerraformVersion != nil {
 		tfVersion = ctx.ProjectConfig.TerraformVersion
@@ -55,7 +55,7 @@ func (p *PlanStepOperator) Run(ctx models.ProjectCommandContext, extraArgs []str
 
 // switchWorkspace changes the terraform workspace if necessary and will create
 // it if it doesn't exist. It handles differences between versions.
-func (p *PlanStepOperator) switchWorkspace(ctx models.ProjectCommandContext, path string, tfVersion *version.Version) error {
+func (p *PlanStepRunner) switchWorkspace(ctx models.ProjectCommandContext, path string, tfVersion *version.Version) error {
 	// In versions less than 0.9 there is no support for workspaces.
 	noWorkspaceSupport := MustConstraint("<0.9").Check(tfVersion)
 	// If the user tried to set a specific workspace in the comment but their

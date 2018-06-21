@@ -15,41 +15,45 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_pull_request_operator.go PullRequestOperator
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
 
-type PullRequestOperator interface {
-	Autoplan(ctx *CommandContext) CommandResponse
-	PlanViaComment(ctx *CommandContext) CommandResponse
-	ApplyViaComment(ctx *CommandContext) CommandResponse
+type ProjectCommandBuilder interface {
+	BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error)
+	BuildPlanCommand(ctx *CommandContext, commentCommand *CommentCommand) (models.ProjectCommandContext, error)
+	BuildApplyCommand(ctx *CommandContext, commentCommand *CommentCommand) (models.ProjectCommandContext, error)
 }
 
-type DefaultPullRequestOperator struct {
-	TerraformExecutor TerraformExec
-	DefaultTFVersion  *version.Version
-	ParserValidator   *yaml.ParserValidator
-	ProjectFinder     ProjectFinder
-	VCSClient         vcs.ClientProxy
-	Workspace         AtlantisWorkspace
-	ProjectOperator   ProjectOperator
+type DefaultProjectCommandBuilder struct {
+	ParserValidator         *yaml.ParserValidator
+	ProjectFinder           ProjectFinder
+	VCSClient               vcs.ClientProxy
+	Workspace               AtlantisWorkspace
+	AtlantisWorkspaceLocker AtlantisWorkspaceLocker
 }
 
 type TerraformExec interface {
 	RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (string, error)
 }
 
-func (p *DefaultPullRequestOperator) Autoplan(ctx *CommandContext) CommandResponse {
-	// check out repo to parse atlantis.yaml
-	// this will check out the repo to a * dir
-	repoDir, err := p.Workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, ctx.Command.Workspace)
+func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error) {
+	// Need to lock the workspace we're about to clone to.
+	workspace := DefaultWorkspace
+	unlockFn, err := p.AtlantisWorkspaceLocker.TryLock2(ctx.BaseRepo.FullName, workspace, ctx.Pull.Num)
 	if err != nil {
-		return CommandResponse{Error: err}
+		return nil, err
+	}
+	defer unlockFn()
+
+	repoDir, err := p.Workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, workspace)
+	if err != nil {
+		return nil, err
 	}
 
 	// Parse config file if it exists.
 	ctx.Log.Debug("parsing config file")
 	config, err := p.ParserValidator.ReadConfig(repoDir)
 	if err != nil && !os.IsNotExist(err) {
-		return CommandResponse{Error: err}
+		return nil, err
 	}
 	noAtlantisYAML := os.IsNotExist(err)
 	if noAtlantisYAML {
@@ -61,11 +65,11 @@ func (p *DefaultPullRequestOperator) Autoplan(ctx *CommandContext) CommandRespon
 	// We'll need the list of modified files.
 	modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.BaseRepo, ctx.Pull)
 	if err != nil {
-		return CommandResponse{Error: err}
+		return nil, err
 	}
 	ctx.Log.Debug("%d files were modified in this pull request", len(modifiedFiles))
 
-	// Prepare the project contexts so the ProjectOperator can execute.
+	// Prepare the project contexts so the ProjectCommandRunner can execute.
 	var projCtxs []models.ProjectCommandContext
 
 	// If there is no config file, then we try to plan for each project that
@@ -93,7 +97,7 @@ func (p *DefaultPullRequestOperator) Autoplan(ctx *CommandContext) CommandRespon
 		// in the config file.
 		matchingProjects, err := p.matchingProjects(ctx.Log, modifiedFiles, config)
 		if err != nil {
-			return CommandResponse{Error: err}
+			return nil, err
 		}
 		ctx.Log.Info("%d projects are to be autoplanned based on their when_modified config", len(matchingProjects))
 
@@ -120,22 +124,21 @@ func (p *DefaultPullRequestOperator) Autoplan(ctx *CommandContext) CommandRespon
 			})
 		}
 	}
-
-	// Execute the operations.
-	var results []ProjectResult
-	for _, pCtx := range projCtxs {
-		res := p.ProjectOperator.Plan(pCtx, nil)
-		res.Path = pCtx.RepoRelPath
-		res.Workspace = pCtx.Workspace
-		results = append(results, res)
-	}
-	return CommandResponse{ProjectResults: results}
+	return projCtxs, nil
 }
 
-func (p *DefaultPullRequestOperator) PlanViaComment(ctx *CommandContext) CommandResponse {
-	repoDir, err := p.Workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, ctx.Command.Workspace)
+func (p *DefaultProjectCommandBuilder) BuildPlanCommand(ctx *CommandContext, cmd *CommentCommand) (models.ProjectCommandContext, error) {
+	var projCtx models.ProjectCommandContext
+
+	unlockFn, err := p.AtlantisWorkspaceLocker.TryLock2(ctx.BaseRepo.FullName, cmd.Workspace, ctx.Pull.Num)
 	if err != nil {
-		return CommandResponse{Error: err}
+		return projCtx, err
+	}
+	defer unlockFn()
+
+	repoDir, err := p.Workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, cmd.Workspace)
+	if err != nil {
+		return projCtx, err
 	}
 
 	var projCfg *valid.Project
@@ -144,55 +147,49 @@ func (p *DefaultPullRequestOperator) PlanViaComment(ctx *CommandContext) Command
 	// Parse config file if it exists.
 	config, err := p.ParserValidator.ReadConfig(repoDir)
 	if err != nil && !os.IsNotExist(err) {
-		return CommandResponse{Error: err}
+		return projCtx, err
 	}
 	hasAtlantisYAML := !os.IsNotExist(err)
 	if hasAtlantisYAML {
 		// If they've specified a project by name we look it up. Otherwise we
 		// use the dir and workspace.
-		if ctx.Command.ProjectName != "" {
-			projCfg = config.FindProjectByName(ctx.Command.ProjectName)
+		if cmd.ProjectName != "" {
+			projCfg = config.FindProjectByName(cmd.ProjectName)
 			if projCfg == nil {
-				return CommandResponse{Error: fmt.Errorf("no project with name %q configured", ctx.Command.ProjectName)}
+				return projCtx, fmt.Errorf("no project with name %q configured", cmd.ProjectName)
 			}
 		} else {
-			projCfg = config.FindProject(ctx.Command.Dir, ctx.Command.Workspace)
+			projCfg = config.FindProject(cmd.Dir, cmd.Workspace)
 		}
 		globalCfg = &config
 	}
 
-	if ctx.Command.ProjectName != "" && !hasAtlantisYAML {
-		return CommandResponse{Error: fmt.Errorf("cannot specify a project name unless an %s file exists to configure projects", yaml.AtlantisYAMLFilename)}
+	if cmd.ProjectName != "" && !hasAtlantisYAML {
+		return projCtx, fmt.Errorf("cannot specify a project name unless an %s file exists to configure projects", yaml.AtlantisYAMLFilename)
 	}
 
-	projCtx := models.ProjectCommandContext{
+	projCtx = models.ProjectCommandContext{
 		BaseRepo:      ctx.BaseRepo,
 		HeadRepo:      ctx.HeadRepo,
 		Pull:          ctx.Pull,
 		User:          ctx.User,
 		Log:           ctx.Log,
-		CommentArgs:   ctx.Command.Flags,
-		Workspace:     ctx.Command.Workspace,
-		RepoRelPath:   ctx.Command.Dir,
-		ProjectName:   ctx.Command.ProjectName,
+		CommentArgs:   cmd.Flags,
+		Workspace:     cmd.Workspace,
+		RepoRelPath:   cmd.Dir,
+		ProjectName:   cmd.ProjectName,
 		ProjectConfig: projCfg,
 		GlobalConfig:  globalCfg,
 	}
-	projAbsPath := filepath.Join(repoDir, ctx.Command.Dir)
-	res := p.ProjectOperator.Plan(projCtx, &projAbsPath)
-	res.Workspace = projCtx.Workspace
-	res.Path = projCtx.RepoRelPath
-	return CommandResponse{
-		ProjectResults: []ProjectResult{
-			res,
-		},
-	}
+	return projCtx, nil
 }
 
-func (p *DefaultPullRequestOperator) ApplyViaComment(ctx *CommandContext) CommandResponse {
-	repoDir, err := p.Workspace.GetWorkspace(ctx.BaseRepo, ctx.Pull, ctx.Command.Workspace)
+func (p *DefaultProjectCommandBuilder) BuildApplyCommand(ctx *CommandContext, cmd *CommentCommand) (models.ProjectCommandContext, error) {
+	var projCtx models.ProjectCommandContext
+
+	repoDir, err := p.Workspace.GetWorkspace(ctx.BaseRepo, ctx.Pull, cmd.Workspace)
 	if err != nil {
-		return CommandResponse{Failure: "No workspace found. Did you run plan?"}
+		return projCtx, err
 	}
 
 	// todo: can deduplicate this between PlanViaComment
@@ -202,53 +199,46 @@ func (p *DefaultPullRequestOperator) ApplyViaComment(ctx *CommandContext) Comman
 	// Parse config file if it exists.
 	config, err := p.ParserValidator.ReadConfig(repoDir)
 	if err != nil && !os.IsNotExist(err) {
-		return CommandResponse{Error: err}
+		return projCtx, err
 	}
 	hasAtlantisYAML := !os.IsNotExist(err)
 	if hasAtlantisYAML {
 		// If they've specified a project by name we look it up. Otherwise we
 		// use the dir and workspace.
-		if ctx.Command.ProjectName != "" {
-			projCfg = config.FindProjectByName(ctx.Command.ProjectName)
+		if cmd.ProjectName != "" {
+			projCfg = config.FindProjectByName(cmd.ProjectName)
 			if projCfg == nil {
-				return CommandResponse{Error: fmt.Errorf("no project with name %q configured", ctx.Command.ProjectName)}
+				return projCtx, fmt.Errorf("no project with name %q configured", cmd.ProjectName)
 			}
 		} else {
-			projCfg = config.FindProject(ctx.Command.Dir, ctx.Command.Workspace)
+			projCfg = config.FindProject(cmd.Dir, cmd.Workspace)
 		}
 		globalCfg = &config
 	}
 
-	if ctx.Command.ProjectName != "" && !hasAtlantisYAML {
-		return CommandResponse{Error: fmt.Errorf("cannot specify a project name unless an %s file exists to configure projects", yaml.AtlantisYAMLFilename)}
+	if cmd.ProjectName != "" && !hasAtlantisYAML {
+		return projCtx, fmt.Errorf("cannot specify a project name unless an %s file exists to configure projects", yaml.AtlantisYAMLFilename)
 	}
 
-	projCtx := models.ProjectCommandContext{
+	projCtx = models.ProjectCommandContext{
 		BaseRepo:      ctx.BaseRepo,
 		HeadRepo:      ctx.HeadRepo,
 		Pull:          ctx.Pull,
 		User:          ctx.User,
 		Log:           ctx.Log,
-		CommentArgs:   ctx.Command.Flags,
-		Workspace:     ctx.Command.Workspace,
-		RepoRelPath:   ctx.Command.Dir,
-		ProjectName:   ctx.Command.ProjectName,
+		CommentArgs:   cmd.Flags,
+		Workspace:     cmd.Workspace,
+		RepoRelPath:   cmd.Dir,
+		ProjectName:   cmd.ProjectName,
 		ProjectConfig: projCfg,
 		GlobalConfig:  globalCfg,
 	}
-	res := p.ProjectOperator.Apply(projCtx, filepath.Join(repoDir, ctx.Command.Dir))
-	res.Workspace = projCtx.Workspace
-	res.Path = projCtx.RepoRelPath
-	return CommandResponse{
-		ProjectResults: []ProjectResult{
-			res,
-		},
-	}
+	return projCtx, nil
 }
 
 // matchingProjects returns the list of projects whose WhenModified fields match
 // any of the modifiedFiles.
-func (p *DefaultPullRequestOperator) matchingProjects(log *logging.SimpleLogger, modifiedFiles []string, config valid.Spec) ([]valid.Project, error) {
+func (p *DefaultProjectCommandBuilder) matchingProjects(log *logging.SimpleLogger, modifiedFiles []string, config valid.Spec) ([]valid.Project, error) {
 	var projects []valid.Project
 	for _, project := range config.Projects {
 		log.Debug("checking if project at dir %q workspace %q was modified", project.Dir, project.Workspace)

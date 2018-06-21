@@ -59,7 +59,7 @@ type CommentParser struct {
 type CommentParseResult struct {
 	// Command is the successfully parsed command. Will be nil if
 	// CommentResponse or Ignore is set.
-	Command *Command
+	Command *CommentCommand
 	// CommentResponse is set when we should respond immediately to the command
 	// for example for atlantis help.
 	CommentResponse string
@@ -215,7 +215,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	}
 
 	return CommentParseResult{
-		Command: NewCommand(dir, extraArgs, name, verbose, workspace, project, false),
+		Command: NewCommand(dir, extraArgs, name, verbose, workspace, project),
 	}
 }
 

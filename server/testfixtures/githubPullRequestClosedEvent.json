@@ -1,15 +1,15 @@
 {
   "action": "closed",
-  "number": 1,
+  "number": 2,
   "pull_request": {
-    "url": "https://api.github.com/repos/runatlantis/atlantis-tests/pulls/1",
+    "url": "https://api.github.com/repos/runatlantis/atlantis-tests/pulls/2",
     "id": 193308707,
     "node_id": "MDExOlB1bGxSZXF1ZXN0MTkzMzA4NzA3",
-    "html_url": "https://github.com/runatlantis/atlantis-tests/pull/1",
-    "diff_url": "https://github.com/runatlantis/atlantis-tests/pull/1.diff",
-    "patch_url": "https://github.com/runatlantis/atlantis-tests/pull/1.patch",
-    "issue_url": "https://api.github.com/repos/runatlantis/atlantis-tests/issues/1",
-    "number": 1,
+    "html_url": "https://github.com/runatlantis/atlantis-tests/pull/2",
+    "diff_url": "https://github.com/runatlantis/atlantis-tests/pull/2.diff",
+    "patch_url": "https://github.com/runatlantis/atlantis-tests/pull/2.patch",
+    "issue_url": "https://api.github.com/repos/runatlantis/atlantis-tests/issues/2",
+    "number": 2,
     "state": "closed",
     "locked": false,
     "title": "Add new project layouts",
@@ -53,10 +53,10 @@
 
     ],
     "milestone": null,
-    "commits_url": "https://api.github.com/repos/runatlantis/atlantis-tests/pulls/1/commits",
-    "review_comments_url": "https://api.github.com/repos/runatlantis/atlantis-tests/pulls/1/comments",
+    "commits_url": "https://api.github.com/repos/runatlantis/atlantis-tests/pulls/2/commits",
+    "review_comments_url": "https://api.github.com/repos/runatlantis/atlantis-tests/pulls/2/comments",
     "review_comment_url": "https://api.github.com/repos/runatlantis/atlantis-tests/pulls/comments{/number}",
-    "comments_url": "https://api.github.com/repos/runatlantis/atlantis-tests/issues/1/comments",
+    "comments_url": "https://api.github.com/repos/runatlantis/atlantis-tests/issues/2/comments",
     "statuses_url": "https://api.github.com/repos/runatlantis/atlantis-tests/statuses/5e2d140b2d74bf61675677f01dc947ae8512e18e",
     "head": {
       "label": "runatlantis:atlantisyaml",
@@ -308,25 +308,25 @@
     },
     "_links": {
       "self": {
-        "href": "https://api.github.com/repos/runatlantis/atlantis-tests/pulls/1"
+        "href": "https://api.github.com/repos/runatlantis/atlantis-tests/pulls/2"
       },
       "html": {
-        "href": "https://github.com/runatlantis/atlantis-tests/pull/1"
+        "href": "https://github.com/runatlantis/atlantis-tests/pull/2"
       },
       "issue": {
-        "href": "https://api.github.com/repos/runatlantis/atlantis-tests/issues/1"
+        "href": "https://api.github.com/repos/runatlantis/atlantis-tests/issues/2"
       },
       "comments": {
-        "href": "https://api.github.com/repos/runatlantis/atlantis-tests/issues/1/comments"
+        "href": "https://api.github.com/repos/runatlantis/atlantis-tests/issues/2/comments"
       },
       "review_comments": {
-        "href": "https://api.github.com/repos/runatlantis/atlantis-tests/pulls/1/comments"
+        "href": "https://api.github.com/repos/runatlantis/atlantis-tests/pulls/2/comments"
       },
       "review_comment": {
         "href": "https://api.github.com/repos/runatlantis/atlantis-tests/pulls/comments{/number}"
       },
       "commits": {
-        "href": "https://api.github.com/repos/runatlantis/atlantis-tests/pulls/1/commits"
+        "href": "https://api.github.com/repos/runatlantis/atlantis-tests/pulls/2/commits"
       },
       "statuses": {
         "href": "https://api.github.com/repos/runatlantis/atlantis-tests/statuses/5e2d140b2d74bf61675677f01dc947ae8512e18e"

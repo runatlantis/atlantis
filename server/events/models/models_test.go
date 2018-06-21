@@ -92,3 +92,10 @@ func TestNewRepo_HTTPSAuth(t *testing.T) {
 		Name:              "repo",
 	}, repo)
 }
+
+func TestProject_String(t *testing.T) {
+	Equals(t, "repofullname=owner/repo path=my/path", (models.Project{
+		RepoFullName: "owner/repo",
+		Path:         "my/path",
+	}).String())
+}

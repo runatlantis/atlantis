@@ -9,12 +9,12 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-// ApplyStepOperator runs `terraform apply`.
-type ApplyStepOperator struct {
+// ApplyStepRunner runs `terraform apply`.
+type ApplyStepRunner struct {
 	TerraformExecutor TerraformExec
 }
 
-func (a *ApplyStepOperator) Run(ctx models.ProjectCommandContext, extraArgs []string, path string) (string, error) {
+func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string) (string, error) {
 	// todo: move this to a common library
 	planFileName := fmt.Sprintf("%s.tfplan", ctx.Workspace)
 	if ctx.ProjectName != "" {

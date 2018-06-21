@@ -35,6 +35,7 @@ type AtlantisWorkspace interface {
 	// absolute path to the root of the cloned repo.
 	Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, workspace string) (string, error)
 	// GetWorkspace returns the path to the workspace for this repo and pull.
+	// If workspace does not exist on disk, error will be of type os.IsNotExist.
 	GetWorkspace(r models.Repo, p models.PullRequest, workspace string) (string, error)
 	// Delete deletes the workspace for this repo and pull.
 	Delete(r models.Repo, p models.PullRequest) error

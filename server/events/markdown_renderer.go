@@ -58,7 +58,7 @@ type ProjectResultTmplData struct {
 
 // Render formats the data into a markdown string.
 // nolint: interfacer
-func (m *MarkdownRenderer) Render(res CommandResponse, cmdName CommandName, log string, verbose bool, autoplan bool) string {
+func (m *MarkdownRenderer) Render(res CommandResult, cmdName CommandName, log string, verbose bool, autoplan bool) string {
 	commandStr := strings.Title(cmdName.String())
 	common := CommonData{commandStr, verbose, log}
 	if res.Error != nil {
@@ -73,10 +73,10 @@ func (m *MarkdownRenderer) Render(res CommandResponse, cmdName CommandName, log 
 	return m.renderProjectResults(res.ProjectResults, common)
 }
 
-func (m *MarkdownRenderer) renderProjectResults(pathResults []ProjectResult, common CommonData) string {
+func (m *MarkdownRenderer) renderProjectResults(results []ProjectResult, common CommonData) string {
 	var resultsTmplData []ProjectResultTmplData
 
-	for _, result := range pathResults {
+	for _, result := range results {
 		resultData := ProjectResultTmplData{
 			Workspace: result.Workspace,
 			Dir:       result.Path,

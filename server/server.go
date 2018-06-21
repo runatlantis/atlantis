@@ -63,7 +63,7 @@ type Server struct {
 	AtlantisVersion    string
 	Router             *mux.Router
 	Port               int
-	CommandHandler     *events.CommandHandler
+	CommandRunner      *events.DefaultCommandRunner
 	Logger             *logging.SimpleLogger
 	Locker             locking.Locker
 	AtlantisURL        string
@@ -221,45 +221,43 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GitlabToken: userConfig.GitlabToken,
 	}
 	defaultTfVersion := terraformClient.Version()
-	commandHandler := &events.CommandHandler{
-		EventParser:              eventParser,
+	commandRunner := &events.DefaultCommandRunner{
 		VCSClient:                vcsClient,
 		GithubPullGetter:         githubClient,
 		GitlabMergeRequestGetter: gitlabClient,
 		CommitStatusUpdater:      commitStatusUpdater,
-		AtlantisWorkspaceLocker:  workspaceLocker,
+		EventParser:              eventParser,
 		MarkdownRenderer:         markdownRenderer,
 		Logger:                   logger,
 		AllowForkPRs:             userConfig.AllowForkPRs,
 		AllowForkPRsFlag:         config.AllowForkPRsFlag,
-		PullRequestOperator: &events.DefaultPullRequestOperator{
-			TerraformExecutor: terraformClient,
-			DefaultTFVersion:  defaultTfVersion,
-			ParserValidator:   &yaml.ParserValidator{},
-			ProjectFinder:     &events.DefaultProjectFinder{},
-			VCSClient:         vcsClient,
-			Workspace:         workspace,
-			ProjectOperator: events.ProjectOperator{
-				Locker:           projectLocker,
-				LockURLGenerator: router,
-				InitStepOperator: runtime.InitStepOperator{
-					TerraformExecutor: terraformClient,
-					DefaultTFVersion:  defaultTfVersion,
-				},
-				PlanStepOperator: runtime.PlanStepOperator{
-					TerraformExecutor: terraformClient,
-					DefaultTFVersion:  defaultTfVersion,
-				},
-				ApplyStepOperator: runtime.ApplyStepOperator{
-					TerraformExecutor: terraformClient,
-				},
-				RunStepOperator: runtime.RunStepOperator{},
-				ApprovalOperator: runtime.ApprovalOperator{
-					VCSClient: vcsClient,
-				},
-				Workspace: workspace,
-				Webhooks:  webhooksManager,
+		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
+			ParserValidator: &yaml.ParserValidator{},
+			ProjectFinder:   &events.DefaultProjectFinder{},
+			VCSClient:       vcsClient,
+			Workspace:       workspace,
+		},
+		ProjectCommandRunner: &events.ProjectCommandRunner{
+			Locker:           projectLocker,
+			LockURLGenerator: router,
+			InitStepRunner: runtime.InitStepRunner{
+				TerraformExecutor: terraformClient,
+				DefaultTFVersion:  defaultTfVersion,
 			},
+			PlanStepRunner: runtime.PlanStepRunner{
+				TerraformExecutor: terraformClient,
+				DefaultTFVersion:  defaultTfVersion,
+			},
+			ApplyStepRunner: runtime.ApplyStepRunner{
+				TerraformExecutor: terraformClient,
+			},
+			RunStepRunner: runtime.RunStepRunner{},
+			PullApprovedChecker: runtime.PullApprovedChecker{
+				VCSClient: vcsClient,
+			},
+			Workspace:               workspace,
+			Webhooks:                webhooksManager,
+			AtlantisWorkspaceLocker: workspaceLocker,
 		},
 	}
 	repoWhitelist := &events.RepoWhitelistChecker{
@@ -273,7 +271,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		LockDetailTemplate: lockTemplate,
 	}
 	eventsController := &EventsController{
-		CommandRunner:                commandHandler,
+		CommandRunner:                commandRunner,
 		PullCleaner:                  pullClosedExecutor,
 		Parser:                       eventParser,
 		CommentParser:                commentParser,
@@ -285,14 +283,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		RepoWhitelistChecker:         repoWhitelist,
 		SupportedVCSHosts:            supportedVCSHosts,
 		VCSClient:                    vcsClient,
-		AtlantisGithubUser:           models.User{Username: userConfig.GithubUser},
-		AtlantisGitlabUser:           models.User{Username: userConfig.GitlabUser},
 	}
 	return &Server{
 		AtlantisVersion:    config.AtlantisVersion,
 		Router:             underlyingRouter,
 		Port:               userConfig.Port,
-		CommandHandler:     commandHandler,
+		CommandRunner:      commandRunner,
 		Logger:             logger,
 		Locker:             lockingClient,
 		AtlantisURL:        userConfig.AtlantisURL,
@@ -313,7 +309,8 @@ func (s *Server) Start() error {
 	s.Router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: static.Asset, AssetDir: static.AssetDir, AssetInfo: static.AssetInfo}))
 	s.Router.HandleFunc("/events", s.EventsController.Post).Methods("POST")
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
-	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").Queries(LockViewRouteIDQueryParam, "{id}").Name(LockViewRouteName)
+	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
+		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
 	n := negroni.New(&negroni.Recovery{
 		Logger:     log.New(os.Stdout, "", log.LstdFlags),
 		PrintStack: false,

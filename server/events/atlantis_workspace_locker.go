@@ -30,6 +30,8 @@ import (
 type AtlantisWorkspaceLocker interface {
 	// TryLock tries to acquire a lock for this repo, workspace and pull.
 	TryLock(repoFullName string, workspace string, pullNum int) bool
+	// TryLock2 tries to acquire a lock for this repo, workspace and pull.
+	TryLock2(repoFullName string, workspace string, pullNum int) (func(), error)
 	// Unlock deletes the lock for this repo, workspace and pull. If there was no
 	// lock it will do nothing.
 	Unlock(repoFullName, workspace string, pullNum int)
@@ -46,6 +48,17 @@ func NewDefaultAtlantisWorkspaceLocker() *DefaultAtlantisWorkspaceLocker {
 	return &DefaultAtlantisWorkspaceLocker{
 		locks: make(map[string]interface{}),
 	}
+}
+
+func (d *DefaultAtlantisWorkspaceLocker) TryLock2(repoFullName string, workspace string, pullNum int) (func(), error) {
+	if !d.TryLock(repoFullName, workspace, pullNum) {
+		return func() {}, fmt.Errorf("the %s workspace is currently locked by another"+
+			" command that is running for this pull request–"+
+			"wait until the previous command is complete and try again", workspace)
+	}
+	return func() {
+		d.Unlock(repoFullName, workspace, pullNum)
+	}, nil
 }
 
 // TryLock returns true if a lock is acquired for this repo, pull and workspace and

@@ -6,13 +6,13 @@ import (
 )
 
 // InitStep runs `terraform init`.
-type InitStepOperator struct {
+type InitStepRunner struct {
 	TerraformExecutor TerraformExec
 	DefaultTFVersion  *version.Version
 }
 
 // nolint: unparam
-func (i *InitStepOperator) Run(ctx models.ProjectCommandContext, extraArgs []string, path string) (string, error) {
+func (i *InitStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string) (string, error) {
 	tfVersion := i.DefaultTFVersion
 	if ctx.ProjectConfig != nil && ctx.ProjectConfig.TerraformVersion != nil {
 		tfVersion = ctx.ProjectConfig.TerraformVersion
