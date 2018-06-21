@@ -153,7 +153,7 @@ func (p *ProjectCommandRunner) Apply(ctx models.ProjectCommandContext) ProjectCo
 		for _, req := range ctx.ProjectConfig.ApplyRequirements {
 			switch req {
 			case "approved":
-				approved, err := p.PullApprovedChecker.PullIsApproved(ctx.BaseRepo, ctx.Pull)
+				approved, err := p.PullApprovedChecker.PullIsApproved(ctx.BaseRepo, ctx.Pull) // nolint: vetshadow
 				if err != nil {
 					return ProjectCommandResult{Error: errors.Wrap(err, "checking if pull request was approved")}
 				}

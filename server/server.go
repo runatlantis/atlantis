@@ -232,10 +232,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AllowForkPRs:             userConfig.AllowForkPRs,
 		AllowForkPRsFlag:         config.AllowForkPRsFlag,
 		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
-			ParserValidator: &yaml.ParserValidator{},
-			ProjectFinder:   &events.DefaultProjectFinder{},
-			VCSClient:       vcsClient,
-			Workspace:       workspace,
+			ParserValidator:         &yaml.ParserValidator{},
+			ProjectFinder:           &events.DefaultProjectFinder{},
+			VCSClient:               vcsClient,
+			Workspace:               workspace,
+			AtlantisWorkspaceLocker: workspaceLocker,
 		},
 		ProjectCommandRunner: &events.ProjectCommandRunner{
 			Locker:           projectLocker,

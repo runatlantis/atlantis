@@ -130,6 +130,8 @@ func (s Step) Validate() error {
 		for k := range elem {
 			keys = append(keys, k)
 		}
+		// Sort so tests can be deterministic.
+		sort.Strings(keys)
 
 		if len(keys) > 1 {
 			return fmt.Errorf("step element can only contain a single key, found %d: %s",
