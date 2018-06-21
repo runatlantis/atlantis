@@ -69,7 +69,7 @@ func setup(t *testing.T) {
 	}
 }
 
-func TestExecuteCommand_LogPanics(t *testing.T) {
+func TestRunCommentCommand_LogPanics(t *testing.T) {
 	t.Log("if there is a panic it is commented back on the pull request")
 	setup(t)
 	ch.AllowForkPRs = true // Lets us get to the panic code.
@@ -80,7 +80,7 @@ func TestExecuteCommand_LogPanics(t *testing.T) {
 	Assert(t, strings.Contains(comment, "Error: goroutine panic"), "comment should be about a goroutine panic")
 }
 
-func TestExecuteCommand_NoGithubPullGetter(t *testing.T) {
+func TestRunCommentCommand_NoGithubPullGetter(t *testing.T) {
 	t.Log("if DefaultCommandRunner was constructed with a nil GithubPullGetter an error should be logged")
 	setup(t)
 	ch.GithubPullGetter = nil
@@ -88,7 +88,7 @@ func TestExecuteCommand_NoGithubPullGetter(t *testing.T) {
 	Equals(t, "[ERROR] runatlantis/atlantis#1: Atlantis not configured to support GitHub\n", logBytes.String())
 }
 
-func TestExecuteCommand_NoGitlabMergeGetter(t *testing.T) {
+func TestRunCommentCommand_NoGitlabMergeGetter(t *testing.T) {
 	t.Log("if DefaultCommandRunner was constructed with a nil GitlabMergeRequestGetter an error should be logged")
 	setup(t)
 	ch.GitlabMergeRequestGetter = nil
@@ -96,7 +96,7 @@ func TestExecuteCommand_NoGitlabMergeGetter(t *testing.T) {
 	Equals(t, "[ERROR] runatlantis/atlantis#1: Atlantis not configured to support GitLab\n", logBytes.String())
 }
 
-func TestExecuteCommand_GithubPullErr(t *testing.T) {
+func TestRunCommentCommand_GithubPullErr(t *testing.T) {
 	t.Log("if getting the github pull request fails an error should be logged")
 	setup(t)
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(nil, errors.New("err"))
@@ -104,7 +104,7 @@ func TestExecuteCommand_GithubPullErr(t *testing.T) {
 	Equals(t, "[ERROR] runatlantis/atlantis#1: Making pull request API call to GitHub: err\n", logBytes.String())
 }
 
-func TestExecuteCommand_GitlabMergeRequestErr(t *testing.T) {
+func TestRunCommentCommand_GitlabMergeRequestErr(t *testing.T) {
 	t.Log("if getting the gitlab merge request fails an error should be logged")
 	setup(t)
 	When(gitlabGetter.GetMergeRequest(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(nil, errors.New("err"))
@@ -112,7 +112,7 @@ func TestExecuteCommand_GitlabMergeRequestErr(t *testing.T) {
 	Equals(t, "[ERROR] runatlantis/atlantis#1: Making merge request API call to GitLab: err\n", logBytes.String())
 }
 
-func TestExecuteCommand_GithubPullParseErr(t *testing.T) {
+func TestRunCommentCommand_GithubPullParseErr(t *testing.T) {
 	t.Log("if parsing the returned github pull request fails an error should be logged")
 	setup(t)
 	var pull github.PullRequest
@@ -123,7 +123,7 @@ func TestExecuteCommand_GithubPullParseErr(t *testing.T) {
 	Equals(t, "[ERROR] runatlantis/atlantis#1: Extracting required fields from comment data: err\n", logBytes.String())
 }
 
-func TestExecuteCommand_ForkPRDisabled(t *testing.T) {
+func TestRunCommentCommand_ForkPRDisabled(t *testing.T) {
 	t.Log("if a command is run on a forked pull request and this is disabled atlantis should" +
 		" comment saying that this is not allowed")
 	setup(t)
@@ -141,7 +141,7 @@ func TestExecuteCommand_ForkPRDisabled(t *testing.T) {
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "Atlantis commands can't be run on fork pull requests. To enable, set --"+ch.AllowForkPRsFlag)
 }
 
-func TestExecuteCommand_ClosedPull(t *testing.T) {
+func TestRunCommentCommand_ClosedPull(t *testing.T) {
 	t.Log("if a command is run on a closed pull request atlantis should" +
 		" comment saying that this is not allowed")
 	setup(t)
@@ -156,33 +156,7 @@ func TestExecuteCommand_ClosedPull(t *testing.T) {
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "Atlantis commands can't be run on closed pull requests")
 }
 
-func TestExecuteCommand_WorkspaceLocked(t *testing.T) {
-	t.Log("if the workspace is locked, should comment back on the pull")
-	setup(t)
-	pull := &github.PullRequest{
-		State: github.String("closed"),
-	}
-	cmd := events.CommentCommand{
-		Name:      events.Plan,
-		Workspace: "workspace",
-	}
-
-	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
-	When(eventParsing.ParseGithubPull(pull)).ThenReturn(fixtures.Pull, fixtures.GithubRepo, nil)
-	When(workspaceLocker.TryLock(fixtures.GithubRepo.FullName, cmd.Workspace, fixtures.Pull.Num)).ThenReturn(false)
-	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, fixtures.User, fixtures.Pull.Num, &cmd)
-
-	msg := "The workspace workspace is currently locked by another" +
-		" command that is running for this pull request." +
-		" Wait until the previous command is complete and try again."
-	ghStatus.VerifyWasCalledOnce().Update(fixtures.GithubRepo, fixtures.Pull, vcs.Pending, cmd.CommandName())
-	_, _, result := ghStatus.VerifyWasCalledOnce().UpdateProjectResult(matchers.AnyPtrToEventsCommandContext(), matchers.AnyEventsCommandName(), matchers.AnyEventsCommandResult()).GetCapturedArguments()
-	Equals(t, msg, result.Failure)
-	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, fixtures.Pull.Num,
-		"**Plan Failed**: "+msg+"\n\n")
-}
-
-func TestExecuteCommand_FullRun(t *testing.T) {
+func TestRunCommentCommand_FullRun(t *testing.T) {
 	t.Log("when running a plan, apply should comment")
 	pull := &github.PullRequest{
 		State: github.String("closed"),
@@ -214,7 +188,7 @@ func TestExecuteCommand_FullRun(t *testing.T) {
 	}
 }
 
-func TestExecuteCommand_ForkPREnabled(t *testing.T) {
+func TestRunCommentCommand_ForkPREnabled(t *testing.T) {
 	t.Log("when running a plan on a fork PR, it should succeed")
 	setup(t)
 
