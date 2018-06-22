@@ -8,3 +8,4 @@ website/src/public
 .DS_Store
 .cover
 .terraform/
+node_modules/
