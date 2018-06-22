@@ -44,10 +44,11 @@ type CommentParsing interface {
 
 // CommentParser implements CommentParsing
 type CommentParser struct {
-	GithubUser  string
-	GithubToken string
-	GitlabUser  string
-	GitlabToken string
+	GithubUser        string
+	GithubToken       string
+	GitlabUser        string
+	GitlabToken       string
+	RequiredWorkspace string
 }
 
 // CommentParseResult describes the result of parsing a comment as a command.
@@ -188,6 +189,11 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	dir, err = e.validateDir(dir)
 	if err != nil {
 		return CommentParseResult{CommentResponse: e.errMarkdown(err.Error(), command, flagSet)}
+	}
+
+	// If RequiredWorkspace flag is set then ignore all other workspaces
+	if len(e.RequiredWorkspace) != 0 && e.RequiredWorkspace != workspace {
+		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("required workspace set to %s – ignoring workspace %s", e.RequiredWorkspace, workspace), command, flagSet)}
 	}
 
 	// Use the same validation that Terraform uses: https://git.io/vxGhU. Plus

@@ -30,6 +30,18 @@ var commentParser = events.CommentParser{
 	GitlabToken: "gitlab-token",
 }
 
+func TestRequiredWorkspace(t *testing.T) {
+	fwParser := commentParser
+	fwParser.RequiredWorkspace = "test-workspace"
+	comment := "atlantis plan -w test-workspace"
+	r := fwParser.Parse(comment, models.Github)
+	Assert(t, r.Command.Workspace == fwParser.RequiredWorkspace, "expected 'test-workspace'")
+
+	comment = "atlantis plan"
+	r = fwParser.Parse(comment, models.Github)
+	Assert(t, r.Command == nil, "command should be nil when required workspace does not match")
+}
+
 func TestParse_Ignored(t *testing.T) {
 	t.Log("given a comment that should be ignored we should set " +
 		"CommentParseResult.Ignore to true")

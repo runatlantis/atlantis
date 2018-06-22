@@ -123,6 +123,7 @@ func (a *ApplyExecutor) apply(ctx *CommandContext, repoDir string, plan models.P
 	applyExtraArgs := config.GetExtraArguments(ctx.Command.Name.String())
 	absolutePath := filepath.Join(repoDir, plan.Project.Path)
 	workspace := ctx.Command.Workspace
+
 	tfApplyCmd := append(append(append([]string{"apply", "-no-color"}, applyExtraArgs...), ctx.Command.Flags...), plan.LocalPath)
 	output, err := a.Terraform.RunCommandWithVersion(ctx.Log, absolutePath, tfApplyCmd, terraformVersion, workspace)
 

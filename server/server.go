@@ -85,11 +85,12 @@ type UserConfig struct {
 	RepoWhitelist       string `mapstructure:"repo-whitelist"`
 	// RequireApproval is whether to require pull request approval before
 	// allowing terraform apply's to be run.
-	RequireApproval bool            `mapstructure:"require-approval"`
-	SlackToken      string          `mapstructure:"slack-token"`
-	SSLCertFile     string          `mapstructure:"ssl-cert-file"`
-	SSLKeyFile      string          `mapstructure:"ssl-key-file"`
-	Webhooks        []WebhookConfig `mapstructure:"webhooks"`
+	RequireApproval   bool            `mapstructure:"require-approval"`
+	RequiredWorkspace string          `mapstructure:"required-workspace"`
+	SlackToken        string          `mapstructure:"slack-token"`
+	SSLCertFile       string          `mapstructure:"ssl-cert-file"`
+	SSLKeyFile        string          `mapstructure:"ssl-key-file"`
+	Webhooks          []WebhookConfig `mapstructure:"webhooks"`
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -221,10 +222,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GitlabToken: userConfig.GitlabToken,
 	}
 	commentParser := &events.CommentParser{
-		GithubUser:  userConfig.GithubUser,
-		GithubToken: userConfig.GithubToken,
-		GitlabUser:  userConfig.GitlabUser,
-		GitlabToken: userConfig.GitlabToken,
+		GithubUser:        userConfig.GithubUser,
+		GithubToken:       userConfig.GithubToken,
+		GitlabUser:        userConfig.GitlabUser,
+		GitlabToken:       userConfig.GitlabToken,
+		RequiredWorkspace: userConfig.RequiredWorkspace,
 	}
 	commandHandler := &events.CommandHandler{
 		ApplyExecutor:            applyExecutor,
