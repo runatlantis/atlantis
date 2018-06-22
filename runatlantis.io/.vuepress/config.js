@@ -33,6 +33,8 @@ module.exports = {
             '/docs/',
             '/docs/pull-request-commands',
             '/docs/deployment',
+            '/docs/faq',
+            '/docs/contributing',
         ],
         repo: 'runatlantis/atlantis',
         docsDir: 'runatlantis.io',

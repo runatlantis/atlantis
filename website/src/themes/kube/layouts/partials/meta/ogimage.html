@@ -1,8 +1,0 @@
-
-{{ if and (.IsNode) (.Site.Params.images) }}
-  <meta property="og:image" content="{{ index .Site.Params.images 0 }}">
-{{ end }}
-
-{{ if and (.IsPage) (not .Params.images) (.Site.Params.images) }}
-  <meta property="og:image" content="{{ index .Site.Params.images 0 }}">
-{{ end }}
