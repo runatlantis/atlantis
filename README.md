@@ -398,7 +398,7 @@ $ atlantis server --atlantis-url $URL --gitlab-user $USERNAME --gitlab-token $TO
 - `$USERNAME` is the GitHub/GitLab username you generated the token for
 - `$TOKEN` is the access token you created. If you don't want this to be passed in as an argument for security reasons you can specify it in a config file (see [Configuration](#configuration)) or as an environment variable: `ATLANTIS_GH_TOKEN` or `ATLANTIS_GITLAB_TOKEN`
 - `$SECRET` is the random key you used for the webhook secret. If you left the secret blank then don't specify this flag. If you don't want this to be passed in as an argument for security reasons you can specify it in a config file (see [Configuration](#configuration)) or as an environment variable: `ATLANTIS_GH_WEBHOOK_SECRET` or `ATLANTIS_GITLAB_WEBHOOK_SECRET`
-- `$GITHUBHOSTNAME` is the URL of your enterprise Github
+- `$GITHUBHOSTNAME` is the FQDN of your enterprise Github, for example `github.mycompany.com` (adding protocol before the FQDN is unnecessary, it will always use https). If you want to set it as an environment variable than use `ATLANTIS_GH_HOSTNAME`.
 
 Atlantis is now running!
 **We recommend running it under something like Systemd or Supervisord.**
