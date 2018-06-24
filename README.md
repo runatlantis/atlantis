@@ -261,6 +261,8 @@ Once a plan is discarded, you'll need to run `plan` again prior to running `appl
 If you'd like to require pull/merge requests to be approved prior to a user running `atlantis apply` simply run Atlantis with the `--require-approval` flag.
 By default, no approval is required.
 
+Please note that this option is not intended for access control purposes: anyone with even read access to a repository can approve a pull request.
+
 For more information on GitHub pull request reviews and approvals see: https://help.github.com/articles/about-pull-request-reviews/
 
 For more information on GitLab merge request reviews and approvals (only supported on GitLab Enterprise) see: https://docs.gitlab.com/ee/user/project/merge_requests/merge_request_approvals.html.
