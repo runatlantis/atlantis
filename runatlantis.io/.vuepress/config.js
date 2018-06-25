@@ -26,16 +26,26 @@ module.exports = {
     themeConfig: {
         nav: [
             {text: 'Home', link: '/'},
+            {text: 'Guide', link: '/guide/'},
             {text: 'Docs', link: '/docs/'},
             {text: 'Blog', link: 'https://medium.com/runatlantis'}
         ],
-        sidebar: [
-            '/docs/',
-            '/docs/pull-request-commands',
-            '/docs/deployment',
-            '/docs/faq',
-            '/docs/contributing',
-        ],
+        sidebar: {
+            '/docs/': [
+                '',
+                ['atlantis-yaml-reference', 'atlantis.yaml Reference'],
+                'pull-request-commands',
+                'deployment',
+                'security',
+                'faq',
+            ],
+            '/guide/': [
+                '',
+                'test-drive',
+                'getting-started',
+                'requirements'
+            ]
+        },
         repo: 'runatlantis/atlantis',
         docsDir: 'runatlantis.io',
         editLinks: true,

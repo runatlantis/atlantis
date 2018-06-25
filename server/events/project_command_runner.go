@@ -69,7 +69,7 @@ func (p *ProjectCommandRunner) Plan(ctx models.ProjectCommandContext) ProjectCom
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.AtlantisWorkspaceLocker.TryLock2(ctx.BaseRepo.FullName, ctx.Workspace, ctx.Pull.Num)
+	unlockFn, err := p.AtlantisWorkspaceLocker.TryLock(ctx.BaseRepo.FullName, ctx.Workspace, ctx.Pull.Num)
 	if err != nil {
 		return ProjectCommandResult{Error: err}
 	}
@@ -164,7 +164,7 @@ func (p *ProjectCommandRunner) Apply(ctx models.ProjectCommandContext) ProjectCo
 		}
 	}
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.AtlantisWorkspaceLocker.TryLock2(ctx.BaseRepo.FullName, ctx.Workspace, ctx.Pull.Num)
+	unlockFn, err := p.AtlantisWorkspaceLocker.TryLock(ctx.BaseRepo.FullName, ctx.Workspace, ctx.Pull.Num)
 	if err != nil {
 		return ProjectCommandResult{Error: err}
 	}

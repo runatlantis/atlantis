@@ -29,9 +29,10 @@ import (
 // Terraform concept of workspaces, not directories on disk managed by Atlantis.
 type AtlantisWorkspaceLocker interface {
 	// TryLock tries to acquire a lock for this repo, workspace and pull.
-	TryLock(repoFullName string, workspace string, pullNum int) bool
-	// TryLock2 tries to acquire a lock for this repo, workspace and pull.
-	TryLock2(repoFullName string, workspace string, pullNum int) (func(), error)
+	// It returns a function that should be used to unlock the workspace and
+	// an error if the workspace is already locked. The error is expected to
+	// be printed to the pull request.
+	TryLock(repoFullName string, workspace string, pullNum int) (func(), error)
 	// Unlock deletes the lock for this repo, workspace and pull. If there was no
 	// lock it will do nothing.
 	Unlock(repoFullName, workspace string, pullNum int)
@@ -50,8 +51,13 @@ func NewDefaultAtlantisWorkspaceLocker() *DefaultAtlantisWorkspaceLocker {
 	}
 }
 
-func (d *DefaultAtlantisWorkspaceLocker) TryLock2(repoFullName string, workspace string, pullNum int) (func(), error) {
-	if !d.TryLock(repoFullName, workspace, pullNum) {
+func (d *DefaultAtlantisWorkspaceLocker) TryLock(repoFullName string, workspace string, pullNum int) (func(), error) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	key := d.key(repoFullName, workspace, pullNum)
+	if _, ok := d.locks[key]; !ok {
+		d.locks[key] = true
 		return func() {}, fmt.Errorf("the %s workspace is currently locked by another"+
 			" command that is running for this pull request–"+
 			"wait until the previous command is complete and try again", workspace)
@@ -59,20 +65,6 @@ func (d *DefaultAtlantisWorkspaceLocker) TryLock2(repoFullName string, workspace
 	return func() {
 		d.Unlock(repoFullName, workspace, pullNum)
 	}, nil
-}
-
-// TryLock returns true if a lock is acquired for this repo, pull and workspace and
-// false otherwise.
-func (d *DefaultAtlantisWorkspaceLocker) TryLock(repoFullName string, workspace string, pullNum int) bool {
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-
-	key := d.key(repoFullName, workspace, pullNum)
-	if _, ok := d.locks[key]; !ok {
-		d.locks[key] = true
-		return true
-	}
-	return false
 }
 
 // Unlock unlocks the repo, pull and workspace.

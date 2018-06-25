@@ -38,7 +38,7 @@ type TerraformExec interface {
 func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error) {
 	// Need to lock the workspace we're about to clone to.
 	workspace := DefaultWorkspace
-	unlockFn, err := p.AtlantisWorkspaceLocker.TryLock2(ctx.BaseRepo.FullName, workspace, ctx.Pull.Num)
+	unlockFn, err := p.AtlantisWorkspaceLocker.TryLock(ctx.BaseRepo.FullName, workspace, ctx.Pull.Num)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext
 func (p *DefaultProjectCommandBuilder) BuildPlanCommand(ctx *CommandContext, cmd *CommentCommand) (models.ProjectCommandContext, error) {
 	var projCtx models.ProjectCommandContext
 
-	unlockFn, err := p.AtlantisWorkspaceLocker.TryLock2(ctx.BaseRepo.FullName, cmd.Workspace, ctx.Pull.Num)
+	unlockFn, err := p.AtlantisWorkspaceLocker.TryLock(ctx.BaseRepo.FullName, cmd.Workspace, ctx.Pull.Num)
 	if err != nil {
 		return projCtx, err
 	}

@@ -1,16 +1,21 @@
 ---
-layout: Home
+layout: HomeCustom
 pageClass: home-custom
-home: true
 heroImage: /hero.png
 heroText: Atlantis
 actionText: Get Started →
-actionLink: /docs/
-features:
-- title: Collaborate
-  details: Run terraform plan and apply from GitHub/GitLab pull requests so everyone can review the output
-- title: Secure Your Credentials
-  details: No need to distribute credentials to your whole team. Developers can submit Terraform changes and run plan and apply directly from the pull request.
-- title: Lock Terraform States
-  details: Lock states until pull requests are merged to prevent concurrent modification and confusion.
+actionLink: /guide/
 ---
+
+## How it works
+* Deploy Atlantis internally. You don't have to give your cloud credentials to a third party.
+    * It runs as a golang binary or Docker container.
+* Add its URL to your GitHub or GitLab repository so it can receive webhooks.
+* When a Terraform pull request is opened, Atlantis runs `terraform plan` and comments
+with the output back to the pull request.
+    * The exact `terraform plan` command is configurable.
+    * This directory and Terraform workspace within the repository are now "Locked".
+    Other pull requests cannot `plan` against the same directory/workspace until the plan
+    is applied or deleted and the pull request is merged.
+* If the `plan` looks good, users can comment on the pull request `atlantis apply` to apply the plan.
+    * You can require pull request approval before running `apply` is allowed.

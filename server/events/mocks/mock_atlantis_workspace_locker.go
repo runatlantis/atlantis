@@ -17,21 +17,9 @@ func NewMockAtlantisWorkspaceLocker() *MockAtlantisWorkspaceLocker {
 	return &MockAtlantisWorkspaceLocker{fail: pegomock.GlobalFailHandler}
 }
 
-func (mock *MockAtlantisWorkspaceLocker) TryLock(repoFullName string, workspace string, pullNum int) bool {
+func (mock *MockAtlantisWorkspaceLocker) TryLock(repoFullName string, workspace string, pullNum int) (func(), error) {
 	params := []pegomock.Param{repoFullName, workspace, pullNum}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("TryLock", params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem()})
-	var ret0 bool
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(bool)
-		}
-	}
-	return ret0
-}
-
-func (mock *MockAtlantisWorkspaceLocker) TryLock2(repoFullName string, workspace string, pullNum int) (func(), error) {
-	params := []pegomock.Param{repoFullName, workspace, pullNum}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("TryLock2", params, []reflect.Type{reflect.TypeOf((*func())(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	result := pegomock.GetGenericMockFrom(mock).Invoke("TryLock", params, []reflect.Type{reflect.TypeOf((*func())(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 func()
 	var ret1 error
 	if len(result) != 0 {
@@ -85,41 +73,6 @@ func (c *AtlantisWorkspaceLocker_TryLock_OngoingVerification) GetCapturedArgumen
 }
 
 func (c *AtlantisWorkspaceLocker_TryLock_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []string, _param2 []int) {
-	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(params) > 0 {
-		_param0 = make([]string, len(params[0]))
-		for u, param := range params[0] {
-			_param0[u] = param.(string)
-		}
-		_param1 = make([]string, len(params[1]))
-		for u, param := range params[1] {
-			_param1[u] = param.(string)
-		}
-		_param2 = make([]int, len(params[2]))
-		for u, param := range params[2] {
-			_param2[u] = param.(int)
-		}
-	}
-	return
-}
-
-func (verifier *VerifierAtlantisWorkspaceLocker) TryLock2(repoFullName string, workspace string, pullNum int) *AtlantisWorkspaceLocker_TryLock2_OngoingVerification {
-	params := []pegomock.Param{repoFullName, workspace, pullNum}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "TryLock2", params)
-	return &AtlantisWorkspaceLocker_TryLock2_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
-}
-
-type AtlantisWorkspaceLocker_TryLock2_OngoingVerification struct {
-	mock              *MockAtlantisWorkspaceLocker
-	methodInvocations []pegomock.MethodInvocation
-}
-
-func (c *AtlantisWorkspaceLocker_TryLock2_OngoingVerification) GetCapturedArguments() (string, string, int) {
-	repoFullName, workspace, pullNum := c.GetAllCapturedArguments()
-	return repoFullName[len(repoFullName)-1], workspace[len(workspace)-1], pullNum[len(pullNum)-1]
-}
-
-func (c *AtlantisWorkspaceLocker_TryLock2_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []string, _param2 []int) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]string, len(params[0]))

