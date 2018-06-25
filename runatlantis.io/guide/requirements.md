@@ -80,3 +80,6 @@ To use a specific version of Terraform:
  running and name it `terraform{version}`, ex. `terraform0.8.8`.
 2. Create an `atlantis.yaml` file for your repo and set the `terraform_version` key.
 See [atlantis.yaml Reference](../docs/atlantis-yaml-reference.html) for more details.
+
+## Next Steps
+Check out our [full documentation](../docs/).

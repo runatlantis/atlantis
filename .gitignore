@@ -9,3 +9,4 @@ website/src/public
 .cover
 .terraform/
 node_modules/
+**/.vuepress/dist
