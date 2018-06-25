@@ -46,7 +46,7 @@ Atlantis supports any Terraform project structures, for example:
         └── ...
 ```
 With modules, if you want `project1` automatically planned when `module1` is modified
-you need to create an `atlantis.yaml` file. See [atlantis.yaml Reference](../docs/atlantis-yaml-reference.html) for more details.
+you need to create an `atlantis.yaml` file. See [atlantis.yaml Use Cases](atlantis-yaml-use-cases.html#configuring-autoplanning) for more details.
 
 ###  Terraform Workspaces
 ::: tip
@@ -54,7 +54,7 @@ See [Terraform's docs](https://www.terraform.io/docs/state/workspaces.html) if y
 :::
 If you're using a Terraform version >= 0.9.0, Atlantis supports workspaces through an
 `atlantis.yaml` file that tells Atlantis the names of your workspaces
-(see [atlantis.yaml Reference](../docs/atlantis-yaml-reference.html) for more details)
+(see [atlantis.yaml Use Cases](atlantis-yaml-use-cases.html#supporting-terraform-workspaces) for more details)
 or through the `-w` flag. For example:
 ```
 atlantis plan -w staging
@@ -71,7 +71,7 @@ atlantis apply -w staging
 ```
 For Atlantis to be able to plan automatically with `.tfvars files`, you need to create
 an `atlantis.yaml` file to tell it to use `-var-file={YOUR_FILE}`.
-See [atlantis.yaml Reference](../docs/atlantis-yaml-reference.html) for more details.
+See [atlantis.yaml Use Cases](atlantis-yaml-use-cases.html#using-tfvars-files) for more details.
 
 ## Terraform Versions
 By default, Atlantis will use the `terraform` executable that is in its path.
@@ -79,7 +79,7 @@ To use a specific version of Terraform:
 1. Install the desired version of Terraform into the `$PATH` of where Atlantis is
  running and name it `terraform{version}`, ex. `terraform0.8.8`.
 2. Create an `atlantis.yaml` file for your repo and set the `terraform_version` key.
-See [atlantis.yaml Reference](../docs/atlantis-yaml-reference.html) for more details.
+See [atlantis.yaml Use Cases](atlantis-yaml-use-cases.html#terraform-versions) for more details.
 
 ## Next Steps
 Check out our [full documentation](../docs/).

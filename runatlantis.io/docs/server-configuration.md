@@ -90,10 +90,3 @@ able to use `session_name = "${var.atlantis_user}"`. However, the backend assume
 role is only used for state-related API actions. Any other API actions will be performed using
 the assumed role specified in the `aws` provider and will have the session named as the GitHub user.
 
-## Approvals
-If you'd like to require pull/merge requests to be approved prior to a user running `atlantis apply` simply run Atlantis with the `--require-approval` flag.
-By default, no approval is required.
-
-For more information on GitHub pull request reviews and approvals see: [https://help.github.com/articles/about-pull-request-reviews/](https://help.github.com/articles/about-pull-request-reviews/)
-
-For more information on GitLab merge request reviews and approvals (only supported on GitLab Enterprise) see: [https://docs.gitlab.com/ee/user/project/merge_requests/merge_request_approvals.html](https://docs.gitlab.com/ee/user/project/merge_requests/merge_request_approvals.html).

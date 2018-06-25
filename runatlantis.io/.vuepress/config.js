@@ -36,7 +36,9 @@ module.exports = {
                 'pull-request-commands',
                 'deployment',
                 'server-configuration',
+                'apply-requirements',
                 'locking',
+                'autoplanning',
                 ['atlantis-yaml-reference', 'atlantis.yaml Reference'],
                 'security',
                 'faq',
@@ -45,7 +47,8 @@ module.exports = {
                 '',
                 'test-drive',
                 'getting-started',
-                'requirements'
+                'requirements',
+                'atlantis-yaml-use-cases'
             ]
         },
         repo: 'runatlantis/atlantis',

@@ -1,4 +1,6 @@
 # Security
+[[toc]]
+## Exploits
 Because you usually run Atlantis on a server with credentials that allow access to your infrastructure it's important that you deploy Atlantis securely.
 
 Atlantis could be exploited by
@@ -35,3 +37,8 @@ This flag ensures your Atlantis install isn't being used with repositories you d
 Atlantis should be run with Webhook secrets set via the `$ATLANTIS_GH_WEBHOOK_SECRET`/`$ATLANTIS_GITLAB_WEBHOOK_SECRET` environment variables.
 Even with the `--repo-whitelist` flag set, without a webhook secret, attackers could make requests to Atlantis posing as a repository that is whitelisted.
 Webhook secrets ensure that the webhook requests are actually coming from your VCS provider (GitHub or GitLab).
+
+### SSL/HTTPS
+If you're using webhook secrets but your traffic is over HTTP then the webhook secrets
+could be stolen. Enable SSL/HTTPS using the `--ssl-cert-file` and `--ssl-key-file`
+flags.
