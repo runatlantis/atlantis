@@ -1,18 +1,14 @@
 # Overview
 
+This documentation is divided into sections:
+* [Pull Request Commands](pull-request-commands.html) - the commands that Atlantis supports via pull request comments.
+* [Production-Ready Deployment](deployment.html) - how to deploy Atlantis.
+* [Server Configuration](server-configuration.html) - how to configure the Atlantis server.
+* [Locking](locking.html) - how and why Atlantis does locking.
+* [`atlantis.yaml` Reference](atlantis-yaml-reference) - reference docs for the `atlantis.yaml` configuration file.
+* [Security](security.html) - what you need to think about in terms of security for Atlantis.
+* [FAQ](faq.html) - Frequently asked questions.
 
-
-
-## Locking
-When `plan` is run, the [project](#project) and [workspace](#workspaceenvironment) (**but not the whole repo**) are **Locked** until an `apply` succeeds **and** the pull request/merge request is merged.
-This protects against concurrent modifications to the same set of infrastructure and prevents
-users from seeing a `plan` that will be invalid if another pull request is merged.
-
-If you have multiple directories inside a single repository, only the directory will be locked. Not the whole repo.
-
-To unlock the project and workspace without completing an `apply` and merging, click the link
-at the bottom of the plan comment to discard the plan and delete the lock.
-Once a plan is discarded, you'll need to run `plan` again prior to running `apply` when you go back to that pull request.
 
 
 

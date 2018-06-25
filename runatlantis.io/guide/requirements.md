@@ -49,8 +49,18 @@ With modules, if you want `project1` automatically planned when `module1` is mod
 you need to create an `atlantis.yaml` file. See [atlantis.yaml Reference](../docs/atlantis-yaml-reference.html) for more details.
 
 ###  Terraform Workspaces
-This refers to [Terraform Workspaces](https://www.terraform.io/docs/state/workspaces.html). You need
-to tell Atlantis the names of your workspaces with an `atlantis.yaml` file. See [atlantis.yaml Reference](../docs/atlantis-yaml-reference.html).
+::: tip
+See [Terraform's docs](https://www.terraform.io/docs/state/workspaces.html) if you are unfamiliar with workspaces.
+:::
+If you're using a Terraform version >= 0.9.0, Atlantis supports workspaces through an
+`atlantis.yaml` file that tells Atlantis the names of your workspaces
+(see [atlantis.yaml Reference](../docs/atlantis-yaml-reference.html) for more details)
+or through the `-w` flag. For example:
+```
+atlantis plan -w staging
+atlantis apply -w staging
+```
+
 
 ### .tfvars Files
 ```
@@ -59,20 +69,9 @@ to tell Atlantis the names of your workspaces with an `atlantis.yaml` file. See 
 │── staging.tfvars
 └── main.tf
 ```
-With .tfvars files, for Atlantis to be able to plan automatically, you need to create
-an `atlantis.yaml` file to tell it to use `-var-file`.
+For Atlantis to be able to plan automatically with `.tfvars files`, you need to create
+an `atlantis.yaml` file to tell it to use `-var-file={YOUR_FILE}`.
 See [atlantis.yaml Reference](../docs/atlantis-yaml-reference.html) for more details.
-
-## Terraform Workspaces
-Terraform introduced [Workspaces](https://www.terraform.io/docs/state/workspaces.html) in Terraform v0.9. They allow for
-> a single directory of Terraform configuration to be used to manage multiple distinct sets of infrastructure resources
-
-If you're using a Terraform version >= 0.9.0, Atlantis supports workspaces through an
-`atlantis.yaml` file that tells Atlantis the names of your workspaces or through the
-the `-w` flag. For example:
-```
-atlantis plan -w staging
-```
 
 ## Terraform Versions
 By default, Atlantis will use the `terraform` executable that is in its path.

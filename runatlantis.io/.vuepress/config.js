@@ -1,6 +1,6 @@
 module.exports = {
     title: 'Atlantis',
-    description: 'Terraform Automation by Pull Request',
+    description: 'Terraform Automation By Pull Request',
     head: [
         ['link', { rel: 'icon', type: 'image/png', href: 'favicon-196x196.png', sizes: '196x196' }],
         ['link', { rel: 'icon', type: 'image/png', href: 'favicon-96x96.png', sizes: '96x96' }],
@@ -33,9 +33,11 @@ module.exports = {
         sidebar: {
             '/docs/': [
                 '',
-                ['atlantis-yaml-reference', 'atlantis.yaml Reference'],
                 'pull-request-commands',
                 'deployment',
+                'server-configuration',
+                'locking',
+                ['atlantis-yaml-reference', 'atlantis.yaml Reference'],
                 'security',
                 'faq',
             ],

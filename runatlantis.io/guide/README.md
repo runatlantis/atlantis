@@ -25,7 +25,6 @@ If you'd like to try out running Atlantis on an example repo check out the [Test
 ## Why would you run Atlantis?
 ### Increased visibility
 When everyone is executing Terraform on their own computers, it's hard to know the
-
 current state of your infrastructure:
 * Is what's in `master` deployed?
 * Did someone forget to create a pull request for that latest change?
