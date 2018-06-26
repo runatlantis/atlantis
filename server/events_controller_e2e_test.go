@@ -429,13 +429,20 @@ func assertCommentEquals(t *testing.T, expFile string, act string, repoDir strin
 	act = idRegex.ReplaceAllString(act, "Creation complete after *s (ID: ******************)")
 
 	if string(exp) != act {
-		actFile := filepath.Join(absRepoPath(t, repoDir), expFile+".act")
-		err := ioutil.WriteFile(actFile, []byte(act), 0600)
-		Ok(t, err)
-		cwd, err := os.Getwd()
-		Ok(t, err)
-		rel, err := filepath.Rel(cwd, actFile)
-		Ok(t, err)
-		t.Errorf("%q was different, wrote actual comment to %q", expFile, rel)
+		// If in CI, we write the diff to the console. Otherwise we write the diff
+		// to file so we can use our local diff viewer.
+		if os.Getenv("CI") == "true" {
+			t.Logf("exp: %s, got: %s", string(exp), act)
+			t.FailNow()
+		} else {
+			actFile := filepath.Join(absRepoPath(t, repoDir), expFile+".act")
+			err := ioutil.WriteFile(actFile, []byte(act), 0600)
+			Ok(t, err)
+			cwd, err := os.Getwd()
+			Ok(t, err)
+			rel, err := filepath.Rel(cwd, actFile)
+			Ok(t, err)
+			t.Errorf("%q was different, wrote actual comment to %q", expFile, rel)
+		}
 	}
 }

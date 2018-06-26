@@ -26,91 +26,129 @@ var workspace = "default"
 func TestTryLock(t *testing.T) {
 	locker := events.NewDefaultAtlantisWorkspaceLocker()
 
-	t.Log("the first lock should succeed")
-	Equals(t, true, locker.TryLock(repo, workspace, 1))
+	// The first lock should succeed.
+	unlockFn, err := locker.TryLock(repo, workspace, 1)
+	Ok(t, err)
 
-	t.Log("now another lock for the same repo, workspace, and pull should fail")
-	Equals(t, false, locker.TryLock(repo, workspace, 1))
+	// Now another lock for the same repo, workspace, and pull should fail
+	_, err = locker.TryLock(repo, workspace, 1)
+	ErrEquals(t, "the default workspace is currently locked by another"+
+		" command that is running for this pull request–"+
+		"wait until the previous command is complete and try again", err)
+
+	// Unlock should work.
+	unlockFn()
+	_, err = locker.TryLock(repo, workspace, 1)
+	Ok(t, err)
 }
 
 func TestTryLockDifferentWorkspaces(t *testing.T) {
 	locker := events.NewDefaultAtlantisWorkspaceLocker()
 
 	t.Log("a lock for the same repo and pull but different workspace should succeed")
-	Equals(t, true, locker.TryLock(repo, workspace, 1))
-	Equals(t, true, locker.TryLock(repo, "new-workspace", 1))
+	_, err := locker.TryLock(repo, workspace, 1)
+	Ok(t, err)
+	_, err = locker.TryLock(repo, "new-workspace", 1)
+	Ok(t, err)
 
 	t.Log("and both should now be locked")
-	Equals(t, false, locker.TryLock(repo, workspace, 1))
-	Equals(t, false, locker.TryLock(repo, "new-workspace", 1))
+	_, err = locker.TryLock(repo, workspace, 1)
+	Assert(t, err != nil, "exp err")
+	_, err = locker.TryLock(repo, "new-workspace", 1)
+	Assert(t, err != nil, "exp err")
 }
 
 func TestTryLockDifferentRepo(t *testing.T) {
 	locker := events.NewDefaultAtlantisWorkspaceLocker()
 
 	t.Log("a lock for a different repo but the same workspace and pull should succeed")
-	Equals(t, true, locker.TryLock(repo, workspace, 1))
+	_, err := locker.TryLock(repo, workspace, 1)
+	Ok(t, err)
 	newRepo := "owner/newrepo"
-	Equals(t, true, locker.TryLock(newRepo, workspace, 1))
+	_, err = locker.TryLock(newRepo, workspace, 1)
+	Ok(t, err)
 
 	t.Log("and both should now be locked")
-	Equals(t, false, locker.TryLock(repo, workspace, 1))
-	Equals(t, false, locker.TryLock(newRepo, workspace, 1))
+	_, err = locker.TryLock(repo, workspace, 1)
+	ErrContains(t, "currently locked", err)
+	_, err = locker.TryLock(newRepo, workspace, 1)
+	ErrContains(t, "currently locked", err)
 }
 
-func TestTryLockDifferent1(t *testing.T) {
+func TestTryLockDifferentPulls(t *testing.T) {
 	locker := events.NewDefaultAtlantisWorkspaceLocker()
 
 	t.Log("a lock for a different pull but the same repo and workspace should succeed")
-	Equals(t, true, locker.TryLock(repo, workspace, 1))
-	new1 := 2
-	Equals(t, true, locker.TryLock(repo, workspace, new1))
+	_, err := locker.TryLock(repo, workspace, 1)
+	Ok(t, err)
+	newPull := 2
+	_, err = locker.TryLock(repo, workspace, newPull)
+	Ok(t, err)
 
 	t.Log("and both should now be locked")
-	Equals(t, false, locker.TryLock(repo, workspace, 1))
-	Equals(t, false, locker.TryLock(repo, workspace, new1))
+	_, err = locker.TryLock(repo, workspace, 1)
+	ErrContains(t, "currently locked", err)
+	_, err = locker.TryLock(repo, workspace, newPull)
+	ErrContains(t, "currently locked", err)
 }
 
 func TestUnlock(t *testing.T) {
 	locker := events.NewDefaultAtlantisWorkspaceLocker()
 
 	t.Log("unlocking should work")
-	Equals(t, true, locker.TryLock(repo, workspace, 1))
-	locker.Unlock(repo, workspace, 1)
-	Equals(t, true, locker.TryLock(repo, workspace, 1))
+	unlockFn, err := locker.TryLock(repo, workspace, 1)
+	Ok(t, err)
+	unlockFn()
+	_, err = locker.TryLock(repo, workspace, 1)
+	Ok(t, err)
 }
 
 func TestUnlockDifferentWorkspaces(t *testing.T) {
 	locker := events.NewDefaultAtlantisWorkspaceLocker()
 	t.Log("unlocking should work for different workspaces")
-	Equals(t, true, locker.TryLock(repo, workspace, 1))
-	Equals(t, true, locker.TryLock(repo, "new-workspace", 1))
-	locker.Unlock(repo, workspace, 1)
-	locker.Unlock(repo, "new-workspace", 1)
-	Equals(t, true, locker.TryLock(repo, workspace, 1))
-	Equals(t, true, locker.TryLock(repo, "new-workspace", 1))
+	unlockFn1, err1 := locker.TryLock(repo, workspace, 1)
+	Ok(t, err1)
+	unlockFn2, err2 := locker.TryLock(repo, "new-workspace", 1)
+	Ok(t, err2)
+	unlockFn1()
+	unlockFn2()
+
+	_, err := locker.TryLock(repo, workspace, 1)
+	Ok(t, err)
+	_, err = locker.TryLock(repo, "new-workspace", 1)
+	Ok(t, err)
 }
 
 func TestUnlockDifferentRepos(t *testing.T) {
 	locker := events.NewDefaultAtlantisWorkspaceLocker()
 	t.Log("unlocking should work for different repos")
-	Equals(t, true, locker.TryLock(repo, workspace, 1))
+	unlockFn1, err1 := locker.TryLock(repo, workspace, 1)
+	Ok(t, err1)
 	newRepo := "owner/newrepo"
-	Equals(t, true, locker.TryLock(newRepo, workspace, 1))
-	locker.Unlock(repo, workspace, 1)
-	locker.Unlock(newRepo, workspace, 1)
-	Equals(t, true, locker.TryLock(repo, workspace, 1))
-	Equals(t, true, locker.TryLock(newRepo, workspace, 1))
+	unlockFn2, err2 := locker.TryLock(newRepo, workspace, 1)
+	Ok(t, err2)
+	unlockFn1()
+	unlockFn2()
+
+	_, err := locker.TryLock(repo, workspace, 1)
+	Ok(t, err)
+	_, err = locker.TryLock(newRepo, workspace, 1)
+	Ok(t, err)
 }
 
 func TestUnlockDifferentPulls(t *testing.T) {
 	locker := events.NewDefaultAtlantisWorkspaceLocker()
-	t.Log("unlocking should work for different 1s")
-	Equals(t, true, locker.TryLock(repo, workspace, 1))
-	new1 := 2
-	Equals(t, true, locker.TryLock(repo, workspace, new1))
-	locker.Unlock(repo, workspace, 1)
-	locker.Unlock(repo, workspace, new1)
-	Equals(t, true, locker.TryLock(repo, workspace, 1))
-	Equals(t, true, locker.TryLock(repo, workspace, new1))
+	t.Log("unlocking should work for different pulls")
+	unlockFn1, err1 := locker.TryLock(repo, workspace, 1)
+	Ok(t, err1)
+	newPull := 2
+	unlockFn2, err2 := locker.TryLock(repo, workspace, newPull)
+	Ok(t, err2)
+	unlockFn1()
+	unlockFn2()
+
+	_, err := locker.TryLock(repo, workspace, 1)
+	Ok(t, err)
+	_, err = locker.TryLock(repo, workspace, newPull)
+	Ok(t, err)
 }

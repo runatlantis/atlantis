@@ -56,12 +56,13 @@ func (d *DefaultAtlantisWorkspaceLocker) TryLock(repoFullName string, workspace 
 	defer d.mutex.Unlock()
 
 	key := d.key(repoFullName, workspace, pullNum)
-	if _, ok := d.locks[key]; !ok {
-		d.locks[key] = true
+	_, exists := d.locks[key]
+	if exists {
 		return func() {}, fmt.Errorf("the %s workspace is currently locked by another"+
 			" command that is running for this pull request–"+
 			"wait until the previous command is complete and try again", workspace)
 	}
+	d.locks[key] = true
 	return func() {
 		d.Unlock(repoFullName, workspace, pullNum)
 	}, nil

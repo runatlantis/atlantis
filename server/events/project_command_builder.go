@@ -40,8 +40,10 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext
 	workspace := DefaultWorkspace
 	unlockFn, err := p.AtlantisWorkspaceLocker.TryLock(ctx.BaseRepo.FullName, workspace, ctx.Pull.Num)
 	if err != nil {
+		ctx.Log.Warn("workspace was locked")
 		return nil, err
 	}
+	ctx.Log.Debug("got workspace lock")
 	defer unlockFn()
 
 	repoDir, err := p.Workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, workspace)
