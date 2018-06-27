@@ -32,7 +32,7 @@ If installing on a single repository, navigate to the repository home page and c
 - Click **Add webhook**
 - set **Payload URL** to `http://$URL/events` where `$URL` is where Atlantis is hosted. **Be sure to add `/events`**
 - set **Content type** to `application/json`
-- set **Secret** to a random key (https://www.random.org/strings/). You'll need to pass this value to the `--gh-webhook-secret` option when you start Atlantis
+- set **Secret** to a random key (https://www.random.org/strings/). You'll need to pass this value to the `--gh-webhook-secret` flag when you start Atlantis
 - select **Let me select individual events**
 - check the boxes
 	- **Pull request reviews**
@@ -46,7 +46,7 @@ If installing on a single repository, navigate to the repository home page and c
 If you're using GitLab, navigate to your project's home page in GitLab
 - Click **Settings > Integrations** in the sidebar
 - set **URL** to `http://$URL/events` where `$URL` is where Atlantis is hosted. **Be sure to add `/events`**
-- leave **Secret Token** blank or set this to a random key (https://www.random.org/strings/). If you set it, you'll need to use the `--gitlab-webhook-secret` option when you start Atlantis
+- set **Secret Token** to a random key (https://www.random.org/strings/). You'll need to pass this value to the `--gitlab-webhook-secret` flag when you start Atlantis
 - check the boxes
     - **Push events**
     - **Comments**
@@ -76,20 +76,30 @@ Now you're ready to start Atlantis!
 
 If you're using GitHub, run:
 ```
-$ atlantis server --atlantis-url $URL --gh-user $USERNAME --gh-token $TOKEN --gh-webhook-secret $SECRET
-2049/10/6 00:00:00 [WARN] server: Atlantis started - listening on port 4141
+atlantis server --atlantis-url $URL --gh-user $USERNAME --gh-token $TOKEN --gh-webhook-secret $SECRET
+```
+
+If you're using GitHub Enterprise, run:
+```
+HOSTNAME=YOUR_GITHUB_ENTERPRISE_HOSTNAME # ex. github.runatlantis.io, without the scheme
+atlantis server --atlantis-url $URL --gh-user $USERNAME --gh-token $TOKEN --gh-webhook-secret $SECRET --gh-hostname $HOSTNAME
 ```
 
 If you're using GitLab, run:
 ```
-$ atlantis server --atlantis-url $URL --gitlab-user $USERNAME --gitlab-token $TOKEN --gitlab-webhook-secret $SECRET
-2049/10/6 00:00:00 [WARN] server: Atlantis started - listening on port 4141
+atlantis server --atlantis-url $URL --gitlab-user $USERNAME --gitlab-token $TOKEN --gitlab-webhook-secret $SECRET
+```
+
+If you're using GitLab Enterprise, run:
+```
+HOSTNAME=YOUR_GITLAB_ENTERPRISE_HOSTNAME # ex. gitlab.runatlantis.io, without the scheme
+atlantis server --atlantis-url $URL --gitlab-user $USERNAME --gitlab-token $TOKEN --gitlab-webhook-secret $SECRET --gitlab-hostname $HOSTNAME
 ```
 
 - `$URL` is the URL that Atlantis can be reached at
 - `$USERNAME` is the GitHub/GitLab username you generated the token for
 - `$TOKEN` is the access token you created. If you don't want this to be passed in as an argument for security reasons you can specify it in a config file (see [Configuration](#configuration)) or as an environment variable: `ATLANTIS_GH_TOKEN` or `ATLANTIS_GITLAB_TOKEN`
-- `$SECRET` is the random key you used for the webhook secret. If you left the secret blank then don't specify this flag. If you don't want this to be passed in as an argument for security reasons you can specify it in a config file (see [Configuration](#configuration)) or as an environment variable: `ATLANTIS_GH_WEBHOOK_SECRET` or `ATLANTIS_GITLAB_WEBHOOK_SECRET`
+- `$SECRET` is the random key you used for the webhook secret. If you don't want this to be passed in as an argument for security reasons you can specify it in a config file (see [Configuration](#configuration)) or as an environment variable: `ATLANTIS_GH_WEBHOOK_SECRET` or `ATLANTIS_GITLAB_WEBHOOK_SECRET`
 
 Atlantis is now running!
 **We recommend running it under something like Systemd or Supervisord.**
