@@ -69,7 +69,7 @@ package events_test
 //}
 //
 //func TestExecute_CloneErr(t *testing.T) {
-//	t.Log("If AtlantisWorkspace.Clone returns an error we return an error")
+//	t.Log("If WorkingDir.Clone returns an error we return an error")
 //	p, _, _ := setupPlanExecutorTest(t)
 //	When(p.VCSClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"file.tf"}, nil)
 //	When(p.Workspace.Clone(planCtx.Log, planCtx.BaseRepo, planCtx.HeadRepo, planCtx.Pull, "workspace")).ThenReturn("", errors.New("err"))
@@ -271,7 +271,7 @@ package events_test
 //func setupPlanExecutorTest(t *testing.T) (*events.PlanExecutor, *tmocks.MockClient, *lmocks.MockLocker) {
 //	RegisterMockTestingT(t)
 //	vcsProxy := vcsmocks.NewMockClientProxy()
-//	w := mocks.NewMockAtlantisWorkspace()
+//	w := mocks.NewMockWorkingDir()
 //	ppe := mocks.NewMockProjectPreExecutor()
 //	runner := tmocks.NewMockClient()
 //	locker := lmocks.NewMockLocker()

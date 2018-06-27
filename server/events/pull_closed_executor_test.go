@@ -31,9 +31,9 @@ import (
 func TestCleanUpPullWorkspaceErr(t *testing.T) {
 	t.Log("when workspace.Delete returns an error, we return it")
 	RegisterMockTestingT(t)
-	w := mocks.NewMockAtlantisWorkspace()
+	w := mocks.NewMockWorkingDir()
 	pce := events.PullClosedExecutor{
-		Workspace: w,
+		WorkingDir: w,
 	}
 	err := errors.New("err")
 	When(w.Delete(fixtures.GithubRepo, fixtures.Pull)).ThenReturn(err)
@@ -44,11 +44,11 @@ func TestCleanUpPullWorkspaceErr(t *testing.T) {
 func TestCleanUpPullUnlockErr(t *testing.T) {
 	t.Log("when locker.UnlockByPull returns an error, we return it")
 	RegisterMockTestingT(t)
-	w := mocks.NewMockAtlantisWorkspace()
+	w := mocks.NewMockWorkingDir()
 	l := lockmocks.NewMockLocker()
 	pce := events.PullClosedExecutor{
-		Locker:    l,
-		Workspace: w,
+		Locker:     l,
+		WorkingDir: w,
 	}
 	err := errors.New("err")
 	When(l.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(nil, err)
@@ -59,13 +59,13 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 func TestCleanUpPullNoLocks(t *testing.T) {
 	t.Log("when there are no locks to clean up, we don't comment")
 	RegisterMockTestingT(t)
-	w := mocks.NewMockAtlantisWorkspace()
+	w := mocks.NewMockWorkingDir()
 	l := lockmocks.NewMockLocker()
 	cp := vcsmocks.NewMockClientProxy()
 	pce := events.PullClosedExecutor{
-		Locker:    l,
-		VCSClient: cp,
-		Workspace: w,
+		Locker:     l,
+		VCSClient:  cp,
+		WorkingDir: w,
 	}
 	When(l.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(nil, nil)
 	err := pce.CleanUpPull(fixtures.GithubRepo, fixtures.Pull)
@@ -139,13 +139,13 @@ func TestCleanUpPullComments(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		w := mocks.NewMockAtlantisWorkspace()
+		w := mocks.NewMockWorkingDir()
 		cp := vcsmocks.NewMockClientProxy()
 		l := lockmocks.NewMockLocker()
 		pce := events.PullClosedExecutor{
-			Locker:    l,
-			VCSClient: cp,
-			Workspace: w,
+			Locker:     l,
+			VCSClient:  cp,
+			WorkingDir: w,
 		}
 		t.Log("testing: " + c.Description)
 		When(l.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(c.Locks, nil)

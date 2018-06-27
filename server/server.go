@@ -188,8 +188,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, err
 	}
 	lockingClient := locking.NewClient(boltdb)
-	workspaceLocker := events.NewDefaultAtlantisWorkspaceLocker()
-	workspace := &events.FileWorkspace{
+	workingDirLocker := events.NewDefaultAtlantisWorkingDirLocker()
+	workingDir := &events.FileWorkspace{
 		DataDir: userConfig.DataDir,
 	}
 	projectLocker := &events.DefaultProjectLocker{
@@ -203,9 +203,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Underlying:                underlyingRouter,
 	}
 	pullClosedExecutor := &events.PullClosedExecutor{
-		VCSClient: vcsClient,
-		Locker:    lockingClient,
-		Workspace: workspace,
+		VCSClient:  vcsClient,
+		Locker:     lockingClient,
+		WorkingDir: workingDir,
 	}
 	logger := logging.NewSimpleLogger("server", nil, false, logging.ToLogLevel(userConfig.LogLevel))
 	eventParser := &events.EventParser{
@@ -232,11 +232,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AllowForkPRs:             userConfig.AllowForkPRs,
 		AllowForkPRsFlag:         config.AllowForkPRsFlag,
 		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
-			ParserValidator:         &yaml.ParserValidator{},
-			ProjectFinder:           &events.DefaultProjectFinder{},
-			VCSClient:               vcsClient,
-			Workspace:               workspace,
-			AtlantisWorkspaceLocker: workspaceLocker,
+			ParserValidator:  &yaml.ParserValidator{},
+			ProjectFinder:    &events.DefaultProjectFinder{},
+			VCSClient:        vcsClient,
+			WorkingDir:       workingDir,
+			WorkingDirLocker: workingDirLocker,
+			RequireApproval:  userConfig.RequireApproval,
 		},
 		ProjectCommandRunner: &events.ProjectCommandRunner{
 			Locker:           projectLocker,
@@ -252,11 +253,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			ApplyStepRunner: runtime.ApplyStepRunner{
 				TerraformExecutor: terraformClient,
 			},
-			RunStepRunner:           runtime.RunStepRunner{},
-			PullApprovedChecker:     vcsClient,
-			Workspace:               workspace,
-			Webhooks:                webhooksManager,
-			AtlantisWorkspaceLocker: workspaceLocker,
+			RunStepRunner:       runtime.RunStepRunner{},
+			PullApprovedChecker: vcsClient,
+			WorkingDir:          workingDir,
+			Webhooks:            webhooksManager,
+			WorkingDirLocker:    workingDirLocker,
 		},
 	}
 	repoWhitelist := &events.RepoWhitelistChecker{

@@ -235,7 +235,8 @@ type ProjectCommandContext struct {
 
 	// CommentArgs are the extra arguments appended to comment,
 	// ex. atlantis plan -- -target=resource
-	CommentArgs []string
-	Workspace   string
-	ProjectName string
+	CommentArgs             []string
+	Workspace               string
+	ProjectName             string
+	RequireApprovalOverride bool
 }

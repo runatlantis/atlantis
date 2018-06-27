@@ -24,11 +24,12 @@ type ProjectCommandBuilder interface {
 }
 
 type DefaultProjectCommandBuilder struct {
-	ParserValidator         *yaml.ParserValidator
-	ProjectFinder           ProjectFinder
-	VCSClient               vcs.ClientProxy
-	Workspace               AtlantisWorkspace
-	AtlantisWorkspaceLocker AtlantisWorkspaceLocker
+	ParserValidator  *yaml.ParserValidator
+	ProjectFinder    ProjectFinder
+	VCSClient        vcs.ClientProxy
+	WorkingDir       WorkingDir
+	WorkingDirLocker WorkingDirLocker
+	RequireApproval  bool
 }
 
 type TerraformExec interface {
@@ -38,7 +39,7 @@ type TerraformExec interface {
 func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error) {
 	// Need to lock the workspace we're about to clone to.
 	workspace := DefaultWorkspace
-	unlockFn, err := p.AtlantisWorkspaceLocker.TryLock(ctx.BaseRepo.FullName, workspace, ctx.Pull.Num)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.BaseRepo.FullName, workspace, ctx.Pull.Num)
 	if err != nil {
 		ctx.Log.Warn("workspace was locked")
 		return nil, err
@@ -46,7 +47,7 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext
 	ctx.Log.Debug("got workspace lock")
 	defer unlockFn()
 
-	repoDir, err := p.Workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, workspace)
+	repoDir, err := p.WorkingDir.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -132,13 +133,13 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext
 func (p *DefaultProjectCommandBuilder) BuildPlanCommand(ctx *CommandContext, cmd *CommentCommand) (models.ProjectCommandContext, error) {
 	var projCtx models.ProjectCommandContext
 
-	unlockFn, err := p.AtlantisWorkspaceLocker.TryLock(ctx.BaseRepo.FullName, cmd.Workspace, ctx.Pull.Num)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.BaseRepo.FullName, cmd.Workspace, ctx.Pull.Num)
 	if err != nil {
 		return projCtx, err
 	}
 	defer unlockFn()
 
-	repoDir, err := p.Workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, cmd.Workspace)
+	repoDir, err := p.WorkingDir.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, cmd.Workspace)
 	if err != nil {
 		return projCtx, err
 	}
@@ -189,7 +190,7 @@ func (p *DefaultProjectCommandBuilder) BuildPlanCommand(ctx *CommandContext, cmd
 func (p *DefaultProjectCommandBuilder) BuildApplyCommand(ctx *CommandContext, cmd *CommentCommand) (models.ProjectCommandContext, error) {
 	var projCtx models.ProjectCommandContext
 
-	repoDir, err := p.Workspace.GetWorkspace(ctx.BaseRepo, ctx.Pull, cmd.Workspace)
+	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, cmd.Workspace)
 	if err != nil {
 		return projCtx, err
 	}
@@ -223,17 +224,18 @@ func (p *DefaultProjectCommandBuilder) BuildApplyCommand(ctx *CommandContext, cm
 	}
 
 	projCtx = models.ProjectCommandContext{
-		BaseRepo:      ctx.BaseRepo,
-		HeadRepo:      ctx.HeadRepo,
-		Pull:          ctx.Pull,
-		User:          ctx.User,
-		Log:           ctx.Log,
-		CommentArgs:   cmd.Flags,
-		Workspace:     cmd.Workspace,
-		RepoRelPath:   cmd.Dir,
-		ProjectName:   cmd.ProjectName,
-		ProjectConfig: projCfg,
-		GlobalConfig:  globalCfg,
+		BaseRepo:                ctx.BaseRepo,
+		HeadRepo:                ctx.HeadRepo,
+		Pull:                    ctx.Pull,
+		User:                    ctx.User,
+		Log:                     ctx.Log,
+		CommentArgs:             cmd.Flags,
+		Workspace:               cmd.Workspace,
+		RepoRelPath:             cmd.Dir,
+		ProjectName:             cmd.ProjectName,
+		ProjectConfig:           projCfg,
+		GlobalConfig:            globalCfg,
+		RequireApprovalOverride: p.RequireApproval,
 	}
 	return projCtx, nil
 }

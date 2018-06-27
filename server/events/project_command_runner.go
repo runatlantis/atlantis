@@ -43,16 +43,16 @@ type PlanSuccess struct {
 }
 
 type ProjectCommandRunner struct {
-	Locker                  ProjectLocker
-	LockURLGenerator        LockURLGenerator
-	InitStepRunner          runtime.InitStepRunner
-	PlanStepRunner          runtime.PlanStepRunner
-	ApplyStepRunner         runtime.ApplyStepRunner
-	RunStepRunner           runtime.RunStepRunner
-	PullApprovedChecker     runtime.PullApprovedChecker
-	Workspace               AtlantisWorkspace
-	Webhooks                WebhooksSender
-	AtlantisWorkspaceLocker AtlantisWorkspaceLocker
+	Locker              ProjectLocker
+	LockURLGenerator    LockURLGenerator
+	InitStepRunner      runtime.InitStepRunner
+	PlanStepRunner      runtime.PlanStepRunner
+	ApplyStepRunner     runtime.ApplyStepRunner
+	RunStepRunner       runtime.RunStepRunner
+	PullApprovedChecker runtime.PullApprovedChecker
+	WorkingDir          WorkingDir
+	Webhooks            WebhooksSender
+	WorkingDirLocker    WorkingDirLocker
 }
 
 func (p *ProjectCommandRunner) Plan(ctx models.ProjectCommandContext) ProjectCommandResult {
@@ -69,14 +69,14 @@ func (p *ProjectCommandRunner) Plan(ctx models.ProjectCommandContext) ProjectCom
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.AtlantisWorkspaceLocker.TryLock(ctx.BaseRepo.FullName, ctx.Workspace, ctx.Pull.Num)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.BaseRepo.FullName, ctx.Workspace, ctx.Pull.Num)
 	if err != nil {
 		return ProjectCommandResult{Error: err}
 	}
 	defer unlockFn()
 
 	// Clone is idempotent so okay to run even if the repo was already cloned.
-	repoDir, cloneErr := p.Workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	repoDir, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if cloneErr != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
@@ -140,7 +140,7 @@ func (p *ProjectCommandRunner) runSteps(steps []valid.Step, ctx models.ProjectCo
 }
 
 func (p *ProjectCommandRunner) Apply(ctx models.ProjectCommandContext) ProjectCommandResult {
-	repoDir, err := p.Workspace.GetWorkspace(ctx.BaseRepo, ctx.Pull, ctx.Workspace)
+	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return ProjectCommandResult{Error: errors.New("project has not been cloned–did you run plan?")}
@@ -149,22 +149,27 @@ func (p *ProjectCommandRunner) Apply(ctx models.ProjectCommandContext) ProjectCo
 	}
 	absPath := filepath.Join(repoDir, ctx.RepoRelPath)
 
+	var applyRequirements []string
 	if ctx.ProjectConfig != nil {
-		for _, req := range ctx.ProjectConfig.ApplyRequirements {
-			switch req {
-			case "approved":
-				approved, err := p.PullApprovedChecker.PullIsApproved(ctx.BaseRepo, ctx.Pull) // nolint: vetshadow
-				if err != nil {
-					return ProjectCommandResult{Error: errors.Wrap(err, "checking if pull request was approved")}
-				}
-				if !approved {
-					return ProjectCommandResult{Failure: "Pull request must be approved before running apply."}
-				}
+		applyRequirements = ctx.ProjectConfig.ApplyRequirements
+	}
+	if ctx.RequireApprovalOverride {
+		applyRequirements = []string{"approved"}
+	}
+	for _, req := range applyRequirements {
+		switch req {
+		case "approved":
+			approved, err := p.PullApprovedChecker.PullIsApproved(ctx.BaseRepo, ctx.Pull) // nolint: vetshadow
+			if err != nil {
+				return ProjectCommandResult{Error: errors.Wrap(err, "checking if pull request was approved")}
+			}
+			if !approved {
+				return ProjectCommandResult{Failure: "Pull request must be approved before running apply."}
 			}
 		}
 	}
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.AtlantisWorkspaceLocker.TryLock(ctx.BaseRepo.FullName, ctx.Workspace, ctx.Pull.Num)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.BaseRepo.FullName, ctx.Workspace, ctx.Pull.Num)
 	if err != nil {
 		return ProjectCommandResult{Error: err}
 	}

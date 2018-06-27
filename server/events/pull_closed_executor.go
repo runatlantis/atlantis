@@ -38,9 +38,9 @@ type PullCleaner interface {
 // PullClosedExecutor executes the tasks required to clean up a closed pull
 // request.
 type PullClosedExecutor struct {
-	Locker    locking.Locker
-	VCSClient vcs.ClientProxy
-	Workspace AtlantisWorkspace
+	Locker     locking.Locker
+	VCSClient  vcs.ClientProxy
+	WorkingDir WorkingDir
 }
 
 type templatedProject struct {
@@ -55,7 +55,7 @@ var pullClosedTemplate = template.Must(template.New("").Parse(
 
 // CleanUpPull cleans up after a closed pull request.
 func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullRequest) error {
-	if err := p.Workspace.Delete(repo, pull); err != nil {
+	if err := p.WorkingDir.Delete(repo, pull); err != nil {
 		return errors.Wrap(err, "cleaning workspace")
 	}
 

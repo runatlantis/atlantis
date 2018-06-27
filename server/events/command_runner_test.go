@@ -39,7 +39,7 @@ var vcsClient *vcsmocks.MockClientProxy
 var ghStatus *mocks.MockCommitStatusUpdater
 var githubGetter *mocks.MockGithubPullGetter
 var gitlabGetter *mocks.MockGitlabMergeRequestGetter
-var workspaceLocker *mocks.MockAtlantisWorkspaceLocker
+var workspaceLocker *mocks.MockWorkingDirLocker
 var ch events.DefaultCommandRunner
 var logBytes *bytes.Buffer
 
@@ -48,7 +48,7 @@ func setup(t *testing.T) {
 	projectCommandBuilder = mocks.NewMockProjectCommandBuilder()
 	eventParsing = mocks.NewMockEventParsing()
 	ghStatus = mocks.NewMockCommitStatusUpdater()
-	workspaceLocker = mocks.NewMockAtlantisWorkspaceLocker()
+	workspaceLocker = mocks.NewMockWorkingDirLocker()
 	vcsClient = vcsmocks.NewMockClientProxy()
 	githubGetter = mocks.NewMockGithubPullGetter()
 	gitlabGetter = mocks.NewMockGitlabMergeRequestGetter()
@@ -166,11 +166,11 @@ func TestRunCommentCommand_ClosedPull(t *testing.T) {
 //		setup(t)
 //		cmd := events.CommentCommand{
 //			Name:      c,
-//			Workspace: "workspace",
+//			WorkingDir: "workspace",
 //		}
 //		When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
 //		When(eventParsing.ParseGithubPull(pull)).ThenReturn(fixtures.Pull, fixtures.GithubRepo, nil)
-//		When(workspaceLocker.TryLock(fixtures.GithubRepo.FullName, cmd.Workspace, fixtures.Pull.Num)).ThenReturn(true)
+//		When(workspaceLocker.TryLock(fixtures.GithubRepo.FullName, cmd.WorkingDir, fixtures.Pull.Num)).ThenReturn(true)
 //		switch c {
 //		case events.Plan:
 //			When(projectCommandBuilder.PlanViaComment(matchers.AnyPtrToEventsCommandContext())).ThenReturn(cmdResult)
@@ -184,7 +184,7 @@ func TestRunCommentCommand_ClosedPull(t *testing.T) {
 //		_, response := ghStatus.VerifyWasCalledOnce().UpdateProjectResult(matchers.AnyPtrToEventsCommandContext(), matchers.AnyEventsCommandResult()).GetCapturedArguments()
 //		Equals(t, cmdResult, response)
 //		vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString())
-//		workspaceLocker.VerifyWasCalledOnce().Unlock(fixtures.GithubRepo.FullName, cmd.Workspace, fixtures.Pull.Num)
+//		workspaceLocker.VerifyWasCalledOnce().Unlock(fixtures.GithubRepo.FullName, cmd.WorkingDir, fixtures.Pull.Num)
 //	}
 //}
 
@@ -200,14 +200,14 @@ func TestRunCommentCommand_ClosedPull(t *testing.T) {
 //	cmdResponse := events.CommandResult{}
 //	cmd := events.CommentCommand{
 //		Name:      events.Plan,
-//		Workspace: "workspace",
+//		WorkingDir: "workspace",
 //	}
 //	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
 //	headRepo := fixtures.GithubRepo
 //	headRepo.FullName = "forkrepo/atlantis"
 //	headRepo.Owner = "forkrepo"
 //	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(fixtures.Pull, headRepo, nil)
-//	When(workspaceLocker.TryLock(fixtures.GithubRepo.FullName, cmd.Workspace, fixtures.Pull.Num)).ThenReturn(true)
+//	When(workspaceLocker.TryLock(fixtures.GithubRepo.FullName, cmd.WorkingDir, fixtures.Pull.Num)).ThenReturn(true)
 //	When(projectCommandBuilder.PlanViaComment(matchers.AnyPtrToEventsCommandContext())).ThenReturn(cmdResponse)
 //
 //	ch.RunCommentCommand(fixtures.GithubRepo, models.Repo{} /* this isn't used */, fixtures.User, fixtures.Pull.Num, &cmd)
@@ -216,5 +216,5 @@ func TestRunCommentCommand_ClosedPull(t *testing.T) {
 //	_, response := ghStatus.VerifyWasCalledOnce().UpdateProjectResult(matchers.AnyPtrToEventsCommandContext(), matchers.AnyEventsCommandResult()).GetCapturedArguments()
 //	Equals(t, cmdResponse, response)
 //	vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString())
-//	workspaceLocker.VerifyWasCalledOnce().Unlock(fixtures.GithubRepo.FullName, cmd.Workspace, fixtures.Pull.Num)
+//	workspaceLocker.VerifyWasCalledOnce().Unlock(fixtures.GithubRepo.FullName, cmd.WorkingDir, fixtures.Pull.Num)
 //}

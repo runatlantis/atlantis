@@ -18,16 +18,14 @@ import (
 	"sync"
 )
 
-//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_atlantis_workspace_locker.go AtlantisWorkspaceLocker
+//go:generate pegomock generate --use-experimental-model-gen --package mocks -o mocks/mock_working_dir_locker.go WorkingDirLocker
 
-// AtlantisWorkspaceLocker is used to prevent multiple commands from executing
+// WorkingDirLocker is used to prevent multiple commands from executing
 // at the same time for a single repo, pull, and workspace. We need to prevent
 // this from happening because a specific repo/pull/workspace has a single workspace
 // on disk and we haven't written Atlantis (yet) to handle concurrent execution
 // within this workspace.
-// This locker is called AtlantisWorkspaceLocker to differentiate it from the
-// Terraform concept of workspaces, not directories on disk managed by Atlantis.
-type AtlantisWorkspaceLocker interface {
+type WorkingDirLocker interface {
 	// TryLock tries to acquire a lock for this repo, workspace and pull.
 	// It returns a function that should be used to unlock the workspace and
 	// an error if the workspace is already locked. The error is expected to
@@ -38,20 +36,20 @@ type AtlantisWorkspaceLocker interface {
 	Unlock(repoFullName, workspace string, pullNum int)
 }
 
-// DefaultAtlantisWorkspaceLocker implements AtlantisWorkspaceLocker.
-type DefaultAtlantisWorkspaceLocker struct {
+// DefaultAtlantisWorkingDirLocker implements WorkingDirLocker.
+type DefaultAtlantisWorkingDirLocker struct {
 	mutex sync.Mutex
 	locks map[string]interface{}
 }
 
-// NewDefaultAtlantisWorkspaceLocker is a constructor.
-func NewDefaultAtlantisWorkspaceLocker() *DefaultAtlantisWorkspaceLocker {
-	return &DefaultAtlantisWorkspaceLocker{
+// NewDefaultAtlantisWorkingDirLocker is a constructor.
+func NewDefaultAtlantisWorkingDirLocker() *DefaultAtlantisWorkingDirLocker {
+	return &DefaultAtlantisWorkingDirLocker{
 		locks: make(map[string]interface{}),
 	}
 }
 
-func (d *DefaultAtlantisWorkspaceLocker) TryLock(repoFullName string, workspace string, pullNum int) (func(), error) {
+func (d *DefaultAtlantisWorkingDirLocker) TryLock(repoFullName string, workspace string, pullNum int) (func(), error) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
@@ -69,12 +67,12 @@ func (d *DefaultAtlantisWorkspaceLocker) TryLock(repoFullName string, workspace 
 }
 
 // Unlock unlocks the repo, pull and workspace.
-func (d *DefaultAtlantisWorkspaceLocker) Unlock(repoFullName, workspace string, pullNum int) {
+func (d *DefaultAtlantisWorkingDirLocker) Unlock(repoFullName, workspace string, pullNum int) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 	delete(d.locks, d.key(repoFullName, workspace, pullNum))
 }
 
-func (d *DefaultAtlantisWorkspaceLocker) key(repo string, workspace string, pull int) string {
+func (d *DefaultAtlantisWorkingDirLocker) key(repo string, workspace string, pull int) string {
 	return fmt.Sprintf("%s/%s/%d", repo, workspace, pull)
 }

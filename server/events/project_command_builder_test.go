@@ -6,11 +6,11 @@ package events_test
 //	tmpDir, cleanup := TempDir(t)
 //	defer cleanup()
 //
-//	workspace := mocks.NewMockAtlantisWorkspace()
+//	workspace := mocks.NewMockWorkingDir()
 //	vcsClient := vcsmocks.NewMockClientProxy()
 //
 //	builder := &events.DefaultProjectCommandBuilder{
-//		AtlantisWorkspaceLocker: events.NewDefaultAtlantisWorkspaceLocker(),
+//		WorkingDirLocker: events.NewDefaultAtlantisWorkingDirLocker(),
 //		Workspace:               workspace,
 //		ParserValidator:         &yaml.ParserValidator{},
 //		VCSClient:               vcsClient,

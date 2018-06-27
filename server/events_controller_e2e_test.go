@@ -230,13 +230,13 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClientProxy,
 	projectLocker := &events.DefaultProjectLocker{
 		Locker: lockingClient,
 	}
-	atlantisWorkspace := &events.FileWorkspace{
+	workingDir := &events.FileWorkspace{
 		DataDir:                 dataDir,
 		TestingOverrideCloneURL: "override-me",
 	}
 
 	defaultTFVersion := terraformClient.Version()
-	locker := events.NewDefaultAtlantisWorkspaceLocker()
+	locker := events.NewDefaultAtlantisWorkingDirLocker()
 	commandRunner := &events.DefaultCommandRunner{
 		ProjectCommandRunner: &events.ProjectCommandRunner{
 			Locker:           projectLocker,
@@ -252,11 +252,11 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClientProxy,
 			ApplyStepRunner: runtime.ApplyStepRunner{
 				TerraformExecutor: terraformClient,
 			},
-			RunStepRunner:           runtime.RunStepRunner{},
-			PullApprovedChecker:     e2eVCSClient,
-			Workspace:               atlantisWorkspace,
-			Webhooks:                &mockWebhookSender{},
-			AtlantisWorkspaceLocker: locker,
+			RunStepRunner:       runtime.RunStepRunner{},
+			PullApprovedChecker: e2eVCSClient,
+			WorkingDir:          workingDir,
+			Webhooks:            &mockWebhookSender{},
+			WorkingDirLocker:    locker,
 		},
 		EventParser:              eventParser,
 		VCSClient:                e2eVCSClient,
@@ -268,11 +268,11 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClientProxy,
 		AllowForkPRs:             allowForkPRs,
 		AllowForkPRsFlag:         "allow-fork-prs",
 		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
-			ParserValidator:         &yaml.ParserValidator{},
-			ProjectFinder:           &events.DefaultProjectFinder{},
-			VCSClient:               e2eVCSClient,
-			Workspace:               atlantisWorkspace,
-			AtlantisWorkspaceLocker: locker,
+			ParserValidator:  &yaml.ParserValidator{},
+			ProjectFinder:    &events.DefaultProjectFinder{},
+			VCSClient:        e2eVCSClient,
+			WorkingDir:       workingDir,
+			WorkingDirLocker: locker,
 		},
 	}
 
@@ -280,9 +280,9 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClientProxy,
 		TestingMode:   true,
 		CommandRunner: commandRunner,
 		PullCleaner: &events.PullClosedExecutor{
-			Locker:    lockingClient,
-			VCSClient: e2eVCSClient,
-			Workspace: atlantisWorkspace,
+			Locker:     lockingClient,
+			VCSClient:  e2eVCSClient,
+			WorkingDir: workingDir,
 		},
 		Logger:                       logger,
 		Parser:                       eventParser,
@@ -297,7 +297,7 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClientProxy,
 		SupportedVCSHosts: []models.VCSHostType{models.Gitlab, models.Github},
 		VCSClient:         e2eVCSClient,
 	}
-	return ctrl, e2eVCSClient, e2eGithubGetter, atlantisWorkspace
+	return ctrl, e2eVCSClient, e2eGithubGetter, workingDir
 }
 
 type mockLockURLGenerator struct{}

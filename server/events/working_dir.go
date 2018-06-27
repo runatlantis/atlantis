@@ -27,21 +27,21 @@ import (
 
 const workspacePrefix = "repos"
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_atlantis_workspace.go AtlantisWorkspace
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_working_dir.go WorkingDir
 
-// AtlantisWorkspace handles the workspace on disk for running commands.
-type AtlantisWorkspace interface {
+// WorkingDir handles the workspace on disk for running commands.
+type WorkingDir interface {
 	// Clone git clones headRepo, checks out the branch and then returns the
 	// absolute path to the root of the cloned repo.
 	Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, workspace string) (string, error)
-	// GetWorkspace returns the path to the workspace for this repo and pull.
+	// GetWorkingDir returns the path to the workspace for this repo and pull.
 	// If workspace does not exist on disk, error will be of type os.IsNotExist.
-	GetWorkspace(r models.Repo, p models.PullRequest, workspace string) (string, error)
+	GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error)
 	// Delete deletes the workspace for this repo and pull.
 	Delete(r models.Repo, p models.PullRequest) error
 }
 
-// FileWorkspace implements AtlantisWorkspace with the file system.
+// FileWorkspace implements WorkingDir with the file system.
 type FileWorkspace struct {
 	DataDir string
 	// TestingOverrideCloneURL can be used during testing to override the URL
@@ -110,8 +110,8 @@ func (w *FileWorkspace) Clone(
 	return cloneDir, nil
 }
 
-// GetWorkspace returns the path to the workspace for this repo and pull.
-func (w *FileWorkspace) GetWorkspace(r models.Repo, p models.PullRequest, workspace string) (string, error) {
+// GetWorkingDir returns the path to the workspace for this repo and pull.
+func (w *FileWorkspace) GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error) {
 	repoDir := w.cloneDir(r, p, workspace)
 	if _, err := os.Stat(repoDir); err != nil {
 		return "", errors.Wrap(err, "checking if workspace exists")
