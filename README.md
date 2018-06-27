@@ -26,7 +26,7 @@ Read about [Why We Built Atlantis](https://medium.com/runatlantis/introducing-at
 * [Locking](#locking)
 * [Approvals](#approvals)
 * [Security](#security)
-* [Production-Ready Deployment](#production-ready-deployment)
+* [Production-Ready Deployment](./docs/deployment.html)
     * [Docker](#docker)
     * [Kubernetes](#kubernetes)
     * [AWS Fargate](#aws-fargate)
@@ -70,7 +70,7 @@ This mode sets up Atlantis on a test repo so you can try it out. It will
 - install ngrok so we can expose Atlantis to GitHub
 - start Atlantis
 
-If you're ready to permanently set up Atlantis see [Production-Ready Deployment](#production-ready-deployment).
+If you're ready to permanently set up Atlantis see [Production-Ready Deployment](./docs/deployment.html)
 
 ## Pull/Merge Request Commands
 Atlantis currently supports three commands that can be run via pull request comments (or merge request comments on GitLab):
