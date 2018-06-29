@@ -15,6 +15,7 @@ workflows:
           extra_args: [-backend-config=default.backend.tfvars]
       - plan:
           extra_args: [-var-file=default.tfvars]
+      - run: echo workspace=$WORKSPACE
   staging:
     plan:
       steps:

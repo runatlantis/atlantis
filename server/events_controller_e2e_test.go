@@ -252,7 +252,9 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClientProxy,
 			ApplyStepRunner: runtime.ApplyStepRunner{
 				TerraformExecutor: terraformClient,
 			},
-			RunStepRunner:       runtime.RunStepRunner{},
+			RunStepRunner: runtime.RunStepRunner{
+				DefaultTFVersion: defaultTFVersion,
+			},
 			PullApprovedChecker: e2eVCSClient,
 			WorkingDir:          workingDir,
 			Webhooks:            &mockWebhookSender{},

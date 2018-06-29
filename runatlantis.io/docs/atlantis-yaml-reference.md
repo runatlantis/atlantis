@@ -66,7 +66,7 @@ workflows:
 | -------------| --- |-------------| -----|---|
 | version      | int | none | yes | This key is required and must be set to `2`|
 | projects      | array[[Project](atlantis-yaml-reference.html#project)] | [] | no | Lists the projects in this repo |
-| workflows      | map string -> [Workflow](atlantis-yaml-reference.html#workflow) | {} | no | Custom workflows |
+| workflows      | map[string -> [Workflow](atlantis-yaml-reference.html#workflow)] | {} | no | Custom workflows |
 
 ### Project
 ```yaml
@@ -153,7 +153,7 @@ A map from string to `extra_args` for a built-in command with extra arguments.
 ```
 | Key        | Type | Default           | Required | Description  |
 | -------------| --- |-------------| -----|---|
-| init/plan/apply      | map `extra_args` -> array[string] | none | no | Use a built-in command and append `extra_args`. Only `init`, `plan` and `apply` are supported as keys and only `extra_args` is supported as a value||
+| init/plan/apply      | map[`extra_args` -> array[string]] | none | no | Use a built-in command and append `extra_args`. Only `init`, `plan` and `apply` are supported as keys and only `extra_args` is supported as a value||
 #### Custom Command
 Or a custom command
 ```yaml
@@ -161,7 +161,15 @@ Or a custom command
 ```
 | Key        | Type | Default           | Required | Description  |
 | -------------| --- |-------------| -----|---|
-| run      | string| "" | no | Run a custom command|
+| run      | string| none | no | Run a custom command|
+
+::: tip
+`run` steps are executed with the following environment variables:
+* `WORKSPACE` - The Terraform workspace used for this project, ex. `default`.
+  * NOTE: if the step is executed before `init` then Atlantis won't have switched to this workspace yet.
+* `ATLANTIS_TERRAFORM_VERSION` - The version of Terraform used for this project, ex. `0.11.0`.
+* `DIR` - Absolute path to the current directory.
+:::
 
 ## Next Steps
 Check out the [atlantis.yaml Use Cases](../guide/atlantis-yaml-use-cases.html) for

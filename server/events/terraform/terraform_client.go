@@ -99,11 +99,8 @@ func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path st
 		tfVersionStr = v.String()
 	}
 
-	// set environment variables
-	// this is to support scripts to use the WORKSPACE, ATLANTIS_TERRAFORM_VERSION
-	// and DIR variables in their scripts
-	// append current process's environment variables
-	// this is to prevent the $PATH variable being removed from the environment
+	// We add custom variables so that if `extra_args` is specified with env
+	// vars then they'll be substituted.
 	envVars := []string{
 		// Will de-emphasize specific commands to run in output.
 		"TF_IN_AUTOMATION=true",
@@ -120,11 +117,15 @@ func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path st
 		fmt.Sprintf("ATLANTIS_TERRAFORM_VERSION=%s", tfVersionStr),
 		fmt.Sprintf("DIR=%s", path),
 	}
+	// Append current Atlantis process's environment variables so PATH is
+	// preserved and any vars that users purposely exec'd Atlantis with.
 	envVars = append(envVars, os.Environ()...)
 
 	// append terraform executable name with args
 	tfCmd := fmt.Sprintf("%s %s", tfExecutable, strings.Join(args, " "))
 
+	// We use 'sh -c' so that if extra_args have been specified with env vars,
+	// ex. -var-file=$WORKSPACE.tfvars, then they get substituted.
 	terraformCmd := exec.Command("sh", "-c", tfCmd) // #nosec
 	terraformCmd.Dir = path
 	terraformCmd.Env = envVars

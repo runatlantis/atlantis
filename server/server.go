@@ -253,7 +253,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			ApplyStepRunner: runtime.ApplyStepRunner{
 				TerraformExecutor: terraformClient,
 			},
-			RunStepRunner:       runtime.RunStepRunner{},
+			RunStepRunner: runtime.RunStepRunner{
+				DefaultTFVersion: defaultTfVersion,
+			},
 			PullApprovedChecker: vcsClient,
 			WorkingDir:          workingDir,
 			Webhooks:            webhooksManager,
