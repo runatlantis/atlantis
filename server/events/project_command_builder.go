@@ -189,7 +189,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 	}, nil
 }
 
-func (p *DefaultProjectCommandBuilder) getCfg(projectName string, dir string, workspace string, repoDir string) (*valid.Project, *valid.Spec, error) {
+func (p *DefaultProjectCommandBuilder) getCfg(projectName string, dir string, workspace string, repoDir string) (*valid.Project, *valid.Config, error) {
 	globalCfg, err := p.ParserValidator.ReadConfig(repoDir)
 	if err != nil && !os.IsNotExist(err) {
 		return nil, nil, err
@@ -224,7 +224,7 @@ func (p *DefaultProjectCommandBuilder) getCfg(projectName string, dir string, wo
 
 // matchingProjects returns the list of projects whose WhenModified fields match
 // any of the modifiedFiles.
-func (p *DefaultProjectCommandBuilder) matchingProjects(log *logging.SimpleLogger, modifiedFiles []string, config valid.Spec) ([]valid.Project, error) {
+func (p *DefaultProjectCommandBuilder) matchingProjects(log *logging.SimpleLogger, modifiedFiles []string, config valid.Config) ([]valid.Project, error) {
 	var projects []valid.Project
 	for _, project := range config.Projects {
 		log.Debug("checking if project at dir %q workspace %q was modified", project.Dir, project.Workspace)

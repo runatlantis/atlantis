@@ -10,17 +10,17 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func TestSpec_UnmarshalYAML(t *testing.T) {
+func TestConfig_UnmarshalYAML(t *testing.T) {
 	cases := []struct {
 		description string
 		input       string
-		exp         raw.Spec
+		exp         raw.Config
 		expErr      string
 	}{
 		{
 			description: "no data",
 			input:       "",
-			exp: raw.Spec{
+			exp: raw.Config{
 				Version:   nil,
 				Projects:  nil,
 				Workflows: nil,
@@ -29,7 +29,7 @@ func TestSpec_UnmarshalYAML(t *testing.T) {
 		{
 			description: "yaml nil",
 			input:       "~",
-			exp: raw.Spec{
+			exp: raw.Config{
 				Version:   nil,
 				Projects:  nil,
 				Workflows: nil,
@@ -38,17 +38,17 @@ func TestSpec_UnmarshalYAML(t *testing.T) {
 		{
 			description: "invalid key",
 			input:       "invalid: key",
-			exp: raw.Spec{
+			exp: raw.Config{
 				Version:   nil,
 				Projects:  nil,
 				Workflows: nil,
 			},
-			expErr: "yaml: unmarshal errors:\n  line 1: field invalid not found in struct raw.Spec",
+			expErr: "yaml: unmarshal errors:\n  line 1: field invalid not found in struct raw.Config",
 		},
 		{
 			description: "version set",
 			input:       "version: 2",
-			exp: raw.Spec{
+			exp: raw.Config{
 				Version:   Int(2),
 				Projects:  nil,
 				Workflows: nil,
@@ -57,7 +57,7 @@ func TestSpec_UnmarshalYAML(t *testing.T) {
 		{
 			description: "projects key without value",
 			input:       "projects:",
-			exp: raw.Spec{
+			exp: raw.Config{
 				Version:   nil,
 				Projects:  nil,
 				Workflows: nil,
@@ -66,7 +66,7 @@ func TestSpec_UnmarshalYAML(t *testing.T) {
 		{
 			description: "workflows key without value",
 			input:       "workflows:",
-			exp: raw.Spec{
+			exp: raw.Config{
 				Version:   nil,
 				Projects:  nil,
 				Workflows: nil,
@@ -75,7 +75,7 @@ func TestSpec_UnmarshalYAML(t *testing.T) {
 		{
 			description: "projects with a map",
 			input:       "projects:\n  key: value",
-			exp: raw.Spec{
+			exp: raw.Config{
 				Version:   nil,
 				Projects:  nil,
 				Workflows: nil,
@@ -85,7 +85,7 @@ func TestSpec_UnmarshalYAML(t *testing.T) {
 		{
 			description: "projects with a scalar",
 			input:       "projects: value",
-			exp: raw.Spec{
+			exp: raw.Config{
 				Version:   nil,
 				Projects:  nil,
 				Workflows: nil,
@@ -111,7 +111,7 @@ workflows:
       steps: []
     apply:
      steps: []`,
-			exp: raw.Spec{
+			exp: raw.Config{
 				Version: Int(2),
 				Projects: []raw.Project{
 					{
@@ -141,7 +141,7 @@ workflows:
 	}
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			var conf raw.Spec
+			var conf raw.Config
 			err := yaml.UnmarshalStrict([]byte(c.input), &conf)
 			if c.expErr != "" {
 				ErrEquals(t, c.expErr, err)
@@ -153,10 +153,10 @@ workflows:
 	}
 }
 
-func TestSpec_Validate(t *testing.T) {
+func TestConfig_Validate(t *testing.T) {
 	cases := []struct {
 		description string
-		input       raw.Spec
+		input       raw.Config
 		expErr      string
 	}{}
 	validation.ErrorTag = "yaml"
@@ -172,28 +172,28 @@ func TestSpec_Validate(t *testing.T) {
 	}
 }
 
-func TestSpec_ToValid(t *testing.T) {
+func TestConfig_ToValid(t *testing.T) {
 	cases := []struct {
 		description string
-		input       raw.Spec
-		exp         valid.Spec
+		input       raw.Config
+		exp         valid.Config
 	}{
 		{
 			description: "nothing set",
-			input:       raw.Spec{Version: Int(2)},
-			exp: valid.Spec{
+			input:       raw.Config{Version: Int(2)},
+			exp: valid.Config{
 				Version:   2,
 				Workflows: make(map[string]valid.Workflow),
 			},
 		},
 		{
 			description: "set to empty",
-			input: raw.Spec{
+			input: raw.Config{
 				Version:   Int(2),
 				Workflows: map[string]raw.Workflow{},
 				Projects:  []raw.Project{},
 			},
-			exp: valid.Spec{
+			exp: valid.Config{
 				Version:   2,
 				Workflows: map[string]valid.Workflow{},
 				Projects:  nil,
@@ -201,7 +201,7 @@ func TestSpec_ToValid(t *testing.T) {
 		},
 		{
 			description: "everything set",
-			input: raw.Spec{
+			input: raw.Config{
 				Version: Int(2),
 				Workflows: map[string]raw.Workflow{
 					"myworkflow": {
@@ -227,7 +227,7 @@ func TestSpec_ToValid(t *testing.T) {
 					},
 				},
 			},
-			exp: valid.Spec{
+			exp: valid.Config{
 				Version: 2,
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": {

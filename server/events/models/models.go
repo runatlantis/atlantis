@@ -231,7 +231,7 @@ type ProjectCommandContext struct {
 	Log           *logging.SimpleLogger
 	RepoRelPath   string
 	ProjectConfig *valid.Project
-	GlobalConfig  *valid.Spec
+	GlobalConfig  *valid.Config
 
 	// CommentArgs are the extra arguments appended to comment,
 	// ex. atlantis plan -- -target=resource

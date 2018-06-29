@@ -18,14 +18,14 @@ func NewMockParserValidator() *MockParserValidator {
 	return &MockParserValidator{fail: pegomock.GlobalFailHandler}
 }
 
-func (mock *MockParserValidator) ReadConfig(repoDir string) (valid.Spec, error) {
+func (mock *MockParserValidator) ReadConfig(repoDir string) (valid.Config, error) {
 	params := []pegomock.Param{repoDir}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("ReadConfig", params, []reflect.Type{reflect.TypeOf((*valid.Spec)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 valid.Spec
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ReadConfig", params, []reflect.Type{reflect.TypeOf((*valid.Config)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 valid.Config
 	var ret1 error
 	if len(result) != 0 {
 		if result[0] != nil {
-			ret0 = result[0].(valid.Spec)
+			ret0 = result[0].(valid.Config)
 		}
 		if result[1] != nil {
 			ret1 = result[1].(error)

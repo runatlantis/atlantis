@@ -7,38 +7,39 @@ import (
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 )
 
-type Spec struct {
+// Config is the representation for the whole config file at the top level.
+type Config struct {
 	Version   *int                `yaml:"version,omitempty"`
 	Projects  []Project           `yaml:"projects,omitempty"`
 	Workflows map[string]Workflow `yaml:"workflows,omitempty"`
 }
 
-func (s Spec) Validate() error {
+func (c Config) Validate() error {
 	equals2 := func(value interface{}) error {
 		if *value.(*int) != 2 {
 			return errors.New("must equal 2")
 		}
 		return nil
 	}
-	return validation.ValidateStruct(&s,
-		validation.Field(&s.Version, validation.NotNil, validation.By(equals2)),
-		validation.Field(&s.Projects),
-		validation.Field(&s.Workflows),
+	return validation.ValidateStruct(&c,
+		validation.Field(&c.Version, validation.NotNil, validation.By(equals2)),
+		validation.Field(&c.Projects),
+		validation.Field(&c.Workflows),
 	)
 }
 
-func (s Spec) ToValid() valid.Spec {
+func (c Config) ToValid() valid.Config {
 	var validProjects []valid.Project
-	for _, p := range s.Projects {
+	for _, p := range c.Projects {
 		validProjects = append(validProjects, p.ToValid())
 	}
 
 	validWorkflows := make(map[string]valid.Workflow)
-	for k, v := range s.Workflows {
+	for k, v := range c.Workflows {
 		validWorkflows[k] = v.ToValid()
 	}
-	return valid.Spec{
-		Version:   *s.Version,
+	return valid.Config{
+		Version:   *c.Version,
 		Projects:  validProjects,
 		Workflows: validWorkflows,
 	}

@@ -49,7 +49,7 @@ func TestReadConfig_UnmarshalErrors(t *testing.T) {
 		{
 			"random characters",
 			"slkjds",
-			"parsing atlantis.yaml: yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `slkjds` into raw.Spec",
+			"parsing atlantis.yaml: yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `slkjds` into raw.Config",
 		},
 		{
 			"just a colon",
@@ -78,7 +78,7 @@ func TestReadConfig(t *testing.T) {
 		description string
 		input       string
 		expErr      string
-		exp         valid.Spec
+		exp         valid.Config
 	}{
 		// Version key.
 		{
@@ -114,7 +114,7 @@ projects:
 			input: `
 version: 2
 projects:`,
-			exp: valid.Spec{
+			exp: valid.Config{
 				Version:   2,
 				Projects:  nil,
 				Workflows: map[string]valid.Workflow{},
@@ -134,7 +134,7 @@ projects:
 version: 2
 projects:
 - dir: .`,
-			exp: valid.Spec{
+			exp: valid.Config{
 				Version: 2,
 				Projects: []valid.Project{
 					{
@@ -164,7 +164,7 @@ projects:
   workflow: myworkflow
 workflows:
   myworkflow: ~`,
-			exp: valid.Spec{
+			exp: valid.Config{
 				Version: 2,
 				Projects: []valid.Project{
 					{
@@ -198,7 +198,7 @@ projects:
     enabled: false
 workflows:
   myworkflow: ~`,
-			exp: valid.Spec{
+			exp: valid.Config{
 				Version: 2,
 				Projects: []valid.Project{
 					{
@@ -309,7 +309,7 @@ projects:
 - name: myname2
   dir: .
   workspace: workspace`,
-			exp: valid.Spec{
+			exp: valid.Config{
 				Version: 2,
 				Projects: []valid.Project{
 					{
@@ -372,7 +372,7 @@ func TestReadConfig_Successes(t *testing.T) {
 	cases := []struct {
 		description string
 		input       string
-		expOutput   valid.Spec
+		expOutput   valid.Config
 	}{
 		{
 			description: "uses project defaults",
@@ -380,7 +380,7 @@ func TestReadConfig_Successes(t *testing.T) {
 version: 2
 projects:
 - dir: "."`,
-			expOutput: valid.Spec{
+			expOutput: valid.Config{
 				Version:   2,
 				Projects:  basicProjects,
 				Workflows: make(map[string]valid.Workflow),
@@ -395,7 +395,7 @@ projects:
   autoplan:
     when_modified: ["**/*.tf"]
 `,
-			expOutput: valid.Spec{
+			expOutput: valid.Config{
 				Version:   2,
 				Projects:  basicProjects,
 				Workflows: make(map[string]valid.Workflow),
@@ -408,7 +408,7 @@ version: 2
 projects:
 - dir: "."
 `,
-			expOutput: valid.Spec{
+			expOutput: valid.Config{
 				Version:   2,
 				Projects:  basicProjects,
 				Workflows: make(map[string]valid.Workflow),
@@ -422,7 +422,7 @@ projects:
 - dir: "."
 workflows: ~
 `,
-			expOutput: valid.Spec{
+			expOutput: valid.Config{
 				Version:   2,
 				Projects:  basicProjects,
 				Workflows: make(map[string]valid.Workflow),
@@ -441,7 +441,7 @@ workflows:
     apply:
       steps:
 `,
-			expOutput: valid.Spec{
+			expOutput: valid.Config{
 				Version:  2,
 				Projects: basicProjects,
 				Workflows: map[string]valid.Workflow{
@@ -473,7 +473,7 @@ workflows:
       - plan # we don't validate if they make sense
       - apply
 `,
-			expOutput: valid.Spec{
+			expOutput: valid.Config{
 				Version:  2,
 				Projects: basicProjects,
 				Workflows: map[string]valid.Workflow{
@@ -525,7 +525,7 @@ workflows:
       - apply:
           extra_args: ["a", "b"]
 `,
-			expOutput: valid.Spec{
+			expOutput: valid.Config{
 				Version:  2,
 				Projects: basicProjects,
 				Workflows: map[string]valid.Workflow{
@@ -573,7 +573,7 @@ workflows:
       steps:
       - run: echo apply "arg 2"
 `,
-			expOutput: valid.Spec{
+			expOutput: valid.Config{
 				Version:  2,
 				Projects: basicProjects,
 				Workflows: map[string]valid.Workflow{

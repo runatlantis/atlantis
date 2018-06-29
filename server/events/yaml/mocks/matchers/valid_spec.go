@@ -7,14 +7,14 @@ import (
 	valid "github.com/runatlantis/atlantis/server/events/yaml/valid"
 )
 
-func AnyValidSpec() valid.Spec {
-	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(valid.Spec))(nil)).Elem()))
-	var nullValue valid.Spec
+func AnyValidConfig() valid.Config {
+	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(valid.Config))(nil)).Elem()))
+	var nullValue valid.Config
 	return nullValue
 }
 
-func EqValidSpec(value valid.Spec) valid.Spec {
+func EqValidConfig(value valid.Config) valid.Config {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
-	var nullValue valid.Spec
+	var nullValue valid.Config
 	return nullValue
 }

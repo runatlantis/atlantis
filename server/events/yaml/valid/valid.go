@@ -1,11 +1,11 @@
+// Package valid contains the structs representing the atlantis.yaml config
+// after it's been parsed and validated.
 package valid
 
 import "github.com/hashicorp/go-version"
 
-// Spec is the atlantis yaml spec after it's been parsed and validated.
-// The raw.Spec is transformed into the ValidSpec which is then used by the
-// rest of Atlantis.
-type Spec struct {
+// Config is the atlantis.yaml config after it's been parsed and validated.
+type Config struct {
 	// Version is the version of the atlantis YAML file. Will always be equal
 	// to 2.
 	Version   int
@@ -13,8 +13,8 @@ type Spec struct {
 	Workflows map[string]Workflow
 }
 
-func (s Spec) GetPlanStage(workflowName string) *Stage {
-	for name, flow := range s.Workflows {
+func (c Config) GetPlanStage(workflowName string) *Stage {
+	for name, flow := range c.Workflows {
 		if name == workflowName {
 			return flow.Plan
 		}
@@ -22,8 +22,8 @@ func (s Spec) GetPlanStage(workflowName string) *Stage {
 	return nil
 }
 
-func (s Spec) GetApplyStage(workflowName string) *Stage {
-	for name, flow := range s.Workflows {
+func (c Config) GetApplyStage(workflowName string) *Stage {
+	for name, flow := range c.Workflows {
 		if name == workflowName {
 			return flow.Apply
 		}
@@ -31,9 +31,9 @@ func (s Spec) GetApplyStage(workflowName string) *Stage {
 	return nil
 }
 
-func (s Spec) FindProjectsByDirWorkspace(dir string, workspace string) []Project {
+func (c Config) FindProjectsByDirWorkspace(dir string, workspace string) []Project {
 	var ps []Project
-	for _, p := range s.Projects {
+	for _, p := range c.Projects {
 		if p.Dir == dir && p.Workspace == workspace {
 			ps = append(ps, p)
 		}
@@ -41,8 +41,8 @@ func (s Spec) FindProjectsByDirWorkspace(dir string, workspace string) []Project
 	return ps
 }
 
-func (s Spec) FindProjectByName(name string) *Project {
-	for _, p := range s.Projects {
+func (c Config) FindProjectByName(name string) *Project {
+	for _, p := range c.Projects {
 		if p.Name != nil && *p.Name == name {
 			return &p
 		}
