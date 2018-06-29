@@ -32,7 +32,6 @@ import (
 type Client interface {
 	Version() *version.Version
 	RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (string, error)
-	Init(log *logging.SimpleLogger, path string, workspace string, extraInitArgs []string, version *version.Version) ([]string, error)
 }
 
 type DefaultClient struct {
@@ -138,58 +137,6 @@ func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path st
 	}
 	log.Info("successfully ran %q in %q", commandStr, path)
 	return string(out), nil
-}
-
-// Init executes "terraform init" and "terraform workspace select" in path.
-// workspace is the workspace to select and extraInitArgs are additional arguments
-// applied to the init command. version is the terraform version being executed.
-// Init is guaranteed to be called with version >= 0.9 since the init command
-// was only introduced in that version. It properly handles the renaming of the
-// env command to workspace since 0.10.
-//
-// Returns the string outputs of running each command.
-func (c *DefaultClient) Init(log *logging.SimpleLogger, path string, workspace string, extraInitArgs []string, version *version.Version) ([]string, error) {
-	var outputs []string
-
-	output, err := c.RunCommandWithVersion(log, path, append([]string{"init", "-no-color"}, extraInitArgs...), version, workspace)
-	outputs = append(outputs, output)
-	if err != nil {
-		return outputs, err
-	}
-
-	workspaceCommand := "workspace"
-	runningZeroPointNine := zeroPointNine.Check(version)
-	if runningZeroPointNine {
-		// In 0.9.* `env` was used instead of `workspace`
-		workspaceCommand = "env"
-	}
-
-	// Use `workspace show` to find out what workspace we're in now. If we're
-	// already in the right workspace then no need to switch. This will save us
-	// about ten seconds. This command is only available in > 0.10.
-	if !runningZeroPointNine {
-		workspaceShowOutput, err := c.RunCommandWithVersion(log, path, []string{workspaceCommand, "show"}, version, workspace) // nolint:vetshadow
-		outputs = append(outputs, workspaceShowOutput)
-		if err != nil {
-			return outputs, err
-		}
-		if strings.TrimSpace(workspaceShowOutput) == workspace {
-			return outputs, nil
-		}
-	}
-
-	output, err = c.RunCommandWithVersion(log, path, []string{workspaceCommand, "select", "-no-color", workspace}, version, workspace)
-	outputs = append(outputs, output)
-	if err != nil {
-		// If terraform workspace select fails we run terraform workspace
-		// new to create a new workspace automatically.
-		output, err = c.RunCommandWithVersion(log, path, []string{workspaceCommand, "new", "-no-color", workspace}, version, workspace)
-		outputs = append(outputs, output)
-		if err != nil {
-			return outputs, err
-		}
-	}
-	return outputs, nil
 }
 
 // MustConstraint will parse one or more constraints from the given

@@ -158,7 +158,22 @@ func TestConfig_Validate(t *testing.T) {
 		description string
 		input       raw.Config
 		expErr      string
-	}{}
+	}{
+		{
+			description: "version not nil",
+			input: raw.Config{
+				Version: nil,
+			},
+			expErr: "version: is required.",
+		},
+		{
+			description: "version not 1",
+			input: raw.Config{
+				Version: Int(1),
+			},
+			expErr: "version: must equal 2.",
+		},
+	}
 	validation.ErrorTag = "yaml"
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {

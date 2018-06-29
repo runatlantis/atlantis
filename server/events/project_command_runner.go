@@ -14,6 +14,7 @@
 package events
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -108,8 +109,7 @@ func (p *DefaultProjectCommandRunner) Plan(ctx models.ProjectCommandContext) Pro
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
 		}
-		// todo: include output from other steps.
-		return ProjectCommandResult{Error: err}
+		return ProjectCommandResult{Error: fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))}
 	}
 
 	return ProjectCommandResult{
@@ -136,12 +136,11 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.Pr
 			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath)
 		}
 
-		if err != nil {
-			// todo: include output from other steps.
-			return nil, err
-		}
 		if out != "" {
 			outputs = append(outputs, out)
+		}
+		if err != nil {
+			return outputs, err
 		}
 	}
 	return outputs, nil
@@ -200,8 +199,7 @@ func (p *DefaultProjectCommandRunner) Apply(ctx models.ProjectCommandContext) Pr
 		Success:   err == nil,
 	})
 	if err != nil {
-		// todo: include output from other steps.
-		return ProjectCommandResult{Error: err}
+		return ProjectCommandResult{Error: fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))}
 	}
 	return ProjectCommandResult{
 		ApplySuccess: strings.Join(outputs, "\n"),
