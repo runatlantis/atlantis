@@ -85,8 +85,8 @@ func (c CommentCommand) String() string {
 	return fmt.Sprintf("command=%q verbose=%t dir=%q workspace=%q project=%q flags=%q", c.Name.String(), c.Verbose, c.Dir, c.Workspace, c.ProjectName, strings.Join(c.Flags, ","))
 }
 
-// NewCommand constructs a Command, setting all missing fields to defaults.
-func NewCommand(dir string, flags []string, name CommandName, verbose bool, workspace string, project string) *CommentCommand {
+// NewCommentCommand constructs a CommentCommand, setting all missing fields to defaults.
+func NewCommentCommand(dir string, flags []string, name CommandName, verbose bool, workspace string, project string) *CommentCommand {
 	// If dir was an empty string, this will return '.'.
 	validDir := path.Clean(dir)
 	if validDir == "/" {

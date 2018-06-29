@@ -88,7 +88,6 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext
 				User:          ctx.User,
 				Log:           ctx.Log,
 				RepoRelPath:   mp.Path,
-				ProjectName:   "",
 				ProjectConfig: nil,
 				GlobalConfig:  nil,
 				CommentArgs:   nil,
@@ -108,10 +107,6 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext
 		// project config.
 		for i := 0; i < len(matchingProjects); i++ {
 			mp := matchingProjects[i]
-			var projectName string
-			if mp.Name != nil {
-				projectName = *mp.Name
-			}
 			projCtxs = append(projCtxs, models.ProjectCommandContext{
 				BaseRepo:      ctx.BaseRepo,
 				HeadRepo:      ctx.HeadRepo,
@@ -121,7 +116,6 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext
 				CommentArgs:   nil,
 				Workspace:     mp.Workspace,
 				RepoRelPath:   mp.Dir,
-				ProjectName:   projectName,
 				ProjectConfig: &mp,
 				GlobalConfig:  &config,
 			})
@@ -144,100 +138,88 @@ func (p *DefaultProjectCommandBuilder) BuildPlanCommand(ctx *CommandContext, cmd
 		return projCtx, err
 	}
 
-	var projCfg *valid.Project
-	var globalCfg *valid.Spec
-
-	// Parse config file if it exists.
-	config, err := p.ParserValidator.ReadConfig(repoDir)
-	if err != nil && !os.IsNotExist(err) {
-		return projCtx, err
-	}
-	hasAtlantisYAML := !os.IsNotExist(err)
-	if hasAtlantisYAML {
-		// If they've specified a project by name we look it up. Otherwise we
-		// use the dir and workspace.
-		if cmd.ProjectName != "" {
-			projCfg = config.FindProjectByName(cmd.ProjectName)
-			if projCfg == nil {
-				return projCtx, fmt.Errorf("no project with name %q configured", cmd.ProjectName)
-			}
-		} else {
-			projCfg = config.FindProject(cmd.Dir, cmd.Workspace)
-		}
-		globalCfg = &config
-	}
-
-	if cmd.ProjectName != "" && !hasAtlantisYAML {
-		return projCtx, fmt.Errorf("cannot specify a project name unless an %s file exists to configure projects", yaml.AtlantisYAMLFilename)
-	}
-
-	projCtx = models.ProjectCommandContext{
-		BaseRepo:      ctx.BaseRepo,
-		HeadRepo:      ctx.HeadRepo,
-		Pull:          ctx.Pull,
-		User:          ctx.User,
-		Log:           ctx.Log,
-		CommentArgs:   cmd.Flags,
-		Workspace:     cmd.Workspace,
-		RepoRelPath:   cmd.Dir,
-		ProjectName:   cmd.ProjectName,
-		ProjectConfig: projCfg,
-		GlobalConfig:  globalCfg,
-	}
-	return projCtx, nil
+	return p.buildProjectCommandCtx(ctx, cmd, repoDir)
 }
 
 func (p *DefaultProjectCommandBuilder) BuildApplyCommand(ctx *CommandContext, cmd *CommentCommand) (models.ProjectCommandContext, error) {
 	var projCtx models.ProjectCommandContext
+
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.BaseRepo.FullName, cmd.Workspace, ctx.Pull.Num)
+	if err != nil {
+		return projCtx, err
+	}
+	defer unlockFn()
 
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, cmd.Workspace)
 	if err != nil {
 		return projCtx, err
 	}
 
-	// todo: can deduplicate this between PlanViaComment
-	var projCfg *valid.Project
-	var globalCfg *valid.Spec
+	return p.buildProjectCommandCtx(ctx, cmd, repoDir)
+}
 
-	// Parse config file if it exists.
-	config, err := p.ParserValidator.ReadConfig(repoDir)
-	if err != nil && !os.IsNotExist(err) {
-		return projCtx, err
-	}
-	hasAtlantisYAML := !os.IsNotExist(err)
-	if hasAtlantisYAML {
-		// If they've specified a project by name we look it up. Otherwise we
-		// use the dir and workspace.
-		if cmd.ProjectName != "" {
-			projCfg = config.FindProjectByName(cmd.ProjectName)
-			if projCfg == nil {
-				return projCtx, fmt.Errorf("no project with name %q configured", cmd.ProjectName)
-			}
-		} else {
-			projCfg = config.FindProject(cmd.Dir, cmd.Workspace)
-		}
-		globalCfg = &config
+func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContext, cmd *CommentCommand, repoDir string) (models.ProjectCommandContext, error) {
+	projCfg, globalCfg, err := p.getCfg(cmd.ProjectName, cmd.Dir, cmd.Workspace, repoDir)
+	if err != nil {
+		return models.ProjectCommandContext{}, err
 	}
 
-	if cmd.ProjectName != "" && !hasAtlantisYAML {
-		return projCtx, fmt.Errorf("cannot specify a project name unless an %s file exists to configure projects", yaml.AtlantisYAMLFilename)
+	// Override any dir/workspace defined on the comment with what was
+	// defined in config. This shouldn't matter since we don't allow comments
+	// with both project name and dir/workspace.
+	dir := cmd.Dir
+	workspace := cmd.Workspace
+	if projCfg != nil {
+		dir = projCfg.Dir
+		workspace = projCfg.Workspace
 	}
 
-	projCtx = models.ProjectCommandContext{
+	return models.ProjectCommandContext{
 		BaseRepo:                ctx.BaseRepo,
 		HeadRepo:                ctx.HeadRepo,
 		Pull:                    ctx.Pull,
 		User:                    ctx.User,
 		Log:                     ctx.Log,
 		CommentArgs:             cmd.Flags,
-		Workspace:               cmd.Workspace,
-		RepoRelPath:             cmd.Dir,
-		ProjectName:             cmd.ProjectName,
+		Workspace:               workspace,
+		RepoRelPath:             dir,
 		ProjectConfig:           projCfg,
 		GlobalConfig:            globalCfg,
 		RequireApprovalOverride: p.RequireApproval,
+	}, nil
+}
+
+func (p *DefaultProjectCommandBuilder) getCfg(projectName string, dir string, workspace string, repoDir string) (*valid.Project, *valid.Spec, error) {
+	globalCfg, err := p.ParserValidator.ReadConfig(repoDir)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, nil, err
 	}
-	return projCtx, nil
+	hasAtlantisYAML := !os.IsNotExist(err)
+	if !hasAtlantisYAML && projectName != "" {
+		return nil, nil, fmt.Errorf("cannot specify a project name unless an %s file exists to configure projects", yaml.AtlantisYAMLFilename)
+	}
+	if !hasAtlantisYAML {
+		return nil, nil, nil
+	}
+
+	// If they've specified a project by name we look it up. Otherwise we
+	// use the dir and workspace.
+	if projectName != "" {
+		projCfg := globalCfg.FindProjectByName(projectName)
+		if projCfg == nil {
+			return nil, nil, fmt.Errorf("no project with name %q is defined in %s", projectName, yaml.AtlantisYAMLFilename)
+		}
+		return projCfg, &globalCfg, nil
+	}
+
+	projCfgs := globalCfg.FindProjectsByDirWorkspace(dir, workspace)
+	if len(projCfgs) == 0 {
+		return nil, nil, nil
+	}
+	if len(projCfgs) > 1 {
+		return nil, nil, fmt.Errorf("must specify project name: more than one project defined in %s matched dir: %q workspace: %q", yaml.AtlantisYAMLFilename, dir, workspace)
+	}
+	return &projCfgs[0], &globalCfg, nil
 }
 
 // matchingProjects returns the list of projects whose WhenModified fields match

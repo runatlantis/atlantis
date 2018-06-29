@@ -81,10 +81,13 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 
 	When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
+	projectName := "projectname"
 	output, err := o.Run(models.ProjectCommandContext{
 		Workspace:   "default",
 		RepoRelPath: ".",
-		ProjectName: "projectname",
+		ProjectConfig: &valid.Project{
+			Name: &projectName,
+		},
 		CommentArgs: []string{"comment", "args"},
 	}, []string{"extra", "args"}, tmpDir)
 	Ok(t, err)

@@ -215,7 +215,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	}
 
 	return CommentParseResult{
-		Command: NewCommand(dir, extraArgs, name, verbose, workspace, project),
+		Command: NewCommentCommand(dir, extraArgs, name, verbose, workspace, project),
 	}
 }
 

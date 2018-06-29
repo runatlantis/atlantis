@@ -31,13 +31,14 @@ func (s Spec) GetApplyStage(workflowName string) *Stage {
 	return nil
 }
 
-func (s Spec) FindProject(dir string, workspace string) *Project {
+func (s Spec) FindProjectsByDirWorkspace(dir string, workspace string) []Project {
+	var ps []Project
 	for _, p := range s.Projects {
 		if p.Dir == dir && p.Workspace == workspace {
-			return &p
+			ps = append(ps, p)
 		}
 	}
-	return nil
+	return ps
 }
 
 func (s Spec) FindProjectByName(name string) *Project {

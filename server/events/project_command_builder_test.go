@@ -1,29 +1,458 @@
 package events_test
 
-//. "github.com/runatlantis/atlantis/testing"
+import (
+	"io/ioutil"
+	"path/filepath"
+	"testing"
 
-//func TestBuildAutoplanCommands(t *testing.T) {
-//	tmpDir, cleanup := TempDir(t)
-//	defer cleanup()
-//
-//	workspace := mocks.NewMockWorkingDir()
-//	vcsClient := vcsmocks.NewMockClientProxy()
-//
-//	builder := &events.DefaultProjectCommandBuilder{
-//		WorkingDirLocker: events.NewDefaultAtlantisWorkingDirLocker(),
-//		Workspace:               workspace,
-//		ParserValidator:         &yaml.ParserValidator{},
-//		VCSClient:               vcsClient,
-//		ProjectFinder:           &events.DefaultProjectFinder{},
-//	}
-//
-//	// If autoplan is false, should return empty steps.
-//	ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
-//		BaseRepo: models.Repo{},
-//		HeadRepo: models.Repo{},
-//		Pull:     models.PullRequest{},
-//		User:     models.User{},
-//		Log:      nil,
-//	})
-//	Ok(t, err)
-//}
+	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/mocks"
+	"github.com/runatlantis/atlantis/server/events/models"
+	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
+	"github.com/runatlantis/atlantis/server/events/yaml"
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/logging"
+	. "github.com/runatlantis/atlantis/testing"
+)
+
+func TestDefaultProjectCommandBuilder_BuildAutoplanCommands(t *testing.T) {
+	// exp defines what we will assert on. We don't check all fields in the
+	// actual contexts.
+	type exp struct {
+		projectConfig *valid.Project
+		dir           string
+		workspace     string
+	}
+	cases := []struct {
+		Description  string
+		AtlantisYAML string
+		exp          []exp
+	}{
+		{
+			Description:  "no atlantis.yaml",
+			AtlantisYAML: "",
+			exp: []exp{
+				{
+					projectConfig: nil,
+					dir:           ".",
+					workspace:     "default",
+				},
+			},
+		},
+		{
+			Description: "autoplan disabled",
+			AtlantisYAML: `
+version: 2
+projects:
+- dir: .
+  autoplan:
+    enabled: false`,
+			exp: nil,
+		},
+		{
+			Description: "simple atlantis.yaml",
+			AtlantisYAML: `
+version: 2
+projects:
+- dir: .
+`,
+			exp: []exp{
+				{
+					projectConfig: &valid.Project{
+						Dir:       ".",
+						Workspace: "default",
+						Autoplan: valid.Autoplan{
+							Enabled:      true,
+							WhenModified: []string{"**/*.tf"},
+						},
+					},
+					dir:       ".",
+					workspace: "default",
+				},
+			},
+		},
+		{
+			Description: "some projects disabled",
+			AtlantisYAML: `
+version: 2
+projects:
+- dir: .
+  autoplan:
+    enabled: false
+- dir: .
+  workspace: myworkspace
+  autoplan:
+    when_modified: ["main.tf"]
+- dir: .
+  workspace: myworkspace2
+`,
+			exp: []exp{
+				{
+					projectConfig: &valid.Project{
+						Dir:       ".",
+						Workspace: "myworkspace",
+						Autoplan: valid.Autoplan{
+							Enabled:      true,
+							WhenModified: []string{"main.tf"},
+						},
+					},
+					dir:       ".",
+					workspace: "myworkspace",
+				},
+				{
+					projectConfig: &valid.Project{
+						Dir:       ".",
+						Workspace: "myworkspace2",
+						Autoplan: valid.Autoplan{
+							Enabled:      true,
+							WhenModified: []string{"**/*.tf"},
+						},
+					},
+					dir:       ".",
+					workspace: "myworkspace2",
+				},
+			},
+		},
+		{
+			Description: "some projects disabled",
+			AtlantisYAML: `
+version: 2
+projects:
+- dir: .
+  autoplan:
+    enabled: false
+- dir: .
+  workspace: myworkspace
+  autoplan:
+    when_modified: ["main.tf"]
+- dir: .
+  workspace: myworkspace2
+`,
+			exp: []exp{
+				{
+					projectConfig: &valid.Project{
+						Dir:       ".",
+						Workspace: "myworkspace",
+						Autoplan: valid.Autoplan{
+							Enabled:      true,
+							WhenModified: []string{"main.tf"},
+						},
+					},
+					dir:       ".",
+					workspace: "myworkspace",
+				},
+				{
+					projectConfig: &valid.Project{
+						Dir:       ".",
+						Workspace: "myworkspace2",
+						Autoplan: valid.Autoplan{
+							Enabled:      true,
+							WhenModified: []string{"**/*.tf"},
+						},
+					},
+					dir:       ".",
+					workspace: "myworkspace2",
+				},
+			},
+		},
+		{
+			Description: "no projects modified",
+			AtlantisYAML: `
+version: 2
+projects:
+- dir: mydir
+`,
+			exp: nil,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.Description, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			tmpDir, cleanup := TempDir(t)
+			defer cleanup()
+
+			baseRepo := models.Repo{}
+			headRepo := models.Repo{}
+			pull := models.PullRequest{}
+			logger := logging.NewNoopLogger()
+			workingDir := mocks.NewMockWorkingDir()
+			When(workingDir.Clone(logger, baseRepo, headRepo, pull, "default")).ThenReturn(tmpDir, nil)
+			if c.AtlantisYAML != "" {
+				err := ioutil.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
+				Ok(t, err)
+			}
+			err := ioutil.WriteFile(filepath.Join(tmpDir, "main.tf"), nil, 0600)
+			Ok(t, err)
+
+			vcsClient := vcsmocks.NewMockClientProxy()
+			When(vcsClient.GetModifiedFiles(baseRepo, pull)).ThenReturn([]string{"main.tf"}, nil)
+
+			builder := &events.DefaultProjectCommandBuilder{
+				WorkingDirLocker: events.NewDefaultAtlantisWorkingDirLocker(),
+				WorkingDir:       workingDir,
+				ParserValidator:  &yaml.ParserValidator{},
+				VCSClient:        vcsClient,
+				ProjectFinder:    &events.DefaultProjectFinder{},
+			}
+
+			ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
+				BaseRepo: baseRepo,
+				HeadRepo: headRepo,
+				Pull:     pull,
+				User:     models.User{},
+				Log:      logger,
+			})
+			Ok(t, err)
+			Equals(t, len(c.exp), len(ctxs))
+
+			for i, actCtx := range ctxs {
+				expCtx := c.exp[i]
+				Equals(t, baseRepo, actCtx.BaseRepo)
+				Equals(t, baseRepo, actCtx.HeadRepo)
+				Equals(t, pull, actCtx.Pull)
+				Equals(t, models.User{}, actCtx.User)
+				Equals(t, logger, actCtx.Log)
+				Equals(t, 0, len(actCtx.CommentArgs))
+				Equals(t, false, actCtx.RequireApprovalOverride)
+
+				Equals(t, expCtx.projectConfig, actCtx.ProjectConfig)
+				Equals(t, expCtx.dir, actCtx.RepoRelPath)
+				Equals(t, expCtx.workspace, actCtx.Workspace)
+			}
+		})
+	}
+}
+
+func TestDefaultProjectCommandBuilder_BuildPlanApplyCommand(t *testing.T) {
+	cases := []struct {
+		Description      string
+		AtlantisYAML     string
+		Cmd              events.CommentCommand
+		ExpProjectConfig *valid.Project
+		ExpCommentArgs   []string
+		ExpWorkspace     string
+		ExpDir           string
+		ExpErr           string
+	}{
+		{
+			Description: "no atlantis.yaml",
+			Cmd: events.CommentCommand{
+				Dir:       ".",
+				Flags:     []string{"commentarg"},
+				Name:      events.Plan,
+				Workspace: "myworkspace",
+			},
+			AtlantisYAML:     "",
+			ExpProjectConfig: nil,
+			ExpCommentArgs:   []string{"commentarg"},
+			ExpWorkspace:     "myworkspace",
+			ExpDir:           ".",
+		},
+		{
+			Description: "no atlantis.yaml with project flag",
+			Cmd: events.CommentCommand{
+				Dir:         ".",
+				Name:        events.Plan,
+				ProjectName: "myproject",
+			},
+			AtlantisYAML: "",
+			ExpErr:       "cannot specify a project name unless an atlantis.yaml file exists to configure projects",
+		},
+		{
+			Description: "simple atlantis.yaml",
+			Cmd: events.CommentCommand{
+				Dir:       ".",
+				Name:      events.Plan,
+				Workspace: "myworkspace",
+			},
+			AtlantisYAML: `
+version: 2
+projects:
+- dir: .
+  workspace: myworkspace
+  apply_requirements: [approved]`,
+			ExpProjectConfig: &valid.Project{
+				Dir:       ".",
+				Workspace: "myworkspace",
+				Autoplan: valid.Autoplan{
+					WhenModified: []string{"**/*.tf"},
+					Enabled:      true,
+				},
+				ApplyRequirements: []string{"approved"},
+			},
+			ExpWorkspace: "myworkspace",
+			ExpDir:       ".",
+		},
+		{
+			Description: "atlantis.yaml wrong dir",
+			Cmd: events.CommentCommand{
+				Dir:       ".",
+				Name:      events.Plan,
+				Workspace: "myworkspace",
+			},
+			AtlantisYAML: `
+version: 2
+projects:
+- dir: notroot
+  workspace: myworkspace
+  apply_requirements: [approved]`,
+			ExpProjectConfig: nil,
+			ExpWorkspace:     "myworkspace",
+			ExpDir:           ".",
+		},
+		{
+			Description: "atlantis.yaml wrong workspace",
+			Cmd: events.CommentCommand{
+				Dir:       ".",
+				Name:      events.Plan,
+				Workspace: "myworkspace",
+			},
+			AtlantisYAML: `
+version: 2
+projects:
+- dir: .
+  workspace: notmyworkspace
+  apply_requirements: [approved]`,
+			ExpProjectConfig: nil,
+			ExpWorkspace:     "myworkspace",
+			ExpDir:           ".",
+		},
+		{
+			Description: "atlantis.yaml with projectname",
+			Cmd: events.CommentCommand{
+				Name:        events.Plan,
+				ProjectName: "myproject",
+			},
+			AtlantisYAML: `
+version: 2
+projects:
+- name: myproject
+  dir: .
+  workspace: myworkspace
+  apply_requirements: [approved]`,
+			ExpProjectConfig: &valid.Project{
+				Dir:       ".",
+				Workspace: "myworkspace",
+				Autoplan: valid.Autoplan{
+					WhenModified: []string{"**/*.tf"},
+					Enabled:      true,
+				},
+				ApplyRequirements: []string{"approved"},
+				Name:              String("myproject"),
+			},
+			ExpWorkspace: "myworkspace",
+			ExpDir:       ".",
+		},
+		{
+			Description: "atlantis.yaml with multiple dir/workspaces matching",
+			Cmd: events.CommentCommand{
+				Name:      events.Plan,
+				Dir:       ".",
+				Workspace: "myworkspace",
+			},
+			AtlantisYAML: `
+version: 2
+projects:
+- name: myproject
+  dir: .
+  workspace: myworkspace
+  apply_requirements: [approved]
+- name: myproject2
+  dir: .
+  workspace: myworkspace
+`,
+			ExpErr: "must specify project name: more than one project defined in atlantis.yaml matched dir: \".\" workspace: \"myworkspace\"",
+		},
+		{
+			Description: "atlantis.yaml with project flag not matching",
+			Cmd: events.CommentCommand{
+				Name:        events.Plan,
+				Dir:         ".",
+				Workspace:   "default",
+				ProjectName: "notconfigured",
+			},
+			AtlantisYAML: `
+version: 2
+projects:
+- dir: .
+`,
+			ExpErr: "no project with name \"notconfigured\" is defined in atlantis.yaml",
+		},
+	}
+
+	for _, c := range cases {
+		// NOTE: we're testing both plan and apply here.
+		for _, cmdName := range []events.CommandName{events.Plan, events.Apply} {
+			t.Run(c.Description, func(t *testing.T) {
+				RegisterMockTestingT(t)
+				tmpDir, cleanup := TempDir(t)
+				defer cleanup()
+
+				baseRepo := models.Repo{}
+				headRepo := models.Repo{}
+				pull := models.PullRequest{}
+				logger := logging.NewNoopLogger()
+				workingDir := mocks.NewMockWorkingDir()
+				if cmdName == events.Plan {
+					When(workingDir.Clone(logger, baseRepo, headRepo, pull, c.Cmd.Workspace)).ThenReturn(tmpDir, nil)
+				} else {
+					When(workingDir.GetWorkingDir(baseRepo, pull, c.Cmd.Workspace)).ThenReturn(tmpDir, nil)
+				}
+				if c.AtlantisYAML != "" {
+					err := ioutil.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
+					Ok(t, err)
+				}
+				err := ioutil.WriteFile(filepath.Join(tmpDir, "main.tf"), nil, 0600)
+				Ok(t, err)
+
+				vcsClient := vcsmocks.NewMockClientProxy()
+				When(vcsClient.GetModifiedFiles(baseRepo, pull)).ThenReturn([]string{"main.tf"}, nil)
+
+				builder := &events.DefaultProjectCommandBuilder{
+					WorkingDirLocker: events.NewDefaultAtlantisWorkingDirLocker(),
+					WorkingDir:       workingDir,
+					ParserValidator:  &yaml.ParserValidator{},
+					VCSClient:        vcsClient,
+					ProjectFinder:    &events.DefaultProjectFinder{},
+				}
+
+				cmdCtx := &events.CommandContext{
+					BaseRepo: baseRepo,
+					HeadRepo: headRepo,
+					Pull:     pull,
+					User:     models.User{},
+					Log:      logger,
+				}
+				var actCtx models.ProjectCommandContext
+
+				if cmdName == events.Plan {
+					actCtx, err = builder.BuildPlanCommand(cmdCtx, &c.Cmd)
+				} else {
+					actCtx, err = builder.BuildApplyCommand(cmdCtx, &c.Cmd)
+				}
+
+				if c.ExpErr != "" {
+					ErrEquals(t, c.ExpErr, err)
+					return
+				}
+
+				Ok(t, err)
+				Equals(t, baseRepo, actCtx.BaseRepo)
+				Equals(t, baseRepo, actCtx.HeadRepo)
+				Equals(t, pull, actCtx.Pull)
+				Equals(t, models.User{}, actCtx.User)
+				Equals(t, logger, actCtx.Log)
+				Equals(t, false, actCtx.RequireApprovalOverride)
+
+				Equals(t, c.ExpProjectConfig, actCtx.ProjectConfig)
+				Equals(t, c.ExpDir, actCtx.RepoRelPath)
+				Equals(t, c.ExpWorkspace, actCtx.Workspace)
+				Equals(t, c.ExpCommentArgs, actCtx.CommentArgs)
+			})
+		}
+	}
+}
+
+func String(v string) *string { return &v }

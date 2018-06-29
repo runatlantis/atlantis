@@ -14,6 +14,7 @@ import (
 	matchers2 "github.com/runatlantis/atlantis/server/events/run/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -282,13 +283,16 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 	expPlanArgs := []string{"plan", "-refresh", "-no-color", "-out", "/path/projectname-default.tfplan", "-var", "atlantis_user=username", "extra", "args", "comment", "args"}
 	When(terraform.RunCommandWithVersion(logger, "/path", expPlanArgs, tfVersion, "default")).ThenReturn("output", nil)
 
+	projectName := "projectname"
 	output, err := s.Run(models.ProjectCommandContext{
 		Log:         logger,
 		Workspace:   "default",
 		RepoRelPath: ".",
-		ProjectName: "projectname",
 		User:        models.User{Username: "username"},
 		CommentArgs: []string{"comment", "args"},
+		ProjectConfig: &valid.Project{
+			Name: &projectName,
+		},
 	}, []string{"extra", "args"}, "/path")
 	Ok(t, err)
 	Equals(t, "output", output)

@@ -344,19 +344,19 @@ func TestNewCommand_CleansDir(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Dir, func(t *testing.T) {
-			cmd := events.NewCommand(c.Dir, nil, events.Plan, false, "workspace", "")
+			cmd := events.NewCommentCommand(c.Dir, nil, events.Plan, false, "workspace", "")
 			Equals(t, c.ExpDir, cmd.Dir)
 		})
 	}
 }
 
 func TestNewCommand_EmptyWorkspace(t *testing.T) {
-	cmd := events.NewCommand("dir", nil, events.Plan, false, "", "")
+	cmd := events.NewCommentCommand("dir", nil, events.Plan, false, "", "")
 	Equals(t, "default", cmd.Workspace)
 }
 
 func TestNewCommand_AllFieldsSet(t *testing.T) {
-	cmd := events.NewCommand("dir", []string{"a", "b"}, events.Plan, true, "workspace", "project")
+	cmd := events.NewCommentCommand("dir", []string{"a", "b"}, events.Plan, true, "workspace", "project")
 	Equals(t, events.CommentCommand{
 		Workspace:   "workspace",
 		Dir:         "dir",
