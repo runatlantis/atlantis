@@ -16,13 +16,17 @@ type Config struct {
 
 func (c Config) Validate() error {
 	equals2 := func(value interface{}) error {
-		if *value.(*int) != 2 {
+		asIntPtr := value.(*int)
+		if asIntPtr == nil {
+			return errors.New("is required. If you've just upgraded Atlantis you need to rewrite your atlantis.yaml for version 2. See www.runatlantis.io/docs/upgrading-atlantis-yaml-to-version-2.html")
+		}
+		if *asIntPtr != 2 {
 			return errors.New("must equal 2")
 		}
 		return nil
 	}
 	return validation.ValidateStruct(&c,
-		validation.Field(&c.Version, validation.NotNil, validation.By(equals2)),
+		validation.Field(&c.Version, validation.By(equals2)),
 		validation.Field(&c.Projects),
 		validation.Field(&c.Workflows),
 	)

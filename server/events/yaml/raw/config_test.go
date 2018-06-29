@@ -164,7 +164,7 @@ func TestConfig_Validate(t *testing.T) {
 			input: raw.Config{
 				Version: nil,
 			},
-			expErr: "version: is required.",
+			expErr: "version: is required. If you've just upgraded Atlantis you need to rewrite your atlantis.yaml for version 2. See www.runatlantis.io/docs/upgrading-atlantis-yaml-to-version-2.html.",
 		},
 		{
 			description: "version not 1",

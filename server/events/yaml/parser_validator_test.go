@@ -87,7 +87,7 @@ func TestReadConfig(t *testing.T) {
 projects:
 - dir: "."
 `,
-			expErr: "version: is required.",
+			expErr: "version: is required. If you've just upgraded Atlantis you need to rewrite your atlantis.yaml for version 2. See www.runatlantis.io/docs/upgrading-atlantis-yaml-to-version-2.html.",
 		},
 		{
 			description: "unsupported version",

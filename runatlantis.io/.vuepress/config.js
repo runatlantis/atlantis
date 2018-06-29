@@ -40,6 +40,7 @@ module.exports = {
                 'locking',
                 'autoplanning',
                 ['atlantis-yaml-reference', 'atlantis.yaml Reference'],
+                'upgrading-atlantis-yaml-to-version-2',
                 'security',
                 'faq',
             ],

@@ -1,8 +1,12 @@
 # atlantis.yaml Reference
 [[toc]]
 
-::: tip
+::: tip Do I need an atlantis.yaml file?
 `atlantis.yaml` files are only required if you wish to customize some aspect of Atlantis.
+:::
+
+::: tip Where are the example use cases?
+See [www.runatlantis.io/guide/atlantis-yaml-use-cases.html](../guide/atlantis-yaml-use-cases.html)
 :::
 
 ## Example Using All Keys
