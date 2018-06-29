@@ -68,7 +68,7 @@ type DefaultCommandRunner struct {
 	// how to enable this functionality.
 	AllowForkPRsFlag      string
 	ProjectCommandBuilder ProjectCommandBuilder
-	ProjectCommandRunner  *ProjectCommandRunner
+	ProjectCommandRunner  ProjectCommandRunner
 }
 
 func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) {
@@ -80,23 +80,30 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		HeadRepo: headRepo,
 		BaseRepo: baseRepo,
 	}
-	runFn := func() ([]ProjectResult, error) {
-		projectCmds, err := c.ProjectCommandBuilder.BuildAutoplanCommands(ctx)
-		if err != nil {
-			return nil, err
-		}
-		var results []ProjectResult
-		for _, cmd := range projectCmds {
-			res := c.ProjectCommandRunner.Plan(cmd)
-			results = append(results, ProjectResult{
-				ProjectCommandResult: res,
-				RepoRelDir:           cmd.RepoRelDir,
-				Workspace:            cmd.Workspace,
-			})
-		}
-		return results, nil
+	defer c.logPanics(ctx)
+	if !c.validateCtxAndComment(ctx) {
+		return
 	}
-	c.run(ctx, AutoplanCommand{}, runFn)
+	if err := c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, vcs.Pending, Plan); err != nil {
+		ctx.Log.Warn("unable to update commit status: %s", err)
+	}
+
+	projectCmds, err := c.ProjectCommandBuilder.BuildAutoplanCommands(ctx)
+	if err != nil {
+		c.updatePull(ctx, AutoplanCommand{}, CommandResult{Error: err})
+		return
+	}
+
+	var results []ProjectResult
+	for _, cmd := range projectCmds {
+		res := c.ProjectCommandRunner.Plan(cmd)
+		results = append(results, ProjectResult{
+			ProjectCommandResult: res,
+			RepoRelDir:           cmd.RepoRelDir,
+			Workspace:            cmd.Workspace,
+		})
+	}
+	c.updatePull(ctx, AutoplanCommand{}, CommandResult{ProjectResults: results})
 }
 
 // RunCommentCommand executes the command.
@@ -132,33 +139,46 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		HeadRepo: headRepo,
 		BaseRepo: baseRepo,
 	}
+	defer c.logPanics(ctx)
 
-	runFn := func() ([]ProjectResult, error) {
-		var result ProjectCommandResult
-		switch cmd.Name {
-		case Plan:
-			projectCmd, err := c.ProjectCommandBuilder.BuildPlanCommand(ctx, cmd)
-			if err != nil {
-				return nil, err
-			}
-			result = c.ProjectCommandRunner.Plan(projectCmd)
-		case Apply:
-			projectCmd, err := c.ProjectCommandBuilder.BuildApplyCommand(ctx, cmd)
-			if err != nil {
-				return nil, err
-			}
-			result = c.ProjectCommandRunner.Apply(projectCmd)
-		default:
-			ctx.Log.Err("failed to determine desired command, neither plan nor apply")
-		}
-		return []ProjectResult{{
-			RepoRelDir:           cmd.RepoRelDir,
-			Workspace:            cmd.Workspace,
-			ProjectCommandResult: result,
-		}}, nil
+	if !c.validateCtxAndComment(ctx) {
+		return
 	}
 
-	c.run(ctx, cmd, runFn)
+	if err := c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, vcs.Pending, cmd.CommandName()); err != nil {
+		ctx.Log.Warn("unable to update commit status: %s", err)
+	}
+
+	var result ProjectCommandResult
+	switch cmd.Name {
+	case Plan:
+		projectCmd, err := c.ProjectCommandBuilder.BuildPlanCommand(ctx, cmd)
+		if err != nil {
+			c.updatePull(ctx, cmd, CommandResult{Error: err})
+			return
+		}
+		result = c.ProjectCommandRunner.Plan(projectCmd)
+	case Apply:
+		projectCmd, err := c.ProjectCommandBuilder.BuildApplyCommand(ctx, cmd)
+		if err != nil {
+			c.updatePull(ctx, cmd, CommandResult{Error: err})
+			return
+		}
+		result = c.ProjectCommandRunner.Apply(projectCmd)
+	default:
+		ctx.Log.Err("failed to determine desired command, neither plan nor apply")
+		return
+	}
+
+	c.updatePull(
+		ctx,
+		cmd,
+		CommandResult{
+			ProjectResults: []ProjectResult{{
+				RepoRelDir:           cmd.RepoRelDir,
+				Workspace:            cmd.Workspace,
+				ProjectCommandResult: result,
+			}}})
 }
 
 func (c *DefaultCommandRunner) getGithubData(baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {
@@ -206,26 +226,6 @@ func (c *DefaultCommandRunner) validateCtxAndComment(ctx *CommandContext) bool {
 		return false
 	}
 	return true
-}
-
-func (c *DefaultCommandRunner) run(ctx *CommandContext, command CommandInterface, commandRunner func() ([]ProjectResult, error)) {
-	defer c.logPanics(ctx)
-
-	if !c.validateCtxAndComment(ctx) {
-		return
-	}
-
-	ctx.Log.Debug("updating commit status to pending")
-	if err := c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, vcs.Pending, command.CommandName()); err != nil {
-		ctx.Log.Warn("unable to update commit status: %s", err)
-	}
-
-	results, err := commandRunner()
-	if err != nil {
-		c.updatePull(ctx, command, CommandResult{Error: err})
-		return
-	}
-	c.updatePull(ctx, command, CommandResult{ProjectResults: results})
 }
 
 func (c *DefaultCommandRunner) updatePull(ctx *CommandContext, command CommandInterface, res CommandResult) {

@@ -239,7 +239,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			WorkingDirLocker: workingDirLocker,
 			RequireApproval:  userConfig.RequireApproval,
 		},
-		ProjectCommandRunner: &events.ProjectCommandRunner{
+		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
 			Locker:           projectLocker,
 			LockURLGenerator: router,
 			InitStepRunner: runtime.InitStepRunner{

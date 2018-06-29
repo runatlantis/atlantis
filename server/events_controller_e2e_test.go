@@ -238,7 +238,7 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClientProxy,
 	defaultTFVersion := terraformClient.Version()
 	locker := events.NewDefaultAtlantisWorkingDirLocker()
 	commandRunner := &events.DefaultCommandRunner{
-		ProjectCommandRunner: &events.ProjectCommandRunner{
+		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
 			Locker:           projectLocker,
 			LockURLGenerator: &mockLockURLGenerator{},
 			InitStepRunner: runtime.InitStepRunner{

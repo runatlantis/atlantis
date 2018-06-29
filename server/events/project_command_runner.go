@@ -22,6 +22,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
+	"github.com/runatlantis/atlantis/server/events/yaml/raw"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -42,7 +43,14 @@ type PlanSuccess struct {
 	LockURL         string
 }
 
-type ProjectCommandRunner struct {
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_runner.go ProjectCommandRunner
+
+type ProjectCommandRunner interface {
+	Plan(ctx models.ProjectCommandContext) ProjectCommandResult
+	Apply(ctx models.ProjectCommandContext) ProjectCommandResult
+}
+
+type DefaultProjectCommandRunner struct {
 	Locker              ProjectLocker
 	LockURLGenerator    LockURLGenerator
 	InitStepRunner      runtime.InitStepRunner
@@ -55,7 +63,7 @@ type ProjectCommandRunner struct {
 	WorkingDirLocker    WorkingDirLocker
 }
 
-func (p *ProjectCommandRunner) Plan(ctx models.ProjectCommandContext) ProjectCommandResult {
+func (p *DefaultProjectCommandRunner) Plan(ctx models.ProjectCommandContext) ProjectCommandResult {
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.BaseRepo.FullName, ctx.RepoRelDir))
 	if err != nil {
@@ -112,7 +120,7 @@ func (p *ProjectCommandRunner) Plan(ctx models.ProjectCommandContext) ProjectCom
 	}
 }
 
-func (p *ProjectCommandRunner) runSteps(steps []valid.Step, ctx models.ProjectCommandContext, absPath string) ([]string, error) {
+func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.ProjectCommandContext, absPath string) ([]string, error) {
 	var outputs []string
 	for _, step := range steps {
 		var out string
@@ -139,7 +147,7 @@ func (p *ProjectCommandRunner) runSteps(steps []valid.Step, ctx models.ProjectCo
 	return outputs, nil
 }
 
-func (p *ProjectCommandRunner) Apply(ctx models.ProjectCommandContext) ProjectCommandResult {
+func (p *DefaultProjectCommandRunner) Apply(ctx models.ProjectCommandContext) ProjectCommandResult {
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -154,11 +162,11 @@ func (p *ProjectCommandRunner) Apply(ctx models.ProjectCommandContext) ProjectCo
 		applyRequirements = ctx.ProjectConfig.ApplyRequirements
 	}
 	if ctx.RequireApprovalOverride {
-		applyRequirements = []string{"approved"}
+		applyRequirements = []string{raw.ApprovedApplyRequirement}
 	}
 	for _, req := range applyRequirements {
 		switch req {
-		case "approved":
+		case raw.ApprovedApplyRequirement:
 			approved, err := p.PullApprovedChecker.PullIsApproved(ctx.BaseRepo, ctx.Pull) // nolint: vetshadow
 			if err != nil {
 				return ProjectCommandResult{Error: errors.Wrap(err, "checking if pull request was approved")}
@@ -200,7 +208,7 @@ func (p *ProjectCommandRunner) Apply(ctx models.ProjectCommandContext) ProjectCo
 	}
 }
 
-func (p ProjectCommandRunner) defaultPlanStage() valid.Stage {
+func (p DefaultProjectCommandRunner) defaultPlanStage() valid.Stage {
 	return valid.Stage{
 		Steps: []valid.Step{
 			{
@@ -213,7 +221,7 @@ func (p ProjectCommandRunner) defaultPlanStage() valid.Stage {
 	}
 }
 
-func (p ProjectCommandRunner) defaultApplyStage() valid.Stage {
+func (p DefaultProjectCommandRunner) defaultApplyStage() valid.Stage {
 	return valid.Stage{
 		Steps: []valid.Step{
 			{

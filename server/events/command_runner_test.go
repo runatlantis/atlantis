@@ -39,21 +39,21 @@ var vcsClient *vcsmocks.MockClientProxy
 var ghStatus *mocks.MockCommitStatusUpdater
 var githubGetter *mocks.MockGithubPullGetter
 var gitlabGetter *mocks.MockGitlabMergeRequestGetter
-var workspaceLocker *mocks.MockWorkingDirLocker
 var ch events.DefaultCommandRunner
 var logBytes *bytes.Buffer
+var projectCommandRunner *mocks.MockProjectCommandRunner
 
 func setup(t *testing.T) {
 	RegisterMockTestingT(t)
 	projectCommandBuilder = mocks.NewMockProjectCommandBuilder()
 	eventParsing = mocks.NewMockEventParsing()
 	ghStatus = mocks.NewMockCommitStatusUpdater()
-	workspaceLocker = mocks.NewMockWorkingDirLocker()
 	vcsClient = vcsmocks.NewMockClientProxy()
 	githubGetter = mocks.NewMockGithubPullGetter()
 	gitlabGetter = mocks.NewMockGitlabMergeRequestGetter()
 	logger := logmocks.NewMockSimpleLogging()
 	logBytes = new(bytes.Buffer)
+	projectCommandRunner := mocks.NewMockProjectCommandRunner()
 	When(logger.Underlying()).ThenReturn(log.New(logBytes, "", 0))
 	ch = events.DefaultCommandRunner{
 		VCSClient:                vcsClient,
@@ -66,6 +66,7 @@ func setup(t *testing.T) {
 		AllowForkPRs:          false,
 		AllowForkPRsFlag:      "allow-fork-prs-flag",
 		ProjectCommandBuilder: projectCommandBuilder,
+		ProjectCommandRunner:  projectCommandRunner,
 	}
 }
 
@@ -156,65 +157,56 @@ func TestRunCommentCommand_ClosedPull(t *testing.T) {
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "Atlantis commands can't be run on closed pull requests")
 }
 
-//func TestRunCommentCommand_FullRun(t *testing.T) {
-//	t.Log("when running a plan, apply should comment")
-//	pull := &github.PullRequest{
-//		State: github.String("closed"),
-//	}
-//	cmdResult := events.CommandResult{}
-//	for _, c := range []events.CommandName{events.Plan, events.Apply} {
-//		setup(t)
-//		cmd := events.CommentCommand{
-//			Name:      c,
-//			WorkingDir: "workspace",
-//		}
-//		When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
-//		When(eventParsing.ParseGithubPull(pull)).ThenReturn(fixtures.Pull, fixtures.GithubRepo, nil)
-//		When(workspaceLocker.TryLock(fixtures.GithubRepo.FullName, cmd.WorkingDir, fixtures.Pull.Num)).ThenReturn(true)
-//		switch c {
-//		case events.Plan:
-//			When(projectCommandBuilder.PlanViaComment(matchers.AnyPtrToEventsCommandContext())).ThenReturn(cmdResult)
-//		case events.Apply:
-//			When(projectCommandBuilder.ApplyViaComment(matchers.AnyPtrToEventsCommandContext())).ThenReturn(cmdResult)
-//		}
-//
-//		ch.RunCommentCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.User, fixtures.Pull.Num, &cmd)
-//
-//		ghStatus.VerifyWasCalledOnce().Update(fixtures.GithubRepo, fixtures.Pull, vcs.Pending, &cmd)
-//		_, response := ghStatus.VerifyWasCalledOnce().UpdateProjectResult(matchers.AnyPtrToEventsCommandContext(), matchers.AnyEventsCommandResult()).GetCapturedArguments()
-//		Equals(t, cmdResult, response)
-//		vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString())
-//		workspaceLocker.VerifyWasCalledOnce().Unlock(fixtures.GithubRepo.FullName, cmd.WorkingDir, fixtures.Pull.Num)
-//	}
-//}
+func TestRunCommentCommand_FullRun(t *testing.T) {
+	pull := &github.PullRequest{
+		State: github.String("closed"),
+	}
+	expCmdResult := events.CommandResult{
+		ProjectResults: []events.ProjectResult{
+			{
+				RepoRelDir: ".",
+				Workspace:  "default",
+			},
+		},
+	}
+	for _, c := range []events.CommandName{events.Plan, events.Apply} {
+		setup(t)
+		cmd := events.NewCommentCommand(".", nil, c, false, "default", "")
+		When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
+		When(eventParsing.ParseGithubPull(pull)).ThenReturn(fixtures.Pull, fixtures.GithubRepo, fixtures.GithubRepo, nil)
 
-//func TestRunCommentCommand_ForkPREnabled(t *testing.T) {
-//	t.Log("when running a plan on a fork PR, it should succeed")
-//	setup(t)
-//
-//	// Enable forked PRs.
-//	ch.AllowForkPRs = true
-//	defer func() { ch.AllowForkPRs = false }() // Reset after test.
-//
-//	var pull github.PullRequest
-//	cmdResponse := events.CommandResult{}
-//	cmd := events.CommentCommand{
-//		Name:      events.Plan,
-//		WorkingDir: "workspace",
-//	}
-//	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
-//	headRepo := fixtures.GithubRepo
-//	headRepo.FullName = "forkrepo/atlantis"
-//	headRepo.Owner = "forkrepo"
-//	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(fixtures.Pull, headRepo, nil)
-//	When(workspaceLocker.TryLock(fixtures.GithubRepo.FullName, cmd.WorkingDir, fixtures.Pull.Num)).ThenReturn(true)
-//	When(projectCommandBuilder.PlanViaComment(matchers.AnyPtrToEventsCommandContext())).ThenReturn(cmdResponse)
-//
-//	ch.RunCommentCommand(fixtures.GithubRepo, models.Repo{} /* this isn't used */, fixtures.User, fixtures.Pull.Num, &cmd)
-//
-//	ghStatus.VerifyWasCalledOnce().Update(fixtures.GithubRepo, fixtures.Pull, vcs.Pending, &cmd)
-//	_, response := ghStatus.VerifyWasCalledOnce().UpdateProjectResult(matchers.AnyPtrToEventsCommandContext(), matchers.AnyEventsCommandResult()).GetCapturedArguments()
-//	Equals(t, cmdResponse, response)
-//	vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString())
-//	workspaceLocker.VerifyWasCalledOnce().Unlock(fixtures.GithubRepo.FullName, cmd.WorkingDir, fixtures.Pull.Num)
-//}
+		cmdCtx := models.ProjectCommandContext{RepoRelDir: "."}
+		switch c {
+		case events.Plan:
+			When(projectCommandBuilder.BuildPlanCommand(matchers.AnyPtrToEventsCommandContext(), matchers.AnyPtrToEventsCommentCommand())).ThenReturn(cmdCtx, nil)
+		case events.Apply:
+			When(projectCommandBuilder.BuildApplyCommand(matchers.AnyPtrToEventsCommandContext(), matchers.AnyPtrToEventsCommentCommand())).ThenReturn(cmdCtx, nil)
+		}
+
+		ch.RunCommentCommand(fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, cmd)
+
+		ghStatus.VerifyWasCalledOnce().Update(fixtures.GithubRepo, fixtures.Pull, vcs.Pending, c)
+		_, _, response := ghStatus.VerifyWasCalledOnce().UpdateProjectResult(matchers.AnyPtrToEventsCommandContext(), matchers.AnyEventsCommandName(), matchers.AnyEventsCommandResult()).GetCapturedArguments()
+		Equals(t, expCmdResult, response)
+		vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString())
+	}
+}
+
+func TestRunAutoplanCommands(t *testing.T) {
+	expCmdResult := events.CommandResult{
+		ProjectResults: []events.ProjectResult{
+			{
+				RepoRelDir: ".",
+				Workspace:  "default",
+			},
+		},
+	}
+	setup(t)
+	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())).ThenReturn([]models.ProjectCommandContext{{RepoRelDir: ".", Workspace: "default"}}, nil)
+	ch.RunAutoplanCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
+
+	ghStatus.VerifyWasCalledOnce().Update(fixtures.GithubRepo, fixtures.Pull, vcs.Pending, events.Plan)
+	_, _, response := ghStatus.VerifyWasCalledOnce().UpdateProjectResult(matchers.AnyPtrToEventsCommandContext(), matchers.AnyEventsCommandName(), matchers.AnyEventsCommandResult()).GetCapturedArguments()
+	Equals(t, expCmdResult, response)
+	vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString())
+}
