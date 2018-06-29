@@ -52,9 +52,9 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 				ThenReturn("output", nil)
 
 			output, err := iso.Run(models.ProjectCommandContext{
-				Log:         logger,
-				Workspace:   "workspace",
-				RepoRelPath: ".",
+				Log:        logger,
+				Workspace:  "workspace",
+				RepoRelDir: ".",
 			}, []string{"extra", "args"}, "/path")
 			Ok(t, err)
 			// Shouldn't return output since we don't print init output to PR.

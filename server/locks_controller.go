@@ -85,7 +85,7 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Once the lock has been deleted, comment back on the pull request.
-	comment := fmt.Sprintf("**Warning**: The plan for path: `%s` workspace: `%s` was **discarded** via the Atlantis UI.\n\n"+
+	comment := fmt.Sprintf("**Warning**: The plan for dir: `%s` workspace: `%s` was **discarded** via the Atlantis UI.\n\n"+
 		"To `apply` you must run `plan` again.", lock.Project.Path, lock.Workspace)
 	// NOTE: Because BaseRepo was added to the PullRequest model later, previous
 	// installations of Atlantis will have locks in their DB that do not have

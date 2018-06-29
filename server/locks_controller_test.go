@@ -234,6 +234,6 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	lc.DeleteLock(w, req)
 	responseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
 	cp.VerifyWasCalled(Once()).CreateComment(pull.BaseRepo, pull.Num,
-		"**Warning**: The plan for path: `path` workspace: `workspace` was **discarded** via the Atlantis UI.\n\n"+
+		"**Warning**: The plan for dir: `path` workspace: `workspace` was **discarded** via the Atlantis UI.\n\n"+
 			"To `apply` you must run `plan` again.")
 }

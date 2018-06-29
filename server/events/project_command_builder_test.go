@@ -218,7 +218,7 @@ projects:
 				Equals(t, false, actCtx.RequireApprovalOverride)
 
 				Equals(t, expCtx.projectConfig, actCtx.ProjectConfig)
-				Equals(t, expCtx.dir, actCtx.RepoRelPath)
+				Equals(t, expCtx.dir, actCtx.RepoRelDir)
 				Equals(t, expCtx.workspace, actCtx.Workspace)
 			}
 		})
@@ -239,10 +239,10 @@ func TestDefaultProjectCommandBuilder_BuildPlanApplyCommand(t *testing.T) {
 		{
 			Description: "no atlantis.yaml",
 			Cmd: events.CommentCommand{
-				Dir:       ".",
-				Flags:     []string{"commentarg"},
-				Name:      events.Plan,
-				Workspace: "myworkspace",
+				RepoRelDir: ".",
+				Flags:      []string{"commentarg"},
+				Name:       events.Plan,
+				Workspace:  "myworkspace",
 			},
 			AtlantisYAML:     "",
 			ExpProjectConfig: nil,
@@ -253,7 +253,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanApplyCommand(t *testing.T) {
 		{
 			Description: "no atlantis.yaml with project flag",
 			Cmd: events.CommentCommand{
-				Dir:         ".",
+				RepoRelDir:  ".",
 				Name:        events.Plan,
 				ProjectName: "myproject",
 			},
@@ -263,9 +263,9 @@ func TestDefaultProjectCommandBuilder_BuildPlanApplyCommand(t *testing.T) {
 		{
 			Description: "simple atlantis.yaml",
 			Cmd: events.CommentCommand{
-				Dir:       ".",
-				Name:      events.Plan,
-				Workspace: "myworkspace",
+				RepoRelDir: ".",
+				Name:       events.Plan,
+				Workspace:  "myworkspace",
 			},
 			AtlantisYAML: `
 version: 2
@@ -288,9 +288,9 @@ projects:
 		{
 			Description: "atlantis.yaml wrong dir",
 			Cmd: events.CommentCommand{
-				Dir:       ".",
-				Name:      events.Plan,
-				Workspace: "myworkspace",
+				RepoRelDir: ".",
+				Name:       events.Plan,
+				Workspace:  "myworkspace",
 			},
 			AtlantisYAML: `
 version: 2
@@ -305,9 +305,9 @@ projects:
 		{
 			Description: "atlantis.yaml wrong workspace",
 			Cmd: events.CommentCommand{
-				Dir:       ".",
-				Name:      events.Plan,
-				Workspace: "myworkspace",
+				RepoRelDir: ".",
+				Name:       events.Plan,
+				Workspace:  "myworkspace",
 			},
 			AtlantisYAML: `
 version: 2
@@ -348,9 +348,9 @@ projects:
 		{
 			Description: "atlantis.yaml with multiple dir/workspaces matching",
 			Cmd: events.CommentCommand{
-				Name:      events.Plan,
-				Dir:       ".",
-				Workspace: "myworkspace",
+				Name:       events.Plan,
+				RepoRelDir: ".",
+				Workspace:  "myworkspace",
 			},
 			AtlantisYAML: `
 version: 2
@@ -369,7 +369,7 @@ projects:
 			Description: "atlantis.yaml with project flag not matching",
 			Cmd: events.CommentCommand{
 				Name:        events.Plan,
-				Dir:         ".",
+				RepoRelDir:  ".",
 				Workspace:   "default",
 				ProjectName: "notconfigured",
 			},
@@ -447,7 +447,7 @@ projects:
 				Equals(t, false, actCtx.RequireApprovalOverride)
 
 				Equals(t, c.ExpProjectConfig, actCtx.ProjectConfig)
-				Equals(t, c.ExpDir, actCtx.RepoRelPath)
+				Equals(t, c.ExpDir, actCtx.RepoRelDir)
 				Equals(t, c.ExpWorkspace, actCtx.Workspace)
 				Equals(t, c.ExpCommentArgs, actCtx.CommentArgs)
 			})

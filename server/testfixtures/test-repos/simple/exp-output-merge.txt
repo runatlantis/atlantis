@@ -1,3 +1,3 @@
 Locks and plans deleted for the projects and workspaces modified in this pull request:
 
-- path: `runatlantis/atlantis-tests/.` workspace: `default`
+- dir: `.` workspace: `default`

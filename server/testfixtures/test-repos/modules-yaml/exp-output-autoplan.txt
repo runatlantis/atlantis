@@ -1,8 +1,8 @@
 Ran Plan for 2 projects:
-1. workspace: `default` path: `staging`
-1. workspace: `default` path: `production`
+1. workspace: `default` dir: `staging`
+1. workspace: `default` dir: `production`
 
-### 1. workspace: `default` path: `staging`
+### 1. workspace: `default` dir: `staging`
 ```diff
 Refreshing Terraform state in-memory prior to plan...
 The refreshed state will be used to calculate this plan, but will not be
@@ -25,7 +25,7 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 
 * To **discard** this plan click [here](lock-url).
 ---
-### 2. workspace: `default` path: `production`
+### 2. workspace: `default` dir: `production`
 ```diff
 Refreshing Terraform state in-memory prior to plan...
 The refreshed state will be used to calculate this plan, but will not be

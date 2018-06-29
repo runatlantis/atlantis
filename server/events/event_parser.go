@@ -55,9 +55,9 @@ func (c AutoplanCommand) IsAutoplan() bool {
 }
 
 type CommentCommand struct {
-	// Dir is the path relative to the repo root to run the command in.
+	// RepoRelDir is the path relative to the repo root to run the command in.
 	// Will never be an empty string and will never end in "/".
-	Dir string
+	RepoRelDir string
 	// CommentArgs are the extra arguments appended to comment,
 	// ex. atlantis plan -- -target=resource
 	Flags     []string
@@ -82,13 +82,13 @@ func (c CommentCommand) IsAutoplan() bool {
 }
 
 func (c CommentCommand) String() string {
-	return fmt.Sprintf("command=%q verbose=%t dir=%q workspace=%q project=%q flags=%q", c.Name.String(), c.Verbose, c.Dir, c.Workspace, c.ProjectName, strings.Join(c.Flags, ","))
+	return fmt.Sprintf("command=%q verbose=%t dir=%q workspace=%q project=%q flags=%q", c.Name.String(), c.Verbose, c.RepoRelDir, c.Workspace, c.ProjectName, strings.Join(c.Flags, ","))
 }
 
 // NewCommentCommand constructs a CommentCommand, setting all missing fields to defaults.
-func NewCommentCommand(dir string, flags []string, name CommandName, verbose bool, workspace string, project string) *CommentCommand {
-	// If dir was an empty string, this will return '.'.
-	validDir := path.Clean(dir)
+func NewCommentCommand(repoRelDir string, flags []string, name CommandName, verbose bool, workspace string, project string) *CommentCommand {
+	// If repoRelDir was an empty string, this will return '.'.
+	validDir := path.Clean(repoRelDir)
 	if validDir == "/" {
 		validDir = "."
 	}
@@ -96,7 +96,7 @@ func NewCommentCommand(dir string, flags []string, name CommandName, verbose boo
 		workspace = DefaultWorkspace
 	}
 	return &CommentCommand{
-		Dir:         validDir,
+		RepoRelDir:  validDir,
 		Flags:       flags,
 		Name:        name,
 		Verbose:     verbose,

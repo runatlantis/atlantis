@@ -23,7 +23,7 @@ func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []stri
 	planFile := filepath.Join(path, planFileName)
 	stat, err := os.Stat(planFile)
 	if err != nil || stat.IsDir() {
-		return "", fmt.Errorf("no plan found at path %q and workspace %q–did you run plan?", ctx.RepoRelPath, ctx.Workspace)
+		return "", fmt.Errorf("no plan found at path %q and workspace %q–did you run plan?", ctx.RepoRelDir, ctx.Workspace)
 	}
 
 	tfApplyCmd := append(append(append([]string{"apply", "-no-color"}, extraArgs...), ctx.CommentArgs...), planFile)

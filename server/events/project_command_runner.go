@@ -57,7 +57,7 @@ type ProjectCommandRunner struct {
 
 func (p *ProjectCommandRunner) Plan(ctx models.ProjectCommandContext) ProjectCommandResult {
 	// Acquire Atlantis lock for this repo/dir/workspace.
-	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.BaseRepo.FullName, ctx.RepoRelPath))
+	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.BaseRepo.FullName, ctx.RepoRelDir))
 	if err != nil {
 		return ProjectCommandResult{
 			Error: errors.Wrap(err, "acquiring lock"),
@@ -83,7 +83,7 @@ func (p *ProjectCommandRunner) Plan(ctx models.ProjectCommandContext) ProjectCom
 		}
 		return ProjectCommandResult{Error: cloneErr}
 	}
-	projAbsPath := filepath.Join(repoDir, ctx.RepoRelPath)
+	projAbsPath := filepath.Join(repoDir, ctx.RepoRelDir)
 
 	// Use default stage unless another workflow is defined in config
 	stage := p.defaultPlanStage()
@@ -147,7 +147,7 @@ func (p *ProjectCommandRunner) Apply(ctx models.ProjectCommandContext) ProjectCo
 		}
 		return ProjectCommandResult{Error: err}
 	}
-	absPath := filepath.Join(repoDir, ctx.RepoRelPath)
+	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
 
 	var applyRequirements []string
 	if ctx.ProjectConfig != nil {

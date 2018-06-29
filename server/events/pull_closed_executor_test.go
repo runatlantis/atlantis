@@ -89,7 +89,7 @@ func TestCleanUpPullComments(t *testing.T) {
 					Workspace: "default",
 				},
 			},
-			"- path: `owner/repo/.` workspace: `default`",
+			"- dir: `.` workspace: `default`",
 		},
 		{
 			"single lock, non-empty path",
@@ -99,7 +99,7 @@ func TestCleanUpPullComments(t *testing.T) {
 					Workspace: "default",
 				},
 			},
-			"- path: `owner/repo/path` workspace: `default`",
+			"- dir: `path` workspace: `default`",
 		},
 		{
 			"single path, multiple workspaces",
@@ -113,7 +113,7 @@ func TestCleanUpPullComments(t *testing.T) {
 					Workspace: "workspace2",
 				},
 			},
-			"- path: `owner/repo/path` workspaces: `workspace1`, `workspace2`",
+			"- dir: `path` workspaces: `workspace1`, `workspace2`",
 		},
 		{
 			"multiple paths, multiple workspaces",
@@ -135,7 +135,7 @@ func TestCleanUpPullComments(t *testing.T) {
 					Workspace: "workspace2",
 				},
 			},
-			"- path: `owner/repo/path` workspaces: `workspace1`, `workspace2`\n- path: `owner/repo/path2` workspaces: `workspace1`, `workspace2`",
+			"- dir: `path` workspaces: `workspace1`, `workspace2`\n- dir: `path2` workspaces: `workspace1`, `workspace2`",
 		},
 	}
 	for _, c := range cases {

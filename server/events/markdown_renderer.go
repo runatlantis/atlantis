@@ -51,9 +51,9 @@ type ResultData struct {
 }
 
 type ProjectResultTmplData struct {
-	Workspace string
-	Dir       string
-	Rendered  string
+	Workspace  string
+	RepoRelDir string
+	Rendered   string
 }
 
 // Render formats the data into a markdown string.
@@ -78,8 +78,8 @@ func (m *MarkdownRenderer) renderProjectResults(results []ProjectResult, common 
 
 	for _, result := range results {
 		resultData := ProjectResultTmplData{
-			Workspace: result.Workspace,
-			Dir:       result.Path,
+			Workspace:  result.Workspace,
+			RepoRelDir: result.RepoRelDir,
 		}
 		if result.Error != nil {
 			resultData.Rendered = m.renderTemplate(errTmpl, struct {
@@ -124,14 +124,14 @@ func (m *MarkdownRenderer) renderTemplate(tmpl *template.Template, data interfac
 	return buf.String()
 }
 
-var singleProjectTmpl = template.Must(template.New("").Parse("{{$result := index .Results 0}}Ran {{.Command}} in dir: `{{$result.Dir}}` workspace: `{{$result.Workspace}}`\n{{$result.Rendered}}\n" + logTmpl))
+var singleProjectTmpl = template.Must(template.New("").Parse("{{$result := index .Results 0}}Ran {{.Command}} in dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n{{$result.Rendered}}\n" + logTmpl))
 var multiProjectTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
 	"Ran {{.Command}} for {{ len .Results }} projects:\n" +
 		"{{ range $result := .Results }}" +
-		"1. workspace: `{{$result.Workspace}}` path: `{{$result.Dir}}`\n" +
+		"1. workspace: `{{$result.Workspace}}` dir: `{{$result.RepoRelDir}}`\n" +
 		"{{end}}\n" +
 		"{{ range $i, $result := .Results }}" +
-		"### {{add $i 1}}. workspace: `{{$result.Workspace}}` path: `{{$result.Dir}}`\n" +
+		"### {{add $i 1}}. workspace: `{{$result.Workspace}}` dir: `{{$result.RepoRelDir}}`\n" +
 		"{{$result.Rendered}}\n" +
 		"---\n{{end}}" +
 		logTmpl))

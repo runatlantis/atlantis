@@ -140,8 +140,8 @@ func TestRenderProjectResults(t *testing.T) {
 							LockURL:         "lock-url",
 						},
 					},
-					Workspace: "workspace",
-					Path:      "path",
+					Workspace:  "workspace",
+					RepoRelDir: "path",
 				},
 			},
 			"Ran Plan in dir: `path` workspace: `workspace`\n```diff\nterraform-output\n```\n\n* To **discard** this plan click [here](lock-url).\n\n",
@@ -154,8 +154,8 @@ func TestRenderProjectResults(t *testing.T) {
 					ProjectCommandResult: events.ProjectCommandResult{
 						ApplySuccess: "success",
 					},
-					Workspace: "workspace",
-					Path:      "path",
+					Workspace:  "workspace",
+					RepoRelDir: "path",
 				},
 			},
 			"Ran Apply in dir: `path` workspace: `workspace`\n```diff\nsuccess\n```\n\n",
@@ -165,8 +165,8 @@ func TestRenderProjectResults(t *testing.T) {
 			events.Plan,
 			[]events.ProjectResult{
 				{
-					Workspace: "workspace",
-					Path:      "path",
+					Workspace:  "workspace",
+					RepoRelDir: "path",
 					ProjectCommandResult: events.ProjectCommandResult{
 						PlanSuccess: &events.PlanSuccess{
 							TerraformOutput: "terraform-output",
@@ -175,8 +175,8 @@ func TestRenderProjectResults(t *testing.T) {
 					},
 				},
 				{
-					Workspace: "workspace",
-					Path:      "path2",
+					Workspace:  "workspace",
+					RepoRelDir: "path2",
 					ProjectCommandResult: events.ProjectCommandResult{
 						PlanSuccess: &events.PlanSuccess{
 							TerraformOutput: "terraform-output2",
@@ -185,28 +185,28 @@ func TestRenderProjectResults(t *testing.T) {
 					},
 				},
 			},
-			"Ran Plan for 2 projects:\n1. workspace: `workspace` path: `path`\n1. workspace: `workspace` path: `path2`\n\n### 1. workspace: `workspace` path: `path`\n```diff\nterraform-output\n```\n\n* To **discard** this plan click [here](lock-url).\n---\n### 2. workspace: `workspace` path: `path2`\n```diff\nterraform-output2\n```\n\n* To **discard** this plan click [here](lock-url2).\n---\n\n",
+			"Ran Plan for 2 projects:\n1. workspace: `workspace` dir: `path`\n1. workspace: `workspace` dir: `path2`\n\n### 1. workspace: `workspace` dir: `path`\n```diff\nterraform-output\n```\n\n* To **discard** this plan click [here](lock-url).\n---\n### 2. workspace: `workspace` dir: `path2`\n```diff\nterraform-output2\n```\n\n* To **discard** this plan click [here](lock-url2).\n---\n\n",
 		},
 		{
 			"multiple successful applies",
 			events.Apply,
 			[]events.ProjectResult{
 				{
-					Path:      "path",
-					Workspace: "workspace",
+					RepoRelDir: "path",
+					Workspace:  "workspace",
 					ProjectCommandResult: events.ProjectCommandResult{
 						ApplySuccess: "success",
 					},
 				},
 				{
-					Path:      "path2",
-					Workspace: "workspace",
+					RepoRelDir: "path2",
+					Workspace:  "workspace",
 					ProjectCommandResult: events.ProjectCommandResult{
 						ApplySuccess: "success2",
 					},
 				},
 			},
-			"Ran Apply for 2 projects:\n1. workspace: `workspace` path: `path`\n1. workspace: `workspace` path: `path2`\n\n### 1. workspace: `workspace` path: `path`\n```diff\nsuccess\n```\n---\n### 2. workspace: `workspace` path: `path2`\n```diff\nsuccess2\n```\n---\n\n",
+			"Ran Apply for 2 projects:\n1. workspace: `workspace` dir: `path`\n1. workspace: `workspace` dir: `path2`\n\n### 1. workspace: `workspace` dir: `path`\n```diff\nsuccess\n```\n---\n### 2. workspace: `workspace` dir: `path2`\n```diff\nsuccess2\n```\n---\n\n",
 		},
 		{
 			"single errored plan",
@@ -216,8 +216,8 @@ func TestRenderProjectResults(t *testing.T) {
 					ProjectCommandResult: events.ProjectCommandResult{
 						Error: errors.New("error"),
 					},
-					Path:      "path",
-					Workspace: "workspace",
+					RepoRelDir: "path",
+					Workspace:  "workspace",
 				},
 			},
 			"Ran Plan in dir: `path` workspace: `workspace`\n**Plan Error**\n```\nerror\n```\n\n\n",
@@ -227,8 +227,8 @@ func TestRenderProjectResults(t *testing.T) {
 			events.Plan,
 			[]events.ProjectResult{
 				{
-					Path:      "path",
-					Workspace: "workspace",
+					RepoRelDir: "path",
+					Workspace:  "workspace",
 					ProjectCommandResult: events.ProjectCommandResult{
 						Failure: "failure",
 					},
@@ -241,8 +241,8 @@ func TestRenderProjectResults(t *testing.T) {
 			events.Plan,
 			[]events.ProjectResult{
 				{
-					Workspace: "workspace",
-					Path:      "path",
+					Workspace:  "workspace",
+					RepoRelDir: "path",
 					ProjectCommandResult: events.ProjectCommandResult{
 						PlanSuccess: &events.PlanSuccess{
 							TerraformOutput: "terraform-output",
@@ -251,49 +251,49 @@ func TestRenderProjectResults(t *testing.T) {
 					},
 				},
 				{
-					Workspace: "workspace",
-					Path:      "path2",
+					Workspace:  "workspace",
+					RepoRelDir: "path2",
 					ProjectCommandResult: events.ProjectCommandResult{
 						Failure: "failure",
 					},
 				},
 				{
-					Workspace: "workspace",
-					Path:      "path3",
+					Workspace:  "workspace",
+					RepoRelDir: "path3",
 					ProjectCommandResult: events.ProjectCommandResult{
 						Error: errors.New("error"),
 					},
 				},
 			},
-			"Ran Plan for 3 projects:\n1. workspace: `workspace` path: `path`\n1. workspace: `workspace` path: `path2`\n1. workspace: `workspace` path: `path3`\n\n### 1. workspace: `workspace` path: `path`\n```diff\nterraform-output\n```\n\n* To **discard** this plan click [here](lock-url).\n---\n### 2. workspace: `workspace` path: `path2`\n**Plan Failed**: failure\n\n---\n### 3. workspace: `workspace` path: `path3`\n**Plan Error**\n```\nerror\n```\n\n---\n\n",
+			"Ran Plan for 3 projects:\n1. workspace: `workspace` dir: `path`\n1. workspace: `workspace` dir: `path2`\n1. workspace: `workspace` dir: `path3`\n\n### 1. workspace: `workspace` dir: `path`\n```diff\nterraform-output\n```\n\n* To **discard** this plan click [here](lock-url).\n---\n### 2. workspace: `workspace` dir: `path2`\n**Plan Failed**: failure\n\n---\n### 3. workspace: `workspace` dir: `path3`\n**Plan Error**\n```\nerror\n```\n\n---\n\n",
 		},
 		{
 			"successful, failed, and errored apply",
 			events.Apply,
 			[]events.ProjectResult{
 				{
-					Workspace: "workspace",
-					Path:      "path",
+					Workspace:  "workspace",
+					RepoRelDir: "path",
 					ProjectCommandResult: events.ProjectCommandResult{
 						ApplySuccess: "success",
 					},
 				},
 				{
-					Workspace: "workspace",
-					Path:      "path2",
+					Workspace:  "workspace",
+					RepoRelDir: "path2",
 					ProjectCommandResult: events.ProjectCommandResult{
 						Failure: "failure",
 					},
 				},
 				{
-					Workspace: "workspace",
-					Path:      "path3",
+					Workspace:  "workspace",
+					RepoRelDir: "path3",
 					ProjectCommandResult: events.ProjectCommandResult{
 						Error: errors.New("error"),
 					},
 				},
 			},
-			"Ran Apply for 3 projects:\n1. workspace: `workspace` path: `path`\n1. workspace: `workspace` path: `path2`\n1. workspace: `workspace` path: `path3`\n\n### 1. workspace: `workspace` path: `path`\n```diff\nsuccess\n```\n---\n### 2. workspace: `workspace` path: `path2`\n**Apply Failed**: failure\n\n---\n### 3. workspace: `workspace` path: `path3`\n**Apply Error**\n```\nerror\n```\n\n---\n\n",
+			"Ran Apply for 3 projects:\n1. workspace: `workspace` dir: `path`\n1. workspace: `workspace` dir: `path2`\n1. workspace: `workspace` dir: `path3`\n\n### 1. workspace: `workspace` dir: `path`\n```diff\nsuccess\n```\n---\n### 2. workspace: `workspace` dir: `path2`\n**Apply Failed**: failure\n\n---\n### 3. workspace: `workspace` dir: `path3`\n**Apply Error**\n```\nerror\n```\n\n---\n\n",
 		},
 	}
 

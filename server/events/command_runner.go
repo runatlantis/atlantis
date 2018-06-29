@@ -90,7 +90,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 			res := c.ProjectCommandRunner.Plan(cmd)
 			results = append(results, ProjectResult{
 				ProjectCommandResult: res,
-				Path:                 cmd.RepoRelPath,
+				RepoRelDir:           cmd.RepoRelDir,
 				Workspace:            cmd.Workspace,
 			})
 		}
@@ -152,7 +152,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 			ctx.Log.Err("failed to determine desired command, neither plan nor apply")
 		}
 		return []ProjectResult{{
-			Path:                 cmd.Dir,
+			RepoRelDir:           cmd.RepoRelDir,
 			Workspace:            cmd.Workspace,
 			ProjectCommandResult: result,
 		}}, nil

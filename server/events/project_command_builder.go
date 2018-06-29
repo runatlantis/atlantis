@@ -87,7 +87,7 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext
 				Pull:          ctx.Pull,
 				User:          ctx.User,
 				Log:           ctx.Log,
-				RepoRelPath:   mp.Path,
+				RepoRelDir:    mp.Path,
 				ProjectConfig: nil,
 				GlobalConfig:  nil,
 				CommentArgs:   nil,
@@ -115,7 +115,7 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext
 				Log:           ctx.Log,
 				CommentArgs:   nil,
 				Workspace:     mp.Workspace,
-				RepoRelPath:   mp.Dir,
+				RepoRelDir:    mp.Dir,
 				ProjectConfig: &mp,
 				GlobalConfig:  &config,
 			})
@@ -159,7 +159,7 @@ func (p *DefaultProjectCommandBuilder) BuildApplyCommand(ctx *CommandContext, cm
 }
 
 func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContext, cmd *CommentCommand, repoDir string) (models.ProjectCommandContext, error) {
-	projCfg, globalCfg, err := p.getCfg(cmd.ProjectName, cmd.Dir, cmd.Workspace, repoDir)
+	projCfg, globalCfg, err := p.getCfg(cmd.ProjectName, cmd.RepoRelDir, cmd.Workspace, repoDir)
 	if err != nil {
 		return models.ProjectCommandContext{}, err
 	}
@@ -167,7 +167,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 	// Override any dir/workspace defined on the comment with what was
 	// defined in config. This shouldn't matter since we don't allow comments
 	// with both project name and dir/workspace.
-	dir := cmd.Dir
+	dir := cmd.RepoRelDir
 	workspace := cmd.Workspace
 	if projCfg != nil {
 		dir = projCfg.Dir
@@ -182,7 +182,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 		Log:                     ctx.Log,
 		CommentArgs:             cmd.Flags,
 		Workspace:               workspace,
-		RepoRelPath:             dir,
+		RepoRelDir:              dir,
 		ProjectConfig:           projCfg,
 		GlobalConfig:            globalCfg,
 		RequireApprovalOverride: p.RequireApproval,

@@ -21,8 +21,8 @@ func TestRun_NoDir(t *testing.T) {
 		TerraformExecutor: nil,
 	}
 	_, err := o.Run(models.ProjectCommandContext{
-		RepoRelPath: ".",
-		Workspace:   "workspace",
+		RepoRelDir: ".",
+		Workspace:  "workspace",
 	}, nil, "/nonexistent/path")
 	ErrEquals(t, "no plan found at path \".\" and workspace \"workspace\"–did you run plan?", err)
 }
@@ -34,8 +34,8 @@ func TestRun_NoPlanFile(t *testing.T) {
 		TerraformExecutor: nil,
 	}
 	_, err := o.Run(models.ProjectCommandContext{
-		RepoRelPath: ".",
-		Workspace:   "workspace",
+		RepoRelDir: ".",
+		Workspace:  "workspace",
 	}, nil, tmpDir)
 	ErrEquals(t, "no plan found at path \".\" and workspace \"workspace\"–did you run plan?", err)
 }
@@ -57,7 +57,7 @@ func TestRun_Success(t *testing.T) {
 		ThenReturn("output", nil)
 	output, err := o.Run(models.ProjectCommandContext{
 		Workspace:   "workspace",
-		RepoRelPath: ".",
+		RepoRelDir:  ".",
 		CommentArgs: []string{"comment", "args"},
 	}, []string{"extra", "args"}, tmpDir)
 	Ok(t, err)
@@ -83,8 +83,8 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 		ThenReturn("output", nil)
 	projectName := "projectname"
 	output, err := o.Run(models.ProjectCommandContext{
-		Workspace:   "default",
-		RepoRelPath: ".",
+		Workspace:  "default",
+		RepoRelDir: ".",
 		ProjectConfig: &valid.Project{
 			Name: &projectName,
 		},
@@ -113,7 +113,7 @@ func TestRun_UsesConfiguredTFVersion(t *testing.T) {
 		ThenReturn("output", nil)
 	output, err := o.Run(models.ProjectCommandContext{
 		Workspace:   "workspace",
-		RepoRelPath: ".",
+		RepoRelDir:  ".",
 		CommentArgs: []string{"comment", "args"},
 		ProjectConfig: &valid.Project{
 			TerraformVersion: tfVersion,

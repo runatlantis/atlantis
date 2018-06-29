@@ -160,6 +160,9 @@ type Project struct {
 	// Path to project root in the repo.
 	// If "." then project is at root.
 	// Never ends in "/".
+	// todo: rename to RepoRelDir to match rest of project once we can separate
+	// out how this is saved in boltdb vs. its usage everywhere else so we don't
+	// break existing dbs.
 	Path string
 }
 
@@ -229,7 +232,7 @@ type ProjectCommandContext struct {
 	// User is the user that triggered this command.
 	User          User
 	Log           *logging.SimpleLogger
-	RepoRelPath   string
+	RepoRelDir    string
 	ProjectConfig *valid.Project
 	GlobalConfig  *valid.Config
 

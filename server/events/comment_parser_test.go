@@ -495,7 +495,7 @@ func TestParse_Parsing(t *testing.T) {
 			comment := fmt.Sprintf("atlantis %s %s", cmdName, test.flags)
 			r := commentParser.Parse(comment, models.Github)
 			Assert(t, r.CommentResponse == "", "CommentResponse should have been empty but was %q for comment %q", r.CommentResponse, comment)
-			Assert(t, test.expDir == r.Command.Dir, "exp dir to equal %q but was %q for comment %q", test.expDir, r.Command.Dir, comment)
+			Assert(t, test.expDir == r.Command.RepoRelDir, "exp dir to equal %q but was %q for comment %q", test.expDir, r.Command.RepoRelDir, comment)
 			Assert(t, test.expWorkspace == r.Command.Workspace, "exp workspace to equal %q but was %q for comment %q", test.expWorkspace, r.Command.Workspace, comment)
 			Assert(t, test.expVerbose == r.Command.Verbose, "exp verbose to equal %v but was %v for comment %q", test.expVerbose, r.Command.Verbose, comment)
 			actExtraArgs := strings.Join(r.Command.Flags, " ")

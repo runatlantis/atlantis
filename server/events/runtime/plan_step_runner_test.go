@@ -38,7 +38,7 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 		Log:         logger,
 		CommentArgs: []string{"comment", "args"},
 		Workspace:   workspace,
-		RepoRelPath: ".",
+		RepoRelDir:  ".",
 		User:        models.User{Username: "username"},
 	}, []string{"extra", "args"}, "/path")
 	Ok(t, err)
@@ -68,10 +68,10 @@ func TestRun_ErrWorkspaceIn08(t *testing.T) {
 	When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
 	_, err := s.Run(models.ProjectCommandContext{
-		Log:         logger,
-		Workspace:   workspace,
-		RepoRelPath: ".",
-		User:        models.User{Username: "username"},
+		Log:        logger,
+		Workspace:  workspace,
+		RepoRelDir: ".",
+		User:       models.User{Username: "username"},
 	}, []string{"extra", "args"}, "/path")
 	ErrEquals(t, "terraform version 0.8.0 does not support workspaces", err)
 }
@@ -118,7 +118,7 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 			output, err := s.Run(models.ProjectCommandContext{
 				Log:         logger,
 				Workspace:   "workspace",
-				RepoRelPath: ".",
+				RepoRelDir:  ".",
 				User:        models.User{Username: "username"},
 				CommentArgs: []string{"comment", "args"},
 			}, []string{"extra", "args"}, "/path")
@@ -181,7 +181,7 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 			output, err := s.Run(models.ProjectCommandContext{
 				Log:         logger,
 				Workspace:   "workspace",
-				RepoRelPath: ".",
+				RepoRelDir:  ".",
 				User:        models.User{Username: "username"},
 				CommentArgs: []string{"comment", "args"},
 			}, []string{"extra", "args"}, "/path")
@@ -214,7 +214,7 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 	output, err := s.Run(models.ProjectCommandContext{
 		Log:         logger,
 		Workspace:   "workspace",
-		RepoRelPath: ".",
+		RepoRelDir:  ".",
 		User:        models.User{Username: "username"},
 		CommentArgs: []string{"comment", "args"},
 	}, []string{"extra", "args"}, "/path")
@@ -255,7 +255,7 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 	output, err := s.Run(models.ProjectCommandContext{
 		Log:         logger,
 		Workspace:   "workspace",
-		RepoRelPath: ".",
+		RepoRelDir:  ".",
 		User:        models.User{Username: "username"},
 		CommentArgs: []string{"comment", "args"},
 	}, []string{"extra", "args"}, tmpDir)
@@ -287,7 +287,7 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 	output, err := s.Run(models.ProjectCommandContext{
 		Log:         logger,
 		Workspace:   "default",
-		RepoRelPath: ".",
+		RepoRelDir:  ".",
 		User:        models.User{Username: "username"},
 		CommentArgs: []string{"comment", "args"},
 		ProjectConfig: &valid.Project{

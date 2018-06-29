@@ -18,8 +18,8 @@ import "github.com/runatlantis/atlantis/server/events/vcs"
 // ProjectResult is the result of executing a plan/apply for a project.
 type ProjectResult struct {
 	ProjectCommandResult
-	Path      string
-	Workspace string
+	RepoRelDir string
+	Workspace  string
 }
 
 type ProjectCommandResult struct {

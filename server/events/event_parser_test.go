@@ -320,8 +320,8 @@ func TestParseGitlabMergeCommentEvent(t *testing.T) {
 
 func TestNewCommand_CleansDir(t *testing.T) {
 	cases := []struct {
-		Dir    string
-		ExpDir string
+		RepoRelDir string
+		ExpDir     string
 	}{
 		{
 			"",
@@ -343,9 +343,9 @@ func TestNewCommand_CleansDir(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		t.Run(c.Dir, func(t *testing.T) {
-			cmd := events.NewCommentCommand(c.Dir, nil, events.Plan, false, "workspace", "")
-			Equals(t, c.ExpDir, cmd.Dir)
+		t.Run(c.RepoRelDir, func(t *testing.T) {
+			cmd := events.NewCommentCommand(c.RepoRelDir, nil, events.Plan, false, "workspace", "")
+			Equals(t, c.ExpDir, cmd.RepoRelDir)
 		})
 	}
 }
@@ -359,7 +359,7 @@ func TestNewCommand_AllFieldsSet(t *testing.T) {
 	cmd := events.NewCommentCommand("dir", []string{"a", "b"}, events.Plan, true, "workspace", "project")
 	Equals(t, events.CommentCommand{
 		Workspace:   "workspace",
-		Dir:         "dir",
+		RepoRelDir:  "dir",
 		Verbose:     true,
 		Flags:       []string{"a", "b"},
 		Name:        events.Plan,
@@ -404,7 +404,7 @@ func TestCommentCommand_IsAutoplan(t *testing.T) {
 func TestCommentCommand_String(t *testing.T) {
 	exp := `command="plan" verbose=true dir="mydir" workspace="myworkspace" project="myproject" flags="flag1,flag2"`
 	Equals(t, exp, (events.CommentCommand{
-		Dir:         "mydir",
+		RepoRelDir:  "mydir",
 		Flags:       []string{"flag1", "flag2"},
 		Name:        events.Plan,
 		Verbose:     true,

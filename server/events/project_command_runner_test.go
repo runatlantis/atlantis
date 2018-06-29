@@ -37,7 +37,7 @@ package events_test
 //	Command: &events.Command{
 //		Name:      events.Plan,
 //		Workspace: "workspace",
-//		Dir:       "",
+//		RepoRelDir:       "",
 //	},
 //	Log:      logging.NewNoopLogger(),
 //	BaseRepo: models.Repo{},
@@ -84,12 +84,12 @@ package events_test
 //	p, runner, _ := setupPlanExecutorTest(t)
 //	ctx := deepcopy.Copy(planCtx).(events.CommandContext)
 //	ctx.Log = logging.NewNoopLogger()
-//	ctx.Command.Dir = "dir1/dir2"
+//	ctx.Command.RepoRelDir = "dir1/dir2"
 //	ctx.Command.Workspace = "workspace-flag"
 //
 //	When(p.Workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, "workspace-flag")).
 //		ThenReturn("/tmp/clone-repo", nil)
-//	When(p.ProjectPreExecute.Execute(&ctx, "/tmp/clone-repo", models.Project{RepoFullName: "", Path: "dir1/dir2"})).
+//	When(p.ProjectPreExecute.Execute(&ctx, "/tmp/clone-repo", models.Project{RepoFullName: "", RepoRelDir: "dir1/dir2"})).
 //		ThenReturn(events.PreExecuteResult{
 //			LockResponse: locking.TryLockResponse{
 //				LockKey: "key",
@@ -121,7 +121,7 @@ package events_test
 //	When(p.VCSClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"file.tf"}, nil)
 //	When(p.Workspace.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, "workspace")).
 //		ThenReturn("/tmp/clone-repo", nil)
-//	When(p.ProjectPreExecute.Execute(&ctx, "/tmp/clone-repo", models.Project{RepoFullName: "", Path: "."})).
+//	When(p.ProjectPreExecute.Execute(&ctx, "/tmp/clone-repo", models.Project{RepoFullName: "", RepoRelDir: "."})).
 //		ThenReturn(events.PreExecuteResult{
 //			LockResponse: locking.TryLockResponse{
 //				LockKey: "key",
@@ -165,7 +165,7 @@ package events_test
 //	When(p.VCSClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"file.tf"}, nil)
 //	When(p.Workspace.Clone(planCtx.Log, planCtx.BaseRepo, planCtx.HeadRepo, planCtx.Pull, "workspace")).
 //		ThenReturn("/tmp/clone-repo", nil)
-//	When(p.ProjectPreExecute.Execute(&planCtx, "/tmp/clone-repo", models.Project{RepoFullName: "", Path: "."})).
+//	When(p.ProjectPreExecute.Execute(&planCtx, "/tmp/clone-repo", models.Project{RepoFullName: "", RepoRelDir: "."})).
 //		ThenReturn(events.PreExecuteResult{
 //			LockResponse: locking.TryLockResponse{
 //				LockKey: "key",
@@ -197,7 +197,7 @@ package events_test
 //	projectResult := events.ProjectResult{
 //		Failure: "failure",
 //	}
-//	When(p.ProjectPreExecute.Execute(&planCtx, "/tmp/clone-repo", models.Project{RepoFullName: "", Path: "."})).
+//	When(p.ProjectPreExecute.Execute(&planCtx, "/tmp/clone-repo", models.Project{RepoFullName: "", RepoRelDir: "."})).
 //		ThenReturn(events.PreExecuteResult{ProjectResult: projectResult})
 //	r := p.Execute(&planCtx)
 //
@@ -215,9 +215,9 @@ package events_test
 //		ThenReturn("/tmp/clone-repo", nil)
 //
 //	// Both projects will succeed in the PreExecute stage.
-//	When(p.ProjectPreExecute.Execute(&planCtx, "/tmp/clone-repo", models.Project{RepoFullName: "", Path: "path1"})).
+//	When(p.ProjectPreExecute.Execute(&planCtx, "/tmp/clone-repo", models.Project{RepoFullName: "", RepoRelDir: "path1"})).
 //		ThenReturn(events.PreExecuteResult{LockResponse: locking.TryLockResponse{LockKey: "key1"}})
-//	When(p.ProjectPreExecute.Execute(&planCtx, "/tmp/clone-repo", models.Project{RepoFullName: "", Path: "path2"})).
+//	When(p.ProjectPreExecute.Execute(&planCtx, "/tmp/clone-repo", models.Project{RepoFullName: "", RepoRelDir: "path2"})).
 //		ThenReturn(events.PreExecuteResult{LockResponse: locking.TryLockResponse{LockKey: "key2"}})
 //
 //	// The first project will fail when running plan
@@ -253,7 +253,7 @@ package events_test
 //	When(p.VCSClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"file.tf"}, nil)
 //	When(p.Workspace.Clone(planCtx.Log, planCtx.BaseRepo, planCtx.HeadRepo, planCtx.Pull, "workspace")).
 //		ThenReturn("/tmp/clone-repo", nil)
-//	When(p.ProjectPreExecute.Execute(&planCtx, "/tmp/clone-repo", models.Project{RepoFullName: "", Path: "."})).
+//	When(p.ProjectPreExecute.Execute(&planCtx, "/tmp/clone-repo", models.Project{RepoFullName: "", RepoRelDir: "."})).
 //		ThenReturn(events.PreExecuteResult{
 //			ProjectConfig: events.ProjectConfig{PostPlan: []string{"post-plan"}},
 //		})
