@@ -9,6 +9,10 @@
 See [www.runatlantis.io/guide/atlantis-yaml-use-cases.html](../guide/atlantis-yaml-use-cases.html)
 :::
 
+## Enabling atlantis.yaml
+The atlantis server must be running with `--allow-repo-config` to allow Atlantis
+to use `atlantis.yaml` files.
+
 ## Example Using All Keys
 ```yaml
 version: 2

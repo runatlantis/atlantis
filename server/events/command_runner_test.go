@@ -41,7 +41,6 @@ var githubGetter *mocks.MockGithubPullGetter
 var gitlabGetter *mocks.MockGitlabMergeRequestGetter
 var ch events.DefaultCommandRunner
 var logBytes *bytes.Buffer
-var projectCommandRunner *mocks.MockProjectCommandRunner
 
 func setup(t *testing.T) {
 	RegisterMockTestingT(t)

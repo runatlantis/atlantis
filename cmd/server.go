@@ -32,8 +32,9 @@ import (
 // 3. Add your flag's description etc. to the stringFlags, intFlags, or boolFlags slices.
 const (
 	// Flag names.
-	AtlantisURLFlag     = "atlantis-url"
 	AllowForkPRsFlag    = "allow-fork-prs"
+	AllowRepoConfigFlag = "allow-repo-config"
+	AtlantisURLFlag     = "atlantis-url"
 	ConfigFlag          = "config"
 	DataDirFlag         = "data-dir"
 	GHHostnameFlag      = "gh-hostname"
@@ -140,6 +141,13 @@ var boolFlags = []boolFlag{
 	{
 		name:         AllowForkPRsFlag,
 		description:  "Allow Atlantis to run on pull requests from forks. A security issue for public repos.",
+		defaultValue: false,
+	},
+	{
+		name: AllowRepoConfigFlag,
+		description: "Allow repositories to use atlantis.yaml files to customize the commands Atlantis runs." +
+			" Should only be enabled in a trusted environment since it enables a pull request to run arbitrary commands" +
+			" on the Atlantis server.",
 		defaultValue: false,
 	},
 	{
@@ -298,8 +306,9 @@ func (s *ServerCmd) run() error {
 
 	// Config looks good. Start the server.
 	server, err := s.ServerCreator.NewServer(userConfig, server.Config{
-		AllowForkPRsFlag: AllowForkPRsFlag,
-		AtlantisVersion:  s.AtlantisVersion,
+		AllowForkPRsFlag:    AllowForkPRsFlag,
+		AllowRepoConfigFlag: AllowRepoConfigFlag,
+		AtlantisVersion:     s.AtlantisVersion,
 	})
 	if err != nil {
 		return errors.Wrap(err, "initializing server")

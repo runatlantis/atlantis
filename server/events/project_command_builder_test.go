@@ -195,6 +195,7 @@ projects:
 				ParserValidator:  &yaml.ParserValidator{},
 				VCSClient:        vcsClient,
 				ProjectFinder:    &events.DefaultProjectFinder{},
+				AllowRepoConfig:  true,
 			}
 
 			ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
@@ -416,6 +417,7 @@ projects:
 					ParserValidator:  &yaml.ParserValidator{},
 					VCSClient:        vcsClient,
 					ProjectFinder:    &events.DefaultProjectFinder{},
+					AllowRepoConfig:  true,
 				}
 
 				cmdCtx := &events.CommandContext{

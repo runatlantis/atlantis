@@ -24,12 +24,14 @@ type ProjectCommandBuilder interface {
 }
 
 type DefaultProjectCommandBuilder struct {
-	ParserValidator  *yaml.ParserValidator
-	ProjectFinder    ProjectFinder
-	VCSClient        vcs.ClientProxy
-	WorkingDir       WorkingDir
-	WorkingDirLocker WorkingDirLocker
-	RequireApproval  bool
+	ParserValidator     *yaml.ParserValidator
+	ProjectFinder       ProjectFinder
+	VCSClient           vcs.ClientProxy
+	WorkingDir          WorkingDir
+	WorkingDirLocker    WorkingDirLocker
+	RequireApproval     bool
+	AllowRepoConfig     bool
+	AllowRepoConfigFlag string
 }
 
 type TerraformExec interface {
@@ -63,6 +65,9 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext
 		ctx.Log.Info("found no %s file", yaml.AtlantisYAMLFilename)
 	} else {
 		ctx.Log.Info("successfully parsed %s file", yaml.AtlantisYAMLFilename)
+		if !p.AllowRepoConfig {
+			return nil, fmt.Errorf("%s files not allowed because Atlantis is not running with --%s", yaml.AtlantisYAMLFilename, p.AllowRepoConfigFlag)
+		}
 	}
 
 	// We'll need the list of modified files.
@@ -200,6 +205,9 @@ func (p *DefaultProjectCommandBuilder) getCfg(projectName string, dir string, wo
 	}
 	if !hasAtlantisYAML {
 		return nil, nil, nil
+	}
+	if !p.AllowRepoConfig {
+		return nil, nil, fmt.Errorf("%s files not allowed because Atlantis is not running with --%s", yaml.AtlantisYAMLFilename, p.AllowRepoConfigFlag)
 	}
 
 	// If they've specified a project by name we look it up. Otherwise we

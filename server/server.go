@@ -80,6 +80,7 @@ type Server struct {
 // the config is parsed from a YAML file.
 type UserConfig struct {
 	AllowForkPRs        bool   `mapstructure:"allow-fork-prs"`
+	AllowRepoConfig     bool   `mapstructure:"allow-repo-config"`
 	AtlantisURL         string `mapstructure:"atlantis-url"`
 	DataDir             string `mapstructure:"data-dir"`
 	GithubHostname      string `mapstructure:"gh-hostname"`
@@ -104,8 +105,9 @@ type UserConfig struct {
 
 // Config holds config for server that isn't passed in by the user.
 type Config struct {
-	AllowForkPRsFlag string
-	AtlantisVersion  string
+	AllowForkPRsFlag    string
+	AllowRepoConfigFlag string
+	AtlantisVersion     string
 }
 
 // WebhookConfig is nested within UserConfig. It's used to configure webhooks.
@@ -232,12 +234,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AllowForkPRs:             userConfig.AllowForkPRs,
 		AllowForkPRsFlag:         config.AllowForkPRsFlag,
 		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
-			ParserValidator:  &yaml.ParserValidator{},
-			ProjectFinder:    &events.DefaultProjectFinder{},
-			VCSClient:        vcsClient,
-			WorkingDir:       workingDir,
-			WorkingDirLocker: workingDirLocker,
-			RequireApproval:  userConfig.RequireApproval,
+			ParserValidator:     &yaml.ParserValidator{},
+			ProjectFinder:       &events.DefaultProjectFinder{},
+			VCSClient:           vcsClient,
+			WorkingDir:          workingDir,
+			WorkingDirLocker:    workingDirLocker,
+			RequireApproval:     userConfig.RequireApproval,
+			AllowRepoConfig:     userConfig.AllowRepoConfig,
+			AllowRepoConfigFlag: config.AllowRepoConfigFlag,
 		},
 		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
 			Locker:           projectLocker,
