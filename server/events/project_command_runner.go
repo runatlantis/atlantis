@@ -34,8 +34,16 @@ type LockURLGenerator interface {
 	GenerateLockURL(lockID string) string
 }
 
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_step_runner.go StepRunner
+
+type StepRunner interface {
+	Run(ctx models.ProjectCommandContext, extraArgs []string, path string) (string, error)
+}
+
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_webhooks_sender.go WebhooksSender
+
 type WebhooksSender interface {
-	Send(log *logging.SimpleLogger, result webhooks.ApplyResult) error
+	Send(log *logging.SimpleLogger, res webhooks.ApplyResult) error
 }
 
 // PlanSuccess is the result of a successful plan.
@@ -52,16 +60,17 @@ type ProjectCommandRunner interface {
 }
 
 type DefaultProjectCommandRunner struct {
-	Locker              ProjectLocker
-	LockURLGenerator    LockURLGenerator
-	InitStepRunner      runtime.InitStepRunner
-	PlanStepRunner      runtime.PlanStepRunner
-	ApplyStepRunner     runtime.ApplyStepRunner
-	RunStepRunner       runtime.RunStepRunner
-	PullApprovedChecker runtime.PullApprovedChecker
-	WorkingDir          WorkingDir
-	Webhooks            WebhooksSender
-	WorkingDirLocker    WorkingDirLocker
+	Locker                  ProjectLocker
+	LockURLGenerator        LockURLGenerator
+	InitStepRunner          StepRunner
+	PlanStepRunner          StepRunner
+	ApplyStepRunner         StepRunner
+	RunStepRunner           StepRunner
+	PullApprovedChecker     runtime.PullApprovedChecker
+	WorkingDir              WorkingDir
+	Webhooks                WebhooksSender
+	WorkingDirLocker        WorkingDirLocker
+	RequireApprovalOverride bool
 }
 
 func (p *DefaultProjectCommandRunner) Plan(ctx models.ProjectCommandContext) ProjectCommandResult {
@@ -160,7 +169,7 @@ func (p *DefaultProjectCommandRunner) Apply(ctx models.ProjectCommandContext) Pr
 	if ctx.ProjectConfig != nil {
 		applyRequirements = ctx.ProjectConfig.ApplyRequirements
 	}
-	if ctx.RequireApprovalOverride {
+	if p.RequireApprovalOverride {
 		applyRequirements = []string{raw.ApprovedApplyRequirement}
 	}
 	for _, req := range applyRequirements {

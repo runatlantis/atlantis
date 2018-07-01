@@ -190,7 +190,7 @@ projects:
 			When(vcsClient.GetModifiedFiles(baseRepo, pull)).ThenReturn([]string{"main.tf"}, nil)
 
 			builder := &events.DefaultProjectCommandBuilder{
-				WorkingDirLocker: events.NewDefaultAtlantisWorkingDirLocker(),
+				WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
 				WorkingDir:       workingDir,
 				ParserValidator:  &yaml.ParserValidator{},
 				VCSClient:        vcsClient,
@@ -216,7 +216,6 @@ projects:
 				Equals(t, models.User{}, actCtx.User)
 				Equals(t, logger, actCtx.Log)
 				Equals(t, 0, len(actCtx.CommentArgs))
-				Equals(t, false, actCtx.RequireApprovalOverride)
 
 				Equals(t, expCtx.projectConfig, actCtx.ProjectConfig)
 				Equals(t, expCtx.dir, actCtx.RepoRelDir)
@@ -412,7 +411,7 @@ projects:
 				When(vcsClient.GetModifiedFiles(baseRepo, pull)).ThenReturn([]string{"main.tf"}, nil)
 
 				builder := &events.DefaultProjectCommandBuilder{
-					WorkingDirLocker: events.NewDefaultAtlantisWorkingDirLocker(),
+					WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
 					WorkingDir:       workingDir,
 					ParserValidator:  &yaml.ParserValidator{},
 					VCSClient:        vcsClient,
@@ -446,7 +445,6 @@ projects:
 				Equals(t, pull, actCtx.Pull)
 				Equals(t, models.User{}, actCtx.User)
 				Equals(t, logger, actCtx.Log)
-				Equals(t, false, actCtx.RequireApprovalOverride)
 
 				Equals(t, c.ExpProjectConfig, actCtx.ProjectConfig)
 				Equals(t, c.ExpDir, actCtx.RepoRelDir)

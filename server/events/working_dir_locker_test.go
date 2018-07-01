@@ -24,7 +24,7 @@ var repo = "repo/owner"
 var workspace = "default"
 
 func TestTryLock(t *testing.T) {
-	locker := events.NewDefaultAtlantisWorkingDirLocker()
+	locker := events.NewDefaultWorkingDirLocker()
 
 	// The first lock should succeed.
 	unlockFn, err := locker.TryLock(repo, workspace, 1)
@@ -43,7 +43,7 @@ func TestTryLock(t *testing.T) {
 }
 
 func TestTryLockDifferentWorkspaces(t *testing.T) {
-	locker := events.NewDefaultAtlantisWorkingDirLocker()
+	locker := events.NewDefaultWorkingDirLocker()
 
 	t.Log("a lock for the same repo and pull but different workspace should succeed")
 	_, err := locker.TryLock(repo, workspace, 1)
@@ -59,7 +59,7 @@ func TestTryLockDifferentWorkspaces(t *testing.T) {
 }
 
 func TestTryLockDifferentRepo(t *testing.T) {
-	locker := events.NewDefaultAtlantisWorkingDirLocker()
+	locker := events.NewDefaultWorkingDirLocker()
 
 	t.Log("a lock for a different repo but the same workspace and pull should succeed")
 	_, err := locker.TryLock(repo, workspace, 1)
@@ -76,7 +76,7 @@ func TestTryLockDifferentRepo(t *testing.T) {
 }
 
 func TestTryLockDifferentPulls(t *testing.T) {
-	locker := events.NewDefaultAtlantisWorkingDirLocker()
+	locker := events.NewDefaultWorkingDirLocker()
 
 	t.Log("a lock for a different pull but the same repo and workspace should succeed")
 	_, err := locker.TryLock(repo, workspace, 1)
@@ -93,7 +93,7 @@ func TestTryLockDifferentPulls(t *testing.T) {
 }
 
 func TestUnlock(t *testing.T) {
-	locker := events.NewDefaultAtlantisWorkingDirLocker()
+	locker := events.NewDefaultWorkingDirLocker()
 
 	t.Log("unlocking should work")
 	unlockFn, err := locker.TryLock(repo, workspace, 1)
@@ -104,7 +104,7 @@ func TestUnlock(t *testing.T) {
 }
 
 func TestUnlockDifferentWorkspaces(t *testing.T) {
-	locker := events.NewDefaultAtlantisWorkingDirLocker()
+	locker := events.NewDefaultWorkingDirLocker()
 	t.Log("unlocking should work for different workspaces")
 	unlockFn1, err1 := locker.TryLock(repo, workspace, 1)
 	Ok(t, err1)
@@ -120,7 +120,7 @@ func TestUnlockDifferentWorkspaces(t *testing.T) {
 }
 
 func TestUnlockDifferentRepos(t *testing.T) {
-	locker := events.NewDefaultAtlantisWorkingDirLocker()
+	locker := events.NewDefaultWorkingDirLocker()
 	t.Log("unlocking should work for different repos")
 	unlockFn1, err1 := locker.TryLock(repo, workspace, 1)
 	Ok(t, err1)
@@ -137,7 +137,7 @@ func TestUnlockDifferentRepos(t *testing.T) {
 }
 
 func TestUnlockDifferentPulls(t *testing.T) {
-	locker := events.NewDefaultAtlantisWorkingDirLocker()
+	locker := events.NewDefaultWorkingDirLocker()
 	t.Log("unlocking should work for different pulls")
 	unlockFn1, err1 := locker.TryLock(repo, workspace, 1)
 	Ok(t, err1)

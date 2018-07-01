@@ -29,7 +29,6 @@ type DefaultProjectCommandBuilder struct {
 	VCSClient           vcs.ClientProxy
 	WorkingDir          WorkingDir
 	WorkingDirLocker    WorkingDirLocker
-	RequireApproval     bool
 	AllowRepoConfig     bool
 	AllowRepoConfigFlag string
 }
@@ -180,17 +179,16 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 	}
 
 	return models.ProjectCommandContext{
-		BaseRepo:                ctx.BaseRepo,
-		HeadRepo:                ctx.HeadRepo,
-		Pull:                    ctx.Pull,
-		User:                    ctx.User,
-		Log:                     ctx.Log,
-		CommentArgs:             cmd.Flags,
-		Workspace:               workspace,
-		RepoRelDir:              dir,
-		ProjectConfig:           projCfg,
-		GlobalConfig:            globalCfg,
-		RequireApprovalOverride: p.RequireApproval,
+		BaseRepo:      ctx.BaseRepo,
+		HeadRepo:      ctx.HeadRepo,
+		Pull:          ctx.Pull,
+		User:          ctx.User,
+		Log:           ctx.Log,
+		CommentArgs:   cmd.Flags,
+		Workspace:     workspace,
+		RepoRelDir:    dir,
+		ProjectConfig: projCfg,
+		GlobalConfig:  globalCfg,
 	}, nil
 }
 

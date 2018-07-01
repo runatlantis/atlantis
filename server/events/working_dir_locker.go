@@ -36,20 +36,20 @@ type WorkingDirLocker interface {
 	Unlock(repoFullName, workspace string, pullNum int)
 }
 
-// DefaultAtlantisWorkingDirLocker implements WorkingDirLocker.
-type DefaultAtlantisWorkingDirLocker struct {
+// DefaultWorkingDirLocker implements WorkingDirLocker.
+type DefaultWorkingDirLocker struct {
 	mutex sync.Mutex
 	locks map[string]interface{}
 }
 
-// NewDefaultAtlantisWorkingDirLocker is a constructor.
-func NewDefaultAtlantisWorkingDirLocker() *DefaultAtlantisWorkingDirLocker {
-	return &DefaultAtlantisWorkingDirLocker{
+// NewDefaultWorkingDirLocker is a constructor.
+func NewDefaultWorkingDirLocker() *DefaultWorkingDirLocker {
+	return &DefaultWorkingDirLocker{
 		locks: make(map[string]interface{}),
 	}
 }
 
-func (d *DefaultAtlantisWorkingDirLocker) TryLock(repoFullName string, workspace string, pullNum int) (func(), error) {
+func (d *DefaultWorkingDirLocker) TryLock(repoFullName string, workspace string, pullNum int) (func(), error) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
@@ -67,12 +67,12 @@ func (d *DefaultAtlantisWorkingDirLocker) TryLock(repoFullName string, workspace
 }
 
 // Unlock unlocks the repo, pull and workspace.
-func (d *DefaultAtlantisWorkingDirLocker) Unlock(repoFullName, workspace string, pullNum int) {
+func (d *DefaultWorkingDirLocker) Unlock(repoFullName, workspace string, pullNum int) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 	delete(d.locks, d.key(repoFullName, workspace, pullNum))
 }
 
-func (d *DefaultAtlantisWorkingDirLocker) key(repo string, workspace string, pull int) string {
+func (d *DefaultWorkingDirLocker) key(repo string, workspace string, pull int) string {
 	return fmt.Sprintf("%s/%s/%d", repo, workspace, pull)
 }

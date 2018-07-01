@@ -190,7 +190,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, err
 	}
 	lockingClient := locking.NewClient(boltdb)
-	workingDirLocker := events.NewDefaultAtlantisWorkingDirLocker()
+	workingDirLocker := events.NewDefaultWorkingDirLocker()
 	workingDir := &events.FileWorkspace{
 		DataDir: userConfig.DataDir,
 	}
@@ -239,31 +239,31 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			VCSClient:           vcsClient,
 			WorkingDir:          workingDir,
 			WorkingDirLocker:    workingDirLocker,
-			RequireApproval:     userConfig.RequireApproval,
 			AllowRepoConfig:     userConfig.AllowRepoConfig,
 			AllowRepoConfigFlag: config.AllowRepoConfigFlag,
 		},
 		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
 			Locker:           projectLocker,
 			LockURLGenerator: router,
-			InitStepRunner: runtime.InitStepRunner{
+			InitStepRunner: &runtime.InitStepRunner{
 				TerraformExecutor: terraformClient,
 				DefaultTFVersion:  defaultTfVersion,
 			},
-			PlanStepRunner: runtime.PlanStepRunner{
+			PlanStepRunner: &runtime.PlanStepRunner{
 				TerraformExecutor: terraformClient,
 				DefaultTFVersion:  defaultTfVersion,
 			},
-			ApplyStepRunner: runtime.ApplyStepRunner{
+			ApplyStepRunner: &runtime.ApplyStepRunner{
 				TerraformExecutor: terraformClient,
 			},
-			RunStepRunner: runtime.RunStepRunner{
+			RunStepRunner: &runtime.RunStepRunner{
 				DefaultTFVersion: defaultTfVersion,
 			},
-			PullApprovedChecker: vcsClient,
-			WorkingDir:          workingDir,
-			Webhooks:            webhooksManager,
-			WorkingDirLocker:    workingDirLocker,
+			PullApprovedChecker:     vcsClient,
+			WorkingDir:              workingDir,
+			Webhooks:                webhooksManager,
+			WorkingDirLocker:        workingDirLocker,
+			RequireApprovalOverride: userConfig.RequireApproval,
 		},
 	}
 	repoWhitelist := &events.RepoWhitelistChecker{

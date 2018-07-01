@@ -236,23 +236,23 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClientProxy,
 	}
 
 	defaultTFVersion := terraformClient.Version()
-	locker := events.NewDefaultAtlantisWorkingDirLocker()
+	locker := events.NewDefaultWorkingDirLocker()
 	commandRunner := &events.DefaultCommandRunner{
 		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
 			Locker:           projectLocker,
 			LockURLGenerator: &mockLockURLGenerator{},
-			InitStepRunner: runtime.InitStepRunner{
+			InitStepRunner: &runtime.InitStepRunner{
 				TerraformExecutor: terraformClient,
 				DefaultTFVersion:  defaultTFVersion,
 			},
-			PlanStepRunner: runtime.PlanStepRunner{
+			PlanStepRunner: &runtime.PlanStepRunner{
 				TerraformExecutor: terraformClient,
 				DefaultTFVersion:  defaultTFVersion,
 			},
-			ApplyStepRunner: runtime.ApplyStepRunner{
+			ApplyStepRunner: &runtime.ApplyStepRunner{
 				TerraformExecutor: terraformClient,
 			},
-			RunStepRunner: runtime.RunStepRunner{
+			RunStepRunner: &runtime.RunStepRunner{
 				DefaultTFVersion: defaultTFVersion,
 			},
 			PullApprovedChecker: e2eVCSClient,
@@ -277,7 +277,6 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClientProxy,
 			WorkingDirLocker:    locker,
 			AllowRepoConfigFlag: "allow-repo-config",
 			AllowRepoConfig:     true,
-			RequireApproval:     false,
 		},
 	}
 
