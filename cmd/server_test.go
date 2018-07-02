@@ -278,6 +278,7 @@ func TestExecute_Defaults(t *testing.T) {
 	Ok(t, err)
 	Equals(t, "http://"+hostname+":4141", passedConfig.AtlantisURL)
 	Equals(t, false, passedConfig.AllowForkPRs)
+	Equals(t, false, passedConfig.AllowRepoConfig)
 
 	// Get our home dir since that's what gets defaulted to
 	dataDir, err := homedir.Expand("~/.atlantis")
@@ -361,6 +362,7 @@ func TestExecute_Flags(t *testing.T) {
 	c := setup(map[string]interface{}{
 		cmd.AtlantisURLFlag:     "url",
 		cmd.AllowForkPRsFlag:    true,
+		cmd.AllowRepoConfigFlag: true,
 		cmd.DataDirFlag:         "/path",
 		cmd.GHHostnameFlag:      "ghhostname",
 		cmd.GHTokenFlag:         "token",
@@ -382,6 +384,7 @@ func TestExecute_Flags(t *testing.T) {
 
 	Equals(t, "url", passedConfig.AtlantisURL)
 	Equals(t, true, passedConfig.AllowForkPRs)
+	Equals(t, true, passedConfig.AllowRepoConfig)
 	Equals(t, "/path", passedConfig.DataDir)
 	Equals(t, "ghhostname", passedConfig.GithubHostname)
 	Equals(t, "token", passedConfig.GithubToken)
@@ -404,6 +407,7 @@ func TestExecute_ConfigFile(t *testing.T) {
 	tmpFile := tempFile(t, `---
 atlantis-url: "url"
 allow-fork-prs: true
+allow-repo-config: true
 data-dir: "/path"
 gh-hostname: "ghhostname"
 gh-token: "token"
@@ -429,6 +433,7 @@ ssl-key-file: key-file
 	Ok(t, err)
 	Equals(t, "url", passedConfig.AtlantisURL)
 	Equals(t, true, passedConfig.AllowForkPRs)
+	Equals(t, true, passedConfig.AllowRepoConfig)
 	Equals(t, "/path", passedConfig.DataDir)
 	Equals(t, "ghhostname", passedConfig.GithubHostname)
 	Equals(t, "token", passedConfig.GithubToken)
@@ -451,6 +456,7 @@ func TestExecute_EnvironmentOverride(t *testing.T) {
 	tmpFile := tempFile(t, `---
 atlantis-url: "url"
 allow-fork-prs: true
+allow-repo-config: true
 data-dir: "/path"
 gh-hostname: "ghhostname"
 gh-token: "token"
@@ -473,6 +479,7 @@ ssl-key-file: key-file
 	for name, value := range map[string]string{
 		"ATLANTIS_URL":          "override-url",
 		"ALLOW_FORK_PRS":        "false",
+		"ALLOW_REPO_CONFIG":     "false",
 		"DATA_DIR":              "/override-path",
 		"GH_HOSTNAME":           "override-gh-hostname",
 		"GH_TOKEN":              "override-gh-token",
@@ -498,6 +505,7 @@ ssl-key-file: key-file
 	Ok(t, err)
 	Equals(t, "override-url", passedConfig.AtlantisURL)
 	Equals(t, false, passedConfig.AllowForkPRs)
+	Equals(t, false, passedConfig.AllowRepoConfig)
 	Equals(t, "/override-path", passedConfig.DataDir)
 	Equals(t, "override-gh-hostname", passedConfig.GithubHostname)
 	Equals(t, "override-gh-token", passedConfig.GithubToken)
@@ -520,6 +528,7 @@ func TestExecute_FlagConfigOverride(t *testing.T) {
 	tmpFile := tempFile(t, `---
 atlantis-url: "url"
 allow-fork-prs: true
+allow-repo-config: true
 data-dir: "/path"
 gh-hostname: "ghhostname"
 gh-token: "token"
@@ -541,6 +550,7 @@ ssl-key-file: key-file
 	c := setup(map[string]interface{}{
 		cmd.AtlantisURLFlag:     "override-url",
 		cmd.AllowForkPRsFlag:    false,
+		cmd.AllowRepoConfigFlag: false,
 		cmd.DataDirFlag:         "/override-path",
 		cmd.GHHostnameFlag:      "override-gh-hostname",
 		cmd.GHTokenFlag:         "override-gh-token",
@@ -584,6 +594,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	for name, value := range map[string]string{
 		"ATLANTIS_URL":          "url",
 		"ALLOW_FORK_PRS":        "true",
+		"ALLOW_REPO_CONFIG":     "true",
 		"DATA_DIR":              "/path",
 		"GH_HOSTNAME":           "gh-hostname",
 		"GH_TOKEN":              "gh-token",
@@ -606,6 +617,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	c := setup(map[string]interface{}{
 		cmd.AtlantisURLFlag:     "override-url",
 		cmd.AllowForkPRsFlag:    false,
+		cmd.AllowRepoConfigFlag: false,
 		cmd.DataDirFlag:         "/override-path",
 		cmd.GHHostnameFlag:      "override-gh-hostname",
 		cmd.GHTokenFlag:         "override-gh-token",
@@ -627,6 +639,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 
 	Equals(t, "override-url", passedConfig.AtlantisURL)
 	Equals(t, false, passedConfig.AllowForkPRs)
+	Equals(t, false, passedConfig.AllowRepoConfig)
 	Equals(t, "/override-path", passedConfig.DataDir)
 	Equals(t, "override-gh-hostname", passedConfig.GithubHostname)
 	Equals(t, "override-gh-token", passedConfig.GithubToken)
