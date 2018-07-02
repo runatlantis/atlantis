@@ -19,7 +19,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/docker/docker/pkg/fileutils"
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -30,6 +33,7 @@ type ProjectFinder interface {
 	// DetermineProjects returns the list of projects that were modified based on
 	// the modifiedFiles. The list will be de-duplicated.
 	DetermineProjects(log *logging.SimpleLogger, modifiedFiles []string, repoFullName string, repoDir string) []models.Project
+	DetermineProjectsViaConfig(log *logging.SimpleLogger, modifiedFiles []string, config valid.Config, repoDir string) ([]valid.Project, error)
 }
 
 // DefaultProjectFinder implements ProjectFinder.
@@ -70,6 +74,45 @@ func (p *DefaultProjectFinder) DetermineProjects(log *logging.SimpleLogger, modi
 	log.Info("there are %d modified project(s) at path(s): %v",
 		len(projects), strings.Join(exists, ", "))
 	return projects
+}
+
+func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log *logging.SimpleLogger, modifiedFiles []string, config valid.Config, repoDir string) ([]valid.Project, error) {
+	var projects []valid.Project
+	for _, project := range config.Projects {
+		log.Debug("checking if project at dir %q workspace %q was modified", project.Dir, project.Workspace)
+		if !project.Autoplan.Enabled {
+			log.Debug("autoplan disabled, ignoring")
+			continue
+		}
+		// Prepend project dir to when modified patterns because the patterns
+		// are relative to the project dirs but our list of modified files is
+		// relative to the repo root.
+		var whenModifiedRelToRepoRoot []string
+		for _, wm := range project.Autoplan.WhenModified {
+			whenModifiedRelToRepoRoot = append(whenModifiedRelToRepoRoot, filepath.Join(project.Dir, wm))
+		}
+		pm, err := fileutils.NewPatternMatcher(whenModifiedRelToRepoRoot)
+		if err != nil {
+			return nil, errors.Wrapf(err, "matching modified files with patterns: %v", project.Autoplan.WhenModified)
+		}
+
+		// If any of the modified files matches the pattern then this project is
+		// considered modified.
+		for _, file := range modifiedFiles {
+			match, err := pm.Matches(file)
+			if err != nil {
+				log.Debug("match err for file %q: %s", file, err)
+				continue
+			}
+			if match {
+				log.Debug("file %q matched pattern", file)
+				projects = append(projects, project)
+				break
+			}
+		}
+	}
+	// todo: check if dir is deleted though
+	return projects, nil
 }
 
 func (p *DefaultProjectFinder) filterToTerraform(files []string) []string {

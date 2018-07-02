@@ -3,11 +3,8 @@ package events
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
-	"github.com/docker/docker/pkg/fileutils"
 	"github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/yaml"
@@ -101,7 +98,7 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext
 	} else {
 		// Otherwise, we use the projects that match the WhenModified fields
 		// in the config file.
-		matchingProjects, err := p.matchingProjects(ctx.Log, modifiedFiles, config)
+		matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, config, repoDir)
 		if err != nil {
 			return nil, err
 		}
@@ -226,45 +223,4 @@ func (p *DefaultProjectCommandBuilder) getCfg(projectName string, dir string, wo
 		return nil, nil, fmt.Errorf("must specify project name: more than one project defined in %s matched dir: %q workspace: %q", yaml.AtlantisYAMLFilename, dir, workspace)
 	}
 	return &projCfgs[0], &globalCfg, nil
-}
-
-// matchingProjects returns the list of projects whose WhenModified fields match
-// any of the modifiedFiles.
-func (p *DefaultProjectCommandBuilder) matchingProjects(log *logging.SimpleLogger, modifiedFiles []string, config valid.Config) ([]valid.Project, error) {
-	var projects []valid.Project
-	for _, project := range config.Projects {
-		log.Debug("checking if project at dir %q workspace %q was modified", project.Dir, project.Workspace)
-		if !project.Autoplan.Enabled {
-			log.Debug("autoplan disabled, ignoring")
-			continue
-		}
-		// Prepend project dir to when modified patterns because the patterns
-		// are relative to the project dirs but our list of modified files is
-		// relative to the repo root.
-		var whenModifiedRelToRepoRoot []string
-		for _, wm := range project.Autoplan.WhenModified {
-			whenModifiedRelToRepoRoot = append(whenModifiedRelToRepoRoot, filepath.Join(project.Dir, wm))
-		}
-		pm, err := fileutils.NewPatternMatcher(whenModifiedRelToRepoRoot)
-		if err != nil {
-			return nil, errors.Wrapf(err, "matching modified files with patterns: %v", project.Autoplan.WhenModified)
-		}
-
-		// If any of the modified files matches the pattern then this project is
-		// considered modified.
-		for _, file := range modifiedFiles {
-			match, err := pm.Matches(file)
-			if err != nil {
-				log.Debug("match err for file %q: %s", file, err)
-				continue
-			}
-			if match {
-				log.Debug("file %q matched pattern", file)
-				projects = append(projects, project)
-				break
-			}
-		}
-	}
-	// todo: check if dir is deleted though
-	return projects, nil
 }

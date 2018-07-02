@@ -45,16 +45,13 @@ const terraformPluginCacheDirName = "plugin-cache"
 var versionRegex = regexp.MustCompile("Terraform v(.*)\n")
 
 func NewClient(dataDir string) (*DefaultClient, error) {
-	// todo: use exec.LookPath to find out if we even have terraform rather than
-	// parsing the error looking for a not found error.
+	_, err := exec.LookPath("terraform")
+	if err != nil {
+		return nil, errors.New("terraform not found in $PATH. \n\nDownload terraform from https://www.terraform.io/downloads.html")
+	}
 	versionCmdOutput, err := exec.Command("terraform", "version").CombinedOutput() // #nosec
 	output := string(versionCmdOutput)
 	if err != nil {
-		// exec.go line 35, Error() returns
-		// "exec: " + strconv.Quote(e.Name) + ": " + e.Err.Error()
-		if err.Error() == fmt.Sprintf("exec: \"terraform\": %s", exec.ErrNotFound.Error()) {
-			return nil, errors.New("terraform not found in $PATH. \n\nDownload terraform from https://www.terraform.io/downloads.html")
-		}
 		return nil, errors.Wrapf(err, "running terraform version: %s", output)
 	}
 	match := versionRegex.FindStringSubmatch(output)
@@ -105,13 +102,6 @@ func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path st
 		"TF_IN_AUTOMATION=true",
 		// Cache plugins so terraform init runs faster.
 		fmt.Sprintf("TF_PLUGIN_CACHE_DIR=%s", c.terraformPluginCacheDir),
-		// Terraform will run all commands in this workspace. We should have
-		// already selected this workspace but this is a fail-safe to ensure
-		// we're operating in the right workspace.
-		fmt.Sprintf("TF_WORKSPACE=%s", workspace),
-		// We're keeping this variable even though it duplicates TF_WORKSPACE
-		// because it's probably safer for users to rely on it. Terraform might
-		// change the way TF_WORKSPACE works in the future.
 		fmt.Sprintf("WORKSPACE=%s", workspace),
 		fmt.Sprintf("ATLANTIS_TERRAFORM_VERSION=%s", tfVersionStr),
 		fmt.Sprintf("DIR=%s", path),

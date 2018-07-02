@@ -88,11 +88,11 @@ func (p *PlanStepRunner) switchWorkspace(ctx models.ProjectCommandContext, path 
 		}
 	}
 
-	// Finally we'll have to select the workspace. Although we end up running
-	// with TF_WORKSPACE set, we need to figure out if this workspace exists so
-	// we can create it if it doesn't. To do this we can either select and catch
-	// the error or use list and then look for the workspace. Both commands take
-	// the same amount of time so that's why we're running select here.
+	// Finally we'll have to select the workspace. We need to figure out if this
+	// workspace exists so we can create it if it doesn't.
+	// To do this we can either select and catch the error or use list and then
+	// look for the workspace. Both commands take the same amount of time so
+	// that's why we're running select here.
 	_, err := p.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, []string{workspaceCmd, "select", "-no-color", ctx.Workspace}, tfVersion, ctx.Workspace)
 	if err != nil {
 		// If terraform workspace select fails we run terraform workspace
