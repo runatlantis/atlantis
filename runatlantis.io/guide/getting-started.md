@@ -26,16 +26,16 @@ Atlantis needs to be accessible somewhere that github.com/gitlab.com or your Git
 One way to accomplish this is with ngrok, a tool that forwards your local port to a random
 public hostname.
 
-TODO: ngrok download instructions
+Go to [https://ngrok.com/download](https://ngrok.com/download), download ngrok and `unzip` it.
 
-Start `ngrok` on port `4141`:
-```
-ngrok http 4141
+Start `ngrok` on port `4141` and take note of the hostname it gives you:
+```bash
+./ngrok http 4141
 ```
 
 In a new tab (where you'll soon start Atlantis) create an environment variable with
-the URL ngrok output:
-```
+ngrok's hostname:
+```bash
 URL=https://{YOUR_HOSTNAME}.ngrok.io
 ```
 
