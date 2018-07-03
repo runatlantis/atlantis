@@ -1,9 +1,15 @@
 # v0.4.0-alpha
 
 ## Features
+* Autoplanning - Atlantis will automatically run `plan` on new pull requests and
+when new commits are pushed to the pull request.
+* New repository `atlantis.yaml` format that supports:
+    * Arbitrary step ordering
+    * Single config file for whole repository
+    * Controlling autoplanning
+* Moved docs to standalone website from the README.
 
 ## Bugfixes
-* Won't attempt to run plan in a directory that was deleted.
 
 ## Backwards Incompatibilities / Notes:
 

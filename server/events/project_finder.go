@@ -106,12 +106,16 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log *logging.SimpleLog
 			}
 			if match {
 				log.Debug("file %q matched pattern", file)
-				projects = append(projects, project)
+				_, err := os.Stat(filepath.Join(repoDir, project.Dir))
+				if err == nil {
+					projects = append(projects, project)
+				} else {
+					log.Debug("project at dir %q not included because dir does not exist", project.Dir)
+				}
 				break
 			}
 		}
 	}
-	// todo: check if dir is deleted though
 	return projects, nil
 }
 

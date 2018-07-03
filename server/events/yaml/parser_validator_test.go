@@ -16,6 +16,10 @@ func TestReadConfig_DirDoesNotExist(t *testing.T) {
 	r := yaml.ParserValidator{}
 	_, err := r.ReadConfig("/not/exist")
 	Assert(t, os.IsNotExist(err), "exp nil ptr")
+
+	exists, err := r.HasConfigFile("/not/exist")
+	Ok(t, err)
+	Equals(t, false, exists)
 }
 
 func TestReadConfig_FileDoesNotExist(t *testing.T) {
@@ -25,6 +29,10 @@ func TestReadConfig_FileDoesNotExist(t *testing.T) {
 	r := yaml.ParserValidator{}
 	_, err := r.ReadConfig(tmpDir)
 	Assert(t, os.IsNotExist(err), "exp nil ptr")
+
+	exists, err := r.HasConfigFile(tmpDir)
+	Ok(t, err)
+	Equals(t, false, exists)
 }
 
 func TestReadConfig_BadPermissions(t *testing.T) {

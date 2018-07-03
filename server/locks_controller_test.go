@@ -11,7 +11,9 @@ import (
 	"github.com/gorilla/mux"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server"
+	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/locking/mocks"
+	mocks2 "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -187,6 +189,8 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 	RegisterMockTestingT(t)
 
 	cp := vcsmocks.NewMockClientProxy()
+	workingDir := mocks2.NewMockWorkingDir()
+	workingDirLocker := events.NewDefaultWorkingDirLocker()
 	When(cp.CreateComment(AnyRepo(), AnyInt(), AnyString())).ThenReturn(errors.New("err"))
 	l := mocks.NewMockLocker()
 	When(l.Unlock("id")).ThenReturn(&models.ProjectLock{
@@ -195,9 +199,11 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 		},
 	}, nil)
 	lc := server.LocksController{
-		Locker:    l,
-		Logger:    logging.NewNoopLogger(),
-		VCSClient: cp,
+		Locker:           l,
+		Logger:           logging.NewNoopLogger(),
+		VCSClient:        cp,
+		WorkingDir:       workingDir,
+		WorkingDirLocker: workingDirLocker,
 	}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
@@ -212,6 +218,8 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 
 	cp := vcsmocks.NewMockClientProxy()
 	l := mocks.NewMockLocker()
+	workingDir := mocks2.NewMockWorkingDir()
+	workingDirLocker := events.NewDefaultWorkingDirLocker()
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: "owner/repo"},
 	}
@@ -224,9 +232,11 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 		},
 	}, nil)
 	lc := server.LocksController{
-		Locker:    l,
-		Logger:    logging.NewNoopLogger(),
-		VCSClient: cp,
+		Locker:           l,
+		Logger:           logging.NewNoopLogger(),
+		VCSClient:        cp,
+		WorkingDirLocker: workingDirLocker,
+		WorkingDir:       workingDir,
 	}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
@@ -236,4 +246,5 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	cp.VerifyWasCalled(Once()).CreateComment(pull.BaseRepo, pull.Num,
 		"**Warning**: The plan for dir: `path` workspace: `workspace` was **discarded** via the Atlantis UI.\n\n"+
 			"To `apply` you must run `plan` again.")
+	workingDir.VerifyWasCalledOnce().DeleteForWorkspace(pull.BaseRepo, pull, "workspace")
 }

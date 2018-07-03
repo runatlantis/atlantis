@@ -63,6 +63,18 @@ func (mock *MockWorkingDir) Delete(r models.Repo, p models.PullRequest) error {
 	return ret0
 }
 
+func (mock *MockWorkingDir) DeleteForWorkspace(r models.Repo, p models.PullRequest, workspace string) error {
+	params := []pegomock.Param{r, p, workspace}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("DeleteForWorkspace", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(error)
+		}
+	}
+	return ret0
+}
+
 func (mock *MockWorkingDir) VerifyWasCalledOnce() *VerifierWorkingDir {
 	return &VerifierWorkingDir{mock, pegomock.Times(1), nil}
 }
@@ -185,6 +197,41 @@ func (c *WorkingDir_Delete_OngoingVerification) GetAllCapturedArguments() (_para
 		_param1 = make([]models.PullRequest, len(params[1]))
 		for u, param := range params[1] {
 			_param1[u] = param.(models.PullRequest)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierWorkingDir) DeleteForWorkspace(r models.Repo, p models.PullRequest, workspace string) *WorkingDir_DeleteForWorkspace_OngoingVerification {
+	params := []pegomock.Param{r, p, workspace}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "DeleteForWorkspace", params)
+	return &WorkingDir_DeleteForWorkspace_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type WorkingDir_DeleteForWorkspace_OngoingVerification struct {
+	mock              *MockWorkingDir
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *WorkingDir_DeleteForWorkspace_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, string) {
+	r, p, workspace := c.GetAllCapturedArguments()
+	return r[len(r)-1], p[len(p)-1], workspace[len(workspace)-1]
+}
+
+func (c *WorkingDir_DeleteForWorkspace_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []string) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]models.Repo, len(params[0]))
+		for u, param := range params[0] {
+			_param0[u] = param.(models.Repo)
+		}
+		_param1 = make([]models.PullRequest, len(params[1]))
+		for u, param := range params[1] {
+			_param1[u] = param.(models.PullRequest)
+		}
+		_param2 = make([]string, len(params[2]))
+		for u, param := range params[2] {
+			_param2[u] = param.(string)
 		}
 	}
 	return

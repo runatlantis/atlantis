@@ -275,6 +275,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Logger:             logger,
 		VCSClient:          vcsClient,
 		LockDetailTemplate: lockTemplate,
+		WorkingDir:         workingDir,
+		WorkingDirLocker:   workingDirLocker,
 	}
 	eventsController := &EventsController{
 		CommandRunner:                commandRunner,

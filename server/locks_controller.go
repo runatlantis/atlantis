@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
+	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -20,6 +21,8 @@ type LocksController struct {
 	Logger             *logging.SimpleLogger
 	VCSClient          vcs.ClientProxy
 	LockDetailTemplate TemplateWriter
+	WorkingDir         events.WorkingDir
+	WorkingDirLocker   events.WorkingDirLocker
 }
 
 // GetLock is the GET /locks/{id} route. It renders the lock detail view.
@@ -84,20 +87,29 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Once the lock has been deleted, comment back on the pull request.
-	comment := fmt.Sprintf("**Warning**: The plan for dir: `%s` workspace: `%s` was **discarded** via the Atlantis UI.\n\n"+
-		"To `apply` you must run `plan` again.", lock.Project.Path, lock.Workspace)
 	// NOTE: Because BaseRepo was added to the PullRequest model later, previous
 	// installations of Atlantis will have locks in their DB that do not have
-	// this field on PullRequest. We skip commenting in this case.
+	// this field on PullRequest. We skip commenting and deleting the working dir in this case.
 	if lock.Pull.BaseRepo != (models.Repo{}) {
+		unlock, err := l.WorkingDirLocker.TryLock(lock.Pull.BaseRepo.FullName, lock.Workspace, lock.Pull.Num)
+		if err != nil {
+			l.Logger.Err("unable to obtain working dir lock when trying to delete old plans: %s", err)
+		} else {
+			defer unlock()
+			err = l.WorkingDir.DeleteForWorkspace(lock.Pull.BaseRepo, lock.Pull, lock.Workspace)
+			l.Logger.Err("unable to delete workspace: %s", err)
+		}
+
+		// Once the lock has been deleted, comment back on the pull request.
+		comment := fmt.Sprintf("**Warning**: The plan for dir: `%s` workspace: `%s` was **discarded** via the Atlantis UI.\n\n"+
+			"To `apply` you must run `plan` again.", lock.Project.Path, lock.Workspace)
 		err = l.VCSClient.CreateComment(lock.Pull.BaseRepo, lock.Pull.Num, comment)
 		if err != nil {
 			l.respond(w, logging.Error, http.StatusInternalServerError, "Failed commenting on pull request: %s", err)
 			return
 		}
 	} else {
-		l.Logger.Debug("skipping commenting on pull request that lock was deleted because BaseRepo field is empty")
+		l.Logger.Debug("skipping commenting on pull request and deleting workspace because BaseRepo field is empty")
 	}
 	l.respond(w, logging.Info, http.StatusOK, "Deleted lock id %q", id)
 }

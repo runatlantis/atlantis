@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -215,6 +216,165 @@ func TestDetermineProjects(t *testing.T) {
 				if !found {
 					t.Fatalf("exp %q but was not in paths %v", expPath, paths)
 				}
+			}
+		})
+	}
+}
+
+func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
+	/*
+		Create dir structure:
+
+		main.tf
+		project1/
+		  main.tf
+		project2/
+		  main.tf
+		modules/
+		  module/
+		    main.tf
+	*/
+	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
+		"main.tf": nil,
+		"project1": map[string]interface{}{
+			"main.tf": nil,
+		},
+		"project2": map[string]interface{}{
+			"main.tf": nil,
+		},
+		"modules": map[string]interface{}{
+			"module": map[string]interface{}{
+				"main.tf": nil,
+			},
+		},
+	})
+	defer cleanup()
+
+	cases := []struct {
+		description  string
+		config       valid.Config
+		modified     []string
+		expProjPaths []string
+	}{
+		{
+			description: "autoplan disabled",
+			config: valid.Config{
+				Projects: []valid.Project{
+					{
+						Dir: ".",
+						Autoplan: valid.Autoplan{
+							Enabled: false,
+						},
+					},
+				},
+			},
+			modified:     []string{"main.tf"},
+			expProjPaths: nil,
+		},
+		{
+			description: "autoplan default",
+			config: valid.Config{
+				Projects: []valid.Project{
+					{
+						Dir: ".",
+						Autoplan: valid.Autoplan{
+							Enabled:      true,
+							WhenModified: []string{"**/*.tf"},
+						},
+					},
+				},
+			},
+			modified:     []string{"main.tf"},
+			expProjPaths: []string{"."},
+		},
+		{
+			description: "parent dir modified",
+			config: valid.Config{
+				Projects: []valid.Project{
+					{
+						Dir: "project",
+						Autoplan: valid.Autoplan{
+							Enabled:      true,
+							WhenModified: []string{"**/*.tf"},
+						},
+					},
+				},
+			},
+			modified:     []string{"main.tf"},
+			expProjPaths: nil,
+		},
+		{
+			description: "parent dir modified matches",
+			config: valid.Config{
+				Projects: []valid.Project{
+					{
+						Dir: "project1",
+						Autoplan: valid.Autoplan{
+							Enabled:      true,
+							WhenModified: []string{"../**/*.tf"},
+						},
+					},
+				},
+			},
+			modified:     []string{"main.tf"},
+			expProjPaths: []string{"project1"},
+		},
+		{
+			description: "dir deleted",
+			config: valid.Config{
+				Projects: []valid.Project{
+					{
+						Dir: "project3",
+						Autoplan: valid.Autoplan{
+							Enabled:      true,
+							WhenModified: []string{"*.tf"},
+						},
+					},
+				},
+			},
+			modified:     []string{"project3/main.tf"},
+			expProjPaths: nil,
+		},
+		{
+			description: "multiple projects",
+			config: valid.Config{
+				Projects: []valid.Project{
+					{
+						Dir: ".",
+						Autoplan: valid.Autoplan{
+							Enabled:      true,
+							WhenModified: []string{"*.tf"},
+						},
+					},
+					{
+						Dir: "project1",
+						Autoplan: valid.Autoplan{
+							Enabled:      true,
+							WhenModified: []string{"../modules/module/*.tf", "**/*.tf"},
+						},
+					},
+					{
+						Dir: "project2",
+						Autoplan: valid.Autoplan{
+							Enabled:      true,
+							WhenModified: []string{"**/*.tf"},
+						},
+					},
+				},
+			},
+			modified:     []string{"main.tf", "modules/module/another.tf", "project2/nontf.txt"},
+			expProjPaths: []string{".", "project1"},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			pf := events.DefaultProjectFinder{}
+			projects, err := pf.DetermineProjectsViaConfig(logging.NewNoopLogger(), c.modified, c.config, tmpDir)
+			Ok(t, err)
+			Equals(t, len(c.expProjPaths), len(projects))
+			for i, proj := range projects {
+				Equals(t, c.expProjPaths[i], proj.Dir)
 			}
 		})
 	}

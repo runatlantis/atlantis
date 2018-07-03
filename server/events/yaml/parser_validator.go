@@ -20,9 +20,10 @@ type ParserValidator struct{}
 
 // ReadConfig returns the parsed and validated atlantis.yaml config for repoDir.
 // If there was no config file, then this can be detected by checking the type
-// of error: os.IsNotExist(error).
+// of error: os.IsNotExist(error) but it's instead preferred to check with
+// HasConfigFile.
 func (p *ParserValidator) ReadConfig(repoDir string) (valid.Config, error) {
-	configFile := filepath.Join(repoDir, AtlantisYAMLFilename)
+	configFile := p.configFilePath(repoDir)
 	configData, err := ioutil.ReadFile(configFile)
 
 	// NOTE: the error we return here must also be os.IsNotExist since that's
@@ -42,6 +43,21 @@ func (p *ParserValidator) ReadConfig(repoDir string) (valid.Config, error) {
 		return valid.Config{}, errors.Wrapf(err, "parsing %s", AtlantisYAMLFilename)
 	}
 	return config, err
+}
+
+func (p *ParserValidator) HasConfigFile(repoDir string) (bool, error) {
+	_, err := os.Stat(p.configFilePath(repoDir))
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err == nil {
+		return true, nil
+	}
+	return false, err
+}
+
+func (p *ParserValidator) configFilePath(repoDir string) string {
+	return filepath.Join(repoDir, AtlantisYAMLFilename)
 }
 
 func (p *ParserValidator) parseAndValidate(configData []byte) (valid.Config, error) {

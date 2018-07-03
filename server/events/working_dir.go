@@ -25,7 +25,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-const workspacePrefix = "repos"
+const workingDirPrefix = "repos"
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_working_dir.go WorkingDir
 
@@ -39,6 +39,7 @@ type WorkingDir interface {
 	GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error)
 	// Delete deletes the workspace for this repo and pull.
 	Delete(r models.Repo, p models.PullRequest) error
+	DeleteForWorkspace(r models.Repo, p models.PullRequest, workspace string) error
 }
 
 // FileWorkspace implements WorkingDir with the file system.
@@ -64,11 +65,13 @@ func (w *FileWorkspace) Clone(
 	// If the directory already exists, check if it's at the right commit.
 	// If so, then we do nothing.
 	if _, err := os.Stat(cloneDir); err == nil {
+		log.Debug("clone directory %q already exists, checking if it's at the right commit", cloneDir)
 		revParseCmd := exec.Command("git", "rev-parse", "HEAD") // #nosec
 		revParseCmd.Dir = cloneDir
 		output, err := revParseCmd.CombinedOutput()
 		if err != nil {
-			return "", errors.Wrapf(err, "running git rev-parse HEAD: %s", string(output))
+			log.Err("will re-clone repo, could not determine if was at correct commit: git rev-parse HEAD: %s: %s", err, string(output))
+			return w.forceClone(log, cloneDir, headRepo, p)
 		}
 		currCommit := strings.Trim(string(output), "\n")
 		if currCommit == p.HeadCommit {
@@ -76,12 +79,21 @@ func (w *FileWorkspace) Clone(
 			return cloneDir, nil
 		}
 		log.Debug("repo was already cloned but is not at correct commit, wanted %q got %q", p.HeadCommit, currCommit)
+		// We'll fall through to re-clone.
+	}
 
-		// It's okay to delete all plans now since they're out of date.
-		log.Info("cleaning clone directory %q", cloneDir)
-		if err := os.RemoveAll(cloneDir); err != nil {
-			return "", errors.Wrap(err, "deleting old workspace")
-		}
+	// Otherwise we clone the repo.
+	return w.forceClone(log, cloneDir, headRepo, p)
+}
+
+func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
+	cloneDir string,
+	headRepo models.Repo,
+	p models.PullRequest) (string, error) {
+
+	err := os.RemoveAll(cloneDir)
+	if err != nil {
+		return "", errors.Wrapf(err, "deleting dir %q before cloning", cloneDir)
 	}
 
 	// Create the directory and parents if necessary.
@@ -124,8 +136,13 @@ func (w *FileWorkspace) Delete(r models.Repo, p models.PullRequest) error {
 	return os.RemoveAll(w.repoPullDir(r, p))
 }
 
+// Delete deletes the working dir for this workspace.
+func (w *FileWorkspace) DeleteForWorkspace(r models.Repo, p models.PullRequest, workspace string) error {
+	return os.RemoveAll(w.cloneDir(r, p, workspace))
+}
+
 func (w *FileWorkspace) repoPullDir(r models.Repo, p models.PullRequest) string {
-	return filepath.Join(w.DataDir, workspacePrefix, r.FullName, strconv.Itoa(p.Num))
+	return filepath.Join(w.DataDir, workingDirPrefix, r.FullName, strconv.Itoa(p.Num))
 }
 
 func (w *FileWorkspace) cloneDir(r models.Repo, p models.PullRequest, workspace string) string {

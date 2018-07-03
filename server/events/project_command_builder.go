@@ -2,9 +2,9 @@ package events
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/hashicorp/go-version"
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/yaml"
@@ -51,19 +51,22 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext
 	}
 
 	// Parse config file if it exists.
-	ctx.Log.Debug("parsing config file")
-	config, err := p.ParserValidator.ReadConfig(repoDir)
-	if err != nil && !os.IsNotExist(err) {
-		return nil, err
+	var config valid.Config
+	hasConfigFile, err := p.ParserValidator.HasConfigFile(repoDir)
+	if err != nil {
+		return nil, errors.Wrapf(err, "looking for %s file in %q", yaml.AtlantisYAMLFilename, repoDir)
 	}
-	noAtlantisYAML := os.IsNotExist(err)
-	if noAtlantisYAML {
-		ctx.Log.Info("found no %s file", yaml.AtlantisYAMLFilename)
-	} else {
-		ctx.Log.Info("successfully parsed %s file", yaml.AtlantisYAMLFilename)
+	if hasConfigFile {
 		if !p.AllowRepoConfig {
 			return nil, fmt.Errorf("%s files not allowed because Atlantis is not running with --%s", yaml.AtlantisYAMLFilename, p.AllowRepoConfigFlag)
 		}
+		config, err = p.ParserValidator.ReadConfig(repoDir)
+		if err != nil {
+			return nil, err
+		}
+		ctx.Log.Info("successfully parsed %s file", yaml.AtlantisYAMLFilename)
+	} else {
+		ctx.Log.Info("found no %s file", yaml.AtlantisYAMLFilename)
 	}
 
 	// We'll need the list of modified files.
@@ -78,7 +81,7 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext
 
 	// If there is no config file, then we try to plan for each project that
 	// was modified in the pull request.
-	if noAtlantisYAML {
+	if !hasConfigFile {
 		modifiedProjects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.BaseRepo.FullName, repoDir)
 		ctx.Log.Info("automatically determined that there were %d projects modified in this pull request: %s", len(modifiedProjects), modifiedProjects)
 		for _, mp := range modifiedProjects {
@@ -128,12 +131,14 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext
 func (p *DefaultProjectCommandBuilder) BuildPlanCommand(ctx *CommandContext, cmd *CommentCommand) (models.ProjectCommandContext, error) {
 	var projCtx models.ProjectCommandContext
 
+	ctx.Log.Debug("building plan command")
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.BaseRepo.FullName, cmd.Workspace, ctx.Pull.Num)
 	if err != nil {
 		return projCtx, err
 	}
 	defer unlockFn()
 
+	ctx.Log.Debug("cloning repository")
 	repoDir, err := p.WorkingDir.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, cmd.Workspace)
 	if err != nil {
 		return projCtx, err
@@ -190,19 +195,24 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 }
 
 func (p *DefaultProjectCommandBuilder) getCfg(projectName string, dir string, workspace string, repoDir string) (*valid.Project, *valid.Config, error) {
-	globalCfg, err := p.ParserValidator.ReadConfig(repoDir)
-	if err != nil && !os.IsNotExist(err) {
-		return nil, nil, err
+	hasConfigFile, err := p.ParserValidator.HasConfigFile(repoDir)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "looking for %s file in %q", yaml.AtlantisYAMLFilename, repoDir)
 	}
-	hasAtlantisYAML := !os.IsNotExist(err)
-	if !hasAtlantisYAML && projectName != "" {
-		return nil, nil, fmt.Errorf("cannot specify a project name unless an %s file exists to configure projects", yaml.AtlantisYAMLFilename)
-	}
-	if !hasAtlantisYAML {
+	if !hasConfigFile {
+		if projectName != "" {
+			return nil, nil, fmt.Errorf("cannot specify a project name unless an %s file exists to configure projects", yaml.AtlantisYAMLFilename)
+		}
 		return nil, nil, nil
 	}
+
 	if !p.AllowRepoConfig {
 		return nil, nil, fmt.Errorf("%s files not allowed because Atlantis is not running with --%s", yaml.AtlantisYAMLFilename, p.AllowRepoConfigFlag)
+	}
+
+	globalCfg, err := p.ParserValidator.ReadConfig(repoDir)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	// If they've specified a project by name we look it up. Otherwise we
