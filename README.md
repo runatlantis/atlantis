@@ -1,12 +1,12 @@
 # Atlantis
 
 <p align="center">
-  <img src="./docs/atlantis-logo.png" alt="Atlantis Logo"/><br><br>
+  <img src="./runatlantis.io/.vuepress/public/hero.png" alt="Atlantis Logo"/><br><br>
   A unified workflow for collaborating on Terraform through GitHub and GitLab
 </p>
 
 ## Walkthrough Video
-[![Atlantis Walkthrough](./docs/atlantis-walkthrough-icon.png)](https://www.youtube.com/watch?v=TmIPWda0IKg)
+[![Atlantis Walkthrough](./runatlantis.io/guide/images/atlantis-walkthrough-icon.png)](https://www.youtube.com/watch?v=TmIPWda0IKg)
 
 Read about [Why We Built Atlantis](https://medium.com/runatlantis/introducing-atlantis-6570d6de7281)
 
