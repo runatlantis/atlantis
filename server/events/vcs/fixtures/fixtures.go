@@ -15,6 +15,14 @@ package fixtures
 
 import "github.com/google/go-github/github"
 
+var PullEvent = github.PullRequestEvent{
+	Sender: &github.User{
+		Login: github.String("user"),
+	},
+	Repo:        &Repo,
+	PullRequest: &Pull,
+}
+
 var Pull = github.PullRequest{
 	Head: &github.PullRequestBranch{
 		SHA:  github.String("sha256"),

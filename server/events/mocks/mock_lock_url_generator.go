@@ -17,9 +17,16 @@ func NewMockLockURLGenerator() *MockLockURLGenerator {
 	return &MockLockURLGenerator{fail: pegomock.GlobalFailHandler}
 }
 
-func (mock *MockLockURLGenerator) SetLockURL(_param0 func(string) string) {
-	params := []pegomock.Param{_param0}
-	pegomock.GetGenericMockFrom(mock).Invoke("SetLockURL", params, []reflect.Type{})
+func (mock *MockLockURLGenerator) GenerateLockURL(lockID string) string {
+	params := []pegomock.Param{lockID}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("GenerateLockURL", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem()})
+	var ret0 string
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(string)
+		}
+	}
+	return ret0
 }
 
 func (mock *MockLockURLGenerator) VerifyWasCalledOnce() *VerifierLockURLGenerator {
@@ -40,28 +47,28 @@ type VerifierLockURLGenerator struct {
 	inOrderContext         *pegomock.InOrderContext
 }
 
-func (verifier *VerifierLockURLGenerator) SetLockURL(_param0 func(string) string) *LockURLGenerator_SetLockURL_OngoingVerification {
-	params := []pegomock.Param{_param0}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "SetLockURL", params)
-	return &LockURLGenerator_SetLockURL_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+func (verifier *VerifierLockURLGenerator) GenerateLockURL(lockID string) *LockURLGenerator_GenerateLockURL_OngoingVerification {
+	params := []pegomock.Param{lockID}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GenerateLockURL", params)
+	return &LockURLGenerator_GenerateLockURL_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type LockURLGenerator_SetLockURL_OngoingVerification struct {
+type LockURLGenerator_GenerateLockURL_OngoingVerification struct {
 	mock              *MockLockURLGenerator
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *LockURLGenerator_SetLockURL_OngoingVerification) GetCapturedArguments() func(string) string {
-	_param0 := c.GetAllCapturedArguments()
-	return _param0[len(_param0)-1]
+func (c *LockURLGenerator_GenerateLockURL_OngoingVerification) GetCapturedArguments() string {
+	lockID := c.GetAllCapturedArguments()
+	return lockID[len(lockID)-1]
 }
 
-func (c *LockURLGenerator_SetLockURL_OngoingVerification) GetAllCapturedArguments() (_param0 []func(string) string) {
+func (c *LockURLGenerator_GenerateLockURL_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]func(string) string, len(params[0]))
+		_param0 = make([]string, len(params[0]))
 		for u, param := range params[0] {
-			_param0[u] = param.(func(string) string)
+			_param0[u] = param.(string)
 		}
 	}
 	return

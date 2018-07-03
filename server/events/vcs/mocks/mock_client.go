@@ -35,8 +35,8 @@ func (mock *MockClient) GetModifiedFiles(repo models.Repo, pull models.PullReque
 	return ret0, ret1
 }
 
-func (mock *MockClient) CreateComment(repo models.Repo, pull models.PullRequest, comment string) error {
-	params := []pegomock.Param{repo, pull, comment}
+func (mock *MockClient) CreateComment(repo models.Repo, pullNum int, comment string) error {
+	params := []pegomock.Param{repo, pullNum, comment}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("CreateComment", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
 	if len(result) != 0 {
@@ -124,8 +124,8 @@ func (c *Client_GetModifiedFiles_OngoingVerification) GetAllCapturedArguments() 
 	return
 }
 
-func (verifier *VerifierClient) CreateComment(repo models.Repo, pull models.PullRequest, comment string) *Client_CreateComment_OngoingVerification {
-	params := []pegomock.Param{repo, pull, comment}
+func (verifier *VerifierClient) CreateComment(repo models.Repo, pullNum int, comment string) *Client_CreateComment_OngoingVerification {
+	params := []pegomock.Param{repo, pullNum, comment}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "CreateComment", params)
 	return &Client_CreateComment_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -135,21 +135,21 @@ type Client_CreateComment_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *Client_CreateComment_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, string) {
-	repo, pull, comment := c.GetAllCapturedArguments()
-	return repo[len(repo)-1], pull[len(pull)-1], comment[len(comment)-1]
+func (c *Client_CreateComment_OngoingVerification) GetCapturedArguments() (models.Repo, int, string) {
+	repo, pullNum, comment := c.GetAllCapturedArguments()
+	return repo[len(repo)-1], pullNum[len(pullNum)-1], comment[len(comment)-1]
 }
 
-func (c *Client_CreateComment_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []string) {
+func (c *Client_CreateComment_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []int, _param2 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.Repo, len(params[0]))
 		for u, param := range params[0] {
 			_param0[u] = param.(models.Repo)
 		}
-		_param1 = make([]models.PullRequest, len(params[1]))
+		_param1 = make([]int, len(params[1]))
 		for u, param := range params[1] {
-			_param1[u] = param.(models.PullRequest)
+			_param1[u] = param.(int)
 		}
 		_param2 = make([]string, len(params[2]))
 		for u, param := range params[2] {

@@ -124,42 +124,42 @@ Atlantis supports several Terraform project structures:
 ```
 .
 ├── project1
-│   ├── main.tf
+│   ├── main.tf
 |   └── ...
 └── project2
-    ├── main.tf
+    ├── main.tf
     └── ...
 ```
 -  one folder per set of configuration
 ```
 .
 ├── staging
-│   ├── main.tf
+│   ├── main.tf
 |   └── ...
 └── production
-    ├── main.tf
+    ├── main.tf
     └── ...
 ```
 -  using `env/{env}.tfvars` to define workspace specific variables. This works in both multi-project repos and single-project repos.
 ```
 .
 ├── env
-│   ├── production.tfvars
-│   └── staging.tfvars
+│   ├── production.tfvars
+│   └── staging.tfvars
 └── main.tf
 ```
 or
 ```
 .
 ├── project1
-│   ├── env
-│   │   ├── production.tfvars
-│   │   └── staging.tfvars
-│   └── main.tf
+│   ├── env
+│   │   ├── production.tfvars
+│   │   └── staging.tfvars
+│   └── main.tf
 └── project2
     ├── env
-    │   ├── production.tfvars
-    │   └── staging.tfvars
+    │   ├── production.tfvars
+    │   └── staging.tfvars
     └── main.tf
 ```
 With the above project structure you can de-duplicate your Terraform code between workspaces/environments without requiring extensive use of modules. At Hootsuite we found this project format to be very successful and use it in all of our 100+ Terraform repositories.

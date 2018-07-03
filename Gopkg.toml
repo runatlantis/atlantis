@@ -88,3 +88,15 @@
 [[constraint]]
   branch = "master"
   name = "github.com/lkysow/go-gitlab"
+
+[[constraint]]
+  name = "github.com/go-test/deep"
+  version = "1.0.1"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/flynn-archive/go-shlex"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/docker/docker"

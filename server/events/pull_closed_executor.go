@@ -38,24 +38,24 @@ type PullCleaner interface {
 // PullClosedExecutor executes the tasks required to clean up a closed pull
 // request.
 type PullClosedExecutor struct {
-	Locker    locking.Locker
-	VCSClient vcs.ClientProxy
-	Workspace AtlantisWorkspace
+	Locker     locking.Locker
+	VCSClient  vcs.ClientProxy
+	WorkingDir WorkingDir
 }
 
 type templatedProject struct {
-	Path       string
+	RepoRelDir string
 	Workspaces string
 }
 
 var pullClosedTemplate = template.Must(template.New("").Parse(
 	"Locks and plans deleted for the projects and workspaces modified in this pull request:\n" +
 		"{{ range . }}\n" +
-		"- path: `{{ .Path }}` {{ .Workspaces }}{{ end }}"))
+		"- dir: `{{ .RepoRelDir }}` {{ .Workspaces }}{{ end }}"))
 
 // CleanUpPull cleans up after a closed pull request.
 func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullRequest) error {
-	if err := p.Workspace.Delete(repo, pull); err != nil {
+	if err := p.WorkingDir.Delete(repo, pull); err != nil {
 		return errors.Wrap(err, "cleaning workspace")
 	}
 
@@ -83,11 +83,11 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 // buildTemplateData formats the lock data into a slice that can easily be
 // templated for the VCS comment. We organize all the workspaces by their
 // respective project paths so the comment can look like:
-// path: {path}, workspaces: {all-workspaces}
+// dir: {dir}, workspaces: {all-workspaces}
 func (p *PullClosedExecutor) buildTemplateData(locks []models.ProjectLock) []templatedProject {
 	workspacesByPath := make(map[string][]string)
 	for _, l := range locks {
-		path := l.Project.RepoFullName + "/" + l.Project.Path
+		path := l.Project.Path
 		workspacesByPath[path] = append(workspacesByPath[path], l.Workspace)
 	}
 
@@ -104,12 +104,12 @@ func (p *PullClosedExecutor) buildTemplateData(locks []models.ProjectLock) []tem
 		workspacesStr := fmt.Sprintf("`%s`", strings.Join(workspace, "`, `"))
 		if len(workspace) == 1 {
 			projects = append(projects, templatedProject{
-				Path:       p,
+				RepoRelDir: p,
 				Workspaces: "workspace: " + workspacesStr,
 			})
 		} else {
 			projects = append(projects, templatedProject{
-				Path:       p,
+				RepoRelDir: p,
 				Workspaces: "workspaces: " + workspacesStr,
 			})
 

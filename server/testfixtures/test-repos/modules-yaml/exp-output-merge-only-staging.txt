@@ -1,0 +1,3 @@
+Locks and plans deleted for the projects and workspaces modified in this pull request:
+
+- path: `runatlantis/atlantis-tests/staging` workspace: `default`

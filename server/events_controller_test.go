@@ -16,6 +16,7 @@ package server_test
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -90,7 +91,7 @@ func TestPost_InvalidGitlabSecret(t *testing.T) {
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(gitlabHeader, "value")
-	When(gl.Validate(req, secret)).ThenReturn(nil, errors.New("err"))
+	When(gl.ParseAndValidate(req, secret)).ThenReturn(nil, errors.New("err"))
 	e.Post(w, req)
 	responseContains(t, w, http.StatusBadRequest, "err")
 }
@@ -112,7 +113,7 @@ func TestPost_UnsupportedGitlabEvent(t *testing.T) {
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(gitlabHeader, "value")
-	When(gl.Validate(req, secret)).ThenReturn([]byte(`{"not an event": ""}`), nil)
+	When(gl.ParseAndValidate(req, secret)).ThenReturn([]byte(`{"not an event": ""}`), nil)
 	e.Post(w, req)
 	responseContains(t, w, http.StatusOK, "Ignoring unsupported event")
 }
@@ -148,7 +149,7 @@ func TestPost_GitlabCommentInvalidCommand(t *testing.T) {
 	e, _, gl, _, _, _, _, cp := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(gitlabHeader, "value")
-	When(gl.Validate(req, secret)).ThenReturn(gitlab.MergeCommentEvent{}, nil)
+	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlab.MergeCommentEvent{}, nil)
 	When(cp.Parse("", models.Gitlab)).ThenReturn(events.CommentParseResult{Ignore: true})
 	w := httptest.NewRecorder()
 	e.Post(w, req)
@@ -174,13 +175,13 @@ func TestPost_GitlabCommentNotWhitelisted(t *testing.T) {
 	RegisterMockTestingT(t)
 	vcsClient := vcsmocks.NewMockClientProxy()
 	e := server.EventsController{
-		Logger:              logging.NewNoopLogger(),
-		CommentParser:       &events.CommentParser{},
-		GitlabRequestParser: &server.DefaultGitlabRequestParser{},
-		Parser:              &events.EventParser{},
-		SupportedVCSHosts:   []models.VCSHostType{models.Gitlab},
-		RepoWhitelist:       &events.RepoWhitelist{},
-		VCSClient:           vcsClient,
+		Logger:                       logging.NewNoopLogger(),
+		CommentParser:                &events.CommentParser{},
+		GitlabRequestParserValidator: &server.DefaultGitlabRequestParserValidator{},
+		Parser:               &events.EventParser{},
+		SupportedVCSHosts:    []models.VCSHostType{models.Gitlab},
+		RepoWhitelistChecker: &events.RepoWhitelistChecker{},
+		VCSClient:            vcsClient,
 	}
 	requestJSON, err := ioutil.ReadFile(filepath.Join("testfixtures", "gitlabMergeCommentEvent_notWhitelisted.json"))
 	Ok(t, err)
@@ -207,7 +208,7 @@ func TestPost_GithubCommentNotWhitelisted(t *testing.T) {
 		CommentParser:          &events.CommentParser{},
 		Parser:                 &events.EventParser{},
 		SupportedVCSHosts:      []models.VCSHostType{models.Github},
-		RepoWhitelist:          &events.RepoWhitelist{},
+		RepoWhitelistChecker:   &events.RepoWhitelistChecker{},
 		VCSClient:              vcsClient,
 	}
 	requestJSON, err := ioutil.ReadFile(filepath.Join("testfixtures", "githubIssueCommentEvent_notWhitelisted.json"))
@@ -231,7 +232,7 @@ func TestPost_GitlabCommentResponse(t *testing.T) {
 	e, _, gl, _, _, _, vcsClient, cp := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(gitlabHeader, "value")
-	When(gl.Validate(req, secret)).ThenReturn(gitlab.MergeCommentEvent{}, nil)
+	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlab.MergeCommentEvent{}, nil)
 	When(cp.Parse("", models.Gitlab)).ThenReturn(events.CommentParseResult{CommentResponse: "a comment"})
 	w := httptest.NewRecorder()
 	e.Post(w, req)
@@ -262,14 +263,12 @@ func TestPost_GitlabCommentSuccess(t *testing.T) {
 	e, _, gl, _, cr, _, _, _ := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(gitlabHeader, "value")
-	When(gl.Validate(req, secret)).ThenReturn(gitlab.MergeCommentEvent{}, nil)
+	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlab.MergeCommentEvent{}, nil)
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	responseContains(t, w, http.StatusOK, "Processing...")
 
-	// wait for 200ms so goroutine is called
-	time.Sleep(200 * time.Millisecond)
-	cr.VerifyWasCalledOnce().ExecuteCommand(models.Repo{}, models.Repo{}, models.User{}, 0, nil)
+	cr.VerifyWasCalledOnce().RunCommentCommand(models.Repo{}, &models.Repo{}, models.User{}, 0, nil)
 }
 
 func TestPost_GithubCommentSuccess(t *testing.T) {
@@ -281,41 +280,14 @@ func TestPost_GithubCommentSuccess(t *testing.T) {
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
 	baseRepo := models.Repo{}
 	user := models.User{}
-	cmd := events.Command{}
+	cmd := events.CommentCommand{}
 	When(p.ParseGithubIssueCommentEvent(matchers.AnyPtrToGithubIssueCommentEvent())).ThenReturn(baseRepo, user, 1, nil)
 	When(cp.Parse("", models.Github)).ThenReturn(events.CommentParseResult{Command: &cmd})
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	responseContains(t, w, http.StatusOK, "Processing...")
 
-	// wait for 200ms so goroutine is called
-	time.Sleep(200 * time.Millisecond)
-	cr.VerifyWasCalledOnce().ExecuteCommand(baseRepo, baseRepo, user, 1, &cmd)
-}
-
-func TestPost_GithubPullRequestNotClosed(t *testing.T) {
-	t.Log("when the event is a github pull reuqest but it's not a closed event we ignore it")
-	e, v, _, _, _, _, _, _ := setup(t)
-	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
-	req.Header.Set(githubHeader, "pull_request")
-	event := `{"action": "opened"}`
-	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
-	w := httptest.NewRecorder()
-	e.Post(w, req)
-	responseContains(t, w, http.StatusOK, "Ignoring opened pull request event")
-}
-
-func TestPost_GitlabMergeRequestNotClosed(t *testing.T) {
-	t.Log("when the event is a gitlab merge request but it's not a closed event we ignore it")
-	e, _, gl, p, _, _, _, _ := setup(t)
-	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
-	req.Header.Set(gitlabHeader, "value")
-	event := gitlab.MergeEvent{}
-	When(gl.Validate(req, secret)).ThenReturn(event, nil)
-	When(p.ParseGitlabMergeEvent(event)).ThenReturn(models.PullRequest{State: models.Open}, models.Repo{}, nil)
-	w := httptest.NewRecorder()
-	e.Post(w, req)
-	responseContains(t, w, http.StatusOK, "Ignoring opened pull request event")
+	cr.VerifyWasCalledOnce().RunCommentCommand(baseRepo, nil, user, 1, &cmd)
 }
 
 func TestPost_GithubPullRequestInvalid(t *testing.T) {
@@ -326,45 +298,87 @@ func TestPost_GithubPullRequestInvalid(t *testing.T) {
 
 	event := `{"action": "closed"}`
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
-	When(p.ParseGithubPull(matchers.AnyPtrToGithubPullRequest())).ThenReturn(models.PullRequest{}, models.Repo{}, errors.New("err"))
+	When(p.ParseGithubPullEvent(matchers.AnyPtrToGithubPullRequestEvent())).ThenReturn(models.PullRequest{}, models.Repo{}, models.Repo{}, models.User{}, errors.New("err"))
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	responseContains(t, w, http.StatusBadRequest, "Error parsing pull data: err")
 }
 
-func TestPost_GithubPullRequestInvalidRepo(t *testing.T) {
-	t.Log("when the event is a github pull request with invalid repo data we return a 400")
-	e, v, _, p, _, _, _, _ := setup(t)
+func TestPost_GitlabMergeRequestInvalid(t *testing.T) {
+	t.Log("when the event is a gitlab merge request with invalid data we return a 400")
+	e, _, gl, p, _, _, _, _ := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
-	req.Header.Set(githubHeader, "pull_request")
-
-	event := `{"action": "closed"}`
-	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
-	When(p.ParseGithubPull(matchers.AnyPtrToGithubPullRequest())).ThenReturn(models.PullRequest{}, models.Repo{}, nil)
-	When(p.ParseGithubRepo(matchers.AnyPtrToGithubRepository())).ThenReturn(models.Repo{}, errors.New("err"))
+	req.Header.Set(gitlabHeader, "value")
+	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
+	repo := models.Repo{}
+	pullRequest := models.PullRequest{State: models.Closed}
+	When(p.ParseGitlabMergeEvent(gitlabMergeEvent)).ThenReturn(pullRequest, repo, repo, models.User{}, errors.New("err"))
 	w := httptest.NewRecorder()
 	e.Post(w, req)
-	responseContains(t, w, http.StatusBadRequest, "Error parsing repo data: err")
+	responseContains(t, w, http.StatusBadRequest, "Error parsing webhook: err")
 }
 
 func TestPost_GithubPullRequestNotWhitelisted(t *testing.T) {
 	t.Log("when the event is a github pull request to a non-whitelisted repo we return a 400")
-	e, v, _, p, _, _, _, _ := setup(t)
-	e.RepoWhitelist = &events.RepoWhitelist{Whitelist: "github.com/nevermatch"}
+	e, v, _, _, _, _, _, _ := setup(t)
+	e.RepoWhitelistChecker = &events.RepoWhitelistChecker{Whitelist: "github.com/nevermatch"}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(githubHeader, "pull_request")
 
 	event := `{"action": "closed"}`
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
-	When(p.ParseGithubPull(matchers.AnyPtrToGithubPullRequest())).ThenReturn(models.PullRequest{}, models.Repo{}, nil)
-	When(p.ParseGithubRepo(matchers.AnyPtrToGithubRepository())).ThenReturn(models.Repo{}, nil)
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	responseContains(t, w, http.StatusForbidden, "Ignoring pull request event from non-whitelisted repo")
 }
 
-func TestPost_GithubPullRequestErrCleaningPull(t *testing.T) {
-	t.Log("when the event is a pull request and we have an error calling CleanUpPull we return a 503")
+func TestPost_GitlabMergeRequestNotWhitelisted(t *testing.T) {
+	t.Log("when the event is a gitlab merge request to a non-whitelisted repo we return a 400")
+	e, _, gl, p, _, _, _, _ := setup(t)
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req.Header.Set(gitlabHeader, "value")
+
+	e.RepoWhitelistChecker = &events.RepoWhitelistChecker{Whitelist: "github.com/nevermatch"}
+	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
+	repo := models.Repo{}
+	pullRequest := models.PullRequest{State: models.Closed}
+	When(p.ParseGitlabMergeEvent(gitlabMergeEvent)).ThenReturn(pullRequest, repo, repo, models.User{}, nil)
+
+	w := httptest.NewRecorder()
+	e.Post(w, req)
+	responseContains(t, w, http.StatusForbidden, "Ignoring pull request event from non-whitelisted repo")
+}
+
+func TestPost_GithubPullRequestUnsupportedAction(t *testing.T) {
+	e, v, _, _, _, _, _, _ := setup(t)
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req.Header.Set(githubHeader, "pull_request")
+
+	event := `{"action": "unsupported"}`
+	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
+	w := httptest.NewRecorder()
+	e.Post(w, req)
+	responseContains(t, w, http.StatusOK, "Ignoring non-actionable pull request event")
+}
+
+func TestPost_GitlabMergeRequestUnsupportedAction(t *testing.T) {
+	t.Log("when the event is a gitlab merge request to a non-whitelisted repo we return a 400")
+	e, _, gl, p, _, _, _, _ := setup(t)
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req.Header.Set(gitlabHeader, "value")
+	gitlabMergeEvent.ObjectAttributes.Action = "unsupported"
+	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
+	repo := models.Repo{}
+	pullRequest := models.PullRequest{State: models.Closed}
+	When(p.ParseGitlabMergeEvent(gitlabMergeEvent)).ThenReturn(pullRequest, repo, repo, models.User{}, nil)
+
+	w := httptest.NewRecorder()
+	e.Post(w, req)
+	responseContains(t, w, http.StatusOK, "Ignoring non-actionable pull request event")
+}
+
+func TestPost_GithubPullRequestClosedErrCleaningPull(t *testing.T) {
+	t.Log("when the event is a closed pull request and we have an error calling CleanUpPull we return a 503")
 	RegisterMockTestingT(t)
 	e, v, _, p, _, c, _, _ := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
@@ -374,31 +388,30 @@ func TestPost_GithubPullRequestErrCleaningPull(t *testing.T) {
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
 	repo := models.Repo{}
 	pull := models.PullRequest{State: models.Closed}
-	When(p.ParseGithubPull(matchers.AnyPtrToGithubPullRequest())).ThenReturn(pull, repo, nil)
-	When(p.ParseGithubRepo(matchers.AnyPtrToGithubRepository())).ThenReturn(repo, nil)
+	When(p.ParseGithubPullEvent(matchers.AnyPtrToGithubPullRequestEvent())).ThenReturn(pull, repo, repo, models.User{}, nil)
 	When(c.CleanUpPull(repo, pull)).ThenReturn(errors.New("cleanup err"))
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	responseContains(t, w, http.StatusInternalServerError, "Error cleaning pull request: cleanup err")
 }
 
-func TestPost_GitlabMergeRequestErrCleaningPull(t *testing.T) {
-	t.Log("when the event is a gitlab merge request and an error occurs calling CleanUpPull we return a 503")
+func TestPost_GitlabMergeRequestClosedErrCleaningPull(t *testing.T) {
+	t.Log("when the event is a closed gitlab merge request and an error occurs calling CleanUpPull we return a 500")
 	e, _, gl, p, _, c, _, _ := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(gitlabHeader, "value")
-	event := gitlab.MergeEvent{}
-	When(gl.Validate(req, secret)).ThenReturn(event, nil)
+	gitlabMergeEvent.ObjectAttributes.Action = "close"
+	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
 	repo := models.Repo{}
 	pullRequest := models.PullRequest{State: models.Closed}
-	When(p.ParseGitlabMergeEvent(event)).ThenReturn(pullRequest, repo, nil)
+	When(p.ParseGitlabMergeEvent(gitlabMergeEvent)).ThenReturn(pullRequest, repo, repo, models.User{}, nil)
 	When(c.CleanUpPull(repo, pullRequest)).ThenReturn(errors.New("err"))
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	responseContains(t, w, http.StatusInternalServerError, "Error cleaning pull request: err")
 }
 
-func TestPost_GithubPullRequestSuccess(t *testing.T) {
+func TestPost_GithubClosedPullRequestSuccess(t *testing.T) {
 	t.Log("when the event is a pull request and everything works we return a 200")
 	e, v, _, p, _, c, _, _ := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
@@ -408,8 +421,7 @@ func TestPost_GithubPullRequestSuccess(t *testing.T) {
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
 	repo := models.Repo{}
 	pull := models.PullRequest{State: models.Closed}
-	When(p.ParseGithubPull(matchers.AnyPtrToGithubPullRequest())).ThenReturn(pull, repo, nil)
-	When(p.ParseGithubRepo(matchers.AnyPtrToGithubRepository())).ThenReturn(repo, nil)
+	When(p.ParseGithubPullEvent(matchers.AnyPtrToGithubPullRequestEvent())).ThenReturn(pull, repo, repo, models.User{}, nil)
 	When(c.CleanUpPull(repo, pull)).ThenReturn(nil)
 	w := httptest.NewRecorder()
 	e.Post(w, req)
@@ -421,40 +433,153 @@ func TestPost_GitlabMergeRequestSuccess(t *testing.T) {
 	e, _, gl, p, _, _, _, _ := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(gitlabHeader, "value")
-	event := gitlab.MergeEvent{}
-	When(gl.Validate(req, secret)).ThenReturn(event, nil)
+	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
 	repo := models.Repo{}
 	pullRequest := models.PullRequest{State: models.Closed}
-	When(p.ParseGitlabMergeEvent(event)).ThenReturn(pullRequest, repo, nil)
+	When(p.ParseGitlabMergeEvent(gitlabMergeEvent)).ThenReturn(pullRequest, repo, repo, models.User{}, nil)
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	responseContains(t, w, http.StatusOK, "Pull request cleaned successfully")
 }
 
-func setup(t *testing.T) (server.EventsController, *mocks.MockGithubRequestValidator, *mocks.MockGitlabRequestParser, *emocks.MockEventParsing, *emocks.MockCommandRunner, *emocks.MockPullCleaner, *vcsmocks.MockClientProxy, *emocks.MockCommentParsing) {
+func TestPost_PullOpenedOrUpdated(t *testing.T) {
+	cases := []struct {
+		Description string
+		HostType    models.VCSHostType
+		Action      string
+	}{
+		{
+			"github opened",
+			models.Github,
+			"opened",
+		},
+		{
+			"gitlab opened",
+			models.Gitlab,
+			"open",
+		},
+		{
+			"github synchronized",
+			models.Github,
+			"synchronize",
+		},
+		{
+			"gitlab update",
+			models.Gitlab,
+			"update",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.Description, func(t *testing.T) {
+			e, v, gl, p, cr, _, _, _ := setup(t)
+			req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+			switch c.HostType {
+			case models.Gitlab:
+				req.Header.Set(gitlabHeader, "value")
+				gitlabMergeEvent.ObjectAttributes.Action = c.Action
+				When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
+				repo := models.Repo{}
+				pullRequest := models.PullRequest{State: models.Closed}
+				When(p.ParseGitlabMergeEvent(gitlabMergeEvent)).ThenReturn(pullRequest, repo, repo, models.User{}, nil)
+			case models.Github:
+				req.Header.Set(githubHeader, "pull_request")
+				event := fmt.Sprintf(`{"action": "%s"}`, c.Action)
+				When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
+				repo := models.Repo{}
+				pull := models.PullRequest{State: models.Closed}
+				When(p.ParseGithubPullEvent(matchers.AnyPtrToGithubPullRequestEvent())).ThenReturn(pull, repo, repo, models.User{}, nil)
+			}
+			w := httptest.NewRecorder()
+			e.Post(w, req)
+			responseContains(t, w, http.StatusOK, "Processing...")
+			cr.VerifyWasCalledOnce().RunAutoplanCommand(models.Repo{}, models.Repo{}, models.PullRequest{State: models.Closed}, models.User{})
+		})
+	}
+}
+
+func setup(t *testing.T) (server.EventsController, *mocks.MockGithubRequestValidator, *mocks.MockGitlabRequestParserValidator, *emocks.MockEventParsing, *emocks.MockCommandRunner, *emocks.MockPullCleaner, *vcsmocks.MockClientProxy, *emocks.MockCommentParsing) {
 	RegisterMockTestingT(t)
 	v := mocks.NewMockGithubRequestValidator()
-	gl := mocks.NewMockGitlabRequestParser()
+	gl := mocks.NewMockGitlabRequestParserValidator()
 	p := emocks.NewMockEventParsing()
 	cp := emocks.NewMockCommentParsing()
 	cr := emocks.NewMockCommandRunner()
 	c := emocks.NewMockPullCleaner()
 	vcsmock := vcsmocks.NewMockClientProxy()
 	e := server.EventsController{
-		Logger:                 logging.NewNoopLogger(),
-		GithubRequestValidator: v,
-		Parser:                 p,
-		CommentParser:          cp,
-		CommandRunner:          cr,
-		PullCleaner:            c,
-		GithubWebHookSecret:    secret,
-		SupportedVCSHosts:      []models.VCSHostType{models.Github, models.Gitlab},
-		GitlabWebHookSecret:    secret,
-		GitlabRequestParser:    gl,
-		RepoWhitelist: &events.RepoWhitelist{
+		TestingMode:                  true,
+		Logger:                       logging.NewNoopLogger(),
+		GithubRequestValidator:       v,
+		Parser:                       p,
+		CommentParser:                cp,
+		CommandRunner:                cr,
+		PullCleaner:                  c,
+		GithubWebHookSecret:          secret,
+		SupportedVCSHosts:            []models.VCSHostType{models.Github, models.Gitlab},
+		GitlabWebHookSecret:          secret,
+		GitlabRequestParserValidator: gl,
+		RepoWhitelistChecker: &events.RepoWhitelistChecker{
 			Whitelist: "*",
 		},
 		VCSClient: vcsmock,
 	}
 	return e, v, gl, p, cr, c, vcsmock, cp
+}
+
+var gitlabMergeEvent = gitlab.MergeEvent{
+	ObjectAttributes: struct {
+		ID              int              `json:"id"`
+		TargetBranch    string           `json:"target_branch"`
+		SourceBranch    string           `json:"source_branch"`
+		SourceProjectID int              `json:"source_project_id"`
+		AuthorID        int              `json:"author_id"`
+		AssigneeID      int              `json:"assignee_id"`
+		Title           string           `json:"title"`
+		CreatedAt       string           `json:"created_at"`
+		UpdatedAt       string           `json:"updated_at"`
+		StCommits       []*gitlab.Commit `json:"st_commits"`
+		StDiffs         []*gitlab.Diff   `json:"st_diffs"`
+		MilestoneID     int              `json:"milestone_id"`
+		State           string           `json:"state"`
+		MergeStatus     string           `json:"merge_status"`
+		TargetProjectID int              `json:"target_project_id"`
+		IID             int              `json:"iid"`
+		Description     string           `json:"description"`
+		Position        int              `json:"position"`
+		LockedAt        string           `json:"locked_at"`
+		UpdatedByID     int              `json:"updated_by_id"`
+		MergeError      string           `json:"merge_error"`
+		MergeParams     struct {
+			ForceRemoveSourceBranch string `json:"force_remove_source_branch"`
+		} `json:"merge_params"`
+		MergeWhenBuildSucceeds   bool               `json:"merge_when_build_succeeds"`
+		MergeUserID              int                `json:"merge_user_id"`
+		MergeCommitSha           string             `json:"merge_commit_sha"`
+		DeletedAt                string             `json:"deleted_at"`
+		ApprovalsBeforeMerge     string             `json:"approvals_before_merge"`
+		RebaseCommitSha          string             `json:"rebase_commit_sha"`
+		InProgressMergeCommitSha string             `json:"in_progress_merge_commit_sha"`
+		LockVersion              int                `json:"lock_version"`
+		TimeEstimate             int                `json:"time_estimate"`
+		Source                   *gitlab.Repository `json:"source"`
+		Target                   *gitlab.Repository `json:"target"`
+		LastCommit               struct {
+			ID        string         `json:"id"`
+			Message   string         `json:"message"`
+			Timestamp *time.Time     `json:"timestamp"`
+			URL       string         `json:"url"`
+			Author    *gitlab.Author `json:"author"`
+		} `json:"last_commit"`
+		WorkInProgress bool   `json:"work_in_progress"`
+		URL            string `json:"url"`
+		Action         string `json:"action"`
+		Assignee       struct {
+			Name      string `json:"name"`
+			Username  string `json:"username"`
+			AvatarURL string `json:"avatar_url"`
+		} `json:"assignee"`
+	}{
+		Action: "merge",
+	},
 }

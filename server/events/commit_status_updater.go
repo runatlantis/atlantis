@@ -27,10 +27,10 @@ import (
 // the status to signify whether the plan/apply succeeds.
 type CommitStatusUpdater interface {
 	// Update updates the status of the head commit of pull.
-	Update(repo models.Repo, pull models.PullRequest, status vcs.CommitStatus, cmd *Command) error
+	Update(repo models.Repo, pull models.PullRequest, status vcs.CommitStatus, command CommandName) error
 	// UpdateProjectResult updates the status of the head commit given the
 	// state of response.
-	UpdateProjectResult(ctx *CommandContext, res CommandResponse) error
+	UpdateProjectResult(ctx *CommandContext, commandName CommandName, res CommandResult) error
 }
 
 // DefaultCommitStatusUpdater implements CommitStatusUpdater.
@@ -39,13 +39,13 @@ type DefaultCommitStatusUpdater struct {
 }
 
 // Update updates the commit status.
-func (d *DefaultCommitStatusUpdater) Update(repo models.Repo, pull models.PullRequest, status vcs.CommitStatus, cmd *Command) error {
-	description := fmt.Sprintf("%s %s", strings.Title(cmd.Name.String()), strings.Title(status.String()))
+func (d *DefaultCommitStatusUpdater) Update(repo models.Repo, pull models.PullRequest, status vcs.CommitStatus, command CommandName) error {
+	description := fmt.Sprintf("%s %s", strings.Title(command.String()), strings.Title(status.String()))
 	return d.Client.UpdateStatus(repo, pull, status, description)
 }
 
 // UpdateProjectResult updates the commit status based on the status of res.
-func (d *DefaultCommitStatusUpdater) UpdateProjectResult(ctx *CommandContext, res CommandResponse) error {
+func (d *DefaultCommitStatusUpdater) UpdateProjectResult(ctx *CommandContext, commandName CommandName, res CommandResult) error {
 	var status vcs.CommitStatus
 	if res.Error != nil || res.Failure != "" {
 		status = vcs.Failed
@@ -56,7 +56,7 @@ func (d *DefaultCommitStatusUpdater) UpdateProjectResult(ctx *CommandContext, re
 		}
 		status = d.worstStatus(statuses)
 	}
-	return d.Update(ctx.BaseRepo, ctx.Pull, status, ctx.Command)
+	return d.Update(ctx.BaseRepo, ctx.Pull, status, commandName)
 }
 
 func (d *DefaultCommitStatusUpdater) worstStatus(ss []vcs.CommitStatus) vcs.CommitStatus {

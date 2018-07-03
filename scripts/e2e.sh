@@ -8,7 +8,7 @@ ${CIRCLE_WORKING_DIRECTORY}/scripts/e2e-deps.sh
 cd "${CIRCLE_WORKING_DIRECTORY}/e2e"
 
 # start atlantis server in the background and wait for it to start
-./atlantis server --gh-user="$GITHUB_USERNAME" --gh-token="$GITHUB_PASSWORD" --data-dir="/tmp" --log-level="debug" --repo-whitelist="github.com/runatlantis/atlantis-tests" &> /tmp/atlantis-server.log &
+./atlantis server --gh-user="$GITHUB_USERNAME" --gh-token="$GITHUB_PASSWORD" --data-dir="/tmp" --log-level="debug" --repo-whitelist="github.com/runatlantis/atlantis-tests" --allow-repo-config &> /tmp/atlantis-server.log &
 sleep 2
 
 # start ngrok in the background and wait for it to start

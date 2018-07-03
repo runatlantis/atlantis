@@ -31,9 +31,9 @@ import (
 func TestCleanUpPullWorkspaceErr(t *testing.T) {
 	t.Log("when workspace.Delete returns an error, we return it")
 	RegisterMockTestingT(t)
-	w := mocks.NewMockAtlantisWorkspace()
+	w := mocks.NewMockWorkingDir()
 	pce := events.PullClosedExecutor{
-		Workspace: w,
+		WorkingDir: w,
 	}
 	err := errors.New("err")
 	When(w.Delete(fixtures.GithubRepo, fixtures.Pull)).ThenReturn(err)
@@ -44,11 +44,11 @@ func TestCleanUpPullWorkspaceErr(t *testing.T) {
 func TestCleanUpPullUnlockErr(t *testing.T) {
 	t.Log("when locker.UnlockByPull returns an error, we return it")
 	RegisterMockTestingT(t)
-	w := mocks.NewMockAtlantisWorkspace()
+	w := mocks.NewMockWorkingDir()
 	l := lockmocks.NewMockLocker()
 	pce := events.PullClosedExecutor{
-		Locker:    l,
-		Workspace: w,
+		Locker:     l,
+		WorkingDir: w,
 	}
 	err := errors.New("err")
 	When(l.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(nil, err)
@@ -59,13 +59,13 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 func TestCleanUpPullNoLocks(t *testing.T) {
 	t.Log("when there are no locks to clean up, we don't comment")
 	RegisterMockTestingT(t)
-	w := mocks.NewMockAtlantisWorkspace()
+	w := mocks.NewMockWorkingDir()
 	l := lockmocks.NewMockLocker()
 	cp := vcsmocks.NewMockClientProxy()
 	pce := events.PullClosedExecutor{
-		Locker:    l,
-		VCSClient: cp,
-		Workspace: w,
+		Locker:     l,
+		VCSClient:  cp,
+		WorkingDir: w,
 	}
 	When(l.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(nil, nil)
 	err := pce.CleanUpPull(fixtures.GithubRepo, fixtures.Pull)
@@ -89,7 +89,7 @@ func TestCleanUpPullComments(t *testing.T) {
 					Workspace: "default",
 				},
 			},
-			"- path: `owner/repo/.` workspace: `default`",
+			"- dir: `.` workspace: `default`",
 		},
 		{
 			"single lock, non-empty path",
@@ -99,7 +99,7 @@ func TestCleanUpPullComments(t *testing.T) {
 					Workspace: "default",
 				},
 			},
-			"- path: `owner/repo/path` workspace: `default`",
+			"- dir: `path` workspace: `default`",
 		},
 		{
 			"single path, multiple workspaces",
@@ -113,7 +113,7 @@ func TestCleanUpPullComments(t *testing.T) {
 					Workspace: "workspace2",
 				},
 			},
-			"- path: `owner/repo/path` workspaces: `workspace1`, `workspace2`",
+			"- dir: `path` workspaces: `workspace1`, `workspace2`",
 		},
 		{
 			"multiple paths, multiple workspaces",
@@ -135,17 +135,17 @@ func TestCleanUpPullComments(t *testing.T) {
 					Workspace: "workspace2",
 				},
 			},
-			"- path: `owner/repo/path` workspaces: `workspace1`, `workspace2`\n- path: `owner/repo/path2` workspaces: `workspace1`, `workspace2`",
+			"- dir: `path` workspaces: `workspace1`, `workspace2`\n- dir: `path2` workspaces: `workspace1`, `workspace2`",
 		},
 	}
 	for _, c := range cases {
-		w := mocks.NewMockAtlantisWorkspace()
+		w := mocks.NewMockWorkingDir()
 		cp := vcsmocks.NewMockClientProxy()
 		l := lockmocks.NewMockLocker()
 		pce := events.PullClosedExecutor{
-			Locker:    l,
-			VCSClient: cp,
-			Workspace: w,
+			Locker:     l,
+			VCSClient:  cp,
+			WorkingDir: w,
 		}
 		t.Log("testing: " + c.Description)
 		When(l.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(c.Locks, nil)

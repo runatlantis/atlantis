@@ -47,11 +47,40 @@ This mode sets up Atlantis on a test repo so you can try it out. We will
 
 [bold]Press Ctrl-c at any time to exit
 `
-var pullRequestBody = "In this pull request we will learn how to use atlantis. There are various commands that are available to you:\n" +
-	"* Start by typing `atlantis help` in the comments.\n" +
-	"* Next, lets plan by typing `atlantis plan` in the comments. That will run a `terraform plan`.\n" +
-	"* Now lets apply that plan. Type `atlantis apply` in the comments. This will run a `terraform apply`.\n" +
-	"\nThank you for trying out atlantis. For more info on running atlantis in production see https://github.com/runatlantis/atlantis"
+var pullRequestBody = strings.Replace(`
+In this pull request we will learn how to use Atlantis.
+
+1. In a couple of seconds you should see the output of Atlantis automatically running $terraform plan$.
+
+1. You can manually run $plan$ by typing a comment:
+
+    $$$
+    atlantis plan
+    $$$
+    Usually you'll let Atlantis automatically run plan for you though.
+
+1. To see all the comment commands available, type:
+    $$$
+    atlantis help
+    $$$
+
+1. To see the help for a specific command, for example $atlantis plan$, type:
+    $$$
+    atlantis plan --help
+    $$$
+
+1. Atlantis holds a "Lock" on this directory to prevent other pull requests modifying
+   the Terraform state until this pull request is merged. To view the lock, go to the Atlantis UI: [http://localhost:4141](http://localhost:4141).
+   If you wanted, you could manually delete the plan and lock from the UI if you weren't ready to apply. Instead, we will apply it!
+
+1. To $terraform apply$ this change (which does nothing because it is creating a $null_resource$), type:
+    $$$
+    atlantis apply
+    $$$
+
+1. Finally, merge the pull request to unlock this directory.
+
+Thank you for trying out Atlantis! Next, try using Atlantis on your own repositories: [www.runatlantis.io/guide/getting-started.html](https://www.runatlantis.io/guide/getting-started.html).`, "$", "`", -1)
 
 // Start begins the testdrive process.
 // nolint: errcheck

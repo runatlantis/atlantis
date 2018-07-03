@@ -24,7 +24,13 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/logging"
 )
+
+// DefaultWorkspace is the default Terraform workspace for both Atlantis and
+// Terraform.
+const DefaultWorkspace = "default"
 
 // Repo is a VCS repository.
 type Repo struct {
@@ -123,6 +129,7 @@ const (
 )
 
 // User is a VCS user.
+// During an autoplan, the user will be the Atlantis API user.
 type User struct {
 	Username string
 }
@@ -153,7 +160,14 @@ type Project struct {
 	// Path to project root in the repo.
 	// If "." then project is at root.
 	// Never ends in "/".
+	// todo: rename to RepoRelDir to match rest of project once we can separate
+	// out how this is saved in boltdb vs. its usage everywhere else so we don't
+	// break existing dbs.
 	Path string
+}
+
+func (p Project) String() string {
+	return fmt.Sprintf("repofullname=%s path=%s", p.RepoFullName, p.Path)
 }
 
 // Plan is the result of running an Atlantis plan command.
@@ -204,4 +218,26 @@ func (h VCSHostType) String() string {
 		return "Gitlab"
 	}
 	return "<missing String() implementation>"
+}
+
+type ProjectCommandContext struct {
+	// BaseRepo is the repository that the pull request will be merged into.
+	BaseRepo Repo
+	// HeadRepo is the repository that is getting merged into the BaseRepo.
+	// If the pull request branch is from the same repository then HeadRepo will
+	// be the same as BaseRepo.
+	// See https://help.github.com/articles/about-pull-request-merges/.
+	HeadRepo Repo
+	Pull     PullRequest
+	// User is the user that triggered this command.
+	User          User
+	Log           *logging.SimpleLogger
+	RepoRelDir    string
+	ProjectConfig *valid.Project
+	GlobalConfig  *valid.Config
+
+	// CommentArgs are the extra arguments appended to comment,
+	// ex. atlantis plan -- -target=resource
+	CommentArgs []string
+	Workspace   string
 }

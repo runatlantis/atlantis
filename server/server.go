@@ -36,24 +36,34 @@ import (
 	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/locking/boltdb"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/run"
+	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
+	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/static"
 	"github.com/urfave/cli"
 	"github.com/urfave/negroni"
 )
 
-const LockRouteName = "lock-detail"
+const (
+	// LockViewRouteName is the named route in mux.Router for the lock view.
+	// The route can be retrieved by this name, ex:
+	//   mux.Router.Get(LockViewRouteName)
+	LockViewRouteName = "lock-detail"
+	// LockViewRouteIDQueryParam is the query parameter needed to construct the lock view
+	// route. ex:
+	//   mux.Router.Get(LockViewRouteName).URL(LockViewRouteIDQueryParam, "my id")
+	LockViewRouteIDQueryParam = "id"
+)
 
 // Server runs the Atlantis web server.
 type Server struct {
 	AtlantisVersion    string
 	Router             *mux.Router
 	Port               int
-	CommandHandler     *events.CommandHandler
+	CommandRunner      *events.DefaultCommandRunner
 	Logger             *logging.SimpleLogger
 	Locker             locking.Locker
 	AtlantisURL        string
@@ -70,6 +80,7 @@ type Server struct {
 // the config is parsed from a YAML file.
 type UserConfig struct {
 	AllowForkPRs        bool   `mapstructure:"allow-fork-prs"`
+	AllowRepoConfig     bool   `mapstructure:"allow-repo-config"`
 	AtlantisURL         string `mapstructure:"atlantis-url"`
 	DataDir             string `mapstructure:"data-dir"`
 	GithubHostname      string `mapstructure:"gh-hostname"`
@@ -94,8 +105,9 @@ type UserConfig struct {
 
 // Config holds config for server that isn't passed in by the user.
 type Config struct {
-	AllowForkPRsFlag string
-	AtlantisVersion  string
+	AllowForkPRsFlag    string
+	AllowRepoConfigFlag string
+	AtlantisVersion     string
 }
 
 // WebhookConfig is nested within UserConfig. It's used to configure webhooks.
@@ -178,40 +190,24 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, err
 	}
 	lockingClient := locking.NewClient(boltdb)
-	run := &run.Run{}
-	configReader := &events.ProjectConfigManager{}
-	workspaceLocker := events.NewDefaultAtlantisWorkspaceLocker()
-	workspace := &events.FileWorkspace{
+	workingDirLocker := events.NewDefaultWorkingDirLocker()
+	workingDir := &events.FileWorkspace{
 		DataDir: userConfig.DataDir,
 	}
-	projectPreExecute := &events.DefaultProjectPreExecutor{
-		Locker:       lockingClient,
-		Run:          run,
-		ConfigReader: configReader,
-		Terraform:    terraformClient,
+	projectLocker := &events.DefaultProjectLocker{
+		Locker: lockingClient,
 	}
-	applyExecutor := &events.ApplyExecutor{
-		VCSClient:         vcsClient,
-		Terraform:         terraformClient,
-		RequireApproval:   userConfig.RequireApproval,
-		Run:               run,
-		AtlantisWorkspace: workspace,
-		ProjectPreExecute: projectPreExecute,
-		Webhooks:          webhooksManager,
-	}
-	planExecutor := &events.PlanExecutor{
-		VCSClient:         vcsClient,
-		Terraform:         terraformClient,
-		Run:               run,
-		Workspace:         workspace,
-		ProjectPreExecute: projectPreExecute,
-		Locker:            lockingClient,
-		ProjectFinder:     &events.DefaultProjectFinder{},
+	underlyingRouter := mux.NewRouter()
+	router := &Router{
+		AtlantisURL:               userConfig.AtlantisURL,
+		LockViewRouteIDQueryParam: LockViewRouteIDQueryParam,
+		LockViewRouteName:         LockViewRouteName,
+		Underlying:                underlyingRouter,
 	}
 	pullClosedExecutor := &events.PullClosedExecutor{
-		VCSClient: vcsClient,
-		Locker:    lockingClient,
-		Workspace: workspace,
+		VCSClient:  vcsClient,
+		Locker:     lockingClient,
+		WorkingDir: workingDir,
 	}
 	logger := logging.NewSimpleLogger("server", nil, false, logging.ToLogLevel(userConfig.LogLevel))
 	eventParser := &events.EventParser{
@@ -226,22 +222,51 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GitlabUser:  userConfig.GitlabUser,
 		GitlabToken: userConfig.GitlabToken,
 	}
-	commandHandler := &events.CommandHandler{
-		ApplyExecutor:            applyExecutor,
-		PlanExecutor:             planExecutor,
-		LockURLGenerator:         planExecutor,
-		EventParser:              eventParser,
+	defaultTfVersion := terraformClient.Version()
+	commandRunner := &events.DefaultCommandRunner{
 		VCSClient:                vcsClient,
 		GithubPullGetter:         githubClient,
 		GitlabMergeRequestGetter: gitlabClient,
 		CommitStatusUpdater:      commitStatusUpdater,
-		AtlantisWorkspaceLocker:  workspaceLocker,
+		EventParser:              eventParser,
 		MarkdownRenderer:         markdownRenderer,
 		Logger:                   logger,
 		AllowForkPRs:             userConfig.AllowForkPRs,
 		AllowForkPRsFlag:         config.AllowForkPRsFlag,
+		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
+			ParserValidator:     &yaml.ParserValidator{},
+			ProjectFinder:       &events.DefaultProjectFinder{},
+			VCSClient:           vcsClient,
+			WorkingDir:          workingDir,
+			WorkingDirLocker:    workingDirLocker,
+			AllowRepoConfig:     userConfig.AllowRepoConfig,
+			AllowRepoConfigFlag: config.AllowRepoConfigFlag,
+		},
+		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
+			Locker:           projectLocker,
+			LockURLGenerator: router,
+			InitStepRunner: &runtime.InitStepRunner{
+				TerraformExecutor: terraformClient,
+				DefaultTFVersion:  defaultTfVersion,
+			},
+			PlanStepRunner: &runtime.PlanStepRunner{
+				TerraformExecutor: terraformClient,
+				DefaultTFVersion:  defaultTfVersion,
+			},
+			ApplyStepRunner: &runtime.ApplyStepRunner{
+				TerraformExecutor: terraformClient,
+			},
+			RunStepRunner: &runtime.RunStepRunner{
+				DefaultTFVersion: defaultTfVersion,
+			},
+			PullApprovedChecker:     vcsClient,
+			WorkingDir:              workingDir,
+			Webhooks:                webhooksManager,
+			WorkingDirLocker:        workingDirLocker,
+			RequireApprovalOverride: userConfig.RequireApproval,
+		},
 	}
-	repoWhitelist := &events.RepoWhitelist{
+	repoWhitelist := &events.RepoWhitelistChecker{
 		Whitelist: userConfig.RepoWhitelist,
 	}
 	locksController := &LocksController{
@@ -250,27 +275,28 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Logger:             logger,
 		VCSClient:          vcsClient,
 		LockDetailTemplate: lockTemplate,
+		WorkingDir:         workingDir,
+		WorkingDirLocker:   workingDirLocker,
 	}
 	eventsController := &EventsController{
-		CommandRunner:          commandHandler,
-		PullCleaner:            pullClosedExecutor,
-		Parser:                 eventParser,
-		CommentParser:          commentParser,
-		Logger:                 logger,
-		GithubWebHookSecret:    []byte(userConfig.GithubWebHookSecret),
-		GithubRequestValidator: &DefaultGithubRequestValidator{},
-		GitlabRequestParser:    &DefaultGitlabRequestParser{},
-		GitlabWebHookSecret:    []byte(userConfig.GitlabWebHookSecret),
-		RepoWhitelist:          repoWhitelist,
-		SupportedVCSHosts:      supportedVCSHosts,
-		VCSClient:              vcsClient,
+		CommandRunner:                commandRunner,
+		PullCleaner:                  pullClosedExecutor,
+		Parser:                       eventParser,
+		CommentParser:                commentParser,
+		Logger:                       logger,
+		GithubWebHookSecret:          []byte(userConfig.GithubWebHookSecret),
+		GithubRequestValidator:       &DefaultGithubRequestValidator{},
+		GitlabRequestParserValidator: &DefaultGitlabRequestParserValidator{},
+		GitlabWebHookSecret:          []byte(userConfig.GitlabWebHookSecret),
+		RepoWhitelistChecker:         repoWhitelist,
+		SupportedVCSHosts:            supportedVCSHosts,
+		VCSClient:                    vcsClient,
 	}
-	router := mux.NewRouter()
 	return &Server{
 		AtlantisVersion:    config.AtlantisVersion,
-		Router:             router,
+		Router:             underlyingRouter,
 		Port:               userConfig.Port,
-		CommandHandler:     commandHandler,
+		CommandRunner:      commandRunner,
 		Logger:             logger,
 		Locker:             lockingClient,
 		AtlantisURL:        userConfig.AtlantisURL,
@@ -291,14 +317,8 @@ func (s *Server) Start() error {
 	s.Router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: static.Asset, AssetDir: static.AssetDir, AssetInfo: static.AssetInfo}))
 	s.Router.HandleFunc("/events", s.EventsController.Post).Methods("POST")
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
-	lockRoute := s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").Queries("id", "{id}").Name(LockRouteName)
-	// function that planExecutor can use to construct detail view url
-	// injecting this here because this is the earliest routes are created
-	s.CommandHandler.SetLockURL(func(lockID string) string {
-		// ignoring error since guaranteed to succeed if "id" is specified
-		u, _ := lockRoute.URL("id", url.QueryEscape(lockID))
-		return s.AtlantisURL + u.RequestURI()
-	})
+	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
+		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
 	n := negroni.New(&negroni.Recovery{
 		Logger:     log.New(os.Stdout, "", log.LstdFlags),
 		PrintStack: false,
@@ -349,7 +369,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 
 	var lockResults []LockIndexData
 	for id, v := range locks {
-		lockURL, _ := s.Router.Get(LockRouteName).URL("id", url.QueryEscape(id))
+		lockURL, _ := s.Router.Get(LockViewRouteName).URL("id", url.QueryEscape(id))
 		lockResults = append(lockResults, LockIndexData{
 			LockURL:      lockURL.String(),
 			RepoFullName: v.Project.RepoFullName,

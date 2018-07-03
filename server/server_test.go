@@ -78,7 +78,7 @@ func TestIndex_Success(t *testing.T) {
 	r := mux.NewRouter()
 	atlantisVersion := "0.3.1"
 	// Need to create a lock route since the server expects this route to exist.
-	r.NewRoute().Path("").Name(server.LockRouteName)
+	r.NewRoute().Path("").Name(server.LockViewRouteName)
 	s := server.Server{
 		Locker:          l,
 		IndexTemplate:   it,
@@ -103,6 +103,7 @@ func TestIndex_Success(t *testing.T) {
 }
 
 func responseContains(t *testing.T, r *httptest.ResponseRecorder, status int, bodySubstr string) {
+	t.Helper()
 	Equals(t, status, r.Result().StatusCode)
 	body, _ := ioutil.ReadAll(r.Result().Body)
 	Assert(t, strings.Contains(string(body), bodySubstr), "exp %q to be contained in %q", bodySubstr, string(body))

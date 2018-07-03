@@ -28,13 +28,17 @@ build-service: ## Build the main Go service
 go-generate: ## Run go generate in all packages
 	go generate $(PKG)
 
-regen-mocks: ## Delete all mocks and then run go generate to regen them
-	find . -type f | grep mocks/mock | grep -v vendor | xargs rm
-	@# not using $(PKG) here because that it includes directories that have now
-	@# been deleted, causing go generate to fail.
-	go generate $$(go list ./... | grep -v e2e | grep -v vendor | grep -v static)
+#regen-mocks: ## Delete all mocks and matchers and then run go generate to regen them. This doesn't work anymore.
+#find . -type f | grep mocks/mock_ | grep -v vendor | xargs rm
+#find . -type f | grep mocks/matchers | grep -v vendor | xargs rm
+#@# not using $(PKG) here because that it includes directories that have now
+#@# been deleted, causing go generate to fail.
+#echo "this doesn't work anymore: go generate \$\$(go list ./... | grep -v e2e | grep -v vendor | grep -v static)"
 
 test: ## Run tests
+	@go test -short $(PKG)
+
+test-all: ## Run tests including integration
 	@go test $(PKG)
 
 test-coverage:
@@ -78,9 +82,9 @@ end-to-end-tests: ## Run e2e tests
 	./scripts/e2e.sh
 
 generate-website-html: ## Generate HTML for website
-	cd website/src && hugo -d ../html
+	yarn website:build
 
 upload-website-html: ## Upload generated website to s3
 	aws s3 rm s3://www.runatlantis.io/ --recursive
-	aws s3 sync website/html/ s3://www.runatlantis.io/
-	rm -rf website/html/
+	aws s3 sync runatlantis.io/.vuepress/dist/ s3://www.runatlantis.io/
+	rm -rf runatlantis.io/.vuepress/dist

@@ -3,7 +3,7 @@ jobs:
   test:
     working_directory: /go/src/github.com/runatlantis/atlantis
     docker:
-    - image: circleci/golang:1.10
+    - image: runatlantis/testing-env
     steps:
     - checkout
     - run: make test-coverage
