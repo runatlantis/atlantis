@@ -1,22 +1,46 @@
-# v0.4.0-alpha
+# v0.4.0
 
 ## Features
 * Autoplanning - Atlantis will automatically run `plan` on new pull requests and
 when new commits are pushed to the pull request.
 * New repository `atlantis.yaml` format that supports:
-    * Arbitrary step ordering
+    * Complete customization of plans run
     * Single config file for whole repository
     * Controlling autoplanning
 * Moved docs to standalone website from the README.
+* Fixes:
+    * [#113](https://github.com/runatlantis/atlantis/issues/113)
+    * [#50](https://github.com/runatlantis/atlantis/issues/50)
+    * [#46](https://github.com/runatlantis/atlantis/issues/46)
+    * [#39](https://github.com/runatlantis/atlantis/issues/39)
+    * [#28](https://github.com/runatlantis/atlantis/issues/28)
+    * [#26](https://github.com/runatlantis/atlantis/issues/26)
+    * [#4](https://github.com/runatlantis/atlantis/issues/4)
 
 ## Bugfixes
 
 ## Backwards Incompatibilities / Notes:
+- The old `atlantis.yaml` config file format is not supported. You will need to migrate to the new config
+format, see: https://www.runatlantis.io/docs/upgrading-atlantis-yaml-to-version-2.html
+- To use the new config file, you must run Atlantis with `--allow-repo-config`.
+- Atlantis will now try to automatically plan. To disable this, you'll need to create an `atlantis.yaml` file
+as follows:
+```yaml
+version: 2
+projects:
+- dir: mydir
+  autoplan:
+    enabled: false
+```
 
 ## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.0/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.0/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.0/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.0/atlantis_linux_arm.zip)
 
 ## Docker
-
+`runatlantis/atlantis:v0.4.0`
 
 # v0.3.10
 
