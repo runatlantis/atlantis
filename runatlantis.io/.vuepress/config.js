@@ -22,7 +22,8 @@ module.exports = {
         ['meta', {name: 'msapplication-square150x150logo', content: 'mstile-150x150.png' }],
         ['meta', {name: 'msapplication-wide310x150logo', content: 'mstile-310x150.png' }],
         ['meta', {name: 'msapplication-square310x310logo', content: 'mstile-310x310.png' }],
-        ['link', { rel: 'stylesheet', sizes: '152x152', href: 'https://fonts.googleapis.com/css?family=Lato:400,900' }]
+        ['link', { rel: 'stylesheet', sizes: '152x152', href: 'https://fonts.googleapis.com/css?family=Lato:400,900' }],
+        ['meta', {name: 'google-site-verification', content: 'kTnsDBpHqtTNY8oscYxrQeeiNml2d2z-03Ct9wqeCeE' }]
     ],
     themeConfig: {
         nav: [
