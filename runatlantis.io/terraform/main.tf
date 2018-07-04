@@ -35,13 +35,9 @@ resource "aws_route53_zone" "zone" {
 resource "aws_route53_record" "www" {
   zone_id = "${aws_route53_zone.zone.zone_id}"
   name    = "${var.www_domain_name}"
-  type    = "A"
-
-  alias = {
-    name                   = "${module.www_distribution.domain_name}"
-    zone_id                = "${module.www_distribution.hosted_zone_id}"
-    evaluate_target_health = false
-  }
+  type    = "CNAME"
+  ttl     = "300"
+  records = ["runatlantis.netlify.com"]
 }
 
 // Use the AWS Certificate Manager to create an SSL cert for our domain.
@@ -138,14 +134,10 @@ resource "aws_route53_record" "root" {
   zone_id = "${aws_route53_zone.zone.zone_id}"
 
   // Note the name is blank here.
-  name = ""
-  type = "A"
-
-  alias = {
-    name                   = "${module.root_distribution.domain_name}"
-    zone_id                = "${module.root_distribution.hosted_zone_id}"
-    evaluate_target_health = false
-  }
+  name    = ""
+  type    = "A"
+  ttl     = "300"
+  records = ["104.198.14.52"]
 }
 
 // MailGun Records
