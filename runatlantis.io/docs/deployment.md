@@ -160,7 +160,7 @@ Next, edit the manifests below as follows:
     * NOTE: You never want to run with `:latest` because if your Pod moves to a new node, Kubernetes will pull the latest image and you might end
 up upgrading Atlantis by accident!
 2. Replace `value: github.com/yourorg/*` under `name: ATLANTIS_REPO_WHITELIST` with the whitelist pattern
-for your Terraform repos. See [--repo-whitelist](#--repo-whitelist) for more details.
+for your Terraform repos. See [--repo-whitelist](/docs/security.html#repo-whitelist) for more details.
 3. If you're using GitHub:
     1. Replace `<YOUR_GITHUB_USER>` with the username of your Atlantis GitHub user without the `@`.
     2. Delete all the `ATLANTIS_GITLAB_*` environment variables.
@@ -201,7 +201,7 @@ spec:
         - name: ATLANTIS_REPO_WHITELIST
           value: github.com/yourorg/* # 2. Replace this with your own repo whitelist.
 
-        ## GitHub Config ###
+        ### GitHub Config ###
         - name: ATLANTIS_GH_USER
           value: <YOUR_GITHUB_USER> # 3i. If you're using GitHub replace <YOUR_GITHUB_USER> with the username of your Atlantis GitHub user without the `@`.
         - name: ATLANTIS_GH_TOKEN
@@ -214,8 +214,9 @@ spec:
             secretKeyRef:
               name: atlantis-vcs
               key: webhook-secret
+        ### End GitHub Config ###
 
-        ## GitLab Config ###
+        ### GitLab Config ###
         - name: ATLANTIS_GITLAB_USER
           value: <YOUR_GITLAB_USER> # 4i. If you're using GitLab replace <YOUR_GITLAB_USER> with the username of your Atlantis GitLab user without the `@`.
         - name: ATLANTIS_GITLAB_TOKEN
@@ -228,6 +229,7 @@ spec:
             secretKeyRef:
               name: atlantis-vcs
               key: webhook-secret
+        ### End GitLab Config ###
 
         - name: ATLANTIS_DATA_DIR
           value: /atlantis
@@ -246,6 +248,22 @@ spec:
           limits:
             memory: 256Mi
             cpu: 100m
+        livenessProbe:
+          # We only need to check every 60s since Atlantis is not a
+          # high-throughput service.
+          periodSeconds: 60
+          httpGet:
+            path: /healthz
+            port: 4141
+            # If using https, change this to HTTPS
+            scheme: HTTP
+        readinessProbe:
+          periodSeconds: 60
+          httpGet:
+            path: /healthz
+            port: 4141
+            # If using https, change this to HTTPS
+            scheme: HTTP
   volumeClaimTemplates:
   - metadata:
       name: atlantis-data
@@ -300,7 +318,7 @@ spec:
         - name: ATLANTIS_REPO_WHITELIST
           value: github.com/yourorg/* # 2. Replace this with your own repo whitelist.
 
-        ## GitHub Config ###
+        ### GitHub Config ###
         - name: ATLANTIS_GH_USER
           value: <YOUR_GITHUB_USER> # 3i. If you're using GitHub replace <YOUR_GITHUB_USER> with the username of your Atlantis GitHub user without the `@`.
         - name: ATLANTIS_GH_TOKEN
@@ -313,8 +331,9 @@ spec:
             secretKeyRef:
               name: atlantis-vcs
               key: webhook-secret
+        ### End GitHub Config ###
 
-        ## GitLab Config ###
+        ### GitLab Config ###
         - name: ATLANTIS_GITLAB_USER
           value: <YOUR_GITLAB_USER> # 4i. If you're using GitLab replace <YOUR_GITLAB_USER> with the username of your Atlantis GitLab user without the `@`.
         - name: ATLANTIS_GITLAB_TOKEN
@@ -327,6 +346,8 @@ spec:
             secretKeyRef:
               name: atlantis-vcs
               key: webhook-secret
+        ### End GitLab Config ###
+
         - name: ATLANTIS_PORT
           value: "4141" # Kubernetes sets an ATLANTIS_PORT variable so we need to override.
         ports:
@@ -339,6 +360,22 @@ spec:
           limits:
             memory: 256Mi
             cpu: 100m
+        livenessProbe:
+          # We only need to check every 60s since Atlantis is not a
+          # high-throughput service.
+          periodSeconds: 60
+          httpGet:
+            path: /healthz
+            port: 4141
+            # If using https, change this to HTTPS
+            scheme: HTTP
+        readinessProbe:
+          periodSeconds: 60
+          httpGet:
+            path: /healthz
+            port: 4141
+            # If using https, change this to HTTPS
+            scheme: HTTP
 ---
 apiVersion: v1
 kind: Service
