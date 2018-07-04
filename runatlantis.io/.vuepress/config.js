@@ -1,6 +1,7 @@
 module.exports = {
     title: 'Atlantis',
     description: 'Terraform Automation By Pull Request',
+    ga: "UA-6850151-3",
     head: [
         ['link', { rel: 'icon', type: 'image/png', href: 'favicon-196x196.png', sizes: '196x196' }],
         ['link', { rel: 'icon', type: 'image/png', href: 'favicon-96x96.png', sizes: '96x96' }],

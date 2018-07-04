@@ -80,11 +80,3 @@ end-to-end-deps: ## Install e2e dependencies
 
 end-to-end-tests: ## Run e2e tests
 	./scripts/e2e.sh
-
-generate-website-html: ## Generate HTML for website
-	yarn website:build
-
-upload-website-html: ## Upload generated website to s3
-	aws s3 rm s3://www.runatlantis.io/ --recursive
-	aws s3 sync runatlantis.io/.vuepress/dist/ s3://www.runatlantis.io/
-	rm -rf runatlantis.io/.vuepress/dist
