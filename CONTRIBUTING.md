@@ -1,6 +1,7 @@
 # Topics
 * [Reporting Issues](#reporting-issues)
 * [Reporting Security Issues](#reporting-security-issues)
+* [Updating The Website](#updating-the-website)
 * [Developing](#developing)
 * [Releasing](#creating-a-new-release)
 
@@ -11,6 +12,12 @@
 
 # Reporting Security Issues
 We take security issues seriously. Please email us directly at security [at] runatlantis.io instead of opening an issue.
+
+# Updating The Website
+* To view the generated website locally, run `yarn website:dev` and then
+open your browser to http://localhost:8080.
+* The website will be regenerated when your pull request is merged to master.
+
 
 # Developing
 
