@@ -9,7 +9,7 @@
 * How to get started: [www.runatlantis.io/guide](https://www.runatlantis.io/guide)
 * Full documentation: [www.runatlantis.io/docs](https://www.runatlantis.io/docs)
 * Download the latest release: [github.com/runatlantis/atlantis/releases/latest](https://github.com/runatlantis/atlantis/releases/latest)
-* Get help in our [Slack channel](https://thawing-headland-22460.herokuapp.com)
+* Get help in our [Slack channel](https://thawing-headland-22460.herokuapp.com) or our [Gitter channel](https://gitter.im/runatlantis/Lobby)
 * Start Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## What is Atlantis?
@@ -29,3 +29,4 @@ Runs `terraform plan` and `apply` remotely and comments back on the pull request
 [![Go Report Card](https://goreportcard.com/badge/github.com/runatlantis/atlantis)](https://goreportcard.com/report/github.com/runatlantis/atlantis)
 [![CircleCI](https://circleci.com/gh/runatlantis/atlantis/tree/master.svg?style=shield)](https://circleci.com/gh/runatlantis/atlantis/tree/master)
 [![Slack Status](https://thawing-headland-22460.herokuapp.com/badge.svg)](https://thawing-headland-22460.herokuapp.com)
+[![Gitter chat](https://badges.gitter.im/runatlantis.png)](https://gitter.im/runatlantis)
