@@ -160,7 +160,7 @@ Next, edit the manifests below as follows:
     * NOTE: You never want to run with `:latest` because if your Pod moves to a new node, Kubernetes will pull the latest image and you might end
 up upgrading Atlantis by accident!
 2. Replace `value: github.com/yourorg/*` under `name: ATLANTIS_REPO_WHITELIST` with the whitelist pattern
-for your Terraform repos. See [--repo-whitelist](#--repo-whitelist) for more details.
+for your Terraform repos. See [--repo-whitelist](/docs/security.html#repo-whitelist) for more details.
 3. If you're using GitHub:
     1. Replace `<YOUR_GITHUB_USER>` with the username of your Atlantis GitHub user without the `@`.
     2. Delete all the `ATLANTIS_GITLAB_*` environment variables.
@@ -214,6 +214,7 @@ spec:
             secretKeyRef:
               name: atlantis-vcs
               key: webhook-secret
+        ### End GitHub Config ###
 
         ### GitLab Config ###
         - name: ATLANTIS_GITLAB_USER
@@ -228,6 +229,7 @@ spec:
             secretKeyRef:
               name: atlantis-vcs
               key: webhook-secret
+        ### End GitLab Config ###
 
         - name: ATLANTIS_DATA_DIR
           value: /atlantis
@@ -253,15 +255,15 @@ spec:
           httpGet:
             path: /healthz
             port: 4141
-            # If using https, change this.
-            scheme: http
+            # If using https, change this to HTTPS
+            scheme: HTTP
         readinessProbe:
           periodSeconds: 60
           httpGet:
             path: /healthz
             port: 4141
-            # If using https, change this.
-            scheme: http
+            # If using https, change this to HTTPS
+            scheme: HTTP
   volumeClaimTemplates:
   - metadata:
       name: atlantis-data
@@ -329,6 +331,7 @@ spec:
             secretKeyRef:
               name: atlantis-vcs
               key: webhook-secret
+        ### End GitHub Config ###
 
         ### GitLab Config ###
         - name: ATLANTIS_GITLAB_USER
@@ -343,6 +346,8 @@ spec:
             secretKeyRef:
               name: atlantis-vcs
               key: webhook-secret
+        ### End GitLab Config ###
+
         - name: ATLANTIS_PORT
           value: "4141" # Kubernetes sets an ATLANTIS_PORT variable so we need to override.
         ports:
@@ -362,15 +367,15 @@ spec:
           httpGet:
             path: /healthz
             port: 4141
-            # If using https, change this.
-            scheme: http
+            # If using https, change this to HTTPS
+            scheme: HTTP
         readinessProbe:
           periodSeconds: 60
           httpGet:
             path: /healthz
             port: 4141
-            # If using https, change this.
-            scheme: http
+            # If using https, change this to HTTPS
+            scheme: HTTP
 ---
 apiVersion: v1
 kind: Service
