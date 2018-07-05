@@ -25,6 +25,10 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
+// maxCommentBodySize is derived from the error message when you go over
+// this limit.
+const maxCommentBodySize = 65536
+
 // GithubClient is used to perform GitHub actions.
 type GithubClient struct {
 	client *github.Client
@@ -87,9 +91,6 @@ func (g *GithubClient) GetModifiedFiles(repo models.Repo, pull models.PullReques
 // If comment length is greater than the max comment length we split into
 // multiple comments.
 func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment string) error {
-	// maxCommentBodySize is derived from the error message when you go over
-	// this limit.
-	const maxCommentBodySize = 65536
 	comments := g.splitAtMaxChars(comment, maxCommentBodySize, "\ncontinued...\n")
 	for _, c := range comments {
 		_, _, err := g.client.Issues.CreateComment(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueComment{Body: &c})
@@ -145,6 +146,7 @@ func (g *GithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 // len separated by join which gets appended to the ends of the middle strings.
 // If max <= len(join) we return an empty slice since this is an edge case we
 // don't want to handle.
+// nolint: unparam
 func (g *GithubClient) splitAtMaxChars(comment string, max int, join string) []string {
 	// If we're under the limit then no need to split.
 	if len(comment) <= max {

@@ -334,7 +334,6 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	}
 }
 
-// nolint: gocyclo
 func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	logLevel := userConfig.LogLevel
 	if logLevel != "debug" && logLevel != "info" && logLevel != "warn" && logLevel != "error" {

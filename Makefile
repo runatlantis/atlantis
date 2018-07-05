@@ -63,8 +63,7 @@ gometalint: ## Run every linter ever
 	# gocyclo is temporarily disabled because we don't pass it right now
 	# golint is temporarily disabled because we need to add comments everywhere first
 	# CGO_ENABLED=0 is attempted workaround for https://github.com/alecthomas/gometalinter/issues/149
-	# errcheck is temporarily disabled until https://github.com/alecthomas/gometalinter/pull/498 is fixed
-	CGO_ENABLED=0 gometalinter --disable gotype --disable gotypex --disable maligned --disable gocyclo --disable golint --disable errcheck --enable=megacheck --enable=unparam --linter='gas:gas -exclude=G104 -fmt=csv:^(?P<path>.*?\.go),(?P<line>\d+),(?P<message>[^,]+,[^,]+,[^,]+)' --deadline=300s --vendor -t --line-length=120 --skip server/static ./...
+	CGO_ENABLED=0 gometalinter --config=.gometalinter.json ./...
 
 gometalint-install: ## Install gometalint
 	go get -u github.com/alecthomas/gometalinter

@@ -83,7 +83,6 @@ type CommentParseResult struct {
 // - atlantis plan -w staging -d dir --verbose
 // - atlantis plan --verbose -- -key=value -key2 value2
 //
-// nolint: gocyclo
 func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) CommentParseResult {
 	if multiLineRegex.MatchString(comment) {
 		return CommentParseResult{Ignore: true}
