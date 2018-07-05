@@ -45,7 +45,7 @@ atlantis apply [options] -- [terraform apply flags]
 Options:
 * `-d directory` Apply the plan for this directory, relative to root of repo. Use `.` for root. Defaults to root.
 * `-p project` Apply the plan for this project. Refers to the name of the project configured in the repo's [`atlantis.yaml` file](/docs/atlantis-yaml-reference.html). Cannot be used at same time as `-d` or `-w`.
-* `-w workspace` Apply the plan for this [Terraform workspace](https://www.terraform.io/images/state/workspaces.html). Defaults to `default`. If not using Terraform workspaces you can ignore this.
+* `-w workspace` Apply the plan for this [Terraform workspace](https://www.terraform.io/docs/state/workspaces.html). Defaults to `default`. If not using Terraform workspaces you can ignore this.
 * `--verbose` Append Atlantis log to comment.
 
 Additional Terraform flags:
