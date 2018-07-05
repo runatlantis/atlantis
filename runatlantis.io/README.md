@@ -5,6 +5,7 @@ heroImage: /hero.png
 heroText: Atlantis
 actionText: Get Started →
 actionLink: /guide/
+title: Terraform Automation By Pull Request
 ---
 
 ## How it works
