@@ -188,7 +188,7 @@ func (s Step) ToValid() valid.Step {
 		for _, v := range s.StringVal {
 			// We ignore the error here because it should have been checked in
 			// Validate().
-			split, _ := shlex.Split(v) // nolint: errcheck
+			split, _ := shlex.Split(v)
 			return valid.Step{
 				StepName:   RunStepName,
 				RunCommand: split,
