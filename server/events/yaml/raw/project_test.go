@@ -225,6 +225,64 @@ func TestProject_ToValid(t *testing.T) {
 				},
 			},
 		},
+		{
+			description: "dir with /",
+			input: raw.Project{
+				Dir: String("/"),
+			},
+			exp: valid.Project{
+				Dir:       ".",
+				Workspace: "default",
+				Autoplan: valid.Autoplan{
+					WhenModified: []string{"**/*.tf"},
+					Enabled:      true,
+				},
+			},
+		},
+		{
+			description: "dir with trailing slash",
+			input: raw.Project{
+				Dir: String("mydir/"),
+			},
+			exp: valid.Project{
+				Dir:       "mydir",
+				Workspace: "default",
+				Autoplan: valid.Autoplan{
+					WhenModified: []string{"**/*.tf"},
+					Enabled:      true,
+				},
+			},
+		},
+		{
+			description: "unclean dir",
+			input: raw.Project{
+				// This won't actually be allowed since it doesn't validate.
+				Dir: String("./mydir/anotherdir/../"),
+			},
+			exp: valid.Project{
+				Dir:       "mydir",
+				Workspace: "default",
+				Autoplan: valid.Autoplan{
+					WhenModified: []string{"**/*.tf"},
+					Enabled:      true,
+				},
+			},
+		},
+		{
+			description: "workspace set to empty string",
+			input: raw.Project{
+				Dir:       String("."),
+				Workspace: String(""),
+			},
+			exp: valid.Project{
+				Dir:       ".",
+				Workspace: "default",
+				Autoplan: valid.Autoplan{
+					WhenModified: []string{"**/*.tf"},
+					Enabled:      true,
+				},
+			},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
