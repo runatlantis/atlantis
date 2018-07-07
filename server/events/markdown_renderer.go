@@ -72,6 +72,7 @@ func (m *MarkdownRenderer) Render(res CommandResult, cmdName CommandName, log st
 
 func (m *MarkdownRenderer) renderProjectResults(results []ProjectResult, common CommonData) string {
 	var resultsTmplData []ProjectResultTmplData
+	numSuccesses := 0
 
 	for _, result := range results {
 		resultData := ProjectResultTmplData{
@@ -96,8 +97,10 @@ func (m *MarkdownRenderer) renderProjectResults(results []ProjectResult, common 
 			})
 		} else if result.PlanSuccess != nil {
 			resultData.Rendered = m.renderTemplate(planSuccessTmpl, *result.PlanSuccess)
+			numSuccesses++
 		} else if result.ApplySuccess != "" {
 			resultData.Rendered = m.renderTemplate(applySuccessTmpl, struct{ Output string }{result.ApplySuccess})
+			numSuccesses++
 		} else {
 			resultData.Rendered = "Found no template. This is a bug!"
 		}
@@ -105,10 +108,19 @@ func (m *MarkdownRenderer) renderProjectResults(results []ProjectResult, common 
 	}
 
 	var tmpl *template.Template
-	if len(resultsTmplData) == 1 {
-		tmpl = singleProjectTmpl
-	} else {
-		tmpl = multiProjectTmpl
+	switch {
+	case len(resultsTmplData) == 1 && common.Command == "Plan" && numSuccesses > 0:
+		tmpl = singleProjectPlanSuccessTmpl
+	case len(resultsTmplData) == 1 && common.Command == "Plan" && numSuccesses == 0:
+		tmpl = singleProjectPlanUnsuccessfulTmpl
+	case len(resultsTmplData) == 1 && common.Command == "Apply":
+		tmpl = singleProjectApplyTmpl
+	case len(resultsTmplData) > 1 && common.Command == "Plan":
+		tmpl = multiProjectPlanTmpl
+	case len(resultsTmplData) > 1 && common.Command == "Apply":
+		tmpl = multiProjectApplyTmpl
+	default:
+		return "no template matched–this is a bug"
 	}
 	return m.renderTemplate(tmpl, ResultData{resultsTmplData, common})
 }
@@ -121,8 +133,26 @@ func (m *MarkdownRenderer) renderTemplate(tmpl *template.Template, data interfac
 	return buf.String()
 }
 
-var singleProjectTmpl = template.Must(template.New("").Parse("{{$result := index .Results 0}}Ran {{.Command}} in dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" + logTmpl))
-var multiProjectTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
+// todo: refactor to remove duplication #refactor
+var singleProjectApplyTmpl = template.Must(template.New("").Parse(
+	"{{$result := index .Results 0}}Ran {{.Command}} in dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" + logTmpl))
+var singleProjectPlanSuccessTmpl = template.Must(template.New("").Parse(
+	"{{$result := index .Results 0}}Ran {{.Command}} in dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" +
+		"* To apply all unapplied plans comment `atlantis apply`" + logTmpl))
+var singleProjectPlanUnsuccessfulTmpl = template.Must(template.New("").Parse(
+	"{{$result := index .Results 0}}Ran {{.Command}} in dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n" +
+		"{{$result.Rendered}}\n" + logTmpl))
+var multiProjectPlanTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
+	"Ran {{.Command}} for {{ len .Results }} projects:\n" +
+		"{{ range $result := .Results }}" +
+		"1. workspace: `{{$result.Workspace}}` dir: `{{$result.RepoRelDir}}`\n" +
+		"{{end}}\n" +
+		"{{ range $i, $result := .Results }}" +
+		"### {{add $i 1}}. workspace: `{{$result.Workspace}}` dir: `{{$result.RepoRelDir}}`\n" +
+		"{{$result.Rendered}}\n" +
+		"---\n{{end}}* To apply all unapplied plans comment `atlantis apply`" +
+		logTmpl))
+var multiProjectApplyTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
 	"Ran {{.Command}} for {{ len .Results }} projects:\n" +
 		"{{ range $result := .Results }}" +
 		"1. workspace: `{{$result.Workspace}}` dir: `{{$result.RepoRelDir}}`\n" +
@@ -136,7 +166,7 @@ var planSuccessTmpl = template.Must(template.New("").Parse(
 	"```diff\n" +
 		"{{.TerraformOutput}}\n" +
 		"```\n\n" +
-		"* To **discard** this plan click [here]({{.LockURL}})."))
+		"* To **delete** this plan click [here]({{.LockURL}})"))
 var applySuccessTmpl = template.Must(template.New("").Parse(
 	"```diff\n" +
 		"{{.Output}}\n" +

@@ -15,6 +15,7 @@ package events_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events"
@@ -141,7 +142,15 @@ func TestRenderProjectResults(t *testing.T) {
 					RepoRelDir: "path",
 				},
 			},
-			"Ran Plan in dir: `path` workspace: `workspace`\n\n```diff\nterraform-output\n```\n\n* To **discard** this plan click [here](lock-url).\n\n",
+			`Ran Plan in dir: $path$ workspace: $workspace$
+
+$$$diff
+terraform-output
+$$$
+
+* To **delete** this plan click [here](lock-url)
+* To apply all unapplied plans comment $atlantis apply$
+`,
 		},
 		{
 			"single successful apply",
@@ -155,7 +164,13 @@ func TestRenderProjectResults(t *testing.T) {
 					RepoRelDir: "path",
 				},
 			},
-			"Ran Apply in dir: `path` workspace: `workspace`\n\n```diff\nsuccess\n```\n\n",
+			`Ran Apply in dir: $path$ workspace: $workspace$
+
+$$$diff
+success
+$$$
+
+`,
 		},
 		{
 			"multiple successful plans",
@@ -182,7 +197,26 @@ func TestRenderProjectResults(t *testing.T) {
 					},
 				},
 			},
-			"Ran Plan for 2 projects:\n1. workspace: `workspace` dir: `path`\n1. workspace: `workspace` dir: `path2`\n\n### 1. workspace: `workspace` dir: `path`\n```diff\nterraform-output\n```\n\n* To **discard** this plan click [here](lock-url).\n---\n### 2. workspace: `workspace` dir: `path2`\n```diff\nterraform-output2\n```\n\n* To **discard** this plan click [here](lock-url2).\n---\n\n",
+			`Ran Plan for 2 projects:
+1. workspace: $workspace$ dir: $path$
+1. workspace: $workspace$ dir: $path2$
+
+### 1. workspace: $workspace$ dir: $path$
+$$$diff
+terraform-output
+$$$
+
+* To **delete** this plan click [here](lock-url)
+---
+### 2. workspace: $workspace$ dir: $path2$
+$$$diff
+terraform-output2
+$$$
+
+* To **delete** this plan click [here](lock-url2)
+---
+* To apply all unapplied plans comment $atlantis apply$
+`,
 		},
 		{
 			"multiple successful applies",
@@ -203,7 +237,22 @@ func TestRenderProjectResults(t *testing.T) {
 					},
 				},
 			},
-			"Ran Apply for 2 projects:\n1. workspace: `workspace` dir: `path`\n1. workspace: `workspace` dir: `path2`\n\n### 1. workspace: `workspace` dir: `path`\n```diff\nsuccess\n```\n---\n### 2. workspace: `workspace` dir: `path2`\n```diff\nsuccess2\n```\n---\n\n",
+			`Ran Apply for 2 projects:
+1. workspace: $workspace$ dir: $path$
+1. workspace: $workspace$ dir: $path2$
+
+### 1. workspace: $workspace$ dir: $path$
+$$$diff
+success
+$$$
+---
+### 2. workspace: $workspace$ dir: $path2$
+$$$diff
+success2
+$$$
+---
+
+`,
 		},
 		{
 			"single errored plan",
@@ -217,7 +266,15 @@ func TestRenderProjectResults(t *testing.T) {
 					Workspace:  "workspace",
 				},
 			},
-			"Ran Plan in dir: `path` workspace: `workspace`\n\n**Plan Error**\n```\nerror\n```\n\n\n",
+			`Ran Plan in dir: $path$ workspace: $workspace$
+
+**Plan Error**
+$$$
+error
+$$$
+
+
+`,
 		},
 		{
 			"single failed plan",
@@ -231,7 +288,12 @@ func TestRenderProjectResults(t *testing.T) {
 					},
 				},
 			},
-			"Ran Plan in dir: `path` workspace: `workspace`\n\n**Plan Failed**: failure\n\n\n",
+			`Ran Plan in dir: $path$ workspace: $workspace$
+
+**Plan Failed**: failure
+
+
+`,
 		},
 		{
 			"successful, failed, and errored plan",
@@ -262,7 +324,31 @@ func TestRenderProjectResults(t *testing.T) {
 					},
 				},
 			},
-			"Ran Plan for 3 projects:\n1. workspace: `workspace` dir: `path`\n1. workspace: `workspace` dir: `path2`\n1. workspace: `workspace` dir: `path3`\n\n### 1. workspace: `workspace` dir: `path`\n```diff\nterraform-output\n```\n\n* To **discard** this plan click [here](lock-url).\n---\n### 2. workspace: `workspace` dir: `path2`\n**Plan Failed**: failure\n\n---\n### 3. workspace: `workspace` dir: `path3`\n**Plan Error**\n```\nerror\n```\n\n---\n\n",
+			`Ran Plan for 3 projects:
+1. workspace: $workspace$ dir: $path$
+1. workspace: $workspace$ dir: $path2$
+1. workspace: $workspace$ dir: $path3$
+
+### 1. workspace: $workspace$ dir: $path$
+$$$diff
+terraform-output
+$$$
+
+* To **delete** this plan click [here](lock-url)
+---
+### 2. workspace: $workspace$ dir: $path2$
+**Plan Failed**: failure
+
+---
+### 3. workspace: $workspace$ dir: $path3$
+**Plan Error**
+$$$
+error
+$$$
+
+---
+* To apply all unapplied plans comment $atlantis apply$
+`,
 		},
 		{
 			"successful, failed, and errored apply",
@@ -290,7 +376,29 @@ func TestRenderProjectResults(t *testing.T) {
 					},
 				},
 			},
-			"Ran Apply for 3 projects:\n1. workspace: `workspace` dir: `path`\n1. workspace: `workspace` dir: `path2`\n1. workspace: `workspace` dir: `path3`\n\n### 1. workspace: `workspace` dir: `path`\n```diff\nsuccess\n```\n---\n### 2. workspace: `workspace` dir: `path2`\n**Apply Failed**: failure\n\n---\n### 3. workspace: `workspace` dir: `path3`\n**Apply Error**\n```\nerror\n```\n\n---\n\n",
+			`Ran Apply for 3 projects:
+1. workspace: $workspace$ dir: $path$
+1. workspace: $workspace$ dir: $path2$
+1. workspace: $workspace$ dir: $path3$
+
+### 1. workspace: $workspace$ dir: $path$
+$$$diff
+success
+$$$
+---
+### 2. workspace: $workspace$ dir: $path2$
+**Apply Failed**: failure
+
+---
+### 3. workspace: $workspace$ dir: $path3$
+**Apply Error**
+$$$
+error
+$$$
+
+---
+
+`,
 		},
 	}
 
@@ -303,10 +411,11 @@ func TestRenderProjectResults(t *testing.T) {
 			for _, verbose := range []bool{true, false} {
 				t.Run(c.Description, func(t *testing.T) {
 					s := r.Render(res, c.Command, "log", verbose)
+					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
 					if !verbose {
-						Equals(t, c.Expected, s)
+						Equals(t, expWithBackticks, s)
 					} else {
-						Equals(t, c.Expected+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
+						Equals(t, expWithBackticks+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
 					}
 				})
 			}
