@@ -138,7 +138,7 @@ steps:
 | steps      | array[[Step](atlantis-yaml-reference.html#step)] | `[]` | no | List of steps for this stage. If the steps key is empty, no steps will be run for this stage. |
 
 ### Step
-#### Built-In Command
+#### Built-In Commands: init, plan, apply
 Steps can be a single string for a built-in command.
 ```yaml
 - init
@@ -162,7 +162,7 @@ A map from string to `extra_args` for a built-in command with extra arguments.
 | Key        | Type | Default           | Required | Description  |
 | -------------| --- |-------------| -----|---|
 | init/plan/apply      | map[`extra_args` -> array[string]] | none | no | Use a built-in command and append `extra_args`. Only `init`, `plan` and `apply` are supported as keys and only `extra_args` is supported as a value||
-#### Custom Command
+#### Custom `run` Command
 Or a custom command
 ```yaml
 - run: custom-command
@@ -177,6 +177,9 @@ Or a custom command
   * NOTE: if the step is executed before `init` then Atlantis won't have switched to this workspace yet.
 * `ATLANTIS_TERRAFORM_VERSION` - The version of Terraform used for this project, ex. `0.11.0`.
 * `DIR` - Absolute path to the current directory.
+* `PLANFILE` - Absolute path to the location where Atlantis expects the plan to
+either be generated (by plan) or already exist (if running apply). Can be used to
+override the built-in `plan`/`apply` commands, ex. `run: terraform plan -out $PLANFILE`.
 :::
 
 ## Next Steps
