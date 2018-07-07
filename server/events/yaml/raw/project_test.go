@@ -128,12 +128,20 @@ func TestProject_Validate(t *testing.T) {
 			expErr: "",
 		},
 		{
-			description: "tf version without prepended",
+			description: "tf version without prepended v",
 			input: raw.Project{
 				Dir:              String("."),
 				TerraformVersion: String("1"),
 			},
 			expErr: "",
+		},
+		{
+			description: "empty string for project name",
+			input: raw.Project{
+				Dir:  String("."),
+				Name: String(""),
+			},
+			expErr: "name: if set cannot be empty.",
 		},
 	}
 	validation.ErrorTag = "yaml"
