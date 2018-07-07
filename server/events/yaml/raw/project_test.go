@@ -234,7 +234,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:       ".",
 				Workspace: "default",
 				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf"},
+					WhenModified: []string{"**/*.tf*"},
 					Enabled:      true,
 				},
 			},
@@ -248,7 +248,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:       "mydir",
 				Workspace: "default",
 				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf"},
+					WhenModified: []string{"**/*.tf*"},
 					Enabled:      true,
 				},
 			},
@@ -263,7 +263,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:       "mydir",
 				Workspace: "default",
 				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf"},
+					WhenModified: []string{"**/*.tf*"},
 					Enabled:      true,
 				},
 			},
@@ -278,7 +278,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:       ".",
 				Workspace: "default",
 				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf"},
+					WhenModified: []string{"**/*.tf*"},
 					Enabled:      true,
 				},
 			},

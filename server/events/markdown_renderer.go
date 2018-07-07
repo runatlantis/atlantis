@@ -115,9 +115,9 @@ func (m *MarkdownRenderer) renderProjectResults(results []ProjectResult, common 
 		tmpl = singleProjectPlanUnsuccessfulTmpl
 	case len(resultsTmplData) == 1 && common.Command == "Apply":
 		tmpl = singleProjectApplyTmpl
-	case len(resultsTmplData) > 1 && common.Command == "Plan":
+	case common.Command == "Plan":
 		tmpl = multiProjectPlanTmpl
-	case len(resultsTmplData) > 1 && common.Command == "Apply":
+	case common.Command == "Apply":
 		tmpl = multiProjectApplyTmpl
 	default:
 		return "no template matched–this is a bug"
@@ -150,7 +150,7 @@ var multiProjectPlanTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap
 		"{{ range $i, $result := .Results }}" +
 		"### {{add $i 1}}. workspace: `{{$result.Workspace}}` dir: `{{$result.RepoRelDir}}`\n" +
 		"{{$result.Rendered}}\n" +
-		"---\n{{end}}* To apply all unapplied plans comment `atlantis apply`" +
+		"---\n{{end}}{{ if gt (len .Results) 0 }}* To apply all unapplied plans comment `atlantis apply`{{end}}" +
 		logTmpl))
 var multiProjectApplyTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
 	"Ran {{.Command}} for {{ len .Results }} projects:\n" +

@@ -36,7 +36,7 @@ type TerraformExec interface {
 
 func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error) {
 	// Need to lock the workspace we're about to clone to.
-	workspace := DefaultWorkspace
+	workspace := "default"
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.BaseRepo.FullName, workspace, ctx.Pull.Num)
 	if err != nil {
 		ctx.Log.Warn("workspace was locked")
@@ -95,7 +95,7 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext
 				ProjectConfig: nil,
 				GlobalConfig:  nil,
 				CommentArgs:   nil,
-				Workspace:     DefaultWorkspace,
+				Workspace:     "default",
 			})
 		}
 	} else {

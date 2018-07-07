@@ -53,17 +53,27 @@ func (c AutoplanCommand) IsAutoplan() bool {
 
 type CommentCommand struct {
 	// RepoRelDir is the path relative to the repo root to run the command in.
-	// Will never be an empty string and will never end in "/".
+	// Will never end in "/". If empty then the comment specified no directory.
 	RepoRelDir string
 	// CommentArgs are the extra arguments appended to comment,
 	// ex. atlantis plan -- -target=resource
-	Flags     []string
-	Name      CommandName
-	Verbose   bool
+	Flags   []string
+	Name    CommandName
+	Verbose bool
+	// Workspace is the name of the Terraform workspace to run the command in.
+	// If empty then the comment specified no workspace.
 	Workspace string
 	// ProjectName is the name of a project to run the command on. It refers to a
 	// project specified in an atlantis.yaml file.
+	// If empty then the comment specified no project.
 	ProjectName string
+}
+
+// IsForSpecificProject returns true if the command is for a specific dir, workspace
+// or project name. Otherwise it's a command like "atlantis plan" or "atlantis
+// apply".
+func (c CommentCommand) IsForSpecificProject() bool {
+	return c.RepoRelDir != "" || c.Workspace != "" || c.ProjectName != ""
 }
 
 func (c CommentCommand) CommandName() CommandName {
@@ -84,16 +94,16 @@ func (c CommentCommand) String() string {
 
 // NewCommentCommand constructs a CommentCommand, setting all missing fields to defaults.
 func NewCommentCommand(repoRelDir string, flags []string, name CommandName, verbose bool, workspace string, project string) *CommentCommand {
-	// If repoRelDir was an empty string, this will return '.'.
-	validDir := path.Clean(repoRelDir)
-	if validDir == "/" {
-		validDir = "."
-	}
-	if workspace == "" {
-		workspace = DefaultWorkspace
+	// If repoRelDir was empty we want to keep it that way to indicate that it
+	// wasn't specified in the comment.
+	if repoRelDir != "" {
+		repoRelDir = path.Clean(repoRelDir)
+		if repoRelDir == "/" {
+			repoRelDir = "."
+		}
 	}
 	return &CommentCommand{
-		RepoRelDir:  validDir,
+		RepoRelDir:  repoRelDir,
 		Flags:       flags,
 		Name:        name,
 		Verbose:     verbose,
