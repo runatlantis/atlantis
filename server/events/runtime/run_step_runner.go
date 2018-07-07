@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/hashicorp/go-version"
@@ -32,6 +33,7 @@ func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command []string, 
 		fmt.Sprintf("WORKSPACE=%s", ctx.Workspace),
 		fmt.Sprintf("ATLANTIS_TERRAFORM_VERSION=%s", tfVersion),
 		fmt.Sprintf("DIR=%s", path),
+		fmt.Sprintf("PLANFILE=%s", filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectConfig))),
 	}
 	finalEnvVars := append(baseEnvVars, customEnvVars...)
 	cmd.Env = finalEnvVars

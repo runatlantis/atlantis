@@ -1,10 +1,12 @@
-// Package runtime handles constructing an execution graph for each action
-// based on configuration and defaults. The handlers can then execute this
-// graph.
+// Package runtime holds code for actually running commands vs. preparing
+// and constructing.
 package runtime
 
 import (
+	"fmt"
+
 	"github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -19,4 +21,13 @@ func MustConstraint(constraint string) version.Constraints {
 		panic(err)
 	}
 	return c
+}
+
+// GetPlanFilename returns the filename (not the path) of the generated tf plan
+// given a workspace and maybe a project's config.
+func GetPlanFilename(workspace string, maybeCfg *valid.Project) string {
+	if maybeCfg == nil || maybeCfg.Name == nil {
+		return fmt.Sprintf("%s.tfplan", workspace)
+	}
+	return fmt.Sprintf("%s-%s.tfplan", *maybeCfg.Name, workspace)
 }

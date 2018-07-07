@@ -35,8 +35,8 @@ func TestRunStepRunner_Run(t *testing.T) {
 			ExpErr:  "exit status 127: running \"lkjlkj\" in",
 		},
 		{
-			Command: "echo workspace=$WORKSPACE version=$ATLANTIS_TERRAFORM_VERSION dir=$DIR",
-			ExpOut:  "workspace=myworkspace version=0.11.0 dir=$DIR\n",
+			Command: "echo workspace=$WORKSPACE version=$ATLANTIS_TERRAFORM_VERSION dir=$DIR planfile=$PLANFILE",
+			ExpOut:  "workspace=myworkspace version=0.11.0 dir=$DIR planfile=$DIR/myworkspace.tfplan\n",
 		},
 	}
 
@@ -70,7 +70,10 @@ func TestRunStepRunner_Run(t *testing.T) {
 				return
 			}
 			Ok(t, err)
-			expOut := strings.Replace(c.ExpOut, "dir=$DIR", "dir="+tmpDir, -1)
+			// Replace $DIR in the exp with the actual temp dir. We do this
+			// here because when constructing the cases we don't yet know the
+			// temp dir.
+			expOut := strings.Replace(c.ExpOut, "$DIR", tmpDir, -1)
 			Equals(t, expOut, out)
 		})
 	}
