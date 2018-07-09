@@ -11,13 +11,12 @@ ENV ATLANTIS_HOME_DIR=/home/atlantis
 ENV DUMB_INIT_VERSION=1.2.0
 ENV GOSU_VERSION=1.10
 RUN apk add --no-cache ca-certificates gnupg curl git unzip bash openssh libcap openssl && \
-    update-ca-certificates && \
-    wget -O /bin/dumb-init https://github.com/Yelp/dumb-init/releases/download/v${DUMB_INIT_VERSION}/dumb-init_${DUMB_INIT_VERSION}_amd64 && \
+    curl -o /bin/dumb-init https://github.com/Yelp/dumb-init/releases/download/v${DUMB_INIT_VERSION}/dumb-init_${DUMB_INIT_VERSION}_amd64 && \
     chmod +x /bin/dumb-init && \
     mkdir -p /tmp/build && \
     cd /tmp/build && \
-    wget -O gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-amd64" && \
-    wget -O gosu.asc "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-amd64.asc" && \
+    curl -o gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-amd64" && \
+    curl -o gosu.asc "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-amd64.asc" && \
     for server in $(shuf -e ipv4.pool.sks-keyservers.net \
                             hkp://p80.pool.sks-keyservers.net:80 \
                             keyserver.ubuntu.com \
