@@ -222,19 +222,16 @@ func TestDetermineProjects(t *testing.T) {
 }
 
 func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
-	/*
-			Create dir structure:
-
-			main.tf
-			project1/
-			  main.tf
-			project2/
-			  main.tf
-		      terraform.tfvars
-			modules/
-			  module/
-			    main.tf
-	*/
+	// Create dir structure:
+	// main.tf
+	// project1/
+	//   main.tf
+	// project2/
+	//   main.tf
+	//   terraform.tfvars
+	// modules/
+	//   module/
+	//	  main.tf
 	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
 		"main.tf": nil,
 		"project1": map[string]interface{}{
