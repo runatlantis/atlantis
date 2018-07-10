@@ -4,6 +4,8 @@
 * Add new `/healthz` endpoint for health checking in Kubernetes ([#102](https://github.com/runatlantis/atlantis/issues/102))
 * Set `$PLANFILE` environment variable to expected location of plan file when running custom steps ([#168](https://github.com/runatlantis/atlantis/issues/168))
     * This enables overriding the command Atlantis uses to `plan` and substituting your own or piping through a custom script.
+* Changed default pattern to detect changed files to `*.tf*` from `*.tf` in order
+to trigger on `.tfvars` files.
 
 ## Bugfixes
 None
