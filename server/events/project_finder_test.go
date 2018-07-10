@@ -222,25 +222,24 @@ func TestDetermineProjects(t *testing.T) {
 }
 
 func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
-	/*
-		Create dir structure:
-
-		main.tf
-		project1/
-		  main.tf
-		project2/
-		  main.tf
-		modules/
-		  module/
-		    main.tf
-	*/
+	// Create dir structure:
+	// main.tf
+	// project1/
+	//   main.tf
+	// project2/
+	//   main.tf
+	//   terraform.tfvars
+	// modules/
+	//   module/
+	//	  main.tf
 	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
 		"main.tf": nil,
 		"project1": map[string]interface{}{
 			"main.tf": nil,
 		},
 		"project2": map[string]interface{}{
-			"main.tf": nil,
+			"main.tf":          nil,
+			"terraform.tfvars": nil,
 		},
 		"modules": map[string]interface{}{
 			"module": map[string]interface{}{
@@ -364,6 +363,22 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 			},
 			modified:     []string{"main.tf", "modules/module/another.tf", "project2/nontf.txt"},
 			expProjPaths: []string{".", "project1"},
+		},
+		{
+			description: ".tfvars file modified",
+			config: valid.Config{
+				Projects: []valid.Project{
+					{
+						Dir: "project2",
+						Autoplan: valid.Autoplan{
+							Enabled:      true,
+							WhenModified: []string{"*.tf*"},
+						},
+					},
+				},
+			},
+			modified:     []string{"project2/terraform.tfvars"},
+			expProjPaths: []string{"project2"},
 		},
 	}
 

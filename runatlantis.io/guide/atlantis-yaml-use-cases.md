@@ -35,14 +35,14 @@ Given the directory structure:
     └── main.tf
 ```
 If you wanted Atlantis to autoplan `project1/` whenever any `.tf` file under `module1/`
-changed, you could use the following configuration:
+changed or any `.tf` or `.tfvars` file under `project1/` changed, you could use the following configuration:
 
 ```yaml
 version: 2
 projects:
 - dir: project1
   autoplan:
-    when_modified: ["../modules/**/*.tf", "*.tf"]
+    when_modified: ["../modules/**/*.tf", "*.tf*"]
 ```
 Note:
 * `when_modified` uses the [`.dockerignore` syntax](https://docs.docker.com/engine/reference/builder/#dockerignore-file)

@@ -175,7 +175,7 @@ func TestProject_ToValid(t *testing.T) {
 				Workflow:         nil,
 				TerraformVersion: nil,
 				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf"},
+					WhenModified: []string{"**/*.tf*"},
 					Enabled:      true,
 				},
 				ApplyRequirements: nil,
@@ -220,7 +220,7 @@ func TestProject_ToValid(t *testing.T) {
 				Workspace:        "default",
 				TerraformVersion: tfVersionPointEleven,
 				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf"},
+					WhenModified: []string{"**/*.tf*"},
 					Enabled:      true,
 				},
 			},

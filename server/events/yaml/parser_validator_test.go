@@ -151,7 +151,7 @@ projects:
 						Workflow:         nil,
 						TerraformVersion: nil,
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf"},
+							WhenModified: []string{"**/*.tf*"},
 							Enabled:      true,
 						},
 						ApplyRequirements: nil,
@@ -181,7 +181,7 @@ workflows:
 						Workflow:         String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf"},
+							WhenModified: []string{"**/*.tf*"},
 							Enabled:      true,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -215,7 +215,7 @@ workflows:
 						Workflow:         String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf"},
+							WhenModified: []string{"**/*.tf*"},
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -325,7 +325,7 @@ projects:
 						Dir:       ".",
 						Workspace: "workspace",
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf"},
+							WhenModified: []string{"**/*.tf*"},
 							Enabled:      true,
 						},
 					},
@@ -334,7 +334,7 @@ projects:
 						Dir:       ".",
 						Workspace: "workspace",
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf"},
+							WhenModified: []string{"**/*.tf*"},
 							Enabled:      true,
 						},
 					},
@@ -369,7 +369,7 @@ func TestReadConfig_Successes(t *testing.T) {
 		{
 			Autoplan: valid.Autoplan{
 				Enabled:      true,
-				WhenModified: []string{"**/*.tf"},
+				WhenModified: []string{"**/*.tf*"},
 			},
 			Workspace:         "default",
 			ApplyRequirements: nil,
@@ -401,7 +401,7 @@ version: 2
 projects:
 - dir: "."
   autoplan:
-    when_modified: ["**/*.tf"]
+    when_modified: ["**/*.tf*"]
 `,
 			expOutput: valid.Config{
 				Version:   2,
