@@ -64,7 +64,7 @@ projects:
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
 							Enabled:      true,
-							WhenModified: []string{"**/*.tf"},
+							WhenModified: []string{"**/*.tf*"},
 						},
 					},
 					dir:       ".",
@@ -106,7 +106,7 @@ projects:
 						Workspace: "myworkspace2",
 						Autoplan: valid.Autoplan{
 							Enabled:      true,
-							WhenModified: []string{"**/*.tf"},
+							WhenModified: []string{"**/*.tf*"},
 						},
 					},
 					dir:       ".",
@@ -148,7 +148,7 @@ projects:
 						Workspace: "myworkspace2",
 						Autoplan: valid.Autoplan{
 							Enabled:      true,
-							WhenModified: []string{"**/*.tf"},
+							WhenModified: []string{"**/*.tf*"},
 						},
 					},
 					dir:       ".",
@@ -277,7 +277,7 @@ projects:
 				Dir:       ".",
 				Workspace: "myworkspace",
 				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf"},
+					WhenModified: []string{"**/*.tf*"},
 					Enabled:      true,
 				},
 				ApplyRequirements: []string{"approved"},
@@ -336,7 +336,7 @@ projects:
 				Dir:       ".",
 				Workspace: "myworkspace",
 				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf"},
+					WhenModified: []string{"**/*.tf*"},
 					Enabled:      true,
 				},
 				ApplyRequirements: []string{"approved"},

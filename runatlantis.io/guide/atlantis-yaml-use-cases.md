@@ -42,7 +42,7 @@ version: 2
 projects:
 - dir: project1
   autoplan:
-    when_modified: ["../modules/**/*.tf", "*.tf"]
+    when_modified: ["../modules/**/*.tf*", "*.tf"]
 ```
 Note:
 * `when_modified` uses the [`.dockerignore` syntax](https://docs.docker.com/engine/reference/builder/#dockerignore-file)

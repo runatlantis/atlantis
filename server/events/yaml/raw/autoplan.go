@@ -2,7 +2,7 @@ package raw
 
 import "github.com/runatlantis/atlantis/server/events/yaml/valid"
 
-const DefaultAutoPlanWhenModified = "**/*.tf"
+const DefaultAutoPlanWhenModified = "**/*.tf*"
 const DefaultAutoPlanEnabled = true
 
 type Autoplan struct {

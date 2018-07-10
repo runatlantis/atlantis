@@ -267,7 +267,7 @@ func TestConfig_ToValid(t *testing.T) {
 						Dir:       "mydir",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf"},
+							WhenModified: []string{"**/*.tf*"},
 							Enabled:      true,
 						},
 					},

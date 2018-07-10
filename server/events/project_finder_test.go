@@ -279,7 +279,7 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 						Dir: ".",
 						Autoplan: valid.Autoplan{
 							Enabled:      true,
-							WhenModified: []string{"**/*.tf"},
+							WhenModified: []string{"**/*.tf*"},
 						},
 					},
 				},
@@ -295,7 +295,7 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 						Dir: "project",
 						Autoplan: valid.Autoplan{
 							Enabled:      true,
-							WhenModified: []string{"**/*.tf"},
+							WhenModified: []string{"**/*.tf*"},
 						},
 					},
 				},
@@ -311,7 +311,7 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 						Dir: "project1",
 						Autoplan: valid.Autoplan{
 							Enabled:      true,
-							WhenModified: []string{"../**/*.tf"},
+							WhenModified: []string{"../**/*.tf*"},
 						},
 					},
 				},
@@ -350,14 +350,14 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 						Dir: "project1",
 						Autoplan: valid.Autoplan{
 							Enabled:      true,
-							WhenModified: []string{"../modules/module/*.tf", "**/*.tf"},
+							WhenModified: []string{"../modules/module/*.tf", "**/*.tf*"},
 						},
 					},
 					{
 						Dir: "project2",
 						Autoplan: valid.Autoplan{
 							Enabled:      true,
-							WhenModified: []string{"**/*.tf"},
+							WhenModified: []string{"**/*.tf*"},
 						},
 					},
 				},
