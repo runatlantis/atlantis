@@ -13,7 +13,7 @@
     <div class="features">
       <div class="feature">
         <h2>What is it?</h2>
-        <p>A standalone application that listens for Terraform pull request events via webhooks. You deploy it yourself.</p>
+        <p>A self-hosted application that listens for Terraform pull request events via webhooks.</p>
       </div>
       <div class="feature">
         <h2>What does it do?</h2>

@@ -9,7 +9,7 @@ title: Terraform Automation By Pull Request
 ---
 
 ## How it works
-* You deploy Atlantis internally. You don't have to give your cloud credentials to a third party.
+* You host Atlantis yourself. You don't have to give your cloud credentials to a third party.
     * It runs as a golang binary or Docker container.
 * Expose it with a URL that is accessible by github/gitlab.com or your private git host.
 * Add its URL to your GitHub or GitLab repository so it can receive webhooks.

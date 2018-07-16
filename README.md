@@ -13,7 +13,7 @@
 * Start Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## What is Atlantis?
-A standalone golang application that listens for Terraform pull request events via webhooks.
+A self-hosted golang application that listens for Terraform pull request events via webhooks.
 
 ## What does it do?
 Runs `terraform plan` and `apply` remotely and comments back on the pull request with the output.
