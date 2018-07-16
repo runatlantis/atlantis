@@ -35,8 +35,6 @@ func TestGitHubWorkflow(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	RegisterMockTestingT(t)
-
 	cases := []struct {
 		Description string
 		// RepoDir is relative to testfixtures/test-repos.
@@ -105,7 +103,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			Description:            "modules modules only",
 			RepoDir:                "modules",
 			ModifiedFiles:          []string{"modules/null/main.tf"},
-			ExpAutoplanCommentFile: "exp-output-autoplan-only-modules.txt",
+			ExpAutoplanCommentFile: "",
 			CommentAndReplies: []string{
 				"atlantis plan -d staging", "exp-output-plan-staging.txt",
 				"atlantis plan -d production", "exp-output-plan-production.txt",
@@ -152,6 +150,8 @@ func TestGitHubWorkflow(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
+			RegisterMockTestingT(t)
+
 			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t)
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
@@ -162,12 +162,14 @@ func TestGitHubWorkflow(t *testing.T) {
 			w := httptest.NewRecorder()
 			When(githubGetter.GetPullRequest(AnyRepo(), AnyInt())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
 			When(vcsClient.GetModifiedFiles(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
+			expNumTimesCalledCreateComment := 0
 
 			// First, send the open pull request event and trigger an autoplan.
 			pullOpenedReq := GitHubPullRequestOpenedEvent(t, headSHA)
 			ctrl.Post(w, pullOpenedReq)
 			responseContains(t, w, 200, "Processing...")
 			if c.ExpAutoplanCommentFile != "" {
+				expNumTimesCalledCreateComment++
 				_, _, autoplanComment := vcsClient.VerifyWasCalledOnce().CreateComment(AnyRepo(), AnyInt(), AnyString()).GetCapturedArguments()
 				assertCommentEquals(t, c.ExpAutoplanCommentFile, autoplanComment, c.RepoDir)
 			}
@@ -181,7 +183,12 @@ func TestGitHubWorkflow(t *testing.T) {
 				w = httptest.NewRecorder()
 				ctrl.Post(w, commentReq)
 				responseContains(t, w, 200, "Processing...")
-				_, _, atlantisComment := vcsClient.VerifyWasCalled(Times((i/2)+2)).CreateComment(AnyRepo(), AnyInt(), AnyString()).GetCapturedArguments()
+				// Each comment warrants a response. The comments are at the
+				// even indices.
+				if i%2 == 0 {
+					expNumTimesCalledCreateComment++
+				}
+				_, _, atlantisComment := vcsClient.VerifyWasCalled(Times(expNumTimesCalledCreateComment)).CreateComment(AnyRepo(), AnyInt(), AnyString()).GetCapturedArguments()
 				assertCommentEquals(t, expOutputFile, atlantisComment, c.RepoDir)
 			}
 
@@ -190,8 +197,8 @@ func TestGitHubWorkflow(t *testing.T) {
 			w = httptest.NewRecorder()
 			ctrl.Post(w, pullClosedReq)
 			responseContains(t, w, 200, "Pull request cleaned successfully")
-			numPrevComments := (len(c.CommentAndReplies) / 2) + 1
-			_, _, pullClosedComment := vcsClient.VerifyWasCalled(Times(numPrevComments+1)).CreateComment(AnyRepo(), AnyInt(), AnyString()).GetCapturedArguments()
+			expNumTimesCalledCreateComment++
+			_, _, pullClosedComment := vcsClient.VerifyWasCalled(Times(expNumTimesCalledCreateComment)).CreateComment(AnyRepo(), AnyInt(), AnyString()).GetCapturedArguments()
 			assertCommentEquals(t, c.ExpMergeCommentFile, pullClosedComment, c.RepoDir)
 		})
 	}

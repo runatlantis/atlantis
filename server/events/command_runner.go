@@ -93,6 +93,13 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		c.updatePull(ctx, AutoplanCommand{}, CommandResult{Error: err})
 		return
 	}
+	if len(projectCmds) == 0 {
+		log.Info("determined there was no project to run plan in")
+		if err := c.CommitStatusUpdater.Update(baseRepo, pull, vcs.Success, Plan); err != nil {
+			ctx.Log.Warn("unable to update commit status: %s", err)
+		}
+		return
+	}
 
 	var results []ProjectResult
 	for _, cmd := range projectCmds {

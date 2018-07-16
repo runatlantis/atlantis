@@ -67,9 +67,6 @@ func (m *MarkdownRenderer) Render(res CommandResult, cmdName CommandName, log st
 	if res.Failure != "" {
 		return m.renderTemplate(failureWithLogTmpl, FailureData{res.Failure, common})
 	}
-	if len(res.ProjectResults) == 0 && autoplan {
-		return m.renderTemplate(autoplanNoProjectsWithLogTmpl, common)
-	}
 	return m.renderProjectResults(res.ProjectResults, common)
 }
 
@@ -148,11 +145,9 @@ var errTmplText = "**{{.Command}} Error**\n" +
 	"```\n" +
 	"{{.Error}}\n" +
 	"```\n"
-var autoplanNoProjectsTmplText = "Ran `plan` in 0 projects because Atlantis detected no Terraform changes or could not determine where to run `plan`.\n"
 var errTmpl = template.Must(template.New("").Parse(errTmplText))
 var errWithLogTmpl = template.Must(template.New("").Parse(errTmplText + logTmpl))
 var failureTmplText = "**{{.Command}} Failed**: {{.Failure}}\n"
 var failureTmpl = template.Must(template.New("").Parse(failureTmplText))
 var failureWithLogTmpl = template.Must(template.New("").Parse(failureTmplText + logTmpl))
-var autoplanNoProjectsWithLogTmpl = template.Must(template.New("").Parse(autoplanNoProjectsTmplText + logTmpl))
 var logTmpl = "{{if .Verbose}}\n<details><summary>Log</summary>\n  <p>\n\n```\n{{.Log}}```\n</p></details>{{end}}\n"
