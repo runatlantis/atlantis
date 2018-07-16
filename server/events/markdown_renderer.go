@@ -58,7 +58,7 @@ type ProjectResultTmplData struct {
 
 // Render formats the data into a markdown string.
 // nolint: interfacer
-func (m *MarkdownRenderer) Render(res CommandResult, cmdName CommandName, log string, verbose bool, autoplan bool) string {
+func (m *MarkdownRenderer) Render(res CommandResult, cmdName CommandName, log string, verbose bool) string {
 	commandStr := strings.Title(cmdName.String())
 	common := CommonData{commandStr, verbose, log}
 	if res.Error != nil {

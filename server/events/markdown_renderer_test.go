@@ -51,7 +51,7 @@ func TestRenderErr(t *testing.T) {
 			}
 			for _, verbose := range []bool{true, false} {
 				t.Log("testing " + c.Description)
-				s := r.Render(res, c.Command, "log", verbose, false)
+				s := r.Render(res, c.Command, "log", verbose)
 				if !verbose {
 					Equals(t, c.Expected, s)
 				} else {
@@ -91,7 +91,7 @@ func TestRenderFailure(t *testing.T) {
 			}
 			for _, verbose := range []bool{true, false} {
 				t.Log("testing " + c.Description)
-				s := r.Render(res, c.Command, "log", verbose, false)
+				s := r.Render(res, c.Command, "log", verbose)
 				if !verbose {
 					Equals(t, c.Expected, s)
 				} else {
@@ -109,7 +109,7 @@ func TestRenderErrAndFailure(t *testing.T) {
 		Error:   errors.New("error"),
 		Failure: "failure",
 	}
-	s := r.Render(res, events.Plan, "", false, false)
+	s := r.Render(res, events.Plan, "", false)
 	Equals(t, "**Plan Error**\n```\nerror\n```\n\n", s)
 }
 
@@ -302,7 +302,7 @@ func TestRenderProjectResults(t *testing.T) {
 			}
 			for _, verbose := range []bool{true, false} {
 				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, "log", verbose, false)
+					s := r.Render(res, c.Command, "log", verbose)
 					if !verbose {
 						Equals(t, c.Expected, s)
 					} else {
