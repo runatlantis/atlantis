@@ -33,7 +33,7 @@ func TestNewRepo_EmptyCloneURL(t *testing.T) {
 
 func TestNewRepo_InvalidCloneURL(t *testing.T) {
 	_, err := models.NewRepo(models.Github, "owner/repo", ":", "u", "p")
-	ErrEquals(t, "invalid clone url: parse :: missing protocol scheme", err)
+	ErrEquals(t, "invalid clone url: parse :.git: missing protocol scheme", err)
 }
 
 func TestNewRepo_CloneURLWrongRepo(t *testing.T) {

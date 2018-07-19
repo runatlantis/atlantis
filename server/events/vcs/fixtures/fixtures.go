@@ -21,6 +21,7 @@ var PullEvent = github.PullRequestEvent{
 	},
 	Repo:        &Repo,
 	PullRequest: &Pull,
+	Action:      github.String("opened"),
 }
 
 var Pull = github.PullRequest{

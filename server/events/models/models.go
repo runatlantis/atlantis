@@ -51,12 +51,20 @@ type Repo struct {
 	VCSHost VCSHost
 }
 
+// NewRepo constructs a Repo object. repoFullName is the owner/repo form,
+// cloneURL can be with or without .git at the end
+// ex. https://github.com/runatlantis/atlantis.git OR
+//     https://github.com/runatlantis/atlantis
 func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsUser string, vcsToken string) (Repo, error) {
 	if repoFullName == "" {
 		return Repo{}, errors.New("repoFullName can't be empty")
 	}
 	if cloneURL == "" {
 		return Repo{}, errors.New("cloneURL can't be empty")
+	}
+
+	if !strings.HasSuffix(cloneURL, ".git") {
+		cloneURL += ".git"
 	}
 
 	// Ensure the Clone URL is for the same repo to avoid something malicious.
@@ -103,8 +111,10 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 type PullRequest struct {
 	// Num is the pull request number or ID.
 	Num int
-	// HeadCommit points to the head of the branch that is being
-	// pull requested into the base.
+	// HeadCommit is a sha256 that points to the head of the branch that is being
+	// pull requested into the base. If the pull request is from BitBucket,
+	// the string will only be 12 characters long because BitBucket truncates
+	// its commit IDs.
 	HeadCommit string
 	// URL is the url of the pull request.
 	// ex. "https://github.com/runatlantis/atlantis/pull/1"
@@ -127,6 +137,29 @@ const (
 	Open PullRequestState = iota
 	Closed
 )
+
+type PullRequestEventType int
+
+const (
+	OpenedPullEvent PullRequestEventType = iota
+	UpdatedPullEvent
+	ClosedPullEvent
+	OtherPullEvent
+)
+
+func (p PullRequestEventType) String() string {
+	switch p {
+	case OpenedPullEvent:
+		return "opened"
+	case UpdatedPullEvent:
+		return "updated"
+	case ClosedPullEvent:
+		return "closed"
+	case OtherPullEvent:
+		return "other"
+	}
+	return "<missing String() implementation>"
+}
 
 // User is a VCS user.
 // During an autoplan, the user will be the Atlantis API user.
@@ -208,6 +241,7 @@ type VCSHostType int
 const (
 	Github VCSHostType = iota
 	Gitlab
+	Bitbucket
 )
 
 func (h VCSHostType) String() string {
@@ -216,6 +250,8 @@ func (h VCSHostType) String() string {
 		return "Github"
 	case Gitlab:
 		return "Gitlab"
+	case Bitbucket:
+		return "Bitbucket"
 	}
 	return "<missing String() implementation>"
 }

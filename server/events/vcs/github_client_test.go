@@ -78,19 +78,19 @@ func TestGithubClient_GetModifiedFiles(t *testing.T) {
 
 func TestGithubClient_UpdateStatus(t *testing.T) {
 	cases := []struct {
-		status   vcs.CommitStatus
+		status   models.CommitStatus
 		expState string
 	}{
 		{
-			vcs.Pending,
+			models.Pending,
 			"pending",
 		},
 		{
-			vcs.Success,
+			models.Success,
 			"success",
 		},
 		{
-			vcs.Failed,
+			models.Failed,
 			"failure",
 		},
 	}

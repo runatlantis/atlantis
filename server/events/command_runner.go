@@ -32,7 +32,7 @@ type CommandRunner interface {
 	// RunCommentCommand is the first step after a command request has been parsed.
 	// It handles gathering additional information needed to execute the command
 	// and then calling the appropriate services to finish executing the command.
-	RunCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, user models.User, pullNum int, cmd *CommentCommand)
+	RunCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *CommentCommand)
 	RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User)
 }
 
@@ -84,7 +84,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	if !c.validateCtxAndComment(ctx) {
 		return
 	}
-	if err := c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, vcs.Pending, Plan); err != nil {
+	if err := c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, models.Pending, Plan); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
@@ -111,7 +111,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 // enough data to construct the Repo model and callers might want to wait until
 // the event is further validated before making an additional (potentially
 // wasteful) call to get the necessary data.
-func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, user models.User, pullNum int, cmd *CommentCommand) {
+func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *CommentCommand) {
 	log := c.buildLogger(baseRepo.FullName, pullNum)
 	var headRepo models.Repo
 	if maybeHeadRepo != nil {
@@ -125,6 +125,11 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		pull, headRepo, err = c.getGithubData(baseRepo, pullNum)
 	case models.Gitlab:
 		pull, err = c.getGitlabData(baseRepo, pullNum)
+	case models.Bitbucket:
+		if maybePull == nil {
+			err = errors.New("pull request should not be nil, this is a bug!")
+		}
+		pull = *maybePull
 	default:
 		err = errors.New("Unknown VCS type, this is a bug!")
 	}
@@ -145,7 +150,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
-	if err := c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, vcs.Pending, cmd.CommandName()); err != nil {
+	if err := c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, models.Pending, cmd.CommandName()); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 

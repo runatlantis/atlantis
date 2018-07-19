@@ -26,26 +26,31 @@ type ClientProxy interface {
 	GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error)
 	CreateComment(repo models.Repo, pullNum int, comment string) error
 	PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error)
-	UpdateStatus(repo models.Repo, pull models.PullRequest, state CommitStatus, description string) error
+	UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, description string) error
 }
 
 // DefaultClientProxy proxies calls to the correct VCS client depending on which
 // VCS host is required.
 type DefaultClientProxy struct {
-	GithubClient Client
-	GitlabClient Client
+	GithubClient    Client
+	GitlabClient    Client
+	BitbucketClient Client
 }
 
-func NewDefaultClientProxy(githubClient Client, gitlabClient Client) *DefaultClientProxy {
+func NewDefaultClientProxy(githubClient Client, gitlabClient Client, bitbucketClient Client) *DefaultClientProxy {
 	if githubClient == nil {
 		githubClient = &NotConfiguredVCSClient{}
 	}
 	if gitlabClient == nil {
 		gitlabClient = &NotConfiguredVCSClient{}
 	}
+	if bitbucketClient == nil {
+		bitbucketClient = &NotConfiguredVCSClient{}
+	}
 	return &DefaultClientProxy{
-		GitlabClient: gitlabClient,
-		GithubClient: githubClient,
+		GitlabClient:    gitlabClient,
+		GithubClient:    githubClient,
+		BitbucketClient: bitbucketClient,
 	}
 }
 
@@ -57,6 +62,8 @@ func (d *DefaultClientProxy) GetModifiedFiles(repo models.Repo, pull models.Pull
 		return d.GithubClient.GetModifiedFiles(repo, pull)
 	case models.Gitlab:
 		return d.GitlabClient.GetModifiedFiles(repo, pull)
+	case models.Bitbucket:
+		return d.BitbucketClient.GetModifiedFiles(repo, pull)
 	}
 	return nil, invalidVCSErr
 }
@@ -67,6 +74,8 @@ func (d *DefaultClientProxy) CreateComment(repo models.Repo, pullNum int, commen
 		return d.GithubClient.CreateComment(repo, pullNum, comment)
 	case models.Gitlab:
 		return d.GitlabClient.CreateComment(repo, pullNum, comment)
+	case models.Bitbucket:
+		return d.BitbucketClient.CreateComment(repo, pullNum, comment)
 	}
 	return invalidVCSErr
 }
@@ -77,16 +86,20 @@ func (d *DefaultClientProxy) PullIsApproved(repo models.Repo, pull models.PullRe
 		return d.GithubClient.PullIsApproved(repo, pull)
 	case models.Gitlab:
 		return d.GitlabClient.PullIsApproved(repo, pull)
+	case models.Bitbucket:
+		return d.BitbucketClient.PullIsApproved(repo, pull)
 	}
 	return false, invalidVCSErr
 }
 
-func (d *DefaultClientProxy) UpdateStatus(repo models.Repo, pull models.PullRequest, state CommitStatus, description string) error {
+func (d *DefaultClientProxy) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, description string) error {
 	switch repo.VCSHost.Type {
 	case models.Github:
 		return d.GithubClient.UpdateStatus(repo, pull, state, description)
 	case models.Gitlab:
 		return d.GitlabClient.UpdateStatus(repo, pull, state, description)
+	case models.Bitbucket:
+		return d.BitbucketClient.UpdateStatus(repo, pull, state, description)
 	}
 	return invalidVCSErr
 }

@@ -15,6 +15,8 @@ package events_test
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/go-github/github"
@@ -103,25 +105,25 @@ func TestParseGithubIssueCommentEvent(t *testing.T) {
 }
 
 func TestParseGithubPullEvent(t *testing.T) {
-	_, _, _, _, err := parser.ParseGithubPullEvent(&github.PullRequestEvent{})
+	_, _, _, _, _, err := parser.ParseGithubPullEvent(&github.PullRequestEvent{})
 	ErrEquals(t, "pull_request is null", err)
 
 	testEvent := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
 	testEvent.PullRequest.HTMLURL = nil
-	_, _, _, _, err = parser.ParseGithubPullEvent(&testEvent)
+	_, _, _, _, _, err = parser.ParseGithubPullEvent(&testEvent)
 	ErrEquals(t, "html_url is null", err)
 
 	testEvent = deepcopy.Copy(PullEvent).(github.PullRequestEvent)
 	testEvent.Sender = nil
-	_, _, _, _, err = parser.ParseGithubPullEvent(&testEvent)
+	_, _, _, _, _, err = parser.ParseGithubPullEvent(&testEvent)
 	ErrEquals(t, "sender is null", err)
 
 	testEvent = deepcopy.Copy(PullEvent).(github.PullRequestEvent)
 	testEvent.Sender.Login = nil
-	_, _, _, _, err = parser.ParseGithubPullEvent(&testEvent)
+	_, _, _, _, _, err = parser.ParseGithubPullEvent(&testEvent)
 	ErrEquals(t, "sender.login is null", err)
 
-	actPull, actBaseRepo, actHeadRepo, actUser, err := parser.ParseGithubPullEvent(&PullEvent)
+	actPull, evType, actBaseRepo, actHeadRepo, actUser, err := parser.ParseGithubPullEvent(&PullEvent)
 	Ok(t, err)
 	expBaseRepo := models.Repo{
 		Owner:             "owner",
@@ -145,7 +147,66 @@ func TestParseGithubPullEvent(t *testing.T) {
 		State:      models.Open,
 		BaseRepo:   expBaseRepo,
 	}, actPull)
+	Equals(t, models.OpenedPullEvent, evType)
 	Equals(t, models.User{Username: "user"}, actUser)
+}
+
+func TestParseGithubPullEvent_EventType(t *testing.T) {
+	cases := []struct {
+		action string
+		exp    models.PullRequestEventType
+	}{
+		{
+			action: "assigned",
+			exp:    models.OtherPullEvent,
+		},
+		{
+			action: "unassigned",
+			exp:    models.OtherPullEvent,
+		},
+		{
+			action: "review_requested",
+			exp:    models.OtherPullEvent,
+		},
+		{
+			action: "review_request_removed",
+			exp:    models.OtherPullEvent,
+		},
+		{
+			action: "labeled",
+			exp:    models.OtherPullEvent,
+		},
+		{
+			action: "unlabeled",
+			exp:    models.OtherPullEvent,
+		},
+		{
+			action: "opened",
+			exp:    models.OpenedPullEvent,
+		},
+		{
+			action: "edited",
+			exp:    models.OtherPullEvent,
+		},
+		{
+			action: "closed",
+			exp:    models.ClosedPullEvent,
+		},
+		{
+			action: "reopened",
+			exp:    models.OtherPullEvent,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.action, func(t *testing.T) {
+			event := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
+			event.Action = &c.action
+			_, actType, _, _, _, err := parser.ParseGithubPullEvent(&event)
+			Ok(t, err)
+			Equals(t, c.exp, actType)
+		})
+	}
 }
 
 func TestParseGithubPull(t *testing.T) {
@@ -205,7 +266,7 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 	var event *gitlab.MergeEvent
 	err := json.Unmarshal([]byte(mergeEventJSON), &event)
 	Ok(t, err)
-	pull, actBaseRepo, actHeadRepo, actUser, err := parser.ParseGitlabMergeEvent(*event)
+	pull, evType, actBaseRepo, actHeadRepo, actUser, err := parser.ParseGitlabMergeEvent(*event)
 	Ok(t, err)
 
 	expBaseRepo := models.Repo{
@@ -229,6 +290,7 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 		State:      models.Open,
 		BaseRepo:   expBaseRepo,
 	}, pull)
+	Equals(t, models.OpenedPullEvent, evType)
 
 	Equals(t, expBaseRepo, actBaseRepo)
 	Equals(t, models.Repo{
@@ -246,9 +308,49 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 
 	t.Log("If the state is closed, should set field correctly.")
 	event.ObjectAttributes.State = "closed"
-	pull, _, _, _, err = parser.ParseGitlabMergeEvent(*event)
+	pull, _, _, _, _, err = parser.ParseGitlabMergeEvent(*event)
 	Ok(t, err)
 	Equals(t, models.Closed, pull.State)
+}
+
+func TestParseGitlabMergeEvent_ActionType(t *testing.T) {
+	cases := []struct {
+		action string
+		exp    models.PullRequestEventType
+	}{
+		{
+			action: "open",
+			exp:    models.OpenedPullEvent,
+		},
+		{
+			action: "update",
+			exp:    models.UpdatedPullEvent,
+		},
+		{
+			action: "merge",
+			exp:    models.ClosedPullEvent,
+		},
+		{
+			action: "close",
+			exp:    models.ClosedPullEvent,
+		},
+		{
+			action: "other",
+			exp:    models.OtherPullEvent,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.action, func(t *testing.T) {
+			var event *gitlab.MergeEvent
+			eventJSON := strings.Replace(mergeEventJSON, `"action": "open"`, fmt.Sprintf(`"action": %q`, c.action), 1)
+			err := json.Unmarshal([]byte(eventJSON), &event)
+			Ok(t, err)
+			_, evType, _, _, _, err := parser.ParseGitlabMergeEvent(*event)
+			Ok(t, err)
+			Equals(t, c.exp, evType)
+		})
+	}
 }
 
 func TestParseGitlabMergeRequest(t *testing.T) {

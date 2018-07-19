@@ -74,7 +74,7 @@ func (w *FileWorkspace) Clone(
 			return w.forceClone(log, cloneDir, headRepo, p)
 		}
 		currCommit := strings.Trim(string(output), "\n")
-		if currCommit == p.HeadCommit {
+		if strings.HasPrefix(currCommit, p.HeadCommit) {
 			log.Debug("repo is at correct commit %q so will not re-clone", p.HeadCommit)
 			return cloneDir, nil
 		}

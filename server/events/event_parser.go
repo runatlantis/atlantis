@@ -14,6 +14,7 @@
 package events
 
 import (
+	"encoding/json"
 	"fmt"
 	"path"
 	"regexp"
@@ -23,6 +24,8 @@ import (
 	"github.com/lkysow/go-gitlab"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs/bitbucket"
+	"gopkg.in/go-playground/validator.v9"
 )
 
 const gitlabPullOpened = "opened"
@@ -31,8 +34,6 @@ const usagesCols = 90
 // multiLineRegex is used to ignore multi-line comments since those aren't valid
 // Atlantis commands.
 var multiLineRegex = regexp.MustCompile(`.*\r?\n.+`)
-
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_event_parsing.go EventParsing
 
 type CommandInterface interface {
 	CommandName() CommandName
@@ -105,26 +106,124 @@ func NewCommentCommand(repoRelDir string, flags []string, name CommandName, verb
 	}
 }
 
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_event_parsing.go EventParsing
+
 type EventParsing interface {
 	ParseGithubIssueCommentEvent(comment *github.IssueCommentEvent) (baseRepo models.Repo, user models.User, pullNum int, err error)
 	// ParseGithubPull returns the pull request, base repo and head repo.
 	ParseGithubPull(pull *github.PullRequest) (models.PullRequest, models.Repo, models.Repo, error)
 	// ParseGithubPullEvent returns the pull request, head repo and user that
 	// caused the event. Base repo is available as a field on PullRequest.
-	ParseGithubPullEvent(pullEvent *github.PullRequestEvent) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, err error)
+	ParseGithubPullEvent(pullEvent *github.PullRequestEvent) (pull models.PullRequest, pullEventType models.PullRequestEventType, baseRepo models.Repo, headRepo models.Repo, user models.User, err error)
 	ParseGithubRepo(ghRepo *github.Repository) (models.Repo, error)
 	// ParseGitlabMergeEvent returns the pull request, base repo, head repo and
 	// user that caused the event.
-	ParseGitlabMergeEvent(event gitlab.MergeEvent) (models.PullRequest, models.Repo, models.Repo, models.User, error)
+	ParseGitlabMergeEvent(event gitlab.MergeEvent) (pull models.PullRequest, pullEventType models.PullRequestEventType, baseRepo models.Repo, headRepo models.Repo, user models.User, err error)
 	ParseGitlabMergeCommentEvent(event gitlab.MergeCommentEvent) (baseRepo models.Repo, headRepo models.Repo, user models.User, err error)
 	ParseGitlabMergeRequest(mr *gitlab.MergeRequest, baseRepo models.Repo) models.PullRequest
+	ParseBitbucketCloudPullEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, err error)
+	ParseBitbucketCloudCommentEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, comment string, err error)
+	GetBitbucketEventType(eventTypeHeader string) models.PullRequestEventType
 }
 
 type EventParser struct {
-	GithubUser  string
-	GithubToken string
-	GitlabUser  string
-	GitlabToken string
+	GithubUser          string
+	GithubToken         string
+	GitlabUser          string
+	GitlabToken         string
+	BitbucketCloudUser  string
+	BitbucketCloudToken string
+}
+
+// GetBitbucketEventType translates the bitbucket header name into a pull
+// request event type.
+func (e *EventParser) GetBitbucketEventType(eventTypeHeader string) models.PullRequestEventType {
+	switch eventTypeHeader {
+	case "pullrequest:created":
+		return models.OpenedPullEvent
+	case "pullrequest:updated":
+		return models.UpdatedPullEvent
+	case "pullrequest:fulfilled", "pullrequest:rejected":
+		return models.ClosedPullEvent
+	}
+	return models.OtherPullEvent
+}
+
+func (e *EventParser) ParseBitbucketCloudCommentEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, comment string, err error) {
+	var event bitbucket.CommentEvent
+	if err = json.Unmarshal(body, &event); err != nil {
+		err = errors.Wrap(err, "parsing json")
+		return
+	}
+	if err = validator.New().Struct(event); err != nil {
+		return
+	}
+	pull, baseRepo, headRepo, user, err = e.parseCommonBitbucketEventData(event.CommonEventData)
+	comment = *event.Comment.Content.Raw
+	return
+}
+
+func (e *EventParser) parseCommonBitbucketEventData(event bitbucket.CommonEventData) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
+	var prState models.PullRequestState
+	switch *event.PullRequest.State {
+	case "OPEN":
+		prState = models.Open
+	case "MERGED":
+		prState = models.Closed
+	case "SUPERSEDED":
+		prState = models.Closed
+	case "DECLINE":
+		prState = models.Closed
+	default:
+		err = fmt.Errorf("unable to determine pull request state from %q, this is a bug!", *event.PullRequest.State)
+		return
+	}
+
+	headRepo, err = models.NewRepo(
+		models.Bitbucket,
+		*event.PullRequest.Source.Repository.FullName,
+		*event.PullRequest.Source.Repository.Links.HTML.HREF,
+		e.BitbucketCloudUser,
+		e.BitbucketCloudToken)
+	if err != nil {
+		return
+	}
+	baseRepo, err = models.NewRepo(
+		models.Bitbucket,
+		*event.Repository.FullName,
+		*event.Repository.Links.HTML.HREF,
+		e.BitbucketCloudUser,
+		e.BitbucketCloudToken)
+	if err != nil {
+		return
+	}
+
+	pull = models.PullRequest{
+		Num:        *event.PullRequest.ID,
+		HeadCommit: *event.PullRequest.Source.Commit.Hash,
+		URL:        *event.PullRequest.Links.HTML.HREF,
+		Branch:     *event.PullRequest.Source.Branch.Name,
+		Author:     *event.Actor.Username,
+		State:      prState,
+		BaseRepo:   baseRepo,
+	}
+	user = models.User{
+		Username: *event.Actor.Username,
+	}
+	return
+}
+
+func (e *EventParser) ParseBitbucketCloudPullEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
+	var event bitbucket.PullRequestEvent
+	if err = json.Unmarshal(body, &event); err != nil {
+		err = errors.Wrap(err, "parsing json")
+		return
+	}
+	if err = validator.New().Struct(event); err != nil {
+		return
+	}
+	pull, baseRepo, headRepo, user, err = e.parseCommonBitbucketEventData(event.CommonEventData)
+	return
 }
 
 func (e *EventParser) ParseGithubIssueCommentEvent(comment *github.IssueCommentEvent) (baseRepo models.Repo, user models.User, pullNum int, err error) {
@@ -148,22 +247,36 @@ func (e *EventParser) ParseGithubIssueCommentEvent(comment *github.IssueCommentE
 	return
 }
 
-func (e *EventParser) ParseGithubPullEvent(pullEvent *github.PullRequestEvent) (models.PullRequest, models.Repo, models.Repo, models.User, error) {
+func (e *EventParser) ParseGithubPullEvent(pullEvent *github.PullRequestEvent) (pull models.PullRequest, pullEventType models.PullRequestEventType, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
 	if pullEvent.PullRequest == nil {
-		return models.PullRequest{}, models.Repo{}, models.Repo{}, models.User{}, errors.New("pull_request is null")
+		err = errors.New("pull_request is null")
+		return
 	}
-	pull, baseRepo, headRepo, err := e.ParseGithubPull(pullEvent.PullRequest)
+	pull, baseRepo, headRepo, err = e.ParseGithubPull(pullEvent.PullRequest)
 	if err != nil {
-		return models.PullRequest{}, models.Repo{}, models.Repo{}, models.User{}, err
+		return
 	}
 	if pullEvent.Sender == nil {
-		return models.PullRequest{}, models.Repo{}, models.Repo{}, models.User{}, errors.New("sender is null")
+		err = errors.New("sender is null")
+		return
 	}
 	senderUsername := pullEvent.Sender.GetLogin()
 	if senderUsername == "" {
-		return models.PullRequest{}, models.Repo{}, models.Repo{}, models.User{}, errors.New("sender.login is null")
+		err = errors.New("sender.login is null")
+		return
 	}
-	return pull, baseRepo, headRepo, models.User{Username: senderUsername}, nil
+	switch pullEvent.GetAction() {
+	case "opened":
+		pullEventType = models.OpenedPullEvent
+	case "synchronize":
+		pullEventType = models.UpdatedPullEvent
+	case "closed":
+		pullEventType = models.ClosedPullEvent
+	default:
+		pullEventType = models.OtherPullEvent
+	}
+	user = models.User{Username: senderUsername}
+	return
 }
 
 func (e *EventParser) ParseGithubPull(pull *github.PullRequest) (pullModel models.PullRequest, baseRepo models.Repo, headRepo models.Repo, err error) {
@@ -223,7 +336,7 @@ func (e *EventParser) ParseGithubRepo(ghRepo *github.Repository) (models.Repo, e
 	return models.NewRepo(models.Github, ghRepo.GetFullName(), ghRepo.GetCloneURL(), e.GithubUser, e.GithubToken)
 }
 
-func (e *EventParser) ParseGitlabMergeEvent(event gitlab.MergeEvent) (models.PullRequest, models.Repo, models.Repo, models.User, error) {
+func (e *EventParser) ParseGitlabMergeEvent(event gitlab.MergeEvent) (pull models.PullRequest, eventType models.PullRequestEventType, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
 	modelState := models.Closed
 	if event.ObjectAttributes.State == gitlabPullOpened {
 		modelState = models.Open
@@ -231,16 +344,16 @@ func (e *EventParser) ParseGitlabMergeEvent(event gitlab.MergeEvent) (models.Pul
 	// GitLab also has a "merged" state, but we map that to Closed so we don't
 	// need to check for it.
 
-	baseRepo, err := models.NewRepo(models.Gitlab, event.Project.PathWithNamespace, event.Project.GitHTTPURL, e.GitlabUser, e.GitlabToken)
+	baseRepo, err = models.NewRepo(models.Gitlab, event.Project.PathWithNamespace, event.Project.GitHTTPURL, e.GitlabUser, e.GitlabToken)
 	if err != nil {
-		return models.PullRequest{}, models.Repo{}, models.Repo{}, models.User{}, err
+		return
 	}
-	headRepo, err := models.NewRepo(models.Gitlab, event.ObjectAttributes.Source.PathWithNamespace, event.ObjectAttributes.Source.GitHTTPURL, e.GitlabUser, e.GitlabToken)
+	headRepo, err = models.NewRepo(models.Gitlab, event.ObjectAttributes.Source.PathWithNamespace, event.ObjectAttributes.Source.GitHTTPURL, e.GitlabUser, e.GitlabToken)
 	if err != nil {
-		return models.PullRequest{}, models.Repo{}, models.Repo{}, models.User{}, err
+		return
 	}
 
-	pull := models.PullRequest{
+	pull = models.PullRequest{
 		URL:        event.ObjectAttributes.URL,
 		Author:     event.User.Username,
 		Num:        event.ObjectAttributes.IID,
@@ -250,11 +363,22 @@ func (e *EventParser) ParseGitlabMergeEvent(event gitlab.MergeEvent) (models.Pul
 		BaseRepo:   baseRepo,
 	}
 
-	user := models.User{
+	switch event.ObjectAttributes.Action {
+	case "open":
+		eventType = models.OpenedPullEvent
+	case "update":
+		eventType = models.UpdatedPullEvent
+	case "merge", "close":
+		eventType = models.ClosedPullEvent
+	default:
+		eventType = models.OtherPullEvent
+	}
+
+	user = models.User{
 		Username: event.User.Username,
 	}
 
-	return pull, baseRepo, headRepo, user, err
+	return
 }
 
 // ParseGitlabMergeCommentEvent creates Atlantis models out of a GitLab event.

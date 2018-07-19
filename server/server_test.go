@@ -118,7 +118,8 @@ func TestHealthz(t *testing.T) {
 
 func responseContains(t *testing.T, r *httptest.ResponseRecorder, status int, bodySubstr string) {
 	t.Helper()
-	Equals(t, status, r.Result().StatusCode)
-	body, _ := ioutil.ReadAll(r.Result().Body)
+	body, err := ioutil.ReadAll(r.Result().Body)
+	Ok(t, err)
+	Assert(t, status == r.Result().StatusCode, "exp %d got %d, body: %s", status, r.Result().StatusCode, string(body))
 	Assert(t, strings.Contains(string(body), bodySubstr), "exp %q to be contained in %q", bodySubstr, string(body))
 }

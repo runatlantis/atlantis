@@ -24,16 +24,28 @@ const Wildcard = "*"
 // RepoWhitelistChecker implements checking if repos are whitelisted to be used with
 // this Atlantis.
 type RepoWhitelistChecker struct {
-	// Whitelist is a comma separated list of rules with wildcards '*' allowed.
-	Whitelist string
+	rules []string
+}
+
+// NewRepoWhitelistChecker constructs a new checker and validates that the
+// whitelist isn't malformed.
+func NewRepoWhitelistChecker(whitelist string) (*RepoWhitelistChecker, error) {
+	rules := strings.Split(whitelist, ",")
+	for _, rule := range rules {
+		if strings.Contains(rule, "://") {
+			return nil, fmt.Errorf("whitelist %q contained ://", rule)
+		}
+	}
+	return &RepoWhitelistChecker{
+		rules: rules,
+	}, nil
 }
 
 // IsWhitelisted returns true if this repo is in our whitelist and false
 // otherwise.
 func (r *RepoWhitelistChecker) IsWhitelisted(repoFullName string, vcsHostname string) bool {
 	candidate := fmt.Sprintf("%s/%s", vcsHostname, repoFullName)
-	rules := strings.Split(r.Whitelist, ",")
-	for _, rule := range rules {
+	for _, rule := range r.rules {
 		if r.matchesRule(rule, candidate) {
 			return true
 		}

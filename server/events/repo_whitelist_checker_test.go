@@ -151,7 +151,8 @@ func TestRepoWhitelistChecker_IsWhitelisted(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
-			w := events.RepoWhitelistChecker{Whitelist: c.Whitelist}
+			w, err := events.NewRepoWhitelistChecker(c.Whitelist)
+			Ok(t, err)
 			Equals(t, c.Exp, w.IsWhitelisted(c.RepoFullName, c.Hostname))
 		})
 	}

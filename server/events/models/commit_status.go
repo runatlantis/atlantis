@@ -11,7 +11,7 @@
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
 //
-package vcs
+package models
 
 // CommitStatus is the result of executing an Atlantis command for the commit.
 // In Github the options are: error, failure, pending, success.
