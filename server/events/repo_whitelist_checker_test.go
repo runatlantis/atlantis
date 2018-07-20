@@ -157,3 +157,27 @@ func TestRepoWhitelistChecker_IsWhitelisted(t *testing.T) {
 		})
 	}
 }
+
+// If the whitelist contains a schema then we should get an error.
+func TestRepoWhitelistChecker_ContainsSchema(t *testing.T) {
+	cases := []struct {
+		whitelist string
+		expErr    string
+	}{
+		{
+			"://",
+			`whitelist "://" contained ://`,
+		},
+		{
+			"valid/*,https://bitbucket.org/*",
+			`whitelist "https://bitbucket.org/*" contained ://`,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.whitelist, func(t *testing.T) {
+			_, err := events.NewRepoWhitelistChecker(c.whitelist)
+			ErrEquals(t, c.expErr, err)
+		})
+	}
+}

@@ -21,6 +21,7 @@ type CommonEventData struct {
 
 type DiffStat struct {
 	Values []DiffStatValue `json:"values,omitempty" validate:"required"`
+	Next   *string         `json:"next,omitempty"`
 }
 type DiffStatValue struct {
 	// Old is the old file, this can be null.

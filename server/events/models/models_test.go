@@ -59,6 +59,14 @@ func TestNewRepo_FullNameWrongFormat(t *testing.T) {
 	}
 }
 
+// If the clone url doesn't end with .git it is appended
+func TestNewRepo_MissingDotGit(t *testing.T) {
+	repo, err := models.NewRepo(models.Bitbucket, "owner/repo", "https://bitbucket.org/owner/repo", "u", "p")
+	Ok(t, err)
+	Equals(t, repo.CloneURL, "https://u:p@bitbucket.org/owner/repo.git")
+	Equals(t, repo.SanitizedCloneURL, "https://bitbucket.org/owner/repo.git")
+}
+
 func TestNewRepo_HTTPAuth(t *testing.T) {
 	// When the url has http the auth should be added.
 	repo, err := models.NewRepo(models.Github, "owner/repo", "http://github.com/owner/repo.git", "u", "p")

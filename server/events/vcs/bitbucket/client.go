@@ -13,15 +13,31 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
+const (
+	// The comments API is only available in the 1.0 API right now.
+	commentsAPIPathFmt     = "%s/1.0/repositories/%s/pullrequests/%d/comments"
+	diffStatAPIPathFmt     = "%s/2.0/repositories/%s/pullrequests/%d/diffstat"
+	pullApprovedAPIPathFmt = "%s/2.0/repositories/%s/pullrequests/%d"
+	buildStatusAPIPathFmt  = "%s/2.0/repositories/%s/commit/%s/statuses/build"
+)
+
 type Client struct {
-	HttpClient      *http.Client
-	Username        string
-	Password        string
-	BaseURL         string
-	AtlantisBaseURL string
+	HttpClient  *http.Client
+	Username    string
+	Password    string
+	BaseURL     string
+	AtlantisURL string
 }
 
-func NewClient(httpClient *http.Client, username string, password string, baseURL string, atlantisBaseUrl string) (*Client, error) {
+// NewClient builds a bitbucket client. Returns an error if the baseURL is
+// malformed. httpClient is the client to use to make the requests, username
+// and password are used as basic auth in the requests, baseURL is the API's
+// baseURL, ex. https://api.bitbucket.org. Don't include the API version, ex.
+// '/1.0' since that changes based on the API call. atlantisURL is the
+// URL for Atlantis that will be linked to from the build status icons. This
+// linking is annoying because we don't have anywhere good to link but a URL is
+// required.
+func NewClient(httpClient *http.Client, username string, password string, baseURL string, atlantisURL string) (*Client, error) {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
@@ -32,66 +48,52 @@ func NewClient(httpClient *http.Client, username string, password string, baseUR
 	}
 	urlWithoutPath := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
 	return &Client{
-		HttpClient:      httpClient,
-		Username:        username,
-		Password:        password,
-		BaseURL:         urlWithoutPath,
-		AtlantisBaseURL: atlantisBaseUrl,
+		HttpClient:  httpClient,
+		Username:    username,
+		Password:    password,
+		BaseURL:     urlWithoutPath,
+		AtlantisURL: atlantisURL,
 	}, nil
-}
-
-func (b *Client) prepRequest(method string, path string, body io.Reader) (*http.Request, error) {
-	req, err := http.NewRequest(method, path, body)
-	if err != nil {
-		return nil, err
-	}
-	req.SetBasicAuth(b.Username, b.Password)
-	return req, nil
 }
 
 // GetModifiedFiles returns the names of files that were modified in the merge request.
 // The names include the path to the file from the repo root, ex. parent/child/file.txt.
 func (b *Client) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
-	path := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/diffstat", b.BaseURL, repo.FullName, pull.Num)
-	// todo: remove duplication
-	req, err := b.prepRequest("GET", path, nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := b.HttpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		body, _ := ioutil.ReadAll(resp.Body)
-		return nil, fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
-	}
-	// todo: pagination
-	var diffStat DiffStat
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errors.Wrap(err, "reading body")
-	}
-	if err := json.Unmarshal(body, &diffStat); err != nil {
-		return nil, err
+	var files []string
+
+	nextPageURL := fmt.Sprintf(diffStatAPIPathFmt, b.BaseURL, repo.FullName, pull.Num)
+	// We'll only loop 100 times as a safety measure.
+	maxLoops := 100
+	for i := 0; i < maxLoops; i++ {
+		resp, err := b.makeRequest("GET", nextPageURL, nil)
+		if err != nil {
+			return nil, err
+		}
+		var diffStat DiffStat
+		if err := json.Unmarshal(resp, &diffStat); err != nil {
+			return nil, err
+		}
+		for _, v := range diffStat.Values {
+			if v.Old != nil {
+				files = append(files, *v.Old.Path)
+			}
+			if v.New != nil {
+				files = append(files, *v.New.Path)
+			}
+		}
+		if diffStat.Next == nil || *diffStat.Next == "" {
+			break
+		}
+		nextPageURL = *diffStat.Next
 	}
 
+	// Now ensure all files are unique.
 	hash := make(map[string]bool)
 	var unique []string
-	for _, v := range diffStat.Values {
-		var paths []string
-		if v.Old != nil {
-			paths = append(paths, *v.Old.Path)
-		}
-		if v.New != nil {
-			paths = append(paths, *v.New.Path)
-		}
-		for _, path := range paths {
-			if !hash[path] {
-				unique = append(unique, path)
-				hash[path] = true
-			}
+	for _, f := range files {
+		if !hash[f] {
+			unique = append(unique, f)
+			hash[f] = true
 		}
 	}
 	return unique, nil
@@ -103,50 +105,23 @@ func (b *Client) CreateComment(repo models.Repo, pullNum int, comment string) er
 	if err != nil {
 		return errors.Wrap(err, "json encoding")
 	}
-	path := fmt.Sprintf("%s/1.0/repositories/%s/pullrequests/%d/comments", b.BaseURL, repo.FullName, pullNum)
-	req, err := b.prepRequest("POST", path, bytes.NewBuffer(bodyBytes))
-	req.Header.Add("Content-Type", "application/json")
-	if err != nil {
-		return errors.Wrap(err, "constructing request")
-	}
-	resp, err := b.HttpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		body, _ := ioutil.ReadAll(resp.Body)
-		return fmt.Errorf("unexpected status code: %d for url: %s, body: %s", resp.StatusCode, path, string(body))
-	}
-	return nil
+	path := fmt.Sprintf(commentsAPIPathFmt, b.BaseURL, repo.FullName, pullNum)
+	_, err = b.makeRequest("POST", path, bytes.NewBuffer(bodyBytes))
+	return err
 }
 
 // PullIsApproved returns true if the merge request was approved.
 func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
-	path := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d", b.BaseURL, repo.FullName, pull.Num)
-	req, err := b.prepRequest("GET", path, nil)
-	if err != nil {
-		return false, errors.Wrap(err, "constructing request")
-	}
-	resp, err := b.HttpClient.Do(req)
+	path := fmt.Sprintf(pullApprovedAPIPathFmt, b.BaseURL, repo.FullName, pull.Num)
+	resp, err := b.makeRequest("GET", path, nil)
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		body, _ := ioutil.ReadAll(resp.Body)
-		return false, fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
+	var pullResp PullRequest
+	if err := json.Unmarshal(resp, &pullResp); err != nil {
+		return false, err
 	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return false, errors.Wrap(err, "reading response body")
-	}
-
-	parsedPull, err := ParseBitBucketPullRequest(body)
-	if err != nil {
-		return false, errors.Wrap(err, "parsing response")
-	}
-	for _, participant := range parsedPull.Participants {
+	for _, participant := range pullResp.Participants {
 		if *participant.Approved == true {
 			return true, nil
 		}
@@ -154,10 +129,10 @@ func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool
 	return false, nil
 }
 
-// UpdateStatus updates the ~ status of a commit.
-func (b *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, description string) error {
+// UpdateStatus updates the status of a commit.
+func (b *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, status models.CommitStatus, description string) error {
 	bbState := "FAILED"
-	switch state {
+	switch status {
 	case models.PendingCommitStatus:
 		bbState = "INPROGRESS"
 	case models.SuccessCommitStatus:
@@ -168,30 +143,51 @@ func (b *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, state m
 
 	bodyBytes, err := json.Marshal(map[string]string{
 		"key":         "atlantis",
-		"url":         b.AtlantisBaseURL,
+		"url":         b.AtlantisURL,
 		"state":       bbState,
 		"description": description,
 	})
 
-	path := fmt.Sprintf("%s/2.0/repositories/%s/commit/%s/statuses/build", b.BaseURL, repo.FullName, pull.HeadCommit)
+	path := fmt.Sprintf(buildStatusAPIPathFmt, b.BaseURL, repo.FullName, pull.HeadCommit)
 	if err != nil {
 		return errors.Wrap(err, "json encoding")
 	}
-	req, err := b.prepRequest("POST", path, bytes.NewBuffer(bodyBytes))
-	req.Header.Add("Content-Type", "application/json")
+	_, err = b.makeRequest("POST", path, bytes.NewBuffer(bodyBytes))
+	return err
+}
+
+// prepRequest adds the HTTP basic auth.
+func (b *Client) prepRequest(method string, path string, body io.Reader) (*http.Request, error) {
+	req, err := http.NewRequest(method, path, body)
 	if err != nil {
-		return errors.Wrap(err, "constructing request")
+		return nil, err
+	}
+	req.SetBasicAuth(b.Username, b.Password)
+	return req, nil
+}
+
+func (b *Client) makeRequest(method string, path string, reqBody io.Reader) ([]byte, error) {
+	req, err := b.prepRequest(method, path, reqBody)
+	if err != nil {
+		return nil, errors.Wrap(err, "constructing request")
+	}
+	if reqBody != nil {
+		req.Header.Add("Content-Type", "application/json")
 	}
 	resp, err := b.HttpClient.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close()
-	// Check for both 201 and 200 because on a new status we'll get a 201 but
-	// on a status update we'll get a 200.
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		body, _ := ioutil.ReadAll(resp.Body)
-		return fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
+	requestStr := fmt.Sprintf("%s %s", method, path)
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		respBody, _ := ioutil.ReadAll(resp.Body)
+		return nil, fmt.Errorf("making request %q unexpected status code: %d, body: %s", requestStr, resp.StatusCode, string(respBody))
 	}
-	return nil
+	respBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.Wrapf(err, "reading response from request %q", requestStr)
+	}
+	return respBody, nil
 }

@@ -74,6 +74,8 @@ func (w *FileWorkspace) Clone(
 			return w.forceClone(log, cloneDir, headRepo, p)
 		}
 		currCommit := strings.Trim(string(output), "\n")
+		// We're prefix matching here because BitBucket doesn't give us the full
+		// commit, only a 12 character prefix.
 		if strings.HasPrefix(currCommit, p.HeadCommit) {
 			log.Debug("repo is at correct commit %q so will not re-clone", p.HeadCommit)
 			return cloneDir, nil
