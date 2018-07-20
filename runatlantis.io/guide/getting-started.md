@@ -41,14 +41,18 @@ URL=https://{YOUR_HOSTNAME}.ngrok.io
 
 ## Create a Webhook Secret
 GitHub and GitLab use webhook secrets so clients can verify that the webhooks came
-from them. Create a random string of any length (you can use [https://www.random.org/strings/](https://www.random.org/strings/))
+from them.
+::: tip
+Bitbucket Cloud (bitbucket.org) doesn't use webhook secrets so if you're using Bitbucket you can skip this.
+:::
+Create a random string of any length (you can use [https://www.random.org/strings/](https://www.random.org/strings/))
 and set an environment variable:
 ```
 SECRET={YOUR_RANDOM_STRING}
 ```
 
 ## Add Webhook
-Take the URL that ngrok output and create a webhook in your GitHub or GitLab repo:
+Take the URL that ngrok output and create a webhook in your GitHub, GitLab or Bitbucket repo:
 
 ### GitHub
 - Go to your repo's settings
@@ -80,6 +84,23 @@ Take the URL that ngrok output and create a webhook in your GitHub or GitLab rep
 - leave **Enable SSL verification** checked
 - click **Add webhook**
 
+### Bitbucket Cloud (bitbucket.org)
+- Go to your repo's home page
+- Click **Settings** in the sidebar
+- Click **Webhooks** under the **WORKFLOW** section
+- Click **Add webhook**
+- Enter "Atlantis" for **Title**
+- set **URL** to your ngrok url with `/events` at the end. Ex. `https://c5004d84.ngrok.io/events`
+- double-check you added `/events` to the end of your URL.
+- Keep **Status** as Active
+- Don't check **Skip certificate validation** because NGROK has a valid cert.
+- Select **Choose from a full list of triggers**
+- Under **Repository** **un**check everything
+- Under **Issues** leave everything **un**checked
+- Under **Pull Request**, select: Created, Updated, Merged, Declined and Comment created
+- Click **Save**
+<img src="./images/bitbucket-webhook.png" alt="Bitbucket Webhook" style="max-height: 500px">
+
 ## Create an access token for Atlantis
 We recommend using a dedicated CI user or creating a new user named **@atlantis** that performs all API actions, however for testing,
 you can use your own user. Here we'll create the access token that Atlantis uses to comment on the pull request and
@@ -101,13 +122,23 @@ TOKEN={YOUR_TOKEN}
 TOKEN={YOUR_TOKEN}
 ```
 
+### Bitbucket Cloud (bitbucket.org)
+- follow [https://confluence.atlassian.com/bitbucket/app-passwords-828781300.html#Apppasswords-Createanapppassword](https://confluence.atlassian.com/bitbucket/app-passwords-828781300.html#Apppasswords-Createanapppassword)
+- Label the password "atlantis"
+- Select **Pull requests**: **Read** and **Write** so that Atlantis can read your pull requests and write comments to them
+- set the token as an environment variable
+```
+TOKEN={YOUR_TOKEN}
+```
+
+
 ## Start Atlantis
 You're almost ready to start Atlantis, just set one more variable:
 
 ```
-USERNAME={the username of your GitHub or GitLab user}
+USERNAME={the username of your GitHub, GitLab or Bitbucket user}
 ```
-Now you can start Atlantis, the exact command differs depending on your Git Host:
+Now you can start Atlantis. The exact command differs depending on your Git Host:
 
 ### GitHub
 ```
@@ -129,6 +160,11 @@ atlantis server --atlantis-url $URL --gitlab-user $USERNAME --gitlab-token $TOKE
 ```
 HOSTNAME=YOUR_GITLAB_ENTERPRISE_HOSTNAME # ex. gitlab.runatlantis.io, without the scheme
 atlantis server --atlantis-url $URL --gitlab-user $USERNAME --gitlab-token $TOKEN --gitlab-webhook-secret $SECRET --gitlab-hostname $HOSTNAME
+```
+
+### Bitbucket Cloud (bitbucket.org)
+```
+atlantis server --atlantis-url $URL --bitbucket-user $USERNAME --bitbucket-token $TOKEN
 ```
 
 ## Create a pull request

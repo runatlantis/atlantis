@@ -14,23 +14,29 @@ Terraform v0.10.0
 If you want to use a different version of Terraform see [Terraform Versions](#terraform-versions)
 
 ## Hosting Atlantis
-Atlantis needs to be hosted somewhere that github.com/gitlab.com or your GitHub/GitLab Enterprise installation can reach. Developers in your organization also need to be able to access Atlantis to view the UI and to delete locks.
+Atlantis needs to be hosted somewhere that github.com/gitlab.com/bitbucket.org or your GitHub/GitLab Enterprise installation can reach.
+Developers in your organization also need to be able to access Atlantis to view the UI and to delete locks.
 
 By default Atlantis runs on port `4141`. This can be changed with the `--port` flag.
 
-## Add GitHub Webhook
-Once you've decided where to host Atlantis you can add it as a Webhook to GitHub.
+## Add Webhook
+Once you've decided where to host Atlantis you need to add that URL as a webhook
+to your Git host so that Atlantis gets notified about pull request events.
+See the instructions for your specific provider below:
+
+### GitHub Webhook
 If you already have a GitHub organization we recommend installing the webhook at the **organization level** rather than on each repository, however both methods will work.
 
 ::: tip
-If you're not sure if you have a GitHub organization see https://help.github.com/articles/differences-between-user-and-organization-accounts/
+If you're not sure if you have a GitHub organization see [https://help.github.com/articles/differences-between-user-and-organization-accounts/](https://help.github.com/articles/differences-between-user-and-organization-accounts/)
 :::
 
 If you're installing on the organization, navigate to your organization's page and click **Settings**.
 If installing on a single repository, navigate to the repository home page and click **Settings**.
 - Select **Webhooks** or **Hooks** in the sidebar
 - Click **Add webhook**
-- set **Payload URL** to `http://$URL/events` where `$URL` is where Atlantis is hosted. **Be sure to add `/events`**
+- set **Payload URL** to `http://$URL/events` (or `https://$URL/events` if you're using SSL) where `$URL` is where Atlantis is hosted. **Be sure to add `/events`**
+- double-check you added `/events` to the end of your URL.
 - set **Content type** to `application/json`
 - set **Secret** to a random key (https://www.random.org/strings/). You'll need to pass this value to the `--gh-webhook-secret` flag when you start Atlantis
 - select **Let me select individual events**
@@ -42,10 +48,11 @@ If installing on a single repository, navigate to the repository home page and c
 - leave **Active** checked
 - click **Add webhook**
 
-## Add GitLab Webhook
+### GitLab Webhook
 If you're using GitLab, navigate to your project's home page in GitLab
 - Click **Settings > Integrations** in the sidebar
-- set **URL** to `http://$URL/events` where `$URL` is where Atlantis is hosted. **Be sure to add `/events`**
+- set **URL** to `http://$URL/events` (or `https://$URL/events` if you're using SSL) where `$URL` is where Atlantis is hosted. **Be sure to add `/events`**
+- double-check you added `/events` to the end of your URL.
 - set **Secret Token** to a random key (https://www.random.org/strings/). You'll need to pass this value to the `--gitlab-webhook-secret` flag when you start Atlantis
 - check the boxes
     - **Push events**
@@ -54,21 +61,44 @@ If you're using GitLab, navigate to your project's home page in GitLab
 - leave **Enable SSL verification** checked
 - click **Add webhook**
 
-## Create a GitHub Token
-We recommend creating a new user in GitHub named **atlantis** that performs all API actions, however you can use any user.
+### Bitbucket Cloud (bitbucket.org) Webhook
+- Go to your repo's home page
+- Click **Settings** in the sidebar
+- Click **Webhooks** under the **WORKFLOW** section
+- Click **Add webhook**
+- Enter "Atlantis" for **Title**
+- set **URL** to `http://$URL/events` (or `https://$URL/events` if you're using SSL) where `$URL` is where Atlantis is hosted. **Be sure to add `/events`**
+- double-check you added `/events` to the end of your URL.
+- Keep **Status** as Active
+- Don't check **Skip certificate validation** because NGROK has a valid cert.
+- Select **Choose from a full list of triggers**
+- Under **Repository** **un**check everything
+- Under **Issues** leave everything **un**checked
+- Under **Pull Request**, select: Created, Updated, Merged, Declined and Comment created
+- Click **Save**
+<img src="../guide/images/bitbucket-webhook.png" alt="Bitbucket Webhook" style="max-height: 500px">
 
+## Create an access token for Atlantis
+We recommend using a dedicated CI user or creating a new user named **@atlantis** that performs all API actions, however for testing,
+you can use your own user. Here we'll create the access token that Atlantis uses to comment on the pull request and
+set commit statuses.
+
+### Create a GitHub Token
 **NOTE: The Atlantis user must have "Write permissions" (for repos in an organization) or be a "Collaborator" (for repos in a user account) to be able to set commit statuses:**
 ![Atlantis status](./images/status.png)
-
-Once you've created the user (or have decided to use an existing user) you need to create a personal access token.
-- follow [https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/#creating-a-token](https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/#creating-a-token)
+- create a Personal Access Token by following [https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/#creating-a-token](https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/#creating-a-token)
+- create the token with **repo** scope
 - copy the access token
 
-## Create a GitLab Token
-We recommend creating a new user in GitLab named **atlantis** that performs all API actions, however you can use any user.
-Once you've created the user (or have decided to use an existing user) you need to create a personal access token.
+### Create a GitLab Token
 - follow [https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#creating-a-personal-access-token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#creating-a-personal-access-token)
 - create a token with **api** scope
+- copy the access token
+
+### Create a Bitbucket Cloud (bitbucket.org) App Password
+- create an App Password by following [https://confluence.atlassian.com/bitbucket/app-passwords-828781300.html#Apppasswords-Createanapppassword](https://confluence.atlassian.com/bitbucket/app-passwords-828781300.html#Apppasswords-Createanapppassword)
+- Label the password "atlantis"
+- Select **Pull requests**: **Read** and **Write** so that Atlantis can read your pull requests and write comments to them
 - copy the access token
 
 ## Start Atlantis
@@ -96,9 +126,14 @@ HOSTNAME=YOUR_GITLAB_ENTERPRISE_HOSTNAME # ex. gitlab.runatlantis.io, without th
 atlantis server --atlantis-url $URL --gitlab-user $USERNAME --gitlab-token $TOKEN --gitlab-webhook-secret $SECRET --gitlab-hostname $HOSTNAME
 ```
 
+If you're using Bitbucket Cloud, run:
+```
+atlantis server --atlantis-url $URL --bitbucket-user $USERNAME --bitbucket-token $TOKEN
+```
+
 - `$URL` is the URL that Atlantis can be reached at
-- `$USERNAME` is the GitHub/GitLab username you generated the token for
-- `$TOKEN` is the access token you created. If you don't want this to be passed in as an argument for security reasons you can specify it in a config file (see [Configuration](#configuration)) or as an environment variable: `ATLANTIS_GH_TOKEN` or `ATLANTIS_GITLAB_TOKEN`
+- `$USERNAME` is the GitHub/GitLab/Bitbucket username you generated the token for
+- `$TOKEN` is the access token you created. If you don't want this to be passed in as an argument for security reasons you can specify it in a config file (see [Configuration](#configuration)) or as an environment variable: `ATLANTIS_GH_TOKEN` or `ATLANTIS_GITLAB_TOKEN` or `ATLANTIS_BITBUCKET_TOKEN`
 - `$SECRET` is the random key you used for the webhook secret. If you don't want this to be passed in as an argument for security reasons you can specify it in a config file (see [Configuration](#configuration)) or as an environment variable: `ATLANTIS_GH_WEBHOOK_SECRET` or `ATLANTIS_GITLAB_WEBHOOK_SECRET`
 
 Atlantis is now running!
@@ -154,6 +189,9 @@ echo -n "yourtoken" > token
 echo -n "yoursecret" > webhook-secret
 kubectl create secret generic atlantis-vcs --from-file=token --from-file=webhook-secret
 ```
+::: tip
+If you're using Bitbucket Cloud then there is no webhook secret since it's not supported.
+:::
 
 Next, edit the manifests below as follows:
 1. Replace `<VERSION>` in `image: runatlantis/atlantis:<VERSION>` with the most recent version from https://github.com/runatlantis/atlantis/releases/latest.
@@ -163,10 +201,13 @@ up upgrading Atlantis by accident!
 for your Terraform repos. See [--repo-whitelist](/docs/security.html#repo-whitelist) for more details.
 3. If you're using GitHub:
     1. Replace `<YOUR_GITHUB_USER>` with the username of your Atlantis GitHub user without the `@`.
-    2. Delete all the `ATLANTIS_GITLAB_*` environment variables.
+    2. Delete all the `ATLANTIS_GITLAB_*` and `ATLANTIS_BITBUCKET_*` environment variables.
 4. If you're using GitLab:
     1. Replace `<YOUR_GITLAB_USER>` with the username of your Atlantis GitLab user without the `@`.
-    2. Delete all the `ATLANTIS_GH_*` environment variables.
+    2. Delete all the `ATLANTIS_GH_*` and `ATLANTIS_BITBUCKET_*` environment variables.
+5. If you're using Bitbucket:
+    1. Replace `<YOUR_BITBUCKET_USER>` with the username of your Atlantis Bitbucket user without the `@`.
+    2. Delete all the `ATLANTIS_GH_*` and `ATLANTIS_GITLAB_*` environment variables.
 
 ### StatefulSet Manifest
 <details>
@@ -230,6 +271,16 @@ spec:
               name: atlantis-vcs
               key: webhook-secret
         ### End GitLab Config ###
+        
+        ### Bitbucket Config ###
+        - name: ATLANTIS_BITBUCKET_USER
+          value: <YOUR_BITBUCKET_USER> # 5i. If you're using Bitbucket replace <YOUR_BITBUCKET_USER> with the username of your Atlantis Bitbucket user without the `@`.
+        - name: ATLANTIS_BITBUCKET_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: token
+        ### End Bitbucket Config ###
 
         - name: ATLANTIS_DATA_DIR
           value: /atlantis
@@ -348,6 +399,16 @@ spec:
               key: webhook-secret
         ### End GitLab Config ###
 
+        ### Bitbucket Config ###
+        - name: ATLANTIS_BITBUCKET_USER
+          value: <YOUR_BITBUCKET_USER> # 5i. If you're using Bitbucket replace <YOUR_BITBUCKET_USER> with the username of your Atlantis Bitbucket user without the `@`.
+        - name: ATLANTIS_BITBUCKET_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: token
+        ### End Bitbucket Config ###
+
         - name: ATLANTIS_PORT
           value: "4141" # Kubernetes sets an ATLANTIS_PORT variable so we need to override.
         ports:
@@ -396,7 +457,7 @@ The manifests above create a Kubernetes `Service` of type `ClusterIP` which isn'
 Depending on how you're doing routing into Kubernetes, you may want to use a `LoadBalancer` so that Atlantis is accessible
 to GitHub/GitLab and your internal users.
 
-If you want to add SSL you can use something like https://github.com/jetstack/cert-manager to generate SSL
+If you want to add SSL you can use something like [https://github.com/jetstack/cert-manager](https://github.com/jetstack/cert-manager) to generate SSL
 certs and mount them into the Pod. Then set the `ATLANTIS_SSL_CERT_FILE` and `ATLANTIS_SSL_KEY_FILE` environment variables to enable SSL.
 You could also set up SSL at your LoadBalancer.
 
