@@ -161,8 +161,8 @@ func TestParseGithubPullEvent_EventType(t *testing.T) {
 		exp    models.PullRequestEventType
 	}{
 		{
-			action: "assigned",
-			exp:    models.OtherPullEvent,
+			action: "synchronize",
+			exp:    models.UpdatedPullEvent,
 		},
 		{
 			action: "unassigned",

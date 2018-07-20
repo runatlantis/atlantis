@@ -1,9 +1,5 @@
 package bitbucket
 
-import (
-	"encoding/json"
-)
-
 type CommentEvent struct {
 	CommonEventData
 	Comment *Comment `json:"comment,omitempty" validate:"required"`
@@ -72,12 +68,4 @@ type Comment struct {
 }
 type CommentContent struct {
 	Raw *string `json:"raw,omitempty" validate:"required"`
-}
-
-func ParseBitBucketPullRequest(body []byte) (PullRequest, error) {
-	var pull PullRequest
-	if err := json.Unmarshal(body, &pull); err != nil {
-		return PullRequest{}, err
-	}
-	return pull, nil
 }

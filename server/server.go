@@ -232,13 +232,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	logger := logging.NewSimpleLogger("server", nil, false, logging.ToLogLevel(userConfig.LogLevel))
 	eventParser := &events.EventParser{
-		GithubUser:  userConfig.GithubUser,
-		GithubToken: userConfig.GithubToken,
-		GitlabUser:  userConfig.GitlabUser,
-		GitlabToken: userConfig.GitlabToken,
-		// todo: fill in properly
-		BitbucketUser:  "lkysow",
-		BitbucketToken: os.Getenv("BITBUCKET_TOKEN"),
+		GithubUser:     userConfig.GithubUser,
+		GithubToken:    userConfig.GithubToken,
+		GitlabUser:     userConfig.GitlabUser,
+		GitlabToken:    userConfig.GitlabToken,
+		BitbucketUser:  userConfig.BitbucketUser,
+		BitbucketToken: userConfig.BitbucketToken,
 	}
 	commentParser := &events.CommentParser{
 		GithubUser:  userConfig.GithubUser,
