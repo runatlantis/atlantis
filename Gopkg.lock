@@ -74,6 +74,21 @@
   version = "v3.3"
 
 [[projects]]
+  name = "github.com/go-playground/locales"
+  packages = [
+    ".",
+    "currency"
+  ]
+  revision = "f63010822830b6fe52288ee52d5a1151088ce039"
+  version = "v0.12.1"
+
+[[projects]]
+  name = "github.com/go-playground/universal-translator"
+  packages = ["."]
+  revision = "b32fa301c9fe55953584134cb6853a13c87ec0a1"
+  version = "v0.16.0"
+
+[[projects]]
   name = "github.com/go-test/deep"
   packages = ["."]
   revision = "6592d9cc0a499ad2d5f574fde80a2b5c5cc3b4f5"
@@ -344,6 +359,12 @@
   revision = "1cbadb444a806fd9430d14ad08967ed91da4fa0a"
 
 [[projects]]
+  name = "gopkg.in/go-playground/validator.v9"
+  packages = ["."]
+  revision = "ab2a8a99087e827c9af87ed6777ba897348fb178"
+  version = "v9.20.2"
+
+[[projects]]
   branch = "v2"
   name = "gopkg.in/yaml.v2"
   packages = ["."]
@@ -352,6 +373,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "0afba7ec3d45c8cf6aea549a9ff30c674c2106f10c8f2865aee452376dcbfbe6"
+  inputs-digest = "a2ddeb1120c832afff8bb9cf48ae85656c0e97f125f0a5d3742152bfb41c04e1"
   solver-name = "gps-cdcl"
   solver-version = 1

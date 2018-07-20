@@ -1,0 +1,7 @@
+[
+    {
+        "locale": "en",
+        "key": "test_trans3",
+        "trans": "Welcome {lettersnotpermitted} to the {1}"
+    }
+]

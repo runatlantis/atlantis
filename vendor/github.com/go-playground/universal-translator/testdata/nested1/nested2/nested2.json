@@ -1,0 +1,17 @@
+[
+    {
+        "locale": "en",
+        "key": "test_trans3",
+        "trans": "Welcome {0} to the {1}"
+    },
+    {
+        "locale": "en",
+        "key": "test_trans4",
+        "trans": "{0}{1}"
+    },
+    {
+        "locale": "en",
+        "key": "test_trans",
+        "trans": "Welcome {0} to the {1}."
+    }
+]
