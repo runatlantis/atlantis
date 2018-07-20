@@ -520,13 +520,11 @@ func TestCommentCommand_String(t *testing.T) {
 }
 
 func TestParseBitbucketCloudCommentEvent_EmptyString(t *testing.T) {
-	parser := events.EventParser{}
 	_, _, _, _, _, err := parser.ParseBitbucketCloudCommentEvent([]byte(""))
 	ErrEquals(t, "parsing json: unexpected end of JSON input", err)
 }
 
 func TestParseBitbucketCloudCommentEvent_EmptyObject(t *testing.T) {
-	parser := events.EventParser{}
 	_, _, _, _, _, err := parser.ParseBitbucketCloudCommentEvent([]byte("{}"))
 	ErrEquals(t, "Key: 'CommentEvent.CommonEventData.Actor' Error:Field validation for 'Actor' failed on the 'required' tag\nKey: 'CommentEvent.CommonEventData.Repository' Error:Field validation for 'Repository' failed on the 'required' tag\nKey: 'CommentEvent.CommonEventData.PullRequest' Error:Field validation for 'PullRequest' failed on the 'required' tag\nKey: 'CommentEvent.Comment' Error:Field validation for 'Comment' failed on the 'required' tag", err)
 }

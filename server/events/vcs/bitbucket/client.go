@@ -122,7 +122,7 @@ func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool
 		return false, err
 	}
 	for _, participant := range pullResp.Participants {
-		if *participant.Approved == true {
+		if *participant.Approved {
 			return true, nil
 		}
 	}
@@ -178,7 +178,7 @@ func (b *Client) makeRequest(method string, path string, reqBody io.Reader) ([]b
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() // nolint: errcheck
 	requestStr := fmt.Sprintf("%s %s", method, path)
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {

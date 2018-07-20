@@ -113,7 +113,7 @@ func (e *EventsController) handleGithubPost(w http.ResponseWriter, r *http.Reque
 func (e *EventsController) handleBitbucketPost(w http.ResponseWriter, r *http.Request) {
 	eventType := r.Header.Get(bitbucketEventTypeHeader)
 	reqID := r.Header.Get(bitbucketRequestIDHeader)
-	defer r.Body.Close()
+	defer r.Body.Close() // nolint: errcheck
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Unable to read body: %s %s=%s", err, bitbucketRequestIDHeader, reqID)
