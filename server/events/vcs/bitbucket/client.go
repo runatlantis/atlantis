@@ -158,11 +158,11 @@ func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool
 func (b *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, description string) error {
 	bbState := "FAILED"
 	switch state {
-	case models.Pending:
+	case models.PendingCommitStatus:
 		bbState = "INPROGRESS"
-	case models.Success:
+	case models.SuccessCommitStatus:
 		bbState = "SUCCESSFUL"
-	case models.Failed:
+	case models.FailedCommitStatus:
 		bbState = "FAILED"
 	}
 

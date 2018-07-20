@@ -27,7 +27,7 @@ import (
 
 var repoModel = models.Repo{}
 var pullModel = models.PullRequest{}
-var status = models.Success
+var status = models.SuccessCommitStatus
 
 func TestUpdate(t *testing.T) {
 	RegisterMockTestingT(t)
@@ -48,7 +48,7 @@ func TestUpdateProjectResult_Error(t *testing.T) {
 	s := events.DefaultCommitStatusUpdater{Client: client}
 	err := s.UpdateProjectResult(ctx, events.Plan, events.CommandResult{Error: errors.New("err")})
 	Ok(t, err)
-	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, models.Failed, "Plan Failed")
+	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, models.FailedCommitStatus, "Plan Failed")
 }
 
 func TestUpdateProjectResult_Failure(t *testing.T) {
@@ -61,7 +61,7 @@ func TestUpdateProjectResult_Failure(t *testing.T) {
 	s := events.DefaultCommitStatusUpdater{Client: client}
 	err := s.UpdateProjectResult(ctx, events.Plan, events.CommandResult{Failure: "failure"})
 	Ok(t, err)
-	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, models.Failed, "Plan Failed")
+	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, models.FailedCommitStatus, "Plan Failed")
 }
 
 func TestUpdateProjectResult(t *testing.T) {
@@ -78,31 +78,31 @@ func TestUpdateProjectResult(t *testing.T) {
 	}{
 		{
 			[]string{"success", "failure", "error"},
-			models.Failed,
+			models.FailedCommitStatus,
 		},
 		{
 			[]string{"failure", "error", "success"},
-			models.Failed,
+			models.FailedCommitStatus,
 		},
 		{
 			[]string{"success", "failure"},
-			models.Failed,
+			models.FailedCommitStatus,
 		},
 		{
 			[]string{"success", "error"},
-			models.Failed,
+			models.FailedCommitStatus,
 		},
 		{
 			[]string{"failure", "error"},
-			models.Failed,
+			models.FailedCommitStatus,
 		},
 		{
 			[]string{"success"},
-			models.Success,
+			models.SuccessCommitStatus,
 		},
 		{
 			[]string{"success", "success"},
-			models.Success,
+			models.SuccessCommitStatus,
 		},
 	}
 

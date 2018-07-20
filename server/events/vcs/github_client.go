@@ -127,11 +127,11 @@ func (g *GithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 	const statusContext = "Atlantis"
 	ghState := "error"
 	switch state {
-	case models.Pending:
+	case models.PendingCommitStatus:
 		ghState = "pending"
-	case models.Success:
+	case models.SuccessCommitStatus:
 		ghState = "success"
-	case models.Failed:
+	case models.FailedCommitStatus:
 		ghState = "failure"
 	}
 	status := &github.RepoStatus{

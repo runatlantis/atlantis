@@ -82,15 +82,15 @@ func TestGithubClient_UpdateStatus(t *testing.T) {
 		expState string
 	}{
 		{
-			models.Pending,
+			models.PendingCommitStatus,
 			"pending",
 		},
 		{
-			models.Success,
+			models.SuccessCommitStatus,
 			"success",
 		},
 		{
-			models.Failed,
+			models.FailedCommitStatus,
 			"failure",
 		},
 	}

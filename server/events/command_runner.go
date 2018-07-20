@@ -84,7 +84,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	if !c.validateCtxAndComment(ctx) {
 		return
 	}
-	if err := c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, models.Pending, Plan); err != nil {
+	if err := c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, models.PendingCommitStatus, Plan); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
@@ -150,7 +150,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
-	if err := c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, models.Pending, cmd.CommandName()); err != nil {
+	if err := c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, models.PendingCommitStatus, cmd.CommandName()); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 

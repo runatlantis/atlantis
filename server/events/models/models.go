@@ -28,10 +28,6 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-// DefaultWorkspace is the default Terraform workspace for both Atlantis and
-// Terraform.
-const DefaultWorkspace = "default"
-
 // Repo is a VCS repository.
 type Repo struct {
 	// FullName is the owner and repo name separated

@@ -48,7 +48,7 @@ func (d *DefaultCommitStatusUpdater) Update(repo models.Repo, pull models.PullRe
 func (d *DefaultCommitStatusUpdater) UpdateProjectResult(ctx *CommandContext, commandName CommandName, res CommandResult) error {
 	var status models.CommitStatus
 	if res.Error != nil || res.Failure != "" {
-		status = models.Failed
+		status = models.FailedCommitStatus
 	} else {
 		var statuses []models.CommitStatus
 		for _, p := range res.ProjectResults {
@@ -61,9 +61,9 @@ func (d *DefaultCommitStatusUpdater) UpdateProjectResult(ctx *CommandContext, co
 
 func (d *DefaultCommitStatusUpdater) worstStatus(ss []models.CommitStatus) models.CommitStatus {
 	for _, s := range ss {
-		if s == models.Failed {
-			return models.Failed
+		if s == models.FailedCommitStatus {
+			return models.FailedCommitStatus
 		}
 	}
-	return models.Success
+	return models.SuccessCommitStatus
 }

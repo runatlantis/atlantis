@@ -9,9 +9,9 @@ import (
 
 func TestStatus_String(t *testing.T) {
 	cases := map[models.CommitStatus]string{
-		models.Pending: "pending",
-		models.Success: "success",
-		models.Failed:  "failed",
+		models.PendingCommitStatus: "pending",
+		models.SuccessCommitStatus: "success",
+		models.FailedCommitStatus:  "failed",
 	}
 	for k, v := range cases {
 		Equals(t, v, k.String())

@@ -20,18 +20,18 @@ package models
 type CommitStatus int
 
 const (
-	Pending CommitStatus = iota
-	Success
-	Failed
+	PendingCommitStatus CommitStatus = iota
+	SuccessCommitStatus
+	FailedCommitStatus
 )
 
 func (s CommitStatus) String() string {
 	switch s {
-	case Pending:
+	case PendingCommitStatus:
 		return "pending"
-	case Success:
+	case SuccessCommitStatus:
 		return "success"
-	case Failed:
+	case FailedCommitStatus:
 		return "failed"
 	}
 	return "failed"

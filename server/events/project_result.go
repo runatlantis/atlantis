@@ -34,10 +34,10 @@ type ProjectCommandResult struct {
 // Status returns the vcs commit status of this project result.
 func (p ProjectResult) Status() models.CommitStatus {
 	if p.Error != nil {
-		return models.Failed
+		return models.FailedCommitStatus
 	}
 	if p.Failure != "" {
-		return models.Failed
+		return models.FailedCommitStatus
 	}
-	return models.Success
+	return models.SuccessCommitStatus
 }
