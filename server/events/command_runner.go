@@ -225,7 +225,7 @@ func (c *DefaultCommandRunner) validateCtxAndComment(ctx *CommandContext) bool {
 		return false
 	}
 
-	if ctx.Pull.State != models.Open {
+	if ctx.Pull.State != models.OpenPullState {
 		ctx.Log.Info("command was run on closed pull request")
 		c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, "Atlantis commands can't be run on closed pull requests") // nolint: errcheck
 		return false

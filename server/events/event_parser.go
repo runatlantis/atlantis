@@ -127,12 +127,12 @@ type EventParsing interface {
 }
 
 type EventParser struct {
-	GithubUser          string
-	GithubToken         string
-	GitlabUser          string
-	GitlabToken         string
-	BitbucketCloudUser  string
-	BitbucketCloudToken string
+	GithubUser     string
+	GithubToken    string
+	GitlabUser     string
+	GitlabToken    string
+	BitbucketUser  string
+	BitbucketToken string
 }
 
 // GetBitbucketEventType translates the bitbucket header name into a pull
@@ -167,13 +167,13 @@ func (e *EventParser) parseCommonBitbucketEventData(event bitbucket.CommonEventD
 	var prState models.PullRequestState
 	switch *event.PullRequest.State {
 	case "OPEN":
-		prState = models.Open
+		prState = models.OpenPullState
 	case "MERGED":
-		prState = models.Closed
+		prState = models.ClosedPullState
 	case "SUPERSEDED":
-		prState = models.Closed
+		prState = models.ClosedPullState
 	case "DECLINE":
-		prState = models.Closed
+		prState = models.ClosedPullState
 	default:
 		err = fmt.Errorf("unable to determine pull request state from %q, this is a bug!", *event.PullRequest.State)
 		return
@@ -183,8 +183,8 @@ func (e *EventParser) parseCommonBitbucketEventData(event bitbucket.CommonEventD
 		models.Bitbucket,
 		*event.PullRequest.Source.Repository.FullName,
 		*event.PullRequest.Source.Repository.Links.HTML.HREF,
-		e.BitbucketCloudUser,
-		e.BitbucketCloudToken)
+		e.BitbucketUser,
+		e.BitbucketToken)
 	if err != nil {
 		return
 	}
@@ -192,8 +192,8 @@ func (e *EventParser) parseCommonBitbucketEventData(event bitbucket.CommonEventD
 		models.Bitbucket,
 		*event.Repository.FullName,
 		*event.Repository.Links.HTML.HREF,
-		e.BitbucketCloudUser,
-		e.BitbucketCloudToken)
+		e.BitbucketUser,
+		e.BitbucketToken)
 	if err != nil {
 		return
 	}
@@ -315,9 +315,9 @@ func (e *EventParser) ParseGithubPull(pull *github.PullRequest) (pullModel model
 		return
 	}
 
-	pullState := models.Closed
+	pullState := models.ClosedPullState
 	if pull.GetState() == "open" {
-		pullState = models.Open
+		pullState = models.OpenPullState
 	}
 
 	pullModel = models.PullRequest{
@@ -337,9 +337,9 @@ func (e *EventParser) ParseGithubRepo(ghRepo *github.Repository) (models.Repo, e
 }
 
 func (e *EventParser) ParseGitlabMergeEvent(event gitlab.MergeEvent) (pull models.PullRequest, eventType models.PullRequestEventType, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
-	modelState := models.Closed
+	modelState := models.ClosedPullState
 	if event.ObjectAttributes.State == gitlabPullOpened {
-		modelState = models.Open
+		modelState = models.OpenPullState
 	}
 	// GitLab also has a "merged" state, but we map that to Closed so we don't
 	// need to check for it.
@@ -406,9 +406,9 @@ func (e *EventParser) ParseGitlabMergeCommentEvent(event gitlab.MergeCommentEven
 // from the merge request, the only caller of this function already has that
 // data. This means we can construct the pull request object correctly.
 func (e *EventParser) ParseGitlabMergeRequest(mr *gitlab.MergeRequest, baseRepo models.Repo) models.PullRequest {
-	pullState := models.Closed
+	pullState := models.ClosedPullState
 	if mr.State == gitlabPullOpened {
-		pullState = models.Open
+		pullState = models.OpenPullState
 	}
 	// GitLab also has a "merged" state, but we map that to Closed so we don't
 	// need to check for it.

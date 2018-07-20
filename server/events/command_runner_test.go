@@ -128,7 +128,7 @@ func TestRunCommentCommand_ForkPRDisabled(t *testing.T) {
 	setup(t)
 	ch.AllowForkPRs = false // by default it's false so don't need to reset
 	var pull github.PullRequest
-	modelPull := models.PullRequest{State: models.Open}
+	modelPull := models.PullRequest{State: models.OpenPullState}
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
 
 	headRepo := fixtures.GithubRepo
@@ -147,7 +147,7 @@ func TestRunCommentCommand_ClosedPull(t *testing.T) {
 	pull := &github.PullRequest{
 		State: github.String("closed"),
 	}
-	modelPull := models.PullRequest{State: models.Closed}
+	modelPull := models.PullRequest{State: models.ClosedPullState}
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
 

@@ -130,8 +130,8 @@ type PullRequest struct {
 type PullRequestState int
 
 const (
-	Open PullRequestState = iota
-	Closed
+	OpenPullState PullRequestState = iota
+	ClosedPullState
 )
 
 type PullRequestEventType int

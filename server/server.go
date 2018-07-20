@@ -237,8 +237,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GitlabUser:  userConfig.GitlabUser,
 		GitlabToken: userConfig.GitlabToken,
 		// todo: fill in properly
-		BitbucketCloudUser:  "lkysow",
-		BitbucketCloudToken: os.Getenv("BITBUCKET_TOKEN"),
+		BitbucketUser:  "lkysow",
+		BitbucketToken: os.Getenv("BITBUCKET_TOKEN"),
 	}
 	commentParser := &events.CommentParser{
 		GithubUser:  userConfig.GithubUser,

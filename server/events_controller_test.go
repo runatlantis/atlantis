@@ -311,7 +311,7 @@ func TestPost_GitlabMergeRequestInvalid(t *testing.T) {
 	req.Header.Set(gitlabHeader, "value")
 	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
 	repo := models.Repo{}
-	pullRequest := models.PullRequest{State: models.Closed}
+	pullRequest := models.PullRequest{State: models.ClosedPullState}
 	When(p.ParseGitlabMergeEvent(gitlabMergeEvent)).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, errors.New("err"))
 	w := httptest.NewRecorder()
 	e.Post(w, req)
@@ -345,7 +345,7 @@ func TestPost_GitlabMergeRequestNotWhitelisted(t *testing.T) {
 	Ok(t, err)
 	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
 	repo := models.Repo{}
-	pullRequest := models.PullRequest{State: models.Closed}
+	pullRequest := models.PullRequest{State: models.ClosedPullState}
 	When(p.ParseGitlabMergeEvent(gitlabMergeEvent)).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
 
 	w := httptest.NewRecorder()
@@ -376,7 +376,7 @@ func TestPost_GitlabMergeRequestUnsupportedAction(t *testing.T) {
 	gitlabMergeEvent.ObjectAttributes.Action = "unsupported"
 	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
 	repo := models.Repo{}
-	pullRequest := models.PullRequest{State: models.Closed}
+	pullRequest := models.PullRequest{State: models.ClosedPullState}
 	When(p.ParseGitlabMergeEvent(gitlabMergeEvent)).ThenReturn(pullRequest, repo, repo, models.User{}, nil)
 
 	w := httptest.NewRecorder()
@@ -395,7 +395,7 @@ func TestPost_GithubPullRequestClosedErrCleaningPull(t *testing.T) {
 	event := `{"action": "closed"}`
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
 	repo := models.Repo{}
-	pull := models.PullRequest{State: models.Closed}
+	pull := models.PullRequest{State: models.ClosedPullState}
 	When(p.ParseGithubPullEvent(matchers.AnyPtrToGithubPullRequestEvent())).ThenReturn(pull, models.OpenedPullEvent, repo, repo, models.User{}, nil)
 	When(c.CleanUpPull(repo, pull)).ThenReturn(errors.New("cleanup err"))
 	w := httptest.NewRecorder()
@@ -412,7 +412,7 @@ func TestPost_GitlabMergeRequestClosedErrCleaningPull(t *testing.T) {
 	gitlabMergeEvent.ObjectAttributes.Action = "close"
 	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
 	repo := models.Repo{}
-	pullRequest := models.PullRequest{State: models.Closed}
+	pullRequest := models.PullRequest{State: models.ClosedPullState}
 	When(p.ParseGitlabMergeEvent(gitlabMergeEvent)).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
 	When(c.CleanUpPull(repo, pullRequest)).ThenReturn(errors.New("err"))
 	w := httptest.NewRecorder()
@@ -430,7 +430,7 @@ func TestPost_GithubClosedPullRequestSuccess(t *testing.T) {
 	event := `{"action": "closed"}`
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
 	repo := models.Repo{}
-	pull := models.PullRequest{State: models.Closed}
+	pull := models.PullRequest{State: models.ClosedPullState}
 	When(p.ParseGithubPullEvent(matchers.AnyPtrToGithubPullRequestEvent())).ThenReturn(pull, models.OpenedPullEvent, repo, repo, models.User{}, nil)
 	When(c.CleanUpPull(repo, pull)).ThenReturn(nil)
 	w := httptest.NewRecorder()
@@ -446,7 +446,7 @@ func TestPost_GitlabMergeRequestSuccess(t *testing.T) {
 	req.Header.Set(gitlabHeader, "value")
 	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
 	repo := models.Repo{}
-	pullRequest := models.PullRequest{State: models.Closed}
+	pullRequest := models.PullRequest{State: models.ClosedPullState}
 	When(p.ParseGitlabMergeEvent(gitlabMergeEvent)).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
 	w := httptest.NewRecorder()
 	e.Post(w, req)
@@ -491,20 +491,20 @@ func TestPost_PullOpenedOrUpdated(t *testing.T) {
 				gitlabMergeEvent.ObjectAttributes.Action = c.Action
 				When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
 				repo := models.Repo{}
-				pullRequest := models.PullRequest{State: models.Closed}
+				pullRequest := models.PullRequest{State: models.ClosedPullState}
 				When(p.ParseGitlabMergeEvent(gitlabMergeEvent)).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
 			case models.Github:
 				req.Header.Set(githubHeader, "pull_request")
 				event := fmt.Sprintf(`{"action": "%s"}`, c.Action)
 				When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
 				repo := models.Repo{}
-				pull := models.PullRequest{State: models.Closed}
+				pull := models.PullRequest{State: models.ClosedPullState}
 				When(p.ParseGithubPullEvent(matchers.AnyPtrToGithubPullRequestEvent())).ThenReturn(pull, models.OpenedPullEvent, repo, repo, models.User{}, nil)
 			}
 			w := httptest.NewRecorder()
 			e.Post(w, req)
 			responseContains(t, w, http.StatusOK, "Processing...")
-			cr.VerifyWasCalledOnce().RunAutoplanCommand(models.Repo{}, models.Repo{}, models.PullRequest{State: models.Closed}, models.User{})
+			cr.VerifyWasCalledOnce().RunAutoplanCommand(models.Repo{}, models.Repo{}, models.PullRequest{State: models.ClosedPullState}, models.User{})
 		})
 	}
 }
