@@ -530,7 +530,7 @@ func TestParseBitbucketCloudCommentEvent_EmptyObject(t *testing.T) {
 }
 
 func TestParseBitbucketCloudCommentEvent_CommitHashMissing(t *testing.T) {
-	path := filepath.Join("testdata", "bitbucket-comment-event.json")
+	path := filepath.Join("testdata", "bitbucket-cloud-comment-event.json")
 	bytes, err := ioutil.ReadFile(path)
 	if err != nil {
 		Ok(t, err)
@@ -541,7 +541,7 @@ func TestParseBitbucketCloudCommentEvent_CommitHashMissing(t *testing.T) {
 }
 
 func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {
-	path := filepath.Join("testdata", "bitbucket-comment-event.json")
+	path := filepath.Join("testdata", "bitbucket-cloud-comment-event.json")
 	bytes, err := ioutil.ReadFile(path)
 	if err != nil {
 		Ok(t, err)
@@ -587,7 +587,7 @@ func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {
 }
 
 func TestParseBitbucketCloudCommentEvent_MultipleStates(t *testing.T) {
-	path := filepath.Join("testdata", "bitbucket-comment-event.json")
+	path := filepath.Join("testdata", "bitbucket-cloud-comment-event.json")
 	bytes, err := ioutil.ReadFile(path)
 	if err != nil {
 		Ok(t, err)
@@ -626,7 +626,7 @@ func TestParseBitbucketCloudCommentEvent_MultipleStates(t *testing.T) {
 }
 
 func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
-	path := filepath.Join("testdata", "bitbucket-pull-event-fulfilled.json")
+	path := filepath.Join("testdata", "bitbucket-cloud-pull-event-fulfilled.json")
 	bytes, err := ioutil.ReadFile(path)
 	if err != nil {
 		Ok(t, err)

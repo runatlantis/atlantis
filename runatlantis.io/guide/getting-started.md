@@ -22,7 +22,7 @@ Get the latest release from [https://github.com/runatlantis/atlantis/releases](h
 and unpackage it.
 
 ## Download Ngrok
-Atlantis needs to be accessible somewhere that github.com/gitlab.com or your GitHub/GitLab Enterprise installation can reach.
+Atlantis needs to be accessible somewhere that github.com/gitlab.com/bitbucket.org or your GitHub/GitLab Enterprise installation can reach.
 One way to accomplish this is with ngrok, a tool that forwards your local port to a random
 public hostname.
 
