@@ -256,6 +256,78 @@ func (mock *MockEventParsing) GetBitbucketCloudEventType(eventTypeHeader string)
 	return ret0
 }
 
+func (mock *MockEventParsing) ParseBitbucketServerPullEvent(body []byte) (models.PullRequest, models.Repo, models.Repo, models.User, error) {
+	params := []pegomock.Param{body}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseBitbucketServerPullEvent", params, []reflect.Type{reflect.TypeOf((*models.PullRequest)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.User)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 models.PullRequest
+	var ret1 models.Repo
+	var ret2 models.Repo
+	var ret3 models.User
+	var ret4 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(models.PullRequest)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(models.Repo)
+		}
+		if result[2] != nil {
+			ret2 = result[2].(models.Repo)
+		}
+		if result[3] != nil {
+			ret3 = result[3].(models.User)
+		}
+		if result[4] != nil {
+			ret4 = result[4].(error)
+		}
+	}
+	return ret0, ret1, ret2, ret3, ret4
+}
+
+func (mock *MockEventParsing) ParseBitbucketServerCommentEvent(body []byte) (models.PullRequest, models.Repo, models.Repo, models.User, string, error) {
+	params := []pegomock.Param{body}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseBitbucketServerCommentEvent", params, []reflect.Type{reflect.TypeOf((*models.PullRequest)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.User)(nil)).Elem(), reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 models.PullRequest
+	var ret1 models.Repo
+	var ret2 models.Repo
+	var ret3 models.User
+	var ret4 string
+	var ret5 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(models.PullRequest)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(models.Repo)
+		}
+		if result[2] != nil {
+			ret2 = result[2].(models.Repo)
+		}
+		if result[3] != nil {
+			ret3 = result[3].(models.User)
+		}
+		if result[4] != nil {
+			ret4 = result[4].(string)
+		}
+		if result[5] != nil {
+			ret5 = result[5].(error)
+		}
+	}
+	return ret0, ret1, ret2, ret3, ret4, ret5
+}
+
+func (mock *MockEventParsing) GetBitbucketServerEventType(eventTypeHeader string) models.PullRequestEventType {
+	params := []pegomock.Param{eventTypeHeader}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("GetBitbucketServerEventType", params, []reflect.Type{reflect.TypeOf((*models.PullRequestEventType)(nil)).Elem()})
+	var ret0 models.PullRequestEventType
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(models.PullRequestEventType)
+		}
+	}
+	return ret0
+}
+
 func (mock *MockEventParsing) VerifyWasCalledOnce() *VerifierEventParsing {
 	return &VerifierEventParsing{mock, pegomock.Times(1), nil}
 }
@@ -538,6 +610,87 @@ func (c *EventParsing_GetBitbucketCloudEventType_OngoingVerification) GetCapture
 }
 
 func (c *EventParsing_GetBitbucketCloudEventType_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]string, len(params[0]))
+		for u, param := range params[0] {
+			_param0[u] = param.(string)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierEventParsing) ParseBitbucketServerPullEvent(body []byte) *EventParsing_ParseBitbucketServerPullEvent_OngoingVerification {
+	params := []pegomock.Param{body}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ParseBitbucketServerPullEvent", params)
+	return &EventParsing_ParseBitbucketServerPullEvent_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type EventParsing_ParseBitbucketServerPullEvent_OngoingVerification struct {
+	mock              *MockEventParsing
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *EventParsing_ParseBitbucketServerPullEvent_OngoingVerification) GetCapturedArguments() []byte {
+	body := c.GetAllCapturedArguments()
+	return body[len(body)-1]
+}
+
+func (c *EventParsing_ParseBitbucketServerPullEvent_OngoingVerification) GetAllCapturedArguments() (_param0 [][]byte) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([][]byte, len(params[0]))
+		for u, param := range params[0] {
+			_param0[u] = param.([]byte)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierEventParsing) ParseBitbucketServerCommentEvent(body []byte) *EventParsing_ParseBitbucketServerCommentEvent_OngoingVerification {
+	params := []pegomock.Param{body}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ParseBitbucketServerCommentEvent", params)
+	return &EventParsing_ParseBitbucketServerCommentEvent_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type EventParsing_ParseBitbucketServerCommentEvent_OngoingVerification struct {
+	mock              *MockEventParsing
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *EventParsing_ParseBitbucketServerCommentEvent_OngoingVerification) GetCapturedArguments() []byte {
+	body := c.GetAllCapturedArguments()
+	return body[len(body)-1]
+}
+
+func (c *EventParsing_ParseBitbucketServerCommentEvent_OngoingVerification) GetAllCapturedArguments() (_param0 [][]byte) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([][]byte, len(params[0]))
+		for u, param := range params[0] {
+			_param0[u] = param.([]byte)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierEventParsing) GetBitbucketServerEventType(eventTypeHeader string) *EventParsing_GetBitbucketServerEventType_OngoingVerification {
+	params := []pegomock.Param{eventTypeHeader}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetBitbucketServerEventType", params)
+	return &EventParsing_GetBitbucketServerEventType_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type EventParsing_GetBitbucketServerEventType_OngoingVerification struct {
+	mock              *MockEventParsing
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *EventParsing_GetBitbucketServerEventType_OngoingVerification) GetCapturedArguments() string {
+	eventTypeHeader := c.GetAllCapturedArguments()
+	return eventTypeHeader[len(eventTypeHeader)-1]
+}
+
+func (c *EventParsing_GetBitbucketServerEventType_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]string, len(params[0]))

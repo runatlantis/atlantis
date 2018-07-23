@@ -526,7 +526,7 @@ func TestParseBitbucketCloudCommentEvent_EmptyString(t *testing.T) {
 
 func TestParseBitbucketCloudCommentEvent_EmptyObject(t *testing.T) {
 	_, _, _, _, _, err := parser.ParseBitbucketCloudCommentEvent([]byte("{}"))
-	ErrEquals(t, "Key: 'CommentEvent.CommonEventData.Actor' Error:Field validation for 'Actor' failed on the 'required' tag\nKey: 'CommentEvent.CommonEventData.Repository' Error:Field validation for 'Repository' failed on the 'required' tag\nKey: 'CommentEvent.CommonEventData.PullRequest' Error:Field validation for 'PullRequest' failed on the 'required' tag\nKey: 'CommentEvent.Comment' Error:Field validation for 'Comment' failed on the 'required' tag", err)
+	ErrContains(t, "Key: 'CommentEvent.CommonEventData.Actor' Error:Field validation for 'Actor' failed on the 'required' tag\nKey: 'CommentEvent.CommonEventData.Repository' Error:Field validation for 'Repository' failed on the 'required' tag\nKey: 'CommentEvent.CommonEventData.PullRequest' Error:Field validation for 'PullRequest' failed on the 'required' tag\nKey: 'CommentEvent.Comment' Error:Field validation for 'Comment' failed on the 'required' tag", err)
 }
 
 func TestParseBitbucketCloudCommentEvent_CommitHashMissing(t *testing.T) {
@@ -537,7 +537,7 @@ func TestParseBitbucketCloudCommentEvent_CommitHashMissing(t *testing.T) {
 	}
 	emptyCommitHash := strings.Replace(string(bytes), `        "hash": "e0624da46d3a",`, "", -1)
 	_, _, _, _, _, err = parser.ParseBitbucketCloudCommentEvent([]byte(emptyCommitHash))
-	ErrEquals(t, "Key: 'CommentEvent.CommonEventData.PullRequest.Source.Commit.Hash' Error:Field validation for 'Hash' failed on the 'required' tag", err)
+	ErrContains(t, "Key: 'CommentEvent.CommonEventData.PullRequest.Source.Commit.Hash' Error:Field validation for 'Hash' failed on the 'required' tag", err)
 }
 
 func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {

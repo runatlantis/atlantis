@@ -132,7 +132,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		pull, headRepo, err = c.getGithubData(baseRepo, pullNum)
 	case models.Gitlab:
 		pull, err = c.getGitlabData(baseRepo, pullNum)
-	case models.BitbucketCloud:
+	case models.BitbucketCloud, models.BitbucketServer:
 		if maybePull == nil {
 			err = errors.New("pull request should not be nil, this is a bug!")
 		}
@@ -253,7 +253,9 @@ func (c *DefaultCommandRunner) updatePull(ctx *CommandContext, command CommandIn
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 	comment := c.MarkdownRenderer.Render(res, command.CommandName(), ctx.Log.History.String(), command.IsVerbose())
-	c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, comment) // nolint: errcheck
+	if err := c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, comment); err != nil {
+		ctx.Log.Err("unable to comment: %s", err)
+	}
 }
 
 // logPanics logs and creates a comment on the pull request for panics.

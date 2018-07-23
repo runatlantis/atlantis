@@ -41,6 +41,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
+	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -137,7 +138,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var supportedVCSHosts []models.VCSHostType
 	var githubClient *vcs.GithubClient
 	var gitlabClient *vcs.GitlabClient
-	var bitbucketClient *bitbucketcloud.Client
+	var bitbucketCloudClient *bitbucketcloud.Client
+	var bitbucketServerClient *bitbucketserver.Client
 	if userConfig.GithubUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		var err error
@@ -168,17 +170,25 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 	}
 	if userConfig.BitbucketUser != "" {
-		supportedVCSHosts = append(supportedVCSHosts, models.BitbucketCloud)
-		var err error
-		bitbucketClient, err = bitbucketcloud.NewClient(
-			http.DefaultClient,
-			userConfig.BitbucketUser,
-			userConfig.BitbucketToken,
-			// todo: don't hardcode when we allow for bitbucket server
-			"https://api.bitbucket.org/",
-			userConfig.AtlantisURL)
-		if err != nil {
-			return nil, errors.Wrapf(err, "setting up Bitbucket client")
+		if userConfig.BitbucketHostname == bitbucketcloud.Hostname {
+			supportedVCSHosts = append(supportedVCSHosts, models.BitbucketCloud)
+			bitbucketCloudClient = bitbucketcloud.NewClient(
+				http.DefaultClient,
+				userConfig.BitbucketUser,
+				userConfig.BitbucketToken,
+				userConfig.AtlantisURL)
+		} else {
+			supportedVCSHosts = append(supportedVCSHosts, models.BitbucketServer)
+			var err error
+			bitbucketServerClient, err = bitbucketserver.NewClient(
+				http.DefaultClient,
+				userConfig.BitbucketUser,
+				userConfig.BitbucketToken,
+				userConfig.BitbucketHostname,
+				userConfig.AtlantisURL)
+			if err != nil {
+				return nil, errors.Wrapf(err, "setting up Bitbucket Server client")
+			}
 		}
 	}
 
@@ -196,7 +206,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing webhooks")
 	}
-	vcsClient := vcs.NewDefaultClientProxy(githubClient, gitlabClient, bitbucketClient, bitbucketClient)
+	vcsClient := vcs.NewDefaultClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient)
 	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient}
 	terraformClient, err := terraform.NewClient(userConfig.DataDir)
 	// The flag.Lookup call is to detect if we're running in a unit test. If we
@@ -232,12 +242,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	logger := logging.NewSimpleLogger("server", nil, false, logging.ToLogLevel(userConfig.LogLevel))
 	eventParser := &events.EventParser{
-		GithubUser:     userConfig.GithubUser,
-		GithubToken:    userConfig.GithubToken,
-		GitlabUser:     userConfig.GitlabUser,
-		GitlabToken:    userConfig.GitlabToken,
-		BitbucketUser:  userConfig.BitbucketUser,
-		BitbucketToken: userConfig.BitbucketToken,
+		GithubUser:         userConfig.GithubUser,
+		GithubToken:        userConfig.GithubToken,
+		GitlabUser:         userConfig.GitlabUser,
+		GitlabToken:        userConfig.GitlabToken,
+		BitbucketUser:      userConfig.BitbucketUser,
+		BitbucketToken:     userConfig.BitbucketToken,
+		BitbucketServerURL: userConfig.BitbucketHostname,
 	}
 	commentParser := &events.CommentParser{
 		GithubUser:  userConfig.GithubUser,

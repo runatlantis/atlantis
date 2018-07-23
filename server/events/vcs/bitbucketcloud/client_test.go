@@ -68,8 +68,8 @@ func TestClient_GetModifiedFilesPagination(t *testing.T) {
 	defer testServer.Close()
 
 	serverURL = testServer.URL
-	client, err := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", serverURL, "runatlantis.io")
-	Ok(t, err)
+	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
+	client.BaseURL = testServer.URL
 
 	files, err := client.GetModifiedFiles(models.Repo{
 		FullName:          "owner/repo",
@@ -129,8 +129,8 @@ func TestClient_GetModifiedFilesOldNil(t *testing.T) {
 	}))
 	defer testServer.Close()
 
-	client, err := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", testServer.URL, "runatlantis.io")
-	Ok(t, err)
+	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
+	client.BaseURL = testServer.URL
 
 	files, err := client.GetModifiedFiles(models.Repo{
 		FullName:          "owner/repo",

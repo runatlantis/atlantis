@@ -305,19 +305,6 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 	}
 }
 
-// Currently we only support bitbucket cloud so we shouldn't allow setting of
-// the bitbucket hostname flag.
-func TestExecute_BitbucketHostname(t *testing.T) {
-	c := setup(map[string]interface{}{
-		cmd.BitbucketTokenFlag:    "bitbucket-token",
-		cmd.BitbucketUserFlag:     "bitbucket-token",
-		cmd.BitbucketHostnameFlag: "hostname",
-		cmd.RepoWhitelistFlag:     "*",
-	})
-	err := c.Execute()
-	ErrEquals(t, "--bitbucket-hostname is currently not allowed because we only support bitbucket cloud", err)
-}
-
 func TestExecute_Defaults(t *testing.T) {
 	t.Log("Should set the defaults for all unspecified flags.")
 	c := setup(map[string]interface{}{

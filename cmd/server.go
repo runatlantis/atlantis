@@ -22,6 +22,7 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server"
+	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -56,7 +57,7 @@ const (
 	SSLKeyFileFlag        = "ssl-key-file"
 
 	// Flag defaults.
-	DefaultBitbucketHostname = "bitbucket.org"
+	DefaultBitbucketHostname = bitbucketcloud.Hostname
 	DefaultDataDir           = "~/.atlantis"
 	DefaultGHHostname        = "github.com"
 	DefaultGitlabHostname    = "gitlab.com"
@@ -82,7 +83,7 @@ var stringFlags = []stringFlag{
 	},
 	{
 		name:         BitbucketHostnameFlag,
-		description:  "Currently not supported! We only support bitbucket cloud (aka bitbucket.org) at this time.",
+		description:  "Hostname and port of your Bitbucket Server (aka Stash) installation. If using Bitbucket Cloud (bitbucket.org), no need to set.",
 		defaultValue: DefaultBitbucketHostname,
 	},
 	{
@@ -362,10 +363,6 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 
 	if (userConfig.SSLKeyFile == "") != (userConfig.SSLCertFile == "") {
 		return fmt.Errorf("--%s and --%s are both required for ssl", SSLKeyFileFlag, SSLCertFileFlag)
-	}
-
-	if userConfig.BitbucketHostname != DefaultBitbucketHostname {
-		return fmt.Errorf("--%s is currently not allowed because we only support bitbucket cloud", BitbucketHostnameFlag)
 	}
 
 	// The following combinations are valid.
