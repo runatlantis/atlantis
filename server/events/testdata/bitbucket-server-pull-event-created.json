@@ -1,0 +1,84 @@
+{
+  "eventKey": "pr:opened",
+  "date": "2018-07-21T23:19:37+0200",
+  "actor": {
+    "name": "lkysow",
+    "emailAddress": "lkysow@gmail.com",
+    "id": 1,
+    "displayName": "Luke Kysow",
+    "active": true,
+    "slug": "lkysow",
+    "type": "NORMAL"
+  },
+  "pullRequest": {
+    "id": 1,
+    "version": 0,
+    "title": "Null resource",
+    "state": "OPEN",
+    "open": true,
+    "closed": false,
+    "createdDate": 1532207977313,
+    "updatedDate": 1532207977313,
+    "fromRef": {
+      "id": "refs/heads/branch",
+      "displayId": "branch",
+      "latestCommit": "bfb1af1ba9c2a2fa84cd61af67e6e1b60a22e060",
+      "repository": {
+        "slug": "atlantis-example",
+        "id": 1,
+        "name": "atlantis-example",
+        "scmId": "git",
+        "state": "AVAILABLE",
+        "statusMessage": "Available",
+        "forkable": true,
+        "project": {
+          "key": "AT",
+          "id": 1,
+          "name": "atlantis",
+          "public": false,
+          "type": "NORMAL"
+        },
+        "public": false
+      }
+    },
+    "toRef": {
+      "id": "refs/heads/master",
+      "displayId": "master",
+      "latestCommit": "3d1f26bc1c8eeb5ad94e247c92072717b9de6aa0",
+      "repository": {
+        "slug": "atlantis-example",
+        "id": 1,
+        "name": "atlantis-example",
+        "scmId": "git",
+        "state": "AVAILABLE",
+        "statusMessage": "Available",
+        "forkable": true,
+        "project": {
+          "key": "AT",
+          "id": 1,
+          "name": "atlantis",
+          "public": false,
+          "type": "NORMAL"
+        },
+        "public": false
+      }
+    },
+    "locked": false,
+    "author": {
+      "user": {
+        "name": "lkysow",
+        "emailAddress": "lkysow@gmail.com",
+        "id": 1,
+        "displayName": "Luke Kysow",
+        "active": true,
+        "slug": "lkysow",
+        "type": "NORMAL"
+      },
+      "role": "AUTHOR",
+      "approved": false,
+      "status": "UNAPPROVED"
+    },
+    "reviewers": [],
+    "participants": []
+  }
+}
