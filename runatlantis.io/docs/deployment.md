@@ -184,7 +184,7 @@ Atlantis has right now is any plans that haven't been applied and Atlantis locks
 Atlantis loses that data, you just need to run `atlantis plan` again so it's not the end of the world.
 
 Regardless of whether you choose a Deployment or StatefulSet, first create a Secret with the webhook secret and access token:
-```
+```bash
 echo -n "yourtoken" > token
 echo -n "yoursecret" > webhook-secret
 kubectl create secret generic atlantis-vcs --from-file=token --from-file=webhook-secret
@@ -469,7 +469,7 @@ If you'd like to run Atlantis on [AWS Fargate](https://aws.amazon.com/fargate/) 
 
 If you'd like to test out Atlantis before running it on your own repositories you can fork our example repo.
 
-- Fork https://github.com/runatlantis/atlantis-example
+- Fork [https://github.com/runatlantis/atlantis-example](https://github.com/runatlantis/atlantis-example)
 - If you didn't add the Webhook as to your organization add Atlantis as a Webhook to the forked repo (see [Add GitHub Webhook](#add-github-webhook))
 - Now that Atlantis can receive events you should be able to comment on a pull request to trigger Atlantis. Create a pull request
 	- Click **Branches** on your forked repo's homepage
