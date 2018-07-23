@@ -14,7 +14,6 @@
 package vcs
 
 import (
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
@@ -32,9 +31,9 @@ type ClientProxy interface {
 // DefaultClientProxy proxies calls to the correct VCS client depending on which
 // VCS host is required.
 type DefaultClientProxy struct {
-	GithubClient    Client
-	GitlabClient    Client
-	BitbucketClient Client
+	// clients maps from the vcs host type to the client that implements the
+	// api for that host type, ex. github -> github client.
+	clients map[models.VCSHostType]Client
 }
 
 func NewDefaultClientProxy(githubClient Client, gitlabClient Client, bitbucketClient Client) *DefaultClientProxy {
@@ -48,58 +47,26 @@ func NewDefaultClientProxy(githubClient Client, gitlabClient Client, bitbucketCl
 		bitbucketClient = &NotConfiguredVCSClient{}
 	}
 	return &DefaultClientProxy{
-		GitlabClient:    gitlabClient,
-		GithubClient:    githubClient,
-		BitbucketClient: bitbucketClient,
+		clients: map[models.VCSHostType]Client{
+			models.Github:    githubClient,
+			models.Gitlab:    gitlabClient,
+			models.Bitbucket: bitbucketClient,
+		},
 	}
 }
 
-var invalidVCSErr = errors.New("Invalid VCS Host. This is a bug!")
-
 func (d *DefaultClientProxy) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
-	switch repo.VCSHost.Type {
-	case models.Github:
-		return d.GithubClient.GetModifiedFiles(repo, pull)
-	case models.Gitlab:
-		return d.GitlabClient.GetModifiedFiles(repo, pull)
-	case models.Bitbucket:
-		return d.BitbucketClient.GetModifiedFiles(repo, pull)
-	}
-	return nil, invalidVCSErr
+	return d.clients[repo.VCSHost.Type].GetModifiedFiles(repo, pull)
 }
 
 func (d *DefaultClientProxy) CreateComment(repo models.Repo, pullNum int, comment string) error {
-	switch repo.VCSHost.Type {
-	case models.Github:
-		return d.GithubClient.CreateComment(repo, pullNum, comment)
-	case models.Gitlab:
-		return d.GitlabClient.CreateComment(repo, pullNum, comment)
-	case models.Bitbucket:
-		return d.BitbucketClient.CreateComment(repo, pullNum, comment)
-	}
-	return invalidVCSErr
+	return d.clients[repo.VCSHost.Type].CreateComment(repo, pullNum, comment)
 }
 
 func (d *DefaultClientProxy) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
-	switch repo.VCSHost.Type {
-	case models.Github:
-		return d.GithubClient.PullIsApproved(repo, pull)
-	case models.Gitlab:
-		return d.GitlabClient.PullIsApproved(repo, pull)
-	case models.Bitbucket:
-		return d.BitbucketClient.PullIsApproved(repo, pull)
-	}
-	return false, invalidVCSErr
+	return d.clients[repo.VCSHost.Type].PullIsApproved(repo, pull)
 }
 
 func (d *DefaultClientProxy) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, description string) error {
-	switch repo.VCSHost.Type {
-	case models.Github:
-		return d.GithubClient.UpdateStatus(repo, pull, state, description)
-	case models.Gitlab:
-		return d.GitlabClient.UpdateStatus(repo, pull, state, description)
-	case models.Bitbucket:
-		return d.BitbucketClient.UpdateStatus(repo, pull, state, description)
-	}
-	return invalidVCSErr
+	return d.clients[repo.VCSHost.Type].UpdateStatus(repo, pull, state, description)
 }
