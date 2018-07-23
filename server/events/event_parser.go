@@ -24,7 +24,7 @@ import (
 	"github.com/lkysow/go-gitlab"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/vcs/bitbucket"
+	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"gopkg.in/go-playground/validator.v9"
 )
 
@@ -123,7 +123,7 @@ type EventParsing interface {
 	ParseGitlabMergeRequest(mr *gitlab.MergeRequest, baseRepo models.Repo) models.PullRequest
 	ParseBitbucketCloudPullEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, err error)
 	ParseBitbucketCloudCommentEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, comment string, err error)
-	GetBitbucketEventType(eventTypeHeader string) models.PullRequestEventType
+	GetBitbucketCloudEventType(eventTypeHeader string) models.PullRequestEventType
 }
 
 type EventParser struct {
@@ -135,9 +135,9 @@ type EventParser struct {
 	BitbucketToken string
 }
 
-// GetBitbucketEventType translates the bitbucket header name into a pull
+// GetBitbucketCloudEventType translates the bitbucket header name into a pull
 // request event type.
-func (e *EventParser) GetBitbucketEventType(eventTypeHeader string) models.PullRequestEventType {
+func (e *EventParser) GetBitbucketCloudEventType(eventTypeHeader string) models.PullRequestEventType {
 	switch eventTypeHeader {
 	case "pullrequest:created":
 		return models.OpenedPullEvent
@@ -150,7 +150,7 @@ func (e *EventParser) GetBitbucketEventType(eventTypeHeader string) models.PullR
 }
 
 func (e *EventParser) ParseBitbucketCloudCommentEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, comment string, err error) {
-	var event bitbucket.CommentEvent
+	var event bitbucketcloud.CommentEvent
 	if err = json.Unmarshal(body, &event); err != nil {
 		err = errors.Wrap(err, "parsing json")
 		return
@@ -163,7 +163,7 @@ func (e *EventParser) ParseBitbucketCloudCommentEvent(body []byte) (pull models.
 	return
 }
 
-func (e *EventParser) parseCommonBitbucketEventData(event bitbucket.CommonEventData) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
+func (e *EventParser) parseCommonBitbucketEventData(event bitbucketcloud.CommonEventData) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
 	var prState models.PullRequestState
 	switch *event.PullRequest.State {
 	case "OPEN":
@@ -180,7 +180,7 @@ func (e *EventParser) parseCommonBitbucketEventData(event bitbucket.CommonEventD
 	}
 
 	headRepo, err = models.NewRepo(
-		models.Bitbucket,
+		models.BitbucketCloud,
 		*event.PullRequest.Source.Repository.FullName,
 		*event.PullRequest.Source.Repository.Links.HTML.HREF,
 		e.BitbucketUser,
@@ -189,7 +189,7 @@ func (e *EventParser) parseCommonBitbucketEventData(event bitbucket.CommonEventD
 		return
 	}
 	baseRepo, err = models.NewRepo(
-		models.Bitbucket,
+		models.BitbucketCloud,
 		*event.Repository.FullName,
 		*event.Repository.Links.HTML.HREF,
 		e.BitbucketUser,
@@ -214,7 +214,7 @@ func (e *EventParser) parseCommonBitbucketEventData(event bitbucket.CommonEventD
 }
 
 func (e *EventParser) ParseBitbucketCloudPullEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
-	var event bitbucket.PullRequestEvent
+	var event bitbucketcloud.PullRequestEvent
 	if err = json.Unmarshal(body, &event); err != nil {
 		err = errors.Wrap(err, "parsing json")
 		return

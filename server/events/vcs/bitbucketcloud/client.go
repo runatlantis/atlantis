@@ -1,4 +1,4 @@
-package bitbucket
+package bitbucketcloud
 
 import (
 	"bytes"
@@ -29,7 +29,7 @@ type Client struct {
 	AtlantisURL string
 }
 
-// NewClient builds a bitbucket client. Returns an error if the baseURL is
+// NewClient builds a bitbucket cloud client. Returns an error if the baseURL is
 // malformed. httpClient is the client to use to make the requests, username
 // and password are used as basic auth in the requests, baseURL is the API's
 // baseURL, ex. https://api.bitbucket.org. Don't include the API version, ex.

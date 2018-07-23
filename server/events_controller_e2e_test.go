@@ -306,7 +306,7 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClientProxy,
 		GitlabRequestParserValidator: &server.DefaultGitlabRequestParserValidator{},
 		GitlabWebHookSecret:          nil,
 		RepoWhitelistChecker:         repoWhitelistChecker,
-		SupportedVCSHosts:            []models.VCSHostType{models.Gitlab, models.Github, models.Bitbucket},
+		SupportedVCSHosts:            []models.VCSHostType{models.Gitlab, models.Github, models.BitbucketCloud},
 		VCSClient:                    e2eVCSClient,
 	}
 	return ctrl, e2eVCSClient, e2eGithubGetter, workingDir

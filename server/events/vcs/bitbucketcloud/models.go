@@ -1,4 +1,4 @@
-package bitbucket
+package bitbucketcloud
 
 type CommentEvent struct {
 	CommonEventData

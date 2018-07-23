@@ -132,7 +132,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		pull, headRepo, err = c.getGithubData(baseRepo, pullNum)
 	case models.Gitlab:
 		pull, err = c.getGitlabData(baseRepo, pullNum)
-	case models.Bitbucket:
+	case models.BitbucketCloud:
 		if maybePull == nil {
 			err = errors.New("pull request should not be nil, this is a bug!")
 		}

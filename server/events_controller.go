@@ -28,8 +28,11 @@ import (
 
 const githubHeader = "X-Github-Event"
 const gitlabHeader = "X-Gitlab-Event"
+
+// bitbucketEventTypeHeader is the same in both cloud and server.
 const bitbucketEventTypeHeader = "X-Event-Key"
-const bitbucketRequestIDHeader = "X-Request-UUID"
+const bitbucketCloudRequestIDHeader = "X-Request-UUID"
+const bitbucketServerRequestIDHeader = "X-Request-ID"
 
 // EventsController handles all webhook requests which signify 'events' in the
 // VCS host, ex. GitHub.
@@ -76,7 +79,7 @@ func (e *EventsController) Post(w http.ResponseWriter, r *http.Request) {
 		e.handleGitlabPost(w, r)
 		return
 	} else if r.Header.Get(bitbucketEventTypeHeader) != "" {
-		if !e.supportsHost(models.Bitbucket) {
+		if !e.supportsHost(models.BitbucketCloud) {
 			e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support Bitbucket")
 			return
 		}
@@ -112,11 +115,11 @@ func (e *EventsController) handleGithubPost(w http.ResponseWriter, r *http.Reque
 
 func (e *EventsController) handleBitbucketPost(w http.ResponseWriter, r *http.Request) {
 	eventType := r.Header.Get(bitbucketEventTypeHeader)
-	reqID := r.Header.Get(bitbucketRequestIDHeader)
+	reqID := r.Header.Get(bitbucketCloudRequestIDHeader)
 	defer r.Body.Close() // nolint: errcheck
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		e.respond(w, logging.Error, http.StatusBadRequest, "Unable to read body: %s %s=%s", err, bitbucketRequestIDHeader, reqID)
+		e.respond(w, logging.Error, http.StatusBadRequest, "Unable to read body: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
 		return
 	}
 	switch eventType {
@@ -129,7 +132,7 @@ func (e *EventsController) handleBitbucketPost(w http.ResponseWriter, r *http.Re
 		e.HandleBitbucketCommentEvent(w, body, reqID)
 		return
 	default:
-		e.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event type %s %s=%s", eventType, bitbucketRequestIDHeader, reqID)
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event type %s %s=%s", eventType, bitbucketCloudRequestIDHeader, reqID)
 	}
 }
 
@@ -156,19 +159,19 @@ func (e *EventsController) HandleGithubCommentEvent(w http.ResponseWriter, event
 func (e *EventsController) HandleBitbucketCommentEvent(w http.ResponseWriter, body []byte, reqID string) {
 	pull, baseRepo, headRepo, user, comment, err := e.Parser.ParseBitbucketCloudCommentEvent(body)
 	if err != nil {
-		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s=%s", err, bitbucketRequestIDHeader, reqID)
+		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
 		return
 	}
-	e.handleCommentEvent(w, baseRepo, &headRepo, &pull, user, pull.Num, comment, models.Bitbucket)
+	e.handleCommentEvent(w, baseRepo, &headRepo, &pull, user, pull.Num, comment, models.BitbucketCloud)
 }
 
 func (e *EventsController) HandleBitbucketPullRequestEvent(w http.ResponseWriter, eventType string, body []byte, reqID string) {
 	pull, baseRepo, headRepo, user, err := e.Parser.ParseBitbucketCloudPullEvent(body)
 	if err != nil {
-		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s=%s", err, bitbucketRequestIDHeader, reqID)
+		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
 		return
 	}
-	pullEventType := e.Parser.GetBitbucketEventType(eventType)
+	pullEventType := e.Parser.GetBitbucketCloudEventType(eventType)
 	e.Logger.Info("identified event as type %q", pullEventType.String())
 	e.handlePullRequestEvent(w, baseRepo, headRepo, pull, user, pullEventType)
 }

@@ -36,21 +36,25 @@ type DefaultClientProxy struct {
 	clients map[models.VCSHostType]Client
 }
 
-func NewDefaultClientProxy(githubClient Client, gitlabClient Client, bitbucketClient Client) *DefaultClientProxy {
+func NewDefaultClientProxy(githubClient Client, gitlabClient Client, bitbucketCloudClient Client, bitbucketServerClient Client) *DefaultClientProxy {
 	if githubClient == nil {
 		githubClient = &NotConfiguredVCSClient{}
 	}
 	if gitlabClient == nil {
 		gitlabClient = &NotConfiguredVCSClient{}
 	}
-	if bitbucketClient == nil {
-		bitbucketClient = &NotConfiguredVCSClient{}
+	if bitbucketCloudClient == nil {
+		bitbucketCloudClient = &NotConfiguredVCSClient{}
+	}
+	if bitbucketServerClient == nil {
+		bitbucketServerClient = &NotConfiguredVCSClient{}
 	}
 	return &DefaultClientProxy{
 		clients: map[models.VCSHostType]Client{
-			models.Github:    githubClient,
-			models.Gitlab:    gitlabClient,
-			models.Bitbucket: bitbucketClient,
+			models.Github:          githubClient,
+			models.Gitlab:          gitlabClient,
+			models.BitbucketCloud:  bitbucketCloudClient,
+			models.BitbucketServer: bitbucketServerClient,
 		},
 	}
 }

@@ -40,7 +40,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	"github.com/runatlantis/atlantis/server/events/vcs"
-	"github.com/runatlantis/atlantis/server/events/vcs/bitbucket"
+	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -137,7 +137,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var supportedVCSHosts []models.VCSHostType
 	var githubClient *vcs.GithubClient
 	var gitlabClient *vcs.GitlabClient
-	var bitbucketClient *bitbucket.Client
+	var bitbucketClient *bitbucketcloud.Client
 	if userConfig.GithubUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		var err error
@@ -168,9 +168,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 	}
 	if userConfig.BitbucketUser != "" {
-		supportedVCSHosts = append(supportedVCSHosts, models.Bitbucket)
+		supportedVCSHosts = append(supportedVCSHosts, models.BitbucketCloud)
 		var err error
-		bitbucketClient, err = bitbucket.NewClient(
+		bitbucketClient, err = bitbucketcloud.NewClient(
 			http.DefaultClient,
 			userConfig.BitbucketUser,
 			userConfig.BitbucketToken,
@@ -196,7 +196,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing webhooks")
 	}
-	vcsClient := vcs.NewDefaultClientProxy(githubClient, gitlabClient, bitbucketClient)
+	vcsClient := vcs.NewDefaultClientProxy(githubClient, gitlabClient, bitbucketClient, bitbucketClient)
 	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient}
 	terraformClient, err := terraform.NewClient(userConfig.DataDir)
 	// The flag.Lookup call is to detect if we're running in a unit test. If we

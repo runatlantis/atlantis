@@ -556,7 +556,7 @@ func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {
 		SanitizedCloneURL: "https://bitbucket.org/lkysow/atlantis-example.git",
 		VCSHost: models.VCSHost{
 			Hostname: "bitbucket.org",
-			Type:     models.Bitbucket,
+			Type:     models.BitbucketCloud,
 		},
 	}
 	Equals(t, expBaseRepo, baseRepo)
@@ -577,7 +577,7 @@ func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {
 		SanitizedCloneURL: "https://bitbucket.org/lkysow-fork/atlantis-example.git",
 		VCSHost: models.VCSHost{
 			Hostname: "bitbucket.org",
-			Type:     models.Bitbucket,
+			Type:     models.BitbucketCloud,
 		},
 	}, headRepo)
 	Equals(t, models.User{
@@ -641,7 +641,7 @@ func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 		SanitizedCloneURL: "https://bitbucket.org/lkysow/atlantis-example.git",
 		VCSHost: models.VCSHost{
 			Hostname: "bitbucket.org",
-			Type:     models.Bitbucket,
+			Type:     models.BitbucketCloud,
 		},
 	}
 	Equals(t, expBaseRepo, baseRepo)
@@ -662,7 +662,7 @@ func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 		SanitizedCloneURL: "https://bitbucket.org/lkysow-fork/atlantis-example.git",
 		VCSHost: models.VCSHost{
 			Hostname: "bitbucket.org",
-			Type:     models.Bitbucket,
+			Type:     models.BitbucketCloud,
 		},
 	}, headRepo)
 	Equals(t, models.User{
@@ -670,7 +670,7 @@ func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 	}, user)
 }
 
-func TestGetBitbucketEventType(t *testing.T) {
+func TestGetBitbucketCloudEventType(t *testing.T) {
 	cases := []struct {
 		header string
 		exp    models.PullRequestEventType
@@ -698,7 +698,7 @@ func TestGetBitbucketEventType(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.header, func(t *testing.T) {
-			act := parser.GetBitbucketEventType(c.header)
+			act := parser.GetBitbucketCloudEventType(c.header)
 			Equals(t, c.exp, act)
 		})
 	}

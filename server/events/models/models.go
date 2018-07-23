@@ -237,7 +237,8 @@ type VCSHostType int
 const (
 	Github VCSHostType = iota
 	Gitlab
-	Bitbucket
+	BitbucketCloud
+	BitbucketServer
 )
 
 func (h VCSHostType) String() string {
@@ -246,8 +247,10 @@ func (h VCSHostType) String() string {
 		return "Github"
 	case Gitlab:
 		return "Gitlab"
-	case Bitbucket:
-		return "Bitbucket"
+	case BitbucketCloud:
+		return "BitbucketCloud"
+	case BitbucketServer:
+		return "BitbucketServer"
 	}
 	return "<missing String() implementation>"
 }
