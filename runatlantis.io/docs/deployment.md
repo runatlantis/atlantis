@@ -102,39 +102,67 @@ set commit statuses.
 - copy the access token
 
 ## Start Atlantis
-Now you're ready to start Atlantis!
+Now you're ready to start Atlantis! The exact command depends on your Git host:
 
-If you're using GitHub, run:
-```
-atlantis server --atlantis-url $URL --gh-user $USERNAME --gh-token $TOKEN --gh-webhook-secret $SECRET
-```
-
-If you're using GitHub Enterprise, run:
-```
-HOSTNAME=YOUR_GITHUB_ENTERPRISE_HOSTNAME # ex. github.runatlantis.io, without the scheme
-atlantis server --atlantis-url $URL --gh-user $USERNAME --gh-token $TOKEN --gh-webhook-secret $SECRET --gh-hostname $HOSTNAME
-```
-
-If you're using GitLab, run:
-```
-atlantis server --atlantis-url $URL --gitlab-user $USERNAME --gitlab-token $TOKEN --gitlab-webhook-secret $SECRET
+### GitHub
+```bash
+atlantis server \
+--atlantis-url="$URL" \
+--gh-user="$USERNAME" \
+--gh-token="$TOKEN" \
+--gh-webhook-secret="$SECRET" \
+--repo-whitelist="$REPO_WHITELIST"
 ```
 
-If you're using GitLab Enterprise, run:
-```
-HOSTNAME=YOUR_GITLAB_ENTERPRISE_HOSTNAME # ex. gitlab.runatlantis.io, without the scheme
-atlantis server --atlantis-url $URL --gitlab-user $USERNAME --gitlab-token $TOKEN --gitlab-webhook-secret $SECRET --gitlab-hostname $HOSTNAME
+### GitHub Enterprise
+```bash
+HOSTNAME=YOUR_GITHUB_ENTERPRISE_HOSTNAME # ex. github.runatlantis.io
+atlantis server \
+--atlantis-url="$URL" \
+--gh-user="$USERNAME" \
+--gh-token="$TOKEN" \
+--gh-webhook-secret="$SECRET" \
+--gh-hostname="$HOSTNAME" \
+--repo-whitelist="$REPO_WHITELIST"
 ```
 
-If you're using Bitbucket Cloud, run:
-```
-atlantis server --atlantis-url $URL --bitbucket-user $USERNAME --bitbucket-token $TOKEN
+### GitLab
+```bash
+atlantis server \
+--atlantis-url="$URL" \
+--gitlab-user="$USERNAME" \
+--gitlab-token="$TOKEN" \
+--gitlab-webhook-secret="$SECRET" \
+--repo-whitelist="$REPO_WHITELIST"
 ```
 
+### GitLab Enterprise
+```bash
+HOSTNAME=YOUR_GITLAB_ENTERPRISE_HOSTNAME # ex. gitlab.runatlantis.io
+atlantis server \
+--atlantis-url="$URL" \
+--gitlab-user="$USERNAME" \
+--gitlab-token="$TOKEN" \
+--gitlab-webhook-secret="$SECRET" \
+--gitlab-hostname="$HOSTNAME" \
+--repo-whitelist="$REPO_WHITELIST"
+```
+
+### Bitbucket Cloud (bitbucket.org)
+```bash
+atlantis server \
+--atlantis-url="$URL" \
+--bitbucket-user="$USERNAME" \
+--bitbucket-token="$TOKEN" \
+--repo-whitelist="$REPO_WHITELIST"
+```
+
+Where
 - `$URL` is the URL that Atlantis can be reached at
 - `$USERNAME` is the GitHub/GitLab/Bitbucket username you generated the token for
 - `$TOKEN` is the access token you created. If you don't want this to be passed in as an argument for security reasons you can specify it in a config file (see [Configuration](#configuration)) or as an environment variable: `ATLANTIS_GH_TOKEN` or `ATLANTIS_GITLAB_TOKEN` or `ATLANTIS_BITBUCKET_TOKEN`
 - `$SECRET` is the random key you used for the webhook secret. If you don't want this to be passed in as an argument for security reasons you can specify it in a config file (see [Configuration](#configuration)) or as an environment variable: `ATLANTIS_GH_WEBHOOK_SECRET` or `ATLANTIS_GITLAB_WEBHOOK_SECRET`
+- `$REPO_WHITELIST` is which repos Atlantis can run on, ex. `github.com/runatlantis/*` or `github.enterprise.corp.com/*`. See [www.runatlantis.io/docs/security.html#repo-whitelist](/docs/security.html#repo-whitelist) for more details.
 
 Atlantis is now running!
 **We recommend running it under something like Systemd or Supervisord.**

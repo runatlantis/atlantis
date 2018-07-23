@@ -36,19 +36,20 @@ Start `ngrok` on port `4141` and take note of the hostname it gives you:
 In a new tab (where you'll soon start Atlantis) create an environment variable with
 ngrok's hostname:
 ```bash
-URL=https://{YOUR_HOSTNAME}.ngrok.io
+URL="https://{YOUR_HOSTNAME}.ngrok.io"
 ```
 
 ## Create a Webhook Secret
 GitHub and GitLab use webhook secrets so clients can verify that the webhooks came
 from them.
-::: tip
-Bitbucket Cloud (bitbucket.org) doesn't use webhook secrets so if you're using Bitbucket you can skip this.
+::: warning
+Bitbucket Cloud (bitbucket.org) doesn't use webhook secrets so if you're using Bitbucket you can skip this
+however you should whitelist Bitbucket IPs as a precaution.
 :::
-Create a random string of any length (you can use [https://www.random.org/strings/](https://www.random.org/strings/))
+Create a random string of any length (you can use [http://www.unit-conversion.info/texttools/random-string-generator/](http://www.unit-conversion.info/texttools/random-string-generator/))
 and set an environment variable:
 ```
-SECRET={YOUR_RANDOM_STRING}
+SECRET="{YOUR_RANDOM_STRING}"
 ```
 
 ## Add Webhook
@@ -111,7 +112,7 @@ set commit statuses.
 - create a token with **repo** scope
 - set the token as an environment variable
 ```
-TOKEN={YOUR_TOKEN}
+TOKEN="{YOUR_TOKEN}"
 ```
 
 ### GitLab
@@ -119,7 +120,7 @@ TOKEN={YOUR_TOKEN}
 - create a token with **api** scope
 - set the token as an environment variable
 ```
-TOKEN={YOUR_TOKEN}
+TOKEN="{YOUR_TOKEN}"
 ```
 
 ### Bitbucket Cloud (bitbucket.org)
@@ -128,43 +129,71 @@ TOKEN={YOUR_TOKEN}
 - Select **Pull requests**: **Read** and **Write** so that Atlantis can read your pull requests and write comments to them
 - set the token as an environment variable
 ```
-TOKEN={YOUR_TOKEN}
+TOKEN="{YOUR_TOKEN}"
 ```
 
 
 ## Start Atlantis
-You're almost ready to start Atlantis, just set one more variable:
+You're almost ready to start Atlantis, just set two more variables:
 
-```
-USERNAME={the username of your GitHub, GitLab or Bitbucket user}
+```bash
+USERNAME="{the username of your GitHub, GitLab or Bitbucket user}"
+REPO_WHITELIST="$YOUR_GIT_HOST/$YOUR_USERNAME/$YOUR_REPO"
+# ex. REPO_WHITELIST="github.com/runatlantis/atlantis"
 ```
 Now you can start Atlantis. The exact command differs depending on your Git Host:
 
 ### GitHub
-```
-atlantis server --atlantis-url $URL --gh-user $USERNAME --gh-token $TOKEN --gh-webhook-secret $SECRET
+```bash
+atlantis server \
+--atlantis-url="$URL" \
+--gh-user="$USERNAME" \
+--gh-token="$TOKEN" \
+--gh-webhook-secret="$SECRET" \
+--repo-whitelist="$REPO_WHITELIST"
 ```
 
 ### GitHub Enterprise
-```
-HOSTNAME=YOUR_GITHUB_ENTERPRISE_HOSTNAME # ex. github.runatlantis.io, without the scheme
-atlantis server --atlantis-url $URL --gh-user $USERNAME --gh-token $TOKEN --gh-webhook-secret $SECRET --gh-hostname $HOSTNAME
+```bash
+HOSTNAME=YOUR_GITHUB_ENTERPRISE_HOSTNAME # ex. github.runatlantis.io
+atlantis server \
+--atlantis-url="$URL" \
+--gh-user="$USERNAME" \
+--gh-token="$TOKEN" \
+--gh-webhook-secret="$SECRET" \
+--gh-hostname="$HOSTNAME" \
+--repo-whitelist="$REPO_WHITELIST"
 ```
 
 ### GitLab
-```
-atlantis server --atlantis-url $URL --gitlab-user $USERNAME --gitlab-token $TOKEN --gitlab-webhook-secret $SECRET
+```bash
+atlantis server \
+--atlantis-url="$URL" \
+--gitlab-user="$USERNAME" \
+--gitlab-token="$TOKEN" \
+--gitlab-webhook-secret="$SECRET" \
+--repo-whitelist="$REPO_WHITELIST"
 ```
 
 ### GitLab Enterprise
-```
-HOSTNAME=YOUR_GITLAB_ENTERPRISE_HOSTNAME # ex. gitlab.runatlantis.io, without the scheme
-atlantis server --atlantis-url $URL --gitlab-user $USERNAME --gitlab-token $TOKEN --gitlab-webhook-secret $SECRET --gitlab-hostname $HOSTNAME
+```bash
+HOSTNAME=YOUR_GITLAB_ENTERPRISE_HOSTNAME # ex. gitlab.runatlantis.io
+atlantis server \
+--atlantis-url="$URL" \
+--gitlab-user="$USERNAME" \
+--gitlab-token="$TOKEN" \
+--gitlab-webhook-secret="$SECRET" \
+--gitlab-hostname="$HOSTNAME" \
+--repo-whitelist="$REPO_WHITELIST"
 ```
 
 ### Bitbucket Cloud (bitbucket.org)
-```
-atlantis server --atlantis-url $URL --bitbucket-user $USERNAME --bitbucket-token $TOKEN
+```bash
+atlantis server \
+--atlantis-url="$URL" \
+--bitbucket-user="$USERNAME" \
+--bitbucket-token="$TOKEN" \
+--repo-whitelist="$REPO_WHITELIST"
 ```
 
 ## Create a pull request
@@ -201,7 +230,8 @@ If you'd like to `apply`, type a comment: `atlantis apply`. You can use the `-d`
 Atlantis at a specific plan. Otherwise it tries to apply the plan for the root directory.
 
 ## Next Steps
-* You're done! Hopefully Atlantis is working with your repo and you're ready to move on to a [production-ready deployment](../docs/deployment.html).
+* If things are working as expected you can `Ctrl-C` the `atlantis server` command and the `ngrok` command.
+* Hopefully Atlantis is working with your repo and you're ready to move on to a [production-ready deployment](../docs/deployment.html).
 * If it's not working as expected, you may need to customize how Atlantis runs with an `atlantis.yaml` file.
 See [atlantis.yaml Reference](../docs/atlantis-yaml-reference.html).
 * Check out our full documentation for more details: [Documentation](../docs/).
