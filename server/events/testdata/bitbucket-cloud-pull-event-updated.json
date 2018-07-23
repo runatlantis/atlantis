@@ -1,0 +1,216 @@
+{
+  "pullrequest": {
+    "type": "pullrequest",
+    "description": "",
+    "links": {
+      "decline": {
+        "href": "https://api.bitbucket.org/2.0/repositories/lkysow/atlantis-example/pullrequests/1/decline"
+      },
+      "commits": {
+        "href": "https://api.bitbucket.org/2.0/repositories/lkysow/atlantis-example/pullrequests/1/commits"
+      },
+      "self": {
+        "href": "https://api.bitbucket.org/2.0/repositories/lkysow/atlantis-example/pullrequests/1"
+      },
+      "comments": {
+        "href": "https://api.bitbucket.org/2.0/repositories/lkysow/atlantis-example/pullrequests/1/comments"
+      },
+      "merge": {
+        "href": "https://api.bitbucket.org/2.0/repositories/lkysow/atlantis-example/pullrequests/1/merge"
+      },
+      "html": {
+        "href": "https://bitbucket.org/lkysow/atlantis-example/pull-requests/1"
+      },
+      "activity": {
+        "href": "https://api.bitbucket.org/2.0/repositories/lkysow/atlantis-example/pullrequests/1/activity"
+      },
+      "diff": {
+        "href": "https://api.bitbucket.org/2.0/repositories/lkysow/atlantis-example/pullrequests/1/diff"
+      },
+      "approve": {
+        "href": "https://api.bitbucket.org/2.0/repositories/lkysow/atlantis-example/pullrequests/1/approve"
+      },
+      "statuses": {
+        "href": "https://api.bitbucket.org/2.0/repositories/lkysow/atlantis-example/pullrequests/1/statuses"
+      }
+    },
+    "title": "Initial commit",
+    "close_source_branch": true,
+    "reviewers": [],
+    "id": 1,
+    "destination": {
+      "commit": {
+        "hash": "3ee903d4cfa0",
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/lkysow/atlantis-example/commit/3ee903d4cfa0"
+          }
+        }
+      },
+      "branch": {
+        "name": "master"
+      },
+      "repository": {
+        "full_name": "lkysow/atlantis-example",
+        "type": "repository",
+        "name": "atlantis-example",
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/lkysow/atlantis-example"
+          },
+          "html": {
+            "href": "https://bitbucket.org/lkysow/atlantis-example"
+          },
+          "avatar": {
+            "href": "https://bytebucket.org/ravatar/%7B94189367-116b-436a-9f77-2314b97a6067%7D?ts=default"
+          }
+        },
+        "uuid": "{94189367-116b-436a-9f77-2314b97a6067}"
+      }
+    },
+    "comment_count": 19,
+    "summary": {
+      "raw": "",
+      "markup": "markdown",
+      "html": "",
+      "type": "rendered"
+    },
+    "source": {
+      "commit": {
+        "hash": "315f27602bd8",
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/lkysow/atlantis-example/commit/315f27602bd8"
+          }
+        }
+      },
+      "branch": {
+        "name": "example"
+      },
+      "repository": {
+        "full_name": "lkysow/atlantis-example",
+        "type": "repository",
+        "name": "atlantis-example",
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/lkysow/atlantis-example"
+          },
+          "html": {
+            "href": "https://bitbucket.org/lkysow/atlantis-example"
+          },
+          "avatar": {
+            "href": "https://bytebucket.org/ravatar/%7B94189367-116b-436a-9f77-2314b97a6067%7D?ts=default"
+          }
+        },
+        "uuid": "{94189367-116b-436a-9f77-2314b97a6067}"
+      }
+    },
+    "state": "OPEN",
+    "author": {
+      "username": "lkysow",
+      "display_name": "Luke",
+      "account_id": "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
+      "links": {
+        "self": {
+          "href": "https://api.bitbucket.org/2.0/users/lkysow"
+        },
+        "html": {
+          "href": "https://bitbucket.org/lkysow/"
+        },
+        "avatar": {
+          "href": "https://bitbucket.org/account/lkysow/avatar/"
+        }
+      },
+      "type": "user",
+      "uuid": "{bf34a99b-8a11-452c-8fbc-bdffc340e584}"
+    },
+    "created_on": "2018-06-02T19:06:43.899883+00:00",
+    "participants": [
+      {
+        "type": "participant",
+        "user": {
+          "username": "lkysow",
+          "display_name": "Luke",
+          "account_id": "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
+          "links": {
+            "self": {
+              "href": "https://api.bitbucket.org/2.0/users/lkysow"
+            },
+            "html": {
+              "href": "https://bitbucket.org/lkysow/"
+            },
+            "avatar": {
+              "href": "https://bitbucket.org/account/lkysow/avatar/"
+            }
+          },
+          "type": "user",
+          "uuid": "{bf34a99b-8a11-452c-8fbc-bdffc340e584}"
+        },
+        "role": "PARTICIPANT",
+        "approved": true,
+        "participated_on": "2018-07-18T15:59:10.105489+00:00"
+      }
+    ],
+    "reason": "",
+    "updated_on": "2018-07-18T18:38:19.271207+00:00",
+    "merge_commit": null,
+    "closed_by": null,
+    "task_count": 0
+  },
+  "actor": {
+    "username": "lkysow",
+    "display_name": "Luke",
+    "account_id": "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
+    "links": {
+      "self": {
+        "href": "https://api.bitbucket.org/2.0/users/lkysow"
+      },
+      "html": {
+        "href": "https://bitbucket.org/lkysow/"
+      },
+      "avatar": {
+        "href": "https://bitbucket.org/account/lkysow/avatar/"
+      }
+    },
+    "type": "user",
+    "uuid": "{bf34a99b-8a11-452c-8fbc-bdffc340e584}"
+  },
+  "repository": {
+    "scm": "git",
+    "website": "",
+    "name": "atlantis-example",
+    "links": {
+      "self": {
+        "href": "https://api.bitbucket.org/2.0/repositories/lkysow/atlantis-example"
+      },
+      "html": {
+        "href": "https://bitbucket.org/lkysow/atlantis-example"
+      },
+      "avatar": {
+        "href": "https://bytebucket.org/ravatar/%7B94189367-116b-436a-9f77-2314b97a6067%7D?ts=default"
+      }
+    },
+    "full_name": "lkysow/atlantis-example",
+    "owner": {
+      "username": "lkysow",
+      "display_name": "Luke",
+      "account_id": "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
+      "links": {
+        "self": {
+          "href": "https://api.bitbucket.org/2.0/users/lkysow"
+        },
+        "html": {
+          "href": "https://bitbucket.org/lkysow/"
+        },
+        "avatar": {
+          "href": "https://bitbucket.org/account/lkysow/avatar/"
+        }
+      },
+      "type": "user",
+      "uuid": "{bf34a99b-8a11-452c-8fbc-bdffc340e584}"
+    },
+    "type": "repository",
+    "is_private": false,
+    "uuid": "{94189367-116b-436a-9f77-2314b97a6067}"
+  }
+}

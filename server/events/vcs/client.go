@@ -24,5 +24,5 @@ type Client interface {
 	GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error)
 	CreateComment(repo models.Repo, pullNum int, comment string) error
 	PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error)
-	UpdateStatus(repo models.Repo, pull models.PullRequest, state CommitStatus, description string) error
+	UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, description string) error
 }

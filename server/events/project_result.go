@@ -13,7 +13,9 @@
 //
 package events
 
-import "github.com/runatlantis/atlantis/server/events/vcs"
+import (
+	"github.com/runatlantis/atlantis/server/events/models"
+)
 
 // ProjectResult is the result of executing a plan/apply for a project.
 type ProjectResult struct {
@@ -30,12 +32,12 @@ type ProjectCommandResult struct {
 }
 
 // Status returns the vcs commit status of this project result.
-func (p ProjectResult) Status() vcs.CommitStatus {
+func (p ProjectResult) Status() models.CommitStatus {
 	if p.Error != nil {
-		return vcs.Failed
+		return models.FailedCommitStatus
 	}
 	if p.Failure != "" {
-		return vcs.Failed
+		return models.FailedCommitStatus
 	}
-	return vcs.Success
+	return models.SuccessCommitStatus
 }

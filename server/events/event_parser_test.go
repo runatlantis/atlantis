@@ -15,6 +15,10 @@ package events_test
 
 import (
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/google/go-github/github"
@@ -27,10 +31,12 @@ import (
 )
 
 var parser = events.EventParser{
-	GithubUser:  "github-user",
-	GithubToken: "github-token",
-	GitlabUser:  "gitlab-user",
-	GitlabToken: "gitlab-token",
+	GithubUser:     "github-user",
+	GithubToken:    "github-token",
+	GitlabUser:     "gitlab-user",
+	GitlabToken:    "gitlab-token",
+	BitbucketUser:  "bitbucket-user",
+	BitbucketToken: "bitbucket-token",
 }
 
 func TestParseGithubRepo(t *testing.T) {
@@ -103,25 +109,25 @@ func TestParseGithubIssueCommentEvent(t *testing.T) {
 }
 
 func TestParseGithubPullEvent(t *testing.T) {
-	_, _, _, _, err := parser.ParseGithubPullEvent(&github.PullRequestEvent{})
+	_, _, _, _, _, err := parser.ParseGithubPullEvent(&github.PullRequestEvent{})
 	ErrEquals(t, "pull_request is null", err)
 
 	testEvent := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
 	testEvent.PullRequest.HTMLURL = nil
-	_, _, _, _, err = parser.ParseGithubPullEvent(&testEvent)
+	_, _, _, _, _, err = parser.ParseGithubPullEvent(&testEvent)
 	ErrEquals(t, "html_url is null", err)
 
 	testEvent = deepcopy.Copy(PullEvent).(github.PullRequestEvent)
 	testEvent.Sender = nil
-	_, _, _, _, err = parser.ParseGithubPullEvent(&testEvent)
+	_, _, _, _, _, err = parser.ParseGithubPullEvent(&testEvent)
 	ErrEquals(t, "sender is null", err)
 
 	testEvent = deepcopy.Copy(PullEvent).(github.PullRequestEvent)
 	testEvent.Sender.Login = nil
-	_, _, _, _, err = parser.ParseGithubPullEvent(&testEvent)
+	_, _, _, _, _, err = parser.ParseGithubPullEvent(&testEvent)
 	ErrEquals(t, "sender.login is null", err)
 
-	actPull, actBaseRepo, actHeadRepo, actUser, err := parser.ParseGithubPullEvent(&PullEvent)
+	actPull, evType, actBaseRepo, actHeadRepo, actUser, err := parser.ParseGithubPullEvent(&PullEvent)
 	Ok(t, err)
 	expBaseRepo := models.Repo{
 		Owner:             "owner",
@@ -142,10 +148,69 @@ func TestParseGithubPullEvent(t *testing.T) {
 		Branch:     Pull.Head.GetRef(),
 		HeadCommit: Pull.Head.GetSHA(),
 		Num:        Pull.GetNumber(),
-		State:      models.Open,
+		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
 	}, actPull)
+	Equals(t, models.OpenedPullEvent, evType)
 	Equals(t, models.User{Username: "user"}, actUser)
+}
+
+func TestParseGithubPullEvent_EventType(t *testing.T) {
+	cases := []struct {
+		action string
+		exp    models.PullRequestEventType
+	}{
+		{
+			action: "synchronize",
+			exp:    models.UpdatedPullEvent,
+		},
+		{
+			action: "unassigned",
+			exp:    models.OtherPullEvent,
+		},
+		{
+			action: "review_requested",
+			exp:    models.OtherPullEvent,
+		},
+		{
+			action: "review_request_removed",
+			exp:    models.OtherPullEvent,
+		},
+		{
+			action: "labeled",
+			exp:    models.OtherPullEvent,
+		},
+		{
+			action: "unlabeled",
+			exp:    models.OtherPullEvent,
+		},
+		{
+			action: "opened",
+			exp:    models.OpenedPullEvent,
+		},
+		{
+			action: "edited",
+			exp:    models.OtherPullEvent,
+		},
+		{
+			action: "closed",
+			exp:    models.ClosedPullEvent,
+		},
+		{
+			action: "reopened",
+			exp:    models.OtherPullEvent,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.action, func(t *testing.T) {
+			event := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
+			event.Action = &c.action
+			_, actType, _, _, _, err := parser.ParseGithubPullEvent(&event)
+			Ok(t, err)
+			Equals(t, c.exp, actType)
+		})
+	}
 }
 
 func TestParseGithubPull(t *testing.T) {
@@ -193,7 +258,7 @@ func TestParseGithubPull(t *testing.T) {
 		Branch:     Pull.Head.GetRef(),
 		HeadCommit: Pull.Head.GetSHA(),
 		Num:        Pull.GetNumber(),
-		State:      models.Open,
+		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
 	}, pullRes)
 	Equals(t, expBaseRepo, actBaseRepo)
@@ -205,7 +270,7 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 	var event *gitlab.MergeEvent
 	err := json.Unmarshal([]byte(mergeEventJSON), &event)
 	Ok(t, err)
-	pull, actBaseRepo, actHeadRepo, actUser, err := parser.ParseGitlabMergeEvent(*event)
+	pull, evType, actBaseRepo, actHeadRepo, actUser, err := parser.ParseGitlabMergeEvent(*event)
 	Ok(t, err)
 
 	expBaseRepo := models.Repo{
@@ -226,9 +291,10 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 		Num:        1,
 		HeadCommit: "da1560886d4f094c3e6c9ef40349f7d38b5d27d7",
 		Branch:     "ms-viewport",
-		State:      models.Open,
+		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
 	}, pull)
+	Equals(t, models.OpenedPullEvent, evType)
 
 	Equals(t, expBaseRepo, actBaseRepo)
 	Equals(t, models.Repo{
@@ -246,9 +312,49 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 
 	t.Log("If the state is closed, should set field correctly.")
 	event.ObjectAttributes.State = "closed"
-	pull, _, _, _, err = parser.ParseGitlabMergeEvent(*event)
+	pull, _, _, _, _, err = parser.ParseGitlabMergeEvent(*event)
 	Ok(t, err)
-	Equals(t, models.Closed, pull.State)
+	Equals(t, models.ClosedPullState, pull.State)
+}
+
+func TestParseGitlabMergeEvent_ActionType(t *testing.T) {
+	cases := []struct {
+		action string
+		exp    models.PullRequestEventType
+	}{
+		{
+			action: "open",
+			exp:    models.OpenedPullEvent,
+		},
+		{
+			action: "update",
+			exp:    models.UpdatedPullEvent,
+		},
+		{
+			action: "merge",
+			exp:    models.ClosedPullEvent,
+		},
+		{
+			action: "close",
+			exp:    models.ClosedPullEvent,
+		},
+		{
+			action: "other",
+			exp:    models.OtherPullEvent,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.action, func(t *testing.T) {
+			var event *gitlab.MergeEvent
+			eventJSON := strings.Replace(mergeEventJSON, `"action": "open"`, fmt.Sprintf(`"action": %q`, c.action), 1)
+			err := json.Unmarshal([]byte(eventJSON), &event)
+			Ok(t, err)
+			_, evType, _, _, _, err := parser.ParseGitlabMergeEvent(*event)
+			Ok(t, err)
+			Equals(t, c.exp, evType)
+		})
+	}
 }
 
 func TestParseGitlabMergeRequest(t *testing.T) {
@@ -274,14 +380,14 @@ func TestParseGitlabMergeRequest(t *testing.T) {
 		Num:        8,
 		HeadCommit: "0b4ac85ea3063ad5f2974d10cd68dd1f937aaac2",
 		Branch:     "abc",
-		State:      models.Open,
+		State:      models.OpenPullState,
 		BaseRepo:   repo,
 	}, pull)
 
 	t.Log("If the state is closed, should set field correctly.")
 	event.State = "closed"
 	pull = parser.ParseGitlabMergeRequest(event, repo)
-	Equals(t, models.Closed, pull.State)
+	Equals(t, models.ClosedPullState, pull.State)
 }
 
 func TestParseGitlabMergeCommentEvent(t *testing.T) {
@@ -411,6 +517,191 @@ func TestCommentCommand_String(t *testing.T) {
 		Workspace:   "myworkspace",
 		ProjectName: "myproject",
 	}).String())
+}
+
+func TestParseBitbucketCloudCommentEvent_EmptyString(t *testing.T) {
+	_, _, _, _, _, err := parser.ParseBitbucketCloudCommentEvent([]byte(""))
+	ErrEquals(t, "parsing json: unexpected end of JSON input", err)
+}
+
+func TestParseBitbucketCloudCommentEvent_EmptyObject(t *testing.T) {
+	_, _, _, _, _, err := parser.ParseBitbucketCloudCommentEvent([]byte("{}"))
+	ErrEquals(t, "Key: 'CommentEvent.CommonEventData.Actor' Error:Field validation for 'Actor' failed on the 'required' tag\nKey: 'CommentEvent.CommonEventData.Repository' Error:Field validation for 'Repository' failed on the 'required' tag\nKey: 'CommentEvent.CommonEventData.PullRequest' Error:Field validation for 'PullRequest' failed on the 'required' tag\nKey: 'CommentEvent.Comment' Error:Field validation for 'Comment' failed on the 'required' tag", err)
+}
+
+func TestParseBitbucketCloudCommentEvent_CommitHashMissing(t *testing.T) {
+	path := filepath.Join("testdata", "bitbucket-cloud-comment-event.json")
+	bytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		Ok(t, err)
+	}
+	emptyCommitHash := strings.Replace(string(bytes), `        "hash": "e0624da46d3a",`, "", -1)
+	_, _, _, _, _, err = parser.ParseBitbucketCloudCommentEvent([]byte(emptyCommitHash))
+	ErrEquals(t, "Key: 'CommentEvent.CommonEventData.PullRequest.Source.Commit.Hash' Error:Field validation for 'Hash' failed on the 'required' tag", err)
+}
+
+func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {
+	path := filepath.Join("testdata", "bitbucket-cloud-comment-event.json")
+	bytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		Ok(t, err)
+	}
+	pull, baseRepo, headRepo, user, comment, err := parser.ParseBitbucketCloudCommentEvent(bytes)
+	Ok(t, err)
+	expBaseRepo := models.Repo{
+		FullName:          "lkysow/atlantis-example",
+		Owner:             "lkysow",
+		Name:              "atlantis-example",
+		CloneURL:          "https://bitbucket-user:bitbucket-token@bitbucket.org/lkysow/atlantis-example.git",
+		SanitizedCloneURL: "https://bitbucket.org/lkysow/atlantis-example.git",
+		VCSHost: models.VCSHost{
+			Hostname: "bitbucket.org",
+			Type:     models.Bitbucket,
+		},
+	}
+	Equals(t, expBaseRepo, baseRepo)
+	Equals(t, models.PullRequest{
+		Num:        2,
+		HeadCommit: "e0624da46d3a",
+		URL:        "https://bitbucket.org/lkysow/atlantis-example/pull-requests/2",
+		Branch:     "lkysow/maintf-edited-online-with-bitbucket-1532029690581",
+		Author:     "lkysow",
+		State:      models.ClosedPullState,
+		BaseRepo:   expBaseRepo,
+	}, pull)
+	Equals(t, models.Repo{
+		FullName:          "lkysow-fork/atlantis-example",
+		Owner:             "lkysow-fork",
+		Name:              "atlantis-example",
+		CloneURL:          "https://bitbucket-user:bitbucket-token@bitbucket.org/lkysow-fork/atlantis-example.git",
+		SanitizedCloneURL: "https://bitbucket.org/lkysow-fork/atlantis-example.git",
+		VCSHost: models.VCSHost{
+			Hostname: "bitbucket.org",
+			Type:     models.Bitbucket,
+		},
+	}, headRepo)
+	Equals(t, models.User{
+		Username: "lkysow",
+	}, user)
+	Equals(t, "my comment", comment)
+}
+
+func TestParseBitbucketCloudCommentEvent_MultipleStates(t *testing.T) {
+	path := filepath.Join("testdata", "bitbucket-cloud-comment-event.json")
+	bytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		Ok(t, err)
+	}
+
+	cases := []struct {
+		pullState string
+		exp       models.PullRequestState
+	}{
+		{
+			"OPEN",
+			models.OpenPullState,
+		},
+		{
+			"MERGED",
+			models.ClosedPullState,
+		},
+		{
+			"SUPERSEDED",
+			models.ClosedPullState,
+		},
+		{
+			"DECLINE",
+			models.ClosedPullState,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.pullState, func(t *testing.T) {
+			withState := strings.Replace(string(bytes), `"state": "MERGED"`, fmt.Sprintf(`"state": "%s"`, c.pullState), -1)
+			pull, _, _, _, _, err := parser.ParseBitbucketCloudCommentEvent([]byte(withState))
+			Ok(t, err)
+			Equals(t, c.exp, pull.State)
+		})
+	}
+}
+
+func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
+	path := filepath.Join("testdata", "bitbucket-cloud-pull-event-fulfilled.json")
+	bytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		Ok(t, err)
+	}
+	pull, baseRepo, headRepo, user, err := parser.ParseBitbucketCloudPullEvent(bytes)
+	Ok(t, err)
+	expBaseRepo := models.Repo{
+		FullName:          "lkysow/atlantis-example",
+		Owner:             "lkysow",
+		Name:              "atlantis-example",
+		CloneURL:          "https://bitbucket-user:bitbucket-token@bitbucket.org/lkysow/atlantis-example.git",
+		SanitizedCloneURL: "https://bitbucket.org/lkysow/atlantis-example.git",
+		VCSHost: models.VCSHost{
+			Hostname: "bitbucket.org",
+			Type:     models.Bitbucket,
+		},
+	}
+	Equals(t, expBaseRepo, baseRepo)
+	Equals(t, models.PullRequest{
+		Num:        2,
+		HeadCommit: "e0624da46d3a",
+		URL:        "https://bitbucket.org/lkysow/atlantis-example/pull-requests/2",
+		Branch:     "lkysow/maintf-edited-online-with-bitbucket-1532029690581",
+		Author:     "lkysow",
+		State:      models.ClosedPullState,
+		BaseRepo:   expBaseRepo,
+	}, pull)
+	Equals(t, models.Repo{
+		FullName:          "lkysow-fork/atlantis-example",
+		Owner:             "lkysow-fork",
+		Name:              "atlantis-example",
+		CloneURL:          "https://bitbucket-user:bitbucket-token@bitbucket.org/lkysow-fork/atlantis-example.git",
+		SanitizedCloneURL: "https://bitbucket.org/lkysow-fork/atlantis-example.git",
+		VCSHost: models.VCSHost{
+			Hostname: "bitbucket.org",
+			Type:     models.Bitbucket,
+		},
+	}, headRepo)
+	Equals(t, models.User{
+		Username: "lkysow",
+	}, user)
+}
+
+func TestGetBitbucketEventType(t *testing.T) {
+	cases := []struct {
+		header string
+		exp    models.PullRequestEventType
+	}{
+		{
+			header: "pullrequest:created",
+			exp:    models.OpenedPullEvent,
+		},
+		{
+			header: "pullrequest:updated",
+			exp:    models.UpdatedPullEvent,
+		},
+		{
+			header: "pullrequest:fulfilled",
+			exp:    models.ClosedPullEvent,
+		},
+		{
+			header: "pullrequest:rejected",
+			exp:    models.ClosedPullEvent,
+		},
+		{
+			header: "random",
+			exp:    models.OtherPullEvent,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.header, func(t *testing.T) {
+			act := parser.GetBitbucketEventType(c.header)
+			Equals(t, c.exp, act)
+		})
+	}
 }
 
 var mergeEventJSON = `{

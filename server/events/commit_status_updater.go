@@ -27,7 +27,7 @@ import (
 // the status to signify whether the plan/apply succeeds.
 type CommitStatusUpdater interface {
 	// Update updates the status of the head commit of pull.
-	Update(repo models.Repo, pull models.PullRequest, status vcs.CommitStatus, command CommandName) error
+	Update(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command CommandName) error
 	// UpdateProjectResult updates the status of the head commit given the
 	// state of response.
 	UpdateProjectResult(ctx *CommandContext, commandName CommandName, res CommandResult) error
@@ -39,18 +39,18 @@ type DefaultCommitStatusUpdater struct {
 }
 
 // Update updates the commit status.
-func (d *DefaultCommitStatusUpdater) Update(repo models.Repo, pull models.PullRequest, status vcs.CommitStatus, command CommandName) error {
+func (d *DefaultCommitStatusUpdater) Update(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command CommandName) error {
 	description := fmt.Sprintf("%s %s", strings.Title(command.String()), strings.Title(status.String()))
 	return d.Client.UpdateStatus(repo, pull, status, description)
 }
 
 // UpdateProjectResult updates the commit status based on the status of res.
 func (d *DefaultCommitStatusUpdater) UpdateProjectResult(ctx *CommandContext, commandName CommandName, res CommandResult) error {
-	var status vcs.CommitStatus
+	var status models.CommitStatus
 	if res.Error != nil || res.Failure != "" {
-		status = vcs.Failed
+		status = models.FailedCommitStatus
 	} else {
-		var statuses []vcs.CommitStatus
+		var statuses []models.CommitStatus
 		for _, p := range res.ProjectResults {
 			statuses = append(statuses, p.Status())
 		}
@@ -59,11 +59,11 @@ func (d *DefaultCommitStatusUpdater) UpdateProjectResult(ctx *CommandContext, co
 	return d.Update(ctx.BaseRepo, ctx.Pull, status, commandName)
 }
 
-func (d *DefaultCommitStatusUpdater) worstStatus(ss []vcs.CommitStatus) vcs.CommitStatus {
+func (d *DefaultCommitStatusUpdater) worstStatus(ss []models.CommitStatus) models.CommitStatus {
 	for _, s := range ss {
-		if s == vcs.Failed {
-			return vcs.Failed
+		if s == models.FailedCommitStatus {
+			return models.FailedCommitStatus
 		}
 	}
-	return vcs.Success
+	return models.SuccessCommitStatus
 }

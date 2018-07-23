@@ -141,7 +141,7 @@ func TestRenderProjectResults(t *testing.T) {
 					RepoRelDir: "path",
 				},
 			},
-			"Ran Plan in dir: `path` workspace: `workspace`\n```diff\nterraform-output\n```\n\n* To **discard** this plan click [here](lock-url).\n\n",
+			"Ran Plan in dir: `path` workspace: `workspace`\n\n```diff\nterraform-output\n```\n\n* To **discard** this plan click [here](lock-url).\n\n",
 		},
 		{
 			"single successful apply",
@@ -155,7 +155,7 @@ func TestRenderProjectResults(t *testing.T) {
 					RepoRelDir: "path",
 				},
 			},
-			"Ran Apply in dir: `path` workspace: `workspace`\n```diff\nsuccess\n```\n\n",
+			"Ran Apply in dir: `path` workspace: `workspace`\n\n```diff\nsuccess\n```\n\n",
 		},
 		{
 			"multiple successful plans",
@@ -217,7 +217,7 @@ func TestRenderProjectResults(t *testing.T) {
 					Workspace:  "workspace",
 				},
 			},
-			"Ran Plan in dir: `path` workspace: `workspace`\n**Plan Error**\n```\nerror\n```\n\n\n",
+			"Ran Plan in dir: `path` workspace: `workspace`\n\n**Plan Error**\n```\nerror\n```\n\n\n",
 		},
 		{
 			"single failed plan",
@@ -231,7 +231,7 @@ func TestRenderProjectResults(t *testing.T) {
 					},
 				},
 			},
-			"Ran Plan in dir: `path` workspace: `workspace`\n**Plan Failed**: failure\n\n\n",
+			"Ran Plan in dir: `path` workspace: `workspace`\n\n**Plan Failed**: failure\n\n\n",
 		},
 		{
 			"successful, failed, and errored plan",

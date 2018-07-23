@@ -8,7 +8,6 @@ import (
 
 	pegomock "github.com/petergtz/pegomock"
 	models "github.com/runatlantis/atlantis/server/events/models"
-	vcs "github.com/runatlantis/atlantis/server/events/vcs"
 )
 
 type MockClientProxy struct {
@@ -63,7 +62,7 @@ func (mock *MockClientProxy) PullIsApproved(repo models.Repo, pull models.PullRe
 	return ret0, ret1
 }
 
-func (mock *MockClientProxy) UpdateStatus(repo models.Repo, pull models.PullRequest, state vcs.CommitStatus, description string) error {
+func (mock *MockClientProxy) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, description string) error {
 	params := []pegomock.Param{repo, pull, state, description}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("UpdateStatus", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
@@ -190,7 +189,7 @@ func (c *ClientProxy_PullIsApproved_OngoingVerification) GetAllCapturedArguments
 	return
 }
 
-func (verifier *VerifierClientProxy) UpdateStatus(repo models.Repo, pull models.PullRequest, state vcs.CommitStatus, description string) *ClientProxy_UpdateStatus_OngoingVerification {
+func (verifier *VerifierClientProxy) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, description string) *ClientProxy_UpdateStatus_OngoingVerification {
 	params := []pegomock.Param{repo, pull, state, description}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "UpdateStatus", params)
 	return &ClientProxy_UpdateStatus_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
@@ -201,12 +200,12 @@ type ClientProxy_UpdateStatus_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *ClientProxy_UpdateStatus_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, vcs.CommitStatus, string) {
+func (c *ClientProxy_UpdateStatus_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, models.CommitStatus, string) {
 	repo, pull, state, description := c.GetAllCapturedArguments()
 	return repo[len(repo)-1], pull[len(pull)-1], state[len(state)-1], description[len(description)-1]
 }
 
-func (c *ClientProxy_UpdateStatus_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []vcs.CommitStatus, _param3 []string) {
+func (c *ClientProxy_UpdateStatus_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []models.CommitStatus, _param3 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.Repo, len(params[0]))
@@ -217,9 +216,9 @@ func (c *ClientProxy_UpdateStatus_OngoingVerification) GetAllCapturedArguments()
 		for u, param := range params[1] {
 			_param1[u] = param.(models.PullRequest)
 		}
-		_param2 = make([]vcs.CommitStatus, len(params[2]))
+		_param2 = make([]models.CommitStatus, len(params[2]))
 		for u, param := range params[2] {
-			_param2[u] = param.(vcs.CommitStatus)
+			_param2[u] = param.(models.CommitStatus)
 		}
 		_param3 = make([]string, len(params[3]))
 		for u, param := range params[3] {

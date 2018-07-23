@@ -121,7 +121,7 @@ func (m *MarkdownRenderer) renderTemplate(tmpl *template.Template, data interfac
 	return buf.String()
 }
 
-var singleProjectTmpl = template.Must(template.New("").Parse("{{$result := index .Results 0}}Ran {{.Command}} in dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n{{$result.Rendered}}\n" + logTmpl))
+var singleProjectTmpl = template.Must(template.New("").Parse("{{$result := index .Results 0}}Ran {{.Command}} in dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" + logTmpl))
 var multiProjectTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
 	"Ran {{.Command}} for {{ len .Results }} projects:\n" +
 		"{{ range $result := .Results }}" +

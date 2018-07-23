@@ -21,14 +21,13 @@ import (
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 var repoModel = models.Repo{}
 var pullModel = models.PullRequest{}
-var status = vcs.Success
+var status = models.SuccessCommitStatus
 
 func TestUpdate(t *testing.T) {
 	RegisterMockTestingT(t)
@@ -49,7 +48,7 @@ func TestUpdateProjectResult_Error(t *testing.T) {
 	s := events.DefaultCommitStatusUpdater{Client: client}
 	err := s.UpdateProjectResult(ctx, events.Plan, events.CommandResult{Error: errors.New("err")})
 	Ok(t, err)
-	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, vcs.Failed, "Plan Failed")
+	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, models.FailedCommitStatus, "Plan Failed")
 }
 
 func TestUpdateProjectResult_Failure(t *testing.T) {
@@ -62,7 +61,7 @@ func TestUpdateProjectResult_Failure(t *testing.T) {
 	s := events.DefaultCommitStatusUpdater{Client: client}
 	err := s.UpdateProjectResult(ctx, events.Plan, events.CommandResult{Failure: "failure"})
 	Ok(t, err)
-	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, vcs.Failed, "Plan Failed")
+	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, models.FailedCommitStatus, "Plan Failed")
 }
 
 func TestUpdateProjectResult(t *testing.T) {
@@ -75,35 +74,35 @@ func TestUpdateProjectResult(t *testing.T) {
 
 	cases := []struct {
 		Statuses []string
-		Expected vcs.CommitStatus
+		Expected models.CommitStatus
 	}{
 		{
 			[]string{"success", "failure", "error"},
-			vcs.Failed,
+			models.FailedCommitStatus,
 		},
 		{
 			[]string{"failure", "error", "success"},
-			vcs.Failed,
+			models.FailedCommitStatus,
 		},
 		{
 			[]string{"success", "failure"},
-			vcs.Failed,
+			models.FailedCommitStatus,
 		},
 		{
 			[]string{"success", "error"},
-			vcs.Failed,
+			models.FailedCommitStatus,
 		},
 		{
 			[]string{"failure", "error"},
-			vcs.Failed,
+			models.FailedCommitStatus,
 		},
 		{
 			[]string{"success"},
-			vcs.Success,
+			models.SuccessCommitStatus,
 		},
 		{
 			[]string{"success", "success"},
-			vcs.Success,
+			models.SuccessCommitStatus,
 		},
 	}
 

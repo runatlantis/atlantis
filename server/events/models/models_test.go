@@ -33,7 +33,7 @@ func TestNewRepo_EmptyCloneURL(t *testing.T) {
 
 func TestNewRepo_InvalidCloneURL(t *testing.T) {
 	_, err := models.NewRepo(models.Github, "owner/repo", ":", "u", "p")
-	ErrEquals(t, "invalid clone url: parse :: missing protocol scheme", err)
+	ErrEquals(t, "invalid clone url: parse :.git: missing protocol scheme", err)
 }
 
 func TestNewRepo_CloneURLWrongRepo(t *testing.T) {
@@ -57,6 +57,14 @@ func TestNewRepo_FullNameWrongFormat(t *testing.T) {
 			ErrEquals(t, fmt.Sprintf(`invalid repo format "%s"`, c), err)
 		})
 	}
+}
+
+// If the clone url doesn't end with .git it is appended
+func TestNewRepo_MissingDotGit(t *testing.T) {
+	repo, err := models.NewRepo(models.Bitbucket, "owner/repo", "https://bitbucket.org/owner/repo", "u", "p")
+	Ok(t, err)
+	Equals(t, repo.CloneURL, "https://u:p@bitbucket.org/owner/repo.git")
+	Equals(t, repo.SanitizedCloneURL, "https://bitbucket.org/owner/repo.git")
 }
 
 func TestNewRepo_HTTPAuth(t *testing.T) {

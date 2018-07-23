@@ -1,4 +1,5 @@
 Ran Apply in dir: `.` workspace: `default`
+
 ```diff
 null_resource.simple: Creating...
 null_resource.simple: Creation complete after *s (ID: ******************)

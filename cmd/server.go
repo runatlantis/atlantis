@@ -32,32 +32,36 @@ import (
 // 3. Add your flag's description etc. to the stringFlags, intFlags, or boolFlags slices.
 const (
 	// Flag names.
-	AllowForkPRsFlag    = "allow-fork-prs"
-	AllowRepoConfigFlag = "allow-repo-config"
-	AtlantisURLFlag     = "atlantis-url"
-	ConfigFlag          = "config"
-	DataDirFlag         = "data-dir"
-	GHHostnameFlag      = "gh-hostname"
-	GHTokenFlag         = "gh-token"
-	GHUserFlag          = "gh-user"
-	GHWebHookSecret     = "gh-webhook-secret" // nolint: gas
-	GitlabHostnameFlag  = "gitlab-hostname"
-	GitlabTokenFlag     = "gitlab-token"
-	GitlabUserFlag      = "gitlab-user"
-	GitlabWebHookSecret = "gitlab-webhook-secret"
-	LogLevelFlag        = "log-level"
-	PortFlag            = "port"
-	RepoWhitelistFlag   = "repo-whitelist"
-	RequireApprovalFlag = "require-approval"
-	SSLCertFileFlag     = "ssl-cert-file"
-	SSLKeyFileFlag      = "ssl-key-file"
+	AllowForkPRsFlag      = "allow-fork-prs"
+	AllowRepoConfigFlag   = "allow-repo-config"
+	AtlantisURLFlag       = "atlantis-url"
+	BitbucketHostnameFlag = "bitbucket-hostname"
+	BitbucketTokenFlag    = "bitbucket-token"
+	BitbucketUserFlag     = "bitbucket-user"
+	ConfigFlag            = "config"
+	DataDirFlag           = "data-dir"
+	GHHostnameFlag        = "gh-hostname"
+	GHTokenFlag           = "gh-token"
+	GHUserFlag            = "gh-user"
+	GHWebHookSecret       = "gh-webhook-secret" // nolint: gas
+	GitlabHostnameFlag    = "gitlab-hostname"
+	GitlabTokenFlag       = "gitlab-token"
+	GitlabUserFlag        = "gitlab-user"
+	GitlabWebHookSecret   = "gitlab-webhook-secret"
+	LogLevelFlag          = "log-level"
+	PortFlag              = "port"
+	RepoWhitelistFlag     = "repo-whitelist"
+	RequireApprovalFlag   = "require-approval"
+	SSLCertFileFlag       = "ssl-cert-file"
+	SSLKeyFileFlag        = "ssl-key-file"
 
 	// Flag defaults.
-	DefaultDataDir        = "~/.atlantis"
-	DefaultGHHostname     = "github.com"
-	DefaultGitlabHostname = "gitlab.com"
-	DefaultLogLevel       = "info"
-	DefaultPort           = 4141
+	DefaultBitbucketHostname = "bitbucket.org"
+	DefaultDataDir           = "~/.atlantis"
+	DefaultGHHostname        = "github.com"
+	DefaultGitlabHostname    = "gitlab.com"
+	DefaultLogLevel          = "info"
+	DefaultPort              = 4141
 )
 
 const RedTermStart = "\033[31m"
@@ -67,6 +71,19 @@ var stringFlags = []stringFlag{
 	{
 		name:        AtlantisURLFlag,
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ".",
+	},
+	{
+		name:        BitbucketUserFlag,
+		description: "Bitbucket username of API user.",
+	},
+	{
+		name:        BitbucketTokenFlag,
+		description: "Bitbucket app password of API user. Can also be specified via the ATLANTIS_BITBUCKET_TOKEN environment variable.",
+	},
+	{
+		name:         BitbucketHostnameFlag,
+		description:  "Currently not supported! We only support bitbucket cloud (aka bitbucket.org) at this time.",
+		defaultValue: DefaultBitbucketHostname,
 	},
 	{
 		name:        ConfigFlag,
@@ -326,6 +343,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	if c.GitlabHostname == "" {
 		c.GitlabHostname = DefaultGitlabHostname
 	}
+	if c.BitbucketHostname == "" {
+		c.BitbucketHostname = DefaultBitbucketHostname
+	}
 	if c.LogLevel == "" {
 		c.LogLevel = DefaultLogLevel
 	}
@@ -344,22 +364,30 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		return fmt.Errorf("--%s and --%s are both required for ssl", SSLKeyFileFlag, SSLCertFileFlag)
 	}
 
+	if userConfig.BitbucketHostname != DefaultBitbucketHostname {
+		return fmt.Errorf("--%s is currently not allowed because we only support bitbucket cloud", BitbucketHostnameFlag)
+	}
+
 	// The following combinations are valid.
 	// 1. github user and token set
 	// 2. gitlab user and token set
-	// 3. all 4 set
-	vcsErr := fmt.Errorf("--%s and --%s or --%s and --%s must be set", GHUserFlag, GHTokenFlag, GitlabUserFlag, GitlabTokenFlag)
-	if ((userConfig.GithubUser == "") != (userConfig.GithubToken == "")) || ((userConfig.GitlabUser == "") != (userConfig.GitlabToken == "")) {
+	// 3. bitbucket user and token set
+	// 4. any combination of the above
+	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag)
+	if ((userConfig.GithubUser == "") != (userConfig.GithubToken == "")) || ((userConfig.GitlabUser == "") != (userConfig.GitlabToken == "")) || ((userConfig.BitbucketUser == "") != (userConfig.BitbucketToken == "")) {
 		return vcsErr
 	}
 	// At this point, we know that there can't be a single user/token without
 	// its partner, but we haven't checked if any user/token is set at all.
-	if userConfig.GithubUser == "" && userConfig.GitlabUser == "" {
+	if userConfig.GithubUser == "" && userConfig.GitlabUser == "" && userConfig.BitbucketUser == "" {
 		return vcsErr
 	}
 
 	if userConfig.RepoWhitelist == "" {
 		return fmt.Errorf("--%s must be set for security purposes", RepoWhitelistFlag)
+	}
+	if strings.Contains(userConfig.RepoWhitelist, "://") {
+		return fmt.Errorf("--%s cannot contain ://, should be hostnames only", RepoWhitelistFlag)
 	}
 
 	return nil
@@ -405,14 +433,18 @@ func (s *ServerCmd) setDataDir(userConfig *server.UserConfig) error {
 func (s *ServerCmd) trimAtSymbolFromUsers(userConfig *server.UserConfig) {
 	userConfig.GithubUser = strings.TrimPrefix(userConfig.GithubUser, "@")
 	userConfig.GitlabUser = strings.TrimPrefix(userConfig.GitlabUser, "@")
+	userConfig.BitbucketUser = strings.TrimPrefix(userConfig.BitbucketUser, "@")
 }
 
 func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 	if userConfig.GithubUser != "" && userConfig.GithubWebHookSecret == "" && !s.SilenceOutput {
-		fmt.Fprintf(os.Stderr, "%s[WARN] No GitHub webhook secret set. This could allow attackers to spoof requests from GitHub. See https://git.io/vAF3t%s\n", RedTermStart, RedTermEnd)
+		fmt.Fprintf(os.Stderr, "%s[WARN] No GitHub webhook secret set. This could allow attackers to spoof requests from GitHub.%s\n", RedTermStart, RedTermEnd)
 	}
 	if userConfig.GitlabUser != "" && userConfig.GitlabWebHookSecret == "" && !s.SilenceOutput {
-		fmt.Fprintf(os.Stderr, "%s[WARN] No GitLab webhook secret set. This could allow attackers to spoof requests from GitLab. See https://git.io/vAF3t%s\n", RedTermStart, RedTermEnd)
+		fmt.Fprintf(os.Stderr, "%s[WARN] No GitLab webhook secret set. This could allow attackers to spoof requests from GitLab.%s\n", RedTermStart, RedTermEnd)
+	}
+	if userConfig.BitbucketUser != "" && userConfig.BitbucketHostname == DefaultBitbucketHostname && !s.SilenceOutput {
+		fmt.Fprintf(os.Stderr, "%s[WARN] Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are whitelisting Bitbucket IPs.%s\n", RedTermStart, RedTermEnd)
 	}
 }
 

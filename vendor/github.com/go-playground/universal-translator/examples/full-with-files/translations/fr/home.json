@@ -1,0 +1,16 @@
+[
+    {
+        "locale": "fr",
+        "key": "days-left",
+        "trans": "Il reste {0} jour",
+        "type": "Cardinal",
+        "rule": "One"
+    },
+    {
+        "locale": "fr",
+        "key": "days-left",
+        "trans": "Il reste {0} jours",
+        "type": "Cardinal",
+        "rule": "Other"
+    }
+]

@@ -15,6 +15,20 @@ resource "null_resource" "null" {
 * Running malicious hook commands specified in an `atlantis.yaml` file.
 * Someone adding `atlantis plan/apply` comments on your valid pull requests causing terraform to run when you don't want it to.
 
+## Bitbucket Cloud (bitbucket.org)
+::: danger
+Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are whitelisting Bitbucket IPs.
+:::
+Bitbucket Cloud doesn't support webhook secrets. This means that an attacker could
+make fake requests to Atlantis that look like they're coming from Bitbucket.
+
+If you are specifying `--repo-whitelist` then they could only fake requests pertaining
+to those repos so the most damage they could do would be to plan/apply on your
+own repos.
+
+To prevent this, whitelist [Bitbucket's IP addresses](https://confluence.atlassian.com/bitbucket/what-are-the-bitbucket-cloud-ip-addresses-i-should-use-to-configure-my-corporate-firewall-343343385.html)
+ (see Outbound IPv4 addresses).
+
 ## Mitigations
 ### Don't Use On Public Repos
 Because anyone can comment on public pull requests, even with all the security mitigations available, it's still dangerous to run Atlantis on public repos until Atlantis gets an authentication system.

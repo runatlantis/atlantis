@@ -105,6 +105,18 @@ func TestExecute_RequireRepoWhitelist(t *testing.T) {
 	Equals(t, "--repo-whitelist must be set for security purposes", err.Error())
 }
 
+// Should error if the repo whitelist contained a scheme.
+func TestExecute_RepoWhitelistScheme(t *testing.T) {
+	c := setup(map[string]interface{}{
+		cmd.GHUserFlag:        "user",
+		cmd.GHTokenFlag:       "token",
+		cmd.RepoWhitelistFlag: "http://github.com/*",
+	})
+	err := c.Execute()
+	Assert(t, err != nil, "should be an error")
+	Equals(t, "--repo-whitelist cannot contain ://, should be hostnames only", err.Error())
+}
+
 func TestExecute_ValidateLogLevel(t *testing.T) {
 	t.Log("Should validate log level.")
 	c := setupWithDefaults(map[string]interface{}{
@@ -164,7 +176,7 @@ func TestExecute_ValidateSSLConfig(t *testing.T) {
 }
 
 func TestExecute_ValidateVCSConfig(t *testing.T) {
-	expErr := "--gh-user and --gh-token or --gitlab-user and --gitlab-token must be set"
+	expErr := "--gh-user/--gh-token or --gitlab-user/--gitlab-token or --bitbucket-user/--bitbucket-token must be set"
 	cases := []struct {
 		description string
 		flags       map[string]interface{}
@@ -190,6 +202,13 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			true,
 		},
 		{
+			"just bitbucket token set",
+			map[string]interface{}{
+				cmd.BitbucketTokenFlag: "token",
+			},
+			true,
+		},
+		{
 			"just github user set",
 			map[string]interface{}{
 				cmd.GHUserFlag: "user",
@@ -200,6 +219,13 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			"just gitlab user set",
 			map[string]interface{}{
 				cmd.GitlabUserFlag: "user",
+			},
+			true,
+		},
+		{
+			"just bitbucket user set",
+			map[string]interface{}{
+				cmd.BitbucketUserFlag: "user",
 			},
 			true,
 		},
@@ -220,6 +246,14 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			true,
 		},
 		{
+			"github user and bitbucket token set",
+			map[string]interface{}{
+				cmd.GHUserFlag:         "user",
+				cmd.BitbucketTokenFlag: "token",
+			},
+			true,
+		},
+		{
 			"github user and github token set and should be successful",
 			map[string]interface{}{
 				cmd.GHUserFlag:  "user",
@@ -236,12 +270,22 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			false,
 		},
 		{
-			"github and gitlab user and github and gitlab token set and should be successful",
+			"bitbucket user and bitbucket token set and should be successful",
 			map[string]interface{}{
-				cmd.GHUserFlag:      "user",
-				cmd.GHTokenFlag:     "token",
-				cmd.GitlabUserFlag:  "user",
-				cmd.GitlabTokenFlag: "token",
+				cmd.BitbucketUserFlag:  "user",
+				cmd.BitbucketTokenFlag: "token",
+			},
+			false,
+		},
+		{
+			"all set should be successful",
+			map[string]interface{}{
+				cmd.GHUserFlag:         "user",
+				cmd.GHTokenFlag:        "token",
+				cmd.GitlabUserFlag:     "user",
+				cmd.GitlabTokenFlag:    "token",
+				cmd.BitbucketUserFlag:  "user",
+				cmd.BitbucketTokenFlag: "token",
 			},
 			false,
 		},
@@ -261,14 +305,29 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 	}
 }
 
+// Currently we only support bitbucket cloud so we shouldn't allow setting of
+// the bitbucket hostname flag.
+func TestExecute_BitbucketHostname(t *testing.T) {
+	c := setup(map[string]interface{}{
+		cmd.BitbucketTokenFlag:    "bitbucket-token",
+		cmd.BitbucketUserFlag:     "bitbucket-token",
+		cmd.BitbucketHostnameFlag: "hostname",
+		cmd.RepoWhitelistFlag:     "*",
+	})
+	err := c.Execute()
+	ErrEquals(t, "--bitbucket-hostname is currently not allowed because we only support bitbucket cloud", err)
+}
+
 func TestExecute_Defaults(t *testing.T) {
 	t.Log("Should set the defaults for all unspecified flags.")
 	c := setup(map[string]interface{}{
-		cmd.GHUserFlag:        "user",
-		cmd.GHTokenFlag:       "token",
-		cmd.GitlabUserFlag:    "gitlab-user",
-		cmd.GitlabTokenFlag:   "gitlab-token",
-		cmd.RepoWhitelistFlag: "*",
+		cmd.GHUserFlag:         "user",
+		cmd.GHTokenFlag:        "token",
+		cmd.GitlabUserFlag:     "gitlab-user",
+		cmd.GitlabTokenFlag:    "gitlab-token",
+		cmd.BitbucketUserFlag:  "bitbucket-user",
+		cmd.BitbucketTokenFlag: "bitbucket-token",
+		cmd.RepoWhitelistFlag:  "*",
 	})
 	err := c.Execute()
 	Ok(t, err)
@@ -293,6 +352,9 @@ func TestExecute_Defaults(t *testing.T) {
 	Equals(t, "gitlab-token", passedConfig.GitlabToken)
 	Equals(t, "gitlab-user", passedConfig.GitlabUser)
 	Equals(t, "", passedConfig.GitlabWebHookSecret)
+	Equals(t, "bitbucket.org", passedConfig.BitbucketHostname)
+	Equals(t, "bitbucket-token", passedConfig.BitbucketToken)
+	Equals(t, "bitbucket-user", passedConfig.BitbucketUser)
 	Equals(t, "info", passedConfig.LogLevel)
 	Equals(t, 4141, passedConfig.Port)
 	Equals(t, false, passedConfig.RequireApproval)
@@ -357,12 +419,28 @@ func TestExecute_GitlabUser(t *testing.T) {
 	Equals(t, "user", passedConfig.GitlabUser)
 }
 
+func TestExecute_BitbucketUser(t *testing.T) {
+	t.Log("Should remove the @ from the bitbucket username if it's passed.")
+	c := setup(map[string]interface{}{
+		cmd.BitbucketUserFlag:  "@user",
+		cmd.BitbucketTokenFlag: "token",
+		cmd.RepoWhitelistFlag:  "*",
+	})
+	err := c.Execute()
+	Ok(t, err)
+
+	Equals(t, "user", passedConfig.BitbucketUser)
+}
+
 func TestExecute_Flags(t *testing.T) {
 	t.Log("Should use all flags that are set.")
 	c := setup(map[string]interface{}{
 		cmd.AtlantisURLFlag:     "url",
 		cmd.AllowForkPRsFlag:    true,
 		cmd.AllowRepoConfigFlag: true,
+		//cmd.BitbucketHostnameFlag:      "ghhostname",
+		cmd.BitbucketTokenFlag:  "bitbucket-token",
+		cmd.BitbucketUserFlag:   "bitbucket-user",
 		cmd.DataDirFlag:         "/path",
 		cmd.GHHostnameFlag:      "ghhostname",
 		cmd.GHTokenFlag:         "token",
@@ -385,6 +463,8 @@ func TestExecute_Flags(t *testing.T) {
 	Equals(t, "url", passedConfig.AtlantisURL)
 	Equals(t, true, passedConfig.AllowForkPRs)
 	Equals(t, true, passedConfig.AllowRepoConfig)
+	Equals(t, "bitbucket-token", passedConfig.BitbucketToken)
+	Equals(t, "bitbucket-user", passedConfig.BitbucketUser)
 	Equals(t, "/path", passedConfig.DataDir)
 	Equals(t, "ghhostname", passedConfig.GithubHostname)
 	Equals(t, "token", passedConfig.GithubToken)
@@ -408,6 +488,8 @@ func TestExecute_ConfigFile(t *testing.T) {
 atlantis-url: "url"
 allow-fork-prs: true
 allow-repo-config: true
+bitbucket-token: "bitbucket-token"
+bitbucket-user: "bitbucket-user"
 data-dir: "/path"
 gh-hostname: "ghhostname"
 gh-token: "token"
@@ -434,6 +516,8 @@ ssl-key-file: key-file
 	Equals(t, "url", passedConfig.AtlantisURL)
 	Equals(t, true, passedConfig.AllowForkPRs)
 	Equals(t, true, passedConfig.AllowRepoConfig)
+	Equals(t, "bitbucket-token", passedConfig.BitbucketToken)
+	Equals(t, "bitbucket-user", passedConfig.BitbucketUser)
 	Equals(t, "/path", passedConfig.DataDir)
 	Equals(t, "ghhostname", passedConfig.GithubHostname)
 	Equals(t, "token", passedConfig.GithubToken)
@@ -457,6 +541,8 @@ func TestExecute_EnvironmentOverride(t *testing.T) {
 atlantis-url: "url"
 allow-fork-prs: true
 allow-repo-config: true
+bitbucket-token: "bitbucket-token"
+bitbucket-user: "bitbucket-user"
 data-dir: "/path"
 gh-hostname: "ghhostname"
 gh-token: "token"
@@ -480,6 +566,8 @@ ssl-key-file: key-file
 		"ATLANTIS_URL":          "override-url",
 		"ALLOW_FORK_PRS":        "false",
 		"ALLOW_REPO_CONFIG":     "false",
+		"BITBUCKET_TOKEN":       "override-bitbucket-token",
+		"BITBUCKET_USER":        "override-bitbucket-user",
 		"DATA_DIR":              "/override-path",
 		"GH_HOSTNAME":           "override-gh-hostname",
 		"GH_TOKEN":              "override-gh-token",
@@ -506,6 +594,8 @@ ssl-key-file: key-file
 	Equals(t, "override-url", passedConfig.AtlantisURL)
 	Equals(t, false, passedConfig.AllowForkPRs)
 	Equals(t, false, passedConfig.AllowRepoConfig)
+	Equals(t, "override-bitbucket-token", passedConfig.BitbucketToken)
+	Equals(t, "override-bitbucket-user", passedConfig.BitbucketUser)
 	Equals(t, "/override-path", passedConfig.DataDir)
 	Equals(t, "override-gh-hostname", passedConfig.GithubHostname)
 	Equals(t, "override-gh-token", passedConfig.GithubToken)
@@ -529,6 +619,8 @@ func TestExecute_FlagConfigOverride(t *testing.T) {
 atlantis-url: "url"
 allow-fork-prs: true
 allow-repo-config: true
+bitbucket-token: "bitbucket-token"
+bitbucket-user: "bitbucket-user"
 data-dir: "/path"
 gh-hostname: "ghhostname"
 gh-token: "token"
@@ -551,6 +643,8 @@ ssl-key-file: key-file
 		cmd.AtlantisURLFlag:     "override-url",
 		cmd.AllowForkPRsFlag:    false,
 		cmd.AllowRepoConfigFlag: false,
+		cmd.BitbucketTokenFlag:  "override-bitbucket-token",
+		cmd.BitbucketUserFlag:   "override-bitbucket-user",
 		cmd.DataDirFlag:         "/override-path",
 		cmd.GHHostnameFlag:      "override-gh-hostname",
 		cmd.GHTokenFlag:         "override-gh-token",
@@ -571,6 +665,8 @@ ssl-key-file: key-file
 	Ok(t, err)
 	Equals(t, "override-url", passedConfig.AtlantisURL)
 	Equals(t, false, passedConfig.AllowForkPRs)
+	Equals(t, "override-bitbucket-token", passedConfig.BitbucketToken)
+	Equals(t, "override-bitbucket-user", passedConfig.BitbucketUser)
 	Equals(t, "/override-path", passedConfig.DataDir)
 	Equals(t, "override-gh-hostname", passedConfig.GithubHostname)
 	Equals(t, "override-gh-token", passedConfig.GithubToken)
@@ -595,6 +691,8 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		"ATLANTIS_URL":          "url",
 		"ALLOW_FORK_PRS":        "true",
 		"ALLOW_REPO_CONFIG":     "true",
+		"BITBUCKET_TOKEN":       "bitbucket-token",
+		"BITBUCKET_USER":        "bitbucket-user",
 		"DATA_DIR":              "/path",
 		"GH_HOSTNAME":           "gh-hostname",
 		"GH_TOKEN":              "gh-token",
@@ -618,6 +716,8 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		cmd.AtlantisURLFlag:     "override-url",
 		cmd.AllowForkPRsFlag:    false,
 		cmd.AllowRepoConfigFlag: false,
+		cmd.BitbucketTokenFlag:  "override-bitbucket-token",
+		cmd.BitbucketUserFlag:   "override-bitbucket-user",
 		cmd.DataDirFlag:         "/override-path",
 		cmd.GHHostnameFlag:      "override-gh-hostname",
 		cmd.GHTokenFlag:         "override-gh-token",
@@ -640,6 +740,8 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	Equals(t, "override-url", passedConfig.AtlantisURL)
 	Equals(t, false, passedConfig.AllowForkPRs)
 	Equals(t, false, passedConfig.AllowRepoConfig)
+	Equals(t, "override-bitbucket-token", passedConfig.BitbucketToken)
+	Equals(t, "override-bitbucket-user", passedConfig.BitbucketUser)
 	Equals(t, "/override-path", passedConfig.DataDir)
 	Equals(t, "override-gh-hostname", passedConfig.GithubHostname)
 	Equals(t, "override-gh-token", passedConfig.GithubToken)
