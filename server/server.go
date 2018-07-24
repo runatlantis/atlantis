@@ -92,11 +92,11 @@ type UserConfig struct {
 	GithubHostname      string `mapstructure:"gh-hostname"`
 	GithubToken         string `mapstructure:"gh-token"`
 	GithubUser          string `mapstructure:"gh-user"`
-	GithubWebHookSecret string `mapstructure:"gh-webhook-secret"`
+	GithubWebhookSecret string `mapstructure:"gh-webhook-secret"`
 	GitlabHostname      string `mapstructure:"gitlab-hostname"`
 	GitlabToken         string `mapstructure:"gitlab-token"`
 	GitlabUser          string `mapstructure:"gitlab-user"`
-	GitlabWebHookSecret string `mapstructure:"gitlab-webhook-secret"`
+	GitlabWebhookSecret string `mapstructure:"gitlab-webhook-secret"`
 	LogLevel            string `mapstructure:"log-level"`
 	Port                int    `mapstructure:"port"`
 	RepoWhitelist       string `mapstructure:"repo-whitelist"`
@@ -319,10 +319,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Parser:                       eventParser,
 		CommentParser:                commentParser,
 		Logger:                       logger,
-		GithubWebHookSecret:          []byte(userConfig.GithubWebHookSecret),
+		GithubWebhookSecret:          []byte(userConfig.GithubWebhookSecret),
 		GithubRequestValidator:       &DefaultGithubRequestValidator{},
 		GitlabRequestParserValidator: &DefaultGitlabRequestParserValidator{},
-		GitlabWebHookSecret:          []byte(userConfig.GitlabWebHookSecret),
+		GitlabWebhookSecret:          []byte(userConfig.GitlabWebhookSecret),
 		RepoWhitelistChecker:         repoWhitelist,
 		SupportedVCSHosts:            supportedVCSHosts,
 		VCSClient:                    vcsClient,

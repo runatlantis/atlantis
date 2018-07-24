@@ -44,11 +44,11 @@ const (
 	GHHostnameFlag        = "gh-hostname"
 	GHTokenFlag           = "gh-token"
 	GHUserFlag            = "gh-user"
-	GHWebHookSecret       = "gh-webhook-secret" // nolint: gosec
+	GHWebhookSecret       = "gh-webhook-secret" // nolint: gosec
 	GitlabHostnameFlag    = "gitlab-hostname"
 	GitlabTokenFlag       = "gitlab-token"
 	GitlabUserFlag        = "gitlab-user"
-	GitlabWebHookSecret   = "gitlab-webhook-secret" // nolint: gosec
+	GitlabWebhookSecret   = "gitlab-webhook-secret" // nolint: gosec
 	LogLevelFlag          = "log-level"
 	PortFlag              = "port"
 	RepoWhitelistFlag     = "repo-whitelist"
@@ -109,7 +109,7 @@ var stringFlags = []stringFlag{
 		description: "GitHub token of API user. Can also be specified via the ATLANTIS_GH_TOKEN environment variable.",
 	},
 	{
-		name: GHWebHookSecret,
+		name: GHWebhookSecret,
 		description: "Secret used to validate GitHub webhooks (see https://developer.github.com/webhooks/securing/)." +
 			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitHub. " +
 			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
@@ -129,7 +129,7 @@ var stringFlags = []stringFlag{
 		description: "GitLab token of API user. Can also be specified via the ATLANTIS_GITLAB_TOKEN environment variable.",
 	},
 	{
-		name: GitlabWebHookSecret,
+		name: GitlabWebhookSecret,
 		description: "Optional secret used to validate GitLab webhooks." +
 			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitLab. " +
 			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
@@ -434,10 +434,10 @@ func (s *ServerCmd) trimAtSymbolFromUsers(userConfig *server.UserConfig) {
 }
 
 func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
-	if userConfig.GithubUser != "" && userConfig.GithubWebHookSecret == "" && !s.SilenceOutput {
+	if userConfig.GithubUser != "" && userConfig.GithubWebhookSecret == "" && !s.SilenceOutput {
 		fmt.Fprintf(os.Stderr, "%s[WARN] No GitHub webhook secret set. This could allow attackers to spoof requests from GitHub.%s\n", RedTermStart, RedTermEnd)
 	}
-	if userConfig.GitlabUser != "" && userConfig.GitlabWebHookSecret == "" && !s.SilenceOutput {
+	if userConfig.GitlabUser != "" && userConfig.GitlabWebhookSecret == "" && !s.SilenceOutput {
 		fmt.Fprintf(os.Stderr, "%s[WARN] No GitLab webhook secret set. This could allow attackers to spoof requests from GitLab.%s\n", RedTermStart, RedTermEnd)
 	}
 	if userConfig.BitbucketUser != "" && userConfig.BitbucketHostname == DefaultBitbucketHostname && !s.SilenceOutput {

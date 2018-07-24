@@ -334,11 +334,11 @@ func TestExecute_Defaults(t *testing.T) {
 	Equals(t, "github.com", passedConfig.GithubHostname)
 	Equals(t, "token", passedConfig.GithubToken)
 	Equals(t, "user", passedConfig.GithubUser)
-	Equals(t, "", passedConfig.GithubWebHookSecret)
+	Equals(t, "", passedConfig.GithubWebhookSecret)
 	Equals(t, "gitlab.com", passedConfig.GitlabHostname)
 	Equals(t, "gitlab-token", passedConfig.GitlabToken)
 	Equals(t, "gitlab-user", passedConfig.GitlabUser)
-	Equals(t, "", passedConfig.GitlabWebHookSecret)
+	Equals(t, "", passedConfig.GitlabWebhookSecret)
 	Equals(t, "bitbucket.org", passedConfig.BitbucketHostname)
 	Equals(t, "bitbucket-token", passedConfig.BitbucketToken)
 	Equals(t, "bitbucket-user", passedConfig.BitbucketUser)
@@ -432,11 +432,11 @@ func TestExecute_Flags(t *testing.T) {
 		cmd.GHHostnameFlag:      "ghhostname",
 		cmd.GHTokenFlag:         "token",
 		cmd.GHUserFlag:          "user",
-		cmd.GHWebHookSecret:     "secret",
+		cmd.GHWebhookSecret:     "secret",
 		cmd.GitlabHostnameFlag:  "gitlab-hostname",
 		cmd.GitlabTokenFlag:     "gitlab-token",
 		cmd.GitlabUserFlag:      "gitlab-user",
-		cmd.GitlabWebHookSecret: "gitlab-secret",
+		cmd.GitlabWebhookSecret: "gitlab-secret",
 		cmd.LogLevelFlag:        "debug",
 		cmd.PortFlag:            8181,
 		cmd.RepoWhitelistFlag:   "github.com/runatlantis/atlantis",
@@ -456,11 +456,11 @@ func TestExecute_Flags(t *testing.T) {
 	Equals(t, "ghhostname", passedConfig.GithubHostname)
 	Equals(t, "token", passedConfig.GithubToken)
 	Equals(t, "user", passedConfig.GithubUser)
-	Equals(t, "secret", passedConfig.GithubWebHookSecret)
+	Equals(t, "secret", passedConfig.GithubWebhookSecret)
 	Equals(t, "gitlab-hostname", passedConfig.GitlabHostname)
 	Equals(t, "gitlab-token", passedConfig.GitlabToken)
 	Equals(t, "gitlab-user", passedConfig.GitlabUser)
-	Equals(t, "gitlab-secret", passedConfig.GitlabWebHookSecret)
+	Equals(t, "gitlab-secret", passedConfig.GitlabWebhookSecret)
 	Equals(t, "debug", passedConfig.LogLevel)
 	Equals(t, 8181, passedConfig.Port)
 	Equals(t, "github.com/runatlantis/atlantis", passedConfig.RepoWhitelist)
@@ -509,11 +509,11 @@ ssl-key-file: key-file
 	Equals(t, "ghhostname", passedConfig.GithubHostname)
 	Equals(t, "token", passedConfig.GithubToken)
 	Equals(t, "user", passedConfig.GithubUser)
-	Equals(t, "secret", passedConfig.GithubWebHookSecret)
+	Equals(t, "secret", passedConfig.GithubWebhookSecret)
 	Equals(t, "gitlab-hostname", passedConfig.GitlabHostname)
 	Equals(t, "gitlab-token", passedConfig.GitlabToken)
 	Equals(t, "gitlab-user", passedConfig.GitlabUser)
-	Equals(t, "gitlab-secret", passedConfig.GitlabWebHookSecret)
+	Equals(t, "gitlab-secret", passedConfig.GitlabWebhookSecret)
 	Equals(t, "debug", passedConfig.LogLevel)
 	Equals(t, 8181, passedConfig.Port)
 	Equals(t, "github.com/runatlantis/atlantis", passedConfig.RepoWhitelist)
@@ -587,11 +587,11 @@ ssl-key-file: key-file
 	Equals(t, "override-gh-hostname", passedConfig.GithubHostname)
 	Equals(t, "override-gh-token", passedConfig.GithubToken)
 	Equals(t, "override-gh-user", passedConfig.GithubUser)
-	Equals(t, "override-gh-webhook-secret", passedConfig.GithubWebHookSecret)
+	Equals(t, "override-gh-webhook-secret", passedConfig.GithubWebhookSecret)
 	Equals(t, "override-gitlab-hostname", passedConfig.GitlabHostname)
 	Equals(t, "override-gitlab-token", passedConfig.GitlabToken)
 	Equals(t, "override-gitlab-user", passedConfig.GitlabUser)
-	Equals(t, "override-gitlab-webhook-secret", passedConfig.GitlabWebHookSecret)
+	Equals(t, "override-gitlab-webhook-secret", passedConfig.GitlabWebhookSecret)
 	Equals(t, "info", passedConfig.LogLevel)
 	Equals(t, 8282, passedConfig.Port)
 	Equals(t, "override,override", passedConfig.RepoWhitelist)
@@ -636,11 +636,11 @@ ssl-key-file: key-file
 		cmd.GHHostnameFlag:      "override-gh-hostname",
 		cmd.GHTokenFlag:         "override-gh-token",
 		cmd.GHUserFlag:          "override-gh-user",
-		cmd.GHWebHookSecret:     "override-gh-webhook-secret",
+		cmd.GHWebhookSecret:     "override-gh-webhook-secret",
 		cmd.GitlabHostnameFlag:  "override-gitlab-hostname",
 		cmd.GitlabTokenFlag:     "override-gitlab-token",
 		cmd.GitlabUserFlag:      "override-gitlab-user",
-		cmd.GitlabWebHookSecret: "override-gitlab-webhook-secret",
+		cmd.GitlabWebhookSecret: "override-gitlab-webhook-secret",
 		cmd.LogLevelFlag:        "info",
 		cmd.PortFlag:            8282,
 		cmd.RepoWhitelistFlag:   "override,override",
@@ -658,11 +658,11 @@ ssl-key-file: key-file
 	Equals(t, "override-gh-hostname", passedConfig.GithubHostname)
 	Equals(t, "override-gh-token", passedConfig.GithubToken)
 	Equals(t, "override-gh-user", passedConfig.GithubUser)
-	Equals(t, "override-gh-webhook-secret", passedConfig.GithubWebHookSecret)
+	Equals(t, "override-gh-webhook-secret", passedConfig.GithubWebhookSecret)
 	Equals(t, "override-gitlab-hostname", passedConfig.GitlabHostname)
 	Equals(t, "override-gitlab-token", passedConfig.GitlabToken)
 	Equals(t, "override-gitlab-user", passedConfig.GitlabUser)
-	Equals(t, "override-gitlab-webhook-secret", passedConfig.GitlabWebHookSecret)
+	Equals(t, "override-gitlab-webhook-secret", passedConfig.GitlabWebhookSecret)
 	Equals(t, "info", passedConfig.LogLevel)
 	Equals(t, 8282, passedConfig.Port)
 	Equals(t, "override,override", passedConfig.RepoWhitelist)
@@ -709,11 +709,11 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		cmd.GHHostnameFlag:      "override-gh-hostname",
 		cmd.GHTokenFlag:         "override-gh-token",
 		cmd.GHUserFlag:          "override-gh-user",
-		cmd.GHWebHookSecret:     "override-gh-webhook-secret",
+		cmd.GHWebhookSecret:     "override-gh-webhook-secret",
 		cmd.GitlabHostnameFlag:  "override-gitlab-hostname",
 		cmd.GitlabTokenFlag:     "override-gitlab-token",
 		cmd.GitlabUserFlag:      "override-gitlab-user",
-		cmd.GitlabWebHookSecret: "override-gitlab-webhook-secret",
+		cmd.GitlabWebhookSecret: "override-gitlab-webhook-secret",
 		cmd.LogLevelFlag:        "info",
 		cmd.PortFlag:            8282,
 		cmd.RepoWhitelistFlag:   "override,override",
@@ -733,11 +733,11 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	Equals(t, "override-gh-hostname", passedConfig.GithubHostname)
 	Equals(t, "override-gh-token", passedConfig.GithubToken)
 	Equals(t, "override-gh-user", passedConfig.GithubUser)
-	Equals(t, "override-gh-webhook-secret", passedConfig.GithubWebHookSecret)
+	Equals(t, "override-gh-webhook-secret", passedConfig.GithubWebhookSecret)
 	Equals(t, "override-gitlab-hostname", passedConfig.GitlabHostname)
 	Equals(t, "override-gitlab-token", passedConfig.GitlabToken)
 	Equals(t, "override-gitlab-user", passedConfig.GitlabUser)
-	Equals(t, "override-gitlab-webhook-secret", passedConfig.GitlabWebHookSecret)
+	Equals(t, "override-gitlab-webhook-secret", passedConfig.GitlabWebhookSecret)
 	Equals(t, "info", passedConfig.LogLevel)
 	Equals(t, 8282, passedConfig.Port)
 	Equals(t, "override,override", passedConfig.RepoWhitelist)

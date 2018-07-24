@@ -44,16 +44,16 @@ type EventsController struct {
 	Logger        *logging.SimpleLogger
 	Parser        events.EventParsing
 	CommentParser events.CommentParsing
-	// GithubWebHookSecret is the secret added to this webhook via the GitHub
+	// GithubWebhookSecret is the secret added to this webhook via the GitHub
 	// UI that identifies this call as coming from GitHub. If empty, no
 	// request validation is done.
-	GithubWebHookSecret          []byte
+	GithubWebhookSecret          []byte
 	GithubRequestValidator       GithubRequestValidator
 	GitlabRequestParserValidator GitlabRequestParserValidator
-	// GitlabWebHookSecret is the secret added to this webhook via the GitLab
+	// GitlabWebhookSecret is the secret added to this webhook via the GitLab
 	// UI that identifies this call as coming from GitLab. If empty, no
 	// request validation is done.
-	GitlabWebHookSecret  []byte
+	GitlabWebhookSecret  []byte
 	RepoWhitelistChecker *events.RepoWhitelistChecker
 	// SupportedVCSHosts is which VCS hosts Atlantis was configured upon
 	// startup to support.
@@ -106,7 +106,7 @@ func (e *EventsController) Post(w http.ResponseWriter, r *http.Request) {
 
 func (e *EventsController) handleGithubPost(w http.ResponseWriter, r *http.Request) {
 	// Validate the request against the optional webhook secret.
-	payload, err := e.GithubRequestValidator.Validate(r, e.GithubWebHookSecret)
+	payload, err := e.GithubRequestValidator.Validate(r, e.GithubWebhookSecret)
 	if err != nil {
 		e.respond(w, logging.Warn, http.StatusBadRequest, err.Error())
 		return
@@ -294,7 +294,7 @@ func (e *EventsController) handlePullRequestEvent(w http.ResponseWriter, baseRep
 }
 
 func (e *EventsController) handleGitlabPost(w http.ResponseWriter, r *http.Request) {
-	event, err := e.GitlabRequestParserValidator.ParseAndValidate(r, e.GitlabWebHookSecret)
+	event, err := e.GitlabRequestParserValidator.ParseAndValidate(r, e.GitlabWebhookSecret)
 	if err != nil {
 		e.respond(w, logging.Warn, http.StatusBadRequest, err.Error())
 		return
