@@ -15,6 +15,7 @@ package cmd
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,36 +34,37 @@ import (
 // 3. Add your flag's description etc. to the stringFlags, intFlags, or boolFlags slices.
 const (
 	// Flag names.
-	AllowForkPRsFlag      = "allow-fork-prs"
-	AllowRepoConfigFlag   = "allow-repo-config"
-	AtlantisURLFlag       = "atlantis-url"
-	BitbucketHostnameFlag = "bitbucket-hostname"
-	BitbucketTokenFlag    = "bitbucket-token"
-	BitbucketUserFlag     = "bitbucket-user"
-	ConfigFlag            = "config"
-	DataDirFlag           = "data-dir"
-	GHHostnameFlag        = "gh-hostname"
-	GHTokenFlag           = "gh-token"
-	GHUserFlag            = "gh-user"
-	GHWebhookSecret       = "gh-webhook-secret" // nolint: gosec
-	GitlabHostnameFlag    = "gitlab-hostname"
-	GitlabTokenFlag       = "gitlab-token"
-	GitlabUserFlag        = "gitlab-user"
-	GitlabWebhookSecret   = "gitlab-webhook-secret" // nolint: gosec
-	LogLevelFlag          = "log-level"
-	PortFlag              = "port"
-	RepoWhitelistFlag     = "repo-whitelist"
-	RequireApprovalFlag   = "require-approval"
-	SSLCertFileFlag       = "ssl-cert-file"
-	SSLKeyFileFlag        = "ssl-key-file"
+	AllowForkPRsFlag           = "allow-fork-prs"
+	AllowRepoConfigFlag        = "allow-repo-config"
+	AtlantisURLFlag            = "atlantis-url"
+	BitbucketBaseURLFlag       = "bitbucket-base-url"
+	BitbucketTokenFlag         = "bitbucket-token"
+	BitbucketUserFlag          = "bitbucket-user"
+	BitbucketWebhookSecretFlag = "bitbucket-webhook-secret" // nolint: gosec
+	ConfigFlag                 = "config"
+	DataDirFlag                = "data-dir"
+	GHHostnameFlag             = "gh-hostname"
+	GHTokenFlag                = "gh-token"
+	GHUserFlag                 = "gh-user"
+	GHWebhookSecretFlag        = "gh-webhook-secret" // nolint: gosec
+	GitlabHostnameFlag         = "gitlab-hostname"
+	GitlabTokenFlag            = "gitlab-token"
+	GitlabUserFlag             = "gitlab-user"
+	GitlabWebhookSecretFlag    = "gitlab-webhook-secret" // nolint: gosec
+	LogLevelFlag               = "log-level"
+	PortFlag                   = "port"
+	RepoWhitelistFlag          = "repo-whitelist"
+	RequireApprovalFlag        = "require-approval"
+	SSLCertFileFlag            = "ssl-cert-file"
+	SSLKeyFileFlag             = "ssl-key-file"
 
 	// Flag defaults.
-	DefaultBitbucketHostname = bitbucketcloud.Hostname
-	DefaultDataDir           = "~/.atlantis"
-	DefaultGHHostname        = "github.com"
-	DefaultGitlabHostname    = "gitlab.com"
-	DefaultLogLevel          = "info"
-	DefaultPort              = 4141
+	DefaultBitbucketBaseURL = bitbucketcloud.BaseURL
+	DefaultDataDir          = "~/.atlantis"
+	DefaultGHHostname       = "github.com"
+	DefaultGitlabHostname   = "gitlab.com"
+	DefaultLogLevel         = "info"
+	DefaultPort             = 4141
 )
 
 const RedTermStart = "\033[31m"
@@ -82,9 +84,18 @@ var stringFlags = []stringFlag{
 		description: "Bitbucket app password of API user. Can also be specified via the ATLANTIS_BITBUCKET_TOKEN environment variable.",
 	},
 	{
-		name:         BitbucketHostnameFlag,
-		description:  "Hostname and port of your Bitbucket Server (aka Stash) installation. If using Bitbucket Cloud (bitbucket.org), no need to set.",
-		defaultValue: DefaultBitbucketHostname,
+		name: BitbucketBaseURLFlag,
+		description: "Base URL of Bitbucket Server (aka Stash) installation." +
+			" Must include scheme, ex. 'http://bitbucket.corp:7990' or 'https://bitbucket.corp'." +
+			" If using Bitbucket Cloud (bitbucket.org), do not set.",
+		defaultValue: DefaultBitbucketBaseURL,
+	},
+	{
+		name: BitbucketWebhookSecretFlag,
+		description: "Secret used to validate Bitbucket webhooks. Only Bitbucket Server supports webhook secrets." +
+			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from Bitbucket. " +
+			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
+			"Should be specified via the ATLANTIS_BITBUCKET_WEBHOOK_SECRET environment variable.",
 	},
 	{
 		name:        ConfigFlag,
@@ -109,7 +120,7 @@ var stringFlags = []stringFlag{
 		description: "GitHub token of API user. Can also be specified via the ATLANTIS_GH_TOKEN environment variable.",
 	},
 	{
-		name: GHWebhookSecret,
+		name: GHWebhookSecretFlag,
 		description: "Secret used to validate GitHub webhooks (see https://developer.github.com/webhooks/securing/)." +
 			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitHub. " +
 			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
@@ -129,7 +140,7 @@ var stringFlags = []stringFlag{
 		description: "GitLab token of API user. Can also be specified via the ATLANTIS_GITLAB_TOKEN environment variable.",
 	},
 	{
-		name: GitlabWebhookSecret,
+		name: GitlabWebhookSecretFlag,
 		description: "Optional secret used to validate GitLab webhooks." +
 			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitLab. " +
 			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
@@ -144,7 +155,8 @@ var stringFlags = []stringFlag{
 		name: RepoWhitelistFlag,
 		description: "Comma separated list of repositories that Atlantis will operate on. " +
 			"The format is {hostname}/{owner}/{repo}, ex. github.com/runatlantis/atlantis. '*' matches any characters until the next comma and can be used for example to whitelist " +
-			"all repos: '*' (not recommended), an entire hostname: 'internalgithub.com/*' or an organization: 'github.com/runatlantis/*'.",
+			"all repos: '*' (not recommended), an entire hostname: 'internalgithub.com/*' or an organization: 'github.com/runatlantis/*'." +
+			" For Bitbucket Server, {hostname} is the domain without scheme and port, {owner} is the name of the project (not the key), and {repo} is the repo name.",
 	},
 	{
 		name:        SSLCertFileFlag,
@@ -344,8 +356,8 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	if c.GitlabHostname == "" {
 		c.GitlabHostname = DefaultGitlabHostname
 	}
-	if c.BitbucketHostname == "" {
-		c.BitbucketHostname = DefaultBitbucketHostname
+	if c.BitbucketBaseURL == "" {
+		c.BitbucketBaseURL = DefaultBitbucketBaseURL
 	}
 	if c.LogLevel == "" {
 		c.LogLevel = DefaultLogLevel
@@ -387,6 +399,17 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		return fmt.Errorf("--%s cannot contain ://, should be hostnames only", RepoWhitelistFlag)
 	}
 
+	if userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && userConfig.BitbucketWebhookSecret != "" {
+		return fmt.Errorf("--%s cannot be specified for Bitbucket Cloud because it is not supported by Bitbucket", BitbucketWebhookSecretFlag)
+	}
+
+	parsed, err := url.Parse(userConfig.BitbucketBaseURL)
+	if err != nil {
+		return fmt.Errorf("error parsing --%s flag value %q: %s", BitbucketWebhookSecretFlag, userConfig.BitbucketBaseURL, err)
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return fmt.Errorf("--%s must have http:// or https://, got %q", BitbucketBaseURLFlag, userConfig.BitbucketBaseURL)
+	}
 	return nil
 }
 
@@ -440,7 +463,10 @@ func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 	if userConfig.GitlabUser != "" && userConfig.GitlabWebhookSecret == "" && !s.SilenceOutput {
 		fmt.Fprintf(os.Stderr, "%s[WARN] No GitLab webhook secret set. This could allow attackers to spoof requests from GitLab.%s\n", RedTermStart, RedTermEnd)
 	}
-	if userConfig.BitbucketUser != "" && userConfig.BitbucketHostname == DefaultBitbucketHostname && !s.SilenceOutput {
+	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL != DefaultBitbucketBaseURL && userConfig.BitbucketWebhookSecret == "" && !s.SilenceOutput {
+		fmt.Fprintf(os.Stderr, "%s[WARN] No Bitbucket webhook secret set. This could allow attackers to spoof requests from Bitbucket.%s\n", RedTermStart, RedTermEnd)
+	}
+	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && !s.SilenceOutput {
 		fmt.Fprintf(os.Stderr, "%s[WARN] Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are whitelisting Bitbucket IPs.%s\n", RedTermStart, RedTermEnd)
 	}
 }

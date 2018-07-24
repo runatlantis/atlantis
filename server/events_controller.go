@@ -20,6 +20,7 @@ import (
 
 	"github.com/google/go-github/github"
 	"github.com/lkysow/go-gitlab"
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -35,6 +36,7 @@ const gitlabHeader = "X-Gitlab-Event"
 const bitbucketEventTypeHeader = "X-Event-Key"
 const bitbucketCloudRequestIDHeader = "X-Request-UUID"
 const bitbucketServerRequestIDHeader = "X-Request-ID"
+const bitbucketServerSignatureHeader = "X-Hub-Signature"
 
 // EventsController handles all webhook requests which signify 'events' in the
 // VCS host, ex. GitHub.
@@ -60,6 +62,10 @@ type EventsController struct {
 	SupportedVCSHosts []models.VCSHostType
 	VCSClient         vcs.ClientProxy
 	TestingMode       bool
+	// BitbucketWebhookSecret is the secret added to this webhook via the Bitbucket
+	// UI that identifies this call as coming from Bitbucket. If empty, no
+	// request validation is done.
+	BitbucketWebhookSecret []byte
 }
 
 // Post handles POST webhook requests.
@@ -153,11 +159,18 @@ func (e *EventsController) handleBitbucketCloudPost(w http.ResponseWriter, r *ht
 func (e *EventsController) handleBitbucketServerPost(w http.ResponseWriter, r *http.Request) {
 	eventType := r.Header.Get(bitbucketEventTypeHeader)
 	reqID := r.Header.Get(bitbucketServerRequestIDHeader)
+	sig := r.Header.Get(bitbucketServerSignatureHeader)
 	defer r.Body.Close() // nolint: errcheck
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Unable to read body: %s %s=%s", err, bitbucketServerRequestIDHeader, reqID)
 		return
+	}
+	if len(e.BitbucketWebhookSecret) > 0 {
+		if err := bitbucketserver.ValidateSignature(body, sig, e.BitbucketWebhookSecret); err != nil {
+			e.respond(w, logging.Warn, http.StatusBadRequest, errors.Wrap(err, "request did not pass validation").Error())
+			return
+		}
 	}
 	switch eventType {
 	case bitbucketserver.PullCreatedHeader, bitbucketserver.PullFulfilledHeader, bitbucketserver.PullDeclinedHeader:

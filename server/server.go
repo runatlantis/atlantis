@@ -82,24 +82,25 @@ type Server struct {
 // The mapstructure tags correspond to flags in cmd/server.go and are used when
 // the config is parsed from a YAML file.
 type UserConfig struct {
-	AllowForkPRs        bool   `mapstructure:"allow-fork-prs"`
-	AllowRepoConfig     bool   `mapstructure:"allow-repo-config"`
-	AtlantisURL         string `mapstructure:"atlantis-url"`
-	BitbucketHostname   string `mapstructure:"bitbucket-hostname"`
-	BitbucketToken      string `mapstructure:"bitbucket-token"`
-	BitbucketUser       string `mapstructure:"bitbucket-user"`
-	DataDir             string `mapstructure:"data-dir"`
-	GithubHostname      string `mapstructure:"gh-hostname"`
-	GithubToken         string `mapstructure:"gh-token"`
-	GithubUser          string `mapstructure:"gh-user"`
-	GithubWebhookSecret string `mapstructure:"gh-webhook-secret"`
-	GitlabHostname      string `mapstructure:"gitlab-hostname"`
-	GitlabToken         string `mapstructure:"gitlab-token"`
-	GitlabUser          string `mapstructure:"gitlab-user"`
-	GitlabWebhookSecret string `mapstructure:"gitlab-webhook-secret"`
-	LogLevel            string `mapstructure:"log-level"`
-	Port                int    `mapstructure:"port"`
-	RepoWhitelist       string `mapstructure:"repo-whitelist"`
+	AllowForkPRs           bool   `mapstructure:"allow-fork-prs"`
+	AllowRepoConfig        bool   `mapstructure:"allow-repo-config"`
+	AtlantisURL            string `mapstructure:"atlantis-url"`
+	BitbucketBaseURL       string `mapstructure:"bitbucket-base-url"`
+	BitbucketToken         string `mapstructure:"bitbucket-token"`
+	BitbucketUser          string `mapstructure:"bitbucket-user"`
+	BitbucketWebhookSecret string `mapstructure:"bitbucket-webhook-secret"`
+	DataDir                string `mapstructure:"data-dir"`
+	GithubHostname         string `mapstructure:"gh-hostname"`
+	GithubToken            string `mapstructure:"gh-token"`
+	GithubUser             string `mapstructure:"gh-user"`
+	GithubWebhookSecret    string `mapstructure:"gh-webhook-secret"`
+	GitlabHostname         string `mapstructure:"gitlab-hostname"`
+	GitlabToken            string `mapstructure:"gitlab-token"`
+	GitlabUser             string `mapstructure:"gitlab-user"`
+	GitlabWebhookSecret    string `mapstructure:"gitlab-webhook-secret"`
+	LogLevel               string `mapstructure:"log-level"`
+	Port                   int    `mapstructure:"port"`
+	RepoWhitelist          string `mapstructure:"repo-whitelist"`
 	// RequireApproval is whether to require pull request approval before
 	// allowing terraform apply's to be run.
 	RequireApproval bool            `mapstructure:"require-approval"`
@@ -170,7 +171,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 	}
 	if userConfig.BitbucketUser != "" {
-		if userConfig.BitbucketHostname == bitbucketcloud.Hostname {
+		if userConfig.BitbucketBaseURL == bitbucketcloud.BaseURL {
 			supportedVCSHosts = append(supportedVCSHosts, models.BitbucketCloud)
 			bitbucketCloudClient = bitbucketcloud.NewClient(
 				http.DefaultClient,
@@ -184,7 +185,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 				http.DefaultClient,
 				userConfig.BitbucketUser,
 				userConfig.BitbucketToken,
-				userConfig.BitbucketHostname,
+				userConfig.BitbucketBaseURL,
 				userConfig.AtlantisURL)
 			if err != nil {
 				return nil, errors.Wrapf(err, "setting up Bitbucket Server client")
@@ -248,7 +249,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GitlabToken:        userConfig.GitlabToken,
 		BitbucketUser:      userConfig.BitbucketUser,
 		BitbucketToken:     userConfig.BitbucketToken,
-		BitbucketServerURL: userConfig.BitbucketHostname,
+		BitbucketServerURL: userConfig.BitbucketBaseURL,
 	}
 	commentParser := &events.CommentParser{
 		GithubUser:  userConfig.GithubUser,
@@ -326,6 +327,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		RepoWhitelistChecker:         repoWhitelist,
 		SupportedVCSHosts:            supportedVCSHosts,
 		VCSClient:                    vcsClient,
+		BitbucketWebhookSecret:       []byte(userConfig.BitbucketWebhookSecret),
 	}
 	return &Server{
 		AtlantisVersion:    config.AtlantisVersion,

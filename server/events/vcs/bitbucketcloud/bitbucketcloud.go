@@ -3,4 +3,4 @@
 // APIs.
 package bitbucketcloud
 
-const Hostname = "bitbucket.org"
+const BaseURL = "https://api.bitbucket.org"
