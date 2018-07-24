@@ -40,7 +40,7 @@ const (
 	BitbucketBaseURLFlag       = "bitbucket-base-url"
 	BitbucketTokenFlag         = "bitbucket-token"
 	BitbucketUserFlag          = "bitbucket-user"
-	BitbucketWebhookSecretFlag = "bitbucket-webhook-secret" // nolint: gosec
+	BitbucketWebhookSecretFlag = "bitbucket-webhook-secret"
 	ConfigFlag                 = "config"
 	DataDirFlag                = "data-dir"
 	GHHostnameFlag             = "gh-hostname"

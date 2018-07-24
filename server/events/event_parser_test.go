@@ -31,12 +31,13 @@ import (
 )
 
 var parser = events.EventParser{
-	GithubUser:     "github-user",
-	GithubToken:    "github-token",
-	GitlabUser:     "gitlab-user",
-	GitlabToken:    "gitlab-token",
-	BitbucketUser:  "bitbucket-user",
-	BitbucketToken: "bitbucket-token",
+	GithubUser:         "github-user",
+	GithubToken:        "github-token",
+	GitlabUser:         "gitlab-user",
+	GitlabToken:        "gitlab-token",
+	BitbucketUser:      "bitbucket-user",
+	BitbucketToken:     "bitbucket-token",
+	BitbucketServerURL: "http://mycorp.com:7490",
 }
 
 func TestParseGithubRepo(t *testing.T) {
@@ -699,6 +700,183 @@ func TestGetBitbucketCloudEventType(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.header, func(t *testing.T) {
 			act := parser.GetBitbucketCloudEventType(c.header)
+			Equals(t, c.exp, act)
+		})
+	}
+}
+
+func TestParseBitbucketServerCommentEvent_EmptyString(t *testing.T) {
+	_, _, _, _, _, err := parser.ParseBitbucketServerCommentEvent([]byte(""))
+	ErrEquals(t, "parsing json: unexpected end of JSON input", err)
+}
+
+func TestParseBitbucketServerCommentEvent_EmptyObject(t *testing.T) {
+	_, _, _, _, _, err := parser.ParseBitbucketServerCommentEvent([]byte("{}"))
+	ErrContains(t, `API response "{}" was missing fields: Key: 'CommentEvent.CommonEventData.Actor' Error:Field validation for 'Actor' failed on the 'required' tag`, err)
+}
+
+func TestParseBitbucketServerCommentEvent_CommitHashMissing(t *testing.T) {
+	path := filepath.Join("testdata", "bitbucket-server-comment-event.json")
+	bytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		Ok(t, err)
+	}
+	emptyCommitHash := strings.Replace(string(bytes), `"latestCommit": "bfb1af1ba9c2a2fa84cd61af67e6e1b60a22e060",`, "", -1)
+	_, _, _, _, _, err = parser.ParseBitbucketServerCommentEvent([]byte(emptyCommitHash))
+	ErrContains(t, "Key: 'CommentEvent.CommonEventData.PullRequest.FromRef.LatestCommit' Error:Field validation for 'LatestCommit' failed on the 'required' tag", err)
+}
+
+func TestParseBitbucketServerCommentEvent_ValidEvent(t *testing.T) {
+	path := filepath.Join("testdata", "bitbucket-server-comment-event.json")
+	bytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		Ok(t, err)
+	}
+	pull, baseRepo, headRepo, user, comment, err := parser.ParseBitbucketServerCommentEvent(bytes)
+	Ok(t, err)
+	expBaseRepo := models.Repo{
+		FullName:          "atlantis/atlantis-example",
+		Owner:             "atlantis",
+		Name:              "atlantis-example",
+		CloneURL:          "http://bitbucket-user:bitbucket-token@mycorp.com:7490/scm/at/atlantis-example.git",
+		SanitizedCloneURL: "http://mycorp.com:7490/scm/at/atlantis-example.git",
+		VCSHost: models.VCSHost{
+			Hostname: "mycorp.com",
+			Type:     models.BitbucketServer,
+		},
+	}
+	Equals(t, expBaseRepo, baseRepo)
+	Equals(t, models.PullRequest{
+		Num:        1,
+		HeadCommit: "bfb1af1ba9c2a2fa84cd61af67e6e1b60a22e060",
+		URL:        "http://mycorp.com:7490/projects/AT/repos/atlantis-example/pull-requests/1",
+		Branch:     "branch",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo:   expBaseRepo,
+	}, pull)
+	Equals(t, models.Repo{
+		FullName:          "atlantis-fork/atlantis-example",
+		Owner:             "atlantis-fork",
+		Name:              "atlantis-example",
+		CloneURL:          "http://bitbucket-user:bitbucket-token@mycorp.com:7490/scm/fk/atlantis-example.git",
+		SanitizedCloneURL: "http://mycorp.com:7490/scm/fk/atlantis-example.git",
+		VCSHost: models.VCSHost{
+			Hostname: "mycorp.com",
+			Type:     models.BitbucketServer,
+		},
+	}, headRepo)
+	Equals(t, models.User{
+		Username: "lkysow",
+	}, user)
+	Equals(t, "atlantis plan", comment)
+}
+
+func TestParseBitbucketServerCommentEvent_MultipleStates(t *testing.T) {
+	path := filepath.Join("testdata", "bitbucket-server-comment-event.json")
+	bytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		Ok(t, err)
+	}
+
+	cases := []struct {
+		pullState string
+		exp       models.PullRequestState
+	}{
+		{
+			"OPEN",
+			models.OpenPullState,
+		},
+		{
+			"MERGED",
+			models.ClosedPullState,
+		},
+		{
+			"DECLINED",
+			models.ClosedPullState,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.pullState, func(t *testing.T) {
+			withState := strings.Replace(string(bytes), `"state": "OPEN"`, fmt.Sprintf(`"state": "%s"`, c.pullState), -1)
+			pull, _, _, _, _, err := parser.ParseBitbucketServerCommentEvent([]byte(withState))
+			Ok(t, err)
+			Equals(t, c.exp, pull.State)
+		})
+	}
+}
+
+func TestParseBitbucketServerPullEvent_ValidEvent(t *testing.T) {
+	path := filepath.Join("testdata", "bitbucket-server-pull-event-merged.json")
+	bytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		Ok(t, err)
+	}
+	pull, baseRepo, headRepo, user, err := parser.ParseBitbucketServerPullEvent(bytes)
+	Ok(t, err)
+	expBaseRepo := models.Repo{
+		FullName:          "atlantis/atlantis-example",
+		Owner:             "atlantis",
+		Name:              "atlantis-example",
+		CloneURL:          "http://bitbucket-user:bitbucket-token@mycorp.com:7490/scm/at/atlantis-example.git",
+		SanitizedCloneURL: "http://mycorp.com:7490/scm/at/atlantis-example.git",
+		VCSHost: models.VCSHost{
+			Hostname: "mycorp.com",
+			Type:     models.BitbucketServer,
+		},
+	}
+	Equals(t, expBaseRepo, baseRepo)
+	Equals(t, models.PullRequest{
+		Num:        2,
+		HeadCommit: "86a574157f5a2dadaf595b9f06c70fdfdd039912",
+		URL:        "http://mycorp.com:7490/projects/AT/repos/atlantis-example/pull-requests/2",
+		Branch:     "branch",
+		Author:     "lkysow",
+		State:      models.ClosedPullState,
+		BaseRepo:   expBaseRepo,
+	}, pull)
+	Equals(t, models.Repo{
+		FullName:          "atlantis-fork/atlantis-example",
+		Owner:             "atlantis-fork",
+		Name:              "atlantis-example",
+		CloneURL:          "http://bitbucket-user:bitbucket-token@mycorp.com:7490/scm/fk/atlantis-example.git",
+		SanitizedCloneURL: "http://mycorp.com:7490/scm/fk/atlantis-example.git",
+		VCSHost: models.VCSHost{
+			Hostname: "mycorp.com",
+			Type:     models.BitbucketServer,
+		},
+	}, headRepo)
+	Equals(t, models.User{
+		Username: "lkysow",
+	}, user)
+}
+
+func TestGetBitbucketServerEventType(t *testing.T) {
+	cases := []struct {
+		header string
+		exp    models.PullRequestEventType
+	}{
+		{
+			header: "pr:opened",
+			exp:    models.OpenedPullEvent,
+		},
+		{
+			header: "pr:merged",
+			exp:    models.ClosedPullEvent,
+		},
+		{
+			header: "pr:declined",
+			exp:    models.ClosedPullEvent,
+		},
+		{
+			header: "random",
+			exp:    models.OtherPullEvent,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.header, func(t *testing.T) {
+			act := parser.GetBitbucketServerEventType(c.header)
 			Equals(t, c.exp, act)
 		})
 	}

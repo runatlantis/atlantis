@@ -173,7 +173,7 @@ func (e *EventsController) handleBitbucketServerPost(w http.ResponseWriter, r *h
 		}
 	}
 	switch eventType {
-	case bitbucketserver.PullCreatedHeader, bitbucketserver.PullFulfilledHeader, bitbucketserver.PullDeclinedHeader:
+	case bitbucketserver.PullCreatedHeader, bitbucketserver.PullMergedHeader, bitbucketserver.PullDeclinedHeader:
 		e.Logger.Debug("handling as pull request state changed event")
 		e.HandleBitbucketServerPullRequestEvent(w, eventType, body, reqID)
 		return

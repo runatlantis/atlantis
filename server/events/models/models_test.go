@@ -41,6 +41,24 @@ func TestNewRepo_CloneURLWrongRepo(t *testing.T) {
 	ErrEquals(t, `expected clone url to have path "/owner/repo.git" but had "/notowner/repo.git"`, err)
 }
 
+// For bitbucket server we don't validate the clone URL because the callers
+// are actually constructing it.
+func TestNewRepo_CloneURLBitbucketServer(t *testing.T) {
+	repo, err := models.NewRepo(models.BitbucketServer, "owner/repo", "http://mycorp.com:7990/scm/at/atlantis-example.git", "u", "p")
+	Ok(t, err)
+	Equals(t, models.Repo{
+		FullName:          "owner/repo",
+		Owner:             "owner",
+		Name:              "repo",
+		CloneURL:          "http://u:p@mycorp.com:7990/scm/at/atlantis-example.git",
+		SanitizedCloneURL: "http://mycorp.com:7990/scm/at/atlantis-example.git",
+		VCSHost: models.VCSHost{
+			Hostname: "mycorp.com",
+			Type:     models.BitbucketServer,
+		},
+	}, repo)
+}
+
 func TestNewRepo_FullNameWrongFormat(t *testing.T) {
 	cases := []string{
 		"owner/repo/extra",

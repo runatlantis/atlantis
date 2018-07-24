@@ -96,8 +96,10 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 			l.Logger.Err("unable to obtain working dir lock when trying to delete old plans: %s", err)
 		} else {
 			defer unlock()
-			err = l.WorkingDir.DeleteForWorkspace(lock.Pull.BaseRepo, lock.Pull, lock.Workspace)
-			l.Logger.Err("unable to delete workspace: %s", err)
+			// nolint: vetshadow
+			if err := l.WorkingDir.DeleteForWorkspace(lock.Pull.BaseRepo, lock.Pull, lock.Workspace); err != nil {
+				l.Logger.Err("unable to delete workspace: %s", err)
+			}
 		}
 
 		// Once the lock has been deleted, comment back on the pull request.

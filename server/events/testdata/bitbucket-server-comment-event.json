@@ -32,9 +32,9 @@
         "statusMessage": "Available",
         "forkable": true,
         "project": {
-          "key": "AT",
+          "key": "FK",
           "id": 1,
-          "name": "atlantis",
+          "name": "atlantis-fork",
           "public": false,
           "type": "NORMAL"
         },

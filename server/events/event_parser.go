@@ -435,7 +435,7 @@ func (e *EventParser) GetBitbucketServerEventType(eventTypeHeader string) models
 	switch eventTypeHeader {
 	case bitbucketserver.PullCreatedHeader:
 		return models.OpenedPullEvent
-	case bitbucketserver.PullFulfilledHeader, bitbucketserver.PullDeclinedHeader:
+	case bitbucketserver.PullMergedHeader, bitbucketserver.PullDeclinedHeader:
 		return models.ClosedPullEvent
 	}
 	return models.OtherPullEvent

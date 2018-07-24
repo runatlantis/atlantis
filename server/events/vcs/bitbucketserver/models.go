@@ -2,7 +2,7 @@ package bitbucketserver
 
 const (
 	PullCreatedHeader        = "pr:opened"
-	PullFulfilledHeader      = "pr:merged"
+	PullMergedHeader         = "pr:merged"
 	PullDeclinedHeader       = "pr:declined"
 	PullCommentCreatedHeader = "pr:comment:added"
 )

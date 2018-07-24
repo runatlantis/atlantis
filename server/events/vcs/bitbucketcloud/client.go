@@ -13,10 +13,6 @@ import (
 	"gopkg.in/go-playground/validator.v9"
 )
 
-const (
-	APIBaseURL = "https://api.bitbucket.org"
-)
-
 type Client struct {
 	HttpClient  *http.Client
 	Username    string
@@ -37,7 +33,7 @@ func NewClient(httpClient *http.Client, username string, password string, atlant
 		HttpClient:  httpClient,
 		Username:    username,
 		Password:    password,
-		BaseURL:     APIBaseURL,
+		BaseURL:     BaseURL,
 		AtlantisURL: atlantisURL,
 	}
 }
@@ -57,7 +53,7 @@ func (b *Client) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]
 		}
 		var diffStat DiffStat
 		if err := json.Unmarshal(resp, &diffStat); err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "Could not parse response %q", string(resp))
 		}
 		if err := validator.New().Struct(diffStat); err != nil {
 			return nil, errors.Wrapf(err, "API response %q was missing fields", string(resp))
@@ -108,7 +104,7 @@ func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool
 	}
 	var pullResp PullRequest
 	if err := json.Unmarshal(resp, &pullResp); err != nil {
-		return false, err
+		return false, errors.Wrapf(err, "Could not parse response %q", string(resp))
 	}
 	if err := validator.New().Struct(pullResp); err != nil {
 		return false, errors.Wrapf(err, "API response %q was missing fields", string(resp))
