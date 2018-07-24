@@ -1,4 +1,4 @@
-# The runatlantis/atlantis-base image is described in the Dockerfile-base image.
+# The runatlantis/atlantis-base is created by docker-base/Dockerfile.
 FROM runatlantis/atlantis-base:latest
 LABEL authors="Anubhav Mishra, Luke Kysow"
 
