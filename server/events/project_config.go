@@ -106,7 +106,7 @@ func (c *ProjectConfigManager) Exists(projectPath string) bool {
 func (c *ProjectConfigManager) Read(execPath string) (ProjectConfig, error) {
 	var pc ProjectConfig
 	filename := filepath.Join(execPath, ProjectConfigFile)
-	raw, err := ioutil.ReadFile(filename)
+	raw, err := ioutil.ReadFile(filename) // nolint: gosec
 	if err != nil {
 		return pc, errors.Wrapf(err, "reading %s", ProjectConfigFile)
 	}
