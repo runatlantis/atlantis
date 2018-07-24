@@ -43,11 +43,11 @@ const (
 	GHHostnameFlag        = "gh-hostname"
 	GHTokenFlag           = "gh-token"
 	GHUserFlag            = "gh-user"
-	GHWebHookSecret       = "gh-webhook-secret" // nolint: gas
+	GHWebHookSecret       = "gh-webhook-secret" // nolint: gosec
 	GitlabHostnameFlag    = "gitlab-hostname"
 	GitlabTokenFlag       = "gitlab-token"
 	GitlabUserFlag        = "gitlab-user"
-	GitlabWebHookSecret   = "gitlab-webhook-secret"
+	GitlabWebHookSecret   = "gitlab-webhook-secret" // nolint: gosec
 	LogLevelFlag          = "log-level"
 	PortFlag              = "port"
 	RepoWhitelistFlag     = "repo-whitelist"

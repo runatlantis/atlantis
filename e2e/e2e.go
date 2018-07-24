@@ -45,7 +45,7 @@ resource "null_resource" "hello" {
 }
 `
 
-// nolint: gas
+// nolint: gosec
 func (t *E2ETester) Start() (*E2EResult, error) {
 	cloneDir := fmt.Sprintf("%s/%s-test", t.cloneDirRoot, t.projectType.Name)
 	branchName := fmt.Sprintf("%s-%s", t.projectType.Name, time.Now().Format("20060102150405"))

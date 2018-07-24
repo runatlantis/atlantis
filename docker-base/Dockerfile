@@ -14,12 +14,12 @@ ENV ATLANTIS_HOME_DIR=/home/atlantis
 ENV DUMB_INIT_VERSION=1.2.0
 ENV GOSU_VERSION=1.10
 RUN apk add --no-cache ca-certificates gnupg curl git unzip bash openssh libcap openssl && \
-    curl -L -o -s /bin/dumb-init https://github.com/Yelp/dumb-init/releases/download/v${DUMB_INIT_VERSION}/dumb-init_${DUMB_INIT_VERSION}_amd64 && \
+    curl -L -s --output /bin/dumb-init "https://github.com/Yelp/dumb-init/releases/download/v${DUMB_INIT_VERSION}/dumb-init_${DUMB_INIT_VERSION}_amd64" && \
     chmod +x /bin/dumb-init && \
     mkdir -p /tmp/build && \
     cd /tmp/build && \
-    curl -L -o -s gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-amd64" && \
-    curl -L -o -s gosu.asc "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-amd64.asc" && \
+    curl -L -s --output gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-amd64" && \
+    curl -L -s --output gosu.asc "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-amd64.asc" && \
     for server in $(shuf -e ipv4.pool.sks-keyservers.net \
                             hkp://p80.pool.sks-keyservers.net:80 \
                             keyserver.ubuntu.com \
@@ -34,3 +34,7 @@ RUN apk add --no-cache ca-certificates gnupg curl git unzip bash openssh libcap 
         rm -rf /tmp/build && \
         apk del gnupg openssl && \
         rm -rf /root/.gnupg && rm -rf /var/cache/apk/*
+
+# set up nsswitch.conf for Go's "netgo" implementation
+# - https://github.com/golang/go/blob/go1.9.1/src/net/conf.go#L194-L275
+RUN [ ! -e /etc/nsswitch.conf ] && echo 'hosts: files dns' > /etc/nsswitch.conf

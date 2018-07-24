@@ -24,7 +24,7 @@ type ParserValidator struct{}
 // HasConfigFile.
 func (p *ParserValidator) ReadConfig(repoDir string) (valid.Config, error) {
 	configFile := p.configFilePath(repoDir)
-	configData, err := ioutil.ReadFile(configFile)
+	configData, err := ioutil.ReadFile(configFile) // nolint: gosec
 
 	// NOTE: the error we return here must also be os.IsNotExist since that's
 	// what our callers use to detect a missing config file.

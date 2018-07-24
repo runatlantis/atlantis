@@ -1,7 +1,7 @@
 {
   "Disable": ["gotype", "gotypex", "maligned", "gocyclo", "golint"],
   "Enable": [
-    "gas",
+    "gosec",
     "errcheck",
     "deadcode",
     "gochecknoinits",
@@ -32,7 +32,7 @@
   "Skip": ["server/static", "mocks"],
   "WarnUnmatchedDirective": true,
   "Linters": {
-    "gas": "gas -exclude=G104 -fmt=csv:^(?P<path>.*?\\.go),(?P<line>\\d+),(?P<message>[^,]+,[^,]+,[^,]+)",
+    "gosec": "gosec -exclude=G104 -fmt=csv:^(?P<path>.*?\\.go),(?P<line>\\d+),(?P<message>[^,]+,[^,]+,[^,]+)",
     "errcheck": {
       "Command": "errcheck -abspath -ignore 'fmt:.*'",
       "Pattern": "PATH:LINE:COL:MESSAGE",
