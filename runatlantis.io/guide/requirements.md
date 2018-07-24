@@ -6,7 +6,7 @@
 * GitHub (public, private or enterprise)
 * GitLab (public, private or enterprise)
 * Bitbucket Cloud aka bitbucket.org (public or private)
-* Bitbucket Server aka Stash (Coming soon: [https://github.com/runatlantis/atlantis/issues/190](https://github.com/runatlantis/atlantis/issues/190))
+* Bitbucket Server aka Stash
 
 ## Remote State
 Atlantis supports all remote state backends. It **does not** support local state

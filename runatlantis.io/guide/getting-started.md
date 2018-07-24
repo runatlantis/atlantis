@@ -1,5 +1,5 @@
 # Getting Started
-These instructions are for running Atlantis locally so you can test it out against
+These instructions are for running Atlantis **locally on your own computer** so you can test it out against
 your own repositories before deciding whether to install it more permanently.
 
 ::: tip
@@ -43,7 +43,7 @@ URL="https://{YOUR_HOSTNAME}.ngrok.io"
 GitHub and GitLab use webhook secrets so clients can verify that the webhooks came
 from them.
 ::: warning
-Bitbucket Cloud (bitbucket.org) doesn't use webhook secrets so if you're using Bitbucket you can skip this
+Bitbucket Cloud (bitbucket.org) doesn't use webhook secrets so if you're using Bitbucket Cloud you can skip this
 however you should whitelist Bitbucket IPs as a precaution.
 :::
 Create a random string of any length (you can use [http://www.unit-conversion.info/texttools/random-string-generator/](http://www.unit-conversion.info/texttools/random-string-generator/))
@@ -55,59 +55,98 @@ SECRET="{YOUR_RANDOM_STRING}"
 ## Add Webhook
 Take the URL that ngrok output and create a webhook in your GitHub, GitLab or Bitbucket repo:
 
-### GitHub
-- Go to your repo's settings
-- Select **Webhooks** or **Hooks** in the sidebar
-- Click **Add webhook**
-- set **Payload URL** to your ngrok url with `/events` at the end. Ex. `https://c5004d84.ngrok.io/events`
-- double-check you added `/events` to the end of your URL.
-- set **Content type** to `application/json`
-- set **Secret** to your random string
-- select **Let me select individual events**
-- check the boxes
-	- **Pull request reviews**
-	- **Pushes**
-	- **Issue comments**
-	- **Pull requests**
-- leave **Active** checked
-- click **Add webhook**
+### GitHub or GitHub Enterprise
+<details>
+    <summary>Expand</summary>
+    <ul>
+        <li>Go to your repo's settings</li>
+        <li>Select <strong>Webhooks</strong> or <strong>Hooks</strong> in the sidebar</li>
+        <li>Click <strong>Add webhook</strong></li>
+        <li>set <strong>Payload URL</strong> to your ngrok url with <code>/events</code> at the end. Ex. <code>https://c5004d84.ngrok.io/events</code></li>
+        <li>double-check you added <code>/events</code> to the end of your URL.</li>
+        <li>set <strong>Content type</strong> to <code>application/json</code></li>
+        <li>set <strong>Secret</strong> to your random string</li>
+        <li>select <strong>Let me select individual events</strong></li>
+        <li>check the boxes
+            <ul>
+                <li><strong>Pull request reviews</strong></li>
+                <li><strong>Pushes</strong></li>
+                <li><strong>Issue comments</strong></li>
+                <li><strong>Pull requests</strong></li>
+            </ul>
+        </li>
+        <li>leave <strong>Active</strong> checked</li>
+        <li>click <strong>Add webhook</strong></li>
+    </ul>
+</details>
 
-### GitLab
-- Go to your repo's home page
-- Click **Settings > Integrations** in the sidebar
-- set **URL** to your ngrok url with `/events` at the end. Ex. `https://c5004d84.ngrok.io/events`
-- double-check you added `/events` to the end of your URL.
-- set **Secret Token** to your random string
-- check the boxes
-    - **Push events**
-    - **Comments**
-    - **Merge Request events**
-- leave **Enable SSL verification** checked
-- click **Add webhook**
+### GitLab or GitLab Enterprise
+<details>
+    <summary>Expand</summary>
+    <ul>
+        <li>Go to your repo's home page</li>
+        <li>Click <strong>Settings &gt; Integrations</strong> in the sidebar</li>
+        <li>set <strong>URL</strong> to your ngrok url with <code>/events</code> at the end. Ex. <code>https://c5004d84.ngrok.io/events</code></li>
+        <li>double-check you added <code>/events</code> to the end of your URL.</li>
+        <li>set <strong>Secret Token</strong> to your random string</li>
+        <li>check the boxes
+            <ul>
+                <li><strong>Push events</strong></li>
+                <li><strong>Comments</strong></li>
+                <li><strong>Merge Request events</strong></li>
+            </ul>
+        </li>
+        <li>leave <strong>Enable SSL verification</strong> checked</li>
+        <li>click <strong>Add webhook</strong></li>
+    </ul>
+</details>
 
 ### Bitbucket Cloud (bitbucket.org)
-- Go to your repo's home page
-- Click **Settings** in the sidebar
-- Click **Webhooks** under the **WORKFLOW** section
-- Click **Add webhook**
-- Enter "Atlantis" for **Title**
-- set **URL** to your ngrok url with `/events` at the end. Ex. `https://c5004d84.ngrok.io/events`
-- double-check you added `/events` to the end of your URL.
-- Keep **Status** as Active
-- Don't check **Skip certificate validation** because NGROK has a valid cert.
-- Select **Choose from a full list of triggers**
-- Under **Repository** **un**check everything
-- Under **Issues** leave everything **un**checked
-- Under **Pull Request**, select: Created, Updated, Merged, Declined and Comment created
-- Click **Save**
-<img src="./images/bitbucket-webhook.png" alt="Bitbucket Webhook" style="max-height: 500px">
+<details>
+    <summary>Expand</summary>
+    <ul>
+        <li>Go to your repo's home page</li>
+        <li>Click <strong>Settings</strong> in the sidebar</li>
+        <li>Click <strong>Webhooks</strong> under the <strong>WORKFLOW</strong> section</li>
+        <li>Click <strong>Add webhook</strong></li>
+        <li>Enter "Atlantis" for <strong>Title</strong></li>
+        <li>Set <strong>URL</strong> to your ngrok url with <code>/events</code> at the end. Ex. <code>https://c5004d84.ngrok.io/events</code></li>
+        <li>Double-check you added <code>/events</code> to the end of your URL.</li>
+        <li>Keep <strong>Status</strong> as Active</li>
+        <li>Don't check <strong>Skip certificate validation</strong> because NGROK has a valid cert.</li>
+        <li>Select <strong>Choose from a full list of triggers</strong></li>
+        <li>Under <strong>Repository</strong><strong>un</strong>check everything</li>
+        <li>Under <strong>Issues</strong> leave everything <strong>un</strong>checked</li>
+        <li>Under <strong>Pull Request</strong>, select: Created, Updated, Merged, Declined and Comment created</li>
+        <li>Click <strong>Save</strong><img src="./images/bitbucket-webhook.png" alt="Bitbucket Webhook" style="max-height: 500px;"></li>
+    </ul>
+</details>
+
+### Bitbucket Server (aka Stash)
+<details>
+    <summary>Expand</summary>
+    <ul>
+        <li>Go to your repo's home page</li>
+        <li>Click <strong>Settings</strong> in the sidebar</li>
+        <li>Click <strong>Webhooks</strong> under the <strong>WORKFLOW</strong> section</li>
+        <li>Click <strong>Create webhook</strong></li>
+        <li>Enter "Atlantis" for <strong>Name</strong></li>
+        <li>Set <strong>URL</strong> to your ngrok url with <code>/events</code> at the end. Ex. <code>https://c5004d84.ngrok.io/events</code></li>
+        <li>Double-check you added <code>/events</code> to the end of your URL.</li>
+        <li>Set <strong>Secret</strong> to your random string</li>
+        <li>Under <strong>Repository</strong> select <strong>Push</strong></li>
+        <li>Under <strong>Pull Request</strong>, select: Opened, Modified, Merged, Declined, Deleted and Comment added</li>
+        <li>Click <strong>Save</strong><img src="./images/bitbucket-server-webhook.png" alt="Bitbucket Webhook" style="max-height: 500px;"></li>
+    </ul>
+</details>
+
 
 ## Create an access token for Atlantis
 We recommend using a dedicated CI user or creating a new user named **@atlantis** that performs all API actions, however for testing,
 you can use your own user. Here we'll create the access token that Atlantis uses to comment on the pull request and
 set commit statuses.
 
-### GitHub
+### GitHub or GitHub Enterprise
 - follow [https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/#creating-a-token](https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/#creating-a-token)
 - create a token with **repo** scope
 - set the token as an environment variable
@@ -115,7 +154,7 @@ set commit statuses.
 TOKEN="{YOUR_TOKEN}"
 ```
 
-### GitLab
+### GitLab or GitLab Enterprise
 - follow [https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#creating-a-personal-access-token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#creating-a-personal-access-token)
 - create a token with **api** scope
 - set the token as an environment variable
@@ -132,6 +171,17 @@ TOKEN="{YOUR_TOKEN}"
 TOKEN="{YOUR_TOKEN}"
 ```
 
+### Bitbucket Server (aka Stash)
+- Click on your avatar in the top right and select **Manage account**
+- Click **Personal access tokens** in the sidebar
+- Click **Create a token**
+- Name the token **atlantis**
+- Give the token **Read** Project permissions and **Write** Pull request permissions
+- Click **create** and set the token as an environment variable
+```
+TOKEN="{YOUR_TOKEN}"
+```
+
 
 ## Start Atlantis
 You're almost ready to start Atlantis, just set two more variables:
@@ -140,6 +190,9 @@ You're almost ready to start Atlantis, just set two more variables:
 USERNAME="{the username of your GitHub, GitLab or Bitbucket user}"
 REPO_WHITELIST="$YOUR_GIT_HOST/$YOUR_USERNAME/$YOUR_REPO"
 # ex. REPO_WHITELIST="github.com/runatlantis/atlantis"
+# If you're using Bitbucket Server, $YOUR_GIT_HOST will be the domain name of your
+# server without scheme or port and $YOUR_USERNAME will be the name of the **project** the repo
+# is under, **not the key** of the project.
 ```
 Now you can start Atlantis. The exact command differs depending on your Git Host:
 
@@ -193,6 +246,18 @@ atlantis server \
 --atlantis-url="$URL" \
 --bitbucket-user="$USERNAME" \
 --bitbucket-token="$TOKEN" \
+--repo-whitelist="$REPO_WHITELIST"
+```
+
+### Bitbucket Server (aka Stash)
+```bash
+BASE_URL=YOUR_BITBUCKET_SERVER_URL # ex. http://bitbucket.mycorp:7990
+atlantis server \
+--atlantis-url="$URL" \
+--bitbucket-user="$USERNAME" \
+--bitbucket-token="$TOKEN" \
+--bitbucket-webhook-secret="$SECRET" \
+--bitbucket-base-url="$BASE_URL" \
 --repo-whitelist="$REPO_WHITELIST"
 ```
 
