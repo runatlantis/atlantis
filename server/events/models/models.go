@@ -79,9 +79,14 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 		}
 	}
 
-	// Construct clone urls with http auth. Need to do both https and http
-	// because in GitLab's docs they have some http urls.
-	auth := fmt.Sprintf("%s:%s@", vcsUser, vcsToken)
+	// We url encode because we're using them in a URL and weird characters can
+	// mess up git.
+	escapedVCSUser := url.QueryEscape(vcsUser)
+	escapedVCSToken := url.QueryEscape(vcsToken)
+	auth := fmt.Sprintf("%s:%s@", escapedVCSUser, escapedVCSToken)
+
+	// Construct clone urls with http and https auth. Need to do both
+	// because Bitbucket supports http.
 	authedCloneURL := strings.Replace(cloneURL, "https://", "https://"+auth, -1)
 	authedCloneURL = strings.Replace(authedCloneURL, "http://", "http://"+auth, -1)
 
