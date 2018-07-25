@@ -125,3 +125,60 @@ func TestProject_String(t *testing.T) {
 		Path:         "my/path",
 	}).String())
 }
+
+func TestNewProject(t *testing.T) {
+	cases := []struct {
+		path    string
+		expPath string
+	}{
+		{
+			"/",
+			".",
+		},
+		{
+			"./another/path",
+			"another/path",
+		},
+		{
+			".",
+			".",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.path, func(t *testing.T) {
+			p := models.NewProject("repo/owner", c.path)
+			Equals(t, c.expPath, p.Path)
+		})
+	}
+}
+
+func TestVCSHostType_ToString(t *testing.T) {
+	cases := []struct {
+		vcsType models.VCSHostType
+		exp     string
+	}{
+		{
+			models.Github,
+			"Github",
+		},
+		{
+			models.Gitlab,
+			"Gitlab",
+		},
+		{
+			models.BitbucketCloud,
+			"BitbucketCloud",
+		},
+		{
+			models.BitbucketServer,
+			"BitbucketServer",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.exp, func(t *testing.T) {
+			Equals(t, c.exp, c.vcsType.String())
+		})
+	}
+}
