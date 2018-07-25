@@ -41,6 +41,24 @@ func TestNewRepo_CloneURLWrongRepo(t *testing.T) {
 	ErrEquals(t, `expected clone url to have path "/owner/repo.git" but had "/notowner/repo.git"`, err)
 }
 
+// For bitbucket server we don't validate the clone URL because the callers
+// are actually constructing it.
+func TestNewRepo_CloneURLBitbucketServer(t *testing.T) {
+	repo, err := models.NewRepo(models.BitbucketServer, "owner/repo", "http://mycorp.com:7990/scm/at/atlantis-example.git", "u", "p")
+	Ok(t, err)
+	Equals(t, models.Repo{
+		FullName:          "owner/repo",
+		Owner:             "owner",
+		Name:              "repo",
+		CloneURL:          "http://u:p@mycorp.com:7990/scm/at/atlantis-example.git",
+		SanitizedCloneURL: "http://mycorp.com:7990/scm/at/atlantis-example.git",
+		VCSHost: models.VCSHost{
+			Hostname: "mycorp.com",
+			Type:     models.BitbucketServer,
+		},
+	}, repo)
+}
+
 func TestNewRepo_FullNameWrongFormat(t *testing.T) {
 	cases := []string{
 		"owner/repo/extra",
@@ -61,7 +79,7 @@ func TestNewRepo_FullNameWrongFormat(t *testing.T) {
 
 // If the clone url doesn't end with .git it is appended
 func TestNewRepo_MissingDotGit(t *testing.T) {
-	repo, err := models.NewRepo(models.Bitbucket, "owner/repo", "https://bitbucket.org/owner/repo", "u", "p")
+	repo, err := models.NewRepo(models.BitbucketCloud, "owner/repo", "https://bitbucket.org/owner/repo", "u", "p")
 	Ok(t, err)
 	Equals(t, repo.CloneURL, "https://u:p@bitbucket.org/owner/repo.git")
 	Equals(t, repo.SanitizedCloneURL, "https://bitbucket.org/owner/repo.git")
@@ -106,4 +124,61 @@ func TestProject_String(t *testing.T) {
 		RepoFullName: "owner/repo",
 		Path:         "my/path",
 	}).String())
+}
+
+func TestNewProject(t *testing.T) {
+	cases := []struct {
+		path    string
+		expPath string
+	}{
+		{
+			"/",
+			".",
+		},
+		{
+			"./another/path",
+			"another/path",
+		},
+		{
+			".",
+			".",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.path, func(t *testing.T) {
+			p := models.NewProject("repo/owner", c.path)
+			Equals(t, c.expPath, p.Path)
+		})
+	}
+}
+
+func TestVCSHostType_ToString(t *testing.T) {
+	cases := []struct {
+		vcsType models.VCSHostType
+		exp     string
+	}{
+		{
+			models.Github,
+			"Github",
+		},
+		{
+			models.Gitlab,
+			"Gitlab",
+		},
+		{
+			models.BitbucketCloud,
+			"BitbucketCloud",
+		},
+		{
+			models.BitbucketServer,
+			"BitbucketServer",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.exp, func(t *testing.T) {
+			Equals(t, c.exp, c.vcsType.String())
+		})
+	}
 }

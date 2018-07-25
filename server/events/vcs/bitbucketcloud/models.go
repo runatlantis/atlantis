@@ -1,4 +1,12 @@
-package bitbucket
+package bitbucketcloud
+
+const (
+	PullCreatedHeader        = "pullrequest:created"
+	PullUpdatedHeader        = "pullrequest:updated"
+	PullFulfilledHeader      = "pullrequest:fulfilled"
+	PullRejectedHeader       = "pullrequest:rejected"
+	PullCommentCreatedHeader = "pullrequest:comment_created"
+)
 
 type CommentEvent struct {
 	CommonEventData

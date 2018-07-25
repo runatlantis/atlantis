@@ -132,7 +132,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		pull, headRepo, err = c.getGithubData(baseRepo, pullNum)
 	case models.Gitlab:
 		pull, err = c.getGitlabData(baseRepo, pullNum)
-	case models.Bitbucket:
+	case models.BitbucketCloud, models.BitbucketServer:
 		if maybePull == nil {
 			err = errors.New("pull request should not be nil, this is a bug!")
 		}
@@ -228,13 +228,17 @@ func (c *DefaultCommandRunner) buildLogger(repoFullName string, pullNum int) *lo
 func (c *DefaultCommandRunner) validateCtxAndComment(ctx *CommandContext) bool {
 	if !c.AllowForkPRs && ctx.HeadRepo.Owner != ctx.BaseRepo.Owner {
 		ctx.Log.Info("command was run on a fork pull request which is disallowed")
-		c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, fmt.Sprintf("Atlantis commands can't be run on fork pull requests. To enable, set --%s", c.AllowForkPRsFlag)) // nolint: errcheck
+		if err := c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, fmt.Sprintf("Atlantis commands can't be run on fork pull requests. To enable, set --%s", c.AllowForkPRsFlag)); err != nil {
+			ctx.Log.Err("unable to comment: %s", err)
+		}
 		return false
 	}
 
 	if ctx.Pull.State != models.OpenPullState {
 		ctx.Log.Info("command was run on closed pull request")
-		c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, "Atlantis commands can't be run on closed pull requests") // nolint: errcheck
+		if err := c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, "Atlantis commands can't be run on closed pull requests"); err != nil {
+			ctx.Log.Err("unable to comment: %s", err)
+		}
 		return false
 	}
 	return true
@@ -253,7 +257,9 @@ func (c *DefaultCommandRunner) updatePull(ctx *CommandContext, command CommandIn
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 	comment := c.MarkdownRenderer.Render(res, command.CommandName(), ctx.Log.History.String(), command.IsVerbose())
-	c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, comment) // nolint: errcheck
+	if err := c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, comment); err != nil {
+		ctx.Log.Err("unable to comment: %s", err)
+	}
 }
 
 // logPanics logs and creates a comment on the pull request for panics.

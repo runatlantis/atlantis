@@ -1,0 +1,156 @@
+{
+  "id": 3,
+  "version": 0,
+  "title": "main.tf edited online with Bitbucket",
+  "state": "OPEN",
+  "open": true,
+  "closed": false,
+  "createdDate": 1532350340104,
+  "updatedDate": 1532350340104,
+  "fromRef": {
+    "id": "refs/heads/lkysow/maintf-1532350335286",
+    "displayId": "lkysow/maintf-1532350335286",
+    "latestCommit": "43b60c668d138b2070bb6a746e09ef513e51a891",
+    "repository": {
+      "slug": "atlantis-example",
+      "id": 1,
+      "name": "atlantis-example",
+      "scmId": "git",
+      "state": "AVAILABLE",
+      "statusMessage": "Available",
+      "forkable": true,
+      "project": {
+        "key": "AT",
+        "id": 1,
+        "name": "atlantis",
+        "public": false,
+        "type": "NORMAL",
+        "links": {
+          "self": [
+            {
+              "href": "http://localhost:7990/projects/AT"
+            }
+          ]
+        }
+      },
+      "public": false,
+      "links": {
+        "clone": [
+          {
+            "href": "http://localhost:7990/scm/at/atlantis-example.git",
+            "name": "http"
+          },
+          {
+            "href": "ssh://git@localhost:7999/at/atlantis-example.git",
+            "name": "ssh"
+          }
+        ],
+        "self": [
+          {
+            "href": "http://localhost:7990/projects/AT/repos/atlantis-example/browse"
+          }
+        ]
+      }
+    }
+  },
+  "toRef": {
+    "id": "refs/heads/master",
+    "displayId": "master",
+    "latestCommit": "bbc7b2a29344646ec8605be9603a0aa625a627ef",
+    "repository": {
+      "slug": "atlantis-example",
+      "id": 1,
+      "name": "atlantis-example",
+      "scmId": "git",
+      "state": "AVAILABLE",
+      "statusMessage": "Available",
+      "forkable": true,
+      "project": {
+        "key": "AT",
+        "id": 1,
+        "name": "atlantis",
+        "public": false,
+        "type": "NORMAL",
+        "links": {
+          "self": [
+            {
+              "href": "http://localhost:7990/projects/AT"
+            }
+          ]
+        }
+      },
+      "public": false,
+      "links": {
+        "clone": [
+          {
+            "href": "http://localhost:7990/scm/at/atlantis-example.git",
+            "name": "http"
+          },
+          {
+            "href": "ssh://git@localhost:7999/at/atlantis-example.git",
+            "name": "ssh"
+          }
+        ],
+        "self": [
+          {
+            "href": "http://localhost:7990/projects/AT/repos/atlantis-example/browse"
+          }
+        ]
+      }
+    }
+  },
+  "locked": false,
+  "author": {
+    "user": {
+      "name": "lkysow",
+      "emailAddress": "lkysow@gmail.com",
+      "id": 1,
+      "displayName": "Luke Kysow",
+      "active": true,
+      "slug": "lkysow",
+      "type": "NORMAL",
+      "links": {
+        "self": [
+          {
+            "href": "http://localhost:7990/users/lkysow"
+          }
+        ]
+      }
+    },
+    "role": "AUTHOR",
+    "approved": false,
+    "status": "UNAPPROVED"
+  },
+  "reviewers": [
+    {
+      "user": {
+        "name": "another-user",
+        "emailAddress": "lkysow@gmail.com",
+        "id": 2,
+        "displayName": "another-user",
+        "active": true,
+        "slug": "another-user",
+        "type": "NORMAL",
+        "links": {
+          "self": [
+            {
+              "href": "http://localhost:7990/users/another-user"
+            }
+          ]
+        }
+      },
+      "lastReviewedCommit": "43b60c668d138b2070bb6a746e09ef513e51a891",
+      "role": "REVIEWER",
+      "approved": true,
+      "status": "APPROVED"
+    }
+  ],
+  "participants": [],
+  "links": {
+    "self": [
+      {
+        "href": "http://localhost:7990/projects/AT/repos/atlantis-example/pull-requests/3"
+      }
+    ]
+  }
+}

@@ -24,7 +24,8 @@ import (
 	"github.com/lkysow/go-gitlab"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/vcs/bitbucket"
+	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
+	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
 	"gopkg.in/go-playground/validator.v9"
 )
 
@@ -123,47 +124,52 @@ type EventParsing interface {
 	ParseGitlabMergeRequest(mr *gitlab.MergeRequest, baseRepo models.Repo) models.PullRequest
 	ParseBitbucketCloudPullEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, err error)
 	ParseBitbucketCloudCommentEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, comment string, err error)
-	GetBitbucketEventType(eventTypeHeader string) models.PullRequestEventType
+	GetBitbucketCloudEventType(eventTypeHeader string) models.PullRequestEventType
+	ParseBitbucketServerPullEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, err error)
+	ParseBitbucketServerCommentEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, comment string, err error)
+	GetBitbucketServerEventType(eventTypeHeader string) models.PullRequestEventType
 }
 
 type EventParser struct {
-	GithubUser     string
-	GithubToken    string
-	GitlabUser     string
-	GitlabToken    string
-	BitbucketUser  string
-	BitbucketToken string
+	GithubUser         string
+	GithubToken        string
+	GitlabUser         string
+	GitlabToken        string
+	BitbucketUser      string
+	BitbucketToken     string
+	BitbucketServerURL string
 }
 
-// GetBitbucketEventType translates the bitbucket header name into a pull
+// GetBitbucketCloudEventType translates the bitbucket header name into a pull
 // request event type.
-func (e *EventParser) GetBitbucketEventType(eventTypeHeader string) models.PullRequestEventType {
+func (e *EventParser) GetBitbucketCloudEventType(eventTypeHeader string) models.PullRequestEventType {
 	switch eventTypeHeader {
-	case "pullrequest:created":
+	case bitbucketcloud.PullCreatedHeader:
 		return models.OpenedPullEvent
-	case "pullrequest:updated":
+	case bitbucketcloud.PullUpdatedHeader:
 		return models.UpdatedPullEvent
-	case "pullrequest:fulfilled", "pullrequest:rejected":
+	case bitbucketcloud.PullFulfilledHeader, bitbucketcloud.PullRejectedHeader:
 		return models.ClosedPullEvent
 	}
 	return models.OtherPullEvent
 }
 
 func (e *EventParser) ParseBitbucketCloudCommentEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, comment string, err error) {
-	var event bitbucket.CommentEvent
+	var event bitbucketcloud.CommentEvent
 	if err = json.Unmarshal(body, &event); err != nil {
 		err = errors.Wrap(err, "parsing json")
 		return
 	}
 	if err = validator.New().Struct(event); err != nil {
+		err = errors.Wrapf(err, "API response %q was missing fields", string(body))
 		return
 	}
-	pull, baseRepo, headRepo, user, err = e.parseCommonBitbucketEventData(event.CommonEventData)
+	pull, baseRepo, headRepo, user, err = e.parseCommonBitbucketCloudEventData(event.CommonEventData)
 	comment = *event.Comment.Content.Raw
 	return
 }
 
-func (e *EventParser) parseCommonBitbucketEventData(event bitbucket.CommonEventData) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
+func (e *EventParser) parseCommonBitbucketCloudEventData(event bitbucketcloud.CommonEventData) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
 	var prState models.PullRequestState
 	switch *event.PullRequest.State {
 	case "OPEN":
@@ -180,7 +186,7 @@ func (e *EventParser) parseCommonBitbucketEventData(event bitbucket.CommonEventD
 	}
 
 	headRepo, err = models.NewRepo(
-		models.Bitbucket,
+		models.BitbucketCloud,
 		*event.PullRequest.Source.Repository.FullName,
 		*event.PullRequest.Source.Repository.Links.HTML.HREF,
 		e.BitbucketUser,
@@ -189,7 +195,7 @@ func (e *EventParser) parseCommonBitbucketEventData(event bitbucket.CommonEventD
 		return
 	}
 	baseRepo, err = models.NewRepo(
-		models.Bitbucket,
+		models.BitbucketCloud,
 		*event.Repository.FullName,
 		*event.Repository.Links.HTML.HREF,
 		e.BitbucketUser,
@@ -214,15 +220,16 @@ func (e *EventParser) parseCommonBitbucketEventData(event bitbucket.CommonEventD
 }
 
 func (e *EventParser) ParseBitbucketCloudPullEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
-	var event bitbucket.PullRequestEvent
+	var event bitbucketcloud.PullRequestEvent
 	if err = json.Unmarshal(body, &event); err != nil {
 		err = errors.Wrap(err, "parsing json")
 		return
 	}
 	if err = validator.New().Struct(event); err != nil {
+		err = errors.Wrapf(err, "API response %q was missing fields", string(body))
 		return
 	}
-	pull, baseRepo, headRepo, user, err = e.parseCommonBitbucketEventData(event.CommonEventData)
+	pull, baseRepo, headRepo, user, err = e.parseCommonBitbucketCloudEventData(event.CommonEventData)
 	return
 }
 
@@ -422,4 +429,98 @@ func (e *EventParser) ParseGitlabMergeRequest(mr *gitlab.MergeRequest, baseRepo 
 		State:      pullState,
 		BaseRepo:   baseRepo,
 	}
+}
+
+func (e *EventParser) GetBitbucketServerEventType(eventTypeHeader string) models.PullRequestEventType {
+	switch eventTypeHeader {
+	case bitbucketserver.PullCreatedHeader:
+		return models.OpenedPullEvent
+	case bitbucketserver.PullMergedHeader, bitbucketserver.PullDeclinedHeader:
+		return models.ClosedPullEvent
+	}
+	return models.OtherPullEvent
+}
+
+func (e *EventParser) ParseBitbucketServerCommentEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, comment string, err error) {
+	var event bitbucketserver.CommentEvent
+	if err = json.Unmarshal(body, &event); err != nil {
+		err = errors.Wrap(err, "parsing json")
+		return
+	}
+	if err = validator.New().Struct(event); err != nil {
+		err = errors.Wrapf(err, "API response %q was missing fields", string(body))
+		return
+	}
+	pull, baseRepo, headRepo, user, err = e.parseCommonBitbucketServerEventData(event.CommonEventData)
+	comment = *event.Comment.Text
+	return
+}
+
+func (e *EventParser) parseCommonBitbucketServerEventData(event bitbucketserver.CommonEventData) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
+	var prState models.PullRequestState
+	switch *event.PullRequest.State {
+	case "OPEN":
+		prState = models.OpenPullState
+	case "MERGED":
+		prState = models.ClosedPullState
+	case "DECLINED":
+		prState = models.ClosedPullState
+	default:
+		err = fmt.Errorf("unable to determine pull request state from %q, this is a bug!", *event.PullRequest.State)
+		return
+	}
+
+	headRepoSlug := *event.PullRequest.FromRef.Repository.Slug
+	headRepoFullname := fmt.Sprintf("%s/%s", *event.PullRequest.FromRef.Repository.Project.Name, headRepoSlug)
+	headRepoCloneURL := fmt.Sprintf("%s/scm/%s/%s.git", e.BitbucketServerURL, strings.ToLower(*event.PullRequest.FromRef.Repository.Project.Key), headRepoSlug)
+	headRepo, err = models.NewRepo(
+		models.BitbucketServer,
+		headRepoFullname,
+		headRepoCloneURL,
+		e.BitbucketUser,
+		e.BitbucketToken)
+	if err != nil {
+		return
+	}
+
+	baseRepoSlug := *event.PullRequest.ToRef.Repository.Slug
+	baseRepoFullname := fmt.Sprintf("%s/%s", *event.PullRequest.ToRef.Repository.Project.Name, baseRepoSlug)
+	baseRepoCloneURL := fmt.Sprintf("%s/scm/%s/%s.git", e.BitbucketServerURL, strings.ToLower(*event.PullRequest.ToRef.Repository.Project.Key), baseRepoSlug)
+	baseRepo, err = models.NewRepo(
+		models.BitbucketServer,
+		baseRepoFullname,
+		baseRepoCloneURL,
+		e.BitbucketUser,
+		e.BitbucketToken)
+	if err != nil {
+		return
+	}
+
+	pull = models.PullRequest{
+		Num:        *event.PullRequest.ID,
+		HeadCommit: *event.PullRequest.FromRef.LatestCommit,
+		URL:        fmt.Sprintf("%s/projects/%s/repos/%s/pull-requests/%d", e.BitbucketServerURL, *event.PullRequest.ToRef.Repository.Project.Key, *event.PullRequest.ToRef.Repository.Slug, *event.PullRequest.ID),
+		Branch:     *event.PullRequest.FromRef.DisplayID,
+		Author:     *event.Actor.Username,
+		State:      prState,
+		BaseRepo:   baseRepo,
+	}
+	user = models.User{
+		Username: *event.Actor.Username,
+	}
+	return
+}
+
+func (e *EventParser) ParseBitbucketServerPullEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
+	var event bitbucketserver.PullRequestEvent
+	if err = json.Unmarshal(body, &event); err != nil {
+		err = errors.Wrap(err, "parsing json")
+		return
+	}
+	if err = validator.New().Struct(event); err != nil {
+		err = errors.Wrapf(err, "API response %q was missing fields", string(body))
+		return
+	}
+	pull, baseRepo, headRepo, user, err = e.parseCommonBitbucketServerEventData(event.CommonEventData)
+	return
 }

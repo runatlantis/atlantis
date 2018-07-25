@@ -40,7 +40,8 @@ import (
 	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	"github.com/runatlantis/atlantis/server/events/vcs"
-	"github.com/runatlantis/atlantis/server/events/vcs/bitbucket"
+	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
+	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -81,24 +82,25 @@ type Server struct {
 // The mapstructure tags correspond to flags in cmd/server.go and are used when
 // the config is parsed from a YAML file.
 type UserConfig struct {
-	AllowForkPRs        bool   `mapstructure:"allow-fork-prs"`
-	AllowRepoConfig     bool   `mapstructure:"allow-repo-config"`
-	AtlantisURL         string `mapstructure:"atlantis-url"`
-	BitbucketHostname   string `mapstructure:"bitbucket-hostname"`
-	BitbucketToken      string `mapstructure:"bitbucket-token"`
-	BitbucketUser       string `mapstructure:"bitbucket-user"`
-	DataDir             string `mapstructure:"data-dir"`
-	GithubHostname      string `mapstructure:"gh-hostname"`
-	GithubToken         string `mapstructure:"gh-token"`
-	GithubUser          string `mapstructure:"gh-user"`
-	GithubWebHookSecret string `mapstructure:"gh-webhook-secret"`
-	GitlabHostname      string `mapstructure:"gitlab-hostname"`
-	GitlabToken         string `mapstructure:"gitlab-token"`
-	GitlabUser          string `mapstructure:"gitlab-user"`
-	GitlabWebHookSecret string `mapstructure:"gitlab-webhook-secret"`
-	LogLevel            string `mapstructure:"log-level"`
-	Port                int    `mapstructure:"port"`
-	RepoWhitelist       string `mapstructure:"repo-whitelist"`
+	AllowForkPRs           bool   `mapstructure:"allow-fork-prs"`
+	AllowRepoConfig        bool   `mapstructure:"allow-repo-config"`
+	AtlantisURL            string `mapstructure:"atlantis-url"`
+	BitbucketBaseURL       string `mapstructure:"bitbucket-base-url"`
+	BitbucketToken         string `mapstructure:"bitbucket-token"`
+	BitbucketUser          string `mapstructure:"bitbucket-user"`
+	BitbucketWebhookSecret string `mapstructure:"bitbucket-webhook-secret"`
+	DataDir                string `mapstructure:"data-dir"`
+	GithubHostname         string `mapstructure:"gh-hostname"`
+	GithubToken            string `mapstructure:"gh-token"`
+	GithubUser             string `mapstructure:"gh-user"`
+	GithubWebhookSecret    string `mapstructure:"gh-webhook-secret"`
+	GitlabHostname         string `mapstructure:"gitlab-hostname"`
+	GitlabToken            string `mapstructure:"gitlab-token"`
+	GitlabUser             string `mapstructure:"gitlab-user"`
+	GitlabWebhookSecret    string `mapstructure:"gitlab-webhook-secret"`
+	LogLevel               string `mapstructure:"log-level"`
+	Port                   int    `mapstructure:"port"`
+	RepoWhitelist          string `mapstructure:"repo-whitelist"`
 	// RequireApproval is whether to require pull request approval before
 	// allowing terraform apply's to be run.
 	RequireApproval bool            `mapstructure:"require-approval"`
@@ -137,7 +139,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var supportedVCSHosts []models.VCSHostType
 	var githubClient *vcs.GithubClient
 	var gitlabClient *vcs.GitlabClient
-	var bitbucketClient *bitbucket.Client
+	var bitbucketCloudClient *bitbucketcloud.Client
+	var bitbucketServerClient *bitbucketserver.Client
 	if userConfig.GithubUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		var err error
@@ -168,17 +171,25 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 	}
 	if userConfig.BitbucketUser != "" {
-		supportedVCSHosts = append(supportedVCSHosts, models.Bitbucket)
-		var err error
-		bitbucketClient, err = bitbucket.NewClient(
-			http.DefaultClient,
-			userConfig.BitbucketUser,
-			userConfig.BitbucketToken,
-			// todo: don't hardcode when we allow for bitbucket server
-			"https://api.bitbucket.org/",
-			userConfig.AtlantisURL)
-		if err != nil {
-			return nil, errors.Wrapf(err, "setting up Bitbucket client")
+		if userConfig.BitbucketBaseURL == bitbucketcloud.BaseURL {
+			supportedVCSHosts = append(supportedVCSHosts, models.BitbucketCloud)
+			bitbucketCloudClient = bitbucketcloud.NewClient(
+				http.DefaultClient,
+				userConfig.BitbucketUser,
+				userConfig.BitbucketToken,
+				userConfig.AtlantisURL)
+		} else {
+			supportedVCSHosts = append(supportedVCSHosts, models.BitbucketServer)
+			var err error
+			bitbucketServerClient, err = bitbucketserver.NewClient(
+				http.DefaultClient,
+				userConfig.BitbucketUser,
+				userConfig.BitbucketToken,
+				userConfig.BitbucketBaseURL,
+				userConfig.AtlantisURL)
+			if err != nil {
+				return nil, errors.Wrapf(err, "setting up Bitbucket Server client")
+			}
 		}
 	}
 
@@ -196,7 +207,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing webhooks")
 	}
-	vcsClient := vcs.NewDefaultClientProxy(githubClient, gitlabClient, bitbucketClient)
+	vcsClient := vcs.NewDefaultClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient)
 	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient}
 	terraformClient, err := terraform.NewClient(userConfig.DataDir)
 	// The flag.Lookup call is to detect if we're running in a unit test. If we
@@ -232,12 +243,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	logger := logging.NewSimpleLogger("server", nil, false, logging.ToLogLevel(userConfig.LogLevel))
 	eventParser := &events.EventParser{
-		GithubUser:     userConfig.GithubUser,
-		GithubToken:    userConfig.GithubToken,
-		GitlabUser:     userConfig.GitlabUser,
-		GitlabToken:    userConfig.GitlabToken,
-		BitbucketUser:  userConfig.BitbucketUser,
-		BitbucketToken: userConfig.BitbucketToken,
+		GithubUser:         userConfig.GithubUser,
+		GithubToken:        userConfig.GithubToken,
+		GitlabUser:         userConfig.GitlabUser,
+		GitlabToken:        userConfig.GitlabToken,
+		BitbucketUser:      userConfig.BitbucketUser,
+		BitbucketToken:     userConfig.BitbucketToken,
+		BitbucketServerURL: userConfig.BitbucketBaseURL,
 	}
 	commentParser := &events.CommentParser{
 		GithubUser:  userConfig.GithubUser,
@@ -308,13 +320,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Parser:                       eventParser,
 		CommentParser:                commentParser,
 		Logger:                       logger,
-		GithubWebHookSecret:          []byte(userConfig.GithubWebHookSecret),
+		GithubWebhookSecret:          []byte(userConfig.GithubWebhookSecret),
 		GithubRequestValidator:       &DefaultGithubRequestValidator{},
 		GitlabRequestParserValidator: &DefaultGitlabRequestParserValidator{},
-		GitlabWebHookSecret:          []byte(userConfig.GitlabWebHookSecret),
+		GitlabWebhookSecret:          []byte(userConfig.GitlabWebhookSecret),
 		RepoWhitelistChecker:         repoWhitelist,
 		SupportedVCSHosts:            supportedVCSHosts,
 		VCSClient:                    vcsClient,
+		BitbucketWebhookSecret:       []byte(userConfig.BitbucketWebhookSecret),
 	}
 	return &Server{
 		AtlantisVersion:    config.AtlantisVersion,

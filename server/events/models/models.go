@@ -63,19 +63,30 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 		cloneURL += ".git"
 	}
 
-	// Ensure the Clone URL is for the same repo to avoid something malicious.
 	cloneURLParsed, err := url.Parse(cloneURL)
 	if err != nil {
 		return Repo{}, errors.Wrap(err, "invalid clone url")
 	}
-	expClonePath := fmt.Sprintf("/%s.git", repoFullName)
-	if expClonePath != cloneURLParsed.Path {
-		return Repo{}, fmt.Errorf("expected clone url to have path %q but had %q", expClonePath, cloneURLParsed.Path)
+
+	// Ensure the Clone URL is for the same repo to avoid something malicious.
+	// We skip this check for Bitbucket Server because its format is different
+	// and because the caller in that case actually constructs the clone url
+	// from the repo name and so there's no point checking if they match.
+	if vcsHostType != BitbucketServer {
+		expClonePath := fmt.Sprintf("/%s.git", repoFullName)
+		if expClonePath != cloneURLParsed.Path {
+			return Repo{}, fmt.Errorf("expected clone url to have path %q but had %q", expClonePath, cloneURLParsed.Path)
+		}
 	}
 
-	// Construct clone urls with http auth. Need to do both https and http
-	// because in GitLab's docs they have some http urls.
-	auth := fmt.Sprintf("%s:%s@", vcsUser, vcsToken)
+	// We url encode because we're using them in a URL and weird characters can
+	// mess up git.
+	escapedVCSUser := url.QueryEscape(vcsUser)
+	escapedVCSToken := url.QueryEscape(vcsToken)
+	auth := fmt.Sprintf("%s:%s@", escapedVCSUser, escapedVCSToken)
+
+	// Construct clone urls with http and https auth. Need to do both
+	// because Bitbucket supports http.
 	authedCloneURL := strings.Replace(cloneURL, "https://", "https://"+auth, -1)
 	authedCloneURL = strings.Replace(authedCloneURL, "http://", "http://"+auth, -1)
 
@@ -108,9 +119,9 @@ type PullRequest struct {
 	// Num is the pull request number or ID.
 	Num int
 	// HeadCommit is a sha256 that points to the head of the branch that is being
-	// pull requested into the base. If the pull request is from BitBucket,
-	// the string will only be 12 characters long because BitBucket truncates
-	// its commit IDs.
+	// pull requested into the base. If the pull request is from Bitbucket Cloud
+	// the string will only be 12 characters long because Bitbucket Cloud
+	// truncates its commit IDs.
 	HeadCommit string
 	// URL is the url of the pull request.
 	// ex. "https://github.com/runatlantis/atlantis/pull/1"
@@ -237,7 +248,8 @@ type VCSHostType int
 const (
 	Github VCSHostType = iota
 	Gitlab
-	Bitbucket
+	BitbucketCloud
+	BitbucketServer
 )
 
 func (h VCSHostType) String() string {
@@ -246,8 +258,10 @@ func (h VCSHostType) String() string {
 		return "Github"
 	case Gitlab:
 		return "Gitlab"
-	case Bitbucket:
-		return "Bitbucket"
+	case BitbucketCloud:
+		return "BitbucketCloud"
+	case BitbucketServer:
+		return "BitbucketServer"
 	}
 	return "<missing String() implementation>"
 }

@@ -1,0 +1,66 @@
+{
+  "fromHash": "bbc7b2a29344646ec8605be9603a0aa625a627ef",
+  "toHash": "737bfd254f39b36733ee2d5089db65c7369c7692",
+  "properties": {
+    "changeScope": "ALL"
+  },
+  "values": [
+    {
+      "contentId": "fdc4b3b5b37ba11f0cbec7a2744cddb35bab785b",
+      "fromContentId": "0000000000000000000000000000000000000000",
+      "path": {
+        "components": [
+          "folder",
+          "another.tf"
+        ],
+        "parent": "folder",
+        "name": "another.tf",
+        "extension": "tf",
+        "toString": "folder/another.tf"
+      },
+      "executable": false,
+      "percentUnchanged": -1,
+      "type": "ADD",
+      "nodeType": "FILE",
+      "links": {
+        "self": [
+          null
+        ]
+      },
+      "properties": {
+        "gitChangeType": "ADD"
+      }
+    },
+    {
+      "contentId": "a44a3e1d545c78dc67236af92395b864a7035498",
+      "fromContentId": "dc333454be3243d54ff155489df0bc0e94807a35",
+      "path": {
+        "components": [
+          "main.tf"
+        ],
+        "parent": "",
+        "name": "main.tf",
+        "extension": "tf",
+        "toString": "main.tf"
+      },
+      "executable": false,
+      "percentUnchanged": -1,
+      "type": "MODIFY",
+      "nodeType": "FILE",
+      "srcExecutable": false,
+      "links": {
+        "self": [
+          null
+        ]
+      },
+      "properties": {
+        "gitChangeType": "MODIFY"
+      }
+    }
+  ],
+  "size": 2,
+  "isLastPage": true,
+  "start": 0,
+  "limit": 25,
+  "nextPageStart": null
+}

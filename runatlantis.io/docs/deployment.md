@@ -24,7 +24,7 @@ Once you've decided where to host Atlantis you need to add that URL as a webhook
 to your Git host so that Atlantis gets notified about pull request events.
 See the instructions for your specific provider below:
 
-### GitHub Webhook
+### GitHub/GitHub Enterprise Webhook
 If you already have a GitHub organization we recommend installing the webhook at the **organization level** rather than on each repository, however both methods will work.
 
 ::: tip
@@ -78,6 +78,19 @@ If you're using GitLab, navigate to your project's home page in GitLab
 - Click **Save**
 <img src="../guide/images/bitbucket-webhook.png" alt="Bitbucket Webhook" style="max-height: 500px">
 
+### Bitbucket Server (aka Stash) Webhook
+- Go to your repo's home page
+- Click **Settings** in the sidebar
+- Click **Webhooks** under the **WORKFLOW** section
+- Click **Create webhook**
+- Enter "Atlantis" for **Name**
+- set **URL** to `http://$URL/events` (or `https://$URL/events` if you're using SSL) where `$URL` is where Atlantis is hosted. **Be sure to add `/events`**
+- Double-check you added `/events` to the end of your URL.
+- Set **Secret** to a random key (https://www.random.org/strings/). You'll need to pass this value to the `--bitbucket-webhook-secret` flag when you start Atlantis
+- Under **Repository** select **Push**
+- Under **Pull Request**, select: Opened, Modified, Merged, Declined, Deleted and Comment added
+- Click **Save**<img src="../guide/images/bitbucket-server-webhook.png" alt="Bitbucket Webhook" style="max-height: 500px;">
+
 ## Create an access token for Atlantis
 We recommend using a dedicated CI user or creating a new user named **@atlantis** that performs all API actions, however for testing,
 you can use your own user. Here we'll create the access token that Atlantis uses to comment on the pull request and
@@ -101,10 +114,18 @@ set commit statuses.
 - Select **Pull requests**: **Read** and **Write** so that Atlantis can read your pull requests and write comments to them
 - copy the access token
 
+### Create a Bitbucket Server (aka Stash) Personal Access Token
+- Click on your avatar in the top right and select **Manage account**
+- Click **Personal access tokens** in the sidebar
+- Click **Create a token**
+- Name the token **atlantis**
+- Give the token **Read** Project permissions and **Write** Pull request permissions
+- Click **Create** and copy the access token
+
 ## Start Atlantis
 Now you're ready to start Atlantis! The exact command depends on your Git host:
 
-### GitHub
+### GitHub Command
 ```bash
 atlantis server \
 --atlantis-url="$URL" \
@@ -114,7 +135,7 @@ atlantis server \
 --repo-whitelist="$REPO_WHITELIST"
 ```
 
-### GitHub Enterprise
+### GitHub Enterprise Command
 ```bash
 HOSTNAME=YOUR_GITHUB_ENTERPRISE_HOSTNAME # ex. github.runatlantis.io
 atlantis server \
@@ -126,7 +147,7 @@ atlantis server \
 --repo-whitelist="$REPO_WHITELIST"
 ```
 
-### GitLab
+### GitLab Command
 ```bash
 atlantis server \
 --atlantis-url="$URL" \
@@ -136,7 +157,7 @@ atlantis server \
 --repo-whitelist="$REPO_WHITELIST"
 ```
 
-### GitLab Enterprise
+### GitLab Enterprise Command
 ```bash
 HOSTNAME=YOUR_GITLAB_ENTERPRISE_HOSTNAME # ex. gitlab.runatlantis.io
 atlantis server \
@@ -148,12 +169,24 @@ atlantis server \
 --repo-whitelist="$REPO_WHITELIST"
 ```
 
-### Bitbucket Cloud (bitbucket.org)
+### Bitbucket Cloud (bitbucket.org) Command
 ```bash
 atlantis server \
 --atlantis-url="$URL" \
 --bitbucket-user="$USERNAME" \
 --bitbucket-token="$TOKEN" \
+--repo-whitelist="$REPO_WHITELIST"
+```
+
+### Bitbucket Server (aka Stash) Command
+```bash
+BASE_URL=YOUR_BITBUCKET_SERVER_URL # ex. http://bitbucket.mycorp:7990
+atlantis server \
+--atlantis-url="$URL" \
+--bitbucket-user="$USERNAME" \
+--bitbucket-token="$TOKEN" \
+--bitbucket-webhook-secret="$SECRET" \
+--bitbucket-base-url="$BASE_URL" \
 --repo-whitelist="$REPO_WHITELIST"
 ```
 

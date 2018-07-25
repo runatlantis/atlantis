@@ -1,4 +1,4 @@
-package bitbucket_test
+package bitbucketcloud_test
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/vcs/bitbucket"
+	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -68,8 +68,8 @@ func TestClient_GetModifiedFilesPagination(t *testing.T) {
 	defer testServer.Close()
 
 	serverURL = testServer.URL
-	client, err := bitbucket.NewClient(http.DefaultClient, "user", "pass", serverURL, "runatlantis.io")
-	Ok(t, err)
+	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
+	client.BaseURL = testServer.URL
 
 	files, err := client.GetModifiedFiles(models.Repo{
 		FullName:          "owner/repo",
@@ -78,7 +78,7 @@ func TestClient_GetModifiedFilesPagination(t *testing.T) {
 		CloneURL:          "",
 		SanitizedCloneURL: "",
 		VCSHost: models.VCSHost{
-			Type:     models.Bitbucket,
+			Type:     models.BitbucketCloud,
 			Hostname: "bitbucket.org",
 		},
 	}, models.PullRequest{
@@ -129,8 +129,8 @@ func TestClient_GetModifiedFilesOldNil(t *testing.T) {
 	}))
 	defer testServer.Close()
 
-	client, err := bitbucket.NewClient(http.DefaultClient, "user", "pass", testServer.URL, "runatlantis.io")
-	Ok(t, err)
+	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
+	client.BaseURL = testServer.URL
 
 	files, err := client.GetModifiedFiles(models.Repo{
 		FullName:          "owner/repo",
@@ -139,7 +139,7 @@ func TestClient_GetModifiedFilesOldNil(t *testing.T) {
 		CloneURL:          "",
 		SanitizedCloneURL: "",
 		VCSHost: models.VCSHost{
-			Type:     models.Bitbucket,
+			Type:     models.BitbucketCloud,
 			Hostname: "bitbucket.org",
 		},
 	}, models.PullRequest{
