@@ -125,7 +125,7 @@ set commit statuses.
 ## Start Atlantis
 Now you're ready to start Atlantis! The exact command depends on your Git host:
 
-### GitHub
+### GitHub Command
 ```bash
 atlantis server \
 --atlantis-url="$URL" \
@@ -135,7 +135,7 @@ atlantis server \
 --repo-whitelist="$REPO_WHITELIST"
 ```
 
-### GitHub Enterprise
+### GitHub Enterprise Command
 ```bash
 HOSTNAME=YOUR_GITHUB_ENTERPRISE_HOSTNAME # ex. github.runatlantis.io
 atlantis server \
@@ -147,7 +147,7 @@ atlantis server \
 --repo-whitelist="$REPO_WHITELIST"
 ```
 
-### GitLab
+### GitLab Command
 ```bash
 atlantis server \
 --atlantis-url="$URL" \
@@ -157,7 +157,7 @@ atlantis server \
 --repo-whitelist="$REPO_WHITELIST"
 ```
 
-### GitLab Enterprise
+### GitLab Enterprise Command
 ```bash
 HOSTNAME=YOUR_GITLAB_ENTERPRISE_HOSTNAME # ex. gitlab.runatlantis.io
 atlantis server \
@@ -169,7 +169,7 @@ atlantis server \
 --repo-whitelist="$REPO_WHITELIST"
 ```
 
-### Bitbucket Cloud (bitbucket.org)
+### Bitbucket Cloud (bitbucket.org) Command
 ```bash
 atlantis server \
 --atlantis-url="$URL" \
@@ -178,7 +178,7 @@ atlantis server \
 --repo-whitelist="$REPO_WHITELIST"
 ```
 
-### Bitbucket Server (aka Stash)
+### Bitbucket Server (aka Stash) Command
 ```bash
 BASE_URL=YOUR_BITBUCKET_SERVER_URL # ex. http://bitbucket.mycorp:7990
 atlantis server \
