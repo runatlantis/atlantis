@@ -59,6 +59,9 @@ type Link struct {
 }
 type Participant struct {
 	Approved *bool `json:"approved,omitempty" validate:"required"`
+	User     *struct {
+		Username *string `json:"username,omitempty" validate:"required"`
+	} `json:"user,omitempty" validate:"required"`
 }
 type Source struct {
 	Repository *Repository `json:"repository,omitempty" validate:"required"`

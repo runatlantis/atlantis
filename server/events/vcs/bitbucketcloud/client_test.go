@@ -2,8 +2,10 @@ package bitbucketcloud_test
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -147,4 +149,67 @@ func TestClient_GetModifiedFilesOldNil(t *testing.T) {
 	})
 	Ok(t, err)
 	Equals(t, []string{"parent/child/file1.txt"}, files)
+}
+
+func TestClient_PullIsApproved(t *testing.T) {
+	cases := []struct {
+		description string
+		testdata    string
+		exp         bool
+	}{
+		{
+			"no approvers",
+			"pull-unapproved.json",
+			false,
+		},
+		{
+			"approver is the author",
+			"pull-approved-by-author.json",
+			false,
+		},
+		{
+			"single approver",
+			"pull-approved.json",
+			true,
+		},
+		{
+			"two approvers one author",
+			"pull-approved-multiple.json",
+			true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			json, err := ioutil.ReadFile(filepath.Join("testdata", c.testdata))
+			Ok(t, err)
+			testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.RequestURI {
+				// The first request should hit this URL.
+				case "/2.0/repositories/owner/repo/pullrequests/1":
+					w.Write([]byte(json)) // nolint: errcheck
+					return
+				default:
+					t.Errorf("got unexpected request at %q", r.RequestURI)
+					http.Error(w, "not found", http.StatusNotFound)
+					return
+				}
+			}))
+			defer testServer.Close()
+
+			client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
+			client.BaseURL = testServer.URL
+
+			repo, err := models.NewRepo(models.BitbucketServer, "owner/repo", "https://bitbucket.org/owner/repo.git", "user", "token")
+			Ok(t, err)
+			approved, err := client.PullIsApproved(repo, models.PullRequest{
+				Num:      1,
+				Branch:   "branch",
+				Author:   "author",
+				BaseRepo: repo,
+			})
+			Ok(t, err)
+			Equals(t, c.exp, approved)
+		})
+	}
 }
