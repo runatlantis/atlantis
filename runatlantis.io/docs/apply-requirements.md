@@ -15,7 +15,12 @@ projects:
 A pull request approval might not be as secure as you'd expect:
 * In GitHub **any user with read permissions** to the repo can approve a pull request.
 * In GitLab, you [can set](https://docs.gitlab.com/ee/user/project/merge_requests/merge_request_approvals.html#editing-approvals) who is allowed to approve.
-* In Bitbucket, a user can **approve their own pull request**.
+:::
+
+::: tip Note
+In Bitbucket Cloud (bitbucket.org), a user can approve their own pull request.
+Atlantis does not count that as an approval and requires at least one user that
+is not the author of the pull request to approve it.
 :::
 
 ## Next Steps
