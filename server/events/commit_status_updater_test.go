@@ -33,7 +33,7 @@ func TestUpdate(t *testing.T) {
 	RegisterMockTestingT(t)
 	client := mocks.NewMockClientProxy()
 	s := events.DefaultCommitStatusUpdater{Client: client}
-	err := s.Update(repoModel, pullModel, status, events.Plan)
+	err := s.Update(repoModel, pullModel, status, events.PlanCommand)
 	Ok(t, err)
 	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, status, "Plan Success")
 }
@@ -46,7 +46,7 @@ func TestUpdateProjectResult_Error(t *testing.T) {
 	}
 	client := mocks.NewMockClientProxy()
 	s := events.DefaultCommitStatusUpdater{Client: client}
-	err := s.UpdateProjectResult(ctx, events.Plan, events.CommandResult{Error: errors.New("err")})
+	err := s.UpdateProjectResult(ctx, events.PlanCommand, events.CommandResult{Error: errors.New("err")})
 	Ok(t, err)
 	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, models.FailedCommitStatus, "Plan Failed")
 }
@@ -59,7 +59,7 @@ func TestUpdateProjectResult_Failure(t *testing.T) {
 	}
 	client := mocks.NewMockClientProxy()
 	s := events.DefaultCommitStatusUpdater{Client: client}
-	err := s.UpdateProjectResult(ctx, events.Plan, events.CommandResult{Failure: "failure"})
+	err := s.UpdateProjectResult(ctx, events.PlanCommand, events.CommandResult{Failure: "failure"})
 	Ok(t, err)
 	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, models.FailedCommitStatus, "Plan Failed")
 }
@@ -129,7 +129,7 @@ func TestUpdateProjectResult(t *testing.T) {
 
 			client := mocks.NewMockClientProxy()
 			s := events.DefaultCommitStatusUpdater{Client: client}
-			err := s.UpdateProjectResult(ctx, events.Plan, resp)
+			err := s.UpdateProjectResult(ctx, events.PlanCommand, resp)
 			Ok(t, err)
 			client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, c.Expected, "Plan "+strings.Title(c.Expected.String()))
 		})

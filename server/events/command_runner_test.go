@@ -73,7 +73,7 @@ func TestRunCommentCommand_LogPanics(t *testing.T) {
 	setup(t)
 	ch.AllowForkPRs = true // Lets us get to the panic code.
 	defer func() { ch.AllowForkPRs = false }()
-	When(ghStatus.Update(fixtures.GithubRepo, fixtures.Pull, models.PendingCommitStatus, events.Plan)).ThenPanic("panic")
+	When(ghStatus.Update(fixtures.GithubRepo, fixtures.Pull, models.PendingCommitStatus, events.PlanCommand)).ThenPanic("panic")
 	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, 1, nil)
 	_, _, comment := vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString()).GetCapturedArguments()
 	Assert(t, strings.Contains(comment, "Error: goroutine panic"), "comment should be about a goroutine panic")
@@ -167,7 +167,7 @@ func TestRunCommentCommand_FullRun(t *testing.T) {
 			},
 		},
 	}
-	for _, c := range []events.CommandName{events.Plan, events.Apply} {
+	for _, c := range []events.CommandName{events.PlanCommand, events.ApplyCommand} {
 		setup(t)
 		cmd := events.NewCommentCommand(".", nil, c, false, "default", "")
 		When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
@@ -175,9 +175,9 @@ func TestRunCommentCommand_FullRun(t *testing.T) {
 
 		cmdCtx := models.ProjectCommandContext{RepoRelDir: "."}
 		switch c {
-		case events.Plan:
+		case events.PlanCommand:
 			When(projectCommandBuilder.BuildPlanCommand(matchers.AnyPtrToEventsCommandContext(), matchers.AnyPtrToEventsCommentCommand())).ThenReturn(cmdCtx, nil)
-		case events.Apply:
+		case events.ApplyCommand:
 			When(projectCommandBuilder.BuildApplyCommand(matchers.AnyPtrToEventsCommandContext(), matchers.AnyPtrToEventsCommentCommand())).ThenReturn(cmdCtx, nil)
 		}
 
@@ -203,7 +203,7 @@ func TestRunAutoplanCommands(t *testing.T) {
 	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())).ThenReturn([]models.ProjectCommandContext{{RepoRelDir: ".", Workspace: "default"}}, nil)
 	ch.RunAutoplanCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
 
-	ghStatus.VerifyWasCalledOnce().Update(fixtures.GithubRepo, fixtures.Pull, models.PendingCommitStatus, events.Plan)
+	ghStatus.VerifyWasCalledOnce().Update(fixtures.GithubRepo, fixtures.Pull, models.PendingCommitStatus, events.PlanCommand)
 	_, _, response := ghStatus.VerifyWasCalledOnce().UpdateProjectResult(matchers.AnyPtrToEventsCommandContext(), matchers.AnyEventsCommandName(), matchers.AnyEventsCommandResult()).GetCapturedArguments()
 	Equals(t, expCmdResult, response)
 	vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString())

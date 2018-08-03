@@ -45,7 +45,7 @@ type CommandInterface interface {
 type AutoplanCommand struct{}
 
 func (c AutoplanCommand) CommandName() CommandName {
-	return Plan
+	return PlanCommand
 }
 
 func (c AutoplanCommand) IsVerbose() bool {

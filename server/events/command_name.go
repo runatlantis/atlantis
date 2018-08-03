@@ -17,17 +17,17 @@ package events
 type CommandName int
 
 const (
-	Apply CommandName = iota
-	Plan
+	ApplyCommand CommandName = iota
+	PlanCommand
 	// Adding more? Don't forget to update String() below
 )
 
 // String returns the string representation of c.
 func (c CommandName) String() string {
 	switch c {
-	case Apply:
+	case ApplyCommand:
 		return "apply"
-	case Plan:
+	case PlanCommand:
 		return "plan"
 	}
 	return ""

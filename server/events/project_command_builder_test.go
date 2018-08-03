@@ -241,7 +241,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanApplyCommand(t *testing.T) {
 			Cmd: events.CommentCommand{
 				RepoRelDir: ".",
 				Flags:      []string{"commentarg"},
-				Name:       events.Plan,
+				Name:       events.PlanCommand,
 				Workspace:  "myworkspace",
 			},
 			AtlantisYAML:     "",
@@ -254,7 +254,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanApplyCommand(t *testing.T) {
 			Description: "no atlantis.yaml with project flag",
 			Cmd: events.CommentCommand{
 				RepoRelDir:  ".",
-				Name:        events.Plan,
+				Name:        events.PlanCommand,
 				ProjectName: "myproject",
 			},
 			AtlantisYAML: "",
@@ -264,7 +264,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanApplyCommand(t *testing.T) {
 			Description: "simple atlantis.yaml",
 			Cmd: events.CommentCommand{
 				RepoRelDir: ".",
-				Name:       events.Plan,
+				Name:       events.PlanCommand,
 				Workspace:  "myworkspace",
 			},
 			AtlantisYAML: `
@@ -289,7 +289,7 @@ projects:
 			Description: "atlantis.yaml wrong dir",
 			Cmd: events.CommentCommand{
 				RepoRelDir: ".",
-				Name:       events.Plan,
+				Name:       events.PlanCommand,
 				Workspace:  "myworkspace",
 			},
 			AtlantisYAML: `
@@ -306,7 +306,7 @@ projects:
 			Description: "atlantis.yaml wrong workspace",
 			Cmd: events.CommentCommand{
 				RepoRelDir: ".",
-				Name:       events.Plan,
+				Name:       events.PlanCommand,
 				Workspace:  "myworkspace",
 			},
 			AtlantisYAML: `
@@ -322,7 +322,7 @@ projects:
 		{
 			Description: "atlantis.yaml with projectname",
 			Cmd: events.CommentCommand{
-				Name:        events.Plan,
+				Name:        events.PlanCommand,
 				ProjectName: "myproject",
 			},
 			AtlantisYAML: `
@@ -348,7 +348,7 @@ projects:
 		{
 			Description: "atlantis.yaml with multiple dir/workspaces matching",
 			Cmd: events.CommentCommand{
-				Name:       events.Plan,
+				Name:       events.PlanCommand,
 				RepoRelDir: ".",
 				Workspace:  "myworkspace",
 			},
@@ -368,7 +368,7 @@ projects:
 		{
 			Description: "atlantis.yaml with project flag not matching",
 			Cmd: events.CommentCommand{
-				Name:        events.Plan,
+				Name:        events.PlanCommand,
 				RepoRelDir:  ".",
 				Workspace:   "default",
 				ProjectName: "notconfigured",
@@ -384,7 +384,7 @@ projects:
 
 	for _, c := range cases {
 		// NOTE: we're testing both plan and apply here.
-		for _, cmdName := range []events.CommandName{events.Plan, events.Apply} {
+		for _, cmdName := range []events.CommandName{events.PlanCommand, events.ApplyCommand} {
 			t.Run(c.Description, func(t *testing.T) {
 				RegisterMockTestingT(t)
 				tmpDir, cleanup := TempDir(t)
@@ -395,7 +395,7 @@ projects:
 				pull := models.PullRequest{}
 				logger := logging.NewNoopLogger()
 				workingDir := mocks.NewMockWorkingDir()
-				if cmdName == events.Plan {
+				if cmdName == events.PlanCommand {
 					When(workingDir.Clone(logger, baseRepo, headRepo, pull, c.Cmd.Workspace)).ThenReturn(tmpDir, nil)
 				} else {
 					When(workingDir.GetWorkingDir(baseRepo, pull, c.Cmd.Workspace)).ThenReturn(tmpDir, nil)
@@ -428,7 +428,7 @@ projects:
 				}
 				var actCtx models.ProjectCommandContext
 
-				if cmdName == events.Plan {
+				if cmdName == events.PlanCommand {
 					actCtx, err = builder.BuildPlanCommand(cmdCtx, &c.Cmd)
 				} else {
 					actCtx, err = builder.BuildApplyCommand(cmdCtx, &c.Cmd)
