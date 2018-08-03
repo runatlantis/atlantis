@@ -18,6 +18,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -37,6 +38,13 @@ const (
 	DefaultWorkspace   = "default"
 	DefaultDir         = "."
 )
+
+// multiLineRegex is used to ignore multi-line comments since those aren't valid
+// Atlantis commands. If the second line just has newlines then we let it pass
+// through because when you double click on a comment in GitHub and then you
+// paste it again, GitHub adds two newlines and so we wanted to allow copying
+// and pasting GitHub comments.
+var multiLineRegex = regexp.MustCompile(`.*\r?\n[^\r\n]+`)
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_comment_parsing.go CommentParsing
 
