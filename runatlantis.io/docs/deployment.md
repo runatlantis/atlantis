@@ -1,5 +1,10 @@
 # Production-Ready Deployment
 [[toc]]
+
+::: tip
+Don't want to host Atlantis yourself? Check out [Hosted Atlantis](/hosting/).
+:::
+
 ## Install Terraform
 `terraform` needs to be in the `$PATH` for Atlantis.
 Download from https://www.terraform.io/downloads.html

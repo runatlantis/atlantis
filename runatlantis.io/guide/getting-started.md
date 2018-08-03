@@ -299,4 +299,5 @@ Atlantis at a specific plan. Otherwise it tries to apply the plan for the root d
 * Hopefully Atlantis is working with your repo and you're ready to move on to a [production-ready deployment](../docs/deployment.html).
 * If it's not working as expected, you may need to customize how Atlantis runs with an `atlantis.yaml` file.
 See [atlantis.yaml Reference](../docs/atlantis-yaml-reference.html).
+* If you're interested in a hosted version of Atlantis, check out [Hosted Atlantis](/hosting/).
 * Check out our full documentation for more details: [Documentation](../docs/).
