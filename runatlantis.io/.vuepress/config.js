@@ -30,6 +30,7 @@ module.exports = {
             {text: 'Home', link: '/'},
             {text: 'Guide', link: '/guide/'},
             {text: 'Docs', link: '/docs/'},
+            {text: 'Hosted Atlantis', link: '/hosting/'},
             {text: 'Support & Consulting', link: '/support/'},
             {text: 'Blog', link: 'https://medium.com/runatlantis'}
         ],
@@ -54,7 +55,8 @@ module.exports = {
                 'requirements',
                 'atlantis-yaml-use-cases'
             ],
-            '/support/': ['']
+            '/support/': [''],
+            '/hosting/': ['']
         },
         repo: 'runatlantis/atlantis',
         docsDir: 'runatlantis.io',
