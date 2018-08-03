@@ -17,7 +17,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
-	"regexp"
 	"strings"
 
 	"github.com/google/go-github/github"
@@ -31,10 +30,6 @@ import (
 
 const gitlabPullOpened = "opened"
 const usagesCols = 90
-
-// multiLineRegex is used to ignore multi-line comments since those aren't valid
-// Atlantis commands.
-var multiLineRegex = regexp.MustCompile(`.*\r?\n.+`)
 
 type CommandInterface interface {
 	CommandName() CommandName

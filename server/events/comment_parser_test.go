@@ -235,6 +235,31 @@ func TestParse_RelativeDirPath(t *testing.T) {
 	}
 }
 
+// If there's multiple lines but it's whitespace, allow the command. This
+// occurs when you copy and paste via GitHub.
+func TestParse_Multiline(t *testing.T) {
+	comments := []string{
+		"atlantis plan\n",
+		"atlantis plan\n\n",
+		"atlantis plan\r\n",
+		"atlantis plan\r\n\r\n",
+	}
+	for _, comment := range comments {
+		t.Run(comment, func(t *testing.T) {
+			r := commentParser.Parse(comment, models.Github)
+			Equals(t, "", r.CommentResponse)
+			Equals(t, &events.CommentCommand{
+				RepoRelDir:  ".",
+				Flags:       nil,
+				Name:        events.PlanCommand,
+				Verbose:     false,
+				Workspace:   "default",
+				ProjectName: "",
+			}, r.Command)
+		})
+	}
+}
+
 func TestParse_InvalidWorkspace(t *testing.T) {
 	t.Log("if -w is used with '..' or '/', should return an error")
 	comments := []string{
