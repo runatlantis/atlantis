@@ -127,7 +127,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	}
 
 	// Need to have a plan or apply at this point.
-	if !e.stringInSlice(command, []string{Plan.String(), Apply.String()}) {
+	if !e.stringInSlice(command, []string{PlanCommand.String(), ApplyCommand.String()}) {
 		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown command %q.\nRun 'atlantis --help' for usage.\n```", command)}
 	}
 
@@ -141,17 +141,17 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 
 	// Set up the flag parsing depending on the command.
 	switch command {
-	case Plan.String():
-		name = Plan
-		flagSet = pflag.NewFlagSet(Plan.String(), pflag.ContinueOnError)
+	case PlanCommand.String():
+		name = PlanCommand
+		flagSet = pflag.NewFlagSet(PlanCommand.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(ioutil.Discard)
 		flagSet.StringVarP(&workspace, WorkspaceFlagLong, WorkspaceFlagShort, DefaultWorkspace, "Switch to this Terraform workspace before planning.")
 		flagSet.StringVarP(&dir, DirFlagLong, DirFlagShort, DefaultDir, "Which directory to run plan in relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, ProjectFlagLong, ProjectFlagShort, "", fmt.Sprintf("Which project to run plan for. Refers to the name of the project configured in %s. Cannot be used at same time as workspace or dir flags.", yaml.AtlantisYAMLFilename))
 		flagSet.BoolVarP(&verbose, VerboseFlagLong, VerboseFlagShort, false, "Append Atlantis log to comment.")
-	case Apply.String():
-		name = Apply
-		flagSet = pflag.NewFlagSet(Apply.String(), pflag.ContinueOnError)
+	case ApplyCommand.String():
+		name = ApplyCommand
+		flagSet = pflag.NewFlagSet(ApplyCommand.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(ioutil.Discard)
 		flagSet.StringVarP(&workspace, WorkspaceFlagLong, WorkspaceFlagShort, DefaultWorkspace, "Apply the plan for this Terraform workspace.")
 		flagSet.StringVarP(&dir, DirFlagLong, DirFlagShort, DefaultDir, "Apply the plan for this directory, relative to root of repo, ex. 'child/dir'.")

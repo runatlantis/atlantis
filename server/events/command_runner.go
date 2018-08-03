@@ -84,7 +84,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	if !c.validateCtxAndComment(ctx) {
 		return
 	}
-	if err := c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, models.PendingCommitStatus, Plan); err != nil {
+	if err := c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, models.PendingCommitStatus, PlanCommand); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
@@ -95,7 +95,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	}
 	if len(projectCmds) == 0 {
 		log.Info("determined there was no project to run plan in")
-		if err := c.CommitStatusUpdater.Update(baseRepo, pull, models.SuccessCommitStatus, Plan); err != nil {
+		if err := c.CommitStatusUpdater.Update(baseRepo, pull, models.SuccessCommitStatus, PlanCommand); err != nil {
 			ctx.Log.Warn("unable to update commit status: %s", err)
 		}
 		return
@@ -163,14 +163,14 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 
 	var result ProjectCommandResult
 	switch cmd.Name {
-	case Plan:
+	case PlanCommand:
 		projectCmd, err := c.ProjectCommandBuilder.BuildPlanCommand(ctx, cmd)
 		if err != nil {
 			c.updatePull(ctx, cmd, CommandResult{Error: err})
 			return
 		}
 		result = c.ProjectCommandRunner.Plan(projectCmd)
-	case Apply:
+	case ApplyCommand:
 		projectCmd, err := c.ProjectCommandBuilder.BuildApplyCommand(ctx, cmd)
 		if err != nil {
 			c.updatePull(ctx, cmd, CommandResult{Error: err})

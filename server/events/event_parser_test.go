@@ -451,31 +451,31 @@ func TestNewCommand_CleansDir(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.RepoRelDir, func(t *testing.T) {
-			cmd := events.NewCommentCommand(c.RepoRelDir, nil, events.Plan, false, "workspace", "")
+			cmd := events.NewCommentCommand(c.RepoRelDir, nil, events.PlanCommand, false, "workspace", "")
 			Equals(t, c.ExpDir, cmd.RepoRelDir)
 		})
 	}
 }
 
 func TestNewCommand_EmptyWorkspace(t *testing.T) {
-	cmd := events.NewCommentCommand("dir", nil, events.Plan, false, "", "")
+	cmd := events.NewCommentCommand("dir", nil, events.PlanCommand, false, "", "")
 	Equals(t, "default", cmd.Workspace)
 }
 
 func TestNewCommand_AllFieldsSet(t *testing.T) {
-	cmd := events.NewCommentCommand("dir", []string{"a", "b"}, events.Plan, true, "workspace", "project")
+	cmd := events.NewCommentCommand("dir", []string{"a", "b"}, events.PlanCommand, true, "workspace", "project")
 	Equals(t, events.CommentCommand{
 		Workspace:   "workspace",
 		RepoRelDir:  "dir",
 		Verbose:     true,
 		Flags:       []string{"a", "b"},
-		Name:        events.Plan,
+		Name:        events.PlanCommand,
 		ProjectName: "project",
 	}, *cmd)
 }
 
 func TestAutoplanCommand_CommandName(t *testing.T) {
-	Equals(t, events.Plan, (events.AutoplanCommand{}).CommandName())
+	Equals(t, events.PlanCommand, (events.AutoplanCommand{}).CommandName())
 }
 
 func TestAutoplanCommand_IsVerbose(t *testing.T) {
@@ -487,11 +487,11 @@ func TestAutoplanCommand_IsAutoplan(t *testing.T) {
 }
 
 func TestCommentCommand_CommandName(t *testing.T) {
-	Equals(t, events.Plan, (events.CommentCommand{
-		Name: events.Plan,
+	Equals(t, events.PlanCommand, (events.CommentCommand{
+		Name: events.PlanCommand,
 	}).CommandName())
-	Equals(t, events.Apply, (events.CommentCommand{
-		Name: events.Apply,
+	Equals(t, events.ApplyCommand, (events.CommentCommand{
+		Name: events.ApplyCommand,
 	}).CommandName())
 }
 
@@ -513,7 +513,7 @@ func TestCommentCommand_String(t *testing.T) {
 	Equals(t, exp, (events.CommentCommand{
 		RepoRelDir:  "mydir",
 		Flags:       []string{"flag1", "flag2"},
-		Name:        events.Plan,
+		Name:        events.PlanCommand,
 		Verbose:     true,
 		Workspace:   "myworkspace",
 		ProjectName: "myproject",

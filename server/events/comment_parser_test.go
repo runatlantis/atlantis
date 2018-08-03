@@ -69,47 +69,47 @@ func TestParse_UnusedArguments(t *testing.T) {
 		Unused  string
 	}{
 		{
-			events.Plan,
+			events.PlanCommand,
 			"-d . arg",
 			"arg",
 		},
 		{
-			events.Plan,
+			events.PlanCommand,
 			"arg -d .",
 			"arg",
 		},
 		{
-			events.Plan,
+			events.PlanCommand,
 			"arg",
 			"arg",
 		},
 		{
-			events.Plan,
+			events.PlanCommand,
 			"arg arg2",
 			"arg arg2",
 		},
 		{
-			events.Plan,
+			events.PlanCommand,
 			"-d . arg -w kjj arg2",
 			"arg arg2",
 		},
 		{
-			events.Apply,
+			events.ApplyCommand,
 			"-d . arg",
 			"arg",
 		},
 		{
-			events.Apply,
+			events.ApplyCommand,
 			"arg arg2",
 			"arg arg2",
 		},
 		{
-			events.Apply,
+			events.ApplyCommand,
 			"arg arg2 -- useful",
 			"arg arg2",
 		},
 		{
-			events.Apply,
+			events.ApplyCommand,
 			"arg arg2 --",
 			"arg arg2",
 		},
@@ -119,7 +119,7 @@ func TestParse_UnusedArguments(t *testing.T) {
 		t.Run(comment, func(t *testing.T) {
 			r := commentParser.Parse(comment, models.Github)
 			usage := PlanUsage
-			if c.Command == events.Apply {
+			if c.Command == events.ApplyCommand {
 				usage = ApplyUsage
 			}
 			Equals(t, fmt.Sprintf("```\nError: unknown argument(s) – %s.\n%s```", c.Unused, usage), r.CommentResponse)
@@ -501,10 +501,10 @@ func TestParse_Parsing(t *testing.T) {
 			actExtraArgs := strings.Join(r.Command.Flags, " ")
 			Assert(t, test.expExtraArgs == actExtraArgs, "exp extra args to equal %v but got %v for comment %q", test.expExtraArgs, actExtraArgs, comment)
 			if cmdName == "plan" {
-				Assert(t, r.Command.Name == events.Plan, "did not parse comment %q as plan command", comment)
+				Assert(t, r.Command.Name == events.PlanCommand, "did not parse comment %q as plan command", comment)
 			}
 			if cmdName == "apply" {
-				Assert(t, r.Command.Name == events.Apply, "did not parse comment %q as apply command", comment)
+				Assert(t, r.Command.Name == events.ApplyCommand, "did not parse comment %q as apply command", comment)
 			}
 		}
 	}

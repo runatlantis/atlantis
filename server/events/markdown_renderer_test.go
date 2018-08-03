@@ -31,13 +31,13 @@ func TestRenderErr(t *testing.T) {
 	}{
 		{
 			"apply error",
-			events.Apply,
+			events.ApplyCommand,
 			err,
 			"**Apply Error**\n```\nerr\n```\n\n",
 		},
 		{
 			"plan error",
-			events.Plan,
+			events.PlanCommand,
 			err,
 			"**Plan Error**\n```\nerr\n```\n\n",
 		},
@@ -71,13 +71,13 @@ func TestRenderFailure(t *testing.T) {
 	}{
 		{
 			"apply failure",
-			events.Apply,
+			events.ApplyCommand,
 			"failure",
 			"**Apply Failed**: failure\n\n",
 		},
 		{
 			"plan failure",
-			events.Plan,
+			events.PlanCommand,
 			"failure",
 			"**Plan Failed**: failure\n\n",
 		},
@@ -109,7 +109,7 @@ func TestRenderErrAndFailure(t *testing.T) {
 		Error:   errors.New("error"),
 		Failure: "failure",
 	}
-	s := r.Render(res, events.Plan, "", false)
+	s := r.Render(res, events.PlanCommand, "", false)
 	Equals(t, "**Plan Error**\n```\nerror\n```\n\n", s)
 }
 
@@ -122,13 +122,13 @@ func TestRenderProjectResults(t *testing.T) {
 	}{
 		{
 			"no projects",
-			events.Plan,
+			events.PlanCommand,
 			[]events.ProjectResult{},
 			"Ran Plan for 0 projects:\n\n\n",
 		},
 		{
 			"single successful plan",
-			events.Plan,
+			events.PlanCommand,
 			[]events.ProjectResult{
 				{
 					ProjectCommandResult: events.ProjectCommandResult{
@@ -145,7 +145,7 @@ func TestRenderProjectResults(t *testing.T) {
 		},
 		{
 			"single successful apply",
-			events.Apply,
+			events.ApplyCommand,
 			[]events.ProjectResult{
 				{
 					ProjectCommandResult: events.ProjectCommandResult{
@@ -159,7 +159,7 @@ func TestRenderProjectResults(t *testing.T) {
 		},
 		{
 			"multiple successful plans",
-			events.Plan,
+			events.PlanCommand,
 			[]events.ProjectResult{
 				{
 					Workspace:  "workspace",
@@ -186,7 +186,7 @@ func TestRenderProjectResults(t *testing.T) {
 		},
 		{
 			"multiple successful applies",
-			events.Apply,
+			events.ApplyCommand,
 			[]events.ProjectResult{
 				{
 					RepoRelDir: "path",
@@ -207,7 +207,7 @@ func TestRenderProjectResults(t *testing.T) {
 		},
 		{
 			"single errored plan",
-			events.Plan,
+			events.PlanCommand,
 			[]events.ProjectResult{
 				{
 					ProjectCommandResult: events.ProjectCommandResult{
@@ -221,7 +221,7 @@ func TestRenderProjectResults(t *testing.T) {
 		},
 		{
 			"single failed plan",
-			events.Plan,
+			events.PlanCommand,
 			[]events.ProjectResult{
 				{
 					RepoRelDir: "path",
@@ -235,7 +235,7 @@ func TestRenderProjectResults(t *testing.T) {
 		},
 		{
 			"successful, failed, and errored plan",
-			events.Plan,
+			events.PlanCommand,
 			[]events.ProjectResult{
 				{
 					Workspace:  "workspace",
@@ -266,7 +266,7 @@ func TestRenderProjectResults(t *testing.T) {
 		},
 		{
 			"successful, failed, and errored apply",
-			events.Apply,
+			events.ApplyCommand,
 			[]events.ProjectResult{
 				{
 					Workspace:  "workspace",
