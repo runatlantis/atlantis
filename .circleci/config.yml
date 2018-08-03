@@ -68,9 +68,15 @@ workflows:
   version: 2
   branch:
     jobs:
-    - test
+    - test:
+        filters:
+          branches:
+            ignore: /.*-docs/
     - e2e:
         requires: [test]
+        filters:
+          branches:
+            ignore: /.*-docs/
     - docker_master:
         requires: [e2e]
         filters:

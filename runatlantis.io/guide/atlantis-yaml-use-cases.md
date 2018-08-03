@@ -159,6 +159,42 @@ workflows:
           extra_args: ["-lock=false"]
 ```
 
+## Terragrunt
+Atlantis supports running custom commands in place of the default Atlantis
+commands. We can use this functionality to enable
+[Terragrunt](https://github.com/gruntwork-io/terragrunt).
+
+Given a directory structure:
+```
+.
+├── atlantis.yaml
+├── live
+│   ├── prod
+│   │   └── terraform.tfvars
+│   └── staging
+│       └── terraform.tfvars
+└── modules
+    └── ...
+```
+
+You could use an `atlantis.yaml` with these contents:
+```yaml
+version: 2
+projects:
+- dir: live/staging
+  workflow: terragrunt
+- dir: live/prod
+  workflow: terragrunt
+workflows:
+  terragrunt:
+    plan:
+      steps:
+      - run: terragrunt plan -no-color -out $PLANFILE
+    apply:
+      steps:
+      - run: terragrunt apply -no-color $PLANFILE
+```
+
 ## Running custom commands
 Atlantis supports running custom commands. In this example, we want to run
 a script after every `apply`:
