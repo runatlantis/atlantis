@@ -23,9 +23,14 @@ Runs `terraform plan` and `apply` remotely and comments back on the pull request
 * Enable non-operations engineers to collaborate on Terraform.
 * Standardize your Terraform workflows.
 
+## Paid Support
+Interested in a paid support plan with direct access to the Atlantis maintainer? Email [support@runatlantis.io](mailto:support@runatlantis.io).
 
+## Consulting
+Need help installing and adopting Atlantis at scale? Require some features not on our roadmap? Email [luke@runatlantis.io](mailto:luke@runatlantis.io).
+
+## Badges!
 [![SuperDopeBadge](./runatlantis.io/.vuepress/public/hightower-super-dope.svg)](https://twitter.com/kelseyhightower/status/893260922222813184)
-[![codecov](https://codecov.io/gh/runatlantis/atlantis/branch/master/graph/badge.svg)](https://codecov.io/gh/runatlantis/atlantis)
 [![Go Report Card](https://goreportcard.com/badge/github.com/runatlantis/atlantis)](https://goreportcard.com/report/github.com/runatlantis/atlantis)
 [![CircleCI](https://circleci.com/gh/runatlantis/atlantis/tree/master.svg?style=shield)](https://circleci.com/gh/runatlantis/atlantis/tree/master)
 [![Slack Status](https://thawing-headland-22460.herokuapp.com/badge.svg)](https://thawing-headland-22460.herokuapp.com)
