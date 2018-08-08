@@ -22,6 +22,11 @@ import (
 	"github.com/Masterminds/sprig"
 )
 
+const (
+	PlanCommandTitle  = "Plan"
+	ApplyCommandTitle = "Apply"
+)
+
 // MarkdownRenderer renders responses as markdown.
 type MarkdownRenderer struct{}
 
@@ -109,15 +114,15 @@ func (m *MarkdownRenderer) renderProjectResults(results []ProjectResult, common 
 
 	var tmpl *template.Template
 	switch {
-	case len(resultsTmplData) == 1 && common.Command == "Plan" && numSuccesses > 0:
+	case len(resultsTmplData) == 1 && common.Command == PlanCommandTitle && numSuccesses > 0:
 		tmpl = singleProjectPlanSuccessTmpl
-	case len(resultsTmplData) == 1 && common.Command == "Plan" && numSuccesses == 0:
+	case len(resultsTmplData) == 1 && common.Command == PlanCommandTitle && numSuccesses == 0:
 		tmpl = singleProjectPlanUnsuccessfulTmpl
-	case len(resultsTmplData) == 1 && common.Command == "Apply":
+	case len(resultsTmplData) == 1 && common.Command == ApplyCommandTitle:
 		tmpl = singleProjectApplyTmpl
-	case common.Command == "Plan":
+	case common.Command == PlanCommandTitle:
 		tmpl = multiProjectPlanTmpl
-	case common.Command == "Apply":
+	case common.Command == ApplyCommandTitle:
 		tmpl = multiProjectApplyTmpl
 	default:
 		return "no template matched–this is a bug"
