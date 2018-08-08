@@ -25,7 +25,7 @@ workspace=default
 
 ```
 
-* To **discard** this plan click [here](lock-url).
+* To **delete** this plan click [here](lock-url)
 ---
 ### 2. workspace: `default` dir: `.`
 ```diff
@@ -48,6 +48,6 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 
 ```
 
-* To **discard** this plan click [here](lock-url).
+* To **delete** this plan click [here](lock-url)
 ---
-
+* To apply all unapplied plans comment `atlantis apply`

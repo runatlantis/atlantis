@@ -73,7 +73,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			CommentAndReplies: []string{
 				"atlantis plan -- -var var=default_workspace", "exp-output-atlantis-plan.txt",
 				"atlantis plan -w new_workspace -- -var var=new_workspace", "exp-output-atlantis-plan-new-workspace.txt",
-				"atlantis apply", "exp-output-apply-var-default-workspace.txt",
+				"atlantis apply -w default", "exp-output-apply-var-default-workspace.txt",
 				"atlantis apply -w new_workspace", "exp-output-apply-var-new-workspace.txt",
 			},
 			ExpMergeCommentFile: "exp-output-merge-workspaces.txt",
@@ -85,7 +85,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			ExpAutoplanCommentFile: "exp-output-autoplan.txt",
 			CommentAndReplies: []string{
 				"atlantis apply -w staging", "exp-output-apply-staging.txt",
-				"atlantis apply", "exp-output-apply-default.txt",
+				"atlantis apply -w default", "exp-output-apply-default.txt",
 			},
 			ExpMergeCommentFile: "exp-output-merge.txt",
 		},
