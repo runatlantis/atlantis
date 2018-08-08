@@ -80,10 +80,6 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log *logging.SimpleLog
 	var projects []valid.Project
 	for _, project := range config.Projects {
 		log.Debug("checking if project at dir %q workspace %q was modified", project.Dir, project.Workspace)
-		if !project.Autoplan.Enabled {
-			log.Debug("autoplan disabled, ignoring")
-			continue
-		}
 		// Prepend project dir to when modified patterns because the patterns
 		// are relative to the project dirs but our list of modified files is
 		// relative to the repo root.

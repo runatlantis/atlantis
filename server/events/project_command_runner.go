@@ -55,8 +55,8 @@ type PlanSuccess struct {
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_runner.go ProjectCommandRunner
 
 type ProjectCommandRunner interface {
-	Plan(ctx models.ProjectCommandContext) ProjectCommandResult
-	Apply(ctx models.ProjectCommandContext) ProjectCommandResult
+	Plan(ctx models.ProjectCommandContext) ProjectResult
+	Apply(ctx models.ProjectCommandContext) ProjectResult
 }
 
 type DefaultProjectCommandRunner struct {
@@ -73,7 +73,25 @@ type DefaultProjectCommandRunner struct {
 	RequireApprovalOverride bool
 }
 
-func (p *DefaultProjectCommandRunner) Plan(ctx models.ProjectCommandContext) ProjectCommandResult {
+func (p *DefaultProjectCommandRunner) Plan(ctx models.ProjectCommandContext) ProjectResult {
+	result := p.doPlan(ctx)
+	return ProjectResult{
+		ProjectCommandResult: result,
+		RepoRelDir:           ctx.RepoRelDir,
+		Workspace:            ctx.Workspace,
+	}
+}
+
+func (p *DefaultProjectCommandRunner) Apply(ctx models.ProjectCommandContext) ProjectResult {
+	result := p.doApply(ctx)
+	return ProjectResult{
+		ProjectCommandResult: result,
+		RepoRelDir:           ctx.RepoRelDir,
+		Workspace:            ctx.Workspace,
+	}
+}
+
+func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) ProjectCommandResult {
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.BaseRepo.FullName, ctx.RepoRelDir))
 	if err != nil {
@@ -155,7 +173,7 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.Pr
 	return outputs, nil
 }
 
-func (p *DefaultProjectCommandRunner) Apply(ctx models.ProjectCommandContext) ProjectCommandResult {
+func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) ProjectCommandResult {
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)
 	if err != nil {
 		if os.IsNotExist(err) {

@@ -37,6 +37,7 @@ type WorkingDir interface {
 	// GetWorkingDir returns the path to the workspace for this repo and pull.
 	// If workspace does not exist on disk, error will be of type os.IsNotExist.
 	GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error)
+	GetPullDir(r models.Repo, p models.PullRequest) (string, error)
 	// Delete deletes the workspace for this repo and pull.
 	Delete(r models.Repo, p models.PullRequest) error
 	DeleteForWorkspace(r models.Repo, p models.PullRequest, workspace string) error
@@ -131,6 +132,14 @@ func (w *FileWorkspace) GetWorkingDir(r models.Repo, p models.PullRequest, works
 		return "", errors.Wrap(err, "checking if workspace exists")
 	}
 	return repoDir, nil
+}
+
+func (w *FileWorkspace) GetPullDir(r models.Repo, p models.PullRequest) (string, error) {
+	dir := w.repoPullDir(r, p)
+	if _, err := os.Stat(dir); err != nil {
+		return "", err
+	}
+	return dir, nil
 }
 
 // Delete deletes the workspace for this repo and pull.

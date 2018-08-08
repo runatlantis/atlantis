@@ -395,10 +395,14 @@ projects:
 				pull := models.PullRequest{}
 				logger := logging.NewNoopLogger()
 				workingDir := mocks.NewMockWorkingDir()
+				expWorkspace := c.Cmd.Workspace
+				if expWorkspace == "" {
+					expWorkspace = "default"
+				}
 				if cmdName == events.PlanCommand {
-					When(workingDir.Clone(logger, baseRepo, headRepo, pull, c.Cmd.Workspace)).ThenReturn(tmpDir, nil)
+					When(workingDir.Clone(logger, baseRepo, headRepo, pull, expWorkspace)).ThenReturn(tmpDir, nil)
 				} else {
-					When(workingDir.GetWorkingDir(baseRepo, pull, c.Cmd.Workspace)).ThenReturn(tmpDir, nil)
+					When(workingDir.GetWorkingDir(baseRepo, pull, expWorkspace)).ThenReturn(tmpDir, nil)
 				}
 				if c.AtlantisYAML != "" {
 					err := ioutil.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
@@ -426,20 +430,21 @@ projects:
 					User:     models.User{},
 					Log:      logger,
 				}
-				var actCtx models.ProjectCommandContext
-
+				var actCtxs []models.ProjectCommandContext
 				if cmdName == events.PlanCommand {
-					actCtx, err = builder.BuildPlanCommand(cmdCtx, &c.Cmd)
+					actCtxs, err = builder.BuildPlanCommands(cmdCtx, &c.Cmd)
 				} else {
-					actCtx, err = builder.BuildApplyCommand(cmdCtx, &c.Cmd)
+					actCtxs, err = builder.BuildApplyCommands(cmdCtx, &c.Cmd)
 				}
 
 				if c.ExpErr != "" {
 					ErrEquals(t, c.ExpErr, err)
 					return
 				}
-
 				Ok(t, err)
+
+				Equals(t, 1, len(actCtxs))
+				actCtx := actCtxs[0]
 				Equals(t, baseRepo, actCtx.BaseRepo)
 				Equals(t, baseRepo, actCtx.HeadRepo)
 				Equals(t, pull, actCtx.Pull)

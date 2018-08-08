@@ -19,25 +19,25 @@ func NewMockProjectCommandRunner() *MockProjectCommandRunner {
 	return &MockProjectCommandRunner{fail: pegomock.GlobalFailHandler}
 }
 
-func (mock *MockProjectCommandRunner) Plan(ctx models.ProjectCommandContext) events.ProjectCommandResult {
+func (mock *MockProjectCommandRunner) Plan(ctx models.ProjectCommandContext) events.ProjectResult {
 	params := []pegomock.Param{ctx}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("Plan", params, []reflect.Type{reflect.TypeOf((*events.ProjectCommandResult)(nil)).Elem()})
-	var ret0 events.ProjectCommandResult
+	result := pegomock.GetGenericMockFrom(mock).Invoke("Plan", params, []reflect.Type{reflect.TypeOf((*events.ProjectResult)(nil)).Elem()})
+	var ret0 events.ProjectResult
 	if len(result) != 0 {
 		if result[0] != nil {
-			ret0 = result[0].(events.ProjectCommandResult)
+			ret0 = result[0].(events.ProjectResult)
 		}
 	}
 	return ret0
 }
 
-func (mock *MockProjectCommandRunner) Apply(ctx models.ProjectCommandContext) events.ProjectCommandResult {
+func (mock *MockProjectCommandRunner) Apply(ctx models.ProjectCommandContext) events.ProjectResult {
 	params := []pegomock.Param{ctx}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("Apply", params, []reflect.Type{reflect.TypeOf((*events.ProjectCommandResult)(nil)).Elem()})
-	var ret0 events.ProjectCommandResult
+	result := pegomock.GetGenericMockFrom(mock).Invoke("Apply", params, []reflect.Type{reflect.TypeOf((*events.ProjectResult)(nil)).Elem()})
+	var ret0 events.ProjectResult
 	if len(result) != 0 {
 		if result[0] != nil {
-			ret0 = result[0].(events.ProjectCommandResult)
+			ret0 = result[0].(events.ProjectResult)
 		}
 	}
 	return ret0

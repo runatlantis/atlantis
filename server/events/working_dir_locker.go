@@ -31,6 +31,7 @@ type WorkingDirLocker interface {
 	// an error if the workspace is already locked. The error is expected to
 	// be printed to the pull request.
 	TryLock(repoFullName string, workspace string, pullNum int) (func(), error)
+	TryLockPull(repoFullName string, pullNum int) (func(), error)
 	// Unlock deletes the lock for this repo, workspace and pull. If there was no
 	// lock it will do nothing.
 	Unlock(repoFullName, workspace string, pullNum int)
@@ -47,6 +48,11 @@ func NewDefaultWorkingDirLocker() *DefaultWorkingDirLocker {
 	return &DefaultWorkingDirLocker{
 		locks: make(map[string]interface{}),
 	}
+}
+
+func (d *DefaultWorkingDirLocker) TryLockPull(repoFullName string, pullNum int) (func(), error) {
+	// todo: implement
+	return func() {}, nil
 }
 
 func (d *DefaultWorkingDirLocker) TryLock(repoFullName string, workspace string, pullNum int) (func(), error) {

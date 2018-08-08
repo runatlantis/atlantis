@@ -101,15 +101,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		return
 	}
 
-	var results []ProjectResult
-	for _, cmd := range projectCmds {
-		res := c.ProjectCommandRunner.Plan(cmd)
-		results = append(results, ProjectResult{
-			ProjectCommandResult: res,
-			RepoRelDir:           cmd.RepoRelDir,
-			Workspace:            cmd.Workspace,
-		})
-	}
+	results := c.runProjectCmds(projectCmds, PlanCommand)
 	c.updatePull(ctx, AutoplanCommand{}, CommandResult{ProjectResults: results})
 }
 
@@ -152,45 +144,48 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		BaseRepo: baseRepo,
 	}
 	defer c.logPanics(ctx)
-
 	if !c.validateCtxAndComment(ctx) {
 		return
 	}
-
 	if err := c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, models.PendingCommitStatus, cmd.CommandName()); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
-	var result ProjectCommandResult
+	var projectCmds []models.ProjectCommandContext
 	switch cmd.Name {
 	case PlanCommand:
-		projectCmd, err := c.ProjectCommandBuilder.BuildPlanCommand(ctx, cmd)
-		if err != nil {
-			c.updatePull(ctx, cmd, CommandResult{Error: err})
-			return
-		}
-		result = c.ProjectCommandRunner.Plan(projectCmd)
+		projectCmds, err = c.ProjectCommandBuilder.BuildPlanCommands(ctx, cmd)
 	case ApplyCommand:
-		projectCmd, err := c.ProjectCommandBuilder.BuildApplyCommand(ctx, cmd)
-		if err != nil {
-			c.updatePull(ctx, cmd, CommandResult{Error: err})
-			return
-		}
-		result = c.ProjectCommandRunner.Apply(projectCmd)
+		projectCmds, err = c.ProjectCommandBuilder.BuildApplyCommands(ctx, cmd)
 	default:
 		ctx.Log.Err("failed to determine desired command, neither plan nor apply")
 		return
 	}
-
+	if err != nil {
+		c.updatePull(ctx, cmd, CommandResult{Error: err})
+		return
+	}
+	results := c.runProjectCmds(projectCmds, cmd.Name)
 	c.updatePull(
 		ctx,
 		cmd,
 		CommandResult{
-			ProjectResults: []ProjectResult{{
-				RepoRelDir:           cmd.RepoRelDir,
-				Workspace:            cmd.Workspace,
-				ProjectCommandResult: result,
-			}}})
+			ProjectResults: results})
+}
+
+func (c *DefaultCommandRunner) runProjectCmds(cmds []models.ProjectCommandContext, cmdName CommandName) []ProjectResult {
+	var results []ProjectResult
+	for _, pCmd := range cmds {
+		var res ProjectResult
+		switch cmdName {
+		case PlanCommand:
+			res = c.ProjectCommandRunner.Plan(pCmd)
+		case ApplyCommand:
+			res = c.ProjectCommandRunner.Apply(pCmd)
+		}
+		results = append(results, res)
+	}
+	return results
 }
 
 func (c *DefaultCommandRunner) getGithubData(baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {
