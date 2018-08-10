@@ -1,4 +1,4 @@
-# v0.4.5 (unreleased)
+# v0.4.5
 
 ## Features
 * `atlantis apply` now applies **all** unapplied plans instead of just the plan in the root directory. ([#169](https://github.com/runatlantis/atlantis/issues/169))
