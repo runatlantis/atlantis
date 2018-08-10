@@ -256,19 +256,23 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 		expProjPaths []string
 	}{
 		{
+			// When autoplan is disabled, we still return the modified project.
+			// If our caller is interested in autoplan enabled projects, they'll
+			// need to filter the results.
 			description: "autoplan disabled",
 			config: valid.Config{
 				Projects: []valid.Project{
 					{
 						Dir: ".",
 						Autoplan: valid.Autoplan{
-							Enabled: false,
+							Enabled:      false,
+							WhenModified: []string{"**/*.tf"},
 						},
 					},
 				},
 			},
 			modified:     []string{"main.tf"},
-			expProjPaths: nil,
+			expProjPaths: []string{"."},
 		},
 		{
 			description: "autoplan default",
@@ -383,6 +387,9 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 	}
 
 	for _, c := range cases {
+		if c.description != "autoplan disabled" {
+			continue
+		}
 		t.Run(c.description, func(t *testing.T) {
 			pf := events.DefaultProjectFinder{}
 			projects, err := pf.DetermineProjectsViaConfig(logging.NewNoopLogger(), c.modified, c.config, tmpDir)

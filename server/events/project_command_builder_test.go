@@ -8,6 +8,7 @@ import (
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/mocks"
+	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/events/yaml"
@@ -190,12 +191,14 @@ projects:
 			When(vcsClient.GetModifiedFiles(baseRepo, pull)).ThenReturn([]string{"main.tf"}, nil)
 
 			builder := &events.DefaultProjectCommandBuilder{
-				WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
-				WorkingDir:       workingDir,
-				ParserValidator:  &yaml.ParserValidator{},
-				VCSClient:        vcsClient,
-				ProjectFinder:    &events.DefaultProjectFinder{},
-				AllowRepoConfig:  true,
+				WorkingDirLocker:    events.NewDefaultWorkingDirLocker(),
+				WorkingDir:          workingDir,
+				ParserValidator:     &yaml.ParserValidator{},
+				VCSClient:           vcsClient,
+				ProjectFinder:       &events.DefaultProjectFinder{},
+				AllowRepoConfig:     true,
+				PendingPlanFinder:   &events.PendingPlanFinder{},
+				AllowRepoConfigFlag: "allow-repo-config",
 			}
 
 			ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
@@ -225,7 +228,8 @@ projects:
 	}
 }
 
-func TestDefaultProjectCommandBuilder_BuildPlanApplyCommand(t *testing.T) {
+// Test building a plan and apply command for one project.
+func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) {
 	cases := []struct {
 		Description      string
 		AtlantisYAML     string
@@ -415,12 +419,13 @@ projects:
 				When(vcsClient.GetModifiedFiles(baseRepo, pull)).ThenReturn([]string{"main.tf"}, nil)
 
 				builder := &events.DefaultProjectCommandBuilder{
-					WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
-					WorkingDir:       workingDir,
-					ParserValidator:  &yaml.ParserValidator{},
-					VCSClient:        vcsClient,
-					ProjectFinder:    &events.DefaultProjectFinder{},
-					AllowRepoConfig:  true,
+					WorkingDirLocker:    events.NewDefaultWorkingDirLocker(),
+					WorkingDir:          workingDir,
+					ParserValidator:     &yaml.ParserValidator{},
+					VCSClient:           vcsClient,
+					ProjectFinder:       &events.DefaultProjectFinder{},
+					AllowRepoConfig:     true,
+					AllowRepoConfigFlag: "allow-repo-config",
 				}
 
 				cmdCtx := &events.CommandContext{
@@ -458,6 +463,384 @@ projects:
 			})
 		}
 	}
+}
+
+// Test building plan command for multiple projects when the comment
+// isn't for a specific project, i.e. atlantis plan and there's no atlantis.yaml.
+// In this case we should just use the list of modified projects.
+func TestDefaultProjectCommandBuilder_BuildMultiPlanNoAtlantisYAML(t *testing.T) {
+	RegisterMockTestingT(t)
+	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
+		"project1": map[string]interface{}{
+			"main.tf": nil,
+		},
+		"project2": map[string]interface{}{
+			"main.tf": nil,
+		},
+	})
+	defer cleanup()
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.Clone(
+		matchers.AnyPtrToLoggingSimpleLogger(),
+		matchers.AnyModelsRepo(),
+		matchers.AnyModelsRepo(),
+		matchers.AnyModelsPullRequest(),
+		AnyString())).ThenReturn(tmpDir, nil)
+	vcsClient := vcsmocks.NewMockClientProxy()
+	When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"project1/main.tf", "project2/main.tf"}, nil)
+
+	builder := &events.DefaultProjectCommandBuilder{
+		WorkingDirLocker:    events.NewDefaultWorkingDirLocker(),
+		WorkingDir:          workingDir,
+		ParserValidator:     &yaml.ParserValidator{},
+		VCSClient:           vcsClient,
+		ProjectFinder:       &events.DefaultProjectFinder{},
+		AllowRepoConfig:     true,
+		AllowRepoConfigFlag: "allow-repo-config",
+	}
+
+	ctxs, err := builder.BuildPlanCommands(&events.CommandContext{
+		BaseRepo: models.Repo{},
+		HeadRepo: models.Repo{},
+		Pull:     models.PullRequest{},
+		User:     models.User{},
+		Log:      logging.NewNoopLogger(),
+	}, &events.CommentCommand{
+		RepoRelDir:  "",
+		Flags:       nil,
+		Name:        events.PlanCommand,
+		Verbose:     false,
+		Workspace:   "",
+		ProjectName: "",
+	})
+	Ok(t, err)
+	Equals(t, 2, len(ctxs))
+	Equals(t, "project1", ctxs[0].RepoRelDir)
+	Equals(t, "default", ctxs[0].Workspace)
+	var nilProjectConfig *valid.Project
+	Equals(t, nilProjectConfig, ctxs[0].ProjectConfig)
+	Equals(t, "project2", ctxs[1].RepoRelDir)
+	Equals(t, "default", ctxs[1].Workspace)
+	Equals(t, nilProjectConfig, ctxs[1].ProjectConfig)
+}
+
+// Test building plan command for multiple projects when the comment
+// isn't for a specific project, i.e. atlantis plan and there's no atlantis.yaml.
+// In this case there are no modified files so there should be 0 plans.
+func TestDefaultProjectCommandBuilder_BuildMultiPlanNoAtlantisYAMLNoModified(t *testing.T) {
+	RegisterMockTestingT(t)
+	tmpDir, cleanup := TempDir(t)
+	defer cleanup()
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.Clone(
+		matchers.AnyPtrToLoggingSimpleLogger(),
+		matchers.AnyModelsRepo(),
+		matchers.AnyModelsRepo(),
+		matchers.AnyModelsPullRequest(),
+		AnyString())).ThenReturn(tmpDir, nil)
+	vcsClient := vcsmocks.NewMockClientProxy()
+	When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{}, nil)
+
+	builder := &events.DefaultProjectCommandBuilder{
+		WorkingDirLocker:    events.NewDefaultWorkingDirLocker(),
+		WorkingDir:          workingDir,
+		ParserValidator:     &yaml.ParserValidator{},
+		VCSClient:           vcsClient,
+		ProjectFinder:       &events.DefaultProjectFinder{},
+		AllowRepoConfig:     true,
+		AllowRepoConfigFlag: "allow-repo-config",
+	}
+
+	ctxs, err := builder.BuildPlanCommands(&events.CommandContext{
+		BaseRepo: models.Repo{},
+		HeadRepo: models.Repo{},
+		Pull:     models.PullRequest{},
+		User:     models.User{},
+		Log:      logging.NewNoopLogger(),
+	}, &events.CommentCommand{
+		RepoRelDir:  "",
+		Flags:       nil,
+		Name:        events.PlanCommand,
+		Verbose:     false,
+		Workspace:   "",
+		ProjectName: "",
+	})
+	Ok(t, err)
+	Equals(t, 0, len(ctxs))
+}
+
+// Test building plan command for multiple projects when the comment
+// isn't for a specific project, i.e. atlantis plan and there is an atlantis.yaml.
+// In this case we should follow the when_modified section of the autoplan config.
+func TestDefaultProjectCommandBuilder_BuildMultiPlanWithAtlantisYAML(t *testing.T) {
+	RegisterMockTestingT(t)
+	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
+		"project1": map[string]interface{}{
+			"main.tf": nil,
+		},
+		"project2": map[string]interface{}{
+			"main.tf": nil,
+		},
+		"project3": map[string]interface{}{
+			"main.tf": nil,
+		},
+	})
+	defer cleanup()
+	yamlCfg := `version: 2
+projects:
+- dir: project1 # project1 uses the defaults
+- dir: project2 # project2 has autoplan disabled but should use default when_modified
+  autoplan:
+    enabled: false
+- dir: project3 # project3 has an empty when_modified
+  autoplan:
+    enabled: false
+    when_modified: []
+`
+	err := ioutil.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(yamlCfg), 0600)
+	Ok(t, err)
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.Clone(
+		matchers.AnyPtrToLoggingSimpleLogger(),
+		matchers.AnyModelsRepo(),
+		matchers.AnyModelsRepo(),
+		matchers.AnyModelsPullRequest(),
+		AnyString())).ThenReturn(tmpDir, nil)
+	vcsClient := vcsmocks.NewMockClientProxy()
+	When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{
+		"project1/main.tf", "project2/main.tf", "project3/main.tf",
+	}, nil)
+
+	builder := &events.DefaultProjectCommandBuilder{
+		WorkingDirLocker:    events.NewDefaultWorkingDirLocker(),
+		WorkingDir:          workingDir,
+		ParserValidator:     &yaml.ParserValidator{},
+		VCSClient:           vcsClient,
+		ProjectFinder:       &events.DefaultProjectFinder{},
+		AllowRepoConfig:     true,
+		AllowRepoConfigFlag: "allow-repo-config",
+	}
+
+	ctxs, err := builder.BuildPlanCommands(&events.CommandContext{
+		BaseRepo: models.Repo{},
+		HeadRepo: models.Repo{},
+		Pull:     models.PullRequest{},
+		User:     models.User{},
+		Log:      logging.NewNoopLogger(),
+	}, &events.CommentCommand{
+		RepoRelDir:  "",
+		Flags:       nil,
+		Name:        events.PlanCommand,
+		Verbose:     false,
+		Workspace:   "",
+		ProjectName: "",
+	})
+	Ok(t, err)
+	Equals(t, 2, len(ctxs))
+	Equals(t, "project1", ctxs[0].RepoRelDir)
+	Equals(t, "default", ctxs[0].Workspace)
+	Equals(t, "project2", ctxs[1].RepoRelDir)
+	Equals(t, "default", ctxs[1].Workspace)
+}
+
+// Test building plan command for multiple projects when the comment
+// isn't for a specific project, i.e. atlantis plan and there is an atlantis.yaml.
+// In this case we should follow the when_modified section of the autoplan config.
+func TestDefaultProjectCommandBuilder_BuildMultiPlanWithAtlantisYAMLWorkspaces(t *testing.T) {
+	RegisterMockTestingT(t)
+	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
+		"main.tf": nil,
+	})
+	defer cleanup()
+	yamlCfg := `version: 2
+projects:
+- dir: .
+  workspace: staging
+- dir: .
+  workspace: production
+`
+	err := ioutil.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(yamlCfg), 0600)
+	Ok(t, err)
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.Clone(
+		matchers.AnyPtrToLoggingSimpleLogger(),
+		matchers.AnyModelsRepo(),
+		matchers.AnyModelsRepo(),
+		matchers.AnyModelsPullRequest(),
+		AnyString())).ThenReturn(tmpDir, nil)
+	vcsClient := vcsmocks.NewMockClientProxy()
+	When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
+
+	builder := &events.DefaultProjectCommandBuilder{
+		WorkingDirLocker:    events.NewDefaultWorkingDirLocker(),
+		WorkingDir:          workingDir,
+		ParserValidator:     &yaml.ParserValidator{},
+		VCSClient:           vcsClient,
+		ProjectFinder:       &events.DefaultProjectFinder{},
+		AllowRepoConfig:     true,
+		AllowRepoConfigFlag: "allow-repo-config",
+	}
+
+	ctxs, err := builder.BuildPlanCommands(&events.CommandContext{
+		BaseRepo: models.Repo{},
+		HeadRepo: models.Repo{},
+		Pull:     models.PullRequest{},
+		User:     models.User{},
+		Log:      logging.NewNoopLogger(),
+	}, &events.CommentCommand{
+		RepoRelDir:  "",
+		Flags:       nil,
+		Name:        events.PlanCommand,
+		Verbose:     false,
+		Workspace:   "",
+		ProjectName: "",
+	})
+	Ok(t, err)
+	Equals(t, 2, len(ctxs))
+	Equals(t, ".", ctxs[0].RepoRelDir)
+	Equals(t, "staging", ctxs[0].Workspace)
+	Equals(t, ".", ctxs[1].RepoRelDir)
+	Equals(t, "production", ctxs[1].Workspace)
+}
+
+// Test building apply command for multiple projects when the comment
+// isn't for a specific project, i.e. atlantis apply.
+// In this case we should apply all outstanding plans.
+func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
+	RegisterMockTestingT(t)
+	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
+		"workspace1": map[string]interface{}{
+			"project1": map[string]interface{}{
+				"main.tf":          nil,
+				"workspace.tfplan": nil,
+			},
+			"project2": map[string]interface{}{
+				"main.tf":          nil,
+				"workspace.tfplan": nil,
+			},
+		},
+		"workspace2": map[string]interface{}{
+			"project1": map[string]interface{}{
+				"main.tf":          nil,
+				"workspace.tfplan": nil,
+			},
+			"project2": map[string]interface{}{
+				"main.tf":          nil,
+				"workspace.tfplan": nil,
+			},
+		},
+	})
+	defer cleanup()
+	// Initialize git repos in each workspace so that the .tfplan files get
+	// picked up.
+	runCmd(t, filepath.Join(tmpDir, "workspace1"), "git", "init")
+	runCmd(t, filepath.Join(tmpDir, "workspace2"), "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(
+		matchers.AnyModelsRepo(),
+		matchers.AnyModelsPullRequest())).
+		ThenReturn(tmpDir, nil)
+
+	builder := &events.DefaultProjectCommandBuilder{
+		WorkingDirLocker:    events.NewDefaultWorkingDirLocker(),
+		WorkingDir:          workingDir,
+		ParserValidator:     &yaml.ParserValidator{},
+		VCSClient:           nil,
+		ProjectFinder:       &events.DefaultProjectFinder{},
+		AllowRepoConfig:     true,
+		AllowRepoConfigFlag: "allow-repo-config",
+		PendingPlanFinder:   &events.PendingPlanFinder{},
+	}
+
+	ctxs, err := builder.BuildApplyCommands(&events.CommandContext{
+		BaseRepo: models.Repo{},
+		HeadRepo: models.Repo{},
+		Pull:     models.PullRequest{},
+		User:     models.User{},
+		Log:      logging.NewNoopLogger(),
+	}, &events.CommentCommand{
+		RepoRelDir:  "",
+		Flags:       nil,
+		Name:        events.ApplyCommand,
+		Verbose:     false,
+		Workspace:   "",
+		ProjectName: "",
+	})
+	Ok(t, err)
+	Equals(t, 4, len(ctxs))
+	Equals(t, "project1", ctxs[0].RepoRelDir)
+	Equals(t, "workspace1", ctxs[0].Workspace)
+	Equals(t, "project2", ctxs[1].RepoRelDir)
+	Equals(t, "workspace1", ctxs[1].Workspace)
+	Equals(t, "project1", ctxs[2].RepoRelDir)
+	Equals(t, "workspace2", ctxs[2].Workspace)
+	Equals(t, "project2", ctxs[3].RepoRelDir)
+	Equals(t, "workspace2", ctxs[3].Workspace)
+}
+
+// Test that if repo config is disabled we error out if there's an atlantis.yaml
+// file.
+func TestDefaultProjectCommandBuilder_RepoConfigDisabled(t *testing.T) {
+	RegisterMockTestingT(t)
+	workingDir := mocks.NewMockWorkingDir()
+
+	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
+		"pulldir": map[string]interface{}{
+			"workspace": map[string]interface{}{},
+		},
+	})
+	defer cleanup()
+	repoDir := filepath.Join(tmpDir, "pulldir/workspace")
+	err := ioutil.WriteFile(filepath.Join(repoDir, yaml.AtlantisYAMLFilename), nil, 0600)
+	Ok(t, err)
+
+	When(workingDir.Clone(
+		matchers.AnyPtrToLoggingSimpleLogger(),
+		matchers.AnyModelsRepo(),
+		matchers.AnyModelsRepo(),
+		matchers.AnyModelsPullRequest(),
+		AnyString())).ThenReturn(repoDir, nil)
+	When(workingDir.GetWorkingDir(
+		matchers.AnyModelsRepo(),
+		matchers.AnyModelsPullRequest(),
+		AnyString())).ThenReturn(repoDir, nil)
+
+	builder := &events.DefaultProjectCommandBuilder{
+		WorkingDirLocker:    events.NewDefaultWorkingDirLocker(),
+		WorkingDir:          workingDir,
+		ParserValidator:     &yaml.ParserValidator{},
+		VCSClient:           nil,
+		ProjectFinder:       &events.DefaultProjectFinder{},
+		AllowRepoConfig:     false,
+		AllowRepoConfigFlag: "allow-repo-config",
+	}
+
+	ctx := &events.CommandContext{
+		BaseRepo: models.Repo{},
+		HeadRepo: models.Repo{},
+		Pull:     models.PullRequest{},
+		User:     models.User{},
+		Log:      logging.NewNoopLogger(),
+	}
+	_, err = builder.BuildAutoplanCommands(ctx)
+	ErrEquals(t, "atlantis.yaml files not allowed because Atlantis is not running with --allow-repo-config", err)
+
+	commentCmd := &events.CommentCommand{
+		RepoRelDir:  "",
+		Flags:       nil,
+		Name:        0,
+		Verbose:     false,
+		Workspace:   "workspace",
+		ProjectName: "",
+	}
+	_, err = builder.BuildPlanCommands(ctx, commentCmd)
+	ErrEquals(t, "atlantis.yaml files not allowed because Atlantis is not running with --allow-repo-config", err)
+
+	_, err = builder.BuildApplyCommands(ctx, commentCmd)
+	ErrEquals(t, "atlantis.yaml files not allowed because Atlantis is not running with --allow-repo-config", err)
 }
 
 func String(v string) *string { return &v }

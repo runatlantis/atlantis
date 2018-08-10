@@ -105,7 +105,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) P
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.BaseRepo.FullName, ctx.Workspace, ctx.Pull.Num)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace)
 	if err != nil {
 		return ProjectCommandResult{Error: err}
 	}
@@ -203,7 +203,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 		}
 	}
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.BaseRepo.FullName, ctx.Workspace, ctx.Pull.Num)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace)
 	if err != nil {
 		return ProjectCommandResult{Error: err}
 	}

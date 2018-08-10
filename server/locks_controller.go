@@ -91,7 +91,7 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 	// installations of Atlantis will have locks in their DB that do not have
 	// this field on PullRequest. We skip commenting and deleting the working dir in this case.
 	if lock.Pull.BaseRepo != (models.Repo{}) {
-		unlock, err := l.WorkingDirLocker.TryLock(lock.Pull.BaseRepo.FullName, lock.Workspace, lock.Pull.Num)
+		unlock, err := l.WorkingDirLocker.TryLock(lock.Pull.BaseRepo.FullName, lock.Pull.Num, lock.Workspace)
 		if err != nil {
 			l.Logger.Err("unable to obtain working dir lock when trying to delete old plans: %s", err)
 		} else {

@@ -134,6 +134,8 @@ func (w *FileWorkspace) GetWorkingDir(r models.Repo, p models.PullRequest, works
 	return repoDir, nil
 }
 
+// GetPullDir returns the dir where the workspaces for this pull are cloned.
+// If the dir doesn't exist it will return an error.
 func (w *FileWorkspace) GetPullDir(r models.Repo, p models.PullRequest) (string, error) {
 	dir := w.repoPullDir(r, p)
 	if _, err := os.Stat(dir); err != nil {

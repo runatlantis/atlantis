@@ -2,9 +2,6 @@ package events
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
 
 	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
@@ -36,6 +33,7 @@ type DefaultProjectCommandBuilder struct {
 	WorkingDirLocker    WorkingDirLocker
 	AllowRepoConfig     bool
 	AllowRepoConfigFlag string
+	PendingPlanFinder   *PendingPlanFinder
 }
 
 type TerraformExec interface {
@@ -43,7 +41,7 @@ type TerraformExec interface {
 }
 
 func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error) {
-	cmds, err := p.BuildPlanAllCommands(ctx, nil, false)
+	cmds, err := p.buildPlanAllCommands(ctx, nil, false)
 	if err != nil {
 		return nil, err
 	}
@@ -59,10 +57,10 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext
 	return autoplanEnabled, nil
 }
 
-func (p *DefaultProjectCommandBuilder) BuildPlanAllCommands(ctx *CommandContext, commentFlags []string, verbose bool) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext, commentFlags []string, verbose bool) ([]models.ProjectCommandContext, error) {
 	// Need to lock the workspace we're about to clone to.
 	workspace := DefaultWorkspace
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.BaseRepo.FullName, workspace, ctx.Pull.Num)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.BaseRepo.FullName, ctx.Pull.Num, workspace)
 	if err != nil {
 		ctx.Log.Warn("workspace was locked")
 		return nil, err
@@ -155,7 +153,7 @@ func (p *DefaultProjectCommandBuilder) BuildPlanAllCommands(ctx *CommandContext,
 	return projCtxs, nil
 }
 
-func (p *DefaultProjectCommandBuilder) BuildProjectPlanCommand(ctx *CommandContext, cmd *CommentCommand) (models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *CommandContext, cmd *CommentCommand) (models.ProjectCommandContext, error) {
 	workspace := DefaultWorkspace
 	if cmd.Workspace != "" {
 		workspace = cmd.Workspace
@@ -163,7 +161,7 @@ func (p *DefaultProjectCommandBuilder) BuildProjectPlanCommand(ctx *CommandConte
 
 	var pcc models.ProjectCommandContext
 	ctx.Log.Debug("building plan command")
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.BaseRepo.FullName, workspace, ctx.Pull.Num)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.BaseRepo.FullName, ctx.Pull.Num, workspace)
 	if err != nil {
 		return pcc, err
 	}
@@ -185,16 +183,16 @@ func (p *DefaultProjectCommandBuilder) BuildProjectPlanCommand(ctx *CommandConte
 
 func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
 	if !cmd.IsForSpecificProject() {
-		return p.BuildPlanAllCommands(ctx, cmd.Flags, cmd.Verbose)
+		return p.buildPlanAllCommands(ctx, cmd.Flags, cmd.Verbose)
 	}
-	pcc, err := p.BuildProjectPlanCommand(ctx, cmd)
+	pcc, err := p.buildProjectPlanCommand(ctx, cmd)
 	if err != nil {
 		return nil, err
 	}
 	return []models.ProjectCommandContext{pcc}, nil
 }
 
-func (p *DefaultProjectCommandBuilder) BuildApplyAllCommands(ctx *CommandContext, commentCmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) buildApplyAllCommands(ctx *CommandContext, commentCmd *CommentCommand) ([]models.ProjectCommandContext, error) {
 	// lock all dirs in this pull request
 	unlockFn, err := p.WorkingDirLocker.TryLockPull(ctx.BaseRepo.FullName, ctx.Pull.Num)
 	if err != nil {
@@ -207,7 +205,7 @@ func (p *DefaultProjectCommandBuilder) BuildApplyAllCommands(ctx *CommandContext
 		return nil, err
 	}
 
-	plans, err := p.findUnappliedPlans(pullDir)
+	plans, err := p.PendingPlanFinder.Find(pullDir)
 	if err != nil {
 		return nil, err
 	}
@@ -223,63 +221,25 @@ func (p *DefaultProjectCommandBuilder) BuildApplyAllCommands(ctx *CommandContext
 	return cmds, nil
 }
 
-type UnappliedPlan struct {
-	RepoDir    string
-	RepoRelDir string
-	Workspace  string
-}
-
-func (p *DefaultProjectCommandBuilder) findUnappliedPlans(pullDir string) ([]UnappliedPlan, error) {
-	workspaceDirs, err := ioutil.ReadDir(pullDir)
-	if err != nil {
-		return nil, err
-	}
-	var plans []UnappliedPlan
-	for _, workspaceDir := range workspaceDirs {
-		workspace := workspaceDir.Name()
-		repoDir := filepath.Join(pullDir, workspace)
-
-		err := filepath.Walk(repoDir, func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-			// Check if the plan is for the right workspace,
-			if !info.IsDir() && filepath.Ext(path) == ".tfplan" {
-				repoRelDir, _ := filepath.Rel(repoDir, filepath.Dir(path))
-				plans = append(plans, UnappliedPlan{
-					RepoDir:    repoDir,
-					RepoRelDir: repoRelDir,
-					Workspace:  workspace,
-				})
-			}
-			return nil
-		})
-		if err != nil {
-			return nil, errors.Wrapf(err, "searching dir %q for unapplied plans", repoDir)
-		}
-	}
-	return plans, nil
-}
-
 func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
 	if !cmd.IsForSpecificProject() {
-		return p.BuildApplyAllCommands(ctx, cmd)
+		return p.buildApplyAllCommands(ctx, cmd)
 	}
-	pac, err := p.BuildProjectApplyCommand(ctx, cmd)
+	pac, err := p.buildProjectApplyCommand(ctx, cmd)
 	if err != nil {
 		return nil, err
 	}
 	return []models.ProjectCommandContext{pac}, nil
 }
 
-func (p *DefaultProjectCommandBuilder) BuildProjectApplyCommand(ctx *CommandContext, cmd *CommentCommand) (models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *CommandContext, cmd *CommentCommand) (models.ProjectCommandContext, error) {
 	workspace := DefaultWorkspace
 	if cmd.Workspace != "" {
 		workspace = cmd.Workspace
 	}
 
 	var projCtx models.ProjectCommandContext
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.BaseRepo.FullName, workspace, ctx.Pull.Num)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.BaseRepo.FullName, ctx.Pull.Num, workspace)
 	if err != nil {
 		return projCtx, err
 	}

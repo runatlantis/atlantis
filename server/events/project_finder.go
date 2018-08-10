@@ -26,8 +26,6 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_finder.go ProjectFinder
-
 // ProjectFinder determines what are the terraform project(s) within a repo.
 type ProjectFinder interface {
 	// DetermineProjects returns the list of projects that were modified based on
@@ -76,6 +74,10 @@ func (p *DefaultProjectFinder) DetermineProjects(log *logging.SimpleLogger, modi
 	return projects
 }
 
+// DetermineProjectsViaConfig returns the list of projects that were modified
+// based on the modifiedFiles and config. We look at the WhenModified section
+// of the config for each project and see if the modifiedFiles matches.
+// The list will be de-duplicated.
 func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log *logging.SimpleLogger, modifiedFiles []string, config valid.Config, repoDir string) ([]valid.Project, error) {
 	var projects []valid.Project
 	for _, project := range config.Projects {

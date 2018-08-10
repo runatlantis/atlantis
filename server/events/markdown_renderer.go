@@ -77,7 +77,7 @@ func (m *MarkdownRenderer) Render(res CommandResult, cmdName CommandName, log st
 
 func (m *MarkdownRenderer) renderProjectResults(results []ProjectResult, common CommonData) string {
 	var resultsTmplData []ProjectResultTmplData
-	numSuccesses := 0
+	numPlanSuccesses := 0
 
 	for _, result := range results {
 		resultData := ProjectResultTmplData{
@@ -102,10 +102,9 @@ func (m *MarkdownRenderer) renderProjectResults(results []ProjectResult, common 
 			})
 		} else if result.PlanSuccess != nil {
 			resultData.Rendered = m.renderTemplate(planSuccessTmpl, *result.PlanSuccess)
-			numSuccesses++
+			numPlanSuccesses++
 		} else if result.ApplySuccess != "" {
 			resultData.Rendered = m.renderTemplate(applySuccessTmpl, struct{ Output string }{result.ApplySuccess})
-			numSuccesses++
 		} else {
 			resultData.Rendered = "Found no template. This is a bug!"
 		}
@@ -114,9 +113,9 @@ func (m *MarkdownRenderer) renderProjectResults(results []ProjectResult, common 
 
 	var tmpl *template.Template
 	switch {
-	case len(resultsTmplData) == 1 && common.Command == PlanCommandTitle && numSuccesses > 0:
+	case len(resultsTmplData) == 1 && common.Command == PlanCommandTitle && numPlanSuccesses > 0:
 		tmpl = singleProjectPlanSuccessTmpl
-	case len(resultsTmplData) == 1 && common.Command == PlanCommandTitle && numSuccesses == 0:
+	case len(resultsTmplData) == 1 && common.Command == PlanCommandTitle && numPlanSuccesses == 0:
 		tmpl = singleProjectPlanUnsuccessfulTmpl
 	case len(resultsTmplData) == 1 && common.Command == ApplyCommandTitle:
 		tmpl = singleProjectApplyTmpl
