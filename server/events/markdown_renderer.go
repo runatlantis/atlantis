@@ -22,6 +22,11 @@ import (
 	"github.com/Masterminds/sprig"
 )
 
+const (
+	PlanCommandTitle  = "Plan"
+	ApplyCommandTitle = "Apply"
+)
+
 // MarkdownRenderer renders responses as markdown.
 type MarkdownRenderer struct{}
 
@@ -72,6 +77,7 @@ func (m *MarkdownRenderer) Render(res CommandResult, cmdName CommandName, log st
 
 func (m *MarkdownRenderer) renderProjectResults(results []ProjectResult, common CommonData) string {
 	var resultsTmplData []ProjectResultTmplData
+	numPlanSuccesses := 0
 
 	for _, result := range results {
 		resultData := ProjectResultTmplData{
@@ -96,6 +102,7 @@ func (m *MarkdownRenderer) renderProjectResults(results []ProjectResult, common 
 			})
 		} else if result.PlanSuccess != nil {
 			resultData.Rendered = m.renderTemplate(planSuccessTmpl, *result.PlanSuccess)
+			numPlanSuccesses++
 		} else if result.ApplySuccess != "" {
 			resultData.Rendered = m.renderTemplate(applySuccessTmpl, struct{ Output string }{result.ApplySuccess})
 		} else {
@@ -105,10 +112,19 @@ func (m *MarkdownRenderer) renderProjectResults(results []ProjectResult, common 
 	}
 
 	var tmpl *template.Template
-	if len(resultsTmplData) == 1 {
-		tmpl = singleProjectTmpl
-	} else {
-		tmpl = multiProjectTmpl
+	switch {
+	case len(resultsTmplData) == 1 && common.Command == PlanCommandTitle && numPlanSuccesses > 0:
+		tmpl = singleProjectPlanSuccessTmpl
+	case len(resultsTmplData) == 1 && common.Command == PlanCommandTitle && numPlanSuccesses == 0:
+		tmpl = singleProjectPlanUnsuccessfulTmpl
+	case len(resultsTmplData) == 1 && common.Command == ApplyCommandTitle:
+		tmpl = singleProjectApplyTmpl
+	case common.Command == PlanCommandTitle:
+		tmpl = multiProjectPlanTmpl
+	case common.Command == ApplyCommandTitle:
+		tmpl = multiProjectApplyTmpl
+	default:
+		return "no template matched–this is a bug"
 	}
 	return m.renderTemplate(tmpl, ResultData{resultsTmplData, common})
 }
@@ -121,8 +137,26 @@ func (m *MarkdownRenderer) renderTemplate(tmpl *template.Template, data interfac
 	return buf.String()
 }
 
-var singleProjectTmpl = template.Must(template.New("").Parse("{{$result := index .Results 0}}Ran {{.Command}} in dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" + logTmpl))
-var multiProjectTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
+// todo: refactor to remove duplication #refactor
+var singleProjectApplyTmpl = template.Must(template.New("").Parse(
+	"{{$result := index .Results 0}}Ran {{.Command}} in dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" + logTmpl))
+var singleProjectPlanSuccessTmpl = template.Must(template.New("").Parse(
+	"{{$result := index .Results 0}}Ran {{.Command}} in dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" +
+		"* To apply all unapplied plans comment `atlantis apply`" + logTmpl))
+var singleProjectPlanUnsuccessfulTmpl = template.Must(template.New("").Parse(
+	"{{$result := index .Results 0}}Ran {{.Command}} in dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n" +
+		"{{$result.Rendered}}\n" + logTmpl))
+var multiProjectPlanTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
+	"Ran {{.Command}} for {{ len .Results }} projects:\n" +
+		"{{ range $result := .Results }}" +
+		"1. workspace: `{{$result.Workspace}}` dir: `{{$result.RepoRelDir}}`\n" +
+		"{{end}}\n" +
+		"{{ range $i, $result := .Results }}" +
+		"### {{add $i 1}}. workspace: `{{$result.Workspace}}` dir: `{{$result.RepoRelDir}}`\n" +
+		"{{$result.Rendered}}\n" +
+		"---\n{{end}}{{ if gt (len .Results) 0 }}* To apply all unapplied plans comment `atlantis apply`{{end}}" +
+		logTmpl))
+var multiProjectApplyTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
 	"Ran {{.Command}} for {{ len .Results }} projects:\n" +
 		"{{ range $result := .Results }}" +
 		"1. workspace: `{{$result.Workspace}}` dir: `{{$result.RepoRelDir}}`\n" +
@@ -136,7 +170,7 @@ var planSuccessTmpl = template.Must(template.New("").Parse(
 	"```diff\n" +
 		"{{.TerraformOutput}}\n" +
 		"```\n\n" +
-		"* To **discard** this plan click [here]({{.LockURL}})."))
+		"* To **delete** this plan click [here]({{.LockURL}})"))
 var applySuccessTmpl = template.Must(template.New("").Parse(
 	"```diff\n" +
 		"{{.Output}}\n" +

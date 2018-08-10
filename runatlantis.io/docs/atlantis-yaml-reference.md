@@ -44,9 +44,9 @@ workflows:
 ## Usage Notes
 * `atlantis.yaml` files must be placed at the root of the repo
 * The only supported name is `atlantis.yaml`. Not `atlantis.yml` or `.atlantis.yaml`.
-* Once an `atlantis.yaml` file exists in a repo Atlantis will not automatically plan
-any other projects. This means if you have multiple projects in the same repo, once
-you add an `atlantis.yaml` you'll need to add entries for each project.
+* Once an `atlantis.yaml` file exists in a repo, Atlantis won't try to determine
+where to run plan automatically. Instead it will just follow the configuration.
+This means that you'll need to define each project in your repo.
 * Atlantis uses the `atlantis.yaml` version from the pull request.
 
 ## Security
@@ -60,7 +60,7 @@ pull request so anyone that can submit a pull request can submit a malicious fil
 As such, **`atlantis.yaml` files should only be enabled in a trusted environment**.
 
 ::: danger
-It should be noted that `atlantis apply` itself could be exploited if run on a malicious file. See [Security](security.html#exploits).
+It should be noted that `atlantis apply` itself could be exploited if run on a malicious terraform file. See [Security](security.html#exploits).
 :::
 
 ## Reference

@@ -2,6 +2,7 @@ package raw
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/go-ozzo/ozzo-validation"
@@ -69,9 +70,13 @@ func (p Project) Validate() error {
 
 func (p Project) ToValid() valid.Project {
 	var v valid.Project
-	v.Dir = *p.Dir
+	cleanedDir := filepath.Clean(*p.Dir)
+	if cleanedDir == "/" {
+		cleanedDir = "."
+	}
+	v.Dir = cleanedDir
 
-	if p.Workspace == nil {
+	if p.Workspace == nil || *p.Workspace == "" {
 		v.Workspace = DefaultWorkspace
 	} else {
 		v.Workspace = *p.Workspace

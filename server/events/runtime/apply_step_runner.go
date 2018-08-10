@@ -26,5 +26,14 @@ func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []stri
 	if ctx.ProjectConfig != nil && ctx.ProjectConfig.TerraformVersion != nil {
 		tfVersion = ctx.ProjectConfig.TerraformVersion
 	}
-	return a.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, tfApplyCmd, tfVersion, ctx.Workspace)
+	out, tfErr := a.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, tfApplyCmd, tfVersion, ctx.Workspace)
+
+	// If the apply was successful, delete the plan.
+	if tfErr == nil {
+		ctx.Log.Info("apply successful, deleting planfile")
+		if err := os.Remove(planPath); err != nil {
+			ctx.Log.Warn("failed to delete planfile after successful apply: %s", err)
+		}
+	}
+	return out, tfErr
 }

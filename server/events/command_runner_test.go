@@ -34,19 +34,18 @@ import (
 
 var projectCommandBuilder *mocks.MockProjectCommandBuilder
 var eventParsing *mocks.MockEventParsing
-var vcsClient *vcsmocks.MockClientProxy
 var ghStatus *mocks.MockCommitStatusUpdater
 var githubGetter *mocks.MockGithubPullGetter
 var gitlabGetter *mocks.MockGitlabMergeRequestGetter
 var ch events.DefaultCommandRunner
 var logBytes *bytes.Buffer
 
-func setup(t *testing.T) {
+func setup(t *testing.T) *vcsmocks.MockClientProxy {
 	RegisterMockTestingT(t)
 	projectCommandBuilder = mocks.NewMockProjectCommandBuilder()
 	eventParsing = mocks.NewMockEventParsing()
 	ghStatus = mocks.NewMockCommitStatusUpdater()
-	vcsClient = vcsmocks.NewMockClientProxy()
+	vcsClient := vcsmocks.NewMockClientProxy()
 	githubGetter = mocks.NewMockGithubPullGetter()
 	gitlabGetter = mocks.NewMockGitlabMergeRequestGetter()
 	logger := logmocks.NewMockSimpleLogging()
@@ -66,11 +65,12 @@ func setup(t *testing.T) {
 		ProjectCommandBuilder: projectCommandBuilder,
 		ProjectCommandRunner:  projectCommandRunner,
 	}
+	return vcsClient
 }
 
 func TestRunCommentCommand_LogPanics(t *testing.T) {
 	t.Log("if there is a panic it is commented back on the pull request")
-	setup(t)
+	vcsClient := setup(t)
 	ch.AllowForkPRs = true // Lets us get to the panic code.
 	defer func() { ch.AllowForkPRs = false }()
 	When(ghStatus.Update(fixtures.GithubRepo, fixtures.Pull, models.PendingCommitStatus, events.PlanCommand)).ThenPanic("panic")
@@ -125,7 +125,7 @@ func TestRunCommentCommand_GithubPullParseErr(t *testing.T) {
 func TestRunCommentCommand_ForkPRDisabled(t *testing.T) {
 	t.Log("if a command is run on a forked pull request and this is disabled atlantis should" +
 		" comment saying that this is not allowed")
-	setup(t)
+	vcsClient := setup(t)
 	ch.AllowForkPRs = false // by default it's false so don't need to reset
 	var pull github.PullRequest
 	modelPull := models.PullRequest{State: models.OpenPullState}
@@ -143,7 +143,7 @@ func TestRunCommentCommand_ForkPRDisabled(t *testing.T) {
 func TestRunCommentCommand_ClosedPull(t *testing.T) {
 	t.Log("if a command is run on a closed pull request atlantis should" +
 		" comment saying that this is not allowed")
-	setup(t)
+	vcsClient := setup(t)
 	pull := &github.PullRequest{
 		State: github.String("closed"),
 	}
@@ -153,58 +153,4 @@ func TestRunCommentCommand_ClosedPull(t *testing.T) {
 
 	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, nil)
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "Atlantis commands can't be run on closed pull requests")
-}
-
-func TestRunCommentCommand_FullRun(t *testing.T) {
-	pull := &github.PullRequest{
-		State: github.String("closed"),
-	}
-	expCmdResult := events.CommandResult{
-		ProjectResults: []events.ProjectResult{
-			{
-				RepoRelDir: ".",
-				Workspace:  "default",
-			},
-		},
-	}
-	for _, c := range []events.CommandName{events.PlanCommand, events.ApplyCommand} {
-		setup(t)
-		cmd := events.NewCommentCommand(".", nil, c, false, "default", "")
-		When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
-		When(eventParsing.ParseGithubPull(pull)).ThenReturn(fixtures.Pull, fixtures.GithubRepo, fixtures.GithubRepo, nil)
-
-		cmdCtx := models.ProjectCommandContext{RepoRelDir: "."}
-		switch c {
-		case events.PlanCommand:
-			When(projectCommandBuilder.BuildPlanCommand(matchers.AnyPtrToEventsCommandContext(), matchers.AnyPtrToEventsCommentCommand())).ThenReturn(cmdCtx, nil)
-		case events.ApplyCommand:
-			When(projectCommandBuilder.BuildApplyCommand(matchers.AnyPtrToEventsCommandContext(), matchers.AnyPtrToEventsCommentCommand())).ThenReturn(cmdCtx, nil)
-		}
-
-		ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, cmd)
-
-		ghStatus.VerifyWasCalledOnce().Update(fixtures.GithubRepo, fixtures.Pull, models.PendingCommitStatus, c)
-		_, _, response := ghStatus.VerifyWasCalledOnce().UpdateProjectResult(matchers.AnyPtrToEventsCommandContext(), matchers.AnyEventsCommandName(), matchers.AnyEventsCommandResult()).GetCapturedArguments()
-		Equals(t, expCmdResult, response)
-		vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString())
-	}
-}
-
-func TestRunAutoplanCommands(t *testing.T) {
-	expCmdResult := events.CommandResult{
-		ProjectResults: []events.ProjectResult{
-			{
-				RepoRelDir: ".",
-				Workspace:  "default",
-			},
-		},
-	}
-	setup(t)
-	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())).ThenReturn([]models.ProjectCommandContext{{RepoRelDir: ".", Workspace: "default"}}, nil)
-	ch.RunAutoplanCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
-
-	ghStatus.VerifyWasCalledOnce().Update(fixtures.GithubRepo, fixtures.Pull, models.PendingCommitStatus, events.PlanCommand)
-	_, _, response := ghStatus.VerifyWasCalledOnce().UpdateProjectResult(matchers.AnyPtrToEventsCommandContext(), matchers.AnyEventsCommandName(), matchers.AnyEventsCommandResult()).GetCapturedArguments()
-	Equals(t, expCmdResult, response)
-	vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString())
 }

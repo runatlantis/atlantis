@@ -286,4 +286,6 @@ type ProjectCommandContext struct {
 	// ex. atlantis plan -- -target=resource
 	CommentArgs []string
 	Workspace   string
+	// Verbose is true when the user would like verbose output.
+	Verbose bool
 }

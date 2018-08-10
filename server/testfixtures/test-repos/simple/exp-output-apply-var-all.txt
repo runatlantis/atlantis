@@ -1,0 +1,33 @@
+Ran Apply for 2 projects:
+1. workspace: `default` dir: `.`
+1. workspace: `new_workspace` dir: `.`
+
+### 1. workspace: `default` dir: `.`
+```diff
+null_resource.simple: Creating...
+null_resource.simple: Creation complete after *s (ID: ******************)
+
+Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+var = default_workspace
+workspace = default
+
+```
+---
+### 2. workspace: `new_workspace` dir: `.`
+```diff
+null_resource.simple: Creating...
+null_resource.simple: Creation complete after *s (ID: ******************)
+
+Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+var = new_workspace
+workspace = new_workspace
+
+```
+---
+

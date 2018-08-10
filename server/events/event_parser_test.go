@@ -432,7 +432,7 @@ func TestNewCommand_CleansDir(t *testing.T) {
 	}{
 		{
 			"",
-			".",
+			"",
 		},
 		{
 			"/",
@@ -457,9 +457,16 @@ func TestNewCommand_CleansDir(t *testing.T) {
 	}
 }
 
-func TestNewCommand_EmptyWorkspace(t *testing.T) {
-	cmd := events.NewCommentCommand("dir", nil, events.PlanCommand, false, "", "")
-	Equals(t, "default", cmd.Workspace)
+func TestNewCommand_EmptyDirWorkspaceProject(t *testing.T) {
+	cmd := events.NewCommentCommand("", nil, events.PlanCommand, false, "", "")
+	Equals(t, events.CommentCommand{
+		RepoRelDir:  "",
+		Flags:       nil,
+		Name:        events.PlanCommand,
+		Verbose:     false,
+		Workspace:   "",
+		ProjectName: "",
+	}, *cmd)
 }
 
 func TestNewCommand_AllFieldsSet(t *testing.T) {

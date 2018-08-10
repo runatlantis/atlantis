@@ -55,6 +55,17 @@ func TestGitHubWorkflow(t *testing.T) {
 			ExpMergeCommentFile: "exp-output-merge.txt",
 		},
 		{
+			Description:            "simple with plan comment",
+			RepoDir:                "simple",
+			ModifiedFiles:          []string{"main.tf"},
+			ExpAutoplanCommentFile: "exp-output-autoplan.txt",
+			CommentAndReplies: []string{
+				"atlantis plan", "exp-output-autoplan.txt",
+				"atlantis apply", "exp-output-apply.txt",
+			},
+			ExpMergeCommentFile: "exp-output-merge.txt",
+		},
+		{
 			Description:            "simple with comment -var",
 			RepoDir:                "simple",
 			ModifiedFiles:          []string{"main.tf"},
@@ -73,8 +84,20 @@ func TestGitHubWorkflow(t *testing.T) {
 			CommentAndReplies: []string{
 				"atlantis plan -- -var var=default_workspace", "exp-output-atlantis-plan.txt",
 				"atlantis plan -w new_workspace -- -var var=new_workspace", "exp-output-atlantis-plan-new-workspace.txt",
-				"atlantis apply", "exp-output-apply-var-default-workspace.txt",
+				"atlantis apply -w default", "exp-output-apply-var-default-workspace.txt",
 				"atlantis apply -w new_workspace", "exp-output-apply-var-new-workspace.txt",
+			},
+			ExpMergeCommentFile: "exp-output-merge-workspaces.txt",
+		},
+		{
+			Description:            "simple with workspaces and apply all",
+			RepoDir:                "simple",
+			ModifiedFiles:          []string{"main.tf"},
+			ExpAutoplanCommentFile: "exp-output-autoplan.txt",
+			CommentAndReplies: []string{
+				"atlantis plan -- -var var=default_workspace", "exp-output-atlantis-plan.txt",
+				"atlantis plan -w new_workspace -- -var var=new_workspace", "exp-output-atlantis-plan-new-workspace.txt",
+				"atlantis apply", "exp-output-apply-var-all.txt",
 			},
 			ExpMergeCommentFile: "exp-output-merge-workspaces.txt",
 		},
@@ -85,7 +108,28 @@ func TestGitHubWorkflow(t *testing.T) {
 			ExpAutoplanCommentFile: "exp-output-autoplan.txt",
 			CommentAndReplies: []string{
 				"atlantis apply -w staging", "exp-output-apply-staging.txt",
-				"atlantis apply", "exp-output-apply-default.txt",
+				"atlantis apply -w default", "exp-output-apply-default.txt",
+			},
+			ExpMergeCommentFile: "exp-output-merge.txt",
+		},
+		{
+			Description:            "simple with atlantis.yaml and apply all",
+			RepoDir:                "simple-yaml",
+			ModifiedFiles:          []string{"main.tf"},
+			ExpAutoplanCommentFile: "exp-output-autoplan.txt",
+			CommentAndReplies: []string{
+				"atlantis apply", "exp-output-apply-all.txt",
+			},
+			ExpMergeCommentFile: "exp-output-merge.txt",
+		},
+		{
+			Description:            "simple with atlantis.yaml and plan/apply all",
+			RepoDir:                "simple-yaml",
+			ModifiedFiles:          []string{"main.tf"},
+			ExpAutoplanCommentFile: "exp-output-autoplan.txt",
+			CommentAndReplies: []string{
+				"atlantis plan", "exp-output-autoplan.txt",
+				"atlantis apply", "exp-output-apply-all.txt",
 			},
 			ExpMergeCommentFile: "exp-output-merge.txt",
 		},
@@ -284,6 +328,7 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClientProxy,
 			WorkingDirLocker:    locker,
 			AllowRepoConfigFlag: "allow-repo-config",
 			AllowRepoConfig:     true,
+			PendingPlanFinder:   &events.PendingPlanFinder{},
 		},
 	}
 
@@ -398,7 +443,7 @@ func absRepoPath(t *testing.T, repoDir string) string {
 // to run in a defer that will delete the dir.
 // The purpose of this function is to create a real git repository with a branch
 // called 'branch' from the files under repoDir. This is so we can check in
-// those files normally without needing a .git directory.
+// those files normally to this repo without needing a .git directory.
 func initializeRepo(t *testing.T, repoDir string) (string, string, func()) {
 	originRepo := absRepoPath(t, repoDir)
 

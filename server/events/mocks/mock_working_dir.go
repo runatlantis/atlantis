@@ -51,6 +51,22 @@ func (mock *MockWorkingDir) GetWorkingDir(r models.Repo, p models.PullRequest, w
 	return ret0, ret1
 }
 
+func (mock *MockWorkingDir) GetPullDir(r models.Repo, p models.PullRequest) (string, error) {
+	params := []pegomock.Param{r, p}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("GetPullDir", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 string
+	var ret1 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(string)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(error)
+		}
+	}
+	return ret0, ret1
+}
+
 func (mock *MockWorkingDir) Delete(r models.Repo, p models.PullRequest) error {
 	params := []pegomock.Param{r, p}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Delete", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
@@ -166,6 +182,37 @@ func (c *WorkingDir_GetWorkingDir_OngoingVerification) GetAllCapturedArguments()
 		_param2 = make([]string, len(params[2]))
 		for u, param := range params[2] {
 			_param2[u] = param.(string)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierWorkingDir) GetPullDir(r models.Repo, p models.PullRequest) *WorkingDir_GetPullDir_OngoingVerification {
+	params := []pegomock.Param{r, p}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetPullDir", params)
+	return &WorkingDir_GetPullDir_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type WorkingDir_GetPullDir_OngoingVerification struct {
+	mock              *MockWorkingDir
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *WorkingDir_GetPullDir_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest) {
+	r, p := c.GetAllCapturedArguments()
+	return r[len(r)-1], p[len(p)-1]
+}
+
+func (c *WorkingDir_GetPullDir_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]models.Repo, len(params[0]))
+		for u, param := range params[0] {
+			_param0[u] = param.(models.Repo)
+		}
+		_param1 = make([]models.PullRequest, len(params[1]))
+		for u, param := range params[1] {
+			_param1[u] = param.(models.PullRequest)
 		}
 	}
 	return
