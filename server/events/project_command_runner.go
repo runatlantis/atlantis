@@ -50,6 +50,10 @@ type WebhooksSender interface {
 type PlanSuccess struct {
 	TerraformOutput string
 	LockURL         string
+	// RePlanCmd is the command that users should run to re-plan this project.
+	RePlanCmd string
+	// ApplyCmd is the command that users should run to apply this plan.
+	ApplyCmd string
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_runner.go ProjectCommandRunner
@@ -143,6 +147,8 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) P
 		PlanSuccess: &PlanSuccess{
 			LockURL:         p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
 			TerraformOutput: strings.Join(outputs, "\n"),
+			RePlanCmd:       ctx.RePlanCmd,
+			ApplyCmd:        ctx.ApplyCmd,
 		},
 	}
 }

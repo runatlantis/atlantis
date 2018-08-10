@@ -537,6 +537,97 @@ func TestParse_Parsing(t *testing.T) {
 	}
 }
 
+func TestBuildPlanApplyComment(t *testing.T) {
+	cases := []struct {
+		repoRelDir    string
+		workspace     string
+		project       string
+		commentArgs   []string
+		expPlanFlags  string
+		expApplyFlags string
+	}{
+		{
+			repoRelDir:    ".",
+			workspace:     "default",
+			project:       "",
+			commentArgs:   nil,
+			expPlanFlags:  "-d .",
+			expApplyFlags: "-d .",
+		},
+		{
+			repoRelDir:    "dir",
+			workspace:     "default",
+			project:       "",
+			commentArgs:   nil,
+			expPlanFlags:  "-d dir",
+			expApplyFlags: "-d dir",
+		},
+		{
+			repoRelDir:    ".",
+			workspace:     "workspace",
+			project:       "",
+			commentArgs:   nil,
+			expPlanFlags:  "-w workspace",
+			expApplyFlags: "-w workspace",
+		},
+		{
+			repoRelDir:    "dir",
+			workspace:     "workspace",
+			project:       "",
+			commentArgs:   nil,
+			expPlanFlags:  "-d dir -w workspace",
+			expApplyFlags: "-d dir -w workspace",
+		},
+		{
+			repoRelDir:    ".",
+			workspace:     "default",
+			project:       "project",
+			commentArgs:   nil,
+			expPlanFlags:  "-p project",
+			expApplyFlags: "-p project",
+		},
+		{
+			repoRelDir:    "dir",
+			workspace:     "workspace",
+			project:       "project",
+			commentArgs:   nil,
+			expPlanFlags:  "-p project",
+			expApplyFlags: "-p project",
+		},
+		{
+			repoRelDir:    ".",
+			workspace:     "default",
+			project:       "",
+			commentArgs:   []string{`"arg1"`, `"arg2"`},
+			expPlanFlags:  "-d . -- arg1 arg2",
+			expApplyFlags: "-d .",
+		},
+		{
+			repoRelDir:    "dir",
+			workspace:     "workspace",
+			project:       "",
+			commentArgs:   []string{`"arg1"`, `"arg2"`, `arg3`},
+			expPlanFlags:  "-d dir -w workspace -- arg1 arg2 arg3",
+			expApplyFlags: "-d dir -w workspace",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.expPlanFlags, func(t *testing.T) {
+			for _, cmd := range []events.CommandName{events.PlanCommand, events.ApplyCommand} {
+				switch cmd {
+				case events.PlanCommand:
+					actComment := commentParser.BuildPlanComment(c.repoRelDir, c.workspace, c.project, c.commentArgs)
+					Equals(t, fmt.Sprintf("atlantis plan %s", c.expPlanFlags), actComment)
+				case events.ApplyCommand:
+					actComment := commentParser.BuildApplyComment(c.repoRelDir, c.workspace, c.project)
+					Equals(t, fmt.Sprintf("atlantis apply %s", c.expApplyFlags), actComment)
+				}
+			}
+		})
+	}
+}
+
 var PlanUsage = `Usage of plan:
   -d, --dir string         Which directory to run plan in relative to root of repo,
                            ex. 'child/dir'.

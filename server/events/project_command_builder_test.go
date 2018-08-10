@@ -199,6 +199,7 @@ projects:
 				AllowRepoConfig:     true,
 				PendingPlanFinder:   &events.PendingPlanFinder{},
 				AllowRepoConfigFlag: "allow-repo-config",
+				CommentBuilder:      &events.CommentParser{},
 			}
 
 			ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
@@ -426,6 +427,7 @@ projects:
 					ProjectFinder:       &events.DefaultProjectFinder{},
 					AllowRepoConfig:     true,
 					AllowRepoConfigFlag: "allow-repo-config",
+					CommentBuilder:      &events.CommentParser{},
 				}
 
 				cmdCtx := &events.CommandContext{
@@ -497,6 +499,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiPlanNoAtlantisYAML(t *testing.T)
 		ProjectFinder:       &events.DefaultProjectFinder{},
 		AllowRepoConfig:     true,
 		AllowRepoConfigFlag: "allow-repo-config",
+		CommentBuilder:      &events.CommentParser{},
 	}
 
 	ctxs, err := builder.BuildPlanCommands(&events.CommandContext{
@@ -549,6 +552,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiPlanNoAtlantisYAMLNoModified(t *
 		ProjectFinder:       &events.DefaultProjectFinder{},
 		AllowRepoConfig:     true,
 		AllowRepoConfigFlag: "allow-repo-config",
+		CommentBuilder:      &events.CommentParser{},
 	}
 
 	ctxs, err := builder.BuildPlanCommands(&events.CommandContext{
@@ -620,6 +624,7 @@ projects:
 		ProjectFinder:       &events.DefaultProjectFinder{},
 		AllowRepoConfig:     true,
 		AllowRepoConfigFlag: "allow-repo-config",
+		CommentBuilder:      &events.CommentParser{},
 	}
 
 	ctxs, err := builder.BuildPlanCommands(&events.CommandContext{
@@ -681,6 +686,7 @@ projects:
 		ProjectFinder:       &events.DefaultProjectFinder{},
 		AllowRepoConfig:     true,
 		AllowRepoConfigFlag: "allow-repo-config",
+		CommentBuilder:      &events.CommentParser{},
 	}
 
 	ctxs, err := builder.BuildPlanCommands(&events.CommandContext{
@@ -753,6 +759,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		AllowRepoConfig:     true,
 		AllowRepoConfigFlag: "allow-repo-config",
 		PendingPlanFinder:   &events.PendingPlanFinder{},
+		CommentBuilder:      &events.CommentParser{},
 	}
 
 	ctxs, err := builder.BuildApplyCommands(&events.CommandContext{
@@ -816,6 +823,7 @@ func TestDefaultProjectCommandBuilder_RepoConfigDisabled(t *testing.T) {
 		ProjectFinder:       &events.DefaultProjectFinder{},
 		AllowRepoConfig:     false,
 		AllowRepoConfigFlag: "allow-repo-config",
+		CommentBuilder:      &events.CommentParser{},
 	}
 
 	ctx := &events.CommandContext{

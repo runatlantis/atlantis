@@ -23,7 +23,11 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 
 ```
 
-* To **delete** this plan click [here](lock-url)
+* :arrow_forward: To **apply** this plan, comment:
+  * `atlantis apply -d staging`
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+  * `atlantis plan -d staging`
 ---
 ### 2. workspace: `default` dir: `production`
 ```diff
@@ -46,6 +50,11 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 
 ```
 
-* To **delete** this plan click [here](lock-url)
+* :arrow_forward: To **apply** this plan, comment:
+  * `atlantis apply -d production`
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+  * `atlantis plan -d production`
 ---
-* To apply all unapplied plans comment `atlantis apply`
+* :fast_forward: To **apply** all unapplied plans, comment:
+  * `atlantis apply`

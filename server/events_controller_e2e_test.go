@@ -71,7 +71,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			ModifiedFiles:          []string{"main.tf"},
 			ExpAutoplanCommentFile: "exp-output-autoplan.txt",
 			CommentAndReplies: []string{
-				"atlantis plan -- -var var=overridden", "exp-output-atlantis-plan.txt",
+				"atlantis plan -- -var var=overridden", "exp-output-atlantis-plan-var-overridden.txt",
 				"atlantis apply", "exp-output-apply-var.txt",
 			},
 			ExpMergeCommentFile: "exp-output-merge.txt",
@@ -329,6 +329,7 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClientProxy,
 			AllowRepoConfigFlag: "allow-repo-config",
 			AllowRepoConfig:     true,
 			PendingPlanFinder:   &events.PendingPlanFinder{},
+			CommentBuilder:      commentParser,
 		},
 	}
 

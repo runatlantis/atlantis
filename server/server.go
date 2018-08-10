@@ -277,6 +277,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			AllowRepoConfig:     userConfig.AllowRepoConfig,
 			AllowRepoConfigFlag: config.AllowRepoConfigFlag,
 			PendingPlanFinder:   &events.PendingPlanFinder{},
+			CommentBuilder:      commentParser,
 		},
 		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
 			Locker:           projectLocker,

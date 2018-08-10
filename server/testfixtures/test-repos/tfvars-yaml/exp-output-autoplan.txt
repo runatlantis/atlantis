@@ -25,7 +25,11 @@ workspace=default
 
 ```
 
-* To **delete** this plan click [here](lock-url)
+* :arrow_forward: To **apply** this plan, comment:
+  * `atlantis apply -p default`
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+  * `atlantis plan -p default`
 ---
 ### 2. workspace: `default` dir: `.`
 ```diff
@@ -48,6 +52,11 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 
 ```
 
-* To **delete** this plan click [here](lock-url)
+* :arrow_forward: To **apply** this plan, comment:
+  * `atlantis apply -p staging`
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+  * `atlantis plan -p staging`
 ---
-* To apply all unapplied plans comment `atlantis apply`
+* :fast_forward: To **apply** all unapplied plans, comment:
+  * `atlantis apply`

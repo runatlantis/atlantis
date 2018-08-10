@@ -142,7 +142,10 @@ var singleProjectApplyTmpl = template.Must(template.New("").Parse(
 	"{{$result := index .Results 0}}Ran {{.Command}} in dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" + logTmpl))
 var singleProjectPlanSuccessTmpl = template.Must(template.New("").Parse(
 	"{{$result := index .Results 0}}Ran {{.Command}} in dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" +
-		"* To apply all unapplied plans comment `atlantis apply`" + logTmpl))
+		"\n" +
+		"---\n" +
+		"* :fast_forward: To **apply** all unapplied plans, comment:\n" +
+		"  * `atlantis apply`" + logTmpl))
 var singleProjectPlanUnsuccessfulTmpl = template.Must(template.New("").Parse(
 	"{{$result := index .Results 0}}Ran {{.Command}} in dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n" +
 		"{{$result.Rendered}}\n" + logTmpl))
@@ -154,7 +157,8 @@ var multiProjectPlanTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap
 		"{{ range $i, $result := .Results }}" +
 		"### {{add $i 1}}. workspace: `{{$result.Workspace}}` dir: `{{$result.RepoRelDir}}`\n" +
 		"{{$result.Rendered}}\n" +
-		"---\n{{end}}{{ if gt (len .Results) 0 }}* To apply all unapplied plans comment `atlantis apply`{{end}}" +
+		"---\n{{end}}{{ if gt (len .Results) 0 }}* :fast_forward: To **apply** all unapplied plans, comment:\n" +
+		"  * `atlantis apply`{{end}}" +
 		logTmpl))
 var multiProjectApplyTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
 	"Ran {{.Command}} for {{ len .Results }} projects:\n" +
@@ -170,7 +174,11 @@ var planSuccessTmpl = template.Must(template.New("").Parse(
 	"```diff\n" +
 		"{{.TerraformOutput}}\n" +
 		"```\n\n" +
-		"* To **delete** this plan click [here]({{.LockURL}})"))
+		"* :arrow_forward: To **apply** this plan, comment:\n" +
+		"  * `{{.ApplyCmd}}`\n" +
+		"* :put_litter_in_its_place: To **delete** this plan click [here]({{.LockURL}})\n" +
+		"* :repeat: To **plan** this project again, comment:\n" +
+		"  * `{{.RePlanCmd}}`"))
 var applySuccessTmpl = template.Must(template.New("").Parse(
 	"```diff\n" +
 		"{{.Output}}\n" +
