@@ -288,4 +288,10 @@ type ProjectCommandContext struct {
 	Workspace   string
 	// Verbose is true when the user would like verbose output.
 	Verbose bool
+	// RePlanCmd is the command that users should run to re-plan this project.
+	// If this is an apply then this will be empty.
+	RePlanCmd string
+	// ApplyCmd is the command that users should run to apply this plan. If
+	// this is an apply then this will be empty.
+	ApplyCmd string
 }

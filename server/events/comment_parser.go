@@ -35,6 +35,7 @@ const (
 	ProjectFlagShort   = "p"
 	VerboseFlagLong    = "verbose"
 	VerboseFlagShort   = ""
+	AtlantisExecutable = "atlantis"
 )
 
 // multiLineRegex is used to ignore multi-line comments since those aren't valid
@@ -51,6 +52,14 @@ type CommentParsing interface {
 	// Parse attempts to parse a pull request comment to see if it's an Atlantis
 	// command.
 	Parse(comment string, vcsHost models.VCSHostType) CommentParseResult
+}
+
+// CommentBuilder builds comment commands that can be used on pull requests.
+type CommentBuilder interface {
+	// BuildPlanComment builds a plan comment for the specified args.
+	BuildPlanComment(repoRelDir string, workspace string, project string, commentArgs []string) string
+	// BuildApplyComment builds an apply comment for the specified args.
+	BuildApplyComment(repoRelDir string, workspace string, project string) string
 }
 
 // CommentParser implements CommentParsing
@@ -112,7 +121,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	if vcsHost == models.Gitlab {
 		vcsUser = e.GitlabUser
 	}
-	executableNames := []string{"run", "atlantis", "@" + vcsUser}
+	executableNames := []string{"run", AtlantisExecutable, "@" + vcsUser}
 
 	// If the comment doesn't start with the name of our 'executable' then
 	// ignore it.
@@ -224,6 +233,49 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	}
 }
 
+// BuildPlanComment builds a plan comment for the specified args.
+func (e *CommentParser) BuildPlanComment(repoRelDir string, workspace string, project string, commentArgs []string) string {
+	flags := e.buildFlags(repoRelDir, workspace, project)
+	commentFlags := ""
+	if len(commentArgs) > 0 {
+		var flagsWithoutQuotes []string
+		for _, f := range commentArgs {
+			f = strings.TrimPrefix(f, "\"")
+			f = strings.TrimSuffix(f, "\"")
+			flagsWithoutQuotes = append(flagsWithoutQuotes, f)
+		}
+		commentFlags = fmt.Sprintf(" -- %s", strings.Join(flagsWithoutQuotes, " "))
+	}
+	return fmt.Sprintf("%s %s%s%s", AtlantisExecutable, PlanCommand.String(), flags, commentFlags)
+}
+
+// BuildApplyComment builds an apply comment for the specified args.
+func (e *CommentParser) BuildApplyComment(repoRelDir string, workspace string, project string) string {
+	flags := e.buildFlags(repoRelDir, workspace, project)
+	return fmt.Sprintf("%s %s%s", AtlantisExecutable, ApplyCommand.String(), flags)
+}
+
+func (e *CommentParser) buildFlags(repoRelDir string, workspace string, project string) string {
+	switch {
+	// If project is specified we can just use its name.
+	case project != "":
+		return fmt.Sprintf(" -%s %s", ProjectFlagShort, project)
+		// If it's the root and default workspace then we just need to specify one
+		// of the flags and the other will get defaulted.
+	case repoRelDir == DefaultRepoRelDir && workspace == DefaultWorkspace:
+		return fmt.Sprintf(" -%s %s", DirFlagShort, DefaultRepoRelDir)
+		// If dir is the default then we just need to specify workspace.
+	case repoRelDir == DefaultRepoRelDir:
+		return fmt.Sprintf(" -%s %s", WorkspaceFlagShort, workspace)
+		// If workspace is the default then we just need to specify the dir.
+	case workspace == DefaultWorkspace:
+		return fmt.Sprintf(" -%s %s", DirFlagShort, repoRelDir)
+		// Otherwise we have to specify both flags.
+	default:
+		return fmt.Sprintf(" -%s %s -%s %s", DirFlagShort, repoRelDir, WorkspaceFlagShort, workspace)
+	}
+}
+
 func (e *CommentParser) validateDir(dir string) (string, error) {
 	if dir == "" {
 		return dir, nil
@@ -274,6 +326,7 @@ Examples:
 
 Commands:
   plan   Runs 'terraform plan' for the changes in this pull request.
+         To plan a specific project, use the -d, -w and -p flags.
   apply  Runs 'terraform apply' on all unapplied plans.
          To only apply a specific plan, use the -d, -w and -p flags.
   help   View help.

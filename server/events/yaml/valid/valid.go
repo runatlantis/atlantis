@@ -60,6 +60,15 @@ type Project struct {
 	ApplyRequirements []string
 }
 
+// GetName returns the name of the project or an empty string if there is no
+// project name.
+func (p Project) GetName() string {
+	if p.Name != nil {
+		return *p.Name
+	}
+	return ""
+}
+
 type Autoplan struct {
 	WhenModified []string
 	Enabled      bool

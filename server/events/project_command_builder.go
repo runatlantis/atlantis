@@ -34,6 +34,7 @@ type DefaultProjectCommandBuilder struct {
 	AllowRepoConfig     bool
 	AllowRepoConfigFlag string
 	PendingPlanFinder   *PendingPlanFinder
+	CommentBuilder      CommentBuilder
 }
 
 type TerraformExec interface {
@@ -120,6 +121,8 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 				CommentArgs:   commentFlags,
 				Workspace:     DefaultWorkspace,
 				Verbose:       verbose,
+				RePlanCmd:     p.CommentBuilder.BuildPlanComment(mp.Path, DefaultWorkspace, "", commentFlags),
+				ApplyCmd:      p.CommentBuilder.BuildApplyComment(mp.Path, DefaultWorkspace, ""),
 			})
 		}
 	} else {
@@ -147,6 +150,8 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 				ProjectConfig: &mp,
 				GlobalConfig:  &config,
 				Verbose:       verbose,
+				RePlanCmd:     p.CommentBuilder.BuildPlanComment(mp.Dir, mp.Workspace, mp.GetName(), commentFlags),
+				ApplyCmd:      p.CommentBuilder.BuildApplyComment(mp.Dir, mp.Workspace, mp.GetName()),
 			})
 		}
 	}
@@ -271,7 +276,6 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 		repoRelDir = projCfg.Dir
 		workspace = projCfg.Workspace
 	}
-
 	return models.ProjectCommandContext{
 		BaseRepo:      ctx.BaseRepo,
 		HeadRepo:      ctx.HeadRepo,
@@ -283,6 +287,8 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 		RepoRelDir:    repoRelDir,
 		ProjectConfig: projCfg,
 		GlobalConfig:  globalCfg,
+		RePlanCmd:     p.CommentBuilder.BuildPlanComment(repoRelDir, workspace, projectName, commentFlags),
+		ApplyCmd:      p.CommentBuilder.BuildApplyComment(repoRelDir, workspace, projectName),
 	}, nil
 }
 

@@ -20,5 +20,12 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 
 ```
 
-* To **delete** this plan click [here](lock-url)
-* To apply all unapplied plans comment `atlantis apply`
+* :arrow_forward: To **apply** this plan, comment:
+  * `atlantis apply -d .`
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+  * `atlantis plan -d . -- -var var=default_workspace`
+
+---
+* :fast_forward: To **apply** all unapplied plans, comment:
+  * `atlantis apply`

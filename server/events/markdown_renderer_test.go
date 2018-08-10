@@ -136,6 +136,8 @@ func TestRenderProjectResults(t *testing.T) {
 						PlanSuccess: &events.PlanSuccess{
 							TerraformOutput: "terraform-output",
 							LockURL:         "lock-url",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
 						},
 					},
 					Workspace:  "workspace",
@@ -148,8 +150,15 @@ $$$diff
 terraform-output
 $$$
 
-* To **delete** this plan click [here](lock-url)
-* To apply all unapplied plans comment $atlantis apply$
+* :arrow_forward: To **apply** this plan, comment:
+  * $atlantis apply -d path -w workspace$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+  * $atlantis plan -d path -w workspace$
+
+---
+* :fast_forward: To **apply** all unapplied plans, comment:
+  * $atlantis apply$
 `,
 		},
 		{
@@ -183,6 +192,8 @@ $$$
 						PlanSuccess: &events.PlanSuccess{
 							TerraformOutput: "terraform-output",
 							LockURL:         "lock-url",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
 						},
 					},
 				},
@@ -193,6 +204,8 @@ $$$
 						PlanSuccess: &events.PlanSuccess{
 							TerraformOutput: "terraform-output2",
 							LockURL:         "lock-url2",
+							ApplyCmd:        "atlantis apply -d path2 -w workspace",
+							RePlanCmd:       "atlantis plan -d path2 -w workspace",
 						},
 					},
 				},
@@ -206,16 +219,25 @@ $$$diff
 terraform-output
 $$$
 
-* To **delete** this plan click [here](lock-url)
+* :arrow_forward: To **apply** this plan, comment:
+  * $atlantis apply -d path -w workspace$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+  * $atlantis plan -d path -w workspace$
 ---
 ### 2. workspace: $workspace$ dir: $path2$
 $$$diff
 terraform-output2
 $$$
 
-* To **delete** this plan click [here](lock-url2)
+* :arrow_forward: To **apply** this plan, comment:
+  * $atlantis apply -d path2 -w workspace$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url2)
+* :repeat: To **plan** this project again, comment:
+  * $atlantis plan -d path2 -w workspace$
 ---
-* To apply all unapplied plans comment $atlantis apply$
+* :fast_forward: To **apply** all unapplied plans, comment:
+  * $atlantis apply$
 `,
 		},
 		{
@@ -306,6 +328,8 @@ $$$
 						PlanSuccess: &events.PlanSuccess{
 							TerraformOutput: "terraform-output",
 							LockURL:         "lock-url",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
 						},
 					},
 				},
@@ -334,7 +358,11 @@ $$$diff
 terraform-output
 $$$
 
-* To **delete** this plan click [here](lock-url)
+* :arrow_forward: To **apply** this plan, comment:
+  * $atlantis apply -d path -w workspace$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+  * $atlantis plan -d path -w workspace$
 ---
 ### 2. workspace: $workspace$ dir: $path2$
 **Plan Failed**: failure
@@ -347,7 +375,8 @@ error
 $$$
 
 ---
-* To apply all unapplied plans comment $atlantis apply$
+* :fast_forward: To **apply** all unapplied plans, comment:
+  * $atlantis apply$
 `,
 		},
 		{
