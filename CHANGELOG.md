@@ -3,6 +3,7 @@
 ## Features
 * `atlantis apply` now applies **all** unapplied plans instead of just the plan in the root directory. ([#169](https://github.com/runatlantis/atlantis/issues/169))
 * `atlantis plan` now plans **all** modified projects instead of just the root directory.
+* Plan comments now contain instructions for how to run apply or re-run plan.
 
 ## Bugfixes
 * Ignore approvals from the pull request author (Bitbucket Cloud only). Fixes ([#201](https://github.com/runatlantis/atlantis/issues/201))
