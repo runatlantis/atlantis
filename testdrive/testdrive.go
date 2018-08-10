@@ -273,7 +273,7 @@ tunnels:
 	select {
 	case <-signalChan:
 		colorstring.Println("\n[red]shutdown signal received, exiting....")
-		colorstring.Println("\n[green]Thank you for using atlantis :) \n[white]For more information about how to use atlantis in production go to: https://github.com/runatlantis/atlantis")
+		colorstring.Println("\n[green]Thank you for using atlantis :) \n[white]For more information about how to use atlantis in production go to: https://www.runatlantis.io")
 		return nil
 	case err := <-ngrokErrors:
 		return errors.Wrap(err, "ngrok tunnel")
