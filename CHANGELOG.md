@@ -1,3 +1,32 @@
+# v0.4.5 (unreleased)
+
+## Features
+* `atlantis apply` now applies **all** unapplied plans instead of just the plan in the root directory. ([#169](https://github.com/runatlantis/atlantis/issues/169))
+* `atlantis plan` now plans **all** modified projects instead of just the root directory.
+
+## Bugfixes
+* Ignore approvals from the pull request author (Bitbucket Cloud only). Fixes ([#201](https://github.com/runatlantis/atlantis/issues/201))
+* When double clicking on a GitHub comment, ex.
+    ```
+    atlantis apply
+    ```
+  GitHub would add two newlines to the end. If this was then pasted into a new
+  comment, Atlantis would accept it because of the extra newlines. This has been fixed
+  and the comment with two newlines will be accepted.
+
+## Backwards Incompatibilities / Notes:
+* `atlantis apply` now applies **all** unapplied plans. Previously it would only apply the plan in the root directory and default workspace.
+* `atlantis plan` now plans **all** modified projects. Previously it would only run plan in the root directory and default workspace.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.5/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.5/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.5/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.5/atlantis_linux_arm.zip)
+
+## Docker
+`runatlantis/atlantis:v0.4.5`
+
 # v0.4.4
 
 ## Features
