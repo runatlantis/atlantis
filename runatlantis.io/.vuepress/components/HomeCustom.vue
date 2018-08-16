@@ -38,8 +38,7 @@
               <h2>Fewer Mistakes</h2>
               <p>Bring the benefits of code review to your operations workflow.</p>
               <ul>
-                <li><img class="checkmark" src="/checkmark.svg">Get proper
-                  reviews from your team before applying.
+                <li><img class="checkmark" src="/checkmark.svg">Catch errors in the Terraform plan output before it's applied.
                 </li>
                 <li><img class="checkmark" src="/checkmark.svg">Ensure that you
                   apply changes before merging to master.
