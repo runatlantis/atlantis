@@ -198,8 +198,8 @@ atlantis server \
 Where
 - `$URL` is the URL that Atlantis can be reached at
 - `$USERNAME` is the GitHub/GitLab/Bitbucket username you generated the token for
-- `$TOKEN` is the access token you created. If you don't want this to be passed in as an argument for security reasons you can specify it in a config file (see [Configuration](#configuration)) or as an environment variable: `ATLANTIS_GH_TOKEN` or `ATLANTIS_GITLAB_TOKEN` or `ATLANTIS_BITBUCKET_TOKEN`
-- `$SECRET` is the random key you used for the webhook secret. If you don't want this to be passed in as an argument for security reasons you can specify it in a config file (see [Configuration](#configuration)) or as an environment variable: `ATLANTIS_GH_WEBHOOK_SECRET` or `ATLANTIS_GITLAB_WEBHOOK_SECRET`
+- `$TOKEN` is the access token you created. If you don't want this to be passed in as an argument for security reasons you can specify it in a config file (see [Configuration](docs/server-configuration.html#environment-variables)) or as an environment variable: `ATLANTIS_GH_TOKEN` or `ATLANTIS_GITLAB_TOKEN` or `ATLANTIS_BITBUCKET_TOKEN`
+- `$SECRET` is the random key you used for the webhook secret. If you don't want this to be passed in as an argument for security reasons you can specify it in a config file (see [Configuration](docs/server-configuration.html#environment-variables)) or as an environment variable: `ATLANTIS_GH_WEBHOOK_SECRET` or `ATLANTIS_GITLAB_WEBHOOK_SECRET`
 - `$REPO_WHITELIST` is which repos Atlantis can run on, ex. `github.com/runatlantis/*` or `github.enterprise.corp.com/*`. See [www.runatlantis.io/docs/security.html#repo-whitelist](/docs/security.html#repo-whitelist) for more details.
 
 Atlantis is now running!
