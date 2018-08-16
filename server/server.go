@@ -69,7 +69,6 @@ type Server struct {
 	CommandRunner      *events.DefaultCommandRunner
 	Logger             *logging.SimpleLogger
 	Locker             locking.Locker
-	AtlantisURL        string
 	EventsController   *EventsController
 	LocksController    *LocksController
 	IndexTemplate      TemplateWriter
@@ -338,7 +337,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CommandRunner:      commandRunner,
 		Logger:             logger,
 		Locker:             lockingClient,
-		AtlantisURL:        userConfig.AtlantisURL,
 		EventsController:   eventsController,
 		LocksController:    locksController,
 		IndexTemplate:      indexTemplate,

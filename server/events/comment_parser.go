@@ -309,7 +309,7 @@ func (e *CommentParser) errMarkdown(errMsg string, command string, flagSet *pfla
 
 var HelpComment = "```cmake\n" +
 	`atlantis
-Terraform automation and collaboration for your team
+Terraform For Teams
 
 Usage:
   atlantis <command> [options] -- [terraform options]

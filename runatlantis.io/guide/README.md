@@ -1,10 +1,14 @@
 # Introduction
 
-::: tip Looking for the docs?
+## Try it out
+* If you'd like to try out running Atlantis yourself on an example repo check out the [Test Drive](test-drive.html).
+* If you'd like to run Atlantis on your repos then read [Getting Started](getting-started.html).
+
+::: tip Looking for the full docs?
 Go here: [www.runatlantis.io/docs](/docs/)
 :::
 
-## Overview
+## Overview – What Is Atlantis?
 Atlantis is an application for automating Terraform via pull requests. It is deployed
 as a standalone application into your infrastructure. No third-party has access to
 your credentials.
@@ -15,12 +19,10 @@ then runs `terraform plan` and comments with the output back on the pull request
 When you want to apply, comment `atlantis apply` on the pull request and Atlantis
 will run `terraform apply` and comment back with the output.
 
+## Watch
 Check out the video below to see it in action:
 
 [![Atlantis Walkthrough](./images/atlantis-walkthrough-icon.png)](https://www.youtube.com/watch?v=TmIPWda0IKg)
-
-## Try it out
-If you'd like to try out running Atlantis on an example repo check out the [Test Drive](test-drive.html).
 
 ## Why would you run Atlantis?
 ### Increased visibility

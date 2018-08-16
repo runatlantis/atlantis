@@ -1,6 +1,6 @@
 module.exports = {
     title: 'Atlantis',
-    description: 'Atlantis: Terraform Automation By Pull Request',
+    description: 'Atlantis: Terraform For Teams',
     ga: "UA-6850151-3",
     head: [
         ['link', { rel: 'icon', type: 'image/png', href: '/favicon-196x196.png', sizes: '196x196' }],
@@ -26,6 +26,7 @@ module.exports = {
         ['meta', {name: 'google-site-verification', content: 'kTnsDBpHqtTNY8oscYxrQeeiNml2d2z-03Ct9wqeCeE' }]
     ],
     themeConfig: {
+        logo: '/hero.png',
         nav: [
             {text: 'Home', link: '/'},
             {text: 'Guide', link: '/guide/'},
