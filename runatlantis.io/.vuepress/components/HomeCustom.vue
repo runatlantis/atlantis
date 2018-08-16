@@ -277,7 +277,9 @@
             padding-right 10px
 
   .benefits-container
+    border-top 1px solid darken($darkBackground, 10%)
     .benefit-container
+      border-bottom 1px solid darken($darkBackground, 10%)
       .title
         padding-top 40px
         text-align center
