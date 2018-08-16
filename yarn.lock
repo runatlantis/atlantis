@@ -3417,10 +3417,6 @@ lodash._reinterpolate@~3.0.0:
   version "3.0.0"
   resolved "https://registry.yarnpkg.com/lodash._reinterpolate/-/lodash._reinterpolate-3.0.0.tgz#0ccf2d89166af03b3663c796538b75ac6e114d9d"
 
-lodash.assign@~4.2.0:
-  version "4.2.0"
-  resolved "https://registry.yarnpkg.com/lodash.assign/-/lodash.assign-4.2.0.tgz#0d99f3ccd7a6d261d19bdaeb9245005d285808e7"
-
 lodash.camelcase@^4.3.0:
   version "4.3.0"
   resolved "https://registry.yarnpkg.com/lodash.camelcase/-/lodash.camelcase-4.3.0.tgz#b28aa6288a2b9fc651035c7711f65ab6190331a6"
@@ -3543,11 +3539,9 @@ map-visit@^1.0.0:
   dependencies:
     object-visit "^1.0.0"
 
-markdown-it-anchor@^4.0.0:
-  version "4.0.0"
-  resolved "https://registry.yarnpkg.com/markdown-it-anchor/-/markdown-it-anchor-4.0.0.tgz#e87fb5543e01965adf71506c6bf7b0491841b7e3"
-  dependencies:
-    string "^3.3.3"
+markdown-it-anchor@^5.0.2:
+  version "5.0.2"
+  resolved "https://registry.yarnpkg.com/markdown-it-anchor/-/markdown-it-anchor-5.0.2.tgz#cdd917a05b7bf92fb736a6dae3385c6d0d0fa552"
 
 markdown-it-container@^2.0.0:
   version "2.0.0"
@@ -3557,12 +3551,9 @@ markdown-it-emoji@^1.4.0:
   version "1.4.0"
   resolved "https://registry.yarnpkg.com/markdown-it-emoji/-/markdown-it-emoji-1.4.0.tgz#9bee0e9a990a963ba96df6980c4fddb05dfb4dcc"
 
-markdown-it-table-of-contents@^0.3.3:
-  version "0.3.6"
-  resolved "https://registry.yarnpkg.com/markdown-it-table-of-contents/-/markdown-it-table-of-contents-0.3.6.tgz#2a733c52485cd47769365402681987ed7d9e64a9"
-  dependencies:
-    lodash.assign "~4.2.0"
-    string "~3.3.3"
+markdown-it-table-of-contents@^0.4.0:
+  version "0.4.2"
+  resolved "https://registry.yarnpkg.com/markdown-it-table-of-contents/-/markdown-it-table-of-contents-0.4.2.tgz#33ebb08eec4790bc1ccf10e3a75e53ac90ce515f"
 
 markdown-it@^8.4.1:
   version "8.4.1"
@@ -3701,10 +3692,11 @@ min-document@^2.19.0:
   dependencies:
     dom-walk "^0.1.0"
 
-mini-css-extract-plugin@^0.4.0:
-  version "0.4.0"
-  resolved "https://registry.yarnpkg.com/mini-css-extract-plugin/-/mini-css-extract-plugin-0.4.0.tgz#ff3bf08bee96e618e177c16ca6131bfecef707f9"
+mini-css-extract-plugin@^0.4.1:
+  version "0.4.1"
+  resolved "https://registry.yarnpkg.com/mini-css-extract-plugin/-/mini-css-extract-plugin-0.4.1.tgz#d2bcf77bb2596b8e4bd9257e43d3f9164c2e86cb"
   dependencies:
+    "@webpack-contrib/schema-utils" "^1.0.0-beta.0"
     loader-utils "^1.1.0"
     webpack-sources "^1.1.0"
 
@@ -4837,9 +4829,9 @@ regexpu-core@^4.1.3, regexpu-core@^4.1.4:
     unicode-match-property-ecmascript "^1.0.4"
     unicode-match-property-value-ecmascript "^1.0.2"
 
-register-service-worker@^1.2.0:
-  version "1.4.1"
-  resolved "https://registry.yarnpkg.com/register-service-worker/-/register-service-worker-1.4.1.tgz#4b4c9b4200fc697942c6ae7d611349587b992b2f"
+register-service-worker@^1.5.1:
+  version "1.5.1"
+  resolved "https://registry.yarnpkg.com/register-service-worker/-/register-service-worker-1.5.1.tgz#4f91d8915f6019b083433b83ffe4bfd6f976f342"
 
 registry-auth-token@^3.0.1:
   version "3.3.2"
@@ -5258,10 +5250,6 @@ string-width@^1.0.1:
   dependencies:
     is-fullwidth-code-point "^2.0.0"
     strip-ansi "^4.0.0"
-
-string@^3.3.3, string@~3.3.3:
-  version "3.3.3"
-  resolved "https://registry.yarnpkg.com/string/-/string-3.3.3.tgz#5ea211cd92d228e184294990a6cc97b366a77cb0"
 
 string_decoder@^1.0.0, string_decoder@~1.1.1:
   version "1.1.1"
@@ -5804,9 +5792,9 @@ vuepress-html-webpack-plugin@^3.2.0:
     toposort "^1.0.0"
     util.promisify "1.0.0"
 
-vuepress@^0.10.2:
-  version "0.10.2"
-  resolved "https://registry.yarnpkg.com/vuepress/-/vuepress-0.10.2.tgz#4f1cd6126619f7a94ab1b08caacdf6d91c52954f"
+vuepress@^0.14.2:
+  version "0.14.2"
+  resolved "https://registry.yarnpkg.com/vuepress/-/vuepress-0.14.2.tgz#48e5e102178370980d1408e230c0263d768435b7"
   dependencies:
     "@babel/core" "7.0.0-beta.47"
     "@vue/babel-preset-app" "3.0.0-beta.11"
@@ -5836,17 +5824,17 @@ vuepress@^0.10.2:
     lodash.throttle "^4.1.1"
     lru-cache "^4.1.2"
     markdown-it "^8.4.1"
-    markdown-it-anchor "^4.0.0"
+    markdown-it-anchor "^5.0.2"
     markdown-it-container "^2.0.0"
     markdown-it-emoji "^1.4.0"
-    markdown-it-table-of-contents "^0.3.3"
-    mini-css-extract-plugin "^0.4.0"
+    markdown-it-table-of-contents "^0.4.0"
+    mini-css-extract-plugin "^0.4.1"
     nprogress "^0.2.0"
     optimize-css-assets-webpack-plugin "^4.0.0"
     portfinder "^1.0.13"
     postcss-loader "^2.1.5"
     prismjs "^1.13.0"
-    register-service-worker "^1.2.0"
+    register-service-worker "^1.5.1"
     semver "^5.5.0"
     stylus "^0.54.5"
     stylus-loader "^3.0.2"

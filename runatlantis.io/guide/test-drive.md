@@ -1,5 +1,5 @@
 # Test Drive
-To try out running Atlantis yourself first, download the latest release for your architecture:
+To test drive Atlantis on an example repo, download the latest release for your architecture:
 [https://github.com/runatlantis/atlantis/releases](https://github.com/runatlantis/atlantis/releases)
 
 Once you've extracted the archive, run:
