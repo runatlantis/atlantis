@@ -29,6 +29,12 @@ spec:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          cmd: atlantis
+          args:
+            - server
+          {{- if .Values.allowRepoConfig }}
+            - --allow-repo-config
+          {{- end }}
           ports:
             - name: atlantis
               containerPort: 4141
