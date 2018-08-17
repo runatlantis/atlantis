@@ -1,11 +1,11 @@
 package runtime_test
 
 import (
-	"errors"
 	"testing"
 
 	version "github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/runtime"
@@ -63,29 +63,26 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 
 			terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", []string{c.expCmd, "-no-color", "extra", "args"}, tfVersion, "workspace")
 		})
-
-		t.Run(c.version, func(t *testing.T) {
-			terraform := mocks.NewMockClient()
-
-			tfVersion, _ := version.NewVersion(c.version)
-			logger := logging.NewNoopLogger()
-			iso := runtime.InitStepRunner{
-				TerraformExecutor: terraform,
-				DefaultTFVersion:  tfVersion,
-			}
-			When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
-				ThenReturn("output", errors.New("err"))
-
-			output, err := iso.Run(models.ProjectCommandContext{
-				Log:        logger,
-				Workspace:  "workspace",
-				RepoRelDir: ".",
-			}, []string{"extra", "args"}, "/path")
-			// But if there is an error, the init output should be returned.
-			ErrEquals(t, "err", err)
-			Equals(t, "output", output)
-
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", []string{c.expCmd, "-no-color", "extra", "args"}, tfVersion, "workspace")
-		})
 	}
+}
+
+func TestRun_ShowInitOutputOnError(t *testing.T) {
+	// If there was an error during init then we want the output to be returned.
+	RegisterMockTestingT(t)
+	tfClient := mocks.NewMockClient()
+	When(tfClient.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+		ThenReturn("output", errors.New("error"))
+
+	tfVersion, _ := version.NewVersion("0.11.0")
+	iso := runtime.InitStepRunner{
+		TerraformExecutor: tfClient,
+		DefaultTFVersion:  tfVersion,
+	}
+
+	output, err := iso.Run(models.ProjectCommandContext{
+		Workspace:  "workspace",
+		RepoRelDir: ".",
+	}, nil, "/path")
+	ErrEquals(t, "error", err)
+	Equals(t, "output", output)
 }
