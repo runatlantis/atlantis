@@ -24,7 +24,8 @@
     <div class="workflow-container">
       <div class="workflow">
         <h1>The Atlantis Workflow</h1>
-        <img src="/workflow.png">
+        <img src="/mobile-workflow.png" class="mobile" alt="Atlantis Workflow">
+        <img src="/workflow.png" class="desktop" alt="Atlantis Workflow">
       </div>
     </div>
     <div class="benefits-container">
@@ -46,7 +47,7 @@
               </ul>
             </div>
           </div>
-          <div class="item">
+          <div class="item image">
             <div class="image">
               <img src="/mistakes.png">
             </div>
@@ -55,7 +56,7 @@
       </div>
       <div class="benefit-container">
         <div class="benefit">
-          <div class="item">
+          <div class="item image">
             <div class="image">
               <img src="/devops.png">
             </div>
@@ -93,7 +94,7 @@
               </ul>
             </div>
           </div>
-          <div class="item">
+          <div class="item image">
             <div class="image">
               <img src="/logs.png">
             </div>
@@ -105,7 +106,7 @@
       <div class="benefit-container">
         <h1 class="title">How It Works</h1>
         <div class="benefit">
-          <div class="item">
+          <div class="item image">
             <div class="image">
               <img src="/hero.png">
             </div>
@@ -260,6 +261,9 @@
     img {
       width 100%
     }
+    .mobile {
+      display none
+    }
     .steps-container
       max-width $homeWidth
       margin 0 auto
@@ -298,11 +302,11 @@
           flex-basis 50%
           flex-grow 1
           min-width 250px
-        .image
-          padding 40px
-          text-align center
-          img
-            max-height 200px
+          .image
+            padding 40px
+            text-align center
+            img
+              max-height 200px
         .description
           padding 40px
           h2
@@ -329,6 +333,19 @@
       .feature
         max-width 100%
         padding 0 2.5rem
+    .workflow
+      .mobile
+        display block
+      .desktop
+        display none
+    .benefits-container
+      .benefit-container
+        .benefit
+          flex-direction column
+          .item
+            &.image
+              order -1
+
 
   @media (max-width: $MQMobileNarrow)
     .home
