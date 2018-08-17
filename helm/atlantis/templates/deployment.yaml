@@ -1,0 +1,99 @@
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: {{ template "atlantis.fullname" . }}
+  labels:
+    app: {{ template "atlantis.name" . }}
+    chart: {{ template "atlantis.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ template "atlantis.name" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "atlantis.name" . }}
+        release: {{ .Release.Name }}
+    spec:
+      volumes:
+      {{- range $name, $_ := .Values.serviceAccountSecrets }}
+        - name: {{ $name }}-volume
+          secret:
+            secretName: {{ $name }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: atlantis
+              containerPort: 4141
+          env:
+          - name: ATLANTIS_REPO_WHITELIST
+            value: {{ .Values.orgWhitelist }}
+          - name: ATLANTIS_PORT
+            value: "4141"
+          {{- if .Values.atlantisUrl }}
+          - name: ATLANTIS_ATLANTIS_URL
+            value: {{ .Values.atlantisUrl }}
+          {{- else if .Values.ingress.enabled }}
+          - name: ATLANTIS_ATLANTIS_URL
+            value: http://{{ .Values.ingress.host }}
+          {{- end }}
+          {{- range $vcsEnvVar := .Values.vcsUserSetup }}
+          - name: {{ $vcsEnvVar.name }}
+            {{- if $vcsEnvVar.valueFrom }}
+            valueFrom:
+{{ toYaml $vcsEnvVar.valueFrom | indent 14 }}
+            {{- else }}
+            value: {{ $vcsEnvVar.value | quote }}
+            {{- end -}}
+          {{- end }}
+          {{- if .Values.livenessProbe.enabled }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 4141
+              scheme: {{ .Values.livenessProbe.scheme }}
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.livenessProbe.successThreshold }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+          {{- end }}
+          {{- if .Values.readinessProbe.enabled }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 4141
+              scheme: {{ .Values.readinessProbe.scheme }}
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.readinessProbe.successThreshold }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+          {{- end }}
+          volumeMounts:
+          {{- range $name, $_ := .Values.serviceAccountSecrets }}
+            - name: {{ $name }}-volume
+              readOnly: true
+              mountPath: /etc/{{ $name }}
+          {{- end }}
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+    {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+    {{- end }}
