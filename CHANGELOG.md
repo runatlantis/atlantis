@@ -1,3 +1,26 @@
+# v0.4.6
+
+## Description
+Just a small bugfix release.
+
+## Features
+None
+
+## Bugfixes
+* If `terraform init` fails, include the failure logs in the comment posted back to the PR.
+
+## Backwards Incompatibilities / Notes:
+None
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.6/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.6/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.6/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.6/atlantis_linux_arm.zip)
+
+## Docker
+`runatlantis/atlantis:v0.4.6`
+
 # v0.4.5
 
 ## Features
