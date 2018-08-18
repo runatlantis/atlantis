@@ -34,6 +34,9 @@ func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command []string, 
 		fmt.Sprintf("ATLANTIS_TERRAFORM_VERSION=%s", tfVersion),
 		fmt.Sprintf("DIR=%s", path),
 		fmt.Sprintf("PLANFILE=%s", filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectConfig))),
+		fmt.Sprintf("REPO_OWNER=%s", ctx.BaseRepo.Owner),
+		fmt.Sprintf("REPO_NAME=%s", ctx.BaseRepo.Name),
+		fmt.Sprintf("BRANCH_NAME=%s", ctx.Pull.Branch)
 	}
 	finalEnvVars := append(baseEnvVars, customEnvVars...)
 	cmd.Env = finalEnvVars
