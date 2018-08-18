@@ -5,6 +5,7 @@ import (
 
 	version "github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/runtime"
@@ -57,10 +58,31 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 				RepoRelDir: ".",
 			}, []string{"extra", "args"}, "/path")
 			Ok(t, err)
-			// Shouldn't return output since we don't print init output to PR.
+			// When there is no error, should not return init output to PR.
 			Equals(t, "", output)
 
 			terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", []string{c.expCmd, "-no-color", "extra", "args"}, tfVersion, "workspace")
 		})
 	}
+}
+
+func TestRun_ShowInitOutputOnError(t *testing.T) {
+	// If there was an error during init then we want the output to be returned.
+	RegisterMockTestingT(t)
+	tfClient := mocks.NewMockClient()
+	When(tfClient.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+		ThenReturn("output", errors.New("error"))
+
+	tfVersion, _ := version.NewVersion("0.11.0")
+	iso := runtime.InitStepRunner{
+		TerraformExecutor: tfClient,
+		DefaultTFVersion:  tfVersion,
+	}
+
+	output, err := iso.Run(models.ProjectCommandContext{
+		Workspace:  "workspace",
+		RepoRelDir: ".",
+	}, nil, "/path")
+	ErrEquals(t, "error", err)
+	Equals(t, "output", output)
 }
