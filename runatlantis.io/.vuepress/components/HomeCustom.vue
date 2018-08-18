@@ -88,7 +88,7 @@
                 <li><img class="checkmark" src="/checkmark.svg">See exactly
                   which resources were changed.
                 </li>
-                <li><img class="checkmark" src="/checkmark.svg">Know who apply'd
+                <li><img class="checkmark" src="/checkmark.svg">Know who applied
                   the change and who approved it.
                 </li>
               </ul>
@@ -118,9 +118,9 @@
                 </li>
                 <li><img class="checkmark" src="/checkmark.svg">Runs as a Golang binary or Docker image and can be deployed on VMs, Kubernetes, Fargate, etc.
                 </li>
-                <li><img class="checkmark" src="/checkmark.svg">Listens for webhooks from GitHub/GitLab/Bitbucket
+                <li><img class="checkmark" src="/checkmark.svg">Listens for webhooks from GitHub/GitLab/Bitbucket.
                 </li>
-                <li><img class="checkmark" src="/checkmark.svg">Runs terraform commands remotely and comments back with their output
+                <li><img class="checkmark" src="/checkmark.svg">Runs terraform commands remotely and comments back with their output.
                 </li>
               </ul>
             </div>
