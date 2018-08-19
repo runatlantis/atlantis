@@ -11,15 +11,6 @@
           <a href="/guide/" class="nav-link action-button">Get Started →</a>
         </p>
       </div>
-      <!--<div class="companies">-->
-      <!--<h2>Used By</h2>-->
-      <!--<div class="company-list">-->
-      <!--<div class="company">Nike</div>-->
-      <!--<div class="company">Samsung</div>-->
-      <!--<div class="company">Lyft</div>-->
-      <!--<div class="company -last">Hootsuite</div>-->
-      <!--</div>-->
-      <!--</div>-->
     </div>
     <div class="workflow-container">
       <div class="workflow">
@@ -37,9 +28,11 @@
           <div class="item">
             <div class="description">
               <h2>Fewer Mistakes</h2>
-              <p>Bring the benefits of code review to your operations workflow.</p>
+              <p>Bring the benefits of <strong>code review</strong> to your operations
+                workflow.</p>
               <ul>
-                <li><img class="checkmark" src="/checkmark.svg">Catch errors in the Terraform plan output before it's applied.
+                <li><img class="checkmark" src="/checkmark.svg">Catch errors in
+                  the Terraform plan output before it's applied.
                 </li>
                 <li><img class="checkmark" src="/checkmark.svg">Ensure that you
                   apply changes before merging to master.
@@ -49,7 +42,7 @@
           </div>
           <div class="item image">
             <div class="image">
-              <img src="/mistakes.png">
+              <img src="/list.svg">
             </div>
           </div>
         </div>
@@ -58,13 +51,13 @@
         <div class="benefit">
           <div class="item image">
             <div class="image">
-              <img src="/devops.png">
+              <img src="/coding.svg">
             </div>
           </div>
           <div class="item">
             <div class="description">
-              <h2>Put the "Dev" back into DevOps</h2>
-              <p>Empower your developers to write Terraform. Safely.</p>
+              <h2>Put the <span style="text-decoration: underline">Dev</span> back into DevOps</h2>
+              <p>Empower your developers to write Terraform. <strong>Safely.</strong></p>
               <ul>
                 <li><img class="checkmark" src="/checkmark.svg">Developers can
                   submit Terraform pull requests without needing credentials.
@@ -81,22 +74,41 @@
         <div class="benefit">
           <div class="item">
             <div class="description">
-              <h2>Free Audit Logs</h2>
-              <p>All production changes are recorded on the pull request where
-                they were made.</p>
+              <h2>Instant Audit Logs And Compliance</h2>
+              <p>Pass audits without compromising your workflow.</p>
               <ul>
-                <li><img class="checkmark" src="/checkmark.svg">See exactly
-                  which resources were changed.
+                <li><img class="checkmark" src="/checkmark.svg">Each pull request now holds a detailed log of what infrastructure changes were made and when; along with who made the change and who approved it.
                 </li>
-                <li><img class="checkmark" src="/checkmark.svg">Know who applied
-                  the change and who approved it.
+                <li><img class="checkmark" src="/checkmark.svg">Atlantis can be configured to require approvals on every production change.
                 </li>
               </ul>
             </div>
           </div>
           <div class="item image">
             <div class="image">
-              <img src="/logs.png">
+              <img src="/certificate.svg">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="benefits-container">
+      <div class="benefit-container">
+        <h1 class="title">Proven at Scale</h1>
+        <div class="benefit">
+          <div class="item image">
+            <div class="image">
+              <img src="/powerful.svg">
+            </div>
+          </div>
+          <div class="item">
+            <div class="description">
+              <ul>
+                <li><img class="checkmark" src="/checkmark.svg">Used by one of the world's top companies to manage over 600 Terraform repos with 300 developers.
+                </li>
+                <li><img class="checkmark" src="/checkmark.svg">In production use for over 2 years.
+                </li>
+              </ul>
             </div>
           </div>
         </div>
@@ -106,23 +118,28 @@
       <div class="benefit-container">
         <h1 class="title">How It Works</h1>
         <div class="benefit">
-          <div class="item image">
-            <div class="image">
-              <img src="/hero.png">
-            </div>
-          </div>
           <div class="item">
             <div class="description">
               <ul>
-                <li><img class="checkmark" src="/checkmark.svg">Atlantis is self-hosted. Your credentials don't leave your infrastructure.
+                <li><img class="checkmark" src="/checkmark.svg">Atlantis is
+                  self-hosted. Your credentials don't leave your infrastructure.
                 </li>
-                <li><img class="checkmark" src="/checkmark.svg">Runs as a Golang binary or Docker image and can be deployed on VMs, Kubernetes, Fargate, etc.
+                <li><img class="checkmark" src="/checkmark.svg">Runs as a Golang
+                  binary or Docker image and can be deployed on VMs, Kubernetes,
+                  Fargate, etc.
                 </li>
-                <li><img class="checkmark" src="/checkmark.svg">Listens for webhooks from GitHub/GitLab/Bitbucket.
+                <li><img class="checkmark" src="/checkmark.svg">Listens for
+                  webhooks from GitHub/GitLab/Bitbucket.
                 </li>
-                <li><img class="checkmark" src="/checkmark.svg">Runs terraform commands remotely and comments back with their output.
+                <li><img class="checkmark" src="/checkmark.svg">Runs terraform
+                  commands remotely and comments back with their output.
                 </li>
               </ul>
+            </div>
+          </div>
+          <div class="item image">
+            <div class="image">
+              <img src="/hero.png">
             </div>
           </div>
         </div>
@@ -333,11 +350,13 @@
       .feature
         max-width 100%
         padding 0 2.5rem
+
     .workflow
       .mobile
         display block
       .desktop
         display none
+
     .benefits-container
       .benefit-container
         .benefit
@@ -345,7 +364,6 @@
           .item
             &.image
               order -1
-
 
   @media (max-width: $MQMobileNarrow)
     .home
