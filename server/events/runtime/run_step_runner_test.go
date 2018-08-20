@@ -40,7 +40,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 		},
 		{
 			Command: "echo base_repo_name=$BASE_REPO_NAME base_repo_owner=$BASE_REPO_OWNER head_repo_name=$HEAD_REPO_NAME head_repo_owner=$HEAD_REPO_OWNER head_branch_name=$HEAD_BRANCH_NAME pull_num=$PULL_NUM pull_author=$PULL_AUTHOR",
-			ExpOut:  "base_repo_name=atlantis base_repo_owner=runatlantis head_repo_name=atlantis head_repo_owner=runatlantis head_branch_name=add-feat pull_num=2 pull_author=acme\n",
+			ExpOut:  "base_repo_name=basename base_repo_owner=baseowner head_repo_name=headname head_repo_owner=headowner head_branch_name=add-feat pull_num=2 pull_author=acme\n",
 		},
 	}
 
@@ -52,12 +52,12 @@ func TestRunStepRunner_Run(t *testing.T) {
 	}
 	ctx := models.ProjectCommandContext{
 		BaseRepo: models.Repo{
-			Name:  "atlantis",
-			Owner: "runatlantis",
+			Name:  "basename",
+			Owner: "baseowner",
 		},
 		HeadRepo: models.Repo{
-			Name:  "atlantis",
-			Owner: "runatlantis",
+			Name:  "headname",
+			Owner: "headowner",
 		},
 		Pull: models.PullRequest{
 			Num:    2,
