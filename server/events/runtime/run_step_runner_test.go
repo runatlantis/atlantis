@@ -38,6 +38,10 @@ func TestRunStepRunner_Run(t *testing.T) {
 			Command: "echo workspace=$WORKSPACE version=$ATLANTIS_TERRAFORM_VERSION dir=$DIR planfile=$PLANFILE",
 			ExpOut:  "workspace=myworkspace version=0.11.0 dir=$DIR planfile=$DIR/myworkspace.tfplan\n",
 		},
+		{
+			Command: "echo base_repo_name=$BASE_REPO_NAME base_repo_owner=$BASE_REPO_OWNER head_repo_name=$HEAD_REPO_NAME head_repo_owner=$HEAD_REPO_OWNER head_branch_name=$HEAD_BRANCH_NAME pull_num=$PULL_NUM pull_author=$PULL_AUTHOR",
+			ExpOut:  "base_repo_name=basename base_repo_owner=baseowner head_repo_name=headname head_repo_owner=headowner head_branch_name=add-feat pull_num=2 pull_author=acme\n",
+		},
 	}
 
 	projVersion, err := version.NewVersion("v0.11.0")
@@ -47,6 +51,19 @@ func TestRunStepRunner_Run(t *testing.T) {
 		DefaultTFVersion: defaultVersion,
 	}
 	ctx := models.ProjectCommandContext{
+		BaseRepo: models.Repo{
+			Name:  "basename",
+			Owner: "baseowner",
+		},
+		HeadRepo: models.Repo{
+			Name:  "headname",
+			Owner: "headowner",
+		},
+		Pull: models.PullRequest{
+			Num:    2,
+			Branch: "add-feat",
+			Author: "acme",
+		},
 		Log:        logging.NewNoopLogger(),
 		Workspace:  "myworkspace",
 		RepoRelDir: "mydir",

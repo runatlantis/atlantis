@@ -180,6 +180,13 @@ Or a custom command
 * `PLANFILE` - Absolute path to the location where Atlantis expects the plan to
 either be generated (by plan) or already exist (if running apply). Can be used to
 override the built-in `plan`/`apply` commands, ex. `run: terraform plan -out $PLANFILE`.
+* `BASE_REPO_NAME` - Name of the repository that the pull request will be merged into, ex. `atlantis`.
+* `BASE_REPO_OWNER` - Owner of the repository that the pull request will be merged into, ex. `runatlantis`.
+* `HEAD_REPO_NAME` - Name of the repository that is getting merged into the base repository, ex. `atlantis`.
+* `HEAD_REPO_OWNER` - Owner of the repository that is getting merged into the base repository, ex. `acme-corp`.
+* `HEAD_BRANCH_NAME` - Name of the head branch of the pull request
+* `PULL_NUM` - Pull request number or ID, ex. `2`.
+* `PULL_AUTHOR` - Username of the pull request author, ex. `acme-user`.
 :::
 
 ## Next Steps
