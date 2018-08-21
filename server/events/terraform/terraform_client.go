@@ -49,7 +49,7 @@ var versionRegex = regexp.MustCompile("Terraform v(.*)\n")
 func NewClient(dataDir string) (*DefaultClient, error) {
 	// todo: use exec.LookPath to find out if we even have terraform rather than
 	// parsing the error looking for a not found error.
-	versionCmdOutput, err := exec.Command("terraform", "version").CombinedOutput() // #nosec
+	versionCmdOutput, err := exec.Command("terraform", "version").Output() // #nosec
 	output := string(versionCmdOutput)
 	if err != nil {
 		// exec.go line 35, Error() returns
