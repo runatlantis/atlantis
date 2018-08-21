@@ -49,14 +49,15 @@ func NewClient(dataDir string) (*DefaultClient, error) {
 	if err != nil {
 		return nil, errors.New("terraform not found in $PATH. \n\nDownload terraform from https://www.terraform.io/downloads.html")
 	}
-	versionCmdOutput, err := exec.Command("terraform", "version").CombinedOutput() // #nosec
-	output := string(versionCmdOutput)
+	versionOutBytes, err := exec.Command("terraform", "version").
+		Output() // #nosec
+	versionOutput := string(versionOutBytes)
 	if err != nil {
-		return nil, errors.Wrapf(err, "running terraform version: %s", output)
+		return nil, errors.Wrapf(err, "running terraform version: %s", versionOutput)
 	}
-	match := versionRegex.FindStringSubmatch(output)
+	match := versionRegex.FindStringSubmatch(versionOutput)
 	if len(match) <= 1 {
-		return nil, fmt.Errorf("could not parse terraform version from %s", output)
+		return nil, fmt.Errorf("could not parse terraform version from %s", versionOutput)
 	}
 	v, err := version.NewVersion(match[1])
 	if err != nil {
