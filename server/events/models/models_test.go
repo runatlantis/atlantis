@@ -59,7 +59,7 @@ func TestNewRepo_CloneURLBitbucketServer(t *testing.T) {
 	}, repo)
 }
 
-func TestNewRepo_FullNameWrongFormat(t *testing.T) {
+func TestNewRepo_GithubFullNameWrongFormat(t *testing.T) {
 	cases := []string{
 		"owner/repo/extra",
 		"/",
@@ -68,11 +68,78 @@ func TestNewRepo_FullNameWrongFormat(t *testing.T) {
 		"a/",
 		"/b",
 	}
+
 	for _, c := range cases {
 		t.Run(c, func(t *testing.T) {
 			cloneURL := fmt.Sprintf("https://github.com/%s.git", c)
 			_, err := models.NewRepo(models.Github, c, cloneURL, "u", "p")
 			ErrEquals(t, fmt.Sprintf(`invalid repo format "%s"`, c), err)
+		})
+	}
+}
+
+func TestNewRepo_BitbucketFullNameFormatCases(t *testing.T) {
+
+	testCases := []struct {
+		Case            string
+		Vcs             models.VCSHostType
+		RepoName        string
+		ExpectedMessage string
+	}{
+		{"Valid Bitbucket cloud repository testing %s case", models.BitbucketCloud, "owner/repo", ""},
+		{"Invalid Bitbucket cloud repository testing %s case", models.BitbucketCloud, "owner/subgroup/repo", `invalid repo format "%s"`},
+		{"Invalid Bitbucket cloud repository testing `%s` case", models.BitbucketCloud, "/", `invalid repo format "%s"`},
+		{"Invalid Bitbucket cloud repository testing `%s` case", models.BitbucketCloud, "//", `invalid repo format "%s"`},
+		{"Invalid Bitbucket cloud repository testing `%s` case", models.BitbucketCloud, "///", `invalid repo format "%s"`},
+		{"Invalid Bitbucket cloud repository testing `%s` case", models.BitbucketCloud, "a/", `invalid repo format "%s"`},
+		{"Invalid Bitbucket cloud repository testing `%s` case", models.BitbucketCloud, "/b", `invalid repo format "%s"`},
+
+		{"Valid Bitbucket server repository testing %s case", models.BitbucketCloud, "owner/repo", ""},
+		{"Invalid Bitbucket server repository testing %s case", models.BitbucketServer, "owner/subgroup/repo", `invalid repo format "%s"`},
+		{"Invalid Bitbucket server repository testing `%s` case", models.BitbucketServer, "/", `invalid repo format "%s"`},
+		{"Invalid Bitbucket server repository testing `%s` case", models.BitbucketServer, "//", `invalid repo format "%s"`},
+		{"Invalid Bitbucket server repository testing `%s` case", models.BitbucketServer, "///", `invalid repo format "%s"`},
+		{"Invalid Bitbucket server repository testing `%s` case", models.BitbucketServer, "a/", `invalid repo format "%s"`},
+		{"Invalid Bitbucket server repository testing `%s` case", models.BitbucketServer, "/b", `invalid repo format "%s"`},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(fmt.Sprintf(testCase.Case, testCase.RepoName), func(t *testing.T) {
+			cloneURL := fmt.Sprintf("https://bitbucket.org/%s.git", testCase.RepoName)
+			_, err := models.NewRepo(testCase.Vcs, testCase.RepoName, cloneURL, "u", "p")
+
+			if err != nil {
+				ErrEquals(t, fmt.Sprintf(testCase.ExpectedMessage, testCase.RepoName), err)
+			}
+		})
+	}
+}
+
+func TestNewRepo_GitlabFullNameFormatCases(t *testing.T) {
+
+	testCases := []struct {
+		Case            string
+		Vcs             models.VCSHostType
+		RepoName        string
+		ExpectedMessage string
+	}{
+		{"Valid gitlab repository testing %s case", models.Gitlab, "owner/repo", ""},
+		{"Valid gitlab repository testing %s case", models.Gitlab, "owner/repo/extra", ""},
+		{"Invalid gitlab repository testing `%s` case", models.Gitlab, "/", `invalid repo format "%s"`},
+		{"Invalid gitlab repository testing `%s` case", models.Gitlab, "//", `invalid repo format "%s"`},
+		{"Invalid gitlab repository testing `%s` case", models.Gitlab, "///", `invalid repo format "%s"`},
+		{"Invalid gitlab repository testing `%s` case", models.Gitlab, "a/", `invalid repo format "%s"`},
+		{"Invalid gitlab repository testing `%s` case", models.Gitlab, "/b", `invalid repo format "%s"`},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(fmt.Sprintf(testCase.Case, testCase.RepoName), func(t *testing.T) {
+			cloneURL := fmt.Sprintf("https://gitlab.com/%s.git", testCase.RepoName)
+			_, err := models.NewRepo(testCase.Vcs, testCase.RepoName, cloneURL, "u", "p")
+
+			if err != nil {
+				ErrEquals(t, fmt.Sprintf(testCase.ExpectedMessage, testCase.RepoName), err)
+			}
 		})
 	}
 }

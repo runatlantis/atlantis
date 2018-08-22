@@ -93,12 +93,20 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 	// Get the owner and repo names from the full name.
 	var owner string
 	var repo string
+
 	pathSplit := strings.Split(repoFullName, "/")
-	if len(pathSplit) != 2 || pathSplit[0] == "" || pathSplit[1] == "" {
+	if (len(pathSplit) != 2 && vcsHostType != Gitlab) || pathSplit[0] == "" || pathSplit[1] == "" {
 		return Repo{}, fmt.Errorf("invalid repo format %q", repoFullName)
 	}
+
 	owner = pathSplit[0]
 	repo = pathSplit[1]
+
+	// If repository has subgroup domain
+	// An example of this requirement is Gitlab subgroups
+	if len(pathSplit) > 2 {
+		repo = fmt.Sprintf("%s/%s", pathSplit[1], pathSplit[2])
+	}
 
 	return Repo{
 		FullName:          repoFullName,
