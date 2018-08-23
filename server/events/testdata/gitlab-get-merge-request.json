@@ -1,0 +1,47 @@
+{
+  "id":6056811,
+  "iid":8,
+  "project_id":4580910,
+  "title":"Update main.tf",
+  "description":"",
+  "state":"opened",
+  "created_at":"2017-11-13T19:33:42.704Z",
+  "updated_at":"2017-11-13T23:35:26.200Z",
+  "target_branch":"master",
+  "source_branch":"abc",
+  "upvotes":0,
+  "downvotes":0,
+  "author":{
+    "id":1755902,
+    "name":"Luke Kysow",
+    "username":"lkysow",
+    "state":"active",
+    "avatar_url":"https://secure.gravatar.com/avatar/25fd57e71590fe28736624ff24d41c5f?s=80\u0026d=identicon",
+    "web_url":"https://gitlab.com/lkysow"
+  },
+  "assignee":null,
+  "source_project_id":4580910,
+  "target_project_id":4580910,
+  "labels":[
+
+  ],
+  "work_in_progress":false,
+  "milestone":null,
+  "merge_when_pipeline_succeeds":false,
+  "merge_status":"can_be_merged",
+  "sha":"0b4ac85ea3063ad5f2974d10cd68dd1f937aaac2",
+  "merge_commit_sha":null,
+  "user_notes_count":10,
+  "approvals_before_merge":null,
+  "discussion_locked":null,
+  "should_remove_source_branch":null,
+  "force_remove_source_branch":false,
+  "squash":false,
+  "web_url":"https://gitlab.com/lkysow/atlantis-example/merge_requests/8",
+  "time_stats":{
+    "time_estimate":0,
+    "total_time_spent":0,
+    "human_time_estimate":null,
+    "human_total_time_spent":null
+  }
+}

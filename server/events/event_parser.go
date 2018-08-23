@@ -414,9 +414,9 @@ func (e *EventParser) ParseGitlabMergeCommentEvent(event gitlab.MergeCommentEven
 }
 
 // ParseGitlabMergeRequest parses the merge requests and returns a pull request
-// model. We require passing in baseRepo because although can't get this information
-// from the merge request, the only caller of this function already has that
-// data. This means we can construct the pull request object correctly.
+// model. We require passing in baseRepo because we can't get this information
+// from the merge request. The only caller of this function already has that
+// data so we can construct the pull request object correctly.
 func (e *EventParser) ParseGitlabMergeRequest(mr *gitlab.MergeRequest, baseRepo models.Repo) models.PullRequest {
 	pullState := models.ClosedPullState
 	if mr.State == gitlabPullOpened {
