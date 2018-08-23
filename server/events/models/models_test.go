@@ -60,19 +60,40 @@ func TestNewRepo_CloneURLBitbucketServer(t *testing.T) {
 }
 
 func TestNewRepo_FullNameWrongFormat(t *testing.T) {
-	cases := []string{
-		"owner/repo/extra",
-		"/",
-		"//",
-		"///",
-		"a/",
-		"/b",
+	cases := []struct {
+		repoFullName string
+		expErr       string
+	}{
+		{
+			"owner/repo/extra",
+			`invalid repo format "owner/repo/extra", owner "owner/repo" should not contain any /'s`,
+		},
+		{
+			"/",
+			`invalid repo format "/", owner "" or repo "" was empty`,
+		},
+		{
+			"//",
+			`invalid repo format "//", owner "" or repo "" was empty`,
+		},
+		{
+			"///",
+			`invalid repo format "///", owner "" or repo "" was empty`,
+		},
+		{
+			"a/",
+			`invalid repo format "a/", owner "" or repo "" was empty`,
+		},
+		{
+			"/b",
+			`invalid repo format "/b", owner "" or repo "b" was empty`,
+		},
 	}
 	for _, c := range cases {
-		t.Run(c, func(t *testing.T) {
-			cloneURL := fmt.Sprintf("https://github.com/%s.git", c)
-			_, err := models.NewRepo(models.Github, c, cloneURL, "u", "p")
-			ErrEquals(t, fmt.Sprintf(`invalid repo format "%s"`, c), err)
+		t.Run(c.repoFullName, func(t *testing.T) {
+			cloneURL := fmt.Sprintf("https://github.com/%s.git", c.repoFullName)
+			_, err := models.NewRepo(models.Github, c.repoFullName, cloneURL, "u", "p")
+			ErrEquals(t, c.expErr, err)
 		})
 	}
 }
@@ -179,6 +200,58 @@ func TestVCSHostType_ToString(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.exp, func(t *testing.T) {
 			Equals(t, c.exp, c.vcsType.String())
+		})
+	}
+}
+
+func TestSplitRepoFullName(t *testing.T) {
+	cases := []struct {
+		input    string
+		expOwner string
+		expRepo  string
+	}{
+		{
+			"owner/repo",
+			"owner",
+			"repo",
+		},
+		{
+			"group/subgroup/owner/repo",
+			"group/subgroup/owner",
+			"repo",
+		},
+		{
+			"",
+			"",
+			"",
+		},
+		{
+			"/",
+			"",
+			"",
+		},
+		{
+			"owner/",
+			"",
+			"",
+		},
+		{
+			"/repo",
+			"",
+			"repo",
+		},
+		{
+			"group/subgroup/",
+			"",
+			"",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.input, func(t *testing.T) {
+			owner, repo := models.SplitRepoFullName(c.input)
+			Equals(t, c.expOwner, owner)
+			Equals(t, c.expRepo, repo)
 		})
 	}
 }

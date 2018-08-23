@@ -31,11 +31,13 @@ import (
 // Repo is a VCS repository.
 type Repo struct {
 	// FullName is the owner and repo name separated
-	// by a "/", ex. "runatlantis/atlantis".
+	// by a "/", ex. "runatlantis/atlantis" or "gitlab/subgroup/atlantis"
 	FullName string
-	// Owner is just the repo owner, ex. "runatlantis".
+	// Owner is just the repo owner, ex. "runatlantis" or "gitlab/subgroup".
+	// This may contain /'s in the case of GitLab subgroups.
 	Owner string
-	// Name is just the repo name, ex. "atlantis".
+	// Name is just the repo name, ex. "atlantis". This will never have
+	// /'s in it.
 	Name string
 	// CloneURL is the full HTTPS url for cloning with username and token string
 	// ex. "https://username:token@github.com/atlantis/atlantis.git".
@@ -91,14 +93,18 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 	authedCloneURL = strings.Replace(authedCloneURL, "http://", "http://"+auth, -1)
 
 	// Get the owner and repo names from the full name.
-	var owner string
-	var repo string
-	pathSplit := strings.Split(repoFullName, "/")
-	if len(pathSplit) != 2 || pathSplit[0] == "" || pathSplit[1] == "" {
-		return Repo{}, fmt.Errorf("invalid repo format %q", repoFullName)
+	owner, repo := SplitRepoFullName(repoFullName)
+	if owner == "" || repo == "" {
+		return Repo{}, fmt.Errorf("invalid repo format %q, owner %q or repo %q was empty", repoFullName, owner, repo)
 	}
-	owner = pathSplit[0]
-	repo = pathSplit[1]
+	// Only GitLab repos can have /'s in their owners. This is for GitLab
+	// subgroups.
+	if strings.Contains(owner, "/") && vcsHostType != Gitlab {
+		return Repo{}, fmt.Errorf("invalid repo format %q, owner %q should not contain any /'s", repoFullName, owner)
+	}
+	if strings.Contains(repo, "/") {
+		return Repo{}, fmt.Errorf("invalid repo format %q, repo %q should not contain any /'s", repoFullName, owner)
+	}
 
 	return Repo{
 		FullName:          repoFullName,
@@ -294,4 +300,17 @@ type ProjectCommandContext struct {
 	// ApplyCmd is the command that users should run to apply this plan. If
 	// this is an apply then this will be empty.
 	ApplyCmd string
+}
+
+// SplitRepoFullName splits a repo full name up into its owner and repo name
+// segments. If the repoFullName is malformed, may return empty strings
+// for owner or repo.
+// Ex. runatlantis/atlantis => (runatlantis, atlantis)
+//     gitlab/subgroup/runatlantis/atlantis => (gitlab/subgroup/runatlantis, atlantis)
+func SplitRepoFullName(repoFullName string) (owner string, repo string) {
+	lastSlashIdx := strings.LastIndex(repoFullName, "/")
+	if lastSlashIdx == -1 || lastSlashIdx == len(repoFullName)-1 {
+		return "", ""
+	}
+	return repoFullName[:lastSlashIdx], repoFullName[lastSlashIdx+1:]
 }

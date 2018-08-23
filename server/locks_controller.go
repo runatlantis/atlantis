@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/runatlantis/atlantis/server/events"
@@ -48,13 +47,12 @@ func (l *LocksController) GetLock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract the repo owner and repo name.
-	repo := strings.Split(lock.Project.RepoFullName, "/")
+	owner, repo := models.SplitRepoFullName(lock.Project.RepoFullName)
 	viewData := LockDetailData{
 		LockKeyEncoded:  id,
 		LockKey:         idUnencoded,
-		RepoOwner:       repo[0],
-		RepoName:        repo[1],
+		RepoOwner:       owner,
+		RepoName:        repo,
 		PullRequestLink: lock.Pull.URL,
 		LockedBy:        lock.Pull.Author,
 		Workspace:       lock.Workspace,
