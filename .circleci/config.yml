@@ -17,7 +17,7 @@ jobs:
     docker:
     - image: circleci/golang:1.10
       environment:
-        TERRAFORM_VERSION: 0.11.7
+        TERRAFORM_VERSION: 0.11.8
     steps:
     - checkout
     - run: make build-service
