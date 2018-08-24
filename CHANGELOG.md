@@ -1,3 +1,30 @@
+# v0.4.7
+
+## Description
+Support GitLab repos nested under multiple levels and use the latest version of Terraform: 0.11.8!
+
+## Features
+* Support GitLab groups which allow repos to be nested under multiple levels,
+ex. `gitlab.com/owner/group/subgroup/subsubgroup/repo`
+* Use latest version of Terraform: 0.11.8 in Docker image
+
+## Bugfixes
+* When running with `TF_LOG` set, Atlantis will start normally. Previously it
+would error out due to attempting to parse the stderr output of the `terraform version`
+command.
+
+## Backwards Incompatibilities / Notes:
+None
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.7/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.7/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.7/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.7/atlantis_linux_arm.zip)
+
+## Docker
+`runatlantis/atlantis:v0.4.7`
+
 # v0.4.6
 
 ## Description
