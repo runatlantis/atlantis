@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package events
 
 import (
@@ -31,34 +31,46 @@ import (
 const gitlabPullOpened = "opened"
 const usagesCols = 90
 
-type CommandInterface interface {
+// PullCommand is a command to run on a pull request.
+type PullCommand interface {
+	// CommandName is the name of the command we're running.
 	CommandName() CommandName
+	// IsVerbose is true if the output of this command should be verbose.
 	IsVerbose() bool
+	// IsAutoplan is true if this is an autoplan command vs. a comment command.
 	IsAutoplan() bool
 }
 
+// AutoplanCommand is a plan command that is automatically triggered when a
+// pull request is opened or updated.
 type AutoplanCommand struct{}
 
+// CommandName is Plan.
 func (c AutoplanCommand) CommandName() CommandName {
 	return PlanCommand
 }
 
+// IsVerbose is false for autoplan commands.
 func (c AutoplanCommand) IsVerbose() bool {
 	return false
 }
 
+// IsAutoplan is true for autoplan commands (obviously).
 func (c AutoplanCommand) IsAutoplan() bool {
 	return true
 }
 
+// CommentCommand is a command that was triggered by a pull request comment.
 type CommentCommand struct {
 	// RepoRelDir is the path relative to the repo root to run the command in.
 	// Will never end in "/". If empty then the comment specified no directory.
 	RepoRelDir string
-	// CommentArgs are the extra arguments appended to comment,
+	// Flags are the extra arguments appended to the comment,
 	// ex. atlantis plan -- -target=resource
-	Flags   []string
-	Name    CommandName
+	Flags []string
+	// Name is the name of the command the comment specified.
+	Name CommandName
+	// Verbose is true if the command should output verbosely.
 	Verbose bool
 	// Workspace is the name of the Terraform workspace to run the command in.
 	// If empty then the comment specified no workspace.
@@ -76,18 +88,22 @@ func (c CommentCommand) IsForSpecificProject() bool {
 	return c.RepoRelDir != "" || c.Workspace != "" || c.ProjectName != ""
 }
 
+// CommandName returns the name of this command.
 func (c CommentCommand) CommandName() CommandName {
 	return c.Name
 }
 
+// IsVerbose is true if the command should give verbose output.
 func (c CommentCommand) IsVerbose() bool {
 	return c.Verbose
 }
 
+// IsAutoplan will be false for comment commands.
 func (c CommentCommand) IsAutoplan() bool {
 	return false
 }
 
+// String returns a string representation of the command.
 func (c CommentCommand) String() string {
 	return fmt.Sprintf("command=%q verbose=%t dir=%q workspace=%q project=%q flags=%q", c.Name.String(), c.Verbose, c.RepoRelDir, c.Workspace, c.ProjectName, strings.Join(c.Flags, ","))
 }
@@ -114,27 +130,113 @@ func NewCommentCommand(repoRelDir string, flags []string, name CommandName, verb
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_event_parsing.go EventParsing
 
+// EventParsing parses webhook events from different VCS hosts into their
+// respective Atlantis models.
+// todo: rename to VCSParsing or the like because this also parses API responses #refactor
 type EventParsing interface {
-	ParseGithubIssueCommentEvent(comment *github.IssueCommentEvent) (baseRepo models.Repo, user models.User, pullNum int, err error)
-	// ParseGithubPull returns the pull request, base repo and head repo.
-	ParseGithubPull(pull *github.PullRequest) (models.PullRequest, models.Repo, models.Repo, error)
-	// ParseGithubPullEvent returns the pull request, head repo and user that
-	// caused the event. Base repo is available as a field on PullRequest.
-	ParseGithubPullEvent(pullEvent *github.PullRequestEvent) (pull models.PullRequest, pullEventType models.PullRequestEventType, baseRepo models.Repo, headRepo models.Repo, user models.User, err error)
+	// ParseGithubIssueCommentEvent parses GitHub pull request comment events.
+	// baseRepo is the repo that the pull request will be merged into.
+	// user is the pull request author.
+	// pullNum is the number of the pull request that triggered the webhook.
+	ParseGithubIssueCommentEvent(comment *github.IssueCommentEvent) (
+		baseRepo models.Repo, user models.User, pullNum int, err error)
+
+	// ParseGithubPull parses the response from the GitHub API endpoint (not
+	// from a webhook) that returns a pull request.
+	// pull is the parsed pull request.
+	// baseRepo is the repo the pull request will be merged into.
+	// headRepo is the repo the pull request branch is from.
+	ParseGithubPull(ghPull *github.PullRequest) (
+		pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, err error)
+
+	// ParseGithubPullEvent parses GitHub pull request events.
+	// pull is the parsed pull request.
+	// pullEventType is the type of event, for example opened/closed.
+	// baseRepo is the repo the pull request will be merged into.
+	// headRepo is the repo the pull request branch is from.
+	// user is the pull request author.
+	ParseGithubPullEvent(pullEvent *github.PullRequestEvent) (
+		pull models.PullRequest, pullEventType models.PullRequestEventType,
+		baseRepo models.Repo, headRepo models.Repo, user models.User, err error)
+
+	// ParseGithubRepo parses the response from the GitHub API endpoint that
+	// returns a repo into the Atlantis model.
 	ParseGithubRepo(ghRepo *github.Repository) (models.Repo, error)
-	// ParseGitlabMergeEvent returns the pull request, base repo, head repo and
-	// user that caused the event.
-	ParseGitlabMergeEvent(event gitlab.MergeEvent) (pull models.PullRequest, pullEventType models.PullRequestEventType, baseRepo models.Repo, headRepo models.Repo, user models.User, err error)
-	ParseGitlabMergeCommentEvent(event gitlab.MergeCommentEvent) (baseRepo models.Repo, headRepo models.Repo, user models.User, err error)
+
+	// ParseGitlabMergeRequestEvent parses GitLab merge request events.
+	// pull is the parsed merge request.
+	// pullEventType is the type of event, for example opened/closed.
+	// baseRepo is the repo the merge request will be merged into.
+	// headRepo is the repo the merge request branch is from.
+	// user is the pull request author.
+	ParseGitlabMergeRequestEvent(event gitlab.MergeEvent) (
+		pull models.PullRequest, pullEventType models.PullRequestEventType,
+		baseRepo models.Repo, headRepo models.Repo, user models.User, err error)
+
+	// ParseGitlabMergeRequestCommentEvent parses GitLab merge request comment
+	// events.
+	// baseRepo is the repo the merge request will be merged into.
+	// headRepo is the repo the merge request branch is from.
+	// user is the pull request author.
+	ParseGitlabMergeRequestCommentEvent(event gitlab.MergeCommentEvent) (
+		baseRepo models.Repo, headRepo models.Repo, user models.User, err error)
+
+	// ParseGitlabMergeRequest parses the response from the GitLab API endpoint
+	// that returns a merge request.
 	ParseGitlabMergeRequest(mr *gitlab.MergeRequest, baseRepo models.Repo) models.PullRequest
-	ParseBitbucketCloudPullEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, err error)
-	ParseBitbucketCloudCommentEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, comment string, err error)
-	GetBitbucketCloudEventType(eventTypeHeader string) models.PullRequestEventType
-	ParseBitbucketServerPullEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, err error)
-	ParseBitbucketServerCommentEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, comment string, err error)
-	GetBitbucketServerEventType(eventTypeHeader string) models.PullRequestEventType
+
+	// ParseBitbucketCloudPullEvent parses a pull request event from Bitbucket
+	// Cloud (bitbucket.org).
+	// pull is the parsed pull request.
+	// baseRepo is the repo the pull request will be merged into.
+	// headRepo is the repo the pull request branch is from.
+	// user is the pull request author.
+	ParseBitbucketCloudPullEvent(body []byte) (
+		pull models.PullRequest, baseRepo models.Repo,
+		headRepo models.Repo, user models.User, err error)
+
+	// ParseBitbucketCloudPullCommentEvent parses a pull request comment event
+	// from Bitbucket Cloud (bitbucket.org).
+	// pull is the parsed pull request.
+	// baseRepo is the repo the pull request will be merged into.
+	// headRepo is the repo the pull request branch is from.
+	// user is the pull request author.
+	// comment is the comment that triggered the event.
+	ParseBitbucketCloudPullCommentEvent(body []byte) (
+		pull models.PullRequest, baseRepo models.Repo,
+		headRepo models.Repo, user models.User, comment string, err error)
+
+	// GetBitbucketCloudPullEventType returns the type of the pull request
+	// event given the Bitbucket Cloud header.
+	GetBitbucketCloudPullEventType(eventTypeHeader string) models.PullRequestEventType
+
+	// ParseBitbucketServerPullEvent parses a pull request event from Bitbucket
+	// Server.
+	// pull is the parsed pull request.
+	// baseRepo is the repo the pull request will be merged into.
+	// headRepo is the repo the pull request branch is from.
+	// user is the pull request author.
+	ParseBitbucketServerPullEvent(body []byte) (
+		pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo,
+		user models.User, err error)
+
+	// ParseBitbucketServerPullCommentEvent parses a pull request comment event
+	// from Bitbucket Server.
+	// pull is the parsed pull request.
+	// baseRepo is the repo the pull request will be merged into.
+	// headRepo is the repo the pull request branch is from.
+	// user is the pull request author.
+	// comment is the comment that triggered the event.
+	ParseBitbucketServerPullCommentEvent(body []byte) (
+		pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo,
+		user models.User, comment string, err error)
+
+	// GetBitbucketServerPullEventType returns the type of the pull request
+	// event given the Bitbucket Server header.
+	GetBitbucketServerPullEventType(eventTypeHeader string) models.PullRequestEventType
 }
 
+// EventParser parses VCS events.
 type EventParser struct {
 	GithubUser         string
 	GithubToken        string
@@ -145,9 +247,9 @@ type EventParser struct {
 	BitbucketServerURL string
 }
 
-// GetBitbucketCloudEventType translates the bitbucket header name into a pull
-// request event type.
-func (e *EventParser) GetBitbucketCloudEventType(eventTypeHeader string) models.PullRequestEventType {
+// GetBitbucketCloudPullEventType returns the type of the pull request
+// event given the Bitbucket Cloud header.
+func (e *EventParser) GetBitbucketCloudPullEventType(eventTypeHeader string) models.PullRequestEventType {
 	switch eventTypeHeader {
 	case bitbucketcloud.PullCreatedHeader:
 		return models.OpenedPullEvent
@@ -159,7 +261,10 @@ func (e *EventParser) GetBitbucketCloudEventType(eventTypeHeader string) models.
 	return models.OtherPullEvent
 }
 
-func (e *EventParser) ParseBitbucketCloudCommentEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, comment string, err error) {
+// ParseBitbucketCloudPullCommentEvent parses a pull request comment event
+// from Bitbucket Cloud (bitbucket.org).
+// See EventParsing for return value docs.
+func (e *EventParser) ParseBitbucketCloudPullCommentEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, comment string, err error) {
 	var event bitbucketcloud.CommentEvent
 	if err = json.Unmarshal(body, &event); err != nil {
 		err = errors.Wrap(err, "parsing json")
@@ -186,7 +291,7 @@ func (e *EventParser) parseCommonBitbucketCloudEventData(event bitbucketcloud.Co
 	case "DECLINE":
 		prState = models.ClosedPullState
 	default:
-		err = fmt.Errorf("unable to determine pull request state from %q, this is a bug!", *event.PullRequest.State)
+		err = fmt.Errorf("unable to determine pull request state from %q–this is a bug", *event.PullRequest.State)
 		return
 	}
 
@@ -224,6 +329,9 @@ func (e *EventParser) parseCommonBitbucketCloudEventData(event bitbucketcloud.Co
 	return
 }
 
+// ParseBitbucketCloudPullEvent parses a pull request event from Bitbucket
+// Cloud (bitbucket.org).
+// See EventParsing for return value docs.
 func (e *EventParser) ParseBitbucketCloudPullEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
 	var event bitbucketcloud.PullRequestEvent
 	if err = json.Unmarshal(body, &event); err != nil {
@@ -238,6 +346,8 @@ func (e *EventParser) ParseBitbucketCloudPullEvent(body []byte) (pull models.Pul
 	return
 }
 
+// ParseGithubIssueCommentEvent parses GitHub pull request comment events.
+// See EventParsing for return value docs.
 func (e *EventParser) ParseGithubIssueCommentEvent(comment *github.IssueCommentEvent) (baseRepo models.Repo, user models.User, pullNum int, err error) {
 	baseRepo, err = e.ParseGithubRepo(comment.Repo)
 	if err != nil {
@@ -259,6 +369,8 @@ func (e *EventParser) ParseGithubIssueCommentEvent(comment *github.IssueCommentE
 	return
 }
 
+// ParseGithubPullEvent parses GitHub pull request events.
+// See EventParsing for return value docs.
 func (e *EventParser) ParseGithubPullEvent(pullEvent *github.PullRequestEvent) (pull models.PullRequest, pullEventType models.PullRequestEventType, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
 	if pullEvent.PullRequest == nil {
 		err = errors.New("pull_request is null")
@@ -291,6 +403,9 @@ func (e *EventParser) ParseGithubPullEvent(pullEvent *github.PullRequestEvent) (
 	return
 }
 
+// ParseGithubPull parses the response from the GitHub API endpoint (not
+// from a webhook) that returns a pull request.
+// See EventParsing for return value docs.
 func (e *EventParser) ParseGithubPull(pull *github.PullRequest) (pullModel models.PullRequest, baseRepo models.Repo, headRepo models.Repo, err error) {
 	commit := pull.Head.GetSHA()
 	if commit == "" {
@@ -344,11 +459,17 @@ func (e *EventParser) ParseGithubPull(pull *github.PullRequest) (pullModel model
 	return
 }
 
+// ParseGithubRepo parses the response from the GitHub API endpoint that
+// returns a repo into the Atlantis model.
+// See EventParsing for return value docs.
 func (e *EventParser) ParseGithubRepo(ghRepo *github.Repository) (models.Repo, error) {
 	return models.NewRepo(models.Github, ghRepo.GetFullName(), ghRepo.GetCloneURL(), e.GithubUser, e.GithubToken)
 }
 
-func (e *EventParser) ParseGitlabMergeEvent(event gitlab.MergeEvent) (pull models.PullRequest, eventType models.PullRequestEventType, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
+// ParseGitlabMergeRequestEvent parses GitLab merge request events.
+// pull is the parsed merge request.
+// See EventParsing for return value docs.
+func (e *EventParser) ParseGitlabMergeRequestEvent(event gitlab.MergeEvent) (pull models.PullRequest, eventType models.PullRequestEventType, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
 	modelState := models.ClosedPullState
 	if event.ObjectAttributes.State == gitlabPullOpened {
 		modelState = models.OpenPullState
@@ -393,8 +514,10 @@ func (e *EventParser) ParseGitlabMergeEvent(event gitlab.MergeEvent) (pull model
 	return
 }
 
-// ParseGitlabMergeCommentEvent creates Atlantis models out of a GitLab event.
-func (e *EventParser) ParseGitlabMergeCommentEvent(event gitlab.MergeCommentEvent) (baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
+// ParseGitlabMergeRequestCommentEvent parses GitLab merge request comment
+// events.
+// See EventParsing for return value docs.
+func (e *EventParser) ParseGitlabMergeRequestCommentEvent(event gitlab.MergeCommentEvent) (baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
 	// Parse the base repo first.
 	repoFullName := event.Project.PathWithNamespace
 	cloneURL := event.Project.GitHTTPURL
@@ -436,7 +559,9 @@ func (e *EventParser) ParseGitlabMergeRequest(mr *gitlab.MergeRequest, baseRepo 
 	}
 }
 
-func (e *EventParser) GetBitbucketServerEventType(eventTypeHeader string) models.PullRequestEventType {
+// GetBitbucketServerPullEventType returns the type of the pull request
+// event given the Bitbucket Server header.
+func (e *EventParser) GetBitbucketServerPullEventType(eventTypeHeader string) models.PullRequestEventType {
 	switch eventTypeHeader {
 	case bitbucketserver.PullCreatedHeader:
 		return models.OpenedPullEvent
@@ -446,7 +571,10 @@ func (e *EventParser) GetBitbucketServerEventType(eventTypeHeader string) models
 	return models.OtherPullEvent
 }
 
-func (e *EventParser) ParseBitbucketServerCommentEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, comment string, err error) {
+// ParseBitbucketServerPullCommentEvent parses a pull request comment event
+// from Bitbucket Server.
+// See EventParsing for return value docs.
+func (e *EventParser) ParseBitbucketServerPullCommentEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, comment string, err error) {
 	var event bitbucketserver.CommentEvent
 	if err = json.Unmarshal(body, &event); err != nil {
 		err = errors.Wrap(err, "parsing json")
@@ -471,7 +599,7 @@ func (e *EventParser) parseCommonBitbucketServerEventData(event bitbucketserver.
 	case "DECLINED":
 		prState = models.ClosedPullState
 	default:
-		err = fmt.Errorf("unable to determine pull request state from %q, this is a bug!", *event.PullRequest.State)
+		err = fmt.Errorf("unable to determine pull request state from %q–this is a bug", *event.PullRequest.State)
 		return
 	}
 
@@ -516,6 +644,9 @@ func (e *EventParser) parseCommonBitbucketServerEventData(event bitbucketserver.
 	return
 }
 
+// ParseBitbucketServerPullEvent parses a pull request event from Bitbucket
+// Server.
+// See EventParsing for return value docs.
 func (e *EventParser) ParseBitbucketServerPullEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
 	var event bitbucketserver.PullRequestEvent
 	if err = json.Unmarshal(body, &event); err != nil {

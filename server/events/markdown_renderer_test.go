@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package events_test
 
 import (
@@ -132,13 +132,11 @@ func TestRenderProjectResults(t *testing.T) {
 			events.PlanCommand,
 			[]events.ProjectResult{
 				{
-					ProjectCommandResult: events.ProjectCommandResult{
-						PlanSuccess: &events.PlanSuccess{
-							TerraformOutput: "terraform-output",
-							LockURL:         "lock-url",
-							RePlanCmd:       "atlantis plan -d path -w workspace",
-							ApplyCmd:        "atlantis apply -d path -w workspace",
-						},
+					PlanSuccess: &events.PlanSuccess{
+						TerraformOutput: "terraform-output",
+						LockURL:         "lock-url",
+						RePlanCmd:       "atlantis plan -d path -w workspace",
+						ApplyCmd:        "atlantis apply -d path -w workspace",
 					},
 					Workspace:  "workspace",
 					RepoRelDir: "path",
@@ -166,11 +164,9 @@ $$$
 			events.ApplyCommand,
 			[]events.ProjectResult{
 				{
-					ProjectCommandResult: events.ProjectCommandResult{
-						ApplySuccess: "success",
-					},
-					Workspace:  "workspace",
-					RepoRelDir: "path",
+					ApplySuccess: "success",
+					Workspace:    "workspace",
+					RepoRelDir:   "path",
 				},
 			},
 			`Ran Apply in dir: $path$ workspace: $workspace$
@@ -188,25 +184,21 @@ $$$
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					ProjectCommandResult: events.ProjectCommandResult{
-						PlanSuccess: &events.PlanSuccess{
-							TerraformOutput: "terraform-output",
-							LockURL:         "lock-url",
-							ApplyCmd:        "atlantis apply -d path -w workspace",
-							RePlanCmd:       "atlantis plan -d path -w workspace",
-						},
+					PlanSuccess: &events.PlanSuccess{
+						TerraformOutput: "terraform-output",
+						LockURL:         "lock-url",
+						ApplyCmd:        "atlantis apply -d path -w workspace",
+						RePlanCmd:       "atlantis plan -d path -w workspace",
 					},
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path2",
-					ProjectCommandResult: events.ProjectCommandResult{
-						PlanSuccess: &events.PlanSuccess{
-							TerraformOutput: "terraform-output2",
-							LockURL:         "lock-url2",
-							ApplyCmd:        "atlantis apply -d path2 -w workspace",
-							RePlanCmd:       "atlantis plan -d path2 -w workspace",
-						},
+					PlanSuccess: &events.PlanSuccess{
+						TerraformOutput: "terraform-output2",
+						LockURL:         "lock-url2",
+						ApplyCmd:        "atlantis apply -d path2 -w workspace",
+						RePlanCmd:       "atlantis plan -d path2 -w workspace",
 					},
 				},
 			},
@@ -245,18 +237,14 @@ $$$
 			events.ApplyCommand,
 			[]events.ProjectResult{
 				{
-					RepoRelDir: "path",
-					Workspace:  "workspace",
-					ProjectCommandResult: events.ProjectCommandResult{
-						ApplySuccess: "success",
-					},
+					RepoRelDir:   "path",
+					Workspace:    "workspace",
+					ApplySuccess: "success",
 				},
 				{
-					RepoRelDir: "path2",
-					Workspace:  "workspace",
-					ProjectCommandResult: events.ProjectCommandResult{
-						ApplySuccess: "success2",
-					},
+					RepoRelDir:   "path2",
+					Workspace:    "workspace",
+					ApplySuccess: "success2",
 				},
 			},
 			`Ran Apply for 2 projects:
@@ -281,9 +269,7 @@ $$$
 			events.PlanCommand,
 			[]events.ProjectResult{
 				{
-					ProjectCommandResult: events.ProjectCommandResult{
-						Error: errors.New("error"),
-					},
+					Error:      errors.New("error"),
 					RepoRelDir: "path",
 					Workspace:  "workspace",
 				},
@@ -305,9 +291,7 @@ $$$
 				{
 					RepoRelDir: "path",
 					Workspace:  "workspace",
-					ProjectCommandResult: events.ProjectCommandResult{
-						Failure: "failure",
-					},
+					Failure:    "failure",
 				},
 			},
 			`Ran Plan in dir: $path$ workspace: $workspace$
@@ -324,28 +308,22 @@ $$$
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					ProjectCommandResult: events.ProjectCommandResult{
-						PlanSuccess: &events.PlanSuccess{
-							TerraformOutput: "terraform-output",
-							LockURL:         "lock-url",
-							ApplyCmd:        "atlantis apply -d path -w workspace",
-							RePlanCmd:       "atlantis plan -d path -w workspace",
-						},
+					PlanSuccess: &events.PlanSuccess{
+						TerraformOutput: "terraform-output",
+						LockURL:         "lock-url",
+						ApplyCmd:        "atlantis apply -d path -w workspace",
+						RePlanCmd:       "atlantis plan -d path -w workspace",
 					},
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path2",
-					ProjectCommandResult: events.ProjectCommandResult{
-						Failure: "failure",
-					},
+					Failure:    "failure",
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path3",
-					ProjectCommandResult: events.ProjectCommandResult{
-						Error: errors.New("error"),
-					},
+					Error:      errors.New("error"),
 				},
 			},
 			`Ran Plan for 3 projects:
@@ -384,25 +362,19 @@ $$$
 			events.ApplyCommand,
 			[]events.ProjectResult{
 				{
-					Workspace:  "workspace",
-					RepoRelDir: "path",
-					ProjectCommandResult: events.ProjectCommandResult{
-						ApplySuccess: "success",
-					},
+					Workspace:    "workspace",
+					RepoRelDir:   "path",
+					ApplySuccess: "success",
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path2",
-					ProjectCommandResult: events.ProjectCommandResult{
-						Failure: "failure",
-					},
+					Failure:    "failure",
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path3",
-					ProjectCommandResult: events.ProjectCommandResult{
-						Error: errors.New("error"),
-					},
+					Error:      errors.New("error"),
 				},
 			},
 			`Ran Apply for 3 projects:

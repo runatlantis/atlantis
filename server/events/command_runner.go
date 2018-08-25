@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package events
 
 import (
@@ -71,6 +71,7 @@ type DefaultCommandRunner struct {
 	ProjectCommandRunner  ProjectCommandRunner
 }
 
+// RunAutoplanCommand runs plan when a pull request is opened or updated.
 func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) {
 	log := c.buildLogger(baseRepo.FullName, pull.Num)
 	ctx := &CommandContext{
@@ -126,11 +127,11 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		pull, err = c.getGitlabData(baseRepo, pullNum)
 	case models.BitbucketCloud, models.BitbucketServer:
 		if maybePull == nil {
-			err = errors.New("pull request should not be nil, this is a bug!")
+			err = errors.New("pull request should not be nil–this is a bug")
 		}
 		pull = *maybePull
 	default:
-		err = errors.New("Unknown VCS type, this is a bug!")
+		err = errors.New("Unknown VCS type–this is a bug")
 	}
 	if err != nil {
 		log.Err(err.Error())
@@ -239,7 +240,7 @@ func (c *DefaultCommandRunner) validateCtxAndComment(ctx *CommandContext) bool {
 	return true
 }
 
-func (c *DefaultCommandRunner) updatePull(ctx *CommandContext, command CommandInterface, res CommandResult) {
+func (c *DefaultCommandRunner) updatePull(ctx *CommandContext, command PullCommand, res CommandResult) {
 	// Log if we got any errors or failures.
 	if res.Error != nil {
 		ctx.Log.Err(res.Error.Error())

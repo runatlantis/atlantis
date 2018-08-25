@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package events
 
 import (
@@ -27,15 +27,15 @@ import (
 )
 
 const (
-	WorkspaceFlagLong  = "workspace"
-	WorkspaceFlagShort = "w"
-	DirFlagLong        = "dir"
-	DirFlagShort       = "d"
-	ProjectFlagLong    = "project"
-	ProjectFlagShort   = "p"
-	VerboseFlagLong    = "verbose"
-	VerboseFlagShort   = ""
-	AtlantisExecutable = "atlantis"
+	workspaceFlagLong  = "workspace"
+	workspaceFlagShort = "w"
+	dirFlagLong        = "dir"
+	dirFlagShort       = "d"
+	projectFlagLong    = "project"
+	projectFlagShort   = "p"
+	verboseFlagLong    = "verbose"
+	verboseFlagShort   = ""
+	atlantisExecutable = "atlantis"
 )
 
 // multiLineRegex is used to ignore multi-line comments since those aren't valid
@@ -121,7 +121,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	if vcsHost == models.Gitlab {
 		vcsUser = e.GitlabUser
 	}
-	executableNames := []string{"run", AtlantisExecutable, "@" + vcsUser}
+	executableNames := []string{"run", atlantisExecutable, "@" + vcsUser}
 
 	// If the comment doesn't start with the name of our 'executable' then
 	// ignore it.
@@ -160,18 +160,18 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		name = PlanCommand
 		flagSet = pflag.NewFlagSet(PlanCommand.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(ioutil.Discard)
-		flagSet.StringVarP(&workspace, WorkspaceFlagLong, WorkspaceFlagShort, "", "Switch to this Terraform workspace before planning.")
-		flagSet.StringVarP(&dir, DirFlagLong, DirFlagShort, "", "Which directory to run plan in relative to root of repo, ex. 'child/dir'.")
-		flagSet.StringVarP(&project, ProjectFlagLong, ProjectFlagShort, "", fmt.Sprintf("Which project to run plan for. Refers to the name of the project configured in %s. Cannot be used at same time as workspace or dir flags.", yaml.AtlantisYAMLFilename))
-		flagSet.BoolVarP(&verbose, VerboseFlagLong, VerboseFlagShort, false, "Append Atlantis log to comment.")
+		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Switch to this Terraform workspace before planning.")
+		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run plan in relative to root of repo, ex. 'child/dir'.")
+		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", fmt.Sprintf("Which project to run plan for. Refers to the name of the project configured in %s. Cannot be used at same time as workspace or dir flags.", yaml.AtlantisYAMLFilename))
+		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 	case ApplyCommand.String():
 		name = ApplyCommand
 		flagSet = pflag.NewFlagSet(ApplyCommand.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(ioutil.Discard)
-		flagSet.StringVarP(&workspace, WorkspaceFlagLong, WorkspaceFlagShort, "", "Apply the plan for this Terraform workspace.")
-		flagSet.StringVarP(&dir, DirFlagLong, DirFlagShort, "", "Apply the plan for this directory, relative to root of repo, ex. 'child/dir'.")
-		flagSet.StringVarP(&project, ProjectFlagLong, ProjectFlagShort, "", fmt.Sprintf("Apply the plan for this project. Refers to the name of the project configured in %s. Cannot be used at same time as workspace or dir flags.", yaml.AtlantisYAMLFilename))
-		flagSet.BoolVarP(&verbose, VerboseFlagLong, VerboseFlagShort, false, "Append Atlantis log to comment.")
+		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Apply the plan for this Terraform workspace.")
+		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Apply the plan for this directory, relative to root of repo, ex. 'child/dir'.")
+		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", fmt.Sprintf("Apply the plan for this project. Refers to the name of the project configured in %s. Cannot be used at same time as workspace or dir flags.", yaml.AtlantisYAMLFilename))
+		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 	default:
 		return CommentParseResult{CommentResponse: fmt.Sprintf("Error: unknown command %q – this is a bug", command)}
 	}
@@ -224,7 +224,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	// don't detect, ex. atlantis plan -p project -d . -w default won't cause
 	// an error.
 	if project != "" && (workspace != "" || dir != "") {
-		err := fmt.Sprintf("cannot use -%s/--%s at same time as -%s/--%s or -%s/--%s", ProjectFlagShort, ProjectFlagLong, DirFlagShort, DirFlagLong, WorkspaceFlagShort, WorkspaceFlagLong)
+		err := fmt.Sprintf("cannot use -%s/--%s at same time as -%s/--%s or -%s/--%s", projectFlagShort, projectFlagLong, dirFlagShort, dirFlagLong, workspaceFlagShort, workspaceFlagLong)
 		return CommentParseResult{CommentResponse: e.errMarkdown(err, command, flagSet)}
 	}
 
@@ -246,33 +246,33 @@ func (e *CommentParser) BuildPlanComment(repoRelDir string, workspace string, pr
 		}
 		commentFlags = fmt.Sprintf(" -- %s", strings.Join(flagsWithoutQuotes, " "))
 	}
-	return fmt.Sprintf("%s %s%s%s", AtlantisExecutable, PlanCommand.String(), flags, commentFlags)
+	return fmt.Sprintf("%s %s%s%s", atlantisExecutable, PlanCommand.String(), flags, commentFlags)
 }
 
 // BuildApplyComment builds an apply comment for the specified args.
 func (e *CommentParser) BuildApplyComment(repoRelDir string, workspace string, project string) string {
 	flags := e.buildFlags(repoRelDir, workspace, project)
-	return fmt.Sprintf("%s %s%s", AtlantisExecutable, ApplyCommand.String(), flags)
+	return fmt.Sprintf("%s %s%s", atlantisExecutable, ApplyCommand.String(), flags)
 }
 
 func (e *CommentParser) buildFlags(repoRelDir string, workspace string, project string) string {
 	switch {
 	// If project is specified we can just use its name.
 	case project != "":
-		return fmt.Sprintf(" -%s %s", ProjectFlagShort, project)
+		return fmt.Sprintf(" -%s %s", projectFlagShort, project)
 		// If it's the root and default workspace then we just need to specify one
 		// of the flags and the other will get defaulted.
 	case repoRelDir == DefaultRepoRelDir && workspace == DefaultWorkspace:
-		return fmt.Sprintf(" -%s %s", DirFlagShort, DefaultRepoRelDir)
+		return fmt.Sprintf(" -%s %s", dirFlagShort, DefaultRepoRelDir)
 		// If dir is the default then we just need to specify workspace.
 	case repoRelDir == DefaultRepoRelDir:
-		return fmt.Sprintf(" -%s %s", WorkspaceFlagShort, workspace)
+		return fmt.Sprintf(" -%s %s", workspaceFlagShort, workspace)
 		// If workspace is the default then we just need to specify the dir.
 	case workspace == DefaultWorkspace:
-		return fmt.Sprintf(" -%s %s", DirFlagShort, repoRelDir)
+		return fmt.Sprintf(" -%s %s", dirFlagShort, repoRelDir)
 		// Otherwise we have to specify both flags.
 	default:
-		return fmt.Sprintf(" -%s %s -%s %s", DirFlagShort, repoRelDir, WorkspaceFlagShort, workspace)
+		return fmt.Sprintf(" -%s %s -%s %s", dirFlagShort, repoRelDir, workspaceFlagShort, workspace)
 	}
 }
 
@@ -288,7 +288,7 @@ func (e *CommentParser) validateDir(dir string) (string, error) {
 	validatedDir = filepath.Clean(validatedDir)
 	// Detect relative dirs since they're not allowed.
 	if strings.HasPrefix(validatedDir, "..") {
-		return "", fmt.Errorf("using a relative path %q with -%s/--%s is not allowed", dir, DirFlagShort, DirFlagLong)
+		return "", fmt.Errorf("using a relative path %q with -%s/--%s is not allowed", dir, dirFlagShort, dirFlagLong)
 	}
 
 	return validatedDir, nil
@@ -307,6 +307,8 @@ func (e *CommentParser) errMarkdown(errMsg string, command string, flagSet *pfla
 	return fmt.Sprintf("```\nError: %s.\nUsage of %s:\n%s```", errMsg, command, flagSet.FlagUsagesWrapped(usagesCols))
 }
 
+// HelpComment is the comment we add to the pull request when someone runs
+// `atlantis help`.
 var HelpComment = "```cmake\n" +
 	`atlantis
 Terraform For Teams
@@ -337,4 +339,6 @@ Flags:
 Use "atlantis [command] --help" for more information about a command.
 `
 
+// DidYouMeanAtlantisComment is the comment we add to the pull request when
+// someone runs a command with terraform instead of atlantis.
 var DidYouMeanAtlantisComment = "Did you mean to use `atlantis` instead of `terraform`?"
