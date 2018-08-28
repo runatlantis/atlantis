@@ -372,7 +372,7 @@ func (s *Server) Start() error {
 
 	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n}
 	go func() {
-		s.Logger.Warn("Atlantis started - listening on port %v", s.Port)
+		s.Logger.Info("Atlantis started - listening on port %v", s.Port)
 
 		var err error
 		if s.SSLCertFile != "" && s.SSLKeyFile != "" {
