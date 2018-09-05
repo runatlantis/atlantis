@@ -16,11 +16,7 @@ metadata:
 spec:
 {{- if .Values.ingress.tls }}
   tls:
-  {{- range .Values.ingress.tls }}
-    - hosts:
-        - {{ .Values.ingress.host }}
-      secretName: {{ .secretName }}
-  {{- end }}
+{{ toYaml .Values.ingress.tls | indent 4 }}
 {{- end }}
   rules:
     - host: {{ .Values.ingress.host }}
@@ -29,5 +25,5 @@ spec:
           - path: {{ .Values.ingress.path }}
             backend:
               serviceName: {{ $fullName }}
-              servicePort: atlantis
+              servicePort: 4141
 {{- end }}

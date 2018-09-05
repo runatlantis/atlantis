@@ -6,65 +6,15 @@
 ##   if not using an ingress, set it to the external IP.
 # atlantisUrl: http://10.0.0.0
 
-## set these based on instructions for VCS.
-##   https://www.runatlantis.io/docs/deployment.html#add-webhook
-webhook:
-  token:
-  secret:
-
-## Replace this with your own repo whitelist.
+## Replace this with your own repo whitelist:
 orgWhitelist: github.com/yourorg/*
 
-## Based on which VCS you use, set the values accordingly.
-vcsUserSetup: {}
-  # ### GitHub Config ###
-  # atlantisGithubUser:
-  #   name: ATLANTIS_GH_USER
-  #   value: <YOUR_GITHUB_USER> # 3i. If you're using GitHub replace <YOUR_GITHUB_USER> with the username of your Atlantis GitHub user without the `@`.
-  # atlantisGithubToken:
-  #   name: ATLANTIS_GH_TOKEN
-  #   valueFrom:
-  #     secretKeyRef:
-  #       name: atlantis-webhook
-  #       key: token
-  # atlantisGithubWebhookSecret:
-  #   name: ATLANTIS_GH_WEBHOOK_SECRET
-  #   valueFrom:
-  #     secretKeyRef:
-  #       name: atlantis-webhook
-  #       key: webhook-secret
-  # ### -------------- ###
-
-  # ### GitLab Config ###
-  # atlantisGitLabUser:
-  #   name: ATLANTIS_GITLAB_USER
-  #   value: <YOUR_GITLAB_USER> # 4i. If you're using GitLab replace <YOUR_GITLAB_USER> with the username of your Atlantis GitLab user without the `@`.
-  # atlantisGitLabToken:
-  #   name: ATLANTIS_GITLAB_TOKEN
-  #   valueFrom:
-  #     secretKeyRef:
-  #       name: atlantis-webhook
-  #       key: token
-  # atlantisWebhookSecret:
-  #   name: ATLANTIS_GITLAB_WEBHOOK_SECRET
-  #   valueFrom:
-  #     secretKeyRef:
-  #       name: atlantis-webhook
-  #       key: webhook-secret
-  # ### -------------- ###
-
-  # ### Bitbucket Config ###
-  # atlantis_bitbucket_user:
-  #   name: ATLANTIS_BITBUCKET_USER
-  #   value: <YOUR_BITBUCKET_USER> # 5i. If you're using Bitbucket replace <YOUR_BITBUCKET_USER> with the username of your Atlantis Bitbucket user without the `@`.
-  # atlantis_bitbucket_token:
-  #   name: ATLANTIS_BITBUCKET_TOKEN
-  #   valueFrom:
-  #     secretKeyRef:
-  #       name: atlantis-webhook
-  #       key: token
-  # ### -------------- ###
-
+# If using GitLab, specify like the following:
+# gitlab:
+#   user: foo
+#   token: bar
+#   secret: baz
+gitlab: {}
 
 ## To be used for mounting credential files (when using google provider).
 serviceAccountSecrets:

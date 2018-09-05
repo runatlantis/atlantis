@@ -36,8 +36,8 @@ spec:
             - --allow-repo-config
           {{- end }}
           ports:
-            - name: atlantis
-              containerPort: 4141
+          - name: atlantis
+            containerPort: 4141
           env:
           - name: ATLANTIS_REPO_WHITELIST
             value: {{ .Values.orgWhitelist }}
@@ -50,15 +50,20 @@ spec:
           - name: ATLANTIS_ATLANTIS_URL
             value: http://{{ .Values.ingress.host }}
           {{- end }}
-          {{- range $vcsEnvVar := .Values.vcsUserSetup }}
-          - name: {{ $vcsEnvVar.name }}
-            {{- if $vcsEnvVar.valueFrom }}
+          {{- if .Values.gitlab }}
+          - name: ATLANTIS_GITLAB_USER
+            value: {{ required "gitlab.user is required if gitlab configuration is specified." .Values.gitlab.user }}
+          - name: ATLANTIS_GITLAB_TOKEN
             valueFrom:
-{{ toYaml $vcsEnvVar.valueFrom | indent 14 }}
-            {{- else }}
-            value: {{ $vcsEnvVar.value | quote }}
-            {{- end -}}
-          {{- end }}
+              secretKeyRef:
+                name: {{ template "atlantis.name" . }}-webhook
+                key: gitlab_token
+          - name: ATLANTIS_GITLAB_WEBHOOK_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: {{ template "atlantis.name" . }}-webhook
+                key: gitlab_secret
+          {{- end}}
           {{- if .Values.livenessProbe.enabled }}
           livenessProbe:
             httpGet:

@@ -9,3 +9,4 @@ output
 .terraform/
 node_modules/
 **/.vuepress/dist
+helm/test-values.yaml
