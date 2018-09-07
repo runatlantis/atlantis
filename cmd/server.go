@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package cmd
 
 import (
@@ -67,8 +67,8 @@ const (
 	DefaultPort             = 4141
 )
 
-const RedTermStart = "\033[31m"
-const RedTermEnd = "\033[39m"
+const redTermStart = "\033[31m"
+const redTermEnd = "\033[39m"
 
 var stringFlags = []stringFlag{
 	{
@@ -458,16 +458,16 @@ func (s *ServerCmd) trimAtSymbolFromUsers(userConfig *server.UserConfig) {
 
 func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 	if userConfig.GithubUser != "" && userConfig.GithubWebhookSecret == "" && !s.SilenceOutput {
-		fmt.Fprintf(os.Stderr, "%s[WARN] No GitHub webhook secret set. This could allow attackers to spoof requests from GitHub.%s\n", RedTermStart, RedTermEnd)
+		fmt.Fprintf(os.Stderr, "%s[WARN] No GitHub webhook secret set. This could allow attackers to spoof requests from GitHub.%s\n", redTermStart, redTermEnd)
 	}
 	if userConfig.GitlabUser != "" && userConfig.GitlabWebhookSecret == "" && !s.SilenceOutput {
-		fmt.Fprintf(os.Stderr, "%s[WARN] No GitLab webhook secret set. This could allow attackers to spoof requests from GitLab.%s\n", RedTermStart, RedTermEnd)
+		fmt.Fprintf(os.Stderr, "%s[WARN] No GitLab webhook secret set. This could allow attackers to spoof requests from GitLab.%s\n", redTermStart, redTermEnd)
 	}
 	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL != DefaultBitbucketBaseURL && userConfig.BitbucketWebhookSecret == "" && !s.SilenceOutput {
-		fmt.Fprintf(os.Stderr, "%s[WARN] No Bitbucket webhook secret set. This could allow attackers to spoof requests from Bitbucket.%s\n", RedTermStart, RedTermEnd)
+		fmt.Fprintf(os.Stderr, "%s[WARN] No Bitbucket webhook secret set. This could allow attackers to spoof requests from Bitbucket.%s\n", redTermStart, redTermEnd)
 	}
 	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && !s.SilenceOutput {
-		fmt.Fprintf(os.Stderr, "%s[WARN] Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are whitelisting Bitbucket IPs.%s\n", RedTermStart, RedTermEnd)
+		fmt.Fprintf(os.Stderr, "%s[WARN] Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are whitelisting Bitbucket IPs.%s\n", redTermStart, redTermEnd)
 	}
 }
 
@@ -476,7 +476,7 @@ func (s *ServerCmd) withErrPrint(f func(*cobra.Command, []string) error) func(*c
 	return func(cmd *cobra.Command, args []string) error {
 		err := f(cmd, args)
 		if err != nil && !s.SilenceOutput {
-			fmt.Fprintf(os.Stderr, "%s[ERROR] %s%s\n\n", RedTermStart, err.Error(), RedTermEnd)
+			fmt.Fprintf(os.Stderr, "%s[ERROR] %s%s\n\n", redTermStart, err.Error(), redTermEnd)
 		}
 		return err
 	}

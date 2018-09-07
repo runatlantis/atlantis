@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package server
 
 import (
@@ -145,7 +145,7 @@ func (e *EventsController) handleBitbucketCloudPost(w http.ResponseWriter, r *ht
 	switch eventType {
 	case bitbucketcloud.PullCreatedHeader, bitbucketcloud.PullUpdatedHeader, bitbucketcloud.PullFulfilledHeader, bitbucketcloud.PullRejectedHeader:
 		e.Logger.Debug("handling as pull request state changed event")
-		e.HandleBitbucketCloudPullRequestEvent(w, eventType, body, reqID)
+		e.handleBitbucketCloudPullRequestEvent(w, eventType, body, reqID)
 		return
 	case bitbucketcloud.PullCommentCreatedHeader:
 		e.Logger.Debug("handling as comment created event")
@@ -175,7 +175,7 @@ func (e *EventsController) handleBitbucketServerPost(w http.ResponseWriter, r *h
 	switch eventType {
 	case bitbucketserver.PullCreatedHeader, bitbucketserver.PullMergedHeader, bitbucketserver.PullDeclinedHeader:
 		e.Logger.Debug("handling as pull request state changed event")
-		e.HandleBitbucketServerPullRequestEvent(w, eventType, body, reqID)
+		e.handleBitbucketServerPullRequestEvent(w, eventType, body, reqID)
 		return
 	case bitbucketserver.PullCommentCreatedHeader:
 		e.Logger.Debug("handling as comment created event")
@@ -207,7 +207,7 @@ func (e *EventsController) HandleGithubCommentEvent(w http.ResponseWriter, event
 
 // HandleBitbucketCloudCommentEvent handles comment events from Bitbucket.
 func (e *EventsController) HandleBitbucketCloudCommentEvent(w http.ResponseWriter, body []byte, reqID string) {
-	pull, baseRepo, headRepo, user, comment, err := e.Parser.ParseBitbucketCloudCommentEvent(body)
+	pull, baseRepo, headRepo, user, comment, err := e.Parser.ParseBitbucketCloudPullCommentEvent(body)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
 		return
@@ -217,7 +217,7 @@ func (e *EventsController) HandleBitbucketCloudCommentEvent(w http.ResponseWrite
 
 // HandleBitbucketServerCommentEvent handles comment events from Bitbucket.
 func (e *EventsController) HandleBitbucketServerCommentEvent(w http.ResponseWriter, body []byte, reqID string) {
-	pull, baseRepo, headRepo, user, comment, err := e.Parser.ParseBitbucketServerCommentEvent(body)
+	pull, baseRepo, headRepo, user, comment, err := e.Parser.ParseBitbucketServerPullCommentEvent(body)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
 		return
@@ -225,24 +225,24 @@ func (e *EventsController) HandleBitbucketServerCommentEvent(w http.ResponseWrit
 	e.handleCommentEvent(w, baseRepo, &headRepo, &pull, user, pull.Num, comment, models.BitbucketCloud)
 }
 
-func (e *EventsController) HandleBitbucketCloudPullRequestEvent(w http.ResponseWriter, eventType string, body []byte, reqID string) {
+func (e *EventsController) handleBitbucketCloudPullRequestEvent(w http.ResponseWriter, eventType string, body []byte, reqID string) {
 	pull, baseRepo, headRepo, user, err := e.Parser.ParseBitbucketCloudPullEvent(body)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
 		return
 	}
-	pullEventType := e.Parser.GetBitbucketCloudEventType(eventType)
+	pullEventType := e.Parser.GetBitbucketCloudPullEventType(eventType)
 	e.Logger.Info("identified event as type %q", pullEventType.String())
 	e.handlePullRequestEvent(w, baseRepo, headRepo, pull, user, pullEventType)
 }
 
-func (e *EventsController) HandleBitbucketServerPullRequestEvent(w http.ResponseWriter, eventType string, body []byte, reqID string) {
+func (e *EventsController) handleBitbucketServerPullRequestEvent(w http.ResponseWriter, eventType string, body []byte, reqID string) {
 	pull, baseRepo, headRepo, user, err := e.Parser.ParseBitbucketServerPullEvent(body)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s=%s", err, bitbucketServerRequestIDHeader, reqID)
 		return
 	}
-	pullEventType := e.Parser.GetBitbucketServerEventType(eventType)
+	pullEventType := e.Parser.GetBitbucketServerPullEventType(eventType)
 	e.Logger.Info("identified event as type %q", pullEventType.String())
 	e.handlePullRequestEvent(w, baseRepo, headRepo, pull, user, pullEventType)
 }
@@ -331,7 +331,7 @@ func (e *EventsController) handleGitlabPost(w http.ResponseWriter, r *http.Reque
 // commands can come from. It's exported to make testing easier.
 func (e *EventsController) HandleGitlabCommentEvent(w http.ResponseWriter, event gitlab.MergeCommentEvent) {
 	// todo: can gitlab return the pull request here too?
-	baseRepo, headRepo, user, err := e.Parser.ParseGitlabMergeCommentEvent(event)
+	baseRepo, headRepo, user, err := e.Parser.ParseGitlabMergeRequestCommentEvent(event)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing webhook: %s", err)
 		return
@@ -389,7 +389,7 @@ func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo mo
 // request if the event is a merge request closed event. It's exported to make
 // testing easier.
 func (e *EventsController) HandleGitlabMergeRequestEvent(w http.ResponseWriter, event gitlab.MergeEvent) {
-	pull, pullEventType, baseRepo, headRepo, user, err := e.Parser.ParseGitlabMergeEvent(event)
+	pull, pullEventType, baseRepo, headRepo, user, err := e.Parser.ParseGitlabMergeRequestEvent(event)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing webhook: %s", err)
 		return

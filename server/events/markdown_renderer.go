@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package events
 
 import (
@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	PlanCommandTitle  = "Plan"
-	ApplyCommandTitle = "Apply"
+	planCommandTitle  = "Plan"
+	applyCommandTitle = "Apply"
 )
 
 // MarkdownRenderer renders responses as markdown.
@@ -51,11 +51,11 @@ type FailureData struct {
 
 // ResultData is data about a successful response.
 type ResultData struct {
-	Results []ProjectResultTmplData
+	Results []projectResultTmplData
 	CommonData
 }
 
-type ProjectResultTmplData struct {
+type projectResultTmplData struct {
 	Workspace  string
 	RepoRelDir string
 	Rendered   string
@@ -76,11 +76,11 @@ func (m *MarkdownRenderer) Render(res CommandResult, cmdName CommandName, log st
 }
 
 func (m *MarkdownRenderer) renderProjectResults(results []ProjectResult, common CommonData) string {
-	var resultsTmplData []ProjectResultTmplData
+	var resultsTmplData []projectResultTmplData
 	numPlanSuccesses := 0
 
 	for _, result := range results {
-		resultData := ProjectResultTmplData{
+		resultData := projectResultTmplData{
 			Workspace:  result.Workspace,
 			RepoRelDir: result.RepoRelDir,
 		}
@@ -113,15 +113,15 @@ func (m *MarkdownRenderer) renderProjectResults(results []ProjectResult, common 
 
 	var tmpl *template.Template
 	switch {
-	case len(resultsTmplData) == 1 && common.Command == PlanCommandTitle && numPlanSuccesses > 0:
+	case len(resultsTmplData) == 1 && common.Command == planCommandTitle && numPlanSuccesses > 0:
 		tmpl = singleProjectPlanSuccessTmpl
-	case len(resultsTmplData) == 1 && common.Command == PlanCommandTitle && numPlanSuccesses == 0:
+	case len(resultsTmplData) == 1 && common.Command == planCommandTitle && numPlanSuccesses == 0:
 		tmpl = singleProjectPlanUnsuccessfulTmpl
-	case len(resultsTmplData) == 1 && common.Command == ApplyCommandTitle:
+	case len(resultsTmplData) == 1 && common.Command == applyCommandTitle:
 		tmpl = singleProjectApplyTmpl
-	case common.Command == PlanCommandTitle:
+	case common.Command == planCommandTitle:
 		tmpl = multiProjectPlanTmpl
-	case common.Command == ApplyCommandTitle:
+	case common.Command == applyCommandTitle:
 		tmpl = multiProjectApplyTmpl
 	default:
 		return "no template matched–this is a bug"

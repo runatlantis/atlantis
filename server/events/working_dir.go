@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package events
 
 import (
@@ -149,7 +149,7 @@ func (w *FileWorkspace) Delete(r models.Repo, p models.PullRequest) error {
 	return os.RemoveAll(w.repoPullDir(r, p))
 }
 
-// Delete deletes the working dir for this workspace.
+// DeleteForWorkspace deletes the working dir for this workspace.
 func (w *FileWorkspace) DeleteForWorkspace(r models.Repo, p models.PullRequest, workspace string) error {
 	return os.RemoveAll(w.cloneDir(r, p, workspace))
 }
