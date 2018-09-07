@@ -178,10 +178,10 @@ func TestPost_GitlabCommentNotWhitelisted(t *testing.T) {
 		Logger:                       logging.NewNoopLogger(),
 		CommentParser:                &events.CommentParser{},
 		GitlabRequestParserValidator: &server.DefaultGitlabRequestParserValidator{},
-		Parser:               &events.EventParser{},
-		SupportedVCSHosts:    []models.VCSHostType{models.Gitlab},
-		RepoWhitelistChecker: &events.RepoWhitelistChecker{},
-		VCSClient:            vcsClient,
+		Parser:                       &events.EventParser{},
+		SupportedVCSHosts:            []models.VCSHostType{models.Gitlab},
+		RepoWhitelistChecker:         &events.RepoWhitelistChecker{},
+		VCSClient:                    vcsClient,
 	}
 	requestJSON, err := ioutil.ReadFile(filepath.Join("testfixtures", "gitlabMergeCommentEvent_notWhitelisted.json"))
 	Ok(t, err)
