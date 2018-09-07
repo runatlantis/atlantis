@@ -6,7 +6,7 @@
 ##   if not using an ingress, set it to the external IP.
 # atlantisUrl: http://10.0.0.0
 
-## Replace this with your own repo whitelist:
+# Replace this with your own repo whitelist:
 orgWhitelist: github.com/yourorg/*
 
 # If using GitLab, specify like the following:
@@ -14,7 +14,14 @@ orgWhitelist: github.com/yourorg/*
 #   user: foo
 #   token: bar
 #   secret: baz
-gitlab: {}
+# (The chart will perform the base64 encoding for you.)
+
+# When referencing Terraform modules in private repositories, it may be helpful
+# (necessary?) to use redirection in a .gitconfig like so:
+# gitconfig: |
+#   [url "https://oauth2:YOUR_GITLAB_USER_TOKEN@gitlab.com"]
+#     insteadOf = https://gitlab.com
+gitconfig:
 
 ## To be used for mounting credential files (when using google provider).
 serviceAccountSecrets:

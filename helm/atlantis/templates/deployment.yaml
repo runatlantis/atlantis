@@ -21,14 +21,25 @@ spec:
     spec:
       volumes:
       {{- range $name, $_ := .Values.serviceAccountSecrets }}
-        - name: {{ $name }}-volume
-          secret:
-            secretName: {{ $name }}
+      - name: {{ $name }}-volume
+        secret:
+          secretName: {{ $name }}
+      {{- end }}
+      {{- if .Values.gitconfig }}
+      - name: gitconfig-volume
+        secret:
+          secretName: {{ template "atlantis.name" . }}-gitconfig
       {{- end }}
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.gitconfig }}
+          lifecycle:
+            postStart:
+              exec:
+                command: ["/bin/sh", "-c", "cp /etc/secret-gitconfig/gitconfig /home/atlantis/.gitconfig && chown atlantis /home/atlantis/.gitconfig"]
+          {{- end}}
           cmd: atlantis
           args:
             - server
@@ -64,6 +75,7 @@ spec:
                 name: {{ template "atlantis.name" . }}-webhook
                 key: gitlab_secret
           {{- end}}
+
           {{- if .Values.livenessProbe.enabled }}
           livenessProbe:
             httpGet:
@@ -90,10 +102,15 @@ spec:
           {{- end }}
           volumeMounts:
           {{- range $name, $_ := .Values.serviceAccountSecrets }}
-            - name: {{ $name }}-volume
-              readOnly: true
-              mountPath: /etc/{{ $name }}
+          - name: {{ $name }}-volume
+            readOnly: true
+            mountPath: /etc/{{ $name }}
           {{- end }}
+          {{- if .Values.gitconfig}}
+          - name: gitconfig-volume
+            readonly: true
+            mountPath: /etc/secret-gitconfig
+          {{- end}}
           resources:
 {{ toYaml .Values.resources | indent 12 }}
     {{- with .Values.nodeSelector }}
