@@ -52,7 +52,7 @@ func downloadFile(url string, path string) error {
 	}
 	defer output.Close() // nolint: errcheck
 
-	response, err := http.Get(url)
+	response, err := http.Get(url) // nolint: gosec
 	if err != nil {
 		return err
 	}
@@ -99,7 +99,7 @@ func unzip(archive, target string) error {
 
 func getTunnelAddr() (string, error) {
 	tunAPI := fmt.Sprintf("http://%s/api/tunnels", ngrokAPIURL)
-	response, err := http.Get(tunAPI)
+	response, err := http.Get(tunAPI) // nolint: gosec
 	if err != nil {
 		return "", err
 	}

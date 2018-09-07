@@ -59,11 +59,11 @@ func setup(t *testing.T) *vcsmocks.MockClientProxy {
 		MarkdownRenderer:         &events.MarkdownRenderer{},
 		GithubPullGetter:         githubGetter,
 		GitlabMergeRequestGetter: gitlabGetter,
-		Logger:                logger,
-		AllowForkPRs:          false,
-		AllowForkPRsFlag:      "allow-fork-prs-flag",
-		ProjectCommandBuilder: projectCommandBuilder,
-		ProjectCommandRunner:  projectCommandRunner,
+		Logger:                   logger,
+		AllowForkPRs:             false,
+		AllowForkPRsFlag:         "allow-fork-prs-flag",
+		ProjectCommandBuilder:    projectCommandBuilder,
+		ProjectCommandRunner:     projectCommandRunner,
 	}
 	return vcsClient
 }
