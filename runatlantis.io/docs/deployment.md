@@ -66,6 +66,8 @@ If you're using GitLab, navigate to your project's home page in GitLab
 - leave **Enable SSL verification** checked
 - click **Add webhook**
 
+**NOTE:** If you are using Atlantis with multiple GitLab repositories, you must either use the same Integration secret token across all GitLab repositories, or use a separate Atlantis instance for each repository.  The former approach is recommended.**
+
 ### Bitbucket Cloud (bitbucket.org) Webhook
 - Go to your repo's home page
 - Click **Settings** in the sidebar
