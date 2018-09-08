@@ -30,6 +30,11 @@ spec:
         secret:
           secretName: {{ template "atlantis.name" . }}-gitconfig
       {{- end }}
+      {{- if .Values.aws }}
+      - name: aws-volume
+        secret:
+          secretName: {{ template "atlantis.name" . }}-aws
+      {{- end }}
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -110,7 +115,12 @@ spec:
           - name: gitconfig-volume
             readonly: true
             mountPath: /etc/secret-gitconfig
-          {{- end}}
+          {{- end }}
+          {{- if .Values.aws}}
+          - name: aws-volume
+            readonly: true
+            mountPath: /home/atlantis/.aws
+          {{- end }}
           resources:
 {{ toYaml .Values.resources | indent 12 }}
     {{- with .Values.nodeSelector }}
