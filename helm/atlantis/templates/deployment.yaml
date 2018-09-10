@@ -79,6 +79,10 @@ spec:
               secretKeyRef:
                 name: {{ template "atlantis.name" . }}-webhook
                 key: github_secret
+          {{- if .Values.github.hostname }}
+          - name: ATLANTIS_GH_HOSTNAME
+            value: {{ .Values.github.hostname }}
+          {{- end }}
           {{- end}}
           {{- if .Values.gitlab }}
           - name: ATLANTIS_GITLAB_USER
@@ -93,6 +97,10 @@ spec:
               secretKeyRef:
                 name: {{ template "atlantis.name" . }}-webhook
                 key: gitlab_secret
+          {{- if .Values.gitlab.hostname }}
+          - name: ATLANTIS_GITLAB_HOSTNAME
+            value: {{ .Values.gitlab.hostname }}
+          {{- end }}
           {{- end}}
 
           {{- if .Values.livenessProbe.enabled }}
