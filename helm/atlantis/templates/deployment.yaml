@@ -102,7 +102,24 @@ spec:
             value: {{ .Values.gitlab.hostname }}
           {{- end }}
           {{- end}}
-
+          {{- if .Values.bitbucket }}
+          - name: ATLANTIS_BITBUCKET_USER
+            value: {{ required "bitbucket.user is required if bitbucket configuration is specified." .Values.bitbucket.user }}
+          - name: ATLANTIS_BITBUCKET_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: {{ template "atlantis.name" . }}-webhook
+                key: bitbucket_token
+          {{- if .Values.bitbucket.base_url }}
+          - name: ATLANTIS_BITBUCKET_BASE_URL
+            value: {{ .Values.bitbucket.base_url }}
+          - name: ATLANTIS_BITBUCKET_WEBHOOK_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: {{ template "atlantis.name" . }}-webhook
+                key: bitbucket_secret
+          {{- end }}
+          {{- end }}
           {{- if .Values.livenessProbe.enabled }}
           livenessProbe:
             httpGet:

@@ -9,12 +9,32 @@
 # Replace this with your own repo whitelist:
 orgWhitelist: github.com/yourorg/*
 
+# If using GitHub, specify like the following:
+# github:
+#   user: foo
+#   token: bar
+#   secret: baz
+# GitHub Enterprise only:
+#   hostname: github.your.org
+# (The chart will perform the base64 encoding for you.)
+
 # If using GitLab, specify like the following:
 # gitlab:
 #   user: foo
 #   token: bar
 #   secret: baz
+# GitLab Enterprise only:
+#   hostname: gitlab.your.org
 # (The chart will perform the base64 encoding for you.)
+
+# If using Bitbucket, specify like the following:
+# bitbucket:
+#   user: jkodroff
+#   token: 7EKP4yWUpLRBJh2pW2t3
+# Bitbucket Server only:
+#   secret: mysecret
+#   base_url: https://bitbucket.2ndwatch.com
+
 
 # When referencing Terraform modules in private repositories, it may be helpful
 # (necessary?) to use redirection in a .gitconfig like so:
