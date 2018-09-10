@@ -19,10 +19,15 @@ orgWhitelist: github.com/yourorg/*
 # When referencing Terraform modules in private repositories, it may be helpful
 # (necessary?) to use redirection in a .gitconfig like so:
 # gitconfig:
+  # [url "https://YOUR_GH_TOKEN@github.com"]
+  #   insteadOf = https://github.com
+  # [url "https://YOUR_GH_TOKEN@github.com"]
+  #   insteadOf = ssh://git@github.com
   # [url "https://oauth2:YOUR_GITLAB_TOKEN@gitlab.com"]
   #   insteadOf = https://gitlab.com
   # [url "https://oauth2:YOUR_GITLAB_TOKEN@gitlab.com"]
   #   insteadOf = ssh://git@gitlab.com
+# Source: https://stackoverflow.com/questions/42148841/github-clone-with-oauth-access-token
 
 ## To be used for mounting credential files (when using google provider).
 serviceAccountSecrets:

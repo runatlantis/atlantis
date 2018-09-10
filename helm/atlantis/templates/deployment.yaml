@@ -66,6 +66,20 @@ spec:
           - name: ATLANTIS_ATLANTIS_URL
             value: http://{{ .Values.ingress.host }}
           {{- end }}
+          {{- if .Values.github }}
+          - name: ATLANTIS_GH_USER
+            value: {{ required "github.user is required if github configuration is specified." .Values.github.user }}
+          - name: ATLANTIS_GH_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: {{ template "atlantis.name" . }}-webhook
+                key: github_token
+          - name: ATLANTIS_GH_WEBHOOK_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: {{ template "atlantis.name" . }}-webhook
+                key: github_secret
+          {{- end}}
           {{- if .Values.gitlab }}
           - name: ATLANTIS_GITLAB_USER
             value: {{ required "gitlab.user is required if gitlab configuration is specified." .Values.gitlab.user }}
