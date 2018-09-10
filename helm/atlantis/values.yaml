@@ -49,6 +49,18 @@ orgWhitelist: github.com/yourorg/*
   #   insteadOf = ssh://git@gitlab.com
 # Source: https://stackoverflow.com/questions/42148841/github-clone-with-oauth-access-token
 
+# To specify AWS credentials to be mapped to ~/.aws:
+# aws:
+#   credentials: |
+#     [default]
+#     aws_access_key_id=YOUR_ACCESS_KEY_ID
+#     aws_secret_access_key=YOUR_SECRET_ACCESS_KEY
+#     region=us-east-1
+#   config: |
+#     [profile a_role_to_assume]
+#     role_arn = arn:aws:iam::123456789:role/service-role/roleToAssume
+#     source_profile = default
+
 ## To be used for mounting credential files (when using google provider).
 serviceAccountSecrets:
   # credentials: <json file as base64 encoded string>
