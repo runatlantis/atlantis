@@ -1,5 +1,5 @@
 apiVersion: apps/v1beta2
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: {{ template "atlantis.fullname" . }}
   labels:
@@ -55,6 +55,8 @@ spec:
           - name: atlantis
             containerPort: 4141
           env:
+          - name: ATLANTIS_DATA_DIR
+            value: /atlantis-data
           - name: ATLANTIS_REPO_WHITELIST
             value: {{ .Values.orgWhitelist }}
           - name: ATLANTIS_PORT
@@ -145,6 +147,8 @@ spec:
             failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
           {{- end }}
           volumeMounts:
+          - name: atlantis-data
+            mountPath: /atlantis-data
           {{- range $name, $_ := .Values.serviceAccountSecrets }}
           - name: {{ $name }}-volume
             readOnly: true
@@ -174,3 +178,13 @@ spec:
       tolerations:
 {{ toYaml . | indent 8 }}
     {{- end }}
+  volumeClaimTemplates:
+  - metadata:
+      name: atlantis-data
+    spec:
+      accessModes: ["ReadWriteOnce"] # Volume should not be shared by multiple nodes.
+      resources:
+        requests:
+          # The biggest thing Atlantis stores is the Git repo when it checks it out.
+          # It deletes the repo after the pull request is merged.
+          storage: 5Gi
