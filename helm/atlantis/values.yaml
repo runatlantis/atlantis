@@ -115,10 +115,10 @@ ingress:
 
 resources:
   requests:
-    memory: 256Mi
+    memory: 1Gi
     cpu: 100m
   limits:
-    memory: 256Mi
+    memory: 1Gi
     cpu: 100m
 
 replicaCount: 1
