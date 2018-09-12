@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package events_test
 
 import (
@@ -59,11 +59,11 @@ func setup(t *testing.T) *vcsmocks.MockClientProxy {
 		MarkdownRenderer:         &events.MarkdownRenderer{},
 		GithubPullGetter:         githubGetter,
 		GitlabMergeRequestGetter: gitlabGetter,
-		Logger:                logger,
-		AllowForkPRs:          false,
-		AllowForkPRsFlag:      "allow-fork-prs-flag",
-		ProjectCommandBuilder: projectCommandBuilder,
-		ProjectCommandRunner:  projectCommandRunner,
+		Logger:                   logger,
+		AllowForkPRs:             false,
+		AllowForkPRsFlag:         "allow-fork-prs-flag",
+		ProjectCommandBuilder:    projectCommandBuilder,
+		ProjectCommandRunner:     projectCommandRunner,
 	}
 	return vcsClient
 }

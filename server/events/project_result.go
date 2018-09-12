@@ -10,21 +10,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package events
 
 import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-// ProjectResult is the result of executing a plan/apply for a project.
+// ProjectResult is the result of executing a plan/apply for a specific project.
 type ProjectResult struct {
-	ProjectCommandResult
-	RepoRelDir string
-	Workspace  string
-}
-
-type ProjectCommandResult struct {
+	RepoRelDir   string
+	Workspace    string
 	Error        error
 	Failure      string
 	PlanSuccess  *PlanSuccess

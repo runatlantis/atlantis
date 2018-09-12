@@ -13,18 +13,34 @@ import (
 )
 
 const (
+	// DefaultRepoRelDir is the default directory we run commands in, relative
+	// to the root of the repo.
 	DefaultRepoRelDir = "."
-	DefaultWorkspace  = "default"
+	// DefaultWorkspace is the default Terraform workspace we run commands in.
+	// This is also Terraform's default workspace.
+	DefaultWorkspace = "default"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
 
+// ProjectCommandBuilder builds commands that run on individual projects.
 type ProjectCommandBuilder interface {
+	// BuildAutoplanCommands builds project commands that will run plan on
+	// the projects determined to be modified.
 	BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error)
+	// BuildPlanCommands builds project plan commands for this comment. If the
+	// comment doesn't specify one project then there may be multiple commands
+	// to be run.
 	BuildPlanCommands(ctx *CommandContext, commentCommand *CommentCommand) ([]models.ProjectCommandContext, error)
+	// BuildApplyCommands builds project apply commands for this comment. If the
+	// comment doesn't specify one project then there may be multiple commands
+	// to be run.
 	BuildApplyCommands(ctx *CommandContext, commentCommand *CommentCommand) ([]models.ProjectCommandContext, error)
 }
 
+// DefaultProjectCommandBuilder implements ProjectCommandBuilder.
+// This class combines the data from the comment and any repo config file or
+// Atlantis server config and then generates a set of contexts.
 type DefaultProjectCommandBuilder struct {
 	ParserValidator     *yaml.ParserValidator
 	ProjectFinder       ProjectFinder
@@ -37,10 +53,14 @@ type DefaultProjectCommandBuilder struct {
 	CommentBuilder      CommentBuilder
 }
 
-type TerraformExec interface {
+// TFCommandRunner runs Terraform commands.
+type TFCommandRunner interface {
+	// RunCommandWithVersion runs a Terraform command using the version v.
 	RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (string, error)
 }
 
+// BuildAutoplanCommands builds project commands that will run plan on
+// the projects determined to be modified.
 func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error) {
 	cmds, err := p.buildPlanAllCommands(ctx, nil, false)
 	if err != nil {
@@ -186,6 +206,9 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *CommandConte
 	return p.buildProjectCommandCtx(ctx, cmd.ProjectName, cmd.Flags, repoDir, repoRelDir, workspace)
 }
 
+// BuildPlanCommands builds project plan commands for this comment. If the
+// comment doesn't specify one project then there may be multiple commands
+// to be run.
 func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
 	if !cmd.IsForSpecificProject() {
 		return p.buildPlanAllCommands(ctx, cmd.Flags, cmd.Verbose)
@@ -226,6 +249,9 @@ func (p *DefaultProjectCommandBuilder) buildApplyAllCommands(ctx *CommandContext
 	return cmds, nil
 }
 
+// BuildApplyCommands builds project apply commands for this comment. If the
+// comment doesn't specify one project then there may be multiple commands
+// to be run.
 func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
 	if !cmd.IsForSpecificProject() {
 		return p.buildApplyAllCommands(ctx, cmd)

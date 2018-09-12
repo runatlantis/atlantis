@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package server_test
 
 import (
@@ -178,10 +178,10 @@ func TestPost_GitlabCommentNotWhitelisted(t *testing.T) {
 		Logger:                       logging.NewNoopLogger(),
 		CommentParser:                &events.CommentParser{},
 		GitlabRequestParserValidator: &server.DefaultGitlabRequestParserValidator{},
-		Parser:               &events.EventParser{},
-		SupportedVCSHosts:    []models.VCSHostType{models.Gitlab},
-		RepoWhitelistChecker: &events.RepoWhitelistChecker{},
-		VCSClient:            vcsClient,
+		Parser:                       &events.EventParser{},
+		SupportedVCSHosts:            []models.VCSHostType{models.Gitlab},
+		RepoWhitelistChecker:         &events.RepoWhitelistChecker{},
+		VCSClient:                    vcsClient,
 	}
 	requestJSON, err := ioutil.ReadFile(filepath.Join("testfixtures", "gitlabMergeCommentEvent_notWhitelisted.json"))
 	Ok(t, err)
@@ -312,7 +312,7 @@ func TestPost_GitlabMergeRequestInvalid(t *testing.T) {
 	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
 	repo := models.Repo{}
 	pullRequest := models.PullRequest{State: models.ClosedPullState}
-	When(p.ParseGitlabMergeEvent(gitlabMergeEvent)).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, errors.New("err"))
+	When(p.ParseGitlabMergeRequestEvent(gitlabMergeEvent)).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, errors.New("err"))
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	responseContains(t, w, http.StatusBadRequest, "Error parsing webhook: err")
@@ -346,7 +346,7 @@ func TestPost_GitlabMergeRequestNotWhitelisted(t *testing.T) {
 	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
 	repo := models.Repo{}
 	pullRequest := models.PullRequest{State: models.ClosedPullState}
-	When(p.ParseGitlabMergeEvent(gitlabMergeEvent)).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
+	When(p.ParseGitlabMergeRequestEvent(gitlabMergeEvent)).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
 
 	w := httptest.NewRecorder()
 	e.Post(w, req)
@@ -377,7 +377,7 @@ func TestPost_GitlabMergeRequestUnsupportedAction(t *testing.T) {
 	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
 	repo := models.Repo{}
 	pullRequest := models.PullRequest{State: models.ClosedPullState}
-	When(p.ParseGitlabMergeEvent(gitlabMergeEvent)).ThenReturn(pullRequest, repo, repo, models.User{}, nil)
+	When(p.ParseGitlabMergeRequestEvent(gitlabMergeEvent)).ThenReturn(pullRequest, repo, repo, models.User{}, nil)
 
 	w := httptest.NewRecorder()
 	e.Post(w, req)
@@ -413,7 +413,7 @@ func TestPost_GitlabMergeRequestClosedErrCleaningPull(t *testing.T) {
 	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
 	repo := models.Repo{}
 	pullRequest := models.PullRequest{State: models.ClosedPullState}
-	When(p.ParseGitlabMergeEvent(gitlabMergeEvent)).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
+	When(p.ParseGitlabMergeRequestEvent(gitlabMergeEvent)).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
 	When(c.CleanUpPull(repo, pullRequest)).ThenReturn(errors.New("err"))
 	w := httptest.NewRecorder()
 	e.Post(w, req)
@@ -447,7 +447,7 @@ func TestPost_GitlabMergeRequestSuccess(t *testing.T) {
 	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
 	repo := models.Repo{}
 	pullRequest := models.PullRequest{State: models.ClosedPullState}
-	When(p.ParseGitlabMergeEvent(gitlabMergeEvent)).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
+	When(p.ParseGitlabMergeRequestEvent(gitlabMergeEvent)).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	responseContains(t, w, http.StatusOK, "Pull request cleaned successfully")
@@ -492,7 +492,7 @@ func TestPost_PullOpenedOrUpdated(t *testing.T) {
 				When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
 				repo := models.Repo{}
 				pullRequest := models.PullRequest{State: models.ClosedPullState}
-				When(p.ParseGitlabMergeEvent(gitlabMergeEvent)).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
+				When(p.ParseGitlabMergeRequestEvent(gitlabMergeEvent)).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
 			case models.Github:
 				req.Header.Set(githubHeader, "pull_request")
 				event := fmt.Sprintf(`{"action": "%s"}`, c.Action)

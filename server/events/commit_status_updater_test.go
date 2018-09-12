@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package events_test
 
 import (
@@ -114,11 +114,11 @@ func TestUpdateProjectResult(t *testing.T) {
 				switch statusStr {
 				case "failure":
 					result = events.ProjectResult{
-						ProjectCommandResult: events.ProjectCommandResult{Failure: "failure"},
+						Failure: "failure",
 					}
 				case "error":
 					result = events.ProjectResult{
-						ProjectCommandResult: events.ProjectCommandResult{Error: errors.New("err")},
+						Error: errors.New("err"),
 					}
 				default:
 					result = events.ProjectResult{}

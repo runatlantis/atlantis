@@ -15,7 +15,7 @@ jobs:
   e2e:
     working_directory: /go/src/github.com/runatlantis/atlantis
     docker:
-    - image: circleci/golang:1.10
+    - image: circleci/golang:1.11
       environment:
         TERRAFORM_VERSION: 0.11.8
     steps:
@@ -28,7 +28,7 @@ jobs:
   docker_master:
     working_directory: /go/src/github.com/runatlantis/atlantis
     docker:
-    - image: circleci/golang:1.10
+    - image: circleci/golang:1.11
     steps:
     - checkout
     - run: make build-service
@@ -51,7 +51,7 @@ jobs:
   docker_tag:
     working_directory: /go/src/github.com/runatlantis/atlantis
     docker:
-    - image: circleci/golang:1.10
+    - image: circleci/golang:1.11
     steps:
     - checkout
     - run: make build-service
