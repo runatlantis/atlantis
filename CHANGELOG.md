@@ -1,3 +1,30 @@
+# v0.4.8
+
+## Description
+Security release to upgrade the Docker image to the latest version of Alpine linux that fixes
+this bug: https://justi.cz/security/2018/09/13/alpine-apk-rce.html
+
+Diff: https://github.com/runatlantis/atlantis/compare/v0.4.7...v0.4.8
+
+## Features
+None
+
+## Bugfixes
+* Change server startup message to INFO from WARN level.
+
+## Backwards Incompatibilities / Notes:
+None
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.8/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.8/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.8/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.8/atlantis_linux_arm.zip)
+
+## Docker
+`runatlantis/atlantis:v0.4.8`
+
+
 # v0.4.7
 
 ## Description
