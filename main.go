@@ -15,7 +15,7 @@
 package main
 
 import (
-	"github.com/austinorth/atlantis/cmd"
+	"github.com/runatlantis/atlantis/cmd"
 	"github.com/spf13/viper"
 )
 
