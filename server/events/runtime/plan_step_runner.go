@@ -34,7 +34,7 @@ func (p *PlanStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []strin
 
 	planFile := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectConfig))
 	userVar := fmt.Sprintf("%s=%s", atlantisUserTFVar, ctx.User.Username)
-	tfPlanCmd := append(append([]string{"plan", "-refresh", "-no-color", "-out", planFile, "-var", userVar}, extraArgs...), ctx.CommentArgs...)
+	tfPlanCmd := append(append([]string{"plan", "-input=false", "-refresh", "-no-color", "-out", planFile, "-var", userVar}, extraArgs...), ctx.CommentArgs...)
 
 	// Check if env/{workspace}.tfvars exist and include it. This is a use-case
 	// from Hootsuite where Atlantis was first created so we're keeping this as
