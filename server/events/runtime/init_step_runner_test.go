@@ -61,7 +61,7 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 			// When there is no error, should not return init output to PR.
 			Equals(t, "", output)
 
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", []string{c.expCmd, "-no-color", "extra", "args"}, tfVersion, "workspace")
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", []string{c.expCmd, "-input=false", "-no-color", "extra", "args"}, tfVersion, "workspace")
 		})
 	}
 }

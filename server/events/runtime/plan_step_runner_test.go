@@ -44,7 +44,7 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 	Ok(t, err)
 
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", []string{"plan", "-refresh", "-no-color", "-out", "/path/default.tfplan", "-var", "atlantis_user=username", "extra", "args", "comment", "args"}, tfVersion, workspace)
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", []string{"plan", "-input=false", "-refresh", "-no-color", "-out", "/path/default.tfplan", "-var", "atlantis_user=username", "extra", "args", "comment", "args"}, tfVersion, workspace)
 
 	// Verify that no env or workspace commands were run
 	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(logger, "/path", []string{"env", "select", "-no-color", "workspace"}, tfVersion, workspace)
