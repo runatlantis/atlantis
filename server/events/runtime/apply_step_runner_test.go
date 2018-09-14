@@ -95,7 +95,7 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 	}, []string{"extra", "args"}, tmpDir)
 	Ok(t, err)
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, tmpDir, []string{"apply", "-no-color", "extra", "args", "comment", "args", planPath}, nil, "default")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", planPath}, nil, "default")
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
@@ -126,7 +126,7 @@ func TestRun_UsesConfiguredTFVersion(t *testing.T) {
 	}, []string{"extra", "args"}, tmpDir)
 	Ok(t, err)
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, tmpDir, []string{"apply", "-no-color", "extra", "args", "comment", "args", planPath}, tfVersion, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", planPath}, tfVersion, "workspace")
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }

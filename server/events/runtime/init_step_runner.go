@@ -16,7 +16,7 @@ func (i *InitStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []strin
 	if ctx.ProjectConfig != nil && ctx.ProjectConfig.TerraformVersion != nil {
 		tfVersion = ctx.ProjectConfig.TerraformVersion
 	}
-	terraformInitCmd := append([]string{"init", "-no-color", "-input=false"}, extraArgs...)
+	terraformInitCmd := append([]string{"init", "-input=false", "-no-color"}, extraArgs...)
 
 	// If we're running < 0.9 we have to use `terraform get` instead of `init`.
 	if MustConstraint("< 0.9.0").Check(tfVersion) {
