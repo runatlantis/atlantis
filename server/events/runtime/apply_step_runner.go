@@ -21,7 +21,7 @@ func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []stri
 		return "", fmt.Errorf("no plan found at path %q and workspace %q–did you run plan?", ctx.RepoRelDir, ctx.Workspace)
 	}
 
-	tfApplyCmd := append(append(append([]string{"apply", "-no-color"}, extraArgs...), ctx.CommentArgs...), planPath)
+	tfApplyCmd := append(append(append([]string{"apply", "-input=false", "-no-color"}, extraArgs...), ctx.CommentArgs...), planPath)
 	var tfVersion *version.Version
 	if ctx.ProjectConfig != nil && ctx.ProjectConfig.TerraformVersion != nil {
 		tfVersion = ctx.ProjectConfig.TerraformVersion

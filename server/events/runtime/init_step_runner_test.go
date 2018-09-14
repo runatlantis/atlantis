@@ -11,7 +11,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
 	matchers2 "github.com/runatlantis/atlantis/server/events/terraform/mocks/matchers"
-	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -44,7 +43,6 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 			terraform := mocks.NewMockClient()
 
 			tfVersion, _ := version.NewVersion(c.version)
-			logger := logging.NewNoopLogger()
 			iso := runtime.InitStepRunner{
 				TerraformExecutor: terraform,
 				DefaultTFVersion:  tfVersion,
@@ -53,7 +51,6 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 				ThenReturn("output", nil)
 
 			output, err := iso.Run(models.ProjectCommandContext{
-				Log:        logger,
 				Workspace:  "workspace",
 				RepoRelDir: ".",
 			}, []string{"extra", "args"}, "/path")
@@ -61,7 +58,12 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 			// When there is no error, should not return init output to PR.
 			Equals(t, "", output)
 
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", []string{c.expCmd, "-no-color", "extra", "args"}, tfVersion, "workspace")
+			// If using init then we specify -input=false but not for get.
+			expArgs := []string{c.expCmd, "-input=false", "-no-color", "extra", "args"}
+			if c.expCmd == "get" {
+				expArgs = []string{c.expCmd, "-no-color", "extra", "args"}
+			}
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, "/path", expArgs, tfVersion, "workspace")
 		})
 	}
 }

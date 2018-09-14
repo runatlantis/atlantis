@@ -44,7 +44,7 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 	Ok(t, err)
 
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", []string{"plan", "-refresh", "-no-color", "-out", "/path/default.tfplan", "-var", "atlantis_user=username", "extra", "args", "comment", "args"}, tfVersion, workspace)
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", []string{"plan", "-input=false", "-refresh", "-no-color", "-out", "/path/default.tfplan", "-var", "atlantis_user=username", "extra", "args", "comment", "args"}, tfVersion, workspace)
 
 	// Verify that no env or workspace commands were run
 	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(logger, "/path", []string{"env", "select", "-no-color", "workspace"}, tfVersion, workspace)
@@ -127,7 +127,7 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 			Equals(t, "output", output)
 			// Verify that env select was called as well as plan.
 			terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", []string{c.expWorkspaceCmd, "select", "-no-color", "workspace"}, tfVersion, "workspace")
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", []string{"plan", "-refresh", "-no-color", "-out", "/path/workspace.tfplan", "-var", "atlantis_user=username", "extra", "args", "comment", "args"}, tfVersion, "workspace")
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", []string{"plan", "-input=false", "-refresh", "-no-color", "-out", "/path/workspace.tfplan", "-var", "atlantis_user=username", "extra", "args", "comment", "args"}, tfVersion, "workspace")
 		})
 	}
 }
@@ -175,7 +175,7 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 			expWorkspaceArgs := []string{c.expWorkspaceCommand, "select", "-no-color", "workspace"}
 			When(terraform.RunCommandWithVersion(logger, "/path", expWorkspaceArgs, tfVersion, "workspace")).ThenReturn("", errors.New("workspace does not exist"))
 
-			expPlanArgs := []string{"plan", "-refresh", "-no-color", "-out", "/path/workspace.tfplan", "-var", "atlantis_user=username", "extra", "args", "comment", "args"}
+			expPlanArgs := []string{"plan", "-input=false", "-refresh", "-no-color", "-out", "/path/workspace.tfplan", "-var", "atlantis_user=username", "extra", "args", "comment", "args"}
 			When(terraform.RunCommandWithVersion(logger, "/path", expPlanArgs, tfVersion, "workspace")).ThenReturn("output", nil)
 
 			output, err := s.Run(models.ProjectCommandContext{
@@ -208,7 +208,7 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 	}
 	When(terraform.RunCommandWithVersion(logger, "/path", []string{"workspace", "show"}, tfVersion, "workspace")).ThenReturn("workspace\n", nil)
 
-	expPlanArgs := []string{"plan", "-refresh", "-no-color", "-out", "/path/workspace.tfplan", "-var", "atlantis_user=username", "extra", "args", "comment", "args"}
+	expPlanArgs := []string{"plan", "-input=false", "-refresh", "-no-color", "-out", "/path/workspace.tfplan", "-var", "atlantis_user=username", "extra", "args", "comment", "args"}
 	When(terraform.RunCommandWithVersion(logger, "/path", expPlanArgs, tfVersion, "workspace")).ThenReturn("output", nil)
 
 	output, err := s.Run(models.ProjectCommandContext{
@@ -249,7 +249,7 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 		DefaultTFVersion:  tfVersion,
 	}
 
-	expPlanArgs := []string{"plan", "-refresh", "-no-color", "-out", filepath.Join(tmpDir, "workspace.tfplan"), "-var", "atlantis_user=username", "extra", "args", "comment", "args", "-var-file", envVarsFile}
+	expPlanArgs := []string{"plan", "-input=false", "-refresh", "-no-color", "-out", filepath.Join(tmpDir, "workspace.tfplan"), "-var", "atlantis_user=username", "extra", "args", "comment", "args", "-var-file", envVarsFile}
 	When(terraform.RunCommandWithVersion(logger, tmpDir, expPlanArgs, tfVersion, "workspace")).ThenReturn("output", nil)
 
 	output, err := s.Run(models.ProjectCommandContext{
@@ -280,7 +280,7 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 	}
 	When(terraform.RunCommandWithVersion(logger, "/path", []string{"workspace", "show"}, tfVersion, "workspace")).ThenReturn("workspace\n", nil)
 
-	expPlanArgs := []string{"plan", "-refresh", "-no-color", "-out", "/path/projectname-default.tfplan", "-var", "atlantis_user=username", "extra", "args", "comment", "args"}
+	expPlanArgs := []string{"plan", "-input=false", "-refresh", "-no-color", "-out", "/path/projectname-default.tfplan", "-var", "atlantis_user=username", "extra", "args", "comment", "args"}
 	When(terraform.RunCommandWithVersion(logger, "/path", expPlanArgs, tfVersion, "default")).ThenReturn("output", nil)
 
 	projectName := "projectname"
