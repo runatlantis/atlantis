@@ -1,5 +1,7 @@
 Ran Apply in dir: `.` workspace: `default`
 
+<details><summary>Show Output</summary>
+
 ```diff
 null_resource.simple: Creating...
 null_resource.simple: Creation complete after *s (ID: ******************)
@@ -19,4 +21,5 @@ var = staging
 workspace = default
 
 ```
+</details>
 

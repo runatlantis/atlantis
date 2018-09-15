@@ -16,15 +16,26 @@ package events
 import (
 	"bytes"
 	"fmt"
+	"regexp"
 	"strings"
 	"text/template"
 
 	"github.com/Masterminds/sprig"
+	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 const (
 	planCommandTitle  = "Plan"
 	applyCommandTitle = "Apply"
+	// maxUnwrappedLines is the maximum number of lines the Terraform output
+	// can be before we wrap it in an expandable template.
+	maxUnwrappedLines = 12
+)
+
+var (
+	plusDiffRegex  = regexp.MustCompile(`(?m)^  \+`)
+	tildeDiffRegex = regexp.MustCompile(`(?m)^  ~`)
+	minusDiffRegex = regexp.MustCompile(`(?m)^  -`)
 )
 
 // MarkdownRenderer renders responses as markdown.
@@ -63,19 +74,19 @@ type projectResultTmplData struct {
 
 // Render formats the data into a markdown string.
 // nolint: interfacer
-func (m *MarkdownRenderer) Render(res CommandResult, cmdName CommandName, log string, verbose bool) string {
+func (m *MarkdownRenderer) Render(res CommandResult, cmdName CommandName, log string, verbose bool, vcsHost models.VCSHostType) string {
 	commandStr := strings.Title(cmdName.String())
 	common := CommonData{commandStr, verbose, log}
 	if res.Error != nil {
-		return m.renderTemplate(errWithLogTmpl, ErrData{res.Error.Error(), common})
+		return m.renderTemplate(unwrappedErrWithLogTmpl, ErrData{res.Error.Error(), common})
 	}
 	if res.Failure != "" {
 		return m.renderTemplate(failureWithLogTmpl, FailureData{res.Failure, common})
 	}
-	return m.renderProjectResults(res.ProjectResults, common)
+	return m.renderProjectResults(res.ProjectResults, common, vcsHost)
 }
 
-func (m *MarkdownRenderer) renderProjectResults(results []ProjectResult, common CommonData) string {
+func (m *MarkdownRenderer) renderProjectResults(results []ProjectResult, common CommonData, vcsHost models.VCSHostType) string {
 	var resultsTmplData []projectResultTmplData
 	numPlanSuccesses := 0
 
@@ -85,7 +96,11 @@ func (m *MarkdownRenderer) renderProjectResults(results []ProjectResult, common 
 			RepoRelDir: result.RepoRelDir,
 		}
 		if result.Error != nil {
-			resultData.Rendered = m.renderTemplate(errTmpl, struct {
+			tmpl := unwrappedErrTmpl
+			if m.shouldUseWrappedTmpl(vcsHost, result.Error.Error()) {
+				tmpl = wrappedErrTmpl
+			}
+			resultData.Rendered = m.renderTemplate(tmpl, struct {
 				Command string
 				Error   string
 			}{
@@ -101,10 +116,20 @@ func (m *MarkdownRenderer) renderProjectResults(results []ProjectResult, common 
 				Failure: result.Failure,
 			})
 		} else if result.PlanSuccess != nil {
-			resultData.Rendered = m.renderTemplate(planSuccessTmpl, *result.PlanSuccess)
+			result.PlanSuccess.TerraformOutput = m.fmtDiff(result.PlanSuccess.TerraformOutput)
+			if m.shouldUseWrappedTmpl(vcsHost, result.PlanSuccess.TerraformOutput) {
+				resultData.Rendered = m.renderTemplate(planSuccessWrappedTmpl, *result.PlanSuccess)
+			} else {
+				resultData.Rendered = m.renderTemplate(planSuccessUnwrappedTmpl, *result.PlanSuccess)
+			}
 			numPlanSuccesses++
 		} else if result.ApplySuccess != "" {
-			resultData.Rendered = m.renderTemplate(applySuccessTmpl, struct{ Output string }{result.ApplySuccess})
+			if m.shouldUseWrappedTmpl(vcsHost, result.ApplySuccess) {
+				resultData.Rendered = m.renderTemplate(applyWrappedSuccessTmpl, struct{ Output string }{result.ApplySuccess})
+			} else {
+				resultData.Rendered = m.renderTemplate(applyUnwrappedSuccessTmpl, struct{ Output string }{result.ApplySuccess})
+			}
+
 		} else {
 			resultData.Rendered = "Found no template. This is a bug!"
 		}
@@ -129,6 +154,29 @@ func (m *MarkdownRenderer) renderProjectResults(results []ProjectResult, common 
 	return m.renderTemplate(tmpl, ResultData{resultsTmplData, common})
 }
 
+// shouldUseWrappedTmpl returns true if we should use the wrapped markdown
+// templates that collapse the output to make the comment smaller on initial
+// load.
+func (m *MarkdownRenderer) shouldUseWrappedTmpl(vcsHost models.VCSHostType, output string) bool {
+	// Bitbucket Cloud and Server don't support the folding markdown syntax.
+	if vcsHost == models.BitbucketServer || vcsHost == models.BitbucketCloud {
+		return false
+	}
+
+	return strings.Count(output, "\n") > maxUnwrappedLines
+}
+
+// fmtDiff uses regex's to remove any leading whitespace in front of the
+// terraform output so that the diff syntax highlighting works. Example:
+// "  - aws_security_group_rule.allow_all" =>
+// "- aws_security_group_rule.allow_all"
+// We do it for +, ~ and -.
+func (m *MarkdownRenderer) fmtDiff(tfOutput string) string {
+	tfOutput = plusDiffRegex.ReplaceAllString(tfOutput, "+")
+	tfOutput = tildeDiffRegex.ReplaceAllString(tfOutput, "~")
+	return minusDiffRegex.ReplaceAllString(tfOutput, "-")
+}
+
 func (m *MarkdownRenderer) renderTemplate(tmpl *template.Template, data interface{}) string {
 	buf := &bytes.Buffer{}
 	if err := tmpl.Execute(buf, data); err != nil {
@@ -144,8 +192,8 @@ var singleProjectPlanSuccessTmpl = template.Must(template.New("").Parse(
 	"{{$result := index .Results 0}}Ran {{.Command}} in dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" +
 		"\n" +
 		"---\n" +
-		"* :fast_forward: To **apply** all unapplied plans, comment:\n" +
-		"  * `atlantis apply`" + logTmpl))
+		"* :fast_forward: To **apply** all unapplied plans from this pull request, comment:\n" +
+		"    * `atlantis apply`" + logTmpl))
 var singleProjectPlanUnsuccessfulTmpl = template.Must(template.New("").Parse(
 	"{{$result := index .Results 0}}Ran {{.Command}} in dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n" +
 		"{{$result.Rendered}}\n" + logTmpl))
@@ -157,8 +205,8 @@ var multiProjectPlanTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap
 		"{{ range $i, $result := .Results }}" +
 		"### {{add $i 1}}. workspace: `{{$result.Workspace}}` dir: `{{$result.RepoRelDir}}`\n" +
 		"{{$result.Rendered}}\n" +
-		"---\n{{end}}{{ if gt (len .Results) 0 }}* :fast_forward: To **apply** all unapplied plans, comment:\n" +
-		"  * `atlantis apply`{{end}}" +
+		"---\n{{end}}{{ if gt (len .Results) 0 }}* :fast_forward: To **apply** all unapplied plans from this pull request, comment:\n" +
+		"    * `atlantis apply`{{end}}" +
 		logTmpl))
 var multiProjectApplyTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
 	"Ran {{.Command}} for {{ len .Results }} projects:\n" +
@@ -170,25 +218,47 @@ var multiProjectApplyTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMa
 		"{{$result.Rendered}}\n" +
 		"---\n{{end}}" +
 		logTmpl))
-var planSuccessTmpl = template.Must(template.New("").Parse(
+var planSuccessUnwrappedTmpl = template.Must(template.New("").Parse(
 	"```diff\n" +
 		"{{.TerraformOutput}}\n" +
+		"```\n\n" + planNextSteps))
+var planSuccessWrappedTmpl = template.Must(template.New("").Parse(
+	"<details><summary>Show Output</summary>\n\n" +
+		"```diff\n" +
+		"{{.TerraformOutput}}\n" +
 		"```\n\n" +
-		"* :arrow_forward: To **apply** this plan, comment:\n" +
-		"  * `{{.ApplyCmd}}`\n" +
-		"* :put_litter_in_its_place: To **delete** this plan click [here]({{.LockURL}})\n" +
-		"* :repeat: To **plan** this project again, comment:\n" +
-		"  * `{{.RePlanCmd}}`"))
-var applySuccessTmpl = template.Must(template.New("").Parse(
+		planNextSteps +
+		"</details>"))
+
+// planNextSteps are instructions appended after successful plans as to what
+// to do next.
+var planNextSteps = "* :arrow_forward: To **apply** this plan, comment:\n" +
+	"    * `{{.ApplyCmd}}`\n" +
+	"* :put_litter_in_its_place: To **delete** this plan click [here]({{.LockURL}})\n" +
+	"* :repeat: To **plan** this project again, comment:\n" +
+	"    * `{{.RePlanCmd}}`"
+var applyUnwrappedSuccessTmpl = template.Must(template.New("").Parse(
 	"```diff\n" +
 		"{{.Output}}\n" +
 		"```"))
-var errTmplText = "**{{.Command}} Error**\n" +
+var applyWrappedSuccessTmpl = template.Must(template.New("").Parse(
+	"<details><summary>Show Output</summary>\n\n" +
+		"```diff\n" +
+		"{{.Output}}\n" +
+		"```\n" +
+		"</details>"))
+var unwrappedErrTmplText = "**{{.Command}} Error**\n" +
 	"```\n" +
 	"{{.Error}}\n" +
 	"```\n"
-var errTmpl = template.Must(template.New("").Parse(errTmplText))
-var errWithLogTmpl = template.Must(template.New("").Parse(errTmplText + logTmpl))
+var wrappedErrTmplText = "**{{.Command}} Error**\n" +
+	"<details><summary>Show Output</summary>\n\n" +
+	"```\n" +
+	"{{.Error}}\n" +
+	"```\n</details>"
+var unwrappedErrTmpl = template.Must(template.New("").Parse(unwrappedErrTmplText))
+var unwrappedErrWithLogTmpl = template.Must(template.New("").Parse(unwrappedErrTmplText + logTmpl))
+var wrappedErrTmpl = template.Must(template.New("").Parse(wrappedErrTmplText))
 var failureTmplText = "**{{.Command}} Failed**: {{.Failure}}\n"
 var failureTmpl = template.Must(template.New("").Parse(failureTmplText))
 var failureWithLogTmpl = template.Must(template.New("").Parse(failureTmplText + logTmpl))

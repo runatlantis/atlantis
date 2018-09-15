@@ -252,7 +252,7 @@ func (c *DefaultCommandRunner) updatePull(ctx *CommandContext, command PullComma
 	if err := c.CommitStatusUpdater.UpdateProjectResult(ctx, command.CommandName(), res); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
-	comment := c.MarkdownRenderer.Render(res, command.CommandName(), ctx.Log.History.String(), command.IsVerbose())
+	comment := c.MarkdownRenderer.Render(res, command.CommandName(), ctx.Log.History.String(), command.IsVerbose(), ctx.BaseRepo.VCSHost.Type)
 	if err := c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, comment); err != nil {
 		ctx.Log.Err("unable to comment: %s", err)
 	}
