@@ -320,7 +320,7 @@ Examples:
   # run plan in the root directory passing the -target flag to terraform
   atlantis plan -d . -- -target=resource
 
-  # apply all unapplied plans
+  # apply all unapplied plans from this pull request
   atlantis apply
 
   # apply the plan for the root directory and staging workspace
@@ -329,7 +329,7 @@ Examples:
 Commands:
   plan   Runs 'terraform plan' for the changes in this pull request.
          To plan a specific project, use the -d, -w and -p flags.
-  apply  Runs 'terraform apply' on all unapplied plans.
+  apply  Runs 'terraform apply' on all unapplied plans from this pull request.
          To only apply a specific plan, use the -d, -w and -p flags.
   help   View help.
 

@@ -63,12 +63,12 @@ atlantis apply [options] -- [terraform apply flags]
 Runs `terraform apply` for the plan that matches the directory/project/workspace.
 
 ::: tip
-If no directory/project/workspace is specified, ex. `atlantis apply`, this command will apply **all unapplied plans**.
+If no directory/project/workspace is specified, ex. `atlantis apply`, this command will apply **all unapplied plans from this pull request**.
 :::
 
 ### Examples
 ```bash
-# Runs apply for all unapplied plans.
+# Runs apply for all unapplied plans from this pull request.
 atlantis apply
 
 # Runs apply in the root directory of the repo with workspace `default`.
