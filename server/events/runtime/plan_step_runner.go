@@ -10,9 +10,18 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-// atlantisUserTFVar is the name of the variable we execute terraform
-// with, containing the vcs username of who is running the command
+// atlantisUserTFVar is the name of the tf variable we execute terraform
+// with set to the vcs username of who caused the plan command to run.
 const atlantisUserTFVar = "atlantis_user"
+
+// atlantisRepoTFVar is the name of the tf variable we execute terraform
+// with set to the full name of the repository this pull request is from, ex.
+// "runatlantis/atlantis", "repo/gitlab/subgroup".
+const atlantisRepoTFVar = "atlantis_repo"
+
+// atlantisPullNumTFVar is the name of the tf variable we execute terraform
+// with set to the number of the pull request.
+const atlantisPullNumTFVar = "atlantis_pull_num"
 const defaultWorkspace = "default"
 
 type PlanStepRunner struct {
@@ -32,20 +41,8 @@ func (p *PlanStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []strin
 		return "", err
 	}
 
-	planFile := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectConfig))
-	userVar := fmt.Sprintf("%s=%s", atlantisUserTFVar, ctx.User.Username)
-	tfPlanCmd := append(append([]string{"plan", "-input=false", "-refresh", "-no-color", "-out", planFile, "-var", userVar}, extraArgs...), ctx.CommentArgs...)
-
-	// Check if env/{workspace}.tfvars exist and include it. This is a use-case
-	// from Hootsuite where Atlantis was first created so we're keeping this as
-	// an homage and a favor so they don't need to refactor all their repos.
-	// It's also a nice way to structure your repos to reduce duplication.
-	optionalEnvFile := filepath.Join(path, "env", ctx.Workspace+".tfvars")
-	if _, err := os.Stat(optionalEnvFile); err == nil {
-		tfPlanCmd = append(tfPlanCmd, "-var-file", optionalEnvFile)
-	}
-
-	return p.TerraformExecutor.RunCommandWithVersion(ctx.Log, filepath.Join(path), tfPlanCmd, tfVersion, ctx.Workspace)
+	planCmd := p.buildPlanCmd(ctx, extraArgs, path)
+	return p.TerraformExecutor.RunCommandWithVersion(ctx.Log, filepath.Clean(path), planCmd, tfVersion, ctx.Workspace)
 }
 
 // switchWorkspace changes the terraform workspace if necessary and will create
@@ -96,4 +93,54 @@ func (p *PlanStepRunner) switchWorkspace(ctx models.ProjectCommandContext, path 
 		return err
 	}
 	return nil
+}
+
+func (p *PlanStepRunner) buildPlanCmd(ctx models.ProjectCommandContext, extraArgs []string, path string) []string {
+	tfVars := p.tfVars(ctx.User.Username, ctx.BaseRepo.FullName, ctx.Pull.Num)
+	planFile := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectConfig))
+
+	// Check if env/{workspace}.tfvars exist and include it. This is a use-case
+	// from Hootsuite where Atlantis was first created so we're keeping this as
+	// an homage and a favor so they don't need to refactor all their repos.
+	// It's also a nice way to structure your repos to reduce duplication.
+	var envFileArgs []string
+	envFile := filepath.Join(path, "env", ctx.Workspace+".tfvars")
+	if _, err := os.Stat(envFile); err == nil {
+		envFileArgs = []string{"-var-file", envFile}
+	}
+
+	argList := [][]string{
+		{"plan", "-input=false", "-refresh", "-no-color", "-out", planFile},
+		tfVars,
+		extraArgs,
+		ctx.CommentArgs,
+		envFileArgs,
+	}
+
+	return p.flatten(argList)
+}
+
+// tfVars returns a list of "-var", "key=value" pairs that identify who and which
+// repo this command is running for. This can be used for naming the
+// session name in AWS which will identify in CloudTrail the source of
+// Atlantis API calls.
+func (p *PlanStepRunner) tfVars(username string, baseRepoFullName string, pullNum int) []string {
+	// NOTE: not using maps and looping here because we need to keep the
+	// ordering for testing purposes.
+	return []string{
+		"-var",
+		fmt.Sprintf("%s=%s", atlantisUserTFVar, username),
+		"-var",
+		fmt.Sprintf("%s=%s", atlantisRepoTFVar, baseRepoFullName),
+		"-var",
+		fmt.Sprintf("%s=%d", atlantisPullNumTFVar, pullNum),
+	}
+}
+
+func (p *PlanStepRunner) flatten(slices [][]string) []string {
+	var flattened []string
+	for _, v := range slices {
+		flattened = append(flattened, v...)
+	}
+	return flattened
 }
