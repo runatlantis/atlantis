@@ -16,6 +16,9 @@ const atlantisUserTFVar = "atlantis_user"
 // atlantisRepoTFVar is the name of the variable we execute terraform
 // in, containing the vcs repo name of who is running the command
 const atlantisRepoTFVar = "atlantis_repo"
+// atlantisPullNumTFVar is variable name of the Pull Request Number we execute
+// terraform in
+const atlantisPullNumTFVar = "atlantis_pull_num"
 const defaultWorkspace = "default"
 
 type PlanStepRunner struct {
@@ -38,7 +41,8 @@ func (p *PlanStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []strin
 	planFile := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectConfig))
 	userVar := fmt.Sprintf("%s=%s", atlantisUserTFVar, ctx.User.Username)
 	repoVar := fmt.Sprintf("%s=%s", atlantisiRepoTFVar, ctx.BaseRepo.FullName)
-	tfPlanCmd := append(append([]string{"plan", "-input=false", "-refresh", "-no-color", "-out", planFile, "-var", userVar, "-var", repoVar}, extraArgs...), ctx.CommentArgs...)
+	pullNumVar := fmt.Sprintf("%s=%s", atlantisPullNumTFVar, ctx.Pull.Num)
+	tfPlanCmd := append(append([]string{"plan", "-input=false", "-refresh", "-no-color", "-out", planFile, "-var", userVar, "-var", repoVar, "-var", pullNumVar}, extraArgs...), ctx.CommentArgs...)
 
 	// Check if env/{workspace}.tfvars exist and include it. This is a use-case
 	// from Hootsuite where Atlantis was first created so we're keeping this as
