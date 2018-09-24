@@ -40,7 +40,7 @@ func (p *PlanStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []strin
 
 	planFile := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectConfig))
 	userVar := fmt.Sprintf("%s=%s", atlantisUserTFVar, ctx.User.Username)
-	repoVar := fmt.Sprintf("%s=%s", atlantisiRepoTFVar, ctx.BaseRepo.FullName)
+	repoVar := fmt.Sprintf("%s=%s", atlantisRepoTFVar, ctx.BaseRepo.FullName)
 	pullNumVar := fmt.Sprintf("%s=%s", atlantisPullNumTFVar, ctx.Pull.Num)
 	tfPlanCmd := append(append([]string{"plan", "-input=false", "-refresh", "-no-color", "-out", planFile, "-var", userVar, "-var", repoVar, "-var", pullNumVar}, extraArgs...), ctx.CommentArgs...)
 
