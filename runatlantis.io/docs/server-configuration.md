@@ -47,26 +47,36 @@ won't work for multiple accounts since Atlantis wouldn't know which environment 
 Terraform with.
 
 ### Assume Role Session Names
-Atlantis injects the Terraform variable `atlantis_user` and sets it to the GitHub username of
-the user that is running the Atlantis command. This can be used to dynamically name the assume role
-session which would allow you to view the GitHub username associated with the AWS API calls
-being made during a `plan` or `apply` in CloudWatch.
+Atlantis injects 3 Terraform variables that can be used to dynamically name the assume role
+session:
 
-To take advantage of this feature, use Terraform's [built-in support](https://www.terraform.io/docs/providers/aws/#assume-role) for assume role
-and use the `atlantis_user` terraform variable
-
-```hcl
-provider "aws" {
-  assume_role {
-    role_arn     = "arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME"
-    session_name = "${var.atlantis_user}"
-  }
-}
-
+```bash
+# Set to the VCS username of who is running the plan command, ex. lkysow
 variable "atlantis_user" {
   default = "atlantis_user"
 }
+
+# Set to the full name of the repo the pull request is in, ex. runatlantis/atlantis
+variable "atlantis_repo" {
+  default = "atlantis_repo"
+}
+
+# Set to the pull request number, ex. 200
+variable "atlantis_pull_num" {
+  default = "atlantis_pull_num"
+}
+
+# Can be used within the assume_role block for session_name.
+provider "aws" {
+  assume_role {
+    role_arn     = "arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME"
+    session_name = "${var.atlantis_user}:${var.atlantis_repo}:${var.atlantis_pull_num}"
+  }
+}
 ```
+
+Setting `session_name` allows you to trace where API calls made through Atlantis came from in
+CloudWatch.
 
 If you're also using the [S3 Backend](https://www.terraform.io/docs/backends/types/s3.html)
 make sure to add the `role_arn` option:
@@ -85,8 +95,10 @@ terraform {
 }
 ```
 
+::: warning
 Terraform doesn't support interpolations in backend config so you will not be
 able to use `session_name = "${var.atlantis_user}"`. However, the backend assumed
 role is only used for state-related API actions. Any other API actions will be performed using
 the assumed role specified in the `aws` provider and will have the session named as the GitHub user.
+:::
 
