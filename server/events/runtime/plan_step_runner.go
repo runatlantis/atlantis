@@ -110,7 +110,9 @@ func (p *PlanStepRunner) buildPlanCmd(ctx models.ProjectCommandContext, extraArg
 	}
 
 	argList := [][]string{
-		{"plan", "-input=false", "-refresh", "-no-color", "-out", planFile},
+		// NOTE: we need to quote the plan filename because Bitbucket Server can
+		// have spaces in its repo owner names.
+		{"plan", "-input=false", "-refresh", "-no-color", "-out", fmt.Sprintf("%q", planFile)},
 		tfVars,
 		extraArgs,
 		ctx.CommentArgs,
