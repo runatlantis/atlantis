@@ -31,10 +31,11 @@ import (
 // Repo is a VCS repository.
 type Repo struct {
 	// FullName is the owner and repo name separated
-	// by a "/", ex. "runatlantis/atlantis" or "gitlab/subgroup/atlantis"
+	// by a "/", ex. "runatlantis/atlantis", "gitlab/subgroup/atlantis", "Bitbucket Server/atlantis".
 	FullName string
 	// Owner is just the repo owner, ex. "runatlantis" or "gitlab/subgroup".
 	// This may contain /'s in the case of GitLab subgroups.
+	// This may contain spaces in the case of Bitbucket Server.
 	Owner string
 	// Name is just the repo name, ex. "atlantis". This will never have
 	// /'s in it.

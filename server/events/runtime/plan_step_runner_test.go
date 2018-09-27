@@ -1,6 +1,7 @@
 package runtime_test
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -58,7 +59,7 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 			"-refresh",
 			"-no-color",
 			"-out",
-			"/path/default.tfplan",
+			"\"/path/default.tfplan\"",
 			"-var",
 			"atlantis_user=username",
 			"-var",
@@ -187,7 +188,7 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 					"-refresh",
 					"-no-color",
 					"-out",
-					"/path/workspace.tfplan",
+					"\"/path/workspace.tfplan\"",
 					"-var",
 					"atlantis_user=username",
 					"-var",
@@ -252,7 +253,7 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 				"-refresh",
 				"-no-color",
 				"-out",
-				"/path/workspace.tfplan",
+				"\"/path/workspace.tfplan\"",
 				"-var",
 				"atlantis_user=username",
 				"-var",
@@ -306,7 +307,7 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 		"-refresh",
 		"-no-color",
 		"-out",
-		"/path/workspace.tfplan",
+		"\"/path/workspace.tfplan\"",
 		"-var",
 		"atlantis_user=username",
 		"-var",
@@ -368,7 +369,7 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 		"-refresh",
 		"-no-color",
 		"-out",
-		filepath.Join(tmpDir, "workspace.tfplan"),
+		fmt.Sprintf("%q", filepath.Join(tmpDir, "workspace.tfplan")),
 		"-var",
 		"atlantis_user=username",
 		"-var",
@@ -423,7 +424,7 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 		"-refresh",
 		"-no-color",
 		"-out",
-		"/path/projectname-default.tfplan",
+		"\"/path/projectname-default.tfplan\"",
 		"-var",
 		"atlantis_user=username",
 		"-var",
