@@ -1,3 +1,46 @@
+# v0.4.9
+
+## Description
+This release is mostly focused on changing how comments look. Terraform output
+is now automatically hidden if it's over 12 lines long:
+![https://user-images.githubusercontent.com/1034429/45580771-d4603b80-b849-11e8-8c4b-5984bd0bff7f.png](https://user-images.githubusercontent.com/1034429/45580771-d4603b80-b849-11e8-8c4b-5984bd0bff7f.png)
+Also the red and green highlighting for added and removed resources is fixed:
+![https://user-images.githubusercontent.com/1034429/45580777-d9bd8600-b849-11e8-8f2d-867fbf4e72d7.png](https://user-images.githubusercontent.com/1034429/45580777-d9bd8600-b849-11e8-8f2d-867fbf4e72d7.png)
+
+Diff: https://github.com/runatlantis/atlantis/compare/v0.4.8...v0.4.9
+
+## Features
+* Terraform output over 12 lines is hidden in comment until expanded
+* `terraform plan` output is highlighted correctly
+* Terraform is now executed with `-var atlantis_repo={repo name} -var atlantis_pull_num {pull num}`.
+This will allow users to trace Atlantis `terraform` executions in CloudTrail back to a specific
+user and pull request if using assume role by creating a specific name for the session Terraform initiates.
+```
+provider "aws" {
+  assume_role {
+    role_arn     = "arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME"
+    session_name = "${var.atlantis_user}:${var.atlantis_repo}:${var.atlantis_pull_num}"
+  }
+}
+```
+
+## Bugfixes
+* Run terraform with `-input=false` ([#268](https://github.com/runatlantis/atlantis/issues/268)).
+
+## Backwards Incompatibilities / Notes:
+* We set two new Terraform variables: `atlantis_repo` and `atlantis_pull_num`. If
+you were using variables with those names in your code you will need to rename them
+in your code.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.9/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.9/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.9/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.9/atlantis_linux_arm.zip)
+
+## Docker
+`runatlantis/atlantis:v0.4.9`
+
 # v0.4.8
 
 ## Description
