@@ -26,7 +26,8 @@ Plan: 1 to add, 0 to change, 0 to destroy.
     * `atlantis apply -w new_workspace`
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * `atlantis plan -w new_workspace -- -var var=new_workspace`</details>
+    * `atlantis plan -w new_workspace -- -var var=new_workspace`
+</details>
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:

@@ -36,13 +36,13 @@ func TestRenderErr(t *testing.T) {
 			"apply error",
 			events.ApplyCommand,
 			err,
-			"**Apply Error**\n```\nerr\n```\n\n",
+			"**Apply Error**\n```\nerr\n```\n",
 		},
 		{
 			"plan error",
 			events.PlanCommand,
 			err,
-			"**Plan Error**\n```\nerr\n```\n\n",
+			"**Plan Error**\n```\nerr\n```\n",
 		},
 	}
 
@@ -76,13 +76,13 @@ func TestRenderFailure(t *testing.T) {
 			"apply failure",
 			events.ApplyCommand,
 			"failure",
-			"**Apply Failed**: failure\n\n",
+			"**Apply Failed**: failure\n",
 		},
 		{
 			"plan failure",
 			events.PlanCommand,
 			"failure",
-			"**Plan Failed**: failure\n\n",
+			"**Plan Failed**: failure\n",
 		},
 	}
 
@@ -113,7 +113,7 @@ func TestRenderErrAndFailure(t *testing.T) {
 		Failure: "failure",
 	}
 	s := r.Render(res, events.PlanCommand, "", false, models.Github)
-	Equals(t, "**Plan Error**\n```\nerror\n```\n\n", s)
+	Equals(t, "**Plan Error**\n```\nerror\n```\n", s)
 }
 
 func TestRenderProjectResults(t *testing.T) {
@@ -223,6 +223,7 @@ $$$
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path -w workspace$
+
 ---
 ### 2. workspace: $workspace$ dir: $path2$
 $$$diff
@@ -234,6 +235,7 @@ $$$
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url2)
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path2 -w workspace$
+
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
@@ -263,11 +265,13 @@ $$$
 $$$diff
 success
 $$$
+
 ---
 ### 2. workspace: $workspace$ dir: $path2$
 $$$diff
 success2
 $$$
+
 ---
 
 `,
@@ -290,7 +294,6 @@ $$$
 error
 $$$
 
-
 `,
 		},
 		{
@@ -307,7 +310,6 @@ $$$
 			`Ran Plan in dir: $path$ workspace: $workspace$
 
 **Plan Failed**: failure
-
 
 `,
 		},
@@ -352,6 +354,7 @@ $$$
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path -w workspace$
+
 ---
 ### 2. workspace: $workspace$ dir: $path2$
 **Plan Failed**: failure
@@ -398,6 +401,7 @@ $$$
 $$$diff
 success
 $$$
+
 ---
 ### 2. workspace: $workspace$ dir: $path2$
 **Apply Failed**: failure
@@ -443,6 +447,7 @@ $$$
 $$$diff
 success
 $$$
+
 ---
 ### 2. workspace: $workspace$ dir: $path2$
 **Apply Failed**: failure
@@ -568,7 +573,8 @@ $$$
     * $atlantis apply -d .$
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * $atlantis plan -d .$</details>
+    * $atlantis plan -d .$
+</details>
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
@@ -661,7 +667,6 @@ $$$
 $$$
 ` + c.Output + `
 $$$
-
 
 `
 				}
@@ -768,7 +773,8 @@ $$$
     * $applycmd$
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * $replancmd$</details>
+    * $replancmd$
+</details>
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
@@ -822,7 +828,7 @@ $$$
 	}
 }
 
-func TestRenderProjectResults_MultiProjectWrapped(t *testing.T) {
+func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
 	mr := events.MarkdownRenderer{}
 	tfOut := strings.Repeat("line\n", 13)
 	rendered := mr.Render(events.CommandResult{
@@ -850,6 +856,7 @@ $$$diff
 ` + tfOut + `
 $$$
 </details>
+
 ---
 ### 2. workspace: $production$ dir: $.$
 <details><summary>Show Output</summary>
@@ -858,8 +865,77 @@ $$$diff
 ` + tfOut + `
 $$$
 </details>
+
 ---
 
+`
+	expWithBackticks := strings.Replace(exp, "$", "`", -1)
+	Equals(t, expWithBackticks, rendered)
+}
+
+func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
+	mr := events.MarkdownRenderer{}
+	tfOut := strings.Repeat("line\n", 13)
+	rendered := mr.Render(events.CommandResult{
+		ProjectResults: []events.ProjectResult{
+			{
+				RepoRelDir: ".",
+				Workspace:  "staging",
+				PlanSuccess: &events.PlanSuccess{
+					TerraformOutput: tfOut,
+					LockURL:         "staging-lock-url",
+					ApplyCmd:        "staging-apply-cmd",
+					RePlanCmd:       "staging-replan-cmd",
+				},
+			},
+			{
+				RepoRelDir: ".",
+				Workspace:  "production",
+				PlanSuccess: &events.PlanSuccess{
+					TerraformOutput: tfOut,
+					LockURL:         "production-lock-url",
+					ApplyCmd:        "production-apply-cmd",
+					RePlanCmd:       "production-replan-cmd",
+				},
+			},
+		},
+	}, events.PlanCommand, "log", false, models.Github)
+	exp := `Ran Plan for 2 projects:
+1. workspace: $staging$ dir: $.$
+1. workspace: $production$ dir: $.$
+
+### 1. workspace: $staging$ dir: $.$
+<details><summary>Show Output</summary>
+
+$$$diff
+` + tfOut + `
+$$$
+
+* :arrow_forward: To **apply** this plan, comment:
+    * $staging-apply-cmd$
+* :put_litter_in_its_place: To **delete** this plan click [here](staging-lock-url)
+* :repeat: To **plan** this project again, comment:
+    * $staging-replan-cmd$
+</details>
+
+---
+### 2. workspace: $production$ dir: $.$
+<details><summary>Show Output</summary>
+
+$$$diff
+` + tfOut + `
+$$$
+
+* :arrow_forward: To **apply** this plan, comment:
+    * $production-apply-cmd$
+* :put_litter_in_its_place: To **delete** this plan click [here](production-lock-url)
+* :repeat: To **plan** this project again, comment:
+    * $production-replan-cmd$
+</details>
+
+---
+* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
+    * $atlantis apply$
 `
 	expWithBackticks := strings.Replace(exp, "$", "`", -1)
 	Equals(t, expWithBackticks, rendered)

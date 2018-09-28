@@ -15,6 +15,7 @@ var = fromconfig
 workspace = default
 
 ```
+
 ---
 ### 2. workspace: `staging` dir: `.`
 ```diff
@@ -29,5 +30,6 @@ var = fromfile
 workspace = staging
 
 ```
+
 ---
 
