@@ -15,6 +15,7 @@ var = default_workspace
 workspace = default
 
 ```
+
 ---
 ### 2. workspace: `new_workspace` dir: `.`
 ```diff
@@ -29,5 +30,6 @@ var = new_workspace
 workspace = new_workspace
 
 ```
+
 ---
 

@@ -204,7 +204,7 @@ var multiProjectPlanTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap
 		"{{end}}\n" +
 		"{{ range $i, $result := .Results }}" +
 		"### {{add $i 1}}. workspace: `{{$result.Workspace}}` dir: `{{$result.RepoRelDir}}`\n" +
-		"{{$result.Rendered}}\n" +
+		"{{$result.Rendered}}\n\n" +
 		"---\n{{end}}{{ if gt (len .Results) 0 }}* :fast_forward: To **apply** all unapplied plans from this pull request, comment:\n" +
 		"    * `atlantis apply`{{end}}" +
 		logTmpl))
@@ -215,7 +215,7 @@ var multiProjectApplyTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMa
 		"{{end}}\n" +
 		"{{ range $i, $result := .Results }}" +
 		"### {{add $i 1}}. workspace: `{{$result.Workspace}}` dir: `{{$result.RepoRelDir}}`\n" +
-		"{{$result.Rendered}}\n" +
+		"{{$result.Rendered}}\n\n" +
 		"---\n{{end}}" +
 		logTmpl))
 var planSuccessUnwrappedTmpl = template.Must(template.New("").Parse(
@@ -227,7 +227,7 @@ var planSuccessWrappedTmpl = template.Must(template.New("").Parse(
 		"```diff\n" +
 		"{{.TerraformOutput}}\n" +
 		"```\n\n" +
-		planNextSteps +
+		planNextSteps + "\n" +
 		"</details>"))
 
 // planNextSteps are instructions appended after successful plans as to what
@@ -250,7 +250,7 @@ var applyWrappedSuccessTmpl = template.Must(template.New("").Parse(
 var unwrappedErrTmplText = "**{{.Command}} Error**\n" +
 	"```\n" +
 	"{{.Error}}\n" +
-	"```\n"
+	"```"
 var wrappedErrTmplText = "**{{.Command}} Error**\n" +
 	"<details><summary>Show Output</summary>\n\n" +
 	"```\n" +
@@ -259,7 +259,7 @@ var wrappedErrTmplText = "**{{.Command}} Error**\n" +
 var unwrappedErrTmpl = template.Must(template.New("").Parse(unwrappedErrTmplText))
 var unwrappedErrWithLogTmpl = template.Must(template.New("").Parse(unwrappedErrTmplText + logTmpl))
 var wrappedErrTmpl = template.Must(template.New("").Parse(wrappedErrTmplText))
-var failureTmplText = "**{{.Command}} Failed**: {{.Failure}}\n"
+var failureTmplText = "**{{.Command}} Failed**: {{.Failure}}"
 var failureTmpl = template.Must(template.New("").Parse(failureTmplText))
 var failureWithLogTmpl = template.Must(template.New("").Parse(failureTmplText + logTmpl))
 var logTmpl = "{{if .Verbose}}\n<details><summary>Log</summary>\n  <p>\n\n```\n{{.Log}}```\n</p></details>{{end}}\n"
