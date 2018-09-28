@@ -9,8 +9,8 @@ Diff: https://github.com/runatlantis/atlantis/compare/v0.4.9...v0.4.10
 None
 
 ## Bugfixes
-* Fix bad comment rendering ((#294)[https://github.com/runatlantis/atlantis/issues/294])
-* Fix `plan` not working on Bitbucket Server when repo owner contains spaces ((#290)[https://github.com/runatlantis/atlantis/issues/290])
+* Fix bad comment rendering ([#294](https://github.com/runatlantis/atlantis/issues/294))
+* Fix `plan` not working on Bitbucket Server when repo owner contains spaces ([#290](https://github.com/runatlantis/atlantis/issues/290))
 
 ## Backwards Incompatibilities / Notes:
 None
