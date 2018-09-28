@@ -1,3 +1,29 @@
+# v0.4.10
+
+## Description
+Small bugfix release to fix issues with new comment format.
+
+Diff: https://github.com/runatlantis/atlantis/compare/v0.4.9...v0.4.10
+
+## Features
+None
+
+## Bugfixes
+* Fix bad comment rendering ((#294)[https://github.com/runatlantis/atlantis/issues/294])
+* Fix `plan` not working on Bitbucket Server when repo owner contains spaces ((#290)[https://github.com/runatlantis/atlantis/issues/290])
+
+## Backwards Incompatibilities / Notes:
+None
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.10/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.10/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.10/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.10/atlantis_linux_arm.zip)
+
+## Docker
+`runatlantis/atlantis:v0.4.10`
+
 # v0.4.9
 
 ## Description
