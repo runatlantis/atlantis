@@ -44,6 +44,15 @@ atlantis server --gh-user <your username> --gh-token <your token> --repo-whiteli
 ```
 If you get an error like `command not found: atlantis`, ensure that `$GOPATH/bin` is in your `$PATH`.
 
+Running Tests Locally:
+
+`make test`. If you want to run the integration tests that actually run real `terraform` commands, run `make test-all`.
+
+Running Tests In Docker:
+```
+docker run --rm -v $(pwd):/go/src/github.com/runatlantis/atlantis -w /go/src/github.com/runatlantis/atlantis runatlantis/testing-env make test
+```
+
 ## Calling Your Local Atlantis From GitHub
 - Create a test terraform repository in your GitHub.
 - Create a personal access token for Atlantis. See [Create a GitHub token](https://github.com/runatlantis/atlantis#create-a-github-token).
