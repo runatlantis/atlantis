@@ -10,18 +10,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-// atlantisUserTFVar is the name of the tf variable we execute terraform
-// with set to the vcs username of who caused the plan command to run.
-const atlantisUserTFVar = "atlantis_user"
-
-// atlantisRepoTFVar is the name of the tf variable we execute terraform
-// with set to the full name of the repository this pull request is from, ex.
-// "runatlantis/atlantis", "repo/gitlab/subgroup".
-const atlantisRepoTFVar = "atlantis_repo"
-
-// atlantisPullNumTFVar is the name of the tf variable we execute terraform
-// with set to the number of the pull request.
-const atlantisPullNumTFVar = "atlantis_pull_num"
 const defaultWorkspace = "default"
 
 type PlanStepRunner struct {
@@ -96,7 +84,7 @@ func (p *PlanStepRunner) switchWorkspace(ctx models.ProjectCommandContext, path 
 }
 
 func (p *PlanStepRunner) buildPlanCmd(ctx models.ProjectCommandContext, extraArgs []string, path string) []string {
-	tfVars := p.tfVars(ctx.User.Username, ctx.BaseRepo.FullName, ctx.Pull.Num)
+	tfVars := p.tfVars(ctx)
 	planFile := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectConfig))
 
 	// Check if env/{workspace}.tfvars exist and include it. This is a use-case
@@ -126,16 +114,20 @@ func (p *PlanStepRunner) buildPlanCmd(ctx models.ProjectCommandContext, extraArg
 // repo this command is running for. This can be used for naming the
 // session name in AWS which will identify in CloudTrail the source of
 // Atlantis API calls.
-func (p *PlanStepRunner) tfVars(username string, baseRepoFullName string, pullNum int) []string {
+func (p *PlanStepRunner) tfVars(ctx models.ProjectCommandContext) []string {
 	// NOTE: not using maps and looping here because we need to keep the
 	// ordering for testing purposes.
 	return []string{
 		"-var",
-		fmt.Sprintf("%s=%s", atlantisUserTFVar, username),
+		fmt.Sprintf("%s=%s", "atlantis_user", ctx.User.Username),
 		"-var",
-		fmt.Sprintf("%s=%s", atlantisRepoTFVar, baseRepoFullName),
+		fmt.Sprintf("%s=%s", "atlantis_repo", ctx.BaseRepo.FullName),
 		"-var",
-		fmt.Sprintf("%s=%d", atlantisPullNumTFVar, pullNum),
+		fmt.Sprintf("%s=%s", "atlantis_repo_name", ctx.BaseRepo.Name),
+		"-var",
+		fmt.Sprintf("%s=%s", "atlantis_repo_owner", ctx.BaseRepo.Owner),
+		"-var",
+		fmt.Sprintf("%s=%d", "atlantis_pull_num", ctx.Pull.Num),
 	}
 }
 
