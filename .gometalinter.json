@@ -37,7 +37,6 @@
       "Command": "errcheck -abspath -ignore 'fmt:.*'",
       "Pattern": "PATH:LINE:COL:MESSAGE",
       "PartitionStrategy": "packages"
-    },
-    "unconvert": {"Command": "unconvert --all"}
+    }
   }
 }
