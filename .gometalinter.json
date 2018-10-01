@@ -38,5 +38,6 @@
       "Pattern": "PATH:LINE:COL:MESSAGE",
       "PartitionStrategy": "packages"
     }
+    "unconvert": {"Command": "unconvert --all"}
   }
 }
