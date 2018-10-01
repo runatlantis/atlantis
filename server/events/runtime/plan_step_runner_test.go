@@ -46,6 +46,8 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 		},
 		BaseRepo: models.Repo{
 			FullName: "owner/repo",
+			Owner:    "owner",
+			Name:     "repo",
 		},
 	}, []string{"extra", "args"}, "/path")
 	Ok(t, err)
@@ -64,6 +66,10 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 			"atlantis_user=username",
 			"-var",
 			"atlantis_repo=owner/repo",
+			"-var",
+			"atlantis_repo_name=repo",
+			"-var",
+			"atlantis_repo_owner=owner",
 			"-var",
 			"atlantis_pull_num=2",
 			"extra",
@@ -167,6 +173,8 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 				},
 				BaseRepo: models.Repo{
 					FullName: "owner/repo",
+					Owner:    "owner",
+					Name:     "repo",
 				},
 			}, []string{"extra", "args"}, "/path")
 			Ok(t, err)
@@ -193,6 +201,10 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 					"atlantis_user=username",
 					"-var",
 					"atlantis_repo=owner/repo",
+					"-var",
+					"atlantis_repo_name=repo",
+					"-var",
+					"atlantis_repo_owner=owner",
 					"-var",
 					"atlantis_pull_num=2",
 					"extra",
@@ -259,6 +271,10 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 				"-var",
 				"atlantis_repo=owner/repo",
 				"-var",
+				"atlantis_repo_name=repo",
+				"-var",
+				"atlantis_repo_owner=owner",
+				"-var",
 				"atlantis_pull_num=2",
 				"extra",
 				"args",
@@ -277,6 +293,8 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 				},
 				BaseRepo: models.Repo{
 					FullName: "owner/repo",
+					Owner:    "owner",
+					Name:     "repo",
 				},
 			}, []string{"extra", "args"}, "/path")
 			Ok(t, err)
@@ -313,6 +331,10 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 		"-var",
 		"atlantis_repo=owner/repo",
 		"-var",
+		"atlantis_repo_name=repo",
+		"-var",
+		"atlantis_repo_owner=owner",
+		"-var",
 		"atlantis_pull_num=2",
 		"extra",
 		"args",
@@ -331,6 +353,8 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 		},
 		BaseRepo: models.Repo{
 			FullName: "owner/repo",
+			Owner:    "owner",
+			Name:     "repo",
 		},
 	}, []string{"extra", "args"}, "/path")
 	Ok(t, err)
@@ -375,6 +399,10 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 		"-var",
 		"atlantis_repo=owner/repo",
 		"-var",
+		"atlantis_repo_name=repo",
+		"-var",
+		"atlantis_repo_owner=owner",
+		"-var",
 		"atlantis_pull_num=2",
 		"extra",
 		"args",
@@ -396,6 +424,8 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 		},
 		BaseRepo: models.Repo{
 			FullName: "owner/repo",
+			Owner:    "owner",
+			Name:     "repo",
 		},
 	}, []string{"extra", "args"}, tmpDir)
 	Ok(t, err)
@@ -430,6 +460,10 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 		"-var",
 		"atlantis_repo=owner/repo",
 		"-var",
+		"atlantis_repo_name=repo",
+		"-var",
+		"atlantis_repo_owner=owner",
+		"-var",
 		"atlantis_pull_num=2",
 		"extra",
 		"args",
@@ -453,6 +487,8 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 		},
 		BaseRepo: models.Repo{
 			FullName: "owner/repo",
+			Owner:    "owner",
+			Name:     "repo",
 		},
 	}, []string{"extra", "args"}, "/path")
 	Ok(t, err)

@@ -70,7 +70,7 @@ variable "atlantis_pull_num" {
 provider "aws" {
   assume_role {
     role_arn     = "arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME"
-    session_name = "${var.atlantis_user}-${var.atlantis_repo}-${var.atlantis_pull_num}"
+    session_name = "${var.atlantis_user}-${var.atlantis_repo_owner}-${var.atlantis_repo_name}-${var.atlantis_pull_num}"
   }
 }
 ```
@@ -97,7 +97,7 @@ terraform {
 
 ::: warning
 Terraform doesn't support interpolations in backend config so you will not be
-able to use `session_name = "${var.atlantis_user}"`. However, the backend assumed
+able to use `session_name = "${var.atlantis_user}"` in your backend block. However, the backend assumed
 role is only used for state-related API actions. Any other API actions will be performed using
 the assumed role specified in the `aws` provider and will have the session named as the GitHub user.
 :::
