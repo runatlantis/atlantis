@@ -41,7 +41,7 @@ const ngrokAPIURL = "localhost:41414" // We hope this isn't used.
 const atlantisPort = 4141
 
 func readPassword() (string, error) {
-	password, err := terminal.ReadPassword(syscall.Stdin)
+	password, err := terminal.ReadPassword(int(syscall.Stdin)) // nolint: unconvert
 	return string(password), err
 }
 
