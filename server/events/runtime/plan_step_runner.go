@@ -117,15 +117,17 @@ func (p *PlanStepRunner) buildPlanCmd(ctx models.ProjectCommandContext, extraArg
 func (p *PlanStepRunner) tfVars(ctx models.ProjectCommandContext) []string {
 	// NOTE: not using maps and looping here because we need to keep the
 	// ordering for testing purposes.
+	// NOTE: quoting the values because in Bitbucket the owner can have
+	// spaces, ex -var atlantis_repo_owner="bitbucket owner".
 	return []string{
 		"-var",
-		fmt.Sprintf("%s=%s", "atlantis_user", ctx.User.Username),
+		fmt.Sprintf("%s=%q", "atlantis_user", ctx.User.Username),
 		"-var",
-		fmt.Sprintf("%s=%s", "atlantis_repo", ctx.BaseRepo.FullName),
+		fmt.Sprintf("%s=%q", "atlantis_repo", ctx.BaseRepo.FullName),
 		"-var",
-		fmt.Sprintf("%s=%s", "atlantis_repo_name", ctx.BaseRepo.Name),
+		fmt.Sprintf("%s=%q", "atlantis_repo_name", ctx.BaseRepo.Name),
 		"-var",
-		fmt.Sprintf("%s=%s", "atlantis_repo_owner", ctx.BaseRepo.Owner),
+		fmt.Sprintf("%s=%q", "atlantis_repo_owner", ctx.BaseRepo.Owner),
 		"-var",
 		fmt.Sprintf("%s=%d", "atlantis_pull_num", ctx.Pull.Num),
 	}

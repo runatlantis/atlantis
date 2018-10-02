@@ -1,6 +1,7 @@
 package runtime_test
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -63,7 +64,7 @@ func TestRun_Success(t *testing.T) {
 	}, []string{"extra", "args"}, tmpDir)
 	Ok(t, err)
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", planPath}, nil, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, nil, "workspace")
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
@@ -95,7 +96,7 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 	}, []string{"extra", "args"}, tmpDir)
 	Ok(t, err)
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", planPath}, nil, "default")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, nil, "default")
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
@@ -126,7 +127,7 @@ func TestRun_UsesConfiguredTFVersion(t *testing.T) {
 	}, []string{"extra", "args"}, tmpDir)
 	Ok(t, err)
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", planPath}, tfVersion, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, tfVersion, "workspace")
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
