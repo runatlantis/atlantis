@@ -84,6 +84,7 @@ type UserConfig struct {
 	AllowForkPRs           bool   `mapstructure:"allow-fork-prs"`
 	AllowRepoConfig        bool   `mapstructure:"allow-repo-config"`
 	AtlantisURL            string `mapstructure:"atlantis-url"`
+	AtlantisYAMLFilename   string `mapstructure:"atlantis-yaml-filename"`
 	BitbucketBaseURL       string `mapstructure:"bitbucket-base-url"`
 	BitbucketToken         string `mapstructure:"bitbucket-token"`
 	BitbucketUser          string `mapstructure:"bitbucket-user"`
@@ -275,6 +276,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			WorkingDirLocker:    workingDirLocker,
 			AllowRepoConfig:     userConfig.AllowRepoConfig,
 			AllowRepoConfigFlag: config.AllowRepoConfigFlag,
+			AtlantisYAMLFilename: userConfig.AtlantisYAMLFilename,
 			PendingPlanFinder:   &events.PendingPlanFinder{},
 			CommentBuilder:      commentParser,
 		},

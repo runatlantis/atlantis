@@ -37,6 +37,7 @@ const (
 	AllowForkPRsFlag           = "allow-fork-prs"
 	AllowRepoConfigFlag        = "allow-repo-config"
 	AtlantisURLFlag            = "atlantis-url"
+	AtlantisYAMLFilenameFlag   = "atlantis.yaml"
 	BitbucketBaseURLFlag       = "bitbucket-base-url"
 	BitbucketTokenFlag         = "bitbucket-token"
 	BitbucketUserFlag          = "bitbucket-user"
@@ -74,6 +75,10 @@ var stringFlags = []stringFlag{
 	{
 		name:        AtlantisURLFlag,
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ".",
+	},
+	{
+		name:        AtlantisYAMLFilenameFlag,
+		description: "The name of the Atlantis config yaml file contained in each repo. Defaults to atlantis.yaml.",
 	},
 	{
 		name:        BitbucketUserFlag,
