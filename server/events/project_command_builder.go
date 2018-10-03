@@ -42,15 +42,16 @@ type ProjectCommandBuilder interface {
 // This class combines the data from the comment and any repo config file or
 // Atlantis server config and then generates a set of contexts.
 type DefaultProjectCommandBuilder struct {
-	ParserValidator     *yaml.ParserValidator
-	ProjectFinder       ProjectFinder
-	VCSClient           vcs.ClientProxy
-	WorkingDir          WorkingDir
-	WorkingDirLocker    WorkingDirLocker
-	AllowRepoConfig     bool
-	AllowRepoConfigFlag string
-	PendingPlanFinder   *PendingPlanFinder
-	CommentBuilder      CommentBuilder
+	ParserValidator      *yaml.ParserValidator
+	ProjectFinder        ProjectFinder
+	VCSClient            vcs.ClientProxy
+	WorkingDir           WorkingDir
+	WorkingDirLocker     WorkingDirLocker
+	AllowRepoConfig      bool
+	AllowRepoConfigFlag  string
+	AtlantisYAMLFilename string
+	PendingPlanFinder    *PendingPlanFinder
+	CommentBuilder       CommentBuilder
 }
 
 // TFCommandRunner runs Terraform commands.
@@ -96,21 +97,21 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 
 	// Parse config file if it exists.
 	var config valid.Config
-	hasConfigFile, err := p.ParserValidator.HasConfigFile(repoDir)
+	hasConfigFile, err := p.ParserValidator.HasConfigFile(repoDir, p.AtlantisYAMLFilename)
 	if err != nil {
-		return nil, errors.Wrapf(err, "looking for %s file in %q", yaml.AtlantisYAMLFilename, repoDir)
+		return nil, errors.Wrapf(err, "looking for %s file in %q", p.AtlantisYAMLFilename, repoDir)
 	}
 	if hasConfigFile {
 		if !p.AllowRepoConfig {
-			return nil, fmt.Errorf("%s files not allowed because Atlantis is not running with --%s", yaml.AtlantisYAMLFilename, p.AllowRepoConfigFlag)
+			return nil, fmt.Errorf("%s files not allowed because Atlantis is not running with --%s", p.AtlantisYAMLFilename, p.AllowRepoConfigFlag)
 		}
-		config, err = p.ParserValidator.ReadConfig(repoDir)
+		config, err = p.ParserValidator.ReadConfig(repoDir, p.AtlantisYAMLFilename)
 		if err != nil {
 			return nil, err
 		}
-		ctx.Log.Info("successfully parsed %s file", yaml.AtlantisYAMLFilename)
+		ctx.Log.Info("successfully parsed %s file", p.AtlantisYAMLFilename)
 	} else {
-		ctx.Log.Info("found no %s file", yaml.AtlantisYAMLFilename)
+		ctx.Log.Info("found no %s file", p.AtlantisYAMLFilename)
 	}
 
 	// We'll need the list of modified files.
@@ -319,19 +320,19 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 }
 
 func (p *DefaultProjectCommandBuilder) getCfg(projectName string, dir string, workspace string, repoDir string) (*valid.Project, *valid.Config, error) {
-	hasConfigFile, err := p.ParserValidator.HasConfigFile(repoDir)
+	hasConfigFile, err := p.ParserValidator.HasConfigFile(repoDir, p.AtlantisYAMLFilename)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "looking for %s file in %q", yaml.AtlantisYAMLFilename, repoDir)
+		return nil, nil, errors.Wrapf(err, "looking for %s file in %q", p.AtlantisYAMLFilename, repoDir)
 	}
 	if !hasConfigFile {
 		if projectName != "" {
-			return nil, nil, fmt.Errorf("cannot specify a project name unless an %s file exists to configure projects", yaml.AtlantisYAMLFilename)
+			return nil, nil, fmt.Errorf("cannot specify a project name unless an %s file exists to configure projects", p.AtlantisYAMLFilename)
 		}
 		return nil, nil, nil
 	}
 
 	if !p.AllowRepoConfig {
-		return nil, nil, fmt.Errorf("%s files not allowed because Atlantis is not running with --%s", yaml.AtlantisYAMLFilename, p.AllowRepoConfigFlag)
+		return nil, nil, fmt.Errorf("%s files not allowed because Atlantis is not running with --%s", p.AtlantisYAMLFilename, p.AllowRepoConfigFlag)
 	}
 
 	globalCfg, err := p.ParserValidator.ReadConfig(repoDir)
@@ -344,7 +345,7 @@ func (p *DefaultProjectCommandBuilder) getCfg(projectName string, dir string, wo
 	if projectName != "" {
 		projCfg := globalCfg.FindProjectByName(projectName)
 		if projCfg == nil {
-			return nil, nil, fmt.Errorf("no project with name %q is defined in %s", projectName, yaml.AtlantisYAMLFilename)
+			return nil, nil, fmt.Errorf("no project with name %q is defined in %s", projectName, p.AtlantisYAMLFilename)
 		}
 		return projCfg, &globalCfg, nil
 	}
@@ -354,7 +355,7 @@ func (p *DefaultProjectCommandBuilder) getCfg(projectName string, dir string, wo
 		return nil, nil, nil
 	}
 	if len(projCfgs) > 1 {
-		return nil, nil, fmt.Errorf("must specify project name: more than one project defined in %s matched dir: %q workspace: %q", yaml.AtlantisYAMLFilename, dir, workspace)
+		return nil, nil, fmt.Errorf("must specify project name: more than one project defined in %s matched dir: %q workspace: %q", p.AtlantisYAMLFilename, dir, workspace)
 	}
 	return &projCfgs[0], &globalCfg, nil
 }
