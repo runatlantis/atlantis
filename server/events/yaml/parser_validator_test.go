@@ -24,7 +24,7 @@ func TestReadConfig_DirDoesNotExist(t *testing.T) {
 
 func TestReadConfig_FileDoesNotExist(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
-	repoConfig      := "atlantis.yaml"
+	repoConfig := "atlantis.yaml"
 	defer cleanup()
 
 	r := yaml.ParserValidator{}
@@ -38,7 +38,7 @@ func TestReadConfig_FileDoesNotExist(t *testing.T) {
 
 func TestReadConfig_BadPermissions(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
-	repoConfig      := "atlantis.yaml"
+	repoConfig := "atlantis.yaml"
 	defer cleanup()
 	err := ioutil.WriteFile(filepath.Join(tmpDir, repoConfig), nil, 0000)
 	Ok(t, err)
@@ -51,7 +51,7 @@ func TestReadConfig_BadPermissions(t *testing.T) {
 func TestReadConfig_UnmarshalErrors(t *testing.T) {
 	// We only have a few cases here because we assume the YAML library to be
 	// well tested. See https://github.com/go-yaml/yaml/blob/v2/decode_test.go#L810.
-	repoConfig      := "atlantis.yaml"
+	repoConfig := "atlantis.yaml"
 
 	cases := []struct {
 		description string
@@ -61,12 +61,12 @@ func TestReadConfig_UnmarshalErrors(t *testing.T) {
 		{
 			"random characters",
 			"slkjds",
-			"parsing "+repoConfig+": yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `slkjds` into raw.Config",
+			"parsing " + repoConfig + ": yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `slkjds` into raw.Config",
 		},
 		{
 			"just a colon",
 			":",
-			"parsing "+repoConfig+": yaml: did not find expected key",
+			"parsing " + repoConfig + ": yaml: did not find expected key",
 		},
 	}
 
@@ -350,7 +350,7 @@ projects:
 	}
 
 	tmpDir, cleanup := TempDir(t)
-	repoConfig      := "atlantis.yaml"
+	repoConfig := "atlantis.yaml"
 	defer cleanup()
 
 	for _, c := range cases {
@@ -615,7 +615,7 @@ workflows:
 	}
 
 	tmpDir, cleanup := TempDir(t)
-	repoConfig      := "atlantis.yaml"
+	repoConfig := "atlantis.yaml"
 	defer cleanup()
 
 	for _, c := range cases {

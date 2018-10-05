@@ -172,7 +172,7 @@ projects:
 		t.Run(c.Description, func(t *testing.T) {
 			RegisterMockTestingT(t)
 			tmpDir, cleanup := TempDir(t)
-			repoConfig      := "atlantis.yaml"
+			repoConfig := "atlantis.yaml"
 			defer cleanup()
 
 			baseRepo := models.Repo{}
@@ -395,7 +395,7 @@ projects:
 			t.Run(c.Description, func(t *testing.T) {
 				RegisterMockTestingT(t)
 				tmpDir, cleanup := TempDir(t)
-				repoConfig      := "atlantis.yaml"
+				repoConfig := "atlantis.yaml"
 				defer cleanup()
 
 				baseRepo := models.Repo{}

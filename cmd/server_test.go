@@ -840,9 +840,9 @@ func TestExecute_RepoConfigWithoutAllowRepoConfig(t *testing.T) {
 	t.Log("Should error when repo-config provided and allow-repo-config false.")
 
 	c := setup(map[string]interface{}{
-		cmd.BitbucketUserFlag:    "user",
-		cmd.BitbucketTokenFlag:   "token",
-		cmd.RepoWhitelistFlag:    "*",
+		cmd.BitbucketUserFlag:   "user",
+		cmd.BitbucketTokenFlag:  "token",
+		cmd.RepoWhitelistFlag:   "*",
 		cmd.AllowRepoConfigFlag: false,
 		cmd.RepoConfigFlag:      "atlantis-stage.yaml",
 	})
