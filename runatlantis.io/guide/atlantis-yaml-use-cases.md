@@ -264,7 +264,7 @@ workflows:
   staging:
     plan:
       steps:
-      - rm -rf .terraform
+      - run: rm -rf .terraform
       - init:
           extra_args: [-backend-config=staging.backend.tfvars]
       - plan:
@@ -272,7 +272,7 @@ workflows:
   production:
     plan:
       steps:
-      - rm -rf .terraform
+      - run: rm -rf .terraform
       - init:
           extra_args: [-backend-config=production.backend.tfvars]
       - plan:
