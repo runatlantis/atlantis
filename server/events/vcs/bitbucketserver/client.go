@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -118,18 +119,98 @@ func (b *Client) GetProjectKey(repoName string, cloneURL string) (string, error)
 }
 
 // CreateComment creates a comment on the merge request.
+// If comment length is greater than the max comment length we split into
+// multiple comments.
 func (b *Client) CreateComment(repo models.Repo, pullNum int, comment string) error {
-	bodyBytes, err := json.Marshal(map[string]string{"text": comment})
-	if err != nil {
-		return errors.Wrap(err, "json encoding")
-	}
+	// maxCommentBodySize is derived from the error message when you go over
+	// this limit.
+	// real limit is 32768 but we want some padding for code blocks
+	const maxCommentBodySize = 32748
+	comments := b.splitAtMaxChars(comment, maxCommentBodySize, "\ncontinued...\n")
+
 	projectKey, err := b.GetProjectKey(repo.Name, repo.SanitizedCloneURL)
 	if err != nil {
 		return err
 	}
 	path := fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d/comments", b.BaseURL, projectKey, repo.Name, pullNum)
-	_, err = b.makeRequest("POST", path, bytes.NewBuffer(bodyBytes))
-	return err
+
+	for _, comment := range comments {
+		bodyBytes, err := json.Marshal(map[string]string{"text": comment})
+		if err != nil {
+			return errors.Wrap(err, "json encoding")
+		}
+		_, err = b.makeRequest("POST", path, bytes.NewBuffer(bodyBytes))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// splitAtMaxChars splits comment into a slice with string up to max
+// len separated by join which gets appended to the ends of the middle strings.
+// If max <= len(join) we return an empty slice since this is an edge case we
+// don't want to handle.
+func (b *Client) splitAtMaxChars(comment string, max int, join string) []string {
+	// If we're under the limit then no need to split.
+	if len(comment) <= max {
+		return []string{comment}
+	}
+	// If we can't fit the joining string in then this doesn't make sense.
+	if max <= len(join) {
+		return nil
+	}
+
+	const startCodeBlockPattern = "```diff\n"
+	const endCodeBlockPattern = "```\n\n"
+	startCodeBlockRegexp := regexp.MustCompile(startCodeBlockPattern)
+	endCodeBlockRegexp := regexp.MustCompile(endCodeBlockPattern)
+
+	var comments []string
+	maxSize := max - len(join)
+	numComments := int(math.Ceil(float64(len(comment)) / float64(maxSize)))
+	inCodeBlock := false
+	for i := 0; i < numComments; i++ {
+		upTo := b.min(len(comment), (i+1)*maxSize)
+		portion := comment[i*maxSize : upTo]
+		// We need to count # of "```" and "```diff" string
+		startMatches := startCodeBlockRegexp.FindAllStringIndex(portion, -1)
+		endMatches := endCodeBlockRegexp.FindAllStringIndex(portion, -1)
+		countStartCodeBlock := len(startMatches)
+		countEndCodeBlock := len(endMatches)
+		portionPrefix := ""
+		portionSufix := ""
+		if countStartCodeBlock != countEndCodeBlock {
+			inCodeBlock = true
+			if countStartCodeBlock > countEndCodeBlock {
+				// We started a block and we need to close it
+				portionSufix = "\n" + endCodeBlockPattern
+			} else if countStartCodeBlock < countEndCodeBlock {
+				// We will close the block so we need to open it first
+				inCodeBlock = false
+				portionPrefix = startCodeBlockPattern
+			}
+		} else if countStartCodeBlock == countEndCodeBlock && inCodeBlock {
+			// We are already inside a code block so we need to open it and close it
+			portionPrefix = startCodeBlockPattern
+			portionSufix = "\n" + endCodeBlockPattern
+		}
+
+		portion = portionPrefix + portion
+		portion += portionSufix
+		if i < numComments-1 {
+			portion += join
+		}
+		comments = append(comments, portion)
+	}
+	return comments
+}
+
+func (b *Client) min(a, c int) int {
+	if a < c {
+		return a
+	}
+	return c
 }
 
 // PullIsApproved returns true if the merge request was approved.
