@@ -102,11 +102,12 @@ type UserConfig struct {
 	RepoWhitelist          string `mapstructure:"repo-whitelist"`
 	// RequireApproval is whether to require pull request approval before
 	// allowing terraform apply's to be run.
-	RequireApproval bool            `mapstructure:"require-approval"`
-	SlackToken      string          `mapstructure:"slack-token"`
-	SSLCertFile     string          `mapstructure:"ssl-cert-file"`
-	SSLKeyFile      string          `mapstructure:"ssl-key-file"`
-	Webhooks        []WebhookConfig `mapstructure:"webhooks"`
+	RequireApproval        bool            `mapstructure:"require-approval"`
+	SilenceWhitelistErrors bool            `mapstructure:"silence-whitelist-errors"`
+	SlackToken             string          `mapstructure:"slack-token"`
+	SSLCertFile            string          `mapstructure:"ssl-cert-file"`
+	SSLKeyFile             string          `mapstructure:"ssl-key-file"`
+	Webhooks               []WebhookConfig `mapstructure:"webhooks"`
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -326,6 +327,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GitlabRequestParserValidator: &DefaultGitlabRequestParserValidator{},
 		GitlabWebhookSecret:          []byte(userConfig.GitlabWebhookSecret),
 		RepoWhitelistChecker:         repoWhitelist,
+		SilenceWhitelistErrors:       userConfig.SilenceWhitelistErrors,
 		SupportedVCSHosts:            supportedVCSHosts,
 		VCSClient:                    vcsClient,
 		BitbucketWebhookSecret:       []byte(userConfig.BitbucketWebhookSecret),

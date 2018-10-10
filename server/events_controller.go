@@ -57,6 +57,9 @@ type EventsController struct {
 	// request validation is done.
 	GitlabWebhookSecret  []byte
 	RepoWhitelistChecker *events.RepoWhitelistChecker
+	// Signifies if we post a comment when an event comes in for a non-whitelisted
+	// repository
+	SilenceWhitelistErrors bool
 	// SupportedVCSHosts is which VCS hosts Atlantis was configured upon
 	// startup to support.
 	SupportedVCSHosts []models.VCSHostType
@@ -418,6 +421,10 @@ func (e *EventsController) respond(w http.ResponseWriter, lvl logging.LogLevel, 
 // commentNotWhitelisted comments on the pull request that the repo is not
 // whitelisted.
 func (e *EventsController) commentNotWhitelisted(baseRepo models.Repo, pullNum int) {
+	if e.SilenceWhitelistErrors {
+		return
+	}
+
 	errMsg := "```\nError: This repo is not whitelisted for Atlantis.\n```"
 	if err := e.VCSClient.CreateComment(baseRepo, pullNum, errMsg); err != nil {
 		e.Logger.Err("unable to comment on pull request: %s", err)

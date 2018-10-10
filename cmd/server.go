@@ -55,6 +55,7 @@ const (
 	PortFlag                   = "port"
 	RepoWhitelistFlag          = "repo-whitelist"
 	RequireApprovalFlag        = "require-approval"
+	SilenceWhitelistErrorsFlag = "silence-whitelist-errors"
 	SSLCertFileFlag            = "ssl-cert-file"
 	SSLKeyFileFlag             = "ssl-key-file"
 
@@ -183,6 +184,11 @@ var boolFlags = []boolFlag{
 	{
 		name:         RequireApprovalFlag,
 		description:  "Require pull requests to be \"Approved\" before allowing the apply command to be run.",
+		defaultValue: false,
+	},
+	{
+		name:         SilenceWhitelistErrorsFlag,
+		description:  "Silences the posting of whitelist error comments.",
 		defaultValue: false,
 	},
 }
