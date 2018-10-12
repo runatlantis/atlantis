@@ -16,6 +16,7 @@ import (
 // LocksController handles all requests relating to Atlantis locks.
 type LocksController struct {
 	AtlantisVersion    string
+	AtlantisURL        url.URL
 	Locker             locking.Locker
 	Logger             *logging.SimpleLogger
 	VCSClient          vcs.ClientProxy
@@ -57,6 +58,7 @@ func (l *LocksController) GetLock(w http.ResponseWriter, r *http.Request) {
 		LockedBy:        lock.Pull.Author,
 		Workspace:       lock.Workspace,
 		AtlantisVersion: l.AtlantisVersion,
+		AtlantisURL:     l.AtlantisURL,
 	}
 	l.LockDetailTemplate.Execute(w, viewData) // nolint: errcheck
 }

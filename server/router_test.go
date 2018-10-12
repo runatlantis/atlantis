@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"net/http"
+	"net/url"
 	"testing"
 
 	"github.com/gorilla/mux"
@@ -12,13 +13,14 @@ import (
 func TestRouter_GenerateLockURL(t *testing.T) {
 	queryParam := "queryparam"
 	routeName := "routename"
-	atlantisURL := "https://example.com"
+	atlantisURL, err := url.Parse("https://example.com")
+	Ok(t, err)
 
 	underlyingRouter := mux.NewRouter()
 	underlyingRouter.HandleFunc("/lock", func(_ http.ResponseWriter, _ *http.Request) {}).Methods("GET").Queries(queryParam, "{queryparam}").Name(routeName)
 
 	router := &server.Router{
-		AtlantisURL:               atlantisURL,
+		AtlantisURL:               *atlantisURL,
 		LockViewRouteIDQueryParam: queryParam,
 		LockViewRouteName:         routeName,
 		Underlying:                underlyingRouter,

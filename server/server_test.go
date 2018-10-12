@@ -19,6 +19,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -37,7 +38,8 @@ func TestNewServer(t *testing.T) {
 	tmpDir, err := ioutil.TempDir("", "")
 	Ok(t, err)
 	_, err = server.NewServer(server.UserConfig{
-		DataDir: tmpDir,
+		DataDir:     tmpDir,
+		AtlantisURL: "http://example.com",
 	}, server.Config{})
 	Ok(t, err)
 }
@@ -91,7 +93,7 @@ func TestIndex_Success(t *testing.T) {
 	it.VerifyWasCalledOnce().Execute(w, server.IndexData{
 		Locks: []server.LockIndexData{
 			{
-				LockURL:      "",
+				LockURL:      url.URL{},
 				RepoFullName: "owner/repo",
 				PullNum:      9,
 				Time:         now,

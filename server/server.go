@@ -64,6 +64,7 @@ const (
 // Server runs the Atlantis web server.
 type Server struct {
 	AtlantisVersion    string
+	AtlantisURL        url.URL
 	Router             *mux.Router
 	Port               int
 	CommandRunner      *events.DefaultCommandRunner
@@ -229,9 +230,17 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	projectLocker := &events.DefaultProjectLocker{
 		Locker: lockingClient,
 	}
+	atlantisURL, err := url.Parse(userConfig.AtlantisURL)
+	if err != nil {
+		return nil, errors.Wrap(err, "parsing atlantis URL")
+	}
+	atlantisURL, err = NormalizeBaseURL(atlantisURL)
+	if err != nil {
+		return nil, errors.Wrap(err, "normalizing atlantis URL")
+	}
 	underlyingRouter := mux.NewRouter()
 	router := &Router{
-		AtlantisURL:               userConfig.AtlantisURL,
+		AtlantisURL:               *atlantisURL,
 		LockViewRouteIDQueryParam: LockViewRouteIDQueryParam,
 		LockViewRouteName:         LockViewRouteName,
 		Underlying:                underlyingRouter,
@@ -309,6 +318,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	locksController := &LocksController{
 		AtlantisVersion:    config.AtlantisVersion,
+		AtlantisURL:        *atlantisURL,
 		Locker:             lockingClient,
 		Logger:             logger,
 		VCSClient:          vcsClient,
@@ -334,6 +344,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	return &Server{
 		AtlantisVersion:    config.AtlantisVersion,
+		AtlantisURL:        *atlantisURL,
 		Router:             underlyingRouter,
 		Port:               userConfig.Port,
 		CommandRunner:      commandRunner,
@@ -411,7 +422,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	for id, v := range locks {
 		lockURL, _ := s.Router.Get(LockViewRouteName).URL("id", url.QueryEscape(id))
 		lockResults = append(lockResults, LockIndexData{
-			LockURL:      lockURL.String(),
+			LockURL:      *lockURL,
 			RepoFullName: v.Project.RepoFullName,
 			PullNum:      v.Pull.Num,
 			Time:         v.Time,
@@ -421,6 +432,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	s.IndexTemplate.Execute(w, IndexData{
 		Locks:           lockResults,
 		AtlantisVersion: s.AtlantisVersion,
+		AtlantisURL:     s.AtlantisURL,
 	})
 }
 

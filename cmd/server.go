@@ -74,7 +74,7 @@ const redTermEnd = "\033[39m"
 var stringFlags = []stringFlag{
 	{
 		name:        AtlantisURLFlag,
-		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ".",
+		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path, e.g. https://example.com/basepath",
 	},
 	{
 		name:        BitbucketUserFlag,

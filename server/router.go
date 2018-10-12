@@ -21,11 +21,11 @@ type Router struct {
 	LockViewRouteIDQueryParam string
 	// AtlantisURL is the fully qualified URL (scheme included) that Atlantis is
 	// being served at, ex: https://example.com.
-	AtlantisURL string
+	AtlantisURL url.URL
 }
 
 // GenerateLockURL returns a fully qualified URL to view the lock at lockID.
 func (r *Router) GenerateLockURL(lockID string) string {
 	path, _ := r.Underlying.Get(r.LockViewRouteName).URL(r.LockViewRouteIDQueryParam, url.QueryEscape(lockID))
-	return fmt.Sprintf("%s%s", r.AtlantisURL, path)
+	return fmt.Sprintf("%s%s", r.AtlantisURL.String(), path)
 }
