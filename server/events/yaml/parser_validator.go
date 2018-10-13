@@ -13,17 +13,14 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// AtlantisYAMLFilename is the name of the config file for each repo.
-const AtlantisYAMLFilename = "atlantis.yaml"
-
 type ParserValidator struct{}
 
-// ReadConfig returns the parsed and validated atlantis.yaml config for repoDir.
+// ReadConfig returns the parsed and validated atlantis yaml repoConfig for repoDir.
 // If there was no config file, then this can be detected by checking the type
 // of error: os.IsNotExist(error) but it's instead preferred to check with
 // HasConfigFile.
-func (p *ParserValidator) ReadConfig(repoDir string) (valid.Config, error) {
-	configFile := p.configFilePath(repoDir)
+func (p *ParserValidator) ReadConfig(repoDir string, repoConfig string) (valid.Config, error) {
+	configFile := p.configFilePath(repoDir, repoConfig)
 	configData, err := ioutil.ReadFile(configFile) // nolint: gosec
 
 	// NOTE: the error we return here must also be os.IsNotExist since that's
@@ -34,19 +31,19 @@ func (p *ParserValidator) ReadConfig(repoDir string) (valid.Config, error) {
 
 	// If it exists but we couldn't read it return an error.
 	if err != nil {
-		return valid.Config{}, errors.Wrapf(err, "unable to read %s file", AtlantisYAMLFilename)
+		return valid.Config{}, errors.Wrapf(err, "unable to read %s file", repoConfig)
 	}
 
 	// If the config file exists, parse it.
 	config, err := p.parseAndValidate(configData)
 	if err != nil {
-		return valid.Config{}, errors.Wrapf(err, "parsing %s", AtlantisYAMLFilename)
+		return valid.Config{}, errors.Wrapf(err, "parsing %s", repoConfig)
 	}
 	return config, err
 }
 
-func (p *ParserValidator) HasConfigFile(repoDir string) (bool, error) {
-	_, err := os.Stat(p.configFilePath(repoDir))
+func (p *ParserValidator) HasConfigFile(repoDir string, repoConfig string) (bool, error) {
+	_, err := os.Stat(p.configFilePath(repoDir, repoConfig))
 	if os.IsNotExist(err) {
 		return false, nil
 	}
@@ -56,8 +53,8 @@ func (p *ParserValidator) HasConfigFile(repoDir string) (bool, error) {
 	return false, err
 }
 
-func (p *ParserValidator) configFilePath(repoDir string) string {
-	return filepath.Join(repoDir, AtlantisYAMLFilename)
+func (p *ParserValidator) configFilePath(repoDir string, repoConfig string) string {
+	return filepath.Join(repoDir, repoConfig)
 }
 
 func (p *ParserValidator) parseAndValidate(configData []byte) (valid.Config, error) {

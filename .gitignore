@@ -10,3 +10,4 @@ output
 node_modules/
 **/.vuepress/dist
 helm/test-values.yaml
+server/testfixtures/test-repos/*/*.txt.act

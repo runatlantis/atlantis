@@ -14,41 +14,45 @@ import (
 
 func TestReadConfig_DirDoesNotExist(t *testing.T) {
 	r := yaml.ParserValidator{}
-	_, err := r.ReadConfig("/not/exist")
+	_, err := r.ReadConfig("/not/exist", "atlantis.yaml")
 	Assert(t, os.IsNotExist(err), "exp nil ptr")
 
-	exists, err := r.HasConfigFile("/not/exist")
+	exists, err := r.HasConfigFile("/not/exist", "atlantis.yaml")
 	Ok(t, err)
 	Equals(t, false, exists)
 }
 
 func TestReadConfig_FileDoesNotExist(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
+	repoConfig := "atlantis.yaml"
 	defer cleanup()
 
 	r := yaml.ParserValidator{}
-	_, err := r.ReadConfig(tmpDir)
+	_, err := r.ReadConfig(tmpDir, repoConfig)
 	Assert(t, os.IsNotExist(err), "exp nil ptr")
 
-	exists, err := r.HasConfigFile(tmpDir)
+	exists, err := r.HasConfigFile(tmpDir, repoConfig)
 	Ok(t, err)
 	Equals(t, false, exists)
 }
 
 func TestReadConfig_BadPermissions(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
+	repoConfig := "atlantis.yaml"
 	defer cleanup()
-	err := ioutil.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), nil, 0000)
+	err := ioutil.WriteFile(filepath.Join(tmpDir, repoConfig), nil, 0000)
 	Ok(t, err)
 
 	r := yaml.ParserValidator{}
-	_, err = r.ReadConfig(tmpDir)
-	ErrContains(t, "unable to read atlantis.yaml file: ", err)
+	_, err = r.ReadConfig(tmpDir, repoConfig)
+	ErrContains(t, "unable to read "+repoConfig+" file: ", err)
 }
 
 func TestReadConfig_UnmarshalErrors(t *testing.T) {
 	// We only have a few cases here because we assume the YAML library to be
 	// well tested. See https://github.com/go-yaml/yaml/blob/v2/decode_test.go#L810.
+	repoConfig := "atlantis.yaml"
+
 	cases := []struct {
 		description string
 		input       string
@@ -57,24 +61,25 @@ func TestReadConfig_UnmarshalErrors(t *testing.T) {
 		{
 			"random characters",
 			"slkjds",
-			"parsing atlantis.yaml: yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `slkjds` into raw.Config",
+			"parsing " + repoConfig + ": yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `slkjds` into raw.Config",
 		},
 		{
 			"just a colon",
 			":",
-			"parsing atlantis.yaml: yaml: did not find expected key",
+			"parsing " + repoConfig + ": yaml: did not find expected key",
 		},
 	}
 
 	tmpDir, cleanup := TempDir(t)
+
 	defer cleanup()
 
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			err := ioutil.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(c.input), 0600)
+			err := ioutil.WriteFile(filepath.Join(tmpDir, repoConfig), []byte(c.input), 0600)
 			Ok(t, err)
 			r := yaml.ParserValidator{}
-			_, err = r.ReadConfig(tmpDir)
+			_, err = r.ReadConfig(tmpDir, repoConfig)
 			ErrEquals(t, c.expErr, err)
 		})
 	}
@@ -345,17 +350,18 @@ projects:
 	}
 
 	tmpDir, cleanup := TempDir(t)
+	repoConfig := "atlantis.yaml"
 	defer cleanup()
 
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			err := ioutil.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(c.input), 0600)
+			err := ioutil.WriteFile(filepath.Join(tmpDir, repoConfig), []byte(c.input), 0600)
 			Ok(t, err)
 
 			r := yaml.ParserValidator{}
-			act, err := r.ReadConfig(tmpDir)
+			act, err := r.ReadConfig(tmpDir, repoConfig)
 			if c.expErr != "" {
-				ErrEquals(t, "parsing atlantis.yaml: "+c.expErr, err)
+				ErrEquals(t, "parsing "+repoConfig+": "+c.expErr, err)
 				return
 			}
 			Ok(t, err)
@@ -609,15 +615,16 @@ workflows:
 	}
 
 	tmpDir, cleanup := TempDir(t)
+	repoConfig := "atlantis.yaml"
 	defer cleanup()
 
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			err := ioutil.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(c.input), 0600)
+			err := ioutil.WriteFile(filepath.Join(tmpDir, repoConfig), []byte(c.input), 0600)
 			Ok(t, err)
 
 			r := yaml.ParserValidator{}
-			act, err := r.ReadConfig(tmpDir)
+			act, err := r.ReadConfig(tmpDir, repoConfig)
 			Ok(t, err)
 			Equals(t, c.expOutput, act)
 		})

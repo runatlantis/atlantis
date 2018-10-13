@@ -314,6 +314,7 @@ func TestExecute_Defaults(t *testing.T) {
 		cmd.GitlabTokenFlag:    "gitlab-token",
 		cmd.BitbucketUserFlag:  "bitbucket-user",
 		cmd.BitbucketTokenFlag: "bitbucket-token",
+		cmd.RepoConfigFlag:     "atlantis.yaml",
 		cmd.RepoWhitelistFlag:  "*",
 	})
 	err := c.Execute()
@@ -441,6 +442,7 @@ func TestExecute_Flags(t *testing.T) {
 		cmd.GitlabWebhookSecretFlag:    "gitlab-secret",
 		cmd.LogLevelFlag:               "debug",
 		cmd.PortFlag:                   8181,
+		cmd.RepoConfigFlag:             "atlantis.yaml",
 		cmd.RepoWhitelistFlag:          "github.com/runatlantis/atlantis",
 		cmd.RequireApprovalFlag:        true,
 		cmd.SSLCertFileFlag:            "cert-file",
@@ -467,6 +469,7 @@ func TestExecute_Flags(t *testing.T) {
 	Equals(t, "gitlab-secret", passedConfig.GitlabWebhookSecret)
 	Equals(t, "debug", passedConfig.LogLevel)
 	Equals(t, 8181, passedConfig.Port)
+	Equals(t, "atlantis.yaml", passedConfig.RepoConfig)
 	Equals(t, "github.com/runatlantis/atlantis", passedConfig.RepoWhitelist)
 	Equals(t, true, passedConfig.RequireApproval)
 	Equals(t, "cert-file", passedConfig.SSLCertFile)
@@ -494,6 +497,7 @@ gitlab-user: "gitlab-user"
 gitlab-webhook-secret: "gitlab-secret"
 log-level: "debug"
 port: 8181
+repo-config: "atlantis.yaml"
 repo-whitelist: "github.com/runatlantis/atlantis"
 require-approval: true
 ssl-cert-file: cert-file
@@ -524,6 +528,7 @@ ssl-key-file: key-file
 	Equals(t, "gitlab-secret", passedConfig.GitlabWebhookSecret)
 	Equals(t, "debug", passedConfig.LogLevel)
 	Equals(t, 8181, passedConfig.Port)
+	Equals(t, "atlantis.yaml", passedConfig.RepoConfig)
 	Equals(t, "github.com/runatlantis/atlantis", passedConfig.RepoWhitelist)
 	Equals(t, true, passedConfig.RequireApproval)
 	Equals(t, "cert-file", passedConfig.SSLCertFile)
@@ -551,6 +556,7 @@ gitlab-user: "gitlab-user"
 gitlab-webhook-secret: "gitlab-secret"
 log-level: "debug"
 port: 8181
+repo-config: "atlantis.yaml"
 repo-whitelist: "github.com/runatlantis/atlantis"
 require-approval: true
 ssl-cert-file: cert-file
@@ -562,7 +568,7 @@ ssl-key-file: key-file
 	for name, value := range map[string]string{
 		"ATLANTIS_URL":             "override-url",
 		"ALLOW_FORK_PRS":           "false",
-		"ALLOW_REPO_CONFIG":        "false",
+		"ALLOW_REPO_CONFIG":        "true",
 		"BITBUCKET_BASE_URL":       "https://override-bitbucket-base-url",
 		"BITBUCKET_TOKEN":          "override-bitbucket-token",
 		"BITBUCKET_USER":           "override-bitbucket-user",
@@ -578,6 +584,7 @@ ssl-key-file: key-file
 		"GITLAB_WEBHOOK_SECRET":    "override-gitlab-webhook-secret",
 		"LOG_LEVEL":                "info",
 		"PORT":                     "8282",
+		"REPO_CONFIG":              "override-atlantis.yaml",
 		"REPO_WHITELIST":           "override,override",
 		"REQUIRE_APPROVAL":         "false",
 		"SSL_CERT_FILE":            "override-cert-file",
@@ -592,7 +599,7 @@ ssl-key-file: key-file
 	Ok(t, err)
 	Equals(t, "override-url", passedConfig.AtlantisURL)
 	Equals(t, false, passedConfig.AllowForkPRs)
-	Equals(t, false, passedConfig.AllowRepoConfig)
+	Equals(t, true, passedConfig.AllowRepoConfig)
 	Equals(t, "https://override-bitbucket-base-url", passedConfig.BitbucketBaseURL)
 	Equals(t, "override-bitbucket-token", passedConfig.BitbucketToken)
 	Equals(t, "override-bitbucket-user", passedConfig.BitbucketUser)
@@ -608,6 +615,7 @@ ssl-key-file: key-file
 	Equals(t, "override-gitlab-webhook-secret", passedConfig.GitlabWebhookSecret)
 	Equals(t, "info", passedConfig.LogLevel)
 	Equals(t, 8282, passedConfig.Port)
+	Equals(t, "override-atlantis.yaml", passedConfig.RepoConfig)
 	Equals(t, "override,override", passedConfig.RepoWhitelist)
 	Equals(t, false, passedConfig.RequireApproval)
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
@@ -619,7 +627,7 @@ func TestExecute_FlagConfigOverride(t *testing.T) {
 	tmpFile := tempFile(t, `---
 atlantis-url: "url"
 allow-fork-prs: true
-allow-repo-config: true
+allow-repo-config: false
 bitbucket-base-url: "https://bitbucket-base-url"
 bitbucket-token: "bitbucket-token"
 bitbucket-user: "bitbucket-user"
@@ -635,6 +643,7 @@ gitlab-user: "gitlab-user"
 gitlab-webhook-secret: "gitlab-secret"
 log-level: "debug"
 port: 8181
+repo-config: "atlantis.yaml"
 repo-whitelist: "github.com/runatlantis/atlantis"
 require-approval: true
 ssl-cert-file: cert-file
@@ -645,7 +654,7 @@ ssl-key-file: key-file
 	c := setup(map[string]interface{}{
 		cmd.AtlantisURLFlag:            "override-url",
 		cmd.AllowForkPRsFlag:           false,
-		cmd.AllowRepoConfigFlag:        false,
+		cmd.AllowRepoConfigFlag:        true,
 		cmd.BitbucketBaseURLFlag:       "https://override-bitbucket-base-url",
 		cmd.BitbucketTokenFlag:         "override-bitbucket-token",
 		cmd.BitbucketUserFlag:          "override-bitbucket-user",
@@ -661,6 +670,7 @@ ssl-key-file: key-file
 		cmd.GitlabWebhookSecretFlag:    "override-gitlab-webhook-secret",
 		cmd.LogLevelFlag:               "info",
 		cmd.PortFlag:                   8282,
+		cmd.RepoConfigFlag:             "override-atlantis.yaml",
 		cmd.RepoWhitelistFlag:          "override,override",
 		cmd.RequireApprovalFlag:        false,
 		cmd.SSLCertFileFlag:            "override-cert-file",
@@ -685,6 +695,7 @@ ssl-key-file: key-file
 	Equals(t, "override-gitlab-webhook-secret", passedConfig.GitlabWebhookSecret)
 	Equals(t, "info", passedConfig.LogLevel)
 	Equals(t, 8282, passedConfig.Port)
+	Equals(t, "override-atlantis.yaml", passedConfig.RepoConfig)
 	Equals(t, "override,override", passedConfig.RepoWhitelist)
 	Equals(t, false, passedConfig.RequireApproval)
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
@@ -697,7 +708,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	envVars := map[string]string{
 		"ATLANTIS_URL":             "url",
 		"ALLOW_FORK_PRS":           "true",
-		"ALLOW_REPO_CONFIG":        "true",
+		"ALLOW_REPO_CONFIG":        "false",
 		"BITBUCKET_BASE_URL":       "https://bitbucket-base-url",
 		"BITBUCKET_TOKEN":          "bitbucket-token",
 		"BITBUCKET_USER":           "bitbucket-user",
@@ -713,6 +724,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		"GITLAB_WEBHOOK_SECRET":    "gitlab-webhook-secret",
 		"LOG_LEVEL":                "debug",
 		"PORT":                     "8181",
+		"REPO_CONFIG":              "atlantis.yaml",
 		"REPO_WHITELIST":           "*",
 		"REQUIRE_APPROVAL":         "true",
 		"SSL_CERT_FILE":            "cert-file",
@@ -731,7 +743,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	c := setup(map[string]interface{}{
 		cmd.AtlantisURLFlag:            "override-url",
 		cmd.AllowForkPRsFlag:           false,
-		cmd.AllowRepoConfigFlag:        false,
+		cmd.AllowRepoConfigFlag:        true,
 		cmd.BitbucketBaseURLFlag:       "https://override-bitbucket-base-url",
 		cmd.BitbucketTokenFlag:         "override-bitbucket-token",
 		cmd.BitbucketUserFlag:          "override-bitbucket-user",
@@ -747,6 +759,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		cmd.GitlabWebhookSecretFlag:    "override-gitlab-webhook-secret",
 		cmd.LogLevelFlag:               "info",
 		cmd.PortFlag:                   8282,
+		cmd.RepoConfigFlag:             "override-atlantis.yaml",
 		cmd.RepoWhitelistFlag:          "override,override",
 		cmd.RequireApprovalFlag:        false,
 		cmd.SSLCertFileFlag:            "override-cert-file",
@@ -757,7 +770,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 
 	Equals(t, "override-url", passedConfig.AtlantisURL)
 	Equals(t, false, passedConfig.AllowForkPRs)
-	Equals(t, false, passedConfig.AllowRepoConfig)
+	Equals(t, true, passedConfig.AllowRepoConfig)
 	Equals(t, "https://override-bitbucket-base-url", passedConfig.BitbucketBaseURL)
 	Equals(t, "override-bitbucket-token", passedConfig.BitbucketToken)
 	Equals(t, "override-bitbucket-user", passedConfig.BitbucketUser)
@@ -773,6 +786,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	Equals(t, "override-gitlab-webhook-secret", passedConfig.GitlabWebhookSecret)
 	Equals(t, "info", passedConfig.LogLevel)
 	Equals(t, 8282, passedConfig.Port)
+	Equals(t, "override-atlantis.yaml", passedConfig.RepoConfig)
 	Equals(t, "override,override", passedConfig.RepoWhitelist)
 	Equals(t, false, passedConfig.RequireApproval)
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
@@ -820,6 +834,20 @@ func TestExecute_BitbucketServerBaseURLPort(t *testing.T) {
 	})
 	Ok(t, c.Execute())
 	Equals(t, "http://mydomain.com:7990", passedConfig.BitbucketBaseURL)
+}
+
+func TestExecute_RepoConfigWithoutAllowRepoConfig(t *testing.T) {
+	t.Log("Should error when repo-config provided and allow-repo-config false.")
+
+	c := setup(map[string]interface{}{
+		cmd.BitbucketUserFlag:   "user",
+		cmd.BitbucketTokenFlag:  "token",
+		cmd.RepoWhitelistFlag:   "*",
+		cmd.AllowRepoConfigFlag: false,
+		cmd.RepoConfigFlag:      "atlantis-stage.yaml",
+	})
+	err := c.Execute()
+	ErrEquals(t, "custom --repo-config cannot be specified if --allow-repo-config is false", err)
 }
 
 func setup(flags map[string]interface{}) *cobra.Command {

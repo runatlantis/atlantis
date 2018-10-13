@@ -53,6 +53,7 @@ const (
 	GitlabWebhookSecretFlag    = "gitlab-webhook-secret" // nolint: gosec
 	LogLevelFlag               = "log-level"
 	PortFlag                   = "port"
+	RepoConfigFlag             = "repo-config"
 	RepoWhitelistFlag          = "repo-whitelist"
 	RequireApprovalFlag        = "require-approval"
 	SSLCertFileFlag            = "ssl-cert-file"
@@ -65,6 +66,7 @@ const (
 	DefaultGitlabHostname   = "gitlab.com"
 	DefaultLogLevel         = "info"
 	DefaultPort             = 4141
+	DefaultRepoConfig       = "atlantis.yaml"
 )
 
 const redTermStart = "\033[31m"
@@ -152,6 +154,12 @@ var stringFlags = []stringFlag{
 		defaultValue: DefaultLogLevel,
 	},
 	{
+		name: RepoConfigFlag,
+		description: "Optional path to the Atlantis YAML config file contained in each repo that this server should use. " +
+			"This allows different Atlantis servers to point at different configs in the same repo.",
+		defaultValue: DefaultRepoConfig,
+	},
+	{
 		name: RepoWhitelistFlag,
 		description: "Comma separated list of repositories that Atlantis will operate on. " +
 			"The format is {hostname}/{owner}/{repo}, ex. github.com/runatlantis/atlantis. '*' matches any characters until the next comma and can be used for example to whitelist " +
@@ -175,7 +183,7 @@ var boolFlags = []boolFlag{
 	},
 	{
 		name: AllowRepoConfigFlag,
-		description: "Allow repositories to use atlantis.yaml files to customize the commands Atlantis runs." +
+		description: "Allow repositories to use atlantis repo config YAML files to customize the commands Atlantis runs." +
 			" Should only be enabled in a trusted environment since it enables a pull request to run arbitrary commands" +
 			" on the Atlantis server.",
 		defaultValue: false,
@@ -365,6 +373,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	if c.Port == 0 {
 		c.Port = DefaultPort
 	}
+	if c.RepoConfig == "" {
+		c.RepoConfig = DefaultRepoConfig
+	}
 }
 
 func (s *ServerCmd) validate(userConfig server.UserConfig) error {
@@ -410,6 +421,12 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return fmt.Errorf("--%s must have http:// or https://, got %q", BitbucketBaseURLFlag, userConfig.BitbucketBaseURL)
 	}
+
+	// Cannot accept custom repo config if we know repo configs are disabled
+	if (userConfig.RepoConfig != DefaultRepoConfig) && (!userConfig.AllowRepoConfig) {
+		return fmt.Errorf("custom --%s cannot be specified if --%s is false", RepoConfigFlag, AllowRepoConfigFlag)
+	}
+
 	return nil
 }
 

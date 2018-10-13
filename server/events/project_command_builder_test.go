@@ -172,6 +172,7 @@ projects:
 		t.Run(c.Description, func(t *testing.T) {
 			RegisterMockTestingT(t)
 			tmpDir, cleanup := TempDir(t)
+			repoConfig := "atlantis.yaml"
 			defer cleanup()
 
 			baseRepo := models.Repo{}
@@ -181,7 +182,7 @@ projects:
 			workingDir := mocks.NewMockWorkingDir()
 			When(workingDir.Clone(logger, baseRepo, headRepo, pull, "default")).ThenReturn(tmpDir, nil)
 			if c.AtlantisYAML != "" {
-				err := ioutil.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
+				err := ioutil.WriteFile(filepath.Join(tmpDir, repoConfig), []byte(c.AtlantisYAML), 0600)
 				Ok(t, err)
 			}
 			err := ioutil.WriteFile(filepath.Join(tmpDir, "main.tf"), nil, 0600)
@@ -197,6 +198,7 @@ projects:
 				VCSClient:           vcsClient,
 				ProjectFinder:       &events.DefaultProjectFinder{},
 				AllowRepoConfig:     true,
+				RepoConfig:          repoConfig,
 				PendingPlanFinder:   &events.PendingPlanFinder{},
 				AllowRepoConfigFlag: "allow-repo-config",
 				CommentBuilder:      &events.CommentParser{},
@@ -393,6 +395,7 @@ projects:
 			t.Run(c.Description, func(t *testing.T) {
 				RegisterMockTestingT(t)
 				tmpDir, cleanup := TempDir(t)
+				repoConfig := "atlantis.yaml"
 				defer cleanup()
 
 				baseRepo := models.Repo{}
@@ -410,7 +413,7 @@ projects:
 					When(workingDir.GetWorkingDir(baseRepo, pull, expWorkspace)).ThenReturn(tmpDir, nil)
 				}
 				if c.AtlantisYAML != "" {
-					err := ioutil.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
+					err := ioutil.WriteFile(filepath.Join(tmpDir, repoConfig), []byte(c.AtlantisYAML), 0600)
 					Ok(t, err)
 				}
 				err := ioutil.WriteFile(filepath.Join(tmpDir, "main.tf"), nil, 0600)
@@ -427,6 +430,7 @@ projects:
 					ProjectFinder:       &events.DefaultProjectFinder{},
 					AllowRepoConfig:     true,
 					AllowRepoConfigFlag: "allow-repo-config",
+					RepoConfig:          repoConfig,
 					CommentBuilder:      &events.CommentParser{},
 				}
 
@@ -481,6 +485,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiPlanNoAtlantisYAML(t *testing.T)
 		},
 	})
 	defer cleanup()
+	repoConfig := "atlantis.yaml"
 	workingDir := mocks.NewMockWorkingDir()
 	When(workingDir.Clone(
 		matchers.AnyPtrToLoggingSimpleLogger(),
@@ -499,6 +504,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiPlanNoAtlantisYAML(t *testing.T)
 		ProjectFinder:       &events.DefaultProjectFinder{},
 		AllowRepoConfig:     true,
 		AllowRepoConfigFlag: "allow-repo-config",
+		RepoConfig:          repoConfig,
 		CommentBuilder:      &events.CommentParser{},
 	}
 
@@ -534,6 +540,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiPlanNoAtlantisYAMLNoModified(t *
 	RegisterMockTestingT(t)
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
+	repoConfig := "atlantis.yaml"
 	workingDir := mocks.NewMockWorkingDir()
 	When(workingDir.Clone(
 		matchers.AnyPtrToLoggingSimpleLogger(),
@@ -552,6 +559,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiPlanNoAtlantisYAMLNoModified(t *
 		ProjectFinder:       &events.DefaultProjectFinder{},
 		AllowRepoConfig:     true,
 		AllowRepoConfigFlag: "allow-repo-config",
+		RepoConfig:          repoConfig,
 		CommentBuilder:      &events.CommentParser{},
 	}
 
@@ -590,6 +598,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiPlanWithAtlantisYAML(t *testing.
 		},
 	})
 	defer cleanup()
+	repoConfig := "atlantis.yaml"
 	yamlCfg := `version: 2
 projects:
 - dir: project1 # project1 uses the defaults
@@ -601,7 +610,7 @@ projects:
     enabled: false
     when_modified: []
 `
-	err := ioutil.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(yamlCfg), 0600)
+	err := ioutil.WriteFile(filepath.Join(tmpDir, repoConfig), []byte(yamlCfg), 0600)
 	Ok(t, err)
 
 	workingDir := mocks.NewMockWorkingDir()
@@ -624,6 +633,7 @@ projects:
 		ProjectFinder:       &events.DefaultProjectFinder{},
 		AllowRepoConfig:     true,
 		AllowRepoConfigFlag: "allow-repo-config",
+		RepoConfig:          repoConfig,
 		CommentBuilder:      &events.CommentParser{},
 	}
 
@@ -658,6 +668,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiPlanWithAtlantisYAMLWorkspaces(t
 		"main.tf": nil,
 	})
 	defer cleanup()
+	repoConfig := "atlantis.yaml"
 	yamlCfg := `version: 2
 projects:
 - dir: .
@@ -665,7 +676,7 @@ projects:
 - dir: .
   workspace: production
 `
-	err := ioutil.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(yamlCfg), 0600)
+	err := ioutil.WriteFile(filepath.Join(tmpDir, repoConfig), []byte(yamlCfg), 0600)
 	Ok(t, err)
 
 	workingDir := mocks.NewMockWorkingDir()
@@ -686,6 +697,7 @@ projects:
 		ProjectFinder:       &events.DefaultProjectFinder{},
 		AllowRepoConfig:     true,
 		AllowRepoConfigFlag: "allow-repo-config",
+		RepoConfig:          repoConfig,
 		CommentBuilder:      &events.CommentParser{},
 	}
 
@@ -739,6 +751,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		},
 	})
 	defer cleanup()
+	repoConfig := "atlantis.yaml"
 	// Initialize git repos in each workspace so that the .tfplan files get
 	// picked up.
 	runCmd(t, filepath.Join(tmpDir, "workspace1"), "git", "init")
@@ -758,6 +771,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		ProjectFinder:       &events.DefaultProjectFinder{},
 		AllowRepoConfig:     true,
 		AllowRepoConfigFlag: "allow-repo-config",
+		RepoConfig:          repoConfig,
 		PendingPlanFinder:   &events.PendingPlanFinder{},
 		CommentBuilder:      &events.CommentParser{},
 	}
@@ -801,7 +815,8 @@ func TestDefaultProjectCommandBuilder_RepoConfigDisabled(t *testing.T) {
 	})
 	defer cleanup()
 	repoDir := filepath.Join(tmpDir, "pulldir/workspace")
-	err := ioutil.WriteFile(filepath.Join(repoDir, yaml.AtlantisYAMLFilename), nil, 0600)
+	repoConfig := "atlantis.yaml"
+	err := ioutil.WriteFile(filepath.Join(repoDir, repoConfig), nil, 0600)
 	Ok(t, err)
 
 	When(workingDir.Clone(
@@ -823,6 +838,7 @@ func TestDefaultProjectCommandBuilder_RepoConfigDisabled(t *testing.T) {
 		ProjectFinder:       &events.DefaultProjectFinder{},
 		AllowRepoConfig:     false,
 		AllowRepoConfigFlag: "allow-repo-config",
+		RepoConfig:          repoConfig,
 		CommentBuilder:      &events.CommentParser{},
 	}
 

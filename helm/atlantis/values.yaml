@@ -76,7 +76,7 @@ image:
   tag: v0.4.5
   pullPolicy: IfNotPresent
 
-## enable using atlantis.yaml file
+## enable using atlantis repo config YAML files
 allowRepoConfig: false
 
 # We only need to check every 60s since Atlantis is not a high-throughput service.
