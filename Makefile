@@ -4,6 +4,17 @@ PKG := $(shell go list ./... | grep -v e2e | grep -v vendor | grep -v static | g
 PKG_COMMAS := $(shell go list ./... | grep -v e2e | grep -v vendor | grep -v static | grep -v mocks | grep -v testing | tr '\n' ',')
 IMAGE_NAME := runatlantis/atlantis
 
+SHELL = /bin/bash
+PATH:=$(PATH):$(GOPATH)/bin
+
+export DOCKER_ORG ?= cloudposse
+export DOCKER_IMAGE ?= cloudposse/atlantis
+export DOCKER_TAG ?= latest
+export DOCKER_IMAGE_NAME ?= $(DOCKER_IMAGE):$(DOCKER_TAG)
+export DOCKER_BUILD_FLAGS =
+
+-include $(shell curl -sSL -o .build-harness "https://git.io/build-harness"; echo .build-harness)
+
 .PHONY: test
 
 .DEFAULT_GOAL := help
@@ -86,3 +97,9 @@ end-to-end-tests: ## Run e2e tests
 
 website-dev:
 	yarn website:dev
+
+go/get/local:
+	go get
+
+go/build/local:
+	CGO_ENABLED=0 go build -v -o "./dist/bin/atlantis" .

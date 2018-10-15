@@ -1,0 +1,39 @@
+sudo: required
+language: go
+go:
+- 1.11.x
+addons:
+  apt:
+    packages:
+    - git
+    - make
+    - curl
+
+env:
+- DOCKER_IMAGE_NAME=cloudposse/atlantis
+
+services:
+- docker
+
+install:
+- make init
+- make travis/docker-login
+- make go/deps-dev
+
+script:
+- make go/build/local
+- gox -osarch="windows/386 windows/amd64 freebsd/arm netbsd/386 netbsd/amd64 netbsd/arm linux/s390x linux/arm darwin/386 darwin/amd64 linux/386 linux/amd64 freebsd/amd64 freebsd/386 openbsd/386 openbsd/amd64" -output "release/atlantis_{{.OS}}_{{.Arch}}"
+- ls -l release/
+- make docker/build
+
+after_success:
+- make travis/docker-tag-and-push
+
+deploy:
+- provider: releases
+  api_key: "$GITHUB_API_KEY"
+  file_glob: true
+  file: "release/*"
+  skip_cleanup: true
+  on:
+    tags: true
