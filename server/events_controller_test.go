@@ -223,7 +223,6 @@ func TestPost_GitlabCommentNotWhitelistedWithSilenceErrors(t *testing.T) {
 	body, _ := ioutil.ReadAll(w.Result().Body)
 	exp := "Repo not whitelisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
-	models.NewRepo(models.Gitlab, "gitlabhq/gitlab-test", "https://example.com/gitlabhq/gitlab-test.git", "", "")
 	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString())
 
 }
@@ -283,7 +282,6 @@ func TestPost_GithubCommentNotWhitelistedWithSilenceErrors(t *testing.T) {
 	body, _ := ioutil.ReadAll(w.Result().Body)
 	exp := "Repo not whitelisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
-	models.NewRepo(models.Github, "baxterthehacker/public-repo", "https://github.com/baxterthehacker/public-repo.git", "", "")
 	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString())
 }
 
