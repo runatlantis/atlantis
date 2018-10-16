@@ -199,7 +199,7 @@ func TestPost_GitlabCommentNotWhitelisted(t *testing.T) {
 }
 
 func TestPost_GitlabCommentNotWhitelistedWithSilenceErrors(t *testing.T) {
-	t.Log("when the event is a gitlab comment from a repo that isn't whitelisted and we are silencing errors, do no comment with an error")
+	t.Log("when the event is a gitlab comment from a repo that isn't whitelisted and we are silencing errors, do not comment with an error")
 	RegisterMockTestingT(t)
 	vcsClient := vcsmocks.NewMockClientProxy()
 	e := server.EventsController{
@@ -223,8 +223,9 @@ func TestPost_GitlabCommentNotWhitelistedWithSilenceErrors(t *testing.T) {
 	body, _ := ioutil.ReadAll(w.Result().Body)
 	exp := "Repo not whitelisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
-	expRepo, _ := models.NewRepo(models.Gitlab, "gitlabhq/gitlab-test", "https://example.com/gitlabhq/gitlab-test.git", "", "")
-	vcsClient.VerifyWasCalled(Never()).CreateComment(expRepo, 1, "```\nError: This repo is not whitelisted for Atlantis.\n```")
+	models.NewRepo(models.Gitlab, "gitlabhq/gitlab-test", "https://example.com/gitlabhq/gitlab-test.git", "", "")
+	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString())
+
 }
 
 func TestPost_GithubCommentNotWhitelisted(t *testing.T) {
@@ -257,7 +258,7 @@ func TestPost_GithubCommentNotWhitelisted(t *testing.T) {
 }
 
 func TestPost_GithubCommentNotWhitelistedWithSilenceErrors(t *testing.T) {
-	t.Log("when the event is a github comment from a repo that isn't whitelisted and we are silencing errors, do no comment with an error")
+	t.Log("when the event is a github comment from a repo that isn't whitelisted and we are silencing errors, do not comment with an error")
 	RegisterMockTestingT(t)
 	vcsClient := vcsmocks.NewMockClientProxy()
 	e := server.EventsController{
@@ -282,8 +283,8 @@ func TestPost_GithubCommentNotWhitelistedWithSilenceErrors(t *testing.T) {
 	body, _ := ioutil.ReadAll(w.Result().Body)
 	exp := "Repo not whitelisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
-	expRepo, _ := models.NewRepo(models.Github, "baxterthehacker/public-repo", "https://github.com/baxterthehacker/public-repo.git", "", "")
-	vcsClient.VerifyWasCalled(Never()).CreateComment(expRepo, 2, "```\nError: This repo is not whitelisted for Atlantis.\n```")
+	models.NewRepo(models.Github, "baxterthehacker/public-repo", "https://github.com/baxterthehacker/public-repo.git", "", "")
+	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString())
 }
 
 func TestPost_GitlabCommentResponse(t *testing.T) {
