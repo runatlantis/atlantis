@@ -56,5 +56,4 @@ to construct your ideal workflow.
 ## Next Steps
 * If you'd like to try out Atlantis on a test repo, check out the [Test Drive](test-drive.html).
 * If you're ready to deploy it on your own repos, check out [Getting Started](getting-started.html).
-* If you're interested in a hosted version of Atlantis, check out [Hosted Atlantis](/hosting/).
 * If you're wondering if Atlantis supports how you run Terraform, read [Requirements](requirements.html).
