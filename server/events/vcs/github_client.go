@@ -115,6 +115,23 @@ func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 	return false, nil
 }
 
+// PullIsMergeable returns true if the pull request was approved.
+func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
+
+	// TODO: (MattAndMike) add impl that looks for mergable flag
+	return false, nil
+	// reviews, _, err := g.client.PullRequests.ListReviews(g.ctx, repo.Owner, repo.Name, pull.Num, nil)
+	// if err != nil {
+	// 	return false, errors.Wrap(err, "getting reviews")
+	// }
+	// for _, review := range reviews {
+	// 	if review != nil && review.GetState() == "APPROVED" {
+	// 		return true, nil
+	// 	}
+	// }
+	// return false, nil
+}
+
 // GetPullRequest returns the pull request.
 func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRequest, error) {
 	pull, _, err := g.client.PullRequests.Get(g.ctx, repo.Owner, repo.Name, num)

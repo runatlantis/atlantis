@@ -78,6 +78,22 @@ func (g *GitlabClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 	return true, nil
 }
 
+// PullIsMergeable returns true if the merge request was approved.
+func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
+
+	// TODO: (MattAndMike) - add actual impl
+	return false, nil
+
+	// approvals, _, err := g.Client.MergeRequests.GetMergeRequestApprovals(repo.FullName, pull.Num)
+	// if err != nil {
+	// 	return false, err
+	// }
+	// if approvals.ApprovalsLeft > 0 {
+	// 	return false, nil
+	// }
+	// return true, nil
+}
+
 // UpdateStatus updates the build status of a commit.
 func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, description string) error {
 	const statusContext = "Atlantis"

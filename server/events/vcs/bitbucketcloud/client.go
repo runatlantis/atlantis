@@ -119,6 +119,34 @@ func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool
 	return false, nil
 }
 
+// PullIsMergeable returns true if the merge request was approved.
+func (b *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
+
+	// TODO: (MattAndMike) implement
+	return false, nil
+
+	// path := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d", b.BaseURL, repo.FullName, pull.Num)
+	// resp, err := b.makeRequest("GET", path, nil)
+	// if err != nil {
+	// 	return false, err
+	// }
+	// var pullResp PullRequest
+	// if err := json.Unmarshal(resp, &pullResp); err != nil {
+	// 	return false, errors.Wrapf(err, "Could not parse response %q", string(resp))
+	// }
+	// if err := validator.New().Struct(pullResp); err != nil {
+	// 	return false, errors.Wrapf(err, "API response %q was missing fields", string(resp))
+	// }
+	// for _, participant := range pullResp.Participants {
+	// 	// Bitbucket allows the author to approve their own pull request. This
+	// 	// defeats the purpose of approvals so we don't count that approval.
+	// 	if *participant.Approved && *participant.User.Username != pull.Author {
+	// 		return true, nil
+	// 	}
+	// }
+	// return false, nil
+}
+
 // UpdateStatus updates the status of a commit.
 func (b *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, status models.CommitStatus, description string) error {
 	bbState := "FAILED"

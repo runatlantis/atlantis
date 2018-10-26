@@ -35,6 +35,9 @@ func (a *NotConfiguredVCSClient) CreateComment(repo models.Repo, pullNum int, co
 func (a *NotConfiguredVCSClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
 	return false, a.err()
 }
+func (a *NotConfiguredVCSClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
+	return false, a.err()
+}
 func (a *NotConfiguredVCSClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, description string) error {
 	return a.err()
 }

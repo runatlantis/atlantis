@@ -158,6 +158,36 @@ func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool
 	return false, nil
 }
 
+// PullIsMergeable returns true if the merge request was approved.
+func (b *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
+
+	// TODO: (MattAndMike) implement
+	return false, nil
+
+	// projectKey, err := b.GetProjectKey(repo.Name, repo.SanitizedCloneURL)
+	// if err != nil {
+	// 	return false, err
+	// }
+	// path := fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d", b.BaseURL, projectKey, repo.Name, pull.Num)
+	// resp, err := b.makeRequest("GET", path, nil)
+	// if err != nil {
+	// 	return false, err
+	// }
+	// var pullResp PullRequest
+	// if err := json.Unmarshal(resp, &pullResp); err != nil {
+	// 	return false, errors.Wrapf(err, "Could not parse response %q", string(resp))
+	// }
+	// if err := validator.New().Struct(pullResp); err != nil {
+	// 	return false, errors.Wrapf(err, "API response %q was missing fields", string(resp))
+	// }
+	// for _, reviewer := range pullResp.Reviewers {
+	// 	if *reviewer.Approved {
+	// 		return true, nil
+	// 	}
+	// }
+	// return false, nil
+}
+
 // UpdateStatus updates the status of a commit.
 func (b *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, status models.CommitStatus, description string) error {
 	bbState := "FAILED"
