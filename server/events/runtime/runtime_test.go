@@ -21,19 +21,9 @@ func TestGetPlanFilename(t *testing.T) {
 			"workspace.tfplan",
 		},
 		{
-			"workspace with space",
-			nil,
-			"workspace-with-space.tfplan",
-		},
-		{
 			"workspace",
 			&valid.Project{},
 			"workspace.tfplan",
-		},
-		{
-			"workspace with space",
-			&valid.Project{},
-			"workspace-with-space.tfplan",
 		},
 		{
 			"workspace",
@@ -54,14 +44,21 @@ func TestGetPlanFilename(t *testing.T) {
 			&valid.Project{
 				Name: String("project with space"),
 			},
-			"project-with-space-workspace.tfplan",
+			"project with space-workspace.tfplan",
 		},
 		{
 			"workspace😀",
 			&valid.Project{
 				Name: String("project😀"),
 			},
-			"project--workspace-.tfplan",
+			"project😀-workspace😀.tfplan",
+		},
+		{
+			"default",
+			&valid.Project{
+				Name: String(`all.invalid.chars \/"*?<>`),
+			},
+			"all.invalid.chars --------default.tfplan",
 		},
 	}
 

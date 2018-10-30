@@ -143,6 +143,46 @@ func TestProject_Validate(t *testing.T) {
 			},
 			expErr: "name: if set cannot be empty.",
 		},
+		{
+			description: "project name with slashes",
+			input: raw.Project{
+				Dir:  String("."),
+				Name: String("my/name"),
+			},
+			expErr: "",
+		},
+		{
+			description: "project name with emoji",
+			input: raw.Project{
+				Dir:  String("."),
+				Name: String("😀"),
+			},
+			expErr: "name: \"😀\" is not allowed: must contain only URL safe characters.",
+		},
+		{
+			description: "project name with spaces",
+			input: raw.Project{
+				Dir:  String("."),
+				Name: String("name with spaces"),
+			},
+			expErr: "name: \"name with spaces\" is not allowed: must contain only URL safe characters.",
+		},
+		{
+			description: "project name with +",
+			input: raw.Project{
+				Dir:  String("."),
+				Name: String("namewith+"),
+			},
+			expErr: "name: \"namewith+\" is not allowed: must contain only URL safe characters.",
+		},
+		{
+			description: `project name with \`,
+			input: raw.Project{
+				Dir:  String("."),
+				Name: String(`namewith\`),
+			},
+			expErr: `name: "namewith\\" is not allowed: must contain only URL safe characters.`,
+		},
 	}
 	validation.ErrorTag = "yaml"
 	for _, c := range cases {

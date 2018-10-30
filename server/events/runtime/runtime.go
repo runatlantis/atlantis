@@ -24,7 +24,10 @@ func MustConstraint(constraint string) version.Constraints {
 	return c
 }
 
-var invalidFilenameChars = regexp.MustCompile(`[^a-zA-Z0-9-_\.]`)
+// invalidFilenameChars matches chars that are invalid for linux and windows
+// filenames.
+// From https://www.oreilly.com/library/view/regular-expressions-cookbook/9781449327453/ch08s25.html
+var invalidFilenameChars = regexp.MustCompile(`[\\/:"*?<>|]`)
 
 // GetPlanFilename returns the filename (not the path) of the generated tf plan
 // given a workspace and maybe a project's config.
