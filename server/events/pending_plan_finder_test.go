@@ -184,7 +184,7 @@ func TestPendingPlanFinder_FindPlanCheckedIn(t *testing.T) {
 	runCmd(t, repoDir, "git", "add", ".")
 	runCmd(t, repoDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
 	runCmd(t, repoDir, "git", "config", "--local", "user.name", "atlantisbot")
-	runCmd(t, repoDir, "git", "commit", "-m", "initial commit")
+	runCmd(t, repoDir, "git", "commit", "--no-gpg-sign", "-m", "initial commit")
 
 	pf := &events.PendingPlanFinder{}
 	actPlans, err := pf.Find(tmpDir)
@@ -193,6 +193,7 @@ func TestPendingPlanFinder_FindPlanCheckedIn(t *testing.T) {
 }
 
 func runCmd(t *testing.T, dir string, name string, args ...string) string {
+	t.Helper()
 	cpCmd := exec.Command(name, args...)
 	cpCmd.Dir = dir
 	cpOut, err := cpCmd.CombinedOutput()
