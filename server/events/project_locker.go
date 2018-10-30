@@ -63,7 +63,7 @@ func (p *DefaultProjectLocker) TryLock(log *logging.SimpleLogger, pull models.Pu
 	}
 	if !lockAttempt.LockAcquired && lockAttempt.CurrLock.Pull.Num != pull.Num {
 		failureMsg := fmt.Sprintf(
-			"**Unable to run `plan`**. This project is currently locked by an unapplied plan from pull #%d. To continue, delete the lock from #%d or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.",
+			"This project is currently locked by an unapplied plan from pull #%d. To continue, delete the lock from #%d or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.",
 			lockAttempt.CurrLock.Pull.Num,
 			lockAttempt.CurrLock.Pull.Num)
 		return &TryLockResponse{
