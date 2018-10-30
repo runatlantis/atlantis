@@ -4,6 +4,7 @@ package runtime
 
 import (
 	"fmt"
+	"regexp"
 
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
@@ -23,11 +24,19 @@ func MustConstraint(constraint string) version.Constraints {
 	return c
 }
 
+// invalidFilenameChars matches chars that are invalid for linux and windows
+// filenames.
+// From https://www.oreilly.com/library/view/regular-expressions-cookbook/9781449327453/ch08s25.html
+var invalidFilenameChars = regexp.MustCompile(`[\\/:"*?<>|]`)
+
 // GetPlanFilename returns the filename (not the path) of the generated tf plan
 // given a workspace and maybe a project's config.
 func GetPlanFilename(workspace string, maybeCfg *valid.Project) string {
+	var unescapedFilename string
 	if maybeCfg == nil || maybeCfg.Name == nil {
-		return fmt.Sprintf("%s.tfplan", workspace)
+		unescapedFilename = fmt.Sprintf("%s.tfplan", workspace)
+	} else {
+		unescapedFilename = fmt.Sprintf("%s-%s.tfplan", *maybeCfg.Name, workspace)
 	}
-	return fmt.Sprintf("%s-%s.tfplan", *maybeCfg.Name, workspace)
+	return invalidFilenameChars.ReplaceAllLiteralString(unescapedFilename, "-")
 }

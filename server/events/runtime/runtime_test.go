@@ -32,6 +32,34 @@ func TestGetPlanFilename(t *testing.T) {
 			},
 			"project-workspace.tfplan",
 		},
+		{
+			"workspace",
+			&valid.Project{
+				Name: String("project/with/slash"),
+			},
+			"project-with-slash-workspace.tfplan",
+		},
+		{
+			"workspace",
+			&valid.Project{
+				Name: String("project with space"),
+			},
+			"project with space-workspace.tfplan",
+		},
+		{
+			"workspace😀",
+			&valid.Project{
+				Name: String("project😀"),
+			},
+			"project😀-workspace😀.tfplan",
+		},
+		{
+			"default",
+			&valid.Project{
+				Name: String(`all.invalid.chars \/"*?<>`),
+			},
+			"all.invalid.chars --------default.tfplan",
+		},
 	}
 
 	for i, c := range cases {
