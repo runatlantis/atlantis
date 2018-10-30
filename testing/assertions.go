@@ -14,9 +14,6 @@
 package testing
 
 import (
-	"fmt"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -27,9 +24,9 @@ import (
 // Assert fails the test if the condition is false.
 // Taken from https://github.com/benbjohnson/testing.
 func Assert(tb testing.TB, condition bool, msg string, v ...interface{}) {
+	tb.Helper()
 	if !condition {
-		_, file, line, _ := runtime.Caller(1)
-		fmt.Printf("\033[31m%s:%d: "+msg+"\033[39m\n\n", append([]interface{}{filepath.Base(file), line}, v...)...)
+		errLog(tb, msg, v...)
 		tb.FailNow()
 	}
 }
@@ -37,9 +34,9 @@ func Assert(tb testing.TB, condition bool, msg string, v ...interface{}) {
 // Ok fails the test if an err is not nil.
 // Taken from https://github.com/benbjohnson/testing.
 func Ok(tb testing.TB, err error) {
+	tb.Helper()
 	if err != nil {
-		_, file, line, _ := runtime.Caller(1)
-		fmt.Printf("\033[31m%s:%d: unexpected error: %s\033[39m\n\n", filepath.Base(file), line, err.Error())
+		errLog(tb, "unexpected error: %s", err.Error())
 		tb.FailNow()
 	}
 }
@@ -49,8 +46,8 @@ func Ok(tb testing.TB, err error) {
 func Equals(tb testing.TB, exp, act interface{}) {
 	tb.Helper()
 	if diff := deep.Equal(exp, act); diff != nil {
-		_, file, line, _ := runtime.Caller(1)
-		tb.Fatalf("\033[31m%s:%d: %s\n\nexp: %s******\ngot: %s\033[39m\n", filepath.Base(file), line, diff, spew.Sdump(exp), spew.Sdump(act))
+		errLog(tb, "%s\n\nexp: %s******\ngot: %s", diff, spew.Sdump(exp), spew.Sdump(act))
+		tb.FailNow()
 	}
 }
 
@@ -58,10 +55,12 @@ func Equals(tb testing.TB, exp, act interface{}) {
 func ErrEquals(tb testing.TB, exp string, act error) {
 	tb.Helper()
 	if act == nil {
-		tb.Fatalf("exp err %q but err was nil\n", exp)
+		errLog(tb, "exp err %q but err was nil\n", exp)
+		tb.FailNow()
 	}
 	if act.Error() != exp {
-		tb.Fatalf("exp err: %q but got: %q\n", exp, act.Error())
+		errLog(tb, "exp err: %q but got: %q\n", exp, act.Error())
+		tb.FailNow()
 	}
 }
 
@@ -70,21 +69,28 @@ func ErrEquals(tb testing.TB, exp string, act error) {
 func ErrContains(tb testing.TB, substr string, act error) {
 	tb.Helper()
 	if act == nil {
-		tb.Fatalf("exp err to contain %q but err was nil", substr)
+		errLog(tb, "exp err to contain %q but err was nil", substr)
+		tb.FailNow()
 	}
 	if !strings.Contains(act.Error(), substr) {
-		tb.Fatalf("exp err %q to contain %q", act.Error(), substr)
+		errLog(tb, "exp err %q to contain %q", act.Error(), substr)
+		tb.FailNow()
 	}
 }
 
 // Contains fails the test if the slice doesn't contain the expected element
 func Contains(tb testing.TB, exp interface{}, slice []string) {
+	tb.Helper()
 	for _, v := range slice {
 		if v == exp {
 			return
 		}
 	}
-	_, file, line, _ := runtime.Caller(1)
-	fmt.Printf("\033[31m%s:%d:\n\n\texp: %#v\n\n\twas not in: %#v\033[39m\n\n", filepath.Base(file), line, exp, slice)
+	errLog(tb, "exp: %#v\n\n\twas not in: %#v", exp, slice)
 	tb.FailNow()
+}
+
+func errLog(tb testing.TB, fmt string, args ...interface{}) {
+	tb.Helper()
+	tb.Logf("\033[31m"+fmt+"\033[39m", args...)
 }
