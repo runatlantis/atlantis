@@ -116,7 +116,7 @@ func (m *MarkdownRenderer) renderProjectResults(results []ProjectResult, common 
 				Failure: result.Failure,
 			})
 		} else if result.PlanSuccess != nil {
-			result.PlanSuccess.TerraformOutput = m.fmtDiff(result.PlanSuccess.TerraformOutput)
+			result.PlanSuccess.TerraformOutput = m.fmtPlan(result.PlanSuccess.TerraformOutput)
 			if m.shouldUseWrappedTmpl(vcsHost, result.PlanSuccess.TerraformOutput) {
 				resultData.Rendered = m.renderTemplate(planSuccessWrappedTmpl, *result.PlanSuccess)
 			} else {
@@ -166,12 +166,21 @@ func (m *MarkdownRenderer) shouldUseWrappedTmpl(vcsHost models.VCSHostType, outp
 	return strings.Count(output, "\n") > maxUnwrappedLines
 }
 
-// fmtDiff uses regex's to remove any leading whitespace in front of the
+// fmtPlan uses regex's to remove any leading whitespace in front of the
 // terraform output so that the diff syntax highlighting works. Example:
 // "  - aws_security_group_rule.allow_all" =>
 // "- aws_security_group_rule.allow_all"
 // We do it for +, ~ and -.
-func (m *MarkdownRenderer) fmtDiff(tfOutput string) string {
+// It also removes the "Refreshing..." preamble.
+func (m *MarkdownRenderer) fmtPlan(tfOutput string) string {
+	// Plan output contains a lot of "Refreshing..." lines followed by a
+	// separator. We want to remove everything before that separator.
+	refreshSeparator := "------------------------------------------------------------------------\n"
+	sepIdx := strings.Index(tfOutput, refreshSeparator)
+	if sepIdx > -1 {
+		tfOutput = tfOutput[sepIdx+len(refreshSeparator):]
+	}
+
 	tfOutput = plusDiffRegex.ReplaceAllString(tfOutput, "+")
 	tfOutput = tildeDiffRegex.ReplaceAllString(tfOutput, "~")
 	return minusDiffRegex.ReplaceAllString(tfOutput, "-")

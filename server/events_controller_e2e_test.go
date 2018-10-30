@@ -486,6 +486,12 @@ func assertCommentEquals(t *testing.T, expFile string, act string, repoDir strin
 	idRegex := regexp.MustCompile(`Creation complete after [0-9]+s \(ID: [0-9]+\)`)
 	act = idRegex.ReplaceAllString(act, "Creation complete after *s (ID: ******************)")
 
+	// Replace all null_resource.simple{n} with null_resource.simple because with
+	// multiple resources they might be created at different times and so the
+	// output is unordered.
+	resourceRegex := regexp.MustCompile(`null_resource\.simple\d:`)
+	act = resourceRegex.ReplaceAllString(act, "null_resource.simple:")
+
 	if string(exp) != act {
 		// If in CI, we write the diff to the console. Otherwise we write the diff
 		// to file so we can use our local diff viewer.
