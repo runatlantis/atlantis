@@ -1,3 +1,73 @@
+# v0.4.12 (UNRELEASED)
+
+## Description
+
+Diff: https://github.com/runatlantis/atlantis/compare/v0.4.11...v0.4.12
+
+## Features
+
+## Bugfixes
+
+## Backwards Incompatibilities / Notes:
+
+## Downloads
+
+## Docker
+
+# v0.4.11
+
+## Description
+Medium sized release that updates the Terraform version and makes `terraform plan`
+output smaller by removing the `Refreshing...` output.
+
+Diff: https://github.com/runatlantis/atlantis/compare/v0.4.10...v0.4.11
+
+## Features
+* Upgraded Docker image to use Terraform 0.11.10
+* `terraform plan` output is shorter now thanks to remove the `Refreshing...` output ([#339](https://github.com/runatlantis/atlantis/pull/339))
+* Project names specified in `atlantis.yaml` can now contain `/`'s. This is useful
+if you want to name your projects similar to the directories they're in. (Fixes [#253](https://github.com/runatlantis/atlantis/issues/253))
+* Added new flag `--silence-whitelist-errors` which prevents Atlantis from comment back on pull requests
+from non-whitelisted repos. This is useful if you want to add the Atlantis webhook to a whole organization
+and then control which repos are actioned on via the whitelist. (Fixes [#312](https://github.com/runatlantis/atlantis/issues/312))
+* The message when the project is locked is now more helpful. ([#336](https://github.com/runatlantis/atlantis/pull/336))
+* Run `terraform plan` with `-var atlantis_repo_owner=runatlantis -var atlantis_repo_name=atlantis -var atlantis_pull_num=10`
+(if the repo was runatlantis/atlantis) ([#300](https://github.com/runatlantis/atlantis/pull/300))
+
+## Bugfixes
+* Quote plan filenames so that Bitbucket projects with spaces in their names still work (Fixes [#302](https://github.com/runatlantis/atlantis/issues/302))
+
+## Backwards Incompatibilities / Notes:
+* Atlantis now runs `terraform plan` with
+    ```bash
+    -var atlantis_repo_owner=runatlantis \
+    -var atlantis_repo_name=atlantis \
+    -var atlantis_pull_num=10
+    ```
+
+    (in this example the repo that Atlantis is running on is runatlantis/atlantis).
+
+    If you were using those variables in your terraform code:
+    ```hcl
+    variable "atlantis_repo_owner" {
+      default = "my_default"
+    }
+    ```
+
+    Then Atlantis will be overriding those variables with its own values. To prevent
+    this, you need to rename your variables.
+
+    If you aren't using those variables then this change won't affect you.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.11/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.11/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.11/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.11/atlantis_linux_arm.zip)
+
+## Docker
+`runatlantis/atlantis:v0.4.11`
+
 # v0.4.10
 
 ## Description
