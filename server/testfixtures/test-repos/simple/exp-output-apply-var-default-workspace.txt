@@ -1,10 +1,16 @@
 Ran Apply in dir: `.` workspace: `default`
 
+<details><summary>Show Output</summary>
+
 ```diff
 null_resource.simple: Creating...
+null_resource.simple: Creating...
+null_resource.simple: Creating...
+null_resource.simple: Creation complete after *s (ID: ******************)
+null_resource.simple: Creation complete after *s (ID: ******************)
 null_resource.simple: Creation complete after *s (ID: ******************)
 
-Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+Apply complete! Resources: 3 added, 0 changed, 0 destroyed.
 
 Outputs:
 
@@ -12,4 +18,5 @@ var = default_workspace
 workspace = default
 
 ```
+</details>
 

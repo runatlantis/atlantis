@@ -541,12 +541,6 @@ Terraform will perform the following actions:
 <details><summary>Show Output</summary>
 
 $$$diff
-Refreshing Terraform state in-memory prior to plan...
-The refreshed state will be used to calculate this plan, but will not be
-persisted to local or remote state storage.
-
-
-------------------------------------------------------------------------
 
 An execution plan has been generated and is shown below.
 Resource actions are indicated with the following symbols:
