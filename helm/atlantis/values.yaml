@@ -73,7 +73,7 @@ serviceAccountSecrets:
 
 image:
   repository: runatlantis/atlantis
-  tag: v0.4.5
+  tag: v0.4.11
   pullPolicy: IfNotPresent
 
 ## enable using atlantis.yaml file
@@ -115,10 +115,10 @@ ingress:
 
 resources:
   requests:
-    memory: 1Gi
+    memory: 256Mi
     cpu: 100m
   limits:
-    memory: 1Gi
+    memory: 256Mi
     cpu: 100m
 
 replicaCount: 1
