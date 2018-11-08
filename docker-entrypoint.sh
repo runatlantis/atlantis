@@ -9,15 +9,30 @@ if [ "${1:0:1}" = '-' ]; then
     set -- atlantis "$@"
 fi
 
-# Look for atlantis subcommands.
+# If the user is running an atlantis subcommand (ex. server) then we want to prepend
+# atlantis as the first arg to exec. To detect if they're running a subcommand
+# we take the potential subcommand and run it through atlantis help {subcommand}.
+# If the output contains "atlantis subcommand" then we know it's a subcommand
+# since the help output contains that string. For anything else (ex. sh)
+# it won't contain that string.
+# NOTE: We use grep instead of the exit code since help always returns 0.
 if atlantis --help "$1" 2>&1 | grep -q "atlantis $1"; then
     # We can't use the return code to check for the existence of a subcommand, so
     # we have to use grep to look for a pattern in the help output.
     set -- atlantis "$@"
 fi
 
-# If we are running atlantis, make sure it executes as the proper user.
-if [ "$1" = 'atlantis' ]; then
+# If the current uid running does not have a user create one in /etc/passwd
+if ! whoami &> /dev/null; then
+  if [ -w /etc/passwd ]; then
+    echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:/home/atlantis:/sbin/nologin" >> /etc/passwd
+  fi
+fi
+
+# If we're running as root and we're trying to execute atlantis then we use
+# gosu to step down from root and run as the atlantis user.
+# In OpenShift, containers are run as a random users so we don't need to use gosu.
+if [[ $(id -u) == 0 ]] && [[ "$1" = 'atlantis' ]]; then
     # If requested, set the capability to bind to privileged ports before
     # we drop to the non-root user. Note that this doesn't work with all
     # storage drivers (it won't work with AUFS).
