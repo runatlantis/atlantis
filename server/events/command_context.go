@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package events
 
 import (
@@ -18,8 +18,8 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-// CommandContext represents the context of a command that came from a comment
-// on a pull request.
+// CommandContext represents the context of a command that should be executed
+// for a pull request.
 type CommandContext struct {
 	// BaseRepo is the repository that the pull request will be merged into.
 	BaseRepo models.Repo
@@ -30,7 +30,6 @@ type CommandContext struct {
 	HeadRepo models.Repo
 	Pull     models.PullRequest
 	// User is the user that triggered this command.
-	User    models.User
-	Command *Command
-	Log     *logging.SimpleLogger
+	User models.User
+	Log  *logging.SimpleLogger
 }

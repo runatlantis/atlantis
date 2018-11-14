@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package vcs
 
 import (
@@ -35,7 +35,7 @@ func (a *NotConfiguredVCSClient) CreateComment(repo models.Repo, pullNum int, co
 func (a *NotConfiguredVCSClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
 	return false, a.err()
 }
-func (a *NotConfiguredVCSClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state CommitStatus, description string) error {
+func (a *NotConfiguredVCSClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, description string) error {
 	return a.err()
 }
 func (a *NotConfiguredVCSClient) err() error {

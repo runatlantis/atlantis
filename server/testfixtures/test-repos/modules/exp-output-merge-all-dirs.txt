@@ -1,0 +1,4 @@
+Locks and plans deleted for the projects and workspaces modified in this pull request:
+
+- dir: `production` workspace: `default`
+- dir: `staging` workspace: `default`

@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package cmd
 
 import (
@@ -22,7 +22,7 @@ import (
 // RootCmd is the base command onto which all other commands are added.
 var RootCmd = &cobra.Command{
 	Use:   "atlantis",
-	Short: "A unified workflow for collaborating on Terraform through GitHub and GitLab",
+	Short: "A unified workflow for collaborating on Terraform",
 }
 
 // Execute starts RootCmd.

@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package webhooks_test
 
 import (
@@ -32,7 +32,7 @@ var client webhooks.DefaultSlackClient
 var result webhooks.ApplyResult
 
 func TestAuthTest_Success(t *testing.T) {
-	t.Log("When the underylying client suceeds, function should succeed")
+	t.Log("When the underylying client succeeds, function should succeed")
 	setup(t)
 	err := client.AuthTest()
 	Ok(t, err)
@@ -91,7 +91,7 @@ func TestChannelExists_Error(t *testing.T) {
 }
 
 func TestPostMessage_Success(t *testing.T) {
-	t.Log("When apply succeds, function should succeed and indicate success")
+	t.Log("When apply succeeds, function should succeed and indicate success")
 	setup(t)
 
 	expParams := slack.NewPostMessageParameters()

@@ -44,12 +44,13 @@ func (mock *MockEventParsing) ParseGithubIssueCommentEvent(comment *github.Issue
 	return ret0, ret1, ret2, ret3
 }
 
-func (mock *MockEventParsing) ParseGithubPull(pull *github.PullRequest) (models.PullRequest, models.Repo, error) {
+func (mock *MockEventParsing) ParseGithubPull(pull *github.PullRequest) (models.PullRequest, models.Repo, models.Repo, error) {
 	params := []pegomock.Param{pull}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseGithubPull", params, []reflect.Type{reflect.TypeOf((*models.PullRequest)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseGithubPull", params, []reflect.Type{reflect.TypeOf((*models.PullRequest)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 models.PullRequest
 	var ret1 models.Repo
-	var ret2 error
+	var ret2 models.Repo
+	var ret3 error
 	if len(result) != 0 {
 		if result[0] != nil {
 			ret0 = result[0].(models.PullRequest)
@@ -58,10 +59,45 @@ func (mock *MockEventParsing) ParseGithubPull(pull *github.PullRequest) (models.
 			ret1 = result[1].(models.Repo)
 		}
 		if result[2] != nil {
-			ret2 = result[2].(error)
+			ret2 = result[2].(models.Repo)
+		}
+		if result[3] != nil {
+			ret3 = result[3].(error)
 		}
 	}
-	return ret0, ret1, ret2
+	return ret0, ret1, ret2, ret3
+}
+
+func (mock *MockEventParsing) ParseGithubPullEvent(pullEvent *github.PullRequestEvent) (models.PullRequest, models.PullRequestEventType, models.Repo, models.Repo, models.User, error) {
+	params := []pegomock.Param{pullEvent}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseGithubPullEvent", params, []reflect.Type{reflect.TypeOf((*models.PullRequest)(nil)).Elem(), reflect.TypeOf((*models.PullRequestEventType)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.User)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 models.PullRequest
+	var ret1 models.PullRequestEventType
+	var ret2 models.Repo
+	var ret3 models.Repo
+	var ret4 models.User
+	var ret5 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(models.PullRequest)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(models.PullRequestEventType)
+		}
+		if result[2] != nil {
+			ret2 = result[2].(models.Repo)
+		}
+		if result[3] != nil {
+			ret3 = result[3].(models.Repo)
+		}
+		if result[4] != nil {
+			ret4 = result[4].(models.User)
+		}
+		if result[5] != nil {
+			ret5 = result[5].(error)
+		}
+	}
+	return ret0, ret1, ret2, ret3, ret4, ret5
 }
 
 func (mock *MockEventParsing) ParseGithubRepo(ghRepo *github.Repository) (models.Repo, error) {
@@ -80,29 +116,41 @@ func (mock *MockEventParsing) ParseGithubRepo(ghRepo *github.Repository) (models
 	return ret0, ret1
 }
 
-func (mock *MockEventParsing) ParseGitlabMergeEvent(event go_gitlab.MergeEvent) (models.PullRequest, models.Repo, error) {
+func (mock *MockEventParsing) ParseGitlabMergeRequestEvent(event go_gitlab.MergeEvent) (models.PullRequest, models.PullRequestEventType, models.Repo, models.Repo, models.User, error) {
 	params := []pegomock.Param{event}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseGitlabMergeEvent", params, []reflect.Type{reflect.TypeOf((*models.PullRequest)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseGitlabMergeRequestEvent", params, []reflect.Type{reflect.TypeOf((*models.PullRequest)(nil)).Elem(), reflect.TypeOf((*models.PullRequestEventType)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.User)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 models.PullRequest
-	var ret1 models.Repo
-	var ret2 error
+	var ret1 models.PullRequestEventType
+	var ret2 models.Repo
+	var ret3 models.Repo
+	var ret4 models.User
+	var ret5 error
 	if len(result) != 0 {
 		if result[0] != nil {
 			ret0 = result[0].(models.PullRequest)
 		}
 		if result[1] != nil {
-			ret1 = result[1].(models.Repo)
+			ret1 = result[1].(models.PullRequestEventType)
 		}
 		if result[2] != nil {
-			ret2 = result[2].(error)
+			ret2 = result[2].(models.Repo)
+		}
+		if result[3] != nil {
+			ret3 = result[3].(models.Repo)
+		}
+		if result[4] != nil {
+			ret4 = result[4].(models.User)
+		}
+		if result[5] != nil {
+			ret5 = result[5].(error)
 		}
 	}
-	return ret0, ret1, ret2
+	return ret0, ret1, ret2, ret3, ret4, ret5
 }
 
-func (mock *MockEventParsing) ParseGitlabMergeCommentEvent(event go_gitlab.MergeCommentEvent) (models.Repo, models.Repo, models.User, error) {
+func (mock *MockEventParsing) ParseGitlabMergeRequestCommentEvent(event go_gitlab.MergeCommentEvent) (models.Repo, models.Repo, models.User, error) {
 	params := []pegomock.Param{event}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseGitlabMergeCommentEvent", params, []reflect.Type{reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.User)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseGitlabMergeRequestCommentEvent", params, []reflect.Type{reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.User)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 models.Repo
 	var ret1 models.Repo
 	var ret2 models.User
@@ -124,13 +172,157 @@ func (mock *MockEventParsing) ParseGitlabMergeCommentEvent(event go_gitlab.Merge
 	return ret0, ret1, ret2, ret3
 }
 
-func (mock *MockEventParsing) ParseGitlabMergeRequest(mr *go_gitlab.MergeRequest) models.PullRequest {
-	params := []pegomock.Param{mr}
+func (mock *MockEventParsing) ParseGitlabMergeRequest(mr *go_gitlab.MergeRequest, baseRepo models.Repo) models.PullRequest {
+	params := []pegomock.Param{mr, baseRepo}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseGitlabMergeRequest", params, []reflect.Type{reflect.TypeOf((*models.PullRequest)(nil)).Elem()})
 	var ret0 models.PullRequest
 	if len(result) != 0 {
 		if result[0] != nil {
 			ret0 = result[0].(models.PullRequest)
+		}
+	}
+	return ret0
+}
+
+func (mock *MockEventParsing) ParseBitbucketCloudPullEvent(body []byte) (models.PullRequest, models.Repo, models.Repo, models.User, error) {
+	params := []pegomock.Param{body}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseBitbucketCloudPullEvent", params, []reflect.Type{reflect.TypeOf((*models.PullRequest)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.User)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 models.PullRequest
+	var ret1 models.Repo
+	var ret2 models.Repo
+	var ret3 models.User
+	var ret4 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(models.PullRequest)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(models.Repo)
+		}
+		if result[2] != nil {
+			ret2 = result[2].(models.Repo)
+		}
+		if result[3] != nil {
+			ret3 = result[3].(models.User)
+		}
+		if result[4] != nil {
+			ret4 = result[4].(error)
+		}
+	}
+	return ret0, ret1, ret2, ret3, ret4
+}
+
+func (mock *MockEventParsing) ParseBitbucketCloudPullCommentEvent(body []byte) (models.PullRequest, models.Repo, models.Repo, models.User, string, error) {
+	params := []pegomock.Param{body}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseBitbucketCloudPullCommentEvent", params, []reflect.Type{reflect.TypeOf((*models.PullRequest)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.User)(nil)).Elem(), reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 models.PullRequest
+	var ret1 models.Repo
+	var ret2 models.Repo
+	var ret3 models.User
+	var ret4 string
+	var ret5 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(models.PullRequest)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(models.Repo)
+		}
+		if result[2] != nil {
+			ret2 = result[2].(models.Repo)
+		}
+		if result[3] != nil {
+			ret3 = result[3].(models.User)
+		}
+		if result[4] != nil {
+			ret4 = result[4].(string)
+		}
+		if result[5] != nil {
+			ret5 = result[5].(error)
+		}
+	}
+	return ret0, ret1, ret2, ret3, ret4, ret5
+}
+
+func (mock *MockEventParsing) GetBitbucketCloudPullEventType(eventTypeHeader string) models.PullRequestEventType {
+	params := []pegomock.Param{eventTypeHeader}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("GetBitbucketCloudPullEventType", params, []reflect.Type{reflect.TypeOf((*models.PullRequestEventType)(nil)).Elem()})
+	var ret0 models.PullRequestEventType
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(models.PullRequestEventType)
+		}
+	}
+	return ret0
+}
+
+func (mock *MockEventParsing) ParseBitbucketServerPullEvent(body []byte) (models.PullRequest, models.Repo, models.Repo, models.User, error) {
+	params := []pegomock.Param{body}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseBitbucketServerPullEvent", params, []reflect.Type{reflect.TypeOf((*models.PullRequest)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.User)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 models.PullRequest
+	var ret1 models.Repo
+	var ret2 models.Repo
+	var ret3 models.User
+	var ret4 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(models.PullRequest)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(models.Repo)
+		}
+		if result[2] != nil {
+			ret2 = result[2].(models.Repo)
+		}
+		if result[3] != nil {
+			ret3 = result[3].(models.User)
+		}
+		if result[4] != nil {
+			ret4 = result[4].(error)
+		}
+	}
+	return ret0, ret1, ret2, ret3, ret4
+}
+
+func (mock *MockEventParsing) ParseBitbucketServerPullCommentEvent(body []byte) (models.PullRequest, models.Repo, models.Repo, models.User, string, error) {
+	params := []pegomock.Param{body}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseBitbucketServerPullCommentEvent", params, []reflect.Type{reflect.TypeOf((*models.PullRequest)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.User)(nil)).Elem(), reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 models.PullRequest
+	var ret1 models.Repo
+	var ret2 models.Repo
+	var ret3 models.User
+	var ret4 string
+	var ret5 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(models.PullRequest)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(models.Repo)
+		}
+		if result[2] != nil {
+			ret2 = result[2].(models.Repo)
+		}
+		if result[3] != nil {
+			ret3 = result[3].(models.User)
+		}
+		if result[4] != nil {
+			ret4 = result[4].(string)
+		}
+		if result[5] != nil {
+			ret5 = result[5].(error)
+		}
+	}
+	return ret0, ret1, ret2, ret3, ret4, ret5
+}
+
+func (mock *MockEventParsing) GetBitbucketServerPullEventType(eventTypeHeader string) models.PullRequestEventType {
+	params := []pegomock.Param{eventTypeHeader}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("GetBitbucketServerPullEventType", params, []reflect.Type{reflect.TypeOf((*models.PullRequestEventType)(nil)).Elem()})
+	var ret0 models.PullRequestEventType
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(models.PullRequestEventType)
 		}
 	}
 	return ret0
@@ -208,6 +400,33 @@ func (c *EventParsing_ParseGithubPull_OngoingVerification) GetAllCapturedArgumen
 	return
 }
 
+func (verifier *VerifierEventParsing) ParseGithubPullEvent(pullEvent *github.PullRequestEvent) *EventParsing_ParseGithubPullEvent_OngoingVerification {
+	params := []pegomock.Param{pullEvent}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ParseGithubPullEvent", params)
+	return &EventParsing_ParseGithubPullEvent_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type EventParsing_ParseGithubPullEvent_OngoingVerification struct {
+	mock              *MockEventParsing
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *EventParsing_ParseGithubPullEvent_OngoingVerification) GetCapturedArguments() *github.PullRequestEvent {
+	pullEvent := c.GetAllCapturedArguments()
+	return pullEvent[len(pullEvent)-1]
+}
+
+func (c *EventParsing_ParseGithubPullEvent_OngoingVerification) GetAllCapturedArguments() (_param0 []*github.PullRequestEvent) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]*github.PullRequestEvent, len(params[0]))
+		for u, param := range params[0] {
+			_param0[u] = param.(*github.PullRequestEvent)
+		}
+	}
+	return
+}
+
 func (verifier *VerifierEventParsing) ParseGithubRepo(ghRepo *github.Repository) *EventParsing_ParseGithubRepo_OngoingVerification {
 	params := []pegomock.Param{ghRepo}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ParseGithubRepo", params)
@@ -237,7 +456,7 @@ func (c *EventParsing_ParseGithubRepo_OngoingVerification) GetAllCapturedArgumen
 
 func (verifier *VerifierEventParsing) ParseGitlabMergeEvent(event go_gitlab.MergeEvent) *EventParsing_ParseGitlabMergeEvent_OngoingVerification {
 	params := []pegomock.Param{event}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ParseGitlabMergeEvent", params)
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ParseGitlabMergeRequestEvent", params)
 	return &EventParsing_ParseGitlabMergeEvent_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
@@ -264,7 +483,7 @@ func (c *EventParsing_ParseGitlabMergeEvent_OngoingVerification) GetAllCapturedA
 
 func (verifier *VerifierEventParsing) ParseGitlabMergeCommentEvent(event go_gitlab.MergeCommentEvent) *EventParsing_ParseGitlabMergeCommentEvent_OngoingVerification {
 	params := []pegomock.Param{event}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ParseGitlabMergeCommentEvent", params)
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ParseGitlabMergeRequestCommentEvent", params)
 	return &EventParsing_ParseGitlabMergeCommentEvent_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
@@ -289,8 +508,8 @@ func (c *EventParsing_ParseGitlabMergeCommentEvent_OngoingVerification) GetAllCa
 	return
 }
 
-func (verifier *VerifierEventParsing) ParseGitlabMergeRequest(mr *go_gitlab.MergeRequest) *EventParsing_ParseGitlabMergeRequest_OngoingVerification {
-	params := []pegomock.Param{mr}
+func (verifier *VerifierEventParsing) ParseGitlabMergeRequest(mr *go_gitlab.MergeRequest, baseRepo models.Repo) *EventParsing_ParseGitlabMergeRequest_OngoingVerification {
+	params := []pegomock.Param{mr, baseRepo}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ParseGitlabMergeRequest", params)
 	return &EventParsing_ParseGitlabMergeRequest_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -300,17 +519,183 @@ type EventParsing_ParseGitlabMergeRequest_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *EventParsing_ParseGitlabMergeRequest_OngoingVerification) GetCapturedArguments() *go_gitlab.MergeRequest {
-	mr := c.GetAllCapturedArguments()
-	return mr[len(mr)-1]
+func (c *EventParsing_ParseGitlabMergeRequest_OngoingVerification) GetCapturedArguments() (*go_gitlab.MergeRequest, models.Repo) {
+	mr, baseRepo := c.GetAllCapturedArguments()
+	return mr[len(mr)-1], baseRepo[len(baseRepo)-1]
 }
 
-func (c *EventParsing_ParseGitlabMergeRequest_OngoingVerification) GetAllCapturedArguments() (_param0 []*go_gitlab.MergeRequest) {
+func (c *EventParsing_ParseGitlabMergeRequest_OngoingVerification) GetAllCapturedArguments() (_param0 []*go_gitlab.MergeRequest, _param1 []models.Repo) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]*go_gitlab.MergeRequest, len(params[0]))
 		for u, param := range params[0] {
 			_param0[u] = param.(*go_gitlab.MergeRequest)
+		}
+		_param1 = make([]models.Repo, len(params[1]))
+		for u, param := range params[1] {
+			_param1[u] = param.(models.Repo)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierEventParsing) ParseBitbucketCloudPullEvent(body []byte) *EventParsing_ParseBitbucketCloudPullEvent_OngoingVerification {
+	params := []pegomock.Param{body}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ParseBitbucketCloudPullEvent", params)
+	return &EventParsing_ParseBitbucketCloudPullEvent_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type EventParsing_ParseBitbucketCloudPullEvent_OngoingVerification struct {
+	mock              *MockEventParsing
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *EventParsing_ParseBitbucketCloudPullEvent_OngoingVerification) GetCapturedArguments() []byte {
+	body := c.GetAllCapturedArguments()
+	return body[len(body)-1]
+}
+
+func (c *EventParsing_ParseBitbucketCloudPullEvent_OngoingVerification) GetAllCapturedArguments() (_param0 [][]byte) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([][]byte, len(params[0]))
+		for u, param := range params[0] {
+			_param0[u] = param.([]byte)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierEventParsing) ParseBitbucketCloudPullCommentEvent(body []byte) *EventParsing_ParseBitbucketCloudCommentEvent_OngoingVerification {
+	params := []pegomock.Param{body}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ParseBitbucketCloudPullCommentEvent", params)
+	return &EventParsing_ParseBitbucketCloudCommentEvent_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type EventParsing_ParseBitbucketCloudCommentEvent_OngoingVerification struct {
+	mock              *MockEventParsing
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *EventParsing_ParseBitbucketCloudCommentEvent_OngoingVerification) GetCapturedArguments() []byte {
+	body := c.GetAllCapturedArguments()
+	return body[len(body)-1]
+}
+
+func (c *EventParsing_ParseBitbucketCloudCommentEvent_OngoingVerification) GetAllCapturedArguments() (_param0 [][]byte) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([][]byte, len(params[0]))
+		for u, param := range params[0] {
+			_param0[u] = param.([]byte)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierEventParsing) GetBitbucketCloudEventType(eventTypeHeader string) *EventParsing_GetBitbucketCloudEventType_OngoingVerification {
+	params := []pegomock.Param{eventTypeHeader}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetBitbucketCloudPullEventType", params)
+	return &EventParsing_GetBitbucketCloudEventType_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type EventParsing_GetBitbucketCloudEventType_OngoingVerification struct {
+	mock              *MockEventParsing
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *EventParsing_GetBitbucketCloudEventType_OngoingVerification) GetCapturedArguments() string {
+	eventTypeHeader := c.GetAllCapturedArguments()
+	return eventTypeHeader[len(eventTypeHeader)-1]
+}
+
+func (c *EventParsing_GetBitbucketCloudEventType_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]string, len(params[0]))
+		for u, param := range params[0] {
+			_param0[u] = param.(string)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierEventParsing) ParseBitbucketServerPullEvent(body []byte) *EventParsing_ParseBitbucketServerPullEvent_OngoingVerification {
+	params := []pegomock.Param{body}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ParseBitbucketServerPullEvent", params)
+	return &EventParsing_ParseBitbucketServerPullEvent_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type EventParsing_ParseBitbucketServerPullEvent_OngoingVerification struct {
+	mock              *MockEventParsing
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *EventParsing_ParseBitbucketServerPullEvent_OngoingVerification) GetCapturedArguments() []byte {
+	body := c.GetAllCapturedArguments()
+	return body[len(body)-1]
+}
+
+func (c *EventParsing_ParseBitbucketServerPullEvent_OngoingVerification) GetAllCapturedArguments() (_param0 [][]byte) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([][]byte, len(params[0]))
+		for u, param := range params[0] {
+			_param0[u] = param.([]byte)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierEventParsing) ParseBitbucketServerPullCommentEvent(body []byte) *EventParsing_ParseBitbucketServerCommentEvent_OngoingVerification {
+	params := []pegomock.Param{body}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ParseBitbucketServerPullCommentEvent", params)
+	return &EventParsing_ParseBitbucketServerCommentEvent_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type EventParsing_ParseBitbucketServerCommentEvent_OngoingVerification struct {
+	mock              *MockEventParsing
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *EventParsing_ParseBitbucketServerCommentEvent_OngoingVerification) GetCapturedArguments() []byte {
+	body := c.GetAllCapturedArguments()
+	return body[len(body)-1]
+}
+
+func (c *EventParsing_ParseBitbucketServerCommentEvent_OngoingVerification) GetAllCapturedArguments() (_param0 [][]byte) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([][]byte, len(params[0]))
+		for u, param := range params[0] {
+			_param0[u] = param.([]byte)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierEventParsing) GetBitbucketServerEventType(eventTypeHeader string) *EventParsing_GetBitbucketServerEventType_OngoingVerification {
+	params := []pegomock.Param{eventTypeHeader}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetBitbucketServerPullEventType", params)
+	return &EventParsing_GetBitbucketServerEventType_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type EventParsing_GetBitbucketServerEventType_OngoingVerification struct {
+	mock              *MockEventParsing
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *EventParsing_GetBitbucketServerEventType_OngoingVerification) GetCapturedArguments() string {
+	eventTypeHeader := c.GetAllCapturedArguments()
+	return eventTypeHeader[len(eventTypeHeader)-1]
+}
+
+func (c *EventParsing_GetBitbucketServerEventType_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]string, len(params[0]))
+		for u, param := range params[0] {
+			_param0[u] = param.(string)
 		}
 	}
 	return

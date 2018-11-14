@@ -1,0 +1,16 @@
+[
+    {
+        "locale": "nl",
+        "key": "day",
+        "trans": "er {0}-{1} dag vertrokken",
+        "type": "Range",
+        "rule": "One"
+    },
+    {
+        "locale": "nl",
+        "key": "day",
+        "trans": "er zijn {0}-{1} dagen over",
+        "type": "Range",
+        "rule": "Other"
+    }
+]

@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package events_test
 
 import (
@@ -31,8 +31,6 @@ var commentParser = events.CommentParser{
 }
 
 func TestParse_Ignored(t *testing.T) {
-	t.Log("given a comment that should be ignored we should set " +
-		"CommentParseResult.Ignore to true")
 	ignoreComments := []string{
 		"",
 		"a",
@@ -47,8 +45,6 @@ func TestParse_Ignored(t *testing.T) {
 }
 
 func TestParse_HelpResponse(t *testing.T) {
-	t.Log("given a comment that should result in help output we " +
-		"should set CommentParseResult.CommentResult")
 	helpComments := []string{
 		"run",
 		"atlantis",
@@ -73,47 +69,47 @@ func TestParse_UnusedArguments(t *testing.T) {
 		Unused  string
 	}{
 		{
-			events.Plan,
+			events.PlanCommand,
 			"-d . arg",
 			"arg",
 		},
 		{
-			events.Plan,
+			events.PlanCommand,
 			"arg -d .",
 			"arg",
 		},
 		{
-			events.Plan,
+			events.PlanCommand,
 			"arg",
 			"arg",
 		},
 		{
-			events.Plan,
+			events.PlanCommand,
 			"arg arg2",
 			"arg arg2",
 		},
 		{
-			events.Plan,
+			events.PlanCommand,
 			"-d . arg -w kjj arg2",
 			"arg arg2",
 		},
 		{
-			events.Apply,
+			events.ApplyCommand,
 			"-d . arg",
 			"arg",
 		},
 		{
-			events.Apply,
+			events.ApplyCommand,
 			"arg arg2",
 			"arg arg2",
 		},
 		{
-			events.Apply,
+			events.ApplyCommand,
 			"arg arg2 -- useful",
 			"arg arg2",
 		},
 		{
-			events.Apply,
+			events.ApplyCommand,
 			"arg arg2 --",
 			"arg arg2",
 		},
@@ -123,7 +119,7 @@ func TestParse_UnusedArguments(t *testing.T) {
 		t.Run(comment, func(t *testing.T) {
 			r := commentParser.Parse(comment, models.Github)
 			usage := PlanUsage
-			if c.Command == events.Apply {
+			if c.Command == events.ApplyCommand {
 				usage = ApplyUsage
 			}
 			Equals(t, fmt.Sprintf("```\nError: unknown argument(s) – %s.\n%s```", c.Unused, usage), r.CommentResponse)
@@ -239,6 +235,31 @@ func TestParse_RelativeDirPath(t *testing.T) {
 	}
 }
 
+// If there's multiple lines but it's whitespace, allow the command. This
+// occurs when you copy and paste via GitHub.
+func TestParse_Multiline(t *testing.T) {
+	comments := []string{
+		"atlantis plan\n",
+		"atlantis plan\n\n",
+		"atlantis plan\r\n",
+		"atlantis plan\r\n\r\n",
+	}
+	for _, comment := range comments {
+		t.Run(comment, func(t *testing.T) {
+			r := commentParser.Parse(comment, models.Github)
+			Equals(t, "", r.CommentResponse)
+			Equals(t, &events.CommentCommand{
+				RepoRelDir:  "",
+				Flags:       nil,
+				Name:        events.PlanCommand,
+				Verbose:     false,
+				Workspace:   "",
+				ProjectName: "",
+			}, r.Command)
+		})
+	}
+}
+
 func TestParse_InvalidWorkspace(t *testing.T) {
 	t.Log("if -w is used with '..' or '/', should return an error")
 	comments := []string{
@@ -259,6 +280,22 @@ func TestParse_InvalidWorkspace(t *testing.T) {
 	}
 }
 
+func TestParse_UsingProjectAtSameTimeAsWorkspaceOrDir(t *testing.T) {
+	cases := []string{
+		"atlantis plan -w workspace -p project",
+		"atlantis plan -d dir -p project",
+		"atlantis plan -d dir -w workspace -p project",
+	}
+	for _, c := range cases {
+		t.Run(c, func(t *testing.T) {
+			r := commentParser.Parse(c, models.Github)
+			exp := "Error: cannot use -p/--project at same time as -d/--dir or -w/--workspace"
+			Assert(t, strings.Contains(r.CommentResponse, exp),
+				"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
+		})
+	}
+}
+
 func TestParse_Parsing(t *testing.T) {
 	cases := []struct {
 		flags        string
@@ -266,36 +303,74 @@ func TestParse_Parsing(t *testing.T) {
 		expDir       string
 		expVerbose   bool
 		expExtraArgs string
+		expProject   string
 	}{
 		// Test defaults.
 		{
 			"",
-			"default",
+			"",
 			"",
 			false,
 			"",
+			"",
 		},
-		// Test each flag individually.
+		// Test each short flag individually.
 		{
 			"-w workspace",
 			"workspace",
 			"",
 			false,
 			"",
+			"",
 		},
 		{
 			"-d dir",
-			"default",
+			"",
 			"dir",
 			false,
 			"",
+			"",
+		},
+		{
+			"-p project",
+			"",
+			"",
+			false,
+			"",
+			"project",
 		},
 		{
 			"--verbose",
-			"default",
+			"",
 			"",
 			true,
 			"",
+			"",
+		},
+		// Test each long flag individually.
+		{
+			"--workspace workspace",
+			"workspace",
+			"",
+			false,
+			"",
+			"",
+		},
+		{
+			"--dir dir",
+			"",
+			"dir",
+			false,
+			"",
+			"",
+		},
+		{
+			"--project project",
+			"",
+			"",
+			false,
+			"",
+			"project",
 		},
 		// Test all of them with different permutations.
 		{
@@ -304,12 +379,14 @@ func TestParse_Parsing(t *testing.T) {
 			"dir",
 			true,
 			"",
+			"",
 		},
 		{
 			"-d dir -w workspace --verbose",
 			"workspace",
 			"dir",
 			true,
+			"",
 			"",
 		},
 		{
@@ -318,6 +395,23 @@ func TestParse_Parsing(t *testing.T) {
 			"dir",
 			true,
 			"",
+			"",
+		},
+		{
+			"-p project --verbose",
+			"",
+			"",
+			true,
+			"",
+			"project",
+		},
+		{
+			"--verbose -p project",
+			"",
+			"",
+			true,
+			"",
+			"project",
 		},
 		// Test that flags after -- are ignored
 		{
@@ -326,6 +420,7 @@ func TestParse_Parsing(t *testing.T) {
 			"dir",
 			false,
 			"\"--verbose\"",
+			"",
 		},
 		{
 			"-w workspace -- -d dir --verbose",
@@ -333,22 +428,25 @@ func TestParse_Parsing(t *testing.T) {
 			"",
 			false,
 			"\"-d\" \"dir\" \"--verbose\"",
+			"",
 		},
 		// Test the extra args parsing.
 		{
 			"--",
-			"default",
+			"",
 			"",
 			false,
+			"",
 			"",
 		},
 		// Test trying to escape quoting
 		{
 			"-- \";echo \"hi",
-			"default",
+			"",
 			"",
 			false,
 			`"\";echo" "\"hi"`,
+			"",
 		},
 		{
 			"-w workspace -d dir --verbose -- arg one -two --three &&",
@@ -356,6 +454,7 @@ func TestParse_Parsing(t *testing.T) {
 			"dir",
 			true,
 			"\"arg\" \"one\" \"-two\" \"--three\" \"&&\"",
+			"",
 		},
 		// Test whitespace.
 		{
@@ -364,6 +463,7 @@ func TestParse_Parsing(t *testing.T) {
 			"dir",
 			true,
 			"\"arg\" \"one\" \"-two\" \"--three\" \"&&\"",
+			"",
 		},
 		{
 			"   -w   workspace   -d   dir   --verbose   --   arg   one   -two   --three   &&",
@@ -371,79 +471,179 @@ func TestParse_Parsing(t *testing.T) {
 			"dir",
 			true,
 			"\"arg\" \"one\" \"-two\" \"--three\" \"&&\"",
+			"",
 		},
 		// Test that the dir string is normalized.
 		{
 			"-d /",
-			"default",
+			"",
 			".",
 			false,
+			"",
 			"",
 		},
 		{
 			"-d /adir",
-			"default",
+			"",
 			"adir",
 			false,
+			"",
 			"",
 		},
 		{
 			"-d .",
-			"default",
+			"",
 			".",
 			false,
+			"",
 			"",
 		},
 		{
 			"-d ./",
-			"default",
+			"",
 			".",
 			false,
+			"",
 			"",
 		},
 		{
 			"-d ./adir",
-			"default",
+			"",
 			"adir",
 			false,
+			"",
 			"",
 		},
 	}
 	for _, test := range cases {
 		for _, cmdName := range []string{"plan", "apply"} {
 			comment := fmt.Sprintf("atlantis %s %s", cmdName, test.flags)
-			r := commentParser.Parse(comment, models.Github)
-			Assert(t, r.CommentResponse == "", "CommentResponse should have been empty but was %q for comment %q", r.CommentResponse, comment)
-			Assert(t, test.expDir == r.Command.Dir, "exp dir to equal %q but was %q for comment %q", test.expDir, r.Command.Dir, comment)
-			Assert(t, test.expWorkspace == r.Command.Workspace, "exp workspace to equal %q but was %q for comment %q", test.expWorkspace, r.Command.Workspace, comment)
-			Assert(t, test.expVerbose == r.Command.Verbose, "exp verbose to equal %v but was %v for comment %q", test.expVerbose, r.Command.Verbose, comment)
-			actExtraArgs := strings.Join(r.Command.Flags, " ")
-			Assert(t, test.expExtraArgs == actExtraArgs, "exp extra args to equal %v but got %v for comment %q", test.expExtraArgs, actExtraArgs, comment)
-			if cmdName == "plan" {
-				Assert(t, r.Command.Name == events.Plan, "did not parse comment %q as plan command", comment)
-			}
-			if cmdName == "apply" {
-				Assert(t, r.Command.Name == events.Apply, "did not parse comment %q as apply command", comment)
-			}
+			t.Run(comment, func(t *testing.T) {
+				r := commentParser.Parse(comment, models.Github)
+				Assert(t, r.CommentResponse == "", "CommentResponse should have been empty but was %q for comment %q", r.CommentResponse, comment)
+				Assert(t, test.expDir == r.Command.RepoRelDir, "exp dir to equal %q but was %q for comment %q", test.expDir, r.Command.RepoRelDir, comment)
+				Assert(t, test.expWorkspace == r.Command.Workspace, "exp workspace to equal %q but was %q for comment %q", test.expWorkspace, r.Command.Workspace, comment)
+				Assert(t, test.expVerbose == r.Command.Verbose, "exp verbose to equal %v but was %v for comment %q", test.expVerbose, r.Command.Verbose, comment)
+				actExtraArgs := strings.Join(r.Command.Flags, " ")
+				Assert(t, test.expExtraArgs == actExtraArgs, "exp extra args to equal %v but got %v for comment %q", test.expExtraArgs, actExtraArgs, comment)
+				if cmdName == "plan" {
+					Assert(t, r.Command.Name == events.PlanCommand, "did not parse comment %q as plan command", comment)
+				}
+				if cmdName == "apply" {
+					Assert(t, r.Command.Name == events.ApplyCommand, "did not parse comment %q as apply command", comment)
+				}
+			})
 		}
 	}
 }
 
+func TestBuildPlanApplyComment(t *testing.T) {
+	cases := []struct {
+		repoRelDir    string
+		workspace     string
+		project       string
+		commentArgs   []string
+		expPlanFlags  string
+		expApplyFlags string
+	}{
+		{
+			repoRelDir:    ".",
+			workspace:     "default",
+			project:       "",
+			commentArgs:   nil,
+			expPlanFlags:  "-d .",
+			expApplyFlags: "-d .",
+		},
+		{
+			repoRelDir:    "dir",
+			workspace:     "default",
+			project:       "",
+			commentArgs:   nil,
+			expPlanFlags:  "-d dir",
+			expApplyFlags: "-d dir",
+		},
+		{
+			repoRelDir:    ".",
+			workspace:     "workspace",
+			project:       "",
+			commentArgs:   nil,
+			expPlanFlags:  "-w workspace",
+			expApplyFlags: "-w workspace",
+		},
+		{
+			repoRelDir:    "dir",
+			workspace:     "workspace",
+			project:       "",
+			commentArgs:   nil,
+			expPlanFlags:  "-d dir -w workspace",
+			expApplyFlags: "-d dir -w workspace",
+		},
+		{
+			repoRelDir:    ".",
+			workspace:     "default",
+			project:       "project",
+			commentArgs:   nil,
+			expPlanFlags:  "-p project",
+			expApplyFlags: "-p project",
+		},
+		{
+			repoRelDir:    "dir",
+			workspace:     "workspace",
+			project:       "project",
+			commentArgs:   nil,
+			expPlanFlags:  "-p project",
+			expApplyFlags: "-p project",
+		},
+		{
+			repoRelDir:    ".",
+			workspace:     "default",
+			project:       "",
+			commentArgs:   []string{`"arg1"`, `"arg2"`},
+			expPlanFlags:  "-d . -- arg1 arg2",
+			expApplyFlags: "-d .",
+		},
+		{
+			repoRelDir:    "dir",
+			workspace:     "workspace",
+			project:       "",
+			commentArgs:   []string{`"arg1"`, `"arg2"`, `arg3`},
+			expPlanFlags:  "-d dir -w workspace -- arg1 arg2 arg3",
+			expApplyFlags: "-d dir -w workspace",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.expPlanFlags, func(t *testing.T) {
+			for _, cmd := range []events.CommandName{events.PlanCommand, events.ApplyCommand} {
+				switch cmd {
+				case events.PlanCommand:
+					actComment := commentParser.BuildPlanComment(c.repoRelDir, c.workspace, c.project, c.commentArgs)
+					Equals(t, fmt.Sprintf("atlantis plan %s", c.expPlanFlags), actComment)
+				case events.ApplyCommand:
+					actComment := commentParser.BuildApplyComment(c.repoRelDir, c.workspace, c.project)
+					Equals(t, fmt.Sprintf("atlantis apply %s", c.expApplyFlags), actComment)
+				}
+			}
+		})
+	}
+}
+
 var PlanUsage = `Usage of plan:
-  -d, --dir string         Which directory to run plan in relative to root of repo.
-                           Use '.' for root. If not specified, will attempt to run
-                           plan for all Terraform projects we think were modified in
-                           this changeset.
+  -d, --dir string         Which directory to run plan in relative to root of repo,
+                           ex. 'child/dir'.
+  -p, --project string     Which project to run plan for. Refers to the name of the
+                           project configured in atlantis.yaml. Cannot be used at
+                           same time as workspace or dir flags.
       --verbose            Append Atlantis log to comment.
   -w, --workspace string   Switch to this Terraform workspace before planning.
-                           (default "default")
 `
 
 var ApplyUsage = `Usage of apply:
   -d, --dir string         Apply the plan for this directory, relative to root of
-                           repo. Use '.' for root. If not specified, will run apply
-                           against all plans created for this workspace.
+                           repo, ex. 'child/dir'.
+  -p, --project string     Apply the plan for this project. Refers to the name of
+                           the project configured in atlantis.yaml. Cannot be used
+                           at same time as workspace or dir flags.
       --verbose            Append Atlantis log to comment.
-  -w, --workspace string   Apply the plan for this Terraform workspace. (default
-                           "default")
+  -w, --workspace string   Apply the plan for this Terraform workspace.
 `

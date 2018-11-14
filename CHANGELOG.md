@@ -1,3 +1,426 @@
+# v0.4.12 (UNRELEASED)
+
+## Description
+
+Diff: https://github.com/runatlantis/atlantis/compare/v0.4.11...v0.4.12
+
+## Features
+
+## Bugfixes
+
+## Backwards Incompatibilities / Notes:
+
+## Downloads
+
+## Docker
+
+# v0.4.11
+
+## Description
+Medium sized release that updates the Terraform version and makes `terraform plan`
+output smaller by removing the `Refreshing...` output.
+
+Diff: https://github.com/runatlantis/atlantis/compare/v0.4.10...v0.4.11
+
+## Features
+* Upgraded Docker image to use Terraform 0.11.10
+* `terraform plan` output is shorter now thanks to remove the `Refreshing...` output ([#339](https://github.com/runatlantis/atlantis/pull/339))
+* Project names specified in `atlantis.yaml` can now contain `/`'s. This is useful
+if you want to name your projects similar to the directories they're in. (Fixes [#253](https://github.com/runatlantis/atlantis/issues/253))
+* Added new flag `--silence-whitelist-errors` which prevents Atlantis from comment back on pull requests
+from non-whitelisted repos. This is useful if you want to add the Atlantis webhook to a whole organization
+and then control which repos are actioned on via the whitelist. (Fixes [#312](https://github.com/runatlantis/atlantis/issues/312))
+* The message when the project is locked is now more helpful. ([#336](https://github.com/runatlantis/atlantis/pull/336))
+* Run `terraform plan` with `-var atlantis_repo_owner=runatlantis -var atlantis_repo_name=atlantis -var atlantis_pull_num=10`
+(if the repo was runatlantis/atlantis) ([#300](https://github.com/runatlantis/atlantis/pull/300))
+
+## Bugfixes
+* Quote plan filenames so that Bitbucket projects with spaces in their names still work (Fixes [#302](https://github.com/runatlantis/atlantis/issues/302))
+
+## Backwards Incompatibilities / Notes:
+* Atlantis now runs `terraform plan` with
+    ```bash
+    -var atlantis_repo_owner=runatlantis \
+    -var atlantis_repo_name=atlantis \
+    -var atlantis_pull_num=10
+    ```
+
+    (in this example the repo that Atlantis is running on is runatlantis/atlantis).
+
+    If you were using those variables in your terraform code:
+    ```hcl
+    variable "atlantis_repo_owner" {
+      default = "my_default"
+    }
+    ```
+
+    Then Atlantis will be overriding those variables with its own values. To prevent
+    this, you need to rename your variables.
+
+    If you aren't using those variables then this change won't affect you.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.11/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.11/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.11/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.11/atlantis_linux_arm.zip)
+
+## Docker
+`runatlantis/atlantis:v0.4.11`
+
+# v0.4.10
+
+## Description
+Small bugfix release to fix issues with new comment format.
+
+Diff: https://github.com/runatlantis/atlantis/compare/v0.4.9...v0.4.10
+
+## Features
+None
+
+## Bugfixes
+* Fix bad comment rendering ([#294](https://github.com/runatlantis/atlantis/issues/294))
+* Fix `plan` not working on Bitbucket Server when repo owner contains spaces ([#290](https://github.com/runatlantis/atlantis/issues/290))
+
+## Backwards Incompatibilities / Notes:
+None
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.10/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.10/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.10/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.10/atlantis_linux_arm.zip)
+
+## Docker
+`runatlantis/atlantis:v0.4.10`
+
+# v0.4.9
+
+## Description
+This release is mostly focused on changing how comments look. Terraform output
+is now automatically hidden if it's over 12 lines long:
+![https://user-images.githubusercontent.com/1034429/45580771-d4603b80-b849-11e8-8c4b-5984bd0bff7f.png](https://user-images.githubusercontent.com/1034429/45580771-d4603b80-b849-11e8-8c4b-5984bd0bff7f.png)
+Also the red and green highlighting for added and removed resources is fixed:
+![https://user-images.githubusercontent.com/1034429/45580777-d9bd8600-b849-11e8-8f2d-867fbf4e72d7.png](https://user-images.githubusercontent.com/1034429/45580777-d9bd8600-b849-11e8-8f2d-867fbf4e72d7.png)
+
+Diff: https://github.com/runatlantis/atlantis/compare/v0.4.8...v0.4.9
+
+## Features
+* Terraform output over 12 lines is hidden in comment until expanded
+* `terraform plan` output is highlighted correctly
+* Terraform is now executed with `-var atlantis_repo={repo name} -var atlantis_pull_num {pull num}`.
+This will allow users to trace Atlantis `terraform` executions in CloudTrail back to a specific
+user and pull request if using assume role by creating a specific name for the session Terraform initiates.
+```
+provider "aws" {
+  assume_role {
+    role_arn     = "arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME"
+    session_name = "${var.atlantis_user}-${var.atlantis_repo}-${var.atlantis_pull_num}"
+  }
+}
+```
+
+## Bugfixes
+* Run terraform with `-input=false` ([#268](https://github.com/runatlantis/atlantis/issues/268)).
+
+## Backwards Incompatibilities / Notes:
+* We set two new Terraform variables: `atlantis_repo` and `atlantis_pull_num`. If
+you were using variables with those names in your code you will need to rename them
+in your code.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.9/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.9/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.9/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.9/atlantis_linux_arm.zip)
+
+## Docker
+`runatlantis/atlantis:v0.4.9`
+
+# v0.4.8
+
+## Description
+Security release to upgrade the Docker image to the latest version of Alpine linux that fixes
+this bug: https://justi.cz/security/2018/09/13/alpine-apk-rce.html
+
+Diff: https://github.com/runatlantis/atlantis/compare/v0.4.7...v0.4.8
+
+## Features
+None
+
+## Bugfixes
+* Change server startup message to INFO from WARN level.
+
+## Backwards Incompatibilities / Notes:
+None
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.8/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.8/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.8/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.8/atlantis_linux_arm.zip)
+
+## Docker
+`runatlantis/atlantis:v0.4.8`
+
+
+# v0.4.7
+
+## Description
+Support GitLab repos nested under multiple levels and use the latest version of Terraform: 0.11.8!
+
+## Features
+* Support GitLab groups which allow repos to be nested under multiple levels,
+ex. `gitlab.com/owner/group/subgroup/subsubgroup/repo`
+* Use latest version of Terraform: 0.11.8 in Docker image
+
+## Bugfixes
+* When running with `TF_LOG` set, Atlantis will start normally. Previously it
+would error out due to attempting to parse the stderr output of the `terraform version`
+command.
+
+## Backwards Incompatibilities / Notes:
+None
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.7/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.7/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.7/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.7/atlantis_linux_arm.zip)
+
+## Docker
+`runatlantis/atlantis:v0.4.7`
+
+# v0.4.6
+
+## Description
+Just a small bugfix release.
+
+## Features
+None
+
+## Bugfixes
+* If `terraform init` fails, include the failure logs in the comment posted back to the PR.
+
+## Backwards Incompatibilities / Notes:
+None
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.6/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.6/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.6/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.6/atlantis_linux_arm.zip)
+
+## Docker
+`runatlantis/atlantis:v0.4.6`
+
+# v0.4.5
+
+## Features
+* `atlantis apply` now applies **all** unapplied plans instead of just the plan in the root directory. ([#169](https://github.com/runatlantis/atlantis/issues/169))
+* `atlantis plan` now plans **all** modified projects instead of just the root directory.
+* Plan comments now contain instructions for how to run apply or re-run plan.
+
+## Bugfixes
+* Ignore approvals from the pull request author (Bitbucket Cloud only). Fixes ([#201](https://github.com/runatlantis/atlantis/issues/201))
+* When double clicking on a GitHub comment, ex.
+    ```
+    atlantis apply
+    ```
+  GitHub would add two newlines to the end. If this was then pasted into a new
+  comment, Atlantis would accept it because of the extra newlines. This has been fixed
+  and the comment with two newlines will be accepted.
+
+## Backwards Incompatibilities / Notes:
+* `atlantis apply` now applies **all** unapplied plans. Previously it would only apply the plan in the root directory and default workspace.
+* `atlantis plan` now plans **all** modified projects. Previously it would only run plan in the root directory and default workspace.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.5/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.5/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.5/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.5/atlantis_linux_arm.zip)
+
+## Docker
+`runatlantis/atlantis:v0.4.5`
+
+# v0.4.4
+
+## Features
+* Supports Bitbucket Server ([#190](https://github.com/runatlantis/atlantis/issues/190)).
+
+## Bugfixes
+* Fix `/etc/hosts` not being respected ([#196](https://github.com/runatlantis/atlantis/issues/196)).
+
+## Backwards Incompatibilities / Notes:
+None
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.4/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.4/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.4/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.4/atlantis_linux_arm.zip)
+
+## Docker
+`runatlantis/atlantis:v0.4.4`
+
+# v0.4.3
+
+## Features
+* Supports Bitbucket Cloud (bitbucket.org) ([#30](https://github.com/runatlantis/atlantis/issues/30)).
+
+## Bugfixes
+None
+
+## Backwards Incompatibilities / Notes:
+None
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.3/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.3/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.3/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.3/atlantis_linux_arm.zip)
+
+## Docker
+`runatlantis/atlantis:v0.4.3`
+
+# v0.4.2
+
+## Features
+* Don't comment on pull request if autoplan determines there are no projects to plan in.
+This was getting very noisy for users who use their repos for more than just Terraform ([#183](https://github.com/runatlantis/atlantis/issues/183)).
+
+## Bugfixes
+None
+
+## Backwards Incompatibilities / Notes:
+None
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.2/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.2/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.2/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.2/atlantis_linux_arm.zip)
+
+## Docker
+`runatlantis/atlantis:v0.4.2`
+
+# v0.4.1
+
+## Features
+* Add new `/healthz` endpoint for health checking in Kubernetes ([#102](https://github.com/runatlantis/atlantis/issues/102))
+* Set `$PLANFILE` environment variable to expected location of plan file when running custom steps ([#168](https://github.com/runatlantis/atlantis/issues/168))
+    * This enables overriding the command Atlantis uses to `plan` and substituting your own or piping through a custom script.
+* Changed default pattern to detect changed files to `*.tf*` from `*.tf` in order
+to trigger on `.tfvars` files.
+
+## Bugfixes
+None
+
+## Backwards Incompatibilities / Notes:
+None
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.1/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.1/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.1/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.1/atlantis_linux_arm.zip)
+
+## Docker
+`runatlantis/atlantis:v0.4.1`
+
+# v0.4.0
+
+## Features
+* Autoplanning - Atlantis will automatically run `plan` on new pull requests and
+when new commits are pushed to the pull request.
+* New repository `atlantis.yaml` format that supports:
+    * Complete customization of plans run
+    * Single config file for whole repository
+    * Controlling autoplanning
+* Moved docs to standalone website from the README.
+* Fixes:
+    * [#113](https://github.com/runatlantis/atlantis/issues/113)
+    * [#50](https://github.com/runatlantis/atlantis/issues/50)
+    * [#46](https://github.com/runatlantis/atlantis/issues/46)
+    * [#39](https://github.com/runatlantis/atlantis/issues/39)
+    * [#28](https://github.com/runatlantis/atlantis/issues/28)
+    * [#26](https://github.com/runatlantis/atlantis/issues/26)
+    * [#4](https://github.com/runatlantis/atlantis/issues/4)
+
+## Bugfixes
+
+## Backwards Incompatibilities / Notes:
+- The old `atlantis.yaml` config file format is not supported. You will need to migrate to the new config
+format, see: https://www.runatlantis.io/docs/upgrading-atlantis-yaml-to-version-2.html
+- To use the new config file, you must run Atlantis with `--allow-repo-config`.
+- Atlantis will now try to automatically plan. To disable this, you'll need to create an `atlantis.yaml` file
+as follows:
+```yaml
+version: 2
+projects:
+- dir: mydir
+  autoplan:
+    enabled: false
+```
+- `atlantis apply` no longer applies all un-applied plans but instead applies only the plan in the root directory and default workspace. This will be reverted in an upcoming release
+- `atlantis plan` no longer plans in all modified projects but instead runs plan only in the root directory and default workspace. This will be reverted in an upcoming release.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.0/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.0/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.0/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.0/atlantis_linux_arm.zip)
+
+## Docker
+`runatlantis/atlantis:v0.4.0`
+
+# v0.3.11
+
+## Features
+None
+
+## Bugfixes
+* If the `TF_LOG` environment variable is set, should still be able to start. Previously `atlantis server` would exit immediately because it couldn't parse the output of `terraform version`.
+
+## Backwards Incompatibilities / Notes:
+None
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.11/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.11/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.11/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.11/atlantis_linux_arm.zip)
+
+## Docker
+`runatlantis/atlantis:v0.3.11`
+
+# v0.3.10
+
+## Features
+* Rename `atlantis bootstrap` to `atlantis testdrive` to make it clearer that it
+doesn't set up Atlantis for you. Fixes ([#129](https://github.com/runatlantis/atlantis/issues/129)).
+* Atlantis will now comment on a pull request when a plan/lock is discarded from
+the Atlantis UI. Fixes ([#27](https://github.com/runatlantis/atlantis/issues/27)).
+
+## Bugfixes
+* Fix issue during `atlantis bootstrap` where ngrok tunnel took a long time to start.
+Atlantis will now wait until it sees the expected log entry before continuing.
+Fixes ([#92](https://github.com/runatlantis/atlantis/issues/92)).
+* Fix missing error checking during `atlantis bootstrap`. ([#130](https://github.com/runatlantis/atlantis/pulls/130)).
+
+## Backwards Incompatibilities / Notes:
+* `atlantis bootstrap` renamed to `atlantis testdrive`
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.10/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.10/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.10/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.10/atlantis_linux_arm.zip)
+
+## Docker
+`runatlantis/atlantis:v0.3.10`
+
 # v0.3.9
 
 ## Features

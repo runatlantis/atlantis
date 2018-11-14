@@ -24,16 +24,21 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 // Repo is a VCS repository.
 type Repo struct {
 	// FullName is the owner and repo name separated
-	// by a "/", ex. "runatlantis/atlantis".
+	// by a "/", ex. "runatlantis/atlantis", "gitlab/subgroup/atlantis", "Bitbucket Server/atlantis".
 	FullName string
-	// Owner is just the repo owner, ex. "runatlantis".
+	// Owner is just the repo owner, ex. "runatlantis" or "gitlab/subgroup".
+	// This may contain /'s in the case of GitLab subgroups.
+	// This may contain spaces in the case of Bitbucket Server.
 	Owner string
-	// Name is just the repo name, ex. "atlantis".
+	// Name is just the repo name, ex. "atlantis". This will never have
+	// /'s in it.
 	Name string
 	// CloneURL is the full HTTPS url for cloning with username and token string
 	// ex. "https://username:token@github.com/atlantis/atlantis.git".
@@ -45,6 +50,10 @@ type Repo struct {
 	VCSHost VCSHost
 }
 
+// NewRepo constructs a Repo object. repoFullName is the owner/repo form,
+// cloneURL can be with or without .git at the end
+// ex. https://github.com/runatlantis/atlantis.git OR
+//     https://github.com/runatlantis/atlantis
 func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsUser string, vcsToken string) (Repo, error) {
 	if repoFullName == "" {
 		return Repo{}, errors.New("repoFullName can't be empty")
@@ -53,31 +62,50 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 		return Repo{}, errors.New("cloneURL can't be empty")
 	}
 
-	// Ensure the Clone URL is for the same repo to avoid something malicious.
+	if !strings.HasSuffix(cloneURL, ".git") {
+		cloneURL += ".git"
+	}
+
 	cloneURLParsed, err := url.Parse(cloneURL)
 	if err != nil {
 		return Repo{}, errors.Wrap(err, "invalid clone url")
 	}
-	expClonePath := fmt.Sprintf("/%s.git", repoFullName)
-	if expClonePath != cloneURLParsed.Path {
-		return Repo{}, fmt.Errorf("expected clone url to have path %q but had %q", expClonePath, cloneURLParsed.Path)
+
+	// Ensure the Clone URL is for the same repo to avoid something malicious.
+	// We skip this check for Bitbucket Server because its format is different
+	// and because the caller in that case actually constructs the clone url
+	// from the repo name and so there's no point checking if they match.
+	if vcsHostType != BitbucketServer {
+		expClonePath := fmt.Sprintf("/%s.git", repoFullName)
+		if expClonePath != cloneURLParsed.Path {
+			return Repo{}, fmt.Errorf("expected clone url to have path %q but had %q", expClonePath, cloneURLParsed.Path)
+		}
 	}
 
-	// Construct clone urls with http auth. Need to do both https and http
-	// because in GitLab's docs they have some http urls.
-	auth := fmt.Sprintf("%s:%s@", vcsUser, vcsToken)
+	// We url encode because we're using them in a URL and weird characters can
+	// mess up git.
+	escapedVCSUser := url.QueryEscape(vcsUser)
+	escapedVCSToken := url.QueryEscape(vcsToken)
+	auth := fmt.Sprintf("%s:%s@", escapedVCSUser, escapedVCSToken)
+
+	// Construct clone urls with http and https auth. Need to do both
+	// because Bitbucket supports http.
 	authedCloneURL := strings.Replace(cloneURL, "https://", "https://"+auth, -1)
 	authedCloneURL = strings.Replace(authedCloneURL, "http://", "http://"+auth, -1)
 
 	// Get the owner and repo names from the full name.
-	var owner string
-	var repo string
-	pathSplit := strings.Split(repoFullName, "/")
-	if len(pathSplit) != 2 || pathSplit[0] == "" || pathSplit[1] == "" {
-		return Repo{}, fmt.Errorf("invalid repo format %q", repoFullName)
+	owner, repo := SplitRepoFullName(repoFullName)
+	if owner == "" || repo == "" {
+		return Repo{}, fmt.Errorf("invalid repo format %q, owner %q or repo %q was empty", repoFullName, owner, repo)
 	}
-	owner = pathSplit[0]
-	repo = pathSplit[1]
+	// Only GitLab repos can have /'s in their owners. This is for GitLab
+	// subgroups.
+	if strings.Contains(owner, "/") && vcsHostType != Gitlab {
+		return Repo{}, fmt.Errorf("invalid repo format %q, owner %q should not contain any /'s", repoFullName, owner)
+	}
+	if strings.Contains(repo, "/") {
+		return Repo{}, fmt.Errorf("invalid repo format %q, repo %q should not contain any /'s", repoFullName, owner)
+	}
 
 	return Repo{
 		FullName:          repoFullName,
@@ -97,8 +125,10 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 type PullRequest struct {
 	// Num is the pull request number or ID.
 	Num int
-	// HeadCommit points to the head of the branch that is being
-	// pull requested into the base.
+	// HeadCommit is a sha256 that points to the head of the branch that is being
+	// pull requested into the base. If the pull request is from Bitbucket Cloud
+	// the string will only be 12 characters long because Bitbucket Cloud
+	// truncates its commit IDs.
 	HeadCommit string
 	// URL is the url of the pull request.
 	// ex. "https://github.com/runatlantis/atlantis/pull/1"
@@ -111,16 +141,42 @@ type PullRequest struct {
 	// Gitlab supports an additional "merged" state but Github doesn't so we map
 	// merged to Closed.
 	State PullRequestState
+	// BaseRepo is the repository that the pull request will be merged into.
+	BaseRepo Repo
 }
 
 type PullRequestState int
 
 const (
-	Open PullRequestState = iota
-	Closed
+	OpenPullState PullRequestState = iota
+	ClosedPullState
 )
 
+type PullRequestEventType int
+
+const (
+	OpenedPullEvent PullRequestEventType = iota
+	UpdatedPullEvent
+	ClosedPullEvent
+	OtherPullEvent
+)
+
+func (p PullRequestEventType) String() string {
+	switch p {
+	case OpenedPullEvent:
+		return "opened"
+	case UpdatedPullEvent:
+		return "updated"
+	case ClosedPullEvent:
+		return "closed"
+	case OtherPullEvent:
+		return "other"
+	}
+	return "<missing String() implementation>"
+}
+
 // User is a VCS user.
+// During an autoplan, the user will be the Atlantis API user.
 type User struct {
 	Username string
 }
@@ -151,7 +207,14 @@ type Project struct {
 	// Path to project root in the repo.
 	// If "." then project is at root.
 	// Never ends in "/".
+	// todo: rename to RepoRelDir to match rest of project once we can separate
+	// out how this is saved in boltdb vs. its usage everywhere else so we don't
+	// break existing dbs.
 	Path string
+}
+
+func (p Project) String() string {
+	return fmt.Sprintf("repofullname=%s path=%s", p.RepoFullName, p.Path)
 }
 
 // Plan is the result of running an Atlantis plan command.
@@ -192,6 +255,8 @@ type VCSHostType int
 const (
 	Github VCSHostType = iota
 	Gitlab
+	BitbucketCloud
+	BitbucketServer
 )
 
 func (h VCSHostType) String() string {
@@ -200,6 +265,53 @@ func (h VCSHostType) String() string {
 		return "Github"
 	case Gitlab:
 		return "Gitlab"
+	case BitbucketCloud:
+		return "BitbucketCloud"
+	case BitbucketServer:
+		return "BitbucketServer"
 	}
 	return "<missing String() implementation>"
+}
+
+type ProjectCommandContext struct {
+	// BaseRepo is the repository that the pull request will be merged into.
+	BaseRepo Repo
+	// HeadRepo is the repository that is getting merged into the BaseRepo.
+	// If the pull request branch is from the same repository then HeadRepo will
+	// be the same as BaseRepo.
+	// See https://help.github.com/articles/about-pull-request-merges/.
+	HeadRepo Repo
+	Pull     PullRequest
+	// User is the user that triggered this command.
+	User          User
+	Log           *logging.SimpleLogger
+	RepoRelDir    string
+	ProjectConfig *valid.Project
+	GlobalConfig  *valid.Config
+
+	// CommentArgs are the extra arguments appended to comment,
+	// ex. atlantis plan -- -target=resource
+	CommentArgs []string
+	Workspace   string
+	// Verbose is true when the user would like verbose output.
+	Verbose bool
+	// RePlanCmd is the command that users should run to re-plan this project.
+	// If this is an apply then this will be empty.
+	RePlanCmd string
+	// ApplyCmd is the command that users should run to apply this plan. If
+	// this is an apply then this will be empty.
+	ApplyCmd string
+}
+
+// SplitRepoFullName splits a repo full name up into its owner and repo name
+// segments. If the repoFullName is malformed, may return empty strings
+// for owner or repo.
+// Ex. runatlantis/atlantis => (runatlantis, atlantis)
+//     gitlab/subgroup/runatlantis/atlantis => (gitlab/subgroup/runatlantis, atlantis)
+func SplitRepoFullName(repoFullName string) (owner string, repo string) {
+	lastSlashIdx := strings.LastIndex(repoFullName, "/")
+	if lastSlashIdx == -1 || lastSlashIdx == len(repoFullName)-1 {
+		return "", ""
+	}
+	return repoFullName[:lastSlashIdx], repoFullName[lastSlashIdx+1:]
 }

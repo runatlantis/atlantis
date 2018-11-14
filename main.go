@@ -19,7 +19,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-const atlantisVersion = "0.3.9"
+const atlantisVersion = "0.4.11"
 
 func main() {
 	v := viper.New()
@@ -32,9 +32,9 @@ func main() {
 		AtlantisVersion: atlantisVersion,
 	}
 	version := &cmd.VersionCmd{AtlantisVersion: atlantisVersion}
-	bootstrap := &cmd.BootstrapCmd{}
+	testdrive := &cmd.TestdriveCmd{}
 	cmd.RootCmd.AddCommand(server.Init())
 	cmd.RootCmd.AddCommand(version.Init())
-	cmd.RootCmd.AddCommand(bootstrap.Init())
+	cmd.RootCmd.AddCommand(testdrive.Init())
 	cmd.Execute()
 }

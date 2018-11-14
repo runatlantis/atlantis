@@ -1,0 +1,42 @@
+{
+  "Disable": ["gotype", "gotypex", "maligned", "gocyclo", "golint"],
+  "Enable": [
+    "gosec",
+    "errcheck",
+    "deadcode",
+    "gochecknoinits",
+    "goconst",
+    "gocyclo",
+    "gofmt",
+    "goimports",
+    "golint",
+    "gotype",
+    "gotypex",
+    "ineffassign",
+    "interfacer",
+    "maligned",
+    "megacheck",
+    "safesql",
+    "structcheck",
+    "test",
+    "testify",
+    "unconvert",
+    "unparam",
+    "varcheck",
+    "vet",
+    "vetshadow"
+  ],
+  "Deadline": "300s",
+  "Vendor": true,
+  "LineLength": 120,
+  "Skip": ["server/static", "mocks"],
+  "WarnUnmatchedDirective": true,
+  "Linters": {
+    "gosec": "gosec -exclude=G104 -fmt=csv:^(?P<path>.*?\\.go),(?P<line>\\d+),(?P<message>[^,]+,[^,]+,[^,]+)",
+    "errcheck": {
+      "Command": "errcheck -abspath -ignore 'fmt:.*'",
+      "Pattern": "PATH:LINE:COL:MESSAGE",
+      "PartitionStrategy": "packages"
+    }
+  }
+}

@@ -122,22 +122,30 @@ func ToLogLevel(levelStr string) LogLevel {
 
 // Debug logs at debug level.
 func (l *SimpleLogger) Debug(format string, a ...interface{}) {
-	l.Log(Debug, format, a...)
+	if l != nil {
+		l.Log(Debug, format, a...)
+	}
 }
 
 // Info logs at info level.
 func (l *SimpleLogger) Info(format string, a ...interface{}) {
-	l.Log(Info, format, a...)
+	if l != nil {
+		l.Log(Info, format, a...)
+	}
 }
 
 // Warn logs at warn level.
 func (l *SimpleLogger) Warn(format string, a ...interface{}) {
-	l.Log(Warn, format, a...)
+	if l != nil {
+		l.Log(Warn, format, a...)
+	}
 }
 
 // Err logs at error level.
 func (l *SimpleLogger) Err(format string, a ...interface{}) {
-	l.Log(Error, format, a...)
+	if l != nil {
+		l.Log(Error, format, a...)
+	}
 }
 
 // Log writes the log at level.

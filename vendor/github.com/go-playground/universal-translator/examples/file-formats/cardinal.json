@@ -1,0 +1,16 @@
+[
+    {
+        "locale": "en",
+        "key": "cardinal_test",
+        "trans": "You have {0} day left.",
+        "type": "Cardinal",
+        "rule": "One"
+    },
+    {
+        "locale": "en",
+        "key": "cardinal_test",
+        "trans": "You have {0} days left.",
+        "type": "Cardinal",
+        "rule": "Other"
+    }
+]

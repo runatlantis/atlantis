@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package vcs
 
 import (
@@ -75,4 +75,18 @@ func TestSplitAtMaxChars(t *testing.T) {
 			Equals(t, c.exp, client.splitAtMaxChars(c.comment, c.max, "join"))
 		})
 	}
+}
+
+// If the hostname is github.com, should use normal BaseURL.
+func TestNewGithubClient_GithubCom(t *testing.T) {
+	client, err := NewGithubClient("github.com", "user", "pass")
+	Ok(t, err)
+	Equals(t, "https://api.github.com/", client.client.BaseURL.String())
+}
+
+// If the hostname is a non-github hostname should use the right BaseURL.
+func TestNewGithubClient_NonGithub(t *testing.T) {
+	client, err := NewGithubClient("example.com", "user", "pass")
+	Ok(t, err)
+	Equals(t, "https://example.com/api/v3/", client.client.BaseURL.String())
 }

@@ -10,47 +10,65 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package server
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/google/go-github/github"
 	"github.com/lkysow/go-gitlab"
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
+	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
 const githubHeader = "X-Github-Event"
 const gitlabHeader = "X-Gitlab-Event"
 
+// bitbucketEventTypeHeader is the same in both cloud and server.
+const bitbucketEventTypeHeader = "X-Event-Key"
+const bitbucketCloudRequestIDHeader = "X-Request-UUID"
+const bitbucketServerRequestIDHeader = "X-Request-ID"
+const bitbucketServerSignatureHeader = "X-Hub-Signature"
+
 // EventsController handles all webhook requests which signify 'events' in the
-// VCS host, ex. GitHub. It's split out from Server to make testing easier.
+// VCS host, ex. GitHub.
 type EventsController struct {
 	CommandRunner events.CommandRunner
 	PullCleaner   events.PullCleaner
 	Logger        *logging.SimpleLogger
 	Parser        events.EventParsing
 	CommentParser events.CommentParsing
-	// GithubWebHookSecret is the secret added to this webhook via the GitHub
+	// GithubWebhookSecret is the secret added to this webhook via the GitHub
 	// UI that identifies this call as coming from GitHub. If empty, no
 	// request validation is done.
-	GithubWebHookSecret    []byte
-	GithubRequestValidator GithubRequestValidator
-	GitlabRequestParser    GitlabRequestParser
-	// GitlabWebHookSecret is the secret added to this webhook via the GitLab
+	GithubWebhookSecret          []byte
+	GithubRequestValidator       GithubRequestValidator
+	GitlabRequestParserValidator GitlabRequestParserValidator
+	// GitlabWebhookSecret is the secret added to this webhook via the GitLab
 	// UI that identifies this call as coming from GitLab. If empty, no
 	// request validation is done.
-	GitlabWebHookSecret []byte
-	RepoWhitelist       *events.RepoWhitelist
+	GitlabWebhookSecret  []byte
+	RepoWhitelistChecker *events.RepoWhitelistChecker
+	// SilenceWhitelistErrors controls whether we write an error comment on
+	// pull requests from non-whitelisted repos.
+	SilenceWhitelistErrors bool
 	// SupportedVCSHosts is which VCS hosts Atlantis was configured upon
 	// startup to support.
 	SupportedVCSHosts []models.VCSHostType
 	VCSClient         vcs.ClientProxy
+	TestingMode       bool
+	// BitbucketWebhookSecret is the secret added to this webhook via the Bitbucket
+	// UI that identifies this call as coming from Bitbucket. If empty, no
+	// request validation is done.
+	BitbucketWebhookSecret []byte
 }
 
 // Post handles POST webhook requests.
@@ -60,6 +78,7 @@ func (e *EventsController) Post(w http.ResponseWriter, r *http.Request) {
 			e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support GitHub")
 			return
 		}
+		e.Logger.Debug("handling GitHub post")
 		e.handleGithubPost(w, r)
 		return
 	} else if r.Header.Get(gitlabHeader) != "" {
@@ -67,29 +86,106 @@ func (e *EventsController) Post(w http.ResponseWriter, r *http.Request) {
 			e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support GitLab")
 			return
 		}
+		e.Logger.Debug("handling GitLab post")
 		e.handleGitlabPost(w, r)
 		return
+	} else if r.Header.Get(bitbucketEventTypeHeader) != "" {
+		// Bitbucket Cloud and Server use the same event type header but they
+		// use different request ID headers.
+		if r.Header.Get(bitbucketCloudRequestIDHeader) != "" {
+			if !e.supportsHost(models.BitbucketCloud) {
+				e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support Bitbucket Cloud")
+				return
+			}
+			e.Logger.Debug("handling Bitbucket Cloud post")
+			e.handleBitbucketCloudPost(w, r)
+			return
+		} else if r.Header.Get(bitbucketServerRequestIDHeader) != "" {
+			if !e.supportsHost(models.BitbucketServer) {
+				e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support Bitbucket Server")
+				return
+			}
+			e.Logger.Debug("handling Bitbucket Server post")
+			e.handleBitbucketServerPost(w, r)
+			return
+		}
 	}
 	e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request")
 }
 
 func (e *EventsController) handleGithubPost(w http.ResponseWriter, r *http.Request) {
 	// Validate the request against the optional webhook secret.
-	payload, err := e.GithubRequestValidator.Validate(r, e.GithubWebHookSecret)
+	payload, err := e.GithubRequestValidator.Validate(r, e.GithubWebhookSecret)
 	if err != nil {
 		e.respond(w, logging.Warn, http.StatusBadRequest, err.Error())
 		return
 	}
+	e.Logger.Debug("request valid")
 
 	githubReqID := "X-Github-Delivery=" + r.Header.Get("X-Github-Delivery")
 	event, _ := github.ParseWebHook(github.WebHookType(r), payload)
 	switch event := event.(type) {
 	case *github.IssueCommentEvent:
+		e.Logger.Debug("handling as comment event")
 		e.HandleGithubCommentEvent(w, event, githubReqID)
 	case *github.PullRequestEvent:
+		e.Logger.Debug("handling as pull request event")
 		e.HandleGithubPullRequestEvent(w, event, githubReqID)
 	default:
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event %s", githubReqID)
+	}
+}
+
+func (e *EventsController) handleBitbucketCloudPost(w http.ResponseWriter, r *http.Request) {
+	eventType := r.Header.Get(bitbucketEventTypeHeader)
+	reqID := r.Header.Get(bitbucketCloudRequestIDHeader)
+	defer r.Body.Close() // nolint: errcheck
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		e.respond(w, logging.Error, http.StatusBadRequest, "Unable to read body: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
+		return
+	}
+	switch eventType {
+	case bitbucketcloud.PullCreatedHeader, bitbucketcloud.PullUpdatedHeader, bitbucketcloud.PullFulfilledHeader, bitbucketcloud.PullRejectedHeader:
+		e.Logger.Debug("handling as pull request state changed event")
+		e.handleBitbucketCloudPullRequestEvent(w, eventType, body, reqID)
+		return
+	case bitbucketcloud.PullCommentCreatedHeader:
+		e.Logger.Debug("handling as comment created event")
+		e.HandleBitbucketCloudCommentEvent(w, body, reqID)
+		return
+	default:
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event type %s %s=%s", eventType, bitbucketCloudRequestIDHeader, reqID)
+	}
+}
+
+func (e *EventsController) handleBitbucketServerPost(w http.ResponseWriter, r *http.Request) {
+	eventType := r.Header.Get(bitbucketEventTypeHeader)
+	reqID := r.Header.Get(bitbucketServerRequestIDHeader)
+	sig := r.Header.Get(bitbucketServerSignatureHeader)
+	defer r.Body.Close() // nolint: errcheck
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		e.respond(w, logging.Error, http.StatusBadRequest, "Unable to read body: %s %s=%s", err, bitbucketServerRequestIDHeader, reqID)
+		return
+	}
+	if len(e.BitbucketWebhookSecret) > 0 {
+		if err := bitbucketserver.ValidateSignature(body, sig, e.BitbucketWebhookSecret); err != nil {
+			e.respond(w, logging.Warn, http.StatusBadRequest, errors.Wrap(err, "request did not pass validation").Error())
+			return
+		}
+	}
+	switch eventType {
+	case bitbucketserver.PullCreatedHeader, bitbucketserver.PullMergedHeader, bitbucketserver.PullDeclinedHeader:
+		e.Logger.Debug("handling as pull request state changed event")
+		e.handleBitbucketServerPullRequestEvent(w, eventType, body, reqID)
+		return
+	case bitbucketserver.PullCommentCreatedHeader:
+		e.Logger.Debug("handling as comment created event")
+		e.HandleBitbucketServerCommentEvent(w, body, reqID)
+		return
+	default:
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event type %s %s=%s", eventType, bitbucketServerRequestIDHeader, reqID)
 	}
 }
 
@@ -107,57 +203,126 @@ func (e *EventsController) HandleGithubCommentEvent(w http.ResponseWriter, event
 		return
 	}
 
-	// We pass in an empty models.Repo for headRepo because we need to do additional
-	// calls to get that information but we need this code path to be generic.
-	// Later on in CommandHandler we detect that this is a GitHub event and
-	// make the necessary calls to get the headRepo.
-	e.handleCommentEvent(w, baseRepo, models.Repo{}, user, pullNum, event.Comment.GetBody(), models.Github)
+	// We pass in nil for maybeHeadRepo because the head repo data isn't
+	// available in the GithubIssueComment event.
+	e.handleCommentEvent(w, baseRepo, nil, nil, user, pullNum, event.Comment.GetBody(), models.Github)
+}
+
+// HandleBitbucketCloudCommentEvent handles comment events from Bitbucket.
+func (e *EventsController) HandleBitbucketCloudCommentEvent(w http.ResponseWriter, body []byte, reqID string) {
+	pull, baseRepo, headRepo, user, comment, err := e.Parser.ParseBitbucketCloudPullCommentEvent(body)
+	if err != nil {
+		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
+		return
+	}
+	e.handleCommentEvent(w, baseRepo, &headRepo, &pull, user, pull.Num, comment, models.BitbucketCloud)
+}
+
+// HandleBitbucketServerCommentEvent handles comment events from Bitbucket.
+func (e *EventsController) HandleBitbucketServerCommentEvent(w http.ResponseWriter, body []byte, reqID string) {
+	pull, baseRepo, headRepo, user, comment, err := e.Parser.ParseBitbucketServerPullCommentEvent(body)
+	if err != nil {
+		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
+		return
+	}
+	e.handleCommentEvent(w, baseRepo, &headRepo, &pull, user, pull.Num, comment, models.BitbucketCloud)
+}
+
+func (e *EventsController) handleBitbucketCloudPullRequestEvent(w http.ResponseWriter, eventType string, body []byte, reqID string) {
+	pull, baseRepo, headRepo, user, err := e.Parser.ParseBitbucketCloudPullEvent(body)
+	if err != nil {
+		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
+		return
+	}
+	pullEventType := e.Parser.GetBitbucketCloudPullEventType(eventType)
+	e.Logger.Info("identified event as type %q", pullEventType.String())
+	e.handlePullRequestEvent(w, baseRepo, headRepo, pull, user, pullEventType)
+}
+
+func (e *EventsController) handleBitbucketServerPullRequestEvent(w http.ResponseWriter, eventType string, body []byte, reqID string) {
+	pull, baseRepo, headRepo, user, err := e.Parser.ParseBitbucketServerPullEvent(body)
+	if err != nil {
+		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s=%s", err, bitbucketServerRequestIDHeader, reqID)
+		return
+	}
+	pullEventType := e.Parser.GetBitbucketServerPullEventType(eventType)
+	e.Logger.Info("identified event as type %q", pullEventType.String())
+	e.handlePullRequestEvent(w, baseRepo, headRepo, pull, user, pullEventType)
 }
 
 // HandleGithubPullRequestEvent will delete any locks associated with the pull
 // request if the event is a pull request closed event. It's exported to make
 // testing easier.
 func (e *EventsController) HandleGithubPullRequestEvent(w http.ResponseWriter, pullEvent *github.PullRequestEvent, githubReqID string) {
-	pull, _, err := e.Parser.ParseGithubPull(pullEvent.PullRequest)
+	pull, pullEventType, baseRepo, headRepo, user, err := e.Parser.ParseGithubPullEvent(pullEvent)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s", err, githubReqID)
 		return
 	}
-	repo, err := e.Parser.ParseGithubRepo(pullEvent.Repo)
-	if err != nil {
-		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing repo data: %s %s", err, githubReqID)
-		return
-	}
-	e.handlePullRequestEvent(w, repo, pull)
+	e.Logger.Info("identified event as type %q", pullEventType.String())
+	e.handlePullRequestEvent(w, baseRepo, headRepo, pull, user, pullEventType)
 }
 
-func (e *EventsController) handlePullRequestEvent(w http.ResponseWriter, repo models.Repo, pull models.PullRequest) {
-	if !e.RepoWhitelist.IsWhitelisted(repo.FullName, repo.VCSHost.Hostname) {
+func (e *EventsController) handlePullRequestEvent(w http.ResponseWriter, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, eventType models.PullRequestEventType) {
+	if !e.RepoWhitelistChecker.IsWhitelisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
+		// If the repo isn't whitelisted and we receive an opened pull request
+		// event we comment back on the pull request that the repo isn't
+		// whitelisted. This is because the user might be expecting Atlantis to
+		// autoplan. For other events, we just ignore them.
+		if eventType == models.OpenedPullEvent {
+			e.commentNotWhitelisted(baseRepo, pull.Num)
+		}
 		e.respond(w, logging.Debug, http.StatusForbidden, "Ignoring pull request event from non-whitelisted repo")
 		return
 	}
-	if pull.State != models.Closed {
-		e.respond(w, logging.Debug, http.StatusOK, "Ignoring opened pull request event")
+
+	switch eventType {
+	case models.OpenedPullEvent, models.UpdatedPullEvent:
+		// If the pull request was opened or updated, we will try to autoplan.
+
+		// Respond with success and then actually execute the command asynchronously.
+		// We use a goroutine so that this function returns and the connection is
+		// closed.
+		fmt.Fprintln(w, "Processing...")
+
+		e.Logger.Info("executing autoplan")
+		if !e.TestingMode {
+			go e.CommandRunner.RunAutoplanCommand(baseRepo, headRepo, pull, user)
+		} else {
+			// When testing we want to wait for everything to complete.
+			e.CommandRunner.RunAutoplanCommand(baseRepo, headRepo, pull, user)
+		}
+		return
+	case models.ClosedPullEvent:
+		// If the pull request was closed, we delete locks.
+		if err := e.PullCleaner.CleanUpPull(baseRepo, pull); err != nil {
+			e.respond(w, logging.Error, http.StatusInternalServerError, "Error cleaning pull request: %s", err)
+			return
+		}
+		e.Logger.Info("deleted locks and workspace for repo %s, pull %d", baseRepo.FullName, pull.Num)
+		fmt.Fprintln(w, "Pull request cleaned successfully")
+		return
+	case models.OtherPullEvent:
+		// Else we ignore the event.
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring non-actionable pull request event")
 		return
 	}
-	if err := e.PullCleaner.CleanUpPull(repo, pull); err != nil {
-		e.respond(w, logging.Error, http.StatusInternalServerError, "Error cleaning pull request: %s", err)
-		return
-	}
-	e.Logger.Info("deleted locks and workspace for repo %s, pull %d", repo.FullName, pull.Num)
-	fmt.Fprintln(w, "Pull request cleaned successfully")
 }
 
 func (e *EventsController) handleGitlabPost(w http.ResponseWriter, r *http.Request) {
-	event, err := e.GitlabRequestParser.Validate(r, e.GitlabWebHookSecret)
+	event, err := e.GitlabRequestParserValidator.ParseAndValidate(r, e.GitlabWebhookSecret)
 	if err != nil {
 		e.respond(w, logging.Warn, http.StatusBadRequest, err.Error())
 		return
 	}
+	e.Logger.Debug("request valid")
+
 	switch event := event.(type) {
 	case gitlab.MergeCommentEvent:
+		e.Logger.Debug("handling as comment event")
 		e.HandleGitlabCommentEvent(w, event)
 	case gitlab.MergeEvent:
+		e.Logger.Debug("handling as pull request event")
 		e.HandleGitlabMergeRequestEvent(w, event)
 	default:
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event")
@@ -168,15 +333,16 @@ func (e *EventsController) handleGitlabPost(w http.ResponseWriter, r *http.Reque
 // HandleGitlabCommentEvent handles comment events from GitLab where Atlantis
 // commands can come from. It's exported to make testing easier.
 func (e *EventsController) HandleGitlabCommentEvent(w http.ResponseWriter, event gitlab.MergeCommentEvent) {
-	baseRepo, headRepo, user, err := e.Parser.ParseGitlabMergeCommentEvent(event)
+	// todo: can gitlab return the pull request here too?
+	baseRepo, headRepo, user, err := e.Parser.ParseGitlabMergeRequestCommentEvent(event)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing webhook: %s", err)
 		return
 	}
-	e.handleCommentEvent(w, baseRepo, headRepo, user, event.MergeRequest.IID, event.ObjectAttributes.Note, models.Gitlab)
+	e.handleCommentEvent(w, baseRepo, &headRepo, nil, user, event.MergeRequest.IID, event.ObjectAttributes.Note, models.Gitlab)
 }
 
-func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo models.Repo, headRepo models.Repo, user models.User, pullNum int, comment string, vcsHost models.VCSHostType) {
+func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, comment string, vcsHost models.VCSHostType) {
 	parseResult := e.CommentParser.Parse(comment, vcsHost)
 	if parseResult.Ignore {
 		truncated := comment
@@ -187,14 +353,12 @@ func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo mo
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring non-command comment: %q", truncated)
 		return
 	}
+	e.Logger.Info("parsed comment as %s", parseResult.Command)
 
 	// At this point we know it's a command we're not supposed to ignore, so now
 	// we check if this repo is allowed to run commands in the first place.
-	if !e.RepoWhitelist.IsWhitelisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
-		errMsg := "```\nError: This repo is not whitelisted for Atlantis.\n```"
-		if err := e.VCSClient.CreateComment(baseRepo, pullNum, errMsg); err != nil {
-			e.Logger.Err("unable to comment on pull request: %s", err)
-		}
+	if !e.RepoWhitelistChecker.IsWhitelisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
+		e.commentNotWhitelisted(baseRepo, pullNum)
 		e.respond(w, logging.Warn, http.StatusForbidden, "Repo not whitelisted")
 		return
 	}
@@ -211,23 +375,30 @@ func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo mo
 		return
 	}
 
-	// Respond with success and then actually execute the command asynchronously.
-	// We use a goroutine so that this function returns and the connection is
-	// closed.
+	e.Logger.Debug("executing command")
 	fmt.Fprintln(w, "Processing...")
-	go e.CommandRunner.ExecuteCommand(baseRepo, headRepo, user, pullNum, parseResult.Command)
+	if !e.TestingMode {
+		// Respond with success and then actually execute the command asynchronously.
+		// We use a goroutine so that this function returns and the connection is
+		// closed.
+		go e.CommandRunner.RunCommentCommand(baseRepo, maybeHeadRepo, maybePull, user, pullNum, parseResult.Command)
+	} else {
+		// When testing we want to wait for everything to complete.
+		e.CommandRunner.RunCommentCommand(baseRepo, maybeHeadRepo, maybePull, user, pullNum, parseResult.Command)
+	}
 }
 
 // HandleGitlabMergeRequestEvent will delete any locks associated with the pull
 // request if the event is a merge request closed event. It's exported to make
 // testing easier.
 func (e *EventsController) HandleGitlabMergeRequestEvent(w http.ResponseWriter, event gitlab.MergeEvent) {
-	pull, repo, err := e.Parser.ParseGitlabMergeEvent(event)
+	pull, pullEventType, baseRepo, headRepo, user, err := e.Parser.ParseGitlabMergeRequestEvent(event)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing webhook: %s", err)
 		return
 	}
-	e.handlePullRequestEvent(w, repo, pull)
+	e.Logger.Info("identified event as type %q", pullEventType.String())
+	e.handlePullRequestEvent(w, baseRepo, headRepo, pull, user, pullEventType)
 }
 
 // supportsHost returns true if h is in e.SupportedVCSHosts and false otherwise.
@@ -245,4 +416,17 @@ func (e *EventsController) respond(w http.ResponseWriter, lvl logging.LogLevel, 
 	e.Logger.Log(lvl, response)
 	w.WriteHeader(code)
 	fmt.Fprintln(w, response)
+}
+
+// commentNotWhitelisted comments on the pull request that the repo is not
+// whitelisted unless whitelist error comments are disabled.
+func (e *EventsController) commentNotWhitelisted(baseRepo models.Repo, pullNum int) {
+	if e.SilenceWhitelistErrors {
+		return
+	}
+
+	errMsg := "```\nError: This repo is not whitelisted for Atlantis.\n```"
+	if err := e.VCSClient.CreateComment(baseRepo, pullNum, errMsg); err != nil {
+		e.Logger.Err("unable to comment on pull request: %s", err)
+	}
 }

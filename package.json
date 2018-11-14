@@ -1,0 +1,9 @@
+{
+  "devDependencies": {
+    "vuepress": "^0.14.2"
+  },
+  "scripts": {
+    "website:dev": "vuepress dev runatlantis.io",
+    "website:build": "vuepress build runatlantis.io"
+  }
+}

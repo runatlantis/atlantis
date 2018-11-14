@@ -8,7 +8,6 @@ import (
 
 	pegomock "github.com/petergtz/pegomock"
 	models "github.com/runatlantis/atlantis/server/events/models"
-	vcs "github.com/runatlantis/atlantis/server/events/vcs"
 )
 
 type MockClient struct {
@@ -35,8 +34,8 @@ func (mock *MockClient) GetModifiedFiles(repo models.Repo, pull models.PullReque
 	return ret0, ret1
 }
 
-func (mock *MockClient) CreateComment(repo models.Repo, pull models.PullRequest, comment string) error {
-	params := []pegomock.Param{repo, pull, comment}
+func (mock *MockClient) CreateComment(repo models.Repo, pullNum int, comment string) error {
+	params := []pegomock.Param{repo, pullNum, comment}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("CreateComment", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
 	if len(result) != 0 {
@@ -63,7 +62,7 @@ func (mock *MockClient) PullIsApproved(repo models.Repo, pull models.PullRequest
 	return ret0, ret1
 }
 
-func (mock *MockClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state vcs.CommitStatus, description string) error {
+func (mock *MockClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, description string) error {
 	params := []pegomock.Param{repo, pull, state, description}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("UpdateStatus", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
@@ -124,8 +123,8 @@ func (c *Client_GetModifiedFiles_OngoingVerification) GetAllCapturedArguments() 
 	return
 }
 
-func (verifier *VerifierClient) CreateComment(repo models.Repo, pull models.PullRequest, comment string) *Client_CreateComment_OngoingVerification {
-	params := []pegomock.Param{repo, pull, comment}
+func (verifier *VerifierClient) CreateComment(repo models.Repo, pullNum int, comment string) *Client_CreateComment_OngoingVerification {
+	params := []pegomock.Param{repo, pullNum, comment}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "CreateComment", params)
 	return &Client_CreateComment_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -135,21 +134,21 @@ type Client_CreateComment_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *Client_CreateComment_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, string) {
-	repo, pull, comment := c.GetAllCapturedArguments()
-	return repo[len(repo)-1], pull[len(pull)-1], comment[len(comment)-1]
+func (c *Client_CreateComment_OngoingVerification) GetCapturedArguments() (models.Repo, int, string) {
+	repo, pullNum, comment := c.GetAllCapturedArguments()
+	return repo[len(repo)-1], pullNum[len(pullNum)-1], comment[len(comment)-1]
 }
 
-func (c *Client_CreateComment_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []string) {
+func (c *Client_CreateComment_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []int, _param2 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.Repo, len(params[0]))
 		for u, param := range params[0] {
 			_param0[u] = param.(models.Repo)
 		}
-		_param1 = make([]models.PullRequest, len(params[1]))
+		_param1 = make([]int, len(params[1]))
 		for u, param := range params[1] {
-			_param1[u] = param.(models.PullRequest)
+			_param1[u] = param.(int)
 		}
 		_param2 = make([]string, len(params[2]))
 		for u, param := range params[2] {
@@ -190,7 +189,7 @@ func (c *Client_PullIsApproved_OngoingVerification) GetAllCapturedArguments() (_
 	return
 }
 
-func (verifier *VerifierClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state vcs.CommitStatus, description string) *Client_UpdateStatus_OngoingVerification {
+func (verifier *VerifierClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, description string) *Client_UpdateStatus_OngoingVerification {
 	params := []pegomock.Param{repo, pull, state, description}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "UpdateStatus", params)
 	return &Client_UpdateStatus_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
@@ -201,12 +200,12 @@ type Client_UpdateStatus_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *Client_UpdateStatus_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, vcs.CommitStatus, string) {
+func (c *Client_UpdateStatus_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, models.CommitStatus, string) {
 	repo, pull, state, description := c.GetAllCapturedArguments()
 	return repo[len(repo)-1], pull[len(pull)-1], state[len(state)-1], description[len(description)-1]
 }
 
-func (c *Client_UpdateStatus_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []vcs.CommitStatus, _param3 []string) {
+func (c *Client_UpdateStatus_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []models.CommitStatus, _param3 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.Repo, len(params[0]))
@@ -217,9 +216,9 @@ func (c *Client_UpdateStatus_OngoingVerification) GetAllCapturedArguments() (_pa
 		for u, param := range params[1] {
 			_param1[u] = param.(models.PullRequest)
 		}
-		_param2 = make([]vcs.CommitStatus, len(params[2]))
+		_param2 = make([]models.CommitStatus, len(params[2]))
 		for u, param := range params[2] {
-			_param2[u] = param.(vcs.CommitStatus)
+			_param2[u] = param.(models.CommitStatus)
 		}
 		_param3 = make([]string, len(params[3]))
 		for u, param := range params[3] {

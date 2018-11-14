@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package events
 
 import (
@@ -19,17 +19,19 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/docker/docker/pkg/fileutils"
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 )
-
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_finder.go ProjectFinder
 
 // ProjectFinder determines what are the terraform project(s) within a repo.
 type ProjectFinder interface {
 	// DetermineProjects returns the list of projects that were modified based on
 	// the modifiedFiles. The list will be de-duplicated.
 	DetermineProjects(log *logging.SimpleLogger, modifiedFiles []string, repoFullName string, repoDir string) []models.Project
+	DetermineProjectsViaConfig(log *logging.SimpleLogger, modifiedFiles []string, config valid.Config, repoDir string) ([]valid.Project, error)
 }
 
 // DefaultProjectFinder implements ProjectFinder.
@@ -49,20 +51,70 @@ func (p *DefaultProjectFinder) DetermineProjects(log *logging.SimpleLogger, modi
 	log.Info("filtered modified files to %d .tf files: %v",
 		len(modifiedTerraformFiles), modifiedTerraformFiles)
 
-	var paths []string
+	var dirs []string
 	for _, modifiedFile := range modifiedTerraformFiles {
-		projectPath := p.getProjectPath(modifiedFile, repoDir)
-		if projectPath != "" {
-			paths = append(paths, projectPath)
+		projectDir := p.getProjectDir(modifiedFile, repoDir)
+		if projectDir != "" {
+			dirs = append(dirs, projectDir)
 		}
 	}
-	uniquePaths := p.unique(paths)
-	for _, uniquePath := range uniquePaths {
-		projects = append(projects, models.NewProject(repoFullName, uniquePath))
+	uniqueDirs := p.unique(dirs)
+
+	// The list of modified files will include files that were deleted. We still
+	// want to run plan if a file was deleted since that often results in a
+	// change however we want to remove directories that have been completely
+	// deleted.
+	exists := p.filterToDirExists(uniqueDirs, repoDir)
+
+	for _, p := range exists {
+		projects = append(projects, models.NewProject(repoFullName, p))
 	}
 	log.Info("there are %d modified project(s) at path(s): %v",
-		len(projects), strings.Join(uniquePaths, ", "))
+		len(projects), strings.Join(exists, ", "))
 	return projects
+}
+
+// DetermineProjectsViaConfig returns the list of projects that were modified
+// based on the modifiedFiles and config. We look at the WhenModified section
+// of the config for each project and see if the modifiedFiles matches.
+// The list will be de-duplicated.
+func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log *logging.SimpleLogger, modifiedFiles []string, config valid.Config, repoDir string) ([]valid.Project, error) {
+	var projects []valid.Project
+	for _, project := range config.Projects {
+		log.Debug("checking if project at dir %q workspace %q was modified", project.Dir, project.Workspace)
+		// Prepend project dir to when modified patterns because the patterns
+		// are relative to the project dirs but our list of modified files is
+		// relative to the repo root.
+		var whenModifiedRelToRepoRoot []string
+		for _, wm := range project.Autoplan.WhenModified {
+			whenModifiedRelToRepoRoot = append(whenModifiedRelToRepoRoot, filepath.Join(project.Dir, wm))
+		}
+		pm, err := fileutils.NewPatternMatcher(whenModifiedRelToRepoRoot)
+		if err != nil {
+			return nil, errors.Wrapf(err, "matching modified files with patterns: %v", project.Autoplan.WhenModified)
+		}
+
+		// If any of the modified files matches the pattern then this project is
+		// considered modified.
+		for _, file := range modifiedFiles {
+			match, err := pm.Matches(file)
+			if err != nil {
+				log.Debug("match err for file %q: %s", file, err)
+				continue
+			}
+			if match {
+				log.Debug("file %q matched pattern", file)
+				_, err := os.Stat(filepath.Join(repoDir, project.Dir))
+				if err == nil {
+					projects = append(projects, project)
+				} else {
+					log.Debug("project at dir %q not included because dir does not exist", project.Dir)
+				}
+				break
+			}
+		}
+	}
+	return projects, nil
 }
 
 func (p *DefaultProjectFinder) filterToTerraform(files []string) []string {
@@ -84,12 +136,12 @@ func (p *DefaultProjectFinder) isInExcludeList(fileName string) bool {
 	return false
 }
 
-// getProjectPath attempts to determine based on the location of a modified
+// getProjectDir attempts to determine based on the location of a modified
 // file, where the root of the Terraform project is. It also attempts to verify
 // if the root is valid by looking for a main.tf file. It returns a relative
-// path. If the project is at the root returns ".". If modified file doesn't
-// lead to a valid project path, returns an empty string.
-func (p *DefaultProjectFinder) getProjectPath(modifiedFilePath string, repoDir string) string {
+// path to the repo. If the project is at the root returns ".". If modified file
+// doesn't lead to a valid project path, returns an empty string.
+func (p *DefaultProjectFinder) getProjectDir(modifiedFilePath string, repoDir string) string {
 	dir := path.Dir(modifiedFilePath)
 	if path.Base(dir) == "env" {
 		// If the modified file was inside an env/ directory, we treat this
@@ -158,4 +210,15 @@ func (p *DefaultProjectFinder) unique(strs []string) []string {
 		}
 	}
 	return unique
+}
+
+func (p *DefaultProjectFinder) filterToDirExists(relativePaths []string, repoDir string) []string {
+	var filtered []string
+	for _, pth := range relativePaths {
+		absPath := filepath.Join(repoDir, pth)
+		if _, err := os.Stat(absPath); !os.IsNotExist(err) {
+			filtered = append(filtered, pth)
+		}
+	}
+	return filtered
 }

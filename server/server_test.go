@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package server_test
 
 import (
@@ -28,7 +28,6 @@ import (
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/logging"
 	sMocks "github.com/runatlantis/atlantis/server/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -51,9 +50,9 @@ func TestIndex_LockErr(t *testing.T) {
 	s := server.Server{
 		Locker: l,
 	}
-	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
-	s.Index(w, eventsReq)
+	s.Index(w, req)
 	responseContains(t, w, 503, "Could not retrieve locks: err")
 }
 
@@ -79,16 +78,16 @@ func TestIndex_Success(t *testing.T) {
 	r := mux.NewRouter()
 	atlantisVersion := "0.3.1"
 	// Need to create a lock route since the server expects this route to exist.
-	r.NewRoute().Path("").Name(server.LockRouteName)
+	r.NewRoute().Path("").Name(server.LockViewRouteName)
 	s := server.Server{
 		Locker:          l,
 		IndexTemplate:   it,
 		Router:          r,
 		AtlantisVersion: atlantisVersion,
 	}
-	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
-	s.Index(w, eventsReq)
+	s.Index(w, req)
 	it.VerifyWasCalledOnce().Execute(w, server.IndexData{
 		Locks: []server.LockIndexData{
 			{
@@ -103,146 +102,24 @@ func TestIndex_Success(t *testing.T) {
 	responseContains(t, w, http.StatusOK, "")
 }
 
-func TestGetLockRoute_NoLockID(t *testing.T) {
-	t.Log("If there is no lock ID in the request then we should get a 400")
-	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
-	w := httptest.NewRecorder()
+func TestHealthz(t *testing.T) {
 	s := server.Server{}
-	s.GetLockRoute(w, eventsReq)
-	responseContains(t, w, http.StatusBadRequest, "No lock id in request")
-}
-
-func TestGetLock_InvalidLockID(t *testing.T) {
-	t.Log("If the lock ID is invalid then we should get a 400")
-	s := server.Server{}
-	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req, _ := http.NewRequest("GET", "/healthz", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
-	s.GetLock(w, eventsReq, "%A@")
-	responseContains(t, w, http.StatusBadRequest, "Invalid lock id")
-}
-
-func TestGetLock_LockerErr(t *testing.T) {
-	t.Log("If there is an error retrieving the lock, a 500 is returned")
-	RegisterMockTestingT(t)
-	l := mocks.NewMockLocker()
-	When(l.GetLock("id")).ThenReturn(nil, errors.New("err"))
-	s := server.Server{
-		Locker: l,
-	}
-	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
-	w := httptest.NewRecorder()
-	s.GetLock(w, eventsReq, "id")
-	responseContains(t, w, http.StatusInternalServerError, "err")
-}
-
-func TestGetLock_None(t *testing.T) {
-	t.Log("If there is no lock at that ID we get a 404")
-	RegisterMockTestingT(t)
-	l := mocks.NewMockLocker()
-	When(l.GetLock("id")).ThenReturn(nil, nil)
-	s := server.Server{
-		Locker: l,
-	}
-	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
-	w := httptest.NewRecorder()
-	s.GetLock(w, eventsReq, "id")
-	responseContains(t, w, http.StatusNotFound, "No lock found at that id")
-}
-
-func TestGetLock_Success(t *testing.T) {
-	t.Log("Should be able to render a lock successfully")
-	RegisterMockTestingT(t)
-	l := mocks.NewMockLocker()
-	When(l.GetLock("id")).ThenReturn(&models.ProjectLock{
-		Project:   models.Project{RepoFullName: "owner/repo", Path: "path"},
-		Pull:      models.PullRequest{URL: "url", Author: "lkysow"},
-		Workspace: "workspace",
-	}, nil)
-	tmpl := sMocks.NewMockTemplateWriter()
-	s := server.Server{
-		Locker:             l,
-		LockDetailTemplate: tmpl,
-	}
-	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
-	w := httptest.NewRecorder()
-	s.GetLock(w, eventsReq, "id")
-	tmpl.VerifyWasCalledOnce().Execute(w, server.LockDetailData{
-		LockKeyEncoded:  "id",
-		LockKey:         "id",
-		RepoOwner:       "owner",
-		RepoName:        "repo",
-		PullRequestLink: "url",
-		LockedBy:        "lkysow",
-		Workspace:       "workspace",
-	})
-	responseContains(t, w, http.StatusOK, "")
-}
-
-func TestDeleteLockRoute_NoLockID(t *testing.T) {
-	t.Log("If there is no lock ID in the request then we should get a 400")
-	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
-	w := httptest.NewRecorder()
-	s := server.Server{Logger: logging.NewNoopLogger()}
-	s.DeleteLockRoute(w, eventsReq)
-	responseContains(t, w, http.StatusBadRequest, "No lock id in request")
-}
-
-func TestDeleteLock_InvalidLockID(t *testing.T) {
-	t.Log("If the lock ID is invalid then we should get a 400")
-	s := server.Server{Logger: logging.NewNoopLogger()}
-	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
-	w := httptest.NewRecorder()
-	s.DeleteLock(w, eventsReq, "%A@")
-	responseContains(t, w, http.StatusBadRequest, "Invalid lock id")
-}
-
-func TestDeleteLock_LockerErr(t *testing.T) {
-	t.Log("If there is an error retrieving the lock, a 500 is returned")
-	RegisterMockTestingT(t)
-	l := mocks.NewMockLocker()
-	When(l.Unlock("id")).ThenReturn(nil, errors.New("err"))
-	s := server.Server{
-		Locker: l,
-		Logger: logging.NewNoopLogger(),
-	}
-	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
-	w := httptest.NewRecorder()
-	s.DeleteLock(w, eventsReq, "id")
-	responseContains(t, w, http.StatusInternalServerError, "err")
-}
-
-func TestDeleteLock_None(t *testing.T) {
-	t.Log("If there is no lock at that ID we get a 404")
-	RegisterMockTestingT(t)
-	l := mocks.NewMockLocker()
-	When(l.Unlock("id")).ThenReturn(nil, nil)
-	s := server.Server{
-		Locker: l,
-		Logger: logging.NewNoopLogger(),
-	}
-	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
-	w := httptest.NewRecorder()
-	s.DeleteLock(w, eventsReq, "id")
-	responseContains(t, w, http.StatusNotFound, "No lock found at that id")
-}
-
-func TestDeleteLock_Success(t *testing.T) {
-	t.Log("If the lock is deleted successfully we get a 200")
-	RegisterMockTestingT(t)
-	l := mocks.NewMockLocker()
-	When(l.Unlock("id")).ThenReturn(&models.ProjectLock{}, nil)
-	s := server.Server{
-		Locker: l,
-		Logger: logging.NewNoopLogger(),
-	}
-	eventsReq, _ = http.NewRequest("GET", "", bytes.NewBuffer(nil))
-	w := httptest.NewRecorder()
-	s.DeleteLock(w, eventsReq, "id")
-	responseContains(t, w, http.StatusOK, "Deleted lock id id")
+	s.Healthz(w, req)
+	Equals(t, http.StatusOK, w.Result().StatusCode)
+	body, _ := ioutil.ReadAll(w.Result().Body)
+	Equals(t, "application/json", w.Result().Header["Content-Type"][0])
+	Equals(t,
+		`{
+  "status": "ok"
+}`, string(body))
 }
 
 func responseContains(t *testing.T, r *httptest.ResponseRecorder, status int, bodySubstr string) {
-	Equals(t, status, r.Result().StatusCode)
-	body, _ := ioutil.ReadAll(r.Result().Body)
+	t.Helper()
+	body, err := ioutil.ReadAll(r.Result().Body)
+	Ok(t, err)
+	Assert(t, status == r.Result().StatusCode, "exp %d got %d, body: %s", status, r.Result().StatusCode, string(body))
 	Assert(t, strings.Contains(string(body), bodySubstr), "exp %q to be contained in %q", bodySubstr, string(body))
 }

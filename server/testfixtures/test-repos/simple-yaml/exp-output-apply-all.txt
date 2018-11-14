@@ -1,0 +1,35 @@
+Ran Apply for 2 projects:
+1. workspace: `default` dir: `.`
+1. workspace: `staging` dir: `.`
+
+### 1. workspace: `default` dir: `.`
+```diff
+null_resource.simple:
+null_resource.simple:
+
+Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+var = fromconfig
+workspace = default
+
+```
+
+---
+### 2. workspace: `staging` dir: `.`
+```diff
+null_resource.simple:
+null_resource.simple:
+
+Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+var = fromfile
+workspace = staging
+
+```
+
+---
+

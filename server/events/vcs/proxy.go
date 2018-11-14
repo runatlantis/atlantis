@@ -10,11 +10,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package vcs
 
 import (
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
@@ -26,67 +25,52 @@ type ClientProxy interface {
 	GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error)
 	CreateComment(repo models.Repo, pullNum int, comment string) error
 	PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error)
-	UpdateStatus(repo models.Repo, pull models.PullRequest, state CommitStatus, description string) error
+	UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, description string) error
 }
 
 // DefaultClientProxy proxies calls to the correct VCS client depending on which
 // VCS host is required.
 type DefaultClientProxy struct {
-	GithubClient Client
-	GitlabClient Client
+	// clients maps from the vcs host type to the client that implements the
+	// api for that host type, ex. github -> github client.
+	clients map[models.VCSHostType]Client
 }
 
-func NewDefaultClientProxy(githubClient Client, gitlabClient Client) *DefaultClientProxy {
+func NewDefaultClientProxy(githubClient Client, gitlabClient Client, bitbucketCloudClient Client, bitbucketServerClient Client) *DefaultClientProxy {
 	if githubClient == nil {
 		githubClient = &NotConfiguredVCSClient{}
 	}
 	if gitlabClient == nil {
 		gitlabClient = &NotConfiguredVCSClient{}
 	}
+	if bitbucketCloudClient == nil {
+		bitbucketCloudClient = &NotConfiguredVCSClient{}
+	}
+	if bitbucketServerClient == nil {
+		bitbucketServerClient = &NotConfiguredVCSClient{}
+	}
 	return &DefaultClientProxy{
-		GitlabClient: gitlabClient,
-		GithubClient: githubClient,
+		clients: map[models.VCSHostType]Client{
+			models.Github:          githubClient,
+			models.Gitlab:          gitlabClient,
+			models.BitbucketCloud:  bitbucketCloudClient,
+			models.BitbucketServer: bitbucketServerClient,
+		},
 	}
 }
 
-var invalidVCSErr = errors.New("Invalid VCS Host. This is a bug!")
-
 func (d *DefaultClientProxy) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
-	switch repo.VCSHost.Type {
-	case models.Github:
-		return d.GithubClient.GetModifiedFiles(repo, pull)
-	case models.Gitlab:
-		return d.GitlabClient.GetModifiedFiles(repo, pull)
-	}
-	return nil, invalidVCSErr
+	return d.clients[repo.VCSHost.Type].GetModifiedFiles(repo, pull)
 }
 
 func (d *DefaultClientProxy) CreateComment(repo models.Repo, pullNum int, comment string) error {
-	switch repo.VCSHost.Type {
-	case models.Github:
-		return d.GithubClient.CreateComment(repo, pullNum, comment)
-	case models.Gitlab:
-		return d.GitlabClient.CreateComment(repo, pullNum, comment)
-	}
-	return invalidVCSErr
+	return d.clients[repo.VCSHost.Type].CreateComment(repo, pullNum, comment)
 }
 
 func (d *DefaultClientProxy) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
-	switch repo.VCSHost.Type {
-	case models.Github:
-		return d.GithubClient.PullIsApproved(repo, pull)
-	case models.Gitlab:
-		return d.GitlabClient.PullIsApproved(repo, pull)
-	}
-	return false, invalidVCSErr
+	return d.clients[repo.VCSHost.Type].PullIsApproved(repo, pull)
 }
 
-func (d *DefaultClientProxy) UpdateStatus(repo models.Repo, pull models.PullRequest, state CommitStatus, description string) error {
-	switch repo.VCSHost.Type {
-	case models.Github:
-		return d.GithubClient.UpdateStatus(repo, pull, state, description)
-	case models.Gitlab:
-		return d.GitlabClient.UpdateStatus(repo, pull, state, description)
-	}
-	return invalidVCSErr
+func (d *DefaultClientProxy) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, description string) error {
+	return d.clients[repo.VCSHost.Type].UpdateStatus(repo, pull, state, description)
 }

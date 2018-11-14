@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package events
 
 import (
@@ -18,28 +18,48 @@ import (
 	"io/ioutil"
 	"net/url"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/spf13/pflag"
 )
 
 const (
-	WorkspaceFlagLong  = "workspace"
-	WorkspaceFlagShort = "w"
-	DirFlagLong        = "dir"
-	DirFlagShort       = "d"
-	VerboseFlagLong    = "verbose"
-	VerboseFlagShort   = ""
+	workspaceFlagLong  = "workspace"
+	workspaceFlagShort = "w"
+	dirFlagLong        = "dir"
+	dirFlagShort       = "d"
+	projectFlagLong    = "project"
+	projectFlagShort   = "p"
+	verboseFlagLong    = "verbose"
+	verboseFlagShort   = ""
+	atlantisExecutable = "atlantis"
 )
+
+// multiLineRegex is used to ignore multi-line comments since those aren't valid
+// Atlantis commands. If the second line just has newlines then we let it pass
+// through because when you double click on a comment in GitHub and then you
+// paste it again, GitHub adds two newlines and so we wanted to allow copying
+// and pasting GitHub comments.
+var multiLineRegex = regexp.MustCompile(`.*\r?\n[^\r\n]+`)
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_comment_parsing.go CommentParsing
 
 // CommentParsing handles parsing pull request comments.
 type CommentParsing interface {
 	// Parse attempts to parse a pull request comment to see if it's an Atlantis
-	// commmand.
+	// command.
 	Parse(comment string, vcsHost models.VCSHostType) CommentParseResult
+}
+
+// CommentBuilder builds comment commands that can be used on pull requests.
+type CommentBuilder interface {
+	// BuildPlanComment builds a plan comment for the specified args.
+	BuildPlanComment(repoRelDir string, workspace string, project string, commentArgs []string) string
+	// BuildApplyComment builds an apply comment for the specified args.
+	BuildApplyComment(repoRelDir string, workspace string, project string) string
 }
 
 // CommentParser implements CommentParsing
@@ -54,7 +74,7 @@ type CommentParser struct {
 type CommentParseResult struct {
 	// Command is the successfully parsed command. Will be nil if
 	// CommentResponse or Ignore is set.
-	Command *Command
+	Command *CommentCommand
 	// CommentResponse is set when we should respond immediately to the command
 	// for example for atlantis help.
 	CommentResponse string
@@ -78,7 +98,6 @@ type CommentParseResult struct {
 // - atlantis plan -w staging -d dir --verbose
 // - atlantis plan --verbose -- -key=value -key2 value2
 //
-// nolint: gocyclo
 func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) CommentParseResult {
 	if multiLineRegex.MatchString(comment) {
 		return CommentParseResult{Ignore: true}
@@ -102,7 +121,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	if vcsHost == models.Gitlab {
 		vcsUser = e.GitlabUser
 	}
-	executableNames := []string{"run", "atlantis", "@" + vcsUser}
+	executableNames := []string{"run", atlantisExecutable, "@" + vcsUser}
 
 	// If the comment doesn't start with the name of our 'executable' then
 	// ignore it.
@@ -123,34 +142,36 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	}
 
 	// Need to have a plan or apply at this point.
-	if !e.stringInSlice(command, []string{Plan.String(), Apply.String()}) {
+	if !e.stringInSlice(command, []string{PlanCommand.String(), ApplyCommand.String()}) {
 		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown command %q.\nRun 'atlantis --help' for usage.\n```", command)}
 	}
 
 	var workspace string
 	var dir string
+	var project string
 	var verbose bool
 	var extraArgs []string
 	var flagSet *pflag.FlagSet
 	var name CommandName
 
 	// Set up the flag parsing depending on the command.
-	const defaultWorkspace = "default"
 	switch command {
-	case Plan.String():
-		name = Plan
-		flagSet = pflag.NewFlagSet(Plan.String(), pflag.ContinueOnError)
+	case PlanCommand.String():
+		name = PlanCommand
+		flagSet = pflag.NewFlagSet(PlanCommand.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(ioutil.Discard)
-		flagSet.StringVarP(&workspace, WorkspaceFlagLong, WorkspaceFlagShort, defaultWorkspace, "Switch to this Terraform workspace before planning.")
-		flagSet.StringVarP(&dir, DirFlagLong, DirFlagShort, "", "Which directory to run plan in relative to root of repo. Use '.' for root. If not specified, will attempt to run plan for all Terraform projects we think were modified in this changeset.")
-		flagSet.BoolVarP(&verbose, VerboseFlagLong, VerboseFlagShort, false, "Append Atlantis log to comment.")
-	case Apply.String():
-		name = Apply
-		flagSet = pflag.NewFlagSet(Apply.String(), pflag.ContinueOnError)
+		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Switch to this Terraform workspace before planning.")
+		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run plan in relative to root of repo, ex. 'child/dir'.")
+		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", fmt.Sprintf("Which project to run plan for. Refers to the name of the project configured in %s. Cannot be used at same time as workspace or dir flags.", yaml.AtlantisYAMLFilename))
+		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
+	case ApplyCommand.String():
+		name = ApplyCommand
+		flagSet = pflag.NewFlagSet(ApplyCommand.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(ioutil.Discard)
-		flagSet.StringVarP(&workspace, WorkspaceFlagLong, WorkspaceFlagShort, defaultWorkspace, "Apply the plan for this Terraform workspace.")
-		flagSet.StringVarP(&dir, DirFlagLong, DirFlagShort, "", "Apply the plan for this directory, relative to root of repo. Use '.' for root. If not specified, will run apply against all plans created for this workspace.")
-		flagSet.BoolVarP(&verbose, VerboseFlagLong, VerboseFlagShort, false, "Append Atlantis log to comment.")
+		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Apply the plan for this Terraform workspace.")
+		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Apply the plan for this directory, relative to root of repo, ex. 'child/dir'.")
+		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", fmt.Sprintf("Apply the plan for this project. Refers to the name of the project configured in %s. Cannot be used at same time as workspace or dir flags.", yaml.AtlantisYAMLFilename))
+		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 	default:
 		return CommentParseResult{CommentResponse: fmt.Sprintf("Error: unknown command %q – this is a bug", command)}
 	}
@@ -197,8 +218,61 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("invalid workspace: %q", workspace), command, flagSet)}
 	}
 
+	// If project is specified, dir or workspace should not be set. Since we
+	// dir/workspace have defaults we can't detect if the user set the flag
+	// to the default or didn't set the flag so there is an edge case here we
+	// don't detect, ex. atlantis plan -p project -d . -w default won't cause
+	// an error.
+	if project != "" && (workspace != "" || dir != "") {
+		err := fmt.Sprintf("cannot use -%s/--%s at same time as -%s/--%s or -%s/--%s", projectFlagShort, projectFlagLong, dirFlagShort, dirFlagLong, workspaceFlagShort, workspaceFlagLong)
+		return CommentParseResult{CommentResponse: e.errMarkdown(err, command, flagSet)}
+	}
+
 	return CommentParseResult{
-		Command: &Command{Name: name, Verbose: verbose, Workspace: workspace, Dir: dir, Flags: extraArgs},
+		Command: NewCommentCommand(dir, extraArgs, name, verbose, workspace, project),
+	}
+}
+
+// BuildPlanComment builds a plan comment for the specified args.
+func (e *CommentParser) BuildPlanComment(repoRelDir string, workspace string, project string, commentArgs []string) string {
+	flags := e.buildFlags(repoRelDir, workspace, project)
+	commentFlags := ""
+	if len(commentArgs) > 0 {
+		var flagsWithoutQuotes []string
+		for _, f := range commentArgs {
+			f = strings.TrimPrefix(f, "\"")
+			f = strings.TrimSuffix(f, "\"")
+			flagsWithoutQuotes = append(flagsWithoutQuotes, f)
+		}
+		commentFlags = fmt.Sprintf(" -- %s", strings.Join(flagsWithoutQuotes, " "))
+	}
+	return fmt.Sprintf("%s %s%s%s", atlantisExecutable, PlanCommand.String(), flags, commentFlags)
+}
+
+// BuildApplyComment builds an apply comment for the specified args.
+func (e *CommentParser) BuildApplyComment(repoRelDir string, workspace string, project string) string {
+	flags := e.buildFlags(repoRelDir, workspace, project)
+	return fmt.Sprintf("%s %s%s", atlantisExecutable, ApplyCommand.String(), flags)
+}
+
+func (e *CommentParser) buildFlags(repoRelDir string, workspace string, project string) string {
+	switch {
+	// If project is specified we can just use its name.
+	case project != "":
+		return fmt.Sprintf(" -%s %s", projectFlagShort, project)
+		// If it's the root and default workspace then we just need to specify one
+		// of the flags and the other will get defaulted.
+	case repoRelDir == DefaultRepoRelDir && workspace == DefaultWorkspace:
+		return fmt.Sprintf(" -%s %s", dirFlagShort, DefaultRepoRelDir)
+		// If dir is the default then we just need to specify workspace.
+	case repoRelDir == DefaultRepoRelDir:
+		return fmt.Sprintf(" -%s %s", workspaceFlagShort, workspace)
+		// If workspace is the default then we just need to specify the dir.
+	case workspace == DefaultWorkspace:
+		return fmt.Sprintf(" -%s %s", dirFlagShort, repoRelDir)
+		// Otherwise we have to specify both flags.
+	default:
+		return fmt.Sprintf(" -%s %s -%s %s", dirFlagShort, repoRelDir, workspaceFlagShort, workspace)
 	}
 }
 
@@ -214,7 +288,7 @@ func (e *CommentParser) validateDir(dir string) (string, error) {
 	validatedDir = filepath.Clean(validatedDir)
 	// Detect relative dirs since they're not allowed.
 	if strings.HasPrefix(validatedDir, "..") {
-		return "", fmt.Errorf("using a relative path %q with -%s/--%s is not allowed", dir, DirFlagShort, DirFlagLong)
+		return "", fmt.Errorf("using a relative path %q with -%s/--%s is not allowed", dir, dirFlagShort, dirFlagLong)
 	}
 
 	return validatedDir, nil
@@ -233,9 +307,11 @@ func (e *CommentParser) errMarkdown(errMsg string, command string, flagSet *pfla
 	return fmt.Sprintf("```\nError: %s.\nUsage of %s:\n%s```", errMsg, command, flagSet.FlagUsagesWrapped(usagesCols))
 }
 
+// HelpComment is the comment we add to the pull request when someone runs
+// `atlantis help`.
 var HelpComment = "```cmake\n" +
 	`atlantis
-Terraform automation and collaboration for your team
+Terraform For Teams
 
 Usage:
   atlantis <command> [options] -- [terraform options]
@@ -244,12 +320,17 @@ Examples:
   # run plan in the root directory passing the -target flag to terraform
   atlantis plan -d . -- -target=resource
 
-  # apply the plan generated
-  atlantis apply -d .
+  # apply all unapplied plans from this pull request
+  atlantis apply
+
+  # apply the plan for the root directory and staging workspace
+  atlantis apply -d . -w staging
 
 Commands:
   plan   Runs 'terraform plan' for the changes in this pull request.
-  apply  Runs 'terraform apply' on the plans generated by 'atlantis plan'.
+         To plan a specific project, use the -d, -w and -p flags.
+  apply  Runs 'terraform apply' on all unapplied plans from this pull request.
+         To only apply a specific plan, use the -d, -w and -p flags.
   help   View help.
 
 Flags:
@@ -258,4 +339,6 @@ Flags:
 Use "atlantis [command] --help" for more information about a command.
 `
 
+// DidYouMeanAtlantisComment is the comment we add to the pull request when
+// someone runs a command with terraform instead of atlantis.
 var DidYouMeanAtlantisComment = "Did you mean to use `atlantis` instead of `terraform`?"

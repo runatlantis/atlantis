@@ -10,27 +10,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package cmd
 
 import (
 	"fmt"
 	"os"
 
-	"github.com/runatlantis/atlantis/bootstrap"
+	"github.com/runatlantis/atlantis/testdrive"
 	"github.com/spf13/cobra"
 )
 
-// BootstrapCmd starts the bootstrap process for testing out Atlantis.
-type BootstrapCmd struct{}
+// TestdriveCmd starts the testdrive process for testing out Atlantis.
+type TestdriveCmd struct{}
 
 // Init returns the runnable cobra command.
-func (b *BootstrapCmd) Init() *cobra.Command {
+func (b *TestdriveCmd) Init() *cobra.Command {
 	return &cobra.Command{
-		Use:   "bootstrap",
+		Use:   "testdrive",
 		Short: "Start a guided tour of Atlantis",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			err := bootstrap.Start()
+			err := testdrive.Start()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "\033[31mError: %s\033[39m\n\n", err.Error())
 			}

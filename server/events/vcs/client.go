@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package vcs
 
 import (
@@ -24,5 +24,5 @@ type Client interface {
 	GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error)
 	CreateComment(repo models.Repo, pullNum int, comment string) error
 	PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error)
-	UpdateStatus(repo models.Repo, pull models.PullRequest, state CommitStatus, description string) error
+	UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, description string) error
 }

@@ -4,17 +4,17 @@ import (
 	"reflect"
 
 	"github.com/petergtz/pegomock"
-	vcs "github.com/runatlantis/atlantis/server/events/vcs"
+	models "github.com/runatlantis/atlantis/server/events/models"
 )
 
-func AnyVcsCommitStatus() vcs.CommitStatus {
-	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(vcs.CommitStatus))(nil)).Elem()))
-	var nullValue vcs.CommitStatus
+func AnyVcsCommitStatus() models.CommitStatus {
+	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(models.CommitStatus))(nil)).Elem()))
+	var nullValue models.CommitStatus
 	return nullValue
 }
 
-func EqVcsCommitStatus(value vcs.CommitStatus) vcs.CommitStatus {
+func EqVcsCommitStatus(value models.CommitStatus) models.CommitStatus {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
-	var nullValue vcs.CommitStatus
+	var nullValue models.CommitStatus
 	return nullValue
 }

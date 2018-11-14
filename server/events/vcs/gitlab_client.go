@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package vcs
 
 import (
@@ -79,16 +79,16 @@ func (g *GitlabClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 }
 
 // UpdateStatus updates the build status of a commit.
-func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state CommitStatus, description string) error {
+func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, description string) error {
 	const statusContext = "Atlantis"
 
 	gitlabState := gitlab.Failed
 	switch state {
-	case Pending:
+	case models.PendingCommitStatus:
 		gitlabState = gitlab.Pending
-	case Failed:
+	case models.FailedCommitStatus:
 		gitlabState = gitlab.Failed
-	case Success:
+	case models.SuccessCommitStatus:
 		gitlabState = gitlab.Success
 	}
 	_, _, err := g.Client.Commits.SetCommitStatus(repo.FullName, pull.HeadCommit, &gitlab.SetCommitStatusOptions{

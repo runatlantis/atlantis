@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package cmd_test
 
 import (
@@ -105,6 +105,18 @@ func TestExecute_RequireRepoWhitelist(t *testing.T) {
 	Equals(t, "--repo-whitelist must be set for security purposes", err.Error())
 }
 
+// Should error if the repo whitelist contained a scheme.
+func TestExecute_RepoWhitelistScheme(t *testing.T) {
+	c := setup(map[string]interface{}{
+		cmd.GHUserFlag:        "user",
+		cmd.GHTokenFlag:       "token",
+		cmd.RepoWhitelistFlag: "http://github.com/*",
+	})
+	err := c.Execute()
+	Assert(t, err != nil, "should be an error")
+	Equals(t, "--repo-whitelist cannot contain ://, should be hostnames only", err.Error())
+}
+
 func TestExecute_ValidateLogLevel(t *testing.T) {
 	t.Log("Should validate log level.")
 	c := setupWithDefaults(map[string]interface{}{
@@ -164,7 +176,7 @@ func TestExecute_ValidateSSLConfig(t *testing.T) {
 }
 
 func TestExecute_ValidateVCSConfig(t *testing.T) {
-	expErr := "--gh-user and --gh-token or --gitlab-user and --gitlab-token must be set"
+	expErr := "--gh-user/--gh-token or --gitlab-user/--gitlab-token or --bitbucket-user/--bitbucket-token must be set"
 	cases := []struct {
 		description string
 		flags       map[string]interface{}
@@ -190,6 +202,13 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			true,
 		},
 		{
+			"just bitbucket token set",
+			map[string]interface{}{
+				cmd.BitbucketTokenFlag: "token",
+			},
+			true,
+		},
+		{
 			"just github user set",
 			map[string]interface{}{
 				cmd.GHUserFlag: "user",
@@ -200,6 +219,13 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			"just gitlab user set",
 			map[string]interface{}{
 				cmd.GitlabUserFlag: "user",
+			},
+			true,
+		},
+		{
+			"just bitbucket user set",
+			map[string]interface{}{
+				cmd.BitbucketUserFlag: "user",
 			},
 			true,
 		},
@@ -220,6 +246,14 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			true,
 		},
 		{
+			"github user and bitbucket token set",
+			map[string]interface{}{
+				cmd.GHUserFlag:         "user",
+				cmd.BitbucketTokenFlag: "token",
+			},
+			true,
+		},
+		{
 			"github user and github token set and should be successful",
 			map[string]interface{}{
 				cmd.GHUserFlag:  "user",
@@ -236,12 +270,22 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			false,
 		},
 		{
-			"github and gitlab user and github and gitlab token set and should be successful",
+			"bitbucket user and bitbucket token set and should be successful",
 			map[string]interface{}{
-				cmd.GHUserFlag:      "user",
-				cmd.GHTokenFlag:     "token",
-				cmd.GitlabUserFlag:  "user",
-				cmd.GitlabTokenFlag: "token",
+				cmd.BitbucketUserFlag:  "user",
+				cmd.BitbucketTokenFlag: "token",
+			},
+			false,
+		},
+		{
+			"all set should be successful",
+			map[string]interface{}{
+				cmd.GHUserFlag:         "user",
+				cmd.GHTokenFlag:        "token",
+				cmd.GitlabUserFlag:     "user",
+				cmd.GitlabTokenFlag:    "token",
+				cmd.BitbucketUserFlag:  "user",
+				cmd.BitbucketTokenFlag: "token",
 			},
 			false,
 		},
@@ -264,11 +308,13 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 func TestExecute_Defaults(t *testing.T) {
 	t.Log("Should set the defaults for all unspecified flags.")
 	c := setup(map[string]interface{}{
-		cmd.GHUserFlag:        "user",
-		cmd.GHTokenFlag:       "token",
-		cmd.GitlabUserFlag:    "gitlab-user",
-		cmd.GitlabTokenFlag:   "gitlab-token",
-		cmd.RepoWhitelistFlag: "*",
+		cmd.GHUserFlag:         "user",
+		cmd.GHTokenFlag:        "token",
+		cmd.GitlabUserFlag:     "gitlab-user",
+		cmd.GitlabTokenFlag:    "gitlab-token",
+		cmd.BitbucketUserFlag:  "bitbucket-user",
+		cmd.BitbucketTokenFlag: "bitbucket-token",
+		cmd.RepoWhitelistFlag:  "*",
 	})
 	err := c.Execute()
 	Ok(t, err)
@@ -278,6 +324,7 @@ func TestExecute_Defaults(t *testing.T) {
 	Ok(t, err)
 	Equals(t, "http://"+hostname+":4141", passedConfig.AtlantisURL)
 	Equals(t, false, passedConfig.AllowForkPRs)
+	Equals(t, false, passedConfig.AllowRepoConfig)
 
 	// Get our home dir since that's what gets defaulted to
 	dataDir, err := homedir.Expand("~/.atlantis")
@@ -287,11 +334,15 @@ func TestExecute_Defaults(t *testing.T) {
 	Equals(t, "github.com", passedConfig.GithubHostname)
 	Equals(t, "token", passedConfig.GithubToken)
 	Equals(t, "user", passedConfig.GithubUser)
-	Equals(t, "", passedConfig.GithubWebHookSecret)
+	Equals(t, "", passedConfig.GithubWebhookSecret)
 	Equals(t, "gitlab.com", passedConfig.GitlabHostname)
 	Equals(t, "gitlab-token", passedConfig.GitlabToken)
 	Equals(t, "gitlab-user", passedConfig.GitlabUser)
-	Equals(t, "", passedConfig.GitlabWebHookSecret)
+	Equals(t, "", passedConfig.GitlabWebhookSecret)
+	Equals(t, "https://api.bitbucket.org", passedConfig.BitbucketBaseURL)
+	Equals(t, "bitbucket-token", passedConfig.BitbucketToken)
+	Equals(t, "bitbucket-user", passedConfig.BitbucketUser)
+	Equals(t, "", passedConfig.BitbucketWebhookSecret)
 	Equals(t, "info", passedConfig.LogLevel)
 	Equals(t, 4141, passedConfig.Port)
 	Equals(t, false, passedConfig.RequireApproval)
@@ -356,41 +407,64 @@ func TestExecute_GitlabUser(t *testing.T) {
 	Equals(t, "user", passedConfig.GitlabUser)
 }
 
+func TestExecute_BitbucketUser(t *testing.T) {
+	t.Log("Should remove the @ from the bitbucket username if it's passed.")
+	c := setup(map[string]interface{}{
+		cmd.BitbucketUserFlag:  "@user",
+		cmd.BitbucketTokenFlag: "token",
+		cmd.RepoWhitelistFlag:  "*",
+	})
+	err := c.Execute()
+	Ok(t, err)
+
+	Equals(t, "user", passedConfig.BitbucketUser)
+}
+
 func TestExecute_Flags(t *testing.T) {
 	t.Log("Should use all flags that are set.")
 	c := setup(map[string]interface{}{
-		cmd.AtlantisURLFlag:     "url",
-		cmd.AllowForkPRsFlag:    true,
-		cmd.DataDirFlag:         "/path",
-		cmd.GHHostnameFlag:      "ghhostname",
-		cmd.GHTokenFlag:         "token",
-		cmd.GHUserFlag:          "user",
-		cmd.GHWebHookSecret:     "secret",
-		cmd.GitlabHostnameFlag:  "gitlab-hostname",
-		cmd.GitlabTokenFlag:     "gitlab-token",
-		cmd.GitlabUserFlag:      "gitlab-user",
-		cmd.GitlabWebHookSecret: "gitlab-secret",
-		cmd.LogLevelFlag:        "debug",
-		cmd.PortFlag:            8181,
-		cmd.RepoWhitelistFlag:   "github.com/runatlantis/atlantis",
-		cmd.RequireApprovalFlag: true,
-		cmd.SSLCertFileFlag:     "cert-file",
-		cmd.SSLKeyFileFlag:      "key-file",
+		cmd.AtlantisURLFlag:            "url",
+		cmd.AllowForkPRsFlag:           true,
+		cmd.AllowRepoConfigFlag:        true,
+		cmd.BitbucketBaseURLFlag:       "https://bitbucket-base-url.com",
+		cmd.BitbucketTokenFlag:         "bitbucket-token",
+		cmd.BitbucketUserFlag:          "bitbucket-user",
+		cmd.BitbucketWebhookSecretFlag: "bitbucket-secret",
+		cmd.DataDirFlag:                "/path",
+		cmd.GHHostnameFlag:             "ghhostname",
+		cmd.GHTokenFlag:                "token",
+		cmd.GHUserFlag:                 "user",
+		cmd.GHWebhookSecretFlag:        "secret",
+		cmd.GitlabHostnameFlag:         "gitlab-hostname",
+		cmd.GitlabTokenFlag:            "gitlab-token",
+		cmd.GitlabUserFlag:             "gitlab-user",
+		cmd.GitlabWebhookSecretFlag:    "gitlab-secret",
+		cmd.LogLevelFlag:               "debug",
+		cmd.PortFlag:                   8181,
+		cmd.RepoWhitelistFlag:          "github.com/runatlantis/atlantis",
+		cmd.RequireApprovalFlag:        true,
+		cmd.SSLCertFileFlag:            "cert-file",
+		cmd.SSLKeyFileFlag:             "key-file",
 	})
 	err := c.Execute()
 	Ok(t, err)
 
 	Equals(t, "url", passedConfig.AtlantisURL)
 	Equals(t, true, passedConfig.AllowForkPRs)
+	Equals(t, true, passedConfig.AllowRepoConfig)
+	Equals(t, "https://bitbucket-base-url.com", passedConfig.BitbucketBaseURL)
+	Equals(t, "bitbucket-token", passedConfig.BitbucketToken)
+	Equals(t, "bitbucket-user", passedConfig.BitbucketUser)
+	Equals(t, "bitbucket-secret", passedConfig.BitbucketWebhookSecret)
 	Equals(t, "/path", passedConfig.DataDir)
 	Equals(t, "ghhostname", passedConfig.GithubHostname)
 	Equals(t, "token", passedConfig.GithubToken)
 	Equals(t, "user", passedConfig.GithubUser)
-	Equals(t, "secret", passedConfig.GithubWebHookSecret)
+	Equals(t, "secret", passedConfig.GithubWebhookSecret)
 	Equals(t, "gitlab-hostname", passedConfig.GitlabHostname)
 	Equals(t, "gitlab-token", passedConfig.GitlabToken)
 	Equals(t, "gitlab-user", passedConfig.GitlabUser)
-	Equals(t, "gitlab-secret", passedConfig.GitlabWebHookSecret)
+	Equals(t, "gitlab-secret", passedConfig.GitlabWebhookSecret)
 	Equals(t, "debug", passedConfig.LogLevel)
 	Equals(t, 8181, passedConfig.Port)
 	Equals(t, "github.com/runatlantis/atlantis", passedConfig.RepoWhitelist)
@@ -404,6 +478,11 @@ func TestExecute_ConfigFile(t *testing.T) {
 	tmpFile := tempFile(t, `---
 atlantis-url: "url"
 allow-fork-prs: true
+allow-repo-config: true
+bitbucket-base-url: "https://mydomain.com"
+bitbucket-token: "bitbucket-token"
+bitbucket-user: "bitbucket-user"
+bitbucket-webhook-secret: "bitbucket-secret"
 data-dir: "/path"
 gh-hostname: "ghhostname"
 gh-token: "token"
@@ -429,15 +508,20 @@ ssl-key-file: key-file
 	Ok(t, err)
 	Equals(t, "url", passedConfig.AtlantisURL)
 	Equals(t, true, passedConfig.AllowForkPRs)
+	Equals(t, true, passedConfig.AllowRepoConfig)
+	Equals(t, "https://mydomain.com", passedConfig.BitbucketBaseURL)
+	Equals(t, "bitbucket-token", passedConfig.BitbucketToken)
+	Equals(t, "bitbucket-user", passedConfig.BitbucketUser)
+	Equals(t, "bitbucket-secret", passedConfig.BitbucketWebhookSecret)
 	Equals(t, "/path", passedConfig.DataDir)
 	Equals(t, "ghhostname", passedConfig.GithubHostname)
 	Equals(t, "token", passedConfig.GithubToken)
 	Equals(t, "user", passedConfig.GithubUser)
-	Equals(t, "secret", passedConfig.GithubWebHookSecret)
+	Equals(t, "secret", passedConfig.GithubWebhookSecret)
 	Equals(t, "gitlab-hostname", passedConfig.GitlabHostname)
 	Equals(t, "gitlab-token", passedConfig.GitlabToken)
 	Equals(t, "gitlab-user", passedConfig.GitlabUser)
-	Equals(t, "gitlab-secret", passedConfig.GitlabWebHookSecret)
+	Equals(t, "gitlab-secret", passedConfig.GitlabWebhookSecret)
 	Equals(t, "debug", passedConfig.LogLevel)
 	Equals(t, 8181, passedConfig.Port)
 	Equals(t, "github.com/runatlantis/atlantis", passedConfig.RepoWhitelist)
@@ -451,6 +535,11 @@ func TestExecute_EnvironmentOverride(t *testing.T) {
 	tmpFile := tempFile(t, `---
 atlantis-url: "url"
 allow-fork-prs: true
+allow-repo-config: true
+bitbucket-base-url: "https://mydomain.com"
+bitbucket-token: "bitbucket-token"
+bitbucket-user: "bitbucket-user"
+bitbucket-webhook-secret: "bitbucket-secret"
 data-dir: "/path"
 gh-hostname: "ghhostname"
 gh-token: "token"
@@ -471,23 +560,28 @@ ssl-key-file: key-file
 
 	// NOTE: We add the ATLANTIS_ prefix below.
 	for name, value := range map[string]string{
-		"ATLANTIS_URL":          "override-url",
-		"ALLOW_FORK_PRS":        "false",
-		"DATA_DIR":              "/override-path",
-		"GH_HOSTNAME":           "override-gh-hostname",
-		"GH_TOKEN":              "override-gh-token",
-		"GH_USER":               "override-gh-user",
-		"GH_WEBHOOK_SECRET":     "override-gh-webhook-secret",
-		"GITLAB_HOSTNAME":       "override-gitlab-hostname",
-		"GITLAB_TOKEN":          "override-gitlab-token",
-		"GITLAB_USER":           "override-gitlab-user",
-		"GITLAB_WEBHOOK_SECRET": "override-gitlab-webhook-secret",
-		"LOG_LEVEL":             "info",
-		"PORT":                  "8282",
-		"REPO_WHITELIST":        "override,override",
-		"REQUIRE_APPROVAL":      "false",
-		"SSL_CERT_FILE":         "override-cert-file",
-		"SSL_KEY_FILE":          "override-key-file",
+		"ATLANTIS_URL":             "override-url",
+		"ALLOW_FORK_PRS":           "false",
+		"ALLOW_REPO_CONFIG":        "false",
+		"BITBUCKET_BASE_URL":       "https://override-bitbucket-base-url",
+		"BITBUCKET_TOKEN":          "override-bitbucket-token",
+		"BITBUCKET_USER":           "override-bitbucket-user",
+		"BITBUCKET_WEBHOOK_SECRET": "override-bitbucket-secret",
+		"DATA_DIR":                 "/override-path",
+		"GH_HOSTNAME":              "override-gh-hostname",
+		"GH_TOKEN":                 "override-gh-token",
+		"GH_USER":                  "override-gh-user",
+		"GH_WEBHOOK_SECRET":        "override-gh-webhook-secret",
+		"GITLAB_HOSTNAME":          "override-gitlab-hostname",
+		"GITLAB_TOKEN":             "override-gitlab-token",
+		"GITLAB_USER":              "override-gitlab-user",
+		"GITLAB_WEBHOOK_SECRET":    "override-gitlab-webhook-secret",
+		"LOG_LEVEL":                "info",
+		"PORT":                     "8282",
+		"REPO_WHITELIST":           "override,override",
+		"REQUIRE_APPROVAL":         "false",
+		"SSL_CERT_FILE":            "override-cert-file",
+		"SSL_KEY_FILE":             "override-key-file",
 	} {
 		os.Setenv("ATLANTIS_"+name, value) // nolint: errcheck
 	}
@@ -498,15 +592,20 @@ ssl-key-file: key-file
 	Ok(t, err)
 	Equals(t, "override-url", passedConfig.AtlantisURL)
 	Equals(t, false, passedConfig.AllowForkPRs)
+	Equals(t, false, passedConfig.AllowRepoConfig)
+	Equals(t, "https://override-bitbucket-base-url", passedConfig.BitbucketBaseURL)
+	Equals(t, "override-bitbucket-token", passedConfig.BitbucketToken)
+	Equals(t, "override-bitbucket-user", passedConfig.BitbucketUser)
+	Equals(t, "override-bitbucket-secret", passedConfig.BitbucketWebhookSecret)
 	Equals(t, "/override-path", passedConfig.DataDir)
 	Equals(t, "override-gh-hostname", passedConfig.GithubHostname)
 	Equals(t, "override-gh-token", passedConfig.GithubToken)
 	Equals(t, "override-gh-user", passedConfig.GithubUser)
-	Equals(t, "override-gh-webhook-secret", passedConfig.GithubWebHookSecret)
+	Equals(t, "override-gh-webhook-secret", passedConfig.GithubWebhookSecret)
 	Equals(t, "override-gitlab-hostname", passedConfig.GitlabHostname)
 	Equals(t, "override-gitlab-token", passedConfig.GitlabToken)
 	Equals(t, "override-gitlab-user", passedConfig.GitlabUser)
-	Equals(t, "override-gitlab-webhook-secret", passedConfig.GitlabWebHookSecret)
+	Equals(t, "override-gitlab-webhook-secret", passedConfig.GitlabWebhookSecret)
 	Equals(t, "info", passedConfig.LogLevel)
 	Equals(t, 8282, passedConfig.Port)
 	Equals(t, "override,override", passedConfig.RepoWhitelist)
@@ -520,6 +619,11 @@ func TestExecute_FlagConfigOverride(t *testing.T) {
 	tmpFile := tempFile(t, `---
 atlantis-url: "url"
 allow-fork-prs: true
+allow-repo-config: true
+bitbucket-base-url: "https://bitbucket-base-url"
+bitbucket-token: "bitbucket-token"
+bitbucket-user: "bitbucket-user"
+bitbucket-webhook-secret: "bitbucket-secret"
 data-dir: "/path"
 gh-hostname: "ghhostname"
 gh-token: "token"
@@ -539,37 +643,46 @@ ssl-key-file: key-file
 
 	defer os.Remove(tmpFile) // nolint: errcheck
 	c := setup(map[string]interface{}{
-		cmd.AtlantisURLFlag:     "override-url",
-		cmd.AllowForkPRsFlag:    false,
-		cmd.DataDirFlag:         "/override-path",
-		cmd.GHHostnameFlag:      "override-gh-hostname",
-		cmd.GHTokenFlag:         "override-gh-token",
-		cmd.GHUserFlag:          "override-gh-user",
-		cmd.GHWebHookSecret:     "override-gh-webhook-secret",
-		cmd.GitlabHostnameFlag:  "override-gitlab-hostname",
-		cmd.GitlabTokenFlag:     "override-gitlab-token",
-		cmd.GitlabUserFlag:      "override-gitlab-user",
-		cmd.GitlabWebHookSecret: "override-gitlab-webhook-secret",
-		cmd.LogLevelFlag:        "info",
-		cmd.PortFlag:            8282,
-		cmd.RepoWhitelistFlag:   "override,override",
-		cmd.RequireApprovalFlag: false,
-		cmd.SSLCertFileFlag:     "override-cert-file",
-		cmd.SSLKeyFileFlag:      "override-key-file",
+		cmd.AtlantisURLFlag:            "override-url",
+		cmd.AllowForkPRsFlag:           false,
+		cmd.AllowRepoConfigFlag:        false,
+		cmd.BitbucketBaseURLFlag:       "https://override-bitbucket-base-url",
+		cmd.BitbucketTokenFlag:         "override-bitbucket-token",
+		cmd.BitbucketUserFlag:          "override-bitbucket-user",
+		cmd.BitbucketWebhookSecretFlag: "override-bitbucket-secret",
+		cmd.DataDirFlag:                "/override-path",
+		cmd.GHHostnameFlag:             "override-gh-hostname",
+		cmd.GHTokenFlag:                "override-gh-token",
+		cmd.GHUserFlag:                 "override-gh-user",
+		cmd.GHWebhookSecretFlag:        "override-gh-webhook-secret",
+		cmd.GitlabHostnameFlag:         "override-gitlab-hostname",
+		cmd.GitlabTokenFlag:            "override-gitlab-token",
+		cmd.GitlabUserFlag:             "override-gitlab-user",
+		cmd.GitlabWebhookSecretFlag:    "override-gitlab-webhook-secret",
+		cmd.LogLevelFlag:               "info",
+		cmd.PortFlag:                   8282,
+		cmd.RepoWhitelistFlag:          "override,override",
+		cmd.RequireApprovalFlag:        false,
+		cmd.SSLCertFileFlag:            "override-cert-file",
+		cmd.SSLKeyFileFlag:             "override-key-file",
 	})
 	err := c.Execute()
 	Ok(t, err)
 	Equals(t, "override-url", passedConfig.AtlantisURL)
 	Equals(t, false, passedConfig.AllowForkPRs)
+	Equals(t, "https://override-bitbucket-base-url", passedConfig.BitbucketBaseURL)
+	Equals(t, "override-bitbucket-token", passedConfig.BitbucketToken)
+	Equals(t, "override-bitbucket-user", passedConfig.BitbucketUser)
+	Equals(t, "override-bitbucket-secret", passedConfig.BitbucketWebhookSecret)
 	Equals(t, "/override-path", passedConfig.DataDir)
 	Equals(t, "override-gh-hostname", passedConfig.GithubHostname)
 	Equals(t, "override-gh-token", passedConfig.GithubToken)
 	Equals(t, "override-gh-user", passedConfig.GithubUser)
-	Equals(t, "override-gh-webhook-secret", passedConfig.GithubWebHookSecret)
+	Equals(t, "override-gh-webhook-secret", passedConfig.GithubWebhookSecret)
 	Equals(t, "override-gitlab-hostname", passedConfig.GitlabHostname)
 	Equals(t, "override-gitlab-token", passedConfig.GitlabToken)
 	Equals(t, "override-gitlab-user", passedConfig.GitlabUser)
-	Equals(t, "override-gitlab-webhook-secret", passedConfig.GitlabWebHookSecret)
+	Equals(t, "override-gitlab-webhook-secret", passedConfig.GitlabWebhookSecret)
 	Equals(t, "info", passedConfig.LogLevel)
 	Equals(t, 8282, passedConfig.Port)
 	Equals(t, "override,override", passedConfig.RepoWhitelist)
@@ -581,67 +694,132 @@ ssl-key-file: key-file
 func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	t.Log("Flags should override environment variables.")
 
-	for name, value := range map[string]string{
-		"ATLANTIS_URL":          "url",
-		"ALLOW_FORK_PRS":        "true",
-		"DATA_DIR":              "/path",
-		"GH_HOSTNAME":           "gh-hostname",
-		"GH_TOKEN":              "gh-token",
-		"GH_USER":               "gh-user",
-		"GH_WEBHOOK_SECRET":     "gh-webhook-secret",
-		"GITLAB_HOSTNAME":       "gitlab-hostname",
-		"GITLAB_TOKEN":          "gitlab-token",
-		"GITLAB_USER":           "gitlab-user",
-		"GITLAB_WEBHOOK_SECRET": "gitlab-webhook-secret",
-		"LOG_LEVEL":             "debug",
-		"PORT":                  "8181",
-		"REPO_WHITELIST":        "*",
-		"REQUIRE_APPROVAL":      "true",
-		"SSL_CERT_FILE":         "cert-file",
-		"SSL_KEY_FILE":          "key-file",
-	} {
+	envVars := map[string]string{
+		"ATLANTIS_URL":             "url",
+		"ALLOW_FORK_PRS":           "true",
+		"ALLOW_REPO_CONFIG":        "true",
+		"BITBUCKET_BASE_URL":       "https://bitbucket-base-url",
+		"BITBUCKET_TOKEN":          "bitbucket-token",
+		"BITBUCKET_USER":           "bitbucket-user",
+		"BITBUCKET_WEBHOOK_SECRET": "bitbucket-secret",
+		"DATA_DIR":                 "/path",
+		"GH_HOSTNAME":              "gh-hostname",
+		"GH_TOKEN":                 "gh-token",
+		"GH_USER":                  "gh-user",
+		"GH_WEBHOOK_SECRET":        "gh-webhook-secret",
+		"GITLAB_HOSTNAME":          "gitlab-hostname",
+		"GITLAB_TOKEN":             "gitlab-token",
+		"GITLAB_USER":              "gitlab-user",
+		"GITLAB_WEBHOOK_SECRET":    "gitlab-webhook-secret",
+		"LOG_LEVEL":                "debug",
+		"PORT":                     "8181",
+		"REPO_WHITELIST":           "*",
+		"REQUIRE_APPROVAL":         "true",
+		"SSL_CERT_FILE":            "cert-file",
+		"SSL_KEY_FILE":             "key-file",
+	}
+	for name, value := range envVars {
 		os.Setenv("ATLANTIS_"+name, value) // nolint: errcheck
 	}
+	defer func() {
+		// Unset after this test finishes.
+		for name := range envVars {
+			os.Unsetenv("ATLANTIS_" + name) // nolint: errcheck
+		}
+	}()
 
 	c := setup(map[string]interface{}{
-		cmd.AtlantisURLFlag:     "override-url",
-		cmd.AllowForkPRsFlag:    false,
-		cmd.DataDirFlag:         "/override-path",
-		cmd.GHHostnameFlag:      "override-gh-hostname",
-		cmd.GHTokenFlag:         "override-gh-token",
-		cmd.GHUserFlag:          "override-gh-user",
-		cmd.GHWebHookSecret:     "override-gh-webhook-secret",
-		cmd.GitlabHostnameFlag:  "override-gitlab-hostname",
-		cmd.GitlabTokenFlag:     "override-gitlab-token",
-		cmd.GitlabUserFlag:      "override-gitlab-user",
-		cmd.GitlabWebHookSecret: "override-gitlab-webhook-secret",
-		cmd.LogLevelFlag:        "info",
-		cmd.PortFlag:            8282,
-		cmd.RepoWhitelistFlag:   "override,override",
-		cmd.RequireApprovalFlag: false,
-		cmd.SSLCertFileFlag:     "override-cert-file",
-		cmd.SSLKeyFileFlag:      "override-key-file",
+		cmd.AtlantisURLFlag:            "override-url",
+		cmd.AllowForkPRsFlag:           false,
+		cmd.AllowRepoConfigFlag:        false,
+		cmd.BitbucketBaseURLFlag:       "https://override-bitbucket-base-url",
+		cmd.BitbucketTokenFlag:         "override-bitbucket-token",
+		cmd.BitbucketUserFlag:          "override-bitbucket-user",
+		cmd.BitbucketWebhookSecretFlag: "override-bitbucket-secret",
+		cmd.DataDirFlag:                "/override-path",
+		cmd.GHHostnameFlag:             "override-gh-hostname",
+		cmd.GHTokenFlag:                "override-gh-token",
+		cmd.GHUserFlag:                 "override-gh-user",
+		cmd.GHWebhookSecretFlag:        "override-gh-webhook-secret",
+		cmd.GitlabHostnameFlag:         "override-gitlab-hostname",
+		cmd.GitlabTokenFlag:            "override-gitlab-token",
+		cmd.GitlabUserFlag:             "override-gitlab-user",
+		cmd.GitlabWebhookSecretFlag:    "override-gitlab-webhook-secret",
+		cmd.LogLevelFlag:               "info",
+		cmd.PortFlag:                   8282,
+		cmd.RepoWhitelistFlag:          "override,override",
+		cmd.RequireApprovalFlag:        false,
+		cmd.SSLCertFileFlag:            "override-cert-file",
+		cmd.SSLKeyFileFlag:             "override-key-file",
 	})
 	err := c.Execute()
 	Ok(t, err)
 
 	Equals(t, "override-url", passedConfig.AtlantisURL)
 	Equals(t, false, passedConfig.AllowForkPRs)
+	Equals(t, false, passedConfig.AllowRepoConfig)
+	Equals(t, "https://override-bitbucket-base-url", passedConfig.BitbucketBaseURL)
+	Equals(t, "override-bitbucket-token", passedConfig.BitbucketToken)
+	Equals(t, "override-bitbucket-user", passedConfig.BitbucketUser)
+	Equals(t, "override-bitbucket-secret", passedConfig.BitbucketWebhookSecret)
 	Equals(t, "/override-path", passedConfig.DataDir)
 	Equals(t, "override-gh-hostname", passedConfig.GithubHostname)
 	Equals(t, "override-gh-token", passedConfig.GithubToken)
 	Equals(t, "override-gh-user", passedConfig.GithubUser)
-	Equals(t, "override-gh-webhook-secret", passedConfig.GithubWebHookSecret)
+	Equals(t, "override-gh-webhook-secret", passedConfig.GithubWebhookSecret)
 	Equals(t, "override-gitlab-hostname", passedConfig.GitlabHostname)
 	Equals(t, "override-gitlab-token", passedConfig.GitlabToken)
 	Equals(t, "override-gitlab-user", passedConfig.GitlabUser)
-	Equals(t, "override-gitlab-webhook-secret", passedConfig.GitlabWebHookSecret)
+	Equals(t, "override-gitlab-webhook-secret", passedConfig.GitlabWebhookSecret)
 	Equals(t, "info", passedConfig.LogLevel)
 	Equals(t, 8282, passedConfig.Port)
 	Equals(t, "override,override", passedConfig.RepoWhitelist)
 	Equals(t, false, passedConfig.RequireApproval)
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
 	Equals(t, "override-key-file", passedConfig.SSLKeyFile)
+}
+
+// If using bitbucket cloud, webhook secrets are not supported.
+func TestExecute_BitbucketCloudWithWebhookSecret(t *testing.T) {
+	c := setup(map[string]interface{}{
+		cmd.BitbucketUserFlag:          "user",
+		cmd.BitbucketTokenFlag:         "token",
+		cmd.RepoWhitelistFlag:          "*",
+		cmd.BitbucketWebhookSecretFlag: "my secret",
+	})
+	err := c.Execute()
+	ErrEquals(t, "--bitbucket-webhook-secret cannot be specified for Bitbucket Cloud because it is not supported by Bitbucket", err)
+}
+
+// Base URL must have a scheme.
+func TestExecute_BitbucketServerBaseURLScheme(t *testing.T) {
+	c := setup(map[string]interface{}{
+		cmd.BitbucketUserFlag:    "user",
+		cmd.BitbucketTokenFlag:   "token",
+		cmd.RepoWhitelistFlag:    "*",
+		cmd.BitbucketBaseURLFlag: "mydomain.com",
+	})
+	ErrEquals(t, "--bitbucket-base-url must have http:// or https://, got \"mydomain.com\"", c.Execute())
+
+	c = setup(map[string]interface{}{
+		cmd.BitbucketUserFlag:    "user",
+		cmd.BitbucketTokenFlag:   "token",
+		cmd.RepoWhitelistFlag:    "*",
+		cmd.BitbucketBaseURLFlag: "://mydomain.com",
+	})
+	ErrEquals(t, "error parsing --bitbucket-webhook-secret flag value \"://mydomain.com\": parse ://mydomain.com: missing protocol scheme", c.Execute())
+}
+
+// Port should be retained on base url.
+func TestExecute_BitbucketServerBaseURLPort(t *testing.T) {
+	c := setup(map[string]interface{}{
+		cmd.BitbucketUserFlag:    "user",
+		cmd.BitbucketTokenFlag:   "token",
+		cmd.RepoWhitelistFlag:    "*",
+		cmd.BitbucketBaseURLFlag: "http://mydomain.com:7990",
+	})
+	Ok(t, c.Execute())
+	Equals(t, "http://mydomain.com:7990", passedConfig.BitbucketBaseURL)
 }
 
 func setup(flags map[string]interface{}) *cobra.Command {

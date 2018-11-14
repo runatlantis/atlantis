@@ -1,0 +1,85 @@
+{
+  "eventKey": "pr:declined",
+  "date": "2018-07-23T13:59:48+0200",
+  "actor": {
+    "name": "lkysow",
+    "emailAddress": "lkysow@gmail.com",
+    "id": 1,
+    "displayName": "Luke Kysow",
+    "active": true,
+    "slug": "lkysow",
+    "type": "NORMAL"
+  },
+  "pullRequest": {
+    "id": 1,
+    "version": 7,
+    "title": "Null resource2",
+    "state": "DECLINED",
+    "open": false,
+    "closed": true,
+    "createdDate": 1532207977313,
+    "updatedDate": 1532347188162,
+    "closedDate": 1532347188162,
+    "fromRef": {
+      "id": "refs/heads/branch",
+      "displayId": "branch",
+      "latestCommit": "46955afd9b6c5dfa8753727d0669925e057e69b1",
+      "repository": {
+        "slug": "atlantis-example",
+        "id": 1,
+        "name": "atlantis-example",
+        "scmId": "git",
+        "state": "AVAILABLE",
+        "statusMessage": "Available",
+        "forkable": true,
+        "project": {
+          "key": "AT",
+          "id": 1,
+          "name": "atlantis",
+          "public": false,
+          "type": "NORMAL"
+        },
+        "public": false
+      }
+    },
+    "toRef": {
+      "id": "refs/heads/master",
+      "displayId": "master",
+      "latestCommit": "120cff6e1452086c90689c810c15b534381ba61b",
+      "repository": {
+        "slug": "atlantis-example",
+        "id": 1,
+        "name": "atlantis-example",
+        "scmId": "git",
+        "state": "AVAILABLE",
+        "statusMessage": "Available",
+        "forkable": true,
+        "project": {
+          "key": "AT",
+          "id": 1,
+          "name": "atlantis",
+          "public": false,
+          "type": "NORMAL"
+        },
+        "public": false
+      }
+    },
+    "locked": false,
+    "author": {
+      "user": {
+        "name": "lkysow",
+        "emailAddress": "lkysow@gmail.com",
+        "id": 1,
+        "displayName": "Luke Kysow",
+        "active": true,
+        "slug": "lkysow",
+        "type": "NORMAL"
+      },
+      "role": "AUTHOR",
+      "approved": false,
+      "status": "UNAPPROVED"
+    },
+    "reviewers": [],
+    "participants": []
+  }
+}

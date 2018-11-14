@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package main
 
 import (
@@ -27,13 +27,12 @@ import (
 
 var defaultAtlantisURL = "http://localhost:4141"
 var projectTypes = []Project{
-	{"standalone", "atlantis plan", "atlantis apply"},
-	{"standalone-with-workspace", "atlantis plan -w staging", "atlantis apply -w staging"},
+	{"standalone", "atlantis apply -d standalone"},
+	{"standalone-with-workspace", "atlantis apply -d standalone-with-workspace -w staging"},
 }
 
 type Project struct {
 	Name         string
-	PlanCommand  string
 	ApplyCommand string
 }
 

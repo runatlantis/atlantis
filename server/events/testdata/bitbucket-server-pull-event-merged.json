@@ -1,0 +1,108 @@
+{
+  "eventKey": "pr:merged",
+  "date": "2018-07-23T14:00:19+0200",
+  "actor": {
+    "name": "lkysow",
+    "emailAddress": "lkysow@gmail.com",
+    "id": 1,
+    "displayName": "Luke Kysow",
+    "active": true,
+    "slug": "lkysow",
+    "type": "NORMAL"
+  },
+  "pullRequest": {
+    "id": 2,
+    "version": 2,
+    "title": "Branch",
+    "description": "* Null resource\r\n* main.tf edited online with Bitbucket\r\n* Update 2\r\n* main.tf edited online with Bitbucket\r\n* kkj\r\n* main.tf edited online with Bitbucket",
+    "state": "MERGED",
+    "open": false,
+    "closed": true,
+    "createdDate": 1532211497403,
+    "updatedDate": 1532347219220,
+    "closedDate": 1532347219220,
+    "fromRef": {
+      "id": "refs/heads/branch",
+      "displayId": "branch",
+      "latestCommit": "86a574157f5a2dadaf595b9f06c70fdfdd039912",
+      "repository": {
+        "slug": "atlantis-example",
+        "id": 2,
+        "name": "atlantis-example",
+        "scmId": "git",
+        "state": "AVAILABLE",
+        "statusMessage": "Available",
+        "forkable": true,
+        "origin": {
+          "slug": "atlantis-example",
+          "id": 1,
+          "name": "atlantis-example",
+          "scmId": "git",
+          "state": "AVAILABLE",
+          "statusMessage": "Available",
+          "forkable": true,
+          "project": {
+            "key": "FK",
+            "id": 1,
+            "name": "atlantis-fork",
+            "public": false,
+            "type": "NORMAL"
+          },
+          "public": false
+        },
+        "project": {
+          "key": "FK",
+          "id": 2,
+          "name": "atlantis-fork",
+          "type": "NORMAL"
+        },
+        "public": false
+      }
+    },
+    "toRef": {
+      "id": "refs/heads/master",
+      "displayId": "master",
+      "latestCommit": "120cff6e1452086c90689c810c15b534381ba61b",
+      "repository": {
+        "slug": "atlantis-example",
+        "id": 1,
+        "name": "atlantis-example",
+        "scmId": "git",
+        "state": "AVAILABLE",
+        "statusMessage": "Available",
+        "forkable": true,
+        "project": {
+          "key": "AT",
+          "id": 1,
+          "name": "atlantis",
+          "public": false,
+          "type": "NORMAL"
+        },
+        "public": false
+      }
+    },
+    "locked": false,
+    "author": {
+      "user": {
+        "name": "lkysow",
+        "emailAddress": "lkysow@gmail.com",
+        "id": 1,
+        "displayName": "Luke Kysow",
+        "active": true,
+        "slug": "lkysow",
+        "type": "NORMAL"
+      },
+      "role": "AUTHOR",
+      "approved": false,
+      "status": "UNAPPROVED"
+    },
+    "reviewers": [],
+    "participants": [],
+    "properties": {
+      "mergeCommit": {
+        "displayId": "bbc7b2a2934",
+        "id": "bbc7b2a29344646ec8605be9603a0aa625a627ef"
+      }
+    }
+  }
+}

@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package main
 
 import (
@@ -45,7 +45,7 @@ resource "null_resource" "hello" {
 }
 `
 
-// nolint: gas
+// nolint: gosec
 func (t *E2ETester) Start() (*E2EResult, error) {
 	cloneDir := fmt.Sprintf("%s/%s-test", t.cloneDirRoot, t.projectType.Name)
 	branchName := fmt.Sprintf("%s-%s", t.projectType.Name, time.Now().Format("20060102150405"))
@@ -128,14 +128,7 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	// defer closing pull request and delete remote branch
 	defer cleanUp(t, pull.GetNumber(), branchName) // nolint: errcheck
 
-	// create run plan comment
-	log.Printf("creating plan comment: %q", t.projectType.PlanCommand)
-	_, _, err = t.githubClient.client.Issues.CreateComment(t.githubClient.ctx, t.ownerName, t.repoName, pull.GetNumber(), &github.IssueComment{Body: github.String(t.projectType.PlanCommand)})
-	if err != nil {
-		return e2eResult, fmt.Errorf("error creating 'run plan' comment on github")
-	}
-
-	// wait for atlantis to respond to webhook
+	// wait for atlantis to respond to webhook and autoplan.
 	time.Sleep(2 * time.Second)
 
 	state := "not started"

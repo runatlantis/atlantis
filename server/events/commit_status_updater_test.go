@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package events_test
 
 import (
@@ -21,34 +21,19 @@ import (
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 var repoModel = models.Repo{}
 var pullModel = models.PullRequest{}
-var status = vcs.Success
-var cmd = events.Command{
-	Name: events.Plan,
-}
-
-func TestStatus_String(t *testing.T) {
-	cases := map[vcs.CommitStatus]string{
-		vcs.Pending: "pending",
-		vcs.Success: "success",
-		vcs.Failed:  "failed",
-	}
-	for k, v := range cases {
-		Equals(t, v, k.String())
-	}
-}
+var status = models.SuccessCommitStatus
 
 func TestUpdate(t *testing.T) {
 	RegisterMockTestingT(t)
 	client := mocks.NewMockClientProxy()
 	s := events.DefaultCommitStatusUpdater{Client: client}
-	err := s.Update(repoModel, pullModel, status, &cmd)
+	err := s.Update(repoModel, pullModel, status, events.PlanCommand)
 	Ok(t, err)
 	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, status, "Plan Success")
 }
@@ -58,13 +43,12 @@ func TestUpdateProjectResult_Error(t *testing.T) {
 	ctx := &events.CommandContext{
 		BaseRepo: repoModel,
 		Pull:     pullModel,
-		Command:  &events.Command{Name: events.Plan},
 	}
 	client := mocks.NewMockClientProxy()
 	s := events.DefaultCommitStatusUpdater{Client: client}
-	err := s.UpdateProjectResult(ctx, events.CommandResponse{Error: errors.New("err")})
+	err := s.UpdateProjectResult(ctx, events.PlanCommand, events.CommandResult{Error: errors.New("err")})
 	Ok(t, err)
-	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, vcs.Failed, "Plan Failed")
+	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, models.FailedCommitStatus, "Plan Failed")
 }
 
 func TestUpdateProjectResult_Failure(t *testing.T) {
@@ -72,79 +56,82 @@ func TestUpdateProjectResult_Failure(t *testing.T) {
 	ctx := &events.CommandContext{
 		BaseRepo: repoModel,
 		Pull:     pullModel,
-		Command:  &events.Command{Name: events.Plan},
 	}
 	client := mocks.NewMockClientProxy()
 	s := events.DefaultCommitStatusUpdater{Client: client}
-	err := s.UpdateProjectResult(ctx, events.CommandResponse{Failure: "failure"})
+	err := s.UpdateProjectResult(ctx, events.PlanCommand, events.CommandResult{Failure: "failure"})
 	Ok(t, err)
-	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, vcs.Failed, "Plan Failed")
+	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, models.FailedCommitStatus, "Plan Failed")
 }
 
 func TestUpdateProjectResult(t *testing.T) {
-	t.Log("should use worst status")
 	RegisterMockTestingT(t)
 
 	ctx := &events.CommandContext{
 		BaseRepo: repoModel,
 		Pull:     pullModel,
-		Command:  &events.Command{Name: events.Plan},
 	}
 
 	cases := []struct {
 		Statuses []string
-		Expected vcs.CommitStatus
+		Expected models.CommitStatus
 	}{
 		{
 			[]string{"success", "failure", "error"},
-			vcs.Failed,
+			models.FailedCommitStatus,
 		},
 		{
 			[]string{"failure", "error", "success"},
-			vcs.Failed,
+			models.FailedCommitStatus,
 		},
 		{
 			[]string{"success", "failure"},
-			vcs.Failed,
+			models.FailedCommitStatus,
 		},
 		{
 			[]string{"success", "error"},
-			vcs.Failed,
+			models.FailedCommitStatus,
 		},
 		{
 			[]string{"failure", "error"},
-			vcs.Failed,
+			models.FailedCommitStatus,
 		},
 		{
 			[]string{"success"},
-			vcs.Success,
+			models.SuccessCommitStatus,
 		},
 		{
 			[]string{"success", "success"},
-			vcs.Success,
+			models.SuccessCommitStatus,
 		},
 	}
 
 	for _, c := range cases {
-		var results []events.ProjectResult
-		for _, statusStr := range c.Statuses {
-			var result events.ProjectResult
-			switch statusStr {
-			case "failure":
-				result = events.ProjectResult{Failure: "failure"}
-			case "error":
-				result = events.ProjectResult{Error: errors.New("err")}
-			default:
-				result = events.ProjectResult{}
+		t.Run(strings.Join(c.Statuses, "-"), func(t *testing.T) {
+			var results []events.ProjectResult
+			for _, statusStr := range c.Statuses {
+				var result events.ProjectResult
+				switch statusStr {
+				case "failure":
+					result = events.ProjectResult{
+						Failure: "failure",
+					}
+				case "error":
+					result = events.ProjectResult{
+						Error: errors.New("err"),
+					}
+				default:
+					result = events.ProjectResult{}
+				}
+				results = append(results, result)
 			}
-			results = append(results, result)
-		}
-		resp := events.CommandResponse{ProjectResults: results}
+			resp := events.CommandResult{ProjectResults: results}
 
-		client := mocks.NewMockClientProxy()
-		s := events.DefaultCommitStatusUpdater{Client: client}
-		err := s.UpdateProjectResult(ctx, resp)
-		Ok(t, err)
-		client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, c.Expected, "Plan "+strings.Title(c.Expected.String()))
+			client := mocks.NewMockClientProxy()
+			s := events.DefaultCommitStatusUpdater{Client: client}
+			err := s.UpdateProjectResult(ctx, events.PlanCommand, resp)
+			Ok(t, err)
+			client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, c.Expected, "Plan "+strings.Title(c.Expected.String()))
+		})
 	}
 }

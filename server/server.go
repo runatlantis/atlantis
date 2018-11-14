@@ -10,13 +10,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 // Package server handles the web server and executing commands that come in
 // via webhooks.
 package server
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -36,28 +37,40 @@ import (
 	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/locking/boltdb"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/run"
+	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
+	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
+	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/static"
 	"github.com/urfave/cli"
 	"github.com/urfave/negroni"
 )
 
-const LockRouteName = "lock-detail"
+const (
+	// LockViewRouteName is the named route in mux.Router for the lock view.
+	// The route can be retrieved by this name, ex:
+	//   mux.Router.Get(LockViewRouteName)
+	LockViewRouteName = "lock-detail"
+	// LockViewRouteIDQueryParam is the query parameter needed to construct the lock view
+	// route. ex:
+	//   mux.Router.Get(LockViewRouteName).URL(LockViewRouteIDQueryParam, "my id")
+	LockViewRouteIDQueryParam = "id"
+)
 
 // Server runs the Atlantis web server.
 type Server struct {
 	AtlantisVersion    string
 	Router             *mux.Router
 	Port               int
-	CommandHandler     *events.CommandHandler
+	CommandRunner      *events.DefaultCommandRunner
 	Logger             *logging.SimpleLogger
 	Locker             locking.Locker
-	AtlantisURL        string
 	EventsController   *EventsController
+	LocksController    *LocksController
 	IndexTemplate      TemplateWriter
 	LockDetailTemplate TemplateWriter
 	SSLCertFile        string
@@ -68,33 +81,40 @@ type Server struct {
 // The mapstructure tags correspond to flags in cmd/server.go and are used when
 // the config is parsed from a YAML file.
 type UserConfig struct {
-	AllowForkPRs        bool   `mapstructure:"allow-fork-prs"`
-	AtlantisURL         string `mapstructure:"atlantis-url"`
-	DataDir             string `mapstructure:"data-dir"`
-	GithubHostname      string `mapstructure:"gh-hostname"`
-	GithubToken         string `mapstructure:"gh-token"`
-	GithubUser          string `mapstructure:"gh-user"`
-	GithubWebHookSecret string `mapstructure:"gh-webhook-secret"`
-	GitlabHostname      string `mapstructure:"gitlab-hostname"`
-	GitlabToken         string `mapstructure:"gitlab-token"`
-	GitlabUser          string `mapstructure:"gitlab-user"`
-	GitlabWebHookSecret string `mapstructure:"gitlab-webhook-secret"`
-	LogLevel            string `mapstructure:"log-level"`
-	Port                int    `mapstructure:"port"`
-	RepoWhitelist       string `mapstructure:"repo-whitelist"`
+	AllowForkPRs           bool   `mapstructure:"allow-fork-prs"`
+	AllowRepoConfig        bool   `mapstructure:"allow-repo-config"`
+	AtlantisURL            string `mapstructure:"atlantis-url"`
+	BitbucketBaseURL       string `mapstructure:"bitbucket-base-url"`
+	BitbucketToken         string `mapstructure:"bitbucket-token"`
+	BitbucketUser          string `mapstructure:"bitbucket-user"`
+	BitbucketWebhookSecret string `mapstructure:"bitbucket-webhook-secret"`
+	DataDir                string `mapstructure:"data-dir"`
+	GithubHostname         string `mapstructure:"gh-hostname"`
+	GithubToken            string `mapstructure:"gh-token"`
+	GithubUser             string `mapstructure:"gh-user"`
+	GithubWebhookSecret    string `mapstructure:"gh-webhook-secret"`
+	GitlabHostname         string `mapstructure:"gitlab-hostname"`
+	GitlabToken            string `mapstructure:"gitlab-token"`
+	GitlabUser             string `mapstructure:"gitlab-user"`
+	GitlabWebhookSecret    string `mapstructure:"gitlab-webhook-secret"`
+	LogLevel               string `mapstructure:"log-level"`
+	Port                   int    `mapstructure:"port"`
+	RepoWhitelist          string `mapstructure:"repo-whitelist"`
 	// RequireApproval is whether to require pull request approval before
 	// allowing terraform apply's to be run.
-	RequireApproval bool            `mapstructure:"require-approval"`
-	SlackToken      string          `mapstructure:"slack-token"`
-	SSLCertFile     string          `mapstructure:"ssl-cert-file"`
-	SSLKeyFile      string          `mapstructure:"ssl-key-file"`
-	Webhooks        []WebhookConfig `mapstructure:"webhooks"`
+	RequireApproval        bool            `mapstructure:"require-approval"`
+	SilenceWhitelistErrors bool            `mapstructure:"silence-whitelist-errors"`
+	SlackToken             string          `mapstructure:"slack-token"`
+	SSLCertFile            string          `mapstructure:"ssl-cert-file"`
+	SSLKeyFile             string          `mapstructure:"ssl-key-file"`
+	Webhooks               []WebhookConfig `mapstructure:"webhooks"`
 }
 
 // Config holds config for server that isn't passed in by the user.
 type Config struct {
-	AllowForkPRsFlag string
-	AtlantisVersion  string
+	AllowForkPRsFlag    string
+	AllowRepoConfigFlag string
+	AtlantisVersion     string
 }
 
 // WebhookConfig is nested within UserConfig. It's used to configure webhooks.
@@ -119,6 +139,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var supportedVCSHosts []models.VCSHostType
 	var githubClient *vcs.GithubClient
 	var gitlabClient *vcs.GitlabClient
+	var bitbucketCloudClient *bitbucketcloud.Client
+	var bitbucketServerClient *bitbucketserver.Client
 	if userConfig.GithubUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		var err error
@@ -148,6 +170,29 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			}
 		}
 	}
+	if userConfig.BitbucketUser != "" {
+		if userConfig.BitbucketBaseURL == bitbucketcloud.BaseURL {
+			supportedVCSHosts = append(supportedVCSHosts, models.BitbucketCloud)
+			bitbucketCloudClient = bitbucketcloud.NewClient(
+				http.DefaultClient,
+				userConfig.BitbucketUser,
+				userConfig.BitbucketToken,
+				userConfig.AtlantisURL)
+		} else {
+			supportedVCSHosts = append(supportedVCSHosts, models.BitbucketServer)
+			var err error
+			bitbucketServerClient, err = bitbucketserver.NewClient(
+				http.DefaultClient,
+				userConfig.BitbucketUser,
+				userConfig.BitbucketToken,
+				userConfig.BitbucketBaseURL,
+				userConfig.AtlantisURL)
+			if err != nil {
+				return nil, errors.Wrapf(err, "setting up Bitbucket Server client")
+			}
+		}
+	}
+
 	var webhooksConfig []webhooks.Config
 	for _, c := range userConfig.Webhooks {
 		config := webhooks.Config{
@@ -162,7 +207,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing webhooks")
 	}
-	vcsClient := vcs.NewDefaultClientProxy(githubClient, gitlabClient)
+	vcsClient := vcs.NewDefaultClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient)
 	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient}
 	terraformClient, err := terraform.NewClient(userConfig.DataDir)
 	// The flag.Lookup call is to detect if we're running in a unit test. If we
@@ -177,47 +222,34 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, err
 	}
 	lockingClient := locking.NewClient(boltdb)
-	run := &run.Run{}
-	configReader := &events.ProjectConfigManager{}
-	workspaceLocker := events.NewDefaultAtlantisWorkspaceLocker()
-	workspace := &events.FileWorkspace{
+	workingDirLocker := events.NewDefaultWorkingDirLocker()
+	workingDir := &events.FileWorkspace{
 		DataDir: userConfig.DataDir,
 	}
-	projectPreExecute := &events.DefaultProjectPreExecutor{
-		Locker:       lockingClient,
-		Run:          run,
-		ConfigReader: configReader,
-		Terraform:    terraformClient,
+	projectLocker := &events.DefaultProjectLocker{
+		Locker: lockingClient,
 	}
-	applyExecutor := &events.ApplyExecutor{
-		VCSClient:         vcsClient,
-		Terraform:         terraformClient,
-		RequireApproval:   userConfig.RequireApproval,
-		Run:               run,
-		AtlantisWorkspace: workspace,
-		ProjectPreExecute: projectPreExecute,
-		Webhooks:          webhooksManager,
-	}
-	planExecutor := &events.PlanExecutor{
-		VCSClient:         vcsClient,
-		Terraform:         terraformClient,
-		Run:               run,
-		Workspace:         workspace,
-		ProjectPreExecute: projectPreExecute,
-		Locker:            lockingClient,
-		ProjectFinder:     &events.DefaultProjectFinder{},
+	underlyingRouter := mux.NewRouter()
+	router := &Router{
+		AtlantisURL:               userConfig.AtlantisURL,
+		LockViewRouteIDQueryParam: LockViewRouteIDQueryParam,
+		LockViewRouteName:         LockViewRouteName,
+		Underlying:                underlyingRouter,
 	}
 	pullClosedExecutor := &events.PullClosedExecutor{
-		VCSClient: vcsClient,
-		Locker:    lockingClient,
-		Workspace: workspace,
+		VCSClient:  vcsClient,
+		Locker:     lockingClient,
+		WorkingDir: workingDir,
 	}
 	logger := logging.NewSimpleLogger("server", nil, false, logging.ToLogLevel(userConfig.LogLevel))
 	eventParser := &events.EventParser{
-		GithubUser:  userConfig.GithubUser,
-		GithubToken: userConfig.GithubToken,
-		GitlabUser:  userConfig.GitlabUser,
-		GitlabToken: userConfig.GitlabToken,
+		GithubUser:         userConfig.GithubUser,
+		GithubToken:        userConfig.GithubToken,
+		GitlabUser:         userConfig.GitlabUser,
+		GitlabToken:        userConfig.GitlabToken,
+		BitbucketUser:      userConfig.BitbucketUser,
+		BitbucketToken:     userConfig.BitbucketToken,
+		BitbucketServerURL: userConfig.BitbucketBaseURL,
 	}
 	commentParser := &events.CommentParser{
 		GithubUser:  userConfig.GithubUser,
@@ -225,48 +257,90 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GitlabUser:  userConfig.GitlabUser,
 		GitlabToken: userConfig.GitlabToken,
 	}
-	commandHandler := &events.CommandHandler{
-		ApplyExecutor:            applyExecutor,
-		PlanExecutor:             planExecutor,
-		LockURLGenerator:         planExecutor,
-		EventParser:              eventParser,
+	defaultTfVersion := terraformClient.Version()
+	commandRunner := &events.DefaultCommandRunner{
 		VCSClient:                vcsClient,
 		GithubPullGetter:         githubClient,
 		GitlabMergeRequestGetter: gitlabClient,
 		CommitStatusUpdater:      commitStatusUpdater,
-		AtlantisWorkspaceLocker:  workspaceLocker,
+		EventParser:              eventParser,
 		MarkdownRenderer:         markdownRenderer,
 		Logger:                   logger,
 		AllowForkPRs:             userConfig.AllowForkPRs,
 		AllowForkPRsFlag:         config.AllowForkPRsFlag,
+		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
+			ParserValidator:     &yaml.ParserValidator{},
+			ProjectFinder:       &events.DefaultProjectFinder{},
+			VCSClient:           vcsClient,
+			WorkingDir:          workingDir,
+			WorkingDirLocker:    workingDirLocker,
+			AllowRepoConfig:     userConfig.AllowRepoConfig,
+			AllowRepoConfigFlag: config.AllowRepoConfigFlag,
+			PendingPlanFinder:   &events.PendingPlanFinder{},
+			CommentBuilder:      commentParser,
+		},
+		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
+			Locker:           projectLocker,
+			LockURLGenerator: router,
+			InitStepRunner: &runtime.InitStepRunner{
+				TerraformExecutor: terraformClient,
+				DefaultTFVersion:  defaultTfVersion,
+			},
+			PlanStepRunner: &runtime.PlanStepRunner{
+				TerraformExecutor: terraformClient,
+				DefaultTFVersion:  defaultTfVersion,
+			},
+			ApplyStepRunner: &runtime.ApplyStepRunner{
+				TerraformExecutor: terraformClient,
+			},
+			RunStepRunner: &runtime.RunStepRunner{
+				DefaultTFVersion: defaultTfVersion,
+			},
+			PullApprovedChecker:     vcsClient,
+			WorkingDir:              workingDir,
+			Webhooks:                webhooksManager,
+			WorkingDirLocker:        workingDirLocker,
+			RequireApprovalOverride: userConfig.RequireApproval,
+		},
 	}
-	repoWhitelist := &events.RepoWhitelist{
-		Whitelist: userConfig.RepoWhitelist,
+	repoWhitelist, err := events.NewRepoWhitelistChecker(userConfig.RepoWhitelist)
+	if err != nil {
+		return nil, err
+	}
+	locksController := &LocksController{
+		AtlantisVersion:    config.AtlantisVersion,
+		Locker:             lockingClient,
+		Logger:             logger,
+		VCSClient:          vcsClient,
+		LockDetailTemplate: lockTemplate,
+		WorkingDir:         workingDir,
+		WorkingDirLocker:   workingDirLocker,
 	}
 	eventsController := &EventsController{
-		CommandRunner:          commandHandler,
-		PullCleaner:            pullClosedExecutor,
-		Parser:                 eventParser,
-		CommentParser:          commentParser,
-		Logger:                 logger,
-		GithubWebHookSecret:    []byte(userConfig.GithubWebHookSecret),
-		GithubRequestValidator: &DefaultGithubRequestValidator{},
-		GitlabRequestParser:    &DefaultGitlabRequestParser{},
-		GitlabWebHookSecret:    []byte(userConfig.GitlabWebHookSecret),
-		RepoWhitelist:          repoWhitelist,
-		SupportedVCSHosts:      supportedVCSHosts,
-		VCSClient:              vcsClient,
+		CommandRunner:                commandRunner,
+		PullCleaner:                  pullClosedExecutor,
+		Parser:                       eventParser,
+		CommentParser:                commentParser,
+		Logger:                       logger,
+		GithubWebhookSecret:          []byte(userConfig.GithubWebhookSecret),
+		GithubRequestValidator:       &DefaultGithubRequestValidator{},
+		GitlabRequestParserValidator: &DefaultGitlabRequestParserValidator{},
+		GitlabWebhookSecret:          []byte(userConfig.GitlabWebhookSecret),
+		RepoWhitelistChecker:         repoWhitelist,
+		SilenceWhitelistErrors:       userConfig.SilenceWhitelistErrors,
+		SupportedVCSHosts:            supportedVCSHosts,
+		VCSClient:                    vcsClient,
+		BitbucketWebhookSecret:       []byte(userConfig.BitbucketWebhookSecret),
 	}
-	router := mux.NewRouter()
 	return &Server{
 		AtlantisVersion:    config.AtlantisVersion,
-		Router:             router,
+		Router:             underlyingRouter,
 		Port:               userConfig.Port,
-		CommandHandler:     commandHandler,
+		CommandRunner:      commandRunner,
 		Logger:             logger,
 		Locker:             lockingClient,
-		AtlantisURL:        userConfig.AtlantisURL,
 		EventsController:   eventsController,
+		LocksController:    locksController,
 		IndexTemplate:      indexTemplate,
 		LockDetailTemplate: lockTemplate,
 		SSLKeyFile:         userConfig.SSLKeyFile,
@@ -279,17 +353,12 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/", s.Index).Methods("GET").MatcherFunc(func(r *http.Request, rm *mux.RouteMatch) bool {
 		return r.URL.Path == "/" || r.URL.Path == "/index.html"
 	})
+	s.Router.HandleFunc("/healthz", s.Healthz).Methods("GET")
 	s.Router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: static.Asset, AssetDir: static.AssetDir, AssetInfo: static.AssetInfo}))
-	s.Router.HandleFunc("/events", s.postEvents).Methods("POST")
-	s.Router.HandleFunc("/locks", s.DeleteLockRoute).Methods("DELETE").Queries("id", "{id:.*}")
-	lockRoute := s.Router.HandleFunc("/lock", s.GetLockRoute).Methods("GET").Queries("id", "{id}").Name(LockRouteName)
-	// function that planExecutor can use to construct detail view url
-	// injecting this here because this is the earliest routes are created
-	s.CommandHandler.SetLockURL(func(lockID string) string {
-		// ignoring error since guaranteed to succeed if "id" is specified
-		u, _ := lockRoute.URL("id", url.QueryEscape(lockID))
-		return s.AtlantisURL + u.RequestURI()
-	})
+	s.Router.HandleFunc("/events", s.EventsController.Post).Methods("POST")
+	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
+	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
+		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
 	n := negroni.New(&negroni.Recovery{
 		Logger:     log.New(os.Stdout, "", log.LstdFlags),
 		PrintStack: false,
@@ -305,7 +374,7 @@ func (s *Server) Start() error {
 
 	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n}
 	go func() {
-		s.Logger.Warn("Atlantis started - listening on port %v", s.Port)
+		s.Logger.Info("Atlantis started - listening on port %v", s.Port)
 
 		var err error
 		if s.SSLCertFile != "" && s.SSLKeyFile != "" {
@@ -340,7 +409,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 
 	var lockResults []LockIndexData
 	for id, v := range locks {
-		lockURL, _ := s.Router.Get(LockRouteName).URL("id", url.QueryEscape(id))
+		lockURL, _ := s.Router.Get(LockViewRouteName).URL("id", url.QueryEscape(id))
 		lockResults = append(lockResults, LockIndexData{
 			LockURL:      lockURL.String(),
 			RepoFullName: v.Project.RepoFullName,
@@ -355,97 +424,18 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-// GetLockRoute is the GET /locks/{id} route. It renders the lock detail view.
-func (s *Server) GetLockRoute(w http.ResponseWriter, r *http.Request) {
-	id, ok := mux.Vars(r)["id"]
-	if !ok {
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, "No lock id in request")
-		return
-	}
-	s.GetLock(w, r, id)
-}
-
-// GetLock handles a lock detail page view. getLockRoute is expected to
-// be called before. This function was extracted to make it testable.
-func (s *Server) GetLock(w http.ResponseWriter, _ *http.Request, id string) {
-	idUnencoded, err := url.QueryUnescape(id)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, "Invalid lock id")
-		return
-	}
-
-	lock, err := s.Locker.GetLock(idUnencoded)
+// Healthz returns the health check response. It always returns a 200 currently.
+func (s *Server) Healthz(w http.ResponseWriter, _ *http.Request) {
+	data, err := json.MarshalIndent(&struct {
+		Status string `json:"status"`
+	}{
+		Status: "ok",
+	}, "", "  ")
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprint(w, err.Error())
+		fmt.Fprintf(w, "Error creating status json response: %s", err)
 		return
 	}
-	if lock == nil {
-		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprint(w, "No lock found at that id")
-		return
-	}
-
-	// Extract the repo owner and repo name.
-	repo := strings.Split(lock.Project.RepoFullName, "/")
-
-	l := LockDetailData{
-		LockKeyEncoded:  id,
-		LockKey:         idUnencoded,
-		RepoOwner:       repo[0],
-		RepoName:        repo[1],
-		PullRequestLink: lock.Pull.URL,
-		LockedBy:        lock.Pull.Author,
-		Workspace:       lock.Workspace,
-		AtlantisVersion: s.AtlantisVersion,
-	}
-
-	s.LockDetailTemplate.Execute(w, l) // nolint: errcheck
-}
-
-// DeleteLockRoute handles deleting the lock at id.
-func (s *Server) DeleteLockRoute(w http.ResponseWriter, r *http.Request) {
-	id, ok := mux.Vars(r)["id"]
-	if !ok || id == "" {
-		s.respond(w, logging.Warn, http.StatusBadRequest, "No lock id in request")
-		return
-	}
-	s.DeleteLock(w, r, id)
-}
-
-// DeleteLock deletes the lock. DeleteLockRoute should be called first.
-// This method is split out to make this route testable.
-func (s *Server) DeleteLock(w http.ResponseWriter, _ *http.Request, id string) {
-	idUnencoded, err := url.PathUnescape(id)
-	if err != nil {
-		s.respond(w, logging.Warn, http.StatusBadRequest, "Invalid lock id: %s", err)
-		return
-	}
-	lock, err := s.Locker.Unlock(idUnencoded)
-	if err != nil {
-		s.respond(w, logging.Error, http.StatusInternalServerError, "Failed to delete lock %s: %s", idUnencoded, err)
-		return
-	}
-	if lock == nil {
-		s.respond(w, logging.Warn, http.StatusNotFound, "No lock found at that id", idUnencoded)
-		return
-	}
-	s.respond(w, logging.Info, http.StatusOK, "Deleted lock id %s", idUnencoded)
-}
-
-// postEvents handles POST requests to our /events endpoint. These should be
-// VCS webhook requests.
-func (s *Server) postEvents(w http.ResponseWriter, r *http.Request) {
-	s.EventsController.Post(w, r)
-}
-
-// respond is a helper function to respond and log the response. lvl is the log
-// level to log at, code is the HTTP response code.
-func (s *Server) respond(w http.ResponseWriter, lvl logging.LogLevel, code int, format string, args ...interface{}) {
-	response := fmt.Sprintf(format, args...)
-	s.Logger.Log(lvl, response)
-	w.WriteHeader(code)
-	fmt.Fprintln(w, response)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(data) // nolint: errcheck
 }

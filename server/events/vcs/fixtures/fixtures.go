@@ -10,10 +10,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-//
+
 package fixtures
 
 import "github.com/google/go-github/github"
+
+var PullEvent = github.PullRequestEvent{
+	Sender: &github.User{
+		Login: github.String("user"),
+	},
+	Repo:        &Repo,
+	PullRequest: &Pull,
+	Action:      github.String("opened"),
+}
 
 var Pull = github.PullRequest{
 	Head: &github.PullRequestBranch{
@@ -22,7 +31,8 @@ var Pull = github.PullRequest{
 		Repo: &Repo,
 	},
 	Base: &github.PullRequestBranch{
-		SHA: github.String("sha256"),
+		SHA:  github.String("sha256"),
+		Repo: &Repo,
 	},
 	HTMLURL: github.String("html-url"),
 	User: &github.User{
