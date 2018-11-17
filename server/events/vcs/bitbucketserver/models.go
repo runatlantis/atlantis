@@ -61,6 +61,6 @@ type Changes struct {
 			ToString *string `json:"toString,omitempty" validate:"required"`
 		} `json:"path,omitempty" validate:"required"`
 	} `json:"values,omitempty" validate:"required"`
-	NextPageStart *string `json:"nextPageStart,omitempty"`
-	IsLastPage    *bool   `json:"isLastPage,omitempty" validate:"required"`
+	NextPageStart *int  `json:"nextPageStart,omitempty"`
+	IsLastPage    *bool `json:"isLastPage,omitempty" validate:"required"`
 }

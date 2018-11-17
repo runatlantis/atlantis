@@ -63,13 +63,13 @@ func (b *Client) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]
 	if err != nil {
 		return nil, err
 	}
-	nextPageStart := "0"
+	nextPageStart := 0
 	baseURL := fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d/changes",
 		b.BaseURL, projectKey, repo.Name, pull.Num)
 	// We'll only loop 1000 times as a safety measure.
 	maxLoops := 1000
 	for i := 0; i < maxLoops; i++ {
-		resp, err := b.makeRequest("GET", fmt.Sprintf("%s?start=%s", baseURL, nextPageStart), nil)
+		resp, err := b.makeRequest("GET", fmt.Sprintf("%s?start=%d", baseURL, nextPageStart), nil)
 		if err != nil {
 			return nil, err
 		}
