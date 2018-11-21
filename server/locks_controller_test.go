@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"testing"
 
@@ -18,6 +19,7 @@ import (
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	sMocks "github.com/runatlantis/atlantis/server/mocks"
+	. "github.com/runatlantis/atlantis/testing"
 )
 
 func AnyRepo() models.Repo {
@@ -90,11 +92,14 @@ func TestGetLock_Success(t *testing.T) {
 		Workspace: "workspace",
 	}, nil)
 	tmpl := sMocks.NewMockTemplateWriter()
+	atlantisURL, err := url.Parse("https://example.com/basepath")
+	Ok(t, err)
 	lc := server.LocksController{
 		Logger:             logging.NewNoopLogger(),
 		Locker:             l,
 		LockDetailTemplate: tmpl,
 		AtlantisVersion:    "1300135",
+		AtlantisURL:        atlantisURL,
 	}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
@@ -109,6 +114,7 @@ func TestGetLock_Success(t *testing.T) {
 		LockedBy:        "lkysow",
 		Workspace:       "workspace",
 		AtlantisVersion: "1300135",
+		CleanedBasePath: "/basepath",
 	})
 	responseContains(t, w, http.StatusOK, "")
 }

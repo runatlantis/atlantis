@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"net/url"
 
 	"github.com/gorilla/mux"
@@ -19,13 +18,18 @@ type Router struct {
 	// LockViewRouteIDQueryParam is the query parameter needed to construct the
 	// lock view: underlying.Get(LockViewRouteName).URL(LockViewRouteIDQueryParam, "my id").
 	LockViewRouteIDQueryParam string
-	// AtlantisURL is the fully qualified URL (scheme included) that Atlantis is
-	// being served at, ex: https://example.com.
-	AtlantisURL string
+	// AtlantisURL is the fully qualified URL that Atlantis is
+	// accessible from externally.
+	AtlantisURL *url.URL
 }
 
 // GenerateLockURL returns a fully qualified URL to view the lock at lockID.
 func (r *Router) GenerateLockURL(lockID string) string {
-	path, _ := r.Underlying.Get(r.LockViewRouteName).URL(r.LockViewRouteIDQueryParam, url.QueryEscape(lockID))
-	return fmt.Sprintf("%s%s", r.AtlantisURL, path)
+	lockURL, _ := r.Underlying.Get(r.LockViewRouteName).URL(r.LockViewRouteIDQueryParam, url.QueryEscape(lockID))
+	// At this point, lockURL will just be a path because r.Underlying isn't
+	// configured with host or scheme information. So to generate the fully
+	// qualified LockURL we just append the router's url to our base url.
+	// We're not doing anything fancy here with the actual url object because
+	// golang likes to double escape the lockURL path when using url.Parse().
+	return r.AtlantisURL.String() + lockURL.String()
 }
