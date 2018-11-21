@@ -64,7 +64,7 @@ const (
 // Server runs the Atlantis web server.
 type Server struct {
 	AtlantisVersion    string
-	AtlantisURL        url.URL
+	AtlantisURL        *url.URL
 	Router             *mux.Router
 	Port               int
 	CommandRunner      *events.DefaultCommandRunner
@@ -115,6 +115,7 @@ type UserConfig struct {
 type Config struct {
 	AllowForkPRsFlag    string
 	AllowRepoConfigFlag string
+	AtlantisURLFlag     string
 	AtlantisVersion     string
 }
 
@@ -230,17 +231,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	projectLocker := &events.DefaultProjectLocker{
 		Locker: lockingClient,
 	}
-	atlantisURL, err := url.Parse(userConfig.AtlantisURL)
+	parsedURL, err := ParseAtlantisURL(userConfig.AtlantisURL)
 	if err != nil {
-		return nil, errors.Wrap(err, "parsing atlantis URL")
-	}
-	atlantisURL, err = NormalizeBaseURL(atlantisURL)
-	if err != nil {
-		return nil, errors.Wrap(err, "normalizing atlantis URL")
+		return nil, errors.Wrapf(err,
+			"parsing --%s flag %q", config.AtlantisURLFlag, userConfig.AtlantisURL)
 	}
 	underlyingRouter := mux.NewRouter()
 	router := &Router{
-		AtlantisURL:               *atlantisURL,
+		AtlantisURL:               parsedURL,
 		LockViewRouteIDQueryParam: LockViewRouteIDQueryParam,
 		LockViewRouteName:         LockViewRouteName,
 		Underlying:                underlyingRouter,
@@ -318,7 +316,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	locksController := &LocksController{
 		AtlantisVersion:    config.AtlantisVersion,
-		AtlantisURL:        *atlantisURL,
+		AtlantisURL:        parsedURL,
 		Locker:             lockingClient,
 		Logger:             logger,
 		VCSClient:          vcsClient,
@@ -344,7 +342,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	return &Server{
 		AtlantisVersion:    config.AtlantisVersion,
-		AtlantisURL:        *atlantisURL,
+		AtlantisURL:        parsedURL,
 		Router:             underlyingRouter,
 		Port:               userConfig.Port,
 		CommandRunner:      commandRunner,
@@ -422,18 +420,22 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	for id, v := range locks {
 		lockURL, _ := s.Router.Get(LockViewRouteName).URL("id", url.QueryEscape(id))
 		lockResults = append(lockResults, LockIndexData{
-			LockURL:      *lockURL,
+			// NOTE: must use .String() instead of .Path because we need the
+			// query params as part of the lock URL.
+			LockPath:     lockURL.String(),
 			RepoFullName: v.Project.RepoFullName,
 			PullNum:      v.Pull.Num,
 			Time:         v.Time,
 		})
 	}
-	// nolint: errcheck
-	s.IndexTemplate.Execute(w, IndexData{
+	err = s.IndexTemplate.Execute(w, IndexData{
 		Locks:           lockResults,
 		AtlantisVersion: s.AtlantisVersion,
-		AtlantisURL:     s.AtlantisURL,
+		CleanedBasePath: s.AtlantisURL.Path,
 	})
+	if err != nil {
+		s.Logger.Err(err.Error())
+	}
 }
 
 // Healthz returns the health check response. It always returns a 200 currently.
@@ -450,4 +452,22 @@ func (s *Server) Healthz(w http.ResponseWriter, _ *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(data) // nolint: errcheck
+}
+
+// ParseAtlantisURL parses the user-passed atlantis URL to ensure it is valid
+// and we can use it in our templates.
+// It removes any trailing slashes from the path so we can concatenate it
+// with other paths without checking.
+func ParseAtlantisURL(u string) (*url.URL, error) {
+	parsed, err := url.Parse(u)
+	if err != nil {
+		return nil, err
+	}
+	if !(parsed.Scheme == "http" || parsed.Scheme == "https") {
+		return nil, errors.New("http or https must be specified")
+	}
+	// We want the path to end without a trailing slash so we know how to
+	// use it in the rest of the program.
+	parsed.Path = strings.TrimSuffix(parsed.Path, "/")
+	return parsed, nil
 }

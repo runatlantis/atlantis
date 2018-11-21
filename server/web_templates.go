@@ -16,7 +16,6 @@ package server
 import (
 	"html/template"
 	"io"
-	"net/url"
 	"time"
 )
 
@@ -32,7 +31,7 @@ type TemplateWriter interface {
 
 // LockIndexData holds the fields needed to display the index view for locks.
 type LockIndexData struct {
-	LockURL      url.URL
+	LockPath     string
 	RepoFullName string
 	PullNum      int
 	Time         time.Time
@@ -42,7 +41,10 @@ type LockIndexData struct {
 type IndexData struct {
 	Locks           []LockIndexData
 	AtlantisVersion string
-	AtlantisURL     url.URL
+	// CleanedBasePath is the path Atlantis is accessible at externally. If
+	// not using a path-based proxy, this will be an empty string. Never ends
+	// in a '/' (hence "cleaned").
+	CleanedBasePath string
 }
 
 var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
@@ -54,7 +56,7 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
   <meta name="description" content="">
   <meta name="author" content="">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script src="{{ .AtlantisURL }}/static/js/jquery-3.2.1.min.js"></script>
+  <script src="{{ .CleanedBasePath }}/static/js/jquery-3.2.1.min.js"></script>
   <script>
     $(document).ready(function () {
       $("p.js-discard-success").toggle(document.URL.indexOf("discard=true") !== -1);
@@ -63,15 +65,15 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
         $("p.js-discard-success").fadeOut('slow');
     }, 5000); // <-- time in milliseconds
   </script>
-  <link rel="stylesheet" href="{{ .AtlantisURL }}/static/css/normalize.css">
-  <link rel="stylesheet" href="{{ .AtlantisURL }}/static/css/skeleton.css">
-  <link rel="stylesheet" href="{{ .AtlantisURL }}/static/css/custom.css">
-  <link rel="icon" type="image/png" href="{{ .AtlantisURL }}/static/images/atlantis-icon.png">
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/normalize.css">
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/custom.css">
+  <link rel="icon" type="image/png" href="{{ .CleanedBasePath }}/static/images/atlantis-icon.png">
 </head>
 <body>
 <div class="container">
   <section class="header">
-    <a title="atlantis" href="{{ .AtlantisURL }}"><img src="{{ .AtlantisURL }}/static/images/atlantis-icon.png"/></a>
+    <a title="atlantis" href="{{ .CleanedBasePath }}/"><img src="{{ .CleanedBasePath }}/static/images/atlantis-icon.png"/></a>
     <p class="title-heading">atlantis</p>
     <p class="js-discard-success"><strong>Plan discarded and unlocked!</strong></p>
   </section>
@@ -84,8 +86,9 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
   <section>
     <p class="title-heading small"><strong>Locks</strong></p>
     {{ if .Locks }}
+    {{ $basePath := .CleanedBasePath }}
     {{ range .Locks }}
-      <a href="{{ .AtlantisURL }}{{.LockURL.Path}}">
+      <a href="{{ $basePath }}{{.LockPath}}">
         <div class="twelve columns button content lock-row">
         <div class="list-title">{{.RepoFullName}} - <span class="heading-font-size">#{{.PullNum}}</span></div>
         <div class="list-status"><code>Locked</code></div>
@@ -116,7 +119,10 @@ type LockDetailData struct {
 	Workspace       string
 	Time            time.Time
 	AtlantisVersion string
-	AtlantisURL     url.URL
+	// CleanedBasePath is the path Atlantis is accessible at externally. If
+	// not using a path-based proxy, this will be an empty string. Never ends
+	// in a '/' (hence "cleaned").
+	CleanedBasePath string
 }
 
 var lockTemplate = template.Must(template.New("lock.html.tmpl").Parse(`
@@ -128,16 +134,16 @@ var lockTemplate = template.Must(template.New("lock.html.tmpl").Parse(`
   <meta name="description" content="">
   <meta name="author" content="">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="{{ .AtlantisURL }}/static/css/normalize.css">
-  <link rel="stylesheet" href="{{ .AtlantisURL }}/static/css/skeleton.css">
-  <link rel="stylesheet" href="{{ .AtlantisURL }}/static/css/custom.css">
-  <link rel="icon" type="image/png" href="{{ .AtlantisURL }}/static/images/atlantis-icon.png">
-  <script src="{{ .AtlantisURL }}/static/js/jquery-3.2.1.min.js"></script>
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/normalize.css">
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/custom.css">
+  <link rel="icon" type="image/png" href="{{ .CleanedBasePath }}/static/images/atlantis-icon.png">
+  <script src="{{ .CleanedBasePath }}/static/js/jquery-3.2.1.min.js"></script>
 </head>
 <body>
   <div class="container">
     <section class="header">
-    <a title="atlantis" href="{{ .AtlantisURL }}"><img src="{{ .AtlantisURL }}/static/images/atlantis-icon.png"/></a>
+    <a title="atlantis" href="{{ .CleanedBasePath }}/"><img src="{{ .CleanedBasePath }}/static/images/atlantis-icon.png"/></a>
     <p class="title-heading">atlantis</p>
     <p class="title-heading"><strong>{{.LockKey}}</strong> <code>Locked</code></p>
     </section>
@@ -202,10 +208,10 @@ v{{ .AtlantisVersion }}
 
   btnDiscard.click(function() {
     $.ajax({
-        url: '{{ .AtlantisURL }}/locks?id='+lockId,
+        url: '{{ .CleanedBasePath }}/locks?id='+lockId,
         type: 'DELETE',
         success: function(result) {
-          window.location.replace("{{ .AtlantisURL }}/?discard=true");
+          window.location.replace("{{ .CleanedBasePath }}/?discard=true");
         }
     });
   });

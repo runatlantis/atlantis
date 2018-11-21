@@ -44,6 +44,18 @@ func TestNewServer(t *testing.T) {
 	Ok(t, err)
 }
 
+func TestNewServer_InvalidAtlantisURL(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "")
+	Ok(t, err)
+	_, err = server.NewServer(server.UserConfig{
+		DataDir:     tmpDir,
+		AtlantisURL: "example.com",
+	}, server.Config{
+		AtlantisURLFlag: "atlantis-url",
+	})
+	ErrEquals(t, "parsing --atlantis-url flag \"example.com\": http or https must be specified", err)
+}
+
 func TestIndex_LockErr(t *testing.T) {
 	t.Log("index should return a 503 if unable to list locks")
 	RegisterMockTestingT(t)
@@ -65,12 +77,12 @@ func TestIndex_Success(t *testing.T) {
 	// These are the locks that we expect to be rendered.
 	now := time.Now()
 	locks := map[string]models.ProjectLock{
-		"id1": {
+		"lkysow/atlantis-example/./default": {
 			Pull: models.PullRequest{
 				Num: 9,
 			},
 			Project: models.Project{
-				RepoFullName: "owner/repo",
+				RepoFullName: "lkysow/atlantis-example",
 			},
 			Time: now,
 		},
@@ -80,12 +92,16 @@ func TestIndex_Success(t *testing.T) {
 	r := mux.NewRouter()
 	atlantisVersion := "0.3.1"
 	// Need to create a lock route since the server expects this route to exist.
-	r.NewRoute().Path("").Name(server.LockViewRouteName)
+	r.NewRoute().Path("/lock").
+		Queries("id", "{id}").Name(server.LockViewRouteName)
+	u, err := url.Parse("https://example.com")
+	Ok(t, err)
 	s := server.Server{
 		Locker:          l,
 		IndexTemplate:   it,
 		Router:          r,
 		AtlantisVersion: atlantisVersion,
+		AtlantisURL:     u,
 	}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
@@ -93,8 +109,8 @@ func TestIndex_Success(t *testing.T) {
 	it.VerifyWasCalledOnce().Execute(w, server.IndexData{
 		Locks: []server.LockIndexData{
 			{
-				LockURL:      url.URL{},
-				RepoFullName: "owner/repo",
+				LockPath:     "/lock?id=lkysow%252Fatlantis-example%252F.%252Fdefault",
+				RepoFullName: "lkysow/atlantis-example",
 				PullNum:      9,
 				Time:         now,
 			},
@@ -116,6 +132,86 @@ func TestHealthz(t *testing.T) {
 		`{
   "status": "ok"
 }`, string(body))
+}
+
+func TestParseAtlantisURL(t *testing.T) {
+	cases := []struct {
+		In     string
+		ExpErr string
+		ExpURL string
+	}{
+		// Valid URLs should work.
+		{
+			In:     "https://example.com",
+			ExpURL: "https://example.com",
+		},
+		{
+			In:     "http://example.com",
+			ExpURL: "http://example.com",
+		},
+		{
+			In:     "http://example.com/",
+			ExpURL: "http://example.com",
+		},
+		{
+			In:     "http://example.com",
+			ExpURL: "http://example.com",
+		},
+		{
+			In:     "http://example.com:4141",
+			ExpURL: "http://example.com:4141",
+		},
+		{
+			In:     "http://example.com:4141/",
+			ExpURL: "http://example.com:4141",
+		},
+		{
+			In:     "http://example.com/baseurl",
+			ExpURL: "http://example.com/baseurl",
+		},
+		{
+			In:     "http://example.com/baseurl/",
+			ExpURL: "http://example.com/baseurl",
+		},
+		{
+			In:     "http://example.com/baseurl/test",
+			ExpURL: "http://example.com/baseurl/test",
+		},
+
+		// Must be valid URL.
+		{
+			In:     "::",
+			ExpErr: "parse ::: missing protocol scheme",
+		},
+
+		// Must be absolute.
+		{
+			In:     "/hi",
+			ExpErr: "http or https must be specified",
+		},
+
+		// Must have http or https scheme..
+		{
+			In:     "localhost/test",
+			ExpErr: "http or https must be specified",
+		},
+		{
+			In:     "httpl://localhost/test",
+			ExpErr: "http or https must be specified",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.In, func(t *testing.T) {
+			act, err := server.ParseAtlantisURL(c.In)
+			if c.ExpErr != "" {
+				ErrEquals(t, c.ExpErr, err)
+			} else {
+				Ok(t, err)
+				Equals(t, c.ExpURL, act.String())
+			}
+		})
+	}
 }
 
 func responseContains(t *testing.T, r *httptest.ResponseRecorder, status int, bodySubstr string) {

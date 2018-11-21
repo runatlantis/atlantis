@@ -74,7 +74,7 @@ const redTermEnd = "\033[39m"
 var stringFlags = []stringFlag{
 	{
 		name:        AtlantisURLFlag,
-		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path, e.g. https://example.com/basepath",
+		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path ex. https://example.com/basepath.",
 	},
 	{
 		name:        BitbucketUserFlag,
@@ -254,7 +254,7 @@ func (s *ServerCmd) Init() *cobra.Command {
 		Short:         "Start the atlantis server",
 		Long:          `Start the atlantis server and listen for webhook calls.`,
 		SilenceErrors: true,
-		SilenceUsage:  s.SilenceOutput,
+		SilenceUsage:  true,
 		PreRunE: s.withErrPrint(func(cmd *cobra.Command, args []string) error {
 			return s.preRun()
 		}),
@@ -344,6 +344,7 @@ func (s *ServerCmd) run() error {
 	server, err := s.ServerCreator.NewServer(userConfig, server.Config{
 		AllowForkPRsFlag:    AllowForkPRsFlag,
 		AllowRepoConfigFlag: AllowRepoConfigFlag,
+		AtlantisURLFlag:     AtlantisURLFlag,
 		AtlantisVersion:     s.AtlantisVersion,
 	})
 	if err != nil {
