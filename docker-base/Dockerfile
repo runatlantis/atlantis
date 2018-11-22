@@ -4,13 +4,19 @@
 FROM alpine:3.8
 LABEL authors="Anubhav Mishra, Luke Kysow"
 
-# create atlantis user
+# We use gosu to step down from root and run as the atlantis user so we need
+# to create that user and group.
+# We add the atlantis user to the root group and make its home directory
+# owned by root so that OpenShift users can use /home/atlantis as their
+# data dir because OpenShift runs containers as a random uid that's part of
+# the root group.
 RUN addgroup atlantis && \
-    adduser -S -G atlantis atlantis
+    adduser -S -G atlantis atlantis && \
+    adduser atlantis root && \
+    chown atlantis:root /home/atlantis/ && \
+    chmod g=u /home/atlantis/
 
-ENV ATLANTIS_HOME_DIR=/home/atlantis
-
-# install atlantis dependencies
+# Install dumb-init and gosu.
 ENV DUMB_INIT_VERSION=1.2.0
 ENV GOSU_VERSION=1.10
 RUN apk add --no-cache ca-certificates gnupg curl git unzip bash openssh libcap openssl && \
@@ -35,6 +41,6 @@ RUN apk add --no-cache ca-certificates gnupg curl git unzip bash openssh libcap 
         apk del gnupg openssl && \
         rm -rf /root/.gnupg && rm -rf /var/cache/apk/*
 
-# set up nsswitch.conf for Go's "netgo" implementation
+# Set up nsswitch.conf for Go's "netgo" implementation
 # - https://github.com/golang/go/blob/go1.9.1/src/net/conf.go#L194-L275
 RUN [ ! -e /etc/nsswitch.conf ] && echo 'hosts: files dns' > /etc/nsswitch.conf
