@@ -21,6 +21,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -138,6 +139,7 @@ type WebhookConfig struct {
 // its dependencies an error will be returned. This is like the main() function
 // for the server CLI command because it injects all the dependencies.
 func NewServer(userConfig UserConfig, config Config) (*Server, error) {
+	logger := logging.NewSimpleLogger("server", nil, false, logging.ToLogLevel(userConfig.LogLevel))
 	var supportedVCSHosts []models.VCSHostType
 	var githubClient *vcs.GithubClient
 	var gitlabClient *vcs.GitlabClient
@@ -161,12 +163,23 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			// Check if they've also provided a scheme so we don't prepend it
 			// again.
 			scheme := "https"
+			hostname := userConfig.GitlabHostname
 			schemeSplit := strings.Split(userConfig.GitlabHostname, "://")
 			if len(schemeSplit) > 1 {
 				scheme = schemeSplit[0]
-				userConfig.GitlabHostname = schemeSplit[1]
+				hostname = schemeSplit[1]
 			}
-			apiURL := fmt.Sprintf("%s://%s/api/v4/", scheme, userConfig.GitlabHostname)
+
+			// Warn if this hostname isn't resolvable. The GitLab client
+			// doesn't give good error messages in this case.
+			ips, err := net.LookupIP(hostname)
+			if err != nil {
+				logger.Warn("unable to resolve %q: %s", hostname, err)
+			} else if len(ips) == 0 {
+				logger.Warn("found no IPs while resolving %q", hostname)
+			}
+
+			apiURL := fmt.Sprintf("%s://%s/api/v4/", scheme, hostname)
 			if err := gitlabClient.Client.SetBaseURL(apiURL); err != nil {
 				return nil, errors.Wrapf(err, "setting GitLab API URL: %s", apiURL)
 			}
@@ -248,7 +261,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Locker:     lockingClient,
 		WorkingDir: workingDir,
 	}
-	logger := logging.NewSimpleLogger("server", nil, false, logging.ToLogLevel(userConfig.LogLevel))
 	eventParser := &events.EventParser{
 		GithubUser:         userConfig.GithubUser,
 		GithubToken:        userConfig.GithubToken,
