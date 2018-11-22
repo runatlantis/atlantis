@@ -25,9 +25,13 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-const detailsClose = "```\n</details>" +
-	"continued...\n"
-const detailsOpen = "<details><summary>Show Output</summary>\n\n" +
+// detailsClose is appended to a comment that is so long we split it into
+// multiple comments.
+const detailsClose = "\n```\n</details>" +
+	"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
+
+// detailsOpen is prepended to the following comments when we split.
+const detailsOpen = "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
 	"```diff\n"
 
 // maxCommentBodySize is derived from the error message when you go over
