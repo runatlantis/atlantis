@@ -25,9 +25,19 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
+// detailsClose is appended to a comment that is so long we split it into
+// multiple comments.
+const detailsClose = "\n```\n</details>" +
+	"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
+
+// detailsOpen is prepended to the following comments when we split.
+const detailsOpen = "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
+	"```diff\n"
+
 // maxCommentBodySize is derived from the error message when you go over
 // this limit.
-const maxCommentBodySize = 65536
+// We deduct some characters for appending details close/open tag
+const maxCommentBodySize = 65536 - len(detailsClose) - len(detailsOpen)
 
 // GithubClient is used to perform GitHub actions.
 type GithubClient struct {
@@ -91,7 +101,7 @@ func (g *GithubClient) GetModifiedFiles(repo models.Repo, pull models.PullReques
 // If comment length is greater than the max comment length we split into
 // multiple comments.
 func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment string) error {
-	comments := g.splitAtMaxChars(comment, maxCommentBodySize, "\ncontinued...\n")
+	comments := g.splitAtMaxChars(comment, maxCommentBodySize)
 	for _, c := range comments {
 		_, _, err := g.client.Issues.CreateComment(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueComment{Body: &c})
 		if err != nil {
@@ -144,28 +154,23 @@ func (g *GithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 
 // splitAtMaxChars splits comment into a slice with string up to max
 // len separated by join which gets appended to the ends of the middle strings.
-// If max <= len(join) we return an empty slice since this is an edge case we
-// don't want to handle.
 // nolint: unparam
-func (g *GithubClient) splitAtMaxChars(comment string, max int, join string) []string {
+func (g *GithubClient) splitAtMaxChars(comment string, maxSize int) []string {
 	// If we're under the limit then no need to split.
-	if len(comment) <= max {
+	if len(comment) <= maxSize {
 		return []string{comment}
 	}
 
-	// If we can't fit the joining string in then this doesn't make sense.
-	if max <= len(join) {
-		return nil
-	}
-
 	var comments []string
-	maxSize := max - len(join)
 	numComments := int(math.Ceil(float64(len(comment)) / float64(maxSize)))
 	for i := 0; i < numComments; i++ {
 		upTo := g.min(len(comment), (i+1)*maxSize)
 		portion := comment[i*maxSize : upTo]
 		if i < numComments-1 {
-			portion += join
+			portion += detailsClose
+		}
+		if i > 0 {
+			portion = detailsOpen + portion
 		}
 		comments = append(comments, portion)
 	}
