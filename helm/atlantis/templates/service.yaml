@@ -7,8 +7,18 @@ metadata:
     chart: {{ template "atlantis.chart" . }}
     release: {{ .Release.Name }}
     heritage: {{ .Release.Service }}
+  {{- with .Values.service.annotations }}
+  annotations:
+{{ toYaml . | indent 4 }}
+  {{- end }}
 spec:
   type: {{ .Values.service.type }}
+  template:
+    metadata:
+{{- with .Values.podTemplate.annotations }}
+      annotations:
+{{ toYaml . | indent 8 }}
+{{- end }}
   ports:
     - port: {{ .Values.service.port }}
       targetPort: 4141

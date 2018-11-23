@@ -1,4 +1,4 @@
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: {{ template "atlantis.fullname" . }}
@@ -7,6 +7,10 @@ metadata:
     chart: {{ template "atlantis.chart" . }}
     release: {{ .Release.Name }}
     heritage: {{ .Release.Service }}
+  {{- with .Values.statefulSet.annotations }}
+  annotations:
+{{ toYaml . | indent 4 }}
+  {{- end }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
@@ -30,12 +34,12 @@ spec:
       {{- if .Values.gitconfig }}
       - name: gitconfig-volume
         secret:
-          secretName: {{ template "atlantis.name" . }}-gitconfig
+          secretName: {{ template "atlantis.fullname" . }}-gitconfig
       {{- end }}
       {{- if .Values.aws }}
       - name: aws-volume
         secret:
-          secretName: {{ template "atlantis.name" . }}-aws
+          secretName: {{ template "atlantis.fullname" . }}-aws
       {{- end }}
       containers:
         - name: {{ .Chart.Name }}
@@ -76,12 +80,12 @@ spec:
           - name: ATLANTIS_GH_TOKEN
             valueFrom:
               secretKeyRef:
-                name: {{ template "atlantis.name" . }}-webhook
+                name: {{ template "atlantis.fullname" . }}-webhook
                 key: github_token
           - name: ATLANTIS_GH_WEBHOOK_SECRET
             valueFrom:
               secretKeyRef:
-                name: {{ template "atlantis.name" . }}-webhook
+                name: {{ template "atlantis.fullname" . }}-webhook
                 key: github_secret
           {{- if .Values.github.hostname }}
           - name: ATLANTIS_GH_HOSTNAME
@@ -99,7 +103,7 @@ spec:
           - name: ATLANTIS_GITLAB_WEBHOOK_SECRET
             valueFrom:
               secretKeyRef:
-                name: {{ template "atlantis.name" . }}-webhook
+                name: {{ template "atlantis.fullname" . }}-webhook
                 key: gitlab_secret
           {{- if .Values.gitlab.hostname }}
           - name: ATLANTIS_GITLAB_HOSTNAME
@@ -112,7 +116,7 @@ spec:
           - name: ATLANTIS_BITBUCKET_TOKEN
             valueFrom:
               secretKeyRef:
-                name: {{ template "atlantis.name" . }}-webhook
+                name: {{ template "atlantis.fullname" . }}-webhook
                 key: bitbucket_token
           {{- if .Values.bitbucket.base_url }}
           - name: ATLANTIS_BITBUCKET_BASE_URL
@@ -120,7 +124,7 @@ spec:
           - name: ATLANTIS_BITBUCKET_WEBHOOK_SECRET
             valueFrom:
               secretKeyRef:
-                name: {{ template "atlantis.name" . }}-webhook
+                name: {{ template "atlantis.fullname" . }}-webhook
                 key: bitbucket_secret
           {{- end }}
           {{- end }}
@@ -189,4 +193,4 @@ spec:
         requests:
           # The biggest thing Atlantis stores is the Git repo when it checks it out.
           # It deletes the repo after the pull request is merged.
-          storage: 5Gi
+          storage: {{ .Values.atlantis_data_storage }}

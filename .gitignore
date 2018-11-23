@@ -1,5 +1,5 @@
 .idea
-atlantis
+./atlantis
 *.iml
 .vscode
 atlantis.db
