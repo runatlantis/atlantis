@@ -16,7 +16,7 @@ orgWhitelist: github.com/yourorg/*
 #   secret: baz
 # GitHub Enterprise only:
 #   hostname: github.your.org
-# (The chart will perform the base64 encoding for you.)
+# (The chart will perform the base64 encoding for you for values that are stored in secrets.)
 
 # If using GitLab, specify like the following:
 # gitlab:
@@ -25,15 +25,16 @@ orgWhitelist: github.com/yourorg/*
 #   secret: baz
 # GitLab Enterprise only:
 #   hostname: gitlab.your.org
-# (The chart will perform the base64 encoding for you.)
+# (The chart will perform the base64 encoding for you for values that are stored in secrets.)
 
 # If using Bitbucket, specify like the following:
 # bitbucket:
-#   user: jkodroff
-#   token: 7EKP4yWUpLRBJh2pW2t3
+#   user: foo
+#   token: bar
 # Bitbucket Server only:
-#   secret: mysecret
-#   base_url: https://bitbucket.2ndwatch.com
+#   secret: baz
+#   base_url: https://bitbucket.yourorganization.com
+# (The chart will perform the base64 encoding for you for values that are stored in secrets.)
 
 
 # When referencing Terraform modules in private repositories, it may be helpful
@@ -91,7 +92,7 @@ livenessProbe:
 readinessProbe:
   enabled: true
   periodSeconds: 60
-  initialDelaySeconds: 30
+  initialDelaySeconds: 5
   timeoutSeconds: 5
   successThreshold: 1
   failureThreshold: 5
@@ -100,6 +101,14 @@ readinessProbe:
 service:
   type: NodePort
   port: 80
+
+podTemplate:
+  annotations: {}
+    # kube2iam example:
+    # iam.amazonaws.com/role: role-arn
+
+statefulSet:
+  annotations: {}
 
 ingress:
   enabled: true
@@ -121,7 +130,15 @@ resources:
     memory: 256Mi
     cpu: 100m
 
+# Disk space for Atlantis to check out repositories
+atlantis_data_storage: 5Gi
+
 replicaCount: 1
+
+## test container details
+test:
+  image: lachlanevenson/k8s-kubectl
+  imageTag: v1.4.8-bash
 
 nodeSelector: {}
 

@@ -17,3 +17,7 @@
   echo "Visit http://127.0.0.1:8080 to use your application"
   kubectl port-forward $POD_NAME 8080:80
 {{- end }}
+2. Atlantis will not start successfully unless at least one of the following sets of credentials are specified (see values.yaml for detailed usage):
+  - github
+  - gitlab
+  - bitbucket
