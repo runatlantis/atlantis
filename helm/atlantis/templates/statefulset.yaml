@@ -23,8 +23,7 @@ spec:
         app: {{ template "atlantis.name" . }}
         release: {{ .Release.Name }}
     spec:
-      securityContext:
-        fsGroup: 1000
+      securityContext: {}
       volumes:
       {{- range $name, $_ := .Values.serviceAccountSecrets }}
       - name: {{ $name }}-volume
