@@ -526,6 +526,13 @@ If you want to add SSL you can use something like [https://github.com/jetstack/c
 certs and mount them into the Pod. Then set the `ATLANTIS_SSL_CERT_FILE` and `ATLANTIS_SSL_KEY_FILE` environment variables to enable SSL.
 You could also set up SSL at your LoadBalancer.
 
+### OpenShift
+The Atlantis Docker image is compatible with OpenShift, however you need to run
+with an additional flag: `--data-dir=/home/atlantis`. This is required because
+OpenShift runs Docker images with random user id's that use `/` as their home directory.
+Since Atlantis defaults to using the home directory as its data dir and `/` doesn't have the correct permissions,
+you need to set `--data-dir` or the environment variable `ATLANTIS_DATA_DIR` to `/home/atlantis`.
+
 ## AWS Fargate
 
 If you'd like to run Atlantis on [AWS Fargate](https://aws.amazon.com/fargate/) check out the Atlantis module on the Terraform Module Registry: https://registry.terraform.io/modules/terraform-aws-modules/atlantis/aws
