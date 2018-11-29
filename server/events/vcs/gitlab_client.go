@@ -15,11 +15,13 @@ package vcs
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/logging"
 	"net"
 	"net/url"
 	"strings"
+
+	"github.com/hashicorp/go-version"
+	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/lkysow/go-gitlab"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -27,7 +29,17 @@ import (
 
 type GitlabClient struct {
 	Client *gitlab.Client
+	// Version is set to the server version.
+	Version *version.Version
 }
+
+// commonMarkSupported is a version constraint that is true when this version of
+// GitLab supports CommonMark, a markdown specification.
+// See https://about.gitlab.com/2018/07/22/gitlab-11-1-released/
+var commonMarkSupported = MustConstraint(">=11.1")
+
+// gitlabClientUnderTest is true if we're running under go test.
+var gitlabClientUnderTest = false
 
 // NewGitlabClient returns a valid GitLab client.
 func NewGitlabClient(hostname string, token string, logger *logging.SimpleLogger) (*GitlabClient, error) {
@@ -37,29 +49,38 @@ func NewGitlabClient(hostname string, token string, logger *logging.SimpleLogger
 
 	// If not using gitlab.com we need to set the URL to the API.
 	if hostname != "gitlab.com" {
-		// Check if they've also provided a scheme so we don't prepend it
-		// again.
-		scheme := "https"
-		hostname := hostname
-		schemeSplit := strings.Split(hostname, "://")
-		if len(schemeSplit) > 1 {
-			scheme = schemeSplit[0]
-			hostname = schemeSplit[1]
+		u, err := url.Parse(hostname)
+		if err != nil {
+			return nil, errors.Wrapf(err, "parsing hostname %q", hostname)
 		}
 
 		// Warn if this hostname isn't resolvable. The GitLab client
 		// doesn't give good error messages in this case.
-		ips, err := net.LookupIP(hostname)
+		ips, err := net.LookupIP(u.Hostname())
 		if err != nil {
-			logger.Warn("unable to resolve %q: %s", hostname, err)
+			logger.Warn("unable to resolve %q: %s", u.Hostname(), err)
 		} else if len(ips) == 0 {
-			logger.Warn("found no IPs while resolving %q", hostname)
+			logger.Warn("found no IPs while resolving %q", u.Hostname())
 		}
 
-		apiURL := fmt.Sprintf("%s://%s/api/v4/", scheme, hostname)
+		scheme := "https"
+		if u.Scheme != "" {
+			scheme = u.Scheme
+		}
+		apiURL := fmt.Sprintf("%s://%s/api/v4/", scheme, u.Host)
 		if err := client.Client.SetBaseURL(apiURL); err != nil {
 			return nil, errors.Wrapf(err, "setting GitLab API URL: %s", apiURL)
 		}
+	}
+
+	// Determine which version of GitLab is running.
+	if !gitlabClientUnderTest {
+		var err error
+		client.Version, err = client.GetVersion()
+		if err != nil {
+			return nil, err
+		}
+		logger.Info("determined GitLab is running version %s", client.Version.String())
 	}
 
 	return client, nil
@@ -142,4 +163,47 @@ func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 func (g *GitlabClient) GetMergeRequest(repoFullName string, pullNum int) (*gitlab.MergeRequest, error) {
 	mr, _, err := g.Client.MergeRequests.GetMergeRequest(repoFullName, pullNum)
 	return mr, err
+}
+
+// GetVersion returns the version of the Gitlab server this client is using.
+func (g *GitlabClient) GetVersion() (*version.Version, error) {
+	req, err := g.Client.NewRequest("GET", "/version", nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	versionResp := new(gitlab.Version)
+	_, err = g.Client.Do(req, versionResp)
+	if err != nil {
+		return nil, err
+	}
+	// We need to strip any "-ee" or similar from the resulting version because go-version
+	// uses that in its constraints and it breaks the comparison we're trying
+	// to do for Common Mark.
+	split := strings.Split(versionResp.Version, "-")
+	parsedVersion, err := version.NewVersion(split[0])
+	if err != nil {
+		return nil, errors.Wrapf(err, "parsing response to /version: %q", versionResp.Version)
+	}
+	return parsedVersion, nil
+}
+
+// SupportsCommonMark returns true if the version of Gitlab this client is
+// using supports the CommonMark markdown format.
+func (g *GitlabClient) SupportsCommonMark() bool {
+	// This function is called even if we didn't construct a gitlab client
+	// so we need to handle that case.
+	if g == nil {
+		return false
+	}
+
+	return commonMarkSupported.Check(g.Version)
+}
+
+// MustConstraint returns a constraint. It panics on error.
+func MustConstraint(constraint string) version.Constraints {
+	c, err := version.NewConstraint(constraint)
+	if err != nil {
+		panic(err)
+	}
+	return c
 }

@@ -205,7 +205,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil && flag.Lookup("test.v") == nil {
 		return nil, errors.Wrap(err, "initializing terraform")
 	}
-	markdownRenderer := &events.MarkdownRenderer{}
+	markdownRenderer := &events.MarkdownRenderer{
+		GitlabSupportsCommonMark: gitlabClient.SupportsCommonMark(),
+	}
 	boltdb, err := boltdb.New(userConfig.DataDir)
 	if err != nil {
 		return nil, err
