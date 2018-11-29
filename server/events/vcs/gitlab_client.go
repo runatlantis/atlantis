@@ -15,7 +15,11 @@ package vcs
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/logging"
+	"net"
 	"net/url"
+	"strings"
 
 	"github.com/lkysow/go-gitlab"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -23,6 +27,42 @@ import (
 
 type GitlabClient struct {
 	Client *gitlab.Client
+}
+
+// NewGitlabClient returns a valid GitLab client.
+func NewGitlabClient(hostname string, token string, logger *logging.SimpleLogger) (*GitlabClient, error) {
+	client := &GitlabClient{
+		Client: gitlab.NewClient(nil, token),
+	}
+
+	// If not using gitlab.com we need to set the URL to the API.
+	if hostname != "gitlab.com" {
+		// Check if they've also provided a scheme so we don't prepend it
+		// again.
+		scheme := "https"
+		hostname := hostname
+		schemeSplit := strings.Split(hostname, "://")
+		if len(schemeSplit) > 1 {
+			scheme = schemeSplit[0]
+			hostname = schemeSplit[1]
+		}
+
+		// Warn if this hostname isn't resolvable. The GitLab client
+		// doesn't give good error messages in this case.
+		ips, err := net.LookupIP(hostname)
+		if err != nil {
+			logger.Warn("unable to resolve %q: %s", hostname, err)
+		} else if len(ips) == 0 {
+			logger.Warn("found no IPs while resolving %q", hostname)
+		}
+
+		apiURL := fmt.Sprintf("%s://%s/api/v4/", scheme, hostname)
+		if err := client.Client.SetBaseURL(apiURL); err != nil {
+			return nil, errors.Wrapf(err, "setting GitLab API URL: %s", apiURL)
+		}
+	}
+
+	return client, nil
 }
 
 // GetModifiedFiles returns the names of files that were modified in the merge request.
