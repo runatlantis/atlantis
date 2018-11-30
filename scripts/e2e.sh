@@ -22,11 +22,17 @@ export ATLANTIS_URL=$(curl -s 'http://localhost:4040/api/tunnels' | jq -r '.tunn
 echo "Running 'make deps'"
 make deps
 
-echo "Running 'make test'"
-make test
-
 echo "Running 'make build'"
 make build
 
 echo "Running e2e test: 'make run'"
 make run
+if [[ $? -eq 0 ]]
+then
+  echo "e2e tests passed"
+else
+  echo "e2e tests failed"
+  echo "atlantis logs:"
+  cat /tmp/atlantis-server.log
+  exit 1
+fi

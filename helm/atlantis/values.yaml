@@ -74,7 +74,7 @@ serviceAccountSecrets:
 
 image:
   repository: runatlantis/atlantis
-  tag: v0.4.11
+  tag: v0.4.12
   pullPolicy: IfNotPresent
 
 ## enable using atlantis.yaml file
