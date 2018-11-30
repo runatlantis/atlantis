@@ -11,9 +11,11 @@ workflows:
     # Only specify plan so should use default apply workflow.
     plan:
       steps:
+      - run: echo preinit
       - init
       - plan:
           extra_args: [-var, var=fromconfig]
+      - run: echo postplan
   staging:
     plan:
       steps:
@@ -21,4 +23,7 @@ workflows:
       - plan:
           extra_args: [-var-file, staging.tfvars]
     apply:
-      steps: [apply]
+      steps:
+      - run: echo preapply
+      - apply
+      - run: echo postapply
