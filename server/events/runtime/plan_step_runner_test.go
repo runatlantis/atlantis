@@ -494,3 +494,69 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 	Ok(t, err)
 	Equals(t, "output", output)
 }
+
+// Test that we format the plan output for better rendering.
+func TestRun_PlanFmt(t *testing.T) {
+	rawOutput := `Refreshing Terraform state in-memory prior to plan...
+The refreshed state will be used to calculate this plan, but will not be
+persisted to local or remote state storage.
+
+
+------------------------------------------------------------------------
+
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+  + create
+  ~ update in-place
+  - destroy
+
+Terraform will perform the following actions:
+
++ null_resource.test[0]
+      id: <computed>
+
+  + null_resource.test[1]
+      id: <computed>
+
+  ~ aws_security_group_rule.allow_all
+      description: "" => "test3"
+
+  - aws_security_group_rule.allow_all
+`
+	RegisterMockTestingT(t)
+	terraform := mocks.NewMockClient()
+	tfVersion, _ := version.NewVersion("0.10.0")
+	s := runtime.PlanStepRunner{
+		TerraformExecutor: terraform,
+		DefaultTFVersion:  tfVersion,
+	}
+	When(terraform.RunCommandWithVersion(
+		matchers.AnyPtrToLoggingSimpleLogger(),
+		AnyString(),
+		AnyStringSlice(),
+		matchers2.AnyPtrToGoVersionVersion(),
+		AnyString())).
+		ThenReturn(rawOutput, nil)
+	actOutput, err := s.Run(models.ProjectCommandContext{}, nil, "")
+	Ok(t, err)
+	Equals(t, `
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
++ create
+~ update in-place
+- destroy
+
+Terraform will perform the following actions:
+
++ null_resource.test[0]
+      id: <computed>
+
++ null_resource.test[1]
+      id: <computed>
+
+~ aws_security_group_rule.allow_all
+      description: "" => "test3"
+
+- aws_security_group_rule.allow_all
+`, actOutput)
+}

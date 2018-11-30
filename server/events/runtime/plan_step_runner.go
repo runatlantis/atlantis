@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/hashicorp/go-version"
@@ -11,6 +12,12 @@ import (
 )
 
 const defaultWorkspace = "default"
+
+var (
+	plusDiffRegex  = regexp.MustCompile(`(?m)^ {2}\+`)
+	tildeDiffRegex = regexp.MustCompile(`(?m)^ {2}~`)
+	minusDiffRegex = regexp.MustCompile(`(?m)^ {2}-`)
+)
 
 type PlanStepRunner struct {
 	TerraformExecutor TerraformExec
@@ -30,7 +37,11 @@ func (p *PlanStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []strin
 	}
 
 	planCmd := p.buildPlanCmd(ctx, extraArgs, path)
-	return p.TerraformExecutor.RunCommandWithVersion(ctx.Log, filepath.Clean(path), planCmd, tfVersion, ctx.Workspace)
+	output, err := p.TerraformExecutor.RunCommandWithVersion(ctx.Log, filepath.Clean(path), planCmd, tfVersion, ctx.Workspace)
+	if err != nil {
+		return "", err
+	}
+	return p.fmtPlanOutput(output), nil
 }
 
 // switchWorkspace changes the terraform workspace if necessary and will create
@@ -139,4 +150,24 @@ func (p *PlanStepRunner) flatten(slices [][]string) []string {
 		flattened = append(flattened, v...)
 	}
 	return flattened
+}
+
+// fmtPlanOutput uses regex's to remove any leading whitespace in front of the
+// terraform output so that the diff syntax highlighting works. Example:
+// "  - aws_security_group_rule.allow_all" =>
+// "- aws_security_group_rule.allow_all"
+// We do it for +, ~ and -.
+// It also removes the "Refreshing..." preamble.
+func (p *PlanStepRunner) fmtPlanOutput(output string) string {
+	// Plan output contains a lot of "Refreshing..." lines followed by a
+	// separator. We want to remove everything before that separator.
+	refreshSeparator := "------------------------------------------------------------------------\n"
+	sepIdx := strings.Index(output, refreshSeparator)
+	if sepIdx > -1 {
+		output = output[sepIdx+len(refreshSeparator):]
+	}
+
+	output = plusDiffRegex.ReplaceAllString(output, "+")
+	output = tildeDiffRegex.ReplaceAllString(output, "~")
+	return minusDiffRegex.ReplaceAllString(output, "-")
 }
