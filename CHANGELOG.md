@@ -1,18 +1,102 @@
-# v0.4.12 (UNRELEASED)
+# v0.4.13 (UNRELEASED)
 
 ## Description
+Diff: https://github.com/runatlantis/atlantis/compare/v0.4.12...v0.4.13
+## Features
+## Bugfixes
+## Backwards Incompatibilities / Notes:
+## Downloads
+## Docker
+
+# v0.4.12
+
+## Description
+Small feature and bug fix release. If you're using GitLab <11.1 then your
+comment formatting is fixed!
 
 Diff: https://github.com/runatlantis/atlantis/compare/v0.4.11...v0.4.12
 
 ## Features
+- Atlantis can now be hosted behind a path-based router and its UI will still
+  render correctly. For example, you could host atlantis at mydomain.com/mypath,
+  then run `atlantis server --atlantis-url https://mydomain.com/mypath` and when
+  atlantis renders its UI, all the URLs will have the `/mypath` prefix so the UI
+  renders properly. (Fixes [#213](https://github.com/runatlantis/atlantis/issues/213))
+- Log warning if GitLab hostname isn't resolvable. (Fixes [#359](https://github.com/runatlantis/atlantis/issues/359))
+- Support running our official Docker image `runatlantis/atlantis` on OpenShift. OpenShift runs images
+  with random uids so we needed to build in support for that. (Fixes [#345](https://github.com/runatlantis/atlantis/issues/345))
 
 ## Bugfixes
+- If the output is too long for a single GitHub comment, maintain formatting when
+  splitting into multiple comments. (Fixes [#111](https://github.com/runatlantis/atlantis/issues/111))
+- Fix bug with using the pagination API in BitBucket. ([#354](https://github.com/runatlantis/atlantis/pull/354))
+- If using GitLab < 11.1 then don't use expandable markdown comments. (Fixes [#315](https://github.com/runatlantis/atlantis/issues/315))
+- Fix output from custom steps that came before the plan step from being removed. ([#367](https://github.com/runatlantis/atlantis/pull/367))
 
 ## Backwards Incompatibilities / Notes:
+We made [changes](https://github.com/runatlantis/atlantis/pull/346) to the base image (`runatlantis/atlantis-base`) that
+`runatlantis/atlantis` is built off of. These changes **should not** affect your
+running of atlantis unless you're building your own custom images and were relying
+on specific user permissions. Even then we don't anticipate any problems.
+
+These are the changes in detail:
+1. Previously, the permissions of `/home/atlantis` were:
+     ```bash
+     $ ls -la /home/atlantis/
+     drwxr-sr-x    2 atlantis atlantis      4096 Sep 13 22:49 .
+     ```
+   Now they are:
+    ```bash
+    $ ls -la /home/atlantis/
+    drwxrwxr-x    2 atlantis root          4096 Nov 28 21:22 .
+    ```
+   * The directory is now owned by the `root` group.
+   * Its group permissions now include `w` and `x`.
+
+   This was needed because OpenShift runs Docker images as random uid's under
+   the root group and so now those random uid's can use `/home/atlantis` as their
+   data directory.
+
+1. Previously, the `atlantis` user was only part of its own group:
+    ```bash
+    $ gosu atlantis sh
+    $ whoami
+    atlantis
+    $ groups
+    atlantis
+    ```
+
+    Now it's also part of the `root` group:
+    ```bash
+    $ gosu atlantis sh
+    $ groups
+    atlantis root
+    ```
+1. Previously, the permissions for `/etc/passwd` were:
+    ```bash
+    $ ls -la /etc/passwd
+    -rw-r--r--    1 root     root          1284 Sep 13 22:49 /etc/passwd
+    ```
+
+    Now the permissions are:
+    ```bash
+    $ ls -la /etc/passwd
+    -rw-rw-r--    1 root     root          1284 Nov 28 21:22 /etc/passwd
+    ```
+
+    The `w` group permission was added so that in OpenShift, the random uid can write
+    their own login entry (https://github.com/runatlantis/atlantis/blob/master/docker-entrypoint.sh#L28)
+    which is required because `terraform` expects the running user to have an entry
+    in `/etc/passwd`.
 
 ## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.12/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.12/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.12/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.12/atlantis_linux_arm.zip)
 
 ## Docker
+[`runatlantis/atlantis:v0.4.12`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
 
 # v0.4.11
 
@@ -66,7 +150,7 @@ and then control which repos are actioned on via the whitelist. (Fixes [#312](ht
 * [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.11/atlantis_linux_arm.zip)
 
 ## Docker
-`runatlantis/atlantis:v0.4.11`
+[`runatlantis/atlantis:v0.4.11`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
 
 # v0.4.10
 
@@ -92,7 +176,7 @@ None
 * [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.10/atlantis_linux_arm.zip)
 
 ## Docker
-`runatlantis/atlantis:v0.4.10`
+[`runatlantis/atlantis:v0.4.10`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
 
 # v0.4.9
 
@@ -135,7 +219,7 @@ in your code.
 * [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.9/atlantis_linux_arm.zip)
 
 ## Docker
-`runatlantis/atlantis:v0.4.9`
+[`runatlantis/atlantis:v0.4.9`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
 
 # v0.4.8
 
@@ -161,7 +245,7 @@ None
 * [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.8/atlantis_linux_arm.zip)
 
 ## Docker
-`runatlantis/atlantis:v0.4.8`
+[`runatlantis/atlantis:v0.4.8`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
 
 
 # v0.4.7
@@ -189,7 +273,7 @@ None
 * [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.7/atlantis_linux_arm.zip)
 
 ## Docker
-`runatlantis/atlantis:v0.4.7`
+[`runatlantis/atlantis:v0.4.7`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
 
 # v0.4.6
 
@@ -212,7 +296,7 @@ None
 * [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.6/atlantis_linux_arm.zip)
 
 ## Docker
-`runatlantis/atlantis:v0.4.6`
+[`runatlantis/atlantis:v0.4.6`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
 
 # v0.4.5
 
@@ -242,7 +326,7 @@ None
 * [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.5/atlantis_linux_arm.zip)
 
 ## Docker
-`runatlantis/atlantis:v0.4.5`
+[`runatlantis/atlantis:v0.4.5`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
 
 # v0.4.4
 
@@ -262,7 +346,7 @@ None
 * [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.4/atlantis_linux_arm.zip)
 
 ## Docker
-`runatlantis/atlantis:v0.4.4`
+[`runatlantis/atlantis:v0.4.4`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
 
 # v0.4.3
 
@@ -282,7 +366,7 @@ None
 * [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.3/atlantis_linux_arm.zip)
 
 ## Docker
-`runatlantis/atlantis:v0.4.3`
+[`runatlantis/atlantis:v0.4.3`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
 
 # v0.4.2
 
@@ -303,7 +387,7 @@ None
 * [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.2/atlantis_linux_arm.zip)
 
 ## Docker
-`runatlantis/atlantis:v0.4.2`
+[`runatlantis/atlantis:v0.4.2`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
 
 # v0.4.1
 
@@ -327,7 +411,7 @@ None
 * [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.1/atlantis_linux_arm.zip)
 
 ## Docker
-`runatlantis/atlantis:v0.4.1`
+[`runatlantis/atlantis:v0.4.1`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
 
 # v0.4.0
 
@@ -373,7 +457,7 @@ projects:
 * [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.0/atlantis_linux_arm.zip)
 
 ## Docker
-`runatlantis/atlantis:v0.4.0`
+[`runatlantis/atlantis:v0.4.0`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
 
 # v0.3.11
 
@@ -393,7 +477,7 @@ None
 * [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.11/atlantis_linux_arm.zip)
 
 ## Docker
-`runatlantis/atlantis:v0.3.11`
+[`runatlantis/atlantis:v0.3.11`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
 
 # v0.3.10
 
@@ -419,7 +503,7 @@ Fixes ([#92](https://github.com/runatlantis/atlantis/issues/92)).
 * [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.3.10/atlantis_linux_arm.zip)
 
 ## Docker
-`runatlantis/atlantis:v0.3.10`
+[`runatlantis/atlantis:v0.3.10`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
 
 # v0.3.9
 
