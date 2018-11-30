@@ -19,8 +19,5 @@ build: ## Build the main Go service
 deps-test: ## Run tests for go dependencies
 	go get -t
 
-test: ## Run tests, coverage reports, and clean (coverage taints the compiled code)
-	go test -v .
-
 run: ## Run e2e tests
 	./atlantis-tests
