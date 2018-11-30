@@ -21,7 +21,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -32,7 +31,6 @@ import (
 
 	"github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
-	"github.com/lkysow/go-gitlab"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/locking"
@@ -155,34 +153,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	if userConfig.GitlabUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Gitlab)
-		gitlabClient = &vcs.GitlabClient{
-			Client: gitlab.NewClient(nil, userConfig.GitlabToken),
-		}
-		// If not using gitlab.com we need to set the URL to the API.
-		if userConfig.GitlabHostname != "gitlab.com" {
-			// Check if they've also provided a scheme so we don't prepend it
-			// again.
-			scheme := "https"
-			hostname := userConfig.GitlabHostname
-			schemeSplit := strings.Split(userConfig.GitlabHostname, "://")
-			if len(schemeSplit) > 1 {
-				scheme = schemeSplit[0]
-				hostname = schemeSplit[1]
-			}
-
-			// Warn if this hostname isn't resolvable. The GitLab client
-			// doesn't give good error messages in this case.
-			ips, err := net.LookupIP(hostname)
-			if err != nil {
-				logger.Warn("unable to resolve %q: %s", hostname, err)
-			} else if len(ips) == 0 {
-				logger.Warn("found no IPs while resolving %q", hostname)
-			}
-
-			apiURL := fmt.Sprintf("%s://%s/api/v4/", scheme, hostname)
-			if err := gitlabClient.Client.SetBaseURL(apiURL); err != nil {
-				return nil, errors.Wrapf(err, "setting GitLab API URL: %s", apiURL)
-			}
+		var err error
+		gitlabClient, err = vcs.NewGitlabClient(userConfig.GitlabHostname, userConfig.GitlabToken, logger)
+		if err != nil {
+			return nil, err
 		}
 	}
 	if userConfig.BitbucketUser != "" {
@@ -231,7 +205,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil && flag.Lookup("test.v") == nil {
 		return nil, errors.Wrap(err, "initializing terraform")
 	}
-	markdownRenderer := &events.MarkdownRenderer{}
+	markdownRenderer := &events.MarkdownRenderer{
+		GitlabSupportsCommonMark: gitlabClient.SupportsCommonMark(),
+	}
 	boltdb, err := boltdb.New(userConfig.DataDir)
 	if err != nil {
 		return nil, err

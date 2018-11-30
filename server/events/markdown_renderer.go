@@ -39,7 +39,12 @@ var (
 )
 
 // MarkdownRenderer renders responses as markdown.
-type MarkdownRenderer struct{}
+type MarkdownRenderer struct {
+	// GitlabSupportsCommonMark is true if the version of GitLab we're
+	// using supports the CommonMark markdown format.
+	// If we're not configured with a GitLab client, this will be false.
+	GitlabSupportsCommonMark bool
+}
 
 // CommonData is data that all responses have.
 type CommonData struct {
@@ -156,10 +161,15 @@ func (m *MarkdownRenderer) renderProjectResults(results []ProjectResult, common 
 
 // shouldUseWrappedTmpl returns true if we should use the wrapped markdown
 // templates that collapse the output to make the comment smaller on initial
-// load.
+// load. Some VCS providers or versions of VCS providers don't support this
+// syntax.
 func (m *MarkdownRenderer) shouldUseWrappedTmpl(vcsHost models.VCSHostType, output string) bool {
 	// Bitbucket Cloud and Server don't support the folding markdown syntax.
 	if vcsHost == models.BitbucketServer || vcsHost == models.BitbucketCloud {
+		return false
+	}
+
+	if vcsHost == models.Gitlab && !m.GitlabSupportsCommonMark {
 		return false
 	}
 
