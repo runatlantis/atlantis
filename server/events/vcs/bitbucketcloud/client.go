@@ -86,11 +86,16 @@ func (b *Client) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]
 
 // CreateComment creates a comment on the merge request.
 func (b *Client) CreateComment(repo models.Repo, pullNum int, comment string) error {
-	bodyBytes, err := json.Marshal(map[string]string{"content": comment})
+	// NOTE: I tried to find the maximum size of a comment for bitbucket.org but
+	// I got up to 200k chars without issue so for now I'm not going to bother
+	// to detect this.
+	bodyBytes, err := json.Marshal(map[string]map[string]string{"content": {
+		"raw": comment,
+	}})
 	if err != nil {
 		return errors.Wrap(err, "json encoding")
 	}
-	path := fmt.Sprintf("%s/1.0/repositories/%s/pullrequests/%d/comments", b.BaseURL, repo.FullName, pullNum)
+	path := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/comments", b.BaseURL, repo.FullName, pullNum)
 	_, err = b.makeRequest("POST", path, bytes.NewBuffer(bodyBytes))
 	return err
 }
