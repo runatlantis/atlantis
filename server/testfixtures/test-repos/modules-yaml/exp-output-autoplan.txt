@@ -1,8 +1,8 @@
 Ran Plan for 2 projects:
-1. workspace: `default` dir: `staging`
-1. workspace: `default` dir: `production`
+1. dir: `staging` workspace: `default`
+1. dir: `production` workspace: `default`
 
-### 1. workspace: `default` dir: `staging`
+### 1. dir: `staging` workspace: `default`
 ```diff
 
 An execution plan has been generated and is shown below.
@@ -24,7 +24,7 @@ Plan: 1 to add, 0 to change, 0 to destroy.
     * `atlantis plan -d staging`
 
 ---
-### 2. workspace: `default` dir: `production`
+### 2. dir: `production` workspace: `default`
 ```diff
 
 An execution plan has been generated and is shown below.

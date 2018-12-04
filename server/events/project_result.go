@@ -25,6 +25,7 @@ type ProjectResult struct {
 	Failure      string
 	PlanSuccess  *PlanSuccess
 	ApplySuccess string
+	ProjectName  string
 }
 
 // Status returns the vcs commit status of this project result.

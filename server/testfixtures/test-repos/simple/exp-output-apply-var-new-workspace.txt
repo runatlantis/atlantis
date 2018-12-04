@@ -1,4 +1,4 @@
-Ran Apply in dir: `.` workspace: `new_workspace`
+Ran Apply for dir: `.` workspace: `new_workspace`
 
 <details><summary>Show Output</summary>
 

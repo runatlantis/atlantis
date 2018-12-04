@@ -1,4 +1,4 @@
-Ran Apply in dir: `.` workspace: `default`
+Ran Apply for project: `staging` dir: `.` workspace: `default`
 
 <details><summary>Show Output</summary>
 

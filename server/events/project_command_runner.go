@@ -100,6 +100,7 @@ func (p *DefaultProjectCommandRunner) Plan(ctx models.ProjectCommandContext) Pro
 		Failure:     failure,
 		RepoRelDir:  ctx.RepoRelDir,
 		Workspace:   ctx.Workspace,
+		ProjectName: ctx.GetProjectName(),
 	}
 }
 
@@ -112,6 +113,7 @@ func (p *DefaultProjectCommandRunner) Apply(ctx models.ProjectCommandContext) Pr
 		ApplySuccess: applyOut,
 		RepoRelDir:   ctx.RepoRelDir,
 		Workspace:    ctx.Workspace,
+		ProjectName:  ctx.GetProjectName(),
 	}
 }
 

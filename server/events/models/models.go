@@ -315,3 +315,12 @@ func SplitRepoFullName(repoFullName string) (owner string, repo string) {
 	}
 	return repoFullName[:lastSlashIdx], repoFullName[lastSlashIdx+1:]
 }
+
+// GetProjectName returns the name of the project this context is for. If no
+// name is configured, it returns an empty string.
+func (p *ProjectCommandContext) GetProjectName() string {
+	if p.ProjectConfig != nil {
+		return p.ProjectConfig.GetName()
+	}
+	return ""
+}

@@ -1,8 +1,8 @@
 Ran Plan for 2 projects:
-1. workspace: `default` dir: `.`
-1. workspace: `staging` dir: `.`
+1. dir: `.` workspace: `default`
+1. dir: `.` workspace: `staging`
 
-### 1. workspace: `default` dir: `.`
+### 1. dir: `.` workspace: `default`
 <details><summary>Show Output</summary>
 
 ```diff
@@ -31,7 +31,7 @@ postplan
 </details>
 
 ---
-### 2. workspace: `staging` dir: `.`
+### 2. dir: `.` workspace: `staging`
 ```diff
 
 An execution plan has been generated and is shown below.

@@ -65,9 +65,10 @@ type ResultData struct {
 }
 
 type projectResultTmplData struct {
-	Workspace  string
-	RepoRelDir string
-	Rendered   string
+	Workspace   string
+	RepoRelDir  string
+	ProjectName string
+	Rendered    string
 }
 
 // Render formats the data into a markdown string.
@@ -90,8 +91,9 @@ func (m *MarkdownRenderer) renderProjectResults(results []ProjectResult, common 
 
 	for _, result := range results {
 		resultData := projectResultTmplData{
-			Workspace:  result.Workspace,
-			RepoRelDir: result.RepoRelDir,
+			Workspace:   result.Workspace,
+			RepoRelDir:  result.RepoRelDir,
+			ProjectName: result.ProjectName,
 		}
 		if result.Error != nil {
 			tmpl := unwrappedErrTmpl
@@ -178,23 +180,23 @@ func (m *MarkdownRenderer) renderTemplate(tmpl *template.Template, data interfac
 
 // todo: refactor to remove duplication #refactor
 var singleProjectApplyTmpl = template.Must(template.New("").Parse(
-	"{{$result := index .Results 0}}Ran {{.Command}} in dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" + logTmpl))
+	"{{$result := index .Results 0}}Ran {{.Command}} for {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" + logTmpl))
 var singleProjectPlanSuccessTmpl = template.Must(template.New("").Parse(
-	"{{$result := index .Results 0}}Ran {{.Command}} in dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" +
+	"{{$result := index .Results 0}}Ran {{.Command}} for {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" +
 		"\n" +
 		"---\n" +
 		"* :fast_forward: To **apply** all unapplied plans from this pull request, comment:\n" +
 		"    * `atlantis apply`" + logTmpl))
 var singleProjectPlanUnsuccessfulTmpl = template.Must(template.New("").Parse(
-	"{{$result := index .Results 0}}Ran {{.Command}} in dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n" +
+	"{{$result := index .Results 0}}Ran {{.Command}} for dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n" +
 		"{{$result.Rendered}}\n" + logTmpl))
 var multiProjectPlanTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
 	"Ran {{.Command}} for {{ len .Results }} projects:\n" +
 		"{{ range $result := .Results }}" +
-		"1. workspace: `{{$result.Workspace}}` dir: `{{$result.RepoRelDir}}`\n" +
+		"1. {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n" +
 		"{{end}}\n" +
 		"{{ range $i, $result := .Results }}" +
-		"### {{add $i 1}}. workspace: `{{$result.Workspace}}` dir: `{{$result.RepoRelDir}}`\n" +
+		"### {{add $i 1}}. {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n" +
 		"{{$result.Rendered}}\n\n" +
 		"---\n{{end}}{{ if gt (len .Results) 0 }}* :fast_forward: To **apply** all unapplied plans from this pull request, comment:\n" +
 		"    * `atlantis apply`{{end}}" +
@@ -202,10 +204,10 @@ var multiProjectPlanTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap
 var multiProjectApplyTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
 	"Ran {{.Command}} for {{ len .Results }} projects:\n" +
 		"{{ range $result := .Results }}" +
-		"1. workspace: `{{$result.Workspace}}` dir: `{{$result.RepoRelDir}}`\n" +
+		"1. {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n" +
 		"{{end}}\n" +
 		"{{ range $i, $result := .Results }}" +
-		"### {{add $i 1}}. workspace: `{{$result.Workspace}}` dir: `{{$result.RepoRelDir}}`\n" +
+		"### {{add $i 1}}. {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n" +
 		"{{$result.Rendered}}\n\n" +
 		"---\n{{end}}" +
 		logTmpl))
