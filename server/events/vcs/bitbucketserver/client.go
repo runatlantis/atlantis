@@ -11,10 +11,16 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
+
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"gopkg.in/go-playground/validator.v9"
 )
+
+// maxCommentLength is the maximum number of chars allowed by Bitbucket in a
+// single comment.
+const maxCommentLength = 32768
 
 type Client struct {
 	HttpClient  *http.Client
@@ -117,8 +123,22 @@ func (b *Client) GetProjectKey(repoName string, cloneURL string) (string, error)
 	return matches[1], nil
 }
 
-// CreateComment creates a comment on the merge request.
+// CreateComment creates a comment on the merge request. It will write multiple
+// comments if a single comment is too long.
 func (b *Client) CreateComment(repo models.Repo, pullNum int, comment string) error {
+	sepEnd := "\n```\n**Warning**: Output length greater than max comment size. Continued in next comment."
+	sepStart := "Continued from previous comment.\n```diff\n"
+	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
+	for _, c := range comments {
+		if err := b.postComment(repo, pullNum, c); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// postComment actually posts the comment. It's a helper for CreateComment().
+func (b *Client) postComment(repo models.Repo, pullNum int, comment string) error {
 	bodyBytes, err := json.Marshal(map[string]string{"text": comment})
 	if err != nil {
 		return errors.Wrap(err, "json encoding")
