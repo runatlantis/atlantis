@@ -48,20 +48,19 @@ func TestRenderErr(t *testing.T) {
 
 	r := events.MarkdownRenderer{}
 	for _, c := range cases {
-		t.Run(c.Description, func(t *testing.T) {
-			res := events.CommandResult{
-				Error: c.Error,
-			}
-			for _, verbose := range []bool{true, false} {
-				t.Log("testing " + c.Description)
+		res := events.CommandResult{
+			Error: c.Error,
+		}
+		for _, verbose := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s_%t", c.Description, verbose), func(t *testing.T) {
 				s := r.Render(res, c.Command, "log", verbose, models.Github)
 				if !verbose {
 					Equals(t, c.Expected, s)
 				} else {
 					Equals(t, c.Expected+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
 				}
-			}
-		})
+			})
+		}
 	}
 }
 
@@ -88,25 +87,23 @@ func TestRenderFailure(t *testing.T) {
 
 	r := events.MarkdownRenderer{}
 	for _, c := range cases {
-		t.Run(c.Description, func(t *testing.T) {
-			res := events.CommandResult{
-				Failure: c.Failure,
-			}
-			for _, verbose := range []bool{true, false} {
-				t.Log("testing " + c.Description)
+		res := events.CommandResult{
+			Failure: c.Failure,
+		}
+		for _, verbose := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s_%t", c.Description, verbose), func(t *testing.T) {
 				s := r.Render(res, c.Command, "log", verbose, models.Github)
 				if !verbose {
 					Equals(t, c.Expected, s)
 				} else {
 					Equals(t, c.Expected+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
 				}
-			}
-		})
+			})
+		}
 	}
 }
 
 func TestRenderErrAndFailure(t *testing.T) {
-	t.Log("if there is an error and a failure, the error should be printed")
 	r := events.MarkdownRenderer{}
 	res := events.CommandResult{
 		Error:   errors.New("error"),
@@ -147,7 +144,41 @@ func TestRenderProjectResults(t *testing.T) {
 				},
 			},
 			models.Github,
-			`Ran Plan in dir: $path$ workspace: $workspace$
+			`Ran Plan for dir: $path$ workspace: $workspace$
+
+$$$diff
+terraform-output
+$$$
+
+* :arrow_forward: To **apply** this plan, comment:
+    * $atlantis apply -d path -w workspace$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+    * $atlantis plan -d path -w workspace$
+
+---
+* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
+    * $atlantis apply$
+`,
+		},
+		{
+			"single successful plan with project name",
+			events.PlanCommand,
+			[]events.ProjectResult{
+				{
+					PlanSuccess: &events.PlanSuccess{
+						TerraformOutput: "terraform-output",
+						LockURL:         "lock-url",
+						RePlanCmd:       "atlantis plan -d path -w workspace",
+						ApplyCmd:        "atlantis apply -d path -w workspace",
+					},
+					Workspace:   "workspace",
+					RepoRelDir:  "path",
+					ProjectName: "projectname",
+				},
+			},
+			models.Github,
+			`Ran Plan for project: $projectname$ dir: $path$ workspace: $workspace$
 
 $$$diff
 terraform-output
@@ -175,7 +206,27 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Apply in dir: $path$ workspace: $workspace$
+			`Ran Apply for dir: $path$ workspace: $workspace$
+
+$$$diff
+success
+$$$
+
+`,
+		},
+		{
+			"single successful apply with project name",
+			events.ApplyCommand,
+			[]events.ProjectResult{
+				{
+					ApplySuccess: "success",
+					Workspace:    "workspace",
+					RepoRelDir:   "path",
+					ProjectName:  "projectname",
+				},
+			},
+			models.Github,
+			`Ran Apply for project: $projectname$ dir: $path$ workspace: $workspace$
 
 $$$diff
 success
@@ -198,8 +249,9 @@ $$$
 					},
 				},
 				{
-					Workspace:  "workspace",
-					RepoRelDir: "path2",
+					Workspace:   "workspace",
+					RepoRelDir:  "path2",
+					ProjectName: "projectname",
 					PlanSuccess: &events.PlanSuccess{
 						TerraformOutput: "terraform-output2",
 						LockURL:         "lock-url2",
@@ -210,10 +262,10 @@ $$$
 			},
 			models.Github,
 			`Ran Plan for 2 projects:
-1. workspace: $workspace$ dir: $path$
-1. workspace: $workspace$ dir: $path2$
+1. dir: $path$ workspace: $workspace$
+1. project: $projectname$ dir: $path2$ workspace: $workspace$
 
-### 1. workspace: $workspace$ dir: $path$
+### 1. dir: $path$ workspace: $workspace$
 $$$diff
 terraform-output
 $$$
@@ -225,7 +277,7 @@ $$$
     * $atlantis plan -d path -w workspace$
 
 ---
-### 2. workspace: $workspace$ dir: $path2$
+### 2. project: $projectname$ dir: $path2$ workspace: $workspace$
 $$$diff
 terraform-output2
 $$$
@@ -248,6 +300,7 @@ $$$
 				{
 					RepoRelDir:   "path",
 					Workspace:    "workspace",
+					ProjectName:  "projectname",
 					ApplySuccess: "success",
 				},
 				{
@@ -258,16 +311,16 @@ $$$
 			},
 			models.Github,
 			`Ran Apply for 2 projects:
-1. workspace: $workspace$ dir: $path$
-1. workspace: $workspace$ dir: $path2$
+1. project: $projectname$ dir: $path$ workspace: $workspace$
+1. dir: $path2$ workspace: $workspace$
 
-### 1. workspace: $workspace$ dir: $path$
+### 1. project: $projectname$ dir: $path$ workspace: $workspace$
 $$$diff
 success
 $$$
 
 ---
-### 2. workspace: $workspace$ dir: $path2$
+### 2. dir: $path2$ workspace: $workspace$
 $$$diff
 success2
 $$$
@@ -287,7 +340,7 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Plan in dir: $path$ workspace: $workspace$
+			`Ran Plan for dir: $path$ workspace: $workspace$
 
 **Plan Error**
 $$$
@@ -307,7 +360,7 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Plan in dir: $path$ workspace: $workspace$
+			`Ran Plan for dir: $path$ workspace: $workspace$
 
 **Plan Failed**: failure
 
@@ -333,18 +386,19 @@ $$$
 					Failure:    "failure",
 				},
 				{
-					Workspace:  "workspace",
-					RepoRelDir: "path3",
-					Error:      errors.New("error"),
+					Workspace:   "workspace",
+					RepoRelDir:  "path3",
+					ProjectName: "projectname",
+					Error:       errors.New("error"),
 				},
 			},
 			models.Github,
 			`Ran Plan for 3 projects:
-1. workspace: $workspace$ dir: $path$
-1. workspace: $workspace$ dir: $path2$
-1. workspace: $workspace$ dir: $path3$
+1. dir: $path$ workspace: $workspace$
+1. dir: $path2$ workspace: $workspace$
+1. project: $projectname$ dir: $path3$ workspace: $workspace$
 
-### 1. workspace: $workspace$ dir: $path$
+### 1. dir: $path$ workspace: $workspace$
 $$$diff
 terraform-output
 $$$
@@ -356,11 +410,11 @@ $$$
     * $atlantis plan -d path -w workspace$
 
 ---
-### 2. workspace: $workspace$ dir: $path2$
+### 2. dir: $path2$ workspace: $workspace$
 **Plan Failed**: failure
 
 ---
-### 3. workspace: $workspace$ dir: $path3$
+### 3. project: $projectname$ dir: $path3$ workspace: $workspace$
 **Plan Error**
 $$$
 error
@@ -393,21 +447,21 @@ $$$
 			},
 			models.Github,
 			`Ran Apply for 3 projects:
-1. workspace: $workspace$ dir: $path$
-1. workspace: $workspace$ dir: $path2$
-1. workspace: $workspace$ dir: $path3$
+1. dir: $path$ workspace: $workspace$
+1. dir: $path2$ workspace: $workspace$
+1. dir: $path3$ workspace: $workspace$
 
-### 1. workspace: $workspace$ dir: $path$
+### 1. dir: $path$ workspace: $workspace$
 $$$diff
 success
 $$$
 
 ---
-### 2. workspace: $workspace$ dir: $path2$
+### 2. dir: $path2$ workspace: $workspace$
 **Apply Failed**: failure
 
 ---
-### 3. workspace: $workspace$ dir: $path3$
+### 3. dir: $path3$ workspace: $workspace$
 **Apply Error**
 $$$
 error
@@ -439,21 +493,21 @@ $$$
 			},
 			models.Github,
 			`Ran Apply for 3 projects:
-1. workspace: $workspace$ dir: $path$
-1. workspace: $workspace$ dir: $path2$
-1. workspace: $workspace$ dir: $path3$
+1. dir: $path$ workspace: $workspace$
+1. dir: $path2$ workspace: $workspace$
+1. dir: $path3$ workspace: $workspace$
 
-### 1. workspace: $workspace$ dir: $path$
+### 1. dir: $path$ workspace: $workspace$
 $$$diff
 success
 $$$
 
 ---
-### 2. workspace: $workspace$ dir: $path2$
+### 2. dir: $path2$ workspace: $workspace$
 **Apply Failed**: failure
 
 ---
-### 3. workspace: $workspace$ dir: $path3$
+### 3. dir: $path3$ workspace: $workspace$
 **Apply Error**
 $$$
 error
@@ -569,7 +623,7 @@ func TestRenderProjectResults_WrappedErr(t *testing.T) {
 				}, events.PlanCommand, "log", false, c.VCSHost)
 				var exp string
 				if c.ShouldWrap {
-					exp = `Ran Plan in dir: $.$ workspace: $default$
+					exp = `Ran Plan for dir: $.$ workspace: $default$
 
 **Plan Error**
 <details><summary>Show Output</summary>
@@ -581,7 +635,7 @@ $$$
 
 `
 				} else {
-					exp = `Ran Plan in dir: $.$ workspace: $default$
+					exp = `Ran Plan for dir: $.$ workspace: $default$
 
 **Plan Error**
 $$$
@@ -698,7 +752,7 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 					switch cmd {
 					case events.PlanCommand:
 						if c.ShouldWrap {
-							exp = `Ran Plan in dir: $.$ workspace: $default$
+							exp = `Ran Plan for dir: $.$ workspace: $default$
 
 <details><summary>Show Output</summary>
 
@@ -718,7 +772,7 @@ $$$
     * $atlantis apply$
 `
 						} else {
-							exp = `Ran Plan in dir: $.$ workspace: $default$
+							exp = `Ran Plan for dir: $.$ workspace: $default$
 
 $$$diff
 ` + c.Output + `
@@ -737,7 +791,7 @@ $$$
 						}
 					case events.ApplyCommand:
 						if c.ShouldWrap {
-							exp = `Ran Apply in dir: $.$ workspace: $default$
+							exp = `Ran Apply for dir: $.$ workspace: $default$
 
 <details><summary>Show Output</summary>
 
@@ -748,7 +802,7 @@ $$$
 
 `
 						} else {
-							exp = `Ran Apply in dir: $.$ workspace: $default$
+							exp = `Ran Apply for dir: $.$ workspace: $default$
 
 $$$diff
 ` + c.Output + `
@@ -783,10 +837,10 @@ func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
 		},
 	}, events.ApplyCommand, "log", false, models.Github)
 	exp := `Ran Apply for 2 projects:
-1. workspace: $staging$ dir: $.$
-1. workspace: $production$ dir: $.$
+1. dir: $.$ workspace: $staging$
+1. dir: $.$ workspace: $production$
 
-### 1. workspace: $staging$ dir: $.$
+### 1. dir: $.$ workspace: $staging$
 <details><summary>Show Output</summary>
 
 $$$diff
@@ -795,7 +849,7 @@ $$$
 </details>
 
 ---
-### 2. workspace: $production$ dir: $.$
+### 2. dir: $.$ workspace: $production$
 <details><summary>Show Output</summary>
 
 $$$diff
@@ -838,10 +892,10 @@ func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 		},
 	}, events.PlanCommand, "log", false, models.Github)
 	exp := `Ran Plan for 2 projects:
-1. workspace: $staging$ dir: $.$
-1. workspace: $production$ dir: $.$
+1. dir: $.$ workspace: $staging$
+1. dir: $.$ workspace: $production$
 
-### 1. workspace: $staging$ dir: $.$
+### 1. dir: $.$ workspace: $staging$
 <details><summary>Show Output</summary>
 
 $$$diff
@@ -856,7 +910,7 @@ $$$
 </details>
 
 ---
-### 2. workspace: $production$ dir: $.$
+### 2. dir: $.$ workspace: $production$
 <details><summary>Show Output</summary>
 
 $$$diff

@@ -1,4 +1,4 @@
-Ran Plan in dir: `staging` workspace: `default`
+Ran Plan for dir: `staging` workspace: `default`
 
 ```diff
 

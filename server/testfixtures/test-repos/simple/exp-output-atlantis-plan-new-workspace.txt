@@ -1,4 +1,4 @@
-Ran Plan in dir: `.` workspace: `new_workspace`
+Ran Plan for dir: `.` workspace: `new_workspace`
 
 <details><summary>Show Output</summary>
 

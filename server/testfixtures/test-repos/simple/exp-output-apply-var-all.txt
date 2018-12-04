@@ -1,8 +1,8 @@
 Ran Apply for 2 projects:
-1. workspace: `default` dir: `.`
-1. workspace: `new_workspace` dir: `.`
+1. dir: `.` workspace: `default`
+1. dir: `.` workspace: `new_workspace`
 
-### 1. workspace: `default` dir: `.`
+### 1. dir: `.` workspace: `default`
 <details><summary>Show Output</summary>
 
 ```diff
@@ -24,7 +24,7 @@ workspace = default
 </details>
 
 ---
-### 2. workspace: `new_workspace` dir: `.`
+### 2. dir: `.` workspace: `new_workspace`
 <details><summary>Show Output</summary>
 
 ```diff
