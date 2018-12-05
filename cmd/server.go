@@ -55,6 +55,7 @@ const (
 	PortFlag                   = "port"
 	RepoWhitelistFlag          = "repo-whitelist"
 	RequireApprovalFlag        = "require-approval"
+	RebaseRepo                 = "rebase-repo"
 	SilenceWhitelistErrorsFlag = "silence-whitelist-errors"
 	SSLCertFileFlag            = "ssl-cert-file"
 	SSLKeyFileFlag             = "ssl-key-file"
@@ -184,6 +185,11 @@ var boolFlags = []boolFlag{
 	{
 		name:         RequireApprovalFlag,
 		description:  "Require pull requests to be \"Approved\" before allowing the apply command to be run.",
+		defaultValue: false,
+	},
+	{
+		name:         RebaseRepo,
+		description:  "Prior to running any commands the pull request is rebased off of master.",
 		defaultValue: false,
 	},
 	{

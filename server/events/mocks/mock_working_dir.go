@@ -19,8 +19,8 @@ func NewMockWorkingDir() *MockWorkingDir {
 	return &MockWorkingDir{fail: pegomock.GlobalFailHandler}
 }
 
-func (mock *MockWorkingDir) Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, workspace string) (string, error) {
-	params := []pegomock.Param{log, baseRepo, headRepo, p, workspace}
+func (mock *MockWorkingDir) Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, rebase bool, workspace string) (string, error) {
+	params := []pegomock.Param{log, baseRepo, headRepo, p, rebase, workspace}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Clone", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
 	var ret1 error

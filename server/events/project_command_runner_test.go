@@ -152,6 +152,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 				matchers.AnyModelsRepo(),
 				matchers.AnyModelsRepo(),
 				matchers.AnyModelsPullRequest(),
+				AnyBool(),
 				AnyString(),
 			)).ThenReturn(repoDir, nil)
 			When(mockLocker.TryLock(

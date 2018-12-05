@@ -179,7 +179,7 @@ projects:
 			pull := models.PullRequest{}
 			logger := logging.NewNoopLogger()
 			workingDir := mocks.NewMockWorkingDir()
-			When(workingDir.Clone(logger, baseRepo, headRepo, pull, "default")).ThenReturn(tmpDir, nil)
+			When(workingDir.Clone(logger, baseRepo, headRepo, pull, false, "default")).ThenReturn(tmpDir, nil)
 			if c.AtlantisYAML != "" {
 				err := ioutil.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
 				Ok(t, err)
@@ -405,7 +405,7 @@ projects:
 					expWorkspace = "default"
 				}
 				if cmdName == events.PlanCommand {
-					When(workingDir.Clone(logger, baseRepo, headRepo, pull, expWorkspace)).ThenReturn(tmpDir, nil)
+					When(workingDir.Clone(logger, baseRepo, headRepo, pull, false, expWorkspace)).ThenReturn(tmpDir, nil)
 				} else {
 					When(workingDir.GetWorkingDir(baseRepo, pull, expWorkspace)).ThenReturn(tmpDir, nil)
 				}
@@ -487,6 +487,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiPlanNoAtlantisYAML(t *testing.T)
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
+		AnyBool(),
 		AnyString())).ThenReturn(tmpDir, nil)
 	vcsClient := vcsmocks.NewMockClientProxy()
 	When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"project1/main.tf", "project2/main.tf"}, nil)
@@ -540,6 +541,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiPlanNoAtlantisYAMLNoModified(t *
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
+		AnyBool(),
 		AnyString())).ThenReturn(tmpDir, nil)
 	vcsClient := vcsmocks.NewMockClientProxy()
 	When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{}, nil)
@@ -610,6 +612,7 @@ projects:
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
+		AnyBool(),
 		AnyString())).ThenReturn(tmpDir, nil)
 	vcsClient := vcsmocks.NewMockClientProxy()
 	When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{
@@ -674,6 +677,7 @@ projects:
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
+		AnyBool(),
 		AnyString())).ThenReturn(tmpDir, nil)
 	vcsClient := vcsmocks.NewMockClientProxy()
 	When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
@@ -809,6 +813,7 @@ func TestDefaultProjectCommandBuilder_RepoConfigDisabled(t *testing.T) {
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
+		AnyBool(),
 		AnyString())).ThenReturn(repoDir, nil)
 	When(workingDir.GetWorkingDir(
 		matchers.AnyModelsRepo(),

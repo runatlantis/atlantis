@@ -33,7 +33,7 @@ const workingDirPrefix = "repos"
 type WorkingDir interface {
 	// Clone git clones headRepo, checks out the branch and then returns the
 	// absolute path to the root of the cloned repo.
-	Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, workspace string) (string, error)
+	Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, rebase bool, workspace string) (string, error)
 	// GetWorkingDir returns the path to the workspace for this repo and pull.
 	// If workspace does not exist on disk, error will be of type os.IsNotExist.
 	GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error)
@@ -60,6 +60,7 @@ func (w *FileWorkspace) Clone(
 	baseRepo models.Repo,
 	headRepo models.Repo,
 	p models.PullRequest,
+	rebase bool,
 	workspace string) (string, error) {
 	cloneDir := w.cloneDir(baseRepo, p, workspace)
 
@@ -72,27 +73,33 @@ func (w *FileWorkspace) Clone(
 		output, err := revParseCmd.CombinedOutput()
 		if err != nil {
 			log.Err("will re-clone repo, could not determine if was at correct commit: git rev-parse HEAD: %s: %s", err, string(output))
-			return w.forceClone(log, cloneDir, headRepo, p)
+			return w.forceClone(log, cloneDir, headRepo, p, rebase)
 		}
 		currCommit := strings.Trim(string(output), "\n")
 		// We're prefix matching here because BitBucket doesn't give us the full
 		// commit, only a 12 character prefix.
-		if strings.HasPrefix(currCommit, p.HeadCommit) {
-			log.Debug("repo is at correct commit %q so will not re-clone", p.HeadCommit)
-			return cloneDir, nil
+		if !rebase {
+			if strings.HasPrefix(currCommit, p.HeadCommit) {
+				log.Debug("repo is at correct commit %q so will not re-clone", p.HeadCommit)
+				return cloneDir, nil
+			}
+			log.Debug("repo was already cloned but is not at correct commit, wanted %q got %q", p.HeadCommit, currCommit)
+		} else {
+			log.Debug("rebase is specified so cloning")
 		}
-		log.Debug("repo was already cloned but is not at correct commit, wanted %q got %q", p.HeadCommit, currCommit)
+
 		// We'll fall through to re-clone.
 	}
 
 	// Otherwise we clone the repo.
-	return w.forceClone(log, cloneDir, headRepo, p)
+	return w.forceClone(log, cloneDir, headRepo, p, rebase)
 }
 
 func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
 	cloneDir string,
 	headRepo models.Repo,
-	p models.PullRequest) (string, error) {
+	p models.PullRequest,
+	rebase bool) (string, error) {
 
 	err := os.RemoveAll(cloneDir)
 	if err != nil {
@@ -122,6 +129,17 @@ func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
 	if err := checkoutCmd.Run(); err != nil {
 		return "", errors.Wrapf(err, "checking out branch %s", p.Branch)
 	}
+
+	if rebase {
+		// Rebase branch
+		log.Info("rebase branch onto master")
+		rebaseCmd := exec.Command("git", "rebase", "origin/master") // #nosec
+		rebaseCmd.Dir = cloneDir
+		if output, err := rebaseCmd.CombinedOutput(); err != nil {
+			return "", errors.Wrapf(err, "unable to rebase %s onto master %s", p.Branch, string(output))
+		}
+	}
+
 	return cloneDir, nil
 }
 

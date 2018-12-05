@@ -69,17 +69,19 @@ type DefaultCommandRunner struct {
 	AllowForkPRsFlag      string
 	ProjectCommandBuilder ProjectCommandBuilder
 	ProjectCommandRunner  ProjectCommandRunner
+	RebaseRepo            bool
 }
 
 // RunAutoplanCommand runs plan when a pull request is opened or updated.
 func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) {
 	log := c.buildLogger(baseRepo.FullName, pull.Num)
 	ctx := &CommandContext{
-		User:     user,
-		Log:      log,
-		Pull:     pull,
-		HeadRepo: headRepo,
-		BaseRepo: baseRepo,
+		User:       user,
+		Log:        log,
+		Pull:       pull,
+		HeadRepo:   headRepo,
+		BaseRepo:   baseRepo,
+		RebaseRepo: c.RebaseRepo,
 	}
 	defer c.logPanics(ctx)
 	if !c.validateCtxAndComment(ctx) {
@@ -138,11 +140,12 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 	ctx := &CommandContext{
-		User:     user,
-		Log:      log,
-		Pull:     pull,
-		HeadRepo: headRepo,
-		BaseRepo: baseRepo,
+		User:       user,
+		Log:        log,
+		Pull:       pull,
+		HeadRepo:   headRepo,
+		BaseRepo:   baseRepo,
+		RebaseRepo: c.RebaseRepo,
 	}
 	defer c.logPanics(ctx)
 	if !c.validateCtxAndComment(ctx) {

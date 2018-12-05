@@ -30,6 +30,7 @@ type CommandContext struct {
 	HeadRepo models.Repo
 	Pull     models.PullRequest
 	// User is the user that triggered this command.
-	User models.User
-	Log  *logging.SimpleLogger
+	User       models.User
+	Log        *logging.SimpleLogger
+	RebaseRepo bool
 }
