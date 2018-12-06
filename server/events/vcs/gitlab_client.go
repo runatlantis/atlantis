@@ -49,25 +49,29 @@ func NewGitlabClient(hostname string, token string, logger *logging.SimpleLogger
 
 	// If not using gitlab.com we need to set the URL to the API.
 	if hostname != "gitlab.com" {
-		u, err := url.Parse(hostname)
+		// We assume the url will be over HTTPS if the user doesn't specify a scheme.
+		absoluteURL := hostname
+		if !strings.HasPrefix(hostname, "http://") && !strings.HasPrefix(hostname, "https://") {
+			absoluteURL = "https://" + absoluteURL
+		}
+
+		url, err := url.Parse(absoluteURL)
 		if err != nil {
-			return nil, errors.Wrapf(err, "parsing hostname %q", hostname)
+			return nil, errors.Wrapf(err, "parsing URL %q", absoluteURL)
 		}
 
 		// Warn if this hostname isn't resolvable. The GitLab client
 		// doesn't give good error messages in this case.
-		ips, err := net.LookupIP(u.Hostname())
+		ips, err := net.LookupIP(url.Hostname())
 		if err != nil {
-			logger.Warn("unable to resolve %q: %s", u.Hostname(), err)
+			logger.Warn("unable to resolve %q: %s", url.Hostname(), err)
 		} else if len(ips) == 0 {
-			logger.Warn("found no IPs while resolving %q", u.Hostname())
+			logger.Warn("found no IPs while resolving %q", url.Hostname())
 		}
 
-		scheme := "https"
-		if u.Scheme != "" {
-			scheme = u.Scheme
-		}
-		apiURL := fmt.Sprintf("%s://%s/api/v4/", scheme, u.Host)
+		// Now we're ready to construct the client.
+		absoluteURL = strings.TrimSuffix(absoluteURL, "/")
+		apiURL := fmt.Sprintf("%s/api/v4/", absoluteURL)
 		if err := client.Client.SetBaseURL(apiURL); err != nil {
 			return nil, errors.Wrapf(err, "setting GitLab API URL: %s", apiURL)
 		}
