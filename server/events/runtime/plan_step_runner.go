@@ -39,7 +39,7 @@ func (p *PlanStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []strin
 	planCmd := p.buildPlanCmd(ctx, extraArgs, path)
 	output, err := p.TerraformExecutor.RunCommandWithVersion(ctx.Log, filepath.Clean(path), planCmd, tfVersion, ctx.Workspace)
 	if err != nil {
-		return "", err
+		return output, err
 	}
 	return p.fmtPlanOutput(output), nil
 }

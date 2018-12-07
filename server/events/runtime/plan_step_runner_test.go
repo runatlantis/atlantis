@@ -536,8 +536,19 @@ Terraform will perform the following actions:
 		AnyStringSlice(),
 		matchers2.AnyPtrToGoVersionVersion(),
 		AnyString())).
-		ThenReturn(rawOutput, nil)
-	actOutput, err := s.Run(models.ProjectCommandContext{}, nil, "")
+		Then(func(params []Param) ReturnValues {
+			// This code allows us to return different values depending on the
+			// tf command being run while still using the wildcard matchers above.
+			tfArgs := params[2].([]string)
+			if stringSliceEquals(tfArgs, []string{"workspace", "show"}) {
+				return []ReturnValue{"default", nil}
+			} else if tfArgs[0] == "plan" {
+				return []ReturnValue{rawOutput, nil}
+			} else {
+				return []ReturnValue{"", errors.New("unexpected call to RunCommandWithVersion")}
+			}
+		})
+	actOutput, err := s.Run(models.ProjectCommandContext{Workspace: "default"}, nil, "")
 	Ok(t, err)
 	Equals(t, `
 An execution plan has been generated and is shown below.
@@ -559,4 +570,50 @@ Terraform will perform the following actions:
 
 - aws_security_group_rule.allow_all
 `, actOutput)
+}
+
+// Test that even if there's an error, we get the returned output.
+func TestRun_OutputOnErr(t *testing.T) {
+	RegisterMockTestingT(t)
+	terraform := mocks.NewMockClient()
+	tfVersion, _ := version.NewVersion("0.10.0")
+	s := runtime.PlanStepRunner{
+		TerraformExecutor: terraform,
+		DefaultTFVersion:  tfVersion,
+	}
+	expOutput := "expected output"
+	expErrMsg := "error!"
+	When(terraform.RunCommandWithVersion(
+		matchers.AnyPtrToLoggingSimpleLogger(),
+		AnyString(),
+		AnyStringSlice(),
+		matchers2.AnyPtrToGoVersionVersion(),
+		AnyString())).
+		Then(func(params []Param) ReturnValues {
+			// This code allows us to return different values depending on the
+			// tf command being run while still using the wildcard matchers above.
+			tfArgs := params[2].([]string)
+			if stringSliceEquals(tfArgs, []string{"workspace", "show"}) {
+				return []ReturnValue{"default\n", nil}
+			} else if tfArgs[0] == "plan" {
+				return []ReturnValue{expOutput, errors.New(expErrMsg)}
+			} else {
+				return []ReturnValue{"", errors.New("unexpected call to RunCommandWithVersion")}
+			}
+		})
+	actOutput, actErr := s.Run(models.ProjectCommandContext{Workspace: "default"}, nil, "")
+	ErrEquals(t, expErrMsg, actErr)
+	Equals(t, expOutput, actOutput)
+}
+
+func stringSliceEquals(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, v := range a {
+		if v != b[i] {
+			return false
+		}
+	}
+	return true
 }
