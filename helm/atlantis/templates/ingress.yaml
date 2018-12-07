@@ -24,6 +24,6 @@ spec:
         paths:
           - path: {{ .Values.ingress.path }}
             backend:
-              serviceName: {{ $fullName }}
-              servicePort: 4141
+              serviceName: {{ template "atlantis.fullname" . }}
+              servicePort: {{ .Values.service.port }}
 {{- end }}
