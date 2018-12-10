@@ -20,12 +20,28 @@ func TestNewGitlabClient_BaseURL(t *testing.T) {
 			"https://gitlab.com/api/v4/",
 		},
 		{
+			"custom.domain",
+			"https://custom.domain/api/v4/",
+		},
+		{
 			"http://custom.domain",
 			"http://custom.domain/api/v4/",
 		},
 		{
+			"http://custom.domain:8080",
+			"http://custom.domain:8080/api/v4/",
+		},
+		{
 			"https://custom.domain",
 			"https://custom.domain/api/v4/",
+		},
+		{
+			"https://custom.domain/",
+			"https://custom.domain/api/v4/",
+		},
+		{
+			"https://custom.domain/basepath/",
+			"https://custom.domain/basepath/api/v4/",
 		},
 	}
 
