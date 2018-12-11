@@ -36,7 +36,7 @@ func GenerateModel(importPath string, interfaceName string) (*model.Package, err
 		}
 	}
 
-	return nil, errors.New("Did not find interface name TODO")
+	return nil, errors.New("Did not find interface name \"" + interfaceName + "\"")
 }
 
 type modelGenerator struct {

@@ -258,3 +258,19 @@ func AnyStringSlice() []string {
 	RegisterMatcher(NewAnyMatcher(reflect.SliceOf(reflect.TypeOf((string)("")))))
 	return nil
 }
+
+func EqInterface(value interface{}) interface{} {
+	RegisterMatcher(&EqMatcher{Value: value})
+	return nil
+}
+
+func AnyInterface() interface{} {
+	RegisterMatcher(NewAnyMatcher(reflect.TypeOf((*(interface{}))(nil)).Elem()))
+	return nil
+}
+
+func AnyInterfaceSlice() []interface{} {
+	RegisterMatcher(NewAnyMatcher(reflect.SliceOf(reflect.TypeOf((*(interface{}))(nil)).Elem())))
+	return nil
+}
+	

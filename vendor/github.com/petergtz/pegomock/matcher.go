@@ -5,14 +5,19 @@ import (
 	"reflect"
 
 	"github.com/petergtz/pegomock/internal/verify"
+	"sync"
 )
 
 type EqMatcher struct {
 	Value  Param
 	actual Param
+	sync.Mutex
 }
 
 func (matcher *EqMatcher) Matches(param Param) bool {
+	matcher.Lock()
+	defer matcher.Unlock()
+
 	matcher.actual = param
 	return reflect.DeepEqual(matcher.Value, param)
 }
@@ -28,6 +33,7 @@ func (matcher *EqMatcher) String() string {
 type AnyMatcher struct {
 	Type   reflect.Type
 	actual reflect.Type
+	sync.Mutex
 }
 
 func NewAnyMatcher(typ reflect.Type) *AnyMatcher {
@@ -36,6 +42,9 @@ func NewAnyMatcher(typ reflect.Type) *AnyMatcher {
 }
 
 func (matcher *AnyMatcher) Matches(param Param) bool {
+	matcher.Lock()
+	defer matcher.Unlock()
+
 	matcher.actual = reflect.TypeOf(param)
 	if matcher.actual == nil {
 		switch matcher.Type.Kind() {

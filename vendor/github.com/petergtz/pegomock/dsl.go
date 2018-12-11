@@ -19,7 +19,9 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/onsi/gomega/format"
 	"github.com/petergtz/pegomock/internal/verify"
@@ -34,7 +36,11 @@ func RegisterMockTestingT(t *testing.T) {
 	RegisterMockFailHandler(BuildTestingTGomegaFailHandler(t))
 }
 
-var lastInvocation *invocation
+var (
+	lastInvocation      *invocation
+	lastInvocationMutex sync.Mutex
+)
+
 var globalArgMatchers Matchers
 
 func RegisterMatcher(matcher Matcher) {
@@ -49,16 +55,19 @@ type invocation struct {
 }
 
 type GenericMock struct {
+	sync.Mutex
 	mockedMethods map[string]*mockedMethod
 }
 
 func (genericMock *GenericMock) Invoke(methodName string, params []Param, returnTypes []reflect.Type) ReturnValues {
+	lastInvocationMutex.Lock()
 	lastInvocation = &invocation{
 		genericMock: genericMock,
 		MethodName:  methodName,
 		Params:      params,
 		ReturnTypes: returnTypes,
 	}
+	lastInvocationMutex.Unlock()
 	return genericMock.getOrCreateMockedMethod(methodName).Invoke(params)
 }
 
@@ -71,6 +80,8 @@ func (genericMock *GenericMock) stubWithCallback(methodName string, paramMatcher
 }
 
 func (genericMock *GenericMock) getOrCreateMockedMethod(methodName string) *mockedMethod {
+	genericMock.Lock()
+	defer genericMock.Unlock()
 	if _, ok := genericMock.mockedMethods[methodName]; !ok {
 		genericMock.mockedMethods[methodName] = &mockedMethod{name: methodName}
 	}
@@ -85,7 +96,13 @@ func (genericMock *GenericMock) Verify(
 	inOrderContext *InOrderContext,
 	invocationCountMatcher Matcher,
 	methodName string,
-	params []Param) []MethodInvocation {
+	params []Param,
+	options ...interface{},
+) []MethodInvocation {
+	var timeout time.Duration
+	if len(options) == 1 {
+		timeout = options[0].(time.Duration)
+	}
 	if GlobalFailHandler == nil {
 		panic("No GlobalFailHandler set. Please use either RegisterMockFailHandler or RegisterMockTestingT to set a fail handler.")
 	}
@@ -94,29 +111,46 @@ func (genericMock *GenericMock) Verify(
 	if len(globalArgMatchers) != 0 {
 		verifyArgMatcherUse(globalArgMatchers, params)
 	}
-
-	methodInvocations := genericMock.methodInvocations(methodName, params, globalArgMatchers)
-	if inOrderContext != nil {
-		for _, methodInvocation := range methodInvocations {
-			if methodInvocation.orderingInvocationNumber <= inOrderContext.invocationCounter {
-				GlobalFailHandler(fmt.Sprintf("Expected function call %v(%v) before function call %v(%v)",
-					methodName, formatParams(params), inOrderContext.lastInvokedMethodName, formatParams(inOrderContext.lastInvokedMethodParams)))
+	startTime := time.Now()
+	// timeoutLoop:
+	for {
+		genericMock.Lock()
+		methodInvocations := genericMock.methodInvocations(methodName, params, globalArgMatchers)
+		genericMock.Unlock()
+		if inOrderContext != nil {
+			for _, methodInvocation := range methodInvocations {
+				if methodInvocation.orderingInvocationNumber <= inOrderContext.invocationCounter {
+					// TODO: should introduce the following, in case we decide support "inorder" and "eventually"
+					// if time.Since(startTime) < timeout {
+					// 	continue timeoutLoop
+					// }
+					GlobalFailHandler(fmt.Sprintf("Expected function call %v(%v) before function call %v(%v)",
+						methodName, formatParams(params), inOrderContext.lastInvokedMethodName, formatParams(inOrderContext.lastInvokedMethodParams)))
+				}
+				inOrderContext.invocationCounter = methodInvocation.orderingInvocationNumber
+				inOrderContext.lastInvokedMethodName = methodName
+				inOrderContext.lastInvokedMethodParams = params
 			}
-			inOrderContext.invocationCounter = methodInvocation.orderingInvocationNumber
-			inOrderContext.lastInvokedMethodName = methodName
-			inOrderContext.lastInvokedMethodParams = params
 		}
-	}
-	if !invocationCountMatcher.Matches(len(methodInvocations)) {
-		var paramsOrMatchers interface{} = formatParams(params)
-		if len(globalArgMatchers) != 0 {
-			paramsOrMatchers = formatMatchers(globalArgMatchers)
+		if !invocationCountMatcher.Matches(len(methodInvocations)) {
+			if time.Since(startTime) < timeout {
+				time.Sleep(10 * time.Millisecond)
+				continue
+			}
+			var paramsOrMatchers interface{} = formatParams(params)
+			if len(globalArgMatchers) != 0 {
+				paramsOrMatchers = formatMatchers(globalArgMatchers)
+			}
+			timeoutInfo := ""
+			if timeout > 0 {
+				timeoutInfo = fmt.Sprintf(" after timeout of %v", timeout)
+			}
+			GlobalFailHandler(fmt.Sprintf(
+				"Mock invocation count for %v(%v) does not match expectation%v.\n\n\t%v\n\n\t%v",
+				methodName, paramsOrMatchers, timeoutInfo, invocationCountMatcher.FailureMessage(), formatInteractions(genericMock.allInteractions())))
 		}
-		GlobalFailHandler(fmt.Sprintf(
-			"Mock invocation count for %v(%v) does not match expectation.\n\n\t%v\n\n\t%v",
-			methodName, paramsOrMatchers, invocationCountMatcher.FailureMessage(), formatInteractions(genericMock.allInteractions())))
+		return methodInvocations
 	}
-	return methodInvocations
 }
 
 // TODO this doesn't need to be a method, can be a free function
@@ -138,8 +172,9 @@ func (genericMock *GenericMock) GetInvocationParams(methodInvocations []MethodIn
 
 func (genericMock *GenericMock) methodInvocations(methodName string, params []Param, matchers []Matcher) []MethodInvocation {
 	var invocations []MethodInvocation
-	if _, exists := genericMock.mockedMethods[methodName]; exists {
-		for _, invocation := range genericMock.mockedMethods[methodName].invocations {
+	if method, exists := genericMock.mockedMethods[methodName]; exists {
+		method.Lock()
+		for _, invocation := range method.invocations {
 			if len(matchers) != 0 {
 				if Matchers(matchers).Matches(invocation.params) {
 					invocations = append(invocations, invocation)
@@ -150,8 +185,8 @@ func (genericMock *GenericMock) methodInvocations(methodName string, params []Pa
 					invocations = append(invocations, invocation)
 				}
 			}
-
 		}
+		method.Unlock()
 	}
 	return invocations
 }
@@ -216,13 +251,16 @@ func (genericMock *GenericMock) allInteractions() map[string][]MethodInvocation 
 }
 
 type mockedMethod struct {
+	sync.Mutex
 	name        string
 	invocations []MethodInvocation
 	stubbings   Stubbings
 }
 
 func (method *mockedMethod) Invoke(params []Param) ReturnValues {
+	method.Lock()
 	method.invocations = append(method.invocations, MethodInvocation{params, globalInvocationCounter.nextNumber()})
+	method.Unlock()
 	stubbing := method.stubbings.find(params)
 	if stubbing == nil {
 		return ReturnValues{}
@@ -249,15 +287,19 @@ func (method *mockedMethod) reset(paramMatchers Matchers) {
 
 type Counter struct {
 	count int
+	sync.Mutex
 }
 
 func (counter *Counter) nextNumber() (nextNumber int) {
+	counter.Lock()
+	defer counter.Unlock()
+
 	nextNumber = counter.count
 	counter.count++
 	return
 }
 
-var globalInvocationCounter = Counter{1}
+var globalInvocationCounter = Counter{count: 1}
 
 type MethodInvocation struct {
 	params                   []Param
@@ -325,6 +367,7 @@ func (matchers Matchers) Matches(params []Param) bool {
 	if len(matchers) != len(params) { // Technically, this is not an error. Variadic arguments can cause this
 		return false
 	}
+
 	for i := range params {
 		if !matchers[i].Matches(params[i]) {
 			return false
@@ -349,7 +392,10 @@ func When(invocation ...interface{}) *ongoingStubbing {
 	verify.Argument(lastInvocation != nil,
 		"When() requires an argument which has to be 'a method call on a mock'.")
 	defer func() {
+		lastInvocationMutex.Lock()
 		lastInvocation = nil
+		lastInvocationMutex.Unlock()
+
 		globalArgMatchers = nil
 	}()
 	lastInvocation.genericMock.mockedMethods[lastInvocation.MethodName].removeLastInvocation()
@@ -413,9 +459,14 @@ func transformParamsIntoEqMatchers(params []Param) []Matcher {
 	return paramMatchers
 }
 
-var genericMocks = make(map[Mock]*GenericMock)
+var (
+	genericMocksMutex sync.Mutex
+	genericMocks      = make(map[Mock]*GenericMock)
+)
 
 func GetGenericMockFrom(mock Mock) *GenericMock {
+	genericMocksMutex.Lock()
+	defer genericMocksMutex.Unlock()
 	if genericMocks[mock] == nil {
 		genericMocks[mock] = &GenericMock{mockedMethods: make(map[string]*mockedMethod)}
 	}
@@ -493,4 +544,21 @@ func SDumpInvocationsFor(mock Mock) string {
 		}
 	}
 	return result.String()
+}
+
+// InterceptMockFailures runs a given callback and returns an array of
+// failure messages generated by any Pegomock verifications within the callback.
+//
+// This is accomplished by temporarily replacing the *global* fail handler
+// with a fail handler that simply annotates failures.  The original fail handler
+// is reset when InterceptMockFailures returns.
+func InterceptMockFailures(f func()) []string {
+	originalHandler := GlobalFailHandler
+	failures := []string{}
+	RegisterMockFailHandler(func(message string, callerSkip ...int) {
+		failures = append(failures, message)
+	})
+	f()
+	RegisterMockFailHandler(originalHandler)
+	return failures
 }
