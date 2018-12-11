@@ -41,6 +41,21 @@ func GenerateDefaultMatchers() string {
 			GenerateAnyMatcherFactory(kind) +
 			GenerateAnySliceMatcherFactory(kind)
 	}
+	// hard-coding this for now as interface{} overall works slighly different than other types.
+	result += `func EqInterface(value interface{}) interface{} {
+	RegisterMatcher(&EqMatcher{Value: value})
+	return nil
+}
+
+func AnyInterface() interface{} {
+	RegisterMatcher(NewAnyMatcher(reflect.TypeOf((*(interface{}))(nil)).Elem()))
+	return nil
+}
+
+func AnyInterfaceSlice() []interface{} {
+	RegisterMatcher(NewAnyMatcher(reflect.SliceOf(reflect.TypeOf((*(interface{}))(nil)).Elem())))
+	return nil
+}`
 	return result
 }
 

@@ -19,16 +19,25 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"sync"
 	"testing"
+	"time"
 
 	. "github.com/petergtz/pegomock"
 	. "github.com/petergtz/pegomock/matchers"
 
 	"github.com/onsi/ginkgo"
-	. "github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	. "github.com/onsi/gomega"
 	"github.com/petergtz/pegomock"
+)
+
+var (
+	BeforeEach = ginkgo.BeforeEach
+	It         = ginkgo.It
+	FIt        = ginkgo.FIt
+	Describe   = ginkgo.Describe
+	Context    = ginkgo.Context
 )
 
 func TestDSL(t *testing.T) {
@@ -750,8 +759,106 @@ var _ = Describe("MockDisplay", func() {
 			})
 		})
 
+		Context("Concurrent access to mock", func() {
+			It("does not panic", func() {
+				Expect(func() {
+					wg := sync.WaitGroup{}
+					for i := 0; i < 10; i++ {
+						wg.Add(1)
+
+						go func() {
+							display.SomeValue()
+							wg.Done()
+						}()
+					}
+					wg.Wait()
+				}).ToNot(Panic())
+			})
+
+			Context("Concurrent access due to one mock calling the other", func() {
+				It("does not deadlock", func() {
+					When(display.SomeValue()).Then(func(params []Param) ReturnValues {
+						display.Show("Some irrelevant string")
+						return []ReturnValue{}
+					})
+					display.SomeValue()
+
+					display.VerifyWasCalledOnce().Show(AnyString())
+				})
+			})
+
+			Context("Concurrent access with multiple stubbing and validation", func() {
+				It("does not panic", func() {
+					pegomock.
+						When(display.MultipleValues()).
+						Then(func(params []pegomock.Param) pegomock.ReturnValues {
+							return pegomock.ReturnValues{"MultipleValues", 42, float32(3.14)}
+						})
+
+					pegomock.
+						When(display.MultipleParamsAndReturnValue(AnyString(), AnyInt())).
+						Then(func(params []pegomock.Param) pegomock.ReturnValues {
+							return pegomock.ReturnValues{"MultipleParamsAndReturnValue" + params[0].(string)}
+						})
+
+					Expect(func() {
+						wg := sync.WaitGroup{}
+
+						for i := 0; i < 10; i++ {
+							wg.Add(1)
+
+							go func() {
+								display.MultipleValues()
+								display.MultipleParamsAndReturnValue("TestString", 42)
+								wg.Done()
+							}()
+						}
+
+						wg.Wait()
+
+						display.VerifyWasCalled(Times(10)).MultipleValues()
+						display.VerifyWasCalled(Times(10)).MultipleParamsAndReturnValue(AnyString(), AnyInt())
+						display.VerifyWasCalled(Never()).SomeValue()
+					}).ToNot(Panic())
+				})
+			})
+		})
+
 	})
 
+	Describe("Using VerifyWasCalledEventually when object under test calls goroutine", func() {
+		It("correctly fails when timeout is shorter than mock invocation, and succeeds, when timeout is longer", func() {
+			go func() {
+				time.Sleep(1 * time.Second)
+				display.Show("hello")
+			}()
+			Expect(func() { display.VerifyWasCalledEventually(Once(), 100*time.Millisecond).Show("hello") }).
+				To(PanicWithMessageTo(SatisfyAll(
+					ContainSubstring("Mock invocation count for Show(\"hello\") does not match expectation"),
+					ContainSubstring("after timeout of 100ms"),
+					ContainSubstring("Expected: 1; but got: 0"),
+				)))
+
+			Expect(func() { display.VerifyWasCalledEventually(Once(), 2*time.Second).Show("hello") }).NotTo(Panic())
+		})
+
+	})
+
+	Describe("Manipulating out args (using pointers) in Then blocks", func() {
+		It("correctly manipulates the out args", func() {
+			type Entity struct{ i int }
+			var input = []Entity{}
+			When(func() { display.InterfaceParam(AnyInterface()) }).Then(func(params []pegomock.Param) pegomock.ReturnValues {
+				*params[0].(*[]Entity) = append(*params[0].(*[]Entity), Entity{3})
+				return nil
+			})
+
+			display.InterfaceParam(&input)
+
+			Expect(input).To(HaveLen(1))
+			Expect(input[0].i).To(Equal(3))
+		})
+	})
 })
 
 func flattenStringSliceOfSlices(sliceOfSlices [][]string) (result []string) {

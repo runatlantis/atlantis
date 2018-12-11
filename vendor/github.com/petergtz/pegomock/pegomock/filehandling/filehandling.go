@@ -25,7 +25,17 @@ func GenerateMockFileInOutputDir(
 	debugParser bool,
 	out io.Writer,
 	useExperimentalModelGen bool,
-	shouldGenerateMatchers bool) {
+	shouldGenerateMatchers bool,
+	matchersDestination string) {
+
+	// if a file path override is specified
+	// ensure all directories in the path are created
+	if outputFilePathOverride != "" {
+		if err := os.MkdirAll(filepath.Dir(outputFilePathOverride), 0755); err != nil {
+			panic(fmt.Errorf("Failed to make output directory, error: %v", err))
+		}
+	}
+
 	GenerateMockFile(
 		args,
 		OutputFilePath(args, outputDirPath, outputFilePathOverride),
@@ -34,7 +44,8 @@ func GenerateMockFileInOutputDir(
 		debugParser,
 		out,
 		useExperimentalModelGen,
-		shouldGenerateMatchers)
+		shouldGenerateMatchers,
+		matchersDestination)
 }
 
 func OutputFilePath(args []string, outputDirPath string, outputFilePathOverride string) string {
@@ -47,7 +58,7 @@ func OutputFilePath(args []string, outputDirPath string, outputFilePathOverride 
 	}
 }
 
-func GenerateMockFile(args []string, outputFilePath string, packageOut string, selfPackage string, debugParser bool, out io.Writer, useExperimentalModelGen bool, shouldGenerateMatchers bool) {
+func GenerateMockFile(args []string, outputFilePath string, packageOut string, selfPackage string, debugParser bool, out io.Writer, useExperimentalModelGen bool, shouldGenerateMatchers bool, matchersDestination string) {
 	mockSourceCode, matcherSourceCodes := GenerateMockSourceCode(args, packageOut, selfPackage, debugParser, out, useExperimentalModelGen)
 
 	err := ioutil.WriteFile(outputFilePath, mockSourceCode, 0664)
@@ -57,6 +68,9 @@ func GenerateMockFile(args []string, outputFilePath string, packageOut string, s
 
 	if shouldGenerateMatchers {
 		matchersPath := filepath.Join(filepath.Dir(outputFilePath), "matchers")
+		if matchersDestination != "" {
+			matchersPath = matchersDestination
+		}
 		err = os.MkdirAll(matchersPath, 0755)
 		if err != nil {
 			panic(fmt.Errorf("Failed making dirs \"%v\": %v", matchersPath, err))

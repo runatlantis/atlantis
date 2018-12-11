@@ -30,5 +30,5 @@ var _ = It("Generate mocks", func() {
 	filehandling.GenerateMockFile(
 		[]string{"github.com/petergtz/pegomock/test_interface", "Display"},
 		"../../mock_display_test.go", "pegomock_test",
-		"", false, os.Stdout, true, true)
+		"", false, os.Stdout, true, true, "")
 })
