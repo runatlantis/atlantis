@@ -227,6 +227,74 @@ workflows:
 			},
 		},
 		{
+			description: "project field with mergeable apply requirement",
+			input: `
+version: 2
+projects:
+- dir: .
+  workspace: myworkspace
+  terraform_version: v0.11.0
+  apply_requirements: [mergeable]
+  workflow: myworkflow
+  autoplan:
+    enabled: false
+workflows:
+  myworkflow: ~`,
+			exp: valid.Config{
+				Version: 2,
+				Projects: []valid.Project{
+					{
+						Dir:              ".",
+						Workspace:        "myworkspace",
+						Workflow:         String("myworkflow"),
+						TerraformVersion: tfVersion,
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf*"},
+							Enabled:      false,
+						},
+						ApplyRequirements: []string{"mergeable"},
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"myworkflow": {},
+				},
+			},
+		},
+		{
+			description: "project field with mergeable and approved apply requirements",
+			input: `
+version: 2
+projects:
+- dir: .
+  workspace: myworkspace
+  terraform_version: v0.11.0
+  apply_requirements: [mergeable, approved]
+  workflow: myworkflow
+  autoplan:
+    enabled: false
+workflows:
+  myworkflow: ~`,
+			exp: valid.Config{
+				Version: 2,
+				Projects: []valid.Project{
+					{
+						Dir:              ".",
+						Workspace:        "myworkspace",
+						Workflow:         String("myworkflow"),
+						TerraformVersion: tfVersion,
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf*"},
+							Enabled:      false,
+						},
+						ApplyRequirements: []string{"mergeable", "approved"},
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"myworkflow": {},
+				},
+			},
+		},
+		{
 			description: "project dir with ..",
 			input: `
 version: 2

@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	DefaultWorkspace         = "default"
-	ApprovedApplyRequirement = "approved"
+	DefaultWorkspace          = "default"
+	ApprovedApplyRequirement  = "approved"
+	MergeableApplyRequirement = "mergeable"
 )
 
 type Project struct {
@@ -37,8 +38,8 @@ func (p Project) Validate() error {
 	validApplyReq := func(value interface{}) error {
 		reqs := value.([]string)
 		for _, r := range reqs {
-			if r != ApprovedApplyRequirement {
-				return fmt.Errorf("%q not supported, only %s is supported", r, ApprovedApplyRequirement)
+			if r != ApprovedApplyRequirement && r != MergeableApplyRequirement {
+				return fmt.Errorf("%q not supported, only %s and %s are supported", r, ApprovedApplyRequirement, MergeableApplyRequirement)
 			}
 		}
 		return nil

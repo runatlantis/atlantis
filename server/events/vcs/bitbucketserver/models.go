@@ -64,3 +64,8 @@ type Changes struct {
 	NextPageStart *int  `json:"nextPageStart,omitempty"`
 	IsLastPage    *bool `json:"isLastPage,omitempty" validate:"required"`
 }
+
+type MergeStatus struct {
+	CanMerge   *bool `json:"canMerge,omitempty" validate:"required"`
+	Conflicted *bool `json:"conflicted,omitempty" validate:"required"`
+}

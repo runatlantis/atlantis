@@ -118,7 +118,6 @@ func main() {
 func createAtlantisWebhook(g *GithubClient, ownerName string, repoName string, hookURL string) (int, error) {
 	// create atlantis hook
 	atlantisHook := &github.Hook{
-		Name:   github.String("web"),
 		Events: []string{"issue_comment", "pull_request", "push"},
 		Config: map[string]interface{}{
 			"url":          hookURL,

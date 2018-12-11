@@ -31,7 +31,7 @@ func TestProject_UnmarshalYAML(t *testing.T) {
 			},
 		},
 		{
-			description: "all fields set",
+			description: "all fields set including mergeable apply requirement",
 			input: `
 name: myname
 dir: mydir
@@ -101,13 +101,29 @@ func TestProject_Validate(t *testing.T) {
 				Dir:               String("."),
 				ApplyRequirements: []string{"unsupported"},
 			},
-			expErr: "apply_requirements: \"unsupported\" not supported, only approved is supported.",
+			expErr: "apply_requirements: \"unsupported\" not supported, only approved and mergeable are supported.",
 		},
 		{
-			description: "apply reqs with valid",
+			description: "apply reqs with approved requirement",
 			input: raw.Project{
 				Dir:               String("."),
 				ApplyRequirements: []string{"approved"},
+			},
+			expErr: "",
+		},
+		{
+			description: "apply reqs with mergeable requirement",
+			input: raw.Project{
+				Dir:               String("."),
+				ApplyRequirements: []string{"mergeable"},
+			},
+			expErr: "",
+		},
+		{
+			description: "apply reqs with mergeable and approved requirements",
+			input: raw.Project{
+				Dir:               String("."),
+				ApplyRequirements: []string{"mergeable", "approved"},
 			},
 			expErr: "",
 		},

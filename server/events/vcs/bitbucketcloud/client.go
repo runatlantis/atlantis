@@ -124,6 +124,27 @@ func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool
 	return false, nil
 }
 
+// PullIsMergeable returns true if the merge request has no conflicts and can be merged.
+func (b *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
+	// NOTE: The 1.0 API is deprecated, but the 2.0 API does not provide this endpoint.
+	path := fmt.Sprintf("%s/1.0/repositories/%s/pullrequests/%d/conflict-status", b.BaseURL, repo.FullName, pull.Num)
+	resp, err := b.makeRequest("GET", path, nil)
+	if err != nil {
+		return false, err
+	}
+	var conflictStatus ConflictStatus
+	if err := json.Unmarshal(resp, &conflictStatus); err != nil {
+		return false, errors.Wrapf(err, "Could not parse response %q", string(resp))
+	}
+	if err := validator.New().Struct(conflictStatus); err != nil {
+		return false, errors.Wrapf(err, "API response %q was missing fields", string(resp))
+	}
+	if !*conflictStatus.MergeImpossible && !*conflictStatus.IsConflicted {
+		return true, nil
+	}
+	return false, nil
+}
+
 // UpdateStatus updates the status of a commit.
 func (b *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, status models.CommitStatus, description string) error {
 	bbState := "FAILED"

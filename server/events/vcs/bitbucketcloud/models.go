@@ -80,3 +80,8 @@ type Comment struct {
 type CommentContent struct {
 	Raw *string `json:"raw,omitempty" validate:"required"`
 }
+
+type ConflictStatus struct {
+	MergeImpossible *bool `json:"mergeimpossible,omitempty" validate:"required"`
+	IsConflicted    *bool `json:"isconflicted,omitempty" validate:"required"`
+}

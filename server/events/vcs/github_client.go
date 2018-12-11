@@ -121,6 +121,15 @@ func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 	return false, nil
 }
 
+// PullIsMergeable returns true if the pull request is mergeable.
+func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
+	githubPR, err := g.GetPullRequest(repo, pull.Num)
+	if err != nil {
+		return false, errors.Wrap(err, "getting pull request")
+	}
+	return githubPR.GetMergeable(), nil
+}
+
 // GetPullRequest returns the pull request.
 func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRequest, error) {
 	pull, _, err := g.client.PullRequests.Get(g.ctx, repo.Owner, repo.Name, num)
