@@ -115,7 +115,7 @@ func main() {
 
 }
 
-func createAtlantisWebhook(g *GithubClient, ownerName string, repoName string, hookURL string) (int, error) {
+func createAtlantisWebhook(g *GithubClient, ownerName string, repoName string, hookURL string) (int64, error) {
 	// create atlantis hook
 	atlantisHook := &github.Hook{
 		Events: []string{"issue_comment", "pull_request", "push"},
@@ -137,7 +137,7 @@ func createAtlantisWebhook(g *GithubClient, ownerName string, repoName string, h
 }
 
 // nolint: unparam
-func deleteAtlantisHook(g *GithubClient, ownerName string, repoName string, hookID int) error {
+func deleteAtlantisHook(g *GithubClient, ownerName string, repoName string, hookID int64) error {
 	_, err := g.client.Repositories.DeleteHook(g.ctx, ownerName, repoName, hookID)
 	if err != nil {
 		return err

@@ -29,7 +29,7 @@ type E2ETester struct {
 	repoURL      string
 	ownerName    string
 	repoName     string
-	hookID       int
+	hookID       int64
 	cloneDirRoot string
 	projectType  Project
 }

@@ -17,6 +17,13 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
+	"strings"
+	"testing"
+
 	"github.com/lkysow/go-gitlab"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server"
@@ -28,12 +35,6 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/mocks"
 	. "github.com/runatlantis/atlantis/testing"
-	"io/ioutil"
-	"net/http"
-	"net/http/httptest"
-	"path/filepath"
-	"strings"
-	"testing"
 )
 
 const githubHeader = "X-Github-Event"
