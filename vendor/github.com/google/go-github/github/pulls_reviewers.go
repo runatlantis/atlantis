@@ -32,9 +32,6 @@ func (s *PullRequestsService) RequestReviewers(ctx context.Context, owner, repo 
 		return nil, nil, err
 	}
 
-	// TODO: remove custom Accept header when this API fully launches.
-	req.Header.Set("Accept", mediaTypeTeamReviewPreview)
-
 	r := new(PullRequest)
 	resp, err := s.client.Do(ctx, req, r)
 	if err != nil {
@@ -59,9 +56,6 @@ func (s *PullRequestsService) ListReviewers(ctx context.Context, owner, repo str
 		return nil, nil, err
 	}
 
-	// TODO: remove custom Accept header when this API fully launches.
-	req.Header.Set("Accept", mediaTypeTeamReviewPreview)
-
 	reviewers := new(Reviewers)
 	resp, err := s.client.Do(ctx, req, reviewers)
 	if err != nil {
@@ -81,8 +75,5 @@ func (s *PullRequestsService) RemoveReviewers(ctx context.Context, owner, repo s
 		return nil, err
 	}
 
-	// TODO: remove custom Accept header when this API fully launches.
-	req.Header.Set("Accept", mediaTypeTeamReviewPreview)
-
-	return s.client.Do(ctx, req, reviewers)
+	return s.client.Do(ctx, req, nil)
 }

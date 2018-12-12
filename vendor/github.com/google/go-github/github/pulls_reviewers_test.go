@@ -14,13 +14,12 @@ import (
 )
 
 func TestRequestReviewers(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/repos/o/r/pulls/1/requested_reviewers", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "POST")
 		testBody(t, r, `{"reviewers":["octocat","googlebot"],"team_reviewers":["justice-league","injustice-league"]}`+"\n")
-		testHeader(t, r, "Accept", mediaTypeTeamReviewPreview)
 		fmt.Fprint(w, `{"number":1}`)
 	})
 
@@ -36,12 +35,11 @@ func TestRequestReviewers(t *testing.T) {
 }
 
 func TestRemoveReviewers(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/repos/o/r/pulls/1/requested_reviewers", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
-		testHeader(t, r, "Accept", mediaTypeTeamReviewPreview)
 		testBody(t, r, `{"reviewers":["octocat","googlebot"],"team_reviewers":["justice-league"]}`+"\n")
 	})
 
@@ -52,12 +50,11 @@ func TestRemoveReviewers(t *testing.T) {
 }
 
 func TestListReviewers(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/repos/o/r/pulls/1/requested_reviewers", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
-		testHeader(t, r, "Accept", mediaTypeTeamReviewPreview)
 		fmt.Fprint(w, `{"users":[{"login":"octocat","id":1}],"teams":[{"id":1,"name":"Justice League"}]}`)
 	})
 
@@ -70,12 +67,12 @@ func TestListReviewers(t *testing.T) {
 		Users: []*User{
 			{
 				Login: String("octocat"),
-				ID:    Int(1),
+				ID:    Int64(1),
 			},
 		},
 		Teams: []*Team{
 			{
-				ID:   Int(1),
+				ID:   Int64(1),
 				Name: String("Justice League"),
 			},
 		},
@@ -86,7 +83,7 @@ func TestListReviewers(t *testing.T) {
 }
 
 func TestListReviewers_withOptions(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/repos/o/r/pulls/1/requested_reviewers", func(w http.ResponseWriter, r *http.Request) {

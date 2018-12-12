@@ -15,11 +15,12 @@ import (
 )
 
 func TestIssuesService_ListLabels(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/repos/o/r/labels", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
+		testHeader(t, r, "Accept", mediaTypeLabelDescriptionSearchPreview)
 		testFormValues(t, r, values{"page": "2"})
 		fmt.Fprint(w, `[{"name": "a"},{"name": "b"}]`)
 	})
@@ -37,17 +38,21 @@ func TestIssuesService_ListLabels(t *testing.T) {
 }
 
 func TestIssuesService_ListLabels_invalidOwner(t *testing.T) {
+	client, _, _, teardown := setup()
+	defer teardown()
+
 	_, _, err := client.Issues.ListLabels(context.Background(), "%", "%", nil)
 	testURLParseError(t, err)
 }
 
 func TestIssuesService_GetLabel(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/repos/o/r/labels/n", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
-		fmt.Fprint(w, `{"url":"u", "name": "n", "color": "c"}`)
+		testHeader(t, r, "Accept", mediaTypeLabelDescriptionSearchPreview)
+		fmt.Fprint(w, `{"url":"u", "name": "n", "color": "c", "description": "d"}`)
 	})
 
 	label, _, err := client.Issues.GetLabel(context.Background(), "o", "r", "n")
@@ -55,19 +60,22 @@ func TestIssuesService_GetLabel(t *testing.T) {
 		t.Errorf("Issues.GetLabel returned error: %v", err)
 	}
 
-	want := &Label{URL: String("u"), Name: String("n"), Color: String("c")}
+	want := &Label{URL: String("u"), Name: String("n"), Color: String("c"), Description: String("d")}
 	if !reflect.DeepEqual(label, want) {
 		t.Errorf("Issues.GetLabel returned %+v, want %+v", label, want)
 	}
 }
 
 func TestIssuesService_GetLabel_invalidOwner(t *testing.T) {
+	client, _, _, teardown := setup()
+	defer teardown()
+
 	_, _, err := client.Issues.GetLabel(context.Background(), "%", "%", "%")
 	testURLParseError(t, err)
 }
 
 func TestIssuesService_CreateLabel(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	input := &Label{Name: String("n")}
@@ -77,6 +85,7 @@ func TestIssuesService_CreateLabel(t *testing.T) {
 		json.NewDecoder(r.Body).Decode(v)
 
 		testMethod(t, r, "POST")
+		testHeader(t, r, "Accept", mediaTypeLabelDescriptionSearchPreview)
 		if !reflect.DeepEqual(v, input) {
 			t.Errorf("Request body = %+v, want %+v", v, input)
 		}
@@ -96,12 +105,15 @@ func TestIssuesService_CreateLabel(t *testing.T) {
 }
 
 func TestIssuesService_CreateLabel_invalidOwner(t *testing.T) {
+	client, _, _, teardown := setup()
+	defer teardown()
+
 	_, _, err := client.Issues.CreateLabel(context.Background(), "%", "%", nil)
 	testURLParseError(t, err)
 }
 
 func TestIssuesService_EditLabel(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	input := &Label{Name: String("z")}
@@ -111,6 +123,7 @@ func TestIssuesService_EditLabel(t *testing.T) {
 		json.NewDecoder(r.Body).Decode(v)
 
 		testMethod(t, r, "PATCH")
+		testHeader(t, r, "Accept", mediaTypeLabelDescriptionSearchPreview)
 		if !reflect.DeepEqual(v, input) {
 			t.Errorf("Request body = %+v, want %+v", v, input)
 		}
@@ -130,12 +143,15 @@ func TestIssuesService_EditLabel(t *testing.T) {
 }
 
 func TestIssuesService_EditLabel_invalidOwner(t *testing.T) {
+	client, _, _, teardown := setup()
+	defer teardown()
+
 	_, _, err := client.Issues.EditLabel(context.Background(), "%", "%", "%", nil)
 	testURLParseError(t, err)
 }
 
 func TestIssuesService_DeleteLabel(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/repos/o/r/labels/n", func(w http.ResponseWriter, r *http.Request) {
@@ -149,16 +165,20 @@ func TestIssuesService_DeleteLabel(t *testing.T) {
 }
 
 func TestIssuesService_DeleteLabel_invalidOwner(t *testing.T) {
+	client, _, _, teardown := setup()
+	defer teardown()
+
 	_, err := client.Issues.DeleteLabel(context.Background(), "%", "%", "%")
 	testURLParseError(t, err)
 }
 
 func TestIssuesService_ListLabelsByIssue(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/repos/o/r/issues/1/labels", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
+		testHeader(t, r, "Accept", mediaTypeLabelDescriptionSearchPreview)
 		testFormValues(t, r, values{"page": "2"})
 		fmt.Fprint(w, `[{"name":"a","id":1},{"name":"b","id":2}]`)
 	})
@@ -170,8 +190,8 @@ func TestIssuesService_ListLabelsByIssue(t *testing.T) {
 	}
 
 	want := []*Label{
-		{Name: String("a"), ID: Int(1)},
-		{Name: String("b"), ID: Int(2)},
+		{Name: String("a"), ID: Int64(1)},
+		{Name: String("b"), ID: Int64(2)},
 	}
 	if !reflect.DeepEqual(labels, want) {
 		t.Errorf("Issues.ListLabelsByIssue returned %+v, want %+v", labels, want)
@@ -179,12 +199,15 @@ func TestIssuesService_ListLabelsByIssue(t *testing.T) {
 }
 
 func TestIssuesService_ListLabelsByIssue_invalidOwner(t *testing.T) {
+	client, _, _, teardown := setup()
+	defer teardown()
+
 	_, _, err := client.Issues.ListLabelsByIssue(context.Background(), "%", "%", 1, nil)
 	testURLParseError(t, err)
 }
 
 func TestIssuesService_AddLabelsToIssue(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	input := []string{"a", "b"}
@@ -194,6 +217,7 @@ func TestIssuesService_AddLabelsToIssue(t *testing.T) {
 		json.NewDecoder(r.Body).Decode(&v)
 
 		testMethod(t, r, "POST")
+		testHeader(t, r, "Accept", mediaTypeLabelDescriptionSearchPreview)
 		if !reflect.DeepEqual(v, input) {
 			t.Errorf("Request body = %+v, want %+v", v, input)
 		}
@@ -213,15 +237,19 @@ func TestIssuesService_AddLabelsToIssue(t *testing.T) {
 }
 
 func TestIssuesService_AddLabelsToIssue_invalidOwner(t *testing.T) {
+	client, _, _, teardown := setup()
+	defer teardown()
+
 	_, _, err := client.Issues.AddLabelsToIssue(context.Background(), "%", "%", 1, nil)
 	testURLParseError(t, err)
 }
 
 func TestIssuesService_RemoveLabelForIssue(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/repos/o/r/issues/1/labels/l", func(w http.ResponseWriter, r *http.Request) {
+		testHeader(t, r, "Accept", mediaTypeLabelDescriptionSearchPreview)
 		testMethod(t, r, "DELETE")
 	})
 
@@ -232,12 +260,15 @@ func TestIssuesService_RemoveLabelForIssue(t *testing.T) {
 }
 
 func TestIssuesService_RemoveLabelForIssue_invalidOwner(t *testing.T) {
+	client, _, _, teardown := setup()
+	defer teardown()
+
 	_, err := client.Issues.RemoveLabelForIssue(context.Background(), "%", "%", 1, "%")
 	testURLParseError(t, err)
 }
 
 func TestIssuesService_ReplaceLabelsForIssue(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	input := []string{"a", "b"}
@@ -247,6 +278,7 @@ func TestIssuesService_ReplaceLabelsForIssue(t *testing.T) {
 		json.NewDecoder(r.Body).Decode(&v)
 
 		testMethod(t, r, "PUT")
+		testHeader(t, r, "Accept", mediaTypeLabelDescriptionSearchPreview)
 		if !reflect.DeepEqual(v, input) {
 			t.Errorf("Request body = %+v, want %+v", v, input)
 		}
@@ -266,16 +298,20 @@ func TestIssuesService_ReplaceLabelsForIssue(t *testing.T) {
 }
 
 func TestIssuesService_ReplaceLabelsForIssue_invalidOwner(t *testing.T) {
+	client, _, _, teardown := setup()
+	defer teardown()
+
 	_, _, err := client.Issues.ReplaceLabelsForIssue(context.Background(), "%", "%", 1, nil)
 	testURLParseError(t, err)
 }
 
 func TestIssuesService_RemoveLabelsForIssue(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/repos/o/r/issues/1/labels", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "DELETE")
+		testHeader(t, r, "Accept", mediaTypeLabelDescriptionSearchPreview)
 	})
 
 	_, err := client.Issues.RemoveLabelsForIssue(context.Background(), "o", "r", 1)
@@ -285,16 +321,20 @@ func TestIssuesService_RemoveLabelsForIssue(t *testing.T) {
 }
 
 func TestIssuesService_RemoveLabelsForIssue_invalidOwner(t *testing.T) {
+	client, _, _, teardown := setup()
+	defer teardown()
+
 	_, err := client.Issues.RemoveLabelsForIssue(context.Background(), "%", "%", 1)
 	testURLParseError(t, err)
 }
 
 func TestIssuesService_ListLabelsForMilestone(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/repos/o/r/milestones/1/labels", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
+		testHeader(t, r, "Accept", mediaTypeLabelDescriptionSearchPreview)
 		testFormValues(t, r, values{"page": "2"})
 		fmt.Fprint(w, `[{"name": "a"},{"name": "b"}]`)
 	})
@@ -312,6 +352,9 @@ func TestIssuesService_ListLabelsForMilestone(t *testing.T) {
 }
 
 func TestIssuesService_ListLabelsForMilestone_invalidOwner(t *testing.T) {
+	client, _, _, teardown := setup()
+	defer teardown()
+
 	_, _, err := client.Issues.ListLabelsForMilestone(context.Background(), "%", "%", 1, nil)
 	testURLParseError(t, err)
 }

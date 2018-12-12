@@ -15,7 +15,7 @@ import (
 )
 
 func TestOrganizationsService_ListProjects(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/orgs/o/projects", func(w http.ResponseWriter, r *http.Request) {
@@ -31,17 +31,17 @@ func TestOrganizationsService_ListProjects(t *testing.T) {
 		t.Errorf("Organizations.ListProjects returned error: %v", err)
 	}
 
-	want := []*Project{{ID: Int(1)}}
+	want := []*Project{{ID: Int64(1)}}
 	if !reflect.DeepEqual(projects, want) {
 		t.Errorf("Organizations.ListProjects returned %+v, want %+v", projects, want)
 	}
 }
 
 func TestOrganizationsService_CreateProject(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
-	input := &ProjectOptions{Name: "Project Name", Body: "Project body."}
+	input := &ProjectOptions{Name: String("Project Name"), Body: String("Project body.")}
 
 	mux.HandleFunc("/orgs/o/projects", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "POST")
@@ -61,7 +61,7 @@ func TestOrganizationsService_CreateProject(t *testing.T) {
 		t.Errorf("Organizations.CreateProject returned error: %v", err)
 	}
 
-	want := &Project{ID: Int(1)}
+	want := &Project{ID: Int64(1)}
 	if !reflect.DeepEqual(project, want) {
 		t.Errorf("Organizations.CreateProject returned %+v, want %+v", project, want)
 	}

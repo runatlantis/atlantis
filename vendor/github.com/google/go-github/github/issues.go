@@ -8,6 +8,7 @@ package github
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -25,7 +26,7 @@ type IssuesService service
 // this is an issue, and if PullRequestLinks is not nil, this is a pull request.
 // The IsPullRequest helper method can be used to check that.
 type Issue struct {
-	ID               *int              `json:"id,omitempty"`
+	ID               *int64            `json:"id,omitempty"`
 	Number           *int              `json:"number,omitempty"`
 	State            *string           `json:"state,omitempty"`
 	Locked           *bool             `json:"locked,omitempty"`
@@ -50,10 +51,15 @@ type Issue struct {
 	Repository       *Repository       `json:"repository,omitempty"`
 	Reactions        *Reactions        `json:"reactions,omitempty"`
 	Assignees        []*User           `json:"assignees,omitempty"`
+	NodeID           *string           `json:"node_id,omitempty"`
 
 	// TextMatches is only populated from search results that request text matches
 	// See: search.go and https://developer.github.com/v3/search/#text-match-metadata
 	TextMatches []TextMatch `json:"text_matches,omitempty"`
+
+	// ActiveLockReason is populated only when LockReason is provided while locking the issue.
+	// Possible values are: "off-topic", "too heated", "resolved", and "spam".
+	ActiveLockReason *string `json:"active_lock_reason,omitempty"`
 }
 
 func (i Issue) String() string {
@@ -153,8 +159,9 @@ func (s *IssuesService) listIssues(ctx context.Context, u string, opt *IssueList
 		return nil, nil, err
 	}
 
-	// TODO: remove custom Accept header when this API fully launches.
-	req.Header.Set("Accept", mediaTypeReactionsPreview)
+	// TODO: remove custom Accept headers when APIs fully launch.
+	acceptHeaders := []string{mediaTypeReactionsPreview, mediaTypeLabelDescriptionSearchPreview, mediaTypeLockReasonPreview}
+	req.Header.Set("Accept", strings.Join(acceptHeaders, ", "))
 
 	var issues []*Issue
 	resp, err := s.client.Do(ctx, req, &issues)
@@ -220,8 +227,9 @@ func (s *IssuesService) ListByRepo(ctx context.Context, owner string, repo strin
 		return nil, nil, err
 	}
 
-	// TODO: remove custom Accept header when this API fully launches.
-	req.Header.Set("Accept", mediaTypeReactionsPreview)
+	// TODO: remove custom Accept headers when APIs fully launch.
+	acceptHeaders := []string{mediaTypeReactionsPreview, mediaTypeLabelDescriptionSearchPreview, mediaTypeIntegrationPreview}
+	req.Header.Set("Accept", strings.Join(acceptHeaders, ", "))
 
 	var issues []*Issue
 	resp, err := s.client.Do(ctx, req, &issues)
@@ -242,8 +250,9 @@ func (s *IssuesService) Get(ctx context.Context, owner string, repo string, numb
 		return nil, nil, err
 	}
 
-	// TODO: remove custom Accept header when this API fully launches.
-	req.Header.Set("Accept", mediaTypeReactionsPreview)
+	// TODO: remove custom Accept headers when APIs fully launch.
+	acceptHeaders := []string{mediaTypeReactionsPreview, mediaTypeLabelDescriptionSearchPreview, mediaTypeLockReasonPreview}
+	req.Header.Set("Accept", strings.Join(acceptHeaders, ", "))
 
 	issue := new(Issue)
 	resp, err := s.client.Do(ctx, req, issue)
@@ -264,6 +273,9 @@ func (s *IssuesService) Create(ctx context.Context, owner string, repo string, i
 		return nil, nil, err
 	}
 
+	// TODO: remove custom Accept header when this API fully launches.
+	req.Header.Set("Accept", mediaTypeLabelDescriptionSearchPreview)
+
 	i := new(Issue)
 	resp, err := s.client.Do(ctx, req, i)
 	if err != nil {
@@ -283,6 +295,9 @@ func (s *IssuesService) Edit(ctx context.Context, owner string, repo string, num
 		return nil, nil, err
 	}
 
+	// TODO: remove custom Accept header when this API fully launches.
+	req.Header.Set("Accept", mediaTypeLabelDescriptionSearchPreview)
+
 	i := new(Issue)
 	resp, err := s.client.Do(ctx, req, i)
 	if err != nil {
@@ -292,14 +307,27 @@ func (s *IssuesService) Edit(ctx context.Context, owner string, repo string, num
 	return i, resp, nil
 }
 
+// LockIssueOptions specifies the optional parameters to the
+// IssuesService.Lock method.
+type LockIssueOptions struct {
+	// LockReason specifies the reason to lock this issue.
+	// Providing a lock reason can help make it clearer to contributors why an issue
+	// was locked. Possible values are: "off-topic", "too heated", "resolved", and "spam".
+	LockReason string `json:"lock_reason,omitempty"`
+}
+
 // Lock an issue's conversation.
 //
 // GitHub API docs: https://developer.github.com/v3/issues/#lock-an-issue
-func (s *IssuesService) Lock(ctx context.Context, owner string, repo string, number int) (*Response, error) {
+func (s *IssuesService) Lock(ctx context.Context, owner string, repo string, number int, opt *LockIssueOptions) (*Response, error) {
 	u := fmt.Sprintf("repos/%v/%v/issues/%d/lock", owner, repo, number)
-	req, err := s.client.NewRequest("PUT", u, nil)
+	req, err := s.client.NewRequest("PUT", u, opt)
 	if err != nil {
 		return nil, err
+	}
+
+	if opt != nil {
+		req.Header.Set("Accept", mediaTypeLockReasonPreview)
 	}
 
 	return s.client.Do(ctx, req, nil)

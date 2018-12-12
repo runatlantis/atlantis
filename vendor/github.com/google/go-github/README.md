@@ -1,21 +1,19 @@
 # go-github #
 
+[![GoDoc](https://godoc.org/github.com/google/go-github/github?status.svg)](https://godoc.org/github.com/google/go-github/github) [![Build Status](https://travis-ci.org/google/go-github.svg?branch=master)](https://travis-ci.org/google/go-github) [![Test Coverage](https://coveralls.io/repos/google/go-github/badge.svg?branch=master)](https://coveralls.io/r/google/go-github?branch=master) [![Discuss at go-github@googlegroups.com](https://img.shields.io/badge/discuss-go--github%40googlegroups.com-blue.svg)](https://groups.google.com/group/go-github)
+
 go-github is a Go client library for accessing the [GitHub API v3][].
 
-**Documentation:** [![GoDoc](https://godoc.org/github.com/google/go-github/github?status.svg)](https://godoc.org/github.com/google/go-github/github)  
-**Mailing List:** [go-github@googlegroups.com](https://groups.google.com/group/go-github)  
-**Build Status:** [![Build Status](https://travis-ci.org/google/go-github.svg?branch=master)](https://travis-ci.org/google/go-github)  
-**Test Coverage:** [![Test Coverage](https://coveralls.io/repos/google/go-github/badge.svg?branch=master)](https://coveralls.io/r/google/go-github?branch=master)
-
-go-github requires Go version 1.7 or greater.
+go-github requires Go version 1.9 or greater.
 
 If you're interested in using the [GraphQL API v4][], the recommended library is
-[shurcooL/githubql][].
+[shurcooL/githubv4][].
 
 ## Usage ##
 
 ```go
-import "github.com/google/go-github/github"
+import "github.com/google/go-github/v19/github"	// with go modules enabled (GO111MODULE=on or outside GOPATH)
+import "github.com/google/go-github/github" // with go modules disabled
 ```
 
 Construct a new GitHub client, then use the various services on the client to
@@ -25,7 +23,7 @@ access different parts of the GitHub API. For example:
 client := github.NewClient(nil)
 
 // list all organizations for user "willnorris"
-orgs, _, err := client.Organizations.List(ctx, "willnorris", nil)
+orgs, _, err := client.Organizations.List(context.Background(), "willnorris", nil)
 ```
 
 Some API methods have optional parameters that can be passed. For example:
@@ -35,12 +33,20 @@ client := github.NewClient(nil)
 
 // list public repositories for org "github"
 opt := &github.RepositoryListByOrgOptions{Type: "public"}
-repos, _, err := client.Repositories.ListByOrg(ctx, "github", opt)
+repos, _, err := client.Repositories.ListByOrg(context.Background(), "github", opt)
 ```
 
 The services of a client divide the API into logical chunks and correspond to
 the structure of the GitHub API documentation at
 https://developer.github.com/v3/.
+
+NOTE: Using the [context](https://godoc.org/context) package, one can easily
+pass cancelation signals and deadlines to various services of the client for
+handling a request. In case there is no context available, then `context.Background()`
+can be used as a starting point.
+
+For more sample code snippets, head over to the
+[example](https://github.com/google/go-github/tree/master/example) directory.
 
 ### Authentication ###
 
@@ -208,7 +214,7 @@ For complete usage of go-github, see the full [package docs][].
 [personal API token]: https://github.com/blog/1509-personal-api-tokens
 [package docs]: https://godoc.org/github.com/google/go-github/github
 [GraphQL API v4]: https://developer.github.com/v4/
-[shurcooL/githubql]: https://github.com/shurcooL/githubql
+[shurcooL/githubv4]: https://github.com/shurcooL/githubv4
 
 ### Integration Tests ###
 
@@ -219,25 +225,37 @@ You can run integration tests from the `test` directory. See the integration tes
 This library is being initially developed for an internal application at
 Google, so API methods will likely be implemented in the order that they are
 needed by that application. You can track the status of implementation in
-[this Google spreadsheet][roadmap]. Eventually, I would like to cover the entire
-GitHub API, so contributions are of course [always welcome][contributing]. The
-calling pattern is pretty well established, so adding new methods is relatively
-straightforward.
+[this Google spreadsheet][roadmap].
 
 [roadmap]: https://docs.google.com/spreadsheet/ccc?key=0ApoVX4GOiXr-dGNKN1pObFh6ek1DR2FKUjBNZ1FmaEE&usp=sharing
-[contributing]: CONTRIBUTING.md
 
+## Contributing ##
+I would like to cover the entire GitHub API and contributions are of course always welcome. The
+calling pattern is pretty well established, so adding new methods is relatively
+straightforward. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for details.
 
-## Google App Engine ##
+## Versioning ##
 
-Go on App Engine Classic (which as of this writing uses Go 1.6) can not use
-the `"context"` import and still relies on `"golang.org/x/net/context"`.
-As a result, if you wish to continue to use `go-github` on App Engine Classic,
-you will need to rewrite all the `"context"` imports using the following command:
+In general, go-github follows [semver](https://semver.org/) as closely as we
+can for tagging releases of the package. For self-contained libraries, the
+application of semantic versioning is relatively straightforward and generally
+understood. But because go-github is a client library for the GitHub API, which
+itself changes behavior, and because we are typically pretty aggressive about
+implementing preview features of the GitHub API, we've adopted the following
+versioning policy:
 
-	gofmt -w -r '"context" -> "golang.org/x/net/context"' *.go
+* We increment the **major version** with any incompatible change to
+	non-preview functionality, including changes to the exported Go API surface
+	or behavior of the API.
+* We increment the **minor version** with any backwards-compatible changes to
+	functionality, as well as any changes to preview functionality in the GitHub
+	API. GitHub makes no guarantee about the stability of preview functionality,
+	so neither do we consider it a stable part of the go-github API.
+* We increment the **patch version** with any backwards-compatible bug fixes.
 
-See `with_appengine.go` for more details.
+Preview functionality may take the form of entire methods or simply additional
+data returned from an otherwise non-preview method. Refer to the GitHub API
+documentation for details on preview functionality.
 
 ## License ##
 

@@ -15,18 +15,19 @@ import (
 )
 
 func TestRepositoriesService_CreateHook(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
-	input := &Hook{Name: String("t")}
+	input := &Hook{CreatedAt: &referenceTime}
 
 	mux.HandleFunc("/repos/o/r/hooks", func(w http.ResponseWriter, r *http.Request) {
-		v := new(Hook)
+		v := new(createHookRequest)
 		json.NewDecoder(r.Body).Decode(v)
 
 		testMethod(t, r, "POST")
-		if !reflect.DeepEqual(v, input) {
-			t.Errorf("Request body = %+v, want %+v", v, input)
+		want := &createHookRequest{}
+		if !reflect.DeepEqual(v, want) {
+			t.Errorf("Request body = %+v, want %+v", v, want)
 		}
 
 		fmt.Fprint(w, `{"id":1}`)
@@ -37,19 +38,14 @@ func TestRepositoriesService_CreateHook(t *testing.T) {
 		t.Errorf("Repositories.CreateHook returned error: %v", err)
 	}
 
-	want := &Hook{ID: Int(1)}
+	want := &Hook{ID: Int64(1)}
 	if !reflect.DeepEqual(hook, want) {
 		t.Errorf("Repositories.CreateHook returned %+v, want %+v", hook, want)
 	}
 }
 
-func TestRepositoriesService_CreateHook_invalidOwner(t *testing.T) {
-	_, _, err := client.Repositories.CreateHook(context.Background(), "%", "%", nil)
-	testURLParseError(t, err)
-}
-
 func TestRepositoriesService_ListHooks(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/repos/o/r/hooks", func(w http.ResponseWriter, r *http.Request) {
@@ -65,19 +61,22 @@ func TestRepositoriesService_ListHooks(t *testing.T) {
 		t.Errorf("Repositories.ListHooks returned error: %v", err)
 	}
 
-	want := []*Hook{{ID: Int(1)}, {ID: Int(2)}}
+	want := []*Hook{{ID: Int64(1)}, {ID: Int64(2)}}
 	if !reflect.DeepEqual(hooks, want) {
 		t.Errorf("Repositories.ListHooks returned %+v, want %+v", hooks, want)
 	}
 }
 
 func TestRepositoriesService_ListHooks_invalidOwner(t *testing.T) {
+	client, _, _, teardown := setup()
+	defer teardown()
+
 	_, _, err := client.Repositories.ListHooks(context.Background(), "%", "%", nil)
 	testURLParseError(t, err)
 }
 
 func TestRepositoriesService_GetHook(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/repos/o/r/hooks/1", func(w http.ResponseWriter, r *http.Request) {
@@ -90,22 +89,25 @@ func TestRepositoriesService_GetHook(t *testing.T) {
 		t.Errorf("Repositories.GetHook returned error: %v", err)
 	}
 
-	want := &Hook{ID: Int(1)}
+	want := &Hook{ID: Int64(1)}
 	if !reflect.DeepEqual(hook, want) {
 		t.Errorf("Repositories.GetHook returned %+v, want %+v", hook, want)
 	}
 }
 
 func TestRepositoriesService_GetHook_invalidOwner(t *testing.T) {
+	client, _, _, teardown := setup()
+	defer teardown()
+
 	_, _, err := client.Repositories.GetHook(context.Background(), "%", "%", 1)
 	testURLParseError(t, err)
 }
 
 func TestRepositoriesService_EditHook(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
-	input := &Hook{Name: String("t")}
+	input := &Hook{}
 
 	mux.HandleFunc("/repos/o/r/hooks/1", func(w http.ResponseWriter, r *http.Request) {
 		v := new(Hook)
@@ -124,19 +126,22 @@ func TestRepositoriesService_EditHook(t *testing.T) {
 		t.Errorf("Repositories.EditHook returned error: %v", err)
 	}
 
-	want := &Hook{ID: Int(1)}
+	want := &Hook{ID: Int64(1)}
 	if !reflect.DeepEqual(hook, want) {
 		t.Errorf("Repositories.EditHook returned %+v, want %+v", hook, want)
 	}
 }
 
 func TestRepositoriesService_EditHook_invalidOwner(t *testing.T) {
+	client, _, _, teardown := setup()
+	defer teardown()
+
 	_, _, err := client.Repositories.EditHook(context.Background(), "%", "%", 1, nil)
 	testURLParseError(t, err)
 }
 
 func TestRepositoriesService_DeleteHook(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/repos/o/r/hooks/1", func(w http.ResponseWriter, r *http.Request) {
@@ -150,12 +155,15 @@ func TestRepositoriesService_DeleteHook(t *testing.T) {
 }
 
 func TestRepositoriesService_DeleteHook_invalidOwner(t *testing.T) {
+	client, _, _, teardown := setup()
+	defer teardown()
+
 	_, err := client.Repositories.DeleteHook(context.Background(), "%", "%", 1)
 	testURLParseError(t, err)
 }
 
 func TestRepositoriesService_PingHook(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/repos/o/r/hooks/1/pings", func(w http.ResponseWriter, r *http.Request) {
@@ -169,7 +177,7 @@ func TestRepositoriesService_PingHook(t *testing.T) {
 }
 
 func TestRepositoriesService_TestHook(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/repos/o/r/hooks/1/tests", func(w http.ResponseWriter, r *http.Request) {
@@ -183,6 +191,9 @@ func TestRepositoriesService_TestHook(t *testing.T) {
 }
 
 func TestRepositoriesService_TestHook_invalidOwner(t *testing.T) {
+	client, _, _, teardown := setup()
+	defer teardown()
+
 	_, err := client.Repositories.TestHook(context.Background(), "%", "%", 1)
 	testURLParseError(t, err)
 }

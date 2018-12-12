@@ -15,7 +15,7 @@ import (
 )
 
 func TestAuthorizationsService_List(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/authorizations", func(w http.ResponseWriter, r *http.Request) {
@@ -30,14 +30,14 @@ func TestAuthorizationsService_List(t *testing.T) {
 		t.Errorf("Authorizations.List returned error: %v", err)
 	}
 
-	want := []*Authorization{{ID: Int(1)}}
+	want := []*Authorization{{ID: Int64(1)}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Authorizations.List returned %+v, want %+v", *got[0].ID, *want[0].ID)
 	}
 }
 
 func TestAuthorizationsService_Get(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/authorizations/1", func(w http.ResponseWriter, r *http.Request) {
@@ -50,14 +50,14 @@ func TestAuthorizationsService_Get(t *testing.T) {
 		t.Errorf("Authorizations.Get returned error: %v", err)
 	}
 
-	want := &Authorization{ID: Int(1)}
+	want := &Authorization{ID: Int64(1)}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Authorizations.Get returned auth %+v, want %+v", got, want)
 	}
 }
 
 func TestAuthorizationsService_Create(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	input := &AuthorizationRequest{
@@ -81,14 +81,14 @@ func TestAuthorizationsService_Create(t *testing.T) {
 		t.Errorf("Authorizations.Create returned error: %v", err)
 	}
 
-	want := &Authorization{ID: Int(1)}
+	want := &Authorization{ID: Int64(1)}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Authorization.Create returned %+v, want %+v", got, want)
 	}
 }
 
 func TestAuthorizationsService_GetOrCreateForApp(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	input := &AuthorizationRequest{
@@ -112,14 +112,14 @@ func TestAuthorizationsService_GetOrCreateForApp(t *testing.T) {
 		t.Errorf("Authorizations.GetOrCreateForApp returned error: %v", err)
 	}
 
-	want := &Authorization{ID: Int(1)}
+	want := &Authorization{ID: Int64(1)}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Authorization.GetOrCreateForApp returned %+v, want %+v", got, want)
 	}
 }
 
 func TestAuthorizationsService_GetOrCreateForApp_Fingerprint(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	input := &AuthorizationRequest{
@@ -144,14 +144,14 @@ func TestAuthorizationsService_GetOrCreateForApp_Fingerprint(t *testing.T) {
 		t.Errorf("Authorizations.GetOrCreateForApp returned error: %v", err)
 	}
 
-	want := &Authorization{ID: Int(1)}
+	want := &Authorization{ID: Int64(1)}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Authorization.GetOrCreateForApp returned %+v, want %+v", got, want)
 	}
 }
 
 func TestAuthorizationsService_Edit(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	input := &AuthorizationUpdateRequest{
@@ -175,14 +175,14 @@ func TestAuthorizationsService_Edit(t *testing.T) {
 		t.Errorf("Authorizations.Edit returned error: %v", err)
 	}
 
-	want := &Authorization{ID: Int(1)}
+	want := &Authorization{ID: Int64(1)}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Authorization.Update returned %+v, want %+v", got, want)
 	}
 }
 
 func TestAuthorizationsService_Delete(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/authorizations/1", func(w http.ResponseWriter, r *http.Request) {
@@ -197,7 +197,7 @@ func TestAuthorizationsService_Delete(t *testing.T) {
 }
 
 func TestAuthorizationsService_Check(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/applications/id/tokens/t", func(w http.ResponseWriter, r *http.Request) {
@@ -210,14 +210,14 @@ func TestAuthorizationsService_Check(t *testing.T) {
 		t.Errorf("Authorizations.Check returned error: %v", err)
 	}
 
-	want := &Authorization{ID: Int(1)}
+	want := &Authorization{ID: Int64(1)}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Authorizations.Check returned auth %+v, want %+v", got, want)
 	}
 }
 
 func TestAuthorizationsService_Reset(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/applications/id/tokens/t", func(w http.ResponseWriter, r *http.Request) {
@@ -230,14 +230,14 @@ func TestAuthorizationsService_Reset(t *testing.T) {
 		t.Errorf("Authorizations.Reset returned error: %v", err)
 	}
 
-	want := &Authorization{ID: Int(1)}
+	want := &Authorization{ID: Int64(1)}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Authorizations.Reset returned auth %+v, want %+v", got, want)
 	}
 }
 
 func TestAuthorizationsService_Revoke(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/applications/id/tokens/t", func(w http.ResponseWriter, r *http.Request) {
@@ -252,7 +252,7 @@ func TestAuthorizationsService_Revoke(t *testing.T) {
 }
 
 func TestListGrants(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/applications/grants", func(w http.ResponseWriter, r *http.Request) {
@@ -265,14 +265,14 @@ func TestListGrants(t *testing.T) {
 		t.Errorf("OAuthAuthorizations.ListGrants returned error: %v", err)
 	}
 
-	want := []*Grant{{ID: Int(1)}}
+	want := []*Grant{{ID: Int64(1)}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("OAuthAuthorizations.ListGrants = %+v, want %+v", got, want)
 	}
 }
 
 func TestListGrants_withOptions(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/applications/grants", func(w http.ResponseWriter, r *http.Request) {
@@ -290,7 +290,7 @@ func TestListGrants_withOptions(t *testing.T) {
 }
 
 func TestGetGrant(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/applications/grants/1", func(w http.ResponseWriter, r *http.Request) {
@@ -303,14 +303,14 @@ func TestGetGrant(t *testing.T) {
 		t.Errorf("OAuthAuthorizations.GetGrant returned error: %v", err)
 	}
 
-	want := &Grant{ID: Int(1)}
+	want := &Grant{ID: Int64(1)}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("OAuthAuthorizations.GetGrant = %+v, want %+v", got, want)
 	}
 }
 
 func TestDeleteGrant(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/applications/grants/1", func(w http.ResponseWriter, r *http.Request) {
@@ -324,7 +324,7 @@ func TestDeleteGrant(t *testing.T) {
 }
 
 func TestAuthorizationsService_CreateImpersonation(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/admin/users/u/authorizations", func(w http.ResponseWriter, r *http.Request) {
@@ -338,14 +338,14 @@ func TestAuthorizationsService_CreateImpersonation(t *testing.T) {
 		t.Errorf("Authorizations.CreateImpersonation returned error: %+v", err)
 	}
 
-	want := &Authorization{ID: Int(1)}
+	want := &Authorization{ID: Int64(1)}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Authorizations.CreateImpersonation returned %+v, want %+v", *got.ID, *want.ID)
 	}
 }
 
 func TestAuthorizationsService_DeleteImpersonation(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/admin/users/u/authorizations", func(w http.ResponseWriter, r *http.Request) {

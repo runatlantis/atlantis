@@ -15,13 +15,12 @@ import (
 )
 
 func TestGitService_GetTag(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/repos/o/r/git/tags/s", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		testHeader(t, r, "Accept", mediaTypeGitSigningPreview)
-
 		fmt.Fprint(w, `{"tag": "t"}`)
 	})
 
@@ -37,7 +36,7 @@ func TestGitService_GetTag(t *testing.T) {
 }
 
 func TestGitService_CreateTag(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	input := &createTagRequest{Tag: String("t"), Object: String("s")}

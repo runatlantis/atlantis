@@ -15,7 +15,7 @@ import (
 )
 
 func TestMarkdown(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	input := &markdownRequest{
@@ -48,7 +48,7 @@ func TestMarkdown(t *testing.T) {
 }
 
 func TestListEmojis(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/emojis", func(w http.ResponseWriter, r *http.Request) {
@@ -68,7 +68,7 @@ func TestListEmojis(t *testing.T) {
 }
 
 func TestListCodesOfConduct(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/codes_of_conduct", func(w http.ResponseWriter, r *http.Request) {
@@ -98,7 +98,7 @@ func TestListCodesOfConduct(t *testing.T) {
 }
 
 func TestGetCodeOfConduct(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/codes_of_conduct/k", func(w http.ResponseWriter, r *http.Request) {
@@ -129,12 +129,12 @@ func TestGetCodeOfConduct(t *testing.T) {
 }
 
 func TestAPIMeta(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/meta", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
-		fmt.Fprint(w, `{"hooks":["h"], "git":["g"], "pages":["p"], "verifiable_password_authentication": true}`)
+		fmt.Fprint(w, `{"hooks":["h"], "git":["g"], "pages":["p"], "importer":["i"], "verifiable_password_authentication": true}`)
 	})
 
 	meta, _, err := client.APIMeta(context.Background())
@@ -143,9 +143,11 @@ func TestAPIMeta(t *testing.T) {
 	}
 
 	want := &APIMeta{
-		Hooks: []string{"h"},
-		Git:   []string{"g"},
-		Pages: []string{"p"},
+		Hooks:    []string{"h"},
+		Git:      []string{"g"},
+		Pages:    []string{"p"},
+		Importer: []string{"i"},
+
 		VerifiablePasswordAuthentication: Bool(true),
 	}
 	if !reflect.DeepEqual(want, meta) {
@@ -154,7 +156,7 @@ func TestAPIMeta(t *testing.T) {
 }
 
 func TestOctocat(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	input := "input"
@@ -178,7 +180,7 @@ func TestOctocat(t *testing.T) {
 }
 
 func TestZen(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	output := "sample text"
@@ -200,7 +202,7 @@ func TestZen(t *testing.T) {
 }
 
 func TestListServiceHooks(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/hooks", func(w http.ResponseWriter, r *http.Request) {

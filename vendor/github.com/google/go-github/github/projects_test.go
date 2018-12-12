@@ -11,14 +11,22 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 )
 
 func TestProjectsService_UpdateProject(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
-	input := &ProjectOptions{Name: "Project Name", Body: "Project body."}
+	input := &ProjectOptions{
+		Name:   String("Project Name"),
+		Body:   String("Project body."),
+		State:  String("open"),
+		Public: Bool(true),
+
+		OrganizationPermission: String("read"),
+	}
 
 	mux.HandleFunc("/projects/1", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "PATCH")
@@ -38,14 +46,14 @@ func TestProjectsService_UpdateProject(t *testing.T) {
 		t.Errorf("Projects.UpdateProject returned error: %v", err)
 	}
 
-	want := &Project{ID: Int(1)}
+	want := &Project{ID: Int64(1)}
 	if !reflect.DeepEqual(project, want) {
 		t.Errorf("Projects.UpdateProject returned %+v, want %+v", project, want)
 	}
 }
 
 func TestProjectsService_GetProject(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/projects/1", func(w http.ResponseWriter, r *http.Request) {
@@ -59,14 +67,14 @@ func TestProjectsService_GetProject(t *testing.T) {
 		t.Errorf("Projects.GetProject returned error: %v", err)
 	}
 
-	want := &Project{ID: Int(1)}
+	want := &Project{ID: Int64(1)}
 	if !reflect.DeepEqual(project, want) {
 		t.Errorf("Projects.GetProject returned %+v, want %+v", project, want)
 	}
 }
 
 func TestProjectsService_DeleteProject(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/projects/1", func(w http.ResponseWriter, r *http.Request) {
@@ -81,12 +89,13 @@ func TestProjectsService_DeleteProject(t *testing.T) {
 }
 
 func TestProjectsService_ListProjectColumns(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
+	acceptHeaders := []string{mediaTypeProjectsPreview}
 	mux.HandleFunc("/projects/1/columns", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
-		testHeader(t, r, "Accept", mediaTypeProjectsPreview)
+		testHeader(t, r, "Accept", strings.Join(acceptHeaders, ", "))
 		testFormValues(t, r, values{"page": "2"})
 		fmt.Fprint(w, `[{"id":1}]`)
 	})
@@ -97,14 +106,14 @@ func TestProjectsService_ListProjectColumns(t *testing.T) {
 		t.Errorf("Projects.ListProjectColumns returned error: %v", err)
 	}
 
-	want := []*ProjectColumn{{ID: Int(1)}}
+	want := []*ProjectColumn{{ID: Int64(1)}}
 	if !reflect.DeepEqual(columns, want) {
 		t.Errorf("Projects.ListProjectColumns returned %+v, want %+v", columns, want)
 	}
 }
 
 func TestProjectsService_GetProjectColumn(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/projects/columns/1", func(w http.ResponseWriter, r *http.Request) {
@@ -118,14 +127,14 @@ func TestProjectsService_GetProjectColumn(t *testing.T) {
 		t.Errorf("Projects.GetProjectColumn returned error: %v", err)
 	}
 
-	want := &ProjectColumn{ID: Int(1)}
+	want := &ProjectColumn{ID: Int64(1)}
 	if !reflect.DeepEqual(column, want) {
 		t.Errorf("Projects.GetProjectColumn returned %+v, want %+v", column, want)
 	}
 }
 
 func TestProjectsService_CreateProjectColumn(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	input := &ProjectColumnOptions{Name: "Column Name"}
@@ -148,14 +157,14 @@ func TestProjectsService_CreateProjectColumn(t *testing.T) {
 		t.Errorf("Projects.CreateProjectColumn returned error: %v", err)
 	}
 
-	want := &ProjectColumn{ID: Int(1)}
+	want := &ProjectColumn{ID: Int64(1)}
 	if !reflect.DeepEqual(column, want) {
 		t.Errorf("Projects.CreateProjectColumn returned %+v, want %+v", column, want)
 	}
 }
 
 func TestProjectsService_UpdateProjectColumn(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	input := &ProjectColumnOptions{Name: "Column Name"}
@@ -178,14 +187,14 @@ func TestProjectsService_UpdateProjectColumn(t *testing.T) {
 		t.Errorf("Projects.UpdateProjectColumn returned error: %v", err)
 	}
 
-	want := &ProjectColumn{ID: Int(1)}
+	want := &ProjectColumn{ID: Int64(1)}
 	if !reflect.DeepEqual(column, want) {
 		t.Errorf("Projects.UpdateProjectColumn returned %+v, want %+v", column, want)
 	}
 }
 
 func TestProjectsService_DeleteProjectColumn(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/projects/columns/1", func(w http.ResponseWriter, r *http.Request) {
@@ -200,7 +209,7 @@ func TestProjectsService_DeleteProjectColumn(t *testing.T) {
 }
 
 func TestProjectsService_MoveProjectColumn(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	input := &ProjectColumnMoveOptions{Position: "after:12345"}
@@ -223,30 +232,34 @@ func TestProjectsService_MoveProjectColumn(t *testing.T) {
 }
 
 func TestProjectsService_ListProjectCards(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/projects/columns/1/cards", func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "GET")
 		testHeader(t, r, "Accept", mediaTypeProjectsPreview)
-		testFormValues(t, r, values{"page": "2"})
+		testFormValues(t, r, values{
+			"archived_state": "all",
+			"page":           "2"})
 		fmt.Fprint(w, `[{"id":1}]`)
 	})
 
-	opt := &ListOptions{Page: 2}
+	opt := &ProjectCardListOptions{
+		ArchivedState: String("all"),
+		ListOptions:   ListOptions{Page: 2}}
 	cards, _, err := client.Projects.ListProjectCards(context.Background(), 1, opt)
 	if err != nil {
 		t.Errorf("Projects.ListProjectCards returned error: %v", err)
 	}
 
-	want := []*ProjectCard{{ID: Int(1)}}
+	want := []*ProjectCard{{ID: Int64(1)}}
 	if !reflect.DeepEqual(cards, want) {
 		t.Errorf("Projects.ListProjectCards returned %+v, want %+v", cards, want)
 	}
 }
 
 func TestProjectsService_GetProjectCard(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/projects/columns/cards/1", func(w http.ResponseWriter, r *http.Request) {
@@ -260,14 +273,14 @@ func TestProjectsService_GetProjectCard(t *testing.T) {
 		t.Errorf("Projects.GetProjectCard returned error: %v", err)
 	}
 
-	want := &ProjectCard{ID: Int(1)}
+	want := &ProjectCard{ID: Int64(1)}
 	if !reflect.DeepEqual(card, want) {
 		t.Errorf("Projects.GetProjectCard returned %+v, want %+v", card, want)
 	}
 }
 
 func TestProjectsService_CreateProjectCard(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	input := &ProjectCardOptions{
@@ -293,14 +306,14 @@ func TestProjectsService_CreateProjectCard(t *testing.T) {
 		t.Errorf("Projects.CreateProjectCard returned error: %v", err)
 	}
 
-	want := &ProjectCard{ID: Int(1)}
+	want := &ProjectCard{ID: Int64(1)}
 	if !reflect.DeepEqual(card, want) {
 		t.Errorf("Projects.CreateProjectCard returned %+v, want %+v", card, want)
 	}
 }
 
 func TestProjectsService_UpdateProjectCard(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	input := &ProjectCardOptions{
@@ -318,7 +331,7 @@ func TestProjectsService_UpdateProjectCard(t *testing.T) {
 			t.Errorf("Request body = %+v, want %+v", v, input)
 		}
 
-		fmt.Fprint(w, `{"id":1}`)
+		fmt.Fprint(w, `{"id":1, "archived":false}`)
 	})
 
 	card, _, err := client.Projects.UpdateProjectCard(context.Background(), 1, input)
@@ -326,14 +339,14 @@ func TestProjectsService_UpdateProjectCard(t *testing.T) {
 		t.Errorf("Projects.UpdateProjectCard returned error: %v", err)
 	}
 
-	want := &ProjectCard{ID: Int(1)}
+	want := &ProjectCard{ID: Int64(1), Archived: Bool(false)}
 	if !reflect.DeepEqual(card, want) {
 		t.Errorf("Projects.UpdateProjectCard returned %+v, want %+v", card, want)
 	}
 }
 
 func TestProjectsService_DeleteProjectCard(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	mux.HandleFunc("/projects/columns/cards/1", func(w http.ResponseWriter, r *http.Request) {
@@ -348,7 +361,7 @@ func TestProjectsService_DeleteProjectCard(t *testing.T) {
 }
 
 func TestProjectsService_MoveProjectCard(t *testing.T) {
-	setup()
+	client, mux, _, teardown := setup()
 	defer teardown()
 
 	input := &ProjectCardMoveOptions{Position: "after:12345"}
