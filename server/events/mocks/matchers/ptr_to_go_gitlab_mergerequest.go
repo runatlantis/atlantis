@@ -2,9 +2,9 @@
 package matchers
 
 import (
-	"reflect"
-	"github.com/petergtz/pegomock"
 	go_gitlab "github.com/lkysow/go-gitlab"
+	"github.com/petergtz/pegomock"
+	"reflect"
 )
 
 func AnyPtrToGoGitlabMergeRequest() *go_gitlab.MergeRequest {

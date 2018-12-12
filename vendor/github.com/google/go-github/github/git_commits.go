@@ -31,6 +31,7 @@ type Commit struct {
 	HTMLURL      *string                `json:"html_url,omitempty"`
 	URL          *string                `json:"url,omitempty"`
 	Verification *SignatureVerification `json:"verification,omitempty"`
+	NodeID       *string                `json:"node_id,omitempty"`
 
 	// CommentCount is the number of GitHub comments on the commit. This
 	// is only populated for requests that fetch GitHub data like
@@ -57,7 +58,7 @@ func (c CommitAuthor) String() string {
 	return Stringify(c)
 }
 
-// GetCommit fetchs the Commit object for a given SHA.
+// GetCommit fetches the Commit object for a given SHA.
 //
 // GitHub API docs: https://developer.github.com/v3/git/commits/#get-a-commit
 func (s *GitService) GetCommit(ctx context.Context, owner string, repo string, sha string) (*Commit, *Response, error) {
@@ -67,7 +68,7 @@ func (s *GitService) GetCommit(ctx context.Context, owner string, repo string, s
 		return nil, nil, err
 	}
 
-	// TODO: remove custom Accept header when this API fully launches.
+	// TODO: remove custom Accept headers when APIs fully launch.
 	req.Header.Set("Accept", mediaTypeGitSigningPreview)
 
 	c := new(Commit)

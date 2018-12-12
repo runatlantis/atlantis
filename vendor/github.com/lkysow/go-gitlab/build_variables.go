@@ -30,9 +30,7 @@ func (v BuildVariable) String() string {
 //
 // Gitlab API Docs:
 // https://docs.gitlab.com/ce/api/build_variables.html#list-project-variables
-type ListBuildVariablesOptions struct {
-	ListOptions
-}
+type ListBuildVariablesOptions ListOptions
 
 // ListBuildVariables gets the a list of project variables in a project
 //

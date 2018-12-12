@@ -346,6 +346,7 @@ func TestExecute_Defaults(t *testing.T) {
 	Equals(t, "info", passedConfig.LogLevel)
 	Equals(t, 4141, passedConfig.Port)
 	Equals(t, false, passedConfig.RequireApproval)
+	Equals(t, false, passedConfig.RequireMergeable)
 	Equals(t, "", passedConfig.SSLCertFile)
 	Equals(t, "", passedConfig.SSLKeyFile)
 }
@@ -443,6 +444,7 @@ func TestExecute_Flags(t *testing.T) {
 		cmd.PortFlag:                   8181,
 		cmd.RepoWhitelistFlag:          "github.com/runatlantis/atlantis",
 		cmd.RequireApprovalFlag:        true,
+		cmd.RequireMergeableFlag:       true,
 		cmd.SSLCertFileFlag:            "cert-file",
 		cmd.SSLKeyFileFlag:             "key-file",
 	})
@@ -469,6 +471,7 @@ func TestExecute_Flags(t *testing.T) {
 	Equals(t, 8181, passedConfig.Port)
 	Equals(t, "github.com/runatlantis/atlantis", passedConfig.RepoWhitelist)
 	Equals(t, true, passedConfig.RequireApproval)
+	Equals(t, true, passedConfig.RequireMergeable)
 	Equals(t, "cert-file", passedConfig.SSLCertFile)
 	Equals(t, "key-file", passedConfig.SSLKeyFile)
 }
@@ -496,6 +499,7 @@ log-level: "debug"
 port: 8181
 repo-whitelist: "github.com/runatlantis/atlantis"
 require-approval: true
+require-mergeable: true
 ssl-cert-file: cert-file
 ssl-key-file: key-file
 `)
@@ -526,6 +530,7 @@ ssl-key-file: key-file
 	Equals(t, 8181, passedConfig.Port)
 	Equals(t, "github.com/runatlantis/atlantis", passedConfig.RepoWhitelist)
 	Equals(t, true, passedConfig.RequireApproval)
+	Equals(t, true, passedConfig.RequireMergeable)
 	Equals(t, "cert-file", passedConfig.SSLCertFile)
 	Equals(t, "key-file", passedConfig.SSLKeyFile)
 }
@@ -580,6 +585,7 @@ ssl-key-file: key-file
 		"PORT":                     "8282",
 		"REPO_WHITELIST":           "override,override",
 		"REQUIRE_APPROVAL":         "false",
+		"REQUIRE_MERGEABLE":        "false",
 		"SSL_CERT_FILE":            "override-cert-file",
 		"SSL_KEY_FILE":             "override-key-file",
 	} {
@@ -610,6 +616,7 @@ ssl-key-file: key-file
 	Equals(t, 8282, passedConfig.Port)
 	Equals(t, "override,override", passedConfig.RepoWhitelist)
 	Equals(t, false, passedConfig.RequireApproval)
+	Equals(t, false, passedConfig.RequireMergeable)
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
 	Equals(t, "override-key-file", passedConfig.SSLKeyFile)
 }
@@ -637,6 +644,7 @@ log-level: "debug"
 port: 8181
 repo-whitelist: "github.com/runatlantis/atlantis"
 require-approval: true
+require-mergeable: true
 ssl-cert-file: cert-file
 ssl-key-file: key-file
 `)
@@ -663,6 +671,7 @@ ssl-key-file: key-file
 		cmd.PortFlag:                   8282,
 		cmd.RepoWhitelistFlag:          "override,override",
 		cmd.RequireApprovalFlag:        false,
+		cmd.RequireMergeableFlag:       false,
 		cmd.SSLCertFileFlag:            "override-cert-file",
 		cmd.SSLKeyFileFlag:             "override-key-file",
 	})
@@ -687,6 +696,7 @@ ssl-key-file: key-file
 	Equals(t, 8282, passedConfig.Port)
 	Equals(t, "override,override", passedConfig.RepoWhitelist)
 	Equals(t, false, passedConfig.RequireApproval)
+	Equals(t, false, passedConfig.RequireMergeable)
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
 	Equals(t, "override-key-file", passedConfig.SSLKeyFile)
 }
@@ -715,6 +725,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		"PORT":                     "8181",
 		"REPO_WHITELIST":           "*",
 		"REQUIRE_APPROVAL":         "true",
+		"REQUIRE_MERGEABLE":        "true",
 		"SSL_CERT_FILE":            "cert-file",
 		"SSL_KEY_FILE":             "key-file",
 	}
@@ -749,6 +760,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		cmd.PortFlag:                   8282,
 		cmd.RepoWhitelistFlag:          "override,override",
 		cmd.RequireApprovalFlag:        false,
+		cmd.RequireMergeableFlag:       false,
 		cmd.SSLCertFileFlag:            "override-cert-file",
 		cmd.SSLKeyFileFlag:             "override-key-file",
 	})
@@ -775,6 +787,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	Equals(t, 8282, passedConfig.Port)
 	Equals(t, "override,override", passedConfig.RepoWhitelist)
 	Equals(t, false, passedConfig.RequireApproval)
+	Equals(t, false, passedConfig.RequireMergeable)
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
 	Equals(t, "override-key-file", passedConfig.SSLKeyFile)
 }

@@ -351,6 +351,58 @@ projects:
 			ExpDir:       ".",
 		},
 		{
+			Description: "atlantis.yaml with mergeable apply requirement",
+			Cmd: events.CommentCommand{
+				Name:        events.PlanCommand,
+				ProjectName: "myproject",
+			},
+			AtlantisYAML: `
+version: 2
+projects:
+- name: myproject
+  dir: .
+  workspace: myworkspace
+  apply_requirements: [mergeable]`,
+			ExpProjectConfig: &valid.Project{
+				Dir:       ".",
+				Workspace: "myworkspace",
+				Autoplan: valid.Autoplan{
+					WhenModified: []string{"**/*.tf*"},
+					Enabled:      true,
+				},
+				ApplyRequirements: []string{"mergeable"},
+				Name:              String("myproject"),
+			},
+			ExpWorkspace: "myworkspace",
+			ExpDir:       ".",
+		},
+		{
+			Description: "atlantis.yaml with mergeable and approved apply requirements",
+			Cmd: events.CommentCommand{
+				Name:        events.PlanCommand,
+				ProjectName: "myproject",
+			},
+			AtlantisYAML: `
+version: 2
+projects:
+- name: myproject
+  dir: .
+  workspace: myworkspace
+  apply_requirements: [mergeable, approved]`,
+			ExpProjectConfig: &valid.Project{
+				Dir:       ".",
+				Workspace: "myworkspace",
+				Autoplan: valid.Autoplan{
+					WhenModified: []string{"**/*.tf*"},
+					Enabled:      true,
+				},
+				ApplyRequirements: []string{"mergeable", "approved"},
+				Name:              String("myproject"),
+			},
+			ExpWorkspace: "myworkspace",
+			ExpDir:       ".",
+		},
+		{
 			Description: "atlantis.yaml with multiple dir/workspaces matching",
 			Cmd: events.CommentCommand{
 				Name:       events.PlanCommand,

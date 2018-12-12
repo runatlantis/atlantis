@@ -19,30 +19,42 @@ type OrganizationsService service
 
 // Organization represents a GitHub organization account.
 type Organization struct {
-	Login             *string    `json:"login,omitempty"`
-	ID                *int       `json:"id,omitempty"`
-	AvatarURL         *string    `json:"avatar_url,omitempty"`
-	HTMLURL           *string    `json:"html_url,omitempty"`
-	Name              *string    `json:"name,omitempty"`
-	Company           *string    `json:"company,omitempty"`
-	Blog              *string    `json:"blog,omitempty"`
-	Location          *string    `json:"location,omitempty"`
-	Email             *string    `json:"email,omitempty"`
-	Description       *string    `json:"description,omitempty"`
-	PublicRepos       *int       `json:"public_repos,omitempty"`
-	PublicGists       *int       `json:"public_gists,omitempty"`
-	Followers         *int       `json:"followers,omitempty"`
-	Following         *int       `json:"following,omitempty"`
-	CreatedAt         *time.Time `json:"created_at,omitempty"`
-	UpdatedAt         *time.Time `json:"updated_at,omitempty"`
-	TotalPrivateRepos *int       `json:"total_private_repos,omitempty"`
-	OwnedPrivateRepos *int       `json:"owned_private_repos,omitempty"`
-	PrivateGists      *int       `json:"private_gists,omitempty"`
-	DiskUsage         *int       `json:"disk_usage,omitempty"`
-	Collaborators     *int       `json:"collaborators,omitempty"`
-	BillingEmail      *string    `json:"billing_email,omitempty"`
-	Type              *string    `json:"type,omitempty"`
-	Plan              *Plan      `json:"plan,omitempty"`
+	Login                       *string    `json:"login,omitempty"`
+	ID                          *int64     `json:"id,omitempty"`
+	NodeID                      *string    `json:"node_id,omitempty"`
+	AvatarURL                   *string    `json:"avatar_url,omitempty"`
+	HTMLURL                     *string    `json:"html_url,omitempty"`
+	Name                        *string    `json:"name,omitempty"`
+	Company                     *string    `json:"company,omitempty"`
+	Blog                        *string    `json:"blog,omitempty"`
+	Location                    *string    `json:"location,omitempty"`
+	Email                       *string    `json:"email,omitempty"`
+	Description                 *string    `json:"description,omitempty"`
+	PublicRepos                 *int       `json:"public_repos,omitempty"`
+	PublicGists                 *int       `json:"public_gists,omitempty"`
+	Followers                   *int       `json:"followers,omitempty"`
+	Following                   *int       `json:"following,omitempty"`
+	CreatedAt                   *time.Time `json:"created_at,omitempty"`
+	UpdatedAt                   *time.Time `json:"updated_at,omitempty"`
+	TotalPrivateRepos           *int       `json:"total_private_repos,omitempty"`
+	OwnedPrivateRepos           *int       `json:"owned_private_repos,omitempty"`
+	PrivateGists                *int       `json:"private_gists,omitempty"`
+	DiskUsage                   *int       `json:"disk_usage,omitempty"`
+	Collaborators               *int       `json:"collaborators,omitempty"`
+	BillingEmail                *string    `json:"billing_email,omitempty"`
+	Type                        *string    `json:"type,omitempty"`
+	Plan                        *Plan      `json:"plan,omitempty"`
+	TwoFactorRequirementEnabled *bool      `json:"two_factor_requirement_enabled,omitempty"`
+
+	// DefaultRepoPermission can be one of: "read", "write", "admin", or "none". (Default: "read").
+	// It is only used in OrganizationsService.Edit.
+	DefaultRepoPermission *string `json:"default_repository_permission,omitempty"`
+	// DefaultRepoSettings can be one of: "read", "write", "admin", or "none". (Default: "read").
+	// It is only used in OrganizationsService.Get.
+	DefaultRepoSettings *string `json:"default_repository_settings,omitempty"`
+
+	// MembersCanCreateRepos default value is true and is only used in Organizations.Edit.
+	MembersCanCreateRepos *bool `json:"members_can_create_repositories,omitempty"`
 
 	// API URLs
 	URL              *string `json:"url,omitempty"`
@@ -74,8 +86,11 @@ func (p Plan) String() string {
 // OrganizationsService.ListAll method.
 type OrganizationsListOptions struct {
 	// Since filters Organizations by ID.
-	Since int `url:"since,omitempty"`
+	Since int64 `url:"since,omitempty"`
 
+	// Note: Pagination is powered exclusively by the Since parameter,
+	// ListOptions.Page has no effect.
+	// ListOptions.PerPage controls an undocumented GitHub API parameter.
 	ListOptions
 }
 
@@ -157,7 +172,7 @@ func (s *OrganizationsService) Get(ctx context.Context, org string) (*Organizati
 // GetByID fetches an organization.
 //
 // Note: GetByID uses the undocumented GitHub API endpoint /organizations/:id.
-func (s *OrganizationsService) GetByID(ctx context.Context, id int) (*Organization, *Response, error) {
+func (s *OrganizationsService) GetByID(ctx context.Context, id int64) (*Organization, *Response, error) {
 	u := fmt.Sprintf("organizations/%d", id)
 	req, err := s.client.NewRequest("GET", u, nil)
 	if err != nil {

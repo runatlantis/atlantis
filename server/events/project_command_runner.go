@@ -78,17 +78,19 @@ type ProjectCommandRunner interface {
 
 // DefaultProjectCommandRunner implements ProjectCommandRunner.
 type DefaultProjectCommandRunner struct {
-	Locker                  ProjectLocker
-	LockURLGenerator        LockURLGenerator
-	InitStepRunner          StepRunner
-	PlanStepRunner          StepRunner
-	ApplyStepRunner         StepRunner
-	RunStepRunner           StepRunner
-	PullApprovedChecker     runtime.PullApprovedChecker
-	WorkingDir              WorkingDir
-	Webhooks                WebhooksSender
-	WorkingDirLocker        WorkingDirLocker
-	RequireApprovalOverride bool
+	Locker                   ProjectLocker
+	LockURLGenerator         LockURLGenerator
+	InitStepRunner           StepRunner
+	PlanStepRunner           StepRunner
+	ApplyStepRunner          StepRunner
+	RunStepRunner            StepRunner
+	PullApprovedChecker      runtime.PullApprovedChecker
+	PullMergeableChecker     runtime.PullMergeableChecker
+	WorkingDir               WorkingDir
+	Webhooks                 WebhooksSender
+	WorkingDirLocker         WorkingDirLocker
+	RequireApprovalOverride  bool
+	RequireMergeableOverride bool
 }
 
 // Plan runs terraform plan for the project described by ctx.
@@ -207,14 +209,19 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 	}
 	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
 
+	// Figure out what our apply requirements are.
 	var applyRequirements []string
-	if ctx.ProjectConfig != nil {
+	if p.RequireApprovalOverride || p.RequireMergeableOverride {
+		// If any server flags are set, they override project config.
+		if p.RequireMergeableOverride {
+			applyRequirements = append(applyRequirements, raw.MergeableApplyRequirement)
+		}
+		if p.RequireApprovalOverride {
+			applyRequirements = append(applyRequirements, raw.ApprovedApplyRequirement)
+		}
+	} else if ctx.ProjectConfig != nil {
+		// Else we use the project config if it's set.
 		applyRequirements = ctx.ProjectConfig.ApplyRequirements
-	}
-	// todo: this class shouldn't know about the server-side approval requirement.
-	// Instead the project_command_builder should figure this out and store this information in the ctx. # refactor
-	if p.RequireApprovalOverride {
-		applyRequirements = []string{raw.ApprovedApplyRequirement}
 	}
 	for _, req := range applyRequirements {
 		switch req {
@@ -225,6 +232,14 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 			}
 			if !approved {
 				return "", "Pull request must be approved before running apply.", nil
+			}
+		case raw.MergeableApplyRequirement:
+			mergeable, err := p.PullMergeableChecker.PullIsMergeable(ctx.BaseRepo, ctx.Pull) // nolint: vetshadow
+			if err != nil {
+				return "", "", errors.Wrap(err, "checking if pull request is mergeable")
+			}
+			if !mergeable {
+				return "", "Pull request must be mergeable before running apply.", nil
 			}
 		}
 	}

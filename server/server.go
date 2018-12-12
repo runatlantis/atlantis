@@ -102,7 +102,10 @@ type UserConfig struct {
 	RepoWhitelist          string `mapstructure:"repo-whitelist"`
 	// RequireApproval is whether to require pull request approval before
 	// allowing terraform apply's to be run.
-	RequireApproval        bool            `mapstructure:"require-approval"`
+	RequireApproval bool `mapstructure:"require-approval"`
+	// RequireMergeable is whether to require pull requests to be mergeable before
+	// allowing terraform apply's to run.
+	RequireMergeable       bool            `mapstructure:"require-mergeable"`
 	SilenceWhitelistErrors bool            `mapstructure:"silence-whitelist-errors"`
 	SlackToken             string          `mapstructure:"slack-token"`
 	SSLCertFile            string          `mapstructure:"ssl-cert-file"`
@@ -291,11 +294,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			RunStepRunner: &runtime.RunStepRunner{
 				DefaultTFVersion: defaultTfVersion,
 			},
-			PullApprovedChecker:     vcsClient,
-			WorkingDir:              workingDir,
-			Webhooks:                webhooksManager,
-			WorkingDirLocker:        workingDirLocker,
-			RequireApprovalOverride: userConfig.RequireApproval,
+			PullApprovedChecker:      vcsClient,
+			PullMergeableChecker:     vcsClient,
+			WorkingDir:               workingDir,
+			Webhooks:                 webhooksManager,
+			WorkingDirLocker:         workingDirLocker,
+			RequireApprovalOverride:  userConfig.RequireApproval,
+			RequireMergeableOverride: userConfig.RequireMergeable,
 		},
 	}
 	repoWhitelist, err := events.NewRepoWhitelistChecker(userConfig.RepoWhitelist)

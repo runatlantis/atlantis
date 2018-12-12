@@ -1,3 +1,0 @@
-#!/bin/bash
-$GOPATH/bin/ginkgo -succinct generate_test_mocks/gomock_reflect
-$GOPATH/bin/ginkgo watch -succinct -r -notify -progress --depth=3

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -134,6 +135,99 @@ func TestGithubClient_UpdateStatus(t *testing.T) {
 				Num: 1,
 			}, c.status, "description")
 			Ok(t, err)
+		})
+	}
+}
+
+func TestGithubClient_PullIsMergeable(t *testing.T) {
+	cases := []struct {
+		state        string
+		expMergeable bool
+	}{
+		{
+			"dirty",
+			false,
+		},
+		{
+			"unknown",
+			false,
+		},
+		{
+			"blocked",
+			false,
+		},
+		{
+			"behind",
+			false,
+		},
+		{
+			"random",
+			false,
+		},
+		{
+			"unstable",
+			true,
+		},
+		{
+			"has_hooks",
+			true,
+		},
+		{
+			"clean",
+			true,
+		},
+		{
+			"",
+			false,
+		},
+	}
+
+	// Use a real GitHub json response and edit the mergeable_state field.
+	jsBytes, err := ioutil.ReadFile("fixtures/github-pull-request.json")
+	Ok(t, err)
+	json := string(jsBytes)
+
+	for _, c := range cases {
+		t.Run(c.state, func(t *testing.T) {
+			response := strings.Replace(json,
+				`"mergeable_state": "clean"`,
+				fmt.Sprintf(`"mergeable_state": "%s"`, c.state),
+				1,
+			)
+
+			testServer := httptest.NewTLSServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/api/v3/repos/owner/repo/pulls/1":
+						w.Write([]byte(response)) // nolint: errcheck
+						return
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+						return
+					}
+				}))
+			testServerURL, err := url.Parse(testServer.URL)
+			Ok(t, err)
+			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+			Ok(t, err)
+			defer disableSSLVerification()()
+
+			actMergeable, err := client.PullIsMergeable(models.Repo{
+				FullName:          "owner/repo",
+				Owner:             "owner",
+				Name:              "repo",
+				CloneURL:          "",
+				SanitizedCloneURL: "",
+				VCSHost: models.VCSHost{
+					Type:     models.Github,
+					Hostname: "github.com",
+				},
+			}, models.PullRequest{
+				Num: 1,
+			})
+			Ok(t, err)
+			Equals(t, c.expMergeable, actMergeable)
 		})
 	}
 }

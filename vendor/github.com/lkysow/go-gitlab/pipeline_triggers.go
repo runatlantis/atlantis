@@ -33,9 +33,7 @@ type PipelineTrigger struct {
 //
 // GitLab API docs:
 // https://docs.gitlab.com/ce/api/pipeline_triggers.html#list-project-triggers
-type ListPipelineTriggersOptions struct {
-	ListOptions
-}
+type ListPipelineTriggersOptions ListOptions
 
 // ListPipelineTriggers gets a list of project triggers.
 //

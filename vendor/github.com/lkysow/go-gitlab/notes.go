@@ -40,17 +40,49 @@ type Note struct {
 	Title      string `json:"title"`
 	FileName   string `json:"file_name"`
 	Author     struct {
-		ID        int        `json:"id"`
-		Username  string     `json:"username"`
-		Email     string     `json:"email"`
-		Name      string     `json:"name"`
-		State     string     `json:"state"`
-		CreatedAt *time.Time `json:"created_at"`
+		ID        int    `json:"id"`
+		Username  string `json:"username"`
+		Email     string `json:"email"`
+		Name      string `json:"name"`
+		State     string `json:"state"`
+		AvatarURL string `json:"avatar_url"`
+		WebURL    string `json:"web_url"`
 	} `json:"author"`
-	System    bool       `json:"system"`
-	ExpiresAt *time.Time `json:"expires_at"`
-	UpdatedAt *time.Time `json:"updated_at"`
-	CreatedAt *time.Time `json:"created_at"`
+	System       bool          `json:"system"`
+	ExpiresAt    *time.Time    `json:"expires_at"`
+	UpdatedAt    *time.Time    `json:"updated_at"`
+	CreatedAt    *time.Time    `json:"created_at"`
+	NoteableID   int           `json:"noteable_id"`
+	NoteableType string        `json:"noteable_type"`
+	Position     *NotePosition `json:"position"`
+	Resolvable   bool          `json:"resolvable"`
+	Resolved     bool          `json:"resolved"`
+	ResolvedBy   struct {
+		ID        int    `json:"id"`
+		Username  string `json:"username"`
+		Email     string `json:"email"`
+		Name      string `json:"name"`
+		State     string `json:"state"`
+		AvatarURL string `json:"avatar_url"`
+		WebURL    string `json:"web_url"`
+	} `json:"resolved_by"`
+	NoteableIID int `json:"noteable_iid"`
+}
+
+// NotePosition represents the position attributes of a note.
+type NotePosition struct {
+	BaseSHA      string `json:"base_sha"`
+	StartSHA     string `json:"start_sha"`
+	HeadSHA      string `json:"head_sha"`
+	PositionType string `json:"position_type"`
+	NewPath      string `json:"new_path,omitempty"`
+	NewLine      int    `json:"new_line,omitempty"`
+	OldPath      string `json:"old_path,omitempty"`
+	OldLine      int    `json:"old_line,omitempty"`
+	Width        int    `json:"width,omitempty"`
+	Height       int    `json:"height,omitempty"`
+	X            int    `json:"x,omitempty"`
+	Y            int    `json:"y,omitempty"`
 }
 
 func (n Note) String() string {
@@ -63,6 +95,8 @@ func (n Note) String() string {
 // https://docs.gitlab.com/ce/api/notes.html#list-project-issue-notes
 type ListIssueNotesOptions struct {
 	ListOptions
+	OrderBy *string `url:"order_by,omitempty" json:"order_by,omitempty"`
+	Sort    *string `url:"sort,omitempty" json:"sort,omitempty"`
 }
 
 // ListIssueNotes gets a list of all notes for a single issue.
@@ -200,19 +234,25 @@ func (s *NotesService) DeleteIssueNote(pid interface{}, issue, note int, options
 	return s.client.Do(req, nil)
 }
 
+// ListSnippetNotesOptions represents the available ListSnippetNotes() options.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ce/api/notes.html#list-all-snippet-notes
+type ListSnippetNotesOptions ListOptions
+
 // ListSnippetNotes gets a list of all notes for a single snippet. Snippet
 // notes are comments users can post to a snippet.
 //
 // GitLab API docs:
 // https://docs.gitlab.com/ce/api/notes.html#list-all-snippet-notes
-func (s *NotesService) ListSnippetNotes(pid interface{}, snippet int, options ...OptionFunc) ([]*Note, *Response, error) {
+func (s *NotesService) ListSnippetNotes(pid interface{}, snippet int, opt *ListSnippetNotesOptions, options ...OptionFunc) ([]*Note, *Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, nil, err
 	}
 	u := fmt.Sprintf("projects/%s/snippets/%d/notes", url.QueryEscape(project), snippet)
 
-	req, err := s.client.NewRequest("GET", u, nil, options)
+	req, err := s.client.NewRequest("GET", u, opt, options)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -337,18 +377,25 @@ func (s *NotesService) DeleteSnippetNote(pid interface{}, snippet, note int, opt
 	return s.client.Do(req, nil)
 }
 
+// ListMergeRequestNotesOptions represents the available ListMergeRequestNotes()
+// options.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ce/api/notes.html#list-all-merge-request-notes
+type ListMergeRequestNotesOptions ListOptions
+
 // ListMergeRequestNotes gets a list of all notes for a single merge request.
 //
 // GitLab API docs:
 // https://docs.gitlab.com/ce/api/notes.html#list-all-merge-request-notes
-func (s *NotesService) ListMergeRequestNotes(pid interface{}, mergeRequest int, options ...OptionFunc) ([]*Note, *Response, error) {
+func (s *NotesService) ListMergeRequestNotes(pid interface{}, mergeRequest int, opt *ListMergeRequestNotesOptions, options ...OptionFunc) ([]*Note, *Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, nil, err
 	}
 	u := fmt.Sprintf("projects/%s/merge_requests/%d/notes", url.QueryEscape(project), mergeRequest)
 
-	req, err := s.client.NewRequest("GET", u, nil, options)
+	req, err := s.client.NewRequest("GET", u, opt, options)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -121,6 +121,28 @@ func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 	return false, nil
 }
 
+// PullIsMergeable returns true if the pull request is mergeable.
+func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
+	githubPR, err := g.GetPullRequest(repo, pull.Num)
+	if err != nil {
+		return false, errors.Wrap(err, "getting pull request")
+	}
+	state := githubPR.GetMergeableState()
+	// We map our mergeable check to when the GitHub merge button is clickable.
+	// This corresponds to the following states:
+	// clean: No conflicts, all requirements satisfied.
+	//        Merging is allowed (green box).
+	// unstable: Failing/pending commit status that is not part of the required
+	//           status checks. Merging is allowed (yellow box).
+	// has_hooks: GitHub Enterprise only, if a repo has custom pre-receive
+	//            hooks. Merging is allowed (green box).
+	// See: https://github.com/octokit/octokit.net/issues/1763
+	if state != "clean" && state != "unstable" && state != "has_hooks" {
+		return false, nil
+	}
+	return true, nil
+}
+
 // GetPullRequest returns the pull request.
 func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRequest, error) {
 	pull, _, err := g.client.PullRequests.Get(g.ctx, repo.Owner, repo.Name, num)
