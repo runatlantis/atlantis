@@ -56,7 +56,6 @@ func (g *Client) CheckForkSuccess(ownerName string, forkRepoName string) bool {
 // CreateWebhook creates a GitHub webhook to send requests to our local ngrok.
 func (g *Client) CreateWebhook(ownerName string, repoName string, hookURL string) error {
 	atlantisHook := &github.Hook{
-		Name:   github.String("web"),
 		Events: []string{"issue_comment", "pull_request", "pull_request_review", "push"},
 		Config: map[string]interface{}{
 			"url":          hookURL,
