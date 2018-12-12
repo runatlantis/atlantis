@@ -1,9 +1,0 @@
-[
-    {
-        "locale": "en",
-        "key": "cardinal_test",
-        "trans": "You have {0} day left.",
-        "type": "Cardinal",
-        "rule": "Many"
-    }
-]

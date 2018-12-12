@@ -17,12 +17,13 @@
 package gitlab
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 )
 
-// LabelsService handles communication with the label related methods
-// of the GitLab API.
+// LabelsService handles communication with the label related methods of the
+// GitLab API.
 //
 // GitLab API docs: https://docs.gitlab.com/ce/api/labels.html
 type LabelsService struct {
@@ -33,29 +34,57 @@ type LabelsService struct {
 //
 // GitLab API docs: https://docs.gitlab.com/ce/api/labels.html
 type Label struct {
+	ID                     int    `json:"id"`
 	Name                   string `json:"name"`
 	Color                  string `json:"color"`
 	Description            string `json:"description"`
 	OpenIssuesCount        int    `json:"open_issues_count"`
 	ClosedIssuesCount      int    `json:"closed_issues_count"`
 	OpenMergeRequestsCount int    `json:"open_merge_requests_count"`
+	Subscribed             bool   `json:"subscribed"`
+	Priority               int    `json:"priority"`
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface.
+func (l *Label) UnmarshalJSON(data []byte) error {
+	type alias Label
+	if err := json.Unmarshal(data, (*alias)(l)); err != nil {
+		return err
+	}
+
+	if l.Name == "" {
+		var raw map[string]interface{}
+		if err := json.Unmarshal(data, &raw); err != nil {
+			return err
+		}
+		if title, ok := raw["title"].(string); ok {
+			l.Name = title
+		}
+	}
+
+	return nil
 }
 
 func (l Label) String() string {
 	return Stringify(l)
 }
 
+// ListLabelsOptions represents the available ListLabels() options.
+//
+// GitLab API docs: https://docs.gitlab.com/ce/api/labels.html#list-labels
+type ListLabelsOptions ListOptions
+
 // ListLabels gets all labels for given project.
 //
 // GitLab API docs: https://docs.gitlab.com/ce/api/labels.html#list-labels
-func (s *LabelsService) ListLabels(pid interface{}, options ...OptionFunc) ([]*Label, *Response, error) {
+func (s *LabelsService) ListLabels(pid interface{}, opt *ListLabelsOptions, options ...OptionFunc) ([]*Label, *Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, nil, err
 	}
 	u := fmt.Sprintf("projects/%s/labels", url.QueryEscape(project))
 
-	req, err := s.client.NewRequest("GET", u, nil, options)
+	req, err := s.client.NewRequest("GET", u, opt, options)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -161,4 +190,60 @@ func (s *LabelsService) UpdateLabel(pid interface{}, opt *UpdateLabelOptions, op
 	}
 
 	return l, resp, err
+}
+
+// SubscribeToLabel subscribes the authenticated user to a label to receive
+// notifications. If the user is already subscribed to the label, the status
+// code 304 is returned.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ce/api/labels.html#subscribe-to-a-label
+func (s *LabelsService) SubscribeToLabel(pid interface{}, labelID interface{}, options ...OptionFunc) (*Label, *Response, error) {
+	project, err := parseID(pid)
+	if err != nil {
+		return nil, nil, err
+	}
+	label, err := parseID(labelID)
+	if err != nil {
+		return nil, nil, err
+	}
+	u := fmt.Sprintf("projects/%s/labels/%s/subscribe", url.QueryEscape(project), label)
+
+	req, err := s.client.NewRequest("POST", u, nil, options)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	l := new(Label)
+	resp, err := s.client.Do(req, l)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return l, resp, err
+}
+
+// UnsubscribeFromLabel unsubscribes the authenticated user from a label to not
+// receive notifications from it. If the user is not subscribed to the label, the
+// status code 304 is returned.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ce/api/labels.html#unsubscribe-from-a-label
+func (s *LabelsService) UnsubscribeFromLabel(pid interface{}, labelID interface{}, options ...OptionFunc) (*Response, error) {
+	project, err := parseID(pid)
+	if err != nil {
+		return nil, err
+	}
+	label, err := parseID(labelID)
+	if err != nil {
+		return nil, err
+	}
+	u := fmt.Sprintf("projects/%s/labels/%s/unsubscribe", url.QueryEscape(project), label)
+
+	req, err := s.client.NewRequest("POST", u, nil, options)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.client.Do(req, nil)
 }

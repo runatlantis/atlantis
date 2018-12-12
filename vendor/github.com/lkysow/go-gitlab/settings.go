@@ -36,7 +36,7 @@ type Settings struct {
 	AdminNotificationEmail              string            `json:"admin_notification_email"`
 	AfterSignOutPath                    string            `json:"after_sign_out_path"`
 	AfterSignUpText                     string            `json:"after_sign_up_text"`
-	AkismetApiKey                       string            `json:"akismet_api_key"`
+	AkismetAPIKey                       string            `json:"akismet_api_key"`
 	AkismetEnabled                      bool              `json:"akismet_enabled"`
 	CircuitbreakerAccessRetries         int               `json:"circuitbreaker_access_retries"`
 	CircuitbreakerBackoffThreshold      int               `json:"circuitbreaker_backoff_threshold"`
@@ -86,8 +86,9 @@ type Settings struct {
 	MetricsPort                         int               `json:"metrics_port"`
 	MetricsSampleInterval               int               `json:"metrics_sample_interval"`
 	MetricsTimeout                      int               `json:"metrics_timeout"`
-	PasswordAuthenticationEnabled       bool              `json:"password_authentication_enabled"`
-	PerformanceBarAllowedGroupId        string            `json:"performance_bar_allowed_group_id"`
+	PasswordAuthenticationEnabledForWeb bool              `json:"password_authentication_enabled_for_web"`
+	PasswordAuthenticationEnabledForGit bool              `json:"password_authentication_enabled_for_git"`
+	PerformanceBarAllowedGroupID        string            `json:"performance_bar_allowed_group_id"`
 	PerformanceBarEnabled               bool              `json:"performance_bar_enabled"`
 	PlantumlEnabled                     bool              `json:"plantuml_enabled"`
 	PlantumlURL                         string            `json:"plantuml_url"`
@@ -155,7 +156,7 @@ type UpdateSettingsOptions struct {
 	AdminNotificationEmail              *string           `url:"admin_notification_email,omitempty" json:"admin_notification_email,omitempty"`
 	AfterSignOutPath                    *string           `url:"after_sign_out_path,omitempty" json:"after_sign_out_path,omitempty"`
 	AfterSignUpText                     *string           `url:"after_sign_up_text,omitempty" json:"after_sign_up_text,omitempty"`
-	AkismetApiKey                       *string           `url:"akismet_api_key,omitempty" json:"akismet_api_key,omitempty"`
+	AkismetAPIKey                       *string           `url:"akismet_api_key,omitempty" json:"akismet_api_key,omitempty"`
 	AkismetEnabled                      *bool             `url:"akismet_enabled,omitempty" json:"akismet_enabled,omitempty"`
 	CircuitbreakerAccessRetries         *int              `url:"circuitbreaker_access_retries,omitempty" json:"circuitbreaker_access_retries,omitempty"`
 	CircuitbreakerBackoffThreshold      *int              `url:"circuitbreaker_backoff_threshold,omitempty" json:"circuitbreaker_backoff_threshold,omitempty"`
@@ -205,8 +206,9 @@ type UpdateSettingsOptions struct {
 	MetricsPort                         *int              `url:"metrics_port,omitempty" json:"metrics_port,omitempty"`
 	MetricsSampleInterval               *int              `url:"metrics_sample_interval,omitempty" json:"metrics_sample_interval,omitempty"`
 	MetricsTimeout                      *int              `url:"metrics_timeout,omitempty" json:"metrics_timeout,omitempty"`
-	PasswordAuthenticationEnabled       *bool             `url:"password_authentication_enabled,omitempty" json:"password_authentication_enabled,omitempty"`
-	PerformanceBarAllowedGroupId        *string           `url:"performance_bar_allowed_group_id,omitempty" json:"performance_bar_allowed_group_id,omitempty"`
+	PasswordAuthenticationEnabledForWeb *bool             `url:"password_authentication_enabled_for_web,omitempty" json:"password_authentication_enabled_for_web,omitempty"`
+	PasswordAuthenticationEnabledForGit *bool             `url:"password_authentication_enabled_for_git,omitempty" json:"password_authentication_enabled_for_git,omitempty"`
+	PerformanceBarAllowedGroupID        *string           `url:"performance_bar_allowed_group_id,omitempty" json:"performance_bar_allowed_group_id,omitempty"`
 	PerformanceBarEnabled               *bool             `url:"performance_bar_enabled,omitempty" json:"performance_bar_enabled,omitempty"`
 	PlantumlEnabled                     *bool             `url:"plantuml_enabled,omitempty" json:"plantuml_enabled,omitempty"`
 	PlantumlURL                         *string           `url:"plantuml_url,omitempty" json:"plantuml_url,omitempty"`

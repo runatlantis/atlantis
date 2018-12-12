@@ -32,35 +32,43 @@ type UsersService struct {
 
 // User represents a GitLab user.
 //
-// GitLab API docs: https://docs.gitlab.com/ce/api/users.html
+// GitLab API docs: https://docs.gitlab.com/ee/api/users.html
 type User struct {
-	ID               int             `json:"id"`
-	Username         string          `json:"username"`
-	Email            string          `json:"email"`
-	Name             string          `json:"name"`
-	State            string          `json:"state"`
-	CreatedAt        *time.Time      `json:"created_at"`
-	Bio              string          `json:"bio"`
-	Skype            string          `json:"skype"`
-	Linkedin         string          `json:"linkedin"`
-	Twitter          string          `json:"twitter"`
-	WebsiteURL       string          `json:"website_url"`
-	ExternUID        string          `json:"extern_uid"`
-	Provider         string          `json:"provider"`
-	ThemeID          int             `json:"theme_id"`
-	ColorSchemeID    int             `json:"color_scheme_id"`
-	IsAdmin          bool            `json:"is_admin"`
-	AvatarURL        string          `json:"avatar_url"`
-	CanCreateGroup   bool            `json:"can_create_group"`
-	CanCreateProject bool            `json:"can_create_project"`
-	ProjectsLimit    int             `json:"projects_limit"`
-	CurrentSignInAt  *time.Time      `json:"current_sign_in_at"`
-	LastSignInAt     *time.Time      `json:"last_sign_in_at"`
-	TwoFactorEnabled bool            `json:"two_factor_enabled"`
-	Identities       []*UserIdentity `json:"identities"`
+	ID                        int             `json:"id"`
+	Username                  string          `json:"username"`
+	Email                     string          `json:"email"`
+	Name                      string          `json:"name"`
+	State                     string          `json:"state"`
+	CreatedAt                 *time.Time      `json:"created_at"`
+	Bio                       string          `json:"bio"`
+	Location                  string          `json:"location"`
+	PublicEmail               string          `json:"public_email"`
+	Skype                     string          `json:"skype"`
+	Linkedin                  string          `json:"linkedin"`
+	Twitter                   string          `json:"twitter"`
+	WebsiteURL                string          `json:"website_url"`
+	Organization              string          `json:"organization"`
+	ExternUID                 string          `json:"extern_uid"`
+	Provider                  string          `json:"provider"`
+	ThemeID                   int             `json:"theme_id"`
+	LastActivityOn            *ISOTime        `json:"last_activity_on"`
+	ColorSchemeID             int             `json:"color_scheme_id"`
+	IsAdmin                   bool            `json:"is_admin"`
+	AvatarURL                 string          `json:"avatar_url"`
+	CanCreateGroup            bool            `json:"can_create_group"`
+	CanCreateProject          bool            `json:"can_create_project"`
+	ProjectsLimit             int             `json:"projects_limit"`
+	CurrentSignInAt           *time.Time      `json:"current_sign_in_at"`
+	LastSignInAt              *time.Time      `json:"last_sign_in_at"`
+	ConfirmedAt               *time.Time      `json:"confirmed_at"`
+	TwoFactorEnabled          bool            `json:"two_factor_enabled"`
+	Identities                []*UserIdentity `json:"identities"`
+	External                  bool            `json:"external"`
+	PrivateProfile            bool            `json:"private_profile"`
+	SharedRunnersMinutesLimit int             `json:"shared_runners_minutes_limit"`
 }
 
-// UserIdentity represents a user identity
+// UserIdentity represents a user identity.
 type UserIdentity struct {
 	Provider  string `json:"provider"`
 	ExternUID string `json:"extern_uid"`
@@ -71,10 +79,18 @@ type UserIdentity struct {
 // GitLab API docs: https://docs.gitlab.com/ce/api/users.html#list-users
 type ListUsersOptions struct {
 	ListOptions
-	Active   *bool   `url:"active,omitempty" json:"active,omitempty"`
-	Blocked  *bool   `url:"blocked,omitempty" json:"blocked,omitempty"`
-	Search   *string `url:"search,omitempty" json:"search,omitempty"`
-	Username *string `url:"username,omitempty" json:"username,omitempty"`
+	Active  *bool `url:"active,omitempty" json:"active,omitempty"`
+	Blocked *bool `url:"blocked,omitempty" json:"blocked,omitempty"`
+
+	// The options below are only available for admins.
+	Search        *string    `url:"search,omitempty" json:"search,omitempty"`
+	Username      *string    `url:"username,omitempty" json:"username,omitempty"`
+	ExternalUID   *string    `url:"extern_uid,omitempty" json:"extern_uid,omitempty"`
+	Provider      *string    `url:"provider,omitempty" json:"provider,omitempty"`
+	CreatedBefore *time.Time `url:"created_before,omitempty" json:"created_before,omitempty"`
+	CreatedAfter  *time.Time `url:"created_after,omitempty" json:"created_after,omitempty"`
+	OrderBy       *string    `url:"order_by,omitempty" json:"order_by,omitempty"`
+	Sort          *string    `url:"sort,omitempty" json:"sort,omitempty"`
 }
 
 // ListUsers gets a list of users.
@@ -121,19 +137,23 @@ func (s *UsersService) GetUser(user int, options ...OptionFunc) (*User, *Respons
 type CreateUserOptions struct {
 	Email            *string `url:"email,omitempty" json:"email,omitempty"`
 	Password         *string `url:"password,omitempty" json:"password,omitempty"`
+	ResetPassword    *bool   `url:"reset_password,omitempty" json:"reset_password,omitempty"`
 	Username         *string `url:"username,omitempty" json:"username,omitempty"`
 	Name             *string `url:"name,omitempty" json:"name,omitempty"`
 	Skype            *string `url:"skype,omitempty" json:"skype,omitempty"`
 	Linkedin         *string `url:"linkedin,omitempty" json:"linkedin,omitempty"`
 	Twitter          *string `url:"twitter,omitempty" json:"twitter,omitempty"`
 	WebsiteURL       *string `url:"website_url,omitempty" json:"website_url,omitempty"`
+	Organization     *string `url:"organization,omitempty" json:"organization,omitempty"`
 	ProjectsLimit    *int    `url:"projects_limit,omitempty" json:"projects_limit,omitempty"`
 	ExternUID        *string `url:"extern_uid,omitempty" json:"extern_uid,omitempty"`
 	Provider         *string `url:"provider,omitempty" json:"provider,omitempty"`
 	Bio              *string `url:"bio,omitempty" json:"bio,omitempty"`
+	Location         *string `url:"location,omitempty" json:"location,omitempty"`
 	Admin            *bool   `url:"admin,omitempty" json:"admin,omitempty"`
 	CanCreateGroup   *bool   `url:"can_create_group,omitempty" json:"can_create_group,omitempty"`
 	SkipConfirmation *bool   `url:"skip_confirmation,omitempty" json:"skip_confirmation,omitempty"`
+	External         *bool   `url:"external,omitempty" json:"external,omitempty"`
 }
 
 // CreateUser creates a new user. Note only administrators can create new users.
@@ -158,20 +178,24 @@ func (s *UsersService) CreateUser(opt *CreateUserOptions, options ...OptionFunc)
 //
 // GitLab API docs: https://docs.gitlab.com/ce/api/users.html#user-modification
 type ModifyUserOptions struct {
-	Email          *string `url:"email,omitempty" json:"email,omitempty"`
-	Password       *string `url:"password,omitempty" json:"password,omitempty"`
-	Username       *string `url:"username,omitempty" json:"username,omitempty"`
-	Name           *string `url:"name,omitempty" json:"name,omitempty"`
-	Skype          *string `url:"skype,omitempty" json:"skype,omitempty"`
-	Linkedin       *string `url:"linkedin,omitempty" json:"linkedin,omitempty"`
-	Twitter        *string `url:"twitter,omitempty" json:"twitter,omitempty"`
-	WebsiteURL     *string `url:"website_url,omitempty" json:"website_url,omitempty"`
-	ProjectsLimit  *int    `url:"projects_limit,omitempty" json:"projects_limit,omitempty"`
-	ExternUID      *string `url:"extern_uid,omitempty" json:"extern_uid,omitempty"`
-	Provider       *string `url:"provider,omitempty" json:"provider,omitempty"`
-	Bio            *string `url:"bio,omitempty" json:"bio,omitempty"`
-	Admin          *bool   `url:"admin,omitempty" json:"admin,omitempty"`
-	CanCreateGroup *bool   `url:"can_create_group,omitempty" json:"can_create_group,omitempty"`
+	Email              *string `url:"email,omitempty" json:"email,omitempty"`
+	Password           *string `url:"password,omitempty" json:"password,omitempty"`
+	Username           *string `url:"username,omitempty" json:"username,omitempty"`
+	Name               *string `url:"name,omitempty" json:"name,omitempty"`
+	Skype              *string `url:"skype,omitempty" json:"skype,omitempty"`
+	Linkedin           *string `url:"linkedin,omitempty" json:"linkedin,omitempty"`
+	Twitter            *string `url:"twitter,omitempty" json:"twitter,omitempty"`
+	WebsiteURL         *string `url:"website_url,omitempty" json:"website_url,omitempty"`
+	Organization       *string `url:"organization,omitempty" json:"organization,omitempty"`
+	ProjectsLimit      *int    `url:"projects_limit,omitempty" json:"projects_limit,omitempty"`
+	ExternUID          *string `url:"extern_uid,omitempty" json:"extern_uid,omitempty"`
+	Provider           *string `url:"provider,omitempty" json:"provider,omitempty"`
+	Bio                *string `url:"bio,omitempty" json:"bio,omitempty"`
+	Location           *string `url:"location,omitempty" json:"location,omitempty"`
+	Admin              *bool   `url:"admin,omitempty" json:"admin,omitempty"`
+	CanCreateGroup     *bool   `url:"can_create_group,omitempty" json:"can_create_group,omitempty"`
+	SkipReconfirmation *bool   `url:"skip_reconfirmation,omitempty" json:"skip_reconfirmation,omitempty"`
+	External           *bool   `url:"external,omitempty" json:"external,omitempty"`
 }
 
 // ModifyUser modifies an existing user. Only administrators can change attributes
@@ -259,15 +283,21 @@ func (s *UsersService) ListSSHKeys(options ...OptionFunc) ([]*SSHKey, *Response,
 	return k, resp, err
 }
 
+// ListSSHKeysForUserOptions represents the available ListSSHKeysForUser() options.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ce/api/users.html#list-ssh-keys-for-user
+type ListSSHKeysForUserOptions ListOptions
+
 // ListSSHKeysForUser gets a list of a specified user's SSH keys. Available
 // only for admin
 //
 // GitLab API docs:
 // https://docs.gitlab.com/ce/api/users.html#list-ssh-keys-for-user
-func (s *UsersService) ListSSHKeysForUser(user int, options ...OptionFunc) ([]*SSHKey, *Response, error) {
+func (s *UsersService) ListSSHKeysForUser(user int, opt *ListSSHKeysForUserOptions, options ...OptionFunc) ([]*SSHKey, *Response, error) {
 	u := fmt.Sprintf("users/%d/keys", user)
 
-	req, err := s.client.NewRequest("GET", u, nil, options)
+	req, err := s.client.NewRequest("GET", u, opt, options)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -398,7 +428,7 @@ func (s *UsersService) BlockUser(user int, options ...OptionFunc) error {
 	}
 
 	switch resp.StatusCode {
-	case 200:
+	case 201:
 		return nil
 	case 403:
 		return errors.New("Cannot block a user that is already blocked by LDAP synchronization")
@@ -426,7 +456,7 @@ func (s *UsersService) UnblockUser(user int, options ...OptionFunc) error {
 	}
 
 	switch resp.StatusCode {
-	case 200:
+	case 201:
 		return nil
 	case 403:
 		return errors.New("Cannot unblock a user that is blocked by LDAP synchronization")
@@ -463,15 +493,21 @@ func (s *UsersService) ListEmails(options ...OptionFunc) ([]*Email, *Response, e
 	return e, resp, err
 }
 
+// ListEmailsForUserOptions represents the available ListEmailsForUser() options.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ce/api/users.html#list-emails-for-user
+type ListEmailsForUserOptions ListOptions
+
 // ListEmailsForUser gets a list of a specified user's Emails. Available
 // only for admin
 //
 // GitLab API docs:
 // https://docs.gitlab.com/ce/api/users.html#list-emails-for-user
-func (s *UsersService) ListEmailsForUser(user int, options ...OptionFunc) ([]*Email, *Response, error) {
+func (s *UsersService) ListEmailsForUser(user int, opt *ListEmailsForUserOptions, options ...OptionFunc) ([]*Email, *Response, error) {
 	u := fmt.Sprintf("users/%d/emails", user)
 
-	req, err := s.client.NewRequest("GET", u, nil, options)
+	req, err := s.client.NewRequest("GET", u, opt, options)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -596,7 +632,7 @@ type ImpersonationToken struct {
 	Scopes    []string   `json:"scopes"`
 	Revoked   bool       `json:"revoked"`
 	CreatedAt *time.Time `json:"created_at"`
-	ExpiresAt *time.Time `json:"expires_at"`
+	ExpiresAt *ISOTime   `json:"expires_at"`
 }
 
 // GetAllImpersonationTokensOptions represents the available
@@ -605,6 +641,7 @@ type ImpersonationToken struct {
 // GitLab API docs:
 // https://docs.gitlab.com/ce/api/users.html#get-all-impersonation-tokens-of-a-user
 type GetAllImpersonationTokensOptions struct {
+	ListOptions
 	State *string `url:"state,omitempty" json:"state,omitempty"`
 }
 
@@ -695,4 +732,118 @@ func (s *UsersService) RevokeImpersonationToken(user, token int, options ...Opti
 	}
 
 	return s.client.Do(req, nil)
+}
+
+// UserActivity represents an entry in the user/activities response
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ce/api/users.html#get-user-activities-admin-only
+type UserActivity struct {
+	Username       string   `json:"username"`
+	LastActivityOn *ISOTime `json:"last_activity_on"`
+}
+
+// GetUserActivitiesOptions represents the options for GetUserActivities
+//
+// GitLap API docs:
+// https://docs.gitlab.com/ce/api/users.html#get-user-activities-admin-only
+type GetUserActivitiesOptions struct {
+	From *ISOTime `url:"from,omitempty" json:"from,omitempty"`
+}
+
+// GetUserActivities retrieves user activities (admin only)
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ce/api/users.html#get-user-activities-admin-only
+func (s *UsersService) GetUserActivities(opt *GetUserActivitiesOptions, options ...OptionFunc) ([]*UserActivity, *Response, error) {
+	req, err := s.client.NewRequest("GET", "user/activities", opt, options)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var t []*UserActivity
+	resp, err := s.client.Do(req, &t)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return t, resp, err
+}
+
+// UserStatus represents the current status of a user
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ce/api/users.html#user-status
+type UserStatus struct {
+	Emoji       string `json:"emoji"`
+	Message     string `json:"message"`
+	MessageHTML string `json:"message_html"`
+}
+
+// CurrentUserStatus retrieves the user status
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ce/api/users.html#user-status
+func (s *UsersService) CurrentUserStatus(options ...OptionFunc) (*UserStatus, *Response, error) {
+	req, err := s.client.NewRequest("GET", "user/status", nil, options)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	status := new(UserStatus)
+	resp, err := s.client.Do(req, status)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return status, resp, err
+}
+
+// GetUserStatus retrieves a user's status
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ce/api/users.html#get-the-status-of-a-user
+func (s *UsersService) GetUserStatus(user int, options ...OptionFunc) (*UserStatus, *Response, error) {
+	u := fmt.Sprintf("users/%d/status", user)
+
+	req, err := s.client.NewRequest("GET", u, nil, options)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	status := new(UserStatus)
+	resp, err := s.client.Do(req, status)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return status, resp, err
+}
+
+// UserStatusOptions represents the options required to set the status
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ce/api/users.html#set-user-status
+type UserStatusOptions struct {
+	Emoji   *string `url:"emoji,omitempty" json:"emoji,omitempty"`
+	Message *string `url:"message,omitempty" json:"message,omitempty"`
+}
+
+// SetUserStatus sets the user's status
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ce/api/users.html#set-user-status
+func (s *UsersService) SetUserStatus(opt *UserStatusOptions, options ...OptionFunc) (*UserStatus, *Response, error) {
+	req, err := s.client.NewRequest("PUT", "user/status", opt, options)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	status := new(UserStatus)
+	resp, err := s.client.Do(req, status)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return status, resp, err
 }

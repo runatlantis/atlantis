@@ -49,9 +49,7 @@ func (b Branch) String() string {
 //
 // GitLab API docs:
 // https://docs.gitlab.com/ce/api/branches.html#list-repository-branches
-type ListBranchesOptions struct {
-	ListOptions
-}
+type ListBranchesOptions ListOptions
 
 // ListBranches gets a list of repository branches from a project, sorted by
 // name alphabetically.
@@ -88,7 +86,7 @@ func (s *BranchesService) GetBranch(pid interface{}, branch string, options ...O
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/repository/branches/%s", url.QueryEscape(project), branch)
+	u := fmt.Sprintf("projects/%s/repository/branches/%s", url.QueryEscape(project), url.QueryEscape(branch))
 
 	req, err := s.client.NewRequest("GET", u, nil, options)
 	if err != nil {
@@ -124,7 +122,7 @@ func (s *BranchesService) ProtectBranch(pid interface{}, branch string, opts *Pr
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/repository/branches/%s/protect", url.QueryEscape(project), branch)
+	u := fmt.Sprintf("projects/%s/repository/branches/%s/protect", url.QueryEscape(project), url.QueryEscape(branch))
 
 	req, err := s.client.NewRequest("PUT", u, opts, options)
 	if err != nil {
@@ -151,7 +149,7 @@ func (s *BranchesService) UnprotectBranch(pid interface{}, branch string, option
 	if err != nil {
 		return nil, nil, err
 	}
-	u := fmt.Sprintf("projects/%s/repository/branches/%s/unprotect", url.QueryEscape(project), branch)
+	u := fmt.Sprintf("projects/%s/repository/branches/%s/unprotect", url.QueryEscape(project), url.QueryEscape(branch))
 
 	req, err := s.client.NewRequest("PUT", u, nil, options)
 	if err != nil {
@@ -210,7 +208,7 @@ func (s *BranchesService) DeleteBranch(pid interface{}, branch string, options .
 	if err != nil {
 		return nil, err
 	}
-	u := fmt.Sprintf("projects/%s/repository/branches/%s", url.QueryEscape(project), branch)
+	u := fmt.Sprintf("projects/%s/repository/branches/%s", url.QueryEscape(project), url.QueryEscape(branch))
 
 	req, err := s.client.NewRequest("DELETE", u, nil, options)
 	if err != nil {

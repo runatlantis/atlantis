@@ -17,14 +17,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"net/http/httptest"
-	"path/filepath"
-	"strings"
-	"testing"
-	"time"
-
 	"github.com/lkysow/go-gitlab"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server"
@@ -36,6 +28,12 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/mocks"
 	. "github.com/runatlantis/atlantis/testing"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
+	"strings"
+	"testing"
 )
 
 const githubHeader = "X-Github-Event"
@@ -367,10 +365,10 @@ func TestPost_GitlabMergeRequestInvalid(t *testing.T) {
 	e, _, gl, p, _, _, _, _ := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(gitlabHeader, "value")
-	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
+	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlab.MergeEvent{}, nil)
 	repo := models.Repo{}
 	pullRequest := models.PullRequest{State: models.ClosedPullState}
-	When(p.ParseGitlabMergeRequestEvent(gitlabMergeEvent)).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, errors.New("err"))
+	When(p.ParseGitlabMergeRequestEvent(gitlab.MergeEvent{})).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, errors.New("err"))
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	responseContains(t, w, http.StatusBadRequest, "Error parsing webhook: err")
@@ -401,10 +399,10 @@ func TestPost_GitlabMergeRequestNotWhitelisted(t *testing.T) {
 	var err error
 	e.RepoWhitelistChecker, err = events.NewRepoWhitelistChecker("github.com/nevermatch")
 	Ok(t, err)
-	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
+	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlab.MergeEvent{}, nil)
 	repo := models.Repo{}
 	pullRequest := models.PullRequest{State: models.ClosedPullState}
-	When(p.ParseGitlabMergeRequestEvent(gitlabMergeEvent)).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
+	When(p.ParseGitlabMergeRequestEvent(gitlab.MergeEvent{})).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
 
 	w := httptest.NewRecorder()
 	e.Post(w, req)
@@ -431,11 +429,12 @@ func TestPost_GitlabMergeRequestUnsupportedAction(t *testing.T) {
 	e, _, gl, p, _, _, _, _ := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(gitlabHeader, "value")
-	gitlabMergeEvent.ObjectAttributes.Action = "unsupported"
-	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
+	var event gitlab.MergeEvent
+	event.ObjectAttributes.Action = "unsupported"
+	When(gl.ParseAndValidate(req, secret)).ThenReturn(event, nil)
 	repo := models.Repo{}
 	pullRequest := models.PullRequest{State: models.ClosedPullState}
-	When(p.ParseGitlabMergeRequestEvent(gitlabMergeEvent)).ThenReturn(pullRequest, repo, repo, models.User{}, nil)
+	When(p.ParseGitlabMergeRequestEvent(event)).ThenReturn(pullRequest, repo, repo, models.User{}, nil)
 
 	w := httptest.NewRecorder()
 	e.Post(w, req)
@@ -467,11 +466,12 @@ func TestPost_GitlabMergeRequestClosedErrCleaningPull(t *testing.T) {
 	e, _, gl, p, _, c, _, _ := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(gitlabHeader, "value")
-	gitlabMergeEvent.ObjectAttributes.Action = "close"
-	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
+	var event gitlab.MergeEvent
+	event.ObjectAttributes.Action = "close"
+	When(gl.ParseAndValidate(req, secret)).ThenReturn(event, nil)
 	repo := models.Repo{}
 	pullRequest := models.PullRequest{State: models.ClosedPullState}
-	When(p.ParseGitlabMergeRequestEvent(gitlabMergeEvent)).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
+	When(p.ParseGitlabMergeRequestEvent(event)).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
 	When(c.CleanUpPull(repo, pullRequest)).ThenReturn(errors.New("err"))
 	w := httptest.NewRecorder()
 	e.Post(w, req)
@@ -502,10 +502,10 @@ func TestPost_GitlabMergeRequestSuccess(t *testing.T) {
 	e, _, gl, p, _, _, _, _ := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(gitlabHeader, "value")
-	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
+	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlab.MergeEvent{}, nil)
 	repo := models.Repo{}
 	pullRequest := models.PullRequest{State: models.ClosedPullState}
-	When(p.ParseGitlabMergeRequestEvent(gitlabMergeEvent)).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
+	When(p.ParseGitlabMergeRequestEvent(gitlab.MergeEvent{})).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	responseContains(t, w, http.StatusOK, "Pull request cleaned successfully")
@@ -546,11 +546,12 @@ func TestPost_PullOpenedOrUpdated(t *testing.T) {
 			switch c.HostType {
 			case models.Gitlab:
 				req.Header.Set(gitlabHeader, "value")
-				gitlabMergeEvent.ObjectAttributes.Action = c.Action
-				When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlabMergeEvent, nil)
+				var event gitlab.MergeEvent
+				event.ObjectAttributes.Action = c.Action
+				When(gl.ParseAndValidate(req, secret)).ThenReturn(event, nil)
 				repo := models.Repo{}
 				pullRequest := models.PullRequest{State: models.ClosedPullState}
-				When(p.ParseGitlabMergeRequestEvent(gitlabMergeEvent)).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
+				When(p.ParseGitlabMergeRequestEvent(event)).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
 			case models.Github:
 				req.Header.Set(githubHeader, "pull_request")
 				event := fmt.Sprintf(`{"action": "%s"}`, c.Action)
@@ -594,61 +595,4 @@ func setup(t *testing.T) (server.EventsController, *mocks.MockGithubRequestValid
 		VCSClient:                    vcsmock,
 	}
 	return e, v, gl, p, cr, c, vcsmock, cp
-}
-
-var gitlabMergeEvent = gitlab.MergeEvent{
-	ObjectAttributes: struct {
-		ID              int              `json:"id"`
-		TargetBranch    string           `json:"target_branch"`
-		SourceBranch    string           `json:"source_branch"`
-		SourceProjectID int              `json:"source_project_id"`
-		AuthorID        int              `json:"author_id"`
-		AssigneeID      int              `json:"assignee_id"`
-		Title           string           `json:"title"`
-		CreatedAt       string           `json:"created_at"`
-		UpdatedAt       string           `json:"updated_at"`
-		StCommits       []*gitlab.Commit `json:"st_commits"`
-		StDiffs         []*gitlab.Diff   `json:"st_diffs"`
-		MilestoneID     int              `json:"milestone_id"`
-		State           string           `json:"state"`
-		MergeStatus     string           `json:"merge_status"`
-		TargetProjectID int              `json:"target_project_id"`
-		IID             int              `json:"iid"`
-		Description     string           `json:"description"`
-		Position        int              `json:"position"`
-		LockedAt        string           `json:"locked_at"`
-		UpdatedByID     int              `json:"updated_by_id"`
-		MergeError      string           `json:"merge_error"`
-		MergeParams     struct {
-			ForceRemoveSourceBranch string `json:"force_remove_source_branch"`
-		} `json:"merge_params"`
-		MergeWhenBuildSucceeds   bool               `json:"merge_when_build_succeeds"`
-		MergeUserID              int                `json:"merge_user_id"`
-		MergeCommitSha           string             `json:"merge_commit_sha"`
-		DeletedAt                string             `json:"deleted_at"`
-		ApprovalsBeforeMerge     string             `json:"approvals_before_merge"`
-		RebaseCommitSha          string             `json:"rebase_commit_sha"`
-		InProgressMergeCommitSha string             `json:"in_progress_merge_commit_sha"`
-		LockVersion              int                `json:"lock_version"`
-		TimeEstimate             int                `json:"time_estimate"`
-		Source                   *gitlab.Repository `json:"source"`
-		Target                   *gitlab.Repository `json:"target"`
-		LastCommit               struct {
-			ID        string         `json:"id"`
-			Message   string         `json:"message"`
-			Timestamp *time.Time     `json:"timestamp"`
-			URL       string         `json:"url"`
-			Author    *gitlab.Author `json:"author"`
-		} `json:"last_commit"`
-		WorkInProgress bool   `json:"work_in_progress"`
-		URL            string `json:"url"`
-		Action         string `json:"action"`
-		Assignee       struct {
-			Name      string `json:"name"`
-			Username  string `json:"username"`
-			AvatarURL string `json:"avatar_url"`
-		} `json:"assignee"`
-	}{
-		Action: "merge",
-	},
 }
