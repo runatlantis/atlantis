@@ -144,12 +144,24 @@ func (g *GitlabClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 }
 
 // PullIsMergeable returns true if the merge request can be merged.
+// In GitLab, there isn't a single field that tells us if the pull request is
+// mergeable so for now we check the merge_status and approvals_before_merge
+// fields. We aren't checking if there are unresolved discussions or failing
+// pipelines because those only block merges if the repo is set to require that.
+// In order to check if the repo required these, we'd need to make another API
+// call to get the repo settings. For now I'm going to leave this as is and if
+// some users require checking this as well then we can revisit.
+// It's also possible that GitLab implements their own "mergeable" field in
+// their API in the future.
+// See:
+// - https://gitlab.com/gitlab-org/gitlab-ee/issues/3169
+// - https://gitlab.com/gitlab-org/gitlab-ce/issues/42344
 func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
 	mr, _, err := g.Client.MergeRequests.GetMergeRequest(repo.FullName, pull.Num)
 	if err != nil {
 		return false, err
 	}
-	if mr.MergeStatus == "can_be_merged" {
+	if mr.MergeStatus == "can_be_merged" && mr.ApprovalsBeforeMerge <= 0 {
 		return true, nil
 	}
 	return false, nil
