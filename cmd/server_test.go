@@ -459,6 +459,7 @@ func TestExecute_Flags(t *testing.T) {
 		cmd.SSLCertFileFlag:            "cert-file",
 		cmd.SSLKeyFileFlag:             "key-file",
 		cmd.TFETokenFlag:               "my-token",
+		cmd.AutomergeFlag:              true,
 	})
 	err := c.Execute()
 	Ok(t, err)
@@ -610,6 +611,7 @@ ssl-key-file: my-token
 		"SSL_CERT_FILE":            "override-cert-file",
 		"SSL_KEY_FILE":             "override-key-file",
 		"TFE_TOKEN":                "override-my-token",
+		"AUTOMERGE":                "false",
 	} {
 		os.Setenv("ATLANTIS_"+name, value) // nolint: errcheck
 	}
@@ -760,6 +762,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		"SSL_CERT_FILE":            "cert-file",
 		"SSL_KEY_FILE":             "key-file",
 		"TFE_TOKEN":                "my-token",
+		"AUTOMERGE":                "true",
 	}
 	for name, value := range envVars {
 		os.Setenv("ATLANTIS_"+name, value) // nolint: errcheck
@@ -797,6 +800,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		cmd.SSLCertFileFlag:            "override-cert-file",
 		cmd.SSLKeyFileFlag:             "override-key-file",
 		cmd.TFETokenFlag:               "override-my-token",
+		cmd.AutomergeFlag:              true,
 	})
 	err := c.Execute()
 	Ok(t, err)
@@ -826,6 +830,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
 	Equals(t, "override-key-file", passedConfig.SSLKeyFile)
 	Equals(t, "override-my-token", passedConfig.TFEToken)
+	Equals(t, true, passedConfig.Automerge)
 }
 
 // If using bitbucket cloud, webhook secrets are not supported.

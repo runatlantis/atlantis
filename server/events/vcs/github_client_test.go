@@ -287,6 +287,80 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 	}
 }
 
+func TestGithubClient_MergePull(t *testing.T) {
+	cases := []struct {
+		code    int
+		message string
+		merged  string
+	}{
+		{
+			200,
+			"Pull Request successfully merged",
+			"true",
+		},
+		{
+			405,
+			"Pull Request is not mergeable",
+			"",
+		},
+		{
+			409,
+			"Head branch was modified. Review and try the merge again.",
+			"",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.message, func(t *testing.T) {
+			testServer := httptest.NewTLSServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/api/v3/repos/owner/repo/pulls/1/merge":
+						body, err := ioutil.ReadAll(r.Body)
+						Ok(t, err)
+						exp := "{\"commit_message\":\"[Atlantis] Automerge after successful apply\"}\n"
+						Equals(t, exp, string(body))
+						var resp string
+						if c.code == 200 {
+							resp = fmt.Sprintf(`{"message":"%s","merged":%s}%s`, c.message, c.merged, "\n")
+						} else {
+							resp = fmt.Sprintf(`{"message":"%s"}%s`, c.message, "\n")
+						}
+						defer r.Body.Close() // nolint: errcheck
+						w.WriteHeader(c.code)
+						w.Write([]byte(resp)) // nolint: errcheck
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+						return
+					}
+				}))
+
+			testServerURL, err := url.Parse(testServer.URL)
+			Ok(t, err)
+			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+			Ok(t, err)
+			defer disableSSLVerification()()
+
+			result, err := client.MergePullRequest(models.Repo{
+				FullName:          "owner/repo",
+				Owner:             "owner",
+				Name:              "repo",
+				CloneURL:          "",
+				SanitizedCloneURL: "",
+				VCSHost: models.VCSHost{
+					Type:     models.Github,
+					Hostname: "github.com",
+				},
+			}, 1)
+			if c.code == 200 {
+				Ok(t, err)
+				Equals(t, c.message, result.GetMessage())
+			}
+		})
+	}
+}
+
 // disableSSLVerification disables ssl verification for the global http client
 // and returns a function to be called in a defer that will re-enable it.
 func disableSSLVerification() func() {

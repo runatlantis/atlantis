@@ -175,3 +175,20 @@ func (g *GithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 	_, _, err := g.client.Repositories.CreateStatus(g.ctx, repo.Owner, repo.Name, pull.HeadCommit, status)
 	return err
 }
+
+// MergePullRequest merges the pull request.
+func (g *GithubClient) MergePullRequest(repo models.Repo, num int) (*github.PullRequestMergeResult, error) {
+	mergeResult, _, err := g.client.PullRequests.Merge(g.ctx, repo.Owner, repo.Name, num, "[Atlantis] Automerge after successful apply", nil)
+	return mergeResult, err
+}
+
+func (g *GithubClient) MergePull(repo models.Repo, pull models.PullRequest) (bool, error) {
+	mergeResult, err := g.MergePullRequest(repo, pull.Num)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to merge pull request")
+	}
+	if !mergeResult.GetMerged() {
+		return mergeResult.GetMerged(), errors.Wrap(err, mergeResult.GetMessage())
+	}
+	return mergeResult.GetMerged(), nil
+}

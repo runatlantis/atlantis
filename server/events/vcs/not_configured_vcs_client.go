@@ -45,3 +45,6 @@ func (a *NotConfiguredVCSClient) err() error {
 	//noinspection GoErrorStringFormat
 	return fmt.Errorf("Atlantis was not configured to support repos from %s", a.Host.String())
 }
+func (a *NotConfiguredVCSClient) MergePull(repo models.Repo, pull models.PullRequest) (bool, error) {
+	return false, a.err()
+}

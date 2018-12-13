@@ -1,6 +1,9 @@
 package runtime_test
 
 import (
+	"io/ioutil"
+	"os"
+	"path"
 	"testing"
 
 	version "github.com/hashicorp/go-version"
@@ -50,10 +53,13 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 			When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 				ThenReturn("output", nil)
 
+			dir, cleanup := TempDir(t)
+			defer cleanup()
+
 			output, err := iso.Run(models.ProjectCommandContext{
 				Workspace:  "workspace",
 				RepoRelDir: ".",
-			}, []string{"extra", "args"}, "/path")
+			}, []string{"extra", "args"}, dir)
 			Ok(t, err)
 			// When there is no error, should not return init output to PR.
 			Equals(t, "", output)
@@ -63,7 +69,7 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 			if c.expCmd == "get" {
 				expArgs = []string{c.expCmd, "-no-color", "extra", "args"}
 			}
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, "/path", expArgs, tfVersion, "workspace")
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, dir, expArgs, tfVersion, "workspace")
 		})
 	}
 }
@@ -81,10 +87,21 @@ func TestRun_ShowInitOutputOnError(t *testing.T) {
 		DefaultTFVersion:  tfVersion,
 	}
 
+	dir, cleanup := TempDir(t)
+	defer cleanup()
+
 	output, err := iso.Run(models.ProjectCommandContext{
 		Workspace:  "workspace",
 		RepoRelDir: ".",
-	}, nil, "/path")
+	}, nil, dir)
 	ErrEquals(t, "error", err)
 	Equals(t, "output", output)
+
+	// Check error was written to `workspace.tfinit-error`
+	errorFilePath := path.Join(dir, "workspace.tfinit-error")
+	contents, err := ioutil.ReadFile(errorFilePath)
+	Ok(t, err)
+	Equals(t, output, string(contents))
+	err = os.Remove(errorFilePath)
+	Ok(t, err)
 }

@@ -16,6 +16,7 @@ to use `atlantis.yaml` files.
 ## Example Using All Keys
 ```yaml
 version: 2
+automerge: false
 projects:
 - name: my-project-name
   dir: .
@@ -69,12 +70,15 @@ It should be noted that `atlantis apply` itself could be exploited if run on a m
 version:
 projects:
 workflows:
+automerge:
 ```
-| Key       | Type                                                             | Default | Required | Description                                 |
-| --------- | ---------------------------------------------------------------- | ------- | -------- | ------------------------------------------- |
-| version   | int                                                              | none    | yes      | This key is required and must be set to `2` |
-| projects  | array[[Project](atlantis-yaml-reference.html#project)]           | []      | no       | Lists the projects in this repo             |
-| workflows | map[string -> [Workflow](atlantis-yaml-reference.html#workflow)] | {}      | no       | Custom workflows                            |
+| Key       | Type                                                             | Default | Required | Description                                     |
+| --------- | ---------------------------------------------------------------- | ------- | -------- | ----------------------------------------------- |
+| version   | int                                                              | none    | yes      | This key is required and must be set to `2`     |
+| projects  | array[[Project](atlantis-yaml-reference.html#project)]           | []      | no       | Lists the projects in this repo                 |
+| workflows | map[string -> [Workflow](atlantis-yaml-reference.html#workflow)] | {}      | no       | Custom workflows                                |
+| automerge | boolean                                                          | false   | no       | Enable automatic merging after successful apply |
+
 
 ### Project
 ```yaml

@@ -1,0 +1,18 @@
+Ran Apply for dir: `.` workspace: `staging`
+
+```diff
+preapply
+
+null_resource.simple:
+null_resource.simple:
+
+Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+var = default_workspace
+workspace = staging
+postapply
+
+```
+

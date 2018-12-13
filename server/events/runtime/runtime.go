@@ -29,14 +29,20 @@ func MustConstraint(constraint string) version.Constraints {
 // From https://www.oreilly.com/library/view/regular-expressions-cookbook/9781449327453/ch08s25.html
 var invalidFilenameChars = regexp.MustCompile(`[\\/:"*?<>|]`)
 
+// GetProjectFilenamePrefix returns the filename prefix given a workspace and
+// maybe a project's config.
+func GetProjectFilenamePrefix(workspace string, maybeCfg *valid.Project) string {
+	var unescapedFilename string
+	if maybeCfg == nil || maybeCfg.Name == nil {
+		unescapedFilename = workspace
+	} else {
+		unescapedFilename = fmt.Sprintf("%s-%s", *maybeCfg.Name, workspace)
+	}
+	return invalidFilenameChars.ReplaceAllLiteralString(unescapedFilename, "-")
+}
+
 // GetPlanFilename returns the filename (not the path) of the generated tf plan
 // given a workspace and maybe a project's config.
 func GetPlanFilename(workspace string, maybeCfg *valid.Project) string {
-	var unescapedFilename string
-	if maybeCfg == nil || maybeCfg.Name == nil {
-		unescapedFilename = fmt.Sprintf("%s.tfplan", workspace)
-	} else {
-		unescapedFilename = fmt.Sprintf("%s-%s.tfplan", *maybeCfg.Name, workspace)
-	}
-	return invalidFilenameChars.ReplaceAllLiteralString(unescapedFilename, "-")
+	return GetProjectFilenamePrefix(workspace, maybeCfg) + ".tfplan"
 }

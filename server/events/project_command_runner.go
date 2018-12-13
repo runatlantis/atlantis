@@ -74,6 +74,10 @@ type ProjectCommandRunner interface {
 	Plan(ctx models.ProjectCommandContext) ProjectResult
 	// Apply runs terraform apply for the project described by ctx.
 	Apply(ctx models.ProjectCommandContext) ProjectResult
+	// HasPendingPlans returns true if there are any pending plans.
+	HasPendingPlans(ctx models.ProjectCommandContext) bool
+	// HasErrors returns true if one or more projects have errors.
+	HasErrors(ctx models.ProjectCommandContext) bool
 }
 
 // DefaultProjectCommandRunner implements ProjectCommandRunner.
@@ -91,6 +95,7 @@ type DefaultProjectCommandRunner struct {
 	WorkingDirLocker         WorkingDirLocker
 	RequireApprovalOverride  bool
 	RequireMergeableOverride bool
+	PendingPlanFinder        *PendingPlanFinder
 }
 
 // Plan runs terraform plan for the project described by ctx.
@@ -117,6 +122,43 @@ func (p *DefaultProjectCommandRunner) Apply(ctx models.ProjectCommandContext) Pr
 		Workspace:    ctx.Workspace,
 		ProjectName:  ctx.GetProjectName(),
 	}
+}
+
+// HasPendingPlans returns true if there are pending plans. In the case of errors, it returns false.
+func (p *DefaultProjectCommandRunner) HasPendingPlans(ctx models.ProjectCommandContext) bool {
+	pullDir, err := p.WorkingDir.GetPullDir(ctx.BaseRepo, ctx.Pull)
+	if err != nil {
+		return false
+	}
+
+	plans, err := p.PendingPlanFinder.Find(pullDir)
+
+	if err != nil {
+		return false
+	}
+	if len(plans) > 0 {
+		return true
+	}
+	return false
+}
+
+// HasErrors returns true if one or more have errors. Returns false if something
+// goes wrong when searching for errors.
+func (p *DefaultProjectCommandRunner) HasErrors(ctx models.ProjectCommandContext) bool {
+	pullDir, err := p.WorkingDir.GetPullDir(ctx.BaseRepo, ctx.Pull)
+	if err != nil {
+		return false
+	}
+
+	plans, err := p.PendingPlanFinder.FindErrors(pullDir)
+
+	if err != nil {
+		return false
+	}
+	if len(plans) > 0 {
+		return true
+	}
+	return false
 }
 
 func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (*PlanSuccess, string, error) {

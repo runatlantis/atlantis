@@ -69,6 +69,7 @@ type DefaultCommandRunner struct {
 	AllowForkPRsFlag      string
 	ProjectCommandBuilder ProjectCommandBuilder
 	ProjectCommandRunner  ProjectCommandRunner
+	AutomergeOverride     bool
 }
 
 // RunAutoplanCommand runs plan when a pull request is opened or updated.
@@ -176,6 +177,53 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		cmd,
 		CommandResult{
 			ProjectResults: results})
+
+	if cmd.Name == ApplyCommand {
+		// Lastly, merge the PR if required
+		c.mergePullIfRequired(ctx, projectCmds, results)
+	}
+}
+
+func (c *DefaultCommandRunner) mergePullIfRequired(ctx *CommandContext, projectCmds []models.ProjectCommandContext, results []ProjectResult) {
+	if len(projectCmds) < 1 || len(results) != len(projectCmds) {
+		ctx.Log.Debug("unexpected lengths of projectCmds and results (got %d and %d", len(projectCmds), len(results))
+		return
+	}
+	// Fetch the global config from any command, if it exists (is there a better way to do this?)
+	if !c.AutomergeOverride && !(projectCmds[0].GlobalConfig != nil && projectCmds[0].GlobalConfig.Automerge) {
+		ctx.Log.Debug("automerging disabled")
+		return
+	}
+	// Check to be sure all results did not have errors
+	for _, result := range results {
+		if result.Error != nil {
+			// If there was any error, do not merge
+			ctx.Log.Debug("automerging canceled due to errors")
+			return
+		}
+	}
+
+	// Double check that there are no more plans
+	if c.ProjectCommandRunner.HasErrors(projectCmds[0]) {
+		ctx.Log.Debug("automerging canceled because one or more projects have errors")
+		return
+	}
+
+	// Double check that there are no more plans
+	if c.ProjectCommandRunner.HasPendingPlans(projectCmds[0]) {
+		ctx.Log.Debug("automerging canceled because there are pending plans")
+		return
+	}
+
+	ctx.Log.Debug("automerging PR num=%d", ctx.Pull.Num)
+
+	// If we made it here, the PR can be merged automatically
+	mergeResult, err := c.VCSClient.MergePull(ctx.BaseRepo, ctx.Pull)
+	if err != nil {
+		ctx.Log.Err("unable to merge pull: %s", err)
+	} else if !mergeResult {
+		ctx.Log.Err("unable to merge pull")
+	}
 }
 
 func (c *DefaultCommandRunner) runProjectCmds(cmds []models.ProjectCommandContext, cmdName CommandName) []ProjectResult {

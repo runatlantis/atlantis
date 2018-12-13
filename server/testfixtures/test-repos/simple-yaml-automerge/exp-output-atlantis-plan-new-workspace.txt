@@ -1,0 +1,4 @@
+**Plan Error**
+```
+running commands in workspace "new_workspace" is not allowed because this directory is only configured for the following workspaces: default, staging
+```

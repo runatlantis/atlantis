@@ -63,6 +63,7 @@ const (
 	SSLCertFileFlag            = "ssl-cert-file"
 	SSLKeyFileFlag             = "ssl-key-file"
 	TFETokenFlag               = "tfe-token"
+	AutomergeFlag              = "automerge"
 
 	// Flag defaults.
 	DefaultCheckoutStrategy = "branch"
@@ -213,6 +214,11 @@ var boolFlags = []boolFlag{
 	{
 		name:         SilenceWhitelistErrorsFlag,
 		description:  "Silences the posting of whitelist error comments.",
+		defaultValue: false,
+	},
+	{
+		name:         AutomergeFlag,
+		description:  "Automatically merge a pull/merge request when all plans are successfully applied.",
 		defaultValue: false,
 	},
 }

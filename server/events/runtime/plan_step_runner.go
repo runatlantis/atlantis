@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -36,9 +37,22 @@ func (p *PlanStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []strin
 		return "", err
 	}
 
+	// Remove any error file from any previous plans
+	planErrorFile := filepath.Join(path, GetProjectFilenamePrefix(ctx.Workspace, ctx.ProjectConfig)+".tfplan-error")
+	_ = os.Remove(planErrorFile) // safe to ignore return result
+
 	planCmd := p.buildPlanCmd(ctx, extraArgs, path, tfVersion)
 	output, err := p.TerraformExecutor.RunCommandWithVersion(ctx.Log, filepath.Clean(path), planCmd, tfVersion, ctx.Workspace)
 	if err != nil {
+		// If there was an error, write the result out to the '.tfplan-error' file in
+		// the workspace. This may be used later to either retrieve the reason for the
+		// failure, or to prevent automerging.
+		writeErr := ioutil.WriteFile(planErrorFile, []byte(output), 0644)
+		if writeErr != nil {
+			panic(writeErr)
+		}
+		ctx.Log.Info("Failed plan output has been written to %s", planErrorFile)
+
 		return output, err
 	}
 	return p.fmtPlanOutput(output), nil

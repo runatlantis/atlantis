@@ -49,6 +49,36 @@ func (mock *MockProjectCommandRunner) Apply(ctx models.ProjectCommandContext) ev
 	return ret0
 }
 
+func (mock *MockProjectCommandRunner) HasPendingPlans(ctx models.ProjectCommandContext) bool {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockProjectCommandRunner().")
+	}
+	params := []pegomock.Param{ctx}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("HasPendingPlans", params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem()})
+	var ret0 bool
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(bool)
+		}
+	}
+	return ret0
+}
+
+func (mock *MockProjectCommandRunner) HasErrors(ctx models.ProjectCommandContext) bool {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockProjectCommandRunner().")
+	}
+	params := []pegomock.Param{ctx}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("HasErrors", params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem()})
+	var ret0 bool
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(bool)
+		}
+	}
+	return ret0
+}
+
 func (mock *MockProjectCommandRunner) VerifyWasCalledOnce() *VerifierProjectCommandRunner {
 	return &VerifierProjectCommandRunner{
 		mock:                   mock,
@@ -130,6 +160,60 @@ func (c *ProjectCommandRunner_Apply_OngoingVerification) GetCapturedArguments() 
 }
 
 func (c *ProjectCommandRunner_Apply_OngoingVerification) GetAllCapturedArguments() (_param0 []models.ProjectCommandContext) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]models.ProjectCommandContext, len(params[0]))
+		for u, param := range params[0] {
+			_param0[u] = param.(models.ProjectCommandContext)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierProjectCommandRunner) HasPendingPlans(ctx models.ProjectCommandContext) *ProjectCommandRunner_HasPendingPlans_OngoingVerification {
+	params := []pegomock.Param{ctx}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "HasPendingPlans", params, verifier.timeout)
+	return &ProjectCommandRunner_HasPendingPlans_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type ProjectCommandRunner_HasPendingPlans_OngoingVerification struct {
+	mock              *MockProjectCommandRunner
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *ProjectCommandRunner_HasPendingPlans_OngoingVerification) GetCapturedArguments() models.ProjectCommandContext {
+	ctx := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1]
+}
+
+func (c *ProjectCommandRunner_HasPendingPlans_OngoingVerification) GetAllCapturedArguments() (_param0 []models.ProjectCommandContext) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]models.ProjectCommandContext, len(params[0]))
+		for u, param := range params[0] {
+			_param0[u] = param.(models.ProjectCommandContext)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierProjectCommandRunner) HasErrors(ctx models.ProjectCommandContext) *ProjectCommandRunner_HasErrors_OngoingVerification {
+	params := []pegomock.Param{ctx}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "HasErrors", params, verifier.timeout)
+	return &ProjectCommandRunner_HasErrors_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type ProjectCommandRunner_HasErrors_OngoingVerification struct {
+	mock              *MockProjectCommandRunner
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *ProjectCommandRunner_HasErrors_OngoingVerification) GetCapturedArguments() models.ProjectCommandContext {
+	ctx := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1]
+}
+
+func (c *ProjectCommandRunner_HasErrors_OngoingVerification) GetAllCapturedArguments() (_param0 []models.ProjectCommandContext) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.ProjectCommandContext, len(params[0]))

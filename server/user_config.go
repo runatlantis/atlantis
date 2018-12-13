@@ -9,6 +9,7 @@ type UserConfig struct {
 	AllowForkPRs           bool   `mapstructure:"allow-fork-prs"`
 	AllowRepoConfig        bool   `mapstructure:"allow-repo-config"`
 	AtlantisURL            string `mapstructure:"atlantis-url"`
+	Automerge              bool   `mapstructure:"automerge"`
 	BitbucketBaseURL       string `mapstructure:"bitbucket-base-url"`
 	BitbucketToken         string `mapstructure:"bitbucket-token"`
 	BitbucketUser          string `mapstructure:"bitbucket-user"`

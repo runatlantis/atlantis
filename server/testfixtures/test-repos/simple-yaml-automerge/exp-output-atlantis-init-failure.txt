@@ -1,0 +1,73 @@
+Ran Plan for 3 projects:
+1. dir: `.` workspace: `default`
+1. dir: `.` workspace: `staging`
+1. dir: `failing-init` workspace: `default`
+
+### 1. dir: `.` workspace: `default`
+<details><summary>Show Output</summary>
+
+```diff
+preinit
+
+
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
++ create
+
+Terraform will perform the following actions:
+
++ null_resource.simple
+      id: <computed>
+Plan: 1 to add, 0 to change, 0 to destroy.
+postplan
+
+```
+
+* :arrow_forward: To **apply** this plan, comment:
+    * `atlantis apply -d .`
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+    * `atlantis plan -d .`
+</details>
+
+---
+### 2. dir: `.` workspace: `staging`
+```diff
+
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
++ create
+
+Terraform will perform the following actions:
+
++ null_resource.simple
+      id: <computed>
+Plan: 1 to add, 0 to change, 0 to destroy.
+```
+
+* :arrow_forward: To **apply** this plan, comment:
+    * `atlantis apply -w staging`
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+    * `atlantis plan -w staging`
+
+---
+### 3. dir: `failing-init` workspace: `default`
+**Plan Error**
+```
+exit status 1: running "terraform init -input=false -no-color" in "/dataDir/repos/runatlantis/atlantis-tests/2/default/failing-init"
+preinit
+
+There are some problems with the configuration, described below.
+
+The Terraform configuration must be valid before initialization so that
+Terraform can determine which modules and providers need to be installed.
+
+Error: Error loading /dataDir/repos/runatlantis/atlantis-tests/2/default/failing-init/main.tf: position 1:10: resource must be followed by exactly two strings, a type and a name
+
+
+```
+
+---
+* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
+    * `atlantis apply`

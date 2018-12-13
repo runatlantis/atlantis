@@ -7,11 +7,14 @@ import (
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 )
 
+const DefaultAutomergeEnabled = false
+
 // Config is the representation for the whole config file at the top level.
 type Config struct {
 	Version   *int                `yaml:"version,omitempty"`
 	Projects  []Project           `yaml:"projects,omitempty"`
 	Workflows map[string]Workflow `yaml:"workflows,omitempty"`
+	Automerge *bool               `yaml:"automerge,omitempty"`
 }
 
 func (c Config) Validate() error {
@@ -29,6 +32,7 @@ func (c Config) Validate() error {
 		validation.Field(&c.Version, validation.By(equals2)),
 		validation.Field(&c.Projects),
 		validation.Field(&c.Workflows),
+		validation.Field(&c.Automerge),
 	)
 }
 
@@ -42,9 +46,16 @@ func (c Config) ToValid() valid.Config {
 	for k, v := range c.Workflows {
 		validWorkflows[k] = v.ToValid()
 	}
+
+	validAutomerge := DefaultAutomergeEnabled
+	if c.Automerge != nil {
+		validAutomerge = *c.Automerge
+	}
+
 	return valid.Config{
 		Version:   *c.Version,
 		Projects:  validProjects,
 		Workflows: validWorkflows,
+		Automerge: validAutomerge,
 	}
 }

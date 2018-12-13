@@ -24,6 +24,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 				Version:   nil,
 				Projects:  nil,
 				Workflows: nil,
+				Automerge: nil,
 			},
 		},
 		{
@@ -33,6 +34,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 				Version:   nil,
 				Projects:  nil,
 				Workflows: nil,
+				Automerge: nil,
 			},
 		},
 		{
@@ -42,6 +44,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 				Version:   nil,
 				Projects:  nil,
 				Workflows: nil,
+				Automerge: nil,
 			},
 			expErr: "yaml: unmarshal errors:\n  line 1: field invalid not found in struct raw.Config",
 		},
@@ -52,6 +55,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 				Version:   Int(2),
 				Projects:  nil,
 				Workflows: nil,
+				Automerge: nil,
 			},
 		},
 		{
@@ -61,6 +65,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 				Version:   nil,
 				Projects:  nil,
 				Workflows: nil,
+				Automerge: nil,
 			},
 		},
 		{
@@ -79,6 +84,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 				Version:   nil,
 				Projects:  nil,
 				Workflows: nil,
+				Automerge: nil,
 			},
 			expErr: "yaml: unmarshal errors:\n  line 2: cannot unmarshal !!map into []raw.Project",
 		},
@@ -89,6 +95,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 				Version:   nil,
 				Projects:  nil,
 				Workflows: nil,
+				Automerge: nil,
 			},
 			expErr: "yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `value` into []raw.Project",
 		},
@@ -96,6 +103,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 			description: "should use values if set",
 			input: `
 version: 2
+automerge: false
 projects:
 - dir: mydir
   workspace: myworkspace
@@ -136,6 +144,20 @@ workflows:
 						},
 					},
 				},
+				Automerge: Bool(false),
+			},
+		},
+		{
+			description: "automerge set to true",
+			input: `
+version: 2
+automerge: true
+`,
+			exp: raw.Config{
+				Version:   Int(2),
+				Projects:  nil,
+				Workflows: nil,
+				Automerge: Bool(true),
 			},
 		},
 	}

@@ -241,3 +241,15 @@ func MustConstraint(constraint string) version.Constraints {
 	}
 	return c
 }
+
+// MergePull returns true if the merge request was accepted.
+func (g *GitlabClient) MergePull(repo models.Repo, pull models.PullRequest) (bool, error) {
+	_, resp, err := g.Client.MergeRequests.AcceptMergeRequest(repo.FullName, pull.Num, nil)
+	if resp.StatusCode != 200 {
+		return false, errors.Wrapf(err, "failed to accept merge request")
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}

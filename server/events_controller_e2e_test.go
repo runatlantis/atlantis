@@ -43,6 +43,7 @@ func TestGitHubWorkflow(t *testing.T) {
 		ExpAutoplanCommentFile string
 		ExpMergeCommentFile    string
 		CommentAndReplies      []string
+		Automerge              bool
 	}{
 		{
 			Description:            "simple",
@@ -53,6 +54,7 @@ func TestGitHubWorkflow(t *testing.T) {
 				"atlantis apply", "exp-output-apply.txt",
 			},
 			ExpMergeCommentFile: "exp-output-merge.txt",
+			Automerge:           false,
 		},
 		{
 			Description:            "simple with plan comment",
@@ -64,6 +66,7 @@ func TestGitHubWorkflow(t *testing.T) {
 				"atlantis apply", "exp-output-apply.txt",
 			},
 			ExpMergeCommentFile: "exp-output-merge.txt",
+			Automerge:           false,
 		},
 		{
 			Description:            "simple with comment -var",
@@ -75,6 +78,7 @@ func TestGitHubWorkflow(t *testing.T) {
 				"atlantis apply", "exp-output-apply-var.txt",
 			},
 			ExpMergeCommentFile: "exp-output-merge.txt",
+			Automerge:           false,
 		},
 		{
 			Description:            "simple with workspaces",
@@ -88,6 +92,35 @@ func TestGitHubWorkflow(t *testing.T) {
 				"atlantis apply -w new_workspace", "exp-output-apply-var-new-workspace.txt",
 			},
 			ExpMergeCommentFile: "exp-output-merge-workspaces.txt",
+			Automerge:           false,
+		},
+		{
+			Description:            "simple with workspaces yaml and automerge",
+			RepoDir:                "simple-yaml-automerge",
+			ModifiedFiles:          []string{"main.tf"},
+			ExpAutoplanCommentFile: "exp-output-autoplan-automerge.txt",
+			CommentAndReplies: []string{
+				"atlantis plan -- -var var=default_workspace", "exp-output-atlantis-plan.txt",
+				"atlantis plan -w new_workspace -- -var var=new_workspace", "exp-output-atlantis-plan-new-workspace.txt",
+				"atlantis apply -w default", "exp-output-apply-var-default-workspace.txt",
+				"atlantis apply -w new_workspace", "exp-output-apply-var-new-workspace.txt",
+				"atlantis apply -w staging", "exp-output-apply-var-staging.txt",
+			},
+			ExpMergeCommentFile: "exp-output-merge-workspaces-automerge.txt",
+			Automerge:           true,
+		},
+		{
+			Description:            "simple with workspaces yaml and automerge not all plans applied",
+			RepoDir:                "simple-yaml-automerge",
+			ModifiedFiles:          []string{"main.tf"},
+			ExpAutoplanCommentFile: "exp-output-autoplan-automerge.txt",
+			CommentAndReplies: []string{
+				"atlantis plan -- -var var=default_workspace", "exp-output-atlantis-plan.txt",
+				"atlantis plan -w new_workspace -- -var var=new_workspace", "exp-output-atlantis-plan-new-workspace.txt",
+				"atlantis apply -w default", "exp-output-apply-var-default-workspace.txt",
+			},
+			ExpMergeCommentFile: "exp-output-merge-workspaces-automerge.txt",
+			Automerge:           false,
 		},
 		{
 			Description:            "simple with workspaces and apply all",
@@ -100,6 +133,44 @@ func TestGitHubWorkflow(t *testing.T) {
 				"atlantis apply", "exp-output-apply-var-all.txt",
 			},
 			ExpMergeCommentFile: "exp-output-merge-workspaces.txt",
+			Automerge:           false,
+		},
+		{
+			Description:            "simple with workspaces yaml apply all and automerge",
+			RepoDir:                "simple-yaml-automerge",
+			ModifiedFiles:          []string{"main.tf"},
+			ExpAutoplanCommentFile: "exp-output-autoplan-automerge-applyall.txt",
+			CommentAndReplies: []string{
+				"atlantis plan -- -var var=default_workspace", "exp-output-atlantis-plan.txt",
+				"atlantis plan -w new_workspace -- -var var=new_workspace", "exp-output-atlantis-plan-new-workspace.txt",
+				"atlantis apply", "exp-output-apply-var-all.txt",
+			},
+			ExpMergeCommentFile: "exp-output-merge-workspaces-automerge-applyall.txt",
+			Automerge:           true,
+		},
+		{
+			Description:            "simple with workspaces yaml failed init apply all and no automerge",
+			RepoDir:                "simple-yaml-automerge",
+			ModifiedFiles:          []string{"main.tf", "failing-init/main.tf"},
+			ExpAutoplanCommentFile: "exp-output-autoplan-automerge-applyall-init-failure.txt",
+			CommentAndReplies: []string{
+				"atlantis plan", "exp-output-atlantis-init-failure.txt",
+				"atlantis apply", "exp-output-apply-var-all-init-failure.txt",
+			},
+			ExpMergeCommentFile: "exp-output-merge-workspaces-automerge-applyall-init-failure.txt",
+			Automerge:           false,
+		},
+		{
+			Description:            "simple with workspaces yaml failed plan apply all and no automerge",
+			RepoDir:                "simple-yaml-automerge",
+			ModifiedFiles:          []string{"main.tf", "failing-plan/main.tf"},
+			ExpAutoplanCommentFile: "exp-output-autoplan-automerge-applyall-plan-failure.txt",
+			CommentAndReplies: []string{
+				"atlantis plan", "exp-output-atlantis-plan-failure.txt",
+				"atlantis apply", "exp-output-apply-var-all-plan-failure.txt",
+			},
+			ExpMergeCommentFile: "exp-output-merge-workspaces-automerge-applyall-plan-failure.txt",
+			Automerge:           false,
 		},
 		{
 			Description:            "simple with atlantis.yaml",
@@ -111,6 +182,7 @@ func TestGitHubWorkflow(t *testing.T) {
 				"atlantis apply -w default", "exp-output-apply-default.txt",
 			},
 			ExpMergeCommentFile: "exp-output-merge.txt",
+			Automerge:           false,
 		},
 		{
 			Description:            "simple with atlantis.yaml and apply all",
@@ -121,6 +193,7 @@ func TestGitHubWorkflow(t *testing.T) {
 				"atlantis apply", "exp-output-apply-all.txt",
 			},
 			ExpMergeCommentFile: "exp-output-merge.txt",
+			Automerge:           false,
 		},
 		{
 			Description:            "simple with atlantis.yaml and plan/apply all",
@@ -132,6 +205,7 @@ func TestGitHubWorkflow(t *testing.T) {
 				"atlantis apply", "exp-output-apply-all.txt",
 			},
 			ExpMergeCommentFile: "exp-output-merge.txt",
+			Automerge:           false,
 		},
 		{
 			Description:            "modules staging only",
@@ -142,6 +216,7 @@ func TestGitHubWorkflow(t *testing.T) {
 				"atlantis apply -d staging", "exp-output-apply-staging.txt",
 			},
 			ExpMergeCommentFile: "exp-output-merge-only-staging.txt",
+			Automerge:           false,
 		},
 		{
 			Description:            "modules modules only",
@@ -155,6 +230,7 @@ func TestGitHubWorkflow(t *testing.T) {
 				"atlantis apply -d production", "exp-output-apply-production.txt",
 			},
 			ExpMergeCommentFile: "exp-output-merge-all-dirs.txt",
+			Automerge:           false,
 		},
 		{
 			Description:            "modules-yaml",
@@ -166,6 +242,7 @@ func TestGitHubWorkflow(t *testing.T) {
 				"atlantis apply -d production", "exp-output-apply-production.txt",
 			},
 			ExpMergeCommentFile: "exp-output-merge.txt",
+			Automerge:           false,
 		},
 		{
 			Description:            "tfvars-yaml",
@@ -177,6 +254,7 @@ func TestGitHubWorkflow(t *testing.T) {
 				"atlantis apply -p default", "exp-output-apply-default.txt",
 			},
 			ExpMergeCommentFile: "exp-output-merge.txt",
+			Automerge:           false,
 		},
 		{
 			Description:            "tfvars no autoplan",
@@ -190,6 +268,7 @@ func TestGitHubWorkflow(t *testing.T) {
 				"atlantis apply -p default", "exp-output-apply-default.txt",
 			},
 			ExpMergeCommentFile: "exp-output-merge.txt",
+			Automerge:           false,
 		},
 	}
 	for _, c := range cases {
@@ -198,14 +277,15 @@ func TestGitHubWorkflow(t *testing.T) {
 
 			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t)
 			// Set the repo to be cloned through the testing backdoor.
-			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
+			tmpRepoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
 			defer cleanup()
-			atlantisWorkspace.TestingOverrideHeadCloneURL = fmt.Sprintf("file://%s", repoDir)
+			atlantisWorkspace.TestingOverrideHeadCloneURL = fmt.Sprintf("file://%s", tmpRepoDir)
 
 			// Setup test dependencies.
 			w := httptest.NewRecorder()
 			When(githubGetter.GetPullRequest(AnyRepo(), AnyInt())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
 			When(vcsClient.GetModifiedFiles(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
+			When(vcsClient.MergePull(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.Automerge, nil)
 			expNumTimesCalledCreateComment := 0
 
 			// First, send the open pull request event and trigger an autoplan.
@@ -215,7 +295,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			if c.ExpAutoplanCommentFile != "" {
 				expNumTimesCalledCreateComment++
 				_, _, autoplanComment := vcsClient.VerifyWasCalledOnce().CreateComment(AnyRepo(), AnyInt(), AnyString()).GetCapturedArguments()
-				assertCommentEquals(t, c.ExpAutoplanCommentFile, autoplanComment, c.RepoDir)
+				assertCommentEquals(t, c.ExpAutoplanCommentFile, autoplanComment, c.RepoDir, atlantisWorkspace.DataDir)
 			}
 
 			// Now send any other comments.
@@ -233,7 +313,13 @@ func TestGitHubWorkflow(t *testing.T) {
 					expNumTimesCalledCreateComment++
 				}
 				_, _, atlantisComment := vcsClient.VerifyWasCalled(Times(expNumTimesCalledCreateComment)).CreateComment(AnyRepo(), AnyInt(), AnyString()).GetCapturedArguments()
-				assertCommentEquals(t, expOutputFile, atlantisComment, c.RepoDir)
+				assertCommentEquals(t, expOutputFile, atlantisComment, c.RepoDir, atlantisWorkspace.DataDir)
+			}
+
+			if c.Automerge {
+				vcsClient.VerifyWasCalledOnce().MergePull(AnyRepo(), matchers.AnyModelsPullRequest())
+			} else {
+				vcsClient.VerifyWasCalled(Times(0)).MergePull(AnyRepo(), matchers.AnyModelsPullRequest())
 			}
 
 			// Finally, send the pull request merged event.
@@ -243,7 +329,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			responseContains(t, w, 200, "Pull request cleaned successfully")
 			expNumTimesCalledCreateComment++
 			_, _, pullClosedComment := vcsClient.VerifyWasCalled(Times(expNumTimesCalledCreateComment)).CreateComment(AnyRepo(), AnyInt(), AnyString()).GetCapturedArguments()
-			assertCommentEquals(t, c.ExpMergeCommentFile, pullClosedComment, c.RepoDir)
+			assertCommentEquals(t, c.ExpMergeCommentFile, pullClosedComment, c.RepoDir, atlantisWorkspace.DataDir)
 		})
 	}
 }
@@ -310,7 +396,9 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClientProxy,
 			WorkingDir:          workingDir,
 			Webhooks:            &mockWebhookSender{},
 			WorkingDirLocker:    locker,
+			PendingPlanFinder:   &events.PendingPlanFinder{},
 		},
+		AutomergeOverride:        false,
 		EventParser:              eventParser,
 		VCSClient:                e2eVCSClient,
 		GithubPullGetter:         e2eGithubGetter,
@@ -459,6 +547,7 @@ func initializeRepo(t *testing.T, repoDir string) (string, string, func()) {
 	runCmd(t, destDir, "git", "add", ".gitkeep")
 	runCmd(t, destDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
 	runCmd(t, destDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, destDir, "git", "config", "--local", "commit.gpgsign", "false")
 	runCmd(t, destDir, "git", "commit", "-m", "initial commit")
 	runCmd(t, destDir, "git", "checkout", "-b", "branch")
 	runCmd(t, destDir, "git", "add", ".")
@@ -477,10 +566,16 @@ func runCmd(t *testing.T, dir string, name string, args ...string) string {
 	return string(cpOut)
 }
 
-func assertCommentEquals(t *testing.T, expFile string, act string, repoDir string) {
+func assertCommentEquals(t *testing.T, expFile string, act string, repoDir string, dataDir string) {
 	t.Helper()
 	exp, err := ioutil.ReadFile(filepath.Join(absRepoPath(t, repoDir), expFile))
 	Ok(t, err)
+
+	// Replace all instances of dataDir with `/dataDir`, since dataDir is a
+	// random path somewhere on the host system which changes on each run.
+	// On macOS, the datadir is sometimes prefixed with `/private`.
+	act = strings.Replace(act, "/private"+dataDir, "/dataDir", -1)
+	act = strings.Replace(act, dataDir, "/dataDir", -1)
 
 	// Replace all 'Creation complete after 1s ID: 1111818181' strings with
 	// 'Creation complete after *s ID: **********' so we can do a comparison.

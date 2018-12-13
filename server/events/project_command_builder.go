@@ -247,6 +247,7 @@ func (p *DefaultProjectCommandBuilder) buildApplyAllCommands(ctx *CommandContext
 		}
 		cmds = append(cmds, cmd)
 	}
+
 	return cmds, nil
 }
 

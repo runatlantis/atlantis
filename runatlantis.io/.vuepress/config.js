@@ -82,6 +82,7 @@ module.exports = {
                         'locking',
                         'autoplanning',
                         'checkout-strategy',
+                        'automerging',
                         'security'
                     ]
                 }

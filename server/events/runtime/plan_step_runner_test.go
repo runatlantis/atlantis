@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"testing"
 
@@ -583,6 +584,10 @@ func TestRun_OutputOnErr(t *testing.T) {
 	}
 	expOutput := "expected output"
 	expErrMsg := "error!"
+
+	workspaceDir, cleanup := TempDir(t)
+	defer cleanup()
+
 	When(terraform.RunCommandWithVersion(
 		matchers.AnyPtrToLoggingSimpleLogger(),
 		AnyString(),
@@ -601,9 +606,18 @@ func TestRun_OutputOnErr(t *testing.T) {
 				return []ReturnValue{"", errors.New("unexpected call to RunCommandWithVersion")}
 			}
 		})
-	actOutput, actErr := s.Run(models.ProjectCommandContext{Workspace: "default"}, nil, "")
+
+	actOutput, actErr := s.Run(models.ProjectCommandContext{Workspace: "default"}, nil, workspaceDir)
 	ErrEquals(t, expErrMsg, actErr)
 	Equals(t, expOutput, actOutput)
+
+	// Check error was written to `default.tfplan-error`
+	planErrorFile := path.Join(workspaceDir, "default.tfplan-error")
+	contents, err := ioutil.ReadFile(planErrorFile)
+	Ok(t, err)
+	Equals(t, expOutput, string(contents))
+	err = os.Remove(planErrorFile)
+	Ok(t, err)
 }
 
 // Test that if we're using 0.12, we don't set the optional -var atlantis_repo_name

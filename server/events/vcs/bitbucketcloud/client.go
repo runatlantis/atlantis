@@ -207,3 +207,13 @@ func (b *Client) makeRequest(method string, path string, reqBody io.Reader) ([]b
 	}
 	return respBody, nil
 }
+
+// MergePull returns true if the pull request was accepted.
+func (b *Client) MergePull(repo models.Repo, pull models.PullRequest) (bool, error) {
+	path := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/merge", b.BaseURL, repo.FullName, pull.Num)
+	_, err := b.makeRequest("POST", path, nil)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}

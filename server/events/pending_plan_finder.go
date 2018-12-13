@@ -59,3 +59,39 @@ func (p *PendingPlanFinder) Find(pullDir string) ([]PendingPlan, error) {
 	}
 	return plans, nil
 }
+
+// FindErrors finds all failed init or plans in pullDir. pullDir should be the
+// working directory where Atlantis will operate on this pull request. It's one
+// level up from where Atlantis clones the repo for each workspace.
+func (p *PendingPlanFinder) FindErrors(pullDir string) ([]PendingPlan, error) {
+	workspaceDirs, err := ioutil.ReadDir(pullDir)
+	if err != nil {
+		return nil, err
+	}
+	var plans []PendingPlan
+	for _, workspaceDir := range workspaceDirs {
+		workspace := workspaceDir.Name()
+		repoDir := filepath.Join(pullDir, workspace)
+
+		// Any generated plans should be untracked by git since Atlantis created
+		// them.
+		lsCmd := exec.Command("git", "ls-files", ".", "--others") // nolint: gosec
+		lsCmd.Dir = repoDir
+		lsOut, err := lsCmd.CombinedOutput()
+		if err != nil {
+			return nil, errors.Wrapf(err, "running git ls-files . "+
+				"--others: %s", string(lsOut))
+		}
+		for _, file := range strings.Split(string(lsOut), "\n") {
+			if filepath.Ext(file) == ".tfinit-error" || filepath.Ext(file) == ".tfplan-error" {
+				repoRelDir := filepath.Dir(file)
+				plans = append(plans, PendingPlan{
+					RepoDir:    repoDir,
+					RepoRelDir: repoRelDir,
+					Workspace:  workspace,
+				})
+			}
+		}
+	}
+	return plans, nil
+}

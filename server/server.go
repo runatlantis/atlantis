@@ -231,6 +231,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Logger:                   logger,
 		AllowForkPRs:             userConfig.AllowForkPRs,
 		AllowForkPRsFlag:         config.AllowForkPRsFlag,
+		AutomergeOverride:        userConfig.Automerge,
 		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
 			ParserValidator:     &yaml.ParserValidator{},
 			ProjectFinder:       &events.DefaultProjectFinder{},

@@ -1,6 +1,10 @@
 package runtime
 
 import (
+	"io/ioutil"
+	"os"
+	"path/filepath"
+
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
@@ -24,10 +28,23 @@ func (i *InitStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []strin
 		terraformInitCmd = append([]string{"get", "-no-color"}, extraArgs...)
 	}
 
+	// Remove any error file from any previous init
+	initErrorFile := filepath.Join(path, GetProjectFilenamePrefix(ctx.Workspace, ctx.ProjectConfig)+".tfinit-error")
+	_ = os.Remove(initErrorFile) // safe to ignore return result
+
 	out, err := i.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, terraformInitCmd, tfVersion, ctx.Workspace)
 	// Only include the init output if there was an error. Otherwise it's
 	// unnecessary and lengthens the comment.
 	if err != nil {
+		// If there was an error, write the result out to the '.tfinit-error' file in
+		// the workspace. This may be used later to either retrieve the reason for the
+		// failure, or to prevent automerging.
+		writeErr := ioutil.WriteFile(initErrorFile, []byte(out), 0644)
+		if writeErr != nil {
+			panic(writeErr)
+		}
+		ctx.Log.Info("Failed init output has been written to %s", initErrorFile)
+
 		return out, err
 	}
 	return "", nil
