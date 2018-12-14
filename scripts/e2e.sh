@@ -26,6 +26,7 @@ echo "Running 'make build'"
 make build
 
 echo "Running e2e test: 'make run'"
+set +e
 make run
 if [[ $? -eq 0 ]]
 then
