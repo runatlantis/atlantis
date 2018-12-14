@@ -117,6 +117,18 @@ func TestPost_UnsupportedGitlabEvent(t *testing.T) {
 	responseContains(t, w, http.StatusOK, "Ignoring unsupported event")
 }
 
+// Test that if the comment comes from a commit rather than a merge request,
+// we give an error and ignore it.
+func TestPost_GitlabCommentOnCommit(t *testing.T) {
+	e, _, gl, _, _, _, _, _ := setup(t)
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	w := httptest.NewRecorder()
+	req.Header.Set(gitlabHeader, "value")
+	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlab.CommitCommentEvent{}, nil)
+	e.Post(w, req)
+	responseContains(t, w, http.StatusOK, "Ignoring comment on commit event")
+}
+
 func TestPost_GithubCommentNotCreated(t *testing.T) {
 	t.Log("when the event is a github comment but it's not a created event we ignore it")
 	e, v, _, _, _, _, _, _ := setup(t)

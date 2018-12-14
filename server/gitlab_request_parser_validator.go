@@ -80,11 +80,28 @@ func (d *DefaultGitlabRequestParserValidator) ParseAndValidate(r *http.Request, 
 		}
 		return m, nil
 	case noteEventHeader:
-		var m gitlab.MergeCommentEvent
-		if err := json.Unmarshal(bytes, &m); err != nil {
+		// First, parse a small part of the json to determine if this is a
+		// comment on a merge request or a commit.
+		var subset struct {
+			ObjectAttributes struct {
+				NoteableType string `json:"noteable_type"`
+			} `json:"object_attributes"`
+		}
+		if err := json.Unmarshal(bytes, &subset); err != nil {
 			return nil, err
 		}
-		return m, nil
+
+		// We then parse into the correct comment event type.
+		switch subset.ObjectAttributes.NoteableType {
+		case "Commit":
+			var e gitlab.CommitCommentEvent
+			err := json.Unmarshal(bytes, &e)
+			return e, err
+		case "MergeRequest":
+			var e gitlab.MergeCommentEvent
+			err := json.Unmarshal(bytes, &e)
+			return e, err
+		}
 	}
 	return nil, nil
 }
