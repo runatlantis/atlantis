@@ -324,6 +324,9 @@ func (e *EventsController) handleGitlabPost(w http.ResponseWriter, r *http.Reque
 	case gitlab.MergeEvent:
 		e.Logger.Debug("handling as pull request event")
 		e.HandleGitlabMergeRequestEvent(w, event)
+	case gitlab.CommitCommentEvent:
+		e.Logger.Debug("comments on commits are not supported, only comments on merge requests")
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment on commit event")
 	default:
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event")
 	}
