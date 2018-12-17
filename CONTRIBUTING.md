@@ -118,10 +118,7 @@ func TestLockingExisting(t *testing.T) {
 - each test should have a `t.Log` that describes what the current state is and what should happen (like a behavioural test)
 
 # Creating a New Release
-1. Update version number in
-    1. `main.go`
-    1. `helm/atlantis/Chart.yaml` (until the official chart is merged)
-    1. `helm/atlantis/values.yaml` (until the official chart is merged)
+1. Update version number in `main.go`.
 1. Update `CHANGELOG.md` with latest release number and information (this URL might be useful: https://github.com/runatlantis/atlantis/compare/v0.3.5...master)
 1. Create a pull request and merge to master
 1. Check out master and fetch latest
@@ -132,3 +129,4 @@ func TestLockingExisting(t *testing.T) {
     1. Fill in description by copying from the CHANGELOG just without the Downloads section
     1. Drag in binaries made with `make release`
 1. Re-run master branch build to ensure tag gets pushed to Docker hub: https://hub.docker.com/r/runatlantis/atlantis/tags/
+1. Update the default version in `Chart.yaml` in [the official Helm chart](https://github.com/helm/charts/blob/master/stable/atlantis/Chart.yaml).
