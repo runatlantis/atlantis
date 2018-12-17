@@ -20,6 +20,9 @@ Developers in your organization also need to be able to access Atlantis to view 
 
 By default Atlantis runs on port `4141`. This can be changed with the `--port` flag.
 
+## Install Atlantis
+Get the latest release from [https://github.com/runatlantis/atlantis/releases](https://github.com/runatlantis/atlantis/releases) and unpackage it.
+
 ## Add Webhook
 Once you've decided where to host Atlantis you need to add that URL as a webhook
 to your Git host so that Atlantis gets notified about pull request events.
