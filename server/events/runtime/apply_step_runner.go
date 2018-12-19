@@ -1,9 +1,11 @@
 package runtime
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -15,6 +17,10 @@ type ApplyStepRunner struct {
 }
 
 func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string) (string, error) {
+	if a.hasTargetFlag(ctx, extraArgs) {
+		return "", errors.New("cannot run apply with -target because we are applying an already generated plan. Instead, run -target with atlantis plan")
+	}
+
 	planPath := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectConfig))
 	stat, err := os.Stat(planPath)
 	if err != nil || stat.IsDir() {
@@ -38,4 +44,26 @@ func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []stri
 		}
 	}
 	return out, tfErr
+}
+
+func (a *ApplyStepRunner) hasTargetFlag(ctx models.ProjectCommandContext, extraArgs []string) bool {
+	isTargetFlag := func(s string) bool {
+		if s == "-target" {
+			return true
+		}
+		split := strings.Split(s, "=")
+		return split[0] == "-target"
+	}
+
+	for _, arg := range ctx.CommentArgs {
+		if isTargetFlag(arg) {
+			return true
+		}
+	}
+	for _, arg := range extraArgs {
+		if isTargetFlag(arg) {
+			return true
+		}
+	}
+	return false
 }
