@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/go-version"
@@ -130,4 +131,83 @@ func TestRun_UsesConfiguredTFVersion(t *testing.T) {
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, tfVersion, "workspace")
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
+}
+
+// Apply ignores the -target flag when used with a planfile so we should give
+// an error if it's being used with -target.
+func TestRun_UsingTarget(t *testing.T) {
+	cases := []struct {
+		commentFlags []string
+		extraArgs    []string
+		expErr       bool
+	}{
+		{
+			commentFlags: []string{"-target", "mytarget"},
+			expErr:       true,
+		},
+		{
+			commentFlags: []string{"-target=mytarget"},
+			expErr:       true,
+		},
+		{
+			extraArgs: []string{"-target", "mytarget"},
+			expErr:    true,
+		},
+		{
+			extraArgs: []string{"-target=mytarget"},
+			expErr:    true,
+		},
+		{
+			commentFlags: []string{"-target", "mytarget"},
+			extraArgs:    []string{"-target=mytarget"},
+			expErr:       true,
+		},
+		// Test false positives.
+		{
+			commentFlags: []string{"-targethahagotcha"},
+			expErr:       false,
+		},
+		{
+			extraArgs: []string{"-targethahagotcha"},
+			expErr:    false,
+		},
+		{
+			commentFlags: []string{"-targeted=weird"},
+			expErr:       false,
+		},
+		{
+			extraArgs: []string{"-targeted=weird"},
+			expErr:    false,
+		},
+	}
+
+	RegisterMockTestingT(t)
+
+	for _, c := range cases {
+		descrip := fmt.Sprintf("comments flags: %s extra args: %s",
+			strings.Join(c.commentFlags, ", "), strings.Join(c.extraArgs, ", "))
+		t.Run(descrip, func(t *testing.T) {
+			tmpDir, cleanup := TempDir(t)
+			defer cleanup()
+			planPath := filepath.Join(tmpDir, "workspace.tfplan")
+			err := ioutil.WriteFile(planPath, nil, 0644)
+			Ok(t, err)
+			terraform := mocks.NewMockClient()
+			step := runtime.ApplyStepRunner{
+				TerraformExecutor: terraform,
+			}
+
+			output, err := step.Run(models.ProjectCommandContext{
+				Workspace:   "workspace",
+				RepoRelDir:  ".",
+				CommentArgs: c.commentFlags,
+			}, c.extraArgs, tmpDir)
+			Equals(t, "", output)
+			if c.expErr {
+				ErrEquals(t, "cannot run apply with -target because we are applying an already generated plan. Instead, run -target with atlantis plan", err)
+			} else {
+				Ok(t, err)
+			}
+		})
+	}
 }
