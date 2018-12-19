@@ -74,6 +74,7 @@ type DefaultCommandRunner struct {
 // RunAutoplanCommand runs plan when a pull request is opened or updated.
 func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) {
 	log := c.buildLogger(baseRepo.FullName, pull.Num)
+	defer c.logPanics(baseRepo, pull.Num, log)
 	ctx := &CommandContext{
 		User:     user,
 		Log:      log,
@@ -81,7 +82,6 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		HeadRepo: headRepo,
 		BaseRepo: baseRepo,
 	}
-	defer c.logPanics(ctx)
 	if !c.validateCtxAndComment(ctx) {
 		return
 	}
@@ -113,6 +113,8 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 // wasteful) call to get the necessary data.
 func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *CommentCommand) {
 	log := c.buildLogger(baseRepo.FullName, pullNum)
+	defer c.logPanics(baseRepo, pullNum, log)
+
 	var headRepo models.Repo
 	if maybeHeadRepo != nil {
 		headRepo = *maybeHeadRepo
@@ -147,7 +149,6 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		HeadRepo: headRepo,
 		BaseRepo: baseRepo,
 	}
-	defer c.logPanics(ctx)
 	if !c.validateCtxAndComment(ctx) {
 		return
 	}
@@ -221,7 +222,7 @@ func (c *DefaultCommandRunner) getGitlabData(baseRepo models.Repo, pullNum int) 
 
 func (c *DefaultCommandRunner) buildLogger(repoFullName string, pullNum int) *logging.SimpleLogger {
 	src := fmt.Sprintf("%s#%d", repoFullName, pullNum)
-	return logging.NewSimpleLogger(src, c.Logger.Underlying(), true, c.Logger.GetLevel())
+	return c.Logger.NewLogger(src, true, c.Logger.GetLevel())
 }
 
 func (c *DefaultCommandRunner) validateCtxAndComment(ctx *CommandContext) bool {
@@ -262,11 +263,16 @@ func (c *DefaultCommandRunner) updatePull(ctx *CommandContext, command PullComma
 }
 
 // logPanics logs and creates a comment on the pull request for panics.
-func (c *DefaultCommandRunner) logPanics(ctx *CommandContext) {
+func (c *DefaultCommandRunner) logPanics(baseRepo models.Repo, pullNum int, logger logging.SimpleLogging) {
 	if err := recover(); err != nil {
 		stack := recovery.Stack(3)
-		c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, // nolint: errcheck
-			fmt.Sprintf("**Error: goroutine panic. This is a bug.**\n```\n%s\n%s```", err, stack))
-		ctx.Log.Err("PANIC: %s\n%s", err, stack)
+		logger.Err("PANIC: %s\n%s", err, stack)
+		if commentErr := c.VCSClient.CreateComment(
+			baseRepo,
+			pullNum,
+			fmt.Sprintf("**Error: goroutine panic. This is a bug.**\n```\n%s\n%s```", err, stack),
+		); commentErr != nil {
+			logger.Err("unable to comment: %s", commentErr)
+		}
 	}
 }

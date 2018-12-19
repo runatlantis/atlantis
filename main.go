@@ -16,6 +16,7 @@ package main
 
 import (
 	"github.com/runatlantis/atlantis/cmd"
+	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/spf13/viper"
 )
 
@@ -30,6 +31,7 @@ func main() {
 		ServerCreator:   &cmd.DefaultServerCreator{},
 		Viper:           v,
 		AtlantisVersion: atlantisVersion,
+		Logger:          logging.NewSimpleLogger("cmd", false, logging.Info),
 	}
 	version := &cmd.VersionCmd{AtlantisVersion: atlantisVersion}
 	testdrive := &cmd.TestdriveCmd{}

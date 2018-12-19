@@ -20,6 +20,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/runatlantis/atlantis/server/logging"
+
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server"
@@ -68,9 +70,6 @@ const (
 	DefaultLogLevel         = "info"
 	DefaultPort             = 4141
 )
-
-const redTermStart = "\033[31m"
-const redTermEnd = "\033[39m"
 
 var stringFlags = []stringFlag{
 	{
@@ -231,6 +230,7 @@ type ServerCmd struct {
 	// Useful for testing to keep the logs clean.
 	SilenceOutput   bool
 	AtlantisVersion string
+	Logger          *logging.SimpleLogger
 }
 
 // ServerCreator creates servers.
@@ -283,7 +283,7 @@ func (s *ServerCmd) Init() *cobra.Command {
 
 	// If a user passes in an invalid flag, tell them what the flag was.
 	c.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
-		fmt.Fprintf(os.Stderr, "\033[31mError: %s\033[39m\n\n", err.Error())
+		s.printErr(err)
 		return err
 	})
 
@@ -334,6 +334,11 @@ func (s *ServerCmd) run() error {
 		return err
 	}
 	s.setDefaults(&userConfig)
+
+	// Now that we've parsed the config we can set our local logger to the
+	// right level.
+	s.Logger.SetLevel(userConfig.ToLogLevel())
+
 	if err := s.validate(userConfig); err != nil {
 		return err
 	}
@@ -471,26 +476,31 @@ func (s *ServerCmd) trimAtSymbolFromUsers(userConfig *server.UserConfig) {
 
 func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 	if userConfig.GithubUser != "" && userConfig.GithubWebhookSecret == "" && !s.SilenceOutput {
-		fmt.Fprintf(os.Stderr, "%s[WARN] No GitHub webhook secret set. This could allow attackers to spoof requests from GitHub.%s\n", redTermStart, redTermEnd)
+		s.Logger.Warn("no GitHub webhook secret set. This could allow attackers to spoof requests from GitHub")
 	}
 	if userConfig.GitlabUser != "" && userConfig.GitlabWebhookSecret == "" && !s.SilenceOutput {
-		fmt.Fprintf(os.Stderr, "%s[WARN] No GitLab webhook secret set. This could allow attackers to spoof requests from GitLab.%s\n", redTermStart, redTermEnd)
+		s.Logger.Warn("no GitLab webhook secret set. This could allow attackers to spoof requests from GitLab")
 	}
 	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL != DefaultBitbucketBaseURL && userConfig.BitbucketWebhookSecret == "" && !s.SilenceOutput {
-		fmt.Fprintf(os.Stderr, "%s[WARN] No Bitbucket webhook secret set. This could allow attackers to spoof requests from Bitbucket.%s\n", redTermStart, redTermEnd)
+		s.Logger.Warn("no Bitbucket webhook secret set. This could allow attackers to spoof requests from Bitbucket")
 	}
 	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && !s.SilenceOutput {
-		fmt.Fprintf(os.Stderr, "%s[WARN] Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are whitelisting Bitbucket IPs.%s\n", redTermStart, redTermEnd)
+		s.Logger.Warn("Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are whitelisting Bitbucket IPs")
 	}
 }
 
-// withErrPrint prints out any errors to a terminal in red.
+// withErrPrint prints out any cmd errors to stderr.
 func (s *ServerCmd) withErrPrint(f func(*cobra.Command, []string) error) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		err := f(cmd, args)
 		if err != nil && !s.SilenceOutput {
-			fmt.Fprintf(os.Stderr, "%s[ERROR] %s%s\n\n", redTermStart, err.Error(), redTermEnd)
+			s.printErr(err)
 		}
 		return err
 	}
+}
+
+// printErr prints err to stderr using a red terminal colour.
+func (s *ServerCmd) printErr(err error) {
+	fmt.Fprintf(os.Stderr, "%sError: %s%s\n", "\033[31m", err.Error(), "\033[39m")
 }
