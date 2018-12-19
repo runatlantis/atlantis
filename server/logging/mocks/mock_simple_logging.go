@@ -104,6 +104,21 @@ func (mock *MockSimpleLogging) GetLevel() logging.LogLevel {
 	return ret0
 }
 
+func (mock *MockSimpleLogging) NewLogger(_param0 string, _param1 bool, _param2 logging.LogLevel) *logging.SimpleLogger {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockSimpleLogging().")
+	}
+	params := []pegomock.Param{_param0, _param1, _param2}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("NewLogger", params, []reflect.Type{reflect.TypeOf((**logging.SimpleLogger)(nil)).Elem()})
+	var ret0 *logging.SimpleLogger
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(*logging.SimpleLogger)
+		}
+	}
+	return ret0
+}
+
 func (mock *MockSimpleLogging) VerifyWasCalledOnce() *VerifierSimpleLogging {
 	return &VerifierSimpleLogging{
 		mock:                   mock,
@@ -372,4 +387,39 @@ func (c *SimpleLogging_GetLevel_OngoingVerification) GetCapturedArguments() {
 }
 
 func (c *SimpleLogging_GetLevel_OngoingVerification) GetAllCapturedArguments() {
+}
+
+func (verifier *VerifierSimpleLogging) NewLogger(_param0 string, _param1 bool, _param2 logging.LogLevel) *SimpleLogging_NewLogger_OngoingVerification {
+	params := []pegomock.Param{_param0, _param1, _param2}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "NewLogger", params, verifier.timeout)
+	return &SimpleLogging_NewLogger_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type SimpleLogging_NewLogger_OngoingVerification struct {
+	mock              *MockSimpleLogging
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *SimpleLogging_NewLogger_OngoingVerification) GetCapturedArguments() (string, bool, logging.LogLevel) {
+	_param0, _param1, _param2 := c.GetAllCapturedArguments()
+	return _param0[len(_param0)-1], _param1[len(_param1)-1], _param2[len(_param2)-1]
+}
+
+func (c *SimpleLogging_NewLogger_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []bool, _param2 []logging.LogLevel) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]string, len(params[0]))
+		for u, param := range params[0] {
+			_param0[u] = param.(string)
+		}
+		_param1 = make([]bool, len(params[1]))
+		for u, param := range params[1] {
+			_param1[u] = param.(bool)
+		}
+		_param2 = make([]logging.LogLevel, len(params[2]))
+		for u, param := range params[2] {
+			_param2[u] = param.(logging.LogLevel)
+		}
+	}
+	return
 }
