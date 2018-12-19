@@ -97,29 +97,29 @@ func TestRunCommentCommand_NoGitlabMergeGetter(t *testing.T) {
 
 func TestRunCommentCommand_GithubPullErr(t *testing.T) {
 	t.Log("if getting the github pull request fails an error should be logged")
-	setup(t)
+	vcsClient := setup(t)
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(nil, errors.New("err"))
 	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, nil)
-	Equals(t, "[ERROR] runatlantis/atlantis#1: Making pull request API call to GitHub: err\n", logBytes.String())
+	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, fixtures.Pull.Num, "`Error: making pull request API call to GitHub: err`")
 }
 
 func TestRunCommentCommand_GitlabMergeRequestErr(t *testing.T) {
 	t.Log("if getting the gitlab merge request fails an error should be logged")
-	setup(t)
-	When(gitlabGetter.GetMergeRequest(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(nil, errors.New("err"))
+	vcsClient := setup(t)
+	When(gitlabGetter.GetMergeRequest(fixtures.GitlabRepo.FullName, fixtures.Pull.Num)).ThenReturn(nil, errors.New("err"))
 	ch.RunCommentCommand(fixtures.GitlabRepo, &fixtures.GitlabRepo, nil, fixtures.User, fixtures.Pull.Num, nil)
-	Equals(t, "[ERROR] runatlantis/atlantis#1: Making merge request API call to GitLab: err\n", logBytes.String())
+	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GitlabRepo, fixtures.Pull.Num, "`Error: making merge request API call to GitLab: err`")
 }
 
 func TestRunCommentCommand_GithubPullParseErr(t *testing.T) {
 	t.Log("if parsing the returned github pull request fails an error should be logged")
-	setup(t)
+	vcsClient := setup(t)
 	var pull github.PullRequest
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
 	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(fixtures.Pull, fixtures.GithubRepo, fixtures.GitlabRepo, errors.New("err"))
 
 	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, nil)
-	Equals(t, "[ERROR] runatlantis/atlantis#1: Extracting required fields from comment data: err\n", logBytes.String())
+	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, fixtures.Pull.Num, "`Error: extracting required fields from comment data: err`")
 }
 
 func TestRunCommentCommand_ForkPRDisabled(t *testing.T) {

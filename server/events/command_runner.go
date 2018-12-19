@@ -135,6 +135,9 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	}
 	if err != nil {
 		log.Err(err.Error())
+		if commentErr := c.VCSClient.CreateComment(baseRepo, pullNum, fmt.Sprintf("`Error: %s`", err)); commentErr != nil {
+			log.Err("unable to comment: %s", commentErr)
+		}
 		return
 	}
 	ctx := &CommandContext{
