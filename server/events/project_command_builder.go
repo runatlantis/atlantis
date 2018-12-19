@@ -2,6 +2,7 @@ package events
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
@@ -302,6 +303,11 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 		repoRelDir = projCfg.Dir
 		workspace = projCfg.Workspace
 	}
+
+	if err := p.validateWorkspaceAllowed(globalCfg, repoRelDir, workspace); err != nil {
+		return models.ProjectCommandContext{}, err
+	}
+
 	return models.ProjectCommandContext{
 		BaseRepo:      ctx.BaseRepo,
 		HeadRepo:      ctx.HeadRepo,
@@ -318,43 +324,81 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 	}, nil
 }
 
-func (p *DefaultProjectCommandBuilder) getCfg(projectName string, dir string, workspace string, repoDir string) (*valid.Project, *valid.Config, error) {
+func (p *DefaultProjectCommandBuilder) getCfg(projectName string, dir string, workspace string, repoDir string) (projectCfg *valid.Project, globalCfg *valid.Config, err error) {
 	hasConfigFile, err := p.ParserValidator.HasConfigFile(repoDir)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "looking for %s file in %q", yaml.AtlantisYAMLFilename, repoDir)
+		err = errors.Wrapf(err, "looking for %s file in %q", yaml.AtlantisYAMLFilename, repoDir)
+		return
 	}
 	if !hasConfigFile {
 		if projectName != "" {
-			return nil, nil, fmt.Errorf("cannot specify a project name unless an %s file exists to configure projects", yaml.AtlantisYAMLFilename)
+			err = fmt.Errorf("cannot specify a project name unless an %s file exists to configure projects", yaml.AtlantisYAMLFilename)
+			return
 		}
-		return nil, nil, nil
+		return
 	}
 
 	if !p.AllowRepoConfig {
-		return nil, nil, fmt.Errorf("%s files not allowed because Atlantis is not running with --%s", yaml.AtlantisYAMLFilename, p.AllowRepoConfigFlag)
+		err = fmt.Errorf("%s files not allowed because Atlantis is not running with --%s", yaml.AtlantisYAMLFilename, p.AllowRepoConfigFlag)
+		return
 	}
 
-	globalCfg, err := p.ParserValidator.ReadConfig(repoDir)
+	globalCfgStruct, err := p.ParserValidator.ReadConfig(repoDir)
 	if err != nil {
-		return nil, nil, err
+		return
 	}
+	globalCfg = &globalCfgStruct
 
 	// If they've specified a project by name we look it up. Otherwise we
 	// use the dir and workspace.
 	if projectName != "" {
-		projCfg := globalCfg.FindProjectByName(projectName)
-		if projCfg == nil {
-			return nil, nil, fmt.Errorf("no project with name %q is defined in %s", projectName, yaml.AtlantisYAMLFilename)
+		projectCfg = globalCfg.FindProjectByName(projectName)
+		if projectCfg == nil {
+			err = fmt.Errorf("no project with name %q is defined in %s", projectName, yaml.AtlantisYAMLFilename)
+			return
 		}
-		return projCfg, &globalCfg, nil
+		return
 	}
 
 	projCfgs := globalCfg.FindProjectsByDirWorkspace(dir, workspace)
 	if len(projCfgs) == 0 {
-		return nil, nil, nil
+		return
 	}
 	if len(projCfgs) > 1 {
-		return nil, nil, fmt.Errorf("must specify project name: more than one project defined in %s matched dir: %q workspace: %q", yaml.AtlantisYAMLFilename, dir, workspace)
+		err = fmt.Errorf("must specify project name: more than one project defined in %s matched dir: %q workspace: %q", yaml.AtlantisYAMLFilename, dir, workspace)
+		return
 	}
-	return &projCfgs[0], &globalCfg, nil
+	projectCfg = &projCfgs[0]
+	return
+}
+
+// validateWorkspaceAllowed returns an error if there are projects configured
+// in globalCfg for repoRelDir and none of those projects use workspace.
+func (p *DefaultProjectCommandBuilder) validateWorkspaceAllowed(globalCfg *valid.Config, repoRelDir string, workspace string) error {
+	if globalCfg == nil {
+		return nil
+	}
+
+	projects := globalCfg.FindProjectsByDir(repoRelDir)
+
+	// If that directory doesn't have any projects configured then we don't
+	// enforce workspace names.
+	if len(projects) == 0 {
+		return nil
+	}
+
+	var configuredSpaces []string
+	for _, p := range projects {
+		if p.Workspace == workspace {
+			return nil
+		}
+		configuredSpaces = append(configuredSpaces, p.Workspace)
+	}
+
+	return fmt.Errorf(
+		"running commands in workspace %q is not allowed because this"+
+			" directory is only configured for the following workspaces: %s",
+		workspace,
+		strings.Join(configuredSpaces, ", "),
+	)
 }

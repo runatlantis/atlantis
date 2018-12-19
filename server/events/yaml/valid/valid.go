@@ -41,6 +41,17 @@ func (c Config) FindProjectsByDirWorkspace(dir string, workspace string) []Proje
 	return ps
 }
 
+// FindProjectsByDir returns all projects that are in dir.
+func (c Config) FindProjectsByDir(dir string) []Project {
+	var ps []Project
+	for _, p := range c.Projects {
+		if p.Dir == dir {
+			ps = append(ps, p)
+		}
+	}
+	return ps
+}
+
 func (c Config) FindProjectByName(name string) *Project {
 	for _, p := range c.Projects {
 		if p.Name != nil && *p.Name == name {

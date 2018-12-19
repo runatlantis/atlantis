@@ -321,8 +321,7 @@ projects:
   workspace: notmyworkspace
   apply_requirements: [approved]`,
 			ExpProjectConfig: nil,
-			ExpWorkspace:     "myworkspace",
-			ExpDir:           ".",
+			ExpErr:           "running commands in workspace \"myworkspace\" is not allowed because this directory is only configured for the following workspaces: notmyworkspace",
 		},
 		{
 			Description: "atlantis.yaml with projectname",
@@ -901,6 +900,70 @@ func TestDefaultProjectCommandBuilder_RepoConfigDisabled(t *testing.T) {
 
 	_, err = builder.BuildApplyCommands(ctx, commentCmd)
 	ErrEquals(t, "atlantis.yaml files not allowed because Atlantis is not running with --allow-repo-config", err)
+}
+
+// Test that if a directory has a list of workspaces configured then we don't
+// allow plans for other workspace names.
+func TestDefaultProjectCommandBuilder_WrongWorkspaceName(t *testing.T) {
+	RegisterMockTestingT(t)
+	workingDir := mocks.NewMockWorkingDir()
+
+	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
+		"pulldir": map[string]interface{}{
+			"notconfigured": map[string]interface{}{},
+		},
+	})
+	defer cleanup()
+	repoDir := filepath.Join(tmpDir, "pulldir/notconfigured")
+
+	yamlCfg := `version: 2
+projects:
+- dir: .
+  workspace: default
+- dir: .
+  workspace: staging
+`
+	err := ioutil.WriteFile(filepath.Join(repoDir, yaml.AtlantisYAMLFilename), []byte(yamlCfg), 0600)
+	Ok(t, err)
+
+	When(workingDir.Clone(
+		matchers.AnyPtrToLoggingSimpleLogger(),
+		matchers.AnyModelsRepo(),
+		matchers.AnyModelsRepo(),
+		matchers.AnyModelsPullRequest(),
+		AnyString())).ThenReturn(repoDir, nil)
+	When(workingDir.GetWorkingDir(
+		matchers.AnyModelsRepo(),
+		matchers.AnyModelsPullRequest(),
+		AnyString())).ThenReturn(repoDir, nil)
+
+	builder := &events.DefaultProjectCommandBuilder{
+		WorkingDirLocker:    events.NewDefaultWorkingDirLocker(),
+		WorkingDir:          workingDir,
+		ParserValidator:     &yaml.ParserValidator{},
+		VCSClient:           nil,
+		ProjectFinder:       &events.DefaultProjectFinder{},
+		AllowRepoConfig:     true,
+		AllowRepoConfigFlag: "allow-repo-config",
+		CommentBuilder:      &events.CommentParser{},
+	}
+
+	ctx := &events.CommandContext{
+		BaseRepo: models.Repo{},
+		HeadRepo: models.Repo{},
+		Pull:     models.PullRequest{},
+		User:     models.User{},
+		Log:      logging.NewNoopLogger(),
+	}
+	_, err = builder.BuildPlanCommands(ctx, &events.CommentCommand{
+		RepoRelDir:  ".",
+		Flags:       nil,
+		Name:        events.PlanCommand,
+		Verbose:     false,
+		Workspace:   "notconfigured",
+		ProjectName: "",
+	})
+	ErrEquals(t, "running commands in workspace \"notconfigured\" is not allowed because this directory is only configured for the following workspaces: default, staging", err)
 }
 
 func String(v string) *string { return &v }
