@@ -189,6 +189,15 @@ override the built-in `plan`/`apply` commands, ex. `run: terraform plan -out $PL
 * `PULL_AUTHOR` - Username of the pull request author, ex. `acme-user`.
 :::
 
+::: tip
+Note that a custom command will only terminate if all output file descriptors are closed.
+Therefore a custom command can only be sent to the background (e.g. for an SSH tunnel during
+the terraform run) when its output is redirected to a different location. For example, atlantis
+will execute a custom script containing the following code to create a SSH tunnel correctly: 
+`ssh -f -M -S /tmp/ssh_tunnel -L 3306:database:3306 -N bastion 1>/dev/null 2>&1`. Without
+the pipe, the script would block the atlantis workflow.
+:::
+
 ## Next Steps
 Check out the [atlantis.yaml Use Cases](../guide/atlantis-yaml-use-cases.html) for
 some real world examples.
