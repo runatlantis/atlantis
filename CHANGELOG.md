@@ -1,12 +1,91 @@
-# v0.4.13 (UNRELEASED)
+# v0.4.13
 
 ## Description
+This release is focused on quick-wins, bugfixes and one new feature that allows
+users to require pull requests be "mergeable", before allowing for `atlantis apply`.
+
+The mergeable apply requirement is very useful for GitHub users where it allows
+them to require pull requests be approved by specific users or require certain
+status checks to pass. See https://www.runatlantis.io/docs/apply-requirements.html#mergeable for
+more information.
+
 Diff: https://github.com/runatlantis/atlantis/compare/v0.4.12...v0.4.13
+
 ## Features
+* Introduce a new (optional) `mergeable` apply requirement that requires pull requests to be mergeable prior to allowing `apply` to run. (Fixes [#43](https://github.com/runatlantis/atlantis/issues/43))
+* If users have workspaces configured for a directory via an `atlantis.yaml` file, only allow
+    commands to be run on those workspaces. All commands attempted to be run on different workspaces will error out.
+
+    For example, if I have an `atlantis.yaml` file:
+    ```yaml
+    version: 2
+    projects:
+    - dir: mydir
+      workspace: default
+    - dir: mydir
+      workspace: staging
+    ```
+    Then I can run `atlantis apply -d mydir -w default` and `atlantis apply -d mydir -w staging`
+    but I will receive an error if I run `atlantis apply -d mydir -w somethingelse`.
+
+* If users are setting the `name` key for their projects in `atlantis.yaml`, then
+  include the project name in the comment output so it's easier to identify which
+  plan/apply output is for which project. (Fixes [#353](https://github.com/runatlantis/atlantis/issues/353))
+* Bump the Terraform version in the Docker image to `0.11.11`.
+* Tweak logging to add timezone to the timestamp and make the output more readable. ([#402](https://github.com/runatlantis/atlantis/pull/402))
+* Warn users if running `atlantis apply -- -target=myresource` because `-target` can
+  only be specified during `atlantis plan`. (Fixes [#399](https://github.com/runatlantis/atlantis/issues/399))
+
 ## Bugfixes
+* If `terraform plan` returns an error, print the error to the pull request. ([#381](https://github.com/runatlantis/atlantis/pull/381))
+* Split Bitbucket Server comments into multiple comments if over the max size. (Fixes [#280](https://github.com/runatlantis/atlantis/issues/280))
+* Fix issue where if users specified `--gitlab-hostname` without a scheme then Atlantis wouldn't parse the URL correctly. ([#377](https://github.com/runatlantis/atlantis/issues/377))
+* Give better error message if GitLab users are commenting on commits instead of a merge request. (Fixes [#150](https://github.com/runatlantis/atlantis/issues/150), [#390](https://github.com/runatlantis/atlantis/issues/390))
+* If an error occurs early in request processing, comment that error back on the pull request.
+  Previously, we *were* commenting back on errors but not for errors very early in the processing. (Fixes [#398](https://github.com/runatlantis/atlantis/issues/398))
+
 ## Backwards Incompatibilities / Notes:
+* The version of Terraform installed in the `runatlantis/atlantis` Docker image
+  is now `0.11.11`. Previously it was `0.11.10`.
+* If you are a) using an `atlantis.yaml` file and b) defining Terraform workspaces
+    and c) running plan and apply against workspaces that **were not** defined in the
+    `atlantis.yaml` file, then this no longer works.
+
+    You will now need to define all the workspaces in the `atlantis.yaml` file.
+    For example, say you had the following config:
+    ```yaml
+    version: 2
+    projects:
+    - dir: mydir
+      workspace: production
+    ```
+
+    And you used to run:
+    ```
+    atlantis plan -d mydir -w anotherworkspace
+    atlantis apply -d mydir -w anotherworkspace
+    ```
+
+    For this to work now, you need to add the `anotherworkspace` workspace to your
+    `atlantis.yaml` file:
+    ```yaml
+    version: 2
+    projects:
+    - dir: mydir
+      workspace: production
+    - dir: mydir
+      workspace: anotherworkspace
+    ```
+
+
 ## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.13/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.13/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.13/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.13/atlantis_linux_arm.zip)
+
 ## Docker
+[`runatlantis/atlantis:v0.4.13`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
 
 # v0.4.12
 
