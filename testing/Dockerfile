@@ -1,6 +1,7 @@
 # This Dockerfile builds the docker image used for running circle ci tests.
 # We need terraform installed for our full test suite so it installs that.
-# It's updated by running make build-testing-image
+# It's updated by running make build-testing-image which will also push a new
+# image.
 FROM circleci/golang:1.11
 
 # Install Terraform

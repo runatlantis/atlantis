@@ -3,7 +3,7 @@ jobs:
   test:
     working_directory: /go/src/github.com/runatlantis/atlantis
     docker:
-    - image: runatlantis/testing-env
+    - image: runatlantis/testing-env:latest
     steps:
     - checkout
     - run: make test-coverage
