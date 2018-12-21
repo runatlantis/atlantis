@@ -213,6 +213,15 @@ workflows:
 ```
 
 ::: tip
+Note that a custom command will only terminate if all output file descriptors are closed.
+Therefore a custom command can only be sent to the background (e.g. for an SSH tunnel during
+the terraform run) when its output is redirected to a different location. For example, atlantis
+will execute a custom script containing the following code to create a SSH tunnel correctly: 
+`ssh -f -M -S /tmp/ssh_tunnel -L 3306:database:3306 -N bastion 1>/dev/null 2>&1`. Without
+the pipe, the script would block the atlantis workflow.
+:::
+
+::: tip
 Note how we're not specifying the `plan` key under `myworkflow`. If the `plan` key
 isn't set, Atlantis will use the default plan workflow which is what we want in this case.
 :::
