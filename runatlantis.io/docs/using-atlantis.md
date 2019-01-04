@@ -1,4 +1,5 @@
-# Pull Request Commands
+# Using Atlantis
+
 Atlantis currently supports three commands that can be run via pull request comments:
 [[toc]]
 
@@ -51,7 +52,7 @@ you can append them to the end of the comment after `--`, ex.
 ```
 atlantis plan -d dir -- -var 'foo=bar'
 ```
-If you always need to append a certain flag, see [Project-Specific Customization](#project-specific-customization).
+If you always need to append a certain flag, see [atlantis.yaml Use Cases](/guide/atlantis-yaml-use-cases.html#adding-extra-arguments-to-terraform-commands).
 
 ---
 ## atlantis apply
@@ -96,3 +97,4 @@ Because Atlantis under the hood is running `terraform apply plan.tfplan`, any Te
 
 They're ignored because they can't be specified for an already generated planfile.
 If you would like to specify these flags, do it while running `atlantis plan`.
+
