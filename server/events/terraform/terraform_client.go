@@ -41,8 +41,13 @@ type DefaultClient struct {
 
 const terraformPluginCacheDirName = "plugin-cache"
 
-// zeroPointNine constrains the version to be 0.9.*
-var versionRegex = regexp.MustCompile("Terraform v(.*)\n")
+// versionRegex extracts the version from `terraform version` output.
+//     Terraform v0.12.0-alpha4 (2c36829d3265661d8edbd5014de8090ea7e2a076)
+//	   => 0.12.0-alpha4
+//
+//     Terraform v0.11.10
+//	   => 0.11.10
+var versionRegex = regexp.MustCompile("Terraform v(.*?)(\\s.*)?\n")
 
 func NewClient(dataDir string) (*DefaultClient, error) {
 	_, err := exec.LookPath("terraform")
