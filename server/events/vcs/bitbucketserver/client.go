@@ -88,6 +88,12 @@ func (b *Client) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]
 		}
 		for _, v := range changes.Values {
 			files = append(files, *v.Path.ToString)
+
+			// If the file was renamed, we'll want to run plan in the directory
+			// it was moved from as well.
+			if v.SrcPath != nil {
+				files = append(files, *v.SrcPath.ToString)
+			}
 		}
 		if *changes.IsLastPage {
 			break
