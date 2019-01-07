@@ -1,18 +1,14 @@
-# Overview
+# Atlantis Documentation
 
-This documentation is divided into sections:
-* [Pull Request Commands](pull-request-commands.html) - the commands that Atlantis supports via pull request comments.
-* [Production-Ready Deployment](deployment.html) - how to deploy Atlantis.
-* [Server Configuration](server-configuration.html) - how to configure the Atlantis server.
-* [Apply Requirements](apply-requirements.html) - what requirements can be set before `atlantis apply` is allowed.
-* [Locking](locking.html) - how and why Atlantis does locking.
-* [Autoplanning](autoplanning.html) - how Atlantis runs plan automatically.
-* [`atlantis.yaml` Reference](atlantis-yaml-reference.html) - reference docs for the `atlantis.yaml` configuration file.
-* [Security](security.html) - what you need to think about in terms of security for Atlantis.
-* [FAQ](faq.html) - Frequently asked questions.
+These docs are for users that are ready to get Atlantis installed and start using it.
 
+:::tip Looking to get started?
+If you're new here, check out the [Guide](/guide/)
+where you can try our [Test Drive](/guide/test-drive.html) or [Run Atlantis Locally](/guide/getting-started.html).
+:::
 
-
-
-
-
+### Next Steps
+* [Installing Atlantis](/docs/installation-guide.html)&nbsp;&nbsp;–&nbsp;&nbsp;Get Atlantis up and running
+* [Using Atlantis](using-atlantis.html)&nbsp;&nbsp;–&nbsp;&nbsp;How do I use Atlantis to run Terraform
+* [Customizing Atlantis](customizing-atlantis.html)&nbsp;&nbsp;–&nbsp;&nbsp;Modify how Atlantis works for my use case
+* [How Atlantis Works](how-atlantis-works.html)&nbsp;&nbsp;–&nbsp;&nbsp;Internals of what Atlantis is doing

@@ -34,25 +34,54 @@ module.exports = {
             {text: 'Blog', link: 'https://medium.com/runatlantis'}
         ],
         sidebar: {
-            '/docs/': [
-                '',
-                'pull-request-commands',
-                'deployment',
-                'server-configuration',
-                'apply-requirements',
-                'locking',
-                'autoplanning',
-                ['atlantis-yaml-reference', 'atlantis.yaml Reference'],
-                'upgrading-atlantis-yaml-to-version-2',
-                'security',
-                'faq',
-            ],
             '/guide/': [
                 '',
                 'test-drive',
                 'getting-started',
-                'requirements',
                 'atlantis-yaml-use-cases'
+            ],
+            '/docs/': [
+                ['', 'Overview'],
+                {
+                    title: 'Installing Atlantis',
+                    collapsable: true,
+                    children: [
+                        'installation-guide',
+                        'requirements',
+                        'access-credentials',
+                        'webhook-secrets',
+                        'deployment',
+                        'configuring-webhooks',
+                        'server-configuration',
+                        'security'
+                    ]
+                },
+                {
+                    title: 'Using Atlantis',
+                    collapsable: true,
+                    children: [
+                        ['using-atlantis', 'Overview']
+                    ]
+                },
+                {
+                    title: 'Customizing Atlantis',
+                    collapsable: true,
+                    children: [
+                        ['customizing-atlantis', 'Overview'],
+                        'atlantis-yaml-reference',
+                        'upgrading-atlantis-yaml-to-version-2',
+                        'apply-requirements'
+                    ]
+                },
+                {
+                    title: 'How Atlantis Works',
+                    collapsable: true,
+                    children: [
+                        ['how-atlantis-works', 'Overview'],
+                        'locking',
+                        'autoplanning'
+                    ]
+                }
             ]
         },
         repo: 'runatlantis/atlantis',

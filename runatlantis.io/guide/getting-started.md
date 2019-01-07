@@ -195,7 +195,7 @@ REPO_WHITELIST="$YOUR_GIT_HOST/$YOUR_USERNAME/$YOUR_REPO"
 # server without scheme or port and $YOUR_USERNAME will be the name of the **project** the repo
 # is under, **not the key** of the project.
 ```
-Now you can start Atlantis. The exact command differs depending on your Git Host:
+Now you can start Atlantis. The exact command differs depending on your Git host:
 
 ### GitHub Command
 ```bash

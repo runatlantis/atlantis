@@ -85,3 +85,22 @@ terraform {
   }
 }
 ```
+
+## Repo Whitelist
+Atlantis requires you to specify a whitelist of repositories it will accept webhooks from via the `--repo-whitelist` flag.
+
+Notes:
+* Accepts a comma separated list, ex. `definition1,definition2`
+* Format is `{hostname}/{owner}/{repo}`, ex. `github.com/runatlantis/atlantis`
+* `*` matches any characters, ex. `github.com/runatlantis/*` will match all repos in the runatlantis organization
+* For Bitbucket Server: `{hostname}` is the domain without scheme and port, `{owner}` is the name of the project (not the key), and `{repo}` is the repo name
+
+Examples:
+* Whitelist `myorg/repo1` and `myorg/repo2` on `github.com`
+  * `--repo-whitelist=github.com/myorg/repo1,github.com/myorg/repo2`
+* Whitelist all repos under `myorg` on `github.com`
+  * `--repo-whitelist='github.com/myorg/*'`
+* Whitelist all repos in my GitHub Enterprise installation
+  * `--repo-whitelist='github.yourcompany.com/*'`
+* Whitelist all repositories
+  * `--repo-whitelist='*'`
