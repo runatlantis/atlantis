@@ -114,10 +114,13 @@ func (g *GitlabClient) GetModifiedFiles(repo models.Repo, pull models.PullReques
 		}
 
 		for _, f := range mr.Changes {
+			files = append(files, f.NewPath)
+
+			// If the file was renamed, we'll want to run plan in the directory
+			// it was moved from as well.
 			if f.RenamedFile {
 				files = append(files, f.OldPath)
 			}
-			files = append(files, f.NewPath)
 		}
 		if resp.NextPage == 0 {
 			break

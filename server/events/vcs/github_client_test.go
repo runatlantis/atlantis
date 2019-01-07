@@ -77,6 +77,61 @@ func TestGithubClient_GetModifiedFiles(t *testing.T) {
 	Equals(t, []string{"file1.txt", "file2.txt"}, files)
 }
 
+// GetModifiedFiles should include the source and destination of a moved
+// file.
+func TestGithubClient_GetModifiedFilesMovedFile(t *testing.T) {
+	resp := `[
+  {
+    "sha": "bbcd538c8e72b8c175046e27cc8f907076331401",
+    "filename": "new/filename.txt",
+    "previous_filename": "previous/filename.txt",
+    "status": "renamed",
+    "additions": 103,
+    "deletions": 21,
+    "changes": 124,
+    "blob_url": "https://github.com/octocat/Hello-World/blob/6dcb09b5b57875f334f61aebed695e2e4193db5e/file1.txt",
+    "raw_url": "https://github.com/octocat/Hello-World/raw/6dcb09b5b57875f334f61aebed695e2e4193db5e/file1.txt",
+    "contents_url": "https://api.github.com/repos/octocat/Hello-World/contents/file1.txt?ref=6dcb09b5b57875f334f61aebed695e2e4193db5e",
+    "patch": "@@ -132,7 +132,7 @@ module Test @@ -1000,7 +1000,7 @@ module Test"
+  }
+]`
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			// The first request should hit this URL.
+			case "/api/v3/repos/owner/repo/pulls/1/files?per_page=300":
+				w.Write([]byte(resp)) // nolint: errcheck
+				return
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}))
+
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+	Ok(t, err)
+	defer disableSSLVerification()()
+
+	files, err := client.GetModifiedFiles(models.Repo{
+		FullName:          "owner/repo",
+		Owner:             "owner",
+		Name:              "repo",
+		CloneURL:          "",
+		SanitizedCloneURL: "",
+		VCSHost: models.VCSHost{
+			Type:     models.Github,
+			Hostname: "github.com",
+		},
+	}, models.PullRequest{
+		Num: 1,
+	})
+	Ok(t, err)
+	Equals(t, []string{"new/filename.txt", "previous/filename.txt"}, files)
+}
+
 func TestGithubClient_UpdateStatus(t *testing.T) {
 	cases := []struct {
 		status   models.CommitStatus

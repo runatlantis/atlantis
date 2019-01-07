@@ -60,6 +60,9 @@ type Changes struct {
 		Path struct {
 			ToString *string `json:"toString,omitempty" validate:"required"`
 		} `json:"path,omitempty" validate:"required"`
+		SrcPath *struct {
+			ToString *string `json:"toString,omitempty"`
+		} `json:"srcPath,omitempty"`
 	} `json:"values,omitempty" validate:"required"`
 	NextPageStart *int  `json:"nextPageStart,omitempty"`
 	IsLastPage    *bool `json:"isLastPage,omitempty" validate:"required"`

@@ -79,6 +79,12 @@ func (g *GithubClient) GetModifiedFiles(repo models.Repo, pull models.PullReques
 		}
 		for _, f := range pageFiles {
 			files = append(files, f.GetFilename())
+
+			// If the file was renamed, we'll want to run plan in the directory
+			// it was moved from as well.
+			if f.GetStatus() == "renamed" {
+				files = append(files, f.GetPreviousFilename())
+			}
 		}
 		if resp.NextPage == 0 {
 			break
