@@ -53,7 +53,8 @@ module.exports = {
                         'deployment',
                         'configuring-webhooks',
                         'server-configuration',
-                        'security'
+                        'provider-credentials',
+                        'terraform-enterprise'
                     ]
                 },
                 {
@@ -79,7 +80,8 @@ module.exports = {
                     children: [
                         ['how-atlantis-works', 'Overview'],
                         'locking',
-                        'autoplanning'
+                        'autoplanning',
+                        'security'
                     ]
                 }
             ]

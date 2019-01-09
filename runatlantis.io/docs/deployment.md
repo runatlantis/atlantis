@@ -37,7 +37,7 @@ Pick your deployment type:
 * [AWS Fargate](#aws-fargate)
 * [Google Kubernetes Engine (GKE)](#google-kubernetes-engine-gke)
 * [Docker](#docker)
-* [Roll your own](#roll-your-own)
+* [Roll Your Own](#roll-your-own)
 
 
 ### Kubernetes Helm Chart
@@ -57,13 +57,12 @@ To install:
       token: bar
       secret: baz
     ```
-1. Edit `values.yaml` and set your `orgWhitelist`
+1. Edit `values.yaml` and set your `orgWhitelist` (see [Repo Whitelist](server-configuration.html#repo-whitelist) for more information)
     ```yaml
     orgWhitelist: github.com/runatlantis/*
     ```
-   See [Repo Whitelist](server-configuration.html#repo-whitelist) for more information.
-1. Configure any other variables. See [https://github.com/helm/charts/tree/master/stable/atlantis#customization](https://github.com/helm/charts/tree/master/stable/atlantis#customization)
-    for documentation.
+1. Configure any other variables (see [https://github.com/helm/charts/tree/master/stable/atlantis#customization](https://github.com/helm/charts/tree/master/stable/atlantis#customization)
+    for documentation)
 1. Run
     ```sh
     helm install -f values.yaml stable/atlantis

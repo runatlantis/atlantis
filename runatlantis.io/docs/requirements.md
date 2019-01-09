@@ -4,7 +4,7 @@ it works with yours.
 
 [[toc]]
 
-## Git host
+## Git Host
 Atlantis integrates with the following Git hosts:
 
 * GitHub (public, private or enterprise)
@@ -13,8 +13,14 @@ Atlantis integrates with the following Git hosts:
 * Bitbucket Server aka Stash
 
 ## Terraform State
-Atlantis supports all **remote state** backends. It **does not** support local state
-because it does not commit the modified state files back to version control.
+Atlantis supports all backend types **except for local state**. We don't support local state
+because Atlantis does not have permanent storage and it doesn't commit the new
+statefile back to version control.
+
+:::tip
+If you're looking for an easy remote state solution, check out [free remote state](https://app.terraform.io/signup)
+storage from Terraform Enterprise. This is fully supported by Atlantis.
+:::
 
 ## Repository Structure
 Atlantis supports any Terraform repository structure, for example:
