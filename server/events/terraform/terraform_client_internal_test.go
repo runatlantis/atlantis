@@ -2,10 +2,11 @@ package terraform
 
 import (
 	"fmt"
-	. "github.com/runatlantis/atlantis/testing"
 	"io/ioutil"
 	"path/filepath"
 	"testing"
+
+	. "github.com/runatlantis/atlantis/testing"
 )
 
 // Test that we write the file as expected

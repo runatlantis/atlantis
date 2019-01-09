@@ -16,13 +16,14 @@ package terraform
 
 import (
 	"fmt"
-	"github.com/mitchellh/go-homedir"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/mitchellh/go-homedir"
 
 	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
@@ -100,22 +101,25 @@ func NewClient(dataDir string, tfeToken string) (*DefaultClient, error) {
 func generateRCFile(tfeToken string, home string) error {
 	const rcFilename = ".terraformrc"
 	rcFile := filepath.Join(home, rcFilename)
+	config := fmt.Sprintf(rcFileContents, tfeToken)
 
 	// If there is already a .terraformrc file and its contents aren't exactly
 	// what we would have written to it, then we error out because we don't
 	// want to overwrite anything.
-	newContents := fmt.Sprintf(rcFileContents, tfeToken)
 	if _, err := os.Stat(rcFile); err == nil {
-		currContents, err := ioutil.ReadFile(rcFile)
+		currContents, err := ioutil.ReadFile(rcFile) // nolint: gosec
 		if err != nil {
 			return errors.Wrapf(err, "trying to read %s to ensure we're not overwriting it", rcFile)
 		}
-		if newContents != string(currContents) {
+		if config != string(currContents) {
 			return fmt.Errorf("can't write TFE token to %s because that file has contents that would be overwritten", rcFile)
 		}
+		// Otherwise we don't need to write the file because it already has
+		// what we need.
+		return nil
 	}
 
-	if err := ioutil.WriteFile(rcFile, []byte(newContents), 0600); err != nil {
+	if err := ioutil.WriteFile(rcFile, []byte(config), 0600); err != nil {
 		return errors.Wrapf(err, "writing generated %s file with TFE token to %s", rcFilename, rcFile)
 	}
 	return nil

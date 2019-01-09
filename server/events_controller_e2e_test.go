@@ -273,7 +273,7 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClientProxy,
 		GitlabUser:  "gitlab-user",
 		GitlabToken: "gitlab-token",
 	}
-	terraformClient, err := terraform.NewClient(dataDir)
+	terraformClient, err := terraform.NewClient(dataDir, "")
 	Ok(t, err)
 	boltdb, err := boltdb.New(dataDir)
 	Ok(t, err)

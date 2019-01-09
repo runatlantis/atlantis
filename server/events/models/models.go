@@ -18,12 +18,13 @@ package models
 
 import (
 	"fmt"
-	"github.com/hashicorp/go-version"
-	"github.com/runatlantis/atlantis/server/logging"
 	"net/url"
 	paths "path"
 	"strings"
 	"time"
+
+	"github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"

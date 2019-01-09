@@ -21,7 +21,7 @@ won't work for multiple accounts since Atlantis wouldn't know which environment 
 Terraform with.
 
 ### Assume Role Session Names
-Atlantis injects 5 Terraform variables that can be used to dynamically name the assume role session name.
+If you're using Terraform < 0.12, Atlantis injects 5 Terraform variables that can be used to dynamically name the assume role session name.
 Setting the `session_name` allows you to trace API calls made through Atlantis back to a specific
 user and repo via CloudWatch:
 
@@ -59,3 +59,11 @@ terraform {
   }
 }
 ```
+
+:::tip Why does this not work in TF >= 0.12?
+In Terraform >= 0.12, you're not allowed to set any `-var` flags if those variables
+aren't being used. Since we can't know if you're using these `atlantis_*` variables,
+we can't set the `-var` flag.
+
+You can still set these variables yourself using the `extra_args` configuration.
+:::

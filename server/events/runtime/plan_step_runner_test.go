@@ -606,6 +606,57 @@ func TestRun_OutputOnErr(t *testing.T) {
 	Equals(t, expOutput, actOutput)
 }
 
+// Test that if we're using 0.12, we don't set the optional -var atlantis_repo_name
+// flags because in >= 0.12 you can't set -var flags if those variables aren't
+// being used.
+func TestRun_NoOptionalVarsIn012(t *testing.T) {
+	RegisterMockTestingT(t)
+	terraform := mocks.NewMockClient()
+
+	tfVersion, _ := version.NewVersion("0.12.0")
+	s := runtime.PlanStepRunner{
+		TerraformExecutor: terraform,
+		DefaultTFVersion:  tfVersion,
+	}
+
+	When(terraform.RunCommandWithVersion(
+		matchers.AnyPtrToLoggingSimpleLogger(),
+		AnyString(),
+		AnyStringSlice(),
+		matchers2.AnyPtrToGoVersionVersion(),
+		AnyString())).ThenReturn("output", nil)
+
+	output, err := s.Run(models.ProjectCommandContext{
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		User:        models.User{Username: "username"},
+		CommentArgs: []string{"comment", "args"},
+		Pull: models.PullRequest{
+			Num: 2,
+		},
+		BaseRepo: models.Repo{
+			FullName: "owner/repo",
+			Owner:    "owner",
+			Name:     "repo",
+		},
+	}, []string{"extra", "args"}, "/path")
+	Ok(t, err)
+	Equals(t, "output", output)
+
+	expPlanArgs := []string{"plan",
+		"-input=false",
+		"-refresh",
+		"-no-color",
+		"-out",
+		fmt.Sprintf("%q", "/path/default.tfplan"),
+		"extra",
+		"args",
+		"comment",
+		"args",
+	}
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, "/path", expPlanArgs, tfVersion, "default")
+}
+
 func stringSliceEquals(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
