@@ -18,6 +18,8 @@ package models
 
 import (
 	"fmt"
+	"github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/logging"
 	"net/url"
 	paths "path"
 	"strings"
@@ -25,7 +27,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
-	"github.com/runatlantis/atlantis/server/logging"
 )
 
 // Repo is a VCS repository.
@@ -274,33 +275,33 @@ func (h VCSHostType) String() string {
 }
 
 type ProjectCommandContext struct {
+	// ApplyCmd is the command that users should run to apply this plan. If
+	// this is an apply then this will be empty.
+	ApplyCmd string
 	// BaseRepo is the repository that the pull request will be merged into.
 	BaseRepo Repo
+	// CommentArgs are the extra arguments appended to comment,
+	// ex. atlantis plan -- -target=resource
+	CommentArgs  []string
+	GlobalConfig *valid.Config
 	// HeadRepo is the repository that is getting merged into the BaseRepo.
 	// If the pull request branch is from the same repository then HeadRepo will
 	// be the same as BaseRepo.
 	// See https://help.github.com/articles/about-pull-request-merges/.
-	HeadRepo Repo
-	Pull     PullRequest
-	// User is the user that triggered this command.
-	User          User
+	HeadRepo      Repo
 	Log           *logging.SimpleLogger
-	RepoRelDir    string
+	Pull          PullRequest
 	ProjectConfig *valid.Project
-	GlobalConfig  *valid.Config
-
-	// CommentArgs are the extra arguments appended to comment,
-	// ex. atlantis plan -- -target=resource
-	CommentArgs []string
-	Workspace   string
-	// Verbose is true when the user would like verbose output.
-	Verbose bool
 	// RePlanCmd is the command that users should run to re-plan this project.
 	// If this is an apply then this will be empty.
-	RePlanCmd string
-	// ApplyCmd is the command that users should run to apply this plan. If
-	// this is an apply then this will be empty.
-	ApplyCmd string
+	RePlanCmd        string
+	RepoRelDir       string
+	TerraformVersion *version.Version
+	// User is the user that triggered this command.
+	User User
+	// Verbose is true when the user would like verbose output.
+	Verbose   bool
+	Workspace string
 }
 
 // SplitRepoFullName splits a repo full name up into its owner and repo name
