@@ -61,6 +61,7 @@ const (
 	SilenceWhitelistErrorsFlag = "silence-whitelist-errors"
 	SSLCertFileFlag            = "ssl-cert-file"
 	SSLKeyFileFlag             = "ssl-key-file"
+	TFETokenFlag               = "tfe-token"
 
 	// Flag defaults.
 	DefaultBitbucketBaseURL = bitbucketcloud.BaseURL
@@ -166,6 +167,12 @@ var stringFlags = []stringFlag{
 	{
 		name:        SSLKeyFileFlag,
 		description: fmt.Sprintf("File containing x509 private key matching --%s.", SSLCertFileFlag),
+	},
+	{
+		name: TFETokenFlag,
+		description: "API token for Terraform Enterprise. This will be used to generate a ~/.terraformrc file." +
+			" Only set if using TFE as a backend." +
+			" Should be specified via the ATLANTIS_TFE_TOKEN environment variable for security.",
 	},
 }
 var boolFlags = []boolFlag{

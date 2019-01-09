@@ -16,6 +16,8 @@ package terraform
 
 import (
 	"fmt"
+	"github.com/mitchellh/go-homedir"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -49,7 +51,7 @@ const terraformPluginCacheDirName = "plugin-cache"
 //	   => 0.11.10
 var versionRegex = regexp.MustCompile("Terraform v(.*?)(\\s.*)?\n")
 
-func NewClient(dataDir string) (*DefaultClient, error) {
+func NewClient(dataDir string, tfeToken string) (*DefaultClient, error) {
 	_, err := exec.LookPath("terraform")
 	if err != nil {
 		return nil, errors.New("terraform not found in $PATH. \n\nDownload terraform from https://www.terraform.io/downloads.html")
@@ -69,6 +71,17 @@ func NewClient(dataDir string) (*DefaultClient, error) {
 		return nil, errors.Wrap(err, "parsing terraform version")
 	}
 
+	// If tfeToken is set, we try to create a ~/.terraformrc file.
+	if tfeToken != "" {
+		home, err := homedir.Dir()
+		if err != nil {
+			return nil, errors.Wrap(err, "getting home dir to write ~/.terraformrc file")
+		}
+		if err := generateRCFile(tfeToken, home); err != nil {
+			return nil, err
+		}
+	}
+
 	// We will run terraform with the TF_PLUGIN_CACHE_DIR env var set to this
 	// directory inside our data dir.
 	cacheDir := filepath.Join(dataDir, terraformPluginCacheDirName)
@@ -80,6 +93,32 @@ func NewClient(dataDir string) (*DefaultClient, error) {
 		defaultVersion:          v,
 		terraformPluginCacheDir: cacheDir,
 	}, nil
+}
+
+// generateRCFile generates a .terraformrc file containing config for tfeToken.
+// It will create the file in home/.terraformrc.
+func generateRCFile(tfeToken string, home string) error {
+	const rcFilename = ".terraformrc"
+	rcFile := filepath.Join(home, rcFilename)
+
+	// If there is already a .terraformrc file and its contents aren't exactly
+	// what we would have written to it, then we error out because we don't
+	// want to overwrite anything.
+	newContents := fmt.Sprintf(rcFileContents, tfeToken)
+	if _, err := os.Stat(rcFile); err == nil {
+		currContents, err := ioutil.ReadFile(rcFile)
+		if err != nil {
+			return errors.Wrapf(err, "trying to read %s to ensure we're not overwriting it", rcFile)
+		}
+		if newContents != string(currContents) {
+			return fmt.Errorf("can't write TFE token to %s because that file has contents that would be overwritten", rcFile)
+		}
+	}
+
+	if err := ioutil.WriteFile(rcFile, []byte(newContents), 0600); err != nil {
+		return errors.Wrapf(err, "writing generated %s file with TFE token to %s", rcFilename, rcFile)
+	}
+	return nil
 }
 
 // Version returns the version of the terraform executable in our $PATH.
@@ -145,3 +184,10 @@ func MustConstraint(v string) version.Constraints {
 	}
 	return c
 }
+
+// rcFileContents is a format string to be used with Sprintf that can be used
+// to generate the contents of a ~/.terraformrc file for authenticating with
+// Terraform Enterprise.
+var rcFileContents = `credentials "app.terraform.io" {
+  token = %q
+}`
