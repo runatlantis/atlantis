@@ -288,6 +288,14 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:2155cb970ad9dee55f4561a0a859a3f84fe20d7581409ed6e77b874a90709bfb"
+  name = "github.com/mitchellh/go-linereader"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "07bab5fdd9580500aea6ada0e09df4aa28e68abd"
+
+[[projects]]
+  branch = "master"
   digest = "1:3d64942cc75c655215a64496e35a2ca1a30ee0007cd24f41b57631486f3d083c"
   name = "github.com/mitchellh/mapstructure"
   packages = ["."]
@@ -541,6 +549,7 @@
     "github.com/lkysow/go-gitlab",
     "github.com/mitchellh/colorstring",
     "github.com/mitchellh/go-homedir",
+    "github.com/mitchellh/go-linereader",
     "github.com/mohae/deepcopy",
     "github.com/nlopes/slack",
     "github.com/petergtz/pegomock",
