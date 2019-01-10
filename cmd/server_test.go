@@ -349,6 +349,7 @@ func TestExecute_Defaults(t *testing.T) {
 	Equals(t, false, passedConfig.RequireMergeable)
 	Equals(t, "", passedConfig.SSLCertFile)
 	Equals(t, "", passedConfig.SSLKeyFile)
+	Equals(t, "", passedConfig.TFEToken)
 }
 
 func TestExecute_ExpandHomeInDataDir(t *testing.T) {
@@ -447,6 +448,7 @@ func TestExecute_Flags(t *testing.T) {
 		cmd.RequireMergeableFlag:       true,
 		cmd.SSLCertFileFlag:            "cert-file",
 		cmd.SSLKeyFileFlag:             "key-file",
+		cmd.TFETokenFlag:               "my-token",
 	})
 	err := c.Execute()
 	Ok(t, err)
@@ -474,6 +476,7 @@ func TestExecute_Flags(t *testing.T) {
 	Equals(t, true, passedConfig.RequireMergeable)
 	Equals(t, "cert-file", passedConfig.SSLCertFile)
 	Equals(t, "key-file", passedConfig.SSLKeyFile)
+	Equals(t, "my-token", passedConfig.TFEToken)
 }
 
 func TestExecute_ConfigFile(t *testing.T) {
@@ -502,6 +505,7 @@ require-approval: true
 require-mergeable: true
 ssl-cert-file: cert-file
 ssl-key-file: key-file
+tfe-token: my-token
 `)
 	defer os.Remove(tmpFile) // nolint: errcheck
 	c := setup(map[string]interface{}{
@@ -533,6 +537,7 @@ ssl-key-file: key-file
 	Equals(t, true, passedConfig.RequireMergeable)
 	Equals(t, "cert-file", passedConfig.SSLCertFile)
 	Equals(t, "key-file", passedConfig.SSLKeyFile)
+	Equals(t, "my-token", passedConfig.TFEToken)
 }
 
 func TestExecute_EnvironmentOverride(t *testing.T) {
@@ -560,6 +565,7 @@ repo-whitelist: "github.com/runatlantis/atlantis"
 require-approval: true
 ssl-cert-file: cert-file
 ssl-key-file: key-file
+ssl-key-file: my-token
 `)
 	defer os.Remove(tmpFile) // nolint: errcheck
 
@@ -588,6 +594,7 @@ ssl-key-file: key-file
 		"REQUIRE_MERGEABLE":        "false",
 		"SSL_CERT_FILE":            "override-cert-file",
 		"SSL_KEY_FILE":             "override-key-file",
+		"TFE_TOKEN":                "override-my-token",
 	} {
 		os.Setenv("ATLANTIS_"+name, value) // nolint: errcheck
 	}
@@ -619,6 +626,7 @@ ssl-key-file: key-file
 	Equals(t, false, passedConfig.RequireMergeable)
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
 	Equals(t, "override-key-file", passedConfig.SSLKeyFile)
+	Equals(t, "override-my-token", passedConfig.TFEToken)
 }
 
 func TestExecute_FlagConfigOverride(t *testing.T) {
@@ -647,6 +655,7 @@ require-approval: true
 require-mergeable: true
 ssl-cert-file: cert-file
 ssl-key-file: key-file
+tfe-token: my-token
 `)
 
 	defer os.Remove(tmpFile) // nolint: errcheck
@@ -674,6 +683,7 @@ ssl-key-file: key-file
 		cmd.RequireMergeableFlag:       false,
 		cmd.SSLCertFileFlag:            "override-cert-file",
 		cmd.SSLKeyFileFlag:             "override-key-file",
+		cmd.TFETokenFlag:               "override-my-token",
 	})
 	err := c.Execute()
 	Ok(t, err)
@@ -699,6 +709,7 @@ ssl-key-file: key-file
 	Equals(t, false, passedConfig.RequireMergeable)
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
 	Equals(t, "override-key-file", passedConfig.SSLKeyFile)
+	Equals(t, "override-my-token", passedConfig.TFEToken)
 }
 
 func TestExecute_FlagEnvVarOverride(t *testing.T) {
@@ -728,6 +739,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		"REQUIRE_MERGEABLE":        "true",
 		"SSL_CERT_FILE":            "cert-file",
 		"SSL_KEY_FILE":             "key-file",
+		"TFE_TOKEN":                "my-token",
 	}
 	for name, value := range envVars {
 		os.Setenv("ATLANTIS_"+name, value) // nolint: errcheck
@@ -763,6 +775,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		cmd.RequireMergeableFlag:       false,
 		cmd.SSLCertFileFlag:            "override-cert-file",
 		cmd.SSLKeyFileFlag:             "override-key-file",
+		cmd.TFETokenFlag:               "override-my-token",
 	})
 	err := c.Execute()
 	Ok(t, err)
@@ -790,6 +803,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	Equals(t, false, passedConfig.RequireMergeable)
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
 	Equals(t, "override-key-file", passedConfig.SSLKeyFile)
+	Equals(t, "override-my-token", passedConfig.TFEToken)
 }
 
 // If using bitbucket cloud, webhook secrets are not supported.

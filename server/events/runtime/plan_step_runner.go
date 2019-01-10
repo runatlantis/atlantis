@@ -36,7 +36,7 @@ func (p *PlanStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []strin
 		return "", err
 	}
 
-	planCmd := p.buildPlanCmd(ctx, extraArgs, path)
+	planCmd := p.buildPlanCmd(ctx, extraArgs, path, tfVersion)
 	output, err := p.TerraformExecutor.RunCommandWithVersion(ctx.Log, filepath.Clean(path), planCmd, tfVersion, ctx.Workspace)
 	if err != nil {
 		return output, err
@@ -94,8 +94,8 @@ func (p *PlanStepRunner) switchWorkspace(ctx models.ProjectCommandContext, path 
 	return nil
 }
 
-func (p *PlanStepRunner) buildPlanCmd(ctx models.ProjectCommandContext, extraArgs []string, path string) []string {
-	tfVars := p.tfVars(ctx)
+func (p *PlanStepRunner) buildPlanCmd(ctx models.ProjectCommandContext, extraArgs []string, path string, tfVersion *version.Version) []string {
+	tfVars := p.tfVars(ctx, tfVersion)
 	planFile := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectConfig))
 
 	// Check if env/{workspace}.tfvars exist and include it. This is a use-case
@@ -125,7 +125,15 @@ func (p *PlanStepRunner) buildPlanCmd(ctx models.ProjectCommandContext, extraArg
 // repo this command is running for. This can be used for naming the
 // session name in AWS which will identify in CloudTrail the source of
 // Atlantis API calls.
-func (p *PlanStepRunner) tfVars(ctx models.ProjectCommandContext) []string {
+// If using Terraform >= 0.12 we don't set any of these variables because
+// those versions don't allow setting -var flags for any variables that aren't
+// actually used in the configuration. Since there's no way for us to detect
+// if the configuration is using those variables, we don't set them.
+func (p *PlanStepRunner) tfVars(ctx models.ProjectCommandContext, tfVersion *version.Version) []string {
+	if vTwelveAndUp.Check(tfVersion) {
+		return nil
+	}
+
 	// NOTE: not using maps and looping here because we need to keep the
 	// ordering for testing purposes.
 	// NOTE: quoting the values because in Bitbucket the owner can have
@@ -171,3 +179,5 @@ func (p *PlanStepRunner) fmtPlanOutput(output string) string {
 	output = tildeDiffRegex.ReplaceAllString(output, "~")
 	return minusDiffRegex.ReplaceAllString(output, "-")
 }
+
+var vTwelveAndUp = MustConstraint(">=0.12-a")
