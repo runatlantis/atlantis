@@ -159,6 +159,33 @@ workflows:
           extra_args: ["-lock=false"]
 ```
 
+## Custom init/plan/apply Commands
+If you want to customize `terraform init`, `plan` or `apply` in ways that
+aren't supported by `extra_args`, you can completely override those commands.
+
+In this example, we're not using any of the built-in commands and are instead
+using our own.
+
+```yaml
+version: 2
+projects:
+- dir: .
+  workspace: staging
+  workflow: myworkflow
+workflows:
+  myworkflow:
+    plan:
+      steps:
+      - run: terraform init -input=false -no-color
+      # If you're using workspaces you need to select the workspace using the
+      # $WORKSPACE environment variable.
+      - run: terraform workspace select -no-color $WORKSPACE
+      - run: terraform plan -input=false -refresh -no-color -out $PLANFILE
+    apply:
+      steps:
+      - run: terraform apply -no-color $PLANFILE
+```
+
 ## Terragrunt
 Atlantis supports running custom commands in place of the default Atlantis
 commands. We can use this functionality to enable
