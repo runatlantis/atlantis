@@ -13,13 +13,10 @@ Outputs:
 
 var = fromconfig
 workspace = default
-
 ```
 
 ---
 ### 2. dir: `.` workspace: `staging`
-<details><summary>Show Output</summary>
-
 ```diff
 preapply
 
@@ -32,11 +29,9 @@ Outputs:
 
 var = fromfile
 workspace = staging
-
 postapply
 
 ```
-</details>
 
 ---
 

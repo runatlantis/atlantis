@@ -19,7 +19,6 @@ Outputs:
 
 var = default
 workspace = default
-
 ```
 </details>
 

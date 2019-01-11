@@ -19,7 +19,6 @@ Outputs:
 
 var = staging
 workspace = default
-
 ```
 </details>
 
