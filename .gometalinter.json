@@ -18,8 +18,6 @@
     "megacheck",
     "safesql",
     "structcheck",
-    "test",
-    "testify",
     "unconvert",
     "unparam",
     "varcheck",

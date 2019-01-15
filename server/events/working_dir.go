@@ -154,7 +154,7 @@ func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
 	}
 
 	for _, args := range cmds {
-		cmd := exec.Command(args[0], args[1:]...)
+		cmd := exec.Command(args[0], args[1:]...) // nolint: gosec
 		cmd.Dir = cloneDir
 
 		cmdStr := w.cmdAsSanitizedStr(cmd, p.BaseRepo, headRepo)
