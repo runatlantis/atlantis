@@ -135,8 +135,12 @@ type PullRequest struct {
 	// URL is the url of the pull request.
 	// ex. "https://github.com/runatlantis/atlantis/pull/1"
 	URL string
-	// Branch is the name of the head branch (not the base).
-	Branch string
+	// HeadBranch is the name of the head branch (the branch that is getting
+	// merged into the base).
+	HeadBranch string
+	// BaseBranch is the name of the base branch (the branch that the pull
+	// request is getting merged into).
+	BaseBranch string
 	// Author is the username of the pull request author.
 	Author string
 	// State will be one of Open or Closed.

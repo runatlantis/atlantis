@@ -318,7 +318,8 @@ func (e *EventParser) parseCommonBitbucketCloudEventData(event bitbucketcloud.Co
 		Num:        *event.PullRequest.ID,
 		HeadCommit: *event.PullRequest.Source.Commit.Hash,
 		URL:        *event.PullRequest.Links.HTML.HREF,
-		Branch:     *event.PullRequest.Source.Branch.Name,
+		HeadBranch: *event.PullRequest.Source.Branch.Name,
+		BaseBranch: *event.PullRequest.Destination.Branch.Name,
 		Author:     *event.Actor.Username,
 		State:      prState,
 		BaseRepo:   baseRepo,
@@ -417,11 +418,17 @@ func (e *EventParser) ParseGithubPull(pull *github.PullRequest) (pullModel model
 		err = errors.New("html_url is null")
 		return
 	}
-	branch := pull.Head.GetRef()
-	if branch == "" {
+	headBranch := pull.Head.GetRef()
+	if headBranch == "" {
 		err = errors.New("head.ref is null")
 		return
 	}
+	baseBranch := pull.Base.GetRef()
+	if baseBranch == "" {
+		err = errors.New("base.ref is null")
+		return
+	}
+
 	authorUsername := pull.User.GetLogin()
 	if authorUsername == "" {
 		err = errors.New("user.login is null")
@@ -449,12 +456,13 @@ func (e *EventParser) ParseGithubPull(pull *github.PullRequest) (pullModel model
 
 	pullModel = models.PullRequest{
 		Author:     authorUsername,
-		Branch:     branch,
+		HeadBranch: headBranch,
 		HeadCommit: commit,
 		URL:        url,
 		Num:        num,
 		State:      pullState,
 		BaseRepo:   baseRepo,
+		BaseBranch: baseBranch,
 	}
 	return
 }
@@ -491,7 +499,8 @@ func (e *EventParser) ParseGitlabMergeRequestEvent(event gitlab.MergeEvent) (pul
 		Author:     event.User.Username,
 		Num:        event.ObjectAttributes.IID,
 		HeadCommit: event.ObjectAttributes.LastCommit.ID,
-		Branch:     event.ObjectAttributes.SourceBranch,
+		HeadBranch: event.ObjectAttributes.SourceBranch,
+		BaseBranch: event.ObjectAttributes.TargetBranch,
 		State:      modelState,
 		BaseRepo:   baseRepo,
 	}
@@ -553,7 +562,8 @@ func (e *EventParser) ParseGitlabMergeRequest(mr *gitlab.MergeRequest, baseRepo 
 		Author:     mr.Author.Username,
 		Num:        mr.IID,
 		HeadCommit: mr.SHA,
-		Branch:     mr.SourceBranch,
+		HeadBranch: mr.SourceBranch,
+		BaseBranch: mr.TargetBranch,
 		State:      pullState,
 		BaseRepo:   baseRepo,
 	}
@@ -633,7 +643,8 @@ func (e *EventParser) parseCommonBitbucketServerEventData(event bitbucketserver.
 		Num:        *event.PullRequest.ID,
 		HeadCommit: *event.PullRequest.FromRef.LatestCommit,
 		URL:        fmt.Sprintf("%s/projects/%s/repos/%s/pull-requests/%d", e.BitbucketServerURL, *event.PullRequest.ToRef.Repository.Project.Key, *event.PullRequest.ToRef.Repository.Slug, *event.PullRequest.ID),
-		Branch:     *event.PullRequest.FromRef.DisplayID,
+		HeadBranch: *event.PullRequest.FromRef.DisplayID,
+		BaseBranch: *event.PullRequest.ToRef.DisplayID,
 		Author:     *event.Actor.Username,
 		State:      prState,
 		BaseRepo:   baseRepo,
