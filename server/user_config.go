@@ -13,6 +13,7 @@ type UserConfig struct {
 	BitbucketToken         string `mapstructure:"bitbucket-token"`
 	BitbucketUser          string `mapstructure:"bitbucket-user"`
 	BitbucketWebhookSecret string `mapstructure:"bitbucket-webhook-secret"`
+	CheckoutStrategy       string `mapstructure:"checkout-strategy"`
 	DataDir                string `mapstructure:"data-dir"`
 	GithubHostname         string `mapstructure:"gh-hostname"`
 	GithubToken            string `mapstructure:"gh-token"`

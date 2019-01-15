@@ -182,7 +182,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	lockingClient := locking.NewClient(boltdb)
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 	workingDir := &events.FileWorkspace{
-		DataDir: userConfig.DataDir,
+		DataDir:       userConfig.DataDir,
+		CheckoutMerge: userConfig.CheckoutStrategy == "merge",
 	}
 	projectLocker := &events.DefaultProjectLocker{
 		Locker: lockingClient,

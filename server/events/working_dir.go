@@ -14,6 +14,7 @@
 package events
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -46,6 +47,11 @@ type WorkingDir interface {
 // FileWorkspace implements WorkingDir with the file system.
 type FileWorkspace struct {
 	DataDir string
+	// CheckoutMerge is true if we should check out the branch that corresponds
+	// to what the base branch will look like *after* the pull request is merged.
+	// If this is false, then we will check out the head branch from the pull
+	// request.
+	CheckoutMerge bool
 	// TestingOverrideCloneURL can be used during testing to override the URL
 	// that is cloned. If it's empty then we clone normally.
 	TestingOverrideCloneURL string
@@ -67,11 +73,21 @@ func (w *FileWorkspace) Clone(
 	// If so, then we do nothing.
 	if _, err := os.Stat(cloneDir); err == nil {
 		log.Debug("clone directory %q already exists, checking if it's at the right commit", cloneDir)
-		revParseCmd := exec.Command("git", "rev-parse", "HEAD") // #nosec
+
+		// We use git rev-parse to see if our repo is at the right commit.
+		// If just checking out the pull request branch, we can use HEAD.
+		// If doing a merge, then HEAD won't be at the pull request's HEAD
+		// because we'll already have performed a merge. Instead, we'll check
+		// HEAD^2 since that will be the commit before our merge.
+		pullHead := "HEAD"
+		if w.CheckoutMerge {
+			pullHead = "HEAD^2"
+		}
+		revParseCmd := exec.Command("git", "rev-parse", pullHead) // #nosec
 		revParseCmd.Dir = cloneDir
 		output, err := revParseCmd.CombinedOutput()
 		if err != nil {
-			log.Err("will re-clone repo, could not determine if was at correct commit: git rev-parse HEAD: %s: %s", err, string(output))
+			log.Err("will re-clone repo, could not determine if was at correct commit: %s: %s: %s", strings.Join(revParseCmd.Args, " "), err, string(output))
 			return w.forceClone(log, cloneDir, headRepo, p)
 		}
 		currCommit := strings.Trim(string(output), "\n")
@@ -105,22 +121,48 @@ func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
 		return "", errors.Wrap(err, "creating new workspace")
 	}
 
-	log.Info("git cloning %q into %q", headRepo.SanitizedCloneURL, cloneDir)
-	cloneURL := headRepo.CloneURL
-	if w.TestingOverrideCloneURL != "" {
-		cloneURL = w.TestingOverrideCloneURL
-	}
-	cloneCmd := exec.Command("git", "clone", cloneURL, cloneDir) // #nosec
-	if output, err := cloneCmd.CombinedOutput(); err != nil {
-		return "", errors.Wrapf(err, "cloning %s: %s", headRepo.SanitizedCloneURL, string(output))
+	var cmds [][]string
+	if w.CheckoutMerge {
+		// NOTE: We can't do a shallow clone when we're merging because we'll
+		// get merge conflicts if our clone doesn't have the commits that the
+		// branch we're merging branched off at.
+		// See https://groups.google.com/forum/#!topic/git-users/v3MkuuiDJ98.
+		cmds = [][]string{
+			{
+				"git", "clone", "--branch", p.BaseBranch, "--single-branch", p.BaseRepo.CloneURL, cloneDir,
+			},
+			{
+				"git", "remote", "add", "head", headRepo.CloneURL,
+			},
+			{
+				"git", "fetch", "head", fmt.Sprintf("+refs/heads/%s:", p.HeadBranch),
+			},
+			{
+				"git", "merge", "-q", "-m", "atlantis-merge", "FETCH_HEAD",
+			},
+		}
+	} else {
+		cloneURL := headRepo.CloneURL
+		if w.TestingOverrideCloneURL != "" {
+			cloneURL = w.TestingOverrideCloneURL
+		}
+		cmds = [][]string{
+			{
+				"git", "clone", "--branch", p.HeadBranch, "--depth=1", "--single-branch", cloneURL, cloneDir,
+			},
+		}
 	}
 
-	// Check out the branch for this PR.
-	log.Info("checking out branch %q", p.Branch)
-	checkoutCmd := exec.Command("git", "checkout", p.Branch) // #nosec
-	checkoutCmd.Dir = cloneDir
-	if err := checkoutCmd.Run(); err != nil {
-		return "", errors.Wrapf(err, "checking out branch %s", p.Branch)
+	for _, args := range cmds {
+		cmd := exec.Command(args[0], args[1:]...)
+		cmd.Dir = cloneDir
+
+		cmdStr := w.cmdAsSanitizedStr(cmd, p.BaseRepo, headRepo)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return "", errors.Wrapf(err, "running %s: %s", cmdStr, string(output))
+		}
+		log.Debug("ran: %s. Output: %s", cmdStr, string(output))
 	}
 	return cloneDir, nil
 }
@@ -160,4 +202,10 @@ func (w *FileWorkspace) repoPullDir(r models.Repo, p models.PullRequest) string 
 
 func (w *FileWorkspace) cloneDir(r models.Repo, p models.PullRequest, workspace string) string {
 	return filepath.Join(w.repoPullDir(r, p), workspace)
+}
+
+func (w *FileWorkspace) cmdAsSanitizedStr(cmd *exec.Cmd, base models.Repo, head models.Repo) string {
+	cmdAsStr := strings.Join(cmd.Args, " ")
+	baseReplaced := strings.Replace(cmdAsStr, base.CloneURL, base.SanitizedCloneURL, -1)
+	return strings.Replace(baseReplaced, head.CloneURL, head.SanitizedCloneURL, -1)
 }
