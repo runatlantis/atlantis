@@ -387,9 +387,6 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		if c.description != "autoplan disabled" {
-			continue
-		}
 		t.Run(c.description, func(t *testing.T) {
 			pf := events.DefaultProjectFinder{}
 			projects, err := pf.DetermineProjectsViaConfig(logging.NewNoopLogger(), c.modified, c.config, tmpDir)
