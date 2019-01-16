@@ -52,9 +52,12 @@ type FileWorkspace struct {
 	// If this is false, then we will check out the head branch from the pull
 	// request.
 	CheckoutMerge bool
-	// TestingOverrideCloneURL can be used during testing to override the URL
-	// that is cloned. If it's empty then we clone normally.
-	TestingOverrideCloneURL string
+	// TestingOverrideHeadCloneURL can be used during testing to override the
+	// URL of the head repo to be cloned. If it's empty then we clone normally.
+	TestingOverrideHeadCloneURL string
+	// TestingOverrideBaseCloneURL can be used during testing to override the
+	// URL of the base repo to be cloned. If it's empty then we clone normally.
+	TestingOverrideBaseCloneURL string
 }
 
 // Clone git clones headRepo, checks out the branch and then returns the absolute
@@ -121,6 +124,16 @@ func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
 		return "", errors.Wrap(err, "creating new workspace")
 	}
 
+	// During testing, we mock some of this out.
+	headCloneURL := headRepo.CloneURL
+	if w.TestingOverrideHeadCloneURL != "" {
+		headCloneURL = w.TestingOverrideHeadCloneURL
+	}
+	baseCloneURL := p.BaseRepo.CloneURL
+	if w.TestingOverrideBaseCloneURL != "" {
+		baseCloneURL = w.TestingOverrideBaseCloneURL
+	}
+
 	var cmds [][]string
 	if w.CheckoutMerge {
 		// NOTE: We can't do a shallow clone when we're merging because we'll
@@ -129,10 +142,10 @@ func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
 		// See https://groups.google.com/forum/#!topic/git-users/v3MkuuiDJ98.
 		cmds = [][]string{
 			{
-				"git", "clone", "--branch", p.BaseBranch, "--single-branch", p.BaseRepo.CloneURL, cloneDir,
+				"git", "clone", "--branch", p.BaseBranch, "--single-branch", baseCloneURL, cloneDir,
 			},
 			{
-				"git", "remote", "add", "head", headRepo.CloneURL,
+				"git", "remote", "add", "head", headCloneURL,
 			},
 			{
 				"git", "fetch", "head", fmt.Sprintf("+refs/heads/%s:", p.HeadBranch),
@@ -142,13 +155,9 @@ func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
 			},
 		}
 	} else {
-		cloneURL := headRepo.CloneURL
-		if w.TestingOverrideCloneURL != "" {
-			cloneURL = w.TestingOverrideCloneURL
-		}
 		cmds = [][]string{
 			{
-				"git", "clone", "--branch", p.HeadBranch, "--depth=1", "--single-branch", cloneURL, cloneDir,
+				"git", "clone", "--branch", p.HeadBranch, "--depth=1", "--single-branch", headCloneURL, cloneDir,
 			},
 		}
 	}
@@ -156,6 +165,12 @@ func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
 	for _, args := range cmds {
 		cmd := exec.Command(args[0], args[1:]...) // nolint: gosec
 		cmd.Dir = cloneDir
+		// The git merge command requires these env vars are set.
+		cmd.Env = []string{
+			"EMAIL=atlantis@runatlants.io",
+			"GIT_AUTHOR_NAME=atlantis",
+			"GIT_COMMITTER_NAME=atlantis",
+		}
 
 		cmdStr := w.cmdAsSanitizedStr(cmd, p.BaseRepo, headRepo)
 		output, err := cmd.CombinedOutput()

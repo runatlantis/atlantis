@@ -200,7 +200,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
 			defer cleanup()
-			atlantisWorkspace.TestingOverrideCloneURL = fmt.Sprintf("file://%s", repoDir)
+			atlantisWorkspace.TestingOverrideHeadCloneURL = fmt.Sprintf("file://%s", repoDir)
 
 			// Setup test dependencies.
 			w := httptest.NewRecorder()
@@ -282,8 +282,8 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClientProxy,
 		Locker: lockingClient,
 	}
 	workingDir := &events.FileWorkspace{
-		DataDir:                 dataDir,
-		TestingOverrideCloneURL: "override-me",
+		DataDir:                     dataDir,
+		TestingOverrideHeadCloneURL: "override-me",
 	}
 
 	defaultTFVersion := terraformClient.Version()
