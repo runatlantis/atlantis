@@ -46,7 +46,8 @@ type Repository struct {
 }
 type PullRequest struct {
 	ID           *int          `json:"id,omitempty" validate:"required"`
-	Source       *Source       `json:"source,omitempty" validate:"required"`
+	Source       *BranchMeta   `json:"source,omitempty" validate:"required"`
+	Destination  *BranchMeta   `json:"destination,omitempty" validate:"required"`
 	Participants []Participant `json:"participants,omitempty" validate:"required"`
 	Links        *Links        `json:"links,omitempty" validate:"required"`
 	State        *string       `json:"state,omitempty" validate:"required"`
@@ -63,7 +64,7 @@ type Participant struct {
 		Username *string `json:"username,omitempty" validate:"required"`
 	} `json:"user,omitempty" validate:"required"`
 }
-type Source struct {
+type BranchMeta struct {
 	Repository *Repository `json:"repository,omitempty" validate:"required"`
 	Commit     *Commit     `json:"commit,omitempty" validate:"required"`
 	Branch     *Branch     `json:"branch,omitempty" validate:"required"`

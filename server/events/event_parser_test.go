@@ -146,7 +146,8 @@ func TestParseGithubPullEvent(t *testing.T) {
 	Equals(t, models.PullRequest{
 		URL:        Pull.GetHTMLURL(),
 		Author:     Pull.User.GetLogin(),
-		Branch:     Pull.Head.GetRef(),
+		HeadBranch: Pull.Head.GetRef(),
+		BaseBranch: Pull.Base.GetRef(),
 		HeadCommit: Pull.Head.GetSHA(),
 		Num:        Pull.GetNumber(),
 		State:      models.OpenPullState,
@@ -231,6 +232,11 @@ func TestParseGithubPull(t *testing.T) {
 	ErrEquals(t, "head.ref is null", err)
 
 	testPull = deepcopy.Copy(Pull).(github.PullRequest)
+	testPull.Base.Ref = nil
+	_, _, _, err = parser.ParseGithubPull(&testPull)
+	ErrEquals(t, "base.ref is null", err)
+
+	testPull = deepcopy.Copy(Pull).(github.PullRequest)
 	testPull.User.Login = nil
 	_, _, _, err = parser.ParseGithubPull(&testPull)
 	ErrEquals(t, "user.login is null", err)
@@ -256,7 +262,8 @@ func TestParseGithubPull(t *testing.T) {
 	Equals(t, models.PullRequest{
 		URL:        Pull.GetHTMLURL(),
 		Author:     Pull.User.GetLogin(),
-		Branch:     Pull.Head.GetRef(),
+		HeadBranch: Pull.Head.GetRef(),
+		BaseBranch: Pull.Base.GetRef(),
 		HeadCommit: Pull.Head.GetSHA(),
 		Num:        Pull.GetNumber(),
 		State:      models.OpenPullState,
@@ -294,7 +301,8 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 		Author:     "lkysow",
 		Num:        12,
 		HeadCommit: "d2eae324ca26242abca45d7b49d582cddb2a4f15",
-		Branch:     "patch-1",
+		HeadBranch: "patch-1",
+		BaseBranch: "master",
 		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
 	}, pull)
@@ -350,7 +358,8 @@ func TestParseGitlabMergeEvent_Subgroup(t *testing.T) {
 		Author:     "lkysow",
 		Num:        2,
 		HeadCommit: "901d9770ef1a6862e2a73ec1bacc73590abb9aff",
-		Branch:     "patch",
+		HeadBranch: "patch",
+		BaseBranch: "master",
 		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
 	}, pull)
@@ -445,7 +454,8 @@ func TestParseGitlabMergeRequest(t *testing.T) {
 		Author:     "lkysow",
 		Num:        8,
 		HeadCommit: "0b4ac85ea3063ad5f2974d10cd68dd1f937aaac2",
-		Branch:     "abc",
+		HeadBranch: "abc",
+		BaseBranch: "master",
 		State:      models.OpenPullState,
 		BaseRepo:   repo,
 	}, pull)
@@ -483,7 +493,8 @@ func TestParseGitlabMergeRequest_Subgroup(t *testing.T) {
 		Author:     "lkysow",
 		Num:        2,
 		HeadCommit: "901d9770ef1a6862e2a73ec1bacc73590abb9aff",
-		Branch:     "patch",
+		HeadBranch: "patch",
+		BaseBranch: "master",
 		State:      models.OpenPullState,
 		BaseRepo:   repo,
 	}, pull)
@@ -707,7 +718,8 @@ func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {
 		Num:        2,
 		HeadCommit: "e0624da46d3a",
 		URL:        "https://bitbucket.org/lkysow/atlantis-example/pull-requests/2",
-		Branch:     "lkysow/maintf-edited-online-with-bitbucket-1532029690581",
+		HeadBranch: "lkysow/maintf-edited-online-with-bitbucket-1532029690581",
+		BaseBranch: "master",
 		Author:     "lkysow",
 		State:      models.ClosedPullState,
 		BaseRepo:   expBaseRepo,
@@ -792,7 +804,8 @@ func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 		Num:        2,
 		HeadCommit: "e0624da46d3a",
 		URL:        "https://bitbucket.org/lkysow/atlantis-example/pull-requests/2",
-		Branch:     "lkysow/maintf-edited-online-with-bitbucket-1532029690581",
+		HeadBranch: "lkysow/maintf-edited-online-with-bitbucket-1532029690581",
+		BaseBranch: "master",
 		Author:     "lkysow",
 		State:      models.ClosedPullState,
 		BaseRepo:   expBaseRepo,
@@ -892,7 +905,8 @@ func TestParseBitbucketServerCommentEvent_ValidEvent(t *testing.T) {
 		Num:        1,
 		HeadCommit: "bfb1af1ba9c2a2fa84cd61af67e6e1b60a22e060",
 		URL:        "http://mycorp.com:7490/projects/AT/repos/atlantis-example/pull-requests/1",
-		Branch:     "branch",
+		HeadBranch: "branch",
+		BaseBranch: "master",
 		Author:     "lkysow",
 		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
@@ -973,7 +987,8 @@ func TestParseBitbucketServerPullEvent_ValidEvent(t *testing.T) {
 		Num:        2,
 		HeadCommit: "86a574157f5a2dadaf595b9f06c70fdfdd039912",
 		URL:        "http://mycorp.com:7490/projects/AT/repos/atlantis-example/pull-requests/2",
-		Branch:     "branch",
+		HeadBranch: "branch",
+		BaseBranch: "master",
 		Author:     "lkysow",
 		State:      models.ClosedPullState,
 		BaseRepo:   expBaseRepo,

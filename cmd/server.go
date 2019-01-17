@@ -44,6 +44,7 @@ const (
 	BitbucketUserFlag          = "bitbucket-user"
 	BitbucketWebhookSecretFlag = "bitbucket-webhook-secret"
 	ConfigFlag                 = "config"
+	CheckoutStrategyFlag       = "checkout-strategy"
 	DataDirFlag                = "data-dir"
 	GHHostnameFlag             = "gh-hostname"
 	GHTokenFlag                = "gh-token"
@@ -64,6 +65,7 @@ const (
 	TFETokenFlag               = "tfe-token"
 
 	// Flag defaults.
+	DefaultCheckoutStrategy = "branch"
 	DefaultBitbucketBaseURL = bitbucketcloud.BaseURL
 	DefaultDataDir          = "~/.atlantis"
 	DefaultGHHostname       = "github.com"
@@ -102,6 +104,16 @@ var stringFlags = []stringFlag{
 	{
 		name:        ConfigFlag,
 		description: "Path to config file. All flags can be set in a YAML config file instead.",
+	},
+	{
+		name: CheckoutStrategyFlag,
+		description: "How to check out pull requests. Accepts either 'branch' (default) or 'merge'." +
+			" If set to branch, Atlantis will check out the source branch of the pull request." +
+			" If set to merge, Atlantis will check out the destination branch of the pull request (ex. master)" +
+			" and then locally perform a git merge of the source branch." +
+			" This effectively means Atlantis operates on the repo as it will look" +
+			" after the pull request is merged.",
+		defaultValue: "branch",
 	},
 	{
 		name:         DataDirFlag,
@@ -372,6 +384,9 @@ func (s *ServerCmd) run() error {
 }
 
 func (s *ServerCmd) setDefaults(c *server.UserConfig) {
+	if c.CheckoutStrategy == "" {
+		c.CheckoutStrategy = DefaultCheckoutStrategy
+	}
 	if c.DataDir == "" {
 		c.DataDir = DefaultDataDir
 	}
@@ -396,6 +411,10 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	logLevel := userConfig.LogLevel
 	if logLevel != "debug" && logLevel != "info" && logLevel != "warn" && logLevel != "error" {
 		return errors.New("invalid log level: not one of debug, info, warn, error")
+	}
+	checkoutStrat := userConfig.CheckoutStrategy
+	if checkoutStrat != "branch" && checkoutStrat != "merge" {
+		return errors.New("invalid checkout strategy: not one of branch or merge")
 	}
 
 	if (userConfig.SSLKeyFile == "") != (userConfig.SSLCertFile == "") {

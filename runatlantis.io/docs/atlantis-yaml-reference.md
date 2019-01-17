@@ -184,7 +184,8 @@ override the built-in `plan`/`apply` commands, ex. `run: terraform plan -out $PL
 * `BASE_REPO_OWNER` - Owner of the repository that the pull request will be merged into, ex. `runatlantis`.
 * `HEAD_REPO_NAME` - Name of the repository that is getting merged into the base repository, ex. `atlantis`.
 * `HEAD_REPO_OWNER` - Owner of the repository that is getting merged into the base repository, ex. `acme-corp`.
-* `HEAD_BRANCH_NAME` - Name of the head branch of the pull request
+* `HEAD_BRANCH_NAME` - Name of the head branch of the pull request (the branch that is getting merged into the base)
+* `BASE_BRANCH_NAME` - Name of the base branch of the pull request (the branch that the pull request is getting merged into)
 * `PULL_NUM` - Pull request number or ID, ex. `2`.
 * `PULL_AUTHOR` - Username of the pull request author, ex. `acme-user`.
 :::

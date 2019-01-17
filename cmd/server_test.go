@@ -127,6 +127,14 @@ func TestExecute_ValidateLogLevel(t *testing.T) {
 	Equals(t, "invalid log level: not one of debug, info, warn, error", err.Error())
 }
 
+func TestExecute_ValidateCheckoutStrategy(t *testing.T) {
+	c := setupWithDefaults(map[string]interface{}{
+		cmd.CheckoutStrategyFlag: "invalid",
+	})
+	err := c.Execute()
+	ErrEquals(t, "invalid checkout strategy: not one of branch or merge", err)
+}
+
 func TestExecute_ValidateSSLConfig(t *testing.T) {
 	expErr := "--ssl-key-file and --ssl-cert-file are both required for ssl"
 	cases := []struct {
@@ -331,6 +339,7 @@ func TestExecute_Defaults(t *testing.T) {
 	Ok(t, err)
 	Equals(t, dataDir, passedConfig.DataDir)
 
+	Equals(t, "branch", passedConfig.CheckoutStrategy)
 	Equals(t, "github.com", passedConfig.GithubHostname)
 	Equals(t, "token", passedConfig.GithubToken)
 	Equals(t, "user", passedConfig.GithubUser)
@@ -432,6 +441,7 @@ func TestExecute_Flags(t *testing.T) {
 		cmd.BitbucketTokenFlag:         "bitbucket-token",
 		cmd.BitbucketUserFlag:          "bitbucket-user",
 		cmd.BitbucketWebhookSecretFlag: "bitbucket-secret",
+		cmd.CheckoutStrategyFlag:       "merge",
 		cmd.DataDirFlag:                "/path",
 		cmd.GHHostnameFlag:             "ghhostname",
 		cmd.GHTokenFlag:                "token",
@@ -460,6 +470,7 @@ func TestExecute_Flags(t *testing.T) {
 	Equals(t, "bitbucket-token", passedConfig.BitbucketToken)
 	Equals(t, "bitbucket-user", passedConfig.BitbucketUser)
 	Equals(t, "bitbucket-secret", passedConfig.BitbucketWebhookSecret)
+	Equals(t, "merge", passedConfig.CheckoutStrategy)
 	Equals(t, "/path", passedConfig.DataDir)
 	Equals(t, "ghhostname", passedConfig.GithubHostname)
 	Equals(t, "token", passedConfig.GithubToken)
@@ -489,6 +500,7 @@ bitbucket-base-url: "https://mydomain.com"
 bitbucket-token: "bitbucket-token"
 bitbucket-user: "bitbucket-user"
 bitbucket-webhook-secret: "bitbucket-secret"
+checkout-strategy: "merge"
 data-dir: "/path"
 gh-hostname: "ghhostname"
 gh-token: "token"
@@ -521,6 +533,7 @@ tfe-token: my-token
 	Equals(t, "bitbucket-token", passedConfig.BitbucketToken)
 	Equals(t, "bitbucket-user", passedConfig.BitbucketUser)
 	Equals(t, "bitbucket-secret", passedConfig.BitbucketWebhookSecret)
+	Equals(t, "merge", passedConfig.CheckoutStrategy)
 	Equals(t, "/path", passedConfig.DataDir)
 	Equals(t, "ghhostname", passedConfig.GithubHostname)
 	Equals(t, "token", passedConfig.GithubToken)
@@ -550,6 +563,7 @@ bitbucket-base-url: "https://mydomain.com"
 bitbucket-token: "bitbucket-token"
 bitbucket-user: "bitbucket-user"
 bitbucket-webhook-secret: "bitbucket-secret"
+checkout-strategy: "merge"
 data-dir: "/path"
 gh-hostname: "ghhostname"
 gh-token: "token"
@@ -578,6 +592,7 @@ ssl-key-file: my-token
 		"BITBUCKET_TOKEN":          "override-bitbucket-token",
 		"BITBUCKET_USER":           "override-bitbucket-user",
 		"BITBUCKET_WEBHOOK_SECRET": "override-bitbucket-secret",
+		"CHECKOUT_STRATEGY":        "branch",
 		"DATA_DIR":                 "/override-path",
 		"GH_HOSTNAME":              "override-gh-hostname",
 		"GH_TOKEN":                 "override-gh-token",
@@ -610,6 +625,7 @@ ssl-key-file: my-token
 	Equals(t, "override-bitbucket-token", passedConfig.BitbucketToken)
 	Equals(t, "override-bitbucket-user", passedConfig.BitbucketUser)
 	Equals(t, "override-bitbucket-secret", passedConfig.BitbucketWebhookSecret)
+	Equals(t, "branch", passedConfig.CheckoutStrategy)
 	Equals(t, "/override-path", passedConfig.DataDir)
 	Equals(t, "override-gh-hostname", passedConfig.GithubHostname)
 	Equals(t, "override-gh-token", passedConfig.GithubToken)
@@ -639,6 +655,7 @@ bitbucket-base-url: "https://bitbucket-base-url"
 bitbucket-token: "bitbucket-token"
 bitbucket-user: "bitbucket-user"
 bitbucket-webhook-secret: "bitbucket-secret"
+checkout-strategy: "merge"
 data-dir: "/path"
 gh-hostname: "ghhostname"
 gh-token: "token"
@@ -667,6 +684,7 @@ tfe-token: my-token
 		cmd.BitbucketTokenFlag:         "override-bitbucket-token",
 		cmd.BitbucketUserFlag:          "override-bitbucket-user",
 		cmd.BitbucketWebhookSecretFlag: "override-bitbucket-secret",
+		cmd.CheckoutStrategyFlag:       "branch",
 		cmd.DataDirFlag:                "/override-path",
 		cmd.GHHostnameFlag:             "override-gh-hostname",
 		cmd.GHTokenFlag:                "override-gh-token",
@@ -693,6 +711,7 @@ tfe-token: my-token
 	Equals(t, "override-bitbucket-token", passedConfig.BitbucketToken)
 	Equals(t, "override-bitbucket-user", passedConfig.BitbucketUser)
 	Equals(t, "override-bitbucket-secret", passedConfig.BitbucketWebhookSecret)
+	Equals(t, "branch", passedConfig.CheckoutStrategy)
 	Equals(t, "/override-path", passedConfig.DataDir)
 	Equals(t, "override-gh-hostname", passedConfig.GithubHostname)
 	Equals(t, "override-gh-token", passedConfig.GithubToken)
@@ -723,6 +742,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		"BITBUCKET_TOKEN":          "bitbucket-token",
 		"BITBUCKET_USER":           "bitbucket-user",
 		"BITBUCKET_WEBHOOK_SECRET": "bitbucket-secret",
+		"CHECKOUT_STRATEGY":        "merge",
 		"DATA_DIR":                 "/path",
 		"GH_HOSTNAME":              "gh-hostname",
 		"GH_TOKEN":                 "gh-token",
@@ -759,6 +779,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		cmd.BitbucketTokenFlag:         "override-bitbucket-token",
 		cmd.BitbucketUserFlag:          "override-bitbucket-user",
 		cmd.BitbucketWebhookSecretFlag: "override-bitbucket-secret",
+		cmd.CheckoutStrategyFlag:       "branch",
 		cmd.DataDirFlag:                "/override-path",
 		cmd.GHHostnameFlag:             "override-gh-hostname",
 		cmd.GHTokenFlag:                "override-gh-token",
@@ -787,6 +808,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	Equals(t, "override-bitbucket-token", passedConfig.BitbucketToken)
 	Equals(t, "override-bitbucket-user", passedConfig.BitbucketUser)
 	Equals(t, "override-bitbucket-secret", passedConfig.BitbucketWebhookSecret)
+	Equals(t, "branch", passedConfig.CheckoutStrategy)
 	Equals(t, "/override-path", passedConfig.DataDir)
 	Equals(t, "override-gh-hostname", passedConfig.GithubHostname)
 	Equals(t, "override-gh-token", passedConfig.GithubToken)

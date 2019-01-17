@@ -18,7 +18,7 @@ import "github.com/runatlantis/atlantis/server/events/models"
 var Pull = models.PullRequest{
 	Num:        1,
 	HeadCommit: "16ca62f65c18ff456c6ef4cacc8d4826e264bb17",
-	Branch:     "branch",
+	HeadBranch: "branch",
 	Author:     "lkysow",
 	URL:        "url",
 }
