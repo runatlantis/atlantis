@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/go-ozzo/ozzo-validation"
@@ -22,14 +23,27 @@ type ParserValidator struct{}
 // If there was no config file, then this can be detected by checking the type
 // of error: os.IsNotExist(error) but it's instead preferred to check with
 // HasConfigFile.
-func (p *ParserValidator) ReadConfig(repoDir string) (valid.Config, error) {
-	configFile := p.configFilePath(repoDir)
-	configData, err := ioutil.ReadFile(configFile) // nolint: gosec
+func (p *ParserValidator) ReadConfig(repoDir, branch string) (valid.Config, error) {
+	var configData []byte
+	var err error
 
-	// NOTE: the error we return here must also be os.IsNotExist since that's
-	// what our callers use to detect a missing config file.
-	if err != nil && os.IsNotExist(err) {
-		return valid.Config{}, err
+	if branch != "" {
+		fmt.Println("lawson: about to git exec")
+		gitShow := exec.Command("git", "--git-dir", filepath.Join(repoDir, ".git"),
+			"show", fmt.Sprintf("%s:%s", branch, AtlantisYAMLFilename),
+		)
+
+		gitShow.Stderr = os.Stderr
+		configData, err = gitShow.Output()
+	} else {
+		configFile := p.configFilePath(repoDir)
+		configData, err = ioutil.ReadFile(configFile) // nolint: gosec
+
+		// NOTE: the error we return here must also be os.IsNotExist since that's
+		// what our callers use to detect a missing config file.
+		if err != nil && os.IsNotExist(err) {
+			return valid.Config{}, err
+		}
 	}
 
 	// If it exists but we couldn't read it return an error.

@@ -239,6 +239,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			WorkingDirLocker:    workingDirLocker,
 			AllowRepoConfig:     userConfig.AllowRepoConfig,
 			AllowRepoConfigFlag: config.AllowRepoConfigFlag,
+			ConfigBranch:        userConfig.AtlantisConfigBranch,
 			PendingPlanFinder:   &events.PendingPlanFinder{},
 			CommentBuilder:      commentParser,
 		},

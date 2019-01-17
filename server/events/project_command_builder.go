@@ -50,6 +50,7 @@ type DefaultProjectCommandBuilder struct {
 	WorkingDirLocker    WorkingDirLocker
 	AllowRepoConfig     bool
 	AllowRepoConfigFlag string
+	ConfigBranch        string
 	PendingPlanFinder   *PendingPlanFinder
 	CommentBuilder      CommentBuilder
 }
@@ -105,7 +106,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		if !p.AllowRepoConfig {
 			return nil, fmt.Errorf("%s files not allowed because Atlantis is not running with --%s", yaml.AtlantisYAMLFilename, p.AllowRepoConfigFlag)
 		}
-		config, err = p.ParserValidator.ReadConfig(repoDir)
+		config, err = p.ParserValidator.ReadConfig(repoDir, p.ConfigBranch)
 		if err != nil {
 			return nil, err
 		}
@@ -343,7 +344,7 @@ func (p *DefaultProjectCommandBuilder) getCfg(projectName string, dir string, wo
 		return
 	}
 
-	globalCfgStruct, err := p.ParserValidator.ReadConfig(repoDir)
+	globalCfgStruct, err := p.ParserValidator.ReadConfig(repoDir, p.ConfigBranch)
 	if err != nil {
 		return
 	}
