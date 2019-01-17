@@ -81,6 +81,7 @@ module.exports = {
                         ['how-atlantis-works', 'Overview'],
                         'locking',
                         'autoplanning',
+                        'checkout-strategy',
                         'security'
                     ]
                 }
