@@ -23,6 +23,8 @@ type UserConfig struct {
 	GitlabToken            string `mapstructure:"gitlab-token"`
 	GitlabUser             string `mapstructure:"gitlab-user"`
 	GitlabWebhookSecret    string `mapstructure:"gitlab-webhook-secret"`
+	LetsEncrypt            bool   `mapstructure:"lets-encrypt"`
+	LetsEncryptEmail       string `mapstructure:"lets-encrypt-email"`
 	LogLevel               string `mapstructure:"log-level"`
 	Port                   int    `mapstructure:"port"`
 	RepoWhitelist          string `mapstructure:"repo-whitelist"`

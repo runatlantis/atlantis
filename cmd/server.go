@@ -54,6 +54,8 @@ const (
 	GitlabTokenFlag            = "gitlab-token"
 	GitlabUserFlag             = "gitlab-user"
 	GitlabWebhookSecretFlag    = "gitlab-webhook-secret" // nolint: gosec
+	LetsEncrypt                = "lets-encrypt"
+	LetsEncryptEmail           = "lets-encrypt-email"
 	LogLevelFlag               = "log-level"
 	PortFlag                   = "port"
 	RepoWhitelistFlag          = "repo-whitelist"
@@ -161,6 +163,10 @@ var stringFlags = []stringFlag{
 			"Should be specified via the ATLANTIS_GITLAB_WEBHOOK_SECRET environment variable.",
 	},
 	{
+		name:        LetsEncryptEmail,
+		description: "Optional email address to provide to Let's Encrypt. Used to get certificate expiry notifications, etc.",
+	},
+	{
 		name:         LogLevelFlag,
 		description:  "Log level. Either debug, info, warn, or error.",
 		defaultValue: DefaultLogLevel,
@@ -198,6 +204,11 @@ var boolFlags = []boolFlag{
 		description: "Allow repositories to use atlantis.yaml files to customize the commands Atlantis runs." +
 			" Should only be enabled in a trusted environment since it enables a pull request to run arbitrary commands" +
 			" on the Atlantis server.",
+		defaultValue: false,
+	},
+	{
+		name:         LetsEncrypt,
+		description:  "Enable automatic HTTPS configuration via Let's Encrypt",
 		defaultValue: false,
 	},
 	{
