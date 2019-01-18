@@ -54,5 +54,15 @@ Webhook secrets ensure that the webhook requests are actually coming from your V
 
 ### SSL/HTTPS
 If you're using webhook secrets but your traffic is over HTTP then the webhook secrets
-could be stolen. Enable SSL/HTTPS using the `--ssl-cert-file` and `--ssl-key-file`
-flags.
+could be stolen.
+
+#### Provide Your Own Certs
+
+Enable SSL/HTTPS using the `--ssl-cert-file` and `--ssl-key-file` CLI flags.
+
+#### Automatic SSL via Let's Encrypt
+
+Pass the CLI flag `--lets-encrypt`. Optionally pass `--lets-encrypt-email` to receive expiry notifications.
+
+For automatic verification to function, ensure that Atlantis is reachable from the public Internet at `--atlantis-url` and
+that `--port` is set to `443`.

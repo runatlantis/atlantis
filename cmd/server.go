@@ -207,8 +207,10 @@ var boolFlags = []boolFlag{
 		defaultValue: false,
 	},
 	{
-		name:         LetsEncrypt,
-		description:  "Enable automatic HTTPS configuration via Let's Encrypt",
+		name: LetsEncrypt,
+		description: "Enable automatic HTTPS configuration via Let's Encrypt. Atlantis must be reachable on the public " +
+			"Internet at the provided Atlantis URL, port 443. Typically that means setting 'atlantis-url' to HTTPS and " +
+			"'port' to 443.",
 		defaultValue: false,
 	},
 	{
