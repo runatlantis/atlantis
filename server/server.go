@@ -47,6 +47,7 @@ import (
 	"github.com/runatlantis/atlantis/server/static"
 	"github.com/urfave/cli"
 	"github.com/urfave/negroni"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 const (
@@ -64,6 +65,7 @@ const (
 type Server struct {
 	AtlantisVersion    string
 	AtlantisURL        *url.URL
+	AutocertManager    *autocert.Manager
 	Router             *mux.Router
 	Port               int
 	CommandRunner      *events.DefaultCommandRunner
@@ -298,9 +300,19 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		VCSClient:                    vcsClient,
 		BitbucketWebhookSecret:       []byte(userConfig.BitbucketWebhookSecret),
 	}
+	var autocertManager *autocert.Manager
+	if userConfig.LetsEncrypt {
+		autocertManager = &autocert.Manager{
+			Cache:      autocert.DirCache(fmt.Sprintf("%s/acme", userConfig.DataDir)),
+			Email:      userConfig.LetsEncryptEmail,
+			Prompt:     autocert.AcceptTOS,
+			HostPolicy: autocert.HostWhitelist(parsedURL.Hostname()),
+		}
+	}
 	return &Server{
 		AtlantisVersion:    config.AtlantisVersion,
 		AtlantisURL:        parsedURL,
+		AutocertManager:    autocertManager,
 		Router:             underlyingRouter,
 		Port:               userConfig.Port,
 		CommandRunner:      commandRunner,
@@ -345,8 +357,17 @@ func (s *Server) Start() error {
 
 		var err error
 		if s.SSLCertFile != "" && s.SSLKeyFile != "" {
+			// Prefer provided SSL cert
 			err = server.ListenAndServeTLS(s.SSLCertFile, s.SSLKeyFile)
+
+		} else if s.AutocertManager != nil {
+			// Then SSL via Let's Encrypt
+			server.Addr = ":https"
+			server.TLSConfig = s.AutocertManager.TLSConfig()
+			err = server.ListenAndServeTLS("", "")
+
 		} else {
+			// Otherwise serve HTTP
 			err = server.ListenAndServe()
 		}
 
