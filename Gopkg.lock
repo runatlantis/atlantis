@@ -51,7 +51,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:a9f44d1fa39a286f0f9cf4a274667810e7c0b7fbd2ff98d21e3900f43fa7ac29"
+  digest = "1:b720609f1709b65be0d7a8fd810fa2e87f877aeaca7db7b642ad318cb707c5a8"
   name = "github.com/docker/docker"
   packages = ["pkg/fileutils"]
   pruneopts = "UT"
@@ -438,9 +438,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:b45bdff0b14568a4419b3e2f6485ad1667b4bfcf1581972fe619ee5962308939"
+  digest = "1:0fb5fd549743e2bc93f09506649606eea419541cb7a9e0b94bf4d97a61dbaa09"
   name = "golang.org/x/crypto"
   packages = [
+    "acme",
+    "acme/autocert",
     "pbkdf2",
     "scrypt",
     "ssh/terminal",
@@ -559,6 +561,7 @@
     "github.com/spf13/viper",
     "github.com/urfave/cli",
     "github.com/urfave/negroni",
+    "golang.org/x/crypto/acme/autocert",
     "golang.org/x/crypto/ssh/terminal",
     "gopkg.in/go-playground/validator.v9",
     "gopkg.in/yaml.v2",
