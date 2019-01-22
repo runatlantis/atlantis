@@ -203,7 +203,6 @@ func (l *SimpleLogger) levelToString(level LogLevel) string {
 
 // callSite returns the location of the caller of this function via its
 // filename and line number. skip is the number of stack frames to skip.
-// nolint: unparam
 func (l *SimpleLogger) callSite(skip int) (string, int) {
 	_, file, line, ok := runtime.Caller(skip)
 	if !ok {

@@ -42,6 +42,5 @@ func (a *NotConfiguredVCSClient) UpdateStatus(repo models.Repo, pull models.Pull
 	return a.err()
 }
 func (a *NotConfiguredVCSClient) err() error {
-	//noinspection GoErrorStringFormat
-	return fmt.Errorf("Atlantis was not configured to support repos from %s", a.Host.String())
+	return fmt.Errorf("atlantis was not configured to support repos from %s", a.Host.String())
 }

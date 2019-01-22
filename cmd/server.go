@@ -462,7 +462,7 @@ func (s *ServerCmd) setAtlantisURL(userConfig *server.UserConfig) error {
 	if userConfig.AtlantisURL == "" {
 		hostname, err := os.Hostname()
 		if err != nil {
-			return fmt.Errorf("Failed to determine hostname: %v", err)
+			return errors.Wrap(err, "failed to determine hostname")
 		}
 		userConfig.AtlantisURL = fmt.Sprintf("http://%s:%d", hostname, userConfig.Port)
 	}

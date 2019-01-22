@@ -136,7 +136,6 @@ func createAtlantisWebhook(g *GithubClient, ownerName string, repoName string, h
 	return hook.GetID(), nil
 }
 
-// nolint: unparam
 func deleteAtlantisHook(g *GithubClient, ownerName string, repoName string, hookID int64) error {
 	_, err := g.client.Repositories.DeleteHook(g.ctx, ownerName, repoName, hookID)
 	if err != nil {

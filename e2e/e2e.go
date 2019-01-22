@@ -158,7 +158,6 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	return e2eResult, nil
 }
 
-// nolint: unparam
 func getAtlantisStatus(t *E2ETester, branchName string) (string, error) {
 	// check repo status
 	combinedStatus, _, err := t.githubClient.client.Repositories.GetCombinedStatus(t.githubClient.ctx, t.ownerName, t.repoName, branchName, nil)
@@ -184,7 +183,6 @@ func checkStatus(state string) bool {
 	return true
 }
 
-// nolint: unparam
 func cleanUp(t *E2ETester, pullRequestNumber int, branchName string) error {
 	// clean up
 	pullClosed, _, err := t.githubClient.client.PullRequests.Edit(t.githubClient.ctx, t.ownerName, t.repoName, pullRequestNumber, &github.PullRequest{State: github.String("closed")})
