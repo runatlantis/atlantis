@@ -10,36 +10,39 @@ to use Terraform Enterprise (TFE). Read [TODO: use right link](https://www.terra
 for more information on how to migrate.
 
 ## Configuring Atlantis
-Once you've migrated your state to TFE, and your code is using the TFE backend:
+Once you've migrated your state to TFE, and your code is using the TFE backend,
+you're ready to configure Atlantis.
 
-```bash
-# Example configuration
-terraform {
-  backend "remote" {
-    organization = "company"
-    workspaces {
-      name = "my-app-prod"
-    }
-  }
+Atlantis needs a TFE Token that it will use to access the TFE API.
+Using a **Team Token is recommended**, however you can also use a User Token.
+
+### Team Token
+To generate a team token, click on **Settings** in the top bar, then **Teams** in
+the sidebar, then scroll down to **Team API Token**.
+
+### User Token
+To generate a user token, click on your avatar, then **User Settings**, then
+**Tokens** in the sidebar.
+
+### Passing The Token To Atlantis
+The token can be passed to Atlantis via the `ATLANTIS_TFE_TOKEN` environment variable.
+
+You can also use the `--tfe-token` flag, however your token would then be easily
+viewable in the process list.
+
+That's it! Atlantis should be able to perform Terraform operations using TFE's
+remote state backend now.
+
+:::tip NOTE
+Under the hood, Atlantis is generating a `~/.terraformrc` file.
+If you already had a `~/.terraformrc` file, then you'll need to manually
+add the credentials block:
+```
+...
+credentials "app.terraform.io" {
+  token = "xxxx"
 }
 ```
-
-You need to provide Atlantis with a TFE [User Token](https://www.terraform.io/docs/enterprise/users-teams-organizations/users.html#api-tokens)
-that it will use to access the TFE API.
-
-You can provide this token by either:
-1. Setting the `--tfe-token` flag, or the `ATLANTIS_TFE_TOKEN` environment variable
-1. Creating a `.terraformrc` file in the home directory of whichever user is executing Atlantis
-    with the following contents:
-    ```json
-    credentials "app.terraform.io" {
-      token = "xxxxxx.hunter2.zzzzzzzzzzzzz"
-    }
-    ```
-
-Notes:
-* If you specify the `--tfe-token` or `ATLANTIS_TFE_TOKEN` environment variable,
-    on startup, Atlantis will generate a config file to `~/.terraformrc`. If
-    this file already exists, Atlantis will error.
-* If you're using the Atlantis Docker image, the `.terraformrc` file should be
-   placed in `/home/atlantis/.terraformrc`
+Instead of using the `ATLANTIS_TFE_TOKEN` environment variable since Atlantis
+won't overwrite your `.terraformrc` file.
+:::
