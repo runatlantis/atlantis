@@ -24,18 +24,6 @@ jobs:
     # We don't run e2e tests on fork PRs because they don't have access to the secret env vars.
     - run: if [ -z "${CIRCLE_PR_REPONAME}" ]; then ./scripts/e2e.sh; fi
 
-  # Check the website that this PR creates for broken links.
-  website_link_check:
-    docker:
-    - image: lkysow/netlify-broken-link-checker:latest
-    environment:
-      GITHUB_ORG: runatlantis
-      GITHUB_REPO: atlantis
-      MUFFET_ARGS: '-e https://github\.com/runatlantis/atlantis/edit/master/.* -e https://github.com/helm/charts/tree/master/stable/atlantis#customization'
-      DELAY_SECONDS: 30
-    steps:
-    - run: check-links
-
   # Build and push 'latest' Docker tag.
   docker_master:
     working_directory: /go/src/github.com/runatlantis/atlantis
@@ -89,10 +77,6 @@ workflows:
         filters:
           branches:
             ignore: /.*-docs/
-    - website_link_check:
-        filters:
-          branches:
-            ignore: master
     - docker_master:
         requires: [e2e]
         filters:
