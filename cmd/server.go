@@ -175,7 +175,7 @@ var stringFlags = []stringFlag{
 	},
 	{
 		name:        SlackTokenFlag,
-		description: "API token for Slack notifications",
+		description: "API token for Slack notifications.",
 	},
 	{
 		name:        SSLCertFileFlag,
@@ -512,26 +512,4 @@ func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 	if userConfig.GitlabUser != "" && userConfig.GitlabWebhookSecret == "" && !s.SilenceOutput {
 		s.Logger.Warn("no GitLab webhook secret set. This could allow attackers to spoof requests from GitLab")
 	}
-	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL != DefaultBitbucketBaseURL && userConfig.BitbucketWebhookSecret == "" && !s.SilenceOutput {
-		s.Logger.Warn("no Bitbucket webhook secret set. This could allow attackers to spoof requests from Bitbucket")
-	}
-	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && !s.SilenceOutput {
-		s.Logger.Warn("Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are whitelisting Bitbucket IPs")
-	}
-}
-
-// withErrPrint prints out any cmd errors to stderr.
-func (s *ServerCmd) withErrPrint(f func(*cobra.Command, []string) error) func(*cobra.Command, []string) error {
-	return func(cmd *cobra.Command, args []string) error {
-		err := f(cmd, args)
-		if err != nil && !s.SilenceOutput {
-			s.printErr(err)
-		}
-		return err
-	}
-}
-
-// printErr prints err to stderr using a red terminal colour.
-func (s *ServerCmd) printErr(err error) {
-	fmt.Fprintf(os.Stderr, "%sError: %s%s\n", "\033[31m", err.Error(), "\033[39m")
-}
+	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL != 
