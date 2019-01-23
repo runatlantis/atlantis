@@ -178,10 +178,10 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 			ProjectResults: results})
 }
 
-func (c *DefaultCommandRunner) runProjectCmds(cmds []models.ProjectCommandContext, cmdName CommandName) []ProjectResult {
-	var results []ProjectResult
+func (c *DefaultCommandRunner) runProjectCmds(cmds []models.ProjectCommandContext, cmdName CommandName) []models.ProjectResult {
+	var results []models.ProjectResult
 	for _, pCmd := range cmds {
-		var res ProjectResult
+		var res models.ProjectResult
 		switch cmdName {
 		case PlanCommand:
 			res = c.ProjectCommandRunner.Plan(pCmd)

@@ -85,7 +85,7 @@ func (m *MarkdownRenderer) Render(res CommandResult, cmdName CommandName, log st
 	return m.renderProjectResults(res.ProjectResults, common, vcsHost)
 }
 
-func (m *MarkdownRenderer) renderProjectResults(results []ProjectResult, common CommonData, vcsHost models.VCSHostType) string {
+func (m *MarkdownRenderer) renderProjectResults(results []models.ProjectResult, common CommonData, vcsHost models.VCSHostType) string {
 	var resultsTmplData []projectResultTmplData
 	numPlanSuccesses := 0
 
