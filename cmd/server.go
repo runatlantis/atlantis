@@ -60,6 +60,7 @@ const (
 	RequireApprovalFlag        = "require-approval"
 	RequireMergeableFlag       = "require-mergeable"
 	SilenceWhitelistErrorsFlag = "silence-whitelist-errors"
+	SlackTokenFlag             = "slack-token"
 	SSLCertFileFlag            = "ssl-cert-file"
 	SSLKeyFileFlag             = "ssl-key-file"
 	TFETokenFlag               = "tfe-token"
@@ -171,6 +172,10 @@ var stringFlags = []stringFlag{
 			"The format is {hostname}/{owner}/{repo}, ex. github.com/runatlantis/atlantis. '*' matches any characters until the next comma and can be used for example to whitelist " +
 			"all repos: '*' (not recommended), an entire hostname: 'internalgithub.com/*' or an organization: 'github.com/runatlantis/*'." +
 			" For Bitbucket Server, {hostname} is the domain without scheme and port, {owner} is the name of the project (not the key), and {repo} is the repo name.",
+	},
+	{
+		name:        SlackTokenFlag,
+		description: "API token for Slack notifications.",
 	},
 	{
 		name:        SSLCertFileFlag,

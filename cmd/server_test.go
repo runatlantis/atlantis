@@ -356,6 +356,7 @@ func TestExecute_Defaults(t *testing.T) {
 	Equals(t, 4141, passedConfig.Port)
 	Equals(t, false, passedConfig.RequireApproval)
 	Equals(t, false, passedConfig.RequireMergeable)
+	Equals(t, "", passedConfig.SlackToken)
 	Equals(t, "", passedConfig.SSLCertFile)
 	Equals(t, "", passedConfig.SSLKeyFile)
 	Equals(t, "", passedConfig.TFEToken)
@@ -456,6 +457,7 @@ func TestExecute_Flags(t *testing.T) {
 		cmd.RepoWhitelistFlag:          "github.com/runatlantis/atlantis",
 		cmd.RequireApprovalFlag:        true,
 		cmd.RequireMergeableFlag:       true,
+		cmd.SlackTokenFlag:             "slack-token",
 		cmd.SSLCertFileFlag:            "cert-file",
 		cmd.SSLKeyFileFlag:             "key-file",
 		cmd.TFETokenFlag:               "my-token",
@@ -485,6 +487,7 @@ func TestExecute_Flags(t *testing.T) {
 	Equals(t, "github.com/runatlantis/atlantis", passedConfig.RepoWhitelist)
 	Equals(t, true, passedConfig.RequireApproval)
 	Equals(t, true, passedConfig.RequireMergeable)
+	Equals(t, "slack-token", passedConfig.SlackToken)
 	Equals(t, "cert-file", passedConfig.SSLCertFile)
 	Equals(t, "key-file", passedConfig.SSLKeyFile)
 	Equals(t, "my-token", passedConfig.TFEToken)
@@ -515,6 +518,7 @@ port: 8181
 repo-whitelist: "github.com/runatlantis/atlantis"
 require-approval: true
 require-mergeable: true
+slack-token: slack-token
 ssl-cert-file: cert-file
 ssl-key-file: key-file
 tfe-token: my-token
@@ -548,6 +552,7 @@ tfe-token: my-token
 	Equals(t, "github.com/runatlantis/atlantis", passedConfig.RepoWhitelist)
 	Equals(t, true, passedConfig.RequireApproval)
 	Equals(t, true, passedConfig.RequireMergeable)
+	Equals(t, "slack-token", passedConfig.SlackToken)
 	Equals(t, "cert-file", passedConfig.SSLCertFile)
 	Equals(t, "key-file", passedConfig.SSLKeyFile)
 	Equals(t, "my-token", passedConfig.TFEToken)
@@ -577,9 +582,10 @@ log-level: "debug"
 port: 8181
 repo-whitelist: "github.com/runatlantis/atlantis"
 require-approval: true
+slack-token: slack-token
 ssl-cert-file: cert-file
 ssl-key-file: key-file
-ssl-key-file: my-token
+tfe-token: my-token
 `)
 	defer os.Remove(tmpFile) // nolint: errcheck
 
@@ -607,6 +613,7 @@ ssl-key-file: my-token
 		"REPO_WHITELIST":           "override,override",
 		"REQUIRE_APPROVAL":         "false",
 		"REQUIRE_MERGEABLE":        "false",
+		"SLACK_TOKEN":              "override-slack-token",
 		"SSL_CERT_FILE":            "override-cert-file",
 		"SSL_KEY_FILE":             "override-key-file",
 		"TFE_TOKEN":                "override-my-token",
@@ -640,6 +647,7 @@ ssl-key-file: my-token
 	Equals(t, "override,override", passedConfig.RepoWhitelist)
 	Equals(t, false, passedConfig.RequireApproval)
 	Equals(t, false, passedConfig.RequireMergeable)
+	Equals(t, "override-slack-token", passedConfig.SlackToken)
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
 	Equals(t, "override-key-file", passedConfig.SSLKeyFile)
 	Equals(t, "override-my-token", passedConfig.TFEToken)
@@ -670,6 +678,7 @@ port: 8181
 repo-whitelist: "github.com/runatlantis/atlantis"
 require-approval: true
 require-mergeable: true
+slack-token: slack-token
 ssl-cert-file: cert-file
 ssl-key-file: key-file
 tfe-token: my-token
@@ -699,6 +708,7 @@ tfe-token: my-token
 		cmd.RepoWhitelistFlag:          "override,override",
 		cmd.RequireApprovalFlag:        false,
 		cmd.RequireMergeableFlag:       false,
+		cmd.SlackTokenFlag:             "override-slack-token",
 		cmd.SSLCertFileFlag:            "override-cert-file",
 		cmd.SSLKeyFileFlag:             "override-key-file",
 		cmd.TFETokenFlag:               "override-my-token",
@@ -726,9 +736,11 @@ tfe-token: my-token
 	Equals(t, "override,override", passedConfig.RepoWhitelist)
 	Equals(t, false, passedConfig.RequireApproval)
 	Equals(t, false, passedConfig.RequireMergeable)
+	Equals(t, "override-slack-token", passedConfig.SlackToken)
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
 	Equals(t, "override-key-file", passedConfig.SSLKeyFile)
 	Equals(t, "override-my-token", passedConfig.TFEToken)
+
 }
 
 func TestExecute_FlagEnvVarOverride(t *testing.T) {
@@ -757,6 +769,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		"REPO_WHITELIST":           "*",
 		"REQUIRE_APPROVAL":         "true",
 		"REQUIRE_MERGEABLE":        "true",
+		"SLACK_TOKEN":              "slack-token",
 		"SSL_CERT_FILE":            "cert-file",
 		"SSL_KEY_FILE":             "key-file",
 		"TFE_TOKEN":                "my-token",
@@ -794,6 +807,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		cmd.RepoWhitelistFlag:          "override,override",
 		cmd.RequireApprovalFlag:        false,
 		cmd.RequireMergeableFlag:       false,
+		cmd.SlackTokenFlag:             "override-slack-token",
 		cmd.SSLCertFileFlag:            "override-cert-file",
 		cmd.SSLKeyFileFlag:             "override-key-file",
 		cmd.TFETokenFlag:               "override-my-token",
@@ -823,6 +837,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	Equals(t, "override,override", passedConfig.RepoWhitelist)
 	Equals(t, false, passedConfig.RequireApproval)
 	Equals(t, false, passedConfig.RequireMergeable)
+	Equals(t, "override-slack-token", passedConfig.SlackToken)
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
 	Equals(t, "override-key-file", passedConfig.SSLKeyFile)
 	Equals(t, "override-my-token", passedConfig.TFEToken)
