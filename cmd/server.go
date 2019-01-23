@@ -175,7 +175,7 @@ var stringFlags = []stringFlag{
 	},
 	{
 		name:        SlackTokenFlag,
-		description: "API token for Slack notifications",
+		description: "API token for Slack notifications.",
 	},
 	{
 		name:        SSLCertFileFlag,
