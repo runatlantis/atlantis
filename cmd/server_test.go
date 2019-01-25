@@ -333,6 +333,7 @@ func TestExecute_Defaults(t *testing.T) {
 	Equals(t, "http://"+hostname+":4141", passedConfig.AtlantisURL)
 	Equals(t, false, passedConfig.AllowForkPRs)
 	Equals(t, false, passedConfig.AllowRepoConfig)
+	Equals(t, false, passedConfig.Automerge)
 
 	// Get our home dir since that's what gets defaulted to
 	dataDir, err := homedir.Expand("~/.atlantis")
@@ -438,6 +439,7 @@ func TestExecute_Flags(t *testing.T) {
 		cmd.AtlantisURLFlag:            "url",
 		cmd.AllowForkPRsFlag:           true,
 		cmd.AllowRepoConfigFlag:        true,
+		cmd.AutomergeFlag:              true,
 		cmd.BitbucketBaseURLFlag:       "https://bitbucket-base-url.com",
 		cmd.BitbucketTokenFlag:         "bitbucket-token",
 		cmd.BitbucketUserFlag:          "bitbucket-user",
@@ -468,6 +470,7 @@ func TestExecute_Flags(t *testing.T) {
 	Equals(t, "url", passedConfig.AtlantisURL)
 	Equals(t, true, passedConfig.AllowForkPRs)
 	Equals(t, true, passedConfig.AllowRepoConfig)
+	Equals(t, true, passedConfig.Automerge)
 	Equals(t, "https://bitbucket-base-url.com", passedConfig.BitbucketBaseURL)
 	Equals(t, "bitbucket-token", passedConfig.BitbucketToken)
 	Equals(t, "bitbucket-user", passedConfig.BitbucketUser)
@@ -499,6 +502,7 @@ func TestExecute_ConfigFile(t *testing.T) {
 atlantis-url: "url"
 allow-fork-prs: true
 allow-repo-config: true
+automerge: true
 bitbucket-base-url: "https://mydomain.com"
 bitbucket-token: "bitbucket-token"
 bitbucket-user: "bitbucket-user"
@@ -533,6 +537,7 @@ tfe-token: my-token
 	Equals(t, "url", passedConfig.AtlantisURL)
 	Equals(t, true, passedConfig.AllowForkPRs)
 	Equals(t, true, passedConfig.AllowRepoConfig)
+	Equals(t, true, passedConfig.Automerge)
 	Equals(t, "https://mydomain.com", passedConfig.BitbucketBaseURL)
 	Equals(t, "bitbucket-token", passedConfig.BitbucketToken)
 	Equals(t, "bitbucket-user", passedConfig.BitbucketUser)
@@ -564,6 +569,7 @@ func TestExecute_EnvironmentOverride(t *testing.T) {
 atlantis-url: "url"
 allow-fork-prs: true
 allow-repo-config: true
+automerge: true
 bitbucket-base-url: "https://mydomain.com"
 bitbucket-token: "bitbucket-token"
 bitbucket-user: "bitbucket-user"
@@ -594,6 +600,7 @@ tfe-token: my-token
 		"ATLANTIS_URL":             "override-url",
 		"ALLOW_FORK_PRS":           "false",
 		"ALLOW_REPO_CONFIG":        "false",
+		"AUTOMERGE":                "false",
 		"BITBUCKET_BASE_URL":       "https://override-bitbucket-base-url",
 		"BITBUCKET_TOKEN":          "override-bitbucket-token",
 		"BITBUCKET_USER":           "override-bitbucket-user",
@@ -628,6 +635,7 @@ tfe-token: my-token
 	Equals(t, "override-url", passedConfig.AtlantisURL)
 	Equals(t, false, passedConfig.AllowForkPRs)
 	Equals(t, false, passedConfig.AllowRepoConfig)
+	Equals(t, false, passedConfig.Automerge)
 	Equals(t, "https://override-bitbucket-base-url", passedConfig.BitbucketBaseURL)
 	Equals(t, "override-bitbucket-token", passedConfig.BitbucketToken)
 	Equals(t, "override-bitbucket-user", passedConfig.BitbucketUser)
@@ -659,6 +667,7 @@ func TestExecute_FlagConfigOverride(t *testing.T) {
 atlantis-url: "url"
 allow-fork-prs: true
 allow-repo-config: true
+automerge: true
 bitbucket-base-url: "https://bitbucket-base-url"
 bitbucket-token: "bitbucket-token"
 bitbucket-user: "bitbucket-user"
@@ -689,6 +698,7 @@ tfe-token: my-token
 		cmd.AtlantisURLFlag:            "override-url",
 		cmd.AllowForkPRsFlag:           false,
 		cmd.AllowRepoConfigFlag:        false,
+		cmd.AutomergeFlag:              false,
 		cmd.BitbucketBaseURLFlag:       "https://override-bitbucket-base-url",
 		cmd.BitbucketTokenFlag:         "override-bitbucket-token",
 		cmd.BitbucketUserFlag:          "override-bitbucket-user",
@@ -717,6 +727,7 @@ tfe-token: my-token
 	Ok(t, err)
 	Equals(t, "override-url", passedConfig.AtlantisURL)
 	Equals(t, false, passedConfig.AllowForkPRs)
+	Equals(t, false, passedConfig.Automerge)
 	Equals(t, "https://override-bitbucket-base-url", passedConfig.BitbucketBaseURL)
 	Equals(t, "override-bitbucket-token", passedConfig.BitbucketToken)
 	Equals(t, "override-bitbucket-user", passedConfig.BitbucketUser)
@@ -750,6 +761,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		"ATLANTIS_URL":             "url",
 		"ALLOW_FORK_PRS":           "true",
 		"ALLOW_REPO_CONFIG":        "true",
+		"AUTOMERGE":                "true",
 		"BITBUCKET_BASE_URL":       "https://bitbucket-base-url",
 		"BITBUCKET_TOKEN":          "bitbucket-token",
 		"BITBUCKET_USER":           "bitbucket-user",
@@ -788,6 +800,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		cmd.AtlantisURLFlag:            "override-url",
 		cmd.AllowForkPRsFlag:           false,
 		cmd.AllowRepoConfigFlag:        false,
+		cmd.AutomergeFlag:              false,
 		cmd.BitbucketBaseURLFlag:       "https://override-bitbucket-base-url",
 		cmd.BitbucketTokenFlag:         "override-bitbucket-token",
 		cmd.BitbucketUserFlag:          "override-bitbucket-user",
@@ -818,6 +831,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	Equals(t, "override-url", passedConfig.AtlantisURL)
 	Equals(t, false, passedConfig.AllowForkPRs)
 	Equals(t, false, passedConfig.AllowRepoConfig)
+	Equals(t, false, passedConfig.Automerge)
 	Equals(t, "https://override-bitbucket-base-url", passedConfig.BitbucketBaseURL)
 	Equals(t, "override-bitbucket-token", passedConfig.BitbucketToken)
 	Equals(t, "override-bitbucket-user", passedConfig.BitbucketUser)
