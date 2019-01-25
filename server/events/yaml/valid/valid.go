@@ -11,6 +11,7 @@ type Config struct {
 	Version   int
 	Projects  []Project
 	Workflows map[string]Workflow
+	Automerge bool
 }
 
 func (c Config) GetPlanStage(workflowName string) *Stage {
