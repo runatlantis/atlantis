@@ -69,6 +69,11 @@ type DefaultCommandRunner struct {
 	AllowForkPRsFlag      string
 	ProjectCommandBuilder ProjectCommandBuilder
 	ProjectCommandRunner  ProjectCommandRunner
+	// RequireAllPlansSucceed is true if we require all plans succeed in each
+	// run. If all plans don't succeed, we delete the ones that did.
+	RequireAllPlansSucceed bool
+	PendingPlanFinder      PendingPlanFinder
+	WorkingDir             WorkingDir
 }
 
 // RunAutoplanCommand runs plan when a pull request is opened or updated.
@@ -102,8 +107,12 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		return
 	}
 
-	results := c.runProjectCmds(projectCmds, PlanCommand)
-	c.updatePull(ctx, AutoplanCommand{}, CommandResult{ProjectResults: results})
+	result := c.runProjectCmds(projectCmds, PlanCommand)
+	if c.RequireAllPlansSucceed && result.HasErrors() {
+		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
+		c.deletePlans(ctx)
+	}
+	c.updatePull(ctx, AutoplanCommand{}, result)
 }
 
 // RunCommentCommand executes the command.
@@ -170,15 +179,38 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		c.updatePull(ctx, cmd, CommandResult{Error: err})
 		return
 	}
-	results := c.runProjectCmds(projectCmds, cmd.Name)
+	result := c.runProjectCmds(projectCmds, cmd.Name)
+	if cmd.Name == PlanCommand && c.RequireAllPlansSucceed && result.HasErrors() {
+		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
+		c.deletePlans(ctx)
+	}
 	c.updatePull(
 		ctx,
 		cmd,
-		CommandResult{
-			ProjectResults: results})
+		result)
+
+	//if err := c.DB.WriteResults(ctx.BaseRepo, ctx.Pull, result.ProjectResults); err != nil {
+	//	c.Logger.Err("writing results: %s", err)
+	//	return
+	//}
+	//
+	//if cmd.Name == ApplyCommand {
+	//	dbPull, err := c.DB.GetPull(ctx.Pull)
+	//	if err != nil {
+	//		c.Logger.Err("getting pull from db: %s", err)
+	//		return
+	//	}
+	//	for _, proj := range dbPull.Projects {
+	//		if proj.Status != "applied" {
+	//			log.Info("not automerging because >1 project not applied")
+	//			return
+	//		}
+	//	}
+	//	log.Info("ready to automerge!")
+	//}
 }
 
-func (c *DefaultCommandRunner) runProjectCmds(cmds []models.ProjectCommandContext, cmdName CommandName) []models.ProjectResult {
+func (c *DefaultCommandRunner) runProjectCmds(cmds []models.ProjectCommandContext, cmdName CommandName) CommandResult {
 	var results []models.ProjectResult
 	for _, pCmd := range cmds {
 		var res models.ProjectResult
@@ -190,7 +222,7 @@ func (c *DefaultCommandRunner) runProjectCmds(cmds []models.ProjectCommandContex
 		}
 		results = append(results, res)
 	}
-	return results
+	return CommandResult{ProjectResults: results}
 }
 
 func (c *DefaultCommandRunner) getGithubData(baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {
@@ -274,5 +306,16 @@ func (c *DefaultCommandRunner) logPanics(baseRepo models.Repo, pullNum int, logg
 		); commentErr != nil {
 			logger.Err("unable to comment: %s", commentErr)
 		}
+	}
+}
+
+// deletePlans deletes all plans generated in this ctx.
+func (c *DefaultCommandRunner) deletePlans(ctx *CommandContext) {
+	pullDir, err := c.WorkingDir.GetPullDir(ctx.BaseRepo, ctx.Pull)
+	if err != nil {
+		ctx.Log.Err("getting pull dir: %s", err)
+	}
+	if err := c.PendingPlanFinder.DeletePlans(pullDir); err != nil {
+		ctx.Log.Err("deleting pending plans: %s", err)
 	}
 }

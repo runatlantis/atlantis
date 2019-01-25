@@ -1,6 +1,7 @@
 package events_test
 
 import (
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -12,7 +13,7 @@ import (
 
 // If the dir doesn't exist should get an error.
 func TestPendingPlanFinder_FindNoDir(t *testing.T) {
-	pf := &events.PendingPlanFinder{}
+	pf := &events.DefaultPendingPlanFinder{}
 	_, err := pf.Find("/doesntexist")
 	ErrEquals(t, "open /doesntexist: no such file or directory", err)
 }
@@ -140,7 +141,7 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 		},
 	}
 
-	pf := &events.PendingPlanFinder{}
+	pf := &events.DefaultPendingPlanFinder{}
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			tmpDir, cleanup := DirStructure(t, c.files)
@@ -186,10 +187,53 @@ func TestPendingPlanFinder_FindPlanCheckedIn(t *testing.T) {
 	runCmd(t, repoDir, "git", "config", "--local", "user.name", "atlantisbot")
 	runCmd(t, repoDir, "git", "commit", "--no-gpg-sign", "-m", "initial commit")
 
-	pf := &events.PendingPlanFinder{}
+	pf := &events.DefaultPendingPlanFinder{}
 	actPlans, err := pf.Find(tmpDir)
 	Ok(t, err)
 	Equals(t, 0, len(actPlans))
+}
+
+// Test that it deletes pending plans.
+func TestPendingPlanFinder_DeletePlans(t *testing.T) {
+	files := map[string]interface{}{
+		"default": map[string]interface{}{
+			"dir1": map[string]interface{}{
+				"default.tfplan": nil,
+			},
+			"dir2": map[string]interface{}{
+				"default.tfplan": nil,
+			},
+		},
+	}
+	tmp, cleanup := DirStructure(t,
+		files)
+	defer cleanup()
+
+	// Create a git repo in each workspace directory.
+	for dirname, contents := range files {
+		// If contents is nil then this isn't a directory.
+		if contents != nil {
+			runCmd(t, filepath.Join(tmp, dirname), "git", "init")
+		}
+	}
+
+	pf := &events.DefaultPendingPlanFinder{}
+	Ok(t, pf.DeletePlans(tmp))
+
+	// First, check the files were deleted.
+	for _, plan := range []string{
+		"default/dir1/default.tfplan",
+		"default/dir2/default.tfplan",
+	} {
+		absPath := filepath.Join(tmp, plan)
+		_, err := os.Stat(absPath)
+		ErrContains(t, "no such file or directory", err)
+	}
+
+	// Double check by using Find().
+	foundPlans, err := pf.Find(tmp)
+	Ok(t, err)
+	Equals(t, 0, len(foundPlans))
 }
 
 func runCmd(t *testing.T, dir string, name string, args ...string) string {

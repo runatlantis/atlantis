@@ -14,6 +14,7 @@
 package models_test
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -252,6 +253,44 @@ func TestSplitRepoFullName(t *testing.T) {
 			owner, repo := models.SplitRepoFullName(c.input)
 			Equals(t, c.expOwner, owner)
 			Equals(t, c.expRepo, repo)
+		})
+	}
+}
+
+func TestProjectResult_IsSuccessful(t *testing.T) {
+	cases := map[string]struct {
+		pr  models.ProjectResult
+		exp bool
+	}{
+		"plan success": {
+			models.ProjectResult{
+				PlanSuccess: &models.PlanSuccess{},
+			},
+			true,
+		},
+		"apply success": {
+			models.ProjectResult{
+				ApplySuccess: "success",
+			},
+			true,
+		},
+		"failure": {
+			models.ProjectResult{
+				Failure: "failure",
+			},
+			false,
+		},
+		"error": {
+			models.ProjectResult{
+				Error: errors.New("error"),
+			},
+			false,
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			Equals(t, c.exp, c.pr.IsSuccessful())
 		})
 	}
 }
