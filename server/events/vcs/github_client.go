@@ -175,3 +175,21 @@ func (g *GithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 	_, _, err := g.client.Repositories.CreateStatus(g.ctx, repo.Owner, repo.Name, pull.HeadCommit, status)
 	return err
 }
+
+// MergePull merges the pull request.
+func (g *GithubClient) MergePull(pull models.PullRequest) error {
+	mergeResult, _, err := g.client.PullRequests.Merge(
+		g.ctx,
+		pull.BaseRepo.Owner,
+		pull.BaseRepo.Name,
+		pull.Num,
+		common.AutomergeCommitMsg,
+		nil)
+	if err != nil {
+		return errors.Wrap(err, "merging pull request")
+	}
+	if !mergeResult.GetMerged() {
+		return fmt.Errorf("could not merge pull request: %s", mergeResult.GetMessage())
+	}
+	return nil
+}

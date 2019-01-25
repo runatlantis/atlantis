@@ -1,8 +1,14 @@
+// Package common is used to share common code between all VCS clients without
+// running into circular dependency issues.
 package common
 
 import (
 	"math"
 )
+
+// AutomergeCommitMsg is the commit message Atlantis will use when automatically
+// merging pull requests.
+const AutomergeCommitMsg = "[Atlantis] Automatically merging after successful apply"
 
 // SplitComment splits comment into a slice of comments that are under maxSize.
 // It appends sepEnd to all comments that have a following comment.

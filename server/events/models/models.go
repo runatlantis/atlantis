@@ -330,3 +330,37 @@ func (p *ProjectCommandContext) GetProjectName() string {
 	}
 	return ""
 }
+
+// ProjectResult is the result of executing a plan/apply for a specific project.
+type ProjectResult struct {
+	RepoRelDir   string
+	Workspace    string
+	Error        error
+	Failure      string
+	PlanSuccess  *PlanSuccess
+	ApplySuccess string
+	ProjectName  string
+}
+
+// Status returns the vcs commit status of this project result.
+func (p ProjectResult) Status() CommitStatus {
+	if p.Error != nil {
+		return FailedCommitStatus
+	}
+	if p.Failure != "" {
+		return FailedCommitStatus
+	}
+	return SuccessCommitStatus
+}
+
+// PlanSuccess is the result of a successful plan.
+type PlanSuccess struct {
+	// TerraformOutput is the output from Terraform of running plan.
+	TerraformOutput string
+	// LockURL is the full URL to the lock held by this plan.
+	LockURL string
+	// RePlanCmd is the command that users should run to re-plan this project.
+	RePlanCmd string
+	// ApplyCmd is the command that users should run to apply this plan.
+	ApplyCmd string
+}

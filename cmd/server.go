@@ -39,6 +39,7 @@ const (
 	AllowForkPRsFlag           = "allow-fork-prs"
 	AllowRepoConfigFlag        = "allow-repo-config"
 	AtlantisURLFlag            = "atlantis-url"
+	AutomergeFlag              = "automerge"
 	BitbucketBaseURLFlag       = "bitbucket-base-url"
 	BitbucketTokenFlag         = "bitbucket-token"
 	BitbucketUserFlag          = "bitbucket-user"
@@ -203,6 +204,11 @@ var boolFlags = []boolFlag{
 		description: "Allow repositories to use atlantis.yaml files to customize the commands Atlantis runs." +
 			" Should only be enabled in a trusted environment since it enables a pull request to run arbitrary commands" +
 			" on the Atlantis server.",
+		defaultValue: false,
+	},
+	{
+		name:         AutomergeFlag,
+		description:  "Automatically merge pull requests when all plans are successfully applied.",
 		defaultValue: false,
 	},
 	{

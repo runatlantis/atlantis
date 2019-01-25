@@ -4,9 +4,8 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
-	events "github.com/runatlantis/atlantis/server/events"
-	models "github.com/runatlantis/atlantis/server/events/models"
+	"github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"reflect"
 	"time"
 )
@@ -19,31 +18,31 @@ func NewMockProjectCommandRunner() *MockProjectCommandRunner {
 	return &MockProjectCommandRunner{fail: pegomock.GlobalFailHandler}
 }
 
-func (mock *MockProjectCommandRunner) Plan(ctx models.ProjectCommandContext) events.ProjectResult {
+func (mock *MockProjectCommandRunner) Plan(ctx models.ProjectCommandContext) models.ProjectResult {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandRunner().")
 	}
 	params := []pegomock.Param{ctx}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("Plan", params, []reflect.Type{reflect.TypeOf((*events.ProjectResult)(nil)).Elem()})
-	var ret0 events.ProjectResult
+	result := pegomock.GetGenericMockFrom(mock).Invoke("Plan", params, []reflect.Type{reflect.TypeOf((*models.ProjectResult)(nil)).Elem()})
+	var ret0 models.ProjectResult
 	if len(result) != 0 {
 		if result[0] != nil {
-			ret0 = result[0].(events.ProjectResult)
+			ret0 = result[0].(models.ProjectResult)
 		}
 	}
 	return ret0
 }
 
-func (mock *MockProjectCommandRunner) Apply(ctx models.ProjectCommandContext) events.ProjectResult {
+func (mock *MockProjectCommandRunner) Apply(ctx models.ProjectCommandContext) models.ProjectResult {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandRunner().")
 	}
 	params := []pegomock.Param{ctx}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("Apply", params, []reflect.Type{reflect.TypeOf((*events.ProjectResult)(nil)).Elem()})
-	var ret0 events.ProjectResult
+	result := pegomock.GetGenericMockFrom(mock).Invoke("Apply", params, []reflect.Type{reflect.TypeOf((*models.ProjectResult)(nil)).Elem()})
+	var ret0 models.ProjectResult
 	if len(result) != 0 {
 		if result[0] != nil {
-			ret0 = result[0].(events.ProjectResult)
+			ret0 = result[0].(models.ProjectResult)
 		}
 	}
 	return ret0

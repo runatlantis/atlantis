@@ -105,6 +105,21 @@ func (mock *MockClientProxy) UpdateStatus(repo models.Repo, pull models.PullRequ
 	return ret0
 }
 
+func (mock *MockClientProxy) MergePull(pull models.PullRequest) error {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockClientProxy().")
+	}
+	params := []pegomock.Param{pull}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("MergePull", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(error)
+		}
+	}
+	return ret0
+}
+
 func (mock *MockClientProxy) VerifyWasCalledOnce() *VerifierClientProxy {
 	return &VerifierClientProxy{
 		mock:                   mock,
@@ -304,6 +319,33 @@ func (c *ClientProxy_UpdateStatus_OngoingVerification) GetAllCapturedArguments()
 		_param3 = make([]string, len(params[3]))
 		for u, param := range params[3] {
 			_param3[u] = param.(string)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierClientProxy) MergePull(pull models.PullRequest) *ClientProxy_MergePull_OngoingVerification {
+	params := []pegomock.Param{pull}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "MergePull", params, verifier.timeout)
+	return &ClientProxy_MergePull_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type ClientProxy_MergePull_OngoingVerification struct {
+	mock              *MockClientProxy
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *ClientProxy_MergePull_OngoingVerification) GetCapturedArguments() models.PullRequest {
+	pull := c.GetAllCapturedArguments()
+	return pull[len(pull)-1]
+}
+
+func (c *ClientProxy_MergePull_OngoingVerification) GetAllCapturedArguments() (_param0 []models.PullRequest) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]models.PullRequest, len(params[0]))
+		for u, param := range params[0] {
+			_param0[u] = param.(models.PullRequest)
 		}
 	}
 	return

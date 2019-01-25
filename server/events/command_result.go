@@ -13,9 +13,11 @@
 
 package events
 
+import "github.com/runatlantis/atlantis/server/events/models"
+
 // CommandResult is the result of running a Command.
 type CommandResult struct {
 	Error          error
 	Failure        string
-	ProjectResults []ProjectResult
+	ProjectResults []models.ProjectResult
 }
