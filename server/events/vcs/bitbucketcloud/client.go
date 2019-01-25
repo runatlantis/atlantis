@@ -172,6 +172,13 @@ func (b *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, status 
 	return err
 }
 
+// MergePull merges the pull request.
+func (b *Client) MergePull(pull models.PullRequest) error {
+	path := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/merge", b.BaseURL, pull.BaseRepo.FullName, pull.Num)
+	_, err := b.makeRequest("POST", path, nil)
+	return err
+}
+
 // prepRequest adds the HTTP basic auth.
 func (b *Client) prepRequest(method string, path string, body io.Reader) (*http.Request, error) {
 	req, err := http.NewRequest(method, path, body)

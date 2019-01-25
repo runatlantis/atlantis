@@ -26,4 +26,5 @@ type Client interface {
 	PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error)
 	PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error)
 	UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, description string) error
+	MergePull(pull models.PullRequest) error
 }

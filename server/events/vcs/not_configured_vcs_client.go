@@ -41,6 +41,9 @@ func (a *NotConfiguredVCSClient) PullIsMergeable(repo models.Repo, pull models.P
 func (a *NotConfiguredVCSClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, description string) error {
 	return a.err()
 }
+func (a *NotConfiguredVCSClient) MergePull(pull models.PullRequest) error {
+	return a.err()
+}
 func (a *NotConfiguredVCSClient) err() error {
 	return fmt.Errorf("atlantis was not configured to support repos from %s", a.Host.String())
 }
