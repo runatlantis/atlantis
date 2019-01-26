@@ -37,31 +37,41 @@ type MarkdownRenderer struct {
 	// using supports the CommonMark markdown format.
 	// If we're not configured with a GitLab client, this will be false.
 	GitlabSupportsCommonMark bool
+
+	// RequireAllPlansSucceed is true if we require all plans succeed in each
+	// run. If all plans don't succeed, we delete the ones that did.
+	RequireAllPlansSucceed bool
 }
 
-// CommonData is data that all responses have.
-type CommonData struct {
-	Command string
-	Verbose bool
-	Log     string
+// commonData is data that all responses have.
+type commonData struct {
+	Command      string
+	Verbose      bool
+	Log          string
+	PlansDeleted bool
 }
 
-// ErrData is data about an error response.
-type ErrData struct {
+// errData is data about an error response.
+type errData struct {
 	Error string
-	CommonData
+	commonData
 }
 
-// FailureData is data about a failure response.
-type FailureData struct {
+// failureData is data about a failure response.
+type failureData struct {
 	Failure string
-	CommonData
+	commonData
 }
 
-// ResultData is data about a successful response.
-type ResultData struct {
+// resultData is data about a successful response.
+type resultData struct {
 	Results []projectResultTmplData
-	CommonData
+	commonData
+}
+
+type planSuccessData struct {
+	models.PlanSuccess
+	PlanWasDeleted bool
 }
 
 type projectResultTmplData struct {
@@ -75,17 +85,22 @@ type projectResultTmplData struct {
 // nolint: interfacer
 func (m *MarkdownRenderer) Render(res CommandResult, cmdName CommandName, log string, verbose bool, vcsHost models.VCSHostType) string {
 	commandStr := strings.Title(cmdName.String())
-	common := CommonData{commandStr, verbose, log}
+	common := commonData{
+		Command:      commandStr,
+		Verbose:      verbose,
+		Log:          log,
+		PlansDeleted: m.RequireAllPlansSucceed && cmdName == PlanCommand && res.HasErrors(),
+	}
 	if res.Error != nil {
-		return m.renderTemplate(unwrappedErrWithLogTmpl, ErrData{res.Error.Error(), common})
+		return m.renderTemplate(unwrappedErrWithLogTmpl, errData{res.Error.Error(), common})
 	}
 	if res.Failure != "" {
-		return m.renderTemplate(failureWithLogTmpl, FailureData{res.Failure, common})
+		return m.renderTemplate(failureWithLogTmpl, failureData{res.Failure, common})
 	}
-	return m.renderProjectResults(res.ProjectResults, common, vcsHost)
+	return m.renderProjectResults(res.ProjectResults, common, vcsHost, m.RequireAllPlansSucceed && res.HasErrors())
 }
 
-func (m *MarkdownRenderer) renderProjectResults(results []models.ProjectResult, common CommonData, vcsHost models.VCSHostType) string {
+func (m *MarkdownRenderer) renderProjectResults(results []models.ProjectResult, common commonData, vcsHost models.VCSHostType, plansDeleted bool) string {
 	var resultsTmplData []projectResultTmplData
 	numPlanSuccesses := 0
 
@@ -117,9 +132,9 @@ func (m *MarkdownRenderer) renderProjectResults(results []models.ProjectResult, 
 			})
 		} else if result.PlanSuccess != nil {
 			if m.shouldUseWrappedTmpl(vcsHost, result.PlanSuccess.TerraformOutput) {
-				resultData.Rendered = m.renderTemplate(planSuccessWrappedTmpl, *result.PlanSuccess)
+				resultData.Rendered = m.renderTemplate(planSuccessWrappedTmpl, planSuccessData{PlanSuccess: *result.PlanSuccess, PlanWasDeleted: plansDeleted})
 			} else {
-				resultData.Rendered = m.renderTemplate(planSuccessUnwrappedTmpl, *result.PlanSuccess)
+				resultData.Rendered = m.renderTemplate(planSuccessUnwrappedTmpl, planSuccessData{PlanSuccess: *result.PlanSuccess, PlanWasDeleted: plansDeleted})
 			}
 			numPlanSuccesses++
 		} else if result.ApplySuccess != "" {
@@ -150,7 +165,7 @@ func (m *MarkdownRenderer) renderProjectResults(results []models.ProjectResult, 
 	default:
 		return "no template matched–this is a bug"
 	}
-	return m.renderTemplate(tmpl, ResultData{resultsTmplData, common})
+	return m.renderTemplate(tmpl, resultData{resultsTmplData, common})
 }
 
 // shouldUseWrappedTmpl returns true if we should use the wrapped markdown
@@ -198,7 +213,7 @@ var multiProjectPlanTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap
 		"{{ range $i, $result := .Results }}" +
 		"### {{add $i 1}}. {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n" +
 		"{{$result.Rendered}}\n\n" +
-		"---\n{{end}}{{ if gt (len .Results) 0 }}* :fast_forward: To **apply** all unapplied plans from this pull request, comment:\n" +
+		"---\n{{end}}{{ if and (gt (len .Results) 0) (not .PlansDeleted) }}* :fast_forward: To **apply** all unapplied plans from this pull request, comment:\n" +
 		"    * `atlantis apply`{{end}}" +
 		logTmpl))
 var multiProjectApplyTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
@@ -225,11 +240,11 @@ var planSuccessWrappedTmpl = template.Must(template.New("").Parse(
 
 // planNextSteps are instructions appended after successful plans as to what
 // to do next.
-var planNextSteps = "* :arrow_forward: To **apply** this plan, comment:\n" +
+var planNextSteps = "{{ if .PlanWasDeleted }}This plan was not saved because one or more projects failed and automerge requires all plans pass.{{ else }}* :arrow_forward: To **apply** this plan, comment:\n" +
 	"    * `{{.ApplyCmd}}`\n" +
 	"* :put_litter_in_its_place: To **delete** this plan click [here]({{.LockURL}})\n" +
 	"* :repeat: To **plan** this project again, comment:\n" +
-	"    * `{{.RePlanCmd}}`"
+	"    * `{{.RePlanCmd}}`{{end}}"
 var applyUnwrappedSuccessTmpl = template.Must(template.New("").Parse(
 	"```diff\n" +
 		"{{.Output}}\n" +

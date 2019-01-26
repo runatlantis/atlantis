@@ -174,6 +174,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	markdownRenderer := &events.MarkdownRenderer{
 		GitlabSupportsCommonMark: gitlabClient.SupportsCommonMark(),
+		RequireAllPlansSucceed:   userConfig.Automerge,
 	}
 	boltdb, err := boltdb.New(userConfig.DataDir)
 	if err != nil {
@@ -221,6 +222,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GitlabToken: userConfig.GitlabToken,
 	}
 	defaultTfVersion := terraformClient.Version()
+	pendingPlanFinder := &events.DefaultPendingPlanFinder{}
 	commandRunner := &events.DefaultCommandRunner{
 		VCSClient:                vcsClient,
 		GithubPullGetter:         githubClient,
@@ -239,7 +241,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			WorkingDirLocker:    workingDirLocker,
 			AllowRepoConfig:     userConfig.AllowRepoConfig,
 			AllowRepoConfigFlag: config.AllowRepoConfigFlag,
-			PendingPlanFinder:   &events.PendingPlanFinder{},
+			PendingPlanFinder:   pendingPlanFinder,
 			CommentBuilder:      commentParser,
 		},
 		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
@@ -267,6 +269,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			RequireApprovalOverride:  userConfig.RequireApproval,
 			RequireMergeableOverride: userConfig.RequireMergeable,
 		},
+		RequireAllPlansSucceed: userConfig.Automerge,
+		WorkingDir:             workingDir,
+		PendingPlanFinder:      pendingPlanFinder,
 	}
 	repoWhitelist, err := events.NewRepoWhitelistChecker(userConfig.RepoWhitelist)
 	if err != nil {

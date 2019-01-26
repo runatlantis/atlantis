@@ -50,7 +50,7 @@ type DefaultProjectCommandBuilder struct {
 	WorkingDirLocker    WorkingDirLocker
 	AllowRepoConfig     bool
 	AllowRepoConfigFlag string
-	PendingPlanFinder   *PendingPlanFinder
+	PendingPlanFinder   *DefaultPendingPlanFinder
 	CommentBuilder      CommentBuilder
 }
 

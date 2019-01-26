@@ -353,6 +353,14 @@ func (p ProjectResult) Status() CommitStatus {
 	return SuccessCommitStatus
 }
 
+// IsSuccessful returns true if this project result had no errors.
+func (p ProjectResult) IsSuccessful() bool {
+	if p.PlanSuccess != nil || p.ApplySuccess != "" {
+		return true
+	}
+	return false
+}
+
 // PlanSuccess is the result of a successful plan.
 type PlanSuccess struct {
 	// TerraformOutput is the output from Terraform of running plan.

@@ -931,3 +931,109 @@ $$$
 	expWithBackticks := strings.Replace(exp, "$", "`", -1)
 	Equals(t, expWithBackticks, rendered)
 }
+
+// Test rendering when there was an error in one of the plans and we require
+// all plans to succeed.
+func TestRenderProjectResults_PlansDeleted(t *testing.T) {
+	cases := map[string]struct {
+		cr  events.CommandResult
+		exp string
+	}{
+		"one failure": {
+			cr: events.CommandResult{
+				ProjectResults: []models.ProjectResult{
+					{
+						RepoRelDir: ".",
+						Workspace:  "staging",
+						Failure:    "failure",
+					},
+				},
+			},
+			exp: `Ran Plan for dir: $.$ workspace: $staging$
+
+**Plan Failed**: failure
+
+`,
+		},
+		"two failures": {
+			cr: events.CommandResult{
+				ProjectResults: []models.ProjectResult{
+					{
+						RepoRelDir: ".",
+						Workspace:  "staging",
+						Failure:    "failure",
+					},
+					{
+						RepoRelDir: ".",
+						Workspace:  "production",
+						Failure:    "failure",
+					},
+				},
+			},
+			exp: `Ran Plan for 2 projects:
+1. dir: $.$ workspace: $staging$
+1. dir: $.$ workspace: $production$
+
+### 1. dir: $.$ workspace: $staging$
+**Plan Failed**: failure
+
+---
+### 2. dir: $.$ workspace: $production$
+**Plan Failed**: failure
+
+---
+
+`,
+		},
+		"one failure, one success": {
+			cr: events.CommandResult{
+				ProjectResults: []models.ProjectResult{
+					{
+						RepoRelDir: ".",
+						Workspace:  "staging",
+						Failure:    "failure",
+					},
+					{
+						RepoRelDir: ".",
+						Workspace:  "production",
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "tf out",
+							LockURL:         "lock-url",
+							RePlanCmd:       "re-plan cmd",
+							ApplyCmd:        "apply cmd",
+						},
+					},
+				},
+			},
+			exp: `Ran Plan for 2 projects:
+1. dir: $.$ workspace: $staging$
+1. dir: $.$ workspace: $production$
+
+### 1. dir: $.$ workspace: $staging$
+**Plan Failed**: failure
+
+---
+### 2. dir: $.$ workspace: $production$
+$$$diff
+tf out
+$$$
+
+This plan was not saved because one or more projects failed and automerge requires all plans pass.
+
+---
+
+`,
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			mr := events.MarkdownRenderer{
+				RequireAllPlansSucceed: true,
+			}
+			rendered := mr.Render(c.cr, events.PlanCommand, "log", false, models.Github)
+			expWithBackticks := strings.Replace(c.exp, "$", "`", -1)
+			Equals(t, expWithBackticks, rendered)
+		})
+	}
+}

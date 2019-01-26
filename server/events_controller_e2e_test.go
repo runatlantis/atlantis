@@ -328,7 +328,7 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClientProxy,
 			WorkingDirLocker:    locker,
 			AllowRepoConfigFlag: "allow-repo-config",
 			AllowRepoConfig:     true,
-			PendingPlanFinder:   &events.PendingPlanFinder{},
+			PendingPlanFinder:   &events.DefaultPendingPlanFinder{},
 			CommentBuilder:      commentParser,
 		},
 	}
