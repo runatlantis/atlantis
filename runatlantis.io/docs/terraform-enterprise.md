@@ -6,7 +6,8 @@ Atlantis integrates seamlessly with Terraform Enterprise's new [Free Remote Stat
 
 ## Migrating to TFE's Remote State
 If you're using a different state backend, you first need to migrate your state
-to use Terraform Enterprise (TFE). Read [TODO: use right link](https://www.terraform.io/docs/enterprise/migrate/index.html)
+to use Terraform Enterprise (TFE). Read
+[Getting Started with the Terraform Enterprise Free Tier](https://www.terraform.io/docs/enterprise/free/index.html#enable-remote-state-in-terraform-configurations)
 for more information on how to migrate.
 
 ## Configuring Atlantis
@@ -35,14 +36,15 @@ remote state backend now.
 
 :::tip NOTE
 Under the hood, Atlantis is generating a `~/.terraformrc` file.
-If you already had a `~/.terraformrc` file, then you'll need to manually
-add the credentials block:
+If you already had a `~/.terraformrc` file where Atlantis is running,
+ then you'll need to manually
+add the credentials block to that file:
 ```
 ...
 credentials "app.terraform.io" {
   token = "xxxx"
 }
 ```
-Instead of using the `ATLANTIS_TFE_TOKEN` environment variable since Atlantis
+instead of using the `ATLANTIS_TFE_TOKEN` environment variable, since Atlantis
 won't overwrite your `.terraformrc` file.
 :::
