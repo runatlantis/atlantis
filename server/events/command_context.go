@@ -32,4 +32,7 @@ type CommandContext struct {
 	// User is the user that triggered this command.
 	User models.User
 	Log  *logging.SimpleLogger
+	// Mergeable tells us whether Pull is mergeable before changing the status of the Pull
+	// PullMergeable is true if Pull is able to be merged.
+	PullMergeable bool
 }

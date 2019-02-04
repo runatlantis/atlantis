@@ -293,8 +293,10 @@ type ProjectCommandContext struct {
 	// If the pull request branch is from the same repository then HeadRepo will
 	// be the same as BaseRepo.
 	// See https://help.github.com/articles/about-pull-request-merges/.
-	HeadRepo      Repo
-	Log           *logging.SimpleLogger
+	HeadRepo Repo
+	Log      *logging.SimpleLogger
+	// PullMergeable is true if the pull request for this project is able to be merged.
+	PullMergeable bool
 	Pull          PullRequest
 	ProjectConfig *valid.Project
 	// RePlanCmd is the command that users should run to re-plan this project.

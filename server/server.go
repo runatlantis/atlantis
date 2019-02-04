@@ -30,7 +30,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/elazarl/go-bindata-assetfs"
+	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events"
@@ -263,7 +263,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 				DefaultTFVersion: defaultTfVersion,
 			},
 			PullApprovedChecker:      vcsClient,
-			PullMergeableChecker:     vcsClient,
 			WorkingDir:               workingDir,
 			Webhooks:                 webhooksManager,
 			WorkingDirLocker:         workingDirLocker,

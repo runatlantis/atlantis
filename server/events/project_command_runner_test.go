@@ -134,17 +134,16 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 			mockLocker := mocks.NewMockProjectLocker()
 
 			runner := events.DefaultProjectCommandRunner{
-				Locker:               mockLocker,
-				LockURLGenerator:     mockURLGenerator{},
-				InitStepRunner:       mockInit,
-				PlanStepRunner:       mockPlan,
-				ApplyStepRunner:      mockApply,
-				RunStepRunner:        mockRun,
-				PullApprovedChecker:  nil,
-				PullMergeableChecker: nil,
-				WorkingDir:           mockWorkingDir,
-				Webhooks:             nil,
-				WorkingDirLocker:     events.NewDefaultWorkingDirLocker(),
+				Locker:              mockLocker,
+				LockURLGenerator:    mockURLGenerator{},
+				InitStepRunner:      mockInit,
+				PlanStepRunner:      mockPlan,
+				ApplyStepRunner:     mockApply,
+				RunStepRunner:       mockRun,
+				PullApprovedChecker: nil,
+				WorkingDir:          mockWorkingDir,
+				Webhooks:            nil,
+				WorkingDirLocker:    events.NewDefaultWorkingDirLocker(),
 			}
 
 			repoDir, cleanup := TempDir(t)
@@ -236,10 +235,8 @@ func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 	RegisterMockTestingT(t)
 	mockWorkingDir := mocks.NewMockWorkingDir()
-	mockMergeable := mocks2.NewMockPullMergeableChecker()
 	runner := &events.DefaultProjectCommandRunner{
 		WorkingDir:               mockWorkingDir,
-		PullMergeableChecker:     mockMergeable,
 		WorkingDirLocker:         events.NewDefaultWorkingDirLocker(),
 		RequireMergeableOverride: true,
 	}
@@ -247,7 +244,6 @@ func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
-	When(mockMergeable.PullIsMergeable(ctx.BaseRepo, ctx.Pull)).ThenReturn(false, nil)
 
 	res := runner.Apply(ctx)
 	Equals(t, "Pull request must be mergeable before running apply.", res.Failure)
@@ -255,18 +251,21 @@ func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 
 func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 	cases := []struct {
-		description string
-		projCfg     *valid.Project
-		globalCfg   *valid.Config
-		expSteps    []string
-		expOut      string
+		description   string
+		projCfg       *valid.Project
+		globalCfg     *valid.Config
+		expSteps      []string
+		expOut        string
+		expFailure    string
+		pullMergeable bool
 	}{
 		{
-			description: "use defaults",
-			projCfg:     nil,
-			globalCfg:   nil,
-			expSteps:    []string{"apply"},
-			expOut:      "apply",
+			description:   "use defaults",
+			projCfg:       nil,
+			globalCfg:     nil,
+			expSteps:      []string{"apply"},
+			expOut:        "apply",
+			pullMergeable: true,
 		},
 		{
 			description: "no workflow, use defaults",
@@ -281,8 +280,9 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 					},
 				},
 			},
-			expSteps: []string{"apply"},
-			expOut:   "apply",
+			expSteps:      []string{"apply"},
+			expOut:        "apply",
+			pullMergeable: true,
 		},
 		{
 			description: "no workflow, approval required, use defaults",
@@ -299,8 +299,9 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 					},
 				},
 			},
-			expSteps: []string{"approve", "apply"},
-			expOut:   "apply",
+			expSteps:      []string{"approve", "apply"},
+			expOut:        "apply",
+			pullMergeable: true,
 		},
 		{
 			description: "no workflow, mergeable required, use defaults",
@@ -317,8 +318,29 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 					},
 				},
 			},
-			expSteps: []string{"mergeable", "apply"},
-			expOut:   "apply",
+			expSteps:      []string{"apply"},
+			expOut:        "apply",
+			pullMergeable: true,
+		},
+		{
+			description: "no workflow, mergeable required, use defaults, commit unmergeable",
+			projCfg: &valid.Project{
+				Dir:               ".",
+				ApplyRequirements: []string{"mergeable"},
+			},
+			globalCfg: &valid.Config{
+				Version: 2,
+				Projects: []valid.Project{
+					{
+						Dir:               ".",
+						ApplyRequirements: []string{"mergeable"},
+					},
+				},
+			},
+			expSteps:      []string{""},
+			expOut:        "",
+			expFailure:    "Pull request must be mergeable before running apply.",
+			pullMergeable: false,
 		},
 		{
 			description: "no workflow, mergeable and approved required, use defaults",
@@ -335,8 +357,9 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 					},
 				},
 			},
-			expSteps: []string{"mergeable", "approved", "apply"},
-			expOut:   "apply",
+			expSteps:      []string{"approved", "apply"},
+			expOut:        "apply",
+			pullMergeable: true,
 		},
 		{
 			description: "workflow without apply stage set",
@@ -359,8 +382,9 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 					},
 				},
 			},
-			expSteps: []string{"apply"},
-			expOut:   "apply",
+			expSteps:      []string{"apply"},
+			expOut:        "apply",
+			pullMergeable: true,
 		},
 		{
 			description: "workflow with custom apply stage",
@@ -396,8 +420,9 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 					},
 				},
 			},
-			expSteps: []string{"run", "apply", "plan", "init"},
-			expOut:   "run\napply\nplan\ninit",
+			expSteps:      []string{"run", "apply", "plan", "init"},
+			expOut:        "run\napply\nplan\ninit",
+			pullMergeable: true,
 		},
 	}
 
@@ -409,23 +434,21 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			mockApply := mocks.NewMockStepRunner()
 			mockRun := mocks.NewMockStepRunner()
 			mockApproved := mocks2.NewMockPullApprovedChecker()
-			mockMergeable := mocks2.NewMockPullMergeableChecker()
 			mockWorkingDir := mocks.NewMockWorkingDir()
 			mockLocker := mocks.NewMockProjectLocker()
 			mockSender := mocks.NewMockWebhooksSender()
 
 			runner := events.DefaultProjectCommandRunner{
-				Locker:               mockLocker,
-				LockURLGenerator:     mockURLGenerator{},
-				InitStepRunner:       mockInit,
-				PlanStepRunner:       mockPlan,
-				ApplyStepRunner:      mockApply,
-				RunStepRunner:        mockRun,
-				PullApprovedChecker:  mockApproved,
-				PullMergeableChecker: mockMergeable,
-				WorkingDir:           mockWorkingDir,
-				Webhooks:             mockSender,
-				WorkingDirLocker:     events.NewDefaultWorkingDirLocker(),
+				Locker:              mockLocker,
+				LockURLGenerator:    mockURLGenerator{},
+				InitStepRunner:      mockInit,
+				PlanStepRunner:      mockPlan,
+				ApplyStepRunner:     mockApply,
+				RunStepRunner:       mockRun,
+				PullApprovedChecker: mockApproved,
+				WorkingDir:          mockWorkingDir,
+				Webhooks:            mockSender,
+				WorkingDirLocker:    events.NewDefaultWorkingDirLocker(),
 			}
 			repoDir, cleanup := TempDir(t)
 			defer cleanup()
@@ -441,23 +464,22 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				Workspace:     "default",
 				GlobalConfig:  c.globalCfg,
 				RepoRelDir:    ".",
+				PullMergeable: c.pullMergeable,
 			}
 			When(mockInit.Run(ctx, nil, repoDir)).ThenReturn("init", nil)
 			When(mockPlan.Run(ctx, nil, repoDir)).ThenReturn("plan", nil)
 			When(mockApply.Run(ctx, nil, repoDir)).ThenReturn("apply", nil)
 			When(mockRun.Run(ctx, nil, repoDir)).ThenReturn("run", nil)
 			When(mockApproved.PullIsApproved(ctx.BaseRepo, ctx.Pull)).ThenReturn(true, nil)
-			When(mockMergeable.PullIsMergeable(ctx.BaseRepo, ctx.Pull)).ThenReturn(true, nil)
 
 			res := runner.Apply(ctx)
 			Equals(t, c.expOut, res.ApplySuccess)
+			Equals(t, c.expFailure, res.Failure)
 
 			for _, step := range c.expSteps {
 				switch step {
 				case "approved":
 					mockApproved.VerifyWasCalledOnce().PullIsApproved(ctx.BaseRepo, ctx.Pull)
-				case "mergeable":
-					mockMergeable.VerifyWasCalledOnce().PullIsMergeable(ctx.BaseRepo, ctx.Pull)
 				case "init":
 					mockInit.VerifyWasCalledOnce().Run(ctx, nil, repoDir)
 				case "plan":

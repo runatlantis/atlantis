@@ -15,6 +15,7 @@ package events
 
 import (
 	"fmt"
+
 	"github.com/google/go-github/github"
 	"github.com/lkysow/go-gitlab"
 	"github.com/pkg/errors"
@@ -167,7 +168,18 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	if !c.validateCtxAndComment(ctx) {
 		return
 	}
-	if err = c.CommitStatusUpdater.Update(baseRepo, pull, models.PendingCommitStatus, cmd.CommandName()); err != nil {
+
+	if cmd.CommandName() == ApplyCommand {
+		ctx.PullMergeable, err = c.VCSClient.PullIsMergeable(baseRepo, pull)
+		if err != nil {
+			// On error we continue the request with mergeable assumed false.
+			// We want to continue because not all apply's will need this status,
+			// only if they rely on the mergeability requirement.
+			ctx.PullMergeable = false
+			ctx.Log.Warn("unable to get mergeable status: %s. Continuing with mergeable assumed false", err)
+		}
+	}
+	if err = c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, models.PendingCommitStatus, cmd.CommandName()); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
