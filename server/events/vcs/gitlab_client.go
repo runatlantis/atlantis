@@ -19,6 +19,8 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
+
 	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -197,6 +199,18 @@ func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 func (g *GitlabClient) GetMergeRequest(repoFullName string, pullNum int) (*gitlab.MergeRequest, error) {
 	mr, _, err := g.Client.MergeRequests.GetMergeRequest(repoFullName, pullNum)
 	return mr, err
+}
+
+// MergePull merges the merge request.
+func (g *GitlabClient) MergePull(pull models.PullRequest) error {
+	commitMsg := common.AutomergeCommitMsg
+	_, _, err := g.Client.MergeRequests.AcceptMergeRequest(
+		pull.BaseRepo.FullName,
+		pull.Num,
+		&gitlab.AcceptMergeRequestOptions{
+			MergeCommitMessage: &commitMsg,
+		})
+	return errors.Wrap(err, "unable to merge merge request, it may not be in a mergeable state")
 }
 
 // GetVersion returns the version of the Gitlab server this client is using.

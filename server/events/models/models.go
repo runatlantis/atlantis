@@ -330,3 +330,89 @@ func (p *ProjectCommandContext) GetProjectName() string {
 	}
 	return ""
 }
+
+// ProjectResult is the result of executing a plan/apply for a specific project.
+type ProjectResult struct {
+	RepoRelDir   string
+	Workspace    string
+	Error        error
+	Failure      string
+	PlanSuccess  *PlanSuccess
+	ApplySuccess string
+	ProjectName  string
+}
+
+// Status returns the vcs commit status of this project result.
+func (p ProjectResult) Status() CommitStatus {
+	if p.Error != nil {
+		return FailedCommitStatus
+	}
+	if p.Failure != "" {
+		return FailedCommitStatus
+	}
+	return SuccessCommitStatus
+}
+
+// IsSuccessful returns true if this project result had no errors.
+func (p ProjectResult) IsSuccessful() bool {
+	return p.PlanSuccess != nil || p.ApplySuccess != ""
+}
+
+// PlanSuccess is the result of a successful plan.
+type PlanSuccess struct {
+	// TerraformOutput is the output from Terraform of running plan.
+	TerraformOutput string
+	// LockURL is the full URL to the lock held by this plan.
+	LockURL string
+	// RePlanCmd is the command that users should run to re-plan this project.
+	RePlanCmd string
+	// ApplyCmd is the command that users should run to apply this plan.
+	ApplyCmd string
+}
+
+// PullStatus is the current status of a pull request that is in progress.
+type PullStatus struct {
+	// Projects are the projects that have been modified in this pull request.
+	Projects []ProjectStatus
+	// Pull is the original pull request model.
+	Pull PullRequest
+}
+
+// ProjectStatus is the status of a specific project.
+type ProjectStatus struct {
+	Workspace   string
+	RepoRelDir  string
+	ProjectName string
+	// Status is the status of where this project is at in the planning cycle.
+	Status ProjectPlanStatus
+}
+
+// ProjectPlanStatus is the status of where this project is at in the planning
+// cycle.
+type ProjectPlanStatus int
+
+const (
+	// ErroredPlanStatus means that this plan has an error or the apply has an
+	// error.
+	ErroredPlanStatus ProjectPlanStatus = iota
+	// PlannedPlanStatus means that a plan has been successfully generated but
+	// not yet applied.
+	PlannedPlanStatus
+	// AppliedPlanStatus means that a plan has been generated and applied
+	// successfully.
+	AppliedPlanStatus
+)
+
+// String returns a string representation of the status.
+func (p ProjectPlanStatus) String() string {
+	switch p {
+	case ErroredPlanStatus:
+		return "errored"
+	case PlannedPlanStatus:
+		return "planned"
+	case AppliedPlanStatus:
+		return "applied"
+	default:
+		return "errored"
+	}
+}

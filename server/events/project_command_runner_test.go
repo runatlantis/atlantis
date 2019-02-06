@@ -147,7 +147,8 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 				WorkingDirLocker:     events.NewDefaultWorkingDirLocker(),
 			}
 
-			repoDir := "/tmp/mydir"
+			repoDir, cleanup := TempDir(t)
+			defer cleanup()
 			When(mockWorkingDir.Clone(
 				matchers.AnyPtrToLoggingSimpleLogger(),
 				matchers.AnyModelsRepo(),
@@ -223,7 +224,9 @@ func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 		RequireApprovalOverride: true,
 	}
 	ctx := models.ProjectCommandContext{}
-	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn("/tmp/mydir", nil)
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
 	When(mockApproved.PullIsApproved(ctx.BaseRepo, ctx.Pull)).ThenReturn(false, nil)
 
 	res := runner.Apply(ctx)
@@ -241,7 +244,9 @@ func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 		RequireMergeableOverride: true,
 	}
 	ctx := models.ProjectCommandContext{}
-	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn("/tmp/mydir", nil)
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
 	When(mockMergeable.PullIsMergeable(ctx.BaseRepo, ctx.Pull)).ThenReturn(false, nil)
 
 	res := runner.Apply(ctx)
@@ -422,8 +427,8 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				Webhooks:             mockSender,
 				WorkingDirLocker:     events.NewDefaultWorkingDirLocker(),
 			}
-
-			repoDir := "/tmp/mydir"
+			repoDir, cleanup := TempDir(t)
+			defer cleanup()
 			When(mockWorkingDir.GetWorkingDir(
 				matchers.AnyModelsRepo(),
 				matchers.AnyModelsPullRequest(),

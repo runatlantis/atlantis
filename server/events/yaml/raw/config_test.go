@@ -93,9 +93,20 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 			expErr: "yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `value` into []raw.Project",
 		},
 		{
+			description: "automerge not a boolean",
+			input:       "version: 2\nautomerge: notabool",
+			exp: raw.Config{
+				Version:   nil,
+				Projects:  nil,
+				Workflows: nil,
+			},
+			expErr: "yaml: unmarshal errors:\n  line 2: cannot unmarshal !!str `notabool` into bool",
+		},
+		{
 			description: "should use values if set",
 			input: `
 version: 2
+automerge: true
 projects:
 - dir: mydir
   workspace: myworkspace
@@ -112,7 +123,8 @@ workflows:
     apply:
      steps: []`,
 			exp: raw.Config{
-				Version: Int(2),
+				Version:   Int(2),
+				Automerge: Bool(true),
 				Projects: []raw.Project{
 					{
 						Dir:              String("mydir"),
@@ -215,9 +227,45 @@ func TestConfig_ToValid(t *testing.T) {
 			},
 		},
 		{
-			description: "everything set",
+			description: "automerge ommitted",
 			input: raw.Config{
 				Version: Int(2),
+			},
+			exp: valid.Config{
+				Version:   2,
+				Automerge: false,
+				Workflows: map[string]valid.Workflow{},
+			},
+		},
+		{
+			description: "automerge true",
+			input: raw.Config{
+				Version:   Int(2),
+				Automerge: Bool(true),
+			},
+			exp: valid.Config{
+				Version:   2,
+				Automerge: true,
+				Workflows: map[string]valid.Workflow{},
+			},
+		},
+		{
+			description: "automerge false",
+			input: raw.Config{
+				Version:   Int(2),
+				Automerge: Bool(false),
+			},
+			exp: valid.Config{
+				Version:   2,
+				Automerge: false,
+				Workflows: map[string]valid.Workflow{},
+			},
+		},
+		{
+			description: "everything set",
+			input: raw.Config{
+				Version:   Int(2),
+				Automerge: Bool(true),
 				Workflows: map[string]raw.Workflow{
 					"myworkflow": {
 						Apply: &raw.Stage{
@@ -243,7 +291,8 @@ func TestConfig_ToValid(t *testing.T) {
 				},
 			},
 			exp: valid.Config{
-				Version: 2,
+				Version:   2,
+				Automerge: true,
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": {
 						Apply: &valid.Stage{

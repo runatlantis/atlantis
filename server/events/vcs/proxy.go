@@ -27,6 +27,7 @@ type ClientProxy interface {
 	PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error)
 	PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error)
 	UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, description string) error
+	MergePull(pull models.PullRequest) error
 }
 
 // DefaultClientProxy proxies calls to the correct VCS client depending on which
@@ -78,4 +79,8 @@ func (d *DefaultClientProxy) PullIsMergeable(repo models.Repo, pull models.PullR
 
 func (d *DefaultClientProxy) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, description string) error {
 	return d.clients[repo.VCSHost.Type].UpdateStatus(repo, pull, state, description)
+}
+
+func (d *DefaultClientProxy) MergePull(pull models.PullRequest) error {
+	return d.clients[pull.BaseRepo.VCSHost.Type].MergePull(pull)
 }

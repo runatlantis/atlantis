@@ -11,9 +11,10 @@
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
 
-package boltdb_test
+package db_test
 
 import (
+	"github.com/runatlantis/atlantis/server/events/db"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -21,7 +22,6 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/events/locking/boltdb"
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -352,8 +352,319 @@ func TestGetLock(t *testing.T) {
 	Equals(t, lock.User, l.User)
 }
 
+// Test we can create a status and then get it.
+func TestPullStatus_UpdateGet(t *testing.T) {
+	b, cleanup := newTestDB2(t)
+	defer cleanup()
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha",
+		URL:        "url",
+		HeadBranch: "head",
+		BaseBranch: "base",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+	status, err := b.UpdatePullWithResults(
+		pull,
+		[]models.ProjectResult{
+			{
+				RepoRelDir: ".",
+				Workspace:  "default",
+				Failure:    "failure",
+			},
+		})
+	Ok(t, err)
+	Assert(t, status != nil, "exp non-nil")
+
+	status, err = b.GetPullStatus(pull)
+	Ok(t, err)
+	Equals(t, pull, status.Pull)
+	Equals(t, []models.ProjectStatus{
+		{
+			Workspace:   "default",
+			RepoRelDir:  ".",
+			ProjectName: "",
+			Status:      models.ErroredPlanStatus,
+		},
+	}, status.Projects)
+}
+
+// Test we can create a status, delete it, and then we shouldn't be able to get
+// it.
+func TestPullStatus_UpdateDeleteGet(t *testing.T) {
+	b, cleanup := newTestDB2(t)
+	defer cleanup()
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha",
+		URL:        "url",
+		HeadBranch: "head",
+		BaseBranch: "base",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+	status, err := b.UpdatePullWithResults(
+		pull,
+		[]models.ProjectResult{
+			{
+				RepoRelDir: ".",
+				Workspace:  "default",
+				Failure:    "failure",
+			},
+		})
+	Ok(t, err)
+	Assert(t, status != nil, "exp non-nil")
+
+	err = b.DeletePullStatus(pull)
+	Ok(t, err)
+
+	status, err = b.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, status == nil, "exp nil")
+}
+
+// Test we can create a status, delete a specific project's status within that
+// pull status, and when we get all the project statuses, that specific project
+// should not be there.
+func TestPullStatus_UpdateDeleteProject(t *testing.T) {
+	b, cleanup := newTestDB2(t)
+	defer cleanup()
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha",
+		URL:        "url",
+		HeadBranch: "head",
+		BaseBranch: "base",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+	status, err := b.UpdatePullWithResults(
+		pull,
+		[]models.ProjectResult{
+			{
+				RepoRelDir: ".",
+				Workspace:  "default",
+				Failure:    "failure",
+			},
+			{
+				RepoRelDir:   ".",
+				Workspace:    "staging",
+				ApplySuccess: "success!",
+			},
+		})
+	Ok(t, err)
+	Assert(t, status != nil, "exp non-nil")
+
+	err = b.DeleteProjectStatus(pull, "default", ".")
+	Ok(t, err)
+
+	status, err = b.GetPullStatus(pull)
+	Ok(t, err)
+	Equals(t, pull, status.Pull)
+	Equals(t, []models.ProjectStatus{
+		{
+			Workspace:   "staging",
+			RepoRelDir:  ".",
+			ProjectName: "",
+			Status:      models.AppliedPlanStatus,
+		},
+	}, status.Projects)
+}
+
+// Test that if we update an existing pull status and our new status is for a
+// different HeadSHA, that we just overwrite the old status.
+func TestPullStatus_UpdateNewCommit(t *testing.T) {
+	b, cleanup := newTestDB2(t)
+	defer cleanup()
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha",
+		URL:        "url",
+		HeadBranch: "head",
+		BaseBranch: "base",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+	status, err := b.UpdatePullWithResults(
+		pull,
+		[]models.ProjectResult{
+			{
+				RepoRelDir: ".",
+				Workspace:  "default",
+				Failure:    "failure",
+			},
+		})
+	Ok(t, err)
+	Assert(t, status != nil, "exp non-nil")
+
+	pull.HeadCommit = "newsha"
+	status, err = b.UpdatePullWithResults(pull,
+		[]models.ProjectResult{
+			{
+				RepoRelDir:   ".",
+				Workspace:    "staging",
+				ApplySuccess: "success!",
+			},
+		})
+
+	Ok(t, err)
+	Equals(t, 1, len(status.Projects))
+
+	status, err = b.GetPullStatus(pull)
+	Ok(t, err)
+	Equals(t, pull, status.Pull)
+	Equals(t, []models.ProjectStatus{
+		{
+			Workspace:   "staging",
+			RepoRelDir:  ".",
+			ProjectName: "",
+			Status:      models.AppliedPlanStatus,
+		},
+	}, status.Projects)
+}
+
+// Test that if we update an existing pull status and our new status is for a
+// the same commit, that we merge the statuses.
+func TestPullStatus_UpdateMerge(t *testing.T) {
+	b, cleanup := newTestDB2(t)
+	defer cleanup()
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha",
+		URL:        "url",
+		HeadBranch: "head",
+		BaseBranch: "base",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+	status, err := b.UpdatePullWithResults(
+		pull,
+		[]models.ProjectResult{
+			{
+				RepoRelDir: "mergeme",
+				Workspace:  "default",
+				Failure:    "failure",
+			},
+			{
+				RepoRelDir: "staythesame",
+				Workspace:  "default",
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: "tf out",
+					LockURL:         "lock-url",
+					RePlanCmd:       "plan command",
+					ApplyCmd:        "apply command",
+				},
+			},
+		})
+	Ok(t, err)
+	Assert(t, status != nil, "exp non-nil")
+
+	status, err = b.UpdatePullWithResults(pull,
+		[]models.ProjectResult{
+			{
+				RepoRelDir:   "mergeme",
+				Workspace:    "default",
+				ApplySuccess: "applied!",
+			},
+			{
+				RepoRelDir:   "newresult",
+				Workspace:    "default",
+				ApplySuccess: "success!",
+			},
+		})
+
+	Ok(t, err)
+
+	getStatus, err := b.GetPullStatus(pull)
+	Ok(t, err)
+
+	// Test both the pull state returned from the update call *and* the get
+	// call.
+	for _, s := range []*models.PullStatus{status, getStatus} {
+		Equals(t, pull, s.Pull)
+		Equals(t, []models.ProjectStatus{
+			{
+				RepoRelDir: "mergeme",
+				Workspace:  "default",
+				Status:     models.AppliedPlanStatus,
+			},
+			{
+				RepoRelDir: "staythesame",
+				Workspace:  "default",
+				Status:     models.PlannedPlanStatus,
+			},
+			{
+				RepoRelDir: "newresult",
+				Workspace:  "default",
+				Status:     models.AppliedPlanStatus,
+			},
+		}, status.Projects)
+	}
+}
+
 // newTestDB returns a TestDB using a temporary path.
-func newTestDB() (*bolt.DB, *boltdb.BoltLocker) {
+func newTestDB() (*bolt.DB, *db.BoltDB) {
 	// Retrieve a temporary path.
 	f, err := ioutil.TempFile("", "")
 	if err != nil {
@@ -363,11 +674,11 @@ func newTestDB() (*bolt.DB, *boltdb.BoltLocker) {
 	f.Close() // nolint: errcheck
 
 	// Open the database.
-	db, err := bolt.Open(path, 0600, nil)
+	boltDB, err := bolt.Open(path, 0600, nil)
 	if err != nil {
 		panic(errors.Wrap(err, "could not start bolt DB"))
 	}
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := boltDB.Update(func(tx *bolt.Tx) error {
 		if _, err := tx.CreateBucketIfNotExists([]byte(lockBucket)); err != nil {
 			return errors.Wrap(err, "failed to create bucket")
 		}
@@ -375,8 +686,17 @@ func newTestDB() (*bolt.DB, *boltdb.BoltLocker) {
 	}); err != nil {
 		panic(errors.Wrap(err, "could not create bucket"))
 	}
-	b, _ := boltdb.NewWithDB(db, lockBucket)
-	return db, b
+	b, _ := db.NewWithDB(boltDB, lockBucket)
+	return boltDB, b
+}
+
+func newTestDB2(t *testing.T) (*db.BoltDB, func()) {
+	tmp, cleanup := TempDir(t)
+	boltDB, err := db.New(tmp)
+	Ok(t, err)
+	return boltDB, func() {
+		cleanup()
+	}
 }
 
 func cleanupDB(db *bolt.DB) {

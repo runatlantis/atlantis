@@ -30,6 +30,7 @@ func ValidateSignature(payload []byte, signature string, secretKey []byte) error
 // and hashFunc.
 func genMAC(message, key []byte, hashFunc func() hash.Hash) []byte {
 	mac := hmac.New(hashFunc, key)
+	// nolint: errcheck
 	mac.Write(message)
 	return mac.Sum(nil)
 }

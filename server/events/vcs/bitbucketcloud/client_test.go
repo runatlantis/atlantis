@@ -187,7 +187,7 @@ func TestClient_PullIsApproved(t *testing.T) {
 				switch r.RequestURI {
 				// The first request should hit this URL.
 				case "/2.0/repositories/owner/repo/pullrequests/1":
-					w.Write([]byte(json)) // nolint: errcheck
+					w.Write(json) // nolint: errcheck
 					return
 				default:
 					t.Errorf("got unexpected request at %q", r.RequestURI)

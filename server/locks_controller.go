@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/runatlantis/atlantis/server/events/db"
 	"net/http"
 	"net/url"
 
@@ -23,6 +24,7 @@ type LocksController struct {
 	LockDetailTemplate TemplateWriter
 	WorkingDir         events.WorkingDir
 	WorkingDirLocker   events.WorkingDirLocker
+	DB                 *db.BoltDB
 }
 
 // GetLock is the GET /locks/{id} route. It renders the lock detail view.
@@ -103,6 +105,9 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 			if err := l.WorkingDir.DeleteForWorkspace(lock.Pull.BaseRepo, lock.Pull, lock.Workspace); err != nil {
 				l.Logger.Err("unable to delete workspace: %s", err)
 			}
+		}
+		if err := l.DB.DeleteProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path); err != nil {
+			l.Logger.Err("unable to delete project status: %s", err)
 		}
 
 		// Once the lock has been deleted, comment back on the pull request.

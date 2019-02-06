@@ -42,9 +42,10 @@ jobs:
       # We use dockerize -wait here to wait until the server is up.
     - run: |
         dockerize -wait tcp://localhost:8080 -- \
-          muffet -e 'https://github\\.com/runatlantis/atlantis/edit/master/.*' \
-          -e 'https://github.com/helm/charts/tree/master/stable/atlantis#customization' \
-          http://localhost:8080/
+          muffet \
+            -e 'https://github\.com/runatlantis/atlantis/edit/master/.*' \
+            -e 'https://github.com/helm/charts/tree/master/stable/atlantis#customization' \
+            http://localhost:8080/
 
   # Build and push 'latest' Docker tag.
   docker_master:

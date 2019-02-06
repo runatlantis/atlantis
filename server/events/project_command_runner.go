@@ -28,6 +28,16 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
+// DirNotExistErr is an error caused by the directory not existing.
+type DirNotExistErr struct {
+	RepoRelDir string
+}
+
+// Error implements the error interface.
+func (d DirNotExistErr) Error() string {
+	return fmt.Sprintf("dir %q does not exist", d.RepoRelDir)
+}
+
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_lock_url_generator.go LockURLGenerator
 
 // LockURLGenerator generates urls to locks.
@@ -53,27 +63,15 @@ type WebhooksSender interface {
 	Send(log *logging.SimpleLogger, res webhooks.ApplyResult) error
 }
 
-// PlanSuccess is the result of a successful plan.
-type PlanSuccess struct {
-	// TerraformOutput is the output from Terraform of running plan.
-	TerraformOutput string
-	// LockURL is the full URL to the lock held by this plan.
-	LockURL string
-	// RePlanCmd is the command that users should run to re-plan this project.
-	RePlanCmd string
-	// ApplyCmd is the command that users should run to apply this plan.
-	ApplyCmd string
-}
-
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_runner.go ProjectCommandRunner
 
 // ProjectCommandRunner runs project commands. A project command is a command
 // for a specific TF project.
 type ProjectCommandRunner interface {
 	// Plan runs terraform plan for the project described by ctx.
-	Plan(ctx models.ProjectCommandContext) ProjectResult
+	Plan(ctx models.ProjectCommandContext) models.ProjectResult
 	// Apply runs terraform apply for the project described by ctx.
-	Apply(ctx models.ProjectCommandContext) ProjectResult
+	Apply(ctx models.ProjectCommandContext) models.ProjectResult
 }
 
 // DefaultProjectCommandRunner implements ProjectCommandRunner.
@@ -94,9 +92,9 @@ type DefaultProjectCommandRunner struct {
 }
 
 // Plan runs terraform plan for the project described by ctx.
-func (p *DefaultProjectCommandRunner) Plan(ctx models.ProjectCommandContext) ProjectResult {
+func (p *DefaultProjectCommandRunner) Plan(ctx models.ProjectCommandContext) models.ProjectResult {
 	planSuccess, failure, err := p.doPlan(ctx)
-	return ProjectResult{
+	return models.ProjectResult{
 		PlanSuccess: planSuccess,
 		Error:       err,
 		Failure:     failure,
@@ -107,9 +105,9 @@ func (p *DefaultProjectCommandRunner) Plan(ctx models.ProjectCommandContext) Pro
 }
 
 // Apply runs terraform apply for the project described by ctx.
-func (p *DefaultProjectCommandRunner) Apply(ctx models.ProjectCommandContext) ProjectResult {
+func (p *DefaultProjectCommandRunner) Apply(ctx models.ProjectCommandContext) models.ProjectResult {
 	applyOut, failure, err := p.doApply(ctx)
-	return ProjectResult{
+	return models.ProjectResult{
 		Failure:      failure,
 		Error:        err,
 		ApplySuccess: applyOut,
@@ -119,7 +117,7 @@ func (p *DefaultProjectCommandRunner) Apply(ctx models.ProjectCommandContext) Pr
 	}
 }
 
-func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (*PlanSuccess, string, error) {
+func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (*models.PlanSuccess, string, error) {
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.BaseRepo.FullName, ctx.RepoRelDir))
 	if err != nil {
@@ -146,6 +144,9 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 		return nil, "", cloneErr
 	}
 	projAbsPath := filepath.Join(repoDir, ctx.RepoRelDir)
+	if _, err := os.Stat(projAbsPath); os.IsNotExist(err) {
+		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+	}
 
 	// Use default stage unless another workflow is defined in config
 	stage := p.defaultPlanStage()
@@ -165,7 +166,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 		return nil, "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
 	}
 
-	return &PlanSuccess{
+	return &models.PlanSuccess{
 		LockURL:         p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
 		TerraformOutput: strings.Join(outputs, "\n"),
 		RePlanCmd:       ctx.RePlanCmd,
@@ -208,6 +209,9 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 		return "", "", err
 	}
 	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
+	if _, err := os.Stat(absPath); os.IsNotExist(err) {
+		return "", "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+	}
 
 	// Figure out what our apply requirements are.
 	var applyRequirements []string
