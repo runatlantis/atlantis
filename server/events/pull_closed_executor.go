@@ -16,11 +16,12 @@ package events
 import (
 	"bytes"
 	"fmt"
-	"github.com/runatlantis/atlantis/server/events/locking/boltdb"
-	"github.com/runatlantis/atlantis/server/logging"
 	"sort"
 	"strings"
 	"text/template"
+
+	"github.com/runatlantis/atlantis/server/events/locking/boltdb"
+	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/locking"

@@ -15,6 +15,7 @@ package events
 
 import (
 	"fmt"
+
 	"github.com/google/go-github/github"
 	"github.com/lkysow/go-gitlab"
 	"github.com/pkg/errors"
@@ -117,7 +118,10 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		c.deletePlans(ctx)
 	}
 	c.updatePull(ctx, AutoplanCommand{}, result)
-	c.updateDB(ctx.Pull, result.ProjectResults)
+	_, err = c.updateDB(ctx.Pull, result.ProjectResults)
+	if err != nil {
+		c.Logger.Err("writing results: %s", err)
+	}
 }
 
 // RunCommentCommand executes the command.
@@ -196,7 +200,12 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		result)
 
 	pullStatus, err := c.updateDB(pull, result.ProjectResults)
-	if err == nil && cmd.Name == ApplyCommand && c.Automerge {
+	if err != nil {
+		c.Logger.Err("writing results: %s", err)
+		return
+	}
+
+	if cmd.Name == ApplyCommand && c.Automerge {
 		c.automerge(ctx, pullStatus)
 	}
 }
@@ -352,11 +361,7 @@ func (c *DefaultCommandRunner) updateDB(pull models.PullRequest, results []model
 		filtered = append(filtered, r)
 	}
 
-	status, err := c.DB.UpdatePullWithResults(pull, filtered)
-	if err != nil {
-		c.Logger.Err("writing results: %s", err)
-	}
-	return status, err
+	return c.DB.UpdatePullWithResults(pull, filtered)
 }
 
 var automergeComment = `Automatically merging because all plans have been successfully applied.`

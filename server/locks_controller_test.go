@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/runatlantis/atlantis/server/events/locking/boltdb"
+
 	"github.com/gorilla/mux"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server"
@@ -204,12 +206,17 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 			BaseRepo: models.Repo{FullName: "owner/repo"},
 		},
 	}, nil)
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	db, err := boltdb.New(tmp)
+	Ok(t, err)
 	lc := server.LocksController{
 		Locker:           l,
 		Logger:           logging.NewNoopLogger(),
 		VCSClient:        cp,
 		WorkingDir:       workingDir,
 		WorkingDirLocker: workingDirLocker,
+		DB:               db,
 	}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
@@ -237,12 +244,17 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 			RepoFullName: "owner/repo",
 		},
 	}, nil)
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	db, err := boltdb.New(tmp)
+	Ok(t, err)
 	lc := server.LocksController{
 		Locker:           l,
 		Logger:           logging.NewNoopLogger(),
 		VCSClient:        cp,
 		WorkingDirLocker: workingDirLocker,
 		WorkingDir:       workingDir,
+		DB:               db,
 	}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
