@@ -331,11 +331,10 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClientProxy,
 			PendingPlanFinder:   &events.DefaultPendingPlanFinder{},
 			CommentBuilder:      commentParser,
 		},
-		DB:                     boltdb,
-		PendingPlanFinder:      &events.DefaultPendingPlanFinder{},
-		Automerge:              false,
-		RequireAllPlansSucceed: false,
-		WorkingDir:             workingDir,
+		DB:                boltdb,
+		PendingPlanFinder: &events.DefaultPendingPlanFinder{},
+		GlobalAutomerge:   false,
+		WorkingDir:        workingDir,
 	}
 
 	repoWhitelistChecker, err := events.NewRepoWhitelistChecker("*")

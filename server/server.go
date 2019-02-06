@@ -174,7 +174,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	markdownRenderer := &events.MarkdownRenderer{
 		GitlabSupportsCommonMark: gitlabClient.SupportsCommonMark(),
-		RequireAllPlansSucceed:   userConfig.Automerge,
 	}
 	boltdb, err := db.New(userConfig.DataDir)
 	if err != nil {
@@ -271,11 +270,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			RequireApprovalOverride:  userConfig.RequireApproval,
 			RequireMergeableOverride: userConfig.RequireMergeable,
 		},
-		RequireAllPlansSucceed: userConfig.Automerge,
-		WorkingDir:             workingDir,
-		PendingPlanFinder:      pendingPlanFinder,
-		DB:                     boltdb,
-		Automerge:              userConfig.Automerge,
+		WorkingDir:        workingDir,
+		PendingPlanFinder: pendingPlanFinder,
+		DB:                boltdb,
+		GlobalAutomerge:   userConfig.Automerge,
 	}
 	repoWhitelist, err := events.NewRepoWhitelistChecker(userConfig.RepoWhitelist)
 	if err != nil {

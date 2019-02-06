@@ -20,6 +20,10 @@ type CommandResult struct {
 	Error          error
 	Failure        string
 	ProjectResults []models.ProjectResult
+	// PlansDeleted is true if all plans created during this command were
+	// deleted. This happens if automerging is enabled and one project has an
+	// error since automerging requires all plans to succeed.
+	PlansDeleted bool
 }
 
 // HasErrors returns true if there were any errors during the execution,

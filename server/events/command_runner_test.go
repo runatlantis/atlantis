@@ -163,12 +163,12 @@ func TestRunCommentCommand_ClosedPull(t *testing.T) {
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "Atlantis commands can't be run on closed pull requests")
 }
 
-// Test that if one plan fails and we are set to RequireAllPlansSucceed, that
+// Test that if one plan fails and we are using automerge, that
 // we delete the plans.
 func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 	setup(t)
-	ch.RequireAllPlansSucceed = true
-	defer func() { ch.RequireAllPlansSucceed = false }()
+	ch.GlobalAutomerge = true
+	defer func() { ch.GlobalAutomerge = false }()
 
 	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())).
 		ThenReturn([]models.ProjectCommandContext{

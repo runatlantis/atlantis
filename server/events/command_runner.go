@@ -69,12 +69,9 @@ type DefaultCommandRunner struct {
 	AllowForkPRsFlag      string
 	ProjectCommandBuilder ProjectCommandBuilder
 	ProjectCommandRunner  ProjectCommandRunner
-	// RequireAllPlansSucceed is true if we require all plans succeed in each
-	// run. If all plans don't succeed, we delete the ones that did.
-	RequireAllPlansSucceed bool
-	// Automerge is true if we should automatically merge pull requests if all
-	// plans have been successfully applied.
-	Automerge         bool
+	// GlobalAutomerge is true if we should automatically merge pull requests if all
+	// plans have been successfully applied. This is set via a CLI flag.
+	GlobalAutomerge   bool
 	PendingPlanFinder PendingPlanFinder
 	WorkingDir        WorkingDir
 	DB                *db.BoltDB
@@ -112,9 +109,10 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	}
 
 	result := c.runProjectCmds(projectCmds, PlanCommand)
-	if c.RequireAllPlansSucceed && result.HasErrors() {
+	if c.automergeEnabled(ctx, projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
 		c.deletePlans(ctx)
+		result.PlansDeleted = true
 	}
 	c.updatePull(ctx, AutoplanCommand{}, result)
 	_, err = c.updateDB(ctx.Pull, result.ProjectResults)
@@ -189,9 +187,10 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	}
 
 	result := c.runProjectCmds(projectCmds, cmd.Name)
-	if cmd.Name == PlanCommand && c.RequireAllPlansSucceed && result.HasErrors() {
+	if cmd.Name == PlanCommand && c.automergeEnabled(ctx, projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
 		c.deletePlans(ctx)
+		result.PlansDeleted = true
 	}
 	c.updatePull(
 		ctx,
@@ -204,7 +203,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
-	if cmd.Name == ApplyCommand && c.Automerge {
+	if cmd.Name == ApplyCommand && c.automergeEnabled(ctx, projectCmds) {
 		c.automerge(ctx, pullStatus)
 	}
 }
@@ -361,6 +360,14 @@ func (c *DefaultCommandRunner) updateDB(pull models.PullRequest, results []model
 	}
 
 	return c.DB.UpdatePullWithResults(pull, filtered)
+}
+
+// automergeEnabled returns true if automerging is enabled in this context.
+func (c *DefaultCommandRunner) automergeEnabled(ctx *CommandContext, projectCmds []models.ProjectCommandContext) bool {
+	// If the global automerge is set, we always automerge.
+	return c.GlobalAutomerge ||
+		// Otherwise we check if this repo is configured for automerging.
+		(len(projectCmds) > 0 && projectCmds[0].GlobalConfig != nil && projectCmds[0].GlobalConfig.Automerge)
 }
 
 var automergeComment = `Automatically merging because all plans have been successfully applied.`

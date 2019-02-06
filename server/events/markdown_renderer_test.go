@@ -932,8 +932,8 @@ $$$
 	Equals(t, expWithBackticks, rendered)
 }
 
-// Test rendering when there was an error in one of the plans and we require
-// all plans to succeed.
+// Test rendering when there was an error in one of the plans and we deleted
+// all the plans as a result.
 func TestRenderProjectResults_PlansDeleted(t *testing.T) {
 	cases := map[string]struct {
 		cr  events.CommandResult
@@ -948,6 +948,7 @@ func TestRenderProjectResults_PlansDeleted(t *testing.T) {
 						Failure:    "failure",
 					},
 				},
+				PlansDeleted: true,
 			},
 			exp: `Ran Plan for dir: $.$ workspace: $staging$
 
@@ -969,6 +970,7 @@ func TestRenderProjectResults_PlansDeleted(t *testing.T) {
 						Failure:    "failure",
 					},
 				},
+				PlansDeleted: true,
 			},
 			exp: `Ran Plan for 2 projects:
 1. dir: $.$ workspace: $staging$
@@ -1004,6 +1006,7 @@ func TestRenderProjectResults_PlansDeleted(t *testing.T) {
 						},
 					},
 				},
+				PlansDeleted: true,
 			},
 			exp: `Ran Plan for 2 projects:
 1. dir: $.$ workspace: $staging$
@@ -1028,9 +1031,7 @@ This plan was not saved because one or more projects failed and automerge requir
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			mr := events.MarkdownRenderer{
-				RequireAllPlansSucceed: true,
-			}
+			mr := events.MarkdownRenderer{}
 			rendered := mr.Render(c.cr, events.PlanCommand, "log", false, models.Github)
 			expWithBackticks := strings.Replace(c.exp, "$", "`", -1)
 			Equals(t, expWithBackticks, rendered)

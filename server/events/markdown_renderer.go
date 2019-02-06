@@ -37,10 +37,6 @@ type MarkdownRenderer struct {
 	// using supports the CommonMark markdown format.
 	// If we're not configured with a GitLab client, this will be false.
 	GitlabSupportsCommonMark bool
-
-	// RequireAllPlansSucceed is true if we require all plans succeed in each
-	// run. If all plans don't succeed, we delete the ones that did.
-	RequireAllPlansSucceed bool
 }
 
 // commonData is data that all responses have.
@@ -89,7 +85,7 @@ func (m *MarkdownRenderer) Render(res CommandResult, cmdName CommandName, log st
 		Command:      commandStr,
 		Verbose:      verbose,
 		Log:          log,
-		PlansDeleted: m.RequireAllPlansSucceed && cmdName == PlanCommand && res.HasErrors(),
+		PlansDeleted: res.PlansDeleted,
 	}
 	if res.Error != nil {
 		return m.renderTemplate(unwrappedErrWithLogTmpl, errData{res.Error.Error(), common})
@@ -97,10 +93,10 @@ func (m *MarkdownRenderer) Render(res CommandResult, cmdName CommandName, log st
 	if res.Failure != "" {
 		return m.renderTemplate(failureWithLogTmpl, failureData{res.Failure, common})
 	}
-	return m.renderProjectResults(res.ProjectResults, common, vcsHost, m.RequireAllPlansSucceed && res.HasErrors())
+	return m.renderProjectResults(res.ProjectResults, common, vcsHost)
 }
 
-func (m *MarkdownRenderer) renderProjectResults(results []models.ProjectResult, common commonData, vcsHost models.VCSHostType, plansDeleted bool) string {
+func (m *MarkdownRenderer) renderProjectResults(results []models.ProjectResult, common commonData, vcsHost models.VCSHostType) string {
 	var resultsTmplData []projectResultTmplData
 	numPlanSuccesses := 0
 
@@ -132,9 +128,9 @@ func (m *MarkdownRenderer) renderProjectResults(results []models.ProjectResult, 
 			})
 		} else if result.PlanSuccess != nil {
 			if m.shouldUseWrappedTmpl(vcsHost, result.PlanSuccess.TerraformOutput) {
-				resultData.Rendered = m.renderTemplate(planSuccessWrappedTmpl, planSuccessData{PlanSuccess: *result.PlanSuccess, PlanWasDeleted: plansDeleted})
+				resultData.Rendered = m.renderTemplate(planSuccessWrappedTmpl, planSuccessData{PlanSuccess: *result.PlanSuccess, PlanWasDeleted: common.PlansDeleted})
 			} else {
-				resultData.Rendered = m.renderTemplate(planSuccessUnwrappedTmpl, planSuccessData{PlanSuccess: *result.PlanSuccess, PlanWasDeleted: plansDeleted})
+				resultData.Rendered = m.renderTemplate(planSuccessUnwrappedTmpl, planSuccessData{PlanSuccess: *result.PlanSuccess, PlanWasDeleted: common.PlansDeleted})
 			}
 			numPlanSuccesses++
 		} else if result.ApplySuccess != "" {
