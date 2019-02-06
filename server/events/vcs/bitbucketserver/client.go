@@ -23,7 +23,7 @@ import (
 const maxCommentLength = 32768
 
 type Client struct {
-	HttpClient  *http.Client
+	HTTPClient  *http.Client
 	Username    string
 	Password    string
 	BaseURL     string
@@ -52,7 +52,7 @@ func NewClient(httpClient *http.Client, username string, password string, baseUR
 	}
 	urlWithoutPath := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
 	return &Client{
-		HttpClient:  httpClient,
+		HTTPClient:  httpClient,
 		Username:    username,
 		Password:    password,
 		BaseURL:     urlWithoutPath,
@@ -264,7 +264,7 @@ func (b *Client) makeRequest(method string, path string, reqBody io.Reader) ([]b
 	if reqBody != nil {
 		req.Header.Add("Content-Type", "application/json")
 	}
-	resp, err := b.HttpClient.Do(req)
+	resp, err := b.HTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

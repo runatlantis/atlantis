@@ -60,19 +60,13 @@ release: ## Create packages for a release
 fmt: ## Run goimports (which also formats)
 	goimports -w $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "./server/static/bindata_assetfs.go" ! -path "**/mocks/*")
 
-gometalint: ## Run every linter ever
-	# gotype and gotypex are disabled because they don't pass on CI and https://github.com/alecthomas/gometalinter/issues/206
-	# maligned is disabled because I'd rather have alphabetical struct fields than save a few bytes
-	# gocyclo is temporarily disabled because we don't pass it right now
-	# golint is temporarily disabled because we need to add comments everywhere first
-	# CGO_ENABLED=0 is attempted workaround for https://github.com/alecthomas/gometalinter/issues/149
-	CGO_ENABLED=0 gometalinter --config=.gometalinter.json ./...
+lint: ## Run linter
+	golangci-lint run
 
-gometalint-install: ## Install gometalint
-	go get -u github.com/alecthomas/gometalinter
-	gometalinter --install
+lint-install: ## Install linter via CI
+	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin v1.13.2
 
-check-gometalint: gometalint-install gometalint
+check-lint: lint-install lint
 
 check-fmt: ## Fail if not formatted
 	go get golang.org/x/tools/cmd/goimports

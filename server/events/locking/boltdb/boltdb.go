@@ -315,7 +315,7 @@ func (b *BoltLocker) DeletePullStatus(pull models.PullRequest) error {
 	}
 	err = b.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(b.pullsBucketName)
-		return bucket.Delete([]byte(key))
+		return bucket.Delete(key)
 	})
 	return errors.Wrap(err, "DB transaction failed")
 }

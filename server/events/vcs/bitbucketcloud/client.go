@@ -14,7 +14,7 @@ import (
 )
 
 type Client struct {
-	HttpClient  *http.Client
+	HTTPClient  *http.Client
 	Username    string
 	Password    string
 	BaseURL     string
@@ -30,7 +30,7 @@ func NewClient(httpClient *http.Client, username string, password string, atlant
 		httpClient = http.DefaultClient
 	}
 	return &Client{
-		HttpClient:  httpClient,
+		HTTPClient:  httpClient,
 		Username:    username,
 		Password:    password,
 		BaseURL:     BaseURL,
@@ -197,7 +197,7 @@ func (b *Client) makeRequest(method string, path string, reqBody io.Reader) ([]b
 	if reqBody != nil {
 		req.Header.Add("Content-Type", "application/json")
 	}
-	resp, err := b.HttpClient.Do(req)
+	resp, err := b.HTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

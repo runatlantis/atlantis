@@ -373,6 +373,7 @@ func TestGithubClient_MergePull(t *testing.T) {
 // and returns a function to be called in a defer that will re-enable it.
 func disableSSLVerification() func() {
 	orig := http.DefaultTransport.(*http.Transport).TLSClientConfig
+	// nolint: gosec
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	return func() {
 		http.DefaultTransport.(*http.Transport).TLSClientConfig = orig

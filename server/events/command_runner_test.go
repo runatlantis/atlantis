@@ -185,13 +185,12 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 					PlanSuccess: &models.PlanSuccess{},
 				},
 			}
-		} else {
-			// The second call, we return a failed result.
-			return ReturnValues{
-				models.ProjectResult{
-					Error: errors.New("err"),
-				},
-			}
+		}
+		// The second call, we return a failed result.
+		return ReturnValues{
+			models.ProjectResult{
+				Error: errors.New("err"),
+			},
 		}
 	})
 	tmp, cleanup := TempDir(t)
