@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/runatlantis/atlantis/server/events/db"
 	"log"
 	"net/http"
 	"net/url"
@@ -34,7 +35,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/locking"
-	"github.com/runatlantis/atlantis/server/events/locking/boltdb"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/terraform"
@@ -176,7 +176,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GitlabSupportsCommonMark: gitlabClient.SupportsCommonMark(),
 		RequireAllPlansSucceed:   userConfig.Automerge,
 	}
-	boltdb, err := boltdb.New(userConfig.DataDir)
+	boltdb, err := db.New(userConfig.DataDir)
 	if err != nil {
 		return nil, err
 	}

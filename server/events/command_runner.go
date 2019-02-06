@@ -15,11 +15,10 @@ package events
 
 import (
 	"fmt"
-
 	"github.com/google/go-github/github"
 	"github.com/lkysow/go-gitlab"
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/events/locking/boltdb"
+	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -78,7 +77,7 @@ type DefaultCommandRunner struct {
 	Automerge         bool
 	PendingPlanFinder PendingPlanFinder
 	WorkingDir        WorkingDir
-	DB                *boltdb.BoltLocker
+	DB                *db.BoltDB
 }
 
 // RunAutoplanCommand runs plan when a pull request is opened or updated.
@@ -210,10 +209,10 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	}
 }
 
-func (c *DefaultCommandRunner) automerge(ctx *CommandContext, pullStatus *boltdb.PullStatus) {
+func (c *DefaultCommandRunner) automerge(ctx *CommandContext, pullStatus *db.PullStatus) {
 	// We only automerge if all projects have been successfully applied.
 	for _, p := range pullStatus.Projects {
-		if p.Status != boltdb.AppliedPlanStatus {
+		if p.Status != db.AppliedPlanStatus {
 			ctx.Log.Info("not automerging because project at dir %q, workspace %q has status %q", p.RepoRelDir, p.Workspace, p.Status.String())
 			return
 		}
@@ -349,7 +348,7 @@ func (c *DefaultCommandRunner) deletePlans(ctx *CommandContext) {
 	}
 }
 
-func (c *DefaultCommandRunner) updateDB(pull models.PullRequest, results []models.ProjectResult) (*boltdb.PullStatus, error) {
+func (c *DefaultCommandRunner) updateDB(pull models.PullRequest, results []models.ProjectResult) (*db.PullStatus, error) {
 	// Filter out results that errored due to the directory not existing. We
 	// don't store these in the database because they would never be "applyable"
 	// and so the pull request would always have errors.

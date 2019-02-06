@@ -3,6 +3,7 @@ package server_test
 import (
 	"bytes"
 	"fmt"
+	"github.com/runatlantis/atlantis/server/events/db"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -18,7 +19,6 @@ import (
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/locking"
-	"github.com/runatlantis/atlantis/server/events/locking/boltdb"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -275,7 +275,7 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClientProxy,
 	}
 	terraformClient, err := terraform.NewClient(dataDir, "")
 	Ok(t, err)
-	boltdb, err := boltdb.New(dataDir)
+	boltdb, err := db.New(dataDir)
 	Ok(t, err)
 	lockingClient := locking.NewClient(boltdb)
 	projectLocker := &events.DefaultProjectLocker{

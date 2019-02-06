@@ -16,11 +16,11 @@ package events
 import (
 	"bytes"
 	"fmt"
+	"github.com/runatlantis/atlantis/server/events/db"
 	"sort"
 	"strings"
 	"text/template"
 
-	"github.com/runatlantis/atlantis/server/events/locking/boltdb"
 	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/pkg/errors"
@@ -45,7 +45,7 @@ type PullClosedExecutor struct {
 	VCSClient  vcs.ClientProxy
 	WorkingDir WorkingDir
 	Logger     logging.SimpleLogging
-	DB         *boltdb.BoltLocker
+	DB         *db.BoltDB
 }
 
 type templatedProject struct {

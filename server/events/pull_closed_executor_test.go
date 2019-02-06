@@ -15,9 +15,8 @@ package events_test
 
 import (
 	"errors"
+	"github.com/runatlantis/atlantis/server/events/db"
 	"testing"
-
-	"github.com/runatlantis/atlantis/server/events/locking/boltdb"
 
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events"
@@ -66,7 +65,7 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 	cp := vcsmocks.NewMockClientProxy()
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
-	db, err := boltdb.New(tmp)
+	db, err := db.New(tmp)
 	Ok(t, err)
 	pce := events.PullClosedExecutor{
 		Locker:     l,
@@ -152,7 +151,7 @@ func TestCleanUpPullComments(t *testing.T) {
 			l := lockmocks.NewMockLocker()
 			tmp, cleanup := TempDir(t)
 			defer cleanup()
-			db, err := boltdb.New(tmp)
+			db, err := db.New(tmp)
 			Ok(t, err)
 			pce := events.PullClosedExecutor{
 				Locker:     l,

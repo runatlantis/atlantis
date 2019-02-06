@@ -2,10 +2,9 @@ package server
 
 import (
 	"fmt"
+	"github.com/runatlantis/atlantis/server/events/db"
 	"net/http"
 	"net/url"
-
-	"github.com/runatlantis/atlantis/server/events/locking/boltdb"
 
 	"github.com/gorilla/mux"
 	"github.com/runatlantis/atlantis/server/events"
@@ -25,7 +24,7 @@ type LocksController struct {
 	LockDetailTemplate TemplateWriter
 	WorkingDir         events.WorkingDir
 	WorkingDirLocker   events.WorkingDirLocker
-	DB                 *boltdb.BoltLocker
+	DB                 *db.BoltDB
 }
 
 // GetLock is the GET /locks/{id} route. It renders the lock detail view.

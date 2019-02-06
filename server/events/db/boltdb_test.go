@@ -11,9 +11,10 @@
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
 
-package boltdb_test
+package db_test
 
 import (
+	"github.com/runatlantis/atlantis/server/events/db"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -21,7 +22,6 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/events/locking/boltdb"
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -353,7 +353,7 @@ func TestGetLock(t *testing.T) {
 }
 
 // newTestDB returns a TestDB using a temporary path.
-func newTestDB() (*bolt.DB, *boltdb.BoltLocker) {
+func newTestDB() (*bolt.DB, *db.BoltDB) {
 	// Retrieve a temporary path.
 	f, err := ioutil.TempFile("", "")
 	if err != nil {
@@ -363,11 +363,11 @@ func newTestDB() (*bolt.DB, *boltdb.BoltLocker) {
 	f.Close() // nolint: errcheck
 
 	// Open the database.
-	db, err := bolt.Open(path, 0600, nil)
+	boltDB, err := bolt.Open(path, 0600, nil)
 	if err != nil {
 		panic(errors.Wrap(err, "could not start bolt DB"))
 	}
-	if err := db.Update(func(tx *bolt.Tx) error {
+	if err := boltDB.Update(func(tx *bolt.Tx) error {
 		if _, err := tx.CreateBucketIfNotExists([]byte(lockBucket)); err != nil {
 			return errors.Wrap(err, "failed to create bucket")
 		}
@@ -375,8 +375,8 @@ func newTestDB() (*bolt.DB, *boltdb.BoltLocker) {
 	}); err != nil {
 		panic(errors.Wrap(err, "could not create bucket"))
 	}
-	b, _ := boltdb.NewWithDB(db, lockBucket)
-	return db, b
+	b, _ := db.NewWithDB(boltDB, lockBucket)
+	return boltDB, b
 }
 
 func cleanupDB(db *bolt.DB) {

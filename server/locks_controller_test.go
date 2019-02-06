@@ -3,13 +3,12 @@ package server_test
 import (
 	"bytes"
 	"errors"
+	"github.com/runatlantis/atlantis/server/events/db"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"reflect"
 	"testing"
-
-	"github.com/runatlantis/atlantis/server/events/locking/boltdb"
 
 	"github.com/gorilla/mux"
 	. "github.com/petergtz/pegomock"
@@ -208,7 +207,7 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 	}, nil)
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
-	db, err := boltdb.New(tmp)
+	db, err := db.New(tmp)
 	Ok(t, err)
 	lc := server.LocksController{
 		Locker:           l,
@@ -246,7 +245,7 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	}, nil)
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
-	db, err := boltdb.New(tmp)
+	db, err := db.New(tmp)
 	Ok(t, err)
 	lc := server.LocksController{
 		Locker:           l,
