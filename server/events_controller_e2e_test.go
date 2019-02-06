@@ -38,158 +38,251 @@ func TestGitHubWorkflow(t *testing.T) {
 	cases := []struct {
 		Description string
 		// RepoDir is relative to testfixtures/test-repos.
-		RepoDir                string
-		ModifiedFiles          []string
-		ExpAutoplanCommentFile string
-		ExpMergeCommentFile    string
-		CommentAndReplies      []string
+		RepoDir string
+		// ModifiedFiles are the list of files that have been modified in this
+		// pull request.
+		ModifiedFiles []string
+		// Comments are what our mock user writes to the pull request.
+		Comments []string
+		// ExpAutomerge is true if we expect Atlantis to automerge.
+		ExpAutomerge bool
+		// ExpAutoplan is true if we expect Atlantis to autoplan.
+		ExpAutoplan bool
+		// ExpReplies is a list of files containing the expected replies that
+		// Atlantis writes to the pull request in order.
+		ExpReplies []string
 	}{
 		{
-			Description:            "simple",
-			RepoDir:                "simple",
-			ModifiedFiles:          []string{"main.tf"},
-			ExpAutoplanCommentFile: "exp-output-autoplan.txt",
-			CommentAndReplies: []string{
-				"atlantis apply", "exp-output-apply.txt",
+			Description:   "simple",
+			RepoDir:       "simple",
+			ModifiedFiles: []string{"main.tf"},
+			Comments: []string{
+				"atlantis apply",
 			},
-			ExpMergeCommentFile: "exp-output-merge.txt",
+			ExpReplies: []string{
+				"exp-output-autoplan.txt",
+				"exp-output-apply.txt",
+				"exp-output-merge.txt",
+			},
+			ExpAutoplan: true,
 		},
 		{
-			Description:            "simple with plan comment",
-			RepoDir:                "simple",
-			ModifiedFiles:          []string{"main.tf"},
-			ExpAutoplanCommentFile: "exp-output-autoplan.txt",
-			CommentAndReplies: []string{
-				"atlantis plan", "exp-output-autoplan.txt",
-				"atlantis apply", "exp-output-apply.txt",
+			Description:   "simple with plan comment",
+			RepoDir:       "simple",
+			ModifiedFiles: []string{"main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis plan",
+				"atlantis apply",
 			},
-			ExpMergeCommentFile: "exp-output-merge.txt",
+			ExpReplies: []string{
+				"exp-output-autoplan.txt",
+				"exp-output-autoplan.txt",
+				"exp-output-apply.txt",
+				"exp-output-merge.txt",
+			},
 		},
 		{
-			Description:            "simple with comment -var",
-			RepoDir:                "simple",
-			ModifiedFiles:          []string{"main.tf"},
-			ExpAutoplanCommentFile: "exp-output-autoplan.txt",
-			CommentAndReplies: []string{
-				"atlantis plan -- -var var=overridden", "exp-output-atlantis-plan-var-overridden.txt",
-				"atlantis apply", "exp-output-apply-var.txt",
+			Description:   "simple with comment -var",
+			RepoDir:       "simple",
+			ModifiedFiles: []string{"main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis plan -- -var var=overridden",
+				"atlantis apply",
 			},
-			ExpMergeCommentFile: "exp-output-merge.txt",
+			ExpReplies: []string{
+				"exp-output-autoplan.txt",
+				"exp-output-atlantis-plan-var-overridden.txt",
+				"exp-output-apply-var.txt",
+				"exp-output-merge.txt",
+			},
 		},
 		{
-			Description:            "simple with workspaces",
-			RepoDir:                "simple",
-			ModifiedFiles:          []string{"main.tf"},
-			ExpAutoplanCommentFile: "exp-output-autoplan.txt",
-			CommentAndReplies: []string{
-				"atlantis plan -- -var var=default_workspace", "exp-output-atlantis-plan.txt",
-				"atlantis plan -w new_workspace -- -var var=new_workspace", "exp-output-atlantis-plan-new-workspace.txt",
-				"atlantis apply -w default", "exp-output-apply-var-default-workspace.txt",
-				"atlantis apply -w new_workspace", "exp-output-apply-var-new-workspace.txt",
+			Description:   "simple with workspaces",
+			RepoDir:       "simple",
+			ModifiedFiles: []string{"main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis plan -- -var var=default_workspace",
+				"atlantis plan -w new_workspace -- -var var=new_workspace",
+				"atlantis apply -w default",
+				"atlantis apply -w new_workspace",
 			},
-			ExpMergeCommentFile: "exp-output-merge-workspaces.txt",
+			ExpReplies: []string{
+				"exp-output-autoplan.txt",
+				"exp-output-atlantis-plan.txt",
+				"exp-output-atlantis-plan-new-workspace.txt",
+				"exp-output-apply-var-default-workspace.txt",
+				"exp-output-apply-var-new-workspace.txt",
+				"exp-output-merge-workspaces.txt",
+			},
 		},
 		{
-			Description:            "simple with workspaces and apply all",
-			RepoDir:                "simple",
-			ModifiedFiles:          []string{"main.tf"},
-			ExpAutoplanCommentFile: "exp-output-autoplan.txt",
-			CommentAndReplies: []string{
-				"atlantis plan -- -var var=default_workspace", "exp-output-atlantis-plan.txt",
-				"atlantis plan -w new_workspace -- -var var=new_workspace", "exp-output-atlantis-plan-new-workspace.txt",
-				"atlantis apply", "exp-output-apply-var-all.txt",
+			Description:   "simple with workspaces and apply all",
+			RepoDir:       "simple",
+			ModifiedFiles: []string{"main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis plan -- -var var=default_workspace",
+				"atlantis plan -w new_workspace -- -var var=new_workspace",
+				"atlantis apply",
 			},
-			ExpMergeCommentFile: "exp-output-merge-workspaces.txt",
+			ExpReplies: []string{
+				"exp-output-autoplan.txt",
+				"exp-output-atlantis-plan.txt",
+				"exp-output-atlantis-plan-new-workspace.txt",
+				"exp-output-apply-var-all.txt",
+				"exp-output-merge-workspaces.txt",
+			},
 		},
 		{
-			Description:            "simple with atlantis.yaml",
-			RepoDir:                "simple-yaml",
-			ModifiedFiles:          []string{"main.tf"},
-			ExpAutoplanCommentFile: "exp-output-autoplan.txt",
-			CommentAndReplies: []string{
-				"atlantis apply -w staging", "exp-output-apply-staging.txt",
-				"atlantis apply -w default", "exp-output-apply-default.txt",
+			Description:   "simple with atlantis.yaml",
+			RepoDir:       "simple-yaml",
+			ModifiedFiles: []string{"main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis apply -w staging",
+				"atlantis apply -w default",
 			},
-			ExpMergeCommentFile: "exp-output-merge.txt",
+			ExpReplies: []string{
+				"exp-output-autoplan.txt",
+				"exp-output-apply-staging.txt",
+				"exp-output-apply-default.txt",
+				"exp-output-merge.txt",
+			},
 		},
 		{
-			Description:            "simple with atlantis.yaml and apply all",
-			RepoDir:                "simple-yaml",
-			ModifiedFiles:          []string{"main.tf"},
-			ExpAutoplanCommentFile: "exp-output-autoplan.txt",
-			CommentAndReplies: []string{
-				"atlantis apply", "exp-output-apply-all.txt",
+			Description:   "simple with atlantis.yaml and apply all",
+			RepoDir:       "simple-yaml",
+			ModifiedFiles: []string{"main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis apply",
 			},
-			ExpMergeCommentFile: "exp-output-merge.txt",
+			ExpReplies: []string{
+				"exp-output-autoplan.txt",
+				"exp-output-apply-all.txt",
+				"exp-output-merge.txt",
+			},
 		},
 		{
-			Description:            "simple with atlantis.yaml and plan/apply all",
-			RepoDir:                "simple-yaml",
-			ModifiedFiles:          []string{"main.tf"},
-			ExpAutoplanCommentFile: "exp-output-autoplan.txt",
-			CommentAndReplies: []string{
-				"atlantis plan", "exp-output-autoplan.txt",
-				"atlantis apply", "exp-output-apply-all.txt",
+			Description:   "simple with atlantis.yaml and plan/apply all",
+			RepoDir:       "simple-yaml",
+			ModifiedFiles: []string{"main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis plan",
+				"atlantis apply",
 			},
-			ExpMergeCommentFile: "exp-output-merge.txt",
+			ExpReplies: []string{
+				"exp-output-autoplan.txt",
+				"exp-output-autoplan.txt",
+				"exp-output-apply-all.txt",
+				"exp-output-merge.txt",
+			},
 		},
 		{
-			Description:            "modules staging only",
-			RepoDir:                "modules",
-			ModifiedFiles:          []string{"staging/main.tf"},
-			ExpAutoplanCommentFile: "exp-output-autoplan-only-staging.txt",
-			CommentAndReplies: []string{
-				"atlantis apply -d staging", "exp-output-apply-staging.txt",
+			Description:   "modules staging only",
+			RepoDir:       "modules",
+			ModifiedFiles: []string{"staging/main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis apply -d staging",
 			},
-			ExpMergeCommentFile: "exp-output-merge-only-staging.txt",
+			ExpReplies: []string{
+				"exp-output-autoplan-only-staging.txt",
+				"exp-output-apply-staging.txt",
+				"exp-output-merge-only-staging.txt",
+			},
 		},
 		{
-			Description:            "modules modules only",
-			RepoDir:                "modules",
-			ModifiedFiles:          []string{"modules/null/main.tf"},
-			ExpAutoplanCommentFile: "",
-			CommentAndReplies: []string{
-				"atlantis plan -d staging", "exp-output-plan-staging.txt",
-				"atlantis plan -d production", "exp-output-plan-production.txt",
-				"atlantis apply -d staging", "exp-output-apply-staging.txt",
-				"atlantis apply -d production", "exp-output-apply-production.txt",
+			Description:   "modules modules only",
+			RepoDir:       "modules",
+			ModifiedFiles: []string{"modules/null/main.tf"},
+			ExpAutoplan:   false,
+			Comments: []string{
+				"atlantis plan -d staging",
+				"atlantis plan -d production",
+				"atlantis apply -d staging",
+				"atlantis apply -d production",
 			},
-			ExpMergeCommentFile: "exp-output-merge-all-dirs.txt",
+			ExpReplies: []string{
+				"exp-output-plan-staging.txt",
+				"exp-output-plan-production.txt",
+				"exp-output-apply-staging.txt",
+				"exp-output-apply-production.txt",
+				"exp-output-merge-all-dirs.txt",
+			},
 		},
 		{
-			Description:            "modules-yaml",
-			RepoDir:                "modules-yaml",
-			ModifiedFiles:          []string{"modules/null/main.tf"},
-			ExpAutoplanCommentFile: "exp-output-autoplan.txt",
-			CommentAndReplies: []string{
-				"atlantis apply -d staging", "exp-output-apply-staging.txt",
-				"atlantis apply -d production", "exp-output-apply-production.txt",
+			Description:   "modules-yaml",
+			RepoDir:       "modules-yaml",
+			ModifiedFiles: []string{"modules/null/main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis apply -d staging",
+				"atlantis apply -d production",
 			},
-			ExpMergeCommentFile: "exp-output-merge.txt",
+			ExpReplies: []string{
+				"exp-output-autoplan.txt",
+				"exp-output-apply-staging.txt",
+				"exp-output-apply-production.txt",
+				"exp-output-merge.txt",
+			},
 		},
 		{
-			Description:            "tfvars-yaml",
-			RepoDir:                "tfvars-yaml",
-			ModifiedFiles:          []string{"main.tf"},
-			ExpAutoplanCommentFile: "exp-output-autoplan.txt",
-			CommentAndReplies: []string{
-				"atlantis apply -p staging", "exp-output-apply-staging.txt",
-				"atlantis apply -p default", "exp-output-apply-default.txt",
+			Description:   "tfvars-yaml",
+			RepoDir:       "tfvars-yaml",
+			ModifiedFiles: []string{"main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis apply -p staging",
+				"atlantis apply -p default",
 			},
-			ExpMergeCommentFile: "exp-output-merge.txt",
+			ExpReplies: []string{
+				"exp-output-autoplan.txt",
+				"exp-output-apply-staging.txt",
+				"exp-output-apply-default.txt",
+				"exp-output-merge.txt",
+			},
 		},
 		{
-			Description:            "tfvars no autoplan",
-			RepoDir:                "tfvars-yaml-no-autoplan",
-			ModifiedFiles:          []string{"main.tf"},
-			ExpAutoplanCommentFile: "",
-			CommentAndReplies: []string{
-				"atlantis plan -p staging", "exp-output-plan-staging.txt",
-				"atlantis plan -p default", "exp-output-plan-default.txt",
-				"atlantis apply -p staging", "exp-output-apply-staging.txt",
-				"atlantis apply -p default", "exp-output-apply-default.txt",
+			Description:   "tfvars no autoplan",
+			RepoDir:       "tfvars-yaml-no-autoplan",
+			ModifiedFiles: []string{"main.tf"},
+			ExpAutoplan:   false,
+			Comments: []string{
+				"atlantis plan -p staging",
+				"atlantis plan -p default",
+				"atlantis apply -p staging",
+				"atlantis apply -p default",
 			},
-			ExpMergeCommentFile: "exp-output-merge.txt",
+			ExpReplies: []string{
+				"exp-output-plan-staging.txt",
+				"exp-output-plan-default.txt",
+				"exp-output-apply-staging.txt",
+				"exp-output-apply-default.txt",
+				"exp-output-merge.txt",
+			},
+		},
+		{
+			Description:   "automerge",
+			RepoDir:       "automerge",
+			ExpAutomerge:  true,
+			ExpAutoplan:   true,
+			ModifiedFiles: []string{"dir1/main.tf", "dir2/main.tf"},
+			Comments: []string{
+				"atlantis apply -d dir1",
+				"atlantis apply -d dir2",
+			},
+			ExpReplies: []string{
+				"exp-output-autoplan.txt",
+				"exp-output-apply-dir1.txt",
+				"exp-output-apply-dir2.txt",
+				"exp-output-automerge.txt",
+				"exp-output-merge.txt",
+			},
 		},
 	}
 	for _, c := range cases {
@@ -206,44 +299,51 @@ func TestGitHubWorkflow(t *testing.T) {
 			w := httptest.NewRecorder()
 			When(githubGetter.GetPullRequest(AnyRepo(), AnyInt())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
 			When(vcsClient.GetModifiedFiles(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
-			expNumTimesCalledCreateComment := 0
 
-			// First, send the open pull request event and trigger an autoplan.
+			// First, send the open pull request event which triggers autoplan.
 			pullOpenedReq := GitHubPullRequestOpenedEvent(t, headSHA)
 			ctrl.Post(w, pullOpenedReq)
 			responseContains(t, w, 200, "Processing...")
-			if c.ExpAutoplanCommentFile != "" {
-				expNumTimesCalledCreateComment++
-				_, _, autoplanComment := vcsClient.VerifyWasCalledOnce().CreateComment(AnyRepo(), AnyInt(), AnyString()).GetCapturedArguments()
-				assertCommentEquals(t, c.ExpAutoplanCommentFile, autoplanComment, c.RepoDir)
-			}
 
 			// Now send any other comments.
-			for i := 0; i < len(c.CommentAndReplies); i += 2 {
-				comment := c.CommentAndReplies[i]
-				expOutputFile := c.CommentAndReplies[i+1]
-
+			for _, comment := range c.Comments {
 				commentReq := GitHubCommentEvent(t, comment)
 				w = httptest.NewRecorder()
 				ctrl.Post(w, commentReq)
 				responseContains(t, w, 200, "Processing...")
-				// Each comment warrants a response. The comments are at the
-				// even indices.
-				if i%2 == 0 {
-					expNumTimesCalledCreateComment++
-				}
-				_, _, atlantisComment := vcsClient.VerifyWasCalled(Times(expNumTimesCalledCreateComment)).CreateComment(AnyRepo(), AnyInt(), AnyString()).GetCapturedArguments()
-				assertCommentEquals(t, expOutputFile, atlantisComment, c.RepoDir)
 			}
 
-			// Finally, send the pull request merged event.
+			// Send the "pull closed" event which would be triggered by the
+			// automerge or a manual merge.
 			pullClosedReq := GitHubPullRequestClosedEvent(t)
 			w = httptest.NewRecorder()
 			ctrl.Post(w, pullClosedReq)
 			responseContains(t, w, 200, "Pull request cleaned successfully")
-			expNumTimesCalledCreateComment++
-			_, _, pullClosedComment := vcsClient.VerifyWasCalled(Times(expNumTimesCalledCreateComment)).CreateComment(AnyRepo(), AnyInt(), AnyString()).GetCapturedArguments()
-			assertCommentEquals(t, c.ExpMergeCommentFile, pullClosedComment, c.RepoDir)
+
+			// Now we're ready to verify Atlantis made all the comments back
+			// (or replies) that we expect.
+			// We expect replies for each comment plus one for the locks deleted
+			// at the end.
+			expNumReplies := len(c.Comments) + 1
+			if c.ExpAutoplan {
+				expNumReplies++
+			}
+			if c.ExpAutomerge {
+				expNumReplies++
+			}
+
+			_, _, actReplies := vcsClient.VerifyWasCalled(Times(expNumReplies)).CreateComment(AnyRepo(), AnyInt(), AnyString()).GetAllCapturedArguments()
+			Assert(t, len(c.ExpReplies) == len(actReplies), "missing expected replies, got %d but expected %d", len(actReplies), len(c.ExpReplies))
+			for i, expReply := range c.ExpReplies {
+				assertCommentEquals(t, expReply, actReplies[i], c.RepoDir)
+			}
+
+			if c.ExpAutomerge {
+				// Verify that the merge API call was made.
+				vcsClient.VerifyWasCalledOnce().MergePull(matchers.AnyModelsPullRequest())
+			} else {
+				vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest())
+			}
 		})
 	}
 }
@@ -420,7 +520,7 @@ func GitHubPullRequestParsed(headSHA string) *github.PullRequest {
 		Head: &github.PullRequestBranch{
 			Repo: &github.Repository{
 				FullName: github.String("runatlantis/atlantis-tests"),
-				CloneURL: github.String("/runatlantis/atlantis-tests.git"),
+				CloneURL: github.String("https://github.com/runatlantis/atlantis-tests.git"),
 			},
 			SHA: github.String(headSHA),
 			Ref: github.String("branch"),
@@ -428,7 +528,7 @@ func GitHubPullRequestParsed(headSHA string) *github.PullRequest {
 		Base: &github.PullRequestBranch{
 			Repo: &github.Repository{
 				FullName: github.String("runatlantis/atlantis-tests"),
-				CloneURL: github.String("/runatlantis/atlantis-tests.git"),
+				CloneURL: github.String("https://github.com/runatlantis/atlantis-tests.git"),
 			},
 			Ref: github.String("master"),
 		},
@@ -498,11 +598,19 @@ func assertCommentEquals(t *testing.T, expFile string, act string, repoDir strin
 	resourceRegex := regexp.MustCompile(`null_resource\.simple\d?:.*`)
 	act = resourceRegex.ReplaceAllString(act, "null_resource.simple:")
 
-	if string(exp) != act {
+	expStr := string(exp)
+	// My editor adds a newline to all the files, so if the actual comment
+	// doesn't end with a newline then strip the last newline from the file's
+	// contents.
+	if !strings.HasSuffix(act, "\n") {
+		expStr = strings.TrimSuffix(expStr, "\n")
+	}
+
+	if expStr != act {
 		// If in CI, we write the diff to the console. Otherwise we write the diff
 		// to file so we can use our local diff viewer.
 		if os.Getenv("CI") == "true" {
-			t.Logf("exp: %s, got: %s", string(exp), act)
+			t.Logf("exp: %s, got: %s", expStr, act)
 			t.FailNow()
 		} else {
 			actFile := filepath.Join(absRepoPath(t, repoDir), expFile+".act")

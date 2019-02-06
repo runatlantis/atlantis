@@ -115,7 +115,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		result.PlansDeleted = true
 	}
 	c.updatePull(ctx, AutoplanCommand{}, result)
-	_, err = c.updateDB(ctx.Pull, result.ProjectResults)
+	_, err = c.updateDB(ctx, ctx.Pull, result.ProjectResults)
 	if err != nil {
 		c.Logger.Err("writing results: %s", err)
 	}
@@ -197,7 +197,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		cmd,
 		result)
 
-	pullStatus, err := c.updateDB(pull, result.ProjectResults)
+	pullStatus, err := c.updateDB(ctx, pull, result.ProjectResults)
 	if err != nil {
 		c.Logger.Err("writing results: %s", err)
 		return
@@ -347,18 +347,19 @@ func (c *DefaultCommandRunner) deletePlans(ctx *CommandContext) {
 	}
 }
 
-func (c *DefaultCommandRunner) updateDB(pull models.PullRequest, results []models.ProjectResult) (*db.PullStatus, error) {
+func (c *DefaultCommandRunner) updateDB(ctx *CommandContext, pull models.PullRequest, results []models.ProjectResult) (*db.PullStatus, error) {
 	// Filter out results that errored due to the directory not existing. We
 	// don't store these in the database because they would never be "applyable"
 	// and so the pull request would always have errors.
 	var filtered []models.ProjectResult
 	for _, r := range results {
 		if _, ok := r.Error.(DirNotExistErr); ok {
+			ctx.Log.Debug("ignoring error result from project at dir %q workspace %q because it is dir not exist error", r.RepoRelDir, r.Workspace)
 			continue
 		}
 		filtered = append(filtered, r)
 	}
-
+	ctx.Log.Debug("updating DB with pull results")
 	return c.DB.UpdatePullWithResults(pull, filtered)
 }
 
