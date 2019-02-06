@@ -117,10 +117,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		c.deletePlans(ctx)
 	}
 	c.updatePull(ctx, AutoplanCommand{}, result)
-
-	if _, err := c.DB.UpdatePullWithResults(ctx.Pull, result.ProjectResults); err != nil {
-		c.Logger.Err("writing results: %s", err)
-	}
+	c.updateDB(ctx.Pull, result.ProjectResults)
 }
 
 // RunCommentCommand executes the command.
@@ -198,14 +195,8 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		cmd,
 		result)
 
-	pullStatus, err := c.DB.UpdatePullWithResults(pull, result.ProjectResults)
-	if err != nil {
-		c.Logger.Err("writing results: %s", err)
-		return
-	}
-
-	// Automerge if required.
-	if cmd.Name == ApplyCommand && c.Automerge {
+	pullStatus, err := c.updateDB(pull, result.ProjectResults)
+	if err == nil && cmd.Name == ApplyCommand && c.Automerge {
 		c.automerge(ctx, pullStatus)
 	}
 }
@@ -347,6 +338,25 @@ func (c *DefaultCommandRunner) deletePlans(ctx *CommandContext) {
 	if err := c.PendingPlanFinder.DeletePlans(pullDir); err != nil {
 		ctx.Log.Err("deleting pending plans: %s", err)
 	}
+}
+
+func (c *DefaultCommandRunner) updateDB(pull models.PullRequest, results []models.ProjectResult) (*boltdb.PullStatus, error) {
+	// Filter out results that errored due to the directory not existing. We
+	// don't store these in the database because they would never be "applyable"
+	// and so the pull request would always have errors.
+	var filtered []models.ProjectResult
+	for _, r := range results {
+		if _, ok := r.Error.(DirNotExistErr); ok {
+			continue
+		}
+		filtered = append(filtered, r)
+	}
+
+	status, err := c.DB.UpdatePullWithResults(pull, filtered)
+	if err != nil {
+		c.Logger.Err("writing results: %s", err)
+	}
+	return status, err
 }
 
 var automergeComment = `Automatically merging because all plans have been successfully applied.`

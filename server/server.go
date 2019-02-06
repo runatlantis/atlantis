@@ -290,6 +290,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		LockDetailTemplate: lockTemplate,
 		WorkingDir:         workingDir,
 		WorkingDirLocker:   workingDirLocker,
+		DB:                 boltdb,
 	}
 	eventsController := &EventsController{
 		CommandRunner:                commandRunner,

@@ -28,6 +28,14 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
+type DirNotExistErr struct {
+	RepoRelDir string
+}
+
+func (d DirNotExistErr) Error() string {
+	return fmt.Sprintf("dir %q does not exist", d.RepoRelDir)
+}
+
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_lock_url_generator.go LockURLGenerator
 
 // LockURLGenerator generates urls to locks.
@@ -134,6 +142,9 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 		return nil, "", cloneErr
 	}
 	projAbsPath := filepath.Join(repoDir, ctx.RepoRelDir)
+	if _, err := os.Stat(projAbsPath); os.IsNotExist(err) {
+		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+	}
 
 	// Use default stage unless another workflow is defined in config
 	stage := p.defaultPlanStage()
@@ -196,6 +207,9 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 		return "", "", err
 	}
 	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
+	if _, err := os.Stat(absPath); os.IsNotExist(err) {
+		return "", "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+	}
 
 	// Figure out what our apply requirements are.
 	var applyRequirements []string
