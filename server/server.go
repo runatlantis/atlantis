@@ -205,6 +205,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		VCSClient:  vcsClient,
 		Locker:     lockingClient,
 		WorkingDir: workingDir,
+		Logger:     logger,
+		DB:         boltdb,
 	}
 	eventParser := &events.EventParser{
 		GithubUser:         userConfig.GithubUser,
@@ -272,6 +274,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		RequireAllPlansSucceed: userConfig.Automerge,
 		WorkingDir:             workingDir,
 		PendingPlanFinder:      pendingPlanFinder,
+		DB:                     boltdb,
+		Automerge:              userConfig.Automerge,
 	}
 	repoWhitelist, err := events.NewRepoWhitelistChecker(userConfig.RepoWhitelist)
 	if err != nil {

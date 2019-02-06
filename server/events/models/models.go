@@ -355,10 +355,7 @@ func (p ProjectResult) Status() CommitStatus {
 
 // IsSuccessful returns true if this project result had no errors.
 func (p ProjectResult) IsSuccessful() bool {
-	if p.PlanSuccess != nil || p.ApplySuccess != "" {
-		return true
-	}
-	return false
+	return p.PlanSuccess != nil || p.ApplySuccess != ""
 }
 
 // PlanSuccess is the result of a successful plan.
