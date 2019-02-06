@@ -63,10 +63,9 @@ fmt: ## Run goimports (which also formats)
 lint: ## Run linter
 	golangci-lint run
 
-lint-install: ## Install linter via CI
-	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin v1.13.2
-
-check-lint: lint-install lint
+check-lint:
+	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b ./bin v1.13.2
+	./bin/golangci-lint run
 
 check-fmt: ## Fail if not formatted
 	go get golang.org/x/tools/cmd/goimports
