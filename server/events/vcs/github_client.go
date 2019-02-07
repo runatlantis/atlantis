@@ -178,13 +178,28 @@ func (g *GithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 
 // MergePull merges the pull request.
 func (g *GithubClient) MergePull(pull models.PullRequest) error {
+	// Determine which method to use for merging this PR
+	repo, _, err := g.client.Repositories.Get(g.ctx, pull.BaseRepo.Owner, pull.BaseRepo.Name)
+	if err != nil {
+		return errors.Wrap(err, "fetching repo info")
+	}
+	// Default method is "merge"
+	method := "merge"
+	if !*repo.AllowMergeCommit && *repo.AllowRebaseMerge {
+		method = "rebase"
+	} else if !*repo.AllowMergeCommit && *repo.AllowSquashMerge {
+		method = "squash"
+	}
+	options := &github.PullRequestOptions{
+		MergeMethod: method,
+	}
 	mergeResult, _, err := g.client.PullRequests.Merge(
 		g.ctx,
 		pull.BaseRepo.Owner,
 		pull.BaseRepo.Name,
 		pull.Num,
 		common.AutomergeCommitMsg,
-		nil)
+		options)
 	if err != nil {
 		return errors.Wrap(err, "merging pull request")
 	}

@@ -312,15 +312,21 @@ func TestGithubClient_MergePull(t *testing.T) {
 		},
 	}
 
+	// Use a real GitHub json response and edit the mergeable_state field.
+	jsBytes, _ := ioutil.ReadFile("fixtures/github-pull-request-baserepo.json")
+
 	for _, c := range cases {
 		t.Run(c.message, func(t *testing.T) {
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch r.RequestURI {
+					case "/api/v3/repos/owner/repo":
+						w.Write(jsBytes) // nolint: errcheck
+						return
 					case "/api/v3/repos/owner/repo/pulls/1/merge":
 						body, err := ioutil.ReadAll(r.Body)
 						Ok(t, err)
-						exp := "{\"commit_message\":\"[Atlantis] Automatically merging after successful apply\"}\n"
+						exp := "{\"commit_message\":\"[Atlantis] Automatically merging after successful apply\",\"merge_method\":\"merge\"}\n"
 						Equals(t, exp, string(body))
 						var resp string
 						if c.code == 200 {
