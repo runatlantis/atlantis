@@ -197,7 +197,7 @@ projects:
 				VCSClient:           vcsClient,
 				ProjectFinder:       &events.DefaultProjectFinder{},
 				AllowRepoConfig:     true,
-				PendingPlanFinder:   &events.PendingPlanFinder{},
+				PendingPlanFinder:   &events.DefaultPendingPlanFinder{},
 				AllowRepoConfigFlag: "allow-repo-config",
 				CommentBuilder:      &events.CommentParser{},
 			}
@@ -809,7 +809,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		ProjectFinder:       &events.DefaultProjectFinder{},
 		AllowRepoConfig:     true,
 		AllowRepoConfigFlag: "allow-repo-config",
-		PendingPlanFinder:   &events.PendingPlanFinder{},
+		PendingPlanFinder:   &events.DefaultPendingPlanFinder{},
 		CommentBuilder:      &events.CommentParser{},
 	}
 

@@ -177,7 +177,7 @@ func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
 		if err != nil {
 			return "", errors.Wrapf(err, "running %s: %s", cmdStr, string(output))
 		}
-		log.Debug("ran: %s. Output: %s", cmdStr, string(output))
+		log.Debug("ran: %s. Output: %s", cmdStr, strings.TrimSuffix(string(output), "\n"))
 	}
 	return cloneDir, nil
 }

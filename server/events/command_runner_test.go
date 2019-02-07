@@ -34,12 +34,15 @@ import (
 )
 
 var projectCommandBuilder *mocks.MockProjectCommandBuilder
+var projectCommandRunner *mocks.MockProjectCommandRunner
 var eventParsing *mocks.MockEventParsing
 var ghStatus *mocks.MockCommitStatusUpdater
 var githubGetter *mocks.MockGithubPullGetter
 var gitlabGetter *mocks.MockGitlabMergeRequestGetter
 var ch events.DefaultCommandRunner
 var pullLogger *logging.SimpleLogger
+var workingDir events.WorkingDir
+var pendingPlanFinder *mocks.MockPendingPlanFinder
 
 func setup(t *testing.T) *vcsmocks.MockClientProxy {
 	RegisterMockTestingT(t)
@@ -51,7 +54,9 @@ func setup(t *testing.T) *vcsmocks.MockClientProxy {
 	gitlabGetter = mocks.NewMockGitlabMergeRequestGetter()
 	logger := logmocks.NewMockSimpleLogging()
 	pullLogger = logging.NewSimpleLogger("runatlantis/atlantis#1", true, logging.Info)
-	projectCommandRunner := mocks.NewMockProjectCommandRunner()
+	projectCommandRunner = mocks.NewMockProjectCommandRunner()
+	workingDir = mocks.NewMockWorkingDir()
+	pendingPlanFinder = mocks.NewMockPendingPlanFinder()
 	When(logger.GetLevel()).ThenReturn(logging.Info)
 	When(logger.NewLogger("runatlantis/atlantis#1", true, logging.Info)).
 		ThenReturn(pullLogger)
@@ -67,6 +72,8 @@ func setup(t *testing.T) *vcsmocks.MockClientProxy {
 		AllowForkPRsFlag:         "allow-fork-prs-flag",
 		ProjectCommandBuilder:    projectCommandBuilder,
 		ProjectCommandRunner:     projectCommandRunner,
+		PendingPlanFinder:        pendingPlanFinder,
+		WorkingDir:               workingDir,
 	}
 	return vcsClient
 }
@@ -154,4 +161,43 @@ func TestRunCommentCommand_ClosedPull(t *testing.T) {
 
 	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, nil)
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "Atlantis commands can't be run on closed pull requests")
+}
+
+// Test that if one plan fails and we are using automerge, that
+// we delete the plans.
+func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
+	setup(t)
+	ch.GlobalAutomerge = true
+	defer func() { ch.GlobalAutomerge = false }()
+
+	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())).
+		ThenReturn([]models.ProjectCommandContext{
+			{},
+			{},
+		}, nil)
+	callCount := 0
+	When(projectCommandRunner.Plan(matchers.AnyModelsProjectCommandContext())).Then(func(_ []Param) ReturnValues {
+		if callCount == 0 {
+			// The first call, we return a successful result.
+			callCount++
+			return ReturnValues{
+				models.ProjectResult{
+					PlanSuccess: &models.PlanSuccess{},
+				},
+			}
+		}
+		// The second call, we return a failed result.
+		return ReturnValues{
+			models.ProjectResult{
+				Error: errors.New("err"),
+			},
+		}
+	})
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+
+	When(workingDir.GetPullDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).
+		ThenReturn(tmp, nil)
+	ch.RunAutoplanCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
+	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
 }

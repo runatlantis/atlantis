@@ -15,6 +15,7 @@ package events_test
 
 import (
 	"errors"
+	"github.com/runatlantis/atlantis/server/events/db"
 	"testing"
 
 	. "github.com/petergtz/pegomock"
@@ -62,13 +63,18 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 	w := mocks.NewMockWorkingDir()
 	l := lockmocks.NewMockLocker()
 	cp := vcsmocks.NewMockClientProxy()
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	db, err := db.New(tmp)
+	Ok(t, err)
 	pce := events.PullClosedExecutor{
 		Locker:     l,
 		VCSClient:  cp,
 		WorkingDir: w,
+		DB:         db,
 	}
 	When(l.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(nil, nil)
-	err := pce.CleanUpPull(fixtures.GithubRepo, fixtures.Pull)
+	err = pce.CleanUpPull(fixtures.GithubRepo, fixtures.Pull)
 	Ok(t, err)
 	cp.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString())
 }
@@ -139,21 +145,28 @@ func TestCleanUpPullComments(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		w := mocks.NewMockWorkingDir()
-		cp := vcsmocks.NewMockClientProxy()
-		l := lockmocks.NewMockLocker()
-		pce := events.PullClosedExecutor{
-			Locker:     l,
-			VCSClient:  cp,
-			WorkingDir: w,
-		}
-		t.Log("testing: " + c.Description)
-		When(l.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(c.Locks, nil)
-		err := pce.CleanUpPull(fixtures.GithubRepo, fixtures.Pull)
-		Ok(t, err)
-		_, _, comment := cp.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString()).GetCapturedArguments()
+		func() {
+			w := mocks.NewMockWorkingDir()
+			cp := vcsmocks.NewMockClientProxy()
+			l := lockmocks.NewMockLocker()
+			tmp, cleanup := TempDir(t)
+			defer cleanup()
+			db, err := db.New(tmp)
+			Ok(t, err)
+			pce := events.PullClosedExecutor{
+				Locker:     l,
+				VCSClient:  cp,
+				WorkingDir: w,
+				DB:         db,
+			}
+			t.Log("testing: " + c.Description)
+			When(l.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(c.Locks, nil)
+			err = pce.CleanUpPull(fixtures.GithubRepo, fixtures.Pull)
+			Ok(t, err)
+			_, _, comment := cp.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString()).GetCapturedArguments()
 
-		expected := "Locks and plans deleted for the projects and workspaces modified in this pull request:\n\n" + c.Exp
-		Equals(t, expected, comment)
+			expected := "Locks and plans deleted for the projects and workspaces modified in this pull request:\n\n" + c.Exp
+			Equals(t, expected, comment)
+		}()
 	}
 }

@@ -16,9 +16,12 @@ package events
 import (
 	"bytes"
 	"fmt"
+	"github.com/runatlantis/atlantis/server/events/db"
 	"sort"
 	"strings"
 	"text/template"
+
+	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/locking"
@@ -41,6 +44,8 @@ type PullClosedExecutor struct {
 	Locker     locking.Locker
 	VCSClient  vcs.ClientProxy
 	WorkingDir WorkingDir
+	Logger     logging.SimpleLogging
+	DB         *db.BoltDB
 }
 
 type templatedProject struct {
@@ -65,6 +70,11 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 	locks, err := p.Locker.UnlockByPull(repo.FullName, pull.Num)
 	if err != nil {
 		return errors.Wrap(err, "cleaning up locks")
+	}
+
+	// Delete pull from DB.
+	if err := p.DB.DeletePullStatus(pull); err != nil {
+		p.Logger.Err("deleting pull from db: %s", err)
 	}
 
 	// If there are no locks then there's no need to comment.

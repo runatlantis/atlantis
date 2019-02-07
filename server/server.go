@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/runatlantis/atlantis/server/events/db"
 	"log"
 	"net/http"
 	"net/url"
@@ -34,7 +35,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/locking"
-	"github.com/runatlantis/atlantis/server/events/locking/boltdb"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/terraform"
@@ -175,7 +175,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	markdownRenderer := &events.MarkdownRenderer{
 		GitlabSupportsCommonMark: gitlabClient.SupportsCommonMark(),
 	}
-	boltdb, err := boltdb.New(userConfig.DataDir)
+	boltdb, err := db.New(userConfig.DataDir)
 	if err != nil {
 		return nil, err
 	}
@@ -204,6 +204,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		VCSClient:  vcsClient,
 		Locker:     lockingClient,
 		WorkingDir: workingDir,
+		Logger:     logger,
+		DB:         boltdb,
 	}
 	eventParser := &events.EventParser{
 		GithubUser:         userConfig.GithubUser,
@@ -221,6 +223,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GitlabToken: userConfig.GitlabToken,
 	}
 	defaultTfVersion := terraformClient.Version()
+	pendingPlanFinder := &events.DefaultPendingPlanFinder{}
 	commandRunner := &events.DefaultCommandRunner{
 		VCSClient:                vcsClient,
 		GithubPullGetter:         githubClient,
@@ -239,7 +242,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			WorkingDirLocker:    workingDirLocker,
 			AllowRepoConfig:     userConfig.AllowRepoConfig,
 			AllowRepoConfigFlag: config.AllowRepoConfigFlag,
-			PendingPlanFinder:   &events.PendingPlanFinder{},
+			PendingPlanFinder:   pendingPlanFinder,
 			CommentBuilder:      commentParser,
 		},
 		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
@@ -267,6 +270,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			RequireApprovalOverride:  userConfig.RequireApproval,
 			RequireMergeableOverride: userConfig.RequireMergeable,
 		},
+		WorkingDir:        workingDir,
+		PendingPlanFinder: pendingPlanFinder,
+		DB:                boltdb,
+		GlobalAutomerge:   userConfig.Automerge,
 	}
 	repoWhitelist, err := events.NewRepoWhitelistChecker(userConfig.RepoWhitelist)
 	if err != nil {
@@ -281,6 +288,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		LockDetailTemplate: lockTemplate,
 		WorkingDir:         workingDir,
 		WorkingDirLocker:   workingDirLocker,
+		DB:                 boltdb,
 	}
 	eventsController := &EventsController{
 		CommandRunner:                commandRunner,

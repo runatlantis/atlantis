@@ -108,20 +108,20 @@ func TestUpdateProjectResult(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(strings.Join(c.Statuses, "-"), func(t *testing.T) {
-			var results []events.ProjectResult
+			var results []models.ProjectResult
 			for _, statusStr := range c.Statuses {
-				var result events.ProjectResult
+				var result models.ProjectResult
 				switch statusStr {
 				case "failure":
-					result = events.ProjectResult{
+					result = models.ProjectResult{
 						Failure: "failure",
 					}
 				case "error":
-					result = events.ProjectResult{
+					result = models.ProjectResult{
 						Error: errors.New("err"),
 					}
 				default:
-					result = events.ProjectResult{}
+					result = models.ProjectResult{}
 				}
 				results = append(results, result)
 			}

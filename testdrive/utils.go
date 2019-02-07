@@ -208,7 +208,7 @@ func execAndWaitForStderr(wg *sync.WaitGroup, stderrMatch *regexp.Regexp, timeou
 		cancel()
 		// We still need to wait for the command to finish.
 		command.Wait()                                                  // nolint: errcheck
-		return cancel, errChan, fmt.Errorf("timeout, logs:\n%s\n", log) // nolint: staticcheck
+		return cancel, errChan, fmt.Errorf("timeout, logs:\n%s\n", log) // nolint: staticcheck, golint
 	}
 
 	// Increment the wait group so callers can wait for the command to finish.

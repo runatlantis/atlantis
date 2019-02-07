@@ -16,6 +16,7 @@ to use `atlantis.yaml` files.
 ## Example Using All Keys
 ```yaml
 version: 2
+automerge: true
 projects:
 - name: my-project-name
   dir: .
@@ -67,14 +68,16 @@ It should be noted that `atlantis apply` itself could be exploited if run on a m
 ### Top-Level Keys
 ```yaml
 version:
+automerge:
 projects:
 workflows:
 ```
-| Key       | Type                                                             | Default | Required | Description                                 |
-| --------- | ---------------------------------------------------------------- | ------- | -------- | ------------------------------------------- |
-| version   | int                                                              | none    | yes      | This key is required and must be set to `2` |
-| projects  | array[[Project](atlantis-yaml-reference.html#project)]           | []      | no       | Lists the projects in this repo             |
-| workflows | map[string -> [Workflow](atlantis-yaml-reference.html#workflow)] | {}      | no       | Custom workflows                            |
+| Key       | Type                                                             | Default | Required | Description                                                 |
+| --------- | ---------------------------------------------------------------- | ------- | -------- | ----------------------------------------------------------- |
+| version   | int                                                              | none    | yes      | This key is required and must be set to `2`                 |
+| automerge | bool                                                             | false   | no       | Automatically merge pull request when all plans are applied |
+| projects  | array[[Project](atlantis-yaml-reference.html#project)]           | []      | no       | Lists the projects in this repo                             |
+| workflows | map[string -> [Workflow](atlantis-yaml-reference.html#workflow)] | {}      | no       | Custom workflows                                            |
 
 ### Project
 ```yaml

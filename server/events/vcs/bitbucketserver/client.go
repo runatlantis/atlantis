@@ -23,7 +23,7 @@ import (
 const maxCommentLength = 32768
 
 type Client struct {
-	HttpClient  *http.Client
+	HTTPClient  *http.Client
 	Username    string
 	Password    string
 	BaseURL     string
@@ -52,7 +52,7 @@ func NewClient(httpClient *http.Client, username string, password string, baseUR
 	}
 	urlWithoutPath := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
 	return &Client{
-		HttpClient:  httpClient,
+		HTTPClient:  httpClient,
 		Username:    username,
 		Password:    password,
 		BaseURL:     urlWithoutPath,
@@ -235,6 +235,17 @@ func (b *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, status 
 	return err
 }
 
+// MergePull merges the pull request.
+func (b *Client) MergePull(pull models.PullRequest) error {
+	projectKey, err := b.GetProjectKey(pull.BaseRepo.Name, pull.BaseRepo.SanitizedCloneURL)
+	if err != nil {
+		return err
+	}
+	path := fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d/merge", b.BaseURL, projectKey, pull.BaseRepo.Name, pull.Num)
+	_, err = b.makeRequest("POST", path, nil)
+	return err
+}
+
 // prepRequest adds the HTTP basic auth.
 func (b *Client) prepRequest(method string, path string, body io.Reader) (*http.Request, error) {
 	req, err := http.NewRequest(method, path, body)
@@ -253,7 +264,7 @@ func (b *Client) makeRequest(method string, path string, reqBody io.Reader) ([]b
 	if reqBody != nil {
 		req.Header.Add("Content-Type", "application/json")
 	}
-	resp, err := b.HttpClient.Do(req)
+	resp, err := b.HTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

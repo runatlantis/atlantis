@@ -44,7 +44,7 @@ func TestGithubClient_GetModifiedFiles(t *testing.T) {
       <https://api.github.com/resource?page=2>; rel="last"`)
 				w.Write([]byte(firstResp)) // nolint: errcheck
 				return
-			// The second should hit this URL.
+				// The second should hit this URL.
 			case "/api/v3/repos/owner/repo/pulls/1/files?page=2&per_page=300":
 				w.Write([]byte(secondResp)) // nolint: errcheck
 			default:
@@ -287,10 +287,93 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 	}
 }
 
+func TestGithubClient_MergePull(t *testing.T) {
+	cases := []struct {
+		code    int
+		message string
+		merged  string
+		expErr  string
+	}{
+		{
+			code:    200,
+			message: "Pull Request successfully merged",
+			merged:  "true",
+			expErr:  "",
+		},
+		{
+			code:    405,
+			message: "Pull Request is not mergeable",
+			expErr:  "405 Pull Request is not mergeable []",
+		},
+		{
+			code:    409,
+			message: "Head branch was modified. Review and try the merge again.",
+			expErr:  "409 Head branch was modified. Review and try the merge again. []",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.message, func(t *testing.T) {
+			testServer := httptest.NewTLSServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/api/v3/repos/owner/repo/pulls/1/merge":
+						body, err := ioutil.ReadAll(r.Body)
+						Ok(t, err)
+						exp := "{\"commit_message\":\"[Atlantis] Automatically merging after successful apply\"}\n"
+						Equals(t, exp, string(body))
+						var resp string
+						if c.code == 200 {
+							resp = fmt.Sprintf(`{"message":"%s","merged":%s}%s`, c.message, c.merged, "\n")
+						} else {
+							resp = fmt.Sprintf(`{"message":"%s"}%s`, c.message, "\n")
+						}
+						defer r.Body.Close() // nolint: errcheck
+						w.WriteHeader(c.code)
+						w.Write([]byte(resp)) // nolint: errcheck
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+						return
+					}
+				}))
+
+			testServerURL, err := url.Parse(testServer.URL)
+			Ok(t, err)
+			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+			Ok(t, err)
+			defer disableSSLVerification()()
+
+			err = client.MergePull(
+				models.PullRequest{
+					BaseRepo: models.Repo{
+						FullName:          "owner/repo",
+						Owner:             "owner",
+						Name:              "repo",
+						CloneURL:          "",
+						SanitizedCloneURL: "",
+						VCSHost: models.VCSHost{
+							Type:     models.Github,
+							Hostname: "github.com",
+						},
+					},
+					Num: 1,
+				})
+
+			if c.expErr == "" {
+				Ok(t, err)
+			} else {
+				ErrContains(t, c.expErr, err)
+			}
+		})
+	}
+}
+
 // disableSSLVerification disables ssl verification for the global http client
 // and returns a function to be called in a defer that will re-enable it.
 func disableSSLVerification() func() {
 	orig := http.DefaultTransport.(*http.Transport).TLSClientConfig
+	// nolint: gosec
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	return func() {
 		http.DefaultTransport.(*http.Transport).TLSClientConfig = orig
