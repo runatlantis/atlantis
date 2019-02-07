@@ -1,3 +1,53 @@
+# v0.4.14
+
+## Description
+This release contains two big new features: Automerge and Checkout Strategy.
+
+Automerge is a much asked for feature that allows Atlantis to automatically
+merge your pull requests if all plans have been applied successfully.
+It can be enabled via the `--automerge` flag, or via an `atlantis.yaml` setting:
+```yaml
+version: 2
+automerge: true
+projects:
+- ...
+```
+
+Checkout Strategy allows you to choose if Atlantis checks out the exact branch
+from the pull request or what the destination branch will look like once the pull
+request is merged. You can choose your checkout strategy via the `--checkout-strategy`
+flag which supports `branch` (the default) or `merge`.
+
+Diff: https://github.com/runatlantis/atlantis/compare/v0.4.13...v0.4.14
+
+## Features
+* Can now be configured to **automatically merge pull requests** after all plans have
+  been applied. See https://www.runatlantis.io/docs/automerging.html. (Fixes [#186](https://github.com/runatlantis/atlantis/issues/186))
+* New `--checkout-strategy` flag which supports checking out the code as it will
+  look once the pull request was merged. Previously we only supported checking out
+  the pull request branch which might be out of date with the destination branch
+  and so cause Terraform to delete resources that have already been applied.
+  See https://www.runatlantis.io/docs/checkout-strategy.html. (Fixes [#35](https://github.com/runatlantis/atlantis/issues/35)
+* Support Terraform 0.12 by version detection and then changing how Atlantis runs
+  its Terraform commands. ([#419](https://github.com/runatlantis/atlantis/pull/419))
+* New `--tfe-token` flag to support using Terraform Enterprise's Free Remote State Storage. ([#419](https://github.com/runatlantis/atlantis/pull/419))
+
+## Bugfixes
+* Run plan in directory when file is moved. (Fixes [#413](https://github.com/runatlantis/atlantis/issues/413))
+* Fix bug where when Terraform crashed, Atlantis would hang indefinitely. ([#421](https://github.com/runatlantis/atlantis/pull/421))
+
+## Backwards Incompatibilities / Notes:
+None
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.14/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.14/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.14/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.14/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.4.14`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
 # v0.4.13
 
 ## Description
@@ -30,7 +80,7 @@ Diff: https://github.com/runatlantis/atlantis/compare/v0.4.12...v0.4.13
 
 * If users are setting the `name` key for their projects in `atlantis.yaml`, then
   include the project name in the comment output so it's easier to identify which
-  plan/apply output is for which project. (Fixes [#353](https://github.com/runatlantis/atlantis/issues/353))
+  plan/apply output is for which project. (Fixes [#353](https://github.com/runatlantis/atlantis/issues/353)))
 * Bump the Terraform version in the Docker image to `0.11.11`.
 * Tweak logging to add timezone to the timestamp and make the output more readable. ([#402](https://github.com/runatlantis/atlantis/pull/402))
 * Warn users if running `atlantis apply -- -target=myresource` because `-target` can
