@@ -11,6 +11,7 @@ Terraform will perform the following actions:
 + module.null.null_resource.this
       id: <computed>
 Plan: 1 to add, 0 to change, 0 to destroy.
+
 ```
 
 * :arrow_forward: To **apply** this plan, comment:

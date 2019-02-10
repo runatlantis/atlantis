@@ -3,6 +3,8 @@ Ran Apply for 2 projects:
 1. dir: `.` workspace: `new_workspace`
 
 ### 1. dir: `.` workspace: `default`
+<details><summary>Show Output</summary>
+
 ```diff
 null_resource.simple:
 null_resource.simple:
@@ -17,10 +19,14 @@ Outputs:
 
 var = default_workspace
 workspace = default
+
 ```
+</details>
 
 ---
 ### 2. dir: `.` workspace: `new_workspace`
+<details><summary>Show Output</summary>
+
 ```diff
 null_resource.simple:
 null_resource.simple:
@@ -35,7 +41,9 @@ Outputs:
 
 var = new_workspace
 workspace = new_workspace
+
 ```
+</details>
 
 ---
 

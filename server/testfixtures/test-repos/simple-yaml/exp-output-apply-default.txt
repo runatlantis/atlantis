@@ -10,5 +10,6 @@ Outputs:
 
 var = fromconfig
 workspace = default
+
 ```
 
