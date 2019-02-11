@@ -179,13 +179,19 @@ func (b *Client) MergePull(pull models.PullRequest) error {
 	return err
 }
 
-// prepRequest adds the HTTP basic auth.
+// prepRequest adds auth and necessary headers.
 func (b *Client) prepRequest(method string, path string, body io.Reader) (*http.Request, error) {
 	req, err := http.NewRequest(method, path, body)
 	if err != nil {
 		return nil, err
 	}
 	req.SetBasicAuth(b.Username, b.Password)
+	if body != nil {
+		req.Header.Add("Content-Type", "application/json")
+	}
+	// Add this header to disable CSRF checks.
+	// See https://confluence.atlassian.com/cloudkb/xsrf-check-failed-when-calling-cloud-apis-826874382.html
+	req.Header.Add("X-Atlassian-Token", "no-check")
 	return req, nil
 }
 
@@ -193,9 +199,6 @@ func (b *Client) makeRequest(method string, path string, reqBody io.Reader) ([]b
 	req, err := b.prepRequest(method, path, reqBody)
 	if err != nil {
 		return nil, errors.Wrap(err, "constructing request")
-	}
-	if reqBody != nil {
-		req.Header.Add("Content-Type", "application/json")
 	}
 	resp, err := b.HTTPClient.Do(req)
 	if err != nil {
