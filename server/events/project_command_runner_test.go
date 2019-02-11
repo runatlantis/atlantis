@@ -323,7 +323,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			pullMergeable: true,
 		},
 		{
-			description: "no workflow, mergeable required, use defaults, commit unmergeable",
+			description: "no workflow, mergeable required, pull not mergeable",
 			projCfg: &valid.Project{
 				Dir:               ".",
 				ApplyRequirements: []string{"mergeable"},

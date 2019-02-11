@@ -30,7 +30,7 @@ import (
 	"syscall"
 	"time"
 
-	assetfs "github.com/elazarl/go-bindata-assetfs"
+	"github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events"

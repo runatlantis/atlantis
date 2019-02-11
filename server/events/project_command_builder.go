@@ -144,6 +144,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 				Verbose:       verbose,
 				RePlanCmd:     p.CommentBuilder.BuildPlanComment(mp.Path, DefaultWorkspace, "", commentFlags),
 				ApplyCmd:      p.CommentBuilder.BuildApplyComment(mp.Path, DefaultWorkspace, ""),
+				PullMergeable: ctx.PullMergeable,
 			})
 		}
 	} else {
@@ -173,6 +174,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 				Verbose:       verbose,
 				RePlanCmd:     p.CommentBuilder.BuildPlanComment(mp.Dir, mp.Workspace, mp.GetName(), commentFlags),
 				ApplyCmd:      p.CommentBuilder.BuildApplyComment(mp.Dir, mp.Workspace, mp.GetName()),
+				PullMergeable: ctx.PullMergeable,
 			})
 		}
 	}

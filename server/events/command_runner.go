@@ -15,7 +15,6 @@ package events
 
 import (
 	"fmt"
-
 	"github.com/google/go-github/github"
 	"github.com/lkysow/go-gitlab"
 	"github.com/pkg/errors"
@@ -170,6 +169,10 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	}
 
 	if cmd.CommandName() == ApplyCommand {
+		// Get the mergeable status before we set any build statuses of our own.
+		// We do this here because when we set a "Pending" status, if users have
+		// required the Atlantis status checks to pass, then we've now changed
+		// the mergeability status of the pull request.
 		ctx.PullMergeable, err = c.VCSClient.PullIsMergeable(baseRepo, pull)
 		if err != nil {
 			// On error we continue the request with mergeable assumed false.
@@ -178,8 +181,10 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 			ctx.PullMergeable = false
 			ctx.Log.Warn("unable to get mergeable status: %s. Continuing with mergeable assumed false", err)
 		}
+		ctx.Log.Info("pull request mergeable status: %t", ctx.PullMergeable)
 	}
-	if err = c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, models.PendingCommitStatus, cmd.CommandName()); err != nil {
+
+	if err = c.CommitStatusUpdater.Update(baseRepo, pull, models.PendingCommitStatus, cmd.CommandName()); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
