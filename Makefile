@@ -60,10 +60,10 @@ release: ## Create packages for a release
 fmt: ## Run goimports (which also formats)
 	goimports -w $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "./server/static/bindata_assetfs.go" ! -path "**/mocks/*")
 
-lint: ## Run linter
+lint: ## Run linter locally
 	golangci-lint run
 
-check-lint:
+check-lint: ## Run linter in CI/CD. If running locally use 'lint'
 	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b ./bin v1.13.2
 	./bin/golangci-lint run
 

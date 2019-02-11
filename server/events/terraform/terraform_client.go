@@ -23,8 +23,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/mitchellh/go-linereader"
-
 	"github.com/hashicorp/go-version"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
@@ -162,69 +160,17 @@ func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path st
 
 	// append terraform executable name with args
 	tfCmd := fmt.Sprintf("%s %s", tfExecutable, strings.Join(args, " "))
-	out, err := c.crashSafeExec(tfCmd, path, envVars)
+	cmd := exec.Command("sh", "-c", tfCmd)
+	cmd.Dir = path
+	cmd.Env = envVars
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		err = fmt.Errorf("%s: running %q in %q", err, tfCmd, path)
 		log.Debug("error: %s", err)
-		return out, err
+		return string(out), err
 	}
 	log.Info("successfully ran %q in %q", tfCmd, path)
-	return out, err
-}
-
-// crashSafeExec executes tfCmd in dir with the env environment variables. It
-// returns any stderr and stdout output from the command as a combined string.
-// It is "crash safe" in that it handles an edge case related to:
-//    https://github.com/golang/go/issues/18874
-// where when terraform itself panics, it leaves file descriptors open which
-// cause golang to not know the process has terminated.
-// To handle this, we borrow code from
-//    https://github.com/hashicorp/terraform/blob/master/builtin/provisioners/local-exec/resource_provisioner.go#L92
-// and use an os.Pipe to collect the stderr and stdout. This allows golang to
-// know the command has exited and so the call to cmd.Wait() won't block
-// indefinitely.
-//
-// Unfortunately, this causes another issue where we never receive an EOF to
-// our pipe during a terraform panic and so again, we're left waiting
-// indefinitely. To handle this, I've hacked in detection of Terraform panic
-// output as a special case that causes us to exit the loop.
-func (c *DefaultClient) crashSafeExec(tfCmd string, dir string, env []string) (string, error) {
-	pr, pw, err := os.Pipe()
-	if err != nil {
-		return "", errors.Wrap(err, "failed to initialize pipe for output")
-	}
-
-	// We use 'sh -c' so that if extra_args have been specified with env vars,
-	// ex. -var-file=$WORKSPACE.tfvars, then they get substituted.
-	cmd := exec.Command("sh", "-c", tfCmd) // #nosec
-	cmd.Stdout = pw
-	cmd.Stderr = pw
-	cmd.Dir = dir
-	cmd.Env = env
-
-	err = cmd.Start()
-	if err == nil {
-		err = cmd.Wait()
-	}
-	pw.Close() // nolint: errcheck
-
-	lr := linereader.New(pr)
-	var outputLines []string
-	for line := range lr.Ch {
-		outputLines = append(outputLines, line)
-		// This checks if our output is a Terraform panic. If so, we break
-		// out of the loop because in this case, for some reason to do with
-		// terraform forking itself, we never receive an EOF and
-		// so this will block indefinitely.
-		if len(outputLines) >= 3 &&
-			strings.Join(
-				outputLines[len(outputLines)-3:], "\n") ==
-				tfCrashDelim {
-			break
-		}
-	}
-
-	return strings.Join(outputLines, "\n"), err
+	return string(out), nil
 }
 
 // MustConstraint will parse one or more constraints from the given
@@ -244,8 +190,3 @@ func MustConstraint(v string) version.Constraints {
 var rcFileContents = `credentials "app.terraform.io" {
   token = %q
 }`
-
-// tfCrashDelim is what the end of a terraform crash log looks like.
-var tfCrashDelim = `[1]: https://github.com/hashicorp/terraform/issues
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!! TERRAFORM CRASH !!!!!!!!!!!!!!!!!!!!!!!!!!!!`

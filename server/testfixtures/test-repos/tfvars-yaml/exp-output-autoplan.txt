@@ -14,6 +14,7 @@ Terraform will perform the following actions:
 + null_resource.simple
       id: <computed>
 Plan: 1 to add, 0 to change, 0 to destroy.
+
 workspace=default
 
 ```
@@ -37,6 +38,7 @@ Terraform will perform the following actions:
 + null_resource.simple
       id: <computed>
 Plan: 1 to add, 0 to change, 0 to destroy.
+
 ```
 
 * :arrow_forward: To **apply** this plan, comment:
