@@ -2,6 +2,7 @@ package vcs_test
 
 import (
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -287,7 +288,7 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 	}
 }
 
-func TestGithubClient_MergePull(t *testing.T) {
+func TestGithubClient_MergePullHandlesError(t *testing.T) {
 	cases := []struct {
 		code    int
 		message string
@@ -312,15 +313,21 @@ func TestGithubClient_MergePull(t *testing.T) {
 		},
 	}
 
+	jsBytes, err := ioutil.ReadFile("fixtures/github-repo.json")
+	Ok(t, err)
+
 	for _, c := range cases {
 		t.Run(c.message, func(t *testing.T) {
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch r.RequestURI {
+					case "/api/v3/repos/owner/repo":
+						w.Write(jsBytes) // nolint: errcheck
+						return
 					case "/api/v3/repos/owner/repo/pulls/1/merge":
 						body, err := ioutil.ReadAll(r.Body)
 						Ok(t, err)
-						exp := "{\"commit_message\":\"[Atlantis] Automatically merging after successful apply\"}\n"
+						exp := "{\"commit_message\":\"[Atlantis] Automatically merging after successful apply\",\"merge_method\":\"merge\"}\n"
 						Equals(t, exp, string(body))
 						var resp string
 						if c.code == 200 {
@@ -365,6 +372,124 @@ func TestGithubClient_MergePull(t *testing.T) {
 			} else {
 				ErrContains(t, c.expErr, err)
 			}
+		})
+	}
+}
+
+// Test that if the pull request only allows a certain merge method that we
+// use that method
+func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
+	cases := map[string]struct {
+		allowMerge  bool
+		allowRebase bool
+		allowSquash bool
+		expMethod   string
+	}{
+		"all true": {
+			allowMerge:  true,
+			allowRebase: true,
+			allowSquash: true,
+			expMethod:   "merge",
+		},
+		"all false (edge case)": {
+			allowMerge:  false,
+			allowRebase: false,
+			allowSquash: false,
+			expMethod:   "merge",
+		},
+		"merge: false rebase: true squash: true": {
+			allowMerge:  false,
+			allowRebase: true,
+			allowSquash: true,
+			expMethod:   "rebase",
+		},
+		"merge: false rebase: false squash: true": {
+			allowMerge:  false,
+			allowRebase: false,
+			allowSquash: true,
+			expMethod:   "squash",
+		},
+		"merge: false rebase: true squash: false": {
+			allowMerge:  false,
+			allowRebase: true,
+			allowSquash: false,
+			expMethod:   "rebase",
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+
+			// Modify response.
+			jsBytes, err := ioutil.ReadFile("fixtures/github-repo.json")
+			Ok(t, err)
+			resp := string(jsBytes)
+			resp = strings.Replace(resp,
+				`"allow_squash_merge": true`,
+				fmt.Sprintf(`"allow_squash_merge": %t`, c.allowSquash),
+				-1)
+			resp = strings.Replace(resp,
+				`"allow_merge_commit": true`,
+				fmt.Sprintf(`"allow_merge_commit": %t`, c.allowMerge),
+				-1)
+			resp = strings.Replace(resp,
+				`"allow_rebase_merge": true`,
+				fmt.Sprintf(`"allow_rebase_merge": %t`, c.allowRebase),
+				-1)
+
+			testServer := httptest.NewTLSServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/api/v3/repos/runatlantis/atlantis":
+						w.Write([]byte(resp)) // nolint: errcheck
+						return
+					case "/api/v3/repos/runatlantis/atlantis/pulls/1/merge":
+						body, err := ioutil.ReadAll(r.Body)
+						Ok(t, err)
+						defer r.Body.Close() // nolint: errcheck
+						type bodyJSON struct {
+							CommitMessage string `json:"commit_message"`
+							MergeMethod   string `json:"merge_method"`
+						}
+						expBody := bodyJSON{
+							CommitMessage: "[Atlantis] Automatically merging after successful apply",
+							MergeMethod:   c.expMethod,
+						}
+						expBytes, err := json.Marshal(expBody)
+						Ok(t, err)
+						Equals(t, string(expBytes)+"\n", string(body))
+
+						resp := `{"sha":"6dcb09b5b57875f334f61aebed695e2e4193db5e","merged":true,"message":"Pull Request successfully merged"}`
+						w.Write([]byte(resp)) // nolint: errcheck
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+						return
+					}
+				}))
+
+			testServerURL, err := url.Parse(testServer.URL)
+			Ok(t, err)
+			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+			Ok(t, err)
+			defer disableSSLVerification()()
+
+			err = client.MergePull(
+				models.PullRequest{
+					BaseRepo: models.Repo{
+						FullName:          "runatlantis/atlantis",
+						Owner:             "runatlantis",
+						Name:              "atlantis",
+						CloneURL:          "",
+						SanitizedCloneURL: "",
+						VCSHost: models.VCSHost{
+							Type:     models.Github,
+							Hostname: "github.com",
+						},
+					},
+					Num: 1,
+				})
+			Ok(t, err)
 		})
 	}
 }

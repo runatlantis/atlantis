@@ -178,13 +178,37 @@ func (g *GithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 
 // MergePull merges the pull request.
 func (g *GithubClient) MergePull(pull models.PullRequest) error {
+	// Users can set their repo to disallow certain types of merging.
+	// We detect which types aren't allowed and use the type that is.
+	repo, _, err := g.client.Repositories.Get(g.ctx, pull.BaseRepo.Owner, pull.BaseRepo.Name)
+	if err != nil {
+		return errors.Wrap(err, "fetching repo info")
+	}
+	const (
+		defaultMergeMethod = "merge"
+		rebaseMergeMethod  = "rebase"
+		squashMergeMethod  = "squash"
+	)
+	method := defaultMergeMethod
+	if !repo.GetAllowMergeCommit() {
+		if repo.GetAllowRebaseMerge() {
+			method = rebaseMergeMethod
+		} else if repo.GetAllowSquashMerge() {
+			method = squashMergeMethod
+		}
+	}
+
+	// Now we're ready to make our API call to merge the pull request.
+	options := &github.PullRequestOptions{
+		MergeMethod: method,
+	}
 	mergeResult, _, err := g.client.PullRequests.Merge(
 		g.ctx,
 		pull.BaseRepo.Owner,
 		pull.BaseRepo.Name,
 		pull.Num,
 		common.AutomergeCommitMsg,
-		nil)
+		options)
 	if err != nil {
 		return errors.Wrap(err, "merging pull request")
 	}
