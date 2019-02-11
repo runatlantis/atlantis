@@ -1,6 +1,43 @@
+# v0.4.15
+
+## Description
+This is a bugfix release containing an important fix to how Atlantis executes Terraform. A
+bug was introduced in v0.4.14 that causes Atlantis to hang indefinitely when
+executing Terraform when there is a lot of output from Terraform.
+
+In addition, there's a fix to automerge when you require rebasing or commit
+squashing in GitHub and a fix for the mergeability check if you're requiring
+the Atlantis status to pass in GitHub.
+
+Diff: https://github.com/runatlantis/atlantis/compare/v0.4.14...v0.4.15
+
+## Features
+None – this is a bugfix release.
+
+## Bugfixes
+* Atlantis hangs on large plans. (Fixes [#452](https://github.com/runatlantis/atlantis/issues/452))
+* Automerge now works on GitHub if you require a rebase or squash merge. ([#466](https://github.com/runatlantis/atlantis/pull/466))
+* Automerge now works on Bitbucket if previously you were getting XSRF errors. (Fixes [#465](https://github.com/runatlantis/atlantis/issues/465))
+* Requiring `mergeable` now works on GitHub if you are also requiring the Atlantis status to pass before merging. (Fixes [#453](https://github.com/runatlantis/atlantis/issues/453))
+
+## Backwards Incompatibilities / Notes:
+None
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.15/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.15/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.15/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.15/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.4.15`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
 # v0.4.14
 
 ## Description
+**WARNING:** This release contains a bug that causes Terraform execution to stall
+on large infrastructures. Please use v0.4.15 instead.
+
 This release contains two big new features: Automerge and Checkout Strategy.
 
 Automerge is a much asked for feature that allows Atlantis to automatically
@@ -40,13 +77,10 @@ Diff: https://github.com/runatlantis/atlantis/compare/v0.4.13...v0.4.14
 None
 
 ## Downloads
-* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.14/atlantis_darwin_amd64.zip)
-* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.14/atlantis_linux_386.zip)
-* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.14/atlantis_linux_amd64.zip)
-* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.4.14/atlantis_linux_arm.zip)
+**The release downloads have been deleted because this release contains a critical bug**
 
 ## Docker
-[`runatlantis/atlantis:v0.4.14`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+**The release downloads have been deleted because this release contains a critical bug**
 
 # v0.4.13
 
