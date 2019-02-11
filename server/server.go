@@ -263,7 +263,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 				DefaultTFVersion: defaultTfVersion,
 			},
 			PullApprovedChecker:      vcsClient,
-			PullMergeableChecker:     vcsClient,
 			WorkingDir:               workingDir,
 			Webhooks:                 webhooksManager,
 			WorkingDirLocker:         workingDirLocker,

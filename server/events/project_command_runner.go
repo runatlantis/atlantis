@@ -83,7 +83,6 @@ type DefaultProjectCommandRunner struct {
 	ApplyStepRunner          StepRunner
 	RunStepRunner            StepRunner
 	PullApprovedChecker      runtime.PullApprovedChecker
-	PullMergeableChecker     runtime.PullMergeableChecker
 	WorkingDir               WorkingDir
 	Webhooks                 WebhooksSender
 	WorkingDirLocker         WorkingDirLocker
@@ -144,7 +143,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 		return nil, "", cloneErr
 	}
 	projAbsPath := filepath.Join(repoDir, ctx.RepoRelDir)
-	if _, err := os.Stat(projAbsPath); os.IsNotExist(err) {
+	if _, err = os.Stat(projAbsPath); os.IsNotExist(err) {
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
@@ -209,7 +208,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 		return "", "", err
 	}
 	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
-	if _, err := os.Stat(absPath); os.IsNotExist(err) {
+	if _, err = os.Stat(absPath); os.IsNotExist(err) {
 		return "", "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
@@ -238,11 +237,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 				return "", "Pull request must be approved before running apply.", nil
 			}
 		case raw.MergeableApplyRequirement:
-			mergeable, err := p.PullMergeableChecker.PullIsMergeable(ctx.BaseRepo, ctx.Pull) // nolint: vetshadow
-			if err != nil {
-				return "", "", errors.Wrap(err, "checking if pull request is mergeable")
-			}
-			if !mergeable {
+			if !ctx.PullMergeable {
 				return "", "Pull request must be mergeable before running apply.", nil
 			}
 		}
