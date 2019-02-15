@@ -1,6 +1,7 @@
 package bitbucketserver
 
 const (
+	DiagnosticsPingHeader    = "diagnostics:ping"
 	PullCreatedHeader        = "pr:opened"
 	PullMergedHeader         = "pr:merged"
 	PullDeclinedHeader       = "pr:declined"

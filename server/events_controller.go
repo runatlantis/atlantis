@@ -169,6 +169,12 @@ func (e *EventsController) handleBitbucketServerPost(w http.ResponseWriter, r *h
 		e.respond(w, logging.Error, http.StatusBadRequest, "Unable to read body: %s %s=%s", err, bitbucketServerRequestIDHeader, reqID)
 		return
 	}
+	if eventType == bitbucketserver.DiagnosticsPingHeader {
+		// Specially handle the diagnostics:ping event because Bitbucket Server
+		// doesn't send the signature with this event for some reason.
+		e.respond(w, logging.Info, http.StatusOK, "Successfully received %s event %s=%s", eventType, bitbucketServerRequestIDHeader, reqID)
+		return
+	}
 	if len(e.BitbucketWebhookSecret) > 0 {
 		if err := bitbucketserver.ValidateSignature(body, sig, e.BitbucketWebhookSecret); err != nil {
 			e.respond(w, logging.Warn, http.StatusBadRequest, errors.Wrap(err, "request did not pass validation").Error())
