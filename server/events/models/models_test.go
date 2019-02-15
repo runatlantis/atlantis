@@ -49,6 +49,7 @@ func TestNewRepo_CloneURLBitbucketServer(t *testing.T) {
 	Ok(t, err)
 	Equals(t, models.Repo{
 		FullName:          "owner/repo",
+		FullNameWithHost:  "mycorp.com:7990/owner/repo",
 		Owner:             "owner",
 		Name:              "repo",
 		CloneURL:          "http://u:p@mycorp.com:7990/scm/at/atlantis-example.git",
@@ -119,6 +120,7 @@ func TestNewRepo_HTTPAuth(t *testing.T) {
 		SanitizedCloneURL: "http://github.com/owner/repo.git",
 		CloneURL:          "http://u:p@github.com/owner/repo.git",
 		FullName:          "owner/repo",
+		FullNameWithHost:  "github.com/owner/repo",
 		Owner:             "owner",
 		Name:              "repo",
 	}, repo)
@@ -136,6 +138,7 @@ func TestNewRepo_HTTPSAuth(t *testing.T) {
 		SanitizedCloneURL: "https://github.com/owner/repo.git",
 		CloneURL:          "https://u:p@github.com/owner/repo.git",
 		FullName:          "owner/repo",
+		FullNameWithHost:  "github.com/owner/repo",
 		Owner:             "owner",
 		Name:              "repo",
 	}, repo)

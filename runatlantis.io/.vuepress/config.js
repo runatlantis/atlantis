@@ -69,6 +69,7 @@ module.exports = {
                     collapsable: true,
                     children: [
                         ['customizing-atlantis', 'Overview'],
+                        'repos-yaml-reference',
                         'atlantis-yaml-reference',
                         'upgrading-atlantis-yaml-to-version-2',
                         'apply-requirements'

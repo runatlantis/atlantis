@@ -1,6 +1,7 @@
 package events_test
 
 import (
+	"github.com/runatlantis/atlantis/server/events/yaml/raw"
 	"io/ioutil"
 	"path/filepath"
 	"testing"
@@ -35,9 +36,13 @@ func TestDefaultProjectCommandBuilder_BuildAutoplanCommands(t *testing.T) {
 			AtlantisYAML: "",
 			exp: []exp{
 				{
-					projectConfig: nil,
-					dir:           ".",
-					workspace:     "default",
+					projectConfig: &valid.Project{
+						Dir:       ".",
+						Workspace: "default",
+						Autoplan:  getDefaultAutoPlan(),
+					},
+					dir:       ".",
+					workspace: "default",
 				},
 			},
 		},
@@ -229,6 +234,175 @@ projects:
 	}
 }
 
+func TestDefaultProjectCommandBuilder_RepoRestrictionsBuildPlanCommands(t *testing.T) {
+
+	workflow := "repoworkflow"
+	repoConfig := raw.RepoConfig{
+		Repos: []raw.Repo{{
+			ID:       "/.*/",
+			Workflow: &workflow,
+		}},
+	}
+
+	expWorkspace := "default"
+	expDir := "."
+	expProjectCfg := &valid.Project{
+		Dir:       ".",
+		Workflow:  repoConfig.Repos[0].Workflow,
+		Workspace: expWorkspace,
+		Autoplan: valid.Autoplan{
+			Enabled:      true,
+			WhenModified: []string{"**/*.tf*"},
+		},
+	}
+
+	t.Run("run plan with server side repo config and no atlantis.yaml", func(t *testing.T) {
+		RegisterMockTestingT(t)
+		tmpDir, cleanup := TempDir(t)
+		defer cleanup()
+
+		baseRepo := models.Repo{}
+		headRepo := models.Repo{}
+		pull := models.PullRequest{}
+		logger := logging.NewNoopLogger()
+		workingDir := mocks.NewMockWorkingDir()
+		When(workingDir.Clone(logger, baseRepo, headRepo, pull, "default")).ThenReturn(tmpDir, nil)
+
+		vcsClient := vcsmocks.NewMockClient()
+		When(vcsClient.GetModifiedFiles(baseRepo, pull)).ThenReturn([]string{"main.tf"}, nil)
+
+		builder := &events.DefaultProjectCommandBuilder{
+			WorkingDirLocker:    events.NewDefaultWorkingDirLocker(),
+			WorkingDir:          workingDir,
+			ParserValidator:     &yaml.ParserValidator{},
+			VCSClient:           vcsClient,
+			ProjectFinder:       &events.DefaultProjectFinder{},
+			AllowRepoConfig:     false,
+			RepoConfig:          repoConfig,
+			PendingPlanFinder:   &events.DefaultPendingPlanFinder{},
+			AllowRepoConfigFlag: "allow-repo-config",
+			CommentBuilder:      &events.CommentParser{},
+		}
+
+		ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
+			BaseRepo: baseRepo,
+			HeadRepo: headRepo,
+			Pull:     pull,
+			User:     models.User{},
+			Log:      logger,
+		})
+		Ok(t, err)
+
+		for _, actCtx := range ctxs {
+			Equals(t, baseRepo, actCtx.BaseRepo)
+			Equals(t, baseRepo, actCtx.HeadRepo)
+			Equals(t, pull, actCtx.Pull)
+			Equals(t, models.User{}, actCtx.User)
+			Equals(t, logger, actCtx.Log)
+			Equals(t, 0, len(actCtx.CommentArgs))
+
+			Equals(t, expProjectCfg, actCtx.ProjectConfig)
+			Equals(t, expDir, actCtx.RepoRelDir)
+			Equals(t, expWorkspace, actCtx.Workspace)
+		}
+	})
+
+}
+
+func TestDefaultProjectCommandBuilder_BuildSingleApplyCommandRepoRestrictions(t *testing.T) {
+	workflow := "repoworkflow"
+	repoConfig := raw.RepoConfig{
+		Repos: []raw.Repo{{
+			ID:       "/.*/",
+			Workflow: &workflow,
+		}},
+	}
+
+	expWorkspace := "default"
+	expDir := "."
+	expProjectCfg := &valid.Project{
+		Dir:       ".",
+		Workflow:  repoConfig.Repos[0].Workflow,
+		Workspace: expWorkspace,
+		Autoplan: valid.Autoplan{
+			Enabled:      true,
+			WhenModified: []string{"**/*.tf*"},
+		},
+	}
+
+	expCommentArgs := "commentarg"
+	cmd := events.CommentCommand{
+		RepoRelDir: ".",
+		Flags:      []string{expCommentArgs},
+		Name:       models.PlanCommand,
+	}
+
+	for _, cmdName := range []models.CommandName{models.PlanCommand, models.ApplyCommand} {
+		t.Run("run apply with server side repo config and no atlantis.yaml", func(t *testing.T) {
+			RegisterMockTestingT(t)
+			tmpDir, cleanup := TempDir(t)
+			defer cleanup()
+
+			baseRepo := models.Repo{}
+			headRepo := models.Repo{}
+			pull := models.PullRequest{}
+			logger := logging.NewNoopLogger()
+			workingDir := mocks.NewMockWorkingDir()
+			if cmdName == models.PlanCommand {
+				When(workingDir.Clone(logger, baseRepo, headRepo, pull, expWorkspace)).ThenReturn(tmpDir, nil)
+			} else {
+				When(workingDir.GetWorkingDir(baseRepo, pull, expWorkspace)).ThenReturn(tmpDir, nil)
+			}
+
+			vcsClient := vcsmocks.NewMockClient()
+			When(vcsClient.GetModifiedFiles(baseRepo, pull)).ThenReturn([]string{"main.tf"}, nil)
+
+			builder := &events.DefaultProjectCommandBuilder{
+				WorkingDirLocker:    events.NewDefaultWorkingDirLocker(),
+				WorkingDir:          workingDir,
+				ParserValidator:     &yaml.ParserValidator{},
+				VCSClient:           vcsClient,
+				ProjectFinder:       &events.DefaultProjectFinder{},
+				AllowRepoConfig:     false,
+				RepoConfig:          repoConfig,
+				AllowRepoConfigFlag: "allow-repo-config",
+				CommentBuilder:      &events.CommentParser{},
+			}
+
+			cmdCtx := &events.CommandContext{
+				BaseRepo: baseRepo,
+				HeadRepo: headRepo,
+				Pull:     pull,
+				User:     models.User{},
+				Log:      logger,
+			}
+			var actCtxs []models.ProjectCommandContext
+
+			var err error
+			if cmdName == models.PlanCommand {
+				actCtxs, err = builder.BuildPlanCommands(cmdCtx, &cmd)
+			} else {
+				actCtxs, err = builder.BuildApplyCommands(cmdCtx, &cmd)
+			}
+			Ok(t, err)
+
+			Equals(t, 1, len(actCtxs))
+			actCtx := actCtxs[0]
+			Equals(t, baseRepo, actCtx.BaseRepo)
+			Equals(t, baseRepo, actCtx.HeadRepo)
+			Equals(t, pull, actCtx.Pull)
+			Equals(t, models.User{}, actCtx.User)
+			Equals(t, logger, actCtx.Log)
+
+			Equals(t, expProjectCfg, actCtx.ProjectConfig)
+			Equals(t, expDir, actCtx.RepoRelDir)
+			Equals(t, expWorkspace, actCtx.Workspace)
+			Equals(t, []string{expCommentArgs}, actCtx.CommentArgs)
+		})
+	}
+
+}
+
 // Test building a plan and apply command for one project.
 func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) {
 	cases := []struct {
@@ -249,11 +423,15 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) 
 				Name:       models.PlanCommand,
 				Workspace:  "myworkspace",
 			},
-			AtlantisYAML:     "",
-			ExpProjectConfig: nil,
-			ExpCommentArgs:   []string{"commentarg"},
-			ExpWorkspace:     "myworkspace",
-			ExpDir:           ".",
+			AtlantisYAML: "",
+			ExpProjectConfig: &valid.Project{
+				Dir:       ".",
+				Workspace: "myworkspace",
+				Autoplan:  getDefaultAutoPlan(),
+			},
+			ExpCommentArgs: []string{"commentarg"},
+			ExpWorkspace:   "myworkspace",
+			ExpDir:         ".",
 		},
 		{
 			Description: "no atlantis.yaml with project flag",
@@ -571,11 +749,21 @@ func TestDefaultProjectCommandBuilder_BuildMultiPlanNoAtlantisYAML(t *testing.T)
 	Equals(t, 2, len(ctxs))
 	Equals(t, "project1", ctxs[0].RepoRelDir)
 	Equals(t, "default", ctxs[0].Workspace)
-	var nilProjectConfig *valid.Project
-	Equals(t, nilProjectConfig, ctxs[0].ProjectConfig)
+	project1Config := valid.Project{
+		Dir:       "project1",
+		Workspace: events.DefaultWorkspace,
+		Autoplan:  getDefaultAutoPlan(),
+	}
+
+	project2Config := valid.Project{
+		Dir:       "project2",
+		Workspace: events.DefaultWorkspace,
+		Autoplan:  getDefaultAutoPlan(),
+	}
+	Equals(t, project1Config, *ctxs[0].ProjectConfig)
 	Equals(t, "project2", ctxs[1].RepoRelDir)
 	Equals(t, "default", ctxs[1].Workspace)
-	Equals(t, nilProjectConfig, ctxs[1].ProjectConfig)
+	Equals(t, project2Config, *ctxs[1].ProjectConfig)
 }
 
 // Test building plan command for multiple projects when the comment
@@ -839,69 +1027,6 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	Equals(t, "workspace2", ctxs[3].Workspace)
 }
 
-// Test that if repo config is disabled we error out if there's an atlantis.yaml
-// file.
-func TestDefaultProjectCommandBuilder_RepoConfigDisabled(t *testing.T) {
-	RegisterMockTestingT(t)
-	workingDir := mocks.NewMockWorkingDir()
-
-	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
-		"pulldir": map[string]interface{}{
-			"workspace": map[string]interface{}{},
-		},
-	})
-	defer cleanup()
-	repoDir := filepath.Join(tmpDir, "pulldir/workspace")
-	err := ioutil.WriteFile(filepath.Join(repoDir, yaml.AtlantisYAMLFilename), nil, 0600)
-	Ok(t, err)
-
-	When(workingDir.Clone(
-		matchers.AnyPtrToLoggingSimpleLogger(),
-		matchers.AnyModelsRepo(),
-		matchers.AnyModelsRepo(),
-		matchers.AnyModelsPullRequest(),
-		AnyString())).ThenReturn(repoDir, nil)
-	When(workingDir.GetWorkingDir(
-		matchers.AnyModelsRepo(),
-		matchers.AnyModelsPullRequest(),
-		AnyString())).ThenReturn(repoDir, nil)
-
-	builder := &events.DefaultProjectCommandBuilder{
-		WorkingDirLocker:    events.NewDefaultWorkingDirLocker(),
-		WorkingDir:          workingDir,
-		ParserValidator:     &yaml.ParserValidator{},
-		VCSClient:           nil,
-		ProjectFinder:       &events.DefaultProjectFinder{},
-		AllowRepoConfig:     false,
-		AllowRepoConfigFlag: "allow-repo-config",
-		CommentBuilder:      &events.CommentParser{},
-	}
-
-	ctx := &events.CommandContext{
-		BaseRepo: models.Repo{},
-		HeadRepo: models.Repo{},
-		Pull:     models.PullRequest{},
-		User:     models.User{},
-		Log:      logging.NewNoopLogger(),
-	}
-	_, err = builder.BuildAutoplanCommands(ctx)
-	ErrEquals(t, "atlantis.yaml files not allowed because Atlantis is not running with --allow-repo-config", err)
-
-	commentCmd := &events.CommentCommand{
-		RepoRelDir:  "",
-		Flags:       nil,
-		Name:        0,
-		Verbose:     false,
-		Workspace:   "workspace",
-		ProjectName: "",
-	}
-	_, err = builder.BuildPlanCommands(ctx, commentCmd)
-	ErrEquals(t, "atlantis.yaml files not allowed because Atlantis is not running with --allow-repo-config", err)
-
-	_, err = builder.BuildApplyCommands(ctx, commentCmd)
-	ErrEquals(t, "atlantis.yaml files not allowed because Atlantis is not running with --allow-repo-config", err)
-}
-
 // Test that if a directory has a list of workspaces configured then we don't
 // allow plans for other workspace names.
 func TestDefaultProjectCommandBuilder_WrongWorkspaceName(t *testing.T) {
@@ -967,3 +1092,10 @@ projects:
 }
 
 func String(v string) *string { return &v }
+
+func getDefaultAutoPlan() valid.Autoplan {
+	return valid.Autoplan{
+		WhenModified: []string{"**/*.tf*"},
+		Enabled:      true,
+	}
+}
