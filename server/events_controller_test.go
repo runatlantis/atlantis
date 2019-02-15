@@ -578,6 +578,7 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 
 			expRepo := models.Repo{
 				FullName:          "project/repository",
+				FullNameWithHost:  "bbserver.com/project/repository",
 				Owner:             "project",
 				Name:              "repository",
 				CloneURL:          "https://bb-user:bb-token@bbserver.com/scm/proj/repository.git",

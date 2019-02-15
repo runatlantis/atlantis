@@ -2,6 +2,8 @@ package events
 
 import (
 	"fmt"
+	"github.com/runatlantis/atlantis/server/events/yaml/raw"
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"strings"
 
 	"github.com/hashicorp/go-version"
@@ -9,7 +11,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/yaml"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -50,6 +51,7 @@ type DefaultProjectCommandBuilder struct {
 	WorkingDirLocker    WorkingDirLocker
 	AllowRepoConfig     bool
 	AllowRepoConfigFlag string
+	RepoConfig          raw.RepoConfig
 	PendingPlanFinder   *DefaultPendingPlanFinder
 	CommentBuilder      CommentBuilder
 }
@@ -102,10 +104,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		return nil, errors.Wrapf(err, "looking for %s file in %q", yaml.AtlantisYAMLFilename, repoDir)
 	}
 	if hasConfigFile {
-		if !p.AllowRepoConfig {
-			return nil, fmt.Errorf("%s files not allowed because Atlantis is not running with --%s", yaml.AtlantisYAMLFilename, p.AllowRepoConfigFlag)
-		}
-		config, err = p.ParserValidator.ReadConfig(repoDir)
+		config, err = p.ParserValidator.ReadConfig(repoDir, p.RepoConfig, ctx.BaseRepo.FullNameWithHost, p.AllowRepoConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -130,6 +129,24 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		modifiedProjects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.BaseRepo.FullName, repoDir)
 		ctx.Log.Info("automatically determined that there were %d projects modified in this pull request: %s", len(modifiedProjects), modifiedProjects)
 		for _, mp := range modifiedProjects {
+			var globalConfig valid.Config
+			var projectConfig *valid.Project
+
+			// If there is a server side repo config that matches, then the project should be planned using
+			// a config that honors those values.  Creating a single project config with no settings other than
+			// dir and merging with the server side repo yaml achieves this
+			version := 2
+			config := raw.Config{
+				Version:  &version,
+				Projects: []raw.Project{{Dir: &mp.Path}},
+			}
+			config, err = p.ParserValidator.ValidateOverridesAndMergeConfig(config, p.RepoConfig, ctx.BaseRepo.FullNameWithHost, p.AllowRepoConfig)
+			if err != nil {
+				return nil, err
+			}
+			globalConfig = config.ToValid()
+			projectConfig = &globalConfig.Projects[0]
+
 			projCtxs = append(projCtxs, models.ProjectCommandContext{
 				BaseRepo:      ctx.BaseRepo,
 				HeadRepo:      ctx.HeadRepo,
@@ -137,8 +154,8 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 				User:          ctx.User,
 				Log:           ctx.Log,
 				RepoRelDir:    mp.Path,
-				ProjectConfig: nil,
-				GlobalConfig:  nil,
+				ProjectConfig: projectConfig,
+				GlobalConfig:  &globalConfig,
 				CommentArgs:   commentFlags,
 				Workspace:     DefaultWorkspace,
 				Verbose:       verbose,
@@ -293,7 +310,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *CommandCont
 }
 
 func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContext, projectName string, commentFlags []string, repoDir string, repoRelDir string, workspace string) (models.ProjectCommandContext, error) {
-	projCfg, globalCfg, err := p.getCfg(projectName, repoRelDir, workspace, repoDir)
+	projCfg, globalCfg, err := p.getCfg(ctx, projectName, repoRelDir, workspace, repoDir)
 	if err != nil {
 		return models.ProjectCommandContext{}, err
 	}
@@ -327,26 +344,38 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 	}, nil
 }
 
-func (p *DefaultProjectCommandBuilder) getCfg(projectName string, dir string, workspace string, repoDir string) (projectCfg *valid.Project, globalCfg *valid.Config, err error) {
+// This function is used to get the project config file when apply is being run
+func (p *DefaultProjectCommandBuilder) getCfg(ctx *CommandContext, projectName string, dir string, workspace string, repoDir string) (projectCfg *valid.Project, globalCfg *valid.Config, err error) {
 	hasConfigFile, err := p.ParserValidator.HasConfigFile(repoDir)
 	if err != nil {
 		err = errors.Wrapf(err, "looking for %s file in %q", yaml.AtlantisYAMLFilename, repoDir)
 		return
 	}
-	if !hasConfigFile {
-		if projectName != "" {
-			err = fmt.Errorf("cannot specify a project name unless an %s file exists to configure projects", yaml.AtlantisYAMLFilename)
-			return
+	if !hasConfigFile && projectName != "" {
+		err = fmt.Errorf("cannot specify a project name unless an %s file exists to configure projects", yaml.AtlantisYAMLFilename)
+		return
+	}
+
+	var globalCfgStruct valid.Config
+	// If we have a config file, read it and let any repo restricted config be merged and validated
+	if hasConfigFile {
+		globalCfgStruct, err = p.ParserValidator.ReadConfig(repoDir, p.RepoConfig, ctx.BaseRepo.FullNameWithHost, p.AllowRepoConfig)
+	} else {
+		// If no atlantis.yaml file exists, we generate a skeleton config and merge all of the server side repo config
+		// settings into.  If no server side repo config was provided, a default one was generated at server start
+		version := 2
+		rawConfig := raw.Config{
+			Version: &version,
+			Projects: []raw.Project{
+				{
+					Dir:       &dir,
+					Workspace: &workspace,
+				},
+			},
 		}
-		return
+		rawConfig, err = p.ParserValidator.ValidateOverridesAndMergeConfig(rawConfig, p.RepoConfig, ctx.BaseRepo.FullNameWithHost, p.AllowRepoConfig)
+		globalCfgStruct = rawConfig.ToValid()
 	}
-
-	if !p.AllowRepoConfig {
-		err = fmt.Errorf("%s files not allowed because Atlantis is not running with --%s", yaml.AtlantisYAMLFilename, p.AllowRepoConfigFlag)
-		return
-	}
-
-	globalCfgStruct, err := p.ParserValidator.ReadConfig(repoDir)
 	if err != nil {
 		return
 	}

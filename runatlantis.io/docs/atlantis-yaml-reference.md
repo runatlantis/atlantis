@@ -10,8 +10,12 @@ See [www.runatlantis.io/guide/atlantis-yaml-use-cases.html](../guide/atlantis-ya
 :::
 
 ## Enabling atlantis.yaml
-The atlantis server must be running with `--allow-repo-config` to allow Atlantis
-to use `atlantis.yaml` files.
+By default all repos are allowed to have an `atlantis.yaml` file, but not all of the keys are enabled by default due to
+the sensitive nature of some keys.
+
+Restricted keys can be set in the server side `repos.yaml` file, and you can enable `atlantis.yaml` to override restricted
+keys by setting `allowed_overrides` in the `repos.yaml`.  See the [repos.yaml reference](repos-yaml-reference.html) for
+more information.
 
 ## Example Using All Keys
 ```yaml
@@ -58,11 +62,10 @@ likely hold your highest privilege credentials.
 The risk is increased because Atlantis uses the `atlantis.yaml` file from the
 pull request so anyone that can submit a pull request can submit a malicious file.
 
-As such, **`atlantis.yaml` files should only be enabled in a trusted environment**.
-
-::: danger
-It should be noted that `atlantis apply` itself could be exploited if run on a malicious terraform file. See [Security](security.html#exploits).
-:::
+By default, the keys that are sensitive in nature are restricted from being used in the `atlantis.yaml` file.
+Restricted keys can be set in the server side `repos.yaml` file, and you can enable `atlantis.yaml` to override restricted
+keys by setting `allowed_overrides` in the `repos.yaml`.  See the [repos.yaml reference](repos-yaml-reference.html) for
+more information.
 
 ## Reference
 ### Top-Level Keys
@@ -72,12 +75,12 @@ automerge:
 projects:
 workflows:
 ```
-| Key       | Type                                                             | Default | Required | Description                                                 |
-| --------- | ---------------------------------------------------------------- | ------- | -------- | ----------------------------------------------------------- |
-| version   | int                                                              | none    | yes      | This key is required and must be set to `2`                 |
-| automerge | bool                                                             | false   | no       | Automatically merge pull request when all plans are applied |
-| projects  | array[[Project](atlantis-yaml-reference.html#project)]           | []      | no       | Lists the projects in this repo                             |
-| workflows | map[string -> [Workflow](atlantis-yaml-reference.html#workflow)] | {}      | no       | Custom workflows                                            |
+| Key                           | Type                                                             | Default | Required | Description                                                 |
+| ----------------------------- | ---------------------------------------------------------------- | ------- | -------- | ----------------------------------------------------------- |
+| version                       | int                                                              | none    | yes      | This key is required and must be set to `2`                 |
+| automerge                     | bool                                                             | false   | no       | Automatically merge pull request when all plans are applied |
+| projects                      | array[[Project](atlantis-yaml-reference.html#project)]           | []      | no       | Lists the projects in this repo                             |
+| workflows<br />*(restricted)* | map[string -> [Workflow](atlantis-yaml-reference.html#workflow)] | {}      | no       | Custom workflows                                            |
 
 ### Project
 ```yaml
@@ -90,15 +93,15 @@ apply_requirements: ["approved"]
 workflow: myworkflow
 ```
 
-| Key                | Type                                              | Default | Required | Description                                                                                                                                                                                                           |
-| ------------------ | ------------------------------------------------- | ------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| name               | string                                            | none    | maybe    | Required if there is more than one project with the same `dir` and `workspace`. This project name can be used with the `-p` flag.                                                                                     |
-| dir                | string                                            | none    | yes      | The directory of this project relative to the repo root. Use `.` for the root. For example if the project was under `./project1` then use `project1`                                                                  |
-| workspace          | string                                            | default | no       | The [Terraform workspace](https://www.terraform.io/docs/state/workspaces.html) for this project. Atlantis will switch to this workplace when planning/applying and will create it if it doesn't exist.                |
-| autoplan           | [Autoplan](atlantis-yaml-reference.html#autoplan) | none    | no       | A custom autoplan configuration. If not specified, will use the default algorithm. See [Autoplanning](autoplanning.html).                                                                                             |
-| terraform_version  | string                                            | none    | no       | A specific Terraform version to use when running commands for this project. Must be [Semver compatible](https://semver.org/), ex. `v0.11.0`, `0.12.0-beta1`.                                                          |
-| apply_requirements | array[string]                                     | []      | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved` and `mergeable`. See [Apply Requirements](apply-requirements.html) for more details. |
-| workflow           | string                                            | none    | no       | A custom workflow. If not specified, Atlantis will use its default workflow.                                                                                                                                          |
+| Key                                    | Type                                              | Default | Required | Description                                                                                                                                                                                                           |
+| -------------------------------------- | ------------------------------------------------- | ------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| name                                   | string                                            | none    | maybe    | Required if there is more than one project with the same `dir` and `workspace`. This project name can be used with the `-p` flag.                                                                                     |
+| dir                                    | string                                            | none    | yes      | The directory of this project relative to the repo root. Use `.` for the root. For example if the project was under `./project1` then use `project1`                                                                  |
+| workspace                              | string                                            | default | no       | The [Terraform workspace](https://www.terraform.io/docs/state/workspaces.html) for this project. Atlantis will switch to this workplace when planning/applying and will create it if it doesn't exist.                |
+| autoplan                               | [Autoplan](atlantis-yaml-reference.html#autoplan) | none    | no       | A custom autoplan configuration. If not specified, will use the default algorithm. See [Autoplanning](autoplanning.html).                                                                                             |
+| terraform_version                      | string                                            | none    | no       | A specific Terraform version to use when running commands for this project. Must be [Semver compatible](https://semver.org/), ex. `v0.11.0`, `0.12.0-beta1`.                                                          |
+| apply_requirements<br />*(restricted)* | array[string]                                     | []      | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved` and `mergeable`. See [Apply Requirements](apply-requirements.html) for more details. |
+| workflow <br />*(restricted)*          | string                                            | none    | no       | A custom workflow. If not specified, Atlantis will use its default workflow.                                                                                                                                          |
 
 ::: tip
 A project represents a Terraform state. Typically, there is one state per directory and workspace however it's possible to
@@ -112,7 +115,7 @@ enabled: true
 when_modified: ["*.tf"]
 ```
 | Key           | Type          | Default | Required | Description                                                                                                                                                                                                                                                                                                              |
-| ------------- | ------------- | ------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ------------- | ------------- | ------- | -------- |  ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | enabled       | boolean       | true    | no       | Whether autoplanning is enabled for this project.                                                                                                                                                                                                                                                                        |
 | when_modified | array[string] | no      | no       | Uses [.dockerignore](https://docs.docker.com/engine/reference/builder/#dockerignore-file) syntax. If any modified file in the pull request matches, this project will be planned. If not specified, Atlantis will use its own algorithm. See [Autoplanning](autoplanning.html). Paths are relative to the project's dir. |
 
@@ -122,8 +125,8 @@ plan:
 apply:
 ```
 
-| Key   | Type                                        | Default               | Required | Description                    |
-| ----- | ------------------------------------------- | --------------------- | -------- | ------------------------------ |
+| Key   | Type                                        | Default               | Required |  Description                    |
+| ----- | ------------------------------------------- | --------------------- | -------- |  ------------------------------ |
 | plan  | [Stage](atlantis-yaml-reference.html#stage) | `steps: [init, plan]` | no       | How to plan for this project.  |
 | apply | [Stage](atlantis-yaml-reference.html#stage) | `steps: [apply]`      | no       | How to apply for this project. |
 

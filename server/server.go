@@ -21,6 +21,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/runatlantis/atlantis/server/events/db"
+	"github.com/runatlantis/atlantis/server/events/yaml/raw"
 	"log"
 	"net/http"
 	"net/url"
@@ -194,6 +195,21 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, errors.Wrapf(err,
 			"parsing --%s flag %q", config.AtlantisURLFlag, userConfig.AtlantisURL)
 	}
+	validator := &yaml.ParserValidator{}
+
+	// This is a default config that will allow safe keys to be used in atlantis.yaml by default
+	// but restrict all sensitive keys.  This is used if the server is started without --repo-config.
+	repoConfig := raw.RepoConfig{
+		Repos: []raw.Repo{{ID: "/.*/"}},
+	}
+
+	if userConfig.RepoConfig != "" {
+		repoConfig, err = validator.ReadServerConfig(userConfig.RepoConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	underlyingRouter := mux.NewRouter()
 	router := &Router{
 		AtlantisURL:               parsedURL,
@@ -235,12 +251,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AllowForkPRs:             userConfig.AllowForkPRs,
 		AllowForkPRsFlag:         config.AllowForkPRsFlag,
 		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
-			ParserValidator:     &yaml.ParserValidator{},
+			ParserValidator:     validator,
 			ProjectFinder:       &events.DefaultProjectFinder{},
 			VCSClient:           vcsClient,
 			WorkingDir:          workingDir,
 			WorkingDirLocker:    workingDirLocker,
 			AllowRepoConfig:     userConfig.AllowRepoConfig,
+			RepoConfig:          repoConfig,
 			AllowRepoConfigFlag: config.AllowRepoConfigFlag,
 			PendingPlanFinder:   pendingPlanFinder,
 			CommentBuilder:      commentParser,

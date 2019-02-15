@@ -35,6 +35,9 @@ type Repo struct {
 	// FullName is the owner and repo name separated
 	// by a "/", ex. "runatlantis/atlantis", "gitlab/subgroup/atlantis", "Bitbucket Server/atlantis".
 	FullName string
+	// FullNameWithHost
+	// This is the full name of the repo including the hostname. ex github.com/runatlantis/atlantis
+	FullNameWithHost string
 	// Owner is just the repo owner, ex. "runatlantis" or "gitlab/subgroup".
 	// This may contain /'s in the case of GitLab subgroups.
 	// This may contain spaces in the case of Bitbucket Server.
@@ -72,6 +75,12 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 	if err != nil {
 		return Repo{}, errors.Wrap(err, "invalid clone url")
 	}
+
+	repoHostname := cloneURLParsed.Hostname()
+	if cloneURLParsed.Port() != "" {
+		repoHostname = fmt.Sprintf("%s:%s", repoHostname, cloneURLParsed.Port())
+	}
+	repoFullNameWithHost := fmt.Sprintf("%s/%s", repoHostname, repoFullName)
 
 	// Ensure the Clone URL is for the same repo to avoid something malicious.
 	// We skip this check for Bitbucket Server because its format is different
@@ -111,6 +120,7 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 
 	return Repo{
 		FullName:          repoFullName,
+		FullNameWithHost:  repoFullNameWithHost,
 		Owner:             owner,
 		Name:              repo,
 		CloneURL:          authedCloneURL,
