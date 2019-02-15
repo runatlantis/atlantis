@@ -20,7 +20,21 @@ by at least one person other than the author.
 #### Usage
 You can set the `approved` requirement by:
 1. Passing the `--require-approval` flag to `atlantis server` or
-1. Creating an `atlantis.yaml` file with the `apply_requirements` key:
+1. Creating a `repos.yaml` file with the `apply_requirements` key:
+   ```yaml
+   repos:
+   - id: /.*/
+     apply_requirements: [approved]
+   ```
+1. Or by allowing an `atlantis.yaml` file to specify the `apply_requirements` key in your `repos.yaml` config:
+    #### repos.yaml
+    ```yaml
+    repos:
+    - id: /.*/
+      allowed_overrides: [apply_requirements]
+    ```
+    
+    #### atlantis.yaml
     ```yaml
     version: 2
     projects:
@@ -47,14 +61,29 @@ The `mergeable` requirement will prevent applies unless a pull request is able t
 #### Usage
 You can set the `mergeable` requirement by:
 1. Passing the `--require-mergeable` flag to `atlantis server` or
-1. Creating an `atlantis.yaml` file with the `apply_requirements` key:
+1. Creating a `repos.yaml` file with the `apply_requirements` key:
+   ```yaml
+   repos:
+   - id: /.*/
+     apply_requirements: [mergeable]
+    ```
+  
+1. Or by allowing an `atlantis.yaml` file to specify the `apply_requirements` key in your `repos.yaml` config:
+    #### repos.yaml
+    ```yaml
+    repos:
+    - id: /.*/
+      allowed_overrides: [apply_requirements]
+    ```
+     
+    #### atlantis.yaml
     ```yaml
     version: 2
     projects:
     - dir: .
       apply_requirements: [mergeable]
-     ```
-
+    ```
+     
 #### Meaning
 Each VCS provider has a different concept of "mergeability":
 #### GitHub
@@ -92,18 +121,47 @@ If you need a specific check, please
 [open an issue](https://github.com/runatlantis/atlantis/issues/new).
 
 ## Setting Apply Requirements
-As mentioned above, you can set apply requirements via flags or `atlantis.yaml`.
+As mentioned above, you can set apply requirements via flags, in `repos.yaml`, or in `atlantis.yaml` if `repos.yaml`
+allows the override.
 
 ### Flags Override
-Flags **override** any `atlantis.yaml` settings so they are equivalent to always
+Flags **override** any `repos.yaml` or `atlantis.yaml` settings so they are equivalent to always
 having that apply requirement set.
 
 ### Project-Specific Settings
 If you only want some projects/repos to have apply requirements, then you must
 1. Not set the `--require-approval` or `--require-mergeable` flags, since those
-   will override any `atlantis.yaml` settings
-1. Specify which projects have which requirements via an `atlantis.yaml` file.
+   will override any `repos.yaml` or `atlantis.yaml` settings
+1. Specifying which repos have which requirements via the `repos.yaml` file.
+   ```yaml
+   repos:
+   - id: /.*/
+     apply_requirements: [approved]
+   # Regex that defaults all repos to requiring approval
+   - id: /github.com/runatlantis/.*/
+     # Regex to match any repo under the atlantis namespace, and not require approval
+     # except for repos that might match later in the chain
+     apply_requirements: []
+   - id: github.com/runatlantis/atlantis
+     apply_requirements: [approved]
+     # Exact string match of the github.com/runatlantis/atlantis repo
+     # that sets apply_requirements to approved
+   ```
+
+1. Specify which projects have which requirements via an `atlantis.yaml` file, and allowing
+   `apply_requirements` to be set in in `atlantis.yaml` by the server side `repos.yaml`
+   config.
+   
    For example if I have two directories, `staging` and `production`, I might use:
+   #### repos.yaml
+   ```yaml
+   repos:
+   - id: /.*/
+     allowed_overrides: [apply_requirements]
+     # Allow any repo to specify apply_requirements in atlantis.yaml
+   ```
+   
+   #### atlatis.yaml
    ```yaml
    version: 2
    projects:

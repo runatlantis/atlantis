@@ -58,6 +58,7 @@ const (
 	GitlabWebhookSecretFlag    = "gitlab-webhook-secret" // nolint: gosec
 	LogLevelFlag               = "log-level"
 	PortFlag                   = "port"
+	RepoConfigFlag             = "repo-config"
 	RepoWhitelistFlag          = "repo-whitelist"
 	RequireApprovalFlag        = "require-approval"
 	RequireMergeableFlag       = "require-mergeable"
@@ -169,6 +170,10 @@ var stringFlags = []stringFlag{
 		defaultValue: DefaultLogLevel,
 	},
 	{
+		name:        RepoConfigFlag,
+		description: "Path to a repo config file, used to configure how atlantis.yaml will behave on repos.  Repos can be specified as an exact string or using regular expressions",
+	},
+	{
 		name: RepoWhitelistFlag,
 		description: "Comma separated list of repositories that Atlantis will operate on. " +
 			"The format is {hostname}/{owner}/{repo}, ex. github.com/runatlantis/atlantis. '*' matches any characters until the next comma and can be used for example to whitelist " +
@@ -211,6 +216,7 @@ var boolFlags = []boolFlag{
 			" Should only be enabled in a trusted environment since it enables a pull request to run arbitrary commands" +
 			" on the Atlantis server.",
 		defaultValue: false,
+		deprecated:   fmt.Sprintf("use --%s to allow sensitive keys in atlantis.yaml", RepoConfigFlag),
 	},
 	{
 		name:         AutomergeFlag,
@@ -245,16 +251,19 @@ type stringFlag struct {
 	name         string
 	description  string
 	defaultValue string
+	deprecated   string
 }
 type intFlag struct {
 	name         string
 	description  string
 	defaultValue int
+	deprecated   string
 }
 type boolFlag struct {
 	name         string
 	description  string
 	defaultValue bool
+	deprecated   string
 }
 
 // ServerCmd is an abstraction that helps us test. It allows
@@ -330,6 +339,9 @@ func (s *ServerCmd) Init() *cobra.Command {
 			usage = fmt.Sprintf("%s (default \"%s\")", usage, f.defaultValue)
 		}
 		c.Flags().String(f.name, "", usage+"\n")
+		if f.deprecated != "" {
+			c.Flags().MarkDeprecated(f.name, f.deprecated) // nolint: errcheck
+		}
 		s.Viper.BindPFlag(f.name, c.Flags().Lookup(f.name)) // nolint: errcheck
 	}
 
@@ -340,12 +352,18 @@ func (s *ServerCmd) Init() *cobra.Command {
 			usage = fmt.Sprintf("%s (default %d)", usage, f.defaultValue)
 		}
 		c.Flags().Int(f.name, 0, usage+"\n")
+		if f.deprecated != "" {
+			c.Flags().MarkDeprecated(f.name, f.deprecated) // nolint: errcheck
+		}
 		s.Viper.BindPFlag(f.name, c.Flags().Lookup(f.name)) // nolint: errcheck
 	}
 
 	// Set bool flags.
 	for _, f := range boolFlags {
 		c.Flags().Bool(f.name, f.defaultValue, f.description+"\n")
+		if f.deprecated != "" {
+			c.Flags().MarkDeprecated(f.name, f.deprecated) // nolint: errcheck
+		}
 		s.Viper.BindPFlag(f.name, c.Flags().Lookup(f.name)) // nolint: errcheck
 	}
 
@@ -437,6 +455,9 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 
 	if (userConfig.SSLKeyFile == "") != (userConfig.SSLCertFile == "") {
 		return fmt.Errorf("--%s and --%s are both required for ssl", SSLKeyFileFlag, SSLCertFileFlag)
+	}
+	if userConfig.AllowRepoConfig && userConfig.RepoConfig != "" {
+		return fmt.Errorf("You cannot use both --%s and --%s together.  --%s is deprecated and will be removed in a later version, you should use --%s instead", AllowRepoConfigFlag, RepoConfigFlag, AllowRepoConfigFlag, RepoConfigFlag)
 	}
 
 	// The following combinations are valid.
