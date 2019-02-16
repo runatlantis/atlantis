@@ -276,7 +276,7 @@ Or just modify the whitespace in a file.
 You should see Atlantis logging about receiving the webhook and you should see the output of `terraform plan` on your repo.
 
 Atlantis tries to figure out the directory to plan in based on the files modified.
-If you need to customize the directories that that Atlantis runs in or the commands it runs if you're using workspaces
+If you need to customize the directories that Atlantis runs in or the commands it runs if you're using workspaces
 or `.tfvars` files, see [atlantis.yaml Reference](../docs/atlantis-yaml-reference.html).
 
 ### Manual Plan
