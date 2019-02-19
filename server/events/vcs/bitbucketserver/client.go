@@ -241,7 +241,21 @@ func (b *Client) MergePull(pull models.PullRequest) error {
 	if err != nil {
 		return err
 	}
-	path := fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d/merge", b.BaseURL, projectKey, pull.BaseRepo.Name, pull.Num)
+
+	// We need to make a get pull request API call to get the correct "version".
+	path := fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d", b.BaseURL, projectKey, pull.BaseRepo.Name, pull.Num)
+	resp, err := b.makeRequest("GET", path, nil)
+	if err != nil {
+		return err
+	}
+	var pullResp PullRequest
+	if err := json.Unmarshal(resp, &pullResp); err != nil {
+		return errors.Wrapf(err, "Could not parse response %q", string(resp))
+	}
+	if err := validator.New().Struct(pullResp); err != nil {
+		return errors.Wrapf(err, "API response %q was missing fields", string(resp))
+	}
+	path = fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d/merge?version=%d", b.BaseURL, projectKey, pull.BaseRepo.Name, pull.Num, *pullResp.Version)
 	_, err = b.makeRequest("POST", path, nil)
 	return err
 }

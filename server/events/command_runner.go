@@ -247,7 +247,7 @@ func (c *DefaultCommandRunner) automerge(ctx *CommandContext, pullStatus *models
 	if err != nil {
 		ctx.Log.Err("automerging failed: %s", err)
 
-		failureComment := fmt.Sprintf("Automerging failed: %s", err)
+		failureComment := fmt.Sprintf("Automerging failed:\n```\n%s\n```", err)
 		if commentErr := c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, failureComment); commentErr != nil {
 			ctx.Log.Err("failed to comment about automerge failing: %s", err)
 		}

@@ -23,6 +23,7 @@ type CommonEventData struct {
 }
 
 type PullRequest struct {
+	Version   *int    `json:"version,omitempty" validate:"required"`
 	ID        *int    `json:"id,omitempty" validate:"required"`
 	FromRef   *Ref    `json:"fromRef,omitempty" validate:"required"`
 	ToRef     *Ref    `json:"toRef,omitempty" validate:"required"`

@@ -1,0 +1,134 @@
+{
+  "id": 2,
+  "version": 3,
+  "title": "hi",
+  "state": "MERGED",
+  "open": false,
+  "closed": true,
+  "createdDate": 1550611116280,
+  "updatedDate": 1550611904547,
+  "closedDate": 1550611904547,
+  "fromRef": {
+    "id": "refs/heads/hi",
+    "displayId": "hi",
+    "latestCommit": "bdcaa224f4b65edb853a689404ef79cf47d8cdda",
+    "repository": {
+      "slug": "example",
+      "id": 1,
+      "name": "example",
+      "scmId": "git",
+      "state": "AVAILABLE",
+      "statusMessage": "Available",
+      "forkable": true,
+      "project": {
+        "key": "AT",
+        "id": 1,
+        "name": "atlantis",
+        "public": false,
+        "type": "NORMAL",
+        "links": {
+          "self": [
+            {
+              "href": "http://localhost:7990/projects/AT"
+            }
+          ]
+        }
+      },
+      "public": false,
+      "links": {
+        "clone": [
+          {
+            "href": "ssh://git@localhost:7999/at/example.git",
+            "name": "ssh"
+          },
+          {
+            "href": "http://localhost:7990/scm/at/example.git",
+            "name": "http"
+          }
+        ],
+        "self": [
+          {
+            "href": "http://localhost:7990/projects/AT/repos/example/browse"
+          }
+        ]
+      }
+    }
+  },
+  "toRef": {
+    "id": "refs/heads/master",
+    "displayId": "master",
+    "latestCommit": "59e03b9cc44e16e20741e328faaac26e377c07bf",
+    "repository": {
+      "slug": "example",
+      "id": 1,
+      "name": "example",
+      "scmId": "git",
+      "state": "AVAILABLE",
+      "statusMessage": "Available",
+      "forkable": true,
+      "project": {
+        "key": "AT",
+        "id": 1,
+        "name": "atlantis",
+        "public": false,
+        "type": "NORMAL",
+        "links": {
+          "self": [
+            {
+              "href": "http://localhost:7990/projects/AT"
+            }
+          ]
+        }
+      },
+      "public": false,
+      "links": {
+        "clone": [
+          {
+            "href": "ssh://git@localhost:7999/at/example.git",
+            "name": "ssh"
+          },
+          {
+            "href": "http://localhost:7990/scm/at/example.git",
+            "name": "http"
+          }
+        ],
+        "self": [
+          {
+            "href": "http://localhost:7990/projects/AT/repos/example/browse"
+          }
+        ]
+      }
+    }
+  },
+  "locked": false,
+  "author": {
+    "user": {
+      "name": "admin",
+      "emailAddress": "luke@hashicorp.com",
+      "id": 1,
+      "displayName": "admin",
+      "active": true,
+      "slug": "admin",
+      "type": "NORMAL",
+      "links": {
+        "self": [
+          {
+            "href": "http://localhost:7990/users/admin"
+          }
+        ]
+      }
+    },
+    "role": "AUTHOR",
+    "approved": false,
+    "status": "UNAPPROVED"
+  },
+  "reviewers": [],
+  "participants": [],
+  "links": {
+    "self": [
+      {
+        "href": "http://localhost:7990/projects/AT/repos/example/pull-requests/2"
+      }
+    ]
+  }
+}
