@@ -42,6 +42,10 @@ func TestRunStepRunner_Run(t *testing.T) {
 			Command: "echo base_repo_name=$BASE_REPO_NAME base_repo_owner=$BASE_REPO_OWNER head_repo_name=$HEAD_REPO_NAME head_repo_owner=$HEAD_REPO_OWNER head_branch_name=$HEAD_BRANCH_NAME base_branch_name=$BASE_BRANCH_NAME pull_num=$PULL_NUM pull_author=$PULL_AUTHOR",
 			ExpOut:  "base_repo_name=basename base_repo_owner=baseowner head_repo_name=headname head_repo_owner=headowner head_branch_name=add-feat base_branch_name=master pull_num=2 pull_author=acme\n",
 		},
+		{
+			Command: "echo user_name=$USER_NAME",
+			ExpOut:  "user_name=acme-user\n",
+		},
 	}
 
 	projVersion, err := version.NewVersion("v0.11.0")
@@ -64,6 +68,9 @@ func TestRunStepRunner_Run(t *testing.T) {
 			HeadBranch: "add-feat",
 			BaseBranch: "master",
 			Author:     "acme",
+		},
+		User: models.User{
+			Username: "acme-user",
 		},
 		Log:        logging.NewNoopLogger(),
 		Workspace:  "myworkspace",
