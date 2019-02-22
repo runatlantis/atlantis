@@ -42,6 +42,7 @@ func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command []string, 
 		"BASE_BRANCH_NAME":           ctx.Pull.BaseBranch,
 		"PULL_NUM":                   fmt.Sprintf("%d", ctx.Pull.Num),
 		"PULL_AUTHOR":                ctx.Pull.Author,
+		"USER_NAME":                  ctx.User.Username,
 	}
 
 	finalEnvVars := baseEnvVars

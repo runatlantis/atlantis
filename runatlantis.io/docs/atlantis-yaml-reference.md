@@ -191,6 +191,7 @@ override the built-in `plan`/`apply` commands, ex. `run: terraform plan -out $PL
 * `BASE_BRANCH_NAME` - Name of the base branch of the pull request (the branch that the pull request is getting merged into)
 * `PULL_NUM` - Pull request number or ID, ex. `2`.
 * `PULL_AUTHOR` - Username of the pull request author, ex. `acme-user`.
+* `USER_NAME` - Username of the VCS user running command, ex. `acme-user`. During an autoplan, the user will be the Atlantis API user, ex. `atlantis`.
 :::
 
 ::: tip
