@@ -211,3 +211,50 @@ func TestRun_UsingTarget(t *testing.T) {
 		})
 	}
 }
+
+// Test that apply works for remote applies.
+func TestRun_RemoteApply(t *testing.T) {
+	tmpDir, cleanup := TempDir(t)
+	defer cleanup()
+	planPath := filepath.Join(tmpDir, "workspace.tfplan")
+	planFileContents := `Atlantis: this plan was created by remote ops
+
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+  - destroy
+
+Terraform will perform the following actions:
+
+  - null_resource.hi[1]
+
+
+Plan: 0 to add, 0 to change, 1 to destroy.`
+	err := ioutil.WriteFile(planPath, []byte(planFileContents), 0644)
+	Ok(t, err)
+
+	RegisterMockTestingT(t)
+	terraform := mocks.NewMockClient()
+	o := runtime.ApplyStepRunner{
+		TerraformExecutor: terraform,
+	}
+	tfVersion, _ := version.NewVersion("0.11.0")
+
+	When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+		ThenReturn("output", nil)
+	output, err := o.Run(models.ProjectCommandContext{
+		Workspace:   "workspace",
+		RepoRelDir:  ".",
+		CommentArgs: []string{"comment", "args"},
+		ProjectConfig: &valid.Project{
+			TerraformVersion: tfVersion,
+		},
+	}, []string{"extra", "args"}, tmpDir)
+	Ok(t, err)
+	Equals(t, "output", output)
+
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, tmpDir,
+		[]string{"apply", "-input=false", "-no-color", "-auto-approve", "extra", "args", "comment", "args"},
+		tfVersion, "workspace")
+	_, err = os.Stat(planPath)
+	Assert(t, os.IsNotExist(err), "planfile should be deleted")
+}

@@ -657,6 +657,111 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, "/path", expPlanArgs, tfVersion, "default")
 }
 
+// Test plans if using remote ops.
+func TestRun_RemoteOps(t *testing.T) {
+	RegisterMockTestingT(t)
+	terraform := mocks.NewMockClient()
+
+	tfVersion, _ := version.NewVersion("0.11.12")
+	s := runtime.PlanStepRunner{
+		TerraformExecutor: terraform,
+		DefaultTFVersion:  tfVersion,
+	}
+	absProjectPath, cleanup := TempDir(t)
+	defer cleanup()
+
+	// First, terraform workspace gets run.
+	When(terraform.RunCommandWithVersion(
+		nil,
+		absProjectPath,
+		[]string{"workspace", "show"},
+		tfVersion,
+		"default")).ThenReturn("default\n", nil)
+
+	// Then the first call to terraform plan should return the remote ops error.
+	expPlanArgs := []string{"plan",
+		"-input=false",
+		"-refresh",
+		"-no-color",
+		"-out",
+		fmt.Sprintf("%q", filepath.Join(absProjectPath, "default.tfplan")),
+		"-var",
+		"atlantis_user=\"username\"",
+		"-var",
+		"atlantis_repo=\"owner/repo\"",
+		"-var",
+		"atlantis_repo_name=\"repo\"",
+		"-var",
+		"atlantis_repo_owner=\"owner\"",
+		"-var",
+		"atlantis_pull_num=2",
+		"extra",
+		"args",
+		"comment",
+		"args",
+	}
+
+	planErr := errors.New("exit status 1: err")
+	planOutput := `
+Error: Saving a generated plan is currently not supported!
+
+The "remote" backend does not support saving the generated execution
+plan locally at this time.
+
+`
+	When(terraform.RunCommandWithVersion(nil, absProjectPath, expPlanArgs, tfVersion, "default")).
+		ThenReturn(planOutput, planErr)
+
+	// We should detect that, and then run the remote-compatible plan.
+	remotePlan := []string{"plan", "-input=false", "-refresh", "-no-color", "extra", "args", "comment", "args"}
+	When(terraform.RunCommandWithVersion(nil, absProjectPath, remotePlan, tfVersion, "default")).
+		ThenReturn(remotePlanOutput, nil)
+
+	// Now that mocking is set up, we're ready to run the plan.
+	output, err := s.Run(models.ProjectCommandContext{
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		User:        models.User{Username: "username"},
+		CommentArgs: []string{"comment", "args"},
+		Pull: models.PullRequest{
+			Num: 2,
+		},
+		BaseRepo: models.Repo{
+			FullName: "owner/repo",
+			Owner:    "owner",
+			Name:     "repo",
+		},
+	}, []string{"extra", "args"}, absProjectPath)
+	Ok(t, err)
+	Equals(t, `
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+- destroy
+
+Terraform will perform the following actions:
+
+- null_resource.hi[1]
+
+
+Plan: 0 to add, 0 to change, 1 to destroy.`, output)
+
+	// Verify that the fake plan file we write has the correct contents.
+	bytes, err := ioutil.ReadFile(filepath.Join(absProjectPath, "default.tfplan"))
+	Ok(t, err)
+	Equals(t, `Atlantis: this plan was created by remote ops
+
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+  - destroy
+
+Terraform will perform the following actions:
+
+  - null_resource.hi[1]
+
+
+Plan: 0 to add, 0 to change, 1 to destroy.`, string(bytes))
+}
+
 func stringSliceEquals(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
@@ -668,3 +773,38 @@ func stringSliceEquals(a, b []string) bool {
 	}
 	return true
 }
+
+var remotePlanOutput = `Running plan in the remote backend. Output will stream here. Pressing Ctrl-C
+will stop streaming the logs, but will not stop the plan running remotely.
+
+Preparing the remote plan...
+
+To view this run in a browser, visit:
+https://app.terraform.io/app/lkysow-enterprises/atlantis-tfe-test/runs/run-is4oVvJfrkud1KvE
+
+Waiting for the plan to start...
+
+Terraform v0.11.11
+
+Configuring remote state backend...
+Initializing Terraform configuration...
+2019/02/20 22:40:52 [DEBUG] Using modified User-Agent: Terraform/0.11.11 TFE/202eeff
+Refreshing Terraform state in-memory prior to plan...
+The refreshed state will be used to calculate this plan, but will not be
+persisted to local or remote state storage.
+
+null_resource.hi: Refreshing state... (ID: 217661332516885645)
+null_resource.hi[1]: Refreshing state... (ID: 6064510335076839362)
+
+------------------------------------------------------------------------
+
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+  - destroy
+
+Terraform will perform the following actions:
+
+  - null_resource.hi[1]
+
+
+Plan: 0 to add, 0 to change, 1 to destroy.`
