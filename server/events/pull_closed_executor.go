@@ -42,7 +42,7 @@ type PullCleaner interface {
 // request.
 type PullClosedExecutor struct {
 	Locker     locking.Locker
-	VCSClient  vcs.ClientProxy
+	VCSClient  vcs.Client
 	WorkingDir WorkingDir
 	Logger     logging.SimpleLogging
 	DB         *db.BoltDB

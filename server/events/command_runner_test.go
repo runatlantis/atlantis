@@ -44,12 +44,12 @@ var pullLogger *logging.SimpleLogger
 var workingDir events.WorkingDir
 var pendingPlanFinder *mocks.MockPendingPlanFinder
 
-func setup(t *testing.T) *vcsmocks.MockClientProxy {
+func setup(t *testing.T) *vcsmocks.MockClient {
 	RegisterMockTestingT(t)
 	projectCommandBuilder = mocks.NewMockProjectCommandBuilder()
 	eventParsing = mocks.NewMockEventParsing()
 	ghStatus = mocks.NewMockCommitStatusUpdater()
-	vcsClient := vcsmocks.NewMockClientProxy()
+	vcsClient := vcsmocks.NewMockClient()
 	githubGetter = mocks.NewMockGithubPullGetter()
 	gitlabGetter = mocks.NewMockGitlabMergeRequestGetter()
 	logger := logmocks.NewMockSimpleLogging()

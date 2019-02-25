@@ -45,7 +45,7 @@ type ProjectCommandBuilder interface {
 type DefaultProjectCommandBuilder struct {
 	ParserValidator     *yaml.ParserValidator
 	ProjectFinder       ProjectFinder
-	VCSClient           vcs.ClientProxy
+	VCSClient           vcs.Client
 	WorkingDir          WorkingDir
 	WorkingDirLocker    WorkingDirLocker
 	AllowRepoConfig     bool

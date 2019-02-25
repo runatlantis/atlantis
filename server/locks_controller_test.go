@@ -175,7 +175,7 @@ func TestDeleteLock_OldFormat(t *testing.T) {
 	t.Log("If the lock doesn't have BaseRepo set it is deleted successfully")
 	RegisterMockTestingT(t)
 
-	cp := vcsmocks.NewMockClientProxy()
+	cp := vcsmocks.NewMockClient()
 	l := mocks.NewMockLocker()
 	When(l.Unlock("id")).ThenReturn(&models.ProjectLock{}, nil)
 	lc := server.LocksController{
@@ -195,7 +195,7 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 	t.Log("If the commenting fails we return an error")
 	RegisterMockTestingT(t)
 
-	cp := vcsmocks.NewMockClientProxy()
+	cp := vcsmocks.NewMockClient()
 	workingDir := mocks2.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 	When(cp.CreateComment(AnyRepo(), AnyInt(), AnyString())).ThenReturn(errors.New("err"))
@@ -228,7 +228,7 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	t.Log("We should comment back on the pull request if the lock is deleted")
 	RegisterMockTestingT(t)
 
-	cp := vcsmocks.NewMockClientProxy()
+	cp := vcsmocks.NewMockClient()
 	l := mocks.NewMockLocker()
 	workingDir := mocks2.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()

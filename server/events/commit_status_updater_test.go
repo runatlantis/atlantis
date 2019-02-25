@@ -31,7 +31,7 @@ var status = models.SuccessCommitStatus
 
 func TestUpdate(t *testing.T) {
 	RegisterMockTestingT(t)
-	client := mocks.NewMockClientProxy()
+	client := mocks.NewMockClient()
 	s := events.DefaultCommitStatusUpdater{Client: client}
 	err := s.Update(repoModel, pullModel, status, events.PlanCommand)
 	Ok(t, err)
@@ -44,7 +44,7 @@ func TestUpdateProjectResult_Error(t *testing.T) {
 		BaseRepo: repoModel,
 		Pull:     pullModel,
 	}
-	client := mocks.NewMockClientProxy()
+	client := mocks.NewMockClient()
 	s := events.DefaultCommitStatusUpdater{Client: client}
 	err := s.UpdateProjectResult(ctx, events.PlanCommand, events.CommandResult{Error: errors.New("err")})
 	Ok(t, err)
@@ -57,7 +57,7 @@ func TestUpdateProjectResult_Failure(t *testing.T) {
 		BaseRepo: repoModel,
 		Pull:     pullModel,
 	}
-	client := mocks.NewMockClientProxy()
+	client := mocks.NewMockClient()
 	s := events.DefaultCommitStatusUpdater{Client: client}
 	err := s.UpdateProjectResult(ctx, events.PlanCommand, events.CommandResult{Failure: "failure"})
 	Ok(t, err)
@@ -127,7 +127,7 @@ func TestUpdateProjectResult(t *testing.T) {
 			}
 			resp := events.CommandResult{ProjectResults: results}
 
-			client := mocks.NewMockClientProxy()
+			client := mocks.NewMockClient()
 			s := events.DefaultCommitStatusUpdater{Client: client}
 			err := s.UpdateProjectResult(ctx, events.PlanCommand, resp)
 			Ok(t, err)

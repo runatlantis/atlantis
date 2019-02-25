@@ -187,7 +187,7 @@ projects:
 			err := ioutil.WriteFile(filepath.Join(tmpDir, "main.tf"), nil, 0600)
 			Ok(t, err)
 
-			vcsClient := vcsmocks.NewMockClientProxy()
+			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(baseRepo, pull)).ThenReturn([]string{"main.tf"}, nil)
 
 			builder := &events.DefaultProjectCommandBuilder{
@@ -467,7 +467,7 @@ projects:
 				err := ioutil.WriteFile(filepath.Join(tmpDir, "main.tf"), nil, 0600)
 				Ok(t, err)
 
-				vcsClient := vcsmocks.NewMockClientProxy()
+				vcsClient := vcsmocks.NewMockClient()
 				When(vcsClient.GetModifiedFiles(baseRepo, pull)).ThenReturn([]string{"main.tf"}, nil)
 
 				builder := &events.DefaultProjectCommandBuilder{
@@ -539,7 +539,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiPlanNoAtlantisYAML(t *testing.T)
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
 		AnyString())).ThenReturn(tmpDir, nil)
-	vcsClient := vcsmocks.NewMockClientProxy()
+	vcsClient := vcsmocks.NewMockClient()
 	When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"project1/main.tf", "project2/main.tf"}, nil)
 
 	builder := &events.DefaultProjectCommandBuilder{
@@ -592,7 +592,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiPlanNoAtlantisYAMLNoModified(t *
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
 		AnyString())).ThenReturn(tmpDir, nil)
-	vcsClient := vcsmocks.NewMockClientProxy()
+	vcsClient := vcsmocks.NewMockClient()
 	When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{}, nil)
 
 	builder := &events.DefaultProjectCommandBuilder{
@@ -662,7 +662,7 @@ projects:
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
 		AnyString())).ThenReturn(tmpDir, nil)
-	vcsClient := vcsmocks.NewMockClientProxy()
+	vcsClient := vcsmocks.NewMockClient()
 	When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{
 		"project1/main.tf", "project2/main.tf", "project3/main.tf",
 	}, nil)
@@ -726,7 +726,7 @@ projects:
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
 		AnyString())).ThenReturn(tmpDir, nil)
-	vcsClient := vcsmocks.NewMockClientProxy()
+	vcsClient := vcsmocks.NewMockClient()
 	When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
 
 	builder := &events.DefaultProjectCommandBuilder{

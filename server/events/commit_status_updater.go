@@ -35,7 +35,7 @@ type CommitStatusUpdater interface {
 
 // DefaultCommitStatusUpdater implements CommitStatusUpdater.
 type DefaultCommitStatusUpdater struct {
-	Client vcs.ClientProxy
+	Client vcs.Client
 }
 
 // Update updates the commit status.

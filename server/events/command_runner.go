@@ -54,7 +54,7 @@ type GitlabMergeRequestGetter interface {
 
 // DefaultCommandRunner is the first step when processing a comment command.
 type DefaultCommandRunner struct {
-	VCSClient                vcs.ClientProxy
+	VCSClient                vcs.Client
 	GithubPullGetter         GithubPullGetter
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
 	CommitStatusUpdater      CommitStatusUpdater
