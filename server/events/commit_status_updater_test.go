@@ -35,7 +35,7 @@ func TestUpdate(t *testing.T) {
 	s := events.DefaultCommitStatusUpdater{Client: client}
 	err := s.Update(repoModel, pullModel, status, events.PlanCommand)
 	Ok(t, err)
-	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, status, "Plan Success")
+	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, status, "Atlantis", "Plan Success")
 }
 
 func TestUpdateProjectResult_Error(t *testing.T) {
@@ -48,7 +48,7 @@ func TestUpdateProjectResult_Error(t *testing.T) {
 	s := events.DefaultCommitStatusUpdater{Client: client}
 	err := s.UpdateProjectResult(ctx, events.PlanCommand, events.CommandResult{Error: errors.New("err")})
 	Ok(t, err)
-	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, models.FailedCommitStatus, "Plan Failed")
+	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, models.FailedCommitStatus, "Atlantis", "Plan Failed")
 }
 
 func TestUpdateProjectResult_Failure(t *testing.T) {
@@ -61,7 +61,7 @@ func TestUpdateProjectResult_Failure(t *testing.T) {
 	s := events.DefaultCommitStatusUpdater{Client: client}
 	err := s.UpdateProjectResult(ctx, events.PlanCommand, events.CommandResult{Failure: "failure"})
 	Ok(t, err)
-	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, models.FailedCommitStatus, "Plan Failed")
+	client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, models.FailedCommitStatus, "Atlantis", "Plan Failed")
 }
 
 func TestUpdateProjectResult(t *testing.T) {
@@ -131,7 +131,7 @@ func TestUpdateProjectResult(t *testing.T) {
 			s := events.DefaultCommitStatusUpdater{Client: client}
 			err := s.UpdateProjectResult(ctx, events.PlanCommand, resp)
 			Ok(t, err)
-			client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, c.Expected, "Plan "+strings.Title(c.Expected.String()))
+			client.VerifyWasCalledOnce().UpdateStatus(repoModel, pullModel, c.Expected, "Atlantis", "Plan "+strings.Title(c.Expected.String()))
 		})
 	}
 }

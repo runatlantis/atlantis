@@ -41,7 +41,7 @@ type DefaultCommitStatusUpdater struct {
 // Update updates the commit status.
 func (d *DefaultCommitStatusUpdater) Update(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command CommandName) error {
 	description := fmt.Sprintf("%s %s", strings.Title(command.String()), strings.Title(status.String()))
-	return d.Client.UpdateStatus(repo, pull, status, description)
+	return d.Client.UpdateStatus(repo, pull, status, "Atlantis", description)
 }
 
 // UpdateProjectResult updates the commit status based on the status of res.

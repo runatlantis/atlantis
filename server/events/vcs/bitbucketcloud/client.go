@@ -146,7 +146,7 @@ func (b *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest) (boo
 }
 
 // UpdateStatus updates the status of a commit.
-func (b *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, status models.CommitStatus, description string) error {
+func (b *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, status models.CommitStatus, src string, description string) error {
 	bbState := "FAILED"
 	switch status {
 	case models.PendingCommitStatus:
@@ -158,7 +158,7 @@ func (b *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, status 
 	}
 
 	bodyBytes, err := json.Marshal(map[string]string{
-		"key":         "atlantis",
+		"key":         src,
 		"url":         b.AtlantisURL,
 		"state":       bbState,
 		"description": description,

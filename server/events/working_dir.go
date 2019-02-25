@@ -166,11 +166,11 @@ func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
 		cmd := exec.Command(args[0], args[1:]...) // nolint: gosec
 		cmd.Dir = cloneDir
 		// The git merge command requires these env vars are set.
-		cmd.Env = []string{
+		cmd.Env = append(os.Environ(), []string{
 			"EMAIL=atlantis@runatlants.io",
 			"GIT_AUTHOR_NAME=atlantis",
 			"GIT_COMMITTER_NAME=atlantis",
-		}
+		}...)
 
 		cmdStr := w.cmdAsSanitizedStr(cmd, p.BaseRepo, headRepo)
 		output, err := cmd.CombinedOutput()

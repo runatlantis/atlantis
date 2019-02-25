@@ -157,8 +157,7 @@ func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRe
 
 // UpdateStatus updates the status badge on the pull request.
 // See https://github.com/blog/1227-commit-status-api.
-func (g *GithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, description string) error {
-	const statusContext = "Atlantis"
+func (g *GithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string) error {
 	ghState := "error"
 	switch state {
 	case models.PendingCommitStatus:
@@ -168,10 +167,11 @@ func (g *GithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 	case models.FailedCommitStatus:
 		ghState = "failure"
 	}
+
 	status := &github.RepoStatus{
 		State:       github.String(ghState),
 		Description: github.String(description),
-		Context:     github.String(statusContext)}
+		Context:     github.String(src)}
 	_, _, err := g.client.Repositories.CreateStatus(g.ctx, repo.Owner, repo.Name, pull.HeadCommit, status)
 	return err
 }
