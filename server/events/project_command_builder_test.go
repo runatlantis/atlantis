@@ -246,7 +246,7 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) 
 			Cmd: events.CommentCommand{
 				RepoRelDir: ".",
 				Flags:      []string{"commentarg"},
-				Name:       events.PlanCommand,
+				Name:       models.PlanCommand,
 				Workspace:  "myworkspace",
 			},
 			AtlantisYAML:     "",
@@ -259,7 +259,7 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) 
 			Description: "no atlantis.yaml with project flag",
 			Cmd: events.CommentCommand{
 				RepoRelDir:  ".",
-				Name:        events.PlanCommand,
+				Name:        models.PlanCommand,
 				ProjectName: "myproject",
 			},
 			AtlantisYAML: "",
@@ -269,7 +269,7 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) 
 			Description: "simple atlantis.yaml",
 			Cmd: events.CommentCommand{
 				RepoRelDir: ".",
-				Name:       events.PlanCommand,
+				Name:       models.PlanCommand,
 				Workspace:  "myworkspace",
 			},
 			AtlantisYAML: `
@@ -294,7 +294,7 @@ projects:
 			Description: "atlantis.yaml wrong dir",
 			Cmd: events.CommentCommand{
 				RepoRelDir: ".",
-				Name:       events.PlanCommand,
+				Name:       models.PlanCommand,
 				Workspace:  "myworkspace",
 			},
 			AtlantisYAML: `
@@ -311,7 +311,7 @@ projects:
 			Description: "atlantis.yaml wrong workspace",
 			Cmd: events.CommentCommand{
 				RepoRelDir: ".",
-				Name:       events.PlanCommand,
+				Name:       models.PlanCommand,
 				Workspace:  "myworkspace",
 			},
 			AtlantisYAML: `
@@ -326,7 +326,7 @@ projects:
 		{
 			Description: "atlantis.yaml with projectname",
 			Cmd: events.CommentCommand{
-				Name:        events.PlanCommand,
+				Name:        models.PlanCommand,
 				ProjectName: "myproject",
 			},
 			AtlantisYAML: `
@@ -352,7 +352,7 @@ projects:
 		{
 			Description: "atlantis.yaml with mergeable apply requirement",
 			Cmd: events.CommentCommand{
-				Name:        events.PlanCommand,
+				Name:        models.PlanCommand,
 				ProjectName: "myproject",
 			},
 			AtlantisYAML: `
@@ -378,7 +378,7 @@ projects:
 		{
 			Description: "atlantis.yaml with mergeable and approved apply requirements",
 			Cmd: events.CommentCommand{
-				Name:        events.PlanCommand,
+				Name:        models.PlanCommand,
 				ProjectName: "myproject",
 			},
 			AtlantisYAML: `
@@ -404,7 +404,7 @@ projects:
 		{
 			Description: "atlantis.yaml with multiple dir/workspaces matching",
 			Cmd: events.CommentCommand{
-				Name:       events.PlanCommand,
+				Name:       models.PlanCommand,
 				RepoRelDir: ".",
 				Workspace:  "myworkspace",
 			},
@@ -424,7 +424,7 @@ projects:
 		{
 			Description: "atlantis.yaml with project flag not matching",
 			Cmd: events.CommentCommand{
-				Name:        events.PlanCommand,
+				Name:        models.PlanCommand,
 				RepoRelDir:  ".",
 				Workspace:   "default",
 				ProjectName: "notconfigured",
@@ -440,7 +440,7 @@ projects:
 
 	for _, c := range cases {
 		// NOTE: we're testing both plan and apply here.
-		for _, cmdName := range []events.CommandName{events.PlanCommand, events.ApplyCommand} {
+		for _, cmdName := range []models.CommandName{models.PlanCommand, models.ApplyCommand} {
 			t.Run(c.Description, func(t *testing.T) {
 				RegisterMockTestingT(t)
 				tmpDir, cleanup := TempDir(t)
@@ -455,7 +455,7 @@ projects:
 				if expWorkspace == "" {
 					expWorkspace = "default"
 				}
-				if cmdName == events.PlanCommand {
+				if cmdName == models.PlanCommand {
 					When(workingDir.Clone(logger, baseRepo, headRepo, pull, expWorkspace)).ThenReturn(tmpDir, nil)
 				} else {
 					When(workingDir.GetWorkingDir(baseRepo, pull, expWorkspace)).ThenReturn(tmpDir, nil)
@@ -489,7 +489,7 @@ projects:
 					Log:      logger,
 				}
 				var actCtxs []models.ProjectCommandContext
-				if cmdName == events.PlanCommand {
+				if cmdName == models.PlanCommand {
 					actCtxs, err = builder.BuildPlanCommands(cmdCtx, &c.Cmd)
 				} else {
 					actCtxs, err = builder.BuildApplyCommands(cmdCtx, &c.Cmd)
@@ -562,7 +562,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiPlanNoAtlantisYAML(t *testing.T)
 	}, &events.CommentCommand{
 		RepoRelDir:  "",
 		Flags:       nil,
-		Name:        events.PlanCommand,
+		Name:        models.PlanCommand,
 		Verbose:     false,
 		Workspace:   "",
 		ProjectName: "",
@@ -615,7 +615,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiPlanNoAtlantisYAMLNoModified(t *
 	}, &events.CommentCommand{
 		RepoRelDir:  "",
 		Flags:       nil,
-		Name:        events.PlanCommand,
+		Name:        models.PlanCommand,
 		Verbose:     false,
 		Workspace:   "",
 		ProjectName: "",
@@ -687,7 +687,7 @@ projects:
 	}, &events.CommentCommand{
 		RepoRelDir:  "",
 		Flags:       nil,
-		Name:        events.PlanCommand,
+		Name:        models.PlanCommand,
 		Verbose:     false,
 		Workspace:   "",
 		ProjectName: "",
@@ -749,7 +749,7 @@ projects:
 	}, &events.CommentCommand{
 		RepoRelDir:  "",
 		Flags:       nil,
-		Name:        events.PlanCommand,
+		Name:        models.PlanCommand,
 		Verbose:     false,
 		Workspace:   "",
 		ProjectName: "",
@@ -822,7 +822,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	}, &events.CommentCommand{
 		RepoRelDir:  "",
 		Flags:       nil,
-		Name:        events.ApplyCommand,
+		Name:        models.ApplyCommand,
 		Verbose:     false,
 		Workspace:   "",
 		ProjectName: "",
@@ -958,7 +958,7 @@ projects:
 	_, err = builder.BuildPlanCommands(ctx, &events.CommentCommand{
 		RepoRelDir:  ".",
 		Flags:       nil,
-		Name:        events.PlanCommand,
+		Name:        models.PlanCommand,
 		Verbose:     false,
 		Workspace:   "notconfigured",
 		ProjectName: "",

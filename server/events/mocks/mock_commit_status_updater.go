@@ -4,9 +4,9 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock"
-	events "github.com/runatlantis/atlantis/server/events"
-	models "github.com/runatlantis/atlantis/server/events/models"
+	"github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"reflect"
 	"time"
 )
@@ -19,7 +19,7 @@ func NewMockCommitStatusUpdater() *MockCommitStatusUpdater {
 	return &MockCommitStatusUpdater{fail: pegomock.GlobalFailHandler}
 }
 
-func (mock *MockCommitStatusUpdater) Update(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command events.CommandName) error {
+func (mock *MockCommitStatusUpdater) Update(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockCommitStatusUpdater().")
 	}
@@ -34,7 +34,7 @@ func (mock *MockCommitStatusUpdater) Update(repo models.Repo, pull models.PullRe
 	return ret0
 }
 
-func (mock *MockCommitStatusUpdater) UpdateProjectResult(ctx *events.CommandContext, commandName events.CommandName, res events.CommandResult) error {
+func (mock *MockCommitStatusUpdater) UpdateProjectResult(ctx *events.CommandContext, commandName models.CommandName, res events.CommandResult) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockCommitStatusUpdater().")
 	}
@@ -86,7 +86,7 @@ type VerifierCommitStatusUpdater struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierCommitStatusUpdater) Update(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command events.CommandName) *CommitStatusUpdater_Update_OngoingVerification {
+func (verifier *VerifierCommitStatusUpdater) Update(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName) *CommitStatusUpdater_Update_OngoingVerification {
 	params := []pegomock.Param{repo, pull, status, command}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Update", params, verifier.timeout)
 	return &CommitStatusUpdater_Update_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
@@ -97,12 +97,12 @@ type CommitStatusUpdater_Update_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *CommitStatusUpdater_Update_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, models.CommitStatus, events.CommandName) {
+func (c *CommitStatusUpdater_Update_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, models.CommitStatus, models.CommandName) {
 	repo, pull, status, command := c.GetAllCapturedArguments()
 	return repo[len(repo)-1], pull[len(pull)-1], status[len(status)-1], command[len(command)-1]
 }
 
-func (c *CommitStatusUpdater_Update_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []models.CommitStatus, _param3 []events.CommandName) {
+func (c *CommitStatusUpdater_Update_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []models.CommitStatus, _param3 []models.CommandName) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.Repo, len(params[0]))
@@ -117,15 +117,15 @@ func (c *CommitStatusUpdater_Update_OngoingVerification) GetAllCapturedArguments
 		for u, param := range params[2] {
 			_param2[u] = param.(models.CommitStatus)
 		}
-		_param3 = make([]events.CommandName, len(params[3]))
+		_param3 = make([]models.CommandName, len(params[3]))
 		for u, param := range params[3] {
-			_param3[u] = param.(events.CommandName)
+			_param3[u] = param.(models.CommandName)
 		}
 	}
 	return
 }
 
-func (verifier *VerifierCommitStatusUpdater) UpdateProjectResult(ctx *events.CommandContext, commandName events.CommandName, res events.CommandResult) *CommitStatusUpdater_UpdateProjectResult_OngoingVerification {
+func (verifier *VerifierCommitStatusUpdater) UpdateProjectResult(ctx *events.CommandContext, commandName models.CommandName, res events.CommandResult) *CommitStatusUpdater_UpdateProjectResult_OngoingVerification {
 	params := []pegomock.Param{ctx, commandName, res}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "UpdateProjectResult", params, verifier.timeout)
 	return &CommitStatusUpdater_UpdateProjectResult_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
@@ -136,21 +136,21 @@ type CommitStatusUpdater_UpdateProjectResult_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *CommitStatusUpdater_UpdateProjectResult_OngoingVerification) GetCapturedArguments() (*events.CommandContext, events.CommandName, events.CommandResult) {
+func (c *CommitStatusUpdater_UpdateProjectResult_OngoingVerification) GetCapturedArguments() (*events.CommandContext, models.CommandName, events.CommandResult) {
 	ctx, commandName, res := c.GetAllCapturedArguments()
 	return ctx[len(ctx)-1], commandName[len(commandName)-1], res[len(res)-1]
 }
 
-func (c *CommitStatusUpdater_UpdateProjectResult_OngoingVerification) GetAllCapturedArguments() (_param0 []*events.CommandContext, _param1 []events.CommandName, _param2 []events.CommandResult) {
+func (c *CommitStatusUpdater_UpdateProjectResult_OngoingVerification) GetAllCapturedArguments() (_param0 []*events.CommandContext, _param1 []models.CommandName, _param2 []events.CommandResult) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]*events.CommandContext, len(params[0]))
 		for u, param := range params[0] {
 			_param0[u] = param.(*events.CommandContext)
 		}
-		_param1 = make([]events.CommandName, len(params[1]))
+		_param1 = make([]models.CommandName, len(params[1]))
 		for u, param := range params[1] {
-			_param1[u] = param.(events.CommandName)
+			_param1[u] = param.(models.CommandName)
 		}
 		_param2 = make([]events.CommandResult, len(params[2]))
 		for u, param := range params[2] {

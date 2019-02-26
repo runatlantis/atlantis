@@ -91,7 +91,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	if !c.validateCtxAndComment(ctx) {
 		return
 	}
-	if err := c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, models.PendingCommitStatus, PlanCommand); err != nil {
+	if err := c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, models.PendingCommitStatus, models.PlanCommand); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
@@ -102,13 +102,13 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	}
 	if len(projectCmds) == 0 {
 		log.Info("determined there was no project to run plan in")
-		if err := c.CommitStatusUpdater.Update(baseRepo, pull, models.SuccessCommitStatus, PlanCommand); err != nil {
+		if err := c.CommitStatusUpdater.Update(baseRepo, pull, models.SuccessCommitStatus, models.PlanCommand); err != nil {
 			ctx.Log.Warn("unable to update commit status: %s", err)
 		}
 		return
 	}
 
-	result := c.runProjectCmds(projectCmds, PlanCommand)
+	result := c.runProjectCmds(projectCmds, models.PlanCommand)
 	if c.automergeEnabled(ctx, projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
 		c.deletePlans(ctx)
@@ -168,7 +168,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
-	if cmd.CommandName() == ApplyCommand {
+	if cmd.CommandName() == models.ApplyCommand {
 		// Get the mergeable status before we set any build statuses of our own.
 		// We do this here because when we set a "Pending" status, if users have
 		// required the Atlantis status checks to pass, then we've now changed
@@ -190,9 +190,9 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 
 	var projectCmds []models.ProjectCommandContext
 	switch cmd.Name {
-	case PlanCommand:
+	case models.PlanCommand:
 		projectCmds, err = c.ProjectCommandBuilder.BuildPlanCommands(ctx, cmd)
-	case ApplyCommand:
+	case models.ApplyCommand:
 		projectCmds, err = c.ProjectCommandBuilder.BuildApplyCommands(ctx, cmd)
 	default:
 		ctx.Log.Err("failed to determine desired command, neither plan nor apply")
@@ -204,7 +204,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	}
 
 	result := c.runProjectCmds(projectCmds, cmd.Name)
-	if cmd.Name == PlanCommand && c.automergeEnabled(ctx, projectCmds) && result.HasErrors() {
+	if cmd.Name == models.PlanCommand && c.automergeEnabled(ctx, projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
 		c.deletePlans(ctx)
 		result.PlansDeleted = true
@@ -220,7 +220,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
-	if cmd.Name == ApplyCommand && c.automergeEnabled(ctx, projectCmds) {
+	if cmd.Name == models.ApplyCommand && c.automergeEnabled(ctx, projectCmds) {
 		c.automerge(ctx, pullStatus)
 	}
 }
@@ -254,14 +254,14 @@ func (c *DefaultCommandRunner) automerge(ctx *CommandContext, pullStatus *models
 	}
 }
 
-func (c *DefaultCommandRunner) runProjectCmds(cmds []models.ProjectCommandContext, cmdName CommandName) CommandResult {
+func (c *DefaultCommandRunner) runProjectCmds(cmds []models.ProjectCommandContext, cmdName models.CommandName) CommandResult {
 	var results []models.ProjectResult
 	for _, pCmd := range cmds {
 		var res models.ProjectResult
 		switch cmdName {
-		case PlanCommand:
+		case models.PlanCommand:
 			res = c.ProjectCommandRunner.Plan(pCmd)
-		case ApplyCommand:
+		case models.ApplyCommand:
 			res = c.ProjectCommandRunner.Apply(pCmd)
 		}
 		results = append(results, res)

@@ -27,10 +27,10 @@ import (
 // the status to signify whether the plan/apply succeeds.
 type CommitStatusUpdater interface {
 	// Update updates the status of the head commit of pull.
-	Update(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command CommandName) error
+	Update(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName) error
 	// UpdateProjectResult updates the status of the head commit given the
 	// state of response.
-	UpdateProjectResult(ctx *CommandContext, commandName CommandName, res CommandResult) error
+	UpdateProjectResult(ctx *CommandContext, commandName models.CommandName, res CommandResult) error
 }
 
 // DefaultCommitStatusUpdater implements CommitStatusUpdater.
@@ -39,13 +39,13 @@ type DefaultCommitStatusUpdater struct {
 }
 
 // Update updates the commit status.
-func (d *DefaultCommitStatusUpdater) Update(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command CommandName) error {
+func (d *DefaultCommitStatusUpdater) Update(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName) error {
 	description := fmt.Sprintf("%s %s", strings.Title(command.String()), strings.Title(status.String()))
 	return d.Client.UpdateStatus(repo, pull, status, "Atlantis", description)
 }
 
 // UpdateProjectResult updates the commit status based on the status of res.
-func (d *DefaultCommitStatusUpdater) UpdateProjectResult(ctx *CommandContext, commandName CommandName, res CommandResult) error {
+func (d *DefaultCommitStatusUpdater) UpdateProjectResult(ctx *CommandContext, commandName models.CommandName, res CommandResult) error {
 	var status models.CommitStatus
 	if res.Error != nil || res.Failure != "" {
 		status = models.FailedCommitStatus

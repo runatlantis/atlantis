@@ -418,3 +418,25 @@ func (p ProjectPlanStatus) String() string {
 		return "errored"
 	}
 }
+
+// CommandName is which command to run.
+type CommandName int
+
+const (
+	// ApplyCommand is a command to run terraform apply.
+	ApplyCommand CommandName = iota
+	// PlanCommand is a command to run terraform plan.
+	PlanCommand
+	// Adding more? Don't forget to update String() below
+)
+
+// String returns the string representation of c.
+func (c CommandName) String() string {
+	switch c {
+	case ApplyCommand:
+		return "apply"
+	case PlanCommand:
+		return "plan"
+	}
+	return ""
+}

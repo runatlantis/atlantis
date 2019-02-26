@@ -79,7 +79,7 @@ type projectResultTmplData struct {
 
 // Render formats the data into a markdown string.
 // nolint: interfacer
-func (m *MarkdownRenderer) Render(res CommandResult, cmdName CommandName, log string, verbose bool, vcsHost models.VCSHostType) string {
+func (m *MarkdownRenderer) Render(res CommandResult, cmdName models.CommandName, log string, verbose bool, vcsHost models.VCSHostType) string {
 	commandStr := strings.Title(cmdName.String())
 	common := commonData{
 		Command:      commandStr,

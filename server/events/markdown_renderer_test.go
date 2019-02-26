@@ -28,19 +28,19 @@ func TestRenderErr(t *testing.T) {
 	err := errors.New("err")
 	cases := []struct {
 		Description string
-		Command     events.CommandName
+		Command     models.CommandName
 		Error       error
 		Expected    string
 	}{
 		{
 			"apply error",
-			events.ApplyCommand,
+			models.ApplyCommand,
 			err,
 			"**Apply Error**\n```\nerr\n```\n",
 		},
 		{
 			"plan error",
-			events.PlanCommand,
+			models.PlanCommand,
 			err,
 			"**Plan Error**\n```\nerr\n```\n",
 		},
@@ -67,19 +67,19 @@ func TestRenderErr(t *testing.T) {
 func TestRenderFailure(t *testing.T) {
 	cases := []struct {
 		Description string
-		Command     events.CommandName
+		Command     models.CommandName
 		Failure     string
 		Expected    string
 	}{
 		{
 			"apply failure",
-			events.ApplyCommand,
+			models.ApplyCommand,
 			"failure",
 			"**Apply Failed**: failure\n",
 		},
 		{
 			"plan failure",
-			events.PlanCommand,
+			models.PlanCommand,
 			"failure",
 			"**Plan Failed**: failure\n",
 		},
@@ -109,28 +109,28 @@ func TestRenderErrAndFailure(t *testing.T) {
 		Error:   errors.New("error"),
 		Failure: "failure",
 	}
-	s := r.Render(res, events.PlanCommand, "", false, models.Github)
+	s := r.Render(res, models.PlanCommand, "", false, models.Github)
 	Equals(t, "**Plan Error**\n```\nerror\n```\n", s)
 }
 
 func TestRenderProjectResults(t *testing.T) {
 	cases := []struct {
 		Description    string
-		Command        events.CommandName
+		Command        models.CommandName
 		ProjectResults []models.ProjectResult
 		VCSHost        models.VCSHostType
 		Expected       string
 	}{
 		{
 			"no projects",
-			events.PlanCommand,
+			models.PlanCommand,
 			[]models.ProjectResult{},
 			models.Github,
 			"Ran Plan for 0 projects:\n\n\n",
 		},
 		{
 			"single successful plan",
-			events.PlanCommand,
+			models.PlanCommand,
 			[]models.ProjectResult{
 				{
 					PlanSuccess: &models.PlanSuccess{
@@ -163,7 +163,7 @@ $$$
 		},
 		{
 			"single successful plan with project name",
-			events.PlanCommand,
+			models.PlanCommand,
 			[]models.ProjectResult{
 				{
 					PlanSuccess: &models.PlanSuccess{
@@ -197,7 +197,7 @@ $$$
 		},
 		{
 			"single successful apply",
-			events.ApplyCommand,
+			models.ApplyCommand,
 			[]models.ProjectResult{
 				{
 					ApplySuccess: "success",
@@ -216,7 +216,7 @@ $$$
 		},
 		{
 			"single successful apply with project name",
-			events.ApplyCommand,
+			models.ApplyCommand,
 			[]models.ProjectResult{
 				{
 					ApplySuccess: "success",
@@ -236,7 +236,7 @@ $$$
 		},
 		{
 			"multiple successful plans",
-			events.PlanCommand,
+			models.PlanCommand,
 			[]models.ProjectResult{
 				{
 					Workspace:  "workspace",
@@ -295,7 +295,7 @@ $$$
 		},
 		{
 			"multiple successful applies",
-			events.ApplyCommand,
+			models.ApplyCommand,
 			[]models.ProjectResult{
 				{
 					RepoRelDir:   "path",
@@ -331,7 +331,7 @@ $$$
 		},
 		{
 			"single errored plan",
-			events.PlanCommand,
+			models.PlanCommand,
 			[]models.ProjectResult{
 				{
 					Error:      errors.New("error"),
@@ -351,7 +351,7 @@ $$$
 		},
 		{
 			"single failed plan",
-			events.PlanCommand,
+			models.PlanCommand,
 			[]models.ProjectResult{
 				{
 					RepoRelDir: "path",
@@ -368,7 +368,7 @@ $$$
 		},
 		{
 			"successful, failed, and errored plan",
-			events.PlanCommand,
+			models.PlanCommand,
 			[]models.ProjectResult{
 				{
 					Workspace:  "workspace",
@@ -427,7 +427,7 @@ $$$
 		},
 		{
 			"successful, failed, and errored apply",
-			events.ApplyCommand,
+			models.ApplyCommand,
 			[]models.ProjectResult{
 				{
 					Workspace:    "workspace",
@@ -473,7 +473,7 @@ $$$
 		},
 		{
 			"successful, failed, and errored apply",
-			events.ApplyCommand,
+			models.ApplyCommand,
 			[]models.ProjectResult{
 				{
 					Workspace:    "workspace",
@@ -620,7 +620,7 @@ func TestRenderProjectResults_WrappedErr(t *testing.T) {
 							Error:      errors.New(c.Output),
 						},
 					},
-				}, events.PlanCommand, "log", false, c.VCSHost)
+				}, models.PlanCommand, "log", false, c.VCSHost)
 				var exp string
 				if c.ShouldWrap {
 					exp = `Ran Plan for dir: $.$ workspace: $default$
@@ -717,7 +717,7 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		for _, cmd := range []events.CommandName{events.PlanCommand, events.ApplyCommand} {
+		for _, cmd := range []models.CommandName{models.PlanCommand, models.ApplyCommand} {
 			t.Run(fmt.Sprintf("%s_%s_%v", c.VCSHost.String(), cmd.String(), c.ShouldWrap),
 				func(t *testing.T) {
 					mr := events.MarkdownRenderer{
@@ -725,7 +725,7 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 					}
 					var pr models.ProjectResult
 					switch cmd {
-					case events.PlanCommand:
+					case models.PlanCommand:
 						pr = models.ProjectResult{
 							RepoRelDir: ".",
 							Workspace:  "default",
@@ -736,7 +736,7 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 								ApplyCmd:        "applycmd",
 							},
 						}
-					case events.ApplyCommand:
+					case models.ApplyCommand:
 						pr = models.ProjectResult{
 							RepoRelDir:   ".",
 							Workspace:    "default",
@@ -750,7 +750,7 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 					// Check result.
 					var exp string
 					switch cmd {
-					case events.PlanCommand:
+					case models.PlanCommand:
 						if c.ShouldWrap {
 							exp = `Ran Plan for dir: $.$ workspace: $default$
 
@@ -789,7 +789,7 @@ $$$
     * $atlantis apply$
 `
 						}
-					case events.ApplyCommand:
+					case models.ApplyCommand:
 						if c.ShouldWrap {
 							exp = `Ran Apply for dir: $.$ workspace: $default$
 
@@ -835,7 +835,7 @@ func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
 				ApplySuccess: tfOut,
 			},
 		},
-	}, events.ApplyCommand, "log", false, models.Github)
+	}, models.ApplyCommand, "log", false, models.Github)
 	exp := `Ran Apply for 2 projects:
 1. dir: $.$ workspace: $staging$
 1. dir: $.$ workspace: $production$
@@ -890,7 +890,7 @@ func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 				},
 			},
 		},
-	}, events.PlanCommand, "log", false, models.Github)
+	}, models.PlanCommand, "log", false, models.Github)
 	exp := `Ran Plan for 2 projects:
 1. dir: $.$ workspace: $staging$
 1. dir: $.$ workspace: $production$
@@ -1032,7 +1032,7 @@ This plan was not saved because one or more projects failed and automerge requir
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			mr := events.MarkdownRenderer{}
-			rendered := mr.Render(c.cr, events.PlanCommand, "log", false, models.Github)
+			rendered := mr.Render(c.cr, models.PlanCommand, "log", false, models.Github)
 			expWithBackticks := strings.Replace(c.exp, "$", "`", -1)
 			Equals(t, expWithBackticks, rendered)
 		})
