@@ -38,7 +38,7 @@ func (a *NotConfiguredVCSClient) PullIsApproved(repo models.Repo, pull models.Pu
 func (a *NotConfiguredVCSClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
 	return false, a.err()
 }
-func (a *NotConfiguredVCSClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string) error {
+func (a *NotConfiguredVCSClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
 	return a.err()
 }
 func (a *NotConfiguredVCSClient) MergePull(pull models.PullRequest) error {

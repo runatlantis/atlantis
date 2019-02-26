@@ -2,8 +2,10 @@ package terraform
 
 import (
 	"fmt"
+	"github.com/hashicorp/go-version"
 	"io/ioutil"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	. "github.com/runatlantis/atlantis/testing"
@@ -78,4 +80,139 @@ func TestGenerateRCFile_ErrIfCannotWrite(t *testing.T) {
 	expErr := fmt.Sprintf("writing generated .terraformrc file with TFE token to %s: open %s: no such file or directory", rcFile, rcFile)
 	actErr := generateRCFile("token", "/this/dir/does/not/exist")
 	ErrEquals(t, expErr, actErr)
+}
+
+// Test that it executes with the expected env vars.
+func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
+	v, err := version.NewVersion("0.11.11")
+	Ok(t, err)
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	client := &DefaultClient{
+		defaultVersion:          v,
+		terraformPluginCacheDir: tmp,
+		tfExecutableName:        "echo",
+	}
+
+	args := []string{
+		"TF_IN_AUTOMATION=$TF_IN_AUTOMATION",
+		"TF_PLUGIN_CACHE_DIR=$TF_PLUGIN_CACHE_DIR",
+		"WORKSPACE=$WORKSPACE",
+		"ATLANTIS_TERRAFORM_VERSION=$ATLANTIS_TERRAFORM_VERSION",
+		"DIR=$DIR",
+	}
+	out, err := client.RunCommandWithVersion(nil, tmp, args, nil, "workspace")
+	Ok(t, err)
+	exp := fmt.Sprintf("TF_IN_AUTOMATION=true TF_PLUGIN_CACHE_DIR=%s WORKSPACE=workspace ATLANTIS_TERRAFORM_VERSION=0.11.11 DIR=%s\n", tmp, tmp)
+	Equals(t, exp, out)
+}
+
+// Test that it returns an error on error.
+func TestDefaultClient_RunCommandWithVersion_Error(t *testing.T) {
+	v, err := version.NewVersion("0.11.11")
+	Ok(t, err)
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	client := &DefaultClient{
+		defaultVersion:          v,
+		terraformPluginCacheDir: tmp,
+		tfExecutableName:        "echo",
+	}
+
+	args := []string{
+		"dying",
+		"&&",
+		"exit",
+		"1",
+	}
+	out, err := client.RunCommandWithVersion(nil, tmp, args, nil, "workspace")
+	ErrEquals(t, fmt.Sprintf(`running "echo dying && exit 1" in %q: exit status 1`, tmp), err)
+	// Test that we still get our output.
+	Equals(t, "dying\n", out)
+}
+
+func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
+	v, err := version.NewVersion("0.11.11")
+	Ok(t, err)
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	client := &DefaultClient{
+		defaultVersion:          v,
+		terraformPluginCacheDir: tmp,
+		tfExecutableName:        "echo",
+	}
+
+	args := []string{
+		"TF_IN_AUTOMATION=$TF_IN_AUTOMATION",
+		"TF_PLUGIN_CACHE_DIR=$TF_PLUGIN_CACHE_DIR",
+		"WORKSPACE=$WORKSPACE",
+		"ATLANTIS_TERRAFORM_VERSION=$ATLANTIS_TERRAFORM_VERSION",
+		"DIR=$DIR",
+	}
+	outCh, errCh := client.RunCommandAsync(nil, tmp, args, nil, "workspace")
+
+	out, err := waitChs(outCh, errCh)
+	Ok(t, err)
+	exp := fmt.Sprintf("TF_IN_AUTOMATION=true TF_PLUGIN_CACHE_DIR=%s WORKSPACE=workspace ATLANTIS_TERRAFORM_VERSION=0.11.11 DIR=%s", tmp, tmp)
+	Equals(t, exp, out)
+}
+
+func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
+	v, err := version.NewVersion("0.11.11")
+	Ok(t, err)
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	client := &DefaultClient{
+		defaultVersion:          v,
+		terraformPluginCacheDir: tmp,
+		tfExecutableName:        "echo",
+	}
+	outCh, errCh := client.RunCommandAsync(nil, tmp, []string{"stderr", ">&2"}, nil, "workspace")
+
+	out, err := waitChs(outCh, errCh)
+	Ok(t, err)
+	Equals(t, "stderr", out)
+}
+
+func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
+	v, err := version.NewVersion("0.11.11")
+	Ok(t, err)
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	client := &DefaultClient{
+		defaultVersion:          v,
+		terraformPluginCacheDir: tmp,
+		tfExecutableName:        "echo",
+	}
+	outCh, errCh := client.RunCommandAsync(nil, tmp, []string{"dying", "&&", "exit", "1"}, nil, "workspace")
+
+	out, err := waitChs(outCh, errCh)
+	ErrEquals(t, fmt.Sprintf(`running "echo dying && exit 1" in %q: exit status 1`, tmp), err)
+	// Test that we still get our output.
+	Equals(t, "dying", out)
+}
+
+func waitChs(outCh <-chan string, errCh <-chan error) (string, error) {
+	var out []string
+	var err error
+	for {
+		if outCh == nil && errCh == nil {
+			break
+		}
+		select {
+		case line, ok := <-outCh:
+			if ok {
+				out = append(out, line)
+			} else {
+				outCh = nil
+			}
+		case e, ok := <-errCh:
+			if ok {
+				err = e
+			} else {
+				errCh = nil
+			}
+		}
+	}
+	return strings.Join(out, "\n"), err
 }

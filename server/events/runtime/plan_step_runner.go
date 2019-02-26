@@ -2,15 +2,14 @@ package runtime
 
 import (
 	"fmt"
+	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
-
-	"github.com/hashicorp/go-version"
-	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 const (
@@ -27,8 +26,10 @@ var (
 )
 
 type PlanStepRunner struct {
-	TerraformExecutor TerraformExec
-	DefaultTFVersion  *version.Version
+	TerraformExecutor   TerraformExec
+	DefaultTFVersion    *version.Version
+	CommitStatusUpdater StatusUpdater
+	AsyncTFExec         AsyncTFExec
 }
 
 func (p *PlanStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string) (string, error) {
@@ -74,10 +75,11 @@ func (p *PlanStepRunner) runRemotePlan(ctx models.ProjectCommandContext, extraAr
 		ctx.CommentArgs,
 	}
 	args := p.flatten(argList)
-	output, err := p.TerraformExecutor.RunCommandWithVersion(ctx.Log, filepath.Clean(path), args, tfVersion, ctx.Workspace)
+	output, err := runRemoteOp(ctx, models.PlanCommand, args, path, tfVersion, p.AsyncTFExec, p.CommitStatusUpdater)
 	if err != nil {
 		return output, err
 	}
+
 	// If using remote ops, we create our own "fake" planfile with the
 	// text output of the plan. We do this for two reasons:
 	// 1) Atlantis relies on there being a planfile on disk to detect which

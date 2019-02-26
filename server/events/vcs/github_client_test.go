@@ -160,7 +160,7 @@ func TestGithubClient_UpdateStatus(t *testing.T) {
 					case "/api/v3/repos/owner/repo/statuses/":
 						body, err := ioutil.ReadAll(r.Body)
 						Ok(t, err)
-						exp := fmt.Sprintf(`{"state":"%s","description":"description","context":"src"}%s`, c.expState, "\n")
+						exp := fmt.Sprintf(`{"state":"%s","target_url":"https://google.com","description":"description","context":"src"}%s`, c.expState, "\n")
 						Equals(t, exp, string(body))
 						defer r.Body.Close() // nolint: errcheck
 						w.WriteHeader(http.StatusOK)
@@ -189,7 +189,7 @@ func TestGithubClient_UpdateStatus(t *testing.T) {
 				},
 			}, models.PullRequest{
 				Num: 1,
-			}, c.status, "src", "description")
+			}, c.status, "src", "description", "https://google.com")
 			Ok(t, err)
 		})
 	}

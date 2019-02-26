@@ -2,6 +2,8 @@ package runtime_test
 
 import (
 	"fmt"
+	mocks2 "github.com/runatlantis/atlantis/server/events/mocks"
+	"github.com/runatlantis/atlantis/server/logging"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -233,14 +235,14 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 	Ok(t, err)
 
 	RegisterMockTestingT(t)
-	terraform := mocks.NewMockClient()
+	terraform := newAsyncTFExecMock()
+	terraform.Output = "output"
 	o := runtime.ApplyStepRunner{
-		TerraformExecutor: terraform,
+		AsyncTFExec:         terraform,
+		CommitStatusUpdater: mocks2.NewMockCommitStatusUpdater(),
 	}
 	tfVersion, _ := version.NewVersion("0.11.0")
 
-	When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
-		ThenReturn("output", nil)
 	output, err := o.Run(models.ProjectCommandContext{
 		Workspace:   "workspace",
 		RepoRelDir:  ".",
@@ -252,9 +254,26 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 	Ok(t, err)
 	Equals(t, "output", output)
 
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, tmpDir,
-		[]string{"apply", "-input=false", "-no-color", "-auto-approve", "extra", "args", "comment", "args"},
-		tfVersion, "workspace")
+	Equals(t, []string{"apply", "-input=false", "-no-color", "-auto-approve", "extra", "args", "comment", "args"}, terraform.CalledArgs)
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
+}
+
+type tfExecMock struct {
+	OutCh      chan string
+	ErrCh      chan error
+	Output     string
+	CalledArgs []string
+}
+
+func (t *tfExecMock) RunCommandAsync(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (<-chan string, <-chan error) {
+	go func() {
+		for _, line := range strings.Split(t.Output, "\n") {
+			t.OutCh <- line
+		}
+		close(t.OutCh)
+		close(t.ErrCh)
+	}()
+	t.CalledArgs = args
+	return t.OutCh, t.ErrCh
 }

@@ -15,7 +15,9 @@ import (
 
 // ApplyStepRunner runs `terraform apply`.
 type ApplyStepRunner struct {
-	TerraformExecutor TerraformExec
+	TerraformExecutor   TerraformExec
+	CommitStatusUpdater StatusUpdater
+	AsyncTFExec         AsyncTFExec
 }
 
 func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string) (string, error) {
@@ -32,30 +34,34 @@ func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []stri
 		return "", errors.Wrap(err, "unable to read planfile")
 	}
 
-	var tfApplyCmd []string
-	if a.isRemotePlan(contents) {
-		// todo: diff output during apply with output in planfile.
-		tfApplyCmd = append(append(append([]string{"apply", "-input=false", "-no-color", "-auto-approve"}, extraArgs...), ctx.CommentArgs...))
-	} else {
-		// NOTE: we need to quote the plan path because Bitbucket Server can
-		// have spaces in its repo owner names which is part of the path.
-		tfApplyCmd = append(append(append([]string{"apply", "-input=false", "-no-color"}, extraArgs...), ctx.CommentArgs...), fmt.Sprintf("%q", planPath))
-	}
-
 	var tfVersion *version.Version
 	if ctx.ProjectConfig != nil && ctx.ProjectConfig.TerraformVersion != nil {
 		tfVersion = ctx.ProjectConfig.TerraformVersion
 	}
-	out, tfErr := a.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, tfApplyCmd, tfVersion, ctx.Workspace)
+
+	var out string
+	if a.isRemotePlan(contents) {
+		// todo: diff output during apply with output in planfile.
+		args := append(append(append([]string{"apply", "-input=false", "-no-color", "-auto-approve"}, extraArgs...), ctx.CommentArgs...))
+		out, err = runRemoteOp(ctx, models.ApplyCommand, args, path, tfVersion, a.AsyncTFExec, a.CommitStatusUpdater)
+		if err == nil {
+			out = a.cleanRemoteOpOutput(out)
+		}
+	} else {
+		// NOTE: we need to quote the plan path because Bitbucket Server can
+		// have spaces in its repo owner names which is part of the path.
+		args := append(append(append([]string{"apply", "-input=false", "-no-color"}, extraArgs...), ctx.CommentArgs...), fmt.Sprintf("%q", planPath))
+		out, err = a.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, args, tfVersion, ctx.Workspace)
+	}
 
 	// If the apply was successful, delete the plan.
-	if tfErr == nil {
+	if err == nil {
 		ctx.Log.Info("apply successful, deleting planfile")
-		if err := os.Remove(planPath); err != nil {
-			ctx.Log.Warn("failed to delete planfile after successful apply: %s", err)
+		if removeErr := os.Remove(planPath); removeErr != nil {
+			ctx.Log.Warn("failed to delete planfile after successful apply: %s", removeErr)
 		}
 	}
-	return out, tfErr
+	return out, err
 }
 
 // isRemotePlan returns true if planContents are from a plan that was generated
@@ -87,4 +93,15 @@ func (a *ApplyStepRunner) hasTargetFlag(ctx models.ProjectCommandContext, extraA
 		}
 	}
 	return false
+}
+
+// cleanRemoteOpOutput removes unneeded output from before the separator.
+// This makes the apply output easier to read.
+func (a *ApplyStepRunner) cleanRemoteOpOutput(out string) string {
+	sep := "------------------------------------------------------------------------\n"
+	sepIdx := strings.Index(out, sep)
+	if sepIdx > -1 {
+		return out[sepIdx+len(sep):]
+	}
+	return out
 }

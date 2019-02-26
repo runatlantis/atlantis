@@ -15,6 +15,7 @@
 package terraform
 
 import (
+	"bufio"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -22,6 +23,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/hashicorp/go-version"
 	"github.com/mitchellh/go-homedir"
@@ -39,6 +41,10 @@ type Client interface {
 type DefaultClient struct {
 	defaultVersion          *version.Version
 	terraformPluginCacheDir string
+	// tfExecutableName is the name of the default terraform binary.
+	// This should always be set to "terraform" by the NewClient constructor
+	// however it can be overridden during testing.
+	tfExecutableName string
 }
 
 const terraformPluginCacheDirName = "plugin-cache"
@@ -92,7 +98,135 @@ func NewClient(dataDir string, tfeToken string) (*DefaultClient, error) {
 	return &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: cacheDir,
+		tfExecutableName:        "terraform",
 	}, nil
+}
+
+// Version returns the version of the terraform executable in our $PATH.
+func (c *DefaultClient) Version() *version.Version {
+	return c.defaultVersion
+}
+
+// RunCommandWithVersion executes the provided version of terraform with
+// the provided args in path. v is the version of terraform executable to use.
+// If v is nil, will use the default version.
+// Workspace is the terraform workspace to run in. We won't switch workspaces
+// but will set the TERRAFORM_WORKSPACE environment variable.
+func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (string, error) {
+	tfCmd, cmd := c.prepCmd(v, workspace, path, args)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		err = errors.Wrapf(err, "running %q in %q", tfCmd, path)
+		log.Err(err.Error())
+		return string(out), err
+	}
+	log.Info("successfully ran %q in %q", tfCmd, path)
+	return string(out), nil
+}
+
+func (c *DefaultClient) prepCmd(v *version.Version, workspace string, path string, args []string) (string, *exec.Cmd) {
+	tfExecutable := c.tfExecutableName
+	tfVersionStr := c.defaultVersion.String()
+	// if version is the same as the default, don't need to prepend the version name to the executable
+	if v != nil && !v.Equal(c.defaultVersion) {
+		tfExecutable = fmt.Sprintf("%s%s", tfExecutable, v.String())
+		tfVersionStr = v.String()
+	}
+	// We add custom variables so that if `extra_args` is specified with env
+	// vars then they'll be substituted.
+	envVars := []string{
+		// Will de-emphasize specific commands to run in output.
+		"TF_IN_AUTOMATION=true",
+		// Cache plugins so terraform init runs faster.
+		fmt.Sprintf("TF_PLUGIN_CACHE_DIR=%s", c.terraformPluginCacheDir),
+		fmt.Sprintf("WORKSPACE=%s", workspace),
+		fmt.Sprintf("ATLANTIS_TERRAFORM_VERSION=%s", tfVersionStr),
+		fmt.Sprintf("DIR=%s", path),
+	}
+	// Append current Atlantis process's environment variables so PATH is
+	// preserved and any vars that users purposely exec'd Atlantis with.
+	envVars = append(envVars, os.Environ()...)
+	// append terraform executable name with args
+	tfCmd := fmt.Sprintf("%s %s", tfExecutable, strings.Join(args, " "))
+	cmd := exec.Command("sh", "-c", tfCmd)
+	cmd.Dir = path
+	cmd.Env = envVars
+	return tfCmd, cmd
+}
+
+// RunCommandAsync runs terraform with args. It immediately returns an
+// output and error channel that callers can use to follow the progress
+// of the command. 1 or 0 errors will be sent on the error channel.
+// When the command is complete, both channels will be closed.
+func (c *DefaultClient) RunCommandAsync(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (<-chan string, <-chan error) {
+	outChan := make(chan string)
+	errChan := make(chan error)
+
+	go func() {
+		tfCmd, cmd := c.prepCmd(v, workspace, path, args)
+		stdoutIn, _ := cmd.StdoutPipe()
+		stderrIn, _ := cmd.StderrPipe()
+		err := cmd.Start()
+		if err != nil {
+			err = errors.Wrapf(err, "running %q in %q", tfCmd, path)
+			log.Err(err.Error())
+			errChan <- err
+			close(outChan)
+			close(errChan)
+			return
+		}
+
+		// Use a waitgroup to block until our std{out|err} copying is complete.
+		wg := new(sync.WaitGroup)
+		wg.Add(2)
+
+		// Asynchronously copy from std{out|err} to our outChannel.
+		go func() {
+			s := bufio.NewScanner(stdoutIn)
+			for s.Scan() {
+				outChan <- s.Text()
+			}
+			wg.Done()
+		}()
+		go func() {
+			s := bufio.NewScanner(stderrIn)
+			for s.Scan() {
+				outChan <- s.Text()
+			}
+			wg.Done()
+		}()
+
+		// Wait for the command to complete.
+		err = cmd.Wait()
+
+		// Now we wait for our copying to complete since that may still be
+		// going after the command finishes.
+		wg.Wait()
+
+		// We're done now. Send an error if there was one.
+		if err != nil {
+			err = errors.Wrapf(err, "running %q in %q", tfCmd, path)
+			log.Err(err.Error())
+			errChan <- err
+		} else {
+			log.Info("successfully ran %q in %q", tfCmd, path)
+		}
+		close(outChan)
+		close(errChan)
+	}()
+
+	return outChan, errChan
+}
+
+// MustConstraint will parse one or more constraints from the given
+// constraint string. The string must be a comma-separated list of
+// constraints. It panics if there is an error.
+func MustConstraint(v string) version.Constraints {
+	c, err := version.NewConstraint(v)
+	if err != nil {
+		panic(err)
+	}
+	return c
 }
 
 // generateRCFile generates a .terraformrc file containing config for tfeToken.
@@ -122,66 +256,6 @@ func generateRCFile(tfeToken string, home string) error {
 		return errors.Wrapf(err, "writing generated %s file with TFE token to %s", rcFilename, rcFile)
 	}
 	return nil
-}
-
-// Version returns the version of the terraform executable in our $PATH.
-func (c *DefaultClient) Version() *version.Version {
-	return c.defaultVersion
-}
-
-// RunCommandWithVersion executes the provided version of terraform with
-// the provided args in path. v is the version of terraform executable to use.
-// If v is nil, will use the default version.
-// Workspace is the terraform workspace to run in. We won't switch workspaces
-// but will set the TERRAFORM_WORKSPACE environment variable.
-func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (string, error) {
-	tfExecutable := "terraform"
-	tfVersionStr := c.defaultVersion.String()
-	// if version is the same as the default, don't need to prepend the version name to the executable
-	if v != nil && !v.Equal(c.defaultVersion) {
-		tfExecutable = fmt.Sprintf("%s%s", tfExecutable, v.String())
-		tfVersionStr = v.String()
-	}
-
-	// We add custom variables so that if `extra_args` is specified with env
-	// vars then they'll be substituted.
-	envVars := []string{
-		// Will de-emphasize specific commands to run in output.
-		"TF_IN_AUTOMATION=true",
-		// Cache plugins so terraform init runs faster.
-		fmt.Sprintf("TF_PLUGIN_CACHE_DIR=%s", c.terraformPluginCacheDir),
-		fmt.Sprintf("WORKSPACE=%s", workspace),
-		fmt.Sprintf("ATLANTIS_TERRAFORM_VERSION=%s", tfVersionStr),
-		fmt.Sprintf("DIR=%s", path),
-	}
-	// Append current Atlantis process's environment variables so PATH is
-	// preserved and any vars that users purposely exec'd Atlantis with.
-	envVars = append(envVars, os.Environ()...)
-
-	// append terraform executable name with args
-	tfCmd := fmt.Sprintf("%s %s", tfExecutable, strings.Join(args, " "))
-	cmd := exec.Command("sh", "-c", tfCmd)
-	cmd.Dir = path
-	cmd.Env = envVars
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		err = fmt.Errorf("%s: running %q in %q", err, tfCmd, path)
-		log.Debug("error: %s", err)
-		return string(out), err
-	}
-	log.Info("successfully ran %q in %q", tfCmd, path)
-	return string(out), nil
-}
-
-// MustConstraint will parse one or more constraints from the given
-// constraint string. The string must be a comma-separated list of
-// constraints. It panics if there is an error.
-func MustConstraint(v string) version.Constraints {
-	c, err := version.NewConstraint(v)
-	if err != nil {
-		panic(err)
-	}
-	return c
 }
 
 // rcFileContents is a format string to be used with Sprintf that can be used
