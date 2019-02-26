@@ -253,11 +253,15 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 				DefaultTFVersion:  defaultTfVersion,
 			},
 			PlanStepRunner: &runtime.PlanStepRunner{
-				TerraformExecutor: terraformClient,
-				DefaultTFVersion:  defaultTfVersion,
+				TerraformExecutor:   terraformClient,
+				DefaultTFVersion:    defaultTfVersion,
+				CommitStatusUpdater: commitStatusUpdater,
+				AsyncTFExec:         terraformClient,
 			},
 			ApplyStepRunner: &runtime.ApplyStepRunner{
-				TerraformExecutor: terraformClient,
+				TerraformExecutor:   terraformClient,
+				CommitStatusUpdater: commitStatusUpdater,
+				AsyncTFExec:         terraformClient,
 			},
 			RunStepRunner: &runtime.RunStepRunner{
 				DefaultTFVersion: defaultTfVersion,

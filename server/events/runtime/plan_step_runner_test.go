@@ -2,6 +2,7 @@ package runtime_test
 
 import (
 	"fmt"
+	mocks2 "github.com/runatlantis/atlantis/server/events/mocks"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -661,11 +662,14 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 func TestRun_RemoteOps(t *testing.T) {
 	RegisterMockTestingT(t)
 	terraform := mocks.NewMockClient()
+	asyncTf := &tfExecMock{}
 
 	tfVersion, _ := version.NewVersion("0.11.12")
 	s := runtime.PlanStepRunner{
-		TerraformExecutor: terraform,
-		DefaultTFVersion:  tfVersion,
+		TerraformExecutor:   terraform,
+		DefaultTFVersion:    tfVersion,
+		AsyncTFExec:         asyncTf,
+		CommitStatusUpdater: mocks2.NewMockCommitStatusUpdater(),
 	}
 	absProjectPath, cleanup := TempDir(t)
 	defer cleanup()
@@ -709,13 +713,9 @@ The "remote" backend does not support saving the generated execution
 plan locally at this time.
 
 `
+	asyncTf.LinesToSend = remotePlanOutput
 	When(terraform.RunCommandWithVersion(nil, absProjectPath, expPlanArgs, tfVersion, "default")).
 		ThenReturn(planOutput, planErr)
-
-	// We should detect that, and then run the remote-compatible plan.
-	remotePlan := []string{"plan", "-input=false", "-refresh", "-no-color", "extra", "args", "comment", "args"}
-	When(terraform.RunCommandWithVersion(nil, absProjectPath, remotePlan, tfVersion, "default")).
-		ThenReturn(remotePlanOutput, nil)
 
 	// Now that mocking is set up, we're ready to run the plan.
 	output, err := s.Run(models.ProjectCommandContext{
@@ -744,6 +744,9 @@ Terraform will perform the following actions:
 
 
 Plan: 0 to add, 0 to change, 1 to destroy.`, output)
+
+	expRemotePlanArgs := []string{"plan", "-input=false", "-refresh", "-no-color", "extra", "args", "comment", "args"}
+	Equals(t, expRemotePlanArgs, asyncTf.CalledArgs)
 
 	// Verify that the fake plan file we write has the correct contents.
 	bytes, err := ioutil.ReadFile(filepath.Join(absProjectPath, "default.tfplan"))

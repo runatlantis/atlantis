@@ -2,6 +2,9 @@ package runtime_test
 
 import (
 	"fmt"
+	mocks2 "github.com/runatlantis/atlantis/server/events/mocks"
+	"github.com/runatlantis/atlantis/server/events/terraform"
+	"github.com/runatlantis/atlantis/server/logging"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -233,14 +236,14 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 	Ok(t, err)
 
 	RegisterMockTestingT(t)
-	terraform := mocks.NewMockClient()
+	terraform := &tfExecMock{}
+	terraform.LinesToSend = "output"
 	o := runtime.ApplyStepRunner{
-		TerraformExecutor: terraform,
+		AsyncTFExec:         terraform,
+		CommitStatusUpdater: mocks2.NewMockCommitStatusUpdater(),
 	}
 	tfVersion, _ := version.NewVersion("0.11.0")
 
-	When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
-		ThenReturn("output", nil)
 	output, err := o.Run(models.ProjectCommandContext{
 		Workspace:   "workspace",
 		RepoRelDir:  ".",
@@ -252,9 +255,28 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 	Ok(t, err)
 	Equals(t, "output", output)
 
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, tmpDir,
-		[]string{"apply", "-input=false", "-no-color", "-auto-approve", "extra", "args", "comment", "args"},
-		tfVersion, "workspace")
+	Equals(t, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args"}, terraform.CalledArgs)
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
+}
+
+type tfExecMock struct {
+	// LinesToSend will be sent on the channel.
+	LinesToSend string
+	// CalledArgs is what args we were called with.
+	CalledArgs []string
+}
+
+func (t *tfExecMock) RunCommandAsync(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (chan<- string, <-chan terraform.Line) {
+	t.CalledArgs = args
+
+	out := make(chan terraform.Line)
+	in := make(chan string)
+	go func() {
+		for _, line := range strings.Split(t.LinesToSend, "\n") {
+			out <- terraform.Line{Line: line}
+		}
+		close(out)
+	}()
+	return in, out
 }

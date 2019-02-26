@@ -37,7 +37,7 @@ go-generate: ## Run go generate in all packages
 #echo "this doesn't work anymore: go generate \$\$(go list ./... | grep -v e2e | grep -v vendor | grep -v static)"
 
 test: ## Run tests
-	@go test -short $(PKG)
+	@go test -race -short $(PKG)
 
 test-all: ## Run tests including integration
 	@go test $(PKG)

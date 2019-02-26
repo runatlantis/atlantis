@@ -64,8 +64,8 @@ func (d *ClientProxy) PullIsMergeable(repo models.Repo, pull models.PullRequest)
 	return d.clients[repo.VCSHost.Type].PullIsMergeable(repo, pull)
 }
 
-func (d *ClientProxy) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string) error {
-	return d.clients[repo.VCSHost.Type].UpdateStatus(repo, pull, state, src, description)
+func (d *ClientProxy) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
+	return d.clients[repo.VCSHost.Type].UpdateStatus(repo, pull, state, src, description, url)
 }
 
 func (d *ClientProxy) MergePull(pull models.PullRequest) error {

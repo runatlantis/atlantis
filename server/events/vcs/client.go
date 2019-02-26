@@ -30,6 +30,8 @@ type Client interface {
 	// ex. plan/atlantis or apply/atlantis.
 	// description is a description of this particular status update and can
 	// change across runs.
-	UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string) error
+	// url is an optional link that users should click on for more information
+	// about this status.
+	UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error
 	MergePull(pull models.PullRequest) error
 }

@@ -2,8 +2,10 @@ package terraform
 
 import (
 	"fmt"
+	"github.com/hashicorp/go-version"
 	"io/ioutil"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	. "github.com/runatlantis/atlantis/testing"
@@ -78,4 +80,143 @@ func TestGenerateRCFile_ErrIfCannotWrite(t *testing.T) {
 	expErr := fmt.Sprintf("writing generated .terraformrc file with TFE token to %s: open %s: no such file or directory", rcFile, rcFile)
 	actErr := generateRCFile("token", "/this/dir/does/not/exist")
 	ErrEquals(t, expErr, actErr)
+}
+
+// Test that it executes with the expected env vars.
+func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
+	v, err := version.NewVersion("0.11.11")
+	Ok(t, err)
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	client := &DefaultClient{
+		defaultVersion:          v,
+		terraformPluginCacheDir: tmp,
+		tfExecutableName:        "echo",
+	}
+
+	args := []string{
+		"TF_IN_AUTOMATION=$TF_IN_AUTOMATION",
+		"TF_PLUGIN_CACHE_DIR=$TF_PLUGIN_CACHE_DIR",
+		"WORKSPACE=$WORKSPACE",
+		"ATLANTIS_TERRAFORM_VERSION=$ATLANTIS_TERRAFORM_VERSION",
+		"DIR=$DIR",
+	}
+	out, err := client.RunCommandWithVersion(nil, tmp, args, nil, "workspace")
+	Ok(t, err)
+	exp := fmt.Sprintf("TF_IN_AUTOMATION=true TF_PLUGIN_CACHE_DIR=%s WORKSPACE=workspace ATLANTIS_TERRAFORM_VERSION=0.11.11 DIR=%s\n", tmp, tmp)
+	Equals(t, exp, out)
+}
+
+// Test that it returns an error on error.
+func TestDefaultClient_RunCommandWithVersion_Error(t *testing.T) {
+	v, err := version.NewVersion("0.11.11")
+	Ok(t, err)
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	client := &DefaultClient{
+		defaultVersion:          v,
+		terraformPluginCacheDir: tmp,
+		tfExecutableName:        "echo",
+	}
+
+	args := []string{
+		"dying",
+		"&&",
+		"exit",
+		"1",
+	}
+	out, err := client.RunCommandWithVersion(nil, tmp, args, nil, "workspace")
+	ErrEquals(t, fmt.Sprintf(`running "echo dying && exit 1" in %q: exit status 1`, tmp), err)
+	// Test that we still get our output.
+	Equals(t, "dying\n", out)
+}
+
+func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
+	v, err := version.NewVersion("0.11.11")
+	Ok(t, err)
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	client := &DefaultClient{
+		defaultVersion:          v,
+		terraformPluginCacheDir: tmp,
+		tfExecutableName:        "echo",
+	}
+
+	args := []string{
+		"TF_IN_AUTOMATION=$TF_IN_AUTOMATION",
+		"TF_PLUGIN_CACHE_DIR=$TF_PLUGIN_CACHE_DIR",
+		"WORKSPACE=$WORKSPACE",
+		"ATLANTIS_TERRAFORM_VERSION=$ATLANTIS_TERRAFORM_VERSION",
+		"DIR=$DIR",
+	}
+	_, outCh := client.RunCommandAsync(nil, tmp, args, nil, "workspace")
+
+	out, err := waitCh(outCh)
+	Ok(t, err)
+	exp := fmt.Sprintf("TF_IN_AUTOMATION=true TF_PLUGIN_CACHE_DIR=%s WORKSPACE=workspace ATLANTIS_TERRAFORM_VERSION=0.11.11 DIR=%s", tmp, tmp)
+	Equals(t, exp, out)
+}
+
+func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
+	v, err := version.NewVersion("0.11.11")
+	Ok(t, err)
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	client := &DefaultClient{
+		defaultVersion:          v,
+		terraformPluginCacheDir: tmp,
+		tfExecutableName:        "echo",
+	}
+	_, outCh := client.RunCommandAsync(nil, tmp, []string{"stderr", ">&2"}, nil, "workspace")
+
+	out, err := waitCh(outCh)
+	Ok(t, err)
+	Equals(t, "stderr", out)
+}
+
+func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
+	v, err := version.NewVersion("0.11.11")
+	Ok(t, err)
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	client := &DefaultClient{
+		defaultVersion:          v,
+		terraformPluginCacheDir: tmp,
+		tfExecutableName:        "echo",
+	}
+	_, outCh := client.RunCommandAsync(nil, tmp, []string{"dying", "&&", "exit", "1"}, nil, "workspace")
+
+	out, err := waitCh(outCh)
+	ErrEquals(t, fmt.Sprintf(`running "echo dying && exit 1" in %q: exit status 1`, tmp), err)
+	// Test that we still get our output.
+	Equals(t, "dying", out)
+}
+
+func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
+	v, err := version.NewVersion("0.11.11")
+	Ok(t, err)
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	client := &DefaultClient{
+		defaultVersion:          v,
+		terraformPluginCacheDir: tmp,
+		tfExecutableName:        "read",
+	}
+	inCh, outCh := client.RunCommandAsync(nil, tmp, []string{"a", "&&", "echo", "$a"}, nil, "workspace")
+	inCh <- "echo me\n"
+
+	out, err := waitCh(outCh)
+	Ok(t, err)
+	Equals(t, "echo me", out)
+}
+
+func waitCh(ch <-chan Line) (string, error) {
+	var ls []string
+	for line := range ch {
+		if line.Err != nil {
+			return strings.Join(ls, "\n"), line.Err
+		}
+		ls = append(ls, line.Line)
+	}
+	return strings.Join(ls, "\n"), nil
 }
