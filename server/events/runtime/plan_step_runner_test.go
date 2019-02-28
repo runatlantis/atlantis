@@ -3,9 +3,11 @@ package runtime_test
 import (
 	"fmt"
 	mocks2 "github.com/runatlantis/atlantis/server/events/mocks"
+	"github.com/runatlantis/atlantis/server/events/terraform"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/go-version"
@@ -662,7 +664,7 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 func TestRun_RemoteOps(t *testing.T) {
 	RegisterMockTestingT(t)
 	terraform := mocks.NewMockClient()
-	asyncTf := &tfExecMock{}
+	asyncTf := &remotePlanMock{}
 
 	tfVersion, _ := version.NewVersion("0.11.12")
 	updater := mocks2.NewMockCommitStatusUpdater()
@@ -770,6 +772,27 @@ Plan: 0 to add, 0 to change, 1 to destroy.`, string(bytes))
 	runURL := "https://app.terraform.io/app/lkysow-enterprises/atlantis-tfe-test/runs/run-is4oVvJfrkud1KvE"
 	updater.VerifyWasCalledOnce().UpdateProject(ctx, models.PlanCommand, models.PendingCommitStatus, runURL)
 	updater.VerifyWasCalledOnce().UpdateProject(ctx, models.PlanCommand, models.SuccessCommitStatus, runURL)
+}
+
+type remotePlanMock struct {
+	// LinesToSend will be sent on the channel.
+	LinesToSend string
+	// CalledArgs is what args we were called with.
+	CalledArgs []string
+}
+
+func (r *remotePlanMock) RunCommandAsync(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (chan<- string, <-chan terraform.Line) {
+	r.CalledArgs = args
+	in := make(chan string)
+	out := make(chan terraform.Line)
+	go func() {
+		for _, line := range strings.Split(r.LinesToSend, "\n") {
+			out <- terraform.Line{Line: line}
+		}
+		close(out)
+		close(in)
+	}()
+	return in, out
 }
 
 func stringSliceEquals(a, b []string) bool {

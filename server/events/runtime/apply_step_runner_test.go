@@ -1,6 +1,7 @@
 package runtime_test
 
 import (
+	"errors"
 	"fmt"
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
@@ -217,7 +218,6 @@ func TestRun_UsingTarget(t *testing.T) {
 
 // Test that apply works for remote applies.
 func TestRun_RemoteApply_Success(t *testing.T) {
-	t.Skip()
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
 	planPath := filepath.Join(tmpDir, "workspace.tfplan")
@@ -236,28 +236,16 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 	Ok(t, err)
 
 	RegisterMockTestingT(t)
-	outCh := make(chan terraform.Line)
-	tfExec := &tfExecMock{OutCh: outCh, ExpInput: true}
+	tfOut := fmt.Sprintf(preConfirmOutFmt, planFileContents) + postConfirmOut
+	tfExec := &remoteApplyMock{LinesToSend: tfOut, DoneCh: make(chan bool)}
 	updater := mocks2.NewMockCommitStatusUpdater()
 	o := runtime.ApplyStepRunner{
 		AsyncTFExec:         tfExec,
 		CommitStatusUpdater: updater,
 	}
 	tfVersion, _ := version.NewVersion("0.11.0")
-
-	// Asynchronously start sending output on the channel.
-	go func() {
-		preConfirmOut := fmt.Sprintf(preConfirmOutFmt, planFileContents)
-		for _, line := range strings.Split(preConfirmOut, "\n") {
-			outCh <- terraform.Line{Line: line}
-		}
-		for _, line := range strings.Split(postConfirmOut, "\n") {
-			outCh <- terraform.Line{Line: line}
-		}
-		close(outCh)
-	}()
-
 	ctx := models.ProjectCommandContext{
+		Log:         logging.NewSimpleLogger("testing", false, logging.Debug),
 		Workspace:   "workspace",
 		RepoRelDir:  ".",
 		CommentArgs: []string{"comment", "args"},
@@ -266,9 +254,9 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 		},
 	}
 	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir)
+	<-tfExec.DoneCh
+
 	Ok(t, err)
-	tfExec.PassedInputMutex.Lock()
-	defer tfExec.PassedInputMutex.Unlock()
 	Equals(t, "yes\n", tfExec.PassedInput)
 	Equals(t, `
 2019/02/27 21:47:36 [DEBUG] Using modified User-Agent: Terraform/0.11.11 TFE/d161c1b
@@ -290,7 +278,6 @@ Apply complete! Resources: 0 added, 0 changed, 1 destroyed.
 
 // Test that if the plan is different, we error out.
 func TestRun_RemoteApply_PlanChanged(t *testing.T) {
-	t.Skip()
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
 	planPath := filepath.Join(tmpDir, "workspace.tfplan")
@@ -309,23 +296,17 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 	Ok(t, err)
 
 	RegisterMockTestingT(t)
-	outCh := make(chan terraform.Line)
-	tfExec := &tfExecMock{OutCh: outCh, ExpInput: true}
+	tfOut := fmt.Sprintf(preConfirmOutFmt, "not the expected plan!") + noConfirmationOut
+	tfExec := &remoteApplyMock{
+		LinesToSend: tfOut,
+		Err:         errors.New("exit status 1"),
+		DoneCh:      make(chan bool),
+	}
 	o := runtime.ApplyStepRunner{
 		AsyncTFExec:         tfExec,
 		CommitStatusUpdater: mocks2.NewMockCommitStatusUpdater(),
 	}
 	tfVersion, _ := version.NewVersion("0.11.0")
-
-	// Asynchronously start sending output on the channel.
-	go func() {
-		preConfirmOut := fmt.Sprintf(preConfirmOutFmt, "not the expected plan!")
-		for _, line := range strings.Split(preConfirmOut, "\n") {
-			outCh <- terraform.Line{Line: line}
-		}
-		outCh <- terraform.Line{Line: "Aborting!"}
-		close(outCh)
-	}()
 
 	output, err := o.Run(models.ProjectCommandContext{
 		Log:         logging.NewSimpleLogger("testing", false, logging.Debug),
@@ -336,6 +317,7 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 			TerraformVersion: tfVersion,
 		},
 	}, []string{"extra", "args"}, tmpDir)
+	<-tfExec.DoneCh
 	ErrEquals(t, `Plan generated during apply phase did not match plan generated during plan phase.
 Aborting apply.
 
@@ -362,8 +344,6 @@ This likely occurred because someone applied a change to this state in-between
 your plan and apply commands.
 To resolve, re-run plan.`, err)
 	Equals(t, "", output)
-	tfExec.PassedInputMutex.Lock()
-	defer tfExec.PassedInputMutex.Unlock()
 	Equals(t, "no\n", tfExec.PassedInput)
 
 	// Planfile should not be deleted.
@@ -371,50 +351,56 @@ To resolve, re-run plan.`, err)
 	Ok(t, err)
 }
 
-type tfExecMock struct {
+type remoteApplyMock struct {
 	// LinesToSend will be sent on the channel.
 	LinesToSend string
-	// OutCh can be set to your own channel so you can send whatever you want.
-	// Won't be used if LinesToSend is set.
-	OutCh chan terraform.Line
+	// Err will be sent on the channel after all LinesToSend.
+	Err error
 	// CalledArgs is what args we were called with.
 	CalledArgs []string
 	// PassedInput is set to the last string passed to our input channel.
-	PassedInput      string
-	PassedInputMutex sync.Mutex
-	// ExpInput is true if we should expect input.
-	ExpInput bool
+	PassedInput string
+	// DoneCh callers should wait on the done channel to ensure we're done.
+	DoneCh chan bool
 }
 
-func (t *tfExecMock) RunCommandAsync(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (chan<- string, <-chan terraform.Line) {
-	t.CalledArgs = args
+// RunCommandAsync fakes out running terraform async.
+func (r *remoteApplyMock) RunCommandAsync(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (chan<- string, <-chan terraform.Line) {
+	r.CalledArgs = args
 
-	if t.OutCh == nil {
-		t.OutCh = make(chan terraform.Line)
-	}
 	in := make(chan string)
+	out := make(chan terraform.Line)
+
+	// We use a wait group to ensure our sending and receiving routines have
+	// completed.
+	wg := new(sync.WaitGroup)
+	wg.Add(2)
+	go func() {
+		wg.Wait()
+		// When they're done, we signal the done channel.
+		r.DoneCh <- true
+	}()
 
 	// Asynchronously process input.
-	if t.ExpInput {
-		go func() {
-			inLine := <-in
-			// Use a mutex to make the race detector happy.
-			t.PassedInputMutex.Lock()
-			t.PassedInput = inLine
-			t.PassedInputMutex.Unlock()
-			close(in)
-		}()
-	}
-
 	go func() {
-		if t.LinesToSend != "" {
-			for _, line := range strings.Split(t.LinesToSend, "\n") {
-				t.OutCh <- terraform.Line{Line: line}
-			}
-			close(t.OutCh)
-		}
+		inLine := <-in
+		r.PassedInput = inLine
+		close(in)
+		wg.Done()
 	}()
-	return in, t.OutCh
+
+	// Asynchronously send the lines we're supposed to.
+	go func() {
+		for _, line := range strings.Split(r.LinesToSend, "\n") {
+			out <- terraform.Line{Line: line}
+		}
+		if r.Err != nil {
+			out <- terraform.Line{Err: r.Err}
+		}
+		close(out)
+		wg.Done()
+	}()
+	return in, out
 }
 
 var preConfirmOutFmt = `
@@ -445,14 +431,20 @@ null_resource.dir2[0]: Refreshing state... (ID: 8492616078576984857)
 
 Do you want to perform these actions in workspace "atlantis-tfe-test-dir2"?
   Terraform will perform the actions described above.
-  Only 'yes' will be accepted to approve.`
+  Only 'yes' will be accepted to approve.
+
+  Enter a value: `
 
 var postConfirmOut = `
-  Enter a value: 
 
 2019/02/27 21:47:36 [DEBUG] Using modified User-Agent: Terraform/0.11.11 TFE/d161c1b
 null_resource.dir2[1]: Destroying... (ID: 8554368366766418126)
 null_resource.dir2[1]: Destruction complete after 0s
 
 Apply complete! Resources: 0 added, 0 changed, 1 destroyed.
+`
+
+var noConfirmationOut = `
+
+Error: Apply discarded.
 `

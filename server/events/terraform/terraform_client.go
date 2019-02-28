@@ -228,12 +228,12 @@ func (c *DefaultClient) RunCommandAsync(log *logging.SimpleLogger, path string, 
 			wg.Done()
 		}()
 
+		// Wait for our copying to complete. This *must* be done before
+		// calling cmd.Wait(). (see https://github.com/golang/go/issues/19685)
+		wg.Wait()
+
 		// Wait for the command to complete.
 		err = cmd.Wait()
-
-		// Wait for our copying to complete since that may still be
-		// going after the command finishes.
-		wg.Wait()
 
 		// We're done now. Send an error if there was one.
 		if err != nil {
