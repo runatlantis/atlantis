@@ -236,7 +236,7 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 
 	RegisterMockTestingT(t)
 	outCh := make(chan terraform.Line)
-	tfExec := &tfExecMock{OutCh: outCh}
+	tfExec := &tfExecMock{OutCh: outCh, ExpInput: true}
 	updater := mocks2.NewMockCommitStatusUpdater()
 	o := runtime.ApplyStepRunner{
 		AsyncTFExec:         tfExec,
@@ -308,7 +308,7 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 
 	RegisterMockTestingT(t)
 	outCh := make(chan terraform.Line)
-	tfExec := &tfExecMock{OutCh: outCh}
+	tfExec := &tfExecMock{OutCh: outCh, ExpInput: true}
 	o := runtime.ApplyStepRunner{
 		AsyncTFExec:         tfExec,
 		CommitStatusUpdater: mocks2.NewMockCommitStatusUpdater(),
@@ -321,6 +321,7 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 		for _, line := range strings.Split(preConfirmOut, "\n") {
 			outCh <- terraform.Line{Line: line}
 		}
+		outCh <- terraform.Line{Line: "Aborting!"}
 		close(outCh)
 	}()
 
@@ -378,6 +379,8 @@ type tfExecMock struct {
 	// PassedInput is set to the last string passed to our input channel.
 	PassedInput      string
 	PassedInputMutex sync.Mutex
+	// ExpInput is true if we should expect input.
+	ExpInput bool
 }
 
 func (t *tfExecMock) RunCommandAsync(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (chan<- string, <-chan terraform.Line) {
@@ -387,13 +390,20 @@ func (t *tfExecMock) RunCommandAsync(log *logging.SimpleLogger, path string, arg
 		t.OutCh = make(chan terraform.Line)
 	}
 	in := make(chan string)
-	go func() {
-		for inLine := range in {
-			t.PassedInputMutex.Lock()
-			t.PassedInput = inLine
-			t.PassedInputMutex.Unlock()
-		}
-	}()
+
+	// Asynchronously process input.
+	if t.ExpInput {
+		go func() {
+			select {
+			case inLine := <-in:
+				// Use a mutex to make the race detector happy.
+				t.PassedInputMutex.Lock()
+				t.PassedInput = inLine
+				t.PassedInputMutex.Unlock()
+			}
+			close(in)
+		}()
+	}
 
 	go func() {
 		if t.LinesToSend != "" {
@@ -401,7 +411,6 @@ func (t *tfExecMock) RunCommandAsync(log *logging.SimpleLogger, path string, arg
 				t.OutCh <- terraform.Line{Line: line}
 			}
 			close(t.OutCh)
-			close(in)
 		}
 	}()
 	return in, t.OutCh
