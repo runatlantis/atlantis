@@ -63,7 +63,7 @@ type EventsController struct {
 	// SupportedVCSHosts is which VCS hosts Atlantis was configured upon
 	// startup to support.
 	SupportedVCSHosts []models.VCSHostType
-	VCSClient         vcs.ClientProxy
+	VCSClient         vcs.Client
 	TestingMode       bool
 	// BitbucketWebhookSecret is the secret added to this webhook via the Bitbucket
 	// UI that identifies this call as coming from Bitbucket. If empty, no

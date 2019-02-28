@@ -64,52 +64,52 @@ func TestParse_HelpResponse(t *testing.T) {
 func TestParse_UnusedArguments(t *testing.T) {
 	t.Log("if there are unused flags we return an error")
 	cases := []struct {
-		Command events.CommandName
+		Command models.CommandName
 		Args    string
 		Unused  string
 	}{
 		{
-			events.PlanCommand,
+			models.PlanCommand,
 			"-d . arg",
 			"arg",
 		},
 		{
-			events.PlanCommand,
+			models.PlanCommand,
 			"arg -d .",
 			"arg",
 		},
 		{
-			events.PlanCommand,
+			models.PlanCommand,
 			"arg",
 			"arg",
 		},
 		{
-			events.PlanCommand,
+			models.PlanCommand,
 			"arg arg2",
 			"arg arg2",
 		},
 		{
-			events.PlanCommand,
+			models.PlanCommand,
 			"-d . arg -w kjj arg2",
 			"arg arg2",
 		},
 		{
-			events.ApplyCommand,
+			models.ApplyCommand,
 			"-d . arg",
 			"arg",
 		},
 		{
-			events.ApplyCommand,
+			models.ApplyCommand,
 			"arg arg2",
 			"arg arg2",
 		},
 		{
-			events.ApplyCommand,
+			models.ApplyCommand,
 			"arg arg2 -- useful",
 			"arg arg2",
 		},
 		{
-			events.ApplyCommand,
+			models.ApplyCommand,
 			"arg arg2 --",
 			"arg arg2",
 		},
@@ -119,7 +119,7 @@ func TestParse_UnusedArguments(t *testing.T) {
 		t.Run(comment, func(t *testing.T) {
 			r := commentParser.Parse(comment, models.Github)
 			usage := PlanUsage
-			if c.Command == events.ApplyCommand {
+			if c.Command == models.ApplyCommand {
 				usage = ApplyUsage
 			}
 			Equals(t, fmt.Sprintf("```\nError: unknown argument(s) – %s.\n%s```", c.Unused, usage), r.CommentResponse)
@@ -251,7 +251,7 @@ func TestParse_Multiline(t *testing.T) {
 			Equals(t, &events.CommentCommand{
 				RepoRelDir:  "",
 				Flags:       nil,
-				Name:        events.PlanCommand,
+				Name:        models.PlanCommand,
 				Verbose:     false,
 				Workspace:   "",
 				ProjectName: "",
@@ -527,10 +527,10 @@ func TestParse_Parsing(t *testing.T) {
 				actExtraArgs := strings.Join(r.Command.Flags, " ")
 				Assert(t, test.expExtraArgs == actExtraArgs, "exp extra args to equal %v but got %v for comment %q", test.expExtraArgs, actExtraArgs, comment)
 				if cmdName == "plan" {
-					Assert(t, r.Command.Name == events.PlanCommand, "did not parse comment %q as plan command", comment)
+					Assert(t, r.Command.Name == models.PlanCommand, "did not parse comment %q as plan command", comment)
 				}
 				if cmdName == "apply" {
-					Assert(t, r.Command.Name == events.ApplyCommand, "did not parse comment %q as apply command", comment)
+					Assert(t, r.Command.Name == models.ApplyCommand, "did not parse comment %q as apply command", comment)
 				}
 			})
 		}
@@ -614,12 +614,12 @@ func TestBuildPlanApplyComment(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.expPlanFlags, func(t *testing.T) {
-			for _, cmd := range []events.CommandName{events.PlanCommand, events.ApplyCommand} {
+			for _, cmd := range []models.CommandName{models.PlanCommand, models.ApplyCommand} {
 				switch cmd {
-				case events.PlanCommand:
+				case models.PlanCommand:
 					actComment := commentParser.BuildPlanComment(c.repoRelDir, c.workspace, c.project, c.commentArgs)
 					Equals(t, fmt.Sprintf("atlantis plan %s", c.expPlanFlags), actComment)
-				case events.ApplyCommand:
+				case models.ApplyCommand:
 					actComment := commentParser.BuildApplyComment(c.repoRelDir, c.workspace, c.project)
 					Equals(t, fmt.Sprintf("atlantis apply %s", c.expApplyFlags), actComment)
 				}

@@ -17,28 +17,15 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_proxy.go ClientProxy
-
 // ClientProxy proxies calls to the correct VCS client depending on which
 // VCS host is required.
-type ClientProxy interface {
-	GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error)
-	CreateComment(repo models.Repo, pullNum int, comment string) error
-	PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error)
-	PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error)
-	UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, description string) error
-	MergePull(pull models.PullRequest) error
-}
-
-// DefaultClientProxy proxies calls to the correct VCS client depending on which
-// VCS host is required.
-type DefaultClientProxy struct {
+type ClientProxy struct {
 	// clients maps from the vcs host type to the client that implements the
 	// api for that host type, ex. github -> github client.
 	clients map[models.VCSHostType]Client
 }
 
-func NewDefaultClientProxy(githubClient Client, gitlabClient Client, bitbucketCloudClient Client, bitbucketServerClient Client) *DefaultClientProxy {
+func NewClientProxy(githubClient Client, gitlabClient Client, bitbucketCloudClient Client, bitbucketServerClient Client) *ClientProxy {
 	if githubClient == nil {
 		githubClient = &NotConfiguredVCSClient{}
 	}
@@ -51,7 +38,7 @@ func NewDefaultClientProxy(githubClient Client, gitlabClient Client, bitbucketCl
 	if bitbucketServerClient == nil {
 		bitbucketServerClient = &NotConfiguredVCSClient{}
 	}
-	return &DefaultClientProxy{
+	return &ClientProxy{
 		clients: map[models.VCSHostType]Client{
 			models.Github:          githubClient,
 			models.Gitlab:          gitlabClient,
@@ -61,26 +48,26 @@ func NewDefaultClientProxy(githubClient Client, gitlabClient Client, bitbucketCl
 	}
 }
 
-func (d *DefaultClientProxy) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
+func (d *ClientProxy) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	return d.clients[repo.VCSHost.Type].GetModifiedFiles(repo, pull)
 }
 
-func (d *DefaultClientProxy) CreateComment(repo models.Repo, pullNum int, comment string) error {
+func (d *ClientProxy) CreateComment(repo models.Repo, pullNum int, comment string) error {
 	return d.clients[repo.VCSHost.Type].CreateComment(repo, pullNum, comment)
 }
 
-func (d *DefaultClientProxy) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (d *ClientProxy) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
 	return d.clients[repo.VCSHost.Type].PullIsApproved(repo, pull)
 }
 
-func (d *DefaultClientProxy) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (d *ClientProxy) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
 	return d.clients[repo.VCSHost.Type].PullIsMergeable(repo, pull)
 }
 
-func (d *DefaultClientProxy) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, description string) error {
-	return d.clients[repo.VCSHost.Type].UpdateStatus(repo, pull, state, description)
+func (d *ClientProxy) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
+	return d.clients[repo.VCSHost.Type].UpdateStatus(repo, pull, state, src, description, url)
 }
 
-func (d *DefaultClientProxy) MergePull(pull models.PullRequest) error {
+func (d *ClientProxy) MergePull(pull models.PullRequest) error {
 	return d.clients[pull.BaseRepo.VCSHost.Type].MergePull(pull)
 }

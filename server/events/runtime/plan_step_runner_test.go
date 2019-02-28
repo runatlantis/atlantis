@@ -2,6 +2,7 @@ package runtime_test
 
 import (
 	"fmt"
+	mocks2 "github.com/runatlantis/atlantis/server/events/mocks"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -661,11 +662,15 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 func TestRun_RemoteOps(t *testing.T) {
 	RegisterMockTestingT(t)
 	terraform := mocks.NewMockClient()
+	asyncTf := &tfExecMock{}
 
 	tfVersion, _ := version.NewVersion("0.11.12")
+	updater := mocks2.NewMockCommitStatusUpdater()
 	s := runtime.PlanStepRunner{
-		TerraformExecutor: terraform,
-		DefaultTFVersion:  tfVersion,
+		TerraformExecutor:   terraform,
+		DefaultTFVersion:    tfVersion,
+		AsyncTFExec:         asyncTf,
+		CommitStatusUpdater: updater,
 	}
 	absProjectPath, cleanup := TempDir(t)
 	defer cleanup()
@@ -709,16 +714,12 @@ The "remote" backend does not support saving the generated execution
 plan locally at this time.
 
 `
+	asyncTf.LinesToSend = remotePlanOutput
 	When(terraform.RunCommandWithVersion(nil, absProjectPath, expPlanArgs, tfVersion, "default")).
 		ThenReturn(planOutput, planErr)
 
-	// We should detect that, and then run the remote-compatible plan.
-	remotePlan := []string{"plan", "-input=false", "-refresh", "-no-color", "extra", "args", "comment", "args"}
-	When(terraform.RunCommandWithVersion(nil, absProjectPath, remotePlan, tfVersion, "default")).
-		ThenReturn(remotePlanOutput, nil)
-
 	// Now that mocking is set up, we're ready to run the plan.
-	output, err := s.Run(models.ProjectCommandContext{
+	ctx := models.ProjectCommandContext{
 		Workspace:   "default",
 		RepoRelDir:  ".",
 		User:        models.User{Username: "username"},
@@ -731,7 +732,8 @@ plan locally at this time.
 			Owner:    "owner",
 			Name:     "repo",
 		},
-	}, []string{"extra", "args"}, absProjectPath)
+	}
+	output, err := s.Run(ctx, []string{"extra", "args"}, absProjectPath)
 	Ok(t, err)
 	Equals(t, `
 An execution plan has been generated and is shown below.
@@ -744,6 +746,9 @@ Terraform will perform the following actions:
 
 
 Plan: 0 to add, 0 to change, 1 to destroy.`, output)
+
+	expRemotePlanArgs := []string{"plan", "-input=false", "-refresh", "-no-color", "extra", "args", "comment", "args"}
+	Equals(t, expRemotePlanArgs, asyncTf.CalledArgs)
 
 	// Verify that the fake plan file we write has the correct contents.
 	bytes, err := ioutil.ReadFile(filepath.Join(absProjectPath, "default.tfplan"))
@@ -760,6 +765,11 @@ Terraform will perform the following actions:
 
 
 Plan: 0 to add, 0 to change, 1 to destroy.`, string(bytes))
+
+	// Ensure that the status was updated with the runURL.
+	runURL := "https://app.terraform.io/app/lkysow-enterprises/atlantis-tfe-test/runs/run-is4oVvJfrkud1KvE"
+	updater.VerifyWasCalledOnce().UpdateProject(ctx, models.PlanCommand, models.PendingCommitStatus, runURL)
+	updater.VerifyWasCalledOnce().UpdateProject(ctx, models.PlanCommand, models.SuccessCommitStatus, runURL)
 }
 
 func stringSliceEquals(a, b []string) bool {

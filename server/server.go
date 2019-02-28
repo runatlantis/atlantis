@@ -163,7 +163,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing webhooks")
 	}
-	vcsClient := vcs.NewDefaultClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient)
+	vcsClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient)
 	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient}
 	terraformClient, err := terraform.NewClient(userConfig.DataDir, userConfig.TFEToken)
 	// The flag.Lookup call is to detect if we're running in a unit test. If we
@@ -253,11 +253,15 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 				DefaultTFVersion:  defaultTfVersion,
 			},
 			PlanStepRunner: &runtime.PlanStepRunner{
-				TerraformExecutor: terraformClient,
-				DefaultTFVersion:  defaultTfVersion,
+				TerraformExecutor:   terraformClient,
+				DefaultTFVersion:    defaultTfVersion,
+				CommitStatusUpdater: commitStatusUpdater,
+				AsyncTFExec:         terraformClient,
 			},
 			ApplyStepRunner: &runtime.ApplyStepRunner{
-				TerraformExecutor: terraformClient,
+				TerraformExecutor:   terraformClient,
+				CommitStatusUpdater: commitStatusUpdater,
+				AsyncTFExec:         terraformClient,
 			},
 			RunStepRunner: &runtime.RunStepRunner{
 				DefaultTFVersion: defaultTfVersion,

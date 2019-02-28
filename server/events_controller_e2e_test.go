@@ -348,13 +348,13 @@ func TestGitHubWorkflow(t *testing.T) {
 	}
 }
 
-func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClientProxy, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
+func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
 	allowForkPRs := false
 	dataDir, cleanup := TempDir(t)
 	defer cleanup()
 
 	// Mocks.
-	e2eVCSClient := vcsmocks.NewMockClientProxy()
+	e2eVCSClient := vcsmocks.NewMockClient()
 	e2eStatusUpdater := mocks.NewMockCommitStatusUpdater()
 	e2eGithubGetter := mocks.NewMockGithubPullGetter()
 	e2eGitlabGetter := mocks.NewMockGitlabMergeRequestGetter()

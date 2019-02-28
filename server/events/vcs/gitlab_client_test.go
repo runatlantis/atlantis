@@ -1,6 +1,8 @@
 package vcs
 
 import (
+	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -164,6 +166,68 @@ func TestGitlabClient_MergePull(t *testing.T) {
 				ErrContains(t, c.expErr, err)
 				ErrContains(t, "unable to merge merge request, it may not be in a mergeable state", err)
 			}
+		})
+	}
+}
+
+func TestGitlabClient_UpdateStatus(t *testing.T) {
+	cases := []struct {
+		status   models.CommitStatus
+		expState string
+	}{
+		{
+			models.PendingCommitStatus,
+			"pending",
+		},
+		{
+			models.SuccessCommitStatus,
+			"success",
+		},
+		{
+			models.FailedCommitStatus,
+			"failed",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.expState, func(t *testing.T) {
+			gotRequest := false
+			testServer := httptest.NewServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/api/v4/projects/runatlantis%2Fatlantis/statuses/sha":
+						gotRequest = true
+
+						body, err := ioutil.ReadAll(r.Body)
+						Ok(t, err)
+						exp := fmt.Sprintf(`{"state":"%s","context":"src","target_url":"https://google.com","description":"description"}`, c.expState)
+						Equals(t, exp, string(body))
+						defer r.Body.Close()  // nolint: errcheck
+						w.Write([]byte("{}")) // nolint: errcheck
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+					}
+				}))
+
+			internalClient := gitlab.NewClient(nil, "token")
+			Ok(t, internalClient.SetBaseURL(testServer.URL))
+			client := &GitlabClient{
+				Client:  internalClient,
+				Version: nil,
+			}
+
+			repo := models.Repo{
+				FullName: "runatlantis/atlantis",
+				Owner:    "runatlantis",
+				Name:     "atlantis",
+			}
+			err := client.UpdateStatus(repo, models.PullRequest{
+				Num:        1,
+				BaseRepo:   repo,
+				HeadCommit: "sha",
+			}, c.status, "src", "description", "https://google.com")
+			Ok(t, err)
+			Assert(t, gotRequest, "expected to get the request")
 		})
 	}
 }

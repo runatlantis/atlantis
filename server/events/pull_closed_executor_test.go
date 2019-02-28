@@ -62,7 +62,7 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 	RegisterMockTestingT(t)
 	w := mocks.NewMockWorkingDir()
 	l := lockmocks.NewMockLocker()
-	cp := vcsmocks.NewMockClientProxy()
+	cp := vcsmocks.NewMockClient()
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 	db, err := db.New(tmp)
@@ -147,7 +147,7 @@ func TestCleanUpPullComments(t *testing.T) {
 	for _, c := range cases {
 		func() {
 			w := mocks.NewMockWorkingDir()
-			cp := vcsmocks.NewMockClientProxy()
+			cp := vcsmocks.NewMockClient()
 			l := lockmocks.NewMockLocker()
 			tmp, cleanup := TempDir(t)
 			defer cleanup()

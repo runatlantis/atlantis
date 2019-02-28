@@ -2,15 +2,14 @@ package runtime
 
 import (
 	"fmt"
+	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
-
-	"github.com/hashicorp/go-version"
-	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 const (
@@ -27,8 +26,10 @@ var (
 )
 
 type PlanStepRunner struct {
-	TerraformExecutor TerraformExec
-	DefaultTFVersion  *version.Version
+	TerraformExecutor   TerraformExec
+	DefaultTFVersion    *version.Version
+	CommitStatusUpdater StatusUpdater
+	AsyncTFExec         AsyncTFExec
 }
 
 func (p *PlanStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string) (string, error) {
@@ -48,7 +49,7 @@ func (p *PlanStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []strin
 	output, err := p.TerraformExecutor.RunCommandWithVersion(ctx.Log, filepath.Clean(path), planCmd, tfVersion, ctx.Workspace)
 	if p.isRemoteOpsErr(output, err) {
 		ctx.Log.Debug("detected that this project is using TFE remote ops")
-		return p.runRemotePlan(ctx, extraArgs, path, tfVersion, planFile)
+		return p.remotePlan(ctx, extraArgs, path, tfVersion, planFile)
 	}
 	if err != nil {
 		return output, err
@@ -65,19 +66,20 @@ func (p *PlanStepRunner) isRemoteOpsErr(output string, err error) bool {
 	return strings.Contains(output, remoteOpsErr)
 }
 
-// runRemotePlan runs a terraform plan command compatible with TFE remote
+// remotePlan runs a terraform plan command compatible with TFE remote
 // operations.
-func (p *PlanStepRunner) runRemotePlan(ctx models.ProjectCommandContext, extraArgs []string, path string, tfVersion *version.Version, planFile string) (string, error) {
+func (p *PlanStepRunner) remotePlan(ctx models.ProjectCommandContext, extraArgs []string, path string, tfVersion *version.Version, planFile string) (string, error) {
 	argList := [][]string{
 		{"plan", "-input=false", "-refresh", "-no-color"},
 		extraArgs,
 		ctx.CommentArgs,
 	}
 	args := p.flatten(argList)
-	output, err := p.TerraformExecutor.RunCommandWithVersion(ctx.Log, filepath.Clean(path), args, tfVersion, ctx.Workspace)
+	output, err := p.runRemotePlan(ctx, args, path, tfVersion)
 	if err != nil {
 		return output, err
 	}
+
 	// If using remote ops, we create our own "fake" planfile with the
 	// text output of the plan. We do this for two reasons:
 	// 1) Atlantis relies on there being a planfile on disk to detect which
@@ -234,6 +236,63 @@ func (p *PlanStepRunner) fmtPlanOutput(output string) string {
 	output = plusDiffRegex.ReplaceAllString(output, "+")
 	output = tildeDiffRegex.ReplaceAllString(output, "~")
 	return minusDiffRegex.ReplaceAllString(output, "-")
+}
+
+// runRemotePlan runs a terraform command that utilizes the remote operations
+// backend. It watches the command output for the run url to be printed, and
+// then updates the commit status with a link to the run url.
+// The run url is a link to the Terraform Enterprise UI where the output
+// from the in-progress command can be viewed.
+// cmdArgs is the args to terraform to execute.
+// path is the path to where we need to execute.
+func (p *PlanStepRunner) runRemotePlan(
+	ctx models.ProjectCommandContext,
+	cmdArgs []string,
+	path string,
+	tfVersion *version.Version) (string, error) {
+
+	// updateStatusF will update the commit status and log any error.
+	updateStatusF := func(status models.CommitStatus, url string) {
+		if err := p.CommitStatusUpdater.UpdateProject(ctx, models.PlanCommand, status, url); err != nil {
+			ctx.Log.Err("unable to update status: %s", err)
+		}
+	}
+
+	// Start the async command execution.
+	ctx.Log.Debug("starting async tf remote operation")
+	_, outCh := p.AsyncTFExec.RunCommandAsync(ctx.Log, filepath.Clean(path), cmdArgs, tfVersion, ctx.Workspace)
+	var lines []string
+	nextLineIsRunURL := false
+	var runURL string
+	var err error
+
+	for line := range outCh {
+		if line.Err != nil {
+			err = line.Err
+			break
+		}
+		lines = append(lines, line.Line)
+
+		// Here we're checking for the run url and updating the status
+		// if found.
+		if line.Line == lineBeforeRunURL {
+			nextLineIsRunURL = true
+		} else if nextLineIsRunURL {
+			runURL = strings.TrimSpace(line.Line)
+			ctx.Log.Debug("remote run url found, updating commit status")
+			updateStatusF(models.PendingCommitStatus, runURL)
+			nextLineIsRunURL = false
+		}
+	}
+
+	ctx.Log.Debug("async tf remote operation complete")
+	output := strings.Join(lines, "\n")
+	if err != nil {
+		updateStatusF(models.FailedCommitStatus, runURL)
+	} else {
+		updateStatusF(models.SuccessCommitStatus, runURL)
+	}
+	return output, err
 }
 
 var vTwelveAndUp = MustConstraint(">=0.12-a")

@@ -601,18 +601,18 @@ func TestNewCommand_CleansDir(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.RepoRelDir, func(t *testing.T) {
-			cmd := events.NewCommentCommand(c.RepoRelDir, nil, events.PlanCommand, false, "workspace", "")
+			cmd := events.NewCommentCommand(c.RepoRelDir, nil, models.PlanCommand, false, "workspace", "")
 			Equals(t, c.ExpDir, cmd.RepoRelDir)
 		})
 	}
 }
 
 func TestNewCommand_EmptyDirWorkspaceProject(t *testing.T) {
-	cmd := events.NewCommentCommand("", nil, events.PlanCommand, false, "", "")
+	cmd := events.NewCommentCommand("", nil, models.PlanCommand, false, "", "")
 	Equals(t, events.CommentCommand{
 		RepoRelDir:  "",
 		Flags:       nil,
-		Name:        events.PlanCommand,
+		Name:        models.PlanCommand,
 		Verbose:     false,
 		Workspace:   "",
 		ProjectName: "",
@@ -620,19 +620,19 @@ func TestNewCommand_EmptyDirWorkspaceProject(t *testing.T) {
 }
 
 func TestNewCommand_AllFieldsSet(t *testing.T) {
-	cmd := events.NewCommentCommand("dir", []string{"a", "b"}, events.PlanCommand, true, "workspace", "project")
+	cmd := events.NewCommentCommand("dir", []string{"a", "b"}, models.PlanCommand, true, "workspace", "project")
 	Equals(t, events.CommentCommand{
 		Workspace:   "workspace",
 		RepoRelDir:  "dir",
 		Verbose:     true,
 		Flags:       []string{"a", "b"},
-		Name:        events.PlanCommand,
+		Name:        models.PlanCommand,
 		ProjectName: "project",
 	}, *cmd)
 }
 
 func TestAutoplanCommand_CommandName(t *testing.T) {
-	Equals(t, events.PlanCommand, (events.AutoplanCommand{}).CommandName())
+	Equals(t, models.PlanCommand, (events.AutoplanCommand{}).CommandName())
 }
 
 func TestAutoplanCommand_IsVerbose(t *testing.T) {
@@ -644,11 +644,11 @@ func TestAutoplanCommand_IsAutoplan(t *testing.T) {
 }
 
 func TestCommentCommand_CommandName(t *testing.T) {
-	Equals(t, events.PlanCommand, (events.CommentCommand{
-		Name: events.PlanCommand,
+	Equals(t, models.PlanCommand, (events.CommentCommand{
+		Name: models.PlanCommand,
 	}).CommandName())
-	Equals(t, events.ApplyCommand, (events.CommentCommand{
-		Name: events.ApplyCommand,
+	Equals(t, models.ApplyCommand, (events.CommentCommand{
+		Name: models.ApplyCommand,
 	}).CommandName())
 }
 
@@ -670,7 +670,7 @@ func TestCommentCommand_String(t *testing.T) {
 	Equals(t, exp, (events.CommentCommand{
 		RepoRelDir:  "mydir",
 		Flags:       []string{"flag1", "flag2"},
-		Name:        events.PlanCommand,
+		Name:        models.PlanCommand,
 		Verbose:     true,
 		Workspace:   "myworkspace",
 		ProjectName: "myproject",

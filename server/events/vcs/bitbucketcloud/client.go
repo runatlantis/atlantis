@@ -146,7 +146,7 @@ func (b *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest) (boo
 }
 
 // UpdateStatus updates the status of a commit.
-func (b *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, status models.CommitStatus, description string) error {
+func (b *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, status models.CommitStatus, src string, description string, url string) error {
 	bbState := "FAILED"
 	switch status {
 	case models.PendingCommitStatus:
@@ -157,9 +157,15 @@ func (b *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, status 
 		bbState = "FAILED"
 	}
 
+	// URL is a required field for bitbucket statuses. We default to the
+	// Atlantis server's URL.
+	if url == "" {
+		url = b.AtlantisURL
+	}
+
 	bodyBytes, err := json.Marshal(map[string]string{
-		"key":         "atlantis",
-		"url":         b.AtlantisURL,
+		"key":         src,
+		"url":         url,
 		"state":       bbState,
 		"description": description,
 	})

@@ -34,7 +34,7 @@ const usagesCols = 90
 // PullCommand is a command to run on a pull request.
 type PullCommand interface {
 	// CommandName is the name of the command we're running.
-	CommandName() CommandName
+	CommandName() models.CommandName
 	// IsVerbose is true if the output of this command should be verbose.
 	IsVerbose() bool
 	// IsAutoplan is true if this is an autoplan command vs. a comment command.
@@ -46,8 +46,8 @@ type PullCommand interface {
 type AutoplanCommand struct{}
 
 // CommandName is Plan.
-func (c AutoplanCommand) CommandName() CommandName {
-	return PlanCommand
+func (c AutoplanCommand) CommandName() models.CommandName {
+	return models.PlanCommand
 }
 
 // IsVerbose is false for autoplan commands.
@@ -69,7 +69,7 @@ type CommentCommand struct {
 	// ex. atlantis plan -- -target=resource
 	Flags []string
 	// Name is the name of the command the comment specified.
-	Name CommandName
+	Name models.CommandName
 	// Verbose is true if the command should output verbosely.
 	Verbose bool
 	// Workspace is the name of the Terraform workspace to run the command in.
@@ -89,7 +89,7 @@ func (c CommentCommand) IsForSpecificProject() bool {
 }
 
 // CommandName returns the name of this command.
-func (c CommentCommand) CommandName() CommandName {
+func (c CommentCommand) CommandName() models.CommandName {
 	return c.Name
 }
 
@@ -109,7 +109,7 @@ func (c CommentCommand) String() string {
 }
 
 // NewCommentCommand constructs a CommentCommand, setting all missing fields to defaults.
-func NewCommentCommand(repoRelDir string, flags []string, name CommandName, verbose bool, workspace string, project string) *CommentCommand {
+func NewCommentCommand(repoRelDir string, flags []string, name models.CommandName, verbose bool, workspace string, project string) *CommentCommand {
 	// If repoRelDir was empty we want to keep it that way to indicate that it
 	// wasn't specified in the comment.
 	if repoRelDir != "" {

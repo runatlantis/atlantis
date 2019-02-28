@@ -25,6 +25,13 @@ type Client interface {
 	CreateComment(repo models.Repo, pullNum int, comment string) error
 	PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error)
 	PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error)
-	UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, description string) error
+	// UpdateStatus updates the commit status to state for pull. src is the
+	// source of this status. This should be relatively static across runs,
+	// ex. plan/atlantis or apply/atlantis.
+	// description is a description of this particular status update and can
+	// change across runs.
+	// url is an optional link that users should click on for more information
+	// about this status.
+	UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error
 	MergePull(pull models.PullRequest) error
 }

@@ -1,19 +1,46 @@
 # Terraform Enterprise
 
-Atlantis integrates seamlessly with Terraform Enterprise's new [Free Remote State Management](https://app.terraform.io/signup).
+Atlantis integrates seamlessly with Terraform Enterprise, whether you're using:
+* New [Free Remote State Management](https://app.terraform.io/signup)
+* Terraform Enterprise SaaS
+* Private Terraform Enterprise
 
+Read the docs below :point_down: depending on your use-case.
 [[toc]]
 
-## Migrating to TFE's Remote State
-If you're using a different state backend, you first need to migrate your state
-to use Terraform Enterprise (TFE). Read
-[Getting Started with the Terraform Enterprise Free Tier](https://www.terraform.io/docs/enterprise/free/index.html#enable-remote-state-in-terraform-configurations)
-for more information on how to migrate.
+## Using Atlantis With Free Remote State Storage
+To use Atlantis with Free Remote State Storage, you need to:
+1. Migrate your state to Terraform Enterprise. See [Getting Started with the Terraform Enterprise Free Tier](https://www.terraform.io/docs/enterprise/free/index.html#enable-remote-state-in-terraform-configurations)
+1. Update any projects that are referencing the state you migrated to use the new location
+1. [Generate a Terraform Enterprise Token](#generating-a-terraform-enterprise-token)
+1. [Pass the token to Atlantis](#passing-the-token-to-atlantis)
 
-## Configuring Atlantis
-Once you've migrated your state to TFE, and your code is using the TFE backend,
-you're ready to configure Atlantis.
+That's it! Atlantis will run as normal and your state will be stored in Terraform
+Enterprise.
 
+## Using Atlantis With Full Terraform Enterprise
+Atlantis integrates with the full version of Terraform Enterprise (TFE) via the [remote backend](https://www.terraform.io/docs/backends/types/remote.html).
+
+Atlantis will run `terraform` commands as usual, however those commands will
+actually be executed *remotely* in Terraform Enterprise.
+
+### Why?
+Using Atlantis with TFE gives you access to Terraform Enterprise features like:
+* Real-time streaming output
+* Ability to cancel in-progress commands
+* Secret variables
+* [Sentinel](https://www.hashicorp.com/sentinel)
+
+**Without** having to change your pull request workflow.
+
+### Getting Started
+To use Atlantis with Terraform Enterprise, you need to:
+1. Migrate your state to Terraform Enterprise. See [Migrating State from Terraform Open Source](https://www.terraform.io/docs/enterprise/migrate/index.html)
+1. Update any projects that are referencing the state you migrated to use the new location
+1. [Generate a Terraform Enterprise Token](#generating-a-terraform-enterprise-token)
+1. [Pass the token to Atlantis](#passing-the-token-to-atlantis)
+
+## Generating a Terraform Enterprise Token
 Atlantis needs a TFE Token that it will use to access the TFE API.
 Using a **Team Token is recommended**, however you can also use a User Token.
 
@@ -25,7 +52,7 @@ the sidebar, then scroll down to **Team API Token**.
 To generate a user token, click on your avatar, then **User Settings**, then
 **Tokens** in the sidebar.
 
-### Passing The Token To Atlantis
+## Passing The Token To Atlantis
 The token can be passed to Atlantis via the `ATLANTIS_TFE_TOKEN` environment variable.
 
 You can also use the `--tfe-token` flag, however your token would then be easily

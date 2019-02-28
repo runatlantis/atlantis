@@ -142,7 +142,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	}
 
 	// Need to have a plan or apply at this point.
-	if !e.stringInSlice(command, []string{PlanCommand.String(), ApplyCommand.String()}) {
+	if !e.stringInSlice(command, []string{models.PlanCommand.String(), models.ApplyCommand.String()}) {
 		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown command %q.\nRun 'atlantis --help' for usage.\n```", command)}
 	}
 
@@ -152,21 +152,21 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	var verbose bool
 	var extraArgs []string
 	var flagSet *pflag.FlagSet
-	var name CommandName
+	var name models.CommandName
 
 	// Set up the flag parsing depending on the command.
 	switch command {
-	case PlanCommand.String():
-		name = PlanCommand
-		flagSet = pflag.NewFlagSet(PlanCommand.String(), pflag.ContinueOnError)
+	case models.PlanCommand.String():
+		name = models.PlanCommand
+		flagSet = pflag.NewFlagSet(models.PlanCommand.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(ioutil.Discard)
 		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Switch to this Terraform workspace before planning.")
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run plan in relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", fmt.Sprintf("Which project to run plan for. Refers to the name of the project configured in %s. Cannot be used at same time as workspace or dir flags.", yaml.AtlantisYAMLFilename))
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
-	case ApplyCommand.String():
-		name = ApplyCommand
-		flagSet = pflag.NewFlagSet(ApplyCommand.String(), pflag.ContinueOnError)
+	case models.ApplyCommand.String():
+		name = models.ApplyCommand
+		flagSet = pflag.NewFlagSet(models.ApplyCommand.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(ioutil.Discard)
 		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Apply the plan for this Terraform workspace.")
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Apply the plan for this directory, relative to root of repo, ex. 'child/dir'.")
@@ -246,13 +246,13 @@ func (e *CommentParser) BuildPlanComment(repoRelDir string, workspace string, pr
 		}
 		commentFlags = fmt.Sprintf(" -- %s", strings.Join(flagsWithoutQuotes, " "))
 	}
-	return fmt.Sprintf("%s %s%s%s", atlantisExecutable, PlanCommand.String(), flags, commentFlags)
+	return fmt.Sprintf("%s %s%s%s", atlantisExecutable, models.PlanCommand.String(), flags, commentFlags)
 }
 
 // BuildApplyComment builds an apply comment for the specified args.
 func (e *CommentParser) BuildApplyComment(repoRelDir string, workspace string, project string) string {
 	flags := e.buildFlags(repoRelDir, workspace, project)
-	return fmt.Sprintf("%s %s%s", atlantisExecutable, ApplyCommand.String(), flags)
+	return fmt.Sprintf("%s %s%s", atlantisExecutable, models.ApplyCommand.String(), flags)
 }
 
 func (e *CommentParser) buildFlags(repoRelDir string, workspace string, project string) string {
