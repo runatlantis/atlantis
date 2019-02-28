@@ -665,11 +665,12 @@ func TestRun_RemoteOps(t *testing.T) {
 	asyncTf := &tfExecMock{}
 
 	tfVersion, _ := version.NewVersion("0.11.12")
+	updater := mocks2.NewMockCommitStatusUpdater()
 	s := runtime.PlanStepRunner{
 		TerraformExecutor:   terraform,
 		DefaultTFVersion:    tfVersion,
 		AsyncTFExec:         asyncTf,
-		CommitStatusUpdater: mocks2.NewMockCommitStatusUpdater(),
+		CommitStatusUpdater: updater,
 	}
 	absProjectPath, cleanup := TempDir(t)
 	defer cleanup()
@@ -718,7 +719,7 @@ plan locally at this time.
 		ThenReturn(planOutput, planErr)
 
 	// Now that mocking is set up, we're ready to run the plan.
-	output, err := s.Run(models.ProjectCommandContext{
+	ctx := models.ProjectCommandContext{
 		Workspace:   "default",
 		RepoRelDir:  ".",
 		User:        models.User{Username: "username"},
@@ -731,7 +732,8 @@ plan locally at this time.
 			Owner:    "owner",
 			Name:     "repo",
 		},
-	}, []string{"extra", "args"}, absProjectPath)
+	}
+	output, err := s.Run(ctx, []string{"extra", "args"}, absProjectPath)
 	Ok(t, err)
 	Equals(t, `
 An execution plan has been generated and is shown below.
@@ -763,6 +765,11 @@ Terraform will perform the following actions:
 
 
 Plan: 0 to add, 0 to change, 1 to destroy.`, string(bytes))
+
+	// Ensure that the status was updated with the runURL.
+	runURL := "https://app.terraform.io/app/lkysow-enterprises/atlantis-tfe-test/runs/run-is4oVvJfrkud1KvE"
+	updater.VerifyWasCalledOnce().UpdateProject(ctx, models.PlanCommand, models.PendingCommitStatus, runURL)
+	updater.VerifyWasCalledOnce().UpdateProject(ctx, models.PlanCommand, models.SuccessCommitStatus, runURL)
 }
 
 func stringSliceEquals(a, b []string) bool {

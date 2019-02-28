@@ -79,3 +79,6 @@ Apply complete! Resources: 0 added, 0 changed, 1 destroyed.
 		})
 	}
 }
+
+// Test: works normally, sends yes, updates run urls
+// Test: if plans don't match, sends no
