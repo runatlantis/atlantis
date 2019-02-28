@@ -320,12 +320,12 @@ func (e *EventParser) parseCommonBitbucketCloudEventData(event bitbucketcloud.Co
 		URL:        *event.PullRequest.Links.HTML.HREF,
 		HeadBranch: *event.PullRequest.Source.Branch.Name,
 		BaseBranch: *event.PullRequest.Destination.Branch.Name,
-		Author:     *event.Actor.Username,
+		Author:     *event.Actor.Nickname,
 		State:      prState,
 		BaseRepo:   baseRepo,
 	}
 	user = models.User{
-		Username: *event.Actor.Username,
+		Username: *event.Actor.Nickname,
 	}
 	return
 }
