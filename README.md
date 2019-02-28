@@ -26,6 +26,7 @@ Runs `terraform plan` and `apply` remotely and comments back on the pull request
 ## Badges!
 [![SuperDopeBadge](./runatlantis.io/.vuepress/public/hightower-super-dope.svg)](https://twitter.com/kelseyhightower/status/893260922222813184)
 [![Go Report Card](https://goreportcard.com/badge/github.com/runatlantis/atlantis)](https://goreportcard.com/report/github.com/runatlantis/atlantis)
+[![codecov](https://codecov.io/gh/runatlantis/atlantis/branch/master/graph/badge.svg)](https://codecov.io/gh/runatlantis/atlantis)
 [![CircleCI](https://circleci.com/gh/runatlantis/atlantis/tree/master.svg?style=shield)](https://circleci.com/gh/runatlantis/atlantis/tree/master)
 [![Slack Status](https://thawing-headland-22460.herokuapp.com/badge.svg)](https://thawing-headland-22460.herokuapp.com)
 [![Gitter chat](https://badges.gitter.im/runatlantis.png)](https://gitter.im/runatlantis)
