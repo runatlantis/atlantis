@@ -326,6 +326,7 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 	}()
 
 	output, err := o.Run(models.ProjectCommandContext{
+		Log:         logging.NewSimpleLogger("testing", false, logging.Debug),
 		Workspace:   "workspace",
 		RepoRelDir:  ".",
 		CommentArgs: []string{"comment", "args"},
@@ -394,13 +395,11 @@ func (t *tfExecMock) RunCommandAsync(log *logging.SimpleLogger, path string, arg
 	// Asynchronously process input.
 	if t.ExpInput {
 		go func() {
-			select {
-			case inLine := <-in:
-				// Use a mutex to make the race detector happy.
-				t.PassedInputMutex.Lock()
-				t.PassedInput = inLine
-				t.PassedInputMutex.Unlock()
-			}
+			inLine := <-in
+			// Use a mutex to make the race detector happy.
+			t.PassedInputMutex.Lock()
+			t.PassedInput = inLine
+			t.PassedInputMutex.Unlock()
 			close(in)
 		}()
 	}
