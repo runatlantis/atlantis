@@ -147,23 +147,25 @@ func (l *SimpleLogger) Err(format string, a ...interface{}) {
 
 // Log writes the log at level.
 func (l *SimpleLogger) Log(level LogLevel, format string, a ...interface{}) {
-	levelStr := l.levelToString(level)
-	msg := l.capitalizeFirstLetter(fmt.Sprintf(format, a...))
+	if l != nil {
+		levelStr := l.levelToString(level)
+		msg := l.capitalizeFirstLetter(fmt.Sprintf(format, a...))
 
-	// Only log this message if configured to log at this level.
-	if l.Level <= level {
-		datetime := time.Now().Format("2006/01/02 15:04:05-0700")
-		var caller string
-		if l.Level <= Debug {
-			file, line := l.callSite(3)
-			caller = fmt.Sprintf(" %s:%d", file, line)
+		// Only log this message if configured to log at this level.
+		if l.Level <= level {
+			datetime := time.Now().Format("2006/01/02 15:04:05-0700")
+			var caller string
+			if l.Level <= Debug {
+				file, line := l.callSite(3)
+				caller = fmt.Sprintf(" %s:%d", file, line)
+			}
+			l.Logger.Printf("%s [%s]%s %s: %s\n", datetime, levelStr, caller, l.Source, msg) // noline: errcheck
 		}
-		l.Logger.Printf("%s [%s]%s %s: %s\n", datetime, levelStr, caller, l.Source, msg) // noline: errcheck
-	}
 
-	// Keep history at all log levels.
-	if l.KeepHistory {
-		l.saveToHistory(levelStr, msg)
+		// Keep history at all log levels.
+		if l.KeepHistory {
+			l.saveToHistory(levelStr, msg)
+		}
 	}
 }
 

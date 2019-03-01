@@ -524,6 +524,83 @@ func TestPost_GitlabMergeRequestSuccess(t *testing.T) {
 	responseContains(t, w, http.StatusOK, "Pull request cleaned successfully")
 }
 
+// Test Bitbucket server pull closed events.
+func TestPost_BBServerPullClosed(t *testing.T) {
+	cases := []struct {
+		header string
+	}{
+		{
+			"pr:deleted",
+		},
+		{
+			"pr:merged",
+		},
+		{
+			"pr:declined",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.header, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			pullCleaner := emocks.NewMockPullCleaner()
+			whitelist, err := events.NewRepoWhitelistChecker("*")
+			Ok(t, err)
+			ec := &server.EventsController{
+				PullCleaner: pullCleaner,
+				Parser: &events.EventParser{
+					BitbucketUser:      "bb-user",
+					BitbucketToken:     "bb-token",
+					BitbucketServerURL: "https://bbserver.com",
+				},
+				RepoWhitelistChecker: whitelist,
+				SupportedVCSHosts:    []models.VCSHostType{models.BitbucketServer},
+				VCSClient:            nil,
+			}
+
+			// Build HTTP request.
+			requestBytes, err := ioutil.ReadFile(filepath.Join("testfixtures", "bb-server-pull-deleted-event.json"))
+			// Replace the eventKey field with our event type.
+			requestJSON := strings.Replace(string(requestBytes), `"eventKey":"pr:deleted",`, fmt.Sprintf(`"eventKey":"%s",`, c.header), -1)
+			Ok(t, err)
+			req, err := http.NewRequest("POST", "/events", bytes.NewBuffer([]byte(requestJSON)))
+			Ok(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("X-Event-Key", c.header)
+			req.Header.Set("X-Request-ID", "request-id")
+
+			// Send the request.
+			w := httptest.NewRecorder()
+			ec.Post(w, req)
+
+			// Make our assertions.
+			responseContains(t, w, 200, "Pull request cleaned successfully")
+
+			expRepo := models.Repo{
+				FullName:          "project/repository",
+				Owner:             "project",
+				Name:              "repository",
+				CloneURL:          "https://bb-user:bb-token@bbserver.com/scm/proj/repository.git",
+				SanitizedCloneURL: "https://bbserver.com/scm/proj/repository.git",
+				VCSHost: models.VCSHost{
+					Hostname: "bbserver.com",
+					Type:     models.BitbucketServer,
+				},
+			}
+			pullCleaner.VerifyWasCalledOnce().CleanUpPull(expRepo, models.PullRequest{
+				Num:        10,
+				HeadCommit: "2d9fb6b9a46eafb1dcef7b008d1a429d45ca742c",
+				URL:        "https://bbserver.com/projects/PROJ/repos/repository/pull-requests/10",
+				HeadBranch: "decline-me",
+				BaseBranch: "master",
+				Author:     "admin",
+				State:      models.OpenPullState,
+				BaseRepo:   expRepo,
+			})
+		})
+	}
+}
+
 func TestPost_PullOpenedOrUpdated(t *testing.T) {
 	cases := []struct {
 		Description string

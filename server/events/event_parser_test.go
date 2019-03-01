@@ -1027,6 +1027,10 @@ func TestGetBitbucketServerEventType(t *testing.T) {
 			exp:    models.ClosedPullEvent,
 		},
 		{
+			header: "pr:deleted",
+			exp:    models.ClosedPullEvent,
+		},
+		{
 			header: "random",
 			exp:    models.OtherPullEvent,
 		},

@@ -5,6 +5,7 @@ const (
 	PullCreatedHeader        = "pr:opened"
 	PullMergedHeader         = "pr:merged"
 	PullDeclinedHeader       = "pr:declined"
+	PullDeletedHeader        = "pr:deleted"
 	PullCommentCreatedHeader = "pr:comment:added"
 )
 
