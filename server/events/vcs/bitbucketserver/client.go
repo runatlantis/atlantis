@@ -42,7 +42,6 @@ func NewClient(httpClient *http.Client, username string, password string, baseUR
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
-	// Remove the trailing '/' from the URL.
 	parsedURL, err := url.Parse(baseURL)
 	if err != nil {
 		return nil, errors.Wrapf(err, "parsing %s", baseURL)
@@ -50,12 +49,11 @@ func NewClient(httpClient *http.Client, username string, password string, baseUR
 	if parsedURL.Scheme == "" {
 		return nil, fmt.Errorf("must have 'http://' or 'https://' in base url %q", baseURL)
 	}
-	urlWithoutPath := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
 	return &Client{
 		HTTPClient:  httpClient,
 		Username:    username,
 		Password:    password,
-		BaseURL:     urlWithoutPath,
+		BaseURL:     strings.TrimRight(parsedURL.String(), "/"),
 		AtlantisURL: atlantisURL,
 	}, nil
 }

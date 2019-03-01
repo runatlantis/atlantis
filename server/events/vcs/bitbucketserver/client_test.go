@@ -14,6 +14,60 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
+// Test that we include the base path in our base url.
+func TestClient_BasePath(t *testing.T) {
+	cases := []struct {
+		inputURL string
+		expURL   string
+		expErr   string
+	}{
+		{
+			inputURL: "mycompany.com",
+			expErr:   `must have 'http://' or 'https://' in base url "mycompany.com"`,
+		},
+		{
+			inputURL: "https://mycompany.com",
+			expURL:   "https://mycompany.com",
+		},
+		{
+			inputURL: "http://mycompany.com",
+			expURL:   "http://mycompany.com",
+		},
+		{
+			inputURL: "http://mycompany.com:7990",
+			expURL:   "http://mycompany.com:7990",
+		},
+		{
+			inputURL: "http://mycompany.com/",
+			expURL:   "http://mycompany.com",
+		},
+		{
+			inputURL: "http://mycompany.com:7990/",
+			expURL:   "http://mycompany.com:7990",
+		},
+		{
+			inputURL: "http://mycompany.com/basepath/",
+			expURL:   "http://mycompany.com/basepath",
+		},
+		{
+			inputURL: "http://mycompany.com:7990/basepath/",
+			expURL:   "http://mycompany.com:7990/basepath",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.inputURL, func(t *testing.T) {
+			client, err := bitbucketserver.NewClient(nil, "u", "p", c.inputURL, "atlantis-url")
+			if c.expErr != "" {
+				ErrEquals(t, c.expErr, err)
+			} else {
+				Ok(t, err)
+				Equals(t, c.expURL, client.BaseURL)
+			}
+		})
+	}
+}
+
 // Should follow pagination properly.
 func TestClient_GetModifiedFilesPagination(t *testing.T) {
 	respTemplate := `
