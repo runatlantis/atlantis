@@ -405,6 +405,17 @@ type PullStatus struct {
 	Pull PullRequest
 }
 
+// StatusCount returns the number of projects that have status.
+func (p PullStatus) StatusCount(status ProjectPlanStatus) int {
+	c := 0
+	for _, pr := range p.Projects {
+		if pr.Status == status {
+			c++
+		}
+	}
+	return c
+}
+
 // ProjectStatus is the status of a specific project.
 type ProjectStatus struct {
 	Workspace   string

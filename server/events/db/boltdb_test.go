@@ -381,6 +381,7 @@ func TestPullStatus_UpdateGet(t *testing.T) {
 		pull,
 		[]models.ProjectResult{
 			{
+				Command:    models.PlanCommand,
 				RepoRelDir: ".",
 				Workspace:  "default",
 				Failure:    "failure",
@@ -600,11 +601,20 @@ func TestPullStatus_UpdateMerge(t *testing.T) {
 		pull,
 		[]models.ProjectResult{
 			{
+				Command:    models.PlanCommand,
 				RepoRelDir: "mergeme",
 				Workspace:  "default",
 				Failure:    "failure",
 			},
 			{
+				Command:     models.PlanCommand,
+				RepoRelDir:  "projectname",
+				Workspace:   "default",
+				ProjectName: "projectname",
+				Failure:     "failure",
+			},
+			{
+				Command:    models.PlanCommand,
 				RepoRelDir: "staythesame",
 				Workspace:  "default",
 				PlanSuccess: &models.PlanSuccess{
@@ -620,11 +630,20 @@ func TestPullStatus_UpdateMerge(t *testing.T) {
 	updateStatus, err := b.UpdatePullWithResults(pull,
 		[]models.ProjectResult{
 			{
+				Command:      models.ApplyCommand,
 				RepoRelDir:   "mergeme",
 				Workspace:    "default",
 				ApplySuccess: "applied!",
 			},
 			{
+				Command:     models.ApplyCommand,
+				RepoRelDir:  "projectname",
+				Workspace:   "default",
+				ProjectName: "projectname",
+				Error:       errors.New("apply error"),
+			},
+			{
+				Command:      models.ApplyCommand,
 				RepoRelDir:   "newresult",
 				Workspace:    "default",
 				ApplySuccess: "success!",
@@ -644,6 +663,12 @@ func TestPullStatus_UpdateMerge(t *testing.T) {
 				RepoRelDir: "mergeme",
 				Workspace:  "default",
 				Status:     models.AppliedPlanStatus,
+			},
+			{
+				RepoRelDir:  "projectname",
+				Workspace:   "default",
+				ProjectName: "projectname",
+				Status:      models.ErroredApplyStatus,
 			},
 			{
 				RepoRelDir: "staythesame",

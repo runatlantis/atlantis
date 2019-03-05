@@ -91,18 +91,26 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	if !c.validateCtxAndComment(ctx) {
 		return
 	}
-	if err := c.CommitStatusUpdater.Update(ctx.BaseRepo, ctx.Pull, models.PendingCommitStatus, models.PlanCommand); err != nil {
+
+	if err := c.CommitStatusUpdater.UpdateCombined(ctx.BaseRepo, ctx.Pull, models.PendingCommitStatus, models.PlanCommand); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
 	projectCmds, err := c.ProjectCommandBuilder.BuildAutoplanCommands(ctx)
 	if err != nil {
+		if statusErr := c.CommitStatusUpdater.UpdateCombined(ctx.BaseRepo, ctx.Pull, models.FailedCommitStatus, models.PlanCommand); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
+
 		c.updatePull(ctx, AutoplanCommand{}, CommandResult{Error: err})
 		return
 	}
 	if len(projectCmds) == 0 {
 		log.Info("determined there was no project to run plan in")
-		if err := c.CommitStatusUpdater.Update(baseRepo, pull, models.SuccessCommitStatus, models.PlanCommand); err != nil {
+		// If there were no projects modified, we set a successful commit status
+		// with 0/0 projects planned successfully because we've already set an
+		// in-progress status and we don't want that to be "in progress" forever.
+		if err := c.CommitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, models.PlanCommand, 0, 0); err != nil {
 			ctx.Log.Warn("unable to update commit status: %s", err)
 		}
 		return
@@ -115,10 +123,12 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		result.PlansDeleted = true
 	}
 	c.updatePull(ctx, AutoplanCommand{}, result)
-	_, err = c.updateDB(ctx, ctx.Pull, result.ProjectResults)
+	pullStatus, err := c.updateDB(ctx, ctx.Pull, result.ProjectResults)
 	if err != nil {
 		c.Logger.Err("writing results: %s", err)
 	}
+
+	c.updateCommitStatus(ctx, models.PlanCommand, pullStatus)
 }
 
 // RunCommentCommand executes the command.
@@ -184,7 +194,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		ctx.Log.Info("pull request mergeable status: %t", ctx.PullMergeable)
 	}
 
-	if err = c.CommitStatusUpdater.Update(baseRepo, pull, models.PendingCommitStatus, cmd.CommandName()); err != nil {
+	if err = c.CommitStatusUpdater.UpdateCombined(baseRepo, pull, models.PendingCommitStatus, cmd.CommandName()); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
@@ -199,6 +209,9 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 	if err != nil {
+		if statusErr := c.CommitStatusUpdater.UpdateCombined(ctx.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
 		c.updatePull(ctx, cmd, CommandResult{Error: err})
 		return
 	}
@@ -220,8 +233,42 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
+	c.updateCommitStatus(ctx, cmd.Name, pullStatus)
+
 	if cmd.Name == models.ApplyCommand && c.automergeEnabled(ctx, projectCmds) {
 		c.automerge(ctx, pullStatus)
+	}
+}
+
+func (c *DefaultCommandRunner) updateCommitStatus(ctx *CommandContext, cmd models.CommandName, pullStatus models.PullStatus) {
+	var numSuccess int
+	var status models.CommitStatus
+
+	if cmd == models.PlanCommand {
+		// We consider anything that isn't a plan error as a plan success.
+		// For example, if there is an apply error, that means that at least a
+		// plan was generated successfully.
+		numSuccess = len(pullStatus.Projects) - pullStatus.StatusCount(models.ErroredPlanStatus)
+		status = models.SuccessCommitStatus
+		if numSuccess != len(pullStatus.Projects) {
+			status = models.FailedCommitStatus
+		}
+	} else {
+		numSuccess = pullStatus.StatusCount(models.AppliedPlanStatus)
+
+		numErrored := pullStatus.StatusCount(models.ErroredApplyStatus)
+		status = models.SuccessCommitStatus
+		if numErrored > 0 {
+			status = models.FailedCommitStatus
+		} else if numSuccess < len(pullStatus.Projects) {
+			// If there are plans that haven't been applied yet, we'll use a pending
+			// status.
+			status = models.PendingCommitStatus
+		}
+	}
+
+	if err := c.CommitStatusUpdater.UpdateCombinedCount(ctx.BaseRepo, ctx.Pull, status, cmd, numSuccess, len(pullStatus.Projects)); err != nil {
+		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 }
 
@@ -328,10 +375,6 @@ func (c *DefaultCommandRunner) updatePull(ctx *CommandContext, command PullComma
 		ctx.Log.Warn(res.Failure)
 	}
 
-	// Update the pull request's status icon and comment back.
-	if err := c.CommitStatusUpdater.UpdateProjectResult(ctx, command.CommandName(), res); err != nil {
-		ctx.Log.Warn("unable to update commit status: %s", err)
-	}
 	comment := c.MarkdownRenderer.Render(res, command.CommandName(), ctx.Log.History.String(), command.IsVerbose(), ctx.BaseRepo.VCSHost.Type)
 	if err := c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, comment); err != nil {
 		ctx.Log.Err("unable to comment: %s", err)
