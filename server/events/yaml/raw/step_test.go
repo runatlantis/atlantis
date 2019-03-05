@@ -216,7 +216,7 @@ func TestStep_Validate(t *testing.T) {
 			input: raw.Step{
 				Key: String("invalid"),
 			},
-			expErr: "\"invalid\" is not a valid step type",
+			expErr: "\"invalid\" is not a valid step type, maybe you omitted the 'run' key",
 		},
 		{
 			description: "multiple keys in map",
