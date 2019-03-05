@@ -225,7 +225,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	}
 }
 
-func (c *DefaultCommandRunner) automerge(ctx *CommandContext, pullStatus *models.PullStatus) {
+func (c *DefaultCommandRunner) automerge(ctx *CommandContext, pullStatus models.PullStatus) {
 	// We only automerge if all projects have been successfully applied.
 	for _, p := range pullStatus.Projects {
 		if p.Status != models.AppliedPlanStatus {
@@ -364,7 +364,7 @@ func (c *DefaultCommandRunner) deletePlans(ctx *CommandContext) {
 	}
 }
 
-func (c *DefaultCommandRunner) updateDB(ctx *CommandContext, pull models.PullRequest, results []models.ProjectResult) (*models.PullStatus, error) {
+func (c *DefaultCommandRunner) updateDB(ctx *CommandContext, pull models.PullRequest, results []models.ProjectResult) (models.PullStatus, error) {
 	// Filter out results that errored due to the directory not existing. We
 	// don't store these in the database because they would never be "applyable"
 	// and so the pull request would always have errors.
