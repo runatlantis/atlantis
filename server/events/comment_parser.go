@@ -15,6 +15,7 @@ package events
 
 import (
 	"fmt"
+	"github.com/flynn-archive/go-shlex"
 	"io/ioutil"
 	"net/url"
 	"path/filepath"
@@ -103,9 +104,10 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		return CommentParseResult{Ignore: true}
 	}
 
-	// strings.Fields strips out newlines but that's okay since we've removed
-	// multiline strings above.
-	args := strings.Fields(comment)
+	args, err := shlex.Split(comment)
+	if err != nil {
+		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError parsing command: %s\n```", err)}
+	}
 	if len(args) < 1 {
 		return CommentParseResult{Ignore: true}
 	}
@@ -178,7 +180,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 
 	// Now parse the flags.
 	// It's safe to use [2:] because we know there's at least 2 elements in args.
-	err := flagSet.Parse(args[2:])
+	err = flagSet.Parse(args[2:])
 	if err == pflag.ErrHelp {
 		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nUsage of %s:\n%s\n```", command, flagSet.FlagUsagesWrapped(usagesCols))}
 	}
@@ -256,22 +258,28 @@ func (e *CommentParser) BuildApplyComment(repoRelDir string, workspace string, p
 }
 
 func (e *CommentParser) buildFlags(repoRelDir string, workspace string, project string) string {
+	// Add quotes if dir has spaces.
+	if strings.Contains(repoRelDir, " ") {
+		repoRelDir = fmt.Sprintf("%q", repoRelDir)
+	}
+
 	switch {
 	// If project is specified we can just use its name.
 	case project != "":
 		return fmt.Sprintf(" -%s %s", projectFlagShort, project)
+	case repoRelDir == DefaultRepoRelDir && workspace == DefaultWorkspace:
 		// If it's the root and default workspace then we just need to specify one
 		// of the flags and the other will get defaulted.
-	case repoRelDir == DefaultRepoRelDir && workspace == DefaultWorkspace:
 		return fmt.Sprintf(" -%s %s", dirFlagShort, DefaultRepoRelDir)
-		// If dir is the default then we just need to specify workspace.
 	case repoRelDir == DefaultRepoRelDir:
+		// If dir is the default then we just need to specify workspace.
 		return fmt.Sprintf(" -%s %s", workspaceFlagShort, workspace)
-		// If workspace is the default then we just need to specify the dir.
 	case workspace == DefaultWorkspace:
+		// If workspace is the default then we just need to specify the dir.
+
 		return fmt.Sprintf(" -%s %s", dirFlagShort, repoRelDir)
-		// Otherwise we have to specify both flags.
 	default:
+		// Otherwise we have to specify both flags.
 		return fmt.Sprintf(" -%s %s -%s %s", dirFlagShort, repoRelDir, workspaceFlagShort, workspace)
 	}
 }
