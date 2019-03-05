@@ -445,7 +445,7 @@ func TestParse_Parsing(t *testing.T) {
 			"",
 			"",
 			false,
-			`"\";echo" "\"hi"`,
+			`";echo hi"`,
 			"",
 		},
 		{
@@ -510,6 +510,14 @@ func TestParse_Parsing(t *testing.T) {
 			"-d ./adir",
 			"",
 			"adir",
+			false,
+			"",
+			"",
+		},
+		{
+			"-d \"dir with space\"",
+			"",
+			"dir with space",
 			false,
 			"",
 			"",
@@ -609,6 +617,13 @@ func TestBuildPlanApplyComment(t *testing.T) {
 			commentArgs:   []string{`"arg1"`, `"arg2"`, `arg3`},
 			expPlanFlags:  "-d dir -w workspace -- arg1 arg2 arg3",
 			expApplyFlags: "-d dir -w workspace",
+		},
+		{
+			repoRelDir:    "dir with spaces",
+			workspace:     "default",
+			project:       "",
+			expPlanFlags:  "-d \"dir with spaces\"",
+			expApplyFlags: "-d \"dir with spaces\"",
 		},
 	}
 
