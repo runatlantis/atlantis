@@ -110,8 +110,8 @@ func (c *DefaultClient) Version() *version.Version {
 // RunCommandWithVersion executes the provided version of terraform with
 // the provided args in path. v is the version of terraform executable to use.
 // If v is nil, will use the default version.
-// Workspace is the terraform workspace to run in. We won't switch workspaces
-// but will set the TERRAFORM_WORKSPACE environment variable.
+// Workspace is the terraform workspace to run in. We won't switch workspaces,
+// just set a WORKSPACE environment variable.
 func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (string, error) {
 	tfCmd, cmd := c.prepCmd(v, workspace, path, args)
 	out, err := cmd.CombinedOutput()
