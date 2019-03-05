@@ -56,7 +56,7 @@ func (d *DefaultCommitStatusUpdater) UpdateProjectResult(ctx *CommandContext, co
 	} else {
 		var statuses []models.CommitStatus
 		for _, p := range res.ProjectResults {
-			statuses = append(statuses, p.Status())
+			statuses = append(statuses, p.CommitStatus())
 		}
 		status = d.worstStatus(statuses)
 	}

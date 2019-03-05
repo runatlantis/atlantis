@@ -258,7 +258,7 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []mod
 						res.RepoRelDir == proj.RepoRelDir &&
 						res.ProjectName == proj.ProjectName {
 
-						proj.Status = b.getPlanStatus(res)
+						proj.Status = res.PlanStatus()
 						updatedExisting = true
 						break
 					}
@@ -382,27 +382,11 @@ func (b *BoltDB) writePullToBucket(bucket *bolt.Bucket, key []byte, pull models.
 	return bucket.Put(key, serialized)
 }
 
-func (b *BoltDB) getPlanStatus(p models.ProjectResult) models.ProjectPlanStatus {
-	if p.Error != nil {
-		return models.ErroredPlanStatus
-	}
-	if p.Failure != "" {
-		return models.ErroredPlanStatus
-	}
-	if p.PlanSuccess != nil {
-		return models.PlannedPlanStatus
-	}
-	if p.ApplySuccess != "" {
-		return models.AppliedPlanStatus
-	}
-	return models.ErroredPlanStatus
-}
-
 func (b *BoltDB) projectResultToProject(p models.ProjectResult) models.ProjectStatus {
 	return models.ProjectStatus{
 		Workspace:   p.Workspace,
 		RepoRelDir:  p.RepoRelDir,
 		ProjectName: p.ProjectName,
-		Status:      b.getPlanStatus(p),
+		Status:      p.PlanStatus(),
 	}
 }
