@@ -83,7 +83,7 @@ func (s Step) Validate() error {
 	validStep := func(value interface{}) error {
 		str := *value.(*string)
 		if str != InitStepName && str != PlanStepName && str != ApplyStepName {
-			return fmt.Errorf("%q is not a valid step type", str)
+			return fmt.Errorf("%q is not a valid step type, maybe you omitted the 'run' key", str)
 		}
 		return nil
 	}

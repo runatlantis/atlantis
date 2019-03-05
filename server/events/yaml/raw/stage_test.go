@@ -58,7 +58,7 @@ func TestStage_Validate(t *testing.T) {
 		},
 	}
 	validation.ErrorTag = "yaml"
-	ErrEquals(t, "steps: (0: \"invalid\" is not a valid step type.).", s.Validate())
+	ErrEquals(t, "steps: (0: \"invalid\" is not a valid step type, maybe you omitted the 'run' key.).", s.Validate())
 
 	// Empty steps should validate.
 	Ok(t, (raw.Stage{}).Validate())
