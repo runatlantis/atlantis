@@ -94,6 +94,7 @@ type DefaultProjectCommandRunner struct {
 func (p *DefaultProjectCommandRunner) Plan(ctx models.ProjectCommandContext) models.ProjectResult {
 	planSuccess, failure, err := p.doPlan(ctx)
 	return models.ProjectResult{
+		Command:     models.PlanCommand,
 		PlanSuccess: planSuccess,
 		Error:       err,
 		Failure:     failure,
@@ -107,6 +108,7 @@ func (p *DefaultProjectCommandRunner) Plan(ctx models.ProjectCommandContext) mod
 func (p *DefaultProjectCommandRunner) Apply(ctx models.ProjectCommandContext) models.ProjectResult {
 	applyOut, failure, err := p.doApply(ctx)
 	return models.ProjectResult{
+		Command:      models.ApplyCommand,
 		Failure:      failure,
 		Error:        err,
 		ApplySuccess: applyOut,

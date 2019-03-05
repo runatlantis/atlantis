@@ -335,6 +335,7 @@ func (p *ProjectCommandContext) GetProjectName() string {
 
 // ProjectResult is the result of executing a plan/apply for a specific project.
 type ProjectResult struct {
+	Command      CommandName
 	RepoRelDir   string
 	Workspace    string
 	Error        error
