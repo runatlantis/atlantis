@@ -139,6 +139,30 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 				},
 			},
 		},
+		{
+			".terragrunt-cache",
+			map[string]interface{}{
+				"default": map[string]interface{}{
+					".terragrunt-cache": map[string]interface{}{
+						"N6lY9xk7PivbOAzdsjDL6VUFVYk": map[string]interface{}{
+							"K4xpUZI6HgUF-ip6E1eib4L8mwQ": map[string]interface{}{
+								"app": map[string]interface{}{
+									"default.tfplan": nil,
+								},
+							},
+						},
+					},
+					"default.tfplan": nil,
+				},
+			},
+			[]events.PendingPlan{
+				{
+					RepoDir:    "???/default",
+					RepoRelDir: ".",
+					Workspace:  "default",
+				},
+			},
+		},
 	}
 
 	pf := &events.DefaultPendingPlanFinder{}

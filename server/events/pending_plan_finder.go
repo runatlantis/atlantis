@@ -62,6 +62,11 @@ func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPl
 		}
 		for _, file := range strings.Split(string(lsOut), "\n") {
 			if filepath.Ext(file) == ".tfplan" {
+				// Ignore .terragrunt-cache dirs (#487)
+				if strings.Contains(file, ".terragrunt-cache/") {
+					continue
+				}
+
 				repoRelDir := filepath.Dir(file)
 				plans = append(plans, PendingPlan{
 					RepoDir:    repoDir,
