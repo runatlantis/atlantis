@@ -36,7 +36,6 @@ import (
 var projectCommandBuilder *mocks.MockProjectCommandBuilder
 var projectCommandRunner *mocks.MockProjectCommandRunner
 var eventParsing *mocks.MockEventParsing
-var ghStatus *mocks.MockCommitStatusUpdater
 var githubGetter *mocks.MockGithubPullGetter
 var gitlabGetter *mocks.MockGitlabMergeRequestGetter
 var ch events.DefaultCommandRunner
@@ -48,7 +47,6 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	RegisterMockTestingT(t)
 	projectCommandBuilder = mocks.NewMockProjectCommandBuilder()
 	eventParsing = mocks.NewMockEventParsing()
-	ghStatus = mocks.NewMockCommitStatusUpdater()
 	vcsClient := vcsmocks.NewMockClient()
 	githubGetter = mocks.NewMockGithubPullGetter()
 	gitlabGetter = mocks.NewMockGitlabMergeRequestGetter()
@@ -62,7 +60,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		ThenReturn(pullLogger)
 	ch = events.DefaultCommandRunner{
 		VCSClient:                vcsClient,
-		CommitStatusUpdater:      ghStatus,
+		CommitStatusUpdater:      &events.DefaultCommitStatusUpdater{vcsClient},
 		EventParser:              eventParsing,
 		MarkdownRenderer:         &events.MarkdownRenderer{},
 		GithubPullGetter:         githubGetter,

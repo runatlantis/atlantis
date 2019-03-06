@@ -335,6 +335,7 @@ func (p *ProjectCommandContext) GetProjectName() string {
 
 // ProjectResult is the result of executing a plan/apply for a specific project.
 type ProjectResult struct {
+	Command      CommandName
 	RepoRelDir   string
 	Workspace    string
 	Error        error
@@ -344,8 +345,8 @@ type ProjectResult struct {
 	ProjectName  string
 }
 
-// Status returns the vcs commit status of this project result.
-func (p ProjectResult) Status() CommitStatus {
+// CommitStatus returns the vcs commit status of this project result.
+func (p ProjectResult) CommitStatus() CommitStatus {
 	if p.Error != nil {
 		return FailedCommitStatus
 	}
@@ -353,6 +354,30 @@ func (p ProjectResult) Status() CommitStatus {
 		return FailedCommitStatus
 	}
 	return SuccessCommitStatus
+}
+
+// PlanStatus returns the plan status.
+func (p ProjectResult) PlanStatus() ProjectPlanStatus {
+	switch p.Command {
+
+	case PlanCommand:
+		if p.Error != nil {
+			return ErroredPlanStatus
+		} else if p.Failure != "" {
+			return ErroredPlanStatus
+		}
+		return PlannedPlanStatus
+
+	case ApplyCommand:
+		if p.Error != nil {
+			return ErroredApplyStatus
+		} else if p.Failure != "" {
+			return ErroredApplyStatus
+		}
+		return AppliedPlanStatus
+	}
+
+	panic("PlanStatus() missing a combination")
 }
 
 // IsSuccessful returns true if this project result had no errors.
@@ -380,6 +405,17 @@ type PullStatus struct {
 	Pull PullRequest
 }
 
+// StatusCount returns the number of projects that have status.
+func (p PullStatus) StatusCount(status ProjectPlanStatus) int {
+	c := 0
+	for _, pr := range p.Projects {
+		if pr.Status == status {
+			c++
+		}
+	}
+	return c
+}
+
 // ProjectStatus is the status of a specific project.
 type ProjectStatus struct {
 	Workspace   string
@@ -400,6 +436,9 @@ const (
 	// PlannedPlanStatus means that a plan has been successfully generated but
 	// not yet applied.
 	PlannedPlanStatus
+	// ErrorApplyStatus means that a plan has been generated but there was an
+	// error while applying it.
+	ErroredApplyStatus
 	// AppliedPlanStatus means that a plan has been generated and applied
 	// successfully.
 	AppliedPlanStatus
@@ -409,13 +448,15 @@ const (
 func (p ProjectPlanStatus) String() string {
 	switch p {
 	case ErroredPlanStatus:
-		return "errored"
+		return "plan_errored"
 	case PlannedPlanStatus:
 		return "planned"
+	case ErroredApplyStatus:
+		return "apply_errored"
 	case AppliedPlanStatus:
 		return "applied"
 	default:
-		return "errored"
+		panic("missing String() impl for ProjectPlanStatus")
 	}
 }
 

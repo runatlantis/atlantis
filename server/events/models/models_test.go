@@ -294,3 +294,83 @@ func TestProjectResult_IsSuccessful(t *testing.T) {
 		})
 	}
 }
+
+func TestProjectResult_PlanStatus(t *testing.T) {
+	cases := []struct {
+		p         models.ProjectResult
+		expStatus models.ProjectPlanStatus
+	}{
+		{
+			p: models.ProjectResult{
+				Command: models.PlanCommand,
+				Error:   errors.New("err"),
+			},
+			expStatus: models.ErroredPlanStatus,
+		},
+		{
+			p: models.ProjectResult{
+				Command: models.PlanCommand,
+				Failure: "failure",
+			},
+			expStatus: models.ErroredPlanStatus,
+		},
+		{
+			p: models.ProjectResult{
+				Command:     models.PlanCommand,
+				PlanSuccess: &models.PlanSuccess{},
+			},
+			expStatus: models.PlannedPlanStatus,
+		},
+		{
+			p: models.ProjectResult{
+				Command: models.ApplyCommand,
+				Error:   errors.New("err"),
+			},
+			expStatus: models.ErroredApplyStatus,
+		},
+		{
+			p: models.ProjectResult{
+				Command: models.ApplyCommand,
+				Failure: "failure",
+			},
+			expStatus: models.ErroredApplyStatus,
+		},
+		{
+			p: models.ProjectResult{
+				Command:      models.ApplyCommand,
+				ApplySuccess: "success",
+			},
+			expStatus: models.AppliedPlanStatus,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.expStatus.String(), func(t *testing.T) {
+			Equals(t, c.expStatus, c.p.PlanStatus())
+		})
+	}
+}
+
+func TestPullStatus_StatusCount(t *testing.T) {
+	ps := models.PullStatus{
+		Projects: []models.ProjectStatus{
+			{
+				Status: models.PlannedPlanStatus,
+			},
+			{
+				Status: models.PlannedPlanStatus,
+			},
+			{
+				Status: models.AppliedPlanStatus,
+			},
+			{
+				Status: models.ErroredApplyStatus,
+			},
+		},
+	}
+
+	Equals(t, 2, ps.StatusCount(models.PlannedPlanStatus))
+	Equals(t, 1, ps.StatusCount(models.AppliedPlanStatus))
+	Equals(t, 1, ps.StatusCount(models.ErroredApplyStatus))
+	Equals(t, 0, ps.StatusCount(models.ErroredPlanStatus))
+}

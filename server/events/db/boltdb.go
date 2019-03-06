@@ -215,13 +215,13 @@ func (b *BoltDB) GetLock(p models.Project, workspace string) (*models.ProjectLoc
 
 // UpdatePullWithResults updates pull's status with the latest project results.
 // It returns the new PullStatus object.
-func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []models.ProjectResult) (*models.PullStatus, error) {
+func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []models.ProjectResult) (models.PullStatus, error) {
 	key, err := b.pullKey(pull)
 	if err != nil {
-		return nil, err
+		return models.PullStatus{}, err
 	}
 
-	var newStatus *models.PullStatus
+	var newStatus models.PullStatus
 	err = b.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(b.pullsBucketName)
 		currStatus, err := b.getPullFromBucket(bucket, key)
@@ -236,7 +236,7 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []mod
 			for _, r := range newResults {
 				statuses = append(statuses, b.projectResultToProject(r))
 			}
-			newStatus = &models.PullStatus{
+			newStatus = models.PullStatus{
 				Pull:     pull,
 				Projects: statuses,
 			}
@@ -246,7 +246,7 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []mod
 			// because it's possible a user is just applying a single project
 			// in this command and so we don't want to delete our data about
 			// other projects that aren't affected by this command.
-			newStatus = currStatus
+			newStatus = *currStatus
 			for _, res := range newResults {
 				// First, check if we should update any existing projects.
 				updatedExisting := false
@@ -258,7 +258,7 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []mod
 						res.RepoRelDir == proj.RepoRelDir &&
 						res.ProjectName == proj.ProjectName {
 
-						proj.Status = b.getPlanStatus(res)
+						proj.Status = res.PlanStatus()
 						updatedExisting = true
 						break
 					}
@@ -317,13 +317,14 @@ func (b *BoltDB) DeleteProjectStatus(pull models.PullRequest, workspace string, 
 	}
 	err = b.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(b.pullsBucketName)
-		currStatus, err := b.getPullFromBucket(bucket, key)
+		currStatusPtr, err := b.getPullFromBucket(bucket, key)
 		if err != nil {
 			return err
 		}
-		if currStatus == nil {
+		if currStatusPtr == nil {
 			return nil
 		}
+		currStatus := *currStatusPtr
 
 		// Create a new projectStatuses array without the ones we want to
 		// delete.
@@ -373,7 +374,7 @@ func (b *BoltDB) getPullFromBucket(bucket *bolt.Bucket, key []byte) (*models.Pul
 	return &p, nil
 }
 
-func (b *BoltDB) writePullToBucket(bucket *bolt.Bucket, key []byte, pull *models.PullStatus) error {
+func (b *BoltDB) writePullToBucket(bucket *bolt.Bucket, key []byte, pull models.PullStatus) error {
 	serialized, err := json.Marshal(pull)
 	if err != nil {
 		return errors.Wrap(err, "serializing")
@@ -381,27 +382,11 @@ func (b *BoltDB) writePullToBucket(bucket *bolt.Bucket, key []byte, pull *models
 	return bucket.Put(key, serialized)
 }
 
-func (b *BoltDB) getPlanStatus(p models.ProjectResult) models.ProjectPlanStatus {
-	if p.Error != nil {
-		return models.ErroredPlanStatus
-	}
-	if p.Failure != "" {
-		return models.ErroredPlanStatus
-	}
-	if p.PlanSuccess != nil {
-		return models.PlannedPlanStatus
-	}
-	if p.ApplySuccess != "" {
-		return models.AppliedPlanStatus
-	}
-	return models.ErroredPlanStatus
-}
-
 func (b *BoltDB) projectResultToProject(p models.ProjectResult) models.ProjectStatus {
 	return models.ProjectStatus{
 		Workspace:   p.Workspace,
 		RepoRelDir:  p.RepoRelDir,
 		ProjectName: p.ProjectName,
-		Status:      b.getPlanStatus(p),
+		Status:      p.PlanStatus(),
 	}
 }

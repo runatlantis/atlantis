@@ -26,12 +26,12 @@ import (
 // CommitStatusUpdater updates the status of a commit with the VCS host. We set
 // the status to signify whether the plan/apply succeeds.
 type CommitStatusUpdater interface {
-	// Update updates the status of the head commit of pull.
-	Update(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName) error
-	// UpdateProjectResult updates the status of the head commit given the
-	// state of response.
-	// todo: rename this so it doesn't conflict with UpdateProject
-	UpdateProjectResult(ctx *CommandContext, commandName models.CommandName, res CommandResult) error
+	// UpdateCombined updates the combined status of the head commit of pull.
+	// A combined status represents all the projects modified in the pull.
+	UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName) error
+	// UpdateCombinedCount updates the combined status to reflect the
+	// numSuccess out of numTotal.
+	UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName, numSuccess int, numTotal int) error
 	// UpdateProject sets the commit status for the project represented by
 	// ctx.
 	UpdateProject(ctx models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus, url string) error
@@ -42,25 +42,28 @@ type DefaultCommitStatusUpdater struct {
 	Client vcs.Client
 }
 
-// Update updates the commit status.
-func (d *DefaultCommitStatusUpdater) Update(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName) error {
-	description := fmt.Sprintf("%s %s", strings.Title(command.String()), strings.Title(status.String()))
-	return d.Client.UpdateStatus(repo, pull, status, "Atlantis", description, "")
+func (d *DefaultCommitStatusUpdater) UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName) error {
+	src := fmt.Sprintf("%s/atlantis", command.String())
+	var descripWords string
+	switch status {
+	case models.PendingCommitStatus:
+		descripWords = "in progress..."
+	case models.FailedCommitStatus:
+		descripWords = "failed."
+	case models.SuccessCommitStatus:
+		descripWords = "succeeded."
+	}
+	descrip := fmt.Sprintf("%s %s", strings.Title(command.String()), descripWords)
+	return d.Client.UpdateStatus(repo, pull, status, src, descrip, "")
 }
 
-// UpdateProjectResult updates the commit status based on the status of res.
-func (d *DefaultCommitStatusUpdater) UpdateProjectResult(ctx *CommandContext, commandName models.CommandName, res CommandResult) error {
-	var status models.CommitStatus
-	if res.Error != nil || res.Failure != "" {
-		status = models.FailedCommitStatus
-	} else {
-		var statuses []models.CommitStatus
-		for _, p := range res.ProjectResults {
-			statuses = append(statuses, p.Status())
-		}
-		status = d.worstStatus(statuses)
+func (d *DefaultCommitStatusUpdater) UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName, numSuccess int, numTotal int) error {
+	src := fmt.Sprintf("%s/atlantis", command.String())
+	cmdVerb := "planned"
+	if command == models.ApplyCommand {
+		cmdVerb = "applied"
 	}
-	return d.Update(ctx.BaseRepo, ctx.Pull, status, commandName)
+	return d.Client.UpdateStatus(repo, pull, status, src, fmt.Sprintf("%d/%d projects %s successfully.", numSuccess, numTotal, cmdVerb), "")
 }
 
 func (d *DefaultCommitStatusUpdater) UpdateProject(ctx models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus, url string) error {
@@ -80,13 +83,4 @@ func (d *DefaultCommitStatusUpdater) UpdateProject(ctx models.ProjectCommandCont
 	}
 	descrip := fmt.Sprintf("%s %s", strings.Title(cmdName.String()), descripWords)
 	return d.Client.UpdateStatus(ctx.BaseRepo, ctx.Pull, status, src, descrip, url)
-}
-
-func (d *DefaultCommitStatusUpdater) worstStatus(ss []models.CommitStatus) models.CommitStatus {
-	for _, s := range ss {
-		if s == models.FailedCommitStatus {
-			return models.FailedCommitStatus
-		}
-	}
-	return models.SuccessCommitStatus
 }

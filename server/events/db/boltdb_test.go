@@ -381,17 +381,18 @@ func TestPullStatus_UpdateGet(t *testing.T) {
 		pull,
 		[]models.ProjectResult{
 			{
+				Command:    models.PlanCommand,
 				RepoRelDir: ".",
 				Workspace:  "default",
 				Failure:    "failure",
 			},
 		})
 	Ok(t, err)
-	Assert(t, status != nil, "exp non-nil")
 
-	status, err = b.GetPullStatus(pull)
+	maybeStatus, err := b.GetPullStatus(pull)
 	Ok(t, err)
-	Equals(t, pull, status.Pull)
+	Assert(t, maybeStatus != nil, "exp non-nil")
+	Equals(t, pull, maybeStatus.Pull)
 	Equals(t, []models.ProjectStatus{
 		{
 			Workspace:   "default",
@@ -428,7 +429,7 @@ func TestPullStatus_UpdateDeleteGet(t *testing.T) {
 			},
 		},
 	}
-	status, err := b.UpdatePullWithResults(
+	_, err := b.UpdatePullWithResults(
 		pull,
 		[]models.ProjectResult{
 			{
@@ -438,14 +439,13 @@ func TestPullStatus_UpdateDeleteGet(t *testing.T) {
 			},
 		})
 	Ok(t, err)
-	Assert(t, status != nil, "exp non-nil")
 
 	err = b.DeletePullStatus(pull)
 	Ok(t, err)
 
-	status, err = b.GetPullStatus(pull)
+	maybeStatus, err := b.GetPullStatus(pull)
 	Ok(t, err)
-	Assert(t, status == nil, "exp nil")
+	Assert(t, maybeStatus == nil, "exp nil")
 }
 
 // Test we can create a status, delete a specific project's status within that
@@ -475,7 +475,7 @@ func TestPullStatus_UpdateDeleteProject(t *testing.T) {
 			},
 		},
 	}
-	status, err := b.UpdatePullWithResults(
+	_, err := b.UpdatePullWithResults(
 		pull,
 		[]models.ProjectResult{
 			{
@@ -490,13 +490,13 @@ func TestPullStatus_UpdateDeleteProject(t *testing.T) {
 			},
 		})
 	Ok(t, err)
-	Assert(t, status != nil, "exp non-nil")
 
 	err = b.DeleteProjectStatus(pull, "default", ".")
 	Ok(t, err)
 
-	status, err = b.GetPullStatus(pull)
+	status, err := b.GetPullStatus(pull)
 	Ok(t, err)
+	Assert(t, status != nil, "exp non-nil")
 	Equals(t, pull, status.Pull)
 	Equals(t, []models.ProjectStatus{
 		{
@@ -534,7 +534,7 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 			},
 		},
 	}
-	status, err := b.UpdatePullWithResults(
+	_, err := b.UpdatePullWithResults(
 		pull,
 		[]models.ProjectResult{
 			{
@@ -544,10 +544,9 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 			},
 		})
 	Ok(t, err)
-	Assert(t, status != nil, "exp non-nil")
 
 	pull.HeadCommit = "newsha"
-	status, err = b.UpdatePullWithResults(pull,
+	status, err := b.UpdatePullWithResults(pull,
 		[]models.ProjectResult{
 			{
 				RepoRelDir:   ".",
@@ -559,9 +558,9 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 	Ok(t, err)
 	Equals(t, 1, len(status.Projects))
 
-	status, err = b.GetPullStatus(pull)
+	maybeStatus, err := b.GetPullStatus(pull)
 	Ok(t, err)
-	Equals(t, pull, status.Pull)
+	Equals(t, pull, maybeStatus.Pull)
 	Equals(t, []models.ProjectStatus{
 		{
 			Workspace:   "staging",
@@ -569,7 +568,7 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 			ProjectName: "",
 			Status:      models.AppliedPlanStatus,
 		},
-	}, status.Projects)
+	}, maybeStatus.Projects)
 }
 
 // Test that if we update an existing pull status and our new status is for a
@@ -598,15 +597,24 @@ func TestPullStatus_UpdateMerge(t *testing.T) {
 			},
 		},
 	}
-	status, err := b.UpdatePullWithResults(
+	_, err := b.UpdatePullWithResults(
 		pull,
 		[]models.ProjectResult{
 			{
+				Command:    models.PlanCommand,
 				RepoRelDir: "mergeme",
 				Workspace:  "default",
 				Failure:    "failure",
 			},
 			{
+				Command:     models.PlanCommand,
+				RepoRelDir:  "projectname",
+				Workspace:   "default",
+				ProjectName: "projectname",
+				Failure:     "failure",
+			},
+			{
+				Command:    models.PlanCommand,
 				RepoRelDir: "staythesame",
 				Workspace:  "default",
 				PlanSuccess: &models.PlanSuccess{
@@ -618,22 +626,29 @@ func TestPullStatus_UpdateMerge(t *testing.T) {
 			},
 		})
 	Ok(t, err)
-	Assert(t, status != nil, "exp non-nil")
 
-	status, err = b.UpdatePullWithResults(pull,
+	updateStatus, err := b.UpdatePullWithResults(pull,
 		[]models.ProjectResult{
 			{
+				Command:      models.ApplyCommand,
 				RepoRelDir:   "mergeme",
 				Workspace:    "default",
 				ApplySuccess: "applied!",
 			},
 			{
+				Command:     models.ApplyCommand,
+				RepoRelDir:  "projectname",
+				Workspace:   "default",
+				ProjectName: "projectname",
+				Error:       errors.New("apply error"),
+			},
+			{
+				Command:      models.ApplyCommand,
 				RepoRelDir:   "newresult",
 				Workspace:    "default",
 				ApplySuccess: "success!",
 			},
 		})
-
 	Ok(t, err)
 
 	getStatus, err := b.GetPullStatus(pull)
@@ -641,13 +656,19 @@ func TestPullStatus_UpdateMerge(t *testing.T) {
 
 	// Test both the pull state returned from the update call *and* the get
 	// call.
-	for _, s := range []*models.PullStatus{status, getStatus} {
+	for _, s := range []models.PullStatus{updateStatus, *getStatus} {
 		Equals(t, pull, s.Pull)
 		Equals(t, []models.ProjectStatus{
 			{
 				RepoRelDir: "mergeme",
 				Workspace:  "default",
 				Status:     models.AppliedPlanStatus,
+			},
+			{
+				RepoRelDir:  "projectname",
+				Workspace:   "default",
+				ProjectName: "projectname",
+				Status:      models.ErroredApplyStatus,
 			},
 			{
 				RepoRelDir: "staythesame",
@@ -659,7 +680,7 @@ func TestPullStatus_UpdateMerge(t *testing.T) {
 				Workspace:  "default",
 				Status:     models.AppliedPlanStatus,
 			},
-		}, status.Projects)
+		}, updateStatus.Projects)
 	}
 }
 
