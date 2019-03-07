@@ -1,3 +1,111 @@
+# v0.5.0
+
+## Description
+This release has two big features: New Status Checks and Terraform Enterprise
+Integration.
+
+**New Status Checks:**
+
+The new status checks split the old status check into `plan` and `apply` phases.
+Each check now tracks the status of each project modified in the pull request.
+For example if two projects are modified, the `plan` check might read:
+> 2/2 projects planned successfully.
+
+And the `apply` check might read:
+> 0/2 projects applied successfully.
+
+Users can now use their Git host's settings to require these checks pass
+before a pull request is merged and be confident that all changes have been
+applied (for example).
+
+**Terraform Enterprise Integration:**
+
+Atlantis now integrates with the Terraform Enterprise (TFE)
+via the [remote backend](https://www.terraform.io/docs/backends/types/remote.html).
+Atlantis will run `terraform` commands as usual, however those commands will
+actually be executed *remotely* in Terraform Enterprise.
+
+Using Atlantis with Terraform Enterprise gives you access to TFE features like:
+* Real-time streaming output
+* Ability to cancel in-progress commands
+* Secret variables
+* [Sentinel](https://www.hashicorp.com/sentinel)
+Without having to change your pull request workflow.
+
+Diff: https://github.com/runatlantis/atlantis/compare/v0.4.15...v0.5.0
+
+## Features
+* Split single status check into one for `plan` and one for `apply` (see above).
+* Support using Atlantis with Terraform Enterprise via
+ [remote operations](https://www.terraform.io/docs/backends/operations.html) (see above).
+* Add `USER_NAME` environment variable for custom steps to use. ([#489](https://github.com/runatlantis/atlantis/pull/489))
+* Support Bitbucket Cloud's upcoming API deprecations. ([#502](https://github.com/runatlantis/atlantis/pull/502))
+* Support Bitbucket Server hosted at a basepath, ex. `bitbucket.mycompany.com/pathprefix` (Fixes [#508](https://github.com/runatlantis/atlantis/issues/508))
+
+## Bugfixes
+* Allow Bitbucket Server diagnostics checks. (Fixes [#474](https://github.com/runatlantis/atlantis/issues/474))
+* Fix automerge for Bitbucket Server. (Fixes [#479](https://github.com/runatlantis/atlantis/issues/479))
+* Run `terraform init` with `-upgrade`. (Fixes [#443](https://github.com/runatlantis/atlantis/issues/443))
+* If a pull request is deleted in Bitbucket Server, delete locks. (Fixes [#498](https://github.com/runatlantis/atlantis/issues/498))
+* Support directories with spaces, ex `atlantis plan -d 'dir with spaces'`. (Fixes [#423](https://github.com/runatlantis/atlantis/issues/423))
+* Ignore Terragrunt cache directories that were causing duplicate applies. (Fixes [#487](https://github.com/runatlantis/atlantis/issues/487))
+
+## Backwards Incompatibilities / Notes:
+* **New Status Checks** - If you have settings in your Git host that require the Atlantis commit status
+  check to be in a certain condition, you will need to modify that setting as follows:
+
+  Previously, Atlantis set a single check with the name `Atlantis`. Now there are
+  two checks with the names `plan/atlantis` and `apply/atlantis`. If you had
+  previously required the `Atlantis` check to pass, you should now require both
+  the `plan/atlantis` and `apply/atlantis` checks to pass.
+
+  The behaviour has also changed. Previously, the single Atlantis check
+  would represent the status of the **last
+  run command**. For example, if I ran `atlantis plan` and it failed, the check
+  would be in a *Failed* state. If I ran `atlantis apply -p project1` and it succeeded,
+  then the check would be in a *Success* state, regardless of the status of other projects
+  in the pull request.
+
+  Now, each check represents the plan/apply status of **all** projects modified in
+  the pull request. For example, say I open up a pull request that modifies
+  two projects, one in directory `proj1` and the other in `proj2`. If autoplanning
+  is enabled, and both plans succeed, then there will be a single status check:
+  * `plan/atlantis - 2/2 projects planned successfully` (success)
+
+  If I run `atlantis apply -d proj1`, then Atlantis will set a pending apply check:
+  * `plan/atlantis - 2/2 projects planned successfully` (success)
+  * `apply/atlantis - 1/2 projects applied successfully` (pending)
+
+  If I apply the final project with `atlantis apply -d proj2`, then my checks
+  will look like:
+  * `plan/atlantis - 2/2 projects planned successfully` (success)
+  * `apply/atlantis - 2/2 projects applied successfully` (success)
+
+* `terraform init` is now run with `-upgrade=true`. Previously, it used Terraform's
+  default setting which was `false`.
+
+  This means that `terraform` will always update to the latest version of plugins
+  and modules. For example, if you're using a module source of
+    ```hcl
+    source = "git::https://example.com/vpc.git?ref=master"
+    ```
+  then `terraform init` will now always use the version on `master` whereas
+  previously, if you had already run `atlantis plan` before `master` was updated,
+  a new `atlantis plan` wouldn't pull the latest changes and would just use
+  the cached version.
+  
+  This is unlikely to cause any issues because most users already expected Atlantis
+  to use the most up-to-date version of modules/plugins within the set constraints.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.5.0/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.5.0/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.5.0/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.5.0/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.5.0`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
 # v0.4.15
 
 ## Description
@@ -15,7 +123,7 @@ Diff: https://github.com/runatlantis/atlantis/compare/v0.4.14...v0.4.15
 None – this is a bugfix release.
 
 ## Bugfixes
-* Atlantis hangs on large plans. (Fixes [#452](https://github.com/runatlantis/atlantis/issues/452))
+* Atlantis hangs on large plans. (Fixes [#474](https://github.com/runatlantis/atlantis/issues/474))
 * Automerge now works on GitHub if you require a rebase or squash merge. ([#466](https://github.com/runatlantis/atlantis/pull/466))
 * Automerge now works on Bitbucket if previously you were getting XSRF errors. (Fixes [#465](https://github.com/runatlantis/atlantis/issues/465))
 * Requiring `mergeable` now works on GitHub if you are also requiring the Atlantis status to pass before merging. (Fixes [#453](https://github.com/runatlantis/atlantis/issues/453))
