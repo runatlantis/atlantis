@@ -126,7 +126,7 @@ func getTunnelAddr() (string, error) {
 	}
 
 	// Find the tunnel we just created.
-	expAtlantisURL := fmt.Sprintf("localhost:%d", atlantisPort)
+	expAtlantisURL := fmt.Sprintf("http://localhost:%d", atlantisPort)
 	for _, tun := range t.Tunnels {
 		if tun.Proto == "https" && tun.Config.Addr == expAtlantisURL {
 			return tun.PublicURL, nil

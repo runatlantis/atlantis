@@ -49,6 +49,7 @@ Diff: https://github.com/runatlantis/atlantis/compare/v0.4.15...v0.5.0
 * If a pull request is deleted in Bitbucket Server, delete locks. (Fixes [#498](https://github.com/runatlantis/atlantis/issues/498))
 * Support directories with spaces, ex `atlantis plan -d 'dir with spaces'`. (Fixes [#423](https://github.com/runatlantis/atlantis/issues/423))
 * Ignore Terragrunt cache directories that were causing duplicate applies. (Fixes [#487](https://github.com/runatlantis/atlantis/issues/487))
+* Fix `atlantis testdrive` for latest version of ngrok.
 
 ## Backwards Incompatibilities / Notes:
 * **New Status Checks** - If you have settings in your Git host that require the Atlantis commit status
