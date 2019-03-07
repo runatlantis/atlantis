@@ -90,7 +90,7 @@ func (w *FileWorkspace) Clone(
 		revParseCmd.Dir = cloneDir
 		output, err := revParseCmd.CombinedOutput()
 		if err != nil {
-			log.Err("will re-clone repo, could not determine if was at correct commit: %s: %s: %s", strings.Join(revParseCmd.Args, " "), err, string(output))
+			log.Warn("will re-clone repo, could not determine if was at correct commit: %s: %s: %s", strings.Join(revParseCmd.Args, " "), err, string(output))
 			return w.forceClone(log, cloneDir, headRepo, p)
 		}
 		currCommit := strings.Trim(string(output), "\n")
