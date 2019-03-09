@@ -70,6 +70,12 @@ If you set up Protected Branches then you can enforce:
 See [https://help.github.com/articles/about-protected-branches/](https://help.github.com/articles/about-protected-branches/)
 for more details.
 
+::: warning
+If you have the **Restrict who can push to this branch** requirement, then
+the Atlantis user needs to be part of that list in order for it to consider
+a pull request mergeable.
+:::
+
 #### GitLab
 For GitLab, a merge request will be mergeable if it has no conflicts and if all
 required approvers have approved the pull request.
