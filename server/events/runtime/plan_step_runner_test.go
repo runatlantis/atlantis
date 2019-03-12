@@ -817,11 +817,11 @@ https://app.terraform.io/app/lkysow-enterprises/atlantis-tfe-test/runs/run-is4oV
 
 Waiting for the plan to start...
 
-Terraform v0.11.11
+Terraform v0.11.13
 
 Configuring remote state backend...
 Initializing Terraform configuration...
-2019/02/20 22:40:52 [DEBUG] Using modified User-Agent: Terraform/0.11.11 TFE/202eeff
+2019/02/20 22:40:52 [DEBUG] Using modified User-Agent: Terraform/0.11.13 TFE/202eeff
 Refreshing Terraform state in-memory prior to plan...
 The refreshed state will be used to calculate this plan, but will not be
 persisted to local or remote state storage.

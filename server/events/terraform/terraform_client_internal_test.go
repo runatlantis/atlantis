@@ -86,7 +86,7 @@ func TestGenerateRCFile_ErrIfCannotWrite(t *testing.T) {
 
 // Test that it executes with the expected env vars.
 func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
-	v, err := version.NewVersion("0.11.11")
+	v, err := version.NewVersion("0.11.13")
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
@@ -105,13 +105,13 @@ func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
 	}
 	out, err := client.RunCommandWithVersion(nil, tmp, args, nil, "workspace")
 	Ok(t, err)
-	exp := fmt.Sprintf("TF_IN_AUTOMATION=true TF_PLUGIN_CACHE_DIR=%s WORKSPACE=workspace ATLANTIS_TERRAFORM_VERSION=0.11.11 DIR=%s\n", tmp, tmp)
+	exp := fmt.Sprintf("TF_IN_AUTOMATION=true TF_PLUGIN_CACHE_DIR=%s WORKSPACE=workspace ATLANTIS_TERRAFORM_VERSION=0.11.13 DIR=%s\n", tmp, tmp)
 	Equals(t, exp, out)
 }
 
 // Test that it returns an error on error.
 func TestDefaultClient_RunCommandWithVersion_Error(t *testing.T) {
-	v, err := version.NewVersion("0.11.11")
+	v, err := version.NewVersion("0.11.13")
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
@@ -135,7 +135,7 @@ func TestDefaultClient_RunCommandWithVersion_Error(t *testing.T) {
 }
 
 func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
-	v, err := version.NewVersion("0.11.11")
+	v, err := version.NewVersion("0.11.13")
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
@@ -156,14 +156,14 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
-	exp := fmt.Sprintf("TF_IN_AUTOMATION=true TF_PLUGIN_CACHE_DIR=%s WORKSPACE=workspace ATLANTIS_TERRAFORM_VERSION=0.11.11 DIR=%s", tmp, tmp)
+	exp := fmt.Sprintf("TF_IN_AUTOMATION=true TF_PLUGIN_CACHE_DIR=%s WORKSPACE=workspace ATLANTIS_TERRAFORM_VERSION=0.11.13 DIR=%s", tmp, tmp)
 	Equals(t, exp, out)
 }
 
 func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 	// todo: figure out why larger outputs cause everything to block.
 	t.Skip()
-	v, err := version.NewVersion("0.11.11")
+	v, err := version.NewVersion("0.11.13")
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
@@ -191,7 +191,7 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 }
 
 func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
-	v, err := version.NewVersion("0.11.11")
+	v, err := version.NewVersion("0.11.13")
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
@@ -209,7 +209,7 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 }
 
 func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
-	v, err := version.NewVersion("0.11.11")
+	v, err := version.NewVersion("0.11.13")
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
@@ -228,7 +228,7 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 }
 
 func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
-	v, err := version.NewVersion("0.11.11")
+	v, err := version.NewVersion("0.11.13")
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	defer cleanup()

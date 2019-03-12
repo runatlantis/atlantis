@@ -259,7 +259,7 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 	Ok(t, err)
 	Equals(t, "yes\n", tfExec.PassedInput)
 	Equals(t, `
-2019/02/27 21:47:36 [DEBUG] Using modified User-Agent: Terraform/0.11.11 TFE/d161c1b
+2019/02/27 21:47:36 [DEBUG] Using modified User-Agent: Terraform/0.11.13 TFE/d161c1b
 null_resource.dir2[1]: Destroying... (ID: 8554368366766418126)
 null_resource.dir2[1]: Destruction complete after 0s
 
@@ -415,11 +415,11 @@ https://app.terraform.io/app/lkysow-enterprises/atlantis-tfe-test-dir2/runs/run-
 
 Waiting for the plan to start...
 
-Terraform v0.11.11
+Terraform v0.11.13
 
 Configuring remote state backend...
 Initializing Terraform configuration...
-2019/02/27 21:50:44 [DEBUG] Using modified User-Agent: Terraform/0.11.11 TFE/d161c1b
+2019/02/27 21:50:44 [DEBUG] Using modified User-Agent: Terraform/0.11.13 TFE/d161c1b
 Refreshing Terraform state in-memory prior to plan...
 The refreshed state will be used to calculate this plan, but will not be
 persisted to local or remote state storage.
@@ -437,7 +437,7 @@ Do you want to perform these actions in workspace "atlantis-tfe-test-dir2"?
 
 var postConfirmOut = `
 
-2019/02/27 21:47:36 [DEBUG] Using modified User-Agent: Terraform/0.11.11 TFE/d161c1b
+2019/02/27 21:47:36 [DEBUG] Using modified User-Agent: Terraform/0.11.13 TFE/d161c1b
 null_resource.dir2[1]: Destroying... (ID: 8554368366766418126)
 null_resource.dir2[1]: Destruction complete after 0s
 

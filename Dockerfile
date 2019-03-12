@@ -3,7 +3,7 @@ FROM runatlantis/atlantis-base:v2.0
 LABEL authors="Anubhav Mishra, Luke Kysow"
 
 # install terraform binaries
-ENV DEFAULT_TERRAFORM_VERSION=0.11.11
+ENV DEFAULT_TERRAFORM_VERSION=0.11.13
 
 # In the official Atlantis image we only have the latest of each Terrafrom version.
 RUN AVAILABLE_TERRAFORM_VERSIONS="0.8.8 0.9.11 0.10.8 ${DEFAULT_TERRAFORM_VERSION}" && \
@@ -27,4 +27,3 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["server"]
-

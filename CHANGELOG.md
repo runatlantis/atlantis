@@ -94,7 +94,7 @@ Diff: https://github.com/runatlantis/atlantis/compare/v0.4.15...v0.5.0
   previously, if you had already run `atlantis plan` before `master` was updated,
   a new `atlantis plan` wouldn't pull the latest changes and would just use
   the cached version.
-  
+
   This is unlikely to cause any issues because most users already expected Atlantis
   to use the most up-to-date version of modules/plugins within the set constraints.
 
@@ -224,7 +224,7 @@ Diff: https://github.com/runatlantis/atlantis/compare/v0.4.12...v0.4.13
 * If users are setting the `name` key for their projects in `atlantis.yaml`, then
   include the project name in the comment output so it's easier to identify which
   plan/apply output is for which project. (Fixes [#353](https://github.com/runatlantis/atlantis/issues/353)))
-* Bump the Terraform version in the Docker image to `0.11.11`.
+* Bump the Terraform version in the Docker image to `0.11.13`.
 * Tweak logging to add timezone to the timestamp and make the output more readable. ([#402](https://github.com/runatlantis/atlantis/pull/402))
 * Warn users if running `atlantis apply -- -target=myresource` because `-target` can
   only be specified during `atlantis plan`. (Fixes [#399](https://github.com/runatlantis/atlantis/issues/399))
@@ -239,7 +239,7 @@ Diff: https://github.com/runatlantis/atlantis/compare/v0.4.12...v0.4.13
 
 ## Backwards Incompatibilities / Notes:
 * The version of Terraform installed in the `runatlantis/atlantis` Docker image
-  is now `0.11.11`. Previously it was `0.11.10`.
+  is now `0.11.13`. Previously it was `0.11.11`.
 * If you are a) using an `atlantis.yaml` file and b) defining Terraform workspaces
     and c) running plan and apply against workspaces that **were not** defined in the
     `atlantis.yaml` file, then this no longer works.

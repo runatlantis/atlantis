@@ -53,8 +53,8 @@ const terraformPluginCacheDirName = "plugin-cache"
 //     Terraform v0.12.0-alpha4 (2c36829d3265661d8edbd5014de8090ea7e2a076)
 //	   => 0.12.0-alpha4
 //
-//     Terraform v0.11.10
-//	   => 0.11.10
+//     Terraform v0.11.13
+//	   => 0.11.13
 var versionRegex = regexp.MustCompile("Terraform v(.*?)(\\s.*)?\n")
 
 func NewClient(dataDir string, tfeToken string) (*DefaultClient, error) {
