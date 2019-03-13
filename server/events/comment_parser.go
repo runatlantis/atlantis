@@ -16,15 +16,14 @@ package events
 import (
 	"fmt"
 	"github.com/flynn-archive/go-shlex"
+	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/yaml"
+	"github.com/spf13/pflag"
 	"io/ioutil"
 	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
-
-	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/yaml"
-	"github.com/spf13/pflag"
 )
 
 const (
@@ -104,10 +103,9 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		return CommentParseResult{Ignore: true}
 	}
 
-	args, err := shlex.Split(comment)
-	if err != nil {
-		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError parsing command: %s\n```", err)}
-	}
+	// We first use strings.Fields to parse and do an initial evaluation.
+	// Later we use a proper shell parser and re-parse.
+	args := strings.Fields(comment)
 	if len(args) < 1 {
 		return CommentParseResult{Ignore: true}
 	}
@@ -124,10 +122,17 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		vcsUser = e.GitlabUser
 	}
 	executableNames := []string{"run", atlantisExecutable, "@" + vcsUser}
-
-	// If the comment doesn't start with the name of our 'executable' then
-	// ignore it.
 	if !e.stringInSlice(args[0], executableNames) {
+		return CommentParseResult{Ignore: true}
+	}
+
+	// Now that we know Atlantis is being invoked, re-parse using a shell-style
+	// parser.
+	args, err := shlex.Split(comment)
+	if err != nil {
+		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError parsing command: %s\n```", err)}
+	}
+	if len(args) < 1 {
 		return CommentParseResult{Ignore: true}
 	}
 

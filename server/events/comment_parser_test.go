@@ -37,6 +37,7 @@ func TestParse_Ignored(t *testing.T) {
 		"abc",
 		"atlantis plan\nbut with newlines",
 		"terraform plan\nbut with newlines",
+		"This shouldn't error, but it does.",
 	}
 	for _, c := range ignoreComments {
 		r := commentParser.Parse(c, models.Github)
