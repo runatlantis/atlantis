@@ -24,10 +24,8 @@ import (
 )
 
 var commentParser = events.CommentParser{
-	GithubUser:  "github-user",
-	GithubToken: "github-token",
-	GitlabUser:  "gitlab-user",
-	GitlabToken: "gitlab-token",
+	GithubUser: "github-user",
+	GitlabUser: "gitlab-user",
 }
 
 func TestParse_Ignored(t *testing.T) {
@@ -640,6 +638,42 @@ func TestBuildPlanApplyComment(t *testing.T) {
 					Equals(t, fmt.Sprintf("atlantis apply %s", c.expApplyFlags), actComment)
 				}
 			}
+		})
+	}
+}
+
+func TestParse_VCSUsername(t *testing.T) {
+	cp := events.CommentParser{
+		GithubUser:    "gh",
+		GitlabUser:    "gl",
+		BitbucketUser: "bb",
+	}
+	cases := []struct {
+		vcs  models.VCSHostType
+		user string
+	}{
+		{
+			vcs:  models.Github,
+			user: "gh",
+		},
+		{
+			vcs:  models.Gitlab,
+			user: "gl",
+		},
+		{
+			vcs:  models.BitbucketServer,
+			user: "bb",
+		},
+		{
+			vcs:  models.BitbucketCloud,
+			user: "bb",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.vcs.String(), func(t *testing.T) {
+			r := cp.Parse(fmt.Sprintf("@%s %s", c.user, "help"), c.vcs)
+			Equals(t, events.HelpComment, r.CommentResponse)
 		})
 	}
 }

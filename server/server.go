@@ -217,10 +217,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		BitbucketServerURL: userConfig.BitbucketBaseURL,
 	}
 	commentParser := &events.CommentParser{
-		GithubUser:  userConfig.GithubUser,
-		GithubToken: userConfig.GithubToken,
-		GitlabUser:  userConfig.GitlabUser,
-		GitlabToken: userConfig.GitlabToken,
+		GithubUser:    userConfig.GithubUser,
+		GitlabUser:    userConfig.GitlabUser,
+		BitbucketUser: userConfig.BitbucketUser,
 	}
 	defaultTfVersion := terraformClient.Version()
 	pendingPlanFinder := &events.DefaultPendingPlanFinder{}
