@@ -16,9 +16,16 @@ type MockEventParsing struct {
 	fail func(message string, callerSkip ...int)
 }
 
-func NewMockEventParsing() *MockEventParsing {
-	return &MockEventParsing{fail: pegomock.GlobalFailHandler}
+func NewMockEventParsing(options ...pegomock.Option) *MockEventParsing {
+	mock := &MockEventParsing{}
+	for _, option := range options {
+		option.Apply(mock)
+	}
+	return mock
 }
+
+func (mock *MockEventParsing) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
+func (mock *MockEventParsing) FailHandler() pegomock.FailHandler      { return mock.fail }
 
 func (mock *MockEventParsing) ParseGithubIssueCommentEvent(comment *github.IssueCommentEvent) (models.Repo, models.User, int, error) {
 	if mock == nil {

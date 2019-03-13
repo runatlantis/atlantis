@@ -4,8 +4,8 @@
 package mocks
 
 import (
-	"github.com/petergtz/pegomock"
-	"github.com/runatlantis/atlantis/server/events/models"
+	pegomock "github.com/petergtz/pegomock"
+	models "github.com/runatlantis/atlantis/server/events/models"
 	"reflect"
 	"time"
 )
@@ -14,9 +14,16 @@ type MockProjectCommandRunner struct {
 	fail func(message string, callerSkip ...int)
 }
 
-func NewMockProjectCommandRunner() *MockProjectCommandRunner {
-	return &MockProjectCommandRunner{fail: pegomock.GlobalFailHandler}
+func NewMockProjectCommandRunner(options ...pegomock.Option) *MockProjectCommandRunner {
+	mock := &MockProjectCommandRunner{}
+	for _, option := range options {
+		option.Apply(mock)
+	}
+	return mock
 }
+
+func (mock *MockProjectCommandRunner) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
+func (mock *MockProjectCommandRunner) FailHandler() pegomock.FailHandler      { return mock.fail }
 
 func (mock *MockProjectCommandRunner) Plan(ctx models.ProjectCommandContext) models.ProjectResult {
 	if mock == nil {

@@ -24,6 +24,9 @@
   go-tests = true
   unused-packages = true
 
+[[constraint]]
+  name = "github.com/petergtz/pegomock"
+  version = "v2.1.0"
 
 [[constraint]]
   name = "github.com/boltdb/bolt"

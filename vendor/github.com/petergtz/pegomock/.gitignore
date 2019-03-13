@@ -5,3 +5,5 @@ debug.test
 *.coverprofile
 .idea
 *.iml
+dist
+pegomock/pegomock

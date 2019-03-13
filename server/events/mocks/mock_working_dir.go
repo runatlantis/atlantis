@@ -15,9 +15,16 @@ type MockWorkingDir struct {
 	fail func(message string, callerSkip ...int)
 }
 
-func NewMockWorkingDir() *MockWorkingDir {
-	return &MockWorkingDir{fail: pegomock.GlobalFailHandler}
+func NewMockWorkingDir(options ...pegomock.Option) *MockWorkingDir {
+	mock := &MockWorkingDir{}
+	for _, option := range options {
+		option.Apply(mock)
+	}
+	return mock
 }
+
+func (mock *MockWorkingDir) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
+func (mock *MockWorkingDir) FailHandler() pegomock.FailHandler      { return mock.fail }
 
 func (mock *MockWorkingDir) Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, workspace string) (string, error) {
 	if mock == nil {

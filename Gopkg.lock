@@ -467,15 +467,15 @@
   version = "v1.0.0"
 
 [[projects]]
-  branch = "master"
-  digest = "1:ef8f9b6070787c300b6eaedfa8f4ca9fc3ab7970db7265301e69240619465629"
+  digest = "1:93dfae430ab8f6570399b3b21390cc35d9663c6f859540ad685042ecb39e0a63"
   name = "github.com/petergtz/pegomock"
   packages = [
     ".",
     "internal/verify",
   ]
   pruneopts = "UT"
-  revision = "b113d17a7e81ba2aa33486b49f7477a9de919cbb"
+  revision = "cab79a9916fbfa874d47beb4ca9c1b3bb9a8e0cb"
+  version = "v2.1.0"
 
 [[projects]]
   digest = "1:40e195917a951a8bf867cd05de2a46aaf1806c50cf92eebf4c16f78cd196f747"

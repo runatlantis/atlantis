@@ -14,9 +14,16 @@ type MockPullCleaner struct {
 	fail func(message string, callerSkip ...int)
 }
 
-func NewMockPullCleaner() *MockPullCleaner {
-	return &MockPullCleaner{fail: pegomock.GlobalFailHandler}
+func NewMockPullCleaner(options ...pegomock.Option) *MockPullCleaner {
+	mock := &MockPullCleaner{}
+	for _, option := range options {
+		option.Apply(mock)
+	}
+	return mock
 }
+
+func (mock *MockPullCleaner) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
+func (mock *MockPullCleaner) FailHandler() pegomock.FailHandler      { return mock.fail }
 
 func (mock *MockPullCleaner) CleanUpPull(repo models.Repo, pull models.PullRequest) error {
 	if mock == nil {

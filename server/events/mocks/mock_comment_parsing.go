@@ -15,9 +15,16 @@ type MockCommentParsing struct {
 	fail func(message string, callerSkip ...int)
 }
 
-func NewMockCommentParsing() *MockCommentParsing {
-	return &MockCommentParsing{fail: pegomock.GlobalFailHandler}
+func NewMockCommentParsing(options ...pegomock.Option) *MockCommentParsing {
+	mock := &MockCommentParsing{}
+	for _, option := range options {
+		option.Apply(mock)
+	}
+	return mock
 }
+
+func (mock *MockCommentParsing) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
+func (mock *MockCommentParsing) FailHandler() pegomock.FailHandler      { return mock.fail }
 
 func (mock *MockCommentParsing) Parse(comment string, vcsHost models.VCSHostType) events.CommentParseResult {
 	if mock == nil {

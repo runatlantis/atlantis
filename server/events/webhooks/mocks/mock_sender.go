@@ -15,9 +15,16 @@ type MockSender struct {
 	fail func(message string, callerSkip ...int)
 }
 
-func NewMockSender() *MockSender {
-	return &MockSender{fail: pegomock.GlobalFailHandler}
+func NewMockSender(options ...pegomock.Option) *MockSender {
+	mock := &MockSender{}
+	for _, option := range options {
+		option.Apply(mock)
+	}
+	return mock
 }
+
+func (mock *MockSender) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
+func (mock *MockSender) FailHandler() pegomock.FailHandler      { return mock.fail }
 
 func (mock *MockSender) Send(log *logging.SimpleLogger, applyResult webhooks.ApplyResult) error {
 	if mock == nil {

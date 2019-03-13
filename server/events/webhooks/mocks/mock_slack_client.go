@@ -14,9 +14,16 @@ type MockSlackClient struct {
 	fail func(message string, callerSkip ...int)
 }
 
-func NewMockSlackClient() *MockSlackClient {
-	return &MockSlackClient{fail: pegomock.GlobalFailHandler}
+func NewMockSlackClient(options ...pegomock.Option) *MockSlackClient {
+	mock := &MockSlackClient{}
+	for _, option := range options {
+		option.Apply(mock)
+	}
+	return mock
 }
+
+func (mock *MockSlackClient) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
+func (mock *MockSlackClient) FailHandler() pegomock.FailHandler      { return mock.fail }
 
 func (mock *MockSlackClient) AuthTest() error {
 	if mock == nil {

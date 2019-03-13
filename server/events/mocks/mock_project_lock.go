@@ -16,9 +16,16 @@ type MockProjectLocker struct {
 	fail func(message string, callerSkip ...int)
 }
 
-func NewMockProjectLocker() *MockProjectLocker {
-	return &MockProjectLocker{fail: pegomock.GlobalFailHandler}
+func NewMockProjectLocker(options ...pegomock.Option) *MockProjectLocker {
+	mock := &MockProjectLocker{}
+	for _, option := range options {
+		option.Apply(mock)
+	}
+	return mock
 }
+
+func (mock *MockProjectLocker) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
+func (mock *MockProjectLocker) FailHandler() pegomock.FailHandler      { return mock.fail }
 
 func (mock *MockProjectLocker) TryLock(log *logging.SimpleLogger, pull models.PullRequest, user models.User, workspace string, project models.Project) (*events.TryLockResponse, error) {
 	if mock == nil {

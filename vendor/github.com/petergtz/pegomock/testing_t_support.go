@@ -31,7 +31,7 @@ type testingT interface {
 	Errorf(format string, args ...interface{})
 }
 
-func BuildTestingTGomegaFailHandler(t testingT) FailHandler {
+func BuildTestingTFailHandler(t testingT) FailHandler {
 	return func(message string, callerSkip ...int) {
 		skip := 1
 		if len(callerSkip) > 0 {
@@ -56,4 +56,8 @@ func pruneStack(fullStackTrace string, skip int) string {
 		}
 	}
 	return strings.Join(prunedStack, "\n")
+}
+
+func WithT(t testingT) Option {
+	return WithFailHandler(BuildTestingTFailHandler(t))
 }

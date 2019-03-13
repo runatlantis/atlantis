@@ -14,9 +14,16 @@ type MockStepRunner struct {
 	fail func(message string, callerSkip ...int)
 }
 
-func NewMockStepRunner() *MockStepRunner {
-	return &MockStepRunner{fail: pegomock.GlobalFailHandler}
+func NewMockStepRunner(options ...pegomock.Option) *MockStepRunner {
+	mock := &MockStepRunner{}
+	for _, option := range options {
+		option.Apply(mock)
+	}
+	return mock
 }
+
+func (mock *MockStepRunner) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
+func (mock *MockStepRunner) FailHandler() pegomock.FailHandler      { return mock.fail }
 
 func (mock *MockStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string) (string, error) {
 	if mock == nil {

@@ -14,9 +14,16 @@ type MockGithubRequestValidator struct {
 	fail func(message string, callerSkip ...int)
 }
 
-func NewMockGithubRequestValidator() *MockGithubRequestValidator {
-	return &MockGithubRequestValidator{fail: pegomock.GlobalFailHandler}
+func NewMockGithubRequestValidator(options ...pegomock.Option) *MockGithubRequestValidator {
+	mock := &MockGithubRequestValidator{}
+	for _, option := range options {
+		option.Apply(mock)
+	}
+	return mock
 }
+
+func (mock *MockGithubRequestValidator) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
+func (mock *MockGithubRequestValidator) FailHandler() pegomock.FailHandler      { return mock.fail }
 
 func (mock *MockGithubRequestValidator) Validate(r *http.Request, secret []byte) ([]byte, error) {
 	if mock == nil {

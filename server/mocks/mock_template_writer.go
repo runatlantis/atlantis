@@ -14,9 +14,16 @@ type MockTemplateWriter struct {
 	fail func(message string, callerSkip ...int)
 }
 
-func NewMockTemplateWriter() *MockTemplateWriter {
-	return &MockTemplateWriter{fail: pegomock.GlobalFailHandler}
+func NewMockTemplateWriter(options ...pegomock.Option) *MockTemplateWriter {
+	mock := &MockTemplateWriter{}
+	for _, option := range options {
+		option.Apply(mock)
+	}
+	return mock
 }
+
+func (mock *MockTemplateWriter) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
+func (mock *MockTemplateWriter) FailHandler() pegomock.FailHandler      { return mock.fail }
 
 func (mock *MockTemplateWriter) Execute(wr io.Writer, data interface{}) error {
 	if mock == nil {

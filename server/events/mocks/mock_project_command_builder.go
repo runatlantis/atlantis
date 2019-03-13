@@ -15,9 +15,16 @@ type MockProjectCommandBuilder struct {
 	fail func(message string, callerSkip ...int)
 }
 
-func NewMockProjectCommandBuilder() *MockProjectCommandBuilder {
-	return &MockProjectCommandBuilder{fail: pegomock.GlobalFailHandler}
+func NewMockProjectCommandBuilder(options ...pegomock.Option) *MockProjectCommandBuilder {
+	mock := &MockProjectCommandBuilder{}
+	for _, option := range options {
+		option.Apply(mock)
+	}
+	return mock
 }
+
+func (mock *MockProjectCommandBuilder) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
+func (mock *MockProjectCommandBuilder) FailHandler() pegomock.FailHandler      { return mock.fail }
 
 func (mock *MockProjectCommandBuilder) BuildAutoplanCommands(ctx *events.CommandContext) ([]models.ProjectCommandContext, error) {
 	if mock == nil {

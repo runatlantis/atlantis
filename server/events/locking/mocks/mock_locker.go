@@ -15,9 +15,16 @@ type MockLocker struct {
 	fail func(message string, callerSkip ...int)
 }
 
-func NewMockLocker() *MockLocker {
-	return &MockLocker{fail: pegomock.GlobalFailHandler}
+func NewMockLocker(options ...pegomock.Option) *MockLocker {
+	mock := &MockLocker{}
+	for _, option := range options {
+		option.Apply(mock)
+	}
+	return mock
 }
+
+func (mock *MockLocker) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
+func (mock *MockLocker) FailHandler() pegomock.FailHandler      { return mock.fail }
 
 func (mock *MockLocker) TryLock(p models.Project, workspace string, pull models.PullRequest, user models.User) (locking.TryLockResponse, error) {
 	if mock == nil {

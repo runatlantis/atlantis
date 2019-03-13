@@ -14,9 +14,16 @@ type MockGitlabMergeRequestGetter struct {
 	fail func(message string, callerSkip ...int)
 }
 
-func NewMockGitlabMergeRequestGetter() *MockGitlabMergeRequestGetter {
-	return &MockGitlabMergeRequestGetter{fail: pegomock.GlobalFailHandler}
+func NewMockGitlabMergeRequestGetter(options ...pegomock.Option) *MockGitlabMergeRequestGetter {
+	mock := &MockGitlabMergeRequestGetter{}
+	for _, option := range options {
+		option.Apply(mock)
+	}
+	return mock
 }
+
+func (mock *MockGitlabMergeRequestGetter) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
+func (mock *MockGitlabMergeRequestGetter) FailHandler() pegomock.FailHandler      { return mock.fail }
 
 func (mock *MockGitlabMergeRequestGetter) GetMergeRequest(repoFullName string, pullNum int) (*go_gitlab.MergeRequest, error) {
 	if mock == nil {
