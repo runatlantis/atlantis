@@ -14,9 +14,16 @@ type MockBackend struct {
 	fail func(message string, callerSkip ...int)
 }
 
-func NewMockBackend() *MockBackend {
-	return &MockBackend{fail: pegomock.GlobalFailHandler}
+func NewMockBackend(options ...pegomock.Option) *MockBackend {
+	mock := &MockBackend{}
+	for _, option := range options {
+		option.Apply(mock)
+	}
+	return mock
 }
+
+func (mock *MockBackend) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
+func (mock *MockBackend) FailHandler() pegomock.FailHandler      { return mock.fail }
 
 func (mock *MockBackend) TryLock(lock models.ProjectLock) (bool, models.ProjectLock, error) {
 	if mock == nil {

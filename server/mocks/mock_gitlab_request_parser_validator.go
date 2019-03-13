@@ -14,9 +14,16 @@ type MockGitlabRequestParserValidator struct {
 	fail func(message string, callerSkip ...int)
 }
 
-func NewMockGitlabRequestParserValidator() *MockGitlabRequestParserValidator {
-	return &MockGitlabRequestParserValidator{fail: pegomock.GlobalFailHandler}
+func NewMockGitlabRequestParserValidator(options ...pegomock.Option) *MockGitlabRequestParserValidator {
+	mock := &MockGitlabRequestParserValidator{}
+	for _, option := range options {
+		option.Apply(mock)
+	}
+	return mock
 }
+
+func (mock *MockGitlabRequestParserValidator) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
+func (mock *MockGitlabRequestParserValidator) FailHandler() pegomock.FailHandler      { return mock.fail }
 
 func (mock *MockGitlabRequestParserValidator) ParseAndValidate(r *http.Request, secret []byte) (interface{}, error) {
 	if mock == nil {

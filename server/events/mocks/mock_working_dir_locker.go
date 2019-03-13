@@ -13,9 +13,16 @@ type MockWorkingDirLocker struct {
 	fail func(message string, callerSkip ...int)
 }
 
-func NewMockWorkingDirLocker() *MockWorkingDirLocker {
-	return &MockWorkingDirLocker{fail: pegomock.GlobalFailHandler}
+func NewMockWorkingDirLocker(options ...pegomock.Option) *MockWorkingDirLocker {
+	mock := &MockWorkingDirLocker{}
+	for _, option := range options {
+		option.Apply(mock)
+	}
+	return mock
 }
+
+func (mock *MockWorkingDirLocker) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
+func (mock *MockWorkingDirLocker) FailHandler() pegomock.FailHandler      { return mock.fail }
 
 func (mock *MockWorkingDirLocker) TryLock(repoFullName string, pullNum int, workspace string) (func(), error) {
 	if mock == nil {

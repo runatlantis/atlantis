@@ -33,7 +33,7 @@ func RegisterMockFailHandler(handler FailHandler) {
 	GlobalFailHandler = handler
 }
 func RegisterMockTestingT(t *testing.T) {
-	RegisterMockFailHandler(BuildTestingTGomegaFailHandler(t))
+	RegisterMockFailHandler(BuildTestingTFailHandler(t))
 }
 
 var (
@@ -57,6 +57,7 @@ type invocation struct {
 type GenericMock struct {
 	sync.Mutex
 	mockedMethods map[string]*mockedMethod
+	fail          FailHandler
 }
 
 func (genericMock *GenericMock) Invoke(methodName string, params []Param, returnTypes []reflect.Type) ReturnValues {
@@ -103,8 +104,12 @@ func (genericMock *GenericMock) Verify(
 	if len(options) == 1 {
 		timeout = options[0].(time.Duration)
 	}
-	if GlobalFailHandler == nil {
-		panic("No GlobalFailHandler set. Please use either RegisterMockFailHandler or RegisterMockTestingT to set a fail handler.")
+	if genericMock.fail == nil && GlobalFailHandler == nil {
+		panic("No FailHandler set. Please use either RegisterMockFailHandler or RegisterMockTestingT or TODO to set a fail handler.")
+	}
+	fail := GlobalFailHandler
+	if genericMock.fail != nil {
+		fail = genericMock.fail
 	}
 	defer func() { globalArgMatchers = nil }() // We don't want a panic somewhere during verification screw our global argMatchers
 
@@ -124,7 +129,7 @@ func (genericMock *GenericMock) Verify(
 					// if time.Since(startTime) < timeout {
 					// 	continue timeoutLoop
 					// }
-					GlobalFailHandler(fmt.Sprintf("Expected function call %v(%v) before function call %v(%v)",
+					fail(fmt.Sprintf("Expected function call %v(%v) before function call %v(%v)",
 						methodName, formatParams(params), inOrderContext.lastInvokedMethodName, formatParams(inOrderContext.lastInvokedMethodParams)))
 				}
 				inOrderContext.invocationCounter = methodInvocation.orderingInvocationNumber
@@ -145,7 +150,7 @@ func (genericMock *GenericMock) Verify(
 			if timeout > 0 {
 				timeoutInfo = fmt.Sprintf(" after timeout of %v", timeout)
 			}
-			GlobalFailHandler(fmt.Sprintf(
+			fail(fmt.Sprintf(
 				"Mock invocation count for %v(%v) does not match expectation%v.\n\n\t%v\n\n\t%v",
 				methodName, paramsOrMatchers, timeoutInfo, invocationCountMatcher.FailureMessage(), formatInteractions(genericMock.allInteractions())))
 		}
@@ -468,7 +473,10 @@ func GetGenericMockFrom(mock Mock) *GenericMock {
 	genericMocksMutex.Lock()
 	defer genericMocksMutex.Unlock()
 	if genericMocks[mock] == nil {
-		genericMocks[mock] = &GenericMock{mockedMethods: make(map[string]*mockedMethod)}
+		genericMocks[mock] = &GenericMock{
+			mockedMethods: make(map[string]*mockedMethod),
+			fail:          mock.FailHandler(),
+		}
 	}
 	return genericMocks[mock]
 }

@@ -14,9 +14,16 @@ type MockPendingPlanFinder struct {
 	fail func(message string, callerSkip ...int)
 }
 
-func NewMockPendingPlanFinder() *MockPendingPlanFinder {
-	return &MockPendingPlanFinder{fail: pegomock.GlobalFailHandler}
+func NewMockPendingPlanFinder(options ...pegomock.Option) *MockPendingPlanFinder {
+	mock := &MockPendingPlanFinder{}
+	for _, option := range options {
+		option.Apply(mock)
+	}
+	return mock
 }
+
+func (mock *MockPendingPlanFinder) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
+func (mock *MockPendingPlanFinder) FailHandler() pegomock.FailHandler      { return mock.fail }
 
 func (mock *MockPendingPlanFinder) Find(pullDir string) ([]events.PendingPlan, error) {
 	if mock == nil {

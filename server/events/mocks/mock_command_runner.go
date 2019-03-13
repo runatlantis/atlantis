@@ -15,9 +15,16 @@ type MockCommandRunner struct {
 	fail func(message string, callerSkip ...int)
 }
 
-func NewMockCommandRunner() *MockCommandRunner {
-	return &MockCommandRunner{fail: pegomock.GlobalFailHandler}
+func NewMockCommandRunner(options ...pegomock.Option) *MockCommandRunner {
+	mock := &MockCommandRunner{}
+	for _, option := range options {
+		option.Apply(mock)
+	}
+	return mock
 }
+
+func (mock *MockCommandRunner) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
+func (mock *MockCommandRunner) FailHandler() pegomock.FailHandler      { return mock.fail }
 
 func (mock *MockCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *events.CommentCommand) {
 	if mock == nil {

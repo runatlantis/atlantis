@@ -15,9 +15,16 @@ type MockGithubPullGetter struct {
 	fail func(message string, callerSkip ...int)
 }
 
-func NewMockGithubPullGetter() *MockGithubPullGetter {
-	return &MockGithubPullGetter{fail: pegomock.GlobalFailHandler}
+func NewMockGithubPullGetter(options ...pegomock.Option) *MockGithubPullGetter {
+	mock := &MockGithubPullGetter{}
+	for _, option := range options {
+		option.Apply(mock)
+	}
+	return mock
 }
+
+func (mock *MockGithubPullGetter) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
+func (mock *MockGithubPullGetter) FailHandler() pegomock.FailHandler      { return mock.fail }
 
 func (mock *MockGithubPullGetter) GetPullRequest(repo models.Repo, pullNum int) (*github.PullRequest, error) {
 	if mock == nil {

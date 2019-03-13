@@ -19,26 +19,36 @@ Getting Started
 Using Pegomock with Golang’s XUnit-style Tests
 ----------------------------------------------
 
-Use it like this:
+The preferred way is:
 
 ```go
-
 import (
 	"github.com/petergtz/pegomock"
 	"testing"
 )
 
 func TestUsingMocks(t *testing.T) {
-	pegomock.RegisterMockTestingT(t)
+	mock := NewMockPhoneBook(pegomock.WithT(t))
 
-	// use Pegomock here
+	// use your mock here
 }
 ```
 
-There are two caveats:
 
--	You must register the `t *testing.T` passed to your test with Pegomock before you make any verifications associated with that test. So every `Test...` function in your suite should have the `RegisterTestingT(t)` line.
--	Pegomock uses a global (singleton) fail handler. This has the benefit that you don’t need to pass the fail handler down to each test, but does mean that you cannot run your XUnit style tests in parallel with Pegomock.
+Alternatively, you can set a global fail handler within your test:
+
+```go
+func TestUsingMocks(t *testing.T) {
+	pegomock.RegisterMockTestingT(t)
+
+	mock := NewMockPhoneBook()
+
+	// use your mock here
+}
+```
+**Note:** In this case, Pegomock uses a global (singleton) fail handler. This has the benefit that you don’t need to pass the fail handler down to each test, but does mean that you cannot run your XUnit style tests in parallel with Pegomock.
+
+If you configure both a global fail handler and a specific one for your mock, the specific one overrides the global fail handler.
 
 Using Pegomock with Ginkgo
 --------------------------
@@ -199,6 +209,7 @@ phoneBook.VerifyWasCalledOnce().GetPhoneNumber("Tom")
 
 -	By default, for all methods that return a value, a mock will return zero values.
 -	Once stubbed, the method will always return a stubbed value, regardless of how many times it is called.
+- `ThenReturn` supports chaining, i.e. `ThenReturn(...).ThenReturn(...)` etc. The mock will return the values in the same order the chaining was done. The values from the last `ThenReturn` will be returned indefinitely when the number of call exceeds the `ThenReturn`s.
 
 Stubbing Functions That Have no Return Value
 --------------------------------------------
@@ -364,6 +375,20 @@ texts := display.VerifyWasCalled(AtLeast(1)).Show(AnyString()).GetAllCapturedArg
 Expect(texts).To(ConsistOf("Hello", "Hello, again", "And again"))
 ```
 
+Verifying with Asynchronous Mock Invocations
+--------------------------------------------
+
+When the code exercising the mock is run as part of a Goroutine, it's necessary to verify in a polling fashion until a timeout kicks in. `VerifyWasCalledEventually` can help here:
+```go
+display := NewMockDisplay()
+
+go func() {
+	doSomething()
+	display.Show("Hello")
+}()
+
+display.VerifyWasCalledEventually(Once(), 2*time.Second).Show("Hello")
+```
 
 
 The Pegomock CLI

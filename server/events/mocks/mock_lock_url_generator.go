@@ -13,9 +13,16 @@ type MockLockURLGenerator struct {
 	fail func(message string, callerSkip ...int)
 }
 
-func NewMockLockURLGenerator() *MockLockURLGenerator {
-	return &MockLockURLGenerator{fail: pegomock.GlobalFailHandler}
+func NewMockLockURLGenerator(options ...pegomock.Option) *MockLockURLGenerator {
+	mock := &MockLockURLGenerator{}
+	for _, option := range options {
+		option.Apply(mock)
+	}
+	return mock
 }
+
+func (mock *MockLockURLGenerator) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
+func (mock *MockLockURLGenerator) FailHandler() pegomock.FailHandler      { return mock.fail }
 
 func (mock *MockLockURLGenerator) GenerateLockURL(lockID string) string {
 	if mock == nil {

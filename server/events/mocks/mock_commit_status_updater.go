@@ -14,9 +14,16 @@ type MockCommitStatusUpdater struct {
 	fail func(message string, callerSkip ...int)
 }
 
-func NewMockCommitStatusUpdater() *MockCommitStatusUpdater {
-	return &MockCommitStatusUpdater{fail: pegomock.GlobalFailHandler}
+func NewMockCommitStatusUpdater(options ...pegomock.Option) *MockCommitStatusUpdater {
+	mock := &MockCommitStatusUpdater{}
+	for _, option := range options {
+		option.Apply(mock)
+	}
+	return mock
 }
+
+func (mock *MockCommitStatusUpdater) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
+func (mock *MockCommitStatusUpdater) FailHandler() pegomock.FailHandler      { return mock.fail }
 
 func (mock *MockCommitStatusUpdater) UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName) error {
 	if mock == nil {

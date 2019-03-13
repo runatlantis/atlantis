@@ -14,9 +14,16 @@ type MockPullApprovedChecker struct {
 	fail func(message string, callerSkip ...int)
 }
 
-func NewMockPullApprovedChecker() *MockPullApprovedChecker {
-	return &MockPullApprovedChecker{fail: pegomock.GlobalFailHandler}
+func NewMockPullApprovedChecker(options ...pegomock.Option) *MockPullApprovedChecker {
+	mock := &MockPullApprovedChecker{}
+	for _, option := range options {
+		option.Apply(mock)
+	}
+	return mock
 }
+
+func (mock *MockPullApprovedChecker) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
+func (mock *MockPullApprovedChecker) FailHandler() pegomock.FailHandler      { return mock.fail }
 
 func (mock *MockPullApprovedChecker) PullIsApproved(baseRepo models.Repo, pull models.PullRequest) (bool, error) {
 	if mock == nil {

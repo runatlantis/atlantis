@@ -14,9 +14,16 @@ type MockClient struct {
 	fail func(message string, callerSkip ...int)
 }
 
-func NewMockClient() *MockClient {
-	return &MockClient{fail: pegomock.GlobalFailHandler}
+func NewMockClient(options ...pegomock.Option) *MockClient {
+	mock := &MockClient{}
+	for _, option := range options {
+		option.Apply(mock)
+	}
+	return mock
 }
+
+func (mock *MockClient) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
+func (mock *MockClient) FailHandler() pegomock.FailHandler      { return mock.fail }
 
 func (mock *MockClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	if mock == nil {

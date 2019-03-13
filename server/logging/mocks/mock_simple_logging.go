@@ -15,9 +15,16 @@ type MockSimpleLogging struct {
 	fail func(message string, callerSkip ...int)
 }
 
-func NewMockSimpleLogging() *MockSimpleLogging {
-	return &MockSimpleLogging{fail: pegomock.GlobalFailHandler}
+func NewMockSimpleLogging(options ...pegomock.Option) *MockSimpleLogging {
+	mock := &MockSimpleLogging{}
+	for _, option := range options {
+		option.Apply(mock)
+	}
+	return mock
 }
+
+func (mock *MockSimpleLogging) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
+func (mock *MockSimpleLogging) FailHandler() pegomock.FailHandler      { return mock.fail }
 
 func (mock *MockSimpleLogging) Debug(format string, a ...interface{}) {
 	if mock == nil {
