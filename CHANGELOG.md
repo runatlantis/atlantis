@@ -1,3 +1,33 @@
+# v0.5.1
+
+## Description
+This is a bugfix release to fix a bug where Atlantis was replying to comments
+that weren't directed to it.
+
+Diff: https://github.com/runatlantis/atlantis/compare/v0.5.0...v0.5.1
+
+## Features
+* On Bitbucket Cloud and Server, Atlantis now responds if it's invoked with the
+  username it's running under, ex. @my-bb-atlantis-user. This is the same
+  functionality as GitHub and GitLab. ([#534](https://github.com/runatlantis/atlantis/pull/534))
+
+## Bugfixes
+* Atlantis ignore comments that aren't addressed to it. (Fixes [#533](https://github.com/runatlantis/atlantis/issues/533))
+
+## Backwards Incompatibilities / Notes:
+* On Bitbucket Cloud and Server, Atlantis now responds if it's invoked with the
+  username it's running under, ex. @my-bb-atlantis-user. This is the same
+  functionality as GitHub and GitLab.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.5.1/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.5.1/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.5.1/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.5.1/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.5.1`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
 # v0.5.0
 
 ## Description
