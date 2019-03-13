@@ -64,10 +64,9 @@ type CommentBuilder interface {
 
 // CommentParser implements CommentParsing
 type CommentParser struct {
-	GithubUser  string
-	GithubToken string
-	GitlabUser  string
-	GitlabToken string
+	GithubUser    string
+	GitlabUser    string
+	BitbucketUser string
 }
 
 // CommentParseResult describes the result of parsing a comment as a command.
@@ -117,9 +116,14 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 
 	// Atlantis can be invoked using the name of the VCS host user we're
 	// running under. Need to be able to match against that user.
-	vcsUser := e.GithubUser
-	if vcsHost == models.Gitlab {
+	var vcsUser string
+	switch vcsHost {
+	case models.Github:
+		vcsUser = e.GithubUser
+	case models.Gitlab:
 		vcsUser = e.GitlabUser
+	case models.BitbucketCloud, models.BitbucketServer:
+		vcsUser = e.BitbucketUser
 	}
 	executableNames := []string{"run", atlantisExecutable, "@" + vcsUser}
 	if !e.stringInSlice(args[0], executableNames) {

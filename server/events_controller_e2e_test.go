@@ -368,10 +368,8 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClient, *moc
 		GitlabToken: "gitlab-token",
 	}
 	commentParser := &events.CommentParser{
-		GithubUser:  "github-user",
-		GithubToken: "github-token",
-		GitlabUser:  "gitlab-user",
-		GitlabToken: "gitlab-token",
+		GithubUser: "github-user",
+		GitlabUser: "gitlab-user",
 	}
 	terraformClient, err := terraform.NewClient(dataDir, "")
 	Ok(t, err)
