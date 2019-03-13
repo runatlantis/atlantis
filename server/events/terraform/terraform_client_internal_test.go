@@ -161,8 +161,6 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 }
 
 func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
-	// todo: figure out why larger outputs cause everything to block.
-	t.Skip()
 	v, err := version.NewVersion("0.11.11")
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
