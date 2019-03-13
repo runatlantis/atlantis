@@ -14,9 +14,19 @@
 package terraform_test
 
 import (
+	"fmt"
+	"github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/cmd"
+	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/go-version"
+	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -38,4 +48,202 @@ func TestMustConstraint(t *testing.T) {
 	expectedConstraint, err := version.NewConstraint(">0.1")
 	Ok(t, err)
 	Equals(t, expectedConstraint.String(), c.String())
+}
+
+// Test that if terraform is in path and we're not setting the default-tf flag,
+// that we use that version as our default version.
+func TestNewClient_LocalTFOnly(t *testing.T) {
+	fakeBinOut := `Terraform v0.11.10
+
+Your version of Terraform is out of date! The latest version
+is 0.11.13. You can update by downloading from www.terraform.io/downloads.html
+`
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+
+	// We're testing this by adding our own "fake" terraform binary to path that
+	// outputs what would normally come from terraform version.
+	err := ioutil.WriteFile(filepath.Join(tmp, "terraform"), []byte(fmt.Sprintf("#!/bin/sh\necho '%s'", fakeBinOut)), 0755)
+	Ok(t, err)
+	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
+
+	c, err := terraform.NewClient(nil, tmp, "", "", cmd.DefaultTFVersionFlag, nil)
+	Ok(t, err)
+
+	Ok(t, err)
+	Equals(t, "0.11.10", c.Version().String())
+
+	output, err := c.RunCommandWithVersion(nil, tmp, nil, nil, "")
+	Ok(t, err)
+	Equals(t, fakeBinOut+"\n", output)
+}
+
+// Test that if terraform is in path and the default-tf flag is set to the
+// same version that we don't download anything.
+func TestNewClient_LocalTFMatchesFlag(t *testing.T) {
+	fakeBinOut := `Terraform v0.11.10
+
+Your version of Terraform is out of date! The latest version
+is 0.11.13. You can update by downloading from www.terraform.io/downloads.html
+`
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+
+	// We're testing this by adding our own "fake" terraform binary to path that
+	// outputs what would normally come from terraform version.
+	err := ioutil.WriteFile(filepath.Join(tmp, "terraform"), []byte(fmt.Sprintf("#!/bin/sh\necho '%s'", fakeBinOut)), 0755)
+	Ok(t, err)
+	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
+
+	c, err := terraform.NewClient(nil, tmp, "", "0.11.10", cmd.DefaultTFVersionFlag, nil)
+	Ok(t, err)
+
+	Ok(t, err)
+	Equals(t, "0.11.10", c.Version().String())
+
+	output, err := c.RunCommandWithVersion(nil, tmp, nil, nil, "")
+	Ok(t, err)
+	Equals(t, fakeBinOut+"\n", output)
+}
+
+// Test that if terraform is not in PATH and we didn't set the default-tf flag
+// that we error.
+func TestNewClient_NoTF(t *testing.T) {
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+
+	// Set PATH to only include our empty directory.
+	defer tempSetEnv(t, "PATH", tmp)()
+
+	_, err := terraform.NewClient(nil, tmp, "", "", cmd.DefaultTFVersionFlag, nil)
+	ErrEquals(t, "terraform not found in $PATH. Set --default-tf-version or download terraform from https://www.terraform.io/downloads.html", err)
+}
+
+// Test that if the default-tf flag is set and that binary is in our PATH
+// that we use it.
+func TestNewClient_DefaultTFFlagInPath(t *testing.T) {
+	fakeBinOut := "Terraform v0.11.10\n"
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+
+	// We're testing this by adding our own "fake" terraform binary to path that
+	// outputs what would normally come from terraform version.
+	err := ioutil.WriteFile(filepath.Join(tmp, "terraform0.11.10"), []byte(fmt.Sprintf("#!/bin/sh\necho '%s'", fakeBinOut)), 0755)
+	Ok(t, err)
+	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
+
+	c, err := terraform.NewClient(nil, tmp, "", "0.11.10", cmd.DefaultTFVersionFlag, nil)
+	Ok(t, err)
+
+	Ok(t, err)
+	Equals(t, "0.11.10", c.Version().String())
+
+	output, err := c.RunCommandWithVersion(nil, tmp, nil, nil, "")
+	Ok(t, err)
+	Equals(t, fakeBinOut+"\n", output)
+}
+
+// Test that if the default-tf flag is set and that binary is in our download
+// bin dir that we use it.
+func TestNewClient_DefaultTFFlagInBinDir(t *testing.T) {
+	fakeBinOut := "Terraform v0.11.10\n"
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+
+	// Add our fake binary to {datadir}/bin/terraform{version}.
+	Ok(t, os.Mkdir(filepath.Join(tmp, "bin"), 0700))
+	err := ioutil.WriteFile(filepath.Join(tmp, "bin", "terraform0.11.10"), []byte(fmt.Sprintf("#!/bin/sh\necho '%s'", fakeBinOut)), 0755)
+	Ok(t, err)
+	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
+
+	c, err := terraform.NewClient(nil, tmp, "", "0.11.10", cmd.DefaultTFVersionFlag, nil)
+	Ok(t, err)
+
+	Ok(t, err)
+	Equals(t, "0.11.10", c.Version().String())
+
+	output, err := c.RunCommandWithVersion(nil, tmp, nil, nil, "")
+	Ok(t, err)
+	Equals(t, fakeBinOut+"\n", output)
+}
+
+// Test that if we don't have that version of TF that we download it.
+func TestNewClient_DefaultTFFlagDownload(t *testing.T) {
+	RegisterMockTestingT(t)
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+
+	// Set PATH to empty so there's no TF available.
+	orig := os.Getenv("PATH")
+	defer tempSetEnv(t, "PATH", "")()
+
+	mockDownloader := mocks.NewMockDownloader()
+	When(mockDownloader.GetFile(AnyString(), AnyString())).Then(func(params []pegomock.Param) pegomock.ReturnValues {
+		err := ioutil.WriteFile(params[0].(string), []byte("#!/bin/sh\necho '\nTerraform v0.11.10\n'"), 0755)
+		return []pegomock.ReturnValue{err}
+	})
+	c, err := terraform.NewClient(nil, tmp, "", "0.11.10", cmd.DefaultTFVersionFlag, mockDownloader)
+	Ok(t, err)
+
+	Ok(t, err)
+	Equals(t, "0.11.10", c.Version().String())
+	baseURL := "https://releases.hashicorp.com/terraform/0.11.10"
+	expURL := fmt.Sprintf("%s/terraform_0.11.10_%s_%s.zip?checksum=file:%s/terraform_0.11.10_SHA256SUMS",
+		baseURL,
+		runtime.GOOS,
+		runtime.GOARCH,
+		baseURL)
+	mockDownloader.VerifyWasCalledEventually(Once(), 2*time.Second).GetFile(filepath.Join(tmp, "bin", "terraform0.11.10"), expURL)
+
+	// Reset PATH so that it has sh.
+	Ok(t, os.Setenv("PATH", orig))
+	output, err := c.RunCommandWithVersion(nil, tmp, nil, nil, "")
+	Ok(t, err)
+	Equals(t, "\nTerraform v0.11.10\n\n", output)
+}
+
+// Test that we get an error if the terraform version flag is malformed.
+func TestNewClient_BadVersion(t *testing.T) {
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	_, err := terraform.NewClient(nil, tmp, "", "malformed", cmd.DefaultTFVersionFlag, nil)
+	ErrEquals(t, "Malformed version: malformed", err)
+}
+
+// Test that if we run a command with a version we don't have, we download it.
+func TestRunCommandWithVersion_DLsTF(t *testing.T) {
+	RegisterMockTestingT(t)
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+
+	mockDownloader := mocks.NewMockDownloader()
+	// Set up our mock downloader to write a fake tf binary when it's called.
+	baseURL := "https://releases.hashicorp.com/terraform/0.12.0"
+	expURL := fmt.Sprintf("%s/terraform_0.12.0_%s_%s.zip?checksum=file:%s/terraform_0.12.0_SHA256SUMS",
+		baseURL,
+		runtime.GOOS,
+		runtime.GOARCH,
+		baseURL)
+	When(mockDownloader.GetFile(filepath.Join(tmp, "bin", "terraform0.12.0"), expURL)).Then(func(params []pegomock.Param) pegomock.ReturnValues {
+		err := ioutil.WriteFile(params[0].(string), []byte("#!/bin/sh\necho '\nTerraform v0.12.0\n'"), 0755)
+		return []pegomock.ReturnValue{err}
+	})
+
+	c, err := terraform.NewClient(nil, tmp, "", "0.11.10", cmd.DefaultTFVersionFlag, mockDownloader)
+	Ok(t, err)
+	Equals(t, "0.11.10", c.Version().String())
+
+	v, err := version.NewVersion("0.12.0")
+	Ok(t, err)
+	output, err := c.RunCommandWithVersion(nil, tmp, nil, v, "")
+	Assert(t, err == nil, "err: %s: %s", err, output)
+	Equals(t, "\nTerraform v0.12.0\n\n", output)
+}
+
+// tempSetEnv sets env var key to value. It returns a function that when called
+// will reset the env var to its original value.
+func tempSetEnv(t *testing.T, key string, value string) func() {
+	orig := os.Getenv(key)
+	Ok(t, os.Setenv(key, value))
+	return func() { os.Setenv(key, orig) }
 }

@@ -71,7 +71,9 @@ module.exports = {
                         ['customizing-atlantis', 'Overview'],
                         'atlantis-yaml-reference',
                         'upgrading-atlantis-yaml-to-version-2',
-                        'apply-requirements'
+                        'apply-requirements',
+                        'checkout-strategy',
+                        'terraform-versions'
                     ]
                 },
                 {
@@ -82,7 +84,6 @@ module.exports = {
                         'locking',
                         'autoplanning',
                         'automerging',
-                        'checkout-strategy',
                         'security'
                     ]
                 }

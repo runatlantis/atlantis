@@ -79,10 +79,11 @@ type Server struct {
 
 // Config holds config for server that isn't passed in by the user.
 type Config struct {
-	AllowForkPRsFlag    string
-	AllowRepoConfigFlag string
-	AtlantisURLFlag     string
-	AtlantisVersion     string
+	AllowForkPRsFlag     string
+	AllowRepoConfigFlag  string
+	AtlantisURLFlag      string
+	AtlantisVersion      string
+	DefaultTFVersionFlag string
 }
 
 // WebhookConfig is nested within UserConfig. It's used to configure webhooks.
@@ -165,7 +166,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	vcsClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient)
 	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient}
-	terraformClient, err := terraform.NewClient(userConfig.DataDir, userConfig.TFEToken)
+	terraformClient, err := terraform.NewClient(logger, userConfig.DataDir, userConfig.TFEToken, userConfig.DefaultTFVersion, config.DefaultTFVersionFlag, &terraform.DefaultDownloader{})
 	// The flag.Lookup call is to detect if we're running in a unit test. If we
 	// are, then we don't error out because we don't have/want terraform
 	// installed on our CI system where the unit tests run.

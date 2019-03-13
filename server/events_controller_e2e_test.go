@@ -3,6 +3,7 @@ package server_test
 import (
 	"bytes"
 	"fmt"
+	"github.com/hashicorp/go-getter"
 	"github.com/runatlantis/atlantis/server/events/db"
 	"io/ioutil"
 	"net/http"
@@ -30,6 +31,12 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
+
+type NoopTFDownloader struct{}
+
+func (m *NoopTFDownloader) GetFile(dst, src string, opts ...getter.ClientOption) error {
+	return nil
+}
 
 func TestGitHubWorkflow(t *testing.T) {
 	if testing.Short() {
@@ -371,7 +378,7 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClient, *moc
 		GithubUser: "github-user",
 		GitlabUser: "gitlab-user",
 	}
-	terraformClient, err := terraform.NewClient(dataDir, "")
+	terraformClient, err := terraform.NewClient(logger, dataDir, "", "", "default-tf-version", &NoopTFDownloader{})
 	Ok(t, err)
 	boltdb, err := db.New(dataDir)
 	Ok(t, err)

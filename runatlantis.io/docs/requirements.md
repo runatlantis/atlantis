@@ -83,12 +83,8 @@ an `atlantis.yaml` file to tell it to use `-var-file={YOUR_FILE}`.
 See [atlantis.yaml Use Cases](/guide/atlantis-yaml-use-cases.html#using-tfvars-files) for more details.
 
 ## Terraform Versions
-By default, Atlantis will use the `terraform` executable that is in its path.
-To use a specific version of Terraform:
-1. Install the desired version of Terraform into the `$PATH` of where Atlantis is
- running and name it `terraform{version}`, ex. `terraform0.8.8`.
-2. Create an `atlantis.yaml` file for your repo and set the `terraform_version` key.
-See [atlantis.yaml Use Cases](/guide/atlantis-yaml-use-cases.html#terraform-versions) for more details.
+Atlantis supports all Terraform versions (including 0.12) and can be configured
+to use different versions for different repositories/projects. See [Terraform Versions](/docs/terraform-versions.html)l
 
 ## Next Steps
 * If your Terraform setup meets the Atlantis requirements, head back to our [Installation Guide](installation-guide.html) to get started

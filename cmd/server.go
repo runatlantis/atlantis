@@ -47,6 +47,7 @@ const (
 	ConfigFlag                 = "config"
 	CheckoutStrategyFlag       = "checkout-strategy"
 	DataDirFlag                = "data-dir"
+	DefaultTFVersionFlag       = "default-tf-version"
 	GHHostnameFlag             = "gh-hostname"
 	GHTokenFlag                = "gh-token"
 	GHUserFlag                 = "gh-user"
@@ -191,6 +192,11 @@ var stringFlags = []stringFlag{
 		description: "API token for Terraform Enterprise. This will be used to generate a ~/.terraformrc file." +
 			" Only set if using TFE as a backend." +
 			" Should be specified via the ATLANTIS_TFE_TOKEN environment variable for security.",
+	},
+	{
+		name: DefaultTFVersionFlag,
+		description: "Terraform version to default to (ex. v0.12.0). Will download if not yet on disk." +
+			" If not set, Atlantis uses the terraform binary in its PATH.",
 	},
 }
 var boolFlags = []boolFlag{
@@ -383,10 +389,11 @@ func (s *ServerCmd) run() error {
 
 	// Config looks good. Start the server.
 	server, err := s.ServerCreator.NewServer(userConfig, server.Config{
-		AllowForkPRsFlag:    AllowForkPRsFlag,
-		AllowRepoConfigFlag: AllowRepoConfigFlag,
-		AtlantisURLFlag:     AtlantisURLFlag,
-		AtlantisVersion:     s.AtlantisVersion,
+		AllowForkPRsFlag:     AllowForkPRsFlag,
+		AllowRepoConfigFlag:  AllowRepoConfigFlag,
+		AtlantisURLFlag:      AtlantisURLFlag,
+		AtlantisVersion:      s.AtlantisVersion,
+		DefaultTFVersionFlag: DefaultTFVersionFlag,
 	})
 	if err != nil {
 		return errors.Wrap(err, "initializing server")
