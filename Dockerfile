@@ -1,3 +1,8 @@
+FROM golang:alpine
+RUN apk --no-cache add git make
+RUN git clone https://github.com/runatlantis/atlantis.git
+RUN cd atlantis && make build-service
+
 # The runatlantis/atlantis-base is created by docker-base/Dockerfile.
 FROM runatlantis/atlantis-base:v2.0
 LABEL authors="Anubhav Mishra, Luke Kysow"
@@ -20,11 +25,10 @@ RUN AVAILABLE_TERRAFORM_VERSIONS="0.8.8 0.9.11 0.10.8 ${DEFAULT_TERRAFORM_VERSIO
     ln -s /usr/local/bin/tf/versions/${DEFAULT_TERRAFORM_VERSION}/terraform /usr/local/bin/terraform
 
 # copy binary
-COPY atlantis /usr/local/bin/atlantis
+COPY --from=0 atlantis /usr/local/bin/atlantis
 
 # copy docker entrypoint
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["server"]
-
