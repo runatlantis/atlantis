@@ -37,18 +37,18 @@ go-generate: ## Run go generate in all packages
 #echo "this doesn't work anymore: go generate \$\$(go list ./... | grep -v e2e | grep -v vendor | grep -v static)"
 
 test: ## Run tests
-	@go test -race -short $(PKG)
+	@go test -short $(PKG)
 
 test-all: ## Run tests including integration
 	@go test $(PKG)
 
 test-coverage:
 	@mkdir -p .cover
-	@go test -coverpkg $(PKG_COMMAS) -coverprofile .cover/cover.out $(PKG)
+	@go test -covermode atomic -coverprofile .cover/cover.out $(PKG)
 
 test-coverage-html:
 	@mkdir -p .cover
-	@go test -coverpkg $(PKG_COMMAS) -coverprofile .cover/cover.out $(PKG)
+	@go test -covermode atomic -coverprofile .cover/cover.out $(PKG)
 	go tool cover -html .cover/cover.out
 
 dist: ## Package up everything in static/ using go-bindata-assetfs so it can be served by a single binary

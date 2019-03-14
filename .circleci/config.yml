@@ -7,11 +7,11 @@ jobs:
     steps:
     - checkout
     - run: make test-coverage
-    - run: make check-fmt
-    - run: make check-lint
     - run:
         name: post coverage to codecov.io
         command: bash <(curl -s https://codecov.io/bash)
+    - run: make check-fmt
+    - run: make check-lint
   e2e:
     working_directory: /go/src/github.com/runatlantis/atlantis
     docker:

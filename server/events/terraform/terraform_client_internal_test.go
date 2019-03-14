@@ -93,7 +93,7 @@ func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
-		tfExecutableName:        "echo",
+		overrideTF:              "echo",
 	}
 
 	args := []string{
@@ -118,7 +118,7 @@ func TestDefaultClient_RunCommandWithVersion_Error(t *testing.T) {
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
-		tfExecutableName:        "echo",
+		overrideTF:              "echo",
 	}
 
 	args := []string{
@@ -142,7 +142,7 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
-		tfExecutableName:        "echo",
+		overrideTF:              "echo",
 	}
 
 	args := []string{
@@ -168,7 +168,7 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
-		tfExecutableName:        "cat",
+		overrideTF:              "cat",
 	}
 	filename := filepath.Join(tmp, "data")
 	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
@@ -196,7 +196,7 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
-		tfExecutableName:        "echo",
+		overrideTF:              "echo",
 	}
 	log := logging.NewSimpleLogger("test", false, logging.Debug)
 	_, outCh := client.RunCommandAsync(log, tmp, []string{"stderr", ">&2"}, nil, "workspace")
@@ -214,7 +214,7 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
-		tfExecutableName:        "echo",
+		overrideTF:              "echo",
 	}
 	log := logging.NewSimpleLogger("test", false, logging.Debug)
 	_, outCh := client.RunCommandAsync(log, tmp, []string{"dying", "&&", "exit", "1"}, nil, "workspace")
@@ -233,7 +233,7 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
-		tfExecutableName:        "read",
+		overrideTF:              "read",
 	}
 	log := logging.NewSimpleLogger("test", false, logging.Debug)
 	inCh, outCh := client.RunCommandAsync(log, tmp, []string{"a", "&&", "echo", "$a"}, nil, "workspace")

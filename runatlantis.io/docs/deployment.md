@@ -383,14 +383,14 @@ Once you're done, see [Next Steps](#next-steps).
 Atlantis has an [official](https://hub.docker.com/r/runatlantis/atlantis/) Docker image: `runatlantis/atlantis`.
 
 #### Customization
-If you need to modify the Docker image that we provide, for instance to add a specific version of Terraform, you can do something like this:
+If you need to modify the Docker image that we provide, for instance to add the terragrunt binary, you can do something like this:
 
 1. Create a custom docker file
     ```dockerfile
     FROM runatlantis/atlantis:{latest version}
 
     # copy a terraform binary of the version you need
-    COPY terraform /usr/local/bin/terraform
+    COPY terragrunt /usr/local/bin/terrgrunt
     ```
 
 1. Build your Docker image

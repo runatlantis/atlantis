@@ -38,6 +38,7 @@ type UserConfig struct {
 	SSLCertFile            string          `mapstructure:"ssl-cert-file"`
 	SSLKeyFile             string          `mapstructure:"ssl-key-file"`
 	TFEToken               string          `mapstructure:"tfe-token"`
+	DefaultTFVersion       string          `mapstructure:"default-tf-version"`
 	Webhooks               []WebhookConfig `mapstructure:"webhooks"`
 }
 

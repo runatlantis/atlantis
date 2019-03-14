@@ -222,6 +222,11 @@ workflows:
       - run: terragrunt apply -no-color $PLANFILE
 ```
 
+::: warning
+Atlantis will need to have the `terragrunt` binary in its PATH.
+If you're using Docker you can build your own image, see [Customization](/docs/deployment.html#customization).
+:::
+
 ## Running custom commands
 Atlantis supports running custom commands. In this example, we want to run
 a script after every `apply`:
@@ -255,7 +260,7 @@ isn't set, Atlantis will use the default plan workflow which is what we want in 
 
 ## Terraform Versions
 If you'd like to use a different version of Terraform than what is in Atlantis'
-`PATH` then set the `terraform_version` key:
+`PATH` or is set by the `--default-tf-version` flag, then set the `terraform_version` key:
 
 ```yaml
 version: 2
@@ -264,9 +269,7 @@ projects:
   terraform_version: 0.10.0
 ```
 
-Atlantis will then execute all Terraform commands with `terraform0.10.0` instead
-of `terraform`. This requires that the 0.10.0 binary is in Atlantis's `PATH` with the
-name `terraform0.10.0`.
+Atlantis will automatically download and use this version.
 
 ## Requiring Approvals For Production
 In this example, we only want to require `apply` approvals for the `production` directory.

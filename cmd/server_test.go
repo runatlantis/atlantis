@@ -341,6 +341,7 @@ func TestExecute_Defaults(t *testing.T) {
 	Equals(t, dataDir, passedConfig.DataDir)
 
 	Equals(t, "branch", passedConfig.CheckoutStrategy)
+	Equals(t, "", passedConfig.DefaultTFVersion)
 	Equals(t, "github.com", passedConfig.GithubHostname)
 	Equals(t, "token", passedConfig.GithubToken)
 	Equals(t, "user", passedConfig.GithubUser)
@@ -446,6 +447,7 @@ func TestExecute_Flags(t *testing.T) {
 		cmd.BitbucketWebhookSecretFlag: "bitbucket-secret",
 		cmd.CheckoutStrategyFlag:       "merge",
 		cmd.DataDirFlag:                "/path",
+		cmd.DefaultTFVersionFlag:       "v0.11.0",
 		cmd.GHHostnameFlag:             "ghhostname",
 		cmd.GHTokenFlag:                "token",
 		cmd.GHUserFlag:                 "user",
@@ -477,6 +479,7 @@ func TestExecute_Flags(t *testing.T) {
 	Equals(t, "bitbucket-secret", passedConfig.BitbucketWebhookSecret)
 	Equals(t, "merge", passedConfig.CheckoutStrategy)
 	Equals(t, "/path", passedConfig.DataDir)
+	Equals(t, "v0.11.0", passedConfig.DefaultTFVersion)
 	Equals(t, "ghhostname", passedConfig.GithubHostname)
 	Equals(t, "token", passedConfig.GithubToken)
 	Equals(t, "user", passedConfig.GithubUser)
@@ -509,6 +512,7 @@ bitbucket-user: "bitbucket-user"
 bitbucket-webhook-secret: "bitbucket-secret"
 checkout-strategy: "merge"
 data-dir: "/path"
+default-tf-version: "v0.11.0"
 gh-hostname: "ghhostname"
 gh-token: "token"
 gh-user: "user"
@@ -544,6 +548,7 @@ tfe-token: my-token
 	Equals(t, "bitbucket-secret", passedConfig.BitbucketWebhookSecret)
 	Equals(t, "merge", passedConfig.CheckoutStrategy)
 	Equals(t, "/path", passedConfig.DataDir)
+	Equals(t, "v0.11.0", passedConfig.DefaultTFVersion)
 	Equals(t, "ghhostname", passedConfig.GithubHostname)
 	Equals(t, "token", passedConfig.GithubToken)
 	Equals(t, "user", passedConfig.GithubUser)
@@ -576,6 +581,7 @@ bitbucket-user: "bitbucket-user"
 bitbucket-webhook-secret: "bitbucket-secret"
 checkout-strategy: "merge"
 data-dir: "/path"
+default-tf-version: "v0.11.0"
 gh-hostname: "ghhostname"
 gh-token: "token"
 gh-user: "user"
@@ -607,6 +613,7 @@ tfe-token: my-token
 		"BITBUCKET_WEBHOOK_SECRET": "override-bitbucket-secret",
 		"CHECKOUT_STRATEGY":        "branch",
 		"DATA_DIR":                 "/override-path",
+		"DEFAULT_TF_VERSION":       "v0.12.0",
 		"GH_HOSTNAME":              "override-gh-hostname",
 		"GH_TOKEN":                 "override-gh-token",
 		"GH_USER":                  "override-gh-user",
@@ -642,6 +649,7 @@ tfe-token: my-token
 	Equals(t, "override-bitbucket-secret", passedConfig.BitbucketWebhookSecret)
 	Equals(t, "branch", passedConfig.CheckoutStrategy)
 	Equals(t, "/override-path", passedConfig.DataDir)
+	Equals(t, "v0.12.0", passedConfig.DefaultTFVersion)
 	Equals(t, "override-gh-hostname", passedConfig.GithubHostname)
 	Equals(t, "override-gh-token", passedConfig.GithubToken)
 	Equals(t, "override-gh-user", passedConfig.GithubUser)
@@ -674,6 +682,7 @@ bitbucket-user: "bitbucket-user"
 bitbucket-webhook-secret: "bitbucket-secret"
 checkout-strategy: "merge"
 data-dir: "/path"
+default-tf-version: "v0.11.0"
 gh-hostname: "ghhostname"
 gh-token: "token"
 gh-user: "user"
@@ -705,6 +714,7 @@ tfe-token: my-token
 		cmd.BitbucketWebhookSecretFlag: "override-bitbucket-secret",
 		cmd.CheckoutStrategyFlag:       "branch",
 		cmd.DataDirFlag:                "/override-path",
+		cmd.DefaultTFVersionFlag:       "v0.12.0",
 		cmd.GHHostnameFlag:             "override-gh-hostname",
 		cmd.GHTokenFlag:                "override-gh-token",
 		cmd.GHUserFlag:                 "override-gh-user",
@@ -734,6 +744,7 @@ tfe-token: my-token
 	Equals(t, "override-bitbucket-secret", passedConfig.BitbucketWebhookSecret)
 	Equals(t, "branch", passedConfig.CheckoutStrategy)
 	Equals(t, "/override-path", passedConfig.DataDir)
+	Equals(t, "v0.12.0", passedConfig.DefaultTFVersion)
 	Equals(t, "override-gh-hostname", passedConfig.GithubHostname)
 	Equals(t, "override-gh-token", passedConfig.GithubToken)
 	Equals(t, "override-gh-user", passedConfig.GithubUser)
@@ -768,6 +779,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		"BITBUCKET_WEBHOOK_SECRET": "bitbucket-secret",
 		"CHECKOUT_STRATEGY":        "merge",
 		"DATA_DIR":                 "/path",
+		"DEFAULT_TF_VERSION":       "v0.11.0",
 		"GH_HOSTNAME":              "gh-hostname",
 		"GH_TOKEN":                 "gh-token",
 		"GH_USER":                  "gh-user",
@@ -807,6 +819,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		cmd.BitbucketWebhookSecretFlag: "override-bitbucket-secret",
 		cmd.CheckoutStrategyFlag:       "branch",
 		cmd.DataDirFlag:                "/override-path",
+		cmd.DefaultTFVersionFlag:       "v0.12.0",
 		cmd.GHHostnameFlag:             "override-gh-hostname",
 		cmd.GHTokenFlag:                "override-gh-token",
 		cmd.GHUserFlag:                 "override-gh-user",
@@ -838,6 +851,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	Equals(t, "override-bitbucket-secret", passedConfig.BitbucketWebhookSecret)
 	Equals(t, "branch", passedConfig.CheckoutStrategy)
 	Equals(t, "/override-path", passedConfig.DataDir)
+	Equals(t, "v0.12.0", passedConfig.DefaultTFVersion)
 	Equals(t, "override-gh-hostname", passedConfig.GithubHostname)
 	Equals(t, "override-gh-token", passedConfig.GithubToken)
 	Equals(t, "override-gh-user", passedConfig.GithubUser)
