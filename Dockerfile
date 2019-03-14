@@ -19,7 +19,7 @@ RUN AVAILABLE_TERRAFORM_VERSIONS="0.8.8 0.9.11 0.10.8 $(curl -s https://releases
         rm terraform_${VERSION}_linux_amd64.zip && \
         rm terraform_${VERSION}_SHA256SUMS; \
     done && \
-    ln -s /usr/local/bin/tf/versions/ $(curl -s https://releases.hashicorp.com/terraform/ | cut -d '/' -f 3 | grep '^[0-9]' | grep -v '-' | head -n 1)/terraform /usr/local/bin/terraform
+    ln -s /usr/local/bin/tf/versions/$(curl -s https://releases.hashicorp.com/terraform/ | cut -d '/' -f 3 | grep '^[0-9]' | grep -v '-' | head -n 1)/terraform /usr/local/bin/terraform
 
 # copy binary
 COPY --from=0 /go/bin/atlantis /usr/local/bin/atlantis
