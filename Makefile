@@ -44,7 +44,7 @@ test-all: ## Run tests including integration
 
 test-coverage:
 	@mkdir -p .cover
-	@go test -coverpkg $(PKG_COMMAS) -coverprofile .cover/cover.out $(PKG)
+	@go test -covermode atomic -coverprofile .cover/cover.out $(PKG)
 
 test-coverage-html:
 	@mkdir -p .cover
