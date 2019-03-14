@@ -1,7 +1,7 @@
 FROM golang:alpine
 RUN apk --no-cache add git make
 RUN git clone https://github.com/runatlantis/atlantis.git
-RUN cd atlantis && make build-service
+RUN cd atlantis && make deps && make build-service
 
 # The runatlantis/atlantis-base is created by docker-base/Dockerfile.
 FROM runatlantis/atlantis-base:v2.0
