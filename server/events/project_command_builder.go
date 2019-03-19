@@ -104,7 +104,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		return nil, errors.Wrapf(err, "looking for %s file in %q", yaml.AtlantisYAMLFilename, repoDir)
 	}
 	if hasConfigFile {
-		config, err = p.ParserValidator.ReadConfig(repoDir, p.RepoConfig, ctx.BaseRepo.FullNameWithHost, p.AllowRepoConfig)
+		config, err = p.ParserValidator.ReadConfig(repoDir, p.RepoConfig, ctx.BaseRepo.ID(), p.AllowRepoConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -140,7 +140,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 				Version:  &version,
 				Projects: []raw.Project{{Dir: &mp.Path}},
 			}
-			config, err = p.ParserValidator.ValidateOverridesAndMergeConfig(config, p.RepoConfig, ctx.BaseRepo.FullNameWithHost, p.AllowRepoConfig)
+			config, err = p.ParserValidator.ValidateOverridesAndMergeConfig(config, p.RepoConfig, ctx.BaseRepo.ID(), p.AllowRepoConfig)
 			if err != nil {
 				return nil, err
 			}
@@ -359,7 +359,7 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *CommandContext, projectName s
 	var globalCfgStruct valid.Config
 	// If we have a config file, read it and let any repo restricted config be merged and validated
 	if hasConfigFile {
-		globalCfgStruct, err = p.ParserValidator.ReadConfig(repoDir, p.RepoConfig, ctx.BaseRepo.FullNameWithHost, p.AllowRepoConfig)
+		globalCfgStruct, err = p.ParserValidator.ReadConfig(repoDir, p.RepoConfig, ctx.BaseRepo.ID(), p.AllowRepoConfig)
 	} else {
 		// If no atlantis.yaml file exists, we generate a skeleton config and merge all of the server side repo config
 		// settings into.  If no server side repo config was provided, a default one was generated at server start
@@ -373,7 +373,7 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *CommandContext, projectName s
 				},
 			},
 		}
-		rawConfig, err = p.ParserValidator.ValidateOverridesAndMergeConfig(rawConfig, p.RepoConfig, ctx.BaseRepo.FullNameWithHost, p.AllowRepoConfig)
+		rawConfig, err = p.ParserValidator.ValidateOverridesAndMergeConfig(rawConfig, p.RepoConfig, ctx.BaseRepo.ID(), p.AllowRepoConfig)
 		globalCfgStruct = rawConfig.ToValid()
 	}
 	if err != nil {
