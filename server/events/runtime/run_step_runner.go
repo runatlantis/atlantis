@@ -25,15 +25,15 @@ func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command []string, 
 	cmd := exec.Command("sh", "-c", strings.Join(command, " ")) // #nosec
 	cmd.Dir = path
 	tfVersion := r.DefaultTFVersion.String()
-	if ctx.ProjectConfig != nil && ctx.ProjectConfig.TerraformVersion != nil {
-		tfVersion = ctx.ProjectConfig.TerraformVersion.String()
+	if ctx.TerraformVersion != nil {
+		tfVersion = ctx.TerraformVersion.String()
 	}
 	baseEnvVars := os.Environ()
 	customEnvVars := map[string]string{
 		"WORKSPACE":                  ctx.Workspace,
 		"ATLANTIS_TERRAFORM_VERSION": tfVersion,
 		"DIR":                        path,
-		"PLANFILE":                   filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectConfig)),
+		"PLANFILE":                   filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName)),
 		"BASE_REPO_NAME":             ctx.BaseRepo.Name,
 		"BASE_REPO_OWNER":            ctx.BaseRepo.Owner,
 		"HEAD_REPO_NAME":             ctx.HeadRepo.Name,

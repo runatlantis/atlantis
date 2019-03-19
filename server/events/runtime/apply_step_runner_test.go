@@ -3,6 +3,13 @@ package runtime_test
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"testing"
+
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
 	mocks2 "github.com/runatlantis/atlantis/server/events/mocks"
@@ -12,15 +19,8 @@ import (
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
 	matchers2 "github.com/runatlantis/atlantis/server/events/terraform/mocks/matchers"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"strings"
-	"sync"
-	"testing"
 )
 
 func TestRun_NoDir(t *testing.T) {
@@ -90,13 +90,10 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 
 	When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
-	projectName := "projectname"
 	output, err := o.Run(models.ProjectCommandContext{
-		Workspace:  "default",
-		RepoRelDir: ".",
-		ProjectConfig: &valid.Project{
-			Name: &projectName,
-		},
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projectname",
 		CommentArgs: []string{"comment", "args"},
 	}, []string{"extra", "args"}, tmpDir)
 	Ok(t, err)
@@ -123,12 +120,10 @@ func TestRun_UsesConfiguredTFVersion(t *testing.T) {
 	When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
 	output, err := o.Run(models.ProjectCommandContext{
-		Workspace:   "workspace",
-		RepoRelDir:  ".",
-		CommentArgs: []string{"comment", "args"},
-		ProjectConfig: &valid.Project{
-			TerraformVersion: tfVersion,
-		},
+		Workspace:        "workspace",
+		RepoRelDir:       ".",
+		CommentArgs:      []string{"comment", "args"},
+		TerraformVersion: tfVersion,
 	}, []string{"extra", "args"}, tmpDir)
 	Ok(t, err)
 	Equals(t, "output", output)
@@ -245,13 +240,11 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 	}
 	tfVersion, _ := version.NewVersion("0.11.0")
 	ctx := models.ProjectCommandContext{
-		Log:         logging.NewSimpleLogger("testing", false, logging.Debug),
-		Workspace:   "workspace",
-		RepoRelDir:  ".",
-		CommentArgs: []string{"comment", "args"},
-		ProjectConfig: &valid.Project{
-			TerraformVersion: tfVersion,
-		},
+		Log:              logging.NewSimpleLogger("testing", false, logging.Debug),
+		Workspace:        "workspace",
+		RepoRelDir:       ".",
+		CommentArgs:      []string{"comment", "args"},
+		TerraformVersion: tfVersion,
 	}
 	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir)
 	<-tfExec.DoneCh
@@ -309,13 +302,11 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 	tfVersion, _ := version.NewVersion("0.11.0")
 
 	output, err := o.Run(models.ProjectCommandContext{
-		Log:         logging.NewSimpleLogger("testing", false, logging.Debug),
-		Workspace:   "workspace",
-		RepoRelDir:  ".",
-		CommentArgs: []string{"comment", "args"},
-		ProjectConfig: &valid.Project{
-			TerraformVersion: tfVersion,
-		},
+		Log:              logging.NewSimpleLogger("testing", false, logging.Debug),
+		Workspace:        "workspace",
+		RepoRelDir:       ".",
+		CommentArgs:      []string{"comment", "args"},
+		TerraformVersion: tfVersion,
 	}, []string{"extra", "args"}, tmpDir)
 	<-tfExec.DoneCh
 	ErrEquals(t, `Plan generated during apply phase did not match plan generated during plan phase.

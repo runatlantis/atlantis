@@ -25,14 +25,14 @@ storage from Terraform Enterprise. This is fully supported by Atlantis.
 ## Repository Structure
 Atlantis supports any Terraform repository structure, for example:
 
-### Single Terraform project at repo root
+### Single Terraform Project At Repo Root
 ```
 .
 ├── main.tf
 └── ...
 ```
 
-### Multiple project folders
+### Multiple Project Folders
 ```
 .
 ├── project1
@@ -55,21 +55,14 @@ Atlantis supports any Terraform repository structure, for example:
         └── ...
 ```
 With modules, if you want `project1` automatically planned when `module1` is modified
-you need to create an `atlantis.yaml` file. See [atlantis.yaml Use Cases](/guide/atlantis-yaml-use-cases.html#configuring-autoplanning) for more details.
+you need to create an `atlantis.yaml` file. See [atlantis.yaml Use Cases](repo-level-atlantis-yaml.html#configuring-autoplanning) for more details.
 
 ###  Terraform Workspaces
-::: tip
-See [Terraform's docs](https://www.terraform.io/docs/state/workspaces.html) if you are unfamiliar with workspaces.
-:::
+*See [Terraform's docs](https://www.terraform.io/docs/state/workspaces.html) if you are unfamiliar with workspaces.*
+
 If you're using Terraform `>= 0.9.0`, Atlantis supports workspaces through an
 `atlantis.yaml` file that tells Atlantis the names of your workspaces
-(see [atlantis.yaml Use Cases](/guide/atlantis-yaml-use-cases.html#supporting-terraform-workspaces) for more details)
-or through the `-w` flag. For example:
-```
-atlantis plan -w staging
-atlantis apply -w staging
-```
-
+(see [atlantis.yaml Use Cases](repo-level-atlantis-yaml.html#supporting-terraform-workspaces) for more details)
 
 ### .tfvars Files
 ```
@@ -80,12 +73,16 @@ atlantis apply -w staging
 ```
 For Atlantis to be able to plan automatically with `.tfvars files`, you need to create
 an `atlantis.yaml` file to tell it to use `-var-file={YOUR_FILE}`.
-See [atlantis.yaml Use Cases](/guide/atlantis-yaml-use-cases.html#using-tfvars-files) for more details.
+See [atlantis.yaml Use Cases](custom-workflows.html#tfvars-files) for more details.
+
+### Multiple Repos
+Atlantis supports multiple repos as well–as long as there is a webhook configured
+for each repo.
 
 ## Terraform Versions
 Atlantis supports all Terraform versions (including 0.12) and can be configured
-to use different versions for different repositories/projects. See [Terraform Versions](/docs/terraform-versions.html)l
+to use different versions for different repositories/projects. See [Terraform Versions](terraform-versions.html).
 
 ## Next Steps
-* If your Terraform setup meets the Atlantis requirements, head back to our [Installation Guide](installation-guide.html) to get started
-  installing Atlantis
+* If your Terraform setup meets the Atlantis requirements, continue the installation
+  guide and set up your [Git Host Access Credentials](access-credentials.html)

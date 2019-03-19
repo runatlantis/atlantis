@@ -20,8 +20,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/runatlantis/atlantis/server/events/db"
-	"github.com/runatlantis/atlantis/server/events/yaml/raw"
 	"log"
 	"net/http"
 	"net/url"
@@ -30,6 +28,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/runatlantis/atlantis/server/events/db"
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 
 	"github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
@@ -197,14 +198,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	validator := &yaml.ParserValidator{}
 
-	// This is a default config that will allow safe keys to be used in atlantis.yaml by default
-	// but restrict all sensitive keys.  This is used if the server is started without --repo-config.
-	repoConfig := raw.RepoConfig{
-		Repos: []raw.Repo{{ID: "/.*/"}},
-	}
-
+	globalCfg := valid.NewGlobalCfg(userConfig.AllowRepoConfig, userConfig.RequireMergeable, userConfig.RequireApproval)
 	if userConfig.RepoConfig != "" {
-		repoConfig, err = validator.ReadServerConfig(userConfig.RepoConfig)
+		globalCfg, err = validator.ParseGlobalCfg(userConfig.RepoConfig, globalCfg)
 		if err != nil {
 			return nil, err
 		}
@@ -238,7 +234,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GitlabUser:    userConfig.GitlabUser,
 		BitbucketUser: userConfig.BitbucketUser,
 	}
-	defaultTfVersion := terraformClient.Version()
+	defaultTfVersion := terraformClient.DefaultVersion()
 	pendingPlanFinder := &events.DefaultPendingPlanFinder{}
 	commandRunner := &events.DefaultCommandRunner{
 		VCSClient:                vcsClient,
@@ -251,16 +247,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AllowForkPRs:             userConfig.AllowForkPRs,
 		AllowForkPRsFlag:         config.AllowForkPRsFlag,
 		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
-			ParserValidator:     validator,
-			ProjectFinder:       &events.DefaultProjectFinder{},
-			VCSClient:           vcsClient,
-			WorkingDir:          workingDir,
-			WorkingDirLocker:    workingDirLocker,
-			AllowRepoConfig:     userConfig.AllowRepoConfig,
-			RepoConfig:          repoConfig,
-			AllowRepoConfigFlag: config.AllowRepoConfigFlag,
-			PendingPlanFinder:   pendingPlanFinder,
-			CommentBuilder:      commentParser,
+			ParserValidator:   validator,
+			ProjectFinder:     &events.DefaultProjectFinder{},
+			VCSClient:         vcsClient,
+			WorkingDir:        workingDir,
+			WorkingDirLocker:  workingDirLocker,
+			GlobalCfg:         globalCfg,
+			PendingPlanFinder: pendingPlanFinder,
+			CommentBuilder:    commentParser,
 		},
 		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
 			Locker:           projectLocker,
@@ -283,12 +277,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			RunStepRunner: &runtime.RunStepRunner{
 				DefaultTFVersion: defaultTfVersion,
 			},
-			PullApprovedChecker:      vcsClient,
-			WorkingDir:               workingDir,
-			Webhooks:                 webhooksManager,
-			WorkingDirLocker:         workingDirLocker,
-			RequireApprovalOverride:  userConfig.RequireApproval,
-			RequireMergeableOverride: userConfig.RequireMergeable,
+			PullApprovedChecker: vcsClient,
+			WorkingDir:          workingDir,
+			Webhooks:            webhooksManager,
+			WorkingDirLocker:    workingDirLocker,
 		},
 		WorkingDir:        workingDir,
 		PendingPlanFinder: pendingPlanFinder,

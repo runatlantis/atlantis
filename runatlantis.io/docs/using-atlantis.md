@@ -41,7 +41,7 @@ atlantis plan -w staging
 ### Options
 * `-d directory` Which directory to run plan in relative to root of repo. Use `.` for root.
     * Ex. `atlantis plan -d child/dir`
-* `-p project` Which project to run plan for. Refers to the name of the project configured in the repo's [`atlantis.yaml` file](/docs/atlantis-yaml-reference.html). Cannot be used at same time as `-d` or `-w` because the project defines this already.
+* `-p project` Which project to run plan for. Refers to the name of the project configured in the repo's [`atlantis.yaml` file](repo-level-atlantis-yaml.html). Cannot be used at same time as `-d` or `-w` because the project defines this already.
 * `-w workspace` Switch to this [Terraform workspace](https://www.terraform.io/docs/state/workspaces.html) before planning. Defaults to `default`. If not using Terraform workspaces you can ignore this.
 * `--verbose` Append Atlantis log to comment.
 
@@ -52,7 +52,7 @@ you can append them to the end of the comment after `--`, ex.
 ```
 atlantis plan -d dir -- -var 'foo=bar'
 ```
-If you always need to append a certain flag, see [atlantis.yaml Use Cases](/guide/atlantis-yaml-use-cases.html#adding-extra-arguments-to-terraform-commands).
+If you always need to append a certain flag, see [Custom Workflow Use Cases](custom-workflows.html#adding-extra-arguments-to-terraform-commands).
 
 ---
 ## atlantis apply
@@ -84,7 +84,7 @@ atlantis apply -w staging
 
 ### Options
 * `-d directory` Apply the plan for this directory, relative to root of repo. Use `.` for root.
-* `-p project` Apply the plan for this project. Refers to the name of the project configured in the repo's [`atlantis.yaml` file](/docs/atlantis-yaml-reference.html). Cannot be used at same time as `-d` or `-w`.
+* `-p project` Apply the plan for this project. Refers to the name of the project configured in the repo's [`atlantis.yaml` file](repo-level-atlantis-yaml.html). Cannot be used at same time as `-d` or `-w`.
 * `-w workspace` Apply the plan for this [Terraform workspace](https://www.terraform.io/docs/state/workspaces.html). If not using Terraform workspaces you can ignore this.
 * `--verbose` Append Atlantis log to comment.
 

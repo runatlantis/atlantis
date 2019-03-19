@@ -145,6 +145,13 @@
         </div>
       </div>
     </div>
+    <div class="home getting-started-footer">
+      <div class="hero">
+        <p class="action" v-if="data.actionText && data.actionLink">
+          <a href="/guide/" class="nav-link action-button">Get Started →</a>
+        </p>
+      </div>
+    </div>
     <div class="footer" v-if="data.footer">
       {{ data.footer }}
     </div>
@@ -268,6 +275,9 @@
       text-align center
       color lighten($textColor, 25%)
 
+  .getting-started-footer
+    padding 2.5rem 0
+    margin 0 auto
   .workflow-container
     border-top 2px solid $borderColor
 

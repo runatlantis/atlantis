@@ -15,7 +15,6 @@ package events_test
 
 import (
 	"fmt"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"testing"
 
 	. "github.com/petergtz/pegomock"
@@ -172,11 +171,9 @@ func TestDefaultCommitStatusUpdater_UpdateProjectSrc(t *testing.T) {
 			client := mocks.NewMockClient()
 			s := events.DefaultCommitStatusUpdater{Client: client}
 			err := s.UpdateProject(models.ProjectCommandContext{
-				ProjectConfig: &valid.Project{
-					Name: &c.projectName,
-				},
-				RepoRelDir: c.repoRelDir,
-				Workspace:  c.workspace,
+				ProjectName: c.projectName,
+				RepoRelDir:  c.repoRelDir,
+				Workspace:   c.workspace,
 			},
 				models.PlanCommand,
 				models.PendingCommitStatus,

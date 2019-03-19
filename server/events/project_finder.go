@@ -19,29 +19,32 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+
 	"github.com/docker/docker/pkg/fileutils"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-// ProjectFinder determines what are the terraform project(s) within a repo.
+// ProjectFinder determines which projects were modified in a given pull
+// request.
 type ProjectFinder interface {
 	// DetermineProjects returns the list of projects that were modified based on
 	// the modifiedFiles. The list will be de-duplicated.
-	DetermineProjects(log *logging.SimpleLogger, modifiedFiles []string, repoFullName string, repoDir string) []models.Project
-	DetermineProjectsViaConfig(log *logging.SimpleLogger, modifiedFiles []string, config valid.Config, repoDir string) ([]valid.Project, error)
+	// absRepoDir is the path to the cloned repo on disk.
+	DetermineProjects(log *logging.SimpleLogger, modifiedFiles []string, repoFullName string, absRepoDir string) []models.Project
+	// DetermineProjectsViaConfig returns the list of projects that were modified
+	// based on modifiedFiles and the repo's config.
+	// absRepoDir is the path to the cloned repo on disk.
+	DetermineProjectsViaConfig(log *logging.SimpleLogger, modifiedFiles []string, config valid.RepoCfg, absRepoDir string) ([]valid.Project, error)
 }
 
 // DefaultProjectFinder implements ProjectFinder.
 type DefaultProjectFinder struct{}
 
-var excludeList = []string{"terraform.tfstate", "terraform.tfstate.backup"}
-
-// DetermineProjects returns the list of projects that were modified based on
-// the modifiedFiles. The list will be de-duplicated.
-func (p *DefaultProjectFinder) DetermineProjects(log *logging.SimpleLogger, modifiedFiles []string, repoFullName string, repoDir string) []models.Project {
+// See ProjectFinder.DetermineProjects.
+func (p *DefaultProjectFinder) DetermineProjects(log *logging.SimpleLogger, modifiedFiles []string, repoFullName string, absRepoDir string) []models.Project {
 	var projects []models.Project
 
 	modifiedTerraformFiles := p.filterToTerraform(modifiedFiles)
@@ -53,7 +56,7 @@ func (p *DefaultProjectFinder) DetermineProjects(log *logging.SimpleLogger, modi
 
 	var dirs []string
 	for _, modifiedFile := range modifiedTerraformFiles {
-		projectDir := p.getProjectDir(modifiedFile, repoDir)
+		projectDir := p.getProjectDir(modifiedFile, absRepoDir)
 		if projectDir != "" {
 			dirs = append(dirs, projectDir)
 		}
@@ -64,7 +67,7 @@ func (p *DefaultProjectFinder) DetermineProjects(log *logging.SimpleLogger, modi
 	// want to run plan if a file was deleted since that often results in a
 	// change however we want to remove directories that have been completely
 	// deleted.
-	exists := p.filterToDirExists(uniqueDirs, repoDir)
+	exists := p.removeNonExistingDirs(uniqueDirs, absRepoDir)
 
 	for _, p := range exists {
 		projects = append(projects, models.NewProject(repoFullName, p))
@@ -74,11 +77,8 @@ func (p *DefaultProjectFinder) DetermineProjects(log *logging.SimpleLogger, modi
 	return projects
 }
 
-// DetermineProjectsViaConfig returns the list of projects that were modified
-// based on the modifiedFiles and config. We look at the WhenModified section
-// of the config for each project and see if the modifiedFiles matches.
-// The list will be de-duplicated.
-func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log *logging.SimpleLogger, modifiedFiles []string, config valid.Config, repoDir string) ([]valid.Project, error) {
+// See ProjectFinder.DetermineProjectsViaConfig.
+func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log *logging.SimpleLogger, modifiedFiles []string, config valid.RepoCfg, absRepoDir string) ([]valid.Project, error) {
 	var projects []valid.Project
 	for _, project := range config.Projects {
 		log.Debug("checking if project at dir %q workspace %q was modified", project.Dir, project.Workspace)
@@ -104,7 +104,7 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log *logging.SimpleLog
 			}
 			if match {
 				log.Debug("file %q matched pattern", file)
-				_, err := os.Stat(filepath.Join(repoDir, project.Dir))
+				_, err := os.Stat(filepath.Join(absRepoDir, project.Dir))
 				if err == nil {
 					projects = append(projects, project)
 				} else {
@@ -117,18 +117,22 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log *logging.SimpleLog
 	return projects, nil
 }
 
+// filterToTerraform filters non-terraform files from files.
 func (p *DefaultProjectFinder) filterToTerraform(files []string) []string {
 	var filtered []string
 	for _, fileName := range files {
-		if !p.isInExcludeList(fileName) && strings.Contains(fileName, ".tf") {
+		// Filter out tfstate files since they usually checked in by accident
+		// and regardless, they don't affect a plan.
+		if !p.isStatefile(fileName) && strings.Contains(fileName, ".tf") {
 			filtered = append(filtered, fileName)
 		}
 	}
 	return filtered
 }
 
-func (p *DefaultProjectFinder) isInExcludeList(fileName string) bool {
-	for _, s := range excludeList {
+// isStatefile returns true if fileName is a terraform statefile or backup.
+func (p *DefaultProjectFinder) isStatefile(fileName string) bool {
+	for _, s := range []string{"terraform.tfstate", "terraform.tfstate.backup"} {
 		if strings.Contains(fileName, s) {
 			return true
 		}
@@ -200,6 +204,7 @@ func (p *DefaultProjectFinder) getProjectDir(modifiedFilePath string, repoDir st
 	return dir
 }
 
+// unique de-duplicates strs.
 func (p *DefaultProjectFinder) unique(strs []string) []string {
 	hash := make(map[string]bool)
 	var unique []string
@@ -212,10 +217,12 @@ func (p *DefaultProjectFinder) unique(strs []string) []string {
 	return unique
 }
 
-func (p *DefaultProjectFinder) filterToDirExists(relativePaths []string, repoDir string) []string {
+// removeNonExistingDirs removes paths from relativePaths that don't exist.
+// relativePaths is a list of paths relative to absRepoDir.
+func (p *DefaultProjectFinder) removeNonExistingDirs(relativePaths []string, absRepoDir string) []string {
 	var filtered []string
 	for _, pth := range relativePaths {
-		absPath := filepath.Join(repoDir, pth)
+		absPath := filepath.Join(absRepoDir, pth)
 		if _, err := os.Stat(absPath); !os.IsNotExist(err) {
 			filtered = append(filtered, pth)
 		}

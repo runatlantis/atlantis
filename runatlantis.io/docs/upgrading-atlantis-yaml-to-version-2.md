@@ -1,6 +1,6 @@
 # Upgrading atlantis.yaml To Version 2
 These docs describe how to upgrade your `atlantis.yaml` file from the format used
-in previous versions to the latest format.
+in Atlantis `<=v0.3.10`.
 
 ## Single atlantis.yaml
 If you had multiple `atlantis.yaml` files per directory then you'll need to

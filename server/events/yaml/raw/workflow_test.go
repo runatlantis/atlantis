@@ -120,8 +120,8 @@ func TestWorkflow_ToValid(t *testing.T) {
 			description: "nothing set",
 			input:       raw.Workflow{},
 			exp: valid.Workflow{
-				Apply: nil,
-				Plan:  nil,
+				Apply: valid.DefaultApplyStage,
+				Plan:  valid.DefaultPlanStage,
 			},
 		},
 		{
@@ -143,14 +143,14 @@ func TestWorkflow_ToValid(t *testing.T) {
 				},
 			},
 			exp: valid.Workflow{
-				Apply: &valid.Stage{
+				Apply: valid.Stage{
 					Steps: []valid.Step{
 						{
 							StepName: "init",
 						},
 					},
 				},
-				Plan: &valid.Stage{
+				Plan: valid.Stage{
 					Steps: []valid.Step{
 						{
 							StepName: "init",
@@ -162,7 +162,8 @@ func TestWorkflow_ToValid(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			Equals(t, c.exp, c.input.ToValid())
+			c.exp.Name = "name"
+			Equals(t, c.exp, c.input.ToValid("name"))
 		})
 	}
 }

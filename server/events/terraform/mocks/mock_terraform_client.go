@@ -31,7 +31,7 @@ func (mock *MockClient) Version() *go_version.Version {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}
 	params := []pegomock.Param{}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("Version", params, []reflect.Type{reflect.TypeOf((**go_version.Version)(nil)).Elem()})
+	result := pegomock.GetGenericMockFrom(mock).Invoke("DefaultVersion", params, []reflect.Type{reflect.TypeOf((**go_version.Version)(nil)).Elem()})
 	var ret0 *go_version.Version
 	if len(result) != 0 {
 		if result[0] != nil {
@@ -99,7 +99,7 @@ type VerifierClient struct {
 
 func (verifier *VerifierClient) Version() *Client_Version_OngoingVerification {
 	params := []pegomock.Param{}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Version", params, verifier.timeout)
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "DefaultVersion", params, verifier.timeout)
 	return &Client_Version_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 

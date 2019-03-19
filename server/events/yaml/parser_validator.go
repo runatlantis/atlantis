@@ -16,172 +16,100 @@ import (
 // AtlantisYAMLFilename is the name of the config file for each repo.
 const AtlantisYAMLFilename = "atlantis.yaml"
 
+// ParserValidator parses and validates server-side repo config files and
+// repo-level atlantis.yaml files.
 type ParserValidator struct{}
 
-// ReadConfig returns the parsed and validated atlantis.yaml config for repoDir.
-// If there was no config file, then this can be detected by checking the type
-// of error: os.IsNotExist(error) but it's instead preferred to check with
-// HasConfigFile.
-func (p *ParserValidator) ReadConfig(repoDir string, repoConfig raw.RepoConfig, repoName string, allowAllRepoConfig bool) (valid.Config, error) {
-	configFile := p.configFilePath(repoDir)
-	configData, err := ioutil.ReadFile(configFile) // nolint: gosec
-
-	// NOTE: the error we return here must also be os.IsNotExist since that's
-	// what our callers use to detect a missing config file.
-	if err != nil && os.IsNotExist(err) {
-		return valid.Config{}, err
-	}
-
-	// If it exists but we couldn't read it return an error.
-	if err != nil {
-		return valid.Config{}, errors.Wrapf(err, "unable to read %s file", AtlantisYAMLFilename)
-	}
-
-	// If the config file exists, parse it.
-	config, err := p.parseAndValidate(configData, repoConfig, repoName, allowAllRepoConfig)
-	if err != nil {
-		return valid.Config{}, errors.Wrapf(err, "parsing %s", AtlantisYAMLFilename)
-	}
-	return config, err
-}
-
-func (p *ParserValidator) ReadServerConfig(configFile string) (raw.RepoConfig, error) {
-	configData, err := ioutil.ReadFile(configFile) // nolint: gosec
-
-	// NOTE: the error we return here must also be os.IsNotExist since that's
-	// what our callers use to detect a missing config file.
-	if err != nil && os.IsNotExist(err) {
-		return raw.RepoConfig{}, err
-	}
-
-	// If it exists but we couldn't read it return an error.
-	if err != nil {
-		return raw.RepoConfig{}, errors.Wrapf(err, "unable to read %s file", configFile)
-	}
-	config, err := p.parseAndValidateServerConfig(configData)
-	if err != nil {
-		return raw.RepoConfig{}, errors.Wrapf(err, "parsing %s", configFile)
-	}
-	return config, err
-}
-
-func (p *ParserValidator) HasConfigFile(repoDir string) (bool, error) {
-	_, err := os.Stat(p.configFilePath(repoDir))
+// HasRepoCfg returns true if there is a repo config (atlantis.yaml) file
+// for the repo at absRepoDir.
+// Returns an error if for some reason it can't read that directory.
+func (p *ParserValidator) HasRepoCfg(absRepoDir string) (bool, error) {
+	_, err := os.Stat(p.repoCfgPath(absRepoDir))
 	if os.IsNotExist(err) {
 		return false, nil
 	}
-	if err == nil {
-		return true, nil
-	}
-	return false, err
+	return err == nil, err
 }
 
-func (p *ParserValidator) configFilePath(repoDir string) string {
-	return filepath.Join(repoDir, AtlantisYAMLFilename)
-}
+// ParseRepoCfg returns the parsed and validated atlantis.yaml config for the
+// repo at absRepoDir.
+// If there was no config file, it will return an os.IsNotExist(error).
+func (p *ParserValidator) ParseRepoCfg(absRepoDir string, globalCfg valid.GlobalCfg, repoID string) (valid.RepoCfg, error) {
+	configFile := p.repoCfgPath(absRepoDir)
+	configData, err := ioutil.ReadFile(configFile) // nolint: gosec
 
-func (p *ParserValidator) parseAndValidateServerConfig(configData []byte) (raw.RepoConfig, error) {
-	var config raw.RepoConfig
-	if err := yaml.UnmarshalStrict(configData, &config); err != nil {
-		return raw.RepoConfig{}, err
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return valid.RepoCfg{}, errors.Wrapf(err, "unable to read %s file", AtlantisYAMLFilename)
+		}
+		// Don't wrap os.IsNotExist errors because we want our callers to be
+		// able to detect if it's a NotExist err.
+		return valid.RepoCfg{}, err
 	}
 
-	validation.ErrorTag = "yaml"
-
-	if err := config.Validate(); err != nil {
-		return raw.RepoConfig{}, err
-	}
-
-	if err := p.validateRepoWorkflows(config); err != nil {
-		return raw.RepoConfig{}, err
-	}
-	return config, nil
-}
-
-func (p *ParserValidator) parseAndValidate(configData []byte, repoConfig raw.RepoConfig, repoName string, allowAllRepoConfig bool) (valid.Config, error) {
-	var rawConfig raw.Config
+	var rawConfig raw.RepoCfg
 	if err := yaml.UnmarshalStrict(configData, &rawConfig); err != nil {
-		return valid.Config{}, err
+		return valid.RepoCfg{}, err
 	}
 
 	// Set ErrorTag to yaml so it uses the YAML field names in error messages.
 	validation.ErrorTag = "yaml"
-
-	var err error
-	rawConfig, err = p.ValidateOverridesAndMergeConfig(rawConfig, repoConfig, repoName, allowAllRepoConfig)
-	if err != nil {
-		return valid.Config{}, err
-	}
-
 	if err := rawConfig.Validate(); err != nil {
-		return valid.Config{}, err
-	}
-
-	// Top level validation.
-	if err := p.validateWorkflows(rawConfig); err != nil {
-		return valid.Config{}, err
+		return valid.RepoCfg{}, err
 	}
 
 	validConfig := rawConfig.ToValid()
+
+	// We do the project name validation after we get the valid config because
+	// we need the defaults of dir and workspace to be populated.
 	if err := p.validateProjectNames(validConfig); err != nil {
-		return valid.Config{}, err
+		return valid.RepoCfg{}, err
 	}
-
-	return validConfig, nil
+	err = globalCfg.ValidateRepoCfg(validConfig, repoID)
+	return validConfig, err
 }
 
-func (p *ParserValidator) getOverrideErrorMessage(key string) error {
-	return fmt.Errorf("%q cannot be specified in %q by default.  To enable this, add %q to %q in the server side repo config", key, AtlantisYAMLFilename, key, raw.AllowedOverridesKey)
+// ParseGlobalCfg returns the parsed and validated global repo config file at
+// configFile. defaultCfg will be merged into the parsed config.
+// If there is no file at configFile it will return an error.
+func (p *ParserValidator) ParseGlobalCfg(configFile string, defaultCfg valid.GlobalCfg) (valid.GlobalCfg, error) {
+	configData, err := ioutil.ReadFile(configFile) // nolint: gosec
+	if err != nil {
+		return valid.GlobalCfg{}, errors.Wrapf(err, "unable to read %s file", configFile)
+	}
+	if len(configData) == 0 {
+		return valid.GlobalCfg{}, fmt.Errorf("file %s was empty", configFile)
+	}
+
+	var rawCfg raw.GlobalCfg
+	if err := yaml.UnmarshalStrict(configData, &rawCfg); err != nil {
+		return valid.GlobalCfg{}, err
+	}
+
+	// Set ErrorTag to yaml so it uses the YAML field names in error messages.
+	validation.ErrorTag = "yaml"
+	if err := rawCfg.Validate(); err != nil {
+		return valid.GlobalCfg{}, err
+	}
+
+	validCfg := rawCfg.ToValid()
+
+	// Add defaults to the parsed config.
+	validCfg.Repos = append(defaultCfg.Repos, validCfg.Repos...)
+	for k, v := range defaultCfg.Workflows {
+		// We won't override existing workflows.
+		if _, ok := validCfg.Workflows[k]; !ok {
+			validCfg.Workflows[k] = v
+		}
+	}
+	return validCfg, nil
 }
 
-// Checks any sensitive fields present in atlantis.yaml against the list of allowed overrides and merge the configuration
-// from the server side repo config with project settings found in atlantis.yaml
-func (p *ParserValidator) ValidateOverridesAndMergeConfig(config raw.Config, repoConfig raw.RepoConfig, repoName string, allowAllRepoConfig bool) (raw.Config, error) {
-	var finalProjects []raw.Project
-
-	// Start with a repo regex that will match everything, but sets no allowed_overrides. This will
-	// provide a default behavior of "deny all overrides" if no server side defined repos are matched
-	lastMatchingRepo := raw.Repo{ID: "/.*/"}
-
-	// Find the last repo to match.  If multiple are found, the last matched repo's settings will be used
-	for _, repo := range repoConfig.Repos {
-		matches, err := repo.Matches(repoName)
-		if err != nil {
-			return config, err
-		} else if matches {
-			lastMatchingRepo = repo
-		}
-	}
-
-	for _, project := range config.Projects {
-		// If atlantis.yaml has apply requirements, only honor them if this key is allowed in a server side
-		// --repo-config or if --allow-repo-config is specified.
-		if len(project.ApplyRequirements) > 0 && !(allowAllRepoConfig || lastMatchingRepo.IsOverrideAllowed(raw.ApplyRequirementsKey)) {
-			return config, p.getOverrideErrorMessage(raw.ApplyRequirementsKey)
-		}
-
-		// Do not allow projects to specify a workflow unless it is explicitly allowed
-		if project.Workflow != nil && !(allowAllRepoConfig || lastMatchingRepo.IsOverrideAllowed(raw.WorkflowKey)) {
-			return config, p.getOverrideErrorMessage(raw.WorkflowKey)
-		} else if project.Workflow == nil && lastMatchingRepo.Workflow != nil {
-			project.Workflow = lastMatchingRepo.Workflow
-		}
-
-		finalProjects = append(finalProjects, project)
-	}
-	config.Projects = finalProjects
-
-	if len(config.Workflows) > 0 && !(allowAllRepoConfig || lastMatchingRepo.AllowCustomWorkflows) {
-		return config, fmt.Errorf("%q cannot be specified in %q by default.  To enable this, set %q to true in the server side repo config", raw.CustomWorkflowsKey, AtlantisYAMLFilename, raw.CustomWorkflowsKey)
-	} else if len(config.Workflows) == 0 {
-		if len(repoConfig.Workflows) > 0 {
-			config.Workflows = repoConfig.Workflows
-		}
-	}
-	return config, nil
+func (p *ParserValidator) repoCfgPath(repoDir string) string {
+	return filepath.Join(repoDir, AtlantisYAMLFilename)
 }
 
-func (p *ParserValidator) validateProjectNames(config valid.Config) error {
+func (p *ParserValidator) validateProjectNames(config valid.RepoCfg) error {
 	// First, validate that all names are unique.
 	seen := make(map[string]bool)
 	for _, project := range config.Projects {
@@ -216,48 +144,4 @@ func (p *ParserValidator) validateProjectNames(config valid.Config) error {
 	}
 
 	return nil
-}
-
-func (p *ParserValidator) validateWorkflows(config raw.Config) error {
-	for _, project := range config.Projects {
-		if err := p.validateWorkflowExists(project, config.Workflows); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (p *ParserValidator) validateRepoWorkflows(config raw.RepoConfig) error {
-	for _, repo := range config.Repos {
-		if err := p.validateRepoWorkflowExists(repo, config.Workflows); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (p *ParserValidator) validateRepoWorkflowExists(repo raw.Repo, workflows map[string]raw.Workflow) error {
-	if repo.Workflow == nil {
-		return nil
-	}
-	workflow := *repo.Workflow
-	for w := range workflows {
-		if w == workflow {
-			return nil
-		}
-	}
-	return fmt.Errorf("workflow %q is not defined", workflow)
-}
-
-func (p *ParserValidator) validateWorkflowExists(project raw.Project, workflows map[string]raw.Workflow) error {
-	if project.Workflow == nil {
-		return nil
-	}
-	workflow := *project.Workflow
-	for k := range workflows {
-		if k == workflow {
-			return nil
-		}
-	}
-	return fmt.Errorf("workflow %q is not defined", workflow)
 }

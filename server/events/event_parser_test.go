@@ -46,7 +46,6 @@ func TestParseGithubRepo(t *testing.T) {
 	Equals(t, models.Repo{
 		Owner:             "owner",
 		FullName:          "owner/repo",
-		FullNameWithHost:  "github.com/owner/repo",
 		CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",
 		SanitizedCloneURL: Repo.GetCloneURL(),
 		Name:              "repo",
@@ -96,7 +95,6 @@ func TestParseGithubIssueCommentEvent(t *testing.T) {
 	Equals(t, models.Repo{
 		Owner:             *comment.Repo.Owner.Login,
 		FullName:          *comment.Repo.FullName,
-		FullNameWithHost:  "github.com/owner/repo",
 		CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",
 		SanitizedCloneURL: *comment.Repo.CloneURL,
 		Name:              "repo",
@@ -135,7 +133,6 @@ func TestParseGithubPullEvent(t *testing.T) {
 	expBaseRepo := models.Repo{
 		Owner:             "owner",
 		FullName:          "owner/repo",
-		FullNameWithHost:  "github.com/owner/repo",
 		CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",
 		SanitizedCloneURL: Repo.GetCloneURL(),
 		Name:              "repo",
@@ -254,7 +251,6 @@ func TestParseGithubPull(t *testing.T) {
 	expBaseRepo := models.Repo{
 		Owner:             "owner",
 		FullName:          "owner/repo",
-		FullNameWithHost:  "github.com/owner/repo",
 		CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",
 		SanitizedCloneURL: Repo.GetCloneURL(),
 		Name:              "repo",
@@ -290,7 +286,6 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 
 	expBaseRepo := models.Repo{
 		FullName:          "lkysow/atlantis-example",
-		FullNameWithHost:  "gitlab.com/lkysow/atlantis-example",
 		Name:              "atlantis-example",
 		SanitizedCloneURL: "https://gitlab.com/lkysow/atlantis-example.git",
 		Owner:             "lkysow",
@@ -316,7 +311,6 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 	Equals(t, expBaseRepo, actBaseRepo)
 	Equals(t, models.Repo{
 		FullName:          "sourceorg/atlantis-example",
-		FullNameWithHost:  "gitlab.com/sourceorg/atlantis-example",
 		Name:              "atlantis-example",
 		SanitizedCloneURL: "https://gitlab.com/sourceorg/atlantis-example.git",
 		Owner:             "sourceorg",
@@ -349,7 +343,6 @@ func TestParseGitlabMergeEvent_Subgroup(t *testing.T) {
 
 	expBaseRepo := models.Repo{
 		FullName:          "lkysow-test/subgroup/sub-subgroup/atlantis-example",
-		FullNameWithHost:  "gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example",
 		Name:              "atlantis-example",
 		SanitizedCloneURL: "https://gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
 		Owner:             "lkysow-test/subgroup/sub-subgroup",
@@ -375,7 +368,6 @@ func TestParseGitlabMergeEvent_Subgroup(t *testing.T) {
 	Equals(t, expBaseRepo, actBaseRepo)
 	Equals(t, models.Repo{
 		FullName:          "lkysow-test/subgroup/sub-subgroup/atlantis-example",
-		FullNameWithHost:  "gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example",
 		Name:              "atlantis-example",
 		SanitizedCloneURL: "https://gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
 		Owner:             "lkysow-test/subgroup/sub-subgroup",
@@ -447,7 +439,6 @@ func TestParseGitlabMergeRequest(t *testing.T) {
 	Ok(t, err)
 	repo := models.Repo{
 		FullName:          "gitlabhq/gitlab-test",
-		FullNameWithHost:  "example.com/gitlabhq/gitlab-test",
 		Name:              "gitlab-test",
 		SanitizedCloneURL: "https://example.com/gitlabhq/gitlab-test.git",
 		Owner:             "gitlabhq",
@@ -487,7 +478,6 @@ func TestParseGitlabMergeRequest_Subgroup(t *testing.T) {
 
 	repo := models.Repo{
 		FullName:          "lkysow-test/subgroup/sub-subgroup/atlantis-example",
-		FullNameWithHost:  "gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example",
 		Name:              "atlantis-example",
 		SanitizedCloneURL: "https://gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
 		Owner:             "lkysow-test/subgroup/sub-subgroup",
@@ -522,7 +512,6 @@ func TestParseGitlabMergeCommentEvent(t *testing.T) {
 	Ok(t, err)
 	Equals(t, models.Repo{
 		FullName:          "gitlabhq/gitlab-test",
-		FullNameWithHost:  "example.com/gitlabhq/gitlab-test",
 		Name:              "gitlab-test",
 		SanitizedCloneURL: "https://example.com/gitlabhq/gitlab-test.git",
 		Owner:             "gitlabhq",
@@ -534,7 +523,6 @@ func TestParseGitlabMergeCommentEvent(t *testing.T) {
 	}, baseRepo)
 	Equals(t, models.Repo{
 		FullName:          "gitlab-org/gitlab-test",
-		FullNameWithHost:  "example.com/gitlab-org/gitlab-test",
 		Name:              "gitlab-test",
 		SanitizedCloneURL: "https://example.com/gitlab-org/gitlab-test.git",
 		Owner:             "gitlab-org",
@@ -562,7 +550,6 @@ func TestParseGitlabMergeCommentEvent_Subgroup(t *testing.T) {
 
 	Equals(t, models.Repo{
 		FullName:          "lkysow-test/subgroup/sub-subgroup/atlantis-example",
-		FullNameWithHost:  "gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example",
 		Name:              "atlantis-example",
 		SanitizedCloneURL: "https://gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
 		Owner:             "lkysow-test/subgroup/sub-subgroup",
@@ -574,7 +561,6 @@ func TestParseGitlabMergeCommentEvent_Subgroup(t *testing.T) {
 	}, baseRepo)
 	Equals(t, models.Repo{
 		FullName:          "lkysow-test/subgroup/sub-subgroup/atlantis-example",
-		FullNameWithHost:  "gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example",
 		Name:              "atlantis-example",
 		SanitizedCloneURL: "https://gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
 		Owner:             "lkysow-test/subgroup/sub-subgroup",
@@ -718,7 +704,6 @@ func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {
 	Ok(t, err)
 	expBaseRepo := models.Repo{
 		FullName:          "lkysow/atlantis-example",
-		FullNameWithHost:  "bitbucket.org/lkysow/atlantis-example",
 		Owner:             "lkysow",
 		Name:              "atlantis-example",
 		CloneURL:          "https://bitbucket-user:bitbucket-token@bitbucket.org/lkysow/atlantis-example.git",
@@ -741,7 +726,6 @@ func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {
 	}, pull)
 	Equals(t, models.Repo{
 		FullName:          "lkysow-fork/atlantis-example",
-		FullNameWithHost:  "bitbucket.org/lkysow-fork/atlantis-example",
 		Owner:             "lkysow-fork",
 		Name:              "atlantis-example",
 		CloneURL:          "https://bitbucket-user:bitbucket-token@bitbucket.org/lkysow-fork/atlantis-example.git",
@@ -806,7 +790,6 @@ func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 	Ok(t, err)
 	expBaseRepo := models.Repo{
 		FullName:          "lkysow/atlantis-example",
-		FullNameWithHost:  "bitbucket.org/lkysow/atlantis-example",
 		Owner:             "lkysow",
 		Name:              "atlantis-example",
 		CloneURL:          "https://bitbucket-user:bitbucket-token@bitbucket.org/lkysow/atlantis-example.git",
@@ -829,7 +812,6 @@ func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 	}, pull)
 	Equals(t, models.Repo{
 		FullName:          "lkysow-fork/atlantis-example",
-		FullNameWithHost:  "bitbucket.org/lkysow-fork/atlantis-example",
 		Owner:             "lkysow-fork",
 		Name:              "atlantis-example",
 		CloneURL:          "https://bitbucket-user:bitbucket-token@bitbucket.org/lkysow-fork/atlantis-example.git",
@@ -909,7 +891,6 @@ func TestParseBitbucketServerCommentEvent_ValidEvent(t *testing.T) {
 	Ok(t, err)
 	expBaseRepo := models.Repo{
 		FullName:          "atlantis/atlantis-example",
-		FullNameWithHost:  "mycorp.com:7490/atlantis/atlantis-example",
 		Owner:             "atlantis",
 		Name:              "atlantis-example",
 		CloneURL:          "http://bitbucket-user:bitbucket-token@mycorp.com:7490/scm/at/atlantis-example.git",
@@ -932,7 +913,6 @@ func TestParseBitbucketServerCommentEvent_ValidEvent(t *testing.T) {
 	}, pull)
 	Equals(t, models.Repo{
 		FullName:          "atlantis-fork/atlantis-example",
-		FullNameWithHost:  "mycorp.com:7490/atlantis-fork/atlantis-example",
 		Owner:             "atlantis-fork",
 		Name:              "atlantis-example",
 		CloneURL:          "http://bitbucket-user:bitbucket-token@mycorp.com:7490/scm/fk/atlantis-example.git",
@@ -993,7 +973,6 @@ func TestParseBitbucketServerPullEvent_ValidEvent(t *testing.T) {
 	Ok(t, err)
 	expBaseRepo := models.Repo{
 		FullName:          "atlantis/atlantis-example",
-		FullNameWithHost:  "mycorp.com:7490/atlantis/atlantis-example",
 		Owner:             "atlantis",
 		Name:              "atlantis-example",
 		CloneURL:          "http://bitbucket-user:bitbucket-token@mycorp.com:7490/scm/at/atlantis-example.git",
@@ -1016,7 +995,6 @@ func TestParseBitbucketServerPullEvent_ValidEvent(t *testing.T) {
 	}, pull)
 	Equals(t, models.Repo{
 		FullName:          "atlantis-fork/atlantis-example",
-		FullNameWithHost:  "mycorp.com:7490/atlantis-fork/atlantis-example",
 		Owner:             "atlantis-fork",
 		Name:              "atlantis-example",
 		CloneURL:          "http://bitbucket-user:bitbucket-token@mycorp.com:7490/scm/fk/atlantis-example.git",

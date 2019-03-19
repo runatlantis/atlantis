@@ -1,9 +1,10 @@
 package events
 
 import (
+	"testing"
+
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/testing"
-	"testing"
 )
 
 func TestUpdateCommitStatus(t *testing.T) {

@@ -35,9 +35,6 @@ type Repo struct {
 	// FullName is the owner and repo name separated
 	// by a "/", ex. "runatlantis/atlantis", "gitlab/subgroup/atlantis", "Bitbucket Server/atlantis".
 	FullName string
-	// FullNameWithHost
-	// This is the full name of the repo including the hostname. ex github.com/runatlantis/atlantis
-	FullNameWithHost string
 	// Owner is just the repo owner, ex. "runatlantis" or "gitlab/subgroup".
 	// This may contain /'s in the case of GitLab subgroups.
 	// This may contain spaces in the case of Bitbucket Server.
@@ -53,6 +50,12 @@ type Repo struct {
 	SanitizedCloneURL string
 	// VCSHost is where this repo is hosted.
 	VCSHost VCSHost
+}
+
+// ID returns the atlantis ID for this repo.
+// ID is in the form: {vcs hostname}/{repoFullName}.
+func (r Repo) ID() string {
+	return fmt.Sprintf("%s/%s", r.VCSHost.Hostname, r.FullName)
 }
 
 // NewRepo constructs a Repo object. repoFullName is the owner/repo form,
@@ -75,12 +78,6 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 	if err != nil {
 		return Repo{}, errors.Wrap(err, "invalid clone url")
 	}
-
-	repoHostname := cloneURLParsed.Hostname()
-	if cloneURLParsed.Port() != "" {
-		repoHostname = fmt.Sprintf("%s:%s", repoHostname, cloneURLParsed.Port())
-	}
-	repoFullNameWithHost := fmt.Sprintf("%s/%s", repoHostname, repoFullName)
 
 	// Ensure the Clone URL is for the same repo to avoid something malicious.
 	// We skip this check for Bitbucket Server because its format is different
@@ -120,7 +117,6 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 
 	return Repo{
 		FullName:          repoFullName,
-		FullNameWithHost:  repoFullNameWithHost,
 		Owner:             owner,
 		Name:              repo,
 		CloneURL:          authedCloneURL,
@@ -289,35 +285,56 @@ func (h VCSHostType) String() string {
 	return "<missing String() implementation>"
 }
 
+// ProjectCommandContext defines the context for a plan or apply stage that will
+// be executed for a project.
 type ProjectCommandContext struct {
 	// ApplyCmd is the command that users should run to apply this plan. If
 	// this is an apply then this will be empty.
 	ApplyCmd string
+	// ApplyRequirements is the list of requirements that must be satisfied
+	// before we will run the apply stage.
+	ApplyRequirements []string
+	// AutoplanEnabled is true if automerge is enabled for the repo that this
+	// project is in.
+	AutomergeEnabled bool
+	// AutoplanEnabled is true if autoplanning is enabled for this project.
+	AutoplanEnabled bool
 	// BaseRepo is the repository that the pull request will be merged into.
 	BaseRepo Repo
 	// CommentArgs are the extra arguments appended to comment,
 	// ex. atlantis plan -- -target=resource
-	CommentArgs  []string
-	GlobalConfig *valid.Config
+	CommentArgs []string
 	// HeadRepo is the repository that is getting merged into the BaseRepo.
 	// If the pull request branch is from the same repository then HeadRepo will
 	// be the same as BaseRepo.
-	// See https://help.github.com/articles/about-pull-request-merges/.
 	HeadRepo Repo
-	Log      *logging.SimpleLogger
+	// Log is a logger that's been set up for this context.
+	Log *logging.SimpleLogger
 	// PullMergeable is true if the pull request for this project is able to be merged.
 	PullMergeable bool
-	Pull          PullRequest
-	ProjectConfig *valid.Project
+	// Pull is the pull request we're responding to.
+	Pull PullRequest
+	// ProjectName is the name of the project set in atlantis.yaml. If there was
+	// no name this will be an empty string.
+	ProjectName string
 	// RePlanCmd is the command that users should run to re-plan this project.
 	// If this is an apply then this will be empty.
-	RePlanCmd        string
-	RepoRelDir       string
+	RePlanCmd string
+	// RepoRelDir is the directory of this project relative to the repo root.
+	RepoRelDir string
+	// Steps are the sequence of commands we need to run for this project and this
+	// stage.
+	Steps []valid.Step
+	// TerraformVersion is the version of terraform we should use when executing
+	// commands for this project. This can be set to nil in which case we will
+	// use the default Atlantis terraform version.
 	TerraformVersion *version.Version
 	// User is the user that triggered this command.
 	User User
 	// Verbose is true when the user would like verbose output.
-	Verbose   bool
+	Verbose bool
+	// Workspace is the Terraform workspace this project is in. It will always
+	// be set.
 	Workspace string
 }
 
@@ -332,15 +349,6 @@ func SplitRepoFullName(repoFullName string) (owner string, repo string) {
 		return "", ""
 	}
 	return repoFullName[:lastSlashIdx], repoFullName[lastSlashIdx+1:]
-}
-
-// GetProjectName returns the name of the project this context is for. If no
-// name is configured, it returns an empty string.
-func (p *ProjectCommandContext) GetProjectName() string {
-	if p.ProjectConfig != nil {
-		return p.ProjectConfig.GetName()
-	}
-	return ""
 }
 
 // ProjectResult is the result of executing a plan/apply for a specific project.

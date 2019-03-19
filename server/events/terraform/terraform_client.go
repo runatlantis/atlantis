@@ -17,11 +17,6 @@ package terraform
 import (
 	"bufio"
 	"fmt"
-	"github.com/hashicorp/go-getter"
-	"github.com/hashicorp/go-version"
-	"github.com/mitchellh/go-homedir"
-	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/logging"
 	"io"
 	"io/ioutil"
 	"os"
@@ -31,12 +26,20 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+
+	"github.com/hashicorp/go-getter"
+	"github.com/hashicorp/go-version"
+	"github.com/mitchellh/go-homedir"
+	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_terraform_client.go Client
 
 type Client interface {
-	Version() *version.Version
+	// RunCommandWithVersion executes terraform with args in path. If v is nil,
+	// it will use the default Terraform version. workspace is the Terraform
+	// workspace which should be set as an environment variable.
 	RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (string, error)
 }
 
@@ -168,16 +171,13 @@ func NewClient(log *logging.SimpleLogger, dataDir string, tfeToken string, defau
 	}, nil
 }
 
-// Version returns the version of the terraform executable in our $PATH.
-func (c *DefaultClient) Version() *version.Version {
+// Version returns the default version of Terraform we use if no other version
+// is defined.
+func (c *DefaultClient) DefaultVersion() *version.Version {
 	return c.defaultVersion
 }
 
-// RunCommandWithVersion executes the provided version of terraform with
-// the provided args in path. v is the version of terraform executable to use.
-// If v is nil, will use the default version.
-// Workspace is the terraform workspace to run in. We won't switch workspaces,
-// just set a WORKSPACE environment variable.
+// See Client.RunCommandWithVersion.
 func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (string, error) {
 	tfCmd, cmd, err := c.prepCmd(log, v, workspace, path, args)
 	if err != nil {
@@ -434,6 +434,7 @@ var rcFileContents = `credentials "app.terraform.io" {
 
 type DefaultDownloader struct{}
 
+// See go-getter.GetFile.
 func (d *DefaultDownloader) GetFile(dst, src string, opts ...getter.ClientOption) error {
 	return getter.GetFile(dst, src, opts...)
 }

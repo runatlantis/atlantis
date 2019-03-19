@@ -1,4 +1,4 @@
-# Getting Started
+# Testing Locally
 These instructions are for running Atlantis **locally on your own computer** so you can test it out against
 your own repositories before deciding whether to install it more permanently.
 
@@ -277,7 +277,7 @@ You should see Atlantis logging about receiving the webhook and you should see t
 
 Atlantis tries to figure out the directory to plan in based on the files modified.
 If you need to customize the directories that Atlantis runs in or the commands it runs if you're using workspaces
-or `.tfvars` files, see [atlantis.yaml Reference](../docs/atlantis-yaml-reference.html).
+or `.tfvars` files, see [atlantis.yaml Reference](/docs/repo-level-atlantis-yaml.html#reference).
 
 ### Manual Plan
 To manually `plan` in a specific directory or workspace, comment on the pull request using the `-d` or `-w` flags:
@@ -299,5 +299,5 @@ Atlantis at a specific plan. Otherwise it tries to apply the plan for the root d
 * If things are working as expected you can `Ctrl-C` the `atlantis server` command and the `ngrok` command.
 * Hopefully Atlantis is working with your repo and you're ready to move on to a [production-ready deployment](../docs/deployment.html).
 * If it's not working as expected, you may need to customize how Atlantis runs with an `atlantis.yaml` file.
-See [atlantis.yaml Reference](../docs/atlantis-yaml-reference.html).
-* Check out our full documentation for more details: [Documentation](../docs/).
+See [atlantis.yaml use cases](/docs/repo-level-atlantis-yaml.html#use-cases).
+* Check out our [full documentation](../docs/) for more details.

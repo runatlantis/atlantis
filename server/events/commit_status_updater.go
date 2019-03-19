@@ -67,7 +67,7 @@ func (d *DefaultCommitStatusUpdater) UpdateCombinedCount(repo models.Repo, pull 
 }
 
 func (d *DefaultCommitStatusUpdater) UpdateProject(ctx models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus, url string) error {
-	projectID := ctx.GetProjectName()
+	projectID := ctx.ProjectName
 	if projectID == "" {
 		projectID = fmt.Sprintf("%s/%s", ctx.RepoRelDir, ctx.Workspace)
 	}

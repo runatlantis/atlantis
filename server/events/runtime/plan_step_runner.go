@@ -2,14 +2,15 @@ package runtime
 
 import (
 	"fmt"
-	"github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/events/models"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/hashicorp/go-version"
+	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 const (
@@ -34,8 +35,8 @@ type PlanStepRunner struct {
 
 func (p *PlanStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string) (string, error) {
 	tfVersion := p.DefaultTFVersion
-	if ctx.ProjectConfig != nil && ctx.ProjectConfig.TerraformVersion != nil {
-		tfVersion = ctx.ProjectConfig.TerraformVersion
+	if ctx.TerraformVersion != nil {
+		tfVersion = ctx.TerraformVersion
 	}
 
 	// We only need to switch workspaces in version 0.9.*. In older versions,
@@ -44,7 +45,7 @@ func (p *PlanStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []strin
 		return "", err
 	}
 
-	planFile := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectConfig))
+	planFile := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	planCmd := p.buildPlanCmd(ctx, extraArgs, path, tfVersion, planFile)
 	output, err := p.TerraformExecutor.RunCommandWithVersion(ctx.Log, filepath.Clean(path), planCmd, tfVersion, ctx.Workspace)
 	if p.isRemoteOpsErr(output, err) {

@@ -15,8 +15,9 @@ package events_test
 
 import (
 	"errors"
-	"github.com/runatlantis/atlantis/server/events/db"
 	"testing"
+
+	"github.com/runatlantis/atlantis/server/events/db"
 
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events"
