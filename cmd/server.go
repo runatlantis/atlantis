@@ -107,7 +107,7 @@ var stringFlags = []stringFlag{
 	},
 	{
 		name:        ConfigFlag,
-		description: "Path to config file. All flags can be set in a YAML config file instead.",
+		description: "Path to yaml config file where flag values can also be set.",
 	},
 	{
 		name: CheckoutStrategyFlag,
@@ -171,7 +171,7 @@ var stringFlags = []stringFlag{
 	},
 	{
 		name:        RepoConfigFlag,
-		description: "Path to a repo config file, used to configure how atlantis.yaml will behave on repos.  Repos can be specified as an exact string or using regular expressions",
+		description: "Path to a repo config file, used to customize how Atlantis runs on each repo. See runatlantis.io/docs for more details.",
 	},
 	{
 		name: RepoWhitelistFlag,
@@ -216,7 +216,12 @@ var boolFlags = []boolFlag{
 			" Should only be enabled in a trusted environment since it enables a pull request to run arbitrary commands" +
 			" on the Atlantis server.",
 		defaultValue: false,
-		deprecated:   fmt.Sprintf("use --%s to allow sensitive keys in atlantis.yaml", RepoConfigFlag),
+		deprecated: fmt.Sprintf(`set a --%s file with the following config instead:
+    repos:
+    - id: /.*/
+      allowed_overrides: [workflow, apply_requirements]
+      allow_custom_workflows: true
+`, RepoConfigFlag),
 	},
 	{
 		name:         AutomergeFlag,
@@ -227,11 +232,21 @@ var boolFlags = []boolFlag{
 		name:         RequireApprovalFlag,
 		description:  "Require pull requests to be \"Approved\" before allowing the apply command to be run.",
 		defaultValue: false,
+		deprecated: fmt.Sprintf(`set a --%s file with the following config instead:
+    repos:
+    - id: /.*/
+      apply_requirements: [approved]
+`, RepoConfigFlag),
 	},
 	{
 		name:         RequireMergeableFlag,
 		description:  "Require pull requests to be mergeable before allowing the apply command to be run.",
 		defaultValue: false,
+		deprecated: fmt.Sprintf(`set a --%s file with the following config instead:
+    repos:
+    - id: /.*/
+      apply_requirements: [mergeable]
+`, RepoConfigFlag),
 	},
 	{
 		name:         SilenceWhitelistErrorsFlag,
@@ -457,7 +472,11 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		return fmt.Errorf("--%s and --%s are both required for ssl", SSLKeyFileFlag, SSLCertFileFlag)
 	}
 	if userConfig.AllowRepoConfig && userConfig.RepoConfig != "" {
-		return fmt.Errorf("You cannot use both --%s and --%s together.  --%s is deprecated and will be removed in a later version, you should use --%s instead", AllowRepoConfigFlag, RepoConfigFlag, AllowRepoConfigFlag, RepoConfigFlag)
+		return fmt.Errorf(`You cannot use both --%s and --%s together. Instead, use the following config in your --%s file:
+    repos:
+    - id: /.*/
+      allowed_overrides: [workflow, apply_requirements]
+      allow_custom_workflows: true`, AllowRepoConfigFlag, RepoConfigFlag, RepoConfigFlag)
 	}
 
 	// The following combinations are valid.

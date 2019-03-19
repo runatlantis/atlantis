@@ -921,7 +921,13 @@ func TestExecute_AllowRepoConfigWithAllowRestrictedRepoConfig(t *testing.T) {
 		cmd.RepoConfigFlag:      "somefile",
 	})
 	err := c.Execute()
-	ErrEquals(t, "You cannot use both --allow-repo-config and --repo-config together.  --allow-repo-config is deprecated and will be removed in a later version, you should use --repo-config instead", err)
+	ErrEquals(t,
+		`You cannot use both --allow-repo-config and --repo-config together. Instead, use the following config in your --repo-config file:
+    repos:
+    - id: /.*/
+      allowed_overrides: [workflow, apply_requirements]
+      allow_custom_workflows: true`,
+		err)
 }
 
 func setup(flags map[string]interface{}) *cobra.Command {
