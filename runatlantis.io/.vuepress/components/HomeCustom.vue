@@ -15,8 +15,8 @@
     <div class="workflow-container">
       <div class="workflow">
         <h1>The Atlantis Workflow</h1>
-        <img src="/mobile-workflow.png" class="mobile" alt="Atlantis Workflow">
-        <img src="/workflow.png" class="desktop" alt="Atlantis Workflow">
+        <img src="/mobile-workflow-min.png" class="mobile" alt="Atlantis Workflow">
+        <img src="/workflow-min.png" class="desktop" alt="Atlantis Workflow">
       </div>
     </div>
     <div class="benefits-container">
