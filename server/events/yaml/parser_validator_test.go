@@ -950,7 +950,7 @@ repos:
 func TestReadServerConfig_DirDoesNotExist(t *testing.T) {
 	r := yaml.ParserValidator{}
 	_, err := r.ReadServerConfig("/not/exist")
-	Assert(t, os.IsNotExist(err), "exp nil ptr")
+	ErrEquals(t, "unable to read /not/exist file: open /not/exist: no such file or directory", err)
 }
 
 func TestReadServerConfig_FileDoesNotExist(t *testing.T) {
@@ -958,8 +958,9 @@ func TestReadServerConfig_FileDoesNotExist(t *testing.T) {
 	defer cleanup()
 
 	r := yaml.ParserValidator{}
-	_, err := r.ReadServerConfig(tmpDir + "repos.yaml")
-	Assert(t, os.IsNotExist(err), "exp nil ptr")
+	f := filepath.Join(tmpDir, "config.yml")
+	_, err := r.ReadServerConfig(f)
+	ErrEquals(t, fmt.Sprintf("unable to read %s file: open %s: no such file or directory", f, f), err)
 }
 
 func TestReadServerConfig_BadPermissions(t *testing.T) {

@@ -47,14 +47,6 @@ func (p *ParserValidator) ReadConfig(repoDir string, repoConfig raw.RepoConfig, 
 
 func (p *ParserValidator) ReadServerConfig(configFile string) (raw.RepoConfig, error) {
 	configData, err := ioutil.ReadFile(configFile) // nolint: gosec
-
-	// NOTE: the error we return here must also be os.IsNotExist since that's
-	// what our callers use to detect a missing config file.
-	if err != nil && os.IsNotExist(err) {
-		return raw.RepoConfig{}, err
-	}
-
-	// If it exists but we couldn't read it return an error.
 	if err != nil {
 		return raw.RepoConfig{}, errors.Wrapf(err, "unable to read %s file", configFile)
 	}

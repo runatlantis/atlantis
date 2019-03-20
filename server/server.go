@@ -202,7 +202,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	repoConfig := raw.RepoConfig{
 		Repos: []raw.Repo{{ID: "/.*/"}},
 	}
-
 	if userConfig.RepoConfig != "" {
 		repoConfig, err = validator.ReadServerConfig(userConfig.RepoConfig)
 		if err != nil {
