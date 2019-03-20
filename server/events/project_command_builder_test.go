@@ -235,7 +235,7 @@ projects:
 }
 
 func TestDefaultProjectCommandBuilder_RepoRestrictionsBuildPlanCommands(t *testing.T) {
-
+	RegisterMockTestingT(t)
 	workflow := "repoworkflow"
 	repoConfig := raw.RepoConfig{
 		Repos: []raw.Repo{{
@@ -256,57 +256,53 @@ func TestDefaultProjectCommandBuilder_RepoRestrictionsBuildPlanCommands(t *testi
 		},
 	}
 
-	t.Run("run plan with server side repo config and no atlantis.yaml", func(t *testing.T) {
-		RegisterMockTestingT(t)
-		tmpDir, cleanup := TempDir(t)
-		defer cleanup()
+	tmpDir, cleanup := TempDir(t)
+	defer cleanup()
 
-		baseRepo := models.Repo{}
-		headRepo := models.Repo{}
-		pull := models.PullRequest{}
-		logger := logging.NewNoopLogger()
-		workingDir := mocks.NewMockWorkingDir()
-		When(workingDir.Clone(logger, baseRepo, headRepo, pull, "default")).ThenReturn(tmpDir, nil)
+	baseRepo := models.Repo{}
+	headRepo := models.Repo{}
+	pull := models.PullRequest{}
+	logger := logging.NewNoopLogger()
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.Clone(logger, baseRepo, headRepo, pull, "default")).ThenReturn(tmpDir, nil)
 
-		vcsClient := vcsmocks.NewMockClient()
-		When(vcsClient.GetModifiedFiles(baseRepo, pull)).ThenReturn([]string{"main.tf"}, nil)
+	vcsClient := vcsmocks.NewMockClient()
+	When(vcsClient.GetModifiedFiles(baseRepo, pull)).ThenReturn([]string{"main.tf"}, nil)
 
-		builder := &events.DefaultProjectCommandBuilder{
-			WorkingDirLocker:    events.NewDefaultWorkingDirLocker(),
-			WorkingDir:          workingDir,
-			ParserValidator:     &yaml.ParserValidator{},
-			VCSClient:           vcsClient,
-			ProjectFinder:       &events.DefaultProjectFinder{},
-			AllowRepoConfig:     false,
-			RepoConfig:          repoConfig,
-			PendingPlanFinder:   &events.DefaultPendingPlanFinder{},
-			AllowRepoConfigFlag: "allow-repo-config",
-			CommentBuilder:      &events.CommentParser{},
-		}
+	builder := &events.DefaultProjectCommandBuilder{
+		WorkingDirLocker:    events.NewDefaultWorkingDirLocker(),
+		WorkingDir:          workingDir,
+		ParserValidator:     &yaml.ParserValidator{},
+		VCSClient:           vcsClient,
+		ProjectFinder:       &events.DefaultProjectFinder{},
+		AllowRepoConfig:     false,
+		RepoConfig:          repoConfig,
+		PendingPlanFinder:   &events.DefaultPendingPlanFinder{},
+		AllowRepoConfigFlag: "allow-repo-config",
+		CommentBuilder:      &events.CommentParser{},
+	}
 
-		ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
-			BaseRepo: baseRepo,
-			HeadRepo: headRepo,
-			Pull:     pull,
-			User:     models.User{},
-			Log:      logger,
-		})
-		Ok(t, err)
-
-		for _, actCtx := range ctxs {
-			Equals(t, baseRepo, actCtx.BaseRepo)
-			Equals(t, baseRepo, actCtx.HeadRepo)
-			Equals(t, pull, actCtx.Pull)
-			Equals(t, models.User{}, actCtx.User)
-			Equals(t, logger, actCtx.Log)
-			Equals(t, 0, len(actCtx.CommentArgs))
-
-			Equals(t, expProjectCfg, actCtx.ProjectConfig)
-			Equals(t, expDir, actCtx.RepoRelDir)
-			Equals(t, expWorkspace, actCtx.Workspace)
-		}
+	ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
+		BaseRepo: baseRepo,
+		HeadRepo: headRepo,
+		Pull:     pull,
+		User:     models.User{},
+		Log:      logger,
 	})
+	Ok(t, err)
+	Equals(t, 1, len(ctxs))
 
+	actCtx := ctxs[0]
+	Equals(t, baseRepo, actCtx.BaseRepo)
+	Equals(t, baseRepo, actCtx.HeadRepo)
+	Equals(t, pull, actCtx.Pull)
+	Equals(t, models.User{}, actCtx.User)
+	Equals(t, logger, actCtx.Log)
+	Equals(t, 0, len(actCtx.CommentArgs))
+
+	Equals(t, expProjectCfg, actCtx.ProjectConfig)
+	Equals(t, expDir, actCtx.RepoRelDir)
+	Equals(t, expWorkspace, actCtx.Workspace)
 }
 
 func TestDefaultProjectCommandBuilder_BuildSingleApplyCommandRepoRestrictions(t *testing.T) {
