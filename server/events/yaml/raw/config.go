@@ -37,14 +37,14 @@ func (c Config) Validate() error {
 }
 
 func (c Config) ToValid() valid.Config {
+	validWorkflows := make(map[string]valid.Workflow)
+	for k, v := range c.Workflows {
+		validWorkflows[k] = v.ToValid(k)
+	}
+
 	var validProjects []valid.Project
 	for _, p := range c.Projects {
 		validProjects = append(validProjects, p.ToValid())
-	}
-
-	validWorkflows := make(map[string]valid.Workflow)
-	for k, v := range c.Workflows {
-		validWorkflows[k] = v.ToValid()
 	}
 
 	automerge := DefaultAutomerge

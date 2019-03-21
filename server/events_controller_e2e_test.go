@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/hashicorp/go-getter"
 	"github.com/runatlantis/atlantis/server/events/db"
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -426,15 +427,26 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClient, *moc
 		AllowForkPRs:             allowForkPRs,
 		AllowForkPRsFlag:         "allow-fork-prs",
 		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
-			ParserValidator:     &yaml.ParserValidator{},
-			ProjectFinder:       &events.DefaultProjectFinder{},
-			VCSClient:           e2eVCSClient,
-			WorkingDir:          workingDir,
-			WorkingDirLocker:    locker,
-			AllowRepoConfigFlag: "allow-repo-config",
-			AllowRepoConfig:     true,
-			PendingPlanFinder:   &events.DefaultPendingPlanFinder{},
-			CommentBuilder:      commentParser,
+			ParserValidator:   &yaml.ParserValidator{},
+			ProjectFinder:     &events.DefaultProjectFinder{},
+			VCSClient:         e2eVCSClient,
+			WorkingDir:        workingDir,
+			WorkingDirLocker:  locker,
+			PendingPlanFinder: &events.DefaultPendingPlanFinder{},
+			CommentBuilder:    commentParser,
+			GlobalCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					{
+						IDRegex:              regexp.MustCompile(".*"),
+						AllowedOverrides:     []string{"apply_requirments", "workflow"},
+						AllowCustomWorkflows: boolPtr(true),
+						Workflow: &valid.Workflow{
+							Apply: valid.DefaultApplyStage,
+							Plan:  valid.DefaultPlanStage,
+						},
+					},
+				},
+			},
 		},
 		DB:                boltdb,
 		PendingPlanFinder: &events.DefaultPendingPlanFinder{},
@@ -628,4 +640,8 @@ func assertCommentEquals(t *testing.T, expFile string, act string, repoDir strin
 			t.Errorf("%q was different, wrote actual comment to %q", expFile, rel)
 		}
 	}
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }

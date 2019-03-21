@@ -17,15 +17,19 @@ func (w Workflow) Validate() error {
 	)
 }
 
-func (w Workflow) ToValid() valid.Workflow {
-	var v valid.Workflow
-	if w.Apply != nil {
-		apply := w.Apply.ToValid()
-		v.Apply = &apply
+func (w Workflow) ToValid(name string) valid.Workflow {
+	v := valid.Workflow{
+		Name: name,
 	}
-	if w.Plan != nil {
-		plan := w.Plan.ToValid()
-		v.Plan = &plan
+	if w.Apply == nil {
+		v.Apply = valid.DefaultApplyStage
+	} else {
+		v.Apply = w.Apply.ToValid()
+	}
+	if w.Plan == nil {
+		v.Plan = valid.DefaultPlanStage
+	} else {
+		v.Plan = w.Plan.ToValid()
 	}
 	return v
 }

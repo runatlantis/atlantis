@@ -7,7 +7,6 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/terraform"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	"regexp"
 )
@@ -58,12 +57,12 @@ var invalidFilenameChars = regexp.MustCompile(`[\\/:"*?<>|]`)
 
 // GetPlanFilename returns the filename (not the path) of the generated tf plan
 // given a workspace and maybe a project's config.
-func GetPlanFilename(workspace string, maybeCfg *valid.Project) string {
+func GetPlanFilename(workspace string, projName string) string {
 	var unescapedFilename string
-	if maybeCfg == nil || maybeCfg.Name == nil {
+	if projName == "" {
 		unescapedFilename = fmt.Sprintf("%s.tfplan", workspace)
 	} else {
-		unescapedFilename = fmt.Sprintf("%s-%s.tfplan", *maybeCfg.Name, workspace)
+		unescapedFilename = fmt.Sprintf("%s-%s.tfplan", projName, workspace)
 	}
 	return invalidFilenameChars.ReplaceAllLiteralString(unescapedFilename, "-")
 }

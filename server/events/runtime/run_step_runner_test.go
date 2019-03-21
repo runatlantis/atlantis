@@ -7,7 +7,6 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/runtime"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -72,14 +71,10 @@ func TestRunStepRunner_Run(t *testing.T) {
 		User: models.User{
 			Username: "acme-user",
 		},
-		Log:        logging.NewNoopLogger(),
-		Workspace:  "myworkspace",
-		RepoRelDir: "mydir",
-		ProjectConfig: &valid.Project{
-			TerraformVersion: projVersion,
-			Workspace:        "myworkspace",
-			Dir:              "mydir",
-		},
+		Log:              logging.NewNoopLogger(),
+		Workspace:        "myworkspace",
+		RepoRelDir:       "mydir",
+		TerraformVersion: projVersion,
 	}
 	for _, c := range cases {
 		t.Run(c.Command, func(t *testing.T) {

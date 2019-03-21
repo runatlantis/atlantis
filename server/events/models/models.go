@@ -293,8 +293,10 @@ type ProjectCommandContext struct {
 	BaseRepo Repo
 	// CommentArgs are the extra arguments appended to comment,
 	// ex. atlantis plan -- -target=resource
-	CommentArgs  []string
-	GlobalConfig *valid.Config
+	CommentArgs      []string
+	AutomergeEnabled bool
+	AutoplanEnabled  bool
+	Steps            []valid.Step
 	// HeadRepo is the repository that is getting merged into the BaseRepo.
 	// If the pull request branch is from the same repository then HeadRepo will
 	// be the same as BaseRepo.
@@ -302,9 +304,10 @@ type ProjectCommandContext struct {
 	HeadRepo Repo
 	Log      *logging.SimpleLogger
 	// PullMergeable is true if the pull request for this project is able to be merged.
-	PullMergeable bool
-	Pull          PullRequest
-	ProjectConfig *valid.Project
+	PullMergeable     bool
+	Pull              PullRequest
+	ProjectName       string
+	ApplyRequirements []string
 	// RePlanCmd is the command that users should run to re-plan this project.
 	// If this is an apply then this will be empty.
 	RePlanCmd        string
@@ -328,15 +331,6 @@ func SplitRepoFullName(repoFullName string) (owner string, repo string) {
 		return "", ""
 	}
 	return repoFullName[:lastSlashIdx], repoFullName[lastSlashIdx+1:]
-}
-
-// GetProjectName returns the name of the project this context is for. If no
-// name is configured, it returns an empty string.
-func (p *ProjectCommandContext) GetProjectName() string {
-	if p.ProjectConfig != nil {
-		return p.ProjectConfig.GetName()
-	}
-	return ""
 }
 
 // ProjectResult is the result of executing a plan/apply for a specific project.

@@ -21,7 +21,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/runatlantis/atlantis/server/events/db"
-	"github.com/runatlantis/atlantis/server/events/yaml/raw"
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"log"
 	"net/http"
 	"net/url"
@@ -199,11 +199,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	// This is a default config that will allow safe keys to be used in atlantis.yaml by default
 	// but restrict all sensitive keys.  This is used if the server is started without --repo-config.
-	repoConfig := raw.RepoConfig{
-		Repos: []raw.Repo{{ID: "/.*/"}},
-	}
+	// todo: should have a constructor here that takes in the require flags
+	//       and returns a properly created global cfg
+	globalCfg := valid.GlobalCfg{}
 	if userConfig.RepoConfig != "" {
-		repoConfig, err = validator.ReadServerConfig(userConfig.RepoConfig)
+		globalCfg, err = validator.ParseGlobalCfg(userConfig.RepoConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -250,16 +250,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AllowForkPRs:             userConfig.AllowForkPRs,
 		AllowForkPRsFlag:         config.AllowForkPRsFlag,
 		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
-			ParserValidator:     validator,
-			ProjectFinder:       &events.DefaultProjectFinder{},
-			VCSClient:           vcsClient,
-			WorkingDir:          workingDir,
-			WorkingDirLocker:    workingDirLocker,
-			AllowRepoConfig:     userConfig.AllowRepoConfig,
-			RepoConfig:          repoConfig,
-			AllowRepoConfigFlag: config.AllowRepoConfigFlag,
-			PendingPlanFinder:   pendingPlanFinder,
-			CommentBuilder:      commentParser,
+			ParserValidator:   validator,
+			ProjectFinder:     &events.DefaultProjectFinder{},
+			VCSClient:         vcsClient,
+			WorkingDir:        workingDir,
+			WorkingDirLocker:  workingDirLocker,
+			GlobalCfg:         globalCfg,
+			PendingPlanFinder: pendingPlanFinder,
+			CommentBuilder:    commentParser,
 		},
 		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
 			Locker:           projectLocker,
@@ -282,12 +280,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			RunStepRunner: &runtime.RunStepRunner{
 				DefaultTFVersion: defaultTfVersion,
 			},
-			PullApprovedChecker:      vcsClient,
-			WorkingDir:               workingDir,
-			Webhooks:                 webhooksManager,
-			WorkingDirLocker:         workingDirLocker,
-			RequireApprovalOverride:  userConfig.RequireApproval,
-			RequireMergeableOverride: userConfig.RequireMergeable,
+			PullApprovedChecker: vcsClient,
+			WorkingDir:          workingDir,
+			Webhooks:            webhooksManager,
+			WorkingDirLocker:    workingDirLocker,
 		},
 		WorkingDir:        workingDir,
 		PendingPlanFinder: pendingPlanFinder,

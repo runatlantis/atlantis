@@ -14,6 +14,7 @@
 package events
 
 import (
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"os"
 	"path"
 	"path/filepath"
@@ -22,7 +23,6 @@ import (
 	"github.com/docker/docker/pkg/fileutils"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -78,6 +78,7 @@ func (p *DefaultProjectFinder) DetermineProjects(log *logging.SimpleLogger, modi
 // based on the modifiedFiles and config. We look at the WhenModified section
 // of the config for each project and see if the modifiedFiles matches.
 // The list will be de-duplicated.
+// todo: move this to yaml.MergedRepoCfg as a method on this project
 func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log *logging.SimpleLogger, modifiedFiles []string, config valid.Config, repoDir string) ([]valid.Project, error) {
 	var projects []valid.Project
 	for _, project := range config.Projects {

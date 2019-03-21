@@ -35,15 +35,7 @@ func (p Project) Validate() error {
 		}
 		return nil
 	}
-	validApplyReq := func(value interface{}) error {
-		reqs := value.([]string)
-		for _, r := range reqs {
-			if r != ApprovedApplyRequirement && r != MergeableApplyRequirement {
-				return fmt.Errorf("%q not supported, only %s and %s are supported", r, ApprovedApplyRequirement, MergeableApplyRequirement)
-			}
-		}
-		return nil
-	}
+
 	validTFVersion := func(value interface{}) error {
 		strPtr := value.(*string)
 		if strPtr == nil {
@@ -112,4 +104,14 @@ func (p Project) ToValid() valid.Project {
 func validProjectName(name string) bool {
 	nameWithoutSlashes := strings.Replace(name, "/", "-", -1)
 	return nameWithoutSlashes == url.QueryEscape(nameWithoutSlashes)
+}
+
+func validApplyReq(value interface{}) error {
+	reqs := value.([]string)
+	for _, r := range reqs {
+		if r != ApprovedApplyRequirement && r != MergeableApplyRequirement {
+			return fmt.Errorf("%q not supported, only %s and %s are supported", r, ApprovedApplyRequirement, MergeableApplyRequirement)
+		}
+	}
+	return nil
 }

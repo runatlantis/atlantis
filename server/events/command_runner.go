@@ -428,7 +428,7 @@ func (c *DefaultCommandRunner) automergeEnabled(ctx *CommandContext, projectCmds
 	// If the global automerge is set, we always automerge.
 	return c.GlobalAutomerge ||
 		// Otherwise we check if this repo is configured for automerging.
-		(len(projectCmds) > 0 && projectCmds[0].GlobalConfig != nil && projectCmds[0].GlobalConfig.Automerge)
+		(len(projectCmds) > 0 && projectCmds[0].AutomergeEnabled)
 }
 
 // automergeComment is the comment that gets posted when Atlantis automatically

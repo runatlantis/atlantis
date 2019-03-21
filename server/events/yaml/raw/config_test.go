@@ -262,6 +262,37 @@ func TestConfig_ToValid(t *testing.T) {
 			},
 		},
 		{
+			description: "only plan stage set",
+			input: raw.Config{
+				Version: Int(2),
+				Workflows: map[string]raw.Workflow{
+					"myworkflow": {
+						Plan:  &raw.Stage{},
+						Apply: nil,
+					},
+				},
+			},
+			exp: valid.Config{
+				Version:   2,
+				Automerge: false,
+				Workflows: map[string]valid.Workflow{
+					"myworkflow": {
+						Name: "myworkflow",
+						Plan: valid.Stage{
+							Steps: nil,
+						},
+						Apply: valid.Stage{
+							Steps: []valid.Step{
+								{
+									StepName: "apply",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			description: "everything set",
 			input: raw.Config{
 				Version:   Int(2),
@@ -295,14 +326,15 @@ func TestConfig_ToValid(t *testing.T) {
 				Automerge: true,
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": {
-						Apply: &valid.Stage{
+						Name: "myworkflow",
+						Apply: valid.Stage{
 							Steps: []valid.Step{
 								{
 									StepName: "apply",
 								},
 							},
 						},
-						Plan: &valid.Stage{
+						Plan: valid.Stage{
 							Steps: []valid.Step{
 								{
 									StepName: "init",
