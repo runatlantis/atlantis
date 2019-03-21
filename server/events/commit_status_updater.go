@@ -43,7 +43,7 @@ type DefaultCommitStatusUpdater struct {
 }
 
 func (d *DefaultCommitStatusUpdater) UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName) error {
-	src := fmt.Sprintf("%s/atlantis", command.String())
+	src := fmt.Sprintf("atlantis/%s", command.String())
 	var descripWords string
 	switch status {
 	case models.PendingCommitStatus:
@@ -58,7 +58,7 @@ func (d *DefaultCommitStatusUpdater) UpdateCombined(repo models.Repo, pull model
 }
 
 func (d *DefaultCommitStatusUpdater) UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName, numSuccess int, numTotal int) error {
-	src := fmt.Sprintf("%s/atlantis", command.String())
+	src := fmt.Sprintf("atlantis/%s", command.String())
 	cmdVerb := "planned"
 	if command == models.ApplyCommand {
 		cmdVerb = "applied"
@@ -71,7 +71,7 @@ func (d *DefaultCommitStatusUpdater) UpdateProject(ctx models.ProjectCommandCont
 	if projectID == "" {
 		projectID = fmt.Sprintf("%s/%s", ctx.RepoRelDir, ctx.Workspace)
 	}
-	src := fmt.Sprintf("%s/atlantis: %s", cmdName.String(), projectID)
+	src := fmt.Sprintf("atlantis/%s: %s", cmdName.String(), projectID)
 	var descripWords string
 	switch status {
 	case models.PendingCommitStatus:
