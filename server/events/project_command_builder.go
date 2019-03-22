@@ -124,7 +124,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 	}
 
 	// Parse config file if it exists.
-	hasRepoCfg, err := p.ParserValidator.HasConfigFile(repoDir)
+	hasRepoCfg, err := p.ParserValidator.HasRepoCfg(repoDir)
 	if err != nil {
 		return nil, errors.Wrapf(err, "looking for %s file in %q", yaml.AtlantisYAMLFilename, repoDir)
 	}
@@ -282,7 +282,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(
 }
 
 func (p *DefaultProjectCommandBuilder) getCfg(ctx *CommandContext, projectName string, dir string, workspace string, repoDir string) (projectCfg *valid.Project, repoCfg *valid.Config, err error) {
-	hasConfigFile, err := p.ParserValidator.HasConfigFile(repoDir)
+	hasConfigFile, err := p.ParserValidator.HasRepoCfg(repoDir)
 	if err != nil {
 		err = errors.Wrapf(err, "looking for %s file in %q", yaml.AtlantisYAMLFilename, repoDir)
 		return

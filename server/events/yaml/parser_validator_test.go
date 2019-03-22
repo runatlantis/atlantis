@@ -14,30 +14,37 @@ import (
 
 var globalCfg = valid.NewGlobalCfg(true, false, false)
 
-func TestReadConfig_DirDoesNotExist(t *testing.T) {
+func TestHasRepoCfg_DirDoesNotExist(t *testing.T) {
+	r := yaml.ParserValidator{}
+	exists, err := r.HasRepoCfg("/not/exist")
+	Ok(t, err)
+	Equals(t, false, exists)
+}
+
+func TestHasRepoCfg_FileDoesNotExist(t *testing.T) {
+	tmpDir, cleanup := TempDir(t)
+	defer cleanup()
+	r := yaml.ParserValidator{}
+	exists, err := r.HasRepoCfg(tmpDir)
+	Ok(t, err)
+	Equals(t, false, exists)
+}
+
+func TestParseRepoCfg_DirDoesNotExist(t *testing.T) {
 	r := yaml.ParserValidator{}
 	_, err := r.ParseRepoCfg("/not/exist", globalCfg, "")
 	Assert(t, os.IsNotExist(err), "exp nil ptr")
-
-	exists, err := r.HasConfigFile("/not/exist")
-	Ok(t, err)
-	Equals(t, false, exists)
 }
 
-func TestReadConfig_FileDoesNotExist(t *testing.T) {
+func TestParseRepoCfg_FileDoesNotExist(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
-
 	r := yaml.ParserValidator{}
 	_, err := r.ParseRepoCfg(tmpDir, globalCfg, "")
 	Assert(t, os.IsNotExist(err), "exp nil ptr")
-
-	exists, err := r.HasConfigFile(tmpDir)
-	Ok(t, err)
-	Equals(t, false, exists)
 }
 
-func TestReadConfig_BadPermissions(t *testing.T) {
+func TestParseRepoCfg_BadPermissions(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
 	err := ioutil.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), nil, 0000)
@@ -48,7 +55,7 @@ func TestReadConfig_BadPermissions(t *testing.T) {
 	ErrContains(t, "unable to read atlantis.yaml file: ", err)
 }
 
-func TestReadConfig_UnmarshalErrors(t *testing.T) {
+func TestParseRepoCfg_UnmarshalErrors(t *testing.T) {
 	// We only have a few cases here because we assume the YAML library to be
 	// well tested. See https://github.com/go-yaml/yaml/blob/v2/decode_test.go#L810.
 	cases := []struct {
@@ -82,7 +89,7 @@ func TestReadConfig_UnmarshalErrors(t *testing.T) {
 	}
 }
 
-func TestReadConfig(t *testing.T) {
+func TestParseRepoCfg(t *testing.T) {
 	tfVersion, _ := version.NewVersion("v0.11.0")
 	cases := []struct {
 		description string
@@ -160,6 +167,109 @@ projects:
 					},
 				},
 				Workflows: map[string]valid.Workflow{},
+			},
+		},
+		{
+			description: "autoplan should be enabled by default",
+			input: `
+version: 2
+projects:
+- dir: "."
+  autoplan:
+    when_modified: ["**/*.tf*"]
+`,
+			exp: valid.Config{
+				Version: 2,
+				Projects: []valid.Project{
+					{
+						Dir:       ".",
+						Workspace: "default",
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf*"},
+							Enabled:      true,
+						},
+					},
+				},
+				Workflows: make(map[string]valid.Workflow),
+			},
+		},
+		{
+			description: "if workflows not defined there are none",
+			input: `
+version: 2
+projects:
+- dir: "."
+`,
+			exp: valid.Config{
+				Version: 2,
+				Projects: []valid.Project{
+					{
+						Dir:       ".",
+						Workspace: "default",
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf*"},
+							Enabled:      true,
+						},
+					},
+				},
+				Workflows: make(map[string]valid.Workflow),
+			},
+		},
+		{
+			description: "if workflows key set but with no workflows there are none",
+			input: `
+version: 2
+projects:
+- dir: "."
+workflows: ~
+`,
+			exp: valid.Config{
+				Version: 2,
+				Projects: []valid.Project{
+					{
+						Dir:       ".",
+						Workspace: "default",
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf*"},
+							Enabled:      true,
+						},
+					},
+				},
+				Workflows: make(map[string]valid.Workflow),
+			},
+		},
+		{
+			description: "if a plan or apply explicitly defines an empty steps key then it gets the defaults",
+			input: `
+version: 2
+projects:
+- dir: "."
+workflows:
+  default:
+    plan:
+      steps:
+    apply:
+      steps:
+`,
+			exp: valid.Config{
+				Version: 2,
+				Projects: []valid.Project{
+					{
+						Dir:       ".",
+						Workspace: "default",
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf*"},
+							Enabled:      true,
+						},
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"default": {
+						Name:  "default",
+						Plan:  valid.DefaultPlanStage,
+						Apply: valid.DefaultApplyStage,
+					},
+				},
 			},
 		},
 		{
@@ -428,125 +538,6 @@ projects:
 				Workflows: map[string]valid.Workflow{},
 			},
 		},
-	}
-
-	tmpDir, cleanup := TempDir(t)
-	defer cleanup()
-
-	for _, c := range cases {
-		t.Run(c.description, func(t *testing.T) {
-			err := ioutil.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(c.input), 0600)
-			Ok(t, err)
-
-			r := yaml.ParserValidator{}
-			act, err := r.ParseRepoCfg(tmpDir, globalCfg, "")
-			if c.expErr != "" {
-				ErrEquals(t, "parsing atlantis.yaml: "+c.expErr, err)
-				return
-			}
-			Ok(t, err)
-			Equals(t, c.exp, act)
-		})
-	}
-}
-
-func TestReadConfig_Successes(t *testing.T) {
-	basicProjects := []valid.Project{
-		{
-			Autoplan: valid.Autoplan{
-				Enabled:      true,
-				WhenModified: []string{"**/*.tf*"},
-			},
-			Workspace:         "default",
-			ApplyRequirements: nil,
-			Dir:               ".",
-		},
-	}
-
-	cases := []struct {
-		description string
-		input       string
-		expOutput   valid.Config
-	}{
-		{
-			description: "uses project defaults",
-			input: `
-version: 2
-projects:
-- dir: "."`,
-			expOutput: valid.Config{
-				Version:   2,
-				Projects:  basicProjects,
-				Workflows: make(map[string]valid.Workflow),
-			},
-		},
-		{
-			description: "autoplan is enabled by default",
-			input: `
-version: 2
-projects:
-- dir: "."
-  autoplan:
-    when_modified: ["**/*.tf*"]
-`,
-			expOutput: valid.Config{
-				Version:   2,
-				Projects:  basicProjects,
-				Workflows: make(map[string]valid.Workflow),
-			},
-		},
-		{
-			description: "if workflows not defined there are none",
-			input: `
-version: 2
-projects:
-- dir: "."
-`,
-			expOutput: valid.Config{
-				Version:   2,
-				Projects:  basicProjects,
-				Workflows: make(map[string]valid.Workflow),
-			},
-		},
-		{
-			description: "if workflows key set but with no workflows there are none",
-			input: `
-version: 2
-projects:
-- dir: "."
-workflows: ~
-`,
-			expOutput: valid.Config{
-				Version:   2,
-				Projects:  basicProjects,
-				Workflows: make(map[string]valid.Workflow),
-			},
-		},
-		{
-			description: "if a plan or apply explicitly defines an empty steps key then it gets the defaults",
-			input: `
-version: 2
-projects:
-- dir: "."
-workflows:
-  default:
-    plan:
-      steps:
-    apply:
-      steps:
-`,
-			expOutput: valid.Config{
-				Version:  2,
-				Projects: basicProjects,
-				Workflows: map[string]valid.Workflow{
-					"default": {
-						Name:  "default",
-						Plan:  valid.DefaultPlanStage,
-						Apply: valid.DefaultApplyStage,
-					},
-				},
-			},
-		},
 		{
 			description: "if steps are set then we parse them properly",
 			input: `
@@ -564,9 +555,18 @@ workflows:
       - plan # NOTE: we don't validate if they make sense
       - apply
 `,
-			expOutput: valid.Config{
-				Version:  2,
-				Projects: basicProjects,
+			exp: valid.Config{
+				Version: 2,
+				Projects: []valid.Project{
+					{
+						Dir:       ".",
+						Workspace: "default",
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf*"},
+							Enabled:      true,
+						},
+					},
+				},
 				Workflows: map[string]valid.Workflow{
 					"default": {
 						Name: "default",
@@ -617,9 +617,18 @@ workflows:
       - apply:
           extra_args: ["a", "b"]
 `,
-			expOutput: valid.Config{
-				Version:  2,
-				Projects: basicProjects,
+			exp: valid.Config{
+				Version: 2,
+				Projects: []valid.Project{
+					{
+						Dir:       ".",
+						Workspace: "default",
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf*"},
+							Enabled:      true,
+						},
+					},
+				},
 				Workflows: map[string]valid.Workflow{
 					"default": {
 						Name: "default",
@@ -666,9 +675,18 @@ workflows:
       steps:
       - run: echo apply "arg 2"
 `,
-			expOutput: valid.Config{
-				Version:  2,
-				Projects: basicProjects,
+			exp: valid.Config{
+				Version: 2,
+				Projects: []valid.Project{
+					{
+						Dir:       ".",
+						Workspace: "default",
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf*"},
+							Enabled:      true,
+						},
+					},
+				},
 				Workflows: map[string]valid.Workflow{
 					"default": {
 						Name: "default",
@@ -704,8 +722,12 @@ workflows:
 
 			r := yaml.ParserValidator{}
 			act, err := r.ParseRepoCfg(tmpDir, globalCfg, "")
+			if c.expErr != "" {
+				ErrEquals(t, "parsing atlantis.yaml: "+c.expErr, err)
+				return
+			}
 			Ok(t, err)
-			Equals(t, c.expOutput, act)
+			Equals(t, c.exp, act)
 		})
 	}
 }

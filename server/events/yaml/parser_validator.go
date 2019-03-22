@@ -2,7 +2,6 @@ package yaml
 
 import (
 	"fmt"
-	"github.com/hashicorp/go-version"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -19,30 +18,10 @@ const AtlantisYAMLFilename = "atlantis.yaml"
 
 type ParserValidator struct{}
 
-type MergedRepoCfg struct {
-	Projects  []MergedProjCfg
-	Automerge bool
-}
-
-type MergedProjCfg struct {
-	Dir               string
-	Workspace         string
-	Name              string
-	Workflow          MergedWorkflow
-	TerraformVersion  *version.Version
-	Autoplan          *valid.Autoplan
-	ApplyRequirements []string
-}
-
-type MergedWorkflow struct {
-	Apply valid.Stage
-	Plan  valid.Stage
-}
-
 // ParseRepoCfg returns the parsed and validated atlantis.yaml config for repoDir.
 // If there was no config file, then this can be detected by checking the type
 // of error: os.IsNotExist(error) but it's instead preferred to check with
-// HasConfigFile.
+// HasRepoCfg.
 func (p *ParserValidator) ParseRepoCfg(repoDir string, globalCfg valid.GlobalCfg, repoID string) (valid.Config, error) {
 	configFile := p.configFilePath(repoDir)
 	configData, err := ioutil.ReadFile(configFile) // nolint: gosec
@@ -96,7 +75,7 @@ func (p *ParserValidator) ParseGlobalCfg(configFile string, defaultCfg valid.Glo
 	return validCfg, nil
 }
 
-func (p *ParserValidator) HasConfigFile(repoDir string) (bool, error) {
+func (p *ParserValidator) HasRepoCfg(repoDir string) (bool, error) {
 	_, err := os.Stat(p.configFilePath(repoDir))
 	if os.IsNotExist(err) {
 		return false, nil
