@@ -27,9 +27,31 @@ type Repo struct {
 }
 
 func (g GlobalCfg) Validate() error {
-	return validation.ValidateStruct(&g,
+	err := validation.ValidateStruct(&g,
 		validation.Field(&g.Repos),
 		validation.Field(&g.Workflows))
+	if err != nil {
+		return err
+	}
+
+	// Check that all workflows referenced by repos are actually defined.
+	for _, repo := range g.Repos {
+		if repo.Workflow == nil {
+			continue
+		}
+		name := *repo.Workflow
+		found := false
+		for w := range g.Workflows {
+			if w == name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("workflow %q is not defined", name)
+		}
+	}
+	return nil
 }
 
 func (g GlobalCfg) ToValid() valid.GlobalCfg {

@@ -83,10 +83,6 @@ func (p *ParserValidator) ParseGlobalCfg(configFile string, defaultCfg valid.Glo
 		return valid.GlobalCfg{}, err
 	}
 
-	if err := p.validateRepoWorkflows(rawCfg); err != nil {
-		return valid.GlobalCfg{}, err
-	}
-
 	validCfg := rawCfg.ToValid()
 
 	// Add defaults to the parsed config.
@@ -170,42 +166,4 @@ func (p *ParserValidator) validateProjectNames(config valid.Config) error {
 	}
 
 	return nil
-}
-
-func (p *ParserValidator) validateWorkflows(config raw.Config) error {
-	for _, project := range config.Projects {
-		if err := p.validateWorkflowExists(project, config.Workflows); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (p *ParserValidator) validateRepoWorkflows(config raw.GlobalCfg) error {
-	for _, repo := range config.Repos {
-		if repo.Workflow == nil {
-			return nil
-		}
-		workflow := *repo.Workflow
-		for w := range config.Workflows {
-			if w == workflow {
-				return nil
-			}
-		}
-		return fmt.Errorf("workflow %q is not defined", workflow)
-	}
-	return nil
-}
-
-func (p *ParserValidator) validateWorkflowExists(project raw.Project, workflows map[string]raw.Workflow) error {
-	if project.Workflow == nil {
-		return nil
-	}
-	workflow := *project.Workflow
-	for k := range workflows {
-		if k == workflow {
-			return nil
-		}
-	}
-	return fmt.Errorf("workflow %q is not defined", workflow)
 }
