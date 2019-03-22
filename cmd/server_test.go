@@ -914,22 +914,6 @@ func TestExecute_BitbucketServerBaseURLPort(t *testing.T) {
 	Equals(t, "http://mydomain.com:7990", passedConfig.BitbucketBaseURL)
 }
 
-// Cannot use both --allow-repo-config and --repo-config
-func TestExecute_AllowRepoConfigWithAllowRestrictedRepoConfig(t *testing.T) {
-	c := setup(map[string]interface{}{
-		cmd.AllowRepoConfigFlag: true,
-		cmd.RepoConfigFlag:      "somefile",
-	})
-	err := c.Execute()
-	ErrEquals(t,
-		`You cannot use both --allow-repo-config and --repo-config together. Instead, use the following config in your --repo-config file:
-    repos:
-    - id: /.*/
-      allowed_overrides: [workflow, apply_requirements]
-      allow_custom_workflows: true`,
-		err)
-}
-
 func setup(flags map[string]interface{}) *cobra.Command {
 	vipr := viper.New()
 	for k, v := range flags {

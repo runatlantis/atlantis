@@ -471,13 +471,6 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	if (userConfig.SSLKeyFile == "") != (userConfig.SSLCertFile == "") {
 		return fmt.Errorf("--%s and --%s are both required for ssl", SSLKeyFileFlag, SSLCertFileFlag)
 	}
-	if userConfig.AllowRepoConfig && userConfig.RepoConfig != "" {
-		return fmt.Errorf(`You cannot use both --%s and --%s together. Instead, use the following config in your --%s file:
-    repos:
-    - id: /.*/
-      allowed_overrides: [workflow, apply_requirements]
-      allow_custom_workflows: true`, AllowRepoConfigFlag, RepoConfigFlag, RepoConfigFlag)
-	}
 
 	// The following combinations are valid.
 	// 1. github user and token set

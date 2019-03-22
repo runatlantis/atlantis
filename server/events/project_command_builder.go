@@ -86,10 +86,7 @@ func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *CommandContext, cm
 		return p.buildPlanAllCommands(ctx, cmd.Flags, cmd.Verbose)
 	}
 	pcc, err := p.buildProjectPlanCommand(ctx, cmd)
-	if err != nil {
-		return nil, err
-	}
-	return []models.ProjectCommandContext{pcc}, nil
+	return []models.ProjectCommandContext{pcc}, err
 }
 
 // BuildApplyCommands builds project apply commands for this comment. If the
@@ -100,10 +97,7 @@ func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *CommandContext, c
 		return p.buildApplyAllCommands(ctx, cmd)
 	}
 	pac, err := p.buildProjectApplyCommand(ctx, cmd)
-	if err != nil {
-		return nil, err
-	}
-	return []models.ProjectCommandContext{pac}, nil
+	return []models.ProjectCommandContext{pac}, err
 }
 
 func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext, commentFlags []string, verbose bool) ([]models.ProjectCommandContext, error) {
