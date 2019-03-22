@@ -27,7 +27,7 @@ type Client interface {
 	PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error)
 	// UpdateStatus updates the commit status to state for pull. src is the
 	// source of this status. This should be relatively static across runs,
-	// ex. plan/atlantis or apply/atlantis.
+	// ex. atlantis/plan or atlantis/apply.
 	// description is a description of this particular status update and can
 	// change across runs.
 	// url is an optional link that users should click on for more information

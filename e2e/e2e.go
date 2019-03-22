@@ -166,7 +166,7 @@ func getAtlantisStatus(t *E2ETester, branchName string) (string, error) {
 	}
 
 	for _, status := range combinedStatus.Statuses {
-		if status.GetContext() == "plan/atlantis" {
+		if status.GetContext() == "atlantis/plan" {
 			return status.GetState(), nil
 		}
 	}
