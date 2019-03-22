@@ -9,9 +9,71 @@ import (
 	"strings"
 )
 
+const MergeableApplyReq = "mergeable"
+const ApprovedApplyReq = "mergeable"
+const ApplyRequirementsKey string = "apply_requirements"
+const WorkflowKey string = "workflow"
+const CustomWorkflowsKey string = "workflows"
+const AllowedOverridesKey string = "allowed_overrides"
+
 type GlobalCfg struct {
 	Repos     []Repo
 	Workflows map[string]Workflow
+}
+
+func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) GlobalCfg {
+	defaultWorkflow := Workflow{
+		Apply: Stage{
+			Steps: []Step{
+				{
+					StepName: "apply",
+				},
+			},
+		},
+		Plan: Stage{
+			Steps: []Step{
+				{
+					StepName: "init",
+				},
+				{
+					StepName: "plan",
+				},
+			},
+		},
+	}
+	// Must construct a slice here because we treat a nil slice and an empty
+	// slice differently.
+	applyReqs := []string{}
+	if mergeableReq {
+		applyReqs = append(applyReqs, MergeableApplyReq)
+	}
+	if approvedReq {
+		applyReqs = append(applyReqs, ApprovedApplyReq)
+	}
+
+	allowCustomWorkfows := false
+	// Must construct a slice here because we treat a nil slice and an empty
+	// slice differently.
+	allowedOverrides := []string{}
+	if allowRepoCfg {
+		allowedOverrides = []string{ApplyRequirementsKey, WorkflowKey}
+		allowCustomWorkfows = true
+	}
+
+	return GlobalCfg{
+		Repos: []Repo{
+			{
+				IDRegex:              regexp.MustCompile(".*"),
+				ApplyRequirements:    applyReqs,
+				Workflow:             &defaultWorkflow,
+				AllowedOverrides:     allowedOverrides,
+				AllowCustomWorkflows: &allowCustomWorkfows,
+			},
+		},
+		Workflows: map[string]Workflow{
+			"default": defaultWorkflow,
+		},
+	}
 }
 
 type Repo struct {
@@ -126,43 +188,6 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		Name:              proj.GetName(),
 		AutoplanEnabled:   proj.Autoplan.Enabled,
 		TerraformVersion:  proj.TerraformVersion,
-	}
-}
-
-func DefaultGlobalCfg() GlobalCfg {
-	defaultWorkflow := Workflow{
-		Apply: Stage{
-			Steps: []Step{
-				{
-					StepName: "apply",
-				},
-			},
-		},
-		Plan: Stage{
-			Steps: []Step{
-				{
-					StepName: "init",
-				},
-				{
-					StepName: "plan",
-				},
-			},
-		},
-	}
-	f := false
-	return GlobalCfg{
-		Repos: []Repo{
-			{
-				IDRegex:              regexp.MustCompile(".*"),
-				ApplyRequirements:    []string{},
-				Workflow:             &defaultWorkflow,
-				AllowedOverrides:     []string{},
-				AllowCustomWorkflows: &f,
-			},
-		},
-		Workflows: map[string]Workflow{
-			"default": defaultWorkflow,
-		},
 	}
 }
 

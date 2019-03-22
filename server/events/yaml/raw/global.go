@@ -90,8 +90,8 @@ func (r Repo) ToValid(workflows map[string]valid.Workflow) valid.Repo {
 	var id string
 	var idRegex *regexp.Regexp
 	if r.HasRegexID() {
-		// Safe to discard err because we test it in Validate().
-		idRegex, _ = regexp.Compile(strings.Trim(id, "/"))
+		// Safe to use MustCompile because we test it in Validate().
+		idRegex = regexp.MustCompile(strings.Trim(id, "/"))
 	} else {
 		id = r.ID
 	}

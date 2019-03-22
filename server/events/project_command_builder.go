@@ -258,12 +258,19 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(
 	repoRelDir string,
 	workspace string,
 	verbose bool) (models.ProjectCommandContext, error) {
-	var projCfg valid.MergedProjectCfg
+
 	projCfgPtr, repoCfgPtr, err := p.getCfg(ctx, projectName, repoRelDir, workspace, repoDir)
 	if err != nil {
 		return models.ProjectCommandContext{}, err
 	}
+
+	var projCfg valid.MergedProjectCfg
 	if projCfgPtr != nil {
+		// Override any dir/workspace defined on the comment with what was
+		// defined in config. This shouldn't matter since we don't allow comments
+		// with both project name and dir/workspace.
+		repoRelDir = projCfg.RepoRelDir
+		workspace = projCfg.Workspace
 		projCfg = p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.BaseRepo.ID(), *projCfgPtr, *repoCfgPtr)
 	} else {
 		projCfg = p.GlobalCfg.DefaultProjCfg(ctx.BaseRepo.ID(), repoRelDir, workspace)
@@ -326,12 +333,12 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *CommandContext, projectName s
 
 // validateWorkspaceAllowed returns an error if there are projects configured
 // in globalCfg for repoRelDir and none of those projects use workspace.
-func (p *DefaultProjectCommandBuilder) validateWorkspaceAllowed(globalCfg *valid.Config, repoRelDir string, workspace string) error {
-	if globalCfg == nil {
+func (p *DefaultProjectCommandBuilder) validateWorkspaceAllowed(repoCfg *valid.Config, repoRelDir string, workspace string) error {
+	if repoCfg == nil {
 		return nil
 	}
 
-	projects := globalCfg.FindProjectsByDir(repoRelDir)
+	projects := repoCfg.FindProjectsByDir(repoRelDir)
 
 	// If that directory doesn't have any projects configured then we don't
 	// enforce workspace names.

@@ -66,7 +66,7 @@ func (p *ParserValidator) ParseRepoCfg(repoDir string, globalCfg valid.GlobalCfg
 	return config, err
 }
 
-func (p *ParserValidator) ParseGlobalCfg(configFile string) (valid.GlobalCfg, error) {
+func (p *ParserValidator) ParseGlobalCfg(configFile string, defaultCfg valid.GlobalCfg) (valid.GlobalCfg, error) {
 	configData, err := ioutil.ReadFile(configFile) // nolint: gosec
 	if err != nil {
 		return valid.GlobalCfg{}, errors.Wrapf(err, "unable to read %s file", configFile)
@@ -90,7 +90,6 @@ func (p *ParserValidator) ParseGlobalCfg(configFile string) (valid.GlobalCfg, er
 	validCfg := rawCfg.ToValid()
 
 	// Add defaults to the parsed config.
-	defaultCfg := valid.DefaultGlobalCfg()
 	validCfg.Repos = append(defaultCfg.Repos, validCfg.Repos...)
 	for k, v := range defaultCfg.Workflows {
 		// We won't override existing workflows.
@@ -142,10 +141,6 @@ func (p *ParserValidator) parseAndValidate(configData []byte, globalCfg valid.Gl
 	//	return valid.Config{}, err
 	//}
 
-}
-
-func (p *ParserValidator) getOverrideErrorMessage(key string) error {
-	return fmt.Errorf("%q cannot be specified in %q by default.  To enable this, add %q to %q in the server side repo config", key, AtlantisYAMLFilename, key, raw.AllowedOverridesKey)
 }
 
 func (p *ParserValidator) validateProjectNames(config valid.Config) error {

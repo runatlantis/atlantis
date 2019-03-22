@@ -14,101 +14,6 @@ import (
 	"testing"
 )
 
-// Test the behaviour when there's no atlantis.yaml config.
-func TestBuildAutoplanCommands_NoConfig(t *testing.T) {
-	RegisterMockTestingT(t)
-	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
-		"project1": map[string]interface{}{
-			"main.tf": nil,
-		},
-		"project2": map[string]interface{}{
-			"main.tf": nil,
-		},
-	})
-	defer cleanup()
-
-	workingDir := NewMockWorkingDir()
-	When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, nil)
-	vcsClient := vcsmocks.NewMockClient()
-	When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"project1/main.tf", "project2/main.tf"}, nil)
-
-	builder := &DefaultProjectCommandBuilder{
-		WorkingDirLocker:  NewDefaultWorkingDirLocker(),
-		WorkingDir:        workingDir,
-		ParserValidator:   &yaml.ParserValidator{},
-		VCSClient:         vcsClient,
-		ProjectFinder:     &DefaultProjectFinder{},
-		PendingPlanFinder: &DefaultPendingPlanFinder{},
-		CommentBuilder:    &CommentParser{},
-		GlobalCfg:         valid.DefaultGlobalCfg(),
-	}
-
-	ctxs, err := builder.BuildAutoplanCommands(&CommandContext{})
-	Ok(t, err)
-
-	Equals(t, 2, len(ctxs))
-	Equals(t, "project1", ctxs[0].RepoRelDir)
-	Equals(t, "project2", ctxs[1].RepoRelDir)
-}
-
-// Test that we filter out projects that aren't supposed to be autoplanned.
-func TestBuildAutoplanCommands_Filtering(t *testing.T) {
-	RegisterMockTestingT(t)
-	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
-		"project1": map[string]interface{}{
-			"main.tf": nil,
-		},
-		"project2": map[string]interface{}{
-			"main.tf": nil,
-		},
-		"project3": map[string]interface{}{
-			"main.tf": nil,
-		},
-		"modules": map[string]interface{}{
-			"module1": map[string]interface{}{
-				"main.tf": nil,
-			},
-		},
-	})
-	defer cleanup()
-	err := ioutil.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(`
-version: 2
-projects:
-- dir: project1
-  autoplan:
-    enabled: false
-- dir: project2
-- dir: project3
-  autoplan:
-    enabled: true
-    when_modified: ["../modules/**/*tf"]
-`), 0600)
-	Ok(t, err)
-
-	workingDir := NewMockWorkingDir()
-	When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, nil)
-	vcsClient := vcsmocks.NewMockClient()
-	When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"project1/main.tf", "project2/main.tf", "modules/module1/main.tf"}, nil)
-
-	builder := &DefaultProjectCommandBuilder{
-		WorkingDirLocker:  NewDefaultWorkingDirLocker(),
-		WorkingDir:        workingDir,
-		ParserValidator:   &yaml.ParserValidator{},
-		VCSClient:         vcsClient,
-		ProjectFinder:     &DefaultProjectFinder{},
-		PendingPlanFinder: &DefaultPendingPlanFinder{},
-		CommentBuilder:    &CommentParser{},
-		GlobalCfg:         valid.DefaultGlobalCfg(),
-	}
-
-	ctxs, err := builder.BuildAutoplanCommands(&CommandContext{})
-	Ok(t, err)
-
-	Equals(t, 2, len(ctxs))
-	Equals(t, "project2", ctxs[0].RepoRelDir)
-	Equals(t, "project3", ctxs[1].RepoRelDir)
-}
-
 // Test different permutations of global and repo config.
 func TestBuildProjectCmdCtx(t *testing.T) {
 	baseRepo := models.Repo{
@@ -602,7 +507,7 @@ workflows:
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
 			Ok(t, ioutil.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &yaml.ParserValidator{}
-			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath)
+			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfg(false, false, false))
 			Ok(t, err)
 
 			if c.repoCfg != "" {

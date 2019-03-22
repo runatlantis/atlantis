@@ -197,13 +197,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	validator := &yaml.ParserValidator{}
 
-	// This is a default config that will allow safe keys to be used in atlantis.yaml by default
-	// but restrict all sensitive keys.  This is used if the server is started without --repo-config.
-	// todo: should have a constructor here that takes in the require flags
-	//       and returns a properly created global cfg
-	globalCfg := valid.GlobalCfg{}
+	globalCfg := valid.NewGlobalCfg(userConfig.AllowRepoConfig, userConfig.RequireMergeable, userConfig.RequireApproval)
 	if userConfig.RepoConfig != "" {
-		globalCfg, err = validator.ParseGlobalCfg(userConfig.RepoConfig)
+		globalCfg, err = validator.ParseGlobalCfg(userConfig.RepoConfig, globalCfg)
 		if err != nil {
 			return nil, err
 		}
