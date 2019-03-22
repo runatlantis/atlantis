@@ -3,6 +3,7 @@ package raw
 import (
 	"fmt"
 	"github.com/go-ozzo/ozzo-validation"
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"regexp"
 	"strings"
@@ -81,14 +82,14 @@ func (r Repo) Validate() error {
 			return nil
 		}
 		_, err := regexp.Compile(strings.Trim(id, "/"))
-		return err
+		return errors.Wrapf(err, "parsing: %s", id)
 	}
 
 	overridesValid := func(value interface{}) error {
 		overrides := value.([]string)
 		for _, o := range overrides {
 			if o != ApplyRequirementsKey && o != WorkflowKey {
-				return fmt.Errorf("%q is invalid, only %s and %s are supported", o, ApplyRequirementsKey, WorkflowKey)
+				return fmt.Errorf("%q is not a valid override, only %q and %q are supported", o, ApplyRequirementsKey, WorkflowKey)
 			}
 		}
 		return nil
@@ -113,7 +114,7 @@ func (r Repo) ToValid(workflows map[string]valid.Workflow) valid.Repo {
 	var idRegex *regexp.Regexp
 	if r.HasRegexID() {
 		// Safe to use MustCompile because we test it in Validate().
-		idRegex = regexp.MustCompile(strings.Trim(id, "/"))
+		idRegex = regexp.MustCompile(strings.Trim(r.ID, "/"))
 	} else {
 		id = r.ID
 	}

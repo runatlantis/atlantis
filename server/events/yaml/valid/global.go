@@ -1,7 +1,6 @@
 package valid
 
 import (
-	"errors"
 	"fmt"
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -10,11 +9,12 @@ import (
 )
 
 const MergeableApplyReq = "mergeable"
-const ApprovedApplyReq = "mergeable"
-const ApplyRequirementsKey string = "apply_requirements"
-const WorkflowKey string = "workflow"
-const CustomWorkflowsKey string = "workflows"
-const AllowedOverridesKey string = "allowed_overrides"
+const ApprovedApplyReq = "approved"
+const ApplyRequirementsKey = "apply_requirements"
+const WorkflowKey = "workflow"
+const AllowedOverridesKey = "allowed_overrides"
+const AllowCustomWorkflowsKey = "allow_custom_workflows"
+const DefaultWorkflowName = "default"
 
 type GlobalCfg struct {
 	Repos     []Repo
@@ -23,6 +23,7 @@ type GlobalCfg struct {
 
 func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) GlobalCfg {
 	defaultWorkflow := Workflow{
+		Name: DefaultWorkflowName,
 		Apply: Stage{
 			Steps: []Step{
 				{
@@ -71,7 +72,7 @@ func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) Global
 			},
 		},
 		Workflows: map[string]Workflow{
-			"default": defaultWorkflow,
+			DefaultWorkflowName: defaultWorkflow,
 		},
 	}
 }
@@ -116,28 +117,28 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 	var allowedOverrides []string
 	allowCustomWorkflows := false
 
-	for _, key := range []string{"apply_requirements", "workflow", "allowed_overrides", "allow_custom_workflows"} {
+	for _, key := range []string{ApplyRequirementsKey, WorkflowKey, AllowedOverridesKey, AllowCustomWorkflowsKey} {
 		for _, repo := range g.Repos {
 			if repo.IDMatches(repoID) {
 				switch key {
-				case "apply_requirements":
+				case ApplyRequirementsKey:
 					if repo.ApplyRequirements != nil {
-						log.Debug("setting apply_requirements: [%s] from repo config %q", strings.Join(repo.ApplyRequirements, ","), repo.IDString())
+						log.Debug("setting %s: [%s] from repo config %q", ApplyRequirementsKey, strings.Join(repo.ApplyRequirements, ","), repo.IDString())
 						applyReqs = repo.ApplyRequirements
 					}
-				case "workflow":
+				case WorkflowKey:
 					if repo.Workflow != nil {
-						log.Debug("setting workflow %s from repo config %q", repo.Workflow.Name, repo.IDString())
+						log.Debug("setting %s %s from repo config %q", WorkflowKey, repo.Workflow.Name, repo.IDString())
 						workflow = *repo.Workflow
 					}
-				case "allowed_overrides":
+				case AllowedOverridesKey:
 					if repo.AllowedOverrides != nil {
-						log.Debug("setting allow_overrides: [%s] from repo config %q", strings.Join(repo.AllowedOverrides, ","), repo.IDString())
+						log.Debug("setting %s: [%s] from repo config %q", AllowedOverridesKey, strings.Join(repo.AllowedOverrides, ","), repo.IDString())
 						allowedOverrides = repo.AllowedOverrides
 					}
-				case "allow_custom_workflows":
+				case AllowCustomWorkflowsKey:
 					if repo.AllowCustomWorkflows != nil {
-						log.Debug("setting allow_custom_workflows: %t from repo config %q", *repo.AllowCustomWorkflows, repo.IDString())
+						log.Debug("setting %s: %t from repo config %q", AllowCustomWorkflowsKey, *repo.AllowCustomWorkflows, repo.IDString())
 						allowCustomWorkflows = *repo.AllowCustomWorkflows
 					}
 				}
@@ -146,12 +147,12 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 	}
 	for _, key := range allowedOverrides {
 		switch key {
-		case "apply_requirements":
+		case ApplyRequirementsKey:
 			if proj.ApplyRequirements != nil {
-				log.Debug("overriding global apply requirements with repo settings: [%s]", strings.Join(proj.ApplyRequirements, ","))
+				log.Debug("overriding global %s with repo settings: [%s]", ApplyRequirementsKey, strings.Join(proj.ApplyRequirements, ","))
 				applyReqs = proj.ApplyRequirements
 			}
-		case "workflow":
+		case WorkflowKey:
 			if proj.Workflow != nil {
 				// We iterate over the global workflows first and the repo
 				// workflows second so that repo workflows override. This is
@@ -171,13 +172,13 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 						}
 					}
 				}
-				log.Debug("overriding global workflow with repo-specified workflow %q", workflow.Name)
+				log.Debug("overriding global %s with repo-specified workflow %q", WorkflowKey, workflow.Name)
 			}
 		}
 	}
 
-	log.Debug("final settings for repo %s: apply_reqs: [%s], workflow: %s",
-		repoID, strings.Join(applyReqs, ","), workflow.Name)
+	log.Debug("final settings for repo %s: %s: [%s], %s: %s",
+		repoID, ApplyRequirementsKey, strings.Join(applyReqs, ","), WorkflowKey, workflow.Name)
 
 	return MergedProjectCfg{
 		ApplyRequirements: applyReqs,
@@ -219,11 +220,11 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg Config, repoID string) error {
 		}
 	}
 	for _, p := range rCfg.Projects {
-		if p.Workflow != nil && !sliceContainsF(allowedOverrides, "workflow") {
-			return errors.New("repo config not allowed to set 'workflow'")
+		if p.Workflow != nil && !sliceContainsF(allowedOverrides, WorkflowKey) {
+			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", WorkflowKey, AllowedOverridesKey, WorkflowKey)
 		}
-		if p.ApplyRequirements != nil && !sliceContainsF(allowedOverrides, "apply_requirements") {
-			return errors.New("repo config not allowed to set 'apply_requirements'")
+		if p.ApplyRequirements != nil && !sliceContainsF(allowedOverrides, ApplyRequirementsKey) {
+			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", ApplyRequirementsKey, AllowedOverridesKey, ApplyRequirementsKey)
 		}
 	}
 
@@ -238,7 +239,7 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg Config, repoID string) error {
 	}
 
 	if len(rCfg.Workflows) > 0 && !allowCustomWorklows {
-		return errors.New("repo config not allowed to define custom workflows")
+		return fmt.Errorf("repo config not allowed to define custom workflows: server-side config needs '%s: true'", AllowCustomWorkflowsKey)
 	}
 
 	// Check if the repo has set a workflow name that doesn't exist.
@@ -259,19 +260,19 @@ func (g GlobalCfg) DefaultProjCfg(repoID string, repoRelDir string, workspace st
 	var workflow Workflow
 	var allowedOverrides []string
 
-	for _, key := range []string{"apply_requirements", "workflow", "allowed_overrides"} {
+	for _, key := range []string{ApplyRequirementsKey, WorkflowKey, AllowedOverridesKey} {
 		for _, repo := range g.Repos {
 			if repo.IDMatches(repoID) {
 				switch key {
-				case "apply_requirements":
+				case ApplyRequirementsKey:
 					if repo.ApplyRequirements != nil {
 						applyReqs = repo.ApplyRequirements
 					}
-				case "workflow":
+				case WorkflowKey:
 					if repo.Workflow != nil {
 						workflow = *repo.Workflow
 					}
-				case "allowed_overrides":
+				case AllowedOverridesKey:
 					if repo.AllowedOverrides != nil {
 						allowedOverrides = repo.AllowedOverrides
 					}
@@ -290,16 +291,4 @@ func (g GlobalCfg) DefaultProjCfg(repoID string, repoRelDir string, workspace st
 		AutoplanEnabled:   true,
 		TerraformVersion:  nil,
 	}
-}
-
-func (r *Repo) Matches(repoName string) (bool, error) {
-	if strings.Index(r.ID, "/") == 0 && strings.LastIndex(r.ID, "/") == len(r.ID)-1 {
-		matchString := strings.Trim(r.ID, "/")
-		compiled, err := regexp.Compile(matchString)
-		if err != nil {
-			return false, fmt.Errorf("regex compile of repo.ID `%s`: %s", r.ID, err)
-		}
-		return compiled.MatchString(repoName), nil
-	}
-	return repoName == r.ID, nil
 }

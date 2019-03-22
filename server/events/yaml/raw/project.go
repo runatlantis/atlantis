@@ -110,7 +110,7 @@ func validApplyReq(value interface{}) error {
 	reqs := value.([]string)
 	for _, r := range reqs {
 		if r != ApprovedApplyRequirement && r != MergeableApplyRequirement {
-			return fmt.Errorf("%q not supported, only %s and %s are supported", r, ApprovedApplyRequirement, MergeableApplyRequirement)
+			return fmt.Errorf("%q is not a valid apply_requirement, only %q and %q are supported", r, ApprovedApplyRequirement, MergeableApplyRequirement)
 		}
 	}
 	return nil

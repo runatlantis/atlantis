@@ -4,6 +4,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/go-version"
@@ -33,7 +35,7 @@ func TestHasRepoCfg_FileDoesNotExist(t *testing.T) {
 func TestParseRepoCfg_DirDoesNotExist(t *testing.T) {
 	r := yaml.ParserValidator{}
 	_, err := r.ParseRepoCfg("/not/exist", globalCfg, "")
-	Assert(t, os.IsNotExist(err), "exp nil ptr")
+	Assert(t, os.IsNotExist(err), "exp not exist err")
 }
 
 func TestParseRepoCfg_FileDoesNotExist(t *testing.T) {
@@ -41,7 +43,7 @@ func TestParseRepoCfg_FileDoesNotExist(t *testing.T) {
 	defer cleanup()
 	r := yaml.ParserValidator{}
 	_, err := r.ParseRepoCfg(tmpDir, globalCfg, "")
-	Assert(t, os.IsNotExist(err), "exp nil ptr")
+	Assert(t, os.IsNotExist(err), "exp not exist err")
 }
 
 func TestParseRepoCfg_BadPermissions(t *testing.T) {
@@ -55,9 +57,10 @@ func TestParseRepoCfg_BadPermissions(t *testing.T) {
 	ErrContains(t, "unable to read atlantis.yaml file: ", err)
 }
 
-func TestParseRepoCfg_UnmarshalErrors(t *testing.T) {
-	// We only have a few cases here because we assume the YAML library to be
-	// well tested. See https://github.com/go-yaml/yaml/blob/v2/decode_test.go#L810.
+// Test both ParseRepoCfg and ParseGlobalCfg when given in valid YAML.
+// We only have a few cases here because we assume the YAML library to be
+// well tested. See https://github.com/go-yaml/yaml/blob/v2/decode_test.go#L810.
+func TestParseCfgs_InvalidYAML(t *testing.T) {
 	cases := []struct {
 		description string
 		input       string
@@ -66,12 +69,12 @@ func TestParseRepoCfg_UnmarshalErrors(t *testing.T) {
 		{
 			"random characters",
 			"slkjds",
-			"parsing atlantis.yaml: yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `slkjds` into raw.Config",
+			"yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `slkjds` into",
 		},
 		{
 			"just a colon",
 			":",
-			"parsing atlantis.yaml: yaml: did not find expected key",
+			"yaml: did not find expected key",
 		},
 	}
 
@@ -80,11 +83,14 @@ func TestParseRepoCfg_UnmarshalErrors(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			err := ioutil.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(c.input), 0600)
+			confPath := filepath.Join(tmpDir, "atlantis.yaml")
+			err := ioutil.WriteFile(confPath, []byte(c.input), 0600)
 			Ok(t, err)
 			r := yaml.ParserValidator{}
 			_, err = r.ParseRepoCfg(tmpDir, globalCfg, "")
-			ErrEquals(t, c.expErr, err)
+			ErrContains(t, c.expErr, err)
+			_, err = r.ParseGlobalCfg(confPath, valid.NewGlobalCfg(false, false, false))
+			ErrContains(t, c.expErr, err)
 		})
 	}
 }
@@ -723,7 +729,7 @@ workflows:
 			r := yaml.ParserValidator{}
 			act, err := r.ParseRepoCfg(tmpDir, globalCfg, "")
 			if c.expErr != "" {
-				ErrEquals(t, "parsing atlantis.yaml: "+c.expErr, err)
+				ErrEquals(t, c.expErr, err)
 				return
 			}
 			Ok(t, err)
@@ -732,6 +738,245 @@ workflows:
 	}
 }
 
+// Test that we fail if the global validation fails. We test global validation
+// more completely in GlobalCfg.ValidateRepoCfg().
+func TestParseRepoCfg_GlobalValidation(t *testing.T) {
+	tmpDir, cleanup := TempDir(t)
+	defer cleanup()
+
+	repoCfg := `
+version: 2
+projects:
+- dir: .
+  workflow: custom
+workflows:
+  custom: ~`
+	err := ioutil.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(repoCfg), 0600)
+	Ok(t, err)
+
+	r := yaml.ParserValidator{}
+	_, err = r.ParseRepoCfg(tmpDir, valid.NewGlobalCfg(false, false, false), "repo_id")
+	ErrEquals(t, "repo config not allowed to set 'workflow' key: server-side config needs 'allowed_overrides: [workflow]'", err)
+}
+
+func TestParseGlobalCfg_NotExist(t *testing.T) {
+	r := yaml.ParserValidator{}
+	_, err := r.ParseGlobalCfg("/not/exist", valid.NewGlobalCfg(false, false, false))
+	ErrEquals(t, "unable to read /not/exist file: open /not/exist: no such file or directory", err)
+}
+
+func TestParseGlobalCfg(t *testing.T) {
+	defaultCfg := valid.NewGlobalCfg(false, false, false)
+	customWorkflow1 := valid.Workflow{
+		Name: "custom1",
+		Plan: valid.Stage{
+			Steps: []valid.Step{
+				{
+					StepName:   "run",
+					RunCommand: []string{"custom", "command"},
+				},
+				{
+					StepName:  "init",
+					ExtraArgs: []string{"extra", "args"},
+				},
+				{
+					StepName: "plan",
+				},
+			},
+		},
+		Apply: valid.Stage{
+			Steps: []valid.Step{
+				{
+					StepName:   "run",
+					RunCommand: []string{"custom", "command"},
+				},
+				{
+					StepName: "apply",
+				},
+			},
+		},
+	}
+
+	cases := map[string]struct {
+		input  string
+		expErr string
+		exp    valid.GlobalCfg
+	}{
+		"empty file": {
+			input:  "",
+			expErr: "file <tmp> was empty",
+		},
+		"invalid fields": {
+			input:  "invalid: key",
+			expErr: "yaml: unmarshal errors:\n  line 1: field invalid not found in struct raw.GlobalCfg",
+		},
+		"no id specified": {
+			input: `repos:
+- apply_requirements: []`,
+			expErr: "repos: (0: (id: cannot be blank.).).",
+		},
+		"invalid regex": {
+			input: `repos:
+- id: /?/`,
+			expErr: "repos: (0: (id: parsing: /?/: error parsing regexp: missing argument to repetition operator: `?`.).).",
+		},
+		"workflow doesn't exist": {
+			input: `repos:
+- id: /.*/
+  workflow: notdefined`,
+			expErr: "workflow \"notdefined\" is not defined",
+		},
+		"invalid allowed_override": {
+			input: `repos:
+- id: /.*/
+  allowed_overrides: [invalid]`,
+			expErr: "repos: (0: (allowed_overrides: \"invalid\" is not a valid override, only \"apply_requirements\" and \"workflow\" are supported.).).",
+		},
+		"invalid apply_requirement": {
+			input: `repos:
+- id: /.*/
+  apply_requirements: [invalid]`,
+			expErr: "repos: (0: (apply_requirements: \"invalid\" is not a valid apply_requirement, only \"approved\" and \"mergeable\" are supported.).).",
+		},
+		"no workflows key": {
+			input: `repos: []`,
+			exp:   defaultCfg,
+		},
+		"workflows empty": {
+			input: `workflows:`,
+			exp:   defaultCfg,
+		},
+		"workflow name but the rest is empty": {
+			input: `
+workflows:
+  name:`,
+			exp: valid.GlobalCfg{
+				Repos: defaultCfg.Repos,
+				Workflows: map[string]valid.Workflow{
+					"default": defaultCfg.Workflows["default"],
+					"name": {
+						Name:  "name",
+						Apply: valid.DefaultApplyStage,
+						Plan:  valid.DefaultPlanStage,
+					},
+				},
+			},
+		},
+		"workflow stages empty": {
+			input: `
+workflows:
+  name:
+    apply:
+    plan:
+`,
+			exp: valid.GlobalCfg{
+				Repos: defaultCfg.Repos,
+				Workflows: map[string]valid.Workflow{
+					"default": defaultCfg.Workflows["default"],
+					"name": {
+						Name:  "name",
+						Apply: valid.DefaultApplyStage,
+						Plan:  valid.DefaultPlanStage,
+					},
+				},
+			},
+		},
+		"workflow steps empty": {
+			input: `
+workflows:
+  name:
+    apply:
+      steps:
+    plan:
+      steps:`,
+			exp: valid.GlobalCfg{
+				Repos: defaultCfg.Repos,
+				Workflows: map[string]valid.Workflow{
+					"default": defaultCfg.Workflows["default"],
+					"name": {
+						Name:  "name",
+						Plan:  valid.DefaultPlanStage,
+						Apply: valid.DefaultApplyStage,
+					},
+				},
+			},
+		},
+		"all keys specified": {
+			input: `
+repos:
+- id: github.com/owner/repo
+  apply_requirements: [approved, mergeable]
+  workflow: custom1
+  allowed_overrides: [apply_requirements, workflow]
+  allow_custom_workflows: true
+- id: /.*/
+
+workflows:
+  custom1:
+    plan:
+      steps:
+      - run: custom command
+      - init:
+          extra_args: [extra, args]
+      - plan
+    apply:
+      steps:
+      - run: custom command
+      - apply
+`,
+			exp: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					defaultCfg.Repos[0],
+					{
+						ID:                   "github.com/owner/repo",
+						ApplyRequirements:    []string{"approved", "mergeable"},
+						Workflow:             &customWorkflow1,
+						AllowedOverrides:     []string{"apply_requirements", "workflow"},
+						AllowCustomWorkflows: Bool(true),
+					},
+					{
+						IDRegex: regexp.MustCompile(".*"),
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"default": defaultCfg.Workflows["default"],
+					"custom1": customWorkflow1,
+				},
+			},
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			r := yaml.ParserValidator{}
+			tmp, cleanup := TempDir(t)
+			defer cleanup()
+			path := filepath.Join(tmp, "conf.yaml")
+			Ok(t, ioutil.WriteFile(path, []byte(c.input), 0600))
+
+			act, err := r.ParseGlobalCfg(path, valid.NewGlobalCfg(false, false, false))
+			if c.expErr != "" {
+				expErr := strings.Replace(c.expErr, "<tmp>", path, -1)
+				ErrEquals(t, expErr, err)
+				return
+			}
+			Ok(t, err)
+			Equals(t, c.exp, act)
+			// Have to hand-compare regexes because Equals doesn't do it.
+			for i, actRepo := range act.Repos {
+				expRepo := c.exp.Repos[i]
+				if expRepo.IDRegex != nil {
+					Assert(t, expRepo.IDRegex.String() == actRepo.IDRegex.String(),
+						"%q != %q for repos[%d]", expRepo.IDRegex.String(), actRepo.IDRegex.String(), i)
+				}
+			}
+		})
+	}
+}
+
 // String is a helper routine that allocates a new string value
 // to store v and returns a pointer to it.
 func String(v string) *string { return &v }
+
+// Bool is a helper routine that allocates a new bool value
+// to store v and returns a pointer to it.
+func Bool(v bool) *bool { return &v }

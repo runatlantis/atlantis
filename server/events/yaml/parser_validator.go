@@ -18,37 +18,60 @@ const AtlantisYAMLFilename = "atlantis.yaml"
 
 type ParserValidator struct{}
 
+func (p *ParserValidator) HasRepoCfg(repoDir string) (bool, error) {
+	_, err := os.Stat(p.repoCfgPath(repoDir))
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return err == nil, err
+}
+
 // ParseRepoCfg returns the parsed and validated atlantis.yaml config for repoDir.
 // If there was no config file, then this can be detected by checking the type
 // of error: os.IsNotExist(error) but it's instead preferred to check with
 // HasRepoCfg.
 func (p *ParserValidator) ParseRepoCfg(repoDir string, globalCfg valid.GlobalCfg, repoID string) (valid.Config, error) {
-	configFile := p.configFilePath(repoDir)
+	configFile := p.repoCfgPath(repoDir)
 	configData, err := ioutil.ReadFile(configFile) // nolint: gosec
 
-	// NOTE: the error we return here must also be os.IsNotExist since that's
-	// what our callers use to detect a missing config file.
-	if err != nil && os.IsNotExist(err) {
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return valid.Config{}, errors.Wrapf(err, "unable to read %s file", AtlantisYAMLFilename)
+		}
+		// Don't wrap os.IsNotExist errors because we want our callers to be
+		// able to detect if it's a NotExist err.
 		return valid.Config{}, err
 	}
 
-	// If it exists but we couldn't read it return an error.
-	if err != nil {
-		return valid.Config{}, errors.Wrapf(err, "unable to read %s file", AtlantisYAMLFilename)
+	var rawConfig raw.Config
+	if err := yaml.UnmarshalStrict(configData, &rawConfig); err != nil {
+		return valid.Config{}, err
 	}
 
-	// If the config file exists, parse it.
-	config, err := p.parseAndValidate(configData, globalCfg, repoID)
-	if err != nil {
-		return valid.Config{}, errors.Wrapf(err, "parsing %s", AtlantisYAMLFilename)
+	// Set ErrorTag to yaml so it uses the YAML field names in error messages.
+	validation.ErrorTag = "yaml"
+	if err := rawConfig.Validate(); err != nil {
+		return valid.Config{}, err
 	}
-	return config, err
+
+	validConfig := rawConfig.ToValid()
+
+	// We do the project name validation after we get the valid config because
+	// we need the defaults of dir and workspace to be populated.
+	if err := p.validateProjectNames(validConfig); err != nil {
+		return valid.Config{}, err
+	}
+	err = globalCfg.ValidateRepoCfg(validConfig, repoID)
+	return validConfig, err
 }
 
 func (p *ParserValidator) ParseGlobalCfg(configFile string, defaultCfg valid.GlobalCfg) (valid.GlobalCfg, error) {
 	configData, err := ioutil.ReadFile(configFile) // nolint: gosec
 	if err != nil {
 		return valid.GlobalCfg{}, errors.Wrapf(err, "unable to read %s file", configFile)
+	}
+	if len(configData) == 0 {
+		return valid.GlobalCfg{}, fmt.Errorf("file %s was empty", configFile)
 	}
 
 	var rawCfg raw.GlobalCfg
@@ -75,39 +98,8 @@ func (p *ParserValidator) ParseGlobalCfg(configFile string, defaultCfg valid.Glo
 	return validCfg, nil
 }
 
-func (p *ParserValidator) HasRepoCfg(repoDir string) (bool, error) {
-	_, err := os.Stat(p.configFilePath(repoDir))
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	if err == nil {
-		return true, nil
-	}
-	return false, err
-}
-
-func (p *ParserValidator) configFilePath(repoDir string) string {
+func (p *ParserValidator) repoCfgPath(repoDir string) string {
 	return filepath.Join(repoDir, AtlantisYAMLFilename)
-}
-
-func (p *ParserValidator) parseAndValidate(configData []byte, globalCfg valid.GlobalCfg, repoID string) (valid.Config, error) {
-	var rawConfig raw.Config
-	if err := yaml.UnmarshalStrict(configData, &rawConfig); err != nil {
-		return valid.Config{}, err
-	}
-
-	// Set ErrorTag to yaml so it uses the YAML field names in error messages.
-	validation.ErrorTag = "yaml"
-	if err := rawConfig.Validate(); err != nil {
-		return valid.Config{}, err
-	}
-
-	validConfig := rawConfig.ToValid()
-	if err := p.validateProjectNames(validConfig); err != nil {
-		return valid.Config{}, err
-	}
-	err := globalCfg.ValidateRepoCfg(validConfig, repoID)
-	return validConfig, err
 }
 
 func (p *ParserValidator) validateProjectNames(config valid.Config) error {

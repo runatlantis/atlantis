@@ -252,7 +252,7 @@ projects:
   workspace: myworkspace
   apply_requirements: []
 `,
-			expErr: "parsing atlantis.yaml: repo config not allowed to set 'apply_requirements'",
+			expErr: "repo config not allowed to set 'apply_requirements' key: server-side config needs 'allowed_overrides: [apply_requirements]'",
 		},
 
 		// We should get an error if a repo sets a workflow when it's not allowed.
@@ -279,7 +279,7 @@ projects:
   workspace: myworkspace
   workflow: default
 `,
-			expErr: "parsing atlantis.yaml: repo config not allowed to set 'workflow'",
+			expErr: "repo config not allowed to set 'workflow' key: server-side config needs 'allowed_overrides: [workflow]'",
 		},
 
 		// We should get an error if a repo defines a workflow when it's not
@@ -308,7 +308,7 @@ projects:
 workflows:
   new: ~
 `,
-			expErr: "parsing atlantis.yaml: repo config not allowed to define custom workflows",
+			expErr: "repo config not allowed to define custom workflows: server-side config needs 'allow_custom_workflows: true'",
 		},
 
 		// If the repos are allowed to set everything then their config should
