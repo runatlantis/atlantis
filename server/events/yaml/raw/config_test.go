@@ -278,9 +278,7 @@ func TestConfig_ToValid(t *testing.T) {
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": {
 						Name: "myworkflow",
-						Plan: valid.Stage{
-							Steps: nil,
-						},
+						Plan: valid.DefaultPlanStage,
 						Apply: valid.Stage{
 							Steps: []valid.Step{
 								{

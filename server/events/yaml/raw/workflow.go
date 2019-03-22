@@ -21,12 +21,12 @@ func (w Workflow) ToValid(name string) valid.Workflow {
 	v := valid.Workflow{
 		Name: name,
 	}
-	if w.Apply == nil {
+	if w.Apply == nil || w.Apply.Steps == nil {
 		v.Apply = valid.DefaultApplyStage
 	} else {
 		v.Apply = w.Apply.ToValid()
 	}
-	if w.Plan == nil {
+	if w.Plan == nil || w.Plan.Steps == nil {
 		v.Plan = valid.DefaultPlanStage
 	} else {
 		v.Plan = w.Plan.ToValid()

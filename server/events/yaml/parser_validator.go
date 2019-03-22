@@ -128,19 +128,11 @@ func (p *ParserValidator) parseAndValidate(configData []byte, globalCfg valid.Gl
 	}
 
 	validConfig := rawConfig.ToValid()
+	if err := p.validateProjectNames(validConfig); err != nil {
+		return valid.Config{}, err
+	}
 	err := globalCfg.ValidateRepoCfg(validConfig, repoID)
 	return validConfig, err
-	// todo: fix validation
-	//
-	//// Top level validation.
-	//if err := p.validateWorkflows(rawConfig); err != nil {
-	//	return valid.Config{}, err
-	//}
-	//
-	//if err := p.validateProjectNames(validConfig); err != nil {
-	//	return valid.Config{}, err
-	//}
-
 }
 
 func (p *ParserValidator) validateProjectNames(config valid.Config) error {
