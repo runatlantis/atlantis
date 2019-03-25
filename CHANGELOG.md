@@ -1,3 +1,73 @@
+# v0.6.0
+
+## Description
+This release introduces a new flag `--default-tf-version=<version>` that allows users
+to set the version of Terraform that Atlantis defaults to. Atlantis will automatically
+download that version on startup so users don't need to build their own custom
+Docker images.
+
+Atlantis will also now automatically download any Terraform version specified in
+`atlantis.yaml`:
+```yaml
+version: 2
+projects:
+- dir: .
+  terraform_version: v0.12.0-beta1 # Will be downloaded automatically.
+```
+
+## Features
+* New flag: `--default-tf-version=<version>` will cause Atlantis to automatically download
+  and use that version of Terraform by default. Atlantis will also automatically
+  download terraform versions specified in `atlantis.yaml` via the `terraform_version`
+  config key. ([#538](https://github.com/runatlantis/atlantis/pull/538))
+* New status check names mean that the Atlantis checks will appear together (at least on GitHub).
+  ([#545](https://github.com/runatlantis/atlantis/pull/545))
+* Upgrade base Docker image to use Alpine 3.9. Alpine 3.9 mitigates
+  [CVE-2018-19486](https://nvd.nist.gov/vuln/detail/CVE-2018-19486). ([#541](https://github.com/runatlantis/atlantis/pull/541))
+
+## Bugfixes
+None
+
+## Backwards Incompatibilities / Notes:
+* Our Docker image `runatlantis/atlantis` has Terraform `v0.11.13` now. If you
+  use the new flag `--default-tf-version=<desired version>` then you won't
+  be affected by this change (nor for subsequent version upgrades).
+* The Atlantis status checks have been renamed from what they looked like in `v0.5.*`.
+  Previously the names were: `plan/atlantis` and `apply/atlantis`. Now the
+  names are `atlantis/plan` and `atlantis/apply`.
+  
+  This change will only affect you if you're requiring those status checks to pass via a setting in
+  your Git host (ex. via GitHub protected branches). If so, you'll need to change
+  your settings to require the new names to pass and un-require the old names.
+  
+  > If you were on a version lower than `v0.5.*` then read the backwards compatiblity
+    notes for release `0.5.0`.
+    
+  **NOTE from the maintainer**: I take backwards compatibility seriously and I
+  apologize that the status checks are changing again so soon after the 0.5 release
+  also changed them. I know that if you have many repos and require the checks
+  to pass that it is a large task to change them all again.
+  
+  In this case, I decided that the tradeoff was worth it because the
+  0.5 release has only been out for a couple of weeks so hopefully not everyone
+  has upgraded to it. The new check names makes them a lot easier to read
+  (at least on GitHub) because they appear next to each other now due to
+  alphabetical sorting. In this case I felt like it was better to get this change
+  done as soon as possible rather than having this annoying UX issue stay around
+  forever.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.6.0/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.6.0/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.6.0/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.6.0/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.6.0`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.5.1..v0.6.0
+https://github.com/runatlantis/atlantis/compare/v0.5.1...v0.6.0
+
 # v0.5.1
 
 ## Description
