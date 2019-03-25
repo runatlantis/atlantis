@@ -14,13 +14,13 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 	cases := []struct {
 		description string
 		input       string
-		exp         raw.Config
+		exp         raw.RepoCfg
 		expErr      string
 	}{
 		{
 			description: "no data",
 			input:       "",
-			exp: raw.Config{
+			exp: raw.RepoCfg{
 				Version:   nil,
 				Projects:  nil,
 				Workflows: nil,
@@ -29,7 +29,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 		{
 			description: "yaml nil",
 			input:       "~",
-			exp: raw.Config{
+			exp: raw.RepoCfg{
 				Version:   nil,
 				Projects:  nil,
 				Workflows: nil,
@@ -38,17 +38,17 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 		{
 			description: "invalid key",
 			input:       "invalid: key",
-			exp: raw.Config{
+			exp: raw.RepoCfg{
 				Version:   nil,
 				Projects:  nil,
 				Workflows: nil,
 			},
-			expErr: "yaml: unmarshal errors:\n  line 1: field invalid not found in struct raw.Config",
+			expErr: "yaml: unmarshal errors:\n  line 1: field invalid not found in struct raw.RepoCfg",
 		},
 		{
 			description: "version set",
 			input:       "version: 2",
-			exp: raw.Config{
+			exp: raw.RepoCfg{
 				Version:   Int(2),
 				Projects:  nil,
 				Workflows: nil,
@@ -57,7 +57,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 		{
 			description: "projects key without value",
 			input:       "projects:",
-			exp: raw.Config{
+			exp: raw.RepoCfg{
 				Version:   nil,
 				Projects:  nil,
 				Workflows: nil,
@@ -66,7 +66,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 		{
 			description: "workflows key without value",
 			input:       "workflows:",
-			exp: raw.Config{
+			exp: raw.RepoCfg{
 				Version:   nil,
 				Projects:  nil,
 				Workflows: nil,
@@ -75,7 +75,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 		{
 			description: "projects with a map",
 			input:       "projects:\n  key: value",
-			exp: raw.Config{
+			exp: raw.RepoCfg{
 				Version:   nil,
 				Projects:  nil,
 				Workflows: nil,
@@ -85,7 +85,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 		{
 			description: "projects with a scalar",
 			input:       "projects: value",
-			exp: raw.Config{
+			exp: raw.RepoCfg{
 				Version:   nil,
 				Projects:  nil,
 				Workflows: nil,
@@ -95,7 +95,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 		{
 			description: "automerge not a boolean",
 			input:       "version: 2\nautomerge: notabool",
-			exp: raw.Config{
+			exp: raw.RepoCfg{
 				Version:   nil,
 				Projects:  nil,
 				Workflows: nil,
@@ -122,7 +122,7 @@ workflows:
       steps: []
     apply:
      steps: []`,
-			exp: raw.Config{
+			exp: raw.RepoCfg{
 				Version:   Int(2),
 				Automerge: Bool(true),
 				Projects: []raw.Project{
@@ -153,7 +153,7 @@ workflows:
 	}
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			var conf raw.Config
+			var conf raw.RepoCfg
 			err := yaml.UnmarshalStrict([]byte(c.input), &conf)
 			if c.expErr != "" {
 				ErrEquals(t, c.expErr, err)
@@ -168,19 +168,19 @@ workflows:
 func TestConfig_Validate(t *testing.T) {
 	cases := []struct {
 		description string
-		input       raw.Config
+		input       raw.RepoCfg
 		expErr      string
 	}{
 		{
 			description: "version not nil",
-			input: raw.Config{
+			input: raw.RepoCfg{
 				Version: nil,
 			},
 			expErr: "version: is required. If you've just upgraded Atlantis you need to rewrite your atlantis.yaml for version 2. See www.runatlantis.io/docs/upgrading-atlantis-yaml-to-version-2.html.",
 		},
 		{
 			description: "version not 1",
-			input: raw.Config{
+			input: raw.RepoCfg{
 				Version: Int(1),
 			},
 			expErr: "version: must equal 2.",
@@ -202,25 +202,25 @@ func TestConfig_Validate(t *testing.T) {
 func TestConfig_ToValid(t *testing.T) {
 	cases := []struct {
 		description string
-		input       raw.Config
-		exp         valid.Config
+		input       raw.RepoCfg
+		exp         valid.RepoCfg
 	}{
 		{
 			description: "nothing set",
-			input:       raw.Config{Version: Int(2)},
-			exp: valid.Config{
+			input:       raw.RepoCfg{Version: Int(2)},
+			exp: valid.RepoCfg{
 				Version:   2,
 				Workflows: make(map[string]valid.Workflow),
 			},
 		},
 		{
 			description: "set to empty",
-			input: raw.Config{
+			input: raw.RepoCfg{
 				Version:   Int(2),
 				Workflows: map[string]raw.Workflow{},
 				Projects:  []raw.Project{},
 			},
-			exp: valid.Config{
+			exp: valid.RepoCfg{
 				Version:   2,
 				Workflows: map[string]valid.Workflow{},
 				Projects:  nil,
@@ -228,10 +228,10 @@ func TestConfig_ToValid(t *testing.T) {
 		},
 		{
 			description: "automerge ommitted",
-			input: raw.Config{
+			input: raw.RepoCfg{
 				Version: Int(2),
 			},
-			exp: valid.Config{
+			exp: valid.RepoCfg{
 				Version:   2,
 				Automerge: false,
 				Workflows: map[string]valid.Workflow{},
@@ -239,11 +239,11 @@ func TestConfig_ToValid(t *testing.T) {
 		},
 		{
 			description: "automerge true",
-			input: raw.Config{
+			input: raw.RepoCfg{
 				Version:   Int(2),
 				Automerge: Bool(true),
 			},
-			exp: valid.Config{
+			exp: valid.RepoCfg{
 				Version:   2,
 				Automerge: true,
 				Workflows: map[string]valid.Workflow{},
@@ -251,11 +251,11 @@ func TestConfig_ToValid(t *testing.T) {
 		},
 		{
 			description: "automerge false",
-			input: raw.Config{
+			input: raw.RepoCfg{
 				Version:   Int(2),
 				Automerge: Bool(false),
 			},
-			exp: valid.Config{
+			exp: valid.RepoCfg{
 				Version:   2,
 				Automerge: false,
 				Workflows: map[string]valid.Workflow{},
@@ -263,7 +263,7 @@ func TestConfig_ToValid(t *testing.T) {
 		},
 		{
 			description: "only plan stage set",
-			input: raw.Config{
+			input: raw.RepoCfg{
 				Version: Int(2),
 				Workflows: map[string]raw.Workflow{
 					"myworkflow": {
@@ -272,7 +272,7 @@ func TestConfig_ToValid(t *testing.T) {
 					},
 				},
 			},
-			exp: valid.Config{
+			exp: valid.RepoCfg{
 				Version:   2,
 				Automerge: false,
 				Workflows: map[string]valid.Workflow{
@@ -292,7 +292,7 @@ func TestConfig_ToValid(t *testing.T) {
 		},
 		{
 			description: "everything set",
-			input: raw.Config{
+			input: raw.RepoCfg{
 				Version:   Int(2),
 				Automerge: Bool(true),
 				Workflows: map[string]raw.Workflow{
@@ -319,7 +319,7 @@ func TestConfig_ToValid(t *testing.T) {
 					},
 				},
 			},
-			exp: valid.Config{
+			exp: valid.RepoCfg{
 				Version:   2,
 				Automerge: true,
 				Workflows: map[string]valid.Workflow{

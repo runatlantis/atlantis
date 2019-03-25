@@ -101,7 +101,7 @@ func TestParseRepoCfg(t *testing.T) {
 		description string
 		input       string
 		expErr      string
-		exp         valid.Config
+		exp         valid.RepoCfg
 	}{
 		// Version key.
 		{
@@ -137,7 +137,7 @@ projects:
 			input: `
 version: 2
 projects:`,
-			exp: valid.Config{
+			exp: valid.RepoCfg{
 				Version:   2,
 				Projects:  nil,
 				Workflows: map[string]valid.Workflow{},
@@ -157,7 +157,7 @@ projects:
 version: 2
 projects:
 - dir: .`,
-			exp: valid.Config{
+			exp: valid.RepoCfg{
 				Version: 2,
 				Projects: []valid.Project{
 					{
@@ -184,7 +184,7 @@ projects:
   autoplan:
     when_modified: ["**/*.tf*"]
 `,
-			exp: valid.Config{
+			exp: valid.RepoCfg{
 				Version: 2,
 				Projects: []valid.Project{
 					{
@@ -206,7 +206,7 @@ version: 2
 projects:
 - dir: "."
 `,
-			exp: valid.Config{
+			exp: valid.RepoCfg{
 				Version: 2,
 				Projects: []valid.Project{
 					{
@@ -229,7 +229,7 @@ projects:
 - dir: "."
 workflows: ~
 `,
-			exp: valid.Config{
+			exp: valid.RepoCfg{
 				Version: 2,
 				Projects: []valid.Project{
 					{
@@ -257,7 +257,7 @@ workflows:
     apply:
       steps:
 `,
-			exp: valid.Config{
+			exp: valid.RepoCfg{
 				Version: 2,
 				Projects: []valid.Project{
 					{
@@ -290,7 +290,7 @@ projects:
   workflow: myworkflow
 workflows:
   myworkflow: ~`,
-			exp: valid.Config{
+			exp: valid.RepoCfg{
 				Version: 2,
 				Projects: []valid.Project{
 					{
@@ -328,7 +328,7 @@ projects:
     enabled: false
 workflows:
   myworkflow: ~`,
-			exp: valid.Config{
+			exp: valid.RepoCfg{
 				Version: 2,
 				Projects: []valid.Project{
 					{
@@ -366,7 +366,7 @@ projects:
     enabled: false
 workflows:
   myworkflow: ~`,
-			exp: valid.Config{
+			exp: valid.RepoCfg{
 				Version: 2,
 				Projects: []valid.Project{
 					{
@@ -404,7 +404,7 @@ projects:
     enabled: false
 workflows:
   myworkflow: ~`,
-			exp: valid.Config{
+			exp: valid.RepoCfg{
 				Version: 2,
 				Projects: []valid.Project{
 					{
@@ -519,7 +519,7 @@ projects:
 - name: myname2
   dir: .
   workspace: workspace`,
-			exp: valid.Config{
+			exp: valid.RepoCfg{
 				Version: 2,
 				Projects: []valid.Project{
 					{
@@ -561,7 +561,7 @@ workflows:
       - plan # NOTE: we don't validate if they make sense
       - apply
 `,
-			exp: valid.Config{
+			exp: valid.RepoCfg{
 				Version: 2,
 				Projects: []valid.Project{
 					{
@@ -623,7 +623,7 @@ workflows:
       - apply:
           extra_args: ["a", "b"]
 `,
-			exp: valid.Config{
+			exp: valid.RepoCfg{
 				Version: 2,
 				Projects: []valid.Project{
 					{
@@ -681,7 +681,7 @@ workflows:
       steps:
       - run: echo apply "arg 2"
 `,
-			exp: valid.Config{
+			exp: valid.RepoCfg{
 				Version: 2,
 				Projects: []valid.Project{
 					{

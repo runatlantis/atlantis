@@ -282,7 +282,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(
 	return p.buildCtx(ctx, cmd, projCfg, commentFlags, automerge, verbose), nil
 }
 
-func (p *DefaultProjectCommandBuilder) getCfg(ctx *CommandContext, projectName string, dir string, workspace string, repoDir string) (projectCfg *valid.Project, repoCfg *valid.Config, err error) {
+func (p *DefaultProjectCommandBuilder) getCfg(ctx *CommandContext, projectName string, dir string, workspace string, repoDir string) (projectCfg *valid.Project, repoCfg *valid.RepoCfg, err error) {
 	hasConfigFile, err := p.ParserValidator.HasRepoCfg(repoDir)
 	if err != nil {
 		err = errors.Wrapf(err, "looking for %s file in %q", yaml.AtlantisYAMLFilename, repoDir)
@@ -296,7 +296,7 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *CommandContext, projectName s
 		return
 	}
 
-	var repoConfig valid.Config
+	var repoConfig valid.RepoCfg
 	repoConfig, err = p.ParserValidator.ParseRepoCfg(repoDir, p.GlobalCfg, ctx.BaseRepo.ID())
 	if err != nil {
 		return
@@ -328,7 +328,7 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *CommandContext, projectName s
 
 // validateWorkspaceAllowed returns an error if there are projects configured
 // in globalCfg for repoRelDir and none of those projects use workspace.
-func (p *DefaultProjectCommandBuilder) validateWorkspaceAllowed(repoCfg *valid.Config, repoRelDir string, workspace string) error {
+func (p *DefaultProjectCommandBuilder) validateWorkspaceAllowed(repoCfg *valid.RepoCfg, repoRelDir string, workspace string) error {
 	if repoCfg == nil {
 		return nil
 	}

@@ -4,9 +4,8 @@ package valid
 
 import "github.com/hashicorp/go-version"
 
-// todo: rename to RepoCfg
-// Config is the atlantis.yaml config after it's been parsed and validated.
-type Config struct {
+// RepoCfg is the atlantis.yaml config after it's been parsed and validated.
+type RepoCfg struct {
 	// Version is the version of the atlantis YAML file. Will always be equal
 	// to 2.
 	Version   int
@@ -15,9 +14,9 @@ type Config struct {
 	Automerge bool
 }
 
-func (c Config) FindProjectsByDirWorkspace(dir string, workspace string) []Project {
+func (r RepoCfg) FindProjectsByDirWorkspace(dir string, workspace string) []Project {
 	var ps []Project
-	for _, p := range c.Projects {
+	for _, p := range r.Projects {
 		if p.Dir == dir && p.Workspace == workspace {
 			ps = append(ps, p)
 		}
@@ -26,9 +25,9 @@ func (c Config) FindProjectsByDirWorkspace(dir string, workspace string) []Proje
 }
 
 // FindProjectsByDir returns all projects that are in dir.
-func (c Config) FindProjectsByDir(dir string) []Project {
+func (r RepoCfg) FindProjectsByDir(dir string) []Project {
 	var ps []Project
-	for _, p := range c.Projects {
+	for _, p := range r.Projects {
 		if p.Dir == dir {
 			ps = append(ps, p)
 		}
@@ -36,8 +35,8 @@ func (c Config) FindProjectsByDir(dir string) []Project {
 	return ps
 }
 
-func (c Config) FindProjectByName(name string) *Project {
-	for _, p := range c.Projects {
+func (r RepoCfg) FindProjectByName(name string) *Project {
+	for _, p := range r.Projects {
 		if p.Name != nil && *p.Name == name {
 			return &p
 		}

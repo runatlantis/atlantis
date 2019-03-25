@@ -113,7 +113,7 @@ func (r Repo) IDString() string {
 	return "/" + r.IDRegex.String() + "/"
 }
 
-func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, proj Project, rCfg Config) MergedProjectCfg {
+func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, proj Project, rCfg RepoCfg) MergedProjectCfg {
 	applyReqs, workflow, allowedOverrides, allowCustomWorkflows := g.getMatchingCfg(log, repoID)
 
 	// If repos are allowed to override certain keys then override them.
@@ -208,7 +208,7 @@ func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (app
 	return
 }
 
-func (g GlobalCfg) ValidateRepoCfg(rCfg Config, repoID string) error {
+func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 	sliceContainsF := func(slc []string, str string) bool {
 		for _, s := range slc {
 			if s == str {

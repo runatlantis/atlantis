@@ -30,28 +30,28 @@ func (p *ParserValidator) HasRepoCfg(repoDir string) (bool, error) {
 // If there was no config file, then this can be detected by checking the type
 // of error: os.IsNotExist(error) but it's instead preferred to check with
 // HasRepoCfg.
-func (p *ParserValidator) ParseRepoCfg(repoDir string, globalCfg valid.GlobalCfg, repoID string) (valid.Config, error) {
+func (p *ParserValidator) ParseRepoCfg(repoDir string, globalCfg valid.GlobalCfg, repoID string) (valid.RepoCfg, error) {
 	configFile := p.repoCfgPath(repoDir)
 	configData, err := ioutil.ReadFile(configFile) // nolint: gosec
 
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return valid.Config{}, errors.Wrapf(err, "unable to read %s file", AtlantisYAMLFilename)
+			return valid.RepoCfg{}, errors.Wrapf(err, "unable to read %s file", AtlantisYAMLFilename)
 		}
 		// Don't wrap os.IsNotExist errors because we want our callers to be
 		// able to detect if it's a NotExist err.
-		return valid.Config{}, err
+		return valid.RepoCfg{}, err
 	}
 
-	var rawConfig raw.Config
+	var rawConfig raw.RepoCfg
 	if err := yaml.UnmarshalStrict(configData, &rawConfig); err != nil {
-		return valid.Config{}, err
+		return valid.RepoCfg{}, err
 	}
 
 	// Set ErrorTag to yaml so it uses the YAML field names in error messages.
 	validation.ErrorTag = "yaml"
 	if err := rawConfig.Validate(); err != nil {
-		return valid.Config{}, err
+		return valid.RepoCfg{}, err
 	}
 
 	validConfig := rawConfig.ToValid()
@@ -59,7 +59,7 @@ func (p *ParserValidator) ParseRepoCfg(repoDir string, globalCfg valid.GlobalCfg
 	// We do the project name validation after we get the valid config because
 	// we need the defaults of dir and workspace to be populated.
 	if err := p.validateProjectNames(validConfig); err != nil {
-		return valid.Config{}, err
+		return valid.RepoCfg{}, err
 	}
 	err = globalCfg.ValidateRepoCfg(validConfig, repoID)
 	return validConfig, err
@@ -102,7 +102,7 @@ func (p *ParserValidator) repoCfgPath(repoDir string) string {
 	return filepath.Join(repoDir, AtlantisYAMLFilename)
 }
 
-func (p *ParserValidator) validateProjectNames(config valid.Config) error {
+func (p *ParserValidator) validateProjectNames(config valid.RepoCfg) error {
 	// First, validate that all names are unique.
 	seen := make(map[string]bool)
 	for _, project := range config.Projects {

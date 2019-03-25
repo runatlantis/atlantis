@@ -10,15 +10,15 @@ import (
 // DefaultAutomerge is the default setting for automerge.
 const DefaultAutomerge = false
 
-// Config is the representation for the whole config file at the top level.
-type Config struct {
+// RepoCfg is the representation for the whole config file at the top level.
+type RepoCfg struct {
 	Version   *int                `yaml:"version,omitempty"`
 	Projects  []Project           `yaml:"projects,omitempty"`
 	Workflows map[string]Workflow `yaml:"workflows,omitempty"`
 	Automerge *bool               `yaml:"automerge,omitempty"`
 }
 
-func (c Config) Validate() error {
+func (r RepoCfg) Validate() error {
 	equals2 := func(value interface{}) error {
 		asIntPtr := value.(*int)
 		if asIntPtr == nil {
@@ -29,31 +29,31 @@ func (c Config) Validate() error {
 		}
 		return nil
 	}
-	return validation.ValidateStruct(&c,
-		validation.Field(&c.Version, validation.By(equals2)),
-		validation.Field(&c.Projects),
-		validation.Field(&c.Workflows),
+	return validation.ValidateStruct(&r,
+		validation.Field(&r.Version, validation.By(equals2)),
+		validation.Field(&r.Projects),
+		validation.Field(&r.Workflows),
 	)
 }
 
-func (c Config) ToValid() valid.Config {
+func (r RepoCfg) ToValid() valid.RepoCfg {
 	validWorkflows := make(map[string]valid.Workflow)
-	for k, v := range c.Workflows {
+	for k, v := range r.Workflows {
 		validWorkflows[k] = v.ToValid(k)
 	}
 
 	var validProjects []valid.Project
-	for _, p := range c.Projects {
+	for _, p := range r.Projects {
 		validProjects = append(validProjects, p.ToValid())
 	}
 
 	automerge := DefaultAutomerge
-	if c.Automerge != nil {
-		automerge = *c.Automerge
+	if r.Automerge != nil {
+		automerge = *r.Automerge
 	}
 
-	return valid.Config{
-		Version:   *c.Version,
+	return valid.RepoCfg{
+		Version:   *r.Version,
 		Projects:  validProjects,
 		Workflows: validWorkflows,
 		Automerge: automerge,

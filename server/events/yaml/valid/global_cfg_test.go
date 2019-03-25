@@ -124,13 +124,13 @@ func TestNewGlobalCfg(t *testing.T) {
 func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 	cases := map[string]struct {
 		gCfg   valid.GlobalCfg
-		rCfg   valid.Config
+		rCfg   valid.RepoCfg
 		repoID string
 		expErr string
 	}{
 		"workflow not allowed": {
 			gCfg: valid.NewGlobalCfg(false, false, false),
-			rCfg: valid.Config{
+			rCfg: valid.RepoCfg{
 				Projects: []valid.Project{
 					{
 						WorkflowName: String("invalid"),
@@ -142,7 +142,7 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 		},
 		"custom workflows not allowed": {
 			gCfg: valid.NewGlobalCfg(false, false, false),
-			rCfg: valid.Config{
+			rCfg: valid.RepoCfg{
 				Workflows: map[string]valid.Workflow{
 					"custom": {},
 				},
@@ -152,7 +152,7 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 		},
 		"custom workflows allowed": {
 			gCfg: valid.NewGlobalCfg(true, false, false),
-			rCfg: valid.Config{
+			rCfg: valid.RepoCfg{
 				Workflows: map[string]valid.Workflow{
 					"custom": {},
 				},
@@ -162,7 +162,7 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 		},
 		"repo uses custom workflow defined on repo": {
 			gCfg: valid.NewGlobalCfg(true, false, false),
-			rCfg: valid.Config{
+			rCfg: valid.RepoCfg{
 				Projects: []valid.Project{
 					{
 						Dir:          ".",
@@ -187,7 +187,7 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 					},
 				},
 			},
-			rCfg: valid.Config{
+			rCfg: valid.RepoCfg{
 				Workflows: map[string]valid.Workflow{
 					"custom": {},
 				},
@@ -197,7 +197,7 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 		},
 		"repo uses global workflow": {
 			gCfg: valid.NewGlobalCfg(true, false, false),
-			rCfg: valid.Config{
+			rCfg: valid.RepoCfg{
 				Projects: []valid.Project{
 					{
 						Dir:          ".",
@@ -211,7 +211,7 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 		},
 		"apply_reqs not allowed": {
 			gCfg: valid.NewGlobalCfg(false, false, false),
-			rCfg: valid.Config{
+			rCfg: valid.RepoCfg{
 				Projects: []valid.Project{
 					{
 						Dir:               ".",
@@ -225,7 +225,7 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 		},
 		"repo workflow doesn't exist": {
 			gCfg: valid.NewGlobalCfg(true, false, false),
-			rCfg: valid.Config{
+			rCfg: valid.RepoCfg{
 				Projects: []valid.Project{
 					{
 						Dir:          ".",
@@ -392,7 +392,7 @@ repos:
 				global = valid.NewGlobalCfg(false, false, false)
 			}
 
-			Equals(t, c.exp, global.MergeProjectCfg(logging.NewNoopLogger(), c.repoID, c.proj, valid.Config{Workflows: c.repoWorkflows}))
+			Equals(t, c.exp, global.MergeProjectCfg(logging.NewNoopLogger(), c.repoID, c.proj, valid.RepoCfg{Workflows: c.repoWorkflows}))
 		})
 	}
 }
