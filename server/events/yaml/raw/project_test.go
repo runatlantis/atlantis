@@ -228,7 +228,7 @@ func TestProject_ToValid(t *testing.T) {
 			exp: valid.Project{
 				Dir:              ".",
 				Workspace:        "default",
-				Workflow:         nil,
+				WorkflowName:     nil,
 				TerraformVersion: nil,
 				Autoplan: valid.Autoplan{
 					WhenModified: []string{"**/*.tf*"},
@@ -255,7 +255,7 @@ func TestProject_ToValid(t *testing.T) {
 			exp: valid.Project{
 				Dir:              ".",
 				Workspace:        "myworkspace",
-				Workflow:         String("myworkflow"),
+				WorkflowName:     String("myworkflow"),
 				TerraformVersion: tfVersionPointEleven,
 				Autoplan: valid.Autoplan{
 					WhenModified: []string{"hi"},

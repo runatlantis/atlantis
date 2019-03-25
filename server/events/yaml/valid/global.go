@@ -125,13 +125,13 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 				applyReqs = proj.ApplyRequirements
 			}
 		case WorkflowKey:
-			if proj.Workflow != nil {
+			if proj.WorkflowName != nil {
 				// We iterate over the global workflows first and the repo
 				// workflows second so that repo workflows override. This is
 				// safe because at this point we know if a repo is allowed to
 				// define its own workflow. We also know that a workflow will
 				// exist with this name due to earlier validation.
-				name := *proj.Workflow
+				name := *proj.WorkflowName
 				for k, v := range g.Workflows {
 					if k == name {
 						workflow = v
@@ -236,7 +236,7 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg Config, repoID string) error {
 		}
 	}
 	for _, p := range rCfg.Projects {
-		if p.Workflow != nil && !sliceContainsF(allowedOverrides, WorkflowKey) {
+		if p.WorkflowName != nil && !sliceContainsF(allowedOverrides, WorkflowKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", WorkflowKey, AllowedOverridesKey, WorkflowKey)
 		}
 		if p.ApplyRequirements != nil && !sliceContainsF(allowedOverrides, ApplyRequirementsKey) {
@@ -260,8 +260,8 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg Config, repoID string) error {
 
 	// Check if the repo has set a workflow name that doesn't exist.
 	for _, p := range rCfg.Projects {
-		if p.Workflow != nil {
-			name := *p.Workflow
+		if p.WorkflowName != nil {
+			name := *p.WorkflowName
 			if !mapContainsF(rCfg.Workflows, name) && !mapContainsF(g.Workflows, name) {
 				return fmt.Errorf("workflow %q is not defined anywhere", name)
 			}

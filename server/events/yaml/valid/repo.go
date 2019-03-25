@@ -49,7 +49,7 @@ type Project struct {
 	Dir               string
 	Workspace         string
 	Name              *string
-	Workflow          *string
+	WorkflowName      *string
 	TerraformVersion  *version.Version
 	Autoplan          Autoplan
 	ApplyRequirements []string

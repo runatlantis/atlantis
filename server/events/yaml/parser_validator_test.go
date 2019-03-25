@@ -163,7 +163,7 @@ projects:
 					{
 						Dir:              ".",
 						Workspace:        "default",
-						Workflow:         nil,
+						WorkflowName:     nil,
 						TerraformVersion: nil,
 						Autoplan: valid.Autoplan{
 							WhenModified: []string{"**/*.tf*"},
@@ -296,7 +296,7 @@ workflows:
 					{
 						Dir:              ".",
 						Workspace:        "myworkspace",
-						Workflow:         String("myworkflow"),
+						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
 							WhenModified: []string{"**/*.tf*"},
@@ -334,7 +334,7 @@ workflows:
 					{
 						Dir:              ".",
 						Workspace:        "myworkspace",
-						Workflow:         String("myworkflow"),
+						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
 							WhenModified: []string{"**/*.tf*"},
@@ -372,7 +372,7 @@ workflows:
 					{
 						Dir:              ".",
 						Workspace:        "myworkspace",
-						Workflow:         String("myworkflow"),
+						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
 							WhenModified: []string{"**/*.tf*"},
@@ -410,7 +410,7 @@ workflows:
 					{
 						Dir:              ".",
 						Workspace:        "myworkspace",
-						Workflow:         String("myworkflow"),
+						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
 							WhenModified: []string{"**/*.tf*"},

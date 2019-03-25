@@ -133,7 +133,7 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 			rCfg: valid.Config{
 				Projects: []valid.Project{
 					{
-						Workflow: String("invalid"),
+						WorkflowName: String("invalid"),
 					},
 				},
 			},
@@ -165,9 +165,9 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 			rCfg: valid.Config{
 				Projects: []valid.Project{
 					{
-						Dir:       ".",
-						Workspace: "default",
-						Workflow:  String("repodefined"),
+						Dir:          ".",
+						Workspace:    "default",
+						WorkflowName: String("repodefined"),
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -200,9 +200,9 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 			rCfg: valid.Config{
 				Projects: []valid.Project{
 					{
-						Dir:       ".",
-						Workspace: "default",
-						Workflow:  String("default"),
+						Dir:          ".",
+						Workspace:    "default",
+						WorkflowName: String("default"),
 					},
 				},
 			},
@@ -228,9 +228,9 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 			rCfg: valid.Config{
 				Projects: []valid.Project{
 					{
-						Dir:       ".",
-						Workspace: "default",
-						Workflow:  String("doesntexist"),
+						Dir:          ".",
+						Workspace:    "default",
+						WorkflowName: String("doesntexist"),
 					},
 				},
 			},
@@ -269,9 +269,9 @@ workflows:
       steps: [plan]`,
 			repoID: "github.com/owner/repo",
 			proj: valid.Project{
-				Dir:       ".",
-				Workspace: "default",
-				Workflow:  String("custom"),
+				Dir:          ".",
+				Workspace:    "default",
+				WorkflowName: String("custom"),
 			},
 			repoWorkflows: nil,
 			exp: valid.MergedProjectCfg{

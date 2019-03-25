@@ -79,7 +79,7 @@ func (p Project) ToValid() valid.Project {
 		v.Workspace = *p.Workspace
 	}
 
-	v.Workflow = p.Workflow
+	v.WorkflowName = p.Workflow
 	if p.TerraformVersion != nil {
 		v.TerraformVersion, _ = version.NewVersion(*p.TerraformVersion)
 	}
