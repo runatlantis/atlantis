@@ -3,7 +3,6 @@ package raw
 import "github.com/runatlantis/atlantis/server/events/yaml/valid"
 
 const DefaultAutoPlanWhenModified = "**/*.tf*"
-const DefaultAutoPlanEnabled = true
 
 type Autoplan struct {
 	WhenModified []string `yaml:"when_modified,omitempty"`
@@ -34,6 +33,6 @@ func (a Autoplan) Validate() error {
 func DefaultAutoPlan() valid.Autoplan {
 	return valid.Autoplan{
 		WhenModified: []string{DefaultAutoPlanWhenModified},
-		Enabled:      DefaultAutoPlanEnabled,
+		Enabled:      valid.DefaultAutoPlanEnabled,
 	}
 }

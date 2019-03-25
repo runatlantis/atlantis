@@ -84,22 +84,3 @@ type Workflow struct {
 	Apply Stage
 	Plan  Stage
 }
-
-var DefaultApplyStage = Stage{
-	Steps: []Step{
-		{
-			StepName: "apply",
-		},
-	},
-}
-
-var DefaultPlanStage = Stage{
-	Steps: []Step{
-		{
-			StepName: "init",
-		},
-		{
-			StepName: "plan",
-		},
-	},
-}

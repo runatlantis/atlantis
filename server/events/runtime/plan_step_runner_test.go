@@ -2,13 +2,14 @@ package runtime_test
 
 import (
 	"fmt"
-	mocks2 "github.com/runatlantis/atlantis/server/events/mocks"
-	"github.com/runatlantis/atlantis/server/events/terraform"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	mocks2 "github.com/runatlantis/atlantis/server/events/mocks"
+	"github.com/runatlantis/atlantis/server/events/terraform"
 
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"

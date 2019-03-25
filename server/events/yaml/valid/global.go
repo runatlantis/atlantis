@@ -2,10 +2,11 @@ package valid
 
 import (
 	"fmt"
-	"github.com/hashicorp/go-version"
-	"github.com/runatlantis/atlantis/server/logging"
 	"regexp"
 	"strings"
+
+	"github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 const MergeableApplyReq = "mergeable"
@@ -21,30 +22,35 @@ type GlobalCfg struct {
 	Workflows map[string]Workflow
 }
 
+var DefaultApplyStage = Stage{
+	Steps: []Step{
+		{
+			StepName: "apply",
+		},
+	},
+}
+
+var DefaultPlanStage = Stage{
+	Steps: []Step{
+		{
+			StepName: "init",
+		},
+		{
+			StepName: "plan",
+		},
+	},
+}
+
 func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) GlobalCfg {
 	defaultWorkflow := Workflow{
-		Name: DefaultWorkflowName,
-		Apply: Stage{
-			Steps: []Step{
-				{
-					StepName: "apply",
-				},
-			},
-		},
-		Plan: Stage{
-			Steps: []Step{
-				{
-					StepName: "init",
-				},
-				{
-					StepName: "plan",
-				},
-			},
-		},
+		Name:  DefaultWorkflowName,
+		Apply: DefaultApplyStage,
+		Plan:  DefaultPlanStage,
 	}
-	// Must construct a slice here because we treat a nil slice and an empty
-	// slice differently.
+	// Must construct slices here instead of using a `var` declaration because
+	// we treat nil slices differently.
 	applyReqs := []string{}
+	allowedOverrides := []string{}
 	if mergeableReq {
 		applyReqs = append(applyReqs, MergeableApplyReq)
 	}
@@ -53,9 +59,6 @@ func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) Global
 	}
 
 	allowCustomWorkfows := false
-	// Must construct a slice here because we treat a nil slice and an empty
-	// slice differently.
-	allowedOverrides := []string{}
 	if allowRepoCfg {
 		allowedOverrides = []string{ApplyRequirementsKey, WorkflowKey}
 		allowCustomWorkfows = true
@@ -89,7 +92,6 @@ type Repo struct {
 type MergedProjectCfg struct {
 	ApplyRequirements []string
 	Workflow          Workflow
-	AllowedOverrides  []string
 	RepoRelDir        string
 	Workspace         string
 	Name              string
@@ -112,39 +114,9 @@ func (r Repo) IDString() string {
 }
 
 func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, proj Project, rCfg Config) MergedProjectCfg {
-	var applyReqs []string
-	var workflow Workflow
-	var allowedOverrides []string
-	allowCustomWorkflows := false
+	applyReqs, workflow, allowedOverrides, allowCustomWorkflows := g.getMatchingCfg(log, repoID)
 
-	for _, key := range []string{ApplyRequirementsKey, WorkflowKey, AllowedOverridesKey, AllowCustomWorkflowsKey} {
-		for _, repo := range g.Repos {
-			if repo.IDMatches(repoID) {
-				switch key {
-				case ApplyRequirementsKey:
-					if repo.ApplyRequirements != nil {
-						log.Debug("setting %s: [%s] from repo config %q", ApplyRequirementsKey, strings.Join(repo.ApplyRequirements, ","), repo.IDString())
-						applyReqs = repo.ApplyRequirements
-					}
-				case WorkflowKey:
-					if repo.Workflow != nil {
-						log.Debug("setting %s %s from repo config %q", WorkflowKey, repo.Workflow.Name, repo.IDString())
-						workflow = *repo.Workflow
-					}
-				case AllowedOverridesKey:
-					if repo.AllowedOverrides != nil {
-						log.Debug("setting %s: [%s] from repo config %q", AllowedOverridesKey, strings.Join(repo.AllowedOverrides, ","), repo.IDString())
-						allowedOverrides = repo.AllowedOverrides
-					}
-				case AllowCustomWorkflowsKey:
-					if repo.AllowCustomWorkflows != nil {
-						log.Debug("setting %s: %t from repo config %q", AllowCustomWorkflowsKey, *repo.AllowCustomWorkflows, repo.IDString())
-						allowCustomWorkflows = *repo.AllowCustomWorkflows
-					}
-				}
-			}
-		}
-	}
+	// If repos are allowed to override certain keys then override them.
 	for _, key := range allowedOverrides {
 		switch key {
 		case ApplyRequirementsKey:
@@ -183,13 +155,57 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 	return MergedProjectCfg{
 		ApplyRequirements: applyReqs,
 		Workflow:          workflow,
-		AllowedOverrides:  allowedOverrides,
 		RepoRelDir:        proj.Dir,
 		Workspace:         proj.Workspace,
 		Name:              proj.GetName(),
 		AutoplanEnabled:   proj.Autoplan.Enabled,
 		TerraformVersion:  proj.TerraformVersion,
 	}
+}
+
+func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repoRelDir string, workspace string) MergedProjectCfg {
+	applyReqs, workflow, _, _ := g.getMatchingCfg(log, repoID)
+	return MergedProjectCfg{
+		ApplyRequirements: applyReqs,
+		Workflow:          workflow,
+		RepoRelDir:        repoRelDir,
+		Workspace:         workspace,
+		Name:              "",
+		AutoplanEnabled:   DefaultAutoPlanEnabled,
+		TerraformVersion:  nil,
+	}
+}
+
+func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (applyReqs []string, workflow Workflow, allowedOverrides []string, allowCustomWorkflows bool) {
+	for _, key := range []string{ApplyRequirementsKey, WorkflowKey, AllowedOverridesKey, AllowCustomWorkflowsKey} {
+		for _, repo := range g.Repos {
+			if repo.IDMatches(repoID) {
+				switch key {
+				case ApplyRequirementsKey:
+					if repo.ApplyRequirements != nil {
+						log.Debug("setting %s: [%s] from repo config %q", ApplyRequirementsKey, strings.Join(repo.ApplyRequirements, ","), repo.IDString())
+						applyReqs = repo.ApplyRequirements
+					}
+				case WorkflowKey:
+					if repo.Workflow != nil {
+						log.Debug("setting %s %s from repo config %q", WorkflowKey, repo.Workflow.Name, repo.IDString())
+						workflow = *repo.Workflow
+					}
+				case AllowedOverridesKey:
+					if repo.AllowedOverrides != nil {
+						log.Debug("setting %s: [%s] from repo config %q", AllowedOverridesKey, strings.Join(repo.AllowedOverrides, ","), repo.IDString())
+						allowedOverrides = repo.AllowedOverrides
+					}
+				case AllowCustomWorkflowsKey:
+					if repo.AllowCustomWorkflows != nil {
+						log.Debug("setting %s: %t from repo config %q", AllowCustomWorkflowsKey, *repo.AllowCustomWorkflows, repo.IDString())
+						allowCustomWorkflows = *repo.AllowCustomWorkflows
+					}
+				}
+			}
+		}
+	}
+	return
 }
 
 func (g GlobalCfg) ValidateRepoCfg(rCfg Config, repoID string) error {
@@ -253,42 +269,4 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg Config, repoID string) error {
 	}
 
 	return nil
-}
-
-func (g GlobalCfg) DefaultProjCfg(repoID string, repoRelDir string, workspace string) MergedProjectCfg {
-	var applyReqs []string
-	var workflow Workflow
-	var allowedOverrides []string
-
-	for _, key := range []string{ApplyRequirementsKey, WorkflowKey, AllowedOverridesKey} {
-		for _, repo := range g.Repos {
-			if repo.IDMatches(repoID) {
-				switch key {
-				case ApplyRequirementsKey:
-					if repo.ApplyRequirements != nil {
-						applyReqs = repo.ApplyRequirements
-					}
-				case WorkflowKey:
-					if repo.Workflow != nil {
-						workflow = *repo.Workflow
-					}
-				case AllowedOverridesKey:
-					if repo.AllowedOverrides != nil {
-						allowedOverrides = repo.AllowedOverrides
-					}
-				}
-			}
-		}
-	}
-
-	return MergedProjectCfg{
-		ApplyRequirements: applyReqs,
-		Workflow:          workflow,
-		AllowedOverrides:  allowedOverrides,
-		RepoRelDir:        repoRelDir,
-		Workspace:         workspace,
-		Name:              "",
-		AutoplanEnabled:   true,
-		TerraformVersion:  nil,
-	}
 }

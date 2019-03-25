@@ -1,6 +1,10 @@
 package events
 
 import (
+	"io/ioutil"
+	"path/filepath"
+	"testing"
+
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events/matchers"
@@ -9,9 +13,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	. "github.com/runatlantis/atlantis/testing"
-	"io/ioutil"
-	"path/filepath"
-	"testing"
 )
 
 // Test different permutations of global and repo config.
@@ -481,6 +482,46 @@ workflows:
 			},
 			expPlanSteps:  []string{},
 			expApplySteps: []string{},
+		},
+		// Test that if we leave keys undefined, that they don't override.
+		"cascading matches": {
+			globalCfg: `
+repos:
+- id: /.*/
+  apply_requirements: [approved]
+- id: github.com/owner/repo
+  workflow: custom
+workflows:
+  custom:
+    plan:
+      steps: [plan]
+`,
+			repoCfg: `
+version: 2
+projects:
+- dir: project1
+  workspace: myworkspace
+`,
+			expCtx: models.ProjectCommandContext{
+				ApplyCmd:          "atlantis apply -d project1 -w myworkspace",
+				BaseRepo:          baseRepo,
+				CommentArgs:       []string{"flag"},
+				AutomergeEnabled:  false,
+				AutoplanEnabled:   true,
+				HeadRepo:          models.Repo{},
+				Log:               nil,
+				PullMergeable:     true,
+				Pull:              models.PullRequest{},
+				ProjectName:       "",
+				ApplyRequirements: []string{"approved"},
+				RePlanCmd:         "atlantis plan -d project1 -w myworkspace -- flag",
+				RepoRelDir:        "project1",
+				User:              models.User{},
+				Verbose:           true,
+				Workspace:         "myworkspace",
+			},
+			expPlanSteps:  []string{"plan"},
+			expApplySteps: []string{"apply"},
 		},
 	}
 

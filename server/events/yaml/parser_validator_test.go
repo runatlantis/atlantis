@@ -944,6 +944,23 @@ workflows:
 				},
 			},
 		},
+		"id regex with trailing slash": {
+			input: `
+repos:
+- id: /github.com//
+`,
+			exp: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					defaultCfg.Repos[0],
+					{
+						IDRegex: regexp.MustCompile("github.com/"),
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"default": defaultCfg.Workflows["default"],
+				},
+			},
+		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

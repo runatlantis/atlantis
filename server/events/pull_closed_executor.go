@@ -16,10 +16,11 @@ package events
 import (
 	"bytes"
 	"fmt"
-	"github.com/runatlantis/atlantis/server/events/db"
 	"sort"
 	"strings"
 	"text/template"
+
+	"github.com/runatlantis/atlantis/server/events/db"
 
 	"github.com/runatlantis/atlantis/server/logging"
 

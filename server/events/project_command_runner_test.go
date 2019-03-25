@@ -14,6 +14,9 @@
 package events_test
 
 import (
+	"os"
+	"testing"
+
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/mocks"
@@ -23,8 +26,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
-	"os"
-	"testing"
 )
 
 // Test that it runs the expected plan steps.

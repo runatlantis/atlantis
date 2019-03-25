@@ -3,6 +3,13 @@ package runtime_test
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"testing"
+
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
 	mocks2 "github.com/runatlantis/atlantis/server/events/mocks"
@@ -14,12 +21,6 @@ import (
 	matchers2 "github.com/runatlantis/atlantis/server/events/terraform/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"strings"
-	"sync"
-	"testing"
 )
 
 func TestRun_NoDir(t *testing.T) {

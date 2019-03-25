@@ -1,6 +1,10 @@
 package events_test
 
 import (
+	"io/ioutil"
+	"path/filepath"
+	"testing"
+
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/matchers"
@@ -11,9 +15,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
-	"io/ioutil"
-	"path/filepath"
-	"testing"
 )
 
 func TestDefaultProjectCommandBuilder_BuildAutoplanCommands(t *testing.T) {

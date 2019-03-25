@@ -4,11 +4,12 @@ package runtime
 
 import (
 	"fmt"
+	"regexp"
+
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	"github.com/runatlantis/atlantis/server/logging"
-	"regexp"
 )
 
 // lineBeforeRunURL is the line output during a remote operation right before

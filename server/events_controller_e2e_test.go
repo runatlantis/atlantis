@@ -3,9 +3,6 @@ package server_test
 import (
 	"bytes"
 	"fmt"
-	"github.com/hashicorp/go-getter"
-	"github.com/runatlantis/atlantis/server/events/db"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +12,10 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/hashicorp/go-getter"
+	"github.com/runatlantis/atlantis/server/events/db"
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 
 	"github.com/google/go-github/github"
 	. "github.com/petergtz/pegomock"

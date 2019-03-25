@@ -2,17 +2,13 @@ package raw
 
 import (
 	"fmt"
+	"regexp"
+	"strings"
+
 	"github.com/go-ozzo/ozzo-validation"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
-	"regexp"
-	"strings"
 )
-
-const ApplyRequirementsKey string = "apply_requirements"
-const WorkflowKey string = "workflow"
-const CustomWorkflowsKey string = "workflows"
-const AllowedOverridesKey string = "allowed_overrides"
 
 type GlobalCfg struct {
 	Repos     []Repo              `yaml:"repos"`
@@ -81,15 +77,15 @@ func (r Repo) Validate() error {
 		if !r.HasRegexID() {
 			return nil
 		}
-		_, err := regexp.Compile(strings.Trim(id, "/"))
+		_, err := regexp.Compile(id[1 : len(id)-1])
 		return errors.Wrapf(err, "parsing: %s", id)
 	}
 
 	overridesValid := func(value interface{}) error {
 		overrides := value.([]string)
 		for _, o := range overrides {
-			if o != ApplyRequirementsKey && o != WorkflowKey {
-				return fmt.Errorf("%q is not a valid override, only %q and %q are supported", o, ApplyRequirementsKey, WorkflowKey)
+			if o != valid.ApplyRequirementsKey && o != valid.WorkflowKey {
+				return fmt.Errorf("%q is not a valid override, only %q and %q are supported", o, valid.ApplyRequirementsKey, valid.WorkflowKey)
 			}
 		}
 		return nil
@@ -113,8 +109,9 @@ func (r Repo) ToValid(workflows map[string]valid.Workflow) valid.Repo {
 	var id string
 	var idRegex *regexp.Regexp
 	if r.HasRegexID() {
+		withoutSlashes := r.ID[1 : len(r.ID)-1]
 		// Safe to use MustCompile because we test it in Validate().
-		idRegex = regexp.MustCompile(strings.Trim(r.ID, "/"))
+		idRegex = regexp.MustCompile(withoutSlashes)
 	} else {
 		id = r.ID
 	}

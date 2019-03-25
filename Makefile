@@ -48,7 +48,7 @@ test-coverage:
 
 test-coverage-html:
 	@mkdir -p .cover
-	@go test -covermode atomic -coverprofile .cover/cover.out $(PKG)
+	@go test -covermode atomic -coverpkg $(PKG_COMMAS) -coverprofile .cover/cover.out $(PKG)
 	go tool cover -html .cover/cover.out
 
 dist: ## Package up everything in static/ using go-bindata-assetfs so it can be served by a single binary

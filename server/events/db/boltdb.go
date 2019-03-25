@@ -5,13 +5,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/boltdb/bolt"
-	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/events/models"
 	"os"
 	"path"
 	"strings"
 	"time"
+
+	"github.com/boltdb/bolt"
+	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 // BoltDB is a database using BoltDB

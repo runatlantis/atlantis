@@ -3,6 +3,7 @@ package matchers
 
 import (
 	"reflect"
+
 	"github.com/petergtz/pegomock"
 	models "github.com/runatlantis/atlantis/server/events/models"
 )

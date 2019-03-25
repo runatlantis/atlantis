@@ -2,11 +2,16 @@ package valid_test
 
 import (
 	"fmt"
-	"github.com/mohae/deepcopy"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
-	. "github.com/runatlantis/atlantis/testing"
+	"io/ioutil"
+	"path/filepath"
 	"regexp"
 	"testing"
+
+	"github.com/mohae/deepcopy"
+	"github.com/runatlantis/atlantis/server/events/yaml"
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/logging"
+	. "github.com/runatlantis/atlantis/testing"
 )
 
 func TestNewGlobalCfg(t *testing.T) {
@@ -241,6 +246,153 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 			} else {
 				ErrEquals(t, c.expErr, actErr)
 			}
+		})
+	}
+}
+
+func TestGlobalCfg_MergeProjectCfg(t *testing.T) {
+	cases := map[string]struct {
+		gCfg          string
+		repoID        string
+		proj          valid.Project
+		repoWorkflows map[string]valid.Workflow
+		exp           valid.MergedProjectCfg
+	}{
+		"repos can use server-side defined workflow if allowed": {
+			gCfg: `
+repos:
+- id: /.*/
+  allowed_overrides: [workflow]
+workflows:
+  custom:
+    plan:
+      steps: [plan]`,
+			repoID: "github.com/owner/repo",
+			proj: valid.Project{
+				Dir:       ".",
+				Workspace: "default",
+				Workflow:  String("custom"),
+			},
+			repoWorkflows: nil,
+			exp: valid.MergedProjectCfg{
+				ApplyRequirements: []string{},
+				Workflow: valid.Workflow{
+					Name:  "custom",
+					Apply: valid.DefaultApplyStage,
+					Plan: valid.Stage{
+						Steps: []valid.Step{
+							{
+								StepName: "plan",
+							},
+						},
+					},
+				},
+				RepoRelDir:      ".",
+				Workspace:       "default",
+				Name:            "",
+				AutoplanEnabled: false,
+			},
+		},
+		"repo-side apply reqs win out if allowed": {
+			gCfg: `
+repos:
+- id: /.*/
+  allowed_overrides: [apply_requirements]
+  apply_requirements: [approved] 
+`,
+			repoID: "github.com/owner/repo",
+			proj: valid.Project{
+				Dir:               ".",
+				Workspace:         "default",
+				ApplyRequirements: []string{"mergeable"},
+			},
+			repoWorkflows: nil,
+			exp: valid.MergedProjectCfg{
+				ApplyRequirements: []string{"mergeable"},
+				Workflow: valid.Workflow{
+					Name:  "default",
+					Apply: valid.DefaultApplyStage,
+					Plan:  valid.DefaultPlanStage,
+				},
+				RepoRelDir:      ".",
+				Workspace:       "default",
+				Name:            "",
+				AutoplanEnabled: false,
+			},
+		},
+		"last server-side match wins": {
+			gCfg: `
+repos:
+- id: /.*/
+  apply_requirements: [approved] 
+- id: /github.com/.*/
+  apply_requirements: [mergeable] 
+- id: github.com/owner/repo
+  apply_requirements: [approved, mergeable] 
+`,
+			repoID: "github.com/owner/repo",
+			proj: valid.Project{
+				Dir:       "mydir",
+				Workspace: "myworkspace",
+				Name:      String("myname"),
+			},
+			repoWorkflows: nil,
+			exp: valid.MergedProjectCfg{
+				ApplyRequirements: []string{"approved", "mergeable"},
+				Workflow: valid.Workflow{
+					Name:  "default",
+					Apply: valid.DefaultApplyStage,
+					Plan:  valid.DefaultPlanStage,
+				},
+				RepoRelDir:      "mydir",
+				Workspace:       "myworkspace",
+				Name:            "myname",
+				AutoplanEnabled: false,
+			},
+		},
+		"autoplan is set properly": {
+			gCfg:   "",
+			repoID: "github.com/owner/repo",
+			proj: valid.Project{
+				Dir:       "mydir",
+				Workspace: "myworkspace",
+				Name:      String("myname"),
+				Autoplan: valid.Autoplan{
+					WhenModified: []string{".tf"},
+					Enabled:      true,
+				},
+			},
+			repoWorkflows: nil,
+			exp: valid.MergedProjectCfg{
+				ApplyRequirements: []string{},
+				Workflow: valid.Workflow{
+					Name:  "default",
+					Apply: valid.DefaultApplyStage,
+					Plan:  valid.DefaultPlanStage,
+				},
+				RepoRelDir:      "mydir",
+				Workspace:       "myworkspace",
+				Name:            "myname",
+				AutoplanEnabled: true,
+			},
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			tmp, cleanup := TempDir(t)
+			defer cleanup()
+			var global valid.GlobalCfg
+			if c.gCfg != "" {
+				path := filepath.Join(tmp, "config.yaml")
+				Ok(t, ioutil.WriteFile(path, []byte(c.gCfg), 0600))
+				var err error
+				global, err = (&yaml.ParserValidator{}).ParseGlobalCfg(path, valid.NewGlobalCfg(false, false, false))
+				Ok(t, err)
+			} else {
+				global = valid.NewGlobalCfg(false, false, false)
+			}
+
+			Equals(t, c.exp, global.MergeProjectCfg(logging.NewNoopLogger(), c.repoID, c.proj, valid.Config{Workflows: c.repoWorkflows}))
 		})
 	}
 }

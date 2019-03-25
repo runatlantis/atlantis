@@ -16,8 +16,6 @@ package server_test
 import (
 	"bytes"
 	"errors"
-	"github.com/runatlantis/atlantis/server/events"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -26,6 +24,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 
 	"github.com/gorilla/mux"
 	. "github.com/petergtz/pegomock"

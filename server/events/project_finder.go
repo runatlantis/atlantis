@@ -14,11 +14,12 @@
 package events
 
 import (
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 
 	"github.com/docker/docker/pkg/fileutils"
 	"github.com/pkg/errors"

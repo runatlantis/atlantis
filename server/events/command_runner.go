@@ -15,6 +15,7 @@ package events
 
 import (
 	"fmt"
+
 	"github.com/google/go-github/github"
 	"github.com/lkysow/go-gitlab"
 	"github.com/pkg/errors"

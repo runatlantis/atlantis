@@ -15,15 +15,16 @@ package terraform_test
 
 import (
 	"fmt"
-	"github.com/petergtz/pegomock"
-	"github.com/runatlantis/atlantis/cmd"
-	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/cmd"
+	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
 
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"

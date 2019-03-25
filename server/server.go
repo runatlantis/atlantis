@@ -20,8 +20,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/runatlantis/atlantis/server/events/db"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"log"
 	"net/http"
 	"net/url"
@@ -30,6 +28,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/runatlantis/atlantis/server/events/db"
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 
 	"github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"

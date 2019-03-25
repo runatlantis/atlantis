@@ -2,8 +2,9 @@ package events
 
 import (
 	"fmt"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"strings"
+
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 
 	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
@@ -152,7 +153,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		modifiedProjects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.BaseRepo.FullName, repoDir)
 		ctx.Log.Info("automatically determined that there were %d projects modified in this pull request: %s", len(modifiedProjects), modifiedProjects)
 		for _, mp := range modifiedProjects {
-			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.BaseRepo.ID(), mp.Path, DefaultWorkspace)
+			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.BaseRepo.ID(), mp.Path, DefaultWorkspace)
 			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, pCfg, commentFlags, DefaultAutomergeEnabled, verbose))
 		}
 	}
@@ -267,7 +268,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(
 		workspace = projCfg.Workspace
 		projCfg = p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.BaseRepo.ID(), *projCfgPtr, *repoCfgPtr)
 	} else {
-		projCfg = p.GlobalCfg.DefaultProjCfg(ctx.BaseRepo.ID(), repoRelDir, workspace)
+		projCfg = p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.BaseRepo.ID(), repoRelDir, workspace)
 	}
 
 	if err := p.validateWorkspaceAllowed(repoCfgPtr, repoRelDir, workspace); err != nil {

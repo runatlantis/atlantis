@@ -3,12 +3,13 @@ package server_test
 import (
 	"bytes"
 	"errors"
-	"github.com/runatlantis/atlantis/server/events/db"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"reflect"
 	"testing"
+
+	"github.com/runatlantis/atlantis/server/events/db"
 
 	"github.com/gorilla/mux"
 	. "github.com/petergtz/pegomock"

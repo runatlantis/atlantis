@@ -2,14 +2,15 @@ package runtime
 
 import (
 	"fmt"
-	"github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/events/models"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/hashicorp/go-version"
+	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 const (

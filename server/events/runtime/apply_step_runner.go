@@ -3,12 +3,13 @@ package runtime
 import (
 	"bytes"
 	"fmt"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/models"
