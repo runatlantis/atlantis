@@ -1,9 +1,29 @@
 # Provider Credentials
+Atlantis runs Terraform by simply executing `terraform plan` and `apply` commands
+on the server Atlantis is hosted on.
+Just like when you run Terraform locally, Atlantis needs credentials for your
+specific provider.
 
-## AWS
-Atlantis simply shells out to `terraform` so you don't need to do anything special with AWS credentials.
-As long as `terraform` commands works where you're hosting Atlantis, then Atlantis will work.
-See [https://www.terraform.io/docs/providers/aws/#authentication](https://www.terraform.io/docs/providers/aws/#authentication) for more detail.
+It's up to you how you provide credentials for your specific provider to Atlantis:
+* The Atlantis [Helm Chart](deployment.html#kubernetes-helm-chart) and 
+    [AWS Fargate Module](deployment.html#aws-fargate) have their own mechanisms for provider
+    credentials. Read their docs.
+* If you're running Atlantis in a cloud then many clouds have ways to give cloud API access
+  to applications running on them, ex:
+    * [AWS EC2 Roles](https://www.terraform.io/docs/providers/aws/#ec2-role)
+    * [GCE Instance Service Accounts](https://www.terraform.io/docs/providers/google/provider_reference.html#configuration-reference)
+* Many users set environment variables, ex. `AWS_ACCESS_KEY`, where Atlantis is running.
+* Others create the necessary config files, ex. `~/.aws/credentials`, where Atlantis is running.
+* Use the [HashiCorp Vault Provider](https://www.terraform.io/docs/providers/vault/index.html#using-vault-credentials-in-terraform-configuration)
+  to obtain provider credentials.
+
+:::tip
+As a general rule, if you can `ssh` or `exec` into the server where Atlantis is
+running and run `terraform` commands like you would locally, then Atlantis will work.
+:::
+
+
+## AWS Specific Info
 
 ### Multiple AWS Accounts
 Atlantis supports multiple AWS accounts through the use of Terraform's
@@ -16,7 +36,7 @@ If you're using [Assume role](https://www.terraform.io/docs/providers/aws/#assum
 you'll need to ensure that the credentials file has a `default` profile that is able
 to assume all required roles.
 
-[Environment variables](https://www.terraform.io/docs/providers/aws/#environment-variables) authentication
+Using multiple [Environment variables](https://www.terraform.io/docs/providers/aws/#environment-variables)
 won't work for multiple accounts since Atlantis wouldn't know which environment variables to execute
 Terraform with.
 
@@ -67,3 +87,7 @@ we can't set the `-var` flag.
 
 You can still set these variables yourself using the `extra_args` configuration.
 :::
+
+## Next Steps
+* If you want to configure Atlantis further, read [Configuring Atlantis](configuring-atlantis.html)
+* If you're ready to use Atlantis, read [Using Atlantis](using-atlantis.html)

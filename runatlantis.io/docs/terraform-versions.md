@@ -11,7 +11,7 @@ projects:
 - dir: .
   terraform_version: v0.10.5
 ```
-See [atlantis.yaml Use Cases](/guide/atlantis-yaml-use-cases.html#terraform-versions) for more details.
+See [atlantis.yaml Use Cases](repo-level-atlantis-yaml.html#terraform-versions) for more details.
 
 ::: tip NOTE
 Atlantis will automatically download the version specified.
