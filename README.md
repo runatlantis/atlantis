@@ -2,7 +2,7 @@
 
 <p align="center">
   <img src="./runatlantis.io/.vuepress/public/hero.png" alt="Atlantis Logo"/><br><br>
-  <b>Terraform For Teams</b>
+  <b>Terraform Pull Request Automation</b>
 </p>
 
 ## Resources

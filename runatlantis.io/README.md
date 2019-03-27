@@ -5,5 +5,5 @@ heroImage: /hero.png
 heroText: Atlantis
 actionText: Get Started →
 actionLink: /guide/
-title: Terraform For Teams
+title: Terraform Pull Request Automation
 ---
