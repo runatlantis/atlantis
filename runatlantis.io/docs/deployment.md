@@ -21,7 +21,7 @@ a public Git host like GitHub.com, GitLab.com or Bitbucket.org then you'll need 
 expose Atlantis to the internet.
 
 If you're using a private Git host like GitHub Enterprise, GitLab Enterprise or
-Bitbucket Server, then you just need Atlantis to be routable to and from there.
+Bitbucket Server, then Atlantis needs to be routable from the private host and Atlantis will need to be able to route to the private host.
 
 ### Data
 Atlantis has no external database. Atlantis stores Terraform plan files on disk.
