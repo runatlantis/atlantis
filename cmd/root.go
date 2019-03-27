@@ -22,7 +22,7 @@ import (
 // RootCmd is the base command onto which all other commands are added.
 var RootCmd = &cobra.Command{
 	Use:   "atlantis",
-	Short: "A unified workflow for collaborating on Terraform",
+	Short: "Terraform Pull Request Automation",
 }
 
 // Execute starts RootCmd.
