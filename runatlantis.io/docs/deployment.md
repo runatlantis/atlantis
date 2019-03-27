@@ -15,12 +15,13 @@ your Git host and executes Terraform commands locally. There is an official
 Atlantis [Docker image](https://hub.docker.com/r/runatlantis/atlantis/).
 
 ### Routing
-Because Atlantis needs to receive webhooks from your Git host, it must be routable
-from that Git host. If you're using a public Git host like GitHub.com, GitLab.com
-or Bitbucket.org then you'll need to expose Atlantis to the internet.
+Because Atlantis needs to both receive webhooks from your Git host and iteract with
+your Git hosts API, it must be routable to and from that Git host. If you're using 
+a public Git host like GitHub.com, GitLab.com or Bitbucket.org then you'll need to
+expose Atlantis to the internet.
 
 If you're using a private Git host like GitHub Enterprise, GitLab Enterprise or
-Bitbucket Server, then you just need Atlantis to be routable from there.
+Bitbucket Server, then you just need Atlantis to be routable to and from there.
 
 ### Data
 Atlantis has no external database. Atlantis stores Terraform plan files on disk.
