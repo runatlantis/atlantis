@@ -2,14 +2,11 @@ package runtime
 
 import (
 	"fmt"
+	"github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
-
-	"github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 // RunStepRunner runs custom commands.
@@ -17,12 +14,8 @@ type RunStepRunner struct {
 	DefaultTFVersion *version.Version
 }
 
-func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command []string, path string) (string, error) {
-	if len(command) < 1 {
-		return "", errors.New("no commands for run step")
-	}
-
-	cmd := exec.Command("sh", "-c", strings.Join(command, " ")) // #nosec
+func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command string, path string) (string, error) {
+	cmd := exec.Command("sh", "-c", command) // #nosec
 	cmd.Dir = path
 	tfVersion := r.DefaultTFVersion.String()
 	if ctx.TerraformVersion != nil {
@@ -52,12 +45,11 @@ func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command []string, 
 	cmd.Env = finalEnvVars
 	out, err := cmd.CombinedOutput()
 
-	commandStr := strings.Join(command, " ")
 	if err != nil {
-		err = fmt.Errorf("%s: running %q in %q: \n%s", err, commandStr, path, out)
+		err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, out)
 		ctx.Log.Debug("error: %s", err)
 		return string(out), err
 	}
-	ctx.Log.Info("successfully ran %q in %q", commandStr, path)
+	ctx.Log.Info("successfully ran %q in %q", command, path)
 	return string(out), nil
 }

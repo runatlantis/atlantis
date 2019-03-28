@@ -34,7 +34,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	mockInit := mocks.NewMockStepRunner()
 	mockPlan := mocks.NewMockStepRunner()
 	mockApply := mocks.NewMockStepRunner()
-	mockRun := mocks.NewMockStepRunner()
+	mockRun := mocks.NewMockCustomStepRunner()
 	mockWorkingDir := mocks.NewMockWorkingDir()
 	mockLocker := mocks.NewMockProjectLocker()
 
@@ -94,7 +94,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	When(mockInit.Run(ctx, nil, repoDir)).ThenReturn("init", nil)
 	When(mockPlan.Run(ctx, nil, repoDir)).ThenReturn("plan", nil)
 	When(mockApply.Run(ctx, nil, repoDir)).ThenReturn("apply", nil)
-	When(mockRun.Run(ctx, nil, repoDir)).ThenReturn("run", nil)
+	When(mockRun.Run(ctx, "", repoDir)).ThenReturn("run", nil)
 
 	res := runner.Plan(ctx)
 
@@ -112,7 +112,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		case "apply":
 			mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir)
 		case "run":
-			mockRun.VerifyWasCalledOnce().Run(ctx, nil, repoDir)
+			mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir)
 		}
 	}
 }
@@ -250,7 +250,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			mockInit := mocks.NewMockStepRunner()
 			mockPlan := mocks.NewMockStepRunner()
 			mockApply := mocks.NewMockStepRunner()
-			mockRun := mocks.NewMockStepRunner()
+			mockRun := mocks.NewMockCustomStepRunner()
 			mockApproved := mocks2.NewMockPullApprovedChecker()
 			mockWorkingDir := mocks.NewMockWorkingDir()
 			mockLocker := mocks.NewMockProjectLocker()
@@ -287,7 +287,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			When(mockInit.Run(ctx, nil, repoDir)).ThenReturn("init", nil)
 			When(mockPlan.Run(ctx, nil, repoDir)).ThenReturn("plan", nil)
 			When(mockApply.Run(ctx, nil, repoDir)).ThenReturn("apply", nil)
-			When(mockRun.Run(ctx, nil, repoDir)).ThenReturn("run", nil)
+			When(mockRun.Run(ctx, "", repoDir)).ThenReturn("run", nil)
 			When(mockApproved.PullIsApproved(ctx.BaseRepo, ctx.Pull)).ThenReturn(true, nil)
 
 			res := runner.Apply(ctx)
@@ -305,7 +305,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				case "apply":
 					mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir)
 				case "run":
-					mockRun.VerifyWasCalledOnce().Run(ctx, nil, repoDir)
+					mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir)
 				}
 			}
 		})

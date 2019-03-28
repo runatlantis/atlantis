@@ -36,7 +36,7 @@ You can set the `approved` requirement by:
     
     #### atlantis.yaml
     ```yaml
-    version: 2
+    version: 3
     projects:
     - dir: .
       apply_requirements: [approved]
@@ -78,7 +78,7 @@ You can set the `mergeable` requirement by:
      
     #### atlantis.yaml
     ```yaml
-    version: 2
+    version: 3
     projects:
     - dir: .
       apply_requirements: [mergeable]
@@ -163,7 +163,7 @@ If you only want some projects/repos to have apply requirements, then you must
    
    #### atlatis.yaml
    ```yaml
-   version: 2
+   version: 3
    projects:
    - dir: staging
      # By default, apply_requirements is empty so this

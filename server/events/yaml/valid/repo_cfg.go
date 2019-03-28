@@ -6,8 +6,7 @@ import "github.com/hashicorp/go-version"
 
 // RepoCfg is the atlantis.yaml config after it's been parsed and validated.
 type RepoCfg struct {
-	// Version is the version of the atlantis YAML file. Will always be equal
-	// to 2.
+	// Version is the version of the atlantis YAML file.
 	Version   int
 	Projects  []Project
 	Workflows map[string]Workflow
@@ -75,7 +74,7 @@ type Stage struct {
 type Step struct {
 	StepName   string
 	ExtraArgs  []string
-	RunCommand []string
+	RunCommand string
 }
 
 type Workflow struct {

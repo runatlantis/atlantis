@@ -45,6 +45,7 @@ type MergedProjectCfg struct {
 	Name              string
 	AutoplanEnabled   bool
 	TerraformVersion  *version.Version
+	RepoCfgVersion    int
 }
 
 // DefaultApplyStage is the Atlantis default apply stage.
@@ -178,6 +179,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		Name:              proj.GetName(),
 		AutoplanEnabled:   proj.Autoplan.Enabled,
 		TerraformVersion:  proj.TerraformVersion,
+		RepoCfgVersion:    rCfg.Version,
 	}
 }
 

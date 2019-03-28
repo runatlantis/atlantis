@@ -317,6 +317,9 @@ type ProjectCommandContext struct {
 	// ProjectName is the name of the project set in atlantis.yaml. If there was
 	// no name this will be an empty string.
 	ProjectName string
+	// RepoConfigVersion is the version of the repo's atlantis.yaml file. If
+	// there was no file, this will be 0.
+	RepoConfigVersion int
 	// RePlanCmd is the command that users should run to re-plan this project.
 	// If this is an apply then this will be empty.
 	RePlanCmd string

@@ -1,6 +1,7 @@
 package yaml_test
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -110,7 +111,7 @@ func TestParseRepoCfg(t *testing.T) {
 projects:
 - dir: "."
 `,
-			expErr: "version: is required. If you've just upgraded Atlantis you need to rewrite your atlantis.yaml for version 2. See www.runatlantis.io/docs/upgrading-atlantis-yaml-to-version-2.html.",
+			expErr: "version: is required. If you've just upgraded Atlantis you need to rewrite your atlantis.yaml for version 3. See www.runatlantis.io/docs/upgrading-atlantis-yaml.html.",
 		},
 		{
 			description: "unsupported version",
@@ -119,7 +120,7 @@ version: 0
 projects:
 - dir: "."
 `,
-			expErr: "version: must equal 2.",
+			expErr: "version: only versions 2 and 3 are supported.",
 		},
 		{
 			description: "empty version",
@@ -128,17 +129,45 @@ version: ~
 projects:
 - dir: "."
 `,
-			expErr: "version: must equal 2.",
+			expErr: "version: only versions 2 and 3 are supported.",
+		},
+		{
+			description: "version 2",
+			input: `
+version: 2
+workflows:
+  custom:
+    plan:
+      steps:
+      - run: old 'shell parsing'
+`,
+			exp: valid.RepoCfg{
+				Version: 2,
+				Workflows: map[string]valid.Workflow{
+					"custom": {
+						Name:  "custom",
+						Apply: valid.DefaultApplyStage,
+						Plan: valid.Stage{
+							Steps: []valid.Step{
+								{
+									StepName:   "run",
+									RunCommand: "old shell parsing",
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 
 		// Projects key.
 		{
 			description: "empty projects list",
 			input: `
-version: 2
+version: 3
 projects:`,
 			exp: valid.RepoCfg{
-				Version:   2,
+				Version:   3,
 				Projects:  nil,
 				Workflows: map[string]valid.Workflow{},
 			},
@@ -146,7 +175,7 @@ projects:`,
 		{
 			description: "project dir not set",
 			input: `
-version: 2
+version: 3
 projects:
 - `,
 			expErr: "projects: (0: (dir: cannot be blank.).).",
@@ -154,11 +183,11 @@ projects:
 		{
 			description: "project dir set",
 			input: `
-version: 2
+version: 3
 projects:
 - dir: .`,
 			exp: valid.RepoCfg{
-				Version: 2,
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:              ".",
@@ -178,14 +207,14 @@ projects:
 		{
 			description: "autoplan should be enabled by default",
 			input: `
-version: 2
+version: 3
 projects:
 - dir: "."
   autoplan:
     when_modified: ["**/*.tf*"]
 `,
 			exp: valid.RepoCfg{
-				Version: 2,
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:       ".",
@@ -202,12 +231,12 @@ projects:
 		{
 			description: "if workflows not defined there are none",
 			input: `
-version: 2
+version: 3
 projects:
 - dir: "."
 `,
 			exp: valid.RepoCfg{
-				Version: 2,
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:       ".",
@@ -224,13 +253,13 @@ projects:
 		{
 			description: "if workflows key set but with no workflows there are none",
 			input: `
-version: 2
+version: 3
 projects:
 - dir: "."
 workflows: ~
 `,
 			exp: valid.RepoCfg{
-				Version: 2,
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:       ".",
@@ -247,7 +276,7 @@ workflows: ~
 		{
 			description: "if a plan or apply explicitly defines an empty steps key then it gets the defaults",
 			input: `
-version: 2
+version: 3
 projects:
 - dir: "."
 workflows:
@@ -258,7 +287,7 @@ workflows:
       steps:
 `,
 			exp: valid.RepoCfg{
-				Version: 2,
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:       ".",
@@ -281,7 +310,7 @@ workflows:
 		{
 			description: "project fields set except autoplan",
 			input: `
-version: 2
+version: 3
 projects:
 - dir: .
   workspace: myworkspace
@@ -291,7 +320,7 @@ projects:
 workflows:
   myworkflow: ~`,
 			exp: valid.RepoCfg{
-				Version: 2,
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:              ".",
@@ -317,7 +346,7 @@ workflows:
 		{
 			description: "project field with autoplan",
 			input: `
-version: 2
+version: 3
 projects:
 - dir: .
   workspace: myworkspace
@@ -329,7 +358,7 @@ projects:
 workflows:
   myworkflow: ~`,
 			exp: valid.RepoCfg{
-				Version: 2,
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:              ".",
@@ -355,7 +384,7 @@ workflows:
 		{
 			description: "project field with mergeable apply requirement",
 			input: `
-version: 2
+version: 3
 projects:
 - dir: .
   workspace: myworkspace
@@ -367,7 +396,7 @@ projects:
 workflows:
   myworkflow: ~`,
 			exp: valid.RepoCfg{
-				Version: 2,
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:              ".",
@@ -393,7 +422,7 @@ workflows:
 		{
 			description: "project field with mergeable and approved apply requirements",
 			input: `
-version: 2
+version: 3
 projects:
 - dir: .
   workspace: myworkspace
@@ -405,7 +434,7 @@ projects:
 workflows:
   myworkflow: ~`,
 			exp: valid.RepoCfg{
-				Version: 2,
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:              ".",
@@ -431,7 +460,7 @@ workflows:
 		{
 			description: "project dir with ..",
 			input: `
-version: 2
+version: 3
 projects:
 - dir: ..`,
 			expErr: "projects: (0: (dir: cannot contain '..'.).).",
@@ -441,7 +470,7 @@ projects:
 		{
 			description: "project with no config",
 			input: `
-version: 2
+version: 3
 projects:
 -`,
 			expErr: "projects: (0: (dir: cannot be blank.).).",
@@ -449,7 +478,7 @@ projects:
 		{
 			description: "project with no config at index 1",
 			input: `
-version: 2
+version: 3
 projects:
 - dir: "."
 -`,
@@ -458,7 +487,7 @@ projects:
 		{
 			description: "project with unknown key",
 			input: `
-version: 2
+version: 3
 projects:
 - unknown: value`,
 			expErr: "yaml: unmarshal errors:\n  line 4: field unknown not found in struct raw.Project",
@@ -466,7 +495,7 @@ projects:
 		{
 			description: "referencing workflow that doesn't exist",
 			input: `
-version: 2
+version: 3
 projects:
 - dir: .
   workflow: undefined`,
@@ -475,7 +504,7 @@ projects:
 		{
 			description: "two projects with same dir/workspace without names",
 			input: `
-version: 2
+version: 3
 projects:
 - dir: .
   workspace: workspace
@@ -486,7 +515,7 @@ projects:
 		{
 			description: "two projects with same dir/workspace only one with name",
 			input: `
-version: 2
+version: 3
 projects:
 - name: myname
   dir: .
@@ -498,7 +527,7 @@ projects:
 		{
 			description: "two projects with same dir/workspace both with same name",
 			input: `
-version: 2
+version: 3
 projects:
 - name: myname
   dir: .
@@ -511,7 +540,7 @@ projects:
 		{
 			description: "two projects with same dir/workspace with different names",
 			input: `
-version: 2
+version: 3
 projects:
 - name: myname
   dir: .
@@ -520,7 +549,7 @@ projects:
   dir: .
   workspace: workspace`,
 			exp: valid.RepoCfg{
-				Version: 2,
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Name:      String("myname"),
@@ -547,7 +576,7 @@ projects:
 		{
 			description: "if steps are set then we parse them properly",
 			input: `
-version: 2
+version: 3
 projects:
 - dir: "."
 workflows:
@@ -562,7 +591,7 @@ workflows:
       - apply
 `,
 			exp: valid.RepoCfg{
-				Version: 2,
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:       ".",
@@ -603,7 +632,7 @@ workflows:
 		{
 			description: "we parse extra_args for the steps",
 			input: `
-version: 2
+version: 3
 projects:
 - dir: "."
 workflows:
@@ -624,7 +653,7 @@ workflows:
           extra_args: ["a", "b"]
 `,
 			exp: valid.RepoCfg{
-				Version: 2,
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:       ".",
@@ -669,7 +698,7 @@ workflows:
 		{
 			description: "custom steps are parsed",
 			input: `
-version: 2
+version: 3
 projects:
 - dir: "."
 workflows:
@@ -682,7 +711,7 @@ workflows:
       - run: echo apply "arg 2"
 `,
 			exp: valid.RepoCfg{
-				Version: 2,
+				Version: 3,
 				Projects: []valid.Project{
 					{
 						Dir:       ".",
@@ -700,7 +729,7 @@ workflows:
 							Steps: []valid.Step{
 								{
 									StepName:   "run",
-									RunCommand: []string{"echo", "plan hi"},
+									RunCommand: "echo \"plan hi\"",
 								},
 							},
 						},
@@ -708,7 +737,7 @@ workflows:
 							Steps: []valid.Step{
 								{
 									StepName:   "run",
-									RunCommand: []string{"echo", "apply", "arg 2"},
+									RunCommand: "echo apply \"arg 2\"",
 								},
 							},
 						},
@@ -745,7 +774,7 @@ func TestParseRepoCfg_GlobalValidation(t *testing.T) {
 	defer cleanup()
 
 	repoCfg := `
-version: 2
+version: 3
 projects:
 - dir: .
   workflow: custom
@@ -773,7 +802,7 @@ func TestParseGlobalCfg(t *testing.T) {
 			Steps: []valid.Step{
 				{
 					StepName:   "run",
-					RunCommand: []string{"custom", "command"},
+					RunCommand: "custom command",
 				},
 				{
 					StepName:  "init",
@@ -788,7 +817,7 @@ func TestParseGlobalCfg(t *testing.T) {
 			Steps: []valid.Step{
 				{
 					StepName:   "run",
-					RunCommand: []string{"custom", "command"},
+					RunCommand: "custom command",
 				},
 				{
 					StepName: "apply",
@@ -1005,7 +1034,7 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 				},
 				{
 					StepName:   "run",
-					RunCommand: []string{"custom", "plan"},
+					RunCommand: "custom plan",
 				},
 			},
 		},
@@ -1013,7 +1042,7 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 			Steps: []valid.Step{
 				{
 					StepName:   "run",
-					RunCommand: []string{"my", "custom", "command"},
+					RunCommand: "my custom command",
 				},
 			},
 		},
@@ -1100,6 +1129,68 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 			}
 			Ok(t, err)
 			Equals(t, c.exp, cfg)
+		})
+	}
+}
+
+// Test legacy shell parsing vs v3 parsing.
+func TestParseRepoCfg_V2ShellParsing(t *testing.T) {
+	cases := []struct {
+		in       string
+		expV2    string
+		expV2Err string
+	}{
+		{
+			in:    "echo a b",
+			expV2: "echo a b",
+		},
+		{
+			in:    "echo 'a b'",
+			expV2: "echo a b",
+		},
+		{
+			in:       "echo 'a b",
+			expV2Err: "unable to parse \"echo 'a b\": EOF found when expecting closing quote.",
+		},
+		{
+			in:    `mkdir a/b/c || printf \'your main.tf file does not provide default region.\\ncheck\'`,
+			expV2: `mkdir a/b/c || printf 'your main.tf file does not provide default region.\ncheck'`,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.in, func(t *testing.T) {
+			v2Dir, cleanup2 := TempDir(t)
+			defer cleanup2()
+			v3Dir, cleanup3 := TempDir(t)
+			defer cleanup3()
+			v2Path := filepath.Join(v2Dir, "atlantis.yaml")
+			v3Path := filepath.Join(v3Dir, "atlantis.yaml")
+			cfg := fmt.Sprintf(`workflows:
+  custom:
+    plan:
+      steps:
+      - run: %s
+    apply:
+      steps:
+      - run: %s`, c.in, c.in)
+			Ok(t, ioutil.WriteFile(v2Path, []byte("version: 2\n"+cfg), 0600))
+			Ok(t, ioutil.WriteFile(v3Path, []byte("version: 3\n"+cfg), 0600))
+
+			p := &yaml.ParserValidator{}
+			v2Cfg, err := p.ParseRepoCfg(v2Dir, valid.NewGlobalCfg(true, false, false), "")
+			if c.expV2Err != "" {
+				ErrEquals(t, c.expV2Err, err)
+			} else {
+				Ok(t, err)
+				Equals(t, c.expV2, v2Cfg.Workflows["custom"].Plan.Steps[0].RunCommand)
+				Equals(t, c.expV2, v2Cfg.Workflows["custom"].Apply.Steps[0].RunCommand)
+			}
+
+			v3Cfg, err := p.ParseRepoCfg(v3Dir, valid.NewGlobalCfg(true, false, false), "")
+			Ok(t, err)
+			Equals(t, c.in, v3Cfg.Workflows["custom"].Plan.Steps[0].RunCommand)
+			Equals(t, c.in, v3Cfg.Workflows["custom"].Apply.Steps[0].RunCommand)
 		})
 	}
 }

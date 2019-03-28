@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/flynn-archive/go-shlex"
 	"github.com/go-ozzo/ozzo-validation"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 )
@@ -108,13 +107,9 @@ func (s Step) Validate() error {
 			return fmt.Errorf("step element can only contain a single key, found %d: %s",
 				len(keys), strings.Join(keys, ","))
 		}
-		for stepName, args := range elem {
+		for stepName := range elem {
 			if stepName != RunStepName {
 				return fmt.Errorf("%q is not a valid step type", stepName)
-			}
-			_, err := shlex.Split(args)
-			if err != nil {
-				return fmt.Errorf("unable to parse as shell command: %s", err)
 			}
 		}
 		return nil
@@ -157,12 +152,9 @@ func (s Step) ToValid() valid.Step {
 		// After validation we assume there's only one key and it's a valid
 		// step name so we just use the first one.
 		for _, v := range s.StringVal {
-			// We ignore the error here because it should have been checked in
-			// Validate().
-			split, _ := shlex.Split(v)
 			return valid.Step{
 				StepName:   RunStepName,
-				RunCommand: split,
+				RunCommand: v,
 			}
 		}
 	}
