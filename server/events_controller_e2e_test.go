@@ -293,12 +293,29 @@ func TestGitHubWorkflow(t *testing.T) {
 				"exp-output-merge.txt",
 			},
 		},
+		{
+			Description:   "server-side cfg",
+			RepoDir:       "server-side-cfg",
+			ExpAutomerge:  false,
+			ExpAutoplan:   true,
+			ModifiedFiles: []string{"main.tf"},
+			Comments: []string{
+				"atlantis apply -w staging",
+				"atlantis apply -w default",
+			},
+			ExpReplies: []string{
+				"exp-output-autoplan.txt",
+				"exp-output-apply-staging-workspace.txt",
+				"exp-output-apply-default-workspace.txt",
+				"exp-output-merge.txt",
+			},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			RegisterMockTestingT(t)
 
-			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t)
+			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir)
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
 			defer cleanup()
@@ -357,7 +374,7 @@ func TestGitHubWorkflow(t *testing.T) {
 	}
 }
 
-func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
+func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
 	allowForkPRs := false
 	dataDir, cleanup := TempDir(t)
 	defer cleanup()
@@ -395,6 +412,13 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClient, *moc
 
 	defaultTFVersion := terraformClient.DefaultVersion()
 	locker := events.NewDefaultWorkingDirLocker()
+	parser := &yaml.ParserValidator{}
+	globalCfg := valid.NewGlobalCfg(true, false, false)
+	expCfgPath := filepath.Join(absRepoPath(t, repoDir), "repos.yaml")
+	if _, err := os.Stat(expCfgPath); err == nil {
+		globalCfg, err = parser.ParseGlobalCfg(expCfgPath, globalCfg)
+		Ok(t, err)
+	}
 	commandRunner := &events.DefaultCommandRunner{
 		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
 			Locker:           projectLocker,
@@ -428,26 +452,14 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClient, *moc
 		AllowForkPRs:             allowForkPRs,
 		AllowForkPRsFlag:         "allow-fork-prs",
 		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
-			ParserValidator:   &yaml.ParserValidator{},
+			ParserValidator:   parser,
 			ProjectFinder:     &events.DefaultProjectFinder{},
 			VCSClient:         e2eVCSClient,
 			WorkingDir:        workingDir,
 			WorkingDirLocker:  locker,
 			PendingPlanFinder: &events.DefaultPendingPlanFinder{},
 			CommentBuilder:    commentParser,
-			GlobalCfg: valid.GlobalCfg{
-				Repos: []valid.Repo{
-					{
-						IDRegex:              regexp.MustCompile(".*"),
-						AllowedOverrides:     []string{"apply_requirments", "workflow"},
-						AllowCustomWorkflows: boolPtr(true),
-						Workflow: &valid.Workflow{
-							Apply: valid.DefaultApplyStage,
-							Plan:  valid.DefaultPlanStage,
-						},
-					},
-				},
-			},
+			GlobalCfg:         globalCfg,
 		},
 		DB:                boltdb,
 		PendingPlanFinder: &events.DefaultPendingPlanFinder{},
@@ -641,8 +653,4 @@ func assertCommentEquals(t *testing.T, expFile string, act string, repoDir strin
 			t.Errorf("%q was different, wrote actual comment to %q", expFile, rel)
 		}
 	}
-}
-
-func boolPtr(b bool) *bool {
-	return &b
 }
