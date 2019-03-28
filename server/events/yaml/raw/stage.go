@@ -6,7 +6,7 @@ import (
 )
 
 type Stage struct {
-	Steps []Step `yaml:"steps,omitempty"`
+	Steps []Step `yaml:"steps,omitempty" json:"steps,omitempty"`
 }
 
 func (s Stage) Validate() error {

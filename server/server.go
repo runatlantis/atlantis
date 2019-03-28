@@ -82,10 +82,10 @@ type Server struct {
 // Config holds config for server that isn't passed in by the user.
 type Config struct {
 	AllowForkPRsFlag     string
-	AllowRepoConfigFlag  string
 	AtlantisURLFlag      string
 	AtlantisVersion      string
 	DefaultTFVersionFlag string
+	RepoConfigJSONFlag   string
 }
 
 // WebhookConfig is nested within UserConfig. It's used to configure webhooks.
@@ -202,7 +202,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if userConfig.RepoConfig != "" {
 		globalCfg, err = validator.ParseGlobalCfg(userConfig.RepoConfig, globalCfg)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "parsing %s file", userConfig.RepoConfig)
+		}
+	} else if userConfig.RepoConfigJSON != "" {
+		globalCfg, err = validator.ParseGlobalCfgJSON(userConfig.RepoConfigJSON, globalCfg)
+		if err != nil {
+			return nil, errors.Wrapf(err, "parsing --%s", config.RepoConfigJSONFlag)
 		}
 	}
 

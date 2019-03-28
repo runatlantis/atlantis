@@ -990,6 +990,120 @@ repos:
 	}
 }
 
+// Test that if we pass in JSON strings everything should parse fine.
+func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
+	customWorkflow := valid.Workflow{
+		Name: "custom",
+		Plan: valid.Stage{
+			Steps: []valid.Step{
+				{
+					StepName: "init",
+				},
+				{
+					StepName:  "plan",
+					ExtraArgs: []string{"extra", "args"},
+				},
+				{
+					StepName:   "run",
+					RunCommand: []string{"custom", "plan"},
+				},
+			},
+		},
+		Apply: valid.Stage{
+			Steps: []valid.Step{
+				{
+					StepName:   "run",
+					RunCommand: []string{"my", "custom", "command"},
+				},
+			},
+		},
+	}
+
+	cases := map[string]struct {
+		json   string
+		exp    valid.GlobalCfg
+		expErr string
+	}{
+		"empty string": {
+			json:   "",
+			expErr: "unexpected end of JSON input",
+		},
+		"empty object": {
+			json: "{}",
+			exp:  valid.NewGlobalCfg(false, false, false),
+		},
+		"setting all keys": {
+			json: `
+{
+  "repos": [
+    {
+      "id": "/.*/",
+      "workflow": "custom",
+      "apply_requirements": ["mergeable", "approved"],
+      "allowed_overrides": ["workflow", "apply_requirements"],
+      "allow_custom_workflows": true
+    },
+    {
+      "id": "github.com/owner/repo"
+    }
+  ],
+  "workflows": {
+    "custom": {
+      "plan": {
+        "steps": [
+          "init",
+          {"plan": {"extra_args": ["extra", "args"]}},
+          {"run": "custom plan"}
+        ]
+      },
+      "apply": {
+        "steps": [
+          {"run": "my custom command"}
+        ]
+      }
+    }
+  }
+}
+`,
+			exp: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					valid.NewGlobalCfg(false, false, false).Repos[0],
+					{
+						IDRegex:              regexp.MustCompile(".*"),
+						ApplyRequirements:    []string{"mergeable", "approved"},
+						Workflow:             &customWorkflow,
+						AllowedOverrides:     []string{"workflow", "apply_requirements"},
+						AllowCustomWorkflows: Bool(true),
+					},
+					{
+						ID:                   "github.com/owner/repo",
+						IDRegex:              nil,
+						ApplyRequirements:    nil,
+						AllowedOverrides:     nil,
+						AllowCustomWorkflows: nil,
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"default": valid.NewGlobalCfg(false, false, false).Workflows["default"],
+					"custom":  customWorkflow,
+				},
+			},
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			pv := &yaml.ParserValidator{}
+			cfg, err := pv.ParseGlobalCfgJSON(c.json, valid.NewGlobalCfg(false, false, false))
+			if c.expErr != "" {
+				ErrEquals(t, c.expErr, err)
+				return
+			}
+			Ok(t, err)
+			Equals(t, c.exp, cfg)
+		})
+	}
+}
+
 // String is a helper routine that allocates a new string value
 // to store v and returns a pointer to it.
 func String(v string) *string { return &v }

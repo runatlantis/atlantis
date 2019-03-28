@@ -914,6 +914,19 @@ func TestExecute_BitbucketServerBaseURLPort(t *testing.T) {
 	Equals(t, "http://mydomain.com:7990", passedConfig.BitbucketBaseURL)
 }
 
+// Can't use both --repo-config and --repo-config-json.
+func TestExecute_RepoCfgFlags(t *testing.T) {
+	c := setup(map[string]interface{}{
+		cmd.GHUserFlag:         "user",
+		cmd.GHTokenFlag:        "token",
+		cmd.RepoWhitelistFlag:  "github.com",
+		cmd.RepoConfigFlag:     "repos.yaml",
+		cmd.RepoConfigJSONFlag: "{}",
+	})
+	err := c.Execute()
+	ErrEquals(t, "cannot use --repo-config and --repo-config-json at the same time", err)
+}
+
 func setup(flags map[string]interface{}) *cobra.Command {
 	vipr := viper.New()
 	for k, v := range flags {

@@ -1,6 +1,7 @@
 package yaml
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -86,8 +87,23 @@ func (p *ParserValidator) ParseGlobalCfg(configFile string, defaultCfg valid.Glo
 		return valid.GlobalCfg{}, err
 	}
 
-	// Set ErrorTag to yaml so it uses the YAML field names in error messages.
-	validation.ErrorTag = "yaml"
+	return p.validateRawGlobalCfg(rawCfg, defaultCfg, "yaml")
+}
+
+// ParseGlobalCfgJSON parses a json string cfgJSON into global config.
+func (p *ParserValidator) ParseGlobalCfgJSON(cfgJSON string, defaultCfg valid.GlobalCfg) (valid.GlobalCfg, error) {
+	var rawCfg raw.GlobalCfg
+	err := json.Unmarshal([]byte(cfgJSON), &rawCfg)
+	if err != nil {
+		return valid.GlobalCfg{}, err
+	}
+	return p.validateRawGlobalCfg(rawCfg, defaultCfg, "json")
+}
+
+func (p *ParserValidator) validateRawGlobalCfg(rawCfg raw.GlobalCfg, defaultCfg valid.GlobalCfg, errTag string) (valid.GlobalCfg, error) {
+	// Setting ErrorTag means our errors will use the field names defined in
+	// the struct tags for yaml/json.
+	validation.ErrorTag = errTag
 	if err := rawCfg.Validate(); err != nil {
 		return valid.GlobalCfg{}, err
 	}

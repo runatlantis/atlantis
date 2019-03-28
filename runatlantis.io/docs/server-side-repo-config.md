@@ -14,6 +14,11 @@ Read through the [use-cases](#use-cases) to determine if you need it.
 To use server side repo config create a config file, ex. `repos.yaml`, and pass it to
 the `atlantis server` command via the `--repo-config` flag, ex. `--repo-config=path/to/repos.yaml`. 
 
+If you don't wish to write a config file to disk, you can use the
+`--repo-config-json` flag or `ATLANTIS_REPO_CONFIG_JSON` environment variable
+to specify your config as JSON. See [--repo-config-json](server-configuration.html#repo-config-json)
+for an example.
+
 ## Example Server Side Repo
 ```yaml
 # repos lists the config for specific repos.
