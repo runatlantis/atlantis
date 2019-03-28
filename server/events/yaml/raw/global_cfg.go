@@ -12,17 +12,17 @@ import (
 
 // GlobalCfg is the raw schema for server-side repo config.
 type GlobalCfg struct {
-	Repos     []Repo              `yaml:"repos"`
-	Workflows map[string]Workflow `yaml:"workflows"`
+	Repos     []Repo              `yaml:"repos" json:"repos"`
+	Workflows map[string]Workflow `yaml:"workflows" json:"workflows"`
 }
 
 // Repo is the raw schema for repos in the server-side repo config.
 type Repo struct {
-	ID                   string   `yaml:"id"`
-	ApplyRequirements    []string `yaml:"apply_requirements"`
-	Workflow             *string  `yaml:"workflow,omitempty"`
-	AllowedOverrides     []string `yaml:"allowed_overrides"`
-	AllowCustomWorkflows *bool    `yaml:"allow_custom_workflows,omitempty"`
+	ID                   string   `yaml:"id" json:"id"`
+	ApplyRequirements    []string `yaml:"apply_requirements" json:"apply_requirements"`
+	Workflow             *string  `yaml:"workflow,omitempty" json:"workflow,omitempty"`
+	AllowedOverrides     []string `yaml:"allowed_overrides" json:"allowed_overrides"`
+	AllowCustomWorkflows *bool    `yaml:"allow_custom_workflows,omitempty" json:"allow_custom_workflows,omitempty"`
 }
 
 func (g GlobalCfg) Validate() error {

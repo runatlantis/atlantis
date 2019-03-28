@@ -15,6 +15,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -59,6 +60,7 @@ const (
 	LogLevelFlag               = "log-level"
 	PortFlag                   = "port"
 	RepoConfigFlag             = "repo-config"
+	RepoConfigJSONFlag         = "repo-config-json"
 	RepoWhitelistFlag          = "repo-whitelist"
 	RequireApprovalFlag        = "require-approval"
 	RequireMergeableFlag       = "require-mergeable"
@@ -174,6 +176,10 @@ var stringFlags = []stringFlag{
 		description: "Path to a repo config file, used to customize how Atlantis runs on each repo. See runatlantis.io/docs for more details.",
 	},
 	{
+		name:        RepoConfigJSONFlag,
+		description: "Specify repo config as a JSON string. Useful if you don't want to write a config file to disk.",
+	},
+	{
 		name: RepoWhitelistFlag,
 		description: "Comma separated list of repositories that Atlantis will operate on. " +
 			"The format is {hostname}/{owner}/{repo}, ex. github.com/runatlantis/atlantis. '*' matches any characters until the next comma and can be used for example to whitelist " +
@@ -216,12 +222,7 @@ var boolFlags = []boolFlag{
 			" Should only be enabled in a trusted environment since it enables a pull request to run arbitrary commands" +
 			" on the Atlantis server.",
 		defaultValue: false,
-		deprecated: fmt.Sprintf(`set a --%s file with the following config instead:
-    repos:
-    - id: /.*/
-      allowed_overrides: [workflow, apply_requirements]
-      allow_custom_workflows: true
-`, RepoConfigFlag),
+		hidden:       true,
 	},
 	{
 		name:         AutomergeFlag,
@@ -232,21 +233,13 @@ var boolFlags = []boolFlag{
 		name:         RequireApprovalFlag,
 		description:  "Require pull requests to be \"Approved\" before allowing the apply command to be run.",
 		defaultValue: false,
-		deprecated: fmt.Sprintf(`set a --%s file with the following config instead:
-    repos:
-    - id: /.*/
-      apply_requirements: [approved]
-`, RepoConfigFlag),
+		hidden:       true,
 	},
 	{
 		name:         RequireMergeableFlag,
 		description:  "Require pull requests to be mergeable before allowing the apply command to be run.",
 		defaultValue: false,
-		deprecated: fmt.Sprintf(`set a --%s file with the following config instead:
-    repos:
-    - id: /.*/
-      apply_requirements: [mergeable]
-`, RepoConfigFlag),
+		hidden:       true,
 	},
 	{
 		name:         SilenceWhitelistErrorsFlag,
@@ -266,19 +259,19 @@ type stringFlag struct {
 	name         string
 	description  string
 	defaultValue string
-	deprecated   string
+	hidden       bool
 }
 type intFlag struct {
 	name         string
 	description  string
 	defaultValue int
-	deprecated   string
+	hidden       bool
 }
 type boolFlag struct {
 	name         string
 	description  string
 	defaultValue bool
-	deprecated   string
+	hidden       bool
 }
 
 // ServerCmd is an abstraction that helps us test. It allows
@@ -354,8 +347,8 @@ func (s *ServerCmd) Init() *cobra.Command {
 			usage = fmt.Sprintf("%s (default \"%s\")", usage, f.defaultValue)
 		}
 		c.Flags().String(f.name, "", usage+"\n")
-		if f.deprecated != "" {
-			c.Flags().MarkDeprecated(f.name, f.deprecated) // nolint: errcheck
+		if f.hidden {
+			c.Flags().MarkHidden(f.name) // nolint: errcheck
 		}
 		s.Viper.BindPFlag(f.name, c.Flags().Lookup(f.name)) // nolint: errcheck
 	}
@@ -367,8 +360,8 @@ func (s *ServerCmd) Init() *cobra.Command {
 			usage = fmt.Sprintf("%s (default %d)", usage, f.defaultValue)
 		}
 		c.Flags().Int(f.name, 0, usage+"\n")
-		if f.deprecated != "" {
-			c.Flags().MarkDeprecated(f.name, f.deprecated) // nolint: errcheck
+		if f.hidden {
+			c.Flags().MarkHidden(f.name) // nolint: errcheck
 		}
 		s.Viper.BindPFlag(f.name, c.Flags().Lookup(f.name)) // nolint: errcheck
 	}
@@ -376,8 +369,8 @@ func (s *ServerCmd) Init() *cobra.Command {
 	// Set bool flags.
 	for _, f := range boolFlags {
 		c.Flags().Bool(f.name, f.defaultValue, f.description+"\n")
-		if f.deprecated != "" {
-			c.Flags().MarkDeprecated(f.name, f.deprecated) // nolint: errcheck
+		if f.hidden {
+			c.Flags().MarkHidden(f.name) // nolint: errcheck
 		}
 		s.Viper.BindPFlag(f.name, c.Flags().Lookup(f.name)) // nolint: errcheck
 	}
@@ -417,16 +410,19 @@ func (s *ServerCmd) run() error {
 	if err := s.setDataDir(&userConfig); err != nil {
 		return err
 	}
+	if err := s.deprecationWarnings(&userConfig); err != nil {
+		return err
+	}
 	s.securityWarnings(&userConfig)
 	s.trimAtSymbolFromUsers(&userConfig)
 
 	// Config looks good. Start the server.
 	server, err := s.ServerCreator.NewServer(userConfig, server.Config{
 		AllowForkPRsFlag:     AllowForkPRsFlag,
-		AllowRepoConfigFlag:  AllowRepoConfigFlag,
 		AtlantisURLFlag:      AtlantisURLFlag,
 		AtlantisVersion:      s.AtlantisVersion,
 		DefaultTFVersionFlag: DefaultTFVersionFlag,
+		RepoConfigJSONFlag:   RepoConfigJSONFlag,
 	})
 	if err != nil {
 		return errors.Wrap(err, "initializing server")
@@ -505,6 +501,10 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return fmt.Errorf("--%s must have http:// or https://, got %q", BitbucketBaseURLFlag, userConfig.BitbucketBaseURL)
 	}
+
+	if userConfig.RepoConfig != "" && userConfig.RepoConfigJSON != "" {
+		return fmt.Errorf("cannot use --%s and --%s at the same time", RepoConfigFlag, RepoConfigJSONFlag)
+	}
 	return nil
 }
 
@@ -564,6 +564,55 @@ func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && !s.SilenceOutput {
 		s.Logger.Warn("Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are whitelisting Bitbucket IPs")
 	}
+}
+
+// deprecationWarnings prints a warning if flags that are deprecated are
+// being used. Right now this only applies to flags that have been made obsolete
+// due to server-side config.
+func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
+	var applyReqs []string
+	var deprecatedFlags []string
+	if userConfig.RequireApproval {
+		deprecatedFlags = append(deprecatedFlags, RequireApprovalFlag)
+		applyReqs = append(applyReqs, valid.ApprovedApplyReq)
+	}
+	if userConfig.RequireMergeable {
+		deprecatedFlags = append(deprecatedFlags, RequireMergeableFlag)
+		applyReqs = append(applyReqs, valid.MergeableApplyReq)
+	}
+
+	// Build up strings with what the recommended yaml and json config should
+	// be instead of using the deprecated flags.
+	yamlCfg := "---\nrepos:\n- id: /.*/"
+	jsonCfg := `{"repos":[{"id":"/.*/"`
+	if len(applyReqs) > 0 {
+		yamlCfg += fmt.Sprintf("\n  apply_requirements: [%s]", strings.Join(applyReqs, ", "))
+		jsonCfg += fmt.Sprintf(`, "apply_requirements":["%s"]`, strings.Join(applyReqs, "\", \""))
+
+	}
+	if userConfig.AllowRepoConfig {
+		deprecatedFlags = append(deprecatedFlags, AllowRepoConfigFlag)
+		yamlCfg += "\n  allowed_overrides: [apply_requirements, workflow]\n  allow_custom_workflows: true"
+		jsonCfg += `, "allowed_overrides":["apply_requirements","workflow"], "allow_custom_workflows":true`
+	}
+	jsonCfg += "}]}"
+
+	if len(deprecatedFlags) > 0 {
+		warning := "WARNING: "
+		if len(deprecatedFlags) == 1 {
+			warning += fmt.Sprintf("Flag --%s has been deprecated.", deprecatedFlags[0])
+		} else {
+			warning += fmt.Sprintf("Flags --%s and --%s have been deprecated.", strings.Join(deprecatedFlags[0:len(deprecatedFlags)-1], ", --"), deprecatedFlags[len(deprecatedFlags)-1:][0])
+		}
+		warning += fmt.Sprintf("\nCreate a --%s file with the following config instead:\n\n%s\n\nor use --%s='%s'\n",
+			RepoConfigFlag,
+			yamlCfg,
+			RepoConfigJSONFlag,
+			jsonCfg,
+		)
+		fmt.Println(warning)
+	}
+	return nil
 }
 
 // withErrPrint prints out any cmd errors to stderr.
