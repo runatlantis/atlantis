@@ -1,0 +1,18 @@
+repos:
+- id: /.*/
+  workflow: custom
+  allowed_overrides: [workflow]
+workflows:
+  custom:
+    plan:
+      steps:
+        - run: echo preinit custom
+        - init
+        - plan
+        - run: echo postplan custom
+  staging:
+    plan:
+      steps:
+        - run: echo preinit staging
+        - init
+        - plan

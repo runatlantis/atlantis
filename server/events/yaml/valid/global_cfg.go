@@ -133,6 +133,7 @@ func (r Repo) IDString() string {
 // MergeProjectCfg merges proj and rCfg with the global config to return a
 // final config. It assumes that all configs have been validated.
 func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, proj Project, rCfg RepoCfg) MergedProjectCfg {
+	log.Debug("merging repo and server-side configs")
 	applyReqs, workflow, allowedOverrides, allowCustomWorkflows := g.getMatchingCfg(log, repoID)
 
 	// If repos are allowed to override certain keys then override them.
@@ -186,6 +187,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 // DefaultProjCfg returns the default project config for all projects under the
 // repo with id repoID. It is used when there is no repo config.
 func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repoRelDir string, workspace string) MergedProjectCfg {
+	log.Debug("building config based on server-side config")
 	applyReqs, workflow, _, _ := g.getMatchingCfg(log, repoID)
 	return MergedProjectCfg{
 		ApplyRequirements: applyReqs,
@@ -276,7 +278,7 @@ func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (app
 					}
 				case WorkflowKey:
 					if repo.Workflow != nil {
-						log.Debug("setting %s %s from repo config %q", WorkflowKey, repo.Workflow.Name, repo.IDString())
+						log.Debug("setting %s: %q from repo config %q", WorkflowKey, repo.Workflow.Name, repo.IDString())
 						workflow = *repo.Workflow
 					}
 				case AllowedOverridesKey:
