@@ -44,7 +44,7 @@ need to be defined.
 
 ## Example Using All Keys
 ```yaml
-version: 2
+version: 3
 automerge: true
 projects:
 - name: my-project-name
@@ -74,7 +74,7 @@ workflows:
 ## Use Cases
 ### Disabling Autoplanning
 ```yaml
-version: 2
+version: 3
 projects:
 - dir: project1
   autoplan:
@@ -101,7 +101,7 @@ If you wanted Atlantis to autoplan `project1/` whenever any `.tf` file under `mo
 changed or any `.tf` or `.tfvars` file under `project1/` changed, you could use the following configuration:
 
 ```yaml
-version: 2
+version: 3
 projects:
 - dir: project1
   autoplan:
@@ -113,7 +113,7 @@ Note:
 
 ### Supporting Terraform Workspaces
 ```yaml
-version: 2
+version: 3
 projects:
 - dir: project1
   workspace: staging
@@ -152,7 +152,7 @@ If you'd like to use a different version of Terraform than what is in Atlantis'
 `PATH` or is set by the `--default-tf-version` flag, then set the `terraform_version` key:
 
 ```yaml
-version: 2
+version: 3
 projects:
 - dir: project1
   terraform_version: 0.10.0
@@ -163,7 +163,7 @@ Atlantis will automatically download and use this version.
 ### Requiring Approvals For Production
 In this example, we only want to require `apply` approvals for the `production` directory.
 ```yaml
-version: 2
+version: 3
 projects:
 - dir: staging
 - dir: production

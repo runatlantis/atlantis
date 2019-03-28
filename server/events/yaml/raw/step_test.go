@@ -268,13 +268,14 @@ func TestStep_Validate(t *testing.T) {
 			expErr: "built-in steps only support a single extra_args key, found \"invalid\" in step init",
 		},
 		{
+			// For atlantis.yaml v2, this wouldn't parse, but now there should
+			// be no error.
 			description: "unparseable shell command",
 			input: raw.Step{
 				StringVal: map[string]string{
 					"run": "my 'c",
 				},
 			},
-			expErr: "unable to parse as shell command: EOF found when expecting closing quote.",
 		},
 	}
 	for _, c := range cases {
@@ -373,7 +374,7 @@ func TestStep_ToValid(t *testing.T) {
 			},
 			exp: valid.Step{
 				StepName:   "run",
-				RunCommand: []string{"my", "run command"},
+				RunCommand: "my 'run command'",
 			},
 		},
 	}

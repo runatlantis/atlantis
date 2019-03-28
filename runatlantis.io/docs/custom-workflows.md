@@ -51,7 +51,7 @@ workflows:
 Then in your repo-level `atlantis.yaml` file, you would reference the workflows:
 ```yaml
 # atlantis.yaml
-version: 2
+version: 3
 projects:
 # If two or more projects have the same dir and workspace, they must also have
 # a 'name' key to differentiate them.
@@ -163,7 +163,7 @@ workflows:
 
 Which you would then reference in your repo-level `atlantis.yaml`:
 ```yaml
-version: 2
+version: 3
 projects:
 - dir: live/staging
   workflow: terragrunt
@@ -233,7 +233,7 @@ will complain in-between commands since the backend config has changed.
 
 You would then reference the workflows in your repo-level `atlantis.yaml`:
 ```yaml
-version: 2
+version: 3
 projects:
 - name: staging
   dir: .

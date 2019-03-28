@@ -22,10 +22,10 @@ func (r RepoCfg) Validate() error {
 	equals2 := func(value interface{}) error {
 		asIntPtr := value.(*int)
 		if asIntPtr == nil {
-			return errors.New("is required. If you've just upgraded Atlantis you need to rewrite your atlantis.yaml for version 2. See www.runatlantis.io/docs/upgrading-atlantis-yaml-to-version-2.html")
+			return errors.New("is required. If you've just upgraded Atlantis you need to rewrite your atlantis.yaml for version 3. See www.runatlantis.io/docs/upgrading-atlantis-yaml.html")
 		}
-		if *asIntPtr != 2 {
-			return errors.New("must equal 2")
+		if *asIntPtr != 2 && *asIntPtr != 3 {
+			return errors.New("only versions 2 and 3 are supported")
 		}
 		return nil
 	}

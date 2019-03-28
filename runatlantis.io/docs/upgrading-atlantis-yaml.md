@@ -1,8 +1,45 @@
-# Upgrading atlantis.yaml To Version 2
-These docs describe how to upgrade your `atlantis.yaml` file from the format used
-in Atlantis `<=v0.3.10`.
+# Upgrading atlantis.yaml
 
-## Single atlantis.yaml
+## Upgrading From v2 To v3
+Atlantis version `v0.7.0` introduced a new version 3 of `atlantis.yaml`.
+
+**If you're not using [custom `run` steps](custom-workflows.html#custom-run-command),
+ then you can upgrade from `version: 2` to `version: 3` without any changes.**
+
+**NOTE:** Version 2 **is not being deprecated** and there is no need to upgrade your version
+if you don't wish to do so.
+
+The only change from v2 to v3 is that we're parsing custom `run` steps differently.
+```yaml
+# atlantis.yaml
+worklows:
+  custom:
+    plan:
+      steps:
+      - run: my custom command
+```
+<center><i>An example workflow using a custom run step</i></center>
+
+Previously, we used a library that would parse the custom step prior to running
+it. Now, we just run the step directly. This will only affect your steps if they were using shell escaping of some sort.
+For example, if your step was previously:
+```yaml
+# version: 2
+- run: "printf \'print me\'"
+```
+
+You can now write this in version 3 as:
+```yaml
+# version: 3
+- run: "printf 'print me'"
+```
+
+
+## Upgrading From V1 To V3
+If you are upgrading from an **old** Atlantis version `<=v0.3.10` (from before July 4, 2018)
+you'll need to follow the following steps.
+
+### Single atlantis.yaml
 If you had multiple `atlantis.yaml` files per directory then you'll need to
 consolidate them into a single `atlantis.yaml` file at the root of the repo.
 
@@ -42,7 +79,7 @@ workflows:
 
 We will talk more about `workflows` below.
 
-## Terraform Version
+### Terraform Version
 The `terraform_version` key moved from being a top-level key to being per `project`
 so if before your `atlantis.yaml` was in directory `mydir` and looked like:
 ```yaml
@@ -57,7 +94,7 @@ projects:
   terraform_version: 0.11.0
 ```
 
-## Workflows
+### Workflows
 Workflows are the new way to set all `pre_*`, `post_*` and `extra_arguments`.
 
 Each `project` can have a custom workflow via the `workflow` key.
@@ -105,7 +142,7 @@ workflows:
       ...
 ```
 
-### Extra Arguments
+#### Extra Arguments
 `extra_arguments` is now specified as follows. Given a previous config:
 ```yaml
 extra_arguments:
@@ -138,7 +175,7 @@ workflows:
 ```
 
 
-### Pre/Post Commands
+#### Pre/Post Commands
 Instead of using `pre_*` or `post_*`, you now can insert your custom commands
 before/after the built-in commands. Given a previous config:
 

@@ -46,10 +46,19 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 			expErr: "yaml: unmarshal errors:\n  line 1: field invalid not found in struct raw.RepoCfg",
 		},
 		{
-			description: "version set",
+			description: "version set to 2",
 			input:       "version: 2",
 			exp: raw.RepoCfg{
 				Version:   Int(2),
+				Projects:  nil,
+				Workflows: nil,
+			},
+		},
+		{
+			description: "version set to 3",
+			input:       "version: 3",
+			exp: raw.RepoCfg{
+				Version:   Int(3),
 				Projects:  nil,
 				Workflows: nil,
 			},
@@ -94,7 +103,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 		},
 		{
 			description: "automerge not a boolean",
-			input:       "version: 2\nautomerge: notabool",
+			input:       "version: 3\nautomerge: notabool",
 			exp: raw.RepoCfg{
 				Version:   nil,
 				Projects:  nil,
@@ -105,7 +114,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 		{
 			description: "should use values if set",
 			input: `
-version: 2
+version: 3
 automerge: true
 projects:
 - dir: mydir
@@ -123,7 +132,7 @@ workflows:
     apply:
      steps: []`,
 			exp: raw.RepoCfg{
-				Version:   Int(2),
+				Version:   Int(3),
 				Automerge: Bool(true),
 				Projects: []raw.Project{
 					{
@@ -176,14 +185,14 @@ func TestConfig_Validate(t *testing.T) {
 			input: raw.RepoCfg{
 				Version: nil,
 			},
-			expErr: "version: is required. If you've just upgraded Atlantis you need to rewrite your atlantis.yaml for version 2. See www.runatlantis.io/docs/upgrading-atlantis-yaml-to-version-2.html.",
+			expErr: "version: is required. If you've just upgraded Atlantis you need to rewrite your atlantis.yaml for version 3. See www.runatlantis.io/docs/upgrading-atlantis-yaml.html.",
 		},
 		{
-			description: "version not 1",
+			description: "version not 2 or 3",
 			input: raw.RepoCfg{
 				Version: Int(1),
 			},
-			expErr: "version: must equal 2.",
+			expErr: "version: only versions 2 and 3 are supported.",
 		},
 	}
 	validation.ErrorTag = "yaml"

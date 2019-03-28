@@ -5,7 +5,7 @@
         <img v-if="data.heroImage" :src="$withBase(data.heroImage)" alt="hero">
         <h1>{{ data.heroText || $title || 'Hello' }}</h1>
         <p class="description">
-          Start working on Terraform <strong>as a team</strong>.
+          Terraform Pull Request Automation
         </p>
         <p class="action" v-if="data.actionText && data.actionLink">
           <a href="/guide/" class="nav-link action-button">Get Started →</a>

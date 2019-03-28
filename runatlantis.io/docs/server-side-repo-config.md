@@ -143,7 +143,7 @@ Then each allowed repo can have an `atlantis.yaml` file that
 sets `apply_requirements` to an empty array (disabling the requirement).
 ```yaml
 # atlantis.yaml in the repo root
-version: 2
+version: 3
 projects:
 - dir: .
   apply_requirements: []
@@ -210,7 +210,7 @@ files:
 
 ```yaml
 # atlantis.yaml
-version: 2
+version: 3
 projects:
 - dir: .
   workflow: custom1 # could also be custom2 OR default
@@ -250,7 +250,7 @@ repos:
 Then each allowed repo can define and use a custom workflow in their `atlantis.yaml` files:
 ```yaml
 # atlantis.yaml
-version: 2
+version: 3
 projects:
 - dir: .
   workflow: custom1

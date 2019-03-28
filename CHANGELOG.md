@@ -808,7 +808,7 @@ when new commits are pushed to the pull request.
 
 ## Backwards Incompatibilities / Notes:
 - The old `atlantis.yaml` config file format is not supported. You will need to migrate to the new config
-format, see: https://www.runatlantis.io/docs/upgrading-atlantis-yaml-to-version-2.html
+format, see: https://www.runatlantis.io/docs/upgrading-atlantis-yaml.html
 - To use the new config file, you must run Atlantis with `--allow-repo-config`.
 - Atlantis will now try to automatically plan. To disable this, you'll need to create an `atlantis.yaml` file
 as follows:

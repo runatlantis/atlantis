@@ -62,7 +62,7 @@ module.exports = {
                         'server-side-repo-config',
                         'custom-workflows',
                         'repo-level-atlantis-yaml',
-                        'upgrading-atlantis-yaml-to-version-2',
+                        'upgrading-atlantis-yaml',
                         'apply-requirements',
                         'checkout-strategy',
                         'terraform-versions',

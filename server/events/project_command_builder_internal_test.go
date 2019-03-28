@@ -87,7 +87,7 @@ workflows:
       steps:
       - apply`,
 			repoCfg: `
-version: 2
+version: 3
 automerge: true
 projects:
 - dir: project1
@@ -109,6 +109,7 @@ projects:
 				Pull:              models.PullRequest{},
 				ProjectName:       "",
 				ApplyRequirements: []string{},
+				RepoConfigVersion: 3,
 				RePlanCmd:         "atlantis plan -d project1 -w myworkspace -- flag",
 				RepoRelDir:        "project1",
 				TerraformVersion:  mustVersion("10.0"),
@@ -137,7 +138,7 @@ workflows:
       steps:
       - apply`,
 			repoCfg: `
-version: 2
+version: 3
 automerge: true
 projects:
 - dir: project1
@@ -159,6 +160,7 @@ projects:
 				Pull:              models.PullRequest{},
 				ProjectName:       "",
 				ApplyRequirements: []string{"approved", "mergeable"},
+				RepoConfigVersion: 3,
 				RePlanCmd:         "atlantis plan -d project1 -w myworkspace -- flag",
 				RepoRelDir:        "project1",
 				TerraformVersion:  mustVersion("10.0"),
@@ -195,7 +197,7 @@ workflows:
     apply:
       steps: []`,
 			repoCfg: `
-version: 2
+version: 3
 automerge: true
 projects:
 - dir: project1
@@ -217,6 +219,7 @@ projects:
 				Pull:              models.PullRequest{},
 				ProjectName:       "",
 				ApplyRequirements: []string{"approved"},
+				RepoConfigVersion: 3,
 				RePlanCmd:         "atlantis plan -d project1 -w myworkspace -- flag",
 				RepoRelDir:        "project1",
 				TerraformVersion:  mustVersion("10.0"),
@@ -246,7 +249,7 @@ workflows:
       steps:
       - apply`,
 			repoCfg: `
-version: 2
+version: 3
 automerge: true
 projects:
 - dir: project1
@@ -273,7 +276,7 @@ workflows:
       steps:
       - apply`,
 			repoCfg: `
-version: 2
+version: 3
 automerge: true
 projects:
 - dir: project1
@@ -301,7 +304,7 @@ workflows:
       steps:
       - apply`,
 			repoCfg: `
-version: 2
+version: 3
 automerge: true
 projects:
 - dir: project1
@@ -330,7 +333,7 @@ workflows:
       steps: []
 `,
 			repoCfg: `
-version: 2
+version: 3
 automerge: true
 projects:
 - dir: project1
@@ -362,6 +365,7 @@ workflows:
 				Pull:              models.PullRequest{},
 				ProjectName:       "",
 				ApplyRequirements: []string{},
+				RepoConfigVersion: 3,
 				RePlanCmd:         "atlantis plan -d project1 -w myworkspace -- flag",
 				RepoRelDir:        "project1",
 				TerraformVersion:  mustVersion("10.0"),
@@ -393,7 +397,7 @@ workflows:
       steps: [apply]
 `,
 			repoCfg: `
-version: 2
+version: 3
 automerge: true
 projects:
 - dir: project1
@@ -416,6 +420,7 @@ projects:
 				Pull:              models.PullRequest{},
 				ProjectName:       "",
 				ApplyRequirements: []string{},
+				RepoConfigVersion: 3,
 				RePlanCmd:         "atlantis plan -d project1 -w myworkspace -- flag",
 				RepoRelDir:        "project1",
 				TerraformVersion:  mustVersion("10.0"),
@@ -444,7 +449,7 @@ workflows:
       steps: [apply]
 `,
 			repoCfg: `
-version: 2
+version: 3
 automerge: true
 projects:
 - dir: project1
@@ -473,6 +478,7 @@ workflows:
 				Pull:              models.PullRequest{},
 				ProjectName:       "",
 				ApplyRequirements: []string{},
+				RepoConfigVersion: 3,
 				RePlanCmd:         "atlantis plan -d project1 -w myworkspace -- flag",
 				RepoRelDir:        "project1",
 				TerraformVersion:  mustVersion("10.0"),
@@ -497,7 +503,7 @@ workflows:
       steps: [plan]
 `,
 			repoCfg: `
-version: 2
+version: 3
 projects:
 - dir: project1
   workspace: myworkspace
@@ -514,6 +520,7 @@ projects:
 				Pull:              models.PullRequest{},
 				ProjectName:       "",
 				ApplyRequirements: []string{"approved"},
+				RepoConfigVersion: 3,
 				RePlanCmd:         "atlantis plan -d project1 -w myworkspace -- flag",
 				RepoRelDir:        "project1",
 				User:              models.User{},

@@ -19,11 +19,23 @@ func TestRunStepRunner_Run(t *testing.T) {
 	}{
 		{
 			Command: "",
-			ExpErr:  "no commands for run step",
+			ExpOut:  "",
 		},
 		{
 			Command: "echo hi",
 			ExpOut:  "hi\n",
+		},
+		{
+			Command: `printf \'your main.tf file does not provide default region.\\ncheck\'`,
+			ExpOut:  `'your`,
+		},
+		{
+			Command: `printf 'your main.tf file does not provide default region.\ncheck'`,
+			ExpOut:  "your main.tf file does not provide default region.\ncheck",
+		},
+		{
+			Command: "echo 'a",
+			ExpErr:  "exit status 2: running \"echo 'a\" in",
 		},
 		{
 			Command: "echo hi >> file && cat file",
@@ -80,11 +92,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 		t.Run(c.Command, func(t *testing.T) {
 			tmpDir, cleanup := TempDir(t)
 			defer cleanup()
-			var split []string
-			if c.Command != "" {
-				split = strings.Split(c.Command, " ")
-			}
-			out, err := r.Run(ctx, split, tmpDir)
+			out, err := r.Run(ctx, c.Command, tmpDir)
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
 				return

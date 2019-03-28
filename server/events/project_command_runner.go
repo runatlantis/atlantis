@@ -55,6 +55,14 @@ type StepRunner interface {
 	Run(ctx models.ProjectCommandContext, extraArgs []string, path string) (string, error)
 }
 
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_custom_step_runner.go CustomStepRunner
+
+// CustomStepRunner runs custom run steps.
+type CustomStepRunner interface {
+	// Run cmd in path.
+	Run(ctx models.ProjectCommandContext, cmd string, path string) (string, error)
+}
+
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_webhooks_sender.go WebhooksSender
 
 // WebhooksSender sends webhook.
@@ -81,7 +89,7 @@ type DefaultProjectCommandRunner struct {
 	InitStepRunner      StepRunner
 	PlanStepRunner      StepRunner
 	ApplyStepRunner     StepRunner
-	RunStepRunner       StepRunner
+	RunStepRunner       CustomStepRunner
 	PullApprovedChecker runtime.PullApprovedChecker
 	WorkingDir          WorkingDir
 	Webhooks            WebhooksSender

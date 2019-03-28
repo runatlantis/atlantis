@@ -35,7 +35,7 @@ func TestDefaultProjectCommandBuilder_BuildAutoplanCommands(t *testing.T) {
 		{
 			Description: "simple atlantis.yaml",
 			AtlantisYAML: `
-version: 2
+version: 3
 projects:
 - dir: .
 `,
@@ -50,7 +50,7 @@ projects:
 		{
 			Description: "some projects disabled",
 			AtlantisYAML: `
-version: 2
+version: 3
 projects:
 - dir: .
   autoplan:
@@ -79,7 +79,7 @@ projects:
 		{
 			Description: "some projects disabled",
 			AtlantisYAML: `
-version: 2
+version: 3
 projects:
 - dir: .
   autoplan:
@@ -107,7 +107,7 @@ projects:
 		{
 			Description: "no projects modified",
 			AtlantisYAML: `
-version: 2
+version: 3
 projects:
 - dir: mydir
 `,
@@ -203,7 +203,7 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) 
 				Workspace:  "myworkspace",
 			},
 			AtlantisYAML: `
-version: 2
+version: 3
 projects:
 - dir: .
   workspace: myworkspace
@@ -220,7 +220,7 @@ projects:
 				Workspace:  "myworkspace",
 			},
 			AtlantisYAML: `
-version: 2
+version: 3
 projects:
 - dir: notroot
   workspace: myworkspace
@@ -237,7 +237,7 @@ projects:
 				Workspace:  "myworkspace",
 			},
 			AtlantisYAML: `
-version: 2
+version: 3
 projects:
 - dir: .
   workspace: notmyworkspace
@@ -251,7 +251,7 @@ projects:
 				ProjectName: "myproject",
 			},
 			AtlantisYAML: `
-version: 2
+version: 3
 projects:
 - name: myproject
   dir: .
@@ -269,7 +269,7 @@ projects:
 				ProjectName: "myproject",
 			},
 			AtlantisYAML: `
-version: 2
+version: 3
 projects:
 - name: myproject
   dir: .
@@ -287,7 +287,7 @@ projects:
 				ProjectName: "myproject",
 			},
 			AtlantisYAML: `
-version: 2
+version: 3
 projects:
 - name: myproject
   dir: .
@@ -306,7 +306,7 @@ projects:
 				Workspace:  "myworkspace",
 			},
 			AtlantisYAML: `
-version: 2
+version: 3
 projects:
 - name: myproject
   dir: .
@@ -327,7 +327,7 @@ projects:
 				ProjectName: "notconfigured",
 			},
 			AtlantisYAML: `
-version: 2
+version: 3
 projects:
 - dir: .
 `,
@@ -447,7 +447,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands(t *testing.T) {
 					"main.tf": nil,
 				},
 			},
-			AtlantisYAML: `version: 2
+			AtlantisYAML: `version: 3
 projects:
 - dir: project1 # project1 uses the defaults
 - dir: project2 # project2 has autoplan disabled but should use default when_modified
@@ -606,7 +606,7 @@ func TestDefaultProjectCommandBuilder_WrongWorkspaceName(t *testing.T) {
 	defer cleanup()
 	repoDir := filepath.Join(tmpDir, "pulldir/notconfigured")
 
-	yamlCfg := `version: 2
+	yamlCfg := `version: 3
 projects:
 - dir: .
   workspace: default
