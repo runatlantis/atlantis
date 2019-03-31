@@ -3,17 +3,17 @@ package yaml
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/flynn-archive/go-shlex"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/go-ozzo/ozzo-validation"
+	shlex "github.com/flynn-archive/go-shlex"
+	validation "github.com/go-ozzo/ozzo-validation"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/yaml/raw"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 )
 
 // AtlantisYAMLFilename is the name of the config file for each repo.

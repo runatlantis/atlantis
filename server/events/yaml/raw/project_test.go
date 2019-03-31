@@ -3,12 +3,12 @@ package raw_test
 import (
 	"testing"
 
-	"github.com/go-ozzo/ozzo-validation"
-	"github.com/hashicorp/go-version"
+	validation "github.com/go-ozzo/ozzo-validation"
+	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/yaml/raw"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	. "github.com/runatlantis/atlantis/testing"
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 )
 
 func TestProject_UnmarshalYAML(t *testing.T) {

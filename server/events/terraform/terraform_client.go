@@ -27,9 +27,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/hashicorp/go-getter"
-	"github.com/hashicorp/go-version"
-	"github.com/mitchellh/go-homedir"
+	getter "github.com/hashicorp/go-getter"
+	version "github.com/hashicorp/go-version"
+	homedir "github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/logging"
 )

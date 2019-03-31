@@ -22,13 +22,12 @@ import (
 	"testing"
 	"time"
 
+	version "github.com/hashicorp/go-version"
 	"github.com/petergtz/pegomock"
-	"github.com/runatlantis/atlantis/cmd"
-	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
-
-	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/cmd"
 	"github.com/runatlantis/atlantis/server/events/terraform"
+	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
 

@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
+	version "github.com/hashicorp/go-version"
 	mocks2 "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 
-	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"

@@ -2,7 +2,7 @@
 // after it's been parsed and validated.
 package valid
 
-import "github.com/hashicorp/go-version"
+import version "github.com/hashicorp/go-version"
 
 // RepoCfg is the atlantis.yaml config after it's been parsed and validated.
 type RepoCfg struct {

@@ -21,7 +21,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/flynn-archive/go-shlex"
+	shlex "github.com/flynn-archive/go-shlex"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/spf13/pflag"
