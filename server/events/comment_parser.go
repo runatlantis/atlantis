@@ -38,6 +38,13 @@ const (
 	atlantisExecutable = "atlantis"
 )
 
+// These aliases are expanded before a command is parsed. Note that they will
+// only expand at the start of the comment.
+var aliases = map[string]string{
+	"abracadabra": "atlantis plan",
+	"simsalabim":  "atlantis apply",
+}
+
 // multiLineRegex is used to ignore multi-line comments since those aren't valid
 // Atlantis commands. If the second line just has newlines then we let it pass
 // through because when you double click on a comment in GitHub and then you
@@ -98,6 +105,8 @@ type CommentParseResult struct {
 // - atlantis plan --verbose -- -key=value -key2 value2
 //
 func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) CommentParseResult {
+	aliased := false
+
 	if multiLineRegex.MatchString(comment) {
 		return CommentParseResult{Ignore: true}
 	}
@@ -114,6 +123,14 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		return CommentParseResult{CommentResponse: DidYouMeanAtlantisComment}
 	}
 
+	// Expand aliases, allowing for custom adaptions in companies where you are only allowed
+	// to use a controlled vocabulary defined by enterprise IT in comments.
+	if expansion, aliasPresent := aliases[args[0]]; aliasPresent {
+		var re = regexp.MustCompile(fmt.Sprintf("^(%s)", args[0]))
+		comment = re.ReplaceAllString(comment, expansion)
+		aliased = true
+	}
+
 	// Atlantis can be invoked using the name of the VCS host user we're
 	// running under. Need to be able to match against that user.
 	var vcsUser string
@@ -126,7 +143,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		vcsUser = e.BitbucketUser
 	}
 	executableNames := []string{"run", atlantisExecutable, "@" + vcsUser}
-	if !e.stringInSlice(args[0], executableNames) {
+	if !e.stringInSlice(args[0], executableNames) && !aliased {
 		return CommentParseResult{Ignore: true}
 	}
 
