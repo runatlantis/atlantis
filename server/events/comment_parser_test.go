@@ -145,6 +145,18 @@ func TestParse_DidYouMeanAtlantis(t *testing.T) {
 	}
 }
 
+func TestParse_Aliases(t *testing.T) {
+	t.Log("given an alias, this should be expanded to the standard atlantis command")
+	plan := "abracadabra"
+	r1 := commentParser.Parse(plan, models.Github)
+	Assert(t, r1.Command.Name == models.PlanCommand, "For comment %q expected Command==%q, but got %q", plan, models.PlanCommand, r1.Command)
+	directory := "only/the/magical/parts"
+	apply := fmt.Sprintf("simsalabim -d %s", directory)
+	r2 := commentParser.Parse(apply, models.Github)
+	Assert(t, r2.Command.Name == models.ApplyCommand, "For comment %q expected Command=%q, but got %q", apply, models.ApplyCommand, r2.Command)
+	Assert(t, r2.Command.RepoRelDir == "only/the/magical/parts", "For comment %q expected RepoRelDir=%q, but got %q", apply, directory, r2.Command.RepoRelDir)
+}
+
 func TestParse_InvalidCommand(t *testing.T) {
 	t.Log("given a comment with an invalid atlantis command, should return " +
 		"a warning.")
