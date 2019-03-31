@@ -8,9 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hashicorp/go-version"
+	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/logging"
-
 	. "github.com/runatlantis/atlantis/testing"
 )
 

@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/go-version"
+	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/pkg/errors"

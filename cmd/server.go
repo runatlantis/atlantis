@@ -15,18 +15,17 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/runatlantis/atlantis/server/logging"
-
-	"github.com/mitchellh/go-homedir"
+	homedir "github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

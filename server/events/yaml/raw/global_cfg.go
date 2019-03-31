@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/go-ozzo/ozzo-validation"
+	validation "github.com/go-ozzo/ozzo-validation"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 )

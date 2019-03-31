@@ -6,7 +6,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/yaml/raw"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	. "github.com/runatlantis/atlantis/testing"
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 )
 
 func TestStepConfig_UnmarshalYAML(t *testing.T) {

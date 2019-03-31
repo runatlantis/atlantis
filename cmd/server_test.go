@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mitchellh/go-homedir"
+	homedir "github.com/mitchellh/go-homedir"
 	"github.com/runatlantis/atlantis/cmd"
 	"github.com/runatlantis/atlantis/server"
 	. "github.com/runatlantis/atlantis/testing"

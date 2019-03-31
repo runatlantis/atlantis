@@ -17,7 +17,7 @@ import (
 	"fmt"
 
 	"github.com/google/go-github/github"
-	"github.com/lkysow/go-gitlab"
+	gitlab "github.com/lkysow/go-gitlab"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/events/models"

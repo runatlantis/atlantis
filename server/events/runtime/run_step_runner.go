@@ -2,11 +2,12 @@ package runtime
 
 import (
 	"fmt"
-	"github.com/hashicorp/go-version"
-	"github.com/runatlantis/atlantis/server/events/models"
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	version "github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 // RunStepRunner runs custom commands.

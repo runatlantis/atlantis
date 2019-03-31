@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hashicorp/go-getter"
+	getter "github.com/hashicorp/go-getter"
 	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 
