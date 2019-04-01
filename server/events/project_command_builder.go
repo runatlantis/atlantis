@@ -2,6 +2,8 @@ package events
 
 import (
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
 	"strings"
 
 	"github.com/hashicorp/go-version"
@@ -10,6 +12,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/fetchers"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -52,6 +55,7 @@ type DefaultProjectCommandBuilder struct {
 	AllowRepoConfigFlag string
 	PendingPlanFinder   *DefaultPendingPlanFinder
 	CommentBuilder      CommentBuilder
+	FetcherConfig       fetchers.FetcherConfig
 }
 
 // TFCommandRunner runs Terraform commands.
@@ -95,6 +99,24 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		return nil, err
 	}
 
+	switch p.FetcherConfig.ConfigType {
+	case fetchers.Github:
+		ctx.Log.Debug("fetching github config...")
+		configString, err := p.FetcherConfig.GithubConfig.FetchConfig()
+		if err != nil {
+			return nil, errors.Wrap(err, "could not fetch github config")
+		}
+
+		configFilePath := filepath.Join(repoDir, yaml.AtlantisYAMLFilename)
+		if configString != "" {
+			err = ioutil.WriteFile(configFilePath, []byte(configString), 0644)
+		} else {
+			return nil, errors.Wrap(nil, "empty config file retrieved")
+		}
+		if err != nil {
+			return nil, errors.Wrap(err, "could not write config file")
+		}
+	}
 	// Parse config file if it exists.
 	var config valid.Config
 	hasConfigFile, err := p.ParserValidator.HasConfigFile(repoDir)

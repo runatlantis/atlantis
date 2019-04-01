@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/runatlantis/atlantis/server/events/db"
 	"log"
 	"net/http"
 	"net/url"
@@ -34,6 +33,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/runtime"
@@ -43,6 +43,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/events/yaml"
+	"github.com/runatlantis/atlantis/server/fetchers"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/static"
 	"github.com/urfave/cli"
@@ -84,6 +85,7 @@ type Config struct {
 	AtlantisURLFlag      string
 	AtlantisVersion      string
 	DefaultTFVersionFlag string
+	ConfigSource         string
 }
 
 // WebhookConfig is nested within UserConfig. It's used to configure webhooks.
@@ -111,6 +113,28 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var gitlabClient *vcs.GitlabClient
 	var bitbucketCloudClient *bitbucketcloud.Client
 	var bitbucketServerClient *bitbucketserver.Client
+	var fetcherConfig fetchers.FetcherConfig
+
+	if userConfig.ConfigSource != "" {
+		sourceType, err := fetchers.GetType(userConfig.ConfigSource)
+		if err != nil {
+			return nil, errors.Wrap(err, "could not determine config source type")
+		}
+
+		switch sourceType {
+		case fetchers.Github:
+			githubFetcherConfig := fetchers.GithubFetcherConfig{}
+			err := fetchers.ParseGithubReference(&githubFetcherConfig, userConfig.ConfigSource, userConfig.GithubToken)
+			if err != nil {
+				return nil, errors.Wrap(err, "could not parse remote reference")
+			}
+			fetcherConfig.GithubConfig = &githubFetcherConfig
+
+		default:
+			return nil, errors.Errorf("unknown config source for remote reference string: %s", userConfig.ConfigSource)
+		}
+	}
+
 	if userConfig.GithubUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		var err error
@@ -244,6 +268,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			AllowRepoConfigFlag: config.AllowRepoConfigFlag,
 			PendingPlanFinder:   pendingPlanFinder,
 			CommentBuilder:      commentParser,
+			FetcherConfig:       fetcherConfig,
 		},
 		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
 			Locker:           projectLocker,

@@ -45,6 +45,7 @@ const (
 	BitbucketUserFlag          = "bitbucket-user"
 	BitbucketWebhookSecretFlag = "bitbucket-webhook-secret"
 	ConfigFlag                 = "config"
+	ConfigSourceFlag           = "config-source"
 	CheckoutStrategyFlag       = "checkout-strategy"
 	DataDirFlag                = "data-dir"
 	DefaultTFVersionFlag       = "default-tf-version"
@@ -107,6 +108,10 @@ var stringFlags = []stringFlag{
 	{
 		name:        ConfigFlag,
 		description: "Path to config file. All flags can be set in a YAML config file instead.",
+	},
+	{
+		name:        ConfigSourceFlag,
+		description: "Specifies a source to get the atlantis configuration file from. Requires the --allow-repo-config flag to be set.",
 	},
 	{
 		name: CheckoutStrategyFlag,
@@ -394,6 +399,7 @@ func (s *ServerCmd) run() error {
 		AtlantisURLFlag:      AtlantisURLFlag,
 		AtlantisVersion:      s.AtlantisVersion,
 		DefaultTFVersionFlag: DefaultTFVersionFlag,
+		ConfigSource:         ConfigSourceFlag,
 	})
 	if err != nil {
 		return errors.Wrap(err, "initializing server")
