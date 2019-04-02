@@ -48,6 +48,10 @@ const (
 	CheckoutStrategyFlag       = "checkout-strategy"
 	DataDirFlag                = "data-dir"
 	DefaultTFVersionFlag       = "default-tf-version"
+	DOHostnameFlag             = "devops-hostname"
+	DOTokenFlag                = "devops-token"
+	DOUserFlag                 = "devops-user"
+	DOWebhookSecretFlag        = "devops-webhook-secret" // nolint: gosec
 	GHHostnameFlag             = "gh-hostname"
 	GHTokenFlag                = "gh-token"
 	GHUserFlag                 = "gh-user"
@@ -73,6 +77,7 @@ const (
 	DefaultDataDir          = "~/.atlantis"
 	DefaultGHHostname       = "github.com"
 	DefaultGitlabHostname   = "gitlab.com"
+	DefaultDOHostname		= "dev.azure.com"
 	DefaultLogLevel         = "info"
 	DefaultPort             = 4141
 )
@@ -122,6 +127,26 @@ var stringFlags = []stringFlag{
 		name:         DataDirFlag,
 		description:  "Path to directory to store Atlantis data.",
 		defaultValue: DefaultDataDir,
+	},
+	{
+		name:         DOHostnameFlag,
+		description:  "Hostname of your Azure Devops installation.",
+		defaultValue: DefaultGHHostname,
+	},
+	{
+		name:        DOUserFlag,
+		description: "Azure Devops username of API user.",
+	},
+	{
+		name:        DOTokenFlag,
+		description: "Azure Devops token of API user. Can also be specified via the ATLANTIS_DO_TOKEN environment variable.",
+	},
+	{
+		name: DOWebhookSecretFlag,
+		description: "Secret used to validate Azure Devops webhooks (see https://docs.microsoft.com/en-us/azure/devops/service-hooks/authorize?view=azure-devops)." +
+			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from your Azure Devops org. " +
+			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
+			"Should be specified via the ATLANTIS_DO_WEBHOOK_SECRET environment variable.",
 	},
 	{
 		name:         GHHostnameFlag,

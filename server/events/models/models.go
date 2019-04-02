@@ -263,6 +263,7 @@ const (
 	Gitlab
 	BitbucketCloud
 	BitbucketServer
+	AzureDevops
 )
 
 func (h VCSHostType) String() string {
@@ -275,6 +276,9 @@ func (h VCSHostType) String() string {
 		return "BitbucketCloud"
 	case BitbucketServer:
 		return "BitbucketServer"
+	}
+	case AzureDevops:
+		return "AzureDevops"
 	}
 	return "<missing String() implementation>"
 }
