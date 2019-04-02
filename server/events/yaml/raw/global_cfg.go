@@ -39,6 +39,10 @@ func (g GlobalCfg) Validate() error {
 			continue
 		}
 		name := *repo.Workflow
+		if name == valid.DefaultWorkflowName {
+			// The 'default' workflow will always be defined.
+			continue
+		}
 		found := false
 		for w := range g.Workflows {
 			if w == name {
@@ -53,16 +57,23 @@ func (g GlobalCfg) Validate() error {
 	return nil
 }
 
-func (g GlobalCfg) ToValid() valid.GlobalCfg {
+func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 	workflows := make(map[string]valid.Workflow)
 	for k, v := range g.Workflows {
 		workflows[k] = v.ToValid(k)
+	}
+	// Merge in defaults without overriding.
+	for k, v := range defaultCfg.Workflows {
+		if _, ok := workflows[k]; !ok {
+			workflows[k] = v
+		}
 	}
 
 	var repos []valid.Repo
 	for _, r := range g.Repos {
 		repos = append(repos, r.ToValid(workflows))
 	}
+	repos = append(defaultCfg.Repos, repos...)
 	return valid.GlobalCfg{
 		Repos:     repos,
 		Workflows: workflows,

@@ -990,6 +990,25 @@ repos:
 				},
 			},
 		},
+		"referencing default workflow": {
+			input: `
+repos:
+- id: github.com/owner/repo
+  workflow: default
+`,
+			exp: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					defaultCfg.Repos[0],
+					{
+						ID:       "github.com/owner/repo",
+						Workflow: defaultCfg.Repos[0].Workflow,
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"default": defaultCfg.Workflows["default"],
+				},
+			},
+		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
