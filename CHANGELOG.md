@@ -39,6 +39,11 @@ repos can do in their `atlantis.yaml` files. Read [docs](https://www.runatlantis
   
   If you are using `run` steps, check our [upgrade guide](https://www.runatlantis.io/docs/upgrading-atlantis-yaml.html#upgrading-from-v2-to-v3)
   to see if you need to make any changes before upgrading.
+* Flags `--require-approval`, `--require-mergeable` and `--allow-repo-config` are
+  deprecated in favour of creating a server-side repo config file that applies
+  the same configuration. If you run `atlantis server` with those flags, a
+  deprecation warning will be printed telling you what server-side config is
+  recommended instead.
 * If you have projects configured with the same directory and workspace (which means
   you're probably using the `-backend-config` flag) **and** their names contain `/`'s,
   then you'll have to re-run `atlantis plan` after upgrading if you had any unapplied plans.
