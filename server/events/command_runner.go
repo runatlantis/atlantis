@@ -15,6 +15,7 @@ package events
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/google/go-github/github"
 	gitlab "github.com/lkysow/go-gitlab"
@@ -313,16 +314,38 @@ func (c *DefaultCommandRunner) automerge(ctx *CommandContext, pullStatus models.
 
 func (c *DefaultCommandRunner) runProjectCmds(cmds []models.ProjectCommandContext, cmdName models.CommandName) CommandResult {
 	var results []models.ProjectResult
+	var wg sync.WaitGroup
+	mux := &sync.Mutex{}
+
+	wg.Add(len(cmds))
 	for _, pCmd := range cmds {
-		var res models.ProjectResult
+		pCmd := pCmd
+		var execute func()
+
 		switch cmdName {
 		case models.PlanCommand:
-			res = c.ProjectCommandRunner.Plan(pCmd)
+			execute = func() {
+				defer wg.Done()
+				res := c.ProjectCommandRunner.Plan(pCmd)
+				mux.Lock()
+				results = append(results, res)
+				mux.Unlock()
+				return
+			}
 		case models.ApplyCommand:
-			res = c.ProjectCommandRunner.Apply(pCmd)
+			execute = func() {
+				defer wg.Done()
+				res := c.ProjectCommandRunner.Apply(pCmd)
+				mux.Lock()
+				results = append(results, res)
+				mux.Unlock()
+				return
+			}
 		}
-		results = append(results, res)
+		go execute()
 	}
+
+	wg.Wait()
 	return CommandResult{ProjectResults: results}
 }
 
