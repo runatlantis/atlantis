@@ -13,10 +13,10 @@ type RepoCfg struct {
 	Automerge bool
 }
 
-func (r RepoCfg) FindProjectsByDirWorkspace(dir string, workspace string) []Project {
+func (r RepoCfg) FindProjectsByDirWorkspace(repoRelDir string, workspace string) []Project {
 	var ps []Project
 	for _, p := range r.Projects {
-		if p.Dir == dir && p.Workspace == workspace {
+		if p.Dir == repoRelDir && p.Workspace == workspace {
 			ps = append(ps, p)
 		}
 	}

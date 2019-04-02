@@ -4,17 +4,22 @@ package runtime
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 	"regexp"
+	"strings"
 
-	version "github.com/hashicorp/go-version"
+	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-// lineBeforeRunURL is the line output during a remote operation right before
-// a link to the run url will be output.
-const lineBeforeRunURL = "To view this run in a browser, visit:"
+const (
+	// lineBeforeRunURL is the line output during a remote operation right before
+	// a link to the run url will be output.
+	lineBeforeRunURL     = "To view this run in a browser, visit:"
+	planfileSlashReplace = "::"
+)
 
 // TerraformExec brings the interface from TerraformClient into this package
 // without causing circular imports.
@@ -51,19 +56,28 @@ func MustConstraint(constraint string) version.Constraints {
 	return c
 }
 
-// invalidFilenameChars matches chars that are invalid for linux and windows
-// filenames.
-// From https://www.oreilly.com/library/view/regular-expressions-cookbook/9781449327453/ch08s25.html
-var invalidFilenameChars = regexp.MustCompile(`[\\/:"*?<>|]`)
-
 // GetPlanFilename returns the filename (not the path) of the generated tf plan
 // given a workspace and project name.
 func GetPlanFilename(workspace string, projName string) string {
-	var unescapedFilename string
 	if projName == "" {
-		unescapedFilename = fmt.Sprintf("%s.tfplan", workspace)
-	} else {
-		unescapedFilename = fmt.Sprintf("%s-%s.tfplan", projName, workspace)
+		return fmt.Sprintf("%s.tfplan", workspace)
 	}
-	return invalidFilenameChars.ReplaceAllLiteralString(unescapedFilename, "-")
+	projName = strings.Replace(projName, "/", planfileSlashReplace, -1)
+	return fmt.Sprintf("%s-%s.tfplan", projName, workspace)
+}
+
+// ProjectNameFromPlanfile returns the project name that a planfile with name
+// filename is for. If filename is for a project without a name then it will
+// return an empty string. workspace is the workspace this project is in.
+func ProjectNameFromPlanfile(workspace string, filename string) (string, error) {
+	r, err := regexp.Compile(fmt.Sprintf(`(.*?)-%s\.tfplan`, workspace))
+	if err != nil {
+		return "", errors.Wrap(err, "compiling project name regex, this is a bug")
+	}
+	projMatch := r.FindAllStringSubmatch(filename, 1)
+	if projMatch == nil {
+		return "", nil
+	}
+	rawProjName := projMatch[0][1]
+	return strings.Replace(rawProjName, planfileSlashReplace, "/", -1), nil
 }
