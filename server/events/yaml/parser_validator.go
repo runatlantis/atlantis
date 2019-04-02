@@ -118,16 +118,7 @@ func (p *ParserValidator) validateRawGlobalCfg(rawCfg raw.GlobalCfg, defaultCfg 
 		return valid.GlobalCfg{}, err
 	}
 
-	validCfg := rawCfg.ToValid()
-
-	// Add defaults to the parsed config.
-	validCfg.Repos = append(defaultCfg.Repos, validCfg.Repos...)
-	for k, v := range defaultCfg.Workflows {
-		// We won't override existing workflows.
-		if _, ok := validCfg.Workflows[k]; !ok {
-			validCfg.Workflows[k] = v
-		}
-	}
+	validCfg := rawCfg.ToValid(defaultCfg)
 	return validCfg, nil
 }
 
