@@ -133,7 +133,6 @@ func (r Repo) IDString() string {
 // MergeProjectCfg merges proj and rCfg with the global config to return a
 // final config. It assumes that all configs have been validated.
 func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, proj Project, rCfg RepoCfg) MergedProjectCfg {
-	log.Debug("merging repo and server-side configs")
 	applyReqs, workflow, allowedOverrides, allowCustomWorkflows := g.getMatchingCfg(log, repoID)
 
 	// If repos are allowed to override certain keys then override them.
@@ -141,7 +140,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		switch key {
 		case ApplyRequirementsKey:
 			if proj.ApplyRequirements != nil {
-				log.Debug("overriding global %s with repo settings: [%s]", ApplyRequirementsKey, strings.Join(proj.ApplyRequirements, ","))
+				log.Debug("overriding server-defined %s with repo settings: [%s]", ApplyRequirementsKey, strings.Join(proj.ApplyRequirements, ","))
 				applyReqs = proj.ApplyRequirements
 			}
 		case WorkflowKey:
@@ -164,13 +163,13 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 						}
 					}
 				}
-				log.Debug("overriding global %s with repo-specified workflow %q", WorkflowKey, workflow.Name)
+				log.Debug("overriding server-defined %s with repo-specified workflow: %q", WorkflowKey, workflow.Name)
 			}
 		}
 	}
 
-	log.Debug("final settings for repo %s: %s: [%s], %s: %s",
-		repoID, ApplyRequirementsKey, strings.Join(applyReqs, ","), WorkflowKey, workflow.Name)
+	log.Debug("final settings: %s: [%s], %s: %s",
+		ApplyRequirementsKey, strings.Join(applyReqs, ","), WorkflowKey, workflow.Name)
 
 	return MergedProjectCfg{
 		ApplyRequirements: applyReqs,
@@ -267,33 +266,57 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 
 // getMatchingCfg returns the key settings for repoID.
 func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (applyReqs []string, workflow Workflow, allowedOverrides []string, allowCustomWorkflows bool) {
+	toLog := make(map[string]string)
+	traceF := func(repoIdx int, repoID string, key string, val interface{}) string {
+		from := "default server config"
+		if repoIdx > 0 {
+			from = fmt.Sprintf("repos[%d], id: %s", repoIdx, repoID)
+		}
+		var valStr string
+		switch v := val.(type) {
+		case string:
+			valStr = fmt.Sprintf("%q", v)
+		case []string:
+			valStr = fmt.Sprintf("[%s]", strings.Join(v, ","))
+		case bool:
+			valStr = fmt.Sprintf("%t", v)
+		default:
+			valStr = "this is a bug"
+		}
+
+		return fmt.Sprintf("setting %s: %s from %s", key, valStr, from)
+	}
+
 	for _, key := range []string{ApplyRequirementsKey, WorkflowKey, AllowedOverridesKey, AllowCustomWorkflowsKey} {
-		for _, repo := range g.Repos {
+		for i, repo := range g.Repos {
 			if repo.IDMatches(repoID) {
 				switch key {
 				case ApplyRequirementsKey:
 					if repo.ApplyRequirements != nil {
-						log.Debug("setting %s: [%s] from repo config %q", ApplyRequirementsKey, strings.Join(repo.ApplyRequirements, ","), repo.IDString())
+						toLog[ApplyRequirementsKey] = traceF(i, repo.IDString(), ApplyRequirementsKey, repo.ApplyRequirements)
 						applyReqs = repo.ApplyRequirements
 					}
 				case WorkflowKey:
 					if repo.Workflow != nil {
-						log.Debug("setting %s: %q from repo config %q", WorkflowKey, repo.Workflow.Name, repo.IDString())
+						toLog[WorkflowKey] = traceF(i, repo.IDString(), WorkflowKey, repo.Workflow.Name)
 						workflow = *repo.Workflow
 					}
 				case AllowedOverridesKey:
 					if repo.AllowedOverrides != nil {
-						log.Debug("setting %s: [%s] from repo config %q", AllowedOverridesKey, strings.Join(repo.AllowedOverrides, ","), repo.IDString())
+						toLog[AllowedOverridesKey] = traceF(i, repo.IDString(), AllowedOverridesKey, repo.AllowedOverrides)
 						allowedOverrides = repo.AllowedOverrides
 					}
 				case AllowCustomWorkflowsKey:
 					if repo.AllowCustomWorkflows != nil {
-						log.Debug("setting %s: %t from repo config %q", AllowCustomWorkflowsKey, *repo.AllowCustomWorkflows, repo.IDString())
+						toLog[AllowCustomWorkflowsKey] = traceF(i, repo.IDString(), AllowCustomWorkflowsKey, *repo.AllowCustomWorkflows)
 						allowCustomWorkflows = *repo.AllowCustomWorkflows
 					}
 				}
 			}
 		}
+	}
+	for _, l := range toLog {
+		log.Debug(l)
 	}
 	return
 }
