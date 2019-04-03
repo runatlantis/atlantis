@@ -97,6 +97,10 @@
   name = "github.com/lkysow/go-gitlab"
 
 [[constraint]]
+  branch = "master"
+  name = "github.com/benmatselby/go-azuredevops/azuredevops"
+
+[[constraint]]
   name = "github.com/go-test/deep"
   version = "1.0.1"
 
