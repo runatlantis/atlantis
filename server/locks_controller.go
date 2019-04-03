@@ -2,9 +2,10 @@ package server
 
 import (
 	"fmt"
-	"github.com/runatlantis/atlantis/server/events/db"
 	"net/http"
 	"net/url"
+
+	"github.com/runatlantis/atlantis/server/events/db"
 
 	"github.com/gorilla/mux"
 	"github.com/runatlantis/atlantis/server/events"

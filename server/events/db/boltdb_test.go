@@ -14,11 +14,12 @@
 package db_test
 
 import (
-	"github.com/runatlantis/atlantis/server/events/db"
 	"io/ioutil"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/runatlantis/atlantis/server/events/db"
 
 	"github.com/boltdb/bolt"
 	"github.com/pkg/errors"

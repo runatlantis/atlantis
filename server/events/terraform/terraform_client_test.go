@@ -15,9 +15,6 @@ package terraform_test
 
 import (
 	"fmt"
-	"github.com/petergtz/pegomock"
-	"github.com/runatlantis/atlantis/cmd"
-	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -25,9 +22,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/go-version"
+	version "github.com/hashicorp/go-version"
+	"github.com/petergtz/pegomock"
 	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/cmd"
 	"github.com/runatlantis/atlantis/server/events/terraform"
+	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -71,7 +71,7 @@ is 0.11.13. You can update by downloading from www.terraform.io/downloads.html
 	Ok(t, err)
 
 	Ok(t, err)
-	Equals(t, "0.11.10", c.Version().String())
+	Equals(t, "0.11.10", c.DefaultVersion().String())
 
 	output, err := c.RunCommandWithVersion(nil, tmp, nil, nil, "")
 	Ok(t, err)
@@ -99,7 +99,7 @@ is 0.11.13. You can update by downloading from www.terraform.io/downloads.html
 	Ok(t, err)
 
 	Ok(t, err)
-	Equals(t, "0.11.10", c.Version().String())
+	Equals(t, "0.11.10", c.DefaultVersion().String())
 
 	output, err := c.RunCommandWithVersion(nil, tmp, nil, nil, "")
 	Ok(t, err)
@@ -136,7 +136,7 @@ func TestNewClient_DefaultTFFlagInPath(t *testing.T) {
 	Ok(t, err)
 
 	Ok(t, err)
-	Equals(t, "0.11.10", c.Version().String())
+	Equals(t, "0.11.10", c.DefaultVersion().String())
 
 	output, err := c.RunCommandWithVersion(nil, tmp, nil, nil, "")
 	Ok(t, err)
@@ -160,7 +160,7 @@ func TestNewClient_DefaultTFFlagInBinDir(t *testing.T) {
 	Ok(t, err)
 
 	Ok(t, err)
-	Equals(t, "0.11.10", c.Version().String())
+	Equals(t, "0.11.10", c.DefaultVersion().String())
 
 	output, err := c.RunCommandWithVersion(nil, tmp, nil, nil, "")
 	Ok(t, err)
@@ -186,7 +186,7 @@ func TestNewClient_DefaultTFFlagDownload(t *testing.T) {
 	Ok(t, err)
 
 	Ok(t, err)
-	Equals(t, "0.11.10", c.Version().String())
+	Equals(t, "0.11.10", c.DefaultVersion().String())
 	baseURL := "https://releases.hashicorp.com/terraform/0.11.10"
 	expURL := fmt.Sprintf("%s/terraform_0.11.10_%s_%s.zip?checksum=file:%s/terraform_0.11.10_SHA256SUMS",
 		baseURL,
@@ -231,7 +231,7 @@ func TestRunCommandWithVersion_DLsTF(t *testing.T) {
 
 	c, err := terraform.NewClient(nil, tmp, "", "0.11.10", cmd.DefaultTFVersionFlag, mockDownloader)
 	Ok(t, err)
-	Equals(t, "0.11.10", c.Version().String())
+	Equals(t, "0.11.10", c.DefaultVersion().String())
 
 	v, err := version.NewVersion("0.12.0")
 	Ok(t, err)

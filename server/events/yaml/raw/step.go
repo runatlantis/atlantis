@@ -1,13 +1,13 @@
 package raw
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
 	"strings"
 
-	"github.com/flynn-archive/go-shlex"
-	"github.com/go-ozzo/ozzo-validation"
+	validation "github.com/go-ozzo/ozzo-validation"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 )
 
@@ -41,44 +41,14 @@ type Step struct {
 }
 
 func (s *Step) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	// First try to unmarshal as a single string, ex.
-	// steps:
-	// - init
-	// - plan
-	// We validate if it's a legal string later.
-	var singleString string
-	err := unmarshal(&singleString)
-	if err == nil {
-		s.Key = &singleString
-		return nil
-	}
-
-	// This represents a step with extra_args, ex:
-	//   init:
-	//     extra_args: [a, b]
-	// We validate if there's a single key in the map and if the value is a
-	// legal value later.
-	var step map[string]map[string][]string
-	err = unmarshal(&step)
-	if err == nil {
-		s.Map = step
-		return nil
-	}
-
-	// Try to unmarshal as a custom run step, ex.
-	// steps:
-	// - run: my command
-	// We validate if the key is run later.
-	var runStep map[string]string
-	err = unmarshal(&runStep)
-	if err == nil {
-		s.StringVal = runStep
-		return nil
-	}
-
-	return err
+	return s.unmarshalGeneric(unmarshal)
 }
 
+func (s *Step) UnmarshalJSON(data []byte) error {
+	return s.unmarshalGeneric(func(i interface{}) error {
+		return json.Unmarshal(data, i)
+	})
+}
 func (s Step) Validate() error {
 	validStep := func(value interface{}) error {
 		str := *value.(*string)
@@ -137,13 +107,9 @@ func (s Step) Validate() error {
 			return fmt.Errorf("step element can only contain a single key, found %d: %s",
 				len(keys), strings.Join(keys, ","))
 		}
-		for stepName, args := range elem {
+		for stepName := range elem {
 			if stepName != RunStepName {
 				return fmt.Errorf("%q is not a valid step type", stepName)
-			}
-			_, err := shlex.Split(args)
-			if err != nil {
-				return fmt.Errorf("unable to parse as shell command: %s", err)
 			}
 		}
 		return nil
@@ -186,15 +152,60 @@ func (s Step) ToValid() valid.Step {
 		// After validation we assume there's only one key and it's a valid
 		// step name so we just use the first one.
 		for _, v := range s.StringVal {
-			// We ignore the error here because it should have been checked in
-			// Validate().
-			split, _ := shlex.Split(v)
 			return valid.Step{
 				StepName:   RunStepName,
-				RunCommand: split,
+				RunCommand: v,
 			}
 		}
 	}
 
 	panic("step was not valid. This is a bug!")
+}
+
+// unmarshalGeneric is used by UnmarshalJSON and UnmarshalYAML to unmarshal
+// a step into one of its three forms. We need to implement a custom unmarshal
+// function because steps can either be:
+// 1. a built-in step: " - init"
+// 2. a built-in step with extra_args: " - init: {extra_args: [arg1] }"
+// 3. a custom run step: " - run: my custom command"
+// It takes a parameter unmarshal that is a function that tries to unmarshal
+// the current element into a given object.
+func (s *Step) unmarshalGeneric(unmarshal func(interface{}) error) error {
+
+	// First try to unmarshal as a single string, ex.
+	// steps:
+	// - init
+	// - plan
+	// We validate if it's a legal string later.
+	var singleString string
+	err := unmarshal(&singleString)
+	if err == nil {
+		s.Key = &singleString
+		return nil
+	}
+
+	// This represents a step with extra_args, ex:
+	//   init:
+	//     extra_args: [a, b]
+	// We validate if there's a single key in the map and if the value is a
+	// legal value later.
+	var step map[string]map[string][]string
+	err = unmarshal(&step)
+	if err == nil {
+		s.Map = step
+		return nil
+	}
+
+	// Try to unmarshal as a custom run step, ex.
+	// steps:
+	// - run: my command
+	// We validate if the key is run later.
+	var runStep map[string]string
+	err = unmarshal(&runStep)
+	if err == nil {
+		s.StringVal = runStep
+		return nil
+	}
+
+	return err
 }

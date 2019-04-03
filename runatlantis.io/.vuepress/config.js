@@ -1,6 +1,6 @@
 module.exports = {
     title: 'Atlantis',
-    description: 'Atlantis: Terraform For Teams',
+    description: 'Atlantis: Terraform Pull Request Automation',
     ga: "UA-6850151-3",
     head: [
         ['link', { rel: 'icon', type: 'image/png', href: '/favicon-196x196.png', sizes: '196x196' }],
@@ -37,11 +37,9 @@ module.exports = {
             '/guide/': [
                 '',
                 'test-drive',
-                'getting-started',
-                'atlantis-yaml-use-cases'
+                'testing-locally',
             ],
             '/docs/': [
-                ['', 'Overview'],
                 {
                     title: 'Installing Atlantis',
                     collapsable: true,
@@ -52,8 +50,22 @@ module.exports = {
                         'webhook-secrets',
                         'deployment',
                         'configuring-webhooks',
+                        'provider-credentials'
+                    ]
+                },
+                {
+                    title: 'Configuring Atlantis',
+                    collapsable: true,
+                    children: [
+                        ['configuring-atlantis', 'Overview'],
                         'server-configuration',
-                        'provider-credentials',
+                        'server-side-repo-config',
+                        'custom-workflows',
+                        'repo-level-atlantis-yaml',
+                        'upgrading-atlantis-yaml',
+                        'apply-requirements',
+                        'checkout-strategy',
+                        'terraform-versions',
                         'terraform-enterprise'
                     ]
                 },
@@ -62,18 +74,6 @@ module.exports = {
                     collapsable: true,
                     children: [
                         ['using-atlantis', 'Overview']
-                    ]
-                },
-                {
-                    title: 'Customizing Atlantis',
-                    collapsable: true,
-                    children: [
-                        ['customizing-atlantis', 'Overview'],
-                        'atlantis-yaml-reference',
-                        'upgrading-atlantis-yaml-to-version-2',
-                        'apply-requirements',
-                        'checkout-strategy',
-                        'terraform-versions'
                     ]
                 },
                 {

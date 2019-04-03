@@ -4,10 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hashicorp/go-version"
+	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/runtime"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -20,11 +19,23 @@ func TestRunStepRunner_Run(t *testing.T) {
 	}{
 		{
 			Command: "",
-			ExpErr:  "no commands for run step",
+			ExpOut:  "",
 		},
 		{
 			Command: "echo hi",
 			ExpOut:  "hi\n",
+		},
+		{
+			Command: `printf \'your main.tf file does not provide default region.\\ncheck\'`,
+			ExpOut:  `'your`,
+		},
+		{
+			Command: `printf 'your main.tf file does not provide default region.\ncheck'`,
+			ExpOut:  "your main.tf file does not provide default region.\ncheck",
+		},
+		{
+			Command: "echo 'a",
+			ExpErr:  "exit status 2: running \"echo 'a\" in",
 		},
 		{
 			Command: "echo hi >> file && cat file",
@@ -72,24 +83,16 @@ func TestRunStepRunner_Run(t *testing.T) {
 		User: models.User{
 			Username: "acme-user",
 		},
-		Log:        logging.NewNoopLogger(),
-		Workspace:  "myworkspace",
-		RepoRelDir: "mydir",
-		ProjectConfig: &valid.Project{
-			TerraformVersion: projVersion,
-			Workspace:        "myworkspace",
-			Dir:              "mydir",
-		},
+		Log:              logging.NewNoopLogger(),
+		Workspace:        "myworkspace",
+		RepoRelDir:       "mydir",
+		TerraformVersion: projVersion,
 	}
 	for _, c := range cases {
 		t.Run(c.Command, func(t *testing.T) {
 			tmpDir, cleanup := TempDir(t)
 			defer cleanup()
-			var split []string
-			if c.Command != "" {
-				split = strings.Split(c.Command, " ")
-			}
-			out, err := r.Run(ctx, split, tmpDir)
+			out, err := r.Run(ctx, c.Command, tmpDir)
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
 				return

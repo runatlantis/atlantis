@@ -1,3 +1,90 @@
+# v0.7.0
+
+## Description
+This release implements Server-Side Repo Config which allows users to write
+`atlantis.yaml`-style config on the server rather than in individual repos.
+The Server Side config also allow Atlantis operators to control what individual
+repos can do in their `atlantis.yaml` files. Read [docs](https://www.runatlantis.io/docs/server-side-repo-config.html) for more details.
+
+## Features
+* Server-Side Repo Config. Read [docs](https://www.runatlantis.io/docs/server-side-repo-config.html)
+  and [use cases](https://www.runatlantis.io/docs/server-side-repo-config.html#use-cases) for full details. ([#47](https://github.com/runatlantis/atlantis/issues/47))
+  * New flag `atlantis server` flag `--repo-config` for specifying the
+    repo config file .
+  * New flag `--repo-config-json` for specifying the repo config as a JSON string
+    instead of having to write a config file to disk.
+  * All repos can now create `atlantis.yaml` files to configure their projects,
+    however by default, those files can't create custom workflows or set Apply
+    Requirements.
+* New version `3` of `atlantis.yaml` fixes a small issue with how we were parsing
+  custom `run` steps. Previously we were doing additional parsing which caused some
+  users to have to add extra escaping to their commands. Now this is no longer
+  required. See the Backwards Compatibility section for more details.
+
+## Bugfixes
+* Fix bug where running `atlantis apply` to apply all outstanding plans wouldn't work if
+  you had more than one project defined in the exact same directory and workspace. (Fixes [#365](https://github.com/runatlantis/atlantis/issues/365))
+
+## Backwards Incompatibilities / Notes:
+* The server-side config changes are fully backwards compatible. The biggest
+  difference is that all repos can now create `atlantis.yaml` files, but without
+  being able to create custom workflows or set apply requirements. This will
+  allow users to configure their projects, workspaces and terraform versions
+  at a repo level without enabling those repos to run custom code or circumvent
+  apply requirements set server-side.
+* `atlantis.yaml` has a new version `3`. If you continue to use version `2`, you
+  will experience no changes. If you want to upgrade to version `3`, then
+  if you're not using any custom `run` steps in your workflows you can upgrade
+  the version number without additional changes.
+  
+  If you are using `run` steps, check our [upgrade guide](https://www.runatlantis.io/docs/upgrading-atlantis-yaml.html#upgrading-from-v2-to-v3)
+  to see if you need to make any changes before upgrading.
+* Flags `--require-approval`, `--require-mergeable` and `--allow-repo-config` are
+  deprecated in favour of creating a server-side repo config file that applies
+  the same configuration. If you run `atlantis server` with those flags, a
+  deprecation warning will be printed telling you what server-side config is
+  recommended instead.
+* If you have projects configured with the same directory and workspace (which means
+  you're probably using the `-backend-config` flag) **and** their names contain `/`'s,
+  then you'll have to re-run `atlantis plan` after upgrading if you had any unapplied plans.
+  
+  An example of what config would mean you need to re-plan:
+  ```yaml
+  projects:
+  - name: name/with/slashes
+    dir: samedir
+    workflow: a
+  - name: another/with/slashes
+    dir: samedir
+    workflow: b
+  a:
+     plan:
+       steps:
+       - run: rm -rf .terraform
+       - init:
+           extra_args: [-backend-config=staging.backend.tfvars]
+       - plan
+  b:
+     plan:
+       steps:
+       - run: rm -rf .terraform
+       - init:
+           extra_args: [-backend-config=staging.backend.tfvars]
+       - plan
+  ```
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.7.0/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.7.0/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.7.0/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.7.0/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.7.0`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.6.0..v0.7.0
+https://github.com/runatlantis/atlantis/compare/v0.6.0...v0.7.0
+
 # v0.6.0
 
 ## Description
@@ -808,7 +895,7 @@ when new commits are pushed to the pull request.
 
 ## Backwards Incompatibilities / Notes:
 - The old `atlantis.yaml` config file format is not supported. You will need to migrate to the new config
-format, see: https://www.runatlantis.io/docs/upgrading-atlantis-yaml-to-version-2.html
+format, see: https://www.runatlantis.io/docs/upgrading-atlantis-yaml.html
 - To use the new config file, you must run Atlantis with `--allow-repo-config`.
 - Atlantis will now try to automatically plan. To disable this, you'll need to create an `atlantis.yaml` file
 as follows:

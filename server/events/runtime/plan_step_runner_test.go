@@ -2,15 +2,16 @@ package runtime_test
 
 import (
 	"fmt"
-	mocks2 "github.com/runatlantis/atlantis/server/events/mocks"
-	"github.com/runatlantis/atlantis/server/events/terraform"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/hashicorp/go-version"
+	version "github.com/hashicorp/go-version"
+	mocks2 "github.com/runatlantis/atlantis/server/events/mocks"
+	"github.com/runatlantis/atlantis/server/events/terraform"
+
 	. "github.com/petergtz/pegomock"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
@@ -18,7 +19,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
 	matchers2 "github.com/runatlantis/atlantis/server/events/terraform/mocks/matchers"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -475,16 +475,13 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 	}
 	When(terraform.RunCommandWithVersion(logger, "/path", expPlanArgs, tfVersion, "default")).ThenReturn("output", nil)
 
-	projectName := "projectname"
 	output, err := s.Run(models.ProjectCommandContext{
 		Log:         logger,
 		Workspace:   "default",
 		RepoRelDir:  ".",
 		User:        models.User{Username: "username"},
 		CommentArgs: []string{"comment", "args"},
-		ProjectConfig: &valid.Project{
-			Name: &projectName,
-		},
+		ProjectName: "projectname",
 		Pull: models.PullRequest{
 			Num: 2,
 		},

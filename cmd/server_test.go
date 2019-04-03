@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mitchellh/go-homedir"
+	homedir "github.com/mitchellh/go-homedir"
 	"github.com/runatlantis/atlantis/cmd"
 	"github.com/runatlantis/atlantis/server"
 	. "github.com/runatlantis/atlantis/testing"
@@ -912,6 +912,19 @@ func TestExecute_BitbucketServerBaseURLPort(t *testing.T) {
 	})
 	Ok(t, c.Execute())
 	Equals(t, "http://mydomain.com:7990", passedConfig.BitbucketBaseURL)
+}
+
+// Can't use both --repo-config and --repo-config-json.
+func TestExecute_RepoCfgFlags(t *testing.T) {
+	c := setup(map[string]interface{}{
+		cmd.GHUserFlag:         "user",
+		cmd.GHTokenFlag:        "token",
+		cmd.RepoWhitelistFlag:  "github.com",
+		cmd.RepoConfigFlag:     "repos.yaml",
+		cmd.RepoConfigJSONFlag: "{}",
+	})
+	err := c.Execute()
+	ErrEquals(t, "cannot use --repo-config and --repo-config-json at the same time", err)
 }
 
 func setup(flags map[string]interface{}) *cobra.Command {

@@ -1,0 +1,7 @@
+version: 3
+projects:
+- dir: .
+  workspace: default
+- dir: .
+  workspace: staging
+  workflow: staging

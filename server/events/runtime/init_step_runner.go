@@ -1,7 +1,7 @@
 package runtime
 
 import (
-	"github.com/hashicorp/go-version"
+	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
@@ -13,8 +13,8 @@ type InitStepRunner struct {
 
 func (i *InitStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string) (string, error) {
 	tfVersion := i.DefaultTFVersion
-	if ctx.ProjectConfig != nil && ctx.ProjectConfig.TerraformVersion != nil {
-		tfVersion = ctx.ProjectConfig.TerraformVersion
+	if ctx.TerraformVersion != nil {
+		tfVersion = ctx.TerraformVersion
 	}
 	terraformInitCmd := append([]string{"init", "-input=false", "-no-color", "-upgrade"}, extraArgs...)
 

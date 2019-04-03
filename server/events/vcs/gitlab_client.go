@@ -21,11 +21,11 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 
-	"github.com/hashicorp/go-version"
+	version "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/logging"
 
-	"github.com/lkysow/go-gitlab"
+	gitlab "github.com/lkysow/go-gitlab"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 

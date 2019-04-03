@@ -48,7 +48,7 @@ test-coverage:
 
 test-coverage-html:
 	@mkdir -p .cover
-	@go test -covermode atomic -coverprofile .cover/cover.out $(PKG)
+	@go test -covermode atomic -coverpkg $(PKG_COMMAS) -coverprofile .cover/cover.out $(PKG)
 	go tool cover -html .cover/cover.out
 
 dist: ## Package up everything in static/ using go-bindata-assetfs so it can be served by a single binary
@@ -69,7 +69,7 @@ check-lint: ## Run linter in CI/CD. If running locally use 'lint'
 
 check-fmt: ## Fail if not formatted
 	go get golang.org/x/tools/cmd/goimports
-	goimports -d $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "./server/static/bindata_assetfs.go" ! -path "**/mocks/*")
+	if [[ $$(goimports -l $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "./server/static/bindata_assetfs.go" ! -path "**/mocks/*")) ]]; then exit 1; fi
 
 end-to-end-deps: ## Install e2e dependencies
 	./scripts/e2e-deps.sh

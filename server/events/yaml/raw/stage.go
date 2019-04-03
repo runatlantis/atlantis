@@ -1,12 +1,12 @@
 package raw
 
 import (
-	"github.com/go-ozzo/ozzo-validation"
+	validation "github.com/go-ozzo/ozzo-validation"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 )
 
 type Stage struct {
-	Steps []Step `yaml:"steps,omitempty"`
+	Steps []Step `yaml:"steps,omitempty" json:"steps,omitempty"`
 }
 
 func (s Stage) Validate() error {

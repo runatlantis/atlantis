@@ -2,14 +2,14 @@ package terraform
 
 import (
 	"fmt"
-	"github.com/hashicorp/go-version"
-	"github.com/runatlantis/atlantis/server/logging"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	version "github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
 

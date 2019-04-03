@@ -54,9 +54,26 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 			},
 			[]events.PendingPlan{
 				{
-					RepoDir:    "???/default",
-					RepoRelDir: ".",
-					Workspace:  "default",
+					RepoDir:     "???/default",
+					RepoRelDir:  ".",
+					Workspace:   "default",
+					ProjectName: "projectname",
+				},
+			},
+		},
+		{
+			"root dir project plan with slashes",
+			map[string]interface{}{
+				"default": map[string]interface{}{
+					"project::name-default.tfplan": nil,
+				},
+			},
+			[]events.PendingPlan{
+				{
+					RepoDir:     "???/default",
+					RepoRelDir:  ".",
+					Workspace:   "default",
+					ProjectName: "project/name",
 				},
 			},
 		},

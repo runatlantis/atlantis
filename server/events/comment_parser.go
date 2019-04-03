@@ -15,15 +15,16 @@ package events
 
 import (
 	"fmt"
-	"github.com/flynn-archive/go-shlex"
-	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/yaml"
-	"github.com/spf13/pflag"
 	"io/ioutil"
 	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	shlex "github.com/flynn-archive/go-shlex"
+	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/yaml"
+	"github.com/spf13/pflag"
 )
 
 const (
@@ -328,7 +329,7 @@ func (e *CommentParser) errMarkdown(errMsg string, command string, flagSet *pfla
 // `atlantis help`.
 var HelpComment = "```cmake\n" +
 	`atlantis
-Terraform For Teams
+Terraform Pull Request Automation
 
 Usage:
   atlantis <command> [options] -- [terraform options]
