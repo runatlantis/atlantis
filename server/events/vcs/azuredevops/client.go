@@ -197,7 +197,7 @@ func (b *Client) prepRequest(method string, path string, body io.Reader) (*http.
 	}
 	// Add this header to disable CSRF checks.
 	// See https://confluence.atlassian.com/cloudkb/xsrf-check-failed-when-calling-cloud-apis-826874382.html
-	req.Header.Add("X-Atlassian-Token", "no-check")
+	//req.Header.Add("X-Atlassian-Token", "no-check")
 	return req, nil
 }
 

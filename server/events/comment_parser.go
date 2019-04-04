@@ -65,9 +65,10 @@ type CommentBuilder interface {
 
 // CommentParser implements CommentParsing
 type CommentParser struct {
-	GithubUser    string
-	GitlabUser    string
-	BitbucketUser string
+	GithubUser      string
+	GitlabUser      string
+	BitbucketUser   string
+	AzureDevopsUser string
 }
 
 // CommentParseResult describes the result of parsing a comment as a command.
@@ -125,6 +126,8 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		vcsUser = e.GitlabUser
 	case models.BitbucketCloud, models.BitbucketServer:
 		vcsUser = e.BitbucketUser
+	case models.AzureDevops:
+		vcsUser = e.AzureDevopsUser
 	}
 	executableNames := []string{"run", atlantisExecutable, "@" + vcsUser}
 	if !e.stringInSlice(args[0], executableNames) {

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs/azuredevops"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -28,7 +29,7 @@ func TestClient_GetModifiedFilesPagination(t *testing.T) {
                 "type": "commit_file",
                 "links": {
                     "self": {
-                        "href": "https://dev.azure.com/2.0/repositories/bitbucket/geordi/src/e1749643d655d7c7014001a6c0f58abaf42ad850/setup.py"
+                        "href": "https://visualstudio.com/org/2.0/repositories/bitbucket/geordi/src/e1749643d655d7c7014001a6c0f58abaf42ad850/setup.py"
                     }
                 }
             },
@@ -37,7 +38,7 @@ func TestClient_GetModifiedFilesPagination(t *testing.T) {
                 "type": "commit_file",
                 "links": {
                     "self": {
-                        "href": "https://dev.azure.com/2.0/repositories/bitbucket/geordi/src/d222fa235229c55dad20b190b0b571adf737d5a6/setup.py"
+                        "href": "https://visualstudio.com/org/2.0/repositories/bitbucket/geordi/src/d222fa235229c55dad20b190b0b571adf737d5a6/setup.py"
                     }
                 }
             }
@@ -69,7 +70,7 @@ func TestClient_GetModifiedFilesPagination(t *testing.T) {
 	defer testServer.Close()
 
 	serverURL = testServer.URL
-	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
+	client := azuredevops.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
 	client.BaseURL = testServer.URL
 
 	files, err := client.GetModifiedFiles(models.Repo{
@@ -79,8 +80,8 @@ func TestClient_GetModifiedFilesPagination(t *testing.T) {
 		CloneURL:          "",
 		SanitizedCloneURL: "",
 		VCSHost: models.VCSHost{
-			Type:     models.BitbucketCloud,
-			Hostname: "dev.azure.com",
+			Type:     models.AzureDevops,
+			Hostname: "visualstudio.com",
 		},
 	}, models.PullRequest{
 		Num: 1,
@@ -105,7 +106,7 @@ func TestClient_GetModifiedFilesOldNil(t *testing.T) {
         "type": "commit_file",
         "links": {
           "self": {
-            "href": "https://dev.azure.com/2.0/repositories/lkysow/atlantis-example/src/1ed8205eec00dab4f1c0a8c486a4492c98c51f8e/main.tf"
+            "href": "https://visualstudio.com/2.0/repositories/lkysow/atlantis-example/src/1ed8205eec00dab4f1c0a8c486a4492c98c51f8e/main.tf"
           }
         }
       },
@@ -130,7 +131,7 @@ func TestClient_GetModifiedFilesOldNil(t *testing.T) {
 	}))
 	defer testServer.Close()
 
-	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
+	client := azuredevops.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
 	client.BaseURL = testServer.URL
 
 	files, err := client.GetModifiedFiles(models.Repo{
@@ -140,8 +141,8 @@ func TestClient_GetModifiedFilesOldNil(t *testing.T) {
 		CloneURL:          "",
 		SanitizedCloneURL: "",
 		VCSHost: models.VCSHost{
-			Type:     models.BitbucketCloud,
-			Hostname: "dev.azure.com",
+			Type:     models.AzureDevops,
+			Hostname: "visualstudio.com",
 		},
 	}, models.PullRequest{
 		Num: 1,
@@ -196,10 +197,10 @@ func TestClient_PullIsApproved(t *testing.T) {
 			}))
 			defer testServer.Close()
 
-			client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
+			client := azuredevops.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
 			client.BaseURL = testServer.URL
 
-			repo, err := models.NewRepo(models.BitbucketServer, "owner/repo", "https://dev.azure.com/owner/repo.git", "user", "token")
+			repo, err := models.NewRepo(models.AzureDevops, "owner/repo", "https://visualstudio.com/owner/repo.git", "user", "token")
 			Ok(t, err)
 			approved, err := client.PullIsApproved(repo, models.PullRequest{
 				Num:        1,

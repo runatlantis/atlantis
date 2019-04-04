@@ -3,4 +3,4 @@
 // APIs.
 package azuredevops
 
-const BaseURL = "https://dev.azure.com"
+const BaseURL = "https://visualstudio.com"

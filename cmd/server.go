@@ -75,7 +75,7 @@ const (
 	TFETokenFlag               = "tfe-token"
 
 	// Flag defaults.
-	DefaultADHostname       = "linkconsulting.visualstudio.com"
+	DefaultADHostname       = "visualstudio.com"
 	DefaultCheckoutStrategy = "branch"
 	DefaultBitbucketBaseURL = bitbucketcloud.BaseURL
 	DefaultDataDir          = "~/.atlantis"

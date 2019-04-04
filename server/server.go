@@ -235,11 +235,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		BitbucketUser:      userConfig.BitbucketUser,
 		BitbucketToken:     userConfig.BitbucketToken,
 		BitbucketServerURL: userConfig.BitbucketBaseURL,
+		AzureDevopsUser:    userConfig.AzureDevopsUser,
+		AzureDevopsToken:   userConfig.AzureDevopsToken,
 	}
 	commentParser := &events.CommentParser{
-		GithubUser:    userConfig.GithubUser,
-		GitlabUser:    userConfig.GitlabUser,
-		BitbucketUser: userConfig.BitbucketUser,
+		GithubUser:      userConfig.GithubUser,
+		GitlabUser:      userConfig.GitlabUser,
+		BitbucketUser:   userConfig.BitbucketUser,
+		AzureDevopsUser: userConfig.AzureDevopsUser,
 	}
 	defaultTfVersion := terraformClient.DefaultVersion()
 	pendingPlanFinder := &events.DefaultPendingPlanFinder{}
@@ -324,6 +327,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		SupportedVCSHosts:            supportedVCSHosts,
 		VCSClient:                    vcsClient,
 		BitbucketWebhookSecret:       []byte(userConfig.BitbucketWebhookSecret),
+		AzureDevopsWebhookSecret:     []byte(userConfig.AzureDevopsWebhookSecret),
 	}
 	return &Server{
 		AtlantisVersion:    config.AtlantisVersion,

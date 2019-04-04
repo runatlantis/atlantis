@@ -31,6 +31,7 @@ import (
 
 const githubHeader = "X-Github-Event"
 const gitlabHeader = "X-Gitlab-Event"
+const azuredevopsHeader = "X-AzureDevops-Event"
 
 // bitbucketEventTypeHeader is the same in both cloud and server.
 const bitbucketEventTypeHeader = "X-Event-Key"
@@ -69,6 +70,10 @@ type EventsController struct {
 	// UI that identifies this call as coming from Bitbucket. If empty, no
 	// request validation is done.
 	BitbucketWebhookSecret []byte
+	// AzureDevopsWebhookSecret is the secret added to this webhook via the Azure
+	// Devops UI that identifies this call as coming from Bitbucket. If empty, no
+	// request validation is done.
+	AzureDevopsWebhookSecret []byte
 }
 
 // Post handles POST webhook requests.
@@ -107,6 +112,14 @@ func (e *EventsController) Post(w http.ResponseWriter, r *http.Request) {
 			}
 			e.Logger.Debug("handling Bitbucket Server post")
 			e.handleBitbucketServerPost(w, r)
+			return
+		} else if r.Header.Get(azuredevopsHeader) != "" {
+			if !e.supportsHost(models.AzureDevops) {
+				e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support AzureDevops")
+				return
+			}
+			e.Logger.Debug("handling AzureDevops post")
+			e.handleAzureDevopsPost(w, r)
 			return
 		}
 	}
@@ -194,6 +207,44 @@ func (e *EventsController) handleBitbucketServerPost(w http.ResponseWriter, r *h
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event type %s %s=%s", eventType, bitbucketServerRequestIDHeader, reqID)
 	}
 }
+
+func (e *EventsController) handleAzureDevopsPost(w http.ResponseWriter, r *http.Request) {}
+
+/*func (e *EventsController) handleAzureDevopsPost(w http.ResponseWriter, r *http.Request) {
+	eventType := r.Header.Get(azuredevopsEventTypeHeader)
+	reqID := r.Header.Get(azuredevopsRequestIDHeader)
+	sig := r.Header.Get(azuredevopsSignatureHeader)
+	defer r.Body.Close() // nolint: errcheck
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		e.respond(w, logging.Error, http.StatusBadRequest, "Unable to read body: %s %s=%s", err, azuredevopsRequestIDHeader, reqID)
+		return
+	}
+	if eventType == azuredevops.DiagnosticsPingHeader {
+		// Specially handle the diagnostics:ping event because Bitbucket Server
+		// doesn't send the signature with this event for some reason.
+		e.respond(w, logging.Info, http.StatusOK, "Successfully received %s event %s=%s", eventType, azuredevopsRequestIDHeader, reqID)
+		return
+	}
+	if len(e.AzureDevopsWebhookSecret) > 0 {
+		if err := azuredevops.ValidateSignature(body, sig, e.AzureDevopsWebhookSecret); err != nil {
+			e.respond(w, logging.Warn, http.StatusBadRequest, errors.Wrap(err, "request did not pass validation").Error())
+			return
+		}
+	}
+	switch eventType {
+	case azuredevops.PullCreatedHeader, azuredevops.PullMergedHeader, azuredevops.PullDeclinedHeader, azuredevops.PullDeletedHeader:
+		e.Logger.Debug("handling as pull request state changed event")
+		e.handleBitbucketServerPullRequestEvent(w, eventType, body, reqID)
+		return
+	case azuredevops.PullCommentCreatedHeader:
+		e.Logger.Debug("handling as comment created event")
+		e.HandleBitbucketServerCommentEvent(w, body, reqID)
+		return
+	default:
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event type %s %s=%s", eventType, bitbucketServerRequestIDHeader, reqID)
+	}
+}*/
 
 // HandleGithubCommentEvent handles comment events from GitHub where Atlantis
 // commands can come from. It's exported to make testing easier.

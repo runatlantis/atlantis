@@ -47,7 +47,7 @@ func NewClientProxy(githubClient Client, gitlabClient Client, bitbucketCloudClie
 			models.Gitlab:          gitlabClient,
 			models.BitbucketCloud:  bitbucketCloudClient,
 			models.BitbucketServer: bitbucketServerClient,
-			models.AzureDevops:		azuredevopsClient
+			models.AzureDevops:     azuredevopsClient,
 		},
 	}
 }

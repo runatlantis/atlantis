@@ -1,11 +1,11 @@
 package azuredevops
 
 const (
-	PullCreatedHeader        = "pullrequest:created"
-	PullUpdatedHeader        = "pullrequest:updated"
-	PullFulfilledHeader      = "pullrequest:fulfilled"
+	PullCreatedHeader        = "git.pullrequest.created"
+	PullUpdatedHeader        = "git.pullrequest.updated"
+	PullFulfilledHeader      = "git.pullrequest.merged"
 	PullRejectedHeader       = "pullrequest:rejected"
-	PullCommentCreatedHeader = "pullrequest:comment_created"
+	PullCommentCreatedHeader = "workitem.commented"
 )
 
 type CommentEvent struct {
