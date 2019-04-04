@@ -1,5 +1,5 @@
 # Git Host Access Credentials
-This doc describes how to create credentials on your Git host (GitHub, GitLab or Bitbucket)
+This doc describes how to create credentials on your Git host (GitHub, GitLab, Bitbucket, or Azure Devops)
 that Atlantis will use to make API calls.
 [[toc]]
 
@@ -41,6 +41,12 @@ generate an access token. Read on for the instructions for your Git host.
 - Name the token **atlantis**
 - Give the token **Read** Project permissions and **Write** Pull request permissions
 - Click **Create** and record the access token
+
+### Create an Azure Devops (dev.azure.com) Personal Access Token
+- create a Personal access token by following [https://docs.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops](https://docs.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops)
+- Label the password "atlantis"
+- Under scope "Code", select **Read & Write** and **Status** so that Atlantis can read your pull requests and write comments to them
+- record the access token
 
 ## Next Steps
 Once you've got your user and access token, you're ready to create a webhook secret. See [Creating a Webhook Secret](webhook-secrets.html).

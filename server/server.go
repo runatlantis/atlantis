@@ -39,6 +39,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/vcs/azuredevops"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
@@ -111,6 +112,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var gitlabClient *vcs.GitlabClient
 	var bitbucketCloudClient *bitbucketcloud.Client
 	var bitbucketServerClient *bitbucketserver.Client
+	var azuredevopsClient *azuredevops.Client
 	if userConfig.GithubUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		var err error
@@ -164,7 +166,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing webhooks")
 	}
-	vcsClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient)
+	vcsClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient)
 	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient}
 	terraformClient, err := terraform.NewClient(logger, userConfig.DataDir, userConfig.TFEToken, userConfig.DefaultTFVersion, config.DefaultTFVersionFlag, &terraform.DefaultDownloader{})
 	// The flag.Lookup call is to detect if we're running in a unit test. If we
