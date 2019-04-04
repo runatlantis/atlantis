@@ -1,8 +1,8 @@
 # Deployment
-This doc covers getting Atlantis up and running in your infrastructure.
+This page covers getting Atlantis up and running in your infrastructure.
 
-::: tip Pre-Requisites
-* You have created an [access credential](access-credentials.html)
+::: tip Prerequisites
+* You have created [access credentials](access-credentials.html) for your Atlantis user
 * You have created a [webhook secret](webhook-secrets.html)
 :::
 
@@ -230,6 +230,7 @@ kind: Service
 metadata:
   name: atlantis
 spec:
+  type: ClusterIP
   ports:
   - name: atlantis
     port: 80
@@ -342,6 +343,7 @@ kind: Service
 metadata:
   name: atlantis
 spec:
+  type: ClusterIP
   ports:
   - name: atlantis
     port: 80
@@ -352,8 +354,8 @@ spec:
 </details>
 
 #### Routing and SSL
-The manifests above create a Kubernetes `Service` of type `ClusterIP` which isn't accessible outside your cluster.
-Depending on how you're doing routing into Kubernetes, you may want to use a `LoadBalancer` so that Atlantis is accessible
+The manifests above create a Kubernetes `Service` of `type: ClusterIP` which isn't accessible outside your cluster.
+Depending on how you're doing routing into Kubernetes, you may want to use a Service of `type: LoadBalancer` so that Atlantis is accessible
 to GitHub/GitLab and your internal users.
 
 If you want to add SSL you can use something like [https://github.com/jetstack/cert-manager](https://github.com/jetstack/cert-manager) to generate SSL
@@ -405,24 +407,9 @@ If you need to modify the Docker image that we provide, for instance to add the 
     ```
 
 ### Roll Your Own
-If you're deploying Atlantis into infrastructure not listed above, here's what
-Atlantis needs in its environment.
-
-#### Terraform
-The `terraform` binary needs to be in the `$PATH` for Atlantis.
-Download from https://www.terraform.io/downloads.html
-```bash
-unzip path/to/terraform_*.zip -d /usr/local/bin
-```
-Check that it's in your `$PATH`
-```
-$ terraform version
-Terraform v0.10.0
-```
-If you want to use a different version of Terraform see [Terraform Versions](requirements.html#terraform-versions)
-
-#### Atlantis Binary
-Get the latest release from [https://github.com/runatlantis/atlantis/releases](https://github.com/runatlantis/atlantis/releases) and unpackage it.
+If you want to roll your own Atlantis installation, you can get the `atlantis`
+binary from [https://github.com/runatlantis/atlantis/releases](https://github.com/runatlantis/atlantis/releases)
+or use the [official Docker image](https://hub.docker.com/r/runatlantis/atlantis/).
 
 #### Startup Command
 The exact flags to `atlantis server` depends on your Git host:
@@ -511,7 +498,7 @@ Where
 
 Atlantis is now running!
 ::: tip
-We recommend running it under something like Systemd or Supervisord. That will
+We recommend running it under something like Systemd or Supervisord that will
 restart it in case of failure.
 :::
 

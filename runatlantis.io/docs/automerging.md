@@ -11,7 +11,7 @@ Automerging can be enabled either by:
    pull requests to be automerged and any repo config will be ignored.
 1. Setting `automerge: true` in the repo's `atlantis.yaml` file:
     ```yaml
-    version: 2
+    version: 3
     automerge: true
     projects:
     - dir: .

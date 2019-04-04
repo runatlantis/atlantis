@@ -3,14 +3,15 @@ package runtime
 import (
 	"bytes"
 	"fmt"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 
-	"github.com/hashicorp/go-version"
+	"github.com/pkg/errors"
+
+	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
@@ -26,7 +27,7 @@ func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []stri
 		return "", errors.New("cannot run apply with -target because we are applying an already generated plan. Instead, run -target with atlantis plan")
 	}
 
-	planPath := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectConfig))
+	planPath := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	contents, err := ioutil.ReadFile(planPath)
 	if os.IsNotExist(err) {
 		return "", fmt.Errorf("no plan found at path %q and workspace %q–did you run plan?", ctx.RepoRelDir, ctx.Workspace)
@@ -35,15 +36,10 @@ func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []stri
 		return "", errors.Wrap(err, "unable to read planfile")
 	}
 
-	var tfVersion *version.Version
-	if ctx.ProjectConfig != nil && ctx.ProjectConfig.TerraformVersion != nil {
-		tfVersion = ctx.ProjectConfig.TerraformVersion
-	}
-
 	var out string
 	if a.isRemotePlan(contents) {
 		args := append(append(append([]string{"apply", "-input=false", "-no-color"}, extraArgs...), ctx.CommentArgs...))
-		out, err = a.runRemoteApply(ctx, args, path, planPath, tfVersion)
+		out, err = a.runRemoteApply(ctx, args, path, planPath, ctx.TerraformVersion)
 		if err == nil {
 			out = a.cleanRemoteApplyOutput(out)
 		}
@@ -51,7 +47,7 @@ func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []stri
 		// NOTE: we need to quote the plan path because Bitbucket Server can
 		// have spaces in its repo owner names which is part of the path.
 		args := append(append(append([]string{"apply", "-input=false", "-no-color"}, extraArgs...), ctx.CommentArgs...), fmt.Sprintf("%q", planPath))
-		out, err = a.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, args, tfVersion, ctx.Workspace)
+		out, err = a.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, args, ctx.TerraformVersion, ctx.Workspace)
 	}
 
 	// If the apply was successful, delete the plan.

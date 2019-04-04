@@ -3,12 +3,12 @@ package raw_test
 import (
 	"testing"
 
-	"github.com/go-ozzo/ozzo-validation"
-	"github.com/hashicorp/go-version"
+	validation "github.com/go-ozzo/ozzo-validation"
+	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/yaml/raw"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	. "github.com/runatlantis/atlantis/testing"
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 )
 
 func TestProject_UnmarshalYAML(t *testing.T) {
@@ -101,7 +101,7 @@ func TestProject_Validate(t *testing.T) {
 				Dir:               String("."),
 				ApplyRequirements: []string{"unsupported"},
 			},
-			expErr: "apply_requirements: \"unsupported\" not supported, only approved and mergeable are supported.",
+			expErr: "apply_requirements: \"unsupported\" is not a valid apply_requirement, only \"approved\" and \"mergeable\" are supported.",
 		},
 		{
 			description: "apply reqs with approved requirement",
@@ -228,7 +228,7 @@ func TestProject_ToValid(t *testing.T) {
 			exp: valid.Project{
 				Dir:              ".",
 				Workspace:        "default",
-				Workflow:         nil,
+				WorkflowName:     nil,
 				TerraformVersion: nil,
 				Autoplan: valid.Autoplan{
 					WhenModified: []string{"**/*.tf*"},
@@ -255,7 +255,7 @@ func TestProject_ToValid(t *testing.T) {
 			exp: valid.Project{
 				Dir:              ".",
 				Workspace:        "myworkspace",
-				Workflow:         String("myworkflow"),
+				WorkflowName:     String("myworkflow"),
 				TerraformVersion: tfVersionPointEleven,
 				Autoplan: valid.Autoplan{
 					WhenModified: []string{"hi"},

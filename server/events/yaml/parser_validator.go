@@ -1,92 +1,132 @@
 package yaml
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
-	"github.com/go-ozzo/ozzo-validation"
+	shlex "github.com/flynn-archive/go-shlex"
+	validation "github.com/go-ozzo/ozzo-validation"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/yaml/raw"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 )
 
 // AtlantisYAMLFilename is the name of the config file for each repo.
 const AtlantisYAMLFilename = "atlantis.yaml"
 
+// ParserValidator parses and validates server-side repo config files and
+// repo-level atlantis.yaml files.
 type ParserValidator struct{}
 
-// ReadConfig returns the parsed and validated atlantis.yaml config for repoDir.
-// If there was no config file, then this can be detected by checking the type
-// of error: os.IsNotExist(error) but it's instead preferred to check with
-// HasConfigFile.
-func (p *ParserValidator) ReadConfig(repoDir string) (valid.Config, error) {
-	configFile := p.configFilePath(repoDir)
-	configData, err := ioutil.ReadFile(configFile) // nolint: gosec
-
-	// NOTE: the error we return here must also be os.IsNotExist since that's
-	// what our callers use to detect a missing config file.
-	if err != nil && os.IsNotExist(err) {
-		return valid.Config{}, err
-	}
-
-	// If it exists but we couldn't read it return an error.
-	if err != nil {
-		return valid.Config{}, errors.Wrapf(err, "unable to read %s file", AtlantisYAMLFilename)
-	}
-
-	// If the config file exists, parse it.
-	config, err := p.parseAndValidate(configData)
-	if err != nil {
-		return valid.Config{}, errors.Wrapf(err, "parsing %s", AtlantisYAMLFilename)
-	}
-	return config, err
-}
-
-func (p *ParserValidator) HasConfigFile(repoDir string) (bool, error) {
-	_, err := os.Stat(p.configFilePath(repoDir))
+// HasRepoCfg returns true if there is a repo config (atlantis.yaml) file
+// for the repo at absRepoDir.
+// Returns an error if for some reason it can't read that directory.
+func (p *ParserValidator) HasRepoCfg(absRepoDir string) (bool, error) {
+	_, err := os.Stat(p.repoCfgPath(absRepoDir))
 	if os.IsNotExist(err) {
 		return false, nil
 	}
-	if err == nil {
-		return true, nil
+	return err == nil, err
+}
+
+// ParseRepoCfg returns the parsed and validated atlantis.yaml config for the
+// repo at absRepoDir.
+// If there was no config file, it will return an os.IsNotExist(error).
+func (p *ParserValidator) ParseRepoCfg(absRepoDir string, globalCfg valid.GlobalCfg, repoID string) (valid.RepoCfg, error) {
+	configFile := p.repoCfgPath(absRepoDir)
+	configData, err := ioutil.ReadFile(configFile) // nolint: gosec
+
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return valid.RepoCfg{}, errors.Wrapf(err, "unable to read %s file", AtlantisYAMLFilename)
+		}
+		// Don't wrap os.IsNotExist errors because we want our callers to be
+		// able to detect if it's a NotExist err.
+		return valid.RepoCfg{}, err
 	}
-	return false, err
-}
 
-func (p *ParserValidator) configFilePath(repoDir string) string {
-	return filepath.Join(repoDir, AtlantisYAMLFilename)
-}
-
-func (p *ParserValidator) parseAndValidate(configData []byte) (valid.Config, error) {
-	var rawConfig raw.Config
+	var rawConfig raw.RepoCfg
 	if err := yaml.UnmarshalStrict(configData, &rawConfig); err != nil {
-		return valid.Config{}, err
+		return valid.RepoCfg{}, err
 	}
 
 	// Set ErrorTag to yaml so it uses the YAML field names in error messages.
 	validation.ErrorTag = "yaml"
-
 	if err := rawConfig.Validate(); err != nil {
-		return valid.Config{}, err
-	}
-
-	// Top level validation.
-	if err := p.validateWorkflows(rawConfig); err != nil {
-		return valid.Config{}, err
+		return valid.RepoCfg{}, err
 	}
 
 	validConfig := rawConfig.ToValid()
+
+	// We do the project name validation after we get the valid config because
+	// we need the defaults of dir and workspace to be populated.
 	if err := p.validateProjectNames(validConfig); err != nil {
-		return valid.Config{}, err
+		return valid.RepoCfg{}, err
+	}
+	if validConfig.Version == 2 {
+		// The only difference between v2 and v3 is how we parse custom run
+		// commands.
+		if err := p.applyLegacyShellParsing(&validConfig); err != nil {
+			return validConfig, err
+		}
 	}
 
-	return validConfig, nil
+	err = globalCfg.ValidateRepoCfg(validConfig, repoID)
+	return validConfig, err
 }
 
-func (p *ParserValidator) validateProjectNames(config valid.Config) error {
+// ParseGlobalCfg returns the parsed and validated global repo config file at
+// configFile. defaultCfg will be merged into the parsed config.
+// If there is no file at configFile it will return an error.
+func (p *ParserValidator) ParseGlobalCfg(configFile string, defaultCfg valid.GlobalCfg) (valid.GlobalCfg, error) {
+	configData, err := ioutil.ReadFile(configFile) // nolint: gosec
+	if err != nil {
+		return valid.GlobalCfg{}, errors.Wrapf(err, "unable to read %s file", configFile)
+	}
+	if len(configData) == 0 {
+		return valid.GlobalCfg{}, fmt.Errorf("file %s was empty", configFile)
+	}
+
+	var rawCfg raw.GlobalCfg
+	if err := yaml.UnmarshalStrict(configData, &rawCfg); err != nil {
+		return valid.GlobalCfg{}, err
+	}
+
+	return p.validateRawGlobalCfg(rawCfg, defaultCfg, "yaml")
+}
+
+// ParseGlobalCfgJSON parses a json string cfgJSON into global config.
+func (p *ParserValidator) ParseGlobalCfgJSON(cfgJSON string, defaultCfg valid.GlobalCfg) (valid.GlobalCfg, error) {
+	var rawCfg raw.GlobalCfg
+	err := json.Unmarshal([]byte(cfgJSON), &rawCfg)
+	if err != nil {
+		return valid.GlobalCfg{}, err
+	}
+	return p.validateRawGlobalCfg(rawCfg, defaultCfg, "json")
+}
+
+func (p *ParserValidator) validateRawGlobalCfg(rawCfg raw.GlobalCfg, defaultCfg valid.GlobalCfg, errTag string) (valid.GlobalCfg, error) {
+	// Setting ErrorTag means our errors will use the field names defined in
+	// the struct tags for yaml/json.
+	validation.ErrorTag = errTag
+	if err := rawCfg.Validate(); err != nil {
+		return valid.GlobalCfg{}, err
+	}
+
+	validCfg := rawCfg.ToValid(defaultCfg)
+	return validCfg, nil
+}
+
+func (p *ParserValidator) repoCfgPath(repoDir string) string {
+	return filepath.Join(repoDir, AtlantisYAMLFilename)
+}
+
+func (p *ParserValidator) validateProjectNames(config valid.RepoCfg) error {
 	// First, validate that all names are unique.
 	seen := make(map[string]bool)
 	for _, project := range config.Projects {
@@ -123,24 +163,35 @@ func (p *ParserValidator) validateProjectNames(config valid.Config) error {
 	return nil
 }
 
-func (p *ParserValidator) validateWorkflows(config raw.Config) error {
-	for _, project := range config.Projects {
-		if err := p.validateWorkflowExists(project, config.Workflows); err != nil {
-			return err
+// applyLegacyShellParsing changes any custom run commands in cfg to use the old
+// parsing method with shlex.Split().
+func (p *ParserValidator) applyLegacyShellParsing(cfg *valid.RepoCfg) error {
+	legacyParseF := func(s *valid.Step) error {
+		if s.StepName == "run" {
+			split, err := shlex.Split(s.RunCommand)
+			if err != nil {
+				return errors.Wrapf(err, "unable to parse %q", s.RunCommand)
+			}
+			s.RunCommand = strings.Join(split, " ")
 		}
-	}
-	return nil
-}
-
-func (p *ParserValidator) validateWorkflowExists(project raw.Project, workflows map[string]raw.Workflow) error {
-	if project.Workflow == nil {
 		return nil
 	}
-	workflow := *project.Workflow
-	for k := range workflows {
-		if k == workflow {
-			return nil
+
+	for k := range cfg.Workflows {
+		w := cfg.Workflows[k]
+		for i := range w.Plan.Steps {
+			s := &w.Plan.Steps[i]
+			if err := legacyParseF(s); err != nil {
+				return err
+			}
 		}
+		for i := range w.Apply.Steps {
+			s := &w.Apply.Steps[i]
+			if err := legacyParseF(s); err != nil {
+				return err
+			}
+		}
+		cfg.Workflows[k] = w
 	}
-	return fmt.Errorf("workflow %q is not defined", workflow)
+	return nil
 }

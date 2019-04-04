@@ -26,6 +26,8 @@ type UserConfig struct {
 	GitlabWebhookSecret    string `mapstructure:"gitlab-webhook-secret"`
 	LogLevel               string `mapstructure:"log-level"`
 	Port                   int    `mapstructure:"port"`
+	RepoConfig             string `mapstructure:"repo-config"`
+	RepoConfigJSON         string `mapstructure:"repo-config-json"`
 	RepoWhitelist          string `mapstructure:"repo-whitelist"`
 	// RequireApproval is whether to require pull request approval before
 	// allowing terraform apply's to be run.

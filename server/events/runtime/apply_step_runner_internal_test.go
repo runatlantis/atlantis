@@ -1,8 +1,9 @@
 package runtime
 
 import (
-	. "github.com/runatlantis/atlantis/testing"
 	"testing"
+
+	. "github.com/runatlantis/atlantis/testing"
 )
 
 func TestCleanRemoteOpOutput(t *testing.T) {

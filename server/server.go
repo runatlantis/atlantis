@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/runatlantis/atlantis/server/events/db"
 	"log"
 	"net/http"
 	"net/url"
@@ -30,7 +29,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/elazarl/go-bindata-assetfs"
+	"github.com/runatlantis/atlantis/server/events/db"
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+
+	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events"
@@ -81,10 +83,10 @@ type Server struct {
 // Config holds config for server that isn't passed in by the user.
 type Config struct {
 	AllowForkPRsFlag     string
-	AllowRepoConfigFlag  string
 	AtlantisURLFlag      string
 	AtlantisVersion      string
 	DefaultTFVersionFlag string
+	RepoConfigJSONFlag   string
 }
 
 // WebhookConfig is nested within UserConfig. It's used to configure webhooks.
@@ -196,6 +198,21 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, errors.Wrapf(err,
 			"parsing --%s flag %q", config.AtlantisURLFlag, userConfig.AtlantisURL)
 	}
+	validator := &yaml.ParserValidator{}
+
+	globalCfg := valid.NewGlobalCfg(userConfig.AllowRepoConfig, userConfig.RequireMergeable, userConfig.RequireApproval)
+	if userConfig.RepoConfig != "" {
+		globalCfg, err = validator.ParseGlobalCfg(userConfig.RepoConfig, globalCfg)
+		if err != nil {
+			return nil, errors.Wrapf(err, "parsing %s file", userConfig.RepoConfig)
+		}
+	} else if userConfig.RepoConfigJSON != "" {
+		globalCfg, err = validator.ParseGlobalCfgJSON(userConfig.RepoConfigJSON, globalCfg)
+		if err != nil {
+			return nil, errors.Wrapf(err, "parsing --%s", config.RepoConfigJSONFlag)
+		}
+	}
+
 	underlyingRouter := mux.NewRouter()
 	router := &Router{
 		AtlantisURL:               parsedURL,
@@ -224,7 +241,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GitlabUser:    userConfig.GitlabUser,
 		BitbucketUser: userConfig.BitbucketUser,
 	}
-	defaultTfVersion := terraformClient.Version()
+	defaultTfVersion := terraformClient.DefaultVersion()
 	pendingPlanFinder := &events.DefaultPendingPlanFinder{}
 	commandRunner := &events.DefaultCommandRunner{
 		VCSClient:                vcsClient,
@@ -237,15 +254,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AllowForkPRs:             userConfig.AllowForkPRs,
 		AllowForkPRsFlag:         config.AllowForkPRsFlag,
 		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
-			ParserValidator:     &yaml.ParserValidator{},
-			ProjectFinder:       &events.DefaultProjectFinder{},
-			VCSClient:           vcsClient,
-			WorkingDir:          workingDir,
-			WorkingDirLocker:    workingDirLocker,
-			AllowRepoConfig:     userConfig.AllowRepoConfig,
-			AllowRepoConfigFlag: config.AllowRepoConfigFlag,
-			PendingPlanFinder:   pendingPlanFinder,
-			CommentBuilder:      commentParser,
+			ParserValidator:   validator,
+			ProjectFinder:     &events.DefaultProjectFinder{},
+			VCSClient:         vcsClient,
+			WorkingDir:        workingDir,
+			WorkingDirLocker:  workingDirLocker,
+			GlobalCfg:         globalCfg,
+			PendingPlanFinder: pendingPlanFinder,
+			CommentBuilder:    commentParser,
 		},
 		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
 			Locker:           projectLocker,
@@ -268,12 +284,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			RunStepRunner: &runtime.RunStepRunner{
 				DefaultTFVersion: defaultTfVersion,
 			},
-			PullApprovedChecker:      vcsClient,
-			WorkingDir:               workingDir,
-			Webhooks:                 webhooksManager,
-			WorkingDirLocker:         workingDirLocker,
-			RequireApprovalOverride:  userConfig.RequireApproval,
-			RequireMergeableOverride: userConfig.RequireMergeable,
+			PullApprovedChecker: vcsClient,
+			WorkingDir:          workingDir,
+			Webhooks:            webhooksManager,
+			WorkingDirLocker:    workingDirLocker,
 		},
 		WorkingDir:        workingDir,
 		PendingPlanFinder: pendingPlanFinder,
