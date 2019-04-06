@@ -23,29 +23,34 @@ import (
 )
 
 func TestNewRepo_EmptyRepoFullName(t *testing.T) {
-	_, err := models.NewRepo(models.Github, "", "https://github.com/notowner/repo.git", "u", "p")
+	_, err := models.NewRepo(models.Github, "", "", "https://github.com/notowner/repo.git", "u", "p")
 	ErrEquals(t, "repoFullName can't be empty", err)
 }
 
 func TestNewRepo_EmptyCloneURL(t *testing.T) {
-	_, err := models.NewRepo(models.Github, "owner/repo", "", "u", "p")
+	_, err := models.NewRepo(models.Github, "owner/repo", "", "", "u", "p")
 	ErrEquals(t, "cloneURL can't be empty", err)
 }
 
 func TestNewRepo_InvalidCloneURL(t *testing.T) {
-	_, err := models.NewRepo(models.Github, "owner/repo", ":", "u", "p")
+	_, err := models.NewRepo(models.Github, "owner/repo", "", ":", "u", "p")
 	ErrEquals(t, "invalid clone url: parse :.git: missing protocol scheme", err)
 }
 
 func TestNewRepo_CloneURLWrongRepo(t *testing.T) {
-	_, err := models.NewRepo(models.Github, "owner/repo", "https://github.com/notowner/repo.git", "u", "p")
+	_, err := models.NewRepo(models.Github, "owner/repo", "", "https://github.com/notowner/repo.git", "u", "p")
 	ErrEquals(t, `expected clone url to have path "/owner/repo.git" but had "/notowner/repo.git"`, err)
+}
+
+func TestNewRepo_EmptyAzureDevopsProject(t *testing.T) {
+	_, err := models.NewRepo(models.AzureDevops, "owner/repo", "", "https://dev.azure.com/notowner/project/_git/repo.git", "u", "p")
+	ErrEquals(t, "AzureDevops project name can't be empty", err)
 }
 
 // For bitbucket server we don't validate the clone URL because the callers
 // are actually constructing it.
 func TestNewRepo_CloneURLBitbucketServer(t *testing.T) {
-	repo, err := models.NewRepo(models.BitbucketServer, "owner/repo", "http://mycorp.com:7990/scm/at/atlantis-example.git", "u", "p")
+	repo, err := models.NewRepo(models.BitbucketServer, "owner/repo", "", "http://mycorp.com:7990/scm/at/atlantis-example.git", "u", "p")
 	Ok(t, err)
 	Equals(t, models.Repo{
 		FullName:          "owner/repo",
@@ -93,7 +98,7 @@ func TestNewRepo_FullNameWrongFormat(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.repoFullName, func(t *testing.T) {
 			cloneURL := fmt.Sprintf("https://github.com/%s.git", c.repoFullName)
-			_, err := models.NewRepo(models.Github, c.repoFullName, cloneURL, "u", "p")
+			_, err := models.NewRepo(models.Github, c.repoFullName, "", cloneURL, "u", "p")
 			ErrEquals(t, c.expErr, err)
 		})
 	}
@@ -101,7 +106,7 @@ func TestNewRepo_FullNameWrongFormat(t *testing.T) {
 
 // If the clone url doesn't end with .git it is appended
 func TestNewRepo_MissingDotGit(t *testing.T) {
-	repo, err := models.NewRepo(models.BitbucketCloud, "owner/repo", "https://bitbucket.org/owner/repo", "u", "p")
+	repo, err := models.NewRepo(models.BitbucketCloud, "owner/repo", "", "https://bitbucket.org/owner/repo", "u", "p")
 	Ok(t, err)
 	Equals(t, repo.CloneURL, "https://u:p@bitbucket.org/owner/repo.git")
 	Equals(t, repo.SanitizedCloneURL, "https://bitbucket.org/owner/repo.git")
@@ -109,7 +114,7 @@ func TestNewRepo_MissingDotGit(t *testing.T) {
 
 func TestNewRepo_HTTPAuth(t *testing.T) {
 	// When the url has http the auth should be added.
-	repo, err := models.NewRepo(models.Github, "owner/repo", "http://github.com/owner/repo.git", "u", "p")
+	repo, err := models.NewRepo(models.Github, "owner/repo", "", "http://github.com/owner/repo.git", "u", "p")
 	Ok(t, err)
 	Equals(t, models.Repo{
 		VCSHost: models.VCSHost{
@@ -126,7 +131,7 @@ func TestNewRepo_HTTPAuth(t *testing.T) {
 
 func TestNewRepo_HTTPSAuth(t *testing.T) {
 	// When the url has https the auth should be added.
-	repo, err := models.NewRepo(models.Github, "owner/repo", "https://github.com/owner/repo.git", "u", "p")
+	repo, err := models.NewRepo(models.Github, "owner/repo", "", "https://github.com/owner/repo.git", "u", "p")
 	Ok(t, err)
 	Equals(t, models.Repo{
 		VCSHost: models.VCSHost{
@@ -195,6 +200,10 @@ func TestVCSHostType_ToString(t *testing.T) {
 		{
 			models.BitbucketServer,
 			"BitbucketServer",
+		},
+		{
+			models.AzureDevops,
+			"AzureDevops",
 		},
 	}
 

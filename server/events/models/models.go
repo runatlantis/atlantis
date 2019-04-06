@@ -39,6 +39,9 @@ type Repo struct {
 	// This may contain /'s in the case of GitLab subgroups.
 	// This may contain spaces in the case of Bitbucket Server.
 	Owner string
+	// Project is juts the project name, only required for Azure Devops.  This will never
+	// have /'s in it.
+	Project string
 	// Name is just the repo name, ex. "atlantis". This will never have
 	// /'s in it.
 	Name string
@@ -62,12 +65,18 @@ func (r Repo) ID() string {
 // cloneURL can be with or without .git at the end
 // ex. https://github.com/runatlantis/atlantis.git OR
 //     https://github.com/runatlantis/atlantis
-func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsUser string, vcsToken string) (Repo, error) {
+func NewRepo(vcsHostType VCSHostType, repoFullName string, project string, cloneURL string, vcsUser string, vcsToken string) (Repo, error) {
 	if repoFullName == "" {
 		return Repo{}, errors.New("repoFullName can't be empty")
 	}
 	if cloneURL == "" {
 		return Repo{}, errors.New("cloneURL can't be empty")
+	}
+
+	if vcsHostType == AzureDevops {
+		if project == "" {
+			return Repo{}, errors.New("AzureDevops project name can't be empty")
+		}
 	}
 
 	if !strings.HasSuffix(cloneURL, ".git") {
@@ -118,6 +127,7 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 	return Repo{
 		FullName:          repoFullName,
 		Owner:             owner,
+		Project:           project,
 		Name:              repo,
 		CloneURL:          authedCloneURL,
 		SanitizedCloneURL: cloneURL,
