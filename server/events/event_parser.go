@@ -300,6 +300,7 @@ func (e *EventParser) parseCommonBitbucketCloudEventData(event bitbucketcloud.Co
 	headRepo, err = models.NewRepo(
 		models.BitbucketCloud,
 		*event.PullRequest.Source.Repository.FullName,
+		"",
 		*event.PullRequest.Source.Repository.Links.HTML.HREF,
 		e.BitbucketUser,
 		e.BitbucketToken)
@@ -309,6 +310,7 @@ func (e *EventParser) parseCommonBitbucketCloudEventData(event bitbucketcloud.Co
 	baseRepo, err = models.NewRepo(
 		models.BitbucketCloud,
 		*event.Repository.FullName,
+		"",
 		*event.Repository.Links.HTML.HREF,
 		e.BitbucketUser,
 		e.BitbucketToken)
@@ -473,7 +475,7 @@ func (e *EventParser) ParseGithubPull(pull *github.PullRequest) (pullModel model
 // returns a repo into the Atlantis model.
 // See EventParsing for return value docs.
 func (e *EventParser) ParseGithubRepo(ghRepo *github.Repository) (models.Repo, error) {
-	return models.NewRepo(models.Github, ghRepo.GetFullName(), ghRepo.GetCloneURL(), e.GithubUser, e.GithubToken)
+	return models.NewRepo(models.Github, ghRepo.GetFullName(), "", ghRepo.GetCloneURL(), e.GithubUser, e.GithubToken)
 }
 
 // ParseGitlabMergeRequestEvent parses GitLab merge request events.
@@ -487,11 +489,11 @@ func (e *EventParser) ParseGitlabMergeRequestEvent(event gitlab.MergeEvent) (pul
 	// GitLab also has a "merged" state, but we map that to Closed so we don't
 	// need to check for it.
 
-	baseRepo, err = models.NewRepo(models.Gitlab, event.Project.PathWithNamespace, event.Project.GitHTTPURL, e.GitlabUser, e.GitlabToken)
+	baseRepo, err = models.NewRepo(models.Gitlab, event.Project.PathWithNamespace, "", event.Project.GitHTTPURL, e.GitlabUser, e.GitlabToken)
 	if err != nil {
 		return
 	}
-	headRepo, err = models.NewRepo(models.Gitlab, event.ObjectAttributes.Source.PathWithNamespace, event.ObjectAttributes.Source.GitHTTPURL, e.GitlabUser, e.GitlabToken)
+	headRepo, err = models.NewRepo(models.Gitlab, event.ObjectAttributes.Source.PathWithNamespace, "", event.ObjectAttributes.Source.GitHTTPURL, e.GitlabUser, e.GitlabToken)
 	if err != nil {
 		return
 	}
@@ -532,7 +534,7 @@ func (e *EventParser) ParseGitlabMergeRequestCommentEvent(event gitlab.MergeComm
 	// Parse the base repo first.
 	repoFullName := event.Project.PathWithNamespace
 	cloneURL := event.Project.GitHTTPURL
-	baseRepo, err = models.NewRepo(models.Gitlab, repoFullName, cloneURL, e.GitlabUser, e.GitlabToken)
+	baseRepo, err = models.NewRepo(models.Gitlab, repoFullName, "", cloneURL, e.GitlabUser, e.GitlabToken)
 	if err != nil {
 		return
 	}
@@ -543,7 +545,7 @@ func (e *EventParser) ParseGitlabMergeRequestCommentEvent(event gitlab.MergeComm
 	// Now parse the head repo.
 	headRepoFullName := event.MergeRequest.Source.PathWithNamespace
 	headCloneURL := event.MergeRequest.Source.GitHTTPURL
-	headRepo, err = models.NewRepo(models.Gitlab, headRepoFullName, headCloneURL, e.GitlabUser, e.GitlabToken)
+	headRepo, err = models.NewRepo(models.Gitlab, headRepoFullName, "", headCloneURL, e.GitlabUser, e.GitlabToken)
 	return
 }
 
@@ -621,6 +623,7 @@ func (e *EventParser) parseCommonBitbucketServerEventData(event bitbucketserver.
 	headRepo, err = models.NewRepo(
 		models.BitbucketServer,
 		headRepoFullname,
+		"",
 		headRepoCloneURL,
 		e.BitbucketUser,
 		e.BitbucketToken)
@@ -634,6 +637,7 @@ func (e *EventParser) parseCommonBitbucketServerEventData(event bitbucketserver.
 	baseRepo, err = models.NewRepo(
 		models.BitbucketServer,
 		baseRepoFullname,
+		"",
 		baseRepoCloneURL,
 		e.BitbucketUser,
 		e.BitbucketToken)
