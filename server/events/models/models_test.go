@@ -43,7 +43,7 @@ func TestNewRepo_CloneURLWrongRepo(t *testing.T) {
 }
 
 func TestNewRepo_EmptyAzureDevopsProject(t *testing.T) {
-	_, err := models.NewRepo(models.AzureDevops, "owner/repo", "", "https://dev.azure.com/notowner/project/_git/repo.git", "u", "p")
+	_, err := models.NewRepo(models.AzureDevops, "owner/repo", "", "https://dev.azure.com/notowner/project/_git/repo", "u", "p")
 	ErrEquals(t, "AzureDevops project name can't be empty", err)
 }
 
@@ -104,7 +104,7 @@ func TestNewRepo_FullNameWrongFormat(t *testing.T) {
 	}
 }
 
-// If the clone url doesn't end with .git it is appended
+// If the clone url doesn't end with .git, and VCS is not Azure Devops, it is appended
 func TestNewRepo_MissingDotGit(t *testing.T) {
 	repo, err := models.NewRepo(models.BitbucketCloud, "owner/repo", "", "https://bitbucket.org/owner/repo", "u", "p")
 	Ok(t, err)

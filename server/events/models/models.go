@@ -79,7 +79,8 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, project string, clone
 		}
 	}
 
-	if !strings.HasSuffix(cloneURL, ".git") {
+	// Azure Devops doesn't work with .git suffix on clone URLs
+	if !strings.HasSuffix(cloneURL, ".git") && vcsHostType != AzureDevops {
 		cloneURL += ".git"
 	}
 
