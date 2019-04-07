@@ -32,6 +32,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 
+	"github.com/benmatselby/go-azuredevops/azuredevops"
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
@@ -41,7 +42,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	"github.com/runatlantis/atlantis/server/events/vcs"
-	"github.com/runatlantis/atlantis/server/events/vcs/azuredevops"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
@@ -237,6 +237,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		BitbucketServerURL: userConfig.BitbucketBaseURL,
 		AzureDevopsUser:    userConfig.AzureDevopsUser,
 		AzureDevopsToken:   userConfig.AzureDevopsToken,
+		AzureDevopsOrg:     userConfig.AzureDevopsOrg,
+		AzureDevopsProject: userConfig.AzureDevopsProject,
 	}
 	commentParser := &events.CommentParser{
 		GithubUser:      userConfig.GithubUser,

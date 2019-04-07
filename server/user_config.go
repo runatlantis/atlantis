@@ -10,8 +10,8 @@ type UserConfig struct {
 	AllowRepoConfig          bool   `mapstructure:"allow-repo-config"`
 	AtlantisURL              string `mapstructure:"atlantis-url"`
 	Automerge                bool   `mapstructure:"automerge"`
-	AzureDevopsBaseURL       string `mapstructure:"azuredevops-base-url"`
-	AzureDevopsHostname      string `mapstructure:"azuredevops-hostname"`
+	AzureDevopsOrg           string `mapstructure:"azuredevops-org"`
+	AzureDevopsProject       string `mapstructure:"azuredevops-project"`
 	AzureDevopsToken         string `mapstructure:"azuredevops-token"`
 	AzureDevopsUser          string `mapstructure:"azuredevops-user"`
 	AzureDevopsWebhookSecret string `mapstructure:"azuredevops-webhook-secret"`

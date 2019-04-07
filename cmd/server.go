@@ -23,7 +23,6 @@ import (
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server"
-	//"github.com/runatlantis/atlantis/server/events/vcs/azuredevops"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -37,7 +36,8 @@ import (
 // 3. Add your flag's description etc. to the stringFlags, intFlags, or boolFlags slices.
 const (
 	// Flag names.
-	ADHostnameFlag             = "azuredevops-hostname"
+	ADOrgFlag                  = "azuredevops-org"
+	ADProjectFlag              = "azuredevops-project"
 	ADTokenFlag                = "azuredevops-token"
 	ADUserFlag                 = "azuredevops-user"
 	ADWebhookSecretFlag        = "azuredevops-webhook-secret" // nolint: gosec
@@ -75,7 +75,7 @@ const (
 	TFETokenFlag               = "tfe-token"
 
 	// Flag defaults.
-	DefaultADHostname       = "visualstudio.com"
+	DefaultADOrg            = ""
 	DefaultCheckoutStrategy = "branch"
 	DefaultBitbucketBaseURL = bitbucketcloud.BaseURL
 	DefaultDataDir          = "~/.atlantis"
@@ -86,9 +86,13 @@ const (
 )
 
 var stringFlags = map[string]stringFlag{
-	ADHostnameFlag: {
-		description:  "Hostname of your Azure Devops installation.",
-		defaultValue: DefaultADHostname,
+	ADOrgFlag: {
+		description:  "Organization name of your Azure Devops instance.",
+		defaultValue: "",
+	},
+	ADProjectFlag: {
+		description:  "Project name in your Azure Devops insance.",
+		defaultValue: "",
 	},
 	ADUserFlag: {
 		description: "Azure Devops username of API user.",
@@ -420,8 +424,8 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	if c.DataDir == "" {
 		c.DataDir = DefaultDataDir
 	}
-	if c.AzureDevopsHostname == "" {
-		c.AzureDevopsHostname = DefaultADHostname
+	if c.AzureDevopsOrg == "" {
+		c.AzureDevopsOrg = DefaultADOrg
 	}
 	if c.GithubHostname == "" {
 		c.GithubHostname = DefaultGHHostname
@@ -458,10 +462,11 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	// 1. github user and token set
 	// 2. gitlab user and token set
 	// 3. bitbucket user and token set
-	// 4. azuredevops user and token set
+	// 4. azuredevops user, token, org and project set
 	// 5. any combination of the above
-	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag)
-	if ((userConfig.GithubUser == "") != (userConfig.GithubToken == "")) || ((userConfig.GitlabUser == "") != (userConfig.GitlabToken == "")) || ((userConfig.BitbucketUser == "") != (userConfig.BitbucketToken == "")) || ((userConfig.AzureDevopsUser == "") != (userConfig.AzureDevopsToken == "")) {
+	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s/--%s/--%s must be set", GHUserFlag, GHTokenFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag, ADOrgFlag, ADProjectFlag)
+	if ((userConfig.GithubUser == "") != (userConfig.GithubToken == "")) || ((userConfig.GitlabUser == "") != (userConfig.GitlabToken == "")) || ((userConfig.BitbucketUser == "") != (userConfig.BitbucketToken == "")) || ((userConfig.AzureDevopsUser == "") != (userConfig.AzureDevopsToken == "") ||
+		(userConfig.AzureDevopsOrg == "") != (userConfig.AzureDevopsProject == "")) {
 		return vcsErr
 	}
 	// At this point, we know that there can't be a single user/token without
@@ -479,10 +484,6 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 
 	if userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && userConfig.BitbucketWebhookSecret != "" {
 		return fmt.Errorf("--%s cannot be specified for Bitbucket Cloud because it is not supported by Bitbucket", BitbucketWebhookSecretFlag)
-	}
-
-	if userConfig.AzureDevopsUser == DefaultADHostname && userConfig.AzureDevopsToken != "" {
-		return fmt.Errorf("--%s cannot be specified for Azure Devops because it is not supported by Microsoft", BitbucketWebhookSecretFlag)
 	}
 
 	parsed, err := url.Parse(userConfig.BitbucketBaseURL)
@@ -556,8 +557,11 @@ func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && !s.SilenceOutput {
 		s.Logger.Warn("Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are whitelisting Bitbucket IPs")
 	}
-	if userConfig.AzureDevopsUser != "" && userConfig.AzureDevopsHostname == DefaultADHostname && !s.SilenceOutput {
-		s.Logger.Warn("Azure Devops does not support webhook secrets without org identifier. This could allow attackers to spoof requests from Azure. Ensure you are whitelisting Azure Devops IPs")
+	if userConfig.AzureDevopsUser != "" && userConfig.AzureDevopsWebhookSecret == "" && !s.SilenceOutput {
+		s.Logger.Warn("No Azure Devops webhook secret set. This could allow attackers to spoof requests from Azure Devops.")
+	}
+	if userConfig.AzureDevopsUser != "" && userConfig.AzureDevopsWebhookSecret == "" && !s.SilenceOutput {
+		s.Logger.Warn("No Azure Devops webhook secret set. This could allow attackers to spoof requests from Azure Devops.")
 	}
 }
 
