@@ -24,20 +24,20 @@ func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command string, pa
 	}
 	baseEnvVars := os.Environ()
 	customEnvVars := map[string]string{
-		"WORKSPACE":                  ctx.Workspace,
 		"ATLANTIS_TERRAFORM_VERSION": tfVersion,
-		"DIR":                        path,
-		"PLANFILE":                   filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName)),
+		"BASE_BRANCH_NAME":           ctx.Pull.BaseBranch,
 		"BASE_REPO_NAME":             ctx.BaseRepo.Name,
 		"BASE_REPO_OWNER":            ctx.BaseRepo.Owner,
+		"DIR":                        path,
+		"HEAD_BRANCH_NAME":           ctx.Pull.HeadBranch,
 		"HEAD_REPO_NAME":             ctx.HeadRepo.Name,
 		"HEAD_REPO_OWNER":            ctx.HeadRepo.Owner,
-		"HEAD_BRANCH_NAME":           ctx.Pull.HeadBranch,
-		"BASE_BRANCH_NAME":           ctx.Pull.BaseBranch,
-		"PULL_NUM":                   fmt.Sprintf("%d", ctx.Pull.Num),
-		"PULL_AUTHOR":                ctx.Pull.Author,
-		"USER_NAME":                  ctx.User.Username,
+		"PLANFILE":                   filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName)),
 		"PROJECT_NAME":               ctx.ProjectName,
+		"PULL_AUTHOR":                ctx.Pull.Author,
+		"PULL_NUM":                   fmt.Sprintf("%d", ctx.Pull.Num),
+		"USER_NAME":                  ctx.User.Username,
+		"WORKSPACE":                  ctx.Workspace,
 	}
 
 	finalEnvVars := baseEnvVars
