@@ -1,7 +1,6 @@
 package events
 
 import (
-	"github.com/runatlantis/atlantis/server/events/runtime"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -9,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/runtime"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_pending_plan_finder.go PendingPlanFinder
