@@ -189,6 +189,8 @@ func (l *SimpleLogger) capitalizeFirstLetter(s string) string {
 	return string(runes)
 }
 
+// levelToString returns the logging level as a 4 character string. DEBUG and ERROR are shortened intentionally
+// so that logs line up.
 func (l *SimpleLogger) levelToString(level LogLevel) string {
 	switch level {
 	case Debug:
