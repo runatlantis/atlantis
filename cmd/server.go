@@ -466,6 +466,21 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	if userConfig.RepoConfig != "" && userConfig.RepoConfigJSON != "" {
 		return fmt.Errorf("cannot use --%s and --%s at the same time", RepoConfigFlag, RepoConfigJSONFlag)
 	}
+
+	// Warn if any tokens have newlines.
+	for name, token := range map[string]string{
+		GHTokenFlag:                userConfig.GithubToken,
+		GHWebhookSecretFlag:        userConfig.GithubWebhookSecret,
+		GitlabTokenFlag:            userConfig.GitlabToken,
+		GitlabWebhookSecretFlag:    userConfig.GitlabWebhookSecret,
+		BitbucketTokenFlag:         userConfig.BitbucketToken,
+		BitbucketWebhookSecretFlag: userConfig.BitbucketWebhookSecret,
+	} {
+		if strings.Contains(token, "\n") {
+			s.Logger.Warn("--%s contains a newline which is usually unintentional", name)
+		}
+	}
+
 	return nil
 }
 
