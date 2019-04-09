@@ -50,7 +50,7 @@ atlantis plan -w staging
 If you need to run `terraform plan` with additional arguments, like `-target=resource` or `-var 'foo-bar'` or `-var-file myfile.tfvars`
 you can append them to the end of the comment after `--`, ex.
 ```
-atlantis plan -d dir -- -var 'foo=bar'
+atlantis plan -d dir -- -var foo='bar'
 ```
 If you always need to append a certain flag, see [Custom Workflow Use Cases](custom-workflows.html#adding-extra-arguments-to-terraform-commands).
 
