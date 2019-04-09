@@ -1,5 +1,5 @@
 # Locking
-When `plan` is run, the directory and Terraform workspace are **Locked** until the pull request merged or the plan is manually deleted.
+When `plan` is run, the directory and Terraform workspace are **Locked** until the pull request is merged or closed, or the plan is manually deleted.
 
 If another user attempts to `plan` for the same directory and workspace in a different pull request
 they'll see this error:
@@ -41,6 +41,8 @@ You can click on a lock to view its details:
 </p>
 
 ## Unlocking
+The project and workspace will be automatically unlocked when the PR is merged or closed.
+
 To unlock the project and workspace without completing an `apply` and merging, click the link
 at the bottom of the plan comment to discard the plan and delete the lock where
 it says **"To discard this plan click here"**:
