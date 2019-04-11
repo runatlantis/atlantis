@@ -2,7 +2,7 @@
 # We need terraform installed for our full test suite so it installs that.
 # It's updated by running make build-testing-image which will also push a new
 # image.
-FROM circleci/golang:1.11
+FROM circleci/golang:1.12
 
 # Install Terraform
 ENV TERRAFORM_VERSION=0.11.13
