@@ -36,11 +36,13 @@ import (
 // 3. Add your flag's description etc. to the stringFlags, intFlags, or boolFlags slices.
 const (
 	// Flag names.
+	ADBasicAuthFlag            = "azuredevops-basic-auth"
+	ADBasicPasswordFlag        = "azuredevops-basic-password" // inbound requests
+	ADBasicUserFlag            = "azuredevops-basic-user"     // inbound requests
 	ADOrgFlag                  = "azuredevops-org"
 	ADProjectFlag              = "azuredevops-project"
-	ADTokenFlag                = "azuredevops-token"
-	ADUserFlag                 = "azuredevops-user"
-	ADWebhookSecretFlag        = "azuredevops-webhook-secret" // nolint: gosec
+	ADTokenFlag                = "azuredevops-token" // outbound requests
+	ADUserFlag                 = "azuredevops-user"  // outbound requests
 	AllowForkPRsFlag           = "allow-fork-prs"
 	AllowRepoConfigFlag        = "allow-repo-config"
 	AtlantisURLFlag            = "atlantis-url"
@@ -75,7 +77,7 @@ const (
 	TFETokenFlag               = "tfe-token"
 
 	// Flag defaults.
-	DefaultADOrg            = ""
+	DefaultADBasicAuth      = true
 	DefaultCheckoutStrategy = "branch"
 	DefaultBitbucketBaseURL = bitbucketcloud.BaseURL
 	DefaultDataDir          = "~/.atlantis"
@@ -86,6 +88,20 @@ const (
 )
 
 var stringFlags = map[string]stringFlag{
+	ADBasicAuthFlag: {
+		description: "Enable/disable basic auth for validating Azure Devops webhooks (see https://docs.microsoft.com/en-us/azure/devops/service-hooks/authorize?view=azure-devops)." +
+			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from your Azure Devops org. " +
+			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
+			"Should be specified via the ATLANTIS_AD_BASIC_AUTH environment variable.",
+	},
+	ADBasicPasswordFlag: {
+		description:  "Azure Devops basic authentication password for inbound webhooks.",
+		defaultValue: "",
+	},
+	ADBasicUserFlag: {
+		description:  "Azure Devops basic authentication username for inbound webhooks.",
+		defaultValue: "",
+	},
 	ADOrgFlag: {
 		description:  "Organization name of your Azure Devops instance.",
 		defaultValue: "",
@@ -94,17 +110,11 @@ var stringFlags = map[string]stringFlag{
 		description:  "Project name in your Azure Devops insance.",
 		defaultValue: "",
 	},
-	ADUserFlag: {
-		description: "Azure Devops username of API user.",
-	},
 	ADTokenFlag: {
 		description: "Azure Devops token of API user. Can also be specified via the ATLANTIS_DO_TOKEN environment variable.",
 	},
-	ADWebhookSecretFlag: {
-		description: "Secret used to validate Azure Devops webhooks (see https://docs.microsoft.com/en-us/azure/devops/service-hooks/authorize?view=azure-devops)." +
-			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from your Azure Devops org. " +
-			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
-			"Should be specified via the ATLANTIS_DO_WEBHOOK_SECRET environment variable.",
+	ADUserFlag: {
+		description: "Azure Devops username of API user.",
 	},
 	AtlantisURLFlag: {
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path ex. https://example.com/basepath.",

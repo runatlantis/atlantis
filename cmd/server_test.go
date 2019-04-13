@@ -346,8 +346,13 @@ func TestExecute_Defaults(t *testing.T) {
 		cmd.GitlabTokenFlag:    "gitlab-token",
 		cmd.BitbucketUserFlag:  "bitbucket-user",
 		cmd.BitbucketTokenFlag: "bitbucket-token",
-		cmd.ADUserFlag:         "azuredevops-user",
+		cmd.ADBasicAuthFlag:    "azuredevops-basic-auth",
+		cmd.ADBasicUser:        "azuredevops-basic-user",
+		cmd.ADBasicPassowrd:    "azuredevops-basic-password",
+		cmd.ADOrgFlag:          "azuredevops-org",
+		cmd.ADProjectFlag:      "azuredevops-project",
 		cmd.ADTokenFlag:        "azuredevops-token",
+		cmd.ADUserFlag:         "azuredevops-user",
 		cmd.RepoWhitelistFlag:  "*",
 	})
 	err := c.Execute()
