@@ -151,8 +151,14 @@ func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
 			{
 				"git", "fetch", "head", fmt.Sprintf("+refs/heads/%s:", p.HeadBranch),
 			},
+			// We use --no-ff because we always want there to be a merge commit.
+			// This way, our branch will look the same regardless if the merge
+			// could be fast forwarded. This is useful later when we run
+			// git rev-parse HEAD^2 to get the head commit because it will
+			// always succeed whereas without --no-ff, if the merge was fast
+			// forwarded then git rev-parse HEAD^2 would fail.
 			{
-				"git", "merge", "-q", "-m", "atlantis-merge", "FETCH_HEAD",
+				"git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD",
 			},
 		}
 	} else {

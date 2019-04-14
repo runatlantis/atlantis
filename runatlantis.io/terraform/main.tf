@@ -22,31 +22,32 @@ variable "root_domain_name" {
 }
 
 resource "aws_route53_zone" "zone" {
-  name = "${var.root_domain_name}"
+  name = var.root_domain_name
 }
 
 resource "aws_route53_record" "www" {
-  zone_id = "${aws_route53_zone.zone.zone_id}"
-  name    = "${var.www_domain_name}"
+  zone_id = aws_route53_zone.zone.zone_id
+  name    = var.www_domain_name
   type    = "CNAME"
   ttl     = "300"
   records = ["runatlantis.netlify.com"]
 }
 
 resource "aws_route53_record" "root" {
-  zone_id = "${aws_route53_zone.zone.zone_id}"
+  zone_id = aws_route53_zone.zone.zone_id
 
   // Note the name is blank here.
-  name    = ""
-  type    = "A"
-  ttl     = "300"
+  name = ""
+  type = "A"
+  ttl  = "300"
+
   // This IP is for Netlify.
   records = ["104.198.14.52"]
 }
 
 // MailGun Records
 resource "aws_route53_record" "mailgun_txt_0" {
-  zone_id = "${aws_route53_zone.zone.zone_id}"
+  zone_id = aws_route53_zone.zone.zone_id
   name    = ""
   type    = "TXT"
   ttl     = "300"
@@ -54,7 +55,7 @@ resource "aws_route53_record" "mailgun_txt_0" {
 }
 
 resource "aws_route53_record" "mailgun_txt_1" {
-  zone_id = "${aws_route53_zone.zone.zone_id}"
+  zone_id = aws_route53_zone.zone.zone_id
   name    = "krs._domainkey"
   type    = "TXT"
   ttl     = "300"
@@ -62,7 +63,7 @@ resource "aws_route53_record" "mailgun_txt_1" {
 }
 
 resource "aws_route53_record" "mailgun_mx" {
-  zone_id = "${aws_route53_zone.zone.zone_id}"
+  zone_id = aws_route53_zone.zone.zone_id
   name    = ""
   type    = "MX"
   ttl     = "300"
@@ -70,7 +71,7 @@ resource "aws_route53_record" "mailgun_mx" {
 }
 
 resource "aws_route53_record" "mailgun_cname" {
-  zone_id = "${aws_route53_zone.zone.zone_id}"
+  zone_id = aws_route53_zone.zone.zone_id
   name    = "email"
   type    = "CNAME"
   ttl     = "300"
@@ -78,9 +79,10 @@ resource "aws_route53_record" "mailgun_cname" {
 }
 
 resource "aws_route53_record" "mailchimp_cname" {
-  zone_id = "${aws_route53_zone.zone.zone_id}"
+  zone_id = aws_route53_zone.zone.zone_id
   name    = "k1._domainkey"
   type    = "CNAME"
   ttl     = "300"
   records = ["dkim.mcsv.net"]
 }
+
