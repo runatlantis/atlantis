@@ -98,7 +98,7 @@
 
 [[constraint]]
   branch = "master"
-  name = "github.com/benmatselby/go-azuredevops"
+  name = "github.com/mcdafydd/go-azuredevops"
 
 [[constraint]]
   name = "github.com/go-test/deep"
