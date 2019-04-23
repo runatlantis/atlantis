@@ -99,24 +99,11 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		return nil, err
 	}
 
-	switch p.FetcherConfig.ConfigType {
-	case fetchers.Github:
-		ctx.Log.Debug("fetching github config...")
-		configString, err := p.FetcherConfig.GithubConfig.FetchConfig()
-		if err != nil {
-			return nil, errors.Wrap(err, "could not fetch github config")
-		}
-
-		configFilePath := filepath.Join(repoDir, yaml.AtlantisYAMLFilename)
-		if configString != "" {
-			err = ioutil.WriteFile(configFilePath, []byte(configString), 0644)
-		} else {
-			return nil, errors.Wrap(nil, "empty config file retrieved")
-		}
-		if err != nil {
-			return nil, errors.Wrap(err, "could not write config file")
-		}
+	err = p.fetchConfig(ctx, repoDir, yaml.AtlantisYAMLFilename)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to fetch config")
 	}
+
 	// Parse config file if it exists.
 	var config valid.Config
 	hasConfigFile, err := p.ParserValidator.HasConfigFile(repoDir)
@@ -315,7 +302,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *CommandCont
 }
 
 func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContext, projectName string, commentFlags []string, repoDir string, repoRelDir string, workspace string) (models.ProjectCommandContext, error) {
-	projCfg, globalCfg, err := p.getCfg(projectName, repoRelDir, workspace, repoDir)
+	projCfg, globalCfg, err := p.getCfg(ctx, projectName, repoRelDir, workspace, repoDir)
 	if err != nil {
 		return models.ProjectCommandContext{}, err
 	}
@@ -349,7 +336,13 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 	}, nil
 }
 
-func (p *DefaultProjectCommandBuilder) getCfg(projectName string, dir string, workspace string, repoDir string) (projectCfg *valid.Project, globalCfg *valid.Config, err error) {
+func (p *DefaultProjectCommandBuilder) getCfg(ctx *CommandContext, projectName string, dir string, workspace string, repoDir string) (projectCfg *valid.Project, globalCfg *valid.Config, err error) {
+	err = p.fetchConfig(ctx, repoDir, yaml.AtlantisYAMLFilename)
+	if err != nil {
+		err = errors.Wrap(err, "unable to fetch config")
+		return
+	}
+
 	hasConfigFile, err := p.ParserValidator.HasConfigFile(repoDir)
 	if err != nil {
 		err = errors.Wrapf(err, "looking for %s file in %q", yaml.AtlantisYAMLFilename, repoDir)
@@ -395,6 +388,29 @@ func (p *DefaultProjectCommandBuilder) getCfg(projectName string, dir string, wo
 	}
 	projectCfg = &projCfgs[0]
 	return
+}
+
+func (p *DefaultProjectCommandBuilder) fetchConfig(ctx *CommandContext, repoDir string, atlantisFileName string) error {
+	switch p.FetcherConfig.ConfigType {
+	case fetchers.Github:
+		ctx.Log.Debug("fetching github config...")
+		configString, err := p.FetcherConfig.GithubConfig.FetchConfig()
+		if err != nil {
+			return errors.Wrap(err, "could not fetch github config")
+		}
+
+		configFilePath := filepath.Join(repoDir, atlantisFileName)
+		if configString != "" {
+			err = ioutil.WriteFile(configFilePath, []byte(configString), 0644)
+		} else {
+			return errors.Wrap(nil, "empty config file retrieved")
+		}
+		if err != nil {
+			return errors.Wrap(err, "could not write config file")
+		}
+	}
+	ctx.Log.Debug("skipped fetching: no known fetcher config found.")
+	return nil
 }
 
 // validateWorkspaceAllowed returns an error if there are projects configured
