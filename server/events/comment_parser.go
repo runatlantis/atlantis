@@ -354,8 +354,8 @@ Commands:
 Flags:
   -h, --help   help for atlantis
 
-Use "atlantis [command] --help" for more information about a command.
-`
+Use "atlantis [command] --help" for more information about a command.` +
+	"\n```"
 
 // DidYouMeanAtlantisComment is the comment we add to the pull request when
 // someone runs a command with terraform instead of atlantis.
