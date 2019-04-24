@@ -126,7 +126,7 @@ func TestRenderProjectResults(t *testing.T) {
 			models.PlanCommand,
 			[]models.ProjectResult{},
 			models.Github,
-			"Ran Plan for 0 projects:\n\n\n",
+			"Ran Plan for 0 projects:\n\n\n\n",
 		},
 		{
 			"single successful plan",
@@ -262,6 +262,7 @@ $$$
 			},
 			models.Github,
 			`Ran Plan for 2 projects:
+
 1. dir: $path$ workspace: $workspace$
 1. project: $projectname$ dir: $path2$ workspace: $workspace$
 
@@ -311,6 +312,7 @@ $$$
 			},
 			models.Github,
 			`Ran Apply for 2 projects:
+
 1. project: $projectname$ dir: $path$ workspace: $workspace$
 1. dir: $path2$ workspace: $workspace$
 
@@ -394,6 +396,7 @@ $$$
 			},
 			models.Github,
 			`Ran Plan for 3 projects:
+
 1. dir: $path$ workspace: $workspace$
 1. dir: $path2$ workspace: $workspace$
 1. project: $projectname$ dir: $path3$ workspace: $workspace$
@@ -447,6 +450,7 @@ $$$
 			},
 			models.Github,
 			`Ran Apply for 3 projects:
+
 1. dir: $path$ workspace: $workspace$
 1. dir: $path2$ workspace: $workspace$
 1. dir: $path3$ workspace: $workspace$
@@ -493,6 +497,7 @@ $$$
 			},
 			models.Github,
 			`Ran Apply for 3 projects:
+
 1. dir: $path$ workspace: $workspace$
 1. dir: $path2$ workspace: $workspace$
 1. dir: $path3$ workspace: $workspace$
@@ -837,6 +842,7 @@ func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
 		},
 	}, models.ApplyCommand, "log", false, models.Github)
 	exp := `Ran Apply for 2 projects:
+
 1. dir: $.$ workspace: $staging$
 1. dir: $.$ workspace: $production$
 
@@ -892,6 +898,7 @@ func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 		},
 	}, models.PlanCommand, "log", false, models.Github)
 	exp := `Ran Plan for 2 projects:
+
 1. dir: $.$ workspace: $staging$
 1. dir: $.$ workspace: $production$
 
@@ -973,6 +980,7 @@ func TestRenderProjectResults_PlansDeleted(t *testing.T) {
 				PlansDeleted: true,
 			},
 			exp: `Ran Plan for 2 projects:
+
 1. dir: $.$ workspace: $staging$
 1. dir: $.$ workspace: $production$
 
@@ -1009,6 +1017,7 @@ func TestRenderProjectResults_PlansDeleted(t *testing.T) {
 				PlansDeleted: true,
 			},
 			exp: `Ran Plan for 2 projects:
+
 1. dir: $.$ workspace: $staging$
 1. dir: $.$ workspace: $production$
 
