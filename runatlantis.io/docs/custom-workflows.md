@@ -328,3 +328,4 @@ will execute a custom script containing the following code to create a SSH tunne
 `ssh -f -M -S /tmp/ssh_tunnel -L 3306:database:3306 -N bastion 1>/dev/null 2>&1`. Without
 the redirect, the script would block the Atlantis workflow.
 :::
+* If a workflow step returns a non-zero exit code, the workflow will stop. 
