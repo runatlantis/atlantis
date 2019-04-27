@@ -18,6 +18,7 @@ import (
 
 	"github.com/google/go-github/github"
 	gitlab "github.com/lkysow/go-gitlab"
+	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -45,6 +46,12 @@ type GithubPullGetter interface {
 	GetPullRequest(repo models.Repo, pullNum int) (*github.PullRequest, error)
 }
 
+// AzureDevopsPullGetter makes API calls to get pull requests.
+type AzureDevopsPullGetter interface {
+	// GetPullRequest gets the pull request with id pullNum for the repo.
+	GetPullRequest(repo models.Repo, pullNum int) (*azuredevops.GitPullRequest, error)
+}
+
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_gitlab_merge_request_getter.go GitlabMergeRequestGetter
 
 // GitlabMergeRequestGetter makes API calls to get merge requests.
@@ -57,6 +64,7 @@ type GitlabMergeRequestGetter interface {
 type DefaultCommandRunner struct {
 	VCSClient                vcs.Client
 	GithubPullGetter         GithubPullGetter
+	AzureDevopsPullGetter    AzureDevopsPullGetter
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
 	CommitStatusUpdater      CommitStatusUpdater
 	EventParser              EventParsing
@@ -158,6 +166,8 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 			err = errors.New("pull request should not be nil–this is a bug")
 		}
 		pull = *maybePull
+	case models.AzureDevops:
+		pull, headRepo, err = c.getAzureDevopsData(baseRepo, pullNum)
 	default:
 		err = errors.New("Unknown VCS type–this is a bug")
 	}
@@ -342,6 +352,21 @@ func (c *DefaultCommandRunner) getGitlabData(baseRepo models.Repo, pullNum int) 
 	}
 	pull := c.EventParser.ParseGitlabMergeRequest(mr, baseRepo)
 	return pull, nil
+}
+
+func (c *DefaultCommandRunner) getAzureDevopsData(baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {
+	if c.AzureDevopsPullGetter == nil {
+		return models.PullRequest{}, models.Repo{}, errors.New("Atlantis not configured to support Azure Devops")
+	}
+	adPull, err := c.AzureDevopsPullGetter.GetPullRequest(baseRepo, pullNum)
+	if err != nil {
+		return models.PullRequest{}, models.Repo{}, errors.Wrap(err, "making pull request API call to Azure Devops")
+	}
+	pull, _, headRepo, err := c.EventParser.ParseAzureDevopsPull(adPull)
+	if err != nil {
+		return pull, headRepo, errors.Wrap(err, "extracting required fields from comment data")
+	}
+	return pull, headRepo, nil
 }
 
 func (c *DefaultCommandRunner) buildLogger(repoFullName string, pullNum int) *logging.SimpleLogger {

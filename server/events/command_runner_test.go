@@ -50,6 +50,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	vcsClient := vcsmocks.NewMockClient()
 	githubGetter = mocks.NewMockGithubPullGetter()
 	gitlabGetter = mocks.NewMockGitlabMergeRequestGetter()
+	azuredevopsGetter = mocks.NewMockAzureDevopsPullGetter()
 	logger := logmocks.NewMockSimpleLogging()
 	pullLogger = logging.NewSimpleLogger("runatlantis/atlantis#1", true, logging.Info)
 	projectCommandRunner = mocks.NewMockProjectCommandRunner()
@@ -65,6 +66,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		MarkdownRenderer:         &events.MarkdownRenderer{},
 		GithubPullGetter:         githubGetter,
 		GitlabMergeRequestGetter: gitlabGetter,
+		AzureDevopsPullGetter:    azuredevopsGetter,
 		Logger:                   logger,
 		AllowForkPRs:             false,
 		AllowForkPRsFlag:         "allow-fork-prs-flag",
