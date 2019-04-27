@@ -15,10 +15,8 @@ package vcs
 
 import (
 	"fmt"
-	"net"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	version "github.com/hashicorp/go-version"
@@ -48,33 +46,9 @@ func NewAzureDevopsClient(hostname string, account string, project string, token
 	if err != nil {
 		return nil, errors.Wrapf(err, "azuredevops.NewClient() %p", adClient)
 	}
+
 	client := &AzureDevopsClient{
 		Client: adClient,
-	}
-
-	// If not using dev.azure.com we need to set the URL to the API.
-	if hostname != "dev.azure.com" {
-		// We assume the url will be over HTTPS if the user doesn't specify a scheme.
-		absoluteURL := hostname
-		if !strings.HasPrefix(hostname, "http://") && !strings.HasPrefix(hostname, "https://") {
-			absoluteURL = "https://" + absoluteURL
-		}
-
-		url, err := url.Parse(absoluteURL)
-		if err != nil {
-			return nil, errors.Wrapf(err, "parsing URL %q", absoluteURL)
-		}
-
-		// Warn if this hostname isn't resolvable.
-		ips, err := net.LookupIP(url.Hostname())
-		if err != nil {
-			logger.Warn("unable to resolve %q: %s", url.Hostname(), err)
-		} else if len(ips) == 0 {
-			logger.Warn("found no IPs while resolving %q", url.Hostname())
-		}
-
-		// Now we're ready to construct the client.
-		absoluteURL = strings.TrimSuffix(absoluteURL, "/")
 	}
 
 	return client, nil
@@ -112,7 +86,8 @@ func (g *AzureDevopsClient) GetModifiedFiles(repo models.Repo, pull models.PullR
 
 		// If the file was renamed, we'll want to run plan in the directory
 		// it was moved from as well.
-		if change.ChangeType == azuredevops.Rename {
+		changeType := azuredevops.Rename.String()
+		if change.ChangeType == &changeType {
 			files = append(files, change.GetSourceServerItem())
 		}
 	}
@@ -132,9 +107,10 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 	maxCommentLength := 72
 	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
 	adComments := make([]azuredevops.Comment, len(comments))
+	ct := azuredevops.CommentTypeText.String()
 	for i, c := range comments {
 		entry := azuredevops.Comment{
-			CommentType: azuredevops.CommentTypeText,
+			CommentType: &ct,
 			Content:     &c,
 		}
 		adComments[i] = entry
@@ -193,27 +169,35 @@ func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRe
 	if err != nil {
 		return false, errors.Wrap(err, "getting pull request")
 	}
-	if adPull.MergeStatus != azuredevops.MergeConflicts && adPull.MergeStatus != azuredevops.MergeRejectedByPolicy {
+	if *adPull.MergeStatus != azuredevops.MergeConflicts.String() &&
+		*adPull.MergeStatus != azuredevops.MergeRejectedByPolicy.String() {
 		return false, nil
 	}
 	return true, nil
 }
 
+// GetPullRequest returns the pull request.
+func (g *AzureDevopsClient) GetPullRequest(repo models.Repo, num int) (*azuredevops.GitPullRequest, error) {
+	opts := &azuredevops.PullRequestListOptions{}
+	pull, _, err := g.Client.PullRequests.Get(num, opts)
+	return pull, err
+}
+
 // UpdateStatus updates the build status of a commit.
 func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
-	adState := azuredevops.GitError
+	adState := azuredevops.GitError.String()
 	switch state {
 	case models.PendingCommitStatus:
-		adState = azuredevops.GitPending
+		adState = azuredevops.GitPending.String()
 	case models.SuccessCommitStatus:
-		adState = azuredevops.GitSucceeded
+		adState = azuredevops.GitSucceeded.String()
 	case models.FailedCommitStatus:
-		adState = azuredevops.GitFailed
+		adState = azuredevops.GitFailed.String()
 	}
 
 	genreStr := "Atlantis Bot"
 	status := &azuredevops.GitStatus{
-		State:       adState,
+		State:       &adState,
 		Description: &description,
 		Context: &azuredevops.GitStatusContext{
 			Name:  &src,
@@ -267,7 +251,7 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
 	if err != nil {
 		return errors.Wrap(err, "merging pull request")
 	}
-	if mergeResult.MergeStatus != azuredevops.MergeSucceeded {
+	if *mergeResult.MergeStatus != azuredevops.MergeSucceeded.String() {
 		return fmt.Errorf("could not merge pull request: %s", mergeResult.GetMergeFailureMessage())
 	}
 	return nil

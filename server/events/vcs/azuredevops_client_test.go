@@ -90,7 +90,7 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 
 			var httpClient = &http.Client{
 				Timeout: time.Second * 10,
-                        }
+			}
 			internalClient := azuredevops.NewClient(account, project, "token", httpClient)
 			Ok(t, internalClient.SetBaseURL(testServer.URL))
 			client := &AzureDevopsClient{
@@ -156,8 +156,8 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 				}))
 
 			var httpClient = &http.Client{
-                                Timeout: time.Second * 10,
-                        }
+				Timeout: time.Second * 10,
+			}
 			internalClient := azuredevops.NewClient(account, project, "token", httpClient)
 			Ok(t, internalClient.SetBaseURL(testServer.URL))
 			client := &AzureDevopsClient{
