@@ -32,7 +32,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 
-	"github.com/benmatselby/go-azuredevops/azuredevops"
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
@@ -114,7 +113,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var gitlabClient *vcs.GitlabClient
 	var bitbucketCloudClient *bitbucketcloud.Client
 	var bitbucketServerClient *bitbucketserver.Client
-	var azuredevopsClient *azuredevops.Client
+	var azuredevopsClient *vcs.AzureDevopsClient
 	if userConfig.GithubUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		var err error
@@ -151,6 +150,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			if err != nil {
 				return nil, errors.Wrapf(err, "setting up Bitbucket Server client")
 			}
+		}
+	}
+	if userConfig.AzureDevopsUser != "" {
+		supportedVCSHosts = append(supportedVCSHosts, models.AzureDevops)
+		var err error
+		azuredevopsClient, err = vcs.NewAzureDevopsClient(userConfig.AzureDevopsOrg, userConfig.AzureDevopsUser, userConfig.AzureDevopsProject, userConfig.AzureDevopsToken, logger)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -252,6 +259,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		VCSClient:                vcsClient,
 		GithubPullGetter:         githubClient,
 		GitlabMergeRequestGetter: gitlabClient,
+		AzureDevopsPullGetter:    azuredevopsClient,
 		CommitStatusUpdater:      commitStatusUpdater,
 		EventParser:              eventParser,
 		MarkdownRenderer:         markdownRenderer,
@@ -315,21 +323,23 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DB:                 boltdb,
 	}
 	eventsController := &EventsController{
-		CommandRunner:                commandRunner,
-		PullCleaner:                  pullClosedExecutor,
-		Parser:                       eventParser,
-		CommentParser:                commentParser,
-		Logger:                       logger,
-		GithubWebhookSecret:          []byte(userConfig.GithubWebhookSecret),
-		GithubRequestValidator:       &DefaultGithubRequestValidator{},
-		GitlabRequestParserValidator: &DefaultGitlabRequestParserValidator{},
-		GitlabWebhookSecret:          []byte(userConfig.GitlabWebhookSecret),
-		RepoWhitelistChecker:         repoWhitelist,
-		SilenceWhitelistErrors:       userConfig.SilenceWhitelistErrors,
-		SupportedVCSHosts:            supportedVCSHosts,
-		VCSClient:                    vcsClient,
-		BitbucketWebhookSecret:       []byte(userConfig.BitbucketWebhookSecret),
-		AzureDevopsWebhookSecret:     []byte(userConfig.AzureDevopsWebhookSecret),
+		CommandRunner:                   commandRunner,
+		PullCleaner:                     pullClosedExecutor,
+		Parser:                          eventParser,
+		CommentParser:                   commentParser,
+		Logger:                          logger,
+		GithubWebhookSecret:             []byte(userConfig.GithubWebhookSecret),
+		GithubRequestValidator:          &DefaultGithubRequestValidator{},
+		GitlabRequestParserValidator:    &DefaultGitlabRequestParserValidator{},
+		GitlabWebhookSecret:             []byte(userConfig.GitlabWebhookSecret),
+		RepoWhitelistChecker:            repoWhitelist,
+		SilenceWhitelistErrors:          userConfig.SilenceWhitelistErrors,
+		SupportedVCSHosts:               supportedVCSHosts,
+		VCSClient:                       vcsClient,
+		BitbucketWebhookSecret:          []byte(userConfig.BitbucketWebhookSecret),
+		AzureDevopsWebhookBasicUser:     []byte(userConfig.AzureDevopsWebhookBasicUser),
+		AzureDevopsWebhookBasicPassword: []byte(userConfig.AzureDevopsWebhookBasicPassword),
+		AzureDevopsRequestValidator:     &DefaultAzureDevopsRequestValidator{},
 	}
 	return &Server{
 		AtlantisVersion:    config.AtlantisVersion,

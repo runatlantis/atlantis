@@ -34,7 +34,7 @@ func TestValidate_WithSecretErr(t *testing.T) {
 	req.Header.Set("X-Hub-Signature", "sha1=126f2c800419c60137ce748d7672e77b65cf16d6")
 	req.Header.Set("Content-Type", "application/json")
 
-	_, err = g.Validate(req, []byte("secret"))
+	_, err = g.Validate(req, []byte("user"), nil)
 	Assert(t, err != nil, "error should not be nil")
 	Equals(t, "payload signature check failed", err.Error())
 }
@@ -49,7 +49,7 @@ func TestValidate_WithSecret(t *testing.T) {
 	req.Header.Set("X-Hub-Signature", "sha1=126f2c800419c60137ce748d7672e77b65cf16d6")
 	req.Header.Set("Content-Type", "application/json")
 
-	bs, err := g.Validate(req, []byte("0123456789abcdef"))
+	bs, err := g.Validate(req, []byte("username"), []byte("0123456789abcdef"))
 	Ok(t, err)
 	Equals(t, `{"yo":true}`, string(bs))
 }
@@ -77,7 +77,7 @@ func TestValidate_WithoutSecretJSON(t *testing.T) {
 	Ok(t, err)
 	req.Header.Set("Content-Type", "application/json")
 
-	bs, err := g.Validate(req, nil)
+	bs, err := g.Validate(req, nil, nil)
 	Ok(t, err)
 	Equals(t, `{"yo":true}`, string(bs))
 }
@@ -91,7 +91,7 @@ func TestValidate_WithoutSecretFormNoPayload(t *testing.T) {
 	Ok(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	_, err = g.Validate(req, nil)
+	_, err = g.Validate(req, nil, nil)
 	Assert(t, err != nil, "error should not be nil")
 	Equals(t, "webhook request did not contain expected 'payload' form value", err.Error())
 }
@@ -107,7 +107,9 @@ func TestValidate_WithoutSecretForm(t *testing.T) {
 	Ok(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	bs, err := g.Validate(req, nil)
+	bs, err := g.Validate(req, nil, nil)
 	Ok(t, err)
 	Equals(t, `{"yo":true}`, string(bs))
 }
+
+// *** add tests for all supported content types

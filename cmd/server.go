@@ -78,6 +78,8 @@ const (
 
 	// Flag defaults.
 	DefaultADBasicAuth      = true
+	DefaultADBasicUser      = ""
+	DefaultADBasicPassword  = ""
 	DefaultCheckoutStrategy = "branch"
 	DefaultBitbucketBaseURL = bitbucketcloud.BaseURL
 	DefaultDataDir          = "~/.atlantis"
@@ -434,9 +436,6 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	if c.DataDir == "" {
 		c.DataDir = DefaultDataDir
 	}
-	if c.AzureDevopsOrg == "" {
-		c.AzureDevopsOrg = DefaultADOrg
-	}
 	if c.GithubHostname == "" {
 		c.GithubHostname = DefaultGHHostname
 	}
@@ -582,11 +581,11 @@ func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && !s.SilenceOutput {
 		s.Logger.Warn("Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are whitelisting Bitbucket IPs")
 	}
-	if userConfig.AzureDevopsUser != "" && userConfig.AzureDevopsWebhookSecret == "" && !s.SilenceOutput {
-		s.Logger.Warn("No Azure Devops webhook secret set. This could allow attackers to spoof requests from Azure Devops.")
+	if userConfig.AzureDevopsUser != "" && userConfig.AzureDevopsWebhookBasicUser == "" && !s.SilenceOutput {
+		s.Logger.Warn("No Azure Devops webhook basic user set. This could allow attackers to spoof requests from Azure Devops.")
 	}
-	if userConfig.AzureDevopsUser != "" && userConfig.AzureDevopsWebhookSecret == "" && !s.SilenceOutput {
-		s.Logger.Warn("No Azure Devops webhook secret set. This could allow attackers to spoof requests from Azure Devops.")
+	if userConfig.AzureDevopsUser != "" && userConfig.AzureDevopsWebhookBasicPassword == "" && !s.SilenceOutput {
+		s.Logger.Warn("No Azure Devops webhook basic password set. This could allow attackers to spoof requests from Azure Devops.")
 	}
 }
 

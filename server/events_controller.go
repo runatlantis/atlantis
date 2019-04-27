@@ -20,6 +20,7 @@ import (
 
 	"github.com/google/go-github/github"
 	gitlab "github.com/lkysow/go-gitlab"
+	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -31,7 +32,7 @@ import (
 
 const githubHeader = "X-Github-Event"
 const gitlabHeader = "X-Gitlab-Event"
-const azuredevopsHeader = "X-AzureDevops-Event"
+const azuredevopsHeader = "Request-Id"
 
 // bitbucketEventTypeHeader is the same in both cloud and server.
 const bitbucketEventTypeHeader = "X-Event-Key"
@@ -70,10 +71,16 @@ type EventsController struct {
 	// UI that identifies this call as coming from Bitbucket. If empty, no
 	// request validation is done.
 	BitbucketWebhookSecret []byte
-	// AzureDevopsWebhookSecret is the secret added to this webhook via the Azure
-	// Devops UI that identifies this call as coming from Bitbucket. If empty, no
-	// request validation is done.
-	AzureDevopsWebhookSecret []byte
+	// AzureDevopsWebhookBasicUser is the Basic authentication username added to this
+	// webhook via the Azure Devops UI that identifies this call as coming from your
+	// Azure Devops Team Project. If empty, no request validation is done.
+	// For more information, see https://docs.microsoft.com/en-us/azure/devops/service-hooks/services/webhooks?view=azure-devops
+	AzureDevopsWebhookBasicUser []byte
+	// AzureDevopsWebhookBasicPassword is the Basic authentication password added to this
+	// webhook via the Azure Devops UI that identifies this call as coming from your
+	// Azure Devops Team Project. If empty, no request validation is done.
+	AzureDevopsWebhookBasicPassword []byte
+	AzureDevopsRequestValidator     AzureDevopsRequestValidator
 }
 
 // Post handles POST webhook requests.
@@ -113,15 +120,15 @@ func (e *EventsController) Post(w http.ResponseWriter, r *http.Request) {
 			e.Logger.Debug("handling Bitbucket Server post")
 			e.handleBitbucketServerPost(w, r)
 			return
-		} else if r.Header.Get(azuredevopsHeader) != "" {
-			if !e.supportsHost(models.AzureDevops) {
-				e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support AzureDevops")
-				return
-			}
-			e.Logger.Debug("handling AzureDevops post")
-			e.handleAzureDevopsPost(w, r)
+		}
+	} else if r.Header.Get(azuredevopsHeader) != "" {
+		if !e.supportsHost(models.AzureDevops) {
+			e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support AzureDevops")
 			return
 		}
+		e.Logger.Debug("handling AzureDevops post")
+		e.handleAzureDevopsPost(w, r)
+		return
 	}
 	e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request")
 }
@@ -208,43 +215,32 @@ func (e *EventsController) handleBitbucketServerPost(w http.ResponseWriter, r *h
 	}
 }
 
-func (e *EventsController) handleAzureDevopsPost(w http.ResponseWriter, r *http.Request) {}
-
-/*func (e *EventsController) handleAzureDevopsPost(w http.ResponseWriter, r *http.Request) {
-	eventType := r.Header.Get(azuredevopsEventTypeHeader)
-	reqID := r.Header.Get(azuredevopsRequestIDHeader)
-	sig := r.Header.Get(azuredevopsSignatureHeader)
-	defer r.Body.Close() // nolint: errcheck
-	body, err := ioutil.ReadAll(r.Body)
+func (e *EventsController) handleAzureDevopsPost(w http.ResponseWriter, r *http.Request) {
+	// Validate the request against the optional basic auth username and password.
+	payload, err := e.AzureDevopsRequestValidator.Validate(r, e.AzureDevopsWebhookBasicUser, e.AzureDevopsWebhookBasicPassword)
 	if err != nil {
-		e.respond(w, logging.Error, http.StatusBadRequest, "Unable to read body: %s %s=%s", err, azuredevopsRequestIDHeader, reqID)
+		e.respond(w, logging.Warn, http.StatusUnauthorized, err.Error())
 		return
 	}
-	if eventType == azuredevops.DiagnosticsPingHeader {
-		// Specially handle the diagnostics:ping event because Bitbucket Server
-		// doesn't send the signature with this event for some reason.
-		e.respond(w, logging.Info, http.StatusOK, "Successfully received %s event %s=%s", eventType, azuredevopsRequestIDHeader, reqID)
-		return
-	}
-	if len(e.AzureDevopsWebhookSecret) > 0 {
-		if err := azuredevops.ValidateSignature(body, sig, e.AzureDevopsWebhookSecret); err != nil {
-			e.respond(w, logging.Warn, http.StatusBadRequest, errors.Wrap(err, "request did not pass validation").Error())
-			return
-		}
-	}
-	switch eventType {
-	case azuredevops.PullCreatedHeader, azuredevops.PullMergedHeader, azuredevops.PullDeclinedHeader, azuredevops.PullDeletedHeader:
-		e.Logger.Debug("handling as pull request state changed event")
-		e.handleBitbucketServerPullRequestEvent(w, eventType, body, reqID)
-		return
-	case azuredevops.PullCommentCreatedHeader:
-		e.Logger.Debug("handling as comment created event")
-		e.HandleBitbucketServerCommentEvent(w, body, reqID)
-		return
+	e.Logger.Debug("request valid")
+
+	azuredevopsReqID := "Request-Id=" + r.Header.Get("Request-Id")
+	event, _ := azuredevops.ParseWebHook(payload)
+	/*event, ok := webhook.(*azuredevops.Event)
+	if !ok {
+		e.respond(w, logging.Debug, http.StatusBadRequest, "Error unmarshaling webhook payload %s", azuredevopsReqID)
+	}*/
+	switch event.PayloadType {
+	case azuredevops.WorkItemEvent:
+		e.Logger.Debug("handling as comment event")
+		e.HandleAzureDevopsCommentEvent(w, event, azuredevopsReqID)
+	case azuredevops.PullRequestEvent:
+		e.Logger.Debug("handling as pull request event")
+		e.HandleAzureDevopsPullRequestEvent(w, event, azuredevopsReqID)
 	default:
-		e.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event type %s %s=%s", eventType, bitbucketServerRequestIDHeader, reqID)
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event %s", azuredevopsReqID)
 	}
-}*/
+}
 
 // HandleGithubCommentEvent handles comment events from GitHub where Atlantis
 // commands can come from. It's exported to make testing easier.
@@ -455,6 +451,42 @@ func (e *EventsController) HandleGitlabMergeRequestEvent(w http.ResponseWriter, 
 	pull, pullEventType, baseRepo, headRepo, user, err := e.Parser.ParseGitlabMergeRequestEvent(event)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing webhook: %s", err)
+		return
+	}
+	e.Logger.Info("identified event as type %q", pullEventType.String())
+	e.handlePullRequestEvent(w, baseRepo, headRepo, pull, user, pullEventType)
+}
+
+// HandleAzureDevopsCommentEvent handles comment events from Azure Devops where Atlantis
+// commands can come from. It's exported to make testing easier.
+func (e *EventsController) HandleAzureDevopsCommentEvent(w http.ResponseWriter, event *azuredevops.Event, azuredevopsReqID string) {
+	workItem := event.Resource.(*azuredevops.WorkItem)
+	fields := *workItem.Fields
+	if fields["System.State"] != "New" {
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since action was not created %s", azuredevopsReqID)
+		return
+	}
+
+	baseRepo, user, pullNum, err := e.Parser.ParseAzureDevopsWorkItemEvent(workItem)
+	if err != nil {
+		e.respond(w, logging.Error, http.StatusBadRequest, "Failed parsing event: %v %s", err, azuredevopsReqID)
+		return
+	}
+
+	// *** Verify this for Azure Devops - comes from Github behavior ***
+	// We pass in nil for maybeHeadRepo because the head repo data isn't
+	// available in the AzureDevopsWorkItem event.
+	comment := fields["System.History"]
+	e.handleCommentEvent(w, baseRepo, nil, nil, user, pullNum, comment, models.AzureDevops)
+}
+
+// HandleAzureDevopsPullRequestEvent will delete any locks associated with the pull
+// request if the event is a pull request closed event. It's exported to make
+// testing easier.
+func (e *EventsController) HandleAzureDevopsPullRequestEvent(w http.ResponseWriter, pullEvent *azuredevops.Event, azuredevopsReqID string) {
+	pull, pullEventType, baseRepo, headRepo, user, err := e.Parser.ParseAzureDevopsPullEvent(*pullEvent)
+	if err != nil {
+		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s", err, azuredevopsReqID)
 		return
 	}
 	e.Logger.Info("identified event as type %q", pullEventType.String())

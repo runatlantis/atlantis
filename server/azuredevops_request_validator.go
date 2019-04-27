@@ -58,14 +58,14 @@ func (d *DefaultAzureDevopsRequestValidator) validateWithBasicAuth(r *http.Reque
 }
 
 func (d *DefaultAzureDevopsRequestValidator) validateWithoutBasicAuth(r *http.Request) ([]byte, error) {
-	switch ct := r.Header.Get("Content-Type"); ct {
-	case "application/json":
+	ct := r.Header.Get("Content-Type")
+	if ct == "application/json" || ct == "application/json; charset=utf-8" {
 		payload, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			return nil, fmt.Errorf("could not read body: %s", err)
 		}
 		return payload, nil
-	default:
+	} else {
 		return nil, fmt.Errorf("webhook request has unsupported Content-Type %q", ct)
 	}
 }
