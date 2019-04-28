@@ -1,4 +1,5 @@
 Ran Apply for 2 projects:
+
 1. dir: `.` workspace: `default`
 1. dir: `.` workspace: `staging`
 
