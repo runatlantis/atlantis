@@ -33,11 +33,13 @@ import (
 // Repo is a VCS repository.
 type Repo struct {
 	// FullName is the owner and repo name separated
-	// by a "/", ex. "runatlantis/atlantis", "gitlab/subgroup/atlantis", "Bitbucket Server/atlantis".
+	// by a "/", ex. "runatlantis/atlantis", "gitlab/subgroup/atlantis", 
+	// "Bitbucket Server/atlantis", "azuredevops/project/atlantis".
 	FullName string
-	// Owner is just the repo owner, ex. "runatlantis" or "gitlab/subgroup".
-	// This may contain /'s in the case of GitLab subgroups.
-	// This may contain spaces in the case of Bitbucket Server.
+	// Owner is just the repo owner, ex. "runatlantis" or "gitlab/subgroup"
+	// or azuredevops/project. This may contain /'s in the case of GitLab 
+	// subgroups or Azure Devops Team Projects. This may contain spaces in
+	// the case of Bitbucket Server.
 	Owner string
 	// Project is juts the project name, only required for Azure Devops.  This will never
 	// have /'s in it.
@@ -93,7 +95,8 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, project string, clone
 	// We skip this check for Bitbucket Server because its format is different
 	// and because the caller in that case actually constructs the clone url
 	// from the repo name and so there's no point checking if they match.
-	if vcsHostType != BitbucketServer {
+	// Azure Devops also does not require .git at the end of clone urls.
+	if vcsHostType != BitbucketServer && vcsHostType != AzureDevops {
 		expClonePath := fmt.Sprintf("/%s.git", repoFullName)
 		if expClonePath != cloneURLParsed.Path {
 			return Repo{}, fmt.Errorf("expected clone url to have path %q but had %q", expClonePath, cloneURLParsed.Path)
@@ -116,9 +119,9 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, project string, clone
 	if owner == "" || repo == "" {
 		return Repo{}, fmt.Errorf("invalid repo format %q, owner %q or repo %q was empty", repoFullName, owner, repo)
 	}
-	// Only GitLab repos can have /'s in their owners. This is for GitLab
-	// subgroups.
-	if strings.Contains(owner, "/") && vcsHostType != Gitlab {
+	// Only GitLab and Azure Devops repos can have /'s in their owners. 
+	// This is for GitLab subgroups and Azure Devops Team Projects.
+	if strings.Contains(owner, "/") && vcsHostType != Gitlab && vcsHostType != AzureDevops {
 		return Repo{}, fmt.Errorf("invalid repo format %q, owner %q should not contain any /'s", repoFullName, owner)
 	}
 	if strings.Contains(repo, "/") {
@@ -360,6 +363,7 @@ type ProjectCommandContext struct {
 // for owner or repo.
 // Ex. runatlantis/atlantis => (runatlantis, atlantis)
 //     gitlab/subgroup/runatlantis/atlantis => (gitlab/subgroup/runatlantis, atlantis)
+//     azuredevops/project/atlantis => (azuredevops/project, atlantis)
 func SplitRepoFullName(repoFullName string) (owner string, repo string) {
 	lastSlashIdx := strings.LastIndex(repoFullName, "/")
 	if lastSlashIdx == -1 || lastSlashIdx == len(repoFullName)-1 {

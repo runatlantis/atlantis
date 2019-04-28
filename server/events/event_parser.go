@@ -862,14 +862,30 @@ func (e *EventParser) ParseAzureDevopsWorkItemEvent(comment *azuredevops.WorkIte
 
 // ParseAzureDevopsRepo parses the response from the Azure Devops API endpoint that
 // returns a repo into the Atlantis model.
+// If the event payload doesn't contain a parent repository reference, extract the owner
+// name from the URL.
 // See EventParsing for return value docs.
 func (e *EventParser) ParseAzureDevopsRepo(adRepo *azuredevops.GitRepository) (models.Repo, error) {
 	teamProject := adRepo.GetProject()
-	projectName := new(string)
-	if teamProject != nil {
-		*projectName = teamProject.GetName()
+	parent := adRepo.GetParentRepository()
+	owner := ""
+	if parent != nil {
+		owner = parent.GetName()
 	} else {
-		*projectName = ""
+		uri, err := url.Parse(adRepo.GetRemoteURL())
+		if err != nil {
+			return models.Repo{}, err
+		}
+		// ex: https://runatlantis.visualstudio.com/project/_git/repo
+		if strings.Contains(uri.Host, "visualstudio.com") {
+			owner = strings.Split(uri.Host, ".")[0]
+			// ex: https://dev.azure.com/runatlantis/project/_git/repo
+		} else if strings.Contains(uri.Host, "dev.azure.com") {
+			owner = strings.Split(uri.Path, "/")[1]
+		} else {
+			owner = ""
+		}
 	}
-	return models.NewRepo(models.AzureDevops, adRepo.GetName(), *projectName, adRepo.GetRemoteURL(), e.AzureDevopsUser, e.AzureDevopsToken)
+	fullName := fmt.Sprintf("%s/%s/%s", owner, teamProject.GetName(), adRepo.GetName())
+	return models.NewRepo(models.AzureDevops, fullName, teamProject.GetName(), adRepo.GetRemoteURL(), e.AzureDevopsUser, e.AzureDevopsToken)
 }
