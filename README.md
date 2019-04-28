@@ -5,6 +5,10 @@
   <b>Terraform Pull Request Automation</b>
 </p>
 
+## Azure Devops Support (alpha)
+
+This fork contains Azure Devops support using a fork of the [go-azuredevops](https://github.com/mcdafydd/go-azuredevops/tree/webhook-support) library.  It will build and is somewhat functional now, but beware that work is still ongoing to fix panics, add more tests, fix work item comment support, and update documentation.
+
 ## Resources
 * How to get started: [www.runatlantis.io/guide](https://www.runatlantis.io/guide)
 * Full documentation: [www.runatlantis.io/docs](https://www.runatlantis.io/docs)
