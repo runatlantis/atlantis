@@ -196,16 +196,18 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
 	}
 
 	genreStr := "Atlantis Bot"
-	status := &azuredevops.GitStatus{
+	status := azuredevops.GitStatus{
 		State:       &adState,
 		Description: &description,
 		Context: &azuredevops.GitStatusContext{
 			Name:  &src,
 			Genre: &genreStr,
 		},
-		TargetURL: &url,
 	}
-	_, _, err := g.Client.Git.CreateStatus(repo.Name, pull.HeadCommit, *status)
+	if url != "" {
+		status.TargetURL = &url
+	}
+	_, _, err := g.Client.Git.CreateStatus(repo.Name, pull.HeadCommit, status)
 	return err
 }
 
