@@ -38,11 +38,11 @@ type AzureDevopsClient struct {
 var azuredevopsClientUnderTest = false
 
 // NewAzureDevopsClient returns a valid Azure Devops client.
-func NewAzureDevopsClient(hostname string, account string, project string, token string, logger *logging.SimpleLogger) (*AzureDevopsClient, error) {
+func NewAzureDevopsClient(org string, username string, project string, token string, logger *logging.SimpleLogger) (*AzureDevopsClient, error) {
 	var httpClient = http.Client{
 		Timeout: time.Second * 10,
 	}
-	var adClient, err = azuredevops.NewClient(account, project, token, &httpClient)
+	var adClient, err = azuredevops.NewClient(org, project, token, &httpClient)
 	if err != nil {
 		return nil, errors.Wrapf(err, "azuredevops.NewClient() %p", adClient)
 	}

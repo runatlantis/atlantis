@@ -792,6 +792,10 @@ func (e *EventParser) ParseAzureDevopsPull(pull *azuredevops.GitPullRequest) (pu
 	if err != nil {
 		return
 	}
+	headRepo, err = e.ParseAzureDevopsRepo(pull.GetRepository())
+	if err != nil {
+		return
+	}
 
 	pullState := models.ClosedPullState
 	if *pull.Status == azuredevops.PullActive.String() {
@@ -800,13 +804,13 @@ func (e *EventParser) ParseAzureDevopsPull(pull *azuredevops.GitPullRequest) (pu
 
 	pullModel = models.PullRequest{
 		Author:     authorUsername,
-		HeadBranch: headBranch,
+		HeadBranch: path.Base(headBranch),
 		HeadCommit: commit,
 		URL:        url,
 		Num:        num,
 		State:      pullState,
 		BaseRepo:   baseRepo,
-		BaseBranch: baseBranch,
+		BaseBranch: path.Base(baseBranch),
 	}
 	return
 }
@@ -842,9 +846,7 @@ func (e *EventParser) ParseAzureDevopsWorkItemEvent(comment *azuredevops.WorkIte
 	}
 
 	// Retrieve the linked pull request to get baseRepo and user
-	fields := comment.GetFields()
-	project := fields["System.TeamProject"]
-	client, err := azuredevops.NewClient(e.AzureDevopsUser, project, e.AzureDevopsToken, nil)
+	client, err := azuredevops.NewClient(e.AzureDevopsOrg, e.AzureDevopsProject, e.AzureDevopsToken, nil)
 	opts := azuredevops.PullRequestListOptions{}
 	pr, _, err := client.PullRequests.Get(pullNum, &opts)
 	if err != nil {
