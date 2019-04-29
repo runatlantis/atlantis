@@ -890,6 +890,13 @@ func (e *EventParser) ParseAzureDevopsRepo(adRepo *azuredevops.GitRepository) (m
 			owner = ""
 		}
 	}
-	fullName := fmt.Sprintf("%s/%s/%s", owner, teamProject.GetName(), adRepo.GetName())
-	return models.NewRepo(models.AzureDevops, fullName, teamProject.GetName(), adRepo.GetRemoteURL(), e.AzureDevopsUser, e.AzureDevopsToken)
+
+	// Construct our own clone URL so we always get the new dev.azure.com
+	// hostname for now.
+	// https://docs.microsoft.com/en-us/azure/devops/release-notes/2018/sep-10-azure-devops-launch#switch-existing-organizations-to-use-the-new-domain-name-url
+	project := teamProject.GetName()
+	repo := adRepo.GetName()
+	cloneURL := fmt.Sprintf("https://dev.azure.com/%s/%s/_git/%s", owner, project, repo)
+	fullName := fmt.Sprintf("%s/%s/%s", owner, project, repo)
+	return models.NewRepo(models.AzureDevops, fullName, teamProject.GetName(), cloneURL, e.AzureDevopsUser, e.AzureDevopsToken)
 }
