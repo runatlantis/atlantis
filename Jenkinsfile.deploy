@@ -1,0 +1,5 @@
+@Library('dronedeploy@0.0.18') _
+
+ansibleKubeDeploy([
+  Playbook: 'atlantis.yml',
+])
