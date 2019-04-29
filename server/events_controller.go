@@ -21,6 +21,7 @@ import (
 	"github.com/google/go-github/github"
 	gitlab "github.com/lkysow/go-gitlab"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
+	"github.com/microcosm-cc/bluemonday"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -231,7 +232,7 @@ func (e *EventsController) handleAzureDevopsPost(w http.ResponseWriter, r *http.
 		e.respond(w, logging.Debug, http.StatusBadRequest, "Error unmarshaling webhook payload %s", azuredevopsReqID)
 	}*/
 	switch event.PayloadType {
-	case azuredevops.WorkItemEvent:
+	case azuredevops.WorkItemCommentedEvent:
 		e.Logger.Debug("handling as comment event")
 		e.HandleAzureDevopsCommentEvent(w, event, azuredevopsReqID)
 	case azuredevops.PullRequestEvent:
@@ -459,32 +460,42 @@ func (e *EventsController) HandleGitlabMergeRequestEvent(w http.ResponseWriter, 
 
 // HandleAzureDevopsCommentEvent handles comment events from Azure Devops where Atlantis
 // commands can come from. It's exported to make testing easier.
+// Sometimes we may want data from the parent azuredevops.Event struct, so we handle type checking here.
 func (e *EventsController) HandleAzureDevopsCommentEvent(w http.ResponseWriter, event *azuredevops.Event, azuredevopsReqID string) {
-	workItem := event.Resource.(*azuredevops.WorkItem)
-	fields := *workItem.Fields
-	if fields["System.State"] != "New" {
-		e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since action was not created %s", azuredevopsReqID)
+	comment := new(string)
+	workItem, ok := event.Resource.(*azuredevops.WorkItem)
+	if !ok || event.PayloadType != azuredevops.WorkItemCommentedEvent {
+		e.respond(w, logging.Debug, http.StatusBadRequest, "Event.Resource is nil or received bad event type %v; Request-Id = %s", event.Resource, azuredevopsReqID)
 		return
 	}
+	*comment, ok = (*workItem.Fields)["System.History"].(string)
+	if !ok {
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since comment is not a string; Request-Id = %s", azuredevopsReqID)
+		return
+	}
+	strippedComment := bluemonday.StrictPolicy().SanitizeBytes([]byte(*comment))
 
-	baseRepo, user, pullNum, err := e.Parser.ParseAzureDevopsWorkItemEvent(workItem)
+	if len(workItem.Relations) == 0 {
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since no pull request is linked to work item; Request-Id = %s", azuredevopsReqID)
+		return
+	}
+	pullRefs, err := e.Parser.ParseAzureDevopsWorkItemCommentedEvent(workItem)
+
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Failed parsing event: %v %s", err, azuredevopsReqID)
 		return
 	}
 
-	// *** Verify this for Azure Devops - comes from Github behavior ***
-	// We pass in nil for maybeHeadRepo because the head repo data isn't
-	// available in the AzureDevopsWorkItem event.
-	comment := fields["System.History"]
-	e.handleCommentEvent(w, baseRepo, nil, nil, user, pullNum, comment, models.AzureDevops)
+	for _, ref := range pullRefs {
+		e.handleCommentEvent(w, ref.BaseRepo, nil, nil, ref.User, ref.PullNum, string(strippedComment), models.AzureDevops)
+	}
 }
 
 // HandleAzureDevopsPullRequestEvent will delete any locks associated with the pull
 // request if the event is a pull request closed event. It's exported to make
 // testing easier.
-func (e *EventsController) HandleAzureDevopsPullRequestEvent(w http.ResponseWriter, pullEvent *azuredevops.Event, azuredevopsReqID string) {
-	pull, pullEventType, baseRepo, headRepo, user, err := e.Parser.ParseAzureDevopsPullEvent(*pullEvent)
+func (e *EventsController) HandleAzureDevopsPullRequestEvent(w http.ResponseWriter, event *azuredevops.Event, azuredevopsReqID string) {
+	pull, pullEventType, baseRepo, headRepo, user, err := e.Parser.ParseAzureDevopsPullEvent(*event)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s", err, azuredevopsReqID)
 		return

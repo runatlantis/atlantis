@@ -238,7 +238,7 @@ type EventParsing interface {
 	// event given the Bitbucket Server header.
 	GetBitbucketServerPullEventType(eventTypeHeader string) models.PullRequestEventType
 
-	// ParseAzureDevopsWorkItemEvent parses Azure Devops work item comment events.
+	// ParseAzureDevopsWorkItemCommentedEvent parses Azure Devops work item comment events.
 	// There is no service hook event for comments made directly on a pull request, only
 	// for comments made on a work item.  In order to see the content of a comment in
 	// the webhook payload, the comment must be on a work item.  Since a work item
@@ -251,8 +251,8 @@ type EventParsing interface {
 	// baseRepo is the repo that the pull request will be merged into.
 	// user is the pull request author.
 	// pullNum is the number of the pull request that triggered the webhook.
-	ParseAzureDevopsWorkItemEvent(comment *azuredevops.WorkItem) (
-		baseRepo models.Repo, user models.User, pullNum int, err error)
+	// *** Add tests and handle linking multiple pull requests to a work item.
+	ParseAzureDevopsWorkItemCommentedEvent(comment *azuredevops.WorkItem) (pullRefs []PullRef, err error)
 
 	// ParseAzureDevopsPull parses the response from the Azure Devops API endpoint (not
 	// from a webhook) that returns a pull request.
@@ -723,12 +723,11 @@ func (e *EventParser) ParseBitbucketServerPullEvent(body []byte) (pull models.Pu
 
 // ParseAzureDevopsPullEvent parses Azure Devops pull request events.
 // See EventParsing for return value docs.
-func (e *EventParser) ParseAzureDevopsPullEvent(pullEvent azuredevops.Event) (pull models.PullRequest, pullEventType models.PullRequestEventType, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
-	/*if pullEvent == nil {
-		err = errors.New("pullEvent is null")
+func (e *EventParser) ParseAzureDevopsPullEvent(event azuredevops.Event) (pull models.PullRequest, pullEventType models.PullRequestEventType, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
+	pullResource, ok := event.Resource.(*azuredevops.GitPullRequest)
+	if !ok {
 		return
-	}*/
-	pullResource := pullEvent.Resource.(*azuredevops.GitPullRequest)
+	}
 	pull, baseRepo, headRepo, err = e.ParseAzureDevopsPull(pullResource)
 	if err != nil {
 		return
@@ -743,7 +742,7 @@ func (e *EventParser) ParseAzureDevopsPullEvent(pullEvent azuredevops.Event) (pu
 		err = errors.New("CreatedBy.UniqueName is null")
 		return
 	}
-	switch pullEvent.EventType {
+	switch event.EventType {
 	case "git.pullrequest.created":
 		pullEventType = models.OpenedPullEvent
 	case "git.pullrequest.updated":
@@ -815,22 +814,19 @@ func (e *EventParser) ParseAzureDevopsPull(pull *azuredevops.GitPullRequest) (pu
 	return
 }
 
-// ParseAzureDevopsWorkItemEvent parses Azure Devops work item comment events.
-// Azure Devops does not have a webhook that fires upon commenting on a pull request,
-// only for commenting on a work item.
-// It is possible to get a workitem.commented event without a reference linking it
-// to a repository if the user hasn't linked it to a pull request (relations list field
-// in the JSON payload).  *** Test outcome of linking multiple pull requests to a work item.
-// Example comment in JSON payload:
-// "System.History": "<div>third comment discussion - see where this shows up in the
-// webhook.&nbsp; the webhook should also indicate two existing links to this work item.
-// &nbsp; one branch and one active pull request!</div>"
+// PullRef Data necessary to process a single pull request.
+type PullRef struct {
+	BaseRepo models.Repo
+	User     models.User
+	PullNum  int
+}
+
+// ParseAzureDevopsWorkItemCommentedEvent parses Azure Devops work item comment events.
+// Multiple pull requests can be linked to a single work item.
 // See EventParsing for return value docs.
-func (e *EventParser) ParseAzureDevopsWorkItemEvent(comment *azuredevops.WorkItem) (baseRepo models.Repo, user models.User, pullNum int, err error) {
-	// Check for pull request links to the work item that generated the comment
-	// service event.  If a pull request link exists, extract its number
-	// Example link URI: vstfs:///Git/PullRequestId/d03edfe3-755b-4e8d-8f88-5aa5b51aba61%2f5d4fa372-78d4-4d85-aff6-7dcbc45d44d2%2f7
+func (e *EventParser) ParseAzureDevopsWorkItemCommentedEvent(comment *azuredevops.WorkItem) (pullRefs []PullRef, err error) {
 	for _, relation := range comment.Relations {
+		ref := &PullRef{}
 		if uri := relation.GetURL(); strings.Contains(uri, "vstfs:///Git/PullRequestId/") {
 			var parsed *url.URL
 			parsed, err = url.Parse(uri)
@@ -838,28 +834,34 @@ func (e *EventParser) ParseAzureDevopsWorkItemEvent(comment *azuredevops.WorkIte
 				return
 			}
 			pullNumStr := strings.Split(parsed.Path, "/")[5]
-			pullNum, err = strconv.Atoi(pullNumStr)
+			ref.PullNum, err = strconv.Atoi(pullNumStr)
 			if err != nil {
 				return
 			}
+
+			// Retrieve the linked pull request to get baseRepo and user
+			client := new(azuredevops.Client)
+			client, err = azuredevops.NewClient(e.AzureDevopsOrg, e.AzureDevopsProject, e.AzureDevopsToken, nil)
+			if err != nil {
+				return
+			}
+			pr := new(azuredevops.GitPullRequest)
+			opts := azuredevops.PullRequestListOptions{}
+			pr, _, err = client.PullRequests.Get(ref.PullNum, &opts)
+			if err != nil {
+				return
+			}
+			createdBy := pr.GetCreatedBy()
+			ref.User = models.User{Username: createdBy.GetUniqueName()}
+			ref.BaseRepo, err = e.ParseAzureDevopsRepo(pr.GetRepository())
+			if err != nil {
+				return
+			}
+			pullRefs = append(pullRefs, *ref)
 		}
 	}
 
-	// Retrieve the linked pull request to get baseRepo and user
-	client, err := azuredevops.NewClient(e.AzureDevopsOrg, e.AzureDevopsProject, e.AzureDevopsToken, nil)
-	opts := azuredevops.PullRequestListOptions{}
-	pr, _, err := client.PullRequests.Get(pullNum, &opts)
-	if err != nil {
-		return
-	}
-	createdBy := pr.GetCreatedBy()
-	user = models.User{Username: createdBy.GetUniqueName()}
-	baseRepo, err = e.ParseAzureDevopsRepo(pr.GetRepository())
-	if err != nil {
-		return
-	}
-
-	return baseRepo, user, pullNum, err
+	return pullRefs, err
 }
 
 // ParseAzureDevopsRepo parses the response from the Azure Devops API endpoint that

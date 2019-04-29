@@ -101,6 +101,10 @@
   name = "github.com/mcdafydd/go-azuredevops"
 
 [[constraint]]
+  branch = "master"
+  name = "github.com/microcosm-cc/bluemonday"
+
+[[constraint]]
   name = "github.com/go-test/deep"
   version = "1.0.1"
 
