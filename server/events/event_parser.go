@@ -876,7 +876,7 @@ func (e *EventParser) ParseAzureDevopsRepo(adRepo *azuredevops.GitRepository) (m
 	if parent != nil {
 		owner = parent.GetName()
 	} else {
-		uri, err := url.Parse(adRepo.GetRemoteURL())
+		uri, err := url.Parse(adRepo.GetWebURL())
 		if err != nil {
 			return models.Repo{}, err
 		}

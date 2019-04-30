@@ -171,9 +171,9 @@ func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRe
 	}
 	if *adPull.MergeStatus != azuredevops.MergeConflicts.String() &&
 		*adPull.MergeStatus != azuredevops.MergeRejectedByPolicy.String() {
-		return false, nil
+		return true, nil
 	}
-	return true, nil
+	return false, nil
 }
 
 // GetPullRequest returns the pull request.
