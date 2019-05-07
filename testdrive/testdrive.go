@@ -37,7 +37,7 @@ import (
 
 var terraformExampleRepoOwner = "runatlantis"
 var terraformExampleRepo = "atlantis-example"
-var bootstrapDescription = `[white]Welcome to Atlantis testdrive!
+var bootstrapDescription = `Welcome to Atlantis testdrive!
 
 This mode sets up Atlantis on a test repo so you can try it out. We will
 - fork an example terraform project to your username
@@ -77,6 +77,7 @@ In this pull request we will learn how to use Atlantis.
     $$$
     atlantis apply
     $$$
+    **NOTE:** Because this example isn't using [remote state storage](https://www.terraform.io/docs/state/remote.html) the state will be lost once the pull request is merged. To use Atlantis properly, you **must** be using remote state.
 
 1. Finally, merge the pull request to unlock this directory.
 
@@ -87,23 +88,23 @@ Thank you for trying out Atlantis! Next, try using Atlantis on your own reposito
 func Start() error {
 	s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
 	colorstring.Println(bootstrapDescription)
-	colorstring.Print("\n[white][bold]github.com username: ")
+	colorstring.Print("\n[bold]github.com username: ")
 	fmt.Scanln(&githubUsername)
 	if githubUsername == "" {
 		return fmt.Errorf("please enter a valid github username")
 	}
 	colorstring.Println(`
-[white]To continue, we need you to create a GitHub personal access token
-with [green]"repo" [white]scope so we can fork an example terraform project.
+To continue, we need you to create a GitHub personal access token
+with [green]"repo" [reset]scope so we can fork an example terraform project.
 
 Follow these instructions to create a token (we don't store any tokens):
-[green]https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/#creating-a-token
-[white]- use "atlantis" for the token description
+[green]https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/#creating-a-token[reset]
+- use "atlantis" for the token description
 - add "repo" scope
 - copy the access token
 `)
 	// Read github token, check for error later.
-	colorstring.Print("[white][bold]GitHub access token (will be hidden): ")
+	colorstring.Print("[bold]GitHub access token (will be hidden): ")
 	githubToken, _ = readPassword()
 	tp := github.BasicAuthTransport{
 		Username: strings.TrimSpace(githubUsername),
@@ -112,7 +113,7 @@ Follow these instructions to create a token (we don't store any tokens):
 	githubClient := &Client{client: github.NewClient(tp.Client()), ctx: context.Background()}
 
 	// Fork terraform example repo.
-	colorstring.Println("\n[white]=> forking repo ")
+	colorstring.Println("\n=> forking repo ")
 	s.Start()
 	if err := githubClient.CreateFork(terraformExampleRepoOwner, terraformExampleRepo); err != nil {
 		return errors.Wrapf(err, "forking repo %s/%s", terraformExampleRepoOwner, terraformExampleRepo)
@@ -121,42 +122,42 @@ Follow these instructions to create a token (we don't store any tokens):
 		return fmt.Errorf("didn't find forked repo %s/%s. fork unsuccessful", terraformExampleRepoOwner, terraformExampleRepoOwner)
 	}
 	s.Stop()
-	colorstring.Println("[green]=> fork completed!")
+	colorstring.Println("[green]=> fork completed![reset]")
 
 	// Detect terraform and install it if not installed.
 	_, err := exec.LookPath("terraform")
 	if err != nil {
-		colorstring.Println("[yellow]=> terraform not found in $PATH.")
-		colorstring.Println("[white]=> downloading terraform ")
+		colorstring.Println("[yellow]=> terraform not found in $PATH.[reset]")
+		colorstring.Println("=> downloading terraform ")
 		s.Start()
 		terraformDownloadURL := fmt.Sprintf("%s/terraform/%s/terraform_%s_%s_%s.zip", hashicorpReleasesURL, terraformVersion, terraformVersion, runtime.GOOS, runtime.GOARCH)
 		if err = downloadAndUnzip(terraformDownloadURL, "/tmp/terraform.zip", "/tmp"); err != nil {
 			return errors.Wrapf(err, "downloading and unzipping terraform")
 		}
-		colorstring.Println("[green]=> downloaded terraform successfully!")
+		colorstring.Println("[green]=> downloaded terraform successfully![reset]")
 		s.Stop()
 
 		err = executeCmd("mv", "/tmp/terraform", "/usr/local/bin/")
 		if err != nil {
 			return errors.Wrapf(err, "moving terraform binary into /usr/local/bin")
 		}
-		colorstring.Println("[green]=> installed terraform successfully at /usr/local/bin")
+		colorstring.Println("[green]=> installed terraform successfully at /usr/local/bin[reset]")
 	} else {
-		colorstring.Println("[green]=> terraform found in $PATH!")
+		colorstring.Println("[green]=> terraform found in $PATH![reset]")
 	}
 
 	// Download ngrok.
-	colorstring.Println("[white]=> downloading ngrok  ")
+	colorstring.Println("=> downloading ngrok  ")
 	s.Start()
 	ngrokURL := fmt.Sprintf("%s/ngrok-stable-%s-%s.zip", ngrokDownloadURL, runtime.GOOS, runtime.GOARCH)
 	if err = downloadAndUnzip(ngrokURL, "/tmp/ngrok.zip", "/tmp"); err != nil {
 		return errors.Wrapf(err, "downloading and unzipping ngrok")
 	}
 	s.Stop()
-	colorstring.Println("[green]=> downloaded ngrok successfully!")
+	colorstring.Println("[green]=> downloaded ngrok successfully![reset]")
 
 	// Create ngrok tunnel.
-	colorstring.Println("[white]=> creating secure tunnel")
+	colorstring.Println("=> creating secure tunnel")
 	s.Start()
 
 	// We use a config file so we can set ngrok's API port (web_addr). We use
@@ -199,7 +200,7 @@ tunnels:
 
 	// The tunnel is up!
 	s.Stop()
-	colorstring.Println("[green]=> started tunnel!")
+	colorstring.Println("[green]=> started tunnel![reset]")
 	// There's a 1s delay between tunnel starting and API being up.
 	time.Sleep(1 * time.Second)
 	tunnelURL, err := getTunnelAddr()
@@ -208,7 +209,7 @@ tunnels:
 	}
 
 	// Start atlantis server.
-	colorstring.Println("[white]=> starting atlantis server")
+	colorstring.Println("=> starting atlantis server")
 	s.Start()
 	tmpDir, err := ioutil.TempDir("", "")
 	if err != nil {
@@ -226,43 +227,43 @@ tunnels:
 	// When this function returns atlantis server should be stopped.
 	defer cancelAtlantis()
 
-	colorstring.Printf("[green]=> atlantis server is now securely exposed at [bold][underline]%s\n", tunnelURL)
+	colorstring.Printf("[green]=> atlantis server is now securely exposed at [bold][underline]%s\n[reset]", tunnelURL)
 	fmt.Println("")
 
 	// Create atlantis webhook.
-	colorstring.Println("[white]=> creating atlantis webhook")
+	colorstring.Println("=> creating atlantis webhook")
 	s.Start()
 	err = githubClient.CreateWebhook(githubUsername, terraformExampleRepo, fmt.Sprintf("%s/events", tunnelURL))
 	if err != nil {
 		return errors.Wrapf(err, "creating atlantis webhook")
 	}
 	s.Stop()
-	colorstring.Println("[green]=> atlantis webhook created!")
+	colorstring.Println("[green]=> atlantis webhook created![reset]")
 
 	// Create a new pr in the example repo.
-	colorstring.Println("[white]=> creating a new pull request")
+	colorstring.Println("=> creating a new pull request")
 	s.Start()
 	pullRequestURL, err := githubClient.CreatePullRequest(githubUsername, terraformExampleRepo, "example", "master")
 	if err != nil {
 		return errors.Wrapf(err, "creating new pull request for repo %s/%s", githubUsername, terraformExampleRepo)
 	}
 	s.Stop()
-	colorstring.Println("[green]=> pull request created!")
+	colorstring.Println("[green]=> pull request created![reset]")
 
 	// Open new pull request in the browser.
-	colorstring.Println("[white]=> opening pull request")
+	colorstring.Println("=> opening pull request")
 	s.Start()
 	time.Sleep(2 * time.Second)
 	err = executeCmd("open", pullRequestURL)
 	if err != nil {
-		colorstring.Printf("[red]=> opening pull request failed. please go to: %s on the browser\n", pullRequestURL)
+		colorstring.Printf("[red]=> opening pull request failed. please go to: %s on the browser\n[reset]", pullRequestURL)
 	}
 	s.Stop()
 
 	// Wait for ngrok and atlantis server process to finish.
-	colorstring.Println("[_green_][light_green]atlantis is running ")
+	colorstring.Println("[_green_][light_green]atlantis is running [reset]")
 	s.Start()
-	colorstring.Println("[green] [press Ctrl-c to exit]")
+	colorstring.Println("[green] [press Ctrl-c to exit][reset]")
 
 	// Wait for SIGINT or SIGTERM signals meaning the user has Ctrl-C'd the
 	// testdrive process and want's to stop.
@@ -272,8 +273,8 @@ tunnels:
 	// Keep checking for errors from ngrok or atlantis server. Exit normally on shutdown signal.
 	select {
 	case <-signalChan:
-		colorstring.Println("\n[red]shutdown signal received, exiting....")
-		colorstring.Println("\n[green]Thank you for using atlantis :) \n[white]For more information about how to use atlantis in production go to: https://www.runatlantis.io")
+		colorstring.Println("\n[red]shutdown signal received, exiting....[reset]")
+		colorstring.Println("\n[green]Thank you for using atlantis :) \n[reset]For more information about how to use atlantis in production go to: https://www.runatlantis.io")
 		return nil
 	case err := <-ngrokErrors:
 		return errors.Wrap(err, "ngrok tunnel")
