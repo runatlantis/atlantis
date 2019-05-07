@@ -52,7 +52,7 @@ func TestNewRepo_CloneURLBitbucketServer(t *testing.T) {
 		Owner:             "owner",
 		Name:              "repo",
 		CloneURL:          "http://u:p@mycorp.com:7990/scm/at/atlantis-example.git",
-		SanitizedCloneURL: "http://mycorp.com:7990/scm/at/atlantis-example.git",
+		SanitizedCloneURL: "http://u:<redacted>@mycorp.com:7990/scm/at/atlantis-example.git",
 		VCSHost: models.VCSHost{
 			Hostname: "mycorp.com",
 			Type:     models.BitbucketServer,
@@ -104,7 +104,7 @@ func TestNewRepo_MissingDotGit(t *testing.T) {
 	repo, err := models.NewRepo(models.BitbucketCloud, "owner/repo", "https://bitbucket.org/owner/repo", "u", "p")
 	Ok(t, err)
 	Equals(t, repo.CloneURL, "https://u:p@bitbucket.org/owner/repo.git")
-	Equals(t, repo.SanitizedCloneURL, "https://bitbucket.org/owner/repo.git")
+	Equals(t, repo.SanitizedCloneURL, "https://u:<redacted>@bitbucket.org/owner/repo.git")
 }
 
 func TestNewRepo_HTTPAuth(t *testing.T) {
@@ -116,7 +116,7 @@ func TestNewRepo_HTTPAuth(t *testing.T) {
 			Hostname: "github.com",
 			Type:     models.Github,
 		},
-		SanitizedCloneURL: "http://github.com/owner/repo.git",
+		SanitizedCloneURL: "http://u:<redacted>@github.com/owner/repo.git",
 		CloneURL:          "http://u:p@github.com/owner/repo.git",
 		FullName:          "owner/repo",
 		Owner:             "owner",
@@ -133,7 +133,7 @@ func TestNewRepo_HTTPSAuth(t *testing.T) {
 			Hostname: "github.com",
 			Type:     models.Github,
 		},
-		SanitizedCloneURL: "https://github.com/owner/repo.git",
+		SanitizedCloneURL: "https://u:<redacted>@github.com/owner/repo.git",
 		CloneURL:          "https://u:p@github.com/owner/repo.git",
 		FullName:          "owner/repo",
 		Owner:             "owner",
