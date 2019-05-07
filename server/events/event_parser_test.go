@@ -47,7 +47,7 @@ func TestParseGithubRepo(t *testing.T) {
 		Owner:             "owner",
 		FullName:          "owner/repo",
 		CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",
-		SanitizedCloneURL: Repo.GetCloneURL(),
+		SanitizedCloneURL: "https://github-user:<redacted>@github.com/owner/repo.git",
 		Name:              "repo",
 		VCSHost: models.VCSHost{
 			Hostname: "github.com",
@@ -96,7 +96,7 @@ func TestParseGithubIssueCommentEvent(t *testing.T) {
 		Owner:             *comment.Repo.Owner.Login,
 		FullName:          *comment.Repo.FullName,
 		CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",
-		SanitizedCloneURL: *comment.Repo.CloneURL,
+		SanitizedCloneURL: "https://github-user:<redacted>@github.com/owner/repo.git",
 		Name:              "repo",
 		VCSHost: models.VCSHost{
 			Hostname: "github.com",
@@ -134,7 +134,7 @@ func TestParseGithubPullEvent(t *testing.T) {
 		Owner:             "owner",
 		FullName:          "owner/repo",
 		CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",
-		SanitizedCloneURL: Repo.GetCloneURL(),
+		SanitizedCloneURL: "https://github-user:<redacted>@github.com/owner/repo.git",
 		Name:              "repo",
 		VCSHost: models.VCSHost{
 			Hostname: "github.com",
@@ -252,7 +252,7 @@ func TestParseGithubPull(t *testing.T) {
 		Owner:             "owner",
 		FullName:          "owner/repo",
 		CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",
-		SanitizedCloneURL: Repo.GetCloneURL(),
+		SanitizedCloneURL: "https://github-user:<redacted>@github.com/owner/repo.git",
 		Name:              "repo",
 		VCSHost: models.VCSHost{
 			Hostname: "github.com",
@@ -287,7 +287,7 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 	expBaseRepo := models.Repo{
 		FullName:          "lkysow/atlantis-example",
 		Name:              "atlantis-example",
-		SanitizedCloneURL: "https://gitlab.com/lkysow/atlantis-example.git",
+		SanitizedCloneURL: "https://gitlab-user:<redacted>@gitlab.com/lkysow/atlantis-example.git",
 		Owner:             "lkysow",
 		CloneURL:          "https://gitlab-user:gitlab-token@gitlab.com/lkysow/atlantis-example.git",
 		VCSHost: models.VCSHost{
@@ -312,7 +312,7 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 	Equals(t, models.Repo{
 		FullName:          "sourceorg/atlantis-example",
 		Name:              "atlantis-example",
-		SanitizedCloneURL: "https://gitlab.com/sourceorg/atlantis-example.git",
+		SanitizedCloneURL: "https://gitlab-user:<redacted>@gitlab.com/sourceorg/atlantis-example.git",
 		Owner:             "sourceorg",
 		CloneURL:          "https://gitlab-user:gitlab-token@gitlab.com/sourceorg/atlantis-example.git",
 		VCSHost: models.VCSHost{
@@ -344,7 +344,7 @@ func TestParseGitlabMergeEvent_Subgroup(t *testing.T) {
 	expBaseRepo := models.Repo{
 		FullName:          "lkysow-test/subgroup/sub-subgroup/atlantis-example",
 		Name:              "atlantis-example",
-		SanitizedCloneURL: "https://gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
+		SanitizedCloneURL: "https://gitlab-user:<redacted>@gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
 		Owner:             "lkysow-test/subgroup/sub-subgroup",
 		CloneURL:          "https://gitlab-user:gitlab-token@gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
 		VCSHost: models.VCSHost{
@@ -369,7 +369,7 @@ func TestParseGitlabMergeEvent_Subgroup(t *testing.T) {
 	Equals(t, models.Repo{
 		FullName:          "lkysow-test/subgroup/sub-subgroup/atlantis-example",
 		Name:              "atlantis-example",
-		SanitizedCloneURL: "https://gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
+		SanitizedCloneURL: "https://gitlab-user:<redacted>@gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
 		Owner:             "lkysow-test/subgroup/sub-subgroup",
 		CloneURL:          "https://gitlab-user:gitlab-token@gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
 		VCSHost: models.VCSHost{
@@ -440,7 +440,7 @@ func TestParseGitlabMergeRequest(t *testing.T) {
 	repo := models.Repo{
 		FullName:          "gitlabhq/gitlab-test",
 		Name:              "gitlab-test",
-		SanitizedCloneURL: "https://example.com/gitlabhq/gitlab-test.git",
+		SanitizedCloneURL: "https://gitlab-user:<redacted>@example.com/gitlabhq/gitlab-test.git",
 		Owner:             "gitlabhq",
 		CloneURL:          "https://gitlab-user:gitlab-token@example.com/gitlabhq/gitlab-test.git",
 		VCSHost: models.VCSHost{
@@ -479,7 +479,7 @@ func TestParseGitlabMergeRequest_Subgroup(t *testing.T) {
 	repo := models.Repo{
 		FullName:          "lkysow-test/subgroup/sub-subgroup/atlantis-example",
 		Name:              "atlantis-example",
-		SanitizedCloneURL: "https://gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
+		SanitizedCloneURL: "https://gitlab-user:<redacted>@gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
 		Owner:             "lkysow-test/subgroup/sub-subgroup",
 		CloneURL:          "https://gitlab-user:gitlab-token@gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
 		VCSHost: models.VCSHost{
@@ -513,7 +513,7 @@ func TestParseGitlabMergeCommentEvent(t *testing.T) {
 	Equals(t, models.Repo{
 		FullName:          "gitlabhq/gitlab-test",
 		Name:              "gitlab-test",
-		SanitizedCloneURL: "https://example.com/gitlabhq/gitlab-test.git",
+		SanitizedCloneURL: "https://gitlab-user:<redacted>@example.com/gitlabhq/gitlab-test.git",
 		Owner:             "gitlabhq",
 		CloneURL:          "https://gitlab-user:gitlab-token@example.com/gitlabhq/gitlab-test.git",
 		VCSHost: models.VCSHost{
@@ -524,7 +524,7 @@ func TestParseGitlabMergeCommentEvent(t *testing.T) {
 	Equals(t, models.Repo{
 		FullName:          "gitlab-org/gitlab-test",
 		Name:              "gitlab-test",
-		SanitizedCloneURL: "https://example.com/gitlab-org/gitlab-test.git",
+		SanitizedCloneURL: "https://gitlab-user:<redacted>@example.com/gitlab-org/gitlab-test.git",
 		Owner:             "gitlab-org",
 		CloneURL:          "https://gitlab-user:gitlab-token@example.com/gitlab-org/gitlab-test.git",
 		VCSHost: models.VCSHost{
@@ -551,7 +551,7 @@ func TestParseGitlabMergeCommentEvent_Subgroup(t *testing.T) {
 	Equals(t, models.Repo{
 		FullName:          "lkysow-test/subgroup/sub-subgroup/atlantis-example",
 		Name:              "atlantis-example",
-		SanitizedCloneURL: "https://gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
+		SanitizedCloneURL: "https://gitlab-user:<redacted>@gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
 		Owner:             "lkysow-test/subgroup/sub-subgroup",
 		CloneURL:          "https://gitlab-user:gitlab-token@gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
 		VCSHost: models.VCSHost{
@@ -562,7 +562,7 @@ func TestParseGitlabMergeCommentEvent_Subgroup(t *testing.T) {
 	Equals(t, models.Repo{
 		FullName:          "lkysow-test/subgroup/sub-subgroup/atlantis-example",
 		Name:              "atlantis-example",
-		SanitizedCloneURL: "https://gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
+		SanitizedCloneURL: "https://gitlab-user:<redacted>@gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
 		Owner:             "lkysow-test/subgroup/sub-subgroup",
 		CloneURL:          "https://gitlab-user:gitlab-token@gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
 		VCSHost: models.VCSHost{
@@ -707,7 +707,7 @@ func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {
 		Owner:             "lkysow",
 		Name:              "atlantis-example",
 		CloneURL:          "https://bitbucket-user:bitbucket-token@bitbucket.org/lkysow/atlantis-example.git",
-		SanitizedCloneURL: "https://bitbucket.org/lkysow/atlantis-example.git",
+		SanitizedCloneURL: "https://bitbucket-user:<redacted>@bitbucket.org/lkysow/atlantis-example.git",
 		VCSHost: models.VCSHost{
 			Hostname: "bitbucket.org",
 			Type:     models.BitbucketCloud,
@@ -729,7 +729,7 @@ func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {
 		Owner:             "lkysow-fork",
 		Name:              "atlantis-example",
 		CloneURL:          "https://bitbucket-user:bitbucket-token@bitbucket.org/lkysow-fork/atlantis-example.git",
-		SanitizedCloneURL: "https://bitbucket.org/lkysow-fork/atlantis-example.git",
+		SanitizedCloneURL: "https://bitbucket-user:<redacted>@bitbucket.org/lkysow-fork/atlantis-example.git",
 		VCSHost: models.VCSHost{
 			Hostname: "bitbucket.org",
 			Type:     models.BitbucketCloud,
@@ -793,7 +793,7 @@ func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 		Owner:             "lkysow",
 		Name:              "atlantis-example",
 		CloneURL:          "https://bitbucket-user:bitbucket-token@bitbucket.org/lkysow/atlantis-example.git",
-		SanitizedCloneURL: "https://bitbucket.org/lkysow/atlantis-example.git",
+		SanitizedCloneURL: "https://bitbucket-user:<redacted>@bitbucket.org/lkysow/atlantis-example.git",
 		VCSHost: models.VCSHost{
 			Hostname: "bitbucket.org",
 			Type:     models.BitbucketCloud,
@@ -815,7 +815,7 @@ func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 		Owner:             "lkysow-fork",
 		Name:              "atlantis-example",
 		CloneURL:          "https://bitbucket-user:bitbucket-token@bitbucket.org/lkysow-fork/atlantis-example.git",
-		SanitizedCloneURL: "https://bitbucket.org/lkysow-fork/atlantis-example.git",
+		SanitizedCloneURL: "https://bitbucket-user:<redacted>@bitbucket.org/lkysow-fork/atlantis-example.git",
 		VCSHost: models.VCSHost{
 			Hostname: "bitbucket.org",
 			Type:     models.BitbucketCloud,
@@ -894,7 +894,7 @@ func TestParseBitbucketServerCommentEvent_ValidEvent(t *testing.T) {
 		Owner:             "atlantis",
 		Name:              "atlantis-example",
 		CloneURL:          "http://bitbucket-user:bitbucket-token@mycorp.com:7490/scm/at/atlantis-example.git",
-		SanitizedCloneURL: "http://mycorp.com:7490/scm/at/atlantis-example.git",
+		SanitizedCloneURL: "http://bitbucket-user:<redacted>@mycorp.com:7490/scm/at/atlantis-example.git",
 		VCSHost: models.VCSHost{
 			Hostname: "mycorp.com",
 			Type:     models.BitbucketServer,
@@ -916,7 +916,7 @@ func TestParseBitbucketServerCommentEvent_ValidEvent(t *testing.T) {
 		Owner:             "atlantis-fork",
 		Name:              "atlantis-example",
 		CloneURL:          "http://bitbucket-user:bitbucket-token@mycorp.com:7490/scm/fk/atlantis-example.git",
-		SanitizedCloneURL: "http://mycorp.com:7490/scm/fk/atlantis-example.git",
+		SanitizedCloneURL: "http://bitbucket-user:<redacted>@mycorp.com:7490/scm/fk/atlantis-example.git",
 		VCSHost: models.VCSHost{
 			Hostname: "mycorp.com",
 			Type:     models.BitbucketServer,
@@ -976,7 +976,7 @@ func TestParseBitbucketServerPullEvent_ValidEvent(t *testing.T) {
 		Owner:             "atlantis",
 		Name:              "atlantis-example",
 		CloneURL:          "http://bitbucket-user:bitbucket-token@mycorp.com:7490/scm/at/atlantis-example.git",
-		SanitizedCloneURL: "http://mycorp.com:7490/scm/at/atlantis-example.git",
+		SanitizedCloneURL: "http://bitbucket-user:<redacted>@mycorp.com:7490/scm/at/atlantis-example.git",
 		VCSHost: models.VCSHost{
 			Hostname: "mycorp.com",
 			Type:     models.BitbucketServer,
@@ -998,7 +998,7 @@ func TestParseBitbucketServerPullEvent_ValidEvent(t *testing.T) {
 		Owner:             "atlantis-fork",
 		Name:              "atlantis-example",
 		CloneURL:          "http://bitbucket-user:bitbucket-token@mycorp.com:7490/scm/fk/atlantis-example.git",
-		SanitizedCloneURL: "http://mycorp.com:7490/scm/fk/atlantis-example.git",
+		SanitizedCloneURL: "http://bitbucket-user:<redacted>@mycorp.com:7490/scm/fk/atlantis-example.git",
 		VCSHost: models.VCSHost{
 			Hostname: "mycorp.com",
 			Type:     models.BitbucketServer,

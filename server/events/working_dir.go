@@ -179,12 +179,14 @@ func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
 			"GIT_COMMITTER_NAME=atlantis",
 		}...)
 
-		cmdStr := w.cmdAsSanitizedStr(cmd, p.BaseRepo, headRepo)
+		cmdStr := w.sanitizeGitCredentials(strings.Join(cmd.Args, " "), p.BaseRepo, headRepo)
 		output, err := cmd.CombinedOutput()
+		sanitizedOutput := w.sanitizeGitCredentials(string(output), p.BaseRepo, headRepo)
 		if err != nil {
-			return "", errors.Wrapf(err, "running %s: %s", cmdStr, string(output))
+			sanitizedErrMsg := w.sanitizeGitCredentials(err.Error(), p.BaseRepo, headRepo)
+			return "", fmt.Errorf("running %s: %s: %s", cmdStr, sanitizedOutput, sanitizedErrMsg)
 		}
-		log.Debug("ran: %s. Output: %s", cmdStr, strings.TrimSuffix(string(output), "\n"))
+		log.Debug("ran: %s. Output: %s", cmdStr, strings.TrimSuffix(sanitizedOutput, "\n"))
 	}
 	return cloneDir, nil
 }
@@ -226,8 +228,9 @@ func (w *FileWorkspace) cloneDir(r models.Repo, p models.PullRequest, workspace 
 	return filepath.Join(w.repoPullDir(r, p), workspace)
 }
 
-func (w *FileWorkspace) cmdAsSanitizedStr(cmd *exec.Cmd, base models.Repo, head models.Repo) string {
-	cmdAsStr := strings.Join(cmd.Args, " ")
-	baseReplaced := strings.Replace(cmdAsStr, base.CloneURL, base.SanitizedCloneURL, -1)
+// sanitizeGitCredentials replaces any git clone urls that contain credentials
+// in s with the sanitized versions.
+func (w *FileWorkspace) sanitizeGitCredentials(s string, base models.Repo, head models.Repo) string {
+	baseReplaced := strings.Replace(s, base.CloneURL, base.SanitizedCloneURL, -1)
 	return strings.Replace(baseReplaced, head.CloneURL, head.SanitizedCloneURL, -1)
 }

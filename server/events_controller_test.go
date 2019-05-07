@@ -581,7 +581,7 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 				Owner:             "project",
 				Name:              "repository",
 				CloneURL:          "https://bb-user:bb-token@bbserver.com/scm/proj/repository.git",
-				SanitizedCloneURL: "https://bbserver.com/scm/proj/repository.git",
+				SanitizedCloneURL: "https://bb-user:<redacted>@bbserver.com/scm/proj/repository.git",
 				VCSHost: models.VCSHost{
 					Hostname: "bbserver.com",
 					Type:     models.BitbucketServer,
