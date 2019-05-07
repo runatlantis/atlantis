@@ -102,7 +102,7 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
   </section>
 </div>
 <footer>
-<a href"https://github.com/runatlantis/atlantis/releases/tag/v{{ .AtlantisVersion }}">v{{ .AtlantisVersion }}</a>
+<a href="https://github.com/runatlantis/atlantis/releases/tag/v{{ .AtlantisVersion }}">v{{ .AtlantisVersion }}</a>
 </footer>
 </body>
 </html>
@@ -177,7 +177,7 @@ var lockTemplate = template.Must(template.New("lock.html.tmpl").Parse(`
     </div>
   </div>
 <footer>
-<a href"https://github.com/runatlantis/atlantis/releases/tag/v{{ .AtlantisVersion }}">v{{ .AtlantisVersion }}</a>
+<a href="https://github.com/runatlantis/atlantis/releases/tag/v{{ .AtlantisVersion }}">v{{ .AtlantisVersion }}</a>
 </footer>
 <script>
   // Get the modal
