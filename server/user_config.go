@@ -16,6 +16,7 @@ type UserConfig struct {
 	BitbucketWebhookSecret string `mapstructure:"bitbucket-webhook-secret"`
 	CheckoutStrategy       string `mapstructure:"checkout-strategy"`
 	DataDir                string `mapstructure:"data-dir"`
+	DisableApplyAll        bool   `mapstructure:"disable-apply-all"`
 	GithubHostname         string `mapstructure:"gh-hostname"`
 	GithubToken            string `mapstructure:"gh-token"`
 	GithubUser             string `mapstructure:"gh-user"`
