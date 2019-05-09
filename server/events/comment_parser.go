@@ -65,9 +65,10 @@ type CommentBuilder interface {
 
 // CommentParser implements CommentParsing
 type CommentParser struct {
-	GithubUser    string
-	GitlabUser    string
-	BitbucketUser string
+	GithubUser      string
+	GitlabUser      string
+	BitbucketUser   string
+	DisableApplyAll bool
 }
 
 // CommentParseResult describes the result of parsing a comment as a command.
@@ -237,6 +238,13 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	// an error.
 	if project != "" && (workspace != "" || dir != "") {
 		err := fmt.Sprintf("cannot use -%s/--%s at same time as -%s/--%s or -%s/--%s", projectFlagShort, projectFlagLong, dirFlagShort, dirFlagLong, workspaceFlagShort, workspaceFlagLong)
+		return CommentParseResult{CommentResponse: e.errMarkdown(err, command, flagSet)}
+	}
+
+	// If no project, workspace, or dir is specified and the flag disable-apply-all is set and the command is apply,
+	// return an error that a project or workspace or dir must be set
+	if project == "" && workspace == "" && dir == "" && e.DisableApplyAll && command == "apply" {
+		err := fmt.Sprintf("disable-apply-all flag is set, you must specify a project or workspace or directory")
 		return CommentParseResult{CommentResponse: e.errMarkdown(err, command, flagSet)}
 	}
 
