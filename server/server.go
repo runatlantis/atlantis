@@ -238,7 +238,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubUser:      userConfig.GithubUser,
 		GitlabUser:      userConfig.GitlabUser,
 		BitbucketUser:   userConfig.BitbucketUser,
-		DisableApplyAll: userConfig.DisableApplyAll,
 	}
 	defaultTfVersion := terraformClient.DefaultVersion()
 	pendingPlanFinder := &events.DefaultPendingPlanFinder{}
@@ -252,6 +251,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Logger:                   logger,
 		AllowForkPRs:             userConfig.AllowForkPRs,
 		AllowForkPRsFlag:         config.AllowForkPRsFlag,
+		DisableApplyAll:          userConfig.DisableApplyAll,
 		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
 			ParserValidator:   validator,
 			ProjectFinder:     &events.DefaultProjectFinder{},

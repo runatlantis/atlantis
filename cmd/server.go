@@ -203,7 +203,7 @@ var boolFlags = map[string]boolFlag{
 		defaultValue: false,
 	},
 	DisableApplyAllFlag: {
-		description:  "Disable `atlantis apply` so a project or workspace or directory has to be specified",
+		description:  "Disable \"atlantis apply\" command so a specific project/workspace/directory has to be specified for applies.",
 		defaultValue: false,
 	},
 	RequireApprovalFlag: {
