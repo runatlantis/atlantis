@@ -50,7 +50,7 @@ func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command string, pa
 	if err != nil {
 		err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, out)
 		ctx.Log.Debug("error: %s", err)
-		return string(out), err
+		return "", err
 	}
 	ctx.Log.Info("successfully ran %q in %q", command, path)
 	return string(out), nil

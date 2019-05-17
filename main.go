@@ -20,7 +20,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-const atlantisVersion = "0.7.1"
+const atlantisVersion = "0.7.2"
 
 func main() {
 	v := viper.New()

@@ -1,3 +1,30 @@
+# v0.7.2
+
+## Description
+Small release containing an important security fix and some bugfixes.
+
+## Features
+None
+
+## Bugfixes
+* Atlantis would post its Git credentials as pull request comment and in logs if the git clone failed. (Fixes [#615](https://github.com/runatlantis/atlantis/issues/615))
+* Atlantis would comment the same output twice during errors of custom run steps. (Fixes [#519](https://github.com/runatlantis/atlantis/issues/519))
+* `atlantis testdrive` had unreadable output on solarized terminals. (Fixes [#575](https://github.com/runatlantis/atlantis/issues/575))
+
+## Backwards Incompatibilities / Notes:
+None
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.7.2/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.7.2/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.7.2/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.7.2/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.7.2`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.7.1..v0.7.2
+https://github.com/runatlantis/atlantis/compare/v0.7.1...v0.7.2
 # v0.7.1
 
 ## Description
