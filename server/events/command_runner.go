@@ -59,7 +59,7 @@ type DefaultCommandRunner struct {
 	GithubPullGetter         GithubPullGetter
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
 	CommitStatusUpdater      CommitStatusUpdater
-        DisableApplyAll          bool
+	DisableApplyAll          bool
 	EventParser              EventParsing
 	MarkdownRenderer         *MarkdownRenderer
 	Logger                   logging.SimpleLogging
@@ -141,7 +141,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *CommentCommand) {
 	log := c.buildLogger(baseRepo.FullName, pullNum)
 	defer c.logPanics(baseRepo, pullNum, log)
-        if c.DisableApplyAll && cmd.Name == models.ApplyCommand && !cmd.IsForSpecificProject() {
+	if c.DisableApplyAll && cmd.Name == models.ApplyCommand && !cmd.IsForSpecificProject() {
 		var applyAllDisabledComment = "**Error:** Running `atlantis apply` without flags is disabled. You must specify which project to apply via the `-d <dir>`, `-w <workspace>` or `-p <project name>` flags."
 		if err := c.VCSClient.CreateComment(baseRepo, pullNum, applyAllDisabledComment); err != nil {
 			log.Err("unable to comment on pull request: %s", err)

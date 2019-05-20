@@ -65,9 +65,9 @@ type CommentBuilder interface {
 
 // CommentParser implements CommentParsing
 type CommentParser struct {
-	GithubUser      string
-	GitlabUser      string
-	BitbucketUser   string
+	GithubUser    string
+	GitlabUser    string
+	BitbucketUser string
 }
 
 // CommentParseResult describes the result of parsing a comment as a command.
