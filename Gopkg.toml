@@ -105,6 +105,10 @@
   name = "github.com/microcosm-cc/bluemonday"
 
 [[constraint]]
+  branch = "master"
+  name = "gopkg.in/russross/blackfriday.v2"
+
+[[constraint]]
   name = "github.com/go-test/deep"
   version = "1.0.1"
 

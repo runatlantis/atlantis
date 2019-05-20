@@ -51,18 +51,26 @@ func (l *LocksController) GetLock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	owner, repo := models.SplitRepoFullName(lock.Project.RepoFullName)
 	viewData := LockDetailData{
 		LockKeyEncoded:  id,
 		LockKey:         idUnencoded,
-		RepoOwner:       owner,
-		RepoName:        repo,
 		PullRequestLink: lock.Pull.URL,
 		LockedBy:        lock.Pull.Author,
 		Workspace:       lock.Workspace,
 		AtlantisVersion: l.AtlantisVersion,
 		CleanedBasePath: l.AtlantisURL.Path,
 	}
+	var owner, project, repo string
+	if lock.Pull.BaseRepo.VCSHost.Type == models.AzureDevops {
+		owner, project, repo = models.SplitAzureDevopsRepoFullName(lock.Project.RepoFullName)
+	} else {
+		owner, repo = models.SplitRepoFullName(lock.Project.RepoFullName)
+		project = ""
+	}
+	viewData.RepoOwner = owner
+	viewData.RepoProject = project
+	viewData.RepoName = repo
+
 	err = l.LockDetailTemplate.Execute(w, viewData)
 	if err != nil {
 		l.Logger.Err(err.Error())

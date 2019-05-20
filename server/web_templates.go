@@ -113,6 +113,7 @@ type LockDetailData struct {
 	LockKeyEncoded  string
 	LockKey         string
 	RepoOwner       string
+	RepoProject     string
 	RepoName        string
 	PullRequestLink string
 	LockedBy        string

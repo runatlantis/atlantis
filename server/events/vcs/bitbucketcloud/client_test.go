@@ -200,7 +200,7 @@ func TestClient_PullIsApproved(t *testing.T) {
 			client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
 			client.BaseURL = testServer.URL
 
-			repo, err := models.NewRepo(models.BitbucketServer, "owner/repo", "", "https://bitbucket.org/owner/repo.git", "user", "token")
+			repo, err := models.NewRepo(models.BitbucketServer, "owner/repo", "https://bitbucket.org/owner/repo.git", "user", "token")
 			Ok(t, err)
 			approved, err := client.PullIsApproved(repo, models.PullRequest{
 				Num:        1,

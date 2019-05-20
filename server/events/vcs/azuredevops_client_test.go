@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -88,10 +89,13 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 					}
 				}))
 
-			var httpClient = &http.Client{
-				Timeout: time.Second * 10,
+			tp := azuredevops.BasicAuthTransport{
+				Username: "",
+				Password: strings.TrimSpace("token"),
 			}
-			internalClient := azuredevops.NewClient(account, project, "token", httpClient)
+			httpClient := tp.Client()
+			httpClient.Timeout = time.Second * 10
+			internalClient, _ := azuredevops.NewClient(httpClient)
 			Ok(t, internalClient.SetBaseURL(testServer.URL))
 			client := &AzureDevopsClient{
 				Client:  internalClient,
@@ -155,10 +159,13 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 					}
 				}))
 
-			var httpClient = &http.Client{
-				Timeout: time.Second * 10,
+			tp := azuredevops.BasicAuthTransport{
+				Username: "",
+				Password: strings.TrimSpace("token"),
 			}
-			internalClient := azuredevops.NewClient(account, project, "token", httpClient)
+			httpClient := tp.Client()
+			httpClient.Timeout = time.Second * 10
+			internalClient, _ := azuredevops.NewClient(httpClient)
 			Ok(t, internalClient.SetBaseURL(testServer.URL))
 			client := &AzureDevopsClient{
 				Client:  internalClient,
