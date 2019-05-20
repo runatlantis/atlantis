@@ -177,6 +177,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	markdownRenderer := &events.MarkdownRenderer{
 		GitlabSupportsCommonMark: gitlabClient.SupportsCommonMark(),
+		DisableApplyAll:          userConfig.DisableApplyAll,
 	}
 	boltdb, err := db.New(userConfig.DataDir)
 	if err != nil {
