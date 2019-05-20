@@ -7,7 +7,7 @@
 
 ## Azure Devops Support (alpha)
 
-This fork contains Azure Devops support using a fork of the [go-azuredevops](https://github.com/mcdafydd/go-azuredevops/tree/webhook-support) library.  It will build and is somewhat functional now, but beware that work is still ongoing to fix panics, add more tests, fix work item comment support, and update documentation.
+This fork contains Azure Devops support using a fork of the [go-azuredevops](https://github.com/mcdafydd/go-azuredevops/tree/webhook-support) library.  As of tag `v0.7.1` of go-azuredeops, the basic suport for comments, statuses, running `atlantis help|plan|apply` seems to work.  There is still much to do in terms of writing tests and documentation and operational testing.
 
 ## Resources
 * How to get started: [www.runatlantis.io/guide](https://www.runatlantis.io/guide)
