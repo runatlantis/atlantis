@@ -385,4 +385,4 @@ Values are chosen in this order:
   # or (recommended)
   ATLANTIS_TFE_TOKEN='xxx.atlasv1.yyy' atlantis server
   ```
-  A token for Terraform Enterprise integration. See [Terraform Enterprise](terraform-enterprise.html) for more details.
+  A token for Terraform Cloud/Terraform Enteprise integration. See [Terraform Cloud](terraform-cloud.html) for more details.

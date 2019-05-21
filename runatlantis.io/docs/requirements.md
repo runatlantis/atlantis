@@ -19,7 +19,7 @@ statefile back to version control.
 
 :::tip
 If you're looking for an easy remote state solution, check out [free remote state](https://app.terraform.io/signup)
-storage from Terraform Enterprise. This is fully supported by Atlantis.
+storage from Terraform Cloud. This is fully supported by Atlantis.
 :::
 
 ## Repository Structure
