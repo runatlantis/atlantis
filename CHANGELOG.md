@@ -1,3 +1,35 @@
+# v0.8.0
+
+## Description
+This release upgrades the default version of Terraform to 0.12.
+If you're running Atlantis with the `--default-tf-version` flag set (which
+you always should) then this won't affect you at all.
+
+## Features
+* Upgrade default Terraform version to 0.12
+* Add new `--disable-apply-all` flag that disables running `atlantis apply`
+  without any flags. ([#645](https://github.com/runatlantis/atlantis/pull/645))
+
+## Bugfixes
+None
+
+## Backwards Incompatibilities / Notes:
+* If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
+  then the default version of Terraform will now be 0.12. Simply set the above
+  flag to your desired default version of Terraform and 0.12 won't be used.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.0/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.0/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.0/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.0/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.8.0`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.7.2..v0.8.0
+https://github.com/runatlantis/atlantis/compare/v0.7.2...v0.8.0
+
 # v0.7.2
 
 ## Description
@@ -25,6 +57,7 @@ None
 
 ## Diff v0.7.1..v0.7.2
 https://github.com/runatlantis/atlantis/compare/v0.7.1...v0.7.2
+
 # v0.7.1
 
 ## Description
