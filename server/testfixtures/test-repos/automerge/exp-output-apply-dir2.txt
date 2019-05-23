@@ -1,10 +1,17 @@
 Ran Apply for dir: `dir2` workspace: `default`
 
 ```diff
-null_resource.automerge: Creating...
-null_resource.automerge: Creation complete after *s (ID: ******************)
+null_resource.automerge[0]: Creating...
+null_resource.automerge[0]: Creation complete after *s [id=*******************]
 
 Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+
+The state of your infrastructure has been saved to the path
+below. This state is required to modify and destroy your
+infrastructure, so keep it safe. To inspect the complete state
+use the `terraform show` command.
+
+State path: terraform.tfstate
 
 ```
 
