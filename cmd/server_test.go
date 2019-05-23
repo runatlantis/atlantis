@@ -791,6 +791,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		"CHECKOUT_STRATEGY":        "merge",
 		"DATA_DIR":                 "/path",
 		"DEFAULT_TF_VERSION":       "v0.11.0",
+		"DISABLE_APPLY_ALL":        "true",
 		"GH_HOSTNAME":              "gh-hostname",
 		"GH_TOKEN":                 "gh-token",
 		"GH_USER":                  "gh-user",
