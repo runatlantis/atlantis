@@ -13,14 +13,13 @@ import (
 	"strings"
 	"testing"
 
-	getter "github.com/hashicorp/go-getter"
-	"github.com/runatlantis/atlantis/server/events/db"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
-
 	"github.com/google/go-github/github"
+	"github.com/hashicorp/go-getter"
+	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
@@ -30,6 +29,7 @@ import (
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/events/yaml"
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -44,6 +44,9 @@ func TestGitHubWorkflow(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	// Ensure we have >= TF 0.12 locally.
+	ensureRunning012(t)
+
 	cases := []struct {
 		Description string
 		// RepoDir is relative to testfixtures/test-repos.
@@ -617,15 +620,15 @@ func assertCommentEquals(t *testing.T, expFile string, act string, repoDir strin
 	exp, err := ioutil.ReadFile(filepath.Join(absRepoPath(t, repoDir), expFile))
 	Ok(t, err)
 
-	// Replace all 'Creation complete after 1s ID: 1111818181' strings with
-	// 'Creation complete after *s ID: **********' so we can do a comparison.
-	idRegex := regexp.MustCompile(`Creation complete after [0-9]+s \(ID: [0-9]+\)`)
-	act = idRegex.ReplaceAllString(act, "Creation complete after *s (ID: ******************)")
+	// Replace all 'Creation complete after 0s [id=2135833172528078362]' strings with
+	// 'Creation complete after *s [id=*******************]' so we can do a comparison.
+	idRegex := regexp.MustCompile(`Creation complete after [0-9]+s \[id=[0-9]+]`)
+	act = idRegex.ReplaceAllString(act, "Creation complete after *s [id=*******************]")
 
 	// Replace all null_resource.simple{n}: .* with null_resource.simple: because
 	// with multiple resources being created the logs are all out of order which
 	// makes comparison impossible.
-	resourceRegex := regexp.MustCompile(`null_resource\.simple\d?:.*`)
+	resourceRegex := regexp.MustCompile(`null_resource\.simple(\[\d])?\d?:.*`)
 	act = resourceRegex.ReplaceAllString(act, "null_resource.simple:")
 
 	expStr := string(exp)
@@ -654,3 +657,39 @@ func assertCommentEquals(t *testing.T, expFile string, act string, repoDir strin
 		}
 	}
 }
+
+// Will fail test if terraform isn't in path and isn't version >= 0.12
+func ensureRunning012(t *testing.T) {
+	localPath, err := exec.LookPath("terraform")
+	if err != nil {
+		t.Log("terraform >= 0.12 must be installed to run this test")
+		t.FailNow()
+	}
+	versionOutBytes, err := exec.Command(localPath, "version").Output() // #nosec
+	if err != nil {
+		t.Logf("error running terraform version: %s", err)
+		t.FailNow()
+	}
+	versionOutput := string(versionOutBytes)
+	match := versionRegex.FindStringSubmatch(versionOutput)
+	if len(match) <= 1 {
+		t.Logf("could not parse terraform version from %s", versionOutput)
+		t.FailNow()
+	}
+	localVersion, err := version.NewVersion(match[1])
+	Ok(t, err)
+	minVersion, err := version.NewVersion("0.12.0")
+	Ok(t, err)
+	if localVersion.LessThan(minVersion) {
+		t.Logf("must have terraform version >= %s, you have %s", minVersion, localVersion)
+		t.FailNow()
+	}
+}
+
+// versionRegex extracts the version from `terraform version` output.
+//     Terraform v0.12.0-alpha4 (2c36829d3265661d8edbd5014de8090ea7e2a076)
+//	   => 0.12.0-alpha4
+//
+//     Terraform v0.11.10
+//	   => 0.11.10
+var versionRegex = regexp.MustCompile("Terraform v(.*?)(\\s.*)?\n")

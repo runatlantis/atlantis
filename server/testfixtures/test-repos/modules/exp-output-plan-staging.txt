@@ -1,5 +1,7 @@
 Ran Plan for dir: `staging` workspace: `default`
 
+<details><summary>Show Output</summary>
+
 ```diff
 
 An execution plan has been generated and is shown below.
@@ -8,8 +10,11 @@ Resource actions are indicated with the following symbols:
 
 Terraform will perform the following actions:
 
-+ module.null.null_resource.this
-      id: <computed>
+  # module.null.null_resource.this will be created
++ resource "null_resource" "this" {
+      + id = (known after apply)
+    }
+
 Plan: 1 to add, 0 to change, 0 to destroy.
 
 ```
@@ -19,6 +24,7 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * `atlantis plan -d staging`
+</details>
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
