@@ -278,7 +278,9 @@ func (e *EventsController) handlePullRequestEvent(w http.ResponseWriter, baseRep
 		if eventType == models.OpenedPullEvent {
 			e.commentNotWhitelisted(baseRepo, pull.Num)
 		}
-		e.respond(w, logging.Debug, http.StatusForbidden, "Ignoring pull request event from non-whitelisted repo")
+		e.respond(w, logging.Debug, http.StatusForbidden,
+			"Ignoring pull request event from non-whitelisted repo \"%s/%s\"",
+			baseRepo.VCSHost.Hostname, baseRepo.FullName)
 		return
 	}
 
