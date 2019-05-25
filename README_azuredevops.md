@@ -13,3 +13,13 @@ Known issues:
 
 * Merging pull requests doesn't seem to be removing the locks
 
+## Problems building in a fork
+
+Since the parent project is using dep and the vendor folder, I'm currently developing this inside the following folder on my workstation:
+
+`$GOPATH/src/github.com/runatlantis/atlantis/`
+
+This deals with the problem of breaking local package imports by trying to build inside `$GOPATH/src/github.com/mcdafydd/atlantis`.  With Go modules, apparently `go mod replace` can help to address this issue more cleanly, but for now this works.  I don't want to do a global search replace and then change it back before submitting any pull requests. 
+
+I'm happy to hear any suggestions about better ways to handle this!
+
