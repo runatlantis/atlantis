@@ -19,7 +19,7 @@ generate an access token. Read on for the instructions for your specific Git hos
 * [GitHub](#github)
 * [GitLab](#gitlab)
 * [Bitbucket Cloud (bitbucket.org)](#bitbucket-cloud-bitbucket-org)
-* [Bitbucket Server (aka Stah)](#bitbucket-server-aka-stash)
+* [Bitbucket Server (aka Stash)](#bitbucket-server-aka-stash)
 
 ### GitHub
 - Create a Personal Access Token by following: [https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/#creating-a-token](https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/#creating-a-token)

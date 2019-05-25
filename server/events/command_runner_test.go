@@ -74,6 +74,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		ProjectCommandRunner:     projectCommandRunner,
 		PendingPlanFinder:        pendingPlanFinder,
 		WorkingDir:               workingDir,
+		DisableApplyAll:          false,
 	}
 	return vcsClient
 }
@@ -146,6 +147,16 @@ func TestRunCommentCommand_ForkPRDisabled(t *testing.T) {
 
 	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, nil)
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "Atlantis commands can't be run on fork pull requests. To enable, set --"+ch.AllowForkPRsFlag)
+}
+
+func TestRunCommentCommand_DisableApplyAllDisabled(t *testing.T) {
+	t.Log("if \"atlantis apply\" is run and this is disabled atlantis should" +
+		" comment saying that this is not allowed")
+	vcsClient := setup(t)
+	ch.DisableApplyAll = true
+	modelPull := models.PullRequest{State: models.OpenPullState}
+	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, modelPull.Num, &events.CommentCommand{Name: models.ApplyCommand})
+	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "**Error:** Running `atlantis apply` without flags is disabled. You must specify which project to apply via the `-d <dir>`, `-w <workspace>` or `-p <project name>` flags.")
 }
 
 func TestRunCommentCommand_ClosedPull(t *testing.T) {

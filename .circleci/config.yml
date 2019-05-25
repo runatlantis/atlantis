@@ -17,7 +17,11 @@ jobs:
     docker:
     - image: circleci/golang:1.12
       environment:
-        TERRAFORM_VERSION: 0.11.13
+        # This version of TF will be downloaded before Atlantis is started.
+        # We do this instead of setting --default-tf-version because setting
+        # that flag starts the download asynchronously so we'd have a race
+        # condition.
+        TERRAFORM_VERSION: 0.12.0
     steps:
     - checkout
     - run: make build-service

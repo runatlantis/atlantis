@@ -66,7 +66,7 @@ module.exports = {
                         'apply-requirements',
                         'checkout-strategy',
                         'terraform-versions',
-                        'terraform-enterprise'
+                        'terraform-cloud'
                     ]
                 },
                 {

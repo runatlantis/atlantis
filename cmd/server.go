@@ -55,6 +55,7 @@ const (
 	CheckoutStrategyFlag       = "checkout-strategy"
 	DataDirFlag                = "data-dir"
 	DefaultTFVersionFlag       = "default-tf-version"
+	DisableApplyAllFlag        = "disable-apply-all"
 	GHHostnameFlag             = "gh-hostname"
 	GHTokenFlag                = "gh-token"
 	GHUserFlag                 = "gh-user"
@@ -237,6 +238,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	AutomergeFlag: {
 		description:  "Automatically merge pull requests when all plans are successfully applied.",
+		defaultValue: false,
+	},
+	DisableApplyAllFlag: {
+		description:  "Disable \"atlantis apply\" command so a specific project/workspace/directory has to be specified for applies.",
 		defaultValue: false,
 	},
 	RequireApprovalFlag: {

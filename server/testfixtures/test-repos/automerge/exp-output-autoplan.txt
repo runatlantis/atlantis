@@ -4,6 +4,8 @@ Ran Plan for 2 projects:
 1. dir: `dir2` workspace: `default`
 
 ### 1. dir: `dir1` workspace: `default`
+<details><summary>Show Output</summary>
+
 ```diff
 
 An execution plan has been generated and is shown below.
@@ -12,8 +14,11 @@ Resource actions are indicated with the following symbols:
 
 Terraform will perform the following actions:
 
-+ null_resource.automerge
-      id: <computed>
+  # null_resource.automerge[0] will be created
++ resource "null_resource" "automerge" {
+      + id = (known after apply)
+    }
+
 Plan: 1 to add, 0 to change, 0 to destroy.
 
 ```
@@ -23,9 +28,12 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * `atlantis plan -d dir1`
+</details>
 
 ---
 ### 2. dir: `dir2` workspace: `default`
+<details><summary>Show Output</summary>
+
 ```diff
 
 An execution plan has been generated and is shown below.
@@ -34,8 +42,11 @@ Resource actions are indicated with the following symbols:
 
 Terraform will perform the following actions:
 
-+ null_resource.automerge
-      id: <computed>
+  # null_resource.automerge[0] will be created
++ resource "null_resource" "automerge" {
+      + id = (known after apply)
+    }
+
 Plan: 1 to add, 0 to change, 0 to destroy.
 
 ```
@@ -45,6 +56,7 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * `atlantis plan -d dir2`
+</details>
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
