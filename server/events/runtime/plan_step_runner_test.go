@@ -90,8 +90,8 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 			"select",
 			"-no-color",
 			"workspace"},
-		tfVersion,
 		map[string]string{},
+		tfVersion,
 		workspace)
 	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(logger,
 		"/path",
@@ -539,7 +539,7 @@ Terraform will perform the following actions:
 		matchers.AnyPtrToLoggingSimpleLogger(),
 		AnyString(),
 		AnyStringSlice(),
-		AnyInterface(),
+		map[string]string{},
 		matchers2.AnyPtrToGoVersionVersion(),
 		AnyString())).
 		Then(func(params []Param) ReturnValues {
@@ -593,7 +593,7 @@ func TestRun_OutputOnErr(t *testing.T) {
 		matchers.AnyPtrToLoggingSimpleLogger(),
 		AnyString(),
 		AnyStringSlice(),
-		AnyInterface(),
+		map[string]string{},
 		matchers2.AnyPtrToGoVersionVersion(),
 		AnyString())).
 		Then(func(params []Param) ReturnValues {
@@ -630,7 +630,7 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 		matchers.AnyPtrToLoggingSimpleLogger(),
 		AnyString(),
 		AnyStringSlice(),
-		AnyInterface(),
+		map[string]string{},
 		matchers2.AnyPtrToGoVersionVersion(),
 		AnyString())).ThenReturn("output", nil)
 
