@@ -40,7 +40,7 @@ type Client interface {
 	// RunCommandWithVersion executes terraform with args in path. If v is nil,
 	// it will use the default Terraform version. workspace is the Terraform
 	// workspace which should be set as an environment variable.
-	RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (string, error)
+	RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, envs map[string]string, v *version.Version, workspace string) (string, error)
 }
 
 type DefaultClient struct {
