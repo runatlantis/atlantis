@@ -205,7 +205,7 @@ func TestClient_PullIsApproved(t *testing.T) {
 			approved, err := client.PullIsApproved(repo, models.PullRequest{
 				Num:        1,
 				HeadBranch: "branch",
-				Author:     "author",
+				AuthorId:   "557058:dc3817de-8888-45cd-b81c-5c39d2560090",
 				BaseRepo:   repo,
 			})
 			Ok(t, err)

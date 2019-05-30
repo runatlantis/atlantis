@@ -116,9 +116,8 @@
       "type": "participant",
       "approved": true,
       "user": {
-        "username": "approver",
         "display_name": "Luke",
-        "account_id": "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
+        "account_id": "557058:dc3817de-7777-45cd-b81c-5c39d2560090",
         "links": {
           "self": {
             "href": "https://api.bitbucket.org/2.0/users/lkysow"
@@ -138,7 +137,6 @@
   "reason": "",
   "updated_on": "2018-07-28T00:06:42.257659+00:00",
   "author": {
-    "username": "lkysow",
     "display_name": "Luke",
     "account_id": "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
     "links": {

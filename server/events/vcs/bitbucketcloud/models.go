@@ -38,7 +38,8 @@ type DiffStatFile struct {
 }
 
 type Actor struct {
-	Nickname *string `json:"nickname,omitempty" validate:"required"`
+	Nickname  *string `json:"nickname,omitempty" validate:"required"`
+	AccountId *string `json:"account_id,omitempty" validate:"required"`
 }
 type Repository struct {
 	FullName *string `json:"full_name,omitempty" validate:"required"`
@@ -61,7 +62,8 @@ type Link struct {
 type Participant struct {
 	Approved *bool `json:"approved,omitempty" validate:"required"`
 	User     *struct {
-		Username *string `json:"username,omitempty" validate:"required"`
+		Username  *string `json:"username,omitempty" validate:"required"`
+		AccountId *string `json:"account_id,omitempty" validate:"required"`
 	} `json:"user,omitempty" validate:"required"`
 }
 type BranchMeta struct {

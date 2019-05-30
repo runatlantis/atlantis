@@ -721,6 +721,7 @@ func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {
 		HeadBranch: "lkysow/maintf-edited-online-with-bitbucket-1532029690581",
 		BaseBranch: "master",
 		Author:     "lkysow",
+		AuthorId:   "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
 		State:      models.ClosedPullState,
 		BaseRepo:   expBaseRepo,
 	}, pull)
@@ -807,6 +808,7 @@ func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 		HeadBranch: "lkysow/maintf-edited-online-with-bitbucket-1532029690581",
 		BaseBranch: "master",
 		Author:     "lkysow",
+		AuthorId:   "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
 		State:      models.ClosedPullState,
 		BaseRepo:   expBaseRepo,
 	}, pull)
@@ -908,6 +910,7 @@ func TestParseBitbucketServerCommentEvent_ValidEvent(t *testing.T) {
 		HeadBranch: "branch",
 		BaseBranch: "master",
 		Author:     "lkysow",
+		AuthorId:   "",
 		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
 	}, pull)
@@ -990,6 +993,7 @@ func TestParseBitbucketServerPullEvent_ValidEvent(t *testing.T) {
 		HeadBranch: "branch",
 		BaseBranch: "master",
 		Author:     "lkysow",
+		AuthorId:   "",
 		State:      models.ClosedPullState,
 		BaseRepo:   expBaseRepo,
 	}, pull)
