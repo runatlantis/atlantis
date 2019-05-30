@@ -117,7 +117,7 @@ func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool
 	for _, participant := range pullResp.Participants {
 		// Bitbucket allows the author to approve their own pull request. This
 		// defeats the purpose of approvals so we don't count that approval.
-		if *participant.Approved && *participant.User.AccountId != pull.AuthorId {
+		if *participant.Approved && *participant.User.AccountID != pull.AuthorID {
 			return true, nil
 		}
 	}

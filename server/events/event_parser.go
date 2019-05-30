@@ -321,7 +321,7 @@ func (e *EventParser) parseCommonBitbucketCloudEventData(event bitbucketcloud.Co
 		HeadBranch: *event.PullRequest.Source.Branch.Name,
 		BaseBranch: *event.PullRequest.Destination.Branch.Name,
 		Author:     *event.Actor.Nickname,
-		AuthorId:   *event.Actor.AccountId,
+		AuthorID:   *event.Actor.AccountID,
 		State:      prState,
 		BaseRepo:   baseRepo,
 	}
