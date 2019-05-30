@@ -47,7 +47,7 @@ func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []stri
 		// NOTE: we need to quote the plan path because Bitbucket Server can
 		// have spaces in its repo owner names which is part of the path.
 		args := append(append(append([]string{"apply", "-input=false", "-no-color"}, extraArgs...), ctx.CommentArgs...), fmt.Sprintf("%q", planPath))
-		out, err = a.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, args, ctx.TerraformVersion, ctx.Workspace)
+		out, err = a.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, args, ctx.Env, ctx.TerraformVersion, ctx.Workspace)
 	}
 
 	// If the apply was successful, delete the plan.
@@ -138,7 +138,7 @@ func (a *ApplyStepRunner) runRemoteApply(
 
 	// Start the async command execution.
 	ctx.Log.Debug("starting async tf remote operation")
-	inCh, outCh := a.AsyncTFExec.RunCommandAsync(ctx.Log, filepath.Clean(path), applyArgs, tfVersion, ctx.Workspace)
+	inCh, outCh := a.AsyncTFExec.RunCommandAsync(ctx.Log, filepath.Clean(path), applyArgs, ctx.Env, tfVersion, ctx.Workspace)
 	var lines []string
 	nextLineIsRunURL := false
 	var runURL string

@@ -185,6 +185,18 @@ func TestStep_Validate(t *testing.T) {
 			expErr: "",
 		},
 		{
+			description: "var",
+			input: raw.Step{
+				Var: VarType{
+					"var": {
+						"name": "test",
+						"command": "echo 123",
+					},
+				},
+			},
+			expErr: "",
+		},
+		{
 			description: "apply extra_args",
 			input: raw.Step{
 				Map: MapType{
@@ -324,6 +336,22 @@ func TestStep_ToValid(t *testing.T) {
 			},
 		},
 		{
+			description: "var step",
+			input: raw.Step{
+				Var: VarType{
+					"var": {
+						"name": "test",
+						"command": "echo 123",
+					},
+				},
+			},
+			exp: valid.Step{
+				StepName:  "var",
+				RunCommand: "echo 123",
+				Variable: "test",
+			},
+		},
+		{
 			description: "init extra_args",
 			input: raw.Step{
 				Map: MapType{
@@ -386,3 +414,4 @@ func TestStep_ToValid(t *testing.T) {
 }
 
 type MapType map[string]map[string][]string
+type VarType map[string]map[string]string

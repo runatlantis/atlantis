@@ -75,6 +75,7 @@ type Step struct {
 	StepName   string
 	ExtraArgs  []string
 	RunCommand string
+	Variable   string
 }
 
 type Workflow struct {

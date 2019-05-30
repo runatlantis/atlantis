@@ -178,11 +178,16 @@ func (c *DefaultClient) DefaultVersion() *version.Version {
 }
 
 // See Client.RunCommandWithVersion.
-func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (string, error) {
+func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (string, error) {
 	tfCmd, cmd, err := c.prepCmd(log, v, workspace, path, args)
 	if err != nil {
 		return "", err
 	}
+	envVars := cmd.Env
+	for key, val := range customEnvVars {
+		envVars = append(envVars, fmt.Sprintf("%s=%s", key, val))
+	}
+	cmd.Env = envVars
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		err = errors.Wrapf(err, "running %q in %q", tfCmd, path)
@@ -250,7 +255,7 @@ type Line struct {
 // Callers can use the input channel to pass stdin input to the command.
 // If any error is passed on the out channel, there will be no
 // further output (so callers are free to exit).
-func (c *DefaultClient) RunCommandAsync(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (chan<- string, <-chan Line) {
+func (c *DefaultClient) RunCommandAsync(log *logging.SimpleLogger, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (chan<- string, <-chan Line) {
 	outCh := make(chan Line)
 	inCh := make(chan string)
 
@@ -273,6 +278,11 @@ func (c *DefaultClient) RunCommandAsync(log *logging.SimpleLogger, path string, 
 		stdout, _ := cmd.StdoutPipe()
 		stderr, _ := cmd.StderrPipe()
 		stdin, _ := cmd.StdinPipe()
+		envVars := cmd.Env
+		for key, val := range customEnvVars {
+			envVars = append(envVars, fmt.Sprintf("%s=%s", key, val))
+		}
+		cmd.Env = envVars
 
 		log.Debug("starting %q in %q", tfCmd, path)
 		err = cmd.Start()

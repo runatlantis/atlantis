@@ -44,6 +44,9 @@ func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command string, pa
 	for key, val := range customEnvVars {
 		finalEnvVars = append(finalEnvVars, fmt.Sprintf("%s=%s", key, val))
 	}
+	for key, val := range ctx.Env {
+		finalEnvVars = append(finalEnvVars, fmt.Sprintf("%s=%s", key, val))
+	}
 	cmd.Env = finalEnvVars
 	out, err := cmd.CombinedOutput()
 
