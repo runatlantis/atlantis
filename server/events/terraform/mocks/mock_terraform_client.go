@@ -30,7 +30,7 @@ func (mock *MockClient) RunCommandWithVersion(log *logging.SimpleLogger, path st
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}
-	params := []pegomock.Param{log, path, args, v, workspace}
+	params := []pegomock.Param{log, path, args, envs, v, workspace}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("RunCommandWithVersion", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
 	var ret1 error
