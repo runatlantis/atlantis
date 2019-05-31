@@ -331,8 +331,8 @@ func TestStep_Validate(t *testing.T) {
 			input: raw.Step{
 				Var: VarType{
 					"var": {
-						"invalid":  nil,
-						"invalid2": nil,
+						"invalid":  "",
+						"invalid2": "",
 					},
 				},
 			},
@@ -343,7 +343,7 @@ func TestStep_Validate(t *testing.T) {
 			input: raw.Step{
 				Var: VarType{
 					"var": {
-						"invalid": nil,
+						"invalid": "",
 					},
 				},
 			},
