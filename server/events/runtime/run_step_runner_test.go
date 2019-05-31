@@ -102,7 +102,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 				RepoRelDir:       "mydir",
 				TerraformVersion: projVersion,
 				ProjectName:      c.ProjectName,
-				Env:              map[string]string{
+				Env: map[string]string{
 					"TEST": "value",
 				},
 			}
