@@ -86,6 +86,11 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 			{
 				StepName: "init",
 			},
+			{
+				StepName:   "var",
+				Variable:   "test",
+				RunCommand: "echo 123",
+			},
 		},
 		Workspace:  "default",
 		RepoRelDir: ".",
@@ -95,14 +100,15 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	When(mockPlan.Run(ctx, nil, repoDir)).ThenReturn("plan", nil)
 	When(mockApply.Run(ctx, nil, repoDir)).ThenReturn("apply", nil)
 	When(mockRun.Run(ctx, "", repoDir)).ThenReturn("run", nil)
-
+	When(mockRun.Run(ctx, "echo 123", repoDir)).ThenReturn("123", nil)
 	res := runner.Plan(ctx)
 
 	Assert(t, res.PlanSuccess != nil, "exp plan success")
 	Equals(t, "https://lock-key", res.PlanSuccess.LockURL)
 	Equals(t, "run\napply\nplan\ninit", res.PlanSuccess.TerraformOutput)
+	Equals(t, "123", ctx.Env["test"])
 
-	expSteps := []string{"run", "apply", "plan", "init"}
+	expSteps := []string{"run", "apply", "plan", "init", "var"}
 	for _, step := range expSteps {
 		switch step {
 		case "init":
@@ -113,6 +119,8 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 			mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir)
 		case "run":
 			mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir)
+		case "var":
+			mockRun.VerifyWasCalledOnce().Run(ctx, "echo 123", repoDir)
 		}
 	}
 }
