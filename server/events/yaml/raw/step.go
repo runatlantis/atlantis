@@ -187,8 +187,8 @@ func (s Step) ToValid() valid.Step {
 		// step name so we just use the first one.
 		for stepName, stepArgs := range s.Var {
 			return valid.Step{
-				StepName:  stepName,
-				Variable: stepArgs[NameArgKey],
+				StepName:   stepName,
+				Variable:   stepArgs[NameArgKey],
 				RunCommand: stepArgs[CommandArgKey],
 			}
 		}

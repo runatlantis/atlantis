@@ -189,7 +189,7 @@ func TestStep_Validate(t *testing.T) {
 			input: raw.Step{
 				Var: VarType{
 					"var": {
-						"name": "test",
+						"name":    "test",
 						"command": "echo 123",
 					},
 				},
@@ -340,15 +340,15 @@ func TestStep_ToValid(t *testing.T) {
 			input: raw.Step{
 				Var: VarType{
 					"var": {
-						"name": "test",
+						"name":    "test",
 						"command": "echo 123",
 					},
 				},
 			},
 			exp: valid.Step{
-				StepName:  "var",
+				StepName:   "var",
 				RunCommand: "echo 123",
-				Variable: "test",
+				Variable:   "test",
 			},
 		},
 		{
