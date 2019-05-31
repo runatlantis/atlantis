@@ -83,7 +83,7 @@ var:
 				Var: VarType{
 					"var": {
 						"command": "echo 123",
-						"name": "test",
+						"name":    "test",
 					},
 				},
 			},
@@ -319,7 +319,7 @@ func TestStep_Validate(t *testing.T) {
 			input: raw.Step{
 				Map: MapType{
 					"init": {
-						"invalid": nil,
+						"invalid":  nil,
 						"invalid2": nil,
 					},
 				},
@@ -331,7 +331,7 @@ func TestStep_Validate(t *testing.T) {
 			input: raw.Step{
 				Var: VarType{
 					"var": {
-						"invalid": nil,
+						"invalid":  nil,
 						"invalid2": nil,
 					},
 				},
