@@ -331,12 +331,12 @@ func TestStep_Validate(t *testing.T) {
 			input: raw.Step{
 				Var: VarType{
 					"var": {
-						"invalid":  "",
+						"abc":      "",
 						"invalid2": "",
 					},
 				},
 			},
-			expErr: "built-in steps only support two keys name and command, found \"invalid2\" in step var",
+			expErr: "built-in steps only support two keys name and command, found \"abc\" in step var",
 		},
 		{
 			description: "non two keys in var",
