@@ -73,6 +73,21 @@ key2:
 				},
 			},
 		},
+		{
+			description: "var step",
+			input: `
+var:
+  command: echo 123
+  name: test`,
+			exp: raw.Step{
+				Var: VarType{
+					"var": {
+						"command": "echo 123",
+						"name": "test",
+					},
+				},
+			},
+		},
 
 		// Run-step style
 		{
@@ -106,6 +121,7 @@ key: value`,
 				Key:       nil,
 				Map:       nil,
 				StringVal: nil,
+				Var:       nil,
 			},
 		},
 
