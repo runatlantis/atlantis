@@ -241,6 +241,16 @@ func TestStep_Validate(t *testing.T) {
 			expErr: "step element can only contain a single key, found 2: key1,key2",
 		},
 		{
+			description: "multiple keys in var",
+			input: raw.Step{
+				Var: VarType{
+					"key1": nil,
+					"key2": nil,
+				},
+			},
+			expErr: "step element can only contain a single key, found 2: key1,key2",
+		},
+		{
 			description: "multiple keys in string val",
 			input: raw.Step{
 				StringVal: map[string]string{
@@ -254,6 +264,15 @@ func TestStep_Validate(t *testing.T) {
 			description: "invalid key in map",
 			input: raw.Step{
 				Map: MapType{
+					"invalid": nil,
+				},
+			},
+			expErr: "\"invalid\" is not a valid step type",
+		},
+		{
+			description: "invalid key in var",
+			input: raw.Step{
+				Var: VarType{
 					"invalid": nil,
 				},
 			},
@@ -278,6 +297,41 @@ func TestStep_Validate(t *testing.T) {
 				},
 			},
 			expErr: "built-in steps only support a single extra_args key, found \"invalid\" in step init",
+		},
+		{
+			description: "non extra_arg key",
+			input: raw.Step{
+				Map: MapType{
+					"init": {
+						"invalid": nil,
+						"invalid2": nil,
+					},
+				},
+			},
+			expErr: "built-in steps only support a single extra_args key, found 2: invalid,invalid2",
+		},
+		{
+			description: "non extra_arg key",
+			input: raw.Step{
+				Var: VarType{
+					"var": {
+						"invalid": nil,
+						"invalid2": nil,
+					},
+				},
+			},
+			expErr: "built-in steps only support two keys name and command, found \"invalid\" in step var",
+		},
+		{
+			description: "non two keys in var",
+			input: raw.Step{
+				Var: VarType{
+					"var": {
+						"invalid": nil,
+					},
+				},
+			},
+			expErr: "built-in steps only support two keys name and command, found 1: \"invalid\"",
 		},
 		{
 			// For atlantis.yaml v2, this wouldn't parse, but now there should
