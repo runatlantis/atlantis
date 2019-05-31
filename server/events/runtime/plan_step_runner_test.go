@@ -263,7 +263,7 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 
 			// Ensure that we actually try to switch workspaces by making the
 			// output of `workspace show` to be a different name.
-			When(terraform.RunCommandWithVersion(logger, "/path", []string{"workspace", "show"}, matchers2.AnyMapOfStringToString(), tfVersion, "workspace")).ThenReturn("diffworkspace\n", nil)
+			When(terraform.RunCommandWithVersion(logger, "/path", []string{"workspace", "show"}, map[string]string(nil), tfVersion, "workspace")).ThenReturn("diffworkspace\n", nil)
 
 			expWorkspaceArgs := []string{c.expWorkspaceCommand, "select", "-no-color", "workspace"}
 			When(terraform.RunCommandWithVersion(logger, "/path", expWorkspaceArgs, matchers2.AnyMapOfStringToString(), tfVersion, "workspace")).ThenReturn("", errors.New("workspace does not exist"))
