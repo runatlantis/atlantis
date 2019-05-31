@@ -79,7 +79,7 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 			"args",
 			"comment",
 			"args"},
-		map[string]string{},
+		map[string]string(nil),
 		tfVersion,
 		workspace)
 
@@ -90,7 +90,7 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 			"select",
 			"-no-color",
 			"workspace"},
-		map[string]string{},
+		map[string]string(nil),
 		tfVersion,
 		workspace)
 	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(logger,
@@ -99,7 +99,7 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 			"select",
 			"-no-color",
 			"workspace"},
-		map[string]string{},
+		map[string]string(nil),
 		tfVersion,
 		workspace)
 }
@@ -193,7 +193,7 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 					"select",
 					"-no-color",
 					"workspace"},
-				map[string]string{},
+				map[string]string(nil),
 				tfVersion,
 				"workspace")
 			terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger,
@@ -218,7 +218,7 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 					"args",
 					"comment",
 					"args"},
-				map[string]string{},
+				map[string]string(nil),
 				tfVersion,
 				"workspace")
 		})
@@ -309,8 +309,8 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 
 			Equals(t, "output", output)
 			// Verify that env select was called as well as plan.
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", expWorkspaceArgs, map[string]string{}, tfVersion, "workspace")
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", expPlanArgs, map[string]string{}, tfVersion, "workspace")
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", expWorkspaceArgs, map[string]string(nil), tfVersion, "workspace")
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", expPlanArgs, map[string]string(nil), tfVersion, "workspace")
 		})
 	}
 }
@@ -368,10 +368,10 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 	Ok(t, err)
 
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", expPlanArgs, map[string]string{}, tfVersion, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", expPlanArgs, map[string]string(nil), tfVersion, "workspace")
 
 	// Verify that workspace select was never called.
-	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(logger, "/path", []string{"workspace", "select", "-no-color", "workspace"}, map[string]string{}, tfVersion, "workspace")
+	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(logger, "/path", []string{"workspace", "select", "-no-color", "workspace"}, map[string]string(nil), tfVersion, "workspace")
 }
 
 func TestRun_AddsEnvVarFile(t *testing.T) {
@@ -439,8 +439,8 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 	Ok(t, err)
 
 	// Verify that env select was never called since we're in version >= 0.10
-	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(logger, tmpDir, []string{"env", "select", "-no-color", "workspace"}, map[string]string{}, tfVersion, "workspace")
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, tmpDir, expPlanArgs, map[string]string{}, tfVersion, "workspace")
+	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(logger, tmpDir, []string{"env", "select", "-no-color", "workspace"}, map[string]string(nil), tfVersion, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, tmpDir, expPlanArgs, map[string]string(nil), tfVersion, "workspace")
 	Equals(t, "output", output)
 }
 
@@ -662,7 +662,7 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 		"comment",
 		"args",
 	}
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, "/path", expPlanArgs, map[string]string{}, tfVersion, "default")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, "/path", expPlanArgs, map[string]string(nil), tfVersion, "default")
 }
 
 // Test plans if using remote ops.

@@ -63,7 +63,7 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 			if c.expCmd == "get" {
 				expArgs = []string{c.expCmd, "-no-color", "-upgrade", "extra", "args"}
 			}
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, "/path", expArgs, map[string]string{}, tfVersion, "workspace")
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, "/path", expArgs, map[string]string(nil), tfVersion, "workspace")
 		})
 	}
 }
