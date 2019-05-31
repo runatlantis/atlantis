@@ -401,5 +401,6 @@ func (p *DefaultProjectCommandBuilder) buildCtx(ctx *CommandContext,
 		User:              ctx.User,
 		Verbose:           verbose,
 		Workspace:         projCfg.Workspace,
+		Env:               map[string]string{},
 	}
 }
