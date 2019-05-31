@@ -327,7 +327,7 @@ func TestStep_Validate(t *testing.T) {
 			expErr: "built-in steps only support a single extra_args key, found 2: invalid,invalid2",
 		},
 		{
-			description: "non extra_arg key",
+			description: "incorrect keys in var",
 			input: raw.Step{
 				Var: VarType{
 					"var": {
@@ -336,7 +336,7 @@ func TestStep_Validate(t *testing.T) {
 					},
 				},
 			},
-			expErr: "built-in steps only support two keys name and command, found \"invalid\" in step var",
+			expErr: "built-in steps only support two keys name and command, found \"invalid2\" in step var",
 		},
 		{
 			description: "non two keys in var",
@@ -347,7 +347,7 @@ func TestStep_Validate(t *testing.T) {
 					},
 				},
 			},
-			expErr: "built-in steps only support two keys name and command, found 1: \"invalid\"",
+			expErr: "built-in steps only support two keys name and command, found 1: invalid",
 		},
 		{
 			// For atlantis.yaml v2, this wouldn't parse, but now there should
