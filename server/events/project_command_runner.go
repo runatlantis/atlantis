@@ -186,7 +186,9 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.Pr
 		case "run":
 			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath)
 		case "var":
-			ctx.Env[step.Variable], err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath)
+			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath)
+			ctx.Env[step.Variable] = out
+			out = ""
 		}
 
 		if out != "" {
