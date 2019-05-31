@@ -326,7 +326,7 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
 	}
-	When(terraform.RunCommandWithVersion(logger, "/path", []string{"workspace", "show"}, matchers2.AnyMapOfStringToString(), tfVersion, "workspace")).ThenReturn("workspace\n", nil)
+	When(terraform.RunCommandWithVersion(logger, "/path", []string{"workspace", "show"}, map[string]string(nil), tfVersion, "workspace")).ThenReturn("workspace\n", nil)
 
 	expPlanArgs := []string{"plan",
 		"-input=false",
@@ -348,7 +348,7 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 		"args",
 		"comment",
 		"args"}
-	When(terraform.RunCommandWithVersion(logger, "/path", expPlanArgs, matchers2.AnyMapOfStringToString(), tfVersion, "workspace")).ThenReturn("output", nil)
+	When(terraform.RunCommandWithVersion(logger, "/path", expPlanArgs, map[string]string(nil), tfVersion, "workspace")).ThenReturn("output", nil)
 
 	output, err := s.Run(models.ProjectCommandContext{
 		Log:         logger,
@@ -419,7 +419,7 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 		"-var-file",
 		envVarsFile,
 	}
-	When(terraform.RunCommandWithVersion(logger, tmpDir, expPlanArgs, matchers2.AnyMapOfStringToString(), tfVersion, "workspace")).ThenReturn("output", nil)
+	When(terraform.RunCommandWithVersion(logger, tmpDir, expPlanArgs, map[string]string(nil), tfVersion, "workspace")).ThenReturn("output", nil)
 
 	output, err := s.Run(models.ProjectCommandContext{
 		Log:         logger,
@@ -455,7 +455,7 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
 	}
-	When(terraform.RunCommandWithVersion(logger, "/path", []string{"workspace", "show"}, matchers2.AnyMapOfStringToString(), tfVersion, "workspace")).ThenReturn("workspace\n", nil)
+	When(terraform.RunCommandWithVersion(logger, "/path", []string{"workspace", "show"}, map[string]string(nil), tfVersion, "workspace")).ThenReturn("workspace\n", nil)
 
 	expPlanArgs := []string{"plan",
 		"-input=false",
@@ -478,7 +478,7 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 		"comment",
 		"args",
 	}
-	When(terraform.RunCommandWithVersion(logger, "/path", expPlanArgs, matchers2.AnyMapOfStringToString(), tfVersion, "default")).ThenReturn("output", nil)
+	When(terraform.RunCommandWithVersion(logger, "/path", expPlanArgs, map[string]string(nil), tfVersion, "default")).ThenReturn("output", nil)
 
 	output, err := s.Run(models.ProjectCommandContext{
 		Log:         logger,
@@ -687,7 +687,7 @@ func TestRun_RemoteOps(t *testing.T) {
 		nil,
 		absProjectPath,
 		[]string{"workspace", "show"},
-		matchers2.AnyMapOfStringToString(),
+		map[string]string(nil),
 		tfVersion,
 		"default")).ThenReturn("default\n", nil)
 
@@ -723,7 +723,7 @@ plan locally at this time.
 
 `
 	asyncTf.LinesToSend = remotePlanOutput
-	When(terraform.RunCommandWithVersion(nil, absProjectPath, expPlanArgs, matchers2.AnyMapOfStringToString(), tfVersion, "default")).
+	When(terraform.RunCommandWithVersion(nil, absProjectPath, expPlanArgs, map[string]string(nil), tfVersion, "default")).
 		ThenReturn(planOutput, planErr)
 
 	// Now that mocking is set up, we're ready to run the plan.
