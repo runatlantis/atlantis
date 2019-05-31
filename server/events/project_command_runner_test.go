@@ -94,7 +94,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		},
 		Workspace:  "default",
 		RepoRelDir: ".",
-		Env: map[string]string{},
+		Env:        map[string]string{},
 	}
 	// Each step will output its step name.
 	When(mockInit.Run(ctx, nil, repoDir)).ThenReturn("init", nil)
