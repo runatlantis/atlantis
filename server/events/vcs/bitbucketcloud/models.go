@@ -51,6 +51,7 @@ type PullRequest struct {
 	Participants []Participant `json:"participants,omitempty" validate:"required"`
 	Links        *Links        `json:"links,omitempty" validate:"required"`
 	State        *string       `json:"state,omitempty" validate:"required"`
+	Author       *Author       `jsonN:"author,omitempty" validate:"required"`
 }
 type Links struct {
 	HTML *Link `json:"html,omitempty" validate:"required"`
@@ -61,7 +62,7 @@ type Link struct {
 type Participant struct {
 	Approved *bool `json:"approved,omitempty" validate:"required"`
 	User     *struct {
-		Username *string `json:"username,omitempty" validate:"required"`
+		UUID *string `json:"uuid,omitempty" validate:"required"`
 	} `json:"user,omitempty" validate:"required"`
 }
 type BranchMeta struct {
@@ -85,4 +86,8 @@ type CommentContent struct {
 type ConflictStatus struct {
 	MergeImpossible *bool `json:"mergeimpossible,omitempty" validate:"required"`
 	IsConflicted    *bool `json:"isconflicted,omitempty" validate:"required"`
+}
+
+type Author struct {
+	UUID *string `json:"uuid,omitempty" validate:"required"`
 }
