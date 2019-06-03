@@ -1,3 +1,30 @@
+# v0.8.1
+
+## Description
+Small bugfix release for Bitbucket Cloud users running with require approval.
+
+## Features
+None
+
+## Bugfixes
+* Atlantis would panic when checking if pull requests were approved for Bitbucket
+  Cloud due to an API change. (Fixes [#652](https://github.com/runatlantis/atlantis/issues/652))
+
+## Backwards Incompatibilities / Notes:
+None
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.1/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.1/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.1/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.1/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.8.1`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.8.0..v0.8.1
+https://github.com/runatlantis/atlantis/compare/v0.8.0...v0.8.1
+
 # v0.8.0
 
 ## Description
