@@ -98,6 +98,11 @@ func (d *DefaultSlackClient) createAttachments(applyResult ApplyResult) []slack.
 	}
 
 	text := fmt.Sprintf("Apply %s for <%s|%s>", successWord, applyResult.Pull.URL, applyResult.Repo.FullName)
+	directory := applyResult.Directory
+	if directory == "." {
+		directory = "/"
+	}
+
 	attachment := slack.Attachment{
 		Color: colour,
 		Text:  text,
@@ -110,6 +115,11 @@ func (d *DefaultSlackClient) createAttachments(applyResult ApplyResult) []slack.
 			{
 				Title: "User",
 				Value: applyResult.User.Username,
+				Short: true,
+			},
+			{
+				Title: "Directory",
+				Value: directory,
 				Short: true,
 			},
 		},

@@ -240,6 +240,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 		Repo:      ctx.BaseRepo,
 		Pull:      ctx.Pull,
 		Success:   err == nil,
+		Directory: ctx.RepoRelDir,
 	})
 	if err != nil {
 		return "", "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
