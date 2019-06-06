@@ -613,7 +613,7 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 	RegisterMockTestingT(t)
 	terraform := mocks.NewMockClient()
 
-	tfVersion, _ := version.NewVersion("0.12.0")
+	tfVersion, _ := version.NewVersion("0.12.1")
 	s := runtime.PlanStepRunner{
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,

@@ -158,7 +158,7 @@ Values are chosen in this order:
 
 * ### `--default-tf-version`
   ```bash
-  atlantis server --default-tf-version="v0.12.0"
+  atlantis server --default-tf-version="v0.12.1"
   ```
   Terraform version to default to. Will download to `<data-dir>/bin/terraform<version>`
   if not in `PATH`. See [Terraform Versions](terraform-versions.html) for more details.

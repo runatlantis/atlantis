@@ -678,7 +678,7 @@ func ensureRunning012(t *testing.T) {
 	}
 	localVersion, err := version.NewVersion(match[1])
 	Ok(t, err)
-	minVersion, err := version.NewVersion("0.12.0")
+	minVersion, err := version.NewVersion("0.12.1")
 	Ok(t, err)
 	if localVersion.LessThan(minVersion) {
 		t.Logf("must have terraform version >= %s, you have %s", minVersion, localVersion)
@@ -687,8 +687,8 @@ func ensureRunning012(t *testing.T) {
 }
 
 // versionRegex extracts the version from `terraform version` output.
-//     Terraform v0.12.0-alpha4 (2c36829d3265661d8edbd5014de8090ea7e2a076)
-//	   => 0.12.0-alpha4
+//     Terraform v0.12.1 (12c3170748efe30a36bb2e937c02c2f2a600e120)
+//	   => 0.12.1
 //
 //     Terraform v0.11.10
 //	   => 0.11.10

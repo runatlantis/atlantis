@@ -620,7 +620,7 @@ tfe-token: my-token
 		"CHECKOUT_STRATEGY":        "branch",
 		"DATA_DIR":                 "/override-path",
 		"DISABLE_APPLY_ALL":        "false",
-		"DEFAULT_TF_VERSION":       "v0.12.0",
+		"DEFAULT_TF_VERSION":       "v0.12.1",
 		"GH_HOSTNAME":              "override-gh-hostname",
 		"GH_TOKEN":                 "override-gh-token",
 		"GH_USER":                  "override-gh-user",
@@ -656,7 +656,7 @@ tfe-token: my-token
 	Equals(t, "override-bitbucket-secret", passedConfig.BitbucketWebhookSecret)
 	Equals(t, "branch", passedConfig.CheckoutStrategy)
 	Equals(t, "/override-path", passedConfig.DataDir)
-	Equals(t, "v0.12.0", passedConfig.DefaultTFVersion)
+	Equals(t, "v0.12.1", passedConfig.DefaultTFVersion)
 	Equals(t, false, passedConfig.DisableApplyAll)
 	Equals(t, "override-gh-hostname", passedConfig.GithubHostname)
 	Equals(t, "override-gh-token", passedConfig.GithubToken)
@@ -723,7 +723,7 @@ tfe-token: my-token
 		cmd.BitbucketWebhookSecretFlag: "override-bitbucket-secret",
 		cmd.CheckoutStrategyFlag:       "branch",
 		cmd.DataDirFlag:                "/override-path",
-		cmd.DefaultTFVersionFlag:       "v0.12.0",
+		cmd.DefaultTFVersionFlag:       "v0.12.1",
 		cmd.DisableApplyAllFlag:        false,
 		cmd.GHHostnameFlag:             "override-gh-hostname",
 		cmd.GHTokenFlag:                "override-gh-token",
@@ -754,7 +754,7 @@ tfe-token: my-token
 	Equals(t, "override-bitbucket-secret", passedConfig.BitbucketWebhookSecret)
 	Equals(t, "branch", passedConfig.CheckoutStrategy)
 	Equals(t, "/override-path", passedConfig.DataDir)
-	Equals(t, "v0.12.0", passedConfig.DefaultTFVersion)
+	Equals(t, "v0.12.1", passedConfig.DefaultTFVersion)
 	Equals(t, false, passedConfig.DisableApplyAll)
 	Equals(t, "override-gh-hostname", passedConfig.GithubHostname)
 	Equals(t, "override-gh-token", passedConfig.GithubToken)
@@ -831,7 +831,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		cmd.BitbucketWebhookSecretFlag: "override-bitbucket-secret",
 		cmd.CheckoutStrategyFlag:       "branch",
 		cmd.DataDirFlag:                "/override-path",
-		cmd.DefaultTFVersionFlag:       "v0.12.0",
+		cmd.DefaultTFVersionFlag:       "v0.12.1",
 		cmd.DisableApplyAllFlag:        false,
 		cmd.GHHostnameFlag:             "override-gh-hostname",
 		cmd.GHTokenFlag:                "override-gh-token",
@@ -864,7 +864,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	Equals(t, "override-bitbucket-secret", passedConfig.BitbucketWebhookSecret)
 	Equals(t, "branch", passedConfig.CheckoutStrategy)
 	Equals(t, "/override-path", passedConfig.DataDir)
-	Equals(t, "v0.12.0", passedConfig.DefaultTFVersion)
+	Equals(t, "v0.12.1", passedConfig.DefaultTFVersion)
 	Equals(t, false, passedConfig.DisableApplyAll)
 	Equals(t, "override-gh-hostname", passedConfig.GithubHostname)
 	Equals(t, "override-gh-token", passedConfig.GithubToken)
