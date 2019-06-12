@@ -143,6 +143,7 @@ func (b *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest) (boo
 			return false, errors.Wrapf(err, "API response %q was missing fields", string(resp))
 		}
 		for _, v := range diffStat.Values {
+			// These values are undocumented, found via manual testing.
 			if *v.Status == "merge conflict" || *v.Status == "local deleted" {
 				return false, nil
 			}
