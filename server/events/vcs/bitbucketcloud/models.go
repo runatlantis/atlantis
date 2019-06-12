@@ -28,6 +28,7 @@ type DiffStat struct {
 	Next   *string         `json:"next,omitempty"`
 }
 type DiffStatValue struct {
+	Status *string `json:"status,omitempty" validate:"required"`
 	// Old is the old file, this can be null.
 	Old *DiffStatFile `json:"old,omitempty"`
 	// New is the new file, this can be null.
@@ -82,12 +83,6 @@ type Comment struct {
 type CommentContent struct {
 	Raw *string `json:"raw,omitempty" validate:"required"`
 }
-
-type ConflictStatus struct {
-	MergeImpossible *bool `json:"mergeimpossible,omitempty" validate:"required"`
-	IsConflicted    *bool `json:"isconflicted,omitempty" validate:"required"`
-}
-
 type Author struct {
 	UUID *string `json:"uuid,omitempty" validate:"required"`
 }

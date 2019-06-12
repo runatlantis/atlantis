@@ -127,23 +127,32 @@ func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool
 
 // PullIsMergeable returns true if the merge request has no conflicts and can be merged.
 func (b *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
-	// NOTE: The 1.0 API is deprecated, but the 2.0 API does not provide this endpoint.
-	path := fmt.Sprintf("%s/1.0/repositories/%s/pullrequests/%d/conflict-status", b.BaseURL, repo.FullName, pull.Num)
-	resp, err := b.makeRequest("GET", path, nil)
-	if err != nil {
-		return false, err
+	nextPageURL := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/diffstat", b.BaseURL, repo.FullName, pull.Num)
+	// We'll only loop 1000 times as a safety measure.
+	maxLoops := 1000
+	for i := 0; i < maxLoops; i++ {
+		resp, err := b.makeRequest("GET", nextPageURL, nil)
+		if err != nil {
+			return false, err
+		}
+		var diffStat DiffStat
+		if err := json.Unmarshal(resp, &diffStat); err != nil {
+			return false, errors.Wrapf(err, "Could not parse response %q", string(resp))
+		}
+		if err := validator.New().Struct(diffStat); err != nil {
+			return false, errors.Wrapf(err, "API response %q was missing fields", string(resp))
+		}
+		for _, v := range diffStat.Values {
+			if *v.Status == "merge conflict" || *v.Status == "local deleted" {
+				return false, nil
+			}
+		}
+		if diffStat.Next == nil || *diffStat.Next == "" {
+			break
+		}
+		nextPageURL = *diffStat.Next
 	}
-	var conflictStatus ConflictStatus
-	if err := json.Unmarshal(resp, &conflictStatus); err != nil {
-		return false, errors.Wrapf(err, "Could not parse response %q", string(resp))
-	}
-	if err := validator.New().Struct(conflictStatus); err != nil {
-		return false, errors.Wrapf(err, "API response %q was missing fields", string(resp))
-	}
-	if !*conflictStatus.MergeImpossible && !*conflictStatus.IsConflicted {
-		return true, nil
-	}
-	return false, nil
+	return true, nil
 }
 
 // UpdateStatus updates the status of a commit.

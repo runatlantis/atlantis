@@ -213,3 +213,134 @@ func TestClient_PullIsApproved(t *testing.T) {
 		})
 	}
 }
+
+func TestClient_PullIsMergeable(t *testing.T) {
+	cases := map[string]struct {
+		DiffStat     string
+		ExpMergeable bool
+	}{
+		"mergeable": {
+			DiffStat: `{
+				"pagelen": 500,
+				"values": [
+				{
+					"status": "added",
+					"old": null,
+					"lines_removed": 0,
+					"lines_added": 2,
+					"new": {
+						"path": "parent/child/file1.txt",
+						"type": "commit_file",
+						"links": {
+							"self": {
+								"href": "https://api.bitbucket.org/2.0/repositories/lkysow/atlantis-example/src/1ed8205eec00dab4f1c0a8c486a4492c98c51f8e/main.tf"
+							}
+						}
+					},
+					"type": "diffstat"
+				}
+			],
+				"page": 1,
+				"size": 1
+			}`,
+			ExpMergeable: true,
+		},
+		"merge conflict": {
+			DiffStat: `{
+			  "pagelen": 500,
+			  "values": [
+				{
+				  "status": "merge conflict",
+				  "old": {
+					"path": "main.tf",
+					"type": "commit_file",
+					"links": {
+					  "self": {
+						"href": "https://api.bitbucket.org/2.0/repositories/lkysow/atlantis-example/src/6d6a8026a788621b37a9ac422a7d0ebb1500e85f/main.tf"
+					  }
+					}
+				  },
+				  "lines_removed": 1,
+				  "lines_added": 0,
+				  "new": {
+					"path": "main.tf",
+					"type": "commit_file",
+					"links": {
+					  "self": {
+						"href": "https://api.bitbucket.org/2.0/repositories/lkysow/atlantis-example/src/742e76108714365788f5681e99e4a64f45dce147/main.tf"
+					  }
+					}
+				  },
+				  "type": "diffstat"
+				}
+			  ],
+			  "page": 1,
+			  "size": 1
+			}`,
+			ExpMergeable: false,
+		},
+		"merge conflict due to file deleted": {
+			DiffStat: `{
+			  "pagelen": 500,
+			  "values": [
+				{
+				  "status": "local deleted",
+				  "old": null,
+				  "lines_removed": 0,
+				  "lines_added": 3,
+				  "new": {
+					"path": "main.tf",
+					"type": "commit_file",
+					"links": {
+					  "self": {
+						"href": "https://api.bitbucket.org/2.0/repositories/lkysow/atlantis-example/src/3539b9f51c9f91e8f6280e89c62e2673ddc51144/main.tf"
+					  }
+					}
+				  },
+				  "type": "diffstat"
+				}
+			  ],
+			  "page": 1,
+			  "size": 1
+			}`,
+			ExpMergeable: false,
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.RequestURI {
+				case "/2.0/repositories/owner/repo/pullrequests/1/diffstat":
+					w.Write([]byte(c.DiffStat)) // nolint: errcheck
+					return
+				default:
+					t.Errorf("got unexpected request at %q", r.RequestURI)
+					http.Error(w, "not found", http.StatusNotFound)
+					return
+				}
+			}))
+			defer testServer.Close()
+
+			client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
+			client.BaseURL = testServer.URL
+
+			actMergeable, err := client.PullIsMergeable(models.Repo{
+				FullName:          "owner/repo",
+				Owner:             "owner",
+				Name:              "repo",
+				CloneURL:          "",
+				SanitizedCloneURL: "",
+				VCSHost: models.VCSHost{
+					Type:     models.BitbucketCloud,
+					Hostname: "bitbucket.org",
+				},
+			}, models.PullRequest{
+				Num: 1,
+			})
+			Ok(t, err)
+			Equals(t, c.ExpMergeable, actMergeable)
+		})
+	}
+
+}
