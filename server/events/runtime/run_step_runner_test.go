@@ -62,6 +62,9 @@ func TestRunStepRunner_Run(t *testing.T) {
 		{
 			Command: "echo user_name=$USER_NAME",
 			ExpOut:  "user_name=acme-user\n",
+		},{
+			Command: "echo $PATH",
+			ExpOut:  "$PATH:/bin/dir\n",
 		},
 	}
 
@@ -70,6 +73,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 	defaultVersion, _ := version.NewVersion("0.8")
 	r := runtime.RunStepRunner{
 		DefaultTFVersion: defaultVersion,
+		TerraformBinDir: "/bin/dir",
 	}
 	for _, c := range cases {
 		t.Run(c.Command, func(t *testing.T) {

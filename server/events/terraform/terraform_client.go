@@ -27,9 +27,9 @@ import (
 	"strings"
 	"sync"
 
-	getter "github.com/hashicorp/go-getter"
-	version "github.com/hashicorp/go-version"
-	homedir "github.com/mitchellh/go-homedir"
+	"github.com/hashicorp/go-getter"
+	"github.com/hashicorp/go-version"
+	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -175,6 +175,10 @@ func NewClient(log *logging.SimpleLogger, dataDir string, tfeToken string, defau
 // is defined.
 func (c *DefaultClient) DefaultVersion() *version.Version {
 	return c.defaultVersion
+}
+
+func (c *DefaultClient) TerraformBinDir() string {
+	return c.binDir
 }
 
 // See Client.RunCommandWithVersion.
