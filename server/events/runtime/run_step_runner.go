@@ -33,7 +33,7 @@ func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command string, pa
 		"HEAD_BRANCH_NAME":           ctx.Pull.HeadBranch,
 		"HEAD_REPO_NAME":             ctx.HeadRepo.Name,
 		"HEAD_REPO_OWNER":            ctx.HeadRepo.Owner,
-		"PATH":                       fmt.Sprintf("$PATH:%s", r.TerraformBinDir),
+		"PATH":                       fmt.Sprintf(os.ExpandEnv("$PATH:%s"), r.TerraformBinDir),
 		"PLANFILE":                   filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName)),
 		"PROJECT_NAME":               ctx.ProjectName,
 		"PULL_AUTHOR":                ctx.Pull.Author,
@@ -46,6 +46,7 @@ func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command string, pa
 	for key, val := range customEnvVars {
 		finalEnvVars = append(finalEnvVars, fmt.Sprintf("%s=%s", key, val))
 	}
+
 	cmd.Env = finalEnvVars
 	out, err := cmd.CombinedOutput()
 
