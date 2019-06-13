@@ -288,7 +288,7 @@ func (e *EventParser) parseCommonBitbucketCloudEventData(event bitbucketcloud.Co
 		prState = models.ClosedPullState
 	case "SUPERSEDED":
 		prState = models.ClosedPullState
-	case "DECLINE":
+	case "DECLINED":
 		prState = models.ClosedPullState
 	default:
 		err = fmt.Errorf("unable to determine pull request state from %q–this is a bug", *event.PullRequest.State)
