@@ -765,7 +765,7 @@ func TestParseBitbucketCloudCommentEvent_MultipleStates(t *testing.T) {
 			models.ClosedPullState,
 		},
 		{
-			"DECLINE",
+			"DECLINED",
 			models.ClosedPullState,
 		},
 	}
@@ -781,7 +781,7 @@ func TestParseBitbucketCloudCommentEvent_MultipleStates(t *testing.T) {
 }
 
 func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
-	path := filepath.Join("testdata", "bitbucket-cloud-pull-event-fulfilled.json")
+	path := filepath.Join("testdata", "bitbucket-cloud-pull-event-created.json")
 	bytes, err := ioutil.ReadFile(path)
 	if err != nil {
 		Ok(t, err)
@@ -801,13 +801,13 @@ func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 	}
 	Equals(t, expBaseRepo, baseRepo)
 	Equals(t, models.PullRequest{
-		Num:        2,
-		HeadCommit: "e0624da46d3a",
-		URL:        "https://bitbucket.org/lkysow/atlantis-example/pull-requests/2",
-		HeadBranch: "lkysow/maintf-edited-online-with-bitbucket-1532029690581",
+		Num:        16,
+		HeadCommit: "1e69a602caef",
+		URL:        "https://bitbucket.org/lkysow/atlantis-example/pull-requests/16",
+		HeadBranch: "Luke/maintf-edited-online-with-bitbucket-1560433073473",
 		BaseBranch: "master",
-		Author:     "lkysow",
-		State:      models.ClosedPullState,
+		Author:     "Luke",
+		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
 	}, pull)
 	Equals(t, models.Repo{
@@ -822,8 +822,37 @@ func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 		},
 	}, headRepo)
 	Equals(t, models.User{
-		Username: "lkysow",
+		Username: "Luke",
 	}, user)
+}
+
+func TestParseBitbucketCloudPullEvent_States(t *testing.T) {
+	for _, c := range []struct {
+		JSON     string
+		ExpState models.PullRequestState
+	}{
+		{
+			JSON:     "bitbucket-cloud-pull-event-created.json",
+			ExpState: models.OpenPullState,
+		},
+		{
+			JSON:     "bitbucket-cloud-pull-event-fulfilled.json",
+			ExpState: models.ClosedPullState,
+		},
+		{
+			JSON:     "bitbucket-cloud-pull-event-rejected.json",
+			ExpState: models.ClosedPullState,
+		},
+	} {
+		path := filepath.Join("testdata", c.JSON)
+		bytes, err := ioutil.ReadFile(path)
+		if err != nil {
+			Ok(t, err)
+		}
+		pull, _, _, _, err := parser.ParseBitbucketCloudPullEvent(bytes)
+		Ok(t, err)
+		Equals(t, c.ExpState, pull.State)
+	}
 }
 
 func TestGetBitbucketCloudEventType(t *testing.T) {
