@@ -63,10 +63,6 @@ func TestRunStepRunner_Run(t *testing.T) {
 			Command: "echo user_name=$USER_NAME",
 			ExpOut:  "user_name=acme-user\n",
 		},
-		{
-			Command: "echo $TEST",
-			ExpOut:  "value\n",
-		},
 	}
 
 	projVersion, err := version.NewVersion("v0.11.0")
