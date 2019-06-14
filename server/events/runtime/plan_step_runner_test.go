@@ -52,7 +52,7 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 			Owner:    "owner",
 			Name:     "repo",
 		},
-	}, []string{"extra", "args"}, "/path")
+	}, []string{"extra", "args"}, "/path", map[string]string{})
 	Ok(t, err)
 
 	Equals(t, "output", output)
@@ -125,7 +125,7 @@ func TestRun_ErrWorkspaceIn08(t *testing.T) {
 		Workspace:  workspace,
 		RepoRelDir: ".",
 		User:       models.User{Username: "username"},
-	}, []string{"extra", "args"}, "/path")
+	}, []string{"extra", "args"}, "/path", map[string]string{})
 	ErrEquals(t, "terraform version 0.8.0 does not support workspaces", err)
 }
 
@@ -182,7 +182,7 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 					Owner:    "owner",
 					Name:     "repo",
 				},
-			}, []string{"extra", "args"}, "/path")
+			}, []string{"extra", "args"}, "/path", map[string]string{})
 			Ok(t, err)
 
 			Equals(t, "output", output)
@@ -304,7 +304,7 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 					Owner:    "owner",
 					Name:     "repo",
 				},
-			}, []string{"extra", "args"}, "/path")
+			}, []string{"extra", "args"}, "/path", map[string]string{})
 			Ok(t, err)
 
 			Equals(t, "output", output)
@@ -364,7 +364,7 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 			Owner:    "owner",
 			Name:     "repo",
 		},
-	}, []string{"extra", "args"}, "/path")
+	}, []string{"extra", "args"}, "/path", map[string]string{})
 	Ok(t, err)
 
 	Equals(t, "output", output)
@@ -435,7 +435,7 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 			Owner:    "owner",
 			Name:     "repo",
 		},
-	}, []string{"extra", "args"}, tmpDir)
+	}, []string{"extra", "args"}, tmpDir, map[string]string{})
 	Ok(t, err)
 
 	// Verify that env select was never called since we're in version >= 0.10
@@ -495,7 +495,7 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 			Owner:    "owner",
 			Name:     "repo",
 		},
-	}, []string{"extra", "args"}, "/path")
+	}, []string{"extra", "args"}, "/path", map[string]string{})
 	Ok(t, err)
 	Equals(t, "output", output)
 }
@@ -554,7 +554,7 @@ Terraform will perform the following actions:
 				return []ReturnValue{"", errors.New("unexpected call to RunCommandWithVersion")}
 			}
 		})
-	actOutput, err := s.Run(models.ProjectCommandContext{Workspace: "default"}, nil, "")
+	actOutput, err := s.Run(models.ProjectCommandContext{Workspace: "default"}, nil, "", map[string]string{})
 	Ok(t, err)
 	Equals(t, `
 An execution plan has been generated and is shown below.
@@ -608,7 +608,7 @@ func TestRun_OutputOnErr(t *testing.T) {
 				return []ReturnValue{"", errors.New("unexpected call to RunCommandWithVersion")}
 			}
 		})
-	actOutput, actErr := s.Run(models.ProjectCommandContext{Workspace: "default"}, nil, "")
+	actOutput, actErr := s.Run(models.ProjectCommandContext{Workspace: "default"}, nil, "", map[string]string{})
 	ErrEquals(t, expErrMsg, actErr)
 	Equals(t, expOutput, actOutput)
 }
@@ -647,7 +647,7 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 			Owner:    "owner",
 			Name:     "repo",
 		},
-	}, []string{"extra", "args"}, "/path")
+	}, []string{"extra", "args"}, "/path", map[string]string{})
 	Ok(t, err)
 	Equals(t, "output", output)
 
@@ -741,7 +741,7 @@ plan locally at this time.
 			Name:     "repo",
 		},
 	}
-	output, err := s.Run(ctx, []string{"extra", "args"}, absProjectPath)
+	output, err := s.Run(ctx, []string{"extra", "args"}, absProjectPath, map[string]string{})
 	Ok(t, err)
 	Equals(t, `
 An execution plan has been generated and is shown below.

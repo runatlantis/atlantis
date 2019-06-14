@@ -409,7 +409,7 @@ func TestStep_ToValid(t *testing.T) {
 			description: "env step",
 			input: raw.Step{
 				Env: EnvType{
-					"var": {
+					"env": {
 						"name":    "test",
 						"command": "echo 123",
 					},
@@ -418,7 +418,7 @@ func TestStep_ToValid(t *testing.T) {
 			exp: valid.Step{
 				StepName:   "env",
 				RunCommand: "echo 123",
-				Env:        "test",
+				EnvVarName: "test",
 			},
 		},
 		{
