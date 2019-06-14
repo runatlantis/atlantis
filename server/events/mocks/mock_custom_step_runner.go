@@ -44,60 +44,60 @@ func (mock *MockCustomStepRunner) Run(ctx models.ProjectCommandContext, cmd stri
 	return ret0, ret1
 }
 
-func (mock *MockCustomStepRunner) VerifyWasCalledOnce() *VerifierCustomStepRunner {
-	return &VerifierCustomStepRunner{
+func (mock *MockCustomStepRunner) VerifyWasCalledOnce() *VerifierMockCustomStepRunner {
+	return &VerifierMockCustomStepRunner{
 		mock:                   mock,
 		invocationCountMatcher: pegomock.Times(1),
 	}
 }
 
-func (mock *MockCustomStepRunner) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierCustomStepRunner {
-	return &VerifierCustomStepRunner{
+func (mock *MockCustomStepRunner) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockCustomStepRunner {
+	return &VerifierMockCustomStepRunner{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockCustomStepRunner) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierCustomStepRunner {
-	return &VerifierCustomStepRunner{
+func (mock *MockCustomStepRunner) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockCustomStepRunner {
+	return &VerifierMockCustomStepRunner{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 		inOrderContext:         inOrderContext,
 	}
 }
 
-func (mock *MockCustomStepRunner) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierCustomStepRunner {
-	return &VerifierCustomStepRunner{
+func (mock *MockCustomStepRunner) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockCustomStepRunner {
+	return &VerifierMockCustomStepRunner{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 		timeout:                timeout,
 	}
 }
 
-type VerifierCustomStepRunner struct {
+type VerifierMockCustomStepRunner struct {
 	mock                   *MockCustomStepRunner
 	invocationCountMatcher pegomock.Matcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }
 
-func (verifier *VerifierCustomStepRunner) Run(ctx models.ProjectCommandContext, cmd string, path string) *CustomStepRunner_Run_OngoingVerification {
+func (verifier *VerifierMockCustomStepRunner) Run(ctx models.ProjectCommandContext, cmd string, path string) *MockCustomStepRunner_Run_OngoingVerification {
 	params := []pegomock.Param{ctx, cmd, path}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Run", params, verifier.timeout)
-	return &CustomStepRunner_Run_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+	return &MockCustomStepRunner_Run_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type CustomStepRunner_Run_OngoingVerification struct {
+type MockCustomStepRunner_Run_OngoingVerification struct {
 	mock              *MockCustomStepRunner
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *CustomStepRunner_Run_OngoingVerification) GetCapturedArguments() (models.ProjectCommandContext, string, string) {
+func (c *MockCustomStepRunner_Run_OngoingVerification) GetCapturedArguments() (models.ProjectCommandContext, string, string) {
 	ctx, cmd, path := c.GetAllCapturedArguments()
 	return ctx[len(ctx)-1], cmd[len(cmd)-1], path[len(path)-1]
 }
 
-func (c *CustomStepRunner_Run_OngoingVerification) GetAllCapturedArguments() (_param0 []models.ProjectCommandContext, _param1 []string, _param2 []string) {
+func (c *MockCustomStepRunner_Run_OngoingVerification) GetAllCapturedArguments() (_param0 []models.ProjectCommandContext, _param1 []string, _param2 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.ProjectCommandContext, len(params[0]))

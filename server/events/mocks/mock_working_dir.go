@@ -113,60 +113,60 @@ func (mock *MockWorkingDir) DeleteForWorkspace(r models.Repo, p models.PullReque
 	return ret0
 }
 
-func (mock *MockWorkingDir) VerifyWasCalledOnce() *VerifierWorkingDir {
-	return &VerifierWorkingDir{
+func (mock *MockWorkingDir) VerifyWasCalledOnce() *VerifierMockWorkingDir {
+	return &VerifierMockWorkingDir{
 		mock:                   mock,
 		invocationCountMatcher: pegomock.Times(1),
 	}
 }
 
-func (mock *MockWorkingDir) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierWorkingDir {
-	return &VerifierWorkingDir{
+func (mock *MockWorkingDir) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockWorkingDir {
+	return &VerifierMockWorkingDir{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockWorkingDir) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierWorkingDir {
-	return &VerifierWorkingDir{
+func (mock *MockWorkingDir) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockWorkingDir {
+	return &VerifierMockWorkingDir{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 		inOrderContext:         inOrderContext,
 	}
 }
 
-func (mock *MockWorkingDir) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierWorkingDir {
-	return &VerifierWorkingDir{
+func (mock *MockWorkingDir) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockWorkingDir {
+	return &VerifierMockWorkingDir{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 		timeout:                timeout,
 	}
 }
 
-type VerifierWorkingDir struct {
+type VerifierMockWorkingDir struct {
 	mock                   *MockWorkingDir
 	invocationCountMatcher pegomock.Matcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }
 
-func (verifier *VerifierWorkingDir) Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, workspace string) *WorkingDir_Clone_OngoingVerification {
+func (verifier *VerifierMockWorkingDir) Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, workspace string) *MockWorkingDir_Clone_OngoingVerification {
 	params := []pegomock.Param{log, baseRepo, headRepo, p, workspace}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Clone", params, verifier.timeout)
-	return &WorkingDir_Clone_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+	return &MockWorkingDir_Clone_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type WorkingDir_Clone_OngoingVerification struct {
+type MockWorkingDir_Clone_OngoingVerification struct {
 	mock              *MockWorkingDir
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *WorkingDir_Clone_OngoingVerification) GetCapturedArguments() (*logging.SimpleLogger, models.Repo, models.Repo, models.PullRequest, string) {
+func (c *MockWorkingDir_Clone_OngoingVerification) GetCapturedArguments() (*logging.SimpleLogger, models.Repo, models.Repo, models.PullRequest, string) {
 	log, baseRepo, headRepo, p, workspace := c.GetAllCapturedArguments()
 	return log[len(log)-1], baseRepo[len(baseRepo)-1], headRepo[len(headRepo)-1], p[len(p)-1], workspace[len(workspace)-1]
 }
 
-func (c *WorkingDir_Clone_OngoingVerification) GetAllCapturedArguments() (_param0 []*logging.SimpleLogger, _param1 []models.Repo, _param2 []models.Repo, _param3 []models.PullRequest, _param4 []string) {
+func (c *MockWorkingDir_Clone_OngoingVerification) GetAllCapturedArguments() (_param0 []*logging.SimpleLogger, _param1 []models.Repo, _param2 []models.Repo, _param3 []models.PullRequest, _param4 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]*logging.SimpleLogger, len(params[0]))
@@ -193,23 +193,23 @@ func (c *WorkingDir_Clone_OngoingVerification) GetAllCapturedArguments() (_param
 	return
 }
 
-func (verifier *VerifierWorkingDir) GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) *WorkingDir_GetWorkingDir_OngoingVerification {
+func (verifier *VerifierMockWorkingDir) GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) *MockWorkingDir_GetWorkingDir_OngoingVerification {
 	params := []pegomock.Param{r, p, workspace}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetWorkingDir", params, verifier.timeout)
-	return &WorkingDir_GetWorkingDir_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+	return &MockWorkingDir_GetWorkingDir_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type WorkingDir_GetWorkingDir_OngoingVerification struct {
+type MockWorkingDir_GetWorkingDir_OngoingVerification struct {
 	mock              *MockWorkingDir
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *WorkingDir_GetWorkingDir_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, string) {
+func (c *MockWorkingDir_GetWorkingDir_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, string) {
 	r, p, workspace := c.GetAllCapturedArguments()
 	return r[len(r)-1], p[len(p)-1], workspace[len(workspace)-1]
 }
 
-func (c *WorkingDir_GetWorkingDir_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []string) {
+func (c *MockWorkingDir_GetWorkingDir_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.Repo, len(params[0]))
@@ -228,23 +228,23 @@ func (c *WorkingDir_GetWorkingDir_OngoingVerification) GetAllCapturedArguments()
 	return
 }
 
-func (verifier *VerifierWorkingDir) GetPullDir(r models.Repo, p models.PullRequest) *WorkingDir_GetPullDir_OngoingVerification {
+func (verifier *VerifierMockWorkingDir) GetPullDir(r models.Repo, p models.PullRequest) *MockWorkingDir_GetPullDir_OngoingVerification {
 	params := []pegomock.Param{r, p}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetPullDir", params, verifier.timeout)
-	return &WorkingDir_GetPullDir_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+	return &MockWorkingDir_GetPullDir_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type WorkingDir_GetPullDir_OngoingVerification struct {
+type MockWorkingDir_GetPullDir_OngoingVerification struct {
 	mock              *MockWorkingDir
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *WorkingDir_GetPullDir_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest) {
+func (c *MockWorkingDir_GetPullDir_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest) {
 	r, p := c.GetAllCapturedArguments()
 	return r[len(r)-1], p[len(p)-1]
 }
 
-func (c *WorkingDir_GetPullDir_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest) {
+func (c *MockWorkingDir_GetPullDir_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.Repo, len(params[0]))
@@ -259,23 +259,23 @@ func (c *WorkingDir_GetPullDir_OngoingVerification) GetAllCapturedArguments() (_
 	return
 }
 
-func (verifier *VerifierWorkingDir) Delete(r models.Repo, p models.PullRequest) *WorkingDir_Delete_OngoingVerification {
+func (verifier *VerifierMockWorkingDir) Delete(r models.Repo, p models.PullRequest) *MockWorkingDir_Delete_OngoingVerification {
 	params := []pegomock.Param{r, p}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Delete", params, verifier.timeout)
-	return &WorkingDir_Delete_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+	return &MockWorkingDir_Delete_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type WorkingDir_Delete_OngoingVerification struct {
+type MockWorkingDir_Delete_OngoingVerification struct {
 	mock              *MockWorkingDir
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *WorkingDir_Delete_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest) {
+func (c *MockWorkingDir_Delete_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest) {
 	r, p := c.GetAllCapturedArguments()
 	return r[len(r)-1], p[len(p)-1]
 }
 
-func (c *WorkingDir_Delete_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest) {
+func (c *MockWorkingDir_Delete_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.Repo, len(params[0]))
@@ -290,23 +290,23 @@ func (c *WorkingDir_Delete_OngoingVerification) GetAllCapturedArguments() (_para
 	return
 }
 
-func (verifier *VerifierWorkingDir) DeleteForWorkspace(r models.Repo, p models.PullRequest, workspace string) *WorkingDir_DeleteForWorkspace_OngoingVerification {
+func (verifier *VerifierMockWorkingDir) DeleteForWorkspace(r models.Repo, p models.PullRequest, workspace string) *MockWorkingDir_DeleteForWorkspace_OngoingVerification {
 	params := []pegomock.Param{r, p, workspace}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "DeleteForWorkspace", params, verifier.timeout)
-	return &WorkingDir_DeleteForWorkspace_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+	return &MockWorkingDir_DeleteForWorkspace_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type WorkingDir_DeleteForWorkspace_OngoingVerification struct {
+type MockWorkingDir_DeleteForWorkspace_OngoingVerification struct {
 	mock              *MockWorkingDir
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *WorkingDir_DeleteForWorkspace_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, string) {
+func (c *MockWorkingDir_DeleteForWorkspace_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, string) {
 	r, p, workspace := c.GetAllCapturedArguments()
 	return r[len(r)-1], p[len(p)-1], workspace[len(workspace)-1]
 }
 
-func (c *WorkingDir_DeleteForWorkspace_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []string) {
+func (c *MockWorkingDir_DeleteForWorkspace_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.Repo, len(params[0]))

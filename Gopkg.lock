@@ -474,8 +474,8 @@
     "internal/verify",
   ]
   pruneopts = "UT"
-  revision = "cab79a9916fbfa874d47beb4ca9c1b3bb9a8e0cb"
-  version = "v2.1.0"
+  revision = "3821b977214496511e7e49a911307c68f0785ef9"
+  version = "v2.5.0"
 
 [[projects]]
   digest = "1:40e195917a951a8bf867cd05de2a46aaf1806c50cf92eebf4c16f78cd196f747"
