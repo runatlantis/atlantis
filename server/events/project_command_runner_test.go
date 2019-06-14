@@ -53,6 +53,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		WorkingDirLocker:    events.NewDefaultWorkingDirLocker(),
 	}
 
+	envs := make(map[string]string)
 	repoDir, cleanup := TempDir(t)
 	defer cleanup()
 	When(mockWorkingDir.Clone(
@@ -88,32 +89,38 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 			{
 				StepName: "init",
 			},
+			{
+				StepName: "env",
+			},
 		},
 		Workspace:  "default",
 		RepoRelDir: ".",
 	}
 	// Each step will output its step name.
-	When(mockInit.Run(ctx, nil, repoDir)).ThenReturn("init", nil)
-	When(mockPlan.Run(ctx, nil, repoDir)).ThenReturn("plan", nil)
-	When(mockApply.Run(ctx, nil, repoDir)).ThenReturn("apply", nil)
-	When(mockRun.Run(ctx, "", repoDir)).ThenReturn("run", nil)
+	When(mockInit.Run(ctx, nil, repoDir, envs)).ThenReturn("init", nil)
+	When(mockPlan.Run(ctx, nil, repoDir, envs)).ThenReturn("plan", nil)
+	When(mockApply.Run(ctx, nil, repoDir, envs)).ThenReturn("apply", nil)
+	When(mockRun.Run(ctx, "", repoDir, envs)).ThenReturn("run", nil)
+	When(mockEnv.Run(ctx, "", "", "", repoDir, envs)).ThenReturn("name", "value", nil)
 	res := runner.Plan(ctx)
 
 	Assert(t, res.PlanSuccess != nil, "exp plan success")
 	Equals(t, "https://lock-key", res.PlanSuccess.LockURL)
-	Equals(t, "run\napply\nplan\ninit", res.PlanSuccess.TerraformOutput)
+	Equals(t, "run\napply\nplan\ninit\nenv", res.PlanSuccess.TerraformOutput)
 
-	expSteps := []string{"run", "apply", "plan", "init", "var"}
+	expSteps := []string{"run", "apply", "plan", "init", "var", "env"}
 	for _, step := range expSteps {
 		switch step {
 		case "init":
-			mockInit.VerifyWasCalledOnce().Run(ctx, nil, repoDir)
+			mockInit.VerifyWasCalledOnce().Run(ctx, nil, repoDir, envs)
 		case "plan":
-			mockPlan.VerifyWasCalledOnce().Run(ctx, nil, repoDir)
+			mockPlan.VerifyWasCalledOnce().Run(ctx, nil, repoDir, envs)
 		case "apply":
-			mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir)
+			mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, envs)
 		case "run":
-			mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir)
+			mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir, envs)
+		case "env":
+			mockEnv.VerifyWasCalledOnce().Run(ctx, "", "", "", repoDir, envs)
 		}
 	}
 }
@@ -239,9 +246,12 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				{
 					StepName: "init",
 				},
+				{
+					StepName: "env",
+				},
 			},
-			expSteps: []string{"run", "apply", "plan", "init"},
-			expOut:   "run\napply\nplan\ninit",
+			expSteps: []string{"run", "apply", "plan", "init", "env"},
+			expOut:   "run\napply\nplan\ninit\nenv",
 		},
 	}
 
@@ -271,6 +281,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				Webhooks:            mockSender,
 				WorkingDirLocker:    events.NewDefaultWorkingDirLocker(),
 			}
+			envs := make(map[string]string)
 			repoDir, cleanup := TempDir(t)
 			defer cleanup()
 			When(mockWorkingDir.GetWorkingDir(
@@ -287,10 +298,10 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				RepoRelDir:        ".",
 				PullMergeable:     c.pullMergeable,
 			}
-			When(mockInit.Run(ctx, nil, repoDir)).ThenReturn("init", nil)
-			When(mockPlan.Run(ctx, nil, repoDir)).ThenReturn("plan", nil)
-			When(mockApply.Run(ctx, nil, repoDir)).ThenReturn("apply", nil)
-			When(mockRun.Run(ctx, "", repoDir)).ThenReturn("run", nil)
+			When(mockInit.Run(ctx, nil, repoDir, envs)).ThenReturn("init", nil)
+			When(mockPlan.Run(ctx, nil, repoDir, envs)).ThenReturn("plan", nil)
+			When(mockApply.Run(ctx, nil, repoDir, envs)).ThenReturn("apply", nil)
+			When(mockRun.Run(ctx, "", repoDir, envs)).ThenReturn("run", nil)
 			When(mockApproved.PullIsApproved(ctx.BaseRepo, ctx.Pull)).ThenReturn(true, nil)
 
 			res := runner.Apply(ctx)
@@ -302,13 +313,13 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				case "approved":
 					mockApproved.VerifyWasCalledOnce().PullIsApproved(ctx.BaseRepo, ctx.Pull)
 				case "init":
-					mockInit.VerifyWasCalledOnce().Run(ctx, nil, repoDir)
+					mockInit.VerifyWasCalledOnce().Run(ctx, nil, repoDir, envs)
 				case "plan":
-					mockPlan.VerifyWasCalledOnce().Run(ctx, nil, repoDir)
+					mockPlan.VerifyWasCalledOnce().Run(ctx, nil, repoDir, envs)
 				case "apply":
-					mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir)
+					mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, envs)
 				case "run":
-					mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir)
+					mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir, envs)
 				}
 			}
 		})

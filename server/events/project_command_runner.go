@@ -63,6 +63,9 @@ type CustomStepRunner interface {
 	Run(ctx models.ProjectCommandContext, cmd string, path string, envs map[string]string) (string, error)
 }
 
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_env_step_runner.go EnvStepRunner
+
+// EnvStepRunner runs env steps.
 type EnvStepRunner interface {
 	Run(ctx models.ProjectCommandContext, name string, cmd string, value string, path string, envs map[string]string) (string, string, error)
 }
