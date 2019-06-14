@@ -343,8 +343,6 @@ type ProjectCommandContext struct {
 	// Workspace is the Terraform workspace this project is in. It will always
 	// be set.
 	Workspace string
-	// Additional env variables
-	Env map[string]string
 }
 
 // SplitRepoFullName splits a repo full name up into its owner and repo name

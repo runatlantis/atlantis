@@ -15,7 +15,7 @@ type RunStepRunner struct {
 	DefaultTFVersion *version.Version
 }
 
-func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command string, path string) (string, error) {
+func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command string, path string, envs map[string]string) (string, error) {
 	cmd := exec.Command("sh", "-c", command) // #nosec
 	cmd.Dir = path
 	tfVersion := r.DefaultTFVersion.String()
@@ -44,7 +44,7 @@ func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command string, pa
 	for key, val := range customEnvVars {
 		finalEnvVars = append(finalEnvVars, fmt.Sprintf("%s=%s", key, val))
 	}
-	for key, val := range ctx.Env {
+	for key, val := range envs {
 		finalEnvVars = append(finalEnvVars, fmt.Sprintf("%s=%s", key, val))
 	}
 	cmd.Env = finalEnvVars

@@ -94,7 +94,6 @@ func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *CommandContext, c
 func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext, commentFlags []string, verbose bool) ([]models.ProjectCommandContext, error) {
 	// Need to lock the workspace we're about to clone to.
 	workspace := DefaultWorkspace
-	envs := make(map[string]string)
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.BaseRepo.FullName, ctx.Pull.Num, workspace)
 	if err != nil {
 		ctx.Log.Warn("workspace was locked")
@@ -138,7 +137,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		for _, mp := range matchingProjects {
 			ctx.Log.Debug("determining config for project at dir: %q workspace: %q", mp.Dir, mp.Workspace)
 			mergedCfg := p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.BaseRepo.ID(), mp, repoCfg)
-			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, mergedCfg, commentFlags, repoCfg.Automerge, verbose, envs))
+			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, mergedCfg, commentFlags, repoCfg.Automerge, verbose))
 		}
 	} else {
 		// If there is no config file, then we'll plan each project that
@@ -149,7 +148,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		for _, mp := range modifiedProjects {
 			ctx.Log.Debug("determining config for project at dir: %q", mp.Path)
 			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.BaseRepo.ID(), mp.Path, DefaultWorkspace)
-			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, pCfg, commentFlags, DefaultAutomergeEnabled, verbose, envs))
+			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, pCfg, commentFlags, DefaultAutomergeEnabled, verbose))
 		}
 	}
 
@@ -160,7 +159,6 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 // cmd must be for only one project.
 func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *CommandContext, cmd *CommentCommand) (models.ProjectCommandContext, error) {
 	workspace := DefaultWorkspace
-	envs := make(map[string]string)
 	if cmd.Workspace != "" {
 		workspace = cmd.Workspace
 	}
@@ -184,7 +182,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *CommandConte
 		repoRelDir = cmd.RepoRelDir
 	}
 
-	return p.buildProjectCommandCtx(ctx, models.PlanCommand, cmd.ProjectName, cmd.Flags, repoDir, repoRelDir, workspace, cmd.Verbose, envs)
+	return p.buildProjectCommandCtx(ctx, models.PlanCommand, cmd.ProjectName, cmd.Flags, repoDir, repoRelDir, workspace, cmd.Verbose)
 }
 
 // buildApplyAllCommands builds apply contexts for every project that has
@@ -192,7 +190,6 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *CommandConte
 func (p *DefaultProjectCommandBuilder) buildApplyAllCommands(ctx *CommandContext, commentCmd *CommentCommand) ([]models.ProjectCommandContext, error) {
 	// Lock all dirs in this pull request (instead of a single dir) because we
 	// don't know how many dirs we'll need to apply in.
-	envs := make(map[string]string)
 	unlockFn, err := p.WorkingDirLocker.TryLockPull(ctx.BaseRepo.FullName, ctx.Pull.Num)
 	if err != nil {
 		return nil, err
@@ -211,7 +208,7 @@ func (p *DefaultProjectCommandBuilder) buildApplyAllCommands(ctx *CommandContext
 
 	var cmds []models.ProjectCommandContext
 	for _, plan := range plans {
-		cmd, err := p.buildProjectCommandCtx(ctx, models.ApplyCommand, plan.ProjectName, commentCmd.Flags, plan.RepoDir, plan.RepoRelDir, plan.Workspace, commentCmd.Verbose, envs)
+		cmd, err := p.buildProjectCommandCtx(ctx, models.ApplyCommand, plan.ProjectName, commentCmd.Flags, plan.RepoDir, plan.RepoRelDir, plan.Workspace, commentCmd.Verbose)
 		if err != nil {
 			return nil, errors.Wrapf(err, "building command for dir %q", plan.RepoRelDir)
 		}
@@ -224,8 +221,6 @@ func (p *DefaultProjectCommandBuilder) buildApplyAllCommands(ctx *CommandContext
 // identified by cmd.
 func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *CommandContext, cmd *CommentCommand) (models.ProjectCommandContext, error) {
 	workspace := DefaultWorkspace
-	envs := make(map[string]string)
-	//TODO: load some envs from flags here???
 	if cmd.Workspace != "" {
 		workspace = cmd.Workspace
 	}
@@ -247,7 +242,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *CommandCont
 		repoRelDir = cmd.RepoRelDir
 	}
 
-	return p.buildProjectCommandCtx(ctx, models.ApplyCommand, cmd.ProjectName, cmd.Flags, repoDir, repoRelDir, workspace, cmd.Verbose, envs)
+	return p.buildProjectCommandCtx(ctx, models.ApplyCommand, cmd.ProjectName, cmd.Flags, repoDir, repoRelDir, workspace, cmd.Verbose)
 }
 
 // buildProjectCommandCtx builds a context for a single project identified
@@ -260,8 +255,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(
 	repoDir string,
 	repoRelDir string,
 	workspace string,
-	verbose bool,
-	envs map[string]string) (models.ProjectCommandContext, error) {
+	verbose bool) (models.ProjectCommandContext, error) {
 
 	projCfgPtr, repoCfgPtr, err := p.getCfg(ctx, projectName, repoRelDir, workspace, repoDir)
 	if err != nil {
@@ -288,7 +282,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(
 	if repoCfgPtr != nil {
 		automerge = repoCfgPtr.Automerge
 	}
-	return p.buildCtx(ctx, cmd, projCfg, commentFlags, automerge, verbose, envs), nil
+	return p.buildCtx(ctx, cmd, projCfg, commentFlags, automerge, verbose), nil
 }
 
 // getCfg returns the atlantis.yaml config (if it exists) for this project. If
@@ -377,8 +371,7 @@ func (p *DefaultProjectCommandBuilder) buildCtx(ctx *CommandContext,
 	projCfg valid.MergedProjectCfg,
 	commentArgs []string,
 	automergeEnabled bool,
-	verbose bool,
-	envs map[string]string) models.ProjectCommandContext {
+	verbose bool) models.ProjectCommandContext {
 
 	var steps []valid.Step
 	switch cmd {
@@ -408,6 +401,5 @@ func (p *DefaultProjectCommandBuilder) buildCtx(ctx *CommandContext,
 		User:              ctx.User,
 		Verbose:           verbose,
 		Workspace:         projCfg.Workspace,
-		Env:               envs,
 	}
 }

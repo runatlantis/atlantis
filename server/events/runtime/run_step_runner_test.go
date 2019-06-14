@@ -102,11 +102,8 @@ func TestRunStepRunner_Run(t *testing.T) {
 				RepoRelDir:       "mydir",
 				TerraformVersion: projVersion,
 				ProjectName:      c.ProjectName,
-				Env: map[string]string{
-					"TEST": "value",
-				},
 			}
-			out, err := r.Run(ctx, c.Command, tmpDir)
+			out, err := r.Run(ctx, c.Command, tmpDir, map[string]string{})
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
 				return

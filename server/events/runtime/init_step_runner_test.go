@@ -53,7 +53,7 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 			output, err := iso.Run(models.ProjectCommandContext{
 				Workspace:  "workspace",
 				RepoRelDir: ".",
-			}, []string{"extra", "args"}, "/path")
+			}, []string{"extra", "args"}, "/path", map[string]string{})
 			Ok(t, err)
 			// When there is no error, should not return init output to PR.
 			Equals(t, "", output)
@@ -84,7 +84,7 @@ func TestRun_ShowInitOutputOnError(t *testing.T) {
 	output, err := iso.Run(models.ProjectCommandContext{
 		Workspace:  "workspace",
 		RepoRelDir: ".",
-	}, nil, "/path")
+	}, nil, "/path", map[string]string{})
 	ErrEquals(t, "error", err)
 	Equals(t, "output", output)
 }

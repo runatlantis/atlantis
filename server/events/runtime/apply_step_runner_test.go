@@ -30,7 +30,7 @@ func TestRun_NoDir(t *testing.T) {
 	_, err := o.Run(models.ProjectCommandContext{
 		RepoRelDir: ".",
 		Workspace:  "workspace",
-	}, nil, "/nonexistent/path")
+	}, nil, "/nonexistent/path", map[string]string{})
 	ErrEquals(t, "no plan found at path \".\" and workspace \"workspace\"–did you run plan?", err)
 }
 
@@ -43,7 +43,7 @@ func TestRun_NoPlanFile(t *testing.T) {
 	_, err := o.Run(models.ProjectCommandContext{
 		RepoRelDir: ".",
 		Workspace:  "workspace",
-	}, nil, tmpDir)
+	}, nil, tmpDir, map[string]string{})
 	ErrEquals(t, "no plan found at path \".\" and workspace \"workspace\"–did you run plan?", err)
 }
 
@@ -66,7 +66,7 @@ func TestRun_Success(t *testing.T) {
 		Workspace:   "workspace",
 		RepoRelDir:  ".",
 		CommentArgs: []string{"comment", "args"},
-	}, []string{"extra", "args"}, tmpDir)
+	}, []string{"extra", "args"}, tmpDir, map[string]string{})
 	Ok(t, err)
 	Equals(t, "output", output)
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), nil, "workspace")
@@ -95,7 +95,7 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 		RepoRelDir:  ".",
 		ProjectName: "projectname",
 		CommentArgs: []string{"comment", "args"},
-	}, []string{"extra", "args"}, tmpDir)
+	}, []string{"extra", "args"}, tmpDir, map[string]string{})
 	Ok(t, err)
 	Equals(t, "output", output)
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), nil, "default")
@@ -124,7 +124,7 @@ func TestRun_UsesConfiguredTFVersion(t *testing.T) {
 		RepoRelDir:       ".",
 		CommentArgs:      []string{"comment", "args"},
 		TerraformVersion: tfVersion,
-	}, []string{"extra", "args"}, tmpDir)
+	}, []string{"extra", "args"}, tmpDir, map[string]string{})
 	Ok(t, err)
 	Equals(t, "output", output)
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), tfVersion, "workspace")
@@ -200,7 +200,7 @@ func TestRun_UsingTarget(t *testing.T) {
 				Workspace:   "workspace",
 				RepoRelDir:  ".",
 				CommentArgs: c.commentFlags,
-			}, c.extraArgs, tmpDir)
+			}, c.extraArgs, tmpDir, map[string]string{})
 			Equals(t, "", output)
 			if c.expErr {
 				ErrEquals(t, "cannot run apply with -target because we are applying an already generated plan. Instead, run -target with atlantis plan", err)
@@ -246,7 +246,7 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 		CommentArgs:      []string{"comment", "args"},
 		TerraformVersion: tfVersion,
 	}
-	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir)
+	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string{})
 	<-tfExec.DoneCh
 
 	Ok(t, err)
@@ -307,7 +307,7 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 		RepoRelDir:       ".",
 		CommentArgs:      []string{"comment", "args"},
 		TerraformVersion: tfVersion,
-	}, []string{"extra", "args"}, tmpDir)
+	}, []string{"extra", "args"}, tmpDir, map[string]string{})
 	<-tfExec.DoneCh
 	ErrEquals(t, `Plan generated during apply phase did not match plan generated during plan phase.
 Aborting apply.
