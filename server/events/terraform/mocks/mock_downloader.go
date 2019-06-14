@@ -43,63 +43,63 @@ func (mock *MockDownloader) GetFile(dst string, src string, opts ...go_getter.Cl
 	return ret0
 }
 
-func (mock *MockDownloader) VerifyWasCalledOnce() *VerifierDownloader {
-	return &VerifierDownloader{
+func (mock *MockDownloader) VerifyWasCalledOnce() *VerifierMockDownloader {
+	return &VerifierMockDownloader{
 		mock:                   mock,
 		invocationCountMatcher: pegomock.Times(1),
 	}
 }
 
-func (mock *MockDownloader) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierDownloader {
-	return &VerifierDownloader{
+func (mock *MockDownloader) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockDownloader {
+	return &VerifierMockDownloader{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockDownloader) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierDownloader {
-	return &VerifierDownloader{
+func (mock *MockDownloader) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockDownloader {
+	return &VerifierMockDownloader{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 		inOrderContext:         inOrderContext,
 	}
 }
 
-func (mock *MockDownloader) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierDownloader {
-	return &VerifierDownloader{
+func (mock *MockDownloader) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockDownloader {
+	return &VerifierMockDownloader{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 		timeout:                timeout,
 	}
 }
 
-type VerifierDownloader struct {
+type VerifierMockDownloader struct {
 	mock                   *MockDownloader
 	invocationCountMatcher pegomock.Matcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }
 
-func (verifier *VerifierDownloader) GetFile(dst string, src string, opts ...go_getter.ClientOption) *Downloader_GetFile_OngoingVerification {
+func (verifier *VerifierMockDownloader) GetFile(dst string, src string, opts ...go_getter.ClientOption) *MockDownloader_GetFile_OngoingVerification {
 	params := []pegomock.Param{dst, src}
 	for _, param := range opts {
 		params = append(params, param)
 	}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetFile", params, verifier.timeout)
-	return &Downloader_GetFile_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+	return &MockDownloader_GetFile_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type Downloader_GetFile_OngoingVerification struct {
+type MockDownloader_GetFile_OngoingVerification struct {
 	mock              *MockDownloader
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *Downloader_GetFile_OngoingVerification) GetCapturedArguments() (string, string, []go_getter.ClientOption) {
+func (c *MockDownloader_GetFile_OngoingVerification) GetCapturedArguments() (string, string, []go_getter.ClientOption) {
 	dst, src, opts := c.GetAllCapturedArguments()
 	return dst[len(dst)-1], src[len(src)-1], opts[len(opts)-1]
 }
 
-func (c *Downloader_GetFile_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []string, _param2 [][]go_getter.ClientOption) {
+func (c *MockDownloader_GetFile_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []string, _param2 [][]go_getter.ClientOption) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]string, len(params[0]))

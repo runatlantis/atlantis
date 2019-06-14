@@ -41,60 +41,60 @@ func (mock *MockCommentParsing) Parse(comment string, vcsHost models.VCSHostType
 	return ret0
 }
 
-func (mock *MockCommentParsing) VerifyWasCalledOnce() *VerifierCommentParsing {
-	return &VerifierCommentParsing{
+func (mock *MockCommentParsing) VerifyWasCalledOnce() *VerifierMockCommentParsing {
+	return &VerifierMockCommentParsing{
 		mock:                   mock,
 		invocationCountMatcher: pegomock.Times(1),
 	}
 }
 
-func (mock *MockCommentParsing) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierCommentParsing {
-	return &VerifierCommentParsing{
+func (mock *MockCommentParsing) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockCommentParsing {
+	return &VerifierMockCommentParsing{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockCommentParsing) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierCommentParsing {
-	return &VerifierCommentParsing{
+func (mock *MockCommentParsing) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockCommentParsing {
+	return &VerifierMockCommentParsing{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 		inOrderContext:         inOrderContext,
 	}
 }
 
-func (mock *MockCommentParsing) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierCommentParsing {
-	return &VerifierCommentParsing{
+func (mock *MockCommentParsing) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockCommentParsing {
+	return &VerifierMockCommentParsing{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 		timeout:                timeout,
 	}
 }
 
-type VerifierCommentParsing struct {
+type VerifierMockCommentParsing struct {
 	mock                   *MockCommentParsing
 	invocationCountMatcher pegomock.Matcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }
 
-func (verifier *VerifierCommentParsing) Parse(comment string, vcsHost models.VCSHostType) *CommentParsing_Parse_OngoingVerification {
+func (verifier *VerifierMockCommentParsing) Parse(comment string, vcsHost models.VCSHostType) *MockCommentParsing_Parse_OngoingVerification {
 	params := []pegomock.Param{comment, vcsHost}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Parse", params, verifier.timeout)
-	return &CommentParsing_Parse_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+	return &MockCommentParsing_Parse_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type CommentParsing_Parse_OngoingVerification struct {
+type MockCommentParsing_Parse_OngoingVerification struct {
 	mock              *MockCommentParsing
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *CommentParsing_Parse_OngoingVerification) GetCapturedArguments() (string, models.VCSHostType) {
+func (c *MockCommentParsing_Parse_OngoingVerification) GetCapturedArguments() (string, models.VCSHostType) {
 	comment, vcsHost := c.GetAllCapturedArguments()
 	return comment[len(comment)-1], vcsHost[len(vcsHost)-1]
 }
 
-func (c *CommentParsing_Parse_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []models.VCSHostType) {
+func (c *MockCommentParsing_Parse_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []models.VCSHostType) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]string, len(params[0]))

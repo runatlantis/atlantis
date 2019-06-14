@@ -41,60 +41,60 @@ func (mock *MockWebhooksSender) Send(log *logging.SimpleLogger, res webhooks.App
 	return ret0
 }
 
-func (mock *MockWebhooksSender) VerifyWasCalledOnce() *VerifierWebhooksSender {
-	return &VerifierWebhooksSender{
+func (mock *MockWebhooksSender) VerifyWasCalledOnce() *VerifierMockWebhooksSender {
+	return &VerifierMockWebhooksSender{
 		mock:                   mock,
 		invocationCountMatcher: pegomock.Times(1),
 	}
 }
 
-func (mock *MockWebhooksSender) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierWebhooksSender {
-	return &VerifierWebhooksSender{
+func (mock *MockWebhooksSender) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockWebhooksSender {
+	return &VerifierMockWebhooksSender{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockWebhooksSender) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierWebhooksSender {
-	return &VerifierWebhooksSender{
+func (mock *MockWebhooksSender) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockWebhooksSender {
+	return &VerifierMockWebhooksSender{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 		inOrderContext:         inOrderContext,
 	}
 }
 
-func (mock *MockWebhooksSender) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierWebhooksSender {
-	return &VerifierWebhooksSender{
+func (mock *MockWebhooksSender) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockWebhooksSender {
+	return &VerifierMockWebhooksSender{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 		timeout:                timeout,
 	}
 }
 
-type VerifierWebhooksSender struct {
+type VerifierMockWebhooksSender struct {
 	mock                   *MockWebhooksSender
 	invocationCountMatcher pegomock.Matcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }
 
-func (verifier *VerifierWebhooksSender) Send(log *logging.SimpleLogger, res webhooks.ApplyResult) *WebhooksSender_Send_OngoingVerification {
+func (verifier *VerifierMockWebhooksSender) Send(log *logging.SimpleLogger, res webhooks.ApplyResult) *MockWebhooksSender_Send_OngoingVerification {
 	params := []pegomock.Param{log, res}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Send", params, verifier.timeout)
-	return &WebhooksSender_Send_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+	return &MockWebhooksSender_Send_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type WebhooksSender_Send_OngoingVerification struct {
+type MockWebhooksSender_Send_OngoingVerification struct {
 	mock              *MockWebhooksSender
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *WebhooksSender_Send_OngoingVerification) GetCapturedArguments() (*logging.SimpleLogger, webhooks.ApplyResult) {
+func (c *MockWebhooksSender_Send_OngoingVerification) GetCapturedArguments() (*logging.SimpleLogger, webhooks.ApplyResult) {
 	log, res := c.GetAllCapturedArguments()
 	return log[len(log)-1], res[len(res)-1]
 }
 
-func (c *WebhooksSender_Send_OngoingVerification) GetAllCapturedArguments() (_param0 []*logging.SimpleLogger, _param1 []webhooks.ApplyResult) {
+func (c *MockWebhooksSender_Send_OngoingVerification) GetAllCapturedArguments() (_param0 []*logging.SimpleLogger, _param1 []webhooks.ApplyResult) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]*logging.SimpleLogger, len(params[0]))
