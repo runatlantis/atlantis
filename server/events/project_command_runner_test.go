@@ -34,6 +34,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	mockInit := mocks.NewMockStepRunner()
 	mockPlan := mocks.NewMockStepRunner()
 	mockApply := mocks.NewMockStepRunner()
+	mockEnv := mocks.NewMockEnvStepRunner()
 	mockRun := mocks.NewMockCustomStepRunner()
 	mockWorkingDir := mocks.NewMockWorkingDir()
 	mockLocker := mocks.NewMockProjectLocker()
@@ -45,6 +46,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		PlanStepRunner:      mockPlan,
 		ApplyStepRunner:     mockApply,
 		RunStepRunner:       mockRun,
+		EnvStepRunner:       mockEnv,
 		PullApprovedChecker: nil,
 		WorkingDir:          mockWorkingDir,
 		Webhooks:            nil,
@@ -86,28 +88,20 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 			{
 				StepName: "init",
 			},
-			{
-				StepName:   "env",
-				Env:        "test",
-				RunCommand: "echo 123",
-			},
 		},
 		Workspace:  "default",
 		RepoRelDir: ".",
-		Env:        map[string]string{},
 	}
 	// Each step will output its step name.
 	When(mockInit.Run(ctx, nil, repoDir)).ThenReturn("init", nil)
 	When(mockPlan.Run(ctx, nil, repoDir)).ThenReturn("plan", nil)
 	When(mockApply.Run(ctx, nil, repoDir)).ThenReturn("apply", nil)
 	When(mockRun.Run(ctx, "", repoDir)).ThenReturn("run", nil)
-	When(mockRun.Run(ctx, "echo 123", repoDir)).ThenReturn("123", nil)
 	res := runner.Plan(ctx)
 
 	Assert(t, res.PlanSuccess != nil, "exp plan success")
 	Equals(t, "https://lock-key", res.PlanSuccess.LockURL)
 	Equals(t, "run\napply\nplan\ninit", res.PlanSuccess.TerraformOutput)
-	Equals(t, "123", ctx.Env["test"])
 
 	expSteps := []string{"run", "apply", "plan", "init", "var"}
 	for _, step := range expSteps {
@@ -120,8 +114,6 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 			mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir)
 		case "run":
 			mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir)
-		case "env":
-			mockRun.VerifyWasCalledOnce().Run(ctx, "echo 123", repoDir)
 		}
 	}
 }
@@ -260,6 +252,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			mockPlan := mocks.NewMockStepRunner()
 			mockApply := mocks.NewMockStepRunner()
 			mockRun := mocks.NewMockCustomStepRunner()
+			mockEnv := mocks.NewMockEnvStepRunner()
 			mockApproved := mocks2.NewMockPullApprovedChecker()
 			mockWorkingDir := mocks.NewMockWorkingDir()
 			mockLocker := mocks.NewMockProjectLocker()
@@ -272,6 +265,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				PlanStepRunner:      mockPlan,
 				ApplyStepRunner:     mockApply,
 				RunStepRunner:       mockRun,
+				EnvStepRunner:       mockEnv,
 				PullApprovedChecker: mockApproved,
 				WorkingDir:          mockWorkingDir,
 				Webhooks:            mockSender,

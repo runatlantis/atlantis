@@ -262,7 +262,7 @@ func (s *Step) unmarshalGeneric(unmarshal func(interface{}) error) error {
 	//     name: k
 	//     value: hi //optional
 	//     command: exec
-	// We validate if the key var
+	// We validate if the key env
 	var envStep map[string]map[string]string
 	err = unmarshal(&envStep)
 	if err == nil {
