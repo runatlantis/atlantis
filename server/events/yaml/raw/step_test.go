@@ -336,7 +336,7 @@ func TestStep_Validate(t *testing.T) {
 					},
 				},
 			},
-			expErr: "built-in steps only support two keys name and command, found \"abc\" in step env",
+			expErr: "built-in steps only support two keys name and command or value, found \"abc\" in step env",
 		},
 		{
 			description: "non two keys in env",
@@ -347,7 +347,7 @@ func TestStep_Validate(t *testing.T) {
 					},
 				},
 			},
-			expErr: "built-in steps only support two keys name and command, found 1: invalid",
+			expErr: "built-in steps only support two keys name and command or value, found 1: invalid",
 		},
 		{
 			// For atlantis.yaml v2, this wouldn't parse, but now there should
