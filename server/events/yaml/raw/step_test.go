@@ -201,10 +201,10 @@ func TestStep_Validate(t *testing.T) {
 			expErr: "",
 		},
 		{
-			description: "var",
+			description: "env",
 			input: raw.Step{
 				Env: EnvType{
-					"var": {
+					"env": {
 						"name":    "test",
 						"command": "echo 123",
 					},
@@ -257,7 +257,7 @@ func TestStep_Validate(t *testing.T) {
 			expErr: "step element can only contain a single key, found 2: key1,key2",
 		},
 		{
-			description: "multiple keys in var",
+			description: "multiple keys in env",
 			input: raw.Step{
 				Env: EnvType{
 					"key1": nil,
@@ -286,7 +286,7 @@ func TestStep_Validate(t *testing.T) {
 			expErr: "\"invalid\" is not a valid step type",
 		},
 		{
-			description: "invalid key in var",
+			description: "invalid key in env",
 			input: raw.Step{
 				Env: EnvType{
 					"invalid": nil,
@@ -327,22 +327,22 @@ func TestStep_Validate(t *testing.T) {
 			expErr: "built-in steps only support a single extra_args key, found 2: invalid,invalid2",
 		},
 		{
-			description: "incorrect keys in var",
+			description: "incorrect keys in env",
 			input: raw.Step{
 				Env: EnvType{
-					"var": {
+					"env": {
 						"abc":      "",
 						"invalid2": "",
 					},
 				},
 			},
-			expErr: "built-in steps only support two keys name and command, found \"abc\" in step var",
+			expErr: "built-in steps only support two keys name and command, found \"abc\" in step env",
 		},
 		{
-			description: "non two keys in var",
+			description: "non two keys in env",
 			input: raw.Step{
 				Env: EnvType{
-					"var": {
+					"env": {
 						"invalid": "",
 					},
 				},
