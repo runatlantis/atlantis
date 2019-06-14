@@ -90,7 +90,9 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 				StepName: "init",
 			},
 			{
-				StepName: "env",
+				StepName:    "env",
+				EnvVarName:  "name",
+				EnvVarValue: "value",
 			},
 		},
 		Workspace:  "default",
@@ -101,14 +103,15 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	When(mockPlan.Run(ctx, nil, repoDir, envs)).ThenReturn("plan", nil)
 	When(mockApply.Run(ctx, nil, repoDir, envs)).ThenReturn("apply", nil)
 	When(mockRun.Run(ctx, "", repoDir, envs)).ThenReturn("run", nil)
-	When(mockEnv.Run(ctx, "", "", "", repoDir, envs)).ThenReturn("name", "value", nil)
+	When(mockEnv.Run(ctx, "name", "", "value", repoDir, envs)).ThenReturn("name", "value", nil)
 	res := runner.Plan(ctx)
 
 	Assert(t, res.PlanSuccess != nil, "exp plan success")
 	Equals(t, "https://lock-key", res.PlanSuccess.LockURL)
 	Equals(t, "run\napply\nplan\ninit", res.PlanSuccess.TerraformOutput)
 
-	expSteps := []string{"run", "apply", "plan", "init", "var", "env"}
+	expSteps := []string{"env", "run", "apply", "plan", "init"}
+	var newEnv = map[string]string{"name": "value"}
 	for _, step := range expSteps {
 		switch step {
 		case "init":
@@ -120,7 +123,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		case "run":
 			mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir, envs)
 		case "env":
-			mockEnv.VerifyWasCalledOnce().Run(ctx, "", "", "", repoDir, envs)
+			mockEnv.VerifyWasCalledOnce().Run(ctx, "name", "", "value", repoDir, newEnv)
 		}
 	}
 }
