@@ -319,12 +319,12 @@ func TestStep_Validate(t *testing.T) {
 			input: raw.Step{
 				Map: MapType{
 					"init": {
-						"invalid":  nil,
-						"invalid2": nil,
+						"invalid": nil,
+						"zzzzzzz": nil,
 					},
 				},
 			},
-			expErr: "built-in steps only support a single extra_args key, found 2: invalid,invalid2",
+			expErr: "built-in steps only support a single extra_args key, found 2: invalid,zzzzzzz",
 		},
 		{
 			description: "incorrect keys in env",
