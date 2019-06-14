@@ -99,7 +99,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 				TerraformVersion: projVersion,
 				ProjectName:      c.ProjectName,
 			}
-			out, err := r.Run(ctx, c.Command, tmpDir, map[string]string{})
+			out, err := r.Run(ctx, c.Command, tmpDir, map[string]string{"test": "var"})
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
 				return
