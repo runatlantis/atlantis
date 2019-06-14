@@ -63,6 +63,10 @@ type CustomStepRunner interface {
 	Run(ctx models.ProjectCommandContext, cmd string, path string) (string, error)
 }
 
+type EnvStepRunner interface {
+	Run(ctx models.ProjectCommandContext, name string, cmd string, value string, path string) (string, string, error)
+}
+
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_webhooks_sender.go WebhooksSender
 
 // WebhooksSender sends webhook.
@@ -90,6 +94,7 @@ type DefaultProjectCommandRunner struct {
 	PlanStepRunner      StepRunner
 	ApplyStepRunner     StepRunner
 	RunStepRunner       CustomStepRunner
+	EnvStepRunner       EnvStepRunner
 	PullApprovedChecker runtime.PullApprovedChecker
 	WorkingDir          WorkingDir
 	Webhooks            WebhooksSender
@@ -176,6 +181,7 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.Pr
 	for _, step := range steps {
 		var out string
 		var err error
+		var name string
 		switch step.StepName {
 		case "init":
 			out, err = p.InitStepRunner.Run(ctx, step.ExtraArgs, absPath)
@@ -185,9 +191,9 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.Pr
 			out, err = p.ApplyStepRunner.Run(ctx, step.ExtraArgs, absPath)
 		case "run":
 			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath)
-		case "var":
-			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath)
-			ctx.Env[step.Variable] = out
+		case "env":
+			name, out, err = p.EnvStepRunner.Run(ctx, step.EnvVarName, step.RunCommand, step.EnvVarValue, absPath)
+			ctx.Env[name] = out
 			out = ""
 		}
 

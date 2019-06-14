@@ -87,8 +87,8 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 				StepName: "init",
 			},
 			{
-				StepName:   "var",
-				Variable:   "test",
+				StepName:   "env",
+				Env:        "test",
 				RunCommand: "echo 123",
 			},
 		},
@@ -120,7 +120,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 			mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir)
 		case "run":
 			mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir)
-		case "var":
+		case "env":
 			mockRun.VerifyWasCalledOnce().Run(ctx, "echo 123", repoDir)
 		}
 	}

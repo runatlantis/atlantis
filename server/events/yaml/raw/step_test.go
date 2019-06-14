@@ -74,14 +74,14 @@ key2:
 			},
 		},
 		{
-			description: "var step",
+			description: "env step",
 			input: `
-var:
+env:
   command: echo 123
   name: test`,
 			exp: raw.Step{
-				Var: VarType{
-					"var": {
+				Env: EnvType{
+					"env": {
 						"command": "echo 123",
 						"name":    "test",
 					},
@@ -121,7 +121,7 @@ key: value`,
 				Key:       nil,
 				Map:       nil,
 				StringVal: nil,
-				Var:       nil,
+				Env:       nil,
 			},
 		},
 
@@ -203,7 +203,7 @@ func TestStep_Validate(t *testing.T) {
 		{
 			description: "var",
 			input: raw.Step{
-				Var: VarType{
+				Env: EnvType{
 					"var": {
 						"name":    "test",
 						"command": "echo 123",
@@ -259,7 +259,7 @@ func TestStep_Validate(t *testing.T) {
 		{
 			description: "multiple keys in var",
 			input: raw.Step{
-				Var: VarType{
+				Env: EnvType{
 					"key1": nil,
 					"key2": nil,
 				},
@@ -288,7 +288,7 @@ func TestStep_Validate(t *testing.T) {
 		{
 			description: "invalid key in var",
 			input: raw.Step{
-				Var: VarType{
+				Env: EnvType{
 					"invalid": nil,
 				},
 			},
@@ -329,7 +329,7 @@ func TestStep_Validate(t *testing.T) {
 		{
 			description: "incorrect keys in var",
 			input: raw.Step{
-				Var: VarType{
+				Env: EnvType{
 					"var": {
 						"abc":      "",
 						"invalid2": "",
@@ -341,7 +341,7 @@ func TestStep_Validate(t *testing.T) {
 		{
 			description: "non two keys in var",
 			input: raw.Step{
-				Var: VarType{
+				Env: EnvType{
 					"var": {
 						"invalid": "",
 					},
@@ -406,9 +406,9 @@ func TestStep_ToValid(t *testing.T) {
 			},
 		},
 		{
-			description: "var step",
+			description: "env step",
 			input: raw.Step{
-				Var: VarType{
+				Env: EnvType{
 					"var": {
 						"name":    "test",
 						"command": "echo 123",
@@ -416,9 +416,9 @@ func TestStep_ToValid(t *testing.T) {
 				},
 			},
 			exp: valid.Step{
-				StepName:   "var",
+				StepName:   "env",
 				RunCommand: "echo 123",
-				Variable:   "test",
+				Env:        "test",
 			},
 		},
 		{
@@ -484,4 +484,4 @@ func TestStep_ToValid(t *testing.T) {
 }
 
 type MapType map[string]map[string][]string
-type VarType map[string]map[string]string
+type EnvType map[string]map[string]string

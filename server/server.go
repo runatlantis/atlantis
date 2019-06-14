@@ -284,6 +284,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			RunStepRunner: &runtime.RunStepRunner{
 				DefaultTFVersion: defaultTfVersion,
 			},
+			EnvStepRunner: &runtime.EnvStepRunner{
+				DefaultTFVersion: defaultTfVersion,
+			},
 			PullApprovedChecker: vcsClient,
 			WorkingDir:          workingDir,
 			Webhooks:            webhooksManager,
