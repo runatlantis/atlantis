@@ -177,6 +177,7 @@ func (c *DefaultClient) DefaultVersion() *version.Version {
 	return c.defaultVersion
 }
 
+// TerraformBinDir returns the directory where we download Terraform binaries.
 func (c *DefaultClient) TerraformBinDir() string {
 	return c.binDir
 }

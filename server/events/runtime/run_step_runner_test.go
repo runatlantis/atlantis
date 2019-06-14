@@ -66,7 +66,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 			ExpOut:  "user_name=acme-user\n",
 		}, {
 			Command: "echo $PATH",
-			ExpOut:  fmt.Sprintf(os.ExpandEnv("$PATH%s"), ":/bin/dir\n"),
+			ExpOut:  fmt.Sprintf("%s:%s\n", os.Getenv("PATH"), "/bin/dir"),
 		},
 	}
 
