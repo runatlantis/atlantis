@@ -322,6 +322,7 @@ Or a custom command
   * `PULL_NUM` - Pull request number or ID, ex. `2`.
   * `PULL_AUTHOR` - Username of the pull request author, ex. `acme-user`.
   * `USER_NAME` - Username of the VCS user running command, ex. `acme-user`. During an autoplan, the user will be the Atlantis API user, ex. `atlantis`.
+  * `COMMENT_ARGS` - Any additional flags passed in the comment on the pull request.
 * A custom command will only terminate if all output file descriptors are closed.
 Therefore a custom command can only be sent to the background (e.g. for an SSH tunnel during
 the terraform run) when its output is redirected to a different location. For example, Atlantis
