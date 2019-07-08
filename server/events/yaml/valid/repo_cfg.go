@@ -11,6 +11,7 @@ type RepoCfg struct {
 	Projects  []Project
 	Workflows map[string]Workflow
 	Automerge bool
+	Parallel  bool
 }
 
 func (r RepoCfg) FindProjectsByDirWorkspace(repoRelDir string, workspace string) []Project {
