@@ -56,3 +56,7 @@ Webhook secrets ensure that the webhook requests are actually coming from your V
 If you're using webhook secrets but your traffic is over HTTP then the webhook secrets
 could be stolen. Enable SSL/HTTPS using the `--ssl-cert-file` and `--ssl-key-file`
 flags.
+
+### Arbitrary command injection on comments
+Any user with the ability to comment on the merge request can run any Linux command available to the Linux Atlantis User. Be certain that the Atlantis user is secured as much as possible from running damaging commands.
+Example: terraform plan -- -var=$(rm -rf /) 
