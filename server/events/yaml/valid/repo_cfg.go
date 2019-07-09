@@ -12,14 +12,11 @@ import (
 // RepoCfg is the atlantis.yaml config after it's been parsed and validated.
 type RepoCfg struct {
 	// Version is the version of the atlantis YAML file.
-	Version             int
-	Projects            []Project
-	Workflows           map[string]Workflow
-	PolicySets          PolicySets
-	Automerge           bool
-	ParallelApply       bool
-	ParallelPlan        bool
-	ParallelPolicyCheck bool
+	Version       int
+	Projects      []Project
+	Workflows     map[string]Workflow
+	Automerge     bool
+	ParallelPlans bool
 }
 
 func (r RepoCfg) FindProjectsByDirWorkspace(repoRelDir string, workspace string) []Project {
