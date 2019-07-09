@@ -2,114 +2,21 @@ version: 2
 jobs:
   test:
     docker:
-    - image: runatlantis/testing-env:latest
+      - image: runatlantis/testing-env:latest
     steps:
-    - checkout
-    - run: make test-coverage
-    - run:
-        name: post coverage to codecov.io
-        command: bash <(curl -s https://codecov.io/bash)
-    - run: make check-fmt
-    - run: make check-lint
-  e2e:
-    docker:
-    - image: circleci/golang:1.15 # If you update this, update it in the Makefile too
-      environment:
-        # This version of TF will be downloaded before Atlantis is started.
-        # We do this instead of setting --default-tf-version because setting
-        # that flag starts the download asynchronously so we'd have a race
-        # condition.
-        TERRAFORM_VERSION: 0.14.6
-    steps:
-    - checkout
-    - run: make build-service
-    # We don't run e2e tests on fork PRs because they don't have access to the secret env vars.
-    - run: if [ -z "${CIRCLE_PR_REPONAME}" ]; then ./scripts/e2e.sh; fi
+      - checkout
+      - run: make test-coverage
+      - run:
+          name: post coverage to codecov.io
+          command: bash <(curl -s https://codecov.io/bash)
+      - run: make check-fmt
+      - run: make check-lint
 
-  # Check that there's no missing links for the website.
-  # This job builds the website, starts a server to serve it, and then uses
-  # muffet (https://github.com/raviqqe/muffet) to perform the link check.
-  website_link_check:
-    docker:
-      # This image's Dockerfile is at runatlantis.io/Dockerfile
-    - image: runatlantis/ci-link-checker:0.1
-    steps:
-    - checkout
-    - run: yarn install
-    - run: yarn website:build
-    - run:
-        name: http-server
-        command: http-server runatlantis.io/.vuepress/dist
-        background: true
-      # We use dockerize -wait here to wait until the server is up.
-    - run: |
-        dockerize -wait tcp://localhost:8080 -- \
-          muffet \
-            -e 'https://github\.com/runatlantis/atlantis/edit/master/.*' \
-            -e 'https://github.com/helm/charts/tree/master/stable/atlantis#customization' \
-            http://localhost:8080/
-
-  # Build and push 'latest' Docker tag.
-  docker_master:
-    docker:
-    - image: circleci/golang:1.15 # If you update this, update it in the Makefile too
-    steps:
-    - checkout
-    - run: make build-service
-    - setup_remote_docker
-    - run:
-        name: Build image
-        command: |
-          if [ "${CIRCLE_BRANCH}" == "master" ]; then
-            docker build -t runatlantis/atlantis:latest .
-          fi
-    - run:
-        name: Push image
-        command: |
-          if [ "${CIRCLE_BRANCH}" == "master" ]; then
-            docker login -u "$DOCKER_USER" -p "$DOCKER_PASSWORD"
-            docker push runatlantis/atlantis:latest
-          fi
-  # Build and push Docker tag.
-  docker_tag:
-    docker:
-    - image: circleci/golang:1.15 # If you update this, update it in the Makefile too
-    steps:
-    - checkout
-    - run: make build-service
-    - setup_remote_docker
-    - run:
-        name: Build and tag
-        command: |
-          if [ -n "${CIRCLE_TAG}" ]; then
-            docker build -t "runatlantis/atlantis:${CIRCLE_TAG}" .
-            docker login -u "$DOCKER_USER" -p "$DOCKER_PASSWORD"
-            docker push "runatlantis/atlantis:${CIRCLE_TAG}"
-          fi
 workflows:
   version: 2
   branch:
     jobs:
-    - test:
-        filters:
-          branches:
-            ignore: /.*-docs/
-    - e2e:
-        requires: [test]
-        filters:
-          branches:
-            ignore: /.*-docs/
-    - docker_master:
-        requires: [e2e]
-        filters:
-          branches:
-            only: master
-    - website_link_check
-  tag:
-    jobs:
-    - docker_tag:
-        filters:
-          branches:
-            ignore: /.*/
-          tags:
-            only: /^v.*/
+      - test:
+          filters:
+            branches:
+              ignore: /.*-docs/
