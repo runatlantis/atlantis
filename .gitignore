@@ -11,5 +11,4 @@ node_modules/
 **/.vuepress/dist
 helm/test-values.yaml
 *.swp
-golangci-lint
-atlantis
+bin/
