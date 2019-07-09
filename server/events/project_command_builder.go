@@ -21,6 +21,8 @@ const (
 	DefaultWorkspace = "default"
 	// DefaultAutomergeEnabled is the default for the automerge setting.
 	DefaultAutomergeEnabled = false
+	// DefaultParallelPlansEnabled is the default for the parallel plans setting.
+	DefaultParallelPlansEnabled = false
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
@@ -137,7 +139,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		for _, mp := range matchingProjects {
 			ctx.Log.Debug("determining config for project at dir: %q workspace: %q", mp.Dir, mp.Workspace)
 			mergedCfg := p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.BaseRepo.ID(), mp, repoCfg)
-			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, mergedCfg, commentFlags, repoCfg.Automerge, verbose))
+			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, mergedCfg, commentFlags, repoCfg.Automerge, repoCfg.ParallelPlans, verbose))
 		}
 	} else {
 		// If there is no config file, then we'll plan each project that
@@ -148,7 +150,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		for _, mp := range modifiedProjects {
 			ctx.Log.Debug("determining config for project at dir: %q", mp.Path)
 			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.BaseRepo.ID(), mp.Path, DefaultWorkspace)
-			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, pCfg, commentFlags, DefaultAutomergeEnabled, verbose))
+			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, pCfg, commentFlags, DefaultAutomergeEnabled, DefaultParallelPlansEnabled, verbose))
 		}
 	}
 
@@ -279,10 +281,12 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(
 	}
 
 	automerge := DefaultAutomergeEnabled
+	parallelPlans := DefaultParallelPlansEnabled
 	if repoCfgPtr != nil {
 		automerge = repoCfgPtr.Automerge
+		parallelPlans = repoCfgPtr.ParallelPlans
 	}
-	return p.buildCtx(ctx, cmd, projCfg, commentFlags, automerge, verbose), nil
+	return p.buildCtx(ctx, cmd, projCfg, commentFlags, automerge, parallelPlans, verbose), nil
 }
 
 // getCfg returns the atlantis.yaml config (if it exists) for this project. If
@@ -371,6 +375,7 @@ func (p *DefaultProjectCommandBuilder) buildCtx(ctx *CommandContext,
 	projCfg valid.MergedProjectCfg,
 	commentArgs []string,
 	automergeEnabled bool,
+	parallelPlansEnabled bool,
 	verbose bool) models.ProjectCommandContext {
 
 	var steps []valid.Step
@@ -382,24 +387,25 @@ func (p *DefaultProjectCommandBuilder) buildCtx(ctx *CommandContext,
 	}
 
 	return models.ProjectCommandContext{
-		ApplyCmd:          p.CommentBuilder.BuildApplyComment(projCfg.RepoRelDir, projCfg.Workspace, projCfg.Name),
-		BaseRepo:          ctx.BaseRepo,
-		CommentArgs:       commentArgs,
-		AutomergeEnabled:  automergeEnabled,
-		AutoplanEnabled:   projCfg.AutoplanEnabled,
-		Steps:             steps,
-		HeadRepo:          ctx.HeadRepo,
-		Log:               ctx.Log,
-		PullMergeable:     ctx.PullMergeable,
-		Pull:              ctx.Pull,
-		ProjectName:       projCfg.Name,
-		ApplyRequirements: projCfg.ApplyRequirements,
-		RePlanCmd:         p.CommentBuilder.BuildPlanComment(projCfg.RepoRelDir, projCfg.Workspace, projCfg.Name, commentArgs),
-		RepoRelDir:        projCfg.RepoRelDir,
-		RepoConfigVersion: projCfg.RepoCfgVersion,
-		TerraformVersion:  projCfg.TerraformVersion,
-		User:              ctx.User,
-		Verbose:           verbose,
-		Workspace:         projCfg.Workspace,
+		ApplyCmd:             p.CommentBuilder.BuildApplyComment(projCfg.RepoRelDir, projCfg.Workspace, projCfg.Name),
+		BaseRepo:             ctx.BaseRepo,
+		CommentArgs:          commentArgs,
+		AutomergeEnabled:     automergeEnabled,
+		ParallelPlansEnabled: parallelPlansEnabled,
+		AutoplanEnabled:      projCfg.AutoplanEnabled,
+		Steps:                steps,
+		HeadRepo:             ctx.HeadRepo,
+		Log:                  ctx.Log,
+		PullMergeable:        ctx.PullMergeable,
+		Pull:                 ctx.Pull,
+		ProjectName:          projCfg.Name,
+		ApplyRequirements:    projCfg.ApplyRequirements,
+		RePlanCmd:            p.CommentBuilder.BuildPlanComment(projCfg.RepoRelDir, projCfg.Workspace, projCfg.Name, commentArgs),
+		RepoRelDir:           projCfg.RepoRelDir,
+		RepoConfigVersion:    projCfg.RepoCfgVersion,
+		TerraformVersion:     projCfg.TerraformVersion,
+		User:                 ctx.User,
+		Verbose:              verbose,
+		Workspace:            projCfg.Workspace,
 	}
 }

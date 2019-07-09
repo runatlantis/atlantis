@@ -15,6 +15,7 @@ package events
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/google/go-github/github"
 	gitlab "github.com/lkysow/go-gitlab"
@@ -118,7 +119,15 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		return
 	}
 
-	result := c.runProjectCmds(projectCmds, models.PlanCommand)
+	// Run our plan commands in parallel if enabled
+	var result CommandResult
+	if c.parallelPlansEnabled(ctx, projectCmds) {
+		ctx.Log.Info("Running plans in parallel")
+		result = c.runProjectCmdsParallel(projectCmds, models.PlanCommand)
+	} else {
+		result = c.runProjectCmds(projectCmds, models.PlanCommand)
+	}
+
 	if c.automergeEnabled(ctx, projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
 		c.deletePlans(ctx)
@@ -226,7 +235,15 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
-	result := c.runProjectCmds(projectCmds, cmd.Name)
+	// Run our plan commands in parallel if enabled
+	var result CommandResult
+	if cmd.Name == models.PlanCommand && c.parallelPlansEnabled(ctx, projectCmds) {
+		ctx.Log.Info("Running plans in parallel")
+		result = c.runProjectCmdsParallel(projectCmds, cmd.Name)
+	} else {
+		result = c.runProjectCmds(projectCmds, cmd.Name)
+	}
+
 	if cmd.Name == models.PlanCommand && c.automergeEnabled(ctx, projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
 		c.deletePlans(ctx)
@@ -309,6 +326,41 @@ func (c *DefaultCommandRunner) automerge(ctx *CommandContext, pullStatus models.
 			ctx.Log.Err("failed to comment about automerge failing: %s", err)
 		}
 	}
+}
+
+func (c *DefaultCommandRunner) runProjectCmdsParallel(cmds []models.ProjectCommandContext, cmdName models.CommandName) CommandResult {
+	var results []models.ProjectResult
+	var wg sync.WaitGroup
+	mux := &sync.Mutex{}
+
+	wg.Add(len(cmds))
+	for _, pCmd := range cmds {
+		pCmd := pCmd
+		var execute func()
+
+		switch cmdName {
+		case models.PlanCommand:
+			execute = func() {
+				defer wg.Done()
+				res := c.ProjectCommandRunner.Plan(pCmd)
+				mux.Lock()
+				results = append(results, res)
+				mux.Unlock()
+			}
+		case models.ApplyCommand:
+			execute = func() {
+				defer wg.Done()
+				res := c.ProjectCommandRunner.Apply(pCmd)
+				mux.Lock()
+				results = append(results, res)
+				mux.Unlock()
+			}
+		}
+		go execute()
+	}
+
+	wg.Wait()
+	return CommandResult{ProjectResults: results}
 }
 
 func (c *DefaultCommandRunner) runProjectCmds(cmds []models.ProjectCommandContext, cmdName models.CommandName) CommandResult {
@@ -439,6 +491,11 @@ func (c *DefaultCommandRunner) automergeEnabled(ctx *CommandContext, projectCmds
 	return c.GlobalAutomerge ||
 		// Otherwise we check if this repo is configured for automerging.
 		(len(projectCmds) > 0 && projectCmds[0].AutomergeEnabled)
+}
+
+// parallelPlansEnabled returns true if parallel plans is enabled in this context.
+func (c *DefaultCommandRunner) parallelPlansEnabled(ctx *CommandContext, projectCmds []models.ProjectCommandContext) bool {
+	return len(projectCmds) > 0 && projectCmds[0].ParallelPlansEnabled
 }
 
 // automergeComment is the comment that gets posted when Atlantis automatically
