@@ -10,12 +10,16 @@ import (
 // DefaultAutomerge is the default setting for automerge.
 const DefaultAutomerge = false
 
+// DefaultParallelPlans is the default setting for parallel plans
+const DefaultParallelPlans = false
+
 // RepoCfg is the raw schema for repo-level atlantis.yaml config.
 type RepoCfg struct {
-	Version   *int                `yaml:"version,omitempty"`
-	Projects  []Project           `yaml:"projects,omitempty"`
-	Workflows map[string]Workflow `yaml:"workflows,omitempty"`
-	Automerge *bool               `yaml:"automerge,omitempty"`
+	Version       *int                `yaml:"version,omitempty"`
+	Projects      []Project           `yaml:"projects,omitempty"`
+	Workflows     map[string]Workflow `yaml:"workflows,omitempty"`
+	Automerge     *bool               `yaml:"automerge,omitempty"`
+	ParallelPlans *bool               `yaml:"parallel_plans,omitempty"`
 }
 
 func (r RepoCfg) Validate() error {
@@ -52,10 +56,16 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		automerge = *r.Automerge
 	}
 
+	parallelPlans := DefaultParallelPlans
+	if r.ParallelPlans != nil {
+		parallelPlans = *r.ParallelPlans
+	}
+
 	return valid.RepoCfg{
-		Version:   *r.Version,
-		Projects:  validProjects,
-		Workflows: validWorkflows,
-		Automerge: automerge,
+		Version:       *r.Version,
+		Projects:      validProjects,
+		Workflows:     validWorkflows,
+		Automerge:     automerge,
+		ParallelPlans: parallelPlans,
 	}
 }
