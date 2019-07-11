@@ -29,7 +29,7 @@ func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command string, pa
 		"BASE_BRANCH_NAME":           ctx.Pull.BaseBranch,
 		"BASE_REPO_NAME":             ctx.BaseRepo.Name,
 		"BASE_REPO_OWNER":            ctx.BaseRepo.Owner,
-		"COMMENT_ARGS":               strings.Join(ctx.CommentArgs, ","),
+		"COMMENT_ARGS":               strings.Join(ctx.EscapedCommentArgs, ","),
 		"DIR":                        path,
 		"HEAD_BRANCH_NAME":           ctx.Pull.HeadBranch,
 		"HEAD_REPO_NAME":             ctx.HeadRepo.Name,

@@ -38,7 +38,7 @@ func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []stri
 
 	var out string
 	if a.isRemotePlan(contents) {
-		args := append(append(append([]string{"apply", "-input=false", "-no-color"}, extraArgs...), ctx.CommentArgs...))
+		args := append(append(append([]string{"apply", "-input=false", "-no-color"}, extraArgs...), ctx.EscapedCommentArgs...))
 		out, err = a.runRemoteApply(ctx, args, path, planPath, ctx.TerraformVersion)
 		if err == nil {
 			out = a.cleanRemoteApplyOutput(out)
@@ -46,7 +46,7 @@ func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []stri
 	} else {
 		// NOTE: we need to quote the plan path because Bitbucket Server can
 		// have spaces in its repo owner names which is part of the path.
-		args := append(append(append([]string{"apply", "-input=false", "-no-color"}, extraArgs...), ctx.CommentArgs...), fmt.Sprintf("%q", planPath))
+		args := append(append(append([]string{"apply", "-input=false", "-no-color"}, extraArgs...), ctx.EscapedCommentArgs...), fmt.Sprintf("%q", planPath))
 		out, err = a.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, args, ctx.TerraformVersion, ctx.Workspace)
 	}
 
@@ -78,7 +78,7 @@ func (a *ApplyStepRunner) hasTargetFlag(ctx models.ProjectCommandContext, extraA
 		return split[0] == "-target"
 	}
 
-	for _, arg := range ctx.CommentArgs {
+	for _, arg := range ctx.EscapedCommentArgs {
 		if isTargetFlag(arg) {
 			return true
 		}

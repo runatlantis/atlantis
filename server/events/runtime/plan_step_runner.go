@@ -73,7 +73,7 @@ func (p *PlanStepRunner) remotePlan(ctx models.ProjectCommandContext, extraArgs 
 	argList := [][]string{
 		{"plan", "-input=false", "-refresh", "-no-color"},
 		extraArgs,
-		ctx.CommentArgs,
+		ctx.EscapedCommentArgs,
 	}
 	args := p.flatten(argList)
 	output, err := p.runRemotePlan(ctx, args, path, tfVersion)
@@ -174,7 +174,7 @@ func (p *PlanStepRunner) buildPlanCmd(ctx models.ProjectCommandContext, extraArg
 		{"plan", "-input=false", "-refresh", "-no-color", "-out", fmt.Sprintf("%q", planFile)},
 		tfVars,
 		extraArgs,
-		ctx.CommentArgs,
+		ctx.EscapedCommentArgs,
 		envFileArgs,
 	}
 

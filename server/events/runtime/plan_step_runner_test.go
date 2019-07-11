@@ -39,11 +39,11 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 	When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
 	output, err := s.Run(models.ProjectCommandContext{
-		Log:         logger,
-		CommentArgs: []string{"comment", "args"},
-		Workspace:   workspace,
-		RepoRelDir:  ".",
-		User:        models.User{Username: "username"},
+		Log:                logger,
+		EscapedCommentArgs: []string{"comment", "args"},
+		Workspace:          workspace,
+		RepoRelDir:         ".",
+		User:               models.User{Username: "username"},
 		Pull: models.PullRequest{
 			Num: 2,
 		},
@@ -166,11 +166,11 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 			When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 				ThenReturn("output", nil)
 			output, err := s.Run(models.ProjectCommandContext{
-				Log:         logger,
-				Workspace:   "workspace",
-				RepoRelDir:  ".",
-				User:        models.User{Username: "username"},
-				CommentArgs: []string{"comment", "args"},
+				Log:                logger,
+				Workspace:          "workspace",
+				RepoRelDir:         ".",
+				User:               models.User{Username: "username"},
+				EscapedCommentArgs: []string{"comment", "args"},
 				Pull: models.PullRequest{
 					Num: 2,
 				},
@@ -286,11 +286,11 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 			When(terraform.RunCommandWithVersion(logger, "/path", expPlanArgs, tfVersion, "workspace")).ThenReturn("output", nil)
 
 			output, err := s.Run(models.ProjectCommandContext{
-				Log:         logger,
-				Workspace:   "workspace",
-				RepoRelDir:  ".",
-				User:        models.User{Username: "username"},
-				CommentArgs: []string{"comment", "args"},
+				Log:                logger,
+				Workspace:          "workspace",
+				RepoRelDir:         ".",
+				User:               models.User{Username: "username"},
+				EscapedCommentArgs: []string{"comment", "args"},
 				Pull: models.PullRequest{
 					Num: 2,
 				},
@@ -346,11 +346,11 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 	When(terraform.RunCommandWithVersion(logger, "/path", expPlanArgs, tfVersion, "workspace")).ThenReturn("output", nil)
 
 	output, err := s.Run(models.ProjectCommandContext{
-		Log:         logger,
-		Workspace:   "workspace",
-		RepoRelDir:  ".",
-		User:        models.User{Username: "username"},
-		CommentArgs: []string{"comment", "args"},
+		Log:                logger,
+		Workspace:          "workspace",
+		RepoRelDir:         ".",
+		User:               models.User{Username: "username"},
+		EscapedCommentArgs: []string{"comment", "args"},
 		Pull: models.PullRequest{
 			Num: 2,
 		},
@@ -417,11 +417,11 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 	When(terraform.RunCommandWithVersion(logger, tmpDir, expPlanArgs, tfVersion, "workspace")).ThenReturn("output", nil)
 
 	output, err := s.Run(models.ProjectCommandContext{
-		Log:         logger,
-		Workspace:   "workspace",
-		RepoRelDir:  ".",
-		User:        models.User{Username: "username"},
-		CommentArgs: []string{"comment", "args"},
+		Log:                logger,
+		Workspace:          "workspace",
+		RepoRelDir:         ".",
+		User:               models.User{Username: "username"},
+		EscapedCommentArgs: []string{"comment", "args"},
 		Pull: models.PullRequest{
 			Num: 2,
 		},
@@ -476,12 +476,12 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 	When(terraform.RunCommandWithVersion(logger, "/path", expPlanArgs, tfVersion, "default")).ThenReturn("output", nil)
 
 	output, err := s.Run(models.ProjectCommandContext{
-		Log:         logger,
-		Workspace:   "default",
-		RepoRelDir:  ".",
-		User:        models.User{Username: "username"},
-		CommentArgs: []string{"comment", "args"},
-		ProjectName: "projectname",
+		Log:                logger,
+		Workspace:          "default",
+		RepoRelDir:         ".",
+		User:               models.User{Username: "username"},
+		EscapedCommentArgs: []string{"comment", "args"},
+		ProjectName:        "projectname",
 		Pull: models.PullRequest{
 			Num: 2,
 		},
@@ -627,10 +627,10 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 		AnyString())).ThenReturn("output", nil)
 
 	output, err := s.Run(models.ProjectCommandContext{
-		Workspace:   "default",
-		RepoRelDir:  ".",
-		User:        models.User{Username: "username"},
-		CommentArgs: []string{"comment", "args"},
+		Workspace:          "default",
+		RepoRelDir:         ".",
+		User:               models.User{Username: "username"},
+		EscapedCommentArgs: []string{"comment", "args"},
 		Pull: models.PullRequest{
 			Num: 2,
 		},
@@ -719,10 +719,10 @@ plan locally at this time.
 
 	// Now that mocking is set up, we're ready to run the plan.
 	ctx := models.ProjectCommandContext{
-		Workspace:   "default",
-		RepoRelDir:  ".",
-		User:        models.User{Username: "username"},
-		CommentArgs: []string{"comment", "args"},
+		Workspace:          "default",
+		RepoRelDir:         ".",
+		User:               models.User{Username: "username"},
+		EscapedCommentArgs: []string{"comment", "args"},
 		Pull: models.PullRequest{
 			Num: 2,
 		},
