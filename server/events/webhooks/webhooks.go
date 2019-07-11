@@ -41,6 +41,7 @@ type ApplyResult struct {
 	Pull      models.PullRequest
 	User      models.User
 	Success   bool
+	Directory string
 }
 
 // MultiWebhookSender sends multiple webhooks for each one it's configured for.
