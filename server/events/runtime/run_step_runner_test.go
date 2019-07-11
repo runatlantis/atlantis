@@ -97,12 +97,12 @@ func TestRunStepRunner_Run(t *testing.T) {
 				User: models.User{
 					Username: "acme-user",
 				},
-				Log:              logging.NewNoopLogger(),
-				Workspace:        "myworkspace",
-				RepoRelDir:       "mydir",
-				TerraformVersion: projVersion,
-				ProjectName:      c.ProjectName,
-				CommentArgs:      []string{"-target=resource1", "-target=resource2"},
+				Log:                logging.NewNoopLogger(),
+				Workspace:          "myworkspace",
+				RepoRelDir:         "mydir",
+				TerraformVersion:   projVersion,
+				ProjectName:        c.ProjectName,
+				EscapedCommentArgs: []string{"-target=resource1", "-target=resource2"},
 			}
 			out, err := r.Run(ctx, c.Command, tmpDir)
 			if c.ExpErr != "" {
