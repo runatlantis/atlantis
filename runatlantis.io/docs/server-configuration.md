@@ -385,6 +385,15 @@ Values are chosen in this order:
   atlantis server --ssl-cert-file="/etc/ssl/private/my-cert.key"
   ```
   File containing x509 private key matching `--ssl-cert-file`.
+ 
+* ### `--tfe-hostname`
+  ```bash
+  atlantis server --tfe-hostname="my-terraform-enterprise.company.com"
+  ```
+  Hostname of your Terraform Enterprise installation to be used in conjunction with
+  `--tfe-token`. See [Terraform Cloud](terraform-cloud.html) for more details.
+  If using Terraform Cloud (i.e. you don't have your own Terraform Enterprise installation)
+  no need to set since it defaults to `app.terraform.io`.
 
 * ### `--tfe-token`
   ```bash
