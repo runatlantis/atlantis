@@ -1,3 +1,53 @@
+# v0.8.3
+
+## Description
+This release contains an important security fix in addition to some fixes and
+changes for Terraform Cloud/Enterprise users. It's highly recommended that all
+Atlantis users upgrade to this release. See the Security
+section below for more details.
+
+## Security
+* Additional arguments specified in Atlantis comments, ex. `atlantis plan -- -var=foo=bar`
+  are now escaped before being appended to the relevant Terraform command. (Fixes [#697](https://github.com/runatlantis/atlantis/pull/697)).
+  Previously, a comment like `atlantis plan -- -var=$(touch foo)` would execute
+  the `touch foo` command because the extra arguments weren't being escaped properly.
+  This means anyone with comment access to an Atlantis repo could execute arbitrary
+  code. Because of the severity of this issue, all users should upgrade to this version.
+* Upgrade to latest version of Alpine Linux in our Docker image to mitigate
+  vulnerabilities found in libssh2. (Fixes [#687](https://github.com/runatlantis/atlantis/issues/687))
+
+## Features
+* Upgrade Terraform to 0.12.3 in our base Docker image.
+* Additional arguments specified in Atlantis comments, ex. `atlantis plan -- -var=foo=bar`
+  are now available in custom run steps as the `COMMENT_ARGS` environment variable. (Fixes [#670](https://github.com/runatlantis/atlantis/issues/670))
+* A new flag `--tfe-hostname` is available for specifying a Terraform Enterprise private installation's hostname
+  when using the remote backend integration. ([#706](https://github.com/runatlantis/atlantis/pull/706))
+
+## Bugfixes
+* Parse Bitbucket Cloud pull request rejected events properly. (Fixes [#676](https://github.com/runatlantis/atlantis/issues/676))
+* Terraform >= 0.12.0 works with Terraform Cloud/Enterprise remote operations. (Fixes [#704](https://github.com/runatlantis/atlantis/issues/704))
+
+## Backwards Incompatibilities / Notes:
+* If you were previously relying on being able to execute code in the additional
+  arguments of comments, ex. `atlantis plan -- -var='foo=$(echo $SECRET)'` this
+  is no longer possible. Instead you will need to write a custom workflow with a
+  custom step or the extra_args config.
+* If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
+  then the default version of Terraform will now be 0.12.3. Simply set the above
+  flag to your desired default version to avoid any issues.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.3/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.3/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.3/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.3/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.8.3`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.8.2..v0.8.3
+https://github.com/runatlantis/atlantis/compare/v0.8.2...v0.8.3
+
 # v0.8.2
 
 ## Description
