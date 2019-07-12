@@ -5,6 +5,8 @@
   <b>Terraform For Teams</b>
 </p>
 
+** Please use the `azure-devops` branch in this fork. **
+
 ## Resources
 * How to get started: [www.runatlantis.io/guide](https://www.runatlantis.io/guide)
 * Full documentation: [www.runatlantis.io/docs](https://www.runatlantis.io/docs)
