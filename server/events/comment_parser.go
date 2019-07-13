@@ -21,7 +21,7 @@ import (
 	"regexp"
 	"strings"
 
-	shlex "github.com/flynn-archive/go-shlex"
+	"github.com/flynn-archive/go-shlex"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/spf13/pflag"
@@ -165,7 +165,6 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	var dir string
 	var project string
 	var verbose bool
-	var extraArgs []string
 	var flagSet *pflag.FlagSet
 	var name models.CommandName
 
@@ -211,14 +210,9 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("unknown argument(s) – %s", strings.Join(unusedArgs, " ")), command, flagSet)}
 	}
 
+	var extraArgs []string
 	if flagSet.ArgsLenAtDash() != -1 {
-		extraArgsUnsafe := flagSet.Args()[flagSet.ArgsLenAtDash():]
-		// Quote all extra args so there isn't a security issue when we append
-		// them to the terraform commands, ex. "; cat /etc/passwd"
-		for _, arg := range extraArgsUnsafe {
-			quotesEscaped := strings.Replace(arg, `"`, `\"`, -1)
-			extraArgs = append(extraArgs, fmt.Sprintf(`"%s"`, quotesEscaped))
-		}
+		extraArgs = flagSet.Args()[flagSet.ArgsLenAtDash():]
 	}
 
 	dir, err = e.validateDir(dir)

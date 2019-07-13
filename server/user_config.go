@@ -46,6 +46,7 @@ type UserConfig struct {
 	SlackToken             string          `mapstructure:"slack-token"`
 	SSLCertFile            string          `mapstructure:"ssl-cert-file"`
 	SSLKeyFile             string          `mapstructure:"ssl-key-file"`
+	TFEHostname            string          `mapstructure:"tfe-hostname"`
 	TFEToken               string          `mapstructure:"tfe-token"`
 	DefaultTFVersion       string          `mapstructure:"default-tf-version"`
 	Webhooks               []WebhookConfig `mapstructure:"webhooks"`

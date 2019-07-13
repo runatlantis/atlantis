@@ -382,24 +382,36 @@ func (p *DefaultProjectCommandBuilder) buildCtx(ctx *CommandContext,
 	}
 
 	return models.ProjectCommandContext{
-		ApplyCmd:          p.CommentBuilder.BuildApplyComment(projCfg.RepoRelDir, projCfg.Workspace, projCfg.Name),
-		BaseRepo:          ctx.BaseRepo,
-		CommentArgs:       commentArgs,
-		AutomergeEnabled:  automergeEnabled,
-		AutoplanEnabled:   projCfg.AutoplanEnabled,
-		Steps:             steps,
-		HeadRepo:          ctx.HeadRepo,
-		Log:               ctx.Log,
-		PullMergeable:     ctx.PullMergeable,
-		Pull:              ctx.Pull,
-		ProjectName:       projCfg.Name,
-		ApplyRequirements: projCfg.ApplyRequirements,
-		RePlanCmd:         p.CommentBuilder.BuildPlanComment(projCfg.RepoRelDir, projCfg.Workspace, projCfg.Name, commentArgs),
-		RepoRelDir:        projCfg.RepoRelDir,
-		RepoConfigVersion: projCfg.RepoCfgVersion,
-		TerraformVersion:  projCfg.TerraformVersion,
-		User:              ctx.User,
-		Verbose:           verbose,
-		Workspace:         projCfg.Workspace,
+		ApplyCmd:           p.CommentBuilder.BuildApplyComment(projCfg.RepoRelDir, projCfg.Workspace, projCfg.Name),
+		BaseRepo:           ctx.BaseRepo,
+		EscapedCommentArgs: p.escapeArgs(commentArgs),
+		AutomergeEnabled:   automergeEnabled,
+		AutoplanEnabled:    projCfg.AutoplanEnabled,
+		Steps:              steps,
+		HeadRepo:           ctx.HeadRepo,
+		Log:                ctx.Log,
+		PullMergeable:      ctx.PullMergeable,
+		Pull:               ctx.Pull,
+		ProjectName:        projCfg.Name,
+		ApplyRequirements:  projCfg.ApplyRequirements,
+		RePlanCmd:          p.CommentBuilder.BuildPlanComment(projCfg.RepoRelDir, projCfg.Workspace, projCfg.Name, commentArgs),
+		RepoRelDir:         projCfg.RepoRelDir,
+		RepoConfigVersion:  projCfg.RepoCfgVersion,
+		TerraformVersion:   projCfg.TerraformVersion,
+		User:               ctx.User,
+		Verbose:            verbose,
+		Workspace:          projCfg.Workspace,
 	}
+}
+
+func (p *DefaultProjectCommandBuilder) escapeArgs(args []string) []string {
+	var escaped []string
+	for _, arg := range args {
+		var escapedArg string
+		for i := range arg {
+			escapedArg += "\\" + string(arg[i])
+		}
+		escaped = append(escaped, escapedArg)
+	}
+	return escaped
 }
