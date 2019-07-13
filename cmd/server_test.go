@@ -340,20 +340,20 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 func TestExecute_Defaults(t *testing.T) {
 	t.Log("Should set the defaults for all unspecified flags.")
 	c := setup(map[string]interface{}{
-		cmd.GHUserFlag:         "user",
-		cmd.GHTokenFlag:        "token",
-		cmd.GitlabUserFlag:     "gitlab-user",
-		cmd.GitlabTokenFlag:    "gitlab-token",
-		cmd.BitbucketUserFlag:  "bitbucket-user",
-		cmd.BitbucketTokenFlag: "bitbucket-token",
-		cmd.ADBasicAuthFlag:    "azuredevops-basic-auth",
-		cmd.ADBasicUser:        "azuredevops-basic-user",
-		cmd.ADBasicPassowrd:    "azuredevops-basic-password",
-		cmd.ADOrgFlag:          "azuredevops-org",
-		cmd.ADProjectFlag:      "azuredevops-project",
-		cmd.ADTokenFlag:        "azuredevops-token",
-		cmd.ADUserFlag:         "azuredevops-user",
-		cmd.RepoWhitelistFlag:  "*",
+		cmd.GHUserFlag:          "user",
+		cmd.GHTokenFlag:         "token",
+		cmd.GitlabUserFlag:      "gitlab-user",
+		cmd.GitlabTokenFlag:     "gitlab-token",
+		cmd.BitbucketUserFlag:   "bitbucket-user",
+		cmd.BitbucketTokenFlag:  "bitbucket-token",
+		cmd.ADBasicAuthFlag:     "azuredevops-basic-auth",
+		cmd.ADBasicUserFlag:     "azuredevops-basic-user",
+		cmd.ADBasicPasswordFlag: "azuredevops-basic-password",
+		cmd.ADOrgFlag:           "azuredevops-org",
+		cmd.ADProjectFlag:       "azuredevops-project",
+		cmd.ADTokenFlag:         "azuredevops-token",
+		cmd.ADUserFlag:          "azuredevops-user",
+		cmd.RepoWhitelistFlag:   "*",
 	})
 	err := c.Execute()
 	Ok(t, err)
