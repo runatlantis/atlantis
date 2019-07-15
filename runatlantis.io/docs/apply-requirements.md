@@ -109,7 +109,7 @@ a pull request mergeable.
 For GitLab, a merge request will be mergeable if it has no conflicts and if all
 required approvers have approved the pull request.
 
-We **do not** check if there are [Unresolved Discussions](https://docs.gitlab.com/ee/user/discussions/#resolvable-comments-and-discussions) because GitLab doesn't
+We **do not** check if there are [Unresolved Discussions](https://docs.gitlab.com/ee/user/discussions/#resolvable-comments-and-threads) because GitLab doesn't
 provide that information in their API response. If you need this feature please
 [open an issue](https://github.com/runatlantis/atlantis/issues/new).
 
