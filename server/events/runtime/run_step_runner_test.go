@@ -1,10 +1,12 @@
 package runtime_test
 
 import (
+	"fmt"
+	"os"
 	"strings"
 	"testing"
 
-	version "github.com/hashicorp/go-version"
+	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -62,6 +64,9 @@ func TestRunStepRunner_Run(t *testing.T) {
 		{
 			Command: "echo user_name=$USER_NAME",
 			ExpOut:  "user_name=acme-user\n",
+		}, {
+			Command: "echo $PATH",
+			ExpOut:  fmt.Sprintf("%s:%s\n", os.Getenv("PATH"), "/bin/dir"),
 		},
 		{
 			Command: "echo args=$COMMENT_ARGS",
@@ -74,6 +79,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 	defaultVersion, _ := version.NewVersion("0.8")
 	r := runtime.RunStepRunner{
 		DefaultTFVersion: defaultVersion,
+		TerraformBinDir:  "/bin/dir",
 	}
 	for _, c := range cases {
 		t.Run(c.Command, func(t *testing.T) {

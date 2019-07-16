@@ -290,6 +290,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			},
 			RunStepRunner: &runtime.RunStepRunner{
 				DefaultTFVersion: defaultTfVersion,
+				TerraformBinDir:  terraformClient.TerraformBinDir(),
 			},
 			PullApprovedChecker: vcsClient,
 			WorkingDir:          workingDir,

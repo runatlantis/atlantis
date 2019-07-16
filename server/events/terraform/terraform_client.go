@@ -27,9 +27,9 @@ import (
 	"strings"
 	"sync"
 
-	getter "github.com/hashicorp/go-getter"
-	version "github.com/hashicorp/go-version"
-	homedir "github.com/mitchellh/go-homedir"
+	"github.com/hashicorp/go-getter"
+	"github.com/hashicorp/go-version"
+	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -182,6 +182,11 @@ func NewClient(
 // is defined.
 func (c *DefaultClient) DefaultVersion() *version.Version {
 	return c.defaultVersion
+}
+
+// TerraformBinDir returns the directory where we download Terraform binaries.
+func (c *DefaultClient) TerraformBinDir() string {
+	return c.binDir
 }
 
 // See Client.RunCommandWithVersion.
