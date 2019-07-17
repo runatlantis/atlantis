@@ -16,7 +16,6 @@ package server_test
 import (
 	"bytes"
 	"net/http"
-	"net/url"
 	"testing"
 
 	. "github.com/petergtz/pegomock"
@@ -24,37 +23,37 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-func TestValidate_WithSecretErr(t *testing.T) {
-	t.Log("if the request is not valid against the secret there is an error")
+func TestAzureDevopsValidate_WithBasicAuthErr(t *testing.T) {
+	t.Log("if the request does not have a valid basic auth user and password there is an error")
 	RegisterMockTestingT(t)
 	g := server.DefaultAzureDevopsRequestValidator{}
 	buf := bytes.NewBufferString("")
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
 	Ok(t, err)
-	req.Header.Set("X-Hub-Signature", "sha1=126f2c800419c60137ce748d7672e77b65cf16d6")
+	req.Header.Set("Authorization", "Basic dXNlcjpwYXNz") // user:pass
 	req.Header.Set("Content-Type", "application/json")
 
-	_, err = g.Validate(req, []byte("user"), nil)
+	_, err = g.Validate(req, []byte("user"), []byte("wrongpass"))
 	Assert(t, err != nil, "error should not be nil")
-	Equals(t, "payload signature check failed", err.Error())
+	Equals(t, "ValidatePayload authentication failed", err.Error())
 }
 
-func TestValidate_WithSecret(t *testing.T) {
-	t.Log("if the request is valid against the secret the payload is returned")
+func TestAzureDevopsValidate_WithBasicAuth(t *testing.T) {
+	t.Log("if the request has a valid basic auth user and password the payload is returned")
 	RegisterMockTestingT(t)
 	g := server.DefaultAzureDevopsRequestValidator{}
 	buf := bytes.NewBufferString(`{"yo":true}`)
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
 	Ok(t, err)
-	req.Header.Set("X-Hub-Signature", "sha1=126f2c800419c60137ce748d7672e77b65cf16d6")
+	req.Header.Set("Authorization", "Basic dXNlcjpwYXNz") // user:pass
 	req.Header.Set("Content-Type", "application/json")
 
-	bs, err := g.Validate(req, []byte("username"), []byte("0123456789abcdef"))
+	bs, err := g.Validate(req, []byte("user"), []byte("pass"))
 	Ok(t, err)
 	Equals(t, `{"yo":true}`, string(bs))
 }
 
-func TestValidate_WithoutSecretInvalidContentType(t *testing.T) {
+func TestAzureDevopsValidate_WithoutSecretInvalidContentType(t *testing.T) {
 	t.Log("if the request has an invalid content type an error is returned")
 	RegisterMockTestingT(t)
 	g := server.DefaultAzureDevopsRequestValidator{}
@@ -63,12 +62,12 @@ func TestValidate_WithoutSecretInvalidContentType(t *testing.T) {
 	Ok(t, err)
 	req.Header.Set("Content-Type", "invalid")
 
-	_, err = g.Validate(req, nil)
+	_, err = g.Validate(req, nil, nil)
 	Assert(t, err != nil, "error should not be nil")
 	Equals(t, "webhook request has unsupported Content-Type \"invalid\"", err.Error())
 }
 
-func TestValidate_WithoutSecretJSON(t *testing.T) {
+func TestAzureDevopsValidate_WithoutSecretJSON(t *testing.T) {
 	t.Log("if the request is JSON the body is returned")
 	RegisterMockTestingT(t)
 	g := server.DefaultAzureDevopsRequestValidator{}
@@ -81,35 +80,3 @@ func TestValidate_WithoutSecretJSON(t *testing.T) {
 	Ok(t, err)
 	Equals(t, `{"yo":true}`, string(bs))
 }
-
-func TestValidate_WithoutSecretFormNoPayload(t *testing.T) {
-	t.Log("if the request is form encoded and does not contain a payload param an error is returned")
-	RegisterMockTestingT(t)
-	g := server.DefaultAzureDevopsRequestValidator{}
-	buf := bytes.NewBufferString("")
-	req, err := http.NewRequest("POST", "http://localhost/event", buf)
-	Ok(t, err)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	_, err = g.Validate(req, nil, nil)
-	Assert(t, err != nil, "error should not be nil")
-	Equals(t, "webhook request did not contain expected 'payload' form value", err.Error())
-}
-
-func TestValidate_WithoutSecretForm(t *testing.T) {
-	t.Log("if the request is form encoded and does not contain a payload param an error is returned")
-	RegisterMockTestingT(t)
-	g := server.DefaultAzureDevopsRequestValidator{}
-	form := url.Values{}
-	form.Set("payload", `{"yo":true}`)
-	buf := bytes.NewBufferString(form.Encode())
-	req, err := http.NewRequest("POST", "http://localhost/event", buf)
-	Ok(t, err)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	bs, err := g.Validate(req, nil, nil)
-	Ok(t, err)
-	Equals(t, `{"yo":true}`, string(bs))
-}
-
-// *** add tests for all supported content types

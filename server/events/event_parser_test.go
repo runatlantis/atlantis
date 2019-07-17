@@ -17,6 +17,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -41,8 +44,8 @@ var parser = events.EventParser{
 	BitbucketServerURL: "http://mycorp.com:7490",
 	AzureDevopsUser:    "azuredevops-user",
 	AzureDevopsToken:   "azuredevops-token",
-	AzureDevopsOrg:     "azuredevops-org",
-	AzureDevopsProject: "azuredevops-project",
+	AzureDevopsOrg:     "owner",
+	AzureDevopsProject: "project",
 }
 
 func TestParseGithubRepo(t *testing.T) {
@@ -1078,120 +1081,171 @@ func TestGetBitbucketServerEventType(t *testing.T) {
 }
 
 func TestParseAzureDevopsRepo(t *testing.T) {
-	r, err := parser.ParseAzureDevopsRepo(&Repo)
+	// this should  be successful
+	repo := ADRepo
+	repo.ParentRepository = nil
+	r, err := parser.ParseAzureDevopsRepo(&repo)
 	Ok(t, err)
 	Equals(t, models.Repo{
 		Owner:             "owner",
-		FullName:          "owner/repo",
-		CloneURL:          "https://azuredevops-user:azuredevops-token@azuredevops.com/owner/repo.git",
-		SanitizedCloneURL: Repo.GetCloneURL(),
+		Project:           "project",
+		FullName:          "owner/project/repo",
+		CloneURL:          "https://azuredevops-user:azuredevops-token@dev.azure.com/owner/project/_git/repo",
+		SanitizedCloneURL: "https://azuredevops-user:<redacted>@dev.azure.com/owner/project/_git/repo",
 		Name:              "repo",
 		VCSHost: models.VCSHost{
 			Hostname: "dev.azure.com",
 			Type:     models.AzureDevops,
 		},
 	}, r)
+
+	// this should  be successful
+	repo = ADRepo
+	repo.WebURL = nil
+	r, err = parser.ParseAzureDevopsRepo(&repo)
+	Ok(t, err)
+	Equals(t, models.Repo{
+		Owner:             "owner",
+		Project:           "project",
+		FullName:          "owner/project/repo",
+		CloneURL:          "https://azuredevops-user:azuredevops-token@dev.azure.com/owner/project/_git/repo",
+		SanitizedCloneURL: "https://azuredevops-user:<redacted>@dev.azure.com/owner/project/_git/repo",
+		Name:              "repo",
+		VCSHost: models.VCSHost{
+			Hostname: "dev.azure.com",
+			Type:     models.AzureDevops,
+		},
+	}, r)
+
 }
 
-func TestParseAzureDevopsWorkItemCommentEvent(t *testing.T) {
-	comment := azuredevops.WorkItemCommentEvent{
-		Repo: &Repo,
-		Issue: &azuredevops.Issue{
-			Number:  azuredevops.Int(1),
-			User:    &azuredevops.User{Login: azuredevops.String("issue_user")},
-			HTMLURL: azuredevops.String("https://azuredevops.com/runatlantis/atlantis/issues/1"),
-		},
-		Comment: &azuredevops.WorkItemComment{
-			User: &azuredevops.User{Login: azuredevops.String("comment_user")},
+func TestParseAzureDevopsWorkItemCommentedEvent(t *testing.T) {
+	event := azuredevops.Event{
+		EventType: "workitem.commented",
+		Resource: azuredevops.WorkItem{
+			ID: azuredevops.Int(1),
+			Relations: []*azuredevops.WorkItemRelation{
+				{
+					Rel: azuredevops.String("System.LinkTypes.Hierarchy-Reverse"),
+					URL: azuredevops.String("vstfs:///Git/PullRequestId/a7573007-bbb3-4341-b726-0c4148a07853%2f3411ebc1-d5aa-464f-9615-0b527bc66719%2f22"),
+					Attributes: &map[string]interface{}{
+						"IsLocked": false,
+						"Comment":  "Decomposition of work",
+					},
+				},
+			},
 		},
 	}
 
-	testComment := deepcopy.Copy(comment).(azuredevops.WorkItemCommentEvent)
-	testComment.Comment = nil
-	_, _, _, err := parser.ParseAzureDevopsWorkItemCommentEvent(&testComment)
-	ErrEquals(t, "comment.user.login is null", err)
+	testEvent := deepcopy.Copy(event).(azuredevops.Event)
+	resource := testEvent.Resource.(azuredevops.WorkItem)
+	resource.Relations = nil
+	_, err := parser.ParseAzureDevopsWorkItemCommentedEvent(&resource, nil)
+	ErrEquals(t, "no valid pull request relations in event payload", err)
 
-	testComment = deepcopy.Copy(comment).(azuredevops.WorkItemCommentEvent)
-	testComment.Comment.User = nil
-	_, _, _, err = parser.ParseAzureDevopsWorkItemCommentEvent(&testComment)
-	ErrEquals(t, "comment.user.login is null", err)
+	testEvent = deepcopy.Copy(event).(azuredevops.Event)
+	resource = testEvent.Resource.(azuredevops.WorkItem)
+	resource.Relations[0] = nil
+	_, err = parser.ParseAzureDevopsWorkItemCommentedEvent(&resource, nil)
+	ErrEquals(t, "no valid pull request relations in event payload", err)
 
-	testComment = deepcopy.Copy(comment).(azuredevops.WorkItemCommentEvent)
-	testComment.Comment.User.Login = nil
-	_, _, _, err = parser.ParseAzureDevopsWorkItemCommentEvent(&testComment)
-	ErrEquals(t, "comment.user.login is null", err)
-
-	testComment = deepcopy.Copy(comment).(azuredevops.WorkItemCommentEvent)
-	testComment.Issue = nil
-	_, _, _, err = parser.ParseAzureDevopsWorkItemCommentEvent(&testComment)
-	ErrEquals(t, "issue.number is null", err)
+	testEvent = deepcopy.Copy(event).(azuredevops.Event)
+	resource = testEvent.Resource.(azuredevops.WorkItem)
+	resource.Relations[0].URL = azuredevops.String("")
+	_, err = parser.ParseAzureDevopsWorkItemCommentedEvent(&resource, nil)
+	ErrEquals(t, "no valid pull request relations in event payload", err)
 
 	// this should be successful
-	repo, user, pullNum, err := parser.ParseAzureDevopsWorkItemCommentEvent(&comment)
+	// This parse function requires a mock HTTP server to return the ADPull fixture
+	// after parsing the workitem.commented webhook event
+	mux := http.NewServeMux()
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	mux.HandleFunc("/owner/project/_apis/git/pullrequests/22", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, ADPullJSON)
+	})
+	testEvent = deepcopy.Copy(event).(azuredevops.Event)
+	resource = testEvent.Resource.(azuredevops.WorkItem)
+	pullRefs, err := parser.ParseAzureDevopsWorkItemCommentedEvent(&resource, &server.URL)
 	Ok(t, err)
-	Equals(t, models.Repo{
-		Owner:             *comment.Repo.Owner.Login,
-		FullName:          *comment.Repo.FullName,
-		CloneURL:          "https://azuredevops-user:azuredevops-token@azuredevops.com/owner/repo.git",
-		SanitizedCloneURL: *comment.Repo.CloneURL,
-		Name:              "repo",
-		VCSHost: models.VCSHost{
-			Hostname: "azuredevops.com",
-			Type:     models.AzureDevops,
-		},
-	}, repo)
-	Equals(t, models.User{
-		Username: *comment.Comment.User.Login,
-	}, user)
-	Equals(t, *comment.Issue.Number, pullNum)
+	for _, ref := range pullRefs {
+		Ok(t, err)
+		Equals(t, models.Repo{
+			Owner:             "owner",
+			Project:           "project",
+			FullName:          "owner/project/repo",
+			CloneURL:          "https://azuredevops-user:azuredevops-token@dev.azure.com/owner/project/_git/repo",
+			SanitizedCloneURL: "https://azuredevops-user:<redacted>@dev.azure.com/owner/project/_git/repo",
+			Name:              "repo",
+			VCSHost: models.VCSHost{
+				Hostname: "dev.azure.com",
+				Type:     models.AzureDevops,
+			},
+		}, ref.BaseRepo)
+		Equals(t, models.User{
+			Username: "fabrikamfiber16@hotmail.com",
+		}, ref.User)
+		Equals(t, 22, ref.PullNum)
+	}
 }
 
 func TestParseAzureDevopsPullEvent(t *testing.T) {
-	_, _, _, _, _, err := parser.ParseAzureDevopsPullEvent(&azuredevops.PullRequestEvent{})
-	ErrEquals(t, "pull_request is null", err)
+	_, _, _, _, _, err := parser.ParseAzureDevopsPullEvent(ADPullEvent)
+	Ok(t, err)
 
-	testEvent := deepcopy.Copy(PullEvent).(azuredevops.PullRequestEvent)
-	testEvent.PullRequest.HTMLURL = nil
-	_, _, _, _, _, err = parser.ParseAzureDevopsPullEvent(&testEvent)
-	ErrEquals(t, "html_url is null", err)
+	testPull := deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull.LastMergeSourceCommit.CommitID = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "lastMergeSourceCommit.commitID is null", err)
 
-	testEvent = deepcopy.Copy(PullEvent).(azuredevops.PullRequestEvent)
-	testEvent.Sender = nil
-	_, _, _, _, _, err = parser.ParseAzureDevopsPullEvent(&testEvent)
-	ErrEquals(t, "sender is null", err)
+	testPull = deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull.URL = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "url is null", err)
+	testEvent := deepcopy.Copy(ADPullEvent).(azuredevops.Event)
+	resource := deepcopy.Copy(testEvent.Resource).(azuredevops.GitPullRequest)
+	resource.CreatedBy = nil
+	testEvent.Resource = resource
+	_, _, _, _, _, err = parser.ParseAzureDevopsPullEvent(testEvent)
+	ErrEquals(t, "CreatedBy is null", err)
 
-	testEvent = deepcopy.Copy(PullEvent).(azuredevops.PullRequestEvent)
-	testEvent.Sender.Login = nil
-	_, _, _, _, _, err = parser.ParseAzureDevopsPullEvent(&testEvent)
-	ErrEquals(t, "sender.login is null", err)
+	testEvent = deepcopy.Copy(ADPullEvent).(azuredevops.Event)
+	resource = deepcopy.Copy(testEvent.Resource).(azuredevops.GitPullRequest)
+	resource.CreatedBy.UniqueName = azuredevops.String("")
+	testEvent.Resource = resource
+	_, _, _, _, _, err = parser.ParseAzureDevopsPullEvent(testEvent)
+	ErrEquals(t, "CreatedBy.UniqueName is null", err)
 
-	actPull, evType, actBaseRepo, actHeadRepo, actUser, err := parser.ParseAzureDevopsPullEvent(&PullEvent)
+	actPull, evType, actBaseRepo, actHeadRepo, actUser, err := parser.ParseAzureDevopsPullEvent(ADPullEvent)
 	Ok(t, err)
 	expBaseRepo := models.Repo{
 		Owner:             "owner",
-		FullName:          "owner/repo",
-		CloneURL:          "https://azuredevops-user:azuredevops-token@azuredevops.com/owner/repo.git",
-		SanitizedCloneURL: Repo.GetCloneURL(),
+		Project:           "project",
+		FullName:          "owner/project/repo",
+		CloneURL:          "https://azuredevops-user:azuredevops-token@dev.azure.com/owner/project/_git/repo",
+		SanitizedCloneURL: "https://azuredevops-user:<redacted>@dev.azure.com/owner/project/_git/repo",
 		Name:              "repo",
 		VCSHost: models.VCSHost{
-			Hostname: "azuredevops.com",
+			Hostname: "dev.azure.com",
 			Type:     models.AzureDevops,
 		},
 	}
 	Equals(t, expBaseRepo, actBaseRepo)
 	Equals(t, expBaseRepo, actHeadRepo)
 	Equals(t, models.PullRequest{
-		URL:        Pull.GetHTMLURL(),
-		Author:     Pull.User.GetLogin(),
-		HeadBranch: Pull.Head.GetRef(),
-		BaseBranch: Pull.Base.GetRef(),
-		HeadCommit: Pull.Head.GetSHA(),
-		Num:        Pull.GetNumber(),
+		URL:        ADPull.GetURL(),
+		Author:     ADPull.CreatedBy.GetUniqueName(),
+		HeadBranch: path.Base(ADPull.GetSourceRefName()),
+		BaseBranch: path.Base(ADPull.GetTargetRefName()),
+		HeadCommit: ADPull.LastMergeSourceCommit.GetCommitID(),
+		Num:        ADPull.GetPullRequestID(),
 		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
 	}, actPull)
 	Equals(t, models.OpenedPullEvent, evType)
-	Equals(t, models.User{Username: "user"}, actUser)
+	Equals(t, models.User{Username: "user@example.com"}, actUser)
 }
 
 func TestParseAzureDevopsPullEvent_EventType(t *testing.T) {
@@ -1200,52 +1254,28 @@ func TestParseAzureDevopsPullEvent_EventType(t *testing.T) {
 		exp    models.PullRequestEventType
 	}{
 		{
-			action: "synchronize",
+			action: "git.pullrequest.updated",
 			exp:    models.UpdatedPullEvent,
 		},
 		{
-			action: "unassigned",
-			exp:    models.OtherPullEvent,
-		},
-		{
-			action: "review_requested",
-			exp:    models.OtherPullEvent,
-		},
-		{
-			action: "review_request_removed",
-			exp:    models.OtherPullEvent,
-		},
-		{
-			action: "labeled",
-			exp:    models.OtherPullEvent,
-		},
-		{
-			action: "unlabeled",
-			exp:    models.OtherPullEvent,
-		},
-		{
-			action: "opened",
+			action: "git.pullrequest.created",
 			exp:    models.OpenedPullEvent,
 		},
 		{
-			action: "edited",
-			exp:    models.OtherPullEvent,
-		},
-		{
-			action: "closed",
+			action: "git.pullrequest.merged",
 			exp:    models.ClosedPullEvent,
 		},
 		{
-			action: "reopened",
+			action: "anything_else",
 			exp:    models.OtherPullEvent,
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.action, func(t *testing.T) {
-			event := deepcopy.Copy(PullEvent).(azuredevops.PullRequestEvent)
-			event.Action = &c.action
-			_, actType, _, _, _, err := parser.ParseAzureDevopsPullEvent(&event)
+			event := deepcopy.Copy(ADPullEvent).(azuredevops.Event)
+			event.EventType = c.action
+			_, actType, _, _, _, err := parser.ParseAzureDevopsPullEvent(event)
 			Ok(t, err)
 			Equals(t, c.exp, actType)
 		})
@@ -1253,59 +1283,65 @@ func TestParseAzureDevopsPullEvent_EventType(t *testing.T) {
 }
 
 func TestParseAzureDevopsPull(t *testing.T) {
-	testPull := deepcopy.Copy(Pull).(azuredevops.PullRequest)
-	testPull.Head.SHA = nil
+	testPull := deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull.LastMergeSourceCommit.CommitID = nil
 	_, _, _, err := parser.ParseAzureDevopsPull(&testPull)
-	ErrEquals(t, "head.sha is null", err)
+	ErrEquals(t, "lastMergeSourceCommit.commitID is null", err)
 
-	testPull = deepcopy.Copy(Pull).(azuredevops.PullRequest)
-	testPull.HTMLURL = nil
+	testPull = deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull.URL = nil
 	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
-	ErrEquals(t, "html_url is null", err)
+	ErrEquals(t, "url is null", err)
 
-	testPull = deepcopy.Copy(Pull).(azuredevops.PullRequest)
-	testPull.Head.Ref = nil
+	testPull = deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull.SourceRefName = nil
 	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
-	ErrEquals(t, "head.ref is null", err)
+	ErrEquals(t, "sourceRefName (branch name) is null", err)
 
-	testPull = deepcopy.Copy(Pull).(azuredevops.PullRequest)
-	testPull.Base.Ref = nil
+	testPull = deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull.TargetRefName = nil
 	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
-	ErrEquals(t, "base.ref is null", err)
+	ErrEquals(t, "targetRefName (branch name) is null", err)
 
-	testPull = deepcopy.Copy(Pull).(azuredevops.PullRequest)
-	testPull.User.Login = nil
+	testPull = deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull.CreatedBy = nil
 	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
-	ErrEquals(t, "user.login is null", err)
+	ErrEquals(t, "CreatedBy is null", err)
 
-	testPull = deepcopy.Copy(Pull).(azuredevops.PullRequest)
-	testPull.Number = nil
+	testPull = deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull.CreatedBy.UniqueName = nil
 	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
-	ErrEquals(t, "number is null", err)
+	ErrEquals(t, "CreatedBy.UniqueName is null", err)
 
-	pullRes, actBaseRepo, actHeadRepo, err := parser.ParseAzureDevopsPull(&Pull)
+	testPull = deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull.PullRequestID = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "pullRequestId is null", err)
+
+	actPull, actBaseRepo, actHeadRepo, err := parser.ParseAzureDevopsPull(&ADPull)
 	Ok(t, err)
 	expBaseRepo := models.Repo{
 		Owner:             "owner",
-		FullName:          "owner/repo",
-		CloneURL:          "https://azuredevops-user:azuredevops-token@azuredevops.com/owner/repo.git",
-		SanitizedCloneURL: Repo.GetCloneURL(),
+		Project:           "project",
+		FullName:          "owner/project/repo",
+		CloneURL:          "https://azuredevops-user:azuredevops-token@dev.azure.com/owner/project/_git/repo",
+		SanitizedCloneURL: "https://azuredevops-user:<redacted>@dev.azure.com/owner/project/_git/repo",
 		Name:              "repo",
 		VCSHost: models.VCSHost{
-			Hostname: "azuredevops.com",
+			Hostname: "dev.azure.com",
 			Type:     models.AzureDevops,
 		},
 	}
 	Equals(t, models.PullRequest{
-		URL:        Pull.GetHTMLURL(),
-		Author:     Pull.User.GetLogin(),
-		HeadBranch: Pull.Head.GetRef(),
-		BaseBranch: Pull.Base.GetRef(),
-		HeadCommit: Pull.Head.GetSHA(),
-		Num:        Pull.GetNumber(),
+		URL:        ADPull.GetURL(),
+		Author:     ADPull.CreatedBy.GetUniqueName(),
+		HeadBranch: path.Base(ADPull.GetSourceRefName()),
+		BaseBranch: path.Base(ADPull.GetTargetRefName()),
+		HeadCommit: ADPull.LastMergeSourceCommit.GetCommitID(),
+		Num:        ADPull.GetPullRequestID(),
 		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
-	}, pullRes)
+	}, actPull)
 	Equals(t, expBaseRepo, actBaseRepo)
 	Equals(t, expBaseRepo, actHeadRepo)
 }

@@ -46,6 +46,8 @@ type GithubPullGetter interface {
 	GetPullRequest(repo models.Repo, pullNum int) (*github.PullRequest, error)
 }
 
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_azuredevops_pull_getter.go AzureDevopsPullGetter
+
 // AzureDevopsPullGetter makes API calls to get pull requests.
 type AzureDevopsPullGetter interface {
 	// GetPullRequest gets the pull request with id pullNum for the repo.

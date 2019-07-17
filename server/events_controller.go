@@ -481,7 +481,7 @@ func (e *EventsController) HandleAzureDevopsCommentEvent(w http.ResponseWriter, 
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since no pull request is linked to work item; Request-Id = %s", azuredevopsReqID)
 		return
 	}
-	pullRefs, err := e.Parser.ParseAzureDevopsWorkItemCommentedEvent(workItem)
+	pullRefs, err := e.Parser.ParseAzureDevopsWorkItemCommentedEvent(workItem, nil)
 
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Failed parsing event: %v %s", err, azuredevopsReqID)
