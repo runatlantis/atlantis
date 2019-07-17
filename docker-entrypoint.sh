@@ -47,7 +47,7 @@ if [ ! -z ${ATLANTIS_GH_USER} ] && [ ! -z ${ATLANTIS_GH_TOKEN} ]; then
   if [ ! -z ${ATLANTIS_GH_HOSTNAME} ]; then
     echo "https://${ATLANTIS_GH_USER}:${ATLANTIS_GH_TOKEN}@${ATLANTIS_GH_HOSTNAME}" > /home/atlantis/.git-credentials
   elif [ -z ${ATLANTIS_GH_HOSTNAME} ]; then
-    echo "https://${ATLANTIS_GH_USER}:${ATLANTIS_GH_TOKEN}@github.com" > /home/atlantis/git-credentials
+    echo "https://${ATLANTIS_GH_USER}:${ATLANTIS_GH_TOKEN}@github.com" > /home/atlantis/.git-credentials
   fi
   gosu atlantis bash -c 'chmod 0600 /home/atlantis/.git-credentials'
   gosu atlantis bash -c 'chown atlantis:atlantis /home/atlantis/.git-credentials'
