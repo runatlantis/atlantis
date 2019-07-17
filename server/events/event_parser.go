@@ -254,7 +254,7 @@ type EventParsing interface {
 	// user is the pull request author.
 	// pullNum is the number of the pull request that triggered the webhook.
 	// *** Add tests and handle linking multiple pull requests to a work item.
-	ParseAzureDevopsWorkItemCommentedEvent(comment *azuredevops.WorkItem) (pullRefs []PullRef, err error)
+	ParseAzureDevopsWorkItemCommentedEvent(comment *azuredevops.WorkItem, baseURL *string) (pullRefs []PullRef, err error)
 
 	// ParseAzureDevopsPull parses the response from the Azure Devops API endpoint (not
 	// from a webhook) that returns a pull request.
@@ -722,23 +722,24 @@ func (e *EventParser) ParseBitbucketServerPullEvent(body []byte) (pull models.Pu
 // ParseAzureDevopsPullEvent parses Azure Devops pull request events.
 // See EventParsing for return value docs.
 func (e *EventParser) ParseAzureDevopsPullEvent(event azuredevops.Event) (pull models.PullRequest, pullEventType models.PullRequestEventType, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
-	pullResource, ok := event.Resource.(*azuredevops.GitPullRequest)
+	obj, ok := event.Resource.(azuredevops.GitPullRequest)
 	if !ok {
-		return
+		return pull, pullEventType, baseRepo, headRepo, user, err
 	}
+	pullResource := &obj
 	pull, baseRepo, headRepo, err = e.ParseAzureDevopsPull(pullResource)
 	if err != nil {
-		return
+		return pull, pullEventType, baseRepo, headRepo, user, err
 	}
 	createdBy := pullResource.GetCreatedBy()
 	if createdBy == nil {
 		err = errors.New("CreatedBy is null")
-		return
+		return pull, pullEventType, baseRepo, headRepo, user, err
 	}
 	senderUsername := createdBy.GetUniqueName()
 	if senderUsername == "" {
 		err = errors.New("CreatedBy.UniqueName is null")
-		return
+		return pull, pullEventType, baseRepo, headRepo, user, err
 	}
 	switch event.EventType {
 	case "git.pullrequest.created":
@@ -751,7 +752,7 @@ func (e *EventParser) ParseAzureDevopsPullEvent(event azuredevops.Event) (pull m
 		pullEventType = models.OtherPullEvent
 	}
 	user = models.User{Username: senderUsername}
-	return
+	return pull, pullEventType, baseRepo, headRepo, user, err
 }
 
 // ParseAzureDevopsPull parses the response from the Azure Devops API endpoint (not
@@ -761,39 +762,46 @@ func (e *EventParser) ParseAzureDevopsPull(pull *azuredevops.GitPullRequest) (pu
 	commit := pull.LastMergeSourceCommit.GetCommitID()
 	if commit == "" {
 		err = errors.New("lastMergeSourceCommit.commitID is null")
-		return
+		return pullModel, baseRepo, headRepo, err
 	}
 	url := pull.GetURL()
 	if url == "" {
 		err = errors.New("url is null")
-		return
+		return pullModel, baseRepo, headRepo, err
 	}
 	headBranch := pull.GetSourceRefName()
 	if headBranch == "" {
 		err = errors.New("sourceRefName (branch name) is null")
-		return
+		return pullModel, baseRepo, headRepo, err
 	}
 	baseBranch := pull.GetTargetRefName()
 	if baseBranch == "" {
 		err = errors.New("targetRefName (branch name) is null")
-		return
+		return pullModel, baseRepo, headRepo, err
 	}
 	num := pull.GetPullRequestID()
 	if num == 0 {
 		err = errors.New("pullRequestId is null")
-		return
+		return pullModel, baseRepo, headRepo, err
 	}
 	createdBy := pull.GetCreatedBy()
+	if createdBy == nil {
+		err = errors.New("CreatedBy is null")
+		return pullModel, baseRepo, headRepo, err
+	}
 	authorUsername := createdBy.GetUniqueName()
+	if authorUsername == "" {
+		err = errors.New("CreatedBy.UniqueName is null")
+		return pullModel, baseRepo, headRepo, err
+	}
 	baseRepo, err = e.ParseAzureDevopsRepo(pull.GetRepository())
 	if err != nil {
-		return
+		return pullModel, baseRepo, headRepo, err
 	}
 	headRepo, err = e.ParseAzureDevopsRepo(pull.GetRepository())
 	if err != nil {
-		return
+		return pullModel, baseRepo, headRepo, err
 	}
-
 	pullState := models.ClosedPullState
 	if *pull.Status == azuredevops.PullActive.String() {
 		pullState = models.OpenPullState
@@ -822,19 +830,26 @@ type PullRef struct {
 // ParseAzureDevopsWorkItemCommentedEvent parses Azure Devops work item comment events.
 // Multiple pull requests can be linked to a single work item.
 // See EventParsing for return value docs.
-func (e *EventParser) ParseAzureDevopsWorkItemCommentedEvent(comment *azuredevops.WorkItem) (pullRefs []PullRef, err error) {
+// pullNumStr is retrieved from a URI that resembles:
+// vstfs:///Git/PullRequestId/a7573007-bbb3-4341-b726-0c4148a07853%2f3411ebc1-d5aa-464f-9615-0b527bc66719%2f22
+// where the pull request number is 22, following the %2f near tne end
+// Must set a default error value that will be returned if there are no valid
+// pull request relations in the event
+func (e *EventParser) ParseAzureDevopsWorkItemCommentedEvent(comment *azuredevops.WorkItem, baseURL *string) (pullRefs []PullRef, err error) {
+	defaultErrorStr := "no valid pull request relations in event payload"
+	err = errors.New(defaultErrorStr)
 	for _, relation := range comment.Relations {
 		ref := &PullRef{}
 		if uri := relation.GetURL(); strings.Contains(uri, "vstfs:///Git/PullRequestId/") {
 			var parsed *url.URL
 			parsed, err = url.Parse(uri)
 			if err != nil {
-				return
+				return pullRefs, err
 			}
 			pullNumStr := strings.Split(parsed.Path, "/")[5]
 			ref.PullNum, err = strconv.Atoi(pullNumStr)
 			if err != nil {
-				return
+				return pullRefs, err
 			}
 
 			// Retrieve the linked pull request to get baseRepo and user
@@ -847,21 +862,32 @@ func (e *EventParser) ParseAzureDevopsWorkItemCommentedEvent(comment *azuredevop
 			client := new(azuredevops.Client)
 			client, err = azuredevops.NewClient(httpClient)
 			if err != nil {
-				return
+				return pullRefs, err
+			}
+			if baseURL != nil {
+				if !strings.HasSuffix(*baseURL, "/") {
+					*baseURL = *baseURL + "/"
+				}
+				parsed, err = url.Parse(*baseURL)
+				if err != nil {
+					return pullRefs, err
+				}
+				client.BaseURL = *parsed
 			}
 			pr := new(azuredevops.GitPullRequest)
 			opts := azuredevops.PullRequestListOptions{}
 			pr, _, err = client.PullRequests.Get(context.Background(), e.AzureDevopsOrg, e.AzureDevopsProject, ref.PullNum, &opts)
 			if err != nil {
-				return
+				return pullRefs, err
 			}
 			createdBy := pr.GetCreatedBy()
 			ref.User = models.User{Username: createdBy.GetUniqueName()}
 			ref.BaseRepo, err = e.ParseAzureDevopsRepo(pr.GetRepository())
 			if err != nil {
-				return
+				return pullRefs, err
 			}
 			pullRefs = append(pullRefs, *ref)
+			err = nil
 		}
 	}
 
