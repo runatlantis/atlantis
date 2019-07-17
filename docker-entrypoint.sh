@@ -69,7 +69,7 @@ if [ ! -z ${ATLANTIS_BITBUCKET_USER} ] && [ ! -z ${ATLANTIS_BITBUCKET_TOKEN} ]; 
   if [ ! -z ${ATLANTIS_BITBUCKET_HOSTNAME} ]; then
     echo "https://${ATLANTIS_BITBUCKET_USER}:${ATLANTIS_BITBUCKET_TOKEN}@${ATLANTIS_BITBUCKET_HOSTNAME}" > /home/atlantis/.git-credentials
   elif [ -z ${ATLANTIS_BITBUCKET_HOSTNAME} ]; then
-    echo "https://x-token-auth:${ATLANTIS_BITBUCKET_TOKEN}@bitbucket.org" > /home/atlantis/.git-credentials
+    echo "https://${ATLANTIS_BITBUCKET_USER}:${ATLANTIS_BITBUCKET_TOKEN}@bitbucket.org" > /home/atlantis/.git-credentials
   fi
   chmod 0600 /home/atlantis/.git-credentials
   chown atlantis:atlantis /home/atlantis/.git-credentials
