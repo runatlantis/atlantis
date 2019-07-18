@@ -44,7 +44,7 @@ func writeGitCreds(gitUser string, gitToken string, gitHostname string, home str
 		}
 
 		if err := ioutil.WriteFile(rcFile, []byte(config), 0600); err != nil {
-				return errors.Wrapf(err, "writing generated %s file with git-credentials token to %s", credsFilename, credsFile)
+				return errors.Wrapf(err, "writing generated %s file with user, token and hostname to %s", credsFilename, credsFile)
 		}
 		return nil
 
