@@ -70,6 +70,7 @@ const (
 	SSLKeyFileFlag             = "ssl-key-file"
 	TFEHostnameFlag            = "tfe-hostname"
 	TFETokenFlag               = "tfe-token"
+	WriteGitCreds              = "write-git-creds"
 
 	// Flag defaults.
 	// NOTE: Must manually set these as defaults in the setDefaults function.
@@ -225,6 +226,11 @@ var boolFlags = map[string]boolFlag{
 	},
 	SilenceWhitelistErrorsFlag: {
 		description:  "Silences the posting of whitelist error comments.",
+		defaultValue: false,
+	},
+	WriteGitCredsFlag: {
+		description:  "Write out a .git-credentials file with the provider user and token to allow authentication with git over HTTPS." +
+			" This does write secrets to disk and should only be enabled in a secure environment.",
 		defaultValue: false,
 	},
 }

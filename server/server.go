@@ -29,6 +29,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mitchellh/go-homedir"
 	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 
@@ -36,6 +37,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/git_cred_writer"
 	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/runtime"
