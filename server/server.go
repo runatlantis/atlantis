@@ -29,6 +29,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mitchellh/go-homedir"
 	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 
@@ -148,6 +149,28 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 				userConfig.AtlantisURL)
 			if err != nil {
 				return nil, errors.Wrapf(err, "setting up Bitbucket Server client")
+			}
+		}
+	}
+
+	if userConfig.WriteGitCreds {
+		home, err := homedir.Dir()
+		if err != nil {
+			return nil, errors.Wrap(err, "getting home dir to write ~/.git-credentials file")
+		}
+		if userConfig.GithubUser != "" {
+			if err := events.WriteGitCreds(userConfig.GithubUser, userConfig.GithubToken, userConfig.GithubHostname, home, logger); err != nil {
+				return nil, err
+			}
+		}
+		if userConfig.GitlabUser != "" {
+			if err := events.WriteGitCreds(userConfig.GitlabUser, userConfig.GitlabToken, userConfig.GitlabHostname, home, logger); err != nil {
+				return nil, err
+			}
+		}
+		if userConfig.BitbucketUser != "" {
+			if err := events.WriteGitCreds(userConfig.BitbucketUser, userConfig.BitbucketToken, userConfig.BitbucketBaseURL, home, logger); err != nil {
+				return nil, err
 			}
 		}
 	}
