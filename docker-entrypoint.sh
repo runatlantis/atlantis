@@ -43,37 +43,4 @@ if [[ $(id -u) == 0 ]] && [[ "$1" = 'atlantis' ]]; then
     set -- gosu atlantis "$@"
 fi
 
-if [ ! -z ${ATLANTIS_GH_USER} ] && [ ! -z ${ATLANTIS_GH_TOKEN} ]; then
-  if [ ! -z ${ATLANTIS_GH_HOSTNAME} ]; then
-    echo "https://${ATLANTIS_GH_USER}:${ATLANTIS_GH_TOKEN}@${ATLANTIS_GH_HOSTNAME}" > /home/atlantis/.git-credentials
-  elif [ -z ${ATLANTIS_GH_HOSTNAME} ]; then
-    echo "https://${ATLANTIS_GH_USER}:${ATLANTIS_GH_TOKEN}@github.com" > /home/atlantis/.git-credentials
-  fi
-  chmod 0600 /home/atlantis/.git-credentials
-  chown atlantis:atlantis /home/atlantis/.git-credentials
-  gosu atlantis bash -c 'git config --global credential.helper store'
-fi
-
-if [ ! -z ${ATLANTIS_GITLAB_USER} ] && [ ! -z ${ATLANTIS_GITLAB_TOKEN} ]; then
-  if [ ! -z ${ATLANTIS_GITLAB_HOSTNAME} ]; then
-    echo "https://${ATLANTIS_GITLAB_USER}:${ATLANTIS_GITLAB_TOKEN}@${ATLANTIS_GITLAB_HOSTNAME}" > /home/atlantis/.git-credentials
-  elif [ -z ${ATLANTIS_GITLAB_HOSTNAME} ]; then
-    echo "https://${ATLANTIS_GITLAB_USER}:${ATLANTIS_GITLAB_TOKEN}@gitlab.com" > /home/atlantis/.git-credentials
-  fi
-  chmod 0600 /home/atlantis/.git-credentials
-  chown atlantis:atlantis /home/atlantis/.git-credentials
-  gosu atlantis bash -c 'git config --global credential.helper store'
-fi
-
-if [ ! -z ${ATLANTIS_BITBUCKET_USER} ] && [ ! -z ${ATLANTIS_BITBUCKET_TOKEN} ]; then
-  if [ ! -z ${ATLANTIS_BITBUCKET_HOSTNAME} ]; then
-    echo "https://${ATLANTIS_BITBUCKET_USER}:${ATLANTIS_BITBUCKET_TOKEN}@${ATLANTIS_BITBUCKET_HOSTNAME}" > /home/atlantis/.git-credentials
-  elif [ -z ${ATLANTIS_BITBUCKET_HOSTNAME} ]; then
-    echo "https://${ATLANTIS_BITBUCKET_USER}:${ATLANTIS_BITBUCKET_TOKEN}@bitbucket.org" > /home/atlantis/.git-credentials
-  fi
-  chmod 0600 /home/atlantis/.git-credentials
-  chown atlantis:atlantis /home/atlantis/.git-credentials
-  gosu atlantis bash -c 'git config --global credential.helper store'
-fi
-
 exec "$@"
