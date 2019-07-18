@@ -1,4 +1,6 @@
-import {
+package events_test
+
+import (
 		"fmt"
 		"io/ioutil"
 		"os"
@@ -6,7 +8,7 @@ import {
 		"testing"
 
 		. "github.com/runatlantis/atlantis/testing"
-}
+)
 
 // Test that we write the file as expected
 func TestWriteGitCreds_WriteFile(t *testing.T) {

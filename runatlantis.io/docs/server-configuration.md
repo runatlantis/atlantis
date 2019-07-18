@@ -411,4 +411,4 @@ Values are chosen in this order:
 
   ::: warning SECURITY WARNING
   Potentially dangerous to enable
-  This writes your credentials to disk. And a malicious pull request could then access these details
+  This writes your credentials to disk and a malicious pull request could then access these details

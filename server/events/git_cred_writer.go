@@ -8,6 +8,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
+package events
 
 import (
 		"fmt"
