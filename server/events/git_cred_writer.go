@@ -12,7 +12,7 @@ package events
 
 import (
 		"fmt"
-		"io/util"
+		"io/ioutil"
 		"os"
 		"os/exec"
 		"path/filepath"
