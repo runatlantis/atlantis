@@ -384,65 +384,27 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	defaultTfVersion := terraformClient.DefaultVersion()
 	pendingPlanFinder := &events.DefaultPendingPlanFinder{}
-	runStepRunner := &runtime.RunStepRunner{
-		TerraformExecutor: terraformClient,
-		DefaultTFVersion:  defaultTfVersion,
-		TerraformBinDir:   terraformClient.TerraformBinDir(),
-	}
-	drainer := &events.Drainer{}
-	statusController := &StatusController{
-		Logger:  logger,
-		Drainer: drainer,
-	}
-	preWorkflowHooksCommandRunner := &events.DefaultPreWorkflowHooksCommandRunner{
-		VCSClient:             vcsClient,
-		GlobalCfg:             globalCfg,
-		Logger:                logger,
-		WorkingDirLocker:      workingDirLocker,
-		WorkingDir:            workingDir,
-		Drainer:               drainer,
-		PreWorkflowHookRunner: &runtime.PreWorkflowHookRunner{},
-	}
-	projectCommandBuilder := events.NewProjectCommandBuilder(
-		policyChecksEnabled,
-		validator,
-		&events.DefaultProjectFinder{},
-		vcsClient,
-		workingDir,
-		workingDirLocker,
-		globalCfg,
-		pendingPlanFinder,
-		commentParser,
-		userConfig.SkipCloneNoChanges,
-	)
-
-	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTfVersion)
-
-	if err != nil {
-		return nil, errors.Wrap(err, "initializing show step runner")
-	}
-
-	policyCheckRunner, err := runtime.NewPolicyCheckStepRunner(
-		defaultTfVersion,
-		policy.NewConfTestExecutorWorkflow(logger, binDir, &terraform.DefaultDownloader{}),
-	)
-
-	if err != nil {
-		return nil, errors.Wrap(err, "initializing policy check runner")
-	}
-
-	projectCommandRunner := &events.DefaultProjectCommandRunner{
-		Locker:           projectLocker,
-		LockURLGenerator: router,
-		InitStepRunner: &runtime.InitStepRunner{
-			TerraformExecutor: terraformClient,
-			DefaultTFVersion:  defaultTfVersion,
-		},
-		PlanStepRunner: &runtime.PlanStepRunner{
-			TerraformExecutor:   terraformClient,
-			DefaultTFVersion:    defaultTfVersion,
-			CommitStatusUpdater: commitStatusUpdater,
-			AsyncTFExec:         terraformClient,
+	commandRunner := &events.DefaultCommandRunner{
+		VCSClient:                vcsClient,
+		GithubPullGetter:         githubClient,
+		GitlabMergeRequestGetter: gitlabClient,
+		CommitStatusUpdater:      commitStatusUpdater,
+		EventParser:              eventParser,
+		MarkdownRenderer:         markdownRenderer,
+		Logger:                   logger,
+		AllowForkPRs:             userConfig.AllowForkPRs,
+		AllowForkPRsFlag:         config.AllowForkPRsFlag,
+		DisableApplyAll:          userConfig.DisableApplyAll,
+		ParallelPlansPoolSize:    userConfig.ParallelPlansPoolSize,
+		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
+			ParserValidator:   validator,
+			ProjectFinder:     &events.DefaultProjectFinder{},
+			VCSClient:         vcsClient,
+			WorkingDir:        workingDir,
+			WorkingDirLocker:  workingDirLocker,
+			GlobalCfg:         globalCfg,
+			PendingPlanFinder: pendingPlanFinder,
+			CommentBuilder:    commentParser,
 		},
 		ShowStepRunner:        showStepRunner,
 		PolicyCheckStepRunner: policyCheckRunner,
