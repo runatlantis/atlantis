@@ -58,6 +58,7 @@ const (
 	GitlabUserFlag             = "gitlab-user"
 	GitlabWebhookSecretFlag    = "gitlab-webhook-secret" // nolint: gosec
 	LogLevelFlag               = "log-level"
+	ParallelPlansPoolSize      = "parallel-plans-pool-size"
 	PortFlag                   = "port"
 	RepoConfigFlag             = "repo-config"
 	RepoConfigJSONFlag         = "repo-config-json"
@@ -71,13 +72,14 @@ const (
 	TFETokenFlag               = "tfe-token"
 
 	// Flag defaults.
-	DefaultCheckoutStrategy = "branch"
-	DefaultBitbucketBaseURL = bitbucketcloud.BaseURL
-	DefaultDataDir          = "~/.atlantis"
-	DefaultGHHostname       = "github.com"
-	DefaultGitlabHostname   = "gitlab.com"
-	DefaultLogLevel         = "info"
-	DefaultPort             = 4141
+	DefaultCheckoutStrategy      = "branch"
+	DefaultBitbucketBaseURL      = bitbucketcloud.BaseURL
+	DefaultDataDir               = "~/.atlantis"
+	DefaultGHHostname            = "github.com"
+	DefaultGitlabHostname        = "gitlab.com"
+	DefaultLogLevel              = "info"
+	DefaultParallelPlansPoolSize = 10
+	DefaultPort                  = 4141
 )
 
 var stringFlags = map[string]stringFlag{
@@ -222,6 +224,10 @@ var boolFlags = map[string]boolFlag{
 	},
 }
 var intFlags = map[string]intFlag{
+	ParallelPlansPoolSize: {
+		description:  "Max size of the wait group that runs parallel plans (if enabled).",
+		defaultValue: DefaultParallelPlansPoolSize,
+	},
 	PortFlag: {
 		description:  "Port to bind to.",
 		defaultValue: DefaultPort,

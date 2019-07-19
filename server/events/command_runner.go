@@ -20,6 +20,7 @@ import (
 	"github.com/google/go-github/github"
 	gitlab "github.com/lkysow/go-gitlab"
 	"github.com/pkg/errors"
+	"github.com/remeh/sizedwaitgroup"
 	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -69,7 +70,10 @@ type DefaultCommandRunner struct {
 	// AllowForkPRsFlag is the name of the flag that controls fork PR's. We use
 	// this in our error message back to the user on a forked PR so they know
 	// how to enable this functionality.
-	AllowForkPRsFlag      string
+	AllowForkPRsFlag string
+	// ParallelPlansPoolSize controls the size of the wait group used to run
+	// parallel plans (if enabled).
+	ParallelPlansPoolSize int
 	ProjectCommandBuilder ProjectCommandBuilder
 	ProjectCommandRunner  ProjectCommandRunner
 	// GlobalAutomerge is true if we should automatically merge pull requests if all
@@ -330,13 +334,13 @@ func (c *DefaultCommandRunner) automerge(ctx *CommandContext, pullStatus models.
 
 func (c *DefaultCommandRunner) runProjectCmdsParallel(cmds []models.ProjectCommandContext, cmdName models.CommandName) CommandResult {
 	var results []models.ProjectResult
-	var wg sync.WaitGroup
 	mux := &sync.Mutex{}
 
-	wg.Add(len(cmds))
+	wg := sizedwaitgroup.New(c.ParallelPlansPoolSize)
 	for _, pCmd := range cmds {
 		pCmd := pCmd
 		var execute func()
+		wg.Add()
 
 		switch cmdName {
 		case models.PlanCommand:

@@ -253,6 +253,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AllowForkPRs:             userConfig.AllowForkPRs,
 		AllowForkPRsFlag:         config.AllowForkPRsFlag,
 		DisableApplyAll:          userConfig.DisableApplyAll,
+		ParallelPlansPoolSize:    userConfig.ParallelPlansPoolSize,
 		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
 			ParserValidator:   validator,
 			ProjectFinder:     &events.DefaultProjectFinder{},

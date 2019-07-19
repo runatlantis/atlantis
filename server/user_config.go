@@ -26,6 +26,7 @@ type UserConfig struct {
 	GitlabUser             string `mapstructure:"gitlab-user"`
 	GitlabWebhookSecret    string `mapstructure:"gitlab-webhook-secret"`
 	LogLevel               string `mapstructure:"log-level"`
+	ParallelPlansPoolSize  int    `mapstructure:"parallel-plans-pool-size"`
 	Port                   int    `mapstructure:"port"`
 	RepoConfig             string `mapstructure:"repo-config"`
 	RepoConfigJSON         string `mapstructure:"repo-config-json"`
