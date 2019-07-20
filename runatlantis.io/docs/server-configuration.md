@@ -98,6 +98,57 @@ Values are chosen in this order:
   Automatically merge pull requests after all plans have been successfully applied.
   Defaults to `false`. See [Automerging](automerging.html) for more details.
 
+* ### `--azuredevops-basic-auth`
+  ```bash
+  atlantis server --azuredevops-basic-auth
+  ```
+  Enable/disable basic auth for validating Azure Devops webhooks (see
+  https://docs.microsoft.com/en-us/azure/devops/service-hooks/authorize?view=azure-devops).
+  SECURITY WARNING: If not specified, Atlantis won't be able to validate that the
+  incoming webhook call came from your Azure Devops org. This means that an
+  attacker could spoof calls to Atlantis and cause it to perform malicious
+  actions. Should be specified via the ATLANTIS_AZUREDEVOPS_BASIC_AUTH environment
+  variable.
+
+* ### `--azuredevops-basic-password`
+  ```bash
+  atlantis server --azuredevops-basic-password="password123"
+  ```
+  Azure Devops basic authentication password for inbound webhooks. Can also be specified via the ATLANTIS_AZUREDEVOPS_BASIC_PASSWORD
+  environment variable. 
+
+* ### `--azuredevops-basic-user`
+  ```bash
+  atlantis server --azuredevops-basic-user="username@example.com"
+  ```
+  Azure Devops basic authentication username for inbound webhooks. Can also be specified via the ATLANTIS_AZUREDEVOPS_BASIC_USER
+  environment variable.
+
+* ### `--azuredevops-org`
+  ```bash
+  atlantis server --azuredevops-org="myorgname"
+  ```
+  Organization name of your Azure Devops instance.
+
+* ### `--azuredevops-project`
+  ```bash
+  atlantis server --azuredevops-project="myproject"
+  ```
+  Project name in your Azure Devops insance.
+
+* ### `--azuredevops-token`
+  ```bash
+  atlantis server --azuredevops-token="username@example.com"
+  ```
+  Azure Devops token of API user. Can also be specified via the ATLANTIS_AZUREDEVOPS_TOKEN
+  environment variable.
+
+* ### `--azuredevops-user`
+  ```bash
+  atlantis server --azuredevops-user="username@example.com"
+  ```
+  Azure Devops username of API user.
+
 * ### `--bitbucket-base-url`
   ```bash
   atlantis server --bitbucket-base-url="http://bitbucket.corp:7990/basepath"

@@ -85,7 +85,40 @@ If you're using GitLab, navigate to your project's home page in GitLab
 - Click **Save**<img src="../guide/images/bitbucket-server-webhook.png" alt="Bitbucket Webhook" style="max-height: 500px;">
 - See [Next Steps](#next-steps)
 
+## Azure Devops
+Webhooks are installed at the [team project](https://docs.microsoft.com/en-us/azure/devops/organizations/projects/about-projects?view=azure-devops) level, but may be restricted to only fire based on events pertaining to [specific repos](https://docs.microsoft.com/en-us/azure/devops/service-hooks/services/webhooks?view=azure-devops) within the team project.
+
+- Navigate anywhere within a team project, ie: `https://dev.azure.com/orgName/projectName/_git/repoName`
+- Select **Project settings** in the lower-left corner
+- Select **Service hooks**
+- Click the green plus icon to add a new webhook
+- Scroll to the bottom of the list and select **Web Hooks**
+- Click **Next**
+- Under "Trigger on this type of event", select **Pull request created**
+- Click **Next**
+- Set **URL** to `http://$URL/events` where `$URL` is where Atlantis is hosted. Note that SSL, or `https://$URL/events`, is required if you set a Basic username and password for the webhook). **Be sure to add `/events`**
+- It is strongly recommended to set a Basic Username and Password for all webhooks
+- Leave all three drop-down menus for `...to send` set to **All**
+- Resource version should be set to **1.0**
+- **NOTE** If you're adding a webhook to multiple repositories, each repository will need to use the **same** secret.
+- Click **Finish**
+
+Repeat the process above until you have webhook subscriptions for the following four event types that will trigger on all repositories Atlantis will manage:
+
+- Pull request created
+- Pull request merge attempted
+- Pull request updated
+- Work item commented on
+
+In Azure Devops, the text of a comment made on a pull request is not included in Pull Request webhook event payloads. Instead, to use Azure Devops with Atlantis, you must use an Azure Boards Work Item, such as a User Story, Bug, or Task, and [link it to a pull request](https://docs.microsoft.com/en-us/azure/devops/boards/backlogs/connect-work-items-to-git-dev-ops?view=azure-devops).  Atlantis commands contained in Work Item comments will be sent in the webhook payloads to your Atlantis `/events` endpoint.
+
+- See [Next Steps](#next-steps)
+
+## GitLab
+If you're using GitLab, navigate to your project's home page in GitLab
 ## Next Steps
 * To verify that Atlantis is receiving your webhooks, create a test pull request
-  to your repo. You should see the request show up in the Atlantis logs at an `INFO` level.
+  to your repo. 
+* If you're using Azure Devops, create a new User Story, and from there create a branch, and then a pull request, both linked to the work item
+* You should see the request show up in the Atlantis logs at an `INFO` level.
 * You'll now need to configure Atlantis to add your [Provider Credentials](provider-credentials.html)

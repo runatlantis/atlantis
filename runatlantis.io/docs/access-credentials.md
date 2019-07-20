@@ -20,6 +20,7 @@ generate an access token. Read on for the instructions for your specific Git hos
 * [GitLab](#gitlab)
 * [Bitbucket Cloud (bitbucket.org)](#bitbucket-cloud-bitbucket-org)
 * [Bitbucket Server (aka Stash)](#bitbucket-server-aka-stash)
+* [Azure Devops](#azure-devops)
 
 ### GitHub
 - Create a Personal Access Token by following: [https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/#creating-a-token](https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/#creating-a-token)
@@ -49,8 +50,8 @@ Your Atlantis user must also have "Write permissions" (for repos in an organizat
 - Give the token **Read** Project permissions and **Write** Pull request permissions
 - Click **Create** and record the access token
 
-### Create an Azure Devops (dev.azure.com) Personal Access Token
-- create a Personal access token by following [https://docs.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops](https://docs.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops)
+### Azure Devops
+- Create a Personal access token by following [https://docs.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops](https://docs.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops)
 - Label the password "atlantis"
 - Under scope "Code", select **Read & Write** and **Status** so that Atlantis can read your pull requests and write comments to them
 - record the access token
