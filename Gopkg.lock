@@ -486,6 +486,14 @@
   version = "v0.8.0"
 
 [[projects]]
+  branch = "master"
+  digest = "1:bb90467981c5e812c4d1c78e498a1416b04cb5149dc5fa2200ab758c37488f6f"
+  name = "github.com/remeh/sizedwaitgroup"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "5e7302b12ccef91dce9fde2f5bda6d5c7ea5d2eb"
+
+[[projects]]
   digest = "1:9e9193aa51197513b3abcb108970d831fbcf40ef96aa845c4f03276e1fa316d2"
   name = "github.com/sirupsen/logrus"
   packages = ["."]
@@ -806,6 +814,7 @@
     "github.com/nlopes/slack",
     "github.com/petergtz/pegomock",
     "github.com/pkg/errors",
+    "github.com/remeh/sizedwaitgroup",
     "github.com/spf13/cobra",
     "github.com/spf13/pflag",
     "github.com/spf13/viper",
