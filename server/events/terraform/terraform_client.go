@@ -97,7 +97,14 @@ var versionRegex = regexp.MustCompile("Terraform v(.*?)(\\s.*)?\n")
 // version.
 // tfDownloader is used to download terraform versions.
 // Will asynchronously download the required version if it doesn't exist already.
-func NewClient(log *logging.SimpleLogger, dataDir string, tfeToken string, defaultVersionStr string, defaultVersionFlagName string, tfDownloader Downloader) (*DefaultClient, error) {
+func NewClient(
+	log *logging.SimpleLogger,
+	dataDir string,
+	tfeToken string,
+	tfeHostname string,
+	defaultVersionStr string,
+	defaultVersionFlagName string,
+	tfDownloader Downloader) (*DefaultClient, error) {
 	var finalDefaultVersion *version.Version
 	var localVersion *version.Version
 	versions := make(map[string]string)
@@ -149,7 +156,7 @@ func NewClient(log *logging.SimpleLogger, dataDir string, tfeToken string, defau
 		if err != nil {
 			return nil, errors.Wrap(err, "getting home dir to write ~/.terraformrc file")
 		}
-		if err := generateRCFile(tfeToken, home); err != nil {
+		if err := generateRCFile(tfeToken, tfeHostname, home); err != nil {
 			return nil, err
 		}
 	}
@@ -383,12 +390,13 @@ func ensureVersion(log *logging.SimpleLogger, dl Downloader, versions map[string
 	return dest, nil
 }
 
-// generateRCFile generates a .terraformrc file containing config for tfeToken.
+// generateRCFile generates a .terraformrc file containing config for tfeToken
+// and hostname tfeHostname.
 // It will create the file in home/.terraformrc.
-func generateRCFile(tfeToken string, home string) error {
+func generateRCFile(tfeToken string, tfeHostname string, home string) error {
 	const rcFilename = ".terraformrc"
 	rcFile := filepath.Join(home, rcFilename)
-	config := fmt.Sprintf(rcFileContents, tfeToken)
+	config := fmt.Sprintf(rcFileContents, tfeHostname, tfeToken)
 
 	// If there is already a .terraformrc file and its contents aren't exactly
 	// what we would have written to it, then we error out because we don't
@@ -428,7 +436,7 @@ func getVersion(tfBinary string) (*version.Version, error) {
 // rcFileContents is a format string to be used with Sprintf that can be used
 // to generate the contents of a ~/.terraformrc file for authenticating with
 // Terraform Enterprise.
-var rcFileContents = `credentials "app.terraform.io" {
+var rcFileContents = `credentials "%s" {
   token = %q
 }`
 

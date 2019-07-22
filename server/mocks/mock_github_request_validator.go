@@ -44,60 +44,60 @@ func (mock *MockGithubRequestValidator) Validate(r *http.Request, secret []byte)
 	return ret0, ret1
 }
 
-func (mock *MockGithubRequestValidator) VerifyWasCalledOnce() *VerifierGithubRequestValidator {
-	return &VerifierGithubRequestValidator{
+func (mock *MockGithubRequestValidator) VerifyWasCalledOnce() *VerifierMockGithubRequestValidator {
+	return &VerifierMockGithubRequestValidator{
 		mock:                   mock,
 		invocationCountMatcher: pegomock.Times(1),
 	}
 }
 
-func (mock *MockGithubRequestValidator) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierGithubRequestValidator {
-	return &VerifierGithubRequestValidator{
+func (mock *MockGithubRequestValidator) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockGithubRequestValidator {
+	return &VerifierMockGithubRequestValidator{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockGithubRequestValidator) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierGithubRequestValidator {
-	return &VerifierGithubRequestValidator{
+func (mock *MockGithubRequestValidator) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockGithubRequestValidator {
+	return &VerifierMockGithubRequestValidator{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 		inOrderContext:         inOrderContext,
 	}
 }
 
-func (mock *MockGithubRequestValidator) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierGithubRequestValidator {
-	return &VerifierGithubRequestValidator{
+func (mock *MockGithubRequestValidator) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockGithubRequestValidator {
+	return &VerifierMockGithubRequestValidator{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 		timeout:                timeout,
 	}
 }
 
-type VerifierGithubRequestValidator struct {
+type VerifierMockGithubRequestValidator struct {
 	mock                   *MockGithubRequestValidator
 	invocationCountMatcher pegomock.Matcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }
 
-func (verifier *VerifierGithubRequestValidator) Validate(r *http.Request, secret []byte) *GithubRequestValidator_Validate_OngoingVerification {
+func (verifier *VerifierMockGithubRequestValidator) Validate(r *http.Request, secret []byte) *MockGithubRequestValidator_Validate_OngoingVerification {
 	params := []pegomock.Param{r, secret}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Validate", params, verifier.timeout)
-	return &GithubRequestValidator_Validate_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+	return &MockGithubRequestValidator_Validate_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type GithubRequestValidator_Validate_OngoingVerification struct {
+type MockGithubRequestValidator_Validate_OngoingVerification struct {
 	mock              *MockGithubRequestValidator
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *GithubRequestValidator_Validate_OngoingVerification) GetCapturedArguments() (*http.Request, []byte) {
+func (c *MockGithubRequestValidator_Validate_OngoingVerification) GetCapturedArguments() (*http.Request, []byte) {
 	r, secret := c.GetAllCapturedArguments()
 	return r[len(r)-1], secret[len(secret)-1]
 }
 
-func (c *GithubRequestValidator_Validate_OngoingVerification) GetAllCapturedArguments() (_param0 []*http.Request, _param1 [][]byte) {
+func (c *MockGithubRequestValidator_Validate_OngoingVerification) GetAllCapturedArguments() (_param0 []*http.Request, _param1 [][]byte) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]*http.Request, len(params[0]))

@@ -389,10 +389,10 @@ func (p *DefaultProjectCommandBuilder) buildCtx(ctx *CommandContext,
 	return models.ProjectCommandContext{
 		ApplyCmd:             p.CommentBuilder.BuildApplyComment(projCfg.RepoRelDir, projCfg.Workspace, projCfg.Name),
 		BaseRepo:             ctx.BaseRepo,
-		CommentArgs:          commentArgs,
+		EscapedCommentArgs:   p.escapeArgs(commentArgs),
 		AutomergeEnabled:     automergeEnabled,
-		ParallelPlansEnabled: parallelPlansEnabled,
 		AutoplanEnabled:      projCfg.AutoplanEnabled,
+		ParallelPlansEnabled: parallelPlansEnabled,
 		Steps:                steps,
 		HeadRepo:             ctx.HeadRepo,
 		Log:                  ctx.Log,
@@ -408,4 +408,16 @@ func (p *DefaultProjectCommandBuilder) buildCtx(ctx *CommandContext,
 		Verbose:              verbose,
 		Workspace:            projCfg.Workspace,
 	}
+}
+
+func (p *DefaultProjectCommandBuilder) escapeArgs(args []string) []string {
+	var escaped []string
+	for _, arg := range args {
+		var escapedArg string
+		for i := range arg {
+			escapedArg += "\\" + string(arg[i])
+		}
+		escaped = append(escaped, escapedArg)
+	}
+	return escaped
 }

@@ -29,12 +29,12 @@ build-service: ## Build the main Go service
 go-generate: ## Run go generate in all packages
 	go generate $(PKG)
 
-#regen-mocks: ## Delete all mocks and matchers and then run go generate to regen them. This doesn't work anymore.
-#find . -type f | grep mocks/mock_ | grep -v vendor | xargs rm
-#find . -type f | grep mocks/matchers | grep -v vendor | xargs rm
-#@# not using $(PKG) here because that it includes directories that have now
-#@# been deleted, causing go generate to fail.
-#echo "this doesn't work anymore: go generate \$\$(go list ./... | grep -v e2e | grep -v vendor | grep -v static)"
+regen-mocks: ## Delete all mocks and matchers and then run go generate to regen them.
+	find . -type f | grep mocks/mock_ | grep -v vendor | xargs rm
+	find . -type f | grep mocks/matchers | grep -v vendor | xargs rm
+	@# not using $(PKG) here because that it includes directories that have now
+	@# been deleted, causing go generate to fail.
+	go list ./... | grep -v e2e | grep -v vendor | grep -v static | xargs go generate
 
 test: ## Run tests
 	@go test -short $(PKG)

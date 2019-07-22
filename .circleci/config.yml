@@ -5,6 +5,7 @@ jobs:
     docker:
       - image: runatlantis/testing-env:latest
     steps:
+<<<<<<< HEAD
       - checkout
       - run: make test-coverage
       - run:
@@ -12,6 +13,30 @@ jobs:
           command: bash <(curl -s https://codecov.io/bash)
       - run: make check-fmt
       - run: make check-lint
+=======
+    - checkout
+    - run: make test-coverage
+    - run:
+        name: post coverage to codecov.io
+        command: bash <(curl -s https://codecov.io/bash)
+    - run: make check-fmt
+    - run: make check-lint
+  e2e:
+    working_directory: /go/src/github.com/runatlantis/atlantis
+    docker:
+    - image: circleci/golang:1.12
+      environment:
+        # This version of TF will be downloaded before Atlantis is started.
+        # We do this instead of setting --default-tf-version because setting
+        # that flag starts the download asynchronously so we'd have a race
+        # condition.
+        TERRAFORM_VERSION: 0.12.3
+    steps:
+    - checkout
+    - run: make build-service
+    # We don't run e2e tests on fork PRs because they don't have access to the secret env vars.
+    - run: if [ -z "${CIRCLE_PR_REPONAME}" ]; then ./scripts/e2e.sh; fi
+>>>>>>> 7b9c69732113761de8fac99900887da91c514431
 
 workflows:
   version: 2

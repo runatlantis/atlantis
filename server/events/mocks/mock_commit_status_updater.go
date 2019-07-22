@@ -70,60 +70,60 @@ func (mock *MockCommitStatusUpdater) UpdateProject(ctx models.ProjectCommandCont
 	return ret0
 }
 
-func (mock *MockCommitStatusUpdater) VerifyWasCalledOnce() *VerifierCommitStatusUpdater {
-	return &VerifierCommitStatusUpdater{
+func (mock *MockCommitStatusUpdater) VerifyWasCalledOnce() *VerifierMockCommitStatusUpdater {
+	return &VerifierMockCommitStatusUpdater{
 		mock:                   mock,
 		invocationCountMatcher: pegomock.Times(1),
 	}
 }
 
-func (mock *MockCommitStatusUpdater) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierCommitStatusUpdater {
-	return &VerifierCommitStatusUpdater{
+func (mock *MockCommitStatusUpdater) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockCommitStatusUpdater {
+	return &VerifierMockCommitStatusUpdater{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockCommitStatusUpdater) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierCommitStatusUpdater {
-	return &VerifierCommitStatusUpdater{
+func (mock *MockCommitStatusUpdater) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockCommitStatusUpdater {
+	return &VerifierMockCommitStatusUpdater{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 		inOrderContext:         inOrderContext,
 	}
 }
 
-func (mock *MockCommitStatusUpdater) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierCommitStatusUpdater {
-	return &VerifierCommitStatusUpdater{
+func (mock *MockCommitStatusUpdater) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockCommitStatusUpdater {
+	return &VerifierMockCommitStatusUpdater{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 		timeout:                timeout,
 	}
 }
 
-type VerifierCommitStatusUpdater struct {
+type VerifierMockCommitStatusUpdater struct {
 	mock                   *MockCommitStatusUpdater
 	invocationCountMatcher pegomock.Matcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }
 
-func (verifier *VerifierCommitStatusUpdater) UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName) *CommitStatusUpdater_UpdateCombined_OngoingVerification {
+func (verifier *VerifierMockCommitStatusUpdater) UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName) *MockCommitStatusUpdater_UpdateCombined_OngoingVerification {
 	params := []pegomock.Param{repo, pull, status, command}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "UpdateCombined", params, verifier.timeout)
-	return &CommitStatusUpdater_UpdateCombined_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+	return &MockCommitStatusUpdater_UpdateCombined_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type CommitStatusUpdater_UpdateCombined_OngoingVerification struct {
+type MockCommitStatusUpdater_UpdateCombined_OngoingVerification struct {
 	mock              *MockCommitStatusUpdater
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *CommitStatusUpdater_UpdateCombined_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, models.CommitStatus, models.CommandName) {
+func (c *MockCommitStatusUpdater_UpdateCombined_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, models.CommitStatus, models.CommandName) {
 	repo, pull, status, command := c.GetAllCapturedArguments()
 	return repo[len(repo)-1], pull[len(pull)-1], status[len(status)-1], command[len(command)-1]
 }
 
-func (c *CommitStatusUpdater_UpdateCombined_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []models.CommitStatus, _param3 []models.CommandName) {
+func (c *MockCommitStatusUpdater_UpdateCombined_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []models.CommitStatus, _param3 []models.CommandName) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.Repo, len(params[0]))
@@ -146,23 +146,23 @@ func (c *CommitStatusUpdater_UpdateCombined_OngoingVerification) GetAllCapturedA
 	return
 }
 
-func (verifier *VerifierCommitStatusUpdater) UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName, numSuccess int, numTotal int) *CommitStatusUpdater_UpdateCombinedCount_OngoingVerification {
+func (verifier *VerifierMockCommitStatusUpdater) UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName, numSuccess int, numTotal int) *MockCommitStatusUpdater_UpdateCombinedCount_OngoingVerification {
 	params := []pegomock.Param{repo, pull, status, command, numSuccess, numTotal}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "UpdateCombinedCount", params, verifier.timeout)
-	return &CommitStatusUpdater_UpdateCombinedCount_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+	return &MockCommitStatusUpdater_UpdateCombinedCount_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type CommitStatusUpdater_UpdateCombinedCount_OngoingVerification struct {
+type MockCommitStatusUpdater_UpdateCombinedCount_OngoingVerification struct {
 	mock              *MockCommitStatusUpdater
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *CommitStatusUpdater_UpdateCombinedCount_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, models.CommitStatus, models.CommandName, int, int) {
+func (c *MockCommitStatusUpdater_UpdateCombinedCount_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest, models.CommitStatus, models.CommandName, int, int) {
 	repo, pull, status, command, numSuccess, numTotal := c.GetAllCapturedArguments()
 	return repo[len(repo)-1], pull[len(pull)-1], status[len(status)-1], command[len(command)-1], numSuccess[len(numSuccess)-1], numTotal[len(numTotal)-1]
 }
 
-func (c *CommitStatusUpdater_UpdateCombinedCount_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []models.CommitStatus, _param3 []models.CommandName, _param4 []int, _param5 []int) {
+func (c *MockCommitStatusUpdater_UpdateCombinedCount_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest, _param2 []models.CommitStatus, _param3 []models.CommandName, _param4 []int, _param5 []int) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.Repo, len(params[0]))
@@ -193,23 +193,23 @@ func (c *CommitStatusUpdater_UpdateCombinedCount_OngoingVerification) GetAllCapt
 	return
 }
 
-func (verifier *VerifierCommitStatusUpdater) UpdateProject(ctx models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus, url string) *CommitStatusUpdater_UpdateProject_OngoingVerification {
+func (verifier *VerifierMockCommitStatusUpdater) UpdateProject(ctx models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus, url string) *MockCommitStatusUpdater_UpdateProject_OngoingVerification {
 	params := []pegomock.Param{ctx, cmdName, status, url}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "UpdateProject", params, verifier.timeout)
-	return &CommitStatusUpdater_UpdateProject_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+	return &MockCommitStatusUpdater_UpdateProject_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type CommitStatusUpdater_UpdateProject_OngoingVerification struct {
+type MockCommitStatusUpdater_UpdateProject_OngoingVerification struct {
 	mock              *MockCommitStatusUpdater
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *CommitStatusUpdater_UpdateProject_OngoingVerification) GetCapturedArguments() (models.ProjectCommandContext, models.CommandName, models.CommitStatus, string) {
+func (c *MockCommitStatusUpdater_UpdateProject_OngoingVerification) GetCapturedArguments() (models.ProjectCommandContext, models.CommandName, models.CommitStatus, string) {
 	ctx, cmdName, status, url := c.GetAllCapturedArguments()
 	return ctx[len(ctx)-1], cmdName[len(cmdName)-1], status[len(status)-1], url[len(url)-1]
 }
 
-func (c *CommitStatusUpdater_UpdateProject_OngoingVerification) GetAllCapturedArguments() (_param0 []models.ProjectCommandContext, _param1 []models.CommandName, _param2 []models.CommitStatus, _param3 []string) {
+func (c *MockCommitStatusUpdater_UpdateProject_OngoingVerification) GetAllCapturedArguments() (_param0 []models.ProjectCommandContext, _param1 []models.CommandName, _param2 []models.CommitStatus, _param3 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.ProjectCommandContext, len(params[0]))

@@ -3,6 +3,7 @@ package events_test
 import (
 	"io/ioutil"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	. "github.com/petergtz/pegomock"
@@ -180,7 +181,7 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) 
 				Workspace:  "myworkspace",
 			},
 			AtlantisYAML:   "",
-			ExpCommentArgs: []string{"commentarg"},
+			ExpCommentArgs: []string{`\c\o\m\m\e\n\t\a\r\g`},
 			ExpWorkspace:   "myworkspace",
 			ExpDir:         ".",
 			ExpApplyReqs:   []string{},
@@ -382,7 +383,7 @@ projects:
 				actCtx := actCtxs[0]
 				Equals(t, c.ExpDir, actCtx.RepoRelDir)
 				Equals(t, c.ExpWorkspace, actCtx.Workspace)
-				Equals(t, c.ExpCommentArgs, actCtx.CommentArgs)
+				Equals(t, c.ExpCommentArgs, actCtx.EscapedCommentArgs)
 				Equals(t, c.ExpProjectName, actCtx.ProjectName)
 				Equals(t, c.ExpApplyReqs, actCtx.ApplyRequirements)
 			})
@@ -653,4 +654,65 @@ projects:
 		ProjectName: "",
 	})
 	ErrEquals(t, "running commands in workspace \"notconfigured\" is not allowed because this directory is only configured for the following workspaces: default, staging", err)
+}
+
+// Test that extra comment args are escaped.
+func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
+	cases := []struct {
+		ExtraArgs      []string
+		ExpEscapedArgs []string
+	}{
+		{
+			ExtraArgs:      []string{"arg1", "arg2"},
+			ExpEscapedArgs: []string{`\a\r\g\1`, `\a\r\g\2`},
+		},
+		{
+			ExtraArgs:      []string{"-var=$(touch bad)"},
+			ExpEscapedArgs: []string{`\-\v\a\r\=\$\(\t\o\u\c\h\ \b\a\d\)`},
+		},
+		{
+			ExtraArgs:      []string{"-- ;echo bad"},
+			ExpEscapedArgs: []string{`\-\-\ \;\e\c\h\o\ \b\a\d`},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(strings.Join(c.ExtraArgs, " "), func(t *testing.T) {
+			RegisterMockTestingT(t)
+			tmpDir, cleanup := DirStructure(t, map[string]interface{}{
+				"main.tf": nil,
+			})
+			defer cleanup()
+
+			workingDir := mocks.NewMockWorkingDir()
+			When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, nil)
+			When(workingDir.GetWorkingDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, nil)
+			vcsClient := vcsmocks.NewMockClient()
+			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
+
+			builder := &events.DefaultProjectCommandBuilder{
+				WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+				WorkingDir:       workingDir,
+				ParserValidator:  &yaml.ParserValidator{},
+				VCSClient:        vcsClient,
+				ProjectFinder:    &events.DefaultProjectFinder{},
+				CommentBuilder:   &events.CommentParser{},
+				GlobalCfg:        valid.NewGlobalCfg(true, false, false),
+			}
+
+			var actCtxs []models.ProjectCommandContext
+			var err error
+			actCtxs, err = builder.BuildPlanCommands(&events.CommandContext{}, &events.CommentCommand{
+				RepoRelDir: ".",
+				Flags:      c.ExtraArgs,
+				Name:       models.PlanCommand,
+				Verbose:    false,
+				Workspace:  "default",
+			})
+			Ok(t, err)
+			Equals(t, 1, len(actCtxs))
+			actCtx := actCtxs[0]
+			Equals(t, c.ExpEscapedArgs, actCtx.EscapedCommentArgs)
+		})
+	}
 }
