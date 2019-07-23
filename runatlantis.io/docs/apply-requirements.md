@@ -161,7 +161,7 @@ If you only want some projects/repos to have apply requirements, then you must
      # Allow any repo to specify apply_requirements in atlantis.yaml
    ```
    
-   #### atlatis.yaml
+   #### atlantis.yaml
    ```yaml
    version: 3
    projects:
