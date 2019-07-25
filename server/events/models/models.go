@@ -301,8 +301,12 @@ type ProjectCommandContext struct {
 	// AutomergeEnabled is true if automerge is enabled for the repo that this
 	// project is in.
 	AutomergeEnabled bool
-	// ParallelPlansEnabled is true if parallel plans is enabled for this project.
+	// ParallelPlansEnabled is true if parallel plans is enabled for the repo that this
+	// project is in.
 	ParallelPlansEnabled bool
+	// ProjectLocksEnabled is true if locking is enabled for the repo that this
+	// project is in.
+	ProjectLocksEnabled bool
 	// AutoplanEnabled is true if autoplanning is enabled for this project.
 	AutoplanEnabled bool
 	// BaseRepo is the repository that the pull request will be merged into.
