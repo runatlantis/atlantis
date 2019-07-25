@@ -263,15 +263,20 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx models.ProjectCommandCon
 }
 
 func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (*models.PlanSuccess, string, error) {
-	// Acquire Atlantis lock for this repo/dir/workspace.
-	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir))
-	if err != nil {
-		return nil, "", errors.Wrap(err, "acquiring lock")
+	var lockAttempt *TryLockResponse
+	var lockUrl string
+	if ctx.ProjectLocksEnabled {
+		// Acquire Atlantis lock for this repo/dir/workspace.
+		lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.BaseRepo.FullName, ctx.RepoRelDir))
+		if err != nil {
+			return nil, "", errors.Wrap(err, "acquiring lock")
+		}
+		if !lockAttempt.LockAcquired {
+			return nil, lockAttempt.LockFailureReason, nil
+		}
+		ctx.Log.Debug("acquired lock for project")
+		lockUrl = p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey)
 	}
-	if !lockAttempt.LockAcquired {
-		return nil, lockAttempt.LockFailureReason, nil
-	}
-	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace)
@@ -302,7 +307,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 	}
 
 	return &models.PlanSuccess{
-		LockURL:         p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
+		LockURL:         lockUrl,
 		TerraformOutput: strings.Join(outputs, "\n"),
 		RePlanCmd:       ctx.RePlanCmd,
 		ApplyCmd:        ctx.ApplyCmd,

@@ -122,11 +122,22 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 			expErr: "yaml: unmarshal errors:\n  line 2: cannot unmarshal !!str `notabool` into bool",
 		},
 		{
+			description: "locking not a boolean",
+			input:       "version: 3\nlocking: notabool",
+			exp: raw.RepoCfg{
+				Version:   nil,
+				Projects:  nil,
+				Workflows: nil,
+			},
+			expErr: "yaml: unmarshal errors:\n  line 2: cannot unmarshal !!str `notabool` into bool",
+		},
+		{
 			description: "should use values if set",
 			input: `
 version: 3
 automerge: true
 parallel_plans: true
+locking: false
 projects:
 - dir: mydir
   workspace: myworkspace
@@ -148,6 +159,7 @@ workflows:
 				Version:       Int(3),
 				Automerge:     Bool(true),
 				ParallelPlans: Bool(true),
+				ProjectLocks:  Bool(false),
 				Projects: []raw.Project{
 					{
 						Dir:              String("mydir"),
@@ -235,8 +247,9 @@ func TestConfig_ToValid(t *testing.T) {
 			description: "nothing set",
 			input:       raw.RepoCfg{Version: Int(2)},
 			exp: valid.RepoCfg{
-				Version:   2,
-				Workflows: make(map[string]valid.Workflow),
+				Version:      2,
+				ProjectLocks: true,
+				Workflows:    make(map[string]valid.Workflow),
 			},
 		},
 		{
@@ -247,13 +260,14 @@ func TestConfig_ToValid(t *testing.T) {
 				Projects:  []raw.Project{},
 			},
 			exp: valid.RepoCfg{
-				Version:   2,
-				Workflows: map[string]valid.Workflow{},
-				Projects:  nil,
+				Version:      2,
+				ProjectLocks: true,
+				Workflows:    map[string]valid.Workflow{},
+				Projects:     nil,
 			},
 		},
 		{
-			description: "automerge and parallel_plans ommitted",
+			description: "automerge, parallel_plans and locking ommitted",
 			input: raw.RepoCfg{
 				Version: Int(2),
 			},
@@ -261,34 +275,39 @@ func TestConfig_ToValid(t *testing.T) {
 				Version:       2,
 				Automerge:     false,
 				ParallelPlans: false,
+				ProjectLocks:  true,
 				Workflows:     map[string]valid.Workflow{},
 			},
 		},
 		{
-			description: "automerge and parallel_plans true",
+			description: "automerge, parallel_plans and locking true",
 			input: raw.RepoCfg{
 				Version:       Int(2),
 				Automerge:     Bool(true),
 				ParallelPlans: Bool(true),
+				ProjectLocks:  Bool(true),
 			},
 			exp: valid.RepoCfg{
 				Version:       2,
 				Automerge:     true,
 				ParallelPlans: true,
+				ProjectLocks:  true,
 				Workflows:     map[string]valid.Workflow{},
 			},
 		},
 		{
-			description: "automerge and parallel_plans false",
+			description: "automerge, parallel_plans and locking false",
 			input: raw.RepoCfg{
 				Version:       Int(2),
 				Automerge:     Bool(false),
 				ParallelPlans: Bool(false),
+				ProjectLocks:  Bool(false),
 			},
 			exp: valid.RepoCfg{
 				Version:       2,
 				Automerge:     false,
 				ParallelPlans: false,
+				ProjectLocks:  false,
 				Workflows:     map[string]valid.Workflow{},
 			},
 		},
@@ -308,6 +327,7 @@ func TestConfig_ToValid(t *testing.T) {
 				Version:       2,
 				Automerge:     false,
 				ParallelPlans: false,
+				ProjectLocks:  true,
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": {
 						Name: "myworkflow",
@@ -339,6 +359,7 @@ func TestConfig_ToValid(t *testing.T) {
 				Version:       Int(2),
 				Automerge:     Bool(true),
 				ParallelPlans: Bool(true),
+				ProjectLocks:  Bool(false),
 				Workflows: map[string]raw.Workflow{
 					"myworkflow": {
 						Apply: &raw.Stage{
@@ -374,6 +395,7 @@ func TestConfig_ToValid(t *testing.T) {
 				Version:       2,
 				Automerge:     true,
 				ParallelPlans: true,
+				ProjectLocks:  false,
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": {
 						Name: "myworkflow",

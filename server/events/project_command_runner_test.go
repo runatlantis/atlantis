@@ -79,7 +79,8 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		"name": "value",
 	}
 	ctx := models.ProjectCommandContext{
-		Log: logging.NewNoopLogger(),
+		Log:                 logging.NewNoopLogger(),
+		ProjectLocksEnabled: true,
 		Steps: []valid.Step{
 			{
 				StepName:    "env",
