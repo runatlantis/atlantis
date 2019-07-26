@@ -53,8 +53,11 @@ Your Atlantis user must also have "Write permissions" (for repos in an organizat
 ### Azure Devops
 - Create a Personal access token by following [https://docs.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops](https://docs.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops)
 - Label the password "atlantis"
-- Under scope "Code", select **Read & Write** and **Status** so that Atlantis can read your pull requests and write comments to them
-- record the access token
+- The minimum scopes required for this token are:
+  - Code (Read)
+  - Code (Status)
+  - Work Items (Read & write)
+- Record the access token
 
 ## Next Steps
 Once you've got your user and access token, you're ready to create a webhook secret. See [Creating a Webhook Secret](webhook-secrets.html).

@@ -100,7 +100,7 @@ Webhooks are installed at the [team project](https://docs.microsoft.com/en-us/az
 - It is strongly recommended to set a Basic Username and Password for all webhooks
 - Leave all three drop-down menus for `...to send` set to **All**
 - Resource version should be set to **1.0**
-- **NOTE** If you're adding a webhook to multiple repositories, each repository will need to use the **same** secret.
+- **NOTE** If you're adding a webhook to multiple team projects or repositories (using filters), each repository will need to use the **same** basic username and password.
 - Click **Finish**
 
 Repeat the process above until you have webhook subscriptions for the following four event types that will trigger on all repositories Atlantis will manage:
