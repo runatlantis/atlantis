@@ -722,12 +722,12 @@ func (e *EventParser) ParseBitbucketServerPullEvent(body []byte) (pull models.Pu
 // ParseAzureDevopsPullEvent parses Azure Devops pull request events.
 // See EventParsing for return value docs.
 func (e *EventParser) ParseAzureDevopsPullEvent(event azuredevops.Event) (pull models.PullRequest, pullEventType models.PullRequestEventType, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
-	obj, ok := event.Resource.(azuredevops.GitPullRequest)
+	pullResource, ok := event.Resource.(*azuredevops.GitPullRequest)
 	if !ok {
-		err = errors.New("Unable to type assert event.Resource")
+		errMsg := fmt.Sprintf("Failed to type assert event.Resource.")
+		err = errors.New(errMsg)
 		return pull, pullEventType, baseRepo, headRepo, user, err
 	}
-	pullResource := &obj
 	pull, baseRepo, headRepo, err = e.ParseAzureDevopsPull(pullResource)
 	if err != nil {
 		return pull, pullEventType, baseRepo, headRepo, user, err
@@ -747,8 +747,9 @@ func (e *EventParser) ParseAzureDevopsPullEvent(event azuredevops.Event) (pull m
 		pullEventType = models.OpenedPullEvent
 	case "git.pullrequest.updated":
 		pullEventType = models.UpdatedPullEvent
-	case "git.pullrequest.merged":
-		pullEventType = models.ClosedPullEvent
+		if pull.State == models.ClosedPullState {
+			pullEventType = models.ClosedPullEvent
+		}
 	default:
 		pullEventType = models.OtherPullEvent
 	}
