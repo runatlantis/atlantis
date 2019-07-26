@@ -724,7 +724,7 @@ func (e *EventParser) ParseBitbucketServerPullEvent(body []byte) (pull models.Pu
 func (e *EventParser) ParseAzureDevopsPullEvent(event azuredevops.Event) (pull models.PullRequest, pullEventType models.PullRequestEventType, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
 	pullResource, ok := event.Resource.(*azuredevops.GitPullRequest)
 	if !ok {
-		errMsg := fmt.Sprintf("Failed to type assert event.Resource.")
+		errMsg := fmt.Sprintf("failed to type assert event.Resource.")
 		err = errors.New(errMsg)
 		return pull, pullEventType, baseRepo, headRepo, user, err
 	}

@@ -367,7 +367,7 @@ func (c *DefaultCommandRunner) getGitlabData(baseRepo models.Repo, pullNum int) 
 
 func (c *DefaultCommandRunner) getAzureDevopsData(baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {
 	if c.AzureDevopsPullGetter == nil {
-		return models.PullRequest{}, models.Repo{}, errors.New("Atlantis not configured to support Azure Devops")
+		return models.PullRequest{}, models.Repo{}, errors.New("atlantis not configured to support Azure Devops")
 	}
 	adPull, err := c.AzureDevopsPullGetter.GetPullRequest(baseRepo, pullNum)
 	if err != nil {

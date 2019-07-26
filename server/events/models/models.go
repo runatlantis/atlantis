@@ -81,7 +81,7 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 		// https://docs.microsoft.com/en-us/azure/devops/organizations/settings/naming-restrictions?view=azure-devops
 		matched, err := regexp.MatchString("[A-z0-9][A-z0-9._]+/[A-z0-9][A-z0-9._]+/[A-z0-9][A-z0-9._]+", repoFullName)
 		if err != nil {
-			e := fmt.Sprintf("NewRepo error vcsHostType = AzureDevops: %s", err)
+			e := fmt.Sprintf("newRepo error vcsHostType = AzureDevops: %s", err)
 			return Repo{}, errors.New(e)
 		}
 		if !matched {
