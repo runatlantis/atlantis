@@ -106,7 +106,6 @@ Webhooks are installed at the [team project](https://docs.microsoft.com/en-us/az
 Repeat the process above until you have webhook subscriptions for the following four event types that will trigger on all repositories Atlantis will manage:
 
 - Pull request created
-- Pull request merge attempted
 - Pull request updated
 - Work item commented on
 
