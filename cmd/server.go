@@ -37,12 +37,12 @@ import (
 const (
 	// Flag names.
 	ADBasicAuthFlag            = "azuredevops-basic-auth"
-	ADBasicPasswordFlag        = "azuredevops-basic-password" // inbound requests
-	ADBasicUserFlag            = "azuredevops-basic-user"     // inbound requests
+	ADBasicPasswordFlag        = "azuredevops-basic-password" // nolint: gosec
+	ADBasicUserFlag            = "azuredevops-basic-user"
 	ADOrgFlag                  = "azuredevops-org"
 	ADProjectFlag              = "azuredevops-project"
-	ADTokenFlag                = "azuredevops-token" // outbound requests
-	ADUserFlag                 = "azuredevops-user"  // outbound requests
+	ADTokenFlag                = "azuredevops-token" // nolint: gosec
+	ADUserFlag                 = "azuredevops-user"
 	AllowForkPRsFlag           = "allow-fork-prs"
 	AllowRepoConfigFlag        = "allow-repo-config"
 	AtlantisURLFlag            = "atlantis-url"
@@ -600,10 +600,10 @@ func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 		s.Logger.Warn("Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are whitelisting Bitbucket IPs")
 	}
 	if userConfig.AzureDevopsUser != "" && userConfig.AzureDevopsWebhookBasicUser == "" && !s.SilenceOutput {
-		s.Logger.Warn("No Azure Devops webhook basic user set. This could allow attackers to spoof requests from Azure Devops.")
+		s.Logger.Warn("no Azure Devops webhook basic user set. This could allow attackers to spoof requests from Azure Devops.")
 	}
 	if userConfig.AzureDevopsUser != "" && userConfig.AzureDevopsWebhookBasicPassword == "" && !s.SilenceOutput {
-		s.Logger.Warn("No Azure Devops webhook basic password set. This could allow attackers to spoof requests from Azure Devops.")
+		s.Logger.Warn("no Azure Devops webhook basic password set. This could allow attackers to spoof requests from Azure Devops.")
 	}
 }
 

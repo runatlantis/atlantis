@@ -1,62 +1,32 @@
-package vcs
+package vcs_test
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/vcs/fixtures"
 	. "github.com/runatlantis/atlantis/testing"
 )
-
-// Test that the base url gets set properly.
-func TestNewAzureDevopsClient_BaseURL(t *testing.T) {
-	azuredevopsClientUnderTest = true
-	defer func() { azuredevopsClientUnderTest = false }()
-	cases := []struct {
-		Hostname   string
-		Account    string
-		Project    string
-		ExpBaseURL string
-	}{
-		{
-			"dev.azure.com",
-			"testorg",
-			"testproject",
-			"https://dev.azure.com/testorg/testproject",
-		},
-		{
-			"visualstudio.com",
-			"testorg",
-			"testproject",
-			"https://testorg.visualstudio.com/testproject",
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.Hostname, c.Account, c.Project, func(t *testing.T) {
-			client, err := NewAzureDevopsClient(c.Hostname, c.Account, c.Project, "token", nil)
-			Ok(t, err)
-			Equals(t, c.ExpBaseURL, client.Client.BaseURL().String())
-		})
-	}
-}
 
 func TestAzureDevopsClient_MergePull(t *testing.T) {
 	cases := []struct {
 		description string
-		glResponse  string
+		response    string
 		code        int
 		expErr      string
 	}{
 		{
 			"success",
-			mergeSuccess,
+			adMergeSuccess,
 			200,
 			"",
 		},
@@ -74,40 +44,69 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 		},
 	}
 
+	// Set default pull request completion options
+	mcm := azuredevops.NoFastForward.String()
+	twi := new(bool)
+	*twi = true
+	completionOptions := azuredevops.GitPullRequestCompletionOptions{
+		BypassPolicy:            new(bool),
+		BypassReason:            azuredevops.String(""),
+		DeleteSourceBranch:      new(bool),
+		MergeCommitMessage:      azuredevops.String("commit message"),
+		MergeStrategy:           &mcm,
+		SquashMerge:             new(bool),
+		TransitionWorkItems:     twi,
+		TriggeredByAutoComplete: new(bool),
+	}
+
+	id := azuredevops.IdentityRef{}
+	pull := azuredevops.GitPullRequest{
+		PullRequestID: azuredevops.Int(22),
+	}
+
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			testServer := httptest.NewServer(
+			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch r.RequestURI {
 					// The first request should hit this URL.
-					case "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/1/merge":
+					case "/owner/project/_apis/git/repositories/repo/pullrequests/22?api-version=5.1-preview.1":
 						w.WriteHeader(c.code)
-						w.Write([]byte(c.glResponse)) // nolint: errcheck
+						w.Write([]byte(c.response)) // nolint: errcheck
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
 						http.Error(w, "not found", http.StatusNotFound)
 					}
 				}))
 
-			tp := azuredevops.BasicAuthTransport{
-				Username: "",
-				Password: strings.TrimSpace("token"),
-			}
-			httpClient := tp.Client()
-			httpClient.Timeout = time.Second * 10
-			internalClient, _ := azuredevops.NewClient(httpClient)
-			Ok(t, internalClient.SetBaseURL(testServer.URL))
-			client := &AzureDevopsClient{
-				Client:  internalClient,
-				Version: nil,
-			}
+			testServerURL, err := url.Parse(testServer.URL)
+			Ok(t, err)
+			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "owner", "user", "project", "token")
+			Ok(t, err)
+			defer disableSSLVerification()()
 
-			err := client.MergePull(models.PullRequest{
-				Num: 1,
+			merge, _, err := client.Client.PullRequests.Merge(context.Background(),
+				"owner",
+				"project",
+				"repo",
+				pull.GetPullRequestID(),
+				&pull,
+				completionOptions,
+				id,
+			)
+
+			if err != nil {
+				fmt.Printf("Merge failed: %+v\n", err)
+				return
+			}
+			fmt.Printf("Successfully merged pull request: %+v\n", merge)
+
+			err = client.MergePull(models.PullRequest{
+				Num: 22,
 				BaseRepo: models.Repo{
-					FullName: "runatlantis/atlantis",
-					Owner:    "runatlantis",
-					Name:     "atlantis",
+					FullName: "owner/project/repo",
+					Owner:    "owner",
+					Name:     "repo",
 				},
 			})
 			if c.expErr == "" {
@@ -131,54 +130,48 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 		},
 		{
 			models.SuccessCommitStatus,
-			"success",
+			"succeeded",
 		},
 		{
 			models.FailedCommitStatus,
 			"failed",
 		},
 	}
+	response := `{"context":{"genre":"Atlantis Bot","name":"src"},"description":"description","state":"%s","targetUrl":"https://google.com"}
+`
 	for _, c := range cases {
 		t.Run(c.expState, func(t *testing.T) {
 			gotRequest := false
-			testServer := httptest.NewServer(
+			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch r.RequestURI {
-					case "/api/v4/projects/runatlantis%2Fatlantis/statuses/sha":
+					case "/owner/project/_apis/git/repositories/repo/commits/sha/statuses?api-version=5.1-preview.1":
 						gotRequest = true
-
 						body, err := ioutil.ReadAll(r.Body)
 						Ok(t, err)
-						exp := fmt.Sprintf(`{"state":"%s","context":"src","target_url":"https://google.com","description":"description"}`, c.expState)
+						exp := fmt.Sprintf(response, c.expState)
 						Equals(t, exp, string(body))
-						defer r.Body.Close()  // nolint: errcheck
-						w.Write([]byte("{}")) // nolint: errcheck
+						defer r.Body.Close()      // nolint: errcheck
+						w.Write([]byte(response)) // nolint: errcheck
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
 						http.Error(w, "not found", http.StatusNotFound)
 					}
 				}))
 
-			tp := azuredevops.BasicAuthTransport{
-				Username: "",
-				Password: strings.TrimSpace("token"),
-			}
-			httpClient := tp.Client()
-			httpClient.Timeout = time.Second * 10
-			internalClient, _ := azuredevops.NewClient(httpClient)
-			Ok(t, internalClient.SetBaseURL(testServer.URL))
-			client := &AzureDevopsClient{
-				Client:  internalClient,
-				Version: nil,
-			}
+			testServerURL, err := url.Parse(testServer.URL)
+			Ok(t, err)
+			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "owner", "user", "project", "token")
+			Ok(t, err)
+			defer disableSSLVerification()()
 
 			repo := models.Repo{
-				FullName: "runatlantis/atlantis",
-				Owner:    "runatlantis",
-				Name:     "atlantis",
+				FullName: "owner/project/repo",
+				Owner:    "owner",
+				Name:     "repo",
 			}
-			err := client.UpdateStatus(repo, models.PullRequest{
-				Num:        1,
+			err = client.UpdateStatus(repo, models.PullRequest{
+				Num:        22,
 				BaseRepo:   repo,
 				HeadCommit: "sha",
 			}, c.status, "src", "description", "https://google.com")
@@ -188,29 +181,293 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 	}
 }
 
-var mergeSuccess = `{"id":22461274,"iid":13,"project_id":4580910,"title":"Update main.tf","description":"","state":"merged","created_at":"2019-01-15T18:27:29.375Z","updated_at":"2019-01-25T17:28:01.437Z","merged_by":{"id":1755902,"name":"Luke Kysow","username":"lkysow","state":"active","avatar_url":"https://secure.gravatar.com/avatar/25fd57e71590fe28736624ff24d41c5f?s=80\u0026d=identicon","web_url":"https://github.com/lkysow"},"merged_at":"2019-01-25T17:28:01.459Z","closed_by":null,"closed_at":null,"target_branch":"patch-1","source_branch":"patch-1-merger","upvotes":0,"downvotes":0,"author":{"id":1755902,"name":"Luke Kysow","username":"lkysow","state":"active","avatar_url":"https://secure.gravatar.com/avatar/25fd57e71590fe28736624ff24d41c5f?s=80\u0026d=identicon","web_url":"https://github.com/lkysow"},"assignee":null,"source_project_id":4580910,"target_project_id":4580910,"labels":[],"work_in_progress":false,"milestone":null,"merge_when_pipeline_succeeds":false,"merge_status":"can_be_merged","sha":"cb86d70f464632bdfbe1bb9bc0f2f9d847a774a0","merge_commit_sha":"c9b336f1c71d3e64810b8cfa2abcfab232d6bff6","user_notes_count":0,"discussion_locked":null,"should_remove_source_branch":null,"force_remove_source_branch":false,"web_url":"https://github.com/lkysow/atlantis-example/merge_requests/13","time_stats":{"time_estimate":0,"total_time_spent":0,"human_time_estimate":null,"human_total_time_spent":null},"squash":false,"subscribed":true,"changes_count":"1","latest_build_started_at":null,"latest_build_finished_at":null,"first_deployed_to_production_at":null,"pipeline":null,"diff_refs":{"base_sha":"67cb91d3f6198189f433c045154a885784ba6977","head_sha":"cb86d70f464632bdfbe1bb9bc0f2f9d847a774a0","start_sha":"67cb91d3f6198189f433c045154a885784ba6977"},"merge_error":null,"approvals_before_merge":null}`
+// GetModifiedFiles should make multiple requests if more than one page
+// and concat results.
+func TestAzureDevopsClient_GetModifiedFiles(t *testing.T) {
+	itemRespTemplate := `{
+		"changes": [
+	{
+		"item": {
+			"gitObjectType": "blob",
+			"path": "%s",
+			"url": "https://dev.azure.com/fabrikam/_apis/git/repositories/278d5cd2-584d-4b63-824a-2ba458937249/items/MyWebSite/MyWebSite/%s?versionType=Commit"
+		},
+		"changeType": "add"
+	},
+	{
+		"item": {
+			"gitObjectType": "blob",
+			"path": "%s",
+			"url": "https://dev.azure.com/fabrikam/_apis/git/repositories/278d5cd2-584d-4b63-824a-2ba458937249/items/MyWebSite/MyWebSite/%s?versionType=Commit"
+		},
+		"changeType": "add"
+	}
+]}`
+	resp := fmt.Sprintf(itemRespTemplate, "file1.txt", "file1.txt", "file2.txt", "file2.txt")
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			// The first request should hit this URL.
+			case "/owner/project/_apis/git/repositories/repo/pullrequests/1?api-version=5.1-preview.1&includeWorkItemRefs=true":
+				w.Write([]byte(fixtures.ADPullJSON)) // nolint: errcheck
+			// The second should hit this URL.
+			case "/owner/project/_apis/git/repositories/repo/commits/b60280bc6e62e2f880f1b63c1e24987664d3bda3/changes?api-version=5.1-preview.1":
+				// We write a header that means there's an additional page.
+				w.Write([]byte(resp)) // nolint: errcheck
+				return
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}))
 
-var getChangesResp = `{
-  "changeCounts": {
-    "Add": 456
-  },
-  "changes": [
-    {
-      "item": {
-        "gitObjectType": "blob",
-        "path": "/MyWebSite/MyWebSite/favicon.ico",
-        "url": "https://dev.azure.com/fabrikam/_apis/git/repositories/278d5cd2-584d-4b63-824a-2ba458937249/items/MyWebSite/MyWebSite/favicon.ico?versionType=Commit"
-      },
-      "changeType": "add"
-    },
-    {
-      "item": {
-        "gitObjectType": "tree",
-        "path": "/MyWebSite/MyWebSite/fonts",
-        "isFolder": true,
-        "url": "https://dev.azure.com/fabrikam/_apis/git/repositories/278d5cd2-584d-4b63-824a-2ba458937249/items/MyWebSite/MyWebSite/fonts?versionType=Commit"
-      },
-      "changeType": "add"
-    }
-  ]
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+	client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "owner", "user", "project", "token")
+	Ok(t, err)
+	defer disableSSLVerification()()
+
+	files, err := client.GetModifiedFiles(models.Repo{
+		FullName:          "owner/project/repo",
+		Owner:             "owner",
+		Name:              "repo",
+		CloneURL:          "",
+		SanitizedCloneURL: "",
+		VCSHost: models.VCSHost{
+			Type:     models.AzureDevops,
+			Hostname: "dev.azure.com",
+		},
+	}, models.PullRequest{
+		Num: 1,
+	})
+	Ok(t, err)
+	Equals(t, []string{"file1.txt", "file2.txt"}, files)
+}
+
+func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
+	cases := []struct {
+		state        string
+		expMergeable bool
+	}{
+		{
+			azuredevops.MergeConflicts.String(),
+			false,
+		},
+		{
+			azuredevops.MergeRejectedByPolicy.String(),
+			false,
+		},
+		{
+			azuredevops.MergeFailure.String(),
+			true,
+		},
+		{
+			azuredevops.MergeNotSet.String(),
+			true,
+		},
+		{
+			azuredevops.MergeQueued.String(),
+			true,
+		},
+		{
+			azuredevops.MergeSucceeded.String(),
+			true,
+		},
+	}
+
+	// Use a real Azure Devops json response and edit the mergeable_state field.
+	jsBytes, err := ioutil.ReadFile("fixtures/azuredevops-pr.json")
+	Ok(t, err)
+	json := string(jsBytes)
+
+	for _, c := range cases {
+		t.Run(c.state, func(t *testing.T) {
+			response := strings.Replace(json,
+				`"mergeStatus": "NotSet"`,
+				fmt.Sprintf(`"mergeStatus": "%s"`, c.state),
+				1,
+			)
+
+			testServer := httptest.NewTLSServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/owner/project/_apis/git/repositories/repo/pullrequests/1?api-version=5.1-preview.1&includeWorkItemRefs=true":
+						w.Write([]byte(response)) // nolint: errcheck
+						return
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+						return
+					}
+				}))
+			testServerURL, err := url.Parse(testServer.URL)
+			Ok(t, err)
+			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "owner", "user", "project", "token")
+			Ok(t, err)
+			defer disableSSLVerification()()
+
+			actMergeable, err := client.PullIsMergeable(models.Repo{
+				FullName:          "owner/project/repo",
+				Owner:             "owner",
+				Name:              "repo",
+				CloneURL:          "",
+				SanitizedCloneURL: "",
+				VCSHost: models.VCSHost{
+					Type:     models.AzureDevops,
+					Hostname: "dev.azure.com",
+				},
+			}, models.PullRequest{
+				Num: 1,
+			})
+			Ok(t, err)
+			Equals(t, c.expMergeable, actMergeable)
+		})
+	}
+}
+
+func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
+	cases := []struct {
+		testName    string
+		vote        int
+		expApproved bool
+	}{
+		{
+			"approved",
+			azuredevops.VoteApproved,
+			true,
+		},
+		{
+			"approved with suggestions",
+			azuredevops.VoteApprovedWithSuggestions,
+			false,
+		},
+		{
+			"no vote",
+			azuredevops.VoteNone,
+			false,
+		},
+		{
+			"vote waiting for author",
+			azuredevops.VoteWaitingForAuthor,
+			false,
+		},
+		{
+			"vote rejected",
+			azuredevops.VoteRejected,
+			false,
+		},
+	}
+
+	// Use a real Azure Devops json response and edit the mergeable_state field.
+	jsBytes, err := ioutil.ReadFile("fixtures/azuredevops-pr.json")
+	Ok(t, err)
+	json := string(jsBytes)
+
+	for _, c := range cases {
+		t.Run(c.testName, func(t *testing.T) {
+			response := strings.Replace(json,
+				`"vote": 0,`,
+				fmt.Sprintf(`"vote": %d,`, c.vote),
+				1,
+			)
+
+			testServer := httptest.NewTLSServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/owner/project/_apis/git/repositories/repo/pullrequests/1?api-version=5.1-preview.1&includeWorkItemRefs=true":
+						w.Write([]byte(response)) // nolint: errcheck
+						return
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+						return
+					}
+				}))
+			testServerURL, err := url.Parse(testServer.URL)
+			Ok(t, err)
+			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "owner", "user", "project", "token")
+			Ok(t, err)
+			defer disableSSLVerification()()
+
+			actApproved, err := client.PullIsApproved(models.Repo{
+				FullName:          "owner/project/repo",
+				Owner:             "owner",
+				Name:              "repo",
+				CloneURL:          "",
+				SanitizedCloneURL: "",
+				VCSHost: models.VCSHost{
+					Type:     models.AzureDevops,
+					Hostname: "dev.azure.com",
+				},
+			}, models.PullRequest{
+				Num: 1,
+			})
+			Ok(t, err)
+			Equals(t, c.expApproved, actApproved)
+		})
+	}
+}
+
+func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
+	// Use a real Azure Devops json response and edit the mergeable_state field.
+	jsBytes, err := ioutil.ReadFile("fixtures/azuredevops-pr.json")
+	Ok(t, err)
+	response := string(jsBytes)
+
+	t.Run("get pull request", func(t *testing.T) {
+		testServer := httptest.NewTLSServer(
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.RequestURI {
+				case "/owner/project/_apis/git/repositories/repo/pullrequests/1?api-version=5.1-preview.1&includeWorkItemRefs=true":
+					w.Write([]byte(response)) // nolint: errcheck
+					return
+				default:
+					t.Errorf("got unexpected request at %q", r.RequestURI)
+					http.Error(w, "not found", http.StatusNotFound)
+					return
+				}
+			}))
+		testServerURL, err := url.Parse(testServer.URL)
+		Ok(t, err)
+		client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "owner", "user", "project", "token")
+		Ok(t, err)
+		defer disableSSLVerification()()
+
+		_, err = client.GetPullRequest(models.Repo{
+			FullName:          "owner/project/repo",
+			Owner:             "owner",
+			Name:              "repo",
+			CloneURL:          "",
+			SanitizedCloneURL: "",
+			VCSHost: models.VCSHost{
+				Type:     models.AzureDevops,
+				Hostname: "dev.azure.com",
+			},
+		}, 1)
+		Ok(t, err)
+	})
+}
+
+var adMergeSuccess = `{
+	"status": "completed",
+	"mergeStatus": "succeeded",
+	"autoCompleteSetBy": {
+					"id": "54d125f7-69f7-4191-904f-c5b96b6261c8",
+					"displayName": "Jamal Hartnett",
+					"uniqueName": "fabrikamfiber4@hotmail.com",
+					"url": "https://vssps.dev.azure.com/fabrikam/_apis/Identities/54d125f7-69f7-4191-904f-c5b96b6261c8",
+					"imageUrl": "https://dev.azure.com/fabrikam/DefaultCollection/_api/_common/identityImage?id=54d125f7-69f7-4191-904f-c5b96b6261c8"
+	},
+	"pullRequestId": 22,
+	"completionOptions": {
+					"bypassPolicy":false,
+					"bypassReason":"",
+					"deleteSourceBranch":false,
+					"mergeCommitMessage":"TEST MERGE COMMIT MESSAGE",
+					"mergeStrategy":"noFastForward",
+					"squashMerge":false,
+					"transitionWorkItems":true,
+					"triggeredByAutoComplete":false
+	}
 }`

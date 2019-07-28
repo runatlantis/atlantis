@@ -65,7 +65,6 @@ func (d *DefaultAzureDevopsRequestValidator) validateWithoutBasicAuth(r *http.Re
 			return nil, fmt.Errorf("could not read body: %s", err)
 		}
 		return payload, nil
-	} else {
-		return nil, fmt.Errorf("webhook request has unsupported Content-Type %q", ct)
 	}
+	return nil, fmt.Errorf("webhook request has unsupported Content-Type %q", ct)
 }

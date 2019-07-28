@@ -5,6 +5,9 @@ jobs:
     docker:
     - image: runatlantis/testing-env:latest
     steps:
+    - run: go get github.com/mcdafydd/go-azuredevops/azuredevops
+    - run: go get github.com/microcosm-cc/bluemonday
+    - run: go get gopkg.in/russross/blackfriday.v2
     - checkout
     - run: make test-coverage
     - run:

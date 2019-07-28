@@ -55,7 +55,17 @@ var Repo = github.Repository{
 
 var ADPullEvent = azuredevops.Event{
 	EventType: "git.pullrequest.created",
-	Resource:  ADPull,
+	Resource:  &ADPull,
+}
+
+var ADPullUpdatedEvent = azuredevops.Event{
+	EventType: "git.pullrequest.updated",
+	Resource:  &ADPull,
+}
+
+var ADPullClosedEvent = azuredevops.Event{
+	EventType: "git.pullrequest.merged",
+	Resource:  &ADPullCompleted,
 }
 
 var ADPull = azuredevops.GitPullRequest{
@@ -72,6 +82,24 @@ var ADPull = azuredevops.GitPullRequest{
 	Repository:    &ADRepo,
 	SourceRefName: azuredevops.String("refs/heads/owner/sourceBranch"),
 	Status:        azuredevops.String("active"),
+	TargetRefName: azuredevops.String("refs/heads/targetBranch"),
+	URL:           azuredevops.String("https://dev.azure.com/fabrikam/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/pullRequests/21"),
+}
+
+var ADPullCompleted = azuredevops.GitPullRequest{
+	CreatedBy: &azuredevops.IdentityRef{
+		ID:          azuredevops.String("d6245f20-2af8-44f4-9451-8107cb2767db"),
+		DisplayName: azuredevops.String("User"),
+		UniqueName:  azuredevops.String("user@example.com"),
+	},
+	LastMergeSourceCommit: &azuredevops.GitCommitRef{
+		CommitID: azuredevops.String("b60280bc6e62e2f880f1b63c1e24987664d3bda3"),
+		URL:      azuredevops.String("https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/commits/b60280bc6e62e2f880f1b63c1e24987664d3bda3"),
+	},
+	PullRequestID: azuredevops.Int(1),
+	Repository:    &ADRepo,
+	SourceRefName: azuredevops.String("refs/heads/owner/sourceBranch"),
+	Status:        azuredevops.String("completed"),
 	TargetRefName: azuredevops.String("refs/heads/targetBranch"),
 	URL:           azuredevops.String("https://dev.azure.com/fabrikam/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/pullRequests/21"),
 }

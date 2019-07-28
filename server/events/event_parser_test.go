@@ -1205,14 +1205,14 @@ func TestParseAzureDevopsPullEvent(t *testing.T) {
 	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
 	ErrEquals(t, "url is null", err)
 	testEvent := deepcopy.Copy(ADPullEvent).(azuredevops.Event)
-	resource := deepcopy.Copy(testEvent.Resource).(azuredevops.GitPullRequest)
+	resource := deepcopy.Copy(testEvent.Resource).(*azuredevops.GitPullRequest)
 	resource.CreatedBy = nil
 	testEvent.Resource = resource
 	_, _, _, _, _, err = parser.ParseAzureDevopsPullEvent(testEvent)
 	ErrEquals(t, "CreatedBy is null", err)
 
 	testEvent = deepcopy.Copy(ADPullEvent).(azuredevops.Event)
-	resource = deepcopy.Copy(testEvent.Resource).(azuredevops.GitPullRequest)
+	resource = deepcopy.Copy(testEvent.Resource).(*azuredevops.GitPullRequest)
 	resource.CreatedBy.UniqueName = azuredevops.String("")
 	testEvent.Resource = resource
 	_, _, _, _, _, err = parser.ParseAzureDevopsPullEvent(testEvent)
@@ -1262,7 +1262,7 @@ func TestParseAzureDevopsPullEvent_EventType(t *testing.T) {
 			exp:    models.OpenedPullEvent,
 		},
 		{
-			action: "git.pullrequest.merged",
+			action: "git.pullrequest.updated",
 			exp:    models.ClosedPullEvent,
 		},
 		{
@@ -1274,6 +1274,9 @@ func TestParseAzureDevopsPullEvent_EventType(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.action, func(t *testing.T) {
 			event := deepcopy.Copy(ADPullEvent).(azuredevops.Event)
+			if c.exp == models.ClosedPullEvent {
+				event = deepcopy.Copy(ADPullClosedEvent).(azuredevops.Event)
+			}
 			event.EventType = c.action
 			_, actType, _, _, _, err := parser.ParseAzureDevopsPullEvent(event)
 			Ok(t, err)

@@ -16,6 +16,7 @@ package vcs
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -30,6 +31,7 @@ import (
 	"gopkg.in/russross/blackfriday.v2"
 )
 
+// AzureDevopsClient represents an Azure Devops VCS client
 type AzureDevopsClient struct {
 	Client *azuredevops.Client
 	// Version is set to the server version.
@@ -37,11 +39,8 @@ type AzureDevopsClient struct {
 	ctx     context.Context
 }
 
-// azuredevopsClientUnderTest is true if we're running under go test.
-var azuredevopsClientUnderTest = false
-
 // NewAzureDevopsClient returns a valid Azure Devops client.
-func NewAzureDevopsClient(org string, username string, project string, token string) (*AzureDevopsClient, error) {
+func NewAzureDevopsClient(hostname string, org string, username string, project string, token string) (*AzureDevopsClient, error) {
 	tp := azuredevops.BasicAuthTransport{
 		Username: "",
 		Password: strings.TrimSpace(token),
@@ -51,6 +50,15 @@ func NewAzureDevopsClient(org string, username string, project string, token str
 	var adClient, err = azuredevops.NewClient(httpClient)
 	if err != nil {
 		return nil, errors.Wrapf(err, "azuredevops.NewClient() %p", adClient)
+	}
+
+	if hostname != "dev.azure.com" {
+		baseURL := fmt.Sprintf("https://%s/", hostname)
+		base, err := url.Parse(baseURL)
+		if err != nil {
+			return nil, errors.Wrapf(err, "invalid azure devops hostname trying to parse %s", baseURL)
+		}
+		adClient.BaseURL = *base
 	}
 
 	client := &AzureDevopsClient{
@@ -186,8 +194,8 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 }
 
 // PullIsApproved returns true if the merge request was approved.
+// https://docs.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops#require-a-minimum-number-of-reviewers
 func (g *AzureDevopsClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
-	// previews List() args were g.ctx, repo.Owner, repo.Name, pull.Num, nil
 	opts := azuredevops.PullRequestGetOptions{
 		IncludeWorkItemRefs: true,
 	}
@@ -195,18 +203,16 @@ func (g *AzureDevopsClient) PullIsApproved(repo models.Repo, pull models.PullReq
 	if err != nil {
 		return false, errors.Wrap(err, "getting pull request")
 	}
-	reviews := adPull.Reviewers
-	if err != nil {
-		return false, errors.Wrap(err, "getting list of pull request reviewers")
-	}
-	for _, review := range reviews {
-		if *review.Vote == azuredevops.VoteApproved {
-			return true, nil
+	for _, review := range adPull.Reviewers {
+		if review == nil {
+			continue
+		}
+		if *review.Vote != azuredevops.VoteApproved {
+			return false, err
 		}
 	}
-	// what happens if no reviewers?  must have reviewers? handle both states
-	//return false, nil
-	return true, nil
+
+	return true, err
 }
 
 // PullIsMergeable returns true if the merge request can be merged.
@@ -259,32 +265,16 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
 	if url != "" {
 		status.TargetURL = &url
 	}
-	_, _, err := g.Client.Git.CreateStatus(g.ctx, repo.Owner, repo.Project, repo.Name, pull.HeadCommit, status)
+	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
+	_, _, err := g.Client.Git.CreateStatus(g.ctx, owner, project, repoName, pull.HeadCommit, status)
 	return err
 }
 
-// MergePull merges the merge request.
+// MergePull merges the merge request using the default no fast-forward strategy
+// If the user has set a branch policy that disallows no fast-forward, the merge will fail
+// until we handle branch policies
+// https://docs.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops
 func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
-	// Users can set their repo to disallow certain types of merging.
-	// We detect which types aren't allowed and use the type that is.
-
-	// Azure Devops supports squash merge and noFastForward
-	// in branch policies
-	// Ignoring these for now
-	// https://docs.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops
-
-	/*
-		const (
-			defaultMergeMethod = "merge"
-		)
-		method := defaultMergeMethod
-	*/
-	// Now we're ready to make our API call to merge the pull request.
-	/*
-		options := &azuredevops.GitPullRequestCompletionOptions{
-			Status: "completed",
-	*/
-	// id *IdentityRef, commitMsg string, opts *PullRequestGetOptions
 
 	descriptor := "Atlantis Terraform Pull Request Automation"
 	i := "atlantis"
@@ -309,21 +299,6 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
 		TriggeredByAutoComplete: new(bool),
 	}
 
-	/*
-	   const (
-	   		defaultMergeMethod = "merge"
-	   		rebaseMergeMethod  = "rebase"
-	   		squashMergeMethod  = "squash"
-	   	)
-	   	method := defaultMergeMethod
-	   	if !repo.GetAllowMergeCommit() {
-	   		if repo.GetAllowRebaseMerge() {
-	   			method = rebaseMergeMethod
-	   		} else if repo.GetAllowSquashMerge() {
-	   			method = squashMergeMethod
-	   		}
-	   	}
-	*/
 	// Construct request body from supplied parameters
 	mergePull := new(azuredevops.GitPullRequest)
 	mergePull.AutoCompleteSetBy = &id

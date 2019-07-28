@@ -861,8 +861,7 @@ func (e *EventParser) ParseAzureDevopsWorkItemCommentedEvent(comment *azuredevop
 			}
 			httpClient := tp.Client()
 			httpClient.Timeout = 10 * time.Second
-			client := new(azuredevops.Client)
-			client, err = azuredevops.NewClient(httpClient)
+			client, err := azuredevops.NewClient(httpClient)
 			if err != nil {
 				return pullRefs, err
 			}
@@ -876,9 +875,8 @@ func (e *EventParser) ParseAzureDevopsWorkItemCommentedEvent(comment *azuredevop
 				}
 				client.BaseURL = *parsed
 			}
-			pr := new(azuredevops.GitPullRequest)
 			opts := azuredevops.PullRequestListOptions{}
-			pr, _, err = client.PullRequests.Get(context.Background(), e.AzureDevopsOrg, e.AzureDevopsProject, ref.PullNum, &opts)
+			pr, _, err := client.PullRequests.Get(context.Background(), e.AzureDevopsOrg, e.AzureDevopsProject, ref.PullNum, &opts)
 			if err != nil {
 				return pullRefs, err
 			}
@@ -889,7 +887,6 @@ func (e *EventParser) ParseAzureDevopsWorkItemCommentedEvent(comment *azuredevop
 				return pullRefs, err
 			}
 			pullRefs = append(pullRefs, *ref)
-			err = nil
 		}
 	}
 

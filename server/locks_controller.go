@@ -62,7 +62,7 @@ func (l *LocksController) GetLock(w http.ResponseWriter, r *http.Request) {
 	}
 	var owner, project, repo string
 	if lock.Pull.BaseRepo.VCSHost.Type == models.AzureDevops {
-		owner, project, repo = models.SplitAzureDevopsRepoFullName(lock.Project.RepoFullName)
+		owner, project, repo = vcs.SplitAzureDevopsRepoFullName(lock.Project.RepoFullName)
 	} else {
 		owner, repo = models.SplitRepoFullName(lock.Project.RepoFullName)
 		project = ""
