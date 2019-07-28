@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -43,8 +44,8 @@ func TestNewRepo_CloneURLWrongRepo(t *testing.T) {
 }
 
 func TestNewRepo_EmptyAzureDevopsProject(t *testing.T) {
-	_, err := models.NewRepo(models.AzureDevops, "owner/repo", "https://dev.azure.com/notowner/project/_git/repo", "u", "p")
-	ErrEquals(t, "AzureDevops project name can't be empty", err)
+	_, err := models.NewRepo(models.AzureDevops, "", "https://dev.azure.com/notowner/project/_git/repo", "u", "p")
+	ErrEquals(t, "repoFullName can't be empty", err)
 }
 
 // For bitbucket server we don't validate the clone URL because the callers
@@ -334,7 +335,7 @@ func TestAzureDevopsSplitRepoFullName(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.input, func(t *testing.T) {
-			owner, project, repo := models.SplitAzureDevopsRepoFullName(c.input)
+			owner, project, repo := vcs.SplitAzureDevopsRepoFullName(c.input)
 			Equals(t, c.expOwner, owner)
 			Equals(t, c.expProject, project)
 			Equals(t, c.expRepo, repo)

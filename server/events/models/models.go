@@ -42,9 +42,6 @@ type Repo struct {
 	// subgroups or Azure Devops Team Projects. This may contain spaces in
 	// the case of Bitbucket Server.
 	Owner string
-	// Project is juts the project name, only required for Azure Devops.  This will never
-	// have /'s in it.
-	Project string
 	// Name is just the repo name, ex. "atlantis". This will never have
 	// /'s in it.
 	Name string
@@ -125,19 +122,14 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 	sanitizedCloneURL := strings.Replace(cloneURL, "https://", "https://"+redactedAuth, -1)
 	sanitizedCloneURL = strings.Replace(sanitizedCloneURL, "http://", "http://"+redactedAuth, -1)
 
-	// Get the owner, project, and repo names from the full name.
-	var owner, project, repo string
-	if vcsHostType == AzureDevops {
-		owner, project, repo = SplitAzureDevopsRepoFullName(repoFullName)
-	} else {
-		owner, repo = SplitRepoFullName(repoFullName)
-	}
+	// Get the owner and repo names from the full name.
+	owner, repo := SplitRepoFullName(repoFullName)
 	if owner == "" || repo == "" {
 		return Repo{}, fmt.Errorf("invalid repo format %q, owner %q or repo %q was empty", repoFullName, owner, repo)
 	}
 	// Only GitLab repos can have /'s in their owners.
 	// This is for GitLab subgroups and Azure Devops Team Projects.
-	if strings.Contains(owner, "/") && vcsHostType != Gitlab {
+	if strings.Contains(owner, "/") && vcsHostType != Gitlab && vcsHostType != AzureDevops {
 		return Repo{}, fmt.Errorf("invalid repo format %q, owner %q should not contain any /'s", repoFullName, owner)
 	}
 	if strings.Contains(repo, "/") {
@@ -147,7 +139,6 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 	return Repo{
 		FullName:          repoFullName,
 		Owner:             owner,
-		Project:           project,
 		Name:              repo,
 		CloneURL:          authedCloneURL,
 		SanitizedCloneURL: sanitizedCloneURL,
@@ -389,29 +380,6 @@ func SplitRepoFullName(repoFullName string) (owner string, repo string) {
 	}
 
 	return repoFullName[:lastSlashIdx], repoFullName[lastSlashIdx+1:]
-}
-
-// SplitAzureDevopsRepoFullName splits a repo full name up into its owner,
-// repo and project name segments. If the repoFullName is malformed, may
-// return empty strings for owner, repo, or project.  Azure Devops uses
-// repoFullName format owner/project/repo.
-//
-// Ex. runatlantis/atlantis => (runatlantis, atlantis)
-//     gitlab/subgroup/runatlantis/atlantis => (gitlab/subgroup/runatlantis, atlantis)
-//     azuredevops/project/atlantis => (azuredevops, project, atlantis)
-func SplitAzureDevopsRepoFullName(repoFullName string) (owner string, project string, repo string) {
-	firstSlashIdx := strings.Index(repoFullName, "/")
-	lastSlashIdx := strings.LastIndex(repoFullName, "/")
-	slashCount := strings.Count(repoFullName, "/")
-	if lastSlashIdx == -1 || lastSlashIdx == len(repoFullName)-1 {
-		return "", "", ""
-	}
-	if firstSlashIdx != lastSlashIdx && slashCount == 2 {
-		return repoFullName[:firstSlashIdx],
-			repoFullName[firstSlashIdx+1 : lastSlashIdx],
-			repoFullName[lastSlashIdx+1:]
-	}
-	return repoFullName[:lastSlashIdx], "", repoFullName[lastSlashIdx+1:]
 }
 
 // ProjectResult is the result of executing a plan/apply for a specific project.

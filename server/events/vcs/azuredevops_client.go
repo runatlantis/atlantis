@@ -73,17 +73,16 @@ func NewAzureDevopsClient(hostname string, org string, username string, project 
 // The names include the path to the file from the repo root, ex. parent/child/file.txt.
 func (g *AzureDevopsClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	var files []string
-	commitIDResponse := new(azuredevops.GitPullRequest)
 
 	opts := azuredevops.PullRequestGetOptions{
 		IncludeWorkItemRefs: true,
 	}
-	commitIDResponse, _, _ = g.Client.PullRequests.GetWithRepo(g.ctx, repo.Owner, repo.Project, repo.Name, pull.Num, &opts)
+	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
+	commitIDResponse, _, _ := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, pull.Num, &opts)
 
 	commitID := commitIDResponse.GetLastMergeSourceCommit().GetCommitID()
 
-	r := new(azuredevops.GitCommitChanges)
-	r, _, _ = g.Client.Git.GetChanges(g.ctx, repo.Owner, repo.Project, repo.Name, commitID)
+	r, _, _ := g.Client.Git.GetChanges(g.ctx, owner, project, repoName, commitID)
 
 	for _, change := range r.Changes {
 		item := change.GetItem()
@@ -132,7 +131,8 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 	opts := azuredevops.PullRequestGetOptions{
 		IncludeWorkItemRefs: true,
 	}
-	pull, _, err := g.Client.PullRequests.GetWithRepo(g.ctx, repo.Owner, repo.Project, repo.Name, pullNum, &opts)
+	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
+	pull, _, err := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, pullNum, &opts)
 	if err != nil {
 		return err
 	}
@@ -147,7 +147,8 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 			workItemComment := azuredevops.WorkItemComment{
 				Text: &s,
 			}
-			_, _, err := g.Client.WorkItems.CreateComment(g.ctx, repo.Owner, repo.Project, workItemID, &workItemComment)
+			owner, project, _ := SplitAzureDevopsRepoFullName(repo.FullName)
+			_, _, err := g.Client.WorkItems.CreateComment(g.ctx, owner, project, workItemID, &workItemComment)
 			if err != nil {
 				return err
 			}
@@ -166,7 +167,8 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 				return err
 			}
 			opts := azuredevops.WorkItemCommentListOptions{}
-			r, _, err := g.Client.WorkItems.ListComments(g.ctx, repo.Owner, repo.Project, workItemID, &opts)
+			owner, project, _ := SplitAzureDevopsRepoFullName(repo.FullName)
+			r, _, err := g.Client.WorkItems.ListComments(g.ctx, owner, project, workItemID, &opts)
 			if err != nil {
 				return err
 			}
@@ -180,7 +182,7 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 					workItemComment := azuredevops.WorkItemComment{
 						Text: &s,
 					}
-					_, _, err = g.Client.WorkItems.CreateComment(g.ctx, repo.Owner, repo.Project, workItemID, &workItemComment)
+					_, _, err = g.Client.WorkItems.CreateComment(g.ctx, owner, project, workItemID, &workItemComment)
 					if err != nil {
 						return err
 					}
@@ -199,7 +201,8 @@ func (g *AzureDevopsClient) PullIsApproved(repo models.Repo, pull models.PullReq
 	opts := azuredevops.PullRequestGetOptions{
 		IncludeWorkItemRefs: true,
 	}
-	adPull, _, err := g.Client.PullRequests.GetWithRepo(g.ctx, repo.Owner, repo.Project, repo.Name, pull.Num, &opts)
+	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
+	adPull, _, err := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, pull.Num, &opts)
 	if err != nil {
 		return false, errors.Wrap(err, "getting pull request")
 	}
@@ -221,7 +224,8 @@ func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRe
 	opts := azuredevops.PullRequestGetOptions{
 		IncludeWorkItemRefs: true,
 	}
-	adPull, _, err := g.Client.PullRequests.GetWithRepo(g.ctx, repo.Owner, repo.Project, repo.Name, pull.Num, &opts)
+	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
+	adPull, _, err := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, pull.Num, &opts)
 	if err != nil {
 		return false, errors.Wrap(err, "getting pull request")
 	}
@@ -237,7 +241,9 @@ func (g *AzureDevopsClient) GetPullRequest(repo models.Repo, num int) (*azuredev
 	opts := azuredevops.PullRequestGetOptions{
 		IncludeWorkItemRefs: true,
 	}
-	pull, _, err := g.Client.PullRequests.GetWithRepo(g.ctx, repo.Owner, repo.Project, repo.Name, num, &opts)
+
+	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
+	pull, _, err := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, num, &opts)
 	return pull, err
 }
 
@@ -304,11 +310,12 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
 	mergePull.AutoCompleteSetBy = &id
 	mergePull.CompletionOptions = &completionOpts
 
+	owner, project, repoName := SplitAzureDevopsRepoFullName(pull.BaseRepo.FullName)
 	mergeResult, _, err := g.Client.PullRequests.Merge(
 		g.ctx,
-		pull.BaseRepo.Owner,
-		pull.BaseRepo.Project,
-		pull.BaseRepo.Name,
+		owner,
+		project,
+		repoName,
 		pull.Num,
 		mergePull,
 		completionOpts,
@@ -321,4 +328,27 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
 		return fmt.Errorf("could not merge pull request: %s", mergeResult.GetMergeFailureMessage())
 	}
 	return nil
+}
+
+// SplitAzureDevopsRepoFullName splits a repo full name up into its owner,
+// repo and project name segments. If the repoFullName is malformed, may
+// return empty strings for owner, repo, or project.  Azure Devops uses
+// repoFullName format owner/project/repo.
+//
+// Ex. runatlantis/atlantis => (runatlantis, atlantis)
+//     gitlab/subgroup/runatlantis/atlantis => (gitlab/subgroup/runatlantis, atlantis)
+//     azuredevops/project/atlantis => (azuredevops, project, atlantis)
+func SplitAzureDevopsRepoFullName(repoFullName string) (owner string, project string, repo string) {
+	firstSlashIdx := strings.Index(repoFullName, "/")
+	lastSlashIdx := strings.LastIndex(repoFullName, "/")
+	slashCount := strings.Count(repoFullName, "/")
+	if lastSlashIdx == -1 || lastSlashIdx == len(repoFullName)-1 {
+		return "", "", ""
+	}
+	if firstSlashIdx != lastSlashIdx && slashCount == 2 {
+		return repoFullName[:firstSlashIdx],
+			repoFullName[firstSlashIdx+1 : lastSlashIdx],
+			repoFullName[lastSlashIdx+1:]
+	}
+	return repoFullName[:lastSlashIdx], "", repoFullName[lastSlashIdx+1:]
 }

@@ -1087,8 +1087,7 @@ func TestParseAzureDevopsRepo(t *testing.T) {
 	r, err := parser.ParseAzureDevopsRepo(&repo)
 	Ok(t, err)
 	Equals(t, models.Repo{
-		Owner:             "owner",
-		Project:           "project",
+		Owner:             "owner/project",
 		FullName:          "owner/project/repo",
 		CloneURL:          "https://azuredevops-user:azuredevops-token@dev.azure.com/owner/project/_git/repo",
 		SanitizedCloneURL: "https://azuredevops-user:<redacted>@dev.azure.com/owner/project/_git/repo",
@@ -1105,8 +1104,7 @@ func TestParseAzureDevopsRepo(t *testing.T) {
 	r, err = parser.ParseAzureDevopsRepo(&repo)
 	Ok(t, err)
 	Equals(t, models.Repo{
-		Owner:             "owner",
-		Project:           "project",
+		Owner:             "owner/project",
 		FullName:          "owner/project/repo",
 		CloneURL:          "https://azuredevops-user:azuredevops-token@dev.azure.com/owner/project/_git/repo",
 		SanitizedCloneURL: "https://azuredevops-user:<redacted>@dev.azure.com/owner/project/_git/repo",
@@ -1173,8 +1171,7 @@ func TestParseAzureDevopsWorkItemCommentedEvent(t *testing.T) {
 	for _, ref := range pullRefs {
 		Ok(t, err)
 		Equals(t, models.Repo{
-			Owner:             "owner",
-			Project:           "project",
+			Owner:             "owner/project",
 			FullName:          "owner/project/repo",
 			CloneURL:          "https://azuredevops-user:azuredevops-token@dev.azure.com/owner/project/_git/repo",
 			SanitizedCloneURL: "https://azuredevops-user:<redacted>@dev.azure.com/owner/project/_git/repo",
@@ -1221,8 +1218,7 @@ func TestParseAzureDevopsPullEvent(t *testing.T) {
 	actPull, evType, actBaseRepo, actHeadRepo, actUser, err := parser.ParseAzureDevopsPullEvent(ADPullEvent)
 	Ok(t, err)
 	expBaseRepo := models.Repo{
-		Owner:             "owner",
-		Project:           "project",
+		Owner:             "owner/project",
 		FullName:          "owner/project/repo",
 		CloneURL:          "https://azuredevops-user:azuredevops-token@dev.azure.com/owner/project/_git/repo",
 		SanitizedCloneURL: "https://azuredevops-user:<redacted>@dev.azure.com/owner/project/_git/repo",
@@ -1324,8 +1320,7 @@ func TestParseAzureDevopsPull(t *testing.T) {
 	actPull, actBaseRepo, actHeadRepo, err := parser.ParseAzureDevopsPull(&ADPull)
 	Ok(t, err)
 	expBaseRepo := models.Repo{
-		Owner:             "owner",
-		Project:           "project",
+		Owner:             "owner/project",
 		FullName:          "owner/project/repo",
 		CloneURL:          "https://azuredevops-user:azuredevops-token@dev.azure.com/owner/project/_git/repo",
 		SanitizedCloneURL: "https://azuredevops-user:<redacted>@dev.azure.com/owner/project/_git/repo",
