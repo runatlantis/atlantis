@@ -289,8 +289,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 				AsyncTFExec:         terraformClient,
 			},
 			RunStepRunner: &runtime.RunStepRunner{
-				DefaultTFVersion: defaultTfVersion,
-				TerraformBinDir:  terraformClient.TerraformBinDir(),
+				TerraformExecutor: terraformClient,
+				DefaultTFVersion:  defaultTfVersion,
+				TerraformBinDir:   terraformClient.TerraformBinDir(),
 			},
 			PullApprovedChecker: vcsClient,
 			WorkingDir:          workingDir,

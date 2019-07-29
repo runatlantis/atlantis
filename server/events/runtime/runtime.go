@@ -25,6 +25,7 @@ const (
 // without causing circular imports.
 type TerraformExec interface {
 	RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (string, error)
+	EnsureVersion(log *logging.SimpleLogger, v *version.Version) error
 }
 
 // AsyncTFExec brings the interface from TerraformClient into this package

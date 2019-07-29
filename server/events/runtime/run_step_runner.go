@@ -13,21 +13,31 @@ import (
 
 // RunStepRunner runs custom commands.
 type RunStepRunner struct {
-	DefaultTFVersion *version.Version
+	TerraformExecutor TerraformExec
+	DefaultTFVersion  *version.Version
 	// TerraformBinDir is the directory where Atlantis downloads Terraform binaries.
 	TerraformBinDir string
 }
 
 func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command string, path string) (string, error) {
+	tfVersion := r.DefaultTFVersion
+	if ctx.TerraformVersion != nil {
+		tfVersion = ctx.TerraformVersion
+	}
+
+	err := r.TerraformExecutor.EnsureVersion(ctx.Log, tfVersion)
+	if err != nil {
+		err = fmt.Errorf("%s: Downloading terraform Version %s", err, tfVersion.String())
+		ctx.Log.Debug("error: %s", err)
+		return "", err
+	}
+
 	cmd := exec.Command("sh", "-c", command) // #nosec
 	cmd.Dir = path
-	tfVersion := r.DefaultTFVersion.String()
-	if ctx.TerraformVersion != nil {
-		tfVersion = ctx.TerraformVersion.String()
-	}
+
 	baseEnvVars := os.Environ()
 	customEnvVars := map[string]string{
-		"ATLANTIS_TERRAFORM_VERSION": tfVersion,
+		"ATLANTIS_TERRAFORM_VERSION": tfVersion.String(),
 		"BASE_BRANCH_NAME":           ctx.Pull.BaseBranch,
 		"BASE_REPO_NAME":             ctx.BaseRepo.Name,
 		"BASE_REPO_OWNER":            ctx.BaseRepo.Owner,
