@@ -100,23 +100,16 @@ func (g *AzureDevopsClient) GetModifiedFiles(repo models.Repo, pull models.PullR
 }
 
 // CreateComment creates a comment on a work item linked to pullNum.
-// Comments made on pull requests cannot trigger webhooks as of April, 2019.
-// Since it is possible to link multiple work items to a single pull request, we:
-// 1. Get the pull request
-// 2. Get all linked workItems
-// a. If only one, comment on it
-// b. If more than one, loop through each item and
-// i. Get comments for that work item
-// ii. Comment on the first workItem with a valid atlantis command in a comment
-// iii. Return, ignoring any other items
-// iv. If no work items contain comments with a valid atlantis command, return err
-// c. If anything else, return warning error
+// Comments made on pull requests do not have an associated webhook event
+// trigger, only comments made on work items (user stories, tasks, etc.).
+// If pull request is linked to multiple work items, log an error and ignore.
+//
 // If comment length is greater than the max comment length we split into
 // multiple comments.
 // Azure Devops doesn't support markdown in Work Item comments, but it will
 // convert text to HTML.  We use the blackfriday library to convert Atlantis
 // comment markdown before submission.
-func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment string) error {
+func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment string) (err error) {
 	sepEnd := "\n```\n</details>" +
 		"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
 	sepStart := "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
@@ -153,46 +146,10 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 				return err
 			}
 		}
-		return nil
 	} else if len(pull.WorkItemRefs) > 1 {
-		// Until we figure out a nice way to leverage CommentParser.Parse()
-		// here, we're going to log an error and continue if the user has a
-		// pull request linked to more than one work item. An example
-		// implementation is commented below.
 		return errors.New("pull request linked to more than one work item - ignoring")
-		/* Example handling of PR linked to multiple work items
-		for _, ref := range pull.WorkItemRefs {
-			workItemID, err := strconv.Atoi(*ref.ID)
-			if err != nil {
-				return err
-			}
-			opts := azuredevops.WorkItemCommentListOptions{}
-			owner, project, _ := SplitAzureDevopsRepoFullName(repo.FullName)
-			r, _, err := g.Client.WorkItems.ListComments(g.ctx, owner, project, workItemID, &opts)
-			if err != nil {
-				return err
-			}
-			for _, comment := range r.Comments {
-				fmt.Println(comment)
-				parseResult := commentParser.Parse(comment, vcsHost)
-				if !parseResult.Ignore {
-					// This is likely the correct Work Item
-					input := blackfriday.Run([]byte(comment.GetText()))
-					s := string(input)
-					workItemComment := azuredevops.WorkItemComment{
-						Text: &s,
-					}
-					_, _, err = g.Client.WorkItems.CreateComment(g.ctx, owner, project, workItemID, &workItemComment)
-					if err != nil {
-						return err
-					}
-					return nil
-				}
-			}
-		}
-		*/
 	}
-	return err
+	return
 }
 
 // PullIsApproved returns true if the merge request was approved.

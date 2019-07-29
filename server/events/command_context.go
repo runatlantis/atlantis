@@ -37,10 +37,4 @@ type CommandContext struct {
 	// set our own build statuses which can affect mergeability if users have
 	// required the Atlantis status to be successful prior to merging.
 	PullMergeable bool
-	// AzureDevopsWorkItemID Azure Devops Atlantis commands come from a work item
-	// comment with a link to one or more pull requests. Pull requests may
-	// also be linked to more than one work item, so we need to know which work item
-	// triggered this pull request command.
-	// https://docs.microsoft.com/en-us/azure/devops/boards/queries/link-work-items-support-traceability?view=azure-devops&tabs=new-web-form
-	AzureDevopsWorkItemID int
 }

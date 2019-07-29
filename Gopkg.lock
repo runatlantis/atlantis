@@ -11,7 +11,7 @@
     "internal/optional",
     "internal/trace",
     "internal/version",
-    "storage",
+    "storage"
   ]
   pruneopts = "UT"
   revision = "c9474f2f8deb81759839474b6bd1726bbfe1c1c4"
@@ -78,7 +78,7 @@
     "private/protocol/restxml",
     "private/protocol/xml/xmlutil",
     "service/s3",
-    "service/sts",
+    "service/sts"
   ]
   pruneopts = "UT"
   revision = "8b705a6dec722bcda3a9309c0924d4eca24f7c72"
@@ -169,7 +169,7 @@
   name = "github.com/go-playground/locales"
   packages = [
     ".",
-    "currency",
+    "currency"
   ]
   pruneopts = "UT"
   revision = "f63010822830b6fe52288ee52d5a1151088ce039"
@@ -200,7 +200,7 @@
     "ptypes",
     "ptypes/any",
     "ptypes/duration",
-    "ptypes/timestamp",
+    "ptypes/timestamp"
   ]
   pruneopts = "UT"
   revision = "aa810b61a9c79d51363740d207bb46cf8e620ed5"
@@ -275,7 +275,7 @@
   name = "github.com/hashicorp/go-getter"
   packages = [
     ".",
-    "helper/url",
+    "helper/url"
   ]
   pruneopts = "UT"
   revision = "e1437d0bbb37a1fa61cdb924b034352c823cb89b"
@@ -326,7 +326,7 @@
     "hcl/token",
     "json/parser",
     "json/scanner",
-    "json/token",
+    "json/token"
   ]
   pruneopts = "UT"
   revision = "68e816d1c783414e79bc65b3994d9ab6b0a722ab"
@@ -393,6 +393,22 @@
   pruneopts = "UT"
   revision = "fc9e8d8ef48496124e79ae0df75490096eccf6fe"
   version = "v0.0.2"
+
+[[projects]]
+  digest = "1:09e7697f7b25b7ab6e6470783acaed14c9c360bb80bff7282a3aa818c09a40cf"
+  name = "github.com/mcdafydd/go-azuredevops"
+  packages = ["azuredevops"]
+  pruneopts = "UT"
+  revision = "1e9cd7e952ca2b5735f8a9fe41005a0bed25cc47"
+  version = "v0.8.1"
+
+[[projects]]
+  digest = "1:6ff1026b8d873d074ddec82ad60bb0eb537dc013f456ef26b63d30beba2f99e7"
+  name = "github.com/microcosm-cc/bluemonday"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "506f3da9b7c86d737e91f16b7431df8635871552"
+  version = "v1.0.2"
 
 [[projects]]
   branch = "master"
@@ -471,7 +487,7 @@
   name = "github.com/petergtz/pegomock"
   packages = [
     ".",
-    "internal/verify",
+    "internal/verify"
   ]
   pruneopts = "UT"
   revision = "3821b977214496511e7e49a911307c68f0785ef9"
@@ -484,6 +500,14 @@
   pruneopts = "UT"
   revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
   version = "v0.8.0"
+
+[[projects]]
+  digest = "1:9421f6e9e28ef86933e824b5caff441366f2b69bb281085b9dca40e1f27a1602"
+  name = "github.com/shurcooL/sanitized_anchor_name"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "7bfe4c7ecddb3666a94b053b422cdd8f5aaa3615"
+  version = "v1.0.0"
 
 [[projects]]
   digest = "1:9e9193aa51197513b3abcb108970d831fbcf40ef96aa845c4f03276e1fa316d2"
@@ -499,7 +523,7 @@
   name = "github.com/spf13/afero"
   packages = [
     ".",
-    "mem",
+    "mem"
   ]
   pruneopts = "UT"
   revision = "ee1bd8ee15a1306d1f9201acc41ef39cd9f99a1b"
@@ -551,7 +575,7 @@
     ".",
     "internal/hash",
     "internal/xlog",
-    "lzma",
+    "lzma"
   ]
   pruneopts = "UT"
   revision = "6f934d456d51e742b4eeab20d925a827ef22320a"
@@ -590,7 +614,7 @@
     "trace",
     "trace/internal",
     "trace/propagation",
-    "trace/tracestate",
+    "trace/tracestate"
   ]
   pruneopts = "UT"
   revision = "f305e5c4e2cf345eba88de13d10de1126fa45a61"
@@ -603,25 +627,27 @@
   packages = [
     "pbkdf2",
     "scrypt",
-    "ssh/terminal",
+    "ssh/terminal"
   ]
   pruneopts = "UT"
   revision = "7d9177d70076375b9a59c8fde23d52d9c4a7ecd5"
 
 [[projects]]
   branch = "master"
-  digest = "1:11e1ce0b94b5336730b20ec0e67ade07f2c4d562cd297cea0d1046ab390754f3"
+  digest = "1:4056e0d0dac89ce489912e0add8267cd4fe28cf0ac732ff1bfedb24f256ee739"
   name = "golang.org/x/net"
   packages = [
     "context",
     "context/ctxhttp",
+    "html",
+    "html/atom",
     "http2",
     "http2/hpack",
     "idna",
     "internal/timeseries",
     "lex/httplex",
     "trace",
-    "websocket",
+    "websocket"
   ]
   pruneopts = "UT"
   revision = "9dfe39835686865bff950a07b394c12a98ddc811"
@@ -635,7 +661,7 @@
     "google",
     "internal",
     "jws",
-    "jwt",
+    "jwt"
   ]
   pruneopts = "UT"
   revision = "d668ce993890a79bda886613ee587a69dd5da7a6"
@@ -646,7 +672,7 @@
   name = "golang.org/x/sys"
   packages = [
     "unix",
-    "windows",
+    "windows"
   ]
   pruneopts = "UT"
   revision = "fead79001313d15903fb4605b4a1b781532cd93e"
@@ -669,7 +695,7 @@
     "unicode/bidi",
     "unicode/cldr",
     "unicode/norm",
-    "unicode/rangetable",
+    "unicode/rangetable"
   ]
   pruneopts = "UT"
   revision = "1cbadb444a806fd9430d14ad08967ed91da4fa0a"
@@ -687,7 +713,7 @@
     "option",
     "storage/v1",
     "transport/http",
-    "transport/http/internal/propagation",
+    "transport/http/internal/propagation"
   ]
   pruneopts = "UT"
   revision = "19e022d8cf43ce81f046bae8cc18c5397cc7732f"
@@ -706,7 +732,7 @@
     "internal/modules",
     "internal/remote_api",
     "internal/urlfetch",
-    "urlfetch",
+    "urlfetch"
   ]
   pruneopts = "UT"
   revision = "4a4468ece617fc8205e99368fa2200e9d1fad421"
@@ -720,7 +746,7 @@
     "googleapis/api/annotations",
     "googleapis/iam/v1",
     "googleapis/rpc/code",
-    "googleapis/rpc/status",
+    "googleapis/rpc/status"
   ]
   pruneopts = "UT"
   revision = "5fe7a883aa19554f42890211544aa549836af7b7"
@@ -759,7 +785,7 @@
     "resolver/passthrough",
     "stats",
     "status",
-    "tap",
+    "tap"
   ]
   pruneopts = "UT"
   revision = "2fdaae294f38ed9a121193c51ec99fecd3b13eb7"
@@ -772,6 +798,14 @@
   pruneopts = "UT"
   revision = "ab2a8a99087e827c9af87ed6777ba897348fb178"
   version = "v9.20.2"
+
+[[projects]]
+  digest = "1:2ee0f15eb0fb04f918db7c2dcf39745f40d69f798ef171610a730e8a56aaa4fd"
+  name = "gopkg.in/russross/blackfriday.v2"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "d3b5b032dc8e8927d31a5071b56e14c89f045135"
+  version = "v2.0.1"
 
 [[projects]]
   branch = "v2"
@@ -800,6 +834,8 @@
     "github.com/hashicorp/go-multierror",
     "github.com/hashicorp/go-version",
     "github.com/lkysow/go-gitlab",
+    "github.com/mcdafydd/go-azuredevops/azuredevops",
+    "github.com/microcosm-cc/bluemonday",
     "github.com/mitchellh/colorstring",
     "github.com/mitchellh/go-homedir",
     "github.com/mohae/deepcopy",
@@ -813,7 +849,8 @@
     "github.com/urfave/negroni",
     "golang.org/x/crypto/ssh/terminal",
     "gopkg.in/go-playground/validator.v9",
-    "gopkg.in/yaml.v2",
+    "gopkg.in/russross/blackfriday.v2",
+    "gopkg.in/yaml.v2"
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

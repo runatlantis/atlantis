@@ -97,16 +97,16 @@
   name = "github.com/lkysow/go-gitlab"
 
 [[constraint]]
-  branch = "master"
+  version = "~0.8.1"
   name = "github.com/mcdafydd/go-azuredevops"
 
 [[constraint]]
-  branch = "master"
   name = "github.com/microcosm-cc/bluemonday"
+  version = "1.0.2"
 
 [[constraint]]
-  branch = "master"
   name = "gopkg.in/russross/blackfriday.v2"
+  version = "2.0.1"
 
 [[constraint]]
   name = "github.com/go-test/deep"
