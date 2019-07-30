@@ -241,7 +241,7 @@ var planSuccessWrappedTmpl = template.Must(template.New("").Parse(
 // to do next.
 var planNextSteps = "{{ if .PlanWasDeleted }}This plan was not saved because one or more projects failed and automerge requires all plans pass.{{ else }}* :arrow_forward: To **apply** this plan, comment:\n" +
 	"    * `{{.ApplyCmd}}`\n" +
-	"* :put_litter_in_its_place: To **delete** this plan click [here]({{.LockURL}})\n" +
+	"* :put_litter_in_its_place: To **delete** this plan {{ if ne .LockURL \"\"}}click [here]({{.LockURL}}){{ else }}, close this pull request{{ end }}\n" +
 	"* :repeat: To **plan** this project again, comment:\n" +
 	"    * `{{.RePlanCmd}}`{{end}}"
 var applyUnwrappedSuccessTmpl = template.Must(template.New("").Parse(
