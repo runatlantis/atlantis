@@ -304,7 +304,7 @@ type ProjectCommandContext struct {
 	// ParallelPlansEnabled is true if parallel plans is enabled for the repo that this
 	// project is in.
 	ParallelPlansEnabled bool
-	// ProjectLocksEnabled is true if locking is enabled for the repo that this
+	// ProjectLocksEnabled is true if project locks is enabled for the repo that this
 	// project is in.
 	ProjectLocksEnabled bool
 	// AutoplanEnabled is true if autoplanning is enabled for this project.

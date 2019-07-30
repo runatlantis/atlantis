@@ -202,7 +202,7 @@ workflows:
 			repoCfg: `
 version: 3
 automerge: true
-locking: false
+project_locks: false
 projects:
 - dir: project1
   workspace: myworkspace

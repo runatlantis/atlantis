@@ -122,8 +122,8 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 			expErr: "yaml: unmarshal errors:\n  line 2: cannot unmarshal !!str `notabool` into bool",
 		},
 		{
-			description: "locking not a boolean",
-			input:       "version: 3\nlocking: notabool",
+			description: "project_locks not a boolean",
+			input:       "version: 3\nproject_locks: notabool",
 			exp: raw.RepoCfg{
 				Version:   nil,
 				Projects:  nil,
@@ -137,7 +137,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 version: 3
 automerge: true
 parallel_plans: true
-locking: false
+project_locks: false
 projects:
 - dir: mydir
   workspace: myworkspace
@@ -262,7 +262,7 @@ func TestConfig_ToValid(t *testing.T) {
 			},
 		},
 		{
-			description: "automerge, parallel_plans and locking ommitted",
+			description: "automerge, parallel_plans and project_locks ommitted",
 			input: raw.RepoCfg{
 				Version: Int(2),
 			},
@@ -275,7 +275,7 @@ func TestConfig_ToValid(t *testing.T) {
 			},
 		},
 		{
-			description: "automerge, parallel_plans and locking true",
+			description: "automerge, parallel_plans and project_locks true",
 			input: raw.RepoCfg{
 				Version:       Int(2),
 				Automerge:     Bool(true),
@@ -291,7 +291,7 @@ func TestConfig_ToValid(t *testing.T) {
 			},
 		},
 		{
-			description: "automerge, parallel_plans and locking false",
+			description: "automerge, parallel_plans and project_locks false",
 			input: raw.RepoCfg{
 				Version:       Int(2),
 				Automerge:     Bool(false),

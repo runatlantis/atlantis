@@ -13,7 +13,7 @@ const DefaultAutomerge = false
 // DefaultParallelPlans is the default setting for parallel plans
 const DefaultParallelPlans = false
 
-// DefaultProjectLocks is the default setting for locking
+// DefaultProjectLocks is the default setting for project_locks
 const DefaultProjectLocks = true
 
 // RepoCfg is the raw schema for repo-level atlantis.yaml config.
@@ -23,7 +23,7 @@ type RepoCfg struct {
 	Workflows     map[string]Workflow `yaml:"workflows,omitempty"`
 	Automerge     *bool               `yaml:"automerge,omitempty"`
 	ParallelPlans *bool               `yaml:"parallel_plans,omitempty"`
-	ProjectLocks  *bool               `yaml:"locking,omitempty"`
+	ProjectLocks  *bool               `yaml:"project_locks,omitempty"`
 }
 
 func (r RepoCfg) Validate() error {
