@@ -28,6 +28,7 @@ import (
 	"github.com/runatlantis/atlantis/cmd"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
+	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -156,7 +157,7 @@ func TestNewClient_DefaultTFFlagInBinDir(t *testing.T) {
 	Ok(t, err)
 	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
 
-	c, err := terraform.NewClient(nil, tmp, "", "", "0.11.10", cmd.DefaultTFVersionFlag, nil)
+	c, err := terraform.NewClient(logging.NewNoopLogger(), tmp, "", "", "0.11.10", cmd.DefaultTFVersionFlag, nil)
 	Ok(t, err)
 
 	Ok(t, err)
@@ -238,6 +239,35 @@ func TestRunCommandWithVersion_DLsTF(t *testing.T) {
 	output, err := c.RunCommandWithVersion(nil, tmp, nil, v, "")
 	Assert(t, err == nil, "err: %s: %s", err, output)
 	Equals(t, "\nTerraform v99.99.99\n\n", output)
+}
+
+// Test the EnsureVersion downloads terraform.
+func TestEnsureVersion_downloaded(t *testing.T) {
+	RegisterMockTestingT(t)
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+
+	mockDownloader := mocks.NewMockDownloader()
+
+	c, err := terraform.NewClient(nil, tmp, "", "", "0.11.10", cmd.DefaultTFVersionFlag, mockDownloader)
+	Ok(t, err)
+
+	Equals(t, "0.11.10", c.DefaultVersion().String())
+
+	v, err := version.NewVersion("99.99.99")
+	Ok(t, err)
+
+	err = c.EnsureVersion(nil, v)
+
+	Ok(t, err)
+
+	baseURL := "https://releases.hashicorp.com/terraform/99.99.99"
+	expURL := fmt.Sprintf("%s/terraform_99.99.99_%s_%s.zip?checksum=file:%s/terraform_99.99.99_SHA256SUMS",
+		baseURL,
+		runtime.GOOS,
+		runtime.GOARCH,
+		baseURL)
+	mockDownloader.VerifyWasCalledEventually(Once(), 2*time.Second).GetFile(filepath.Join(tmp, "bin", "terraform99.99.99"), expURL)
 }
 
 // tempSetEnv sets env var key to value. It returns a function that when called

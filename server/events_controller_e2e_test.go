@@ -438,7 +438,8 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 				TerraformExecutor: terraformClient,
 			},
 			RunStepRunner: &runtime.RunStepRunner{
-				DefaultTFVersion: defaultTFVersion,
+				TerraformExecutor: terraformClient,
+				DefaultTFVersion:  defaultTFVersion,
 			},
 			PullApprovedChecker: e2eVCSClient,
 			WorkingDir:          workingDir,
