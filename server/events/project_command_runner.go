@@ -150,8 +150,10 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 	// Clone is idempotent so okay to run even if the repo was already cloned.
 	repoDir, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if cloneErr != nil {
-		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+		if lockAttempt != nil {
+			if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
+				ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+			}
 		}
 		return nil, "", cloneErr
 	}
@@ -162,8 +164,10 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 
 	outputs, err := p.runSteps(ctx.Steps, ctx, projAbsPath)
 	if err != nil {
-		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+		if lockAttempt != nil {
+			if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
+				ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+			}
 		}
 		return nil, "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
 	}
