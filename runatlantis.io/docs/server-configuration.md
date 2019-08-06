@@ -410,5 +410,5 @@ Values are chosen in this order:
   Write out a .git-credentials file and configure git-credentials-store. To allow authentication with your git remotes over https. See [here](https://git-scm.com/docs/git-credential-store) for more information.
 
   ::: warning SECURITY WARNING
-  Potentially dangerous to enable
-  This writes your credentials to disk and a malicious pull request could then access these details
+  Potentially dangerous to enable as this writes your credentials to disk.
+  :::
