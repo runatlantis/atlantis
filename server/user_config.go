@@ -44,6 +44,7 @@ type UserConfig struct {
 	TFEToken               string          `mapstructure:"tfe-token"`
 	DefaultTFVersion       string          `mapstructure:"default-tf-version"`
 	Webhooks               []WebhookConfig `mapstructure:"webhooks"`
+	WriteGitCreds          bool            `mapstructure:"write-git-creds"`
 }
 
 // ToLogLevel returns the LogLevel object corresponding to the user-passed
