@@ -704,7 +704,7 @@ locally at this time.
 				nil,
 				absProjectPath,
 				[]string{"workspace", "show"},
-        map[string]string(nil),
+				map[string]string(nil),
 				tfVersion,
 				"default")).ThenReturn("default\n", nil)
 
