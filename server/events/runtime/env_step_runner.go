@@ -7,7 +7,8 @@ import (
 
 // EnvStepRunner set environment variables.
 type EnvStepRunner struct {
-	DefaultTFVersion *version.Version
+	TerraformExecutor TerraformExec
+	DefaultTFVersion  *version.Version
 }
 
 func (r *EnvStepRunner) Run(ctx models.ProjectCommandContext, name string, command string, value string, path string, envs map[string]string) (string, string, error) {
@@ -15,7 +16,10 @@ func (r *EnvStepRunner) Run(ctx models.ProjectCommandContext, name string, comma
 		return name, value, nil
 	}
 
-	runStepRunner := RunStepRunner{DefaultTFVersion: r.DefaultTFVersion}
+	runStepRunner := RunStepRunner{
+		TerraformExecutor: r.TerraformExecutor,
+		DefaultTFVersion:  r.DefaultTFVersion,
+	}
 	res, err := runStepRunner.Run(ctx, command, path, envs)
 
 	return name, res, err

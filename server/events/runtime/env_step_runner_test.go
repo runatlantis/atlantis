@@ -1,11 +1,13 @@
 package runtime_test
 
 import (
+	"testing"
+
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/runtime"
+	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
-	"testing"
 
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -32,11 +34,13 @@ func TestEnvStepRunner_Run(t *testing.T) {
 			ExpValue: "test",
 		},
 	}
+	terraform := mocks.NewMockClient()
 	projVersion, err := version.NewVersion("v0.11.0")
 	Ok(t, err)
 	defaultVersion, _ := version.NewVersion("0.8")
 	r := runtime.EnvStepRunner{
-		DefaultTFVersion: defaultVersion,
+		TerraformExecutor: terraform,
+		DefaultTFVersion:  defaultVersion,
 	}
 	for _, c := range cases {
 		t.Run(c.Command, func(t *testing.T) {

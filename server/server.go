@@ -317,7 +317,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 				TerraformBinDir:   terraformClient.TerraformBinDir(),
 			},
 			EnvStepRunner: &runtime.EnvStepRunner{
-				DefaultTFVersion: defaultTfVersion,
+				TerraformExecutor: terraformClient,
+				DefaultTFVersion:  defaultTfVersion,
 			},
 			PullApprovedChecker: vcsClient,
 			WorkingDir:          workingDir,
