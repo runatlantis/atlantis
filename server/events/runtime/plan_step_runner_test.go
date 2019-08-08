@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	version "github.com/hashicorp/go-version"
+	"github.com/hashicorp/go-version"
 	mocks2 "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 
@@ -39,11 +39,11 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 	When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
 	output, err := s.Run(models.ProjectCommandContext{
-		Log:         logger,
-		CommentArgs: []string{"comment", "args"},
-		Workspace:   workspace,
-		RepoRelDir:  ".",
-		User:        models.User{Username: "username"},
+		Log:                logger,
+		EscapedCommentArgs: []string{"comment", "args"},
+		Workspace:          workspace,
+		RepoRelDir:         ".",
+		User:               models.User{Username: "username"},
 		Pull: models.PullRequest{
 			Num: 2,
 		},
@@ -169,11 +169,11 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 			When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 				ThenReturn("output", nil)
 			output, err := s.Run(models.ProjectCommandContext{
-				Log:         logger,
-				Workspace:   "workspace",
-				RepoRelDir:  ".",
-				User:        models.User{Username: "username"},
-				CommentArgs: []string{"comment", "args"},
+				Log:                logger,
+				Workspace:          "workspace",
+				RepoRelDir:         ".",
+				User:               models.User{Username: "username"},
+				EscapedCommentArgs: []string{"comment", "args"},
 				Pull: models.PullRequest{
 					Num: 2,
 				},
@@ -291,11 +291,11 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 			When(terraform.RunCommandWithVersion(logger, "/path", expPlanArgs, map[string]string(nil), tfVersion, "workspace")).ThenReturn("output", nil)
 
 			output, err := s.Run(models.ProjectCommandContext{
-				Log:         logger,
-				Workspace:   "workspace",
-				RepoRelDir:  ".",
-				User:        models.User{Username: "username"},
-				CommentArgs: []string{"comment", "args"},
+				Log:                logger,
+				Workspace:          "workspace",
+				RepoRelDir:         ".",
+				User:               models.User{Username: "username"},
+				EscapedCommentArgs: []string{"comment", "args"},
 				Pull: models.PullRequest{
 					Num: 2,
 				},
@@ -351,11 +351,11 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 	When(terraform.RunCommandWithVersion(logger, "/path", expPlanArgs, map[string]string(nil), tfVersion, "workspace")).ThenReturn("output", nil)
 
 	output, err := s.Run(models.ProjectCommandContext{
-		Log:         logger,
-		Workspace:   "workspace",
-		RepoRelDir:  ".",
-		User:        models.User{Username: "username"},
-		CommentArgs: []string{"comment", "args"},
+		Log:                logger,
+		Workspace:          "workspace",
+		RepoRelDir:         ".",
+		User:               models.User{Username: "username"},
+		EscapedCommentArgs: []string{"comment", "args"},
 		Pull: models.PullRequest{
 			Num: 2,
 		},
@@ -422,11 +422,11 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 	When(terraform.RunCommandWithVersion(logger, tmpDir, expPlanArgs, map[string]string(nil), tfVersion, "workspace")).ThenReturn("output", nil)
 
 	output, err := s.Run(models.ProjectCommandContext{
-		Log:         logger,
-		Workspace:   "workspace",
-		RepoRelDir:  ".",
-		User:        models.User{Username: "username"},
-		CommentArgs: []string{"comment", "args"},
+		Log:                logger,
+		Workspace:          "workspace",
+		RepoRelDir:         ".",
+		User:               models.User{Username: "username"},
+		EscapedCommentArgs: []string{"comment", "args"},
 		Pull: models.PullRequest{
 			Num: 2,
 		},
@@ -481,12 +481,12 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 	When(terraform.RunCommandWithVersion(logger, "/path", expPlanArgs, map[string]string(nil), tfVersion, "default")).ThenReturn("output", nil)
 
 	output, err := s.Run(models.ProjectCommandContext{
-		Log:         logger,
-		Workspace:   "default",
-		RepoRelDir:  ".",
-		User:        models.User{Username: "username"},
-		CommentArgs: []string{"comment", "args"},
-		ProjectName: "projectname",
+		Log:                logger,
+		Workspace:          "default",
+		RepoRelDir:         ".",
+		User:               models.User{Username: "username"},
+		EscapedCommentArgs: []string{"comment", "args"},
+		ProjectName:        "projectname",
 		Pull: models.PullRequest{
 			Num: 2,
 		},
@@ -635,10 +635,10 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 		AnyString())).ThenReturn("output", nil)
 
 	output, err := s.Run(models.ProjectCommandContext{
-		Workspace:   "default",
-		RepoRelDir:  ".",
-		User:        models.User{Username: "username"},
-		CommentArgs: []string{"comment", "args"},
+		Workspace:          "default",
+		RepoRelDir:         ".",
+		User:               models.User{Username: "username"},
+		EscapedCommentArgs: []string{"comment", "args"},
 		Pull: models.PullRequest{
 			Num: 2,
 		},
@@ -667,83 +667,94 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 
 // Test plans if using remote ops.
 func TestRun_RemoteOps(t *testing.T) {
-	RegisterMockTestingT(t)
-	terraform := mocks.NewMockClient()
-	asyncTf := &remotePlanMock{}
-
-	tfVersion, _ := version.NewVersion("0.11.12")
-	updater := mocks2.NewMockCommitStatusUpdater()
-	s := runtime.PlanStepRunner{
-		TerraformExecutor:   terraform,
-		DefaultTFVersion:    tfVersion,
-		AsyncTFExec:         asyncTf,
-		CommitStatusUpdater: updater,
-	}
-	absProjectPath, cleanup := TempDir(t)
-	defer cleanup()
-
-	// First, terraform workspace gets run.
-	When(terraform.RunCommandWithVersion(
-		nil,
-		absProjectPath,
-		[]string{"workspace", "show"},
-		map[string]string(nil),
-		tfVersion,
-		"default")).ThenReturn("default\n", nil)
-
-	// Then the first call to terraform plan should return the remote ops error.
-	expPlanArgs := []string{"plan",
-		"-input=false",
-		"-refresh",
-		"-no-color",
-		"-out",
-		fmt.Sprintf("%q", filepath.Join(absProjectPath, "default.tfplan")),
-		"-var",
-		"atlantis_user=\"username\"",
-		"-var",
-		"atlantis_repo=\"owner/repo\"",
-		"-var",
-		"atlantis_repo_name=\"repo\"",
-		"-var",
-		"atlantis_repo_owner=\"owner\"",
-		"-var",
-		"atlantis_pull_num=2",
-		"extra",
-		"args",
-		"comment",
-		"args",
-	}
-
-	planErr := errors.New("exit status 1: err")
-	planOutput := `
-Error: Saving a generated plan is currently not supported!
+	cases := map[string]string{
+		"0.11.14 error": `Error: Saving a generated plan is currently not supported!
 
 The "remote" backend does not support saving the generated execution
 plan locally at this time.
 
-`
-	asyncTf.LinesToSend = remotePlanOutput
-	When(terraform.RunCommandWithVersion(nil, absProjectPath, expPlanArgs, map[string]string(nil), tfVersion, "default")).
-		ThenReturn(planOutput, planErr)
+`,
+		"0.12.* error": `Error: Saving a generated plan is currently not supported
 
-	// Now that mocking is set up, we're ready to run the plan.
-	ctx := models.ProjectCommandContext{
-		Workspace:   "default",
-		RepoRelDir:  ".",
-		User:        models.User{Username: "username"},
-		CommentArgs: []string{"comment", "args"},
-		Pull: models.PullRequest{
-			Num: 2,
-		},
-		BaseRepo: models.Repo{
-			FullName: "owner/repo",
-			Owner:    "owner",
-			Name:     "repo",
-		},
+The "remote" backend does not support saving the generated execution plan
+locally at this time.
+
+`,
 	}
-	output, err := s.Run(ctx, []string{"extra", "args"}, absProjectPath, map[string]string(nil))
-	Ok(t, err)
-	Equals(t, `
+	for name, remoteOpsErr := range cases {
+		t.Run(name, func(t *testing.T) {
+
+			RegisterMockTestingT(t)
+			terraform := mocks.NewMockClient()
+			asyncTf := &remotePlanMock{}
+
+			tfVersion, _ := version.NewVersion("0.11.12")
+			updater := mocks2.NewMockCommitStatusUpdater()
+			s := runtime.PlanStepRunner{
+				TerraformExecutor:   terraform,
+				DefaultTFVersion:    tfVersion,
+				AsyncTFExec:         asyncTf,
+				CommitStatusUpdater: updater,
+			}
+			absProjectPath, cleanup := TempDir(t)
+			defer cleanup()
+
+			// First, terraform workspace gets run.
+			When(terraform.RunCommandWithVersion(
+				nil,
+				absProjectPath,
+				[]string{"workspace", "show"},
+        map[string]string(nil),
+				tfVersion,
+				"default")).ThenReturn("default\n", nil)
+
+			// Then the first call to terraform plan should return the remote ops error.
+			expPlanArgs := []string{"plan",
+				"-input=false",
+				"-refresh",
+				"-no-color",
+				"-out",
+				fmt.Sprintf("%q", filepath.Join(absProjectPath, "default.tfplan")),
+				"-var",
+				"atlantis_user=\"username\"",
+				"-var",
+				"atlantis_repo=\"owner/repo\"",
+				"-var",
+				"atlantis_repo_name=\"repo\"",
+				"-var",
+				"atlantis_repo_owner=\"owner\"",
+				"-var",
+				"atlantis_pull_num=2",
+				"extra",
+				"args",
+				"comment",
+				"args",
+			}
+
+			planErr := errors.New("exit status 1: err")
+			planOutput := "\n" + remoteOpsErr
+			asyncTf.LinesToSend = remotePlanOutput
+			When(terraform.RunCommandWithVersion(nil, absProjectPath, expPlanArgs, map[string]string(nil), tfVersion, "default")).
+				ThenReturn(planOutput, planErr)
+
+			// Now that mocking is set up, we're ready to run the plan.
+			ctx := models.ProjectCommandContext{
+				Workspace:          "default",
+				RepoRelDir:         ".",
+				User:               models.User{Username: "username"},
+				EscapedCommentArgs: []string{"comment", "args"},
+				Pull: models.PullRequest{
+					Num: 2,
+				},
+				BaseRepo: models.Repo{
+					FullName: "owner/repo",
+					Owner:    "owner",
+					Name:     "repo",
+				},
+			}
+			output, err := s.Run(ctx, []string{"extra", "args"}, absProjectPath, map[string]string(nil))
+			Ok(t, err)
+			Equals(t, `
 An execution plan has been generated and is shown below.
 Resource actions are indicated with the following symbols:
 - destroy
@@ -755,13 +766,13 @@ Terraform will perform the following actions:
 
 Plan: 0 to add, 0 to change, 1 to destroy.`, output)
 
-	expRemotePlanArgs := []string{"plan", "-input=false", "-refresh", "-no-color", "extra", "args", "comment", "args"}
-	Equals(t, expRemotePlanArgs, asyncTf.CalledArgs)
+			expRemotePlanArgs := []string{"plan", "-input=false", "-refresh", "-no-color", "extra", "args", "comment", "args"}
+			Equals(t, expRemotePlanArgs, asyncTf.CalledArgs)
 
-	// Verify that the fake plan file we write has the correct contents.
-	bytes, err := ioutil.ReadFile(filepath.Join(absProjectPath, "default.tfplan"))
-	Ok(t, err)
-	Equals(t, `Atlantis: this plan was created by remote ops
+			// Verify that the fake plan file we write has the correct contents.
+			bytes, err := ioutil.ReadFile(filepath.Join(absProjectPath, "default.tfplan"))
+			Ok(t, err)
+			Equals(t, `Atlantis: this plan was created by remote ops
 
 An execution plan has been generated and is shown below.
 Resource actions are indicated with the following symbols:
@@ -774,10 +785,12 @@ Terraform will perform the following actions:
 
 Plan: 0 to add, 0 to change, 1 to destroy.`, string(bytes))
 
-	// Ensure that the status was updated with the runURL.
-	runURL := "https://app.terraform.io/app/lkysow-enterprises/atlantis-tfe-test/runs/run-is4oVvJfrkud1KvE"
-	updater.VerifyWasCalledOnce().UpdateProject(ctx, models.PlanCommand, models.PendingCommitStatus, runURL)
-	updater.VerifyWasCalledOnce().UpdateProject(ctx, models.PlanCommand, models.SuccessCommitStatus, runURL)
+			// Ensure that the status was updated with the runURL.
+			runURL := "https://app.terraform.io/app/lkysow-enterprises/atlantis-tfe-test/runs/run-is4oVvJfrkud1KvE"
+			updater.VerifyWasCalledOnce().UpdateProject(ctx, models.PlanCommand, models.PendingCommitStatus, runURL)
+			updater.VerifyWasCalledOnce().UpdateProject(ctx, models.PlanCommand, models.SuccessCommitStatus, runURL)
+		})
+	}
 }
 
 type remotePlanMock struct {

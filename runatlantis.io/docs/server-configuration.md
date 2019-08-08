@@ -385,6 +385,15 @@ Values are chosen in this order:
   atlantis server --ssl-cert-file="/etc/ssl/private/my-cert.key"
   ```
   File containing x509 private key matching `--ssl-cert-file`.
+ 
+* ### `--tfe-hostname`
+  ```bash
+  atlantis server --tfe-hostname="my-terraform-enterprise.company.com"
+  ```
+  Hostname of your Terraform Enterprise installation to be used in conjunction with
+  `--tfe-token`. See [Terraform Cloud](terraform-cloud.html) for more details.
+  If using Terraform Cloud (i.e. you don't have your own Terraform Enterprise installation)
+  no need to set since it defaults to `app.terraform.io`.
 
 * ### `--tfe-token`
   ```bash
@@ -393,3 +402,13 @@ Values are chosen in this order:
   ATLANTIS_TFE_TOKEN='xxx.atlasv1.yyy' atlantis server
   ```
   A token for Terraform Cloud/Terraform Enteprise integration. See [Terraform Cloud](terraform-cloud.html) for more details.
+
+* ### `--write-git-creds`
+  ```bash
+  atlantis server --write-git-creds
+  ```
+  Write out a .git-credentials file and configure git-credentials-store. To allow authentication with your git remotes over https. See [here](https://git-scm.com/docs/git-credential-store) for more information.
+
+  ::: warning SECURITY WARNING
+  Potentially dangerous to enable as this writes your credentials to disk.
+  :::

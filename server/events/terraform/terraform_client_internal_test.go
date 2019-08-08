@@ -18,10 +18,10 @@ func TestGenerateRCFile_WritesFile(t *testing.T) {
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 
-	err := generateRCFile("token", tmp)
+	err := generateRCFile("token", "hostname", tmp)
 	Ok(t, err)
 
-	expContents := `credentials "app.terraform.io" {
+	expContents := `credentials "hostname" {
   token = "token"
 }`
 	actContents, err := ioutil.ReadFile(filepath.Join(tmp, ".terraformrc"))
@@ -39,7 +39,7 @@ func TestGenerateRCFile_WillNotOverwrite(t *testing.T) {
 	err := ioutil.WriteFile(rcFile, []byte("contents"), 0600)
 	Ok(t, err)
 
-	actErr := generateRCFile("token", tmp)
+	actErr := generateRCFile("token", "hostname", tmp)
 	expErr := fmt.Sprintf("can't write TFE token to %s because that file has contents that would be overwritten", tmp+"/.terraformrc")
 	ErrEquals(t, expErr, actErr)
 }
@@ -57,7 +57,7 @@ func TestGenerateRCFile_NoErrIfContentsSame(t *testing.T) {
 	err := ioutil.WriteFile(rcFile, []byte(contents), 0600)
 	Ok(t, err)
 
-	err = generateRCFile("token", tmp)
+	err = generateRCFile("token", "app.terraform.io", tmp)
 	Ok(t, err)
 }
 
@@ -72,7 +72,7 @@ func TestGenerateRCFile_ErrIfCannotRead(t *testing.T) {
 	Ok(t, err)
 
 	expErr := fmt.Sprintf("trying to read %s to ensure we're not overwriting it: open %s: permission denied", rcFile, rcFile)
-	actErr := generateRCFile("token", tmp)
+	actErr := generateRCFile("token", "hostname", tmp)
 	ErrEquals(t, expErr, actErr)
 }
 
@@ -80,7 +80,7 @@ func TestGenerateRCFile_ErrIfCannotRead(t *testing.T) {
 func TestGenerateRCFile_ErrIfCannotWrite(t *testing.T) {
 	rcFile := "/this/dir/does/not/exist/.terraformrc"
 	expErr := fmt.Sprintf("writing generated .terraformrc file with TFE token to %s: open %s: no such file or directory", rcFile, rcFile)
-	actErr := generateRCFile("token", "/this/dir/does/not/exist")
+	actErr := generateRCFile("token", "hostname", "/this/dir/does/not/exist")
 	ErrEquals(t, expErr, actErr)
 }
 

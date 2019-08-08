@@ -188,7 +188,7 @@ workflows:
 ```
 | Key                           | Type                                                     | Default | Required | Description                                                 |
 |-------------------------------|----------------------------------------------------------|---------|----------|-------------------------------------------------------------|
-| version                       | int                                                      | none    | **yes**  | This key is required and must be set to `2`                 |
+| version                       | int                                                      | none    | **yes**  | This key is required and must be set to `3`                 |
 | automerge                     | bool                                                     | `false` | no       | Automatically merge pull request when all plans are applied |
 | projects                      | array[[Project](repo-level-atlantis-yaml.html#project)]  | `[]`    | no       | Lists the projects in this repo                             |
 | workflows<br />*(restricted)* | map[string: [Workflow](custom-workflows.html#reference)] | `{}`    | no       | Custom workflows                                            |

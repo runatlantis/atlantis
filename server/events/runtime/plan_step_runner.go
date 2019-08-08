@@ -64,7 +64,7 @@ func (p *PlanStepRunner) isRemoteOpsErr(output string, err error) bool {
 	if err == nil {
 		return false
 	}
-	return strings.Contains(output, remoteOpsErr)
+	return strings.Contains(output, remoteOpsErr01114) || strings.Contains(output, remoteOpsErr012)
 }
 
 // remotePlan runs a terraform plan command compatible with TFE remote
@@ -73,7 +73,7 @@ func (p *PlanStepRunner) remotePlan(ctx models.ProjectCommandContext, extraArgs 
 	argList := [][]string{
 		{"plan", "-input=false", "-refresh", "-no-color"},
 		extraArgs,
-		ctx.CommentArgs,
+		ctx.EscapedCommentArgs,
 	}
 	args := p.flatten(argList)
 	output, err := p.runRemotePlan(ctx, args, path, tfVersion, envs)
@@ -174,7 +174,7 @@ func (p *PlanStepRunner) buildPlanCmd(ctx models.ProjectCommandContext, extraArg
 		{"plan", "-input=false", "-refresh", "-no-color", "-out", fmt.Sprintf("%q", planFile)},
 		tfVars,
 		extraArgs,
-		ctx.CommentArgs,
+		ctx.EscapedCommentArgs,
 		envFileArgs,
 	}
 
@@ -299,12 +299,22 @@ func (p *PlanStepRunner) runRemotePlan(
 
 var vTwelveAndUp = MustConstraint(">=0.12-a")
 
-// remoteOpsErr is the error terraform plan will return if this project is
-// using TFE remote operations.
-var remoteOpsErr = `Error: Saving a generated plan is currently not supported!
+// remoteOpsErr01114 is the error terraform plan will return if this project is
+// using TFE remote operations in TF 0.11.14.
+var remoteOpsErr01114 = `Error: Saving a generated plan is currently not supported!
 
 The "remote" backend does not support saving the generated execution
 plan locally at this time.
+
+`
+
+// remoteOpsErr012 is the error terraform plan will return if this project is
+// using TFE remote operations in TF 0.12.{0-4}. Later versions haven't been
+// released yet at this time.
+var remoteOpsErr012 = `Error: Saving a generated plan is currently not supported
+
+The "remote" backend does not support saving the generated execution plan
+locally at this time.
 
 `
 

@@ -1,12 +1,18 @@
 package runtime_test
 
 import (
+	"fmt"
+	"os"
 	"strings"
 	"testing"
 
 	version "github.com/hashicorp/go-version"
+	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/runtime"
+	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
+	matchers2 "github.com/runatlantis/atlantis/server/events/terraform/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -17,14 +23,17 @@ func TestRunStepRunner_Run(t *testing.T) {
 		ProjectName string
 		ExpOut      string
 		ExpErr      string
+		Version     string
 	}{
 		{
 			Command: "",
 			ExpOut:  "",
+			Version: "v1.2.3",
 		},
 		{
 			Command: "echo hi",
 			ExpOut:  "hi\n",
+			Version: "v2.3.4",
 		},
 		{
 			Command: `printf \'your main.tf file does not provide default region.\\ncheck\'`,
@@ -62,16 +71,44 @@ func TestRunStepRunner_Run(t *testing.T) {
 		{
 			Command: "echo user_name=$USER_NAME",
 			ExpOut:  "user_name=acme-user\n",
+		}, {
+			Command: "echo $PATH",
+			ExpOut:  fmt.Sprintf("%s:%s\n", os.Getenv("PATH"), "/bin/dir"),
+		},
+		{
+			Command: "echo args=$COMMENT_ARGS",
+			ExpOut:  "args=-target=resource1,-target=resource2\n",
 		},
 	}
 
-	projVersion, err := version.NewVersion("v0.11.0")
-	Ok(t, err)
-	defaultVersion, _ := version.NewVersion("0.8")
-	r := runtime.RunStepRunner{
-		DefaultTFVersion: defaultVersion,
-	}
 	for _, c := range cases {
+
+		var projVersion *version.Version
+		var err error
+
+		projVersion, err = version.NewVersion("v0.11.0")
+
+		if c.Version != "" {
+			projVersion, err = version.NewVersion(c.Version)
+			Ok(t, err)
+		}
+
+		Ok(t, err)
+
+		defaultVersion, _ := version.NewVersion("0.8")
+
+		RegisterMockTestingT(t)
+		terraform := mocks.NewMockClient()
+		When(terraform.EnsureVersion(matchers.AnyPtrToLoggingSimpleLogger(), matchers2.AnyPtrToGoVersionVersion())).
+			ThenReturn(nil)
+
+		logger := logging.NewNoopLogger()
+
+		r := runtime.RunStepRunner{
+			TerraformExecutor: terraform,
+			DefaultTFVersion:  defaultVersion,
+			TerraformBinDir:   "/bin/dir",
+		}
 		t.Run(c.Command, func(t *testing.T) {
 			tmpDir, cleanup := TempDir(t)
 			defer cleanup()
@@ -93,11 +130,12 @@ func TestRunStepRunner_Run(t *testing.T) {
 				User: models.User{
 					Username: "acme-user",
 				},
-				Log:              logging.NewNoopLogger(),
-				Workspace:        "myworkspace",
-				RepoRelDir:       "mydir",
-				TerraformVersion: projVersion,
-				ProjectName:      c.ProjectName,
+				Log:                logger,
+				Workspace:          "myworkspace",
+				RepoRelDir:         "mydir",
+				TerraformVersion:   projVersion,
+				ProjectName:        c.ProjectName,
+				EscapedCommentArgs: []string{"-target=resource1", "-target=resource2"},
 			}
 			out, err := r.Run(ctx, c.Command, tmpDir, map[string]string{"test": "var"})
 			if c.ExpErr != "" {
@@ -110,6 +148,10 @@ func TestRunStepRunner_Run(t *testing.T) {
 			// temp dir.
 			expOut := strings.Replace(c.ExpOut, "$DIR", tmpDir, -1)
 			Equals(t, expOut, out)
+
+			terraform.VerifyWasCalledOnce().EnsureVersion(logger, projVersion)
+			terraform.VerifyWasCalled(Never()).EnsureVersion(logger, defaultVersion)
+
 		})
 	}
 }

@@ -68,9 +68,12 @@ const (
 	SlackTokenFlag             = "slack-token"
 	SSLCertFileFlag            = "ssl-cert-file"
 	SSLKeyFileFlag             = "ssl-key-file"
+	TFEHostnameFlag            = "tfe-hostname"
 	TFETokenFlag               = "tfe-token"
+	WriteGitCredsFlag          = "write-git-creds"
 
 	// Flag defaults.
+	// NOTE: Must manually set these as defaults in the setDefaults function.
 	DefaultCheckoutStrategy = "branch"
 	DefaultBitbucketBaseURL = bitbucketcloud.BaseURL
 	DefaultDataDir          = "~/.atlantis"
@@ -78,6 +81,7 @@ const (
 	DefaultGitlabHostname   = "gitlab.com"
 	DefaultLogLevel         = "info"
 	DefaultPort             = 4141
+	DefaultTFEHostname      = "app.terraform.io"
 )
 
 var stringFlags = map[string]stringFlag{
@@ -175,9 +179,13 @@ var stringFlags = map[string]stringFlag{
 	SSLKeyFileFlag: {
 		description: fmt.Sprintf("File containing x509 private key matching --%s.", SSLCertFileFlag),
 	},
+	TFEHostnameFlag: {
+		description:  "Hostname of your Terraform Enterprise installation. If using Terraform Cloud no need to set.",
+		defaultValue: DefaultTFEHostname,
+	},
 	TFETokenFlag: {
-		description: "API token for Terraform Enterprise. This will be used to generate a ~/.terraformrc file." +
-			" Only set if using TFE as a backend." +
+		description: "API token for Terraform Cloud/Enterprise. This will be used to generate a ~/.terraformrc file." +
+			" Only set if using TFC/E as a remote backend." +
 			" Should be specified via the ATLANTIS_TFE_TOKEN environment variable for security.",
 	},
 	DefaultTFVersionFlag: {
@@ -218,6 +226,11 @@ var boolFlags = map[string]boolFlag{
 	},
 	SilenceWhitelistErrorsFlag: {
 		description:  "Silences the posting of whitelist error comments.",
+		defaultValue: false,
+	},
+	WriteGitCredsFlag: {
+		description: "Write out a .git-credentials file with the provider user and token to allow authentication with git over HTTPS." +
+			" This does write secrets to disk and should only be enabled in a secure environment.",
 		defaultValue: false,
 	},
 }
@@ -418,6 +431,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	if c.Port == 0 {
 		c.Port = DefaultPort
 	}
+	if c.TFEHostname == "" {
+		c.TFEHostname = DefaultTFEHostname
+	}
 }
 
 func (s *ServerCmd) validate(userConfig server.UserConfig) error {
@@ -484,6 +500,10 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		if strings.Contains(token, "\n") {
 			s.Logger.Warn("--%s contains a newline which is usually unintentional", name)
 		}
+	}
+
+	if userConfig.TFEHostname != DefaultTFEHostname && userConfig.TFEToken == "" {
+		return fmt.Errorf("if setting --%s, must set --%s", TFEHostnameFlag, TFETokenFlag)
 	}
 
 	return nil
