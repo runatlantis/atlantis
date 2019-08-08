@@ -319,8 +319,8 @@ func TestStep_Validate(t *testing.T) {
 			input: raw.Step{
 				Map: MapType{
 					"init": {
-						"zzzzzzz": nil,
 						"invalid": nil,
+						"zzzzzzz": nil,
 					},
 				},
 			},
