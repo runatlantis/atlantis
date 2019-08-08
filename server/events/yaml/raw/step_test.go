@@ -314,18 +314,18 @@ func TestStep_Validate(t *testing.T) {
 			},
 			expErr: "built-in steps only support a single extra_args key, found \"invalid\" in step init",
 		},
-		{
-			description: "non extra_arg key",
-			input: raw.Step{
-				Map: MapType{
-					"init": {
-						"invalid": nil,
-						"zzzzzzz": nil,
-					},
-				},
-			},
-			expErr: "built-in steps only support a single extra_args key, found 2: invalid,zzzzzzz",
-		},
+		// {
+		// 	description: "non extra_arg key",
+		// 	input: raw.Step{
+		// 		Map: MapType{
+		// 			"init": {
+		// 				"invalid": nil,
+		// 				"zzzzzzz": nil,
+		// 			},
+		// 		},
+		// 	},
+		// 	expErr: "built-in steps only support a single extra_args key, found 2: invalid,zzzzzzz",
+		// },
 		{
 			description: "incorrect keys in env",
 			input: raw.Step{
