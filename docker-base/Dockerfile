@@ -18,8 +18,8 @@ RUN addgroup atlantis && \
     chmod g=u /etc/passwd
 
 # Install dumb-init and gosu.
-ENV DUMB_INIT_VERSION=1.2.0
-ENV GOSU_VERSION=1.10
+ENV DUMB_INIT_VERSION=1.2.2
+ENV GOSU_VERSION=1.11
 RUN apk add --no-cache ca-certificates gnupg curl git unzip bash openssh libcap openssl && \
     curl -L -s --output /bin/dumb-init "https://github.com/Yelp/dumb-init/releases/download/v${DUMB_INIT_VERSION}/dumb-init_${DUMB_INIT_VERSION}_amd64" && \
     chmod +x /bin/dumb-init && \
