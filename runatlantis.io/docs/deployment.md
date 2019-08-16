@@ -393,7 +393,7 @@ If you need to modify the Docker image that we provide, for instance to add the 
     FROM runatlantis/atlantis:{latest version}
 
     # copy a terraform binary of the version you need
-    COPY terragrunt /usr/local/bin/terrgrunt
+    COPY terragrunt /usr/local/bin/terragrunt
     ```
 
 1. Build your Docker image
