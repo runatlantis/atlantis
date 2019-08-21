@@ -73,8 +73,24 @@ key2:
 				},
 			},
 		},
+		// Env steps
 		{
-			description: "env step",
+			description: "env step value",
+			input: `
+env:
+  value: direct_value
+  name: test`,
+			exp: raw.Step{
+				Env: EnvType{
+					"env": {
+						"value": "direct_value",
+						"name":  "test",
+					},
+				},
+			},
+		},
+		{
+			description: "env step command",
 			input: `
 env:
   command: echo 123
@@ -314,20 +330,31 @@ func TestStep_Validate(t *testing.T) {
 			},
 			expErr: "built-in steps only support a single extra_args key, found \"invalid\" in step init",
 		},
-		// {
-		// 	description: "non extra_arg key",
-		// 	input: raw.Step{
-		// 		Map: MapType{
-		// 			"init": {
-		// 				"invalid": nil,
-		// 				"zzzzzzz": nil,
-		// 			},
-		// 		},
-		// 	},
-		// 	expErr: "built-in steps only support a single extra_args key, found 2: invalid,zzzzzzz",
-		// },
 		{
-			description: "incorrect keys in env",
+			description: "non extra_arg key",
+			input: raw.Step{
+				Map: MapType{
+					"init": {
+						"invalid": nil,
+						"zzzzzzz": nil,
+					},
+				},
+			},
+			expErr: "built-in steps only support a single extra_args key, found 2: invalid,zzzzzzz",
+		},
+		{
+			description: "env step with no name key set",
+			input: raw.Step{
+				Env: EnvType{
+					"env": {
+						"value": "value",
+					},
+				},
+			},
+			expErr: "env steps must have a \"name\" key set",
+		},
+		{
+			description: "env step with invalid key",
 			input: raw.Step{
 				Env: EnvType{
 					"env": {
@@ -336,18 +363,20 @@ func TestStep_Validate(t *testing.T) {
 					},
 				},
 			},
-			expErr: "built-in steps only support two keys name and command or value, found \"abc\" in step env",
+			expErr: "env steps only support keys \"name\", \"value\" and \"command\", found key \"abc\"",
 		},
 		{
-			description: "non two keys in env",
+			description: "env step with both command and value set",
 			input: raw.Step{
 				Env: EnvType{
 					"env": {
-						"invalid": "",
+						"name":    "name",
+						"command": "command",
+						"value":   "value",
 					},
 				},
 			},
-			expErr: "built-in steps only support two keys name and command or value, found 1: invalid",
+			expErr: "env steps only support one of the \"value\" or \"command\" keys, found both",
 		},
 		{
 			// For atlantis.yaml v2, this wouldn't parse, but now there should

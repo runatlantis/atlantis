@@ -27,10 +27,11 @@ const (
 // 1. A single string for a built-in command:
 //    - init
 //    - plan
-// 2. A map for a built-in env with name and command
+// 2. A map for an env step with name and command or value
 //    - env:
 //        name: test
 //        command: echo 312
+//        value: value
 // 3. A map for a built-in command and extra_args:
 //    - plan:
 //        extra_args: [-var-file=staging.tfvars]
@@ -42,7 +43,7 @@ type Step struct {
 	// Key will be set in case #1 and #3 above to the key. In case #2, there
 	// could be multiple keys (since the element is a map) so we don't set Key.
 	Key *string
-	// Map will be set in case #2 above.
+	// Env will be set in case #2 above.
 	Env map[string]map[string]string
 	// Map will be set in case #3 above.
 	Map map[string]map[string][]string
@@ -89,6 +90,8 @@ func (s Step) Validate() error {
 			for k := range args {
 				argKeys = append(argKeys, k)
 			}
+			// Sort so tests can be deterministic.
+			sort.Strings(argKeys)
 
 			// args should contain a single 'extra_args' key.
 			if len(argKeys) > 1 {
@@ -125,14 +128,25 @@ func (s Step) Validate() error {
 			for k := range args {
 				argKeys = append(argKeys, k)
 			}
-			if len(argKeys) != 2 {
-				return fmt.Errorf("built-in steps only support two keys %s and %s or %s, found %d: %s",
-					NameArgKey, CommandArgKey, ValueArgKey, len(argKeys), strings.Join(argKeys, ","))
-			}
-			for k := range args {
+			// Sort so tests can be deterministic.
+			sort.Strings(argKeys)
+
+			foundNameKey := false
+			for _, k := range argKeys {
 				if k != NameArgKey && k != CommandArgKey && k != ValueArgKey {
-					return fmt.Errorf("built-in steps only support two keys %s and %s or %s, found %q in step %s", NameArgKey, CommandArgKey, ValueArgKey, k, stepName)
+					return fmt.Errorf("env steps only support keys %q, %q and %q, found key %q", NameArgKey, ValueArgKey, CommandArgKey, k)
 				}
+				if k == NameArgKey {
+					foundNameKey = true
+				}
+			}
+			if !foundNameKey {
+				return fmt.Errorf("env steps must have a %q key set", NameArgKey)
+			}
+			// If we have 3 keys at this point then they've set both command and value.
+			if len(argKeys) != 2 {
+				return fmt.Errorf("env steps only support one of the %q or %q keys, found both",
+					ValueArgKey, CommandArgKey)
 			}
 		}
 		return nil
@@ -257,12 +271,11 @@ func (s *Step) unmarshalGeneric(unmarshal func(interface{}) error) error {
 		return nil
 	}
 
-	// This represents a step with extra_args, ex:
+	// This represents an env step, ex:
 	//   env:
 	//     name: k
 	//     value: hi //optional
 	//     command: exec
-	// We validate if the key env
 	var envStep map[string]map[string]string
 	err = unmarshal(&envStep)
 	if err == nil {

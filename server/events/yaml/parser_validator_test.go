@@ -745,6 +745,62 @@ workflows:
 				},
 			},
 		},
+		{
+			description: "env steps",
+			input: `
+version: 3
+projects:
+- dir: "."
+workflows:
+  default:
+    plan:
+      steps:
+      - env:
+          name: env_name
+          value: env_value
+    apply:
+      steps:
+      - env:
+          name: env_name
+          command: command and args
+`,
+			exp: valid.RepoCfg{
+				Version: 3,
+				Projects: []valid.Project{
+					{
+						Dir:       ".",
+						Workspace: "default",
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf*"},
+							Enabled:      true,
+						},
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"default": {
+						Name: "default",
+						Plan: valid.Stage{
+							Steps: []valid.Step{
+								{
+									StepName:    "env",
+									EnvVarName:  "env_name",
+									EnvVarValue: "env_value",
+								},
+							},
+						},
+						Apply: valid.Stage{
+							Steps: []valid.Step{
+								{
+									StepName:   "env",
+									EnvVarName: "env_name",
+									RunCommand: "command and args",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	tmpDir, cleanup := TempDir(t)

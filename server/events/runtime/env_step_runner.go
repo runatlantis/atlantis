@@ -1,26 +1,26 @@
 package runtime
 
 import (
-	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"strings"
 )
 
 // EnvStepRunner set environment variables.
 type EnvStepRunner struct {
-	TerraformExecutor TerraformExec
-	DefaultTFVersion  *version.Version
+	RunStepRunner *RunStepRunner
 }
 
-func (r *EnvStepRunner) Run(ctx models.ProjectCommandContext, name string, command string, value string, path string, envs map[string]string) (string, string, error) {
+// Run runs the env step command.
+// value is the value for the environment variable. If set this is returned as
+// the value. Otherwise command is run and its output is the value returned.
+func (r *EnvStepRunner) Run(ctx models.ProjectCommandContext, command string, value string, path string, envs map[string]string) (string, error) {
 	if value != "" {
-		return name, value, nil
+		return value, nil
 	}
-
-	runStepRunner := RunStepRunner{
-		TerraformExecutor: r.TerraformExecutor,
-		DefaultTFVersion:  r.DefaultTFVersion,
-	}
-	res, err := runStepRunner.Run(ctx, command, path, envs)
-
-	return name, res, err
+	res, err := r.RunStepRunner.Run(ctx, command, path, envs)
+	// Trim newline from res to support running `echo env_value` which has
+	// a newline. We don't recommend users run echo -n env_value to remove the
+	// newline because -n doesn't work in the sh shell which is what we use
+	// to run commands.
+	return strings.TrimSuffix(res, "\n"), err
 }

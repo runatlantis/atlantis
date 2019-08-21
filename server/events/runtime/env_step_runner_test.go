@@ -9,6 +9,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 
+	. "github.com/petergtz/pegomock"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -22,7 +23,7 @@ func TestEnvStepRunner_Run(t *testing.T) {
 	}{
 		{
 			Command:  "echo 123",
-			ExpValue: "123\n",
+			ExpValue: "123",
 		},
 		{
 			Value:    "test",
@@ -34,13 +35,16 @@ func TestEnvStepRunner_Run(t *testing.T) {
 			ExpValue: "test",
 		},
 	}
-	terraform := mocks.NewMockClient()
-	projVersion, err := version.NewVersion("v0.11.0")
+	RegisterMockTestingT(t)
+	tfClient := mocks.NewMockClient()
+	tfVersion, err := version.NewVersion("0.12.0")
 	Ok(t, err)
-	defaultVersion, _ := version.NewVersion("0.8")
-	r := runtime.EnvStepRunner{
-		TerraformExecutor: terraform,
-		DefaultTFVersion:  defaultVersion,
+	runStepRunner := runtime.RunStepRunner{
+		TerraformExecutor: tfClient,
+		DefaultTFVersion:  tfVersion,
+	}
+	envRunner := runtime.EnvStepRunner{
+		RunStepRunner: &runStepRunner,
 	}
 	for _, c := range cases {
 		t.Run(c.Command, func(t *testing.T) {
@@ -67,10 +71,10 @@ func TestEnvStepRunner_Run(t *testing.T) {
 				Log:              logging.NewNoopLogger(),
 				Workspace:        "myworkspace",
 				RepoRelDir:       "mydir",
-				TerraformVersion: projVersion,
+				TerraformVersion: tfVersion,
 				ProjectName:      c.ProjectName,
 			}
-			_, value, err := r.Run(ctx, "var", c.Command, c.Value, tmpDir, map[string]string(nil))
+			value, err := envRunner.Run(ctx, c.Command, c.Value, tmpDir, map[string]string(nil))
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
 				return

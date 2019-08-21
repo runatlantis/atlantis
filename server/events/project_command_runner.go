@@ -67,7 +67,7 @@ type CustomStepRunner interface {
 
 // EnvStepRunner runs env steps.
 type EnvStepRunner interface {
-	Run(ctx models.ProjectCommandContext, name string, cmd string, value string, path string, envs map[string]string) (string, string, error)
+	Run(ctx models.ProjectCommandContext, cmd string, value string, path string, envs map[string]string) (string, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_webhooks_sender.go WebhooksSender
@@ -181,11 +181,10 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 
 func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.ProjectCommandContext, absPath string) ([]string, error) {
 	var outputs []string
+	envs := make(map[string]string)
 	for _, step := range steps {
-		var envs = make(map[string]string)
 		var out string
 		var err error
-		var name string
 		switch step.StepName {
 		case "init":
 			out, err = p.InitStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
@@ -196,8 +195,10 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.Pr
 		case "run":
 			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath, envs)
 		case "env":
-			name, out, err = p.EnvStepRunner.Run(ctx, step.EnvVarName, step.RunCommand, step.EnvVarValue, absPath, envs)
-			envs[name] = out
+			out, err = p.EnvStepRunner.Run(ctx, step.RunCommand, step.EnvVarValue, absPath, envs)
+			envs[step.EnvVarName] = out
+			// We reset out to the empty string because we don't want it to
+			// be printed to the PR, it's solely to set the environment variable.
 			out = ""
 		}
 

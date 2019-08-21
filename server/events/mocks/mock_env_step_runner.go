@@ -25,27 +25,23 @@ func NewMockEnvStepRunner(options ...pegomock.Option) *MockEnvStepRunner {
 func (mock *MockEnvStepRunner) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockEnvStepRunner) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockEnvStepRunner) Run(ctx models.ProjectCommandContext, name string, cmd string, value string, path string, envs map[string]string) (string, string, error) {
+func (mock *MockEnvStepRunner) Run(ctx models.ProjectCommandContext, cmd string, value string, path string, envs map[string]string) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockEnvStepRunner().")
 	}
-	params := []pegomock.Param{ctx, name, cmd, value, path, envs}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("Run", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	params := []pegomock.Param{ctx, cmd, value, path, envs}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("Run", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
-	var ret1 string
-	var ret2 error
+	var ret1 error
 	if len(result) != 0 {
 		if result[0] != nil {
 			ret0 = result[0].(string)
 		}
 		if result[1] != nil {
-			ret1 = result[1].(string)
-		}
-		if result[2] != nil {
-			ret2 = result[2].(error)
+			ret1 = result[1].(error)
 		}
 	}
-	return ret0, ret1, ret2
+	return ret0, ret1
 }
 
 func (mock *MockEnvStepRunner) VerifyWasCalledOnce() *VerifierMockEnvStepRunner {
@@ -85,8 +81,8 @@ type VerifierMockEnvStepRunner struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockEnvStepRunner) Run(ctx models.ProjectCommandContext, name string, cmd string, value string, path string, envs map[string]string) *MockEnvStepRunner_Run_OngoingVerification {
-	params := []pegomock.Param{ctx, name, cmd, value, path, envs}
+func (verifier *VerifierMockEnvStepRunner) Run(ctx models.ProjectCommandContext, cmd string, value string, path string, envs map[string]string) *MockEnvStepRunner_Run_OngoingVerification {
+	params := []pegomock.Param{ctx, cmd, value, path, envs}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Run", params, verifier.timeout)
 	return &MockEnvStepRunner_Run_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -96,12 +92,12 @@ type MockEnvStepRunner_Run_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockEnvStepRunner_Run_OngoingVerification) GetCapturedArguments() (models.ProjectCommandContext, string, string, string, string, map[string]string) {
-	ctx, name, cmd, value, path, envs := c.GetAllCapturedArguments()
-	return ctx[len(ctx)-1], name[len(name)-1], cmd[len(cmd)-1], value[len(value)-1], path[len(path)-1], envs[len(envs)-1]
+func (c *MockEnvStepRunner_Run_OngoingVerification) GetCapturedArguments() (models.ProjectCommandContext, string, string, string, map[string]string) {
+	ctx, cmd, value, path, envs := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1], cmd[len(cmd)-1], value[len(value)-1], path[len(path)-1], envs[len(envs)-1]
 }
 
-func (c *MockEnvStepRunner_Run_OngoingVerification) GetAllCapturedArguments() (_param0 []models.ProjectCommandContext, _param1 []string, _param2 []string, _param3 []string, _param4 []string, _param5 []map[string]string) {
+func (c *MockEnvStepRunner_Run_OngoingVerification) GetAllCapturedArguments() (_param0 []models.ProjectCommandContext, _param1 []string, _param2 []string, _param3 []string, _param4 []map[string]string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.ProjectCommandContext, len(params[0]))
@@ -120,13 +116,9 @@ func (c *MockEnvStepRunner_Run_OngoingVerification) GetAllCapturedArguments() (_
 		for u, param := range params[3] {
 			_param3[u] = param.(string)
 		}
-		_param4 = make([]string, len(params[4]))
+		_param4 = make([]map[string]string, len(params[4]))
 		for u, param := range params[4] {
-			_param4[u] = param.(string)
-		}
-		_param5 = make([]map[string]string, len(params[5]))
-		for u, param := range params[5] {
-			_param5[u] = param.(map[string]string)
+			_param4[u] = param.(map[string]string)
 		}
 	}
 	return
