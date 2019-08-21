@@ -123,7 +123,7 @@ func (p *DefaultProjectFinder) filterToTerraform(files []string) []string {
 	for _, fileName := range files {
 		// Filter out tfstate files since they usually checked in by accident
 		// and regardless, they don't affect a plan.
-		if !p.isStatefile(fileName) && (strings.Contains(fileName, ".tf") || strings.Contains(fileName, "terragrunt.hcl")) {
+		if !p.isStatefile(fileName) && (strings.Contains(fileName, ".tf") || fileName == "terragrunt.hcl") {
 			filtered = append(filtered, fileName)
 		}
 	}
