@@ -34,6 +34,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	mockInit := mocks.NewMockStepRunner()
 	mockPlan := mocks.NewMockStepRunner()
 	mockApply := mocks.NewMockStepRunner()
+	mockEnv := mocks.NewMockEnvStepRunner()
 	mockRun := mocks.NewMockCustomStepRunner()
 	mockWorkingDir := mocks.NewMockWorkingDir()
 	mockLocker := mocks.NewMockProjectLocker()
@@ -45,12 +46,14 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		PlanStepRunner:      mockPlan,
 		ApplyStepRunner:     mockApply,
 		RunStepRunner:       mockRun,
+		EnvStepRunner:       mockEnv,
 		PullApprovedChecker: nil,
 		WorkingDir:          mockWorkingDir,
 		Webhooks:            nil,
 		WorkingDirLocker:    events.NewDefaultWorkingDirLocker(),
 	}
 
+	envs := make(map[string]string)
 	repoDir, cleanup := TempDir(t)
 	defer cleanup()
 	When(mockWorkingDir.Clone(
@@ -86,33 +89,41 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 			{
 				StepName: "init",
 			},
+			{
+				StepName:    "env",
+				EnvVarName:  "name",
+				EnvVarValue: "value",
+			},
 		},
 		Workspace:  "default",
 		RepoRelDir: ".",
 	}
 	// Each step will output its step name.
-	When(mockInit.Run(ctx, nil, repoDir)).ThenReturn("init", nil)
-	When(mockPlan.Run(ctx, nil, repoDir)).ThenReturn("plan", nil)
-	When(mockApply.Run(ctx, nil, repoDir)).ThenReturn("apply", nil)
-	When(mockRun.Run(ctx, "", repoDir)).ThenReturn("run", nil)
-
+	When(mockInit.Run(ctx, nil, repoDir, envs)).ThenReturn("init", nil)
+	When(mockPlan.Run(ctx, nil, repoDir, envs)).ThenReturn("plan", nil)
+	When(mockApply.Run(ctx, nil, repoDir, envs)).ThenReturn("apply", nil)
+	When(mockRun.Run(ctx, "", repoDir, envs)).ThenReturn("run", nil)
+	When(mockEnv.Run(ctx, "name", "", "value", repoDir, envs)).ThenReturn("name", "value", nil)
 	res := runner.Plan(ctx)
 
 	Assert(t, res.PlanSuccess != nil, "exp plan success")
 	Equals(t, "https://lock-key", res.PlanSuccess.LockURL)
 	Equals(t, "run\napply\nplan\ninit", res.PlanSuccess.TerraformOutput)
 
-	expSteps := []string{"run", "apply", "plan", "init"}
+	expSteps := []string{"env", "run", "apply", "plan", "init"}
+	var newEnv = map[string]string{"name": "value"}
 	for _, step := range expSteps {
 		switch step {
 		case "init":
-			mockInit.VerifyWasCalledOnce().Run(ctx, nil, repoDir)
+			mockInit.VerifyWasCalledOnce().Run(ctx, nil, repoDir, envs)
 		case "plan":
-			mockPlan.VerifyWasCalledOnce().Run(ctx, nil, repoDir)
+			mockPlan.VerifyWasCalledOnce().Run(ctx, nil, repoDir, envs)
 		case "apply":
-			mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir)
+			mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, envs)
 		case "run":
-			mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir)
+			mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir, envs)
+		case "env":
+			mockEnv.VerifyWasCalledOnce().Run(ctx, "name", "", "value", repoDir, newEnv)
 		}
 	}
 }
@@ -238,8 +249,11 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				{
 					StepName: "init",
 				},
+				{
+					StepName: "env",
+				},
 			},
-			expSteps: []string{"run", "apply", "plan", "init"},
+			expSteps: []string{"run", "apply", "plan", "init", "env"},
 			expOut:   "run\napply\nplan\ninit",
 		},
 	}
@@ -251,6 +265,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			mockPlan := mocks.NewMockStepRunner()
 			mockApply := mocks.NewMockStepRunner()
 			mockRun := mocks.NewMockCustomStepRunner()
+			mockEnv := mocks.NewMockEnvStepRunner()
 			mockApproved := mocks2.NewMockPullApprovedChecker()
 			mockWorkingDir := mocks.NewMockWorkingDir()
 			mockLocker := mocks.NewMockProjectLocker()
@@ -263,11 +278,13 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				PlanStepRunner:      mockPlan,
 				ApplyStepRunner:     mockApply,
 				RunStepRunner:       mockRun,
+				EnvStepRunner:       mockEnv,
 				PullApprovedChecker: mockApproved,
 				WorkingDir:          mockWorkingDir,
 				Webhooks:            mockSender,
 				WorkingDirLocker:    events.NewDefaultWorkingDirLocker(),
 			}
+			envs := make(map[string]string)
 			repoDir, cleanup := TempDir(t)
 			defer cleanup()
 			When(mockWorkingDir.GetWorkingDir(
@@ -284,10 +301,10 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				RepoRelDir:        ".",
 				PullMergeable:     c.pullMergeable,
 			}
-			When(mockInit.Run(ctx, nil, repoDir)).ThenReturn("init", nil)
-			When(mockPlan.Run(ctx, nil, repoDir)).ThenReturn("plan", nil)
-			When(mockApply.Run(ctx, nil, repoDir)).ThenReturn("apply", nil)
-			When(mockRun.Run(ctx, "", repoDir)).ThenReturn("run", nil)
+			When(mockInit.Run(ctx, nil, repoDir, envs)).ThenReturn("init", nil)
+			When(mockPlan.Run(ctx, nil, repoDir, envs)).ThenReturn("plan", nil)
+			When(mockApply.Run(ctx, nil, repoDir, envs)).ThenReturn("apply", nil)
+			When(mockRun.Run(ctx, "", repoDir, envs)).ThenReturn("run", nil)
 			When(mockApproved.PullIsApproved(ctx.BaseRepo, ctx.Pull)).ThenReturn(true, nil)
 
 			res := runner.Apply(ctx)
@@ -299,13 +316,13 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				case "approved":
 					mockApproved.VerifyWasCalledOnce().PullIsApproved(ctx.BaseRepo, ctx.Pull)
 				case "init":
-					mockInit.VerifyWasCalledOnce().Run(ctx, nil, repoDir)
+					mockInit.VerifyWasCalledOnce().Run(ctx, nil, repoDir, envs)
 				case "plan":
-					mockPlan.VerifyWasCalledOnce().Run(ctx, nil, repoDir)
+					mockPlan.VerifyWasCalledOnce().Run(ctx, nil, repoDir, envs)
 				case "apply":
-					mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir)
+					mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, envs)
 				case "run":
-					mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir)
+					mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir, envs)
 				}
 			}
 		})

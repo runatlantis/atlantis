@@ -75,6 +75,11 @@ type Step struct {
 	StepName   string
 	ExtraArgs  []string
 	RunCommand string
+	// EnvVarName is the name of the
+	// environment variable that should be set by this step.
+	EnvVarName string
+	// EnvVarValue is the value to set EnvVarName to.
+	EnvVarValue string
 }
 
 type Workflow struct {

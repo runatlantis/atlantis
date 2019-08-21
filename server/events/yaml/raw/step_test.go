@@ -73,6 +73,21 @@ key2:
 				},
 			},
 		},
+		{
+			description: "env step",
+			input: `
+env:
+  command: echo 123
+  name: test`,
+			exp: raw.Step{
+				Env: EnvType{
+					"env": {
+						"command": "echo 123",
+						"name":    "test",
+					},
+				},
+			},
+		},
 
 		// Run-step style
 		{
@@ -106,6 +121,7 @@ key: value`,
 				Key:       nil,
 				Map:       nil,
 				StringVal: nil,
+				Env:       nil,
 			},
 		},
 
@@ -185,6 +201,18 @@ func TestStep_Validate(t *testing.T) {
 			expErr: "",
 		},
 		{
+			description: "env",
+			input: raw.Step{
+				Env: EnvType{
+					"env": {
+						"name":    "test",
+						"command": "echo 123",
+					},
+				},
+			},
+			expErr: "",
+		},
+		{
 			description: "apply extra_args",
 			input: raw.Step{
 				Map: MapType{
@@ -229,6 +257,16 @@ func TestStep_Validate(t *testing.T) {
 			expErr: "step element can only contain a single key, found 2: key1,key2",
 		},
 		{
+			description: "multiple keys in env",
+			input: raw.Step{
+				Env: EnvType{
+					"key1": nil,
+					"key2": nil,
+				},
+			},
+			expErr: "step element can only contain a single key, found 2: key1,key2",
+		},
+		{
 			description: "multiple keys in string val",
 			input: raw.Step{
 				StringVal: map[string]string{
@@ -242,6 +280,15 @@ func TestStep_Validate(t *testing.T) {
 			description: "invalid key in map",
 			input: raw.Step{
 				Map: MapType{
+					"invalid": nil,
+				},
+			},
+			expErr: "\"invalid\" is not a valid step type",
+		},
+		{
+			description: "invalid key in env",
+			input: raw.Step{
+				Env: EnvType{
 					"invalid": nil,
 				},
 			},
@@ -266,6 +313,41 @@ func TestStep_Validate(t *testing.T) {
 				},
 			},
 			expErr: "built-in steps only support a single extra_args key, found \"invalid\" in step init",
+		},
+		// {
+		// 	description: "non extra_arg key",
+		// 	input: raw.Step{
+		// 		Map: MapType{
+		// 			"init": {
+		// 				"invalid": nil,
+		// 				"zzzzzzz": nil,
+		// 			},
+		// 		},
+		// 	},
+		// 	expErr: "built-in steps only support a single extra_args key, found 2: invalid,zzzzzzz",
+		// },
+		{
+			description: "incorrect keys in env",
+			input: raw.Step{
+				Env: EnvType{
+					"env": {
+						"abc":      "",
+						"invalid2": "",
+					},
+				},
+			},
+			expErr: "built-in steps only support two keys name and command or value, found \"abc\" in step env",
+		},
+		{
+			description: "non two keys in env",
+			input: raw.Step{
+				Env: EnvType{
+					"env": {
+						"invalid": "",
+					},
+				},
+			},
+			expErr: "built-in steps only support two keys name and command or value, found 1: invalid",
 		},
 		{
 			// For atlantis.yaml v2, this wouldn't parse, but now there should
@@ -321,6 +403,22 @@ func TestStep_ToValid(t *testing.T) {
 			},
 			exp: valid.Step{
 				StepName: "apply",
+			},
+		},
+		{
+			description: "env step",
+			input: raw.Step{
+				Env: EnvType{
+					"env": {
+						"name":    "test",
+						"command": "echo 123",
+					},
+				},
+			},
+			exp: valid.Step{
+				StepName:   "env",
+				RunCommand: "echo 123",
+				EnvVarName: "test",
 			},
 		},
 		{
@@ -386,3 +484,4 @@ func TestStep_ToValid(t *testing.T) {
 }
 
 type MapType map[string]map[string][]string
+type EnvType map[string]map[string]string

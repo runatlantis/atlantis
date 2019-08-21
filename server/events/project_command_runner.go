@@ -52,7 +52,7 @@ type LockURLGenerator interface {
 // `terraform plan`.
 type StepRunner interface {
 	// Run runs the step.
-	Run(ctx models.ProjectCommandContext, extraArgs []string, path string) (string, error)
+	Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_custom_step_runner.go CustomStepRunner
@@ -60,7 +60,14 @@ type StepRunner interface {
 // CustomStepRunner runs custom run steps.
 type CustomStepRunner interface {
 	// Run cmd in path.
-	Run(ctx models.ProjectCommandContext, cmd string, path string) (string, error)
+	Run(ctx models.ProjectCommandContext, cmd string, path string, envs map[string]string) (string, error)
+}
+
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_env_step_runner.go EnvStepRunner
+
+// EnvStepRunner runs env steps.
+type EnvStepRunner interface {
+	Run(ctx models.ProjectCommandContext, name string, cmd string, value string, path string, envs map[string]string) (string, string, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_webhooks_sender.go WebhooksSender
@@ -90,6 +97,7 @@ type DefaultProjectCommandRunner struct {
 	PlanStepRunner      StepRunner
 	ApplyStepRunner     StepRunner
 	RunStepRunner       CustomStepRunner
+	EnvStepRunner       EnvStepRunner
 	PullApprovedChecker runtime.PullApprovedChecker
 	WorkingDir          WorkingDir
 	Webhooks            WebhooksSender
@@ -174,17 +182,23 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.ProjectCommandContext, absPath string) ([]string, error) {
 	var outputs []string
 	for _, step := range steps {
+		var envs = make(map[string]string)
 		var out string
 		var err error
+		var name string
 		switch step.StepName {
 		case "init":
-			out, err = p.InitStepRunner.Run(ctx, step.ExtraArgs, absPath)
+			out, err = p.InitStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "plan":
-			out, err = p.PlanStepRunner.Run(ctx, step.ExtraArgs, absPath)
+			out, err = p.PlanStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "apply":
-			out, err = p.ApplyStepRunner.Run(ctx, step.ExtraArgs, absPath)
+			out, err = p.ApplyStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "run":
-			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath)
+			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath, envs)
+		case "env":
+			name, out, err = p.EnvStepRunner.Run(ctx, step.EnvVarName, step.RunCommand, step.EnvVarValue, absPath, envs)
+			envs[name] = out
+			out = ""
 		}
 
 		if out != "" {
