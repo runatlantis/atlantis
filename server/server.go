@@ -272,6 +272,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	defaultTfVersion := terraformClient.DefaultVersion()
 	pendingPlanFinder := &events.DefaultPendingPlanFinder{}
+	runStepRunner := &runtime.RunStepRunner{
+		TerraformExecutor: terraformClient,
+		DefaultTFVersion:  defaultTfVersion,
+		TerraformBinDir:   terraformClient.TerraformBinDir(),
+	}
 	commandRunner := &events.DefaultCommandRunner{
 		VCSClient:                vcsClient,
 		GithubPullGetter:         githubClient,
@@ -311,10 +316,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 				CommitStatusUpdater: commitStatusUpdater,
 				AsyncTFExec:         terraformClient,
 			},
-			RunStepRunner: &runtime.RunStepRunner{
-				TerraformExecutor: terraformClient,
-				DefaultTFVersion:  defaultTfVersion,
-				TerraformBinDir:   terraformClient.TerraformBinDir(),
+			RunStepRunner: runStepRunner,
+			EnvStepRunner: &runtime.EnvStepRunner{
+				RunStepRunner: runStepRunner,
 			},
 			PullApprovedChecker: vcsClient,
 			WorkingDir:          workingDir,

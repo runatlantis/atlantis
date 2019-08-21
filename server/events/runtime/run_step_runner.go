@@ -19,7 +19,7 @@ type RunStepRunner struct {
 	TerraformBinDir string
 }
 
-func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command string, path string) (string, error) {
+func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command string, path string, envs map[string]string) (string, error) {
 	tfVersion := r.DefaultTFVersion
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
@@ -57,6 +57,9 @@ func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command string, pa
 
 	finalEnvVars := baseEnvVars
 	for key, val := range customEnvVars {
+		finalEnvVars = append(finalEnvVars, fmt.Sprintf("%s=%s", key, val))
+	}
+	for key, val := range envs {
 		finalEnvVars = append(finalEnvVars, fmt.Sprintf("%s=%s", key, val))
 	}
 	cmd.Env = finalEnvVars

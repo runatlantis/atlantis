@@ -137,7 +137,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 				ProjectName:        c.ProjectName,
 				EscapedCommentArgs: []string{"-target=resource1", "-target=resource2"},
 			}
-			out, err := r.Run(ctx, c.Command, tmpDir)
+			out, err := r.Run(ctx, c.Command, tmpDir, map[string]string{"test": "var"})
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
 				return
