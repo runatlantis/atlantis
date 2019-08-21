@@ -141,7 +141,7 @@ Given a directory structure:
 .
 ├── live
 │   ├── prod
-│   │   └── terraform.tfvars
+│   │   └── terraform.tfvars     # OR terragrunt.hcl for terragrunt 0.19+ 
 │   └── staging
 │       └── terraform.tfvars
 └── modules
@@ -175,6 +175,41 @@ projects:
 Atlantis will need to have the `terragrunt` binary in its PATH.
 If you're using Docker you can build your own image, see [Customization](/docs/deployment.html#customization).
 :::
+
+#### Terragrunt Autoplan Configuration
+Since many Terragrunt projects have numerous nested folders where project files reside, 
+updating your repo-level `atlantis.yaml` to include every possible path can be tedious.
+
+Instead, you can use a server-side repo config like this to enable autoplanning of your Terragrunt projects:
+
+```json
+{
+  "repos": [
+    {
+      "id": "/.*/",
+      "workflow": "terragrunt"
+    }
+  ],
+  "workflows": {
+    "terragrunt": {
+      "plan": {
+        "steps": [
+          {
+            "run": "terragrunt plan -no-color -out=$PLANFILE"
+          }
+        ]
+      },
+      "apply": {
+        "steps": [
+          {
+            "run": "terragrunt apply -no-color $PLANFILE"
+          }
+        ]
+      }
+    }
+  }
+}
+```
 
 ### Running custom commands
 Atlantis supports running completely custom commands. In this example, we want to run
