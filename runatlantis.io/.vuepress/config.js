@@ -86,6 +86,13 @@ module.exports = {
                         'automerging',
                         'security'
                     ]
+                },
+                {
+                    title: 'Troubleshooting',
+                    collapsable: true,
+                    children: [
+                        'troubleshooting-https',
+                    ]
                 }
             ]
         },
