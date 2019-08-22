@@ -195,6 +195,12 @@ func TestDetermineProjects(t *testing.T) {
 			[]string{"."},
 			nestedModules2,
 		},
+		{
+			"Should find terragrunt.hcl file inside a nested directory",
+			[]string{"project1/terragrunt.hcl"},
+			[]string{"project1"},
+			nestedModules1,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {

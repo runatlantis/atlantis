@@ -182,33 +182,18 @@ updating your repo-level `atlantis.yaml` to include every possible path can be t
 
 Instead, you can use a server-side repo config like this to enable autoplanning of your Terragrunt projects:
 
-```json
-{
-  "repos": [
-    {
-      "id": "/.*/",
-      "workflow": "terragrunt"
-    }
-  ],
-  "workflows": {
-    "terragrunt": {
-      "plan": {
-        "steps": [
-          {
-            "run": "terragrunt plan -no-color -out=$PLANFILE"
-          }
-        ]
-      },
-      "apply": {
-        "steps": [
-          {
-            "run": "terragrunt apply -no-color $PLANFILE"
-          }
-        ]
-      }
-    }
-  }
-}
+```yaml
+repos:
+- id: "/.*/"
+  workflow: terragrunt
+workflows:
+  terragrunt:
+    plan:
+      steps:
+      - run: terragrunt plan -no-color -out=$PLANFILE
+    apply:
+      steps:
+      - run: terragrunt apply -no-color $PLANFILE
 ```
 
 ### Running custom commands
