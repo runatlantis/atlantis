@@ -12,4 +12,3 @@ where you can try our [Test Drive](/guide/test-drive.html) or [Run Atlantis Loca
 * [Configuring Atlantis](configuring-atlantis.html)&nbsp;&nbsp;–&nbsp;&nbsp;Configure how Atlantis works for your specific use-cases
 * [Using Atlantis](using-atlantis.html)&nbsp;&nbsp;–&nbsp;&nbsp;How do you use Atlantis?
 * [How Atlantis Works](how-atlantis-works.html)&nbsp;&nbsp;–&nbsp;&nbsp;Internals of what Atlantis is doing
-* [Troubleshooting](troubleshooting.html)&nbsp;&nbsp;–&nbsp;&nbsp;Common solutions to common problems

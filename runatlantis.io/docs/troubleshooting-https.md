@@ -10,7 +10,7 @@ the method name is [ListenAndServeTLS](https://golang.org/pkg/net/http/#ListenAn
 except that it expects HTTPS connections. 
 Additionally, files containing a certificate and matching private key for the server must be provided. 
 If the certificate is signed by a certificate authority, 
-the certFile should be the concatenation of the server's certificate, any intermediates, and the CA's certificate. 
+the file passed to `--ssl-cert-file` should be the concatenation of the server's certificate, any intermediates, and the CA's certificate. 
 
 If you have this error when specifying a TLS cert with a key: 
 ```
