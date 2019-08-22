@@ -6,7 +6,7 @@ there are a few considerations.
 Atlantis uses the web server from the standard Go library, 
 the method name is [ListenAndServeTLS](https://golang.org/pkg/net/http/#ListenAndServeTLS).
 
-For info, ListenAndServeTLS acts identically to [ListenAndServe](https://golang.org/pkg/net/http/#ListenAndServe),
+`ListenAndServeTLS` acts identically to [ListenAndServe](https://golang.org/pkg/net/http/#ListenAndServe),
 except that it expects HTTPS connections. 
 Additionally, files containing a certificate and matching private key for the server must be provided. 
 If the certificate is signed by a certificate authority, 
