@@ -56,7 +56,8 @@ type DefaultClient struct {
 	// with another binary, ex. echo.
 	overrideTF string
 	// downloader downloads terraform versions.
-	downloader Downloader
+	downloader      Downloader
+	downloadBaseURL string
 	// versions maps from the string representation of a tf version (ex. 0.11.10)
 	// to the absolute path of that binary on disk (if it exists).
 	// Use versionsLock to control access.
@@ -80,8 +81,6 @@ const (
 	// binDirName is the name of the directory inside our data dir where
 	// we download terraform binaries.
 	binDirName = "bin"
-	// releasesURL is the base url to download terraform from.
-	releasesURL = "https://releases.hashicorp.com"
 )
 
 // versionRegex extracts the version from `terraform version` output.
@@ -107,6 +106,7 @@ func NewClient(
 	tfeHostname string,
 	defaultVersionStr string,
 	defaultVersionFlagName string,
+	tfDownloadURL string,
 	tfDownloader Downloader) (*DefaultClient, error) {
 	var finalDefaultVersion *version.Version
 	var localVersion *version.Version
@@ -145,7 +145,7 @@ func NewClient(
 			// Since ensureVersion might end up downloading terraform,
 			// we call it asynchronously so as to not delay server startup.
 			versionsLock.Lock()
-			_, err := ensureVersion(log, tfDownloader, versions, defaultVersion, binDir)
+			_, err := ensureVersion(log, tfDownloader, versions, defaultVersion, binDir, tfDownloadURL)
 			versionsLock.Unlock()
 			if err != nil {
 				log.Err("could not download terraform %s", defaultVersion.String())
@@ -176,6 +176,7 @@ func NewClient(
 		terraformPluginCacheDir: cacheDir,
 		binDir:                  binDir,
 		downloader:              tfDownloader,
+		downloadBaseURL:         tfDownloadURL,
 		versionsLock:            &versionsLock,
 		versions:                versions,
 	}, nil
@@ -200,7 +201,7 @@ func (c *DefaultClient) EnsureVersion(log *logging.SimpleLogger, v *version.Vers
 
 	var err error
 	c.versionsLock.Lock()
-	_, err = ensureVersion(log, c.downloader, c.versions, v, c.binDir)
+	_, err = ensureVersion(log, c.downloader, c.versions, v, c.binDir, c.downloadBaseURL)
 	c.versionsLock.Unlock()
 	if err != nil {
 		return err
@@ -245,7 +246,7 @@ func (c *DefaultClient) prepCmd(log *logging.SimpleLogger, v *version.Version, w
 	} else {
 		var err error
 		c.versionsLock.Lock()
-		binPath, err = ensureVersion(log, c.downloader, c.versions, v, c.binDir)
+		binPath, err = ensureVersion(log, c.downloader, c.versions, v, c.binDir, c.downloadBaseURL)
 		c.versionsLock.Unlock()
 		if err != nil {
 			return "", nil, err
@@ -390,7 +391,7 @@ func MustConstraint(v string) version.Constraints {
 
 // ensureVersion returns the path to a terraform binary of version v.
 // It will download this version if we don't have it.
-func ensureVersion(log *logging.SimpleLogger, dl Downloader, versions map[string]string, v *version.Version, binDir string) (string, error) {
+func ensureVersion(log *logging.SimpleLogger, dl Downloader, versions map[string]string, v *version.Version, binDir string, downloadURL string) (string, error) {
 	if binPath, ok := versions[v.String()]; ok {
 		return binPath, nil
 	}
@@ -411,9 +412,8 @@ func ensureVersion(log *logging.SimpleLogger, dl Downloader, versions map[string
 		versions[v.String()] = dest
 		return dest, nil
 	}
-
-	log.Info("could not find terraform version %s in PATH or %s, downloading from %s", v.String(), binDir, releasesURL)
-	urlPrefix := fmt.Sprintf("%s/terraform/%s/terraform_%s", releasesURL, v.String(), v.String())
+	log.Info("could not find terraform version %s in PATH or %s, downloading from %s", v.String(), binDir, downloadURL)
+	urlPrefix := fmt.Sprintf("%s/terraform/%s/terraform_%s", downloadURL, v.String(), v.String())
 	binURL := fmt.Sprintf("%s_%s_%s.zip", urlPrefix, runtime.GOOS, runtime.GOARCH)
 	checksumURL := fmt.Sprintf("%s_SHA256SUMS", urlPrefix)
 	if err := dl.GetFile(dest, fmt.Sprintf("%s?checksum=file:%s", binURL, checksumURL)); err != nil {

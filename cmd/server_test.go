@@ -392,6 +392,7 @@ func TestExecute_Defaults(t *testing.T) {
 	Equals(t, "", passedConfig.SlackToken)
 	Equals(t, "", passedConfig.SSLCertFile)
 	Equals(t, "", passedConfig.SSLKeyFile)
+	Equals(t, "https://releases.hashicorp.com", passedConfig.TFDownloadURL)
 	Equals(t, "app.terraform.io", passedConfig.TFEHostname)
 	Equals(t, "", passedConfig.TFEToken)
 	Equals(t, false, passedConfig.WriteGitCreds)
@@ -515,6 +516,7 @@ func TestExecute_Flags(t *testing.T) {
 		cmd.SlackTokenFlag:             "slack-token",
 		cmd.SSLCertFileFlag:            "cert-file",
 		cmd.SSLKeyFileFlag:             "key-file",
+		cmd.TFDownloadURLFlag:          "https://my-hostname.com",
 		cmd.TFEHostnameFlag:            "my-hostname",
 		cmd.TFETokenFlag:               "my-token",
 		cmd.WriteGitCredsFlag:          true,
@@ -554,6 +556,7 @@ func TestExecute_Flags(t *testing.T) {
 	Equals(t, "slack-token", passedConfig.SlackToken)
 	Equals(t, "cert-file", passedConfig.SSLCertFile)
 	Equals(t, "key-file", passedConfig.SSLKeyFile)
+	Equals(t, "https://my-hostname.com", passedConfig.TFDownloadURL)
 	Equals(t, "my-hostname", passedConfig.TFEHostname)
 	Equals(t, "my-token", passedConfig.TFEToken)
 	Equals(t, true, passedConfig.WriteGitCreds)
@@ -594,6 +597,7 @@ require-mergeable: true
 slack-token: slack-token
 ssl-cert-file: cert-file
 ssl-key-file: key-file
+tf-download-url: https://my-hostname.com
 tfe-hostname: my-hostname
 tfe-token: my-token
 write-git-creds: true
@@ -637,6 +641,7 @@ write-git-creds: true
 	Equals(t, "slack-token", passedConfig.SlackToken)
 	Equals(t, "cert-file", passedConfig.SSLCertFile)
 	Equals(t, "key-file", passedConfig.SSLKeyFile)
+	Equals(t, "https://my-hostname.com", passedConfig.TFDownloadURL)
 	Equals(t, "my-hostname", passedConfig.TFEHostname)
 	Equals(t, "my-token", passedConfig.TFEToken)
 	Equals(t, true, passedConfig.WriteGitCreds)
@@ -676,6 +681,7 @@ require-approval: true
 slack-token: slack-token
 ssl-cert-file: cert-file
 ssl-key-file: key-file
+tf-download-url: https://my-hostname.com
 tfe-hostname: my-hostname
 tfe-token: my-token
 write-git-creds: true
@@ -716,6 +722,7 @@ write-git-creds: true
 		"SLACK_TOKEN":                  "override-slack-token",
 		"SSL_CERT_FILE":                "override-cert-file",
 		"SSL_KEY_FILE":                 "override-key-file",
+		"TF_DOWNLOAD_URL":              "https://override-my-hostname.com",
 		"TFE_HOSTNAME":                 "override-my-hostname",
 		"TFE_TOKEN":                    "override-my-token",
 		"WRITE_GIT_CREDS":              "false",
@@ -759,6 +766,7 @@ write-git-creds: true
 	Equals(t, "override-slack-token", passedConfig.SlackToken)
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
 	Equals(t, "override-key-file", passedConfig.SSLKeyFile)
+	Equals(t, "https://override-my-hostname.com", passedConfig.TFDownloadURL)
 	Equals(t, "override-my-hostname", passedConfig.TFEHostname)
 	Equals(t, "override-my-token", passedConfig.TFEToken)
 	Equals(t, false, passedConfig.WriteGitCreds)
@@ -799,6 +807,7 @@ require-mergeable: true
 slack-token: slack-token
 ssl-cert-file: cert-file
 ssl-key-file: key-file
+tf-download-url: https://my-hostname.com
 tfe-hostname: my-hostname
 tfe-token: my-token
 write-git-creds: true
@@ -838,6 +847,7 @@ write-git-creds: true
 		cmd.SlackTokenFlag:             "override-slack-token",
 		cmd.SSLCertFileFlag:            "override-cert-file",
 		cmd.SSLKeyFileFlag:             "override-key-file",
+		cmd.TFDownloadURLFlag:          "https://override-my-hostname.com",
 		cmd.TFEHostnameFlag:            "override-my-hostname",
 		cmd.TFETokenFlag:               "override-my-token",
 		cmd.WriteGitCredsFlag:          false,
@@ -875,6 +885,7 @@ write-git-creds: true
 	Equals(t, "override-slack-token", passedConfig.SlackToken)
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
 	Equals(t, "override-key-file", passedConfig.SSLKeyFile)
+	Equals(t, "https://override-my-hostname.com", passedConfig.TFDownloadURL)
 	Equals(t, "override-my-hostname", passedConfig.TFEHostname)
 	Equals(t, "override-my-token", passedConfig.TFEToken)
 	Equals(t, false, passedConfig.WriteGitCreds)
@@ -917,6 +928,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		"SLACK_TOKEN":                  "slack-token",
 		"SSL_CERT_FILE":                "cert-file",
 		"SSL_KEY_FILE":                 "key-file",
+		"TF_DOWNLOAD_URL":              "https://my-hostname.com",
 		"TFE_HOSTNAME":                 "my-hostname",
 		"TFE_TOKEN":                    "my-token",
 		"WRITE_GIT_CREDS":              "true",
@@ -964,6 +976,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		cmd.SlackTokenFlag:             "override-slack-token",
 		cmd.SSLCertFileFlag:            "override-cert-file",
 		cmd.SSLKeyFileFlag:             "override-key-file",
+		cmd.TFDownloadURLFlag:          "https://override-my-hostname.com",
 		cmd.TFEHostnameFlag:            "override-my-hostname",
 		cmd.TFETokenFlag:               "override-my-token",
 		cmd.WriteGitCredsFlag:          false,
@@ -1003,6 +1016,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	Equals(t, "override-slack-token", passedConfig.SlackToken)
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
 	Equals(t, "override-key-file", passedConfig.SSLKeyFile)
+	Equals(t, "https://override-my-hostname.com", passedConfig.TFDownloadURL)
 	Equals(t, "override-my-hostname", passedConfig.TFEHostname)
 	Equals(t, "override-my-token", passedConfig.TFEToken)
 	Equals(t, false, passedConfig.WriteGitCreds)
