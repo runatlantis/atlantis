@@ -211,6 +211,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.DataDir,
 		userConfig.TFEToken,
 		userConfig.TFEHostname,
+		userConfig.TFDownloadURL,
 		userConfig.DefaultTFVersion,
 		config.DefaultTFVersionFlag,
 		&terraform.DefaultDownloader{})
