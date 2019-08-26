@@ -1,3 +1,52 @@
+# v0.9.0
+
+## Description
+This release contains a new step for custom workflows called `var`. It allows
+users to set environment variables statically and dynamically for their workflows:
+```yaml
+workflows:
+  var:
+    plan:
+      steps:
+      - var:
+          name: STATIC
+          value: set-statically
+      - var:
+          name: DYNAMIC
+          command: echo set-dynamically
+      - run: echo $STATIC $DYNAMIC # outputs 'set-statically set-dynamically'
+```
+
+## Features
+* New `var` step in custom workflows ([#751](https://github.com/runatlantis/atlantis/pull/751))
+* New flag `--write-git-creds` helps Atlantis support private module sources. ([#711](https://github.com/runatlantis/atlantis/pull/711))
+* Upgrade Terraform to 0.12.7 in our base Docker image.
+* Support for Terragrunt > 0.19.0 ([#748](https://github.com/runatlantis/atlantis/pull/748))
+* The directory where Atlantis downloads Terraform binaries is now in the PATH
+of custom workflows ([#678](https://github.com/runatlantis/atlantis/pull/678)) 
+* `dumb-init` and `gosu` upgraded in our Docker image ([#730](https://github.com/runatlantis/atlantis/pull/730))
+
+## Bugfixes
+* The Terraform version specified in `terraform_version` is now downloaded even
+if there are only custom steps (Fixes [#675](https://github.com/runatlantis/atlantis/issues/675))
+
+## Backwards Incompatibilities / Notes:
+* If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
+  then the default version of Terraform will now be 0.12.7. Simply set the above
+  flag to your desired default version to avoid any issues.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.9.0/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.9.0/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.9.0/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.9.0/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.9.0`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.8.3..v0.9.0
+https://github.com/runatlantis/atlantis/compare/v0.8.3...v0.9.0
+
 # v0.8.3
 
 ## Description
