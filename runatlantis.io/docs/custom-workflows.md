@@ -136,21 +136,43 @@ Atlantis supports running custom commands in place of the default Atlantis
 commands. We can use this functionality to enable
 [Terragrunt](https://github.com/gruntwork-io/terragrunt).
 
+You can either use your repo's `atlantis.yaml` file or the Atlantis server's `repos.yaml` file.
+
 Given a directory structure:
 ```
 .
-├── live
-│   ├── prod
-│   │   └── terraform.tfvars     # OR terragrunt.hcl for terragrunt 0.19+ 
-│   └── staging
-│       └── terraform.tfvars
-└── modules
-    └── ...
+└── live
+    ├── prod
+    │   └── terragrunt.hcl
+    └── staging
+        └── terragrunt.cl
 ```
 
-You would define a custom workflow:
+If using the server `repos.yaml` file, you would use the following config:
+
 ```yaml
-# repos.yaml or atlantis.yaml
+# repos.yaml
+repos:
+- id: "/.*/"
+  workflow: terragrunt
+workflows:
+  terragrunt:
+    plan:
+      steps:
+      - run: terragrunt plan -no-color -out=$PLANFILE
+    apply:
+      steps:
+      - run: terragrunt apply -no-color $PLANFILE
+```
+
+If using the repo's `atlantis.yaml` file you would use the following config:
+```yaml
+version: 3
+projects:
+- dir: live/staging
+  workflow: terragrunt
+- dir: live/prod
+  workflow: terragrunt
 workflows:
   terragrunt:
     plan:
@@ -161,15 +183,8 @@ workflows:
       - run: terragrunt apply -no-color $PLANFILE
 ```
 
-Which you would then reference in your repo-level `atlantis.yaml`:
-```yaml
-version: 3
-projects:
-- dir: live/staging
-  workflow: terragrunt
-- dir: live/prod
-  workflow: terragrunt
-```
+**NOTE:** If using the repo's `atlantis.yaml` file, you will need to specify each directory that is a Terragrunt project.
+
 
 ::: warning
 Atlantis will need to have the `terragrunt` binary in its PATH.
