@@ -20,11 +20,11 @@ import (
 	"strings"
 
 	"github.com/google/go-github/github"
-	gitlab "github.com/lkysow/go-gitlab"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
+	gitlab "github.com/xanzy/go-gitlab"
 	validator "gopkg.in/go-playground/validator.v9"
 )
 

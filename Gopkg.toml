@@ -94,7 +94,7 @@
 
 [[constraint]]
   branch = "master"
-  name = "github.com/lkysow/go-gitlab"
+  name = "github.com/xanzy/go-gitlab"
 
 [[constraint]]
   name = "github.com/go-test/deep"

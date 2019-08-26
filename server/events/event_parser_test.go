@@ -22,12 +22,12 @@ import (
 	"testing"
 
 	"github.com/google/go-github/github"
-	gitlab "github.com/lkysow/go-gitlab"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/server/events/vcs/fixtures"
 	. "github.com/runatlantis/atlantis/testing"
+	gitlab "github.com/xanzy/go-gitlab"
 )
 
 var parser = events.EventParser{

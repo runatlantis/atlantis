@@ -5,9 +5,9 @@ package mocks
 
 import (
 	github "github.com/google/go-github/github"
-	go_gitlab "github.com/lkysow/go-gitlab"
 	pegomock "github.com/petergtz/pegomock"
 	models "github.com/runatlantis/atlantis/server/events/models"
+	go_gitlab "github.com/xanzy/go-gitlab"
 	"reflect"
 	"time"
 )

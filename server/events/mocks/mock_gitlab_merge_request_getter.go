@@ -4,8 +4,8 @@
 package mocks
 
 import (
-	go_gitlab "github.com/lkysow/go-gitlab"
 	pegomock "github.com/petergtz/pegomock"
+	go_gitlab "github.com/xanzy/go-gitlab"
 	"reflect"
 	"time"
 )
