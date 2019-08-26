@@ -13,7 +13,7 @@
 
 package fixtures
 
-import "github.com/google/go-github/github"
+import "github.com/google/go-github/v28/github"
 
 var PullEvent = github.PullRequestEvent{
 	Sender: &github.User{
