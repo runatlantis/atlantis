@@ -20,7 +20,7 @@ debug: ## Output internal make variables
 	@echo PKG = $(PKG)
 
 build-service: ## Build the main Go service
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o atlantis .
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=vendor -v -o atlantis .
 
 go-generate: ## Run go generate in all packages
 	go generate $(PKG)
