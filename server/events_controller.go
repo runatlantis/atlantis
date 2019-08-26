@@ -18,8 +18,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/google/go-github/github"
-	gitlab "github.com/lkysow/go-gitlab"
+	"github.com/google/go-github/v28/github"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -27,6 +26,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
 	"github.com/runatlantis/atlantis/server/logging"
+	gitlab "github.com/xanzy/go-gitlab"
 )
 
 const githubHeader = "X-Github-Event"

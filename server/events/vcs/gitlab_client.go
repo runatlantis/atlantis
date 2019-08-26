@@ -25,8 +25,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/logging"
 
-	gitlab "github.com/lkysow/go-gitlab"
 	"github.com/runatlantis/atlantis/server/events/models"
+	gitlab "github.com/xanzy/go-gitlab"
 )
 
 type GitlabClient struct {
@@ -165,7 +165,7 @@ func (g *GitlabClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 // - https://gitlab.com/gitlab-org/gitlab-ee/issues/3169
 // - https://gitlab.com/gitlab-org/gitlab-ce/issues/42344
 func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
-	mr, _, err := g.Client.MergeRequests.GetMergeRequest(repo.FullName, pull.Num)
+	mr, _, err := g.Client.MergeRequests.GetMergeRequest(repo.FullName, pull.Num, nil)
 	if err != nil {
 		return false, err
 	}
@@ -196,7 +196,7 @@ func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 }
 
 func (g *GitlabClient) GetMergeRequest(repoFullName string, pullNum int) (*gitlab.MergeRequest, error) {
-	mr, _, err := g.Client.MergeRequests.GetMergeRequest(repoFullName, pullNum)
+	mr, _, err := g.Client.MergeRequests.GetMergeRequest(repoFullName, pullNum, nil)
 	return mr, err
 }
 

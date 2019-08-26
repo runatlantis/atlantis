@@ -19,12 +19,8 @@ debug: ## Output internal make variables
 	@echo WORKSPACE = $(WORKSPACE)
 	@echo PKG = $(PKG)
 
-deps: ## Download dependencies
-	go get -u github.com/golang/dep/cmd/dep
-	dep ensure
-
 build-service: ## Build the main Go service
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o atlantis .
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=vendor -v -o atlantis .
 
 go-generate: ## Run go generate in all packages
 	go generate $(PKG)
@@ -68,7 +64,6 @@ check-lint: ## Run linter in CI/CD. If running locally use 'lint'
 	./bin/golangci-lint run
 
 check-fmt: ## Fail if not formatted
-	go get golang.org/x/tools/cmd/goimports
 	if [[ $$(goimports -l $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "./server/static/bindata_assetfs.go" ! -path "**/mocks/*")) ]]; then exit 1; fi
 
 end-to-end-deps: ## Install e2e dependencies
