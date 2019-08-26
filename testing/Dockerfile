@@ -11,3 +11,4 @@ RUN curl -LOks https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/ter
     sudo unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip -d /usr/local/bin/tf/versions/${TERRAFORM_VERSION} && \
     sudo ln -s /usr/local/bin/tf/versions/${TERRAFORM_VERSION}/terraform /usr/local/bin/terraform && \
     rm terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+RUN go get golang.org/x/tools/cmd/goimports
