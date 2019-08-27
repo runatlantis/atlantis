@@ -117,7 +117,7 @@ func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment stri
 func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
 	nextPage := 0
 	for {
-		opts := github.ListOptions {
+		opts := github.ListOptions{
 			PerPage: 300,
 		}
 		if nextPage != 0 {
@@ -134,7 +134,7 @@ func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 		}
 		if resp.NextPage == 0 {
 			break
-		}	
+		}
 		nextPage = resp.NextPage
 	}
 	return false, nil

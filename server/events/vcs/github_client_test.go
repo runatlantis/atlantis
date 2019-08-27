@@ -280,8 +280,6 @@ func TestGithubClient_PullIsApproved(t *testing.T) {
 	Equals(t, false, approved)
 }
 
-
-
 func TestGithubClient_PullIsMergeable(t *testing.T) {
 	cases := []struct {
 		state        string
