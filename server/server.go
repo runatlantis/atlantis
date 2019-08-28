@@ -445,6 +445,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 			LockPath:     lockURL.String(),
 			RepoFullName: v.Project.RepoFullName,
 			PullNum:      v.Pull.Num,
+			Workspace:    v.Workspace,
 			Time:         v.Time,
 		})
 	}
