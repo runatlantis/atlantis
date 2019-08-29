@@ -28,5 +28,6 @@ Runs `terraform plan` and `apply` remotely and comments back on the pull request
 [![Go Report Card](https://goreportcard.com/badge/github.com/runatlantis/atlantis)](https://goreportcard.com/report/github.com/runatlantis/atlantis)
 [![codecov](https://codecov.io/gh/runatlantis/atlantis/branch/master/graph/badge.svg)](https://codecov.io/gh/runatlantis/atlantis)
 [![CircleCI](https://circleci.com/gh/runatlantis/atlantis/tree/master.svg?style=shield)](https://circleci.com/gh/runatlantis/atlantis/tree/master)
+[![Docker Image Metadata](https://images.microbadger.com/badges/image/runatlantis/atlantis.svg)](https://microbadger.com/images/runatlantis/atlantis)
 [![Slack Status](https://thawing-headland-22460.herokuapp.com/badge.svg)](https://thawing-headland-22460.herokuapp.com)
 [![Gitter chat](https://badges.gitter.im/runatlantis.png)](https://gitter.im/runatlantis)

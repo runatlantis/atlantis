@@ -453,3 +453,13 @@ Values are chosen in this order:
   ATLANTIS_TFE_TOKEN='xxx.atlasv1.yyy' atlantis server
   ```
   A token for Terraform Cloud/Terraform Enteprise integration. See [Terraform Cloud](terraform-cloud.html) for more details.
+
+* ### `--write-git-creds`
+  ```bash
+  atlantis server --write-git-creds
+  ```
+  Write out a .git-credentials file and configure git-credentials-store. To allow authentication with your git remotes over https. See [here](https://git-scm.com/docs/git-credential-store) for more information.
+
+  ::: warning SECURITY WARNING
+  Potentially dangerous to enable as this writes your credentials to disk.
+  :::

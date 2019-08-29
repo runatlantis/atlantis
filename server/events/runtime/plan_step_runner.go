@@ -33,7 +33,7 @@ type PlanStepRunner struct {
 	AsyncTFExec         AsyncTFExec
 }
 
-func (p *PlanStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string) (string, error) {
+func (p *PlanStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error) {
 	tfVersion := p.DefaultTFVersion
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
@@ -41,16 +41,16 @@ func (p *PlanStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []strin
 
 	// We only need to switch workspaces in version 0.9.*. In older versions,
 	// there is no such thing as a workspace so we don't need to do anything.
-	if err := p.switchWorkspace(ctx, path, tfVersion); err != nil {
+	if err := p.switchWorkspace(ctx, path, tfVersion, envs); err != nil {
 		return "", err
 	}
 
 	planFile := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	planCmd := p.buildPlanCmd(ctx, extraArgs, path, tfVersion, planFile)
-	output, err := p.TerraformExecutor.RunCommandWithVersion(ctx.Log, filepath.Clean(path), planCmd, tfVersion, ctx.Workspace)
+	output, err := p.TerraformExecutor.RunCommandWithVersion(ctx.Log, filepath.Clean(path), planCmd, envs, tfVersion, ctx.Workspace)
 	if p.isRemoteOpsErr(output, err) {
 		ctx.Log.Debug("detected that this project is using TFE remote ops")
-		return p.remotePlan(ctx, extraArgs, path, tfVersion, planFile)
+		return p.remotePlan(ctx, extraArgs, path, tfVersion, planFile, envs)
 	}
 	if err != nil {
 		return output, err
@@ -69,14 +69,14 @@ func (p *PlanStepRunner) isRemoteOpsErr(output string, err error) bool {
 
 // remotePlan runs a terraform plan command compatible with TFE remote
 // operations.
-func (p *PlanStepRunner) remotePlan(ctx models.ProjectCommandContext, extraArgs []string, path string, tfVersion *version.Version, planFile string) (string, error) {
+func (p *PlanStepRunner) remotePlan(ctx models.ProjectCommandContext, extraArgs []string, path string, tfVersion *version.Version, planFile string, envs map[string]string) (string, error) {
 	argList := [][]string{
 		{"plan", "-input=false", "-refresh", "-no-color"},
 		extraArgs,
 		ctx.EscapedCommentArgs,
 	}
 	args := p.flatten(argList)
-	output, err := p.runRemotePlan(ctx, args, path, tfVersion)
+	output, err := p.runRemotePlan(ctx, args, path, tfVersion, envs)
 	if err != nil {
 		return output, err
 	}
@@ -107,7 +107,7 @@ func (p *PlanStepRunner) remotePlan(ctx models.ProjectCommandContext, extraArgs 
 
 // switchWorkspace changes the terraform workspace if necessary and will create
 // it if it doesn't exist. It handles differences between versions.
-func (p *PlanStepRunner) switchWorkspace(ctx models.ProjectCommandContext, path string, tfVersion *version.Version) error {
+func (p *PlanStepRunner) switchWorkspace(ctx models.ProjectCommandContext, path string, tfVersion *version.Version, envs map[string]string) error {
 	// In versions less than 0.9 there is no support for workspaces.
 	noWorkspaceSupport := MustConstraint("<0.9").Check(tfVersion)
 	// If the user tried to set a specific workspace in the comment but their
@@ -130,7 +130,7 @@ func (p *PlanStepRunner) switchWorkspace(ctx models.ProjectCommandContext, path 
 	// already in the right workspace then no need to switch. This will save us
 	// about ten seconds. This command is only available in > 0.10.
 	if !runningZeroPointNine {
-		workspaceShowOutput, err := p.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, []string{workspaceCmd, "show"}, tfVersion, ctx.Workspace)
+		workspaceShowOutput, err := p.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, []string{workspaceCmd, "show"}, envs, tfVersion, ctx.Workspace)
 		if err != nil {
 			return err
 		}
@@ -145,11 +145,11 @@ func (p *PlanStepRunner) switchWorkspace(ctx models.ProjectCommandContext, path 
 	// To do this we can either select and catch the error or use list and then
 	// look for the workspace. Both commands take the same amount of time so
 	// that's why we're running select here.
-	_, err := p.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, []string{workspaceCmd, "select", "-no-color", ctx.Workspace}, tfVersion, ctx.Workspace)
+	_, err := p.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, []string{workspaceCmd, "select", "-no-color", ctx.Workspace}, envs, tfVersion, ctx.Workspace)
 	if err != nil {
 		// If terraform workspace select fails we run terraform workspace
 		// new to create a new workspace automatically.
-		_, err = p.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, []string{workspaceCmd, "new", "-no-color", ctx.Workspace}, tfVersion, ctx.Workspace)
+		_, err = p.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, []string{workspaceCmd, "new", "-no-color", ctx.Workspace}, envs, tfVersion, ctx.Workspace)
 		return err
 	}
 	return nil
@@ -250,7 +250,8 @@ func (p *PlanStepRunner) runRemotePlan(
 	ctx models.ProjectCommandContext,
 	cmdArgs []string,
 	path string,
-	tfVersion *version.Version) (string, error) {
+	tfVersion *version.Version,
+	envs map[string]string) (string, error) {
 
 	// updateStatusF will update the commit status and log any error.
 	updateStatusF := func(status models.CommitStatus, url string) {
@@ -261,7 +262,7 @@ func (p *PlanStepRunner) runRemotePlan(
 
 	// Start the async command execution.
 	ctx.Log.Debug("starting async tf remote operation")
-	_, outCh := p.AsyncTFExec.RunCommandAsync(ctx.Log, filepath.Clean(path), cmdArgs, tfVersion, ctx.Workspace)
+	_, outCh := p.AsyncTFExec.RunCommandAsync(ctx.Log, filepath.Clean(path), cmdArgs, envs, tfVersion, ctx.Workspace)
 	var lines []string
 	nextLineIsRunURL := false
 	var runURL string

@@ -51,7 +51,7 @@ func (p *DefaultProjectFinder) DetermineProjects(log *logging.SimpleLogger, modi
 	if len(modifiedTerraformFiles) == 0 {
 		return projects
 	}
-	log.Info("filtered modified files to %d .tf files: %v",
+	log.Info("filtered modified files to %d .tf or terragrunt.hcl files: %v",
 		len(modifiedTerraformFiles), modifiedTerraformFiles)
 
 	var dirs []string
@@ -123,7 +123,7 @@ func (p *DefaultProjectFinder) filterToTerraform(files []string) []string {
 	for _, fileName := range files {
 		// Filter out tfstate files since they usually checked in by accident
 		// and regardless, they don't affect a plan.
-		if !p.isStatefile(fileName) && strings.Contains(fileName, ".tf") {
+		if !p.isStatefile(fileName) && (strings.Contains(fileName, ".tf") || filepath.Base(fileName) == "terragrunt.hcl") {
 			filtered = append(filtered, fileName)
 		}
 	}
