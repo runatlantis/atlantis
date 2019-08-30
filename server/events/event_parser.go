@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/google/go-github/v28/github"
-	gitlab "github.com/lkysow/go-gitlab"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"

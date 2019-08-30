@@ -19,7 +19,6 @@ import (
 	"net/http"
 
 	"github.com/google/go-github/v28/github"
-	gitlab "github.com/lkysow/go-gitlab"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/pkg/errors"

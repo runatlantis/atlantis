@@ -25,7 +25,6 @@ import (
 	"testing"
 
 	"github.com/google/go-github/v28/github"
-	gitlab "github.com/lkysow/go-gitlab"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/events"
