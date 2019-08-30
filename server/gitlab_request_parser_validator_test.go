@@ -19,10 +19,10 @@ import (
 	"reflect"
 	"testing"
 
-	gitlab "github.com/lkysow/go-gitlab"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server"
 	. "github.com/runatlantis/atlantis/testing"
+	gitlab "github.com/xanzy/go-gitlab"
 )
 
 var parser = server.DefaultGitlabRequestParserValidator{}

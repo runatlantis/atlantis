@@ -16,7 +16,7 @@ package events
 import (
 	"fmt"
 
-	"github.com/google/go-github/github"
+	"github.com/google/go-github/v28/github"
 	gitlab "github.com/lkysow/go-gitlab"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
@@ -25,6 +25,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/recovery"
+	gitlab "github.com/xanzy/go-gitlab"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_command_runner.go CommandRunner

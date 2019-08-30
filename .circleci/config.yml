@@ -1,9 +1,10 @@
 version: 2
 jobs:
   test:
-    working_directory: /go/src/github.com/runatlantis/atlantis
     docker:
     - image: runatlantis/testing-env:latest
+      environment:
+        GOFLAGS: "-mod=vendor"
     steps:
     - checkout
     - run: make test-coverage
@@ -13,7 +14,6 @@ jobs:
     - run: make check-fmt
     - run: make check-lint
   e2e:
-    working_directory: /go/src/github.com/runatlantis/atlantis
     docker:
     - image: circleci/golang:1.12
       environment:
@@ -53,9 +53,10 @@ jobs:
 
   # Build and push 'latest' Docker tag.
   docker_master:
-    working_directory: /go/src/github.com/runatlantis/atlantis
     docker:
     - image: circleci/golang:1.12
+      environment:
+        GOFLAGS: "-mod=vendor"
     steps:
     - checkout
     - run: make build-service
@@ -75,9 +76,10 @@ jobs:
           fi
   # Build and push Docker tag.
   docker_tag:
-    working_directory: /go/src/github.com/runatlantis/atlantis
     docker:
     - image: circleci/golang:1.12
+      environment:
+        GOFLAGS: "-mod=vendor"
     steps:
     - checkout
     - run: make build-service

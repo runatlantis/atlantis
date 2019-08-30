@@ -2,9 +2,9 @@
 package matchers
 
 import (
-	"reflect"
+	github "github.com/google/go-github/v28/github"
 	"github.com/petergtz/pegomock"
-	github "github.com/google/go-github/github"
+	"reflect"
 )
 
 func AnyPtrToGithubIssueCommentEvent() *github.IssueCommentEvent {

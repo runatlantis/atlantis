@@ -125,11 +125,11 @@ projects:
 		{
 			description: "empty version",
 			input: `
-version: ~
+version:
 projects:
 - dir: "."
 `,
-			expErr: "version: only versions 2 and 3 are supported.",
+			expErr: "version: is required. If you've just upgraded Atlantis you need to rewrite your atlantis.yaml for version 3. See www.runatlantis.io/docs/upgrading-atlantis-yaml.html.",
 		},
 		{
 			description: "version 2",
@@ -490,7 +490,7 @@ projects:
 version: 3
 projects:
 - unknown: value`,
-			expErr: "yaml: unmarshal errors:\n  line 4: field unknown not found in struct raw.Project",
+			expErr: "yaml: unmarshal errors:\n  line 4: field unknown not found in type raw.Project",
 		},
 		{
 			description: "referencing workflow that doesn't exist",
@@ -893,7 +893,7 @@ func TestParseGlobalCfg(t *testing.T) {
 		},
 		"invalid fields": {
 			input:  "invalid: key",
-			expErr: "yaml: unmarshal errors:\n  line 1: field invalid not found in struct raw.GlobalCfg",
+			expErr: "yaml: unmarshal errors:\n  line 1: field invalid not found in type raw.GlobalCfg",
 		},
 		"no id specified": {
 			input: `repos:

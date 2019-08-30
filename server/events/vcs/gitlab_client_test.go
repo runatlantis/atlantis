@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	version "github.com/hashicorp/go-version"
-	gitlab "github.com/lkysow/go-gitlab"
 	"github.com/runatlantis/atlantis/server/events/models"
+	gitlab "github.com/xanzy/go-gitlab"
 
 	. "github.com/runatlantis/atlantis/testing"
 )

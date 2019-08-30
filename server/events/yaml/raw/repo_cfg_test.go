@@ -43,7 +43,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 				Projects:  nil,
 				Workflows: nil,
 			},
-			expErr: "yaml: unmarshal errors:\n  line 1: field invalid not found in struct raw.RepoCfg",
+			expErr: "yaml: unmarshal errors:\n  line 1: field invalid not found in type raw.RepoCfg",
 		},
 		{
 			description: "version set to 2",
