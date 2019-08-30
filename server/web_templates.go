@@ -33,7 +33,8 @@ type TemplateWriter interface {
 type LockIndexData struct {
 	LockPath     string
 	RepoFullName string
-	PullNum      int
+  PullNum      int
+  Path         string
 	Workspace    string
 	Time         time.Time
 }
@@ -91,7 +92,7 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
     {{ range .Locks }}
       <a href="{{ $basePath }}{{.LockPath}}">
         <div class="twelve columns button content lock-row">
-        <div class="list-title">{{.RepoFullName}} - <span class="heading-font-size">#{{.PullNum}} <code>{{.Workspace}}</code></span></div>
+        <div class="list-title">{{.RepoFullName}} <span class="heading-font-size">#{{.PullNum}}</span> - <small>dir:<code>{{.Path}}</code> workspace:<code>{{.Workspace}}</code></small></div>
         <div class="list-status"><code>Locked</code></div>
         <div class="list-timestamp"><span class="heading-font-size">{{.Time}}</span></div>
         </div>
