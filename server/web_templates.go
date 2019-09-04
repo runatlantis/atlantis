@@ -33,8 +33,8 @@ type TemplateWriter interface {
 type LockIndexData struct {
 	LockPath     string
 	RepoFullName string
-  PullNum      int
-  Path         string
+	PullNum      int
+	Path         string
 	Workspace    string
 	Time         time.Time
 }

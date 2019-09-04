@@ -25,6 +25,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
@@ -445,11 +446,15 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 			LockPath:     lockURL.String(),
 			RepoFullName: v.Project.RepoFullName,
 			PullNum:      v.Pull.Num,
-			Path:	      v.Project.Path,
+			Path:         v.Project.Path,
 			Workspace:    v.Workspace,
 			Time:         v.Time,
 		})
 	}
+
+	//sort by date - newest to oldest
+	sort.SliceStable(lockResults, func(i, j int) bool { return lockResults[i].Time.After(lockResults[j].Time) })
+
 	err = s.IndexTemplate.Execute(w, IndexData{
 		Locks:           lockResults,
 		AtlantisVersion: s.AtlantisVersion,
