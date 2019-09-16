@@ -83,8 +83,10 @@ projects:
 This will stop Atlantis automatically running plan when `project1/` is updated
 in a pull request.
 
-### Configuring Autoplanning
+### Configuring Planning
+
 Given the directory structure:
+
 ```
 .
 ├── modules
@@ -97,8 +99,9 @@ Given the directory structure:
 └── project1
     └── main.tf
 ```
-If you wanted Atlantis to autoplan `project1/` whenever any `.tf` file under `module1/`
-changed or any `.tf` or `.tfvars` file under `project1/` changed, you could use the following configuration:
+
+If you want Atlantis to plan `project1/` whenever any `.tf` files under `module1/` change or any `.tf` or `.tfvars` files under `project1/` change you could use the following configuration:
+
 
 ```yaml
 version: 3
@@ -107,9 +110,12 @@ projects:
   autoplan:
     when_modified: ["../modules/**/*.tf", "*.tf*"]
 ```
+
 Note:
 * `when_modified` uses the [`.dockerignore` syntax](https://docs.docker.com/engine/reference/builder/#dockerignore-file)
 * The paths are relative to the project's directory.
+* `when_modified` will be used by both automatic and manually run plans.
+* `when_modified` will continue to work for manually run plans even when autoplan is disabled.
 
 ### Supporting Terraform Workspaces
 ```yaml
@@ -229,5 +235,3 @@ when_modified: ["*.tf"]
 |---------------|---------------|----------------|----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | enabled       | boolean       | `true`         | no       | Whether autoplanning is enabled for this project.                                                                                                                                                                                                                 |
 | when_modified | array[string] | `["**/*.tf*"]` | no       | Uses [.dockerignore](https://docs.docker.com/engine/reference/builder/#dockerignore-file) syntax. If any modified file in the pull request matches, this project will be planned. See [Autoplanning](autoplanning.html). Paths are relative to the project's dir. |
-
-
