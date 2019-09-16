@@ -443,16 +443,17 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 		lockResults = append(lockResults, LockIndexData{
 			// NOTE: must use .String() instead of .Path because we need the
 			// query params as part of the lock URL.
-			LockPath:     lockURL.String(),
-			RepoFullName: v.Project.RepoFullName,
-			PullNum:      v.Pull.Num,
-			Path:         v.Project.Path,
-			Workspace:    v.Workspace,
-			Time:         v.Time,
+			LockPath:      lockURL.String(),
+			RepoFullName:  v.Project.RepoFullName,
+			PullNum:       v.Pull.Num,
+			Path:          v.Project.Path,
+			Workspace:     v.Workspace,
+			Time:          v.Time,
+			TimeFormatted: v.Time.Format("02-01-2006 15:04:05"),
 		})
 	}
 
-	//sort by date - newest to oldest
+	//Sort by date - newest to oldest.
 	sort.SliceStable(lockResults, func(i, j int) bool { return lockResults[i].Time.After(lockResults[j].Time) })
 
 	err = s.IndexTemplate.Execute(w, IndexData{
