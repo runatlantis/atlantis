@@ -31,10 +31,13 @@ type TemplateWriter interface {
 
 // LockIndexData holds the fields needed to display the index view for locks.
 type LockIndexData struct {
-	LockPath     string
-	RepoFullName string
-	PullNum      int
-	Time         time.Time
+	LockPath      string
+	RepoFullName  string
+	PullNum       int
+	Path          string
+	Workspace     string
+	Time          time.Time
+	TimeFormatted string
 }
 
 // IndexData holds the data for rendering the index page
@@ -90,9 +93,9 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
     {{ range .Locks }}
       <a href="{{ $basePath }}{{.LockPath}}">
         <div class="twelve columns button content lock-row">
-        <div class="list-title">{{.RepoFullName}} - <span class="heading-font-size">#{{.PullNum}}</span></div>
+        <div class="list-title">{{.RepoFullName}} <span class="heading-font-size">#{{.PullNum}}</span> <code>{{.Path}}</code> <code>{{.Workspace}}</code></div>
         <div class="list-status"><code>Locked</code></div>
-        <div class="list-timestamp"><span class="heading-font-size">{{.Time}}</span></div>
+        <div class="list-timestamp"><span class="heading-font-size">{{.TimeFormatted}}</span></div>
         </div>
       </a>
     {{ end }}
