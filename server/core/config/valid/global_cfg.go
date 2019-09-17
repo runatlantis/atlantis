@@ -22,6 +22,7 @@ const AllowedOverridesKey = "allowed_overrides"
 const AllowCustomWorkflowsKey = "allow_custom_workflows"
 const DefaultWorkflowName = "default"
 const DeleteSourceBranchOnMergeKey = "delete_source_branch_on_merge"
+const ConfigSourceBranchKey = "config_source_branch"
 
 // NonOverrideableApplyReqs will get applied across all "repos" in the server side config.
 // If repo config is allowed overrides, they can override this.
@@ -69,6 +70,9 @@ type Repo struct {
 	AllowedOverrides          []string
 	AllowCustomWorkflows      *bool
 	DeleteSourceBranchOnMerge *bool
+	// ConfigSourceBranch specifies the branch that we'll use to checkout the atlantis repo
+	// configuration
+	ConfigSourceBranch *string
 }
 
 type MergedProjectCfg struct {
@@ -245,7 +249,7 @@ func (r Repo) IDString() string {
 // final config. It assumes that all configs have been validated.
 func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, proj Project, rCfg RepoCfg) MergedProjectCfg {
 	log.Debug("MergeProjectCfg started")
-	applyReqs, workflow, allowedOverrides, allowCustomWorkflows, deleteSourceBranchOnMerge := g.getMatchingCfg(log, repoID)
+	applyReqs, workflow, allowedOverrides, allowCustomWorkflows, deleteSourceBranchOnMerge, _ := g.GetMatchingCfg(log, repoID)
 
 	// If repos are allowed to override certain keys then override them.
 	for _, key := range allowedOverrides {
@@ -317,7 +321,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 // repo with id repoID. It is used when there is no repo config.
 func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repoRelDir string, workspace string) MergedProjectCfg {
 	log.Debug("building config based on server-side config")
-	applyReqs, workflow, _, _, deleteSourceBranchOnMerge := g.getMatchingCfg(log, repoID)
+	applyReqs, workflow, _, _, deleteSourceBranchOnMerge, _ := g.GetMatchingCfg(log, repoID)
 	return MergedProjectCfg{
 		ApplyRequirements:         applyReqs,
 		Workflow:                  workflow,
@@ -428,8 +432,8 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 	return nil
 }
 
-// getMatchingCfg returns the key settings for repoID.
-func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (applyReqs []string, workflow Workflow, allowedOverrides []string, allowCustomWorkflows bool, deleteSourceBranchOnMerge bool) {
+// GetMatchingCfg returns the key settings for repoID.
+func (g GlobalCfg) GetMatchingCfg(log logging.SimpleLogging, repoID string) (applyReqs []string, workflow Workflow, allowedOverrides []string, allowCustomWorkflows bool, deleteSourceBranchOnMerge bool, configSourceBranch *string) {
 	toLog := make(map[string]string)
 	traceF := func(repoIdx int, repoID string, key string, val interface{}) string {
 		from := "default server config"
@@ -451,7 +455,7 @@ func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (app
 		return fmt.Sprintf("setting %s: %s from %s", key, valStr, from)
 	}
 
-	for _, key := range []string{ApplyRequirementsKey, WorkflowKey, AllowedOverridesKey, AllowCustomWorkflowsKey, DeleteSourceBranchOnMergeKey} {
+	for _, key := range []string{ApplyRequirementsKey, WorkflowKey, AllowedOverridesKey, AllowCustomWorkflowsKey, DeleteSourceBranchOnMergeKey, ConfigSourceBranchKey} {
 		for i, repo := range g.Repos {
 			if repo.IDMatches(repoID) {
 				switch key {
@@ -480,7 +484,13 @@ func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (app
 						toLog[DeleteSourceBranchOnMergeKey] = traceF(i, repo.IDString(), DeleteSourceBranchOnMergeKey, *repo.DeleteSourceBranchOnMerge)
 						deleteSourceBranchOnMerge = *repo.DeleteSourceBranchOnMerge
 					}
+				case ConfigSourceBranchKey:
+					if repo.ConfigSourceBranch != nil {
+						toLog[ConfigSourceBranchKey] = traceF(i, repo.IDString(), ConfigSourceBranchKey, *repo.ConfigSourceBranch)
+						configSourceBranch = repo.ConfigSourceBranch
+					}
 				}
+
 			}
 		}
 	}

@@ -50,7 +50,7 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 	cloneDir, _, err := gwd.Clone(logger, models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
-	}, "default")
+	}, "default", []string{})
 	Ok(t, err)
 
 	// Use rev-parse to verify at correct commit.
