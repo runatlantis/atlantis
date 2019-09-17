@@ -1,3 +1,9 @@
+# Build our upstream version of atlantis while this is being developed
+FROM golang:1.13 as builder
+WORKDIR /go/src/github.com/runatlantis/atlantis
+COPY . /go/src/github.com/runatlantis/atlantis
+RUN GO111MODULE=off CGO_ENABLED=0 go build -o atlantis main.go
+
 # The runatlantis/atlantis-base is created by docker-base/Dockerfile.
 FROM runatlantis/atlantis-base:v3.5
 LABEL authors="Anubhav Mishra, Luke Kysow"
@@ -20,7 +26,10 @@ RUN AVAILABLE_TERRAFORM_VERSIONS="0.8.8 0.9.11 0.10.8 0.11.14 0.12.29 ${DEFAULT_
     ln -s /usr/local/bin/tf/versions/${DEFAULT_TERRAFORM_VERSION}/terraform /usr/local/bin/terraform
 
 # copy binary
-COPY atlantis /usr/local/bin/atlantis
+# COPY atlantis /usr/local/bin/atlantis
+
+# Override this binary with what we built in the builder image
+COPY --from=builder /go/src/github.com/runatlantis/atlantis/atlantis /usr/local/bin/atlantis
 
 # copy docker entrypoint
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
