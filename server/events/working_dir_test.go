@@ -42,7 +42,7 @@ func TestClone_NoneExisting(t *testing.T) {
 
 	cloneDir, _, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
-	}, "default")
+	}, "default", []string{})
 	Ok(t, err)
 
 	// Use rev-parse to verify at correct commit.
@@ -92,7 +92,7 @@ func TestClone_CheckoutMergeNoneExisting(t *testing.T) {
 	cloneDir, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		BaseBranch: "master",
-	}, "default")
+	}, "default", []string{})
 	Ok(t, err)
 	Equals(t, false, hasDiverged)
 
@@ -140,7 +140,7 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 	_, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		BaseBranch: "master",
-	}, "default")
+	}, "default", []string{})
 	Ok(t, err)
 	Equals(t, false, hasDiverged)
 
@@ -151,7 +151,7 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 	cloneDir, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		BaseBranch: "master",
-	}, "default")
+	}, "default", []string{})
 	Ok(t, err)
 	Equals(t, false, hasDiverged)
 
@@ -188,7 +188,7 @@ func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
 	_, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		BaseBranch: "master",
-	}, "default")
+	}, "default", []string{})
 	Ok(t, err)
 	Equals(t, false, hasDiverged)
 
@@ -199,7 +199,7 @@ func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
 	cloneDir, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		BaseBranch: "master",
-	}, "default")
+	}, "default", []string{})
 	Ok(t, err)
 	Equals(t, false, hasDiverged)
 
@@ -241,7 +241,7 @@ func TestClone_CheckoutMergeConflict(t *testing.T) {
 	_, _, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		BaseBranch: "master",
-	}, "default")
+	}, "default", []string{})
 
 	ErrContains(t, "running git merge -q --no-ff -m atlantis-merge FETCH_HEAD", err)
 	ErrContains(t, "Auto-merging file", err)
@@ -270,7 +270,7 @@ func TestClone_NoReclone(t *testing.T) {
 	}
 	cloneDir, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
-	}, "default")
+	}, "default", []string{})
 	Ok(t, err)
 	Equals(t, false, hasDiverged)
 
@@ -306,7 +306,7 @@ func TestClone_RecloneWrongCommit(t *testing.T) {
 	cloneDir, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		HeadCommit: expCommit,
-	}, "default")
+	}, "default", []string{})
 	Ok(t, err)
 	Equals(t, false, hasDiverged)
 
@@ -371,7 +371,7 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	_, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "second-pr",
 		BaseBranch: "master",
-	}, "default")
+	}, "default", []string{})
 	Ok(t, err)
 	Equals(t, hasDiverged, true)
 
@@ -381,7 +381,7 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	_, hasDiverged, err = wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "second-pr",
 		BaseBranch: "master",
-	}, "default")
+	}, "default", []string{})
 	Ok(t, err)
 	Equals(t, hasDiverged, false)
 }

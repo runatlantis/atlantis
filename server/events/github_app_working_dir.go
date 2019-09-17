@@ -21,7 +21,7 @@ type GithubAppWorkingDir struct {
 }
 
 // Clone writes a fresh token for Github App authentication
-func (g *GithubAppWorkingDir) Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, workspace string) (string, bool, error) {
+func (g *GithubAppWorkingDir) Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, workspace string, additionalBranches []string) (string, bool, error) {
 
 	log.Info("Refreshing git tokens for Github App")
 
@@ -43,5 +43,5 @@ func (g *GithubAppWorkingDir) Clone(log *logging.SimpleLogger, baseRepo models.R
 	authURL := fmt.Sprintf("://x-access-token:%s", token)
 	baseRepo.CloneURL = strings.Replace(baseRepo.CloneURL, "://:", authURL, 1)
 	headRepo.CloneURL = strings.Replace(headRepo.CloneURL, "://:", authURL, 1)
-	return g.WorkingDir.Clone(log, baseRepo, headRepo, p, workspace)
+	return g.WorkingDir.Clone(log, baseRepo, headRepo, p, workspace, additionalBranches)
 }

@@ -37,7 +37,7 @@ type WorkingDir interface {
 	// absolute path to the root of the cloned repo. It also returns
 	// a boolean indicating if we should warn users that the branch we're
 	// merging into has been updated since we cloned it.
-	Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, workspace string) (string, bool, error)
+	Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, workspace string, additionalBranches []string) (string, bool, error)
 	// GetWorkingDir returns the path to the workspace for this repo and pull.
 	// If workspace does not exist on disk, error will be of type os.IsNotExist.
 	GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error)
@@ -67,53 +67,88 @@ type FileWorkspace struct {
 // path to the root of the cloned repo. It also returns
 // a boolean indicating if we should warn users that the branch we're
 // merging into has been updated since we cloned it.
-//If the repo already exists and is at
+// If the repo already exists and is at
 // the right commit it does nothing. This is to support running commands in
 // multiple dirs of the same repo without deleting existing plans.
+//
+// By default, our clone is shallow. If you wish to access resources from
+// commits other than the pulls base, then provide them as additionalBranches.
 func (w *FileWorkspace) Clone(
 	log *logging.SimpleLogger,
 	baseRepo models.Repo,
 	headRepo models.Repo,
 	p models.PullRequest,
-	workspace string) (string, bool, error) {
+	workspace string,
+	additionalBranches []string) (string, bool, error) {
 	cloneDir := w.cloneDir(baseRepo, p, workspace)
 
-	// If the directory already exists, check if it's at the right commit.
-	// If so, then we do nothing.
-	if _, err := os.Stat(cloneDir); err == nil {
-		log.Debug("clone directory %q already exists, checking if it's at the right commit", cloneDir)
-
-		// We use git rev-parse to see if our repo is at the right commit.
-		// If just checking out the pull request branch, we can use HEAD.
-		// If doing a merge, then HEAD won't be at the pull request's HEAD
-		// because we'll already have performed a merge. Instead, we'll check
-		// HEAD^2 since that will be the commit before our merge.
-		pullHead := "HEAD"
-		if w.CheckoutMerge {
-			pullHead = "HEAD^2"
+	if !w.alreadyClonedHEAD(log, cloneDir, p) {
+		if err := w.forceClone(log, cloneDir, headRepo, p); err != nil {
+			return cloneDir, false, err
 		}
-		revParseCmd := exec.Command("git", "rev-parse", pullHead) // #nosec
-		revParseCmd.Dir = cloneDir
-		outputRevParseCmd, err := revParseCmd.CombinedOutput()
-		if err != nil {
-			log.Warn("will re-clone repo, could not determine if was at correct commit: %s: %s: %s", strings.Join(revParseCmd.Args, " "), err, string(outputRevParseCmd))
-			return cloneDir, false, w.forceClone(log, cloneDir, headRepo, p)
-		}
-		currCommit := strings.Trim(string(outputRevParseCmd), "\n")
-
-		// We're prefix matching here because BitBucket doesn't give us the full
-		// commit, only a 12 character prefix.
-		if strings.HasPrefix(currCommit, p.HeadCommit) {
-			log.Debug("repo is at correct commit %q so will not re-clone", p.HeadCommit)
-			return cloneDir, w.warnDiverged(log, cloneDir), nil
-		}
-
-		log.Debug("repo was already cloned but is not at correct commit, wanted %q got %q", p.HeadCommit, currCommit)
-		// We'll fall through to re-clone.
 	}
 
-	// Otherwise we clone the repo.
-	return cloneDir, false, w.forceClone(log, cloneDir, headRepo, p)
+	for _, branch := range additionalBranches {
+		if _, err := w.fetchBranch(log, cloneDir, branch); err != nil {
+			return cloneDir, false, err
+		}
+	}
+
+	return cloneDir, w.warnDiverged(log, cloneDir), nil
+}
+
+// alreadyClonedHEAD determines whether the HEAD commit is already present in the cloneDir
+// repository. This can be used to determine whether we should force clone again.
+func (w *FileWorkspace) alreadyClonedHEAD(log *logging.SimpleLogger, cloneDir string, p models.PullRequest) bool {
+	// If the directory isn't there or isn't readable, we cannot already be cloned
+	if _, err := os.Stat(cloneDir); err != nil {
+		return false
+	}
+
+	log.Debug("clone directory %q already exists, checking if it's at the right commit", cloneDir)
+
+	// We use git rev-parse to see if our repo is at the right commit.
+	// If just checking out the pull request branch, we can use HEAD.
+	// If doing a merge, then HEAD won't be at the pull request's HEAD
+	// because we'll already have performed a merge. Instead, we'll check
+	// HEAD^2 since that will be the commit before our merge.
+	pullHead := "HEAD"
+	if w.CheckoutMerge {
+		pullHead = "HEAD^2"
+	}
+	revParseCmd := exec.Command("git", "rev-parse", pullHead) // #nosec
+	revParseCmd.Dir = cloneDir
+	output, err := revParseCmd.CombinedOutput()
+	if err != nil {
+		log.Warn("will re-clone repo, could not determine if was at correct commit: %s: %s: %s", strings.Join(revParseCmd.Args, " "), err, string(output))
+		return false
+	}
+	currCommit := strings.Trim(string(output), "\n")
+	// We're prefix matching here because BitBucket doesn't give us the full
+	// commit, only a 12 character prefix.
+	if strings.HasPrefix(currCommit, p.HeadCommit) {
+		log.Debug("repo is at correct commit %q so will not re-clone", p.HeadCommit)
+		return true
+	}
+
+	log.Debug("repo was already cloned but is not at correct commit, wanted %q got %q", p.HeadCommit, currCommit)
+	return false
+}
+
+// fetchBranch causes the repository to fetch the most recent version of the given branch
+// in a shallow fashion. This ensures we can access files from this branch, enabling later
+// reading of files from this revision.
+func (w *FileWorkspace) fetchBranch(log *logging.SimpleLogger, cloneDir, branch string) (string, error) {
+	log.Debug("fetching branch %s into repository %s", branch, cloneDir)
+
+	fetchCmd := exec.Command("git", "fetch", "--depth=1", "origin", fmt.Sprintf("+refs/heads/%s:refs/remotes/origin/%s", branch, branch))
+	fetchCmd.Dir = cloneDir
+	output, err := fetchCmd.CombinedOutput()
+	if err != nil {
+		err = errors.Wrapf(err, "failed to fetch base branch %s: %s", branch, string(output))
+	}
+
+	return cloneDir, err
 }
 
 // warnDiverged returns true if we should warn the user that the branch we're
