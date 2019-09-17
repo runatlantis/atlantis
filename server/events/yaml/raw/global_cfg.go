@@ -23,6 +23,7 @@ type Repo struct {
 	Workflow             *string  `yaml:"workflow,omitempty" json:"workflow,omitempty"`
 	AllowedOverrides     []string `yaml:"allowed_overrides" json:"allowed_overrides"`
 	AllowCustomWorkflows *bool    `yaml:"allow_custom_workflows,omitempty" json:"allow_custom_workflows,omitempty"`
+	ConfigSourceBranch   *string  `yaml:"config_source_branch,omitempty" json:"config_source_branch,omitempty"`
 }
 
 func (g GlobalCfg) Validate() error {
@@ -146,5 +147,6 @@ func (r Repo) ToValid(workflows map[string]valid.Workflow) valid.Repo {
 		Workflow:             workflow,
 		AllowedOverrides:     r.AllowedOverrides,
 		AllowCustomWorkflows: r.AllowCustomWorkflows,
+		ConfigSourceBranch:   r.ConfigSourceBranch,
 	}
 }

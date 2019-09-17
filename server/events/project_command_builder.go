@@ -2,6 +2,7 @@ package events
 
 import (
 	"fmt"
+	"os/exec"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
@@ -109,7 +110,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 	}
 	ctx.Log.Debug("%d files were modified in this pull request", len(modifiedFiles))
 
-	repoDir, err := p.WorkingDir.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, workspace)
+	repoDir, err := p.prepareWorkspace(ctx, workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +173,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *CommandConte
 	defer unlockFn()
 
 	ctx.Log.Debug("cloning repository")
-	repoDir, err := p.WorkingDir.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, workspace)
+	repoDir, err := p.prepareWorkspace(ctx, workspace)
 	if err != nil {
 		return pcc, err
 	}
@@ -183,6 +184,39 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *CommandConte
 	}
 
 	return p.buildProjectCommandCtx(ctx, models.PlanCommand, cmd.ProjectName, cmd.Flags, repoDir, repoRelDir, workspace, cmd.Verbose)
+}
+
+// prepareWorkspace clones new changes into our repository and checks out the appropriate
+// version of atlantis.yaml.
+func (p *DefaultProjectCommandBuilder) prepareWorkspace(ctx *CommandContext, workspace string) (string, error) {
+	// If we have no repo that matches in our global config then that is ok, as we'll get a
+	// nil pointer back that will allow us to ignore the config source branch
+	_, _, _, _, configSourceBranch := p.GlobalCfg.GetMatchingCfg(ctx.Log, ctx.BaseRepo.ID())
+
+	// If we need to access another branch, ensure we fetch it during our initial clone
+	additionalBranches := []string{}
+	if configSourceBranch != nil {
+		additionalBranches = append(additionalBranches, *configSourceBranch)
+	}
+
+	repoDir, err := p.WorkingDir.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, workspace, additionalBranches)
+	if err != nil {
+		return repoDir, err
+	}
+
+	// If we've specified a source branch for our atlantis.yaml, checkout the file from that
+	// branch before continuing with validation.
+	if configSourceBranch != nil {
+		ctx.Log.Debug("checking out %s from repos config source branch %s", yaml.AtlantisYAMLFilename, *configSourceBranch)
+		checkoutCmd := exec.Command("git", "checkout", fmt.Sprintf("origin/%s", *configSourceBranch), "--", yaml.AtlantisYAMLFilename)
+		checkoutCmd.Dir = repoDir
+		output, err := checkoutCmd.CombinedOutput()
+		if err != nil {
+			return repoDir, errors.Wrapf(err, "failed to checkout %s from branch %s in %s: %s", yaml.AtlantisYAMLFilename, *configSourceBranch, repoDir, string(output))
+		}
+	}
+
+	return repoDir, nil
 }
 
 // buildApplyAllCommands builds apply contexts for every project that has

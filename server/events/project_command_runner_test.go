@@ -14,10 +14,11 @@
 package events_test
 
 import (
-	"github.com/hashicorp/go-version"
-	"github.com/runatlantis/atlantis/server/events/runtime"
 	"os"
 	"testing"
+
+	"github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/events/runtime"
 
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events"
@@ -64,6 +65,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
 		AnyString(),
+		AnyStringSlice(),
 	)).ThenReturn(repoDir, nil)
 	When(mockLocker.TryLock(
 		matchers.AnyPtrToLoggingSimpleLogger(),
@@ -376,6 +378,7 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
 		AnyString(),
+		AnyStringSlice(),
 	)).ThenReturn(repoDir, nil)
 	When(mockLocker.TryLock(
 		matchers.AnyPtrToLoggingSimpleLogger(),

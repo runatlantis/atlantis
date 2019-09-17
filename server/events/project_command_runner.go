@@ -150,8 +150,10 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 	}
 	defer unlockFn()
 
-	// Clone is idempotent so okay to run even if the repo was already cloned.
-	repoDir, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	// Clone is idempotent so okay to run even if the repo was already cloned. We only need
+	// to ensure we've checked out the atlantis.yaml when building our project command, so
+	// we can omit the additional config source branch in this clone.
+	repoDir, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, ctx.Workspace, []string{})
 	if cloneErr != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)

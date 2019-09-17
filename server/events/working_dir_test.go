@@ -29,7 +29,7 @@ func TestClone_NoneExisting(t *testing.T) {
 
 	cloneDir, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
-	}, "default")
+	}, "default", []string{})
 	Ok(t, err)
 
 	// Use rev-parse to verify at correct commit.
@@ -79,7 +79,7 @@ func TestClone_CheckoutMergeNoneExisting(t *testing.T) {
 	cloneDir, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		BaseBranch: "master",
-	}, "default")
+	}, "default", []string{})
 	Ok(t, err)
 
 	// Check the commits.
@@ -126,7 +126,7 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 	_, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		BaseBranch: "master",
-	}, "default")
+	}, "default", []string{})
 	Ok(t, err)
 
 	// Create a file that we can use to check if the repo was recloned.
@@ -136,7 +136,7 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 	cloneDir, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		BaseBranch: "master",
-	}, "default")
+	}, "default", []string{})
 	Ok(t, err)
 
 	// Check that our proof file is still there, proving that we didn't reclone.
@@ -172,7 +172,7 @@ func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
 	_, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		BaseBranch: "master",
-	}, "default")
+	}, "default", []string{})
 	Ok(t, err)
 
 	// Create a file that we can use to check if the repo was recloned.
@@ -182,7 +182,7 @@ func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
 	cloneDir, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		BaseBranch: "master",
-	}, "default")
+	}, "default", []string{})
 	Ok(t, err)
 
 	// Check that our proof file is still there, proving that we didn't reclone.
@@ -223,7 +223,7 @@ func TestClone_CheckoutMergeConflict(t *testing.T) {
 	_, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		BaseBranch: "master",
-	}, "default")
+	}, "default", []string{})
 	ErrEquals(t, `running git merge -q --no-ff -m atlantis-merge FETCH_HEAD: Auto-merging file
 CONFLICT (add/add): Merge conflict in file
 Automatic merge failed; fix conflicts and then commit the result.
@@ -249,7 +249,7 @@ func TestClone_NoReclone(t *testing.T) {
 	}
 	cloneDir, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
-	}, "default")
+	}, "default", []string{})
 	Ok(t, err)
 
 	// Check that our proof file is still there.
@@ -284,7 +284,7 @@ func TestClone_RecloneWrongCommit(t *testing.T) {
 	cloneDir, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		HeadCommit: expCommit,
-	}, "default")
+	}, "default", []string{})
 	Ok(t, err)
 
 	// Use rev-parse to verify at correct commit.
