@@ -76,7 +76,7 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
 <body>
 <div class="container">
   <section class="header">
-    <a title="atlantis" href="{{ .CleanedBasePath }}/"><img src="{{ .CleanedBasePath }}/static/images/atlantis-icon.png"/></a>
+    <a title="atlantis" href="{{ .CleanedBasePath }}/"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
     <p class="title-heading">atlantis</p>
     <p class="js-discard-success"><strong>Plan discarded and unlocked!</strong></p>
   </section>
@@ -146,7 +146,7 @@ var lockTemplate = template.Must(template.New("lock.html.tmpl").Parse(`
 <body>
   <div class="container">
     <section class="header">
-    <a title="atlantis" href="{{ .CleanedBasePath }}/"><img src="{{ .CleanedBasePath }}/static/images/atlantis-icon.png"/></a>
+    <a title="atlantis" href="{{ .CleanedBasePath }}/"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
     <p class="title-heading">atlantis</p>
     <p class="title-heading"><strong>{{.LockKey}}</strong> <code>Locked</code></p>
     </section>
