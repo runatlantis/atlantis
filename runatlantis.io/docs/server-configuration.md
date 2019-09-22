@@ -98,24 +98,17 @@ Values are chosen in this order:
   Automatically merge pull requests after all plans have been successfully applied.
   Defaults to `false`. See [Automerging](automerging.html) for more details.
 
-* ### `--azuredevops-basic-auth`
+* ### `--azuredevops-basic-password`
   ```bash
-  atlantis server --azuredevops-basic-auth
+  atlantis server --azuredevops-basic-password="password123"
   ```
-  Enable/disable basic auth for validating Azure Devops webhooks (see
+  Azure Devops basic authentication password for inbound webhooks (see
   https://docs.microsoft.com/en-us/azure/devops/service-hooks/authorize?view=azure-devops).
   SECURITY WARNING: If not specified, Atlantis won't be able to validate that the
   incoming webhook call came from your Azure Devops org. This means that an
   attacker could spoof calls to Atlantis and cause it to perform malicious
   actions. Should be specified via the ATLANTIS_AZUREDEVOPS_BASIC_AUTH environment
   variable.
-
-* ### `--azuredevops-basic-password`
-  ```bash
-  atlantis server --azuredevops-basic-password="password123"
-  ```
-  Azure Devops basic authentication password for inbound webhooks. Can also be specified via the ATLANTIS_AZUREDEVOPS_BASIC_PASSWORD
-  environment variable. 
 
 * ### `--azuredevops-basic-user`
   ```bash

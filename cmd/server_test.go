@@ -346,7 +346,6 @@ func TestExecute_Defaults(t *testing.T) {
 		cmd.GitlabTokenFlag:     "gitlab-token",
 		cmd.BitbucketUserFlag:   "bitbucket-user",
 		cmd.BitbucketTokenFlag:  "bitbucket-token",
-		cmd.ADBasicAuthFlag:     "azuredevops-basic-auth",
 		cmd.ADBasicUserFlag:     "azuredevops-basic-user",
 		cmd.ADBasicPasswordFlag: "azuredevops-basic-password",
 		cmd.ADOrgFlag:           "azuredevops-org",

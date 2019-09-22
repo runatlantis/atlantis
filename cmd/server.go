@@ -36,7 +36,6 @@ import (
 // 3. Add your flag's description etc. to the stringFlags, intFlags, or boolFlags slices.
 const (
 	// Flag names.
-	ADBasicAuthFlag            = "azuredevops-basic-auth"
 	ADBasicPasswordFlag        = "azuredevops-basic-password" // nolint: gosec
 	ADBasicUserFlag            = "azuredevops-basic-user"
 	ADOrgFlag                  = "azuredevops-org"
@@ -80,7 +79,6 @@ const (
 	WriteGitCredsFlag          = "write-git-creds"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
-	DefaultADBasicAuth      = true
 	DefaultADBasicUser      = ""
 	DefaultADBasicPassword  = ""
 	DefaultCheckoutStrategy = "branch"
@@ -94,14 +92,12 @@ const (
 )
 
 var stringFlags = map[string]stringFlag{
-	ADBasicAuthFlag: {
-		description: "Enable/disable basic auth for validating Azure Devops webhooks (see https://docs.microsoft.com/en-us/azure/devops/service-hooks/authorize?view=azure-devops)." +
+	ADBasicPasswordFlag: {
+		description: "Azure Devops basic authentication password for inbound webhooks " +
+			"(see https://docs.microsoft.com/en-us/azure/devops/service-hooks/authorize?view=azure-devops)." +
 			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from your Azure Devops org. " +
 			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
-			"Should be specified via the ATLANTIS_AD_BASIC_AUTH environment variable.",
-	},
-	ADBasicPasswordFlag: {
-		description:  "Azure Devops basic authentication password for inbound webhooks.",
+			"Should be specified via the ATLANTIS_AD_BASIC_PASSWORD environment variable.",
 		defaultValue: "",
 	},
 	ADBasicUserFlag: {
