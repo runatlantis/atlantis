@@ -262,6 +262,24 @@ atlantis server \
 --repo-whitelist="$REPO_WHITELIST"
 ```
 
+##### Azure Devops
+
+A certificate and private key are required if using Basic authentication for webhooks.
+
+```bash
+atlantis server \
+--atlantis-url="$URL" \
+--azuredevops-user="$USERNAME" \
+--azuredevops-token="$TOKEN" \
+--azuredevops-org="myorg" \
+--azuredevops-project="myproject" \
+--azuredevops-basic-username="$ATLANTIS_AZUREDEVOPS_BASIC_USER" \
+--azuredevops-basic-password="$ATLANTIS_AZUREDEVOPS_BASIC_PASS" \
+--repo-whitelist="$REPO_WHITELIST"
+--ssl-cert-file=file.crt
+--ssl-key-file=file.key
+```
+
 ## Create a pull request
 Create a pull request so you can test Atlantis.
 ::: tip

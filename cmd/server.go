@@ -109,7 +109,7 @@ var stringFlags = map[string]stringFlag{
 		defaultValue: "",
 	},
 	ADProjectFlag: {
-		description:  "Project name in your Azure Devops insance.",
+		description:  "Project name in your Azure Devops instance.",
 		defaultValue: "",
 	},
 	ADTokenFlag: {
