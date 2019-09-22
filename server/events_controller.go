@@ -226,11 +226,11 @@ func (e *EventsController) handleAzureDevopsPost(w http.ResponseWriter, r *http.
 	e.Logger.Debug("request valid")
 
 	azuredevopsReqID := "Request-Id=" + r.Header.Get("Request-Id")
-	event, _ := azuredevops.ParseWebHook(payload)
-	/*event, ok := webhook.(*azuredevops.Event)
-	if !ok {
-		e.respond(w, logging.Debug, http.StatusBadRequest, "Error unmarshaling webhook payload %s", azuredevopsReqID)
-	}*/
+	event, err := azuredevops.ParseWebHook(payload)
+	if err != nil {
+		e.respond(w, logging.Error, http.StatusBadRequest, "Failed parsing webhook: %v %s", err, azuredevopsReqID)
+		return
+	}
 	switch event.PayloadType {
 	case azuredevops.WorkItemCommentedEvent:
 		e.Logger.Debug("handling as comment event")
@@ -239,7 +239,7 @@ func (e *EventsController) handleAzureDevopsPost(w http.ResponseWriter, r *http.
 		e.Logger.Debug("handling as pull request event")
 		e.HandleAzureDevopsPullRequestEvent(w, event, azuredevopsReqID)
 	default:
-		e.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event %s", azuredevopsReqID)
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event: %v %s", event.PayloadType, azuredevopsReqID)
 	}
 }
 
@@ -477,15 +477,22 @@ func (e *EventsController) HandleAzureDevopsCommentEvent(w http.ResponseWriter, 
 	}
 	strippedComment := bluemonday.StrictPolicy().SanitizeBytes([]byte(*comment))
 
-	if len(workItem.Relations) == 0 {
+	pullRefs, err := e.Parser.ParseAzureDevopsWorkItemCommentedEvent(workItem, nil)
+
+	if err != nil && len(pullRefs) == 0 {
+		e.respond(w, logging.Error, http.StatusBadRequest, "Failed parsing event: %v %s", err, azuredevopsReqID)
+		return
+	}
+
+	if len(pullRefs) == 0 {
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since no pull request is linked to work item; Request-Id = %s", azuredevopsReqID)
 		return
 	}
-	pullRefs, err := e.Parser.ParseAzureDevopsWorkItemCommentedEvent(workItem, nil)
 
-	if err != nil {
-		e.respond(w, logging.Error, http.StatusBadRequest, "Failed parsing event: %v %s", err, azuredevopsReqID)
-		return
+	if err != nil && len(pullRefs) > 0 {
+		e.respond(w, logging.Warn, http.StatusOK, "Failed parsing one of the linked pull requests: %v %s", err, azuredevopsReqID)
+	} else {
+		e.respond(w, logging.Info, http.StatusOK, "Successfully parsed workitem.commented event; Request-Id = %s", azuredevopsReqID)
 	}
 
 	for _, ref := range pullRefs {

@@ -253,7 +253,6 @@ type EventParsing interface {
 	// baseRepo is the repo that the pull request will be merged into.
 	// user is the pull request author.
 	// pullNum is the number of the pull request that triggered the webhook.
-	// *** Add tests and handle linking multiple pull requests to a work item.
 	ParseAzureDevopsWorkItemCommentedEvent(comment *azuredevops.WorkItem, baseURL *string) (pullRefs []PullRef, err error)
 
 	// ParseAzureDevopsPull parses the response from the Azure Devops API endpoint (not
@@ -835,23 +834,19 @@ type PullRef struct {
 // pullNumStr is retrieved from a URI that resembles:
 // vstfs:///Git/PullRequestId/a7573007-bbb3-4341-b726-0c4148a07853%2f3411ebc1-d5aa-464f-9615-0b527bc66719%2f22
 // where the pull request number is 22, following the %2f near tne end
-// Must set a default error value that will be returned if there are no valid
-// pull request relations in the event
 func (e *EventParser) ParseAzureDevopsWorkItemCommentedEvent(comment *azuredevops.WorkItem, baseURL *string) (pullRefs []PullRef, err error) {
-	defaultErrorStr := "no valid pull request relations in event payload"
-	err = errors.New(defaultErrorStr)
 	for _, relation := range comment.Relations {
 		ref := &PullRef{}
 		if uri := relation.GetURL(); strings.Contains(uri, "vstfs:///Git/PullRequestId/") {
 			var parsed *url.URL
 			parsed, err = url.Parse(uri)
 			if err != nil {
-				return pullRefs, err
+				continue
 			}
 			pullNumStr := strings.Split(parsed.Path, "/")[5]
 			ref.PullNum, err = strconv.Atoi(pullNumStr)
 			if err != nil {
-				return pullRefs, err
+				continue
 			}
 
 			// Retrieve the linked pull request to get baseRepo and user
@@ -863,7 +858,7 @@ func (e *EventParser) ParseAzureDevopsWorkItemCommentedEvent(comment *azuredevop
 			httpClient.Timeout = 10 * time.Second
 			client, err := azuredevops.NewClient(httpClient)
 			if err != nil {
-				return pullRefs, err
+				continue
 			}
 			if baseURL != nil {
 				if !strings.HasSuffix(*baseURL, "/") {
@@ -871,20 +866,20 @@ func (e *EventParser) ParseAzureDevopsWorkItemCommentedEvent(comment *azuredevop
 				}
 				parsed, err = url.Parse(*baseURL)
 				if err != nil {
-					return pullRefs, err
+					continue
 				}
 				client.BaseURL = *parsed
 			}
 			opts := azuredevops.PullRequestListOptions{}
 			pr, _, err := client.PullRequests.Get(context.Background(), e.AzureDevopsOrg, e.AzureDevopsProject, ref.PullNum, &opts)
 			if err != nil {
-				return pullRefs, err
+				continue
 			}
 			createdBy := pr.GetCreatedBy()
 			ref.User = models.User{Username: createdBy.GetUniqueName()}
 			ref.BaseRepo, err = e.ParseAzureDevopsRepo(pr.GetRepository())
 			if err != nil {
-				return pullRefs, err
+				continue
 			}
 			pullRefs = append(pullRefs, *ref)
 		}

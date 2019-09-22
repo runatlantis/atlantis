@@ -1139,19 +1139,19 @@ func TestParseAzureDevopsWorkItemCommentedEvent(t *testing.T) {
 	resource := testEvent.Resource.(azuredevops.WorkItem)
 	resource.Relations = nil
 	_, err := parser.ParseAzureDevopsWorkItemCommentedEvent(&resource, nil)
-	ErrEquals(t, "no valid pull request relations in event payload", err)
+	Ok(t, err)
 
 	testEvent = deepcopy.Copy(event).(azuredevops.Event)
 	resource = testEvent.Resource.(azuredevops.WorkItem)
 	resource.Relations[0] = nil
 	_, err = parser.ParseAzureDevopsWorkItemCommentedEvent(&resource, nil)
-	ErrEquals(t, "no valid pull request relations in event payload", err)
+	Ok(t, err)
 
 	testEvent = deepcopy.Copy(event).(azuredevops.Event)
 	resource = testEvent.Resource.(azuredevops.WorkItem)
-	resource.Relations[0].URL = azuredevops.String("")
+	resource.Relations[0].URL = azuredevops.String("vstfs:///Git/PullRequestId/a7573007-bbb3-4341-b726-0c4148a07853%2f3411ebc1-d5aa-464f-9615-0b527bc66719%2fwat")
 	_, err = parser.ParseAzureDevopsWorkItemCommentedEvent(&resource, nil)
-	ErrEquals(t, "no valid pull request relations in event payload", err)
+	ErrEquals(t, "strconv.Atoi: parsing \"wat\": invalid syntax", err)
 
 	// this should be successful
 	// This parse function requires a mock HTTP server to return the ADPull fixture
