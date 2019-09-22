@@ -528,6 +528,9 @@ atlantis server \
 ```
 
 ##### Azure Devops
+
+A certificate and private key are required if using Basic authentication for webhooks.
+
 ```bash
 atlantis server \
 --atlantis-url="$URL" \
@@ -536,6 +539,8 @@ atlantis server \
 --azuredevops-basic-username="$ATLANTIS_AZUREDEVOPS_BASIC_USER" \
 --azuredevops-basic-password="$ATLANTIS_AZUREDEVOPS_BASIC_PASS" \
 --repo-whitelist="$REPO_WHITELIST"
+--ssl-cert-file=file.crt
+--ssl-key-file=file.key
 ```
 
 Where
