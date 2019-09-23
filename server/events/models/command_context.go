@@ -11,10 +11,11 @@
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
 
-package events
+package models
 
 import (
-	"github.com/runatlantis/atlantis/server/events/models"
+	"os/exec"
+
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -22,19 +23,32 @@ import (
 // for a pull request.
 type CommandContext struct {
 	// BaseRepo is the repository that the pull request will be merged into.
-	BaseRepo models.Repo
+	BaseRepo Repo
 	// HeadRepo is the repository that is getting merged into the BaseRepo.
 	// If the pull request branch is from the same repository then HeadRepo will
 	// be the same as BaseRepo.
 	// See https://help.github.com/articles/about-pull-request-merges/.
-	HeadRepo models.Repo
-	Pull     models.PullRequest
+	HeadRepo Repo
+	Pull     PullRequest
 	// User is the user that triggered this command.
-	User models.User
+	User User
 	Log  *logging.SimpleLogger
 	// PullMergeable is true if Pull is able to be merged. This is available in
 	// the CommandContext because we want to collect this information before we
 	// set our own build statuses which can affect mergeability if users have
 	// required the Atlantis status to be successful prior to merging.
 	PullMergeable bool
+
+	// Cancelled signifies that the command should stop running
+	Cancelled bool
+	// LastCmd is the command to cancel
+	LastCmd *exec.Cmd
+}
+
+// Cancel the running command
+func (ctx *CommandContext) Cancel() {
+	ctx.Cancelled = true
+	if ctx.LastCmd != nil && !ctx.LastCmd.ProcessState.Exited() {
+		ctx.LastCmd.Process.Kill()
+	}
 }

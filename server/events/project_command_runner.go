@@ -52,7 +52,7 @@ type LockURLGenerator interface {
 // `terraform plan`.
 type StepRunner interface {
 	// Run runs the step.
-	Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error)
+	Run(ctx *models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_custom_step_runner.go CustomStepRunner
@@ -60,14 +60,14 @@ type StepRunner interface {
 // CustomStepRunner runs custom run steps.
 type CustomStepRunner interface {
 	// Run cmd in path.
-	Run(ctx models.ProjectCommandContext, cmd string, path string, envs map[string]string) (string, error)
+	Run(ctx *models.ProjectCommandContext, cmd string, path string, envs map[string]string) (string, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_env_step_runner.go EnvStepRunner
 
 // EnvStepRunner runs env steps.
 type EnvStepRunner interface {
-	Run(ctx models.ProjectCommandContext, cmd string, value string, path string, envs map[string]string) (string, error)
+	Run(ctx *models.ProjectCommandContext, cmd string, value string, path string, envs map[string]string) (string, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_webhooks_sender.go WebhooksSender
@@ -84,9 +84,9 @@ type WebhooksSender interface {
 // for a specific TF project.
 type ProjectCommandRunner interface {
 	// Plan runs terraform plan for the project described by ctx.
-	Plan(ctx models.ProjectCommandContext) models.ProjectResult
+	Plan(ctx *models.ProjectCommandContext) models.ProjectResult
 	// Apply runs terraform apply for the project described by ctx.
-	Apply(ctx models.ProjectCommandContext) models.ProjectResult
+	Apply(ctx *models.ProjectCommandContext) models.ProjectResult
 }
 
 // DefaultProjectCommandRunner implements ProjectCommandRunner.
@@ -105,7 +105,7 @@ type DefaultProjectCommandRunner struct {
 }
 
 // Plan runs terraform plan for the project described by ctx.
-func (p *DefaultProjectCommandRunner) Plan(ctx models.ProjectCommandContext) models.ProjectResult {
+func (p *DefaultProjectCommandRunner) Plan(ctx *models.ProjectCommandContext) models.ProjectResult {
 	planSuccess, failure, err := p.doPlan(ctx)
 	return models.ProjectResult{
 		Command:     models.PlanCommand,
@@ -119,7 +119,7 @@ func (p *DefaultProjectCommandRunner) Plan(ctx models.ProjectCommandContext) mod
 }
 
 // Apply runs terraform apply for the project described by ctx.
-func (p *DefaultProjectCommandRunner) Apply(ctx models.ProjectCommandContext) models.ProjectResult {
+func (p *DefaultProjectCommandRunner) Apply(ctx *models.ProjectCommandContext) models.ProjectResult {
 	applyOut, failure, err := p.doApply(ctx)
 	return models.ProjectResult{
 		Command:      models.ApplyCommand,
@@ -132,7 +132,7 @@ func (p *DefaultProjectCommandRunner) Apply(ctx models.ProjectCommandContext) mo
 	}
 }
 
-func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (*models.PlanSuccess, string, error) {
+func (p *DefaultProjectCommandRunner) doPlan(ctx *models.ProjectCommandContext) (*models.PlanSuccess, string, error) {
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.BaseRepo.FullName, ctx.RepoRelDir))
 	if err != nil {
@@ -144,14 +144,17 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, nil, false)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.CommandContext, ctx.Workspace, false)
 	if err != nil {
 		return nil, "", err
 	}
 	defer unlockFn()
 
 	// Clone is idempotent so okay to run even if the repo was already cloned.
-	repoDir, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	repoDir, cloneErr := p.WorkingDir.Clone(ctx.CommandContext, ctx.Workspace)
+	if ctx.CommandContext.Cancelled {
+		return nil, "", nil
+	}
 	if cloneErr != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
@@ -179,10 +182,13 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 	}, "", nil
 }
 
-func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.ProjectCommandContext, absPath string) ([]string, error) {
+func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx *models.ProjectCommandContext, absPath string) ([]string, error) {
 	var outputs []string
 	envs := make(map[string]string)
 	for _, step := range steps {
+		if ctx.CommandContext.Cancelled {
+			break
+		}
 		var out string
 		var err error
 		switch step.StepName {
@@ -212,7 +218,7 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.Pr
 	return outputs, nil
 }
 
-func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) (applyOut string, failure string, err error) {
+func (p *DefaultProjectCommandRunner) doApply(ctx *models.ProjectCommandContext) (applyOut string, failure string, err error) {
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -242,7 +248,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 		}
 	}
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, nil, false)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.CommandContext, ctx.Workspace, false)
 	if err != nil {
 		return "", "", err
 	}

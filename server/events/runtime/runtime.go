@@ -24,7 +24,7 @@ const (
 // TerraformExec brings the interface from TerraformClient into this package
 // without causing circular imports.
 type TerraformExec interface {
-	RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, envs map[string]string, v *version.Version, workspace string) (string, error)
+	RunCommandWithVersion(ctx *models.ProjectCommandContext, path string, args []string, envs map[string]string, v *version.Version) (string, error)
 	EnsureVersion(log *logging.SimpleLogger, v *version.Version) error
 }
 
@@ -45,7 +45,7 @@ type AsyncTFExec interface {
 // StatusUpdater brings the interface from CommitStatusUpdater into this package
 // without causing circular imports.
 type StatusUpdater interface {
-	UpdateProject(ctx models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus, url string) error
+	UpdateProject(ctx *models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus, url string) error
 }
 
 // MustConstraint returns a constraint. It panics on error.

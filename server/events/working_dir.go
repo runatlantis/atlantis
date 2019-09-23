@@ -23,7 +23,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/logging"
 )
 
 const workingDirPrefix = "repos"
@@ -35,7 +34,7 @@ const workingDirPrefix = "repos"
 type WorkingDir interface {
 	// Clone git clones headRepo, checks out the branch and then returns the
 	// absolute path to the root of the cloned repo.
-	Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, workspace string) (string, error)
+	Clone(ctx *models.CommandContext, workspace string) (string, error)
 	// GetWorkingDir returns the path to the workspace for this repo and pull.
 	// If workspace does not exist on disk, error will be of type os.IsNotExist.
 	GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error)
@@ -65,18 +64,13 @@ type FileWorkspace struct {
 // path to the root of the cloned repo. If the repo already exists and is at
 // the right commit it does nothing. This is to support running commands in
 // multiple dirs of the same repo without deleting existing plans.
-func (w *FileWorkspace) Clone(
-	log *logging.SimpleLogger,
-	baseRepo models.Repo,
-	headRepo models.Repo,
-	p models.PullRequest,
-	workspace string) (string, error) {
-	cloneDir := w.cloneDir(baseRepo, p, workspace)
+func (w *FileWorkspace) Clone(ctx *models.CommandContext, workspace string) (string, error) {
+	cloneDir := w.cloneDir(ctx.BaseRepo, ctx.Pull, workspace)
 
 	// If the directory already exists, check if it's at the right commit.
 	// If so, then we do nothing.
 	if _, err := os.Stat(cloneDir); err == nil {
-		log.Debug("clone directory %q already exists, checking if it's at the right commit", cloneDir)
+		ctx.Log.Debug("clone directory %q already exists, checking if it's at the right commit", cloneDir)
 
 		// We use git rev-parse to see if our repo is at the right commit.
 		// If just checking out the pull request branch, we can use HEAD.
@@ -89,48 +83,48 @@ func (w *FileWorkspace) Clone(
 		}
 		revParseCmd := exec.Command("git", "rev-parse", pullHead) // #nosec
 		revParseCmd.Dir = cloneDir
+		ctx.LastCmd = revParseCmd
 		output, err := revParseCmd.CombinedOutput()
+		if ctx.Cancelled {
+			return "", nil
+		}
 		if err != nil {
-			log.Warn("will re-clone repo, could not determine if was at correct commit: %s: %s: %s", strings.Join(revParseCmd.Args, " "), err, string(output))
-			return w.forceClone(log, cloneDir, headRepo, p)
+			ctx.Log.Warn("will re-clone repo, could not determine if was at correct commit: %s: %s: %s", strings.Join(revParseCmd.Args, " "), err, string(output))
+			return w.forceClone(ctx, cloneDir)
 		}
 		currCommit := strings.Trim(string(output), "\n")
 		// We're prefix matching here because BitBucket doesn't give us the full
 		// commit, only a 12 character prefix.
-		if strings.HasPrefix(currCommit, p.HeadCommit) {
-			log.Debug("repo is at correct commit %q so will not re-clone", p.HeadCommit)
+		if strings.HasPrefix(currCommit, ctx.Pull.HeadCommit) {
+			ctx.Log.Debug("repo is at correct commit %q so will not re-clone", ctx.Pull.HeadCommit)
 			return cloneDir, nil
 		}
-		log.Debug("repo was already cloned but is not at correct commit, wanted %q got %q", p.HeadCommit, currCommit)
+		ctx.Log.Debug("repo was already cloned but is not at correct commit, wanted %q got %q", ctx.Pull.HeadCommit, currCommit)
 		// We'll fall through to re-clone.
 	}
 
 	// Otherwise we clone the repo.
-	return w.forceClone(log, cloneDir, headRepo, p)
+	return w.forceClone(ctx, cloneDir)
 }
 
-func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
-	cloneDir string,
-	headRepo models.Repo,
-	p models.PullRequest) (string, error) {
-
+func (w *FileWorkspace) forceClone(ctx *models.CommandContext, cloneDir string) (string, error) {
 	err := os.RemoveAll(cloneDir)
 	if err != nil {
 		return "", errors.Wrapf(err, "deleting dir %q before cloning", cloneDir)
 	}
 
 	// Create the directory and parents if necessary.
-	log.Info("creating dir %q", cloneDir)
+	ctx.Log.Info("creating dir %q", cloneDir)
 	if err := os.MkdirAll(cloneDir, 0700); err != nil {
 		return "", errors.Wrap(err, "creating new workspace")
 	}
 
 	// During testing, we mock some of this out.
-	headCloneURL := headRepo.CloneURL
+	headCloneURL := ctx.HeadRepo.CloneURL
 	if w.TestingOverrideHeadCloneURL != "" {
 		headCloneURL = w.TestingOverrideHeadCloneURL
 	}
-	baseCloneURL := p.BaseRepo.CloneURL
+	baseCloneURL := ctx.Pull.BaseRepo.CloneURL
 	if w.TestingOverrideBaseCloneURL != "" {
 		baseCloneURL = w.TestingOverrideBaseCloneURL
 	}
@@ -143,13 +137,13 @@ func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
 		// See https://groups.google.com/forum/#!topic/git-users/v3MkuuiDJ98.
 		cmds = [][]string{
 			{
-				"git", "clone", "--branch", p.BaseBranch, "--single-branch", baseCloneURL, cloneDir,
+				"git", "clone", "--branch", ctx.Pull.BaseBranch, "--single-branch", baseCloneURL, cloneDir,
 			},
 			{
 				"git", "remote", "add", "head", headCloneURL,
 			},
 			{
-				"git", "fetch", "head", fmt.Sprintf("+refs/heads/%s:", p.HeadBranch),
+				"git", "fetch", "head", fmt.Sprintf("+refs/heads/%s:", ctx.Pull.HeadBranch),
 			},
 			// We use --no-ff because we always want there to be a merge commit.
 			// This way, our branch will look the same regardless if the merge
@@ -164,13 +158,17 @@ func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
 	} else {
 		cmds = [][]string{
 			{
-				"git", "clone", "--branch", p.HeadBranch, "--depth=1", "--single-branch", headCloneURL, cloneDir,
+				"git", "clone", "--branch", ctx.Pull.HeadBranch, "--depth=1", "--single-branch", headCloneURL, cloneDir,
 			},
 		}
 	}
 
 	for _, args := range cmds {
+		if ctx.Cancelled {
+			return cloneDir, nil
+		}
 		cmd := exec.Command(args[0], args[1:]...) // nolint: gosec
+		ctx.LastCmd = cmd
 		cmd.Dir = cloneDir
 		// The git merge command requires these env vars are set.
 		cmd.Env = append(os.Environ(), []string{
@@ -179,14 +177,14 @@ func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
 			"GIT_COMMITTER_NAME=atlantis",
 		}...)
 
-		cmdStr := w.sanitizeGitCredentials(strings.Join(cmd.Args, " "), p.BaseRepo, headRepo)
+		cmdStr := w.sanitizeGitCredentials(strings.Join(cmd.Args, " "), ctx.Pull.BaseRepo, ctx.HeadRepo)
 		output, err := cmd.CombinedOutput()
-		sanitizedOutput := w.sanitizeGitCredentials(string(output), p.BaseRepo, headRepo)
+		sanitizedOutput := w.sanitizeGitCredentials(string(output), ctx.Pull.BaseRepo, ctx.HeadRepo)
 		if err != nil {
-			sanitizedErrMsg := w.sanitizeGitCredentials(err.Error(), p.BaseRepo, headRepo)
+			sanitizedErrMsg := w.sanitizeGitCredentials(err.Error(), ctx.Pull.BaseRepo, ctx.HeadRepo)
 			return "", fmt.Errorf("running %s: %s: %s", cmdStr, sanitizedOutput, sanitizedErrMsg)
 		}
-		log.Debug("ran: %s. Output: %s", cmdStr, strings.TrimSuffix(sanitizedOutput, "\n"))
+		ctx.Log.Debug("ran: %s. Output: %s", cmdStr, strings.TrimSuffix(sanitizedOutput, "\n"))
 	}
 	return cloneDir, nil
 }

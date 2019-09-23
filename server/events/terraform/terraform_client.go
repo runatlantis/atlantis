@@ -27,6 +27,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/runatlantis/atlantis/server/events/models"
+
 	"github.com/hashicorp/go-getter"
 	"github.com/hashicorp/go-version"
 	"github.com/mitchellh/go-homedir"
@@ -40,7 +42,7 @@ type Client interface {
 	// RunCommandWithVersion executes terraform with args in path. If v is nil,
 	// it will use the default Terraform version. workspace is the Terraform
 	// workspace which should be set as an environment variable.
-	RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, envs map[string]string, v *version.Version, workspace string) (string, error)
+	RunCommandWithVersion(ctx *models.ProjectCommandContext, path string, args []string, envs map[string]string, v *version.Version) (string, error)
 
 	// EnsureVersion makes sure that terraform version `v` is available to use
 	EnsureVersion(log *logging.SimpleLogger, v *version.Version) error
@@ -210,8 +212,8 @@ func (c *DefaultClient) EnsureVersion(log *logging.SimpleLogger, v *version.Vers
 }
 
 // See Client.RunCommandWithVersion.
-func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (string, error) {
-	tfCmd, cmd, err := c.prepCmd(log, v, workspace, path, args)
+func (c *DefaultClient) RunCommandWithVersion(ctx *models.ProjectCommandContext, path string, args []string, customEnvVars map[string]string, v *version.Version) (string, error) {
+	tfCmd, cmd, err := c.prepCmd(ctx.Log, v, ctx.Workspace, path, args)
 	if err != nil {
 		return "", err
 	}
@@ -220,13 +222,17 @@ func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path st
 		envVars = append(envVars, fmt.Sprintf("%s=%s", key, val))
 	}
 	cmd.Env = envVars
+	ctx.CommandContext.LastCmd = cmd
 	out, err := cmd.CombinedOutput()
+	if ctx.CommandContext.Cancelled {
+		return "", nil
+	}
 	if err != nil {
 		err = errors.Wrapf(err, "running %q in %q", tfCmd, path)
-		log.Err(err.Error())
+		ctx.Log.Err(err.Error())
 		return string(out), err
 	}
-	log.Info("successfully ran %q in %q", tfCmd, path)
+	ctx.Log.Info("successfully ran %q in %q", tfCmd, path)
 	return string(out), nil
 }
 

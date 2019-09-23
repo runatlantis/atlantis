@@ -1,8 +1,9 @@
 package runtime
 
 import (
-	"github.com/runatlantis/atlantis/server/events/models"
 	"strings"
+
+	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 // EnvStepRunner set environment variables.
@@ -13,7 +14,7 @@ type EnvStepRunner struct {
 // Run runs the env step command.
 // value is the value for the environment variable. If set this is returned as
 // the value. Otherwise command is run and its output is the value returned.
-func (r *EnvStepRunner) Run(ctx models.ProjectCommandContext, command string, value string, path string, envs map[string]string) (string, error) {
+func (r *EnvStepRunner) Run(ctx *models.ProjectCommandContext, command string, value string, path string, envs map[string]string) (string, error) {
 	if value != "" {
 		return value, nil
 	}

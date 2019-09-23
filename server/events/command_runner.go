@@ -83,7 +83,7 @@ type DefaultCommandRunner struct {
 func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) {
 	log := c.buildLogger(baseRepo.FullName, pull.Num)
 	defer c.logPanics(baseRepo, pull.Num, log)
-	ctx := &CommandContext{
+	ctx := &models.CommandContext{
 		User:     user,
 		Log:      log,
 		Pull:     pull,
@@ -177,7 +177,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		}
 		return
 	}
-	ctx := &CommandContext{
+	ctx := &models.CommandContext{
 		User:     user,
 		Log:      log,
 		Pull:     pull,
@@ -208,7 +208,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
-	var projectCmds []models.ProjectCommandContext
+	var projectCmds []*models.ProjectCommandContext
 	switch cmd.Name {
 	case models.PlanCommand:
 		projectCmds, err = c.ProjectCommandBuilder.BuildPlanCommands(ctx, cmd)
@@ -250,7 +250,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	}
 }
 
-func (c *DefaultCommandRunner) updateCommitStatus(ctx *CommandContext, cmd models.CommandName, pullStatus models.PullStatus) {
+func (c *DefaultCommandRunner) updateCommitStatus(ctx *models.CommandContext, cmd models.CommandName, pullStatus models.PullStatus) {
 	var numSuccess int
 	var status models.CommitStatus
 
@@ -282,7 +282,7 @@ func (c *DefaultCommandRunner) updateCommitStatus(ctx *CommandContext, cmd model
 	}
 }
 
-func (c *DefaultCommandRunner) automerge(ctx *CommandContext, pullStatus models.PullStatus) {
+func (c *DefaultCommandRunner) automerge(ctx *models.CommandContext, pullStatus models.PullStatus) {
 	// We only automerge if all projects have been successfully applied.
 	for _, p := range pullStatus.Projects {
 		if p.Status != models.AppliedPlanStatus {
@@ -311,7 +311,7 @@ func (c *DefaultCommandRunner) automerge(ctx *CommandContext, pullStatus models.
 	}
 }
 
-func (c *DefaultCommandRunner) runProjectCmds(cmds []models.ProjectCommandContext, cmdName models.CommandName) CommandResult {
+func (c *DefaultCommandRunner) runProjectCmds(cmds []*models.ProjectCommandContext, cmdName models.CommandName) CommandResult {
 	var results []models.ProjectResult
 	for _, pCmd := range cmds {
 		var res models.ProjectResult
@@ -358,7 +358,7 @@ func (c *DefaultCommandRunner) buildLogger(repoFullName string, pullNum int) *lo
 	return c.Logger.NewLogger(src, true, c.Logger.GetLevel())
 }
 
-func (c *DefaultCommandRunner) validateCtxAndComment(ctx *CommandContext) bool {
+func (c *DefaultCommandRunner) validateCtxAndComment(ctx *models.CommandContext) bool {
 	if !c.AllowForkPRs && ctx.HeadRepo.Owner != ctx.BaseRepo.Owner {
 		ctx.Log.Info("command was run on a fork pull request which is disallowed")
 		if err := c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, fmt.Sprintf("Atlantis commands can't be run on fork pull requests. To enable, set --%s", c.AllowForkPRsFlag)); err != nil {
@@ -377,7 +377,7 @@ func (c *DefaultCommandRunner) validateCtxAndComment(ctx *CommandContext) bool {
 	return true
 }
 
-func (c *DefaultCommandRunner) updatePull(ctx *CommandContext, command PullCommand, res CommandResult) {
+func (c *DefaultCommandRunner) updatePull(ctx *models.CommandContext, command PullCommand, res CommandResult) {
 	// Log if we got any errors or failures.
 	if res.Error != nil {
 		ctx.Log.Err(res.Error.Error())
@@ -407,7 +407,7 @@ func (c *DefaultCommandRunner) logPanics(baseRepo models.Repo, pullNum int, logg
 }
 
 // deletePlans deletes all plans generated in this ctx.
-func (c *DefaultCommandRunner) deletePlans(ctx *CommandContext) {
+func (c *DefaultCommandRunner) deletePlans(ctx *models.CommandContext) {
 	pullDir, err := c.WorkingDir.GetPullDir(ctx.BaseRepo, ctx.Pull)
 	if err != nil {
 		ctx.Log.Err("getting pull dir: %s", err)
@@ -417,7 +417,7 @@ func (c *DefaultCommandRunner) deletePlans(ctx *CommandContext) {
 	}
 }
 
-func (c *DefaultCommandRunner) updateDB(ctx *CommandContext, pull models.PullRequest, results []models.ProjectResult) (models.PullStatus, error) {
+func (c *DefaultCommandRunner) updateDB(ctx *models.CommandContext, pull models.PullRequest, results []models.ProjectResult) (models.PullStatus, error) {
 	// Filter out results that errored due to the directory not existing. We
 	// don't store these in the database because they would never be "applyable"
 	// and so the pull request would always have errors.
@@ -434,7 +434,7 @@ func (c *DefaultCommandRunner) updateDB(ctx *CommandContext, pull models.PullReq
 }
 
 // automergeEnabled returns true if automerging is enabled in this context.
-func (c *DefaultCommandRunner) automergeEnabled(ctx *CommandContext, projectCmds []models.ProjectCommandContext) bool {
+func (c *DefaultCommandRunner) automergeEnabled(ctx *models.CommandContext, projectCmds []*models.ProjectCommandContext) bool {
 	// If the global automerge is set, we always automerge.
 	return c.GlobalAutomerge ||
 		// Otherwise we check if this repo is configured for automerging.

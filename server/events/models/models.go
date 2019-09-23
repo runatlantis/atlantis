@@ -345,6 +345,8 @@ type ProjectCommandContext struct {
 	// Workspace is the Terraform workspace this project is in. It will always
 	// be set.
 	Workspace string
+	// CommandContext that started this project command
+	CommandContext *CommandContext
 }
 
 // SplitRepoFullName splits a repo full name up into its owner and repo name
