@@ -34,6 +34,7 @@ for Atlantis.
 Pick your deployment type:
 * [Kubernetes Helm Chart](#kubernetes-helm-chart)
 * [Kubernetes Manifests](#kubernetes-manifests)
+* [Kustomize](#kubernetes-kustomize)
 * [OpenShift](#openshift)
 * [AWS Fargate](#aws-fargate)
 * [Google Kubernetes Engine (GKE)](#google-kubernetes-engine-gke)
@@ -364,6 +365,84 @@ You could also set up SSL at your LoadBalancer.
 
 **You're done! See [Next Steps](#next-steps) for what to do next.**
 
+### Kubernetes Kustomize
+
+A `kustomization.yaml` file is rovided at in the direpctory `kustomize/`, so you may use this repository as a remote target.
+
+Example:
+```yaml
+resources:
+- github.com/runatlantis/atlantis/kustomize
+```
+
+**Important:** You must ensure you patch the provided manifests with the correct environment variables for your installation, such as the following:
+
+#### Required
+```yaml
+...
+ containers:
+  - name: atlantis
+    env:
+      - name: ATLANTIS_REPO_WHITELIST
+        value: github.com/yourorg/* # 2. Replace this with your own repo whitelist.
+```
+
+#### GitLab
+```yaml
+...
+containers:
+- name: atlantis
+  env:
+    - name: ATLANTIS_GITLAB_USER
+      value: <YOUR_GITLAB_USER> # 4i. If you're using GitLab replace <YOUR_GITLAB_USER> with the username of your Atlantis GitLab user without the `@`.
+    - name: ATLANTIS_GITLAB_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: atlantis-vcs
+          key: token
+    - name: ATLANTIS_GITLAB_WEBHOOK_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: atlantis-vcs
+          key: webhook-secret
+```
+#### GitHub
+
+```yaml
+...
+containers:
+- name: atlantis
+  env:
+    - name: ATLANTIS_GH_USER
+      value: <YOUR_GITHUB_USER> # 3i. If you're using GitHub replace <YOUR_GITHUB_USER> with the username of your Atlantis GitHub user without the `@`.
+    - name: ATLANTIS_GH_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: atlantis-vcs
+          key: token
+    - name: ATLANTIS_GH_WEBHOOK_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: atlantis-vcs
+          key: webhook-secret
+```
+
+#### BitBucket
+```yaml
+...
+containers:
+- name: atlantis
+  env:
+    - name: ATLANTIS_BITBUCKET_USER
+          value: <YOUR_BITBUCKET_USER> # 5i. If you're using Bitbucket replace <YOUR_BITBUCKET_USER> with the username of your Atlantis Bitbucket user without the `@`.
+    - name: ATLANTIS_BITBUCKET_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: atlantis-vcs
+          key: token
+```
+
+       
 ### OpenShift
 The Helm chart and Kubernetes manifests above are compatible with OpenShift, however you need to run
 with an additional environment variable: `ATLANTIS_DATA_DIR=/home/atlantis`. This is required because

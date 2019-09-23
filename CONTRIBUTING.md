@@ -104,6 +104,7 @@ This is easier to read and more consistent
 
 # Creating a New Release
 1. Update version number in `main.go`.
+1. Update image tag version in the [kustomize/bundle.yaml](kustomize/bundle.yaml).
 1. Update `CHANGELOG.md` with latest release number and information (this URL might be useful: https://github.com/runatlantis/atlantis/compare/v0.3.5...master)
 1. Create a pull request and merge to master
 1. Check out master and fetch latest
