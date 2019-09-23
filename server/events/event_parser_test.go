@@ -44,8 +44,6 @@ var parser = events.EventParser{
 	BitbucketServerURL: "http://mycorp.com:7490",
 	AzureDevopsUser:    "azuredevops-user",
 	AzureDevopsToken:   "azuredevops-token",
-	AzureDevopsOrg:     "owner",
-	AzureDevopsProject: "project",
 }
 
 func TestParseGithubRepo(t *testing.T) {

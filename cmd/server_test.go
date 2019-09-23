@@ -184,7 +184,7 @@ func TestExecute_ValidateSSLConfig(t *testing.T) {
 }
 
 func TestExecute_ValidateVCSConfig(t *testing.T) {
-	expErr := "--gh-user/--gh-token or --gitlab-user/--gitlab-token or --bitbucket-user/--bitbucket-token or --azuredevops-user/--azuredevops-token/--azuredevops-org/--azuredevops-project must be set"
+	expErr := "--gh-user/--gh-token or --gitlab-user/--gitlab-token or --bitbucket-user/--bitbucket-token or --azuredevops-user/--azuredevops-token must be set"
 	cases := []struct {
 		description string
 		flags       map[string]interface{}
@@ -348,8 +348,6 @@ func TestExecute_Defaults(t *testing.T) {
 		cmd.BitbucketTokenFlag:  "bitbucket-token",
 		cmd.ADBasicUserFlag:     "azuredevops-basic-user",
 		cmd.ADBasicPasswordFlag: "azuredevops-basic-password",
-		cmd.ADOrgFlag:           "azuredevops-org",
-		cmd.ADProjectFlag:       "azuredevops-project",
 		cmd.ADTokenFlag:         "azuredevops-token",
 		cmd.ADUserFlag:          "azuredevops-user",
 		cmd.RepoWhitelistFlag:   "*",
@@ -384,8 +382,6 @@ func TestExecute_Defaults(t *testing.T) {
 	Equals(t, "https://api.bitbucket.org", passedConfig.BitbucketBaseURL)
 	Equals(t, "bitbucket-token", passedConfig.BitbucketToken)
 	Equals(t, "bitbucket-user", passedConfig.BitbucketUser)
-	Equals(t, "azuredevops-org", passedConfig.AzureDevopsOrg)
-	Equals(t, "azuredevops-project", passedConfig.AzureDevopsProject)
 	Equals(t, "azuredevops-token", passedConfig.AzureDevopsToken)
 	Equals(t, "azuredevops-user", passedConfig.AzureDevopsUser)
 	Equals(t, "", passedConfig.BitbucketWebhookSecret)

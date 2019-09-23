@@ -81,7 +81,7 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "owner", "user", "project", "token")
+			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
 			Ok(t, err)
 			defer disableSSLVerification()()
 
@@ -161,7 +161,7 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "owner", "user", "project", "token")
+			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
 			Ok(t, err)
 			defer disableSSLVerification()()
 
@@ -224,7 +224,7 @@ func TestAzureDevopsClient_GetModifiedFiles(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "owner", "user", "project", "token")
+	client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
 	Ok(t, err)
 	defer disableSSLVerification()()
 
@@ -303,7 +303,7 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 				}))
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "owner", "user", "project", "token")
+			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
 			Ok(t, err)
 			defer disableSSLVerification()()
 
@@ -386,7 +386,7 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 				}))
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "owner", "user", "project", "token")
+			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
 			Ok(t, err)
 			defer disableSSLVerification()()
 
@@ -430,7 +430,7 @@ func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 			}))
 		testServerURL, err := url.Parse(testServer.URL)
 		Ok(t, err)
-		client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "owner", "user", "project", "token")
+		client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
 		Ok(t, err)
 		defer disableSSLVerification()()
 

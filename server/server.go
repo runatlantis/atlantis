@@ -156,7 +156,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if userConfig.AzureDevopsUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.AzureDevops)
 		var err error
-		azuredevopsClient, err = vcs.NewAzureDevopsClient("dev.azure.com", userConfig.AzureDevopsOrg, userConfig.AzureDevopsUser, userConfig.AzureDevopsProject, userConfig.AzureDevopsToken)
+		azuredevopsClient, err = vcs.NewAzureDevopsClient("dev.azure.com", userConfig.AzureDevopsToken)
 		if err != nil {
 			return nil, err
 		}
@@ -179,6 +179,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 		if userConfig.BitbucketUser != "" {
 			if err := events.WriteGitCreds(userConfig.BitbucketUser, userConfig.BitbucketToken, userConfig.BitbucketBaseURL, home, logger); err != nil {
+				return nil, err
+			}
+		}
+		if userConfig.AzureDevopsUser != "" {
+			if err := events.WriteGitCreds(userConfig.AzureDevopsUser, userConfig.AzureDevopsToken, "https://dev.azure.com/", home, logger); err != nil {
 				return nil, err
 			}
 		}
@@ -275,8 +280,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		BitbucketServerURL: userConfig.BitbucketBaseURL,
 		AzureDevopsUser:    userConfig.AzureDevopsUser,
 		AzureDevopsToken:   userConfig.AzureDevopsToken,
-		AzureDevopsOrg:     userConfig.AzureDevopsOrg,
-		AzureDevopsProject: userConfig.AzureDevopsProject,
 	}
 	commentParser := &events.CommentParser{
 		GithubUser:      userConfig.GithubUser,
