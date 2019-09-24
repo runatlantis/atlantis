@@ -287,8 +287,6 @@ type EventParser struct {
 	BitbucketUser      string
 	BitbucketToken     string
 	BitbucketServerURL string
-	AzureDevopsOrg     string
-	AzureDevopsProject string
 	AzureDevopsToken   string
 	AzureDevopsUser    string
 }
@@ -829,23 +827,40 @@ type PullRef struct {
 }
 
 // ParseAzureDevopsWorkItemCommentedEvent parses Azure Devops work item comment events.
-// Multiple pull requests can be linked to a single work item.
+// Multiple pull requests can be linked to a single work item, and linked
+// objects can belong to different Team Projects. Parse all items in the
+// Relations object and only return the last error.
 // See EventParsing for return value docs.
-// pullNumStr is retrieved from a URI that resembles:
+// project and pullNumStr are retrieved from a URI that resembles:
 // vstfs:///Git/PullRequestId/a7573007-bbb3-4341-b726-0c4148a07853%2f3411ebc1-d5aa-464f-9615-0b527bc66719%2f22
-// where the pull request number is 22, following the %2f near tne end
-func (e *EventParser) ParseAzureDevopsWorkItemCommentedEvent(comment *azuredevops.WorkItem, baseURL *string) (pullRefs []PullRef, err error) {
+// where the project is the UUID starting with a75, and the pull request number
+// is 22, following %2f near tne end
+func (e *EventParser) ParseAzureDevopsWorkItemCommentedEvent(comment *azuredevops.WorkItem, baseURL *string) (pullRefs []PullRef, lastErr error) {
+	tenanturi, err := url.Parse(comment.GetURL())
+	owner := ""
+	if err != nil {
+		return pullRefs, err
+	}
+	if strings.Contains(tenanturi.Host, "visualstudio.com") {
+		owner = strings.Split(tenanturi.Host, ".")[0]
+	} else {
+		owner = strings.Split(tenanturi.Path, "/")[1]
+	}
+
 	for _, relation := range comment.Relations {
 		ref := &PullRef{}
 		if uri := relation.GetURL(); strings.Contains(uri, "vstfs:///Git/PullRequestId/") {
-			var parsed *url.URL
-			parsed, err = url.Parse(uri)
+			parsed, err := url.Parse(uri)
 			if err != nil {
+				lastErr = err
 				continue
 			}
-			pullNumStr := strings.Split(parsed.Path, "/")[5]
+			path := strings.Split(parsed.Path, "/")
+			project := path[3]
+			pullNumStr := path[5]
 			ref.PullNum, err = strconv.Atoi(pullNumStr)
 			if err != nil {
+				lastErr = err
 				continue
 			}
 
@@ -858,6 +873,7 @@ func (e *EventParser) ParseAzureDevopsWorkItemCommentedEvent(comment *azuredevop
 			httpClient.Timeout = 10 * time.Second
 			client, err := azuredevops.NewClient(httpClient)
 			if err != nil {
+				lastErr = err
 				continue
 			}
 			if baseURL != nil {
@@ -866,32 +882,39 @@ func (e *EventParser) ParseAzureDevopsWorkItemCommentedEvent(comment *azuredevop
 				}
 				parsed, err = url.Parse(*baseURL)
 				if err != nil {
+					lastErr = err
 					continue
 				}
 				client.BaseURL = *parsed
 			}
 			opts := azuredevops.PullRequestListOptions{}
-			pr, _, err := client.PullRequests.Get(context.Background(), e.AzureDevopsOrg, e.AzureDevopsProject, ref.PullNum, &opts)
+			pr, _, err := client.PullRequests.Get(context.Background(), owner, project, ref.PullNum, &opts)
 			if err != nil {
+				lastErr = err
 				continue
 			}
 			createdBy := pr.GetCreatedBy()
 			ref.User = models.User{Username: createdBy.GetUniqueName()}
 			ref.BaseRepo, err = e.ParseAzureDevopsRepo(pr.GetRepository())
 			if err != nil {
+				lastErr = err
 				continue
 			}
 			pullRefs = append(pullRefs, *ref)
 		}
 	}
 
-	return pullRefs, err
+	return pullRefs, lastErr
 }
 
 // ParseAzureDevopsRepo parses the response from the Azure Devops API endpoint that
 // returns a repo into the Atlantis model.
 // If the event payload doesn't contain a parent repository reference, extract the owner
-// name from the URL.
+// name from the URL. The URL will match one of two different formats:
+//
+// https://runatlantis.visualstudio.com/project/_git/repo
+// https://dev.azure.com/runatlantis/project/_git/repo
+//
 // See EventParsing for return value docs.
 func (e *EventParser) ParseAzureDevopsRepo(adRepo *azuredevops.GitRepository) (models.Repo, error) {
 	teamProject := adRepo.GetProject()
@@ -904,10 +927,8 @@ func (e *EventParser) ParseAzureDevopsRepo(adRepo *azuredevops.GitRepository) (m
 		if err != nil {
 			return models.Repo{}, err
 		}
-		// ex: https://runatlantis.visualstudio.com/project/_git/repo
 		if strings.Contains(uri.Host, "visualstudio.com") {
 			owner = strings.Split(uri.Host, ".")[0]
-			// ex: https://dev.azure.com/runatlantis/project/_git/repo
 		} else if strings.Contains(uri.Host, "dev.azure.com") {
 			owner = strings.Split(uri.Path, "/")[1]
 		} else {

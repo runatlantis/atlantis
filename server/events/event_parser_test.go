@@ -1130,6 +1130,7 @@ func TestParseAzureDevopsWorkItemCommentedEvent(t *testing.T) {
 					},
 				},
 			},
+			URL: azuredevops.String("https://owner.visualstudio.com/a7573007-bbb3-4341-b726-0c4148a07853/_api"),
 		},
 	}
 
@@ -1158,7 +1159,7 @@ func TestParseAzureDevopsWorkItemCommentedEvent(t *testing.T) {
 	server := httptest.NewServer(mux)
 	defer server.Close()
 
-	mux.HandleFunc("/owner/project/_apis/git/pullrequests/22", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/owner/a7573007-bbb3-4341-b726-0c4148a07853/_apis/git/pullrequests/22", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprint(w, ADPullJSON)
 	})
