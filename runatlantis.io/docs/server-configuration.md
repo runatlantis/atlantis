@@ -117,18 +117,6 @@ Values are chosen in this order:
   Azure Devops basic authentication username for inbound webhooks. Can also be specified via the ATLANTIS_AZUREDEVOPS_BASIC_USER
   environment variable.
 
-* ### `--azuredevops-org`
-  ```bash
-  atlantis server --azuredevops-org="myorgname"
-  ```
-  Organization name of your Azure Devops instance.
-
-* ### `--azuredevops-project`
-  ```bash
-  atlantis server --azuredevops-project="myproject"
-  ```
-  Project name in your Azure Devops insance.
-
 * ### `--azuredevops-token`
   ```bash
   atlantis server --azuredevops-token="username@example.com"

@@ -536,8 +536,6 @@ atlantis server \
 --atlantis-url="$URL" \
 --azuredevops-user="$USERNAME" \
 --azuredevops-token="$TOKEN" \
---azuredevops-org="myorg" \
---azuredevops-project="myproject" \
 --azuredevops-basic-username="$ATLANTIS_AZUREDEVOPS_BASIC_USER" \
 --azuredevops-basic-password="$ATLANTIS_AZUREDEVOPS_BASIC_PASS" \
 --repo-whitelist="$REPO_WHITELIST"
