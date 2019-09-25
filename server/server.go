@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/runatlantis/atlantis/server/metrics"
 	"log"
 	"net/http"
 	"net/url"
@@ -362,6 +363,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		VCSClient:                    vcsClient,
 		BitbucketWebhookSecret:       []byte(userConfig.BitbucketWebhookSecret),
 	}
+	// Start the metrics server
+	metrics.Init(logger)
 	return &Server{
 		AtlantisVersion:    config.AtlantisVersion,
 		AtlantisURL:        parsedURL,

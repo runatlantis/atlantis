@@ -15,6 +15,8 @@ package events
 
 import (
 	"fmt"
+	"github.com/runatlantis/atlantis/server/metrics"
+	"time"
 
 	"github.com/google/go-github/v28/github"
 	"github.com/pkg/errors"
@@ -314,6 +316,9 @@ func (c *DefaultCommandRunner) automerge(ctx *CommandContext, pullStatus models.
 func (c *DefaultCommandRunner) runProjectCmds(cmds []models.ProjectCommandContext, cmdName models.CommandName) CommandResult {
 	var results []models.ProjectResult
 	for _, pCmd := range cmds {
+		cmdStart := time.Now().UnixNano()
+		baseRepoHostnameAndFullName := pCmd.BaseRepo.VCSHost.Hostname + "/" + pCmd.BaseRepo.FullName
+		metrics.OpsInProgress.WithLabelValues(baseRepoHostnameAndFullName, pCmd.RepoRelDir, pCmd.Workspace, cmdName.String()).Inc()
 		var res models.ProjectResult
 		switch cmdName {
 		case models.PlanCommand:
@@ -321,6 +326,15 @@ func (c *DefaultCommandRunner) runProjectCmds(cmds []models.ProjectCommandContex
 		case models.ApplyCommand:
 			res = c.ProjectCommandRunner.Apply(pCmd)
 		}
+		var success string
+		if res.Error != nil || res.Failure != "" {
+			success = "false"
+		} else {
+			success = "true"
+		}
+		took := (float64(time.Now().UnixNano()-cmdStart) / 1000000000.0)
+		metrics.OpsProcessedHistogram.WithLabelValues(baseRepoHostnameAndFullName, pCmd.RepoRelDir, pCmd.Workspace, cmdName.String(), success).Observe(took)
+		metrics.OpsInProgress.WithLabelValues(baseRepoHostnameAndFullName, pCmd.RepoRelDir, pCmd.Workspace, cmdName.String()).Dec()
 		results = append(results, res)
 	}
 	return CommandResult{ProjectResults: results}

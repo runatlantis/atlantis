@@ -24,7 +24,7 @@ require (
 	github.com/gorilla/mux v1.6.2
 	github.com/hashicorp/errwrap v0.0.0-20141028054710-7554cd9344ce // indirect
 	github.com/hashicorp/go-getter v1.2.0
-	github.com/hashicorp/go-multierror v0.0.0-20170622060955-83588e72410a
+	github.com/hashicorp/go-multierror v0.0.0-20170622060955-83588e72410a // indirect
 	github.com/hashicorp/go-version v1.1.0
 	github.com/hashicorp/golang-lru v0.5.1 // indirect
 	github.com/hashicorp/hcl v0.0.0-20170914154624-68e816d1c783 // indirect
@@ -44,6 +44,7 @@ require (
 	github.com/pelletier/go-toml v1.0.0 // indirect
 	github.com/petergtz/pegomock v2.5.0+incompatible
 	github.com/pkg/errors v0.8.0
+	github.com/prometheus/client_golang v1.1.0
 	github.com/spf13/afero v0.0.0-20170901052352-ee1bd8ee15a1 // indirect
 	github.com/spf13/cast v1.1.0 // indirect
 	github.com/spf13/cobra v0.0.0-20170905172051-b78744579491
@@ -56,7 +57,6 @@ require (
 	github.com/xanzy/go-gitlab v0.20.2-0.20190819195750-b1d195859ad0
 	go.opencensus.io v0.19.1 // indirect
 	golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2
-	golang.org/x/sys v0.0.0-20190312061237-fead79001313 // indirect
 	google.golang.org/genproto v0.0.0-20190307195333-5fe7a883aa19 // indirect
 	gopkg.in/fsnotify.v1 v1.4.7 // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
