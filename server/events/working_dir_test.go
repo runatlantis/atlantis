@@ -224,10 +224,13 @@ func TestClone_CheckoutMergeConflict(t *testing.T) {
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
-	ErrEquals(t, `running git merge -q --no-ff -m atlantis-merge FETCH_HEAD: Auto-merging file
-CONFLICT (add/add): Merge conflict in file
-Automatic merge failed; fix conflicts and then commit the result.
-: exit status 1`, err)
+
+	ErrContains(t, "running git merge -q --no-ff -m atlantis-merge FETCH_HEAD", err)
+	ErrContains(t, "Auto-merging file", err)
+	ErrContains(t, "CONFLICT (add/add)", err)
+	ErrContains(t, "Merge conflict in file", err)
+	ErrContains(t, "Automatic merge failed; fix conflicts and then commit the result.", err)
+	ErrContains(t, "exit status 1", err)
 }
 
 // Test that if the repo is already cloned and is at the right commit, we
