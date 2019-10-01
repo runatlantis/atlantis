@@ -78,12 +78,12 @@ func (r *RepoWhitelistChecker) matchesRule(rule string, candidate string) bool {
 	// substr(candidate): -abc
 	// substr(rule): -abc
 	if wildcardIdx != len(rule)-1 {
-		// If the rule substring after wildcard does not exist in the candidate, then it is not a match.  
+		// If the rule substring after wildcard does not exist in the candidate, then it is not a match.
 		if !strings.Contains(candidate, rule[wildcardIdx+1:]) {
 			return false
 		}
-			
-		return candidate[strings.Index(candidate, rule[wildcardIdx+1:]):] == rule[wildcardIdx+1:] 
+
+		return candidate[strings.Index(candidate, rule[wildcardIdx+1:]):] == rule[wildcardIdx+1:]
 	}
 
 	// If wildcard is last character, substring both so they're comparing before the wildcard. Example:

@@ -147,6 +147,13 @@ func TestRepoWhitelistChecker_IsWhitelisted(t *testing.T) {
 			"github.com",
 			true,
 		},
+		{
+			"should match if wildcard is not last character",
+			"github.com/owner/*-repo",
+			"owner/prefix-repo",
+			"github.com",
+			true,
+		},
 	}
 
 	for _, c := range cases {
