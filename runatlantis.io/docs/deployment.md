@@ -196,7 +196,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: atlantis-vcs
-              key: basic-username
+              key: basic-user
         - name: ATLANTIS_AZUREDEVOPS_BASIC_PASS
           valueFrom:
             secretKeyRef:
@@ -344,7 +344,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: atlantis-vcs
-              key: basic-username
+              key: basic-user
         - name: ATLANTIS_AZUREDEVOPS_BASIC_PASS
           valueFrom:
             secretKeyRef:
