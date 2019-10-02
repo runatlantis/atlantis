@@ -2,13 +2,14 @@ package events
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/logging"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 // WriteGitCreds generates a .git-credentials file containing the username and token
@@ -42,10 +43,16 @@ func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home str
 
 	logger.Info("wrote git credentials to %s", credsFile)
 
-	cmd := exec.Command("git", "config", "--global", "credential.helper", "store")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return errors.Wrapf(err, "There was an error running %s: %s", strings.Join(cmd.Args, " "), string(out))
+	credentialCmd := exec.Command("git", "config", "--global", "credential.helper", "store")
+	if out, err := credentialCmd.CombinedOutput(); err != nil {
+		return errors.Wrapf(err, "There was an error running %s: %s", strings.Join(credentialCmd.Args, " "), string(out))
 	}
-	logger.Info("successfully ran %s", strings.Join(cmd.Args, " "))
+	logger.Info("successfully ran %s", strings.Join(credentialCmd.Args, " "))
+
+	urlCmd := exec.Command("git", "config", "--global", fmt.Sprintf("url.https://%s/.insteadOf", gitHostname), fmt.Sprintf("git@%s:", gitHostname))
+	if out, err := urlCmd.CombinedOutput(); err != nil {
+		return errors.Wrapf(err, "There was an error running %s: %s", strings.Join(urlCmd.Args, " "), string(out))
+	}
+	logger.Info("successfully ran %s", strings.Join(urlCmd.Args, " "))
 	return nil
 }

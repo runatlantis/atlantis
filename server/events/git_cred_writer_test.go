@@ -84,7 +84,7 @@ func TestWriteGitCreds_ErrIfCannotWrite(t *testing.T) {
 }
 
 // Test that git is actually configured to use the credentials
-func TestWriteGitCreds_ConfigureGit(t *testing.T) {
+func TestWriteGitCreds_ConfigureGitCredentialHelper(t *testing.T) {
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 
@@ -93,6 +93,20 @@ func TestWriteGitCreds_ConfigureGit(t *testing.T) {
 
 	expOutput := `store`
 	actOutput, err := exec.Command("git", "config", "--global", "credential.helper").Output()
+	Ok(t, err)
+	Equals(t, expOutput+"\n", string(actOutput))
+}
+
+// Test that git is configured to use https instead of ssh
+func TestWriteGitCreds_ConfigureGitUrlOveride(t *testing.T) {
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+
+	err := events.WriteGitCreds("user", "token", "hostname", tmp, logger)
+	Ok(t, err)
+
+	expOutput := `git@hostname:`
+	actOutput, err := exec.Command("git", "config", "--global", "url.https://hostname/.insteadof").Output()
 	Ok(t, err)
 	Equals(t, expOutput+"\n", string(actOutput))
 }
