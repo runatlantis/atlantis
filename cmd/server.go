@@ -229,7 +229,7 @@ var boolFlags = map[string]boolFlag{
 		defaultValue: false,
 	},
 	WriteGitCredsFlag: {
-		description: "Write out a .git-credentials file with the provider user and token to allow authentication with git over HTTPS." +
+		description: "Write out a .git-credentials file with the provider user and token to allow cloning private modules over HTTPS or SSH" +
 			" This does write secrets to disk and should only be enabled in a secure environment.",
 		defaultValue: false,
 	},
