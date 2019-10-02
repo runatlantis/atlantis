@@ -161,6 +161,20 @@ func TestRepoWhitelistChecker_IsWhitelisted(t *testing.T) {
 			"github.com",
 			true,
 		},
+		{
+			"should match if wildcard is at beginning",
+			"*-owner/repo",
+			"prefix-owner/repo",
+			"github.com",
+			true,
+		},
+		{
+			"should match with duplicate",
+			"*runatlantis",
+			"runatlantis/runatlantis",
+			"github.com",
+			true,
+		},
 	}
 
 	for _, c := range cases {
