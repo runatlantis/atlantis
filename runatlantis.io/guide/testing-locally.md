@@ -271,7 +271,7 @@ atlantis server \
 --atlantis-url="$URL" \
 --azuredevops-user="$USERNAME" \
 --azuredevops-token="$TOKEN" \
---azuredevops-basic-username="$ATLANTIS_AZUREDEVOPS_BASIC_USER" \
+--azuredevops-basic-user="$ATLANTIS_AZUREDEVOPS_BASIC_USER" \
 --azuredevops-basic-password="$ATLANTIS_AZUREDEVOPS_BASIC_PASS" \
 --repo-whitelist="$REPO_WHITELIST"
 --ssl-cert-file=file.crt
