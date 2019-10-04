@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -86,10 +85,7 @@ func (g *AzureDevopsClient) GetModifiedFiles(repo models.Repo, pull models.PullR
 	return files, nil
 }
 
-// CreateComment creates a comment on a work item linked to pullNum.
-// Comments made on pull requests do not have an associated webhook event
-// trigger, only comments made on work items (user stories, tasks, etc.).
-// If pull request is linked to multiple work items, log an error and ignore.
+// CreateComment creates a comment on a pull request.
 //
 // If comment length is greater than the max comment length we split into
 // multiple comments.
@@ -108,33 +104,27 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 	const maxCommentLength = 65536
 
 	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
-	opts := azuredevops.PullRequestGetOptions{
-		IncludeWorkItemRefs: true,
-	}
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
-	pull, _, err := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, pullNum, &opts)
-	if err != nil {
-		return err
-	}
-	if len(pull.WorkItemRefs) == 1 {
-		workItemID, err := strconv.Atoi(*pull.WorkItemRefs[0].ID)
+
+	for _, c := range comments {
+		input := blackfriday.Run([]byte(c))
+		s := string(input)
+		commentType := "text"
+		parentCommentID := 0
+
+		prComment := azuredevops.Comment{
+			CommentType:     &commentType,
+			Content:         &s,
+			ParentCommentID: &parentCommentID,
+		}
+		prComments := []*azuredevops.Comment{&prComment}
+		body := azuredevops.GitPullRequestCommentThread{
+			Comments: prComments,
+		}
+		_, _, err := g.Client.PullRequests.CreateComments(g.ctx, owner, project, repoName, pullNum, &body)
 		if err != nil {
 			return err
 		}
-		for _, c := range comments {
-			input := blackfriday.Run([]byte(c))
-			s := string(input)
-			workItemComment := azuredevops.WorkItemComment{
-				Text: &s,
-			}
-			owner, project, _ := SplitAzureDevopsRepoFullName(repo.FullName)
-			_, _, err := g.Client.WorkItems.CreateComment(g.ctx, owner, project, workItemID, &workItemComment)
-			if err != nil {
-				return err
-			}
-		}
-	} else if len(pull.WorkItemRefs) > 1 {
-		return errors.New("pull request linked to more than one work item - ignoring")
 	}
 	return
 }

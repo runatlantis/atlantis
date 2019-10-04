@@ -1851,6 +1851,22 @@ func (g *GitPullRequestStatus) GetProperties() time.Time {
 	return *g.Properties
 }
 
+// GetComment returns the Comment field.
+func (g *GitPullRequestWithComment) GetComment() *Comment {
+	if g == nil {
+		return nil
+	}
+	return g.Comment
+}
+
+// GetPullRequest returns the PullRequest field.
+func (g *GitPullRequestWithComment) GetPullRequest() *GitPullRequest {
+	if g == nil {
+		return nil
+	}
+	return g.PullRequest
+}
+
 // GetDate returns the Date field if it's non-nil, zero value otherwise.
 func (g *GitPush) GetDate() time.Time {
 	if g == nil || g.Date == nil {
@@ -3009,6 +3025,14 @@ func (t *TeamProjectReference) GetID() string {
 		return ""
 	}
 	return *t.ID
+}
+
+// GetLastUpdateTime returns the LastUpdateTime field if it's non-nil, zero value otherwise.
+func (t *TeamProjectReference) GetLastUpdateTime() time.Time {
+	if t == nil || t.LastUpdateTime == nil {
+		return time.Time{}
+	}
+	return *t.LastUpdateTime
 }
 
 // GetName returns the Name field if it's non-nil, zero value otherwise.

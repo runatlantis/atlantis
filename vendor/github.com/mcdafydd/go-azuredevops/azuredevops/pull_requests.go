@@ -340,6 +340,13 @@ type GitPullRequestCommentThreadContext struct {
 	RightFileStart *CommentPosition `json:"rightFileStart,omitempty"`
 }
 
+// GitPullRequestWithComment contains a reference to an existing pull request and a
+// comment.
+type GitPullRequestWithComment struct {
+	Comment     *Comment        `json:"comment,omitempty"`
+	PullRequest *GitPullRequest `json:"pullRequest,omitempty"`
+}
+
 // ListCommits lists the commits in a pull request.
 // Azure Devops API docs: https://docs.microsoft.com/en-us/rest/api/azure/devops/git/pull%20request%20commits/get%20pull%20request%20commits
 //
@@ -363,4 +370,78 @@ func (s *PullRequestsService) ListCommits(ctx context.Context, owner, project, r
 	}
 
 	return r.GitCommitRefs, resp, err
+}
+
+// CreateComment adds a comment to a pull request thread.
+// Azure Devops API docs: https://docs.microsoft.com/en-us/rest/api/azure/devops/git/pull%20request%20thread%20comments/create
+//
+func (s *PullRequestsService) CreateComment(ctx context.Context, owner, project, repo string, pullNum int, threadId int, comment *Comment) (*Comment, *http.Response, error) {
+	URL := fmt.Sprintf("%s/%s/_apis/git/repositories/%s/pullrequests/%d/threads/%d/comments?api-version=5.1-preview.1",
+		owner,
+		project,
+		repo,
+		pullNum,
+		threadId,
+	)
+
+	if comment.GetContent() == "" {
+		return nil, nil, errors.New("PullRequests.CreateComment: Nil pointer or empty string in comment.Content field ")
+	}
+
+	if comment.GetCommentType() == "" {
+		comment.CommentType = String("text")
+	}
+
+	req, err := s.client.NewRequest("POST", URL, comment)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	r := new(Comment)
+	resp, err := s.client.Execute(ctx, req, r)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return r, resp, err
+}
+
+// CreateComments adds one or more comments to a new or existing thread
+// and may include additional context
+// Azure Devops API docs: https://docs.microsoft.com/en-us/rest/api/azure/devops/git/pull%20request%20threads/create
+//
+func (s *PullRequestsService) CreateComments(ctx context.Context, owner, project, repo string, pullNum int, body *GitPullRequestCommentThread) (*GitPullRequestCommentThread, *http.Response, error) {
+	URL := fmt.Sprintf("%s/%s/_apis/git/repositories/%s/pullrequests/%d/threads?api-version=5.1-preview.1",
+		owner,
+		project,
+		repo,
+		pullNum,
+	)
+
+	if len(body.Comments) == 0 {
+		return nil, nil, errors.New("PullRequests.CreateComments: Must supply at least one comment in Comments field")
+	}
+
+	for idx, comment := range body.Comments {
+		if comment.GetContent() == "" {
+			return nil, nil, errors.New("PullRequests.CreateComment: Nil pointer or empty string in comment.Content field ")
+		}
+
+		if comment.GetCommentType() == "" {
+			body.Comments[idx].CommentType = String("text")
+		}
+	}
+
+	req, err := s.client.NewRequest("POST", URL, body)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	r := new(GitPullRequestCommentThread)
+	resp, err := s.client.Execute(ctx, req, r)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return r, resp, err
 }

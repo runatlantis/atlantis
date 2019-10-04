@@ -30,12 +30,13 @@ var (
 	// eventTypeMapping maps webhooks types to their corresponding go-azuredevops
 	// resource struct types.
 	eventTypeMapping = map[string]string{
-		"git.pullrequest.created": "PullRequestEvent",
-		"git.pullrequest.merged":  "PullRequestEvent",
-		"git.pullrequest.updated": "PullRequestEvent",
-		"git.push":                "PushEvent",
-		"workitem.commented":      "WorkItemCommentedEvent",
-		"workitem.updated":        "WorkItemUpdatedEvent",
+		"git.pullrequest.created":                   "PullRequestEvent",
+		"git.pullrequest.merged":                    "PullRequestEvent",
+		"git.pullrequest.updated":                   "PullRequestEvent",
+		"git.push":                                  "PushEvent",
+		"ms.vss-code.git-pullrequest-comment-event": "PullRequestCommentedEvent",
+		"workitem.commented":                        "WorkItemCommentedEvent",
+		"workitem.updated":                          "WorkItemUpdatedEvent",
 	}
 )
 
