@@ -103,7 +103,7 @@ Webhooks are installed at the [team project](https://docs.microsoft.com/en-us/az
 - Set **URL** to `http://$URL/events` where `$URL` is where Atlantis is hosted. Note that SSL, or `https://$URL/events`, is required if you set a Basic username and password for the webhook). **Be sure to add `/events`**
 - It is strongly recommended to set a Basic Username and Password for all webhooks
 - Leave all three drop-down menus for `...to send` set to **All**
-- Resource version should be set to **1.0**
+- Resource version should be set to **1.0** for `Pull request created` and `Pull request updated` event types and **2.0** for `Pull request commented on`
 - **NOTE** If you're adding a webhook to multiple team projects or repositories (using filters), each repository will need to use the **same** basic username and password.
 - Click **Finish**
 
@@ -111,9 +111,7 @@ Repeat the process above until you have webhook subscriptions for the following 
 
 - Pull request created (you just added this one)
 - Pull request updated
-- Work item commented on
-
-In Azure Devops, the text of a comment made on a pull request is not included in Pull Request webhook event payloads. Instead, to use Azure Devops with Atlantis, you must use an Azure Boards Work Item, such as a User Story, Bug, or Task, and [link it to a pull request](https://docs.microsoft.com/en-us/azure/devops/boards/backlogs/connect-work-items-to-git-dev-ops?view=azure-devops).  Atlantis commands contained in Work Item comments will be sent in the webhook payloads to your Atlantis `/events` endpoint.
+- Pull request commented on
 
 - See [Next Steps](#next-steps)
 
@@ -122,6 +120,5 @@ If you're using GitLab, navigate to your project's home page in GitLab
 ## Next Steps
 * To verify that Atlantis is receiving your webhooks, create a test pull request
   to your repo. 
-* If you're using Azure Devops, create a new User Story, and from there create a branch, and then a pull request, both linked to the work item
 * You should see the request show up in the Atlantis logs at an `INFO` level.
 * You'll now need to configure Atlantis to add your [Provider Credentials](provider-credentials.html)

@@ -17,8 +17,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"net/http"
-	"net/http/httptest"
 	"path"
 	"path/filepath"
 	"strings"
@@ -1113,78 +1111,6 @@ func TestParseAzureDevopsRepo(t *testing.T) {
 		},
 	}, r)
 
-}
-
-func TestParseAzureDevopsWorkItemCommentedEvent(t *testing.T) {
-	event := azuredevops.Event{
-		EventType: "workitem.commented",
-		Resource: azuredevops.WorkItem{
-			ID: azuredevops.Int(1),
-			Relations: []*azuredevops.WorkItemRelation{
-				{
-					Rel: azuredevops.String("System.LinkTypes.Hierarchy-Reverse"),
-					URL: azuredevops.String("vstfs:///Git/PullRequestId/a7573007-bbb3-4341-b726-0c4148a07853%2f3411ebc1-d5aa-464f-9615-0b527bc66719%2f22"),
-					Attributes: &map[string]interface{}{
-						"IsLocked": false,
-						"Comment":  "Decomposition of work",
-					},
-				},
-			},
-			URL: azuredevops.String("https://owner.visualstudio.com/a7573007-bbb3-4341-b726-0c4148a07853/_api"),
-		},
-	}
-
-	testEvent := deepcopy.Copy(event).(azuredevops.Event)
-	resource := testEvent.Resource.(azuredevops.WorkItem)
-	resource.Relations = nil
-	_, err := parser.ParseAzureDevopsWorkItemCommentedEvent(&resource, nil)
-	Ok(t, err)
-
-	testEvent = deepcopy.Copy(event).(azuredevops.Event)
-	resource = testEvent.Resource.(azuredevops.WorkItem)
-	resource.Relations[0] = nil
-	_, err = parser.ParseAzureDevopsWorkItemCommentedEvent(&resource, nil)
-	Ok(t, err)
-
-	testEvent = deepcopy.Copy(event).(azuredevops.Event)
-	resource = testEvent.Resource.(azuredevops.WorkItem)
-	resource.Relations[0].URL = azuredevops.String("vstfs:///Git/PullRequestId/a7573007-bbb3-4341-b726-0c4148a07853%2f3411ebc1-d5aa-464f-9615-0b527bc66719%2fwat")
-	_, err = parser.ParseAzureDevopsWorkItemCommentedEvent(&resource, nil)
-	ErrEquals(t, "strconv.Atoi: parsing \"wat\": invalid syntax", err)
-
-	// this should be successful
-	// This parse function requires a mock HTTP server to return the ADPull fixture
-	// after parsing the workitem.commented webhook event
-	mux := http.NewServeMux()
-	server := httptest.NewServer(mux)
-	defer server.Close()
-
-	mux.HandleFunc("/owner/a7573007-bbb3-4341-b726-0c4148a07853/_apis/git/pullrequests/22", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, ADPullJSON)
-	})
-	testEvent = deepcopy.Copy(event).(azuredevops.Event)
-	resource = testEvent.Resource.(azuredevops.WorkItem)
-	pullRefs, err := parser.ParseAzureDevopsWorkItemCommentedEvent(&resource, &server.URL)
-	Ok(t, err)
-	for _, ref := range pullRefs {
-		Ok(t, err)
-		Equals(t, models.Repo{
-			Owner:             "owner/project",
-			FullName:          "owner/project/repo",
-			CloneURL:          "https://azuredevops-user:azuredevops-token@dev.azure.com/owner/project/_git/repo",
-			SanitizedCloneURL: "https://azuredevops-user:<redacted>@dev.azure.com/owner/project/_git/repo",
-			Name:              "repo",
-			VCSHost: models.VCSHost{
-				Hostname: "dev.azure.com",
-				Type:     models.AzureDevops,
-			},
-		}, ref.BaseRepo)
-		Equals(t, models.User{
-			Username: "fabrikamfiber16@hotmail.com",
-		}, ref.User)
-		Equals(t, 22, ref.PullNum)
-	}
 }
 
 func TestParseAzureDevopsPullEvent(t *testing.T) {
