@@ -7,7 +7,6 @@ import (
 	github "github.com/google/go-github/v28/github"
 	azuredevops "github.com/mcdafydd/go-azuredevops/azuredevops"
 	pegomock "github.com/petergtz/pegomock"
-	events "github.com/runatlantis/atlantis/server/events"
 	models "github.com/runatlantis/atlantis/server/events/models"
 	go_gitlab "github.com/xanzy/go-gitlab"
 	"reflect"
@@ -374,25 +373,6 @@ func (mock *MockEventParsing) GetBitbucketServerPullEventType(eventTypeHeader st
 		}
 	}
 	return ret0
-}
-
-func (mock *MockEventParsing) ParseAzureDevopsWorkItemCommentedEvent(comment *azuredevops.WorkItem, baseURL *string) ([]events.PullRef, error) {
-	if mock == nil {
-		panic("mock must not be nil. Use myMock := NewMockEventParsing().")
-	}
-	params := []pegomock.Param{comment, baseURL}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseAzureDevopsWorkItemCommentedEvent", params, []reflect.Type{reflect.TypeOf((*[]events.PullRef)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 []events.PullRef
-	var ret1 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].([]events.PullRef)
-		}
-		if result[1] != nil {
-			ret1 = result[1].(error)
-		}
-	}
-	return ret0, ret1
 }
 
 func (mock *MockEventParsing) ParseAzureDevopsPull(adPull *azuredevops.GitPullRequest) (models.PullRequest, models.Repo, models.Repo, error) {
@@ -863,37 +843,6 @@ func (c *MockEventParsing_GetBitbucketServerPullEventType_OngoingVerification) G
 		_param0 = make([]string, len(params[0]))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
-		}
-	}
-	return
-}
-
-func (verifier *VerifierMockEventParsing) ParseAzureDevopsWorkItemCommentedEvent(comment *azuredevops.WorkItem, baseURL *string) *MockEventParsing_ParseAzureDevopsWorkItemCommentedEvent_OngoingVerification {
-	params := []pegomock.Param{comment, baseURL}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ParseAzureDevopsWorkItemCommentedEvent", params, verifier.timeout)
-	return &MockEventParsing_ParseAzureDevopsWorkItemCommentedEvent_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
-}
-
-type MockEventParsing_ParseAzureDevopsWorkItemCommentedEvent_OngoingVerification struct {
-	mock              *MockEventParsing
-	methodInvocations []pegomock.MethodInvocation
-}
-
-func (c *MockEventParsing_ParseAzureDevopsWorkItemCommentedEvent_OngoingVerification) GetCapturedArguments() (*azuredevops.WorkItem, *string) {
-	comment, baseURL := c.GetAllCapturedArguments()
-	return comment[len(comment)-1], baseURL[len(baseURL)-1]
-}
-
-func (c *MockEventParsing_ParseAzureDevopsWorkItemCommentedEvent_OngoingVerification) GetAllCapturedArguments() (_param0 []*azuredevops.WorkItem, _param1 []*string) {
-	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(params) > 0 {
-		_param0 = make([]*azuredevops.WorkItem, len(params[0]))
-		for u, param := range params[0] {
-			_param0[u] = param.(*azuredevops.WorkItem)
-		}
-		_param1 = make([]*string, len(params[1]))
-		for u, param := range params[1] {
-			_param1[u] = param.(*string)
 		}
 	}
 	return
