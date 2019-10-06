@@ -22,16 +22,22 @@ func TempDir(t *testing.T) (string, func()) {
 // DirStructure creates a directory structure in a temporary directory.
 // structure describes the dir structure. If the value is another map, then the
 // key is the name of a directory. If the value is nil, then the key is the name
-// of a file. It returns the path to the temp directory containing the defined
+// of a file. If val is a string then key is a file name and val is the file's content.
+// It returns the path to the temp directory containing the defined
 // structure and a cleanup function to delete the directory.
 // Example usage:
+// 	versionConfig := `
+//  terraform {
+// 	  required_version = "= 0.12.8"
+//  }
+//  `
 //	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
 //		"pulldir": map[string]interface{}{
 //			"project1": map[string]interface{}{
 //				"main.tf": nil,
 //			},
 //			"project2": map[string]interface{}{,
-//				"main.tf": nil,
+//				"main.tf": versionConfig,
 //			},
 //		},
 //	})
@@ -57,6 +63,10 @@ func dirStructureGo(t *testing.T, parentDir string, structure map[string]interfa
 			Ok(t, os.Mkdir(subDir, 0700))
 			// Recurse and create contents.
 			dirStructureGo(t, subDir, dirContents)
+		} else if fileContent, ok := val.(string); ok {
+			// If val is a string then key is a file name and val is the file's content
+			err := ioutil.WriteFile(filepath.Join(parentDir, key), []byte(fileContent), 0600)
+			Ok(t, err)
 		}
 	}
 }
