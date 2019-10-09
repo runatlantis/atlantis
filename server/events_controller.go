@@ -468,18 +468,18 @@ func (e *EventsController) HandleGitlabMergeRequestEvent(w http.ResponseWriter, 
 func (e *EventsController) HandleAzureDevopsPullRequestCommentedEvent(w http.ResponseWriter, event *azuredevops.Event, azuredevopsReqID string) {
 	resource, ok := event.Resource.(*azuredevops.GitPullRequestWithComment)
 	if !ok || event.PayloadType != azuredevops.PullRequestCommentedEvent {
-		e.respond(w, logging.Debug, http.StatusBadRequest, "Event.Resource is nil or received bad event type %v; Request-Id = %s", event.Resource, azuredevopsReqID)
+		e.respond(w, logging.Debug, http.StatusBadRequest, "Event.Resource is nil or received bad event type %v; %s", event.Resource, azuredevopsReqID)
 		return
 	}
 
 	if resource.Comment == nil {
-		e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since no comment is linked to payload; Request-Id = %s", azuredevopsReqID)
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since no comment is linked to payload; %s", azuredevopsReqID)
 		return
 	}
 	strippedComment := bluemonday.StrictPolicy().SanitizeBytes([]byte(*resource.Comment.Content))
 
 	if resource.PullRequest == nil {
-		e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since no pull request is linked to payload; Request-Id = %s", azuredevopsReqID)
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since no pull request is linked to payload; %s", azuredevopsReqID)
 		return
 	}
 
@@ -487,7 +487,7 @@ func (e *EventsController) HandleAzureDevopsPullRequestCommentedEvent(w http.Res
 	user := models.User{Username: createdBy.GetUniqueName()}
 	baseRepo, err := e.Parser.ParseAzureDevopsRepo(resource.PullRequest.GetRepository())
 	if err != nil {
-		e.respond(w, logging.Debug, http.StatusOK, "Error parsing pull request repository field; Request-Id = %s", azuredevopsReqID)
+		e.respond(w, logging.Debug, http.StatusOK, "Error parsing pull request repository field; %s", azuredevopsReqID)
 		return
 	}
 	e.handleCommentEvent(w, baseRepo, nil, nil, user, resource.PullRequest.GetPullRequestID(), string(strippedComment), models.AzureDevops)
@@ -499,8 +499,7 @@ func (e *EventsController) HandleAzureDevopsPullRequestCommentedEvent(w http.Res
 func (e *EventsController) HandleAzureDevopsPullRequestEvent(w http.ResponseWriter, event *azuredevops.Event, azuredevopsReqID string) {
 	if strings.Contains(event.Message.GetText(), "changed the reviewer list") {
 		msg := "pull request updated event is not a supported type [changed the reviewer list]"
-		e.Logger.Debug(msg)
-		e.respond(w, logging.Debug, http.StatusOK, "%s: Request-Id = %s", msg, azuredevopsReqID)
+		e.respond(w, logging.Debug, http.StatusOK, "%s: %s", msg, azuredevopsReqID)
 		return
 	}
 
