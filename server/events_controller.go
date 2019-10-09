@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 
 	"github.com/google/go-github/v28/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
@@ -496,6 +497,13 @@ func (e *EventsController) HandleAzureDevopsPullRequestCommentedEvent(w http.Res
 // request if the event is a pull request closed event. It's exported to make
 // testing easier.
 func (e *EventsController) HandleAzureDevopsPullRequestEvent(w http.ResponseWriter, event *azuredevops.Event, azuredevopsReqID string) {
+	if strings.Contains(event.Message.GetText(), "changed the reviewer list") {
+		msg := "pull request updated event is not a supported type [changed the reviewer list]"
+		e.Logger.Debug(msg)
+		e.respond(w, logging.Debug, http.StatusOK, "%s: Request-Id = %s", msg, azuredevopsReqID)
+		return
+	}
+
 	pull, pullEventType, baseRepo, headRepo, user, err := e.Parser.ParseAzureDevopsPullEvent(*event)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s", err, azuredevopsReqID)
