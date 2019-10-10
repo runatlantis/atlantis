@@ -144,12 +144,11 @@ func (g *AzureDevopsClient) PullIsApproved(repo models.Repo, pull models.PullReq
 		if review == nil {
 			continue
 		}
-		if *review.Vote != azuredevops.VoteApproved {
-			return false, err
+		if review.GetVote() == azuredevops.VoteApproved {
+			return true, nil
 		}
 	}
-
-	return true, err
+	return false, nil
 }
 
 // PullIsMergeable returns true if the merge request can be merged.
