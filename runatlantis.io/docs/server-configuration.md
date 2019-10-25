@@ -407,8 +407,8 @@ Values are chosen in this order:
   ```bash
   atlantis server --write-git-creds
   ```
-  Write out a .git-credentials file and configure git-credentials-store. To allow authentication with your git remotes over https. See [here](https://git-scm.com/docs/git-credential-store) for more information.
-
+  Write out a .git-credentials file with the provider user and token to allow
+  cloning private modules over HTTPS or SSH. See [here](https://git-scm.com/docs/git-credential-store) for more information.
   ::: warning SECURITY WARNING
-  Potentially dangerous to enable as this writes your credentials to disk.
+  This does write secrets to disk and should only be enabled in a secure environment.
   :::
