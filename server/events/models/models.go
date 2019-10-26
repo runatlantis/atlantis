@@ -20,11 +20,10 @@ import (
 	"fmt"
 	"net/url"
 	paths "path"
-	"regexp"
 	"strings"
 	"time"
 
-	version "github.com/hashicorp/go-version"
+	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/pkg/errors"
@@ -39,7 +38,7 @@ type Repo struct {
 	FullName string
 	// Owner is just the repo owner, ex. "runatlantis" or "gitlab/subgroup"
 	// or azuredevops/project. This may contain /'s in the case of GitLab
-	// subgroups or Azure Devops Team Projects. This may contain spaces in
+	// subgroups or Azure DevOps Team Projects. This may contain spaces in
 	// the case of Bitbucket Server.
 	Owner string
 	// Name is just the repo name, ex. "atlantis". This will never have
@@ -74,19 +73,7 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 		return Repo{}, errors.New("cloneURL can't be empty")
 	}
 
-	if vcsHostType == AzureDevops {
-		// https://docs.microsoft.com/en-us/azure/devops/organizations/settings/naming-restrictions?view=azure-devops
-		matched, err := regexp.MatchString("[A-z0-9][A-z0-9._]+/[A-z0-9][A-z0-9._]+/[A-z0-9][A-z0-9._]+", repoFullName)
-		if err != nil {
-			e := fmt.Sprintf("newRepo error vcsHostType = AzureDevops: %s", err)
-			return Repo{}, errors.New(e)
-		}
-		if !matched {
-			return Repo{}, errors.New("AzureDevops repoFullName must be of the format owner/project/repo")
-		}
-	}
-
-	// Azure Devops doesn't work with .git suffix on clone URLs
+	// Azure DevOps doesn't work with .git suffix on clone URLs
 	if !strings.HasSuffix(cloneURL, ".git") && vcsHostType != AzureDevops {
 		cloneURL += ".git"
 	}
@@ -100,7 +87,7 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 	// We skip this check for Bitbucket Server because its format is different
 	// and because the caller in that case actually constructs the clone url
 	// from the repo name and so there's no point checking if they match.
-	// Azure Devops also does not require .git at the end of clone urls.
+	// Azure DevOps also does not require .git at the end of clone urls.
 	if vcsHostType != BitbucketServer && vcsHostType != AzureDevops {
 		expClonePath := fmt.Sprintf("/%s.git", repoFullName)
 		if expClonePath != cloneURLParsed.Path {
@@ -127,8 +114,8 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 	if owner == "" || repo == "" {
 		return Repo{}, fmt.Errorf("invalid repo format %q, owner %q or repo %q was empty", repoFullName, owner, repo)
 	}
-	// Only GitLab repos can have /'s in their owners.
-	// This is for GitLab subgroups and Azure Devops Team Projects.
+	// Only GitLab and AzureDevops repos can have /'s in their owners.
+	// This is for GitLab subgroups and Azure DevOps Team Projects.
 	if strings.Contains(owner, "/") && vcsHostType != Gitlab && vcsHostType != AzureDevops {
 		return Repo{}, fmt.Errorf("invalid repo format %q, owner %q should not contain any /'s", repoFullName, owner)
 	}
@@ -372,7 +359,7 @@ type ProjectCommandContext struct {
 // strings for owner or repo.
 // Ex. runatlantis/atlantis => (runatlantis, atlantis)
 //     gitlab/subgroup/runatlantis/atlantis => (gitlab/subgroup/runatlantis, atlantis)
-//     azuredevops/project/atlantis => (azuredevops, project, atlantis)
+//     azuredevops/project/atlantis => (azuredevops/project, atlantis)
 func SplitRepoFullName(repoFullName string) (owner string, repo string) {
 	lastSlashIdx := strings.LastIndex(repoFullName, "/")
 	if lastSlashIdx == -1 || lastSlashIdx == len(repoFullName)-1 {

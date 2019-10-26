@@ -378,8 +378,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		SupportedVCSHosts:               supportedVCSHosts,
 		VCSClient:                       vcsClient,
 		BitbucketWebhookSecret:          []byte(userConfig.BitbucketWebhookSecret),
-		AzureDevopsWebhookBasicUser:     []byte(userConfig.AzureDevopsWebhookBasicUser),
-		AzureDevopsWebhookBasicPassword: []byte(userConfig.AzureDevopsWebhookBasicPassword),
+		AzureDevopsWebhookBasicUser:     []byte(userConfig.AzureDevopsWebhookUser),
+		AzureDevopsWebhookBasicPassword: []byte(userConfig.AzureDevopsWebhookPassword),
 		AzureDevopsRequestValidator:     &DefaultAzureDevopsRequestValidator{},
 	}
 	return &Server{

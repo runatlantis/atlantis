@@ -10,7 +10,7 @@ import (
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_azuredevops_request_validator.go AzureDevopsRequestValidator
 
-// AzureDevopsRequestValidator handles checking if Azure Devops requests
+// AzureDevopsRequestValidator handles checking if Azure DevOps requests
 // contain a valid Basic authentication username and password.
 type AzureDevopsRequestValidator interface {
 	// Validate returns the JSON payload of the request.
@@ -21,7 +21,7 @@ type AzureDevopsRequestValidator interface {
 	Validate(r *http.Request, user []byte, pass []byte) ([]byte, error)
 }
 
-// DefaultAzureDevopsRequestValidator handles checking if Azure Devops
+// DefaultAzureDevopsRequestValidator handles checking if Azure DevOps
 // requests contain the correct Basic auth username and password.
 type DefaultAzureDevopsRequestValidator struct{}
 

@@ -262,7 +262,7 @@ atlantis server \
 --repo-whitelist="$REPO_WHITELIST"
 ```
 
-##### Azure Devops
+##### Azure DevOps
 
 A certificate and private key are required if using Basic authentication for webhooks.
 
@@ -271,8 +271,8 @@ atlantis server \
 --atlantis-url="$URL" \
 --azuredevops-user="$USERNAME" \
 --azuredevops-token="$TOKEN" \
---azuredevops-basic-user="$ATLANTIS_AZUREDEVOPS_BASIC_USER" \
---azuredevops-basic-password="$ATLANTIS_AZUREDEVOPS_BASIC_PASS" \
+--azuredevops-webhook-user="$ATLANTIS_AZUREDEVOPS_WEBHOOK_USER" \
+--azuredevops-webhook-password="$ATLANTIS_AZUREDEVOPS_WEBHOOK_PASSWORD" \
 --repo-whitelist="$REPO_WHITELIST"
 --ssl-cert-file=file.crt
 --ssl-key-file=file.key

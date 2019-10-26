@@ -13,7 +13,7 @@ security.
 :::
 
 ::: tip NOTE
-Azure Devops uses Basic authentication for webhooks rather than webhook secrets.
+Azure DevOps uses Basic authentication for webhooks rather than webhook secrets.
 :::
 
 ::: warning

@@ -53,11 +53,11 @@ Even with the `--repo-whitelist` flag set, without a webhook secret, attackers c
 Webhook secrets ensure that the webhook requests are actually coming from your VCS provider (GitHub or GitLab).
 
 :::tip Tip
-If you are using Azure Devops, instead of webhook secrets add a [basic username and password](#azure devops basic authentication)
+If you are using Azure DevOps, instead of webhook secrets add a [basic username and password](#azure devops basic authentication)
 :::
 
-### Azure Devops Basic Authentication
-Azure Devops supports sending a basic authentication header in all webhook events. This requires using an HTTPS URL for your webhook location.
+### Azure DevOps Basic Authentication
+Azure DevOps supports sending a basic authentication header in all webhook events. This requires using an HTTPS URL for your webhook location.
 
 ### SSL/HTTPS
 If you're using webhook secrets but your traffic is over HTTP then the webhook secrets

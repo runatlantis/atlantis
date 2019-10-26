@@ -85,7 +85,7 @@ If you're using GitLab, navigate to your project's home page in GitLab
 - Click **Save**<img src="../guide/images/bitbucket-server-webhook.png" alt="Bitbucket Webhook" style="max-height: 500px;">
 - See [Next Steps](#next-steps)
 
-## Azure Devops
+## Azure DevOps
 Webhooks are installed at the [team project](https://docs.microsoft.com/en-us/azure/devops/organizations/projects/about-projects?view=azure-devops) level, but may be restricted to only fire based on events pertaining to [specific repos](https://docs.microsoft.com/en-us/azure/devops/service-hooks/services/webhooks?view=azure-devops) within the team project.
 
 - Navigate anywhere within a team project, ie: `https://dev.azure.com/orgName/projectName/_git/repoName`

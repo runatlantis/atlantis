@@ -73,14 +73,14 @@ type EventsController struct {
 	// UI that identifies this call as coming from Bitbucket. If empty, no
 	// request validation is done.
 	BitbucketWebhookSecret []byte
-	// AzureDevopsWebhookBasicUser is the Basic authentication username added to this
-	// webhook via the Azure Devops UI that identifies this call as coming from your
-	// Azure Devops Team Project. If empty, no request validation is done.
+	// AzureDevopsWebhookUser is the Basic authentication username added to this
+	// webhook via the Azure DevOps UI that identifies this call as coming from your
+	// Azure DevOps Team Project. If empty, no request validation is done.
 	// For more information, see https://docs.microsoft.com/en-us/azure/devops/service-hooks/services/webhooks?view=azure-devops
 	AzureDevopsWebhookBasicUser []byte
-	// AzureDevopsWebhookBasicPassword is the Basic authentication password added to this
-	// webhook via the Azure Devops UI that identifies this call as coming from your
-	// Azure Devops Team Project. If empty, no request validation is done.
+	// AzureDevopsWebhookPassword is the Basic authentication password added to this
+	// webhook via the Azure DevOps UI that identifies this call as coming from your
+	// Azure DevOps Team Project. If empty, no request validation is done.
 	AzureDevopsWebhookBasicPassword []byte
 	AzureDevopsRequestValidator     AzureDevopsRequestValidator
 }
@@ -461,14 +461,14 @@ func (e *EventsController) HandleGitlabMergeRequestEvent(w http.ResponseWriter, 
 	e.handlePullRequestEvent(w, baseRepo, headRepo, pull, user, pullEventType)
 }
 
-// HandleAzureDevopsPullRequestCommentedEvent handles comment events from Azure Devops where Atlantis
+// HandleAzureDevopsPullRequestCommentedEvent handles comment events from Azure DevOps where Atlantis
 // commands can come from. It's exported to make testing easier.
 // Sometimes we may want data from the parent azuredevops.Event struct, so we handle type checking here.
 // Requires Resource Version 2.0 of the Pull Request Commented On webhook payload.
 func (e *EventsController) HandleAzureDevopsPullRequestCommentedEvent(w http.ResponseWriter, event *azuredevops.Event, azuredevopsReqID string) {
 	resource, ok := event.Resource.(*azuredevops.GitPullRequestWithComment)
 	if !ok || event.PayloadType != azuredevops.PullRequestCommentedEvent {
-		e.respond(w, logging.Debug, http.StatusBadRequest, "Event.Resource is nil or received bad event type %v; %s", event.Resource, azuredevopsReqID)
+		e.respond(w, logging.Error, http.StatusBadRequest, "Event.Resource is nil or received bad event type %v; %s", event.Resource, azuredevopsReqID)
 		return
 	}
 
@@ -487,7 +487,7 @@ func (e *EventsController) HandleAzureDevopsPullRequestCommentedEvent(w http.Res
 	user := models.User{Username: createdBy.GetUniqueName()}
 	baseRepo, err := e.Parser.ParseAzureDevopsRepo(resource.PullRequest.GetRepository())
 	if err != nil {
-		e.respond(w, logging.Debug, http.StatusOK, "Error parsing pull request repository field; %s", azuredevopsReqID)
+		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull request repository field: %s; %s", err, azuredevopsReqID)
 		return
 	}
 	e.handleCommentEvent(w, baseRepo, nil, nil, user, resource.PullRequest.GetPullRequestID(), string(strippedComment), models.AzureDevops)
