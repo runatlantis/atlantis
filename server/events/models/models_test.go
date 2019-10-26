@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -40,6 +41,11 @@ func TestNewRepo_InvalidCloneURL(t *testing.T) {
 func TestNewRepo_CloneURLWrongRepo(t *testing.T) {
 	_, err := models.NewRepo(models.Github, "owner/repo", "https://github.com/notowner/repo.git", "u", "p")
 	ErrEquals(t, `expected clone url to have path "/owner/repo.git" but had "/notowner/repo.git"`, err)
+}
+
+func TestNewRepo_EmptyAzureDevopsProject(t *testing.T) {
+	_, err := models.NewRepo(models.AzureDevops, "", "https://dev.azure.com/notowner/project/_git/repo", "u", "p")
+	ErrEquals(t, "repoFullName can't be empty", err)
 }
 
 // For bitbucket server we don't validate the clone URL because the callers
@@ -99,7 +105,7 @@ func TestNewRepo_FullNameWrongFormat(t *testing.T) {
 	}
 }
 
-// If the clone url doesn't end with .git it is appended
+// If the clone url doesn't end with .git, and VCS is not Azure Devops, it is appended
 func TestNewRepo_MissingDotGit(t *testing.T) {
 	repo, err := models.NewRepo(models.BitbucketCloud, "owner/repo", "https://bitbucket.org/owner/repo", "u", "p")
 	Ok(t, err)
@@ -196,6 +202,10 @@ func TestVCSHostType_ToString(t *testing.T) {
 			models.BitbucketServer,
 			"BitbucketServer",
 		},
+		{
+			models.AzureDevops,
+			"AzureDevops",
+		},
 	}
 
 	for _, c := range cases {
@@ -252,6 +262,82 @@ func TestSplitRepoFullName(t *testing.T) {
 		t.Run(c.input, func(t *testing.T) {
 			owner, repo := models.SplitRepoFullName(c.input)
 			Equals(t, c.expOwner, owner)
+			Equals(t, c.expRepo, repo)
+		})
+	}
+}
+
+// These test cases should cover the same behavior as TestSplitRepoFullName
+// and only produce different output in the AzureDevops case of
+// owner/project/repo.
+func TestAzureDevopsSplitRepoFullName(t *testing.T) {
+	cases := []struct {
+		input      string
+		expOwner   string
+		expRepo    string
+		expProject string
+	}{
+		{
+			"owner/repo",
+			"owner",
+			"repo",
+			"",
+		},
+		{
+			"group/subgroup/owner/repo",
+			"group/subgroup/owner",
+			"repo",
+			"",
+		},
+		{
+			"group/subgroup/owner/project/repo",
+			"group/subgroup/owner/project",
+			"repo",
+			"",
+		},
+		{
+			"",
+			"",
+			"",
+			"",
+		},
+		{
+			"/",
+			"",
+			"",
+			"",
+		},
+		{
+			"owner/",
+			"",
+			"",
+			"",
+		},
+		{
+			"/repo",
+			"",
+			"repo",
+			"",
+		},
+		{
+			"group/subgroup/",
+			"",
+			"",
+			"",
+		},
+		{
+			"owner/project/repo",
+			"owner",
+			"repo",
+			"project",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.input, func(t *testing.T) {
+			owner, project, repo := vcs.SplitAzureDevopsRepoFullName(c.input)
+			Equals(t, c.expOwner, owner)
+			Equals(t, c.expProject, project)
 			Equals(t, c.expRepo, repo)
 		})
 	}

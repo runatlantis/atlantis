@@ -129,7 +129,7 @@
                   Fargate, etc.
                 </li>
                 <li><img class="checkmark" src="/checkmark.svg">Listens for
-                  webhooks from GitHub/GitLab/Bitbucket.
+                  webhooks from GitHub/GitLab/Bitbucket/Azure Devops.
                 </li>
                 <li><img class="checkmark" src="/checkmark.svg">Runs terraform
                   commands remotely and comments back with their output.

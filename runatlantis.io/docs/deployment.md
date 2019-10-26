@@ -17,7 +17,7 @@ Atlantis [Docker image](https://hub.docker.com/r/runatlantis/atlantis/).
 ### Routing
 Atlantis and your Git host need to be able to route and communicate with one another. Your Git host needs to be able to send webhooks to Atlantis and Atlantis needs to be able to make API calls to your Git host.
 If you're using 
-a public Git host like GitHub.com, GitLab.com or Bitbucket.org then you'll need to
+a public Git host like GitHub.com, GitLab.com, Bitbucket.org, or Dev.azure.com then you'll need to
 expose Atlantis to the internet.
 
 If you're using a private Git host like GitHub Enterprise, GitLab Enterprise or
@@ -100,13 +100,16 @@ up upgrading Atlantis by accident!
 for your Terraform repos. See [Repo Whitelist](server-configuration.html#repo-whitelist) for more details.
 3. If you're using GitHub:
     1. Replace `<YOUR_GITHUB_USER>` with the username of your Atlantis GitHub user without the `@`.
-    2. Delete all the `ATLANTIS_GITLAB_*` and `ATLANTIS_BITBUCKET_*` environment variables.
+    2. Delete all the `ATLANTIS_GITLAB_*`, `ATLANTIS_BITBUCKET_*`, and `ATLANTIS_ADS_*` environment variables.
 4. If you're using GitLab:
     1. Replace `<YOUR_GITLAB_USER>` with the username of your Atlantis GitLab user without the `@`.
-    2. Delete all the `ATLANTIS_GH_*` and `ATLANTIS_BITBUCKET_*` environment variables.
+    2. Delete all the `ATLANTIS_GH_*`, `ATLANTIS_BITBUCKET_*`, and `ATLANTIS_AZUREDEVOPS_*` environment variables.
 5. If you're using Bitbucket:
     1. Replace `<YOUR_BITBUCKET_USER>` with the username of your Atlantis Bitbucket user without the `@`.
-    2. Delete all the `ATLANTIS_GH_*` and `ATLANTIS_GITLAB_*` environment variables.
+    2. Delete all the `ATLANTIS_GH_*`, `ATLANTIS_GITLAB_*`, and `ATLANTIS_AZUREDEVOPS_*` environment variables.
+6. If you're using Azure Devops:
+    1. Replace `<YOUR_AZUREDEVOPS_USER>` with the username of your Atlantis Azure Devops user without the `@`.
+    2. Delete all the `ATLANTIS_GH_*`, `ATLANTIS_GITLAB_*`, and `ATLANTIS_BITBUCKET_*` environment variables.
 
 #### StatefulSet Manifest
 <details>
@@ -180,6 +183,26 @@ spec:
               name: atlantis-vcs
               key: token
         ### End Bitbucket Config ###
+
+        ### Azure Devops Config ###
+        - name: ATLANTIS_AZUREDEVOPS_USER
+          value: <YOUR_AZUREDEVOPS_USER> # 6i. If you're using Azure Devops replace <YOUR_AZUREDEVOPS_USER> with the username of your Atlantis Azure Devops user without the `@`.
+        - name: ATLANTIS_AZUREDEVOPS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: token
+        - name: ATLANTIS_AZUREDEVOPS_BASIC_USER
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: basic-user
+        - name: ATLANTIS_AZUREDEVOPS_BASIC_PASS
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: basic-password
+        ### End Azure Devops Config ###
 
         - name: ATLANTIS_DATA_DIR
           value: /atlantis
@@ -308,6 +331,26 @@ spec:
               name: atlantis-vcs
               key: token
         ### End Bitbucket Config ###
+
+        ### Azure Devops Config ###
+        - name: ATLANTIS_AZUREDEVOPS_USER
+          value: <YOUR_AZUREDEVOPS_USER> # 6i. If you're using Azure Devops replace <YOUR_AZUREDEVOPS_USER> with the username of your Atlantis Azure Devops user without the `@`.
+        - name: ATLANTIS_AZUREDEVOPS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: token
+        - name: ATLANTIS_AZUREDEVOPS_BASIC_USER
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: basic-user
+        - name: ATLANTIS_AZUREDEVOPS_BASIC_PASS
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: basic-password
+        ### End Azure Devops Config ###
 
         - name: ATLANTIS_PORT
           value: "4141" # Kubernetes sets an ATLANTIS_PORT variable so we need to override.
@@ -484,14 +527,30 @@ atlantis server \
 --repo-whitelist="$REPO_WHITELIST"
 ```
 
+##### Azure Devops
+
+A certificate and private key are required if using Basic authentication for webhooks.
+
+```bash
+atlantis server \
+--atlantis-url="$URL" \
+--azuredevops-user="$USERNAME" \
+--azuredevops-token="$TOKEN" \
+--azuredevops-basic-user="$ATLANTIS_AZUREDEVOPS_BASIC_USER" \
+--azuredevops-basic-password="$ATLANTIS_AZUREDEVOPS_BASIC_PASS" \
+--repo-whitelist="$REPO_WHITELIST"
+--ssl-cert-file=file.crt
+--ssl-key-file=file.key
+```
+
 Where
 - `$URL` is the URL that Atlantis can be reached at
-- `$USERNAME` is the GitHub/GitLab/Bitbucket username you generated the token for
+- `$USERNAME` is the GitHub/GitLab/Bitbucket/AzureDevops username you generated the token for
 - `$TOKEN` is the access token you created. If you don't want this to be passed
   in as an argument for security reasons you can specify it in a config file
    (see [Configuration](/docs/server-configuration.html#environment-variables))
     or as an environment variable: `ATLANTIS_GH_TOKEN` or `ATLANTIS_GITLAB_TOKEN`
-     or `ATLANTIS_BITBUCKET_TOKEN`
+     or `ATLANTIS_BITBUCKET_TOKEN` or `ATLANTIS_AZUREDEVOPS_TOKEN`
 - `$SECRET` is the random key you used for the webhook secret.
    If you don't want this to be passed in as an argument for security reasons
     you can specify it in a config file

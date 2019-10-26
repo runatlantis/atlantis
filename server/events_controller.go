@@ -17,8 +17,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 
 	"github.com/google/go-github/v28/github"
+	"github.com/mcdafydd/go-azuredevops/azuredevops"
+	"github.com/microcosm-cc/bluemonday"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -31,6 +34,7 @@ import (
 
 const githubHeader = "X-Github-Event"
 const gitlabHeader = "X-Gitlab-Event"
+const azuredevopsHeader = "Request-Id"
 
 // bitbucketEventTypeHeader is the same in both cloud and server.
 const bitbucketEventTypeHeader = "X-Event-Key"
@@ -69,6 +73,16 @@ type EventsController struct {
 	// UI that identifies this call as coming from Bitbucket. If empty, no
 	// request validation is done.
 	BitbucketWebhookSecret []byte
+	// AzureDevopsWebhookBasicUser is the Basic authentication username added to this
+	// webhook via the Azure Devops UI that identifies this call as coming from your
+	// Azure Devops Team Project. If empty, no request validation is done.
+	// For more information, see https://docs.microsoft.com/en-us/azure/devops/service-hooks/services/webhooks?view=azure-devops
+	AzureDevopsWebhookBasicUser []byte
+	// AzureDevopsWebhookBasicPassword is the Basic authentication password added to this
+	// webhook via the Azure Devops UI that identifies this call as coming from your
+	// Azure Devops Team Project. If empty, no request validation is done.
+	AzureDevopsWebhookBasicPassword []byte
+	AzureDevopsRequestValidator     AzureDevopsRequestValidator
 }
 
 // Post handles POST webhook requests.
@@ -109,6 +123,14 @@ func (e *EventsController) Post(w http.ResponseWriter, r *http.Request) {
 			e.handleBitbucketServerPost(w, r)
 			return
 		}
+	} else if r.Header.Get(azuredevopsHeader) != "" {
+		if !e.supportsHost(models.AzureDevops) {
+			e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support AzureDevops")
+			return
+		}
+		e.Logger.Debug("handling AzureDevops post")
+		e.handleAzureDevopsPost(w, r)
+		return
 	}
 	e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request")
 }
@@ -192,6 +214,33 @@ func (e *EventsController) handleBitbucketServerPost(w http.ResponseWriter, r *h
 		return
 	default:
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event type %s %s=%s", eventType, bitbucketServerRequestIDHeader, reqID)
+	}
+}
+
+func (e *EventsController) handleAzureDevopsPost(w http.ResponseWriter, r *http.Request) {
+	// Validate the request against the optional basic auth username and password.
+	payload, err := e.AzureDevopsRequestValidator.Validate(r, e.AzureDevopsWebhookBasicUser, e.AzureDevopsWebhookBasicPassword)
+	if err != nil {
+		e.respond(w, logging.Warn, http.StatusUnauthorized, err.Error())
+		return
+	}
+	e.Logger.Debug("request valid")
+
+	azuredevopsReqID := "Request-Id=" + r.Header.Get("Request-Id")
+	event, err := azuredevops.ParseWebHook(payload)
+	if err != nil {
+		e.respond(w, logging.Error, http.StatusBadRequest, "Failed parsing webhook: %v %s", err, azuredevopsReqID)
+		return
+	}
+	switch event.PayloadType {
+	case azuredevops.PullRequestCommentedEvent:
+		e.Logger.Debug("handling as pull request commented event")
+		e.HandleAzureDevopsPullRequestCommentedEvent(w, event, azuredevopsReqID)
+	case azuredevops.PullRequestEvent:
+		e.Logger.Debug("handling as pull request event")
+		e.HandleAzureDevopsPullRequestEvent(w, event, azuredevopsReqID)
+	default:
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event: %v %s", event.PayloadType, azuredevopsReqID)
 	}
 }
 
@@ -406,6 +455,57 @@ func (e *EventsController) HandleGitlabMergeRequestEvent(w http.ResponseWriter, 
 	pull, pullEventType, baseRepo, headRepo, user, err := e.Parser.ParseGitlabMergeRequestEvent(event)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing webhook: %s", err)
+		return
+	}
+	e.Logger.Info("identified event as type %q", pullEventType.String())
+	e.handlePullRequestEvent(w, baseRepo, headRepo, pull, user, pullEventType)
+}
+
+// HandleAzureDevopsPullRequestCommentedEvent handles comment events from Azure Devops where Atlantis
+// commands can come from. It's exported to make testing easier.
+// Sometimes we may want data from the parent azuredevops.Event struct, so we handle type checking here.
+// Requires Resource Version 2.0 of the Pull Request Commented On webhook payload.
+func (e *EventsController) HandleAzureDevopsPullRequestCommentedEvent(w http.ResponseWriter, event *azuredevops.Event, azuredevopsReqID string) {
+	resource, ok := event.Resource.(*azuredevops.GitPullRequestWithComment)
+	if !ok || event.PayloadType != azuredevops.PullRequestCommentedEvent {
+		e.respond(w, logging.Debug, http.StatusBadRequest, "Event.Resource is nil or received bad event type %v; %s", event.Resource, azuredevopsReqID)
+		return
+	}
+
+	if resource.Comment == nil {
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since no comment is linked to payload; %s", azuredevopsReqID)
+		return
+	}
+	strippedComment := bluemonday.StrictPolicy().SanitizeBytes([]byte(*resource.Comment.Content))
+
+	if resource.PullRequest == nil {
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring comment event since no pull request is linked to payload; %s", azuredevopsReqID)
+		return
+	}
+
+	createdBy := resource.PullRequest.GetCreatedBy()
+	user := models.User{Username: createdBy.GetUniqueName()}
+	baseRepo, err := e.Parser.ParseAzureDevopsRepo(resource.PullRequest.GetRepository())
+	if err != nil {
+		e.respond(w, logging.Debug, http.StatusOK, "Error parsing pull request repository field; %s", azuredevopsReqID)
+		return
+	}
+	e.handleCommentEvent(w, baseRepo, nil, nil, user, resource.PullRequest.GetPullRequestID(), string(strippedComment), models.AzureDevops)
+}
+
+// HandleAzureDevopsPullRequestEvent will delete any locks associated with the pull
+// request if the event is a pull request closed event. It's exported to make
+// testing easier.
+func (e *EventsController) HandleAzureDevopsPullRequestEvent(w http.ResponseWriter, event *azuredevops.Event, azuredevopsReqID string) {
+	if strings.Contains(event.Message.GetText(), "changed the reviewer list") {
+		msg := "pull request updated event is not a supported type [changed the reviewer list]"
+		e.respond(w, logging.Debug, http.StatusOK, "%s: %s", msg, azuredevopsReqID)
+		return
+	}
+
+	pull, pullEventType, baseRepo, headRepo, user, err := e.Parser.ParseAzureDevopsPullEvent(*event)
+	if err != nil {
+		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s", err, azuredevopsReqID)
 		return
 	}
 	e.Logger.Info("identified event as type %q", pullEventType.String())

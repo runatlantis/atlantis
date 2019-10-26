@@ -98,6 +98,38 @@ Values are chosen in this order:
   Automatically merge pull requests after all plans have been successfully applied.
   Defaults to `false`. See [Automerging](automerging.html) for more details.
 
+* ### `--azuredevops-basic-password`
+  ```bash
+  atlantis server --azuredevops-basic-password="password123"
+  ```
+  Azure Devops basic authentication password for inbound webhooks (see
+  https://docs.microsoft.com/en-us/azure/devops/service-hooks/authorize?view=azure-devops).
+  SECURITY WARNING: If not specified, Atlantis won't be able to validate that the
+  incoming webhook call came from your Azure Devops org. This means that an
+  attacker could spoof calls to Atlantis and cause it to perform malicious
+  actions. Should be specified via the ATLANTIS_AZUREDEVOPS_BASIC_AUTH environment
+  variable.
+
+* ### `--azuredevops-basic-user`
+  ```bash
+  atlantis server --azuredevops-basic-user="username@example.com"
+  ```
+  Azure Devops basic authentication username for inbound webhooks. Can also be specified via the ATLANTIS_AZUREDEVOPS_BASIC_USER
+  environment variable.
+
+* ### `--azuredevops-token`
+  ```bash
+  atlantis server --azuredevops-token="username@example.com"
+  ```
+  Azure Devops token of API user. Can also be specified via the ATLANTIS_AZUREDEVOPS_TOKEN
+  environment variable.
+
+* ### `--azuredevops-user`
+  ```bash
+  atlantis server --azuredevops-user="username@example.com"
+  ```
+  Azure Devops username of API user.
+
 * ### `--bitbucket-base-url`
   ```bash
   atlantis server --bitbucket-base-url="http://bitbucket.corp:7990/basepath"
@@ -308,6 +340,8 @@ Values are chosen in this order:
   * Format is `{hostname}/{owner}/{repo}`, ex. `github.com/runatlantis/atlantis`
   * `*` matches any characters, ex. `github.com/runatlantis/*` will match all repos in the runatlantis organization
   * For Bitbucket Server: `{hostname}` is the domain without scheme and port, `{owner}` is the name of the project (not the key), and `{repo}` is the repo name
+  * For Azure Devops the whitelist takes one of two forms: `{owner}.visualstudio.com/{project}/{repo}` or `dev.azure.com/{owner}/{project}/{repo}
+  * Microsoft is in the process of changing Azure Devops to the latter form, so it may be safest to always specify both formats in your repo whitelist for each repository until the change is complete.
 
   Examples:
   * Whitelist `myorg/repo1` and `myorg/repo2` on `github.com`
@@ -316,6 +350,8 @@ Values are chosen in this order:
     * `--repo-whitelist='github.com/myorg/*'`
   * Whitelist all repos in my GitHub Enterprise installation
     * `--repo-whitelist='github.yourcompany.com/*'`
+  * Whitelist all repos under `myorg` project `myproject` on Azure Devops
+    * `--repo-whitelist='myorg.visualstudio.com/myproject/*,dev.azure.com/myorg/myproject/*'`
   * Whitelist all repositories
     * `--repo-whitelist='*'`
 

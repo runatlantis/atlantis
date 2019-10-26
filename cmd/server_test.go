@@ -184,7 +184,7 @@ func TestExecute_ValidateSSLConfig(t *testing.T) {
 }
 
 func TestExecute_ValidateVCSConfig(t *testing.T) {
-	expErr := "--gh-user/--gh-token or --gitlab-user/--gitlab-token or --bitbucket-user/--bitbucket-token must be set"
+	expErr := "--gh-user/--gh-token or --gitlab-user/--gitlab-token or --bitbucket-user/--bitbucket-token or --azuredevops-user/--azuredevops-token must be set"
 	cases := []struct {
 		description string
 		flags       map[string]interface{}
@@ -217,6 +217,13 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			true,
 		},
 		{
+			"just azuredevops token set",
+			map[string]interface{}{
+				cmd.ADTokenFlag: "token",
+			},
+			true,
+		},
+		{
 			"just github user set",
 			map[string]interface{}{
 				cmd.GHUserFlag: "user",
@@ -234,6 +241,13 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			"just bitbucket user set",
 			map[string]interface{}{
 				cmd.BitbucketUserFlag: "user",
+			},
+			true,
+		},
+		{
+			"just azuredevops user set",
+			map[string]interface{}{
+				cmd.ADUserFlag: "user",
 			},
 			true,
 		},
@@ -286,6 +300,14 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			false,
 		},
 		{
+			"azuredevops user and azuredevops token set and should be successful",
+			map[string]interface{}{
+				cmd.ADUserFlag:  "user",
+				cmd.ADTokenFlag: "token",
+			},
+			false,
+		},
+		{
 			"all set should be successful",
 			map[string]interface{}{
 				cmd.GHUserFlag:         "user",
@@ -294,6 +316,8 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 				cmd.GitlabTokenFlag:    "token",
 				cmd.BitbucketUserFlag:  "user",
 				cmd.BitbucketTokenFlag: "token",
+				cmd.ADUserFlag:         "user",
+				cmd.ADTokenFlag:        "token",
 			},
 			false,
 		},
@@ -316,13 +340,17 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 func TestExecute_Defaults(t *testing.T) {
 	t.Log("Should set the defaults for all unspecified flags.")
 	c := setup(map[string]interface{}{
-		cmd.GHUserFlag:         "user",
-		cmd.GHTokenFlag:        "token",
-		cmd.GitlabUserFlag:     "gitlab-user",
-		cmd.GitlabTokenFlag:    "gitlab-token",
-		cmd.BitbucketUserFlag:  "bitbucket-user",
-		cmd.BitbucketTokenFlag: "bitbucket-token",
-		cmd.RepoWhitelistFlag:  "*",
+		cmd.GHUserFlag:          "user",
+		cmd.GHTokenFlag:         "token",
+		cmd.GitlabUserFlag:      "gitlab-user",
+		cmd.GitlabTokenFlag:     "gitlab-token",
+		cmd.BitbucketUserFlag:   "bitbucket-user",
+		cmd.BitbucketTokenFlag:  "bitbucket-token",
+		cmd.ADBasicUserFlag:     "azuredevops-basic-user",
+		cmd.ADBasicPasswordFlag: "azuredevops-basic-password",
+		cmd.ADTokenFlag:         "azuredevops-token",
+		cmd.ADUserFlag:          "azuredevops-user",
+		cmd.RepoWhitelistFlag:   "*",
 	})
 	err := c.Execute()
 	Ok(t, err)
@@ -354,6 +382,8 @@ func TestExecute_Defaults(t *testing.T) {
 	Equals(t, "https://api.bitbucket.org", passedConfig.BitbucketBaseURL)
 	Equals(t, "bitbucket-token", passedConfig.BitbucketToken)
 	Equals(t, "bitbucket-user", passedConfig.BitbucketUser)
+	Equals(t, "azuredevops-token", passedConfig.AzureDevopsToken)
+	Equals(t, "azuredevops-user", passedConfig.AzureDevopsUser)
 	Equals(t, "", passedConfig.BitbucketWebhookSecret)
 	Equals(t, "info", passedConfig.LogLevel)
 	Equals(t, 4141, passedConfig.Port)

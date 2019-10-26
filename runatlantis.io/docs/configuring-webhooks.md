@@ -85,7 +85,40 @@ If you're using GitLab, navigate to your project's home page in GitLab
 - Click **Save**<img src="../guide/images/bitbucket-server-webhook.png" alt="Bitbucket Webhook" style="max-height: 500px;">
 - See [Next Steps](#next-steps)
 
+## Azure Devops
+Webhooks are installed at the [team project](https://docs.microsoft.com/en-us/azure/devops/organizations/projects/about-projects?view=azure-devops) level, but may be restricted to only fire based on events pertaining to [specific repos](https://docs.microsoft.com/en-us/azure/devops/service-hooks/services/webhooks?view=azure-devops) within the team project.
+
+- Navigate anywhere within a team project, ie: `https://dev.azure.com/orgName/projectName/_git/repoName`
+- Select **Project settings** in the lower-left corner
+- Select **Service hooks**
+  - If you see the message "You do not have sufficient permissions to view or configure subscriptions." you need to ensure your user is a member of either the organization's "Project Collection Administrators" group or the project's "Project Administrators" group.
+  - To add your user to the Project Collection Build Administrators group, navigate to the organization level, click **Organization Settings** and then click **Permissions**. You should be at `https://dev.azure.com/<organization>/_settings/groups`. Now click on the **<organization>/Project Collection Administrators** group and add your user as a member.
+  - To add your user to the Project Administrators group, navigate to the project level, click **Project Settings** and then click **Permissions**. You should be at `https://dev.azure.com/<organization>/<project>/_settings/permissions`. Now click on the **[<project>]/Project Administrators** group and add your user as a member.
+- Click **Create subscription** or the green plus icon to add a new webhook
+- Scroll to the bottom of the list and select **Web Hooks**
+- Click **Next**
+- Under "Trigger on this type of event", select **Pull request created**
+  - Optionally, select a repository under **Filters** to restrict the scope of this webhook subscription to a specific repository
+- Click **Next**
+- Set **URL** to `http://$URL/events` where `$URL` is where Atlantis is hosted. Note that SSL, or `https://$URL/events`, is required if you set a Basic username and password for the webhook). **Be sure to add `/events`**
+- It is strongly recommended to set a Basic Username and Password for all webhooks
+- Leave all three drop-down menus for `...to send` set to **All**
+- Resource version should be set to **1.0** for `Pull request created` and `Pull request updated` event types and **2.0** for `Pull request commented on`
+- **NOTE** If you're adding a webhook to multiple team projects or repositories (using filters), each repository will need to use the **same** basic username and password.
+- Click **Finish**
+
+Repeat the process above until you have webhook subscriptions for the following event types that will trigger on all repositories Atlantis will manage:
+
+- Pull request created (you just added this one)
+- Pull request updated
+- Pull request commented on
+
+- See [Next Steps](#next-steps)
+
+## GitLab
+If you're using GitLab, navigate to your project's home page in GitLab
 ## Next Steps
 * To verify that Atlantis is receiving your webhooks, create a test pull request
-  to your repo. You should see the request show up in the Atlantis logs at an `INFO` level.
+  to your repo. 
+* You should see the request show up in the Atlantis logs at an `INFO` level.
 * You'll now need to configure Atlantis to add your [Provider Credentials](provider-credentials.html)

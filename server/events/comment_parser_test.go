@@ -635,9 +635,10 @@ func TestBuildPlanApplyComment(t *testing.T) {
 
 func TestParse_VCSUsername(t *testing.T) {
 	cp := events.CommentParser{
-		GithubUser:    "gh",
-		GitlabUser:    "gl",
-		BitbucketUser: "bb",
+		GithubUser:      "gh",
+		GitlabUser:      "gl",
+		BitbucketUser:   "bb",
+		AzureDevopsUser: "ad",
 	}
 	cases := []struct {
 		vcs  models.VCSHostType
@@ -658,6 +659,10 @@ func TestParse_VCSUsername(t *testing.T) {
 		{
 			vcs:  models.BitbucketCloud,
 			user: "bb",
+		},
+		{
+			vcs:  models.AzureDevops,
+			user: "ad",
 		},
 	}
 

@@ -49,6 +49,7 @@ Each VCS provider has different rules around who can approve:
 * **Bitbucket Cloud (bitbucket.org)** – A user can approve their own pull request but
   Atlantis does not count that as an approval and requires an approval from at least one user that
   is not the author of the pull request
+* **Azure Devops** – **All builtin groups include the "Contribute to pull requests"** permission and can approve a pull request
 
 :::tip Tip
 If you want to require **certain people** to approve the pull request, look at the
@@ -120,6 +121,20 @@ merge. We don't check anything else because Bitbucket's API doesn't support it.
 If you need a specific check, please
 [open an issue](https://github.com/runatlantis/atlantis/issues/new).
 
+#### Azure Devops
+In Azure Devops, all pull requests are mergeable unless there is a conflict. You can set a pull request to "Complete" right away, or set "Auto-Complete", which will merge after all branch policies are met. See [Review code with pull requests](https://docs.microsoft.com/en-us/azure/devops/repos/git/pull-requests?view=azure-devops).
+
+[Branch policies](https://docs.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops) can:
+* Require a minimum number of reviewers
+* Allow users to approve their own changes
+* Allow completion even if some reviewers vote "Waiting" or "Reject"
+* Reset code reviewer votes when there are new changes
+* Require a specfic merge strategy (squash, rebase, etc.)
+
+::: warning
+At this time, the Azure Devops client only supports merging using the default 'no fast-forward' strategy. Make sure your branch policies permit this type of merge.
+:::
+
 ## Setting Apply Requirements
 As mentioned above, you can set apply requirements via flags, in `repos.yaml`, or in `atlantis.yaml` if `repos.yaml`
 allows the override.
@@ -186,3 +201,4 @@ request can run the actual `atlantis apply` command.
 * For more information on GitHub pull request reviews and approvals see: [https://help.github.com/articles/about-pull-request-reviews/](https://help.github.com/articles/about-pull-request-reviews/)
 * For more information on GitLab merge request reviews and approvals (only supported on GitLab Enterprise) see: [https://docs.gitlab.com/ee/user/project/merge_requests/merge_request_approvals.html](https://docs.gitlab.com/ee/user/project/merge_requests/merge_request_approvals.html).
 * For more information on Bitbucket pull request reviews and approvals see: [https://confluence.atlassian.com/bitbucket/pull-requests-and-code-review-223220593.html](https://confluence.atlassian.com/bitbucket/pull-requests-and-code-review-223220593.html)
+* For more information on Azure Devops pull request reviews and approvals see: [https://docs.microsoft.com/en-us/azure/devops/repos/git/pull-requests-overview?view=azure-devops](https://docs.microsoft.com/en-us/azure/devops/repos/git/pull-requests-overview?view=azure-devops)

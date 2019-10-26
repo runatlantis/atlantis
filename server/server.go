@@ -115,6 +115,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var gitlabClient *vcs.GitlabClient
 	var bitbucketCloudClient *bitbucketcloud.Client
 	var bitbucketServerClient *bitbucketserver.Client
+	var azuredevopsClient *vcs.AzureDevopsClient
 	if userConfig.GithubUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		var err error
@@ -153,6 +154,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			}
 		}
 	}
+	if userConfig.AzureDevopsUser != "" {
+		supportedVCSHosts = append(supportedVCSHosts, models.AzureDevops)
+		var err error
+		azuredevopsClient, err = vcs.NewAzureDevopsClient("dev.azure.com", userConfig.AzureDevopsToken)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	if userConfig.WriteGitCreds {
 		home, err := homedir.Dir()
@@ -174,6 +183,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 				return nil, err
 			}
 		}
+		if userConfig.AzureDevopsUser != "" {
+			if err := events.WriteGitCreds(userConfig.AzureDevopsUser, userConfig.AzureDevopsToken, "https://dev.azure.com/", home, logger); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	var webhooksConfig []webhooks.Config
@@ -190,7 +204,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing webhooks")
 	}
-	vcsClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient)
+	vcsClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient)
 	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient}
 	terraformClient, err := terraform.NewClient(
 		logger,
@@ -265,11 +279,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		BitbucketUser:      userConfig.BitbucketUser,
 		BitbucketToken:     userConfig.BitbucketToken,
 		BitbucketServerURL: userConfig.BitbucketBaseURL,
+		AzureDevopsUser:    userConfig.AzureDevopsUser,
+		AzureDevopsToken:   userConfig.AzureDevopsToken,
 	}
 	commentParser := &events.CommentParser{
-		GithubUser:    userConfig.GithubUser,
-		GitlabUser:    userConfig.GitlabUser,
-		BitbucketUser: userConfig.BitbucketUser,
+		GithubUser:      userConfig.GithubUser,
+		GitlabUser:      userConfig.GitlabUser,
+		BitbucketUser:   userConfig.BitbucketUser,
+		AzureDevopsUser: userConfig.AzureDevopsUser,
 	}
 	defaultTfVersion := terraformClient.DefaultVersion()
 	pendingPlanFinder := &events.DefaultPendingPlanFinder{}
@@ -282,6 +299,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		VCSClient:                vcsClient,
 		GithubPullGetter:         githubClient,
 		GitlabMergeRequestGetter: gitlabClient,
+		AzureDevopsPullGetter:    azuredevopsClient,
 		CommitStatusUpdater:      commitStatusUpdater,
 		EventParser:              eventParser,
 		MarkdownRenderer:         markdownRenderer,
@@ -347,20 +365,23 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DB:                 boltdb,
 	}
 	eventsController := &EventsController{
-		CommandRunner:                commandRunner,
-		PullCleaner:                  pullClosedExecutor,
-		Parser:                       eventParser,
-		CommentParser:                commentParser,
-		Logger:                       logger,
-		GithubWebhookSecret:          []byte(userConfig.GithubWebhookSecret),
-		GithubRequestValidator:       &DefaultGithubRequestValidator{},
-		GitlabRequestParserValidator: &DefaultGitlabRequestParserValidator{},
-		GitlabWebhookSecret:          []byte(userConfig.GitlabWebhookSecret),
-		RepoWhitelistChecker:         repoWhitelist,
-		SilenceWhitelistErrors:       userConfig.SilenceWhitelistErrors,
-		SupportedVCSHosts:            supportedVCSHosts,
-		VCSClient:                    vcsClient,
-		BitbucketWebhookSecret:       []byte(userConfig.BitbucketWebhookSecret),
+		CommandRunner:                   commandRunner,
+		PullCleaner:                     pullClosedExecutor,
+		Parser:                          eventParser,
+		CommentParser:                   commentParser,
+		Logger:                          logger,
+		GithubWebhookSecret:             []byte(userConfig.GithubWebhookSecret),
+		GithubRequestValidator:          &DefaultGithubRequestValidator{},
+		GitlabRequestParserValidator:    &DefaultGitlabRequestParserValidator{},
+		GitlabWebhookSecret:             []byte(userConfig.GitlabWebhookSecret),
+		RepoWhitelistChecker:            repoWhitelist,
+		SilenceWhitelistErrors:          userConfig.SilenceWhitelistErrors,
+		SupportedVCSHosts:               supportedVCSHosts,
+		VCSClient:                       vcsClient,
+		BitbucketWebhookSecret:          []byte(userConfig.BitbucketWebhookSecret),
+		AzureDevopsWebhookBasicUser:     []byte(userConfig.AzureDevopsWebhookBasicUser),
+		AzureDevopsWebhookBasicPassword: []byte(userConfig.AzureDevopsWebhookBasicPassword),
+		AzureDevopsRequestValidator:     &DefaultAzureDevopsRequestValidator{},
 	}
 	return &Server{
 		AtlantisVersion:    config.AtlantisVersion,

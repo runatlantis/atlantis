@@ -36,6 +36,10 @@ import (
 // 3. Add your flag's description etc. to the stringFlags, intFlags, or boolFlags slices.
 const (
 	// Flag names.
+	ADBasicPasswordFlag        = "azuredevops-basic-password" // nolint: gosec
+	ADBasicUserFlag            = "azuredevops-basic-user"
+	ADTokenFlag                = "azuredevops-token" // nolint: gosec
+	ADUserFlag                 = "azuredevops-user"
 	AllowForkPRsFlag           = "allow-fork-prs"
 	AllowRepoConfigFlag        = "allow-repo-config"
 	AtlantisURLFlag            = "atlantis-url"
@@ -72,8 +76,9 @@ const (
 	TFETokenFlag               = "tfe-token"
 	WriteGitCredsFlag          = "write-git-creds"
 
-	// Flag defaults.
 	// NOTE: Must manually set these as defaults in the setDefaults function.
+	DefaultADBasicUser      = ""
+	DefaultADBasicPassword  = ""
 	DefaultCheckoutStrategy = "branch"
 	DefaultBitbucketBaseURL = bitbucketcloud.BaseURL
 	DefaultDataDir          = "~/.atlantis"
@@ -85,6 +90,24 @@ const (
 )
 
 var stringFlags = map[string]stringFlag{
+	ADBasicPasswordFlag: {
+		description: "Azure Devops basic authentication password for inbound webhooks " +
+			"(see https://docs.microsoft.com/en-us/azure/devops/service-hooks/authorize?view=azure-devops)." +
+			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from your Azure Devops org. " +
+			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
+			"Should be specified via the ATLANTIS_AZUREDEVOPS_BASIC_PASSWORD environment variable.",
+		defaultValue: "",
+	},
+	ADBasicUserFlag: {
+		description:  "Azure Devops basic authentication username for inbound webhooks.",
+		defaultValue: "",
+	},
+	ADTokenFlag: {
+		description: "Azure Devops token of API user. Can also be specified via the ATLANTIS_DO_TOKEN environment variable.",
+	},
+	ADUserFlag: {
+		description: "Azure Devops username of API user.",
+	},
 	AtlantisURLFlag: {
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path ex. https://example.com/basepath.",
 	},
@@ -454,14 +477,15 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	// 1. github user and token set
 	// 2. gitlab user and token set
 	// 3. bitbucket user and token set
-	// 4. any combination of the above
-	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag)
-	if ((userConfig.GithubUser == "") != (userConfig.GithubToken == "")) || ((userConfig.GitlabUser == "") != (userConfig.GitlabToken == "")) || ((userConfig.BitbucketUser == "") != (userConfig.BitbucketToken == "")) {
+	// 4. azuredevops user and token set
+	// 5. any combination of the above
+	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag)
+	if ((userConfig.GithubUser == "") != (userConfig.GithubToken == "")) || ((userConfig.GitlabUser == "") != (userConfig.GitlabToken == "")) || ((userConfig.BitbucketUser == "") != (userConfig.BitbucketToken == "")) || ((userConfig.AzureDevopsUser == "") != (userConfig.AzureDevopsToken == "")) {
 		return vcsErr
 	}
 	// At this point, we know that there can't be a single user/token without
 	// its partner, but we haven't checked if any user/token is set at all.
-	if userConfig.GithubUser == "" && userConfig.GitlabUser == "" && userConfig.BitbucketUser == "" {
+	if userConfig.GithubUser == "" && userConfig.GitlabUser == "" && userConfig.BitbucketUser == "" && userConfig.AzureDevopsUser == "" {
 		return vcsErr
 	}
 
@@ -550,6 +574,7 @@ func (s *ServerCmd) trimAtSymbolFromUsers(userConfig *server.UserConfig) {
 	userConfig.GithubUser = strings.TrimPrefix(userConfig.GithubUser, "@")
 	userConfig.GitlabUser = strings.TrimPrefix(userConfig.GitlabUser, "@")
 	userConfig.BitbucketUser = strings.TrimPrefix(userConfig.BitbucketUser, "@")
+	userConfig.AzureDevopsUser = strings.TrimPrefix(userConfig.AzureDevopsUser, "@")
 }
 
 func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
@@ -564,6 +589,9 @@ func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 	}
 	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && !s.SilenceOutput {
 		s.Logger.Warn("Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are whitelisting Bitbucket IPs")
+	}
+	if (userConfig.AzureDevopsWebhookBasicUser == "" || userConfig.AzureDevopsWebhookBasicPassword == "") && !s.SilenceOutput {
+		s.Logger.Warn("no Azure Devops webhook basic user and password set. This could allow attackers to spoof requests from Azure Devops.")
 	}
 }
 
