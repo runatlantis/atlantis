@@ -7,25 +7,20 @@ import (
 	"strings"
 	"time"
 
-	version "github.com/hashicorp/go-version"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/events/vcs/common"
-
 	"github.com/runatlantis/atlantis/server/events/models"
-
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"gopkg.in/russross/blackfriday.v2"
 )
 
-// AzureDevopsClient represents an Azure Devops VCS client
+// AzureDevopsClient represents an Azure DevOps VCS client
 type AzureDevopsClient struct {
 	Client *azuredevops.Client
-	// Version is set to the server version.
-	Version *version.Version
-	ctx     context.Context
+	ctx    context.Context
 }
 
-// NewAzureDevopsClient returns a valid Azure Devops client.
+// NewAzureDevopsClient returns a valid Azure DevOps client.
 func NewAzureDevopsClient(hostname string, token string) (*AzureDevopsClient, error) {
 	tp := azuredevops.BasicAuthTransport{
 		Username: "",
@@ -35,7 +30,7 @@ func NewAzureDevopsClient(hostname string, token string) (*AzureDevopsClient, er
 	httpClient.Timeout = time.Second * 10
 	var adClient, err = azuredevops.NewClient(httpClient)
 	if err != nil {
-		return nil, errors.Wrapf(err, "azuredevops.NewClient() %p", adClient)
+		return nil, err
 	}
 
 	if hostname != "dev.azure.com" {
@@ -89,10 +84,10 @@ func (g *AzureDevopsClient) GetModifiedFiles(repo models.Repo, pull models.PullR
 //
 // If comment length is greater than the max comment length we split into
 // multiple comments.
-// Azure Devops doesn't support markdown in Work Item comments, but it will
+// Azure DevOps doesn't support markdown in Work Item comments, but it will
 // convert text to HTML.  We use the blackfriday library to convert Atlantis
 // comment markdown before submission.
-func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment string) (err error) {
+func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment string) error {
 	sepEnd := "\n```\n</details>" +
 		"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
 	sepStart := "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
@@ -100,7 +95,7 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 
 	// maxCommentLength is the maximum number of chars allowed in a single comment
 	// This length was copied from the Github client - haven't found documentation
-	// or tested limit in Azure Devops.
+	// or tested limit in Azure DevOps.
 	const maxCommentLength = 65536
 
 	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
@@ -126,7 +121,7 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 			return err
 		}
 	}
-	return
+	return nil
 }
 
 // PullIsApproved returns true if the merge request was approved.
@@ -153,7 +148,6 @@ func (g *AzureDevopsClient) PullIsApproved(repo models.Repo, pull models.PullReq
 
 // PullIsMergeable returns true if the merge request can be merged.
 func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
-
 	opts := azuredevops.PullRequestGetOptions{
 		IncludeWorkItemRefs: true,
 	}
@@ -174,7 +168,6 @@ func (g *AzureDevopsClient) GetPullRequest(repo models.Repo, num int) (*azuredev
 	opts := azuredevops.PullRequestGetOptions{
 		IncludeWorkItemRefs: true,
 	}
-
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 	pull, _, err := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, num, &opts)
 	return pull, err
@@ -214,7 +207,6 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
 // until we handle branch policies
 // https://docs.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops
 func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
-
 	descriptor := "Atlantis Terraform Pull Request Automation"
 	i := "atlantis"
 	imageURL := "https://github.com/runatlantis/atlantis/raw/master/runatlantis.io/.vuepress/public/hero.png"
@@ -265,7 +257,7 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
 
 // SplitAzureDevopsRepoFullName splits a repo full name up into its owner,
 // repo and project name segments. If the repoFullName is malformed, may
-// return empty strings for owner, repo, or project.  Azure Devops uses
+// return empty strings for owner, repo, or project.  Azure DevOps uses
 // repoFullName format owner/project/repo.
 //
 // Ex. runatlantis/atlantis => (runatlantis, atlantis)

@@ -11,7 +11,7 @@ Atlantis integrates with the following Git hosts:
 * GitLab (public, private or enterprise)
 * Bitbucket Cloud aka bitbucket.org (public or private)
 * Bitbucket Server aka Stash
-* Azure Devops
+* Azure DevOps
 
 ## Terraform State
 Atlantis supports all backend types **except for local state**. We don't support local state

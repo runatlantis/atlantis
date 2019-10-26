@@ -1,5 +1,5 @@
 # Git Host Access Credentials
-This page describes how to create credentials for your Git host (GitHub, GitLab, Bitbucket, or Azure Devops)
+This page describes how to create credentials for your Git host (GitHub, GitLab, Bitbucket, or Azure DevOps)
 
 that Atlantis will use to make API calls.
 [[toc]]
@@ -20,7 +20,7 @@ generate an access token. Read on for the instructions for your specific Git hos
 * [GitLab](#gitlab)
 * [Bitbucket Cloud (bitbucket.org)](#bitbucket-cloud-bitbucket-org)
 * [Bitbucket Server (aka Stash)](#bitbucket-server-aka-stash)
-* [Azure Devops](#azure-devops)
+* [Azure DevOps](#azure-devops)
 
 ### GitHub
 - Create a Personal Access Token by following: [https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/#creating-a-token](https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/#creating-a-token)
@@ -50,13 +50,12 @@ Your Atlantis user must also have "Write permissions" (for repos in an organizat
 - Give the token **Read** Project permissions and **Write** Pull request permissions
 - Click **Create** and record the access token
 
-### Azure Devops
+### Azure DevOps
 - Create a Personal access token by following [https://docs.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops](https://docs.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops)
 - Label the password "atlantis"
 - The minimum scopes required for this token are:
-  - Code (Read)
+  - Code (Read & Write)
   - Code (Status)
-  - Work Items (Read & write)
 - Record the access token
 
 ## Next Steps

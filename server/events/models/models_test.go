@@ -105,7 +105,7 @@ func TestNewRepo_FullNameWrongFormat(t *testing.T) {
 	}
 }
 
-// If the clone url doesn't end with .git, and VCS is not Azure Devops, it is appended
+// If the clone url doesn't end with .git, and VCS is not Azure DevOps, it is appended
 func TestNewRepo_MissingDotGit(t *testing.T) {
 	repo, err := models.NewRepo(models.BitbucketCloud, "owner/repo", "https://bitbucket.org/owner/repo", "u", "p")
 	Ok(t, err)

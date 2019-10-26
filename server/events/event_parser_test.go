@@ -1077,7 +1077,7 @@ func TestGetBitbucketServerEventType(t *testing.T) {
 }
 
 func TestParseAzureDevopsRepo(t *testing.T) {
-	// this should  be successful
+	// this should be successful
 	repo := ADRepo
 	repo.ParentRepository = nil
 	r, err := parser.ParseAzureDevopsRepo(&repo)
@@ -1094,7 +1094,7 @@ func TestParseAzureDevopsRepo(t *testing.T) {
 		},
 	}, r)
 
-	// this should  be successful
+	// this should be successful
 	repo = ADRepo
 	repo.WebURL = nil
 	r, err = parser.ParseAzureDevopsRepo(&repo)
