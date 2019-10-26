@@ -431,6 +431,8 @@ type PlanSuccess struct {
 	RePlanCmd string
 	// ApplyCmd is the command that users should run to apply this plan.
 	ApplyCmd string
+	// Indicates if remote master has diverged
+	HasDiverged bool
 }
 
 // PullStatus is the current status of a pull request that is in progress.

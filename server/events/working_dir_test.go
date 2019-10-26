@@ -27,7 +27,7 @@ func TestClone_NoneExisting(t *testing.T) {
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
 	}
 
-	cloneDir, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	cloneDir, _, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 	}, "default")
 	Ok(t, err)
@@ -76,7 +76,7 @@ func TestClone_CheckoutMergeNoneExisting(t *testing.T) {
 		TestingOverrideBaseCloneURL: overrideURL,
 	}
 
-	cloneDir, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	cloneDir, _, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
@@ -123,7 +123,7 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 		TestingOverrideBaseCloneURL: overrideURL,
 	}
 
-	_, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	_, _, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
@@ -133,7 +133,7 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 	runCmd(t, dataDir, "touch", "repos/0/default/proof")
 
 	// Now run the clone again.
-	cloneDir, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	cloneDir, _, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
@@ -169,7 +169,7 @@ func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
 		TestingOverrideBaseCloneURL: overrideURL,
 	}
 
-	_, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	_, _, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
@@ -179,7 +179,7 @@ func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
 	runCmd(t, dataDir, "touch", "repos/0/default/proof")
 
 	// Now run the clone again.
-	cloneDir, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	cloneDir, _, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
@@ -220,7 +220,7 @@ func TestClone_CheckoutMergeConflict(t *testing.T) {
 		TestingOverrideBaseCloneURL: overrideURL,
 	}
 
-	_, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	_, _, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
@@ -250,7 +250,7 @@ func TestClone_NoReclone(t *testing.T) {
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
 	}
-	cloneDir, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	cloneDir, _, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 	}, "default")
 	Ok(t, err)
@@ -284,7 +284,7 @@ func TestClone_RecloneWrongCommit(t *testing.T) {
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
 	}
-	cloneDir, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	cloneDir, _, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		HeadCommit: expCommit,
 	}, "default")

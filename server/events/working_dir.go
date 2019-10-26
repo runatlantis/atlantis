@@ -35,7 +35,7 @@ const workingDirPrefix = "repos"
 type WorkingDir interface {
 	// Clone git clones headRepo, checks out the branch and then returns the
 	// absolute path to the root of the cloned repo.
-	Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, workspace string) (string, error)
+	Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, workspace string) (string, bool, error)
 	// GetWorkingDir returns the path to the workspace for this repo and pull.
 	// If workspace does not exist on disk, error will be of type os.IsNotExist.
 	GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error)
@@ -70,7 +70,7 @@ func (w *FileWorkspace) Clone(
 	baseRepo models.Repo,
 	headRepo models.Repo,
 	p models.PullRequest,
-	workspace string) (string, error) {
+	workspace string) (string, bool, error) {
 	cloneDir := w.cloneDir(baseRepo, p, workspace)
 
 	// If the directory already exists, check if it's at the right commit.
@@ -89,17 +89,41 @@ func (w *FileWorkspace) Clone(
 		}
 		revParseCmd := exec.Command("git", "rev-parse", pullHead) // #nosec
 		revParseCmd.Dir = cloneDir
-		output, err := revParseCmd.CombinedOutput()
-		if err != nil {
-			log.Warn("will re-clone repo, could not determine if was at correct commit: %s: %s: %s", strings.Join(revParseCmd.Args, " "), err, string(output))
+		outputRevParseCmd, errRevParseCmd := revParseCmd.CombinedOutput()
+		if errRevParseCmd != nil {
+			log.Warn("will re-clone repo, could not determine if was at correct commit: %s: %s: %s", strings.Join(revParseCmd.Args, " "), err, string(outputRevParseCmd))
 			return w.forceClone(log, cloneDir, headRepo, p)
 		}
-		currCommit := strings.Trim(string(output), "\n")
+		currCommit := strings.Trim(string(outputRevParseCmd), "\n")
+
+		// We're bring our remote refs up to date
+		remoteUpdateCmd := exec.Command("git", "remote", "update")
+		remoteUpdateCmd.Dir = cloneDir
+		outputRemoteUpdate, errRemoteUpdate := remoteUpdateCmd.CombinedOutput()
+		if errRemoteUpdate != nil {
+			log.Warn("getting remote update failed: %s", string(outputRemoteUpdate))
+		}
+
+		// We're checking if remote master branch has diverged
+		statusUnoCmd := exec.Command("git", "status", "-uno")
+		statusUnoCmd.Dir = cloneDir
+		outputStatusUno, errStatusUno := statusUnoCmd.CombinedOutput()
+		if errStatusUno != nil {
+			log.Warn("getting repo status has failed: %s", string(outputStatusUno))
+		}
+		status := strings.Trim(string(outputStatusUno), "\n")
+		hasDiverged := strings.Contains(status, "have diverged")
+		if hasDiverged {
+			log.Info("remote master branch has new commits, you have to pull new commits")
+		} else {
+			log.Debug("remote master branch has no new commits")
+		}
+
 		// We're prefix matching here because BitBucket doesn't give us the full
 		// commit, only a 12 character prefix.
 		if strings.HasPrefix(currCommit, p.HeadCommit) {
 			log.Debug("repo is at correct commit %q so will not re-clone", p.HeadCommit)
-			return cloneDir, nil
+			return cloneDir, hasDiverged, nil
 		}
 		log.Debug("repo was already cloned but is not at correct commit, wanted %q got %q", p.HeadCommit, currCommit)
 		// We'll fall through to re-clone.
@@ -112,17 +136,17 @@ func (w *FileWorkspace) Clone(
 func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
 	cloneDir string,
 	headRepo models.Repo,
-	p models.PullRequest) (string, error) {
+	p models.PullRequest) (string, bool, error) {
 
 	err := os.RemoveAll(cloneDir)
 	if err != nil {
-		return "", errors.Wrapf(err, "deleting dir %q before cloning", cloneDir)
+		return "", false, errors.Wrapf(err, "deleting dir %q before cloning", cloneDir)
 	}
 
 	// Create the directory and parents if necessary.
 	log.Info("creating dir %q", cloneDir)
 	if err := os.MkdirAll(cloneDir, 0700); err != nil {
-		return "", errors.Wrap(err, "creating new workspace")
+		return "", false, errors.Wrap(err, "creating new workspace")
 	}
 
 	// During testing, we mock some of this out.
@@ -184,11 +208,11 @@ func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
 		sanitizedOutput := w.sanitizeGitCredentials(string(output), p.BaseRepo, headRepo)
 		if err != nil {
 			sanitizedErrMsg := w.sanitizeGitCredentials(err.Error(), p.BaseRepo, headRepo)
-			return "", fmt.Errorf("running %s: %s: %s", cmdStr, sanitizedOutput, sanitizedErrMsg)
+			return "", false, fmt.Errorf("running %s: %s: %s", cmdStr, sanitizedOutput, sanitizedErrMsg)
 		}
 		log.Debug("ran: %s. Output: %s", cmdStr, strings.TrimSuffix(sanitizedOutput, "\n"))
 	}
-	return cloneDir, nil
+	return cloneDir, false, nil
 }
 
 // GetWorkingDir returns the path to the workspace for this repo and pull.
