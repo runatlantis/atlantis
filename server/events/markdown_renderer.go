@@ -229,7 +229,7 @@ var planSuccessUnwrappedTmpl = template.Must(template.New("").Parse(
 	"```diff\n" +
 		"{{.TerraformOutput}}\n" +
 		"```\n\n" + planNextSteps +
-		"{{ if .HasDiverged }}\n\n :warning: Master branch has new commits, it is recommended to pull new commits{{end}}"))
+		"{{ if .HasDiverged }}\n\n :warning: Master branch is ahead and thereby has new commits, it is recommended to pull new commits.{{end}}"))
 
 var planSuccessWrappedTmpl = template.Must(template.New("").Parse(
 	"<details><summary>Show Output</summary>\n\n" +
@@ -238,7 +238,7 @@ var planSuccessWrappedTmpl = template.Must(template.New("").Parse(
 		"```\n\n" +
 		planNextSteps + "\n" +
 		"</details>" +
-		"{{ if .HasDiverged }}\n\n :warning: Master branch has new commits, it is recommended to pull new commits{{end}}"))
+		"{{ if .HasDiverged }}\n\n :warning: Master branch is ahead and thereby has new commits, it is recommended to pull new commits.{{end}}"))
 
 // planNextSteps are instructions appended after successful plans as to what
 // to do next.

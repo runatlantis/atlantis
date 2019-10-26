@@ -114,7 +114,7 @@ func (w *FileWorkspace) Clone(
 		status := strings.Trim(string(outputStatusUno), "\n")
 		hasDiverged := strings.Contains(status, "have diverged")
 		if hasDiverged {
-			log.Info("remote master branch has new commits, you have to pull new commits")
+			log.Info("remote master branch is ahead and thereby has new commits, it is recommended to pull new commits")
 		} else {
 			log.Debug("remote master branch has no new commits")
 		}
