@@ -149,8 +149,10 @@ func (p *PlanStepRunner) switchWorkspace(ctx models.ProjectCommandContext, path 
 	if err != nil {
 		// If terraform workspace select fails we run terraform workspace
 		// new to create a new workspace automatically.
-		_, err = p.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, []string{workspaceCmd, "new", "-no-color", ctx.Workspace}, envs, tfVersion, ctx.Workspace)
-		return err
+		out, err := p.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, []string{workspaceCmd, "new", "-no-color", ctx.Workspace}, envs, tfVersion, ctx.Workspace)
+		if err != nil {
+			return fmt.Errorf("%s: %s", err, out)
+		}
 	}
 	return nil
 }
