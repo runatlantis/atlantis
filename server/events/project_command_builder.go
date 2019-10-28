@@ -2,10 +2,14 @@ package events
 
 import (
 	"fmt"
+	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 
+	"github.com/hashicorp/go-version"
+	"github.com/hashicorp/terraform-config-inspect/tfconfig"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -137,7 +141,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		for _, mp := range matchingProjects {
 			ctx.Log.Debug("determining config for project at dir: %q workspace: %q", mp.Dir, mp.Workspace)
 			mergedCfg := p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.BaseRepo.ID(), mp, repoCfg)
-			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, mergedCfg, commentFlags, repoCfg.Automerge, verbose))
+			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, mergedCfg, commentFlags, repoCfg.Automerge, verbose, repoDir))
 		}
 	} else {
 		// If there is no config file, then we'll plan each project that
@@ -148,7 +152,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		for _, mp := range modifiedProjects {
 			ctx.Log.Debug("determining config for project at dir: %q", mp.Path)
 			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.BaseRepo.ID(), mp.Path, DefaultWorkspace)
-			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, pCfg, commentFlags, DefaultAutomergeEnabled, verbose))
+			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, pCfg, commentFlags, DefaultAutomergeEnabled, verbose, repoDir))
 		}
 	}
 
@@ -282,7 +286,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(
 	if repoCfgPtr != nil {
 		automerge = repoCfgPtr.Automerge
 	}
-	return p.buildCtx(ctx, cmd, projCfg, commentFlags, automerge, verbose), nil
+	return p.buildCtx(ctx, cmd, projCfg, commentFlags, automerge, verbose, repoDir), nil
 }
 
 // getCfg returns the atlantis.yaml config (if it exists) for this project. If
@@ -371,7 +375,8 @@ func (p *DefaultProjectCommandBuilder) buildCtx(ctx *CommandContext,
 	projCfg valid.MergedProjectCfg,
 	commentArgs []string,
 	automergeEnabled bool,
-	verbose bool) models.ProjectCommandContext {
+	verbose bool,
+	absRepoDir string) models.ProjectCommandContext {
 
 	var steps []valid.Step
 	switch cmd {
@@ -379,6 +384,14 @@ func (p *DefaultProjectCommandBuilder) buildCtx(ctx *CommandContext,
 		steps = projCfg.Workflow.Plan.Steps
 	case models.ApplyCommand:
 		steps = projCfg.Workflow.Apply.Steps
+	}
+
+	// if TerraformVersion not defined in config file fallback to terraform configuration
+	if projCfg.TerraformVersion == nil {
+		version := p.getTfVersion(ctx, filepath.Join(absRepoDir, projCfg.RepoRelDir))
+		if version != nil {
+			projCfg.TerraformVersion = version
+		}
 	}
 
 	return models.ProjectCommandContext{
@@ -414,4 +427,39 @@ func (p *DefaultProjectCommandBuilder) escapeArgs(args []string) []string {
 		escaped = append(escaped, escapedArg)
 	}
 	return escaped
+}
+
+// Extracts required_version from Terraform configuration.
+// Returns nil if unable to determine version from configuation, check warning log for clarification.
+func (p *DefaultProjectCommandBuilder) getTfVersion(ctx *CommandContext, absProjDir string) *version.Version {
+	module, diags := tfconfig.LoadModule(absProjDir)
+	if diags.HasErrors() {
+		ctx.Log.Debug(diags.Error())
+		return nil
+	}
+
+	if len(module.RequiredCore) != 1 {
+		ctx.Log.Info("cannot determine which version to use from terraform configuration, detected %d possibilities.", len(module.RequiredCore))
+		return nil
+	}
+
+	ctx.Log.Info("verifying if \"%q\" is valid exact version.", module.RequiredCore[0])
+
+	// We allow `= x.y.z`, `=x.y.z` or `x.y.z` where `x`, `y` and `z` are integers
+	re := regexp.MustCompile(`^=?\s*([^\s]+)\s*$`)
+	matched := re.FindStringSubmatch(module.RequiredCore[0])
+	if len(matched) == 0 {
+		ctx.Log.Info("did not specify exact version in terraform configuration.")
+		return nil
+	}
+
+	version, err := version.NewVersion(matched[1])
+
+	if err != nil {
+		ctx.Log.Debug(err.Error())
+		return nil
+	}
+
+	ctx.Log.Debug("detected version: \"%q\".", version)
+	return version
 }
