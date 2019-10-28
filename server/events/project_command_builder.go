@@ -386,12 +386,10 @@ func (p *DefaultProjectCommandBuilder) buildCtx(ctx *CommandContext,
 		steps = projCfg.Workflow.Apply.Steps
 	}
 
-	// if TerraformVersion not defined in config file fallback to terraform configuration
+	// If TerraformVersion not defined in config file look for a
+	// terraform.require_version block.
 	if projCfg.TerraformVersion == nil {
-		version := p.getTfVersion(ctx, filepath.Join(absRepoDir, projCfg.RepoRelDir))
-		if version != nil {
-			projCfg.TerraformVersion = version
-		}
+		projCfg.TerraformVersion = p.getTfVersion(ctx, filepath.Join(absRepoDir, projCfg.RepoRelDir))
 	}
 
 	return models.ProjectCommandContext{
@@ -430,11 +428,11 @@ func (p *DefaultProjectCommandBuilder) escapeArgs(args []string) []string {
 }
 
 // Extracts required_version from Terraform configuration.
-// Returns nil if unable to determine version from configuation, check warning log for clarification.
+// Returns nil if unable to determine version from configuration.
 func (p *DefaultProjectCommandBuilder) getTfVersion(ctx *CommandContext, absProjDir string) *version.Version {
 	module, diags := tfconfig.LoadModule(absProjDir)
 	if diags.HasErrors() {
-		ctx.Log.Debug(diags.Error())
+		ctx.Log.Err("trying to detect required version: %s", diags.Error())
 		return nil
 	}
 
@@ -442,24 +440,22 @@ func (p *DefaultProjectCommandBuilder) getTfVersion(ctx *CommandContext, absProj
 		ctx.Log.Info("cannot determine which version to use from terraform configuration, detected %d possibilities.", len(module.RequiredCore))
 		return nil
 	}
+	requiredVersionSetting := module.RequiredCore[0]
 
-	ctx.Log.Info("verifying if \"%q\" is valid exact version.", module.RequiredCore[0])
-
-	// We allow `= x.y.z`, `=x.y.z` or `x.y.z` where `x`, `y` and `z` are integers
+	// We allow `= x.y.z`, `=x.y.z` or `x.y.z` where `x`, `y` and `z` are integers.
 	re := regexp.MustCompile(`^=?\s*([^\s]+)\s*$`)
-	matched := re.FindStringSubmatch(module.RequiredCore[0])
+	matched := re.FindStringSubmatch(requiredVersionSetting)
 	if len(matched) == 0 {
-		ctx.Log.Info("did not specify exact version in terraform configuration.")
+		ctx.Log.Debug("did not specify exact version in terraform configuration, found %q", requiredVersionSetting)
 		return nil
 	}
-
+	ctx.Log.Debug("found required_version setting of %q", requiredVersionSetting)
 	version, err := version.NewVersion(matched[1])
-
 	if err != nil {
 		ctx.Log.Debug(err.Error())
 		return nil
 	}
 
-	ctx.Log.Debug("detected version: \"%q\".", version)
+	ctx.Log.Info("detected module requires version: %q", version.String())
 	return version
 }
