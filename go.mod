@@ -25,7 +25,7 @@ require (
 	github.com/gorilla/mux v1.6.2
 	github.com/grpc-ecosystem/grpc-gateway v1.6.2 // indirect
 	github.com/hashicorp/go-getter v1.4.0
-	github.com/hashicorp/go-version v1.1.0
+	github.com/hashicorp/go-version v1.2.0
 	github.com/hashicorp/hcl v0.0.0-20170914154624-68e816d1c783 // indirect
 	github.com/hashicorp/terraform-config-inspect v0.0.0-20190821133035-82a99dc22ef4
 	github.com/huandu/xstrings v1.0.0 // indirect
@@ -36,6 +36,7 @@ require (
 	github.com/microcosm-cc/bluemonday v1.0.1
 	github.com/mitchellh/colorstring v0.0.0-20150917214807-8631ce90f286
 	github.com/mitchellh/go-homedir v1.0.0
+	github.com/mitchellh/gox v1.0.1 // indirect
 	github.com/mitchellh/mapstructure v0.0.0-20170523030023-d0303fe80992 // indirect
 	github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb
 	github.com/nlopes/slack v0.1.0
