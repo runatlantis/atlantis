@@ -3,6 +3,7 @@ module github.com/runatlantis/atlantis
 go 1.13
 
 require (
+	git.apache.org/thrift.git v0.12.0 // indirect
 	github.com/Masterminds/semver v1.4.2 // indirect
 	github.com/Masterminds/sprig v2.15.0+incompatible
 	github.com/aokoli/goutils v1.0.1 // indirect
@@ -22,9 +23,9 @@ require (
 	github.com/google/uuid v0.0.0-20161128191214-064e2069ce9c // indirect
 	github.com/gorilla/context v0.0.0-20160226214623-1ea25387ff6f // indirect
 	github.com/gorilla/mux v1.6.2
-	github.com/hashicorp/go-getter v1.2.0
+	github.com/grpc-ecosystem/grpc-gateway v1.6.2 // indirect
+	github.com/hashicorp/go-getter v1.4.0
 	github.com/hashicorp/go-version v1.1.0
-	github.com/hashicorp/golang-lru v0.5.1 // indirect
 	github.com/hashicorp/hcl v0.0.0-20170914154624-68e816d1c783 // indirect
 	github.com/hashicorp/terraform-config-inspect v0.0.0-20190821133035-82a99dc22ef4
 	github.com/huandu/xstrings v1.0.0 // indirect
@@ -39,10 +40,12 @@ require (
 	github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb
 	github.com/nlopes/slack v0.1.0
 	github.com/onsi/ginkgo v1.9.0 // indirect
+	github.com/openzipkin/zipkin-go v0.1.3 // indirect
 	github.com/pelletier/go-buffruneio v0.2.0 // indirect
 	github.com/pelletier/go-toml v1.0.0 // indirect
 	github.com/petergtz/pegomock v2.5.0+incompatible
 	github.com/pkg/errors v0.8.0
+	github.com/prometheus/client_golang v0.9.3-0.20190127221311-3c4408c8b829 // indirect
 	github.com/spf13/afero v0.0.0-20170901052352-ee1bd8ee15a1 // indirect
 	github.com/spf13/cast v1.1.0 // indirect
 	github.com/spf13/cobra v0.0.0-20170905172051-b78744579491
@@ -53,11 +56,11 @@ require (
 	github.com/urfave/cli v1.20.0
 	github.com/urfave/negroni v0.2.0
 	github.com/xanzy/go-gitlab v0.20.2-0.20190819195750-b1d195859ad0
-	go.opencensus.io v0.19.1 // indirect
-	golang.org/x/crypto v0.0.0-20190426145343-a29dc8fdc734
-	google.golang.org/genproto v0.0.0-20190307195333-5fe7a883aa19 // indirect
+	golang.org/x/build v0.0.0-20190111050920-041ab4dc3f9d // indirect
+	golang.org/x/crypto v0.0.0-20190605123033-f99c8df09eb5
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v9 v9.20.2
+	gopkg.in/russross/blackfriday.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.2.2
 	gotest.tools v2.2.0+incompatible // indirect
 )
