@@ -27,7 +27,14 @@ type ParserValidator struct{}
 // for the repo at absRepoDir.
 // Returns an error if for some reason it can't read that directory.
 func (p *ParserValidator) HasRepoCfg(absRepoDir string) (bool, error) {
-	_, err := os.Stat(p.repoCfgPath(absRepoDir))
+	// Checks for a config file with an invalid extension (atlantis.yml)
+	const invalidExtensionFilename = "atlantis.yml"
+	_, err := os.Stat(p.repoCfgPath(absRepoDir, invalidExtensionFilename))
+	if err == nil {
+		return false, errors.Errorf("found %q as config file; rename using the .yaml extension - %q", invalidExtensionFilename, AtlantisYAMLFilename)
+	}
+
+	_, err = os.Stat(p.repoCfgPath(absRepoDir, AtlantisYAMLFilename))
 	if os.IsNotExist(err) {
 		return false, nil
 	}
@@ -38,7 +45,7 @@ func (p *ParserValidator) HasRepoCfg(absRepoDir string) (bool, error) {
 // repo at absRepoDir.
 // If there was no config file, it will return an os.IsNotExist(error).
 func (p *ParserValidator) ParseRepoCfg(absRepoDir string, globalCfg valid.GlobalCfg, repoID string) (valid.RepoCfg, error) {
-	configFile := p.repoCfgPath(absRepoDir)
+	configFile := p.repoCfgPath(absRepoDir, AtlantisYAMLFilename)
 	configData, err := ioutil.ReadFile(configFile) // nolint: gosec
 
 	if err != nil {
@@ -122,8 +129,8 @@ func (p *ParserValidator) validateRawGlobalCfg(rawCfg raw.GlobalCfg, defaultCfg 
 	return validCfg, nil
 }
 
-func (p *ParserValidator) repoCfgPath(repoDir string) string {
-	return filepath.Join(repoDir, AtlantisYAMLFilename)
+func (p *ParserValidator) repoCfgPath(repoDir, cfgFilename string) string {
+	return filepath.Join(repoDir, cfgFilename)
 }
 
 func (p *ParserValidator) validateProjectNames(config valid.RepoCfg) error {

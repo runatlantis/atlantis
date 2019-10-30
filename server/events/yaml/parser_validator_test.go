@@ -33,6 +33,17 @@ func TestHasRepoCfg_FileDoesNotExist(t *testing.T) {
 	Equals(t, false, exists)
 }
 
+func TestHasRepoCfg_InvalidFileExtension(t *testing.T) {
+	tmpDir, cleanup := TempDir(t)
+	defer cleanup()
+	_, err := os.Create(filepath.Join(tmpDir, "atlantis.yml"))
+	Ok(t, err)
+
+	r := yaml.ParserValidator{}
+	_, err = r.HasRepoCfg(tmpDir)
+	ErrContains(t, "found \"atlantis.yml\" as config file; rename using the .yaml extension - \"atlantis.yaml\"", err)
+}
+
 func TestParseRepoCfg_DirDoesNotExist(t *testing.T) {
 	r := yaml.ParserValidator{}
 	_, err := r.ParseRepoCfg("/not/exist", globalCfg, "")
