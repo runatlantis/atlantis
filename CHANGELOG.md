@@ -1,3 +1,31 @@
+# v0.10.1
+
+## Description
+Small release that is built using Go 1.13.3 to mitigate a
+CVE (https://99designs.ca/blog/engineering/request-smuggling/).
+
+## Features
+* Error out when user has an atlantis.yml file (wrong extension, needs .yaml) ([#816](https://github.com/runatlantis/atlantis/pull/816) by @mdcurran)
+
+## Bugfixes
+None
+
+## Backwards Incompatibilities / Notes:
+If you had an `atlantis.yml` file (note the `.yml` extension), previously Atlantis ignored it.
+Now it will error to warn you that it's not being used.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.10.1/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.10.1/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.10.1/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.10.1/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.10.1`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.10.0..v0.10.1
+https://github.com/runatlantis/atlantis/compare/v0.10.0...v0.10.1
+
 # v0.10.0
 
 ## Description
@@ -32,6 +60,7 @@ All by community contributors!
 
 ## Diff v0.9.0..v0.10.0
 https://github.com/runatlantis/atlantis/compare/v0.9.0...v0.10.0
+
 # v0.9.0
 
 ## Description

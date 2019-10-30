@@ -34,15 +34,9 @@ Versions
 --------
 
 Currently maintained and recommended version of Blackfriday is `v2`. It's being
-developed on its own branch: https://github.com/russross/blackfriday/tree/v2 and the
-documentation is available at
-https://godoc.org/gopkg.in/russross/blackfriday.v2.
-
-It is `go get`-able via via [gopkg.in][6] at `gopkg.in/russross/blackfriday.v2`,
-but we highly recommend using package management tool like [dep][7] or
-[Glide][8] and make use of semantic versioning. With package management you
-should import `github.com/russross/blackfriday` and specify that you're using
-version 2.0.0.
+developed on its own branch: https://github.com/russross/blackfriday/v2. You
+should install and import it via [gopkg.in][6] at
+`gopkg.in/russross/blackfriday.v2`.
 
 Version 2 offers a number of improvements over v1:
 
@@ -204,7 +198,7 @@ implements the following extensions:
 
         Cat
         : Fluffy animal everyone likes
-
+        
         Internet
         : Vector of transmission for pictures of cats
 
@@ -215,7 +209,7 @@ implements the following extensions:
     end of the document. A footnote looks like this:
 
         This is a footnote.[^1]
-
+        
         [^1]: the footnote text.
 
 *   **Autolinking**. Blackfriday can find URLs that have not been
@@ -261,10 +255,8 @@ are a few of note:
 *   [markdownfmt](https://github.com/shurcooL/markdownfmt): like gofmt,
     but for markdown.
 
-*   [LaTeX output](https://github.com/Ambrevar/Blackfriday-LaTeX):
+*   [LaTeX output](https://bitbucket.org/ambrevar/blackfriday-latex):
     renders output as LaTeX.
-
-*   [Blackfriday-Confluence](https://github.com/kentaro-m/blackfriday-confluence): provides a [Confluence Wiki Markup](https://confluence.atlassian.com/doc/confluence-wiki-markup-251003035.html) renderer.
 
 
 Todo
