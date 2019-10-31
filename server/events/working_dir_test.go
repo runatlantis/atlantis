@@ -27,10 +27,13 @@ func TestClone_NoneExisting(t *testing.T) {
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
 	}
 
-	cloneDir, _, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	cloneDir, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 	}, "default")
 	Ok(t, err)
+
+	// Check if master repo has not diverged
+	Equals(t, hasDiverged, false)
 
 	// Use rev-parse to verify at correct commit.
 	actCommit := runCmd(t, cloneDir, "git", "rev-parse", "HEAD")
@@ -76,11 +79,14 @@ func TestClone_CheckoutMergeNoneExisting(t *testing.T) {
 		TestingOverrideBaseCloneURL: overrideURL,
 	}
 
-	cloneDir, _, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	cloneDir, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
 	Ok(t, err)
+
+	// Check if master repo has not diverged
+	Equals(t, hasDiverged, false)
 
 	// Check the commits.
 	actBaseCommit := runCmd(t, cloneDir, "git", "rev-parse", "HEAD~1")
@@ -123,21 +129,27 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 		TestingOverrideBaseCloneURL: overrideURL,
 	}
 
-	_, _, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	_, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
 	Ok(t, err)
+
+	// Check if master repo has not diverged
+	Equals(t, hasDiverged, false)
 
 	// Create a file that we can use to check if the repo was recloned.
 	runCmd(t, dataDir, "touch", "repos/0/default/proof")
 
 	// Now run the clone again.
-	cloneDir, _, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	cloneDir, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
 	Ok(t, err)
+
+	// Check if master repo has not diverged
+	Equals(t, hasDiverged, false)
 
 	// Check that our proof file is still there, proving that we didn't reclone.
 	_, err = os.Stat(filepath.Join(cloneDir, "proof"))
@@ -169,21 +181,27 @@ func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
 		TestingOverrideBaseCloneURL: overrideURL,
 	}
 
-	_, _, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	_, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
 	Ok(t, err)
+
+	// Check if master repo has not diverged
+	Equals(t, hasDiverged, false)
 
 	// Create a file that we can use to check if the repo was recloned.
 	runCmd(t, dataDir, "touch", "repos/0/default/proof")
 
 	// Now run the clone again.
-	cloneDir, _, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	cloneDir, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
 	Ok(t, err)
+
+	// Check if master repo has not diverged
+	Equals(t, hasDiverged, false)
 
 	// Check that our proof file is still there, proving that we didn't reclone.
 	_, err = os.Stat(filepath.Join(cloneDir, "proof"))
@@ -220,10 +238,13 @@ func TestClone_CheckoutMergeConflict(t *testing.T) {
 		TestingOverrideBaseCloneURL: overrideURL,
 	}
 
-	_, _, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	_, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
+
+	// Check if master repo has not diverged
+	Equals(t, hasDiverged, false)
 
 	ErrContains(t, "running git merge -q --no-ff -m atlantis-merge FETCH_HEAD", err)
 	ErrContains(t, "Auto-merging file", err)
@@ -250,10 +271,13 @@ func TestClone_NoReclone(t *testing.T) {
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
 	}
-	cloneDir, _, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	cloneDir, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 	}, "default")
 	Ok(t, err)
+
+	// Check if master repo has not diverged
+	Equals(t, hasDiverged, false)
 
 	// Check that our proof file is still there.
 	_, err = os.Stat(filepath.Join(cloneDir, "proof"))
@@ -284,11 +308,14 @@ func TestClone_RecloneWrongCommit(t *testing.T) {
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
 	}
-	cloneDir, _, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	cloneDir, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		HeadCommit: expCommit,
 	}, "default")
 	Ok(t, err)
+
+	// Check if master repo has not diverged
+	Equals(t, hasDiverged, false)
 
 	// Use rev-parse to verify at correct commit.
 	actCommit := runCmd(t, cloneDir, "git", "rev-parse", "HEAD")
