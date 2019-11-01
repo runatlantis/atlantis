@@ -16,7 +16,7 @@ Atlantis [Docker image](https://hub.docker.com/r/runatlantis/atlantis/).
 
 ### Routing
 Atlantis and your Git host need to be able to route and communicate with one another. Your Git host needs to be able to send webhooks to Atlantis and Atlantis needs to be able to make API calls to your Git host.
-If you're using 
+If you're using
 a public Git host like github.com, gitlab.com, bitbucket.org, or dev.azure.com then you'll need to
 expose Atlantis to the internet.
 
@@ -411,6 +411,14 @@ You could also set up SSL at your LoadBalancer.
 The Helm chart and Kubernetes manifests above are compatible with OpenShift, however you need to run
 with an additional environment variable: `ATLANTIS_DATA_DIR=/home/atlantis`. This is required because
 OpenShift runs Docker images with random user id's that use `/` as their home directory.
+
+If you are deploying Atlantis as a StatefulSet, you will also want to change the `atlantis-data`
+volume mount from `/atlantis` to `/home/atlantis`, matching the `ATLANTIS_DATA_DIR`.
+```
+volumeMounts:
+- name: atlantis-data
+  mountPath: /home/atlantis
+```
 
 ### AWS Fargate
 If you'd like to run Atlantis on [AWS Fargate](https://aws.amazon.com/fargate/)
