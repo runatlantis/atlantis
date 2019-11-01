@@ -16,7 +16,7 @@ Atlantis [Docker image](https://hub.docker.com/r/runatlantis/atlantis/).
 
 ### Routing
 Atlantis and your Git host need to be able to route and communicate with one another. Your Git host needs to be able to send webhooks to Atlantis and Atlantis needs to be able to make API calls to your Git host.
-If you're using
+If you're using 
 a public Git host like github.com, gitlab.com, bitbucket.org, or dev.azure.com then you'll need to
 expose Atlantis to the internet.
 
