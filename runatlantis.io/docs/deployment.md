@@ -412,6 +412,14 @@ The Helm chart and Kubernetes manifests above are compatible with OpenShift, how
 with an additional environment variable: `ATLANTIS_DATA_DIR=/home/atlantis`. This is required because
 OpenShift runs Docker images with random user id's that use `/` as their home directory.
 
+If you are deploying Atlantis as a StatefulSet, you will also want to change the `atlantis-data`
+volume mount from `/atlantis` to `/home/atlantis`, matching the `ATLANTIS_DATA_DIR`.
+```
+volumeMounts:
+- name: atlantis-data
+  mountPath: /home/atlantis
+```
+
 ### AWS Fargate
 If you'd like to run Atlantis on [AWS Fargate](https://aws.amazon.com/fargate/)
  check out the Atlantis module on the Terraform Module Registry: [https://registry.terraform.io/modules/terraform-aws-modules/atlantis/aws](https://registry.terraform.io/modules/terraform-aws-modules/atlantis/aws)
