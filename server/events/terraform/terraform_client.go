@@ -57,7 +57,7 @@ type DefaultClient struct {
 	overrideTF string
 	// downloader downloads terraform versions.
 	downloader  Downloader
-	downloadURL string
+	downloadBaseURL string
 	// versions maps from the string representation of a tf version (ex. 0.11.10)
 	// to the absolute path of that binary on disk (if it exists).
 	// Use versionsLock to control access.

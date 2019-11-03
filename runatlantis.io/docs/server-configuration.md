@@ -426,7 +426,7 @@ Values are chosen in this order:
   ```bash
   atlantis server --tf-download-url="https://releases.company.com"
   ```
-  An alternative URL to download Terraform Versions if they are missing. Useful in an airgapped
+  An alternative URL to download Terraform versions if they are missing. Useful in an airgapped
   environment where releases.hashicorp.com is not available. Directory structure of the custom
   endpoint should match that of releases.hashicorp.com.
 
