@@ -68,7 +68,7 @@ is 0.11.13. You can update by downloading from www.terraform.io/downloads.html
 	Ok(t, err)
 	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
 
-	c, err := terraform.NewClient(nil, tmp, "", "", "", cmd.DefaultTFVersionFlag, cmd.TFDownloadURLFlag, nil)
+	c, err := terraform.NewClient(nil, tmp, "", "", "", cmd.DefaultTFVersionFlag, "https://releases.hashicorp.com", nil)
 	Ok(t, err)
 
 	Ok(t, err)
@@ -183,12 +183,12 @@ func TestNewClient_DefaultTFFlagDownload(t *testing.T) {
 		err := ioutil.WriteFile(params[0].(string), []byte("#!/bin/sh\necho '\nTerraform v0.11.10\n'"), 0755)
 		return []pegomock.ReturnValue{err}
 	})
-	c, err := terraform.NewClient(nil, tmp, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.TFDownloadURLFlag, mockDownloader)
+	c, err := terraform.NewClient(nil, tmp, "", "", "0.11.10", cmd.DefaultTFVersionFlag, "https://my-mirror.releases.mycompany.com", mockDownloader)
 	Ok(t, err)
 
 	Ok(t, err)
 	Equals(t, "0.11.10", c.DefaultVersion().String())
-	baseURL := fmt.Sprintf("%s/terraform/0.11.10", cmd.TFDownloadURLFlag)
+	baseURL := "https://my-mirror.releases.mycompany.com/terraform/0.11.10"
 	expURL := fmt.Sprintf("%s/terraform_0.11.10_%s_%s.zip?checksum=file:%s/terraform_0.11.10_SHA256SUMS",
 		baseURL,
 		runtime.GOOS,
