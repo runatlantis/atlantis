@@ -34,7 +34,7 @@ const workingDirPrefix = "repos"
 // WorkingDir handles the workspace on disk for running commands.
 type WorkingDir interface {
 	// Clone git clones headRepo, checks out the branch and then returns the
-	// absolute path to the root of the cloned repo.
+	// absolute path to the root of the cloned repo as well as if master branch has diverged.
 	Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, workspace string) (string, bool, error)
 	// GetWorkingDir returns the path to the workspace for this repo and pull.
 	// If workspace does not exist on disk, error will be of type os.IsNotExist.
@@ -89,26 +89,26 @@ func (w *FileWorkspace) Clone(
 		}
 		revParseCmd := exec.Command("git", "rev-parse", pullHead) // #nosec
 		revParseCmd.Dir = cloneDir
-		outputRevParseCmd, errRevParseCmd := revParseCmd.CombinedOutput()
-		if errRevParseCmd != nil {
+		outputRevParseCmd, err := revParseCmd.CombinedOutput()
+		if err != nil {
 			log.Warn("will re-clone repo, could not determine if was at correct commit: %s: %s: %s", strings.Join(revParseCmd.Args, " "), err, string(outputRevParseCmd))
 			return w.forceClone(log, cloneDir, headRepo, p)
 		}
 		currCommit := strings.Trim(string(outputRevParseCmd), "\n")
 
-		// We're bring our remote refs up to date
+		// Bring our remote refs up to date.
 		remoteUpdateCmd := exec.Command("git", "remote", "update")
 		remoteUpdateCmd.Dir = cloneDir
-		outputRemoteUpdate, errRemoteUpdate := remoteUpdateCmd.CombinedOutput()
-		if errRemoteUpdate != nil {
+		outputRemoteUpdate, err := remoteUpdateCmd.CombinedOutput()
+		if err != nil {
 			log.Warn("getting remote update failed: %s", string(outputRemoteUpdate))
 		}
 
-		// We're checking if remote master branch has diverged
-		statusUnoCmd := exec.Command("git", "status", "-uno")
+		// Check if remote master branch has diverged.
+		statusUnoCmd := exec.Command("git", "status", "--untracked-files=no")
 		statusUnoCmd.Dir = cloneDir
-		outputStatusUno, errStatusUno := statusUnoCmd.CombinedOutput()
-		if errStatusUno != nil {
+		outputStatusUno, err := statusUnoCmd.CombinedOutput()
+		if err != nil {
 			log.Warn("getting repo status has failed: %s", string(outputStatusUno))
 		}
 		status := strings.Trim(string(outputStatusUno), "\n")
