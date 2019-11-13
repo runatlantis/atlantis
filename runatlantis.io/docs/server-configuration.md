@@ -431,6 +431,14 @@ Values are chosen in this order:
   environment where releases.hashicorp.com is not available. Directory structure of the custom
   endpoint should match that of releases.hashicorp.com.
 
+* ### `--status-name`
+  ```bash
+  atlantis server --status-name="atlantis-dev"
+  ```
+  Application name to use when updating a pull request status.
+
+  This is useful when running multiple Atlantis servers against a single repository.
+
 * ### `--tfe-hostname`
   ```bash
   atlantis server --tfe-hostname="my-terraform-enterprise.company.com"

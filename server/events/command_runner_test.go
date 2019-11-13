@@ -62,7 +62,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		ThenReturn(pullLogger)
 	ch = events.DefaultCommandRunner{
 		VCSClient:                vcsClient,
-		CommitStatusUpdater:      &events.DefaultCommitStatusUpdater{vcsClient},
+		CommitStatusUpdater:      &events.DefaultCommitStatusUpdater{vcsClient, "atlantis"},
 		EventParser:              eventParsing,
 		MarkdownRenderer:         &events.MarkdownRenderer{},
 		GithubPullGetter:         githubGetter,

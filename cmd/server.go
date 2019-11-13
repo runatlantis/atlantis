@@ -73,6 +73,7 @@ const (
 	SSLCertFileFlag            = "ssl-cert-file"
 	SSLKeyFileFlag             = "ssl-key-file"
 	TFDownloadURLFlag          = "tf-download-url"
+	StatusName                 = "status-name"
 	TFEHostnameFlag            = "tfe-hostname"
 	TFETokenFlag               = "tfe-token"
 	WriteGitCredsFlag          = "write-git-creds"
@@ -89,6 +90,7 @@ const (
 	DefaultPort             = 4141
 	DefaultTFDownloadURL    = "https://releases.hashicorp.com"
 	DefaultTFEHostname      = "app.terraform.io"
+	DefaultStatusName       = "atlantis"
 )
 
 var stringFlags = map[string]stringFlag{
@@ -207,6 +209,10 @@ var stringFlags = map[string]stringFlag{
 	TFDownloadURLFlag: {
 		description:  "Base URL to download Terraform versions from.",
 		defaultValue: DefaultTFDownloadURL,
+	},
+	StatusName: {
+		description:  "Name used for updating the pull request status.",
+		defaultValue: DefaultStatusName,
 	},
 	TFEHostnameFlag: {
 		description:  "Hostname of your Terraform Enterprise installation. If using Terraform Cloud no need to set.",
@@ -462,6 +468,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	}
 	if c.TFDownloadURL == "" {
 		c.TFDownloadURL = DefaultTFDownloadURL
+	}
+	if c.StatusName == "" {
+		c.StatusName = DefaultStatusName
 	}
 	if c.TFEHostname == "" {
 		c.TFEHostname = DefaultTFEHostname
