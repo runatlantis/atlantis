@@ -72,6 +72,7 @@ const (
 	SlackTokenFlag             = "slack-token"
 	SSLCertFileFlag            = "ssl-cert-file"
 	SSLKeyFileFlag             = "ssl-key-file"
+	StatusName                 = "status-name"
 	TFEHostnameFlag            = "tfe-hostname"
 	TFETokenFlag               = "tfe-token"
 	WriteGitCredsFlag          = "write-git-creds"
@@ -87,6 +88,7 @@ const (
 	DefaultLogLevel         = "info"
 	DefaultPort             = 4141
 	DefaultTFEHostname      = "app.terraform.io"
+	DefaultStatusName       = "atlantis"
 )
 
 var stringFlags = map[string]stringFlag{
@@ -201,6 +203,10 @@ var stringFlags = map[string]stringFlag{
 	},
 	SSLKeyFileFlag: {
 		description: fmt.Sprintf("File containing x509 private key matching --%s.", SSLCertFileFlag),
+	},
+	StatusName: {
+		description:  "Name used for updating the pull request status.",
+		defaultValue: DefaultStatusName,
 	},
 	TFEHostnameFlag: {
 		description:  "Hostname of your Terraform Enterprise installation. If using Terraform Cloud no need to set.",
@@ -453,6 +459,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	}
 	if c.Port == 0 {
 		c.Port = DefaultPort
+	}
+	if c.StatusName == "" {
+		c.StatusName = DefaultStatusName
 	}
 	if c.TFEHostname == "" {
 		c.TFEHostname = DefaultTFEHostname

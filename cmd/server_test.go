@@ -392,6 +392,7 @@ func TestExecute_Defaults(t *testing.T) {
 	Equals(t, "", passedConfig.SlackToken)
 	Equals(t, "", passedConfig.SSLCertFile)
 	Equals(t, "", passedConfig.SSLKeyFile)
+	Equals(t, "atlantis", passedConfig.StatusName)
 	Equals(t, "app.terraform.io", passedConfig.TFEHostname)
 	Equals(t, "", passedConfig.TFEToken)
 	Equals(t, false, passedConfig.WriteGitCreds)
