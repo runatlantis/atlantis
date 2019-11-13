@@ -720,6 +720,7 @@ write-git-creds: true
 		"TFE_HOSTNAME":                 "override-my-hostname",
 		"TFE_TOKEN":                    "override-my-token",
 		"WRITE_GIT_CREDS":              "false",
+		"STATUS_NAME":                  "override-status-name",
 	} {
 		os.Setenv("ATLANTIS_"+name, value) // nolint: errcheck
 	}
@@ -763,6 +764,7 @@ write-git-creds: true
 	Equals(t, "override-my-hostname", passedConfig.TFEHostname)
 	Equals(t, "override-my-token", passedConfig.TFEToken)
 	Equals(t, false, passedConfig.WriteGitCreds)
+	Equals(t, "override-status-name", passedConfig.StatusName)
 }
 
 func TestExecute_FlagConfigOverride(t *testing.T) {
@@ -800,6 +802,7 @@ require-mergeable: true
 slack-token: slack-token
 ssl-cert-file: cert-file
 ssl-key-file: key-file
+status-name: status-name
 tfe-hostname: my-hostname
 tfe-token: my-token
 write-git-creds: true
@@ -839,6 +842,7 @@ write-git-creds: true
 		cmd.SlackTokenFlag:             "override-slack-token",
 		cmd.SSLCertFileFlag:            "override-cert-file",
 		cmd.SSLKeyFileFlag:             "override-key-file",
+		cmd.StatusName:                 "override-status-name",
 		cmd.TFEHostnameFlag:            "override-my-hostname",
 		cmd.TFETokenFlag:               "override-my-token",
 		cmd.WriteGitCredsFlag:          false,
@@ -876,6 +880,7 @@ write-git-creds: true
 	Equals(t, "override-slack-token", passedConfig.SlackToken)
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
 	Equals(t, "override-key-file", passedConfig.SSLKeyFile)
+	Equals(t, "override-status-name", passedConfig.StatusName)
 	Equals(t, "override-my-hostname", passedConfig.TFEHostname)
 	Equals(t, "override-my-token", passedConfig.TFEToken)
 	Equals(t, false, passedConfig.WriteGitCreds)
@@ -918,6 +923,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		"SLACK_TOKEN":                  "slack-token",
 		"SSL_CERT_FILE":                "cert-file",
 		"SSL_KEY_FILE":                 "key-file",
+		"STATUS_NAME":                  "status-name",
 		"TFE_HOSTNAME":                 "my-hostname",
 		"TFE_TOKEN":                    "my-token",
 		"WRITE_GIT_CREDS":              "true",
@@ -965,6 +971,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		cmd.SlackTokenFlag:             "override-slack-token",
 		cmd.SSLCertFileFlag:            "override-cert-file",
 		cmd.SSLKeyFileFlag:             "override-key-file",
+		cmd.StatusName:                 "override-status-name",
 		cmd.TFEHostnameFlag:            "override-my-hostname",
 		cmd.TFETokenFlag:               "override-my-token",
 		cmd.WriteGitCredsFlag:          false,
@@ -1004,6 +1011,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	Equals(t, "override-slack-token", passedConfig.SlackToken)
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
 	Equals(t, "override-key-file", passedConfig.SSLKeyFile)
+	Equals(t, "override-status-name", passedConfig.StatusName)
 	Equals(t, "override-my-hostname", passedConfig.TFEHostname)
 	Equals(t, "override-my-token", passedConfig.TFEToken)
 	Equals(t, false, passedConfig.WriteGitCreds)
