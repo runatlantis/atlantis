@@ -205,7 +205,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, errors.Wrap(err, "initializing webhooks")
 	}
 	vcsClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient)
-	commitStatusUpdater := &events.DefaultCommitStatusUpdater{StatusName: userConfig.StatusName, Client: vcsClient}
+	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient, StatusName: userConfig.StatusName}
 	terraformClient, err := terraform.NewClient(
 		logger,
 		userConfig.DataDir,
