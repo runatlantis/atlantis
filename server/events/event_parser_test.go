@@ -17,7 +17,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -1158,8 +1157,8 @@ func TestParseAzureDevopsPullEvent(t *testing.T) {
 	Equals(t, models.PullRequest{
 		URL:        ADPull.GetURL(),
 		Author:     ADPull.CreatedBy.GetUniqueName(),
-		HeadBranch: path.Base(ADPull.GetSourceRefName()),
-		BaseBranch: path.Base(ADPull.GetTargetRefName()),
+		HeadBranch: strings.SplitAfterN(ADPull.GetSourceRefName(), "/", 3)[2],
+		BaseBranch: strings.SplitAfterN(ADPull.GetTargetRefName(), "/", 3)[2],
 		HeadCommit: ADPull.LastMergeSourceCommit.GetCommitID(),
 		Num:        ADPull.GetPullRequestID(),
 		State:      models.OpenPullState,
@@ -1258,8 +1257,8 @@ func TestParseAzureDevopsPull(t *testing.T) {
 	Equals(t, models.PullRequest{
 		URL:        ADPull.GetURL(),
 		Author:     ADPull.CreatedBy.GetUniqueName(),
-		HeadBranch: path.Base(ADPull.GetSourceRefName()),
-		BaseBranch: path.Base(ADPull.GetTargetRefName()),
+		HeadBranch: strings.SplitAfterN(ADPull.GetSourceRefName(), "/", 3)[2],
+		BaseBranch: strings.SplitAfterN(ADPull.GetTargetRefName(), "/", 3)[2],
 		HeadCommit: ADPull.LastMergeSourceCommit.GetCommitID(),
 		Num:        ADPull.GetPullRequestID(),
 		State:      models.OpenPullState,

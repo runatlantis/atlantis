@@ -789,13 +789,13 @@ func (e *EventParser) ParseAzureDevopsPull(pull *azuredevops.GitPullRequest) (pu
 
 	pullModel = models.PullRequest{
 		Author:     authorUsername,
-		HeadBranch: path.Base(headBranch),
+		HeadBranch: strings.SplitAfterN(headBranch, "/", 3)[2],
 		HeadCommit: commit,
 		URL:        url,
 		Num:        num,
 		State:      pullState,
 		BaseRepo:   baseRepo,
-		BaseBranch: path.Base(baseBranch),
+		BaseBranch: strings.SplitAfterN(baseBranch, "/", 3)[2],
 	}
 	return
 }
