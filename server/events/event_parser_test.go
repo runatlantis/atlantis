@@ -1157,8 +1157,8 @@ func TestParseAzureDevopsPullEvent(t *testing.T) {
 	Equals(t, models.PullRequest{
 		URL:        ADPull.GetURL(),
 		Author:     ADPull.CreatedBy.GetUniqueName(),
-		HeadBranch: strings.SplitAfterN(ADPull.GetSourceRefName(), "/", 3)[2],
-		BaseBranch: strings.SplitAfterN(ADPull.GetTargetRefName(), "/", 3)[2],
+		HeadBranch: "feature/sourceBranch",
+		BaseBranch: "targetBranch",
 		HeadCommit: ADPull.LastMergeSourceCommit.GetCommitID(),
 		Num:        ADPull.GetPullRequestID(),
 		State:      models.OpenPullState,
@@ -1257,8 +1257,8 @@ func TestParseAzureDevopsPull(t *testing.T) {
 	Equals(t, models.PullRequest{
 		URL:        ADPull.GetURL(),
 		Author:     ADPull.CreatedBy.GetUniqueName(),
-		HeadBranch: strings.SplitAfterN(ADPull.GetSourceRefName(), "/", 3)[2],
-		BaseBranch: strings.SplitAfterN(ADPull.GetTargetRefName(), "/", 3)[2],
+		HeadBranch: "feature/sourceBranch",
+		BaseBranch: "targetBranch",
 		HeadCommit: ADPull.LastMergeSourceCommit.GetCommitID(),
 		Num:        ADPull.GetPullRequestID(),
 		State:      models.OpenPullState,

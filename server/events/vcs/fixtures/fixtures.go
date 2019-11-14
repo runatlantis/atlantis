@@ -80,7 +80,7 @@ var ADPull = azuredevops.GitPullRequest{
 	},
 	PullRequestID: azuredevops.Int(1),
 	Repository:    &ADRepo,
-	SourceRefName: azuredevops.String("refs/heads/owner/feature/sourceBranch"),
+	SourceRefName: azuredevops.String("refs/heads/feature/sourceBranch"),
 	Status:        azuredevops.String("active"),
 	TargetRefName: azuredevops.String("refs/heads/targetBranch"),
 	URL:           azuredevops.String("https://dev.azure.com/fabrikam/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/pullRequests/21"),

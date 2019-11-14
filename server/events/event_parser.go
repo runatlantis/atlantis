@@ -788,14 +788,15 @@ func (e *EventParser) ParseAzureDevopsPull(pull *azuredevops.GitPullRequest) (pu
 	}
 
 	pullModel = models.PullRequest{
-		Author:     authorUsername,
-		HeadBranch: strings.SplitAfterN(headBranch, "/", 3)[2],
+		Author: authorUsername,
+		// Change webhook refs from "refs/heads/<branch>" to "<branch>"
+		HeadBranch: strings.Replace(headBranch, "refs/heads/", "", 1),
 		HeadCommit: commit,
 		URL:        url,
 		Num:        num,
 		State:      pullState,
 		BaseRepo:   baseRepo,
-		BaseBranch: strings.SplitAfterN(baseBranch, "/", 3)[2],
+		BaseBranch: strings.Replace(baseBranch, "refs/heads/", "", 1),
 	}
 	return
 }
