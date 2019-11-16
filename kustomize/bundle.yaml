@@ -23,7 +23,7 @@ spec:
       containers:
       - name: atlantis
         image: runatlantis/atlantis:v0.10.1 
-        volumes:
+        env:
         - name: ATLANTIS_DATA_DIR
           value: /atlantis
         - name: ATLANTIS_PORT

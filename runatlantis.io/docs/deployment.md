@@ -34,7 +34,7 @@ for Atlantis.
 Pick your deployment type:
 * [Kubernetes Helm Chart](#kubernetes-helm-chart)
 * [Kubernetes Manifests](#kubernetes-manifests)
-* [Kustomize](#kubernetes-kustomize)
+* [Kubernetes Kustomize](#kubernetes-kustomize)
 * [OpenShift](#openshift)
 * [AWS Fargate](#aws-fargate)
 * [Google Kubernetes Engine (GKE)](#google-kubernetes-engine-gke)
@@ -410,17 +410,37 @@ You could also set up SSL at your LoadBalancer.
 
 ### Kubernetes Kustomize
 
-A `kustomization.yaml` file is rovided at in the direpctory `kustomize/`, so you may use this repository as a remote target.
+A `kustomization.yaml` file is provided in the directory `kustomize/`, so you may use this repository as a remote base for deploying Atlantis with Kustomize.
+
+You will need to provide a secret (with the default name of `atlantis-vcs`) to configure Atlantis with access credentials for your remote repositories.
 
 Example:
 ```yaml
+bases:
+- github.com/runatlantis/atlantis//kustomize
+
 resources:
-- github.com/runatlantis/atlantis/kustomize
+- secrets.yaml
 ```
 
-**Important:** You must ensure you patch the provided manifests with the correct environment variables for your installation, such as the following:
+**Important:** You must ensure you patch the provided manifests with the correct environment variables for your installation. You can create inline patches from your `kustomization.yaml` file such as below:
+
+```yaml
+patchesStrategicMerge:
+- |-
+  apiVersion: apps/v1
+  kind: StatefulSet
+  metadata:
+    name: atlantis
+  spec:
+    template:
+      spec:
+        ...
+```
 
 #### Required
+
+
 ```yaml
 ...
  containers:
@@ -431,6 +451,7 @@ resources:
 ```
 
 #### GitLab
+
 ```yaml
 ...
 containers:
@@ -449,7 +470,8 @@ containers:
           name: atlantis-vcs
           key: webhook-secret
 ```
-#### GitHub
+
+#### GitHub
 
 ```yaml
 ...
@@ -470,14 +492,15 @@ containers:
           key: webhook-secret
 ```
 
-#### BitBucket
+#### BitBucket
+
 ```yaml
 ...
 containers:
 - name: atlantis
   env:
     - name: ATLANTIS_BITBUCKET_USER
-          value: <YOUR_BITBUCKET_USER> # 5i. If you're using Bitbucket replace <YOUR_BITBUCKET_USER> with the username of your Atlantis Bitbucket user without the `@`.
+      value: <YOUR_BITBUCKET_USER> # 5i. If you're using Bitbucket replace <YOUR_BITBUCKET_USER> with the username of your Atlantis Bitbucket user without the `@`.
     - name: ATLANTIS_BITBUCKET_TOKEN
       valueFrom:
         secretKeyRef:
