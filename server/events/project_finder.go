@@ -82,12 +82,25 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log *logging.SimpleLog
 	var projects []valid.Project
 	for _, project := range config.Projects {
 		log.Debug("checking if project at dir %q workspace %q was modified", project.Dir, project.Workspace)
-		// Prepend project dir to when modified patterns because the patterns
-		// are relative to the project dirs but our list of modified files is
-		// relative to the repo root.
 		var whenModifiedRelToRepoRoot []string
 		for _, wm := range project.Autoplan.WhenModified {
-			whenModifiedRelToRepoRoot = append(whenModifiedRelToRepoRoot, filepath.Join(project.Dir, wm))
+			wm = strings.TrimSpace(wm)
+			// An exclusion uses a '!' at the beginning. If it's there, we need
+			// to remove it, then add in the project path, then add it back.
+			exclusion := false
+			if wm != "" && wm[0] == '!' {
+				wm = wm[1:]
+				exclusion = true
+			}
+
+			// Prepend project dir to when modified patterns because the patterns
+			// are relative to the project dirs but our list of modified files is
+			// relative to the repo root.
+			wmRelPath := filepath.Join(project.Dir, wm)
+			if exclusion {
+				wmRelPath = "!" + wmRelPath
+			}
+			whenModifiedRelToRepoRoot = append(whenModifiedRelToRepoRoot, wmRelPath)
 		}
 		pm, err := fileutils.NewPatternMatcher(whenModifiedRelToRepoRoot)
 		if err != nil {
