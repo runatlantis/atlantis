@@ -87,7 +87,20 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log *logging.SimpleLog
 		// relative to the repo root.
 		var whenModifiedRelToRepoRoot []string
 		for _, wm := range project.Autoplan.WhenModified {
-			whenModifiedRelToRepoRoot = append(whenModifiedRelToRepoRoot, filepath.Join(project.Dir, wm))
+			exclusion := false
+			wm = strings.TrimSpace(wm)
+			if wm == "" {
+				continue
+			}
+			if wm[0] == '!' {
+				wm = wm[1:]
+				exclusion = true
+			}
+			wmRelPath := filepath.Join(project.Dir, wm)
+			if exclusion {
+				wmRelPath = "!" + wmRelPath
+			}
+			whenModifiedRelToRepoRoot = append(whenModifiedRelToRepoRoot, wmRelPath)
 		}
 		pm, err := fileutils.NewPatternMatcher(whenModifiedRelToRepoRoot)
 		if err != nil {
