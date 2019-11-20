@@ -89,10 +89,7 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log *logging.SimpleLog
 		for _, wm := range project.Autoplan.WhenModified {
 			exclusion := false
 			wm = strings.TrimSpace(wm)
-			if wm == "" {
-				continue
-			}
-			if wm[0] == '!' {
+			if wm != "" && wm[0] == '!' {
 				wm = wm[1:]
 				exclusion = true
 			}
