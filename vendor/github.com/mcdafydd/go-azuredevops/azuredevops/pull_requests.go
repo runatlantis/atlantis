@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 )
 
 // Vote identifiers
@@ -300,10 +299,10 @@ type Comment struct {
 	Content                *string          `json:"content,omitempty"`
 	ID                     *int             `json:"id,omitempty"`
 	IsDeleted              *bool            `json:"isDeleted,omitempty"`
-	LastContentUpdatedDate *time.Time       `json:"lastContentUpdatedDate,omitempty"`
-	LastUpdatedDate        *time.Time       `json:"lastUpdatedDate,omitempty"`
+	LastContentUpdatedDate *Time            `json:"lastContentUpdatedDate,omitempty"`
+	LastUpdatedDate        *Time            `json:"lastUpdatedDate,omitempty"`
 	ParentCommentID        *int             `json:"parentCommentId,omitempty"`
-	PublishedDate          *time.Time       `json:"publishedDate,omitempty"`
+	PublishedDate          *Time            `json:"publishedDate,omitempty"`
 	UsersLiked             []*IdentityRef   `json:"usersLiked,omitempty"`
 }
 
@@ -322,9 +321,9 @@ type GitPullRequestCommentThread struct {
 	ID                       *int                                `json:"id,omitempty"`
 	Identities               []*IdentityRef                      `json:"identities,omitempty"`
 	IsDeleted                *bool                               `json:"isDeleted,omitempty"`
-	LastUpdatedDate          *time.Time                          `json:"lastUpdatedDate,omitempty"`
+	LastUpdatedDate          *Time                               `json:"lastUpdatedDate,omitempty"`
 	Properties               []*int                              `json:"properties,omitempty"`
-	PublishedDate            *time.Time                          `json:"publishedDate,omitempty"`
+	PublishedDate            *Time                               `json:"publishedDate,omitempty"`
 	Status                   *string                             `json:"status,omitempty"`
 	PullRequestThreadContext *GitPullRequestCommentThreadContext `json:"pullRequestThreadContext,omitempty"`
 }
