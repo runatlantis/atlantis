@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // WorkItemsService handles communication with the work items methods on the API
@@ -26,10 +25,10 @@ type IterationWorkItems struct {
 // WorkItemComment Describes a response to CreateComment
 type WorkItemComment struct {
 	CreatedBy    *IdentityRef `json:"createdBy,omitempty"`
-	CreatedDate  *time.Time   `json:"createdDate,omitempty"`
+	CreatedDate  *Time        `json:"createdDate,omitempty"`
 	ID           *int         `json:"id,omitempty"`
 	ModifiedBy   *IdentityRef `json:"modifiedBy,omitempty"`
-	ModifiedDate *time.Time   `json:"modifiedDate,omitempty"`
+	ModifiedDate *Time        `json:"modifiedDate,omitempty"`
 	Text         *string      `json:"text,omitempty"`
 	URL          *string      `json:"url,omitempty"`
 	Version      *int         `json:"version,omitempty"`
@@ -121,7 +120,7 @@ type WorkItemUpdate struct {
 	Relations   *WorkItemRelationUpdates        `json:"relations,omitempty"`
 	Rev         *int                            `json:"rev,omitempty"`
 	RevisedBy   *IdentityRef                    `json:"revisedBy,omitempty"`
-	RevisedDate *time.Time                      `json:"revisedDate,omitempty"`
+	RevisedDate *Time                           `json:"revisedDate,omitempty"`
 	WorkItemID  *int                            `json:"workItemId,omitempty"`
 	URL         *string                         `json:"url,omitempty"`
 }

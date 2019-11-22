@@ -7,10 +7,6 @@
 
 package azuredevops
 
-import (
-	"time"
-)
-
 // GetID returns the ID field if it's non-nil, zero value otherwise.
 func (a *AgentPoolQueue) GetID() int {
 	if a == nil || a.ID == nil {
@@ -891,20 +887,20 @@ func (c *Comment) GetIsDeleted() bool {
 	return *c.IsDeleted
 }
 
-// GetLastContentUpdatedDate returns the LastContentUpdatedDate field if it's non-nil, zero value otherwise.
-func (c *Comment) GetLastContentUpdatedDate() time.Time {
-	if c == nil || c.LastContentUpdatedDate == nil {
-		return time.Time{}
+// GetLastContentUpdatedDate returns the LastContentUpdatedDate field.
+func (c *Comment) GetLastContentUpdatedDate() *Time {
+	if c == nil {
+		return nil
 	}
-	return *c.LastContentUpdatedDate
+	return c.LastContentUpdatedDate
 }
 
-// GetLastUpdatedDate returns the LastUpdatedDate field if it's non-nil, zero value otherwise.
-func (c *Comment) GetLastUpdatedDate() time.Time {
-	if c == nil || c.LastUpdatedDate == nil {
-		return time.Time{}
+// GetLastUpdatedDate returns the LastUpdatedDate field.
+func (c *Comment) GetLastUpdatedDate() *Time {
+	if c == nil {
+		return nil
 	}
-	return *c.LastUpdatedDate
+	return c.LastUpdatedDate
 }
 
 // GetLinks returns the Links field if it's non-nil, zero value otherwise.
@@ -923,12 +919,12 @@ func (c *Comment) GetParentCommentID() int {
 	return *c.ParentCommentID
 }
 
-// GetPublishedDate returns the PublishedDate field if it's non-nil, zero value otherwise.
-func (c *Comment) GetPublishedDate() time.Time {
-	if c == nil || c.PublishedDate == nil {
-		return time.Time{}
+// GetPublishedDate returns the PublishedDate field.
+func (c *Comment) GetPublishedDate() *Time {
+	if c == nil {
+		return nil
 	}
-	return *c.PublishedDate
+	return c.PublishedDate
 }
 
 // GetLine returns the Line field if it's non-nil, zero value otherwise.
@@ -1451,12 +1447,12 @@ func (g *GitPullRequest) GetClosedBy() *IdentityRef {
 	return g.ClosedBy
 }
 
-// GetClosedDate returns the ClosedDate field if it's non-nil, zero value otherwise.
-func (g *GitPullRequest) GetClosedDate() time.Time {
-	if g == nil || g.ClosedDate == nil {
-		return time.Time{}
+// GetClosedDate returns the ClosedDate field.
+func (g *GitPullRequest) GetClosedDate() *Time {
+	if g == nil {
+		return nil
 	}
-	return *g.ClosedDate
+	return g.ClosedDate
 }
 
 // GetCodeReviewID returns the CodeReviewID field if it's non-nil, zero value otherwise.
@@ -1475,12 +1471,12 @@ func (g *GitPullRequest) GetCompletionOptions() *GitPullRequestCompletionOptions
 	return g.CompletionOptions
 }
 
-// GetCompletionQueueTime returns the CompletionQueueTime field if it's non-nil, zero value otherwise.
-func (g *GitPullRequest) GetCompletionQueueTime() time.Time {
-	if g == nil || g.CompletionQueueTime == nil {
-		return time.Time{}
+// GetCompletionQueueTime returns the CompletionQueueTime field.
+func (g *GitPullRequest) GetCompletionQueueTime() *Time {
+	if g == nil {
+		return nil
 	}
-	return *g.CompletionQueueTime
+	return g.CompletionQueueTime
 }
 
 // GetCreatedBy returns the CreatedBy field.
@@ -1491,12 +1487,12 @@ func (g *GitPullRequest) GetCreatedBy() *IdentityRef {
 	return g.CreatedBy
 }
 
-// GetCreationDate returns the CreationDate field if it's non-nil, zero value otherwise.
-func (g *GitPullRequest) GetCreationDate() time.Time {
-	if g == nil || g.CreationDate == nil {
-		return time.Time{}
+// GetCreationDate returns the CreationDate field.
+func (g *GitPullRequest) GetCreationDate() *Time {
+	if g == nil {
+		return nil
 	}
-	return *g.CreationDate
+	return g.CreationDate
 }
 
 // GetDescription returns the Description field if it's non-nil, zero value otherwise.
@@ -1683,12 +1679,12 @@ func (g *GitPullRequestCommentThread) GetIsDeleted() bool {
 	return *g.IsDeleted
 }
 
-// GetLastUpdatedDate returns the LastUpdatedDate field if it's non-nil, zero value otherwise.
-func (g *GitPullRequestCommentThread) GetLastUpdatedDate() time.Time {
-	if g == nil || g.LastUpdatedDate == nil {
-		return time.Time{}
+// GetLastUpdatedDate returns the LastUpdatedDate field.
+func (g *GitPullRequestCommentThread) GetLastUpdatedDate() *Time {
+	if g == nil {
+		return nil
 	}
-	return *g.LastUpdatedDate
+	return g.LastUpdatedDate
 }
 
 // GetLinks returns the Links field if it's non-nil, zero value otherwise.
@@ -1699,12 +1695,12 @@ func (g *GitPullRequestCommentThread) GetLinks() map[string]Link {
 	return *g.Links
 }
 
-// GetPublishedDate returns the PublishedDate field if it's non-nil, zero value otherwise.
-func (g *GitPullRequestCommentThread) GetPublishedDate() time.Time {
-	if g == nil || g.PublishedDate == nil {
-		return time.Time{}
+// GetPublishedDate returns the PublishedDate field.
+func (g *GitPullRequestCommentThread) GetPublishedDate() *Time {
+	if g == nil {
+		return nil
 	}
-	return *g.PublishedDate
+	return g.PublishedDate
 }
 
 // GetPullRequestThreadContext returns the PullRequestThreadContext field.
@@ -1843,12 +1839,12 @@ func (g *GitPullRequestMergeOptions) GetDisableRenames() bool {
 	return *g.DisableRenames
 }
 
-// GetProperties returns the Properties field if it's non-nil, zero value otherwise.
-func (g *GitPullRequestStatus) GetProperties() time.Time {
-	if g == nil || g.Properties == nil {
-		return time.Time{}
+// GetProperties returns the Properties field.
+func (g *GitPullRequestStatus) GetProperties() *Time {
+	if g == nil {
+		return nil
 	}
-	return *g.Properties
+	return g.Properties
 }
 
 // GetComment returns the Comment field.
@@ -1867,12 +1863,12 @@ func (g *GitPullRequestWithComment) GetPullRequest() *GitPullRequest {
 	return g.PullRequest
 }
 
-// GetDate returns the Date field if it's non-nil, zero value otherwise.
-func (g *GitPush) GetDate() time.Time {
-	if g == nil || g.Date == nil {
-		return time.Time{}
+// GetDate returns the Date field.
+func (g *GitPush) GetDate() *Time {
+	if g == nil {
+		return nil
 	}
-	return *g.Date
+	return g.Date
 }
 
 // GetLinks returns the Links field if it's non-nil, zero value otherwise.
@@ -2211,12 +2207,12 @@ func (g *GitStatus) GetCreatedBy() *IdentityRef {
 	return g.CreatedBy
 }
 
-// GetCreationDate returns the CreationDate field if it's non-nil, zero value otherwise.
-func (g *GitStatus) GetCreationDate() time.Time {
-	if g == nil || g.CreationDate == nil {
-		return time.Time{}
+// GetCreationDate returns the CreationDate field.
+func (g *GitStatus) GetCreationDate() *Time {
+	if g == nil {
+		return nil
 	}
-	return *g.CreationDate
+	return g.CreationDate
 }
 
 // GetDescription returns the Description field if it's non-nil, zero value otherwise.
@@ -2259,12 +2255,12 @@ func (g *GitStatus) GetTargetURL() string {
 	return *g.TargetURL
 }
 
-// GetUpdatedDate returns the UpdatedDate field if it's non-nil, zero value otherwise.
-func (g *GitStatus) GetUpdatedDate() time.Time {
-	if g == nil || g.UpdatedDate == nil {
-		return time.Time{}
+// GetUpdatedDate returns the UpdatedDate field.
+func (g *GitStatus) GetUpdatedDate() *Time {
+	if g == nil {
+		return nil
 	}
-	return *g.UpdatedDate
+	return g.UpdatedDate
 }
 
 // GetGenre returns the Genre field if it's non-nil, zero value otherwise.
@@ -2299,12 +2295,12 @@ func (g *GitTemplate) GetType() string {
 	return *g.Type
 }
 
-// GetDate returns the Date field if it's non-nil, zero value otherwise.
-func (g *GitUserDate) GetDate() time.Time {
-	if g == nil || g.Date == nil {
-		return time.Time{}
+// GetDate returns the Date field.
+func (g *GitUserDate) GetDate() *Time {
+	if g == nil {
+		return nil
 	}
-	return *g.Date
+	return g.Date
 }
 
 // GetEmail returns the Email field if it's non-nil, zero value otherwise.
@@ -2507,12 +2503,12 @@ func (g *GraphUser) GetIsDeletedInOrigin() bool {
 	return *g.IsDeletedInOrigin
 }
 
-// GetMetadataUpdateDate returns the MetadataUpdateDate field if it's non-nil, zero value otherwise.
-func (g *GraphUser) GetMetadataUpdateDate() time.Time {
-	if g == nil || g.MetadataUpdateDate == nil {
-		return time.Time{}
+// GetMetadataUpdateDate returns the MetadataUpdateDate field.
+func (g *GraphUser) GetMetadataUpdateDate() *Time {
+	if g == nil {
+		return nil
 	}
-	return *g.MetadataUpdateDate
+	return g.MetadataUpdateDate
 }
 
 // GetMetaType returns the MetaType field if it's non-nil, zero value otherwise.
@@ -2803,12 +2799,12 @@ func (p *Project) GetID() string {
 	return *p.ID
 }
 
-// GetLastUpdateTime returns the LastUpdateTime field if it's non-nil, zero value otherwise.
-func (p *Project) GetLastUpdateTime() time.Time {
-	if p == nil || p.LastUpdateTime == nil {
-		return time.Time{}
+// GetLastUpdateTime returns the LastUpdateTime field.
+func (p *Project) GetLastUpdateTime() *Time {
+	if p == nil {
+		return nil
 	}
-	return *p.LastUpdateTime
+	return p.LastUpdateTime
 }
 
 // GetName returns the Name field if it's non-nil, zero value otherwise.
@@ -3027,12 +3023,12 @@ func (t *TeamProjectReference) GetID() string {
 	return *t.ID
 }
 
-// GetLastUpdateTime returns the LastUpdateTime field if it's non-nil, zero value otherwise.
-func (t *TeamProjectReference) GetLastUpdateTime() time.Time {
-	if t == nil || t.LastUpdateTime == nil {
-		return time.Time{}
+// GetLastUpdateTime returns the LastUpdateTime field.
+func (t *TeamProjectReference) GetLastUpdateTime() *Time {
+	if t == nil {
+		return nil
 	}
-	return *t.LastUpdateTime
+	return t.LastUpdateTime
 }
 
 // GetName returns the Name field if it's non-nil, zero value otherwise.
@@ -3347,12 +3343,12 @@ func (w *WorkItemComment) GetCreatedBy() *IdentityRef {
 	return w.CreatedBy
 }
 
-// GetCreatedDate returns the CreatedDate field if it's non-nil, zero value otherwise.
-func (w *WorkItemComment) GetCreatedDate() time.Time {
-	if w == nil || w.CreatedDate == nil {
-		return time.Time{}
+// GetCreatedDate returns the CreatedDate field.
+func (w *WorkItemComment) GetCreatedDate() *Time {
+	if w == nil {
+		return nil
 	}
-	return *w.CreatedDate
+	return w.CreatedDate
 }
 
 // GetID returns the ID field if it's non-nil, zero value otherwise.
@@ -3371,12 +3367,12 @@ func (w *WorkItemComment) GetModifiedBy() *IdentityRef {
 	return w.ModifiedBy
 }
 
-// GetModifiedDate returns the ModifiedDate field if it's non-nil, zero value otherwise.
-func (w *WorkItemComment) GetModifiedDate() time.Time {
-	if w == nil || w.ModifiedDate == nil {
-		return time.Time{}
+// GetModifiedDate returns the ModifiedDate field.
+func (w *WorkItemComment) GetModifiedDate() *Time {
+	if w == nil {
+		return nil
 	}
-	return *w.ModifiedDate
+	return w.ModifiedDate
 }
 
 // GetText returns the Text field if it's non-nil, zero value otherwise.
@@ -3555,12 +3551,12 @@ func (w *WorkItemUpdate) GetRevisedBy() *IdentityRef {
 	return w.RevisedBy
 }
 
-// GetRevisedDate returns the RevisedDate field if it's non-nil, zero value otherwise.
-func (w *WorkItemUpdate) GetRevisedDate() time.Time {
-	if w == nil || w.RevisedDate == nil {
-		return time.Time{}
+// GetRevisedDate returns the RevisedDate field.
+func (w *WorkItemUpdate) GetRevisedDate() *Time {
+	if w == nil {
+		return nil
 	}
-	return *w.RevisedDate
+	return w.RevisedDate
 }
 
 // GetURL returns the URL field if it's non-nil, zero value otherwise.
