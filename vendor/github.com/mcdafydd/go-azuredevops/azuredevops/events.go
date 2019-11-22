@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"time"
 )
 
 // Message represents an Azure Devops webhook message property
@@ -35,7 +34,7 @@ type Event struct {
 	RawPayload         json.RawMessage    `json:"resource,omitempty"`
 	ResourceVersion    string             `json:"resourceVersion,omitempty"`
 	ResourceContainers ResourceContainers `json:"resourceContainers,omitempty"`
-	CreatedDate        time.Time          `json:"createdDate,omitempty"`
+	CreatedDate        Time               `json:"createdDate,omitempty"`
 	Resource           interface{}
 	PayloadType        PayloadType
 }

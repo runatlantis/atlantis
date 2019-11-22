@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"time"
 )
 
 // VersionControlChangeType enum declaration
@@ -170,13 +169,13 @@ type GitPullRequest struct {
 	ArtifactID            *string                          `json:"artifactId,omitempty"`
 	AutoCompleteSetBy     *IdentityRef                     `json:"autoCompleteSetBy,omitempty"`
 	ClosedBy              *IdentityRef                     `json:"closedBy,omitempty"`
-	ClosedDate            *time.Time                       `json:"closedDate,omitempty"`
+	ClosedDate            *Time                            `json:"closedDate,omitempty"`
 	CodeReviewID          *int                             `json:"codeReviewId,omitempty"`
 	Commits               []*GitCommitRef                  `json:"commits,omitempty"`
 	CompletionOptions     *GitPullRequestCompletionOptions `json:"completionOptions,omitempty"`
-	CompletionQueueTime   *time.Time                       `json:"completionQueueTime,	omitempty"`
+	CompletionQueueTime   *Time                            `json:"completionQueueTime,	omitempty"`
 	CreatedBy             *IdentityRef                     `json:"createdBy,omitempty"`
-	CreationDate          *time.Time                       `json:"creationDate,omitempty"`
+	CreationDate          *Time                            `json:"creationDate,omitempty"`
 	Description           *string                          `json:"description,omitempty"`
 	ForkSource            *GitRef                          `json:"forkSource,omitempty"`
 	IsDraft               *bool                            `json:"isDraft,omitempty"`
@@ -246,7 +245,7 @@ func (d GitPullRequestMergeStrategy) String() string {
 type GitPush struct {
 	Links      *map[string]Link `json:"_links,omitempty"`
 	Commits    []*GitCommitRef  `json:"commits,omitempty"`
-	Date       *time.Time       `json:"date,omitempty"`
+	Date       *Time            `json:"date,omitempty"`
 	PushID     *int             `json:"pushId,omitempty"`
 	PushedBy   *IdentityRef     `json:"pushedBy,omitempty"`
 	RefUpdates []*GitRefUpdate  `json:"refUpdates,omitempty"`
@@ -321,12 +320,12 @@ type GitStatus struct {
 	Links        *map[string]Link  `json:"_links,omitempty"`
 	Context      *GitStatusContext `json:"context,omitempty"`
 	CreatedBy    *IdentityRef      `json:"createdBy,omitempty"`
-	CreationDate *time.Time        `json:"creationDate,omitempty"`
+	CreationDate *Time             `json:"creationDate,omitempty"`
 	Description  *string           `json:"description,omitempty"`
 	ID           *int              `json:"id,omitempty"`
 	State        *string           `json:"state,omitempty"`
 	TargetURL    *string           `json:"targetUrl,omitempty"`
-	UpdatedDate  *time.Time        `json:"updatedDate,omitempty"`
+	UpdatedDate  *Time             `json:"updatedDate,omitempty"`
 }
 
 // GitPullRequestStatus This class contains the metadata of a service/extension
@@ -334,8 +333,8 @@ type GitStatus struct {
 // an iteration.
 type GitPullRequestStatus struct {
 	GitStatus
-	IterationID int        `json:"iterationId,omitempty"`
-	Properties  *time.Time `json:"properties,omitempty"`
+	IterationID int   `json:"iterationId,omitempty"`
+	Properties  *Time `json:"properties,omitempty"`
 }
 
 // GitRefListOptions describes what the request to the API should look like
@@ -359,9 +358,9 @@ type GitTemplate struct {
 
 // GitUserDate User info and date for Git operations.
 type GitUserDate struct {
-	Name  *string    `json:"name,omitempty"`
-	Email *string    `json:"email,omitempty"`
-	Date  *time.Time `json:"date,omitempty"`
+	Name  *string `json:"name,omitempty"`
+	Email *string `json:"email,omitempty"`
+	Date  *Time   `json:"date,omitempty"`
 }
 
 // UpdateRefs returns a list of the references for a git repo

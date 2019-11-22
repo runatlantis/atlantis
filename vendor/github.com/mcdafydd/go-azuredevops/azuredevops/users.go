@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 )
 
 // UsersService handles communication with the Graph.Users methods on the API
@@ -108,8 +107,8 @@ type GraphSubject struct {
 // GraphUser is the parent struct describing a Microsoft Graph user for Azure Devops
 type GraphUser struct {
 	GraphMember
-	IsDeletedInOrigin  *bool      `json:"isDeletedOrigin,omitempty"`
-	MetadataUpdateDate *time.Time `json:"metadataUpdateDate,omitempty"`
+	IsDeletedInOrigin  *bool `json:"isDeletedOrigin,omitempty"`
+	MetadataUpdateDate *Time `json:"metadataUpdateDate,omitempty"`
 	/**
 	* The meta type of the user in the origin, such as "member", "guest",
 	* etc. See UserMetaType for the set of possible values.

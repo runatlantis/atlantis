@@ -149,7 +149,7 @@ github.com/magiconair/properties
 github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.4
 github.com/mattn/go-isatty
-# github.com/mcdafydd/go-azuredevops v0.8.4
+# github.com/mcdafydd/go-azuredevops v0.9.0
 github.com/mcdafydd/go-azuredevops/azuredevops
 # github.com/microcosm-cc/bluemonday v1.0.1
 github.com/microcosm-cc/bluemonday

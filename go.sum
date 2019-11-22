@@ -192,6 +192,8 @@ github.com/mattn/go-runewidth v0.0.4/go.mod h1:LwmH8dsx7+W8Uxz3IHJYH5QSwggIsqBzp
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
 github.com/mcdafydd/go-azuredevops v0.8.4 h1:MVQgoF2xep/7mMPRrv0u6+nCbFSrMTImnwv4kwUlkok=
 github.com/mcdafydd/go-azuredevops v0.8.4/go.mod h1:1RwqgbF/Afc2o/BLKsRy3dD/nNFQF0YqroNp0CkP4i0=
+github.com/mcdafydd/go-azuredevops v0.9.0 h1:WX53H3Z4Mgz9QqRutZFs8+MR8sGJch2Jd6IvPp0GNfo=
+github.com/mcdafydd/go-azuredevops v0.9.0/go.mod h1:1RwqgbF/Afc2o/BLKsRy3dD/nNFQF0YqroNp0CkP4i0=
 github.com/microcosm-cc/bluemonday v1.0.1 h1:SIYunPjnlXcW+gVfvm0IlSeR5U3WZUOLfVmqg85Go44=
 github.com/microcosm-cc/bluemonday v1.0.1/go.mod h1:hsXNsILzKxV+sX77C5b8FSuKF00vh2OMYv+xgHpAMF4=
 github.com/mitchellh/colorstring v0.0.0-20150917214807-8631ce90f286 h1:KHyL+3mQOF9sPfs26lsefckcFNDcIZtiACQiECzIUkw=
