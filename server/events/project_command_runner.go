@@ -52,7 +52,22 @@ type LockURLGenerator interface {
 // `terraform plan`.
 type StepRunner interface {
 	// Run runs the step.
-	Run(ctx models.ProjectCommandContext, extraArgs []string, path string) (string, error)
+	Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error)
+}
+
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_custom_step_runner.go CustomStepRunner
+
+// CustomStepRunner runs custom run steps.
+type CustomStepRunner interface {
+	// Run cmd in path.
+	Run(ctx models.ProjectCommandContext, cmd string, path string, envs map[string]string) (string, error)
+}
+
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_env_step_runner.go EnvStepRunner
+
+// EnvStepRunner runs env steps.
+type EnvStepRunner interface {
+	Run(ctx models.ProjectCommandContext, cmd string, value string, path string, envs map[string]string) (string, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_webhooks_sender.go WebhooksSender
@@ -76,18 +91,17 @@ type ProjectCommandRunner interface {
 
 // DefaultProjectCommandRunner implements ProjectCommandRunner.
 type DefaultProjectCommandRunner struct {
-	Locker                   ProjectLocker
-	LockURLGenerator         LockURLGenerator
-	InitStepRunner           StepRunner
-	PlanStepRunner           StepRunner
-	ApplyStepRunner          StepRunner
-	RunStepRunner            StepRunner
-	PullApprovedChecker      runtime.PullApprovedChecker
-	WorkingDir               WorkingDir
-	Webhooks                 WebhooksSender
-	WorkingDirLocker         WorkingDirLocker
-	RequireApprovalOverride  bool
-	RequireMergeableOverride bool
+	Locker              ProjectLocker
+	LockURLGenerator    LockURLGenerator
+	InitStepRunner      StepRunner
+	PlanStepRunner      StepRunner
+	ApplyStepRunner     StepRunner
+	RunStepRunner       CustomStepRunner
+	EnvStepRunner       EnvStepRunner
+	PullApprovedChecker runtime.PullApprovedChecker
+	WorkingDir          WorkingDir
+	Webhooks            WebhooksSender
+	WorkingDirLocker    WorkingDirLocker
 }
 
 // Plan runs terraform plan for the project described by ctx.
@@ -100,7 +114,7 @@ func (p *DefaultProjectCommandRunner) Plan(ctx models.ProjectCommandContext) mod
 		Failure:     failure,
 		RepoRelDir:  ctx.RepoRelDir,
 		Workspace:   ctx.Workspace,
-		ProjectName: ctx.GetProjectName(),
+		ProjectName: ctx.ProjectName,
 	}
 }
 
@@ -114,7 +128,7 @@ func (p *DefaultProjectCommandRunner) Apply(ctx models.ProjectCommandContext) mo
 		ApplySuccess: applyOut,
 		RepoRelDir:   ctx.RepoRelDir,
 		Workspace:    ctx.Workspace,
-		ProjectName:  ctx.GetProjectName(),
+		ProjectName:  ctx.ProjectName,
 	}
 }
 
@@ -149,17 +163,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
-	// Use default stage unless another workflow is defined in config
-	stage := p.defaultPlanStage()
-	if ctx.ProjectConfig != nil && ctx.ProjectConfig.Workflow != nil {
-		ctx.Log.Debug("project configured to use workflow %q", *ctx.ProjectConfig.Workflow)
-		configuredStage := ctx.GlobalConfig.GetPlanStage(*ctx.ProjectConfig.Workflow)
-		if configuredStage != nil {
-			ctx.Log.Debug("project will use the configured stage for that workflow")
-			stage = *configuredStage
-		}
-	}
-	outputs, err := p.runSteps(stage.Steps, ctx, projAbsPath)
+	outputs, err := p.runSteps(ctx.Steps, ctx, projAbsPath)
 	if err != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
@@ -177,18 +181,25 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 
 func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.ProjectCommandContext, absPath string) ([]string, error) {
 	var outputs []string
+	envs := make(map[string]string)
 	for _, step := range steps {
 		var out string
 		var err error
 		switch step.StepName {
 		case "init":
-			out, err = p.InitStepRunner.Run(ctx, step.ExtraArgs, absPath)
+			out, err = p.InitStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "plan":
-			out, err = p.PlanStepRunner.Run(ctx, step.ExtraArgs, absPath)
+			out, err = p.PlanStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "apply":
-			out, err = p.ApplyStepRunner.Run(ctx, step.ExtraArgs, absPath)
+			out, err = p.ApplyStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "run":
-			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath)
+			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath, envs)
+		case "env":
+			out, err = p.EnvStepRunner.Run(ctx, step.RunCommand, step.EnvVarValue, absPath, envs)
+			envs[step.EnvVarName] = out
+			// We reset out to the empty string because we don't want it to
+			// be printed to the PR, it's solely to set the environment variable.
+			out = ""
 		}
 
 		if out != "" {
@@ -214,21 +225,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 		return "", "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
-	// Figure out what our apply requirements are.
-	var applyRequirements []string
-	if p.RequireApprovalOverride || p.RequireMergeableOverride {
-		// If any server flags are set, they override project config.
-		if p.RequireMergeableOverride {
-			applyRequirements = append(applyRequirements, raw.MergeableApplyRequirement)
-		}
-		if p.RequireApprovalOverride {
-			applyRequirements = append(applyRequirements, raw.ApprovedApplyRequirement)
-		}
-	} else if ctx.ProjectConfig != nil {
-		// Else we use the project config if it's set.
-		applyRequirements = ctx.ProjectConfig.ApplyRequirements
-	}
-	for _, req := range applyRequirements {
+	for _, req := range ctx.ApplyRequirements {
 		switch req {
 		case raw.ApprovedApplyRequirement:
 			approved, err := p.PullApprovedChecker.PullIsApproved(ctx.BaseRepo, ctx.Pull) // nolint: vetshadow
@@ -251,47 +248,17 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 	}
 	defer unlockFn()
 
-	// Use default stage unless another workflow is defined in config
-	stage := p.defaultApplyStage()
-	if ctx.ProjectConfig != nil && ctx.ProjectConfig.Workflow != nil {
-		configuredStage := ctx.GlobalConfig.GetApplyStage(*ctx.ProjectConfig.Workflow)
-		if configuredStage != nil {
-			stage = *configuredStage
-		}
-	}
-	outputs, err := p.runSteps(stage.Steps, ctx, absPath)
+	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
 	p.Webhooks.Send(ctx.Log, webhooks.ApplyResult{ // nolint: errcheck
 		Workspace: ctx.Workspace,
 		User:      ctx.User,
 		Repo:      ctx.BaseRepo,
 		Pull:      ctx.Pull,
 		Success:   err == nil,
+		Directory: ctx.RepoRelDir,
 	})
 	if err != nil {
 		return "", "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
 	}
 	return strings.Join(outputs, "\n"), "", nil
-}
-
-func (p DefaultProjectCommandRunner) defaultPlanStage() valid.Stage {
-	return valid.Stage{
-		Steps: []valid.Step{
-			{
-				StepName: "init",
-			},
-			{
-				StepName: "plan",
-			},
-		},
-	}
-}
-
-func (p DefaultProjectCommandRunner) defaultApplyStage() valid.Stage {
-	return valid.Stage{
-		Steps: []valid.Step{
-			{
-				StepName: "apply",
-			},
-		},
-	}
 }

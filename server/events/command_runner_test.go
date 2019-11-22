@@ -21,7 +21,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/logging"
 
-	"github.com/google/go-github/github"
+	"github.com/google/go-github/v28/github"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/mocks"
@@ -36,6 +36,7 @@ import (
 var projectCommandBuilder *mocks.MockProjectCommandBuilder
 var projectCommandRunner *mocks.MockProjectCommandRunner
 var eventParsing *mocks.MockEventParsing
+var azuredevopsGetter *mocks.MockAzureDevopsPullGetter
 var githubGetter *mocks.MockGithubPullGetter
 var gitlabGetter *mocks.MockGitlabMergeRequestGetter
 var ch events.DefaultCommandRunner
@@ -50,6 +51,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	vcsClient := vcsmocks.NewMockClient()
 	githubGetter = mocks.NewMockGithubPullGetter()
 	gitlabGetter = mocks.NewMockGitlabMergeRequestGetter()
+	azuredevopsGetter = mocks.NewMockAzureDevopsPullGetter()
 	logger := logmocks.NewMockSimpleLogging()
 	pullLogger = logging.NewSimpleLogger("runatlantis/atlantis#1", true, logging.Info)
 	projectCommandRunner = mocks.NewMockProjectCommandRunner()
@@ -65,6 +67,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		MarkdownRenderer:         &events.MarkdownRenderer{},
 		GithubPullGetter:         githubGetter,
 		GitlabMergeRequestGetter: gitlabGetter,
+		AzureDevopsPullGetter:    azuredevopsGetter,
 		Logger:                   logger,
 		AllowForkPRs:             false,
 		AllowForkPRsFlag:         "allow-fork-prs-flag",
@@ -72,6 +75,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		ProjectCommandRunner:     projectCommandRunner,
 		PendingPlanFinder:        pendingPlanFinder,
 		WorkingDir:               workingDir,
+		DisableApplyAll:          false,
 	}
 	return vcsClient
 }
@@ -144,6 +148,16 @@ func TestRunCommentCommand_ForkPRDisabled(t *testing.T) {
 
 	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, nil)
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "Atlantis commands can't be run on fork pull requests. To enable, set --"+ch.AllowForkPRsFlag)
+}
+
+func TestRunCommentCommand_DisableApplyAllDisabled(t *testing.T) {
+	t.Log("if \"atlantis apply\" is run and this is disabled atlantis should" +
+		" comment saying that this is not allowed")
+	vcsClient := setup(t)
+	ch.DisableApplyAll = true
+	modelPull := models.PullRequest{State: models.OpenPullState}
+	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, modelPull.Num, &events.CommentCommand{Name: models.ApplyCommand})
+	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "**Error:** Running `atlantis apply` without flags is disabled. You must specify which project to apply via the `-d <dir>`, `-w <workspace>` or `-p <project name>` flags.")
 }
 
 func TestRunCommentCommand_ClosedPull(t *testing.T) {

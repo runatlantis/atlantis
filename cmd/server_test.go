@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mitchellh/go-homedir"
+	homedir "github.com/mitchellh/go-homedir"
 	"github.com/runatlantis/atlantis/cmd"
 	"github.com/runatlantis/atlantis/server"
 	. "github.com/runatlantis/atlantis/testing"
@@ -184,7 +184,7 @@ func TestExecute_ValidateSSLConfig(t *testing.T) {
 }
 
 func TestExecute_ValidateVCSConfig(t *testing.T) {
-	expErr := "--gh-user/--gh-token or --gitlab-user/--gitlab-token or --bitbucket-user/--bitbucket-token must be set"
+	expErr := "--gh-user/--gh-token or --gitlab-user/--gitlab-token or --bitbucket-user/--bitbucket-token or --azuredevops-user/--azuredevops-token must be set"
 	cases := []struct {
 		description string
 		flags       map[string]interface{}
@@ -217,6 +217,13 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			true,
 		},
 		{
+			"just azuredevops token set",
+			map[string]interface{}{
+				cmd.ADTokenFlag: "token",
+			},
+			true,
+		},
+		{
 			"just github user set",
 			map[string]interface{}{
 				cmd.GHUserFlag: "user",
@@ -234,6 +241,13 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			"just bitbucket user set",
 			map[string]interface{}{
 				cmd.BitbucketUserFlag: "user",
+			},
+			true,
+		},
+		{
+			"just azuredevops user set",
+			map[string]interface{}{
+				cmd.ADUserFlag: "user",
 			},
 			true,
 		},
@@ -286,6 +300,14 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			false,
 		},
 		{
+			"azuredevops user and azuredevops token set and should be successful",
+			map[string]interface{}{
+				cmd.ADUserFlag:  "user",
+				cmd.ADTokenFlag: "token",
+			},
+			false,
+		},
+		{
 			"all set should be successful",
 			map[string]interface{}{
 				cmd.GHUserFlag:         "user",
@@ -294,6 +316,8 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 				cmd.GitlabTokenFlag:    "token",
 				cmd.BitbucketUserFlag:  "user",
 				cmd.BitbucketTokenFlag: "token",
+				cmd.ADUserFlag:         "user",
+				cmd.ADTokenFlag:        "token",
 			},
 			false,
 		},
@@ -322,6 +346,8 @@ func TestExecute_Defaults(t *testing.T) {
 		cmd.GitlabTokenFlag:    "gitlab-token",
 		cmd.BitbucketUserFlag:  "bitbucket-user",
 		cmd.BitbucketTokenFlag: "bitbucket-token",
+		cmd.ADTokenFlag:        "azuredevops-token",
+		cmd.ADUserFlag:         "azuredevops-user",
 		cmd.RepoWhitelistFlag:  "*",
 	})
 	err := c.Execute()
@@ -341,6 +367,7 @@ func TestExecute_Defaults(t *testing.T) {
 	Equals(t, dataDir, passedConfig.DataDir)
 
 	Equals(t, "branch", passedConfig.CheckoutStrategy)
+	Equals(t, false, passedConfig.DisableApplyAll)
 	Equals(t, "", passedConfig.DefaultTFVersion)
 	Equals(t, "github.com", passedConfig.GithubHostname)
 	Equals(t, "token", passedConfig.GithubToken)
@@ -353,6 +380,10 @@ func TestExecute_Defaults(t *testing.T) {
 	Equals(t, "https://api.bitbucket.org", passedConfig.BitbucketBaseURL)
 	Equals(t, "bitbucket-token", passedConfig.BitbucketToken)
 	Equals(t, "bitbucket-user", passedConfig.BitbucketUser)
+	Equals(t, "azuredevops-token", passedConfig.AzureDevopsToken)
+	Equals(t, "azuredevops-user", passedConfig.AzureDevopsUser)
+	Equals(t, "", passedConfig.AzureDevopsWebhookPassword)
+	Equals(t, "", passedConfig.AzureDevopsWebhookUser)
 	Equals(t, "", passedConfig.BitbucketWebhookSecret)
 	Equals(t, "info", passedConfig.LogLevel)
 	Equals(t, 4141, passedConfig.Port)
@@ -361,7 +392,9 @@ func TestExecute_Defaults(t *testing.T) {
 	Equals(t, "", passedConfig.SlackToken)
 	Equals(t, "", passedConfig.SSLCertFile)
 	Equals(t, "", passedConfig.SSLKeyFile)
+	Equals(t, "app.terraform.io", passedConfig.TFEHostname)
 	Equals(t, "", passedConfig.TFEToken)
+	Equals(t, false, passedConfig.WriteGitCreds)
 }
 
 func TestExecute_ExpandHomeInDataDir(t *testing.T) {
@@ -434,9 +467,26 @@ func TestExecute_BitbucketUser(t *testing.T) {
 	Equals(t, "user", passedConfig.BitbucketUser)
 }
 
+func TestExecute_ADUser(t *testing.T) {
+	t.Log("Should remove the @ from the azure devops username if it's passed.")
+	c := setup(map[string]interface{}{
+		cmd.ADUserFlag:        "@user",
+		cmd.ADTokenFlag:       "token",
+		cmd.RepoWhitelistFlag: "*",
+	})
+	err := c.Execute()
+	Ok(t, err)
+
+	Equals(t, "user", passedConfig.AzureDevopsUser)
+}
+
 func TestExecute_Flags(t *testing.T) {
 	t.Log("Should use all flags that are set.")
 	c := setup(map[string]interface{}{
+		cmd.ADTokenFlag:                "ad-token",
+		cmd.ADUserFlag:                 "ad-user",
+		cmd.ADWebhookPasswordFlag:      "ad-wh-pass",
+		cmd.ADWebhookUserFlag:          "ad-wh-user",
 		cmd.AtlantisURLFlag:            "url",
 		cmd.AllowForkPRsFlag:           true,
 		cmd.AllowRepoConfigFlag:        true,
@@ -448,6 +498,7 @@ func TestExecute_Flags(t *testing.T) {
 		cmd.CheckoutStrategyFlag:       "merge",
 		cmd.DataDirFlag:                "/path",
 		cmd.DefaultTFVersionFlag:       "v0.11.0",
+		cmd.DisableApplyAllFlag:        true,
 		cmd.GHHostnameFlag:             "ghhostname",
 		cmd.GHTokenFlag:                "token",
 		cmd.GHUserFlag:                 "user",
@@ -464,11 +515,17 @@ func TestExecute_Flags(t *testing.T) {
 		cmd.SlackTokenFlag:             "slack-token",
 		cmd.SSLCertFileFlag:            "cert-file",
 		cmd.SSLKeyFileFlag:             "key-file",
+		cmd.TFEHostnameFlag:            "my-hostname",
 		cmd.TFETokenFlag:               "my-token",
+		cmd.WriteGitCredsFlag:          true,
 	})
 	err := c.Execute()
 	Ok(t, err)
 
+	Equals(t, "ad-token", passedConfig.AzureDevopsToken)
+	Equals(t, "ad-user", passedConfig.AzureDevopsUser)
+	Equals(t, "ad-wh-pass", passedConfig.AzureDevopsWebhookPassword)
+	Equals(t, "ad-wh-user", passedConfig.AzureDevopsWebhookUser)
 	Equals(t, "url", passedConfig.AtlantisURL)
 	Equals(t, true, passedConfig.AllowForkPRs)
 	Equals(t, true, passedConfig.AllowRepoConfig)
@@ -480,6 +537,7 @@ func TestExecute_Flags(t *testing.T) {
 	Equals(t, "merge", passedConfig.CheckoutStrategy)
 	Equals(t, "/path", passedConfig.DataDir)
 	Equals(t, "v0.11.0", passedConfig.DefaultTFVersion)
+	Equals(t, true, passedConfig.DisableApplyAll)
 	Equals(t, "ghhostname", passedConfig.GithubHostname)
 	Equals(t, "token", passedConfig.GithubToken)
 	Equals(t, "user", passedConfig.GithubUser)
@@ -496,12 +554,18 @@ func TestExecute_Flags(t *testing.T) {
 	Equals(t, "slack-token", passedConfig.SlackToken)
 	Equals(t, "cert-file", passedConfig.SSLCertFile)
 	Equals(t, "key-file", passedConfig.SSLKeyFile)
+	Equals(t, "my-hostname", passedConfig.TFEHostname)
 	Equals(t, "my-token", passedConfig.TFEToken)
+	Equals(t, true, passedConfig.WriteGitCreds)
 }
 
 func TestExecute_ConfigFile(t *testing.T) {
 	t.Log("Should use all the values from the config file.")
 	tmpFile := tempFile(t, `---
+azuredevops-token: ad-token
+azuredevops-user: ad-user
+azuredevops-webhook-password: ad-wh-pass
+azuredevops-webhook-user: ad-wh-user
 atlantis-url: "url"
 allow-fork-prs: true
 allow-repo-config: true
@@ -513,6 +577,7 @@ bitbucket-webhook-secret: "bitbucket-secret"
 checkout-strategy: "merge"
 data-dir: "/path"
 default-tf-version: "v0.11.0"
+disable-apply-all: true
 gh-hostname: "ghhostname"
 gh-token: "token"
 gh-user: "user"
@@ -529,7 +594,9 @@ require-mergeable: true
 slack-token: slack-token
 ssl-cert-file: cert-file
 ssl-key-file: key-file
+tfe-hostname: my-hostname
 tfe-token: my-token
+write-git-creds: true
 `)
 	defer os.Remove(tmpFile) // nolint: errcheck
 	c := setup(map[string]interface{}{
@@ -538,6 +605,10 @@ tfe-token: my-token
 
 	err := c.Execute()
 	Ok(t, err)
+	Equals(t, "ad-token", passedConfig.AzureDevopsToken)
+	Equals(t, "ad-user", passedConfig.AzureDevopsUser)
+	Equals(t, "ad-wh-pass", passedConfig.AzureDevopsWebhookPassword)
+	Equals(t, "ad-wh-user", passedConfig.AzureDevopsWebhookUser)
 	Equals(t, "url", passedConfig.AtlantisURL)
 	Equals(t, true, passedConfig.AllowForkPRs)
 	Equals(t, true, passedConfig.AllowRepoConfig)
@@ -549,6 +620,7 @@ tfe-token: my-token
 	Equals(t, "merge", passedConfig.CheckoutStrategy)
 	Equals(t, "/path", passedConfig.DataDir)
 	Equals(t, "v0.11.0", passedConfig.DefaultTFVersion)
+	Equals(t, true, passedConfig.DisableApplyAll)
 	Equals(t, "ghhostname", passedConfig.GithubHostname)
 	Equals(t, "token", passedConfig.GithubToken)
 	Equals(t, "user", passedConfig.GithubUser)
@@ -565,12 +637,18 @@ tfe-token: my-token
 	Equals(t, "slack-token", passedConfig.SlackToken)
 	Equals(t, "cert-file", passedConfig.SSLCertFile)
 	Equals(t, "key-file", passedConfig.SSLKeyFile)
+	Equals(t, "my-hostname", passedConfig.TFEHostname)
 	Equals(t, "my-token", passedConfig.TFEToken)
+	Equals(t, true, passedConfig.WriteGitCreds)
 }
 
 func TestExecute_EnvironmentOverride(t *testing.T) {
 	t.Log("Environment variables should override config file flags.")
 	tmpFile := tempFile(t, `---
+azuredevops-token: ad-token
+azuredevops-user: ad-user
+azuredevops-webhook-password: ad-wh-pass
+azuredevops-webhook-user: ad-wh-user
 atlantis-url: "url"
 allow-fork-prs: true
 allow-repo-config: true
@@ -582,6 +660,7 @@ bitbucket-webhook-secret: "bitbucket-secret"
 checkout-strategy: "merge"
 data-dir: "/path"
 default-tf-version: "v0.11.0"
+disable-apply-all: true
 gh-hostname: "ghhostname"
 gh-token: "token"
 gh-user: "user"
@@ -597,40 +676,49 @@ require-approval: true
 slack-token: slack-token
 ssl-cert-file: cert-file
 ssl-key-file: key-file
+tfe-hostname: my-hostname
 tfe-token: my-token
+write-git-creds: true
 `)
 	defer os.Remove(tmpFile) // nolint: errcheck
 
 	// NOTE: We add the ATLANTIS_ prefix below.
 	for name, value := range map[string]string{
-		"ATLANTIS_URL":             "override-url",
-		"ALLOW_FORK_PRS":           "false",
-		"ALLOW_REPO_CONFIG":        "false",
-		"AUTOMERGE":                "false",
-		"BITBUCKET_BASE_URL":       "https://override-bitbucket-base-url",
-		"BITBUCKET_TOKEN":          "override-bitbucket-token",
-		"BITBUCKET_USER":           "override-bitbucket-user",
-		"BITBUCKET_WEBHOOK_SECRET": "override-bitbucket-secret",
-		"CHECKOUT_STRATEGY":        "branch",
-		"DATA_DIR":                 "/override-path",
-		"DEFAULT_TF_VERSION":       "v0.12.0",
-		"GH_HOSTNAME":              "override-gh-hostname",
-		"GH_TOKEN":                 "override-gh-token",
-		"GH_USER":                  "override-gh-user",
-		"GH_WEBHOOK_SECRET":        "override-gh-webhook-secret",
-		"GITLAB_HOSTNAME":          "override-gitlab-hostname",
-		"GITLAB_TOKEN":             "override-gitlab-token",
-		"GITLAB_USER":              "override-gitlab-user",
-		"GITLAB_WEBHOOK_SECRET":    "override-gitlab-webhook-secret",
-		"LOG_LEVEL":                "info",
-		"PORT":                     "8282",
-		"REPO_WHITELIST":           "override,override",
-		"REQUIRE_APPROVAL":         "false",
-		"REQUIRE_MERGEABLE":        "false",
-		"SLACK_TOKEN":              "override-slack-token",
-		"SSL_CERT_FILE":            "override-cert-file",
-		"SSL_KEY_FILE":             "override-key-file",
-		"TFE_TOKEN":                "override-my-token",
+		"AZUREDEVOPS_TOKEN":            "override-ad-token",
+		"AZUREDEVOPS_USER":             "override-ad-user",
+		"AZUREDEVOPS_WEBHOOK_PASSWORD": "override-ad-wh-pass",
+		"AZUREDEVOPS_WEBHOOK_USER":     "override-ad-wh-user",
+		"ATLANTIS_URL":                 "override-url",
+		"ALLOW_FORK_PRS":               "false",
+		"ALLOW_REPO_CONFIG":            "false",
+		"AUTOMERGE":                    "false",
+		"BITBUCKET_BASE_URL":           "https://override-bitbucket-base-url",
+		"BITBUCKET_TOKEN":              "override-bitbucket-token",
+		"BITBUCKET_USER":               "override-bitbucket-user",
+		"BITBUCKET_WEBHOOK_SECRET":     "override-bitbucket-secret",
+		"CHECKOUT_STRATEGY":            "branch",
+		"DATA_DIR":                     "/override-path",
+		"DISABLE_APPLY_ALL":            "false",
+		"DEFAULT_TF_VERSION":           "v0.12.0",
+		"GH_HOSTNAME":                  "override-gh-hostname",
+		"GH_TOKEN":                     "override-gh-token",
+		"GH_USER":                      "override-gh-user",
+		"GH_WEBHOOK_SECRET":            "override-gh-webhook-secret",
+		"GITLAB_HOSTNAME":              "override-gitlab-hostname",
+		"GITLAB_TOKEN":                 "override-gitlab-token",
+		"GITLAB_USER":                  "override-gitlab-user",
+		"GITLAB_WEBHOOK_SECRET":        "override-gitlab-webhook-secret",
+		"LOG_LEVEL":                    "info",
+		"PORT":                         "8282",
+		"REPO_WHITELIST":               "override,override",
+		"REQUIRE_APPROVAL":             "false",
+		"REQUIRE_MERGEABLE":            "false",
+		"SLACK_TOKEN":                  "override-slack-token",
+		"SSL_CERT_FILE":                "override-cert-file",
+		"SSL_KEY_FILE":                 "override-key-file",
+		"TFE_HOSTNAME":                 "override-my-hostname",
+		"TFE_TOKEN":                    "override-my-token",
+		"WRITE_GIT_CREDS":              "false",
 	} {
 		os.Setenv("ATLANTIS_"+name, value) // nolint: errcheck
 	}
@@ -639,6 +727,10 @@ tfe-token: my-token
 	})
 	err := c.Execute()
 	Ok(t, err)
+	Equals(t, "override-ad-token", passedConfig.AzureDevopsToken)
+	Equals(t, "override-ad-user", passedConfig.AzureDevopsUser)
+	Equals(t, "override-ad-wh-pass", passedConfig.AzureDevopsWebhookPassword)
+	Equals(t, "override-ad-wh-user", passedConfig.AzureDevopsWebhookUser)
 	Equals(t, "override-url", passedConfig.AtlantisURL)
 	Equals(t, false, passedConfig.AllowForkPRs)
 	Equals(t, false, passedConfig.AllowRepoConfig)
@@ -650,6 +742,7 @@ tfe-token: my-token
 	Equals(t, "branch", passedConfig.CheckoutStrategy)
 	Equals(t, "/override-path", passedConfig.DataDir)
 	Equals(t, "v0.12.0", passedConfig.DefaultTFVersion)
+	Equals(t, false, passedConfig.DisableApplyAll)
 	Equals(t, "override-gh-hostname", passedConfig.GithubHostname)
 	Equals(t, "override-gh-token", passedConfig.GithubToken)
 	Equals(t, "override-gh-user", passedConfig.GithubUser)
@@ -666,12 +759,18 @@ tfe-token: my-token
 	Equals(t, "override-slack-token", passedConfig.SlackToken)
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
 	Equals(t, "override-key-file", passedConfig.SSLKeyFile)
+	Equals(t, "override-my-hostname", passedConfig.TFEHostname)
 	Equals(t, "override-my-token", passedConfig.TFEToken)
+	Equals(t, false, passedConfig.WriteGitCreds)
 }
 
 func TestExecute_FlagConfigOverride(t *testing.T) {
 	t.Log("Flags should override config file flags.")
 	tmpFile := tempFile(t, `---
+azuredevops-token: ad-token
+azuredevops-user: ad-user
+azuredevops-webhook-password: ad-wh-pass
+azuredevops-webhook-user: ad-wh-user
 atlantis-url: "url"
 allow-fork-prs: true
 allow-repo-config: true
@@ -683,6 +782,7 @@ bitbucket-webhook-secret: "bitbucket-secret"
 checkout-strategy: "merge"
 data-dir: "/path"
 default-tf-version: "v0.11.0"
+disable-apply-all: true
 gh-hostname: "ghhostname"
 gh-token: "token"
 gh-user: "user"
@@ -699,11 +799,17 @@ require-mergeable: true
 slack-token: slack-token
 ssl-cert-file: cert-file
 ssl-key-file: key-file
+tfe-hostname: my-hostname
 tfe-token: my-token
+write-git-creds: true
 `)
 
 	defer os.Remove(tmpFile) // nolint: errcheck
 	c := setup(map[string]interface{}{
+		cmd.ADTokenFlag:                "override-ad-token",
+		cmd.ADUserFlag:                 "override-ad-user",
+		cmd.ADWebhookPasswordFlag:      "override-ad-wh-pass",
+		cmd.ADWebhookUserFlag:          "override-ad-wh-user",
 		cmd.AtlantisURLFlag:            "override-url",
 		cmd.AllowForkPRsFlag:           false,
 		cmd.AllowRepoConfigFlag:        false,
@@ -715,6 +821,7 @@ tfe-token: my-token
 		cmd.CheckoutStrategyFlag:       "branch",
 		cmd.DataDirFlag:                "/override-path",
 		cmd.DefaultTFVersionFlag:       "v0.12.0",
+		cmd.DisableApplyAllFlag:        false,
 		cmd.GHHostnameFlag:             "override-gh-hostname",
 		cmd.GHTokenFlag:                "override-gh-token",
 		cmd.GHUserFlag:                 "override-gh-user",
@@ -731,10 +838,16 @@ tfe-token: my-token
 		cmd.SlackTokenFlag:             "override-slack-token",
 		cmd.SSLCertFileFlag:            "override-cert-file",
 		cmd.SSLKeyFileFlag:             "override-key-file",
+		cmd.TFEHostnameFlag:            "override-my-hostname",
 		cmd.TFETokenFlag:               "override-my-token",
+		cmd.WriteGitCredsFlag:          false,
 	})
 	err := c.Execute()
 	Ok(t, err)
+	Equals(t, "override-ad-token", passedConfig.AzureDevopsToken)
+	Equals(t, "override-ad-user", passedConfig.AzureDevopsUser)
+	Equals(t, "override-ad-wh-pass", passedConfig.AzureDevopsWebhookPassword)
+	Equals(t, "override-ad-wh-user", passedConfig.AzureDevopsWebhookUser)
 	Equals(t, "override-url", passedConfig.AtlantisURL)
 	Equals(t, false, passedConfig.AllowForkPRs)
 	Equals(t, false, passedConfig.Automerge)
@@ -745,6 +858,7 @@ tfe-token: my-token
 	Equals(t, "branch", passedConfig.CheckoutStrategy)
 	Equals(t, "/override-path", passedConfig.DataDir)
 	Equals(t, "v0.12.0", passedConfig.DefaultTFVersion)
+	Equals(t, false, passedConfig.DisableApplyAll)
 	Equals(t, "override-gh-hostname", passedConfig.GithubHostname)
 	Equals(t, "override-gh-token", passedConfig.GithubToken)
 	Equals(t, "override-gh-user", passedConfig.GithubUser)
@@ -761,7 +875,9 @@ tfe-token: my-token
 	Equals(t, "override-slack-token", passedConfig.SlackToken)
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
 	Equals(t, "override-key-file", passedConfig.SSLKeyFile)
+	Equals(t, "override-my-hostname", passedConfig.TFEHostname)
 	Equals(t, "override-my-token", passedConfig.TFEToken)
+	Equals(t, false, passedConfig.WriteGitCreds)
 
 }
 
@@ -769,34 +885,41 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	t.Log("Flags should override environment variables.")
 
 	envVars := map[string]string{
-		"ATLANTIS_URL":             "url",
-		"ALLOW_FORK_PRS":           "true",
-		"ALLOW_REPO_CONFIG":        "true",
-		"AUTOMERGE":                "true",
-		"BITBUCKET_BASE_URL":       "https://bitbucket-base-url",
-		"BITBUCKET_TOKEN":          "bitbucket-token",
-		"BITBUCKET_USER":           "bitbucket-user",
-		"BITBUCKET_WEBHOOK_SECRET": "bitbucket-secret",
-		"CHECKOUT_STRATEGY":        "merge",
-		"DATA_DIR":                 "/path",
-		"DEFAULT_TF_VERSION":       "v0.11.0",
-		"GH_HOSTNAME":              "gh-hostname",
-		"GH_TOKEN":                 "gh-token",
-		"GH_USER":                  "gh-user",
-		"GH_WEBHOOK_SECRET":        "gh-webhook-secret",
-		"GITLAB_HOSTNAME":          "gitlab-hostname",
-		"GITLAB_TOKEN":             "gitlab-token",
-		"GITLAB_USER":              "gitlab-user",
-		"GITLAB_WEBHOOK_SECRET":    "gitlab-webhook-secret",
-		"LOG_LEVEL":                "debug",
-		"PORT":                     "8181",
-		"REPO_WHITELIST":           "*",
-		"REQUIRE_APPROVAL":         "true",
-		"REQUIRE_MERGEABLE":        "true",
-		"SLACK_TOKEN":              "slack-token",
-		"SSL_CERT_FILE":            "cert-file",
-		"SSL_KEY_FILE":             "key-file",
-		"TFE_TOKEN":                "my-token",
+		"AZUREDEVOPS_TOKEN":            "ad-token",
+		"AZUREDEVOPS_USER":             "ad-user",
+		"AZUREDEVOPS_WEBHOOK_PASSWORD": "ad-wh-pass",
+		"AZUREDEVOPS_WEBHOOK_USER":     "ad-wh-user",
+		"ATLANTIS_URL":                 "url",
+		"ALLOW_FORK_PRS":               "true",
+		"ALLOW_REPO_CONFIG":            "true",
+		"AUTOMERGE":                    "true",
+		"BITBUCKET_BASE_URL":           "https://bitbucket-base-url",
+		"BITBUCKET_TOKEN":              "bitbucket-token",
+		"BITBUCKET_USER":               "bitbucket-user",
+		"BITBUCKET_WEBHOOK_SECRET":     "bitbucket-secret",
+		"CHECKOUT_STRATEGY":            "merge",
+		"DATA_DIR":                     "/path",
+		"DEFAULT_TF_VERSION":           "v0.11.0",
+		"DISABLE_APPLY_ALL":            "true",
+		"GH_HOSTNAME":                  "gh-hostname",
+		"GH_TOKEN":                     "gh-token",
+		"GH_USER":                      "gh-user",
+		"GH_WEBHOOK_SECRET":            "gh-webhook-secret",
+		"GITLAB_HOSTNAME":              "gitlab-hostname",
+		"GITLAB_TOKEN":                 "gitlab-token",
+		"GITLAB_USER":                  "gitlab-user",
+		"GITLAB_WEBHOOK_SECRET":        "gitlab-webhook-secret",
+		"LOG_LEVEL":                    "debug",
+		"PORT":                         "8181",
+		"REPO_WHITELIST":               "*",
+		"REQUIRE_APPROVAL":             "true",
+		"REQUIRE_MERGEABLE":            "true",
+		"SLACK_TOKEN":                  "slack-token",
+		"SSL_CERT_FILE":                "cert-file",
+		"SSL_KEY_FILE":                 "key-file",
+		"TFE_HOSTNAME":                 "my-hostname",
+		"TFE_TOKEN":                    "my-token",
+		"WRITE_GIT_CREDS":              "true",
 	}
 	for name, value := range envVars {
 		os.Setenv("ATLANTIS_"+name, value) // nolint: errcheck
@@ -809,6 +932,10 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	}()
 
 	c := setup(map[string]interface{}{
+		cmd.ADTokenFlag:                "override-ad-token",
+		cmd.ADUserFlag:                 "override-ad-user",
+		cmd.ADWebhookPasswordFlag:      "override-ad-wh-pass",
+		cmd.ADWebhookUserFlag:          "override-ad-wh-user",
 		cmd.AtlantisURLFlag:            "override-url",
 		cmd.AllowForkPRsFlag:           false,
 		cmd.AllowRepoConfigFlag:        false,
@@ -820,6 +947,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		cmd.CheckoutStrategyFlag:       "branch",
 		cmd.DataDirFlag:                "/override-path",
 		cmd.DefaultTFVersionFlag:       "v0.12.0",
+		cmd.DisableApplyAllFlag:        false,
 		cmd.GHHostnameFlag:             "override-gh-hostname",
 		cmd.GHTokenFlag:                "override-gh-token",
 		cmd.GHUserFlag:                 "override-gh-user",
@@ -836,11 +964,17 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		cmd.SlackTokenFlag:             "override-slack-token",
 		cmd.SSLCertFileFlag:            "override-cert-file",
 		cmd.SSLKeyFileFlag:             "override-key-file",
+		cmd.TFEHostnameFlag:            "override-my-hostname",
 		cmd.TFETokenFlag:               "override-my-token",
+		cmd.WriteGitCredsFlag:          false,
 	})
 	err := c.Execute()
 	Ok(t, err)
 
+	Equals(t, "override-ad-token", passedConfig.AzureDevopsToken)
+	Equals(t, "override-ad-user", passedConfig.AzureDevopsUser)
+	Equals(t, "override-ad-wh-pass", passedConfig.AzureDevopsWebhookPassword)
+	Equals(t, "override-ad-wh-user", passedConfig.AzureDevopsWebhookUser)
 	Equals(t, "override-url", passedConfig.AtlantisURL)
 	Equals(t, false, passedConfig.AllowForkPRs)
 	Equals(t, false, passedConfig.AllowRepoConfig)
@@ -852,6 +986,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	Equals(t, "branch", passedConfig.CheckoutStrategy)
 	Equals(t, "/override-path", passedConfig.DataDir)
 	Equals(t, "v0.12.0", passedConfig.DefaultTFVersion)
+	Equals(t, false, passedConfig.DisableApplyAll)
 	Equals(t, "override-gh-hostname", passedConfig.GithubHostname)
 	Equals(t, "override-gh-token", passedConfig.GithubToken)
 	Equals(t, "override-gh-user", passedConfig.GithubUser)
@@ -868,7 +1003,9 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	Equals(t, "override-slack-token", passedConfig.SlackToken)
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
 	Equals(t, "override-key-file", passedConfig.SSLKeyFile)
+	Equals(t, "override-my-hostname", passedConfig.TFEHostname)
 	Equals(t, "override-my-token", passedConfig.TFEToken)
+	Equals(t, false, passedConfig.WriteGitCreds)
 }
 
 // If using bitbucket cloud, webhook secrets are not supported.
@@ -912,6 +1049,31 @@ func TestExecute_BitbucketServerBaseURLPort(t *testing.T) {
 	})
 	Ok(t, c.Execute())
 	Equals(t, "http://mydomain.com:7990", passedConfig.BitbucketBaseURL)
+}
+
+// Can't use both --repo-config and --repo-config-json.
+func TestExecute_RepoCfgFlags(t *testing.T) {
+	c := setup(map[string]interface{}{
+		cmd.GHUserFlag:         "user",
+		cmd.GHTokenFlag:        "token",
+		cmd.RepoWhitelistFlag:  "github.com",
+		cmd.RepoConfigFlag:     "repos.yaml",
+		cmd.RepoConfigJSONFlag: "{}",
+	})
+	err := c.Execute()
+	ErrEquals(t, "cannot use --repo-config and --repo-config-json at the same time", err)
+}
+
+// Can't use both --tfe-hostname flag without --tfe-token.
+func TestExecute_TFEHostnameOnly(t *testing.T) {
+	c := setup(map[string]interface{}{
+		cmd.GHUserFlag:        "user",
+		cmd.GHTokenFlag:       "token",
+		cmd.RepoWhitelistFlag: "github.com",
+		cmd.TFEHostnameFlag:   "not-app.terraform.io",
+	})
+	err := c.Execute()
+	ErrEquals(t, "if setting --tfe-hostname, must set --tfe-token", err)
 }
 
 func setup(flags map[string]interface{}) *cobra.Command {

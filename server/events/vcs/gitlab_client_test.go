@@ -7,10 +7,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/lkysow/go-gitlab"
+	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/models"
+	gitlab "github.com/xanzy/go-gitlab"
 
-	"github.com/hashicorp/go-version"
 	. "github.com/runatlantis/atlantis/testing"
 )
 

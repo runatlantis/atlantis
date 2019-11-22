@@ -8,56 +8,68 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 // RunStepRunner runs custom commands.
 type RunStepRunner struct {
-	DefaultTFVersion *version.Version
+	TerraformExecutor TerraformExec
+	DefaultTFVersion  *version.Version
+	// TerraformBinDir is the directory where Atlantis downloads Terraform binaries.
+	TerraformBinDir string
 }
 
-func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command []string, path string) (string, error) {
-	if len(command) < 1 {
-		return "", errors.New("no commands for run step")
+func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command string, path string, envs map[string]string) (string, error) {
+	tfVersion := r.DefaultTFVersion
+	if ctx.TerraformVersion != nil {
+		tfVersion = ctx.TerraformVersion
 	}
 
-	cmd := exec.Command("sh", "-c", strings.Join(command, " ")) // #nosec
-	cmd.Dir = path
-	tfVersion := r.DefaultTFVersion.String()
-	if ctx.ProjectConfig != nil && ctx.ProjectConfig.TerraformVersion != nil {
-		tfVersion = ctx.ProjectConfig.TerraformVersion.String()
+	err := r.TerraformExecutor.EnsureVersion(ctx.Log, tfVersion)
+	if err != nil {
+		err = fmt.Errorf("%s: Downloading terraform Version %s", err, tfVersion.String())
+		ctx.Log.Debug("error: %s", err)
+		return "", err
 	}
+
+	cmd := exec.Command("sh", "-c", command) // #nosec
+	cmd.Dir = path
+
 	baseEnvVars := os.Environ()
 	customEnvVars := map[string]string{
-		"WORKSPACE":                  ctx.Workspace,
-		"ATLANTIS_TERRAFORM_VERSION": tfVersion,
-		"DIR":                        path,
-		"PLANFILE":                   filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectConfig)),
+		"ATLANTIS_TERRAFORM_VERSION": tfVersion.String(),
+		"BASE_BRANCH_NAME":           ctx.Pull.BaseBranch,
 		"BASE_REPO_NAME":             ctx.BaseRepo.Name,
 		"BASE_REPO_OWNER":            ctx.BaseRepo.Owner,
+		"COMMENT_ARGS":               strings.Join(ctx.EscapedCommentArgs, ","),
+		"DIR":                        path,
+		"HEAD_BRANCH_NAME":           ctx.Pull.HeadBranch,
 		"HEAD_REPO_NAME":             ctx.HeadRepo.Name,
 		"HEAD_REPO_OWNER":            ctx.HeadRepo.Owner,
-		"HEAD_BRANCH_NAME":           ctx.Pull.HeadBranch,
-		"BASE_BRANCH_NAME":           ctx.Pull.BaseBranch,
-		"PULL_NUM":                   fmt.Sprintf("%d", ctx.Pull.Num),
+		"PATH":                       fmt.Sprintf("%s:%s", os.Getenv("PATH"), r.TerraformBinDir),
+		"PLANFILE":                   filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName)),
+		"PROJECT_NAME":               ctx.ProjectName,
 		"PULL_AUTHOR":                ctx.Pull.Author,
+		"PULL_NUM":                   fmt.Sprintf("%d", ctx.Pull.Num),
 		"USER_NAME":                  ctx.User.Username,
+		"WORKSPACE":                  ctx.Workspace,
 	}
 
 	finalEnvVars := baseEnvVars
 	for key, val := range customEnvVars {
 		finalEnvVars = append(finalEnvVars, fmt.Sprintf("%s=%s", key, val))
 	}
+	for key, val := range envs {
+		finalEnvVars = append(finalEnvVars, fmt.Sprintf("%s=%s", key, val))
+	}
 	cmd.Env = finalEnvVars
 	out, err := cmd.CombinedOutput()
 
-	commandStr := strings.Join(command, " ")
 	if err != nil {
-		err = fmt.Errorf("%s: running %q in %q: \n%s", err, commandStr, path, out)
+		err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, out)
 		ctx.Log.Debug("error: %s", err)
-		return string(out), err
+		return "", err
 	}
-	ctx.Log.Info("successfully ran %q in %q", commandStr, path)
+	ctx.Log.Info("successfully ran %q in %q", command, path)
 	return string(out), nil
 }

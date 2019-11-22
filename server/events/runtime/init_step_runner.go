@@ -1,7 +1,7 @@
 package runtime
 
 import (
-	"github.com/hashicorp/go-version"
+	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
@@ -11,10 +11,10 @@ type InitStepRunner struct {
 	DefaultTFVersion  *version.Version
 }
 
-func (i *InitStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string) (string, error) {
+func (i *InitStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error) {
 	tfVersion := i.DefaultTFVersion
-	if ctx.ProjectConfig != nil && ctx.ProjectConfig.TerraformVersion != nil {
-		tfVersion = ctx.ProjectConfig.TerraformVersion
+	if ctx.TerraformVersion != nil {
+		tfVersion = ctx.TerraformVersion
 	}
 	terraformInitCmd := append([]string{"init", "-input=false", "-no-color", "-upgrade"}, extraArgs...)
 
@@ -24,7 +24,7 @@ func (i *InitStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []strin
 		terraformInitCmd = append([]string{"get", "-no-color", "-upgrade"}, extraArgs...)
 	}
 
-	out, err := i.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, terraformInitCmd, tfVersion, ctx.Workspace)
+	out, err := i.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, terraformInitCmd, envs, tfVersion, ctx.Workspace)
 	// Only include the init output if there was an error. Otherwise it's
 	// unnecessary and lengthens the comment.
 	if err != nil {

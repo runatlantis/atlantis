@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/go-ozzo/ozzo-validation"
-	"github.com/hashicorp/go-version"
+	validation "github.com/go-ozzo/ozzo-validation"
+	version "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 )
@@ -35,15 +35,7 @@ func (p Project) Validate() error {
 		}
 		return nil
 	}
-	validApplyReq := func(value interface{}) error {
-		reqs := value.([]string)
-		for _, r := range reqs {
-			if r != ApprovedApplyRequirement && r != MergeableApplyRequirement {
-				return fmt.Errorf("%q not supported, only %s and %s are supported", r, ApprovedApplyRequirement, MergeableApplyRequirement)
-			}
-		}
-		return nil
-	}
+
 	validTFVersion := func(value interface{}) error {
 		strPtr := value.(*string)
 		if strPtr == nil {
@@ -87,7 +79,7 @@ func (p Project) ToValid() valid.Project {
 		v.Workspace = *p.Workspace
 	}
 
-	v.Workflow = p.Workflow
+	v.WorkflowName = p.Workflow
 	if p.TerraformVersion != nil {
 		v.TerraformVersion, _ = version.NewVersion(*p.TerraformVersion)
 	}
@@ -112,4 +104,14 @@ func (p Project) ToValid() valid.Project {
 func validProjectName(name string) bool {
 	nameWithoutSlashes := strings.Replace(name, "/", "-", -1)
 	return nameWithoutSlashes == url.QueryEscape(nameWithoutSlashes)
+}
+
+func validApplyReq(value interface{}) error {
+	reqs := value.([]string)
+	for _, r := range reqs {
+		if r != ApprovedApplyRequirement && r != MergeableApplyRequirement {
+			return fmt.Errorf("%q is not a valid apply_requirement, only %q and %q are supported", r, ApprovedApplyRequirement, MergeableApplyRequirement)
+		}
+	}
+	return nil
 }

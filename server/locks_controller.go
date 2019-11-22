@@ -2,9 +2,10 @@ package server
 
 import (
 	"fmt"
-	"github.com/runatlantis/atlantis/server/events/db"
 	"net/http"
 	"net/url"
+
+	"github.com/runatlantis/atlantis/server/events/db"
 
 	"github.com/gorilla/mux"
 	"github.com/runatlantis/atlantis/server/events"
@@ -54,14 +55,15 @@ func (l *LocksController) GetLock(w http.ResponseWriter, r *http.Request) {
 	viewData := LockDetailData{
 		LockKeyEncoded:  id,
 		LockKey:         idUnencoded,
-		RepoOwner:       owner,
-		RepoName:        repo,
 		PullRequestLink: lock.Pull.URL,
 		LockedBy:        lock.Pull.Author,
 		Workspace:       lock.Workspace,
 		AtlantisVersion: l.AtlantisVersion,
 		CleanedBasePath: l.AtlantisURL.Path,
+		RepoOwner:       owner,
+		RepoName:        repo,
 	}
+
 	err = l.LockDetailTemplate.Execute(w, viewData)
 	if err != nil {
 		l.Logger.Err(err.Error())

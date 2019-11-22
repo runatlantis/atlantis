@@ -106,23 +106,15 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 	runCmd(t, repoDir, "git", "add", "branch-file")
 	runCmd(t, repoDir, "git", "commit", "-m", "branch-commit")
 
-	// Now switch back to master, advance the master branch by another
-	// commit and perform the merge.
+	// Now switch back to master and advance the master branch by another commit.
 	runCmd(t, repoDir, "git", "checkout", "master")
 	runCmd(t, repoDir, "touch", "master-file")
 	runCmd(t, repoDir, "git", "add", "master-file")
 	runCmd(t, repoDir, "git", "commit", "-m", "master-commit")
-	runCmd(t, repoDir, "git", "merge", "-m", "atlantis-merge", "branch")
 
-	// Our repo is set up, so now copy it into where Atlantis will have
-	// cloned it.
+	// Run the clone for the first time.
 	dataDir, cleanup2 := TempDir(t)
 	defer cleanup2()
-	runCmd(t, dataDir, "mkdir", "-p", "repos/0/")
-	runCmd(t, dataDir, "cp", "-R", repoDir, "repos/0/default")
-	// Create a file that we can use later to check if the repo was recloned.
-	runCmd(t, dataDir, "touch", "repos/0/default/proof")
-
 	overrideURL := fmt.Sprintf("file://%s", repoDir)
 	wd := &events.FileWorkspace{
 		DataDir:                     dataDir,
@@ -131,6 +123,62 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 		TestingOverrideBaseCloneURL: overrideURL,
 	}
 
+	_, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+		HeadBranch: "branch",
+		BaseBranch: "master",
+	}, "default")
+	Ok(t, err)
+
+	// Create a file that we can use to check if the repo was recloned.
+	runCmd(t, dataDir, "touch", "repos/0/default/proof")
+
+	// Now run the clone again.
+	cloneDir, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+		HeadBranch: "branch",
+		BaseBranch: "master",
+	}, "default")
+	Ok(t, err)
+
+	// Check that our proof file is still there, proving that we didn't reclone.
+	_, err = os.Stat(filepath.Join(cloneDir, "proof"))
+	Ok(t, err)
+}
+
+// Same as TestClone_CheckoutMergeNoReclone however the branch that gets
+// merged is a fast-forward merge. See #584.
+func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
+	// Initialize the git repo.
+	repoDir, cleanup := initRepo(t)
+	defer cleanup()
+
+	// Add a commit to branch 'branch' that's not on master.
+	// This will result in a fast-forwardable merge.
+	runCmd(t, repoDir, "git", "checkout", "branch")
+	runCmd(t, repoDir, "touch", "branch-file")
+	runCmd(t, repoDir, "git", "add", "branch-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "branch-commit")
+
+	// Run the clone for the first time.
+	dataDir, cleanup2 := TempDir(t)
+	defer cleanup2()
+	overrideURL := fmt.Sprintf("file://%s", repoDir)
+	wd := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		CheckoutMerge:               true,
+		TestingOverrideHeadCloneURL: overrideURL,
+		TestingOverrideBaseCloneURL: overrideURL,
+	}
+
+	_, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+		HeadBranch: "branch",
+		BaseBranch: "master",
+	}, "default")
+	Ok(t, err)
+
+	// Create a file that we can use to check if the repo was recloned.
+	runCmd(t, dataDir, "touch", "repos/0/default/proof")
+
+	// Now run the clone again.
 	cloneDir, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		BaseBranch: "master",
@@ -176,10 +224,13 @@ func TestClone_CheckoutMergeConflict(t *testing.T) {
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
-	ErrEquals(t, `running git merge -q -m atlantis-merge FETCH_HEAD: Auto-merging file
-CONFLICT (add/add): Merge conflict in file
-Automatic merge failed; fix conflicts and then commit the result.
-: exit status 1`, err)
+
+	ErrContains(t, "running git merge -q --no-ff -m atlantis-merge FETCH_HEAD", err)
+	ErrContains(t, "Auto-merging file", err)
+	ErrContains(t, "CONFLICT (add/add)", err)
+	ErrContains(t, "Merge conflict in file", err)
+	ErrContains(t, "Automatic merge failed; fix conflicts and then commit the result.", err)
+	ErrContains(t, "exit status 1", err)
 }
 
 // Test that if the repo is already cloned and is at the right commit, we

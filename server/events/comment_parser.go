@@ -15,15 +15,16 @@ package events
 
 import (
 	"fmt"
-	"github.com/flynn-archive/go-shlex"
-	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/yaml"
-	"github.com/spf13/pflag"
 	"io/ioutil"
 	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/flynn-archive/go-shlex"
+	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/yaml"
+	"github.com/spf13/pflag"
 )
 
 const (
@@ -64,9 +65,10 @@ type CommentBuilder interface {
 
 // CommentParser implements CommentParsing
 type CommentParser struct {
-	GithubUser    string
-	GitlabUser    string
-	BitbucketUser string
+	GithubUser      string
+	GitlabUser      string
+	BitbucketUser   string
+	AzureDevopsUser string
 }
 
 // CommentParseResult describes the result of parsing a comment as a command.
@@ -124,6 +126,8 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		vcsUser = e.GitlabUser
 	case models.BitbucketCloud, models.BitbucketServer:
 		vcsUser = e.BitbucketUser
+	case models.AzureDevops:
+		vcsUser = e.AzureDevopsUser
 	}
 	executableNames := []string{"run", atlantisExecutable, "@" + vcsUser}
 	if !e.stringInSlice(args[0], executableNames) {
@@ -161,7 +165,6 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	var dir string
 	var project string
 	var verbose bool
-	var extraArgs []string
 	var flagSet *pflag.FlagSet
 	var name models.CommandName
 
@@ -207,14 +210,9 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("unknown argument(s) – %s", strings.Join(unusedArgs, " ")), command, flagSet)}
 	}
 
+	var extraArgs []string
 	if flagSet.ArgsLenAtDash() != -1 {
-		extraArgsUnsafe := flagSet.Args()[flagSet.ArgsLenAtDash():]
-		// Quote all extra args so there isn't a security issue when we append
-		// them to the terraform commands, ex. "; cat /etc/passwd"
-		for _, arg := range extraArgsUnsafe {
-			quotesEscaped := strings.Replace(arg, `"`, `\"`, -1)
-			extraArgs = append(extraArgs, fmt.Sprintf(`"%s"`, quotesEscaped))
-		}
+		extraArgs = flagSet.Args()[flagSet.ArgsLenAtDash():]
 	}
 
 	dir, err = e.validateDir(dir)
@@ -328,7 +326,7 @@ func (e *CommentParser) errMarkdown(errMsg string, command string, flagSet *pfla
 // `atlantis help`.
 var HelpComment = "```cmake\n" +
 	`atlantis
-Terraform For Teams
+Terraform Pull Request Automation
 
 Usage:
   atlantis <command> [options] -- [terraform options]
@@ -353,8 +351,8 @@ Commands:
 Flags:
   -h, --help   help for atlantis
 
-Use "atlantis [command] --help" for more information about a command.
-`
+Use "atlantis [command] --help" for more information about a command.` +
+	"\n```"
 
 // DidYouMeanAtlantisComment is the comment we add to the pull request when
 // someone runs a command with terraform instead of atlantis.

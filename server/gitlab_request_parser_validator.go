@@ -19,7 +19,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/lkysow/go-gitlab"
+	gitlab "github.com/xanzy/go-gitlab"
 )
 
 const secretHeader = "X-Gitlab-Token" // #nosec

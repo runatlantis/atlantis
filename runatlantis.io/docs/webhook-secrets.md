@@ -12,6 +12,10 @@ Webhook secrets are actually optional. However they're highly recommended for
 security.
 :::
 
+::: tip NOTE
+Azure DevOps uses Basic authentication for webhooks rather than webhook secrets.
+:::
+
 ::: warning
 Bitbucket.org **does not** support webhook secrets.
 To mitigate, use repo whitelists and IP whitelists. See [Security](security.html#bitbucket-cloud-bitbucket-org) for more information.

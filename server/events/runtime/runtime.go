@@ -4,22 +4,28 @@ package runtime
 
 import (
 	"fmt"
-	"github.com/hashicorp/go-version"
+	"regexp"
+	"strings"
+
+	version "github.com/hashicorp/go-version"
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/terraform"
-	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
-	"regexp"
 )
 
-// lineBeforeRunURL is the line output during a remote operation right before
-// a link to the run url will be output.
-const lineBeforeRunURL = "To view this run in a browser, visit:"
+const (
+	// lineBeforeRunURL is the line output during a remote operation right before
+	// a link to the run url will be output.
+	lineBeforeRunURL     = "To view this run in a browser, visit:"
+	planfileSlashReplace = "::"
+)
 
 // TerraformExec brings the interface from TerraformClient into this package
 // without causing circular imports.
 type TerraformExec interface {
-	RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (string, error)
+	RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, envs map[string]string, v *version.Version, workspace string) (string, error)
+	EnsureVersion(log *logging.SimpleLogger, v *version.Version) error
 }
 
 // AsyncTFExec brings the interface from TerraformClient into this package
@@ -33,7 +39,7 @@ type AsyncTFExec interface {
 	// Callers can use the input channel to pass stdin input to the command.
 	// If any error is passed on the out channel, there will be no
 	// further output (so callers are free to exit).
-	RunCommandAsync(log *logging.SimpleLogger, path string, args []string, v *version.Version, workspace string) (chan<- string, <-chan terraform.Line)
+	RunCommandAsync(log *logging.SimpleLogger, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan terraform.Line)
 }
 
 // StatusUpdater brings the interface from CommitStatusUpdater into this package
@@ -51,19 +57,28 @@ func MustConstraint(constraint string) version.Constraints {
 	return c
 }
 
-// invalidFilenameChars matches chars that are invalid for linux and windows
-// filenames.
-// From https://www.oreilly.com/library/view/regular-expressions-cookbook/9781449327453/ch08s25.html
-var invalidFilenameChars = regexp.MustCompile(`[\\/:"*?<>|]`)
-
 // GetPlanFilename returns the filename (not the path) of the generated tf plan
-// given a workspace and maybe a project's config.
-func GetPlanFilename(workspace string, maybeCfg *valid.Project) string {
-	var unescapedFilename string
-	if maybeCfg == nil || maybeCfg.Name == nil {
-		unescapedFilename = fmt.Sprintf("%s.tfplan", workspace)
-	} else {
-		unescapedFilename = fmt.Sprintf("%s-%s.tfplan", *maybeCfg.Name, workspace)
+// given a workspace and project name.
+func GetPlanFilename(workspace string, projName string) string {
+	if projName == "" {
+		return fmt.Sprintf("%s.tfplan", workspace)
 	}
-	return invalidFilenameChars.ReplaceAllLiteralString(unescapedFilename, "-")
+	projName = strings.Replace(projName, "/", planfileSlashReplace, -1)
+	return fmt.Sprintf("%s-%s.tfplan", projName, workspace)
+}
+
+// ProjectNameFromPlanfile returns the project name that a planfile with name
+// filename is for. If filename is for a project without a name then it will
+// return an empty string. workspace is the workspace this project is in.
+func ProjectNameFromPlanfile(workspace string, filename string) (string, error) {
+	r, err := regexp.Compile(fmt.Sprintf(`(.*?)-%s\.tfplan`, workspace))
+	if err != nil {
+		return "", errors.Wrap(err, "compiling project name regex, this is a bug")
+	}
+	projMatch := r.FindAllStringSubmatch(filename, 1)
+	if projMatch == nil {
+		return "", nil
+	}
+	rawProjName := projMatch[0][1]
+	return strings.Replace(rawProjName, planfileSlashReplace, "/", -1), nil
 }

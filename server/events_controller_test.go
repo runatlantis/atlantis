@@ -24,7 +24,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lkysow/go-gitlab"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events"
@@ -35,6 +34,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/mocks"
 	. "github.com/runatlantis/atlantis/testing"
+	gitlab "github.com/xanzy/go-gitlab"
 )
 
 const githubHeader = "X-Github-Event"
@@ -581,7 +581,7 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 				Owner:             "project",
 				Name:              "repository",
 				CloneURL:          "https://bb-user:bb-token@bbserver.com/scm/proj/repository.git",
-				SanitizedCloneURL: "https://bbserver.com/scm/proj/repository.git",
+				SanitizedCloneURL: "https://bb-user:<redacted>@bbserver.com/scm/proj/repository.git",
 				VCSHost: models.VCSHost{
 					Hostname: "bbserver.com",
 					Type:     models.BitbucketServer,

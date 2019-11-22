@@ -124,60 +124,60 @@ func (mock *MockBackend) UnlockByPull(repoFullName string, pullNum int) ([]model
 	return ret0, ret1
 }
 
-func (mock *MockBackend) VerifyWasCalledOnce() *VerifierBackend {
-	return &VerifierBackend{
+func (mock *MockBackend) VerifyWasCalledOnce() *VerifierMockBackend {
+	return &VerifierMockBackend{
 		mock:                   mock,
 		invocationCountMatcher: pegomock.Times(1),
 	}
 }
 
-func (mock *MockBackend) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierBackend {
-	return &VerifierBackend{
+func (mock *MockBackend) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockBackend {
+	return &VerifierMockBackend{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockBackend) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierBackend {
-	return &VerifierBackend{
+func (mock *MockBackend) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockBackend {
+	return &VerifierMockBackend{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 		inOrderContext:         inOrderContext,
 	}
 }
 
-func (mock *MockBackend) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierBackend {
-	return &VerifierBackend{
+func (mock *MockBackend) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockBackend {
+	return &VerifierMockBackend{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 		timeout:                timeout,
 	}
 }
 
-type VerifierBackend struct {
+type VerifierMockBackend struct {
 	mock                   *MockBackend
 	invocationCountMatcher pegomock.Matcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }
 
-func (verifier *VerifierBackend) TryLock(lock models.ProjectLock) *Backend_TryLock_OngoingVerification {
+func (verifier *VerifierMockBackend) TryLock(lock models.ProjectLock) *MockBackend_TryLock_OngoingVerification {
 	params := []pegomock.Param{lock}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "TryLock", params, verifier.timeout)
-	return &Backend_TryLock_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+	return &MockBackend_TryLock_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type Backend_TryLock_OngoingVerification struct {
+type MockBackend_TryLock_OngoingVerification struct {
 	mock              *MockBackend
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *Backend_TryLock_OngoingVerification) GetCapturedArguments() models.ProjectLock {
+func (c *MockBackend_TryLock_OngoingVerification) GetCapturedArguments() models.ProjectLock {
 	lock := c.GetAllCapturedArguments()
 	return lock[len(lock)-1]
 }
 
-func (c *Backend_TryLock_OngoingVerification) GetAllCapturedArguments() (_param0 []models.ProjectLock) {
+func (c *MockBackend_TryLock_OngoingVerification) GetAllCapturedArguments() (_param0 []models.ProjectLock) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.ProjectLock, len(params[0]))
@@ -188,23 +188,23 @@ func (c *Backend_TryLock_OngoingVerification) GetAllCapturedArguments() (_param0
 	return
 }
 
-func (verifier *VerifierBackend) Unlock(project models.Project, workspace string) *Backend_Unlock_OngoingVerification {
+func (verifier *VerifierMockBackend) Unlock(project models.Project, workspace string) *MockBackend_Unlock_OngoingVerification {
 	params := []pegomock.Param{project, workspace}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Unlock", params, verifier.timeout)
-	return &Backend_Unlock_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+	return &MockBackend_Unlock_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type Backend_Unlock_OngoingVerification struct {
+type MockBackend_Unlock_OngoingVerification struct {
 	mock              *MockBackend
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *Backend_Unlock_OngoingVerification) GetCapturedArguments() (models.Project, string) {
+func (c *MockBackend_Unlock_OngoingVerification) GetCapturedArguments() (models.Project, string) {
 	project, workspace := c.GetAllCapturedArguments()
 	return project[len(project)-1], workspace[len(workspace)-1]
 }
 
-func (c *Backend_Unlock_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Project, _param1 []string) {
+func (c *MockBackend_Unlock_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Project, _param1 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.Project, len(params[0]))
@@ -219,40 +219,40 @@ func (c *Backend_Unlock_OngoingVerification) GetAllCapturedArguments() (_param0 
 	return
 }
 
-func (verifier *VerifierBackend) List() *Backend_List_OngoingVerification {
+func (verifier *VerifierMockBackend) List() *MockBackend_List_OngoingVerification {
 	params := []pegomock.Param{}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "List", params, verifier.timeout)
-	return &Backend_List_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+	return &MockBackend_List_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type Backend_List_OngoingVerification struct {
+type MockBackend_List_OngoingVerification struct {
 	mock              *MockBackend
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *Backend_List_OngoingVerification) GetCapturedArguments() {
+func (c *MockBackend_List_OngoingVerification) GetCapturedArguments() {
 }
 
-func (c *Backend_List_OngoingVerification) GetAllCapturedArguments() {
+func (c *MockBackend_List_OngoingVerification) GetAllCapturedArguments() {
 }
 
-func (verifier *VerifierBackend) GetLock(project models.Project, workspace string) *Backend_GetLock_OngoingVerification {
+func (verifier *VerifierMockBackend) GetLock(project models.Project, workspace string) *MockBackend_GetLock_OngoingVerification {
 	params := []pegomock.Param{project, workspace}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetLock", params, verifier.timeout)
-	return &Backend_GetLock_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+	return &MockBackend_GetLock_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type Backend_GetLock_OngoingVerification struct {
+type MockBackend_GetLock_OngoingVerification struct {
 	mock              *MockBackend
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *Backend_GetLock_OngoingVerification) GetCapturedArguments() (models.Project, string) {
+func (c *MockBackend_GetLock_OngoingVerification) GetCapturedArguments() (models.Project, string) {
 	project, workspace := c.GetAllCapturedArguments()
 	return project[len(project)-1], workspace[len(workspace)-1]
 }
 
-func (c *Backend_GetLock_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Project, _param1 []string) {
+func (c *MockBackend_GetLock_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Project, _param1 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.Project, len(params[0]))
@@ -267,23 +267,23 @@ func (c *Backend_GetLock_OngoingVerification) GetAllCapturedArguments() (_param0
 	return
 }
 
-func (verifier *VerifierBackend) UnlockByPull(repoFullName string, pullNum int) *Backend_UnlockByPull_OngoingVerification {
+func (verifier *VerifierMockBackend) UnlockByPull(repoFullName string, pullNum int) *MockBackend_UnlockByPull_OngoingVerification {
 	params := []pegomock.Param{repoFullName, pullNum}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "UnlockByPull", params, verifier.timeout)
-	return &Backend_UnlockByPull_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+	return &MockBackend_UnlockByPull_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type Backend_UnlockByPull_OngoingVerification struct {
+type MockBackend_UnlockByPull_OngoingVerification struct {
 	mock              *MockBackend
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *Backend_UnlockByPull_OngoingVerification) GetCapturedArguments() (string, int) {
+func (c *MockBackend_UnlockByPull_OngoingVerification) GetCapturedArguments() (string, int) {
 	repoFullName, pullNum := c.GetAllCapturedArguments()
 	return repoFullName[len(repoFullName)-1], pullNum[len(pullNum)-1]
 }
 
-func (c *Backend_UnlockByPull_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []int) {
+func (c *MockBackend_UnlockByPull_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []int) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]string, len(params[0]))

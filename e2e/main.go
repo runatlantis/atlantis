@@ -21,8 +21,8 @@ import (
 
 	"fmt"
 
-	"github.com/google/go-github/github"
-	"github.com/hashicorp/go-multierror"
+	"github.com/google/go-github/v28/github"
+	multierror "github.com/hashicorp/go-multierror"
 )
 
 var defaultAtlantisURL = "http://localhost:4141"

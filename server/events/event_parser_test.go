@@ -21,13 +21,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/github"
-	"github.com/lkysow/go-gitlab"
+	"github.com/google/go-github/v28/github"
+	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/server/events/vcs/fixtures"
 	. "github.com/runatlantis/atlantis/testing"
+	gitlab "github.com/xanzy/go-gitlab"
 )
 
 var parser = events.EventParser{
@@ -38,6 +39,8 @@ var parser = events.EventParser{
 	BitbucketUser:      "bitbucket-user",
 	BitbucketToken:     "bitbucket-token",
 	BitbucketServerURL: "http://mycorp.com:7490",
+	AzureDevopsUser:    "azuredevops-user",
+	AzureDevopsToken:   "azuredevops-token",
 }
 
 func TestParseGithubRepo(t *testing.T) {
@@ -47,7 +50,7 @@ func TestParseGithubRepo(t *testing.T) {
 		Owner:             "owner",
 		FullName:          "owner/repo",
 		CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",
-		SanitizedCloneURL: Repo.GetCloneURL(),
+		SanitizedCloneURL: "https://github-user:<redacted>@github.com/owner/repo.git",
 		Name:              "repo",
 		VCSHost: models.VCSHost{
 			Hostname: "github.com",
@@ -96,7 +99,7 @@ func TestParseGithubIssueCommentEvent(t *testing.T) {
 		Owner:             *comment.Repo.Owner.Login,
 		FullName:          *comment.Repo.FullName,
 		CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",
-		SanitizedCloneURL: *comment.Repo.CloneURL,
+		SanitizedCloneURL: "https://github-user:<redacted>@github.com/owner/repo.git",
 		Name:              "repo",
 		VCSHost: models.VCSHost{
 			Hostname: "github.com",
@@ -134,7 +137,7 @@ func TestParseGithubPullEvent(t *testing.T) {
 		Owner:             "owner",
 		FullName:          "owner/repo",
 		CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",
-		SanitizedCloneURL: Repo.GetCloneURL(),
+		SanitizedCloneURL: "https://github-user:<redacted>@github.com/owner/repo.git",
 		Name:              "repo",
 		VCSHost: models.VCSHost{
 			Hostname: "github.com",
@@ -252,7 +255,7 @@ func TestParseGithubPull(t *testing.T) {
 		Owner:             "owner",
 		FullName:          "owner/repo",
 		CloneURL:          "https://github-user:github-token@github.com/owner/repo.git",
-		SanitizedCloneURL: Repo.GetCloneURL(),
+		SanitizedCloneURL: "https://github-user:<redacted>@github.com/owner/repo.git",
 		Name:              "repo",
 		VCSHost: models.VCSHost{
 			Hostname: "github.com",
@@ -287,7 +290,7 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 	expBaseRepo := models.Repo{
 		FullName:          "lkysow/atlantis-example",
 		Name:              "atlantis-example",
-		SanitizedCloneURL: "https://gitlab.com/lkysow/atlantis-example.git",
+		SanitizedCloneURL: "https://gitlab-user:<redacted>@gitlab.com/lkysow/atlantis-example.git",
 		Owner:             "lkysow",
 		CloneURL:          "https://gitlab-user:gitlab-token@gitlab.com/lkysow/atlantis-example.git",
 		VCSHost: models.VCSHost{
@@ -312,7 +315,7 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 	Equals(t, models.Repo{
 		FullName:          "sourceorg/atlantis-example",
 		Name:              "atlantis-example",
-		SanitizedCloneURL: "https://gitlab.com/sourceorg/atlantis-example.git",
+		SanitizedCloneURL: "https://gitlab-user:<redacted>@gitlab.com/sourceorg/atlantis-example.git",
 		Owner:             "sourceorg",
 		CloneURL:          "https://gitlab-user:gitlab-token@gitlab.com/sourceorg/atlantis-example.git",
 		VCSHost: models.VCSHost{
@@ -344,7 +347,7 @@ func TestParseGitlabMergeEvent_Subgroup(t *testing.T) {
 	expBaseRepo := models.Repo{
 		FullName:          "lkysow-test/subgroup/sub-subgroup/atlantis-example",
 		Name:              "atlantis-example",
-		SanitizedCloneURL: "https://gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
+		SanitizedCloneURL: "https://gitlab-user:<redacted>@gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
 		Owner:             "lkysow-test/subgroup/sub-subgroup",
 		CloneURL:          "https://gitlab-user:gitlab-token@gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
 		VCSHost: models.VCSHost{
@@ -369,7 +372,7 @@ func TestParseGitlabMergeEvent_Subgroup(t *testing.T) {
 	Equals(t, models.Repo{
 		FullName:          "lkysow-test/subgroup/sub-subgroup/atlantis-example",
 		Name:              "atlantis-example",
-		SanitizedCloneURL: "https://gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
+		SanitizedCloneURL: "https://gitlab-user:<redacted>@gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
 		Owner:             "lkysow-test/subgroup/sub-subgroup",
 		CloneURL:          "https://gitlab-user:gitlab-token@gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
 		VCSHost: models.VCSHost{
@@ -440,7 +443,7 @@ func TestParseGitlabMergeRequest(t *testing.T) {
 	repo := models.Repo{
 		FullName:          "gitlabhq/gitlab-test",
 		Name:              "gitlab-test",
-		SanitizedCloneURL: "https://example.com/gitlabhq/gitlab-test.git",
+		SanitizedCloneURL: "https://gitlab-user:<redacted>@example.com/gitlabhq/gitlab-test.git",
 		Owner:             "gitlabhq",
 		CloneURL:          "https://gitlab-user:gitlab-token@example.com/gitlabhq/gitlab-test.git",
 		VCSHost: models.VCSHost{
@@ -479,7 +482,7 @@ func TestParseGitlabMergeRequest_Subgroup(t *testing.T) {
 	repo := models.Repo{
 		FullName:          "lkysow-test/subgroup/sub-subgroup/atlantis-example",
 		Name:              "atlantis-example",
-		SanitizedCloneURL: "https://gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
+		SanitizedCloneURL: "https://gitlab-user:<redacted>@gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
 		Owner:             "lkysow-test/subgroup/sub-subgroup",
 		CloneURL:          "https://gitlab-user:gitlab-token@gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
 		VCSHost: models.VCSHost{
@@ -513,7 +516,7 @@ func TestParseGitlabMergeCommentEvent(t *testing.T) {
 	Equals(t, models.Repo{
 		FullName:          "gitlabhq/gitlab-test",
 		Name:              "gitlab-test",
-		SanitizedCloneURL: "https://example.com/gitlabhq/gitlab-test.git",
+		SanitizedCloneURL: "https://gitlab-user:<redacted>@example.com/gitlabhq/gitlab-test.git",
 		Owner:             "gitlabhq",
 		CloneURL:          "https://gitlab-user:gitlab-token@example.com/gitlabhq/gitlab-test.git",
 		VCSHost: models.VCSHost{
@@ -524,7 +527,7 @@ func TestParseGitlabMergeCommentEvent(t *testing.T) {
 	Equals(t, models.Repo{
 		FullName:          "gitlab-org/gitlab-test",
 		Name:              "gitlab-test",
-		SanitizedCloneURL: "https://example.com/gitlab-org/gitlab-test.git",
+		SanitizedCloneURL: "https://gitlab-user:<redacted>@example.com/gitlab-org/gitlab-test.git",
 		Owner:             "gitlab-org",
 		CloneURL:          "https://gitlab-user:gitlab-token@example.com/gitlab-org/gitlab-test.git",
 		VCSHost: models.VCSHost{
@@ -551,7 +554,7 @@ func TestParseGitlabMergeCommentEvent_Subgroup(t *testing.T) {
 	Equals(t, models.Repo{
 		FullName:          "lkysow-test/subgroup/sub-subgroup/atlantis-example",
 		Name:              "atlantis-example",
-		SanitizedCloneURL: "https://gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
+		SanitizedCloneURL: "https://gitlab-user:<redacted>@gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
 		Owner:             "lkysow-test/subgroup/sub-subgroup",
 		CloneURL:          "https://gitlab-user:gitlab-token@gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
 		VCSHost: models.VCSHost{
@@ -562,7 +565,7 @@ func TestParseGitlabMergeCommentEvent_Subgroup(t *testing.T) {
 	Equals(t, models.Repo{
 		FullName:          "lkysow-test/subgroup/sub-subgroup/atlantis-example",
 		Name:              "atlantis-example",
-		SanitizedCloneURL: "https://gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
+		SanitizedCloneURL: "https://gitlab-user:<redacted>@gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
 		Owner:             "lkysow-test/subgroup/sub-subgroup",
 		CloneURL:          "https://gitlab-user:gitlab-token@gitlab.com/lkysow-test/subgroup/sub-subgroup/atlantis-example.git",
 		VCSHost: models.VCSHost{
@@ -707,7 +710,7 @@ func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {
 		Owner:             "lkysow",
 		Name:              "atlantis-example",
 		CloneURL:          "https://bitbucket-user:bitbucket-token@bitbucket.org/lkysow/atlantis-example.git",
-		SanitizedCloneURL: "https://bitbucket.org/lkysow/atlantis-example.git",
+		SanitizedCloneURL: "https://bitbucket-user:<redacted>@bitbucket.org/lkysow/atlantis-example.git",
 		VCSHost: models.VCSHost{
 			Hostname: "bitbucket.org",
 			Type:     models.BitbucketCloud,
@@ -729,7 +732,7 @@ func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {
 		Owner:             "lkysow-fork",
 		Name:              "atlantis-example",
 		CloneURL:          "https://bitbucket-user:bitbucket-token@bitbucket.org/lkysow-fork/atlantis-example.git",
-		SanitizedCloneURL: "https://bitbucket.org/lkysow-fork/atlantis-example.git",
+		SanitizedCloneURL: "https://bitbucket-user:<redacted>@bitbucket.org/lkysow-fork/atlantis-example.git",
 		VCSHost: models.VCSHost{
 			Hostname: "bitbucket.org",
 			Type:     models.BitbucketCloud,
@@ -765,7 +768,7 @@ func TestParseBitbucketCloudCommentEvent_MultipleStates(t *testing.T) {
 			models.ClosedPullState,
 		},
 		{
-			"DECLINE",
+			"DECLINED",
 			models.ClosedPullState,
 		},
 	}
@@ -781,7 +784,7 @@ func TestParseBitbucketCloudCommentEvent_MultipleStates(t *testing.T) {
 }
 
 func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
-	path := filepath.Join("testdata", "bitbucket-cloud-pull-event-fulfilled.json")
+	path := filepath.Join("testdata", "bitbucket-cloud-pull-event-created.json")
 	bytes, err := ioutil.ReadFile(path)
 	if err != nil {
 		Ok(t, err)
@@ -793,7 +796,7 @@ func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 		Owner:             "lkysow",
 		Name:              "atlantis-example",
 		CloneURL:          "https://bitbucket-user:bitbucket-token@bitbucket.org/lkysow/atlantis-example.git",
-		SanitizedCloneURL: "https://bitbucket.org/lkysow/atlantis-example.git",
+		SanitizedCloneURL: "https://bitbucket-user:<redacted>@bitbucket.org/lkysow/atlantis-example.git",
 		VCSHost: models.VCSHost{
 			Hostname: "bitbucket.org",
 			Type:     models.BitbucketCloud,
@@ -801,13 +804,13 @@ func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 	}
 	Equals(t, expBaseRepo, baseRepo)
 	Equals(t, models.PullRequest{
-		Num:        2,
-		HeadCommit: "e0624da46d3a",
-		URL:        "https://bitbucket.org/lkysow/atlantis-example/pull-requests/2",
-		HeadBranch: "lkysow/maintf-edited-online-with-bitbucket-1532029690581",
+		Num:        16,
+		HeadCommit: "1e69a602caef",
+		URL:        "https://bitbucket.org/lkysow/atlantis-example/pull-requests/16",
+		HeadBranch: "Luke/maintf-edited-online-with-bitbucket-1560433073473",
 		BaseBranch: "master",
-		Author:     "lkysow",
-		State:      models.ClosedPullState,
+		Author:     "Luke",
+		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
 	}, pull)
 	Equals(t, models.Repo{
@@ -815,15 +818,44 @@ func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 		Owner:             "lkysow-fork",
 		Name:              "atlantis-example",
 		CloneURL:          "https://bitbucket-user:bitbucket-token@bitbucket.org/lkysow-fork/atlantis-example.git",
-		SanitizedCloneURL: "https://bitbucket.org/lkysow-fork/atlantis-example.git",
+		SanitizedCloneURL: "https://bitbucket-user:<redacted>@bitbucket.org/lkysow-fork/atlantis-example.git",
 		VCSHost: models.VCSHost{
 			Hostname: "bitbucket.org",
 			Type:     models.BitbucketCloud,
 		},
 	}, headRepo)
 	Equals(t, models.User{
-		Username: "lkysow",
+		Username: "Luke",
 	}, user)
+}
+
+func TestParseBitbucketCloudPullEvent_States(t *testing.T) {
+	for _, c := range []struct {
+		JSON     string
+		ExpState models.PullRequestState
+	}{
+		{
+			JSON:     "bitbucket-cloud-pull-event-created.json",
+			ExpState: models.OpenPullState,
+		},
+		{
+			JSON:     "bitbucket-cloud-pull-event-fulfilled.json",
+			ExpState: models.ClosedPullState,
+		},
+		{
+			JSON:     "bitbucket-cloud-pull-event-rejected.json",
+			ExpState: models.ClosedPullState,
+		},
+	} {
+		path := filepath.Join("testdata", c.JSON)
+		bytes, err := ioutil.ReadFile(path)
+		if err != nil {
+			Ok(t, err)
+		}
+		pull, _, _, _, err := parser.ParseBitbucketCloudPullEvent(bytes)
+		Ok(t, err)
+		Equals(t, c.ExpState, pull.State)
+	}
 }
 
 func TestGetBitbucketCloudEventType(t *testing.T) {
@@ -894,7 +926,7 @@ func TestParseBitbucketServerCommentEvent_ValidEvent(t *testing.T) {
 		Owner:             "atlantis",
 		Name:              "atlantis-example",
 		CloneURL:          "http://bitbucket-user:bitbucket-token@mycorp.com:7490/scm/at/atlantis-example.git",
-		SanitizedCloneURL: "http://mycorp.com:7490/scm/at/atlantis-example.git",
+		SanitizedCloneURL: "http://bitbucket-user:<redacted>@mycorp.com:7490/scm/at/atlantis-example.git",
 		VCSHost: models.VCSHost{
 			Hostname: "mycorp.com",
 			Type:     models.BitbucketServer,
@@ -916,7 +948,7 @@ func TestParseBitbucketServerCommentEvent_ValidEvent(t *testing.T) {
 		Owner:             "atlantis-fork",
 		Name:              "atlantis-example",
 		CloneURL:          "http://bitbucket-user:bitbucket-token@mycorp.com:7490/scm/fk/atlantis-example.git",
-		SanitizedCloneURL: "http://mycorp.com:7490/scm/fk/atlantis-example.git",
+		SanitizedCloneURL: "http://bitbucket-user:<redacted>@mycorp.com:7490/scm/fk/atlantis-example.git",
 		VCSHost: models.VCSHost{
 			Hostname: "mycorp.com",
 			Type:     models.BitbucketServer,
@@ -976,7 +1008,7 @@ func TestParseBitbucketServerPullEvent_ValidEvent(t *testing.T) {
 		Owner:             "atlantis",
 		Name:              "atlantis-example",
 		CloneURL:          "http://bitbucket-user:bitbucket-token@mycorp.com:7490/scm/at/atlantis-example.git",
-		SanitizedCloneURL: "http://mycorp.com:7490/scm/at/atlantis-example.git",
+		SanitizedCloneURL: "http://bitbucket-user:<redacted>@mycorp.com:7490/scm/at/atlantis-example.git",
 		VCSHost: models.VCSHost{
 			Hostname: "mycorp.com",
 			Type:     models.BitbucketServer,
@@ -998,7 +1030,7 @@ func TestParseBitbucketServerPullEvent_ValidEvent(t *testing.T) {
 		Owner:             "atlantis-fork",
 		Name:              "atlantis-example",
 		CloneURL:          "http://bitbucket-user:bitbucket-token@mycorp.com:7490/scm/fk/atlantis-example.git",
-		SanitizedCloneURL: "http://mycorp.com:7490/scm/fk/atlantis-example.git",
+		SanitizedCloneURL: "http://bitbucket-user:<redacted>@mycorp.com:7490/scm/fk/atlantis-example.git",
 		VCSHost: models.VCSHost{
 			Hostname: "mycorp.com",
 			Type:     models.BitbucketServer,
@@ -1041,4 +1073,197 @@ func TestGetBitbucketServerEventType(t *testing.T) {
 			Equals(t, c.exp, act)
 		})
 	}
+}
+
+func TestParseAzureDevopsRepo(t *testing.T) {
+	// this should be successful
+	repo := ADRepo
+	repo.ParentRepository = nil
+	r, err := parser.ParseAzureDevopsRepo(&repo)
+	Ok(t, err)
+	Equals(t, models.Repo{
+		Owner:             "owner/project",
+		FullName:          "owner/project/repo",
+		CloneURL:          "https://azuredevops-user:azuredevops-token@dev.azure.com/owner/project/_git/repo",
+		SanitizedCloneURL: "https://azuredevops-user:<redacted>@dev.azure.com/owner/project/_git/repo",
+		Name:              "repo",
+		VCSHost: models.VCSHost{
+			Hostname: "dev.azure.com",
+			Type:     models.AzureDevops,
+		},
+	}, r)
+
+	// this should be successful
+	repo = ADRepo
+	repo.WebURL = nil
+	r, err = parser.ParseAzureDevopsRepo(&repo)
+	Ok(t, err)
+	Equals(t, models.Repo{
+		Owner:             "owner/project",
+		FullName:          "owner/project/repo",
+		CloneURL:          "https://azuredevops-user:azuredevops-token@dev.azure.com/owner/project/_git/repo",
+		SanitizedCloneURL: "https://azuredevops-user:<redacted>@dev.azure.com/owner/project/_git/repo",
+		Name:              "repo",
+		VCSHost: models.VCSHost{
+			Hostname: "dev.azure.com",
+			Type:     models.AzureDevops,
+		},
+	}, r)
+
+}
+
+func TestParseAzureDevopsPullEvent(t *testing.T) {
+	_, _, _, _, _, err := parser.ParseAzureDevopsPullEvent(ADPullEvent)
+	Ok(t, err)
+
+	testPull := deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull.LastMergeSourceCommit.CommitID = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "lastMergeSourceCommit.commitID is null", err)
+
+	testPull = deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull.URL = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "url is null", err)
+	testEvent := deepcopy.Copy(ADPullEvent).(azuredevops.Event)
+	resource := deepcopy.Copy(testEvent.Resource).(*azuredevops.GitPullRequest)
+	resource.CreatedBy = nil
+	testEvent.Resource = resource
+	_, _, _, _, _, err = parser.ParseAzureDevopsPullEvent(testEvent)
+	ErrEquals(t, "CreatedBy is null", err)
+
+	testEvent = deepcopy.Copy(ADPullEvent).(azuredevops.Event)
+	resource = deepcopy.Copy(testEvent.Resource).(*azuredevops.GitPullRequest)
+	resource.CreatedBy.UniqueName = azuredevops.String("")
+	testEvent.Resource = resource
+	_, _, _, _, _, err = parser.ParseAzureDevopsPullEvent(testEvent)
+	ErrEquals(t, "CreatedBy.UniqueName is null", err)
+
+	actPull, evType, actBaseRepo, actHeadRepo, actUser, err := parser.ParseAzureDevopsPullEvent(ADPullEvent)
+	Ok(t, err)
+	expBaseRepo := models.Repo{
+		Owner:             "owner/project",
+		FullName:          "owner/project/repo",
+		CloneURL:          "https://azuredevops-user:azuredevops-token@dev.azure.com/owner/project/_git/repo",
+		SanitizedCloneURL: "https://azuredevops-user:<redacted>@dev.azure.com/owner/project/_git/repo",
+		Name:              "repo",
+		VCSHost: models.VCSHost{
+			Hostname: "dev.azure.com",
+			Type:     models.AzureDevops,
+		},
+	}
+	Equals(t, expBaseRepo, actBaseRepo)
+	Equals(t, expBaseRepo, actHeadRepo)
+	Equals(t, models.PullRequest{
+		URL:        ADPull.GetURL(),
+		Author:     ADPull.CreatedBy.GetUniqueName(),
+		HeadBranch: "feature/sourceBranch",
+		BaseBranch: "targetBranch",
+		HeadCommit: ADPull.LastMergeSourceCommit.GetCommitID(),
+		Num:        ADPull.GetPullRequestID(),
+		State:      models.OpenPullState,
+		BaseRepo:   expBaseRepo,
+	}, actPull)
+	Equals(t, models.OpenedPullEvent, evType)
+	Equals(t, models.User{Username: "user@example.com"}, actUser)
+}
+
+func TestParseAzureDevopsPullEvent_EventType(t *testing.T) {
+	cases := []struct {
+		action string
+		exp    models.PullRequestEventType
+	}{
+		{
+			action: "git.pullrequest.updated",
+			exp:    models.UpdatedPullEvent,
+		},
+		{
+			action: "git.pullrequest.created",
+			exp:    models.OpenedPullEvent,
+		},
+		{
+			action: "git.pullrequest.updated",
+			exp:    models.ClosedPullEvent,
+		},
+		{
+			action: "anything_else",
+			exp:    models.OtherPullEvent,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.action, func(t *testing.T) {
+			event := deepcopy.Copy(ADPullEvent).(azuredevops.Event)
+			if c.exp == models.ClosedPullEvent {
+				event = deepcopy.Copy(ADPullClosedEvent).(azuredevops.Event)
+			}
+			event.EventType = c.action
+			_, actType, _, _, _, err := parser.ParseAzureDevopsPullEvent(event)
+			Ok(t, err)
+			Equals(t, c.exp, actType)
+		})
+	}
+}
+
+func TestParseAzureDevopsPull(t *testing.T) {
+	testPull := deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull.LastMergeSourceCommit.CommitID = nil
+	_, _, _, err := parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "lastMergeSourceCommit.commitID is null", err)
+
+	testPull = deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull.URL = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "url is null", err)
+
+	testPull = deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull.SourceRefName = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "sourceRefName (branch name) is null", err)
+
+	testPull = deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull.TargetRefName = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "targetRefName (branch name) is null", err)
+
+	testPull = deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull.CreatedBy = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "CreatedBy is null", err)
+
+	testPull = deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull.CreatedBy.UniqueName = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "CreatedBy.UniqueName is null", err)
+
+	testPull = deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull.PullRequestID = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "pullRequestId is null", err)
+
+	actPull, actBaseRepo, actHeadRepo, err := parser.ParseAzureDevopsPull(&ADPull)
+	Ok(t, err)
+	expBaseRepo := models.Repo{
+		Owner:             "owner/project",
+		FullName:          "owner/project/repo",
+		CloneURL:          "https://azuredevops-user:azuredevops-token@dev.azure.com/owner/project/_git/repo",
+		SanitizedCloneURL: "https://azuredevops-user:<redacted>@dev.azure.com/owner/project/_git/repo",
+		Name:              "repo",
+		VCSHost: models.VCSHost{
+			Hostname: "dev.azure.com",
+			Type:     models.AzureDevops,
+		},
+	}
+	Equals(t, models.PullRequest{
+		URL:        ADPull.GetURL(),
+		Author:     ADPull.CreatedBy.GetUniqueName(),
+		HeadBranch: "feature/sourceBranch",
+		BaseBranch: "targetBranch",
+		HeadCommit: ADPull.LastMergeSourceCommit.GetCommitID(),
+		Num:        ADPull.GetPullRequestID(),
+		State:      models.OpenPullState,
+		BaseRepo:   expBaseRepo,
+	}, actPull)
+	Equals(t, expBaseRepo, actBaseRepo)
+	Equals(t, expBaseRepo, actHeadRepo)
 }

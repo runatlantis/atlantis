@@ -19,22 +19,18 @@ debug: ## Output internal make variables
 	@echo WORKSPACE = $(WORKSPACE)
 	@echo PKG = $(PKG)
 
-deps: ## Download dependencies
-	go get -u github.com/golang/dep/cmd/dep
-	dep ensure
-
 build-service: ## Build the main Go service
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o atlantis .
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=vendor -v -o atlantis .
 
 go-generate: ## Run go generate in all packages
 	go generate $(PKG)
 
-#regen-mocks: ## Delete all mocks and matchers and then run go generate to regen them. This doesn't work anymore.
-#find . -type f | grep mocks/mock_ | grep -v vendor | xargs rm
-#find . -type f | grep mocks/matchers | grep -v vendor | xargs rm
-#@# not using $(PKG) here because that it includes directories that have now
-#@# been deleted, causing go generate to fail.
-#echo "this doesn't work anymore: go generate \$\$(go list ./... | grep -v e2e | grep -v vendor | grep -v static)"
+regen-mocks: ## Delete all mocks and matchers and then run go generate to regen them.
+	find . -type f | grep mocks/mock_ | grep -v vendor | xargs rm
+	find . -type f | grep mocks/matchers | grep -v vendor | xargs rm
+	@# not using $(PKG) here because that it includes directories that have now
+	@# been deleted, causing go generate to fail.
+	go list ./... | grep -v e2e | grep -v vendor | grep -v static | xargs go generate
 
 test: ## Run tests
 	@go test -short $(PKG)
@@ -48,14 +44,14 @@ test-coverage:
 
 test-coverage-html:
 	@mkdir -p .cover
-	@go test -covermode atomic -coverprofile .cover/cover.out $(PKG)
+	@go test -covermode atomic -coverpkg $(PKG_COMMAS) -coverprofile .cover/cover.out $(PKG)
 	go tool cover -html .cover/cover.out
 
 dist: ## Package up everything in static/ using go-bindata-assetfs so it can be served by a single binary
 	rm -f server/static/bindata_assetfs.go && go-bindata-assetfs -pkg static -prefix server server/static/... && mv bindata_assetfs.go server/static
 
 release: ## Create packages for a release
-	./scripts/binary-release.sh
+	docker run -v $$(pwd):/go/src/github.com/runatlantis/atlantis circleci/golang:1.13 sh -c 'cd /go/src/github.com/runatlantis/atlantis && scripts/binary-release.sh'
 
 fmt: ## Run goimports (which also formats)
 	goimports -w $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "./server/static/bindata_assetfs.go" ! -path "**/mocks/*")
@@ -68,8 +64,7 @@ check-lint: ## Run linter in CI/CD. If running locally use 'lint'
 	./bin/golangci-lint run
 
 check-fmt: ## Fail if not formatted
-	go get golang.org/x/tools/cmd/goimports
-	goimports -d $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "./server/static/bindata_assetfs.go" ! -path "**/mocks/*")
+	if [[ $$(goimports -l $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "./server/static/bindata_assetfs.go" ! -path "**/mocks/*")) ]]; then exit 1; fi
 
 end-to-end-deps: ## Install e2e dependencies
 	./scripts/e2e-deps.sh

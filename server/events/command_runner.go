@@ -15,14 +15,16 @@ package events
 
 import (
 	"fmt"
-	"github.com/google/go-github/github"
-	"github.com/lkysow/go-gitlab"
+
+	"github.com/google/go-github/v28/github"
+	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/recovery"
+	gitlab "github.com/xanzy/go-gitlab"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_command_runner.go CommandRunner
@@ -44,6 +46,14 @@ type GithubPullGetter interface {
 	GetPullRequest(repo models.Repo, pullNum int) (*github.PullRequest, error)
 }
 
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_azuredevops_pull_getter.go AzureDevopsPullGetter
+
+// AzureDevopsPullGetter makes API calls to get pull requests.
+type AzureDevopsPullGetter interface {
+	// GetPullRequest gets the pull request with id pullNum for the repo.
+	GetPullRequest(repo models.Repo, pullNum int) (*azuredevops.GitPullRequest, error)
+}
+
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_gitlab_merge_request_getter.go GitlabMergeRequestGetter
 
 // GitlabMergeRequestGetter makes API calls to get merge requests.
@@ -56,8 +66,10 @@ type GitlabMergeRequestGetter interface {
 type DefaultCommandRunner struct {
 	VCSClient                vcs.Client
 	GithubPullGetter         GithubPullGetter
+	AzureDevopsPullGetter    AzureDevopsPullGetter
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
 	CommitStatusUpdater      CommitStatusUpdater
+	DisableApplyAll          bool
 	EventParser              EventParsing
 	MarkdownRenderer         *MarkdownRenderer
 	Logger                   logging.SimpleLogging
@@ -140,6 +152,14 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	log := c.buildLogger(baseRepo.FullName, pullNum)
 	defer c.logPanics(baseRepo, pullNum, log)
 
+	if c.DisableApplyAll && cmd.Name == models.ApplyCommand && !cmd.IsForSpecificProject() {
+		log.Info("ignoring apply command without flags since apply all is disabled")
+		if err := c.VCSClient.CreateComment(baseRepo, pullNum, applyAllDisabledComment); err != nil {
+			log.Err("unable to comment on pull request: %s", err)
+		}
+		return
+	}
+
 	var headRepo models.Repo
 	if maybeHeadRepo != nil {
 		headRepo = *maybeHeadRepo
@@ -157,6 +177,8 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 			err = errors.New("pull request should not be nil–this is a bug")
 		}
 		pull = *maybePull
+	case models.AzureDevops:
+		pull, headRepo, err = c.getAzureDevopsData(baseRepo, pullNum)
 	default:
 		err = errors.New("Unknown VCS type–this is a bug")
 	}
@@ -343,6 +365,21 @@ func (c *DefaultCommandRunner) getGitlabData(baseRepo models.Repo, pullNum int) 
 	return pull, nil
 }
 
+func (c *DefaultCommandRunner) getAzureDevopsData(baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {
+	if c.AzureDevopsPullGetter == nil {
+		return models.PullRequest{}, models.Repo{}, errors.New("atlantis not configured to support Azure DevOps")
+	}
+	adPull, err := c.AzureDevopsPullGetter.GetPullRequest(baseRepo, pullNum)
+	if err != nil {
+		return models.PullRequest{}, models.Repo{}, errors.Wrap(err, "making pull request API call to Azure DevOps")
+	}
+	pull, _, headRepo, err := c.EventParser.ParseAzureDevopsPull(adPull)
+	if err != nil {
+		return pull, headRepo, errors.Wrap(err, "extracting required fields from comment data")
+	}
+	return pull, headRepo, nil
+}
+
 func (c *DefaultCommandRunner) buildLogger(repoFullName string, pullNum int) *logging.SimpleLogger {
 	src := fmt.Sprintf("%s#%d", repoFullName, pullNum)
 	return c.Logger.NewLogger(src, true, c.Logger.GetLevel())
@@ -428,9 +465,14 @@ func (c *DefaultCommandRunner) automergeEnabled(ctx *CommandContext, projectCmds
 	// If the global automerge is set, we always automerge.
 	return c.GlobalAutomerge ||
 		// Otherwise we check if this repo is configured for automerging.
-		(len(projectCmds) > 0 && projectCmds[0].GlobalConfig != nil && projectCmds[0].GlobalConfig.Automerge)
+		(len(projectCmds) > 0 && projectCmds[0].AutomergeEnabled)
 }
 
 // automergeComment is the comment that gets posted when Atlantis automatically
 // merges the PR.
 var automergeComment = `Automatically merging because all plans have been successfully applied.`
+
+// applyAllDisabledComment is posted when apply all commands (i.e. "atlantis apply")
+// are disabled and an apply all command is issued.
+var applyAllDisabledComment = "**Error:** Running `atlantis apply` without flags is disabled." +
+	" You must specify which project to apply via the `-d <dir>`, `-w <workspace>` or `-p <project name>` flags."

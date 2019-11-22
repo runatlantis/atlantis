@@ -1,3 +1,395 @@
+# v0.10.1
+
+## Description
+Small release that is built using Go 1.13.3 to mitigate a
+CVE (https://99designs.ca/blog/engineering/request-smuggling/).
+
+## Features
+* Error out when user has an atlantis.yml file (wrong extension, needs .yaml) ([#816](https://github.com/runatlantis/atlantis/pull/816) by @mdcurran)
+
+## Bugfixes
+None
+
+## Backwards Incompatibilities / Notes:
+If you had an `atlantis.yml` file (note the `.yml` extension), previously Atlantis ignored it.
+Now it will error to warn you that it's not being used.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.10.1/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.10.1/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.10.1/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.10.1/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.10.1`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.10.0..v0.10.1
+https://github.com/runatlantis/atlantis/compare/v0.10.0...v0.10.1
+
+# v0.10.0
+
+## Description
+Lots of new features in this release: Azure DevOps support,
+automatic Terraform version detection and private module cloning support.
+All by community contributors!
+
+## Features
+* Support for Azure DevOps ([719](https://github.com/runatlantis/atlantis/pull/719) by @mcdafydd)
+* Support detecting Terraform version from `terraform { required_version = "=<version>" }` block ([#789](https://github.com/runatlantis/atlantis/pull/789) by @kennethtxytqw)
+* Improve `--write-git-creds` command so that it supports ssh private modules ([#799](https://github.com/runatlantis/atlantis/pull/799) by @ImperialXT)
+* Default TF version is now 0.12.12
+* Logo is now bigger on locks listing ([#783](https://github.com/runatlantis/atlantis/pull/783) by @Nuru)
+
+## Bugfixes
+* Fix error when using GitLab with the "Delete source branch" setting (Fixes [#760](https://github.com/runatlantis/atlantis/issues/760))
+* Fix repo whitelist when using wildcard in the middle, ex. `github.com/*-something` (Fixes [#692](https://github.com/runatlantis/atlantis/issues/692) by @dedamico)
+
+## Backwards Incompatibilities / Notes:
+* If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
+  then the default version of Terraform will now be 0.12.12. Simply set the above
+  flag to your desired default version to avoid any issues.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.10.0/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.10.0/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.10.0/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.10.0/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.10.0`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.9.0..v0.10.0
+https://github.com/runatlantis/atlantis/compare/v0.9.0...v0.10.0
+
+# v0.9.0
+
+## Description
+This release contains a new step for custom workflows called `env`. It allows
+users to set environment variables statically and dynamically for their workflows:
+```yaml
+workflows:
+  env:
+    plan:
+      steps:
+      - env:
+          name: STATIC
+          value: set-statically
+      - env:
+          name: DYNAMIC
+          command: echo set-dynamically
+      - run: echo $STATIC $DYNAMIC # outputs 'set-statically set-dynamically'
+```
+
+## Features
+* New `env` step in custom workflows ([#751](https://github.com/runatlantis/atlantis/pull/751))
+* New flag `--write-git-creds` helps Atlantis support private module sources. ([#711](https://github.com/runatlantis/atlantis/pull/711))
+* Upgrade Terraform to 0.12.7 in our base Docker image.
+* Support for Terragrunt > 0.19.0 ([#748](https://github.com/runatlantis/atlantis/pull/748))
+* The directory where Atlantis downloads Terraform binaries is now in the PATH
+of custom workflows ([#678](https://github.com/runatlantis/atlantis/pull/678)) 
+* `dumb-init` and `gosu` upgraded in our Docker image ([#730](https://github.com/runatlantis/atlantis/pull/730))
+
+## Bugfixes
+* The Terraform version specified in `terraform_version` is now downloaded even
+if there are only custom steps (Fixes [#675](https://github.com/runatlantis/atlantis/issues/675))
+
+## Backwards Incompatibilities / Notes:
+* If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
+  then the default version of Terraform will now be 0.12.7. Simply set the above
+  flag to your desired default version to avoid any issues.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.9.0/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.9.0/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.9.0/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.9.0/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.9.0`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.8.3..v0.9.0
+https://github.com/runatlantis/atlantis/compare/v0.8.3...v0.9.0
+
+# v0.8.3
+
+## Description
+This release contains an important security fix in addition to some fixes and
+changes for Terraform Cloud/Enterprise users. It's highly recommended that all
+Atlantis users upgrade to this release. See the Security
+section below for more details.
+
+## Security
+* Additional arguments specified in Atlantis comments, ex. `atlantis plan -- -var=foo=bar`
+  are now escaped before being appended to the relevant Terraform command. (Fixes [#697](https://github.com/runatlantis/atlantis/pull/697)).
+  Previously, a comment like `atlantis plan -- -var=$(touch foo)` would execute
+  the `touch foo` command because the extra arguments weren't being escaped properly.
+  This means anyone with comment access to an Atlantis repo could execute arbitrary
+  code. Because of the severity of this issue, all users should upgrade to this version.
+* Upgrade to latest version of Alpine Linux in our Docker image to mitigate
+  vulnerabilities found in libssh2. (Fixes [#687](https://github.com/runatlantis/atlantis/issues/687))
+
+## Features
+* Upgrade Terraform to 0.12.3 in our base Docker image.
+* Additional arguments specified in Atlantis comments, ex. `atlantis plan -- -var=foo=bar`
+  are now available in custom run steps as the `COMMENT_ARGS` environment variable. (Fixes [#670](https://github.com/runatlantis/atlantis/issues/670))
+* A new flag `--tfe-hostname` is available for specifying a Terraform Enterprise private installation's hostname
+  when using the remote backend integration. ([#706](https://github.com/runatlantis/atlantis/pull/706))
+
+## Bugfixes
+* Parse Bitbucket Cloud pull request rejected events properly. (Fixes [#676](https://github.com/runatlantis/atlantis/issues/676))
+* Terraform >= 0.12.0 works with Terraform Cloud/Enterprise remote operations. (Fixes [#704](https://github.com/runatlantis/atlantis/issues/704))
+
+## Backwards Incompatibilities / Notes:
+* If you were previously relying on being able to execute code in the additional
+  arguments of comments, ex. `atlantis plan -- -var='foo=$(echo $SECRET)'` this
+  is no longer possible. Instead you will need to write a custom workflow with a
+  custom step or the extra_args config.
+* If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
+  then the default version of Terraform will now be 0.12.3. Simply set the above
+  flag to your desired default version to avoid any issues.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.3/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.3/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.3/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.3/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.8.3`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.8.2..v0.8.3
+https://github.com/runatlantis/atlantis/compare/v0.8.2...v0.8.3
+
+# v0.8.2
+
+## Description
+Small bugfix release for Bitbucket Cloud users running with "require mergeable".
+
+## Features
+* Update default Terraform version to 0.12.1.
+* Include directory in Slack message ([#660](https://github.com/runatlantis/atlantis/issues/660)).
+
+## Bugfixes
+* Atlantis would not allow applies for all Bitbucket Cloud pull requests if running with "require mergeable" 
+  even if the pull request *was* mergeable due to an API change. (Fixes [#672](https://github.com/runatlantis/atlantis/issues/672))
+
+## Backwards Incompatibilities / Notes:
+* If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
+  then the default version of Terraform will now be 0.12.1. Simply set the above
+  flag to your desired default version to avoid any issues.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.2/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.2/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.2/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.2/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.8.2`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.8.1..v0.8.2
+https://github.com/runatlantis/atlantis/compare/v0.8.1...v0.8.2
+
+# v0.8.1
+
+## Description
+Small bugfix release for Bitbucket Cloud users running with require approval.
+
+## Features
+None
+
+## Bugfixes
+* Atlantis would panic when checking if pull requests were approved for Bitbucket
+  Cloud due to an API change. (Fixes [#652](https://github.com/runatlantis/atlantis/issues/652))
+
+## Backwards Incompatibilities / Notes:
+None
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.1/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.1/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.1/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.1/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.8.1`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.8.0..v0.8.1
+https://github.com/runatlantis/atlantis/compare/v0.8.0...v0.8.1
+
+# v0.8.0
+
+## Description
+This release upgrades the default version of Terraform to 0.12.
+If you're running Atlantis with the `--default-tf-version` flag set (which
+you always should) then this won't affect you at all.
+
+## Features
+* Upgrade default Terraform version to 0.12
+* Add new `--disable-apply-all` flag that disables running `atlantis apply`
+  without any flags. ([#645](https://github.com/runatlantis/atlantis/pull/645))
+
+## Bugfixes
+None
+
+## Backwards Incompatibilities / Notes:
+* If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
+  then the default version of Terraform will now be 0.12. Simply set the above
+  flag to your desired default version of Terraform and 0.12 won't be used.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.0/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.0/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.0/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.8.0/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.8.0`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.7.2..v0.8.0
+https://github.com/runatlantis/atlantis/compare/v0.7.2...v0.8.0
+
+# v0.7.2
+
+## Description
+Small release containing an important security fix and some bugfixes.
+
+## Features
+None
+
+## Bugfixes
+* Atlantis would post its Git credentials as pull request comment and in logs if the git clone failed. (Fixes [#615](https://github.com/runatlantis/atlantis/issues/615))
+* Atlantis would comment the same output twice during errors of custom run steps. (Fixes [#519](https://github.com/runatlantis/atlantis/issues/519))
+* `atlantis testdrive` had unreadable output on solarized terminals. (Fixes [#575](https://github.com/runatlantis/atlantis/issues/575))
+
+## Backwards Incompatibilities / Notes:
+None
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.7.2/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.7.2/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.7.2/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.7.2/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.7.2`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.7.1..v0.7.2
+https://github.com/runatlantis/atlantis/compare/v0.7.1...v0.7.2
+
+# v0.7.1
+
+## Description
+Small bugfix release to fix an issue when using `--checkout-strategy=merge`.
+
+## Features
+* `PROJECT_NAME` is now available as an environment variable to custom `run` steps. ([#578](https://github.com/runatlantis/atlantis/pull/578))
+
+## Bugfixes
+* Fix deleting unapplied plans when `--checkout-strategy=merge` is used. (Fixes [#582](https://github.com/runatlantis/atlantis/issues/582))
+
+## Backwards Incompatibilities / Notes:
+None
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.7.1/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.7.1/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.7.1/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.7.1/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.7.1`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.7.0..v0.7.1
+https://github.com/runatlantis/atlantis/compare/v0.7.0...v0.7.1
+
+# v0.7.0
+
+## Description
+This release implements Server-Side Repo Config which allows users to write
+`atlantis.yaml`-style config on the server rather than in individual repos.
+The Server Side config also allow Atlantis operators to control what individual
+repos can do in their `atlantis.yaml` files. Read [docs](https://www.runatlantis.io/docs/server-side-repo-config.html) for more details.
+
+## Features
+* Server-Side Repo Config. Read [docs](https://www.runatlantis.io/docs/server-side-repo-config.html)
+  and [use cases](https://www.runatlantis.io/docs/server-side-repo-config.html#use-cases) for full details. ([#47](https://github.com/runatlantis/atlantis/issues/47))
+  * New flag `atlantis server` flag `--repo-config` for specifying the
+    repo config file .
+  * New flag `--repo-config-json` for specifying the repo config as a JSON string
+    instead of having to write a config file to disk.
+  * All repos can now create `atlantis.yaml` files to configure their projects,
+    however by default, those files can't create custom workflows or set Apply
+    Requirements.
+* New version `3` of `atlantis.yaml` fixes a small issue with how we were parsing
+  custom `run` steps. Previously we were doing additional parsing which caused some
+  users to have to add extra escaping to their commands. Now this is no longer
+  required. See the Backwards Compatibility section for more details.
+
+## Bugfixes
+* Fix bug where running `atlantis apply` to apply all outstanding plans wouldn't work if
+  you had more than one project defined in the exact same directory and workspace. (Fixes [#365](https://github.com/runatlantis/atlantis/issues/365))
+
+## Backwards Incompatibilities / Notes:
+* The server-side config changes are fully backwards compatible. The biggest
+  difference is that all repos can now create `atlantis.yaml` files, but without
+  being able to create custom workflows or set apply requirements. This will
+  allow users to configure their projects, workspaces and terraform versions
+  at a repo level without enabling those repos to run custom code or circumvent
+  apply requirements set server-side.
+* `atlantis.yaml` has a new version `3`. If you continue to use version `2`, you
+  will experience no changes. If you want to upgrade to version `3`, then
+  if you're not using any custom `run` steps in your workflows you can upgrade
+  the version number without additional changes.
+  
+  If you are using `run` steps, check our [upgrade guide](https://www.runatlantis.io/docs/upgrading-atlantis-yaml.html#upgrading-from-v2-to-v3)
+  to see if you need to make any changes before upgrading.
+* Flags `--require-approval`, `--require-mergeable` and `--allow-repo-config` are
+  deprecated in favour of creating a server-side repo config file that applies
+  the same configuration. If you run `atlantis server` with those flags, a
+  deprecation warning will be printed telling you what server-side config is
+  recommended instead.
+* If you have projects configured with the same directory and workspace (which means
+  you're probably using the `-backend-config` flag) **and** their names contain `/`'s,
+  then you'll have to re-run `atlantis plan` after upgrading if you had any unapplied plans.
+  
+  An example of what config would mean you need to re-plan:
+  ```yaml
+  projects:
+  - name: name/with/slashes
+    dir: samedir
+    workflow: a
+  - name: another/with/slashes
+    dir: samedir
+    workflow: b
+  a:
+     plan:
+       steps:
+       - run: rm -rf .terraform
+       - init:
+           extra_args: [-backend-config=staging.backend.tfvars]
+       - plan
+  b:
+     plan:
+       steps:
+       - run: rm -rf .terraform
+       - init:
+           extra_args: [-backend-config=staging.backend.tfvars]
+       - plan
+  ```
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.7.0/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.7.0/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.7.0/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.7.0/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.7.0`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.6.0..v0.7.0
+https://github.com/runatlantis/atlantis/compare/v0.6.0...v0.7.0
+
 # v0.6.0
 
 ## Description
@@ -808,7 +1200,7 @@ when new commits are pushed to the pull request.
 
 ## Backwards Incompatibilities / Notes:
 - The old `atlantis.yaml` config file format is not supported. You will need to migrate to the new config
-format, see: https://www.runatlantis.io/docs/upgrading-atlantis-yaml-to-version-2.html
+format, see: https://www.runatlantis.io/docs/upgrading-atlantis-yaml.html
 - To use the new config file, you must run Atlantis with `--allow-repo-config`.
 - Atlantis will now try to automatically plan. To disable this, you'll need to create an `atlantis.yaml` file
 as follows:

@@ -47,13 +47,13 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 				TerraformExecutor: terraform,
 				DefaultTFVersion:  tfVersion,
 			}
-			When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+			When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 				ThenReturn("output", nil)
 
 			output, err := iso.Run(models.ProjectCommandContext{
 				Workspace:  "workspace",
 				RepoRelDir: ".",
-			}, []string{"extra", "args"}, "/path")
+			}, []string{"extra", "args"}, "/path", map[string]string(nil))
 			Ok(t, err)
 			// When there is no error, should not return init output to PR.
 			Equals(t, "", output)
@@ -63,7 +63,7 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 			if c.expCmd == "get" {
 				expArgs = []string{c.expCmd, "-no-color", "-upgrade", "extra", "args"}
 			}
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, "/path", expArgs, tfVersion, "workspace")
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, "/path", expArgs, map[string]string(nil), tfVersion, "workspace")
 		})
 	}
 }
@@ -72,7 +72,7 @@ func TestRun_ShowInitOutputOnError(t *testing.T) {
 	// If there was an error during init then we want the output to be returned.
 	RegisterMockTestingT(t)
 	tfClient := mocks.NewMockClient()
-	When(tfClient.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(tfClient.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", errors.New("error"))
 
 	tfVersion, _ := version.NewVersion("0.11.0")
@@ -84,7 +84,7 @@ func TestRun_ShowInitOutputOnError(t *testing.T) {
 	output, err := iso.Run(models.ProjectCommandContext{
 		Workspace:  "workspace",
 		RepoRelDir: ".",
-	}, nil, "/path")
+	}, nil, "/path", map[string]string(nil))
 	ErrEquals(t, "error", err)
 	Equals(t, "output", output)
 }

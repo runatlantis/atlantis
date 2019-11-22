@@ -1,8 +1,8 @@
 # Deployment
-This doc covers getting Atlantis up and running in your infrastructure.
+This page covers getting Atlantis up and running in your infrastructure.
 
-::: tip Pre-Requisites
-* You have created an [access credential](access-credentials.html)
+::: tip Prerequisites
+* You have created [access credentials](access-credentials.html) for your Atlantis user
 * You have created a [webhook secret](webhook-secrets.html)
 :::
 
@@ -16,8 +16,8 @@ Atlantis [Docker image](https://hub.docker.com/r/runatlantis/atlantis/).
 
 ### Routing
 Atlantis and your Git host need to be able to route and communicate with one another. Your Git host needs to be able to send webhooks to Atlantis and Atlantis needs to be able to make API calls to your Git host.
-If you're using 
-a public Git host like GitHub.com, GitLab.com or Bitbucket.org then you'll need to
+If you're using
+a public Git host like github.com, gitlab.com, bitbucket.org, or dev.azure.com then you'll need to
 expose Atlantis to the internet.
 
 If you're using a private Git host like GitHub Enterprise, GitLab Enterprise or
@@ -34,6 +34,7 @@ for Atlantis.
 Pick your deployment type:
 * [Kubernetes Helm Chart](#kubernetes-helm-chart)
 * [Kubernetes Manifests](#kubernetes-manifests)
+* [Kustomize](#kubernetes-kustomize)
 * [OpenShift](#openshift)
 * [AWS Fargate](#aws-fargate)
 * [Google Kubernetes Engine (GKE)](#google-kubernetes-engine-gke)
@@ -100,13 +101,16 @@ up upgrading Atlantis by accident!
 for your Terraform repos. See [Repo Whitelist](server-configuration.html#repo-whitelist) for more details.
 3. If you're using GitHub:
     1. Replace `<YOUR_GITHUB_USER>` with the username of your Atlantis GitHub user without the `@`.
-    2. Delete all the `ATLANTIS_GITLAB_*` and `ATLANTIS_BITBUCKET_*` environment variables.
+    2. Delete all the `ATLANTIS_GITLAB_*`, `ATLANTIS_BITBUCKET_*`, and `ATLANTIS_AZUREDEVOPS_*` environment variables.
 4. If you're using GitLab:
     1. Replace `<YOUR_GITLAB_USER>` with the username of your Atlantis GitLab user without the `@`.
-    2. Delete all the `ATLANTIS_GH_*` and `ATLANTIS_BITBUCKET_*` environment variables.
+    2. Delete all the `ATLANTIS_GH_*`, `ATLANTIS_BITBUCKET_*`, and `ATLANTIS_AZUREDEVOPS_*` environment variables.
 5. If you're using Bitbucket:
     1. Replace `<YOUR_BITBUCKET_USER>` with the username of your Atlantis Bitbucket user without the `@`.
-    2. Delete all the `ATLANTIS_GH_*` and `ATLANTIS_GITLAB_*` environment variables.
+    2. Delete all the `ATLANTIS_GH_*`, `ATLANTIS_GITLAB_*`, and `ATLANTIS_AZUREDEVOPS_*` environment variables.
+6. If you're using Azure DevOps:
+    1. Replace `<YOUR_AZUREDEVOPS_USER>` with the username of your Atlantis Azure DevOps user without the `@`.
+    2. Delete all the `ATLANTIS_GH_*`, `ATLANTIS_GITLAB_*`, and `ATLANTIS_BITBUCKET_*` environment variables.
 
 #### StatefulSet Manifest
 <details>
@@ -181,6 +185,26 @@ spec:
               key: token
         ### End Bitbucket Config ###
 
+        ### Azure DevOps Config ###
+        - name: ATLANTIS_AZUREDEVOPS_USER
+          value: <YOUR_AZUREDEVOPS_USER> # 6i. If you're using Azure DevOps replace <YOUR_AZUREDEVOPS_USER> with the username of your Atlantis Azure DevOps user without the `@`.
+        - name: ATLANTIS_AZUREDEVOPS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: token
+        - name: ATLANTIS_AZUREDEVOPS_WEBHOOK_USER
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: basic-user
+        - name: ATLANTIS_AZUREDEVOPS_WEBHOOK_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: basic-password
+        ### End Azure DevOps Config ###
+
         - name: ATLANTIS_DATA_DIR
           value: /atlantis
         - name: ATLANTIS_PORT
@@ -230,6 +254,7 @@ kind: Service
 metadata:
   name: atlantis
 spec:
+  type: ClusterIP
   ports:
   - name: atlantis
     port: 80
@@ -308,6 +333,26 @@ spec:
               key: token
         ### End Bitbucket Config ###
 
+        ### Azure DevOps Config ###
+        - name: ATLANTIS_AZUREDEVOPS_USER
+          value: <YOUR_AZUREDEVOPS_USER> # 6i. If you're using Azure DevOps replace <YOUR_AZUREDEVOPS_USER> with the username of your Atlantis Azure DevOps user without the `@`.
+        - name: ATLANTIS_AZUREDEVOPS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: token
+        - name: ATLANTIS_AZUREDEVOPS_WEBHOOK_USER
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: basic-user
+        - name: ATLANTIS_AZUREDEVOPS_WEBHOOK_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: basic-password
+        ### End Azure DevOps Config ###
+
         - name: ATLANTIS_PORT
           value: "4141" # Kubernetes sets an ATLANTIS_PORT variable so we need to override.
         ports:
@@ -342,6 +387,7 @@ kind: Service
 metadata:
   name: atlantis
 spec:
+  type: ClusterIP
   ports:
   - name: atlantis
     port: 80
@@ -352,8 +398,8 @@ spec:
 </details>
 
 #### Routing and SSL
-The manifests above create a Kubernetes `Service` of type `ClusterIP` which isn't accessible outside your cluster.
-Depending on how you're doing routing into Kubernetes, you may want to use a `LoadBalancer` so that Atlantis is accessible
+The manifests above create a Kubernetes `Service` of `type: ClusterIP` which isn't accessible outside your cluster.
+Depending on how you're doing routing into Kubernetes, you may want to use a Service of `type: LoadBalancer` so that Atlantis is accessible
 to GitHub/GitLab and your internal users.
 
 If you want to add SSL you can use something like [https://github.com/jetstack/cert-manager](https://github.com/jetstack/cert-manager) to generate SSL
@@ -362,9 +408,86 @@ You could also set up SSL at your LoadBalancer.
 
 **You're done! See [Next Steps](#next-steps) for what to do next.**
 
+### Kubernetes Kustomize
+
+A `kustomization.yaml` file is rovided at in the direpctory `kustomize/`, so you may use this repository as a remote target.
+
+Example:
+```yaml
+resources:
+- github.com/runatlantis/atlantis/kustomize
+```
+
+**Important:** You must ensure you patch the provided manifests with the correct environment variables for your installation, such as the following:
+
+#### Required
+```yaml
+...
+ containers:
+  - name: atlantis
+    env:
+      - name: ATLANTIS_REPO_WHITELIST
+        value: github.com/yourorg/* # 2. Replace this with your own repo whitelist.
+```
+
+#### GitLab
+```yaml
+...
+containers:
+- name: atlantis
+  env:
+    - name: ATLANTIS_GITLAB_USER
+      value: <YOUR_GITLAB_USER> # 4i. If you're using GitLab replace <YOUR_GITLAB_USER> with the username of your Atlantis GitLab user without the `@`.
+    - name: ATLANTIS_GITLAB_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: atlantis-vcs
+          key: token
+    - name: ATLANTIS_GITLAB_WEBHOOK_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: atlantis-vcs
+          key: webhook-secret
+```
+#### GitHub
+
+```yaml
+...
+containers:
+- name: atlantis
+  env:
+    - name: ATLANTIS_GH_USER
+      value: <YOUR_GITHUB_USER> # 3i. If you're using GitHub replace <YOUR_GITHUB_USER> with the username of your Atlantis GitHub user without the `@`.
+    - name: ATLANTIS_GH_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: atlantis-vcs
+          key: token
+    - name: ATLANTIS_GH_WEBHOOK_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: atlantis-vcs
+          key: webhook-secret
+```
+
+#### BitBucket
+```yaml
+...
+containers:
+- name: atlantis
+  env:
+    - name: ATLANTIS_BITBUCKET_USER
+          value: <YOUR_BITBUCKET_USER> # 5i. If you're using Bitbucket replace <YOUR_BITBUCKET_USER> with the username of your Atlantis Bitbucket user without the `@`.
+    - name: ATLANTIS_BITBUCKET_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: atlantis-vcs
+          key: token
+```
+
 ### OpenShift
 The Helm chart and Kubernetes manifests above are compatible with OpenShift, however you need to run
-with an additional environment variable: `ATLANTIS_DATA_DIR=/home/atlantis`. This is required because
+with an additional environment variable: `HOME=/home/atlantis`. This is required because
 OpenShift runs Docker images with random user id's that use `/` as their home directory.
 
 ### AWS Fargate
@@ -391,7 +514,7 @@ If you need to modify the Docker image that we provide, for instance to add the 
     FROM runatlantis/atlantis:{latest version}
 
     # copy a terraform binary of the version you need
-    COPY terragrunt /usr/local/bin/terrgrunt
+    COPY terragrunt /usr/local/bin/terragrunt
     ```
 
 1. Build your Docker image
@@ -404,25 +527,15 @@ If you need to modify the Docker image that we provide, for instance to add the 
     docker run {YOUR_DOCKER_ORG}/atlantis-custom server --gh-user=GITHUB_USERNAME --gh-token=GITHUB_TOKEN
     ```
 
+### Microsoft Azure
+The standard [Kubernetes Helm Chart](#kubernetes-helm-chart) should work fine on [Azure Kubernetes Service](https://docs.microsoft.com/en-us/azure/aks/intro-kubernetes).
+
+Another option is [Azure Container Instances](https://docs.microsoft.com/en-us/azure/container-instances/). See this community member's [repo](https://github.com/jplane/atlantis-on-aci) for install scripts and more information on running Atlantis on ACI.
+
 ### Roll Your Own
-If you're deploying Atlantis into infrastructure not listed above, here's what
-Atlantis needs in its environment.
-
-#### Terraform
-The `terraform` binary needs to be in the `$PATH` for Atlantis.
-Download from https://www.terraform.io/downloads.html
-```bash
-unzip path/to/terraform_*.zip -d /usr/local/bin
-```
-Check that it's in your `$PATH`
-```
-$ terraform version
-Terraform v0.10.0
-```
-If you want to use a different version of Terraform see [Terraform Versions](requirements.html#terraform-versions)
-
-#### Atlantis Binary
-Get the latest release from [https://github.com/runatlantis/atlantis/releases](https://github.com/runatlantis/atlantis/releases) and unpackage it.
+If you want to roll your own Atlantis installation, you can get the `atlantis`
+binary from [https://github.com/runatlantis/atlantis/releases](https://github.com/runatlantis/atlantis/releases)
+or use the [official Docker image](https://hub.docker.com/r/runatlantis/atlantis/).
 
 #### Startup Command
 The exact flags to `atlantis server` depends on your Git host:
@@ -492,14 +605,30 @@ atlantis server \
 --repo-whitelist="$REPO_WHITELIST"
 ```
 
+##### Azure DevOps
+
+A certificate and private key are required if using Basic authentication for webhooks.
+
+```bash
+atlantis server \
+--atlantis-url="$URL" \
+--azuredevops-user="$USERNAME" \
+--azuredevops-token="$TOKEN" \
+--azuredevops-webhook-user="$ATLANTIS_AZUREDEVOPS_WEBHOOK_USER" \
+--azuredevops-webhook-password="$ATLANTIS_AZUREDEVOPS_WEBHOOK_PASSWORD" \
+--repo-whitelist="$REPO_WHITELIST"
+--ssl-cert-file=file.crt
+--ssl-key-file=file.key
+```
+
 Where
 - `$URL` is the URL that Atlantis can be reached at
-- `$USERNAME` is the GitHub/GitLab/Bitbucket username you generated the token for
+- `$USERNAME` is the GitHub/GitLab/Bitbucket/AzureDevops username you generated the token for
 - `$TOKEN` is the access token you created. If you don't want this to be passed
   in as an argument for security reasons you can specify it in a config file
    (see [Configuration](/docs/server-configuration.html#environment-variables))
     or as an environment variable: `ATLANTIS_GH_TOKEN` or `ATLANTIS_GITLAB_TOKEN`
-     or `ATLANTIS_BITBUCKET_TOKEN`
+     or `ATLANTIS_BITBUCKET_TOKEN` or `ATLANTIS_AZUREDEVOPS_TOKEN`
 - `$SECRET` is the random key you used for the webhook secret.
    If you don't want this to be passed in as an argument for security reasons
     you can specify it in a config file
@@ -511,7 +640,7 @@ Where
 
 Atlantis is now running!
 ::: tip
-We recommend running it under something like Systemd or Supervisord. That will
+We recommend running it under something like Systemd or Supervisord that will
 restart it in case of failure.
 :::
 

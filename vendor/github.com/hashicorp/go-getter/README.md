@@ -128,14 +128,14 @@ go-getter will first download the URL specified _before_ the double-slash
 path after the double slash into the target directory.
 
 For example, if you're downloading this GitHub repository, but you only
-want to download the `test-fixtures` directory, you can do the following:
+want to download the `testdata` directory, you can do the following:
 
 ```
-https://github.com/hashicorp/go-getter.git//test-fixtures
+https://github.com/hashicorp/go-getter.git//testdata
 ```
 
 If you downloaded this to the `/tmp` directory, then the file
-`/tmp/archive.gz` would exist. Notice that this file is in the `test-fixtures`
+`/tmp/archive.gz` would exist. Notice that this file is in the `testdata`
 directory in this repository, but because we specified a subdirectory,
 go-getter automatically copied only that directory contents.
 
@@ -279,6 +279,16 @@ None
   
   * `depth` - The Git clone depth. The provided number specifies the last `n`
     revisions to clone from the repository.
+
+
+The `git` getter accepts both URL-style SSH addresses like
+`git::ssh://git@example.com/foo/bar`, and "scp-style" addresses like
+`git::git@example.com/foo/bar`. In the latter case, omitting the `git::`
+force prefix is allowed if the username prefix is exactly `git@`.
+
+The "scp-style" addresses _cannot_ be used in conjunction with the `ssh://`
+scheme prefix, because in that case the colon is used to mark an optional
+port number to connect on, rather than to delimit the path from the host.
 
 ### Mercurial (`hg`)
 

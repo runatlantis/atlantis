@@ -46,60 +46,60 @@ func (mock *MockProjectLocker) TryLock(log *logging.SimpleLogger, pull models.Pu
 	return ret0, ret1
 }
 
-func (mock *MockProjectLocker) VerifyWasCalledOnce() *VerifierProjectLocker {
-	return &VerifierProjectLocker{
+func (mock *MockProjectLocker) VerifyWasCalledOnce() *VerifierMockProjectLocker {
+	return &VerifierMockProjectLocker{
 		mock:                   mock,
 		invocationCountMatcher: pegomock.Times(1),
 	}
 }
 
-func (mock *MockProjectLocker) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierProjectLocker {
-	return &VerifierProjectLocker{
+func (mock *MockProjectLocker) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockProjectLocker {
+	return &VerifierMockProjectLocker{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockProjectLocker) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierProjectLocker {
-	return &VerifierProjectLocker{
+func (mock *MockProjectLocker) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockProjectLocker {
+	return &VerifierMockProjectLocker{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 		inOrderContext:         inOrderContext,
 	}
 }
 
-func (mock *MockProjectLocker) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierProjectLocker {
-	return &VerifierProjectLocker{
+func (mock *MockProjectLocker) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockProjectLocker {
+	return &VerifierMockProjectLocker{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 		timeout:                timeout,
 	}
 }
 
-type VerifierProjectLocker struct {
+type VerifierMockProjectLocker struct {
 	mock                   *MockProjectLocker
 	invocationCountMatcher pegomock.Matcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }
 
-func (verifier *VerifierProjectLocker) TryLock(log *logging.SimpleLogger, pull models.PullRequest, user models.User, workspace string, project models.Project) *ProjectLocker_TryLock_OngoingVerification {
+func (verifier *VerifierMockProjectLocker) TryLock(log *logging.SimpleLogger, pull models.PullRequest, user models.User, workspace string, project models.Project) *MockProjectLocker_TryLock_OngoingVerification {
 	params := []pegomock.Param{log, pull, user, workspace, project}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "TryLock", params, verifier.timeout)
-	return &ProjectLocker_TryLock_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+	return &MockProjectLocker_TryLock_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type ProjectLocker_TryLock_OngoingVerification struct {
+type MockProjectLocker_TryLock_OngoingVerification struct {
 	mock              *MockProjectLocker
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *ProjectLocker_TryLock_OngoingVerification) GetCapturedArguments() (*logging.SimpleLogger, models.PullRequest, models.User, string, models.Project) {
+func (c *MockProjectLocker_TryLock_OngoingVerification) GetCapturedArguments() (*logging.SimpleLogger, models.PullRequest, models.User, string, models.Project) {
 	log, pull, user, workspace, project := c.GetAllCapturedArguments()
 	return log[len(log)-1], pull[len(pull)-1], user[len(user)-1], workspace[len(workspace)-1], project[len(project)-1]
 }
 
-func (c *ProjectLocker_TryLock_OngoingVerification) GetAllCapturedArguments() (_param0 []*logging.SimpleLogger, _param1 []models.PullRequest, _param2 []models.User, _param3 []string, _param4 []models.Project) {
+func (c *MockProjectLocker_TryLock_OngoingVerification) GetAllCapturedArguments() (_param0 []*logging.SimpleLogger, _param1 []models.PullRequest, _param2 []models.User, _param3 []string, _param4 []models.Project) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]*logging.SimpleLogger, len(params[0]))

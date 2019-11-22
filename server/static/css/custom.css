@@ -1,8 +1,14 @@
 .container {
   max-width: 1000px; }
 .header {
-  margin-top: 6rem;
+  margin-top: 2.5vh;
   text-align: center; }
+img.hero {
+  height: 20vh;
+  max-height: 240px;
+  width: auto;
+  max-width: 241px
+}
 .heading-font-size {
   font-size: 1.2rem;
   color: #999;
@@ -57,8 +63,6 @@ tbody {
 
 /* Larger than phone */
 @media (min-width: 550px) {
-  .header {
-    margin-top: 10rem; }
   .value-props {
     margin-top: 9rem;
     margin-bottom: 7rem; }

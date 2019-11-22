@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/runtime"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_pending_plan_finder.go PendingPlanFinder
@@ -29,7 +30,8 @@ type PendingPlan struct {
 	// the plan is for.
 	RepoRelDir string
 	// Workspace is the workspace this plan should execute in.
-	Workspace string
+	Workspace   string
+	ProjectName string
 }
 
 // Find finds all pending plans in pullDir. pullDir should be the working
@@ -67,11 +69,15 @@ func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPl
 					continue
 				}
 
-				repoRelDir := filepath.Dir(file)
+				projectName, err := runtime.ProjectNameFromPlanfile(workspace, filepath.Base(file))
+				if err != nil {
+					return nil, nil, err
+				}
 				plans = append(plans, PendingPlan{
-					RepoDir:    repoDir,
-					RepoRelDir: repoRelDir,
-					Workspace:  workspace,
+					RepoDir:     repoDir,
+					RepoRelDir:  filepath.Dir(file),
+					Workspace:   workspace,
+					ProjectName: projectName,
 				})
 				absPaths = append(absPaths, filepath.Join(repoDir, file))
 			}

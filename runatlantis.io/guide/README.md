@@ -1,8 +1,9 @@
 # Introduction
 
-## Try it out
-* If you'd like to try out running Atlantis yourself on an example repo check out the [Test Drive](test-drive.html).
-* If you'd like to run Atlantis on your repos then read [Getting Started](getting-started.html).
+## Getting Started
+* If you'd like to just test out running Atlantis on an **example repo** check out the [Test Drive](test-drive.html).
+* If you'd like to test out running Atlantis on **your repos** then read [Testing Locally](testing-locally.html).
+* If you're ready to properly install Atlantis on real infrastructure then head over to the [Installation Guide](/docs/installation-guide.html).
 
 ::: tip Looking for the full docs?
 Go here: [www.runatlantis.io/docs](/docs/)
@@ -54,6 +55,6 @@ The exact commands that Atlantis runs are configurable. You can run custom scrip
 to construct your ideal workflow.
 
 ## Next Steps
-* If you'd like to try out Atlantis on a test repo, check out the [Test Drive](test-drive.html).
-* If you're ready to deploy it on your own repos, check out [Getting Started](getting-started.html).
-* If you're wondering if Atlantis supports how you run Terraform, read [Requirements](/docs/requirements.html).
+* If you'd like to just test out running Atlantis on an **example repo** check out the [Test Drive](test-drive.html).
+* If you'd like to test out running Atlantis on **your repos** then read [Testing Locally](testing-locally.html).
+* If you're ready to properly install Atlantis on real infrastructure then head over to the [Installation Guide](/docs/installation-guide.html).

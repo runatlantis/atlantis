@@ -418,7 +418,7 @@ func TestParse_Parsing(t *testing.T) {
 			"workspace",
 			"dir",
 			false,
-			"\"--verbose\"",
+			"--verbose",
 			"",
 		},
 		{
@@ -426,7 +426,7 @@ func TestParse_Parsing(t *testing.T) {
 			"workspace",
 			"",
 			false,
-			"\"-d\" \"dir\" \"--verbose\"",
+			"-d dir --verbose",
 			"",
 		},
 		// Test the extra args parsing.
@@ -438,21 +438,12 @@ func TestParse_Parsing(t *testing.T) {
 			"",
 			"",
 		},
-		// Test trying to escape quoting
-		{
-			"-- \";echo \"hi",
-			"",
-			"",
-			false,
-			`";echo hi"`,
-			"",
-		},
 		{
 			"-w workspace -d dir --verbose -- arg one -two --three &&",
 			"workspace",
 			"dir",
 			true,
-			"\"arg\" \"one\" \"-two\" \"--three\" \"&&\"",
+			"arg one -two --three &&",
 			"",
 		},
 		// Test whitespace.
@@ -461,7 +452,7 @@ func TestParse_Parsing(t *testing.T) {
 			"workspace",
 			"dir",
 			true,
-			"\"arg\" \"one\" \"-two\" \"--three\" \"&&\"",
+			"arg one -two --three &&",
 			"",
 		},
 		{
@@ -469,7 +460,7 @@ func TestParse_Parsing(t *testing.T) {
 			"workspace",
 			"dir",
 			true,
-			"\"arg\" \"one\" \"-two\" \"--three\" \"&&\"",
+			"arg one -two --three &&",
 			"",
 		},
 		// Test that the dir string is normalized.
@@ -644,9 +635,10 @@ func TestBuildPlanApplyComment(t *testing.T) {
 
 func TestParse_VCSUsername(t *testing.T) {
 	cp := events.CommentParser{
-		GithubUser:    "gh",
-		GitlabUser:    "gl",
-		BitbucketUser: "bb",
+		GithubUser:      "gh",
+		GitlabUser:      "gl",
+		BitbucketUser:   "bb",
+		AzureDevopsUser: "ad",
 	}
 	cases := []struct {
 		vcs  models.VCSHostType
@@ -667,6 +659,10 @@ func TestParse_VCSUsername(t *testing.T) {
 		{
 			vcs:  models.BitbucketCloud,
 			user: "bb",
+		},
+		{
+			vcs:  models.AzureDevops,
+			user: "ad",
 		},
 	}
 

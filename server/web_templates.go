@@ -31,10 +31,13 @@ type TemplateWriter interface {
 
 // LockIndexData holds the fields needed to display the index view for locks.
 type LockIndexData struct {
-	LockPath     string
-	RepoFullName string
-	PullNum      int
-	Time         time.Time
+	LockPath      string
+	RepoFullName  string
+	PullNum       int
+	Path          string
+	Workspace     string
+	Time          time.Time
+	TimeFormatted string
 }
 
 // IndexData holds the data for rendering the index page
@@ -73,7 +76,7 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
 <body>
 <div class="container">
   <section class="header">
-    <a title="atlantis" href="{{ .CleanedBasePath }}/"><img src="{{ .CleanedBasePath }}/static/images/atlantis-icon.png"/></a>
+    <a title="atlantis" href="{{ .CleanedBasePath }}/"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
     <p class="title-heading">atlantis</p>
     <p class="js-discard-success"><strong>Plan discarded and unlocked!</strong></p>
   </section>
@@ -90,9 +93,9 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
     {{ range .Locks }}
       <a href="{{ $basePath }}{{.LockPath}}">
         <div class="twelve columns button content lock-row">
-        <div class="list-title">{{.RepoFullName}} - <span class="heading-font-size">#{{.PullNum}}</span></div>
+        <div class="list-title">{{.RepoFullName}} <span class="heading-font-size">#{{.PullNum}}</span> <code>{{.Path}}</code> <code>{{.Workspace}}</code></div>
         <div class="list-status"><code>Locked</code></div>
-        <div class="list-timestamp"><span class="heading-font-size">{{.Time}}</span></div>
+        <div class="list-timestamp"><span class="heading-font-size">{{.TimeFormatted}}</span></div>
         </div>
       </a>
     {{ end }}
@@ -143,7 +146,7 @@ var lockTemplate = template.Must(template.New("lock.html.tmpl").Parse(`
 <body>
   <div class="container">
     <section class="header">
-    <a title="atlantis" href="{{ .CleanedBasePath }}/"><img src="{{ .CleanedBasePath }}/static/images/atlantis-icon.png"/></a>
+    <a title="atlantis" href="{{ .CleanedBasePath }}/"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
     <p class="title-heading">atlantis</p>
     <p class="title-heading"><strong>{{.LockKey}}</strong> <code>Locked</code></p>
     </section>

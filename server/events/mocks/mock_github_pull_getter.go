@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	github "github.com/google/go-github/github"
+	github "github.com/google/go-github/v28/github"
 	pegomock "github.com/petergtz/pegomock"
 	models "github.com/runatlantis/atlantis/server/events/models"
 	"reflect"
@@ -45,60 +45,60 @@ func (mock *MockGithubPullGetter) GetPullRequest(repo models.Repo, pullNum int) 
 	return ret0, ret1
 }
 
-func (mock *MockGithubPullGetter) VerifyWasCalledOnce() *VerifierGithubPullGetter {
-	return &VerifierGithubPullGetter{
+func (mock *MockGithubPullGetter) VerifyWasCalledOnce() *VerifierMockGithubPullGetter {
+	return &VerifierMockGithubPullGetter{
 		mock:                   mock,
 		invocationCountMatcher: pegomock.Times(1),
 	}
 }
 
-func (mock *MockGithubPullGetter) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierGithubPullGetter {
-	return &VerifierGithubPullGetter{
+func (mock *MockGithubPullGetter) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockGithubPullGetter {
+	return &VerifierMockGithubPullGetter{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockGithubPullGetter) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierGithubPullGetter {
-	return &VerifierGithubPullGetter{
+func (mock *MockGithubPullGetter) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockGithubPullGetter {
+	return &VerifierMockGithubPullGetter{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 		inOrderContext:         inOrderContext,
 	}
 }
 
-func (mock *MockGithubPullGetter) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierGithubPullGetter {
-	return &VerifierGithubPullGetter{
+func (mock *MockGithubPullGetter) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockGithubPullGetter {
+	return &VerifierMockGithubPullGetter{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 		timeout:                timeout,
 	}
 }
 
-type VerifierGithubPullGetter struct {
+type VerifierMockGithubPullGetter struct {
 	mock                   *MockGithubPullGetter
 	invocationCountMatcher pegomock.Matcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }
 
-func (verifier *VerifierGithubPullGetter) GetPullRequest(repo models.Repo, pullNum int) *GithubPullGetter_GetPullRequest_OngoingVerification {
+func (verifier *VerifierMockGithubPullGetter) GetPullRequest(repo models.Repo, pullNum int) *MockGithubPullGetter_GetPullRequest_OngoingVerification {
 	params := []pegomock.Param{repo, pullNum}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetPullRequest", params, verifier.timeout)
-	return &GithubPullGetter_GetPullRequest_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+	return &MockGithubPullGetter_GetPullRequest_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type GithubPullGetter_GetPullRequest_OngoingVerification struct {
+type MockGithubPullGetter_GetPullRequest_OngoingVerification struct {
 	mock              *MockGithubPullGetter
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *GithubPullGetter_GetPullRequest_OngoingVerification) GetCapturedArguments() (models.Repo, int) {
+func (c *MockGithubPullGetter_GetPullRequest_OngoingVerification) GetCapturedArguments() (models.Repo, int) {
 	repo, pullNum := c.GetAllCapturedArguments()
 	return repo[len(repo)-1], pullNum[len(pullNum)-1]
 }
 
-func (c *GithubPullGetter_GetPullRequest_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []int) {
+func (c *MockGithubPullGetter_GetPullRequest_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []int) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.Repo, len(params[0]))

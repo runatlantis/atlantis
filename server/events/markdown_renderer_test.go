@@ -126,7 +126,7 @@ func TestRenderProjectResults(t *testing.T) {
 			models.PlanCommand,
 			[]models.ProjectResult{},
 			models.Github,
-			"Ran Plan for 0 projects:\n\n\n",
+			"Ran Plan for 0 projects:\n\n\n\n",
 		},
 		{
 			"single successful plan",
@@ -262,6 +262,7 @@ $$$
 			},
 			models.Github,
 			`Ran Plan for 2 projects:
+
 1. dir: $path$ workspace: $workspace$
 1. project: $projectname$ dir: $path2$ workspace: $workspace$
 
@@ -311,6 +312,7 @@ $$$
 			},
 			models.Github,
 			`Ran Apply for 2 projects:
+
 1. project: $projectname$ dir: $path$ workspace: $workspace$
 1. dir: $path2$ workspace: $workspace$
 
@@ -394,6 +396,7 @@ $$$
 			},
 			models.Github,
 			`Ran Plan for 3 projects:
+
 1. dir: $path$ workspace: $workspace$
 1. dir: $path2$ workspace: $workspace$
 1. project: $projectname$ dir: $path3$ workspace: $workspace$
@@ -447,6 +450,7 @@ $$$
 			},
 			models.Github,
 			`Ran Apply for 3 projects:
+
 1. dir: $path$ workspace: $workspace$
 1. dir: $path2$ workspace: $workspace$
 1. dir: $path3$ workspace: $workspace$
@@ -493,6 +497,7 @@ $$$
 			},
 			models.Github,
 			`Ran Apply for 3 projects:
+
 1. dir: $path$ workspace: $workspace$
 1. dir: $path2$ workspace: $workspace$
 1. dir: $path3$ workspace: $workspace$
@@ -520,6 +525,159 @@ $$$
 	}
 
 	r := events.MarkdownRenderer{}
+	for _, c := range cases {
+		t.Run(c.Description, func(t *testing.T) {
+			res := events.CommandResult{
+				ProjectResults: c.ProjectResults,
+			}
+			for _, verbose := range []bool{true, false} {
+				t.Run(c.Description, func(t *testing.T) {
+					s := r.Render(res, c.Command, "log", verbose, c.VCSHost)
+					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
+					if !verbose {
+						Equals(t, expWithBackticks, s)
+					} else {
+						Equals(t, expWithBackticks+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
+					}
+				})
+			}
+		})
+	}
+}
+
+// Test that if disable apply all is set then the apply all footer is not added
+func TestRenderProjectResultsDisableApplyAll(t *testing.T) {
+	cases := []struct {
+		Description    string
+		Command        models.CommandName
+		ProjectResults []models.ProjectResult
+		VCSHost        models.VCSHostType
+		Expected       string
+	}{
+		{
+			"single successful plan with disable apply all set",
+			models.PlanCommand,
+			[]models.ProjectResult{
+				{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "terraform-output",
+						LockURL:         "lock-url",
+						RePlanCmd:       "atlantis plan -d path -w workspace",
+						ApplyCmd:        "atlantis apply -d path -w workspace",
+					},
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+				},
+			},
+			models.Github,
+			`Ran Plan for dir: $path$ workspace: $workspace$
+
+$$$diff
+terraform-output
+$$$
+
+* :arrow_forward: To **apply** this plan, comment:
+    * $atlantis apply -d path -w workspace$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+    * $atlantis plan -d path -w workspace$
+
+
+`,
+		},
+		{
+			"single successful plan with project name with disable apply all set",
+			models.PlanCommand,
+			[]models.ProjectResult{
+				{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "terraform-output",
+						LockURL:         "lock-url",
+						RePlanCmd:       "atlantis plan -d path -w workspace",
+						ApplyCmd:        "atlantis apply -d path -w workspace",
+					},
+					Workspace:   "workspace",
+					RepoRelDir:  "path",
+					ProjectName: "projectname",
+				},
+			},
+			models.Github,
+			`Ran Plan for project: $projectname$ dir: $path$ workspace: $workspace$
+
+$$$diff
+terraform-output
+$$$
+
+* :arrow_forward: To **apply** this plan, comment:
+    * $atlantis apply -d path -w workspace$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+    * $atlantis plan -d path -w workspace$
+
+
+`,
+		},
+		{
+			"multiple successful plans, disable apply all set",
+			models.PlanCommand,
+			[]models.ProjectResult{
+				{
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "terraform-output",
+						LockURL:         "lock-url",
+						ApplyCmd:        "atlantis apply -d path -w workspace",
+						RePlanCmd:       "atlantis plan -d path -w workspace",
+					},
+				},
+				{
+					Workspace:   "workspace",
+					RepoRelDir:  "path2",
+					ProjectName: "projectname",
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "terraform-output2",
+						LockURL:         "lock-url2",
+						ApplyCmd:        "atlantis apply -d path2 -w workspace",
+						RePlanCmd:       "atlantis plan -d path2 -w workspace",
+					},
+				},
+			},
+			models.Github,
+			`Ran Plan for 2 projects:
+
+1. dir: $path$ workspace: $workspace$
+1. project: $projectname$ dir: $path2$ workspace: $workspace$
+
+### 1. dir: $path$ workspace: $workspace$
+$$$diff
+terraform-output
+$$$
+
+* :arrow_forward: To **apply** this plan, comment:
+    * $atlantis apply -d path -w workspace$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+    * $atlantis plan -d path -w workspace$
+
+### 2. project: $projectname$ dir: $path2$ workspace: $workspace$
+$$$diff
+terraform-output2
+$$$
+
+* :arrow_forward: To **apply** this plan, comment:
+    * $atlantis apply -d path2 -w workspace$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url2)
+* :repeat: To **plan** this project again, comment:
+    * $atlantis plan -d path2 -w workspace$
+
+
+`,
+		},
+	}
+	r := events.MarkdownRenderer{
+		DisableApplyAll: true,
+	}
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			res := events.CommandResult{
@@ -837,6 +995,7 @@ func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
 		},
 	}, models.ApplyCommand, "log", false, models.Github)
 	exp := `Ran Apply for 2 projects:
+
 1. dir: $.$ workspace: $staging$
 1. dir: $.$ workspace: $production$
 
@@ -892,6 +1051,7 @@ func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 		},
 	}, models.PlanCommand, "log", false, models.Github)
 	exp := `Ran Plan for 2 projects:
+
 1. dir: $.$ workspace: $staging$
 1. dir: $.$ workspace: $production$
 
@@ -973,6 +1133,7 @@ func TestRenderProjectResults_PlansDeleted(t *testing.T) {
 				PlansDeleted: true,
 			},
 			exp: `Ran Plan for 2 projects:
+
 1. dir: $.$ workspace: $staging$
 1. dir: $.$ workspace: $production$
 
@@ -1009,6 +1170,7 @@ func TestRenderProjectResults_PlansDeleted(t *testing.T) {
 				PlansDeleted: true,
 			},
 			exp: `Ran Plan for 2 projects:
+
 1. dir: $.$ workspace: $staging$
 1. dir: $.$ workspace: $production$
 

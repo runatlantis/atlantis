@@ -3,8 +3,6 @@ package server_test
 import (
 	"bytes"
 	"fmt"
-	"github.com/hashicorp/go-getter"
-	"github.com/runatlantis/atlantis/server/events/db"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -15,10 +13,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/github"
+	"github.com/google/go-github/v28/github"
+	"github.com/hashicorp/go-getter"
+	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
@@ -28,6 +29,7 @@ import (
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/events/yaml"
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -42,6 +44,9 @@ func TestGitHubWorkflow(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	// Ensure we have >= TF 0.12 locally.
+	ensureRunning012(t)
+
 	cases := []struct {
 		Description string
 		// RepoDir is relative to testfixtures/test-repos.
@@ -291,12 +296,29 @@ func TestGitHubWorkflow(t *testing.T) {
 				"exp-output-merge.txt",
 			},
 		},
+		{
+			Description:   "server-side cfg",
+			RepoDir:       "server-side-cfg",
+			ExpAutomerge:  false,
+			ExpAutoplan:   true,
+			ModifiedFiles: []string{"main.tf"},
+			Comments: []string{
+				"atlantis apply -w staging",
+				"atlantis apply -w default",
+			},
+			ExpReplies: []string{
+				"exp-output-autoplan.txt",
+				"exp-output-apply-staging-workspace.txt",
+				"exp-output-apply-default-workspace.txt",
+				"exp-output-merge.txt",
+			},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			RegisterMockTestingT(t)
 
-			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t)
+			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir)
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
 			defer cleanup()
@@ -355,7 +377,7 @@ func TestGitHubWorkflow(t *testing.T) {
 	}
 }
 
-func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
+func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
 	allowForkPRs := false
 	dataDir, cleanup := TempDir(t)
 	defer cleanup()
@@ -378,7 +400,7 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClient, *moc
 		GithubUser: "github-user",
 		GitlabUser: "gitlab-user",
 	}
-	terraformClient, err := terraform.NewClient(logger, dataDir, "", "", "default-tf-version", &NoopTFDownloader{})
+	terraformClient, err := terraform.NewClient(logger, dataDir, "", "", "", "default-tf-version", &NoopTFDownloader{})
 	Ok(t, err)
 	boltdb, err := db.New(dataDir)
 	Ok(t, err)
@@ -391,8 +413,15 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClient, *moc
 		TestingOverrideHeadCloneURL: "override-me",
 	}
 
-	defaultTFVersion := terraformClient.Version()
+	defaultTFVersion := terraformClient.DefaultVersion()
 	locker := events.NewDefaultWorkingDirLocker()
+	parser := &yaml.ParserValidator{}
+	globalCfg := valid.NewGlobalCfg(true, false, false)
+	expCfgPath := filepath.Join(absRepoPath(t, repoDir), "repos.yaml")
+	if _, err := os.Stat(expCfgPath); err == nil {
+		globalCfg, err = parser.ParseGlobalCfg(expCfgPath, globalCfg)
+		Ok(t, err)
+	}
 	commandRunner := &events.DefaultCommandRunner{
 		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
 			Locker:           projectLocker,
@@ -409,7 +438,8 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClient, *moc
 				TerraformExecutor: terraformClient,
 			},
 			RunStepRunner: &runtime.RunStepRunner{
-				DefaultTFVersion: defaultTFVersion,
+				TerraformExecutor: terraformClient,
+				DefaultTFVersion:  defaultTFVersion,
 			},
 			PullApprovedChecker: e2eVCSClient,
 			WorkingDir:          workingDir,
@@ -426,15 +456,14 @@ func setupE2E(t *testing.T) (server.EventsController, *vcsmocks.MockClient, *moc
 		AllowForkPRs:             allowForkPRs,
 		AllowForkPRsFlag:         "allow-fork-prs",
 		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
-			ParserValidator:     &yaml.ParserValidator{},
-			ProjectFinder:       &events.DefaultProjectFinder{},
-			VCSClient:           e2eVCSClient,
-			WorkingDir:          workingDir,
-			WorkingDirLocker:    locker,
-			AllowRepoConfigFlag: "allow-repo-config",
-			AllowRepoConfig:     true,
-			PendingPlanFinder:   &events.DefaultPendingPlanFinder{},
-			CommentBuilder:      commentParser,
+			ParserValidator:   parser,
+			ProjectFinder:     &events.DefaultProjectFinder{},
+			VCSClient:         e2eVCSClient,
+			WorkingDir:        workingDir,
+			WorkingDirLocker:  locker,
+			PendingPlanFinder: &events.DefaultPendingPlanFinder{},
+			CommentBuilder:    commentParser,
+			GlobalCfg:         globalCfg,
 		},
 		DB:                boltdb,
 		PendingPlanFinder: &events.DefaultPendingPlanFinder{},
@@ -592,15 +621,15 @@ func assertCommentEquals(t *testing.T, expFile string, act string, repoDir strin
 	exp, err := ioutil.ReadFile(filepath.Join(absRepoPath(t, repoDir), expFile))
 	Ok(t, err)
 
-	// Replace all 'Creation complete after 1s ID: 1111818181' strings with
-	// 'Creation complete after *s ID: **********' so we can do a comparison.
-	idRegex := regexp.MustCompile(`Creation complete after [0-9]+s \(ID: [0-9]+\)`)
-	act = idRegex.ReplaceAllString(act, "Creation complete after *s (ID: ******************)")
+	// Replace all 'Creation complete after 0s [id=2135833172528078362]' strings with
+	// 'Creation complete after *s [id=*******************]' so we can do a comparison.
+	idRegex := regexp.MustCompile(`Creation complete after [0-9]+s \[id=[0-9]+]`)
+	act = idRegex.ReplaceAllString(act, "Creation complete after *s [id=*******************]")
 
 	// Replace all null_resource.simple{n}: .* with null_resource.simple: because
 	// with multiple resources being created the logs are all out of order which
 	// makes comparison impossible.
-	resourceRegex := regexp.MustCompile(`null_resource\.simple\d?:.*`)
+	resourceRegex := regexp.MustCompile(`null_resource\.simple(\[\d])?\d?:.*`)
 	act = resourceRegex.ReplaceAllString(act, "null_resource.simple:")
 
 	expStr := string(exp)
@@ -629,3 +658,39 @@ func assertCommentEquals(t *testing.T, expFile string, act string, repoDir strin
 		}
 	}
 }
+
+// Will fail test if terraform isn't in path and isn't version >= 0.12
+func ensureRunning012(t *testing.T) {
+	localPath, err := exec.LookPath("terraform")
+	if err != nil {
+		t.Log("terraform >= 0.12 must be installed to run this test")
+		t.FailNow()
+	}
+	versionOutBytes, err := exec.Command(localPath, "version").Output() // #nosec
+	if err != nil {
+		t.Logf("error running terraform version: %s", err)
+		t.FailNow()
+	}
+	versionOutput := string(versionOutBytes)
+	match := versionRegex.FindStringSubmatch(versionOutput)
+	if len(match) <= 1 {
+		t.Logf("could not parse terraform version from %s", versionOutput)
+		t.FailNow()
+	}
+	localVersion, err := version.NewVersion(match[1])
+	Ok(t, err)
+	minVersion, err := version.NewVersion("0.12.0")
+	Ok(t, err)
+	if localVersion.LessThan(minVersion) {
+		t.Logf("must have terraform version >= %s, you have %s", minVersion, localVersion)
+		t.FailNow()
+	}
+}
+
+// versionRegex extracts the version from `terraform version` output.
+//     Terraform v0.12.0-alpha4 (2c36829d3265661d8edbd5014de8090ea7e2a076)
+//	   => 0.12.0-alpha4
+//
+//     Terraform v0.11.10
+//	   => 0.11.10
+var versionRegex = regexp.MustCompile("Terraform v(.*?)(\\s.*)?\n")

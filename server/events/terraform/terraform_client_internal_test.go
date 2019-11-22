@@ -2,14 +2,14 @@ package terraform
 
 import (
 	"fmt"
-	"github.com/hashicorp/go-version"
-	"github.com/runatlantis/atlantis/server/logging"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	version "github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -18,10 +18,10 @@ func TestGenerateRCFile_WritesFile(t *testing.T) {
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 
-	err := generateRCFile("token", tmp)
+	err := generateRCFile("token", "hostname", tmp)
 	Ok(t, err)
 
-	expContents := `credentials "app.terraform.io" {
+	expContents := `credentials "hostname" {
   token = "token"
 }`
 	actContents, err := ioutil.ReadFile(filepath.Join(tmp, ".terraformrc"))
@@ -39,7 +39,7 @@ func TestGenerateRCFile_WillNotOverwrite(t *testing.T) {
 	err := ioutil.WriteFile(rcFile, []byte("contents"), 0600)
 	Ok(t, err)
 
-	actErr := generateRCFile("token", tmp)
+	actErr := generateRCFile("token", "hostname", tmp)
 	expErr := fmt.Sprintf("can't write TFE token to %s because that file has contents that would be overwritten", tmp+"/.terraformrc")
 	ErrEquals(t, expErr, actErr)
 }
@@ -57,7 +57,7 @@ func TestGenerateRCFile_NoErrIfContentsSame(t *testing.T) {
 	err := ioutil.WriteFile(rcFile, []byte(contents), 0600)
 	Ok(t, err)
 
-	err = generateRCFile("token", tmp)
+	err = generateRCFile("token", "app.terraform.io", tmp)
 	Ok(t, err)
 }
 
@@ -72,7 +72,7 @@ func TestGenerateRCFile_ErrIfCannotRead(t *testing.T) {
 	Ok(t, err)
 
 	expErr := fmt.Sprintf("trying to read %s to ensure we're not overwriting it: open %s: permission denied", rcFile, rcFile)
-	actErr := generateRCFile("token", tmp)
+	actErr := generateRCFile("token", "hostname", tmp)
 	ErrEquals(t, expErr, actErr)
 }
 
@@ -80,7 +80,7 @@ func TestGenerateRCFile_ErrIfCannotRead(t *testing.T) {
 func TestGenerateRCFile_ErrIfCannotWrite(t *testing.T) {
 	rcFile := "/this/dir/does/not/exist/.terraformrc"
 	expErr := fmt.Sprintf("writing generated .terraformrc file with TFE token to %s: open %s: no such file or directory", rcFile, rcFile)
-	actErr := generateRCFile("token", "/this/dir/does/not/exist")
+	actErr := generateRCFile("token", "hostname", "/this/dir/does/not/exist")
 	ErrEquals(t, expErr, actErr)
 }
 
@@ -103,7 +103,7 @@ func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
 		"ATLANTIS_TERRAFORM_VERSION=$ATLANTIS_TERRAFORM_VERSION",
 		"DIR=$DIR",
 	}
-	out, err := client.RunCommandWithVersion(nil, tmp, args, nil, "workspace")
+	out, err := client.RunCommandWithVersion(nil, tmp, args, map[string]string{}, nil, "workspace")
 	Ok(t, err)
 	exp := fmt.Sprintf("TF_IN_AUTOMATION=true TF_PLUGIN_CACHE_DIR=%s WORKSPACE=workspace ATLANTIS_TERRAFORM_VERSION=0.11.11 DIR=%s\n", tmp, tmp)
 	Equals(t, exp, out)
@@ -128,7 +128,7 @@ func TestDefaultClient_RunCommandWithVersion_Error(t *testing.T) {
 		"1",
 	}
 	log := logging.NewSimpleLogger("test", false, logging.Debug)
-	out, err := client.RunCommandWithVersion(log, tmp, args, nil, "workspace")
+	out, err := client.RunCommandWithVersion(log, tmp, args, map[string]string{}, nil, "workspace")
 	ErrEquals(t, fmt.Sprintf(`running "echo dying && exit 1" in %q: exit status 1`, tmp), err)
 	// Test that we still get our output.
 	Equals(t, "dying\n", out)
@@ -152,7 +152,7 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 		"ATLANTIS_TERRAFORM_VERSION=$ATLANTIS_TERRAFORM_VERSION",
 		"DIR=$DIR",
 	}
-	_, outCh := client.RunCommandAsync(nil, tmp, args, nil, "workspace")
+	_, outCh := client.RunCommandAsync(nil, tmp, args, map[string]string{}, nil, "workspace")
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
@@ -181,7 +181,7 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 		_, err = f.WriteString(s)
 		Ok(t, err)
 	}
-	_, outCh := client.RunCommandAsync(nil, tmp, []string{filename}, nil, "workspace")
+	_, outCh := client.RunCommandAsync(nil, tmp, []string{filename}, map[string]string{}, nil, "workspace")
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
@@ -199,7 +199,7 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 		overrideTF:              "echo",
 	}
 	log := logging.NewSimpleLogger("test", false, logging.Debug)
-	_, outCh := client.RunCommandAsync(log, tmp, []string{"stderr", ">&2"}, nil, "workspace")
+	_, outCh := client.RunCommandAsync(log, tmp, []string{"stderr", ">&2"}, map[string]string{}, nil, "workspace")
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
@@ -217,7 +217,7 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 		overrideTF:              "echo",
 	}
 	log := logging.NewSimpleLogger("test", false, logging.Debug)
-	_, outCh := client.RunCommandAsync(log, tmp, []string{"dying", "&&", "exit", "1"}, nil, "workspace")
+	_, outCh := client.RunCommandAsync(log, tmp, []string{"dying", "&&", "exit", "1"}, map[string]string{}, nil, "workspace")
 
 	out, err := waitCh(outCh)
 	ErrEquals(t, fmt.Sprintf(`running "echo dying && exit 1" in %q: exit status 1`, tmp), err)
@@ -236,7 +236,7 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 		overrideTF:              "read",
 	}
 	log := logging.NewSimpleLogger("test", false, logging.Debug)
-	inCh, outCh := client.RunCommandAsync(log, tmp, []string{"a", "&&", "echo", "$a"}, nil, "workspace")
+	inCh, outCh := client.RunCommandAsync(log, tmp, []string{"a", "&&", "echo", "$a"}, map[string]string{}, nil, "workspace")
 	inCh <- "echo me\n"
 
 	out, err := waitCh(outCh)

@@ -15,9 +15,6 @@ package terraform_test
 
 import (
 	"fmt"
-	"github.com/petergtz/pegomock"
-	"github.com/runatlantis/atlantis/cmd"
-	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -25,9 +22,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/go-version"
+	version "github.com/hashicorp/go-version"
+	"github.com/petergtz/pegomock"
 	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/cmd"
 	"github.com/runatlantis/atlantis/server/events/terraform"
+	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
+	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -67,13 +68,13 @@ is 0.11.13. You can update by downloading from www.terraform.io/downloads.html
 	Ok(t, err)
 	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
 
-	c, err := terraform.NewClient(nil, tmp, "", "", cmd.DefaultTFVersionFlag, nil)
+	c, err := terraform.NewClient(nil, tmp, "", "", "", cmd.DefaultTFVersionFlag, nil)
 	Ok(t, err)
 
 	Ok(t, err)
-	Equals(t, "0.11.10", c.Version().String())
+	Equals(t, "0.11.10", c.DefaultVersion().String())
 
-	output, err := c.RunCommandWithVersion(nil, tmp, nil, nil, "")
+	output, err := c.RunCommandWithVersion(nil, tmp, nil, map[string]string{"test": "123"}, nil, "")
 	Ok(t, err)
 	Equals(t, fakeBinOut+"\n", output)
 }
@@ -95,13 +96,13 @@ is 0.11.13. You can update by downloading from www.terraform.io/downloads.html
 	Ok(t, err)
 	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
 
-	c, err := terraform.NewClient(nil, tmp, "", "0.11.10", cmd.DefaultTFVersionFlag, nil)
+	c, err := terraform.NewClient(nil, tmp, "", "", "0.11.10", cmd.DefaultTFVersionFlag, nil)
 	Ok(t, err)
 
 	Ok(t, err)
-	Equals(t, "0.11.10", c.Version().String())
+	Equals(t, "0.11.10", c.DefaultVersion().String())
 
-	output, err := c.RunCommandWithVersion(nil, tmp, nil, nil, "")
+	output, err := c.RunCommandWithVersion(nil, tmp, nil, map[string]string{}, nil, "")
 	Ok(t, err)
 	Equals(t, fakeBinOut+"\n", output)
 }
@@ -115,7 +116,7 @@ func TestNewClient_NoTF(t *testing.T) {
 	// Set PATH to only include our empty directory.
 	defer tempSetEnv(t, "PATH", tmp)()
 
-	_, err := terraform.NewClient(nil, tmp, "", "", cmd.DefaultTFVersionFlag, nil)
+	_, err := terraform.NewClient(nil, tmp, "", "", "", cmd.DefaultTFVersionFlag, nil)
 	ErrEquals(t, "terraform not found in $PATH. Set --default-tf-version or download terraform from https://www.terraform.io/downloads.html", err)
 }
 
@@ -132,13 +133,13 @@ func TestNewClient_DefaultTFFlagInPath(t *testing.T) {
 	Ok(t, err)
 	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
 
-	c, err := terraform.NewClient(nil, tmp, "", "0.11.10", cmd.DefaultTFVersionFlag, nil)
+	c, err := terraform.NewClient(nil, tmp, "", "", "0.11.10", cmd.DefaultTFVersionFlag, nil)
 	Ok(t, err)
 
 	Ok(t, err)
-	Equals(t, "0.11.10", c.Version().String())
+	Equals(t, "0.11.10", c.DefaultVersion().String())
 
-	output, err := c.RunCommandWithVersion(nil, tmp, nil, nil, "")
+	output, err := c.RunCommandWithVersion(nil, tmp, nil, map[string]string{}, nil, "")
 	Ok(t, err)
 	Equals(t, fakeBinOut+"\n", output)
 }
@@ -156,13 +157,13 @@ func TestNewClient_DefaultTFFlagInBinDir(t *testing.T) {
 	Ok(t, err)
 	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
 
-	c, err := terraform.NewClient(nil, tmp, "", "0.11.10", cmd.DefaultTFVersionFlag, nil)
+	c, err := terraform.NewClient(logging.NewNoopLogger(), tmp, "", "", "0.11.10", cmd.DefaultTFVersionFlag, nil)
 	Ok(t, err)
 
 	Ok(t, err)
-	Equals(t, "0.11.10", c.Version().String())
+	Equals(t, "0.11.10", c.DefaultVersion().String())
 
-	output, err := c.RunCommandWithVersion(nil, tmp, nil, nil, "")
+	output, err := c.RunCommandWithVersion(nil, tmp, nil, map[string]string{}, nil, "")
 	Ok(t, err)
 	Equals(t, fakeBinOut+"\n", output)
 }
@@ -182,11 +183,11 @@ func TestNewClient_DefaultTFFlagDownload(t *testing.T) {
 		err := ioutil.WriteFile(params[0].(string), []byte("#!/bin/sh\necho '\nTerraform v0.11.10\n'"), 0755)
 		return []pegomock.ReturnValue{err}
 	})
-	c, err := terraform.NewClient(nil, tmp, "", "0.11.10", cmd.DefaultTFVersionFlag, mockDownloader)
+	c, err := terraform.NewClient(nil, tmp, "", "", "0.11.10", cmd.DefaultTFVersionFlag, mockDownloader)
 	Ok(t, err)
 
 	Ok(t, err)
-	Equals(t, "0.11.10", c.Version().String())
+	Equals(t, "0.11.10", c.DefaultVersion().String())
 	baseURL := "https://releases.hashicorp.com/terraform/0.11.10"
 	expURL := fmt.Sprintf("%s/terraform_0.11.10_%s_%s.zip?checksum=file:%s/terraform_0.11.10_SHA256SUMS",
 		baseURL,
@@ -197,7 +198,7 @@ func TestNewClient_DefaultTFFlagDownload(t *testing.T) {
 
 	// Reset PATH so that it has sh.
 	Ok(t, os.Setenv("PATH", orig))
-	output, err := c.RunCommandWithVersion(nil, tmp, nil, nil, "")
+	output, err := c.RunCommandWithVersion(nil, tmp, nil, map[string]string{}, nil, "")
 	Ok(t, err)
 	Equals(t, "\nTerraform v0.11.10\n\n", output)
 }
@@ -206,7 +207,7 @@ func TestNewClient_DefaultTFFlagDownload(t *testing.T) {
 func TestNewClient_BadVersion(t *testing.T) {
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
-	_, err := terraform.NewClient(nil, tmp, "", "malformed", cmd.DefaultTFVersionFlag, nil)
+	_, err := terraform.NewClient(nil, tmp, "", "", "malformed", cmd.DefaultTFVersionFlag, nil)
 	ErrEquals(t, "Malformed version: malformed", err)
 }
 
@@ -218,26 +219,55 @@ func TestRunCommandWithVersion_DLsTF(t *testing.T) {
 
 	mockDownloader := mocks.NewMockDownloader()
 	// Set up our mock downloader to write a fake tf binary when it's called.
-	baseURL := "https://releases.hashicorp.com/terraform/0.12.0"
-	expURL := fmt.Sprintf("%s/terraform_0.12.0_%s_%s.zip?checksum=file:%s/terraform_0.12.0_SHA256SUMS",
+	baseURL := "https://releases.hashicorp.com/terraform/99.99.99"
+	expURL := fmt.Sprintf("%s/terraform_99.99.99_%s_%s.zip?checksum=file:%s/terraform_99.99.99_SHA256SUMS",
 		baseURL,
 		runtime.GOOS,
 		runtime.GOARCH,
 		baseURL)
-	When(mockDownloader.GetFile(filepath.Join(tmp, "bin", "terraform0.12.0"), expURL)).Then(func(params []pegomock.Param) pegomock.ReturnValues {
-		err := ioutil.WriteFile(params[0].(string), []byte("#!/bin/sh\necho '\nTerraform v0.12.0\n'"), 0755)
+	When(mockDownloader.GetFile(filepath.Join(tmp, "bin", "terraform99.99.99"), expURL)).Then(func(params []pegomock.Param) pegomock.ReturnValues {
+		err := ioutil.WriteFile(params[0].(string), []byte("#!/bin/sh\necho '\nTerraform v99.99.99\n'"), 0755)
 		return []pegomock.ReturnValue{err}
 	})
 
-	c, err := terraform.NewClient(nil, tmp, "", "0.11.10", cmd.DefaultTFVersionFlag, mockDownloader)
+	c, err := terraform.NewClient(nil, tmp, "", "", "0.11.10", cmd.DefaultTFVersionFlag, mockDownloader)
 	Ok(t, err)
-	Equals(t, "0.11.10", c.Version().String())
+	Equals(t, "0.11.10", c.DefaultVersion().String())
 
-	v, err := version.NewVersion("0.12.0")
+	v, err := version.NewVersion("99.99.99")
 	Ok(t, err)
-	output, err := c.RunCommandWithVersion(nil, tmp, nil, v, "")
+	output, err := c.RunCommandWithVersion(nil, tmp, nil, map[string]string{}, v, "")
 	Assert(t, err == nil, "err: %s: %s", err, output)
-	Equals(t, "\nTerraform v0.12.0\n\n", output)
+	Equals(t, "\nTerraform v99.99.99\n\n", output)
+}
+
+// Test the EnsureVersion downloads terraform.
+func TestEnsureVersion_downloaded(t *testing.T) {
+	RegisterMockTestingT(t)
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+
+	mockDownloader := mocks.NewMockDownloader()
+
+	c, err := terraform.NewClient(nil, tmp, "", "", "0.11.10", cmd.DefaultTFVersionFlag, mockDownloader)
+	Ok(t, err)
+
+	Equals(t, "0.11.10", c.DefaultVersion().String())
+
+	v, err := version.NewVersion("99.99.99")
+	Ok(t, err)
+
+	err = c.EnsureVersion(nil, v)
+
+	Ok(t, err)
+
+	baseURL := "https://releases.hashicorp.com/terraform/99.99.99"
+	expURL := fmt.Sprintf("%s/terraform_99.99.99_%s_%s.zip?checksum=file:%s/terraform_99.99.99_SHA256SUMS",
+		baseURL,
+		runtime.GOOS,
+		runtime.GOARCH,
+		baseURL)
+	mockDownloader.VerifyWasCalledEventually(Once(), 2*time.Second).GetFile(filepath.Join(tmp, "bin", "terraform99.99.99"), expURL)
 }
 
 // tempSetEnv sets env var key to value. It returns a function that when called

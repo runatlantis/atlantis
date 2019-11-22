@@ -195,6 +195,91 @@ func TestGithubClient_UpdateStatus(t *testing.T) {
 	}
 }
 
+func TestGithubClient_PullIsApproved(t *testing.T) {
+	respTemplate := `[
+		{
+			"id": %d,
+			"node_id": "MDE3OlB1bGxSZXF1ZXN0UmV2aWV3ODA=",
+			"user": {
+			  "login": "octocat",
+			  "id": 1,
+			  "node_id": "MDQ6VXNlcjE=",
+			  "avatar_url": "https://github.com/images/error/octocat_happy.gif",
+			  "gravatar_id": "",
+			  "url": "https://api.github.com/users/octocat",
+			  "html_url": "https://github.com/octocat",
+			  "followers_url": "https://api.github.com/users/octocat/followers",
+			  "following_url": "https://api.github.com/users/octocat/following{/other_user}",
+			  "gists_url": "https://api.github.com/users/octocat/gists{/gist_id}",
+			  "starred_url": "https://api.github.com/users/octocat/starred{/owner}{/repo}",
+			  "subscriptions_url": "https://api.github.com/users/octocat/subscriptions",
+			  "organizations_url": "https://api.github.com/users/octocat/orgs",
+			  "repos_url": "https://api.github.com/users/octocat/repos",
+			  "events_url": "https://api.github.com/users/octocat/events{/privacy}",
+			  "received_events_url": "https://api.github.com/users/octocat/received_events",
+			  "type": "User",
+			  "site_admin": false
+			},
+			"body": "Here is the body for the review.",
+			"commit_id": "ecdd80bb57125d7ba9641ffaa4d7d2c19d3f3091",
+			"state": "CHANGES_REQUESTED",
+			"html_url": "https://github.com/octocat/Hello-World/pull/12#pullrequestreview-%d",
+			"pull_request_url": "https://api.github.com/repos/octocat/Hello-World/pulls/12",
+			"_links": {
+			  "html": {
+				"href": "https://github.com/octocat/Hello-World/pull/12#pullrequestreview-%d"
+			  },
+			  "pull_request": {
+				"href": "https://api.github.com/repos/octocat/Hello-World/pulls/12"
+			  }
+			}
+		  }
+]`
+	firstResp := fmt.Sprintf(respTemplate, 80)
+	secondResp := fmt.Sprintf(respTemplate, 81)
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			// The first request should hit this URL.
+			case "/api/v3/repos/owner/repo/pulls/1/reviews?per_page=300":
+				// We write a header that means there's an additional page.
+				w.Header().Add("Link", `<https://api.github.com/resource?page=2>; rel="next",
+      <https://api.github.com/resource?page=2>; rel="last"`)
+				w.Write([]byte(firstResp)) // nolint: errcheck
+				return
+				// The second should hit this URL.
+			case "/api/v3/repos/owner/repo/pulls/1/reviews?page=2&per_page=300":
+				w.Write([]byte(secondResp)) // nolint: errcheck
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}))
+
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+	Ok(t, err)
+	defer disableSSLVerification()()
+
+	approved, err := client.PullIsApproved(models.Repo{
+		FullName:          "owner/repo",
+		Owner:             "owner",
+		Name:              "repo",
+		CloneURL:          "",
+		SanitizedCloneURL: "",
+		VCSHost: models.VCSHost{
+			Type:     models.Github,
+			Hostname: "github.com",
+		},
+	}, models.PullRequest{
+		Num: 1,
+	})
+	Ok(t, err)
+	Equals(t, false, approved)
+}
+
 func TestGithubClient_PullIsMergeable(t *testing.T) {
 	cases := []struct {
 		state        string

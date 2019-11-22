@@ -52,6 +52,13 @@ Atlantis should be run with Webhook secrets set via the `$ATLANTIS_GH_WEBHOOK_SE
 Even with the `--repo-whitelist` flag set, without a webhook secret, attackers could make requests to Atlantis posing as a repository that is whitelisted.
 Webhook secrets ensure that the webhook requests are actually coming from your VCS provider (GitHub or GitLab).
 
+:::tip Tip
+If you are using Azure DevOps, instead of webhook secrets add a [basic username and password](#azure devops basic authentication)
+:::
+
+### Azure DevOps Basic Authentication
+Azure DevOps supports sending a basic authentication header in all webhook events. This requires using an HTTPS URL for your webhook location.
+
 ### SSL/HTTPS
 If you're using webhook secrets but your traffic is over HTTP then the webhook secrets
 could be stolen. Enable SSL/HTTPS using the `--ssl-cert-file` and `--ssl-key-file`
