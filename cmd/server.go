@@ -590,7 +590,7 @@ func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && !s.SilenceOutput {
 		s.Logger.Warn("Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are whitelisting Bitbucket IPs")
 	}
-	if (userConfig.AzureDevopsWebhookUser == "" || userConfig.AzureDevopsWebhookPassword == "") && !s.SilenceOutput {
+	if userConfig.AzureDevopsWebhookUser != "" && userConfig.AzureDevopsWebhookPassword == "" && !s.SilenceOutput {
 		s.Logger.Warn("no Azure DevOps webhook user and password set. This could allow attackers to spoof requests from Azure DevOps.")
 	}
 }
