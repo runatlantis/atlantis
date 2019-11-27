@@ -178,8 +178,6 @@ github.com/petergtz/pegomock
 github.com/petergtz/pegomock/internal/verify
 # github.com/pkg/errors v0.8.0
 github.com/pkg/errors
-# github.com/shurcooL/sanitized_anchor_name v0.0.0-20170918181015-86672fcb3f95
-github.com/shurcooL/sanitized_anchor_name
 # github.com/sirupsen/logrus v1.2.0
 github.com/sirupsen/logrus
 # github.com/spf13/afero v0.0.0-20170901052352-ee1bd8ee15a1
@@ -204,7 +202,7 @@ github.com/ulikunitz/xz/lzma
 github.com/urfave/cli
 # github.com/urfave/negroni v0.2.0
 github.com/urfave/negroni
-# github.com/xanzy/go-gitlab v0.20.2-0.20190819195750-b1d195859ad0
+# github.com/xanzy/go-gitlab v0.22.2-0.20191127083556-16a492660b8c
 github.com/xanzy/go-gitlab
 # github.com/zclconf/go-cty v1.0.0
 github.com/zclconf/go-cty/cty
@@ -242,7 +240,7 @@ golang.org/x/crypto/openpgp/s2k
 golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/scrypt
 golang.org/x/crypto/ssh/terminal
-# golang.org/x/net v0.0.0-20190620200207-3b0461eec859
+# golang.org/x/net v0.0.0-20191126235420-ef20fe5d7933
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
 golang.org/x/net/html
@@ -254,7 +252,7 @@ golang.org/x/net/idna
 golang.org/x/net/internal/timeseries
 golang.org/x/net/trace
 golang.org/x/net/websocket
-# golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
+# golang.org/x/oauth2 v0.0.0-20191122200657-5d9234df094c
 golang.org/x/oauth2
 golang.org/x/oauth2/google
 golang.org/x/oauth2/internal
@@ -279,7 +277,7 @@ google.golang.org/api/option
 google.golang.org/api/storage/v1
 google.golang.org/api/transport/http
 google.golang.org/api/transport/http/internal/propagation
-# google.golang.org/appengine v1.6.1
+# google.golang.org/appengine v1.6.5
 google.golang.org/appengine
 google.golang.org/appengine/internal
 google.golang.org/appengine/internal/app_identity
@@ -331,7 +329,5 @@ google.golang.org/grpc/status
 google.golang.org/grpc/tap
 # gopkg.in/go-playground/validator.v9 v9.20.2
 gopkg.in/go-playground/validator.v9
-# gopkg.in/russross/blackfriday.v2 v2.0.0
-gopkg.in/russross/blackfriday.v2
 # gopkg.in/yaml.v2 v2.2.2
 gopkg.in/yaml.v2

@@ -14,6 +14,7 @@
 // limitations under the License.
 //
 
+// Package gitlab implements a GitLab API client.
 package gitlab
 
 import (
@@ -87,6 +88,7 @@ const (
 	Failed   BuildStateValue = "failed"
 	Canceled BuildStateValue = "canceled"
 	Skipped  BuildStateValue = "skipped"
+	Manual   BuildStateValue = "manual"
 )
 
 // ISOTime represents an ISO 8601 formatted date
@@ -99,7 +101,7 @@ const iso8601 = "2006-01-02"
 func (t ISOTime) MarshalJSON() ([]byte, error) {
 	if y := time.Time(t).Year(); y < 0 || y >= 10000 {
 		// ISO 8901 uses 4 digits for the years
-		return nil, errors.New("ISOTime.MarshalJSON: year outside of range [0,9999]")
+		return nil, errors.New("json: ISOTime year outside of range [0,9999]")
 	}
 
 	b := make([]byte, 0, len(iso8601)+2)
@@ -317,6 +319,7 @@ type Client struct {
 	Features              *FeaturesService
 	GitIgnoreTemplates    *GitIgnoreTemplatesService
 	GroupBadges           *GroupBadgesService
+	GroupCluster          *GroupClustersService
 	GroupIssueBoards      *GroupIssueBoardsService
 	GroupLabels           *GroupLabelsService
 	GroupMembers          *GroupMembersService
@@ -466,6 +469,7 @@ func newClient(httpClient *http.Client) *Client {
 	c.Features = &FeaturesService{client: c}
 	c.GitIgnoreTemplates = &GitIgnoreTemplatesService{client: c}
 	c.GroupBadges = &GroupBadgesService{client: c}
+	c.GroupCluster = &GroupClustersService{client: c}
 	c.GroupIssueBoards = &GroupIssueBoardsService{client: c}
 	c.GroupLabels = &GroupLabelsService{client: c}
 	c.GroupMembers = &GroupMembersService{client: c}
@@ -869,6 +873,14 @@ func Int(v int) *int {
 // to store v and returns a pointer to it.
 func String(v string) *string {
 	p := new(string)
+	*p = v
+	return p
+}
+
+// Time is a helper routine that allocates a new time.Time value
+// to store v and returns a pointer to it.
+func Time(v time.Time) *time.Time {
+	p := new(time.Time)
 	*p = v
 	return p
 }
