@@ -56,9 +56,12 @@ require (
 	github.com/ulikunitz/xz v0.5.6 // indirect
 	github.com/urfave/cli v1.20.0
 	github.com/urfave/negroni v0.2.0
-	github.com/xanzy/go-gitlab v0.20.2-0.20190819195750-b1d195859ad0
+	github.com/xanzy/go-gitlab v0.22.2-0.20191127083556-16a492660b8c
 	golang.org/x/build v0.0.0-20190111050920-041ab4dc3f9d // indirect
 	golang.org/x/crypto v0.0.0-20190605123033-f99c8df09eb5
+	golang.org/x/net v0.0.0-20191126235420-ef20fe5d7933 // indirect
+	golang.org/x/oauth2 v0.0.0-20191122200657-5d9234df094c // indirect
+	google.golang.org/appengine v1.6.5 // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v9 v9.20.2
 	gopkg.in/yaml.v2 v2.2.2
