@@ -27,13 +27,10 @@ func TestClone_NoneExisting(t *testing.T) {
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
 	}
 
-	cloneDir, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	cloneDir, _, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 	}, "default")
 	Ok(t, err)
-
-	// Check if master repo has not diverged
-	Equals(t, hasDiverged, false)
 
 	// Use rev-parse to verify at correct commit.
 	actCommit := runCmd(t, cloneDir, "git", "rev-parse", "HEAD")
@@ -84,9 +81,7 @@ func TestClone_CheckoutMergeNoneExisting(t *testing.T) {
 		BaseBranch: "master",
 	}, "default")
 	Ok(t, err)
-
-	// Check if master repo has not diverged
-	Equals(t, hasDiverged, false)
+	Equals(t, false, hasDiverged)
 
 	// Check the commits.
 	actBaseCommit := runCmd(t, cloneDir, "git", "rev-parse", "HEAD~1")
@@ -134,9 +129,7 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 		BaseBranch: "master",
 	}, "default")
 	Ok(t, err)
-
-	// Check if master repo has not diverged
-	Equals(t, hasDiverged, false)
+	Equals(t, false, hasDiverged)
 
 	// Create a file that we can use to check if the repo was recloned.
 	runCmd(t, dataDir, "touch", "repos/0/default/proof")
@@ -147,9 +140,7 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 		BaseBranch: "master",
 	}, "default")
 	Ok(t, err)
-
-	// Check if master repo has not diverged
-	Equals(t, hasDiverged, false)
+	Equals(t, false, hasDiverged)
 
 	// Check that our proof file is still there, proving that we didn't reclone.
 	_, err = os.Stat(filepath.Join(cloneDir, "proof"))
@@ -186,9 +177,7 @@ func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
 		BaseBranch: "master",
 	}, "default")
 	Ok(t, err)
-
-	// Check if master repo has not diverged
-	Equals(t, hasDiverged, false)
+	Equals(t, false, hasDiverged)
 
 	// Create a file that we can use to check if the repo was recloned.
 	runCmd(t, dataDir, "touch", "repos/0/default/proof")
@@ -199,9 +188,7 @@ func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
 		BaseBranch: "master",
 	}, "default")
 	Ok(t, err)
-
-	// Check if master repo has not diverged
-	Equals(t, hasDiverged, false)
+	Equals(t, false, hasDiverged)
 
 	// Check that our proof file is still there, proving that we didn't reclone.
 	_, err = os.Stat(filepath.Join(cloneDir, "proof"))
@@ -238,13 +225,10 @@ func TestClone_CheckoutMergeConflict(t *testing.T) {
 		TestingOverrideBaseCloneURL: overrideURL,
 	}
 
-	_, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+	_, _, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
-
-	// Check if master repo has not diverged
-	Equals(t, hasDiverged, false)
 
 	ErrContains(t, "running git merge -q --no-ff -m atlantis-merge FETCH_HEAD", err)
 	ErrContains(t, "Auto-merging file", err)
@@ -275,9 +259,7 @@ func TestClone_NoReclone(t *testing.T) {
 		HeadBranch: "branch",
 	}, "default")
 	Ok(t, err)
-
-	// Check if master repo has not diverged
-	Equals(t, hasDiverged, false)
+	Equals(t, false, hasDiverged)
 
 	// Check that our proof file is still there.
 	_, err = os.Stat(filepath.Join(cloneDir, "proof"))
@@ -313,16 +295,15 @@ func TestClone_RecloneWrongCommit(t *testing.T) {
 		HeadCommit: expCommit,
 	}, "default")
 	Ok(t, err)
-
-	// Check if master repo has not diverged
-	Equals(t, hasDiverged, false)
+	Equals(t, false, hasDiverged)
 
 	// Use rev-parse to verify at correct commit.
 	actCommit := runCmd(t, cloneDir, "git", "rev-parse", "HEAD")
 	Equals(t, expCommit, actCommit)
 }
 
-// Test that if master (remote) repo has diverged, see issue 804
+// Test that if the branch we're merging into has diverged and we're using
+// checkout-strategy=merge, we warn the user (see #804).
 func TestClone_MasterHasDiverged(t *testing.T) {
 	// Initialize the git repo.
 	repoDir, cleanup := initRepo(t)
@@ -374,15 +355,22 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 		DataDir:       repoDir,
 		CheckoutMerge: true,
 	}
-
 	_, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
 		HeadBranch: "second-pr",
 		BaseBranch: "master",
 	}, "default")
 	Ok(t, err)
-
-	// Check if master repo is ahead and has diverged
 	Equals(t, hasDiverged, true)
+
+	// Run it again but without the checkout merge strategy. It should return
+	// false.
+	wd.CheckoutMerge = false
+	_, hasDiverged, err = wd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{
+		HeadBranch: "second-pr",
+		BaseBranch: "master",
+	}, "default")
+	Ok(t, err)
+	Equals(t, hasDiverged, false)
 }
 
 func initRepo(t *testing.T) (string, func()) {

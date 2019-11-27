@@ -190,7 +190,7 @@ $$$
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path -w workspace$
 
-:warning: Master branch is ahead, it is recommended to pull new commits first.
+:warning: The branch we're merging into is ahead, it is recommended to pull new commits first.
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
