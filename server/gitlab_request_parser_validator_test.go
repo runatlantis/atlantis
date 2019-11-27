@@ -177,7 +177,7 @@ var mergeEventJSON = `{
     "merge_commit_sha": null,
     "merge_error": null,
     "merge_params": {
-      "force_remove_source_branch": "0"
+      "force_remove_source_branch": false
     },
     "merge_status": "unchecked",
     "merge_user_id": null,
@@ -273,7 +273,7 @@ var mergeEventJSON = `{
       "previous": {
       },
       "current": {
-        "force_remove_source_branch": "0"
+        "force_remove_source_branch": false
       }
     },
     "source_branch": {
