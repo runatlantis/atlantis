@@ -60,7 +60,14 @@ func (g GlobalCfg) Validate() error {
 func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 	workflows := make(map[string]valid.Workflow)
 	for k, v := range g.Workflows {
-		workflows[k] = v.ToValid(k)
+		validatedWorkflow := v.ToValid(k)
+		workflows[k] = validatedWorkflow
+		if k == valid.DefaultWorkflowName {
+			// Handle the special case where they're redefining the default
+			// workflow. In this case, our default repo config references
+			// the "old" default workflow and so needs to be redefined.
+			defaultCfg.Repos[0].Workflow = &validatedWorkflow
+		}
 	}
 	// Merge in defaults without overriding.
 	for k, v := range defaultCfg.Workflows {

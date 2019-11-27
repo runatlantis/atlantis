@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	version "github.com/hashicorp/go-version"
+	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	. "github.com/runatlantis/atlantis/testing"
@@ -1073,6 +1073,57 @@ repos:
 				},
 				Workflows: map[string]valid.Workflow{
 					"default": defaultCfg.Workflows["default"],
+				},
+			},
+		},
+		"redefine default workflow": {
+			input: `
+workflows:
+  default:
+    plan:
+      steps:
+      - run: custom
+    apply:
+     steps: []
+`,
+			exp: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					{
+						IDRegex:           regexp.MustCompile(".*"),
+						ApplyRequirements: []string{},
+						Workflow: &valid.Workflow{
+							Name: "default",
+							Apply: valid.Stage{
+								Steps: nil,
+							},
+							Plan: valid.Stage{
+								Steps: []valid.Step{
+									{
+										StepName:   "run",
+										RunCommand: "custom",
+									},
+								},
+							},
+						},
+						AllowedOverrides:     []string{},
+						AllowCustomWorkflows: Bool(false),
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"default": {
+						Name: "default",
+						Apply: valid.Stage{
+							Steps: nil,
+						},
+						Plan: valid.Stage{
+							Steps: []valid.Step{
+								{
+									StepName:   "run",
+									RunCommand: "custom",
+								},
+							},
+						},
+					},
 				},
 			},
 		},
