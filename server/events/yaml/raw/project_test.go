@@ -226,11 +226,11 @@ func TestProject_ToValid(t *testing.T) {
 				Dir: String("."),
 			},
 			exp: valid.Project{
-				Dir:              ".",
-				Workspace:        "default",
-				WorkflowName:     nil,
-				TerraformVersion: nil,
-				Autoplan: DefaultValidAutoplan(),
+				Dir:               ".",
+				Workspace:         "default",
+				WorkflowName:      nil,
+				TerraformVersion:  nil,
+				Autoplan:          DefaultValidAutoplan(),
 				ApplyRequirements: nil,
 				Name:              nil,
 			},
@@ -272,7 +272,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:              ".",
 				Workspace:        "default",
 				TerraformVersion: tfVersionPointEleven,
-				Autoplan: DefaultValidAutoplan(),
+				Autoplan:         DefaultValidAutoplan(),
 			},
 		},
 		{
@@ -283,7 +283,7 @@ func TestProject_ToValid(t *testing.T) {
 			exp: valid.Project{
 				Dir:       ".",
 				Workspace: "default",
-				Autoplan: DefaultValidAutoplan(),
+				Autoplan:  DefaultValidAutoplan(),
 			},
 		},
 		{
@@ -294,7 +294,7 @@ func TestProject_ToValid(t *testing.T) {
 			exp: valid.Project{
 				Dir:       "mydir",
 				Workspace: "default",
-				Autoplan: DefaultValidAutoplan(),
+				Autoplan:  DefaultValidAutoplan(),
 			},
 		},
 		{
@@ -306,7 +306,7 @@ func TestProject_ToValid(t *testing.T) {
 			exp: valid.Project{
 				Dir:       "mydir",
 				Workspace: "default",
-				Autoplan: DefaultValidAutoplan(),
+				Autoplan:  DefaultValidAutoplan(),
 			},
 		},
 		{
@@ -318,7 +318,7 @@ func TestProject_ToValid(t *testing.T) {
 			exp: valid.Project{
 				Dir:       ".",
 				Workspace: "default",
-				Autoplan: DefaultValidAutoplan(),
+				Autoplan:  DefaultValidAutoplan(),
 			},
 		},
 	}
@@ -328,6 +328,3 @@ func TestProject_ToValid(t *testing.T) {
 		})
 	}
 }
-
-
-

@@ -275,7 +275,7 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 			config: valid.RepoCfg{
 				Projects: []valid.Project{
 					{
-						Dir: ".",
+						Dir:      ".",
 						Autoplan: DefaultValidAutoplan().SetEnabled(false),
 					},
 				},
@@ -288,7 +288,7 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 			config: valid.RepoCfg{
 				Projects: []valid.Project{
 					{
-						Dir: ".",
+						Dir:      ".",
 						Autoplan: DefaultValidAutoplan(),
 					},
 				},
@@ -301,7 +301,7 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 			config: valid.RepoCfg{
 				Projects: []valid.Project{
 					{
-						Dir: "project",
+						Dir:      "project",
 						Autoplan: DefaultValidAutoplan(),
 					},
 				},

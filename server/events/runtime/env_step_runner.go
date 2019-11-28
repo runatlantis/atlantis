@@ -1,8 +1,9 @@
 package runtime
 
 import (
-	"github.com/runatlantis/atlantis/server/events/models"
 	"strings"
+
+	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 // EnvStepRunner set environment variables.

@@ -201,11 +201,11 @@ projects:
 				Version: 3,
 				Projects: []valid.Project{
 					{
-						Dir:              ".",
-						Workspace:        "default",
-						WorkflowName:     nil,
-						TerraformVersion: nil,
-						Autoplan: DefaultValidAutoplan(),
+						Dir:               ".",
+						Workspace:         "default",
+						WorkflowName:      nil,
+						TerraformVersion:  nil,
+						Autoplan:          DefaultValidAutoplan(),
 						ApplyRequirements: nil,
 					},
 				},
@@ -224,7 +224,7 @@ projects:
 					{
 						Dir:       ".",
 						Workspace: "default",
-						Autoplan: DefaultValidAutoplan(),
+						Autoplan:  DefaultValidAutoplan(),
 					},
 				},
 				Workflows: make(map[string]valid.Workflow),
@@ -267,7 +267,7 @@ projects:
 					{
 						Dir:       ".",
 						Workspace: "default",
-						Autoplan: DefaultValidAutoplan(),
+						Autoplan:  DefaultValidAutoplan(),
 					},
 				},
 				Workflows: make(map[string]valid.Workflow),
@@ -287,7 +287,7 @@ workflows: ~
 					{
 						Dir:       ".",
 						Workspace: "default",
-						Autoplan: DefaultValidAutoplan(),
+						Autoplan:  DefaultValidAutoplan(),
 					},
 				},
 				Workflows: make(map[string]valid.Workflow),
@@ -312,7 +312,7 @@ workflows:
 					{
 						Dir:       ".",
 						Workspace: "default",
-						Autoplan: DefaultValidAutoplan(),
+						Autoplan:  DefaultValidAutoplan(),
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -340,11 +340,11 @@ workflows:
 				Version: 3,
 				Projects: []valid.Project{
 					{
-						Dir:              ".",
-						Workspace:        "myworkspace",
-						WorkflowName:     String("myworkflow"),
-						TerraformVersion: tfVersion,
-						Autoplan: DefaultValidAutoplan(),
+						Dir:               ".",
+						Workspace:         "myworkspace",
+						WorkflowName:      String("myworkflow"),
+						TerraformVersion:  tfVersion,
+						Autoplan:          DefaultValidAutoplan(),
 						ApplyRequirements: []string{"approved"},
 					},
 				},
@@ -375,11 +375,11 @@ workflows:
 				Version: 3,
 				Projects: []valid.Project{
 					{
-						Dir:              ".",
-						Workspace:        "myworkspace",
-						WorkflowName:     String("myworkflow"),
-						TerraformVersion: tfVersion,
-						Autoplan: DefaultValidAutoplan().SetEnabled(false),
+						Dir:               ".",
+						Workspace:         "myworkspace",
+						WorkflowName:      String("myworkflow"),
+						TerraformVersion:  tfVersion,
+						Autoplan:          DefaultValidAutoplan().SetEnabled(false),
 						ApplyRequirements: []string{"approved"},
 					},
 				},
@@ -410,11 +410,11 @@ workflows:
 				Version: 3,
 				Projects: []valid.Project{
 					{
-						Dir:              ".",
-						Workspace:        "myworkspace",
-						WorkflowName:     String("myworkflow"),
-						TerraformVersion: tfVersion,
-						Autoplan: DefaultValidAutoplan().SetEnabled(false),
+						Dir:               ".",
+						Workspace:         "myworkspace",
+						WorkflowName:      String("myworkflow"),
+						TerraformVersion:  tfVersion,
+						Autoplan:          DefaultValidAutoplan().SetEnabled(false),
 						ApplyRequirements: []string{"mergeable"},
 					},
 				},
@@ -445,11 +445,11 @@ workflows:
 				Version: 3,
 				Projects: []valid.Project{
 					{
-						Dir:              ".",
-						Workspace:        "myworkspace",
-						WorkflowName:     String("myworkflow"),
-						TerraformVersion: tfVersion,
-						Autoplan: DefaultValidAutoplan().SetEnabled(false),
+						Dir:               ".",
+						Workspace:         "myworkspace",
+						WorkflowName:      String("myworkflow"),
+						TerraformVersion:  tfVersion,
+						Autoplan:          DefaultValidAutoplan().SetEnabled(false),
 						ApplyRequirements: []string{"mergeable", "approved"},
 					},
 				},
@@ -560,13 +560,13 @@ projects:
 						Name:      String("myname"),
 						Dir:       ".",
 						Workspace: "workspace",
-						Autoplan: DefaultValidAutoplan(),
+						Autoplan:  DefaultValidAutoplan(),
 					},
 					{
 						Name:      String("myname2"),
 						Dir:       ".",
 						Workspace: "workspace",
-						Autoplan: DefaultValidAutoplan(),
+						Autoplan:  DefaultValidAutoplan(),
 					},
 				},
 				Workflows: map[string]valid.Workflow{},
@@ -595,7 +595,7 @@ workflows:
 					{
 						Dir:       ".",
 						Workspace: "default",
-						Autoplan: DefaultValidAutoplan(),
+						Autoplan:  DefaultValidAutoplan(),
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -654,7 +654,7 @@ workflows:
 					{
 						Dir:       ".",
 						Workspace: "default",
-						Autoplan: DefaultValidAutoplan(),
+						Autoplan:  DefaultValidAutoplan(),
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -709,7 +709,7 @@ workflows:
 					{
 						Dir:       ".",
 						Workspace: "default",
-						Autoplan: DefaultValidAutoplan(),
+						Autoplan:  DefaultValidAutoplan(),
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -760,7 +760,7 @@ workflows:
 					{
 						Dir:       ".",
 						Workspace: "default",
-						Autoplan: DefaultValidAutoplan(),
+						Autoplan:  DefaultValidAutoplan(),
 					},
 				},
 				Workflows: map[string]valid.Workflow{

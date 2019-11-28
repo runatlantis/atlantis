@@ -107,7 +107,7 @@ func TestAutoplan_ToValid(t *testing.T) {
 		{
 			description: "nothing set",
 			input:       raw.Autoplan{},
-			exp: DefaultValidAutoplan(),
+			exp:         DefaultValidAutoplan(),
 		},
 		{
 			description: "when modified empty",
