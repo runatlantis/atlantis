@@ -14,11 +14,10 @@
 package events_test
 
 import (
-	"os"
-	"testing"
-
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/runtime"
+	"os"
+	"testing"
 
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events"

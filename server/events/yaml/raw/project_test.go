@@ -226,11 +226,14 @@ func TestProject_ToValid(t *testing.T) {
 				Dir: String("."),
 			},
 			exp: valid.Project{
-				Dir:               ".",
-				Workspace:         "default",
-				WorkflowName:      nil,
-				TerraformVersion:  nil,
-				Autoplan:          DefaultValidAutoplan(),
+				Dir:              ".",
+				Workspace:        "default",
+				WorkflowName:     nil,
+				TerraformVersion: nil,
+				Autoplan: valid.Autoplan{
+					WhenModified: []string{"**/*.tf*"},
+					Enabled:      true,
+				},
 				ApplyRequirements: nil,
 				Name:              nil,
 			},
@@ -272,7 +275,10 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:              ".",
 				Workspace:        "default",
 				TerraformVersion: tfVersionPointEleven,
-				Autoplan:         DefaultValidAutoplan(),
+				Autoplan: valid.Autoplan{
+					WhenModified: []string{"**/*.tf*"},
+					Enabled:      true,
+				},
 			},
 		},
 		{
@@ -283,7 +289,10 @@ func TestProject_ToValid(t *testing.T) {
 			exp: valid.Project{
 				Dir:       ".",
 				Workspace: "default",
-				Autoplan:  DefaultValidAutoplan(),
+				Autoplan: valid.Autoplan{
+					WhenModified: []string{"**/*.tf*"},
+					Enabled:      true,
+				},
 			},
 		},
 		{
@@ -294,7 +303,10 @@ func TestProject_ToValid(t *testing.T) {
 			exp: valid.Project{
 				Dir:       "mydir",
 				Workspace: "default",
-				Autoplan:  DefaultValidAutoplan(),
+				Autoplan: valid.Autoplan{
+					WhenModified: []string{"**/*.tf*"},
+					Enabled:      true,
+				},
 			},
 		},
 		{
@@ -306,7 +318,10 @@ func TestProject_ToValid(t *testing.T) {
 			exp: valid.Project{
 				Dir:       "mydir",
 				Workspace: "default",
-				Autoplan:  DefaultValidAutoplan(),
+				Autoplan: valid.Autoplan{
+					WhenModified: []string{"**/*.tf*"},
+					Enabled:      true,
+				},
 			},
 		},
 		{
@@ -318,7 +333,10 @@ func TestProject_ToValid(t *testing.T) {
 			exp: valid.Project{
 				Dir:       ".",
 				Workspace: "default",
-				Autoplan:  DefaultValidAutoplan(),
+				Autoplan: valid.Autoplan{
+					WhenModified: []string{"**/*.tf*"},
+					Enabled:      true,
+				},
 			},
 		},
 	}

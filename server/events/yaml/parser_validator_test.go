@@ -201,11 +201,14 @@ projects:
 				Version: 3,
 				Projects: []valid.Project{
 					{
-						Dir:               ".",
-						Workspace:         "default",
-						WorkflowName:      nil,
-						TerraformVersion:  nil,
-						Autoplan:          DefaultValidAutoplan(),
+						Dir:              ".",
+						Workspace:        "default",
+						WorkflowName:     nil,
+						TerraformVersion: nil,
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf*"},
+							Enabled:      true,
+						},
 						ApplyRequirements: nil,
 					},
 				},
@@ -214,24 +217,6 @@ projects:
 		},
 		{
 			description: "autoplan should be enabled by default",
-			input: `
-version: 3
-projects:
-- dir: "."`,
-			exp: valid.RepoCfg{
-				Version: 3,
-				Projects: []valid.Project{
-					{
-						Dir:       ".",
-						Workspace: "default",
-						Autoplan:  DefaultValidAutoplan(),
-					},
-				},
-				Workflows: make(map[string]valid.Workflow),
-			},
-		},
-		{
-			description: "autoplan should be enabled by default if custom when_modified",
 			input: `
 version: 3
 projects:
@@ -267,7 +252,10 @@ projects:
 					{
 						Dir:       ".",
 						Workspace: "default",
-						Autoplan:  DefaultValidAutoplan(),
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf*"},
+							Enabled:      true,
+						},
 					},
 				},
 				Workflows: make(map[string]valid.Workflow),
@@ -287,7 +275,10 @@ workflows: ~
 					{
 						Dir:       ".",
 						Workspace: "default",
-						Autoplan:  DefaultValidAutoplan(),
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf*"},
+							Enabled:      true,
+						},
 					},
 				},
 				Workflows: make(map[string]valid.Workflow),
@@ -312,7 +303,10 @@ workflows:
 					{
 						Dir:       ".",
 						Workspace: "default",
-						Autoplan:  DefaultValidAutoplan(),
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf*"},
+							Enabled:      true,
+						},
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -340,11 +334,14 @@ workflows:
 				Version: 3,
 				Projects: []valid.Project{
 					{
-						Dir:               ".",
-						Workspace:         "myworkspace",
-						WorkflowName:      String("myworkflow"),
-						TerraformVersion:  tfVersion,
-						Autoplan:          DefaultValidAutoplan(),
+						Dir:              ".",
+						Workspace:        "myworkspace",
+						WorkflowName:     String("myworkflow"),
+						TerraformVersion: tfVersion,
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf*"},
+							Enabled:      true,
+						},
 						ApplyRequirements: []string{"approved"},
 					},
 				},
@@ -358,7 +355,7 @@ workflows:
 			},
 		},
 		{
-			description: "project field with autoplan disabled",
+			description: "project field with autoplan",
 			input: `
 version: 3
 projects:
@@ -375,11 +372,14 @@ workflows:
 				Version: 3,
 				Projects: []valid.Project{
 					{
-						Dir:               ".",
-						Workspace:         "myworkspace",
-						WorkflowName:      String("myworkflow"),
-						TerraformVersion:  tfVersion,
-						Autoplan:          DefaultValidAutoplan().SetEnabled(false),
+						Dir:              ".",
+						Workspace:        "myworkspace",
+						WorkflowName:     String("myworkflow"),
+						TerraformVersion: tfVersion,
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf*"},
+							Enabled:      false,
+						},
 						ApplyRequirements: []string{"approved"},
 					},
 				},
@@ -410,11 +410,14 @@ workflows:
 				Version: 3,
 				Projects: []valid.Project{
 					{
-						Dir:               ".",
-						Workspace:         "myworkspace",
-						WorkflowName:      String("myworkflow"),
-						TerraformVersion:  tfVersion,
-						Autoplan:          DefaultValidAutoplan().SetEnabled(false),
+						Dir:              ".",
+						Workspace:        "myworkspace",
+						WorkflowName:     String("myworkflow"),
+						TerraformVersion: tfVersion,
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf*"},
+							Enabled:      false,
+						},
 						ApplyRequirements: []string{"mergeable"},
 					},
 				},
@@ -445,11 +448,14 @@ workflows:
 				Version: 3,
 				Projects: []valid.Project{
 					{
-						Dir:               ".",
-						Workspace:         "myworkspace",
-						WorkflowName:      String("myworkflow"),
-						TerraformVersion:  tfVersion,
-						Autoplan:          DefaultValidAutoplan().SetEnabled(false),
+						Dir:              ".",
+						Workspace:        "myworkspace",
+						WorkflowName:     String("myworkflow"),
+						TerraformVersion: tfVersion,
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf*"},
+							Enabled:      false,
+						},
 						ApplyRequirements: []string{"mergeable", "approved"},
 					},
 				},
@@ -560,13 +566,19 @@ projects:
 						Name:      String("myname"),
 						Dir:       ".",
 						Workspace: "workspace",
-						Autoplan:  DefaultValidAutoplan(),
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf*"},
+							Enabled:      true,
+						},
 					},
 					{
 						Name:      String("myname2"),
 						Dir:       ".",
 						Workspace: "workspace",
-						Autoplan:  DefaultValidAutoplan(),
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf*"},
+							Enabled:      true,
+						},
 					},
 				},
 				Workflows: map[string]valid.Workflow{},
@@ -595,7 +607,10 @@ workflows:
 					{
 						Dir:       ".",
 						Workspace: "default",
-						Autoplan:  DefaultValidAutoplan(),
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf*"},
+							Enabled:      true,
+						},
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -654,7 +669,10 @@ workflows:
 					{
 						Dir:       ".",
 						Workspace: "default",
-						Autoplan:  DefaultValidAutoplan(),
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf*"},
+							Enabled:      true,
+						},
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -709,7 +727,10 @@ workflows:
 					{
 						Dir:       ".",
 						Workspace: "default",
-						Autoplan:  DefaultValidAutoplan(),
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf*"},
+							Enabled:      true,
+						},
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -760,7 +781,10 @@ workflows:
 					{
 						Dir:       ".",
 						Workspace: "default",
-						Autoplan:  DefaultValidAutoplan(),
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"**/*.tf*"},
+							Enabled:      true,
+						},
 					},
 				},
 				Workflows: map[string]valid.Workflow{
