@@ -230,10 +230,7 @@ func TestProject_ToValid(t *testing.T) {
 				Workspace:        "default",
 				WorkflowName:     nil,
 				TerraformVersion: nil,
-				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf*"},
-					Enabled:      true,
-				},
+				Autoplan: DefaultValidAutoplan(),
 				ApplyRequirements: nil,
 				Name:              nil,
 			},
@@ -275,10 +272,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:              ".",
 				Workspace:        "default",
 				TerraformVersion: tfVersionPointEleven,
-				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf*"},
-					Enabled:      true,
-				},
+				Autoplan: DefaultValidAutoplan(),
 			},
 		},
 		{
@@ -289,10 +283,7 @@ func TestProject_ToValid(t *testing.T) {
 			exp: valid.Project{
 				Dir:       ".",
 				Workspace: "default",
-				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf*"},
-					Enabled:      true,
-				},
+				Autoplan: DefaultValidAutoplan(),
 			},
 		},
 		{
@@ -303,10 +294,7 @@ func TestProject_ToValid(t *testing.T) {
 			exp: valid.Project{
 				Dir:       "mydir",
 				Workspace: "default",
-				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf*"},
-					Enabled:      true,
-				},
+				Autoplan: DefaultValidAutoplan(),
 			},
 		},
 		{
@@ -318,10 +306,7 @@ func TestProject_ToValid(t *testing.T) {
 			exp: valid.Project{
 				Dir:       "mydir",
 				Workspace: "default",
-				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf*"},
-					Enabled:      true,
-				},
+				Autoplan: DefaultValidAutoplan(),
 			},
 		},
 		{
@@ -333,10 +318,7 @@ func TestProject_ToValid(t *testing.T) {
 			exp: valid.Project{
 				Dir:       ".",
 				Workspace: "default",
-				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf*"},
-					Enabled:      true,
-				},
+				Autoplan: DefaultValidAutoplan(),
 			},
 		},
 	}
@@ -346,3 +328,6 @@ func TestProject_ToValid(t *testing.T) {
 		})
 	}
 }
+
+
+

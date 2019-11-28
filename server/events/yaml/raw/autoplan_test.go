@@ -107,10 +107,7 @@ func TestAutoplan_ToValid(t *testing.T) {
 		{
 			description: "nothing set",
 			input:       raw.Autoplan{},
-			exp: valid.Autoplan{
-				Enabled:      true,
-				WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
-			},
+			exp: DefaultValidAutoplan(),
 		},
 		{
 			description: "when modified empty",
@@ -127,20 +124,14 @@ func TestAutoplan_ToValid(t *testing.T) {
 			input: raw.Autoplan{
 				Enabled: Bool(false),
 			},
-			exp: valid.Autoplan{
-				Enabled:      false,
-				WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
-			},
+			exp: DefaultValidAutoplan().SetEnabled(false),
 		},
 		{
 			description: "enabled true",
 			input: raw.Autoplan{
 				Enabled: Bool(true),
 			},
-			exp: valid.Autoplan{
-				Enabled:      true,
-				WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
-			},
+			exp: DefaultValidAutoplan(),
 		},
 	}
 	for _, c := range cases {

@@ -67,6 +67,11 @@ type Autoplan struct {
 	Enabled      bool
 }
 
+func (a Autoplan) SetEnabled(enabled bool) Autoplan {
+	a.Enabled = enabled
+	return a
+}
+
 type Stage struct {
 	Steps []Step
 }

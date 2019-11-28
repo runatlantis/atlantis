@@ -276,10 +276,7 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 				Projects: []valid.Project{
 					{
 						Dir: ".",
-						Autoplan: valid.Autoplan{
-							Enabled:      false,
-							WhenModified: []string{"**/*.tf"},
-						},
+						Autoplan: DefaultValidAutoplan().SetEnabled(false),
 					},
 				},
 			},
@@ -292,10 +289,7 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 				Projects: []valid.Project{
 					{
 						Dir: ".",
-						Autoplan: valid.Autoplan{
-							Enabled:      true,
-							WhenModified: []string{"**/*.tf"},
-						},
+						Autoplan: DefaultValidAutoplan(),
 					},
 				},
 			},
@@ -308,10 +302,7 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 				Projects: []valid.Project{
 					{
 						Dir: "project",
-						Autoplan: valid.Autoplan{
-							Enabled:      true,
-							WhenModified: []string{"**/*.tf"},
-						},
+						Autoplan: DefaultValidAutoplan(),
 					},
 				},
 			},
