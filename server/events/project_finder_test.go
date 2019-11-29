@@ -396,6 +396,54 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 			modified:     []string{"project2/terraform.tfvars"},
 			expProjPaths: []string{"project2"},
 		},
+		{
+			description: "file excluded",
+			config: valid.RepoCfg{
+				Projects: []valid.Project{
+					{
+						Dir: "project1",
+						Autoplan: valid.Autoplan{
+							Enabled:      true,
+							WhenModified: []string{"*.tf", "!exclude-me.tf"},
+						},
+					},
+				},
+			},
+			modified:     []string{"project1/exclude-me.tf"},
+			expProjPaths: nil,
+		},
+		{
+			description: "some files excluded and others included",
+			config: valid.RepoCfg{
+				Projects: []valid.Project{
+					{
+						Dir: "project1",
+						Autoplan: valid.Autoplan{
+							Enabled:      true,
+							WhenModified: []string{"*.tf", "!exclude-me.tf"},
+						},
+					},
+				},
+			},
+			modified:     []string{"project1/exclude-me.tf", "project1/include-me.tf"},
+			expProjPaths: []string{"project1"},
+		},
+		{
+			description: "multiple dirs excluded",
+			config: valid.RepoCfg{
+				Projects: []valid.Project{
+					{
+						Dir: "project1",
+						Autoplan: valid.Autoplan{
+							Enabled:      true,
+							WhenModified: []string{"**/*.tf", "!subdir1/*", "!subdir2/*"},
+						},
+					},
+				},
+			},
+			modified:     []string{"project1/subdir1/main.tf", "project1/subdir2/main.tf"},
+			expProjPaths: nil,
+		},
 	}
 
 	for _, c := range cases {

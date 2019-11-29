@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 )
 
 // TeamsService handles communication with the teams methods on the API
@@ -15,14 +14,14 @@ type TeamsService struct {
 
 // Project Describes a project
 type Project struct {
-	ID             *string    `json:"id,omitempty"`
-	Name           *string    `json:"name,omitempty"`
-	Description    *string    `json:"description,omitempty"`
-	URL            *string    `json:"url,omitempty"`
-	State          *string    `json:"state,omitempty"`
-	Revision       *int       `json:"revision,omitempty"`
-	Visibility     *string    `json:"visibility,omitempty"`
-	LastUpdateTime *time.Time `json:"lastUpdateTime,omitempty"`
+	ID             *string `json:"id,omitempty"`
+	Name           *string `json:"name,omitempty"`
+	Description    *string `json:"description,omitempty"`
+	URL            *string `json:"url,omitempty"`
+	State          *string `json:"state,omitempty"`
+	Revision       *int    `json:"revision,omitempty"`
+	Visibility     *string `json:"visibility,omitempty"`
+	LastUpdateTime *Time   `json:"lastUpdateTime,omitempty"`
 }
 
 // Team describes what a team looks like
@@ -55,16 +54,16 @@ type TeamProjectCollectionReference struct {
 
 // TeamProjectReference Represents a shallow reference to a TeamProject.
 type TeamProjectReference struct {
-	Abbreviation        *string    `json:"abbreviation,omitempty"`
-	DefaultTeamImageURL *string    `json:"defaultTeamImageUrl,omitempty"`
-	Description         *string    `json:"description,omitempty"`
-	ID                  *string    `json:"id,omitempty"`
-	Name                *string    `json:"name,omitempty"`
-	Revision            *int       `json:"revision,omitempty"`
-	State               *string    `json:"state,omitempty"`
-	URL                 *string    `json:"url,omitempty"`
-	Visibility          *string    `json:"visibility,omitempty"`
-	LastUpdateTime      *time.Time `json:"lastUpdateTime,omitempty"`
+	Abbreviation        *string `json:"abbreviation,omitempty"`
+	DefaultTeamImageURL *string `json:"defaultTeamImageUrl,omitempty"`
+	Description         *string `json:"description,omitempty"`
+	ID                  *string `json:"id,omitempty"`
+	Name                *string `json:"name,omitempty"`
+	Revision            *int    `json:"revision,omitempty"`
+	State               *string `json:"state,omitempty"`
+	URL                 *string `json:"url,omitempty"`
+	Visibility          *string `json:"visibility,omitempty"`
+	LastUpdateTime      *Time   `json:"lastUpdateTime,omitempty"`
 }
 
 // List returns list of the teams

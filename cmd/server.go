@@ -252,8 +252,8 @@ var boolFlags = map[string]boolFlag{
 		defaultValue: false,
 	},
 	WriteGitCredsFlag: {
-		description: "Write out a .git-credentials file with the provider user and token to allow cloning private modules over HTTPS or SSH" +
-			" This does write secrets to disk and should only be enabled in a secure environment.",
+		description: "Write out a .git-credentials file with the provider user and token to allow cloning private modules over HTTPS or SSH." +
+			" This writes secrets to disk and should only be enabled in a secure environment.",
 		defaultValue: false,
 	},
 }
@@ -590,7 +590,7 @@ func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && !s.SilenceOutput {
 		s.Logger.Warn("Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are whitelisting Bitbucket IPs")
 	}
-	if (userConfig.AzureDevopsWebhookUser == "" || userConfig.AzureDevopsWebhookPassword == "") && !s.SilenceOutput {
+	if userConfig.AzureDevopsWebhookUser != "" && userConfig.AzureDevopsWebhookPassword == "" && !s.SilenceOutput {
 		s.Logger.Warn("no Azure DevOps webhook user and password set. This could allow attackers to spoof requests from Azure DevOps.")
 	}
 }

@@ -11,7 +11,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
-	"gopkg.in/russross/blackfriday.v2"
 )
 
 // AzureDevopsClient represents an Azure DevOps VCS client
@@ -84,9 +83,6 @@ func (g *AzureDevopsClient) GetModifiedFiles(repo models.Repo, pull models.PullR
 //
 // If comment length is greater than the max comment length we split into
 // multiple comments.
-// Azure DevOps doesn't support markdown in Work Item comments, but it will
-// convert text to HTML.  We use the blackfriday library to convert Atlantis
-// comment markdown before submission.
 func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment string) error {
 	sepEnd := "\n```\n</details>" +
 		"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
@@ -102,14 +98,12 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	for _, c := range comments {
-		input := blackfriday.Run([]byte(c))
-		s := string(input)
 		commentType := "text"
 		parentCommentID := 0
 
 		prComment := azuredevops.Comment{
 			CommentType:     &commentType,
-			Content:         &s,
+			Content:         &c,
 			ParentCommentID: &parentCommentID,
 		}
 		prComments := []*azuredevops.Comment{&prComment}

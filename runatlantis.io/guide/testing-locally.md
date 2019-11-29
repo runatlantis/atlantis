@@ -47,7 +47,7 @@ Bitbucket Cloud (bitbucket.org) doesn't use webhook secrets so if you're using B
 When you're ready to do a production deploy of Atlantis you should whitelist [Bitbucket IPs](https://confluence.atlassian.com/bitbucket/what-are-the-bitbucket-cloud-ip-addresses-i-should-use-to-configure-my-corporate-firewall-343343385.html)
 to ensure the webhooks are coming from them.
 :::
-Create a random string of any length (you can use [http://www.unit-conversion.info/texttools/random-string-generator/](http://www.unit-conversion.info/texttools/random-string-generator/))
+Create a random string of any length (you can use [https://www.random.org/strings/](https://www.random.org/strings/))
 and set an environment variable:
 ```
 SECRET="{YOUR_RANDOM_STRING}"

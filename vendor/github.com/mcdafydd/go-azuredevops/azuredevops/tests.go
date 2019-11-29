@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 )
 
 // TestsService handles communication with the Tests methods on the API
@@ -77,11 +76,11 @@ type TestResult struct {
 		Name string `json:"name"`
 		URL  string `json:"url"`
 	} `json:"project"`
-	StartedDate   time.Time `json:"startedDate"`
-	CompletedDate time.Time `json:"completedDate"`
-	DurationInMs  float64   `json:"durationInMs"`
-	Outcome       string    `json:"outcome"`
-	Revision      int       `json:"revision"`
+	StartedDate   Time    `json:"startedDate"`
+	CompletedDate Time    `json:"completedDate"`
+	DurationInMs  float64 `json:"durationInMs"`
+	Outcome       string  `json:"outcome"`
+	Revision      int     `json:"revision"`
 	RunBy         struct {
 		ID          string `json:"id"`
 		DisplayName string `json:"displayName"`
@@ -99,7 +98,7 @@ type TestResult struct {
 		Name string `json:"name"`
 		URL  string `json:"url"`
 	} `json:"testRun"`
-	LastUpdatedDate time.Time `json:"lastUpdatedDate"`
+	LastUpdatedDate Time `json:"lastUpdatedDate"`
 	LastUpdatedBy   struct {
 		ID          string `json:"id"`
 		DisplayName string `json:"displayName"`
@@ -114,13 +113,13 @@ type TestResult struct {
 		Name string `json:"name"`
 		URL  string `json:"url"`
 	} `json:"build"`
-	CreatedDate          time.Time `json:"createdDate"`
-	URL                  string    `json:"url"`
-	FailureType          string    `json:"failureType"`
-	AutomatedTestStorage string    `json:"automatedTestStorage"`
-	AutomatedTestType    string    `json:"automatedTestType"`
-	AutomatedTestTypeID  string    `json:"automatedTestTypeId"`
-	AutomatedTestID      string    `json:"automatedTestId"`
+	CreatedDate          Time   `json:"createdDate"`
+	URL                  string `json:"url"`
+	FailureType          string `json:"failureType"`
+	AutomatedTestStorage string `json:"automatedTestStorage"`
+	AutomatedTestType    string `json:"automatedTestType"`
+	AutomatedTestTypeID  string `json:"automatedTestTypeId"`
+	AutomatedTestID      string `json:"automatedTestId"`
 	Area                 struct {
 		ID   string `json:"id"`
 		Name string `json:"name"`

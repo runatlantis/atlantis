@@ -1,3 +1,40 @@
+# v0.10.2
+
+## Description
+Some small features in this release and some bug fixes.
+* Exclusions are now supported in `when_modified` config so you can ignore changes
+  in files that you don't want to trigger plan on.
+* Emojis are now supported in Azure DevOps 🎉.
+
+## Features
+* Upgrade Terraform in Docker image to 0.12.16.
+* Add support for [kustomize](https://kustomize.io/) ([#785](https://github.com/runatlantis/atlantis/pull/785) by @tobbbles)
+* Use emojis in comments for Azure DevOps ([#863](https://github.com/runatlantis/atlantis/pull/863) by @mcdafydd)
+* Allow exclusions to be specified in `when_modified`, e.g. `when_modified: ["!this-file.tf"]` ([#847](https://github.com/runatlantis/atlantis/pull/847) by @leonsodhi-lf)
+* When using `--checkout-strategy=merge` warn users if the branch they're merging into has been updated ([#804](https://github.com/runatlantis/atlantis/issues/804) by @MRinalducci)
+
+## Bugfixes
+* Support `/` in branch names for Azure DevOps (Fixes [#835](https://github.com/runatlantis/atlantis/issues/835) by @mcdafydd)
+* Fix bug where a server-side workflow with the name "default" wasn't being used (Fixes [#860](https://github.com/runatlantis/atlantis/issues/860))
+* Fix GitLab error due to API updates (Fixes [#864](https://github.com/runatlantis/atlantis/issues/846))
+
+## Backwards Incompatibilities / Notes:
+* If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
+  then the default version of Terraform will now be 0.12.16. Simply set the above
+  flag to your desired default version to avoid any issues.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.10.2/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.10.2/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.10.2/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.10.2/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.10.2`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.10.1..v0.10.2
+https://github.com/runatlantis/atlantis/compare/v0.10.1...v0.10.2
+
 # v0.10.1
 
 ## Description

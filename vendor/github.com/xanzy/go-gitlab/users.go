@@ -37,6 +37,17 @@ type UsersService struct {
 	client *Client
 }
 
+// BasicUser included in other service responses (such as merge requests, pipelines, etc).
+type BasicUser struct {
+	ID        int        `json:"id"`
+	Username  string     `json:"username"`
+	Name      string     `json:"name"`
+	State     string     `json:"state"`
+	CreatedAt *time.Time `json:"created_at"`
+	AvatarURL string     `json:"avatar_url"`
+	WebURL    string     `json:"web_url"`
+}
+
 // User represents a GitLab user.
 //
 // GitLab API docs: https://docs.gitlab.com/ee/api/users.html
