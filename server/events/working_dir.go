@@ -215,15 +215,17 @@ func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
 		}
 	}
 
+	env := append(os.Environ(), []string{
+		"EMAIL=atlantis@runatlants.io",
+		"GIT_AUTHOR_NAME=atlantis",
+		"GIT_COMMITTER_NAME=atlantis",
+	}...)
+
 	for _, args := range cmds {
 		cmd := exec.Command(args[0], args[1:]...) // nolint: gosec
 		cmd.Dir = cloneDir
 		// The git merge command requires these env vars are set.
-		cmd.Env = append(os.Environ(), []string{
-			"EMAIL=atlantis@runatlants.io",
-			"GIT_AUTHOR_NAME=atlantis",
-			"GIT_COMMITTER_NAME=atlantis",
-		}...)
+		cmd.Env = env
 
 		cmdStr := w.sanitizeGitCredentials(strings.Join(cmd.Args, " "), p.BaseRepo, headRepo)
 		output, err := cmd.CombinedOutput()
@@ -234,6 +236,20 @@ func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
 		}
 		log.Debug("ran: %s. Output: %s", cmdStr, strings.TrimSuffix(sanitizedOutput, "\n"))
 	}
+
+	cmd := exec.Command("git", "lfs", "pull")
+	cmd.Dir = cloneDir
+	cmd.Env = env
+
+	output, err := cmd.CombinedOutput()
+	sanitizedOutput := w.sanitizeGitCredentials(string(output), p.BaseRepo, headRepo)
+	// Git LFS may not be enabled on this repository or may not have been
+	// installed by the user.
+	if err != nil && !strings.Contains(err.Error(), "exited with 1:") {
+		sanitizedErrMsg := w.sanitizeGitCredentials(err.Error(), p.BaseRepo, headRepo)
+		return fmt.Errorf("running git lfs pull: %s: %s", sanitizedOutput, sanitizedErrMsg)
+	}
+	log.Debug("ran: git lfs pull. Output: %s", strings.TrimSuffix(sanitizedOutput, "\n"))
 	return nil
 }
 
