@@ -245,7 +245,7 @@ func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
 	sanitizedOutput := w.sanitizeGitCredentials(string(output), p.BaseRepo, headRepo)
 	// Git LFS may not be enabled on this repository or may not have been
 	// installed by the user.
-	if err != nil && !strings.Contains(err.Error(), "exited with 1:") {
+	if err != nil && err.(*exec.ExitError).ExitCode() != 1 {
 		sanitizedErrMsg := w.sanitizeGitCredentials(err.Error(), p.BaseRepo, headRepo)
 		return fmt.Errorf("running git lfs pull: %s: %s", sanitizedOutput, sanitizedErrMsg)
 	}
