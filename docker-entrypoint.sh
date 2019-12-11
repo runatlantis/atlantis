@@ -16,7 +16,7 @@ fi
 # since the help output contains that string. For anything else (ex. sh)
 # it won't contain that string.
 # NOTE: We use grep instead of the exit code since help always returns 0.
-if atlantis --help "$1" 2>&1 | grep -q "atlantis $1"; then
+if atlantis help "$1" 2>&1 | grep -q "atlantis $1"; then
     # We can't use the return code to check for the existence of a subcommand, so
     # we have to use grep to look for a pattern in the help output.
     set -- atlantis "$@"
