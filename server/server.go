@@ -179,7 +179,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			}
 		}
 		if userConfig.BitbucketUser != "" {
-			if err := events.WriteGitCreds(userConfig.BitbucketUser, userConfig.BitbucketToken, userConfig.BitbucketBaseURL, home, logger); err != nil {
+			// The default BitbucketBaseURL is https://api.bitbucket.org which can't actually be used for git
+			// so we overide it here only if it's that to be bitbucket.org
+			bitbucketBaseURL := userConfig.BitbucketBaseURL
+			if bitbucketBaseURL == "https://api.bitbucket.org" {
+				bitbucketBaseURL = "bitbucket.org"
+			}
+			if err := events.WriteGitCreds(userConfig.BitbucketUser, userConfig.BitbucketToken, bitbucketBaseURL, home, logger); err != nil {
 				return nil, err
 			}
 		}
