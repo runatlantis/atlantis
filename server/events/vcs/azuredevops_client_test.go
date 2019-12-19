@@ -145,7 +145,7 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch r.RequestURI {
-					case "/owner/project/_apis/git/repositories/repo/commits/sha/statuses?api-version=5.1-preview.1":
+					case "/owner/project/_apis/git/repositories/repo/pullrequests/22/statuses?api-version=5.1-preview.1":
 						gotRequest = true
 						body, err := ioutil.ReadAll(r.Body)
 						Ok(t, err)

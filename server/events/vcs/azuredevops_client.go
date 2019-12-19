@@ -180,19 +180,51 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
 	}
 
 	genreStr := "Atlantis Bot"
-	status := azuredevops.GitStatus{
-		State:       &adState,
-		Description: &description,
-		Context: &azuredevops.GitStatusContext{
-			Name:  &src,
-			Genre: &genreStr,
-		},
+	prstatus := azuredevops.GitPullRequestStatus{}
+	prstatus.Context = &azuredevops.GitStatusContext{
+		Name:  &src,
+		Genre: &genreStr,
 	}
+	prstatus.Description = &description
+	prstatus.State = &adState
 	if url != "" {
-		status.TargetURL = &url
+		prstatus.TargetURL = &url
 	}
+
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
-	_, _, err := g.Client.Git.CreateStatus(g.ctx, owner, project, repoName, pull.HeadCommit, status)
+
+	opts := azuredevops.PullRequestListOptions{}
+	source, _, err := g.Client.PullRequests.Get(g.ctx, owner, project, pull.Num, &opts)
+	if err != nil {
+                return errors.Wrap(err, "getting pull request")
+        }
+	if resp.StatusCode != http.StatusOK {
+                return errors.Wrap(resp.StatusCode, "http response code getting pull request")
+        }
+	if source.GetSupportsIterations() == true {
+	        opts := azuredevops.PullRequestIterationsListOptions{}
+		iterations, resp, err := g.Client.PullRequests.ListIterations(g.ctx, owner, project, repoName, pull.Num, &opts)
+	        if err != nil {
+                        return errors.Wrap(err, "listing pull request iterations")
+                }
+	        if resp.StatusCode != http.StatusOK {
+                        return errors.Wrap(resp.StatusCode, "http response code listing pull request iterations")
+                }
+		for _, iteration := range iterations {
+			if *iteration.GetSourceRefCommit().CommitID == pull.HeadCommit {
+				prstatus.IterationID = iteration.ID
+				break
+			}
+		}
+                return errors.New("supportsIterations was true but no matching commit SHA was found in any of the iterations")
+	}
+	_, resp, err = g.Client.PullRequests.CreateStatus(g.ctx, owner, project, repoName, pull.Num, &prstatus)
+	if err != nil {
+                return errors.Wrap(err, "creating pull request status")
+        }
+	if resp.StatusCode != http.StatusOK {
+                return errors.Wrap(resp.StatusCode, "http response code listing pull request iterations")
+        }
 	return err
 }
 

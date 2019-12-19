@@ -201,6 +201,38 @@ type GitPullRequest struct {
 	WorkItemRefs          []*ResourceRef                   `json:"workItemRefs,omitempty"`
 }
 
+// GitPullRequestChange Change made in a pull request.
+type GitPullRequestChange struct {
+	ChangeTrackingID *int `json:"changeTrackingId,omitempty"`
+}
+
+// GitPullRequestIteration Provides properties that describe a Git pull request iteration. Iterations are created as a result of creating and pushing updates to a pull request.
+type GitPullRequestIteration struct {
+	Links            interface{}             `json:"_links,omitempty"`
+	Author           *IdentityRef            `json:"author,omitempty"`
+	ChangeList       []*GitPullRequestChange `json:"changeList,omitempty"`
+	Commits          []*GitCommitRef         `json:"commits,omitempty"`
+	CommonRefCommit  *GitCommitRef           `json:"commonRefCommit,omitempty"`
+	CreatedDate      *Time                   `json:"createdDate,omitempty"`
+	Description      *string                 `json:"description,omitempty"`
+	HasMoreCommits   *bool                   `json:"hasMoreCommits,omitempty"`
+	ID               *int                    `json:"id,omitempty"`
+	NewTargetRefName *string                 `json:"newTargetRefName,omitempty"`
+	OldTargetRefName *string                 `json:"oldTargetRefName,omitempty"`
+	Push             *GitPushRef             `json:"push,omitempty"`
+	Reason           *string                 `json:"reason,omitempty"`
+	SourceRefCommit  *GitCommitRef           `json:"sourceRefCommit,omitempty"`
+	TargetRefCommit  *GitCommitRef           `json:"targetRefCommit,omitempty"`
+	UpdatedDate      *Time                   `json:"updatedDate,omitempty"`
+}
+
+// Collection of changes made in a pull request.
+type GitPullRequestIterationChanges struct {
+	ChangeEntries []*GitPullRequestChange `json:"changeEntries,omitempty"`
+	NextSkip      *int                    `json:"nextSkip,omitempty"`
+	NextTop       *int                    `json:"nextTop,omitempty"`
+}
+
 // GitPullRequestCompletionOptions describes preferences about how the pull
 // request should be completed.
 // SquashMerge is deprecated. You should explicity set the value of MergeStrategy. If
@@ -333,8 +365,8 @@ type GitStatus struct {
 // an iteration.
 type GitPullRequestStatus struct {
 	GitStatus
-	IterationID int   `json:"iterationId,omitempty"`
-	Properties  *Time `json:"properties,omitempty"`
+	IterationID *int                   `json:"iterationId,omitempty"`
+	Properties  map[string]interface{} `json:"properties,omitempty"`
 }
 
 // GitRefListOptions describes what the request to the API should look like
@@ -361,6 +393,23 @@ type GitUserDate struct {
 	Name  *string `json:"name,omitempty"`
 	Email *string `json:"email,omitempty"`
 	Date  *Time   `json:"date,omitempty"`
+}
+
+// IterationReason The reason for which the pull request iteration was created.
+type IterationReason int
+
+// IterationReason enum declaration
+const (
+	IterationPush IterationReason = iota
+	IterationForcePush
+	IterationCreate
+	IterationRebase
+	IterationUnknown
+	IterationRetarget
+)
+
+func (d IterationReason) String() string {
+	return [...]string{"push", "forcePush", "create", "rebase", "unknown", "retarget"}[d]
 }
 
 // UpdateRefs returns a list of the references for a git repo
