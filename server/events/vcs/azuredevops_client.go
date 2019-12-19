@@ -3,6 +3,7 @@ package vcs
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -194,12 +195,12 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	opts := azuredevops.PullRequestListOptions{}
-	source, _, err := g.Client.PullRequests.Get(g.ctx, owner, project, pull.Num, &opts)
+	source, resp, err := g.Client.PullRequests.Get(g.ctx, owner, project, pull.Num, &opts)
 	if err != nil {
                 return errors.Wrap(err, "getting pull request")
         }
 	if resp.StatusCode != http.StatusOK {
-                return errors.Wrap(resp.StatusCode, "http response code getting pull request")
+                return errors.Wrapf(err, "http response code %d getting pull request", resp.StatusCode)
         }
 	if source.GetSupportsIterations() == true {
 	        opts := azuredevops.PullRequestIterationsListOptions{}
@@ -208,7 +209,7 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
                         return errors.Wrap(err, "listing pull request iterations")
                 }
 	        if resp.StatusCode != http.StatusOK {
-                        return errors.Wrap(resp.StatusCode, "http response code listing pull request iterations")
+		        return errors.Wrapf(err, "http response code %d listing pull request iterations", resp.StatusCode)
                 }
 		for _, iteration := range iterations {
 			if *iteration.GetSourceRefCommit().CommitID == pull.HeadCommit {
@@ -223,7 +224,7 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
                 return errors.Wrap(err, "creating pull request status")
         }
 	if resp.StatusCode != http.StatusOK {
-                return errors.Wrap(resp.StatusCode, "http response code listing pull request iterations")
+		return errors.Wrapf(err, "http response code %d creating pull request status", resp.StatusCode)
         }
 	return err
 }
