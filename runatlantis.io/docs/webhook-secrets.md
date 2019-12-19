@@ -25,7 +25,7 @@ To mitigate, use repo whitelists and IP whitelists. See [Security](security.html
 You can use any random string generator to create your Webhook secret. It should be > 24 characters.
 
 For example:
-* Generate via Ruby with `ruby -rsecurerandom -e 'puts SecureRandom.hex(20)'`
+* Generate via Ruby with `ruby -rsecurerandom -e 'puts SecureRandom.hex(32)'`
 * Generate online with [https://www.random.org/passwords/?num=2&len=20&format=html&rnd=new](https://www.random.org/passwords/?num=2&len=20&format=html&rnd=new)
 
 ::: tip NOTE
