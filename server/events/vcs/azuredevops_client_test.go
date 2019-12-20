@@ -121,8 +121,8 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 
 func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 	cases := []struct {
-		status   models.CommitStatus
-		expState string
+		status             models.CommitStatus
+		expState           string
 		supportsIterations bool
 	}{
 		{
@@ -143,7 +143,7 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 		{
 			models.PendingCommitStatus,
 			"pending",
-		  false,
+			false,
 		},
 		{
 			models.SuccessCommitStatus,
@@ -169,7 +169,7 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 					switch r.RequestURI {
 					case "/owner/project/_apis/git/repositories/repo/pullrequests/22/statuses?api-version=5.1-preview.1":
 						gotRequest = true
-						defer r.Body.Close()      // nolint: errcheck
+						defer r.Body.Close() // nolint: errcheck
 						body, err := ioutil.ReadAll(r.Body)
 						Ok(t, err)
 						exp := fmt.Sprintf(partResponse, c.expState)

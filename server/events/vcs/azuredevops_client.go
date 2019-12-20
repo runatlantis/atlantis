@@ -181,15 +181,15 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
 	}
 
 	genreStr := "Atlantis Bot"
-	prstatus := azuredevops.GitPullRequestStatus{}
-	prstatus.Context = &azuredevops.GitStatusContext{
+	status := azuredevops.GitPullRequestStatus{}
+	status.Context = &azuredevops.GitStatusContext{
 		Name:  &src,
 		Genre: &genreStr,
 	}
-	prstatus.Description = &description
-	prstatus.State = &adState
+	status.Description = &description
+	status.State = &adState
 	if url != "" {
-		prstatus.TargetURL = &url
+		status.TargetURL = &url
 	}
 
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
@@ -213,19 +213,19 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
 		}
 		for _, iteration := range iterations {
 			if sourceRef := iteration.GetSourceRefCommit(); sourceRef != nil {
-			  if *sourceRef.CommitID == pull.HeadCommit {
-				  prstatus.IterationID = iteration.ID
-				  break
-			  }
+				if *sourceRef.CommitID == pull.HeadCommit {
+					status.IterationID = iteration.ID
+					break
+				}
 			}
 		}
-		if iterationID := prstatus.IterationID; iterationID != nil {
+		if iterationID := status.IterationID; iterationID != nil {
 			if !(*iterationID >= 1) {
-			  return errors.New("supportsIterations was true but got invalid iteration ID or no matching iteration commit SHA was found")
+				return errors.New("supportsIterations was true but got invalid iteration ID or no matching iteration commit SHA was found")
 			}
 		}
 	}
-	_, resp, err = g.Client.PullRequests.CreateStatus(g.ctx, owner, project, repoName, pull.Num, &prstatus)
+	_, resp, err = g.Client.PullRequests.CreateStatus(g.ctx, owner, project, repoName, pull.Num, &status)
 	if err != nil {
 		return errors.Wrap(err, "creating pull request status")
 	}
