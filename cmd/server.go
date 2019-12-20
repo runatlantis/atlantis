@@ -68,6 +68,7 @@ const (
 	RepoWhitelistFlag          = "repo-whitelist"
 	RequireApprovalFlag        = "require-approval"
 	RequireMergeableFlag       = "require-mergeable"
+	SilenceForkPRErrorsFlag    = "silence-fork-pr-errors"
 	SilenceWhitelistErrorsFlag = "silence-whitelist-errors"
 	SlackTokenFlag             = "slack-token"
 	SSLCertFileFlag            = "ssl-cert-file"
@@ -259,6 +260,10 @@ var boolFlags = map[string]boolFlag{
 		defaultValue: false,
 		hidden:       true,
 	},
+	SilenceForkPRErrorsFlag: {
+		description:  "Silences the posting of fork pull requests not allowed error comments.",
+		defaultValue: false,
+	},
 	SilenceWhitelistErrorsFlag: {
 		description:  "Silences the posting of whitelist error comments.",
 		defaultValue: false,
@@ -432,11 +437,12 @@ func (s *ServerCmd) run() error {
 
 	// Config looks good. Start the server.
 	server, err := s.ServerCreator.NewServer(userConfig, server.Config{
-		AllowForkPRsFlag:     AllowForkPRsFlag,
-		AtlantisURLFlag:      AtlantisURLFlag,
-		AtlantisVersion:      s.AtlantisVersion,
-		DefaultTFVersionFlag: DefaultTFVersionFlag,
-		RepoConfigJSONFlag:   RepoConfigJSONFlag,
+		AllowForkPRsFlag:        AllowForkPRsFlag,
+		AtlantisURLFlag:         AtlantisURLFlag,
+		AtlantisVersion:         s.AtlantisVersion,
+		DefaultTFVersionFlag:    DefaultTFVersionFlag,
+		RepoConfigJSONFlag:      RepoConfigJSONFlag,
+		SilenceForkPRErrorsFlag: SilenceForkPRErrorsFlag,
 	})
 	if err != nil {
 		return errors.Wrap(err, "initializing server")
