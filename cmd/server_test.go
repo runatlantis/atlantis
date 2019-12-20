@@ -512,6 +512,8 @@ func TestExecute_Flags(t *testing.T) {
 		cmd.RepoWhitelistFlag:          "github.com/runatlantis/atlantis",
 		cmd.RequireApprovalFlag:        true,
 		cmd.RequireMergeableFlag:       true,
+		cmd.SilenceForkPRErrorsFlag:    true,
+		cmd.SilenceWhitelistErrorsFlag: true,
 		cmd.SlackTokenFlag:             "slack-token",
 		cmd.SSLCertFileFlag:            "cert-file",
 		cmd.SSLKeyFileFlag:             "key-file",
@@ -551,6 +553,8 @@ func TestExecute_Flags(t *testing.T) {
 	Equals(t, "github.com/runatlantis/atlantis", passedConfig.RepoWhitelist)
 	Equals(t, true, passedConfig.RequireApproval)
 	Equals(t, true, passedConfig.RequireMergeable)
+	Equals(t, true, passedConfig.SilenceForkPRErrors)
+	Equals(t, true, passedConfig.SilenceWhitelistErrors)
 	Equals(t, "slack-token", passedConfig.SlackToken)
 	Equals(t, "cert-file", passedConfig.SSLCertFile)
 	Equals(t, "key-file", passedConfig.SSLKeyFile)
