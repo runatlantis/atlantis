@@ -83,11 +83,12 @@ type Server struct {
 
 // Config holds config for server that isn't passed in by the user.
 type Config struct {
-	AllowForkPRsFlag     string
-	AtlantisURLFlag      string
-	AtlantisVersion      string
-	DefaultTFVersionFlag string
-	RepoConfigJSONFlag   string
+	AllowForkPRsFlag        string
+	AtlantisURLFlag         string
+	AtlantisVersion         string
+	DefaultTFVersionFlag    string
+	RepoConfigJSONFlag      string
+	SilenceForkPRErrorsFlag string
 }
 
 // WebhookConfig is nested within UserConfig. It's used to configure webhooks.
@@ -312,6 +313,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Logger:                   logger,
 		AllowForkPRs:             userConfig.AllowForkPRs,
 		AllowForkPRsFlag:         config.AllowForkPRsFlag,
+		SilenceForkPRErrors:      userConfig.SilenceForkPRErrors,
+		SilenceForkPRErrorsFlag:  config.SilenceForkPRErrorsFlag,
 		DisableApplyAll:          userConfig.DisableApplyAll,
 		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
 			ParserValidator:   validator,

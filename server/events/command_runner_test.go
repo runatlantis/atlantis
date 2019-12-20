@@ -136,7 +136,9 @@ func TestRunCommentCommand_ForkPRDisabled(t *testing.T) {
 	t.Log("if a command is run on a forked pull request and this is disabled atlantis should" +
 		" comment saying that this is not allowed")
 	vcsClient := setup(t)
-	ch.AllowForkPRs = false // by default it's false so don't need to reset
+	// by default these are false so don't need to reset
+	ch.AllowForkPRs = false
+	ch.SilenceForkPRErrors = false
 	var pull github.PullRequest
 	modelPull := models.PullRequest{State: models.OpenPullState}
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
@@ -147,7 +149,26 @@ func TestRunCommentCommand_ForkPRDisabled(t *testing.T) {
 	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, headRepo, nil)
 
 	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, nil)
-	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "Atlantis commands can't be run on fork pull requests. To enable, set --"+ch.AllowForkPRsFlag)
+	commentMessage := fmt.Sprintf("Atlantis commands can't be run on fork pull requests. To enable, set --%s  or, to disable this message, set --%s", ch.AllowForkPRsFlag, ch.SilenceForkPRErrorsFlag)
+	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, commentMessage)
+}
+
+func TestRunCommentCommand_ForkPRDisabled_SilenceEnabled(t *testing.T) {
+	t.Log("if a command is run on a forked pull request and forks are disabled and we are silencing errors do not comment with error")
+	vcsClient := setup(t)
+	ch.AllowForkPRs = false // by default it's false so don't need to reset
+	ch.SilenceForkPRErrors = true
+	var pull github.PullRequest
+	modelPull := models.PullRequest{State: models.OpenPullState}
+	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
+
+	headRepo := fixtures.GithubRepo
+	headRepo.FullName = "forkrepo/atlantis"
+	headRepo.Owner = "forkrepo"
+	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, headRepo, nil)
+
+	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, nil)
+	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString())
 }
 
 func TestRunCommentCommand_DisableApplyAllDisabled(t *testing.T) {

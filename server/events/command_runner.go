@@ -78,9 +78,15 @@ type DefaultCommandRunner struct {
 	// AllowForkPRsFlag is the name of the flag that controls fork PR's. We use
 	// this in our error message back to the user on a forked PR so they know
 	// how to enable this functionality.
-	AllowForkPRsFlag      string
-	ProjectCommandBuilder ProjectCommandBuilder
-	ProjectCommandRunner  ProjectCommandRunner
+	AllowForkPRsFlag string
+	// SilenceForkPRErrors controls whether to comment on Fork PRs when AllowForkPRs = False
+	SilenceForkPRErrors bool
+	// SilenceForkPRErrorsFlag is the name of the flag that controls fork PR's. We use
+	// this in our error message back to the user on a forked PR so they know
+	// how to disable error comment
+	SilenceForkPRErrorsFlag string
+	ProjectCommandBuilder   ProjectCommandBuilder
+	ProjectCommandRunner    ProjectCommandRunner
 	// GlobalAutomerge is true if we should automatically merge pull requests if all
 	// plans have been successfully applied. This is set via a CLI flag.
 	GlobalAutomerge   bool
@@ -387,8 +393,11 @@ func (c *DefaultCommandRunner) buildLogger(repoFullName string, pullNum int) *lo
 
 func (c *DefaultCommandRunner) validateCtxAndComment(ctx *CommandContext) bool {
 	if !c.AllowForkPRs && ctx.HeadRepo.Owner != ctx.BaseRepo.Owner {
+		if c.SilenceForkPRErrors {
+			return false
+		}
 		ctx.Log.Info("command was run on a fork pull request which is disallowed")
-		if err := c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, fmt.Sprintf("Atlantis commands can't be run on fork pull requests. To enable, set --%s", c.AllowForkPRsFlag)); err != nil {
+		if err := c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, fmt.Sprintf("Atlantis commands can't be run on fork pull requests. To enable, set --%s  or, to disable this message, set --%s", c.AllowForkPRsFlag, c.SilenceForkPRErrorsFlag)); err != nil {
 			ctx.Log.Err("unable to comment: %s", err)
 		}
 		return false

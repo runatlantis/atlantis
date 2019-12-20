@@ -389,6 +389,13 @@ Values are chosen in this order:
   ```
   Or use `--repo-config-json='{"repos":[{"id":"/.*/", "apply_requirements":["mergeable"]}]}'` instead.
 
+* ### `--silence-fork-pr-errors`
+  ```bash
+  atlantis server --silence-fork-pr-errors
+  ```
+  Normally, if Atlantis receives a pull request webhook from a fork and --allow-fork-prs is not set,
+  it will comment back with an error. This flag disables that commenting.
+
 * ### `--silence-whitelist-errors`
   ```bash
   atlantis server --silence-whitelist-errors
