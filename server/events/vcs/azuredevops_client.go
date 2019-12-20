@@ -197,35 +197,41 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
 	opts := azuredevops.PullRequestListOptions{}
 	source, resp, err := g.Client.PullRequests.Get(g.ctx, owner, project, pull.Num, &opts)
 	if err != nil {
-                return errors.Wrap(err, "getting pull request")
-        }
+		return errors.Wrap(err, "getting pull request")
+	}
 	if resp.StatusCode != http.StatusOK {
-                return errors.Wrapf(err, "http response code %d getting pull request", resp.StatusCode)
-        }
+		return errors.Wrapf(err, "http response code %d getting pull request", resp.StatusCode)
+	}
 	if source.GetSupportsIterations() == true {
-	        opts := azuredevops.PullRequestIterationsListOptions{}
+		opts := azuredevops.PullRequestIterationsListOptions{}
 		iterations, resp, err := g.Client.PullRequests.ListIterations(g.ctx, owner, project, repoName, pull.Num, &opts)
-	        if err != nil {
-                        return errors.Wrap(err, "listing pull request iterations")
-                }
-	        if resp.StatusCode != http.StatusOK {
-		        return errors.Wrapf(err, "http response code %d listing pull request iterations", resp.StatusCode)
-                }
+		if err != nil {
+			return errors.Wrap(err, "listing pull request iterations")
+		}
+		if resp.StatusCode != http.StatusOK {
+			return errors.Wrapf(err, "http response code %d listing pull request iterations", resp.StatusCode)
+		}
 		for _, iteration := range iterations {
-			if *iteration.GetSourceRefCommit().CommitID == pull.HeadCommit {
-				prstatus.IterationID = iteration.ID
-				break
+			if sourceRef := iteration.GetSourceRefCommit(); sourceRef != nil {
+			  if *sourceRef.CommitID == pull.HeadCommit {
+				  prstatus.IterationID = iteration.ID
+				  break
+			  }
 			}
 		}
-                return errors.New("supportsIterations was true but no matching commit SHA was found in any of the iterations")
+		if iterationID := prstatus.IterationID; iterationID != nil {
+			if !(*iterationID >= 1) {
+			  return errors.New("supportsIterations was true but got invalid iteration ID or no matching iteration commit SHA was found")
+			}
+		}
 	}
 	_, resp, err = g.Client.PullRequests.CreateStatus(g.ctx, owner, project, repoName, pull.Num, &prstatus)
 	if err != nil {
-                return errors.Wrap(err, "creating pull request status")
-        }
+		return errors.Wrap(err, "creating pull request status")
+	}
 	if resp.StatusCode != http.StatusOK {
 		return errors.Wrapf(err, "http response code %d creating pull request status", resp.StatusCode)
-        }
+	}
 	return err
 }
 

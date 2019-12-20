@@ -123,23 +123,45 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 	cases := []struct {
 		status   models.CommitStatus
 		expState string
+		supportsIterations bool
 	}{
 		{
 			models.PendingCommitStatus,
 			"pending",
+			true,
 		},
 		{
 			models.SuccessCommitStatus,
 			"succeeded",
+			true,
 		},
 		{
 			models.FailedCommitStatus,
 			"failed",
+			true,
+		},
+		{
+			models.PendingCommitStatus,
+			"pending",
+		  false,
+		},
+		{
+			models.SuccessCommitStatus,
+			"succeeded",
+			false,
+		},
+		{
+			models.FailedCommitStatus,
+			"failed",
+			false,
 		},
 	}
-	response := `{"context":{"genre":"Atlantis Bot","name":"src"},"description":"description","state":"%s","targetUrl":"https://google.com"}
-`
+	iterResponse := `{"count": 2, "value": [{"id": 1, "sourceRefCommit": { "commitId": "oldsha"}}, {"id": 2, "sourceRefCommit": { "commitId": "sha"}}]}`
+	prResponse := `{"supportsIterations": %t}`
+	partResponse := `{"context":{"genre":"Atlantis Bot","name":"src"},"description":"description","state":"%s","targetUrl":"https://google.com"`
+
 	for _, c := range cases {
+		prResponse := fmt.Sprintf(prResponse, c.supportsIterations)
 		t.Run(c.expState, func(t *testing.T) {
 			gotRequest := false
 			testServer := httptest.NewTLSServer(
@@ -147,12 +169,21 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 					switch r.RequestURI {
 					case "/owner/project/_apis/git/repositories/repo/pullrequests/22/statuses?api-version=5.1-preview.1":
 						gotRequest = true
+						defer r.Body.Close()      // nolint: errcheck
 						body, err := ioutil.ReadAll(r.Body)
 						Ok(t, err)
-						exp := fmt.Sprintf(response, c.expState)
+						exp := fmt.Sprintf(partResponse, c.expState)
+						if c.supportsIterations == true {
+							exp = fmt.Sprintf("%s%s}\n", exp, `,"iterationId":2`)
+						} else {
+							exp = fmt.Sprintf("%s}\n", exp)
+						}
 						Equals(t, exp, string(body))
-						defer r.Body.Close()      // nolint: errcheck
-						w.Write([]byte(response)) // nolint: errcheck
+						w.Write([]byte(exp)) // nolint: errcheck
+					case "/owner/project/_apis/git/repositories/repo/pullrequests/22/iterations?api-version=5.1":
+						w.Write([]byte(iterResponse)) // nolint: errcheck
+					case "/owner/project/_apis/git/pullrequests/22?api-version=5.1-preview.1":
+						w.Write([]byte(prResponse)) // nolint: errcheck
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
 						http.Error(w, "not found", http.StatusNotFound)
