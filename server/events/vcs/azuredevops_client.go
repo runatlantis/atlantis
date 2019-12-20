@@ -202,7 +202,7 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
 	if resp.StatusCode != http.StatusOK {
 		return errors.Wrapf(err, "http response code %d getting pull request", resp.StatusCode)
 	}
-	if source.GetSupportsIterations() == true {
+	if source.GetSupportsIterations() {
 		opts := azuredevops.PullRequestIterationsListOptions{}
 		iterations, resp, err := g.Client.PullRequests.ListIterations(g.ctx, owner, project, repoName, pull.Num, &opts)
 		if err != nil {
