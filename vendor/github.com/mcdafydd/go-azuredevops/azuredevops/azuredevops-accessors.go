@@ -1663,6 +1663,14 @@ func (g *GitPullRequest) GetURL() string {
 	return *g.URL
 }
 
+// GetChangeTrackingID returns the ChangeTrackingID field if it's non-nil, zero value otherwise.
+func (g *GitPullRequestChange) GetChangeTrackingID() int {
+	if g == nil || g.ChangeTrackingID == nil {
+		return 0
+	}
+	return *g.ChangeTrackingID
+}
+
 // GetID returns the ID field if it's non-nil, zero value otherwise.
 func (g *GitPullRequestCommentThread) GetID() int {
 	if g == nil || g.ID == nil {
@@ -1823,6 +1831,126 @@ func (g *GitPullRequestCompletionOptions) GetTriggeredByAutoComplete() bool {
 	return *g.TriggeredByAutoComplete
 }
 
+// GetAuthor returns the Author field.
+func (g *GitPullRequestIteration) GetAuthor() *IdentityRef {
+	if g == nil {
+		return nil
+	}
+	return g.Author
+}
+
+// GetCommonRefCommit returns the CommonRefCommit field.
+func (g *GitPullRequestIteration) GetCommonRefCommit() *GitCommitRef {
+	if g == nil {
+		return nil
+	}
+	return g.CommonRefCommit
+}
+
+// GetCreatedDate returns the CreatedDate field.
+func (g *GitPullRequestIteration) GetCreatedDate() *Time {
+	if g == nil {
+		return nil
+	}
+	return g.CreatedDate
+}
+
+// GetDescription returns the Description field if it's non-nil, zero value otherwise.
+func (g *GitPullRequestIteration) GetDescription() string {
+	if g == nil || g.Description == nil {
+		return ""
+	}
+	return *g.Description
+}
+
+// GetHasMoreCommits returns the HasMoreCommits field if it's non-nil, zero value otherwise.
+func (g *GitPullRequestIteration) GetHasMoreCommits() bool {
+	if g == nil || g.HasMoreCommits == nil {
+		return false
+	}
+	return *g.HasMoreCommits
+}
+
+// GetID returns the ID field if it's non-nil, zero value otherwise.
+func (g *GitPullRequestIteration) GetID() int {
+	if g == nil || g.ID == nil {
+		return 0
+	}
+	return *g.ID
+}
+
+// GetNewTargetRefName returns the NewTargetRefName field if it's non-nil, zero value otherwise.
+func (g *GitPullRequestIteration) GetNewTargetRefName() string {
+	if g == nil || g.NewTargetRefName == nil {
+		return ""
+	}
+	return *g.NewTargetRefName
+}
+
+// GetOldTargetRefName returns the OldTargetRefName field if it's non-nil, zero value otherwise.
+func (g *GitPullRequestIteration) GetOldTargetRefName() string {
+	if g == nil || g.OldTargetRefName == nil {
+		return ""
+	}
+	return *g.OldTargetRefName
+}
+
+// GetPush returns the Push field.
+func (g *GitPullRequestIteration) GetPush() *GitPushRef {
+	if g == nil {
+		return nil
+	}
+	return g.Push
+}
+
+// GetReason returns the Reason field if it's non-nil, zero value otherwise.
+func (g *GitPullRequestIteration) GetReason() string {
+	if g == nil || g.Reason == nil {
+		return ""
+	}
+	return *g.Reason
+}
+
+// GetSourceRefCommit returns the SourceRefCommit field.
+func (g *GitPullRequestIteration) GetSourceRefCommit() *GitCommitRef {
+	if g == nil {
+		return nil
+	}
+	return g.SourceRefCommit
+}
+
+// GetTargetRefCommit returns the TargetRefCommit field.
+func (g *GitPullRequestIteration) GetTargetRefCommit() *GitCommitRef {
+	if g == nil {
+		return nil
+	}
+	return g.TargetRefCommit
+}
+
+// GetUpdatedDate returns the UpdatedDate field.
+func (g *GitPullRequestIteration) GetUpdatedDate() *Time {
+	if g == nil {
+		return nil
+	}
+	return g.UpdatedDate
+}
+
+// GetNextSkip returns the NextSkip field if it's non-nil, zero value otherwise.
+func (g *GitPullRequestIterationChanges) GetNextSkip() int {
+	if g == nil || g.NextSkip == nil {
+		return 0
+	}
+	return *g.NextSkip
+}
+
+// GetNextTop returns the NextTop field if it's non-nil, zero value otherwise.
+func (g *GitPullRequestIterationChanges) GetNextTop() int {
+	if g == nil || g.NextTop == nil {
+		return 0
+	}
+	return *g.NextTop
+}
+
 // GetDetectRenameFalsePositives returns the DetectRenameFalsePositives field if it's non-nil, zero value otherwise.
 func (g *GitPullRequestMergeOptions) GetDetectRenameFalsePositives() bool {
 	if g == nil || g.DetectRenameFalsePositives == nil {
@@ -1839,12 +1967,12 @@ func (g *GitPullRequestMergeOptions) GetDisableRenames() bool {
 	return *g.DisableRenames
 }
 
-// GetProperties returns the Properties field.
-func (g *GitPullRequestStatus) GetProperties() *Time {
-	if g == nil {
-		return nil
+// GetIterationID returns the IterationID field if it's non-nil, zero value otherwise.
+func (g *GitPullRequestStatus) GetIterationID() int {
+	if g == nil || g.IterationID == nil {
+		return 0
 	}
-	return g.Properties
+	return *g.IterationID
 }
 
 // GetComment returns the Comment field.
