@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -49,8 +50,8 @@ func NewAzureDevopsClient(hostname string, token string) (*AzureDevopsClient, er
 	return client, nil
 }
 
-// GetModifiedFiles returns the names of files that were modified in the merge request.
-// The names include the path to the file from the repo root, ex. parent/child/file.txt.
+// GetModifiedFiles returns the names of files that were modified in the merge request
+// relative to the repo root, e.g. parent/child/file.txt.
 func (g *AzureDevopsClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	var files []string
 
@@ -66,13 +67,17 @@ func (g *AzureDevopsClient) GetModifiedFiles(repo models.Repo, pull models.PullR
 
 	for _, change := range r.Changes {
 		item := change.GetItem()
-		files = append(files, item.GetPath())
+		// Convert the path to a relative path from the repo's root.
+		relativePath := filepath.Clean("./" + item.GetPath())
+		files = append(files, relativePath)
 
 		// If the file was renamed, we'll want to run plan in the directory
 		// it was moved from as well.
 		changeType := azuredevops.Rename.String()
 		if change.ChangeType == &changeType {
-			files = append(files, change.GetSourceServerItem())
+			// Convert the path to a relative path from the repo's root.
+			relativePath = filepath.Clean("./" + change.GetSourceServerItem())
+			files = append(files, relativePath)
 		}
 	}
 

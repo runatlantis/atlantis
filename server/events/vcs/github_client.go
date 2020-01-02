@@ -61,8 +61,8 @@ func NewGithubClient(hostname string, user string, pass string) (*GithubClient, 
 	}, nil
 }
 
-// GetModifiedFiles returns the names of files that were modified in the pull request.
-// The names include the path to the file from the repo root, ex. parent/child/file.txt.
+// GetModifiedFiles returns the names of files that were modified in the pull request
+// relative to the repo root, e.g. parent/child/file.txt.
 func (g *GithubClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	var files []string
 	nextPage := 0

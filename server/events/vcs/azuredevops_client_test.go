@@ -203,7 +203,7 @@ func TestAzureDevopsClient_GetModifiedFiles(t *testing.T) {
 		"changeType": "add"
 	}
 ]}`
-	resp := fmt.Sprintf(itemRespTemplate, "file1.txt", "file1.txt", "file2.txt", "file2.txt")
+	resp := fmt.Sprintf(itemRespTemplate, "/file1.txt", "/file1.txt", "/file2.txt", "/file2.txt")
 	testServer := httptest.NewTLSServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.RequestURI {

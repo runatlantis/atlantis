@@ -58,8 +58,8 @@ func NewClient(httpClient *http.Client, username string, password string, baseUR
 	}, nil
 }
 
-// GetModifiedFiles returns the names of files that were modified in the merge request.
-// The names include the path to the file from the repo root, ex. parent/child/file.txt.
+// GetModifiedFiles returns the names of files that were modified in the merge request
+// relative to the repo root, e.g. parent/child/file.txt.
 func (b *Client) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	var files []string
 
