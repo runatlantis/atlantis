@@ -340,7 +340,8 @@ Values are chosen in this order:
   * Format is `{hostname}/{owner}/{repo}`, ex. `github.com/runatlantis/atlantis`
   * `*` matches any characters, ex. `github.com/runatlantis/*` will match all repos in the runatlantis organization
   * For Bitbucket Server: `{hostname}` is the domain without scheme and port, `{owner}` is the name of the project (not the key), and `{repo}` is the repo name
-  * For Azure DevOps the whitelist takes one of two forms: `{owner}.visualstudio.com/{project}/{repo}` or `dev.azure.com/{owner}/{project}/{repo}
+    * User (not project) repositories take on the format: `{hostname}/{full name}/{repo}` (e.g., `bitbucket.example.com/Jane Doe/myatlantis` for username `jdoe` and full name `Jane Doe`, which is not very intuitive)
+  * For Azure DevOps the whitelist takes one of two forms: `{owner}.visualstudio.com/{project}/{repo}` or `dev.azure.com/{owner}/{project}/{repo}`
   * Microsoft is in the process of changing Azure DevOps to the latter form, so it may be safest to always specify both formats in your repo whitelist for each repository until the change is complete.
 
   Examples:
