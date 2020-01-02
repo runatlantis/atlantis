@@ -281,13 +281,28 @@ func TestProject_ToValid(t *testing.T) {
 				},
 			},
 		},
+		// Directories.
 		{
-			description: "dir with /",
+			description: "dir set to /",
 			input: raw.Project{
 				Dir: String("/"),
 			},
 			exp: valid.Project{
 				Dir:       ".",
+				Workspace: "default",
+				Autoplan: valid.Autoplan{
+					WhenModified: []string{"**/*.tf*"},
+					Enabled:      true,
+				},
+			},
+		},
+		{
+			description: "dir starting with /",
+			input: raw.Project{
+				Dir: String("/a/b/c"),
+			},
+			exp: valid.Project{
+				Dir:       "a/b/c",
 				Workspace: "default",
 				Autoplan: valid.Autoplan{
 					WhenModified: []string{"**/*.tf*"},
@@ -324,6 +339,49 @@ func TestProject_ToValid(t *testing.T) {
 				},
 			},
 		},
+		{
+			description: "dir set to ./",
+			input: raw.Project{
+				Dir: String("./"),
+			},
+			exp: valid.Project{
+				Dir:       ".",
+				Workspace: "default",
+				Autoplan: valid.Autoplan{
+					WhenModified: []string{"**/*.tf*"},
+					Enabled:      true,
+				},
+			},
+		},
+		{
+			description: "dir set to ././",
+			input: raw.Project{
+				Dir: String("././"),
+			},
+			exp: valid.Project{
+				Dir:       ".",
+				Workspace: "default",
+				Autoplan: valid.Autoplan{
+					WhenModified: []string{"**/*.tf*"},
+					Enabled:      true,
+				},
+			},
+		},
+		{
+			description: "dir set to .",
+			input: raw.Project{
+				Dir: String("."),
+			},
+			exp: valid.Project{
+				Dir:       ".",
+				Workspace: "default",
+				Autoplan: valid.Autoplan{
+					WhenModified: []string{"**/*.tf*"},
+					Enabled:      true,
+				},
+			},
+		},
+
 		{
 			description: "workspace set to empty string",
 			input: raw.Project{
