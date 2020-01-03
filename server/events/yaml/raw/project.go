@@ -67,10 +67,10 @@ func (p Project) Validate() error {
 
 func (p Project) ToValid() valid.Project {
 	var v valid.Project
-	cleanedDir := filepath.Clean(*p.Dir)
-	if cleanedDir == "/" {
-		cleanedDir = "."
-	}
+	// Prepend ./ and then run .Clean() so we're guaranteed to have a relative
+	// directory. This is necessary because we use this dir without sanitation
+	// in DefaultProjectFinder.
+	cleanedDir := filepath.Clean("./" + *p.Dir)
 	v.Dir = cleanedDir
 
 	if p.Workspace == nil || *p.Workspace == "" {

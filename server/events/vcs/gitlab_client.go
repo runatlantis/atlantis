@@ -92,8 +92,8 @@ func NewGitlabClient(hostname string, token string, logger *logging.SimpleLogger
 	return client, nil
 }
 
-// GetModifiedFiles returns the names of files that were modified in the merge request.
-// The names include the path to the file from the repo root, ex. parent/child/file.txt.
+// GetModifiedFiles returns the names of files that were modified in the merge request
+// relative to the repo root, e.g. parent/child/file.txt.
 func (g *GitlabClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	const maxPerPage = 100
 	var files []string

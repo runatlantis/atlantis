@@ -21,6 +21,8 @@ import (
 
 // Client is used to make API calls to a VCS host like GitHub or GitLab.
 type Client interface {
+	// GetModifiedFiles returns the names of files that were modified in the merge request
+	// relative to the repo root, e.g. parent/child/file.txt.
 	GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error)
 	CreateComment(repo models.Repo, pullNum int, comment string) error
 	PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error)
