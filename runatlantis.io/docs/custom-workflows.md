@@ -348,3 +348,26 @@ the redirect, the script would block the Atlantis workflow.
 * If a workflow step returns a non-zero exit code, the workflow will stop. 
 :::
 
+#### Environment Variable `env` Command
+The `env` command allows you to set environment variables that will be available
+to all steps defined **below** the `env` step.
+
+You can set hard coded values via the `value` key, or set dynamic values via
+the `command` key which allows you to run any command and uses the output
+as the environment variable value.
+```yaml
+- env:
+    name: ENV_NAME
+    value: hard-coded-value
+- env:
+    name: ENV_NAME_2
+    command: 'echo "dynamic-value-$(date)"'
+```
+| Key             | Type                               | Default | Required | Description                                                                                                                                         |
+|-----------------|------------------------------------|---------|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------|
+| env | map[`name` -> string, `value` -> string, `command` -> string] | none    | no       | Set environment variables for subsequent steps |
+
+::: tip Notes
+* `env` `command`'s can use any of the built-in environment variables available
+  to `run` commands. 
+:::
