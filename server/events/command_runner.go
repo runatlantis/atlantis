@@ -425,6 +425,10 @@ func (c *DefaultCommandRunner) updatePull(ctx *CommandContext, command PullComma
 	if err := c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, comment); err != nil {
 		ctx.Log.Err("unable to comment: %s", err)
 	}
+
+	if err := c.VCSClient.HideOldComments(ctx.BaseRepo, ctx.Pull.Num); err != nil {
+		ctx.Log.Err("unable to hide old comments: %s", err)
+	}
 }
 
 // logPanics logs and creates a comment on the pull request for panics.
