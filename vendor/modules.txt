@@ -6,6 +6,10 @@ cloud.google.com/go/internal/optional
 cloud.google.com/go/internal/trace
 cloud.google.com/go/internal/version
 cloud.google.com/go/storage
+# github.com/Laisky/graphql v1.0.4
+github.com/Laisky/graphql
+github.com/Laisky/graphql/ident
+github.com/Laisky/graphql/internal/jsonutil
 # github.com/Masterminds/semver v1.4.2
 github.com/Masterminds/semver
 # github.com/Masterminds/sprig v2.15.0+incompatible
@@ -173,11 +177,17 @@ github.com/onsi/gomega/format
 github.com/pelletier/go-buffruneio
 # github.com/pelletier/go-toml v1.0.0
 github.com/pelletier/go-toml
-# github.com/petergtz/pegomock v2.5.0+incompatible
+# github.com/petergtz/pegomock v2.7.0+incompatible
 github.com/petergtz/pegomock
 github.com/petergtz/pegomock/internal/verify
 # github.com/pkg/errors v0.8.0
 github.com/pkg/errors
+# github.com/shurcooL/githubv4 v0.0.0-20191127044304-8f68eb5628d0
+github.com/shurcooL/githubv4
+# github.com/shurcooL/graphql v0.0.0-20181231061246-d48a9a75455f
+github.com/shurcooL/graphql
+github.com/shurcooL/graphql/ident
+github.com/shurcooL/graphql/internal/jsonutil
 # github.com/sirupsen/logrus v1.2.0
 github.com/sirupsen/logrus
 # github.com/spf13/afero v0.0.0-20170901052352-ee1bd8ee15a1
@@ -240,7 +250,7 @@ golang.org/x/crypto/openpgp/s2k
 golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/scrypt
 golang.org/x/crypto/ssh/terminal
-# golang.org/x/net v0.0.0-20191126235420-ef20fe5d7933
+# golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
 golang.org/x/net/html
