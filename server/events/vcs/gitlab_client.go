@@ -139,6 +139,10 @@ func (g *GitlabClient) CreateComment(repo models.Repo, pullNum int, comment stri
 	return err
 }
 
+func (g *GitlabClient) HideOldComments(repo models.Repo, pullNum int) error {
+	return nil
+}
+
 // PullIsApproved returns true if the merge request was approved.
 func (g *GitlabClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
 	approvals, _, err := g.Client.MergeRequests.GetMergeRequestApprovals(repo.FullName, pull.Num)

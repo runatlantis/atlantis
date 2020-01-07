@@ -25,6 +25,10 @@ type Client interface {
 	// relative to the repo root, e.g. parent/child/file.txt.
 	GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error)
 	CreateComment(repo models.Repo, pullNum int, comment string) error
+	// HideOldComments will hide old comments left from previous plan runs to reduce
+	// clutter in a pull/merge request. This will not delete the comment, since the
+	// comment trail may be useful in auditing or backtracing problems.
+	HideOldComments(repo models.Repo, pullNum int) error
 	PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error)
 	PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error)
 	// UpdateStatus updates the commit status to state for pull. src is the

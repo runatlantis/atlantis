@@ -100,6 +100,10 @@ func (b *Client) CreateComment(repo models.Repo, pullNum int, comment string) er
 	return err
 }
 
+func (b *Client) HideOldComments(repo models.Repo, pullNum int) error {
+	return nil
+}
+
 // PullIsApproved returns true if the merge request was approved.
 func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
 	path := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d", b.BaseURL, repo.FullName, pull.Num)
