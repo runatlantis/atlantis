@@ -438,7 +438,7 @@ Values are chosen in this order:
   # or (recommended)
   ATLANTIS_TFE_TOKEN='xxx.atlasv1.yyy' atlantis server
   ```
-  A token for Terraform Cloud/Terraform Enteprise integration. See [Terraform Cloud](terraform-cloud.html) for more details.
+  A token for Terraform Cloud/Terraform Enterprise integration. See [Terraform Cloud](terraform-cloud.html) for more details.
 
 * ### `--write-git-creds`
   ```bash
