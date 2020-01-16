@@ -384,9 +384,9 @@ func (e *EventParser) ParseGithubIssueCommentEvent(comment *github.IssueCommentE
 		err = errors.New("comment.user.login is null")
 		return
 	}
-	commentorUsername := comment.Comment.User.GetLogin()
+	commenterUsername := comment.Comment.User.GetLogin()
 	user = models.User{
-		Username: commentorUsername,
+		Username: commenterUsername,
 	}
 	pullNum = comment.Issue.GetNumber()
 	if pullNum == 0 {
