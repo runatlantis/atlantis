@@ -180,7 +180,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 		if userConfig.BitbucketUser != "" {
 			// The default BitbucketBaseURL is https://api.bitbucket.org which can't actually be used for git
-			// so we overide it here only if it's that to be bitbucket.org
+			// so we override it here only if it's that to be bitbucket.org
 			bitbucketBaseURL := userConfig.BitbucketBaseURL
 			if bitbucketBaseURL == "https://api.bitbucket.org" {
 				bitbucketBaseURL = "bitbucket.org"

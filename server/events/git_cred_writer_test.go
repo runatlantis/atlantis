@@ -98,7 +98,7 @@ func TestWriteGitCreds_ConfigureGitCredentialHelper(t *testing.T) {
 }
 
 // Test that git is configured to use https instead of ssh
-func TestWriteGitCreds_ConfigureGitUrlOveride(t *testing.T) {
+func TestWriteGitCreds_ConfigureGitUrlOverride(t *testing.T) {
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 
