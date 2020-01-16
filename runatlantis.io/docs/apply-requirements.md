@@ -129,7 +129,7 @@ In Azure DevOps, all pull requests are mergeable unless there is a conflict. You
 * Allow users to approve their own changes
 * Allow completion even if some reviewers vote "Waiting" or "Reject"
 * Reset code reviewer votes when there are new changes
-* Require a specfic merge strategy (squash, rebase, etc.)
+* Require a specific merge strategy (squash, rebase, etc.)
 
 ::: warning
 At this time, the Azure DevOps client only supports merging using the default 'no fast-forward' strategy. Make sure your branch policies permit this type of merge.
