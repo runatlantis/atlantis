@@ -32,7 +32,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-func TestMustConstraint_PancisOnBadConstraint(t *testing.T) {
+func TestMustConstraint_PanicsOnBadConstraint(t *testing.T) {
 	t.Log("MustConstraint should panic on a bad constraint")
 	defer func() {
 		if r := recover(); r == nil {
