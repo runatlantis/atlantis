@@ -32,14 +32,14 @@ var client webhooks.DefaultSlackClient
 var result webhooks.ApplyResult
 
 func TestAuthTest_Success(t *testing.T) {
-	t.Log("When the underylying client succeeds, function should succeed")
+	t.Log("When the underlying client succeeds, function should succeed")
 	setup(t)
 	err := client.AuthTest()
 	Ok(t, err)
 }
 
 func TestAuthTest_Error(t *testing.T) {
-	t.Log("When the underylying slack client errors, an error should be returned")
+	t.Log("When the underlying slack client errors, an error should be returned")
 	setup(t)
 	When(underlying.AuthTest()).ThenReturn(nil, errors.New(""))
 	err := client.AuthTest()
@@ -82,7 +82,7 @@ func TestChannelExists_True(t *testing.T) {
 }
 
 func TestChannelExists_Error(t *testing.T) {
-	t.Log("When the underylying slack client errors, an error should be returned")
+	t.Log("When the underlying slack client errors, an error should be returned")
 	setup(t)
 	When(underlying.GetChannels(true)).ThenReturn(nil, errors.New(""))
 
@@ -135,7 +135,7 @@ func TestPostMessage_Success(t *testing.T) {
 }
 
 func TestPostMessage_Error(t *testing.T) {
-	t.Log("When the underylying slack client errors, an error should be returned")
+	t.Log("When the underlying slack client errors, an error should be returned")
 	setup(t)
 
 	expParams := slack.NewPostMessageParameters()
