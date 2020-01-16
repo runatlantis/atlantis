@@ -116,7 +116,7 @@ func TestNewWebhooksManager_NoConfigSuccess(t *testing.T) {
 	Assert(t, m != nil, "manager shouldn't be nil")
 	Equals(t, 0, len(m.Webhooks))
 
-	t.Log("passing nil client hould succeed")
+	t.Log("passing nil client should succeed")
 	m, err = webhooks.NewMultiWebhookSender(emptyConfigs, nil)
 	Ok(t, err)
 	Assert(t, m != nil, "manager shouldn't be nil")
