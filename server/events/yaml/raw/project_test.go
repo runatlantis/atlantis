@@ -305,7 +305,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:       "a/b/c",
 				Workspace: "default",
 				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf*"},
+					WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
 					Enabled:      true,
 				},
 			},
@@ -348,7 +348,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:       ".",
 				Workspace: "default",
 				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf*"},
+					WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
 					Enabled:      true,
 				},
 			},
@@ -362,7 +362,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:       ".",
 				Workspace: "default",
 				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf*"},
+					WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
 					Enabled:      true,
 				},
 			},
@@ -376,7 +376,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:       ".",
 				Workspace: "default",
 				Autoplan: valid.Autoplan{
-					WhenModified: []string{"**/*.tf*"},
+					WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
 					Enabled:      true,
 				},
 			},
