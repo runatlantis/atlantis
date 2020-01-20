@@ -73,7 +73,7 @@ const (
 	SSLCertFileFlag            = "ssl-cert-file"
 	SSLKeyFileFlag             = "ssl-key-file"
 	TFDownloadURLFlag          = "tf-download-url"
-	StatusName                 = "status-name"
+	VCSStatusName              = "vcs-status-name"
 	TFEHostnameFlag            = "tfe-hostname"
 	TFETokenFlag               = "tfe-token"
 	WriteGitCredsFlag          = "write-git-creds"
@@ -90,7 +90,7 @@ const (
 	DefaultPort             = 4141
 	DefaultTFDownloadURL    = "https://releases.hashicorp.com"
 	DefaultTFEHostname      = "app.terraform.io"
-	DefaultStatusName       = "atlantis"
+	DefaultVCSStatusName    = "atlantis"
 )
 
 var stringFlags = map[string]stringFlag{
@@ -210,10 +210,6 @@ var stringFlags = map[string]stringFlag{
 		description:  "Base URL to download Terraform versions from.",
 		defaultValue: DefaultTFDownloadURL,
 	},
-	StatusName: {
-		description:  "Name used for updating the pull request status.",
-		defaultValue: DefaultStatusName,
-	},
 	TFEHostnameFlag: {
 		description:  "Hostname of your Terraform Enterprise installation. If using Terraform Cloud no need to set.",
 		defaultValue: DefaultTFEHostname,
@@ -226,6 +222,10 @@ var stringFlags = map[string]stringFlag{
 	DefaultTFVersionFlag: {
 		description: "Terraform version to default to (ex. v0.12.0). Will download if not yet on disk." +
 			" If not set, Atlantis uses the terraform binary in its PATH.",
+	},
+	VCSStatusName: {
+		description:  "Name used to identify Atlantis for pull request statuses.",
+		defaultValue: DefaultVCSStatusName,
 	},
 }
 
@@ -469,8 +469,8 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	if c.TFDownloadURL == "" {
 		c.TFDownloadURL = DefaultTFDownloadURL
 	}
-	if c.StatusName == "" {
-		c.StatusName = DefaultStatusName
+	if c.VCSStatusName == "" {
+		c.VCSStatusName = DefaultVCSStatusName
 	}
 	if c.TFEHostname == "" {
 		c.TFEHostname = DefaultTFEHostname

@@ -240,3 +240,20 @@ func TestDefaultCommitStatusUpdater_UpdateProject(t *testing.T) {
 		})
 	}
 }
+
+// Test that we can set the status name.
+func TestDefaultCommitStatusUpdater_UpdateProjectCustomStatusName(t *testing.T) {
+	RegisterMockTestingT(t)
+	client := mocks.NewMockClient()
+	s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "custom"}
+	err := s.UpdateProject(models.ProjectCommandContext{
+		RepoRelDir: ".",
+		Workspace:  "default",
+	},
+		models.ApplyCommand,
+		models.SuccessCommitStatus,
+		"url")
+	Ok(t, err)
+	client.VerifyWasCalledOnce().UpdateStatus(models.Repo{}, models.PullRequest{},
+		models.SuccessCommitStatus, "custom/apply: ./default", "Apply succeeded.", "url")
+}

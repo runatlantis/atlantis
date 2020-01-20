@@ -39,7 +39,8 @@ type CommitStatusUpdater interface {
 
 // DefaultCommitStatusUpdater implements CommitStatusUpdater.
 type DefaultCommitStatusUpdater struct {
-	Client     vcs.Client
+	Client vcs.Client
+	// StatusName is the name used to identify Atlantis when creating PR statuses.
 	StatusName string
 }
 

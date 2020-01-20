@@ -18,13 +18,12 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-version"
-	"github.com/runatlantis/atlantis/server/events/runtime"
-
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/runtime"
 	mocks2 "github.com/runatlantis/atlantis/server/events/runtime/mocks"
 	tmocks "github.com/runatlantis/atlantis/server/events/terraform/mocks"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"

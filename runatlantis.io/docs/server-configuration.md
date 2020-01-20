@@ -431,14 +431,6 @@ Values are chosen in this order:
   environment where releases.hashicorp.com is not available. Directory structure of the custom
   endpoint should match that of releases.hashicorp.com.
 
-* ### `--status-name`
-  ```bash
-  atlantis server --status-name="atlantis-dev"
-  ```
-  Application name to use when updating a pull request status.
-
-  This is useful when running multiple Atlantis servers against a single repository.
-
 * ### `--tfe-hostname`
   ```bash
   atlantis server --tfe-hostname="my-terraform-enterprise.company.com"
@@ -455,6 +447,15 @@ Values are chosen in this order:
   ATLANTIS_TFE_TOKEN='xxx.atlasv1.yyy' atlantis server
   ```
   A token for Terraform Cloud/Terraform Enteprise integration. See [Terraform Cloud](terraform-cloud.html) for more details.
+
+* ### `--vcs-status-name`
+  ```bash
+  atlantis server --vcs-status-name="atlantis-dev"
+  ```
+  Name used to identify Atlantis when updating a pull request status. Defaults to `atlantis`.
+
+  This is useful when running multiple Atlantis servers against a single repository so you can
+  give each Atlantis server its own unique name to prevent the statuses clashing.
 
 * ### `--write-git-creds`
   ```bash
