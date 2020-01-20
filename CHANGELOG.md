@@ -1,3 +1,43 @@
+# v0.11.0
+
+## Description
+Small release with a couple new config flags from contributors.
+
+## Features
+* Upgrade default Terraform version in Docker image to 0.12.19.
+* Add new `--tf-download-url` flag to allow overriding the default download base URL of `https://releases.hashicorp.com`.
+  ([#787](https://github.com/runatlantis/atlantis/pull/787) by @cullenmcdermott)
+* Add new `--vcs-status-name` flag to allow configuring the name Atlantis uses for its
+  PR statuses. Useful if running multiple Atlantis servers on the same repo. ([#841](https://github.com/runatlantis/atlantis/pull/841) by @js-timbirkett)
+* Add new `--silence-fork-pr-errors` flag to silence errors from fork PRs in
+  orgs that use fork PRs for non-terraform changes. ([#885](https://github.com/runatlantis/atlantis/pull/885) by @kinghrothgar)
+
+## Bugfixes
+* Fix Atlantis Dockerfile subcommand detection (Fixes [#870](https://github.com/runatlantis/atlantis/issues/870) by @sparky005)
+* Fix `--write-git-creds` command for BitBucket modules (Fixes [#873](https://github.com/runatlantis/atlantis/issues/873) by @ImperialXT)
+* Fix issue where Atlantis was failing on Azure DevOps PRs with branch protection (Fixes [#880](https://github.com/runatlantis/atlantis/issues/880) by @mcdafydd)
+* Fix issue where project's set with an absolute dir, e.g. `dir: /a/b/c` would actually use
+  that directory instead of making it relative to the reo root (Fixes [#849](https://github.com/runatlantis/atlantis/issues/849)).
+* Fix issue where changes to `terragrunt.hcl` files weren't being detected when
+  using `atlantis.yaml` files (Fixes [#803](https://github.com/runatlantis/atlantis/issues/803) by @JoshiiSinfield)
+
+## Backwards Incompatibilities / Notes:
+* If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
+  then the default version of Terraform will now be 0.12.19. Simply set the above
+  flag to your desired default version to avoid any issues.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.11.0/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.11.0/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.11.0/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.11.0/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.11.0`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.10.2..v0.11.0
+https://github.com/runatlantis/atlantis/compare/v0.10.2...v0.11.0
+
 # v0.10.2
 
 ## Description
