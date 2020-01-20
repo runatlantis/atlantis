@@ -148,7 +148,7 @@ func NewClient(
 			_, err := ensureVersion(log, tfDownloader, versions, defaultVersion, binDir, tfDownloadURL)
 			versionsLock.Unlock()
 			if err != nil {
-				log.Err("could not download terraform %s", defaultVersion.String())
+				log.Err("could not download terraform %s: %s", defaultVersion.String(), err)
 			}
 		}()
 	}
@@ -416,8 +416,9 @@ func ensureVersion(log *logging.SimpleLogger, dl Downloader, versions map[string
 	urlPrefix := fmt.Sprintf("%s/terraform/%s/terraform_%s", downloadURL, v.String(), v.String())
 	binURL := fmt.Sprintf("%s_%s_%s.zip", urlPrefix, runtime.GOOS, runtime.GOARCH)
 	checksumURL := fmt.Sprintf("%s_SHA256SUMS", urlPrefix)
-	if err := dl.GetFile(dest, fmt.Sprintf("%s?checksum=file:%s", binURL, checksumURL)); err != nil {
-		return "", errors.Wrapf(err, "downloading terraform version %s", v.String())
+	fullSrcURL := fmt.Sprintf("%s?checksum=file:%s", binURL, checksumURL)
+	if err := dl.GetFile(dest, fullSrcURL); err != nil {
+		return "", errors.Wrapf(err, "downloading terraform version %s at %q", v.String(), fullSrcURL)
 	}
 
 	log.Info("downloaded terraform %s to %s", v.String(), dest)

@@ -205,7 +205,7 @@ var stringFlags = map[string]stringFlag{
 		description: fmt.Sprintf("File containing x509 private key matching --%s.", SSLCertFileFlag),
 	},
 	TFDownloadURLFlag: {
-		description:  "URL to download Terraform from.",
+		description:  "Base URL to download Terraform versions from.",
 		defaultValue: DefaultTFDownloadURL,
 	},
 	TFEHostnameFlag: {
