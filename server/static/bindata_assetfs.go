@@ -11,10 +11,10 @@
 package static
 
 import (
-	"github.com/elazarl/go-bindata-assetfs"
 	"bytes"
 	"compress/gzip"
 	"fmt"
+	"github.com/elazarl/go-bindata-assetfs"
 	"io"
 	"io/ioutil"
 	"os"
@@ -246,12 +246,12 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"static/css/custom.css": staticCssCustomCss,
-	"static/css/normalize.css": staticCssNormalizeCss,
-	"static/css/skeleton.css": staticCssSkeletonCss,
-	"static/images/atlantis-icon.png": staticImagesAtlantisIconPng,
+	"static/css/custom.css":               staticCssCustomCss,
+	"static/css/normalize.css":            staticCssNormalizeCss,
+	"static/css/skeleton.css":             staticCssSkeletonCss,
+	"static/images/atlantis-icon.png":     staticImagesAtlantisIconPng,
 	"static/images/atlantis-icon_512.png": staticImagesAtlantisIcon_512Png,
-	"static/js/jquery-3.2.1.min.js": staticJsJquery321MinJs,
+	"static/js/jquery-3.2.1.min.js":       staticJsJquery321MinJs,
 }
 
 // AssetDir returns the file names below a certain
@@ -265,7 +265,7 @@ var _bindata = map[string]func() (*asset, error){
 //         b.png
 // then AssetDir("data") would return []string{"foo.txt", "img"}
 // AssetDir("data/img") would return []string{"a.png", "b.png"}
-// AssetDir("foo.txt") and AssetDir("nonexistent") would return an error
+// AssetDir("foo.txt") and AssetDir("notexist") would return an error
 // AssetDir("") will return []string{"data"}.
 func AssetDir(name string) ([]string, error) {
 	node := _bintree
@@ -293,15 +293,16 @@ type bintree struct {
 	Func     func() (*asset, error)
 	Children map[string]*bintree
 }
+
 var _bintree = &bintree{nil, map[string]*bintree{
 	"static": &bintree{nil, map[string]*bintree{
 		"css": &bintree{nil, map[string]*bintree{
-			"custom.css": &bintree{staticCssCustomCss, map[string]*bintree{}},
+			"custom.css":    &bintree{staticCssCustomCss, map[string]*bintree{}},
 			"normalize.css": &bintree{staticCssNormalizeCss, map[string]*bintree{}},
-			"skeleton.css": &bintree{staticCssSkeletonCss, map[string]*bintree{}},
+			"skeleton.css":  &bintree{staticCssSkeletonCss, map[string]*bintree{}},
 		}},
 		"images": &bintree{nil, map[string]*bintree{
-			"atlantis-icon.png": &bintree{staticImagesAtlantisIconPng, map[string]*bintree{}},
+			"atlantis-icon.png":     &bintree{staticImagesAtlantisIconPng, map[string]*bintree{}},
 			"atlantis-icon_512.png": &bintree{staticImagesAtlantisIcon_512Png, map[string]*bintree{}},
 		}},
 		"js": &bintree{nil, map[string]*bintree{
@@ -356,7 +357,6 @@ func _filePath(dir, name string) string {
 	cannonicalName := strings.Replace(name, "\\", "/", -1)
 	return filepath.Join(append([]string{dir}, strings.Split(cannonicalName, "/")...)...)
 }
-
 
 func assetFS() *assetfs.AssetFS {
 	assetInfo := func(path string) (os.FileInfo, error) {
