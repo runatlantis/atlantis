@@ -1,10 +1,12 @@
 package raw
 
-import "github.com/runatlantis/atlantis/server/events/yaml/valid"
+import (
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+)
 
 // DefaultAutoPlanWhenModified is the default element in the when_modified
 // list if none is defined.
-const DefaultAutoPlanWhenModified = "**/*.tf*"
+var DefaultAutoPlanWhenModified = []string{"**/*.tf*", "**/terragrunt.hcl"}
 
 type Autoplan struct {
 	WhenModified []string `yaml:"when_modified,omitempty"`
@@ -14,7 +16,7 @@ type Autoplan struct {
 func (a Autoplan) ToValid() valid.Autoplan {
 	var v valid.Autoplan
 	if a.WhenModified == nil {
-		v.WhenModified = []string{DefaultAutoPlanWhenModified}
+		v.WhenModified = DefaultAutoPlanWhenModified
 	} else {
 		v.WhenModified = a.WhenModified
 	}
@@ -35,7 +37,7 @@ func (a Autoplan) Validate() error {
 // DefaultAutoPlan returns the default autoplan config.
 func DefaultAutoPlan() valid.Autoplan {
 	return valid.Autoplan{
-		WhenModified: []string{DefaultAutoPlanWhenModified},
+		WhenModified: DefaultAutoPlanWhenModified,
 		Enabled:      valid.DefaultAutoPlanEnabled,
 	}
 }

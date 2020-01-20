@@ -109,7 +109,7 @@ func TestAutoplan_ToValid(t *testing.T) {
 			input:       raw.Autoplan{},
 			exp: valid.Autoplan{
 				Enabled:      true,
-				WhenModified: []string{"**/*.tf*"},
+				WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
 			},
 		},
 		{
@@ -129,7 +129,7 @@ func TestAutoplan_ToValid(t *testing.T) {
 			},
 			exp: valid.Autoplan{
 				Enabled:      false,
-				WhenModified: []string{"**/*.tf*"},
+				WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
 			},
 		},
 		{
@@ -139,7 +139,7 @@ func TestAutoplan_ToValid(t *testing.T) {
 			},
 			exp: valid.Autoplan{
 				Enabled:      true,
-				WhenModified: []string{"**/*.tf*"},
+				WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
 			},
 		},
 	}
