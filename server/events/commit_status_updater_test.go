@@ -66,7 +66,7 @@ func TestUpdateCombined(t *testing.T) {
 		t.Run(c.expDescrip, func(t *testing.T) {
 			RegisterMockTestingT(t)
 			client := mocks.NewMockClient()
-			s := events.DefaultCommitStatusUpdater{Client: client}
+			s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis"}
 			err := s.UpdateCombined(models.Repo{}, models.PullRequest{}, c.status, c.command)
 			Ok(t, err)
 
@@ -132,11 +132,11 @@ func TestUpdateCombinedCount(t *testing.T) {
 		t.Run(c.expDescrip, func(t *testing.T) {
 			RegisterMockTestingT(t)
 			client := mocks.NewMockClient()
-			s := events.DefaultCommitStatusUpdater{Client: client}
+			s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis-test"}
 			err := s.UpdateCombinedCount(models.Repo{}, models.PullRequest{}, c.status, c.command, c.numSuccess, c.numTotal)
 			Ok(t, err)
 
-			expSrc := fmt.Sprintf("atlantis/%s", c.command)
+			expSrc := fmt.Sprintf("%s/%s", s.StatusName, c.command)
 			client.VerifyWasCalledOnce().UpdateStatus(models.Repo{}, models.PullRequest{}, c.status, expSrc, c.expDescrip, "")
 		})
 	}
@@ -169,7 +169,7 @@ func TestDefaultCommitStatusUpdater_UpdateProjectSrc(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.expSrc, func(t *testing.T) {
 			client := mocks.NewMockClient()
-			s := events.DefaultCommitStatusUpdater{Client: client}
+			s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis"}
 			err := s.UpdateProject(models.ProjectCommandContext{
 				ProjectName: c.projectName,
 				RepoRelDir:  c.repoRelDir,
@@ -227,7 +227,7 @@ func TestDefaultCommitStatusUpdater_UpdateProject(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.expDescrip, func(t *testing.T) {
 			client := mocks.NewMockClient()
-			s := events.DefaultCommitStatusUpdater{Client: client}
+			s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis"}
 			err := s.UpdateProject(models.ProjectCommandContext{
 				RepoRelDir: ".",
 				Workspace:  "default",
@@ -239,4 +239,21 @@ func TestDefaultCommitStatusUpdater_UpdateProject(t *testing.T) {
 			client.VerifyWasCalledOnce().UpdateStatus(models.Repo{}, models.PullRequest{}, c.status, fmt.Sprintf("atlantis/%s: ./default", c.cmd.String()), c.expDescrip, "url")
 		})
 	}
+}
+
+// Test that we can set the status name.
+func TestDefaultCommitStatusUpdater_UpdateProjectCustomStatusName(t *testing.T) {
+	RegisterMockTestingT(t)
+	client := mocks.NewMockClient()
+	s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "custom"}
+	err := s.UpdateProject(models.ProjectCommandContext{
+		RepoRelDir: ".",
+		Workspace:  "default",
+	},
+		models.ApplyCommand,
+		models.SuccessCommitStatus,
+		"url")
+	Ok(t, err)
+	client.VerifyWasCalledOnce().UpdateStatus(models.Repo{}, models.PullRequest{},
+		models.SuccessCommitStatus, "custom/apply: ./default", "Apply succeeded.", "url")
 }
