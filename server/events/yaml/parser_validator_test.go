@@ -238,7 +238,7 @@ projects:
 			},
 		},
 		{
-			description: "autoplan should be enabled by default if only when_modified set",
+			description: "autoplan should be enabled if only when_modified set",
 			input: `
 version: 3
 projects:
