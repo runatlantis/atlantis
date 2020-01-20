@@ -92,10 +92,10 @@ func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) Global
 		applyReqs = append(applyReqs, ApprovedApplyReq)
 	}
 
-	allowCustomWorkfows := false
+	allowCustomWorkflows := false
 	if allowRepoCfg {
 		allowedOverrides = []string{ApplyRequirementsKey, WorkflowKey}
-		allowCustomWorkfows = true
+		allowCustomWorkflows = true
 	}
 
 	return GlobalCfg{
@@ -105,7 +105,7 @@ func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) Global
 				ApplyRequirements:    applyReqs,
 				Workflow:             &defaultWorkflow,
 				AllowedOverrides:     allowedOverrides,
-				AllowCustomWorkflows: &allowCustomWorkfows,
+				AllowCustomWorkflows: &allowCustomWorkflows,
 			},
 		},
 		Workflows: map[string]Workflow{
@@ -238,16 +238,16 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 	}
 
 	// Check custom workflows.
-	var allowCustomWorklows bool
+	var allowCustomWorkflows bool
 	for _, repo := range g.Repos {
 		if repo.IDMatches(repoID) {
 			if repo.AllowCustomWorkflows != nil {
-				allowCustomWorklows = *repo.AllowCustomWorkflows
+				allowCustomWorkflows = *repo.AllowCustomWorkflows
 			}
 		}
 	}
 
-	if len(rCfg.Workflows) > 0 && !allowCustomWorklows {
+	if len(rCfg.Workflows) > 0 && !allowCustomWorkflows {
 		return fmt.Errorf("repo config not allowed to define custom workflows: server-side config needs '%s: true'", AllowCustomWorkflowsKey)
 	}
 

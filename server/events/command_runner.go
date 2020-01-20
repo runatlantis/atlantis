@@ -455,7 +455,7 @@ func (c *DefaultCommandRunner) deletePlans(ctx *CommandContext) {
 
 func (c *DefaultCommandRunner) updateDB(ctx *CommandContext, pull models.PullRequest, results []models.ProjectResult) (models.PullStatus, error) {
 	// Filter out results that errored due to the directory not existing. We
-	// don't store these in the database because they would never be "applyable"
+	// don't store these in the database because they would never be "apply-able"
 	// and so the pull request would always have errors.
 	var filtered []models.ProjectResult
 	for _, r := range results {

@@ -220,7 +220,7 @@ func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
 		cmd.Dir = cloneDir
 		// The git merge command requires these env vars are set.
 		cmd.Env = append(os.Environ(), []string{
-			"EMAIL=atlantis@runatlants.io",
+			"EMAIL=atlantis@runatlantis.io",
 			"GIT_AUTHOR_NAME=atlantis",
 			"GIT_COMMITTER_NAME=atlantis",
 		}...)

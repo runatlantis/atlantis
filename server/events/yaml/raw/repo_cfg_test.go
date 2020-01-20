@@ -236,7 +236,7 @@ func TestConfig_ToValid(t *testing.T) {
 			},
 		},
 		{
-			description: "automerge ommitted",
+			description: "automerge omitted",
 			input: raw.RepoCfg{
 				Version: Int(2),
 			},

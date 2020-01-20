@@ -469,7 +469,7 @@ None
   your Git host (ex. via GitHub protected branches). If so, you'll need to change
   your settings to require the new names to pass and un-require the old names.
   
-  > If you were on a version lower than `v0.5.*` then read the backwards compatiblity
+  > If you were on a version lower than `v0.5.*` then read the backwards compatibility
     notes for release `0.5.0`.
     
   **NOTE from the maintainer**: I take backwards compatibility seriously and I

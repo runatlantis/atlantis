@@ -12,7 +12,7 @@ if you don't wish to do so.
 The only change from v2 to v3 is that we're parsing custom `run` steps differently.
 ```yaml
 # atlantis.yaml
-worklows:
+workflows:
   custom:
     plan:
       steps:

@@ -2,7 +2,7 @@
 
 ::: tip NOTE
 Terraform Enterprise was [recently renamed](https://www.hashicorp.com/blog/introducing-terraform-cloud-remote-state-management) Terraform Cloud
-and Private Terraform Enteprise was renamed Terraform Enterprise.
+and Private Terraform Enterprise was renamed Terraform Enterprise.
 :::
 
 Atlantis integrates seamlessly with Terraform Cloud and Terraform Enterprise, whether you're using:

@@ -232,7 +232,7 @@ func TestParseAtlantisURL(t *testing.T) {
 			ExpErr: "http or https must be specified",
 		},
 		{
-			In:     "httpl://localhost/test",
+			In:     "http0://localhost/test",
 			ExpErr: "http or https must be specified",
 		},
 	}

@@ -488,8 +488,8 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	if logLevel != "debug" && logLevel != "info" && logLevel != "warn" && logLevel != "error" {
 		return errors.New("invalid log level: not one of debug, info, warn, error")
 	}
-	checkoutStrat := userConfig.CheckoutStrategy
-	if checkoutStrat != "branch" && checkoutStrat != "merge" {
+	checkoutStrategy := userConfig.CheckoutStrategy
+	if checkoutStrategy != "branch" && checkoutStrategy != "merge" {
 		return errors.New("invalid checkout strategy: not one of branch or merge")
 	}
 
