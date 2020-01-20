@@ -72,6 +72,7 @@ const (
 	SlackTokenFlag             = "slack-token"
 	SSLCertFileFlag            = "ssl-cert-file"
 	SSLKeyFileFlag             = "ssl-key-file"
+	TFDownloadURLFlag          = "tf-download-url"
 	TFEHostnameFlag            = "tfe-hostname"
 	TFETokenFlag               = "tfe-token"
 	WriteGitCredsFlag          = "write-git-creds"
@@ -86,6 +87,7 @@ const (
 	DefaultGitlabHostname   = "gitlab.com"
 	DefaultLogLevel         = "info"
 	DefaultPort             = 4141
+	DefaultTFDownloadURL    = "https://releases.hashicorp.com"
 	DefaultTFEHostname      = "app.terraform.io"
 )
 
@@ -201,6 +203,10 @@ var stringFlags = map[string]stringFlag{
 	},
 	SSLKeyFileFlag: {
 		description: fmt.Sprintf("File containing x509 private key matching --%s.", SSLCertFileFlag),
+	},
+	TFDownloadURLFlag: {
+		description:  "Base URL to download Terraform versions from.",
+		defaultValue: DefaultTFDownloadURL,
 	},
 	TFEHostnameFlag: {
 		description:  "Hostname of your Terraform Enterprise installation. If using Terraform Cloud no need to set.",
@@ -453,6 +459,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	}
 	if c.Port == 0 {
 		c.Port = DefaultPort
+	}
+	if c.TFDownloadURL == "" {
+		c.TFDownloadURL = DefaultTFDownloadURL
 	}
 	if c.TFEHostname == "" {
 		c.TFEHostname = DefaultTFEHostname

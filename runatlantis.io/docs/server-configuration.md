@@ -422,7 +422,15 @@ Values are chosen in this order:
   atlantis server --ssl-cert-file="/etc/ssl/private/my-cert.key"
   ```
   File containing x509 private key matching `--ssl-cert-file`.
- 
+
+* ### `--tf-download-url`
+  ```bash
+  atlantis server --tf-download-url="https://releases.company.com"
+  ```
+  An alternative URL to download Terraform versions if they are missing. Useful in an airgapped
+  environment where releases.hashicorp.com is not available. Directory structure of the custom
+  endpoint should match that of releases.hashicorp.com.
+
 * ### `--tfe-hostname`
   ```bash
   atlantis server --tfe-hostname="my-terraform-enterprise.company.com"
