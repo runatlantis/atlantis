@@ -61,7 +61,7 @@ func (d *ClientProxy) CreateComment(repo models.Repo, pullNum int, comment strin
 }
 
 func (d *ClientProxy) HideOldComments(repo models.Repo, pullNum int) error {
-	return nil
+	return d.clients[repo.VCSHost.Type].HideOldComments(repo, pullNum)
 }
 
 func (d *ClientProxy) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
