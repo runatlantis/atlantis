@@ -1,3 +1,29 @@
+# v0.11.1
+
+## Description
+Using the latest Alpine Docker image (3.11) to mitigate some vulnerabilities
+in that image.
+
+## Security
+* Use Alpine 3.11 to mitigate:
+    1. CVE-2019-5482: `curl <7.66.0-r0` https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2019-5482
+    2. CVE-2019-5481: `curl <7.66.0-r0` https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2019-5481
+    3. CVE-2019-15903: `expat <2.2.7-r1` and `git <2.22.0r0`  https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2019-15903
+    4. CVE-2018-20843: `expat <2.2.7-r0` and `git <2.22.0-r0`  https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2018-20843
+    5. CVE-2019-14697: `musl <1.1.22-r3` https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2019-14697
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.11.1/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.11.1/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.11.1/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.11.1/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.11.1`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.11.0..v0.11.1
+https://github.com/runatlantis/atlantis/compare/v0.11.0...v0.11.1
+
 # v0.11.0
 
 ## Description
