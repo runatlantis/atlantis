@@ -152,6 +152,7 @@ If using the server `repos.yaml` file, you would use the following config:
 
 ```yaml
 # repos.yaml
+# Specify TERRAGRUNT_TFPATH environment variable to accomodate setting --default-tf-version
 repos:
 - id: "/.*/"
   workflow: terragrunt
@@ -159,9 +160,15 @@ workflows:
   terragrunt:
     plan:
       steps:
+      - env:
+          name: TERRAGRUNT_TFPATH
+          command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
       - run: terragrunt plan -no-color -out=$PLANFILE
     apply:
       steps:
+      - env:
+          name: TERRAGRUNT_TFPATH
+          command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
       - run: terragrunt apply -no-color $PLANFILE
 ```
 
@@ -177,9 +184,15 @@ workflows:
   terragrunt:
     plan:
       steps:
+      - env:
+          name: TERRAGRUNT_TFPATH
+          command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
       - run: terragrunt plan -no-color -out $PLANFILE
     apply:
       steps:
+      - env:
+          name: TERRAGRUNT_TFPATH
+          command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
       - run: terragrunt apply -no-color $PLANFILE
 ```
 
