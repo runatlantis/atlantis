@@ -56,18 +56,7 @@ func (s *Step) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 func (s Step) MarshalYAML() (interface{}, error) {
-	if len(s.StringVal) != 0 {
-		return s.StringVal, nil
-	} else if len(s.Map) != 0 {
-		return s.Map, nil
-	} else if len(s.Env) != 0 {
-		return s.Env, nil
-	} else if s.Key != nil {
-		return s.Key, nil
-	} else {
-		// TODO: what to do with the empty step?
-		return nil, nil
-	}
+	return s.marshalGeneric()
 }
 
 func (s *Step) UnmarshalJSON(data []byte) error {
@@ -75,6 +64,15 @@ func (s *Step) UnmarshalJSON(data []byte) error {
 		return json.Unmarshal(data, i)
 	})
 }
+
+func (s *Step) MarshalJSON() ([]byte, error) {
+	out, err := s.marshalGeneric()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(out)
+}
+
 func (s Step) Validate() error {
 	validStep := func(value interface{}) error {
 		str := *value.(*string)
@@ -310,4 +308,19 @@ func (s *Step) unmarshalGeneric(unmarshal func(interface{}) error) error {
 	}
 
 	return err
+}
+
+func (s Step) marshalGeneric() (interface{}, error) {
+	if len(s.StringVal) != 0 {
+		return s.StringVal, nil
+	} else if len(s.Map) != 0 {
+		return s.Map, nil
+	} else if len(s.Env) != 0 {
+		return s.Env, nil
+	} else if s.Key != nil {
+		return s.Key, nil
+	} else {
+		// TODO: what to do with the empty step?
+		return nil, nil
+	}
 }
