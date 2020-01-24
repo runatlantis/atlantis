@@ -319,8 +319,9 @@ func (s Step) marshalGeneric() (interface{}, error) {
 		return s.Env, nil
 	} else if s.Key != nil {
 		return s.Key, nil
-	} else {
-		// TODO: what to do with the empty step?
-		return nil, nil
 	}
+
+	// empty step should be marshalled to null, although this is generally
+	// unexpected behavior.
+	return nil, nil
 }
