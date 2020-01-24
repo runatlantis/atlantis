@@ -162,6 +162,14 @@ key:
 			}
 			Ok(t, err)
 			Equals(t, c.exp, got)
+
+			_, err = yaml.Marshal(got)
+			Ok(t, err)
+
+			var got2 raw.Step
+			err = yaml.UnmarshalStrict([]byte(c.input), &got2)
+			Ok(t, err)
+			Equals(t, got2, got)
 		})
 	}
 }

@@ -55,6 +55,21 @@ func (s *Step) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return s.unmarshalGeneric(unmarshal)
 }
 
+func (s Step) MarshalYAML() (interface{}, error) {
+	if len(s.StringVal) != 0 {
+		return s.StringVal, nil
+	} else if len(s.Map) != 0 {
+		return s.Map, nil
+	} else if len(s.Env) != 0 {
+		return s.Env, nil
+	} else if s.Key != nil {
+		return s.Key, nil
+	} else {
+		// TODO: what to do with the empty step?
+		return nil, nil
+	}
+}
+
 func (s *Step) UnmarshalJSON(data []byte) error {
 	return s.unmarshalGeneric(func(i interface{}) error {
 		return json.Unmarshal(data, i)
