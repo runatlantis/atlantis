@@ -276,6 +276,12 @@ Values are chosen in this order:
   ```
   View help.
 
+* ### `--hide-prev-plan-comments`
+  ```bash
+  atlantis server --hide-prev-plan-comments
+  ```
+  Hides previous plan comments to declutter PRs.
+
 * ### `--log-level`
   ```bash
   atlantis server --log-level="<debug|info|warn|error>"
