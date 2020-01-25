@@ -200,7 +200,7 @@ func TestGithubClient_PaginatesComments(t *testing.T) {
 					)
 				}
 				w.Write([]byte(issueResps[calls])) // nolint: errcheck
-				calls += 1
+				calls++
 			}
 		}),
 	)
