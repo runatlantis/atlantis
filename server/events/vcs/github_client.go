@@ -159,7 +159,8 @@ func (g *GithubClient) HideOldComments(repo models.Repo, pullNum int) error {
 		// a reasonable one, given we've already filtered the comments by the
 		// configured Atlantis user.
 		body := strings.Split(comment.GetBody(), "\n")
-		if !strings.Contains(body[0], models.ApplyCommand.String()) {
+		firstLine := strings.ToLower(body[0])
+		if !strings.Contains(firstLine, models.PlanCommand.String()) {
 			continue
 		}
 		var m struct {

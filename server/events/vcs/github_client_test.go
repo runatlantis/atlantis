@@ -137,14 +137,14 @@ func TestGithubClient_GetModifiedFilesMovedFile(t *testing.T) {
 
 func TestGithubClient_HideOldComments(t *testing.T) {
 	// Only comment 6 should be minimized, because it's by the same Atlantis bot user
-	// and it has "apply" in the first line of the comment body.
+	// and it has "plan" in the first line of the comment body.
 	issueResp := `[
-	{"node_id": "1", "body": "asd\napply\nasd", "user": {"login": "someone-else"}},
-	{"node_id": "2", "body": "asd apply\nasd", "user": {"login": "someone-else"}},
+	{"node_id": "1", "body": "asd\nplan\nasd", "user": {"login": "someone-else"}},
+	{"node_id": "2", "body": "asd plan\nasd", "user": {"login": "someone-else"}},
 	{"node_id": "3", "body": "asdasdasd\nasdasdasd", "user": {"login": "someone-else"}},
 	{"node_id": "4", "body": "asdasdasd\nasdasdasd", "user": {"login": "user"}},
-	{"node_id": "5", "body": "asd\napply\nasd", "user": {"login": "user"}},
-	{"node_id": "6", "body": "asd apply\nasd", "user": {"login": "user"}},
+	{"node_id": "5", "body": "asd\nplan\nasd", "user": {"login": "user"}},
+	{"node_id": "6", "body": "asd plan\nasd", "user": {"login": "user"}},
 	{"node_id": "7", "body": "asdasdasd", "user": {"login": "user"}}
 ]`
 	minimizeResp := "{}"
