@@ -140,17 +140,24 @@ func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment stri
 }
 
 func (g *GithubClient) HideOldComments(repo models.Repo, pullNum int) error {
-	// TODO: Paginate issues.
-	comments, _, err := g.client.Issues.ListComments(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueListCommentsOptions{
-		Sort:        "created",
-		Direction:   "asc",
-		ListOptions: github.ListOptions{},
-	})
-	if err != nil {
-		return err
+	var allComments []*github.IssueComment
+	for page := 0; ; {
+		comments, resp, err := g.client.Issues.ListComments(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueListCommentsOptions{
+			Sort:        "created",
+			Direction:   "asc",
+			ListOptions: github.ListOptions{Page: page},
+		})
+		if err != nil {
+			return err
+		}
+		allComments = append(allComments, comments...)
+		if resp.NextPage == 0 {
+			break
+		}
+		page = resp.NextPage
 	}
 
-	for _, comment := range comments {
+	for _, comment := range allComments {
 		if comment.User != nil && comment.User.GetLogin() != g.user {
 			continue
 		}
