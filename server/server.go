@@ -317,6 +317,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		SilenceForkPRErrors:      userConfig.SilenceForkPRErrors,
 		SilenceForkPRErrorsFlag:  config.SilenceForkPRErrorsFlag,
 		DisableApplyAll:          userConfig.DisableApplyAll,
+		ParallelPlansPoolSize:    userConfig.ParallelPlansPoolSize,
 		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
 			ParserValidator:   validator,
 			ProjectFinder:     &events.DefaultProjectFinder{},

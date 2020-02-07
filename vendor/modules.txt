@@ -173,11 +173,13 @@ github.com/onsi/gomega/format
 github.com/pelletier/go-buffruneio
 # github.com/pelletier/go-toml v1.0.0
 github.com/pelletier/go-toml
-# github.com/petergtz/pegomock v2.5.0+incompatible
+# github.com/petergtz/pegomock v2.7.0+incompatible
 github.com/petergtz/pegomock
 github.com/petergtz/pegomock/internal/verify
 # github.com/pkg/errors v0.8.0
 github.com/pkg/errors
+# github.com/remeh/sizedwaitgroup v1.0.0
+github.com/remeh/sizedwaitgroup
 # github.com/sirupsen/logrus v1.2.0
 github.com/sirupsen/logrus
 # github.com/spf13/afero v0.0.0-20170901052352-ee1bd8ee15a1
