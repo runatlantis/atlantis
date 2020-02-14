@@ -9,7 +9,7 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
-func TestStepConfig_UnmarshalYAML(t *testing.T) {
+func TestStepConfig_YAMLMarshalling(t *testing.T) {
 	cases := []struct {
 		description string
 		input       string
