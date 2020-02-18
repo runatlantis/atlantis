@@ -36,48 +36,49 @@ import (
 // 3. Add your flag's description etc. to the stringFlags, intFlags, or boolFlags slices.
 const (
 	// Flag names.
-	ADWebhookPasswordFlag      = "azuredevops-webhook-password" // nolint: gosec
-	ADWebhookUserFlag          = "azuredevops-webhook-user"
-	ADTokenFlag                = "azuredevops-token" // nolint: gosec
-	ADUserFlag                 = "azuredevops-user"
-	AllowForkPRsFlag           = "allow-fork-prs"
-	AllowRepoConfigFlag        = "allow-repo-config"
-	AtlantisURLFlag            = "atlantis-url"
-	AutomergeFlag              = "automerge"
-	BitbucketBaseURLFlag       = "bitbucket-base-url"
-	BitbucketTokenFlag         = "bitbucket-token"
-	BitbucketUserFlag          = "bitbucket-user"
-	BitbucketWebhookSecretFlag = "bitbucket-webhook-secret"
-	ConfigFlag                 = "config"
-	CheckoutStrategyFlag       = "checkout-strategy"
-	DataDirFlag                = "data-dir"
-	DefaultTFVersionFlag       = "default-tf-version"
-	DisableApplyAllFlag        = "disable-apply-all"
-	GHHostnameFlag             = "gh-hostname"
-	GHTokenFlag                = "gh-token"
-	GHUserFlag                 = "gh-user"
-	GHWebhookSecretFlag        = "gh-webhook-secret" // nolint: gosec
-	GitlabHostnameFlag         = "gitlab-hostname"
-	GitlabTokenFlag            = "gitlab-token"
-	GitlabUserFlag             = "gitlab-user"
-	GitlabWebhookSecretFlag    = "gitlab-webhook-secret" // nolint: gosec
-	LogLevelFlag               = "log-level"
-	PortFlag                   = "port"
-	RepoConfigFlag             = "repo-config"
-	RepoConfigJSONFlag         = "repo-config-json"
-	RepoWhitelistFlag          = "repo-whitelist"
-	RequireApprovalFlag        = "require-approval"
-	RequireMergeableFlag       = "require-mergeable"
-	SilenceForkPRErrorsFlag    = "silence-fork-pr-errors"
-	SilenceWhitelistErrorsFlag = "silence-whitelist-errors"
-	SlackTokenFlag             = "slack-token"
-	SSLCertFileFlag            = "ssl-cert-file"
-	SSLKeyFileFlag             = "ssl-key-file"
-	TFDownloadURLFlag          = "tf-download-url"
-	VCSStatusName              = "vcs-status-name"
-	TFEHostnameFlag            = "tfe-hostname"
-	TFETokenFlag               = "tfe-token"
-	WriteGitCredsFlag          = "write-git-creds"
+	ADWebhookPasswordFlag        = "azuredevops-webhook-password" // nolint: gosec
+	ADWebhookUserFlag            = "azuredevops-webhook-user"
+	ADTokenFlag                  = "azuredevops-token" // nolint: gosec
+	ADUserFlag                   = "azuredevops-user"
+	AllowForkPRsFlag             = "allow-fork-prs"
+	AllowRepoConfigFlag          = "allow-repo-config"
+	AtlantisURLFlag              = "atlantis-url"
+	AutomergeFlag                = "automerge"
+	BitbucketBaseURLFlag         = "bitbucket-base-url"
+	BitbucketTokenFlag           = "bitbucket-token"
+	BitbucketUserFlag            = "bitbucket-user"
+	BitbucketWebhookSecretFlag   = "bitbucket-webhook-secret"
+	ConfigFlag                   = "config"
+	CheckoutStrategyFlag         = "checkout-strategy"
+	DataDirFlag                  = "data-dir"
+	DefaultTFVersionFlag         = "default-tf-version"
+	DisableApplyAllFlag          = "disable-apply-all"
+	DisableFoldingLongOutputFlag = "disable-folding-long-output"
+	GHHostnameFlag               = "gh-hostname"
+	GHTokenFlag                  = "gh-token"
+	GHUserFlag                   = "gh-user"
+	GHWebhookSecretFlag          = "gh-webhook-secret" // nolint: gosec
+	GitlabHostnameFlag           = "gitlab-hostname"
+	GitlabTokenFlag              = "gitlab-token"
+	GitlabUserFlag               = "gitlab-user"
+	GitlabWebhookSecretFlag      = "gitlab-webhook-secret" // nolint: gosec
+	LogLevelFlag                 = "log-level"
+	PortFlag                     = "port"
+	RepoConfigFlag               = "repo-config"
+	RepoConfigJSONFlag           = "repo-config-json"
+	RepoWhitelistFlag            = "repo-whitelist"
+	RequireApprovalFlag          = "require-approval"
+	RequireMergeableFlag         = "require-mergeable"
+	SilenceForkPRErrorsFlag      = "silence-fork-pr-errors"
+	SilenceWhitelistErrorsFlag   = "silence-whitelist-errors"
+	SlackTokenFlag               = "slack-token"
+	SSLCertFileFlag              = "ssl-cert-file"
+	SSLKeyFileFlag               = "ssl-key-file"
+	TFDownloadURLFlag            = "tf-download-url"
+	VCSStatusName                = "vcs-status-name"
+	TFEHostnameFlag              = "tfe-hostname"
+	TFETokenFlag                 = "tfe-token"
+	WriteGitCredsFlag            = "write-git-creds"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
 	DefaultADBasicUser      = ""
@@ -266,6 +267,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	SilenceWhitelistErrorsFlag: {
 		description:  "Silences the posting of whitelist error comments.",
+		defaultValue: false,
+	},
+	DisableFoldingLongOutputFlag: {
+		description:  "Toggle off folding atlantis output",
 		defaultValue: false,
 	},
 	WriteGitCredsFlag: {

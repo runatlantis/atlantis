@@ -38,6 +38,7 @@ type MarkdownRenderer struct {
 	// If we're not configured with a GitLab client, this will be false.
 	GitlabSupportsCommonMark bool
 	DisableApplyAll          bool
+	DisableFoldingLongOutput bool
 }
 
 // commonData is data that all responses have.
@@ -178,6 +179,10 @@ func (m *MarkdownRenderer) shouldUseWrappedTmpl(vcsHost models.VCSHostType, outp
 	}
 
 	if vcsHost == models.Gitlab && !m.GitlabSupportsCommonMark {
+		return false
+	}
+
+	if m.DisableFoldingLongOutput {
 		return false
 	}
 
