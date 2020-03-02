@@ -222,7 +222,7 @@ func (g *GithubClient) MergePull(pull models.PullRequest) error {
 		pull.BaseRepo.Owner,
 		pull.BaseRepo.Name,
 		pull.Num,
-		common.AutomergeCommitMsg,
+		"",
 		options)
 	if err != nil {
 		return errors.Wrap(err, "merging pull request")
