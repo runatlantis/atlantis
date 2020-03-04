@@ -119,9 +119,9 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 	}
 	ctx.Log.Debug("%d files were modified in this pull request", len(modifiedFiles))
 
-	// If the --all flag has been given or an empty pull request has been opened,
-	// we just suppose all files have been modified.
-	if all || len(modifiedFiles) == 0 {
+	// If the --all flag has been given we just suppose all files have been
+	// modified.
+	if all {
 		lsCmd := exec.Command("git", "ls-tree", "-r", "--name-only", "HEAD")
 		lsCmd.Dir = repoDir
 		lsOut, err := lsCmd.CombinedOutput()
