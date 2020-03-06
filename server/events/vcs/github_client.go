@@ -16,7 +16,6 @@ package vcs
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -43,32 +42,16 @@ type GithubClient struct {
 }
 
 // NewGithubClient returns a valid GitHub client.
-func NewGithubClient(hostname string, user string, pass string, logger *logging.SimpleLogger) (*GithubClient, error) {
-	tp := github.BasicAuthTransport{
-		Username: strings.TrimSpace(user),
-		Password: strings.TrimSpace(pass),
-	}
-	client := github.NewClient(tp.Client())
-	graphqlURL := "https://api.github.com/graphql"
+func NewGithubClient(hostname string, credentials GithubCredentials, logger *logging.SimpleLogger) (*GithubClient, error) {
 
-	// If we're using github.com then we don't need to do any additional configuration
-	// for the client. It we're using Github Enterprise, then we need to manually
-	// set the base url for the API.
-	if hostname != "github.com" {
-		baseURL := fmt.Sprintf("https://%s/api/v3/", hostname)
-		base, err := url.Parse(baseURL)
-		if err != nil {
-			return nil, errors.Wrapf(err, "Invalid github hostname trying to parse %s", baseURL)
-		}
-		client.BaseURL = base
-		// Github Enterprise uses a slightly different endpoint format for GraphQL.
-		// https://developer.github.com/enterprise/2.20/v4/guides/forming-calls/#the-graphql-endpoint
-		graphqlURL = fmt.Sprintf("https://%s/api/graphql", hostname)
-		_, err = url.Parse(graphqlURL)
-		if err != nil {
-			return nil, errors.Wrapf(err, "Invalid GraphQL github hostname trying to parse %s", graphqlURL)
-		}
+	apiURL := githubAPIURL(hostname)
+	transport, err := credentials.Client(apiURL.String())
+	if err != nil {
+		return nil, errors.Wrap(err, "Error initializing github authentication transport")
 	}
+	client := github.NewClient(transport)
+	client.BaseURL = apiURL
+	graphqlURL := fmt.Sprintf("https://%s/graphql", apiURL.Host)
 
 	// shurcooL's githubv4 library has a client ctor, but it doesn't support schema
 	// previews, which need custom Accept headers (https://developer.github.com/v4/previews)

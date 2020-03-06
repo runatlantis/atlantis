@@ -69,6 +69,9 @@ var testFlags = map[string]interface{}{
 	GHHostnameFlag:             "ghhostname",
 	GHTokenFlag:                "token",
 	GHUserFlag:                 "user",
+	GHAppIDFlag:                int64(0),
+	GHAppKeyFlag:               "",
+	GHOrganizationFlag:         "",
 	GHWebhookSecretFlag:        "secret",
 	GitlabHostnameFlag:         "gitlab-hostname",
 	GitlabTokenFlag:            "gitlab-token",
@@ -347,7 +350,7 @@ func TestExecute_ValidateSSLConfig(t *testing.T) {
 }
 
 func TestExecute_ValidateVCSConfig(t *testing.T) {
-	expErr := "--gh-user/--gh-token or --gitlab-user/--gitlab-token or --bitbucket-user/--bitbucket-token or --azuredevops-user/--azuredevops-token must be set"
+	expErr := "--gh-user/--gh-token or --gh-app-id/--gh-app-key or --gitlab-user/--gitlab-token or --bitbucket-user/--bitbucket-token or --azuredevops-user/--azuredevops-token must be set"
 	cases := []struct {
 		description string
 		flags       map[string]interface{}

@@ -59,7 +59,7 @@ func TestGithubClient_GetModifiedFiles(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass", nil)
+	client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"})
 	Ok(t, err)
 	defer disableSSLVerification()()
 
@@ -114,7 +114,7 @@ func TestGithubClient_GetModifiedFilesMovedFile(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass", nil)
+	client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"})
 	Ok(t, err)
 	defer disableSSLVerification()()
 
@@ -358,7 +358,7 @@ func TestGithubClient_UpdateStatus(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass", nil)
+			client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"})
 			Ok(t, err)
 			defer disableSSLVerification()()
 
@@ -444,7 +444,7 @@ func TestGithubClient_PullIsApproved(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass", nil)
+	client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"})
 	Ok(t, err)
 	defer disableSSLVerification()()
 
@@ -535,7 +535,7 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 				}))
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass", nil)
+			client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"})
 			Ok(t, err)
 			defer disableSSLVerification()()
 
@@ -617,7 +617,7 @@ func TestGithubClient_MergePullHandlesError(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass", nil)
+			client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"})
 			Ok(t, err)
 			defer disableSSLVerification()()
 
@@ -739,7 +739,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass", nil)
+			client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"})
 			Ok(t, err)
 			defer disableSSLVerification()()
 

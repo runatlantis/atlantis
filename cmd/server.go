@@ -57,6 +57,9 @@ const (
 	GHHostnameFlag             = "gh-hostname"
 	GHTokenFlag                = "gh-token"
 	GHUserFlag                 = "gh-user"
+	GHAppIDFlag                = "gh-app-id"
+	GHAppKeyFlag               = "gh-app-key"
+	GHOrganizationFlag         = "gh-org"
 	GHWebhookSecretFlag        = "gh-webhook-secret" // nolint: gosec
 	GitlabHostnameFlag         = "gitlab-hostname"
 	GitlabTokenFlag            = "gitlab-token"
@@ -159,10 +162,19 @@ var stringFlags = map[string]stringFlag{
 		defaultValue: DefaultGHHostname,
 	},
 	GHUserFlag: {
-		description: "GitHub username of API user.",
+		description:  "GitHub username of API user.",
+		defaultValue: "",
 	},
 	GHTokenFlag: {
 		description: "GitHub token of API user. Can also be specified via the ATLANTIS_GH_TOKEN environment variable.",
+	},
+	GHAppKeyFlag: {
+		description:  "A path to a file containing the GitHub App's private key",
+		defaultValue: "",
+	},
+	GHOrganizationFlag: {
+		description:  "The name of the GitHub organization to use during the creation of a Github App for Atlantis",
+		defaultValue: "",
 	},
 	GHWebhookSecretFlag: {
 		description: "Secret used to validate GitHub webhooks (see https://developer.github.com/webhooks/securing/)." +
@@ -302,6 +314,13 @@ var intFlags = map[string]intFlag{
 	},
 }
 
+var int64Flags = map[string]int64Flag{
+	GHAppIDFlag: {
+		description:  "GitHub App Id. If defined, initializes the GitHub client with app-based credentials",
+		defaultValue: 0,
+	},
+}
+
 // ValidLogLevels are the valid log levels that can be set
 var ValidLogLevels = []string{"debug", "info", "warn", "error"}
 
@@ -313,6 +332,11 @@ type stringFlag struct {
 type intFlag struct {
 	description  string
 	defaultValue int
+	hidden       bool
+}
+type int64Flag struct {
+	description  string
+	defaultValue int64
 	hidden       bool
 }
 type boolFlag struct {
@@ -398,6 +422,19 @@ func (s *ServerCmd) Init() *cobra.Command {
 
 	// Set int flags.
 	for name, f := range intFlags {
+		usage := f.description
+		if f.defaultValue != 0 {
+			usage = fmt.Sprintf("%s (default %d)", usage, f.defaultValue)
+		}
+		c.Flags().Int(name, 0, usage+"\n")
+		if f.hidden {
+			c.Flags().MarkHidden(name) // nolint: errcheck
+		}
+		s.Viper.BindPFlag(name, c.Flags().Lookup(name)) // nolint: errcheck
+	}
+
+	// Set int flags.
+	for name, f := range int64Flags {
 		usage := f.description
 		if f.defaultValue != 0 {
 			usage = fmt.Sprintf("%s (default %d)", usage, f.defaultValue)
@@ -528,13 +565,13 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	// 3. bitbucket user and token set
 	// 4. azuredevops user and token set
 	// 5. any combination of the above
-	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag)
-	if ((userConfig.GithubUser == "") != (userConfig.GithubToken == "")) || ((userConfig.GitlabUser == "") != (userConfig.GitlabToken == "")) || ((userConfig.BitbucketUser == "") != (userConfig.BitbucketToken == "")) || ((userConfig.AzureDevopsUser == "") != (userConfig.AzureDevopsToken == "")) {
+	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GHAppIDFlag, GHAppKeyFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag)
+	if ((userConfig.GithubUser == "") != (userConfig.GithubToken == "")) || ((userConfig.GithubAppID == 0) != (userConfig.GithubAppKey == "")) || ((userConfig.GitlabUser == "") != (userConfig.GitlabToken == "")) || ((userConfig.BitbucketUser == "") != (userConfig.BitbucketToken == "")) || ((userConfig.AzureDevopsUser == "") != (userConfig.AzureDevopsToken == "")) {
 		return vcsErr
 	}
 	// At this point, we know that there can't be a single user/token without
 	// its partner, but we haven't checked if any user/token is set at all.
-	if userConfig.GithubUser == "" && userConfig.GitlabUser == "" && userConfig.BitbucketUser == "" && userConfig.AzureDevopsUser == "" {
+	if userConfig.GithubAppID == 0 && userConfig.GithubUser == "" && userConfig.GitlabUser == "" && userConfig.BitbucketUser == "" && userConfig.AzureDevopsUser == "" {
 		return vcsErr
 	}
 
