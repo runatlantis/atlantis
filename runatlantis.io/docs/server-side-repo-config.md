@@ -12,7 +12,7 @@ Read through the [use-cases](#use-cases) to determine if you need it.
 
 ## Enabling Server Side Repo Config
 To use server side repo config create a config file, ex. `repos.yaml`, and pass it to
-the `atlantis server` command via the `--repo-config` flag, ex. `--repo-config=path/to/repos.yaml`. 
+the `atlantis server` command via the `--repo-config` flag, ex. `--repo-config=path/to/repos.yaml`.
 
 If you don't wish to write a config file to disk, you can use the
 `--repo-config-json` flag or `ATLANTIS_REPO_CONFIG_JSON` environment variable
@@ -31,20 +31,20 @@ repos:
 
   # apply_requirements sets the Apply Requirements for all repos that match.
   apply_requirements: [approved, mergeable]
-  
+
   # workflow sets the workflow for all repos that match.
   # This workflow must be defined in the workflows section.
   workflow: custom
-  
+
   # allowed_overrides specifies which keys can be overridden by this repo in
   # its atlantis.yaml file.
   allowed_overrides: [apply_requirements, workflow]
-  
+
   # allow_custom_workflows defines whether this repo can define its own
   # workflows. If false (default), the repo can only use server-side defined
   # workflows.
   allow_custom_workflows: true
-  
+
   # id can also be an exact match.
 - id: github.com/myorg/specific-repo
 
@@ -75,7 +75,7 @@ For all repos:
 ```yaml
 # repos.yaml
 repos:
-- id: /.*/ 
+- id: /.*/
   apply_requirements: [approved]
 ```
 
@@ -97,7 +97,7 @@ For all repos:
 ```yaml
 # repos.yaml
 repos:
-- id: /.*/ 
+- id: /.*/
   apply_requirements: [mergeable]
 ```
 
@@ -119,10 +119,10 @@ To allow all repos to override the default:
 ```yaml
 # repos.yaml
 repos:
-- id: /.*/ 
+- id: /.*/
   # The default will be approved.
   apply_requirements: [approved]
-  
+
   # But all repos can set their own using atlantis.yaml
   allowed_overrides: [apply_requirements]
 ```
@@ -131,9 +131,9 @@ To allow only a specific repo to override the default:
 # repos.yaml
 repos:
 # Set a default for all repos.
-- id: /.*/ 
+- id: /.*/
   apply_requirements: [approved]
-  
+
 # Allow a specific repo to override.
 - id: github.com/myorg/myrepo
   allowed_overrides: [apply_requirements]
@@ -195,7 +195,7 @@ workflows:
     apply:
       steps:
       - run: my custom apply command
-  
+
   custom2:
     plan:
       steps:
@@ -241,7 +241,7 @@ repos:
   # With just allowed_overrides: [workflow], repos can only
   # choose workflows defined server-side.
   allowed_overrides: [workflow]
-  
+
   # By setting allow_custom_workflows to true, we allow repos to also
   # define their own workflows.
   allow_custom_workflows: true
@@ -310,7 +310,7 @@ If you set a workflow with the key `default`, it will override this.
 | workflow               | string   | none    | no       | A custom workflow.                                                                                                                                                                                                                                                                                       |
 | apply_requirements     | []string | none    | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved` and `mergeable`. See [Apply Requirements](apply-requirements.html) for more details.                                                                                    |
 | allowed_overrides      | []string | none    | no       | A list of restricted keys that `atlantis.yaml` files can override. The only supported keys are `apply_requirements` and `workflow`                                                                                                                                                                       |
-| allow_custom_workflows | bool     | none    | no       | A list of restricted keys that `atlantis.yaml` files can override. The only supported keys are `apply_requirements` and `workflow`                                                                                                                                                                       |
+| allow_custom_workflows | bool     | false   | no       | Whether or not to allow [Custom Workflows](custom-workflows.html).                                                                                                                                                                       |
 
 
 :::tip Notes
@@ -319,13 +319,13 @@ If you set a workflow with the key `default`, it will override this.
   For example, given a repo ID `github.com/owner/repo` and a config:
   ```yaml
   repos:
-  - id: /.*/ 
+  - id: /.*/
     allow_custom_workflows: true
     apply_requirements: [approved]
   - id: github.com/owner/repo
     apply_requirements: []
   ```
-  
+
   The final config will look like:
   ```yaml
   apply_requirements: []
