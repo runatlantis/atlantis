@@ -1,7 +1,13 @@
 package runtime
 
 import (
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+
 	version "github.com/hashicorp/go-version"
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
@@ -24,6 +30,11 @@ func (i *InitStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []strin
 		terraformInitCmd = append([]string{"get", "-no-color", "-upgrade"}, extraArgs...)
 	}
 
+	ctx.Log.Info("Trying to generate environment file for workspace %s", ctx.Workspace)
+	if err := generateEnvironmentFile(path, ctx.Workspace); err != nil {
+		return "", nil
+	}
+
 	out, err := i.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, terraformInitCmd, envs, tfVersion, ctx.Workspace)
 	// Only include the init output if there was an error. Otherwise it's
 	// unnecessary and lengthens the comment.
@@ -31,4 +42,24 @@ func (i *InitStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []strin
 		return out, err
 	}
 	return "", nil
+}
+
+// generateEnvironmentFile generates a .terraformrc file containing config for tfeToken
+// and hostname tfeHostname.
+// It will create the file in home/.terraformrc.
+func generateEnvironmentFile(path string, workspace string) error {
+	const tfFolderName = ".terraform"
+	const tfConfigName = "environment"
+
+	tfFolder := filepath.Join(path, tfFolderName)
+	tfConfig := filepath.Join(tfFolder, tfConfigName)
+
+	os.MkdirAll(tfFolder, os.ModePerm)
+
+	config := fmt.Sprintf(workspace)
+
+	if err := ioutil.WriteFile(tfConfig, []byte(config), 0600); err != nil {
+		return errors.Wrapf(err, "writing generated %s file with TFE token to %s", tfConfigName, tfConfig)
+	}
+	return nil
 }

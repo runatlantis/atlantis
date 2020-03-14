@@ -97,7 +97,8 @@ func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *CommandContext, c
 // modified in this ctx.
 func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext, commentFlags []string, verbose bool) ([]models.ProjectCommandContext, error) {
 	// Need to lock the workspace we're about to clone to.
-	workspace := DefaultWorkspace
+	workspace := ctx.Pull.BaseBranch
+
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.BaseRepo.FullName, ctx.Pull.Num, workspace)
 	if err != nil {
 		ctx.Log.Warn("workspace was locked")
@@ -151,7 +152,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		ctx.Log.Info("automatically determined that there were %d projects modified in this pull request: %s", len(modifiedProjects), modifiedProjects)
 		for _, mp := range modifiedProjects {
 			ctx.Log.Debug("determining config for project at dir: %q", mp.Path)
-			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.BaseRepo.ID(), mp.Path, DefaultWorkspace)
+			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.BaseRepo.ID(), mp.Path, ctx.Pull.BaseBranch)
 			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, pCfg, commentFlags, DefaultAutomergeEnabled, verbose, repoDir))
 		}
 	}
@@ -162,7 +163,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 // buildProjectPlanCommand builds a plan context for a single project.
 // cmd must be for only one project.
 func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *CommandContext, cmd *CommentCommand) (models.ProjectCommandContext, error) {
-	workspace := DefaultWorkspace
+	workspace := ctx.Pull.BaseBranch
 	if cmd.Workspace != "" {
 		workspace = cmd.Workspace
 	}
@@ -224,7 +225,7 @@ func (p *DefaultProjectCommandBuilder) buildApplyAllCommands(ctx *CommandContext
 // buildProjectApplyCommand builds an apply command for the single project
 // identified by cmd.
 func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *CommandContext, cmd *CommentCommand) (models.ProjectCommandContext, error) {
-	workspace := DefaultWorkspace
+	workspace := ctx.Pull.BaseBranch
 	if cmd.Workspace != "" {
 		workspace = cmd.Workspace
 	}
