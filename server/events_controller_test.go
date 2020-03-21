@@ -39,6 +39,7 @@ import (
 
 const githubHeader = "X-Github-Event"
 const gitlabHeader = "X-Gitlab-Event"
+const azuredevopsHeader = "Request-Id"
 
 var secret = []byte("secret")
 
@@ -452,6 +453,83 @@ func TestPost_GitlabMergeRequestUnsupportedAction(t *testing.T) {
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	responseContains(t, w, http.StatusOK, "Ignoring non-actionable pull request event")
+}
+
+func TestPost_AzureDevopsPullRequestIgnoreEvent(t *testing.T) {
+	u := "user"
+	user := []byte(u)
+
+	t.Log("when the event is an azure devops pull request update that should not trigger workflow we ignore it")
+	RegisterMockTestingT(t)
+	v := mocks.NewMockAzureDevopsRequestValidator()
+	p := emocks.NewMockEventParsing()
+	cp := emocks.NewMockCommentParsing()
+	cr := emocks.NewMockCommandRunner()
+	c := emocks.NewMockPullCleaner()
+	vcsmock := vcsmocks.NewMockClient()
+	repoWhitelistChecker, err := events.NewRepoWhitelistChecker("*")
+	Ok(t, err)
+	e := server.EventsController{
+		TestingMode:                     true,
+		Logger:                          logging.NewNoopLogger(),
+		AzureDevopsWebhookBasicUser:     user,
+		AzureDevopsWebhookBasicPassword: secret,
+		AzureDevopsRequestValidator:     v,
+		Parser:                          p,
+		CommentParser:                   cp,
+		CommandRunner:                   cr,
+		PullCleaner:                     c,
+		SupportedVCSHosts:               []models.VCSHostType{models.AzureDevops},
+		RepoWhitelistChecker:            repoWhitelistChecker,
+		VCSClient:                       vcsmock,
+	}
+
+	event := `{
+		"subscriptionId": "11111111-1111-1111-1111-111111111111",
+		"notificationId": 1,
+		"id": "22222222-2222-2222-2222-222222222222",
+		"eventType": "git.pullrequest.updated",
+		"publisherId": "tfs",
+		"message": {
+			"text": "Dev %s pull request 1 (Name in repo)"
+		},
+		"resource": {}}`
+
+	cases := []struct {
+		message string
+	}{
+		{
+			"has changed the reviewer list on",
+		},
+		{
+			"has approved",
+		},
+		{
+			"has approved and left suggestions on",
+		},
+		{
+			"is waiting for the author on",
+		},
+		{
+			"rejected",
+		},
+		{
+			"voted on",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.message, func(t *testing.T) {
+			payload := fmt.Sprintf(event, c.message)
+			req, _ := http.NewRequest("GET", "", strings.NewReader(payload))
+			req.Header.Set(azuredevopsHeader, "reqID")
+			When(v.Validate(req, user, secret)).ThenReturn([]byte(payload), nil)
+			w := httptest.NewRecorder()
+			e.Parser = &events.EventParser{}
+			e.Post(w, req)
+			responseContains(t, w, http.StatusOK, "pull request updated event is not a supported type")
+		})
+	}
 }
 
 func TestPost_GithubPullRequestClosedErrCleaningPull(t *testing.T) {
