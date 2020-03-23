@@ -1,4 +1,13 @@
 # The runatlantis/atlantis-base is created by docker-base/Dockerfile.
+FROM  circleci/golang:1.13 as builder
+ENV GOFLAGS=-mod=vendor
+WORKDIR /atlantis
+COPY go.mod .
+COPY go.sum .
+RUN go mod download
+COPY . .
+RUN make build-service
+
 FROM runatlantis/atlantis-base:v3.2
 LABEL authors="Anubhav Mishra, Luke Kysow"
 
@@ -20,7 +29,7 @@ RUN AVAILABLE_TERRAFORM_VERSIONS="0.8.8 0.9.11 0.10.8 0.11.14 ${DEFAULT_TERRAFOR
     ln -s /usr/local/bin/tf/versions/${DEFAULT_TERRAFORM_VERSION}/terraform /usr/local/bin/terraform
 
 # copy binary
-COPY atlantis /usr/local/bin/atlantis
+COPY --from=builder /atlantis/atlantis /usr/local/bin/atlantis
 
 # copy docker entrypoint
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
