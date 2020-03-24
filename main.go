@@ -35,8 +35,12 @@ func main() {
 	}
 	version := &cmd.VersionCmd{AtlantisVersion: atlantisVersion}
 	testdrive := &cmd.TestdriveCmd{}
+	drainCmd := &cmd.DrainCmd{
+		Logger: logging.NewSimpleLogger("cmd", false, logging.Info),
+	}
 	cmd.RootCmd.AddCommand(server.Init())
 	cmd.RootCmd.AddCommand(version.Init())
 	cmd.RootCmd.AddCommand(testdrive.Init())
+	cmd.RootCmd.AddCommand(drainCmd.Init())
 	cmd.Execute()
 }

@@ -75,6 +75,7 @@ type Server struct {
 	Locker             locking.Locker
 	EventsController   *EventsController
 	LocksController    *LocksController
+	DrainController    *DrainController
 	IndexTemplate      TemplateWriter
 	LockDetailTemplate TemplateWriter
 	SSLCertFile        string
@@ -378,6 +379,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDirLocker:   workingDirLocker,
 		DB:                 boltdb,
 	}
+	drainController := &DrainController{
+		Logger: logger,
+	}
 	eventsController := &EventsController{
 		CommandRunner:                   commandRunner,
 		PullCleaner:                     pullClosedExecutor,
@@ -396,6 +400,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AzureDevopsWebhookBasicUser:     []byte(userConfig.AzureDevopsWebhookUser),
 		AzureDevopsWebhookBasicPassword: []byte(userConfig.AzureDevopsWebhookPassword),
 		AzureDevopsRequestValidator:     &DefaultAzureDevopsRequestValidator{},
+		DrainController:                 drainController,
 	}
 	return &Server{
 		AtlantisVersion:    config.AtlantisVersion,
@@ -407,6 +412,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Locker:             lockingClient,
 		EventsController:   eventsController,
 		LocksController:    locksController,
+		DrainController:    drainController,
 		IndexTemplate:      indexTemplate,
 		LockDetailTemplate: lockTemplate,
 		SSLKeyFile:         userConfig.SSLKeyFile,
@@ -420,6 +426,8 @@ func (s *Server) Start() error {
 		return r.URL.Path == "/" || r.URL.Path == "/index.html"
 	})
 	s.Router.HandleFunc("/healthz", s.Healthz).Methods("GET")
+	s.Router.HandleFunc("/drain", s.DrainController.Get).Methods("GET")
+	s.Router.HandleFunc("/drain", s.DrainController.Post).Methods("POST")
 	s.Router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: static.Asset, AssetDir: static.AssetDir, AssetInfo: static.AssetInfo}))
 	s.Router.HandleFunc("/events", s.EventsController.Post).Methods("POST")
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
