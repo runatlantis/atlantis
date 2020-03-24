@@ -306,7 +306,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DefaultTFVersion:  defaultTfVersion,
 		TerraformBinDir:   terraformClient.TerraformBinDir(),
 	}
-	drainer := &events.Drainer{
+	drainer := &events.SimpleDrainer{
 		Logger: logger,
 	}
 	drainController := &DrainController{

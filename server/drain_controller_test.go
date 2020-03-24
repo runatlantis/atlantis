@@ -94,11 +94,13 @@ func TestDrainController_Get(t *testing.T) {
 			logger := logging.NewNoopLogger()
 			r, _ := http.NewRequest("GET", "/drain", bytes.NewBuffer(nil))
 			w := httptest.NewRecorder()
-			dr := &events.Drainer{
-				Logger:                   logger,
-				DrainStarted:             tt.fields.DrainStarted,
-				DrainCompleted:           tt.fields.DrainCompleted,
-				OngoingOperationsCounter: tt.fields.OngoingOperationsCounter,
+			dr := &events.SimpleDrainer{
+				Logger: logger,
+				Status: events.DrainStatus{
+					DrainStarted:             tt.fields.DrainStarted,
+					DrainCompleted:           tt.fields.DrainCompleted,
+					OngoingOperationsCounter: tt.fields.OngoingOperationsCounter,
+				},
 			}
 			d := &server.DrainController{
 				Logger:  logger,
@@ -200,11 +202,13 @@ func TestDrainController_Post(t *testing.T) {
 			logger := logging.NewNoopLogger()
 			r, _ := http.NewRequest("GET", "/drain", bytes.NewBuffer(nil))
 			w := httptest.NewRecorder()
-			dr := &events.Drainer{
-				Logger:                   logger,
-				DrainStarted:             tt.fields.DrainStarted,
-				DrainCompleted:           tt.fields.DrainCompleted,
-				OngoingOperationsCounter: tt.fields.OngoingOperationsCounter,
+			dr := &events.SimpleDrainer{
+				Logger: logger,
+				Status: events.DrainStatus{
+					DrainStarted:             tt.fields.DrainStarted,
+					DrainCompleted:           tt.fields.DrainCompleted,
+					OngoingOperationsCounter: tt.fields.OngoingOperationsCounter,
+				},
 			}
 			d := &server.DrainController{
 				Logger:  logger,

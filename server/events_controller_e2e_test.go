@@ -422,7 +422,7 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 		globalCfg, err = parser.ParseGlobalCfg(expCfgPath, globalCfg)
 		Ok(t, err)
 	}
-	drainer := &events.Drainer{
+	drainer := &events.SimpleDrainer{
 		Logger: logger,
 	}
 	commandRunner := &events.DefaultCommandRunner{

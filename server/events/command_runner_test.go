@@ -33,6 +33,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
+var commitStatusUpdater *mocks.MockCommitStatusUpdater
 var projectCommandBuilder *mocks.MockProjectCommandBuilder
 var projectCommandRunner *mocks.MockProjectCommandRunner
 var eventParsing *mocks.MockEventParsing
@@ -43,9 +44,11 @@ var ch events.DefaultCommandRunner
 var pullLogger *logging.SimpleLogger
 var workingDir events.WorkingDir
 var pendingPlanFinder *mocks.MockPendingPlanFinder
+var drainer *mocks.MockDrainer
 
 func setup(t *testing.T) *vcsmocks.MockClient {
 	RegisterMockTestingT(t)
+	commitStatusUpdater = mocks.NewMockCommitStatusUpdater()
 	projectCommandBuilder = mocks.NewMockProjectCommandBuilder()
 	eventParsing = mocks.NewMockEventParsing()
 	vcsClient := vcsmocks.NewMockClient()
@@ -57,15 +60,14 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	projectCommandRunner = mocks.NewMockProjectCommandRunner()
 	workingDir = mocks.NewMockWorkingDir()
 	pendingPlanFinder = mocks.NewMockPendingPlanFinder()
+	drainer = mocks.NewMockDrainer()
+	When(drainer.TryAddNewOngoingOperation()).ThenReturn(true)
 	When(logger.GetLevel()).ThenReturn(logging.Info)
 	When(logger.NewLogger("runatlantis/atlantis#1", true, logging.Info)).
 		ThenReturn(pullLogger)
-	drainer := &events.Drainer{
-		Logger: logger,
-	}
 	ch = events.DefaultCommandRunner{
 		VCSClient:                vcsClient,
-		CommitStatusUpdater:      &events.DefaultCommitStatusUpdater{vcsClient, "atlantis"},
+		CommitStatusUpdater:      commitStatusUpdater,
 		EventParser:              eventParsing,
 		MarkdownRenderer:         &events.MarkdownRenderer{},
 		GithubPullGetter:         githubGetter,
@@ -237,4 +239,38 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 		ThenReturn(tmp, nil)
 	ch.RunAutoplanCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
 	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
+}
+
+func TestRunCommentCommand_DrainOngoing(t *testing.T) {
+	t.Log("if drain is ongoing then a message should be displayed")
+	vcsClient := setup(t)
+	When(drainer.TryAddNewOngoingOperation()).ThenReturn(false)
+	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, nil)
+	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, fixtures.Pull.Num, "Atlantis server is shutting down, please try again later.")
+}
+
+func TestRunCommentCommand_DrainNotOngoing(t *testing.T) {
+	t.Log("if drain is not ongoing then remove ongoing operation must be called even if panic occured")
+	setup(t)
+	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenPanic("OMG PANIC!!!")
+	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, nil)
+	githubGetter.VerifyWasCalledOnce().GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)
+	drainer.VerifyWasCalledOnce().RemoveOngoingOperation()
+}
+
+func TestRunAutoplanCommand_DrainOngoing(t *testing.T) {
+	t.Log("if drain is ongoing then a message should be displayed")
+	vcsClient := setup(t)
+	When(drainer.TryAddNewOngoingOperation()).ThenReturn(false)
+	ch.RunAutoplanCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
+	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, fixtures.Pull.Num, "Atlantis server is shutting down, please try again later.")
+}
+
+func TestRunAutoplanCommand_DrainNotOngoing(t *testing.T) {
+	t.Log("if drain is not ongoing then remove ongoing operation must be called even if panic occured")
+	setup(t)
+	When(commitStatusUpdater.UpdateCombined(fixtures.GithubRepo, fixtures.Pull, models.PendingCommitStatus, models.PlanCommand)).ThenPanic("OMG PANIC!!!")
+	ch.RunAutoplanCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
+	commitStatusUpdater.VerifyWasCalledOnce().UpdateCombined(fixtures.GithubRepo, fixtures.Pull, models.PendingCommitStatus, models.PlanCommand)
+	drainer.VerifyWasCalledOnce().RemoveOngoingOperation()
 }

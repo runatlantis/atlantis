@@ -12,7 +12,7 @@ import (
 // DrainController handles all requests relating to Atlantis drainage (to shutdown properly).
 type DrainController struct {
 	Logger  *logging.SimpleLogger
-	Drainer *events.Drainer
+	Drainer events.Drainer
 }
 
 type DrainResponse struct {
@@ -33,10 +33,11 @@ func (d *DrainController) Post(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *DrainController) respondStatus(responseCode int, w http.ResponseWriter) {
+	status := d.Drainer.GetStatus()
 	data, err := json.MarshalIndent(&DrainResponse{
-		DrainStarted:             d.Drainer.DrainStarted,
-		DrainCompleted:           d.Drainer.DrainCompleted,
-		OngoingOperationsCounter: d.Drainer.OngoingOperationsCounter,
+		DrainStarted:             status.DrainStarted,
+		DrainCompleted:           status.DrainCompleted,
+		OngoingOperationsCounter: status.OngoingOperationsCounter,
 	}, "", "  ")
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

@@ -98,7 +98,7 @@ type DefaultCommandRunner struct {
 	PendingPlanFinder PendingPlanFinder
 	WorkingDir        WorkingDir
 	DB                *db.BoltDB
-	Drainer           *Drainer
+	Drainer           Drainer
 }
 
 // RunAutoplanCommand runs plan when a pull request is opened or updated.
