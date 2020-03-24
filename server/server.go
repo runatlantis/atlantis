@@ -306,6 +306,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DefaultTFVersion:  defaultTfVersion,
 		TerraformBinDir:   terraformClient.TerraformBinDir(),
 	}
+	drainer := &events.Drainer{
+		Logger: logger,
+	}
+	drainController := &DrainController{
+		Logger:  logger,
+		Drainer: drainer,
+	}
 	commandRunner := &events.DefaultCommandRunner{
 		VCSClient:                vcsClient,
 		GithubPullGetter:         githubClient,
@@ -363,6 +370,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		PendingPlanFinder: pendingPlanFinder,
 		DB:                boltdb,
 		GlobalAutomerge:   userConfig.Automerge,
+		Drainer:           drainer,
 	}
 	repoWhitelist, err := events.NewRepoWhitelistChecker(userConfig.RepoWhitelist)
 	if err != nil {
@@ -378,9 +386,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDir:         workingDir,
 		WorkingDirLocker:   workingDirLocker,
 		DB:                 boltdb,
-	}
-	drainController := &DrainController{
-		Logger: logger,
 	}
 	eventsController := &EventsController{
 		CommandRunner:                   commandRunner,
@@ -400,7 +405,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AzureDevopsWebhookBasicUser:     []byte(userConfig.AzureDevopsWebhookUser),
 		AzureDevopsWebhookBasicPassword: []byte(userConfig.AzureDevopsWebhookPassword),
 		AzureDevopsRequestValidator:     &DefaultAzureDevopsRequestValidator{},
-		DrainController:                 drainController,
 	}
 	return &Server{
 		AtlantisVersion:    config.AtlantisVersion,

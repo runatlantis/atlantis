@@ -98,10 +98,22 @@ type DefaultCommandRunner struct {
 	PendingPlanFinder PendingPlanFinder
 	WorkingDir        WorkingDir
 	DB                *db.BoltDB
+	Drainer           *Drainer
 }
 
 // RunAutoplanCommand runs plan when a pull request is opened or updated.
 func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) {
+	if canProceed := c.Drainer.TryAddNewOngoingOperation(); !canProceed {
+		if commentErr := c.VCSClient.CreateComment(baseRepo, pull.Num, "Atlantis server is shutting down, please try again later."); commentErr != nil {
+			c.Logger.Log(logging.Error, "unable to comment drainage: %s", commentErr)
+		}
+		return
+	}
+
+	defer func() {
+		c.Drainer.RemoveOngoingOperation()
+	}()
+
 	log := c.buildLogger(baseRepo.FullName, pull.Num)
 	defer c.logPanics(baseRepo, pull.Num, log)
 	ctx := &CommandContext{
@@ -164,6 +176,17 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 // the event is further validated before making an additional (potentially
 // wasteful) call to get the necessary data.
 func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *CommentCommand) {
+	if canProceed := c.Drainer.TryAddNewOngoingOperation(); !canProceed {
+		if commentErr := c.VCSClient.CreateComment(baseRepo, pullNum, "Atlantis server is shutting down, please try again later."); commentErr != nil {
+			c.Logger.Log(logging.Error, "unable to comment drainage: %s", commentErr)
+		}
+		return
+	}
+
+	defer func() {
+		c.Drainer.RemoveOngoingOperation()
+	}()
+
 	log := c.buildLogger(baseRepo.FullName, pullNum)
 	defer c.logPanics(baseRepo, pullNum, log)
 

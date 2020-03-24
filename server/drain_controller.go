@@ -4,18 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sync"
 
+	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
 // DrainController handles all requests relating to Atlantis drainage (to shutdown properly).
 type DrainController struct {
-	Logger                   *logging.SimpleLogger
-	DrainStarted             bool
-	DrainCompleted           bool
-	OngoingOperationsCounter int
-	mutex                    sync.Mutex
+	Logger  *logging.SimpleLogger
+	Drainer *events.Drainer
 }
 
 type DrainResponse struct {
@@ -31,46 +28,15 @@ func (d *DrainController) Get(w http.ResponseWriter, r *http.Request) {
 
 // Post is the POST /drain route. It asks atlantis to finish all ongoing operations and to refuse to start new ones.
 func (d *DrainController) Post(w http.ResponseWriter, r *http.Request) {
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-	d.DrainStarted = true
-	if d.OngoingOperationsCounter == 0 {
-		d.DrainCompleted = true
-	}
+	d.Drainer.StartDrain()
 	d.respondStatus(http.StatusCreated, w)
-}
-
-// Try to add an operation as ongoing. Return true if the operation is allowed to start, false if it should be rejected.
-func (d *DrainController) TryAddNewOngoingOperation() bool {
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-	if d.DrainStarted {
-		return false
-	} else {
-		d.OngoingOperationsCounter += 1
-		return true
-	}
-}
-
-// Consider on operation as completed.
-func (d *DrainController) RemoveOngoingOperation() {
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-	d.OngoingOperationsCounter -= 1
-	if d.OngoingOperationsCounter < 0 {
-		d.Logger.Log(logging.Warn, "Drain OngoingOperationsCounter became below 0, this is a bug")
-		d.OngoingOperationsCounter = 0
-	}
-	if d.DrainStarted && d.OngoingOperationsCounter == 0 {
-		d.DrainCompleted = true
-	}
 }
 
 func (d *DrainController) respondStatus(responseCode int, w http.ResponseWriter) {
 	data, err := json.MarshalIndent(&DrainResponse{
-		DrainStarted:             d.DrainStarted,
-		DrainCompleted:           d.DrainCompleted,
-		OngoingOperationsCounter: d.OngoingOperationsCounter,
+		DrainStarted:             d.Drainer.DrainStarted,
+		DrainCompleted:           d.Drainer.DrainCompleted,
+		OngoingOperationsCounter: d.Drainer.OngoingOperationsCounter,
 	}, "", "  ")
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

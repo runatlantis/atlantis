@@ -83,7 +83,6 @@ type EventsController struct {
 	// Azure DevOps Team Project. If empty, no request validation is done.
 	AzureDevopsWebhookBasicPassword []byte
 	AzureDevopsRequestValidator     AzureDevopsRequestValidator
-	DrainController                 *DrainController
 }
 
 // Post handles POST webhook requests.
@@ -320,17 +319,6 @@ func (e *EventsController) HandleGithubPullRequestEvent(w http.ResponseWriter, p
 }
 
 func (e *EventsController) handlePullRequestEvent(w http.ResponseWriter, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, eventType models.PullRequestEventType) {
-	if canProceed := e.DrainController.TryAddNewOngoingOperation(); !canProceed {
-		if commentErr := e.VCSClient.CreateComment(baseRepo, pull.Num, "Atlantis server is shutting down, please try again later."); commentErr != nil {
-			e.Logger.Log(logging.Error, "unable to comment: %s", commentErr)
-		}
-		return
-	}
-
-	defer func() {
-		e.DrainController.RemoveOngoingOperation()
-	}()
-
 	if !e.RepoWhitelistChecker.IsWhitelisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
 		// If the repo isn't whitelisted and we receive an opened pull request
 		// event we comment back on the pull request that the repo isn't
@@ -415,17 +403,6 @@ func (e *EventsController) HandleGitlabCommentEvent(w http.ResponseWriter, event
 }
 
 func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, comment string, vcsHost models.VCSHostType) {
-	if canProceed := e.DrainController.TryAddNewOngoingOperation(); !canProceed {
-		if commentErr := e.VCSClient.CreateComment(baseRepo, pullNum, "Atlantis server is shutting down, please try again later."); commentErr != nil {
-			e.Logger.Log(logging.Error, "unable to comment: %s", commentErr)
-		}
-		return
-	}
-
-	defer func() {
-		e.DrainController.RemoveOngoingOperation()
-	}()
-
 	parseResult := e.CommentParser.Parse(comment, vcsHost)
 	if parseResult.Ignore {
 		truncated := comment
