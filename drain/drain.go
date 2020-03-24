@@ -14,8 +14,8 @@ import (
 // Start begins the shutdown process.
 func Start(logger *logging.SimpleLogger) error {
 	logger.Info("Drain starting")
-	http_client := &http.Client{}
-	resp, err := startDrain(http_client, logger)
+	httpClient := &http.Client{}
+	resp, err := startDrain(httpClient, logger)
 	if err != nil {
 		return err
 	}
@@ -27,12 +27,15 @@ func Start(logger *logging.SimpleLogger) error {
 		}
 		logger.Info("Drain of server still ongoing, waiting a little bit ...")
 		time.Sleep(5 * time.Second)
-		resp, err = getDrainStatus(http_client, logger)
+		resp, err = getDrainStatus(httpClient, logger)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func startDrain(http_client *http.Client, logger *logging.SimpleLogger) (*server.DrainResponse, error) {
+func startDrain(httpClient *http.Client, logger *logging.SimpleLogger) (*server.DrainResponse, error) {
 
 	req, err := http.NewRequest("POST", "http://localhost:4141/drain", nil)
 	if err != nil {
@@ -40,7 +43,7 @@ func startDrain(http_client *http.Client, logger *logging.SimpleLogger) (*server
 		return nil, err
 	}
 
-	resp, err := http_client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		logger.Err("Failed to make POST request to /drain endpoint: %s", err)
 		return nil, err
@@ -53,7 +56,7 @@ func startDrain(http_client *http.Client, logger *logging.SimpleLogger) (*server
 	}
 
 	if resp.StatusCode != http.StatusCreated {
-		logger.Err("Unexpected status code while making POST request to /drain endpoint: ", resp.StatusCode)
+		logger.Err("Unexpected status code while making POST request to /drain endpoint: %d", resp.StatusCode)
 		logger.Info("Response content: %s", string(body))
 		return nil, errors.New("Unexpected status code")
 	}
@@ -67,7 +70,7 @@ func startDrain(http_client *http.Client, logger *logging.SimpleLogger) (*server
 	return &response, nil
 }
 
-func getDrainStatus(http_client *http.Client, logger *logging.SimpleLogger) (*server.DrainResponse, error) {
+func getDrainStatus(httpClient *http.Client, logger *logging.SimpleLogger) (*server.DrainResponse, error) {
 
 	req, err := http.NewRequest("GET", "http://localhost:4141/drain", nil)
 	if err != nil {
@@ -75,7 +78,7 @@ func getDrainStatus(http_client *http.Client, logger *logging.SimpleLogger) (*se
 		return nil, err
 	}
 
-	resp, err := http_client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		logger.Err("Failed to make GET request to /drain endpoint: %s", err)
 		return nil, err
@@ -88,7 +91,7 @@ func getDrainStatus(http_client *http.Client, logger *logging.SimpleLogger) (*se
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		logger.Err("Unexpected status code while making GET request to /drain endpoint: ", resp.StatusCode)
+		logger.Err("Unexpected status code while making GET request to /drain endpoint: %d", resp.StatusCode)
 		logger.Info("Response content: %s", string(body))
 		return nil, errors.New("Unexpected status code")
 	}

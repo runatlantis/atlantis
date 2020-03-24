@@ -7,7 +7,7 @@ import (
 )
 
 type Drainer struct {
-	Logger                   *logging.SimpleLogger
+	Logger                   logging.SimpleLogging
 	DrainStarted             bool
 	DrainCompleted           bool
 	OngoingOperationsCounter int
@@ -20,17 +20,16 @@ func (d *Drainer) TryAddNewOngoingOperation() bool {
 	defer d.mutex.Unlock()
 	if d.DrainStarted {
 		return false
-	} else {
-		d.OngoingOperationsCounter += 1
-		return true
 	}
+	d.OngoingOperationsCounter++
+	return true
 }
 
 // Consider an operation as completed.
 func (d *Drainer) RemoveOngoingOperation() {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
-	d.OngoingOperationsCounter -= 1
+	d.OngoingOperationsCounter--
 	if d.OngoingOperationsCounter < 0 {
 		d.Logger.Log(logging.Warn, "Drain OngoingOperationsCounter became below 0, this is a bug")
 		d.OngoingOperationsCounter = 0

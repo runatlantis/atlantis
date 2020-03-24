@@ -60,6 +60,9 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	When(logger.GetLevel()).ThenReturn(logging.Info)
 	When(logger.NewLogger("runatlantis/atlantis#1", true, logging.Info)).
 		ThenReturn(pullLogger)
+	drainer := &events.Drainer{
+		Logger: logger,
+	}
 	ch = events.DefaultCommandRunner{
 		VCSClient:                vcsClient,
 		CommitStatusUpdater:      &events.DefaultCommitStatusUpdater{vcsClient, "atlantis"},
@@ -76,6 +79,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		PendingPlanFinder:        pendingPlanFinder,
 		WorkingDir:               workingDir,
 		DisableApplyAll:          false,
+		Drainer:                  drainer,
 	}
 	return vcsClient
 }
