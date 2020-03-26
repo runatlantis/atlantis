@@ -80,6 +80,7 @@ var testFlags = map[string]interface{}{
 	RequireMergeableFlag:       true,
 	SilenceForkPRErrorsFlag:    true,
 	SilenceWhitelistErrorsFlag: true,
+	SilenceVCSStatusNoPlans:    true,
 	SlackTokenFlag:             "slack-token",
 	SSLCertFileFlag:            "cert-file",
 	SSLKeyFileFlag:             "key-file",

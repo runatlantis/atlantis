@@ -85,6 +85,9 @@ type DefaultCommandRunner struct {
 	// this in our error message back to the user on a forked PR so they know
 	// how to disable error comment
 	SilenceForkPRErrorsFlag string
+	// SilenceVCSStatusNoPlans is whether autoplan should set commit status if no plans
+	// are found
+	SilenceVCSStatusNoPlans bool
 	ProjectCommandBuilder   ProjectCommandBuilder
 	ProjectCommandRunner    ProjectCommandRunner
 	// GlobalAutomerge is true if we should automatically merge pull requests if all
@@ -110,10 +113,6 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		return
 	}
 
-	if err := c.CommitStatusUpdater.UpdateCombined(ctx.BaseRepo, ctx.Pull, models.PendingCommitStatus, models.PlanCommand); err != nil {
-		ctx.Log.Warn("unable to update commit status: %s", err)
-	}
-
 	projectCmds, err := c.ProjectCommandBuilder.BuildAutoplanCommands(ctx)
 	if err != nil {
 		if statusErr := c.CommitStatusUpdater.UpdateCombined(ctx.BaseRepo, ctx.Pull, models.FailedCommitStatus, models.PlanCommand); statusErr != nil {
@@ -125,13 +124,21 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	}
 	if len(projectCmds) == 0 {
 		log.Info("determined there was no project to run plan in")
-		// If there were no projects modified, we set a successful commit status
-		// with 0/0 projects planned successfully because we've already set an
-		// in-progress status and we don't want that to be "in progress" forever.
-		if err := c.CommitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, models.PlanCommand, 0, 0); err != nil {
-			ctx.Log.Warn("unable to update commit status: %s", err)
+		if !c.SilenceVCSStatusNoPlans {
+			// If there were no projects modified, we set a successful commit status
+			// with 0/0 projects planned successfully because some users require
+			// the Atlantis status to be passing for all pull requests.
+			ctx.Log.Debug("setting VCS status to success with no projects found")
+			if err := c.CommitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, models.PlanCommand, 0, 0); err != nil {
+				ctx.Log.Warn("unable to update commit status: %s", err)
+			}
 		}
 		return
+	}
+
+	// At this point we are sure Atlantis has work to do, so set commit status to pending
+	if err := c.CommitStatusUpdater.UpdateCombined(ctx.BaseRepo, ctx.Pull, models.PendingCommitStatus, models.PlanCommand); err != nil {
+		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
 	result := c.runProjectCmds(projectCmds, models.PlanCommand)

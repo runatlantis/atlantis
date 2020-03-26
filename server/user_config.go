@@ -41,19 +41,22 @@ type UserConfig struct {
 	RequireApproval bool `mapstructure:"require-approval"`
 	// RequireMergeable is whether to require pull requests to be mergeable before
 	// allowing terraform apply's to run.
-	RequireMergeable       bool            `mapstructure:"require-mergeable"`
-	SilenceForkPRErrors    bool            `mapstructure:"silence-fork-pr-errors"`
-	SilenceWhitelistErrors bool            `mapstructure:"silence-whitelist-errors"`
-	SlackToken             string          `mapstructure:"slack-token"`
-	SSLCertFile            string          `mapstructure:"ssl-cert-file"`
-	SSLKeyFile             string          `mapstructure:"ssl-key-file"`
-	TFDownloadURL          string          `mapstructure:"tf-download-url"`
-	TFEHostname            string          `mapstructure:"tfe-hostname"`
-	TFEToken               string          `mapstructure:"tfe-token"`
-	VCSStatusName          string          `mapstructure:"vcs-status-name"`
-	DefaultTFVersion       string          `mapstructure:"default-tf-version"`
-	Webhooks               []WebhookConfig `mapstructure:"webhooks"`
-	WriteGitCreds          bool            `mapstructure:"write-git-creds"`
+	RequireMergeable    bool `mapstructure:"require-mergeable"`
+	SilenceForkPRErrors bool `mapstructure:"silence-fork-pr-errors"`
+	// SilenceVCSStatusNoPlans is whether autoplan should set commit status if no plans
+	// are found.
+	SilenceVCSStatusNoPlans bool            `mapstructure:"silence-vcs-status-no-plans"`
+	SilenceWhitelistErrors  bool            `mapstructure:"silence-whitelist-errors"`
+	SlackToken              string          `mapstructure:"slack-token"`
+	SSLCertFile             string          `mapstructure:"ssl-cert-file"`
+	SSLKeyFile              string          `mapstructure:"ssl-key-file"`
+	TFDownloadURL           string          `mapstructure:"tf-download-url"`
+	TFEHostname             string          `mapstructure:"tfe-hostname"`
+	TFEToken                string          `mapstructure:"tfe-token"`
+	VCSStatusName           string          `mapstructure:"vcs-status-name"`
+	DefaultTFVersion        string          `mapstructure:"default-tf-version"`
+	Webhooks                []WebhookConfig `mapstructure:"webhooks"`
+	WriteGitCreds           bool            `mapstructure:"write-git-creds"`
 }
 
 // ToLogLevel returns the LogLevel object corresponding to the user-passed
