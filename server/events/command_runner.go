@@ -79,15 +79,15 @@ type DefaultCommandRunner struct {
 	// this in our error message back to the user on a forked PR so they know
 	// how to enable this functionality.
 	AllowForkPRsFlag string
-	// SilenceVCSStatusNoPlans is whether autoplan should set commit status if no plans
-	// are found
-	SilenceVCSStatusNoPlans bool
 	// SilenceForkPRErrors controls whether to comment on Fork PRs when AllowForkPRs = False
 	SilenceForkPRErrors bool
 	// SilenceForkPRErrorsFlag is the name of the flag that controls fork PR's. We use
 	// this in our error message back to the user on a forked PR so they know
 	// how to disable error comment
 	SilenceForkPRErrorsFlag string
+	// SilenceVCSStatusNoPlans is whether autoplan should set commit status if no plans
+	// are found
+	SilenceVCSStatusNoPlans bool
 	ProjectCommandBuilder   ProjectCommandBuilder
 	ProjectCommandRunner    ProjectCommandRunner
 	// GlobalAutomerge is true if we should automatically merge pull requests if all
