@@ -314,6 +314,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Logger:                   logger,
 		AllowForkPRs:             userConfig.AllowForkPRs,
 		AllowForkPRsFlag:         config.AllowForkPRsFlag,
+		SilenceVCSStatusNoPlans:      userConfig.SilenceVCSStatusNoPlans,
 		SilenceForkPRErrors:      userConfig.SilenceForkPRErrors,
 		SilenceForkPRErrorsFlag:  config.SilenceForkPRErrorsFlag,
 		DisableApplyAll:          userConfig.DisableApplyAll,

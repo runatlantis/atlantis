@@ -68,6 +68,7 @@ const (
 	RepoWhitelistFlag          = "repo-whitelist"
 	RequireApprovalFlag        = "require-approval"
 	RequireMergeableFlag       = "require-mergeable"
+	SilenceVCSStatusNoPlans        = "silence-vcs-status-no-plans"
 	SilenceForkPRErrorsFlag    = "silence-fork-pr-errors"
 	SilenceWhitelistErrorsFlag = "silence-whitelist-errors"
 	SlackTokenFlag             = "slack-token"
@@ -262,6 +263,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	SilenceForkPRErrorsFlag: {
 		description:  "Silences the posting of fork pull requests not allowed error comments.",
+		defaultValue: false,
+	},
+	SilenceVCSStatusNoPlans: {
+		description:  "Silences VCS commit status when autoplan finds no projects to plan.",
 		defaultValue: false,
 	},
 	SilenceWhitelistErrorsFlag: {

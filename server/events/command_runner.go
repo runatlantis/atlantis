@@ -79,6 +79,9 @@ type DefaultCommandRunner struct {
 	// this in our error message back to the user on a forked PR so they know
 	// how to enable this functionality.
 	AllowForkPRsFlag string
+	// SilenceVCSStatusNoPlans is whether autoplan should set commit status if no plans
+	// are found
+	SilenceVCSStatusNoPlans bool
 	// SilenceForkPRErrors controls whether to comment on Fork PRs when AllowForkPRs = False
 	SilenceForkPRErrors bool
 	// SilenceForkPRErrorsFlag is the name of the flag that controls fork PR's. We use
@@ -121,6 +124,15 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	}
 	if len(projectCmds) == 0 {
 		log.Info("determined there was no project to run plan in")
+		if !c.SilenceVCSStatusNoPlans {
+			// If SilenceVCSStatusNoPlans is not set and no projects were modified
+			// we set a successful commit status with 0/0 projects planned successfully
+			// to indicate that Atlantis has finished working
+			ctx.Log.Debug("setting VCS status to success with no projects found")
+			if err := c.CommitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, models.PlanCommand, 0, 0); err != nil {
+				ctx.Log.Warn("unable to update commit status: %s", err)
+			}
+		}
 		return
 	}
 

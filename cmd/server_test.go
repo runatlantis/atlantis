@@ -390,6 +390,7 @@ func TestExecute_Defaults(t *testing.T) {
 	Equals(t, false, passedConfig.RequireApproval)
 	Equals(t, false, passedConfig.RequireMergeable)
 	Equals(t, false, passedConfig.SilenceForkPRErrors)
+	Equals(t, false, passedConfig.SilenceVCSStatusNoPlans)
 	Equals(t, false, passedConfig.SilenceWhitelistErrors)
 	Equals(t, "", passedConfig.SlackToken)
 	Equals(t, "", passedConfig.SSLCertFile)
@@ -517,6 +518,7 @@ func TestExecute_Flags(t *testing.T) {
 		cmd.RequireApprovalFlag:        true,
 		cmd.RequireMergeableFlag:       true,
 		cmd.SilenceForkPRErrorsFlag:    true,
+		cmd.SilenceVCSStatusNoPlans:    true,
 		cmd.SilenceWhitelistErrorsFlag: true,
 		cmd.SlackTokenFlag:             "slack-token",
 		cmd.SSLCertFileFlag:            "cert-file",
@@ -560,6 +562,7 @@ func TestExecute_Flags(t *testing.T) {
 	Equals(t, true, passedConfig.RequireApproval)
 	Equals(t, true, passedConfig.RequireMergeable)
 	Equals(t, true, passedConfig.SilenceForkPRErrors)
+	Equals(t, true, passedConfig.SilenceVCSStatusNoPlans)
 	Equals(t, true, passedConfig.SilenceWhitelistErrors)
 	Equals(t, "slack-token", passedConfig.SlackToken)
 	Equals(t, "cert-file", passedConfig.SSLCertFile)
@@ -604,6 +607,7 @@ repo-whitelist: "github.com/runatlantis/atlantis"
 require-approval: true
 require-mergeable: true
 silence-fork-pr-errors: true
+silence-vcs-status-no-plans: true
 silence-whitelist-errors: true
 slack-token: slack-token
 ssl-cert-file: cert-file
@@ -651,6 +655,7 @@ write-git-creds: true
 	Equals(t, true, passedConfig.RequireApproval)
 	Equals(t, true, passedConfig.RequireMergeable)
 	Equals(t, true, passedConfig.SilenceForkPRErrors)
+	Equals(t, true, passedConfig.SilenceVCSStatusNoPlans)
 	Equals(t, true, passedConfig.SilenceWhitelistErrors)
 	Equals(t, "slack-token", passedConfig.SlackToken)
 	Equals(t, "cert-file", passedConfig.SSLCertFile)
@@ -694,6 +699,7 @@ port: 8181
 repo-whitelist: "github.com/runatlantis/atlantis"
 require-approval: true
 silence-fork-pr-errors: true
+silence-vcs-status-no-plans: true
 silence-whitelist-errors: true
 slack-token: slack-token
 ssl-cert-file: cert-file
@@ -738,6 +744,7 @@ write-git-creds: true
 		"REQUIRE_APPROVAL":             "false",
 		"REQUIRE_MERGEABLE":            "false",
 		"SILENCE_FORK_PR_ERRORS":       "false",
+		"SILENCE_VCS_STATUS_NO_PLANS":  "false",
 		"SILENCE_WHITELIST_ERRORS":     "false",
 		"SLACK_TOKEN":                  "override-slack-token",
 		"SSL_CERT_FILE":                "override-cert-file",
@@ -785,6 +792,7 @@ write-git-creds: true
 	Equals(t, false, passedConfig.RequireApproval)
 	Equals(t, false, passedConfig.RequireMergeable)
 	Equals(t, false, passedConfig.SilenceForkPRErrors)
+	Equals(t, false, passedConfig.SilenceVCSStatusNoPlans)
 	Equals(t, false, passedConfig.SilenceWhitelistErrors)
 	Equals(t, "override-slack-token", passedConfig.SlackToken)
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
@@ -829,6 +837,7 @@ repo-whitelist: "github.com/runatlantis/atlantis"
 require-approval: true
 require-mergeable: true
 silence-fork-pr-errors: true
+silence-vcs-status-no-plans: true
 silence-whitelist-errors: true
 slack-token: slack-token
 ssl-cert-file: cert-file
@@ -873,6 +882,7 @@ write-git-creds: true
 		cmd.RequireApprovalFlag:        false,
 		cmd.RequireMergeableFlag:       false,
 		cmd.SilenceForkPRErrorsFlag:    false,
+		cmd.SilenceVCSStatusNoPlans:    false,
 		cmd.SilenceWhitelistErrorsFlag: false,
 		cmd.SlackTokenFlag:             "override-slack-token",
 		cmd.SSLCertFileFlag:            "override-cert-file",
@@ -914,6 +924,7 @@ write-git-creds: true
 	Equals(t, false, passedConfig.RequireApproval)
 	Equals(t, false, passedConfig.RequireMergeable)
 	Equals(t, false, passedConfig.SilenceForkPRErrors)
+	Equals(t, false, passedConfig.SilenceVCSStatusNoPlans)
 	Equals(t, false, passedConfig.SilenceWhitelistErrors)
 	Equals(t, "override-slack-token", passedConfig.SlackToken)
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)
@@ -960,6 +971,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		"REQUIRE_APPROVAL":             "true",
 		"REQUIRE_MERGEABLE":            "true",
 		"SILENCE_FORK_PR_ERRORS":       "true",
+		"SILENCE_VCS_STATUS_NO_PLANS":  "true",
 		"SILENCE_WHITELIST_ERRORS":     "true",
 		"SLACK_TOKEN":                  "slack-token",
 		"SSL_CERT_FILE":                "cert-file",
@@ -1012,6 +1024,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 		cmd.RequireApprovalFlag:        false,
 		cmd.RequireMergeableFlag:       false,
 		cmd.SilenceForkPRErrorsFlag:    false,
+		cmd.SilenceVCSStatusNoPlans:    false,
 		cmd.SilenceWhitelistErrorsFlag: false,
 		cmd.SlackTokenFlag:             "override-slack-token",
 		cmd.SSLCertFileFlag:            "override-cert-file",
@@ -1055,6 +1068,7 @@ func TestExecute_FlagEnvVarOverride(t *testing.T) {
 	Equals(t, false, passedConfig.RequireApproval)
 	Equals(t, false, passedConfig.RequireMergeable)
 	Equals(t, false, passedConfig.SilenceForkPRErrors)
+	Equals(t, false, passedConfig.SilenceVCSStatusNoPlans)
 	Equals(t, false, passedConfig.SilenceWhitelistErrors)
 	Equals(t, "override-slack-token", passedConfig.SlackToken)
 	Equals(t, "override-cert-file", passedConfig.SSLCertFile)

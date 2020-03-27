@@ -40,6 +40,9 @@ type UserConfig struct {
 	// RequireMergeable is whether to require pull requests to be mergeable before
 	// allowing terraform apply's to run.
 	RequireMergeable       bool            `mapstructure:"require-mergeable"`
+	// SilenceVCSStatusNoPlans is whether autoplan should set commit status if no plans
+	// are found
+	SilenceVCSStatusNoPlans    bool         `mapstructure:"silence-vcs-status-no-plans"`
 	SilenceForkPRErrors    bool            `mapstructure:"silence-fork-pr-errors"`
 	SilenceWhitelistErrors bool            `mapstructure:"silence-whitelist-errors"`
 	SlackToken             string          `mapstructure:"slack-token"`
