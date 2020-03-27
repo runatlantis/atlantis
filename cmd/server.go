@@ -68,7 +68,7 @@ const (
 	RepoWhitelistFlag          = "repo-whitelist"
 	RequireApprovalFlag        = "require-approval"
 	RequireMergeableFlag       = "require-mergeable"
-	SilenceVCSStatusNoPlans        = "silence-vcs-status-no-plans"
+	SilenceVCSStatusNoPlans    = "silence-vcs-status-no-plans"
 	SilenceForkPRErrorsFlag    = "silence-fork-pr-errors"
 	SilenceWhitelistErrorsFlag = "silence-whitelist-errors"
 	SlackTokenFlag             = "slack-token"
