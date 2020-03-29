@@ -316,6 +316,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AllowForkPRsFlag:         config.AllowForkPRsFlag,
 		SilenceForkPRErrors:      userConfig.SilenceForkPRErrors,
 		SilenceForkPRErrorsFlag:  config.SilenceForkPRErrorsFlag,
+		SilenceVCSStatusNoPlans:  userConfig.SilenceVCSStatusNoPlans,
 		DisableApplyAll:          userConfig.DisableApplyAll,
 		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
 			ParserValidator:   validator,
