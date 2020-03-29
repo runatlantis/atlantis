@@ -53,6 +53,7 @@ const (
 	DataDirFlag                = "data-dir"
 	DefaultTFVersionFlag       = "default-tf-version"
 	DisableApplyAllFlag        = "disable-apply-all"
+	DisableMarkdownFoldingFlag = "disable-markdown-folding"
 	GHHostnameFlag             = "gh-hostname"
 	GHTokenFlag                = "gh-token"
 	GHUserFlag                 = "gh-user"
@@ -271,6 +272,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	SilenceWhitelistErrorsFlag: {
 		description:  "Silences the posting of whitelist error comments.",
+		defaultValue: false,
+	},
+	DisableMarkdownFoldingFlag: {
+		description:  "Toggle off folding in markdown output.",
 		defaultValue: false,
 	},
 	WriteGitCredsFlag: {

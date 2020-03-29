@@ -734,6 +734,24 @@ $$$
 	}
 }
 
+// Test that if folding is disabled that it's not used.
+func TestRenderProjectResults_DisableFolding(t *testing.T) {
+	mr := events.MarkdownRenderer{
+		DisableMarkdownFolding: true,
+	}
+
+	rendered := mr.Render(events.CommandResult{
+		ProjectResults: []models.ProjectResult{
+			{
+				RepoRelDir: ".",
+				Workspace:  "default",
+				Error:      errors.New(strings.Repeat("line\n", 13)),
+			},
+		},
+	}, models.PlanCommand, "log", false, models.Github)
+	Equals(t, false, strings.Contains(rendered, "<details>"))
+}
+
 // Test that if the output is longer than 12 lines, it gets wrapped on the right
 // VCS hosts during an error.
 func TestRenderProjectResults_WrappedErr(t *testing.T) {
