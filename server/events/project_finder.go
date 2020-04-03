@@ -132,12 +132,10 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log *logging.SimpleLog
 	return projects, nil
 }
 
+// TerraformWasModified indicates whether any Terraform files are included in the modifiedFiles parameter
 func (p *DefaultProjectFinder) TerraformWasModified(log *logging.SimpleLogger, modifiedFiles []string) bool {
 	modifiedTerraformFiles := p.filterToTerraform(modifiedFiles)
-	if len(modifiedTerraformFiles) == 0 {
-		return false
-	}
-	return true
+	return len(modifiedTerraformFiles) > 0
 }
 
 // filterToTerraform filters non-terraform files from files.
