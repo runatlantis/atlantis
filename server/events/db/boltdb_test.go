@@ -21,10 +21,10 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/db"
 
-	"github.com/boltdb/bolt"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/testing"
+	bolt "go.etcd.io/bbolt"
 )
 
 var lockBucket = "bucket"

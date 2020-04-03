@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/boltdb/bolt"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
+	bolt "go.etcd.io/bbolt"
 )
 
 // BoltDB is a database using BoltDB
