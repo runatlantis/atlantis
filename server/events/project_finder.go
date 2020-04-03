@@ -136,9 +136,8 @@ func (p *DefaultProjectFinder) TerraformWasModified(log *logging.SimpleLogger, m
 	modifiedTerraformFiles := p.filterToTerraform(modifiedFiles)
 	if len(modifiedTerraformFiles) == 0 {
 		return false
-	} else {
-		return true
 	}
+	return true
 }
 
 // filterToTerraform filters non-terraform files from files.
