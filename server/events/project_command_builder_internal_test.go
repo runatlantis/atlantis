@@ -571,6 +571,7 @@ projects:
 				PendingPlanFinder: &DefaultPendingPlanFinder{},
 				CommentBuilder:    &CommentParser{},
 				GlobalCfg:         globalCfg,
+				SkipCloneNoTF:     false,
 			}
 
 			// We run a test for each type of command.

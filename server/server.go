@@ -329,6 +329,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			GlobalCfg:         globalCfg,
 			PendingPlanFinder: pendingPlanFinder,
 			CommentBuilder:    commentParser,
+			SkipCloneNoTF:     userConfig.SkipCloneNoTF,
 		},
 		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
 			Locker:           projectLocker,

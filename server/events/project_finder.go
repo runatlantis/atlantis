@@ -38,6 +38,8 @@ type ProjectFinder interface {
 	// based on modifiedFiles and the repo's config.
 	// absRepoDir is the path to the cloned repo on disk.
 	DetermineProjectsViaConfig(log *logging.SimpleLogger, modifiedFiles []string, config valid.RepoCfg, absRepoDir string) ([]valid.Project, error)
+	// TerraformWasModified indicates whether any of the modified files are Terraform files
+	TerraformWasModified(log *logging.SimpleLogger, modifiedFiles []string) bool
 }
 
 // DefaultProjectFinder implements ProjectFinder.
@@ -128,6 +130,15 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log *logging.SimpleLog
 		}
 	}
 	return projects, nil
+}
+
+func (p *DefaultProjectFinder) TerraformWasModified(log *logging.SimpleLogger, modifiedFiles []string) bool {
+	modifiedTerraformFiles := p.filterToTerraform(modifiedFiles)
+	if len(modifiedTerraformFiles) == 0 {
+		return false
+	} else {
+		return true
+	}
 }
 
 // filterToTerraform filters non-terraform files from files.

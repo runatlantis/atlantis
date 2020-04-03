@@ -56,6 +56,7 @@ type DefaultProjectCommandBuilder struct {
 	GlobalCfg         valid.GlobalCfg
 	PendingPlanFinder *DefaultPendingPlanFinder
 	CommentBuilder    CommentBuilder
+	SkipCloneNoTF     bool
 }
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
@@ -96,6 +97,20 @@ func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *CommandContext, c
 // buildPlanAllCommands builds plan contexts for all projects we determine were
 // modified in this ctx.
 func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext, commentFlags []string, verbose bool) ([]models.ProjectCommandContext, error) {
+	var projCtxs []models.ProjectCommandContext
+	// We'll need the list of modified files.
+	modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.BaseRepo, ctx.Pull)
+	if err != nil {
+		return nil, err
+	}
+	if p.SkipCloneNoTF {
+		if !p.ProjectFinder.TerraformWasModified(ctx.Log, modifiedFiles) {
+			ctx.Log.Debug("skipping repo clone since no Terraform was modified")
+			return projCtxs, nil
+		}
+		ctx.Log.Debug("found modified Terraform so continuing to clone repo")
+	}
+
 	// Need to lock the workspace we're about to clone to.
 	workspace := DefaultWorkspace
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.BaseRepo.FullName, ctx.Pull.Num, workspace)
@@ -106,11 +121,6 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 	ctx.Log.Debug("got workspace lock")
 	defer unlockFn()
 
-	// We'll need the list of modified files.
-	modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.BaseRepo, ctx.Pull)
-	if err != nil {
-		return nil, err
-	}
 	ctx.Log.Debug("%d files were modified in this pull request", len(modifiedFiles))
 
 	repoDir, _, err := p.WorkingDir.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, workspace)
@@ -124,7 +134,6 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		return nil, errors.Wrapf(err, "looking for %s file in %q", yaml.AtlantisYAMLFilename, repoDir)
 	}
 
-	var projCtxs []models.ProjectCommandContext
 	if hasRepoCfg {
 		// If there's a repo cfg then we'll use it to figure out which projects
 		// should be planed.

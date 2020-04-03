@@ -464,6 +464,7 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 			PendingPlanFinder: &events.DefaultPendingPlanFinder{},
 			CommentBuilder:    commentParser,
 			GlobalCfg:         globalCfg,
+			SkipCloneNoTF:     false,
 		},
 		DB:                boltdb,
 		PendingPlanFinder: &events.DefaultPendingPlanFinder{},

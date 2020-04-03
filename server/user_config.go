@@ -48,6 +48,7 @@ type UserConfig struct {
 	// are found.
 	SilenceVCSStatusNoPlans bool            `mapstructure:"silence-vcs-status-no-plans"`
 	SilenceWhitelistErrors  bool            `mapstructure:"silence-whitelist-errors"`
+	SkipCloneNoTF           bool            `mapstructure:"skip-clone-no-tf"`
 	SlackToken              string          `mapstructure:"slack-token"`
 	SSLCertFile             string          `mapstructure:"ssl-cert-file"`
 	SSLKeyFile              string          `mapstructure:"ssl-key-file"`

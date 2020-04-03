@@ -72,6 +72,7 @@ const (
 	SilenceForkPRErrorsFlag    = "silence-fork-pr-errors"
 	SilenceVCSStatusNoPlans    = "silence-vcs-status-no-plans"
 	SilenceWhitelistErrorsFlag = "silence-whitelist-errors"
+	SkipCloneNoTF              = "skip-clone-no-tf"
 	SlackTokenFlag             = "slack-token"
 	SSLCertFileFlag            = "ssl-cert-file"
 	SSLKeyFileFlag             = "ssl-key-file"
@@ -272,6 +273,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	SilenceWhitelistErrorsFlag: {
 		description:  "Silences the posting of whitelist error comments.",
+		defaultValue: false,
+	},
+	SkipCloneNoTF: {
+		description:  "Skips cloning the PR repo if Terraform files are not modified in the PR.",
 		defaultValue: false,
 	},
 	DisableMarkdownFoldingFlag: {

@@ -143,6 +143,7 @@ projects:
 				PendingPlanFinder: &events.DefaultPendingPlanFinder{},
 				CommentBuilder:    &events.CommentParser{},
 				GlobalCfg:         valid.NewGlobalCfg(false, false, false),
+				SkipCloneNoTF:     false,
 			}
 
 			ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
@@ -365,6 +366,7 @@ projects:
 					ProjectFinder:    &events.DefaultProjectFinder{},
 					CommentBuilder:   &events.CommentParser{},
 					GlobalCfg:        valid.NewGlobalCfg(true, false, false),
+					SkipCloneNoTF:    false,
 				}
 
 				var actCtxs []models.ProjectCommandContext
@@ -498,6 +500,7 @@ projects:
 				ProjectFinder:    &events.DefaultProjectFinder{},
 				CommentBuilder:   &events.CommentParser{},
 				GlobalCfg:        valid.NewGlobalCfg(true, false, false),
+				SkipCloneNoTF:    false,
 			}
 
 			ctxs, err := builder.BuildPlanCommands(
@@ -570,6 +573,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		PendingPlanFinder: &events.DefaultPendingPlanFinder{},
 		CommentBuilder:    &events.CommentParser{},
 		GlobalCfg:         valid.NewGlobalCfg(false, false, false),
+		SkipCloneNoTF:     false,
 	}
 
 	ctxs, err := builder.BuildApplyCommands(
@@ -637,6 +641,7 @@ projects:
 		ProjectFinder:    &events.DefaultProjectFinder{},
 		CommentBuilder:   &events.CommentParser{},
 		GlobalCfg:        valid.NewGlobalCfg(true, false, false),
+		SkipCloneNoTF:    false,
 	}
 
 	ctx := &events.CommandContext{
@@ -699,6 +704,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				ProjectFinder:    &events.DefaultProjectFinder{},
 				CommentBuilder:   &events.CommentParser{},
 				GlobalCfg:        valid.NewGlobalCfg(true, false, false),
+				SkipCloneNoTF:    false,
 			}
 
 			var actCtxs []models.ProjectCommandContext
@@ -863,6 +869,7 @@ projects:
 				ProjectFinder:    &events.DefaultProjectFinder{},
 				CommentBuilder:   &events.CommentParser{},
 				GlobalCfg:        valid.NewGlobalCfg(true, false, false),
+				SkipCloneNoTF:    false,
 			}
 
 			actCtxs, err := builder.BuildPlanCommands(
@@ -883,6 +890,104 @@ projects:
 				} else {
 					Assert(t, actCtx.TerraformVersion == nil, "TerraformVersion is supposed to be nil.")
 				}
+			}
+		})
+	}
+}
+
+// Test that the SkipCloneNoTF setting works as expected
+func TestDefaultProjectCommandBuilder_SkipClone(t *testing.T) {
+	// For the following tests:
+	// If main.tf is modified we should clone the repo
+	// If test.go is modified we should not clone the repo
+	// If init.tf is modified we should clone the repo
+
+	type testCase struct {
+		DirStructure  map[string]interface{}
+		ModifiedFiles []string
+		Exp           map[string][]int
+		ShouldClone   bool
+	}
+
+	testCases := make(map[string]testCase)
+
+	modifiedFiles := []string{"main.tf", "test.go", "init.tf"}
+
+	shouldClone := []bool{true, false, true}
+
+	for index, modifiedFile := range modifiedFiles {
+		testCases[fmt.Sprintf("testing whether cloning is triggered with %s modified", modifiedFile)] = testCase{
+			DirStructure: map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf": "",
+				},
+			},
+			ModifiedFiles: []string{modifiedFile},
+			Exp: map[string][]int{
+				"project1": {0, 12, 8},
+			},
+			ShouldClone: shouldClone[index],
+		}
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			RegisterMockTestingT(t)
+
+			tmpDir, cleanup := DirStructure(t, testCase.DirStructure)
+
+			defer cleanup()
+			vcsClient := vcsmocks.NewMockClient()
+			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(testCase.ModifiedFiles, nil)
+
+			workingDir := mocks.NewMockWorkingDir()
+			When(workingDir.Clone(
+				matchers.AnyPtrToLoggingSimpleLogger(),
+				matchers.AnyModelsRepo(),
+				matchers.AnyModelsRepo(),
+				matchers.AnyModelsPullRequest(),
+				AnyString())).ThenReturn(tmpDir, nil)
+
+			When(workingDir.GetWorkingDir(
+				matchers.AnyModelsRepo(),
+				matchers.AnyModelsPullRequest(),
+				AnyString())).ThenReturn(tmpDir, nil)
+
+			builder := &events.DefaultProjectCommandBuilder{
+				WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+				WorkingDir:       workingDir,
+				VCSClient:        vcsClient,
+				ParserValidator:  &yaml.ParserValidator{},
+				ProjectFinder:    &events.DefaultProjectFinder{},
+				CommentBuilder:   &events.CommentParser{},
+				GlobalCfg:        valid.NewGlobalCfg(true, false, false),
+				SkipCloneNoTF:    true,
+			}
+
+			_, err := builder.BuildPlanCommands(
+				&events.CommandContext{},
+				&events.CommentCommand{
+					RepoRelDir: "",
+					Flags:      nil,
+					Name:       models.PlanCommand,
+					Verbose:    false,
+				})
+
+			Ok(t, err)
+			if testCase.ShouldClone {
+				workingDir.VerifyWasCalled(Once()).Clone(matchers.AnyPtrToLoggingSimpleLogger(),
+					matchers.AnyModelsRepo(),
+					matchers.AnyModelsRepo(),
+					matchers.AnyModelsPullRequest(),
+					AnyString(),
+				)
+			} else {
+				workingDir.VerifyWasCalled(Never()).Clone(matchers.AnyPtrToLoggingSimpleLogger(),
+					matchers.AnyModelsRepo(),
+					matchers.AnyModelsRepo(),
+					matchers.AnyModelsPullRequest(),
+					AnyString(),
+				)
 			}
 		})
 	}
