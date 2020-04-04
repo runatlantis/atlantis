@@ -291,6 +291,9 @@ var intFlags = map[string]intFlag{
 	},
 }
 
+// ValidLogLevels are the valid log levels that can be set
+var ValidLogLevels = []string{"debug", "info", "warn", "error"}
+
 type stringFlag struct {
 	description  string
 	defaultValue string
@@ -494,10 +497,11 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 }
 
 func (s *ServerCmd) validate(userConfig server.UserConfig) error {
-	logLevel := userConfig.LogLevel
-	if logLevel != "debug" && logLevel != "info" && logLevel != "warn" && logLevel != "error" {
-		return errors.New("invalid log level: not one of debug, info, warn, error")
+	userConfig.LogLevel = strings.ToLower(userConfig.LogLevel)
+	if !isValidLogLevel(userConfig.LogLevel) {
+		return fmt.Errorf("invalid log level: must be one of %v", ValidLogLevels)
 	}
+
 	checkoutStrategy := userConfig.CheckoutStrategy
 	if checkoutStrategy != "branch" && checkoutStrategy != "merge" {
 		return errors.New("invalid checkout strategy: not one of branch or merge")
@@ -692,4 +696,14 @@ func (s *ServerCmd) withErrPrint(f func(*cobra.Command, []string) error) func(*c
 // printErr prints err to stderr using a red terminal colour.
 func (s *ServerCmd) printErr(err error) {
 	fmt.Fprintf(os.Stderr, "%sError: %s%s\n", "\033[31m", err.Error(), "\033[39m")
+}
+
+func isValidLogLevel(level string) bool {
+	for _, logLevel := range ValidLogLevels {
+		if strings.EqualFold(logLevel, level) {
+			return true
+		}
+	}
+
+	return false
 }
