@@ -131,6 +131,14 @@ func TestParseGithubPullEvent(t *testing.T) {
 	_, _, _, _, _, err = parser.ParseGithubPullEvent(&testEvent)
 	ErrEquals(t, "sender.login is null", err)
 
+	// verify that draft PRs are treated as 'other' events
+	testEvent = deepcopy.Copy(PullEvent).(github.PullRequestEvent)
+	draftPR := true
+	testEvent.PullRequest.Draft = &draftPR
+	_, evType, _, _, _, err := parser.ParseGithubPullEvent(&testEvent)
+	Ok(t, err)
+	Equals(t, models.OtherPullEvent, evType)
+
 	actPull, evType, actBaseRepo, actHeadRepo, actUser, err := parser.ParseGithubPullEvent(&PullEvent)
 	Ok(t, err)
 	expBaseRepo := models.Repo{

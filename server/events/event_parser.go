@@ -416,15 +416,22 @@ func (e *EventParser) ParseGithubPullEvent(pullEvent *github.PullRequestEvent) (
 		err = errors.New("sender.login is null")
 		return
 	}
-	switch pullEvent.GetAction() {
-	case "opened":
-		pullEventType = models.OpenedPullEvent
-	case "synchronize":
-		pullEventType = models.UpdatedPullEvent
-	case "closed":
-		pullEventType = models.ClosedPullEvent
-	default:
+
+	if pullEvent.GetPullRequest().GetDraft() {
+		// if the PR is in draft state we don't care about the action type
+		// we can set the type to Other and ignore the PR
 		pullEventType = models.OtherPullEvent
+	} else {
+		switch pullEvent.GetAction() {
+		case "opened":
+			pullEventType = models.OpenedPullEvent
+		case "synchronize":
+			pullEventType = models.UpdatedPullEvent
+		case "closed":
+			pullEventType = models.ClosedPullEvent
+		default:
+			pullEventType = models.OtherPullEvent
+		}
 	}
 	user = models.User{Username: senderUsername}
 	return
