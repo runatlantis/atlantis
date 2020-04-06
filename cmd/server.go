@@ -700,7 +700,7 @@ func (s *ServerCmd) printErr(err error) {
 
 func isValidLogLevel(level string) bool {
 	for _, logLevel := range ValidLogLevels {
-		if strings.EqualFold(logLevel, level) {
+		if logLevel == level {
 			return true
 		}
 	}
