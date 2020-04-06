@@ -9,7 +9,6 @@ require (
 	github.com/aokoli/goutils v1.0.1 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a // indirect
 	github.com/aws/aws-sdk-go v1.17.14 // indirect
-	github.com/boltdb/bolt v1.3.1
 	github.com/briandowns/spinner v0.0.0-20170614154858-48dbb65d7bd5
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/docker v0.0.0-20180620051407-e2593239d949
