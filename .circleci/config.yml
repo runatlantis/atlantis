@@ -15,7 +15,7 @@ jobs:
     - run: make check-lint
   e2e:
     docker:
-    - image: circleci/golang:1.13 # If you update this, update it in the Makefile too
+    - image: circleci/golang:1.14 # If you update this, update it in the Makefile too
       environment:
         # This version of TF will be downloaded before Atlantis is started.
         # We do this instead of setting --default-tf-version because setting
@@ -54,7 +54,7 @@ jobs:
   # Build and push 'latest' Docker tag.
   docker_master:
     docker:
-    - image: circleci/golang:1.13 # If you update this, update it in the Makefile too
+    - image: circleci/golang:1.14 # If you update this, update it in the Makefile too
       environment:
         GOFLAGS: "-mod=vendor"
     steps:
@@ -77,7 +77,7 @@ jobs:
   # Build and push Docker tag.
   docker_tag:
     docker:
-    - image: circleci/golang:1.13 # If you update this, update it in the Makefile too
+    - image: circleci/golang:1.14 # If you update this, update it in the Makefile too
       environment:
         GOFLAGS: "-mod=vendor"
     steps:
