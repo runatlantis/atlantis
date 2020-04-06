@@ -433,7 +433,7 @@ func (s *ServerCmd) Init() *cobra.Command {
 		s.Viper.BindPFlag(name, c.Flags().Lookup(name)) // nolint: errcheck
 	}
 
-	// Set int flags.
+	// Set int64 flags.
 	for name, f := range int64Flags {
 		usage := f.description
 		if f.defaultValue != 0 {

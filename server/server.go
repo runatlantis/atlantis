@@ -131,8 +131,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			}
 		} else if userConfig.GithubAppID != 0 {
 			githubCredentials = &vcs.GithubAppCredentials{
-				AppID:   userConfig.GithubAppID,
-				KeyPath: userConfig.GithubAppKey,
+				AppID:    userConfig.GithubAppID,
+				KeyPath:  userConfig.GithubAppKey,
+				Hostname: userConfig.GithubHostname,
 			}
 			githubAppEnabled = true
 		}

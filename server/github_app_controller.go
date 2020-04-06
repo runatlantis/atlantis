@@ -1,13 +1,12 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 
-	"github.com/google/go-github/v28/github"
+	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -54,27 +53,16 @@ func (g *GithubAppController) ExchangeCode(w http.ResponseWriter, r *http.Reques
 	}
 
 	g.Logger.Debug("Exchanging GitHub app code for app credentials")
-	tr := http.DefaultTransport
-	client := github.NewClient(&http.Client{Transport: tr})
-
-	ctx := context.Background()
-	app := &struct {
-		ID            int64  `json:"id"`
-		Key           string `json:"pem"`
-		WebhookSecret string `json:"webhook_secret"`
-		Name          string `json:"name"`
-	}{}
-	url := fmt.Sprintf("https://api.%s/app-manifests/%s/conversions", g.GithubHostname, code)
-	req, err := http.NewRequest("POST", url, nil)
-	req.Header.Add("Accept", "application/vnd.github.fury-preview+json")
+	creds := &vcs.GithubAnonymousCredentials{}
+	client, err := vcs.NewGithubClient(g.GithubHostname, creds)
 	if err != nil {
-		g.respond(w, logging.Error, http.StatusBadGateway, "Error creating http request to exchange token: %s", err)
+		g.respond(w, logging.Error, http.StatusInternalServerError, "Failed to exchange code for github app: %s", err)
 		return
 	}
 
-	_, err = client.Do(ctx, req, app)
+	app, err := client.ExchangeCode(code)
 	if err != nil {
-		g.respond(w, logging.Error, http.StatusBadGateway, "Error exchanging code for token: %s", err)
+		g.respond(w, logging.Error, http.StatusInternalServerError, "Failed to exchange code for github app: %s", err)
 		return
 	}
 
@@ -101,7 +89,7 @@ func (g *GithubAppController) New(w http.ResponseWriter, r *http.Request) {
 	}
 
 	manifest := &githubAppRequest{
-		Name:        "Atlantis",
+		Name:        fmt.Sprintf("Atlantis for %s", g.AtlantisURL.Hostname()),
 		Description: fmt.Sprintf("Terraform Pull Request Automation at %s", g.AtlantisURL),
 		URL:         g.AtlantisURL.String(),
 		RedirectURL: fmt.Sprintf("%s/github-app/exchange-code", g.AtlantisURL),

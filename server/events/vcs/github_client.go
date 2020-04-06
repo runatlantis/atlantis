@@ -23,7 +23,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/Laisky/graphql"
-	"github.com/google/go-github/v28/github"
+	"github.com/google/go-github/v31/github"
 	"github.com/pkg/errors"
 	"github.com/shurcooL/githubv4"
 )
@@ -41,17 +41,35 @@ type GithubClient struct {
 	logger         *logging.SimpleLogger
 }
 
+// GithubAppTemporarySecrets hold app credentials obtained from github after creation
+type GithubAppTemporarySecrets struct {
+	ID            int64
+	Key           string
+	Name          string
+	WebhookSecret string
+}
+
 // NewGithubClient returns a valid GitHub client.
 func NewGithubClient(hostname string, credentials GithubCredentials, logger *logging.SimpleLogger) (*GithubClient, error) {
 
-	apiURL := githubAPIURL(hostname)
-	transport, err := credentials.Client(apiURL.String())
+	transport, err := credentials.Client()
 	if err != nil {
 		return nil, errors.Wrap(err, "Error initializing github authentication transport")
 	}
-	client := github.NewClient(transport)
-	client.BaseURL = apiURL
-	graphqlURL := fmt.Sprintf("https://%s/graphql", apiURL.Host)
+
+	var graphqlURL string
+	var client *github.Client
+	if hostname == "github.com" {
+		client = github.NewClient(transport)
+		graphqlURL = "https://api.github.com/graphql"
+	} else {
+		apiURL := resolveGithubAPIURL(hostname)
+		client, err = github.NewEnterpriseClient(apiURL.String(), apiURL.String(), transport)
+		if err != nil {
+			return nil, err
+		}
+		graphqlURL = fmt.Sprintf("https://%s/graphql", apiURL.Host)
+	}
 
 	// shurcooL's githubv4 library has a client ctor, but it doesn't support schema
 	// previews, which need custom Accept headers (https://developer.github.com/v4/previews)
@@ -62,12 +80,11 @@ func NewGithubClient(hostname string, credentials GithubCredentials, logger *log
 	// shurcooL's libraries completely.
 	v4MutateClient := graphql.NewClient(
 		graphqlURL,
-		tp.Client(),
+		transport,
 		graphql.WithHeader("Accept", "application/vnd.github.queen-beryl-preview+json"),
 	)
-
 	return &GithubClient{
-		user:           user,
+		user:           credentials.GetUser(),
 		client:         client,
 		v4MutateClient: v4MutateClient,
 		ctx:            context.Background(),
@@ -135,8 +152,8 @@ func (g *GithubClient) HidePrevPlanComments(repo models.Repo, pullNum int) error
 	for {
 		g.logger.Debug("GET /repos/%v/%v/issues/%d/comments", repo.Owner, repo.Name, pullNum)
 		comments, resp, err := g.client.Issues.ListComments(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueListCommentsOptions{
-			Sort:        "created",
-			Direction:   "asc",
+			Sort:        github.String("created"),
+			Direction:   github.String("asc"),
 			ListOptions: github.ListOptions{Page: nextPage},
 		})
 		if err != nil {
@@ -319,4 +336,18 @@ func (g *GithubClient) MergePull(pull models.PullRequest) error {
 // MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.
 func (g *GithubClient) MarkdownPullLink(pull models.PullRequest) (string, error) {
 	return fmt.Sprintf("#%d", pull.Num), nil
+}
+
+// ExchangeCode returns a newly created app's info
+func (g *GithubClient) ExchangeCode(code string) (*GithubAppTemporarySecrets, error) {
+	ctx := context.Background()
+	cfg, _, err := g.client.Apps.CompleteAppManifest(ctx, code)
+	data := &GithubAppTemporarySecrets{
+		ID:            cfg.GetID(),
+		Key:           cfg.GetPEM(),
+		WebhookSecret: cfg.GetWebhookSecret(),
+		Name:          cfg.GetName(),
+	}
+
+	return data, err
 }

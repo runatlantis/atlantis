@@ -14,7 +14,6 @@
 package events
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -22,7 +21,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -297,17 +295,14 @@ type GithubAppWorkingDir struct {
 	GithubHostname string
 }
 
+// Clone writes a fresh token for Github App authentication
 func (g *GithubAppWorkingDir) Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, workspace string) (string, bool, error) {
 
 	log.Info("Refreshing git tokens for Github App")
 
-	client, err := g.Credentials.Client(g.GithubHostname)
+	token, err := g.Credentials.GetToken()
 	if err != nil {
-		return "", false, err
-	}
-	token, err := client.Transport.(*ghinstallation.Transport).Token(context.Background())
-	if err != nil {
-		return "", false, err
+		return "", false, errors.Wrap(err, "getting github token")
 	}
 
 	home, err := homedir.Dir()
