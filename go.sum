@@ -319,6 +319,7 @@ github.com/xanzy/go-gitlab v0.22.2-0.20191127083556-16a492660b8c h1:3F9W4LSqOnDh
 github.com/xanzy/go-gitlab v0.22.2-0.20191127083556-16a492660b8c/go.mod h1:t4Bmvnxj7k37S4Y17lfLx+nLqkf/oQwT2HagfWKv5Og=
 github.com/zclconf/go-cty v1.0.0 h1:EWtv3gKe2wPLIB9hQRQJa7k/059oIfAqcEkCNnaVckk=
 github.com/zclconf/go-cty v1.0.0/go.mod h1:xnAOWiHeOqg2nWS62VtQ7pbOu17FtxJNW8RLEih+O3s=
+go.etcd.io/bbolt v1.3.4 h1:hi1bXHMVrlQh6WwxAy+qZCV/SYIlqo+Ushwdpa4tAKg=
 go.etcd.io/bbolt v1.3.4/go.mod h1:G5EMThwa9y8QZGBClrRx5EY+Yw9kAhnjy3bSjsnlVTQ=
 go.opencensus.io v0.18.0/go.mod h1:vKdFvxhtzZ9onBp9VKHK8z/sRpBMnKAsufL7wlDrCOA=
 go.opencensus.io v0.19.1 h1:gPYKQ/GAQYR2ksU+qXNmq3CrOZWT1kkryvW6O0v1acY=
