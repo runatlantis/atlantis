@@ -62,9 +62,15 @@ func (p *DefaultProjectLocker) TryLock(log *logging.SimpleLogger, pull models.Pu
 		return nil, err
 	}
 	if !lockAttempt.LockAcquired && lockAttempt.CurrLock.Pull.Num != pull.Num {
+		pullRefChr := "#"
+		if pull.BaseRepo.VCSHost.Type == models.AzureDevops {
+			pullRefChr = "!"
+		}
 		failureMsg := fmt.Sprintf(
-			"This project is currently locked by an unapplied plan from pull #%d. To continue, delete the lock from #%d or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.",
+			"This project is currently locked by an unapplied plan from pull %s%d. To continue, delete the lock from %s%d or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.",
+			pullRefChr,
 			lockAttempt.CurrLock.Pull.Num,
+			pullRefChr,
 			lockAttempt.CurrLock.Pull.Num)
 		return &TryLockResponse{
 			LockAcquired:      false,
