@@ -56,6 +56,43 @@ func TestDefaultProjectLocker_TryLockWhenLocked(t *testing.T) {
 	}, res)
 }
 
+func TestDefaultProjectLocker_TryLockWhenLockedAzureDevops(t *testing.T) {
+	mockLocker := mocks.NewMockLocker()
+	locker := events.DefaultProjectLocker{
+		Locker: mockLocker,
+	}
+	expProject := models.Project{}
+	expWorkspace := "default"
+	expPull := models.PullRequest{
+		BaseRepo: models.Repo{
+			VCSHost: models.VCSHost{
+				Type: models.AzureDevops,
+			},
+		},
+	}
+	expUser := models.User{}
+
+	lockingPull := models.PullRequest{
+		Num: 2,
+	}
+	When(mockLocker.TryLock(expProject, expWorkspace, expPull, expUser)).ThenReturn(
+		locking.TryLockResponse{
+			LockAcquired: false,
+			CurrLock: models.ProjectLock{
+				Pull: lockingPull,
+			},
+			LockKey: "",
+		},
+		nil,
+	)
+	res, err := locker.TryLock(logging.NewNoopLogger(), expPull, expUser, expWorkspace, expProject)
+	Ok(t, err)
+	Equals(t, &events.TryLockResponse{
+		LockAcquired:      false,
+		LockFailureReason: "This project is currently locked by an unapplied plan from pull !2. To continue, delete the lock from !2 or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.",
+	}, res)
+}
+
 func TestDefaultProjectLocker_TryLockWhenLockedSamePull(t *testing.T) {
 	RegisterMockTestingT(t)
 	mockLocker := mocks.NewMockLocker()
