@@ -32,7 +32,7 @@ require (
 	github.com/imdario/mergo v0.3.5 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/magiconair/properties v1.7.3 // indirect
-	github.com/mcdafydd/go-azuredevops v0.10.2
+	github.com/mcdafydd/go-azuredevops v0.11.0
 	github.com/microcosm-cc/bluemonday v1.0.1
 	github.com/mitchellh/colorstring v0.0.0-20150917214807-8631ce90f286
 	github.com/mitchellh/go-homedir v1.0.0
@@ -44,7 +44,7 @@ require (
 	github.com/openzipkin/zipkin-go v0.1.3 // indirect
 	github.com/pelletier/go-buffruneio v0.2.0 // indirect
 	github.com/pelletier/go-toml v1.0.0 // indirect
-	github.com/petergtz/pegomock v2.5.0+incompatible
+	github.com/petergtz/pegomock v2.7.0+incompatible
 	github.com/pkg/errors v0.8.0
 	github.com/prometheus/client_golang v0.9.3-0.20190127221311-3c4408c8b829 // indirect
 	github.com/spf13/afero v0.0.0-20170901052352-ee1bd8ee15a1 // indirect
@@ -58,7 +58,7 @@ require (
 	github.com/urfave/negroni v0.2.0
 	github.com/xanzy/go-gitlab v0.22.2-0.20191127083556-16a492660b8c
 	golang.org/x/build v0.0.0-20190111050920-041ab4dc3f9d // indirect
-	golang.org/x/crypto v0.0.0-20190605123033-f99c8df09eb5
+	golang.org/x/crypto v0.0.0-20200403201458-baeed622b8d8
 	golang.org/x/net v0.0.0-20191126235420-ef20fe5d7933 // indirect
 	golang.org/x/oauth2 v0.0.0-20191122200657-5d9234df094c // indirect
 	google.golang.org/appengine v1.6.5 // indirect

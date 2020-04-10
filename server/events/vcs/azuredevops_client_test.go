@@ -359,33 +359,45 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 
 func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 	cases := []struct {
-		testName    string
-		vote        int
-		expApproved bool
+		testName           string
+		reviewerUniqueName string
+		reviewerVote       int
+		expApproved        bool
 	}{
 		{
 			"approved",
+			"atlantis.reviewer@example.com",
 			azuredevops.VoteApproved,
 			true,
 		},
 		{
 			"approved with suggestions",
+			"atlantis.reviewer@example.com",
 			azuredevops.VoteApprovedWithSuggestions,
-			false,
+			true,
 		},
 		{
 			"no vote",
+			"atlantis.reviewer@example.com",
 			azuredevops.VoteNone,
 			false,
 		},
 		{
 			"vote waiting for author",
+			"atlantis.reviewer@example.com",
 			azuredevops.VoteWaitingForAuthor,
 			false,
 		},
 		{
 			"vote rejected",
+			"atlantis.reviewer@example.com",
 			azuredevops.VoteRejected,
+			false,
+		},
+		{
+			"approved only by author",
+			"atlantis.author@example.com",
+			azuredevops.VoteApproved,
 			false,
 		},
 	}
@@ -397,11 +409,8 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.testName, func(t *testing.T) {
-			response := strings.Replace(json,
-				`"vote": 0,`,
-				fmt.Sprintf(`"vote": %d,`, c.vote),
-				1,
-			)
+			response := strings.Replace(json, `"vote": 0,`, fmt.Sprintf(`"vote": %d,`, c.reviewerVote), 1)
+			response = strings.Replace(response, "atlantis.reviewer@example.com", c.reviewerUniqueName, 1)
 
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -415,10 +424,13 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 						return
 					}
 				}))
+
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
+
 			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
 			Ok(t, err)
+
 			defer disableSSLVerification()()
 
 			actApproved, err := client.PullIsApproved(models.Repo{
