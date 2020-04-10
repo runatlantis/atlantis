@@ -296,12 +296,6 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 			false,
 		},
 		{
-			"rejected policy status on disabled policy",
-			azuredevops.MergeSucceeded.String(),
-			"rejected",
-			true,
-		},
-		{
 			"merge succeeded",
 			azuredevops.MergeSucceeded.String(),
 			"approved",
