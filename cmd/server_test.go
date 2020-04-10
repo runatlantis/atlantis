@@ -610,7 +610,7 @@ func TestExecute_BitbucketServerBaseURLScheme(t *testing.T) {
 		RepoWhitelistFlag:    "*",
 		BitbucketBaseURLFlag: "://mydomain.com",
 	})
-	ErrEquals(t, "error parsing --bitbucket-webhook-secret flag value \"://mydomain.com\": parse ://mydomain.com: missing protocol scheme", c.Execute())
+	ErrEquals(t, "error parsing --bitbucket-webhook-secret flag value \"://mydomain.com\": parse \"://mydomain.com\": missing protocol scheme", c.Execute())
 }
 
 // Port should be retained on base url.
