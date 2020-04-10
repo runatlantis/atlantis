@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -176,13 +177,16 @@ func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRe
 	}
 
 	projectID := *adPull.Repository.Project.ID
-	artifactID := g.Client.PolicyEvaluations.GetPullRequestArtifactID(projectID, string(pull.Num))
+	artifactID := g.Client.PolicyEvaluations.GetPullRequestArtifactID(projectID, strconv.Itoa(pull.Num))
 	policyEvaluations, _, err := g.Client.PolicyEvaluations.List(g.ctx, owner, project, artifactID, &azuredevops.PolicyEvaluationsListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("list policy evaluations: %w", err)
 	}
 
 	for _, policyEvaluation := range policyEvaluations {
+		if *policyEvaluation.Configuration.IsEnabled == false || *policyEvaluation.Configuration.IsDeleted {
+			continue
+		}
 
 		// Ignore the Atlantis status, even if its set as a blocker.
 		// This status should not be considered when evaluating if the pull request can be applied.
@@ -191,7 +195,7 @@ func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRe
 			continue
 		}
 
-		if *policyEvaluation.Configuration.IsBlocking && *policyEvaluation.Status != "succeeded" {
+		if *policyEvaluation.Configuration.IsBlocking && *policyEvaluation.Status != "approved" {
 			return false, nil
 		}
 	}
