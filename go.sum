@@ -203,6 +203,8 @@ github.com/mcdafydd/go-azuredevops v0.10.2 h1:cVAxfGqSUK7i4ZRc7s+EpeWSOrDgkBM4Sz
 github.com/mcdafydd/go-azuredevops v0.10.2/go.mod h1:/NYbgJ/1+9+SmG5CjETCoWm+FlLNcRwdiw1/AGW9zm0=
 github.com/mcdafydd/go-azuredevops v0.11.0 h1:DHUctw4lNpPfExpwAxDsdat+n4IitH3vYLAxSGs9y0E=
 github.com/mcdafydd/go-azuredevops v0.11.0/go.mod h1:B4UDyn7WEj1/97f45j3VnzEfkWKe05+/dCcAPdOET4A=
+github.com/mcdafydd/go-azuredevops v0.11.1 h1:NO4wlkyFpdxqZZzNzn5m3fJc4box0jnkC8LBhAaPXeA=
+github.com/mcdafydd/go-azuredevops v0.11.1/go.mod h1:B4UDyn7WEj1/97f45j3VnzEfkWKe05+/dCcAPdOET4A=
 github.com/microcosm-cc/bluemonday v1.0.1 h1:SIYunPjnlXcW+gVfvm0IlSeR5U3WZUOLfVmqg85Go44=
 github.com/microcosm-cc/bluemonday v1.0.1/go.mod h1:hsXNsILzKxV+sX77C5b8FSuKF00vh2OMYv+xgHpAMF4=
 github.com/mitchellh/colorstring v0.0.0-20150917214807-8631ce90f286 h1:KHyL+3mQOF9sPfs26lsefckcFNDcIZtiACQiECzIUkw=

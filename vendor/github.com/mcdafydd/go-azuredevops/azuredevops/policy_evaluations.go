@@ -55,10 +55,30 @@ type PolicyTypeRef struct {
 	Url         *string `json:"url,omitempty"`
 }
 
+const (
+	// PolicyEvaluationApproved represents that the policy has been fulfilled for this pull request.
+	PolicyEvaluationApproved = "approved"
+
+	// PolicyEvaluationBroken represents that the policy encountered an unexpected error.
+	PolicyEvaluationBroken = "broken"
+
+	// PolicyEvaluationNotApplicable represents that the policy does not apply to this pull request.
+	PolicyEvaluationNotApplicable = "notApplicable"
+
+	// PolicyEvaluationQueued represents that the policy is either queued to run, or is waiting for some event before progressing.
+	PolicyEvaluationQueued = "queued"
+
+	// PolicyEvaluationRejected represents that the policy has rejected this pull request.
+	PolicyEvaluationRejected = "rejected"
+
+	// PolicyEvaluationRunning represents that the policy is currently running.
+	PolicyEvaluationRunning = "running"
+)
+
 // GetPullRequestArtifactID gets the Artifact ID of a pull request.
 // ex: vstfs:///CodeReview/CodeReviewId/{projectId}/{pullRequestId}
-func (s *PolicyEvaluationsService) GetPullRequestArtifactID(projectID string, pullRequestID string) string {
-	return fmt.Sprintf("vstfs:///CodeReview/CodeReviewId/%s/%s", projectID, pullRequestID)
+func (s *PolicyEvaluationsService) GetPullRequestArtifactID(projectID string, pullRequestID int) string {
+	return fmt.Sprintf("vstfs:///CodeReview/CodeReviewId/%s/%d", projectID, pullRequestID)
 }
 
 // List retrieves a list of all the policy evaluation statuses for a specific pull request.

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -177,7 +176,7 @@ func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRe
 	}
 
 	projectID := *adPull.Repository.Project.ID
-	artifactID := g.Client.PolicyEvaluations.GetPullRequestArtifactID(projectID, strconv.Itoa(pull.Num))
+	artifactID := g.Client.PolicyEvaluations.GetPullRequestArtifactID(projectID, pull.Num)
 	policyEvaluations, _, err := g.Client.PolicyEvaluations.List(g.ctx, owner, project, artifactID, &azuredevops.PolicyEvaluationsListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("list policy evaluations: %w", err)
@@ -195,7 +194,7 @@ func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRe
 			continue
 		}
 
-		if *policyEvaluation.Configuration.IsBlocking && *policyEvaluation.Status != "approved" {
+		if *policyEvaluation.Configuration.IsBlocking && *policyEvaluation.Status != azuredevops.PolicyEvaluationApproved {
 			return false, nil
 		}
 	}
