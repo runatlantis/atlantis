@@ -172,7 +172,7 @@ func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRe
 		return false, nil
 	}
 
-	if *adPull.Status != "active" {
+	if *adPull.Status != azuredevops.PullActive.String() {
 		return false, nil
 	}
 
