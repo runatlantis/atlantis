@@ -183,7 +183,7 @@ func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRe
 	}
 
 	for _, policyEvaluation := range policyEvaluations {
-		if *policyEvaluation.Configuration.IsEnabled == false || *policyEvaluation.Configuration.IsDeleted {
+		if !*policyEvaluation.Configuration.IsEnabled || *policyEvaluation.Configuration.IsDeleted {
 			continue
 		}
 
