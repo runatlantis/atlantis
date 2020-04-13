@@ -5,7 +5,7 @@
 Atlantis allows you to require certain conditions be satisfied **before** an `atlantis apply`
 command can be run:
 
-* [Approved](#approved) – requires pull requests to be approved by at least one user
+* [Approved](#approved) – requires pull requests to be approved by at least one user other than the author
 * [Mergeable](#mergeable) – requires pull requests to be able to be merged
 
 ## What Happens If The Requirement Is Not Met?
