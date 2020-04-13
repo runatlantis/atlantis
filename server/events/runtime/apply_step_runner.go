@@ -38,7 +38,7 @@ func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []stri
 
 	var out string
 	if a.isRemotePlan(contents) {
-		args := append(append(append([]string{"apply", "-input=false", "-no-color"}, extraArgs...), ctx.EscapedCommentArgs...))
+		args := append(append([]string{"apply", "-input=false", "-no-color"}, extraArgs...), ctx.EscapedCommentArgs...)
 		out, err = a.runRemoteApply(ctx, args, path, planPath, ctx.TerraformVersion, envs)
 		if err == nil {
 			out = a.cleanRemoteApplyOutput(out)
