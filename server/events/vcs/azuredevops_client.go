@@ -160,7 +160,7 @@ func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRe
 	opts := azuredevops.PullRequestGetOptions{IncludeWorkItemRefs: true}
 	adPull, _, err := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, pull.Num, &opts)
 	if err != nil {
-		return false, fmt.Errorf("get pull request: %w", err)
+		return false, errors.Wrap(err, "getting pull request")
 	}
 
 	if *adPull.MergeStatus != azuredevops.MergeSucceeded.String() {
@@ -190,7 +190,7 @@ func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRe
 		// Ignore the Atlantis status, even if its set as a blocker.
 		// This status should not be considered when evaluating if the pull request can be applied.
 		settings := (policyEvaluation.Configuration.Settings).(map[string]interface{})
-		if settings["statusName"] == "atlantis/apply" {
+		if ok, status := settings["statusName"]; ok && status == "atlantis/apply" {
 			continue
 		}
 
