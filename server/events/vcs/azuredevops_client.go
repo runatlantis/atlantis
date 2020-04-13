@@ -133,7 +133,7 @@ func (g *AzureDevopsClient) PullIsApproved(repo models.Repo, pull models.PullReq
 	}
 	adPull, _, err := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, pull.Num, &opts)
 	if err != nil {
-		return false, fmt.Errorf("get pull request: %w", err)
+		return false, errors.Wrap(err, "getting pull request")
 	}
 
 	for _, review := range adPull.Reviewers {
