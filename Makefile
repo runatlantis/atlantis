@@ -61,7 +61,7 @@ lint: ## Run linter locally
 
 check-lint: ## Run linter in CI/CD. If running locally use 'lint'
 	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b ./bin v1.24.0
-	./bin/golangci-lint run -j 4
+	./bin/golangci-lint run -j 3
 
 check-fmt: ## Fail if not formatted
 	if [[ $$(goimports -l $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "./server/static/bindata_assetfs.go" ! -path "**/mocks/*")) ]]; then exit 1; fi
