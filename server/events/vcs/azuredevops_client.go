@@ -190,7 +190,7 @@ func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRe
 		// Ignore the Atlantis status, even if its set as a blocker.
 		// This status should not be considered when evaluating if the pull request can be applied.
 		settings := (policyEvaluation.Configuration.Settings).(map[string]interface{})
-		if ok, status := settings["statusName"]; ok && status == "atlantis/apply" {
+		if status, ok := settings["statusName"]; ok && status == "atlantis/apply" {
 			continue
 		}
 
