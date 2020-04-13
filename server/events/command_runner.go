@@ -188,6 +188,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	case models.BitbucketCloud, models.BitbucketServer:
 		if maybePull == nil {
 			err = errors.New("pull request should not be nil–this is a bug")
+			break
 		}
 		pull = *maybePull
 	case models.AzureDevops:
