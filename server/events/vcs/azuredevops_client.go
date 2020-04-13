@@ -179,7 +179,7 @@ func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRe
 	artifactID := g.Client.PolicyEvaluations.GetPullRequestArtifactID(projectID, pull.Num)
 	policyEvaluations, _, err := g.Client.PolicyEvaluations.List(g.ctx, owner, project, artifactID, &azuredevops.PolicyEvaluationsListOptions{})
 	if err != nil {
-		return false, fmt.Errorf("list policy evaluations: %w", err)
+		return false, errors.Wrap(err, "getting policy evaluations")
 	}
 
 	for _, policyEvaluation := range policyEvaluations {
