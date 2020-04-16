@@ -79,6 +79,8 @@ type DefaultCommandRunner struct {
 	// this in our error message back to the user on a forked PR so they know
 	// how to enable this functionality.
 	AllowForkPRsFlag string
+	// HidePrevPlanComments will hide previous plan comments to declutter PRs.
+	HidePrevPlanComments bool
 	// SilenceForkPRErrors controls whether to comment on Fork PRs when AllowForkPRs = False
 	SilenceForkPRErrors bool
 	// SilenceForkPRErrorsFlag is the name of the flag that controls fork PR's. We use
@@ -427,6 +429,15 @@ func (c *DefaultCommandRunner) updatePull(ctx *CommandContext, command PullComma
 		ctx.Log.Err(res.Error.Error())
 	} else if res.Failure != "" {
 		ctx.Log.Warn(res.Failure)
+	}
+
+	// HidePrevPlanComments will hide old comments left from previous plan runs to reduce
+	// clutter in a pull/merge request. This will not delete the comment, since the
+	// comment trail may be useful in auditing or backtracing problems.
+	if c.HidePrevPlanComments {
+		if err := c.VCSClient.HidePrevPlanComments(ctx.BaseRepo, ctx.Pull.Num); err != nil {
+			ctx.Log.Err("unable to hide old comments: %s", err)
+		}
 	}
 
 	comment := c.MarkdownRenderer.Render(res, command.CommandName(), ctx.Log.History.String(), command.IsVerbose(), ctx.BaseRepo.VCSHost.Type)

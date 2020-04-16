@@ -124,7 +124,12 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 	return nil
 }
 
+func (g *AzureDevopsClient) HidePrevPlanComments(repo models.Repo, pullNum int) error {
+	return nil
+}
+
 // PullIsApproved returns true if the merge request was approved by another reviewer.
+// https://docs.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops#require-a-minimum-number-of-reviewers
 func (g *AzureDevopsClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 

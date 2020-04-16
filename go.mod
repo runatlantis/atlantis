@@ -3,6 +3,7 @@ module github.com/runatlantis/atlantis
 go 1.14
 
 require (
+	github.com/Laisky/graphql v1.0.4
 	github.com/Masterminds/semver v1.4.2 // indirect
 	github.com/Masterminds/sprig v2.15.0+incompatible
 	github.com/aokoli/goutils v1.0.1 // indirect
@@ -41,6 +42,8 @@ require (
 	github.com/pelletier/go-toml v1.0.0 // indirect
 	github.com/petergtz/pegomock v2.7.0+incompatible
 	github.com/pkg/errors v0.8.0
+	github.com/shurcooL/githubv4 v0.0.0-20191127044304-8f68eb5628d0
+	github.com/shurcooL/graphql v0.0.0-20181231061246-d48a9a75455f // indirect
 	github.com/sirupsen/logrus v1.2.0 // indirect
 	github.com/spf13/afero v0.0.0-20170901052352-ee1bd8ee15a1 // indirect
 	github.com/spf13/cast v1.1.0 // indirect

@@ -6,6 +6,11 @@ cloud.google.com/go/internal/optional
 cloud.google.com/go/internal/trace
 cloud.google.com/go/internal/version
 cloud.google.com/go/storage
+# github.com/Laisky/graphql v1.0.4
+## explicit
+github.com/Laisky/graphql
+github.com/Laisky/graphql/ident
+github.com/Laisky/graphql/internal/jsonutil
 # github.com/Masterminds/semver v1.4.2
 ## explicit
 github.com/Masterminds/semver
@@ -216,6 +221,14 @@ github.com/petergtz/pegomock/internal/verify
 # github.com/pkg/errors v0.8.0
 ## explicit
 github.com/pkg/errors
+# github.com/shurcooL/githubv4 v0.0.0-20191127044304-8f68eb5628d0
+## explicit
+github.com/shurcooL/githubv4
+# github.com/shurcooL/graphql v0.0.0-20181231061246-d48a9a75455f
+## explicit
+github.com/shurcooL/graphql
+github.com/shurcooL/graphql/ident
+github.com/shurcooL/graphql/internal/jsonutil
 # github.com/sirupsen/logrus v1.2.0
 ## explicit
 github.com/sirupsen/logrus
