@@ -296,6 +296,23 @@ func (h VCSHostType) String() string {
 	return "<missing String() implementation>"
 }
 
+func NewVCSHostType(t string) (VCSHostType, error) {
+	switch t {
+	case "Github":
+		return Github, nil
+	case "Gitlab":
+		return Gitlab, nil
+	case "BitbucketCloud":
+		return BitbucketCloud, nil
+	case "BitbucketServer":
+		return BitbucketServer, nil
+	case "AzureDevops":
+		return AzureDevops, nil
+	}
+
+	return 0, fmt.Errorf("%q is not a valid type", t)
+}
+
 // ProjectCommandContext defines the context for a plan or apply stage that will
 // be executed for a project.
 type ProjectCommandContext struct {

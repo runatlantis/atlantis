@@ -75,3 +75,7 @@ func (d *ClientProxy) UpdateStatus(repo models.Repo, pull models.PullRequest, st
 func (d *ClientProxy) MergePull(pull models.PullRequest) error {
 	return d.clients[pull.BaseRepo.VCSHost.Type].MergePull(pull)
 }
+
+func (d *ClientProxy) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+	return d.clients[VCSHostType].GetCloneURL(VCSHostType, repo)
+}

@@ -315,3 +315,7 @@ func SplitAzureDevopsRepoFullName(repoFullName string) (owner string, project st
 	}
 	return repoFullName[:lastSlashIdx], "", repoFullName[lastSlashIdx+1:]
 }
+
+func (g *AzureDevopsClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+	return "", fmt.Errorf("not yet implemented")
+}

@@ -14,6 +14,7 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -30,6 +31,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
 	"github.com/runatlantis/atlantis/server/logging"
 	gitlab "github.com/xanzy/go-gitlab"
+	"gopkg.in/go-playground/validator.v9"
 )
 
 const githubHeader = "X-Github-Event"
@@ -83,6 +85,8 @@ type EventsController struct {
 	// Azure DevOps Team Project. If empty, no request validation is done.
 	AzureDevopsWebhookBasicPassword []byte
 	AzureDevopsRequestValidator     AzureDevopsRequestValidator
+
+	APISecret []byte
 }
 
 // Post handles POST webhook requests.
@@ -551,4 +555,175 @@ func (e *EventsController) commentNotWhitelisted(baseRepo models.Repo, pullNum i
 	if err := e.VCSClient.CreateComment(baseRepo, pullNum, errMsg); err != nil {
 		e.Logger.Err("unable to comment on pull request: %s", err)
 	}
+}
+
+type APIRequest struct {
+	Repository string `validate:"required"`
+	Ref        string `validate:"required"`
+	Type       string `validate:"required"`
+	Projects   []string
+	Paths      []struct {
+		Directory string
+		Workspace string
+	}
+}
+
+func (a *APIRequest) getCommands(ctx *events.CommandContext, cmdBuilder func(*events.CommandContext, *events.CommentCommand) ([]models.ProjectCommandContext, error)) ([]models.ProjectCommandContext, error) {
+	cc := make([]*events.CommentCommand, 0)
+
+	for _, project := range a.Projects {
+		cc = append(cc, &events.CommentCommand{
+			ProjectName: project,
+		})
+	}
+	for _, path := range a.Paths {
+		cc = append(cc, &events.CommentCommand{
+			RepoRelDir: strings.TrimRight(path.Directory, "/"),
+			Workspace:  path.Workspace,
+		})
+	}
+
+	cmds := make([]models.ProjectCommandContext, 0)
+	for _, commentCommand := range cc {
+		projectCmds, err := cmdBuilder(ctx, commentCommand)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to build command: %v", err)
+		}
+		for _, cmd := range projectCmds {
+			cmds = append(cmds, cmd)
+		}
+	}
+
+	return cmds, nil
+}
+
+func (e *EventsController) apiReportError(w http.ResponseWriter, code int, err error) {
+	response, _ := json.Marshal(map[string]string{
+		"error": err.Error(),
+	})
+	e.respond(w, logging.Warn, code, string(response))
+}
+
+func (e *EventsController) APIPlan(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	request, ctx, code, err := e.apiParseAndValidate(w, r)
+
+	if err != nil {
+		e.apiReportError(w, code, err)
+		return
+	}
+
+	runner := e.CommandRunner.(*events.DefaultCommandRunner)
+	cmds, err := request.getCommands(ctx, runner.ProjectCommandBuilder.BuildPlanCommands)
+	if err != nil {
+		e.apiReportError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	defer runner.ProjectCommandRunner.(*events.DefaultProjectCommandRunner).Locker.(*events.DefaultProjectLocker).Locker.UnlockByPull(ctx.BaseRepo.FullName, -1)
+	result := runner.RunProjectCmds(cmds, models.PlanCommand)
+
+	code = http.StatusOK
+	if result.HasErrors() {
+		code = http.StatusInternalServerError
+	}
+
+	// TODO: make a better response
+	response, _ := json.Marshal(result)
+	e.respond(w, logging.Debug, code, string(response))
+}
+
+func (e *EventsController) APIApply(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	request, ctx, code, err := e.apiParseAndValidate(w, r)
+
+	if err != nil {
+		e.apiReportError(w, code, err)
+		return
+	}
+	runner := e.CommandRunner.(*events.DefaultCommandRunner)
+
+	// We must first make the plan for all projects
+	cmds, err := request.getCommands(ctx, runner.ProjectCommandBuilder.BuildPlanCommands)
+	if err != nil {
+		e.apiReportError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	defer runner.ProjectCommandRunner.(*events.DefaultProjectCommandRunner).Locker.(*events.DefaultProjectLocker).Locker.UnlockByPull(ctx.BaseRepo.FullName, -1)
+	result := runner.RunProjectCmds(cmds, models.PlanCommand)
+
+	// We can now prepare and run the apply step
+	cmds, err = request.getCommands(ctx, runner.ProjectCommandBuilder.BuildApplyCommands)
+	if err != nil {
+		e.apiReportError(w, http.StatusInternalServerError, err)
+		return
+	}
+	result = runner.RunProjectCmds(cmds, models.ApplyCommand)
+
+	code = http.StatusOK
+	if result.HasErrors() {
+		code = http.StatusInternalServerError
+	}
+
+	response, _ := json.Marshal(result)
+	e.respond(w, logging.Debug, http.StatusOK, string(response))
+}
+
+func (e *EventsController) apiParseAndValidate(w http.ResponseWriter, r *http.Request) (*APIRequest, *events.CommandContext, int, error) {
+	if len(e.APISecret) == 0 {
+		return nil, nil, http.StatusBadRequest, fmt.Errorf("Ignoring request since API is disabled")
+	}
+
+	// Validate the secret token
+	header := "X-Atlantis-Token"
+	secret := r.Header.Get(header)
+	if secret != string(e.APISecret) {
+		return nil, nil, http.StatusUnauthorized, fmt.Errorf("header %s did not match expected secret", header)
+	}
+
+	// Parse the JSON payload
+	bytes, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return nil, nil, http.StatusBadRequest, fmt.Errorf("failed to read request")
+	}
+	var request APIRequest
+	if err = json.Unmarshal(bytes, &request); err != nil {
+		return nil, nil, http.StatusBadRequest, fmt.Errorf("Failed to parse request: %v", err.Error())
+	}
+	if err = validator.New().Struct(request); err != nil {
+		return nil, nil, http.StatusBadRequest, fmt.Errorf("Request %q is missing fields", string(bytes))
+	}
+
+	VCSHostType, err := models.NewVCSHostType(request.Type)
+	if err != nil {
+		return nil, nil, http.StatusBadRequest, err
+	}
+	cloneURL, err := e.VCSClient.GetCloneURL(VCSHostType, request.Repository)
+	if err != nil {
+		return nil, nil, http.StatusInternalServerError, err
+	}
+
+	baseRepo, err := e.Parser.ParseAPIPlanRequest(request.Repository, cloneURL)
+	if err != nil {
+		return nil, nil, http.StatusBadRequest, fmt.Errorf("failed to parse request: %v", err)
+	}
+
+	// Check if the repo is whitelisted
+	if !e.RepoWhitelistChecker.IsWhitelisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
+		return nil, nil, http.StatusForbidden, fmt.Errorf("Repo not whitelisted")
+	}
+
+	return &request, &events.CommandContext{
+		BaseRepo: baseRepo,
+		HeadRepo: baseRepo,
+		Pull: models.PullRequest{
+			Num:        -1,
+			BaseBranch: request.Ref,
+			HeadBranch: request.Ref,
+			HeadCommit: request.Ref,
+		},
+	}, 0, nil
 }

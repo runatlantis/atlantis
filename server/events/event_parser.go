@@ -187,6 +187,8 @@ type EventParsing interface {
 	// that returns a merge request.
 	ParseGitlabMergeRequest(mr *gitlab.MergeRequest, baseRepo models.Repo) models.PullRequest
 
+	ParseAPIPlanRequest(path, cloneURL string) (baseRepo models.Repo, err error)
+
 	// ParseBitbucketCloudPullEvent parses a pull request event from Bitbucket
 	// Cloud (bitbucket.org).
 	// pull is the parsed pull request.
@@ -271,6 +273,10 @@ type EventParser struct {
 	BitbucketServerURL string
 	AzureDevopsToken   string
 	AzureDevopsUser    string
+}
+
+func (e *EventParser) ParseAPIPlanRequest(repoFullName, cloneURL string) (models.Repo, error) {
+	return models.NewRepo(models.Gitlab, repoFullName, cloneURL, e.GitlabUser, e.GitlabToken)
 }
 
 // GetBitbucketCloudPullEventType returns the type of the pull request

@@ -234,3 +234,7 @@ func (b *Client) makeRequest(method string, path string, reqBody io.Reader) ([]b
 	}
 	return respBody, nil
 }
+
+func (g *Client) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+	return "", fmt.Errorf("not yet implemented")
+}

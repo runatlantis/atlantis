@@ -36,6 +36,7 @@ type CommandRunner interface {
 	// and then calling the appropriate services to finish executing the command.
 	RunCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *CommentCommand)
 	RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User)
+	RunProjectCmds(cmds []models.ProjectCommandContext, cmdName models.CommandName) CommandResult
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_github_pull_getter.go GithubPullGetter
@@ -141,7 +142,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
-	result := c.runProjectCmds(projectCmds, models.PlanCommand)
+	result := c.RunProjectCmds(projectCmds, models.PlanCommand)
 	if c.automergeEnabled(ctx, projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
 		c.deletePlans(ctx)
@@ -251,7 +252,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
-	result := c.runProjectCmds(projectCmds, cmd.Name)
+	result := c.RunProjectCmds(projectCmds, cmd.Name)
 	if cmd.Name == models.PlanCommand && c.automergeEnabled(ctx, projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
 		c.deletePlans(ctx)
@@ -336,7 +337,7 @@ func (c *DefaultCommandRunner) automerge(ctx *CommandContext, pullStatus models.
 	}
 }
 
-func (c *DefaultCommandRunner) runProjectCmds(cmds []models.ProjectCommandContext, cmdName models.CommandName) CommandResult {
+func (c *DefaultCommandRunner) RunProjectCmds(cmds []models.ProjectCommandContext, cmdName models.CommandName) CommandResult {
 	var results []models.ProjectResult
 	for _, pCmd := range cmds {
 		var res models.ProjectResult

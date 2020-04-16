@@ -254,3 +254,11 @@ func MustConstraint(constraint string) version.Constraints {
 	}
 	return c
 }
+
+func (g *GitlabClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+	project, _, err := g.Client.Projects.GetProject(repo, nil)
+	if err != nil {
+		return "", err
+	}
+	return project.HTTPURLToRepo, nil
+}

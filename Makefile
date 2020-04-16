@@ -3,6 +3,8 @@ WORKSPACE := $(shell pwd)
 PKG := $(shell go list ./... | grep -v e2e | grep -v vendor | grep -v static | grep -v mocks | grep -v testing)
 PKG_COMMAS := $(shell go list ./... | grep -v e2e | grep -v vendor | grep -v static | grep -v mocks | grep -v testing | tr '\n' ',')
 IMAGE_NAME := runatlantis/atlantis
+GOOS := linux
+GOARCH := amd64
 
 .PHONY: test
 
@@ -20,7 +22,7 @@ debug: ## Output internal make variables
 	@echo PKG = $(PKG)
 
 build-service: ## Build the main Go service
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=vendor -v -o atlantis .
+	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build -mod=vendor -v -o atlantis .
 
 go-generate: ## Run go generate in all packages
 	go generate $(PKG)

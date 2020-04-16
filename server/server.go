@@ -387,6 +387,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubRequestValidator:          &DefaultGithubRequestValidator{},
 		GitlabRequestParserValidator:    &DefaultGitlabRequestParserValidator{},
 		GitlabWebhookSecret:             []byte(userConfig.GitlabWebhookSecret),
+		APISecret:                       []byte(userConfig.APISecret),
 		RepoWhitelistChecker:            repoWhitelist,
 		SilenceWhitelistErrors:          userConfig.SilenceWhitelistErrors,
 		SupportedVCSHosts:               supportedVCSHosts,
@@ -421,6 +422,8 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/healthz", s.Healthz).Methods("GET")
 	s.Router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: static.Asset, AssetDir: static.AssetDir, AssetInfo: static.AssetInfo}))
 	s.Router.HandleFunc("/events", s.EventsController.Post).Methods("POST")
+	s.Router.HandleFunc("/plan", s.EventsController.APIPlan).Methods("POST")
+	s.Router.HandleFunc("/apply", s.EventsController.APIApply).Methods("POST")
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
 	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)

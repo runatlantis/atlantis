@@ -232,3 +232,7 @@ func (g *GithubClient) MergePull(pull models.PullRequest) error {
 	}
 	return nil
 }
+
+func (g *GithubClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+	return "", fmt.Errorf("not yet implemented")
+}
