@@ -497,10 +497,21 @@ func (e *EventsController) HandleAzureDevopsPullRequestCommentedEvent(w http.Res
 // request if the event is a pull request closed event. It's exported to make
 // testing easier.
 func (e *EventsController) HandleAzureDevopsPullRequestEvent(w http.ResponseWriter, event *azuredevops.Event, azuredevopsReqID string) {
-	if strings.Contains(event.Message.GetText(), "changed the reviewer list") {
-		msg := "pull request updated event is not a supported type [changed the reviewer list]"
-		e.respond(w, logging.Debug, http.StatusOK, "%s: %s", msg, azuredevopsReqID)
-		return
+	prText := event.Message.GetText()
+	ignoreEvents := []string{
+		"changed the reviewer list",
+		"approved pull request",
+		"has approved and left suggestions",
+		"is waiting for the author",
+		"rejected pull request",
+		"voted on pull request",
+	}
+	for _, s := range ignoreEvents {
+		if strings.Contains(prText, s) {
+			msg := fmt.Sprintf("pull request updated event is not a supported type [%s]", s)
+			e.respond(w, logging.Debug, http.StatusOK, "%s: %s", msg, azuredevopsReqID)
+			return
+		}
 	}
 
 	pull, pullEventType, baseRepo, headRepo, user, err := e.Parser.ParseAzureDevopsPullEvent(*event)

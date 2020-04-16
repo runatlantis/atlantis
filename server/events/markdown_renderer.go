@@ -38,6 +38,7 @@ type MarkdownRenderer struct {
 	// If we're not configured with a GitLab client, this will be false.
 	GitlabSupportsCommonMark bool
 	DisableApplyAll          bool
+	DisableMarkdownFolding   bool
 }
 
 // commonData is data that all responses have.
@@ -172,6 +173,10 @@ func (m *MarkdownRenderer) renderProjectResults(results []models.ProjectResult, 
 // load. Some VCS providers or versions of VCS providers don't support this
 // syntax.
 func (m *MarkdownRenderer) shouldUseWrappedTmpl(vcsHost models.VCSHostType, output string) bool {
+	if m.DisableMarkdownFolding {
+		return false
+	}
+
 	// Bitbucket Cloud and Server don't support the folding markdown syntax.
 	if vcsHost == models.BitbucketServer || vcsHost == models.BitbucketCloud {
 		return false

@@ -51,7 +51,7 @@ dist: ## Package up everything in static/ using go-bindata-assetfs so it can be 
 	rm -f server/static/bindata_assetfs.go && go-bindata-assetfs -pkg static -prefix server server/static/... && mv bindata_assetfs.go server/static
 
 release: ## Create packages for a release
-	docker run -v $$(pwd):/go/src/github.com/runatlantis/atlantis circleci/golang:1.13 sh -c 'cd /go/src/github.com/runatlantis/atlantis && scripts/binary-release.sh'
+	docker run -v $$(pwd):/go/src/github.com/runatlantis/atlantis circleci/golang:1.14 sh -c 'cd /go/src/github.com/runatlantis/atlantis && scripts/binary-release.sh'
 
 fmt: ## Run goimports (which also formats)
 	goimports -w $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "./server/static/bindata_assetfs.go" ! -path "**/mocks/*")
@@ -60,8 +60,8 @@ lint: ## Run linter locally
 	golangci-lint run
 
 check-lint: ## Run linter in CI/CD. If running locally use 'lint'
-	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b ./bin v1.13.2
-	./bin/golangci-lint run
+	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b ./bin v1.23.8
+	./bin/golangci-lint run -j 4
 
 check-fmt: ## Fail if not formatted
 	if [[ $$(goimports -l $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "./server/static/bindata_assetfs.go" ! -path "**/mocks/*")) ]]; then exit 1; fi

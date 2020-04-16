@@ -420,8 +420,8 @@ func TestGithubClient_PullIsApproved(t *testing.T) {
 			}
 		  }
 ]`
-	firstResp := fmt.Sprintf(respTemplate, 80)
-	secondResp := fmt.Sprintf(respTemplate, 81)
+	firstResp := fmt.Sprintf(respTemplate, 80, 80, 80)
+	secondResp := fmt.Sprintf(respTemplate, 81, 81, 81)
 	testServer := httptest.NewTLSServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.RequestURI {

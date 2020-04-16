@@ -114,13 +114,13 @@ func TestNewWebhooksManager_NoConfigSuccess(t *testing.T) {
 	m, err := webhooks.NewMultiWebhookSender(emptyConfigs, webhooks.NewSlackClient(emptyToken))
 	Ok(t, err)
 	Assert(t, m != nil, "manager shouldn't be nil")
-	Equals(t, 0, len(m.Webhooks))
+	Equals(t, 0, len(m.Webhooks)) // nolint: staticcheck
 
 	t.Log("passing nil client should succeed")
 	m, err = webhooks.NewMultiWebhookSender(emptyConfigs, nil)
 	Ok(t, err)
 	Assert(t, m != nil, "manager shouldn't be nil")
-	Equals(t, 0, len(m.Webhooks))
+	Equals(t, 0, len(m.Webhooks)) // nolint: staticcheck
 }
 func TestNewWebhooksManager_SingleConfigSuccess(t *testing.T) {
 	t.Log("When there is one valid config, function should succeed")
@@ -133,7 +133,7 @@ func TestNewWebhooksManager_SingleConfigSuccess(t *testing.T) {
 	m, err := webhooks.NewMultiWebhookSender(configs, client)
 	Ok(t, err)
 	Assert(t, m != nil, "manager shouldn't be nil")
-	Equals(t, 1, len(m.Webhooks))
+	Equals(t, 1, len(m.Webhooks)) // nolint: staticcheck
 }
 
 func TestNewWebhooksManager_MultipleConfigSuccess(t *testing.T) {
@@ -151,7 +151,7 @@ func TestNewWebhooksManager_MultipleConfigSuccess(t *testing.T) {
 	m, err := webhooks.NewMultiWebhookSender(configs, client)
 	Ok(t, err)
 	Assert(t, m != nil, "manager shouldn't be nil")
-	Equals(t, nConfigs, len(m.Webhooks))
+	Equals(t, nConfigs, len(m.Webhooks)) // nolint: staticcheck
 }
 
 func TestSend_SingleSuccess(t *testing.T) {

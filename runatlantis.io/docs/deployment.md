@@ -67,6 +67,11 @@ To install:
     for documentation)
 1. Run
     ```sh
+    helm install atlantis stable/atlantis -f values.yaml
+    ```
+    
+    If you are using helm v2, run:
+    ```sh
     helm install -f values.yaml stable/atlantis
     ```
 

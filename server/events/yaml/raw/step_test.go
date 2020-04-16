@@ -9,7 +9,7 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
-func TestStepConfig_UnmarshalYAML(t *testing.T) {
+func TestStepConfig_YAMLMarshalling(t *testing.T) {
 	cases := []struct {
 		description string
 		input       string
@@ -162,6 +162,14 @@ key:
 			}
 			Ok(t, err)
 			Equals(t, c.exp, got)
+
+			_, err = yaml.Marshal(got)
+			Ok(t, err)
+
+			var got2 raw.Step
+			err = yaml.UnmarshalStrict([]byte(c.input), &got2)
+			Ok(t, err)
+			Equals(t, got2, got)
 		})
 	}
 }

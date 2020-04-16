@@ -1,33 +1,46 @@
 {
-  "status": "completed",
-  "mergeStatus": "NotSet",
-  "autoCompleteSetBy": {
-          "id": "02228777-0784-420f-bdaa-8bc4830a14a6",
-          "displayName": "Atlantis User",
-          "uniqueName": "atlantis.user@example.com",
-          "url": "https://vssps.dev.azure.com/owner/_apis/Identities/02228777-0784-420f-bdaa-8bc4830a14a6",
-          "imageUrl": "https://dev.azure.com/owner/DefaultCollection/_api/_common/identityImage?id=02228777-0784-420f-bdaa-8bc4830a14a6"
-  },
-  "pullRequestId": 22,
-  "completionOptions": {
-          "bypassPolicy":false,
-          "bypassReason":"",
-          "deleteSourceBranch":false,
-          "mergeCommitMessage":"TEST MERGE COMMIT MESSAGE",
-          "mergeStrategy":"noFastForward",
-          "squashMerge":false,
-          "transitionWorkItems":true,
-          "triggeredByAutoComplete":false
-  },
-  "reviewers": [
-    {
-      "reviewerUrl": "https://example:8080/tfs/_apis/git/repositories/8010495e-1002-438d-acbf-aaf245dac7c2/pullRequests/22/reviewers/8010495e-1002-438d-acbf-aaf245dac7c2",
-      "vote": 0,
-      "id": "8010495e-1002-438d-acbf-aaf245dac7c2",
-      "displayName": "Atlantis User",
-      "uniqueName": "atlantis.user@example.com",
-      "url": "https://owner:8080/tfs/_apis/Identities/8010495e-1002-438d-acbf-aaf245dac7c2",
-      "imageUrl": "https://owner:8080/tfs/_api/_common/identityImage?id=8010495e-1002-438d-acbf-aaf245dac7c2"
-    }
-  ]
+    "repository": {
+        "id": "22222222-2222-2222-222222222222",
+        "name": "MyRepository",
+        "project": {
+            "id": "33333333-3333-3333-333333333333",
+            "name": "MyProject",
+            "description": "The place for MyProject"
+        }
+    },
+    "status": "active",
+    "createdBy": {
+        "displayName": "Atlantis Author",
+        "id": "11111111-1111-1111-111111111111",
+        "uniqueName": "atlantis.author@example.com"
+    },
+    "mergeStatus": "notSet",
+    "isDraft": false,
+    "autoCompleteSetBy": {
+        "id": "11111111-1111-1111-111111111111",
+        "displayName": "Atlantis Author",
+        "uniqueName": "atlantis.author@example.com"
+    },
+    "pullRequestId": 22,
+    "completionOptions": {
+        "bypassPolicy": false,
+        "bypassReason": "",
+        "deleteSourceBranch": false,
+        "mergeCommitMessage": "TEST MERGE COMMIT MESSAGE",
+        "mergeStrategy": "noFastForward",
+        "squashMerge": false,
+        "transitionWorkItems": true,
+        "triggeredByAutoComplete": false
+    },
+    "reviewers": [
+        {
+            "reviewerUrl": "https://example:8080/tfs/_apis/git/repositories/8010495e-1002-438d-acbf-aaf245dac7c2/pullRequests/22/reviewers/8010495e-1002-438d-acbf-aaf245dac7c2",
+            "vote": 0,
+            "id": "8010495e-1002-438d-acbf-aaf245dac7c2",
+            "displayName": "Atlantis Reviewer",
+            "uniqueName": "atlantis.reviewer@example.com",
+            "url": "https://owner:8080/tfs/_apis/Identities/8010495e-1002-438d-acbf-aaf245dac7c2",
+            "imageUrl": "https://owner:8080/tfs/_api/_common/identityImage?id=8010495e-1002-438d-acbf-aaf245dac7c2"
+        }
+    ]
 }

@@ -296,7 +296,8 @@ func (z *Tokenizer) Buffered() []byte {
 // too many times in succession.
 func readAtLeastOneByte(r io.Reader, b []byte) (int, error) {
 	for i := 0; i < 100; i++ {
-		if n, err := r.Read(b); n != 0 || err != nil {
+		n, err := r.Read(b)
+		if n != 0 || err != nil {
 			return n, err
 		}
 	}

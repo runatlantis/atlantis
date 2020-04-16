@@ -21,10 +21,10 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/db"
 
-	"github.com/boltdb/bolt"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/testing"
+	bolt "go.etcd.io/bbolt"
 )
 
 var lockBucket = "bucket"
@@ -393,7 +393,7 @@ func TestPullStatus_UpdateGet(t *testing.T) {
 	maybeStatus, err := b.GetPullStatus(pull)
 	Ok(t, err)
 	Assert(t, maybeStatus != nil, "exp non-nil")
-	Equals(t, pull, maybeStatus.Pull)
+	Equals(t, pull, maybeStatus.Pull) // nolint: staticcheck
 	Equals(t, []models.ProjectStatus{
 		{
 			Workspace:   "default",
@@ -498,7 +498,7 @@ func TestPullStatus_UpdateDeleteProject(t *testing.T) {
 	status, err := b.GetPullStatus(pull)
 	Ok(t, err)
 	Assert(t, status != nil, "exp non-nil")
-	Equals(t, pull, status.Pull)
+	Equals(t, pull, status.Pull) // nolint: staticcheck
 	Equals(t, []models.ProjectStatus{
 		{
 			Workspace:   "staging",
@@ -506,7 +506,7 @@ func TestPullStatus_UpdateDeleteProject(t *testing.T) {
 			ProjectName: "",
 			Status:      models.AppliedPlanStatus,
 		},
-	}, status.Projects)
+	}, status.Projects) // nolint: staticcheck
 }
 
 // Test that if we update an existing pull status and our new status is for a

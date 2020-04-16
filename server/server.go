@@ -231,7 +231,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	markdownRenderer := &events.MarkdownRenderer{
 		GitlabSupportsCommonMark: gitlabClient.SupportsCommonMark(),
 		DisableApplyAll:          userConfig.DisableApplyAll,
+		DisableMarkdownFolding:   userConfig.DisableMarkdownFolding,
 	}
+
 	boltdb, err := db.New(userConfig.DataDir)
 	if err != nil {
 		return nil, err
@@ -317,6 +319,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		HidePrevPlanComments:     userConfig.HidePrevPlanComments,
 		SilenceForkPRErrors:      userConfig.SilenceForkPRErrors,
 		SilenceForkPRErrorsFlag:  config.SilenceForkPRErrorsFlag,
+		SilenceVCSStatusNoPlans:  userConfig.SilenceVCSStatusNoPlans,
 		DisableApplyAll:          userConfig.DisableApplyAll,
 		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
 			ParserValidator:   validator,

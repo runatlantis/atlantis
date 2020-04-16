@@ -40,18 +40,19 @@ type Client struct {
 	Account string
 
 	// Services used to proxy to other API endpoints
-	Boards           *BoardsService
-	BuildDefinitions *BuildDefinitionsService
-	Builds           *BuildsService
-	DeliveryPlans    *DeliveryPlansService
-	Favourites       *FavouritesService
-	Git              *GitService
-	Iterations       *IterationsService
-	PullRequests     *PullRequestsService
-	Teams            *TeamsService
-	Tests            *TestsService
-	Users            *UsersService
-	WorkItems        *WorkItemsService
+	Boards            *BoardsService
+	BuildDefinitions  *BuildDefinitionsService
+	Builds            *BuildsService
+	DeliveryPlans     *DeliveryPlansService
+	Favourites        *FavouritesService
+	Git               *GitService
+	Iterations        *IterationsService
+	PolicyEvaluations *PolicyEvaluationsService
+	PullRequests      *PullRequestsService
+	Teams             *TeamsService
+	Tests             *TestsService
+	Users             *UsersService
+	WorkItems         *WorkItemsService
 }
 
 // NewClient returns a new Azure DevOps API client. If a nil httpClient is
@@ -79,6 +80,7 @@ func NewClient(httpClient *http.Client) (*Client, error) {
 	c.Favourites = &FavouritesService{client: c}
 	c.Git = &GitService{client: c}
 	c.Iterations = &IterationsService{client: c}
+	c.PolicyEvaluations = &PolicyEvaluationsService{client: c}
 	c.PullRequests = &PullRequestsService{client: c}
 	c.Teams = &TeamsService{client: c}
 	c.Tests = &TestsService{client: c}

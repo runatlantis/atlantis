@@ -145,7 +145,7 @@ Given a directory structure:
     ├── prod
     │   └── terragrunt.hcl
     └── staging
-        └── terragrunt.cl
+        └── terragrunt.hcl
 ```
 
 If using the server `repos.yaml` file, you would use the following config:
