@@ -162,7 +162,7 @@ func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 	When(mockApproved.PullIsApproved(ctx.BaseRepo, ctx.Pull)).ThenReturn(false, nil)
 
 	res := runner.Apply(ctx)
-	Equals(t, "Pull request must be approved before running apply.", res.Failure)
+	Equals(t, "Pull request must be approved by at least one person other than the author before running apply.", res.Failure)
 }
 
 // Test that if mergeable is required and the PR isn't mergeable we give an error.

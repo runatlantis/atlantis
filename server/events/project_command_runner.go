@@ -234,7 +234,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 				return "", "", errors.Wrap(err, "checking if pull request was approved")
 			}
 			if !approved {
-				return "", "Pull request must be approved before running apply.", nil
+				return "", "Pull request must be approved by at least one person other than the author before running apply.", nil
 			}
 		case raw.MergeableApplyRequirement:
 			if !ctx.PullMergeable {
