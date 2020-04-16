@@ -8,7 +8,6 @@ require (
 	github.com/aokoli/goutils v1.0.1 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a // indirect
 	github.com/aws/aws-sdk-go v1.17.14 // indirect
-	github.com/boltdb/bolt v1.3.1
 	github.com/briandowns/spinner v0.0.0-20170614154858-48dbb65d7bd5
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/docker v0.0.0-20180620051407-e2593239d949
@@ -53,6 +52,7 @@ require (
 	github.com/urfave/cli v1.20.0
 	github.com/urfave/negroni v0.2.0
 	github.com/xanzy/go-gitlab v0.22.2-0.20191127083556-16a492660b8c
+	go.etcd.io/bbolt v1.3.4
 	golang.org/x/crypto v0.0.0-20200403201458-baeed622b8d8
 	golang.org/x/net v0.0.0-20191126235420-ef20fe5d7933 // indirect
 	golang.org/x/oauth2 v0.0.0-20191122200657-5d9234df094c // indirect
