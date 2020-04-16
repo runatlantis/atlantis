@@ -26,6 +26,10 @@ module.exports = {
         ['meta', {name: 'google-site-verification', content: 'kTnsDBpHqtTNY8oscYxrQeeiNml2d2z-03Ct9wqeCeE' }]
     ],
     themeConfig: {
+        algolia: {
+          apiKey: '3b733dff1539ca3a210775860301fa86',
+          indexName: 'runatlantis'
+        },
         logo: '/hero.png',
         nav: [
             {text: 'Home', link: '/'},
