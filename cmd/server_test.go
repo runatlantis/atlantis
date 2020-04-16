@@ -257,13 +257,36 @@ func TestExecute_RepoWhitelistScheme(t *testing.T) {
 }
 
 func TestExecute_ValidateLogLevel(t *testing.T) {
-	t.Log("Should validate log level.")
-	c := setupWithDefaults(map[string]interface{}{
-		LogLevelFlag: "invalid",
-	})
-	err := c.Execute()
-	Assert(t, err != nil, "should be an error")
-	Equals(t, "invalid log level: not one of debug, info, warn, error", err.Error())
+	cases := []struct {
+		description string
+		flags       map[string]interface{}
+		expectError bool
+	}{
+		{
+			"log level is invalid",
+			map[string]interface{}{
+				LogLevelFlag: "invalid",
+			},
+			true,
+		},
+		{
+			"log level is valid uppercase",
+			map[string]interface{}{
+				LogLevelFlag: "DEBUG",
+			},
+			false,
+		},
+	}
+	for _, testCase := range cases {
+		t.Log("Should validate log level when " + testCase.description)
+		c := setupWithDefaults(testCase.flags)
+		err := c.Execute()
+		if testCase.expectError {
+			Assert(t, err != nil, "should be an error")
+		} else {
+			Ok(t, err)
+		}
+	}
 }
 
 func TestExecute_ValidateCheckoutStrategy(t *testing.T) {
@@ -587,7 +610,7 @@ func TestExecute_BitbucketServerBaseURLScheme(t *testing.T) {
 		RepoWhitelistFlag:    "*",
 		BitbucketBaseURLFlag: "://mydomain.com",
 	})
-	ErrEquals(t, "error parsing --bitbucket-webhook-secret flag value \"://mydomain.com\": parse ://mydomain.com: missing protocol scheme", c.Execute())
+	ErrEquals(t, "error parsing --bitbucket-webhook-secret flag value \"://mydomain.com\": parse \"://mydomain.com\": missing protocol scheme", c.Execute())
 }
 
 // Port should be retained on base url.

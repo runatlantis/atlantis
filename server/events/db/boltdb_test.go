@@ -393,7 +393,7 @@ func TestPullStatus_UpdateGet(t *testing.T) {
 	maybeStatus, err := b.GetPullStatus(pull)
 	Ok(t, err)
 	Assert(t, maybeStatus != nil, "exp non-nil")
-	Equals(t, pull, maybeStatus.Pull)
+	Equals(t, pull, maybeStatus.Pull) // nolint: staticcheck
 	Equals(t, []models.ProjectStatus{
 		{
 			Workspace:   "default",
@@ -498,7 +498,7 @@ func TestPullStatus_UpdateDeleteProject(t *testing.T) {
 	status, err := b.GetPullStatus(pull)
 	Ok(t, err)
 	Assert(t, status != nil, "exp non-nil")
-	Equals(t, pull, status.Pull)
+	Equals(t, pull, status.Pull) // nolint: staticcheck
 	Equals(t, []models.ProjectStatus{
 		{
 			Workspace:   "staging",
@@ -506,7 +506,7 @@ func TestPullStatus_UpdateDeleteProject(t *testing.T) {
 			ProjectName: "",
 			Status:      models.AppliedPlanStatus,
 		},
-	}, status.Projects)
+	}, status.Projects) // nolint: staticcheck
 }
 
 // Test that if we update an existing pull status and our new status is for a

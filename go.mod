@@ -1,6 +1,6 @@
 module github.com/runatlantis/atlantis
 
-go 1.13
+go 1.14
 
 require (
 	github.com/Masterminds/semver v1.4.2 // indirect

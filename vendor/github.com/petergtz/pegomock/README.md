@@ -13,6 +13,8 @@ go get github.com/petergtz/pegomock/...
 
 This will download the package and install an executable `pegomock` in your `$GOPATH/bin`.
 
+See also section[Tracking the pegomock tool in your project](#tracking-the-pegomock-tool-in-your-project) for a per-project control of the tool version.
+
 Getting Started
 ===============
 
@@ -402,6 +404,46 @@ Install it via:
 ```
 go install github.com/petergtz/pegomock/pegomock
 ```
+
+Tracking the pegomock tool in your project
+------------------------------------------
+
+Go modules allow to pin not only a package but also a tool (that is, an executable). The steps are:
+
+1. Use a file named `tools.go` with contents similar to this:
+```go
+// +build tools
+
+// This file will never be compiled (see the build constraint above); it is
+// used to record dependencies on build tools with the Go modules machinery.
+// See https://github.com/go-modules-by-example/index/blob/master/010_tools/README.md
+
+package tools
+
+import (
+	_ "github.com/petergtz/pegomock/pegomock"
+)
+```
+2. Set `$GOBIN` to a `bin` directory relative to your repo (this defines where tool dependencies will be installed).
+2. Install the tool with `go install`:
+```console
+$ cd /path/to/myproject
+$ export GOBIN=$PWD/bin
+$ go install github.com/petergtz/pegomock/pegomock
+```
+3. Use that `$GOBIN` when invoking `pegomock` for that project:
+```console
+$ $GOBIN/pegomock ...
+```
+or
+```console
+$ export PATH=$GOBIN:$PATH
+$ pegomock ...
+```
+
+See [Tools as dependencies] for details.
+
+[Tools as dependencies]: https://github.com/go-modules-by-example/index/blob/master/010_tools/README.md
 
 Generating Mocks
 ----------------
