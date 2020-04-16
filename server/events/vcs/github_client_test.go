@@ -212,7 +212,7 @@ func TestGithubClient_PaginatesComments(t *testing.T) {
 	Ok(t, err)
 	defer disableSSLVerification()()
 
-	err = client.HideOldComments(
+	err = client.HidePrevPlanComments(
 		models.Repo{
 			FullName:          "owner/repo",
 			Owner:             "owner",
@@ -298,7 +298,7 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 	Ok(t, err)
 	defer disableSSLVerification()()
 
-	err = client.HideOldComments(
+	err = client.HidePrevPlanComments(
 		models.Repo{
 			FullName:          "owner/repo",
 			Owner:             "owner",

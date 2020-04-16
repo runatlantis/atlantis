@@ -100,7 +100,7 @@ func (b *Client) CreateComment(repo models.Repo, pullNum int, comment string) er
 	return err
 }
 
-func (b *Client) HideOldComments(repo models.Repo, pullNum int) error {
+func (b *Client) HidePrevPlanComments(repo models.Repo, pullNum int) error {
 	return nil
 }
 

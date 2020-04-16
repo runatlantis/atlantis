@@ -139,13 +139,14 @@ func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment stri
 	return nil
 }
 
-func (g *GithubClient) HideOldComments(repo models.Repo, pullNum int) error {
+func (g *GithubClient) HidePrevPlanComments(repo models.Repo, pullNum int) error {
 	var allComments []*github.IssueComment
-	for page := 0; ; {
+	nextPage := 0
+	for {
 		comments, resp, err := g.client.Issues.ListComments(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueListCommentsOptions{
 			Sort:        "created",
 			Direction:   "asc",
-			ListOptions: github.ListOptions{Page: page},
+			ListOptions: github.ListOptions{Page: nextPage},
 		})
 		if err != nil {
 			return err
@@ -154,11 +155,14 @@ func (g *GithubClient) HideOldComments(repo models.Repo, pullNum int) error {
 		if resp.NextPage == 0 {
 			break
 		}
-		page = resp.NextPage
+		nextPage = resp.NextPage
 	}
 
 	for _, comment := range allComments {
-		if comment.User != nil && comment.User.GetLogin() != g.user {
+		// Using a case insensitive compare here because usernames aren't case
+		// sensitive and users may enter their atlantis users with different
+		// cases.
+		if comment.User != nil && !strings.EqualFold(comment.User.GetLogin(), g.user) {
 			continue
 		}
 		// Crude filtering: The comment templates typically include the command name
@@ -166,6 +170,9 @@ func (g *GithubClient) HideOldComments(repo models.Repo, pullNum int) error {
 		// a reasonable one, given we've already filtered the comments by the
 		// configured Atlantis user.
 		body := strings.Split(comment.GetBody(), "\n")
+		if len(body) == 0 {
+			continue
+		}
 		firstLine := strings.ToLower(body[0])
 		if !strings.Contains(firstLine, models.PlanCommand.String()) {
 			continue

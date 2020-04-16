@@ -124,7 +124,7 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 	return nil
 }
 
-func (g *AzureDevopsClient) HideOldComments(repo models.Repo, pullNum int) error {
+func (g *AzureDevopsClient) HidePrevPlanComments(repo models.Repo, pullNum int) error {
 	return nil
 }
 

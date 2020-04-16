@@ -59,12 +59,12 @@ func (mock *MockClient) CreateComment(repo models.Repo, pullNum int, comment str
 	return ret0
 }
 
-func (mock *MockClient) HideOldComments(repo models.Repo, pullNum int) error {
+func (mock *MockClient) HidePrevPlanComments(repo models.Repo, pullNum int) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}
 	params := []pegomock.Param{repo, pullNum}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("HideOldComments", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
+	result := pegomock.GetGenericMockFrom(mock).Invoke("HidePrevPlanComments", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
 	if len(result) != 0 {
 		if result[0] != nil {

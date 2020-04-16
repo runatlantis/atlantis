@@ -252,8 +252,8 @@ var boolFlags = map[string]boolFlag{
 		defaultValue: false,
 	},
 	HidePrevPlanComments: {
-		description: "Hide previous plan comments will be hidden to reduce clutter in a PR. " +
-			"VCS support is limited to: Github",
+		description: "Hide previous plan comments to reduce clutter in the PR. " +
+			"VCS support is limited to: GitHub.",
 		defaultValue: false,
 	},
 	RequireApprovalFlag: {

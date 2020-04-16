@@ -139,7 +139,7 @@ func (g *GitlabClient) CreateComment(repo models.Repo, pullNum int, comment stri
 	return err
 }
 
-func (g *GitlabClient) HideOldComments(repo models.Repo, pullNum int) error {
+func (g *GitlabClient) HidePrevPlanComments(repo models.Repo, pullNum int) error {
 	return nil
 }
 

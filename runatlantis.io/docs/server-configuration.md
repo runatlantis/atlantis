@@ -280,7 +280,8 @@ Values are chosen in this order:
   ```bash
   atlantis server --hide-prev-plan-comments
   ```
-  Hides previous plan comments to declutter PRs.
+  Hide previous plan comments to declutter PRs. This is only supported in
+  GitHub currently.
 
 * ### `--log-level`
   ```bash

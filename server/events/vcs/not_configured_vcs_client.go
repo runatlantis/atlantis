@@ -32,7 +32,7 @@ func (a *NotConfiguredVCSClient) GetModifiedFiles(repo models.Repo, pull models.
 func (a *NotConfiguredVCSClient) CreateComment(repo models.Repo, pullNum int, comment string) error {
 	return a.err()
 }
-func (a *NotConfiguredVCSClient) HideOldComments(repo models.Repo, pullNum int) error {
+func (a *NotConfiguredVCSClient) HidePrevPlanComments(repo models.Repo, pullNum int) error {
 	return nil
 }
 func (a *NotConfiguredVCSClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
