@@ -58,16 +58,16 @@ type PullRequestAsyncStatus int
 
 // PullRequestAsyncStatus enum values
 const (
-	MergeConflicts PullRequestAsyncStatus = iota
-	MergeFailure
-	MergeNotSet
+	MergeNotSet PullRequestAsyncStatus = iota
 	MergeQueued
-	MergeRejectedByPolicy
+	MergeConflicts
 	MergeSucceeded
+	MergeRejectedByPolicy
+	MergeFailure
 )
 
 func (d PullRequestAsyncStatus) String() string {
-	return [...]string{"conflicts", "failure", "notSet", "queued", "rejectedByPolicy", "succeeded"}[d]
+	return [...]string{"notSet", "queued", "conflicts", "succeeded", "rejectedByPolicy", "failure"}[d]
 }
 
 // PullRequestMergeFailureType The specific type of merge request failure
