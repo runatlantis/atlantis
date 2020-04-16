@@ -177,7 +177,7 @@ github.com/magiconair/properties
 github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.4
 github.com/mattn/go-isatty
-# github.com/mcdafydd/go-azuredevops v0.10.2
+# github.com/mcdafydd/go-azuredevops v0.11.1
 ## explicit
 github.com/mcdafydd/go-azuredevops/azuredevops
 # github.com/microcosm-cc/bluemonday v1.0.1
@@ -281,7 +281,7 @@ go.opencensus.io/trace
 go.opencensus.io/trace/internal
 go.opencensus.io/trace/propagation
 go.opencensus.io/trace/tracestate
-# golang.org/x/crypto v0.0.0-20190605123033-f99c8df09eb5
+# golang.org/x/crypto v0.0.0-20200403201458-baeed622b8d8
 ## explicit
 golang.org/x/crypto/cast5
 golang.org/x/crypto/openpgp
