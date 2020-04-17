@@ -43,10 +43,15 @@ type GithubClient struct {
 
 // GithubAppTemporarySecrets hold app credentials obtained from github after creation
 type GithubAppTemporarySecrets struct {
-	ID            int64
-	Key           string
-	Name          string
+	// The app ID
+	ID int64
+	// The app's PEM-encoded key
+	Key  string
+	Name string
+	// The generated webhook secret for this app
 	WebhookSecret string
+	// A link to the app, like https://github.com/apps/octoapp
+	URL string
 }
 
 // NewGithubClient returns a valid GitHub client.
@@ -347,6 +352,7 @@ func (g *GithubClient) ExchangeCode(code string) (*GithubAppTemporarySecrets, er
 		Key:           cfg.GetPEM(),
 		WebhookSecret: cfg.GetWebhookSecret(),
 		Name:          cfg.GetName(),
+		URL:           cfg.GetHTMLURL(),
 	}
 
 	return data, err

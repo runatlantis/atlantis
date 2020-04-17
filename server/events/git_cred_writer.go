@@ -15,7 +15,7 @@ import (
 // WriteGitCreds generates a .git-credentials file containing the username and token
 // used for authenticating with git over HTTPS
 // It will create the file in home/.git-credentials
-func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home string, logger *logging.SimpleLogger) error {
+func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home string, logger *logging.SimpleLogger, ignoreExisting bool) error {
 	const credsFilename = ".git-credentials"
 	credsFile := filepath.Join(home, credsFilename)
 	credsFileContents := `https://%s:%s@%s`
@@ -24,7 +24,7 @@ func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home str
 	// If there is already a .git-credentials file and its contents aren't exactly
 	// what we would have written to it, then we error out because we don't
 	// want to overwrite anything
-	if _, err := os.Stat(credsFile); err == nil {
+	if _, err := os.Stat(credsFile); err == nil && !ignoreExisting {
 		currContents, err := ioutil.ReadFile(credsFile) // nolint: gosec
 		if err != nil {
 			return errors.Wrapf(err, "trying to read %s to ensure we're not overwriting it", credsFile)

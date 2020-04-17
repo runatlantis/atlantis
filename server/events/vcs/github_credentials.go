@@ -2,13 +2,14 @@ package vcs
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 
 	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/google/go-github/v31/github"
+	"github.com/pkg/errors"
 )
 
 // GithubCredentials handles creating http.Clients that authenticate
@@ -69,7 +70,7 @@ type GithubAppCredentials struct {
 	Hostname       string
 	apiURL         *url.URL
 	installationID int64
-	token          *github.InstallationToken
+	tr             *ghinstallation.Transport
 }
 
 // Client returns a github app installation client
@@ -88,38 +89,12 @@ func (c *GithubAppCredentials) GetUser() string {
 
 // GetToken returns a fresh installation token
 func (c *GithubAppCredentials) GetToken() (string, error) {
-	if c.token != nil {
-		log.Println(c.token.GetExpiresAt())
-		return c.token.GetToken(), nil
-	}
-
-	transport, err := c.Client()
+	tr, err := c.transport()
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(err, "transport failed")
 	}
 
-	apiURL := c.getAPIURL()
-	var client *github.Client
-
-	if apiURL.Hostname() == "github.com" {
-		client = github.NewClient(transport)
-	} else {
-		client, _ = github.NewEnterpriseClient(apiURL.String(), apiURL.String(), transport)
-	}
-
-	installationID, err := c.getInstallationID()
-	if err != nil {
-		return "", err
-	}
-
-	token, _, err := client.Apps.CreateInstallationToken(context.Background(), installationID, &github.InstallationTokenOptions{})
-
-	if err != nil {
-		return "", err
-	}
-
-	c.token = token
-	return token.GetToken(), nil
+	return tr.Token(context.Background())
 }
 
 func (c *GithubAppCredentials) getInstallationID() (int64, error) {
@@ -139,16 +114,25 @@ func (c *GithubAppCredentials) getInstallationID() (int64, error) {
 	client := github.NewClient(&http.Client{Transport: t})
 	client.BaseURL = c.getAPIURL()
 	ctx := context.Background()
-	app, _, err := client.Apps.Get(ctx, "")
+
+	installations, _, err := client.Apps.ListInstallations(ctx, nil)
 	if err != nil {
 		return 0, err
 	}
 
-	c.installationID = app.GetID()
+	if len(installations) != 1 {
+		return 0, fmt.Errorf("wrong number of installations, expected 1, found %d", len(installations))
+	}
+
+	c.installationID = installations[0].GetID()
 	return c.installationID, nil
 }
 
 func (c *GithubAppCredentials) transport() (*ghinstallation.Transport, error) {
+	if c.tr != nil {
+		return c.tr, nil
+	}
+
 	installationID, err := c.getInstallationID()
 	if err != nil {
 		return nil, err
@@ -157,7 +141,9 @@ func (c *GithubAppCredentials) transport() (*ghinstallation.Transport, error) {
 	tr := http.DefaultTransport
 	itr, err := ghinstallation.NewKeyFromFile(tr, c.AppID, installationID, c.KeyPath)
 	if err == nil {
-		itr.BaseURL = c.getAPIURL().String()
+		apiURL := c.getAPIURL()
+		itr.BaseURL = strings.TrimSuffix(apiURL.String(), "/")
+		c.tr = itr
 	}
 	return itr, err
 }

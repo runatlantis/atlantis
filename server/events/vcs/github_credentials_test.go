@@ -15,7 +15,7 @@ func TestGithubClient_AppAuthentication(t *testing.T) {
 	Ok(t, err)
 
 	anonCreds := &vcs.GithubAnonymousCredentials{}
-	anonClient, err := vcs.NewGithubClient(testServer, anonCreds)
+	anonClient, err := vcs.NewGithubClient(testServer, anonCreds, nil)
 	Ok(t, err)
 	tempSecrets, err := anonClient.ExchangeCode("good-code")
 	Ok(t, err)
@@ -31,7 +31,7 @@ func TestGithubClient_AppAuthentication(t *testing.T) {
 		KeyPath:  keyPath,
 		Hostname: testServer,
 	}
-	_, err = vcs.NewGithubClient(testServer, appCreds)
+	_, err = vcs.NewGithubClient(testServer, appCreds, nil)
 	Ok(t, err)
 
 	token, err := appCreds.GetToken()
@@ -41,6 +41,6 @@ func TestGithubClient_AppAuthentication(t *testing.T) {
 	Ok(t, err)
 
 	if token != newToken {
-		t.Errorf("app token was not cached")
+		t.Errorf("app token was not cached: %q != %q", token, newToken)
 	}
 }

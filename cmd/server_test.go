@@ -397,6 +397,20 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			true,
 		},
 		{
+			"just github app set",
+			map[string]interface{}{
+				GHAppIDFlag: "1",
+			},
+			true,
+		},
+		{
+			"just github app key set",
+			map[string]interface{}{
+				GHAppKeyFlag: "key.pem",
+			},
+			true,
+		},
+		{
 			"just gitlab user set",
 			map[string]interface{}{
 				GitlabUserFlag: "user",
@@ -446,6 +460,14 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			map[string]interface{}{
 				GHUserFlag:  "user",
 				GHTokenFlag: "token",
+			},
+			false,
+		},
+		{
+			"github app and key set and should be successful",
+			map[string]interface{}{
+				GHAppIDFlag:  "1",
+				GHAppKeyFlag: "key.pem",
 			},
 			false,
 		},
@@ -545,6 +567,19 @@ func TestExecute_GithubUser(t *testing.T) {
 	Ok(t, err)
 
 	Equals(t, "user", passedConfig.GithubUser)
+}
+
+func TestExecute_GithubApp(t *testing.T) {
+	t.Log("Should remove the @ from the github username if it's passed.")
+	c := setup(map[string]interface{}{
+		GHAppKeyFlag:      "key.pem",
+		GHAppIDFlag:       "1",
+		RepoWhitelistFlag: "*",
+	})
+	err := c.Execute()
+	Ok(t, err)
+
+	Equals(t, int64(1), passedConfig.GithubAppID)
 }
 
 func TestExecute_GitlabUser(t *testing.T) {

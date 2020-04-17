@@ -19,7 +19,7 @@ func TestWriteGitCreds_WriteFile(t *testing.T) {
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 
-	err := events.WriteGitCreds("user", "token", "hostname", tmp, logger)
+	err := events.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
 	Ok(t, err)
 
 	expContents := `https://user:token@hostname`
@@ -39,7 +39,7 @@ func TestWriteGitCreds_WillNotOverwrite(t *testing.T) {
 	err := ioutil.WriteFile(credsFile, []byte("contents"), 0600)
 	Ok(t, err)
 
-	actErr := events.WriteGitCreds("user", "token", "hostname", tmp, logger)
+	actErr := events.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
 	expErr := fmt.Sprintf("can't write git-credentials to %s because that file has contents that would be overwritten", tmp+"/.git-credentials")
 	ErrEquals(t, expErr, actErr)
 }
@@ -56,7 +56,7 @@ func TestWriteGitCreds_NoErrIfContentsSame(t *testing.T) {
 	err := ioutil.WriteFile(credsFile, []byte(contents), 0600)
 	Ok(t, err)
 
-	err = events.WriteGitCreds("user", "token", "hostname", tmp, logger)
+	err = events.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
 	Ok(t, err)
 }
 
@@ -71,7 +71,7 @@ func TestWriteGitCreds_ErrIfCannotRead(t *testing.T) {
 	Ok(t, err)
 
 	expErr := fmt.Sprintf("trying to read %s to ensure we're not overwriting it: open %s: permission denied", credsFile, credsFile)
-	actErr := events.WriteGitCreds("user", "token", "hostname", tmp, logger)
+	actErr := events.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
 	ErrEquals(t, expErr, actErr)
 }
 
@@ -79,7 +79,7 @@ func TestWriteGitCreds_ErrIfCannotRead(t *testing.T) {
 func TestWriteGitCreds_ErrIfCannotWrite(t *testing.T) {
 	credsFile := "/this/dir/does/not/exist/.git-credentials"
 	expErr := fmt.Sprintf("writing generated .git-credentials file with user, token and hostname to %s: open %s: no such file or directory", credsFile, credsFile)
-	actErr := events.WriteGitCreds("user", "token", "hostname", "/this/dir/does/not/exist", logger)
+	actErr := events.WriteGitCreds("user", "token", "hostname", "/this/dir/does/not/exist", logger, false)
 	ErrEquals(t, expErr, actErr)
 }
 
@@ -88,7 +88,7 @@ func TestWriteGitCreds_ConfigureGitCredentialHelper(t *testing.T) {
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 
-	err := events.WriteGitCreds("user", "token", "hostname", tmp, logger)
+	err := events.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
 	Ok(t, err)
 
 	expOutput := `store`
@@ -102,7 +102,7 @@ func TestWriteGitCreds_ConfigureGitUrlOverride(t *testing.T) {
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 
-	err := events.WriteGitCreds("user", "token", "hostname", tmp, logger)
+	err := events.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
 	Ok(t, err)
 
 	expOutput := `ssh://git@hostname`

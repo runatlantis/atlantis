@@ -52,7 +52,7 @@ func TestClone_NoneExisting(t *testing.T) {
 	Equals(t, expCommit, actCommit)
 }
 
-// Test that if we don't have any existing files, we check out the repo.
+// Test that if we don't have any existing files, we check out the repo with a github app.
 func TestClone_GithubAppNoneExisting(t *testing.T) {
 	// Initialize the git repo.
 	repoDir, cleanup := initRepo(t)
@@ -84,6 +84,7 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 			AppID:    1,
 			Hostname: testServer,
 		},
+		GithubHostname: testServer,
 	}
 
 	cloneDir, _, err := gwd.Clone(nil, models.Repo{}, models.Repo{}, models.PullRequest{

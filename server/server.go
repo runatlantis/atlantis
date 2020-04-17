@@ -189,12 +189,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			return nil, errors.Wrap(err, "getting home dir to write ~/.git-credentials file")
 		}
 		if userConfig.GithubUser != "" {
-			if err := events.WriteGitCreds(userConfig.GithubUser, userConfig.GithubToken, userConfig.GithubHostname, home, logger); err != nil {
+			if err := events.WriteGitCreds(userConfig.GithubUser, userConfig.GithubToken, userConfig.GithubHostname, home, logger, false); err != nil {
 				return nil, err
 			}
 		}
 		if userConfig.GitlabUser != "" {
-			if err := events.WriteGitCreds(userConfig.GitlabUser, userConfig.GitlabToken, userConfig.GitlabHostname, home, logger); err != nil {
+			if err := events.WriteGitCreds(userConfig.GitlabUser, userConfig.GitlabToken, userConfig.GitlabHostname, home, logger, false); err != nil {
 				return nil, err
 			}
 		}
@@ -205,12 +205,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			if bitbucketBaseURL == "https://api.bitbucket.org" {
 				bitbucketBaseURL = "bitbucket.org"
 			}
-			if err := events.WriteGitCreds(userConfig.BitbucketUser, userConfig.BitbucketToken, bitbucketBaseURL, home, logger); err != nil {
+			if err := events.WriteGitCreds(userConfig.BitbucketUser, userConfig.BitbucketToken, bitbucketBaseURL, home, logger, false); err != nil {
 				return nil, err
 			}
 		}
 		if userConfig.AzureDevopsUser != "" {
-			if err := events.WriteGitCreds(userConfig.AzureDevopsUser, userConfig.AzureDevopsToken, "dev.azure.com", home, logger); err != nil {
+			if err := events.WriteGitCreds(userConfig.AzureDevopsUser, userConfig.AzureDevopsToken, "dev.azure.com", home, logger, false); err != nil {
 				return nil, err
 			}
 		}
@@ -266,7 +266,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CheckoutMerge: userConfig.CheckoutStrategy == "merge",
 	}
 	// provide fresh tokens before clone from the GitHub Apps integration, proxy workingDir
-	if githubAppEnabled && userConfig.WriteGitCreds {
+	if githubAppEnabled {
+		if !userConfig.WriteGitCreds {
+			logger.Warn("Github App requires --write-git-creds, overriding")
+		}
 		workingDir = &events.GithubAppWorkingDir{
 			WorkingDir:     workingDir,
 			Credentials:    githubCredentials,

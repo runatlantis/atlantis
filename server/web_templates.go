@@ -237,6 +237,7 @@ type GithubSetupData struct {
 	ID            int64
 	Key           string
 	WebhookSecret string
+	URL           string
 }
 
 var githubAppSetupTemplate = template.Must(template.New("github-app.html.tmpl").Parse(`
@@ -309,7 +310,7 @@ var githubAppSetupTemplate = template.Must(template.New("github-app.html.tmpl").
       <button type="submit">Setup</button>
     </form>
     {{ else }}
-      <p>Please update the following values in your config and restart Atlantis:</p>
+      <p>Visit <a href="{{ .URL }}/installations/new" target="_blank">{{ .URL }}/installations/new</a> to install the app for your user or organization, then <strong>update the following values</strong> in your config and <strong>restart Atlantis<strong>:</p>
 
       <ul>
         <li class="config"><strong>gh-app-id:</strong> <pre>{{ .ID }}</pre></li>

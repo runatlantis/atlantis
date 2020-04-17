@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/google/go-github/github/v31/github"
+	"github.com/google/go-github/v31/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 )
 
@@ -292,49 +292,45 @@ var githubConversionJSON = `{
 	"pem":            "%s"
 }`
 
-var githubAppInfoJSON = `{
-	"id":      1,
-	"slug":    "atlantis",
-	"node_id": "MDExOkludGVncmF0aW9uMQ==",
-	"owner": {
-		"login":              "github",
-		"id":                 1,
-		"node_id":            "MDEyOk9yZ2FuaXphdGlvbjE=",
-		"url":                "https://api.github.com/orgs/github",
-		"repos_url":          "https://api.github.com/orgs/github/repos",
-		"events_url":         "https://api.github.com/orgs/github/events",
-		"hooks_url":          "https://api.github.com/orgs/github/hooks",
-		"issues_url":         "https://api.github.com/orgs/github/issues",
-		"members_url":        "https://api.github.com/orgs/github/members{/member}",
-		"public_members_url": "https://api.github.com/orgs/github/public_members{/member}",
-		"avatar_url":         "https://github.com/images/error/octocat_happy.gif",
-		"description":        "A great organization"
-	},
-	"name":         "Atlantis",
-	"description":  "atlantis",
-	"external_url": "https://atlantis.example.com",
-	"html_url":     "https://github.com/apps/atlantis",
-	"created_at":   "2017-07-08T16:18:44-04:00",
-	"updated_at":   "2017-07-08T16:18:44-04:00",
-	"permissions":{
-		"checks":           "write",
-		"contents":         "write",
-		"issues":           "write",
-		"pull_requests":    "write",
-		"repository_hooks": "write",
-		"statuses":         "write"
-	},
-	"events": [
-		"check_run",
-		"create",
-		"delete",
-		"pull_request",
-		"push",
-		"issues"
-	],
-	"installations_count": 1
-}`
+var githubAppInstallationJSON = `[
+	{
+		"id": 1,
+		"account": {
+			"login": "github",
+			"id": 1,
+			"node_id": "MDEyOk9yZ2FuaXphdGlvbjE=",
+			"url": "https://api.github.com/orgs/github",
+			"repos_url": "https://api.github.com/orgs/github/repos",
+			"events_url": "https://api.github.com/orgs/github/events",
+			"hooks_url": "https://api.github.com/orgs/github/hooks",
+			"issues_url": "https://api.github.com/orgs/github/issues",
+			"members_url": "https://api.github.com/orgs/github/members{/member}",
+			"public_members_url": "https://api.github.com/orgs/github/public_members{/member}",
+			"avatar_url": "https://github.com/images/error/octocat_happy.gif",
+			"description": "A great organization"
+		},
+		"access_tokens_url": "https://api.github.com/installations/1/access_tokens",
+		"repositories_url": "https://api.github.com/installation/repositories",
+		"html_url": "https://github.com/organizations/github/settings/installations/1",
+		"app_id": 1,
+		"target_id": 1,
+		"target_type": "Organization",
+		"permissions": {
+			"metadata": "read",
+			"contents": "read",
+			"issues": "write",
+			"single_file": "write"
+		},
+		"events": [
+			"push",
+			"pull_request"
+		],
+		"single_file_name": "config.yml",
+		"repository_selection": "selected"
+	}
+]`
 
+// nolint: gosec
 var githubAppTokenJSON = `{
 	"token":      "v1.1f699f1069f60xx%d",
 	"expires_at": "2050-01-01T00:00:00Z",
@@ -488,27 +484,26 @@ func GithubAppTestServer(t *testing.T) (string, error) {
 	testServer := httptest.NewTLSServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.RequestURI {
-			// https://developer.github.com/v3/apps/#get-the-authenticated-github-app
-			case "/api/v3/app":
-				token := strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", 1)
-				if err := validateGithubToken(token); err != nil {
-					w.WriteHeader(403)
-					w.Write([]byte("Invalid token"))
-					return
-				}
-
-				w.Write([]byte(githubAppInfoJSON)) // nolint: errcheck
-				return
 			case "/api/v3/app-manifests/good-code/conversions":
 				encodedKey := strings.Join(strings.Split(GithubPrivateKey, "\n"), "\\n")
 				appInfo := fmt.Sprintf(githubConversionJSON, encodedKey)
 				w.Write([]byte(appInfo)) // nolint: errcheck
-			case "/api/v3/app/installations/1/access_tokens":
-			case "/api/v3//app/installations/1/access_tokens":
+			// https://developer.github.com/v3/apps/#list-installations
+			case "/api/v3/app/installations":
 				token := strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", 1)
 				if err := validateGithubToken(token); err != nil {
 					w.WriteHeader(403)
-					w.Write([]byte("Invalid token"))
+					w.Write([]byte("Invalid token")) // nolint: errcheck
+					return
+				}
+
+				w.Write([]byte(githubAppInstallationJSON)) // nolint: errcheck
+				return
+			case "/api/v3/app/installations/1/access_tokens":
+				token := strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", 1)
+				if err := validateGithubToken(token); err != nil {
+					w.WriteHeader(403)
+					w.Write([]byte("Invalid token")) // nolint: errcheck
 					return
 				}
 

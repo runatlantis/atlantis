@@ -311,9 +311,12 @@ func (g *GithubAppWorkingDir) Clone(log *logging.SimpleLogger, baseRepo models.R
 	}
 
 	// https://developer.github.com/apps/building-github-apps/authenticating-with-github-apps/#http-based-git-access-by-an-installation
-	if err := WriteGitCreds("x-access-token", token, g.GithubHostname, home, log); err != nil {
+	if err := WriteGitCreds("x-access-token", token, g.GithubHostname, home, log, true); err != nil {
 		return "", false, err
 	}
 
+	authURL := fmt.Sprintf("://x-access-token:%s", token)
+	baseRepo.CloneURL = strings.Replace(baseRepo.CloneURL, "://:", authURL, 1)
+	headRepo.CloneURL = strings.Replace(headRepo.CloneURL, "://:", authURL, 1)
 	return g.WorkingDir.Clone(log, baseRepo, headRepo, p, workspace)
 }
