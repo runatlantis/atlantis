@@ -344,3 +344,11 @@ func TestClient_PullIsMergeable(t *testing.T) {
 	}
 
 }
+
+func TestClient_MarkdownPullLink(t *testing.T) {
+	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
+	pull := models.PullRequest{Num: 1}
+	s, _ := client.MarkdownPullLink(pull)
+	exp := "#1"
+	Equals(t, exp, s)
+}

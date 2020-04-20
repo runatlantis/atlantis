@@ -293,6 +293,11 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
 	return nil
 }
 
+// MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.
+func (g *AzureDevopsClient) MarkdownPullLink(pull models.PullRequest) (string, error) {
+	return fmt.Sprintf("!%d", pull.Num), nil
+}
+
 // SplitAzureDevopsRepoFullName splits a repo full name up into its owner,
 // repo and project name segments. If the repoFullName is malformed, may
 // return empty strings for owner, repo, or project.  Azure DevOps uses

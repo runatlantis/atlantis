@@ -196,6 +196,11 @@ func (b *Client) MergePull(pull models.PullRequest) error {
 	return err
 }
 
+// MarkdownPullLink specifies the character used in a pull request comment.
+func (b *Client) MarkdownPullLink(pull models.PullRequest) (string, error) {
+	return fmt.Sprintf("#%d", pull.Num), nil
+}
+
 // prepRequest adds auth and necessary headers.
 func (b *Client) prepRequest(method string, path string, body io.Reader) (*http.Request, error) {
 	req, err := http.NewRequest(method, path, body)
