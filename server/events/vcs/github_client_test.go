@@ -764,6 +764,15 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 	}
 }
 
+func TestGithubClient_MarkdownPullLink(t *testing.T) {
+	client, err := vcs.NewGithubClient("hostname", "user", "pass")
+	Ok(t, err)
+	pull := models.PullRequest{Num: 1}
+	s, _ := client.MarkdownPullLink(pull)
+	exp := "#1"
+	Equals(t, exp, s)
+}
+
 // disableSSLVerification disables ssl verification for the global http client
 // and returns a function to be called in a defer that will re-enable it.
 func disableSSLVerification() func() {
