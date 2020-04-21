@@ -425,6 +425,10 @@ func (e *EventParser) ParseGithubPullEvent(pullEvent *github.PullRequestEvent) (
 		switch pullEvent.GetAction() {
 		case "opened":
 			pullEventType = models.OpenedPullEvent
+		case "ready_for_review":
+			// when an author takes a PR out of 'draft' state a 'ready_for_review'
+			// event is triggered. We want atlantis to treat this as a freshly opened PR
+			pullEventType = models.OpenedPullEvent
 		case "synchronize":
 			pullEventType = models.UpdatedPullEvent
 		case "closed":

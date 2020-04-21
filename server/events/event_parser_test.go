@@ -215,6 +215,10 @@ func TestParseGithubPullEvent_EventType(t *testing.T) {
 			action: "reopened",
 			exp:    models.OtherPullEvent,
 		},
+		{
+			action: "ready_for_review",
+			exp:    models.OpenedPullEvent,
+		},
 	}
 
 	for _, c := range cases {
