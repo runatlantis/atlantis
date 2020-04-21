@@ -160,6 +160,16 @@ func TestParseGithubPullEvent(t *testing.T) {
 	Equals(t, models.User{Username: "user"}, actUser)
 }
 
+func TestParseGithubPullEventFromDraft(t *testing.T) {
+	// verify that draft PRs are treated as 'other' events
+	testEvent := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
+	draftPR := true
+	testEvent.PullRequest.Draft = &draftPR
+	_, evType, _, _, _, err := parser.ParseGithubPullEvent(&testEvent)
+	Ok(t, err)
+	Equals(t, models.OtherPullEvent, evType)
+}
+
 func TestParseGithubPullEvent_EventType(t *testing.T) {
 	cases := []struct {
 		action string
@@ -204,6 +214,10 @@ func TestParseGithubPullEvent_EventType(t *testing.T) {
 		{
 			action: "reopened",
 			exp:    models.OtherPullEvent,
+		},
+		{
+			action: "ready_for_review",
+			exp:    models.OpenedPullEvent,
 		},
 	}
 
