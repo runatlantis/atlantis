@@ -273,6 +273,8 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		projectCmds, err = c.ProjectCommandBuilder.BuildPlanCommands(ctx, cmd)
 	case models.ApplyCommand:
 		projectCmds, err = c.ProjectCommandBuilder.BuildApplyCommands(ctx, cmd)
+	case models.DiscardCommand:
+		projectCmds, err = c.ProjectCommandBuilder.BuildDiscardCommands(ctx, cmd)
 	default:
 		ctx.Log.Err("failed to determine desired command, neither plan nor apply")
 		return
@@ -302,6 +304,14 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		c.deletePlans(ctx)
 		result.PlansDeleted = true
 	}
+
+	// If this was a successful discard command, delete plans anyway
+	if cmd.Name == models.DiscardCommand && !result.HasErrors() {
+		c.deletePlans(ctx)
+		result.PlansDeleted = true
+	}
+
+	// TODO: check here for updating PR with discard
 	c.updatePull(
 		ctx,
 		cmd,
@@ -425,6 +435,8 @@ func (c *DefaultCommandRunner) runProjectCmds(cmds []models.ProjectCommandContex
 			res = c.ProjectCommandRunner.Plan(pCmd)
 		case models.ApplyCommand:
 			res = c.ProjectCommandRunner.Apply(pCmd)
+		case models.DiscardCommand:
+			res = c.ProjectCommandRunner.Discard(pCmd)
 		}
 		results = append(results, res)
 	}

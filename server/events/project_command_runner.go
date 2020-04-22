@@ -87,6 +87,8 @@ type ProjectCommandRunner interface {
 	Plan(ctx models.ProjectCommandContext) models.ProjectResult
 	// Apply runs terraform apply for the project described by ctx.
 	Apply(ctx models.ProjectCommandContext) models.ProjectResult
+	// Discard discards the plan for project described by ctx.
+	Discard(ctx models.ProjectCommandContext) models.ProjectResult
 }
 
 // DefaultProjectCommandRunner implements ProjectCommandRunner.
@@ -96,6 +98,7 @@ type DefaultProjectCommandRunner struct {
 	InitStepRunner      StepRunner
 	PlanStepRunner      StepRunner
 	ApplyStepRunner     StepRunner
+	DiscardStepRunner   StepRunner
 	RunStepRunner       CustomStepRunner
 	EnvStepRunner       EnvStepRunner
 	PullApprovedChecker runtime.PullApprovedChecker
@@ -129,6 +132,20 @@ func (p *DefaultProjectCommandRunner) Apply(ctx models.ProjectCommandContext) mo
 		RepoRelDir:   ctx.RepoRelDir,
 		Workspace:    ctx.Workspace,
 		ProjectName:  ctx.ProjectName,
+	}
+}
+
+// Discard deletes the atlantis plan and discards the lock for the project described by ctx.
+func (p *DefaultProjectCommandRunner) Discard(ctx models.ProjectCommandContext) models.ProjectResult {
+	discardOut, failure, err := p.doDiscard(ctx)
+	return models.ProjectResult{
+		Command:        models.PlanCommand,
+		Error:          err,
+		Failure:        failure,
+		DiscardSuccess: discardOut,
+		RepoRelDir:     ctx.RepoRelDir,
+		Workspace:      ctx.Workspace,
+		ProjectName:    ctx.ProjectName,
 	}
 }
 
@@ -176,6 +193,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 		TerraformOutput: strings.Join(outputs, "\n"),
 		RePlanCmd:       ctx.RePlanCmd,
 		ApplyCmd:        ctx.ApplyCmd,
+		DiscardCmd:      ctx.DiscardCmd,
 		HasDiverged:     hasDiverged,
 	}, "", nil
 }
@@ -262,4 +280,69 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 		return "", "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
 	}
 	return strings.Join(outputs, "\n"), "", nil
+}
+
+func (p *DefaultProjectCommandRunner) doDiscard(ctx models.ProjectCommandContext) (discardOut string, failure string, err error) {
+	// Definitely need this to prevent applying. But need to do something more to
+	// Lead to generation of message: plan is required
+	//if err := p.WorkingDir.Delete(ctx.BaseRepo, ctx.Pull); err != nil {
+	//	return "", "", errors.Wrap(err, "cleaning workspace")
+	//}
+
+	// TryLock is idembpotent so OK to run even if lock already exists - which will normally be the case
+	// TODO try to expose a method to identify if a lock is there to begin with, if not error
+	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.BaseRepo.FullName, ctx.RepoRelDir))
+	ctx.Log.Err("discard: attempting to lock")
+	if err != nil {
+		ctx.Log.Err("discard: failed to lock: %v", err)
+		return "", "", errors.Wrap(err, "acquiring lock")
+	}
+
+	if !lockAttempt.LockAcquired {
+		return "", lockAttempt.LockFailureReason, nil
+	}
+	ctx.Log.Debug("discard: acquired lock for project")
+	ctx.Log.Debug("discard: attempting to unlock project")
+	if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
+		ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+	}
+
+	/*
+		if ctx.BaseRepo != (models.Repo{}) {
+			unlock, err := p.WorkingDirLocker.TryLock(ctx.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace)
+			if err != nil {
+				ctx.Log.Err("unable to obtain working dir lock when trying to delete plans: %s", err)
+			} else {
+				defer unlock()
+				// nolint: vetshadow
+				if err := p.WorkingDir.DeleteForWorkspace(ctx.BaseRepo, ctx.Pull, ctx.Workspace); err != nil {
+					ctx.Log.Err("unable to delete workspace: %s", err)
+				}
+			}
+
+				if err := p.DB.DeleteProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path); err != nil {
+					l.Logger.Err("unable to delete project status: %s", err)
+				}
+
+				// Once the lock has been deleted, comment back on the pull request.
+				comment := fmt.Sprintf("**Warning**: The plan for dir: `%s` workspace: `%s` was **discarded** via the Atlantis UI.\n\n"+
+					"To `apply` this plan you must run `plan` again.", lock.Project.Path, lock.Workspace)
+				err = l.VCSClient.CreateComment(lock.Pull.BaseRepo, lock.Pull.Num, comment)
+				if err != nil {
+					l.respond(w, logging.Error, http.StatusInternalServerError, "Failed commenting on pull request: %s", err)
+					return
+				}
+
+		}
+	*/
+
+	return "discard successful", "", nil
+
+	// Finally, delete locks. We do this last because when someone
+	// unlocks a project, right now we don't actually delete the plan
+	// so we might have plans laying around but no locks.
+	//locks, err := p.Locker(repo.FullName, pull.Num)
+	//if err != nil {
+	//	return nil, "", errors.Wrap(err, "cleaning up locks")
+	//}
 }

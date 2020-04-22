@@ -316,6 +316,9 @@ type ProjectCommandContext struct {
 	AutoplanEnabled bool
 	// BaseRepo is the repository that the pull request will be merged into.
 	BaseRepo Repo
+	// DiscardCmd is the command that users should run to discard a plan.
+	// If this is an apply then this will be empty.
+	DiscardCmd string
 	// EscapedCommentArgs are the extra arguments that were added to the atlantis
 	// command, ex. atlantis plan -- -target=resource. We then escape them
 	// by adding a \ before each character so that they can be used within
@@ -375,14 +378,15 @@ func SplitRepoFullName(repoFullName string) (owner string, repo string) {
 
 // ProjectResult is the result of executing a plan/apply for a specific project.
 type ProjectResult struct {
-	Command      CommandName
-	RepoRelDir   string
-	Workspace    string
-	Error        error
-	Failure      string
-	PlanSuccess  *PlanSuccess
-	ApplySuccess string
-	ProjectName  string
+	Command        CommandName
+	RepoRelDir     string
+	Workspace      string
+	Error          error
+	Failure        string
+	PlanSuccess    *PlanSuccess
+	ApplySuccess   string
+	DiscardSuccess string
+	ProjectName    string
 }
 
 // CommitStatus returns the vcs commit status of this project result.
@@ -435,6 +439,8 @@ type PlanSuccess struct {
 	RePlanCmd string
 	// ApplyCmd is the command that users should run to apply this plan.
 	ApplyCmd string
+	// DiscardCmd is the command that users should run to discard this plan.
+	DiscardCmd string
 	// HasDiverged is true if we're using the checkout merge strategy and the
 	// branch we're merging into has been updated since we cloned and merged
 	// it.
@@ -512,6 +518,8 @@ const (
 	ApplyCommand CommandName = iota
 	// PlanCommand is a command to run terraform plan.
 	PlanCommand
+	// DiscardCommand is a command to discard a previous plan as well as the atlantis lock.
+	DiscardCommand
 	// Adding more? Don't forget to update String() below
 )
 
@@ -522,6 +530,8 @@ func (c CommandName) String() string {
 		return "apply"
 	case PlanCommand:
 		return "plan"
+	case DiscardCommand:
+		return "discard"
 	}
 	return ""
 }

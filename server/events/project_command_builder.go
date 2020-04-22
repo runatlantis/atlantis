@@ -46,6 +46,10 @@ type ProjectCommandBuilder interface {
 	// comment doesn't specify one project then there may be multiple commands
 	// to be run.
 	BuildApplyCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error)
+	// BuildDiscardCommands builds project discard commands for ctx and comment. If
+	// comment doesn't specify one project then there may be multiple commands
+	// to be run.
+	BuildDiscardCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error)
 }
 
 // DefaultProjectCommandBuilder implements ProjectCommandBuilder.
@@ -95,6 +99,15 @@ func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *CommandContext, c
 	}
 	pac, err := p.buildProjectApplyCommand(ctx, cmd)
 	return []models.ProjectCommandContext{pac}, err
+}
+
+// See ProjectCommandBuilder.BuildDiscardCommands.
+func (p *DefaultProjectCommandBuilder) BuildDiscardCommands(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+	//if !cmd.IsForSpecificProject() {
+	//	return p.buildDiscardAllCommands(ctx, cmd.Flags, cmd.Verbose)
+	//}
+	pcc, err := p.buildProjectDiscardCommand(ctx, cmd)
+	return []models.ProjectCommandContext{pcc}, err
 }
 
 // buildPlanAllCommands builds plan contexts for all projects we determine were
@@ -251,6 +264,35 @@ func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *CommandCont
 	}
 
 	return p.buildProjectCommandCtx(ctx, models.ApplyCommand, cmd.ProjectName, cmd.Flags, repoDir, repoRelDir, workspace, cmd.Verbose)
+}
+
+// cmd must be for only one project.
+func (p *DefaultProjectCommandBuilder) buildProjectDiscardCommand(ctx *CommandContext, cmd *CommentCommand) (models.ProjectCommandContext, error) {
+	workspace := DefaultWorkspace
+	if cmd.Workspace != "" {
+		workspace = cmd.Workspace
+	}
+
+	var pcc models.ProjectCommandContext
+	ctx.Log.Debug("building plan command")
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.BaseRepo.FullName, ctx.Pull.Num, workspace)
+	if err != nil {
+		return pcc, err
+	}
+	defer unlockFn()
+
+	ctx.Log.Debug("cloning repository")
+	repoDir, _, err := p.WorkingDir.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, workspace)
+	if err != nil {
+		return pcc, err
+	}
+
+	repoRelDir := DefaultRepoRelDir
+	if cmd.RepoRelDir != "" {
+		repoRelDir = cmd.RepoRelDir
+	}
+
+	return p.buildProjectCommandCtx(ctx, models.PlanCommand, cmd.ProjectName, cmd.Flags, repoDir, repoRelDir, workspace, cmd.Verbose)
 }
 
 // buildProjectCommandCtx builds a context for a single project identified

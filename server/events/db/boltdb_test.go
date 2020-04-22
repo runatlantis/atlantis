@@ -623,6 +623,7 @@ func TestPullStatus_UpdateMerge(t *testing.T) {
 					LockURL:         "lock-url",
 					RePlanCmd:       "plan command",
 					ApplyCmd:        "apply command",
+					DiscardCmd:      "discard command",
 				},
 			},
 		})
