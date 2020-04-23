@@ -371,9 +371,9 @@ Commands:
   plan     Runs 'terraform plan' for the changes in this pull request.
            To plan a specific project, use the -d, -w and -p flags.
   apply    Runs 'terraform apply' on all unapplied plans from this pull request.
-		   To only apply a specific plan, use the -d, -w and -p flags.
-  discard  Discards a previous plan as well as the atlantis lock.
-           To discard a specific plan and atlantis lock use the -d flag.
+           To only apply a specific plan, use the -d, -w and -p flags.
+  discard  Discards all plans in this PR as well as the atlantis locks.
+           To discard a specific plan you can use the Atlantis UI.
   help     View help.
 
 Flags:
