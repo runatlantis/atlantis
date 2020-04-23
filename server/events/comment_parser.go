@@ -61,8 +61,6 @@ type CommentBuilder interface {
 	BuildPlanComment(repoRelDir string, workspace string, project string, commentArgs []string) string
 	// BuildApplyComment builds an apply comment for the specified args.
 	BuildApplyComment(repoRelDir string, workspace string, project string) string
-	// BuildDiscardComment builds a discard comment for the specified args.
-	BuildDiscardComment(repoRelDir string, workspace string, project string, commentArgs []string) string
 }
 
 // CommentParser implements CommentParsing
@@ -158,8 +156,8 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		return CommentParseResult{CommentResponse: HelpComment}
 	}
 
-	// Need to have a plan or apply at this point.
-	if !e.stringInSlice(command, []string{models.PlanCommand.String(), models.ApplyCommand.String(), models.DiscardCommand.String()}) {
+	// Need to have a plan, apply or unlock at this point.
+	if !e.stringInSlice(command, []string{models.PlanCommand.String(), models.ApplyCommand.String(), models.UnlockCommand.String()}) {
 		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown command %q.\nRun 'atlantis --help' for usage.\n```", command)}
 	}
 
@@ -188,13 +186,10 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Apply the plan for this directory, relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", fmt.Sprintf("Apply the plan for this project. Refers to the name of the project configured in %s. Cannot be used at same time as workspace or dir flags.", yaml.AtlantisYAMLFilename))
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
-	case models.DiscardCommand.String():
-		name = models.DiscardCommand
-		flagSet = pflag.NewFlagSet(models.DiscardCommand.String(), pflag.ContinueOnError)
+	case models.UnlockCommand.String():
+		name = models.UnlockCommand
+		flagSet = pflag.NewFlagSet(models.UnlockCommand.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(ioutil.Discard)
-		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Switch to this Terraform workspace before planning.")
-		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run plan in relative to root of repo, ex. 'child/dir'.")
-		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", fmt.Sprintf("Which project to discard the plan for. Refers to the name of the project configured in %s. Cannot be used at same time as workspace or dir flags.", yaml.AtlantisYAMLFilename))
 
 	default:
 		return CommentParseResult{CommentResponse: fmt.Sprintf("Error: unknown command %q – this is a bug", command)}
@@ -207,6 +202,9 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nUsage of %s:\n%s\n```", command, flagSet.FlagUsagesWrapped(usagesCols))}
 	}
 	if err != nil {
+		if command == models.UnlockCommand.String() {
+			return CommentParseResult{CommentResponse: UnlockUsage}
+		}
 		return CommentParseResult{CommentResponse: e.errMarkdown(err.Error(), command, flagSet)}
 	}
 
@@ -272,22 +270,6 @@ func (e *CommentParser) BuildPlanComment(repoRelDir string, workspace string, pr
 func (e *CommentParser) BuildApplyComment(repoRelDir string, workspace string, project string) string {
 	flags := e.buildFlags(repoRelDir, workspace, project)
 	return fmt.Sprintf("%s %s%s", atlantisExecutable, models.ApplyCommand.String(), flags)
-}
-
-// BuildDiscardComment builds discard comment for the specified args.
-func (e *CommentParser) BuildDiscardComment(repoRelDir string, workspace string, project string, commentArgs []string) string {
-	flags := e.buildFlags(repoRelDir, workspace, project)
-	commentFlags := ""
-	if len(commentArgs) > 0 {
-		var flagsWithoutQuotes []string
-		for _, f := range commentArgs {
-			f = strings.TrimPrefix(f, "\"")
-			f = strings.TrimSuffix(f, "\"")
-			flagsWithoutQuotes = append(flagsWithoutQuotes, f)
-		}
-		commentFlags = fmt.Sprintf(" -- %s", strings.Join(flagsWithoutQuotes, " "))
-	}
-	return fmt.Sprintf("%s %s%s%s", atlantisExecutable, models.DiscardCommand.String(), flags, commentFlags)
 }
 
 func (e *CommentParser) buildFlags(repoRelDir string, workspace string, project string) string {
@@ -371,9 +353,9 @@ Commands:
   plan     Runs 'terraform plan' for the changes in this pull request.
            To plan a specific project, use the -d, -w and -p flags.
   apply    Runs 'terraform apply' on all unapplied plans from this pull request.
-		   To only apply a specific plan, use the -d, -w and -p flags.
-  discard  Discards a previous plan as well as the atlantis lock.
-           To discard a specific plan and atlantis lock use the -d flag.
+           To only apply a specific plan, use the -d, -w and -p flags.
+  unlock   Removes all atlantis locks and discards all plans for this PR.
+           To unlock a specific plan you can use the Atlantis UI.
   help     View help.
 
 Flags:
@@ -385,3 +367,14 @@ Use "atlantis [command] --help" for more information about a command.` +
 // DidYouMeanAtlantisComment is the comment we add to the pull request when
 // someone runs a command with terraform instead of atlantis.
 var DidYouMeanAtlantisComment = "Did you mean to use `atlantis` instead of `terraform`?"
+
+// UnlockUsage is the comment we add to the pull request when someone runs
+// `atlantis unlock` with flags.
+
+var UnlockUsage = "`Usage of unlock:`\n\n ```cmake\n" +
+	`atlantis unlock	
+
+  Unlocks the entire PR and discards all plans in this PR.
+  Arguments or flags are not supported at the moment.
+  If you need to unlock a specific project please use the atlantis UI.` +
+	"\n```"

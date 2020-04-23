@@ -13,4 +13,3 @@ helm/test-values.yaml
 *.swp
 golangci-lint
 atlantis
-temp.sh

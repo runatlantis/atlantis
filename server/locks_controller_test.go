@@ -143,11 +143,11 @@ func TestDeleteLock_InvalidLockID(t *testing.T) {
 func TestDeleteLock_LockerErr(t *testing.T) {
 	t.Log("If there is an error retrieving the lock, a 500 is returned")
 	RegisterMockTestingT(t)
-	l := mocks.NewMockLocker()
-	When(l.Unlock("id")).ThenReturn(nil, errors.New("err"))
+	dlc := mocks2.NewMockDeleteLockCommand()
+	When(dlc.DeleteLock("id")).ThenReturn(nil, errors.New("err"))
 	lc := server.LocksController{
-		Locker: l,
-		Logger: logging.NewNoopLogger(),
+		DeleteLockCommand: dlc,
+		Logger:            logging.NewNoopLogger(),
 	}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
@@ -159,11 +159,11 @@ func TestDeleteLock_LockerErr(t *testing.T) {
 func TestDeleteLock_None(t *testing.T) {
 	t.Log("If there is no lock at that ID we get a 404")
 	RegisterMockTestingT(t)
-	l := mocks.NewMockLocker()
-	When(l.Unlock("id")).ThenReturn(nil, nil)
+	dlc := mocks2.NewMockDeleteLockCommand()
+	When(dlc.DeleteLock("id")).ThenReturn(nil, nil)
 	lc := server.LocksController{
-		Locker: l,
-		Logger: logging.NewNoopLogger(),
+		DeleteLockCommand: dlc,
+		Logger:            logging.NewNoopLogger(),
 	}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
@@ -175,14 +175,13 @@ func TestDeleteLock_None(t *testing.T) {
 func TestDeleteLock_OldFormat(t *testing.T) {
 	t.Log("If the lock doesn't have BaseRepo set it is deleted successfully")
 	RegisterMockTestingT(t)
-
 	cp := vcsmocks.NewMockClient()
-	l := mocks.NewMockLocker()
-	When(l.Unlock("id")).ThenReturn(&models.ProjectLock{}, nil)
+	dlc := mocks2.NewMockDeleteLockCommand()
+	When(dlc.DeleteLock("id")).ThenReturn(&models.ProjectLock{}, nil)
 	lc := server.LocksController{
-		Locker:    l,
-		Logger:    logging.NewNoopLogger(),
-		VCSClient: cp,
+		DeleteLockCommand: dlc,
+		Logger:            logging.NewNoopLogger(),
+		VCSClient:         cp,
 	}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
@@ -193,50 +192,46 @@ func TestDeleteLock_OldFormat(t *testing.T) {
 }
 
 func TestDeleteLock_CommentFailed(t *testing.T) {
-	t.Log("If the commenting fails we return an error")
+	t.Log("If the commenting fails we still return success")
 	RegisterMockTestingT(t)
-
-	cp := vcsmocks.NewMockClient()
-	workingDir := mocks2.NewMockWorkingDir()
-	workingDirLocker := events.NewDefaultWorkingDirLocker()
-	When(cp.CreateComment(AnyRepo(), AnyInt(), AnyString())).ThenReturn(errors.New("err"))
-	l := mocks.NewMockLocker()
-	When(l.Unlock("id")).ThenReturn(&models.ProjectLock{
+	dlc := mocks2.NewMockDeleteLockCommand()
+	When(dlc.DeleteLock("id")).ThenReturn(&models.ProjectLock{
 		Pull: models.PullRequest{
 			BaseRepo: models.Repo{FullName: "owner/repo"},
 		},
 	}, nil)
+	cp := vcsmocks.NewMockClient()
+	workingDir := mocks2.NewMockWorkingDir()
+	workingDirLocker := events.NewDefaultWorkingDirLocker()
+	When(cp.CreateComment(AnyRepo(), AnyInt(), AnyString())).ThenReturn(errors.New("err"))
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 	db, err := db.New(tmp)
 	Ok(t, err)
 	lc := server.LocksController{
-		Locker:           l,
-		Logger:           logging.NewNoopLogger(),
-		VCSClient:        cp,
-		WorkingDir:       workingDir,
-		WorkingDirLocker: workingDirLocker,
-		DB:               db,
+		DeleteLockCommand: dlc,
+		Logger:            logging.NewNoopLogger(),
+		VCSClient:         cp,
+		WorkingDir:        workingDir,
+		WorkingDirLocker:  workingDirLocker,
+		DB:                db,
 	}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
-	responseContains(t, w, http.StatusInternalServerError, "Failed commenting on pull request: err")
+	responseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
 }
 
 func TestDeleteLock_CommentSuccess(t *testing.T) {
 	t.Log("We should comment back on the pull request if the lock is deleted")
 	RegisterMockTestingT(t)
-
 	cp := vcsmocks.NewMockClient()
-	l := mocks.NewMockLocker()
-	workingDir := mocks2.NewMockWorkingDir()
-	workingDirLocker := events.NewDefaultWorkingDirLocker()
+	dlc := mocks2.NewMockDeleteLockCommand()
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: "owner/repo"},
 	}
-	When(l.Unlock("id")).ThenReturn(&models.ProjectLock{
+	When(dlc.DeleteLock("id")).ThenReturn(&models.ProjectLock{
 		Pull:      pull,
 		Workspace: "workspace",
 		Project: models.Project{
@@ -249,12 +244,10 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	db, err := db.New(tmp)
 	Ok(t, err)
 	lc := server.LocksController{
-		Locker:           l,
-		Logger:           logging.NewNoopLogger(),
-		VCSClient:        cp,
-		WorkingDirLocker: workingDirLocker,
-		WorkingDir:       workingDir,
-		DB:               db,
+		DeleteLockCommand: dlc,
+		Logger:            logging.NewNoopLogger(),
+		VCSClient:         cp,
+		DB:                db,
 	}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
@@ -264,5 +257,4 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	cp.VerifyWasCalled(Once()).CreateComment(pull.BaseRepo, pull.Num,
 		"**Warning**: The plan for dir: `path` workspace: `workspace` was **discarded** via the Atlantis UI.\n\n"+
 			"To `apply` this plan you must run `plan` again.")
-	workingDir.VerifyWasCalledOnce().DeleteForWorkspace(pull.BaseRepo, pull, "workspace")
 }

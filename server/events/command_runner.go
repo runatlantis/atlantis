@@ -105,6 +105,7 @@ type DefaultCommandRunner struct {
 	WorkingDir        WorkingDir
 	DB                *db.BoltDB
 	Drainer           *Drainer
+	DeleteLockCommand DeleteLockCommand
 }
 
 // RunAutoplanCommand runs plan when a pull request is opened or updated.
@@ -247,6 +248,19 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
+	if cmd.Name == models.UnlockCommand {
+		vcsMessage := "All Atlantis locks for this PR have been unlocked and plans discarded"
+		err := c.DeleteLockCommand.DeleteLocksByPull(baseRepo.FullName, pullNum)
+		if err != nil {
+			vcsMessage = "Failed to delete PR locks"
+			log.Err("failed to delete locks by pull %s", err.Error())
+		}
+		if commentErr := c.VCSClient.CreateComment(baseRepo, pullNum, vcsMessage); commentErr != nil {
+			log.Err("unable to comment: %s", commentErr)
+		}
+		return
+	}
+
 	if cmd.CommandName() == models.ApplyCommand {
 		// Get the mergeable status before we set any build statuses of our own.
 		// We do this here because when we set a "Pending" status, if users have
@@ -273,8 +287,6 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		projectCmds, err = c.ProjectCommandBuilder.BuildPlanCommands(ctx, cmd)
 	case models.ApplyCommand:
 		projectCmds, err = c.ProjectCommandBuilder.BuildApplyCommands(ctx, cmd)
-	case models.DiscardCommand:
-		projectCmds, err = c.ProjectCommandBuilder.BuildDiscardCommands(ctx, cmd)
 	default:
 		ctx.Log.Err("failed to determine desired command, neither plan nor apply")
 		return
@@ -305,13 +317,6 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		result.PlansDeleted = true
 	}
 
-	// If this was a successful discard command, delete plans anyway
-	if cmd.Name == models.DiscardCommand && !result.HasErrors() {
-		c.deletePlans(ctx)
-		result.PlansDeleted = true
-	}
-
-	// TODO: check here for updating PR with discard
 	c.updatePull(
 		ctx,
 		cmd,
@@ -435,8 +440,6 @@ func (c *DefaultCommandRunner) runProjectCmds(cmds []models.ProjectCommandContex
 			res = c.ProjectCommandRunner.Plan(pCmd)
 		case models.ApplyCommand:
 			res = c.ProjectCommandRunner.Apply(pCmd)
-		case models.DiscardCommand:
-			res = c.ProjectCommandRunner.Discard(pCmd)
 		}
 		results = append(results, res)
 	}

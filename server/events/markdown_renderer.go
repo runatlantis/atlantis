@@ -24,9 +24,8 @@ import (
 )
 
 const (
-	planCommandTitle    = "Plan"
-	applyCommandTitle   = "Apply"
-	discardCommandTitle = "Discard"
+	planCommandTitle  = "Plan"
+	applyCommandTitle = "Apply"
 	// maxUnwrappedLines is the maximum number of lines the Terraform output
 	// can be before we wrap it in an expandable template.
 	maxUnwrappedLines = 12
@@ -144,9 +143,6 @@ func (m *MarkdownRenderer) renderProjectResults(results []models.ProjectResult, 
 			} else {
 				resultData.Rendered = m.renderTemplate(applyUnwrappedSuccessTmpl, struct{ Output string }{result.ApplySuccess})
 			}
-
-		} else if result.DiscardSuccess != "" {
-			resultData.Rendered = m.renderTemplate(discardUnwrappedSuccessTmpl, struct{ Output string }{result.DiscardSuccess})
 		} else {
 			resultData.Rendered = "Found no template. This is a bug!"
 		}
@@ -159,8 +155,6 @@ func (m *MarkdownRenderer) renderProjectResults(results []models.ProjectResult, 
 		tmpl = singleProjectPlanSuccessTmpl
 	case len(resultsTmplData) == 1 && common.Command == planCommandTitle && numPlanSuccesses == 0:
 		tmpl = singleProjectPlanUnsuccessfulTmpl
-	case len(resultsTmplData) == 1 && common.Command == discardCommandTitle:
-		tmpl = singleProjectDiscardTmpl
 	case len(resultsTmplData) == 1 && common.Command == applyCommandTitle:
 		tmpl = singleProjectApplyTmpl
 	case common.Command == planCommandTitle:
@@ -210,12 +204,12 @@ var singleProjectPlanSuccessTmpl = template.Must(template.New("").Parse(
 		"\n" +
 		"{{ if ne .DisableApplyAll true  }}---\n" +
 		"* :fast_forward: To **apply** all unapplied plans from this pull request, comment:\n" +
-		"    * `atlantis apply`{{ end }}" + logTmpl))
+		"    * `atlantis apply`\n" +
+		"* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:\n" +
+		"    * `atlantis unlock`{{ end }}" + logTmpl))
 var singleProjectPlanUnsuccessfulTmpl = template.Must(template.New("").Parse(
 	"{{$result := index .Results 0}}Ran {{.Command}} for dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n" +
 		"{{$result.Rendered}}\n" + logTmpl))
-var singleProjectDiscardTmpl = template.Must(template.New("").Parse(
-	"{{$result := index .Results 0}}Ran {{.Command}} for {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" + logTmpl))
 var multiProjectPlanTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
 	"Ran {{.Command}} for {{ len .Results }} projects:\n\n" +
 		"{{ range $result := .Results }}" +
@@ -225,7 +219,10 @@ var multiProjectPlanTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap
 		"### {{add $i 1}}. {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n" +
 		"{{$result.Rendered}}\n\n" +
 		"{{ if ne $disableApplyAll true }}---\n{{end}}{{end}}{{ if ne .DisableApplyAll true }}{{ if and (gt (len .Results) 0) (not .PlansDeleted) }}* :fast_forward: To **apply** all unapplied plans from this pull request, comment:\n" +
-		"    * `atlantis apply`{{end}}{{end}}" +
+		"    * `atlantis apply`\n" +
+		"* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:\n" +
+		"    * `atlantis unlock`" +
+		"{{end}}{{end}}" +
 		logTmpl))
 var multiProjectApplyTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
 	"Ran {{.Command}} for {{ len .Results }} projects:\n\n" +
@@ -256,8 +253,7 @@ var planSuccessWrappedTmpl = template.Must(template.New("").Parse(
 // to do next.
 var planNextSteps = "{{ if .PlanWasDeleted }}This plan was not saved because one or more projects failed and automerge requires all plans pass.{{ else }}* :arrow_forward: To **apply** this plan, comment:\n" +
 	"    * `{{.ApplyCmd}}`\n" +
-	"* :put_litter_in_its_place: To **delete** this plan click [here]({{.LockURL}}), or comment:\n" +
-	"    * `{{.DiscardCmd}}`\n" +
+	"* :put_litter_in_its_place: To **delete** this plan click [here]({{.LockURL}})\n" +
 	"* :repeat: To **plan** this project again, comment:\n" +
 	"    * `{{.RePlanCmd}}`{{end}}"
 var applyUnwrappedSuccessTmpl = template.Must(template.New("").Parse(
@@ -270,10 +266,6 @@ var applyWrappedSuccessTmpl = template.Must(template.New("").Parse(
 		"{{.Output}}\n" +
 		"```\n" +
 		"</details>"))
-var discardUnwrappedSuccessTmpl = template.Must(template.New("").Parse(
-	"```diff\n" +
-		"{{.Output}}\n" +
-		"```"))
 var unwrappedErrTmplText = "**{{.Command}} Error**\n" +
 	"```\n" +
 	"{{.Error}}\n" +
