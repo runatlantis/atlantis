@@ -273,7 +273,8 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 
 	c.updateCommitStatus(ctx, cmd.Name, pullStatus)
 
-	if cmd.Name == models.ApplyCommand && c.automergeEnabled(ctx, projectCmds) {
+	// Do not automerge if no commands were executed at all, or if there have been errors
+	if cmd.Name == models.ApplyCommand && c.automergeEnabled(ctx, projectCmds) && len(projectCmds) > 0 && !result.HasErrors() {
 		c.automerge(ctx, pullStatus)
 	}
 }
