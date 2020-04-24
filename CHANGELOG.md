@@ -38,7 +38,7 @@ a host of other small features and fags.
 [`runatlantis/atlantis:v0.12.0`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
 
 ## Diff v0.11.1..v0.12.0
-https://github.com/runatlantis/atlantis/compare/v0.11.0...v0.11.1
+https://github.com/runatlantis/atlantis/compare/v0.11.0...v0.12.0
 
 # v0.11.1
 
