@@ -64,6 +64,7 @@ const (
 	GitlabWebhookSecretFlag    = "gitlab-webhook-secret" // nolint: gosec
 	HidePrevPlanComments       = "hide-prev-plan-comments"
 	LogLevelFlag               = "log-level"
+	PlanDrafts                 = "plan-drafts"
 	PortFlag                   = "port"
 	RepoConfigFlag             = "repo-config"
 	RepoConfigJSONFlag         = "repo-config-json"
@@ -256,6 +257,10 @@ var boolFlags = map[string]boolFlag{
 	HidePrevPlanComments: {
 		description: "Hide previous plan comments to reduce clutter in the PR. " +
 			"VCS support is limited to: GitHub.",
+		defaultValue: false,
+	},
+	PlanDrafts: {
+		description:  "Enable autoplan for Github Draft Pull Requests",
 		defaultValue: false,
 	},
 	RequireApprovalFlag: {

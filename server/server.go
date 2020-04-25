@@ -290,6 +290,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubToken:        userConfig.GithubToken,
 		GitlabUser:         userConfig.GitlabUser,
 		GitlabToken:        userConfig.GitlabToken,
+		PlanDrafts:         userConfig.PlanDrafts,
 		BitbucketUser:      userConfig.BitbucketUser,
 		BitbucketToken:     userConfig.BitbucketToken,
 		BitbucketServerURL: userConfig.BitbucketBaseURL,
