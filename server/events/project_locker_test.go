@@ -21,14 +21,17 @@ import (
 	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
+	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 func TestDefaultProjectLocker_TryLockWhenLocked(t *testing.T) {
 	mockLocker := mocks.NewMockLocker()
+	mockClient := vcsmocks.NewMockClient()
 	locker := events.DefaultProjectLocker{
-		Locker: mockLocker,
+		Locker:    mockLocker,
+		VCSClient: mockClient,
 	}
 	expProject := models.Project{}
 	expWorkspace := "default"
@@ -58,8 +61,10 @@ func TestDefaultProjectLocker_TryLockWhenLocked(t *testing.T) {
 
 func TestDefaultProjectLocker_TryLockWhenLockedAzureDevops(t *testing.T) {
 	mockLocker := mocks.NewMockLocker()
+	mockClient := vcsmocks.NewMockClient()
 	locker := events.DefaultProjectLocker{
-		Locker: mockLocker,
+		Locker:    mockLocker,
+		VCSClient: mockClient,
 	}
 	expProject := models.Project{}
 	expWorkspace := "default"
@@ -96,8 +101,10 @@ func TestDefaultProjectLocker_TryLockWhenLockedAzureDevops(t *testing.T) {
 func TestDefaultProjectLocker_TryLockWhenLockedSamePull(t *testing.T) {
 	RegisterMockTestingT(t)
 	mockLocker := mocks.NewMockLocker()
+	mockClient := vcsmocks.NewMockClient()
 	locker := events.DefaultProjectLocker{
-		Locker: mockLocker,
+		Locker:    mockLocker,
+		VCSClient: mockClient,
 	}
 	expProject := models.Project{}
 	expWorkspace := "default"
@@ -132,8 +139,10 @@ func TestDefaultProjectLocker_TryLockWhenLockedSamePull(t *testing.T) {
 func TestDefaultProjectLocker_TryLockUnlocked(t *testing.T) {
 	RegisterMockTestingT(t)
 	mockLocker := mocks.NewMockLocker()
+	mockClient := vcsmocks.NewMockClient()
 	locker := events.DefaultProjectLocker{
-		Locker: mockLocker,
+		Locker:    mockLocker,
+		VCSClient: mockClient,
 	}
 	expProject := models.Project{}
 	expWorkspace := "default"
