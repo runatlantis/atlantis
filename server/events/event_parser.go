@@ -266,6 +266,7 @@ type EventParser struct {
 	GithubToken        string
 	GitlabUser         string
 	GitlabToken        string
+	PlanDrafts         bool
 	BitbucketUser      string
 	BitbucketToken     string
 	BitbucketServerURL string
@@ -417,7 +418,7 @@ func (e *EventParser) ParseGithubPullEvent(pullEvent *github.PullRequestEvent) (
 		return
 	}
 
-	if pullEvent.GetPullRequest().GetDraft() {
+	if !e.PlanDrafts && pullEvent.GetPullRequest().GetDraft() {
 		// if the PR is in draft state we don't care about the action type
 		// we can set the type to Other and ignore the PR
 		pullEventType = models.OtherPullEvent

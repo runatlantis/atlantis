@@ -36,6 +36,7 @@ var parser = events.EventParser{
 	GithubToken:        "github-token",
 	GitlabUser:         "gitlab-user",
 	GitlabToken:        "gitlab-token",
+	PlanDrafts:         false,
 	BitbucketUser:      "bitbucket-user",
 	BitbucketToken:     "bitbucket-token",
 	BitbucketServerURL: "http://mycorp.com:7490",
@@ -161,13 +162,18 @@ func TestParseGithubPullEvent(t *testing.T) {
 }
 
 func TestParseGithubPullEventFromDraft(t *testing.T) {
-	// verify that draft PRs are treated as 'other' events
+	// verify that draft PRs are treated as 'other' events by default
 	testEvent := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
 	draftPR := true
 	testEvent.PullRequest.Draft = &draftPR
 	_, evType, _, _, _, err := parser.ParseGithubPullEvent(&testEvent)
 	Ok(t, err)
 	Equals(t, models.OtherPullEvent, evType)
+	// verify that drafts are planned if requested
+	parser.PlanDrafts = true
+	_, evType, _, _, _, err = parser.ParseGithubPullEvent(&testEvent)
+	Ok(t, err)
+	Equals(t, models.OpenedPullEvent, evType)
 }
 
 func TestParseGithubPullEvent_EventType(t *testing.T) {
