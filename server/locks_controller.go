@@ -108,8 +108,8 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 				l.Logger.Err("unable to delete workspace: %s", err)
 			}
 		}
-		if err := l.DB.DeleteProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path); err != nil {
-			l.Logger.Err("unable to delete project status: %s", err)
+		if err := l.DB.UpdateProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path, models.NotPlannedPlanStatus); err != nil {
+			l.Logger.Err("unable to update project status: %s", err)
 		}
 
 		// Once the lock has been deleted, comment back on the pull request.

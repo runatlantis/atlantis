@@ -273,8 +273,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 
 	c.updateCommitStatus(ctx, cmd.Name, pullStatus)
 
-	// Do not automerge if no commands were executed at all, or if there have been errors
-	if cmd.Name == models.ApplyCommand && c.automergeEnabled(ctx, projectCmds) && len(projectCmds) > 0 && !result.HasErrors() {
+	if cmd.Name == models.ApplyCommand && c.automergeEnabled(ctx, projectCmds) {
 		c.automerge(ctx, pullStatus)
 	}
 }
@@ -328,6 +327,7 @@ func (c *DefaultCommandRunner) automerge(ctx *CommandContext, pullStatus models.
 
 	// Make the API call to perform the merge.
 	ctx.Log.Info("automerging pull request")
+
 	err := c.VCSClient.MergePull(ctx.Pull)
 
 	if err != nil {
@@ -338,6 +338,7 @@ func (c *DefaultCommandRunner) automerge(ctx *CommandContext, pullStatus models.
 			ctx.Log.Err("failed to comment about automerge failing: %s", err)
 		}
 	}
+
 }
 
 func (c *DefaultCommandRunner) runProjectCmds(cmds []models.ProjectCommandContext, cmdName models.CommandName) CommandResult {
