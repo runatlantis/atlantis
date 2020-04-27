@@ -31,12 +31,7 @@ import (
 
 func TestDefaultProjectLocker_TryLockWhenLocked(t *testing.T) {
 	var githubClient *vcs.GithubClient
-	var gitlabClient *vcs.GitlabClient
-	var bitbucketCloudClient *bitbucketcloud.Client
-	var bitbucketServerClient *bitbucketserver.Client
-	var azuredevopsClient *vcs.AzureDevopsClient
-
-	mockClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient)
+	mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil)
 	mockLocker := mocks.NewMockLocker()
 	locker := events.DefaultProjectLocker{
 		Locker:    mockLocker,
