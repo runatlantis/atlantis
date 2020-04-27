@@ -14,6 +14,7 @@
 package events_test
 
 import (
+	"fmt"
 	"testing"
 
 	. "github.com/petergtz/pegomock"
@@ -21,14 +22,22 @@ import (
 	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
-	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
+	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
+	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 func TestDefaultProjectLocker_TryLockWhenLocked(t *testing.T) {
+	var githubClient *vcs.GithubClient
+	var gitlabClient *vcs.GitlabClient
+	var bitbucketCloudClient *bitbucketcloud.Client
+	var bitbucketServerClient *bitbucketserver.Client
+	var azuredevopsClient *vcs.AzureDevopsClient
+
+	mockClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient)
 	mockLocker := mocks.NewMockLocker()
-	mockClient := vcsmocks.NewMockClient()
 	locker := events.DefaultProjectLocker{
 		Locker:    mockLocker,
 		VCSClient: mockClient,
@@ -52,56 +61,24 @@ func TestDefaultProjectLocker_TryLockWhenLocked(t *testing.T) {
 		nil,
 	)
 	res, err := locker.TryLock(logging.NewNoopLogger(), expPull, expUser, expWorkspace, expProject)
+	link, _ := mockClient.MarkdownPullLink(lockingPull)
 	Ok(t, err)
 	Equals(t, &events.TryLockResponse{
 		LockAcquired:      false,
-		LockFailureReason: "This project is currently locked by an unapplied plan from pull #2. To continue, delete the lock from #2 or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.",
-	}, res)
-}
-
-func TestDefaultProjectLocker_TryLockWhenLockedAzureDevops(t *testing.T) {
-	mockLocker := mocks.NewMockLocker()
-	mockClient := vcsmocks.NewMockClient()
-	locker := events.DefaultProjectLocker{
-		Locker:    mockLocker,
-		VCSClient: mockClient,
-	}
-	expProject := models.Project{}
-	expWorkspace := "default"
-	expPull := models.PullRequest{
-		BaseRepo: models.Repo{
-			VCSHost: models.VCSHost{
-				Type: models.AzureDevops,
-			},
-		},
-	}
-	expUser := models.User{}
-
-	lockingPull := models.PullRequest{
-		Num: 2,
-	}
-	When(mockLocker.TryLock(expProject, expWorkspace, expPull, expUser)).ThenReturn(
-		locking.TryLockResponse{
-			LockAcquired: false,
-			CurrLock: models.ProjectLock{
-				Pull: lockingPull,
-			},
-			LockKey: "",
-		},
-		nil,
-	)
-	res, err := locker.TryLock(logging.NewNoopLogger(), expPull, expUser, expWorkspace, expProject)
-	Ok(t, err)
-	Equals(t, &events.TryLockResponse{
-		LockAcquired:      false,
-		LockFailureReason: "This project is currently locked by an unapplied plan from pull !2. To continue, delete the lock from !2 or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.",
+		LockFailureReason: fmt.Sprintf("This project is currently locked by an unapplied plan from pull %s. To continue, delete the lock from %s or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.", link, link),
 	}, res)
 }
 
 func TestDefaultProjectLocker_TryLockWhenLockedSamePull(t *testing.T) {
 	RegisterMockTestingT(t)
+	var githubClient *vcs.GithubClient
+	var gitlabClient *vcs.GitlabClient
+	var bitbucketCloudClient *bitbucketcloud.Client
+	var bitbucketServerClient *bitbucketserver.Client
+	var azuredevopsClient *vcs.AzureDevopsClient
+
+	mockClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient)
 	mockLocker := mocks.NewMockLocker()
-	mockClient := vcsmocks.NewMockClient()
 	locker := events.DefaultProjectLocker{
 		Locker:    mockLocker,
 		VCSClient: mockClient,
@@ -138,8 +115,13 @@ func TestDefaultProjectLocker_TryLockWhenLockedSamePull(t *testing.T) {
 
 func TestDefaultProjectLocker_TryLockUnlocked(t *testing.T) {
 	RegisterMockTestingT(t)
+	var githubClient *vcs.GithubClient
+	var gitlabClient *vcs.GitlabClient
+	var bitbucketCloudClient *bitbucketcloud.Client
+	var bitbucketServerClient *bitbucketserver.Client
+	var azuredevopsClient *vcs.AzureDevopsClient
+	mockClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient)
 	mockLocker := mocks.NewMockLocker()
-	mockClient := vcsmocks.NewMockClient()
 	locker := events.DefaultProjectLocker{
 		Locker:    mockLocker,
 		VCSClient: mockClient,
