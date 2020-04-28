@@ -23,8 +23,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
-	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
-	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -67,12 +65,7 @@ func TestDefaultProjectLocker_TryLockWhenLocked(t *testing.T) {
 func TestDefaultProjectLocker_TryLockWhenLockedSamePull(t *testing.T) {
 	RegisterMockTestingT(t)
 	var githubClient *vcs.GithubClient
-	var gitlabClient *vcs.GitlabClient
-	var bitbucketCloudClient *bitbucketcloud.Client
-	var bitbucketServerClient *bitbucketserver.Client
-	var azuredevopsClient *vcs.AzureDevopsClient
-
-	mockClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient)
+	mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil)
 	mockLocker := mocks.NewMockLocker()
 	locker := events.DefaultProjectLocker{
 		Locker:    mockLocker,
@@ -111,11 +104,7 @@ func TestDefaultProjectLocker_TryLockWhenLockedSamePull(t *testing.T) {
 func TestDefaultProjectLocker_TryLockUnlocked(t *testing.T) {
 	RegisterMockTestingT(t)
 	var githubClient *vcs.GithubClient
-	var gitlabClient *vcs.GitlabClient
-	var bitbucketCloudClient *bitbucketcloud.Client
-	var bitbucketServerClient *bitbucketserver.Client
-	var azuredevopsClient *vcs.AzureDevopsClient
-	mockClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient)
+	mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil)
 	mockLocker := mocks.NewMockLocker()
 	locker := events.DefaultProjectLocker{
 		Locker:    mockLocker,
