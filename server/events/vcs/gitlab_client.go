@@ -216,6 +216,11 @@ func (g *GitlabClient) MergePull(pull models.PullRequest) error {
 	return errors.Wrap(err, "unable to merge merge request, it may not be in a mergeable state")
 }
 
+// MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.
+func (g *GitlabClient) MarkdownPullLink(pull models.PullRequest) (string, error) {
+	return fmt.Sprintf("#%d", pull.Num), nil
+}
+
 // GetVersion returns the version of the Gitlab server this client is using.
 func (g *GitlabClient) GetVersion() (*version.Version, error) {
 	req, err := g.Client.NewRequest("GET", "/version", nil, nil)

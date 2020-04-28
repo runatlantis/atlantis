@@ -79,3 +79,7 @@ func (d *ClientProxy) UpdateStatus(repo models.Repo, pull models.PullRequest, st
 func (d *ClientProxy) MergePull(pull models.PullRequest) error {
 	return d.clients[pull.BaseRepo.VCSHost.Type].MergePull(pull)
 }
+
+func (d *ClientProxy) MarkdownPullLink(pull models.PullRequest) (string, error) {
+	return d.clients[pull.BaseRepo.VCSHost.Type].MarkdownPullLink(pull)
+}

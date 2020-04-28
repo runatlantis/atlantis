@@ -245,7 +245,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CheckoutMerge: userConfig.CheckoutStrategy == "merge",
 	}
 	projectLocker := &events.DefaultProjectLocker{
-		Locker: lockingClient,
+		Locker:    lockingClient,
+		VCSClient: vcsClient,
 	}
 	parsedURL, err := ParseAtlantisURL(userConfig.AtlantisURL)
 	if err != nil {

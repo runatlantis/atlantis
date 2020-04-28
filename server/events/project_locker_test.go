@@ -14,6 +14,7 @@
 package events_test
 
 import (
+	"fmt"
 	"testing"
 
 	. "github.com/petergtz/pegomock"
@@ -21,14 +22,18 @@ import (
 	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 func TestDefaultProjectLocker_TryLockWhenLocked(t *testing.T) {
+	var githubClient *vcs.GithubClient
+	mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil)
 	mockLocker := mocks.NewMockLocker()
 	locker := events.DefaultProjectLocker{
-		Locker: mockLocker,
+		Locker:    mockLocker,
+		VCSClient: mockClient,
 	}
 	expProject := models.Project{}
 	expWorkspace := "default"
@@ -49,18 +54,22 @@ func TestDefaultProjectLocker_TryLockWhenLocked(t *testing.T) {
 		nil,
 	)
 	res, err := locker.TryLock(logging.NewNoopLogger(), expPull, expUser, expWorkspace, expProject)
+	link, _ := mockClient.MarkdownPullLink(lockingPull)
 	Ok(t, err)
 	Equals(t, &events.TryLockResponse{
 		LockAcquired:      false,
-		LockFailureReason: "This project is currently locked by an unapplied plan from pull #2. To continue, delete the lock from #2 or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.",
+		LockFailureReason: fmt.Sprintf("This project is currently locked by an unapplied plan from pull %s. To continue, delete the lock from %s or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.", link, link),
 	}, res)
 }
 
 func TestDefaultProjectLocker_TryLockWhenLockedSamePull(t *testing.T) {
 	RegisterMockTestingT(t)
+	var githubClient *vcs.GithubClient
+	mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil)
 	mockLocker := mocks.NewMockLocker()
 	locker := events.DefaultProjectLocker{
-		Locker: mockLocker,
+		Locker:    mockLocker,
+		VCSClient: mockClient,
 	}
 	expProject := models.Project{}
 	expWorkspace := "default"
@@ -94,9 +103,12 @@ func TestDefaultProjectLocker_TryLockWhenLockedSamePull(t *testing.T) {
 
 func TestDefaultProjectLocker_TryLockUnlocked(t *testing.T) {
 	RegisterMockTestingT(t)
+	var githubClient *vcs.GithubClient
+	mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil)
 	mockLocker := mocks.NewMockLocker()
 	locker := events.DefaultProjectLocker{
-		Locker: mockLocker,
+		Locker:    mockLocker,
+		VCSClient: mockClient,
 	}
 	expProject := models.Project{}
 	expWorkspace := "default"
