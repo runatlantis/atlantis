@@ -30,6 +30,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/mitchellh/go-homedir"
 	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
@@ -113,6 +114,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	logger := logging.NewSimpleLogger("server", false, userConfig.ToLogLevel())
 	var supportedVCSHosts []models.VCSHostType
 	var githubClient *vcs.GithubClient
+	var githubTokenSource *ghinstallation.Transport
 	var gitlabClient *vcs.GitlabClient
 	var bitbucketCloudClient *bitbucketcloud.Client
 	var bitbucketServerClient *bitbucketserver.Client
@@ -120,10 +122,18 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if userConfig.GithubUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		var err error
-		githubClient, err = vcs.NewGithubClient(userConfig.GithubHostname, userConfig.GithubUser, userConfig.GithubToken)
+		githubClient, err = vcs.NewGithubClient(
+			userConfig.GithubHostname,
+			userConfig.GithubUser,
+			userConfig.GithubToken,
+			userConfig.GithubAppPrivateKeyPath,
+			userConfig.GithubAppIntegrationId,
+			userConfig.GithubAppInstallationId)
 		if err != nil {
 			return nil, err
 		}
+
+		githubTokenSource = githubClient.GetTokenSource()
 	}
 	if userConfig.GitlabUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Gitlab)
@@ -285,6 +295,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	eventParser := &events.EventParser{
 		GithubUser:         userConfig.GithubUser,
 		GithubToken:        userConfig.GithubToken,
+		GithubTokenSource:  githubTokenSource,
 		GitlabUser:         userConfig.GitlabUser,
 		GitlabToken:        userConfig.GitlabToken,
 		BitbucketUser:      userConfig.BitbucketUser,

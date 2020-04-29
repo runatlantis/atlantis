@@ -14,12 +14,14 @@
 package events
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/url"
 	"path"
 	"strings"
 
+	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/google/go-github/v28/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
@@ -264,6 +266,7 @@ type EventParsing interface {
 type EventParser struct {
 	GithubUser         string
 	GithubToken        string
+	GithubTokenSource  *ghinstallation.Transport
 	GitlabUser         string
 	GitlabToken        string
 	BitbucketUser      string
@@ -508,7 +511,16 @@ func (e *EventParser) ParseGithubPull(pull *github.PullRequest) (pullModel model
 // returns a repo into the Atlantis model.
 // See EventParsing for return value docs.
 func (e *EventParser) ParseGithubRepo(ghRepo *github.Repository) (models.Repo, error) {
-	return models.NewRepo(models.Github, ghRepo.GetFullName(), ghRepo.GetCloneURL(), e.GithubUser, e.GithubToken)
+	if e.GithubTokenSource != nil {
+		accessToken, err := e.GithubTokenSource.Token(context.Background())
+		if err != nil {
+			return models.Repo{}, err
+		}
+
+		return models.NewRepo(models.Github, ghRepo.GetFullName(), ghRepo.GetCloneURL(), "x-access-token", accessToken)
+	} else {
+		return models.NewRepo(models.Github, ghRepo.GetFullName(), ghRepo.GetCloneURL(), e.GithubUser, e.GithubToken)
+	}
 }
 
 // ParseGitlabMergeRequestEvent parses GitLab merge request events.

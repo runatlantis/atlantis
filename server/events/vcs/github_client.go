@@ -16,13 +16,16 @@ package vcs
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 
 	"github.com/Laisky/graphql"
+	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/google/go-github/v28/github"
 	"github.com/pkg/errors"
 	"github.com/shurcooL/githubv4"
@@ -38,15 +41,42 @@ type GithubClient struct {
 	client         *github.Client
 	v4MutateClient *graphql.Client
 	ctx            context.Context
+	jwtTransport   *ghinstallation.Transport
 }
 
 // NewGithubClient returns a valid GitHub client.
-func NewGithubClient(hostname string, user string, pass string) (*GithubClient, error) {
-	tp := github.BasicAuthTransport{
-		Username: strings.TrimSpace(user),
-		Password: strings.TrimSpace(pass),
+func NewGithubClient(hostname string, user string, pass string, privateKeyPath string, appIntegrationId string, appInstallationId string) (*GithubClient, error) {
+	var httpClient *http.Client
+	var jwtTokenTransport *ghinstallation.Transport
+
+	if privateKeyPath != "" && appIntegrationId != "" {
+		installId, err := strconv.ParseInt(appInstallationId, 10, 64)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Invalid App Installation ID. Must be numeric")
+		}
+		integrationId, err := strconv.ParseInt(appIntegrationId, 10, 64)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Invalid App Integration ID. Must be numeric")
+		}
+
+		jwtTokenTransport, err = ghinstallation.NewKeyFromFile(http.DefaultTransport,
+			integrationId,
+			installId,
+			privateKeyPath)
+
+		if err != nil {
+			return nil, errors.Wrapf(err, "Invalid Github App configuration")
+		}
+		httpClient = &http.Client{Transport: jwtTokenTransport}
+	} else {
+		tp := github.BasicAuthTransport{
+			Username: strings.TrimSpace(user),
+			Password: strings.TrimSpace(pass),
+		}
+		httpClient = tp.Client()
 	}
-	client := github.NewClient(tp.Client())
+
+	client := github.NewClient(httpClient)
 	graphqlURL := "https://api.github.com/graphql"
 
 	// If we're using github.com then we don't need to do any additional configuration
@@ -75,7 +105,7 @@ func NewGithubClient(hostname string, user string, pass string) (*GithubClient, 
 	// shurcooL's libraries completely.
 	v4MutateClient := graphql.NewClient(
 		graphqlURL,
-		tp.Client(),
+		httpClient,
 		graphql.WithHeader("Accept", "application/vnd.github.queen-beryl-preview+json"),
 	)
 
@@ -83,8 +113,13 @@ func NewGithubClient(hostname string, user string, pass string) (*GithubClient, 
 		user:           user,
 		client:         client,
 		v4MutateClient: v4MutateClient,
+		jwtTransport:   jwtTokenTransport,
 		ctx:            context.Background(),
 	}, nil
+}
+
+func (g *GithubClient) GetTokenSource() *ghinstallation.Transport {
+	return g.jwtTransport
 }
 
 // GetModifiedFiles returns the names of files that were modified in the pull request
