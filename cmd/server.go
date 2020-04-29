@@ -57,6 +57,9 @@ const (
 	GHHostnameFlag             = "gh-hostname"
 	GHTokenFlag                = "gh-token"
 	GHUserFlag                 = "gh-user"
+	GHAppIntegrationIdFlag     = "gh-app-integration-id"
+	GHAppInstallationIdFlag    = "gh-app-installation-id"
+	GHAppPrivateKeyPathFlag    = "gh-app-private-key-path"
 	GHWebhookSecretFlag        = "gh-webhook-secret" // nolint: gosec
 	GitlabHostnameFlag         = "gitlab-hostname"
 	GitlabTokenFlag            = "gitlab-token"
@@ -162,6 +165,18 @@ var stringFlags = map[string]stringFlag{
 	},
 	GHTokenFlag: {
 		description: "GitHub token of API user. Can also be specified via the ATLANTIS_GH_TOKEN environment variable.",
+	},
+	GHAppInstallationIdFlag: {
+		defaultValue: "",
+		description:  "GitHub application installation id. Can also be specified via the ATLANTIS_GH_APP_INSTALLATION_ID environment variable.",
+	},
+	GHAppPrivateKeyPathFlag: {
+		defaultValue: "",
+		description:  "GitHub private key content from the application. Can also be specified via the ATLANTIS_GH_APP_PRIVATE_KEY_PATH environment variable.",
+	},
+	GHAppIntegrationIdFlag: {
+		defaultValue: "",
+		description:  "GitHub integration ID of the desired application. Can also be specified via the ATLANTIS_GH_APP_INTEGRATION_ID environment variable.",
 	},
 	GHWebhookSecretFlag: {
 		description: "Secret used to validate GitHub webhooks (see https://developer.github.com/webhooks/securing/)." +

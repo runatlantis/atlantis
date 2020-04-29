@@ -27,6 +27,9 @@ type UserConfig struct {
 	GithubHostname             string `mapstructure:"gh-hostname"`
 	GithubToken                string `mapstructure:"gh-token"`
 	GithubUser                 string `mapstructure:"gh-user"`
+	GithubAppInstallationId    string `mapstructure:"gh-app-installation-id"`
+	GithubAppIntegrationId     string `mapstructure:"gh-app-integration-id"`
+	GithubAppPrivateKeyPath    string `mapstructure:"gh-app-private-key-path"`
 	GithubWebhookSecret        string `mapstructure:"gh-webhook-secret"`
 	GitlabHostname             string `mapstructure:"gitlab-hostname"`
 	GitlabToken                string `mapstructure:"gitlab-token"`
