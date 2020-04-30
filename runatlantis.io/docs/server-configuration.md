@@ -16,6 +16,10 @@ All flags can be specified as environment variables.
 1. Prefix with `ATLANTIS_` => `ATLANTIS_GH_USER`
 
 ::: warning NOTE
+To set a boolean flag use `true` or `false` as the value.
+:::
+
+::: warning NOTE
 The flag `--atlantis-url` is set by the environment variable `ATLANTIS_ATLANTIS_URL` **NOT** `ATLANTIS_URL`.
 :::
 
