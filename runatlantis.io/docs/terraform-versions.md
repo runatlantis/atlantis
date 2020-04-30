@@ -24,6 +24,6 @@ terraform {
 See [Terraform `required_version`](https://www.terraform.io/docs/configuration/terraform.html#specifying-a-required-terraform-version) for reference.
 
 ::: tip NOTE
-Atlantis will automatically download the version specified.
+Atlantis will automatically download the version specified into `/usr/local/bin/terraform${ATLANTIS_TERRAFORM_VERSION}`. eg. `/usr/local/bin/terraform0.11.14`
 :::
 
