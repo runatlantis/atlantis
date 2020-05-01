@@ -54,6 +54,7 @@ const (
 	DefaultTFVersionFlag       = "default-tf-version"
 	DisableApplyAllFlag        = "disable-apply-all"
 	DisableMarkdownFoldingFlag = "disable-markdown-folding"
+	ExpensiveInstanceTypeFlag  = "expensive-instances"
 	GHHostnameFlag             = "gh-hostname"
 	GHTokenFlag                = "gh-token"
 	GHUserFlag                 = "gh-user"
@@ -152,6 +153,10 @@ var stringFlags = map[string]stringFlag{
 	DataDirFlag: {
 		description:  "Path to directory to store Atlantis data.",
 		defaultValue: DefaultDataDir,
+	},
+	ExpensiveInstanceTypeFlag: {
+		description: "Comma separated list of VM instance types that, when detected in Terraform output, should warn " +
+			"the user of the cost & encourage alternatives. For example:  c5n.18xlarge,g4dn.2xlarge",
 	},
 	GHHostnameFlag: {
 		description:  "Hostname of your Github Enterprise installation. If using github.com, no need to set.",

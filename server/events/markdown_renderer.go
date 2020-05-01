@@ -14,6 +14,7 @@
 package events
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"strings"
@@ -39,6 +40,7 @@ type MarkdownRenderer struct {
 	GitlabSupportsCommonMark bool
 	DisableApplyAll          bool
 	DisableMarkdownFolding   bool
+	ExpensiveInstanceTypes   []string
 }
 
 // commonData is data that all responses have.
@@ -100,6 +102,25 @@ func (m *MarkdownRenderer) Render(res CommandResult, cmdName models.CommandName,
 	return m.renderProjectResults(res.ProjectResults, common, vcsHost)
 }
 
+func (m *MarkdownRenderer) detectCostViolation(tf string) string {
+	scanner := bufio.NewScanner(strings.NewReader(tf))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "+ instance_type") {
+			// we have found that terraform is creating a new resource with the 'instance_type' field
+			for _, s := range m.ExpensiveInstanceTypes {
+				// we are checking against expensive hosts now
+				if strings.HasSuffix(line, "\""+s+"\"") {
+					// we have found the expensive type
+					return fmt.Sprintf("\n\n**Warning - instance type %s is expensive. Please double check if a cheaper instance can be used.**", s)
+				}
+			}
+		}
+	}
+	//no violations found, return empty string
+	return ""
+}
+
 func (m *MarkdownRenderer) renderProjectResults(results []models.ProjectResult, common commonData, vcsHost models.VCSHostType) string {
 	var resultsTmplData []projectResultTmplData
 	numPlanSuccesses := 0
@@ -135,6 +156,10 @@ func (m *MarkdownRenderer) renderProjectResults(results []models.ProjectResult, 
 				resultData.Rendered = m.renderTemplate(planSuccessWrappedTmpl, planSuccessData{PlanSuccess: *result.PlanSuccess, PlanWasDeleted: common.PlansDeleted})
 			} else {
 				resultData.Rendered = m.renderTemplate(planSuccessUnwrappedTmpl, planSuccessData{PlanSuccess: *result.PlanSuccess, PlanWasDeleted: common.PlansDeleted})
+			}
+			costViolationWarning := m.detectCostViolation(result.PlanSuccess.TerraformOutput)
+			if costViolationWarning != "" {
+				resultData.Rendered = resultData.Rendered + costViolationWarning
 			}
 			numPlanSuccesses++
 		} else if result.ApplySuccess != "" {
@@ -198,6 +223,7 @@ func (m *MarkdownRenderer) renderTemplate(tmpl *template.Template, data interfac
 }
 
 // todo: refactor to remove duplication #refactor
+//cket - add option to append cost violations
 var singleProjectApplyTmpl = template.Must(template.New("").Parse(
 	"{{$result := index .Results 0}}Ran {{.Command}} for {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" + logTmpl))
 var singleProjectPlanSuccessTmpl = template.Must(template.New("").Parse(

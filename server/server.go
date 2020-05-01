@@ -228,10 +228,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil && flag.Lookup("test.v") == nil {
 		return nil, errors.Wrap(err, "initializing terraform")
 	}
+	//split userConfig.ExpensiveInstanceTypeFlag into list of strings
+	expensiveInstanceTypes := strings.Split(userConfig.ExpensiveInstanceTypeFlag, ",")
 	markdownRenderer := &events.MarkdownRenderer{
 		GitlabSupportsCommonMark: gitlabClient.SupportsCommonMark(),
 		DisableApplyAll:          userConfig.DisableApplyAll,
 		DisableMarkdownFolding:   userConfig.DisableMarkdownFolding,
+		ExpensiveInstanceTypes:   expensiveInstanceTypes,
 	}
 
 	boltdb, err := db.New(userConfig.DataDir)
