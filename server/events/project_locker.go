@@ -18,6 +18,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -37,7 +38,8 @@ type ProjectLocker interface {
 
 // DefaultProjectLocker implements ProjectLocker.
 type DefaultProjectLocker struct {
-	Locker locking.Locker
+	Locker    locking.Locker
+	VCSClient vcs.Client
 }
 
 // TryLockResponse is the result of trying to lock a project.
@@ -62,10 +64,14 @@ func (p *DefaultProjectLocker) TryLock(log *logging.SimpleLogger, pull models.Pu
 		return nil, err
 	}
 	if !lockAttempt.LockAcquired && lockAttempt.CurrLock.Pull.Num != pull.Num {
+		link, err := p.VCSClient.MarkdownPullLink(lockAttempt.CurrLock.Pull)
+		if err != nil {
+			return nil, err
+		}
 		failureMsg := fmt.Sprintf(
-			"This project is currently locked by an unapplied plan from pull #%d. To continue, delete the lock from #%d or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.",
-			lockAttempt.CurrLock.Pull.Num,
-			lockAttempt.CurrLock.Pull.Num)
+			"This project is currently locked by an unapplied plan from pull %s. To continue, delete the lock from %s or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.",
+			link,
+			link)
 		return &TryLockResponse{
 			LockAcquired:      false,
 			LockFailureReason: failureMsg,

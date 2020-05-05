@@ -278,53 +278,53 @@ func TestAzureDevopsClient_GetModifiedFiles(t *testing.T) {
 
 func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 	cases := []struct {
-		state        string
+		testName     string
+		mergeStatus  string
+		policyStatus string
 		expMergeable bool
 	}{
 		{
+			"merge conflicts",
 			azuredevops.MergeConflicts.String(),
+			"approved",
 			false,
 		},
 		{
-			azuredevops.MergeRejectedByPolicy.String(),
-			false,
-		},
-		{
-			azuredevops.MergeFailure.String(),
-			true,
-		},
-		{
-			azuredevops.MergeNotSet.String(),
-			true,
-		},
-		{
-			azuredevops.MergeQueued.String(),
-			true,
-		},
-		{
+			"rejected policy status",
 			azuredevops.MergeSucceeded.String(),
+			"rejected",
+			false,
+		},
+		{
+			"merge succeeded",
+			azuredevops.MergeSucceeded.String(),
+			"approved",
 			true,
 		},
 	}
 
-	// Use a real Azure DevOps json response and edit the mergeable_state field.
-	jsBytes, err := ioutil.ReadFile("fixtures/azuredevops-pr.json")
+	jsonPullRequestBytes, err := ioutil.ReadFile("fixtures/azuredevops-pr.json")
 	Ok(t, err)
-	json := string(jsBytes)
+
+	jsonPolicyEvaluationBytes, err := ioutil.ReadFile("fixtures/azuredevops-policyevaluations.json")
+	Ok(t, err)
+
+	pullRequestBody := string(jsonPullRequestBytes)
+	policyEvaluationsBody := string(jsonPolicyEvaluationBytes)
 
 	for _, c := range cases {
-		t.Run(c.state, func(t *testing.T) {
-			response := strings.Replace(json,
-				`"mergeStatus": "NotSet"`,
-				fmt.Sprintf(`"mergeStatus": "%s"`, c.state),
-				1,
-			)
+		t.Run(c.testName, func(t *testing.T) {
+			pullRequestResponse := strings.Replace(pullRequestBody, `"mergeStatus": "notSet"`, fmt.Sprintf(`"mergeStatus": "%s"`, c.mergeStatus), 1)
+			policyEvaluationsResponse := strings.Replace(policyEvaluationsBody, `"status": "approved"`, fmt.Sprintf(`"status": "%s"`, c.policyStatus), 1)
 
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch r.RequestURI {
 					case "/owner/project/_apis/git/repositories/repo/pullrequests/1?api-version=5.1-preview.1&includeWorkItemRefs=true":
-						w.Write([]byte(response)) // nolint: errcheck
+						w.Write([]byte(pullRequestResponse)) // nolint: errcheck
+						return
+					case "/owner/project/_apis/policy/evaluations?api-version=5.1-preview&artifactId=vstfs%3A%2F%2F%2FCodeReview%2FCodeReviewId%2F33333333-3333-3333-333333333333%2F1":
+						w.Write([]byte(policyEvaluationsResponse)) // nolint: errcheck
 						return
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
@@ -332,10 +332,13 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 						return
 					}
 				}))
+
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
+
 			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
 			Ok(t, err)
+
 			defer disableSSLVerification()()
 
 			actMergeable, err := client.PullIsMergeable(models.Repo{
@@ -359,49 +362,57 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 
 func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 	cases := []struct {
-		testName    string
-		vote        int
-		expApproved bool
+		testName           string
+		reviewerUniqueName string
+		reviewerVote       int
+		expApproved        bool
 	}{
 		{
 			"approved",
+			"atlantis.reviewer@example.com",
 			azuredevops.VoteApproved,
 			true,
 		},
 		{
 			"approved with suggestions",
+			"atlantis.reviewer@example.com",
 			azuredevops.VoteApprovedWithSuggestions,
-			false,
+			true,
 		},
 		{
 			"no vote",
+			"atlantis.reviewer@example.com",
 			azuredevops.VoteNone,
 			false,
 		},
 		{
 			"vote waiting for author",
+			"atlantis.reviewer@example.com",
 			azuredevops.VoteWaitingForAuthor,
 			false,
 		},
 		{
 			"vote rejected",
+			"atlantis.reviewer@example.com",
 			azuredevops.VoteRejected,
+			false,
+		},
+		{
+			"approved only by author",
+			"atlantis.author@example.com",
+			azuredevops.VoteApproved,
 			false,
 		},
 	}
 
-	// Use a real Azure DevOps json response and edit the mergeable_state field.
 	jsBytes, err := ioutil.ReadFile("fixtures/azuredevops-pr.json")
 	Ok(t, err)
-	json := string(jsBytes)
 
+	json := string(jsBytes)
 	for _, c := range cases {
 		t.Run(c.testName, func(t *testing.T) {
-			response := strings.Replace(json,
-				`"vote": 0,`,
-				fmt.Sprintf(`"vote": %d,`, c.vote),
-				1,
-			)
+			response := strings.Replace(json, `"vote": 0,`, fmt.Sprintf(`"vote": %d,`, c.reviewerVote), 1)
+			response = strings.Replace(response, "atlantis.reviewer@example.com", c.reviewerUniqueName, 1)
 
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -415,10 +426,13 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 						return
 					}
 				}))
+
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
+
 			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
 			Ok(t, err)
+
 			defer disableSSLVerification()()
 
 			actApproved, err := client.PullIsApproved(models.Repo{
@@ -478,6 +492,15 @@ func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 		}, 1)
 		Ok(t, err)
 	})
+}
+
+func TestAzureDevopsClient_MarkdownPullLink(t *testing.T) {
+	client, err := vcs.NewAzureDevopsClient("hostname", "token")
+	Ok(t, err)
+	pull := models.PullRequest{Num: 1}
+	s, _ := client.MarkdownPullLink(pull)
+	exp := "!1"
+	Equals(t, exp, s)
 }
 
 var adMergeSuccess = `{

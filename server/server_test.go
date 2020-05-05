@@ -217,7 +217,7 @@ func TestParseAtlantisURL(t *testing.T) {
 		// Must be valid URL.
 		{
 			In:     "::",
-			ExpErr: "parse ::: missing protocol scheme",
+			ExpErr: "parse \"::\": missing protocol scheme",
 		},
 
 		// Must be absolute.

@@ -124,43 +124,87 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 	return nil
 }
 
-// PullIsApproved returns true if the merge request was approved.
+func (g *AzureDevopsClient) HidePrevPlanComments(repo models.Repo, pullNum int) error {
+	return nil
+}
+
+// PullIsApproved returns true if the merge request was approved by another reviewer.
 // https://docs.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops#require-a-minimum-number-of-reviewers
 func (g *AzureDevopsClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
+	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
+
 	opts := azuredevops.PullRequestGetOptions{
 		IncludeWorkItemRefs: true,
 	}
-	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 	adPull, _, err := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, pull.Num, &opts)
 	if err != nil {
 		return false, errors.Wrap(err, "getting pull request")
 	}
+
 	for _, review := range adPull.Reviewers {
 		if review == nil {
 			continue
 		}
-		if review.GetVote() == azuredevops.VoteApproved {
+
+		if review.IdentityRef.GetUniqueName() == adPull.GetCreatedBy().GetUniqueName() {
+			continue
+		}
+
+		if review.GetVote() == azuredevops.VoteApproved || review.GetVote() == azuredevops.VoteApprovedWithSuggestions {
 			return true, nil
 		}
 	}
+
 	return false, nil
 }
 
 // PullIsMergeable returns true if the merge request can be merged.
 func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
-	opts := azuredevops.PullRequestGetOptions{
-		IncludeWorkItemRefs: true,
-	}
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
+
+	opts := azuredevops.PullRequestGetOptions{IncludeWorkItemRefs: true}
 	adPull, _, err := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, pull.Num, &opts)
 	if err != nil {
 		return false, errors.Wrap(err, "getting pull request")
 	}
-	if *adPull.MergeStatus != azuredevops.MergeConflicts.String() &&
-		*adPull.MergeStatus != azuredevops.MergeRejectedByPolicy.String() {
-		return true, nil
+
+	if *adPull.MergeStatus != azuredevops.MergeSucceeded.String() {
+		return false, nil
 	}
-	return false, nil
+
+	if *adPull.IsDraft {
+		return false, nil
+	}
+
+	if *adPull.Status != azuredevops.PullActive.String() {
+		return false, nil
+	}
+
+	projectID := *adPull.Repository.Project.ID
+	artifactID := g.Client.PolicyEvaluations.GetPullRequestArtifactID(projectID, pull.Num)
+	policyEvaluations, _, err := g.Client.PolicyEvaluations.List(g.ctx, owner, project, artifactID, &azuredevops.PolicyEvaluationsListOptions{})
+	if err != nil {
+		return false, errors.Wrap(err, "getting policy evaluations")
+	}
+
+	for _, policyEvaluation := range policyEvaluations {
+		if !*policyEvaluation.Configuration.IsEnabled || *policyEvaluation.Configuration.IsDeleted {
+			continue
+		}
+
+		// Ignore the Atlantis status, even if its set as a blocker.
+		// This status should not be considered when evaluating if the pull request can be applied.
+		settings := (policyEvaluation.Configuration.Settings).(map[string]interface{})
+		if status, ok := settings["statusName"]; ok && status == "atlantis/apply" {
+			continue
+		}
+
+		if *policyEvaluation.Configuration.IsBlocking && *policyEvaluation.Status != azuredevops.PolicyEvaluationApproved {
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
 
 // GetPullRequest returns the pull request.
@@ -291,6 +335,11 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
 		return fmt.Errorf("could not merge pull request: %s", mergeResult.GetMergeFailureMessage())
 	}
 	return nil
+}
+
+// MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.
+func (g *AzureDevopsClient) MarkdownPullLink(pull models.PullRequest) (string, error) {
+	return fmt.Sprintf("!%d", pull.Num), nil
 }
 
 // SplitAzureDevopsRepoFullName splits a repo full name up into its owner,

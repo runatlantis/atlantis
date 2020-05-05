@@ -100,6 +100,10 @@ func (b *Client) CreateComment(repo models.Repo, pullNum int, comment string) er
 	return err
 }
 
+func (b *Client) HidePrevPlanComments(repo models.Repo, pullNum int) error {
+	return nil
+}
+
 // PullIsApproved returns true if the merge request was approved.
 func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
 	path := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d", b.BaseURL, repo.FullName, pull.Num)
@@ -194,6 +198,11 @@ func (b *Client) MergePull(pull models.PullRequest) error {
 	path := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/merge", b.BaseURL, pull.BaseRepo.FullName, pull.Num)
 	_, err := b.makeRequest("POST", path, nil)
 	return err
+}
+
+// MarkdownPullLink specifies the character used in a pull request comment.
+func (b *Client) MarkdownPullLink(pull models.PullRequest) (string, error) {
+	return fmt.Sprintf("#%d", pull.Num), nil
 }
 
 // prepRequest adds auth and necessary headers.

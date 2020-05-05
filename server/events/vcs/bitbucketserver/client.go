@@ -141,6 +141,10 @@ func (b *Client) CreateComment(repo models.Repo, pullNum int, comment string) er
 	return nil
 }
 
+func (b *Client) HidePrevPlanComments(repo models.Repo, pullNum int) error {
+	return nil
+}
+
 // postComment actually posts the comment. It's a helper for CreateComment().
 func (b *Client) postComment(repo models.Repo, pullNum int, comment string) error {
 	bodyBytes, err := json.Marshal(map[string]string{"text": comment})
@@ -262,6 +266,11 @@ func (b *Client) MergePull(pull models.PullRequest) error {
 	path = fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d/merge?version=%d", b.BaseURL, projectKey, pull.BaseRepo.Name, pull.Num, *pullResp.Version)
 	_, err = b.makeRequest("POST", path, nil)
 	return err
+}
+
+// MarkdownPullLink specifies the character used in a pull request comment.
+func (b *Client) MarkdownPullLink(pull models.PullRequest) (string, error) {
+	return fmt.Sprintf("#%d", pull.Num), nil
 }
 
 // prepRequest adds auth and necessary headers.

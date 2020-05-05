@@ -1,0 +1,16 @@
+{
+    "value": [
+        {
+            "configuration": {
+                "isDeleted": false,
+                "isEnabled": true,
+                "isBlocking": true,
+                "settings": {
+                    "statusName": "pending"
+                }
+            },
+            "status": "approved"
+        }
+    ],
+    "count": 1
+}

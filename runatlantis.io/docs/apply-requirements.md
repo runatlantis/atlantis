@@ -5,7 +5,7 @@
 Atlantis allows you to require certain conditions be satisfied **before** an `atlantis apply`
 command can be run:
 
-* [Approved](#approved) – requires pull requests to be approved by at least one user
+* [Approved](#approved) – requires pull requests to be approved by at least one user other than the author
 * [Mergeable](#mergeable) – requires pull requests to be able to be merged
 
 ## What Happens If The Requirement Is Not Met?
@@ -45,7 +45,7 @@ You can set the `approved` requirement by:
 #### Meaning
 Each VCS provider has different rules around who can approve:
 * **GitHub** – **Any user with read permissions** to the repo can approve a pull request
-* **GitLab** – You [can set](https://docs.gitlab.com/ee/user/project/merge_requests/merge_request_approvals.html#editing-approvals) who is allowed to approve
+* **GitLab** – You [can set](https://docs.gitlab.com/ee/user/project/merge_requests/merge_request_approvals.html) who is allowed to approve
 * **Bitbucket Cloud (bitbucket.org)** – A user can approve their own pull request but
   Atlantis does not count that as an approval and requires an approval from at least one user that
   is not the author of the pull request

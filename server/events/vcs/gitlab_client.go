@@ -139,6 +139,10 @@ func (g *GitlabClient) CreateComment(repo models.Repo, pullNum int, comment stri
 	return err
 }
 
+func (g *GitlabClient) HidePrevPlanComments(repo models.Repo, pullNum int) error {
+	return nil
+}
+
 // PullIsApproved returns true if the merge request was approved.
 func (g *GitlabClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
 	approvals, _, err := g.Client.MergeRequests.GetMergeRequestApprovals(repo.FullName, pull.Num)
@@ -210,6 +214,11 @@ func (g *GitlabClient) MergePull(pull models.PullRequest) error {
 			MergeCommitMessage: &commitMsg,
 		})
 	return errors.Wrap(err, "unable to merge merge request, it may not be in a mergeable state")
+}
+
+// MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.
+func (g *GitlabClient) MarkdownPullLink(pull models.PullRequest) (string, error) {
+	return fmt.Sprintf("#%d", pull.Num), nil
 }
 
 // GetVersion returns the version of the Gitlab server this client is using.

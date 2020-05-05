@@ -53,6 +53,7 @@ const (
 	DataDirFlag                = "data-dir"
 	DefaultTFVersionFlag       = "default-tf-version"
 	DisableApplyAllFlag        = "disable-apply-all"
+	DisableMarkdownFoldingFlag = "disable-markdown-folding"
 	GHHostnameFlag             = "gh-hostname"
 	GHTokenFlag                = "gh-token"
 	GHUserFlag                 = "gh-user"
@@ -61,6 +62,7 @@ const (
 	GitlabTokenFlag            = "gitlab-token"
 	GitlabUserFlag             = "gitlab-user"
 	GitlabWebhookSecretFlag    = "gitlab-webhook-secret" // nolint: gosec
+	HidePrevPlanComments       = "hide-prev-plan-comments"
 	LogLevelFlag               = "log-level"
 	ParallelPlansPoolSize      = "parallel-plans-pool-size"
 	PortFlag                   = "port"
@@ -70,6 +72,7 @@ const (
 	RequireApprovalFlag        = "require-approval"
 	RequireMergeableFlag       = "require-mergeable"
 	SilenceForkPRErrorsFlag    = "silence-fork-pr-errors"
+	SilenceVCSStatusNoPlans    = "silence-vcs-status-no-plans"
 	SilenceWhitelistErrorsFlag = "silence-whitelist-errors"
 	SlackTokenFlag             = "slack-token"
 	SSLCertFileFlag            = "ssl-cert-file"
@@ -252,6 +255,11 @@ var boolFlags = map[string]boolFlag{
 		description:  "Disable \"atlantis apply\" command so a specific project/workspace/directory has to be specified for applies.",
 		defaultValue: false,
 	},
+	HidePrevPlanComments: {
+		description: "Hide previous plan comments to reduce clutter in the PR. " +
+			"VCS support is limited to: GitHub.",
+		defaultValue: false,
+	},
 	RequireApprovalFlag: {
 		description:  "Require pull requests to be \"Approved\" before allowing the apply command to be run.",
 		defaultValue: false,
@@ -266,8 +274,16 @@ var boolFlags = map[string]boolFlag{
 		description:  "Silences the posting of fork pull requests not allowed error comments.",
 		defaultValue: false,
 	},
+	SilenceVCSStatusNoPlans: {
+		description:  "Silences VCS commit status when autoplan finds no projects to plan.",
+		defaultValue: false,
+	},
 	SilenceWhitelistErrorsFlag: {
 		description:  "Silences the posting of whitelist error comments.",
+		defaultValue: false,
+	},
+	DisableMarkdownFoldingFlag: {
+		description:  "Toggle off folding in markdown output.",
 		defaultValue: false,
 	},
 	WriteGitCredsFlag: {
@@ -286,6 +302,9 @@ var intFlags = map[string]intFlag{
 		defaultValue: DefaultPort,
 	},
 }
+
+// ValidLogLevels are the valid log levels that can be set
+var ValidLogLevels = []string{"debug", "info", "warn", "error"}
 
 type stringFlag struct {
 	description  string
@@ -490,10 +509,11 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 }
 
 func (s *ServerCmd) validate(userConfig server.UserConfig) error {
-	logLevel := userConfig.LogLevel
-	if logLevel != "debug" && logLevel != "info" && logLevel != "warn" && logLevel != "error" {
-		return errors.New("invalid log level: not one of debug, info, warn, error")
+	userConfig.LogLevel = strings.ToLower(userConfig.LogLevel)
+	if !isValidLogLevel(userConfig.LogLevel) {
+		return fmt.Errorf("invalid log level: must be one of %v", ValidLogLevels)
 	}
+
 	checkoutStrategy := userConfig.CheckoutStrategy
 	if checkoutStrategy != "branch" && checkoutStrategy != "merge" {
 		return errors.New("invalid checkout strategy: not one of branch or merge")
@@ -688,4 +708,14 @@ func (s *ServerCmd) withErrPrint(f func(*cobra.Command, []string) error) func(*c
 // printErr prints err to stderr using a red terminal colour.
 func (s *ServerCmd) printErr(err error) {
 	fmt.Fprintf(os.Stderr, "%sError: %s%s\n", "\033[31m", err.Error(), "\033[39m")
+}
+
+func isValidLogLevel(level string) bool {
+	for _, logLevel := range ValidLogLevels {
+		if logLevel == level {
+			return true
+		}
+	}
+
+	return false
 }

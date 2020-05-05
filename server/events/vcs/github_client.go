@@ -19,11 +19,13 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 
+	"github.com/Laisky/graphql"
 	"github.com/google/go-github/v28/github"
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/shurcooL/githubv4"
 )
 
 // maxCommentLength is the maximum number of chars allowed in a single comment
@@ -32,8 +34,10 @@ const maxCommentLength = 65536
 
 // GithubClient is used to perform GitHub actions.
 type GithubClient struct {
-	client *github.Client
-	ctx    context.Context
+	user           string
+	client         *github.Client
+	v4MutateClient *graphql.Client
+	ctx            context.Context
 }
 
 // NewGithubClient returns a valid GitHub client.
@@ -43,6 +47,8 @@ func NewGithubClient(hostname string, user string, pass string) (*GithubClient, 
 		Password: strings.TrimSpace(pass),
 	}
 	client := github.NewClient(tp.Client())
+	graphqlURL := "https://api.github.com/graphql"
+
 	// If we're using github.com then we don't need to do any additional configuration
 	// for the client. It we're using Github Enterprise, then we need to manually
 	// set the base url for the API.
@@ -53,11 +59,31 @@ func NewGithubClient(hostname string, user string, pass string) (*GithubClient, 
 			return nil, errors.Wrapf(err, "Invalid github hostname trying to parse %s", baseURL)
 		}
 		client.BaseURL = base
+		graphqlURL = fmt.Sprintf("https://%s/graphql", hostname)
+		_, err = url.Parse(graphqlURL)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Invalid GraphQL github hostname trying to parse %s", graphqlURL)
+		}
 	}
 
+	// shurcooL's githubv4 library has a client ctor, but it doesn't support schema
+	// previews, which need custom Accept headers (https://developer.github.com/v4/previews)
+	// So for now use the graphql client, since the githubv4 library was basically
+	// a simple wrapper around it. And instead of using shurcooL's graphql lib, use
+	// Laisky's, since shurcooL's doesn't support custom headers.
+	// Once the Minimize Comment schema is official, this can revert back to using
+	// shurcooL's libraries completely.
+	v4MutateClient := graphql.NewClient(
+		graphqlURL,
+		tp.Client(),
+		graphql.WithHeader("Accept", "application/vnd.github.queen-beryl-preview+json"),
+	)
+
 	return &GithubClient{
-		client: client,
-		ctx:    context.Background(),
+		user:           user,
+		client:         client,
+		v4MutateClient: v4MutateClient,
+		ctx:            context.Background(),
 	}, nil
 }
 
@@ -110,6 +136,67 @@ func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment stri
 			return err
 		}
 	}
+	return nil
+}
+
+func (g *GithubClient) HidePrevPlanComments(repo models.Repo, pullNum int) error {
+	var allComments []*github.IssueComment
+	nextPage := 0
+	for {
+		comments, resp, err := g.client.Issues.ListComments(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueListCommentsOptions{
+			Sort:        "created",
+			Direction:   "asc",
+			ListOptions: github.ListOptions{Page: nextPage},
+		})
+		if err != nil {
+			return err
+		}
+		allComments = append(allComments, comments...)
+		if resp.NextPage == 0 {
+			break
+		}
+		nextPage = resp.NextPage
+	}
+
+	for _, comment := range allComments {
+		// Using a case insensitive compare here because usernames aren't case
+		// sensitive and users may enter their atlantis users with different
+		// cases.
+		if comment.User != nil && !strings.EqualFold(comment.User.GetLogin(), g.user) {
+			continue
+		}
+		// Crude filtering: The comment templates typically include the command name
+		// somewhere in the first line. It's a bit of an assumption, but seems like
+		// a reasonable one, given we've already filtered the comments by the
+		// configured Atlantis user.
+		body := strings.Split(comment.GetBody(), "\n")
+		if len(body) == 0 {
+			continue
+		}
+		firstLine := strings.ToLower(body[0])
+		if !strings.Contains(firstLine, models.PlanCommand.String()) {
+			continue
+		}
+		var m struct {
+			MinimizeComment struct {
+				MinimizedComment struct {
+					IsMinimized       githubv4.Boolean
+					MinimizedReason   githubv4.String
+					ViewerCanMinimize githubv4.Boolean
+				}
+			} `graphql:"minimizeComment(input:$input)"`
+		}
+		input := map[string]interface{}{
+			"input": githubv4.MinimizeCommentInput{
+				Classifier: githubv4.ReportedContentClassifiersOutdated,
+				SubjectID:  comment.GetNodeID(),
+			},
+		}
+		if err := g.v4MutateClient.Mutate(g.ctx, &m, input); err != nil {
+			return errors.Wrapf(err, "minimize comment %s", comment.GetNodeID())
+		}
+	}
+
 	return nil
 }
 
@@ -231,4 +318,9 @@ func (g *GithubClient) MergePull(pull models.PullRequest) error {
 		return fmt.Errorf("could not merge pull request: %s", mergeResult.GetMessage())
 	}
 	return nil
+}
+
+// MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.
+func (g *GithubClient) MarkdownPullLink(pull models.PullRequest) (string, error) {
+	return fmt.Sprintf("#%d", pull.Num), nil
 }

@@ -406,7 +406,8 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 	Ok(t, err)
 	lockingClient := locking.NewClient(boltdb)
 	projectLocker := &events.DefaultProjectLocker{
-		Locker: lockingClient,
+		Locker:    lockingClient,
+		VCSClient: e2eVCSClient,
 	}
 	workingDir := &events.FileWorkspace{
 		DataDir:                     dataDir,

@@ -1,3 +1,45 @@
+# v0.12.0
+
+## Description
+This release contains one much-awaited GitHub-only feature: the ability to hide previous
+plan comments with the `--hide-prev-plan-comments` flag. It also contains
+a host of other small features and fags.
+
+## Features
+* GitHub: Add `--hide-prev-plan-comments` flag. When set, previous plan comments will be marked as outdated in GitHub's UI.
+  This collapses them making a PR with lots of plan comments easier to read. ([#994](https://github.com/runatlantis/atlantis/pull/994) by @goodspark)
+* GitHub: Ignore draft PRs until they're changed to "ready for review". ([#977](https://github.com/runatlantis/atlantis/pull/977) by @cket)
+* Upgrade default Terraform version in Docker image to 0.12.24.
+* Set `as_user` param when sending slack notifications so the message is decorated appropriately ([#907](https://github.com/runatlantis/atlantis/pull/907) by @tmcevoy14)
+* Add Git LFS support ([#872](https://github.com/runatlantis/atlantis/pull/872) by @remilapeyre)
+* Add `--silence-vcs-status-no-plans` flag that silences VCS commit status when autoplan finds no projects to plan.
+  When set, Atlantis won't create any VCS statuses if there no projects to plan. ([#959](https://github.com/runatlantis/atlantis/pull/959) by @cket)
+* Add `--disable-markdown-folding` flag that disables folding for long plan/apply outputs. ([#960](https://github.com/runatlantis/atlantis/pull/960) by @mhumeSF)
+* Ignore casing when setting log levels, e.g. `--log-level=INFO` now works. ([#976](https://github.com/runatlantis/atlantis/pull/976) by @jpreese)
+* Azure DevOps: Add policy checking. ([#984](https://github.com/runatlantis/atlantis/pull/984) by @jpreese)
+* Upgrade boltdb to latest maintained version. ([#992](https://github.com/runatlantis/atlantis/pull/992) by @amasover)
+
+## Bugfixes
+* Azure DevOps: Prevent pull request updated events from triggering autoplan when the event was caused by a change in approvals. (Fixes [#946](https://github.com/runatlantis/atlantis/issues/946) by @mcdafydd)
+
+## Backwards Incompatibilities / Notes:
+* GitHub draft PRs are now ignored until they're marked "ready for review" and opened as regular PRs.
+* If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
+  then the default version of Terraform will now be 0.12.24. Simply set the above
+  flag to your desired default version to avoid any issues.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.12.0/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.12.0/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.12.0/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.12.0/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.12.0`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.11.1..v0.12.0
+https://github.com/runatlantis/atlantis/compare/v0.11.0...v0.12.0
+
 # v0.11.1
 
 ## Description
