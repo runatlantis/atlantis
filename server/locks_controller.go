@@ -29,6 +29,29 @@ type LocksController struct {
 	DeleteLockCommand  events.DeleteLockCommand
 }
 
+// GetLocks returns a map of PR URLs to lock IDs held by that PR
+func (l *LocksController) GetLocks() (map[string][]string, error) {
+	response := make(map[string][]string)
+	locks, err := l.Locker.List()
+	if err != nil {
+		return nil, err
+	}
+	for key, lock := range locks {
+		if err != nil {
+			return nil, err
+		}
+		if val, ok := response[lock.Pull.URL]; ok {
+			response[lock.Pull.URL] = append(val, key)
+		} else {
+			response[lock.Pull.URL] = []string{key}
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
 // GetLock is the GET /locks/{id} route. It renders the lock detail view.
 func (l *LocksController) GetLock(w http.ResponseWriter, r *http.Request) {
 	id, ok := mux.Vars(r)["id"]
@@ -36,7 +59,6 @@ func (l *LocksController) GetLock(w http.ResponseWriter, r *http.Request) {
 		l.respond(w, logging.Warn, http.StatusBadRequest, "No lock id in request")
 		return
 	}
-
 	idUnencoded, err := url.QueryUnescape(id)
 	if err != nil {
 		l.respond(w, logging.Warn, http.StatusBadRequest, "Invalid lock id: %s", err)

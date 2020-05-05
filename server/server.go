@@ -490,6 +490,7 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/github-app/exchange-code", s.GithubAppController.ExchangeCode).Methods("GET")
 	s.Router.HandleFunc("/github-app/setup", s.GithubAppController.New).Methods("GET")
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
+	s.Router.HandleFunc("/locks", s.GetLocks).Methods("GET")
 	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
 	n := negroni.New(&negroni.Recovery{
@@ -598,6 +599,24 @@ func (s *Server) Healthz(w http.ResponseWriter, _ *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, "Error creating status json response: %s", err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(data) // nolint: errcheck
+}
+
+// GetLocks returns a list of PR urls to locks held by that PR
+func (s *Server) GetLocks(w http.ResponseWriter, _ *http.Request) {
+	locks, err := s.LocksController.GetLocks()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Error listing locks: %s", err)
+		return
+	}
+	data, err := json.Marshal(locks)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Error creating list response: %s", err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

@@ -30,6 +30,103 @@ func AnyRepo() models.Repo {
 	return models.Repo{}
 }
 
+func TestGetLocks_LockerErr(t *testing.T) {
+	t.Log("If there is an error retrieving the locks, make sure it is propagated")
+	RegisterMockTestingT(t)
+	l := mocks.NewMockLocker()
+	When(l.List()).ThenReturn(nil, errors.New("err"))
+	lc := server.LocksController{
+		Logger: logging.NewNoopLogger(),
+		Locker: l,
+	}
+	lockMap, err := lc.GetLocks()
+	Assert(t, lockMap == nil, "expected nil response from GetLocks, got %s", lockMap)
+	Assert(t, err != nil, "expected error from GetLocks to be non nil")
+}
+
+func TestGetLocks_None(t *testing.T) {
+	t.Log("If are no locks, we should return an empty list")
+	RegisterMockTestingT(t)
+	l := mocks.NewMockLocker()
+	When(l.List()).ThenReturn(make(map[string]models.ProjectLock), nil)
+	lc := server.LocksController{
+		Logger: logging.NewNoopLogger(),
+		Locker: l,
+	}
+	lockMap, err := lc.GetLocks()
+	Ok(t, err)
+	Assert(t, len(lockMap) == 0, "expected empty map from GetLocks, was instead length %i", len(lockMap))
+}
+
+func TestGetLocks_Success(t *testing.T) {
+	t.Log("Should be able to return list of PRs to locks held by PR")
+	RegisterMockTestingT(t)
+	l := mocks.NewMockLocker()
+	response := make(map[string]models.ProjectLock)
+	response["test"] = models.ProjectLock{
+		Pull: models.PullRequest{URL: "url", Author: "lkysow"},
+	}
+	When(l.List()).ThenReturn(response, nil)
+	lc := server.LocksController{
+		Logger: logging.NewNoopLogger(),
+		Locker: l,
+	}
+	lockMap, err := lc.GetLocks()
+	Ok(t, err)
+	Assert(t, len(lockMap) == 1, "expected map with single entry from GetLocks, was instead length %i", len(lockMap))
+	val, ok := lockMap["url"]
+	Assert(t, ok, "expected 'url' as a key in the returned lock map")
+	Assert(t, len(val) == 1, "expected lock ID list to contain single entry, was instead length %i", len(val))
+	testValue := val[0]
+	expectedVal := "test"
+	Assert(t, testValue == expectedVal, "expected lock map ID to equal %s, was %s", expectedVal, testValue)
+}
+
+func TestGetLocks_MultipleSuccess(t *testing.T) {
+	t.Log("Should be able to list multiple locks")
+	RegisterMockTestingT(t)
+	l := mocks.NewMockLocker()
+	response := make(map[string]models.ProjectLock)
+	response["test"] = models.ProjectLock{
+		Pull: models.PullRequest{URL: "url", Author: "lkysow"},
+	}
+	response["testTwo"] = models.ProjectLock{
+		Pull: models.PullRequest{URL: "url", Author: "lkysow"},
+	}
+	response["testThree"] = models.ProjectLock{
+		Pull: models.PullRequest{URL: "urlTwo", Author: "lkysow"},
+	}
+	When(l.List()).ThenReturn(response, nil)
+	lc := server.LocksController{
+		Logger: logging.NewNoopLogger(),
+		Locker: l,
+	}
+	lockMap, err := lc.GetLocks()
+	Ok(t, err)
+	Assert(t, len(lockMap) == 2, "expected map with two entries from GetLocks, was instead length %i", len(lockMap))
+	val, ok := lockMap["url"]
+	Assert(t, ok, "expected 'url' as a key in the returned lock map")
+	Assert(t, len(val) == 2, "expected lock ID list to contain two entries, was instead length %i", len(val))
+	firstValue := val[0]
+	secondValue := val[1]
+	Assert(t, val[0] != val[1], "expected unique lock IDs from list lock response, instead both were %s", val[0])
+	expectedValOne := "test"
+	expectedValTwo := "testTwo"
+	if firstValue != expectedValOne && firstValue != expectedValTwo {
+		t.Errorf("Expected %s to equal %s or %s", firstValue, expectedValOne, expectedValTwo)
+	}
+	if secondValue != expectedValOne && secondValue != expectedValTwo {
+		t.Errorf("Expected %s to equal %s or %s", secondValue, expectedValOne, expectedValTwo)
+	}
+	// now check the second PR url
+	val, ok = lockMap["urlTwo"]
+	Assert(t, ok, "expected 'urlTwo' as a key in the returned lock map")
+	Assert(t, len(val) == 1, "expected lock ID list to contain a single entry, was instead length %i", len(val))
+	thirdValue := val[0]
+	expectedVal := "testThree"
+	Assert(t, thirdValue == expectedVal, "expected lock map ID to equal %s, was %s", expectedVal, thirdValue)
+}
+
 func TestGetLockRoute_NoLockID(t *testing.T) {
 	t.Log("If there is no lock ID in the request then we should get a 400")
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
