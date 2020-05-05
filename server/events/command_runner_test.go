@@ -269,8 +269,8 @@ func TestRunAutoplanCommand_DrainOngoing(t *testing.T) {
 func TestRunAutoplanCommand_DrainNotOngoing(t *testing.T) {
 	t.Log("if drain is not ongoing then remove ongoing operation must be called even if panic occured")
 	setup(t)
-	When(commitStatusUpdater.UpdateCombined(fixtures.GithubRepo, fixtures.Pull, models.PendingCommitStatus, models.PlanCommand)).ThenPanic("OMG PANIC!!!")
+	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())).ThenPanic("OMG PANIC!!!")
 	ch.RunAutoplanCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
-	commitStatusUpdater.VerifyWasCalledOnce().UpdateCombined(fixtures.GithubRepo, fixtures.Pull, models.PendingCommitStatus, models.PlanCommand)
+	projectCommandBuilder.VerifyWasCalledOnce().BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())
 	drainer.VerifyWasCalledOnce().RemoveOngoingOperation()
 }
