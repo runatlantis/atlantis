@@ -25,8 +25,8 @@ const (
 	DefaultWorkspace = "default"
 	// DefaultAutomergeEnabled is the default for the automerge setting.
 	DefaultAutomergeEnabled = false
-	// DefaultParallelPlansEnabled is the default for the parallel plans setting.
-	DefaultParallelPlansEnabled = false
+	// DefaultParallelApplyEnabled is the default for the parallel apply setting.
+	DefaultParallelApplyEnabled = false
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
@@ -143,7 +143,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		for _, mp := range matchingProjects {
 			ctx.Log.Debug("determining config for project at dir: %q workspace: %q", mp.Dir, mp.Workspace)
 			mergedCfg := p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.BaseRepo.ID(), mp, repoCfg)
-			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, mergedCfg, commentFlags, repoCfg.Automerge, repoCfg.ParallelPlans, verbose, repoDir))
+			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, mergedCfg, commentFlags, repoCfg.Automerge, repoCfg.ParallelApply, verbose, repoDir))
 		}
 	} else {
 		// If there is no config file, then we'll plan each project that
@@ -154,7 +154,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		for _, mp := range modifiedProjects {
 			ctx.Log.Debug("determining config for project at dir: %q", mp.Path)
 			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.BaseRepo.ID(), mp.Path, DefaultWorkspace)
-			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, pCfg, commentFlags, DefaultAutomergeEnabled, DefaultParallelPlansEnabled, verbose, repoDir))
+			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, pCfg, commentFlags, DefaultAutomergeEnabled, DefaultParallelApplyEnabled, verbose, repoDir))
 		}
 	}
 
@@ -285,12 +285,12 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(
 	}
 
 	automerge := DefaultAutomergeEnabled
-	parallelPlans := DefaultParallelPlansEnabled
+	parallelApply := DefaultParallelApplyEnabled
 	if repoCfgPtr != nil {
 		automerge = repoCfgPtr.Automerge
-		parallelPlans = repoCfgPtr.ParallelPlans
+		parallelApply = repoCfgPtr.ParallelApply
 	}
-	return p.buildCtx(ctx, cmd, projCfg, commentFlags, automerge, parallelPlans, verbose, repoDir), nil
+	return p.buildCtx(ctx, cmd, projCfg, commentFlags, automerge, parallelApply, verbose, repoDir), nil
 }
 
 // getCfg returns the atlantis.yaml config (if it exists) for this project. If
@@ -379,7 +379,7 @@ func (p *DefaultProjectCommandBuilder) buildCtx(ctx *CommandContext,
 	projCfg valid.MergedProjectCfg,
 	commentArgs []string,
 	automergeEnabled bool,
-	parallelPlansEnabled bool,
+	parallelApplyEnabled bool,
 	verbose bool,
 	absRepoDir string) models.ProjectCommandContext {
 
@@ -402,7 +402,7 @@ func (p *DefaultProjectCommandBuilder) buildCtx(ctx *CommandContext,
 		BaseRepo:             ctx.BaseRepo,
 		EscapedCommentArgs:   p.escapeArgs(commentArgs),
 		AutomergeEnabled:     automergeEnabled,
-		ParallelPlansEnabled: parallelPlansEnabled,
+		ParallelApplyEnabled: parallelApplyEnabled,
 		AutoplanEnabled:      projCfg.AutoplanEnabled,
 		Steps:                steps,
 		HeadRepo:             ctx.HeadRepo,

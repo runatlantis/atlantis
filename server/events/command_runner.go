@@ -145,14 +145,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
-	// Run our plan commands in parallel if enabled
-	var result CommandResult
-	if c.parallelPlansEnabled(ctx, projectCmds) {
-		ctx.Log.Info("Running plans in parallel")
-		result = c.runProjectCmdsParallel(projectCmds, models.PlanCommand)
-	} else {
-		result = c.runProjectCmds(projectCmds, models.PlanCommand)
-	}
+	result := c.runProjectCmdsParallel(projectCmds, models.PlanCommand)
 
 	if c.automergeEnabled(ctx, projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
@@ -264,13 +257,13 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
-	// Run our plan commands in parallel if enabled
+	// Only run applies in parallel if enabled
 	var result CommandResult
-	if cmd.Name == models.PlanCommand && c.parallelPlansEnabled(ctx, projectCmds) {
-		ctx.Log.Info("Running plans in parallel")
-		result = c.runProjectCmdsParallel(projectCmds, cmd.Name)
-	} else {
+	if cmd.Name == models.ApplyCommand && !c.parallelApplyEnabled(ctx, projectCmds) {
 		result = c.runProjectCmds(projectCmds, cmd.Name)
+	} else {
+		ctx.Log.Info("Running commands in parallel")
+		result = c.runProjectCmdsParallel(projectCmds, cmd.Name)
 	}
 	if cmd.Name == models.PlanCommand && c.automergeEnabled(ctx, projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
@@ -548,9 +541,9 @@ func (c *DefaultCommandRunner) automergeEnabled(ctx *CommandContext, projectCmds
 		(len(projectCmds) > 0 && projectCmds[0].AutomergeEnabled)
 }
 
-// parallelPlansEnabled returns true if parallel plans is enabled in this context.
-func (c *DefaultCommandRunner) parallelPlansEnabled(ctx *CommandContext, projectCmds []models.ProjectCommandContext) bool {
-	return len(projectCmds) > 0 && projectCmds[0].ParallelPlansEnabled
+// parallelApplyEnabled returns true if parallel apply is enabled in this context.
+func (c *DefaultCommandRunner) parallelApplyEnabled(ctx *CommandContext, projectCmds []models.ProjectCommandContext) bool {
+	return len(projectCmds) > 0 && projectCmds[0].ParallelApplyEnabled
 }
 
 // automergeComment is the comment that gets posted when Atlantis automatically
