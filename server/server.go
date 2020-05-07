@@ -618,7 +618,12 @@ func (s *Server) GetLocks(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(data) // nolint: errcheck
+	_, err = w.Write(data)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Error writing list response: %s", err)
+		return
+	}
 }
 
 // ParseAtlantisURL parses the user-passed atlantis URL to ensure it is valid
