@@ -172,33 +172,25 @@ func TestHealthz(t *testing.T) {
 }
 
 func TestGetLocks(t *testing.T) {
-	t.Log("Index should render the index template successfully.")
+	t.Log("Get locks should return map of PR urls to list of locks held")
 	RegisterMockTestingT(t)
 	l := mocks.NewMockLocker()
-	// These are the locks that we expect to be rendered.
-	now := time.Now()
 	locks := map[string]models.ProjectLock{
 		"lkysow/atlantis-example/./default": {
 			Pull: models.PullRequest{
-				Num: 9,
 				URL: "https://github.com/lkysow/atlantis/example/pull/7",
 			},
 			Project: models.Project{
 				RepoFullName: "lkysow/atlantis-example",
 				Path:         ".",
 			},
-			Time:      now,
 			Workspace: "default",
 		},
 	}
 	When(l.List()).ThenReturn(locks, nil)
 	it := sMocks.NewMockTemplateWriter()
 	r := mux.NewRouter()
-	atlantisVersion := "0.3.1"
-	// Need to create a lock route since the server expects this route to exist.
 	r.NewRoute().Path("/locks")
-	u, err := url.Parse("https://example.com")
-	Ok(t, err)
 	lc := server.LocksController{
 		Logger: logging.NewNoopLogger(),
 		Locker: l,
@@ -207,8 +199,6 @@ func TestGetLocks(t *testing.T) {
 		Locker:          l,
 		IndexTemplate:   it,
 		Router:          r,
-		AtlantisVersion: atlantisVersion,
-		AtlantisURL:     u,
 		LocksController: &lc,
 	}
 	req, _ := http.NewRequest("GET", "/locks", bytes.NewBuffer(nil))
