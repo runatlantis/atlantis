@@ -581,6 +581,192 @@ $$$
 	}
 }
 
+func TestRenderProjectResultsWithCostWarnings(t *testing.T) {
+	cases := []struct {
+		Description    string
+		Command        models.CommandName
+		ProjectResults []models.ProjectResult
+		VCSHost        models.VCSHostType
+		Expected       string
+	}{
+		{
+			"single successful plan with cost warning",
+			models.PlanCommand,
+			[]models.ProjectResult{
+				{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: `
++ resource "aws_instance" "web" {
+  + instance_type                = "c5n.9xlarge"
+}`,
+						LockURL:   "lock-url",
+						RePlanCmd: "atlantis plan -d path -w workspace",
+						ApplyCmd:  "atlantis apply -d path -w workspace",
+					},
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+				},
+			},
+			models.Github,
+			`Ran Plan for dir: $path$ workspace: $workspace$
+
+$$$diff
+
++ resource "aws_instance" "web" {
+  + instance_type                = "c5n.9xlarge"
+}
+$$$
+
+* :arrow_forward: To **apply** this plan, comment:
+    * $atlantis apply -d path -w workspace$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+    * $atlantis plan -d path -w workspace$
+
+**Warning - instance type c5n.9xlarge is expensive. Please double check if a cheaper instance can be used.**
+
+---
+* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
+    * $atlantis apply$
+`,
+		},
+		{
+			"single successful plan with alternate instance type with cost warning",
+			models.PlanCommand,
+			[]models.ProjectResult{
+				{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: `
++ resource "aws_instance" "web" {
+  + instance_type                = "g4dn.2xlarge"
+}`,
+						LockURL:   "lock-url",
+						RePlanCmd: "atlantis plan -d path -w workspace",
+						ApplyCmd:  "atlantis apply -d path -w workspace",
+					},
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+				},
+			},
+			models.Github,
+			`Ran Plan for dir: $path$ workspace: $workspace$
+
+$$$diff
+
++ resource "aws_instance" "web" {
+  + instance_type                = "g4dn.2xlarge"
+}
+$$$
+
+* :arrow_forward: To **apply** this plan, comment:
+    * $atlantis apply -d path -w workspace$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+    * $atlantis plan -d path -w workspace$
+
+**Warning - instance type g4dn.2xlarge is expensive. Please double check if a cheaper instance can be used.**
+
+---
+* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
+    * $atlantis apply$
+`,
+		},
+		{
+			"multiple successful plans, only one cost warning",
+			models.PlanCommand,
+			[]models.ProjectResult{
+				{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: `
++ resource "aws_instance" "web" {
+  + instance_type                = "g4dn.2xlarge"
+}`,
+						LockURL:   "lock-url",
+						RePlanCmd: "atlantis plan -d path -w workspace",
+						ApplyCmd:  "atlantis apply -d path -w workspace",
+					},
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+				},
+				{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: `
++ resource "aws_instance" "web" {
+  + instance_type                = "g4dn.xlarge"
+}`,
+						LockURL:   "lock-url",
+						RePlanCmd: "atlantis plan -d path2 -w workspace",
+						ApplyCmd:  "atlantis apply -d path2 -w workspace",
+					},
+					Workspace:  "workspace",
+					RepoRelDir: "path2",
+				},
+			},
+			models.Github,
+			`Ran Plan for 2 projects:
+
+1. dir: $path$ workspace: $workspace$
+1. dir: $path2$ workspace: $workspace$
+
+### 1. dir: $path$ workspace: $workspace$
+$$$diff
+
++ resource "aws_instance" "web" {
+  + instance_type                = "g4dn.2xlarge"
+}
+$$$
+
+* :arrow_forward: To **apply** this plan, comment:
+    * $atlantis apply -d path -w workspace$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+    * $atlantis plan -d path -w workspace$
+
+**Warning - instance type g4dn.2xlarge is expensive. Please double check if a cheaper instance can be used.**
+
+---
+### 2. dir: $path2$ workspace: $workspace$
+$$$diff
+
++ resource "aws_instance" "web" {
+  + instance_type                = "g4dn.xlarge"
+}
+$$$
+
+* :arrow_forward: To **apply** this plan, comment:
+    * $atlantis apply -d path2 -w workspace$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+    * $atlantis plan -d path2 -w workspace$
+
+---
+* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
+    * $atlantis apply$
+`,
+		},
+	}
+
+	r := events.MarkdownRenderer{ExpensiveInstanceTypes: []string{"c5n.9xlarge", "g4dn.2xlarge"}}
+	for _, c := range cases {
+		t.Run(c.Description, func(t *testing.T) {
+			res := events.CommandResult{
+				ProjectResults: c.ProjectResults,
+			}
+			for _, verbose := range []bool{true, false} {
+				t.Run(c.Description, func(t *testing.T) {
+					s := r.Render(res, c.Command, "log", verbose, c.VCSHost)
+					expWithBackticks := strings.Replace(c.Expected, "$", "`", -1)
+					if !verbose {
+						Equals(t, expWithBackticks, s)
+					} else {
+						Equals(t, expWithBackticks+"<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>\n", s)
+					}
+				})
+			}
+		})
+	}
+}
+
 // Test that if disable apply all is set then the apply all footer is not added
 func TestRenderProjectResultsDisableApplyAll(t *testing.T) {
 	cases := []struct {

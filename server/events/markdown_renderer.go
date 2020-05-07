@@ -223,7 +223,6 @@ func (m *MarkdownRenderer) renderTemplate(tmpl *template.Template, data interfac
 }
 
 // todo: refactor to remove duplication #refactor
-//cket - add option to append cost violations
 var singleProjectApplyTmpl = template.Must(template.New("").Parse(
 	"{{$result := index .Results 0}}Ran {{.Command}} for {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" + logTmpl))
 var singleProjectPlanSuccessTmpl = template.Must(template.New("").Parse(
