@@ -59,6 +59,7 @@ func (l *LocksController) GetLock(w http.ResponseWriter, r *http.Request) {
 		l.respond(w, logging.Warn, http.StatusBadRequest, "No lock id in request")
 		return
 	}
+
 	idUnencoded, err := url.QueryUnescape(id)
 	if err != nil {
 		l.respond(w, logging.Warn, http.StatusBadRequest, "Invalid lock id: %s", err)
