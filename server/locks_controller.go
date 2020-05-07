@@ -37,17 +37,11 @@ func (l *LocksController) GetLocks() (map[string][]string, error) {
 		return nil, err
 	}
 	for key, lock := range locks {
-		if err != nil {
-			return nil, err
-		}
 		if val, ok := response[lock.Pull.URL]; ok {
 			response[lock.Pull.URL] = append(val, key)
 		} else {
 			response[lock.Pull.URL] = []string{key}
 		}
-	}
-	if err != nil {
-		return nil, err
 	}
 	return response, nil
 }
