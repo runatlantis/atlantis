@@ -127,6 +127,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 version: 3
 automerge: true
 parallel_apply: true
+parallel_plan: false
 projects:
 - dir: mydir
   workspace: myworkspace
@@ -146,6 +147,7 @@ workflows:
 				Version:       Int(3),
 				Automerge:     Bool(true),
 				ParallelApply: Bool(true),
+				ParallelPlan:  Bool(false),
 				Projects: []raw.Project{
 					{
 						Dir:              String("mydir"),

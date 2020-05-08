@@ -310,6 +310,8 @@ type ProjectCommandContext struct {
 	AutomergeEnabled bool
 	// ParallelApplyEnabled is true if parallel apply is enabled for this project.
 	ParallelApplyEnabled bool
+	// ParallelPlanEnabled is true if parallel plan is enabled for this project.
+	ParallelPlanEnabled bool
 	// AutoplanEnabled is true if autoplanning is enabled for this project.
 	AutoplanEnabled bool
 	// BaseRepo is the repository that the pull request will be merged into.
