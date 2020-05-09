@@ -482,9 +482,9 @@ const (
 	// AppliedPlanStatus means that a plan has been generated and applied
 	// successfully.
 	AppliedPlanStatus
-	// NotPlannedPlanStatus means that either no plan has been generated yet or
-	// a plan has been deleted - eg after using the UI to unlock the project
-	NotPlannedPlanStatus
+	// DiscardedPlanStatus means that there was an unapplied plan that was
+	// discarded due to a project being unlocked
+	DiscardedPlanStatus
 )
 
 // String returns a string representation of the status.
@@ -498,8 +498,8 @@ func (p ProjectPlanStatus) String() string {
 		return "apply_errored"
 	case AppliedPlanStatus:
 		return "applied"
-	case NotPlannedPlanStatus:
-		return "not_planned"
+	case DiscardedPlanStatus:
+		return "plan_discarded"
 	default:
 		panic("missing String() impl for ProjectPlanStatus")
 	}

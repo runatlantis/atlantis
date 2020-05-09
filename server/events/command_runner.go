@@ -327,7 +327,6 @@ func (c *DefaultCommandRunner) automerge(ctx *CommandContext, pullStatus models.
 
 	// Make the API call to perform the merge.
 	ctx.Log.Info("automerging pull request")
-
 	err := c.VCSClient.MergePull(ctx.Pull)
 
 	if err != nil {
@@ -338,7 +337,6 @@ func (c *DefaultCommandRunner) automerge(ctx *CommandContext, pullStatus models.
 			ctx.Log.Err("failed to comment about automerge failing: %s", err)
 		}
 	}
-
 }
 
 func (c *DefaultCommandRunner) runProjectCmds(cmds []models.ProjectCommandContext, cmdName models.CommandName) CommandResult {
