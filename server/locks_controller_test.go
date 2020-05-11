@@ -15,6 +15,8 @@ import (
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events"
+	dbmocks "github.com/runatlantis/atlantis/server/events/db/mocks"
+
 	"github.com/runatlantis/atlantis/server/events/locking/mocks"
 	mocks2 "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -190,6 +192,46 @@ func TestDeleteLock_OldFormat(t *testing.T) {
 	lc.DeleteLock(w, req)
 	responseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
 	cp.VerifyWasCalled(Never()).CreateComment(AnyRepo(), AnyInt(), AnyString())
+}
+
+func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
+	t.Log("When deleting a lock, pull status has to be updated to reflect discarded plan")
+	RegisterMockTestingT(t)
+
+	repoName := "owner/repo"
+	projectPath := "path"
+	workspaceName := "workspace"
+
+	cp := vcsmocks.NewMockClient()
+	l := mocks.NewMockLocker()
+	workingDir := mocks2.NewMockWorkingDir()
+	workingDirLocker := events.NewDefaultWorkingDirLocker()
+	pull := models.PullRequest{
+		BaseRepo: models.Repo{FullName: repoName},
+	}
+	When(l.Unlock("id")).ThenReturn(&models.ProjectLock{
+		Pull:      pull,
+		Workspace: workspaceName,
+		Project: models.Project{
+			Path:         projectPath,
+			RepoFullName: repoName,
+		},
+	}, nil)
+	db := dbmocks.NewMockBoltDB()
+	lc := server.LocksController{
+		Locker:           l,
+		Logger:           logging.NewNoopLogger(),
+		VCSClient:        cp,
+		WorkingDirLocker: workingDirLocker,
+		WorkingDir:       workingDir,
+		DB:               db,
+	}
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req = mux.SetURLVars(req, map[string]string{"id": "id"})
+	w := httptest.NewRecorder()
+	lc.DeleteLock(w, req)
+	responseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
+	db.VerifyWasCalledOnce().UpdateProjectStatus(pull, workspaceName, projectPath, models.DiscardedPlanStatus)
 }
 
 func TestDeleteLock_CommentFailed(t *testing.T) {

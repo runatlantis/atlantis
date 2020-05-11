@@ -692,7 +692,7 @@ func TestPullStatus_UpdateMerge(t *testing.T) {
 }
 
 // newTestDB returns a TestDB using a temporary path.
-func newTestDB() (*bolt.DB, *db.BoltDB) {
+func newTestDB() (*bolt.DB, *db.DefaultBoltDB) {
 	// Retrieve a temporary path.
 	f, err := ioutil.TempFile("", "")
 	if err != nil {
@@ -718,7 +718,7 @@ func newTestDB() (*bolt.DB, *db.BoltDB) {
 	return boltDB, b
 }
 
-func newTestDB2(t *testing.T) (*db.BoltDB, func()) {
+func newTestDB2(t *testing.T) (*db.DefaultBoltDB, func()) {
 	tmp, cleanup := TempDir(t)
 	boltDB, err := db.New(tmp)
 	Ok(t, err)

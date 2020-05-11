@@ -46,7 +46,7 @@ type PullClosedExecutor struct {
 	VCSClient  vcs.Client
 	WorkingDir WorkingDir
 	Logger     logging.SimpleLogging
-	DB         *db.BoltDB
+	DB         db.BoltDB
 }
 
 type templatedProject struct {

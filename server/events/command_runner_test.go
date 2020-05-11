@@ -24,6 +24,8 @@ import (
 	"github.com/google/go-github/v28/github"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events"
+	dbmocks "github.com/runatlantis/atlantis/server/events/db/mocks"
+	dbmatchers "github.com/runatlantis/atlantis/server/events/db/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -43,6 +45,7 @@ var ch events.DefaultCommandRunner
 var pullLogger *logging.SimpleLogger
 var workingDir events.WorkingDir
 var pendingPlanFinder *mocks.MockPendingPlanFinder
+var boltDB *dbmocks.MockBoltDB
 
 func setup(t *testing.T) *vcsmocks.MockClient {
 	RegisterMockTestingT(t)
@@ -57,6 +60,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	projectCommandRunner = mocks.NewMockProjectCommandRunner()
 	workingDir = mocks.NewMockWorkingDir()
 	pendingPlanFinder = mocks.NewMockPendingPlanFinder()
+	boltDB = dbmocks.NewMockBoltDB()
 	When(logger.GetLevel()).ThenReturn(logging.Info)
 	When(logger.NewLogger("runatlantis/atlantis#1", true, logging.Info)).
 		ThenReturn(pullLogger)
@@ -76,6 +80,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		PendingPlanFinder:        pendingPlanFinder,
 		WorkingDir:               workingDir,
 		DisableApplyAll:          false,
+		DB:                       boltDB,
 	}
 	return vcsClient
 }
@@ -233,4 +238,54 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 		ThenReturn(tmp, nil)
 	ch.RunAutoplanCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
 	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
+}
+
+func TestApplyWithAutoMerge_VSCMerge(t *testing.T) {
+	t.Log("if \"atlantis apply\" is run with automerge and at least one project" +
+		" has a discarded plan, automerge should not take place")
+
+	vcsClient := setup(t)
+	pull := &github.PullRequest{
+		State: github.String("open"),
+	}
+	modelPull := models.PullRequest{State: models.OpenPullState}
+	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
+	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
+	ch.GlobalAutomerge = true
+
+	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.ApplyCommand})
+	vcsClient.VerifyWasCalledOnce().MergePull(modelPull)
+}
+
+func TestApplyWithAutoMerge_DiscardedPlan(t *testing.T) {
+	t.Log("if \"atlantis apply\" is run with automerge and at least one project" +
+		" has a discarded plan, automerge should not take place")
+
+	setup(t)
+	pull := &github.PullRequest{
+		State: github.String("open"),
+	}
+	modelPull := models.PullRequest{State: models.OpenPullState}
+	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
+	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
+	ch.GlobalAutomerge = true
+
+	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.ApplyCommand})
+	projectStatuses := []models.ProjectStatus{
+		{
+			RepoRelDir:  ".",
+			Workspace:   "default",
+			ProjectName: "automerge-test",
+			Status:      models.DiscardedPlanStatus,
+		},
+	}
+	pullStatus := models.PullStatus{
+		Projects: projectStatuses,
+		Pull:     modelPull,
+	}
+	//When(boltDB.UpdatePullWithResults(modelPull, nil)).ThenReturn(pullStatus, nil)
+	When(boltDB.UpdatePullWithResults(dbmatchers.EqModelsPullRequest(modelPull), dbmatchers.EqSliceOfModelsProjectResult(nil))).ThenReturn(pullStatus, nil)
+	// TODO: stubbing here doesn't seem to work? pullStatus defined here is not actually returned and so I cannot uncomment the next two lines which would verify our scenario here
+	//vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "not automerging because project at dir %q, workspace %q has status %q")
+	//VerifyWasCalled(Never()).MergePull(modelPull)
 }

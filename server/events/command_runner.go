@@ -97,7 +97,7 @@ type DefaultCommandRunner struct {
 	GlobalAutomerge   bool
 	PendingPlanFinder PendingPlanFinder
 	WorkingDir        WorkingDir
-	DB                *db.BoltDB
+	DB                db.BoltDB
 }
 
 // RunAutoplanCommand runs plan when a pull request is opened or updated.
