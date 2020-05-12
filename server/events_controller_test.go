@@ -207,7 +207,7 @@ func TestPost_GitlabCommentNotWhitelisted(t *testing.T) {
 	exp := "Repo not whitelisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
 	expRepo, _ := models.NewRepo(models.Gitlab, "gitlabhq/gitlab-test", "https://example.com/gitlabhq/gitlab-test.git", "", "")
-	vcsClient.VerifyWasCalledOnce().CreateComment(expRepo, 1, "```\nError: This repo is not whitelisted for Atlantis.\n```")
+	vcsClient.VerifyWasCalledOnce().CreateComment(expRepo, 1, "```\nError: This repo is not whitelisted for Atlantis.\n```", "")
 }
 
 func TestPost_GitlabCommentNotWhitelistedWithSilenceErrors(t *testing.T) {
@@ -235,7 +235,7 @@ func TestPost_GitlabCommentNotWhitelistedWithSilenceErrors(t *testing.T) {
 	body, _ := ioutil.ReadAll(w.Result().Body)
 	exp := "Repo not whitelisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
-	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString())
+	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
 
 }
 
@@ -265,7 +265,7 @@ func TestPost_GithubCommentNotWhitelisted(t *testing.T) {
 	exp := "Repo not whitelisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
 	expRepo, _ := models.NewRepo(models.Github, "baxterthehacker/public-repo", "https://github.com/baxterthehacker/public-repo.git", "", "")
-	vcsClient.VerifyWasCalledOnce().CreateComment(expRepo, 2, "```\nError: This repo is not whitelisted for Atlantis.\n```")
+	vcsClient.VerifyWasCalledOnce().CreateComment(expRepo, 2, "```\nError: This repo is not whitelisted for Atlantis.\n```", "")
 }
 
 func TestPost_GithubCommentNotWhitelistedWithSilenceErrors(t *testing.T) {
@@ -294,7 +294,7 @@ func TestPost_GithubCommentNotWhitelistedWithSilenceErrors(t *testing.T) {
 	body, _ := ioutil.ReadAll(w.Result().Body)
 	exp := "Repo not whitelisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
-	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString())
+	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
 }
 
 func TestPost_GitlabCommentResponse(t *testing.T) {
@@ -306,7 +306,7 @@ func TestPost_GitlabCommentResponse(t *testing.T) {
 	When(cp.Parse("", models.Gitlab)).ThenReturn(events.CommentParseResult{CommentResponse: "a comment"})
 	w := httptest.NewRecorder()
 	e.Post(w, req)
-	vcsClient.VerifyWasCalledOnce().CreateComment(models.Repo{}, 0, "a comment")
+	vcsClient.VerifyWasCalledOnce().CreateComment(models.Repo{}, 0, "a comment", "")
 	responseContains(t, w, http.StatusOK, "Commenting back on pull request")
 }
 
@@ -324,7 +324,7 @@ func TestPost_GithubCommentResponse(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	e.Post(w, req)
-	vcsClient.VerifyWasCalledOnce().CreateComment(baseRepo, 1, "a comment")
+	vcsClient.VerifyWasCalledOnce().CreateComment(baseRepo, 1, "a comment", "")
 	responseContains(t, w, http.StatusOK, "Commenting back on pull request")
 }
 

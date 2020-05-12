@@ -134,11 +134,19 @@ func (g *GithubClient) GetModifiedFiles(repo models.Repo, pull models.PullReques
 // CreateComment creates a comment on the pull request.
 // If comment length is greater than the max comment length we split into
 // multiple comments.
-func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment string) error {
+func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment string, command string) error {
+	var sepStart string
+
 	sepEnd := "\n```\n</details>" +
 		"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
-	sepStart := "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
-		"```diff\n"
+
+	if command != "" {
+		sepStart = "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
+			"```diff\n"
+	} else {
+		sepStart = fmt.Sprintf("Continued %s output from previous comment.\n<details><summary>Show Output</summary>\n\n", command) +
+			"```diff\n"
+	}
 
 	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
 	for _, c := range comments {

@@ -428,7 +428,7 @@ func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo mo
 	// We do this here rather than earlier because we need access to the pull
 	// variable to comment back on the pull request.
 	if parseResult.CommentResponse != "" {
-		if err := e.VCSClient.CreateComment(baseRepo, pullNum, parseResult.CommentResponse); err != nil {
+		if err := e.VCSClient.CreateComment(baseRepo, pullNum, parseResult.CommentResponse, ""); err != nil {
 			e.Logger.Err("unable to comment on pull request: %s", err)
 		}
 		e.respond(w, logging.Info, http.StatusOK, "Commenting back on pull request")
@@ -548,7 +548,7 @@ func (e *EventsController) commentNotWhitelisted(baseRepo models.Repo, pullNum i
 	}
 
 	errMsg := "```\nError: This repo is not whitelisted for Atlantis.\n```"
-	if err := e.VCSClient.CreateComment(baseRepo, pullNum, errMsg); err != nil {
+	if err := e.VCSClient.CreateComment(baseRepo, pullNum, errMsg, ""); err != nil {
 		e.Logger.Err("unable to comment on pull request: %s", err)
 	}
 }
