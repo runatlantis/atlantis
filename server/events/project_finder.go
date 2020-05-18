@@ -120,11 +120,16 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log *logging.SimpleLog
 			}
 			if match {
 				log.Debug("file %q matched pattern", file)
-				_, err := os.Stat(filepath.Join(absRepoDir, project.Dir))
-				if err == nil {
-					projects = append(projects, project)
+				// Skipping checking existing if remote atlantis.yaml was used
+				if len(absRepoDir) != 0 {
+					_, err := os.Stat(filepath.Join(absRepoDir, project.Dir))
+					if err == nil {
+						projects = append(projects, project)
+					} else {
+						log.Debug("project at dir %q not included because dir does not exist", project.Dir)
+					}
 				} else {
-					log.Debug("project at dir %q not included because dir does not exist", project.Dir)
+					projects = append(projects, project)
 				}
 				break
 			}

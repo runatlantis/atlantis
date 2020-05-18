@@ -83,3 +83,11 @@ func (d *ClientProxy) MergePull(pull models.PullRequest) error {
 func (d *ClientProxy) MarkdownPullLink(pull models.PullRequest) (string, error) {
 	return d.clients[pull.BaseRepo.VCSHost.Type].MarkdownPullLink(pull)
 }
+
+func (d *ClientProxy) DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error) {
+	return d.clients[pull.BaseRepo.VCSHost.Type].DownloadRepoConfigFile(pull)
+}
+
+func (d *ClientProxy) IsSupportDownloadSingleFile(repo models.Repo) bool {
+	return d.clients[repo.VCSHost.Type].IsSupportDownloadSingleFile(repo)
+}

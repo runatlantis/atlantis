@@ -161,6 +161,14 @@ func (mock *MockClient) MarkdownPullLink(pull models.PullRequest) (string, error
 	return ret0, ret1
 }
 
+func (mock *MockClient) IsSupportDownloadSingleFile(repo models.Repo) bool {
+  return false
+}
+
+func (mock *MockClient) DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error) {
+  return false, []byte{}, nil
+}
+
 func (mock *MockClient) VerifyWasCalledOnce() *VerifierMockClient {
 	return &VerifierMockClient{
 		mock:                   mock,
