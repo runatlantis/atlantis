@@ -44,17 +44,24 @@ func (p *ParserValidator) HasRepoCfg(absRepoDir string) (bool, error) {
 // ParseRepoCfg returns the parsed and validated atlantis.yaml config for the
 // repo at absRepoDir.
 // If there was no config file, it will return an os.IsNotExist(error).
-func (p *ParserValidator) ParseRepoCfg(absRepoDir string, globalCfg valid.GlobalCfg, repoID string) (valid.RepoCfg, error) {
-	configFile := p.repoCfgPath(absRepoDir, AtlantisYAMLFilename)
-	configData, err := ioutil.ReadFile(configFile) // nolint: gosec
+func (p *ParserValidator) ParseRepoCfg(repoCfgData []byte, absRepoDir string, globalCfg valid.GlobalCfg, repoID string) (valid.RepoCfg, error) {
+	var configData []byte
+	var err error
 
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return valid.RepoCfg{}, errors.Wrapf(err, "unable to read %s file", AtlantisYAMLFilename)
+	if len(repoCfgData) > 0 {
+		configData = repoCfgData
+	} else {
+		configFile := p.repoCfgPath(absRepoDir, AtlantisYAMLFilename)
+		configData, err = ioutil.ReadFile(configFile) // nolint: gosec
+
+		if err != nil {
+			if !os.IsNotExist(err) {
+				return valid.RepoCfg{}, errors.Wrapf(err, "unable to read %s file", AtlantisYAMLFilename)
+			}
+			// Don't wrap os.IsNotExist errors because we want our callers to be
+			// able to detect if it's a NotExist err.
+			return valid.RepoCfg{}, err
 		}
-		// Don't wrap os.IsNotExist errors because we want our callers to be
-		// able to detect if it's a NotExist err.
-		return valid.RepoCfg{}, err
 	}
 
 	var rawConfig raw.RepoCfg

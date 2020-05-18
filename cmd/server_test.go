@@ -83,6 +83,7 @@ var testFlags = map[string]interface{}{
 	SilenceForkPRErrorsFlag:    true,
 	SilenceWhitelistErrorsFlag: true,
 	SilenceVCSStatusNoPlans:    true,
+	SkipCloneNoChanges:         true,
 	SlackTokenFlag:             "slack-token",
 	SSLCertFileFlag:            "cert-file",
 	SSLKeyFileFlag:             "key-file",

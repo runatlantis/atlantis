@@ -364,3 +364,11 @@ func SplitAzureDevopsRepoFullName(repoFullName string) (owner string, project st
 	}
 	return repoFullName[:lastSlashIdx], "", repoFullName[lastSlashIdx+1:]
 }
+
+func (g *AzureDevopsClient) IsSupportDownloadSingleFile(repo models.Repo) bool {
+	return false
+}
+
+func (g *AzureDevopsClient) DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error) {
+	return false, []byte{}, fmt.Errorf("Not Implemented")
+}
