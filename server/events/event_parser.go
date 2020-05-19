@@ -418,9 +418,13 @@ func (e *EventParser) ParseGithubPullEvent(pullEvent *github.PullRequestEvent) (
 	}
 
 	if pullEvent.GetPullRequest().GetDraft() {
-		// if the PR is in draft state we don't care about the action type
-		// we can set the type to Other and ignore the PR
-		pullEventType = models.OtherPullEvent
+		// if the PR is in draft state we do not initiate actions proactively however,
+		// we must still clean up locks in the event of a user initiated plan
+		if pullEvent.GetAction() == "closed" {
+			pullEventType = models.ClosedPullEvent
+		} else {
+			pullEventType = models.OtherPullEvent
+		}
 	} else {
 		switch pullEvent.GetAction() {
 		case "opened":
