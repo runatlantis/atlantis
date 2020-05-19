@@ -102,6 +102,7 @@ func (g *GithubClient) GetModifiedFiles(repo models.Repo, pull models.PullReques
 		if nextPage != 0 {
 			opts.Page = nextPage
 		}
+		g.logger.Debug("making github listfiles API call")
 		pageFiles, resp, err := g.client.PullRequests.ListFiles(g.ctx, repo.Owner, repo.Name, pull.Num, &opts)
 		if err != nil {
 			return files, err
@@ -134,6 +135,7 @@ func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment stri
 
 	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
 	for _, c := range comments {
+		g.logger.Debug("making github createcomment API call")
 		_, _, err := g.client.Issues.CreateComment(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueComment{Body: &c})
 		if err != nil {
 			return err
@@ -146,6 +148,7 @@ func (g *GithubClient) HidePrevPlanComments(repo models.Repo, pullNum int) error
 	var allComments []*github.IssueComment
 	nextPage := 0
 	for {
+		g.logger.Debug("making github listcomments API call")
 		comments, resp, err := g.client.Issues.ListComments(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueListCommentsOptions{
 			Sort:        "created",
 			Direction:   "asc",
@@ -213,6 +216,7 @@ func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 		if nextPage != 0 {
 			opts.Page = nextPage
 		}
+		g.logger.Debug("making github listreviews API call")
 		pageReviews, resp, err := g.client.PullRequests.ListReviews(g.ctx, repo.Owner, repo.Name, pull.Num, &opts)
 		if err != nil {
 			return false, errors.Wrap(err, "getting reviews")
@@ -285,6 +289,7 @@ func (g *GithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 func (g *GithubClient) MergePull(pull models.PullRequest) error {
 	// Users can set their repo to disallow certain types of merging.
 	// We detect which types aren't allowed and use the type that is.
+	g.logger.Debug("making github get repositories API call")
 	repo, _, err := g.client.Repositories.Get(g.ctx, pull.BaseRepo.Owner, pull.BaseRepo.Name)
 	if err != nil {
 		return errors.Wrap(err, "fetching repo info")
@@ -307,6 +312,7 @@ func (g *GithubClient) MergePull(pull models.PullRequest) error {
 	options := &github.PullRequestOptions{
 		MergeMethod: method,
 	}
+	g.logger.Debug("making github merge pullrequsts API call")
 	mergeResult, _, err := g.client.PullRequests.Merge(
 		g.ctx,
 		pull.BaseRepo.Owner,
