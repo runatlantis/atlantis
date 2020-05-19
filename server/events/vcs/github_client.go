@@ -21,6 +21,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
+	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/Laisky/graphql"
 	"github.com/google/go-github/v28/github"
@@ -38,10 +39,11 @@ type GithubClient struct {
 	client         *github.Client
 	v4MutateClient *graphql.Client
 	ctx            context.Context
+	logger         *logging.SimpleLogger
 }
 
 // NewGithubClient returns a valid GitHub client.
-func NewGithubClient(hostname string, user string, pass string) (*GithubClient, error) {
+func NewGithubClient(hostname string, user string, pass string, logger *logging.SimpleLogger) (*GithubClient, error) {
 	tp := github.BasicAuthTransport{
 		Username: strings.TrimSpace(user),
 		Password: strings.TrimSpace(pass),
@@ -84,6 +86,7 @@ func NewGithubClient(hostname string, user string, pass string) (*GithubClient, 
 		client:         client,
 		v4MutateClient: v4MutateClient,
 		ctx:            context.Background(),
+		logger:         logger,
 	}, nil
 }
 

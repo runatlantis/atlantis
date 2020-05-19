@@ -13,6 +13,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 
 	"github.com/shurcooL/githubv4"
@@ -59,7 +60,7 @@ func TestGithubClient_GetModifiedFiles(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass", logging.NewNoopLogger())
 	Ok(t, err)
 	defer disableSSLVerification()()
 
@@ -114,7 +115,7 @@ func TestGithubClient_GetModifiedFilesMovedFile(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass", logging.NewNoopLogger())
 	Ok(t, err)
 	defer disableSSLVerification()()
 
@@ -208,7 +209,7 @@ func TestGithubClient_PaginatesComments(t *testing.T) {
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
 
-	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass", logging.NewNoopLogger())
 	Ok(t, err)
 	defer disableSSLVerification()()
 
@@ -294,7 +295,7 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
 
-	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass", logging.NewNoopLogger())
 	Ok(t, err)
 	defer disableSSLVerification()()
 
@@ -358,7 +359,7 @@ func TestGithubClient_UpdateStatus(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass", logging.NewNoopLogger())
 			Ok(t, err)
 			defer disableSSLVerification()()
 
@@ -444,7 +445,7 @@ func TestGithubClient_PullIsApproved(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass", logging.NewNoopLogger())
 	Ok(t, err)
 	defer disableSSLVerification()()
 
@@ -535,7 +536,7 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 				}))
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass", logging.NewNoopLogger())
 			Ok(t, err)
 			defer disableSSLVerification()()
 
@@ -617,7 +618,7 @@ func TestGithubClient_MergePullHandlesError(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass", logging.NewNoopLogger())
 			Ok(t, err)
 			defer disableSSLVerification()()
 
@@ -740,7 +741,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass", logging.NewNoopLogger())
 			Ok(t, err)
 			defer disableSSLVerification()()
 
@@ -765,7 +766,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 }
 
 func TestGithubClient_MarkdownPullLink(t *testing.T) {
-	client, err := vcs.NewGithubClient("hostname", "user", "pass")
+	client, err := vcs.NewGithubClient("hostname", "user", "pass", logging.NewNoopLogger())
 	Ok(t, err)
 	pull := models.PullRequest{Num: 1}
 	s, _ := client.MarkdownPullLink(pull)
