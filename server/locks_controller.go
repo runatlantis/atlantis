@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 
@@ -15,6 +16,11 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
 )
+
+// UnlockRequest is the format of requests made against /unlock to release atlantis locks
+type UnlockRequest struct {
+	Id string
+}
 
 // LocksController handles all requests relating to Atlantis locks.
 type LocksController struct {
@@ -132,10 +138,56 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 		l.respond(w, logging.Info, http.StatusNotFound, "No lock found at id %q", idUnencoded)
 		return
 	}
+	err = l.clearLock(lock)
+	if err != nil {
+		l.respond(w, logging.Error, http.StatusInternalServerError, "Failed unlocking the pull request: %s", err)
+	}
+	if lock.Pull.BaseRepo != (models.Repo{}) {
+		// Once the lock has been deleted, comment back on the pull request.
+		comment := fmt.Sprintf("**Warning**: The plan for dir: `%s` workspace: `%s` was **discarded** via the Atlantis UI.\n\n"+
+			"To `apply` this plan you must run `plan` again.", lock.Project.Path, lock.Workspace)
+		err = l.VCSClient.CreateComment(lock.Pull.BaseRepo, lock.Pull.Num, comment, "")
+		if err != nil {
+			l.respond(w, logging.Error, http.StatusInternalServerError, "Failed commenting on pull request: %s", err)
+			return
+		}
+	}
+	l.respond(w, logging.Info, http.StatusOK, "Deleted lock id %q", id)
+}
 
-	// NOTE: Because BaseRepo was added to the PullRequest model later, previous
-	// installations of Atlantis will have locks in their DB that do not have
-	// this field on PullRequest. We skip commenting in this case.
+// Unlock accepts json list of lock IDs
+func (l *LocksController) Unlock(w http.ResponseWriter, r *http.Request) {
+	// Parse the JSON payload
+	bytes, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		l.respond(w, logging.Error, http.StatusBadRequest, "Invalid unlock request. Failed with error: %s", err)
+		return
+	}
+	var request UnlockRequest
+	if err = json.Unmarshal(bytes, &request); err != nil {
+		l.respond(w, logging.Error, http.StatusBadRequest, "Invalid unlock request. Failed with error: %s", err)
+		return
+	}
+	id := request.Id
+	lock, err := l.Locker.Unlock(id)
+	if err != nil {
+		l.respond(w, logging.Error, http.StatusInternalServerError, "Failed to unlock %s. Failed with error: %s", id, err)
+		return
+	}
+	if lock == nil {
+		// if there is no lock, we will consider that a success to make this idempotent
+		l.respond(w, logging.Debug, http.StatusOK, "no such lock: %s", id)
+		return
+	}
+	err = l.clearLock(lock)
+	if err != nil {
+		l.respond(w, logging.Error, http.StatusInternalServerError, "Failed to clear lock %s. Failed with error: %s", id, err)
+		return
+	}
+	l.respond(w, logging.Debug, http.StatusOK, "Unlocked lock %s", id)
+}
+
+func (l *LocksController) clearLock(lock *models.ProjectLock) error {
 	if lock.Pull.BaseRepo != (models.Repo{}) {
 		unlock, err := l.WorkingDirLocker.TryLock(lock.Pull.BaseRepo.FullName, lock.Pull.Num, lock.Workspace)
 		if err != nil {
@@ -145,22 +197,17 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 			// nolint: vetshadow
 			if err := l.WorkingDir.DeleteForWorkspace(lock.Pull.BaseRepo, lock.Pull, lock.Workspace); err != nil {
 				l.Logger.Err("unable to delete workspace: %s", err)
+				return err
 			}
 		}
 		if err := l.DB.UpdateProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path, models.DiscardedPlanStatus); err != nil {
 			l.Logger.Err("unable to update project status: %s", err)
-		}
-
-		// Once the lock has been deleted, comment back on the pull request.
-		comment := fmt.Sprintf("**Warning**: The plan for dir: `%s` workspace: `%s` was **discarded** via the Atlantis UI.\n\n"+
-			"To `apply` this plan you must run `plan` again.", lock.Project.Path, lock.Workspace)
-		if err = l.VCSClient.CreateComment(lock.Pull.BaseRepo, lock.Pull.Num, comment, ""); err != nil {
-			l.Logger.Warn("failed commenting on pull request: %s", err)
+			return err
 		}
 	} else {
-		l.Logger.Debug("skipping commenting on pull request and deleting workspace because BaseRepo field is empty")
+		l.Logger.Debug("skipping deleting workspace because BaseRepo field is empty")
 	}
-	l.respond(w, logging.Info, http.StatusOK, "Deleted lock id %q", id)
+	return nil
 }
 
 // respond is a helper function to respond and log the response. lvl is the log
