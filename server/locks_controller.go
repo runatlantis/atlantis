@@ -160,12 +160,16 @@ func (l *LocksController) Unlock(w http.ResponseWriter, r *http.Request) {
 	// Parse the JSON payload
 	bytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		l.respond(w, logging.Error, http.StatusBadRequest, "Invalid unlock request. Failed with error: %s", err)
+		l.respond(w, logging.Error, http.StatusBadRequest, "Invalid unlock request. Failed to read request: %s", err)
 		return
 	}
 	var request UnlockRequest
 	if err = json.Unmarshal(bytes, &request); err != nil {
 		l.respond(w, logging.Error, http.StatusBadRequest, "Invalid unlock request. Failed with error: %s", err)
+		return
+	}
+	if request == (UnlockRequest{}) {
+		l.respond(w, logging.Error, http.StatusBadRequest, "Empty unlock request")
 		return
 	}
 	id := request.Id

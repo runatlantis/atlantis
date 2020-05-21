@@ -438,3 +438,96 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 		"**Warning**: The plan for dir: `path` workspace: `workspace` was **discarded** via the Atlantis UI.\n\n"+
 			"To `apply` this plan you must run `plan` again.", "")
 }
+
+func TestUnlock_MalformedJSON(t *testing.T) {
+	t.Log("If there is no UnlockRequest JSON in the request then we should get a 400")
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(nil))
+	w := httptest.NewRecorder()
+	lc := server.LocksController{Logger: logging.NewNoopLogger()}
+	lc.Unlock(w, req)
+	responseContains(t, w, http.StatusBadRequest, "Invalid unlock request. Failed with error")
+}
+
+func TestUnlock_EmptyLockID(t *testing.T) {
+	t.Log("If the lock ID is invalid then we should get a 400")
+	lc := server.LocksController{Logger: logging.NewNoopLogger()}
+	request_json := []byte("{ \"Id\": \"\" }")
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(request_json))
+	w := httptest.NewRecorder()
+	lc.Unlock(w, req)
+	responseContains(t, w, http.StatusBadRequest, "Empty unlock request")
+}
+
+func TestUnlock_LockerErr(t *testing.T) {
+	t.Log("If the locker fails to unlock then we should get a 500")
+	request_json := []byte("{ \"Id\": \"id\" }")
+	l := mocks.NewMockLocker()
+	pull := models.PullRequest{
+		BaseRepo: models.Repo{FullName: "owner/repo"},
+	}
+	When(l.Unlock("id")).ThenReturn(&models.ProjectLock{
+		Pull:      pull,
+		Workspace: "workspace",
+		Project: models.Project{
+			Path:         "path",
+			RepoFullName: "owner/repo",
+		},
+	}, errors.New("err"))
+	lc := server.LocksController{
+		Locker: l,
+		Logger: logging.NewNoopLogger(),
+	}
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(request_json))
+	w := httptest.NewRecorder()
+	lc.Unlock(w, req)
+	responseContains(t, w, http.StatusInternalServerError, "Failed to unlock id.")
+}
+
+func TestUnlock_NoSuchLock(t *testing.T) {
+	t.Log("If there is no lock at that ID we get a 200")
+	request_json := []byte("{ \"Id\": \"id\" }")
+	l := mocks.NewMockLocker()
+	When(l.Unlock("id")).ThenReturn(nil, nil)
+	lc := server.LocksController{
+		Locker: l,
+		Logger: logging.NewNoopLogger(),
+	}
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(request_json))
+	w := httptest.NewRecorder()
+	lc.Unlock(w, req)
+	responseContains(t, w, http.StatusOK, "no such lock")
+}
+
+func TestUnlock_Success(t *testing.T) {
+	t.Log("On successfull unlock we get a 200")
+	request_json := []byte("{ \"Id\": \"id\" }")
+	l := mocks.NewMockLocker()
+	workingDir := mocks2.NewMockWorkingDir()
+	workingDirLocker := events.NewDefaultWorkingDirLocker()
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	db, err := db.New(tmp)
+	Ok(t, err)
+	pull := models.PullRequest{
+		BaseRepo: models.Repo{FullName: "owner/repo"},
+	}
+	When(l.Unlock("id")).ThenReturn(&models.ProjectLock{
+		Pull:      pull,
+		Workspace: "workspace",
+		Project: models.Project{
+			Path:         "path",
+			RepoFullName: "owner/repo",
+		},
+	}, nil)
+	lc := server.LocksController{
+		Locker:           l,
+		Logger:           logging.NewNoopLogger(),
+		WorkingDirLocker: workingDirLocker,
+		WorkingDir:       workingDir,
+		DB:               db,
+	}
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(request_json))
+	w := httptest.NewRecorder()
+	lc.Unlock(w, req)
+	responseContains(t, w, http.StatusOK, "Unlocked lock")
+}
