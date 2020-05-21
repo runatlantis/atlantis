@@ -451,8 +451,8 @@ func TestUnlock_MalformedJSON(t *testing.T) {
 func TestUnlock_EmptyLockID(t *testing.T) {
 	t.Log("If the lock ID is invalid then we should get a 400")
 	lc := server.LocksController{Logger: logging.NewNoopLogger()}
-	request_json := []byte("{ \"Id\": \"\" }")
-	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(request_json))
+	requestJSON := []byte("{ \"ID\": \"\" }")
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(requestJSON))
 	w := httptest.NewRecorder()
 	lc.Unlock(w, req)
 	responseContains(t, w, http.StatusBadRequest, "Empty unlock request")
@@ -460,7 +460,7 @@ func TestUnlock_EmptyLockID(t *testing.T) {
 
 func TestUnlock_LockerErr(t *testing.T) {
 	t.Log("If the locker fails to unlock then we should get a 500")
-	request_json := []byte("{ \"Id\": \"id\" }")
+	requestJSON := []byte("{ \"ID\": \"id\" }")
 	l := mocks.NewMockLocker()
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: "owner/repo"},
@@ -477,7 +477,7 @@ func TestUnlock_LockerErr(t *testing.T) {
 		Locker: l,
 		Logger: logging.NewNoopLogger(),
 	}
-	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(request_json))
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(requestJSON))
 	w := httptest.NewRecorder()
 	lc.Unlock(w, req)
 	responseContains(t, w, http.StatusInternalServerError, "Failed to unlock id.")
@@ -485,14 +485,14 @@ func TestUnlock_LockerErr(t *testing.T) {
 
 func TestUnlock_NoSuchLock(t *testing.T) {
 	t.Log("If there is no lock at that ID we get a 200")
-	request_json := []byte("{ \"Id\": \"id\" }")
+	requestJSON := []byte("{ \"ID\": \"id\" }")
 	l := mocks.NewMockLocker()
 	When(l.Unlock("id")).ThenReturn(nil, nil)
 	lc := server.LocksController{
 		Locker: l,
 		Logger: logging.NewNoopLogger(),
 	}
-	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(request_json))
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(requestJSON))
 	w := httptest.NewRecorder()
 	lc.Unlock(w, req)
 	responseContains(t, w, http.StatusOK, "no such lock")
@@ -500,7 +500,7 @@ func TestUnlock_NoSuchLock(t *testing.T) {
 
 func TestUnlock_Success(t *testing.T) {
 	t.Log("On successfull unlock we get a 200")
-	request_json := []byte("{ \"Id\": \"id\" }")
+	requestJSON := []byte("{ \"ID\": \"id\" }")
 	l := mocks.NewMockLocker()
 	workingDir := mocks2.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
@@ -526,7 +526,7 @@ func TestUnlock_Success(t *testing.T) {
 		WorkingDir:       workingDir,
 		DB:               db,
 	}
-	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(request_json))
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(requestJSON))
 	w := httptest.NewRecorder()
 	lc.Unlock(w, req)
 	responseContains(t, w, http.StatusOK, "Unlocked lock")

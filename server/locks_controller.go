@@ -19,7 +19,7 @@ import (
 
 // UnlockRequest is the format of requests made against /unlock to release atlantis locks
 type UnlockRequest struct {
-	Id string
+	ID string
 }
 
 // LocksController handles all requests relating to Atlantis locks.
@@ -172,7 +172,7 @@ func (l *LocksController) Unlock(w http.ResponseWriter, r *http.Request) {
 		l.respond(w, logging.Error, http.StatusBadRequest, "Empty unlock request")
 		return
 	}
-	id := request.Id
+	id := request.ID
 	lock, err := l.Locker.Unlock(id)
 	if err != nil {
 		l.respond(w, logging.Error, http.StatusInternalServerError, "Failed to unlock %s. Failed with error: %s", id, err)
