@@ -29,7 +29,7 @@ import (
 	gitlab "github.com/xanzy/go-gitlab"
 )
 
-type GitlabClient struct {
+type Client struct {
 	Client *gitlab.Client
 	// Version is set to the server version.
 	Version *version.Version
@@ -43,9 +43,9 @@ var commonMarkSupported = MustConstraint(">=11.1")
 // gitlabClientUnderTest is true if we're running under go test.
 var gitlabClientUnderTest = false
 
-// NewGitlabClient returns a valid GitLab client.
-func NewGitlabClient(hostname string, token string, logger *logging.SimpleLogger) (*GitlabClient, error) {
-	client := &GitlabClient{
+// NewClient returns a valid GitLab client.
+func NewClient(hostname string, token string, logger *logging.SimpleLogger) (*Client, error) {
+	client := &Client{
 		Client: gitlab.NewClient(nil, token),
 	}
 
@@ -94,7 +94,7 @@ func NewGitlabClient(hostname string, token string, logger *logging.SimpleLogger
 
 // GetModifiedFiles returns the names of files that were modified in the merge request
 // relative to the repo root, e.g. parent/child/file.txt.
-func (g *GitlabClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
+func (g *Client) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	const maxPerPage = 100
 	var files []string
 	nextPage := 1
@@ -134,17 +134,17 @@ func (g *GitlabClient) GetModifiedFiles(repo models.Repo, pull models.PullReques
 }
 
 // CreateComment creates a comment on the merge request.
-func (g *GitlabClient) CreateComment(repo models.Repo, pullNum int, comment string) error {
+func (g *Client) CreateComment(repo models.Repo, pullNum int, comment string) error {
 	_, _, err := g.Client.Notes.CreateMergeRequestNote(repo.FullName, pullNum, &gitlab.CreateMergeRequestNoteOptions{Body: gitlab.String(comment)})
 	return err
 }
 
-func (g *GitlabClient) HidePrevPlanComments(repo models.Repo, pullNum int) error {
+func (g *Client) HidePrevPlanComments(repo models.Repo, pullNum int) error {
 	return nil
 }
 
 // PullIsApproved returns true if the merge request was approved.
-func (g *GitlabClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (g *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
 	approvals, _, err := g.Client.MergeRequests.GetMergeRequestApprovals(repo.FullName, pull.Num)
 	if err != nil {
 		return false, err
@@ -168,7 +168,7 @@ func (g *GitlabClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 // See:
 // - https://gitlab.com/gitlab-org/gitlab-ee/issues/3169
 // - https://gitlab.com/gitlab-org/gitlab-ce/issues/42344
-func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (g *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
 	mr, _, err := g.Client.MergeRequests.GetMergeRequest(repo.FullName, pull.Num, nil)
 	if err != nil {
 		return false, err
@@ -180,7 +180,7 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 }
 
 // UpdateStatus updates the build status of a commit.
-func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
+func (g *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
 	gitlabState := gitlab.Failed
 	switch state {
 	case models.PendingCommitStatus:
@@ -199,13 +199,13 @@ func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 	return err
 }
 
-func (g *GitlabClient) GetMergeRequest(repoFullName string, pullNum int) (*gitlab.MergeRequest, error) {
+func (g *Client) GetMergeRequest(repoFullName string, pullNum int) (*gitlab.MergeRequest, error) {
 	mr, _, err := g.Client.MergeRequests.GetMergeRequest(repoFullName, pullNum, nil)
 	return mr, err
 }
 
 // MergePull merges the merge request.
-func (g *GitlabClient) MergePull(pull models.PullRequest) error {
+func (g *Client) MergePull(pull models.PullRequest) error {
 	commitMsg := common.AutomergeCommitMsg
 	_, _, err := g.Client.MergeRequests.AcceptMergeRequest(
 		pull.BaseRepo.FullName,
@@ -217,12 +217,12 @@ func (g *GitlabClient) MergePull(pull models.PullRequest) error {
 }
 
 // MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.
-func (g *GitlabClient) MarkdownPullLink(pull models.PullRequest) (string, error) {
+func (g *Client) MarkdownPullLink(pull models.PullRequest) (string, error) {
 	return fmt.Sprintf("#%d", pull.Num), nil
 }
 
 // GetVersion returns the version of the Gitlab server this client is using.
-func (g *GitlabClient) GetVersion() (*version.Version, error) {
+func (g *Client) GetVersion() (*version.Version, error) {
 	req, err := g.Client.NewRequest("GET", "/version", nil, nil)
 	if err != nil {
 		return nil, err
@@ -245,7 +245,7 @@ func (g *GitlabClient) GetVersion() (*version.Version, error) {
 
 // SupportsCommonMark returns true if the version of Gitlab this client is
 // using supports the CommonMark markdown format.
-func (g *GitlabClient) SupportsCommonMark() bool {
+func (g *Client) SupportsCommonMark() bool {
 	// This function is called even if we didn't construct a gitlab client
 	// so we need to handle that case.
 	if g == nil {

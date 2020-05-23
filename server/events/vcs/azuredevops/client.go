@@ -15,14 +15,14 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 )
 
-// AzureDevopsClient represents an Azure DevOps VCS client
-type AzureDevopsClient struct {
+// Client represents an Azure DevOps VCS client
+type Client struct {
 	Client *azuredevops.Client
 	ctx    context.Context
 }
 
-// NewAzureDevopsClient returns a valid Azure DevOps client.
-func NewAzureDevopsClient(hostname string, token string) (*AzureDevopsClient, error) {
+// NewClient returns a valid Azure DevOps client.
+func NewClient(hostname string, token string) (*Client, error) {
 	tp := azuredevops.BasicAuthTransport{
 		Username: "",
 		Password: strings.TrimSpace(token),
@@ -43,7 +43,7 @@ func NewAzureDevopsClient(hostname string, token string) (*AzureDevopsClient, er
 		adClient.BaseURL = *base
 	}
 
-	client := &AzureDevopsClient{
+	client := &Client{
 		Client: adClient,
 		ctx:    context.Background(),
 	}
@@ -53,7 +53,7 @@ func NewAzureDevopsClient(hostname string, token string) (*AzureDevopsClient, er
 
 // GetModifiedFiles returns the names of files that were modified in the merge request
 // relative to the repo root, e.g. parent/child/file.txt.
-func (g *AzureDevopsClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
+func (g *Client) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	var files []string
 
 	opts := azuredevops.PullRequestGetOptions{
@@ -89,7 +89,7 @@ func (g *AzureDevopsClient) GetModifiedFiles(repo models.Repo, pull models.PullR
 //
 // If comment length is greater than the max comment length we split into
 // multiple comments.
-func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment string) error {
+func (g *Client) CreateComment(repo models.Repo, pullNum int, comment string) error {
 	sepEnd := "\n```\n</details>" +
 		"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
 	sepStart := "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
@@ -124,13 +124,13 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 	return nil
 }
 
-func (g *AzureDevopsClient) HidePrevPlanComments(repo models.Repo, pullNum int) error {
+func (g *Client) HidePrevPlanComments(repo models.Repo, pullNum int) error {
 	return nil
 }
 
 // PullIsApproved returns true if the merge request was approved by another reviewer.
 // https://docs.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops#require-a-minimum-number-of-reviewers
-func (g *AzureDevopsClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (g *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	opts := azuredevops.PullRequestGetOptions{
@@ -159,7 +159,7 @@ func (g *AzureDevopsClient) PullIsApproved(repo models.Repo, pull models.PullReq
 }
 
 // PullIsMergeable returns true if the merge request can be merged.
-func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (g *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	opts := azuredevops.PullRequestGetOptions{IncludeWorkItemRefs: true}
@@ -208,7 +208,7 @@ func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRe
 }
 
 // GetPullRequest returns the pull request.
-func (g *AzureDevopsClient) GetPullRequest(repo models.Repo, num int) (*azuredevops.GitPullRequest, error) {
+func (g *Client) GetPullRequest(repo models.Repo, num int) (*azuredevops.GitPullRequest, error) {
 	opts := azuredevops.PullRequestGetOptions{
 		IncludeWorkItemRefs: true,
 	}
@@ -218,7 +218,7 @@ func (g *AzureDevopsClient) GetPullRequest(repo models.Repo, num int) (*azuredev
 }
 
 // UpdateStatus updates the build status of a commit.
-func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
+func (g *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
 	adState := azuredevops.GitError.String()
 	switch state {
 	case models.PendingCommitStatus:
@@ -288,7 +288,7 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
 // If the user has set a branch policy that disallows no fast-forward, the merge will fail
 // until we handle branch policies
 // https://docs.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops
-func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
+func (g *Client) MergePull(pull models.PullRequest) error {
 	descriptor := "Atlantis Terraform Pull Request Automation"
 	i := "atlantis"
 	imageURL := "https://github.com/runatlantis/atlantis/raw/master/runatlantis.io/.vuepress/public/hero.png"
@@ -338,7 +338,7 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
 }
 
 // MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.
-func (g *AzureDevopsClient) MarkdownPullLink(pull models.PullRequest) (string, error) {
+func (g *Client) MarkdownPullLink(pull models.PullRequest) (string, error) {
 	return fmt.Sprintf("!%d", pull.Num), nil
 }
 

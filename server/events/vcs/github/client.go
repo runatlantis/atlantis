@@ -32,16 +32,16 @@ import (
 // by GitHub.
 const maxCommentLength = 65536
 
-// GithubClient is used to perform GitHub actions.
-type GithubClient struct {
+// Client is used to perform GitHub actions.
+type Client struct {
 	user           string
 	client         *github.Client
 	v4MutateClient *graphql.Client
 	ctx            context.Context
 }
 
-// NewGithubClient returns a valid GitHub client.
-func NewGithubClient(hostname string, user string, pass string) (*GithubClient, error) {
+// NewClient returns a valid GitHub client.
+func NewClient(hostname string, user string, pass string) (*Client, error) {
 	tp := github.BasicAuthTransport{
 		Username: strings.TrimSpace(user),
 		Password: strings.TrimSpace(pass),
@@ -79,7 +79,7 @@ func NewGithubClient(hostname string, user string, pass string) (*GithubClient, 
 		graphql.WithHeader("Accept", "application/vnd.github.queen-beryl-preview+json"),
 	)
 
-	return &GithubClient{
+	return &Client{
 		user:           user,
 		client:         client,
 		v4MutateClient: v4MutateClient,
@@ -89,7 +89,7 @@ func NewGithubClient(hostname string, user string, pass string) (*GithubClient, 
 
 // GetModifiedFiles returns the names of files that were modified in the pull request
 // relative to the repo root, e.g. parent/child/file.txt.
-func (g *GithubClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
+func (g *Client) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	var files []string
 	nextPage := 0
 	for {
@@ -123,7 +123,7 @@ func (g *GithubClient) GetModifiedFiles(repo models.Repo, pull models.PullReques
 // CreateComment creates a comment on the pull request.
 // If comment length is greater than the max comment length we split into
 // multiple comments.
-func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment string) error {
+func (g *Client) CreateComment(repo models.Repo, pullNum int, comment string) error {
 	sepEnd := "\n```\n</details>" +
 		"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
 	sepStart := "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
@@ -139,7 +139,7 @@ func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment stri
 	return nil
 }
 
-func (g *GithubClient) HidePrevPlanComments(repo models.Repo, pullNum int) error {
+func (g *Client) HidePrevPlanComments(repo models.Repo, pullNum int) error {
 	var allComments []*github.IssueComment
 	nextPage := 0
 	for {
@@ -201,7 +201,7 @@ func (g *GithubClient) HidePrevPlanComments(repo models.Repo, pullNum int) error
 }
 
 // PullIsApproved returns true if the pull request was approved.
-func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (g *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
 	nextPage := 0
 	for {
 		opts := github.ListOptions{
@@ -228,7 +228,7 @@ func (g *GithubClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 }
 
 // PullIsMergeable returns true if the pull request is mergeable.
-func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (g *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
 	githubPR, err := g.GetPullRequest(repo, pull.Num)
 	if err != nil {
 		return false, errors.Wrap(err, "getting pull request")
@@ -250,14 +250,14 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 }
 
 // GetPullRequest returns the pull request.
-func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRequest, error) {
+func (g *Client) GetPullRequest(repo models.Repo, num int) (*github.PullRequest, error) {
 	pull, _, err := g.client.PullRequests.Get(g.ctx, repo.Owner, repo.Name, num)
 	return pull, err
 }
 
 // UpdateStatus updates the status badge on the pull request.
 // See https://github.com/blog/1227-commit-status-api.
-func (g *GithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
+func (g *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
 	ghState := "error"
 	switch state {
 	case models.PendingCommitStatus:
@@ -279,7 +279,7 @@ func (g *GithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 }
 
 // MergePull merges the pull request.
-func (g *GithubClient) MergePull(pull models.PullRequest) error {
+func (g *Client) MergePull(pull models.PullRequest) error {
 	// Users can set their repo to disallow certain types of merging.
 	// We detect which types aren't allowed and use the type that is.
 	repo, _, err := g.client.Repositories.Get(g.ctx, pull.BaseRepo.Owner, pull.BaseRepo.Name)
@@ -321,6 +321,6 @@ func (g *GithubClient) MergePull(pull models.PullRequest) error {
 }
 
 // MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.
-func (g *GithubClient) MarkdownPullLink(pull models.PullRequest) (string, error) {
+func (g *Client) MarkdownPullLink(pull models.PullRequest) (string, error) {
 	return fmt.Sprintf("#%d", pull.Num), nil
 }

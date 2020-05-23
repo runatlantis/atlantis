@@ -20,15 +20,15 @@ import (
 )
 
 // If the hostname is github.com, should use normal BaseURL.
-func TestNewGithubClient_GithubCom(t *testing.T) {
-	client, err := NewGithubClient("github.com", "user", "pass")
+func TestNewClient_GithubCom(t *testing.T) {
+	client, err := NewClient("github.com", "user", "pass")
 	Ok(t, err)
 	Equals(t, "https://api.github.com/", client.client.BaseURL.String())
 }
 
 // If the hostname is a non-github hostname should use the right BaseURL.
-func TestNewGithubClient_NonGithub(t *testing.T) {
-	client, err := NewGithubClient("example.com", "user", "pass")
+func TestNewClient_NonGithub(t *testing.T) {
+	client, err := NewClient("example.com", "user", "pass")
 	Ok(t, err)
 	Equals(t, "https://example.com/api/v3/", client.client.BaseURL.String())
 }

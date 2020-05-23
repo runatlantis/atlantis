@@ -17,7 +17,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-func TestAzureDevopsClient_MergePull(t *testing.T) {
+func TestClient_MergePull(t *testing.T) {
 	cases := []struct {
 		description string
 		response    string
@@ -81,7 +81,7 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := azuredevops.NewAzureDevopsClient(testServerURL.Host, "token")
+			client, err := azuredevops.NewClient(testServerURL.Host, "token")
 			Ok(t, err)
 			defer DisableSSLVerification()()
 
@@ -119,7 +119,7 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 	}
 }
 
-func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
+func TestClient_UpdateStatus(t *testing.T) {
 	cases := []struct {
 		status             models.CommitStatus
 		expState           string
@@ -192,7 +192,7 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := azuredevops.NewAzureDevopsClient(testServerURL.Host, "token")
+			client, err := azuredevops.NewClient(testServerURL.Host, "token")
 			Ok(t, err)
 			defer DisableSSLVerification()()
 
@@ -214,7 +214,7 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 
 // GetModifiedFiles should make multiple requests if more than one page
 // and concat results.
-func TestAzureDevopsClient_GetModifiedFiles(t *testing.T) {
+func TestClient_GetModifiedFiles(t *testing.T) {
 	itemRespTemplate := `{
 		"changes": [
 	{
@@ -255,7 +255,7 @@ func TestAzureDevopsClient_GetModifiedFiles(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := azuredevops.NewAzureDevopsClient(testServerURL.Host, "token")
+	client, err := azuredevops.NewClient(testServerURL.Host, "token")
 	Ok(t, err)
 	defer DisableSSLVerification()()
 
@@ -276,7 +276,7 @@ func TestAzureDevopsClient_GetModifiedFiles(t *testing.T) {
 	Equals(t, []string{"file1.txt", "file2.txt"}, files)
 }
 
-func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
+func TestClient_PullIsMergeable(t *testing.T) {
 	cases := []struct {
 		testName     string
 		mergeStatus  string
@@ -336,7 +336,7 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
 
-			client, err := azuredevops.NewAzureDevopsClient(testServerURL.Host, "token")
+			client, err := azuredevops.NewClient(testServerURL.Host, "token")
 			Ok(t, err)
 
 			defer DisableSSLVerification()()
@@ -360,7 +360,7 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 	}
 }
 
-func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
+func TestClient_PullIsApproved(t *testing.T) {
 	cases := []struct {
 		testName           string
 		reviewerUniqueName string
@@ -430,7 +430,7 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
 
-			client, err := azuredevops.NewAzureDevopsClient(testServerURL.Host, "token")
+			client, err := azuredevops.NewClient(testServerURL.Host, "token")
 			Ok(t, err)
 
 			defer DisableSSLVerification()()
@@ -454,7 +454,7 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 	}
 }
 
-func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
+func TestClient_GetPullRequest(t *testing.T) {
 	// Use a real Azure DevOps json response and edit the mergeable_state field.
 	jsBytes, err := ioutil.ReadFile("fixtures/azuredevops-pr.json")
 	Ok(t, err)
@@ -475,7 +475,7 @@ func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 			}))
 		testServerURL, err := url.Parse(testServer.URL)
 		Ok(t, err)
-		client, err := azuredevops.NewAzureDevopsClient(testServerURL.Host, "token")
+		client, err := azuredevops.NewClient(testServerURL.Host, "token")
 		Ok(t, err)
 		defer DisableSSLVerification()()
 
@@ -494,8 +494,8 @@ func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 	})
 }
 
-func TestAzureDevopsClient_MarkdownPullLink(t *testing.T) {
-	client, err := azuredevops.NewAzureDevopsClient("hostname", "token")
+func TestClient_MarkdownPullLink(t *testing.T) {
+	client, err := azuredevops.NewClient("hostname", "token")
 	Ok(t, err)
 	pull := models.PullRequest{Num: 1}
 	s, _ := client.MarkdownPullLink(pull)

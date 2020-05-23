@@ -115,15 +115,15 @@ type WebhookConfig struct {
 func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	logger := logging.NewSimpleLogger("server", false, userConfig.ToLogLevel())
 	var supportedVCSHosts []models.VCSHostType
-	var githubClient *github.GithubClient
-	var gitlabClient *gitlab.GitlabClient
+	var githubClient *github.Client
+	var gitlabClient *gitlab.Client
 	var bitbucketCloudClient *bitbucketcloud.Client
 	var bitbucketServerClient *bitbucketserver.Client
-	var azuredevopsClient *azuredevops.AzureDevopsClient
+	var azuredevopsClient *azuredevops.Client
 	if userConfig.GithubUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		var err error
-		githubClient, err = github.NewGithubClient(userConfig.GithubHostname, userConfig.GithubUser, userConfig.GithubToken)
+		githubClient, err = github.NewClient(userConfig.GithubHostname, userConfig.GithubUser, userConfig.GithubToken)
 		if err != nil {
 			return nil, err
 		}
@@ -131,7 +131,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if userConfig.GitlabUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Gitlab)
 		var err error
-		gitlabClient, err = gitlab.NewGitlabClient(userConfig.GitlabHostname, userConfig.GitlabToken, logger)
+		gitlabClient, err = gitlab.NewClient(userConfig.GitlabHostname, userConfig.GitlabToken, logger)
 		if err != nil {
 			return nil, err
 		}
@@ -161,7 +161,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if userConfig.AzureDevopsUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.AzureDevops)
 		var err error
-		azuredevopsClient, err = azuredevops.NewAzureDevopsClient("dev.azure.com", userConfig.AzureDevopsToken)
+		azuredevopsClient, err = azuredevops.NewClient("dev.azure.com", userConfig.AzureDevopsToken)
 		if err != nil {
 			return nil, err
 		}

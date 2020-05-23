@@ -15,7 +15,7 @@ import (
 )
 
 // Test that the base url gets set properly.
-func TestNewGitlabClient_BaseURL(t *testing.T) {
+func TestNewClient_BaseURL(t *testing.T) {
 	gitlabClientUnderTest = true
 	defer func() { gitlabClientUnderTest = false }()
 	cases := []struct {
@@ -54,21 +54,21 @@ func TestNewGitlabClient_BaseURL(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Hostname, func(t *testing.T) {
-			client, err := NewGitlabClient(c.Hostname, "token", nil)
+			client, err := NewClient(c.Hostname, "token", nil)
 			Ok(t, err)
 			Equals(t, c.ExpBaseURL, client.Client.BaseURL().String())
 		})
 	}
 }
 
-// This function gets called even if GitlabClient is nil
+// This function gets called even if Client is nil
 // so we need to test that.
-func TestGitlabClient_SupportsCommonMarkNil(t *testing.T) {
-	var gl *GitlabClient
+func TestClient_SupportsCommonMarkNil(t *testing.T) {
+	var gl *Client
 	Equals(t, false, gl.SupportsCommonMark())
 }
 
-func TestGitlabClient_SupportsCommonMark(t *testing.T) {
+func TestClient_SupportsCommonMark(t *testing.T) {
 	cases := []struct {
 		version string
 		exp     bool
@@ -95,7 +95,7 @@ func TestGitlabClient_SupportsCommonMark(t *testing.T) {
 		t.Run(c.version, func(t *testing.T) {
 			vers, err := version.NewVersion(c.version)
 			Ok(t, err)
-			gl := GitlabClient{
+			gl := Client{
 				Version: vers,
 			}
 			Equals(t, c.exp, gl.SupportsCommonMark())
@@ -103,7 +103,7 @@ func TestGitlabClient_SupportsCommonMark(t *testing.T) {
 	}
 }
 
-func TestGitlabClient_MergePull(t *testing.T) {
+func TestClient_MergePull(t *testing.T) {
 	cases := []struct {
 		description string
 		glResponse  string
@@ -147,7 +147,7 @@ func TestGitlabClient_MergePull(t *testing.T) {
 
 			internalClient := gitlab.NewClient(nil, "token")
 			Ok(t, internalClient.SetBaseURL(testServer.URL))
-			client := &GitlabClient{
+			client := &Client{
 				Client:  internalClient,
 				Version: nil,
 			}
@@ -170,7 +170,7 @@ func TestGitlabClient_MergePull(t *testing.T) {
 	}
 }
 
-func TestGitlabClient_UpdateStatus(t *testing.T) {
+func TestClient_UpdateStatus(t *testing.T) {
 	cases := []struct {
 		status   models.CommitStatus
 		expState string
@@ -211,7 +211,7 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 
 			internalClient := gitlab.NewClient(nil, "token")
 			Ok(t, internalClient.SetBaseURL(testServer.URL))
-			client := &GitlabClient{
+			client := &Client{
 				Client:  internalClient,
 				Version: nil,
 			}
@@ -232,10 +232,10 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 	}
 }
 
-func TestGitlabClient_MarkdownPullLink(t *testing.T) {
+func TestClient_MarkdownPullLink(t *testing.T) {
 	gitlabClientUnderTest = true
 	defer func() { gitlabClientUnderTest = false }()
-	client, err := NewGitlabClient("gitlab.com", "token", nil)
+	client, err := NewClient("gitlab.com", "token", nil)
 	Ok(t, err)
 	pull := models.PullRequest{Num: 1}
 	s, _ := client.MarkdownPullLink(pull)

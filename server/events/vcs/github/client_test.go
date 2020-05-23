@@ -19,7 +19,7 @@ import (
 
 // GetModifiedFiles should make multiple requests if more than one page
 // and concat results.
-func TestGithubClient_GetModifiedFiles(t *testing.T) {
+func TestClient_GetModifiedFiles(t *testing.T) {
 	respTemplate := `[
   {
     "sha": "bbcd538c8e72b8c175046e27cc8f907076331401",
@@ -58,7 +58,7 @@ func TestGithubClient_GetModifiedFiles(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := github.NewGithubClient(testServerURL.Host, "user", "pass")
+	client, err := github.NewClient(testServerURL.Host, "user", "pass")
 	Ok(t, err)
 	defer DisableSSLVerification()()
 
@@ -81,7 +81,7 @@ func TestGithubClient_GetModifiedFiles(t *testing.T) {
 
 // GetModifiedFiles should include the source and destination of a moved
 // file.
-func TestGithubClient_GetModifiedFilesMovedFile(t *testing.T) {
+func TestClient_GetModifiedFilesMovedFile(t *testing.T) {
 	resp := `[
   {
     "sha": "bbcd538c8e72b8c175046e27cc8f907076331401",
@@ -113,7 +113,7 @@ func TestGithubClient_GetModifiedFilesMovedFile(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := github.NewGithubClient(testServerURL.Host, "user", "pass")
+	client, err := github.NewClient(testServerURL.Host, "user", "pass")
 	Ok(t, err)
 	defer DisableSSLVerification()()
 
@@ -134,7 +134,7 @@ func TestGithubClient_GetModifiedFilesMovedFile(t *testing.T) {
 	Equals(t, []string{"new/filename.txt", "previous/filename.txt"}, files)
 }
 
-func TestGithubClient_PaginatesComments(t *testing.T) {
+func TestClient_PaginatesComments(t *testing.T) {
 	calls := 0
 	issueResps := []string{
 		`[
@@ -207,7 +207,7 @@ func TestGithubClient_PaginatesComments(t *testing.T) {
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
 
-	client, err := github.NewGithubClient(testServerURL.Host, "user", "pass")
+	client, err := github.NewClient(testServerURL.Host, "user", "pass")
 	Ok(t, err)
 	defer DisableSSLVerification()()
 
@@ -233,7 +233,7 @@ func TestGithubClient_PaginatesComments(t *testing.T) {
 	Equals(t, githubv4.ReportedContentClassifiersOutdated, gotMinimizeCalls[1].Variables.Input.Classifier)
 }
 
-func TestGithubClient_HideOldComments(t *testing.T) {
+func TestClient_HideOldComments(t *testing.T) {
 	// Only comment 6 should be minimized, because it's by the same Atlantis bot user
 	// and it has "plan" in the first line of the comment body.
 	issueResp := `[
@@ -293,7 +293,7 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
 
-	client, err := github.NewGithubClient(testServerURL.Host, "user", "pass")
+	client, err := github.NewClient(testServerURL.Host, "user", "pass")
 	Ok(t, err)
 	defer DisableSSLVerification()()
 
@@ -317,7 +317,7 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 	Equals(t, githubv4.ReportedContentClassifiersOutdated, gotMinimizeCalls[0].Variables.Input.Classifier)
 }
 
-func TestGithubClient_UpdateStatus(t *testing.T) {
+func TestClient_UpdateStatus(t *testing.T) {
 	cases := []struct {
 		status   models.CommitStatus
 		expState string
@@ -357,7 +357,7 @@ func TestGithubClient_UpdateStatus(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := github.NewGithubClient(testServerURL.Host, "user", "pass")
+			client, err := github.NewClient(testServerURL.Host, "user", "pass")
 			Ok(t, err)
 			defer DisableSSLVerification()()
 
@@ -379,7 +379,7 @@ func TestGithubClient_UpdateStatus(t *testing.T) {
 	}
 }
 
-func TestGithubClient_PullIsApproved(t *testing.T) {
+func TestClient_PullIsApproved(t *testing.T) {
 	respTemplate := `[
 		{
 			"id": %d,
@@ -443,7 +443,7 @@ func TestGithubClient_PullIsApproved(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := github.NewGithubClient(testServerURL.Host, "user", "pass")
+	client, err := github.NewClient(testServerURL.Host, "user", "pass")
 	Ok(t, err)
 	defer DisableSSLVerification()()
 
@@ -464,7 +464,7 @@ func TestGithubClient_PullIsApproved(t *testing.T) {
 	Equals(t, false, approved)
 }
 
-func TestGithubClient_PullIsMergeable(t *testing.T) {
+func TestClient_PullIsMergeable(t *testing.T) {
 	cases := []struct {
 		state        string
 		expMergeable bool
@@ -534,7 +534,7 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 				}))
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := github.NewGithubClient(testServerURL.Host, "user", "pass")
+			client, err := github.NewClient(testServerURL.Host, "user", "pass")
 			Ok(t, err)
 			defer DisableSSLVerification()()
 
@@ -557,7 +557,7 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 	}
 }
 
-func TestGithubClient_MergePullHandlesError(t *testing.T) {
+func TestClient_MergePullHandlesError(t *testing.T) {
 	cases := []struct {
 		code    int
 		message string
@@ -616,7 +616,7 @@ func TestGithubClient_MergePullHandlesError(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := github.NewGithubClient(testServerURL.Host, "user", "pass")
+			client, err := github.NewClient(testServerURL.Host, "user", "pass")
 			Ok(t, err)
 			defer DisableSSLVerification()()
 
@@ -647,7 +647,7 @@ func TestGithubClient_MergePullHandlesError(t *testing.T) {
 
 // Test that if the pull request only allows a certain merge method that we
 // use that method
-func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
+func TestClient_MergePullCorrectMethod(t *testing.T) {
 	cases := map[string]struct {
 		allowMerge  bool
 		allowRebase bool
@@ -739,7 +739,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := github.NewGithubClient(testServerURL.Host, "user", "pass")
+			client, err := github.NewClient(testServerURL.Host, "user", "pass")
 			Ok(t, err)
 			defer DisableSSLVerification()()
 
@@ -763,8 +763,8 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 	}
 }
 
-func TestGithubClient_MarkdownPullLink(t *testing.T) {
-	client, err := github.NewGithubClient("hostname", "user", "pass")
+func TestClient_MarkdownPullLink(t *testing.T) {
+	client, err := github.NewClient("hostname", "user", "pass")
 	Ok(t, err)
 	pull := models.PullRequest{Num: 1}
 	s, _ := client.MarkdownPullLink(pull)
