@@ -26,7 +26,7 @@ import (
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
-	. "github.com/runatlantis/atlantis/server/events/vcs/fixtures"
+	. "github.com/runatlantis/atlantis/server/events/vcs/azuredevops/fixtures"
 	. "github.com/runatlantis/atlantis/testing"
 	gitlab "github.com/xanzy/go-gitlab"
 )

@@ -1,4 +1,4 @@
-package vcs_test
+package azuredevops_test
 
 import (
 	"context"
@@ -10,10 +10,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mcdafydd/go-azuredevops/azuredevops"
+	devops "github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/vcs"
-	"github.com/runatlantis/atlantis/server/events/vcs/fixtures"
+	"github.com/runatlantis/atlantis/server/events/vcs/azuredevops"
+	"github.com/runatlantis/atlantis/server/events/vcs/azuredevops/fixtures"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -45,23 +45,23 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 	}
 
 	// Set default pull request completion options
-	mcm := azuredevops.NoFastForward.String()
+	mcm := devops.NoFastForward.String()
 	twi := new(bool)
 	*twi = true
-	completionOptions := azuredevops.GitPullRequestCompletionOptions{
+	completionOptions := devops.GitPullRequestCompletionOptions{
 		BypassPolicy:            new(bool),
-		BypassReason:            azuredevops.String(""),
+		BypassReason:            devops.String(""),
 		DeleteSourceBranch:      new(bool),
-		MergeCommitMessage:      azuredevops.String("commit message"),
+		MergeCommitMessage:      devops.String("commit message"),
 		MergeStrategy:           &mcm,
 		SquashMerge:             new(bool),
 		TransitionWorkItems:     twi,
 		TriggeredByAutoComplete: new(bool),
 	}
 
-	id := azuredevops.IdentityRef{}
-	pull := azuredevops.GitPullRequest{
-		PullRequestID: azuredevops.Int(22),
+	id := devops.IdentityRef{}
+	pull := devops.GitPullRequest{
+		PullRequestID: devops.Int(22),
 	}
 
 	for _, c := range cases {
@@ -81,9 +81,9 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
+			client, err := azuredevops.NewAzureDevopsClient(testServerURL.Host, "token")
 			Ok(t, err)
-			defer disableSSLVerification()()
+			defer DisableSSLVerification()()
 
 			merge, _, err := client.Client.PullRequests.Merge(context.Background(),
 				"owner",
@@ -192,9 +192,9 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
+			client, err := azuredevops.NewAzureDevopsClient(testServerURL.Host, "token")
 			Ok(t, err)
-			defer disableSSLVerification()()
+			defer DisableSSLVerification()()
 
 			repo := models.Repo{
 				FullName: "owner/project/repo",
@@ -255,9 +255,9 @@ func TestAzureDevopsClient_GetModifiedFiles(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
+	client, err := azuredevops.NewAzureDevopsClient(testServerURL.Host, "token")
 	Ok(t, err)
-	defer disableSSLVerification()()
+	defer DisableSSLVerification()()
 
 	files, err := client.GetModifiedFiles(models.Repo{
 		FullName:          "owner/project/repo",
@@ -285,19 +285,19 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 	}{
 		{
 			"merge conflicts",
-			azuredevops.MergeConflicts.String(),
+			devops.MergeConflicts.String(),
 			"approved",
 			false,
 		},
 		{
 			"rejected policy status",
-			azuredevops.MergeSucceeded.String(),
+			devops.MergeSucceeded.String(),
 			"rejected",
 			false,
 		},
 		{
 			"merge succeeded",
-			azuredevops.MergeSucceeded.String(),
+			devops.MergeSucceeded.String(),
 			"approved",
 			true,
 		},
@@ -336,10 +336,10 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
 
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
+			client, err := azuredevops.NewAzureDevopsClient(testServerURL.Host, "token")
 			Ok(t, err)
 
-			defer disableSSLVerification()()
+			defer DisableSSLVerification()()
 
 			actMergeable, err := client.PullIsMergeable(models.Repo{
 				FullName:          "owner/project/repo",
@@ -370,37 +370,37 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 		{
 			"approved",
 			"atlantis.reviewer@example.com",
-			azuredevops.VoteApproved,
+			devops.VoteApproved,
 			true,
 		},
 		{
 			"approved with suggestions",
 			"atlantis.reviewer@example.com",
-			azuredevops.VoteApprovedWithSuggestions,
+			devops.VoteApprovedWithSuggestions,
 			true,
 		},
 		{
 			"no vote",
 			"atlantis.reviewer@example.com",
-			azuredevops.VoteNone,
+			devops.VoteNone,
 			false,
 		},
 		{
 			"vote waiting for author",
 			"atlantis.reviewer@example.com",
-			azuredevops.VoteWaitingForAuthor,
+			devops.VoteWaitingForAuthor,
 			false,
 		},
 		{
 			"vote rejected",
 			"atlantis.reviewer@example.com",
-			azuredevops.VoteRejected,
+			devops.VoteRejected,
 			false,
 		},
 		{
 			"approved only by author",
 			"atlantis.author@example.com",
-			azuredevops.VoteApproved,
+			devops.VoteApproved,
 			false,
 		},
 	}
@@ -430,10 +430,10 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
 
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
+			client, err := azuredevops.NewAzureDevopsClient(testServerURL.Host, "token")
 			Ok(t, err)
 
-			defer disableSSLVerification()()
+			defer DisableSSLVerification()()
 
 			actApproved, err := client.PullIsApproved(models.Repo{
 				FullName:          "owner/project/repo",
@@ -475,9 +475,9 @@ func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 			}))
 		testServerURL, err := url.Parse(testServer.URL)
 		Ok(t, err)
-		client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
+		client, err := azuredevops.NewAzureDevopsClient(testServerURL.Host, "token")
 		Ok(t, err)
-		defer disableSSLVerification()()
+		defer DisableSSLVerification()()
 
 		_, err = client.GetPullRequest(models.Repo{
 			FullName:          "owner/project/repo",
@@ -495,7 +495,7 @@ func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 }
 
 func TestAzureDevopsClient_MarkdownPullLink(t *testing.T) {
-	client, err := vcs.NewAzureDevopsClient("hostname", "token")
+	client, err := azuredevops.NewAzureDevopsClient("hostname", "token")
 	Ok(t, err)
 	pull := models.PullRequest{Num: 1}
 	s, _ := client.MarkdownPullLink(pull)

@@ -1,7 +1,6 @@
-package vcs_test
+package github_test
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -12,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/vcs/github"
 	. "github.com/runatlantis/atlantis/testing"
 
 	"github.com/shurcooL/githubv4"
@@ -59,9 +58,9 @@ func TestGithubClient_GetModifiedFiles(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+	client, err := github.NewGithubClient(testServerURL.Host, "user", "pass")
 	Ok(t, err)
-	defer disableSSLVerification()()
+	defer DisableSSLVerification()()
 
 	files, err := client.GetModifiedFiles(models.Repo{
 		FullName:          "owner/repo",
@@ -114,9 +113,9 @@ func TestGithubClient_GetModifiedFilesMovedFile(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+	client, err := github.NewGithubClient(testServerURL.Host, "user", "pass")
 	Ok(t, err)
-	defer disableSSLVerification()()
+	defer DisableSSLVerification()()
 
 	files, err := client.GetModifiedFiles(models.Repo{
 		FullName:          "owner/repo",
@@ -208,9 +207,9 @@ func TestGithubClient_PaginatesComments(t *testing.T) {
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
 
-	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+	client, err := github.NewGithubClient(testServerURL.Host, "user", "pass")
 	Ok(t, err)
-	defer disableSSLVerification()()
+	defer DisableSSLVerification()()
 
 	err = client.HidePrevPlanComments(
 		models.Repo{
@@ -294,9 +293,9 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
 
-	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+	client, err := github.NewGithubClient(testServerURL.Host, "user", "pass")
 	Ok(t, err)
-	defer disableSSLVerification()()
+	defer DisableSSLVerification()()
 
 	err = client.HidePrevPlanComments(
 		models.Repo{
@@ -358,9 +357,9 @@ func TestGithubClient_UpdateStatus(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+			client, err := github.NewGithubClient(testServerURL.Host, "user", "pass")
 			Ok(t, err)
-			defer disableSSLVerification()()
+			defer DisableSSLVerification()()
 
 			err = client.UpdateStatus(models.Repo{
 				FullName:          "owner/repo",
@@ -444,9 +443,9 @@ func TestGithubClient_PullIsApproved(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+	client, err := github.NewGithubClient(testServerURL.Host, "user", "pass")
 	Ok(t, err)
-	defer disableSSLVerification()()
+	defer DisableSSLVerification()()
 
 	approved, err := client.PullIsApproved(models.Repo{
 		FullName:          "owner/repo",
@@ -535,9 +534,9 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 				}))
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+			client, err := github.NewGithubClient(testServerURL.Host, "user", "pass")
 			Ok(t, err)
-			defer disableSSLVerification()()
+			defer DisableSSLVerification()()
 
 			actMergeable, err := client.PullIsMergeable(models.Repo{
 				FullName:          "owner/repo",
@@ -617,9 +616,9 @@ func TestGithubClient_MergePullHandlesError(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+			client, err := github.NewGithubClient(testServerURL.Host, "user", "pass")
 			Ok(t, err)
-			defer disableSSLVerification()()
+			defer DisableSSLVerification()()
 
 			err = client.MergePull(
 				models.PullRequest{
@@ -740,9 +739,9 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+			client, err := github.NewGithubClient(testServerURL.Host, "user", "pass")
 			Ok(t, err)
-			defer disableSSLVerification()()
+			defer DisableSSLVerification()()
 
 			err = client.MergePull(
 				models.PullRequest{
@@ -765,21 +764,10 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 }
 
 func TestGithubClient_MarkdownPullLink(t *testing.T) {
-	client, err := vcs.NewGithubClient("hostname", "user", "pass")
+	client, err := github.NewGithubClient("hostname", "user", "pass")
 	Ok(t, err)
 	pull := models.PullRequest{Num: 1}
 	s, _ := client.MarkdownPullLink(pull)
 	exp := "#1"
 	Equals(t, exp, s)
-}
-
-// disableSSLVerification disables ssl verification for the global http client
-// and returns a function to be called in a defer that will re-enable it.
-func disableSSLVerification() func() {
-	orig := http.DefaultTransport.(*http.Transport).TLSClientConfig
-	// nolint: gosec
-	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	return func() {
-		http.DefaultTransport.(*http.Transport).TLSClientConfig = orig
-	}
 }
