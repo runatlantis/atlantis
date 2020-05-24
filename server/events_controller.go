@@ -55,7 +55,7 @@ type EventsController struct {
 	// UI that identifies this call as coming from GitHub. If empty, no
 	// request validation is done.
 	GithubWebhookSecret          []byte
-	RequestValidator       ghevents.RequestValidator
+	RequestValidator             vcsgithub.RequestValidator
 	GitlabRequestParserValidator GitlabRequestParserValidator
 	// GitlabWebhookSecret is the secret added to this webhook via the GitLab
 	// UI that identifies this call as coming from GitLab. If empty, no

@@ -245,13 +245,13 @@ func TestPost_GithubCommentNotWhitelisted(t *testing.T) {
 	RegisterMockTestingT(t)
 	vcsClient := vcsmocks.NewMockClient()
 	e := server.EventsController{
-		Logger:                 logging.NewNoopLogger(),
-		RequestValidator: &github.DefaultRequestValidator{},
-		CommentParser:          &events.CommentParser{},
-		Parser:                 &events.EventParser{},
-		SupportedVCSHosts:      []models.VCSHostType{models.Github},
-		RepoWhitelistChecker:   &events.RepoWhitelistChecker{},
-		VCSClient:              vcsClient,
+		Logger:               logging.NewNoopLogger(),
+		RequestValidator:     &github.DefaultRequestValidator{},
+		CommentParser:        &events.CommentParser{},
+		Parser:               &events.EventParser{},
+		SupportedVCSHosts:    []models.VCSHostType{models.Github},
+		RepoWhitelistChecker: &events.RepoWhitelistChecker{},
+		VCSClient:            vcsClient,
 	}
 	requestJSON, err := ioutil.ReadFile(filepath.Join("testfixtures", "githubIssueCommentEvent_notWhitelisted.json"))
 	Ok(t, err)
@@ -275,7 +275,7 @@ func TestPost_GithubCommentNotWhitelistedWithSilenceErrors(t *testing.T) {
 	vcsClient := vcsmocks.NewMockClient()
 	e := server.EventsController{
 		Logger:                 logging.NewNoopLogger(),
-		RequestValidator: &github.DefaultRequestValidator{},
+		RequestValidator:       &github.DefaultRequestValidator{},
 		CommentParser:          &events.CommentParser{},
 		Parser:                 &events.EventParser{},
 		SupportedVCSHosts:      []models.VCSHostType{models.Github},
@@ -751,7 +751,7 @@ func setup(t *testing.T) (server.EventsController, *mocks.MockRequestValidator, 
 	e := server.EventsController{
 		TestingMode:                  true,
 		Logger:                       logging.NewNoopLogger(),
-		RequestValidator:       v,
+		RequestValidator:             v,
 		Parser:                       p,
 		CommentParser:                cp,
 		CommandRunner:                cr,
