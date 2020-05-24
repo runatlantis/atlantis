@@ -389,7 +389,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CommentParser:                   commentParser,
 		Logger:                          logger,
 		GithubWebhookSecret:             []byte(userConfig.GithubWebhookSecret),
-		GithubRequestValidator:          &DefaultGithubRequestValidator{},
+		GithubRequestValidator:          &github.DefaultGithubRequestValidator{},
 		GitlabRequestParserValidator:    &DefaultGitlabRequestParserValidator{},
 		GitlabWebhookSecret:             []byte(userConfig.GitlabWebhookSecret),
 		RepoWhitelistChecker:            repoWhitelist,

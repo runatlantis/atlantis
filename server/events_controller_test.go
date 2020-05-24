@@ -30,6 +30,7 @@ import (
 	emocks "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs/github"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/mocks"
@@ -245,7 +246,7 @@ func TestPost_GithubCommentNotWhitelisted(t *testing.T) {
 	vcsClient := vcsmocks.NewMockClient()
 	e := server.EventsController{
 		Logger:                 logging.NewNoopLogger(),
-		GithubRequestValidator: &server.DefaultGithubRequestValidator{},
+		GithubRequestValidator: &github.DefaultGithubRequestValidator{},
 		CommentParser:          &events.CommentParser{},
 		Parser:                 &events.EventParser{},
 		SupportedVCSHosts:      []models.VCSHostType{models.Github},
@@ -274,7 +275,7 @@ func TestPost_GithubCommentNotWhitelistedWithSilenceErrors(t *testing.T) {
 	vcsClient := vcsmocks.NewMockClient()
 	e := server.EventsController{
 		Logger:                 logging.NewNoopLogger(),
-		GithubRequestValidator: &server.DefaultGithubRequestValidator{},
+		GithubRequestValidator: &github.DefaultGithubRequestValidator{},
 		CommentParser:          &events.CommentParser{},
 		Parser:                 &events.EventParser{},
 		SupportedVCSHosts:      []models.VCSHostType{models.Github},
