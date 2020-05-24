@@ -30,6 +30,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
 	vcsgithub "github.com/runatlantis/atlantis/server/events/vcs/github"
+	vcsgitlab "github.com/runatlantis/atlantis/server/events/vcs/gitlab"
 	"github.com/runatlantis/atlantis/server/logging"
 	gitlab "github.com/xanzy/go-gitlab"
 )
@@ -57,7 +58,7 @@ type EventsController struct {
 	// request validation is done.
 	GithubWebhookSecret          []byte
 	RequestValidator             vcsgithub.RequestValidator
-	GitlabRequestParserValidator GitlabRequestParserValidator
+	GitlabRequestParserValidator vcsgitlab.RequestParserValidator
 	// GitlabWebhookSecret is the secret added to this webhook via the GitLab
 	// UI that identifies this call as coming from GitLab. If empty, no
 	// request validation is done.

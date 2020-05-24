@@ -27,6 +27,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	vcsgithub "github.com/runatlantis/atlantis/server/events/vcs/github"
+	vcsgitlab "github.com/runatlantis/atlantis/server/events/vcs/gitlab"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/events/yaml"
@@ -490,7 +491,7 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 		CommentParser:                commentParser,
 		GithubWebhookSecret:          nil,
 		RequestValidator:             &vcsgithub.DefaultRequestValidator{},
-		GitlabRequestParserValidator: &server.DefaultGitlabRequestParserValidator{},
+		GitlabRequestParserValidator: &vcsgitlab.DefaultRequestParserValidator{},
 		GitlabWebhookSecret:          nil,
 		RepoWhitelistChecker:         repoWhitelistChecker,
 		SupportedVCSHosts:            []models.VCSHostType{models.Gitlab, models.Github, models.BitbucketCloud},

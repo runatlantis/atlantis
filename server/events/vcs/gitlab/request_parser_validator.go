@@ -11,7 +11,7 @@
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
 
-package server
+package gitlab
 
 import (
 	"encoding/json"
@@ -22,12 +22,13 @@ import (
 	gitlab "github.com/xanzy/go-gitlab"
 )
 
+const gitlabHeader = "X-Gitlab-Event"
 const secretHeader = "X-Gitlab-Token" // #nosec
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_gitlab_request_parser_validator.go GitlabRequestParserValidator
 
-// GitlabRequestParserValidator parses and validates GitLab requests.
-type GitlabRequestParserValidator interface {
+// RequestParserValidator parses and validates GitLab requests.
+type RequestParserValidator interface {
 	// ParseAndValidate validates that the request has a token header matching secret.
 	// If the secret does not match it returns an error.
 	// If secret is empty it does not check the token header.
@@ -50,12 +51,12 @@ type GitlabRequestParserValidator interface {
 	ParseAndValidate(r *http.Request, secret []byte) (interface{}, error)
 }
 
-// DefaultGitlabRequestParserValidator parses and validates GitLab requests.
-type DefaultGitlabRequestParserValidator struct{}
+// DefaultRequestParserValidator parses and validates GitLab requests.
+type DefaultRequestParserValidator struct{}
 
 // ParseAndValidate returns the JSON payload of the request.
 // See GitlabRequestParserValidator.ParseAndValidate().
-func (d *DefaultGitlabRequestParserValidator) ParseAndValidate(r *http.Request, secret []byte) (interface{}, error) {
+func (d *DefaultRequestParserValidator) ParseAndValidate(r *http.Request, secret []byte) (interface{}, error) {
 	const mergeEventHeader = "Merge Request Hook"
 	const noteEventHeader = "Note Hook"
 

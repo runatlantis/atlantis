@@ -31,6 +31,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/github"
+	vcsgitlab "github.com/runatlantis/atlantis/server/events/vcs/gitlab"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/mocks"
@@ -190,7 +191,7 @@ func TestPost_GitlabCommentNotWhitelisted(t *testing.T) {
 	e := server.EventsController{
 		Logger:                       logging.NewNoopLogger(),
 		CommentParser:                &events.CommentParser{},
-		GitlabRequestParserValidator: &server.DefaultGitlabRequestParserValidator{},
+		GitlabRequestParserValidator: &vcsgitlab.DefaultRequestParserValidator{},
 		Parser:                       &events.EventParser{},
 		SupportedVCSHosts:            []models.VCSHostType{models.Gitlab},
 		RepoWhitelistChecker:         &events.RepoWhitelistChecker{},
@@ -218,7 +219,7 @@ func TestPost_GitlabCommentNotWhitelistedWithSilenceErrors(t *testing.T) {
 	e := server.EventsController{
 		Logger:                       logging.NewNoopLogger(),
 		CommentParser:                &events.CommentParser{},
-		GitlabRequestParserValidator: &server.DefaultGitlabRequestParserValidator{},
+		GitlabRequestParserValidator: &vcsgitlab.DefaultRequestParserValidator{},
 		Parser:                       &events.EventParser{},
 		SupportedVCSHosts:            []models.VCSHostType{models.Gitlab},
 		RepoWhitelistChecker:         &events.RepoWhitelistChecker{},

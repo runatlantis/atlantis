@@ -11,7 +11,7 @@
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
 
-package server_test
+package gitlab_test
 
 import (
 	"bytes"
@@ -20,12 +20,12 @@ import (
 	"testing"
 
 	. "github.com/petergtz/pegomock"
-	"github.com/runatlantis/atlantis/server"
+	vcsgitlab "github.com/runatlantis/atlantis/server/events/vcs/gitlab"
 	. "github.com/runatlantis/atlantis/testing"
 	gitlab "github.com/xanzy/go-gitlab"
 )
 
-var parser = server.DefaultGitlabRequestParserValidator{}
+var parser = vcsgitlab.DefaultRequestParserValidator{}
 
 func TestValidate_InvalidSecret(t *testing.T) {
 	t.Log("If the secret header is set and doesn't match expected an error is returned")
