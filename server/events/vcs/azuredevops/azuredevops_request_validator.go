@@ -1,4 +1,4 @@
-package server
+package azuredevops
 
 import (
 	"fmt"
@@ -10,9 +10,9 @@ import (
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_azuredevops_request_validator.go AzureDevopsRequestValidator
 
-// AzureDevopsRequestValidator handles checking if Azure DevOps requests
+// RequestValidator handles checking if Azure DevOps requests
 // contain a valid Basic authentication username and password.
-type AzureDevopsRequestValidator interface {
+type RequestValidator interface {
 	// Validate returns the JSON payload of the request.
 	// If both username and password values have a length greater than zero,
 	// it checks that the credentials match those configured in Atlantis.

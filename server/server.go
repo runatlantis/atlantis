@@ -399,7 +399,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		BitbucketWebhookSecret:          []byte(userConfig.BitbucketWebhookSecret),
 		AzureDevopsWebhookBasicUser:     []byte(userConfig.AzureDevopsWebhookUser),
 		AzureDevopsWebhookBasicPassword: []byte(userConfig.AzureDevopsWebhookPassword),
-		AzureDevopsRequestValidator:     &DefaultAzureDevopsRequestValidator{},
+		AzureDevopsRequestValidator:     &azuredevops.DefaultAzureDevopsRequestValidator{},
 	}
 	return &Server{
 		AtlantisVersion:    config.AtlantisVersion,
