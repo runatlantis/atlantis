@@ -55,7 +55,7 @@ type EventsController struct {
 	// UI that identifies this call as coming from GitHub. If empty, no
 	// request validation is done.
 	GithubWebhookSecret          []byte
-	GithubRequestValidator       ghevents.GithubRequestValidator
+	RequestValidator       ghevents.RequestValidator
 	GitlabRequestParserValidator GitlabRequestParserValidator
 	// GitlabWebhookSecret is the secret added to this webhook via the GitLab
 	// UI that identifies this call as coming from GitLab. If empty, no
@@ -138,7 +138,7 @@ func (e *EventsController) Post(w http.ResponseWriter, r *http.Request) {
 
 func (e *EventsController) handleGithubPost(w http.ResponseWriter, r *http.Request) {
 	// Validate the request against the optional webhook secret.
-	payload, err := e.GithubRequestValidator.Validate(r, e.GithubWebhookSecret)
+	payload, err := e.RequestValidator.Validate(r, e.GithubWebhookSecret)
 	if err != nil {
 		e.respond(w, logging.Warn, http.StatusBadRequest, err.Error())
 		return

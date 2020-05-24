@@ -22,11 +22,11 @@ import (
 	"github.com/google/go-github/v28/github"
 )
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_github_request_validator.go GithubRequestValidator
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_github_request_validator.go RequestValidator
 
-// GithubRequestValidator handles checking if GitHub requests are signed
+// RequestValidator handles checking if GitHub requests are signed
 // properly by the secret.
-type GithubRequestValidator interface {
+type RequestValidator interface {
 	// Validate returns the JSON payload of the request.
 	// If secret is not empty, it checks that the request was signed
 	// by secret and returns an error if it was not.
@@ -34,22 +34,22 @@ type GithubRequestValidator interface {
 	Validate(r *http.Request, secret []byte) ([]byte, error)
 }
 
-// DefaultGithubRequestValidator handles checking if GitHub requests are signed
+// DefaultRequestValidator handles checking if GitHub requests are signed
 // properly by the secret.
-type DefaultGithubRequestValidator struct{}
+type DefaultRequestValidator struct{}
 
 // Validate returns the JSON payload of the request.
 // If secret is not empty, it checks that the request was signed
 // by secret and returns an error if it was not.
 // If secret is empty, it does not check if the request was signed.
-func (d *DefaultGithubRequestValidator) Validate(r *http.Request, secret []byte) ([]byte, error) {
+func (d *DefaultRequestValidator) Validate(r *http.Request, secret []byte) ([]byte, error) {
 	if len(secret) != 0 {
 		return d.validateAgainstSecret(r, secret)
 	}
 	return d.validateWithoutSecret(r)
 }
 
-func (d *DefaultGithubRequestValidator) validateAgainstSecret(r *http.Request, secret []byte) ([]byte, error) {
+func (d *DefaultRequestValidator) validateAgainstSecret(r *http.Request, secret []byte) ([]byte, error) {
 	payload, err := github.ValidatePayload(r, secret)
 	if err != nil {
 		return nil, err
@@ -57,7 +57,7 @@ func (d *DefaultGithubRequestValidator) validateAgainstSecret(r *http.Request, s
 	return payload, nil
 }
 
-func (d *DefaultGithubRequestValidator) validateWithoutSecret(r *http.Request) ([]byte, error) {
+func (d *DefaultRequestValidator) validateWithoutSecret(r *http.Request) ([]byte, error) {
 	switch ct := r.Header.Get("Content-Type"); ct {
 	case "application/json":
 		payload, err := ioutil.ReadAll(r.Body)

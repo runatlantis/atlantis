@@ -489,7 +489,7 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 		Parser:                       eventParser,
 		CommentParser:                commentParser,
 		GithubWebhookSecret:          nil,
-		GithubRequestValidator:       &vcsgithub.DefaultGithubRequestValidator{},
+		RequestValidator:       &vcsgithub.DefaultRequestValidator{},
 		GitlabRequestParserValidator: &server.DefaultGitlabRequestParserValidator{},
 		GitlabWebhookSecret:          nil,
 		RepoWhitelistChecker:         repoWhitelistChecker,

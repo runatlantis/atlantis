@@ -246,7 +246,7 @@ func TestPost_GithubCommentNotWhitelisted(t *testing.T) {
 	vcsClient := vcsmocks.NewMockClient()
 	e := server.EventsController{
 		Logger:                 logging.NewNoopLogger(),
-		GithubRequestValidator: &github.DefaultGithubRequestValidator{},
+		RequestValidator: &github.DefaultRequestValidator{},
 		CommentParser:          &events.CommentParser{},
 		Parser:                 &events.EventParser{},
 		SupportedVCSHosts:      []models.VCSHostType{models.Github},
@@ -275,7 +275,7 @@ func TestPost_GithubCommentNotWhitelistedWithSilenceErrors(t *testing.T) {
 	vcsClient := vcsmocks.NewMockClient()
 	e := server.EventsController{
 		Logger:                 logging.NewNoopLogger(),
-		GithubRequestValidator: &github.DefaultGithubRequestValidator{},
+		RequestValidator: &github.DefaultRequestValidator{},
 		CommentParser:          &events.CommentParser{},
 		Parser:                 &events.EventParser{},
 		SupportedVCSHosts:      []models.VCSHostType{models.Github},
@@ -737,9 +737,9 @@ func TestPost_PullOpenedOrUpdated(t *testing.T) {
 	}
 }
 
-func setup(t *testing.T) (server.EventsController, *mocks.MockGithubRequestValidator, *mocks.MockGitlabRequestParserValidator, *emocks.MockEventParsing, *emocks.MockCommandRunner, *emocks.MockPullCleaner, *vcsmocks.MockClient, *emocks.MockCommentParsing) {
+func setup(t *testing.T) (server.EventsController, *mocks.MockRequestValidator, *mocks.MockGitlabRequestParserValidator, *emocks.MockEventParsing, *emocks.MockCommandRunner, *emocks.MockPullCleaner, *vcsmocks.MockClient, *emocks.MockCommentParsing) {
 	RegisterMockTestingT(t)
-	v := mocks.NewMockGithubRequestValidator()
+	v := mocks.NewMockRequestValidator()
 	gl := mocks.NewMockGitlabRequestParserValidator()
 	p := emocks.NewMockEventParsing()
 	cp := emocks.NewMockCommentParsing()
@@ -751,7 +751,7 @@ func setup(t *testing.T) (server.EventsController, *mocks.MockGithubRequestValid
 	e := server.EventsController{
 		TestingMode:                  true,
 		Logger:                       logging.NewNoopLogger(),
-		GithubRequestValidator:       v,
+		RequestValidator:       v,
 		Parser:                       p,
 		CommentParser:                cp,
 		CommandRunner:                cr,
