@@ -19,7 +19,7 @@ type DrainStatus struct {
 	InProgressOps int
 }
 
-// StartOp tries to start a new operation. It returns false is Atlantis is
+// StartOp tries to start a new operation. It returns false if Atlantis is
 // shutting down.
 func (d *Drainer) StartOp() bool {
 	d.mutex.Lock()
