@@ -441,6 +441,7 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 		globalCfg, err = parser.ParseGlobalCfg(expCfgPath, globalCfg)
 		Ok(t, err)
 	}
+	drainer := &events.Drainer{}
 	commandRunner := &events.DefaultCommandRunner{
 		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
 			Locker:           projectLocker,
@@ -488,6 +489,7 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 		PendingPlanFinder: &events.DefaultPendingPlanFinder{},
 		GlobalAutomerge:   false,
 		WorkingDir:        workingDir,
+		Drainer:           drainer,
 	}
 
 	repoWhitelistChecker, err := events.NewRepoWhitelistChecker("*")
