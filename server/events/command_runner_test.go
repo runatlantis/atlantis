@@ -33,7 +33,6 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-var commitStatusUpdater *mocks.MockCommitStatusUpdater
 var projectCommandBuilder *mocks.MockProjectCommandBuilder
 var projectCommandRunner *mocks.MockProjectCommandRunner
 var eventParsing *mocks.MockEventParsing
@@ -48,7 +47,6 @@ var drainer *events.Drainer
 
 func setup(t *testing.T) *vcsmocks.MockClient {
 	RegisterMockTestingT(t)
-	commitStatusUpdater = mocks.NewMockCommitStatusUpdater()
 	projectCommandBuilder = mocks.NewMockProjectCommandBuilder()
 	eventParsing = mocks.NewMockEventParsing()
 	vcsClient := vcsmocks.NewMockClient()
@@ -66,7 +64,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		ThenReturn(pullLogger)
 	ch = events.DefaultCommandRunner{
 		VCSClient:                vcsClient,
-		CommitStatusUpdater:      commitStatusUpdater,
+		CommitStatusUpdater:      &events.DefaultCommitStatusUpdater{vcsClient, "atlantis"},
 		EventParser:              eventParsing,
 		MarkdownRenderer:         &events.MarkdownRenderer{},
 		GithubPullGetter:         githubGetter,

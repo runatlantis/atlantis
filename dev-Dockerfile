@@ -1,0 +1,2 @@
+FROM runatlantis/atlantis:latest
+COPY atlantis /usr/local/bin/atlantis
