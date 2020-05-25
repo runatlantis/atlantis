@@ -597,7 +597,7 @@ func TestGithubClient_MergePullHandlesError(t *testing.T) {
 					case "/api/v3/repos/owner/repo/pulls/1/merge":
 						body, err := ioutil.ReadAll(r.Body)
 						Ok(t, err)
-						exp := "{\"commit_message\":\"[Atlantis] Automatically merging after successful apply\",\"merge_method\":\"merge\"}\n"
+						exp := "{\"commit_message\":\"\",\"merge_method\":\"merge\"}\n"
 						Equals(t, exp, string(body))
 						var resp string
 						if c.code == 200 {
@@ -722,8 +722,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 							MergeMethod   string `json:"merge_method"`
 						}
 						expBody := bodyJSON{
-							CommitMessage: "[Atlantis] Automatically merging after successful apply",
-							MergeMethod:   c.expMethod,
+							MergeMethod: c.expMethod,
 						}
 						expBytes, err := json.Marshal(expBody)
 						Ok(t, err)
