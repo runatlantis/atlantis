@@ -64,6 +64,7 @@ const (
 	GitlabWebhookSecretFlag    = "gitlab-webhook-secret" // nolint: gosec
 	HidePrevPlanComments       = "hide-prev-plan-comments"
 	LogLevelFlag               = "log-level"
+	AllowDraftPRs              = "allow-draft-prs"
 	PortFlag                   = "port"
 	RepoConfigFlag             = "repo-config"
 	RepoConfigJSONFlag         = "repo-config-json"
@@ -251,6 +252,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	DisableApplyAllFlag: {
 		description:  "Disable \"atlantis apply\" command so a specific project/workspace/directory has to be specified for applies.",
+		defaultValue: false,
+	},
+	AllowDraftPRs: {
+		description:  "Enable autoplan for Github Draft Pull Requests",
 		defaultValue: false,
 	},
 	HidePrevPlanComments: {
