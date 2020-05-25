@@ -1,293 +1,69 @@
 package events_test
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/runatlantis/atlantis/server/events"
-	"github.com/runatlantis/atlantis/server/logging"
-	myTests "github.com/runatlantis/atlantis/testing"
+	. "github.com/runatlantis/atlantis/testing"
 )
 
-func TestDrainer_TryAddNewOngoingOperation(t *testing.T) {
-	type fields struct {
-		DrainStarted             bool
-		DrainCompleted           bool
-		OngoingOperationsCounter int
-	}
-	type wants struct {
-		DrainStarted             bool
-		DrainCompleted           bool
-		OngoingOperationsCounter int
-		Result                   bool
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		wants  wants
-	}{
-		{
-			name: "simple",
-			fields: fields{
-				DrainStarted:             false,
-				DrainCompleted:           false,
-				OngoingOperationsCounter: 0,
-			},
-			wants: wants{
-				DrainStarted:             false,
-				DrainCompleted:           false,
-				OngoingOperationsCounter: 1,
-				Result:                   true,
-			},
-		},
-		{
-			name: "already started",
-			fields: fields{
-				DrainStarted:             true,
-				DrainCompleted:           false,
-				OngoingOperationsCounter: 1,
-			},
-			wants: wants{
-				DrainStarted:             true,
-				DrainCompleted:           false,
-				OngoingOperationsCounter: 1,
-				Result:                   false,
-			},
-		},
-		{
-			name: "already completed",
-			fields: fields{
-				DrainStarted:             true,
-				DrainCompleted:           true,
-				OngoingOperationsCounter: 1,
-			},
-			wants: wants{
-				DrainStarted:             true,
-				DrainCompleted:           true,
-				OngoingOperationsCounter: 1,
-				Result:                   false,
-			},
-		},
-	}
+// Test starting and completing ops.
+func TestDrainer(t *testing.T) {
+	d := events.Drainer{}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			logger := logging.NewNoopLogger()
-			d := &events.SimpleDrainer{
-				Logger: logger,
-				Status: events.DrainStatus{
-					DrainStarted:             tt.fields.DrainStarted,
-					DrainCompleted:           tt.fields.DrainCompleted,
-					OngoingOperationsCounter: tt.fields.OngoingOperationsCounter,
-				},
-			}
+	// Starts at 0.
+	Equals(t, 0, d.GetStatus().InProgressOps)
 
-			result := d.TryAddNewOngoingOperation()
+	// Add 1.
+	d.StartOp()
+	Equals(t, 1, d.GetStatus().InProgressOps)
 
-			t.Helper()
-			myTests.Assert(t, tt.wants.Result == result, "exp %d got %d", tt.wants.Result, result)
-			myTests.Assert(t, tt.wants.DrainStarted == d.Status.DrainStarted, "exp %s got %s in DrainStarted", tt.wants.DrainStarted, d.Status.DrainStarted)
-			myTests.Assert(t, tt.wants.DrainCompleted == d.Status.DrainCompleted, "exp %s got %s in DrainCompleted", tt.wants.DrainCompleted, d.Status.DrainCompleted)
-			myTests.Assert(t, tt.wants.OngoingOperationsCounter == d.Status.OngoingOperationsCounter, "exp %s got %s in OngoingOperationsCounter", tt.wants.OngoingOperationsCounter, d.Status.OngoingOperationsCounter)
-		})
-	}
+	// Remove 1.
+	d.OpDone()
+	Equals(t, 0, d.GetStatus().InProgressOps)
+
+	// Add 2.
+	d.StartOp()
+	d.StartOp()
+	Equals(t, 2, d.GetStatus().InProgressOps)
+
+	// Remove 1.
+	d.OpDone()
+	Equals(t, 1, d.GetStatus().InProgressOps)
 }
 
-func TestDrainer_RemoveOngoingOperation(t *testing.T) {
-	type fields struct {
-		DrainStarted             bool
-		DrainCompleted           bool
-		OngoingOperationsCounter int
+func TestDrainer_Shutdown(t *testing.T) {
+	d := events.Drainer{}
+	d.StartOp()
+
+	shutdown := make(chan bool)
+	go func() {
+		d.ShutdownBlocking()
+		close(shutdown)
+	}()
+
+	// Sleep to ensure that ShutdownBlocking has been called.
+	time.Sleep(300 * time.Millisecond)
+
+	// Starting another op should fail.
+	Equals(t, false, d.StartOp())
+
+	// Status should be shutting down.
+	Equals(t, events.DrainStatus{
+		ShuttingDown:  true,
+		InProgressOps: 1,
+	}, d.GetStatus())
+
+	// Stop the final operation and wait for shutdown to exit.
+	d.OpDone()
+	timer, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	select {
+	case <-shutdown:
+	case <-timer.Done():
+		Assert(t, false, "Timer reached without shutdown")
+
 	}
-	type wants struct {
-		DrainStarted             bool
-		DrainCompleted           bool
-		OngoingOperationsCounter int
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		wants  wants
-	}{
-		{
-			name: "simple",
-			fields: fields{
-				DrainStarted:             false,
-				DrainCompleted:           false,
-				OngoingOperationsCounter: 1,
-			},
-			wants: wants{
-				DrainStarted:             false,
-				DrainCompleted:           false,
-				OngoingOperationsCounter: 0,
-			},
-		},
-		{
-			name: "already started",
-			fields: fields{
-				DrainStarted:             true,
-				DrainCompleted:           false,
-				OngoingOperationsCounter: 1,
-			},
-			wants: wants{
-				DrainStarted:             true,
-				DrainCompleted:           true,
-				OngoingOperationsCounter: 0,
-			},
-		},
-		{
-			name: "going negative - not started",
-			fields: fields{
-				DrainStarted:             false,
-				DrainCompleted:           false,
-				OngoingOperationsCounter: 0,
-			},
-			wants: wants{
-				DrainStarted:             false,
-				DrainCompleted:           false,
-				OngoingOperationsCounter: 0,
-			},
-		},
-		{
-			name: "going negative - started",
-			fields: fields{
-				DrainStarted:             true,
-				DrainCompleted:           true,
-				OngoingOperationsCounter: 0,
-			},
-			wants: wants{
-				DrainStarted:             true,
-				DrainCompleted:           true,
-				OngoingOperationsCounter: 0,
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			logger := logging.NewNoopLogger()
-			d := &events.SimpleDrainer{
-				Logger: logger,
-				Status: events.DrainStatus{
-					DrainStarted:             tt.fields.DrainStarted,
-					DrainCompleted:           tt.fields.DrainCompleted,
-					OngoingOperationsCounter: tt.fields.OngoingOperationsCounter,
-				},
-			}
-
-			d.RemoveOngoingOperation()
-
-			t.Helper()
-			myTests.Assert(t, tt.wants.DrainStarted == d.Status.DrainStarted, "exp %s got %s in DrainStarted", tt.wants.DrainStarted, d.Status.DrainStarted)
-			myTests.Assert(t, tt.wants.DrainCompleted == d.Status.DrainCompleted, "exp %s got %s in DrainCompleted", tt.wants.DrainCompleted, d.Status.DrainCompleted)
-			myTests.Assert(t, tt.wants.OngoingOperationsCounter == d.Status.OngoingOperationsCounter, "exp %s got %s in OngoingOperationsCounter", tt.wants.OngoingOperationsCounter, d.Status.OngoingOperationsCounter)
-		})
-	}
-}
-
-func TestDrainer_StartDrain(t *testing.T) {
-	type fields struct {
-		DrainStarted             bool
-		DrainCompleted           bool
-		OngoingOperationsCounter int
-	}
-	type wants struct {
-		DrainStarted             bool
-		DrainCompleted           bool
-		OngoingOperationsCounter int
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		wants  wants
-	}{
-		{
-			name: "simple with no ongoing operation",
-			fields: fields{
-				DrainStarted:             false,
-				DrainCompleted:           false,
-				OngoingOperationsCounter: 0,
-			},
-			wants: wants{
-				DrainStarted:             true,
-				DrainCompleted:           true,
-				OngoingOperationsCounter: 0,
-			},
-		},
-		{
-			name: "simple with one ongoing operation",
-			fields: fields{
-				DrainStarted:             false,
-				DrainCompleted:           false,
-				OngoingOperationsCounter: 1,
-			},
-			wants: wants{
-				DrainStarted:             true,
-				DrainCompleted:           false,
-				OngoingOperationsCounter: 1,
-			},
-		},
-		{
-			name: "already started",
-			fields: fields{
-				DrainStarted:             true,
-				DrainCompleted:           false,
-				OngoingOperationsCounter: 1,
-			},
-			wants: wants{
-				DrainStarted:             true,
-				DrainCompleted:           false,
-				OngoingOperationsCounter: 1,
-			},
-		},
-		{
-			name: "already started and completed",
-			fields: fields{
-				DrainStarted:             true,
-				DrainCompleted:           true,
-				OngoingOperationsCounter: 0,
-			},
-			wants: wants{
-				DrainStarted:             true,
-				DrainCompleted:           true,
-				OngoingOperationsCounter: 0,
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			logger := logging.NewNoopLogger()
-			d := &events.SimpleDrainer{
-				Logger: logger,
-				Status: events.DrainStatus{
-					DrainStarted:             tt.fields.DrainStarted,
-					DrainCompleted:           tt.fields.DrainCompleted,
-					OngoingOperationsCounter: tt.fields.OngoingOperationsCounter,
-				},
-			}
-
-			d.StartDrain()
-
-			t.Helper()
-			myTests.Assert(t, tt.wants.DrainStarted == d.Status.DrainStarted, "exp %s got %s in DrainStarted", tt.wants.DrainStarted, d.Status.DrainStarted)
-			myTests.Assert(t, tt.wants.DrainCompleted == d.Status.DrainCompleted, "exp %s got %s in DrainCompleted", tt.wants.DrainCompleted, d.Status.DrainCompleted)
-			myTests.Assert(t, tt.wants.OngoingOperationsCounter == d.Status.OngoingOperationsCounter, "exp %s got %s in OngoingOperationsCounter", tt.wants.OngoingOperationsCounter, d.Status.OngoingOperationsCounter)
-		})
-	}
-}
-
-func TestDrainer_GetStatus(t *testing.T) {
-	d := &events.SimpleDrainer{
-		Status: events.DrainStatus{
-			DrainStarted:             true,
-			DrainCompleted:           true,
-			OngoingOperationsCounter: 12,
-		},
-	}
-	status := d.GetStatus()
-
-	myTests.Assert(t, d.Status.DrainStarted == status.DrainStarted, "exp %s got %s in DrainStarted", d.Status.DrainStarted, status.DrainStarted)
-	myTests.Assert(t, d.Status.DrainCompleted == status.DrainCompleted, "exp %s got %s in DrainCompleted", d.Status.DrainCompleted, status.DrainCompleted)
-	myTests.Assert(t, d.Status.OngoingOperationsCounter == status.OngoingOperationsCounter, "exp %s got %s in OngoingOperationsCounter", d.Status.OngoingOperationsCounter, status.OngoingOperationsCounter)
-
 }

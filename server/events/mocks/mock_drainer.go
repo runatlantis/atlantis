@@ -45,7 +45,7 @@ func (mock *MockDrainer) RemoveOngoingOperation() {
 		panic("mock must not be nil. Use myMock := NewMockDrainer().")
 	}
 	params := []pegomock.Param{}
-	pegomock.GetGenericMockFrom(mock).Invoke("RemoveOngoingOperation", params, []reflect.Type{})
+	pegomock.GetGenericMockFrom(mock).Invoke("OpDone", params, []reflect.Type{})
 }
 
 func (mock *MockDrainer) StartDrain() {
@@ -53,7 +53,7 @@ func (mock *MockDrainer) StartDrain() {
 		panic("mock must not be nil. Use myMock := NewMockDrainer().")
 	}
 	params := []pegomock.Param{}
-	pegomock.GetGenericMockFrom(mock).Invoke("StartDrain", params, []reflect.Type{})
+	pegomock.GetGenericMockFrom(mock).Invoke("ShutdownBlocking", params, []reflect.Type{})
 }
 
 func (mock *MockDrainer) TryAddNewOngoingOperation() bool {
@@ -61,7 +61,7 @@ func (mock *MockDrainer) TryAddNewOngoingOperation() bool {
 		panic("mock must not be nil. Use myMock := NewMockDrainer().")
 	}
 	params := []pegomock.Param{}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("TryAddNewOngoingOperation", params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem()})
+	result := pegomock.GetGenericMockFrom(mock).Invoke("StartOp", params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem()})
 	var ret0 bool
 	if len(result) != 0 {
 		if result[0] != nil {
@@ -127,7 +127,7 @@ func (c *MockDrainer_GetStatus_OngoingVerification) GetAllCapturedArguments() {
 
 func (verifier *VerifierMockDrainer) RemoveOngoingOperation() *MockDrainer_RemoveOngoingOperation_OngoingVerification {
 	params := []pegomock.Param{}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "RemoveOngoingOperation", params, verifier.timeout)
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "OpDone", params, verifier.timeout)
 	return &MockDrainer_RemoveOngoingOperation_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
@@ -144,7 +144,7 @@ func (c *MockDrainer_RemoveOngoingOperation_OngoingVerification) GetAllCapturedA
 
 func (verifier *VerifierMockDrainer) StartDrain() *MockDrainer_StartDrain_OngoingVerification {
 	params := []pegomock.Param{}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "StartDrain", params, verifier.timeout)
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ShutdownBlocking", params, verifier.timeout)
 	return &MockDrainer_StartDrain_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
@@ -161,7 +161,7 @@ func (c *MockDrainer_StartDrain_OngoingVerification) GetAllCapturedArguments() {
 
 func (verifier *VerifierMockDrainer) TryAddNewOngoingOperation() *MockDrainer_TryAddNewOngoingOperation_OngoingVerification {
 	params := []pegomock.Param{}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "TryAddNewOngoingOperation", params, verifier.timeout)
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "StartOp", params, verifier.timeout)
 	return &MockDrainer_TryAddNewOngoingOperation_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 

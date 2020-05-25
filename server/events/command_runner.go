@@ -27,6 +27,10 @@ import (
 	gitlab "github.com/xanzy/go-gitlab"
 )
 
+const (
+	ShutdownComment = "Atlantis server is shutting down, please try again later."
+)
+
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_command_runner.go CommandRunner
 
 // CommandRunner is the first step after a command request has been parsed.
@@ -98,21 +102,18 @@ type DefaultCommandRunner struct {
 	PendingPlanFinder PendingPlanFinder
 	WorkingDir        WorkingDir
 	DB                *db.BoltDB
-	Drainer           Drainer
+	Drainer           *Drainer
 }
 
 // RunAutoplanCommand runs plan when a pull request is opened or updated.
 func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) {
-	if canProceed := c.Drainer.TryAddNewOngoingOperation(); !canProceed {
-		if commentErr := c.VCSClient.CreateComment(baseRepo, pull.Num, "Atlantis server is shutting down, please try again later."); commentErr != nil {
-			c.Logger.Log(logging.Error, "unable to comment drainage: %s", commentErr)
+	if opStarted := c.Drainer.StartOp(); !opStarted {
+		if commentErr := c.VCSClient.CreateComment(baseRepo, pull.Num, ShutdownComment); commentErr != nil {
+			c.Logger.Log(logging.Error, "unable to comment that Atlantis is shutting down: %s", commentErr)
 		}
 		return
 	}
-
-	defer func() {
-		c.Drainer.RemoveOngoingOperation()
-	}()
+	defer c.Drainer.OpDone()
 
 	log := c.buildLogger(baseRepo.FullName, pull.Num)
 	defer c.logPanics(baseRepo, pull.Num, log)
@@ -176,16 +177,13 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 // the event is further validated before making an additional (potentially
 // wasteful) call to get the necessary data.
 func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *CommentCommand) {
-	if canProceed := c.Drainer.TryAddNewOngoingOperation(); !canProceed {
-		if commentErr := c.VCSClient.CreateComment(baseRepo, pullNum, "Atlantis server is shutting down, please try again later."); commentErr != nil {
-			c.Logger.Log(logging.Error, "unable to comment drainage: %s", commentErr)
+	if opStarted := c.Drainer.StartOp(); !opStarted {
+		if commentErr := c.VCSClient.CreateComment(baseRepo, pullNum, ShutdownComment); commentErr != nil {
+			c.Logger.Log(logging.Error, "unable to comment that Atlantis is shutting down: %s", commentErr)
 		}
 		return
 	}
-
-	defer func() {
-		c.Drainer.RemoveOngoingOperation()
-	}()
+	defer c.Drainer.OpDone()
 
 	log := c.buildLogger(baseRepo.FullName, pullNum)
 	defer c.logPanics(baseRepo, pullNum, log)

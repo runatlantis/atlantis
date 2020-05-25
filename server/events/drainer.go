@@ -2,64 +2,62 @@ package events
 
 import (
 	"sync"
-
-	"github.com/runatlantis/atlantis/server/logging"
 )
 
-type Drainer interface {
-	TryAddNewOngoingOperation() bool
-	RemoveOngoingOperation()
-	StartDrain()
-	GetStatus() DrainStatus
-}
-
-type SimpleDrainer struct {
-	Logger logging.SimpleLogging
-	Status DrainStatus
+// Drainer is used to gracefully shut down atlantis by waiting for in-progress
+// operations to complete.
+type Drainer struct {
+	status DrainStatus
 	mutex  sync.Mutex
+	wg     sync.WaitGroup
 }
 
 type DrainStatus struct {
-	DrainStarted             bool
-	DrainCompleted           bool
-	OngoingOperationsCounter int
+	// ShuttingDown is whether we are in the progress of shutting down.
+	ShuttingDown bool
+	// InProgressOps is the number of operations currently in progress.
+	InProgressOps int
 }
 
-// Try to add an operation as ongoing. Return true if the operation is allowed to start, false if it should be rejected.
-func (d *SimpleDrainer) TryAddNewOngoingOperation() bool {
+// StartOp tries to start a new operation. It returns false is Atlantis is
+// shutting down.
+func (d *Drainer) StartOp() bool {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
-	if d.Status.DrainStarted {
+
+	if d.status.ShuttingDown {
 		return false
 	}
-	d.Status.OngoingOperationsCounter++
+	d.status.InProgressOps++
+	d.wg.Add(1)
 	return true
 }
 
-// Consider an operation as completed.
-func (d *SimpleDrainer) RemoveOngoingOperation() {
+// OpDone marks an operation as complete.
+func (d *Drainer) OpDone() {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
-	d.Status.OngoingOperationsCounter--
-	if d.Status.OngoingOperationsCounter < 0 {
-		d.Logger.Log(logging.Warn, "Drain OngoingOperationsCounter became below 0, this is a bug")
-		d.Status.OngoingOperationsCounter = 0
-	}
-	if d.Status.DrainStarted && d.Status.OngoingOperationsCounter == 0 {
-		d.Status.DrainCompleted = true
+
+	d.status.InProgressOps--
+	d.wg.Done()
+	if d.status.InProgressOps < 0 {
+		// This would be a bug.
+		d.status.InProgressOps = 0
 	}
 }
 
-// Start to drain the server.
-func (d *SimpleDrainer) StartDrain() {
+// ShutdownBlocking sets "shutting down" to true and blocks until there are no
+// in progress operations.
+func (d *Drainer) ShutdownBlocking() {
+	// Set the shutdown status.
 	d.mutex.Lock()
-	defer d.mutex.Unlock()
-	d.Status.DrainStarted = true
-	if d.Status.OngoingOperationsCounter == 0 {
-		d.Status.DrainCompleted = true
-	}
+	d.status.ShuttingDown = true
+	d.mutex.Unlock()
+
+	// Block until there are no in-progress ops.
+	d.wg.Wait()
 }
 
-func (d *SimpleDrainer) GetStatus() DrainStatus {
-	return d.Status
+func (d *Drainer) GetStatus() DrainStatus {
+	return d.status
 }
