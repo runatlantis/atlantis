@@ -19,6 +19,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/google/go-github/v28/github"
@@ -203,6 +204,11 @@ func TestRunCommentCommand_ClosedPull(t *testing.T) {
 // we delete the plans.
 func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 	setup(t)
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	boltDB, err := db.New(tmp)
+	Ok(t, err)
+	ch.DB = boltDB
 	ch.GlobalAutomerge = true
 	defer func() { ch.GlobalAutomerge = false }()
 
@@ -229,8 +235,6 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 			},
 		}
 	})
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
 
 	When(workingDir.GetPullDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).
 		ThenReturn(tmp, nil)

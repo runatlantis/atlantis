@@ -95,7 +95,7 @@ func (c *MockLockURLGenerator_GenerateLockURL_OngoingVerification) GetCapturedAr
 func (c *MockLockURLGenerator_GenerateLockURL_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]string, len(params[0]))
+		_param0 = make([]string, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
 		}

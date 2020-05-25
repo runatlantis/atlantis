@@ -177,19 +177,19 @@ func (c *MockLocker_TryLock_OngoingVerification) GetCapturedArguments() (models.
 func (c *MockLocker_TryLock_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Project, _param1 []string, _param2 []models.PullRequest, _param3 []models.User) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]models.Project, len(params[0]))
+		_param0 = make([]models.Project, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(models.Project)
 		}
-		_param1 = make([]string, len(params[1]))
+		_param1 = make([]string, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(string)
 		}
-		_param2 = make([]models.PullRequest, len(params[2]))
+		_param2 = make([]models.PullRequest, len(c.methodInvocations))
 		for u, param := range params[2] {
 			_param2[u] = param.(models.PullRequest)
 		}
-		_param3 = make([]models.User, len(params[3]))
+		_param3 = make([]models.User, len(c.methodInvocations))
 		for u, param := range params[3] {
 			_param3[u] = param.(models.User)
 		}
@@ -216,7 +216,7 @@ func (c *MockLocker_Unlock_OngoingVerification) GetCapturedArguments() string {
 func (c *MockLocker_Unlock_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]string, len(params[0]))
+		_param0 = make([]string, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
 		}
@@ -260,11 +260,11 @@ func (c *MockLocker_UnlockByPull_OngoingVerification) GetCapturedArguments() (st
 func (c *MockLocker_UnlockByPull_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []int) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]string, len(params[0]))
+		_param0 = make([]string, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
 		}
-		_param1 = make([]int, len(params[1]))
+		_param1 = make([]int, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(int)
 		}
@@ -291,7 +291,7 @@ func (c *MockLocker_GetLock_OngoingVerification) GetCapturedArguments() string {
 func (c *MockLocker_GetLock_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]string, len(params[0]))
+		_param0 = make([]string, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
 		}

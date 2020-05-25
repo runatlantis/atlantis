@@ -64,7 +64,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
 		AnyString(),
-	)).ThenReturn(repoDir, nil)
+	)).ThenReturn(repoDir, false, nil)
 	When(mockLocker.TryLock(
 		matchers.AnyPtrToLoggingSimpleLogger(),
 		matchers.AnyModelsPullRequest(),
@@ -376,7 +376,7 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
 		AnyString(),
-	)).ThenReturn(repoDir, nil)
+	)).ThenReturn(repoDir, false, nil)
 	When(mockLocker.TryLock(
 		matchers.AnyPtrToLoggingSimpleLogger(),
 		matchers.AnyModelsPullRequest(),

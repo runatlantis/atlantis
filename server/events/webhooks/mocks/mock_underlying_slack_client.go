@@ -159,7 +159,7 @@ func (c *MockUnderlyingSlackClient_GetChannels_OngoingVerification) GetCapturedA
 func (c *MockUnderlyingSlackClient_GetChannels_OngoingVerification) GetAllCapturedArguments() (_param0 []bool) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]bool, len(params[0]))
+		_param0 = make([]bool, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(bool)
 		}
@@ -186,15 +186,15 @@ func (c *MockUnderlyingSlackClient_PostMessage_OngoingVerification) GetCapturedA
 func (c *MockUnderlyingSlackClient_PostMessage_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []string, _param2 []slack.PostMessageParameters) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]string, len(params[0]))
+		_param0 = make([]string, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
 		}
-		_param1 = make([]string, len(params[1]))
+		_param1 = make([]string, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(string)
 		}
-		_param2 = make([]slack.PostMessageParameters, len(params[2]))
+		_param2 = make([]slack.PostMessageParameters, len(c.methodInvocations))
 		for u, param := range params[2] {
 			_param2[u] = param.(slack.PostMessageParameters)
 		}
