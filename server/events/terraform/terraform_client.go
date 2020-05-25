@@ -65,6 +65,9 @@ type DefaultClient struct {
 
 	// versionsLock is used to ensure versions isn't being concurrently written to.
 	versionsLock *sync.Mutex
+
+	// usePluginCache determines whether or not to set the TF_PLUGIN_CACHE_DIR env var
+	usePluginCache bool
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_downloader.go Downloader
@@ -107,7 +110,8 @@ func NewClient(
 	defaultVersionStr string,
 	defaultVersionFlagName string,
 	tfDownloadURL string,
-	tfDownloader Downloader) (*DefaultClient, error) {
+	tfDownloader Downloader,
+	usePluginCache bool) (*DefaultClient, error) {
 	var finalDefaultVersion *version.Version
 	var localVersion *version.Version
 	versions := make(map[string]string)
@@ -179,6 +183,7 @@ func NewClient(
 		downloadBaseURL:         tfDownloadURL,
 		versionsLock:            &versionsLock,
 		versions:                versions,
+		usePluginCache:          usePluginCache,
 	}, nil
 }
 
@@ -259,10 +264,12 @@ func (c *DefaultClient) prepCmd(log *logging.SimpleLogger, v *version.Version, w
 		// Will de-emphasize specific commands to run in output.
 		"TF_IN_AUTOMATION=true",
 		// Cache plugins so terraform init runs faster.
-		fmt.Sprintf("TF_PLUGIN_CACHE_DIR=%s", c.terraformPluginCacheDir),
 		fmt.Sprintf("WORKSPACE=%s", workspace),
 		fmt.Sprintf("ATLANTIS_TERRAFORM_VERSION=%s", v.String()),
 		fmt.Sprintf("DIR=%s", path),
+	}
+	if c.usePluginCache {
+		envVars = append(envVars, fmt.Sprintf("TF_PLUGIN_CACHE_DIR=%s", c.terraformPluginCacheDir))
 	}
 	// Append current Atlantis process's environment variables, ex.
 	// AWS_ACCESS_KEY.

@@ -94,6 +94,7 @@ func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
 		overrideTF:              "echo",
+		usePluginCache:          true,
 	}
 
 	args := []string{
@@ -143,6 +144,7 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
 		overrideTF:              "echo",
+		usePluginCache:          true,
 	}
 
 	args := []string{

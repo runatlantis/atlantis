@@ -221,6 +221,9 @@ github.com/petergtz/pegomock/internal/verify
 # github.com/pkg/errors v0.8.0
 ## explicit
 github.com/pkg/errors
+# github.com/remeh/sizedwaitgroup v1.0.0
+## explicit
+github.com/remeh/sizedwaitgroup
 # github.com/shurcooL/githubv4 v0.0.0-20191127044304-8f68eb5628d0
 ## explicit
 github.com/shurcooL/githubv4

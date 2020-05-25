@@ -1,0 +1,12 @@
+version: 3
+parallel_plan: false
+parallel_apply: true
+projects:
+  - dir: production
+    workspace: production
+    autoplan:
+      when_modified: ["**/*.tf*"]
+  - dir: staging
+    workspace: staging
+    autoplan:
+      when_modified: ["**/*.tf*"]
