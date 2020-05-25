@@ -19,6 +19,12 @@ import (
 
 // BoltDB interface defines the set of methods the DB implements. Use this to allow DB mocking when testing
 type BoltDB interface {
+	TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, error)
+	Unlock(p models.Project, workspace string) (*models.ProjectLock, error)
+	List() ([]models.ProjectLock, error)
+	UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error)
+	GetLock(p models.Project, workspace string) (*models.ProjectLock, error)
+	GetPullStatus(pull models.PullRequest) (*models.PullStatus, error)
 	UpdatePullWithResults(pull models.PullRequest, newResults []models.ProjectResult) (models.PullStatus, error)
 	DeletePullStatus(pull models.PullRequest) error
 	UpdateProjectStatus(pull models.PullRequest, workspace string, repoRelDir string, targetStatus models.ProjectPlanStatus) error

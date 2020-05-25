@@ -25,6 +25,124 @@ func NewMockBoltDB(options ...pegomock.Option) *MockBoltDB {
 func (mock *MockBoltDB) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockBoltDB) FailHandler() pegomock.FailHandler      { return mock.fail }
 
+func (mock *MockBoltDB) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockBoltDB().")
+	}
+	params := []pegomock.Param{newLock}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("TryLock", params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem(), reflect.TypeOf((*models.ProjectLock)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 bool
+	var ret1 models.ProjectLock
+	var ret2 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(bool)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(models.ProjectLock)
+		}
+		if result[2] != nil {
+			ret2 = result[2].(error)
+		}
+	}
+	return ret0, ret1, ret2
+}
+
+func (mock *MockBoltDB) Unlock(p models.Project, workspace string) (*models.ProjectLock, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockBoltDB().")
+	}
+	params := []pegomock.Param{p, workspace}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("Unlock", params, []reflect.Type{reflect.TypeOf((**models.ProjectLock)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 *models.ProjectLock
+	var ret1 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(*models.ProjectLock)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(error)
+		}
+	}
+	return ret0, ret1
+}
+
+func (mock *MockBoltDB) List() ([]models.ProjectLock, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockBoltDB().")
+	}
+	params := []pegomock.Param{}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("List", params, []reflect.Type{reflect.TypeOf((*[]models.ProjectLock)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 []models.ProjectLock
+	var ret1 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].([]models.ProjectLock)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(error)
+		}
+	}
+	return ret0, ret1
+}
+
+func (mock *MockBoltDB) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockBoltDB().")
+	}
+	params := []pegomock.Param{repoFullName, pullNum}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("UnlockByPull", params, []reflect.Type{reflect.TypeOf((*[]models.ProjectLock)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 []models.ProjectLock
+	var ret1 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].([]models.ProjectLock)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(error)
+		}
+	}
+	return ret0, ret1
+}
+
+func (mock *MockBoltDB) GetLock(p models.Project, workspace string) (*models.ProjectLock, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockBoltDB().")
+	}
+	params := []pegomock.Param{p, workspace}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("GetLock", params, []reflect.Type{reflect.TypeOf((**models.ProjectLock)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 *models.ProjectLock
+	var ret1 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(*models.ProjectLock)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(error)
+		}
+	}
+	return ret0, ret1
+}
+
+func (mock *MockBoltDB) GetPullStatus(pull models.PullRequest) (*models.PullStatus, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockBoltDB().")
+	}
+	params := []pegomock.Param{pull}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("GetPullStatus", params, []reflect.Type{reflect.TypeOf((**models.PullStatus)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 *models.PullStatus
+	var ret1 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(*models.PullStatus)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(error)
+		}
+	}
+	return ret0, ret1
+}
+
 func (mock *MockBoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []models.ProjectResult) (models.PullStatus, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockBoltDB().")
@@ -109,6 +227,170 @@ type VerifierMockBoltDB struct {
 	invocationCountMatcher pegomock.Matcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
+}
+
+func (verifier *VerifierMockBoltDB) TryLock(newLock models.ProjectLock) *MockBoltDB_TryLock_OngoingVerification {
+	params := []pegomock.Param{newLock}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "TryLock", params, verifier.timeout)
+	return &MockBoltDB_TryLock_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockBoltDB_TryLock_OngoingVerification struct {
+	mock              *MockBoltDB
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockBoltDB_TryLock_OngoingVerification) GetCapturedArguments() models.ProjectLock {
+	newLock := c.GetAllCapturedArguments()
+	return newLock[len(newLock)-1]
+}
+
+func (c *MockBoltDB_TryLock_OngoingVerification) GetAllCapturedArguments() (_param0 []models.ProjectLock) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]models.ProjectLock, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(models.ProjectLock)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockBoltDB) Unlock(p models.Project, workspace string) *MockBoltDB_Unlock_OngoingVerification {
+	params := []pegomock.Param{p, workspace}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Unlock", params, verifier.timeout)
+	return &MockBoltDB_Unlock_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockBoltDB_Unlock_OngoingVerification struct {
+	mock              *MockBoltDB
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockBoltDB_Unlock_OngoingVerification) GetCapturedArguments() (models.Project, string) {
+	p, workspace := c.GetAllCapturedArguments()
+	return p[len(p)-1], workspace[len(workspace)-1]
+}
+
+func (c *MockBoltDB_Unlock_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Project, _param1 []string) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]models.Project, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(models.Project)
+		}
+		_param1 = make([]string, len(c.methodInvocations))
+		for u, param := range params[1] {
+			_param1[u] = param.(string)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockBoltDB) List() *MockBoltDB_List_OngoingVerification {
+	params := []pegomock.Param{}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "List", params, verifier.timeout)
+	return &MockBoltDB_List_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockBoltDB_List_OngoingVerification struct {
+	mock              *MockBoltDB
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockBoltDB_List_OngoingVerification) GetCapturedArguments() {
+}
+
+func (c *MockBoltDB_List_OngoingVerification) GetAllCapturedArguments() {
+}
+
+func (verifier *VerifierMockBoltDB) UnlockByPull(repoFullName string, pullNum int) *MockBoltDB_UnlockByPull_OngoingVerification {
+	params := []pegomock.Param{repoFullName, pullNum}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "UnlockByPull", params, verifier.timeout)
+	return &MockBoltDB_UnlockByPull_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockBoltDB_UnlockByPull_OngoingVerification struct {
+	mock              *MockBoltDB
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockBoltDB_UnlockByPull_OngoingVerification) GetCapturedArguments() (string, int) {
+	repoFullName, pullNum := c.GetAllCapturedArguments()
+	return repoFullName[len(repoFullName)-1], pullNum[len(pullNum)-1]
+}
+
+func (c *MockBoltDB_UnlockByPull_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []int) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]string, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(string)
+		}
+		_param1 = make([]int, len(c.methodInvocations))
+		for u, param := range params[1] {
+			_param1[u] = param.(int)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockBoltDB) GetLock(p models.Project, workspace string) *MockBoltDB_GetLock_OngoingVerification {
+	params := []pegomock.Param{p, workspace}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetLock", params, verifier.timeout)
+	return &MockBoltDB_GetLock_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockBoltDB_GetLock_OngoingVerification struct {
+	mock              *MockBoltDB
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockBoltDB_GetLock_OngoingVerification) GetCapturedArguments() (models.Project, string) {
+	p, workspace := c.GetAllCapturedArguments()
+	return p[len(p)-1], workspace[len(workspace)-1]
+}
+
+func (c *MockBoltDB_GetLock_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Project, _param1 []string) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]models.Project, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(models.Project)
+		}
+		_param1 = make([]string, len(c.methodInvocations))
+		for u, param := range params[1] {
+			_param1[u] = param.(string)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockBoltDB) GetPullStatus(pull models.PullRequest) *MockBoltDB_GetPullStatus_OngoingVerification {
+	params := []pegomock.Param{pull}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetPullStatus", params, verifier.timeout)
+	return &MockBoltDB_GetPullStatus_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockBoltDB_GetPullStatus_OngoingVerification struct {
+	mock              *MockBoltDB
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockBoltDB_GetPullStatus_OngoingVerification) GetCapturedArguments() models.PullRequest {
+	pull := c.GetAllCapturedArguments()
+	return pull[len(pull)-1]
+}
+
+func (c *MockBoltDB_GetPullStatus_OngoingVerification) GetAllCapturedArguments() (_param0 []models.PullRequest) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]models.PullRequest, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(models.PullRequest)
+		}
+	}
+	return
 }
 
 func (verifier *VerifierMockBoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []models.ProjectResult) *MockBoltDB_UpdatePullWithResults_OngoingVerification {
