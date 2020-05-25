@@ -18,37 +18,25 @@ We take security issues seriously. Please email us directly at security [at] run
 open your browser to http://localhost:8080.
 * The website will be regenerated when your pull request is merged to master.
 
-
 # Developing
 
 ## Running Atlantis Locally
-Get the source code:
-```
-go get github.com/runatlantis/atlantis
-```
-This will clone Atlantis into `$GOPATH/src/github.com/runatlantis/atlantis` (where `$GOPATH` defaults to `~/go`).
+* Clone the repo from https://github.com/runatlantis/atlantis/
+* Compile Atlantis:
+    ```
+    go install
+    ```
+* Run Atlantis:
+    ```
+    atlantis server --gh-user <your username> --gh-token <your token> --repo-whitelist <your repo> --gh-webhook-secret <your webhook secret> --log-level debug
+    ```
+    If you get an error like `command not found: atlantis`, ensure that `$GOPATH/bin` is in your `$PATH`.
 
-Go to that directory:
-```
-cd $GOPATH/src/github.com/runatlantis/atlantis
-```
-
-Compile Atlantis:
-```
-go install
-```
-
-Run Atlantis:
-```
-atlantis server --gh-user <your username> --gh-token <your token> --repo-whitelist <your repo> --gh-webhook-secret <your webhook secret> --log-level debug
-```
-If you get an error like `command not found: atlantis`, ensure that `$GOPATH/bin` is in your `$PATH`.
-
-Running Tests Locally:
+## Running Tests Locally:
 
 `make test`. If you want to run the integration tests that actually run real `terraform` commands, run `make test-all`.
 
-Running Tests In Docker:
+## Running Tests In Docker:
 ```
 docker run --rm -v $(pwd):/go/src/github.com/runatlantis/atlantis -w /go/src/github.com/runatlantis/atlantis runatlantis/testing-env make test
 ```
@@ -101,6 +89,39 @@ This is easier to read and more consistent
 - place tests under `{package under test}_test` to enforce testing the external interfaces
 - if you need to test internally i.e. access non-exported stuff, call the file `{file under test}_internal_test.go`
 - use our testing utility for easier-to-read assertions: `import . "github.com/runatlantis/atlantis/testing"` and then use `Assert()`, `Equals()` and `Ok()`
+
+### Mocks
+We use [pegomock](https://github.com/petergtz/pegomock) for mocking. If you're
+modifying any interfaces that are mocked, you'll need to regen the mocks for that
+interface.
+
+If you see errors like:
+```
+# github.com/runatlantis/atlantis/server/events [github.com/runatlantis/atlantis/server/events.test]
+server/events/project_command_builder_internal_test.go:567:5: cannot use workingDir (type *MockWorkingDir) as type WorkingDir in field value:
+	*MockWorkingDir does not implement WorkingDir (missing ListAllFiles method)
+```
+
+Then you've likely modified an interface and now need to update the mocks.
+
+Each interface that is mocked has a `go:generate` command above it, e.g.
+```go
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
+
+type ProjectCommandBuilder interface {
+	BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error)
+}
+```
+
+To regen the mock, run `go generate` on that file, e.g.
+```sh
+go generate server/events/project_command_builder.go
+```
+
+If you get an error about `pegomock` not being available, install it:
+```sh
+go get github.com/petergtz/pegomock/...
+```
 
 # Creating a New Release
 1. Update version number in `main.go`.

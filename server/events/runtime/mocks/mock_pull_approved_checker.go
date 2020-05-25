@@ -100,11 +100,11 @@ func (c *MockPullApprovedChecker_PullIsApproved_OngoingVerification) GetCaptured
 func (c *MockPullApprovedChecker_PullIsApproved_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]models.Repo, len(params[0]))
+		_param0 = make([]models.Repo, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(models.Repo)
 		}
-		_param1 = make([]models.PullRequest, len(params[1]))
+		_param1 = make([]models.PullRequest, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(models.PullRequest)
 		}

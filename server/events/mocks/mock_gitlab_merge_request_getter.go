@@ -100,11 +100,11 @@ func (c *MockGitlabMergeRequestGetter_GetMergeRequest_OngoingVerification) GetCa
 func (c *MockGitlabMergeRequestGetter_GetMergeRequest_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []int) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]string, len(params[0]))
+		_param0 = make([]string, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
 		}
-		_param1 = make([]int, len(params[1]))
+		_param1 = make([]int, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(int)
 		}

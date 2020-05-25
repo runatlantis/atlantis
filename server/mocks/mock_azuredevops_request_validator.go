@@ -100,15 +100,15 @@ func (c *MockAzureDevopsRequestValidator_Validate_OngoingVerification) GetCaptur
 func (c *MockAzureDevopsRequestValidator_Validate_OngoingVerification) GetAllCapturedArguments() (_param0 []*http.Request, _param1 [][]byte, _param2 [][]byte) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]*http.Request, len(params[0]))
+		_param0 = make([]*http.Request, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(*http.Request)
 		}
-		_param1 = make([][]byte, len(params[1]))
+		_param1 = make([][]byte, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.([]byte)
 		}
-		_param2 = make([][]byte, len(params[2]))
+		_param2 = make([][]byte, len(c.methodInvocations))
 		for u, param := range params[2] {
 			_param2[u] = param.([]byte)
 		}

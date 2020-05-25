@@ -102,16 +102,16 @@ func (c *MockDownloader_GetFile_OngoingVerification) GetCapturedArguments() (str
 func (c *MockDownloader_GetFile_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []string, _param2 [][]go_getter.ClientOption) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]string, len(params[0]))
+		_param0 = make([]string, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
 		}
-		_param1 = make([]string, len(params[1]))
+		_param1 = make([]string, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(string)
 		}
-		_param2 = make([][]go_getter.ClientOption, len(params[2]))
-		for u := range params[0] {
+		_param2 = make([][]go_getter.ClientOption, len(c.methodInvocations))
+		for u := 0; u < len(c.methodInvocations); u++ {
 			_param2[u] = make([]go_getter.ClientOption, len(params)-2)
 			for x := 2; x < len(params); x++ {
 				if params[x][u] != nil {

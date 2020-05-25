@@ -115,7 +115,7 @@ func (c *MockPendingPlanFinder_Find_OngoingVerification) GetCapturedArguments() 
 func (c *MockPendingPlanFinder_Find_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]string, len(params[0]))
+		_param0 = make([]string, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
 		}
@@ -142,7 +142,7 @@ func (c *MockPendingPlanFinder_DeletePlans_OngoingVerification) GetCapturedArgum
 func (c *MockPendingPlanFinder_DeletePlans_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]string, len(params[0]))
+		_param0 = make([]string, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
 		}

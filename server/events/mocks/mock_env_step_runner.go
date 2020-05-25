@@ -100,23 +100,23 @@ func (c *MockEnvStepRunner_Run_OngoingVerification) GetCapturedArguments() (mode
 func (c *MockEnvStepRunner_Run_OngoingVerification) GetAllCapturedArguments() (_param0 []models.ProjectCommandContext, _param1 []string, _param2 []string, _param3 []string, _param4 []map[string]string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]models.ProjectCommandContext, len(params[0]))
+		_param0 = make([]models.ProjectCommandContext, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(models.ProjectCommandContext)
 		}
-		_param1 = make([]string, len(params[1]))
+		_param1 = make([]string, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(string)
 		}
-		_param2 = make([]string, len(params[2]))
+		_param2 = make([]string, len(c.methodInvocations))
 		for u, param := range params[2] {
 			_param2[u] = param.(string)
 		}
-		_param3 = make([]string, len(params[3]))
+		_param3 = make([]string, len(c.methodInvocations))
 		for u, param := range params[3] {
 			_param3[u] = param.(string)
 		}
-		_param4 = make([]map[string]string, len(params[4]))
+		_param4 = make([]map[string]string, len(c.methodInvocations))
 		for u, param := range params[4] {
 			_param4[u] = param.(map[string]string)
 		}
