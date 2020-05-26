@@ -15,7 +15,6 @@ package server
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/urfave/negroni"
@@ -31,18 +30,9 @@ type RequestLogger struct {
 	logger *logging.SimpleLogger
 }
 
-// ServeHTTP implements the middleware function. It logs a request at INFO
-// level unless it's a request to /static/*.
+// ServeHTTP implements the middleware function. It logs all requests at DEBUG level.
 func (l *RequestLogger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
-	if l.shouldLog(r) {
-		l.logger.Info("%s %s – from %s", r.Method, r.URL.RequestURI(), r.RemoteAddr)
-	}
+	l.logger.Debug("%s %s – from %s", r.Method, r.URL.RequestURI(), r.RemoteAddr)
 	next(rw, r)
-	if l.shouldLog(r) {
-		l.logger.Info("%s %s – respond HTTP %d", r.Method, r.URL.RequestURI(), rw.(negroni.ResponseWriter).Status())
-	}
-}
-
-func (l *RequestLogger) shouldLog(r *http.Request) bool {
-	return !strings.HasPrefix(r.URL.RequestURI(), "/static")
+	l.logger.Debug("%s %s – respond HTTP %d", r.Method, r.URL.RequestURI(), rw.(negroni.ResponseWriter).Status())
 }
