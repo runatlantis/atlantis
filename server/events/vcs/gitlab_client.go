@@ -218,7 +218,7 @@ func (g *GitlabClient) MergePull(pull models.PullRequest) error {
 
 // MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.
 func (g *GitlabClient) MarkdownPullLink(pull models.PullRequest) (string, error) {
-	return fmt.Sprintf("#%d", pull.Num), nil
+	return fmt.Sprintf("!%d", pull.Num), nil
 }
 
 // GetVersion returns the version of the Gitlab server this client is using.
