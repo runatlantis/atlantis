@@ -455,12 +455,12 @@ func TestUnlock_EmptyLockID(t *testing.T) {
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(requestJSON))
 	w := httptest.NewRecorder()
 	lc.Unlock(w, req)
-	responseContains(t, w, http.StatusBadRequest, "Empty unlock request")
+	responseContains(t, w, http.StatusBadRequest, "No IDs specified")
 }
 
 func TestUnlock_LockerErr(t *testing.T) {
-	t.Log("If the locker fails to unlock then we should get a 500")
-	requestJSON := []byte("{ \"ID\": \"id\" }")
+	t.Log("If the locker fails to unlock then we should see the failure propagated")
+	requestJSON := []byte("{ \"IDs\": [\"id\"] }")
 	l := mocks.NewMockLocker()
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: "owner/repo"},
@@ -480,12 +480,12 @@ func TestUnlock_LockerErr(t *testing.T) {
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(requestJSON))
 	w := httptest.NewRecorder()
 	lc.Unlock(w, req)
-	responseContains(t, w, http.StatusInternalServerError, "Failed to unlock id.")
+	responseContains(t, w, http.StatusOK, "\"Success\":false")
 }
 
 func TestUnlock_NoSuchLock(t *testing.T) {
-	t.Log("If there is no lock at that ID we get a 200")
-	requestJSON := []byte("{ \"ID\": \"id\" }")
+	t.Log("If there is no lock at that ID we get a successful response")
+	requestJSON := []byte("{ \"IDs\": [\"id\"] }")
 	l := mocks.NewMockLocker()
 	When(l.Unlock("id")).ThenReturn(nil, nil)
 	lc := server.LocksController{
@@ -495,12 +495,12 @@ func TestUnlock_NoSuchLock(t *testing.T) {
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(requestJSON))
 	w := httptest.NewRecorder()
 	lc.Unlock(w, req)
-	responseContains(t, w, http.StatusOK, "no such lock")
+	responseContains(t, w, http.StatusOK, "\"Success\":true")
 }
 
 func TestUnlock_Success(t *testing.T) {
-	t.Log("On successfull unlock we get a 200")
-	requestJSON := []byte("{ \"ID\": \"id\" }")
+	t.Log("On successful unlock we get a successful response")
+	requestJSON := []byte("{ \"IDs\": [\"id\"] }")
 	l := mocks.NewMockLocker()
 	workingDir := mocks2.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
@@ -529,5 +529,48 @@ func TestUnlock_Success(t *testing.T) {
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(requestJSON))
 	w := httptest.NewRecorder()
 	lc.Unlock(w, req)
-	responseContains(t, w, http.StatusOK, "Unlocked lock")
+	responseContains(t, w, http.StatusOK, "\"Success\":true")
+}
+
+func TestUnlock_MultipleSuccess(t *testing.T) {
+	t.Log("We can unlock multiple locks")
+	requestJSON := []byte("{ \"IDs\": [\"id\", \"id2\"] }")
+	l := mocks.NewMockLocker()
+	workingDir := mocks2.NewMockWorkingDir()
+	workingDirLocker := events.NewDefaultWorkingDirLocker()
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	db, err := db.New(tmp)
+	Ok(t, err)
+	pull := models.PullRequest{
+		BaseRepo: models.Repo{FullName: "owner/repo"},
+	}
+	When(l.Unlock("id")).ThenReturn(&models.ProjectLock{
+		Pull:      pull,
+		Workspace: "workspace",
+		Project: models.Project{
+			Path:         "path",
+			RepoFullName: "owner/repo",
+		},
+	}, nil)
+	lc := server.LocksController{
+		Locker:           l,
+		Logger:           logging.NewNoopLogger(),
+		WorkingDirLocker: workingDirLocker,
+		WorkingDir:       workingDir,
+		DB:               db,
+	}
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(requestJSON))
+	w := httptest.NewRecorder()
+	lc.Unlock(w, req)
+	body, err := ioutil.ReadAll(w.Result().Body)
+	Ok(t, err)
+	var response server.UnlockResponse
+	err = json.Unmarshal(body, &response)
+	Ok(t, err)
+	expectedLen := 2
+	Assert(t, len(response.Result) == expectedLen, "expected response to be of length %s, was %s instead", expectedLen, len(response.Result))
+	for _, lockResult := range response.Result {
+		Assert(t, lockResult.Success, "expected lock to be released successfully")
+	}
 }

@@ -17,9 +17,20 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-// UnlockRequest is the format of requests made against /unlock to release atlantis locks
+// UnlockRequest is the format of requests made against /api/locks with the DELETE method to release atlantis locks
 type UnlockRequest struct {
-	ID string
+	IDs []string
+}
+
+// UnlockResponse is the format of responses made against /api/locks with the DELETE method
+type UnlockResponse struct {
+	Result []UnlockData
+}
+
+// UnlockData indicates whether the given Lock ID was able to be released
+type UnlockData struct {
+	ID      string
+	Success bool
 }
 
 // LocksController handles all requests relating to Atlantis locks.
@@ -168,27 +179,42 @@ func (l *LocksController) Unlock(w http.ResponseWriter, r *http.Request) {
 		l.respond(w, logging.Error, http.StatusBadRequest, "Invalid unlock request. Failed with error: %s", err)
 		return
 	}
-	if request == (UnlockRequest{}) {
-		l.respond(w, logging.Error, http.StatusBadRequest, "Empty unlock request")
+	if len(request.IDs) == 0 {
+		l.respond(w, logging.Error, http.StatusBadRequest, "Invalid unlock request. No IDs specified: %s", err)
 		return
 	}
-	id := request.ID
-	lock, err := l.Locker.Unlock(id)
+	var result []UnlockData
+	for _, id := range request.IDs {
+		lock, err := l.Locker.Unlock(id)
+		if err != nil {
+			result = append(result, UnlockData{ID: id, Success: false})
+			continue
+		}
+		if lock == nil {
+			// if there is no lock, we will consider that a success to make this idempotent
+			result = append(result, UnlockData{ID: id, Success: true})
+			continue
+		}
+		err = l.clearLock(lock)
+		if err != nil {
+			result = append(result, UnlockData{ID: id, Success: false})
+		} else {
+			result = append(result, UnlockData{ID: id, Success: true})
+		}
+	}
+	data, err := json.Marshal(UnlockResponse{Result: result})
 	if err != nil {
-		l.respond(w, logging.Error, http.StatusInternalServerError, "Failed to unlock %s. Failed with error: %s", id, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Error creating unlock response: %s", err)
 		return
 	}
-	if lock == nil {
-		// if there is no lock, we will consider that a success to make this idempotent
-		l.respond(w, logging.Debug, http.StatusOK, "no such lock: %s", id)
-		return
-	}
-	err = l.clearLock(lock)
+	w.Header().Set("Content-Type", "application/json")
+	_, err = w.Write(data)
 	if err != nil {
-		l.respond(w, logging.Error, http.StatusInternalServerError, "Failed to clear lock %s. Failed with error: %s", id, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Error writing unlock response: %s", err)
 		return
 	}
-	l.respond(w, logging.Debug, http.StatusOK, "Unlocked lock %s", id)
 }
 
 func (l *LocksController) clearLock(lock *models.ProjectLock) error {
