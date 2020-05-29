@@ -59,7 +59,7 @@ func TestGetLocks_None(t *testing.T) {
 	req, _ := http.NewRequest("GET", "/api/locks", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
 	lc.GetLocks(w, req)
-	Assert(t, w.Code == 200, "expected error from GetLocks to be non nil")
+	Assert(t, w.Code == 200, "expected successful status code from GetLocks but got %s", w.Code)
 	body, err := ioutil.ReadAll(w.Result().Body)
 	Ok(t, err)
 	var response server.GetLocksResponse
@@ -84,7 +84,7 @@ func TestGetLocks_Success(t *testing.T) {
 	req, _ := http.NewRequest("GET", "/api/locks", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
 	lc.GetLocks(w, req)
-	Assert(t, w.Code == 200, "expected error from GetLocks to be non nil")
+	Assert(t, w.Code == 200, "expected successful status code from GetLocks but got %s", w.Code)
 	body, err := ioutil.ReadAll(w.Result().Body)
 	Ok(t, err)
 	var response server.GetLocksResponse
@@ -120,7 +120,7 @@ func TestGetLocks_MultipleSuccess(t *testing.T) {
 	req, _ := http.NewRequest("GET", "/api/locks", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
 	lc.GetLocks(w, req)
-	Assert(t, w.Code == 200, "expected error from GetLocks to be non nil")
+	Assert(t, w.Code == 200, "expected successful status code from GetLocks but got %s", w.Code)
 	body, err := ioutil.ReadAll(w.Result().Body)
 	Ok(t, err)
 	var response server.GetLocksResponse
