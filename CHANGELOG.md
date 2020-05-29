@@ -1,3 +1,76 @@
+# v0.13.0
+
+## Description
+This release enables support for running plans and applies in parallel **only when using Terraform workspaces**.
+It also enables graceful shutdown for Atlantis where it waits for in-progress plans and applies to complete.
+See below for the complete list.
+
+## Features
+* Upgrade default Terraform version in Docker image to 0.12.26.
+* Add support for parallel plans and applies ([#926](https://github.com/runatlantis/atlantis/pull/926) by @Fauzyy)
+  
+  Running in parallel is only supported if you're using workspaces to separate your projects.
+  Projects in separate directories can **not** be run in parallel currently.
+  To use, set
+  
+  ```yaml
+  parallel_plan: true
+  parallel_apply: true
+  ```
+  
+  In your repo-level `atlantis.yaml` file.
+* Add support for graceful shutdown ([#1051](https://github.com/runatlantis/atlantis/pull/1051) by @benoit74).
+  When Atlantis receive a SIGINT or SIGTERM it won't shut down immediately. It will wait for
+  in-progress plans and applies to complete. Any new actions, e.g. comments or autoplans
+  will be refused and an error comment will be posted to the PR indicating that Atlantis is shutting
+  down and the user should try again later.
+  
+  In addition, a new `/stats` endpoint has been added that currently only returns
+  the number of in-progress operations and whether the server is shutting down.
+
+* GitHub: A new flag `--enable-draft-prs` has been added that will re-enable the ability
+  for users to run plan and apply on GitHub draft PRs. This ability was removed in
+  v0.12.0. ([#1053](https://github.com/runatlantis/atlantis/pull/1053) by @cket)
+* GitHub: Preserve original commit message when automerging ([#1049](https://github.com/runatlantis/atlantis/pull/1049) by @pratikmallya).
+  
+  This change removes the `[Atlantis] Automatically merging after successful apply` commit message
+  and instead has GitHub autogenerate the commit message similarly to how it would when
+  you click the "Merge" button in the UI.
+* Change log level for HTTP requests from INFO to DBUG, e.g.
+  ```
+  2020/05/26 12:16:20+0000 [INFO] server: GET /healthz – respond HTTP 200
+  2020/05/26 12:16:36+0000 [INFO] server: GET /healthz – from <IP>
+  ```
+  ([#1056](https://github.com/runatlantis/atlantis/pull/1056) by @tammert)
+* GitLab: Use correct link to merge requests (previously used `#<num>` instead of `!<num>`) ([#1059](https://github.com/runatlantis/atlantis/pull/1059) by @EppO)
+
+## Bugfixes
+* Azure DevOps: Project links link to pull requests now (Fixes [#957](https://github.com/runatlantis/atlantis/issues/957) by @mcdafydd)
+* GitHub: Release locks when GitHub draft PRs are closed ([#1038](https://github.com/runatlantis/atlantis/pull/1038) by @andrewring)
+* Ensure git-lfs is in our Docker image (Fixes [#1054](https://github.com/runatlantis/atlantis/pull/1054))
+
+## Backwards Incompatibilities / Notes:
+* If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
+  then the default version of Terraform will now be 0.12.26. Simply set the above
+  flag to your desired default version to avoid any issues.
+* HTTP requests are now logged as DBUG instead of INFO to reduce log spam. If you
+  still want to see these logs you must run with `--log-level=debug`.
+* Atlantis will no longer immediately shutdown when it receives a SIGINT or SIGTERM,
+  it will now wait for in-progress plans and applies to complete. To stop Atlantis
+  without waiting, send a SIGKILL.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.13.0/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.13.0/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.13.0/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.13.0/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.13.0`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.12.0..v0.13.0
+https://github.com/runatlantis/atlantis/compare/v0.12.0...v0.13.0
+
 # v0.12.0
 
 ## Description
@@ -24,6 +97,7 @@ a host of other small features and fags.
 
 ## Backwards Incompatibilities / Notes:
 * GitHub draft PRs are now ignored until they're marked "ready for review" and opened as regular PRs.
+  **NOTE: ** This functionality was added back in Atlantis v0.13.0 via the `--enable-draft-prs` flag.
 * If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
   then the default version of Terraform will now be 0.12.24. Simply set the above
   flag to your desired default version to avoid any issues.
@@ -38,7 +112,7 @@ a host of other small features and fags.
 [`runatlantis/atlantis:v0.12.0`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
 
 ## Diff v0.11.1..v0.12.0
-https://github.com/runatlantis/atlantis/compare/v0.11.0...v0.12.0
+https://github.com/runatlantis/atlantis/compare/v0.11.1...v0.12.0
 
 # v0.11.1
 
