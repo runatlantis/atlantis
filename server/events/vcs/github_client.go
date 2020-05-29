@@ -141,6 +141,7 @@ func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment stri
 
 func (g *GithubClient) HidePrevPlanComments(repo models.Repo, pullNum int) error {
 	var allComments []*github.IssueComment
+	var prevComment bool
 	nextPage := 0
 	for {
 		comments, resp, err := g.client.Issues.ListComments(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueListCommentsOptions{
@@ -174,26 +175,28 @@ func (g *GithubClient) HidePrevPlanComments(repo models.Repo, pullNum int) error
 			continue
 		}
 		firstLine := strings.ToLower(body[0])
-		if !strings.Contains(firstLine, models.PlanCommand.String()) {
-			continue
-		}
-		var m struct {
-			MinimizeComment struct {
-				MinimizedComment struct {
-					IsMinimized       githubv4.Boolean
-					MinimizedReason   githubv4.String
-					ViewerCanMinimize githubv4.Boolean
-				}
-			} `graphql:"minimizeComment(input:$input)"`
-		}
-		input := map[string]interface{}{
-			"input": githubv4.MinimizeCommentInput{
-				Classifier: githubv4.ReportedContentClassifiersOutdated,
-				SubjectID:  comment.GetNodeID(),
-			},
-		}
-		if err := g.v4MutateClient.Mutate(g.ctx, &m, input); err != nil {
-			return errors.Wrapf(err, "minimize comment %s", comment.GetNodeID())
+		if (strings.Contains(firstLine, "continued from previous comment") && prevComment) || strings.Contains(firstLine, models.PlanCommand.String()) {
+			prevComment = true
+			var m struct {
+				MinimizeComment struct {
+					MinimizedComment struct {
+						IsMinimized       githubv4.Boolean
+						MinimizedReason   githubv4.String
+						ViewerCanMinimize githubv4.Boolean
+					}
+				} `graphql:"minimizeComment(input:$input)"`
+			}
+			input := map[string]interface{}{
+				"input": githubv4.MinimizeCommentInput{
+					Classifier: githubv4.ReportedContentClassifiersOutdated,
+					SubjectID:  comment.GetNodeID(),
+				},
+			}
+			if err := g.v4MutateClient.Mutate(g.ctx, &m, input); err != nil {
+				return errors.Wrapf(err, "minimize comment %s", comment.GetNodeID())
+			}
+		} else {
+			prevComment = false
 		}
 	}
 

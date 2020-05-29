@@ -244,7 +244,9 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 	{"node_id": "4", "body": "asdasdasd\nasdasdasd", "user": {"login": "user"}},
 	{"node_id": "5", "body": "asd\nplan\nasd", "user": {"login": "user"}},
 	{"node_id": "6", "body": "asd plan\nasd", "user": {"login": "user"}},
-	{"node_id": "7", "body": "asdasdasd", "user": {"login": "user"}}
+	{"node_id": "7", "body": "asdasdasd", "user": {"login": "user"}},
+	{"node_id": "8", "body": "asd plan\nasd", "user": {"login": "user"}},
+	{"node_id": "9", "body": "Continued from previous comment\nasd", "user": {"login": "user"}}
 ]`
 	minimizeResp := "{}"
 	type graphQLCall struct {
@@ -313,8 +315,9 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 		123,
 	)
 	Ok(t, err)
-	Equals(t, 1, len(gotMinimizeCalls))
+	Equals(t, 3, len(gotMinimizeCalls))
 	Equals(t, "6", gotMinimizeCalls[0].Variables.Input.SubjectID)
+	Equals(t, "9", gotMinimizeCalls[2].Variables.Input.SubjectID)
 	Equals(t, githubv4.ReportedContentClassifiersOutdated, gotMinimizeCalls[0].Variables.Input.Classifier)
 }
 
