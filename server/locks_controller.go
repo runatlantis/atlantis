@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -29,21 +30,50 @@ type LocksController struct {
 	DeleteLockCommand  events.DeleteLockCommand
 }
 
-// GetLocks returns a map of PR URLs to lock IDs held by that PR
-func (l *LocksController) GetLocks() (map[string][]string, error) {
-	response := make(map[string][]string)
+// GetLocksResponse is returned to requests against GetLocks at /api/locks with the GET method. It returns a mapping of PRs to locks held by those PRs
+type GetLocksResponse struct {
+	Result []LocksMap
+}
+
+// LocksMap contains information mapping PRs to the locks that are currently held by that PR
+type LocksMap struct {
+	PullRequestURL string
+	LockIDs        []string
+}
+
+// GetLocks response to requests against /api/locks with a marshaled GetLocksResponse object that contains a mapping of PRs and the locks that are held by those PRs
+func (l *LocksController) GetLocks(w http.ResponseWriter, _ *http.Request) {
+	aggregatedLocks := make(map[string][]string)
 	locks, err := l.Locker.List()
 	if err != nil {
-		return nil, err
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Error listing locks: %s", err)
+		return
 	}
 	for key, lock := range locks {
-		if val, ok := response[lock.Pull.URL]; ok {
-			response[lock.Pull.URL] = append(val, key)
+		if val, ok := aggregatedLocks[lock.Pull.URL]; ok {
+			aggregatedLocks[lock.Pull.URL] = append(val, key)
 		} else {
-			response[lock.Pull.URL] = []string{key}
+			aggregatedLocks[lock.Pull.URL] = []string{key}
 		}
 	}
-	return response, nil
+	var result []LocksMap
+	for pr, locks := range aggregatedLocks {
+		result = append(result, LocksMap{PullRequestURL: pr, LockIDs: locks})
+	}
+	data, err := json.Marshal(GetLocksResponse{Result: result})
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Error creating list response: %s", err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, err = w.Write(data)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Error writing list response: %s", err)
+		return
+	}
 }
 
 // GetLock is the GET /locks/{id} route. It renders the lock detail view.
