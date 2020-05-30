@@ -97,11 +97,11 @@ func (c *MockCommentParsing_Parse_OngoingVerification) GetCapturedArguments() (s
 func (c *MockCommentParsing_Parse_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []models.VCSHostType) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]string, len(params[0]))
+		_param0 = make([]string, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
 		}
-		_param1 = make([]models.VCSHostType, len(params[1]))
+		_param1 = make([]models.VCSHostType, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(models.VCSHostType)
 		}

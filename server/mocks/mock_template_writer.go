@@ -96,11 +96,11 @@ func (c *MockTemplateWriter_Execute_OngoingVerification) GetCapturedArguments() 
 func (c *MockTemplateWriter_Execute_OngoingVerification) GetAllCapturedArguments() (_param0 []io.Writer, _param1 []interface{}) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]io.Writer, len(params[0]))
+		_param0 = make([]io.Writer, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(io.Writer)
 		}
-		_param1 = make([]interface{}, len(params[1]))
+		_param1 = make([]interface{}, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(interface{})
 		}

@@ -62,9 +62,12 @@ func TestGitHubWorkflow(t *testing.T) {
 		ExpAutomerge bool
 		// ExpAutoplan is true if we expect Atlantis to autoplan.
 		ExpAutoplan bool
+		// ExpParallel is true if we expect Atlantis to run parallel plans or applies.
+		ExpParallel bool
 		// ExpReplies is a list of files containing the expected replies that
-		// Atlantis writes to the pull request in order.
-		ExpReplies []string
+		// Atlantis writes to the pull request in order. A reply from a parallel operation
+		// will be matched using a substring check.
+		ExpReplies [][]string
 	}{
 		{
 			Description:   "simple",
@@ -73,10 +76,10 @@ func TestGitHubWorkflow(t *testing.T) {
 			Comments: []string{
 				"atlantis apply",
 			},
-			ExpReplies: []string{
-				"exp-output-autoplan.txt",
-				"exp-output-apply.txt",
-				"exp-output-merge.txt",
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-apply.txt"},
+				{"exp-output-merge.txt"},
 			},
 			ExpAutoplan: true,
 		},
@@ -89,11 +92,11 @@ func TestGitHubWorkflow(t *testing.T) {
 				"atlantis plan",
 				"atlantis apply",
 			},
-			ExpReplies: []string{
-				"exp-output-autoplan.txt",
-				"exp-output-autoplan.txt",
-				"exp-output-apply.txt",
-				"exp-output-merge.txt",
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-autoplan.txt"},
+				{"exp-output-apply.txt"},
+				{"exp-output-merge.txt"},
 			},
 		},
 		{
@@ -105,11 +108,11 @@ func TestGitHubWorkflow(t *testing.T) {
 				"atlantis plan -- -var var=overridden",
 				"atlantis apply",
 			},
-			ExpReplies: []string{
-				"exp-output-autoplan.txt",
-				"exp-output-atlantis-plan-var-overridden.txt",
-				"exp-output-apply-var.txt",
-				"exp-output-merge.txt",
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-atlantis-plan-var-overridden.txt"},
+				{"exp-output-apply-var.txt"},
+				{"exp-output-merge.txt"},
 			},
 		},
 		{
@@ -123,13 +126,13 @@ func TestGitHubWorkflow(t *testing.T) {
 				"atlantis apply -w default",
 				"atlantis apply -w new_workspace",
 			},
-			ExpReplies: []string{
-				"exp-output-autoplan.txt",
-				"exp-output-atlantis-plan.txt",
-				"exp-output-atlantis-plan-new-workspace.txt",
-				"exp-output-apply-var-default-workspace.txt",
-				"exp-output-apply-var-new-workspace.txt",
-				"exp-output-merge-workspaces.txt",
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-atlantis-plan.txt"},
+				{"exp-output-atlantis-plan-new-workspace.txt"},
+				{"exp-output-apply-var-default-workspace.txt"},
+				{"exp-output-apply-var-new-workspace.txt"},
+				{"exp-output-merge-workspaces.txt"},
 			},
 		},
 		{
@@ -142,12 +145,12 @@ func TestGitHubWorkflow(t *testing.T) {
 				"atlantis plan -w new_workspace -- -var var=new_workspace",
 				"atlantis apply",
 			},
-			ExpReplies: []string{
-				"exp-output-autoplan.txt",
-				"exp-output-atlantis-plan.txt",
-				"exp-output-atlantis-plan-new-workspace.txt",
-				"exp-output-apply-var-all.txt",
-				"exp-output-merge-workspaces.txt",
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-atlantis-plan.txt"},
+				{"exp-output-atlantis-plan-new-workspace.txt"},
+				{"exp-output-apply-var-all.txt"},
+				{"exp-output-merge-workspaces.txt"},
 			},
 		},
 		{
@@ -159,11 +162,11 @@ func TestGitHubWorkflow(t *testing.T) {
 				"atlantis apply -w staging",
 				"atlantis apply -w default",
 			},
-			ExpReplies: []string{
-				"exp-output-autoplan.txt",
-				"exp-output-apply-staging.txt",
-				"exp-output-apply-default.txt",
-				"exp-output-merge.txt",
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-apply-staging.txt"},
+				{"exp-output-apply-default.txt"},
+				{"exp-output-merge.txt"},
 			},
 		},
 		{
@@ -174,10 +177,10 @@ func TestGitHubWorkflow(t *testing.T) {
 			Comments: []string{
 				"atlantis apply",
 			},
-			ExpReplies: []string{
-				"exp-output-autoplan.txt",
-				"exp-output-apply-all.txt",
-				"exp-output-merge.txt",
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-apply-all.txt"},
+				{"exp-output-merge.txt"},
 			},
 		},
 		{
@@ -189,11 +192,11 @@ func TestGitHubWorkflow(t *testing.T) {
 				"atlantis plan",
 				"atlantis apply",
 			},
-			ExpReplies: []string{
-				"exp-output-autoplan.txt",
-				"exp-output-autoplan.txt",
-				"exp-output-apply-all.txt",
-				"exp-output-merge.txt",
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-autoplan.txt"},
+				{"exp-output-apply-all.txt"},
+				{"exp-output-merge.txt"},
 			},
 		},
 		{
@@ -204,10 +207,10 @@ func TestGitHubWorkflow(t *testing.T) {
 			Comments: []string{
 				"atlantis apply -d staging",
 			},
-			ExpReplies: []string{
-				"exp-output-autoplan-only-staging.txt",
-				"exp-output-apply-staging.txt",
-				"exp-output-merge-only-staging.txt",
+			ExpReplies: [][]string{
+				{"exp-output-autoplan-only-staging.txt"},
+				{"exp-output-apply-staging.txt"},
+				{"exp-output-merge-only-staging.txt"},
 			},
 		},
 		{
@@ -221,12 +224,12 @@ func TestGitHubWorkflow(t *testing.T) {
 				"atlantis apply -d staging",
 				"atlantis apply -d production",
 			},
-			ExpReplies: []string{
-				"exp-output-plan-staging.txt",
-				"exp-output-plan-production.txt",
-				"exp-output-apply-staging.txt",
-				"exp-output-apply-production.txt",
-				"exp-output-merge-all-dirs.txt",
+			ExpReplies: [][]string{
+				{"exp-output-plan-staging.txt"},
+				{"exp-output-plan-production.txt"},
+				{"exp-output-apply-staging.txt"},
+				{"exp-output-apply-production.txt"},
+				{"exp-output-merge-all-dirs.txt"},
 			},
 		},
 		{
@@ -238,11 +241,11 @@ func TestGitHubWorkflow(t *testing.T) {
 				"atlantis apply -d staging",
 				"atlantis apply -d production",
 			},
-			ExpReplies: []string{
-				"exp-output-autoplan.txt",
-				"exp-output-apply-staging.txt",
-				"exp-output-apply-production.txt",
-				"exp-output-merge.txt",
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-apply-staging.txt"},
+				{"exp-output-apply-production.txt"},
+				{"exp-output-merge.txt"},
 			},
 		},
 		{
@@ -254,11 +257,11 @@ func TestGitHubWorkflow(t *testing.T) {
 				"atlantis apply -p staging",
 				"atlantis apply -p default",
 			},
-			ExpReplies: []string{
-				"exp-output-autoplan.txt",
-				"exp-output-apply-staging.txt",
-				"exp-output-apply-default.txt",
-				"exp-output-merge.txt",
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-apply-staging.txt"},
+				{"exp-output-apply-default.txt"},
+				{"exp-output-merge.txt"},
 			},
 		},
 		{
@@ -272,12 +275,12 @@ func TestGitHubWorkflow(t *testing.T) {
 				"atlantis apply -p staging",
 				"atlantis apply -p default",
 			},
-			ExpReplies: []string{
-				"exp-output-plan-staging.txt",
-				"exp-output-plan-default.txt",
-				"exp-output-apply-staging.txt",
-				"exp-output-apply-default.txt",
-				"exp-output-merge.txt",
+			ExpReplies: [][]string{
+				{"exp-output-plan-staging.txt"},
+				{"exp-output-plan-default.txt"},
+				{"exp-output-apply-staging.txt"},
+				{"exp-output-apply-default.txt"},
+				{"exp-output-merge.txt"},
 			},
 		},
 		{
@@ -290,12 +293,12 @@ func TestGitHubWorkflow(t *testing.T) {
 				"atlantis apply -d dir1",
 				"atlantis apply -d dir2",
 			},
-			ExpReplies: []string{
-				"exp-output-autoplan.txt",
-				"exp-output-apply-dir1.txt",
-				"exp-output-apply-dir2.txt",
-				"exp-output-automerge.txt",
-				"exp-output-merge.txt",
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-apply-dir1.txt"},
+				{"exp-output-apply-dir2.txt"},
+				{"exp-output-automerge.txt"},
+				{"exp-output-merge.txt"},
 			},
 		},
 		{
@@ -308,11 +311,26 @@ func TestGitHubWorkflow(t *testing.T) {
 				"atlantis apply -w staging",
 				"atlantis apply -w default",
 			},
-			ExpReplies: []string{
-				"exp-output-autoplan.txt",
-				"exp-output-apply-staging-workspace.txt",
-				"exp-output-apply-default-workspace.txt",
-				"exp-output-merge.txt",
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-apply-staging-workspace.txt"},
+				{"exp-output-apply-default-workspace.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description:   "workspaces parallel with atlantis.yaml",
+			RepoDir:       "workspace-parallel-yaml",
+			ModifiedFiles: []string{"production/main.tf", "staging/main.tf"},
+			ExpAutoplan:   true,
+			ExpParallel:   true,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan-staging.txt", "exp-output-autoplan-production.txt"},
+				{"exp-output-apply-all-staging.txt", "exp-output-apply-all-production.txt"},
+				{"exp-output-merge.txt"},
 			},
 		},
 	}
@@ -366,7 +384,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			_, _, actReplies := vcsClient.VerifyWasCalled(Times(expNumReplies)).CreateComment(AnyRepo(), AnyInt(), AnyString()).GetAllCapturedArguments()
 			Assert(t, len(c.ExpReplies) == len(actReplies), "missing expected replies, got %d but expected %d", len(actReplies), len(c.ExpReplies))
 			for i, expReply := range c.ExpReplies {
-				assertCommentEquals(t, expReply, actReplies[i], c.RepoDir)
+				assertCommentEquals(t, expReply, actReplies[i], c.RepoDir, c.ExpParallel)
 			}
 
 			if c.ExpAutomerge {
@@ -402,7 +420,7 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 		GithubUser: "github-user",
 		GitlabUser: "gitlab-user",
 	}
-	terraformClient, err := terraform.NewClient(logger, dataDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{})
+	terraformClient, err := terraform.NewClient(logger, dataDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{}, false)
 	Ok(t, err)
 	boltdb, err := db.New(dataDir)
 	Ok(t, err)
@@ -425,6 +443,7 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 		globalCfg, err = parser.ParseGlobalCfg(expCfgPath, globalCfg)
 		Ok(t, err)
 	}
+	drainer := &events.Drainer{}
 	commandRunner := &events.DefaultCommandRunner{
 		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
 			Locker:           projectLocker,
@@ -472,6 +491,7 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 		PendingPlanFinder: &events.DefaultPendingPlanFinder{},
 		GlobalAutomerge:   false,
 		WorkingDir:        workingDir,
+		Drainer:           drainer,
 	}
 
 	repoWhitelistChecker, err := events.NewRepoWhitelistChecker("*")
@@ -619,10 +639,8 @@ func runCmd(t *testing.T, dir string, name string, args ...string) string {
 	return string(cpOut)
 }
 
-func assertCommentEquals(t *testing.T, expFile string, act string, repoDir string) {
+func assertCommentEquals(t *testing.T, expReplies []string, act string, repoDir string, parallel bool) {
 	t.Helper()
-	exp, err := ioutil.ReadFile(filepath.Join(absRepoPath(t, repoDir), expFile))
-	Ok(t, err)
 
 	// Replace all 'Creation complete after 0s [id=2135833172528078362]' strings with
 	// 'Creation complete after *s [id=*******************]' so we can do a comparison.
@@ -635,29 +653,45 @@ func assertCommentEquals(t *testing.T, expFile string, act string, repoDir strin
 	resourceRegex := regexp.MustCompile(`null_resource\.simple(\[\d])?\d?:.*`)
 	act = resourceRegex.ReplaceAllString(act, "null_resource.simple:")
 
-	expStr := string(exp)
-	// My editor adds a newline to all the files, so if the actual comment
-	// doesn't end with a newline then strip the last newline from the file's
-	// contents.
-	if !strings.HasSuffix(act, "\n") {
-		expStr = strings.TrimSuffix(expStr, "\n")
+	// For parallel plans and applies, do a substring match since output may be out of order
+	var replyMatchesExpected func(string, string) bool
+	if parallel {
+		replyMatchesExpected = func(act string, expStr string) bool {
+			return strings.Contains(act, expStr)
+		}
+	} else {
+		replyMatchesExpected = func(act string, expStr string) bool {
+			return expStr == act
+		}
 	}
 
-	if expStr != act {
-		// If in CI, we write the diff to the console. Otherwise we write the diff
-		// to file so we can use our local diff viewer.
-		if os.Getenv("CI") == "true" {
-			t.Logf("exp: %s, got: %s", expStr, act)
-			t.FailNow()
-		} else {
-			actFile := filepath.Join(absRepoPath(t, repoDir), expFile+".act")
-			err := ioutil.WriteFile(actFile, []byte(act), 0600)
-			Ok(t, err)
-			cwd, err := os.Getwd()
-			Ok(t, err)
-			rel, err := filepath.Rel(cwd, actFile)
-			Ok(t, err)
-			t.Errorf("%q was different, wrote actual comment to %q", expFile, rel)
+	for _, expFile := range expReplies {
+		exp, err := ioutil.ReadFile(filepath.Join(absRepoPath(t, repoDir), expFile))
+		Ok(t, err)
+		expStr := string(exp)
+		// My editor adds a newline to all the files, so if the actual comment
+		// doesn't end with a newline then strip the last newline from the file's
+		// contents.
+		if !strings.HasSuffix(act, "\n") {
+			expStr = strings.TrimSuffix(expStr, "\n")
+		}
+
+		if !replyMatchesExpected(act, expStr) {
+			// If in CI, we write the diff to the console. Otherwise we write the diff
+			// to file so we can use our local diff viewer.
+			if os.Getenv("CI") == "true" {
+				t.Logf("exp: %s, got: %s", expStr, act)
+				t.FailNow()
+			} else {
+				actFile := filepath.Join(absRepoPath(t, repoDir), expFile+".act")
+				err := ioutil.WriteFile(actFile, []byte(act), 0600)
+				Ok(t, err)
+				cwd, err := os.Getwd()
+				Ok(t, err)
+				rel, err := filepath.Rel(cwd, actFile)
+				Ok(t, err)
+				t.Errorf("%q was different, wrote actual comment to %q", expFile, rel)
+			}
 		}
 	}
 }

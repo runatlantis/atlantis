@@ -309,7 +309,9 @@ func (g *Client) MergePull(pull models.PullRequest) error {
 		pull.BaseRepo.Owner,
 		pull.BaseRepo.Name,
 		pull.Num,
-		common.AutomergeCommitMsg,
+		// NOTE: Using the emtpy string here causes GitHub to autogenerate
+		// the commit message as it normally would.
+		"",
 		options)
 	if err != nil {
 		return errors.Wrap(err, "merging pull request")

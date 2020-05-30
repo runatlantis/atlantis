@@ -111,7 +111,7 @@ func (c *MockProjectCommandRunner_Plan_OngoingVerification) GetCapturedArguments
 func (c *MockProjectCommandRunner_Plan_OngoingVerification) GetAllCapturedArguments() (_param0 []models.ProjectCommandContext) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]models.ProjectCommandContext, len(params[0]))
+		_param0 = make([]models.ProjectCommandContext, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(models.ProjectCommandContext)
 		}
@@ -138,7 +138,7 @@ func (c *MockProjectCommandRunner_Apply_OngoingVerification) GetCapturedArgument
 func (c *MockProjectCommandRunner_Apply_OngoingVerification) GetAllCapturedArguments() (_param0 []models.ProjectCommandContext) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]models.ProjectCommandContext, len(params[0]))
+		_param0 = make([]models.ProjectCommandContext, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(models.ProjectCommandContext)
 		}

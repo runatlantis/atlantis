@@ -75,6 +75,7 @@ var testFlags = map[string]interface{}{
 	GitlabUserFlag:             "gitlab-user",
 	GitlabWebhookSecretFlag:    "gitlab-secret",
 	LogLevelFlag:               "debug",
+	AllowDraftPRs:              true,
 	PortFlag:                   8181,
 	RepoWhitelistFlag:          "github.com/runatlantis/atlantis",
 	RequireApprovalFlag:        true,

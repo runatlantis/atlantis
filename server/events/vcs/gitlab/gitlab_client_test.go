@@ -239,7 +239,7 @@ func TestClient_MarkdownPullLink(t *testing.T) {
 	Ok(t, err)
 	pull := models.PullRequest{Num: 1}
 	s, _ := client.MarkdownPullLink(pull)
-	exp := "#1"
+	exp := "!1"
 	Equals(t, exp, s)
 }
 

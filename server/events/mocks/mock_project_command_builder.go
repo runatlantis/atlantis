@@ -139,7 +139,7 @@ func (c *MockProjectCommandBuilder_BuildAutoplanCommands_OngoingVerification) Ge
 func (c *MockProjectCommandBuilder_BuildAutoplanCommands_OngoingVerification) GetAllCapturedArguments() (_param0 []*events.CommandContext) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]*events.CommandContext, len(params[0]))
+		_param0 = make([]*events.CommandContext, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(*events.CommandContext)
 		}
@@ -166,11 +166,11 @@ func (c *MockProjectCommandBuilder_BuildPlanCommands_OngoingVerification) GetCap
 func (c *MockProjectCommandBuilder_BuildPlanCommands_OngoingVerification) GetAllCapturedArguments() (_param0 []*events.CommandContext, _param1 []*events.CommentCommand) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]*events.CommandContext, len(params[0]))
+		_param0 = make([]*events.CommandContext, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(*events.CommandContext)
 		}
-		_param1 = make([]*events.CommentCommand, len(params[1]))
+		_param1 = make([]*events.CommentCommand, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(*events.CommentCommand)
 		}
@@ -197,11 +197,11 @@ func (c *MockProjectCommandBuilder_BuildApplyCommands_OngoingVerification) GetCa
 func (c *MockProjectCommandBuilder_BuildApplyCommands_OngoingVerification) GetAllCapturedArguments() (_param0 []*events.CommandContext, _param1 []*events.CommentCommand) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]*events.CommandContext, len(params[0]))
+		_param0 = make([]*events.CommandContext, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(*events.CommandContext)
 		}
-		_param1 = make([]*events.CommentCommand, len(params[1]))
+		_param1 = make([]*events.CommentCommand, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(*events.CommentCommand)
 		}

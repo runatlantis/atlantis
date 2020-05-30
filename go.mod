@@ -18,7 +18,7 @@ require (
 	github.com/go-playground/locales v0.12.1 // indirect
 	github.com/go-playground/universal-translator v0.16.0 // indirect
 	github.com/go-test/deep v1.0.3
-	github.com/google/go-github/v28 v28.0.0
+	github.com/google/go-github/v31 v31.0.0
 	github.com/google/uuid v0.0.0-20161128191214-064e2069ce9c // indirect
 	github.com/gorilla/context v0.0.0-20160226214623-1ea25387ff6f // indirect
 	github.com/gorilla/mux v1.6.2
@@ -42,6 +42,7 @@ require (
 	github.com/pelletier/go-toml v1.0.0 // indirect
 	github.com/petergtz/pegomock v2.7.0+incompatible
 	github.com/pkg/errors v0.8.0
+	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/shurcooL/githubv4 v0.0.0-20191127044304-8f68eb5628d0
 	github.com/shurcooL/graphql v0.0.0-20181231061246-d48a9a75455f // indirect
 	github.com/sirupsen/logrus v1.2.0 // indirect

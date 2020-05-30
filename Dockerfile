@@ -1,9 +1,9 @@
 # The runatlantis/atlantis-base is created by docker-base/Dockerfile.
-FROM runatlantis/atlantis-base:v3.2
+FROM runatlantis/atlantis-base:v3.3
 LABEL authors="Anubhav Mishra, Luke Kysow"
 
 # install terraform binaries
-ENV DEFAULT_TERRAFORM_VERSION=0.12.25
+ENV DEFAULT_TERRAFORM_VERSION=0.12.26
 
 # In the official Atlantis image we only have the latest of each Terraform version.
 RUN AVAILABLE_TERRAFORM_VERSIONS="0.8.8 0.9.11 0.10.8 0.11.14 ${DEFAULT_TERRAFORM_VERSION}" && \

@@ -97,11 +97,11 @@ func (c *MockWebhooksSender_Send_OngoingVerification) GetCapturedArguments() (*l
 func (c *MockWebhooksSender_Send_OngoingVerification) GetAllCapturedArguments() (_param0 []*logging.SimpleLogger, _param1 []webhooks.ApplyResult) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]*logging.SimpleLogger, len(params[0]))
+		_param0 = make([]*logging.SimpleLogger, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(*logging.SimpleLogger)
 		}
-		_param1 = make([]webhooks.ApplyResult, len(params[1]))
+		_param1 = make([]webhooks.ApplyResult, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(webhooks.ApplyResult)
 		}
