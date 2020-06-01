@@ -28,7 +28,7 @@ See below for the complete list.
   In addition, a new `/stats` endpoint has been added that currently only returns
   the number of in-progress operations and whether the server is shutting down.
 
-* GitHub: A new flag `--enable-draft-prs` has been added that will re-enable the ability
+* GitHub: A new flag `--allow-draft-prs` has been added that will re-enable the ability
   for users to run plan and apply on GitHub draft PRs. This ability was removed in
   v0.12.0. ([#1053](https://github.com/runatlantis/atlantis/pull/1053) by @cket)
 * GitHub: Preserve original commit message when automerging ([#1049](https://github.com/runatlantis/atlantis/pull/1049) by @pratikmallya).
@@ -97,7 +97,7 @@ a host of other small features and fags.
 
 ## Backwards Incompatibilities / Notes:
 * GitHub draft PRs are now ignored until they're marked "ready for review" and opened as regular PRs.
-  **NOTE: ** This functionality was added back in Atlantis v0.13.0 via the `--enable-draft-prs` flag.
+  **NOTE: ** This functionality was added back in Atlantis v0.13.0 via the `--allow-draft-prs` flag.
 * If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
   then the default version of Terraform will now be 0.12.24. Simply set the above
   flag to your desired default version to avoid any issues.
