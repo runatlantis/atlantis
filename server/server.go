@@ -122,7 +122,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if userConfig.GithubUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		var err error
-		githubClient, err = vcs.NewGithubClient(userConfig.GithubHostname, userConfig.GithubUser, userConfig.GithubToken)
+		githubClient, err = vcs.NewGithubClient(userConfig.GithubHostname, userConfig.GithubUser, userConfig.GithubToken, logger)
 		if err != nil {
 			return nil, err
 		}
