@@ -449,9 +449,9 @@ func TestUnlock_MalformedJSON(t *testing.T) {
 }
 
 func TestUnlock_EmptyLockID(t *testing.T) {
-	t.Log("If the lock ID is invalid then we should get a 400")
+	t.Log("If no lock IDs are provided then we should get a 400")
 	lc := server.LocksController{Logger: logging.NewNoopLogger()}
-	requestJSON := []byte("{ \"ID\": \"\" }")
+	requestJSON := []byte("{ \"LockIDs\": [] }")
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(requestJSON))
 	w := httptest.NewRecorder()
 	lc.Unlock(w, req)
@@ -460,7 +460,7 @@ func TestUnlock_EmptyLockID(t *testing.T) {
 
 func TestUnlock_LockerErr(t *testing.T) {
 	t.Log("If the locker fails to unlock then we should see the failure propagated")
-	requestJSON := []byte("{ \"IDs\": [\"id\"] }")
+	requestJSON := []byte("{ \"LockIDs\": [\"id\"] }")
 	l := mocks.NewMockLocker()
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: "owner/repo"},
@@ -485,7 +485,7 @@ func TestUnlock_LockerErr(t *testing.T) {
 
 func TestUnlock_NoSuchLock(t *testing.T) {
 	t.Log("If there is no lock at that ID we get a successful response")
-	requestJSON := []byte("{ \"IDs\": [\"id\"] }")
+	requestJSON := []byte("{ \"LockIDs\": [\"id\"] }")
 	l := mocks.NewMockLocker()
 	When(l.Unlock("id")).ThenReturn(nil, nil)
 	lc := server.LocksController{
@@ -500,7 +500,7 @@ func TestUnlock_NoSuchLock(t *testing.T) {
 
 func TestUnlock_Success(t *testing.T) {
 	t.Log("On successful unlock we get a successful response")
-	requestJSON := []byte("{ \"IDs\": [\"id\"] }")
+	requestJSON := []byte("{ \"LockIDs\": [\"id\"] }")
 	l := mocks.NewMockLocker()
 	workingDir := mocks2.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
@@ -534,7 +534,7 @@ func TestUnlock_Success(t *testing.T) {
 
 func TestUnlock_MultipleSuccess(t *testing.T) {
 	t.Log("We can unlock multiple locks")
-	requestJSON := []byte("{ \"IDs\": [\"id\", \"id2\"] }")
+	requestJSON := []byte("{ \"LockIDs\": [\"id\", \"id2\"] }")
 	l := mocks.NewMockLocker()
 	workingDir := mocks2.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()

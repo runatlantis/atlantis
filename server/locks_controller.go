@@ -19,7 +19,7 @@ import (
 
 // UnlockRequest is the format of requests made against /api/locks with the DELETE method to release atlantis locks
 type UnlockRequest struct {
-	IDs []string
+	LockIDs []string
 }
 
 // UnlockResponse is the format of responses made against /api/locks with the DELETE method
@@ -29,7 +29,7 @@ type UnlockResponse struct {
 
 // UnlockData indicates whether the given Lock ID was able to be released
 type UnlockData struct {
-	ID      string
+	LockID  string
 	Success bool
 }
 
@@ -179,27 +179,27 @@ func (l *LocksController) Unlock(w http.ResponseWriter, r *http.Request) {
 		l.respond(w, logging.Error, http.StatusBadRequest, "Invalid unlock request. Failed with error: %s", err)
 		return
 	}
-	if len(request.IDs) == 0 {
+	if len(request.LockIDs) == 0 {
 		l.respond(w, logging.Error, http.StatusBadRequest, "Invalid unlock request. No IDs specified: %s", err)
 		return
 	}
 	var result []UnlockData
-	for _, id := range request.IDs {
+	for _, id := range request.LockIDs {
 		lock, err := l.Locker.Unlock(id)
 		if err != nil {
-			result = append(result, UnlockData{ID: id, Success: false})
+			result = append(result, UnlockData{LockID: id, Success: false})
 			continue
 		}
 		if lock == nil {
 			// if there is no lock, we will consider that a success to make this idempotent
-			result = append(result, UnlockData{ID: id, Success: true})
+			result = append(result, UnlockData{LockID: id, Success: true})
 			continue
 		}
 		err = l.clearLock(lock)
 		if err != nil {
-			result = append(result, UnlockData{ID: id, Success: false})
+			result = append(result, UnlockData{LockID: id, Success: false})
 		} else {
-			result = append(result, UnlockData{ID: id, Success: true})
+			result = append(result, UnlockData{LockID: id, Success: true})
 		}
 	}
 	data, err := json.Marshal(UnlockResponse{Result: result})
