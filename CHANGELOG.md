@@ -25,7 +25,7 @@ See below for the complete list.
   will be refused and an error comment will be posted to the PR indicating that Atlantis is shutting
   down and the user should try again later.
   
-  In addition, a new `/stats` endpoint has been added that currently only returns
+  In addition, a new `/status` endpoint has been added that currently only returns
   the number of in-progress operations and whether the server is shutting down.
 
 * GitHub: A new flag `--allow-draft-prs` has been added that will re-enable the ability
