@@ -30,12 +30,12 @@ type LocksController struct {
 	DeleteLockCommand  events.DeleteLockCommand
 }
 
-// GetLocksResponse is returned to requests against GetLocks at /api/locks with the GET method. It returns a mapping of PRs to locks held by those PRs
+// GetLocksResponse is returned to requests against GetLocks at /api/locks with the GET method. It contains a lock data object for each lock held by atlantis
 type GetLocksResponse struct {
 	Result []LockData
 }
 
-// LockData contains information about the lock, including which PR is holding the lock
+// LockData contains information about the lock, including the lock ID and which PR is holding the lock
 type LockData struct {
 	PullRequestURL string
 	LockID         string
