@@ -76,6 +76,7 @@ type DefaultCommandRunner struct {
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
 	CommitStatusUpdater      CommitStatusUpdater
 	DisableApplyAll          bool
+	DisableAutoPlan          bool
 	EventParser              EventParsing
 	MarkdownRenderer         *MarkdownRenderer
 	Logger                   logging.SimpleLogging
@@ -127,6 +128,9 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		BaseRepo: baseRepo,
 	}
 	if !c.validateCtxAndComment(ctx) {
+		return
+	}
+	if c.DisableAutoPlan {
 		return
 	}
 

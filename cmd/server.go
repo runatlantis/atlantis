@@ -53,6 +53,7 @@ const (
 	DataDirFlag                = "data-dir"
 	DefaultTFVersionFlag       = "default-tf-version"
 	DisableApplyAllFlag        = "disable-apply-all"
+	DisableAutoPlanFlag        = "disable-auto-plan"
 	DisableMarkdownFoldingFlag = "disable-markdown-folding"
 	GHHostnameFlag             = "gh-hostname"
 	GHTokenFlag                = "gh-token"
@@ -252,6 +253,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	DisableApplyAllFlag: {
 		description:  "Disable \"atlantis apply\" command so a specific project/workspace/directory has to be specified for applies.",
+		defaultValue: false,
+	},
+	DisableAutoPlanFlag: {
+		description:  "Disable atlantis auto planning feature",
 		defaultValue: false,
 	},
 	AllowDraftPRs: {
