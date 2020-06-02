@@ -32,18 +32,18 @@ type LocksController struct {
 
 // GetLocksResponse is returned to requests against GetLocks at /api/locks with the GET method. It returns a mapping of PRs to locks held by those PRs
 type GetLocksResponse struct {
-	Result []LocksMap
+	Result []LockData
 }
 
-// LocksMap contains information mapping PRs to the locks that are currently held by that PR
-type LocksMap struct {
+// LockData contains information about the lock, including which PR is holding the lock
+type LockData struct {
 	PullRequestURL string
-	LockIDs        []string
+	LockID         string
 }
 
-// GetLocks response to requests against /api/locks with a marshaled GetLocksResponse object that contains a mapping of PRs and the locks that are held by those PRs
+// GetLocks response to requests against /api/locks with a marshaled GetLocksResponse object that contains information about all open locks
 func (l *LocksController) GetLocks(w http.ResponseWriter, _ *http.Request) {
-	aggregatedLocks := make(map[string][]string)
+	var result []LockData
 	locks, err := l.Locker.List()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -51,28 +51,17 @@ func (l *LocksController) GetLocks(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	for key, lock := range locks {
-		if val, ok := aggregatedLocks[lock.Pull.URL]; ok {
-			aggregatedLocks[lock.Pull.URL] = append(val, key)
-		} else {
-			aggregatedLocks[lock.Pull.URL] = []string{key}
-		}
-	}
-	var result []LocksMap
-	for pr, locks := range aggregatedLocks {
-		result = append(result, LocksMap{PullRequestURL: pr, LockIDs: locks})
+		result = append(result, LockData{PullRequestURL: lock.Pull.URL, LockID: key})
 	}
 	data, err := json.Marshal(GetLocksResponse{Result: result})
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "Error creating list response: %s", err)
+		l.respond(w, logging.Error, http.StatusInternalServerError, "Error creating list response: %s", err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_, err = w.Write(data)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "Error writing list response: %s", err)
-		return
+		l.respond(w, logging.Error, http.StatusInternalServerError, "Error writing list response: %s", err)
 	}
 }
 

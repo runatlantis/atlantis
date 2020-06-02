@@ -94,8 +94,7 @@ func TestGetLocks_Success(t *testing.T) {
 	testMap := response.Result[0]
 	expectedVal := "url"
 	Assert(t, testMap.PullRequestURL == expectedVal, "expected lock map ID to equal %s, was %s", expectedVal, testMap.PullRequestURL)
-	Assert(t, len(testMap.LockIDs) == 1, "expected single Lock ID in GetLocks response, was instead length %i", len(testMap.LockIDs))
-	Assert(t, testMap.LockIDs[0] == "test", "expected lock map ID to equal %s, was %s", "test", testMap.LockIDs[0])
+	Assert(t, testMap.LockID == "test", "expected lock map ID to equal %s, was %s", "test", testMap.LockID)
 }
 
 func TestGetLocks_MultipleSuccess(t *testing.T) {
@@ -126,25 +125,15 @@ func TestGetLocks_MultipleSuccess(t *testing.T) {
 	var response server.GetLocksResponse
 	err = json.Unmarshal(body, &response)
 	Ok(t, err)
-	Assert(t, len(response.Result) == 2, "expected map with two entries from GetLocks, was instead length %i", len(response.Result))
+	Assert(t, len(response.Result) == 3, "expected map with three entries from GetLocks, was instead length %i", len(response.Result))
 	for _, lockMap := range response.Result {
 		if lockMap.PullRequestURL == "url" {
-			expectedLocks := 2
-			Assert(t, len(lockMap.LockIDs) == expectedLocks, "expected PR at %s to have %s locks, only returned %s", lockMap.PullRequestURL, expectedLocks, len(lockMap.LockIDs))
-			if lockMap.LockIDs[0] == "testTwo" {
-				expectedLockID := "test"
-				Assert(t, lockMap.LockIDs[1] == expectedLockID, "expected PR at %s to have lock ID %s but found %s instead", lockMap.PullRequestURL, lockMap.LockIDs[0], expectedLockID)
-			} else if lockMap.LockIDs[0] == "test" {
-				expectedLockID := "testTwo"
-				Assert(t, lockMap.LockIDs[1] == expectedLockID, "expected PR at %s to have lock ID %s but found %s instead", lockMap.PullRequestURL, lockMap.LockIDs[0], expectedLockID)
-			} else {
-				Assert(t, false, "Found PR with unexpected lock ID - %s", lockMap.LockIDs[0])
+			if lockMap.LockID != "testTwo" && lockMap.LockID != "test" {
+				Assert(t, false, "unexpected lock ID - found lock with url %s and ID %s", lockMap.PullRequestURL, lockMap.LockID)
 			}
 		} else if lockMap.PullRequestURL == "urlTwo" {
-			expectedLocks := 1
-			Assert(t, len(lockMap.LockIDs) == expectedLocks, "expected PR at %s to have %s locks, only returned %s", lockMap.PullRequestURL, expectedLocks, len(lockMap.LockIDs))
 			expectedLockID := "testThree"
-			Assert(t, lockMap.LockIDs[0] == expectedLockID, "expected PR at %s to have lock ID %s but found %s instead", lockMap.PullRequestURL, lockMap.LockIDs[0], expectedLockID)
+			Assert(t, lockMap.LockID == expectedLockID, "expected PR at %s to have lock ID %s but found %s instead", lockMap.PullRequestURL, lockMap.LockID, expectedLockID)
 		} else {
 			Assert(t, false, "Found PR with unexpected URL - %s", lockMap.PullRequestURL)
 		}
