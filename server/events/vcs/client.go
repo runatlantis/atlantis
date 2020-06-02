@@ -38,4 +38,5 @@ type Client interface {
 	UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error
 	MergePull(pull models.PullRequest) error
 	MarkdownPullLink(pull models.PullRequest) (string, error)
+	GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error)
 }

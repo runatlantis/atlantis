@@ -55,6 +55,7 @@ const (
 	DisableApplyAllFlag        = "disable-apply-all"
 	DisableMarkdownFoldingFlag = "disable-markdown-folding"
 	GHHostnameFlag             = "gh-hostname"
+	GHTeamWhitelistFlag        = "gh-team-whitelist"
 	GHTokenFlag                = "gh-token"
 	GHUserFlag                 = "gh-user"
 	GHWebhookSecretFlag        = "gh-webhook-secret" // nolint: gosec
@@ -90,6 +91,7 @@ const (
 	DefaultBitbucketBaseURL = bitbucketcloud.BaseURL
 	DefaultDataDir          = "~/.atlantis"
 	DefaultGHHostname       = "github.com"
+	DefaultGHTeamWhitelist  = "*:*"
 	DefaultGitlabHostname   = "gitlab.com"
 	DefaultLogLevel         = "info"
 	DefaultPort             = 4141
@@ -157,6 +159,18 @@ var stringFlags = map[string]stringFlag{
 	GHHostnameFlag: {
 		description:  "Hostname of your Github Enterprise installation. If using github.com, no need to set.",
 		defaultValue: DefaultGHHostname,
+	},
+	GHTeamWhitelistFlag: {
+		description: "Comma separated list of key-value pairs representing the GitHub teams and the operations that " +
+			"the members of a particular team are allowed to perform. " +
+			"The format is {team}:{command},{team}:{command}. " +
+			"Valid values for 'command' are 'plan', 'apply' and '*', e.g. 'dev:plan,ops:apply,devops:*'" +
+			"This example gives the users from the 'dev' GitHub team the permissions to execute the 'plan' command, " +
+			"the 'ops' team the permissions to execute the 'apply' command, " +
+			"and allows the 'devops' team to perform any operation. If this argument is not provided, the default value (*:*) " +
+			"will be used and the default behavior will be to not check permissions " +
+			"and to allow users from any team to perform any operation.",
+		defaultValue: DefaultGHTeamWhitelist,
 	},
 	GHUserFlag: {
 		description: "GitHub username of API user.",
@@ -501,6 +515,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	}
 	if c.VCSStatusName == "" {
 		c.VCSStatusName = DefaultVCSStatusName
+	}
+	if c.GithubTeamWhitelist == "" {
+		c.GithubTeamWhitelist = DefaultGHTeamWhitelist
 	}
 	if c.TFEHostname == "" {
 		c.TFEHostname = DefaultTFEHostname

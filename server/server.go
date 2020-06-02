@@ -378,6 +378,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	githubTeamWhitelistChecker, err := events.NewTeamWhitelistChecker(userConfig.GithubTeamWhitelist)
+	if err != nil {
+		return nil, err
+	}
 	locksController := &LocksController{
 		AtlantisVersion:    config.AtlantisVersion,
 		AtlantisURL:        parsedURL,
@@ -397,6 +401,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Logger:                          logger,
 		GithubWebhookSecret:             []byte(userConfig.GithubWebhookSecret),
 		GithubRequestValidator:          &DefaultGithubRequestValidator{},
+		TeamWhitelistChecker:            githubTeamWhitelistChecker,		
 		GitlabRequestParserValidator:    &DefaultGitlabRequestParserValidator{},
 		GitlabWebhookSecret:             []byte(userConfig.GitlabWebhookSecret),
 		RepoWhitelistChecker:            repoWhitelist,
