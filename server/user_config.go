@@ -23,6 +23,7 @@ type UserConfig struct {
 	CheckoutStrategy           string `mapstructure:"checkout-strategy"`
 	DataDir                    string `mapstructure:"data-dir"`
 	DisableApplyAll            bool   `mapstructure:"disable-apply-all"`
+	DisableAutoplan            bool   `mapstructure:"disable-autoplan"`
 	DisableMarkdownFolding     bool   `mapstructure:"disable-markdown-folding"`
 	GithubHostname             string `mapstructure:"gh-hostname"`
 	GithubToken                string `mapstructure:"gh-token"`
