@@ -20,7 +20,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-const atlantisVersion = "0.12.0-multienv-ght3"
+const atlantisVersion = "0.12.0-multienv-ght"
 
 func main() {
 	

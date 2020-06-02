@@ -51,6 +51,7 @@ func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command string, pa
 		"PROJECT_NAME":               ctx.ProjectName,
 		"PULL_AUTHOR":                ctx.Pull.Author,
 		"PULL_NUM":                   fmt.Sprintf("%d", ctx.Pull.Num),
+		"REPO_REL_DIR":               ctx.RepoRelDir,
 		"USER_NAME":                  ctx.User.Username,
 		"WORKSPACE":                  ctx.Workspace,
 	}
