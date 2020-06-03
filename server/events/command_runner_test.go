@@ -24,7 +24,7 @@ import (
 	"github.com/google/go-github/v28/github"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events"
-	dbmocks "github.com/runatlantis/atlantis/server/events/db/mocks"
+	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -44,7 +44,7 @@ var ch events.DefaultCommandRunner
 var pullLogger *logging.SimpleLogger
 var workingDir events.WorkingDir
 var pendingPlanFinder *mocks.MockPendingPlanFinder
-var boltDB *dbmocks.MockBoltDB
+var defaultBoltDB *db.DefaultBoltDB
 
 func setup(t *testing.T) *vcsmocks.MockClient {
 	RegisterMockTestingT(t)
@@ -59,7 +59,12 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	projectCommandRunner = mocks.NewMockProjectCommandRunner()
 	workingDir = mocks.NewMockWorkingDir()
 	pendingPlanFinder = mocks.NewMockPendingPlanFinder()
-	boltDB = dbmocks.NewMockBoltDB()
+
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	defaultBoltDB, err := db.New(tmp)
+	Ok(t, err)
+
 	When(logger.GetLevel()).ThenReturn(logging.Info)
 	When(logger.NewLogger("runatlantis/atlantis#1", true, logging.Info)).
 		ThenReturn(pullLogger)
@@ -79,7 +84,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		PendingPlanFinder:        pendingPlanFinder,
 		WorkingDir:               workingDir,
 		DisableApplyAll:          false,
-		DB:                       boltDB,
+		DB:                       defaultBoltDB,
 	}
 	return vcsClient
 }
@@ -240,8 +245,7 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 }
 
 func TestApplyWithAutoMerge_VSCMerge(t *testing.T) {
-	t.Log("if \"atlantis apply\" is run with automerge and at least one project" +
-		" has a discarded plan, automerge should not take place")
+	t.Log("if \"atlantis apply\" is run with automerge then a VCS merge is performed")
 
 	vcsClient := setup(t)
 	pull := &github.PullRequest{
@@ -251,7 +255,45 @@ func TestApplyWithAutoMerge_VSCMerge(t *testing.T) {
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
 	ch.GlobalAutomerge = true
+	defer func() { ch.GlobalAutomerge = false }()
 
 	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.ApplyCommand})
 	vcsClient.VerifyWasCalledOnce().MergePull(modelPull)
+}
+
+func TestRunApply_DiscardedProjects(t *testing.T) {
+	t.Log("if \"atlantis apply\" is run with automerge and at least one project" +
+		" has a discarded plan, automerge should not take place")
+	vcsClient := setup(t)
+	ch.GlobalAutomerge = true
+	defer func() { ch.GlobalAutomerge = false }()
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	boltDB, err := db.New(tmp)
+	Ok(t, err)
+	ch.DB = boltDB
+	pull := fixtures.Pull
+	pull.BaseRepo = fixtures.GithubRepo
+	_, err = boltDB.UpdatePullWithResults(pull, []models.ProjectResult{
+		{
+			Command:    models.PlanCommand,
+			RepoRelDir: ".",
+			Workspace:  "default",
+			PlanSuccess: &models.PlanSuccess{
+				TerraformOutput: "tf-output",
+				LockURL:         "lock-url",
+			},
+		},
+	})
+	Ok(t, err)
+	Ok(t, boltDB.UpdateProjectStatus(pull, "default", ".", models.DiscardedPlanStatus))
+	ghPull := &github.PullRequest{
+		State: github.String("open"),
+	}
+	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(ghPull, nil)
+	When(eventParsing.ParseGithubPull(ghPull)).ThenReturn(pull, pull.BaseRepo, fixtures.GithubRepo, nil)
+	When(workingDir.GetPullDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).
+		ThenReturn(tmp, nil)
+	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, &pull, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.ApplyCommand})
+	vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest())
 }
