@@ -206,6 +206,13 @@ Values are chosen in this order:
   Disable \"atlantis apply\" command so a specific project/workspace/directory has to
   be specified for applies.
 
+* ### `--disable-auto-plan`
+  ```bash
+  atlantis server --disable-auto-plan
+  ```
+  Disable atlantis auto planning    
+
+
 * ### `--gh-hostname`
   ```bash
   atlantis server --gh-hostname="my.github.enterprise.com"
