@@ -44,7 +44,6 @@ var ch events.DefaultCommandRunner
 var pullLogger *logging.SimpleLogger
 var workingDir events.WorkingDir
 var pendingPlanFinder *mocks.MockPendingPlanFinder
-var defaultBoltDB *db.DefaultBoltDB
 
 func setup(t *testing.T) *vcsmocks.MockClient {
 	RegisterMockTestingT(t)
