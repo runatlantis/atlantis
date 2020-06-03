@@ -61,7 +61,9 @@ func NewGithubClient(hostname string, user string, pass string, logger *logging.
 			return nil, errors.Wrapf(err, "Invalid github hostname trying to parse %s", baseURL)
 		}
 		client.BaseURL = base
-		graphqlURL = fmt.Sprintf("https://%s/graphql", hostname)
+		// Github Enterprise uses a slightly different endpoint format for GraphQL.
+		// https://developer.github.com/enterprise/2.20/v4/guides/forming-calls/#the-graphql-endpoint
+		graphqlURL = fmt.Sprintf("https://%s/api/graphql", hostname)
 		_, err = url.Parse(graphqlURL)
 		if err != nil {
 			return nil, errors.Wrapf(err, "Invalid GraphQL github hostname trying to parse %s", graphqlURL)
