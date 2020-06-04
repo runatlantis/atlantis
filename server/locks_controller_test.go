@@ -15,7 +15,6 @@ import (
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events"
-	dbmocks "github.com/runatlantis/atlantis/server/events/db/mocks"
 
 	"github.com/runatlantis/atlantis/server/events/locking/mocks"
 	mocks2 "github.com/runatlantis/atlantis/server/events/mocks"
@@ -217,7 +216,23 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 			RepoFullName: repoName,
 		},
 	}, nil)
-	db := dbmocks.NewMockBoltDB()
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	db, err := db.New(tmp)
+	Ok(t, err)
+	// Seed the DB with a successful plan for that project (that is later discarded).
+	_, err = db.UpdatePullWithResults(pull, []models.ProjectResult{
+		{
+			Command:    models.PlanCommand,
+			RepoRelDir: projectPath,
+			Workspace:  workspaceName,
+			PlanSuccess: &models.PlanSuccess{
+				TerraformOutput: "tf-output",
+				LockURL:         "lock-url",
+			},
+		},
+	})
+	Ok(t, err)
 	lc := server.LocksController{
 		Locker:           l,
 		Logger:           logging.NewNoopLogger(),
@@ -231,7 +246,16 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
 	responseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
-	db.VerifyWasCalledOnce().UpdateProjectStatus(pull, workspaceName, projectPath, models.DiscardedPlanStatus)
+	status, err := db.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, status != nil, "status was nil")
+	Equals(t, []models.ProjectStatus{
+		{
+			Workspace:  workspaceName,
+			RepoRelDir: projectPath,
+			Status:     models.DiscardedPlanStatus,
+		},
+	}, status.Projects)
 }
 
 func TestDeleteLock_CommentFailed(t *testing.T) {
