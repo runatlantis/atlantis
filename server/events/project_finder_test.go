@@ -53,6 +53,7 @@ func setupTmpRepos(t *testing.T) {
 	Ok(t, err)
 	files := []string{
 		"non-tf",
+		".tflint.hcl",
 		"terraform.tfstate.backup",
 		"project1/main.tf",
 		"project1/terraform.tfstate",
@@ -120,6 +121,12 @@ func TestDetermineProjects(t *testing.T) {
 		{
 			"Should ignore non .tf files and return an empty list",
 			[]string{"non-tf"},
+			nil,
+			nestedModules1,
+		},
+		{
+			"Should ignore .tflint.hcl files and return an empty list",
+			[]string{".tflint.hcl", "project1/.tflint.hcl"},
 			nil,
 			nestedModules1,
 		},

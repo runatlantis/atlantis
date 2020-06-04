@@ -136,16 +136,16 @@ func (p *DefaultProjectFinder) filterToTerraform(files []string) []string {
 	for _, fileName := range files {
 		// Filter out tfstate files since they usually checked in by accident
 		// and regardless, they don't affect a plan.
-		if !p.isStatefile(fileName) && (strings.Contains(fileName, ".tf") || filepath.Base(fileName) == "terragrunt.hcl") {
+		if !p.shouldIgnore(fileName) && (strings.Contains(fileName, ".tf") || filepath.Base(fileName) == "terragrunt.hcl") {
 			filtered = append(filtered, fileName)
 		}
 	}
 	return filtered
 }
 
-// isStatefile returns true if fileName is a terraform statefile or backup.
-func (p *DefaultProjectFinder) isStatefile(fileName string) bool {
-	for _, s := range []string{"terraform.tfstate", "terraform.tfstate.backup"} {
+// shouldIgnore returns true if fileName is a terraform statefile, backup or tflint file.
+func (p *DefaultProjectFinder) shouldIgnore(fileName string) bool {
+	for _, s := range []string{"terraform.tfstate", "terraform.tfstate.backup", "tflint.hcl"} {
 		if strings.Contains(fileName, s) {
 			return true
 		}
