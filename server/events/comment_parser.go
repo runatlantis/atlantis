@@ -158,7 +158,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		return CommentParseResult{CommentResponse: HelpComment}
 	}
 
-	// Need to have a plan or apply at this point.
+	// Need to have a plan, apply or discard at this point.
 	if !e.stringInSlice(command, []string{models.PlanCommand.String(), models.ApplyCommand.String(), models.DiscardCommand.String()}) {
 		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown command %q.\nRun 'atlantis --help' for usage.\n```", command)}
 	}
