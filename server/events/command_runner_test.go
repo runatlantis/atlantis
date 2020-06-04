@@ -25,7 +25,6 @@ import (
 	"github.com/google/go-github/v28/github"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events"
-	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -302,6 +301,7 @@ func TestRunApply_DiscardedProjects(t *testing.T) {
 		ThenReturn(tmp, nil)
 	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, &pull, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.ApplyCommand})
 	vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest())
+}
 
 func TestRunCommentCommand_DrainOngoing(t *testing.T) {
 	t.Log("if drain is ongoing then a message should be displayed")
