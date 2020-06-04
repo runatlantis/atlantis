@@ -279,7 +279,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Locker:     lockingClient,
 		WorkingDir: workingDir,
 		Logger:     logger,
-		DB:         *boltdb,
+		DB:         boltdb,
 	}
 	eventParser := &events.EventParser{
 		GithubUser:         userConfig.GithubUser,
@@ -376,7 +376,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		LockDetailTemplate: lockTemplate,
 		WorkingDir:         workingDir,
 		WorkingDirLocker:   workingDirLocker,
-		DB:                 *boltdb,
+		DB:                 boltdb,
 	}
 	eventsController := &EventsController{
 		CommandRunner:                   commandRunner,

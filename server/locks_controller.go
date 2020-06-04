@@ -25,7 +25,7 @@ type LocksController struct {
 	LockDetailTemplate TemplateWriter
 	WorkingDir         events.WorkingDir
 	WorkingDirLocker   events.WorkingDirLocker
-	DB                 db.BoltDB
+	DB                 *db.BoltDB
 }
 
 // GetLock is the GET /locks/{id} route. It renders the lock detail view.
