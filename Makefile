@@ -28,8 +28,8 @@ go-generate: ## Run go generate in all packages
 regen-mocks: ## Delete all mocks and matchers and then run go generate to regen them.
 	find . -type f | grep mocks/mock_ | grep -v vendor | xargs rm
 	find . -type f | grep mocks/matchers | grep -v vendor | xargs rm
-	@# not using $(PKG) here because that it includes directories that have now
-	@# been deleted, causing go generate to fail.
+	@# not using $(PKG) here because that includes directories that have now
+	@# been made empty, causing go generate to fail.
 	go list ./... | grep -v e2e | grep -v vendor | grep -v static | xargs go generate
 
 test: ## Run tests
@@ -46,6 +46,10 @@ test-coverage-html:
 	@mkdir -p .cover
 	@go test -covermode atomic -coverpkg $(PKG_COMMAS) -coverprofile .cover/cover.out $(PKG)
 	go tool cover -html .cover/cover.out
+
+dev-docker:
+	GOOS=linux GOARCH=amd64 go build -mod=vendor -o atlantis .
+	docker build -f dev-Dockerfile -t atlantis-dev .
 
 dist: ## Package up everything in static/ using go-bindata-assetfs so it can be served by a single binary
 	rm -f server/static/bindata_assetfs.go && go-bindata-assetfs -pkg static -prefix server server/static/... && mv bindata_assetfs.go server/static

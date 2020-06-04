@@ -102,23 +102,23 @@ func (c *MockProjectLocker_TryLock_OngoingVerification) GetCapturedArguments() (
 func (c *MockProjectLocker_TryLock_OngoingVerification) GetAllCapturedArguments() (_param0 []*logging.SimpleLogger, _param1 []models.PullRequest, _param2 []models.User, _param3 []string, _param4 []models.Project) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]*logging.SimpleLogger, len(params[0]))
+		_param0 = make([]*logging.SimpleLogger, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(*logging.SimpleLogger)
 		}
-		_param1 = make([]models.PullRequest, len(params[1]))
+		_param1 = make([]models.PullRequest, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(models.PullRequest)
 		}
-		_param2 = make([]models.User, len(params[2]))
+		_param2 = make([]models.User, len(c.methodInvocations))
 		for u, param := range params[2] {
 			_param2[u] = param.(models.User)
 		}
-		_param3 = make([]string, len(params[3]))
+		_param3 = make([]string, len(c.methodInvocations))
 		for u, param := range params[3] {
 			_param3[u] = param.(string)
 		}
-		_param4 = make([]models.Project, len(params[4]))
+		_param4 = make([]models.Project, len(c.methodInvocations))
 		for u, param := range params[4] {
 			_param4[u] = param.(models.Project)
 		}

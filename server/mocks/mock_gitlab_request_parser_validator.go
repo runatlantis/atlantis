@@ -100,11 +100,11 @@ func (c *MockGitlabRequestParserValidator_ParseAndValidate_OngoingVerification) 
 func (c *MockGitlabRequestParserValidator_ParseAndValidate_OngoingVerification) GetAllCapturedArguments() (_param0 []*http.Request, _param1 [][]byte) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]*http.Request, len(params[0]))
+		_param0 = make([]*http.Request, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(*http.Request)
 		}
-		_param1 = make([][]byte, len(params[1]))
+		_param1 = make([][]byte, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.([]byte)
 		}

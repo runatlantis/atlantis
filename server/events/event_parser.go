@@ -266,6 +266,7 @@ type EventParser struct {
 	GithubToken        string
 	GitlabUser         string
 	GitlabToken        string
+	AllowDraftPRs      bool
 	BitbucketUser      string
 	BitbucketToken     string
 	BitbucketServerURL string
@@ -418,9 +419,13 @@ func (e *EventParser) ParseGithubPullEvent(pullEvent *github.PullRequestEvent) (
 	}
 
 	if pullEvent.GetPullRequest().GetDraft() {
-		// if the PR is in draft state we don't care about the action type
-		// we can set the type to Other and ignore the PR
-		pullEventType = models.OtherPullEvent
+		// Even if the PR is in draft state users can manually run plan or may
+		// be using the -allow-draft-prs flag. If so then we need to ensure locks are cleaned up.
+		if pullEvent.GetAction() == "closed" {
+			pullEventType = models.ClosedPullEvent
+		} else if !e.AllowDraftPRs {
+			pullEventType = models.OtherPullEvent
+		}
 	} else {
 		switch pullEvent.GetAction() {
 		case "opened":

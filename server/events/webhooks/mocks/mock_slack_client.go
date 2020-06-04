@@ -179,7 +179,7 @@ func (c *MockSlackClient_ChannelExists_OngoingVerification) GetCapturedArguments
 func (c *MockSlackClient_ChannelExists_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]string, len(params[0]))
+		_param0 = make([]string, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
 		}
@@ -206,11 +206,11 @@ func (c *MockSlackClient_PostMessage_OngoingVerification) GetCapturedArguments()
 func (c *MockSlackClient_PostMessage_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []webhooks.ApplyResult) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]string, len(params[0]))
+		_param0 = make([]string, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
 		}
-		_param1 = make([]webhooks.ApplyResult, len(params[1]))
+		_param1 = make([]webhooks.ApplyResult, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(webhooks.ApplyResult)
 		}

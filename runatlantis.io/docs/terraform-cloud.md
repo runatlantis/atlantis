@@ -52,11 +52,14 @@ Using a **Team Token is recommended**, however you can also use a User Token.
 
 ### Team Token
 To generate a team token, click on **Settings** in the top bar, then **Teams** in
-the sidebar, then scroll down to **Team API Token**.
+the sidebar.
+Choose an existing team or create a new one.
+Enable the **Manage Workspaces** permission, then scroll down to **Team API Token**.
 
 ### User Token
 To generate a user token, click on your avatar, then **User Settings**, then
 **Tokens** in the sidebar.
+Ensure the **Manage Workspaces** permission is enabled for this user's team.
 
 ## Passing The Token To Atlantis
 The token can be passed to Atlantis via the `ATLANTIS_TFE_TOKEN` environment variable.

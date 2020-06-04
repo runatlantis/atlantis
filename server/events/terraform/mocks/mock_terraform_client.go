@@ -116,27 +116,27 @@ func (c *MockClient_RunCommandWithVersion_OngoingVerification) GetCapturedArgume
 func (c *MockClient_RunCommandWithVersion_OngoingVerification) GetAllCapturedArguments() (_param0 []*logging.SimpleLogger, _param1 []string, _param2 [][]string, _param3 []map[string]string, _param4 []*go_version.Version, _param5 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]*logging.SimpleLogger, len(params[0]))
+		_param0 = make([]*logging.SimpleLogger, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(*logging.SimpleLogger)
 		}
-		_param1 = make([]string, len(params[1]))
+		_param1 = make([]string, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(string)
 		}
-		_param2 = make([][]string, len(params[2]))
+		_param2 = make([][]string, len(c.methodInvocations))
 		for u, param := range params[2] {
 			_param2[u] = param.([]string)
 		}
-		_param3 = make([]map[string]string, len(params[3]))
+		_param3 = make([]map[string]string, len(c.methodInvocations))
 		for u, param := range params[3] {
 			_param3[u] = param.(map[string]string)
 		}
-		_param4 = make([]*go_version.Version, len(params[4]))
+		_param4 = make([]*go_version.Version, len(c.methodInvocations))
 		for u, param := range params[4] {
 			_param4[u] = param.(*go_version.Version)
 		}
-		_param5 = make([]string, len(params[5]))
+		_param5 = make([]string, len(c.methodInvocations))
 		for u, param := range params[5] {
 			_param5[u] = param.(string)
 		}
@@ -163,11 +163,11 @@ func (c *MockClient_EnsureVersion_OngoingVerification) GetCapturedArguments() (*
 func (c *MockClient_EnsureVersion_OngoingVerification) GetAllCapturedArguments() (_param0 []*logging.SimpleLogger, _param1 []*go_version.Version) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]*logging.SimpleLogger, len(params[0]))
+		_param0 = make([]*logging.SimpleLogger, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(*logging.SimpleLogger)
 		}
-		_param1 = make([]*go_version.Version, len(params[1]))
+		_param1 = make([]*go_version.Version, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(*go_version.Version)
 		}

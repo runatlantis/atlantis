@@ -59,7 +59,7 @@ func TestGithubClient_GetModifiedFiles(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass", nil)
 	Ok(t, err)
 	defer disableSSLVerification()()
 
@@ -114,7 +114,7 @@ func TestGithubClient_GetModifiedFilesMovedFile(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass", nil)
 	Ok(t, err)
 	defer disableSSLVerification()()
 
@@ -165,7 +165,7 @@ func TestGithubClient_PaginatesComments(t *testing.T) {
 	testServer := httptest.NewTLSServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.Method + " " + r.RequestURI {
-			case "POST /graphql":
+			case "POST /api/graphql":
 				defer r.Body.Close() // nolint: errcheck
 				body, err := ioutil.ReadAll(r.Body)
 				if err != nil {
@@ -208,7 +208,7 @@ func TestGithubClient_PaginatesComments(t *testing.T) {
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
 
-	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass", nil)
 	Ok(t, err)
 	defer disableSSLVerification()()
 
@@ -260,7 +260,7 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 			case "GET /api/v3/repos/owner/repo/issues/123/comments?direction=asc&sort=created":
 				w.Write([]byte(issueResp)) // nolint: errcheck
 				return
-			case "POST /graphql":
+			case "POST /api/graphql":
 				if accept, has := r.Header["Accept"]; !has || accept[0] != "application/vnd.github.queen-beryl-preview+json" {
 					t.Error("missing preview header")
 					http.Error(w, "bad request", http.StatusBadRequest)
@@ -294,7 +294,7 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
 
-	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass", nil)
 	Ok(t, err)
 	defer disableSSLVerification()()
 
@@ -358,7 +358,7 @@ func TestGithubClient_UpdateStatus(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass", nil)
 			Ok(t, err)
 			defer disableSSLVerification()()
 
@@ -444,7 +444,7 @@ func TestGithubClient_PullIsApproved(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+	client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass", nil)
 	Ok(t, err)
 	defer disableSSLVerification()()
 
@@ -535,7 +535,7 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 				}))
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass", nil)
 			Ok(t, err)
 			defer disableSSLVerification()()
 
@@ -597,7 +597,7 @@ func TestGithubClient_MergePullHandlesError(t *testing.T) {
 					case "/api/v3/repos/owner/repo/pulls/1/merge":
 						body, err := ioutil.ReadAll(r.Body)
 						Ok(t, err)
-						exp := "{\"commit_message\":\"[Atlantis] Automatically merging after successful apply\",\"merge_method\":\"merge\"}\n"
+						exp := "{\"commit_message\":\"\",\"merge_method\":\"merge\"}\n"
 						Equals(t, exp, string(body))
 						var resp string
 						if c.code == 200 {
@@ -617,7 +617,7 @@ func TestGithubClient_MergePullHandlesError(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass", nil)
 			Ok(t, err)
 			defer disableSSLVerification()()
 
@@ -722,8 +722,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 							MergeMethod   string `json:"merge_method"`
 						}
 						expBody := bodyJSON{
-							CommitMessage: "[Atlantis] Automatically merging after successful apply",
-							MergeMethod:   c.expMethod,
+							MergeMethod: c.expMethod,
 						}
 						expBytes, err := json.Marshal(expBody)
 						Ok(t, err)
@@ -740,7 +739,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass")
+			client, err := vcs.NewGithubClient(testServerURL.Host, "user", "pass", nil)
 			Ok(t, err)
 			defer disableSSLVerification()()
 
@@ -762,6 +761,15 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			Ok(t, err)
 		})
 	}
+}
+
+func TestGithubClient_MarkdownPullLink(t *testing.T) {
+	client, err := vcs.NewGithubClient("hostname", "user", "pass", nil)
+	Ok(t, err)
+	pull := models.PullRequest{Num: 1}
+	s, _ := client.MarkdownPullLink(pull)
+	exp := "#1"
+	Equals(t, exp, s)
 }
 
 // disableSSLVerification disables ssl verification for the global http client

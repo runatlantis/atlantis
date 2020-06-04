@@ -494,6 +494,15 @@ func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 	})
 }
 
+func TestAzureDevopsClient_MarkdownPullLink(t *testing.T) {
+	client, err := vcs.NewAzureDevopsClient("hostname", "token")
+	Ok(t, err)
+	pull := models.PullRequest{Num: 1}
+	s, _ := client.MarkdownPullLink(pull)
+	exp := "!1"
+	Equals(t, exp, s)
+}
+
 var adMergeSuccess = `{
 	"status": "completed",
 	"mergeStatus": "succeeded",

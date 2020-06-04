@@ -75,10 +75,12 @@ type Server struct {
 	Locker             locking.Locker
 	EventsController   *EventsController
 	LocksController    *LocksController
+	StatusController   *StatusController
 	IndexTemplate      TemplateWriter
 	LockDetailTemplate TemplateWriter
 	SSLCertFile        string
 	SSLKeyFile         string
+	Drainer            *events.Drainer
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -120,7 +122,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if userConfig.GithubUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		var err error
-		githubClient, err = vcs.NewGithubClient(userConfig.GithubHostname, userConfig.GithubUser, userConfig.GithubToken)
+		githubClient, err = vcs.NewGithubClient(userConfig.GithubHostname, userConfig.GithubUser, userConfig.GithubToken, logger)
 		if err != nil {
 			return nil, err
 		}
@@ -191,7 +193,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			}
 		}
 		if userConfig.AzureDevopsUser != "" {
-			if err := events.WriteGitCreds(userConfig.AzureDevopsUser, userConfig.AzureDevopsToken, "https://dev.azure.com/", home, logger); err != nil {
+			if err := events.WriteGitCreds(userConfig.AzureDevopsUser, userConfig.AzureDevopsToken, "dev.azure.com", home, logger); err != nil {
 				return nil, err
 			}
 		}
@@ -221,7 +223,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.DefaultTFVersion,
 		config.DefaultTFVersionFlag,
 		userConfig.TFDownloadURL,
-		&terraform.DefaultDownloader{})
+		&terraform.DefaultDownloader{},
+		true)
 	// The flag.Lookup call is to detect if we're running in a unit test. If we
 	// are, then we don't error out because we don't have/want terraform
 	// installed on our CI system where the unit tests run.
@@ -245,7 +248,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CheckoutMerge: userConfig.CheckoutStrategy == "merge",
 	}
 	projectLocker := &events.DefaultProjectLocker{
-		Locker: lockingClient,
+		Locker:    lockingClient,
+		VCSClient: vcsClient,
 	}
 	parsedURL, err := ParseAtlantisURL(userConfig.AtlantisURL)
 	if err != nil {
@@ -286,6 +290,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubToken:        userConfig.GithubToken,
 		GitlabUser:         userConfig.GitlabUser,
 		GitlabToken:        userConfig.GitlabToken,
+		AllowDraftPRs:      userConfig.PlanDrafts,
 		BitbucketUser:      userConfig.BitbucketUser,
 		BitbucketToken:     userConfig.BitbucketToken,
 		BitbucketServerURL: userConfig.BitbucketBaseURL,
@@ -304,6 +309,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		TerraformExecutor: terraformClient,
 		DefaultTFVersion:  defaultTfVersion,
 		TerraformBinDir:   terraformClient.TerraformBinDir(),
+	}
+	drainer := &events.Drainer{}
+	statusController := &StatusController{
+		Logger:  logger,
+		Drainer: drainer,
 	}
 	commandRunner := &events.DefaultCommandRunner{
 		VCSClient:                vcsClient,
@@ -362,6 +372,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		PendingPlanFinder: pendingPlanFinder,
 		DB:                boltdb,
 		GlobalAutomerge:   userConfig.Automerge,
+		Drainer:           drainer,
 	}
 	repoWhitelist, err := events.NewRepoWhitelistChecker(userConfig.RepoWhitelist)
 	if err != nil {
@@ -407,10 +418,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Locker:             lockingClient,
 		EventsController:   eventsController,
 		LocksController:    locksController,
+		StatusController:   statusController,
 		IndexTemplate:      indexTemplate,
 		LockDetailTemplate: lockTemplate,
 		SSLKeyFile:         userConfig.SSLKeyFile,
 		SSLCertFile:        userConfig.SSLCertFile,
+		Drainer:            drainer,
 	}, nil
 }
 
@@ -420,6 +433,7 @@ func (s *Server) Start() error {
 		return r.URL.Path == "/" || r.URL.Path == "/index.html"
 	})
 	s.Router.HandleFunc("/healthz", s.Healthz).Methods("GET")
+	s.Router.HandleFunc("/status", s.StatusController.Get).Methods("GET")
 	s.Router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: static.Asset, AssetDir: static.AssetDir, AssetInfo: static.AssetInfo}))
 	s.Router.HandleFunc("/events", s.EventsController.Post).Methods("POST")
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
@@ -455,12 +469,32 @@ func (s *Server) Start() error {
 	}()
 	<-stop
 
-	s.Logger.Warn("Received interrupt. Safely shutting down")
+	s.Logger.Warn("Received interrupt. Waiting for in-progress operations to complete")
+	s.waitForDrain()
 	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second) // nolint: vet
 	if err := server.Shutdown(ctx); err != nil {
 		return cli.NewExitError(fmt.Sprintf("while shutting down: %s", err), 1)
 	}
 	return nil
+}
+
+// waitForDrain blocks until draining is complete.
+func (s *Server) waitForDrain() {
+	drainComplete := make(chan bool, 1)
+	go func() {
+		s.Drainer.ShutdownBlocking()
+		drainComplete <- true
+	}()
+	ticker := time.NewTicker(5 * time.Second)
+	for {
+		select {
+		case <-drainComplete:
+			s.Logger.Info("All in-progress operations complete, shutting down")
+			return
+		case <-ticker.C:
+			s.Logger.Info("Waiting for in-progress operations to complete, current in-progress ops: %d", s.Drainer.GetStatus().InProgressOps)
+		}
+	}
 }
 
 // Index is the / route.

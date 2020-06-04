@@ -36,6 +36,7 @@ var parser = events.EventParser{
 	GithubToken:        "github-token",
 	GitlabUser:         "gitlab-user",
 	GitlabToken:        "gitlab-token",
+	AllowDraftPRs:      false,
 	BitbucketUser:      "bitbucket-user",
 	BitbucketToken:     "bitbucket-token",
 	BitbucketServerURL: "http://mycorp.com:7490",
@@ -161,73 +162,98 @@ func TestParseGithubPullEvent(t *testing.T) {
 }
 
 func TestParseGithubPullEventFromDraft(t *testing.T) {
-	// verify that draft PRs are treated as 'other' events
+	// verify that draft PRs are treated as 'other' events by default
 	testEvent := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
 	draftPR := true
 	testEvent.PullRequest.Draft = &draftPR
 	_, evType, _, _, _, err := parser.ParseGithubPullEvent(&testEvent)
 	Ok(t, err)
 	Equals(t, models.OtherPullEvent, evType)
+	// verify that drafts are planned if requested
+	parser.AllowDraftPRs = true
+	defer func() { parser.AllowDraftPRs = false }()
+	_, evType, _, _, _, err = parser.ParseGithubPullEvent(&testEvent)
+	Ok(t, err)
+	Equals(t, models.OpenedPullEvent, evType)
 }
 
 func TestParseGithubPullEvent_EventType(t *testing.T) {
 	cases := []struct {
-		action string
-		exp    models.PullRequestEventType
+		action   string
+		exp      models.PullRequestEventType
+		draftExp models.PullRequestEventType
 	}{
 		{
-			action: "synchronize",
-			exp:    models.UpdatedPullEvent,
+			action:   "synchronize",
+			exp:      models.UpdatedPullEvent,
+			draftExp: models.OtherPullEvent,
 		},
 		{
-			action: "unassigned",
-			exp:    models.OtherPullEvent,
+			action:   "unassigned",
+			exp:      models.OtherPullEvent,
+			draftExp: models.OtherPullEvent,
 		},
 		{
-			action: "review_requested",
-			exp:    models.OtherPullEvent,
+			action:   "review_requested",
+			exp:      models.OtherPullEvent,
+			draftExp: models.OtherPullEvent,
 		},
 		{
-			action: "review_request_removed",
-			exp:    models.OtherPullEvent,
+			action:   "review_request_removed",
+			exp:      models.OtherPullEvent,
+			draftExp: models.OtherPullEvent,
 		},
 		{
-			action: "labeled",
-			exp:    models.OtherPullEvent,
+			action:   "labeled",
+			exp:      models.OtherPullEvent,
+			draftExp: models.OtherPullEvent,
 		},
 		{
-			action: "unlabeled",
-			exp:    models.OtherPullEvent,
+			action:   "unlabeled",
+			exp:      models.OtherPullEvent,
+			draftExp: models.OtherPullEvent,
 		},
 		{
-			action: "opened",
-			exp:    models.OpenedPullEvent,
+			action:   "opened",
+			exp:      models.OpenedPullEvent,
+			draftExp: models.OtherPullEvent,
 		},
 		{
-			action: "edited",
-			exp:    models.OtherPullEvent,
+			action:   "edited",
+			exp:      models.OtherPullEvent,
+			draftExp: models.OtherPullEvent,
 		},
 		{
-			action: "closed",
-			exp:    models.ClosedPullEvent,
+			action:   "closed",
+			exp:      models.ClosedPullEvent,
+			draftExp: models.ClosedPullEvent,
 		},
 		{
-			action: "reopened",
-			exp:    models.OtherPullEvent,
+			action:   "reopened",
+			exp:      models.OtherPullEvent,
+			draftExp: models.OtherPullEvent,
 		},
 		{
-			action: "ready_for_review",
-			exp:    models.OpenedPullEvent,
+			action:   "ready_for_review",
+			exp:      models.OpenedPullEvent,
+			draftExp: models.OtherPullEvent,
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.action, func(t *testing.T) {
+			// Test normal parsing
 			event := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
 			event.Action = &c.action
 			_, actType, _, _, _, err := parser.ParseGithubPullEvent(&event)
 			Ok(t, err)
 			Equals(t, c.exp, actType)
+			// Test draft parsing
+			draftPR := true
+			event.PullRequest.Draft = &draftPR
+			_, draftEvType, _, _, _, err := parser.ParseGithubPullEvent(&event)
+			Ok(t, err)
+			Equals(t, c.draftExp, draftEvType)
 		})
 	}
 }

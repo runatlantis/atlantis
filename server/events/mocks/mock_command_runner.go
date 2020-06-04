@@ -98,27 +98,27 @@ func (c *MockCommandRunner_RunCommentCommand_OngoingVerification) GetCapturedArg
 func (c *MockCommandRunner_RunCommentCommand_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []*models.Repo, _param2 []*models.PullRequest, _param3 []models.User, _param4 []int, _param5 []*events.CommentCommand) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]models.Repo, len(params[0]))
+		_param0 = make([]models.Repo, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(models.Repo)
 		}
-		_param1 = make([]*models.Repo, len(params[1]))
+		_param1 = make([]*models.Repo, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(*models.Repo)
 		}
-		_param2 = make([]*models.PullRequest, len(params[2]))
+		_param2 = make([]*models.PullRequest, len(c.methodInvocations))
 		for u, param := range params[2] {
 			_param2[u] = param.(*models.PullRequest)
 		}
-		_param3 = make([]models.User, len(params[3]))
+		_param3 = make([]models.User, len(c.methodInvocations))
 		for u, param := range params[3] {
 			_param3[u] = param.(models.User)
 		}
-		_param4 = make([]int, len(params[4]))
+		_param4 = make([]int, len(c.methodInvocations))
 		for u, param := range params[4] {
 			_param4[u] = param.(int)
 		}
-		_param5 = make([]*events.CommentCommand, len(params[5]))
+		_param5 = make([]*events.CommentCommand, len(c.methodInvocations))
 		for u, param := range params[5] {
 			_param5[u] = param.(*events.CommentCommand)
 		}
@@ -145,19 +145,19 @@ func (c *MockCommandRunner_RunAutoplanCommand_OngoingVerification) GetCapturedAr
 func (c *MockCommandRunner_RunAutoplanCommand_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.Repo, _param2 []models.PullRequest, _param3 []models.User) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]models.Repo, len(params[0]))
+		_param0 = make([]models.Repo, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(models.Repo)
 		}
-		_param1 = make([]models.Repo, len(params[1]))
+		_param1 = make([]models.Repo, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(models.Repo)
 		}
-		_param2 = make([]models.PullRequest, len(params[2]))
+		_param2 = make([]models.PullRequest, len(c.methodInvocations))
 		for u, param := range params[2] {
 			_param2[u] = param.(models.PullRequest)
 		}
-		_param3 = make([]models.User, len(params[3]))
+		_param3 = make([]models.User, len(c.methodInvocations))
 		for u, param := range params[3] {
 			_param3[u] = param.(models.User)
 		}

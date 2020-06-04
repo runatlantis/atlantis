@@ -19,6 +19,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/google/go-github/v28/github"
@@ -44,6 +45,7 @@ var ch events.DefaultCommandRunner
 var pullLogger *logging.SimpleLogger
 var workingDir events.WorkingDir
 var pendingPlanFinder *mocks.MockPendingPlanFinder
+var drainer *events.Drainer
 
 func setup(t *testing.T) *vcsmocks.MockClient {
 	RegisterMockTestingT(t)
@@ -64,6 +66,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	defaultBoltDB, err := db.New(tmp)
 	Ok(t, err)
 
+	drainer = &events.Drainer{}
 	When(logger.GetLevel()).ThenReturn(logging.Info)
 	When(logger.NewLogger("runatlantis/atlantis#1", true, logging.Info)).
 		ThenReturn(pullLogger)
@@ -84,6 +87,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		WorkingDir:               workingDir,
 		DisableApplyAll:          false,
 		DB:                       defaultBoltDB,
+		Drainer:                  drainer,
 	}
 	return vcsClient
 }
@@ -91,7 +95,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 func TestRunCommentCommand_LogPanics(t *testing.T) {
 	t.Log("if there is a panic it is commented back on the pull request")
 	vcsClient := setup(t)
-	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenPanic("OMG PANIC!!!")
+	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenPanic("panic test - if you're seeing this in a test failure this isn't the failing test")
 	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, 1, &events.CommentCommand{Name: models.PlanCommand})
 	_, _, comment := vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString()).GetCapturedArguments()
 	Assert(t, strings.Contains(comment, "Error: goroutine panic"), fmt.Sprintf("comment should be about a goroutine panic but was %q", comment))
@@ -208,6 +212,11 @@ func TestRunCommentCommand_ClosedPull(t *testing.T) {
 // we delete the plans.
 func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 	setup(t)
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	boltDB, err := db.New(tmp)
+	Ok(t, err)
+	ch.DB = boltDB
 	ch.GlobalAutomerge = true
 	defer func() { ch.GlobalAutomerge = false }()
 
@@ -234,8 +243,6 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 			},
 		}
 	})
-	tmp, cleanup := TempDir(t)
-	defer cleanup()
 
 	When(workingDir.GetPullDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).
 		ThenReturn(tmp, nil)
@@ -295,4 +302,37 @@ func TestRunApply_DiscardedProjects(t *testing.T) {
 		ThenReturn(tmp, nil)
 	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, &pull, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.ApplyCommand})
 	vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest())
+
+func TestRunCommentCommand_DrainOngoing(t *testing.T) {
+	t.Log("if drain is ongoing then a message should be displayed")
+	vcsClient := setup(t)
+	drainer.ShutdownBlocking()
+	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, nil)
+	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, fixtures.Pull.Num, "Atlantis server is shutting down, please try again later.")
+}
+
+func TestRunCommentCommand_DrainNotOngoing(t *testing.T) {
+	t.Log("if drain is not ongoing then remove ongoing operation must be called even if panic occured")
+	setup(t)
+	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenPanic("panic test - if you're seeing this in a test failure this isn't the failing test")
+	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, nil)
+	githubGetter.VerifyWasCalledOnce().GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)
+	Equals(t, 0, drainer.GetStatus().InProgressOps)
+}
+
+func TestRunAutoplanCommand_DrainOngoing(t *testing.T) {
+	t.Log("if drain is ongoing then a message should be displayed")
+	vcsClient := setup(t)
+	drainer.ShutdownBlocking()
+	ch.RunAutoplanCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
+	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, fixtures.Pull.Num, "Atlantis server is shutting down, please try again later.")
+}
+
+func TestRunAutoplanCommand_DrainNotOngoing(t *testing.T) {
+	t.Log("if drain is not ongoing then remove ongoing operation must be called even if panic occured")
+	setup(t)
+	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())).ThenPanic("panic test - if you're seeing this in a test failure this isn't the failing test")
+	ch.RunAutoplanCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
+	projectCommandBuilder.VerifyWasCalledOnce().BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())
+	Equals(t, 0, drainer.GetStatus().InProgressOps)
 }

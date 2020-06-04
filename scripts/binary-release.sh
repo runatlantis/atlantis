@@ -11,7 +11,13 @@ rm -rf output/*
 
 if ! which gox > /dev/null; then
     echo "-> installing gox..."
+    # Need to run go get in a separate dir
+    # so it doesn't modify our go.mod.
+    SRC_DIR=$(pwd)
+    cd $(mktemp -d)
+    go mod init example.com/m
     go get -u github.com/mitchellh/gox
+    cd "$SRC_DIR"
 fi
 
 # build

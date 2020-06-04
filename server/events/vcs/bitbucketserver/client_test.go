@@ -180,3 +180,12 @@ func TestClient_MergePull(t *testing.T) {
 	})
 	Ok(t, err)
 }
+
+func TestClient_MarkdownPullLink(t *testing.T) {
+	client, err := bitbucketserver.NewClient(nil, "u", "p", "https://base-url", "atlantis-url")
+	Ok(t, err)
+	pull := models.PullRequest{Num: 1}
+	s, _ := client.MarkdownPullLink(pull)
+	exp := "#1"
+	Equals(t, exp, s)
+}

@@ -305,9 +305,13 @@ type ProjectCommandContext struct {
 	// ApplyRequirements is the list of requirements that must be satisfied
 	// before we will run the apply stage.
 	ApplyRequirements []string
-	// AutoplanEnabled is true if automerge is enabled for the repo that this
+	// AutomergeEnabled is true if automerge is enabled for the repo that this
 	// project is in.
 	AutomergeEnabled bool
+	// ParallelApplyEnabled is true if parallel apply is enabled for this project.
+	ParallelApplyEnabled bool
+	// ParallelPlanEnabled is true if parallel plan is enabled for this project.
+	ParallelPlanEnabled bool
 	// AutoplanEnabled is true if autoplanning is enabled for this project.
 	AutoplanEnabled bool
 	// BaseRepo is the repository that the pull request will be merged into.
