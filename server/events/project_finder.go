@@ -40,6 +40,9 @@ type ProjectFinder interface {
 	DetermineProjectsViaConfig(log *logging.SimpleLogger, modifiedFiles []string, config valid.RepoCfg, absRepoDir string) ([]valid.Project, error)
 }
 
+// IgnoredFiles contains filename fragments to ignore while looking at changes
+var IgnoredFiles = [...]string{"terraform.tfstate", "terraform.tfstate.backup", "tflint.hcl"}
+
 // DefaultProjectFinder implements ProjectFinder.
 type DefaultProjectFinder struct{}
 
@@ -145,7 +148,7 @@ func (p *DefaultProjectFinder) filterToTerraform(files []string) []string {
 
 // shouldIgnore returns true if fileName is a terraform statefile, backup or tflint file.
 func (p *DefaultProjectFinder) shouldIgnore(fileName string) bool {
-	for _, s := range []string{"terraform.tfstate", "terraform.tfstate.backup", "tflint.hcl"} {
+	for _, s := range IgnoredFiles {
 		if strings.Contains(fileName, s) {
 			return true
 		}
