@@ -248,6 +248,12 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
+	if cmd.Name == models.DiscardCommand {
+		c.DeleteLockCommand.DeleteLocksByPull(ctx.BaseRepo.FullName, ctx.Pull.Num)
+		c.VCSClient.CreateComment(baseRepo, pullNum, fmt.Sprintf("`All Atlantis locks for this PR have been released - and plans discarded`"))
+		return
+	}
+
 	if cmd.CommandName() == models.ApplyCommand {
 		// Get the mergeable status before we set any build statuses of our own.
 		// We do this here because when we set a "Pending" status, if users have
@@ -274,8 +280,6 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		projectCmds, err = c.ProjectCommandBuilder.BuildPlanCommands(ctx, cmd)
 	case models.ApplyCommand:
 		projectCmds, err = c.ProjectCommandBuilder.BuildApplyCommands(ctx, cmd)
-	case models.DiscardCommand:
-		projectCmds, err = c.ProjectCommandBuilder.BuildDiscardCommands(ctx, cmd)
 	default:
 		ctx.Log.Err("failed to determine desired command, neither plan nor apply")
 		return

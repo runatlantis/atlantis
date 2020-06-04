@@ -61,8 +61,6 @@ type CommentBuilder interface {
 	BuildPlanComment(repoRelDir string, workspace string, project string, commentArgs []string) string
 	// BuildApplyComment builds an apply comment for the specified args.
 	BuildApplyComment(repoRelDir string, workspace string, project string) string
-	// BuildDiscardComment builds a discard comment for the specified args.
-	BuildDiscardComment(repoRelDir string, workspace string, project string, commentArgs []string) string
 }
 
 // CommentParser implements CommentParsing
@@ -272,22 +270,6 @@ func (e *CommentParser) BuildPlanComment(repoRelDir string, workspace string, pr
 func (e *CommentParser) BuildApplyComment(repoRelDir string, workspace string, project string) string {
 	flags := e.buildFlags(repoRelDir, workspace, project)
 	return fmt.Sprintf("%s %s%s", atlantisExecutable, models.ApplyCommand.String(), flags)
-}
-
-// BuildDiscardComment builds discard comment for the specified args.
-func (e *CommentParser) BuildDiscardComment(repoRelDir string, workspace string, project string, commentArgs []string) string {
-	flags := e.buildFlags(repoRelDir, workspace, project)
-	commentFlags := ""
-	if len(commentArgs) > 0 {
-		var flagsWithoutQuotes []string
-		for _, f := range commentArgs {
-			f = strings.TrimPrefix(f, "\"")
-			f = strings.TrimSuffix(f, "\"")
-			flagsWithoutQuotes = append(flagsWithoutQuotes, f)
-		}
-		commentFlags = fmt.Sprintf(" -- %s", strings.Join(flagsWithoutQuotes, " "))
-	}
-	return fmt.Sprintf("%s %s%s%s", atlantisExecutable, models.DiscardCommand.String(), flags, commentFlags)
 }
 
 func (e *CommentParser) buildFlags(repoRelDir string, workspace string, project string) string {

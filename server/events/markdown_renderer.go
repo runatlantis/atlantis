@@ -24,9 +24,8 @@ import (
 )
 
 const (
-	planCommandTitle    = "Plan"
-	applyCommandTitle   = "Apply"
-	discardCommandTitle = "Discard"
+	planCommandTitle  = "Plan"
+	applyCommandTitle = "Apply"
 	// maxUnwrappedLines is the maximum number of lines the Terraform output
 	// can be before we wrap it in an expandable template.
 	maxUnwrappedLines = 12
@@ -159,8 +158,6 @@ func (m *MarkdownRenderer) renderProjectResults(results []models.ProjectResult, 
 		tmpl = singleProjectPlanSuccessTmpl
 	case len(resultsTmplData) == 1 && common.Command == planCommandTitle && numPlanSuccesses == 0:
 		tmpl = singleProjectPlanUnsuccessfulTmpl
-	case len(resultsTmplData) == 1 && common.Command == discardCommandTitle:
-		tmpl = singleProjectDiscardTmpl
 	case len(resultsTmplData) == 1 && common.Command == applyCommandTitle:
 		tmpl = singleProjectApplyTmpl
 	case common.Command == planCommandTitle:
