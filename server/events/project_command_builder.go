@@ -2,7 +2,6 @@ package events
 
 import (
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -112,25 +111,6 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		return nil, err
 	}
 
-	// We'll need the list of modified files.
-	modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.BaseRepo, ctx.Pull)
-	if err != nil {
-		return nil, err
-	}
-	ctx.Log.Debug("%d files were modified in this pull request", len(modifiedFiles))
-
-	// If the --all flag has been given we just suppose all files have been
-	// modified.
-	if all {
-		lsCmd := exec.Command("git", "ls-tree", "-r", "--name-only", "HEAD")
-		lsCmd.Dir = repoDir
-		lsOut, err := lsCmd.CombinedOutput()
-		if err != nil {
-			return nil, errors.Wrapf(err, "running git ls-tree -r --name-only HEAD: %s", string(lsOut))
-		}
-		modifiedFiles = strings.Split(string(lsOut), "\n")
-	}
-
 	// Parse config file if it exists.
 	hasRepoCfg, err := p.ParserValidator.HasRepoCfg(repoDir)
 	if err != nil {
@@ -146,25 +126,48 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 			return nil, errors.Wrapf(err, "parsing %s", yaml.AtlantisYAMLFilename)
 		}
 		ctx.Log.Info("successfully parsed %s file", yaml.AtlantisYAMLFilename)
-		matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, repoDir)
+		var projects []valid.Project
+		if all {
+			projects, err = p.ProjectFinder.AllProjectsViaConfig(ctx.Log, repoCfg, repoDir)
+		} else {
+			modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.BaseRepo, ctx.Pull)
+			if err != nil {
+				return nil, err
+			}
+			ctx.Log.Debug("%d files were modified in this pull request", len(modifiedFiles))
+			projects, err = p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, repoDir)
+		}
 		if err != nil {
 			return nil, err
 		}
-		ctx.Log.Info("%d projects are to be planned based on their when_modified config", len(matchingProjects))
-		for _, mp := range matchingProjects {
-			ctx.Log.Debug("determining config for project at dir: %q workspace: %q", mp.Dir, mp.Workspace)
-			mergedCfg := p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.BaseRepo.ID(), mp, repoCfg)
+		ctx.Log.Info("%d projects are to be planned based on their when_modified config", len(projects))
+		for _, project := range projects {
+			ctx.Log.Debug("determining config for project at dir: %q workspace: %q", project.Dir, project.Workspace)
+			mergedCfg := p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.BaseRepo.ID(), project, repoCfg)
 			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, mergedCfg, commentFlags, repoCfg.Automerge, verbose, repoDir))
 		}
 	} else {
 		// If there is no config file, then we'll plan each project that
 		// our algorithm determines was modified.
 		ctx.Log.Info("found no %s file", yaml.AtlantisYAMLFilename)
-		modifiedProjects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.BaseRepo.FullName, repoDir)
-		ctx.Log.Info("automatically determined that there were %d projects modified in this pull request: %s", len(modifiedProjects), modifiedProjects)
-		for _, mp := range modifiedProjects {
-			ctx.Log.Debug("determining config for project at dir: %q", mp.Path)
-			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.BaseRepo.ID(), mp.Path, DefaultWorkspace)
+		var projects []models.Project
+		if all {
+			projects, err = p.ProjectFinder.AllProjects(ctx.Log, ctx.BaseRepo.FullName, repoDir)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.BaseRepo, ctx.Pull)
+			if err != nil {
+				return nil, err
+			}
+			ctx.Log.Debug("%d files were modified in this pull request", len(modifiedFiles))
+			projects = p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.BaseRepo.FullName, repoDir)
+		}
+		ctx.Log.Info("automatically determined that there were %d projects modified in this pull request: %s", len(projects), projects)
+		for _, project := range projects {
+			ctx.Log.Debug("determining config for project at dir: %q", project.Path)
+			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.BaseRepo.ID(), project.Path, DefaultWorkspace)
 			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, pCfg, commentFlags, DefaultAutomergeEnabled, verbose, repoDir))
 		}
 	}

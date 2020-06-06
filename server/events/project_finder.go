@@ -38,6 +38,13 @@ type ProjectFinder interface {
 	// based on modifiedFiles and the repo's config.
 	// absRepoDir is the path to the cloned repo on disk.
 	DetermineProjectsViaConfig(log *logging.SimpleLogger, modifiedFiles []string, config valid.RepoCfg, absRepoDir string) ([]valid.Project, error)
+	// All projects returns the list of all the projects.
+	// absRepoDir is the path to the cloned repo on dist.
+	AllProjects(log *logging.SimpleLogger, repoFullName string, absRepoDir string) ([]models.Project, error)
+	// AllProjectsViaConfig returns the list of all the projects defined in the
+	// repo's config.
+	// absRepoDir is the path to the cloned repo on disk.
+	AllProjectsViaConfig(log *logging.SimpleLogger, config valid.RepoCfg, absRepoDir string) ([]valid.Project, error)
 }
 
 // DefaultProjectFinder implements ProjectFinder.
@@ -128,6 +135,35 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log *logging.SimpleLog
 		}
 	}
 	return projects, nil
+}
+
+// See ProjectFinder.AllProjects.
+func (p *DefaultProjectFinder) AllProjects(log *logging.SimpleLogger, repoFullName, absRepoDir string) ([]models.Project, error) {
+	modifiedFiles, err := allFiles(absRepoDir)
+	if err != nil {
+		return nil, err
+	}
+	return p.DetermineProjects(log, modifiedFiles, repoFullName, absRepoDir), nil
+}
+
+// See ProjectFinder.AllProjectsViaConfig.
+func (p *DefaultProjectFinder) AllProjectsViaConfig(log *logging.SimpleLogger, config valid.RepoCfg, absRepoDir string) ([]valid.Project, error) {
+	modifiedFiles, err := allFiles(absRepoDir)
+	if err != nil {
+		return nil, err
+	}
+	return p.DetermineProjectsViaConfig(log, modifiedFiles, config, absRepoDir)
+}
+
+// allFiles returns all files in the repo.
+func allFiles(absRepoDir string) ([]string, error) {
+	var files []string
+
+	err := filepath.Walk(absRepoDir, func(path string, info os.FileInfo, err error) error {
+		files = append(files, path)
+		return err
+	})
+	return files, err
 }
 
 // filterToTerraform filters non-terraform files from files.
