@@ -1,6 +1,6 @@
 package fixtures
 
-import "github.com/google/go-github/v28/github"
+import "github.com/google/go-github/v31/github"
 
 var PullEvent = github.PullRequestEvent{
 	Sender: &github.User{

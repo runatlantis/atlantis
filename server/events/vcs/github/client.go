@@ -24,7 +24,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/Laisky/graphql"
-	"github.com/google/go-github/v28/github"
+	"github.com/google/go-github/v31/github"
 	"github.com/pkg/errors"
 	"github.com/shurcooL/githubv4"
 )
@@ -149,11 +149,13 @@ func (g *Client) CreateComment(repo models.Repo, pullNum int, comment string) er
 func (g *Client) HidePrevPlanComments(repo models.Repo, pullNum int) error {
 	var allComments []*github.IssueComment
 	nextPage := 0
+	sort := "created"
+	direction := "asc"
 	for {
 		g.logger.Debug("GET /repos/%v/%v/issues/%d/comments", repo.Owner, repo.Name, pullNum)
 		comments, resp, err := g.client.Issues.ListComments(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueListCommentsOptions{
-			Sort:        "created",
-			Direction:   "asc",
+			Sort:        &sort,
+			Direction:   &direction,
 			ListOptions: github.ListOptions{Page: nextPage},
 		})
 		if err != nil {
