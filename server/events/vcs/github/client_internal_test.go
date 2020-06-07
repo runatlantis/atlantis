@@ -21,14 +21,16 @@ import (
 
 // If the hostname is github.com, should use normal BaseURL.
 func TestNewClient_GithubCom(t *testing.T) {
-	client, err := NewClient("github.com", "user", "pass")
+	client, err := NewClient("github.com", "user", "pass", nil)
 	Ok(t, err)
 	Equals(t, "https://api.github.com/", client.client.BaseURL.String())
 }
 
 // If the hostname is a non-github hostname should use the right BaseURL.
 func TestNewClient_NonGithub(t *testing.T) {
-	client, err := NewClient("example.com", "user", "pass")
+	client, err := NewClient("example.com", "user", "pass", nil)
 	Ok(t, err)
 	Equals(t, "https://example.com/api/v3/", client.client.BaseURL.String())
+	// If possible in the future, test the GraphQL client's URL as well. But at the
+	// moment the shurcooL library doesn't expose it.
 }

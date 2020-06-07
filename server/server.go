@@ -125,7 +125,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if userConfig.GithubUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		var err error
-		githubClient, err = github.NewClient(userConfig.GithubHostname, userConfig.GithubUser, userConfig.GithubToken)
+		githubClient, err = github.NewClient(userConfig.GithubHostname, userConfig.GithubUser, userConfig.GithubToken, logger)
 		if err != nil {
 			return nil, err
 		}
@@ -196,7 +196,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			}
 		}
 		if userConfig.AzureDevopsUser != "" {
-			if err := events.WriteGitCreds(userConfig.AzureDevopsUser, userConfig.AzureDevopsToken, "https://dev.azure.com/", home, logger); err != nil {
+			if err := events.WriteGitCreds(userConfig.AzureDevopsUser, userConfig.AzureDevopsToken, "dev.azure.com", home, logger); err != nil {
 				return nil, err
 			}
 		}

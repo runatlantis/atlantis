@@ -21,6 +21,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
+	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/Laisky/graphql"
 	"github.com/google/go-github/v28/github"
@@ -38,10 +39,11 @@ type Client struct {
 	client         *github.Client
 	v4MutateClient *graphql.Client
 	ctx            context.Context
+	logger         *logging.SimpleLogger
 }
 
 // NewClient returns a valid GitHub client.
-func NewClient(hostname string, user string, pass string) (*Client, error) {
+func NewClient(hostname string, user string, pass string, logger *logging.SimpleLogger) (*Client, error) {
 	tp := github.BasicAuthTransport{
 		Username: strings.TrimSpace(user),
 		Password: strings.TrimSpace(pass),
@@ -59,7 +61,9 @@ func NewClient(hostname string, user string, pass string) (*Client, error) {
 			return nil, errors.Wrapf(err, "Invalid github hostname trying to parse %s", baseURL)
 		}
 		client.BaseURL = base
-		graphqlURL = fmt.Sprintf("https://%s/graphql", hostname)
+		// Github Enterprise uses a slightly different endpoint format for GraphQL.
+		// https://developer.github.com/enterprise/2.20/v4/guides/forming-calls/#the-graphql-endpoint
+		graphqlURL = fmt.Sprintf("https://%s/api/graphql", hostname)
 		_, err = url.Parse(graphqlURL)
 		if err != nil {
 			return nil, errors.Wrapf(err, "Invalid GraphQL github hostname trying to parse %s", graphqlURL)
@@ -84,6 +88,7 @@ func NewClient(hostname string, user string, pass string) (*Client, error) {
 		client:         client,
 		v4MutateClient: v4MutateClient,
 		ctx:            context.Background(),
+		logger:         logger,
 	}, nil
 }
 
@@ -99,6 +104,7 @@ func (g *Client) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]
 		if nextPage != 0 {
 			opts.Page = nextPage
 		}
+		g.logger.Debug("GET /repos/%v/%v/pulls/%d/files", repo.Owner, repo.Name, pull.Num)
 		pageFiles, resp, err := g.client.PullRequests.ListFiles(g.ctx, repo.Owner, repo.Name, pull.Num, &opts)
 		if err != nil {
 			return files, err
@@ -131,6 +137,7 @@ func (g *Client) CreateComment(repo models.Repo, pullNum int, comment string) er
 
 	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
 	for _, c := range comments {
+		g.logger.Debug("POST /repos/%v/%v/issues/%d/comments", repo.Owner, repo.Name, pullNum)
 		_, _, err := g.client.Issues.CreateComment(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueComment{Body: &c})
 		if err != nil {
 			return err
@@ -143,6 +150,7 @@ func (g *Client) HidePrevPlanComments(repo models.Repo, pullNum int) error {
 	var allComments []*github.IssueComment
 	nextPage := 0
 	for {
+		g.logger.Debug("GET /repos/%v/%v/issues/%d/comments", repo.Owner, repo.Name, pullNum)
 		comments, resp, err := g.client.Issues.ListComments(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueListCommentsOptions{
 			Sort:        "created",
 			Direction:   "asc",
@@ -210,6 +218,7 @@ func (g *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool
 		if nextPage != 0 {
 			opts.Page = nextPage
 		}
+		g.logger.Debug("GET /repos/%v/%v/pulls/%d/reviews", repo.Owner, repo.Name, pull.Num)
 		pageReviews, resp, err := g.client.PullRequests.ListReviews(g.ctx, repo.Owner, repo.Name, pull.Num, &opts)
 		if err != nil {
 			return false, errors.Wrap(err, "getting reviews")
@@ -282,6 +291,7 @@ func (g *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, state m
 func (g *Client) MergePull(pull models.PullRequest) error {
 	// Users can set their repo to disallow certain types of merging.
 	// We detect which types aren't allowed and use the type that is.
+	g.logger.Debug("GET /repos/%v/%v", pull.BaseRepo.Owner, pull.BaseRepo.Name)
 	repo, _, err := g.client.Repositories.Get(g.ctx, pull.BaseRepo.Owner, pull.BaseRepo.Name)
 	if err != nil {
 		return errors.Wrap(err, "fetching repo info")
@@ -304,6 +314,7 @@ func (g *Client) MergePull(pull models.PullRequest) error {
 	options := &github.PullRequestOptions{
 		MergeMethod: method,
 	}
+	g.logger.Debug("PUT /repos/%v/%v/pulls/%d/merge", repo.Owner, repo.Name, pull.Num)
 	mergeResult, _, err := g.client.PullRequests.Merge(
 		g.ctx,
 		pull.BaseRepo.Owner,

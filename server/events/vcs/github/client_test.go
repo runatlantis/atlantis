@@ -58,7 +58,7 @@ func TestClient_GetModifiedFiles(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := github.NewClient(testServerURL.Host, "user", "pass")
+	client, err := github.NewClient(testServerURL.Host, "user", "pass", nil)
 	Ok(t, err)
 	defer DisableSSLVerification()()
 
@@ -113,7 +113,7 @@ func TestClient_GetModifiedFilesMovedFile(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := github.NewClient(testServerURL.Host, "user", "pass")
+	client, err := github.NewClient(testServerURL.Host, "user", "pass", nil)
 	Ok(t, err)
 	defer DisableSSLVerification()()
 
@@ -164,7 +164,7 @@ func TestClient_PaginatesComments(t *testing.T) {
 	testServer := httptest.NewTLSServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.Method + " " + r.RequestURI {
-			case "POST /graphql":
+			case "POST /api/graphql":
 				defer r.Body.Close() // nolint: errcheck
 				body, err := ioutil.ReadAll(r.Body)
 				if err != nil {
@@ -207,7 +207,7 @@ func TestClient_PaginatesComments(t *testing.T) {
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
 
-	client, err := github.NewClient(testServerURL.Host, "user", "pass")
+	client, err := github.NewClient(testServerURL.Host, "user", "pass", nil)
 	Ok(t, err)
 	defer DisableSSLVerification()()
 
@@ -259,7 +259,7 @@ func TestClient_HideOldComments(t *testing.T) {
 			case "GET /api/v3/repos/owner/repo/issues/123/comments?direction=asc&sort=created":
 				w.Write([]byte(issueResp)) // nolint: errcheck
 				return
-			case "POST /graphql":
+			case "POST /api/graphql":
 				if accept, has := r.Header["Accept"]; !has || accept[0] != "application/vnd.github.queen-beryl-preview+json" {
 					t.Error("missing preview header")
 					http.Error(w, "bad request", http.StatusBadRequest)
@@ -293,7 +293,7 @@ func TestClient_HideOldComments(t *testing.T) {
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
 
-	client, err := github.NewClient(testServerURL.Host, "user", "pass")
+	client, err := github.NewClient(testServerURL.Host, "user", "pass", nil)
 	Ok(t, err)
 	defer DisableSSLVerification()()
 
@@ -357,7 +357,7 @@ func TestClient_UpdateStatus(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := github.NewClient(testServerURL.Host, "user", "pass")
+			client, err := github.NewClient(testServerURL.Host, "user", "pass", nil)
 			Ok(t, err)
 			defer DisableSSLVerification()()
 
@@ -443,7 +443,7 @@ func TestClient_PullIsApproved(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := github.NewClient(testServerURL.Host, "user", "pass")
+	client, err := github.NewClient(testServerURL.Host, "user", "pass", nil)
 	Ok(t, err)
 	defer DisableSSLVerification()()
 
@@ -534,7 +534,7 @@ func TestClient_PullIsMergeable(t *testing.T) {
 				}))
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := github.NewClient(testServerURL.Host, "user", "pass")
+			client, err := github.NewClient(testServerURL.Host, "user", "pass", nil)
 			Ok(t, err)
 			defer DisableSSLVerification()()
 
@@ -616,7 +616,7 @@ func TestClient_MergePullHandlesError(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := github.NewClient(testServerURL.Host, "user", "pass")
+			client, err := github.NewClient(testServerURL.Host, "user", "pass", nil)
 			Ok(t, err)
 			defer DisableSSLVerification()()
 
@@ -738,7 +738,7 @@ func TestClient_MergePullCorrectMethod(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := github.NewClient(testServerURL.Host, "user", "pass")
+			client, err := github.NewClient(testServerURL.Host, "user", "pass", nil)
 			Ok(t, err)
 			defer DisableSSLVerification()()
 
@@ -763,7 +763,7 @@ func TestClient_MergePullCorrectMethod(t *testing.T) {
 }
 
 func TestClient_MarkdownPullLink(t *testing.T) {
-	client, err := github.NewClient("hostname", "user", "pass")
+	client, err := github.NewClient("hostname", "user", "pass", nil)
 	Ok(t, err)
 	pull := models.PullRequest{Num: 1}
 	s, _ := client.MarkdownPullLink(pull)
