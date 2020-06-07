@@ -596,7 +596,7 @@ func TestClient_MergePullHandlesError(t *testing.T) {
 					case "/api/v3/repos/owner/repo/pulls/1/merge":
 						body, err := ioutil.ReadAll(r.Body)
 						Ok(t, err)
-						exp := "{\"commit_message\":\"\",\"merge_method\":\"merge\"}\n"
+						exp := "{\"merge_method\":\"merge\"}\n"
 						Equals(t, exp, string(body))
 						var resp string
 						if c.code == 200 {
@@ -717,8 +717,8 @@ func TestClient_MergePullCorrectMethod(t *testing.T) {
 						Ok(t, err)
 						defer r.Body.Close() // nolint: errcheck
 						type bodyJSON struct {
-							CommitMessage string `json:"commit_message"`
-							MergeMethod   string `json:"merge_method"`
+							CommitMessage *string `json:"commit_message,omitempty"`
+							MergeMethod   string  `json:"merge_method"`
 						}
 						expBody := bodyJSON{
 							MergeMethod: c.expMethod,
