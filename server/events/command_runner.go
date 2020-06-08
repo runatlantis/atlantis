@@ -249,7 +249,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	}
 
 	if cmd.Name == models.DiscardCommand {
-		c.DeleteLockCommand.DeleteLocksByPull(ctx.BaseRepo.FullName, ctx.Pull.Num)
+		c.DeleteLockCommand.DeleteLocksByPull(ctx.BaseRepo.FullName, ctx.Pull.Num) // ensure DB project status is updated correctly
 		c.VCSClient.CreateComment(baseRepo, pullNum, fmt.Sprintf("`All Atlantis locks for this PR have been released - and plans discarded`"))
 		return
 	}
@@ -304,18 +304,12 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		result = c.runProjectCmds(projectCmds, cmd.Name)
 	}
 
-	// If this was a successful discard command, delete plans anyway
-	if cmd.Name == models.DiscardCommand {
-		c.DeleteLockCommand.DeleteLocksByPull(ctx.BaseRepo.FullName, ctx.Pull.Num)
-	}
-
 	if cmd.Name == models.PlanCommand && c.automergeEnabled(ctx, projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
 		c.deletePlans(ctx)
 		result.PlansDeleted = true
 	}
 
-	// TODO: check here for updating PR with discard
 	c.updatePull(
 		ctx,
 		cmd,
@@ -439,8 +433,6 @@ func (c *DefaultCommandRunner) runProjectCmds(cmds []models.ProjectCommandContex
 			res = c.ProjectCommandRunner.Plan(pCmd)
 		case models.ApplyCommand:
 			res = c.ProjectCommandRunner.Apply(pCmd)
-		case models.DiscardCommand:
-			res = c.ProjectCommandRunner.Discard(pCmd)
 		}
 		results = append(results, res)
 	}

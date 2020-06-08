@@ -191,7 +191,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		flagSet = pflag.NewFlagSet(models.DiscardCommand.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(ioutil.Discard)
 		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Discard the plan for this workspace.")
-		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run plan in relative to root of repo, ex. 'child/dir'.")
+		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Discard the plan for this directory.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", fmt.Sprintf("Which project to discard the plan for. Refers to the name of the project configured in %s. Cannot be used at same time as workspace or dir flags.", yaml.AtlantisYAMLFilename))
 
 	default:
