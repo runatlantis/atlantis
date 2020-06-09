@@ -253,8 +253,8 @@ var planSuccessWrappedTmpl = template.Must(template.New("").Parse(
 // to do next.
 var planNextSteps = "{{ if .PlanWasDeleted }}This plan was not saved because one or more projects failed and automerge requires all plans pass.{{ else }}* :arrow_forward: To **apply** this plan, comment:\n" +
 	"    * `{{.ApplyCmd}}`\n" +
-	"* :put_litter_in_its_place: To **delete** this plan click [here]({{.LockURL}}), or to delete all plans comment and atlantis locks:\n" +
-	"    * `atlantis unlock`\n" + // TODO: adapt this to be sourced from DiscardCmd
+	"* :put_litter_in_its_place: To **delete** this plan click [here]({{.LockURL}}), or to delete all plans and atlantis locks comment:\n" +
+	"    * `{{.DiscardCmd}}`\n" +
 	"* :repeat: To **plan** this project again, comment:\n" +
 	"    * `{{.RePlanCmd}}`{{end}}"
 var applyUnwrappedSuccessTmpl = template.Must(template.New("").Parse(
