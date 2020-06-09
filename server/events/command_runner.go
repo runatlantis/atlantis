@@ -249,8 +249,13 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	}
 
 	if cmd.Name == models.DiscardCommand {
-		c.DeleteLockCommand.DeleteLocksByPull(ctx.BaseRepo.FullName, ctx.Pull.Num) // ensure DB project status is updated correctly
-		c.VCSClient.CreateComment(baseRepo, pullNum, fmt.Sprintf("`All Atlantis locks for this PR have been released - and plans discarded`"))
+		_, err := c.DeleteLockCommand.DeleteLocksByPull(ctx.BaseRepo.FullName, ctx.Pull.Num) // ensure DB project status is updated correctly
+		if err != nil {
+			log.Err("failed to delete locks by pull %s", err.Error())
+		}
+		if commentErr := c.VCSClient.CreateComment(baseRepo, pullNum, "`All Atlantis locks for this PR have been released - and plans discarded`"); commentErr != nil {
+			log.Err("unable to comment: %s", commentErr)
+		}
 		return
 	}
 

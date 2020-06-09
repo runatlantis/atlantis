@@ -211,8 +211,6 @@ var singleProjectPlanSuccessTmpl = template.Must(template.New("").Parse(
 var singleProjectPlanUnsuccessfulTmpl = template.Must(template.New("").Parse(
 	"{{$result := index .Results 0}}Ran {{.Command}} for dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n" +
 		"{{$result.Rendered}}\n" + logTmpl))
-var singleProjectDiscardTmpl = template.Must(template.New("").Parse(
-	"{{$result := index .Results 0}}Ran {{.Command}} for {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" + logTmpl))
 var multiProjectPlanTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
 	"Ran {{.Command}} for {{ len .Results }} projects:\n\n" +
 		"{{ range $result := .Results }}" +
