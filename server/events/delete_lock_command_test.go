@@ -87,7 +87,7 @@ func TestDeleteLocksByPull_OldFormat(t *testing.T) {
 	pullNum := 2
 	RegisterMockTestingT(t)
 	l := lockmocks.NewMockLocker()
-	When(l.UnlockByPull(repoName, pullNum)).ThenReturn([]models.ProjectLock{models.ProjectLock{}}, nil)
+	When(l.UnlockByPull(repoName, pullNum)).ThenReturn([]models.ProjectLock{{}}, nil)
 	dlc := events.DeleteLockCommand{
 		Locker: l,
 		Logger: logging.NewNoopLogger(),
