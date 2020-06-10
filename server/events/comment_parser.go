@@ -190,9 +190,6 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		name = models.DiscardCommand
 		flagSet = pflag.NewFlagSet(models.DiscardCommand.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(ioutil.Discard)
-		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Discard the plan for this workspace.")
-		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Discard the plan for this directory.")
-		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", fmt.Sprintf("Which project to discard the plan for. Refers to the name of the project configured in %s. Cannot be used at same time as workspace or dir flags.", yaml.AtlantisYAMLFilename))
 
 	default:
 		return CommentParseResult{CommentResponse: fmt.Sprintf("Error: unknown command %q – this is a bug", command)}

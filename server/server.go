@@ -251,7 +251,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Locker:    lockingClient,
 		VCSClient: vcsClient,
 	}
-	deleteLockCommand := events.DeleteLockCommand{
+	deleteLockCommand := &events.DefaultDeleteLockCommand{
 		Locker:           lockingClient,
 		Logger:           logger,
 		WorkingDir:       workingDir,

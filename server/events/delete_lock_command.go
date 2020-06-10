@@ -7,8 +7,16 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-// DeleteLockCommand deletes a specific lock after a request from the LocksController.
-type DeleteLockCommand struct {
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_delete_lock_command.go DeleteLockCommand
+
+// DeleteLockCommand is the first step after a command request has been parsed.
+type DeleteLockCommand interface {
+	DeleteLock(id string) (models.DeleteLockCommandResult, *models.ProjectLock, error)
+	DeleteLocksByPull(repoFullName string, pullNum int) (models.DeleteLockCommandResult, error)
+}
+
+// DefaultDeleteLockCommand deletes a specific lock after a request from the LocksController.
+type DefaultDeleteLockCommand struct {
 	Locker           locking.Locker
 	Logger           *logging.SimpleLogger
 	WorkingDir       WorkingDir
@@ -17,7 +25,7 @@ type DeleteLockCommand struct {
 }
 
 // DeleteLock handles deleting the lock at id
-func (l *DeleteLockCommand) DeleteLock(id string) (models.DeleteLockCommandResult, *models.ProjectLock, error) {
+func (l *DefaultDeleteLockCommand) DeleteLock(id string) (models.DeleteLockCommandResult, *models.ProjectLock, error) {
 	lock, err := l.Locker.Unlock(id)
 	if err != nil {
 		return models.DeleteLockFail, nil, err
@@ -32,7 +40,7 @@ func (l *DeleteLockCommand) DeleteLock(id string) (models.DeleteLockCommandResul
 }
 
 // DeleteLocksByPull handles deleting all locks for the pull request
-func (l *DeleteLockCommand) DeleteLocksByPull(repoFullName string, pullNum int) (models.DeleteLockCommandResult, error) {
+func (l *DefaultDeleteLockCommand) DeleteLocksByPull(repoFullName string, pullNum int) (models.DeleteLockCommandResult, error) {
 	locks, err := l.Locker.UnlockByPull(repoFullName, pullNum)
 	if err != nil {
 		return models.DeleteLockFail, err
@@ -49,7 +57,7 @@ func (l *DeleteLockCommand) DeleteLocksByPull(repoFullName string, pullNum int) 
 	return models.DeleteLockSuccess, nil
 }
 
-func (l *DeleteLockCommand) deleteWorkingDir(lock models.ProjectLock) {
+func (l *DefaultDeleteLockCommand) deleteWorkingDir(lock models.ProjectLock) {
 	// NOTE: Because BaseRepo was added to the PullRequest model later, previous
 	// installations of Atlantis will have locks in their DB that do not have
 	// this field on PullRequest. We skip deleting the working dir in this case.
