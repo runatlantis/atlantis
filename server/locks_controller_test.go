@@ -228,8 +228,6 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	RegisterMockTestingT(t)
 	cp := vcsmocks.NewMockClient()
 	dlc := mocks2.NewMockDeleteLockCommand()
-	workingDir := mocks2.NewMockWorkingDir()
-	workingDirLocker := events.NewDefaultWorkingDirLocker()
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: "owner/repo"},
 	}
@@ -249,8 +247,6 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(),
 		VCSClient:         cp,
-		WorkingDirLocker:  workingDirLocker,
-		WorkingDir:        workingDir,
 		DB:                db,
 	}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
