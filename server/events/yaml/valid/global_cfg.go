@@ -13,6 +13,7 @@ const MergeableApplyReq = "mergeable"
 const ApprovedApplyReq = "approved"
 const ApplyRequirementsKey = "apply_requirements"
 const WorkflowKey = "workflow"
+const AlloweddWorkflowsKey = "allowed_workflows"
 const AllowedOverridesKey = "allowed_overrides"
 const AllowCustomWorkflowsKey = "allow_custom_workflows"
 const DefaultWorkflowName = "default"
@@ -33,6 +34,7 @@ type Repo struct {
 	IDRegex              *regexp.Regexp
 	ApplyRequirements    []string
 	Workflow             *Workflow
+	AllowedWorkflows     []string
 	AllowedOverrides     []string
 	AllowCustomWorkflows *bool
 }
@@ -249,6 +251,40 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 
 	if len(rCfg.Workflows) > 0 && !allowCustomWorkflows {
 		return fmt.Errorf("repo config not allowed to define custom workflows: server-side config needs '%s: true'", AllowCustomWorkflowsKey)
+	}
+
+	// TODO:MARC
+	// Check workflow is approved
+	// Move after allowed overrides
+	// This only works with 1 project
+	var allowedWorkflows []string
+	for _, repo := range g.Repos {
+		if repo.IDMatches(repoID) {
+			if repo.AllowedWorkflows != nil {
+				allowedWorkflows = repo.AllowedWorkflows
+			}
+		}
+	}
+
+	// Just print the allowed workflows for this repo
+	// fmt.Println(approvedWorkflows)
+
+	fmt.Println("Allowed workflows for repo are: ", strings.Join(allowedWorkflows, ", "))
+
+	var forbidden string
+	for _, p := range rCfg.Projects {
+		// Verify all approvedWorkflows
+		fmt.Println("verifying that", *p.WorkflowName, "is approved.")
+
+		for _, w := range allowedWorkflows {
+			if *p.WorkflowName == w {
+				break
+			} else {
+
+				forbidden = *p.WorkflowName
+				return fmt.Errorf("workflow '%s' is not allowed for repo", forbidden)
+			}
+		}
 	}
 
 	// Check if the repo has set a workflow name that doesn't exist.
