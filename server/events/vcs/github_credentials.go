@@ -105,10 +105,10 @@ func (c *GithubAppCredentials) getInstallationID() (int64, error) {
 	tr := http.DefaultTransport
 	// A non-installation transport
 	t, err := ghinstallation.NewAppsTransportKeyFromFile(tr, c.AppID, c.KeyPath)
-	t.BaseURL = c.getAPIURL().String()
 	if err != nil {
 		return 0, err
 	}
+	t.BaseURL = c.getAPIURL().String()
 
 	// Query github with the app's JWT
 	client := github.NewClient(&http.Client{Transport: t})
