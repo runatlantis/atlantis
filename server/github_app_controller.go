@@ -96,7 +96,8 @@ func (g *GithubAppController) New(w http.ResponseWriter, r *http.Request) {
 		RedirectURL: fmt.Sprintf("%s/github-app/exchange-code", g.AtlantisURL),
 		Public:      false,
 		Webhook: &githubWebhook{
-			URL: fmt.Sprintf("%s/events", g.AtlantisURL),
+			Active: true,
+			URL:    fmt.Sprintf("%s/events", g.AtlantisURL),
 		},
 		Events: []string{
 			"check_run",
@@ -105,6 +106,7 @@ func (g *GithubAppController) New(w http.ResponseWriter, r *http.Request) {
 			"pull_request",
 			"push",
 			"issues",
+			"issue_comment",
 		},
 		Permissions: map[string]string{
 			"checks":           "write",
