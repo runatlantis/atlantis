@@ -33,7 +33,7 @@ Your Atlantis user must also have "Write permissions" (for repos in an organizat
 :::
 
 ### GitHub app
-- Start Atlantis with fake github username and token
+- Start Atlantis with fake github username and token (`--gh-user fake --gh-token fake`)
 - Visit `$ATLANTIS_HOST/github-app/setup` and click on **Setup** to create the app on Github. You'll be redirected back to Atlantis
 - A link to install your app, along its secrets, will be shown on the screen. Record your app's credentials and install your app for your user/org by following said link.
 - Restart Atlantis
