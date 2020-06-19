@@ -314,7 +314,7 @@ var githubAppSetupTemplate = template.Must(template.New("github-app.html.tmpl").
 
       <ul>
         <li class="config"><strong>gh-app-id:</strong> <pre>{{ .ID }}</pre></li>
-        <li class="config"><strong>gh-app-key:</strong> <pre>{{ .Key }}</pre></li>
+        <li class="config"><strong>gh-app-key-file:</strong> <pre>{{ .Key }}</pre></li>
         <li class="config"><strong>gh-webhook-secret:</strong> <pre>{{ .WebhookSecret }}</pre></li>
       </ul>
     {{ end }}

@@ -41,25 +41,25 @@ type GithubClient struct {
 	logger         *logging.SimpleLogger
 }
 
-// GithubAppTemporarySecrets hold app credentials obtained from github after creation
+// GithubAppTemporarySecrets holds app credentials obtained from github after creation.
 type GithubAppTemporarySecrets struct {
-	// The app ID
+	// ID is the app id.
 	ID int64
-	// The app's PEM-encoded key
-	Key  string
+	// Key is the app's PEM-encoded key.
+	Key string
+	// Name is the app name.
 	Name string
-	// The generated webhook secret for this app
+	// WebhookSecret is the generated webhook secret for this app.
 	WebhookSecret string
-	// A link to the app, like https://github.com/apps/octoapp
+	// URL is a link to the app, like https://github.com/apps/octoapp.
 	URL string
 }
 
 // NewGithubClient returns a valid GitHub client.
 func NewGithubClient(hostname string, credentials GithubCredentials, logger *logging.SimpleLogger) (*GithubClient, error) {
-
 	transport, err := credentials.Client()
 	if err != nil {
-		return nil, errors.Wrap(err, "Error initializing github authentication transport")
+		return nil, errors.Wrap(err, "error initializing github authentication transport")
 	}
 
 	var graphqlURL string

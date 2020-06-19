@@ -30,7 +30,7 @@ type UserConfig struct {
 	GithubWebhookSecret        string `mapstructure:"gh-webhook-secret"`
 	GithubOrg                  string `mapstructure:"gh-org"`
 	GithubAppID                int64  `mapstructure:"gh-app-id"`
-	GithubAppKey               string `mapstructure:"gh-app-key"`
+	GithubAppKey               string `mapstructure:"gh-app-key-file"`
 	GitlabHostname             string `mapstructure:"gitlab-hostname"`
 	GitlabToken                string `mapstructure:"gitlab-token"`
 	GitlabUser                 string `mapstructure:"gitlab-user"`

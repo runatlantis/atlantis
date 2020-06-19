@@ -265,12 +265,12 @@ Values are chosen in this order:
   $(hostname)/github-app/exchange-code?code=some-code
   ```
 
-  After which Atlantis will display your new app's credentials: your app's ID, its generated `--gh-webhook-secret` and the contents of the file for `--gh-app-key`. Update your Atlantis config accordingly, and restart the server.
+  After which Atlantis will display your new app's credentials: your app's ID, its generated `--gh-webhook-secret` and the contents of the file for `--gh-app-key-file`. Update your Atlantis config accordingly, and restart the server.
   :::
 
-- ### `--gh-app-key`
+- ### `--gh-app-key-file`
   ```bash
-  atlantis server --gh-app-key="path/to/app-key.pem"
+  atlantis server --gh-app-key-file="path/to/app-key.pem"
   ```
   Path to a GitHub App PEM encoded private key file. If set, GitHub authentication will be performed as [an installation](https://developer.github.com/v3/apps/installations/).
 

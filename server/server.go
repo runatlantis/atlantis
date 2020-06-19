@@ -268,7 +268,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	// provide fresh tokens before clone from the GitHub Apps integration, proxy workingDir
 	if githubAppEnabled {
 		if !userConfig.WriteGitCreds {
-			logger.Warn("Github App requires --write-git-creds, overriding")
+			return nil, errors.New("Github App requires --write-git-creds to support cloning")
 		}
 		workingDir = &events.GithubAppWorkingDir{
 			WorkingDir:     workingDir,

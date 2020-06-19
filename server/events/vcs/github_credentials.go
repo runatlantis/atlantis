@@ -12,39 +12,39 @@ import (
 	"github.com/pkg/errors"
 )
 
-// GithubCredentials handles creating http.Clients that authenticate
+// GithubCredentials handles creating http.Clients that authenticate.
 type GithubCredentials interface {
 	Client() (*http.Client, error)
 	GetToken() (string, error)
 	GetUser() string
 }
 
-// GithubAnonymousCredentials expose no credentials
+// GithubAnonymousCredentials expose no credentials.
 type GithubAnonymousCredentials struct{}
 
-// Client returns a client with no credentials
+// Client returns a client with no credentials.
 func (c *GithubAnonymousCredentials) Client() (*http.Client, error) {
 	tr := http.DefaultTransport
 	return &http.Client{Transport: tr}, nil
 }
 
-// GetUser returns the username for these credentials
+// GetUser returns the username for these credentials.
 func (c *GithubAnonymousCredentials) GetUser() string {
 	return "anonymous"
 }
 
-// GetToken returns an empty token
+// GetToken returns an empty token.
 func (c *GithubAnonymousCredentials) GetToken() (string, error) {
 	return "", nil
 }
 
-// GithubUserCredentials implements GithubCredentials for the personal auth token flow
+// GithubUserCredentials implements GithubCredentials for the personal auth token flow.
 type GithubUserCredentials struct {
 	User  string
 	Token string
 }
 
-// Client returns a client for basic auth user credentials
+// Client returns a client for basic auth user credentials.
 func (c *GithubUserCredentials) Client() (*http.Client, error) {
 	tr := &github.BasicAuthTransport{
 		Username: strings.TrimSpace(c.User),
@@ -53,17 +53,17 @@ func (c *GithubUserCredentials) Client() (*http.Client, error) {
 	return tr.Client(), nil
 }
 
-// GetUser returns the username for these credentials
+// GetUser returns the username for these credentials.
 func (c *GithubUserCredentials) GetUser() string {
 	return c.User
 }
 
-// GetToken returns the user token
+// GetToken returns the user token.
 func (c *GithubUserCredentials) GetToken() (string, error) {
 	return c.Token, nil
 }
 
-// GithubAppCredentials implements GithubCredentials for github app installation token flow
+// GithubAppCredentials implements GithubCredentials for github app installation token flow.
 type GithubAppCredentials struct {
 	AppID          int64
 	KeyPath        string
@@ -73,7 +73,7 @@ type GithubAppCredentials struct {
 	tr             *ghinstallation.Transport
 }
 
-// Client returns a github app installation client
+// Client returns a github app installation client.
 func (c *GithubAppCredentials) Client() (*http.Client, error) {
 	itr, err := c.transport()
 	if err != nil {
@@ -82,12 +82,12 @@ func (c *GithubAppCredentials) Client() (*http.Client, error) {
 	return &http.Client{Transport: itr}, nil
 }
 
-// GetUser returns the username for these credentials
+// GetUser returns the username for these credentials.
 func (c *GithubAppCredentials) GetUser() string {
 	return ""
 }
 
-// GetToken returns a fresh installation token
+// GetToken returns a fresh installation token.
 func (c *GithubAppCredentials) GetToken() (string, error) {
 	tr, err := c.transport()
 	if err != nil {

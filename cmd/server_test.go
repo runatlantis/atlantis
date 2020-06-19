@@ -70,7 +70,7 @@ var testFlags = map[string]interface{}{
 	GHTokenFlag:                "token",
 	GHUserFlag:                 "user",
 	GHAppIDFlag:                int64(0),
-	GHAppKeyFlag:               "",
+	GHAppKeyFileFlag:           "",
 	GHOrganizationFlag:         "",
 	GHWebhookSecretFlag:        "secret",
 	GitlabHostnameFlag:         "gitlab-hostname",
@@ -350,7 +350,7 @@ func TestExecute_ValidateSSLConfig(t *testing.T) {
 }
 
 func TestExecute_ValidateVCSConfig(t *testing.T) {
-	expErr := "--gh-user/--gh-token or --gh-app-id/--gh-app-key or --gitlab-user/--gitlab-token or --bitbucket-user/--bitbucket-token or --azuredevops-user/--azuredevops-token must be set"
+	expErr := "--gh-user/--gh-token or --gh-app-id/--gh-app-key-file or --gitlab-user/--gitlab-token or --bitbucket-user/--bitbucket-token or --azuredevops-user/--azuredevops-token must be set"
 	cases := []struct {
 		description string
 		flags       map[string]interface{}
@@ -406,7 +406,7 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 		{
 			"just github app key set",
 			map[string]interface{}{
-				GHAppKeyFlag: "key.pem",
+				GHAppKeyFileFlag: "key.pem",
 			},
 			true,
 		},
@@ -466,8 +466,8 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 		{
 			"github app and key set and should be successful",
 			map[string]interface{}{
-				GHAppIDFlag:  "1",
-				GHAppKeyFlag: "key.pem",
+				GHAppIDFlag:      "1",
+				GHAppKeyFileFlag: "key.pem",
 			},
 			false,
 		},
@@ -572,7 +572,7 @@ func TestExecute_GithubUser(t *testing.T) {
 func TestExecute_GithubApp(t *testing.T) {
 	t.Log("Should remove the @ from the github username if it's passed.")
 	c := setup(map[string]interface{}{
-		GHAppKeyFlag:      "key.pem",
+		GHAppKeyFileFlag:  "key.pem",
 		GHAppIDFlag:       "1",
 		RepoWhitelistFlag: "*",
 	})
