@@ -435,6 +435,9 @@ type PlanSuccess struct {
 	RePlanCmd string
 	// ApplyCmd is the command that users should run to apply this plan.
 	ApplyCmd string
+	// UnlockCmd is the command that users should run to unlock atlantis
+	// and discard plans
+	UnlockCmd string
 	// HasDiverged is true if we're using the checkout merge strategy and the
 	// branch we're merging into has been updated since we cloned and merged
 	// it.
