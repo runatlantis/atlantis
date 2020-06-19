@@ -202,6 +202,9 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nUsage of %s:\n%s\n```", command, flagSet.FlagUsagesWrapped(usagesCols))}
 	}
 	if err != nil {
+		if command == models.UnlockCommand.String() {
+			return CommentParseResult{CommentResponse: UnlockUsage}
+		}
 		return CommentParseResult{CommentResponse: e.errMarkdown(err.Error(), command, flagSet)}
 	}
 
@@ -364,3 +367,14 @@ Use "atlantis [command] --help" for more information about a command.` +
 // DidYouMeanAtlantisComment is the comment we add to the pull request when
 // someone runs a command with terraform instead of atlantis.
 var DidYouMeanAtlantisComment = "Did you mean to use `atlantis` instead of `terraform`?"
+
+// UnlockUsage is the comment we add to the pull request when someone runs
+// `atlantis unlock` with flags.
+
+var UnlockUsage = "`Usage of unlock:`\n\n ```cmake\n" +
+	`atlantis unlock	
+
+  Unlocks the entire PR and discards all plans in this PR.
+  Arguments or flags are not supported at the moment.
+  If you need to unlock a specific project please use the atlantis UI.` +
+	"\n```"
