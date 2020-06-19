@@ -435,8 +435,6 @@ type PlanSuccess struct {
 	RePlanCmd string
 	// ApplyCmd is the command that users should run to apply this plan.
 	ApplyCmd string
-	// DiscardCmd is the command that users should run to discard this plan.
-	DiscardCmd string
 	// HasDiverged is true if we're using the checkout merge strategy and the
 	// branch we're merging into has been updated since we cloned and merged
 	// it.

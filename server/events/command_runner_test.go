@@ -204,8 +204,8 @@ func TestRunCommentCommand_ClosedPull(t *testing.T) {
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "Atlantis commands can't be run on closed pull requests")
 }
 
-func TestRunDiscardCommand_VCSComment(t *testing.T) {
-	t.Log("if discard PR command is run, atlantis should" +
+func TestRunUnlockCommand_VCSComment(t *testing.T) {
+	t.Log("if unlock PR command is run, atlantis should" +
 		" invoke the delete command and comment on PR accordingly")
 
 	vcsClient := setup(t)
@@ -216,14 +216,14 @@ func TestRunDiscardCommand_VCSComment(t *testing.T) {
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
 
-	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.DiscardCommand})
+	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.UnlockCommand})
 
 	deleteLockCommand.VerifyWasCalledOnce().DeleteLocksByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, fixtures.Pull.Num, "`All Atlantis locks for this PR have been released - and plans discarded`")
 }
 
-func TestRunDiscardCommandFail_VCSComment(t *testing.T) {
-	t.Log("if discard PR command is run and delete fails, atlantis should" +
+func TestRunUnlockCommandFail_VCSComment(t *testing.T) {
+	t.Log("if unlock PR command is run and delete fails, atlantis should" +
 		" invoke comment on PR with error message")
 
 	vcsClient := setup(t)
@@ -235,7 +235,7 @@ func TestRunDiscardCommandFail_VCSComment(t *testing.T) {
 	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
 	When(deleteLockCommand.DeleteLocksByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(models.DeleteLockFail, errors.New("err"))
 
-	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.DiscardCommand})
+	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.UnlockCommand})
 
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, fixtures.Pull.Num, "Failed to delete PR locks")
 }
