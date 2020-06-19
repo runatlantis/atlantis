@@ -240,6 +240,40 @@ Values are chosen in this order:
   This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions.
   :::
 
+- ### `--gh-org`
+  ```bash
+  atlantis server --gh-org="myorgname"
+  ```
+  GitHub organization name. Set to enable creating a private Github app for this organization.
+
+- ### `--gh-app-id`
+  ```bash
+  atlantis server --gh-app-id="00000"
+  ```
+  GitHub app ID. If set, GitHub authentication will be performed as [an installation](https://developer.github.com/v3/apps/installations/).
+
+  ::: tip
+  A GitHub app can be created by starting Atlantis first, then pointing your browser at
+
+  ```
+  $(hostname)/github-app/setup
+  ```
+
+  You'll be redirected to GitHub to create a new app, and will then be redirected to
+
+  ```
+  $(hostname)/github-app/exchange-code?code=some-code
+  ```
+
+  After which Atlantis will display your new app's credentials: your app's ID, its generated `--gh-webhook-secret` and the contents of the file for `--gh-app-key-file`. Update your Atlantis config accordingly, and restart the server.
+  :::
+
+- ### `--gh-app-key-file`
+  ```bash
+  atlantis server --gh-app-key-file="path/to/app-key.pem"
+  ```
+  Path to a GitHub App PEM encoded private key file. If set, GitHub authentication will be performed as [an installation](https://developer.github.com/v3/apps/installations/).
+
 * ### `--gitlab-hostname`
   ```bash
   atlantis server --gitlab-hostname="my.gitlab.enterprise.com"
