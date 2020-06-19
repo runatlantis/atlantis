@@ -156,7 +156,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		return CommentParseResult{CommentResponse: HelpComment}
 	}
 
-	// Need to have a plan, apply or discard at this point.
+	// Need to have a plan, apply or unlock at this point.
 	if !e.stringInSlice(command, []string{models.PlanCommand.String(), models.ApplyCommand.String(), models.UnlockCommand.String()}) {
 		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown command %q.\nRun 'atlantis --help' for usage.\n```", command)}
 	}
@@ -352,7 +352,7 @@ Commands:
   apply    Runs 'terraform apply' on all unapplied plans from this pull request.
            To only apply a specific plan, use the -d, -w and -p flags.
   unlock   Removes all atlantis locks and discards all plans for this PR.
-           To discard/unlock a specific plan you can use the Atlantis UI.
+           To unlock a specific plan you can use the Atlantis UI.
   help     View help.
 
 Flags:
