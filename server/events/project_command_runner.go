@@ -176,7 +176,6 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 		TerraformOutput: strings.Join(outputs, "\n"),
 		RePlanCmd:       ctx.RePlanCmd,
 		ApplyCmd:        ctx.ApplyCmd,
-		DiscardCmd:      "atlantis unlock",
 		HasDiverged:     hasDiverged,
 	}, "", nil
 }

@@ -157,7 +157,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	}
 
 	// Need to have a plan, apply or discard at this point.
-	if !e.stringInSlice(command, []string{models.PlanCommand.String(), models.ApplyCommand.String(), models.DiscardCommand.String()}) {
+	if !e.stringInSlice(command, []string{models.PlanCommand.String(), models.ApplyCommand.String(), models.UnlockCommand.String()}) {
 		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown command %q.\nRun 'atlantis --help' for usage.\n```", command)}
 	}
 
@@ -186,9 +186,9 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Apply the plan for this directory, relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", fmt.Sprintf("Apply the plan for this project. Refers to the name of the project configured in %s. Cannot be used at same time as workspace or dir flags.", yaml.AtlantisYAMLFilename))
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
-	case models.DiscardCommand.String():
-		name = models.DiscardCommand
-		flagSet = pflag.NewFlagSet(models.DiscardCommand.String(), pflag.ContinueOnError)
+	case models.UnlockCommand.String():
+		name = models.UnlockCommand
+		flagSet = pflag.NewFlagSet(models.UnlockCommand.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(ioutil.Discard)
 
 	default:
@@ -351,8 +351,8 @@ Commands:
            To plan a specific project, use the -d, -w and -p flags.
   apply    Runs 'terraform apply' on all unapplied plans from this pull request.
            To only apply a specific plan, use the -d, -w and -p flags.
-  unlock   Discards all plans in this PR as well as the atlantis locks.
-           To discard a specific plan you can use the Atlantis UI.
+  unlock   Removes all atlantis locks and discards all plans for this PR.
+           To discard/unlock a specific plan you can use the Atlantis UI.
   help     View help.
 
 Flags:

@@ -143,9 +143,6 @@ func (m *MarkdownRenderer) renderProjectResults(results []models.ProjectResult, 
 			} else {
 				resultData.Rendered = m.renderTemplate(applyUnwrappedSuccessTmpl, struct{ Output string }{result.ApplySuccess})
 			}
-
-		} else if result.DiscardSuccess != "" {
-			resultData.Rendered = m.renderTemplate(discardUnwrappedSuccessTmpl, struct{ Output string }{result.DiscardSuccess})
 		} else {
 			resultData.Rendered = "Found no template. This is a bug!"
 		}
@@ -252,7 +249,7 @@ var planSuccessWrappedTmpl = template.Must(template.New("").Parse(
 var planNextSteps = "{{ if .PlanWasDeleted }}This plan was not saved because one or more projects failed and automerge requires all plans pass.{{ else }}* :arrow_forward: To **apply** this plan, comment:\n" +
 	"    * `{{.ApplyCmd}}`\n" +
 	"* :put_litter_in_its_place: To **delete** this plan click [here]({{.LockURL}}), or to delete all plans and atlantis locks comment:\n" +
-	"    * `{{.DiscardCmd}}`\n" +
+	"    * `atlantis unlock`\n" +
 	"* :repeat: To **plan** this project again, comment:\n" +
 	"    * `{{.RePlanCmd}}`{{end}}"
 var applyUnwrappedSuccessTmpl = template.Must(template.New("").Parse(
@@ -265,10 +262,6 @@ var applyWrappedSuccessTmpl = template.Must(template.New("").Parse(
 		"{{.Output}}\n" +
 		"```\n" +
 		"</details>"))
-var discardUnwrappedSuccessTmpl = template.Must(template.New("").Parse(
-	"```diff\n" +
-		"{{.Output}}\n" +
-		"```"))
 var unwrappedErrTmplText = "**{{.Command}} Error**\n" +
 	"```\n" +
 	"{{.Error}}\n" +

@@ -248,7 +248,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
-	if cmd.Name == models.DiscardCommand {
+	if cmd.Name == models.UnlockCommand {
 		vcsMessage := "`All Atlantis locks for this PR have been released - and plans discarded`"
 		_, err := c.DeleteLockCommand.DeleteLocksByPull(baseRepo.FullName, pullNum)
 		if err != nil {
