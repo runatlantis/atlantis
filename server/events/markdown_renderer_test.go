@@ -138,7 +138,6 @@ func TestRenderProjectResults(t *testing.T) {
 						LockURL:         "lock-url",
 						RePlanCmd:       "atlantis plan -d path -w workspace",
 						ApplyCmd:        "atlantis apply -d path -w workspace",
-						UnlockCmd:       "atlantis unlock",
 					},
 					Workspace:  "workspace",
 					RepoRelDir: "path",
@@ -173,7 +172,6 @@ $$$
 						LockURL:         "lock-url",
 						RePlanCmd:       "atlantis plan -d path -w workspace",
 						ApplyCmd:        "atlantis apply -d path -w workspace",
-						UnlockCmd:       "atlantis unlock",
 						HasDiverged:     true,
 					},
 					Workspace:  "workspace",
@@ -211,7 +209,6 @@ $$$
 						LockURL:         "lock-url",
 						RePlanCmd:       "atlantis plan -d path -w workspace",
 						ApplyCmd:        "atlantis apply -d path -w workspace",
-						UnlockCmd:       "atlantis unlock",
 					},
 					Workspace:   "workspace",
 					RepoRelDir:  "path",
@@ -287,7 +284,6 @@ $$$
 						TerraformOutput: "terraform-output",
 						LockURL:         "lock-url",
 						ApplyCmd:        "atlantis apply -d path -w workspace",
-						UnlockCmd:       "atlantis unlock",
 						RePlanCmd:       "atlantis plan -d path -w workspace",
 					},
 				},
@@ -299,7 +295,6 @@ $$$
 						TerraformOutput: "terraform-output2",
 						LockURL:         "lock-url2",
 						ApplyCmd:        "atlantis apply -d path2 -w workspace",
-						UnlockCmd:       "atlantis unlock",
 						RePlanCmd:       "atlantis plan -d path2 -w workspace",
 					},
 				},
@@ -425,7 +420,6 @@ $$$
 						TerraformOutput: "terraform-output",
 						LockURL:         "lock-url",
 						ApplyCmd:        "atlantis apply -d path -w workspace",
-						UnlockCmd:       "atlantis unlock",
 						RePlanCmd:       "atlantis plan -d path -w workspace",
 					},
 				},
@@ -612,7 +606,6 @@ func TestRenderProjectResultsDisableApplyAll(t *testing.T) {
 						LockURL:         "lock-url",
 						RePlanCmd:       "atlantis plan -d path -w workspace",
 						ApplyCmd:        "atlantis apply -d path -w workspace",
-						UnlockCmd:       "atlantis unlock",
 					},
 					Workspace:  "workspace",
 					RepoRelDir: "path",
@@ -644,7 +637,6 @@ $$$
 						TerraformOutput: "terraform-output",
 						LockURL:         "lock-url",
 						RePlanCmd:       "atlantis plan -d path -w workspace",
-						UnlockCmd:       "atlantis unlock",
 						ApplyCmd:        "atlantis apply -d path -w workspace",
 					},
 					Workspace:   "workspace",
@@ -680,7 +672,6 @@ $$$
 						TerraformOutput: "terraform-output",
 						LockURL:         "lock-url",
 						ApplyCmd:        "atlantis apply -d path -w workspace",
-						UnlockCmd:       "atlantis unlock",
 						RePlanCmd:       "atlantis plan -d path -w workspace",
 					},
 				},
@@ -692,7 +683,6 @@ $$$
 						TerraformOutput: "terraform-output2",
 						LockURL:         "lock-url2",
 						ApplyCmd:        "atlantis apply -d path2 -w workspace",
-						UnlockCmd:       "atlantis unlock",
 						RePlanCmd:       "atlantis plan -d path2 -w workspace",
 					},
 				},
@@ -966,7 +956,6 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 								LockURL:         "lock-url",
 								RePlanCmd:       "replancmd",
 								ApplyCmd:        "applycmd",
-								UnlockCmd:       "UnlockCmd",
 							},
 						}
 					case models.ApplyCommand:
@@ -996,7 +985,7 @@ $$$
 * :arrow_forward: To **apply** this plan, comment:
     * $applycmd$
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url), or to delete all plans and atlantis locks comment:
-    * $UnlockCmd$
+    * $atlantis unlock$
 * :repeat: To **plan** this project again, comment:
     * $replancmd$
 </details>
@@ -1015,7 +1004,7 @@ $$$
 * :arrow_forward: To **apply** this plan, comment:
     * $applycmd$
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url), or to delete all plans and atlantis locks comment:
-    * $UnlockCmd$
+    * $atlantis unlock$
 * :repeat: To **plan** this project again, comment:
     * $replancmd$
 
@@ -1112,7 +1101,6 @@ func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 					TerraformOutput: tfOut,
 					LockURL:         "staging-lock-url",
 					ApplyCmd:        "staging-apply-cmd",
-					UnlockCmd:       "staging-discard-cmd",
 					RePlanCmd:       "staging-replan-cmd",
 				},
 			},
@@ -1123,7 +1111,6 @@ func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 					TerraformOutput: tfOut,
 					LockURL:         "production-lock-url",
 					ApplyCmd:        "production-apply-cmd",
-					UnlockCmd:       "production-discard-cmd",
 					RePlanCmd:       "production-replan-cmd",
 				},
 			},
@@ -1144,7 +1131,7 @@ $$$
 * :arrow_forward: To **apply** this plan, comment:
     * $staging-apply-cmd$
 * :put_litter_in_its_place: To **delete** this plan click [here](staging-lock-url), or to delete all plans and atlantis locks comment:
-    * $staging-discard-cmd$
+    * $atlantis unlock$
 * :repeat: To **plan** this project again, comment:
     * $staging-replan-cmd$
 </details>
@@ -1160,7 +1147,7 @@ $$$
 * :arrow_forward: To **apply** this plan, comment:
     * $production-apply-cmd$
 * :put_litter_in_its_place: To **delete** this plan click [here](production-lock-url), or to delete all plans and atlantis locks comment:
-    * $production-discard-cmd$
+    * $atlantis unlock$
 * :repeat: To **plan** this project again, comment:
     * $production-replan-cmd$
 </details>
