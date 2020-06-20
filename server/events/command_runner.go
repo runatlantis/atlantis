@@ -249,8 +249,8 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	}
 
 	if cmd.Name == models.UnlockCommand {
-		vcsMessage := "`All Atlantis locks for this PR have been released - and plans discarded`"
-		_, err := c.DeleteLockCommand.DeleteLocksByPull(baseRepo.FullName, pullNum)
+		vcsMessage := "All Atlantis locks for this PR have been unlocked and plans discarded"
+		err := c.DeleteLockCommand.DeleteLocksByPull(baseRepo.FullName, pullNum)
 		if err != nil {
 			vcsMessage = "Failed to delete PR locks"
 			log.Err("failed to delete locks by pull %s", err.Error())

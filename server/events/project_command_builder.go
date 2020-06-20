@@ -2,6 +2,7 @@ package events
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -241,7 +242,9 @@ func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *CommandCont
 	defer unlockFn()
 
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, workspace)
-	if err != nil {
+	if os.IsNotExist(errors.Cause(err)) {
+		return projCtx, errors.New("no working directory found–did you run plan?")
+	} else if err != nil {
 		return projCtx, err
 	}
 

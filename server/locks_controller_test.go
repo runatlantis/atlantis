@@ -144,7 +144,7 @@ func TestDeleteLock_LockerErr(t *testing.T) {
 	t.Log("If there is an error retrieving the lock, a 500 is returned")
 	RegisterMockTestingT(t)
 	dlc := mocks2.NewMockDeleteLockCommand()
-	When(dlc.DeleteLock("id")).ThenReturn(models.DeleteLockFail, nil, errors.New("err"))
+	When(dlc.DeleteLock("id")).ThenReturn(nil, errors.New("err"))
 	lc := server.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(),
@@ -160,7 +160,7 @@ func TestDeleteLock_None(t *testing.T) {
 	t.Log("If there is no lock at that ID we get a 404")
 	RegisterMockTestingT(t)
 	dlc := mocks2.NewMockDeleteLockCommand()
-	When(dlc.DeleteLock("id")).ThenReturn(models.DeleteLockNotFound, nil, nil)
+	When(dlc.DeleteLock("id")).ThenReturn(nil, nil)
 	lc := server.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(),
@@ -177,7 +177,7 @@ func TestDeleteLock_OldFormat(t *testing.T) {
 	RegisterMockTestingT(t)
 	cp := vcsmocks.NewMockClient()
 	dlc := mocks2.NewMockDeleteLockCommand()
-	When(dlc.DeleteLock("id")).ThenReturn(models.DeleteLockSuccess, &models.ProjectLock{}, nil)
+	When(dlc.DeleteLock("id")).ThenReturn(&models.ProjectLock{}, nil)
 	lc := server.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(),
@@ -192,10 +192,10 @@ func TestDeleteLock_OldFormat(t *testing.T) {
 }
 
 func TestDeleteLock_CommentFailed(t *testing.T) {
-	t.Log("If the commenting fails we return an error")
+	t.Log("If the commenting fails we still return success")
 	RegisterMockTestingT(t)
 	dlc := mocks2.NewMockDeleteLockCommand()
-	When(dlc.DeleteLock("id")).ThenReturn(models.DeleteLockSuccess, &models.ProjectLock{
+	When(dlc.DeleteLock("id")).ThenReturn(&models.ProjectLock{
 		Pull: models.PullRequest{
 			BaseRepo: models.Repo{FullName: "owner/repo"},
 		},
@@ -220,7 +220,7 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
-	responseContains(t, w, http.StatusInternalServerError, "Failed commenting on pull request: err")
+	responseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
 }
 
 func TestDeleteLock_CommentSuccess(t *testing.T) {
@@ -231,7 +231,7 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: "owner/repo"},
 	}
-	When(dlc.DeleteLock("id")).ThenReturn(models.DeleteLockSuccess, &models.ProjectLock{
+	When(dlc.DeleteLock("id")).ThenReturn(&models.ProjectLock{
 		Pull:      pull,
 		Workspace: "workspace",
 		Project: models.Project{

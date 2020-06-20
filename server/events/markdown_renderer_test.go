@@ -152,14 +152,15 @@ $$$
 
 * :arrow_forward: To **apply** this plan, comment:
     * $atlantis apply -d path -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url), or to delete all plans and atlantis locks comment:
-    * $atlantis unlock$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path -w workspace$
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * $atlantis unlock$
 `,
 		},
 		{
@@ -187,8 +188,7 @@ $$$
 
 * :arrow_forward: To **apply** this plan, comment:
     * $atlantis apply -d path -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url), or to delete all plans and atlantis locks comment:
-    * $atlantis unlock$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path -w workspace$
 
@@ -197,6 +197,8 @@ $$$
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * $atlantis unlock$
 `,
 		},
 		{
@@ -224,14 +226,15 @@ $$$
 
 * :arrow_forward: To **apply** this plan, comment:
     * $atlantis apply -d path -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url), or to delete all plans and atlantis locks comment:
-    * $atlantis unlock$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path -w workspace$
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * $atlantis unlock$
 `,
 		},
 		{
@@ -312,8 +315,7 @@ $$$
 
 * :arrow_forward: To **apply** this plan, comment:
     * $atlantis apply -d path -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url), or to delete all plans and atlantis locks comment:
-    * $atlantis unlock$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path -w workspace$
 
@@ -325,14 +327,15 @@ $$$
 
 * :arrow_forward: To **apply** this plan, comment:
     * $atlantis apply -d path2 -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url2), or to delete all plans and atlantis locks comment:
-    * $atlantis unlock$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url2)
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path2 -w workspace$
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * $atlantis unlock$
 `,
 		},
 		{
@@ -449,8 +452,7 @@ $$$
 
 * :arrow_forward: To **apply** this plan, comment:
     * $atlantis apply -d path -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url), or to delete all plans and atlantis locks comment:
-    * $atlantis unlock$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path -w workspace$
 
@@ -468,6 +470,8 @@ $$$
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * $atlantis unlock$
 `,
 		},
 		{
@@ -620,8 +624,7 @@ $$$
 
 * :arrow_forward: To **apply** this plan, comment:
     * $atlantis apply -d path -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url), or to delete all plans and atlantis locks comment:
-    * $atlantis unlock$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path -w workspace$
 
@@ -653,8 +656,7 @@ $$$
 
 * :arrow_forward: To **apply** this plan, comment:
     * $atlantis apply -d path -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url), or to delete all plans and atlantis locks comment:
-    * $atlantis unlock$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path -w workspace$
 
@@ -700,8 +702,7 @@ $$$
 
 * :arrow_forward: To **apply** this plan, comment:
     * $atlantis apply -d path -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url), or to delete all plans and atlantis locks comment:
-    * $atlantis unlock$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path -w workspace$
 
@@ -712,8 +713,7 @@ $$$
 
 * :arrow_forward: To **apply** this plan, comment:
     * $atlantis apply -d path2 -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url2), or to delete all plans and atlantis locks comment:
-    * $atlantis unlock$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url2)
 * :repeat: To **plan** this project again, comment:
     * $atlantis plan -d path2 -w workspace$
 
@@ -984,8 +984,7 @@ $$$
 
 * :arrow_forward: To **apply** this plan, comment:
     * $applycmd$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url), or to delete all plans and atlantis locks comment:
-    * $atlantis unlock$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * $replancmd$
 </details>
@@ -993,6 +992,8 @@ $$$
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * $atlantis unlock$
 `
 						} else {
 							exp = `Ran Plan for dir: $.$ workspace: $default$
@@ -1003,14 +1004,15 @@ $$$
 
 * :arrow_forward: To **apply** this plan, comment:
     * $applycmd$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url), or to delete all plans and atlantis locks comment:
-    * $atlantis unlock$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * $replancmd$
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * $atlantis unlock$
 `
 						}
 					case models.ApplyCommand:
@@ -1130,8 +1132,7 @@ $$$
 
 * :arrow_forward: To **apply** this plan, comment:
     * $staging-apply-cmd$
-* :put_litter_in_its_place: To **delete** this plan click [here](staging-lock-url), or to delete all plans and atlantis locks comment:
-    * $atlantis unlock$
+* :put_litter_in_its_place: To **delete** this plan click [here](staging-lock-url)
 * :repeat: To **plan** this project again, comment:
     * $staging-replan-cmd$
 </details>
@@ -1146,8 +1147,7 @@ $$$
 
 * :arrow_forward: To **apply** this plan, comment:
     * $production-apply-cmd$
-* :put_litter_in_its_place: To **delete** this plan click [here](production-lock-url), or to delete all plans and atlantis locks comment:
-    * $atlantis unlock$
+* :put_litter_in_its_place: To **delete** this plan click [here](production-lock-url)
 * :repeat: To **plan** this project again, comment:
     * $production-replan-cmd$
 </details>
@@ -1155,6 +1155,8 @@ $$$
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * $atlantis unlock$
 `
 	expWithBackticks := strings.Replace(exp, "$", "`", -1)
 	Equals(t, expWithBackticks, rendered)

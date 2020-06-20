@@ -14,7 +14,7 @@ import (
 )
 
 func TestDeleteLock_LockerErr(t *testing.T) {
-	t.Log("If there is an error retrieving the lock, returned a failed status")
+	t.Log("If there is an error retrieving the lock, we return the error")
 	RegisterMockTestingT(t)
 	l := lockmocks.NewMockLocker()
 	When(l.Unlock("id")).ThenReturn(nil, errors.New("err"))
@@ -22,12 +22,12 @@ func TestDeleteLock_LockerErr(t *testing.T) {
 		Locker: l,
 		Logger: logging.NewNoopLogger(),
 	}
-	deleteLockResult, _, _ := dlc.DeleteLock("id")
-	Equals(t, models.DeleteLockFail, deleteLockResult)
+	_, err := dlc.DeleteLock("id")
+	ErrEquals(t, "err", err)
 }
 
 func TestDeleteLock_None(t *testing.T) {
-	t.Log("If there is no lock at that ID return no lock found")
+	t.Log("If there is no lock at that ID we return nil")
 	RegisterMockTestingT(t)
 	l := lockmocks.NewMockLocker()
 	When(l.Unlock("id")).ThenReturn(nil, nil)
@@ -35,8 +35,9 @@ func TestDeleteLock_None(t *testing.T) {
 		Locker: l,
 		Logger: logging.NewNoopLogger(),
 	}
-	deleteLockResult, _, _ := dlc.DeleteLock("id")
-	Equals(t, models.DeleteLockNotFound, deleteLockResult)
+	lock, err := dlc.DeleteLock("id")
+	Ok(t, err)
+	Assert(t, lock == nil, "lock was not nil")
 }
 
 func TestDeleteLock_OldFormat(t *testing.T) {
@@ -48,8 +49,9 @@ func TestDeleteLock_OldFormat(t *testing.T) {
 		Locker: l,
 		Logger: logging.NewNoopLogger(),
 	}
-	deleteLockResult, _, _ := dlc.DeleteLock("id")
-	Equals(t, models.DeleteLockSuccess, deleteLockResult)
+	lock, err := dlc.DeleteLock("id")
+	Ok(t, err)
+	Assert(t, lock != nil, "lock was nil")
 }
 
 func TestDeleteLock_Success(t *testing.T) {
@@ -81,8 +83,9 @@ func TestDeleteLock_Success(t *testing.T) {
 		WorkingDirLocker: workingDirLocker,
 		WorkingDir:       workingDir,
 	}
-	deleteLockResult, _, _ := dlc.DeleteLock("id")
-	Equals(t, models.DeleteLockSuccess, deleteLockResult)
+	lock, err := dlc.DeleteLock("id")
+	Ok(t, err)
+	Assert(t, lock != nil, "lock was nil")
 	workingDir.VerifyWasCalledOnce().DeleteForWorkspace(pull.BaseRepo, pull, "workspace")
 }
 
@@ -97,12 +100,12 @@ func TestDeleteLocksByPull_LockerErr(t *testing.T) {
 		Locker: l,
 		Logger: logging.NewNoopLogger(),
 	}
-	deleteLockResult, _ := dlc.DeleteLocksByPull(repoName, pullNum)
-	Equals(t, models.DeleteLockFail, deleteLockResult)
+	err := dlc.DeleteLocksByPull(repoName, pullNum)
+	ErrEquals(t, "err", err)
 }
 
 func TestDeleteLocksByPull_None(t *testing.T) {
-	t.Log("If there is no lock at that ID return no locks found")
+	t.Log("If there is no lock at that ID there is no error")
 	repoName := "reponame"
 	pullNum := 2
 	RegisterMockTestingT(t)
@@ -112,8 +115,8 @@ func TestDeleteLocksByPull_None(t *testing.T) {
 		Locker: l,
 		Logger: logging.NewNoopLogger(),
 	}
-	deleteLockResult, _ := dlc.DeleteLocksByPull(repoName, pullNum)
-	Equals(t, models.DeleteLockNotFound, deleteLockResult)
+	err := dlc.DeleteLocksByPull(repoName, pullNum)
+	Ok(t, err)
 }
 
 func TestDeleteLocksByPull_OldFormat(t *testing.T) {
@@ -127,6 +130,6 @@ func TestDeleteLocksByPull_OldFormat(t *testing.T) {
 		Locker: l,
 		Logger: logging.NewNoopLogger(),
 	}
-	deleteLockResult, _ := dlc.DeleteLocksByPull(repoName, pullNum)
-	Equals(t, models.DeleteLockSuccess, deleteLockResult)
+	err := dlc.DeleteLocksByPull(repoName, pullNum)
+	Ok(t, err)
 }

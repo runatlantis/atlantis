@@ -529,15 +529,3 @@ func (c CommandName) String() string {
 	}
 	return ""
 }
-
-// DeleteLockCommandResult is the result of attempting to delete an atlantis lock.
-type DeleteLockCommandResult int
-
-const (
-	// DeleteLockFail if unlock failed for some reason
-	DeleteLockFail DeleteLockCommandResult = iota
-	// DeleteLockNotFound if the lock attempting to remove does not exist.
-	DeleteLockNotFound
-	// DeleteLockSuccess if deleting an atlantis lock was successful
-	DeleteLockSuccess
-)

@@ -27,8 +27,7 @@ workspace=default
 
 * :arrow_forward: To **apply** this plan, comment:
     * `atlantis apply -p default`
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url), or to delete all plans and atlantis locks comment:
-    * `atlantis unlock`
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * `atlantis plan -p default`
 </details>
@@ -56,8 +55,7 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 
 * :arrow_forward: To **apply** this plan, comment:
     * `atlantis apply -p staging`
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url), or to delete all plans and atlantis locks comment:
-    * `atlantis unlock`
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
     * `atlantis plan -p staging`
 </details>
@@ -65,3 +63,5 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * `atlantis apply`
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * `atlantis unlock`
