@@ -126,6 +126,13 @@ func TestParse_UnusedArguments(t *testing.T) {
 	}
 }
 
+func TestParse_UnknownShorthandFlag(t *testing.T) {
+	comment := "atlantis unlock -d ."
+	r := commentParser.Parse(comment, models.Github)
+
+	Equals(t, UnlockUsage, r.CommentResponse)
+}
+
 func TestParse_DidYouMeanAtlantis(t *testing.T) {
 	t.Log("given a comment that should result in a 'did you mean atlantis'" +
 		"response, should set CommentParseResult.CommentResult")
@@ -693,3 +700,10 @@ var ApplyUsage = `Usage of apply:
       --verbose            Append Atlantis log to comment.
   -w, --workspace string   Apply the plan for this Terraform workspace.
 `
+var UnlockUsage = "`Usage of unlock:`\n\n ```cmake\n" +
+	`atlantis unlock	
+
+  Unlocks the entire PR and discards all plans in this PR.
+  Arguments or flags are not supported at the moment.
+  If you need to unlock a specific project please use the atlantis UI.` +
+	"\n```"

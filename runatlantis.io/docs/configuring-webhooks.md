@@ -18,6 +18,8 @@ If only some of the repos in your organization are to be managed by Atlantis, th
 may want to only install on specific repos for now.
 :::
 
+When authenticating as a Github App, Webhooks are automatically created and need no additional setup, beyond being installed to your organization/user account after creation. Refer to the [Github App setup](access-credentials.html#github-app) section for instructions on how to do so.
+
 If you're installing on the organization, navigate to your organization's page and click **Settings**.
 If installing on a single repository, navigate to the repository home page and click **Settings**.
 - Select **Webhooks** or **Hooks** in the sidebar

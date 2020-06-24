@@ -16,7 +16,6 @@ package vcs
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -24,7 +23,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/Laisky/graphql"
-	"github.com/google/go-github/v28/github"
+	"github.com/google/go-github/v31/github"
 	"github.com/pkg/errors"
 	"github.com/shurcooL/githubv4"
 )
@@ -42,32 +41,39 @@ type GithubClient struct {
 	logger         *logging.SimpleLogger
 }
 
-// NewGithubClient returns a valid GitHub client.
-func NewGithubClient(hostname string, user string, pass string, logger *logging.SimpleLogger) (*GithubClient, error) {
-	tp := github.BasicAuthTransport{
-		Username: strings.TrimSpace(user),
-		Password: strings.TrimSpace(pass),
-	}
-	client := github.NewClient(tp.Client())
-	graphqlURL := "https://api.github.com/graphql"
+// GithubAppTemporarySecrets holds app credentials obtained from github after creation.
+type GithubAppTemporarySecrets struct {
+	// ID is the app id.
+	ID int64
+	// Key is the app's PEM-encoded key.
+	Key string
+	// Name is the app name.
+	Name string
+	// WebhookSecret is the generated webhook secret for this app.
+	WebhookSecret string
+	// URL is a link to the app, like https://github.com/apps/octoapp.
+	URL string
+}
 
-	// If we're using github.com then we don't need to do any additional configuration
-	// for the client. It we're using Github Enterprise, then we need to manually
-	// set the base url for the API.
-	if hostname != "github.com" {
-		baseURL := fmt.Sprintf("https://%s/api/v3/", hostname)
-		base, err := url.Parse(baseURL)
+// NewGithubClient returns a valid GitHub client.
+func NewGithubClient(hostname string, credentials GithubCredentials, logger *logging.SimpleLogger) (*GithubClient, error) {
+	transport, err := credentials.Client()
+	if err != nil {
+		return nil, errors.Wrap(err, "error initializing github authentication transport")
+	}
+
+	var graphqlURL string
+	var client *github.Client
+	if hostname == "github.com" {
+		client = github.NewClient(transport)
+		graphqlURL = "https://api.github.com/graphql"
+	} else {
+		apiURL := resolveGithubAPIURL(hostname)
+		client, err = github.NewEnterpriseClient(apiURL.String(), apiURL.String(), transport)
 		if err != nil {
-			return nil, errors.Wrapf(err, "Invalid github hostname trying to parse %s", baseURL)
+			return nil, err
 		}
-		client.BaseURL = base
-		// Github Enterprise uses a slightly different endpoint format for GraphQL.
-		// https://developer.github.com/enterprise/2.20/v4/guides/forming-calls/#the-graphql-endpoint
-		graphqlURL = fmt.Sprintf("https://%s/api/graphql", hostname)
-		_, err = url.Parse(graphqlURL)
-		if err != nil {
-			return nil, errors.Wrapf(err, "Invalid GraphQL github hostname trying to parse %s", graphqlURL)
-		}
+		graphqlURL = fmt.Sprintf("https://%s/graphql", apiURL.Host)
 	}
 
 	// shurcooL's githubv4 library has a client ctor, but it doesn't support schema
@@ -79,12 +85,11 @@ func NewGithubClient(hostname string, user string, pass string, logger *logging.
 	// shurcooL's libraries completely.
 	v4MutateClient := graphql.NewClient(
 		graphqlURL,
-		tp.Client(),
+		transport,
 		graphql.WithHeader("Accept", "application/vnd.github.queen-beryl-preview+json"),
 	)
-
 	return &GithubClient{
-		user:           user,
+		user:           credentials.GetUser(),
 		client:         client,
 		v4MutateClient: v4MutateClient,
 		ctx:            context.Background(),
@@ -152,8 +157,8 @@ func (g *GithubClient) HidePrevPlanComments(repo models.Repo, pullNum int) error
 	for {
 		g.logger.Debug("GET /repos/%v/%v/issues/%d/comments", repo.Owner, repo.Name, pullNum)
 		comments, resp, err := g.client.Issues.ListComments(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueListCommentsOptions{
-			Sort:        "created",
-			Direction:   "asc",
+			Sort:        github.String("created"),
+			Direction:   github.String("asc"),
 			ListOptions: github.ListOptions{Page: nextPage},
 		})
 		if err != nil {
@@ -336,4 +341,19 @@ func (g *GithubClient) MergePull(pull models.PullRequest) error {
 // MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.
 func (g *GithubClient) MarkdownPullLink(pull models.PullRequest) (string, error) {
 	return fmt.Sprintf("#%d", pull.Num), nil
+}
+
+// ExchangeCode returns a newly created app's info
+func (g *GithubClient) ExchangeCode(code string) (*GithubAppTemporarySecrets, error) {
+	ctx := context.Background()
+	cfg, _, err := g.client.Apps.CompleteAppManifest(ctx, code)
+	data := &GithubAppTemporarySecrets{
+		ID:            cfg.GetID(),
+		Key:           cfg.GetPEM(),
+		WebhookSecret: cfg.GetWebhookSecret(),
+		Name:          cfg.GetName(),
+		URL:           cfg.GetHTMLURL(),
+	}
+
+	return data, err
 }

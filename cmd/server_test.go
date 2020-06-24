@@ -69,6 +69,9 @@ var testFlags = map[string]interface{}{
 	GHHostnameFlag:             "ghhostname",
 	GHTokenFlag:                "token",
 	GHUserFlag:                 "user",
+	GHAppIDFlag:                int64(0),
+	GHAppKeyFileFlag:           "",
+	GHOrganizationFlag:         "",
 	GHWebhookSecretFlag:        "secret",
 	GitlabHostnameFlag:         "gitlab-hostname",
 	GitlabTokenFlag:            "gitlab-token",
@@ -347,7 +350,7 @@ func TestExecute_ValidateSSLConfig(t *testing.T) {
 }
 
 func TestExecute_ValidateVCSConfig(t *testing.T) {
-	expErr := "--gh-user/--gh-token or --gitlab-user/--gitlab-token or --bitbucket-user/--bitbucket-token or --azuredevops-user/--azuredevops-token must be set"
+	expErr := "--gh-user/--gh-token or --gh-app-id/--gh-app-key-file or --gitlab-user/--gitlab-token or --bitbucket-user/--bitbucket-token or --azuredevops-user/--azuredevops-token must be set"
 	cases := []struct {
 		description string
 		flags       map[string]interface{}
@@ -390,6 +393,20 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			"just github user set",
 			map[string]interface{}{
 				GHUserFlag: "user",
+			},
+			true,
+		},
+		{
+			"just github app set",
+			map[string]interface{}{
+				GHAppIDFlag: "1",
+			},
+			true,
+		},
+		{
+			"just github app key set",
+			map[string]interface{}{
+				GHAppKeyFileFlag: "key.pem",
 			},
 			true,
 		},
@@ -443,6 +460,14 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			map[string]interface{}{
 				GHUserFlag:  "user",
 				GHTokenFlag: "token",
+			},
+			false,
+		},
+		{
+			"github app and key set and should be successful",
+			map[string]interface{}{
+				GHAppIDFlag:      "1",
+				GHAppKeyFileFlag: "key.pem",
 			},
 			false,
 		},
@@ -542,6 +567,19 @@ func TestExecute_GithubUser(t *testing.T) {
 	Ok(t, err)
 
 	Equals(t, "user", passedConfig.GithubUser)
+}
+
+func TestExecute_GithubApp(t *testing.T) {
+	t.Log("Should remove the @ from the github username if it's passed.")
+	c := setup(map[string]interface{}{
+		GHAppKeyFileFlag:  "key.pem",
+		GHAppIDFlag:       "1",
+		RepoWhitelistFlag: "*",
+	})
+	err := c.Execute()
+	Ok(t, err)
+
+	Equals(t, int64(1), passedConfig.GithubAppID)
 }
 
 func TestExecute_GitlabUser(t *testing.T) {
