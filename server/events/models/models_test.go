@@ -452,6 +452,9 @@ func TestPullStatus_StatusCount(t *testing.T) {
 			{
 				Status: models.ErroredApplyStatus,
 			},
+			{
+				Status: models.DiscardedPlanStatus,
+			},
 		},
 	}
 
@@ -459,6 +462,7 @@ func TestPullStatus_StatusCount(t *testing.T) {
 	Equals(t, 1, ps.StatusCount(models.AppliedPlanStatus))
 	Equals(t, 1, ps.StatusCount(models.ErroredApplyStatus))
 	Equals(t, 0, ps.StatusCount(models.ErroredPlanStatus))
+	Equals(t, 1, ps.StatusCount(models.DiscardedPlanStatus))
 }
 
 func TestApplyCommand_String(t *testing.T) {

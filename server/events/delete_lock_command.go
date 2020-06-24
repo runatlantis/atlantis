@@ -73,7 +73,7 @@ func (l *DefaultDeleteLockCommand) deleteWorkingDir(lock models.ProjectLock) {
 			l.Logger.Err("unable to delete workspace: %s", err)
 		}
 	}
-	if err := l.DB.DeleteProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path); err != nil {
+	if err := l.DB.UpdateProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path, models.DiscardedPlanStatus); err != nil {
 		l.Logger.Err("unable to delete project status: %s", err)
 	}
 }

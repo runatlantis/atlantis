@@ -309,9 +309,8 @@ func (b *BoltDB) DeletePullStatus(pull models.PullRequest) error {
 	return errors.Wrap(err, "DB transaction failed")
 }
 
-// DeleteProjectStatus deletes all project statuses under pull that match
-// workspace and repoRelDir.
-func (b *BoltDB) DeleteProjectStatus(pull models.PullRequest, workspace string, repoRelDir string) error {
+// UpdateProjectStatus updates project status.
+func (b *BoltDB) UpdateProjectStatus(pull models.PullRequest, workspace string, repoRelDir string, newStatus models.ProjectPlanStatus) error {
 	key, err := b.pullKey(pull)
 	if err != nil {
 		return err
@@ -327,18 +326,16 @@ func (b *BoltDB) DeleteProjectStatus(pull models.PullRequest, workspace string, 
 		}
 		currStatus := *currStatusPtr
 
-		// Create a new projectStatuses array without the ones we want to
-		// delete.
-		var newProjects []models.ProjectStatus
-		for _, p := range currStatus.Projects {
-			if p.Workspace == workspace && p.RepoRelDir == repoRelDir {
-				continue
+		// Update the status.
+		for i := range currStatus.Projects {
+			// NOTE: We're using a reference here because we are
+			// in-place updating its Status field.
+			proj := &currStatus.Projects[i]
+			if proj.Workspace == workspace && proj.RepoRelDir == repoRelDir {
+				proj.Status = newStatus
+				break
 			}
-			newProjects = append(newProjects, p)
 		}
-
-		// Overwrite the old pull status.
-		currStatus.Projects = newProjects
 		return b.writePullToBucket(bucket, key, currStatus)
 	})
 	return errors.Wrap(err, "DB transaction failed")
