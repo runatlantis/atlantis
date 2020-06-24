@@ -512,6 +512,8 @@ const (
 	ApplyCommand CommandName = iota
 	// PlanCommand is a command to run terraform plan.
 	PlanCommand
+	// UnlockCommand is a command to discard previous plans as well as the atlantis locks.
+	UnlockCommand
 	// Adding more? Don't forget to update String() below
 )
 
@@ -522,6 +524,8 @@ func (c CommandName) String() string {
 		return "apply"
 	case PlanCommand:
 		return "plan"
+	case UnlockCommand:
+		return "unlock"
 	}
 	return ""
 }

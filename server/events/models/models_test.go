@@ -460,3 +460,21 @@ func TestPullStatus_StatusCount(t *testing.T) {
 	Equals(t, 1, ps.StatusCount(models.ErroredApplyStatus))
 	Equals(t, 0, ps.StatusCount(models.ErroredPlanStatus))
 }
+
+func TestApplyCommand_String(t *testing.T) {
+	uc := models.ApplyCommand
+
+	Equals(t, "apply", uc.String())
+}
+
+func TestPlanCommand_String(t *testing.T) {
+	uc := models.PlanCommand
+
+	Equals(t, "plan", uc.String())
+}
+
+func TestUnlockCommand_String(t *testing.T) {
+	uc := models.UnlockCommand
+
+	Equals(t, "unlock", uc.String())
+}

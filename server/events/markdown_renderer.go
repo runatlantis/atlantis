@@ -143,7 +143,6 @@ func (m *MarkdownRenderer) renderProjectResults(results []models.ProjectResult, 
 			} else {
 				resultData.Rendered = m.renderTemplate(applyUnwrappedSuccessTmpl, struct{ Output string }{result.ApplySuccess})
 			}
-
 		} else {
 			resultData.Rendered = "Found no template. This is a bug!"
 		}
@@ -205,7 +204,9 @@ var singleProjectPlanSuccessTmpl = template.Must(template.New("").Parse(
 		"\n" +
 		"{{ if ne .DisableApplyAll true  }}---\n" +
 		"* :fast_forward: To **apply** all unapplied plans from this pull request, comment:\n" +
-		"    * `atlantis apply`{{ end }}" + logTmpl))
+		"    * `atlantis apply`\n" +
+		"* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:\n" +
+		"    * `atlantis unlock`{{ end }}" + logTmpl))
 var singleProjectPlanUnsuccessfulTmpl = template.Must(template.New("").Parse(
 	"{{$result := index .Results 0}}Ran {{.Command}} for dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n" +
 		"{{$result.Rendered}}\n" + logTmpl))
@@ -218,7 +219,10 @@ var multiProjectPlanTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap
 		"### {{add $i 1}}. {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n" +
 		"{{$result.Rendered}}\n\n" +
 		"{{ if ne $disableApplyAll true }}---\n{{end}}{{end}}{{ if ne .DisableApplyAll true }}{{ if and (gt (len .Results) 0) (not .PlansDeleted) }}* :fast_forward: To **apply** all unapplied plans from this pull request, comment:\n" +
-		"    * `atlantis apply`{{end}}{{end}}" +
+		"    * `atlantis apply`\n" +
+		"* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:\n" +
+		"    * `atlantis unlock`" +
+		"{{end}}{{end}}" +
 		logTmpl))
 var multiProjectApplyTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
 	"Ran {{.Command}} for {{ len .Results }} projects:\n\n" +

@@ -105,6 +105,7 @@ type DefaultCommandRunner struct {
 	WorkingDir        WorkingDir
 	DB                *db.BoltDB
 	Drainer           *Drainer
+	DeleteLockCommand DeleteLockCommand
 }
 
 // RunAutoplanCommand runs plan when a pull request is opened or updated.
@@ -247,6 +248,19 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
+	if cmd.Name == models.UnlockCommand {
+		vcsMessage := "All Atlantis locks for this PR have been unlocked and plans discarded"
+		err := c.DeleteLockCommand.DeleteLocksByPull(baseRepo.FullName, pullNum)
+		if err != nil {
+			vcsMessage = "Failed to delete PR locks"
+			log.Err("failed to delete locks by pull %s", err.Error())
+		}
+		if commentErr := c.VCSClient.CreateComment(baseRepo, pullNum, vcsMessage); commentErr != nil {
+			log.Err("unable to comment: %s", commentErr)
+		}
+		return
+	}
+
 	if cmd.CommandName() == models.ApplyCommand {
 		// Get the mergeable status before we set any build statuses of our own.
 		// We do this here because when we set a "Pending" status, if users have
@@ -302,6 +316,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		c.deletePlans(ctx)
 		result.PlansDeleted = true
 	}
+
 	c.updatePull(
 		ctx,
 		cmd,
