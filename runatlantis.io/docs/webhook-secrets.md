@@ -30,7 +30,7 @@ You can use any random string generator to create your Webhook secret. It should
 
 For example:
 * Generate via Ruby with `ruby -rsecurerandom -e 'puts SecureRandom.hex(32)'`
-* Generate online with [https://www.random.org/passwords/?num=2&len=20&format=html&rnd=new](https://www.random.org/passwords/?num=2&len=20&format=html&rnd=new)
+* Generate online with [https://www.browserling.com/tools/random-string](https://www.browserling.com/tools/random-string)
 
 ::: tip NOTE
 You must use **the same** webhook secret for each repo.
