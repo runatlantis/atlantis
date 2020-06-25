@@ -16,6 +16,7 @@ require (
 	github.com/docker/docker v0.0.0-20180620051407-e2593239d949
 	github.com/elazarl/go-bindata-assetfs v1.0.0
 	github.com/flynn-archive/go-shlex v0.0.0-20150515145356-3f9db97f8568
+	github.com/go-bindata/go-bindata v3.1.2+incompatible // indirect
 	github.com/go-ozzo/ozzo-validation v0.0.0-20170913164239-85dcd8368eba
 	github.com/go-playground/locales v0.12.1 // indirect
 	github.com/go-playground/universal-translator v0.16.0 // indirect

@@ -59,7 +59,7 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
   <meta name="description" content="">
   <meta name="author" content="">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script src="{{ .CleanedBasePath }}/static/js/jquery-3.2.1.min.js"></script>
+  <script src="{{ .CleanedBasePath }}/static/js/jquery-3.5.1.min.js"></script>
   <script>
     $(document).ready(function () {
       $("p.js-discard-success").toggle(document.URL.indexOf("discard=true") !== -1);
@@ -141,7 +141,7 @@ var lockTemplate = template.Must(template.New("lock.html.tmpl").Parse(`
   <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
   <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/custom.css">
   <link rel="icon" type="image/png" href="{{ .CleanedBasePath }}/static/images/atlantis-icon.png">
-  <script src="{{ .CleanedBasePath }}/static/js/jquery-3.2.1.min.js"></script>
+  <script src="{{ .CleanedBasePath }}/static/js/jquery-3.5.1.min.js"></script>
 </head>
 <body>
   <div class="container">
@@ -287,7 +287,7 @@ var githubAppSetupTemplate = template.Must(template.New("github-app.html.tmpl").
     }
   </style>
   <link rel="icon" type="image/png" href="/static/images/atlantis-icon.png">
-  <script src="/static/js/jquery-3.2.1.min.js"></script>
+  <script src="/static/js/jquery-3.5.1.min.js"></script>
 </head>
 <body>
 <div class="container">

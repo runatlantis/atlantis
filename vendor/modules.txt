@@ -89,6 +89,8 @@ github.com/fatih/color
 github.com/flynn-archive/go-shlex
 # github.com/fsnotify/fsnotify v1.4.7
 github.com/fsnotify/fsnotify
+# github.com/go-bindata/go-bindata v3.1.2+incompatible
+## explicit
 # github.com/go-ozzo/ozzo-validation v0.0.0-20170913164239-85dcd8368eba
 ## explicit
 github.com/go-ozzo/ozzo-validation
