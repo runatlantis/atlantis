@@ -3,10 +3,20 @@ FROM runatlantis/atlantis-base:v3.3
 LABEL authors="Anubhav Mishra, Luke Kysow"
 
 # install terraform binaries
-ENV DEFAULT_TERRAFORM_VERSION=0.12.27
+ENV DEFAULT_TERRAFORM_VERSION=0.12.24
+
+#Download jq
+RUN wget -O jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 && \
+    chmod +x jq && \
+    mv jq /usr/local/bin
+
+#Download aws-iam-authenticator
+RUN curl -o aws-iam-authenticator https://amazon-eks.s3.us-west-2.amazonaws.com/1.16.8/2020-04-16/bin/linux/amd64/aws-iam-authenticator && \
+      chmod +x ./aws-iam-authenticator && \
+      mv aws-iam-authenticator /usr/local/bin
 
 # In the official Atlantis image we only have the latest of each Terraform version.
-RUN AVAILABLE_TERRAFORM_VERSIONS="0.8.8 0.9.11 0.10.8 0.11.14 ${DEFAULT_TERRAFORM_VERSION}" && \
+RUN AVAILABLE_TERRAFORM_VERSIONS="0.11.14 0.12.18 ${DEFAULT_TERRAFORM_VERSION}" && \
     for VERSION in ${AVAILABLE_TERRAFORM_VERSIONS}; do \
         curl -LOs https://releases.hashicorp.com/terraform/${VERSION}/terraform_${VERSION}_linux_amd64.zip && \
         curl -LOs https://releases.hashicorp.com/terraform/${VERSION}/terraform_${VERSION}_SHA256SUMS && \
