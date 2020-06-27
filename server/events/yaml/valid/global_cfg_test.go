@@ -41,6 +41,7 @@ func TestNewGlobalCfg(t *testing.T) {
 				IDRegex:              regexp.MustCompile(".*"),
 				ApplyRequirements:    []string{},
 				Workflow:             &expDefaultWorkflow,
+				AllowedWorkflows:     []string{},
 				AllowedOverrides:     []string{},
 				AllowCustomWorkflows: Bool(false),
 			},
@@ -177,6 +178,34 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 			repoID: "github.com/owner/repo",
 			expErr: "",
 		},
+		"repo uses workflow that is not allowed": {
+			gCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					valid.NewGlobalCfg(true, false, false).Repos[0],
+					{
+						ID:                   "github.com/owner/repo",
+						AllowCustomWorkflows: Bool(true),
+						AllowedOverrides:     []string{"workflow"},
+						AllowedWorkflows:     []string{"serverdefined"},
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"serverdefined":  {},
+					"serverdefined2": {},
+				},
+			},
+			rCfg: valid.RepoCfg{
+				Projects: []valid.Project{
+					{
+						Dir:          ".",
+						Workspace:    "default",
+						WorkflowName: String("serverdefined2"),
+					},
+				},
+			},
+			repoID: "github.com/owner/repo",
+			expErr: "workflow serverdefined2 is not allowed for this repo",
+		},
 		"custom workflows allowed for this repo only": {
 			gCfg: valid.GlobalCfg{
 				Repos: []valid.Repo{
@@ -298,7 +327,7 @@ workflows:
 repos:
 - id: /.*/
   allowed_overrides: [apply_requirements]
-  apply_requirements: [approved] 
+  apply_requirements: [approved]
 `,
 			repoID: "github.com/owner/repo",
 			proj: valid.Project{
@@ -324,11 +353,11 @@ repos:
 			gCfg: `
 repos:
 - id: /.*/
-  apply_requirements: [approved] 
+  apply_requirements: [approved]
 - id: /github.com/.*/
-  apply_requirements: [mergeable] 
+  apply_requirements: [mergeable]
 - id: github.com/owner/repo
-  apply_requirements: [approved, mergeable] 
+  apply_requirements: [approved, mergeable]
 `,
 			repoID: "github.com/owner/repo",
 			proj: valid.Project{

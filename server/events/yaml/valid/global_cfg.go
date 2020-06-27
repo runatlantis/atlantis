@@ -13,6 +13,7 @@ const MergeableApplyReq = "mergeable"
 const ApprovedApplyReq = "approved"
 const ApplyRequirementsKey = "apply_requirements"
 const WorkflowKey = "workflow"
+const AllowedWorkflowsKey = "allowed_workflows"
 const AllowedOverridesKey = "allowed_overrides"
 const AllowCustomWorkflowsKey = "allow_custom_workflows"
 const DefaultWorkflowName = "default"
@@ -33,6 +34,7 @@ type Repo struct {
 	IDRegex              *regexp.Regexp
 	ApplyRequirements    []string
 	Workflow             *Workflow
+	AllowedWorkflows     []string
 	AllowedOverrides     []string
 	AllowCustomWorkflows *bool
 }
@@ -40,6 +42,7 @@ type Repo struct {
 type MergedProjectCfg struct {
 	ApplyRequirements []string
 	Workflow          Workflow
+	AllowedWorkflows  []string
 	RepoRelDir        string
 	Workspace         string
 	Name              string
@@ -85,6 +88,7 @@ func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) Global
 	// we treat nil slices differently.
 	applyReqs := []string{}
 	allowedOverrides := []string{}
+	allowedWorkflows := []string{}
 	if mergeableReq {
 		applyReqs = append(applyReqs, MergeableApplyReq)
 	}
@@ -104,6 +108,7 @@ func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) Global
 				IDRegex:              regexp.MustCompile(".*"),
 				ApplyRequirements:    applyReqs,
 				Workflow:             &defaultWorkflow,
+				AllowedWorkflows:     allowedWorkflows,
 				AllowedOverrides:     allowedOverrides,
 				AllowCustomWorkflows: &allowCustomWorkflows,
 			},
@@ -202,6 +207,7 @@ func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repo
 // ValidateRepoCfg validates that rCfg for repo with id repoID is valid based
 // on our global config.
 func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
+
 	sliceContainsF := func(slc []string, str string) bool {
 		for _, s := range slc {
 			if s == str {
@@ -257,6 +263,39 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 			name := *p.WorkflowName
 			if !mapContainsF(rCfg.Workflows, name) && !mapContainsF(g.Workflows, name) {
 				return fmt.Errorf("workflow %q is not defined anywhere", name)
+			}
+		}
+	}
+
+	// Check workflow is allowed
+	var allowedWorkflows []string
+	for _, repo := range g.Repos {
+		if repo.IDMatches(repoID) {
+			if repo.AllowedWorkflows != nil {
+				allowedWorkflows = repo.AllowedWorkflows
+			}
+		}
+	}
+
+	for _, p := range rCfg.Projects {
+		// default is always allowed
+		if p.WorkflowName != nil && len(allowedWorkflows) != 0 {
+			name := *p.WorkflowName
+			if allowCustomWorkflows {
+				break
+			}
+			if !sliceContainsF(allowedWorkflows, name) && !allowCustomWorkflows {
+				return fmt.Errorf("workflow '%s' is not allowed for this repo", name)
+			}
+		}
+	}
+
+	for _, p := range rCfg.Projects {
+		// default is always allowed
+		if p.WorkflowName != nil && len(allowedWorkflows) != 0 && !allowCustomWorkflows {
+			name := *p.WorkflowName
+			if !sliceContainsF(allowedWorkflows, name) && !allowCustomWorkflows {
+				return fmt.Errorf("workflow '%s' is not allowed for this repo", name)
 			}
 		}
 	}
