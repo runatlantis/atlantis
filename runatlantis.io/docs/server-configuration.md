@@ -90,6 +90,8 @@ Values are chosen in this order:
 * ### `--atlantis-url`
   ```bash
   atlantis server --atlantis-url="https://my-domain.com:9090/basepath"
+  # or
+  ATLANTIS_ATLANTIS_URL=https://my-domain.com:9090/basepath
   ```
   Specify the URL that Atlantis is accessible from. Used in the Atlantis UI
   and in links from pull request comments. Defaults to `http://$(hostname):$port`
@@ -496,7 +498,7 @@ Values are chosen in this order:
   ```bash
   atlantis server --tfe-token="xxx.atlasv1.yyy"
   # or (recommended)
-  ATLANTIS_TFE_TOKEN='xxx.atlasv1.yyy' atlantis server
+  ATLANTIS_TFE_TOKEN='xxx.atlasv1.yyy'
   ```
   A token for Terraform Cloud/Terraform Enterprise integration. See [Terraform Cloud](terraform-cloud.html) for more details.
 
@@ -512,6 +514,8 @@ Values are chosen in this order:
 * ### `--write-git-creds`
   ```bash
   atlantis server --write-git-creds
+  # or
+  ATLANTIS_WRITE_GIT_CREDS=true
   ```
   Write out a .git-credentials file with the provider user and token to allow
   cloning private modules over HTTPS or SSH. See [here](https://git-scm.com/docs/git-credential-store) for more information.
