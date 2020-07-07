@@ -41,7 +41,7 @@ type ProjectFinder interface {
 }
 
 // ignoredFilenameFragments contains filename fragments to ignore while looking at changes
-var ignoredFilenameFragments = string{"terraform.tfstate", "terraform.tfstate.backup", "tflint.hcl"}
+var ignoredFilenameFragments = []string{"terraform.tfstate", "terraform.tfstate.backup", "tflint.hcl"}
 
 // DefaultProjectFinder implements ProjectFinder.
 type DefaultProjectFinder struct{}
@@ -146,7 +146,7 @@ func (p *DefaultProjectFinder) filterToTerraform(files []string) []string {
 
 // shouldIgnore returns true if we shouldn't trigger a plan on changes to this file.
 func (p *DefaultProjectFinder) shouldIgnore(fileName string) bool {
-	for _, s := range IgnoredFiles {
+	for _, s := range ignoredFilenameFragments {
 		if strings.Contains(fileName, s) {
 			return true
 		}
