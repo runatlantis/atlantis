@@ -77,7 +77,7 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 	When(l.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(nil, nil)
 	err = pce.CleanUpPull(fixtures.GithubRepo, fixtures.Pull)
 	Ok(t, err)
-	cp.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString())
+	cp.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
 }
 
 func TestCleanUpPullComments(t *testing.T) {
@@ -164,7 +164,7 @@ func TestCleanUpPullComments(t *testing.T) {
 			When(l.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(c.Locks, nil)
 			err = pce.CleanUpPull(fixtures.GithubRepo, fixtures.Pull)
 			Ok(t, err)
-			_, _, comment := cp.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString()).GetCapturedArguments()
+			_, _, comment, _ := cp.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString()).GetCapturedArguments()
 
 			expected := "Locks and plans deleted for the projects and workspaces modified in this pull request:\n\n" + c.Exp
 			Equals(t, expected, comment)

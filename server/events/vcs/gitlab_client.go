@@ -134,7 +134,7 @@ func (g *GitlabClient) GetModifiedFiles(repo models.Repo, pull models.PullReques
 }
 
 // CreateComment creates a comment on the merge request.
-func (g *GitlabClient) CreateComment(repo models.Repo, pullNum int, comment string) error {
+func (g *GitlabClient) CreateComment(repo models.Repo, pullNum int, comment string, command string) error {
 	_, _, err := g.Client.Notes.CreateMergeRequestNote(repo.FullName, pullNum, &gitlab.CreateMergeRequestNoteOptions{Body: gitlab.String(comment)})
 	return err
 }

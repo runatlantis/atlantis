@@ -56,8 +56,8 @@ func (d *ClientProxy) GetModifiedFiles(repo models.Repo, pull models.PullRequest
 	return d.clients[repo.VCSHost.Type].GetModifiedFiles(repo, pull)
 }
 
-func (d *ClientProxy) CreateComment(repo models.Repo, pullNum int, comment string) error {
-	return d.clients[repo.VCSHost.Type].CreateComment(repo, pullNum, comment)
+func (d *ClientProxy) CreateComment(repo models.Repo, pullNum int, comment string, command string) error {
+	return d.clients[repo.VCSHost.Type].CreateComment(repo, pullNum, comment, command)
 }
 
 func (d *ClientProxy) HidePrevPlanComments(repo models.Repo, pullNum int) error {
