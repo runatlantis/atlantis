@@ -40,6 +40,9 @@ type ProjectFinder interface {
 	DetermineProjectsViaConfig(log *logging.SimpleLogger, modifiedFiles []string, config valid.RepoCfg, absRepoDir string) ([]valid.Project, error)
 }
 
+// ignoredFilenameFragments contains filename fragments to ignore while looking at changes
+var ignoredFilenameFragments = []string{"terraform.tfstate", "terraform.tfstate.backup", "tflint.hcl"}
+
 // DefaultProjectFinder implements ProjectFinder.
 type DefaultProjectFinder struct{}
 
@@ -134,18 +137,16 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log *logging.SimpleLog
 func (p *DefaultProjectFinder) filterToTerraform(files []string) []string {
 	var filtered []string
 	for _, fileName := range files {
-		// Filter out tfstate files since they usually checked in by accident
-		// and regardless, they don't affect a plan.
-		if !p.isStatefile(fileName) && (strings.Contains(fileName, ".tf") || filepath.Base(fileName) == "terragrunt.hcl") {
+		if !p.shouldIgnore(fileName) && (strings.Contains(fileName, ".tf") || filepath.Base(fileName) == "terragrunt.hcl") {
 			filtered = append(filtered, fileName)
 		}
 	}
 	return filtered
 }
 
-// isStatefile returns true if fileName is a terraform statefile or backup.
-func (p *DefaultProjectFinder) isStatefile(fileName string) bool {
-	for _, s := range []string{"terraform.tfstate", "terraform.tfstate.backup"} {
+// shouldIgnore returns true if we shouldn't trigger a plan on changes to this file.
+func (p *DefaultProjectFinder) shouldIgnore(fileName string) bool {
+	for _, s := range ignoredFilenameFragments {
 		if strings.Contains(fileName, s) {
 			return true
 		}
