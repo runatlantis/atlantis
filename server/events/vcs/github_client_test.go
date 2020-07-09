@@ -165,7 +165,7 @@ func TestGithubClient_PaginatesComments(t *testing.T) {
 	testServer := httptest.NewTLSServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.Method + " " + r.RequestURI {
-			case "POST /graphql":
+			case "POST /api/graphql":
 				defer r.Body.Close() // nolint: errcheck
 				body, err := ioutil.ReadAll(r.Body)
 				if err != nil {
@@ -262,7 +262,7 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 			case "GET /api/v3/repos/owner/repo/issues/123/comments?direction=asc&sort=created":
 				w.Write([]byte(issueResp)) // nolint: errcheck
 				return
-			case "POST /graphql":
+			case "POST /api/graphql":
 				if accept, has := r.Header["Accept"]; !has || accept[0] != "application/vnd.github.queen-beryl-preview+json" {
 					t.Error("missing preview header")
 					http.Error(w, "bad request", http.StatusBadRequest)

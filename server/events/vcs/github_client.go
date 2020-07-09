@@ -73,7 +73,7 @@ func NewGithubClient(hostname string, credentials GithubCredentials, logger *log
 		if err != nil {
 			return nil, err
 		}
-		graphqlURL = fmt.Sprintf("https://%s/graphql", apiURL.Host)
+		graphqlURL = fmt.Sprintf("https://%s/api/graphql", apiURL.Host)
 	}
 
 	// shurcooL's githubv4 library has a client ctor, but it doesn't support schema
