@@ -148,11 +148,6 @@ See [Custom Workflow Use Cases: Adding extra arguments to Terraform commands](cu
 See [Custom Workflow Use Cases: Custom init/plan/apply Commands](custom-workflows.html#custom-init-plan-apply-commands)
 
 ### Terragrunt
-
-Terragrunt declares its module dependencies explicitly, so it is possible to generate an `atlantis.yaml` file by examining all the dependencies in your project.
-
-To take advantage of this, you can use the tool [terragrunt-atlantis-config](https://github.com/transcend-io/terragrunt-atlantis-config).
-
 See [Custom Workflow Use Cases: Terragrunt](custom-workflows.html#terragrunt)
 
 ### Running custom commands
