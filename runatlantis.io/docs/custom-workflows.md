@@ -204,6 +204,10 @@ Atlantis will need to have the `terragrunt` binary in its PATH.
 If you're using Docker you can build your own image, see [Customization](/docs/deployment.html#customization).
 :::
 
+If you don't want to create/manage the repo's `atlantis.yaml` file yourself, you can use the tool [terragrunt-atlantis-config](https://github.com/transcend-io/terragrunt-atlantis-config) to generate it.
+
+The `terragrunt-atlantis-config` tool is a community project and not maintained by the Atlantis team.
+
 ### Running custom commands
 Atlantis supports running completely custom commands. In this example, we want to run
 a script after every `apply`:
