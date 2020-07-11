@@ -141,10 +141,10 @@ func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment stri
 		"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
 
 	if command != "" {
-		sepStart = "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
+		sepStart = fmt.Sprintf("Continued %s output from previous comment.\n<details><summary>Show Output</summary>\n\n", command) +
 			"```diff\n"
 	} else {
-		sepStart = fmt.Sprintf("Continued %s output from previous comment.\n<details><summary>Show Output</summary>\n\n", command) +
+		sepStart = "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
 			"```diff\n"
 	}
 

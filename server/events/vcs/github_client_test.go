@@ -784,3 +784,71 @@ func disableSSLVerification() func() {
 		http.DefaultTransport.(*http.Transport).TLSClientConfig = orig
 	}
 }
+
+func TestGithubClient_SplitComments(t *testing.T) {
+	type githubComment struct {
+		Body string `json:"body"`
+	}
+	githubComments := make([]githubComment, 0, 1)
+
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+			switch r.Method + " " + r.RequestURI {
+			case "POST /api/v3/repos/runatlantis/atlantis/issues/1/comments":
+				defer r.Body.Close() // nolint: errcheck
+				body, err := ioutil.ReadAll(r.Body)
+				if err != nil {
+					t.Errorf("read body error: %v", err)
+					http.Error(w, "server error", http.StatusInternalServerError)
+					return
+				}
+				requestBody := githubComment{}
+				err = json.Unmarshal(body, &requestBody)
+				if err != nil {
+					t.Errorf("parse body error: %v", err)
+					http.Error(w, "server error", http.StatusInternalServerError)
+					return
+				}
+				githubComments = append(githubComments, requestBody)
+				return
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}))
+
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+	client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"}, nil)
+	Ok(t, err)
+	defer disableSSLVerification()()
+	pull := models.PullRequest{Num: 1}
+	repo := models.Repo{
+		FullName:          "runatlantis/atlantis",
+		Owner:             "runatlantis",
+		Name:              "atlantis",
+		CloneURL:          "",
+		SanitizedCloneURL: "",
+		VCSHost: models.VCSHost{
+			Type:     models.Github,
+			Hostname: "github.com",
+		},
+	}
+	// create an extra long string
+	comment := strings.Repeat("a", 65537)
+	err = client.CreateComment(repo, pull.Num, comment, models.PlanCommand.String())
+	Ok(t, err)
+	err = client.CreateComment(repo, pull.Num, comment, "")
+	Ok(t, err)
+
+	body := strings.Split(githubComments[1].Body, "\n")
+	firstSplit := strings.ToLower(body[0])
+	body = strings.Split(githubComments[3].Body, "\n")
+	secondSplit := strings.ToLower(body[0])
+
+	Equals(t, 4, len(githubComments))
+	Assert(t, strings.Contains(firstSplit, models.PlanCommand.String()), fmt.Sprintf("comment should contain the command name but was %q", firstSplit))
+	Assert(t, strings.Contains(secondSplit, "continued from previous comment"), fmt.Sprintf("comment should contain no reference to the command name but was %q", secondSplit))
+}
