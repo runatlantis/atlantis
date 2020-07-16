@@ -7,6 +7,14 @@ Once you've extracted the archive, run:
 ./atlantis testdrive
 ```
 
+If the above command does not work, try installing [golang](https://golang.org/dl/), then running the following commmand:
+```
+go run . testdrive
+```
+
+**Please note:** When prompted for your GitHub username please do not use your Email! 
+Using you e-mail may allow the example repository to fork but it will cause problems when trying to create a hook.
+
 This mode sets up Atlantis on a test repo so you can try it out. It will
 - Fork an example Terraform project into your GitHub account
 - Install Terraform (if not already in your PATH)
