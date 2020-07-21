@@ -592,6 +592,7 @@ func (s *Server) Healthz(w http.ResponseWriter, _ *http.Request) {
 		Status string `json:"status"`
 	}{
 		Status: "ok",
+		Version: s.AtlantisVersion,
 	}, "", "  ")
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
