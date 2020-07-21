@@ -157,7 +157,9 @@ func TestIndex_Success(t *testing.T) {
 }
 
 func TestHealthz(t *testing.T) {
-	s := server.Server{}
+	s := server.Server{
+		AtlantisVersion: "0.14.0",
+	}
 	req, _ := http.NewRequest("GET", "/healthz", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
 	s.Healthz(w, req)
@@ -166,7 +168,8 @@ func TestHealthz(t *testing.T) {
 	Equals(t, "application/json", w.Result().Header["Content-Type"][0])
 	Equals(t,
 		`{
-  "status": "ok"
+  "status": "ok",
+  "version": "0.14.0",
 }`, string(body))
 }
 
