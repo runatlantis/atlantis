@@ -60,6 +60,7 @@ type UserConfig struct {
 	TFDownloadURL           string          `mapstructure:"tf-download-url"`
 	TFEHostname             string          `mapstructure:"tfe-hostname"`
 	TFEToken                string          `mapstructure:"tfe-token"`
+	TriggerWord             []string        `mapstructure:"trigger-word"`
 	VCSStatusName           string          `mapstructure:"vcs-status-name"`
 	DefaultTFVersion        string          `mapstructure:"default-tf-version"`
 	Webhooks                []WebhookConfig `mapstructure:"webhooks"`

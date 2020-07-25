@@ -340,6 +340,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GitlabUser:      userConfig.GitlabUser,
 		BitbucketUser:   userConfig.BitbucketUser,
 		AzureDevopsUser: userConfig.AzureDevopsUser,
+		TriggerWords:    userConfig.TriggerWord,
 	}
 	defaultTfVersion := terraformClient.DefaultVersion()
 	pendingPlanFinder := &events.DefaultPendingPlanFinder{}

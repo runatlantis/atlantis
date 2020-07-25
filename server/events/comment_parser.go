@@ -36,7 +36,9 @@ const (
 	projectFlagShort   = "p"
 	verboseFlagLong    = "verbose"
 	verboseFlagShort   = ""
-	atlantisExecutable = "atlantis"
+
+	// AtlantisExecutable is the name of the Atlantis executable
+	AtlantisExecutable = "atlantis"
 )
 
 // multiLineRegex is used to ignore multi-line comments since those aren't valid
@@ -69,6 +71,7 @@ type CommentParser struct {
 	GitlabUser      string
 	BitbucketUser   string
 	AzureDevopsUser string
+	TriggerWords    []string
 }
 
 // CommentParseResult describes the result of parsing a comment as a command.
@@ -129,7 +132,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	case models.AzureDevops:
 		vcsUser = e.AzureDevopsUser
 	}
-	executableNames := []string{"run", atlantisExecutable, "@" + vcsUser}
+	executableNames := append(e.TriggerWords, "@"+vcsUser)
 	if !e.stringInSlice(args[0], executableNames) {
 		return CommentParseResult{Ignore: true}
 	}
@@ -263,13 +266,13 @@ func (e *CommentParser) BuildPlanComment(repoRelDir string, workspace string, pr
 		}
 		commentFlags = fmt.Sprintf(" -- %s", strings.Join(flagsWithoutQuotes, " "))
 	}
-	return fmt.Sprintf("%s %s%s%s", atlantisExecutable, models.PlanCommand.String(), flags, commentFlags)
+	return fmt.Sprintf("%s %s%s%s", AtlantisExecutable, models.PlanCommand.String(), flags, commentFlags)
 }
 
 // BuildApplyComment builds an apply comment for the specified args.
 func (e *CommentParser) BuildApplyComment(repoRelDir string, workspace string, project string) string {
 	flags := e.buildFlags(repoRelDir, workspace, project)
-	return fmt.Sprintf("%s %s%s", atlantisExecutable, models.ApplyCommand.String(), flags)
+	return fmt.Sprintf("%s %s%s", AtlantisExecutable, models.ApplyCommand.String(), flags)
 }
 
 func (e *CommentParser) buildFlags(repoRelDir string, workspace string, project string) string {

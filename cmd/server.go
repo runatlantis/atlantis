@@ -23,6 +23,7 @@ import (
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server"
+	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -84,6 +85,7 @@ const (
 	VCSStatusName              = "vcs-status-name"
 	TFEHostnameFlag            = "tfe-hostname"
 	TFETokenFlag               = "tfe-token"
+	TriggerWordFlag            = "trigger-words"
 	WriteGitCredsFlag          = "write-git-creds"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
@@ -307,6 +309,14 @@ var boolFlags = map[string]boolFlag{
 		defaultValue: false,
 	},
 }
+
+var stringSliceFlags = map[string]stringSliceFlag{
+	TriggerWordFlag: {
+		description:  "a comma-separated list of keywords in pull request comments that activate Atlantis",
+		defaultValue: []string{events.AtlantisExecutable, "run"},
+	},
+}
+
 var intFlags = map[string]intFlag{
 	PortFlag: {
 		description:  "Port to bind to.",
@@ -329,6 +339,13 @@ type stringFlag struct {
 	defaultValue string
 	hidden       bool
 }
+
+type stringSliceFlag struct {
+	description  string
+	defaultValue []string
+	hidden       bool
+}
+
 type intFlag struct {
 	description  string
 	defaultValue int
@@ -418,6 +435,19 @@ func (s *ServerCmd) Init() *cobra.Command {
 		if f.hidden {
 			c.Flags().MarkHidden(name) // nolint: errcheck
 		}
+	}
+
+	// Set stringSlice flags.
+	for name, f := range stringSliceFlags {
+		usage := f.description
+		if f.defaultValue != nil && len(f.defaultValue) > 0 {
+			usage = fmt.Sprintf("%s (default %q)", usage, strings.Join(f.defaultValue, ", "))
+		}
+		c.Flags().StringSlice(name, f.defaultValue, usage+"\n") // nolint: errcheck
+		if f.hidden {
+			c.Flags().MarkHidden(name) // nolint: errcheck
+		}
+		s.Viper.BindPFlag(name, c.Flags().Lookup(name))
 	}
 
 	// Set int flags.
