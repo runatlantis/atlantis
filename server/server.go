@@ -413,7 +413,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GlobalAutomerge:   userConfig.Automerge,
 		Drainer:           drainer,
 	}
-	repoWhitelist, err := events.NewRepoWhitelistChecker(userConfig.RepoWhitelist)
+	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
 	if err != nil {
 		return nil, err
 	}
@@ -439,8 +439,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubRequestValidator:          &DefaultGithubRequestValidator{},
 		GitlabRequestParserValidator:    &DefaultGitlabRequestParserValidator{},
 		GitlabWebhookSecret:             []byte(userConfig.GitlabWebhookSecret),
-		RepoWhitelistChecker:            repoWhitelist,
-		SilenceWhitelistErrors:          userConfig.SilenceWhitelistErrors,
+		RepoAllowlistChecker:            repoAllowlist,
+		SilenceAllowlistErrors:          userConfig.SilenceAllowlistErrors,
 		SupportedVCSHosts:               supportedVCSHosts,
 		VCSClient:                       vcsClient,
 		BitbucketWebhookSecret:          []byte(userConfig.BitbucketWebhookSecret),

@@ -20,10 +20,10 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-func TestRepoWhitelistChecker_IsWhitelisted(t *testing.T) {
+func TestRepoAllowlistChecker_IsAllowlisted(t *testing.T) {
 	cases := []struct {
 		Description  string
-		Whitelist    string
+		Allowlist    string
 		RepoFullName string
 		Hostname     string
 		Exp          bool
@@ -179,32 +179,32 @@ func TestRepoWhitelistChecker_IsWhitelisted(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
-			w, err := events.NewRepoWhitelistChecker(c.Whitelist)
+			w, err := events.NewRepoAllowlistChecker(c.Allowlist)
 			Ok(t, err)
-			Equals(t, c.Exp, w.IsWhitelisted(c.RepoFullName, c.Hostname))
+			Equals(t, c.Exp, w.IsAllowlisted(c.RepoFullName, c.Hostname))
 		})
 	}
 }
 
-// If the whitelist contains a schema then we should get an error.
-func TestRepoWhitelistChecker_ContainsSchema(t *testing.T) {
+// If the allowlist contains a schema then we should get an error.
+func TestRepoAllowlistChecker_ContainsSchema(t *testing.T) {
 	cases := []struct {
-		whitelist string
+		allowlist string
 		expErr    string
 	}{
 		{
 			"://",
-			`whitelist "://" contained ://`,
+			`allowlist "://" contained ://`,
 		},
 		{
 			"valid/*,https://bitbucket.org/*",
-			`whitelist "https://bitbucket.org/*" contained ://`,
+			`allowlist "https://bitbucket.org/*" contained ://`,
 		},
 	}
 
 	for _, c := range cases {
-		t.Run(c.whitelist, func(t *testing.T) {
-			_, err := events.NewRepoWhitelistChecker(c.whitelist)
+		t.Run(c.allowlist, func(t *testing.T) {
+			_, err := events.NewRepoAllowlistChecker(c.allowlist)
 			ErrEquals(t, c.expErr, err)
 		})
 	}

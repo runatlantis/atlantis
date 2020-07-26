@@ -492,7 +492,7 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 		Drainer:           drainer,
 	}
 
-	repoWhitelistChecker, err := events.NewRepoWhitelistChecker("*")
+	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
 	Ok(t, err)
 
 	ctrl := server.EventsController{
@@ -511,7 +511,7 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 		GithubRequestValidator:       &server.DefaultGithubRequestValidator{},
 		GitlabRequestParserValidator: &server.DefaultGitlabRequestParserValidator{},
 		GitlabWebhookSecret:          nil,
-		RepoWhitelistChecker:         repoWhitelistChecker,
+		RepoAllowlistChecker:         repoAllowlistChecker,
 		SupportedVCSHosts:            []models.VCSHostType{models.Gitlab, models.Github, models.BitbucketCloud},
 		VCSClient:                    e2eVCSClient,
 	}

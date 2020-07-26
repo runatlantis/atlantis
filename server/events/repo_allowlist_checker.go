@@ -21,29 +21,29 @@ import (
 // Wildcard matches 0-n of all characters except commas.
 const Wildcard = "*"
 
-// RepoWhitelistChecker implements checking if repos are whitelisted to be used with
+// RepoAllowlistChecker implements checking if repos are allowlisted to be used with
 // this Atlantis.
-type RepoWhitelistChecker struct {
+type RepoAllowlistChecker struct {
 	rules []string
 }
 
-// NewRepoWhitelistChecker constructs a new checker and validates that the
-// whitelist isn't malformed.
-func NewRepoWhitelistChecker(whitelist string) (*RepoWhitelistChecker, error) {
-	rules := strings.Split(whitelist, ",")
+// NewRepoAllowlistChecker constructs a new checker and validates that the
+// allowlist isn't malformed.
+func NewRepoAllowlistChecker(allowlist string) (*RepoAllowlistChecker, error) {
+	rules := strings.Split(allowlist, ",")
 	for _, rule := range rules {
 		if strings.Contains(rule, "://") {
-			return nil, fmt.Errorf("whitelist %q contained ://", rule)
+			return nil, fmt.Errorf("allowlist %q contained ://", rule)
 		}
 	}
-	return &RepoWhitelistChecker{
+	return &RepoAllowlistChecker{
 		rules: rules,
 	}, nil
 }
 
-// IsWhitelisted returns true if this repo is in our whitelist and false
+// IsAllowlisted returns true if this repo is in our allowlist and false
 // otherwise.
-func (r *RepoWhitelistChecker) IsWhitelisted(repoFullName string, vcsHostname string) bool {
+func (r *RepoAllowlistChecker) IsAllowlisted(repoFullName string, vcsHostname string) bool {
 	candidate := fmt.Sprintf("%s/%s", vcsHostname, repoFullName)
 	for _, rule := range r.rules {
 		if r.matchesRule(rule, candidate) {
@@ -53,7 +53,7 @@ func (r *RepoWhitelistChecker) IsWhitelisted(repoFullName string, vcsHostname st
 	return false
 }
 
-func (r *RepoWhitelistChecker) matchesRule(rule string, candidate string) bool {
+func (r *RepoAllowlistChecker) matchesRule(rule string, candidate string) bool {
 	// Case insensitive compare.
 	rule = strings.ToLower(rule)
 	candidate = strings.ToLower(candidate)

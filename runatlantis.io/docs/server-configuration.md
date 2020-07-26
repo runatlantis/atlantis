@@ -376,11 +376,14 @@ Values are chosen in this order:
   :::
 
 * ### `--repo-whitelist`
+  <Badge text="Deprecated" type="warn"/>
+  Deprecated for `--repo-allowlist`.
+* ### `--repo-allowlist`
   ```bash
   # NOTE: Use single quotes to avoid shell expansion of *.
-  atlantis server --repo-whitelist='github.com/myorg/*'
+  atlantis server --repo-allowlist='github.com/myorg/*'
   ```
-  Atlantis requires you to specify a whitelist of repositories it will accept webhooks from.
+  Atlantis requires you to specify an allowlist of repositories it will accept webhooks from.
 
   Notes:
   * Accepts a comma separated list, ex. `definition1,definition2`
@@ -388,20 +391,20 @@ Values are chosen in this order:
   * `*` matches any characters, ex. `github.com/runatlantis/*` will match all repos in the runatlantis organization
   * For Bitbucket Server: `{hostname}` is the domain without scheme and port, `{owner}` is the name of the project (not the key), and `{repo}` is the repo name
     * User (not project) repositories take on the format: `{hostname}/{full name}/{repo}` (e.g., `bitbucket.example.com/Jane Doe/myatlantis` for username `jdoe` and full name `Jane Doe`, which is not very intuitive)
-  * For Azure DevOps the whitelist takes one of two forms: `{owner}.visualstudio.com/{project}/{repo}` or `dev.azure.com/{owner}/{project}/{repo}`
-  * Microsoft is in the process of changing Azure DevOps to the latter form, so it may be safest to always specify both formats in your repo whitelist for each repository until the change is complete.
+  * For Azure DevOps the allowlist takes one of two forms: `{owner}.visualstudio.com/{project}/{repo}` or `dev.azure.com/{owner}/{project}/{repo}`
+  * Microsoft is in the process of changing Azure DevOps to the latter form, so it may be safest to always specify both formats in your repo allowlist for each repository until the change is complete.
 
   Examples:
-  * Whitelist `myorg/repo1` and `myorg/repo2` on `github.com`
-    * `--repo-whitelist=github.com/myorg/repo1,github.com/myorg/repo2`
-  * Whitelist all repos under `myorg` on `github.com`
-    * `--repo-whitelist='github.com/myorg/*'`
-  * Whitelist all repos in my GitHub Enterprise installation
-    * `--repo-whitelist='github.yourcompany.com/*'`
-  * Whitelist all repos under `myorg` project `myproject` on Azure DevOps
-    * `--repo-whitelist='myorg.visualstudio.com/myproject/*,dev.azure.com/myorg/myproject/*'`
-  * Whitelist all repositories
-    * `--repo-whitelist='*'`
+  * Allowlist `myorg/repo1` and `myorg/repo2` on `github.com`
+    * `--repo-allowlist=github.com/myorg/repo1,github.com/myorg/repo2`
+  * Allowlist all repos under `myorg` on `github.com`
+    * `--repo-allowlist='github.com/myorg/*'`
+  * Allowlist all repos in my GitHub Enterprise installation
+    * `--repo-allowlist='github.yourcompany.com/*'`
+  * Allowlist all repos under `myorg` project `myproject` on Azure DevOps
+    * `--repo-allowlist='myorg.visualstudio.com/myproject/*,dev.azure.com/myorg/myproject/*'`
+  * Allowlist all repositories
+    * `--repo-allowlist='*'`
 
 * ### `--require-approval`
   <Badge text="Deprecated" type="warn"/>
@@ -445,12 +448,15 @@ Values are chosen in this order:
   it will comment back with an error. This flag disables that commenting.
 
 * ### `--silence-whitelist-errors`
+  <Badge text="Deprecated" type="warn"/>
+  Deprecated for `--silence-allowlist-errors`.
+* ### `--silence-allowlist-errors`
   ```bash
-  atlantis server --silence-whitelist-errors
+  atlantis server --silence-allowlist-errors
   ```
-  Some users use the `--repo-whitelist` flag to control which repos Atlantis
+  Some users use the `--repo-allowlist` flag to control which repos Atlantis
   responds to. Normally, if Atlantis receives a pull request webhook from a repo not listed
-  in the whitelist, it will comment back with an error. This flag disables that commenting.
+  in the allowlist, it will comment back with an error. This flag disables that commenting.
 
   Some users find this useful because they prefer to add the Atlantis webhook
   at an organization level rather than on each repo.

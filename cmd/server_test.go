@@ -80,11 +80,11 @@ var testFlags = map[string]interface{}{
 	LogLevelFlag:               "debug",
 	AllowDraftPRs:              true,
 	PortFlag:                   8181,
-	RepoWhitelistFlag:          "github.com/runatlantis/atlantis",
+	RepoAllowlistFlag:          "github.com/runatlantis/atlantis",
 	RequireApprovalFlag:        true,
 	RequireMergeableFlag:       true,
 	SilenceForkPRErrorsFlag:    true,
-	SilenceWhitelistErrorsFlag: true,
+	SilenceAllowlistErrorsFlag: true,
 	SilenceVCSStatusNoPlans:    true,
 	SlackTokenFlag:             "slack-token",
 	SSLCertFileFlag:            "cert-file",
@@ -102,7 +102,7 @@ func TestExecute_Defaults(t *testing.T) {
 	c := setup(map[string]interface{}{
 		GHUserFlag:        "user",
 		GHTokenFlag:       "token",
-		RepoWhitelistFlag: "*",
+		RepoAllowlistFlag: "*",
 	})
 	err := c.Execute()
 	Ok(t, err)
@@ -120,7 +120,7 @@ func TestExecute_Defaults(t *testing.T) {
 		GHTokenFlag:       "token",
 		DataDirFlag:       dataDir,
 		AtlantisURLFlag:   "http://" + hostname + ":4141",
-		RepoWhitelistFlag: "*",
+		RepoAllowlistFlag: "*",
 	}
 	strIgnore := map[string]bool{
 		"config": true,
@@ -237,27 +237,16 @@ func TestExecute_InvalidConfig(t *testing.T) {
 	Assert(t, strings.Contains(err.Error(), "unmarshal errors"), "should be an unmarshal error")
 }
 
-func TestExecute_RequireRepoWhitelist(t *testing.T) {
-	t.Log("If no repo whitelist set should error.")
-	c := setup(map[string]interface{}{
-		GHUserFlag:  "user",
-		GHTokenFlag: "token",
-	})
-	err := c.Execute()
-	Assert(t, err != nil, "should be an error")
-	Equals(t, "--repo-whitelist must be set for security purposes", err.Error())
-}
-
-// Should error if the repo whitelist contained a scheme.
-func TestExecute_RepoWhitelistScheme(t *testing.T) {
+// Should error if the repo allowlist contained a scheme.
+func TestExecute_RepoAllowlistScheme(t *testing.T) {
 	c := setup(map[string]interface{}{
 		GHUserFlag:        "user",
 		GHTokenFlag:       "token",
-		RepoWhitelistFlag: "http://github.com/*",
+		RepoAllowlistFlag: "http://github.com/*",
 	})
 	err := c.Execute()
 	Assert(t, err != nil, "should be an error")
-	Equals(t, "--repo-whitelist cannot contain ://, should be hostnames only", err.Error())
+	Equals(t, "--repo-allowlist cannot contain ://, should be hostnames only", err.Error())
 }
 
 func TestExecute_ValidateLogLevel(t *testing.T) {
@@ -512,7 +501,7 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Log("Should validate vcs config when " + testCase.description)
-		testCase.flags[RepoWhitelistFlag] = "*"
+		testCase.flags[RepoAllowlistFlag] = "*"
 
 		c := setup(testCase.flags)
 		err := c.Execute()
@@ -530,7 +519,7 @@ func TestExecute_ExpandHomeInDataDir(t *testing.T) {
 	c := setup(map[string]interface{}{
 		GHUserFlag:        "user",
 		GHTokenFlag:       "token",
-		RepoWhitelistFlag: "*",
+		RepoAllowlistFlag: "*",
 		DataDirFlag:       "~/this/is/a/path",
 	})
 	err := c.Execute()
@@ -561,7 +550,7 @@ func TestExecute_GithubUser(t *testing.T) {
 	c := setup(map[string]interface{}{
 		GHUserFlag:        "@user",
 		GHTokenFlag:       "token",
-		RepoWhitelistFlag: "*",
+		RepoAllowlistFlag: "*",
 	})
 	err := c.Execute()
 	Ok(t, err)
@@ -574,7 +563,7 @@ func TestExecute_GithubApp(t *testing.T) {
 	c := setup(map[string]interface{}{
 		GHAppKeyFileFlag:  "key.pem",
 		GHAppIDFlag:       "1",
-		RepoWhitelistFlag: "*",
+		RepoAllowlistFlag: "*",
 	})
 	err := c.Execute()
 	Ok(t, err)
@@ -587,7 +576,7 @@ func TestExecute_GitlabUser(t *testing.T) {
 	c := setup(map[string]interface{}{
 		GitlabUserFlag:    "@user",
 		GitlabTokenFlag:   "token",
-		RepoWhitelistFlag: "*",
+		RepoAllowlistFlag: "*",
 	})
 	err := c.Execute()
 	Ok(t, err)
@@ -600,7 +589,7 @@ func TestExecute_BitbucketUser(t *testing.T) {
 	c := setup(map[string]interface{}{
 		BitbucketUserFlag:  "@user",
 		BitbucketTokenFlag: "token",
-		RepoWhitelistFlag:  "*",
+		RepoAllowlistFlag:  "*",
 	})
 	err := c.Execute()
 	Ok(t, err)
@@ -613,7 +602,7 @@ func TestExecute_ADUser(t *testing.T) {
 	c := setup(map[string]interface{}{
 		ADUserFlag:        "@user",
 		ADTokenFlag:       "token",
-		RepoWhitelistFlag: "*",
+		RepoAllowlistFlag: "*",
 	})
 	err := c.Execute()
 	Ok(t, err)
@@ -626,7 +615,7 @@ func TestExecute_BitbucketCloudWithWebhookSecret(t *testing.T) {
 	c := setup(map[string]interface{}{
 		BitbucketUserFlag:          "user",
 		BitbucketTokenFlag:         "token",
-		RepoWhitelistFlag:          "*",
+		RepoAllowlistFlag:          "*",
 		BitbucketWebhookSecretFlag: "my secret",
 	})
 	err := c.Execute()
@@ -638,7 +627,7 @@ func TestExecute_BitbucketServerBaseURLScheme(t *testing.T) {
 	c := setup(map[string]interface{}{
 		BitbucketUserFlag:    "user",
 		BitbucketTokenFlag:   "token",
-		RepoWhitelistFlag:    "*",
+		RepoAllowlistFlag:    "*",
 		BitbucketBaseURLFlag: "mydomain.com",
 	})
 	ErrEquals(t, "--bitbucket-base-url must have http:// or https://, got \"mydomain.com\"", c.Execute())
@@ -646,7 +635,7 @@ func TestExecute_BitbucketServerBaseURLScheme(t *testing.T) {
 	c = setup(map[string]interface{}{
 		BitbucketUserFlag:    "user",
 		BitbucketTokenFlag:   "token",
-		RepoWhitelistFlag:    "*",
+		RepoAllowlistFlag:    "*",
 		BitbucketBaseURLFlag: "://mydomain.com",
 	})
 	ErrEquals(t, "error parsing --bitbucket-webhook-secret flag value \"://mydomain.com\": parse \"://mydomain.com\": missing protocol scheme", c.Execute())
@@ -657,7 +646,7 @@ func TestExecute_BitbucketServerBaseURLPort(t *testing.T) {
 	c := setup(map[string]interface{}{
 		BitbucketUserFlag:    "user",
 		BitbucketTokenFlag:   "token",
-		RepoWhitelistFlag:    "*",
+		RepoAllowlistFlag:    "*",
 		BitbucketBaseURLFlag: "http://mydomain.com:7990",
 	})
 	Ok(t, c.Execute())
@@ -669,7 +658,7 @@ func TestExecute_RepoCfgFlags(t *testing.T) {
 	c := setup(map[string]interface{}{
 		GHUserFlag:         "user",
 		GHTokenFlag:        "token",
-		RepoWhitelistFlag:  "github.com",
+		RepoAllowlistFlag:  "github.com",
 		RepoConfigFlag:     "repos.yaml",
 		RepoConfigJSONFlag: "{}",
 	})
@@ -682,11 +671,61 @@ func TestExecute_TFEHostnameOnly(t *testing.T) {
 	c := setup(map[string]interface{}{
 		GHUserFlag:        "user",
 		GHTokenFlag:       "token",
-		RepoWhitelistFlag: "github.com",
+		RepoAllowlistFlag: "github.com",
 		TFEHostnameFlag:   "not-app.terraform.io",
 	})
 	err := c.Execute()
 	ErrEquals(t, "if setting --tfe-hostname, must set --tfe-token", err)
+}
+
+// Can't use both --repo-allowlist and --repo-whitelist
+func TestExecute_BothAllowAndWhitelist(t *testing.T) {
+	c := setup(map[string]interface{}{
+		GHUserFlag:        "user",
+		GHTokenFlag:       "token",
+		RepoAllowlistFlag: "github.com",
+		RepoWhitelistFlag: "github.com",
+	})
+	err := c.Execute()
+	ErrEquals(t, "both --repo-allowlist and --repo-whitelist cannot be set–use --repo-allowlist", err)
+}
+
+// Must set allow or whitelist.
+func TestExecute_AllowAndWhitelist(t *testing.T) {
+	c := setup(map[string]interface{}{
+		GHUserFlag:  "user",
+		GHTokenFlag: "token",
+	})
+	err := c.Execute()
+	ErrEquals(t, "--repo-allowlist must be set for security purposes", err)
+}
+
+// Can't use both --silence-whitelist-errors and --silence-allowlist-errors
+func TestExecute_BothSilenceAllowAndWhitelistErrors(t *testing.T) {
+	c := setup(map[string]interface{}{
+		GHUserFlag:                 "user",
+		GHTokenFlag:                "token",
+		RepoAllowlistFlag:          "*",
+		SilenceWhitelistErrorsFlag: true,
+		SilenceAllowlistErrorsFlag: true,
+	})
+	err := c.Execute()
+	ErrEquals(t, "both --silence-allowlist-errors and --silence-whitelist-errors cannot be set–use --silence-allowlist-errors", err)
+}
+
+// Test that we set the corresponding allow list values on the userConfig
+// struct if the deprecated whitelist flags are used.
+func TestExecute_RepoWhitelistDeprecation(t *testing.T) {
+	c := setup(map[string]interface{}{
+		GHUserFlag:                 "user",
+		GHTokenFlag:                "token",
+		RepoWhitelistFlag:          "*",
+		SilenceWhitelistErrorsFlag: true,
+	})
+	err := c.Execute()
+	Ok(t, err)
+	Equals(t, true, passedConfig.SilenceAllowlistErrors)
+	Equals(t, "*", passedConfig.RepoAllowlist)
 }
 
 func setup(flags map[string]interface{}) *cobra.Command {
@@ -706,7 +745,7 @@ func setupWithDefaults(flags map[string]interface{}) *cobra.Command {
 	vipr := viper.New()
 	flags[GHUserFlag] = "user"
 	flags[GHTokenFlag] = "token"
-	flags[RepoWhitelistFlag] = "*"
+	flags[RepoAllowlistFlag] = "*"
 
 	for k, v := range flags {
 		vipr.Set(k, v)
