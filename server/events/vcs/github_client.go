@@ -17,6 +17,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
@@ -273,7 +274,25 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 
 // GetPullRequest returns the pull request.
 func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRequest, error) {
-	pull, _, err := g.client.PullRequests.Get(g.ctx, repo.Owner, repo.Name, num)
+	var err error
+	var pull *github.PullRequest
+
+	// GitHub has started to return 404's here (#1019) even after they send the webhook.
+	// They've got some eventual consistency issues going on so we're just going
+	// to retry up to 3 times with a 1s sleep.
+	numRetries := 3
+	retryDelay := 1 * time.Second
+	for i := 0; i < numRetries; i++ {
+		pull, _, err = g.client.PullRequests.Get(g.ctx, repo.Owner, repo.Name, num)
+		if err == nil {
+			return pull, nil
+		}
+		ghErr, ok := err.(*github.ErrorResponse)
+		if !ok || ghErr.Response.StatusCode != 404 {
+			return pull, err
+		}
+		time.Sleep(retryDelay)
+	}
 	return pull, err
 }
 
