@@ -590,7 +590,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 func (s *Server) Healthz(w http.ResponseWriter, _ *http.Request) {
 	data, err := json.MarshalIndent(&struct {
 		Status string `json:"status"`
-		AtlantisVersion string `json:"atlantisVersion"`
+		AtlantisVersion string `json:"atlantis_version"`
 	}{
 		Status: "ok",
 		AtlantisVersion: s.AtlantisVersion,
