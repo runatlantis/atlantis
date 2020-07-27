@@ -169,7 +169,7 @@ func TestHealthz(t *testing.T) {
 	Equals(t,
 		`{
   "status": "ok",
-  "atlantisVersion": "0.14.0",
+  "atlantis_version": "0.14.0",
 }`, string(body))
 }
 
