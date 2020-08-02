@@ -1,7 +1,5 @@
 module github.com/hashicorp/go-getter
 
-go 1.14
-
 require (
 	cloud.google.com/go v0.45.1
 	github.com/aws/aws-sdk-go v1.15.78
@@ -23,3 +21,5 @@ require (
 	google.golang.org/api v0.9.0
 	gopkg.in/cheggaaa/pb.v1 v1.0.27 // indirect
 )
+
+go 1.13

@@ -18,3 +18,5 @@ require (
 	google.golang.org/genproto v0.0.0-20180817151627-c66870c02cf8
 	honnef.co/go/tools v0.0.0-20190102054323-c2f93a96b099
 )
+
+go 1.13
