@@ -644,14 +644,6 @@ func (c *CheckRunAnnotation) GetBlobHRef() string {
 	return *c.BlobHRef
 }
 
-// GetEndColumn returns the EndColumn field if it's non-nil, zero value otherwise.
-func (c *CheckRunAnnotation) GetEndColumn() int {
-	if c == nil || c.EndColumn == nil {
-		return 0
-	}
-	return *c.EndColumn
-}
-
 // GetEndLine returns the EndLine field if it's non-nil, zero value otherwise.
 func (c *CheckRunAnnotation) GetEndLine() int {
 	if c == nil || c.EndLine == nil {
@@ -682,14 +674,6 @@ func (c *CheckRunAnnotation) GetRawDetails() string {
 		return ""
 	}
 	return *c.RawDetails
-}
-
-// GetStartColumn returns the StartColumn field if it's non-nil, zero value otherwise.
-func (c *CheckRunAnnotation) GetStartColumn() int {
-	if c == nil || c.StartColumn == nil {
-		return 0
-	}
-	return *c.StartColumn
 }
 
 // GetStartLine returns the StartLine field if it's non-nil, zero value otherwise.
@@ -7660,14 +7644,6 @@ func (p *PullRequest) GetLinks() *PRLinks {
 	return p.Links
 }
 
-// GetLocked returns the Locked field if it's non-nil, zero value otherwise.
-func (p *PullRequest) GetLocked() bool {
-	if p == nil || p.Locked == nil {
-		return false
-	}
-	return *p.Locked
-}
-
 // GetMaintainerCanModify returns the MaintainerCanModify field if it's non-nil, zero value otherwise.
 func (p *PullRequest) GetMaintainerCanModify() bool {
 	if p == nil || p.MaintainerCanModify == nil {
@@ -7754,14 +7730,6 @@ func (p *PullRequest) GetPatchURL() string {
 		return ""
 	}
 	return *p.PatchURL
-}
-
-// GetRebaseable returns the Rebaseable field if it's non-nil, zero value otherwise.
-func (p *PullRequest) GetRebaseable() bool {
-	if p == nil || p.Rebaseable == nil {
-		return false
-	}
-	return *p.Rebaseable
 }
 
 // GetReviewComments returns the ReviewComments field if it's non-nil, zero value otherwise.
