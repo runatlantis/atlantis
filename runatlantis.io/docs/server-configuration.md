@@ -206,9 +206,9 @@ Values are chosen in this order:
   Disable \"atlantis apply\" command so a specific project/workspace/directory has to
   be specified for applies.
 
-* ### `--disable-auto-plan`
+* ### `--disable-autoplan`
   ```bash
-  atlantis server --disable-auto-plan
+  atlantis server --disable-autoplan
   ```
   Disable atlantis auto planning    
 
