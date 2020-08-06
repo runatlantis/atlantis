@@ -57,7 +57,7 @@ require (
 	github.com/ulikunitz/xz v0.5.6 // indirect
 	github.com/urfave/cli v1.20.0
 	github.com/urfave/negroni v0.2.0
-	github.com/xanzy/go-gitlab v0.22.2-0.20191127083556-16a492660b8c
+	github.com/xanzy/go-gitlab v0.34.1
 	go.etcd.io/bbolt v1.3.4
 	golang.org/x/crypto v0.0.0-20200403201458-baeed622b8d8
 	golang.org/x/net v0.0.0-20191126235420-ef20fe5d7933 // indirect
