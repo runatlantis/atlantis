@@ -1,0 +1,12 @@
+version: 2.1
+
+jobs:
+  build:
+    docker:
+      - image: circleci/golang:1.13.3
+    steps:
+      - run:
+          name: This is needed to get CircleCI building on branches 
+          command: |
+            echo 'This will be overwritten once PR 72 is merged!'
+            
