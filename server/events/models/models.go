@@ -97,6 +97,7 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 
 	// We url encode because we're using them in a URL and weird characters can
 	// mess up git.
+	cloneURL = strings.Replace(cloneURL, " ", "%20", -1)
 	escapedVCSUser := url.QueryEscape(vcsUser)
 	escapedVCSToken := url.QueryEscape(vcsToken)
 	auth := fmt.Sprintf("%s:%s@", escapedVCSUser, escapedVCSToken)

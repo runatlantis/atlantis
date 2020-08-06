@@ -66,6 +66,19 @@ func TestNewRepo_CloneURLBitbucketServer(t *testing.T) {
 	}, repo)
 }
 
+// If the clone URL contains a space, NewRepo() should encode it
+func TestNewRepo_CloneURLContainsSpace(t *testing.T) {
+	repo, err := models.NewRepo(models.AzureDevops, "owner/project space/repo", "https://dev.azure.com/owner/project space/repo", "u", "p")
+	Ok(t, err)
+	Equals(t, repo.CloneURL, "https://u:p@dev.azure.com/owner/project%20space/repo")
+	Equals(t, repo.SanitizedCloneURL, "https://u:<redacted>@dev.azure.com/owner/project%20space/repo")
+
+	repo, err = models.NewRepo(models.BitbucketCloud, "owner/repo space", "https://bitbucket.org/owner/repo space", "u", "p")
+	Ok(t, err)
+	Equals(t, repo.CloneURL, "https://u:p@bitbucket.org/owner/repo%20space.git")
+	Equals(t, repo.SanitizedCloneURL, "https://u:<redacted>@bitbucket.org/owner/repo%20space.git")
+}
+
 func TestNewRepo_FullNameWrongFormat(t *testing.T) {
 	cases := []struct {
 		repoFullName string
