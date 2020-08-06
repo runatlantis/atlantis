@@ -71,11 +71,15 @@ const (
 	PortFlag                   = "port"
 	RepoConfigFlag             = "repo-config"
 	RepoConfigJSONFlag         = "repo-config-json"
+	// RepoWhitelistFlag is deprecated for RepoAllowlistFlag.
 	RepoWhitelistFlag          = "repo-whitelist"
+	RepoAllowlistFlag          = "repo-allowlist"
 	RequireApprovalFlag        = "require-approval"
 	RequireMergeableFlag       = "require-mergeable"
 	SilenceForkPRErrorsFlag    = "silence-fork-pr-errors"
 	SilenceVCSStatusNoPlans    = "silence-vcs-status-no-plans"
+	SilenceAllowlistErrorsFlag = "silence-allowlist-errors"
+	// SilenceWhitelistErrorsFlag is deprecated for SilenceAllowlistErrorsFlag.
 	SilenceWhitelistErrorsFlag = "silence-whitelist-errors"
 	SlackTokenFlag             = "slack-token"
 	SSLCertFileFlag            = "ssl-cert-file"
@@ -208,11 +212,15 @@ var stringFlags = map[string]stringFlag{
 	RepoConfigJSONFlag: {
 		description: "Specify repo config as a JSON string. Useful if you don't want to write a config file to disk.",
 	},
-	RepoWhitelistFlag: {
+	RepoAllowlistFlag: {
 		description: "Comma separated list of repositories that Atlantis will operate on. " +
 			"The format is {hostname}/{owner}/{repo}, ex. github.com/runatlantis/atlantis. '*' matches any characters until the next comma. Examples: " +
 			"all repos: '*' (not secure), an entire hostname: 'internalgithub.com/*' or an organization: 'github.com/runatlantis/*'." +
 			" For Bitbucket Server, {owner} is the name of the project (not the key).",
+	},
+	RepoWhitelistFlag: {
+		description: "[Deprecated for --repo-allowlist].",
+		hidden:      true,
 	},
 	SlackTokenFlag: {
 		description: "API token for Slack notifications.",
@@ -293,9 +301,14 @@ var boolFlags = map[string]boolFlag{
 		description:  "Silences VCS commit status when autoplan finds no projects to plan.",
 		defaultValue: false,
 	},
-	SilenceWhitelistErrorsFlag: {
-		description:  "Silences the posting of whitelist error comments.",
+	SilenceAllowlistErrorsFlag: {
+		description:  "Silences the posting of allowlist error comments.",
 		defaultValue: false,
+	},
+	SilenceWhitelistErrorsFlag: {
+		description:  "[Deprecated for --silence-allowlist-errors].",
+		defaultValue: false,
+		hidden:       true,
 	},
 	DisableMarkdownFoldingFlag: {
 		description:  "Toggle off folding in markdown output.",
@@ -575,11 +588,21 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		return vcsErr
 	}
 
-	if userConfig.RepoWhitelist == "" {
-		return fmt.Errorf("--%s must be set for security purposes", RepoWhitelistFlag)
+	// Handle deprecation of repo whitelist.
+	if userConfig.RepoWhitelist == "" && userConfig.RepoAllowlist == "" {
+		return fmt.Errorf("--%s must be set for security purposes", RepoAllowlistFlag)
+	}
+	if userConfig.RepoAllowlist != "" && userConfig.RepoWhitelist != "" {
+		return fmt.Errorf("both --%s and --%s cannot be set–use --%s", RepoAllowlistFlag, RepoWhitelistFlag, RepoAllowlistFlag)
 	}
 	if strings.Contains(userConfig.RepoWhitelist, "://") {
 		return fmt.Errorf("--%s cannot contain ://, should be hostnames only", RepoWhitelistFlag)
+	}
+	if strings.Contains(userConfig.RepoAllowlist, "://") {
+		return fmt.Errorf("--%s cannot contain ://, should be hostnames only", RepoAllowlistFlag)
+	}
+	if userConfig.SilenceAllowlistErrors && userConfig.SilenceWhitelistErrors {
+		return fmt.Errorf("both --%s and --%s cannot be set–use --%s", SilenceAllowlistErrorsFlag, SilenceWhitelistErrorsFlag, SilenceAllowlistErrorsFlag)
 	}
 
 	if userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && userConfig.BitbucketWebhookSecret != "" {
@@ -674,7 +697,7 @@ func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 		s.Logger.Warn("no Bitbucket webhook secret set. This could allow attackers to spoof requests from Bitbucket")
 	}
 	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && !s.SilenceOutput {
-		s.Logger.Warn("Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are whitelisting Bitbucket IPs")
+		s.Logger.Warn("Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are allowing only Bitbucket IPs")
 	}
 	if userConfig.AzureDevopsWebhookUser != "" && userConfig.AzureDevopsWebhookPassword == "" && !s.SilenceOutput {
 		s.Logger.Warn("no Azure DevOps webhook user and password set. This could allow attackers to spoof requests from Azure DevOps.")
@@ -727,6 +750,15 @@ func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
 		)
 		fmt.Println(warning)
 	}
+
+	// Handle repo whitelist deprecation.
+	if userConfig.SilenceWhitelistErrors {
+		userConfig.SilenceAllowlistErrors = true
+	}
+	if userConfig.RepoWhitelist != "" {
+		userConfig.RepoAllowlist = userConfig.RepoWhitelist
+	}
+
 	return nil
 }
 

@@ -17,16 +17,16 @@ resource "null_resource" "null" {
 
 ## Bitbucket Cloud (bitbucket.org)
 ::: danger
-Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are whitelisting Bitbucket IPs.
+Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are allowing only Bitbucket IPs.
 :::
 Bitbucket Cloud doesn't support webhook secrets. This means that an attacker could
 make fake requests to Atlantis that look like they're coming from Bitbucket.
 
-If you are specifying `--repo-whitelist` then they could only fake requests pertaining
+If you are specifying `--repo-allowlist` then they could only fake requests pertaining
 to those repos so the most damage they could do would be to plan/apply on your
 own repos.
 
-To prevent this, whitelist [Bitbucket's IP addresses](https://confluence.atlassian.com/bitbucket/what-are-the-bitbucket-cloud-ip-addresses-i-should-use-to-configure-my-corporate-firewall-343343385.html)
+To prevent this, allowlist [Bitbucket's IP addresses](https://confluence.atlassian.com/bitbucket/what-are-the-bitbucket-cloud-ip-addresses-i-should-use-to-configure-my-corporate-firewall-343343385.html)
  (see Outbound IPv4 addresses).
 
 ## Mitigations
@@ -37,19 +37,19 @@ Because anyone can comment on public pull requests, even with all the security m
 If you're running on a public repo (which isn't recommended, see above) you shouldn't set `--allow-fork-prs` (defaults to false)
 because anyone can open up a pull request from their fork to your repo.
 
-### `--repo-whitelist`
-Atlantis requires you to specify a whitelist of repositories it will accept webhooks from via the `--repo-whitelist` flag.
+### `--repo-allowlist`
+Atlantis requires you to specify a allowlist of repositories it will accept webhooks from via the `--repo-allowlist` flag.
 For example:
-* Specific repositories: `--repo-whitelist=github.com/runatlantis/atlantis,github.com/runatlantis/atlantis-tests`
-* Your whole organization: `--repo-whitelist=github.com/runatlantis/*`
-* Every repository in your GitHub Enterprise install: `--repo-whitelist=github.yourcompany.com/*`
-* All repositories: `--repo-whitelist=*`. Useful for when you're in a protected network but dangerous without also setting a webhook secret.
+* Specific repositories: `--repo-allowlist=github.com/runatlantis/atlantis,github.com/runatlantis/atlantis-tests`
+* Your whole organization: `--repo-allowlist=github.com/runatlantis/*`
+* Every repository in your GitHub Enterprise install: `--repo-allowlist=github.yourcompany.com/*`
+* All repositories: `--repo-allowlist=*`. Useful for when you're in a protected network but dangerous without also setting a webhook secret.
 
 This flag ensures your Atlantis install isn't being used with repositories you don't control. See `atlantis server --help` for more details.
 
 ### Webhook Secrets
 Atlantis should be run with Webhook secrets set via the `$ATLANTIS_GH_WEBHOOK_SECRET`/`$ATLANTIS_GITLAB_WEBHOOK_SECRET` environment variables.
-Even with the `--repo-whitelist` flag set, without a webhook secret, attackers could make requests to Atlantis posing as a repository that is whitelisted.
+Even with the `--repo-allowlist` flag set, without a webhook secret, attackers could make requests to Atlantis posing as a repository that is allowlisted.
 Webhook secrets ensure that the webhook requests are actually coming from your VCS provider (GitHub or GitLab).
 
 :::tip Tip

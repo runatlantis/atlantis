@@ -41,7 +41,9 @@ type UserConfig struct {
 	Port                       int    `mapstructure:"port"`
 	RepoConfig                 string `mapstructure:"repo-config"`
 	RepoConfigJSON             string `mapstructure:"repo-config-json"`
-	RepoWhitelist              string `mapstructure:"repo-whitelist"`
+	RepoAllowlist              string `mapstructure:"repo-allowlist"`
+	// RepoWhitelist is deprecated in favour of RepoAllowlist.
+	RepoWhitelist string `mapstructure:"repo-whitelist"`
 
 	// RequireApproval is whether to require pull request approval before
 	// allowing terraform apply's to be run.
@@ -52,18 +54,20 @@ type UserConfig struct {
 	SilenceForkPRErrors bool `mapstructure:"silence-fork-pr-errors"`
 	// SilenceVCSStatusNoPlans is whether autoplan should set commit status if no plans
 	// are found.
-	SilenceVCSStatusNoPlans bool            `mapstructure:"silence-vcs-status-no-plans"`
-	SilenceWhitelistErrors  bool            `mapstructure:"silence-whitelist-errors"`
-	SlackToken              string          `mapstructure:"slack-token"`
-	SSLCertFile             string          `mapstructure:"ssl-cert-file"`
-	SSLKeyFile              string          `mapstructure:"ssl-key-file"`
-	TFDownloadURL           string          `mapstructure:"tf-download-url"`
-	TFEHostname             string          `mapstructure:"tfe-hostname"`
-	TFEToken                string          `mapstructure:"tfe-token"`
-	VCSStatusName           string          `mapstructure:"vcs-status-name"`
-	DefaultTFVersion        string          `mapstructure:"default-tf-version"`
-	Webhooks                []WebhookConfig `mapstructure:"webhooks"`
-	WriteGitCreds           bool            `mapstructure:"write-git-creds"`
+	SilenceVCSStatusNoPlans bool `mapstructure:"silence-vcs-status-no-plans"`
+	SilenceAllowlistErrors  bool `mapstructure:"silence-allowlist-errors"`
+	// SilenceWhitelistErrors is deprecated in favour of SilenceAllowlistErrors
+	SilenceWhitelistErrors bool            `mapstructure:"silence-whitelist-errors"`
+	SlackToken             string          `mapstructure:"slack-token"`
+	SSLCertFile            string          `mapstructure:"ssl-cert-file"`
+	SSLKeyFile             string          `mapstructure:"ssl-key-file"`
+	TFDownloadURL          string          `mapstructure:"tf-download-url"`
+	TFEHostname            string          `mapstructure:"tfe-hostname"`
+	TFEToken               string          `mapstructure:"tfe-token"`
+	VCSStatusName          string          `mapstructure:"vcs-status-name"`
+	DefaultTFVersion       string          `mapstructure:"default-tf-version"`
+	Webhooks               []WebhookConfig `mapstructure:"webhooks"`
+	WriteGitCreds          bool            `mapstructure:"write-git-creds"`
 }
 
 // ToLogLevel returns the LogLevel object corresponding to the user-passed

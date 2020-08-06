@@ -102,8 +102,8 @@ Next, edit the manifests below as follows:
 1. Replace `<VERSION>` in `image: runatlantis/atlantis:<VERSION>` with the most recent version from [https://github.com/runatlantis/atlantis/releases/latest](https://github.com/runatlantis/atlantis/releases/latest).
     * NOTE: You never want to run with `:latest` because if your Pod moves to a new node, Kubernetes will pull the latest image and you might end
 up upgrading Atlantis by accident!
-2. Replace `value: github.com/yourorg/*` under `name: ATLANTIS_REPO_WHITELIST` with the whitelist pattern
-for your Terraform repos. See [Repo Whitelist](server-configuration.html#repo-whitelist) for more details.
+2. Replace `value: github.com/yourorg/*` under `name: ATLANTIS_REPO_ALLOWLIST` with the allowlist pattern
+for your Terraform repos. See [Repo Allowlist](server-configuration.html#repo-allowlist) for more details.
 3. If you're using GitHub:
     1. Replace `<YOUR_GITHUB_USER>` with the username of your Atlantis GitHub user without the `@`.
     2. Delete all the `ATLANTIS_GITLAB_*`, `ATLANTIS_BITBUCKET_*`, and `ATLANTIS_AZUREDEVOPS_*` environment variables.
@@ -147,8 +147,8 @@ spec:
       - name: atlantis
         image: runatlantis/atlantis:v<VERSION> # 1. Replace <VERSION> with the most recent release.
         env:
-        - name: ATLANTIS_REPO_WHITELIST
-          value: github.com/yourorg/* # 2. Replace this with your own repo whitelist.
+        - name: ATLANTIS_REPO_ALLOWLIST
+          value: github.com/yourorg/* # 2. Replace this with your own repo allowlist.
 
         ### GitHub Config ###
         - name: ATLANTIS_GH_USER
@@ -295,8 +295,8 @@ spec:
       - name: atlantis
         image: runatlantis/atlantis:v<VERSION> # 1. Replace <VERSION> with the most recent release.
         env:
-        - name: ATLANTIS_REPO_WHITELIST
-          value: github.com/yourorg/* # 2. Replace this with your own repo whitelist.
+        - name: ATLANTIS_REPO_ALLOWLIST
+          value: github.com/yourorg/* # 2. Replace this with your own repo allowlist.
 
         ### GitHub Config ###
         - name: ATLANTIS_GH_USER
@@ -451,8 +451,8 @@ patchesStrategicMerge:
  containers:
   - name: atlantis
     env:
-      - name: ATLANTIS_REPO_WHITELIST
-        value: github.com/yourorg/* # 2. Replace this with your own repo whitelist.
+      - name: ATLANTIS_REPO_ALLOWLIST
+        value: github.com/yourorg/* # 2. Replace this with your own repo allowlist.
 ```
 
 #### GitLab
@@ -575,7 +575,7 @@ atlantis server \
 --gh-user="$USERNAME" \
 --gh-token="$TOKEN" \
 --gh-webhook-secret="$SECRET" \
---repo-whitelist="$REPO_WHITELIST"
+--repo-allowlist="$REPO_ALLOWLIST"
 ```
 
 ##### GitHub Enterprise
@@ -587,7 +587,7 @@ atlantis server \
 --gh-token="$TOKEN" \
 --gh-webhook-secret="$SECRET" \
 --gh-hostname="$HOSTNAME" \
---repo-whitelist="$REPO_WHITELIST"
+--repo-allowlist="$REPO_ALLOWLIST"
 ```
 
 ##### GitLab
@@ -597,7 +597,7 @@ atlantis server \
 --gitlab-user="$USERNAME" \
 --gitlab-token="$TOKEN" \
 --gitlab-webhook-secret="$SECRET" \
---repo-whitelist="$REPO_WHITELIST"
+--repo-allowlist="$REPO_ALLOWLIST"
 ```
 
 ##### GitLab Enterprise
@@ -609,7 +609,7 @@ atlantis server \
 --gitlab-token="$TOKEN" \
 --gitlab-webhook-secret="$SECRET" \
 --gitlab-hostname="$HOSTNAME" \
---repo-whitelist="$REPO_WHITELIST"
+--repo-allowlist="$REPO_ALLOWLIST"
 ```
 
 ##### Bitbucket Cloud (bitbucket.org)
@@ -618,7 +618,7 @@ atlantis server \
 --atlantis-url="$URL" \
 --bitbucket-user="$USERNAME" \
 --bitbucket-token="$TOKEN" \
---repo-whitelist="$REPO_WHITELIST"
+--repo-allowlist="$REPO_ALLOWLIST"
 ```
 
 ##### Bitbucket Server (aka Stash)
@@ -630,7 +630,7 @@ atlantis server \
 --bitbucket-token="$TOKEN" \
 --bitbucket-webhook-secret="$SECRET" \
 --bitbucket-base-url="$BASE_URL" \
---repo-whitelist="$REPO_WHITELIST"
+--repo-allowlist="$REPO_ALLOWLIST"
 ```
 
 ##### Azure DevOps
@@ -644,7 +644,7 @@ atlantis server \
 --azuredevops-token="$TOKEN" \
 --azuredevops-webhook-user="$ATLANTIS_AZUREDEVOPS_WEBHOOK_USER" \
 --azuredevops-webhook-password="$ATLANTIS_AZUREDEVOPS_WEBHOOK_PASSWORD" \
---repo-whitelist="$REPO_WHITELIST"
+--repo-allowlist="$REPO_ALLOWLIST"
 --ssl-cert-file=file.crt
 --ssl-key-file=file.key
 ```
@@ -662,9 +662,9 @@ Where
     you can specify it in a config file
      (see [Configuration](/docs/server-configuration.html#environment-variables))
       or as an environment variable: `ATLANTIS_GH_WEBHOOK_SECRET` or `ATLANTIS_GITLAB_WEBHOOK_SECRET`
-- `$REPO_WHITELIST` is which repos Atlantis can run on, ex.
+- `$REPO_ALLOWLIST` is which repos Atlantis can run on, ex.
  `github.com/runatlantis/*` or `github.enterprise.corp.com/*`.
-  See [Repo Whitelist](server-configuration.html#repo-whitelist) for more details.
+  See [Repo Allowlist](server-configuration.html#repo-allowlist) for more details.
 
 Atlantis is now running!
 ::: tip

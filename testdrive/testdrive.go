@@ -219,7 +219,7 @@ tunnels:
 	serverReadyLog := regexp.MustCompile("Atlantis started - listening on port 4141")
 	serverReadyTimeout := 5 * time.Second
 	cancelAtlantis, atlantisErrors, err := execAndWaitForStderr(&wg, serverReadyLog, serverReadyTimeout,
-		os.Args[0], "server", "--gh-user", githubUsername, "--gh-token", githubToken, "--data-dir", tmpDir, "--atlantis-url", tunnelURL, "--repo-whitelist", fmt.Sprintf("github.com/%s/%s", githubUsername, terraformExampleRepo))
+		os.Args[0], "server", "--gh-user", githubUsername, "--gh-token", githubToken, "--data-dir", tmpDir, "--atlantis-url", tunnelURL, "--repo-allowlist", fmt.Sprintf("github.com/%s/%s", githubUsername, terraformExampleRepo))
 	// Check if we got a fast error. Move on if we haven't (the command is still running).
 	if err != nil {
 		return errors.Wrap(err, "creating atlantis server")
