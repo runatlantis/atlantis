@@ -20,6 +20,7 @@ incompatible changes that were needed to fully support the V4 Gitlab API.
 This API client package covers most of the existing Gitlab API calls and is updated regularly
 to add new and/or missing endpoints. Currently the following services are supported:
 
+- [x] Applications
 - [x] Award Emojis
 - [x] Branches
 - [x] Broadcast Messages
@@ -166,7 +167,7 @@ For complete usage of go-gitlab, see the full [package docs](https://godoc.org/g
 
 ## Author
 
-Sander van Harmelen (<sander@xanzy.io>)
+Sander van Harmelen (<sander@vanharmelen.nl>)
 
 ## License
 

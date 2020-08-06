@@ -55,11 +55,11 @@ type Settings struct {
 	ContainerRegistryTokenExpireDelay         int               `json:"container_registry_token_expire_delay"`
 	DefaultArtifactsExpireIn                  string            `json:"default_artifacts_expire_in"`
 	DefaultBranchProtection                   int               `json:"default_branch_protection"`
-	DefaultGroupVisibility                    *VisibilityValue  `json:"default_group_visibility"`
+	DefaultGroupVisibility                    VisibilityValue   `json:"default_group_visibility"`
 	DefaultProjectCreation                    int               `json:"default_project_creation"`
 	DefaultProjectsLimit                      int               `json:"default_projects_limit"`
-	DefaultProjectVisibility                  *VisibilityValue  `json:"default_project_visibility"`
-	DefaultSnippetVisibility                  *VisibilityValue  `json:"default_snippet_visibility"`
+	DefaultProjectVisibility                  VisibilityValue   `json:"default_project_visibility"`
+	DefaultSnippetVisibility                  VisibilityValue   `json:"default_snippet_visibility"`
 	DiffMaxPatchBytes                         int               `json:"diff_max_patch_bytes"`
 	DisabledOauthSignInSources                []string          `json:"disabled_oauth_sign_in_sources"`
 	DNSRebindingProtectionEnabled             bool              `json:"dns_rebinding_protection_enabled"`

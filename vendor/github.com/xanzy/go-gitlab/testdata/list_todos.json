@@ -1,0 +1,18 @@
+[
+  {
+    "id": 1,
+    "state": "pending",
+    "target": {
+      "id": 1,
+      "approvals_before_merge": 2
+    }
+  },
+  {
+    "id": 2,
+    "state": "pending",
+    "target": {
+      "id": 2,
+      "approvals_before_merge": null
+    }
+  }
+]

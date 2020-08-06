@@ -64,6 +64,7 @@ type MergeRequest struct {
 	Subscribed                bool         `json:"subscribed"`
 	SHA                       string       `json:"sha"`
 	MergeCommitSHA            string       `json:"merge_commit_sha"`
+	SquashCommitSHA           string       `json:"squash_commit_sha"`
 	UserNotesCount            int          `json:"user_notes_count"`
 	ChangesCount              string       `json:"changes_count"`
 	ShouldRemoveSourceBranch  bool         `json:"should_remove_source_branch"`
@@ -97,6 +98,7 @@ type MergeRequest struct {
 		Count          int `json:"count"`
 		CompletedCount int `json:"completed_count"`
 	} `json:"task_completion_status"`
+	HasConflicts bool `json:"has_conflicts"`
 }
 
 func (m MergeRequest) String() string {

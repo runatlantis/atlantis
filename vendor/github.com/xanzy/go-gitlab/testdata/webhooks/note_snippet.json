@@ -1,0 +1,61 @@
+{
+  "object_kind": "note",
+  "user": {
+    "name": "Administrator",
+    "username": "root",
+    "avatar_url": "http://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=40\u0026d=identicon"
+  },
+  "project_id": 5,
+  "project": {
+    "id": 5,
+    "name": "Gitlab Test",
+    "description": "Aut reprehenderit ut est.",
+    "web_url": "http://example.com/gitlab-org/gitlab-test",
+    "avatar_url": null,
+    "git_ssh_url": "git@example.com:gitlab-org/gitlab-test.git",
+    "git_http_url": "http://example.com/gitlab-org/gitlab-test.git",
+    "namespace": "Gitlab Org",
+    "visibility_level": 10,
+    "path_with_namespace": "gitlab-org/gitlab-test",
+    "default_branch": "master",
+    "homepage": "http://example.com/gitlab-org/gitlab-test",
+    "url": "http://example.com/gitlab-org/gitlab-test.git",
+    "ssh_url": "git@example.com:gitlab-org/gitlab-test.git",
+    "http_url": "http://example.com/gitlab-org/gitlab-test.git"
+  },
+  "repository": {
+    "name": "Gitlab Test",
+    "url": "http://example.com/gitlab-org/gitlab-test.git",
+    "description": "Aut reprehenderit ut est.",
+    "homepage": "http://example.com/gitlab-org/gitlab-test"
+  },
+  "object_attributes": {
+    "id": 1245,
+    "note": "Is this snippet doing what it's supposed to be doing?",
+    "noteable_type": "Snippet",
+    "author_id": 1,
+    "created_at": "2015-05-17 18:35:50 UTC",
+    "updated_at": "2015-05-17 18:35:50 UTC",
+    "project_id": 5,
+    "attachment": null,
+    "line_code": null,
+    "commit_id": "",
+    "noteable_id": 53,
+    "system": false,
+    "st_diff": null,
+    "url": "http://example.com/gitlab-org/gitlab-test/snippets/53#note_1245"
+  },
+  "snippet": {
+    "id": 53,
+    "title": "test",
+    "content": "puts 'Hello world'",
+    "author_id": 1,
+    "project_id": 5,
+    "created_at": "2016-01-04T15:31:46.176Z",
+    "updated_at": "2016-01-04T15:31:46.176Z",
+    "file_name": "test.rb",
+    "expires_at": null,
+    "type": "ProjectSnippet",
+    "visibility_level": 0
+  }
+}

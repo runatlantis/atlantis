@@ -44,6 +44,7 @@ type ProjectCluster struct {
 	ClusterType        string              `json:"cluster_type"`
 	User               *User               `json:"user"`
 	PlatformKubernetes *PlatformKubernetes `json:"platform_kubernetes"`
+	ManagementProject  *ManagementProject  `json:"management_project"`
 	Project            *Project            `json:"project"`
 }
 
@@ -58,6 +59,17 @@ type PlatformKubernetes struct {
 	CaCert            string `json:"ca_cert"`
 	Namespace         string `json:"namespace"`
 	AuthorizationType string `json:"authorization_type"`
+}
+
+// ManagementProject represents a GitLab Project Cluster management_project.
+type ManagementProject struct {
+	ID                int        `json:"id"`
+	Description       string     `json:"description"`
+	Name              string     `json:"name"`
+	NameWithNamespace string     `json:"name_with_namespace"`
+	Path              string     `json:"path"`
+	PathWithNamespace string     `json:"path_with_namespace"`
+	CreatedAt         *time.Time `json:"created_at"`
 }
 
 // ListClusters gets a list of all clusters in a project.
@@ -115,12 +127,13 @@ func (s *ProjectClustersService) GetCluster(pid interface{}, cluster int, option
 // GitLab API docs:
 // https://docs.gitlab.com/ee/api/project_clusters.html#add-existing-cluster-to-project
 type AddClusterOptions struct {
-	Name               *string                       `url:"name,omitempty" json:"name,omitempty"`
-	Domain             *string                       `url:"domain,omitempty" json:"domain,omitempty"`
-	Enabled            *bool                         `url:"enabled,omitempty" json:"enabled,omitempty"`
-	Managed            *bool                         `url:"managed,omitempty" json:"managed,omitempty"`
-	EnvironmentScope   *string                       `url:"environment_scope,omitempty" json:"environment_scope,omitempty"`
-	PlatformKubernetes *AddPlatformKubernetesOptions `url:"platform_kubernetes_attributes,omitempty" json:"platform_kubernetes_attributes,omitempty"`
+	Name                *string                       `url:"name,omitempty" json:"name,omitempty"`
+	Domain              *string                       `url:"domain,omitempty" json:"domain,omitempty"`
+	Enabled             *bool                         `url:"enabled,omitempty" json:"enabled,omitempty"`
+	Managed             *bool                         `url:"managed,omitempty" json:"managed,omitempty"`
+	EnvironmentScope    *string                       `url:"environment_scope,omitempty" json:"environment_scope,omitempty"`
+	PlatformKubernetes  *AddPlatformKubernetesOptions `url:"platform_kubernetes_attributes,omitempty" json:"platform_kubernetes_attributes,omitempty"`
+	ManagementProjectID *string                       `url:"management_project_id,omitempty" json:"management_project_id,omitempty"`
 }
 
 // AddPlatformKubernetesOptions represents the available PlatformKubernetes options for adding.
@@ -162,10 +175,11 @@ func (s *ProjectClustersService) AddCluster(pid interface{}, opt *AddClusterOpti
 // GitLab API docs:
 // https://docs.gitlab.com/ee/api/project_clusters.html#edit-project-cluster
 type EditClusterOptions struct {
-	Name               *string                        `url:"name,omitempty" json:"name,omitempty"`
-	Domain             *string                        `url:"domain,omitempty" json:"domain,omitempty"`
-	EnvironmentScope   *string                        `url:"environment_scope,omitempty" json:"environment_scope,omitempty"`
-	PlatformKubernetes *EditPlatformKubernetesOptions `url:"platform_kubernetes_attributes,omitempty" json:"platform_kubernetes_attributes,omitempty"`
+	Name                *string                        `url:"name,omitempty" json:"name,omitempty"`
+	Domain              *string                        `url:"domain,omitempty" json:"domain,omitempty"`
+	EnvironmentScope    *string                        `url:"environment_scope,omitempty" json:"environment_scope,omitempty"`
+	ManagementProjectID *string                        `url:"management_project_id,omitempty" json:"management_project_id,omitempty"`
+	PlatformKubernetes  *EditPlatformKubernetesOptions `url:"platform_kubernetes_attributes,omitempty" json:"platform_kubernetes_attributes,omitempty"`
 }
 
 // EditPlatformKubernetesOptions represents the available PlatformKubernetes options for editing.

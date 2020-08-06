@@ -1,0 +1,10 @@
+{
+  "event_name": "user_failed_login",
+  "created_at": "2017-10-03T06:08:48Z",
+  "updated_at": "2018-01-15T04:52:06Z",
+  "name": "John Smith",
+  "email": "user4@example.com",
+  "user_id": 26,
+  "username": "user4",
+  "state": "blocked"
+}

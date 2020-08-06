@@ -70,12 +70,13 @@ func (c Commit) String() string {
 // GitLab API docs: https://docs.gitlab.com/ce/api/commits.html#list-repository-commits
 type ListCommitsOptions struct {
 	ListOptions
-	RefName   *string    `url:"ref_name,omitempty" json:"ref_name,omitempty"`
-	Since     *time.Time `url:"since,omitempty" json:"since,omitempty"`
-	Until     *time.Time `url:"until,omitempty" json:"until,omitempty"`
-	Path      *string    `url:"path,omitempty" json:"path,omitempty"`
-	All       *bool      `url:"all,omitempty" json:"all,omitempty"`
-	WithStats *bool      `url:"with_stats,omitempty" json:"with_stats,omitempty"`
+	RefName     *string    `url:"ref_name,omitempty" json:"ref_name,omitempty"`
+	Since       *time.Time `url:"since,omitempty" json:"since,omitempty"`
+	Until       *time.Time `url:"until,omitempty" json:"until,omitempty"`
+	Path        *string    `url:"path,omitempty" json:"path,omitempty"`
+	All         *bool      `url:"all,omitempty" json:"all,omitempty"`
+	WithStats   *bool      `url:"with_stats,omitempty" json:"with_stats,omitempty"`
+	FirstParent *bool      `url:"first_parent,omitempty" json:"first_parent,omitempty"`
 }
 
 // ListCommits gets a list of repository commits in a project.

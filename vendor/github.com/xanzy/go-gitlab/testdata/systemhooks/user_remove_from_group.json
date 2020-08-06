@@ -1,0 +1,13 @@
+{
+  "created_at": "2012-07-21T07:30:56Z",
+  "updated_at": "2012-07-21T07:38:22Z",
+  "event_name": "user_remove_from_group",
+  "group_access": "Maintainer",
+  "group_id": 78,
+  "group_name": "StoreCloud",
+  "group_path": "storecloud",
+  "user_email": "johnsmith@gmail.com",
+  "user_name": "John Smith",
+  "user_username": "johnsmith",
+  "user_id": 41
+}

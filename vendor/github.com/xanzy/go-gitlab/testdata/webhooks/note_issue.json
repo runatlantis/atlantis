@@ -1,0 +1,64 @@
+{
+  "object_kind": "note",
+  "user": {
+    "name": "Administrator",
+    "username": "root",
+    "avatar_url": "http://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=40\u0026d=identicon"
+  },
+  "project_id": 5,
+  "project":{
+    "id": 5,
+    "name":"Gitlab Test",
+    "description":"Aut reprehenderit ut est.",
+    "web_url":"http://example.com/gitlab-org/gitlab-test",
+    "avatar_url":null,
+    "git_ssh_url":"git@example.com:gitlab-org/gitlab-test.git",
+    "git_http_url":"http://example.com/gitlab-org/gitlab-test.git",
+    "namespace":"Gitlab Org",
+    "visibility_level":10,
+    "path_with_namespace":"gitlab-org/gitlab-test",
+    "default_branch":"master",
+    "homepage":"http://example.com/gitlab-org/gitlab-test",
+    "url":"http://example.com/gitlab-org/gitlab-test.git",
+    "ssh_url":"git@example.com:gitlab-org/gitlab-test.git",
+    "http_url":"http://example.com/gitlab-org/gitlab-test.git"
+  },
+  "repository":{
+    "name":"diaspora",
+    "url":"git@example.com:mike/diaspora.git",
+    "description":"",
+    "homepage":"http://example.com/mike/diaspora"
+  },
+  "object_attributes": {
+    "id": 1241,
+    "note": "Hello world",
+    "noteable_type": "Issue",
+    "author_id": 1,
+    "created_at": "2015-05-17 17:06:40 UTC",
+    "updated_at": "2015-05-17 17:06:40 UTC",
+    "project_id": 5,
+    "attachment": null,
+    "line_code": null,
+    "commit_id": "",
+    "noteable_id": 92,
+    "system": false,
+    "st_diff": null,
+    "url": "http://example.com/gitlab-org/gitlab-test/issues/17#note_1241"
+  },
+  "issue": {
+    "id": 92,
+    "title": "test",
+    "assignee_ids": [],
+    "assignee_id": null,
+    "author_id": 1,
+    "project_id": 5,
+    "created_at": "2016-01-04T15:31:46.176Z",
+    "updated_at": "2016-01-04T15:31:46.176Z",
+    "position": 0,
+    "branch_name": null,
+    "description": "test",
+    "milestone_id": null,
+    "state": "closed",
+    "iid": 17
+  }
+}

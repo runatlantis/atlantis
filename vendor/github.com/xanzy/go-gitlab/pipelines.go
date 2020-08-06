@@ -101,15 +101,17 @@ func (p PipelineInfo) String() string {
 // GitLab API docs: https://docs.gitlab.com/ce/api/pipelines.html#list-project-pipelines
 type ListProjectPipelinesOptions struct {
 	ListOptions
-	Scope      *string          `url:"scope,omitempty" json:"scope,omitempty"`
-	Status     *BuildStateValue `url:"status,omitempty" json:"status,omitempty"`
-	Ref        *string          `url:"ref,omitempty" json:"ref,omitempty"`
-	SHA        *string          `url:"sha,omitempty" json:"sha,omitempty"`
-	YamlErrors *bool            `url:"yaml_errors,omitempty" json:"yaml_errors,omitempty"`
-	Name       *string          `url:"name,omitempty" json:"name,omitempty"`
-	Username   *string          `url:"username,omitempty" json:"username,omitempty"`
-	OrderBy    *string          `url:"order_by,omitempty" json:"order_by,omitempty"`
-	Sort       *string          `url:"sort,omitempty" json:"sort,omitempty"`
+	Scope         *string          `url:"scope,omitempty" json:"scope,omitempty"`
+	Status        *BuildStateValue `url:"status,omitempty" json:"status,omitempty"`
+	Ref           *string          `url:"ref,omitempty" json:"ref,omitempty"`
+	SHA           *string          `url:"sha,omitempty" json:"sha,omitempty"`
+	YamlErrors    *bool            `url:"yaml_errors,omitempty" json:"yaml_errors,omitempty"`
+	Name          *string          `url:"name,omitempty" json:"name,omitempty"`
+	Username      *string          `url:"username,omitempty" json:"username,omitempty"`
+	UpdatedAfter  *time.Time       `url:"updated_after,omitempty" json:"updated_after,omitempty"`
+	UpdatedBefore *time.Time       `url:"update_before,omitempty" json:"updated_before,omitempty"`
+	OrderBy       *string          `url:"order_by,omitempty" json:"order_by,omitempty"`
+	Sort          *string          `url:"sort,omitempty" json:"sort,omitempty"`
 }
 
 // ListProjectPipelines gets a list of project piplines.

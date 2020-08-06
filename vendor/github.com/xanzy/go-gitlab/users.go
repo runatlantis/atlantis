@@ -24,9 +24,11 @@ import (
 
 // List a couple of standard errors.
 var (
-	ErrUserBlockPrevented   = errors.New("Cannot block a user that is already blocked by LDAP synchronization")
-	ErrUserNotFound         = errors.New("User does not exist")
-	ErrUserUnblockPrevented = errors.New("Cannot unblock a user that is blocked by LDAP synchronization")
+	ErrUserActivatePrevented   = errors.New("Cannot activate a user that is blocked by admin or by LDAP synchronization")
+	ErrUserBlockPrevented      = errors.New("Cannot block a user that is already blocked by LDAP synchronization")
+	ErrUserDeactivatePrevented = errors.New("Cannot deactivate a user that is blocked by admin or by LDAP synchronization, or that has any activity in past 180 days")
+	ErrUserNotFound            = errors.New("User does not exist")
+	ErrUserUnblockPrevented    = errors.New("Cannot unblock a user that is blocked by LDAP synchronization")
 )
 
 // UsersService handles communication with the user related methods of
@@ -155,26 +157,27 @@ func (s *UsersService) GetUser(user int, options ...OptionFunc) (*User, *Respons
 //
 // GitLab API docs: https://docs.gitlab.com/ce/api/users.html#user-creation
 type CreateUserOptions struct {
-	Email            *string `url:"email,omitempty" json:"email,omitempty"`
-	Password         *string `url:"password,omitempty" json:"password,omitempty"`
-	ResetPassword    *bool   `url:"reset_password,omitempty" json:"reset_password,omitempty"`
-	Username         *string `url:"username,omitempty" json:"username,omitempty"`
-	Name             *string `url:"name,omitempty" json:"name,omitempty"`
-	Skype            *string `url:"skype,omitempty" json:"skype,omitempty"`
-	Linkedin         *string `url:"linkedin,omitempty" json:"linkedin,omitempty"`
-	Twitter          *string `url:"twitter,omitempty" json:"twitter,omitempty"`
-	WebsiteURL       *string `url:"website_url,omitempty" json:"website_url,omitempty"`
-	Organization     *string `url:"organization,omitempty" json:"organization,omitempty"`
-	ProjectsLimit    *int    `url:"projects_limit,omitempty" json:"projects_limit,omitempty"`
-	ExternUID        *string `url:"extern_uid,omitempty" json:"extern_uid,omitempty"`
-	Provider         *string `url:"provider,omitempty" json:"provider,omitempty"`
-	Bio              *string `url:"bio,omitempty" json:"bio,omitempty"`
-	Location         *string `url:"location,omitempty" json:"location,omitempty"`
-	Admin            *bool   `url:"admin,omitempty" json:"admin,omitempty"`
-	CanCreateGroup   *bool   `url:"can_create_group,omitempty" json:"can_create_group,omitempty"`
-	SkipConfirmation *bool   `url:"skip_confirmation,omitempty" json:"skip_confirmation,omitempty"`
-	External         *bool   `url:"external,omitempty" json:"external,omitempty"`
-	PrivateProfile   *bool   `url:"private_profile,omitempty" json:"private_profile,omitempty"`
+	Email               *string `url:"email,omitempty" json:"email,omitempty"`
+	Password            *string `url:"password,omitempty" json:"password,omitempty"`
+	ResetPassword       *bool   `url:"reset_password,omitempty" json:"reset_password,omitempty"`
+	ForceRandomPassword *bool   `url:"force_random_password,omitempty" json:"force_random_password,omitempty"`
+	Username            *string `url:"username,omitempty" json:"username,omitempty"`
+	Name                *string `url:"name,omitempty" json:"name,omitempty"`
+	Skype               *string `url:"skype,omitempty" json:"skype,omitempty"`
+	Linkedin            *string `url:"linkedin,omitempty" json:"linkedin,omitempty"`
+	Twitter             *string `url:"twitter,omitempty" json:"twitter,omitempty"`
+	WebsiteURL          *string `url:"website_url,omitempty" json:"website_url,omitempty"`
+	Organization        *string `url:"organization,omitempty" json:"organization,omitempty"`
+	ProjectsLimit       *int    `url:"projects_limit,omitempty" json:"projects_limit,omitempty"`
+	ExternUID           *string `url:"extern_uid,omitempty" json:"extern_uid,omitempty"`
+	Provider            *string `url:"provider,omitempty" json:"provider,omitempty"`
+	Bio                 *string `url:"bio,omitempty" json:"bio,omitempty"`
+	Location            *string `url:"location,omitempty" json:"location,omitempty"`
+	Admin               *bool   `url:"admin,omitempty" json:"admin,omitempty"`
+	CanCreateGroup      *bool   `url:"can_create_group,omitempty" json:"can_create_group,omitempty"`
+	SkipConfirmation    *bool   `url:"skip_confirmation,omitempty" json:"skip_confirmation,omitempty"`
+	External            *bool   `url:"external,omitempty" json:"external,omitempty"`
+	PrivateProfile      *bool   `url:"private_profile,omitempty" json:"private_profile,omitempty"`
 }
 
 // CreateUser creates a new user. Note only administrators can create new users.
@@ -482,6 +485,62 @@ func (s *UsersService) UnblockUser(user int, options ...OptionFunc) error {
 		return nil
 	case 403:
 		return ErrUserUnblockPrevented
+	case 404:
+		return ErrUserNotFound
+	default:
+		return fmt.Errorf("Received unexpected result code: %d", resp.StatusCode)
+	}
+}
+
+// DeactivateUser deactivate the specified user. Available only for admin.
+//
+// GitLab API docs: https://docs.gitlab.com/ce/api/users.html#deactivate-user
+func (s *UsersService) DeactivateUser(user int, options ...OptionFunc) error {
+	u := fmt.Sprintf("users/%d/deactivate", user)
+
+	req, err := s.client.NewRequest("POST", u, nil, options)
+	if err != nil {
+		return err
+	}
+
+	resp, err := s.client.Do(req, nil)
+	if err != nil && resp == nil {
+		return err
+	}
+
+	switch resp.StatusCode {
+	case 201:
+		return nil
+	case 403:
+		return ErrUserDeactivatePrevented
+	case 404:
+		return ErrUserNotFound
+	default:
+		return fmt.Errorf("Received unexpected result code: %d", resp.StatusCode)
+	}
+}
+
+// ActivateUser activate the specified user. Available only for admin.
+//
+// GitLab API docs: https://docs.gitlab.com/ce/api/users.html#activate-user
+func (s *UsersService) ActivateUser(user int, options ...OptionFunc) error {
+	u := fmt.Sprintf("users/%d/activate", user)
+
+	req, err := s.client.NewRequest("POST", u, nil, options)
+	if err != nil {
+		return err
+	}
+
+	resp, err := s.client.Do(req, nil)
+	if err != nil && resp == nil {
+		return err
+	}
+
+	switch resp.StatusCode {
+	case 201:
+		return nil
+	case 403:
+		return ErrUserActivatePrevented
 	case 404:
 		return ErrUserNotFound
 	default:

@@ -1,0 +1,13 @@
+{
+  "created_at": "2012-07-21T07:30:58Z",
+  "updated_at": "2012-07-21T07:38:22Z",
+  "event_name": "project_transfer",
+  "name": "Underscore",
+  "path": "underscore",
+  "path_with_namespace": "scores/underscore",
+  "project_id": 73,
+  "owner_name": "John Smith",
+  "owner_email": "johnsmith@gmail.com",
+  "project_visibility": "internal",
+  "old_path_with_namespace": "jsmith/overscore"
+}

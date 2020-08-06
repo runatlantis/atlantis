@@ -1,0 +1,10 @@
+{
+  "created_at": "2012-07-21T07:30:54Z",
+  "updated_at": "2012-07-21T07:38:22Z",
+  "event_name": "group_create",
+  "name": "StoreCloud",
+  "owner_email": null,
+  "owner_name": null,
+  "path": "storecloud",
+  "group_id": 78
+}

@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"sort"
@@ -33,13 +34,19 @@ import (
 	"time"
 
 	"github.com/google/go-querystring/query"
+	"github.com/hashicorp/go-cleanhttp"
+	retryablehttp "github.com/hashicorp/go-retryablehttp"
 	"golang.org/x/oauth2"
+	"golang.org/x/time/rate"
 )
 
 const (
 	defaultBaseURL = "https://gitlab.com/"
 	apiVersionPath = "api/v4/"
 	userAgent      = "go-gitlab"
+
+	headerRateLimit = "RateLimit-Limit"
+	headerRateReset = "RateLimit-Reset"
 )
 
 // authType represents an authentication type within GitLab.
@@ -83,12 +90,25 @@ type BuildStateValue string
 // These constants represent all valid build states.
 const (
 	Pending  BuildStateValue = "pending"
+	Created  BuildStateValue = "created"
 	Running  BuildStateValue = "running"
 	Success  BuildStateValue = "success"
 	Failed   BuildStateValue = "failed"
 	Canceled BuildStateValue = "canceled"
 	Skipped  BuildStateValue = "skipped"
 	Manual   BuildStateValue = "manual"
+)
+
+// DeploymentStatusValue represents a Gitlab deployment status.
+type DeploymentStatusValue string
+
+// These constants represent all valid deployment statuses.
+const (
+	DeploymentStatusCreated  DeploymentStatusValue = "created"
+	DeploymentStatusRunning  DeploymentStatusValue = "running"
+	DeploymentStatusSuccess  DeploymentStatusValue = "success"
+	DeploymentStatusFailed   DeploymentStatusValue = "failed"
+	DeploymentStatusCanceled DeploymentStatusValue = "canceled"
 )
 
 // ISOTime represents an ISO 8601 formatted date
@@ -215,6 +235,33 @@ const (
 	PublicVisibility   VisibilityValue = "public"
 )
 
+// ProjectCreationLevelValue represents a project creation level within GitLab.
+//
+// GitLab API docs: https://docs.gitlab.com/ce/api/
+type ProjectCreationLevelValue string
+
+// List of available project creation levels.
+//
+// GitLab API docs: https://docs.gitlab.com/ce/api/
+const (
+	NoOneProjectCreation      ProjectCreationLevelValue = "noone"
+	MaintainerProjectCreation ProjectCreationLevelValue = "maintainer"
+	DeveloperProjectCreation  ProjectCreationLevelValue = "developer"
+)
+
+// SubGroupCreationLevelValue represents a sub group creation level within GitLab.
+//
+// GitLab API docs: https://docs.gitlab.com/ce/api/
+type SubGroupCreationLevelValue string
+
+// List of available sub group creation levels.
+//
+// GitLab API docs: https://docs.gitlab.com/ce/api/
+const (
+	OwnerSubGroupCreationLevelValue      SubGroupCreationLevelValue = "owner"
+	MaintainerSubGroupCreationLevelValue SubGroupCreationLevelValue = "maintainer"
+)
+
 // VariableTypeValue represents a variable type within GitLab.
 //
 // GitLab API docs: https://docs.gitlab.com/ce/api/
@@ -281,12 +328,15 @@ const (
 // A Client manages communication with the GitLab API.
 type Client struct {
 	// HTTP client used to communicate with the API.
-	client *http.Client
+	client *retryablehttp.Client
 
 	// Base URL for API requests. Defaults to the public GitLab API, but can be
 	// set to a domain endpoint to use with a self hosted GitLab server. baseURL
 	// should always be specified with a trailing slash.
 	baseURL *url.URL
+
+	// Limiter is used to limit API calls and prevent 429 responses.
+	limiter *rate.Limiter
 
 	// Token type used to make authenticated API calls.
 	authType authType
@@ -302,6 +352,7 @@ type Client struct {
 
 	// Services used for talking to different parts of the GitLab API.
 	AccessRequests        *AccessRequestsService
+	Applications          *ApplicationsService
 	AwardEmoji            *AwardEmojiService
 	Boards                *IssueBoardsService
 	Branches              *BranchesService
@@ -311,6 +362,7 @@ type Client struct {
 	ContainerRegistry     *ContainerRegistryService
 	CustomAttribute       *CustomAttributesService
 	DeployKeys            *DeployKeysService
+	DeployTokens          *DeployTokensService
 	Deployments           *DeploymentsService
 	Discussions           *DiscussionsService
 	Environments          *EnvironmentsService
@@ -438,20 +490,31 @@ func NewOAuthClient(httpClient *http.Client, token string) *Client {
 
 func newClient(httpClient *http.Client) *Client {
 	if httpClient == nil {
-		httpClient = http.DefaultClient
+		httpClient = cleanhttp.DefaultPooledClient()
 	}
 
-	c := &Client{client: httpClient, UserAgent: userAgent}
-	if err := c.SetBaseURL(defaultBaseURL); err != nil {
-		// Should never happen since defaultBaseURL is our constant.
-		panic(err)
+	c := &Client{UserAgent: userAgent}
+
+	// Configure the HTTP client.
+	c.client = &retryablehttp.Client{
+		Backoff:      c.retryHTTPBackoff,
+		CheckRetry:   c.retryHTTPCheck,
+		ErrorHandler: retryablehttp.PassthroughErrorHandler,
+		HTTPClient:   httpClient,
+		RetryWaitMin: 100 * time.Millisecond,
+		RetryWaitMax: 400 * time.Millisecond,
+		RetryMax:     30,
 	}
+
+	// Set the default base URL.
+	_ = c.SetBaseURL(defaultBaseURL)
 
 	// Create the internal timeStats service.
 	timeStats := &timeStatsService{client: c}
 
 	// Create all the public services.
 	c.AccessRequests = &AccessRequestsService{client: c}
+	c.Applications = &ApplicationsService{client: c}
 	c.AwardEmoji = &AwardEmojiService{client: c}
 	c.Boards = &IssueBoardsService{client: c}
 	c.Branches = &BranchesService{client: c}
@@ -461,6 +524,7 @@ func newClient(httpClient *http.Client) *Client {
 	c.ContainerRegistry = &ContainerRegistryService{client: c}
 	c.CustomAttribute = &CustomAttributesService{client: c}
 	c.DeployKeys = &DeployKeysService{client: c}
+	c.DeployTokens = &DeployTokensService{client: c}
 	c.Deployments = &DeploymentsService{client: c}
 	c.Discussions = &DiscussionsService{client: c}
 	c.Environments = &EnvironmentsService{client: c}
@@ -524,6 +588,64 @@ func newClient(httpClient *http.Client) *Client {
 	return c
 }
 
+// retryHTTPCheck provides a callback for Client.CheckRetry which
+// will retry both rate limit (429) and server (>= 500) errors.
+func (c *Client) retryHTTPCheck(ctx context.Context, resp *http.Response, err error) (bool, error) {
+	if ctx.Err() != nil {
+		return false, ctx.Err()
+	}
+	if err != nil {
+		return false, err
+	}
+	if resp.StatusCode == 429 || resp.StatusCode >= 500 {
+		return true, nil
+	}
+	return false, nil
+}
+
+// retryHTTPBackoff provides a generic callback for Client.Backoff which
+// will pass through all calls based on the status code of the response.
+func (c *Client) retryHTTPBackoff(min, max time.Duration, attemptNum int, resp *http.Response) time.Duration {
+	// Use the rate limit backoff function when we are rate limited.
+	if resp != nil && resp.StatusCode == 429 {
+		return rateLimitBackoff(min, max, attemptNum, resp)
+	}
+
+	// Set custom duration's when we experience a service interruption.
+	min = 700 * time.Millisecond
+	max = 900 * time.Millisecond
+
+	return retryablehttp.LinearJitterBackoff(min, max, attemptNum, resp)
+}
+
+// rateLimitBackoff provides a callback for Client.Backoff which will use the
+// RateLimit-Reset header to determine the time to wait. We add some jitter
+// to prevent a thundering herd.
+//
+// min and max are mainly used for bounding the jitter that will be added to
+// the reset time retrieved from the headers. But if the final wait time is
+// less then min, min will be used instead.
+func rateLimitBackoff(min, max time.Duration, attemptNum int, resp *http.Response) time.Duration {
+	// rnd is used to generate pseudo-random numbers.
+	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	// First create some jitter bounded by the min and max durations.
+	jitter := time.Duration(rnd.Float64() * float64(max-min))
+
+	if resp != nil {
+		if v := resp.Header.Get(headerRateReset); v != "" {
+			if reset, _ := strconv.ParseInt(v, 10, 64); reset > 0 {
+				// Only update min if the given time to wait is longer.
+				if wait := time.Until(time.Unix(reset, 0)); wait > min {
+					min = wait
+				}
+			}
+		}
+	}
+
+	return min + jitter
+}
+
 // BaseURL return a copy of the baseURL.
 func (c *Client) BaseURL() *url.URL {
 	u := *c.baseURL
@@ -550,6 +672,49 @@ func (c *Client) SetBaseURL(urlStr string) error {
 	// Update the base URL of the client.
 	c.baseURL = baseURL
 
+	// Reconfigure the rate limiter.
+	return c.configureLimiter()
+}
+
+// configureLimiter configures the rate limiter.
+func (c *Client) configureLimiter() error {
+	// Set default values for when rate limiting is disabled.
+	limit := rate.Inf
+	burst := 0
+
+	defer func() {
+		// Create a new limiter using the calculated values.
+		c.limiter = rate.NewLimiter(limit, burst)
+	}()
+
+	// Create a new request.
+	req, err := http.NewRequest("GET", c.baseURL.String(), nil)
+	if err != nil {
+		return err
+	}
+
+	// Make a single request to retrieve the rate limit headers.
+	resp, err := c.client.HTTPClient.Do(req)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+
+	if v := resp.Header.Get(headerRateLimit); v != "" {
+		if rateLimit, _ := strconv.ParseFloat(v, 64); rateLimit > 0 {
+			// The rate limit is based on requests per minute, so for our limiter to
+			// work correctly we devide the limit by 60 to get the limit per second.
+			rateLimit /= 60
+			// Configure the limit and burst using a split of 2/3 for the limit and
+			// 1/3 for the burst. This enables clients to burst 1/3 of the allowed
+			// calls before the limiter kicks in. The remaining calls will then be
+			// spread out evenly using intervals of time.Second / limit which should
+			// prevent hitting the rate limit.
+			limit = rate.Limit(rateLimit * 0.66)
+			burst = int(rateLimit * 0.33)
+		}
+	}
+
 	return nil
 }
 
@@ -558,7 +723,7 @@ func (c *Client) SetBaseURL(urlStr string) error {
 // Relative URL paths should always be specified without a preceding slash. If
 // specified, the value pointed to by body is JSON encoded and included as the
 // request body.
-func (c *Client) NewRequest(method, path string, opt interface{}, options []OptionFunc) (*http.Request, error) {
+func (c *Client) NewRequest(method, path string, opt interface{}, options []OptionFunc) (*retryablehttp.Request, error) {
 	u := *c.baseURL
 	unescaped, err := url.PathUnescape(path)
 	if err != nil {
@@ -576,15 +741,38 @@ func (c *Client) NewRequest(method, path string, opt interface{}, options []Opti
 		}
 		u.RawQuery = q.Encode()
 	}
+	// Create a request specific headers map.
+	reqHeaders := make(http.Header)
+	reqHeaders.Set("Accept", "application/json")
 
-	req := &http.Request{
-		Method:     method,
-		URL:        &u,
-		Proto:      "HTTP/1.1",
-		ProtoMajor: 1,
-		ProtoMinor: 1,
-		Header:     make(http.Header),
-		Host:       u.Host,
+	switch c.authType {
+	case basicAuth, oAuthToken:
+		reqHeaders.Set("Authorization", "Bearer "+c.token)
+	case privateToken:
+		reqHeaders.Set("PRIVATE-TOKEN", c.token)
+	}
+
+	if c.UserAgent != "" {
+		reqHeaders.Set("User-Agent", c.UserAgent)
+	}
+
+	var body interface{}
+	if method == "POST" || method == "PUT" {
+		u.RawQuery = ""
+		reqHeaders.Set("Content-Type", "application/json")
+
+		if opt != nil {
+			bodyBytes, err := json.Marshal(opt)
+			if err != nil {
+				return nil, err
+			}
+			body = bytes.NewReader(bodyBytes)
+		}
+	}
+
+	req, err := retryablehttp.NewRequest(method, u.String(), body)
+	if err != nil {
+		return nil, err
 	}
 
 	for _, fn := range options {
@@ -597,33 +785,9 @@ func (c *Client) NewRequest(method, path string, opt interface{}, options []Opti
 		}
 	}
 
-	if method == "POST" || method == "PUT" {
-		bodyBytes, err := json.Marshal(opt)
-		if err != nil {
-			return nil, err
-		}
-		bodyReader := bytes.NewReader(bodyBytes)
-
-		u.RawQuery = ""
-		req.Body = ioutil.NopCloser(bodyReader)
-		req.GetBody = func() (io.ReadCloser, error) {
-			return ioutil.NopCloser(bodyReader), nil
-		}
-		req.ContentLength = int64(bodyReader.Len())
-		req.Header.Set("Content-Type", "application/json")
-	}
-
-	req.Header.Set("Accept", "application/json")
-
-	switch c.authType {
-	case basicAuth, oAuthToken:
-		req.Header.Set("Authorization", "Bearer "+c.token)
-	case privateToken:
-		req.Header.Set("PRIVATE-TOKEN", c.token)
-	}
-
-	if c.UserAgent != "" {
-		req.Header.Set("User-Agent", c.UserAgent)
+	// Set the request specific headers.
+	for k, v := range reqHeaders {
+		req.Header[k] = v
 	}
 
 	return req, nil
@@ -691,7 +855,12 @@ func (r *Response) populatePageValues() {
 // error if an API error has occurred. If v implements the io.Writer
 // interface, the raw response body will be written to v, without attempting to
 // first decode it.
-func (c *Client) Do(req *http.Request, v interface{}) (*Response, error) {
+func (c *Client) Do(req *retryablehttp.Request, v interface{}) (*Response, error) {
+	// Wait will block until the limiter can obtain a new token.
+	if err := c.limiter.Wait(req.Context()); err != nil {
+		return nil, err
+	}
+
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
@@ -710,8 +879,8 @@ func (c *Client) Do(req *http.Request, v interface{}) (*Response, error) {
 
 	err = CheckResponse(resp)
 	if err != nil {
-		// even though there was an error, we still return the response
-		// in case the caller wants to inspect it further
+		// Even though there was an error, we still return the response
+		// in case the caller wants to inspect it further.
 		return response, err
 	}
 
@@ -830,11 +999,11 @@ func parseError(raw interface{}) string {
 // another user, provided your private token is from an administrator account.
 //
 // GitLab docs: https://docs.gitlab.com/ce/api/README.html#sudo
-type OptionFunc func(*http.Request) error
+type OptionFunc func(*retryablehttp.Request) error
 
 // WithSudo takes either a username or user ID and sets the SUDO request header
 func WithSudo(uid interface{}) OptionFunc {
-	return func(req *http.Request) error {
+	return func(req *retryablehttp.Request) error {
 		user, err := parseID(uid)
 		if err != nil {
 			return err
@@ -846,7 +1015,7 @@ func WithSudo(uid interface{}) OptionFunc {
 
 // WithContext runs the request with the provided context
 func WithContext(ctx context.Context) OptionFunc {
-	return func(req *http.Request) error {
+	return func(req *retryablehttp.Request) error {
 		*req = *req.WithContext(ctx)
 		return nil
 	}
@@ -901,6 +1070,14 @@ func BuildState(v BuildStateValue) *BuildStateValue {
 	return p
 }
 
+// DeploymentStatus is a helper routine that allocates a new
+// DeploymentStatusValue to store v and returns a pointer to it.
+func DeploymentStatus(v DeploymentStatusValue) *DeploymentStatusValue {
+	p := new(DeploymentStatusValue)
+	*p = v
+	return p
+}
+
 // NotificationLevel is a helper routine that allocates a new NotificationLevelValue
 // to store v and returns a pointer to it.
 func NotificationLevel(v NotificationLevelValue) *NotificationLevelValue {
@@ -921,6 +1098,22 @@ func VariableType(v VariableTypeValue) *VariableTypeValue {
 // to store v and returns a pointer to it.
 func Visibility(v VisibilityValue) *VisibilityValue {
 	p := new(VisibilityValue)
+	*p = v
+	return p
+}
+
+// ProjectCreationLevel is a helper routine that allocates a new ProjectCreationLevelValue
+// to store v and returns a pointer to it.
+func ProjectCreationLevel(v ProjectCreationLevelValue) *ProjectCreationLevelValue {
+	p := new(ProjectCreationLevelValue)
+	*p = v
+	return p
+}
+
+// SubGroupCreationLevel is a helper routine that allocates a new SubGroupCreationLevelValue
+// to store v and returns a pointer to it.
+func SubGroupCreationLevel(v SubGroupCreationLevelValue) *SubGroupCreationLevelValue {
+	p := new(SubGroupCreationLevelValue)
 	*p = v
 	return p
 }

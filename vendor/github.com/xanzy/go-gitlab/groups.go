@@ -32,34 +32,44 @@ type GroupsService struct {
 //
 // GitLab API docs: https://docs.gitlab.com/ce/api/groups.html
 type Group struct {
-	ID                             int                `json:"id"`
-	Name                           string             `json:"name"`
-	Path                           string             `json:"path"`
-	Description                    string             `json:"description"`
-	Visibility                     *VisibilityValue   `json:"visibility"`
-	LFSEnabled                     bool               `json:"lfs_enabled"`
-	AvatarURL                      string             `json:"avatar_url"`
-	WebURL                         string             `json:"web_url"`
-	RequestAccessEnabled           bool               `json:"request_access_enabled"`
-	FullName                       string             `json:"full_name"`
-	FullPath                       string             `json:"full_path"`
-	ParentID                       int                `json:"parent_id"`
-	Projects                       []*Project         `json:"projects"`
-	Statistics                     *StorageStatistics `json:"statistics"`
-	CustomAttributes               []*CustomAttribute `json:"custom_attributes"`
-	ShareWithGroupLock             bool               `json:"share_with_group_lock"`
-	RequireTwoFactorAuth           bool               `json:"require_two_factor_authentication"`
-	TwoFactorGracePeriod           int                `json:"two_factor_grace_period"`
-	ProjectCreationLevel           string             `json:"project_creation_level"`
-	AutoDevopsEnabled              bool               `json:"auto_devops_enabled"`
-	SubGroupCreationLevel          string             `json:"subgroup_creation_level"`
-	EmailsDisabled                 bool               `json:"emails_disabled"`
-	RunnersToken                   string             `json:"runners_token"`
-	SharedProjects                 []*Project         `json:"shared_projects"`
-	LDAPCN                         string             `json:"ldap_cn"`
-	LDAPAccess                     bool               `json:"ldap_access"`
-	SharedRunnersMinutesLimit      int                `json:"shared_runners_minutes_limit"`
-	ExtraSharedRunnersMinutesLimit int                `json:"extra_shared_runners_minutes_limit"`
+	ID                             int                        `json:"id"`
+	Name                           string                     `json:"name"`
+	Path                           string                     `json:"path"`
+	Description                    string                     `json:"description"`
+	MembershipLock                 bool                       `json:"membership_lock"`
+	Visibility                     VisibilityValue            `json:"visibility"`
+	LFSEnabled                     bool                       `json:"lfs_enabled"`
+	AvatarURL                      string                     `json:"avatar_url"`
+	WebURL                         string                     `json:"web_url"`
+	RequestAccessEnabled           bool                       `json:"request_access_enabled"`
+	FullName                       string                     `json:"full_name"`
+	FullPath                       string                     `json:"full_path"`
+	ParentID                       int                        `json:"parent_id"`
+	Projects                       []*Project                 `json:"projects"`
+	Statistics                     *StorageStatistics         `json:"statistics"`
+	CustomAttributes               []*CustomAttribute         `json:"custom_attributes"`
+	ShareWithGroupLock             bool                       `json:"share_with_group_lock"`
+	RequireTwoFactorAuth           bool                       `json:"require_two_factor_authentication"`
+	TwoFactorGracePeriod           int                        `json:"two_factor_grace_period"`
+	ProjectCreationLevel           ProjectCreationLevelValue  `json:"project_creation_level"`
+	AutoDevopsEnabled              bool                       `json:"auto_devops_enabled"`
+	SubGroupCreationLevel          SubGroupCreationLevelValue `json:"subgroup_creation_level"`
+	EmailsDisabled                 bool                       `json:"emails_disabled"`
+	MentionsDisabled               bool                       `json:"mentions_disabled"`
+	RunnersToken                   string                     `json:"runners_token"`
+	SharedProjects                 []*Project                 `json:"shared_projects"`
+	LDAPCN                         string                     `json:"ldap_cn"`
+	LDAPAccess                     AccessLevelValue           `json:"ldap_access"`
+	LDAPGroupLinks                 []*LDAPGroupLink           `json:"ldap_group_links"`
+	SharedRunnersMinutesLimit      int                        `json:"shared_runners_minutes_limit"`
+	ExtraSharedRunnersMinutesLimit int                        `json:"extra_shared_runners_minutes_limit"`
+	MarkedForDeletionOn            *ISOTime                   `json:"marked_for_deletion_on"`
+}
+
+type LDAPGroupLink struct {
+	CN          string           `json:"cn"`
+	GroupAccess AccessLevelValue `json:"group_access"`
+	Provider    string           `json:"provider"`
 }
 
 // ListGroupsOptions represents the available ListGroups() options.
@@ -125,13 +135,24 @@ func (s *GroupsService) GetGroup(gid interface{}, options ...OptionFunc) (*Group
 //
 // GitLab API docs: https://docs.gitlab.com/ce/api/groups.html#new-group
 type CreateGroupOptions struct {
-	Name                 *string          `url:"name,omitempty" json:"name,omitempty"`
-	Path                 *string          `url:"path,omitempty" json:"path,omitempty"`
-	Description          *string          `url:"description,omitempty" json:"description,omitempty"`
-	Visibility           *VisibilityValue `url:"visibility,omitempty" json:"visibility,omitempty"`
-	LFSEnabled           *bool            `url:"lfs_enabled,omitempty" json:"lfs_enabled,omitempty"`
-	RequestAccessEnabled *bool            `url:"request_access_enabled,omitempty" json:"request_access_enabled,omitempty"`
-	ParentID             *int             `url:"parent_id,omitempty" json:"parent_id,omitempty"`
+	Name                           *string                     `url:"name,omitempty" json:"name,omitempty"`
+	Path                           *string                     `url:"path,omitempty" json:"path,omitempty"`
+	Description                    *string                     `url:"description,omitempty" json:"description,omitempty"`
+	MembershipLock                 *bool                       `url:"membership_lock,omitempty" json:"membership_lock,omitempty"`
+	Visibility                     *VisibilityValue            `url:"visibility,omitempty" json:"visibility,omitempty"`
+	ShareWithGroupLock             *bool                       `url:"share_with_group_lock,omitempty" json:"share_with_group_lock,omitempty"`
+	RequireTwoFactorAuth           *bool                       `url:"require_two_factor_authentication,omitempty" json:"require_two_factor_authentication,omitempty"`
+	TwoFactorGracePeriod           *int                        `url:"two_factor_grace_period,omitempty" json:"two_factor_grace_period,omitempty"`
+	ProjectCreationLevel           *ProjectCreationLevelValue  `url:"project_creation_level,omitempty" json:"project_creation_level,omitempty"`
+	AutoDevopsEnabled              *bool                       `url:"auto_devops_enabled,omitempty" json:"auto_devops_enabled,omitempty"`
+	SubGroupCreationLevel          *SubGroupCreationLevelValue `url:"subgroup_creation_level,omitempty" json:"subgroup_creation_level,omitempty"`
+	EmailsDisabled                 *bool                       `url:"emails_disabled,omitempty" json:"emails_disabled,omitempty"`
+	MentionsDisabled               *bool                       `url:"mentions_disabled,omitempty" json:"mentions_disabled,omitempty"`
+	LFSEnabled                     *bool                       `url:"lfs_enabled,omitempty" json:"lfs_enabled,omitempty"`
+	RequestAccessEnabled           *bool                       `url:"request_access_enabled,omitempty" json:"request_access_enabled,omitempty"`
+	ParentID                       *int                        `url:"parent_id,omitempty" json:"parent_id,omitempty"`
+	SharedRunnersMinutesLimit      *int                        `url:"shared_runners_minutes_limit,omitempty" json:"shared_runners_minutes_limit,omitempty"`
+	ExtraSharedRunnersMinutesLimit *int                        `url:"extra_shared_runners_minutes_limit,omitempty" json:"extra_shared_runners_minutes_limit,omitempty"`
 }
 
 // CreateGroup creates a new project group. Available only for users who can
@@ -332,4 +353,111 @@ func (s *GroupsService) ListSubgroups(gid interface{}, opt *ListSubgroupsOptions
 	}
 
 	return g, resp, err
+}
+
+// ListGroupLDAPLinks lists the group's LDAP links. Available only for users who
+// can edit groups.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ee/api/groups.html#list-ldap-group-links-starter
+func (s *GroupsService) ListGroupLDAPLinks(gid interface{}, options ...OptionFunc) ([]*LDAPGroupLink, *Response, error) {
+	group, err := parseID(gid)
+	if err != nil {
+		return nil, nil, err
+	}
+	u := fmt.Sprintf("groups/%s/ldap_group_links", pathEscape(group))
+
+	req, err := s.client.NewRequest("GET", u, nil, options)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var gl []*LDAPGroupLink
+	resp, err := s.client.Do(req, &gl)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return gl, resp, nil
+}
+
+// AddGroupLDAPLinkOptions represents the available AddGroupLDAPLink() options.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ee/api/groups.html#add-ldap-group-link-starter
+type AddGroupLDAPLinkOptions struct {
+	CN          *string `url:"cn,omitempty" json:"cn,omitempty"`
+	GroupAccess *int    `url:"group_access,omitempty" json:"group_access,omitempty"`
+	Provider    *string `url:"provider,omitempty" json:"provider,ommitempty"`
+}
+
+// AddGroupLDAPLink creates a new group LDAP link. Available only for users who
+// can edit groups.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ee/api/groups.html#add-ldap-group-link-starter
+func (s *GroupsService) AddGroupLDAPLink(gid interface{}, opt *AddGroupLDAPLinkOptions, options ...OptionFunc) (*LDAPGroupLink, *Response, error) {
+	group, err := parseID(gid)
+	if err != nil {
+		return nil, nil, err
+	}
+	u := fmt.Sprintf("groups/%s/ldap_group_links", pathEscape(group))
+
+	req, err := s.client.NewRequest("POST", u, opt, options)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	gl := new(LDAPGroupLink)
+	resp, err := s.client.Do(req, gl)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return gl, resp, err
+}
+
+// DeleteGroupLDAPLink deletes a group LDAP link. Available only for users who
+// can edit groups.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ee/api/groups.html#delete-ldap-group-link-starter
+func (s *GroupsService) DeleteGroupLDAPLink(gid interface{}, cn string, options ...OptionFunc) (*Response, error) {
+	group, err := parseID(gid)
+	if err != nil {
+		return nil, err
+	}
+	u := fmt.Sprintf("groups/%s/ldap_group_links/%s", pathEscape(group), pathEscape(cn))
+
+	req, err := s.client.NewRequest("DELETE", u, nil, options)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.client.Do(req, nil)
+}
+
+// DeleteGroupLDAPLinkForProvider deletes a group LDAP link from a specific
+// provider. Available only for users who can edit groups.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ee/api/groups.html#delete-ldap-group-link-starter
+func (s *GroupsService) DeleteGroupLDAPLinkForProvider(gid interface{}, provider, cn string, options ...OptionFunc) (*Response, error) {
+	group, err := parseID(gid)
+	if err != nil {
+		return nil, err
+	}
+	u := fmt.Sprintf(
+		"groups/%s/ldap_group_links/%s/%s",
+		pathEscape(group),
+		pathEscape(provider),
+		pathEscape(cn),
+	)
+
+	req, err := s.client.NewRequest("DELETE", u, nil, options)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.client.Do(req, nil)
 }

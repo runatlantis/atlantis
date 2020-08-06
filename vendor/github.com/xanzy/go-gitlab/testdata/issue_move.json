@@ -1,0 +1,61 @@
+{
+  "id": 92,
+  "iid": 11,
+  "project_id": 5,
+  "title": "Sit voluptas tempora quisquam aut doloribus et.",
+  "description": "Repellat voluptas quibusdam voluptatem exercitationem.",
+  "state": "opened",
+  "created_at": "2016-04-05T21:41:45.652Z",
+  "updated_at": "2016-04-07T12:20:17.596Z",
+  "closed_at": null,
+  "closed_by": null,
+  "labels": [],
+  "upvotes": 4,
+  "downvotes": 0,
+  "merge_requests_count": 0,
+  "milestone": null,
+  "assignees": [{
+    "name": "Miss Monserrate Beier",
+    "username": "axel.block",
+    "id": 12,
+    "state": "active",
+    "avatar_url": "http://www.gravatar.com/avatar/46f6f7dc858ada7be1853f7fb96e81da?s=80&d=identicon",
+    "web_url": "https://gitlab.example.com/axel.block"
+  }],
+  "assignee": {
+    "name": "Miss Monserrate Beier",
+    "username": "axel.block",
+    "id": 12,
+    "state": "active",
+    "avatar_url": "http://www.gravatar.com/avatar/46f6f7dc858ada7be1853f7fb96e81da?s=80&d=identicon",
+    "web_url": "https://gitlab.example.com/axel.block"
+  },
+  "author": {
+    "name": "Kris Steuber",
+    "username": "solon.cremin",
+    "id": 10,
+    "state": "active",
+    "avatar_url": "http://www.gravatar.com/avatar/7a190fecbaa68212a4b68aeb6e3acd10?s=80&d=identicon",
+    "web_url": "https://gitlab.example.com/solon.cremin"
+  },
+  "due_date": null,
+  "web_url": "http://example.com/example/example/issues/11",
+  "time_stats": {
+    "time_estimate": 0,
+    "total_time_spent": 0,
+    "human_time_estimate": null,
+    "human_total_time_spent": null
+  },
+  "confidential": false,
+  "discussion_locked": false,
+  "_links": {
+    "self": "http://example.com/api/v4/projects/1/issues/2",
+    "notes": "http://example.com/api/v4/projects/1/issues/2/notes",
+    "award_emoji": "http://example.com/api/v4/projects/1/issues/2/award_emoji",
+    "project": "http://example.com/api/v4/projects/1"
+  },
+  "task_completion_status":{
+    "count":0,
+    "completed_count":0
+  }
+}

@@ -44,6 +44,7 @@ type GroupCluster struct {
 	ClusterType        string              `json:"cluster_type"`
 	User               *User               `json:"user"`
 	PlatformKubernetes *PlatformKubernetes `json:"platform_kubernetes"`
+	ManagementProject  *ManagementProject  `json:"management_project"`
 	Group              *Group              `json:"group"`
 }
 
@@ -106,12 +107,13 @@ func (s *GroupClustersService) GetCluster(pid interface{}, cluster int, options 
 // GitLab API docs:
 // https://docs.gitlab.com/ee/api/group_clusters.html#add-existing-cluster-to-group
 type AddGroupClusterOptions struct {
-	Name               *string                            `url:"name,omitempty" json:"name,omitempty"`
-	Domain             *string                            `url:"domain,omitempty" json:"domain,omitempty"`
-	Enabled            *bool                              `url:"enabled,omitempty" json:"enabled,omitempty"`
-	Managed            *bool                              `url:"managed,omitempty" json:"managed,omitempty"`
-	EnvironmentScope   *string                            `url:"environment_scope,omitempty" json:"environment_scope,omitempty"`
-	PlatformKubernetes *AddGroupPlatformKubernetesOptions `url:"platform_kubernetes_attributes,omitempty" json:"platform_kubernetes_attributes,omitempty"`
+	Name                *string                            `url:"name,omitempty" json:"name,omitempty"`
+	Domain              *string                            `url:"domain,omitempty" json:"domain,omitempty"`
+	ManagementProjectID *string                            `url:"management_project_id,omitempty" json:"management_project_id,omitempty"`
+	Enabled             *bool                              `url:"enabled,omitempty" json:"enabled,omitempty"`
+	Managed             *bool                              `url:"managed,omitempty" json:"managed,omitempty"`
+	EnvironmentScope    *string                            `url:"environment_scope,omitempty" json:"environment_scope,omitempty"`
+	PlatformKubernetes  *AddGroupPlatformKubernetesOptions `url:"platform_kubernetes_attributes,omitempty" json:"platform_kubernetes_attributes,omitempty"`
 }
 
 // AddGroupPlatformKubernetesOptions represents the available PlatformKubernetes options for adding.
@@ -153,10 +155,11 @@ func (s *GroupClustersService) AddCluster(pid interface{}, opt *AddGroupClusterO
 // GitLab API docs:
 // https://docs.gitlab.com/ee/api/group_clusters.html#edit-group-cluster
 type EditGroupClusterOptions struct {
-	Name               *string                             `url:"name,omitempty" json:"name,omitempty"`
-	Domain             *string                             `url:"domain,omitempty" json:"domain,omitempty"`
-	EnvironmentScope   *string                             `url:"environment_scope,omitempty" json:"environment_scope,omitempty"`
-	PlatformKubernetes *EditGroupPlatformKubernetesOptions `url:"platform_kubernetes_attributes,omitempty" json:"platform_kubernetes_attributes,omitempty"`
+	Name                *string                             `url:"name,omitempty" json:"name,omitempty"`
+	Domain              *string                             `url:"domain,omitempty" json:"domain,omitempty"`
+	EnvironmentScope    *string                             `url:"environment_scope,omitempty" json:"environment_scope,omitempty"`
+	PlatformKubernetes  *EditGroupPlatformKubernetesOptions `url:"platform_kubernetes_attributes,omitempty" json:"platform_kubernetes_attributes,omitempty"`
+	ManagementProjectID *string                             `url:"management_project_id,omitempty" json:"management_project_id,omitempty"`
 }
 
 // EditGroupPlatformKubernetesOptions represents the available PlatformKubernetes options for editing.

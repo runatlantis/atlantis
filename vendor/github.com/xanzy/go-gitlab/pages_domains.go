@@ -18,6 +18,7 @@ type PagesDomainsService struct {
 // GitLab API docs: https://docs.gitlab.com/ce/api/pages_domains.html
 type PagesDomain struct {
 	Domain           string     `json:"domain"`
+	AutoSslEnabled   bool       `json:"auto_ssl_enabled"`
 	URL              string     `json:"url"`
 	ProjectID        int        `json:"project_id"`
 	Verified         bool       `json:"verified"`
@@ -107,11 +108,12 @@ func (s *PagesDomainsService) GetPagesDomain(pid interface{}, domain string, opt
 // CreatePagesDomainOptions represents the available CreatePagesDomain() options.
 //
 // GitLab API docs:
-// // https://docs.gitlab.com/ce/api/pages_domains.html#create-new-pages-domain
+// https://docs.gitlab.com/ce/api/pages_domains.html#create-new-pages-domain
 type CreatePagesDomainOptions struct {
-	Domain      *string `url:"domain,omitempty" json:"domain,omitempty"`
-	Certificate *string `url:"certifiate,omitempty" json:"certifiate,omitempty"`
-	Key         *string `url:"key,omitempty" json:"key,omitempty"`
+	Domain         *string `url:"domain,omitempty" json:"domain,omitempty"`
+	AutoSslEnabled *bool   `url:"auto_ssl_enabled,omitempty" json:"auto_ssl_enabled,omitempty"`
+	Certificate    *string `url:"certifiate,omitempty" json:"certifiate,omitempty"`
+	Key            *string `url:"key,omitempty" json:"key,omitempty"`
 }
 
 // CreatePagesDomain creates a new project pages domain.
@@ -144,8 +146,9 @@ func (s *PagesDomainsService) CreatePagesDomain(pid interface{}, opt *CreatePage
 // GitLab API docs:
 // https://docs.gitlab.com/ce/api/pages_domains.html#update-pages-domain
 type UpdatePagesDomainOptions struct {
-	Cerificate *string `url:"certifiate" json:"certifiate"`
-	Key        *string `url:"key" json:"key"`
+	AutoSslEnabled *bool   `url:"auto_ssl_enabled,omitempty" json:"auto_ssl_enabled,omitempty"`
+	Certificate    *string `url:"certifiate,omitempty" json:"certifiate,omitempty"`
+	Key            *string `url:"key,omitempty" json:"key,omitempty"`
 }
 
 // UpdatePagesDomain updates an existing project pages domain.

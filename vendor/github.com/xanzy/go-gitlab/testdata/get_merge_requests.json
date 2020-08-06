@@ -1,0 +1,1782 @@
+[
+  {
+    "id": 35385049,
+    "iid": 15442,
+    "project_id": 278964,
+    "title": "WIP: Use structured logging for DB load balancer",
+    "description": "## What does this MR do?\r\n\r\n<!--\r\n\r\nDescribe in detail what your merge request does and why.\r\n\r\nAre there any risks involved with the proposed change? What additional\r\ntest coverage is introduced to offset the risk?\r\n\r\nPlease keep this description up-to-date with any discussion that takes\r\nplace so that reviewers can understand your intent. This is especially\r\nimportant if they didn't participate in the discussion.\r\n\r\n-->\r\n\r\nRelates to https://gitlab.com/gitlab-org/gitlab-ee/issues/13547 and https://gitlab.com/gitlab-org/gitlab-ee/issues/13548\r\n\r\n## Does this MR meet the acceptance criteria?\r\n\r\n### Conformity\r\n\r\n- [ ] [Changelog entry](https://docs.gitlab.com/ee/development/changelog.html) \r\n- [ ] [Documentation created/updated](https://docs.gitlab.com/ee/development/documentation/feature-change-workflow.html) or [follow-up review issue created](https://gitlab.com/gitlab-org/gitlab-ce/issues/new?issuable_template=Doc%20Review)\r\n- [ ] [Code review guidelines](https://docs.gitlab.com/ee/development/code_review.html)\r\n- [ ] [Merge request performance guidelines](https://docs.gitlab.com/ee/development/merge_request_performance_guidelines.html)\r\n- [ ] [Style guides](https://gitlab.com/gitlab-org/gitlab-ee/blob/master/doc/development/contributing/style_guides.md)\r\n- [ ] [Database guides](https://docs.gitlab.com/ee/development/README.html#databases-guides)\r\n- [ ] [Separation of EE specific content](https://docs.gitlab.com/ee/development/ee_features.html#separation-of-ee-code)\r\n\r\n### Performance and Testing\r\n\r\n<!-- What risks does this change pose? How might it affect the quality/performance of the product?\r\nWhat additional test coverage or changes to tests will be needed?\r\nWill it require cross-browser testing?\r\nSee the test engineering process for further guidelines: https://about.gitlab.com/handbook/engineering/quality/test-engineering/ -->\r\n\r\n<!-- If cross-browser testing is not required, please remove the relevant item, or mark it as not needed: [-] -->\r\n\r\n- [ ] [Review and add/update tests for this feature/bug](https://docs.gitlab.com/ee/development/testing_guide/index.html). Consider [all test levels](https://docs.gitlab.com/ee/development/testing_guide/testing_levels.html). See the [Test Planning Process](https://about.gitlab.com/handbook/engineering/quality/guidelines/test-engineering/).\r\n- [ ] [Tested in all supported browsers](https://docs.gitlab.com/ee/install/requirements.html#supported-web-browsers)\r\n\r\n### Security\r\n\r\nIf this MR contains changes to processing or storing of credentials or tokens, authorization and authentication methods and other items described in [the security review guidelines](https://about.gitlab.com/handbook/engineering/security/#when-to-request-a-security-review):\r\n\r\n- [ ] Label as ~security and @ mention `@gitlab-com/gl-security/appsec`\r\n- [ ] The MR includes necessary changes to maintain consistency between UI, API, email, or other methods\r\n- [ ] Security reports checked/validated by a reviewer from the AppSec team",
+    "state": "opened",
+    "created_at": "2019-08-20T10:58:54.413Z",
+    "updated_at": "2019-08-20T12:01:49.849Z",
+    "merged_by": null,
+    "merged_at": null,
+    "closed_by": null,
+    "closed_at": null,
+    "target_branch": "master",
+    "source_branch": "use-structured-logging-for-db-load-balancer",
+    "user_notes_count": 1,
+    "upvotes": 0,
+    "downvotes": 0,
+    "assignee": {
+      "id": 4088036,
+      "name": "Hordur Freyr Yngvason",
+      "username": "hfyngvason",
+      "state": "active",
+      "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/4088036/avatar.png",
+      "web_url": "https://gitlab.com/hfyngvason"
+    },
+    "author": {
+      "id": 4088036,
+      "name": "Hordur Freyr Yngvason",
+      "username": "hfyngvason",
+      "state": "active",
+      "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/4088036/avatar.png",
+      "web_url": "https://gitlab.com/hfyngvason"
+    },
+    "assignees": [
+      {
+        "id": 4088036,
+        "name": "Hordur Freyr Yngvason",
+        "username": "hfyngvason",
+        "state": "active",
+        "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/4088036/avatar.png",
+        "web_url": "https://gitlab.com/hfyngvason"
+      }
+    ],
+    "source_project_id": 278964,
+    "target_project_id": 278964,
+    "labels": [
+      "backend",
+      "backstage",
+      "database",
+      "database::review pending",
+      "group::autodevops and kubernetes"
+    ],
+    "work_in_progress": true,
+    "milestone": null,
+    "merge_when_pipeline_succeeds": false,
+    "merge_status": "can_be_merged",
+    "sha": "2fc4e8b972ff3208ec63b6143e34ad67ff343ad7",
+    "merge_commit_sha": null,
+    "discussion_locked": null,
+    "should_remove_source_branch": null,
+    "force_remove_source_branch": true,
+    "reference": "!15442",
+    "web_url": "https://gitlab.com/gitlab-org/gitlab-ee/merge_requests/15442",
+    "time_stats": {
+      "time_estimate": 0,
+      "total_time_spent": 0,
+      "human_time_estimate": null,
+      "human_total_time_spent": null
+    },
+    "squash": true,
+    "task_completion_status": {
+      "count": 12,
+      "completed_count": 0
+    },
+    "approvals_before_merge": 1
+  },
+  {
+    "id": 35384461,
+    "iid": 15441,
+    "project_id": 278964,
+    "title": "WIP: Implement public MR-level approval rules API",
+    "description": "## What does this MR do?\r\n\r\nAdd API endpoints so API users can list, create, update and delete MR-level approval rules.\r\n\r\nThe following API endpoints are added:\r\n- `GET /projects/:id/merge_requests/:merge_request_iid/approval_rules`\r\n- `POST /projects/:id/merge_requests/:merge_request_iid/approval_rules`\r\n- `PUT /projects/:id/merge_requests/:merge_request_iid/approval_rules/:approval_rule_id`\r\n- `DELETE /projects/:id/merge_requests/:merge_request_iid/approval_rules/:approval_rule_id`\r\n\r\n## Does this MR meet the acceptance criteria?\r\n\r\n### Conformity\r\n\r\n- [ ] [Changelog entry](https://docs.gitlab.com/ee/development/changelog.html) \r\n- [ ] [Documentation created/updated](https://docs.gitlab.com/ee/development/documentation/feature-change-workflow.html) or [follow-up review issue created](https://gitlab.com/gitlab-org/gitlab-ce/issues/new?issuable_template=Doc%20Review)\r\n- [ ] [Code review guidelines](https://docs.gitlab.com/ee/development/code_review.html)\r\n- [ ] [Merge request performance guidelines](https://docs.gitlab.com/ee/development/merge_request_performance_guidelines.html)\r\n- [ ] [Style guides](https://gitlab.com/gitlab-org/gitlab-ee/blob/master/doc/development/contributing/style_guides.md)\r\n- [ ] [Database guides](https://docs.gitlab.com/ee/development/README.html#databases-guides)\r\n- [ ] [Separation of EE specific content](https://docs.gitlab.com/ee/development/ee_features.html#separation-of-ee-code)\r\n\r\n### Performance and Testing\r\n\r\n<!-- What risks does this change pose? How might it affect the quality/performance of the product?\r\nWhat additional test coverage or changes to tests will be needed?\r\nWill it require cross-browser testing?\r\nSee the test engineering process for further guidelines: https://about.gitlab.com/handbook/engineering/quality/test-engineering/ -->\r\n\r\n<!-- If cross-browser testing is not required, please remove the relevant item, or mark it as not needed: [-] -->\r\n\r\n- [x] [Review and add/update tests for this feature/bug](https://docs.gitlab.com/ee/development/testing_guide/index.html). Consider [all test levels](https://docs.gitlab.com/ee/development/testing_guide/testing_levels.html). See the [Test Planning Process](https://about.gitlab.com/handbook/engineering/quality/guidelines/test-engineering/).\r\n- [-] [Tested in all supported browsers](https://docs.gitlab.com/ee/install/requirements.html#supported-web-browsers)\r\n\r\n### Security\r\n\r\nIf this MR contains changes to processing or storing of credentials or tokens, authorization and authentication methods and other items described in [the security review guidelines](https://about.gitlab.com/handbook/engineering/security/#when-to-request-a-security-review):\r\n\r\n- [-] Label as ~security and @ mention `@gitlab-com/gl-security/appsec`\r\n- [-] The MR includes necessary changes to maintain consistency between UI, API, email, or other methods\r\n- [-] Security reports checked/validated by a reviewer from the AppSec team \r\n\r\n#12055",
+    "state": "opened",
+    "created_at": "2019-08-20T10:51:56.806Z",
+    "updated_at": "2019-08-20T11:00:25.244Z",
+    "merged_by": null,
+    "merged_at": null,
+    "closed_by": null,
+    "closed_at": null,
+    "target_branch": "master",
+    "source_branch": "12055-public-mr-approval-rules-api",
+    "user_notes_count": 1,
+    "upvotes": 0,
+    "downvotes": 0,
+    "assignee": {
+      "id": 1884221,
+      "name": "Patrick Bajao",
+      "username": "patrickbajao",
+      "state": "active",
+      "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/1884221/avatar.png",
+      "web_url": "https://gitlab.com/patrickbajao"
+    },
+    "author": {
+      "id": 1884221,
+      "name": "Patrick Bajao",
+      "username": "patrickbajao",
+      "state": "active",
+      "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/1884221/avatar.png",
+      "web_url": "https://gitlab.com/patrickbajao"
+    },
+    "assignees": [
+      {
+        "id": 1884221,
+        "name": "Patrick Bajao",
+        "username": "patrickbajao",
+        "state": "active",
+        "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/1884221/avatar.png",
+        "web_url": "https://gitlab.com/patrickbajao"
+      }
+    ],
+    "source_project_id": 278964,
+    "target_project_id": 278964,
+    "labels": [
+      "Create [DEPRECATED]",
+      "Deliverable",
+      "GitLab Enterprise Edition",
+      "GitLab Starter",
+      "api",
+      "approvals",
+      "backend",
+      "devops::create",
+      "feature",
+      "group::source code",
+      "workflow::In dev"
+    ],
+    "work_in_progress": true,
+    "milestone": {
+      "id": 731038,
+      "iid": 37,
+      "group_id": 9970,
+      "title": "12.3",
+      "description": "",
+      "state": "active",
+      "created_at": "2018-12-07T12:40:55.400Z",
+      "updated_at": "2019-01-16T19:50:20.313Z",
+      "due_date": "2019-09-22",
+      "start_date": "2019-08-08",
+      "web_url": "https://gitlab.com/groups/gitlab-org/-/milestones/37"
+    },
+    "merge_when_pipeline_succeeds": false,
+    "merge_status": "can_be_merged",
+    "sha": "dbb2b82236b86328f44a1754c9188c0991e707e5",
+    "merge_commit_sha": null,
+    "discussion_locked": null,
+    "should_remove_source_branch": null,
+    "force_remove_source_branch": false,
+    "reference": "!15441",
+    "web_url": "https://gitlab.com/gitlab-org/gitlab-ee/merge_requests/15441",
+    "time_stats": {
+      "time_estimate": 0,
+      "total_time_spent": 0,
+      "human_time_estimate": null,
+      "human_total_time_spent": null
+    },
+    "squash": false,
+    "task_completion_status": {
+      "count": 8,
+      "completed_count": 1
+    },
+    "approvals_before_merge": 1
+  },
+  {
+    "id": 35368820,
+    "iid": 15440,
+    "project_id": 278964,
+    "title": "Log in Prometheus current number of host and index",
+    "description": "## What does this MR do?\n\n1. Log current number of hosts and current index when `#initialize` is called\n1. Log current number of hosts and current index when `#next` is called\n1. Log current number of hosts and current index when `#hosts=` is called\n\nhttps://gitlab.com/gitlab-org/gitlab-ee/issues/13630\n\n## Does this MR meet the acceptance criteria?\n\n### Conformity\n\n- [x] [Changelog entry](https://docs.gitlab.com/ee/development/changelog.html) \n- [ ] [Documentation created/updated](https://docs.gitlab.com/ee/development/documentation/feature-change-workflow.html) or [follow-up review issue created](https://gitlab.com/gitlab-org/gitlab-ce/issues/new?issuable_template=Doc%20Review)\n- [ ] [Code review guidelines](https://docs.gitlab.com/ee/development/code_review.html)\n- [ ] [Merge request performance guidelines](https://docs.gitlab.com/ee/development/merge_request_performance_guidelines.html)\n- [ ] [Style guides](https://gitlab.com/gitlab-org/gitlab-ee/blob/master/doc/development/contributing/style_guides.md)\n- [ ] [Database guides](https://docs.gitlab.com/ee/development/README.html#databases-guides)\n- [ ] [Separation of EE specific content](https://docs.gitlab.com/ee/development/ee_features.html#separation-of-ee-code)\n\n### Performance and Testing\n\n<!-- What risks does this change pose? How might it affect the quality/performance of the product?\nWhat additional test coverage or changes to tests will be needed?\nWill it require cross-browser testing?\nSee the test engineering process for further guidelines: https://about.gitlab.com/handbook/engineering/quality/test-engineering/ -->\n\n<!-- If cross-browser testing is not required, please remove the relevant item, or mark it as not needed: [-] -->\n\n- [ ] [Review and add/update tests for this feature/bug](https://docs.gitlab.com/ee/development/testing_guide/index.html). Consider [all test levels](https://docs.gitlab.com/ee/development/testing_guide/testing_levels.html). See the [Test Planning Process](https://about.gitlab.com/handbook/engineering/quality/guidelines/test-engineering/).\n- [ ] [Tested in all supported browsers](https://docs.gitlab.com/ee/install/requirements.html#supported-web-browsers)\n\n### Security\n\nIf this MR contains changes to processing or storing of credentials or tokens, authorization and authentication methods and other items described in [the security review guidelines](https://about.gitlab.com/handbook/engineering/security/#when-to-request-a-security-review):\n\n- [ ] Label as ~security and @ mention `@gitlab-com/gl-security/appsec`\n- [ ] The MR includes necessary changes to maintain consistency between UI, API, email, or other methods\n- [ ] Security reports checked/validated by a reviewer from the AppSec team",
+    "state": "opened",
+    "created_at": "2019-08-20T10:20:51.687Z",
+    "updated_at": "2019-08-20T11:06:40.659Z",
+    "merged_by": null,
+    "merged_at": null,
+    "closed_by": null,
+    "closed_at": null,
+    "target_branch": "master",
+    "source_branch": "load-balancing-prometheus",
+    "user_notes_count": 2,
+    "upvotes": 0,
+    "downvotes": 0,
+    "assignee": {
+      "id": 4059128,
+      "name": "Avielle Wolfe",
+      "username": "avielle",
+      "state": "active",
+      "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/4059128/avatar.png",
+      "web_url": "https://gitlab.com/avielle"
+    },
+    "author": {
+      "id": 2535118,
+      "name": "Thong Kuah",
+      "username": "tkuah",
+      "state": "active",
+      "avatar_url": "https://secure.gravatar.com/avatar/f7b51bdd49a4914d29504d7ff4c3f7b9?s=80&d=identicon",
+      "web_url": "https://gitlab.com/tkuah"
+    },
+    "assignees": [
+      {
+        "id": 4059128,
+        "name": "Avielle Wolfe",
+        "username": "avielle",
+        "state": "active",
+        "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/4059128/avatar.png",
+        "web_url": "https://gitlab.com/avielle"
+      },
+      {
+        "id": 2535118,
+        "name": "Thong Kuah",
+        "username": "tkuah",
+        "state": "active",
+        "avatar_url": "https://secure.gravatar.com/avatar/f7b51bdd49a4914d29504d7ff4c3f7b9?s=80&d=identicon",
+        "web_url": "https://gitlab.com/tkuah"
+      }
+    ],
+    "source_project_id": 278964,
+    "target_project_id": 278964,
+    "labels": [
+      "Configure [DEPRECATED]",
+      "Observability",
+      "P1",
+      "backend",
+      "backstage",
+      "database",
+      "database::review pending",
+      "devops::configure",
+      "gitlab.com",
+      "group::autodevops and kubernetes",
+      "infradev",
+      "workflow::In dev"
+    ],
+    "work_in_progress": false,
+    "milestone": {
+      "id": 731038,
+      "iid": 37,
+      "group_id": 9970,
+      "title": "12.3",
+      "description": "",
+      "state": "active",
+      "created_at": "2018-12-07T12:40:55.400Z",
+      "updated_at": "2019-01-16T19:50:20.313Z",
+      "due_date": "2019-09-22",
+      "start_date": "2019-08-08",
+      "web_url": "https://gitlab.com/groups/gitlab-org/-/milestones/37"
+    },
+    "merge_when_pipeline_succeeds": false,
+    "merge_status": "can_be_merged",
+    "sha": "eae31acf34d2df2aba2ea469e432cab1c6a05b53",
+    "merge_commit_sha": null,
+    "discussion_locked": null,
+    "should_remove_source_branch": null,
+    "force_remove_source_branch": false,
+    "reference": "!15440",
+    "web_url": "https://gitlab.com/gitlab-org/gitlab-ee/merge_requests/15440",
+    "time_stats": {
+      "time_estimate": 0,
+      "total_time_spent": 0,
+      "human_time_estimate": null,
+      "human_total_time_spent": null
+    },
+    "squash": false,
+    "task_completion_status": {
+      "count": 12,
+      "completed_count": 1
+    },
+    "approvals_before_merge": 1
+  },
+  {
+    "id": 35355199,
+    "iid": 15438,
+    "project_id": 278964,
+    "title": "WIP: Resolve \"Cancel redundant pipelines in merge train when reconstruction happens\"",
+    "description": "## What does this MR do?\n\n<!--\n\nDescribe in detail what your merge request does and why.\n\nAre there any risks involved with the proposed change? What additional\ntest coverage is introduced to offset the risk?\n\nPlease keep this description up-to-date with any discussion that takes\nplace so that reviewers can understand your intent. This is especially\nimportant if they didn't participate in the discussion.\n\n-->\n\n## Does this MR meet the acceptance criteria?\n\n### Conformity\n\n- [ ] [Changelog entry](https://docs.gitlab.com/ee/development/changelog.html) \n- [ ] [Documentation created/updated](https://docs.gitlab.com/ee/development/documentation/feature-change-workflow.html) or [follow-up review issue created](https://gitlab.com/gitlab-org/gitlab-ce/issues/new?issuable_template=Doc%20Review)\n- [ ] [Code review guidelines](https://docs.gitlab.com/ee/development/code_review.html)\n- [ ] [Merge request performance guidelines](https://docs.gitlab.com/ee/development/merge_request_performance_guidelines.html)\n- [ ] [Style guides](https://gitlab.com/gitlab-org/gitlab-ee/blob/master/doc/development/contributing/style_guides.md)\n- [ ] [Database guides](https://docs.gitlab.com/ee/development/README.html#databases-guides)\n- [ ] [Separation of EE specific content](https://docs.gitlab.com/ee/development/ee_features.html#separation-of-ee-code)\n\n### Performance and Testing\n\n<!-- What risks does this change pose? How might it affect the quality/performance of the product?\nWhat additional test coverage or changes to tests will be needed?\nWill it require cross-browser testing?\nSee the test engineering process for further guidelines: https://about.gitlab.com/handbook/engineering/quality/test-engineering/ -->\n\n<!-- If cross-browser testing is not required, please remove the relevant item, or mark it as not needed: [-] -->\n\n- [ ] [Review and add/update tests for this feature/bug](https://docs.gitlab.com/ee/development/testing_guide/index.html). Consider [all test levels](https://docs.gitlab.com/ee/development/testing_guide/testing_levels.html). See the [Test Planning Process](https://about.gitlab.com/handbook/engineering/quality/guidelines/test-engineering/).\n- [ ] [Tested in all supported browsers](https://docs.gitlab.com/ee/install/requirements.html#supported-web-browsers)\n\n### Security\n\nIf this MR contains changes to processing or storing of credentials or tokens, authorization and authentication methods and other items described in [the security review guidelines](https://about.gitlab.com/handbook/engineering/security/#when-to-request-a-security-review):\n\n- [ ] Label as ~security and @ mention `@gitlab-com/gl-security/appsec`\n- [ ] The MR includes necessary changes to maintain consistency between UI, API, email, or other methods\n- [ ] Security reports checked/validated by a reviewer from the AppSec team \n\n\nCloses #12996",
+    "state": "opened",
+    "created_at": "2019-08-20T08:58:07.507Z",
+    "updated_at": "2019-08-20T11:31:20.704Z",
+    "merged_by": null,
+    "merged_at": null,
+    "closed_by": null,
+    "closed_at": null,
+    "target_branch": "master",
+    "source_branch": "12996-cancel-redundant-pipelines-in-merge-train-when-reconstruction-happens-2",
+    "user_notes_count": 1,
+    "upvotes": 0,
+    "downvotes": 0,
+    "assignee": {
+      "id": 4391348,
+      "name": "Sean Carroll",
+      "username": "sean_carroll",
+      "state": "active",
+      "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/4391348/avatar.png",
+      "web_url": "https://gitlab.com/sean_carroll"
+    },
+    "author": {
+      "id": 4391348,
+      "name": "Sean Carroll",
+      "username": "sean_carroll",
+      "state": "active",
+      "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/4391348/avatar.png",
+      "web_url": "https://gitlab.com/sean_carroll"
+    },
+    "assignees": [
+      {
+        "id": 4391348,
+        "name": "Sean Carroll",
+        "username": "sean_carroll",
+        "state": "active",
+        "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/4391348/avatar.png",
+        "web_url": "https://gitlab.com/sean_carroll"
+      }
+    ],
+    "source_project_id": 278964,
+    "target_project_id": 278964,
+    "labels": [
+      "GitLab Enterprise Edition",
+      "P2",
+      "Release [DEPRECATED]",
+      "S2",
+      "continuous delivery",
+      "devops::release",
+      "devops::release::merge trains",
+      "feature",
+      "group::progressive delivery"
+    ],
+    "work_in_progress": true,
+    "milestone": {
+      "id": 731038,
+      "iid": 37,
+      "group_id": 9970,
+      "title": "12.3",
+      "description": "",
+      "state": "active",
+      "created_at": "2018-12-07T12:40:55.400Z",
+      "updated_at": "2019-01-16T19:50:20.313Z",
+      "due_date": "2019-09-22",
+      "start_date": "2019-08-08",
+      "web_url": "https://gitlab.com/groups/gitlab-org/-/milestones/37"
+    },
+    "merge_when_pipeline_succeeds": false,
+    "merge_status": "cannot_be_merged",
+    "sha": "fcf75b9330b1104bc08c0190cf871759db3f22e0",
+    "merge_commit_sha": null,
+    "discussion_locked": null,
+    "should_remove_source_branch": null,
+    "force_remove_source_branch": null,
+    "reference": "!15438",
+    "web_url": "https://gitlab.com/gitlab-org/gitlab-ee/merge_requests/15438",
+    "time_stats": {
+      "time_estimate": 0,
+      "total_time_spent": 0,
+      "human_time_estimate": null,
+      "human_total_time_spent": null
+    },
+    "squash": false,
+    "task_completion_status": {
+      "count": 12,
+      "completed_count": 0
+    },
+    "approvals_before_merge": null
+  },
+  {
+    "id": 35354393,
+    "iid": 15437,
+    "project_id": 278964,
+    "title": "WIP: Add purchase point to group billing page",
+    "description": "## What does this MR do?\r\n\r\n<!--\r\n\r\nDescribe in detail what your merge request does and why.\r\n\r\nAre there any risks involved with the proposed change? What additional\r\ntest coverage is introduced to offset the risk?\r\n\r\nPlease keep this description up-to-date with any discussion that takes\r\nplace so that reviewers can understand your intent. This is especially\r\nimportant if they didn't participate in the discussion.\r\n\r\n-->\r\n\r\nAdds Billing Plans to top-level `groups/billing` route.\r\nChanges Billing Plan table to Card layout as per https://gitlab.com/gitlab-org/gitlab-ce/issues/63599\r\n\r\nTop-level `groups/billing`\r\n![groups-billing-plans-cards](/uploads/d6a636af7f6d5ba341bfec0d1375f8ea/groups-billing-plans-cards.png)\r\n\r\n`profile/billing`\r\n![profile-billing-plans-cards](/uploads/fa6de1e12b07423573d38af0f523004b/profile-billing-plans-cards.png)\r\n\r\nCloses https://gitlab.com/gitlab-org/gitlab-ce/issues/63599\r\n\r\n## Does this MR meet the acceptance criteria?\r\n\r\n### Conformity\r\n\r\n- [ ] [Changelog entry](https://docs.gitlab.com/ee/development/changelog.html) \r\n- [ ] [Documentation created/updated](https://docs.gitlab.com/ee/development/documentation/feature-change-workflow.html) or [follow-up review issue created](https://gitlab.com/gitlab-org/gitlab-ce/issues/new?issuable_template=Doc%20Review)\r\n- [ ] [Code review guidelines](https://docs.gitlab.com/ee/development/code_review.html)\r\n- [ ] [Merge request performance guidelines](https://docs.gitlab.com/ee/development/merge_request_performance_guidelines.html)\r\n- [ ] [Style guides](https://gitlab.com/gitlab-org/gitlab-ee/blob/master/doc/development/contributing/style_guides.md)\r\n- [ ] [Database guides](https://docs.gitlab.com/ee/development/README.html#databases-guides)\r\n- [ ] [Separation of EE specific content](https://docs.gitlab.com/ee/development/ee_features.html#separation-of-ee-code)\r\n\r\n### Performance and Testing\r\n\r\n<!-- What risks does this change pose? How might it affect the quality/performance of the product?\r\nWhat additional test coverage or changes to tests will be needed?\r\nWill it require cross-browser testing?\r\nSee the test engineering process for further guidelines: https://about.gitlab.com/handbook/engineering/quality/test-engineering/ -->\r\n\r\n<!-- If cross-browser testing is not required, please remove the relevant item, or mark it as not needed: [-] -->\r\n\r\n- [ ] [Review and add/update tests for this feature/bug](https://docs.gitlab.com/ee/development/testing_guide/index.html). Consider [all test levels](https://docs.gitlab.com/ee/development/testing_guide/testing_levels.html). See the [Test Planning Process](https://about.gitlab.com/handbook/engineering/quality/guidelines/test-engineering/).\r\n- [ ] [Tested in all supported browsers](https://docs.gitlab.com/ee/install/requirements.html#supported-web-browsers)\r\n\r\n### Security\r\n\r\nIf this MR contains changes to processing or storing of credentials or tokens, authorization and authentication methods and other items described in [the security review guidelines](https://about.gitlab.com/handbook/engineering/security/#when-to-request-a-security-review):\r\n\r\n- [ ] Label as ~security and @ mention `@gitlab-com/gl-security/appsec`\r\n- [ ] The MR includes necessary changes to maintain consistency between UI, API, email, or other methods\r\n- [ ] Security reports checked/validated by a reviewer from the AppSec team",
+    "state": "opened",
+    "created_at": "2019-08-20T08:46:46.344Z",
+    "updated_at": "2019-08-20T09:26:29.383Z",
+    "merged_by": null,
+    "merged_at": null,
+    "closed_by": null,
+    "closed_at": null,
+    "target_branch": "master",
+    "source_branch": "add-purchase-point-to-group-billing-page",
+    "user_notes_count": 4,
+    "upvotes": 0,
+    "downvotes": 0,
+    "assignee": {
+      "id": 4430316,
+      "name": "Ragnar Hardarson",
+      "username": "rhardarson",
+      "state": "active",
+      "avatar_url": "https://secure.gravatar.com/avatar/ed0d38989fa0a7f168f229dfdf56d2b4?s=80&d=identicon",
+      "web_url": "https://gitlab.com/rhardarson"
+    },
+    "author": {
+      "id": 4430316,
+      "name": "Ragnar Hardarson",
+      "username": "rhardarson",
+      "state": "active",
+      "avatar_url": "https://secure.gravatar.com/avatar/ed0d38989fa0a7f168f229dfdf56d2b4?s=80&d=identicon",
+      "web_url": "https://gitlab.com/rhardarson"
+    },
+    "assignees": [
+      {
+        "id": 4430316,
+        "name": "Ragnar Hardarson",
+        "username": "rhardarson",
+        "state": "active",
+        "avatar_url": "https://secure.gravatar.com/avatar/ed0d38989fa0a7f168f229dfdf56d2b4?s=80&d=identicon",
+        "web_url": "https://gitlab.com/rhardarson"
+      }
+    ],
+    "source_project_id": 278964,
+    "target_project_id": 278964,
+    "labels": [
+      "GitLab Enterprise Edition",
+      "feature",
+      "frontend",
+      "group::fulfillment"
+    ],
+    "work_in_progress": true,
+    "milestone": null,
+    "merge_when_pipeline_succeeds": false,
+    "merge_status": "can_be_merged",
+    "sha": "9af81f5ddb59a57d663c27bcb3144f8c0c26a7fd",
+    "merge_commit_sha": null,
+    "discussion_locked": null,
+    "should_remove_source_branch": null,
+    "force_remove_source_branch": false,
+    "reference": "!15437",
+    "web_url": "https://gitlab.com/gitlab-org/gitlab-ee/merge_requests/15437",
+    "time_stats": {
+      "time_estimate": 0,
+      "total_time_spent": 0,
+      "human_time_estimate": null,
+      "human_total_time_spent": null
+    },
+    "squash": false,
+    "task_completion_status": {
+      "count": 12,
+      "completed_count": 0
+    },
+    "approvals_before_merge": 1
+  },
+  {
+    "id": 35345116,
+    "iid": 15436,
+    "project_id": 278964,
+    "title": "[EE] Add Issue and Merge Request titles to Todo items",
+    "description": "## What does this MR do?\n\nEE version of https://gitlab.com/gitlab-org/gitlab-ce/merge_requests/30435\n\n## Does this MR meet the acceptance criteria?\n\n### Conformity\n\n- [ ] [Changelog entry](https://docs.gitlab.com/ee/development/changelog.html) \n- [ ] [Documentation created/updated](https://docs.gitlab.com/ee/development/documentation/feature-change-workflow.html) or [follow-up review issue created](https://gitlab.com/gitlab-org/gitlab-ce/issues/new?issuable_template=Doc%20Review)\n- [ ] [Code review guidelines](https://docs.gitlab.com/ee/development/code_review.html)\n- [ ] [Merge request performance guidelines](https://docs.gitlab.com/ee/development/merge_request_performance_guidelines.html)\n- [ ] [Style guides](https://gitlab.com/gitlab-org/gitlab-ee/blob/master/doc/development/contributing/style_guides.md)\n- [ ] [Database guides](https://docs.gitlab.com/ee/development/README.html#databases-guides)\n- [ ] [Separation of EE specific content](https://docs.gitlab.com/ee/development/ee_features.html#separation-of-ee-code)\n\n### Performance and Testing\n\n<!-- What risks does this change pose? How might it affect the quality/performance of the product?\nWhat additional test coverage or changes to tests will be needed?\nWill it require cross-browser testing?\nSee the test engineering process for further guidelines: https://about.gitlab.com/handbook/engineering/quality/test-engineering/ -->\n\n<!-- If cross-browser testing is not required, please remove the relevant item, or mark it as not needed: [-] -->\n\n- [ ] [Review and add/update tests for this feature/bug](https://docs.gitlab.com/ee/development/testing_guide/index.html). Consider [all test levels](https://docs.gitlab.com/ee/development/testing_guide/testing_levels.html). See the [Test Planning Process](https://about.gitlab.com/handbook/engineering/quality/guidelines/test-engineering/).\n- [ ] [Tested in all supported browsers](https://docs.gitlab.com/ee/install/requirements.html#supported-web-browsers)\n\n### Security\n\nIf this MR contains changes to processing or storing of credentials or tokens, authorization and authentication methods and other items described in [the security review guidelines](https://about.gitlab.com/handbook/engineering/security/#when-to-request-a-security-review):\n\n- [ ] Label as ~security and @ mention `@gitlab-com/gl-security/appsec`\n- [ ] The MR includes necessary changes to maintain consistency between UI, API, email, or other methods\n- [ ] Security reports checked/validated by a reviewer from the AppSec team",
+    "state": "opened",
+    "created_at": "2019-08-20T08:14:48.224Z",
+    "updated_at": "2019-08-20T08:14:48.224Z",
+    "merged_by": null,
+    "merged_at": null,
+    "closed_by": null,
+    "closed_at": null,
+    "target_branch": "master",
+    "source_branch": "include-issue-mr-titles-ee",
+    "user_notes_count": 0,
+    "upvotes": 0,
+    "downvotes": 0,
+    "assignee": {
+      "id": 1642716,
+      "name": "Jan Provaznik",
+      "username": "jprovaznik",
+      "state": "active",
+      "avatar_url": "https://secure.gravatar.com/avatar/4577c0b60b7640100030d7ab267aba95?s=80&d=identicon",
+      "web_url": "https://gitlab.com/jprovaznik"
+    },
+    "author": {
+      "id": 1642716,
+      "name": "Jan Provaznik",
+      "username": "jprovaznik",
+      "state": "active",
+      "avatar_url": "https://secure.gravatar.com/avatar/4577c0b60b7640100030d7ab267aba95?s=80&d=identicon",
+      "web_url": "https://gitlab.com/jprovaznik"
+    },
+    "assignees": [
+      {
+        "id": 1642716,
+        "name": "Jan Provaznik",
+        "username": "jprovaznik",
+        "state": "active",
+        "avatar_url": "https://secure.gravatar.com/avatar/4577c0b60b7640100030d7ab267aba95?s=80&d=identicon",
+        "web_url": "https://gitlab.com/jprovaznik"
+      }
+    ],
+    "source_project_id": 278964,
+    "target_project_id": 278964,
+    "labels": [
+      "Community contribution",
+      "devops::plan"
+    ],
+    "work_in_progress": false,
+    "milestone": {
+      "id": 693521,
+      "iid": 35,
+      "group_id": 9970,
+      "title": "12.2",
+      "description": "",
+      "state": "active",
+      "created_at": "2018-10-30T16:48:32.567Z",
+      "updated_at": "2019-01-16T19:50:02.455Z",
+      "due_date": "2019-08-22",
+      "start_date": "2019-07-08",
+      "web_url": "https://gitlab.com/groups/gitlab-org/-/milestones/35"
+    },
+    "merge_when_pipeline_succeeds": false,
+    "merge_status": "can_be_merged",
+    "sha": "54ac04bb0ec8849bf2ff43a949150d18008c8d35",
+    "merge_commit_sha": null,
+    "discussion_locked": null,
+    "should_remove_source_branch": null,
+    "force_remove_source_branch": true,
+    "reference": "!15436",
+    "web_url": "https://gitlab.com/gitlab-org/gitlab-ee/merge_requests/15436",
+    "time_stats": {
+      "time_estimate": 0,
+      "total_time_spent": 0,
+      "human_time_estimate": null,
+      "human_total_time_spent": null
+    },
+    "squash": true,
+    "task_completion_status": {
+      "count": 12,
+      "completed_count": 0
+    },
+    "approvals_before_merge": 1
+  },
+  {
+    "id": 35343590,
+    "iid": 15435,
+    "project_id": 278964,
+    "title": "WIP: Resolve \"Data and Privacy Agreement for GitLab users\"",
+    "description": "## What does this MR do?\n\n<!--\n\nDescribe in detail what your merge request does and why.\n\nAre there any risks involved with the proposed change? What additional\ntest coverage is introduced to offset the risk?\n\nPlease keep this description up-to-date with any discussion that takes\nplace so that reviewers can understand your intent. This is especially\nimportant if they didn't participate in the discussion.\n\n-->\n\n## Does this MR meet the acceptance criteria?\n\n### Conformity\n\n- [ ] [Changelog entry](https://docs.gitlab.com/ee/development/changelog.html) \n- [ ] [Documentation created/updated](https://docs.gitlab.com/ee/development/documentation/feature-change-workflow.html) or [follow-up review issue created](https://gitlab.com/gitlab-org/gitlab-ce/issues/new?issuable_template=Doc%20Review)\n- [ ] [Code review guidelines](https://docs.gitlab.com/ee/development/code_review.html)\n- [ ] [Merge request performance guidelines](https://docs.gitlab.com/ee/development/merge_request_performance_guidelines.html)\n- [ ] [Style guides](https://gitlab.com/gitlab-org/gitlab-ee/blob/master/doc/development/contributing/style_guides.md)\n- [ ] [Database guides](https://docs.gitlab.com/ee/development/README.html#databases-guides)\n- [ ] [Separation of EE specific content](https://docs.gitlab.com/ee/development/ee_features.html#separation-of-ee-code)\n\n### Performance and Testing\n\n<!-- What risks does this change pose? How might it affect the quality/performance of the product?\nWhat additional test coverage or changes to tests will be needed?\nWill it require cross-browser testing?\nSee the test engineering process for further guidelines: https://about.gitlab.com/handbook/engineering/quality/test-engineering/ -->\n\n<!-- If cross-browser testing is not required, please remove the relevant item, or mark it as not needed: [-] -->\n\n- [ ] [Review and add/update tests for this feature/bug](https://docs.gitlab.com/ee/development/testing_guide/index.html). Consider [all test levels](https://docs.gitlab.com/ee/development/testing_guide/testing_levels.html). See the [Test Planning Process](https://about.gitlab.com/handbook/engineering/quality/guidelines/test-engineering/).\n- [ ] [Tested in all supported browsers](https://docs.gitlab.com/ee/install/requirements.html#supported-web-browsers)\n\n### Security\n\nIf this MR contains changes to processing or storing of credentials or tokens, authorization and authentication methods and other items described in [the security review guidelines](https://about.gitlab.com/handbook/engineering/security/#when-to-request-a-security-review):\n\n- [ ] Label as ~security and @ mention `@gitlab-com/gl-security/appsec`\n- [ ] The MR includes necessary changes to maintain consistency between UI, API, email, or other methods\n- [ ] Security reports checked/validated by a reviewer from the AppSec team \n\n\nCloses #13665",
+    "state": "opened",
+    "created_at": "2019-08-20T07:47:26.890Z",
+    "updated_at": "2019-08-20T10:37:36.505Z",
+    "merged_by": null,
+    "merged_at": null,
+    "closed_by": null,
+    "closed_at": null,
+    "target_branch": "master",
+    "source_branch": "13665-data-and-privacy-agreement-for-gitlab-users",
+    "user_notes_count": 1,
+    "upvotes": 0,
+    "downvotes": 0,
+    "assignee": {
+      "id": 750946,
+      "name": "Dennis Tang",
+      "username": "dennis",
+      "state": "active",
+      "avatar_url": "https://secure.gravatar.com/avatar/82f4c234d7deecb4760072ecd59f184a?s=80&d=identicon",
+      "web_url": "https://gitlab.com/dennis"
+    },
+    "author": {
+      "id": 750946,
+      "name": "Dennis Tang",
+      "username": "dennis",
+      "state": "active",
+      "avatar_url": "https://secure.gravatar.com/avatar/82f4c234d7deecb4760072ecd59f184a?s=80&d=identicon",
+      "web_url": "https://gitlab.com/dennis"
+    },
+    "assignees": [
+      {
+        "id": 750946,
+        "name": "Dennis Tang",
+        "username": "dennis",
+        "state": "active",
+        "avatar_url": "https://secure.gravatar.com/avatar/82f4c234d7deecb4760072ecd59f184a?s=80&d=identicon",
+        "web_url": "https://gitlab.com/dennis"
+      }
+    ],
+    "source_project_id": 278964,
+    "target_project_id": 278964,
+    "labels": [
+      "P1",
+      "S1",
+      "UX ready",
+      "collection 🧺",
+      "devops::growth",
+      "feature",
+      "frontend",
+      "gitlab.com",
+      "group::telemetry",
+      "missed:12.1",
+      "missed:12.1",
+      "unplanned",
+      "workflow::In review"
+    ],
+    "work_in_progress": true,
+    "milestone": {
+      "id": 693521,
+      "iid": 35,
+      "group_id": 9970,
+      "title": "12.2",
+      "description": "",
+      "state": "active",
+      "created_at": "2018-10-30T16:48:32.567Z",
+      "updated_at": "2019-01-16T19:50:02.455Z",
+      "due_date": "2019-08-22",
+      "start_date": "2019-07-08",
+      "web_url": "https://gitlab.com/groups/gitlab-org/-/milestones/35"
+    },
+    "merge_when_pipeline_succeeds": false,
+    "merge_status": "can_be_merged",
+    "sha": "de5099c8b64d118648c5fd9e381eadc30ae9b72d",
+    "merge_commit_sha": null,
+    "discussion_locked": null,
+    "should_remove_source_branch": null,
+    "force_remove_source_branch": null,
+    "reference": "!15435",
+    "web_url": "https://gitlab.com/gitlab-org/gitlab-ee/merge_requests/15435",
+    "time_stats": {
+      "time_estimate": 0,
+      "total_time_spent": 0,
+      "human_time_estimate": null,
+      "human_total_time_spent": null
+    },
+    "squash": false,
+    "task_completion_status": {
+      "count": 12,
+      "completed_count": 0
+    },
+    "approvals_before_merge": null
+  },
+  {
+    "id": 35338313,
+    "iid": 15434,
+    "project_id": 278964,
+    "title": "Flexible Rules for CI Build config",
+    "description": "## What does this MR do?\n\nThis is the EE compatibility check merge request for https://gitlab.com/gitlab-org/gitlab-ce/merge_requests/29011\n\n## Does this MR meet the acceptance criteria?\n\n### Conformity\n\n- [ ] [Changelog entry](https://docs.gitlab.com/ee/development/changelog.html) \n- [ ] [Documentation created/updated](https://docs.gitlab.com/ee/development/documentation/feature-change-workflow.html) or [follow-up review issue created](https://gitlab.com/gitlab-org/gitlab-ce/issues/new?issuable_template=Doc%20Review)\n- [ ] [Code review guidelines](https://docs.gitlab.com/ee/development/code_review.html)\n- [ ] [Merge request performance guidelines](https://docs.gitlab.com/ee/development/merge_request_performance_guidelines.html)\n- [ ] [Style guides](https://gitlab.com/gitlab-org/gitlab-ee/blob/master/doc/development/contributing/style_guides.md)\n- [ ] [Database guides](https://docs.gitlab.com/ee/development/README.html#databases-guides)\n- [ ] [Separation of EE specific content](https://docs.gitlab.com/ee/development/ee_features.html#separation-of-ee-code)\n\n### Performance and Testing\n\n<!-- What risks does this change pose? How might it affect the quality/performance of the product?\nWhat additional test coverage or changes to tests will be needed?\nWill it require cross-browser testing?\nSee the test engineering process for further guidelines: https://about.gitlab.com/handbook/engineering/quality/test-engineering/ -->\n\n<!-- If cross-browser testing is not required, please remove the relevant item, or mark it as not needed: [-] -->\n\n- [ ] [Review and add/update tests for this feature/bug](https://docs.gitlab.com/ee/development/testing_guide/index.html). Consider [all test levels](https://docs.gitlab.com/ee/development/testing_guide/testing_levels.html). See the [Test Planning Process](https://about.gitlab.com/handbook/engineering/quality/guidelines/test-engineering/).\n- [ ] [Tested in all supported browsers](https://docs.gitlab.com/ee/install/requirements.html#supported-web-browsers)\n\n### Security\n\nIf this MR contains changes to processing or storing of credentials or tokens, authorization and authentication methods and other items described in [the security review guidelines](https://about.gitlab.com/handbook/engineering/security/#when-to-request-a-security-review):\n\n- [ ] Label as ~security and @ mention `@gitlab-com/gl-security/appsec`\n- [ ] The MR includes necessary changes to maintain consistency between UI, API, email, or other methods\n- [ ] Security reports checked/validated by a reviewer from the AppSec team",
+    "state": "opened",
+    "created_at": "2019-08-20T05:51:33.955Z",
+    "updated_at": "2019-08-20T05:52:16.896Z",
+    "merged_by": null,
+    "merged_at": null,
+    "closed_by": null,
+    "closed_at": null,
+    "target_branch": "master",
+    "source_branch": "ee-ci-config-on-policy",
+    "user_notes_count": 0,
+    "upvotes": 0,
+    "downvotes": 0,
+    "assignee": {
+      "id": 12452,
+      "name": "Kamil Trzciński",
+      "username": "ayufan",
+      "state": "active",
+      "avatar_url": "https://secure.gravatar.com/avatar/7a285e30f35d72526fb0954e8fe7cefa?s=80&d=identicon",
+      "web_url": "https://gitlab.com/ayufan"
+    },
+    "author": {
+      "id": 730684,
+      "name": "drew",
+      "username": "drewcimino",
+      "state": "active",
+      "avatar_url": "https://secure.gravatar.com/avatar/59b7f2c95acd4a085d964f745ead6bdb?s=80&d=identicon",
+      "web_url": "https://gitlab.com/drewcimino"
+    },
+    "assignees": [
+      {
+        "id": 12452,
+        "name": "Kamil Trzciński",
+        "username": "ayufan",
+        "state": "active",
+        "avatar_url": "https://secure.gravatar.com/avatar/7a285e30f35d72526fb0954e8fe7cefa?s=80&d=identicon",
+        "web_url": "https://gitlab.com/ayufan"
+      },
+      {
+        "id": 730684,
+        "name": "drew",
+        "username": "drewcimino",
+        "state": "active",
+        "avatar_url": "https://secure.gravatar.com/avatar/59b7f2c95acd4a085d964f745ead6bdb?s=80&d=identicon",
+        "web_url": "https://gitlab.com/drewcimino"
+      }
+    ],
+    "source_project_id": 11495811,
+    "target_project_id": 278964,
+    "labels": [
+      "devops::verify",
+      "feature",
+      "group::continuous integration"
+    ],
+    "work_in_progress": false,
+    "milestone": {
+      "id": 693521,
+      "iid": 35,
+      "group_id": 9970,
+      "title": "12.2",
+      "description": "",
+      "state": "active",
+      "created_at": "2018-10-30T16:48:32.567Z",
+      "updated_at": "2019-01-16T19:50:02.455Z",
+      "due_date": "2019-08-22",
+      "start_date": "2019-07-08",
+      "web_url": "https://gitlab.com/groups/gitlab-org/-/milestones/35"
+    },
+    "merge_when_pipeline_succeeds": false,
+    "merge_status": "can_be_merged",
+    "sha": "846faa7dccc7e52f8d7af6b2fe1ca595340219a4",
+    "merge_commit_sha": null,
+    "discussion_locked": null,
+    "should_remove_source_branch": null,
+    "force_remove_source_branch": false,
+    "allow_collaboration": false,
+    "allow_maintainer_to_push": false,
+    "reference": "!15434",
+    "web_url": "https://gitlab.com/gitlab-org/gitlab-ee/merge_requests/15434",
+    "time_stats": {
+      "time_estimate": 0,
+      "total_time_spent": 0,
+      "human_time_estimate": null,
+      "human_total_time_spent": null
+    },
+    "squash": false,
+    "task_completion_status": {
+      "count": 12,
+      "completed_count": 0
+    },
+    "approvals_before_merge": 1
+  },
+  {
+    "id": 35337566,
+    "iid": 15433,
+    "project_id": 278964,
+    "title": "WIP:",
+    "description": "## What does this MR do?\n\nThis is `WIP` to get feedback on how a `Design` might receive a message when its `Note`s are created, updated, resolved or unresolved.\n\nIssue #13353.\n\n## Does this MR meet the acceptance criteria?\n\n### Conformity\n\n- [ ] [Changelog entry](https://docs.gitlab.com/ee/development/changelog.html) \n- [ ] [Documentation created/updated](https://docs.gitlab.com/ee/development/documentation/feature-change-workflow.html) or [follow-up review issue created](https://gitlab.com/gitlab-org/gitlab-ce/issues/new?issuable_template=Doc%20Review)\n- [ ] [Code review guidelines](https://docs.gitlab.com/ee/development/code_review.html)\n- [ ] [Merge request performance guidelines](https://docs.gitlab.com/ee/development/merge_request_performance_guidelines.html)\n- [ ] [Style guides](https://gitlab.com/gitlab-org/gitlab-ee/blob/master/doc/development/contributing/style_guides.md)\n- [ ] [Database guides](https://docs.gitlab.com/ee/development/README.html#databases-guides)\n- [ ] [Separation of EE specific content](https://docs.gitlab.com/ee/development/ee_features.html#separation-of-ee-code)\n\n### Performance and Testing\n\n<!-- What risks does this change pose? How might it affect the quality/performance of the product?\nWhat additional test coverage or changes to tests will be needed?\nWill it require cross-browser testing?\nSee the test engineering process for further guidelines: https://about.gitlab.com/handbook/engineering/quality/test-engineering/ -->\n\n<!-- If cross-browser testing is not required, please remove the relevant item, or mark it as not needed: [-] -->\n\n- [ ] [Review and add/update tests for this feature/bug](https://docs.gitlab.com/ee/development/testing_guide/index.html). Consider [all test levels](https://docs.gitlab.com/ee/development/testing_guide/testing_levels.html). See the [Test Planning Process](https://about.gitlab.com/handbook/engineering/quality/guidelines/test-engineering/).\n- [ ] [Tested in all supported browsers](https://docs.gitlab.com/ee/install/requirements.html#supported-web-browsers)\n\n### Security\n\nIf this MR contains changes to processing or storing of credentials or tokens, authorization and authentication methods and other items described in [the security review guidelines](https://about.gitlab.com/handbook/engineering/security/#when-to-request-a-security-review):\n\n- [ ] Label as ~security and @ mention `@gitlab-com/gl-security/appsec`\n- [ ] The MR includes necessary changes to maintain consistency between UI, API, email, or other methods\n- [ ] Security reports checked/validated by a reviewer from the AppSec team \n\n\nCloses #13353",
+    "state": "opened",
+    "created_at": "2019-08-20T05:20:41.290Z",
+    "updated_at": "2019-08-20T05:31:20.363Z",
+    "merged_by": null,
+    "merged_at": null,
+    "closed_by": null,
+    "closed_at": null,
+    "target_branch": "master",
+    "source_branch": "13353-DesignType-notes_count",
+    "user_notes_count": 1,
+    "upvotes": 0,
+    "downvotes": 0,
+    "assignee": {
+      "id": 2702368,
+      "name": "Luke Duncalfe",
+      "username": ".luke",
+      "state": "active",
+      "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/2702368/avatar.png",
+      "web_url": "https://gitlab.com/.luke"
+    },
+    "author": {
+      "id": 2702368,
+      "name": "Luke Duncalfe",
+      "username": ".luke",
+      "state": "active",
+      "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/2702368/avatar.png",
+      "web_url": "https://gitlab.com/.luke"
+    },
+    "assignees": [
+      {
+        "id": 2702368,
+        "name": "Luke Duncalfe",
+        "username": ".luke",
+        "state": "active",
+        "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/2702368/avatar.png",
+        "web_url": "https://gitlab.com/.luke"
+      }
+    ],
+    "source_project_id": 278964,
+    "target_project_id": 278964,
+    "labels": [
+      "Deliverable",
+      "GitLab Enterprise Edition",
+      "GraphQL",
+      "backend",
+      "design management",
+      "devops::create",
+      "feature",
+      "group::knowledge",
+      "workflow::In dev"
+    ],
+    "work_in_progress": true,
+    "milestone": {
+      "id": 731038,
+      "iid": 37,
+      "group_id": 9970,
+      "title": "12.3",
+      "description": "",
+      "state": "active",
+      "created_at": "2018-12-07T12:40:55.400Z",
+      "updated_at": "2019-01-16T19:50:20.313Z",
+      "due_date": "2019-09-22",
+      "start_date": "2019-08-08",
+      "web_url": "https://gitlab.com/groups/gitlab-org/-/milestones/37"
+    },
+    "merge_when_pipeline_succeeds": false,
+    "merge_status": "can_be_merged",
+    "sha": "de578529c00060f334b2b3e5aeda7e269d838a73",
+    "merge_commit_sha": null,
+    "discussion_locked": null,
+    "should_remove_source_branch": null,
+    "force_remove_source_branch": false,
+    "reference": "!15433",
+    "web_url": "https://gitlab.com/gitlab-org/gitlab-ee/merge_requests/15433",
+    "time_stats": {
+      "time_estimate": 0,
+      "total_time_spent": 0,
+      "human_time_estimate": null,
+      "human_total_time_spent": null
+    },
+    "squash": false,
+    "task_completion_status": {
+      "count": 12,
+      "completed_count": 0
+    },
+    "approvals_before_merge": 1
+  },
+  {
+    "id": 35336438,
+    "iid": 15432,
+    "project_id": 278964,
+    "title": "WIP:",
+    "description": "## What does this MR do?\n\nThis is `WIP` to get feedback on how a `Design` might receive a message when its `Note`s are created, updated, resolved or unresolved.\n\nIssue #13353.\n\n## Does this MR meet the acceptance criteria?\n\n### Conformity\n\n- [ ] [Changelog entry](https://docs.gitlab.com/ee/development/changelog.html) \n- [ ] [Documentation created/updated](https://docs.gitlab.com/ee/development/documentation/feature-change-workflow.html) or [follow-up review issue created](https://gitlab.com/gitlab-org/gitlab-ce/issues/new?issuable_template=Doc%20Review)\n- [ ] [Code review guidelines](https://docs.gitlab.com/ee/development/code_review.html)\n- [ ] [Merge request performance guidelines](https://docs.gitlab.com/ee/development/merge_request_performance_guidelines.html)\n- [ ] [Style guides](https://gitlab.com/gitlab-org/gitlab-ee/blob/master/doc/development/contributing/style_guides.md)\n- [ ] [Database guides](https://docs.gitlab.com/ee/development/README.html#databases-guides)\n- [ ] [Separation of EE specific content](https://docs.gitlab.com/ee/development/ee_features.html#separation-of-ee-code)\n\n### Performance and Testing\n\n<!-- What risks does this change pose? How might it affect the quality/performance of the product?\nWhat additional test coverage or changes to tests will be needed?\nWill it require cross-browser testing?\nSee the test engineering process for further guidelines: https://about.gitlab.com/handbook/engineering/quality/test-engineering/ -->\n\n<!-- If cross-browser testing is not required, please remove the relevant item, or mark it as not needed: [-] -->\n\n- [ ] [Review and add/update tests for this feature/bug](https://docs.gitlab.com/ee/development/testing_guide/index.html). Consider [all test levels](https://docs.gitlab.com/ee/development/testing_guide/testing_levels.html). See the [Test Planning Process](https://about.gitlab.com/handbook/engineering/quality/guidelines/test-engineering/).\n- [ ] [Tested in all supported browsers](https://docs.gitlab.com/ee/install/requirements.html#supported-web-browsers)\n\n### Security\n\nIf this MR contains changes to processing or storing of credentials or tokens, authorization and authentication methods and other items described in [the security review guidelines](https://about.gitlab.com/handbook/engineering/security/#when-to-request-a-security-review):\n\n- [ ] Label as ~security and @ mention `@gitlab-com/gl-security/appsec`\n- [ ] The MR includes necessary changes to maintain consistency between UI, API, email, or other methods\n- [ ] Security reports checked/validated by a reviewer from the AppSec team",
+    "state": "closed",
+    "created_at": "2019-08-20T04:57:41.639Z",
+    "updated_at": "2019-08-20T05:10:54.302Z",
+    "merged_by": null,
+    "merged_at": null,
+    "closed_by": {
+      "id": 2702368,
+      "name": "Luke Duncalfe",
+      "username": ".luke",
+      "state": "active",
+      "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/2702368/avatar.png",
+      "web_url": "https://gitlab.com/.luke"
+    },
+    "closed_at": "2019-08-20T05:10:54.356Z",
+    "target_branch": "master",
+    "source_branch": "13353-DesignType-notes_count",
+    "user_notes_count": 1,
+    "upvotes": 0,
+    "downvotes": 0,
+    "assignee": {
+      "id": 2702368,
+      "name": "Luke Duncalfe",
+      "username": ".luke",
+      "state": "active",
+      "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/2702368/avatar.png",
+      "web_url": "https://gitlab.com/.luke"
+    },
+    "author": {
+      "id": 2702368,
+      "name": "Luke Duncalfe",
+      "username": ".luke",
+      "state": "active",
+      "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/2702368/avatar.png",
+      "web_url": "https://gitlab.com/.luke"
+    },
+    "assignees": [
+      {
+        "id": 2702368,
+        "name": "Luke Duncalfe",
+        "username": ".luke",
+        "state": "active",
+        "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/2702368/avatar.png",
+        "web_url": "https://gitlab.com/.luke"
+      }
+    ],
+    "source_project_id": 278964,
+    "target_project_id": 278964,
+    "labels": [
+      "Deliverable",
+      "GitLab Enterprise Edition",
+      "GraphQL",
+      "backend",
+      "design management",
+      "devops::create",
+      "feature",
+      "group::knowledge",
+      "workflow::In dev"
+    ],
+    "work_in_progress": true,
+    "milestone": {
+      "id": 731038,
+      "iid": 37,
+      "group_id": 9970,
+      "title": "12.3",
+      "description": "",
+      "state": "active",
+      "created_at": "2018-12-07T12:40:55.400Z",
+      "updated_at": "2019-01-16T19:50:20.313Z",
+      "due_date": "2019-09-22",
+      "start_date": "2019-08-08",
+      "web_url": "https://gitlab.com/groups/gitlab-org/-/milestones/37"
+    },
+    "merge_when_pipeline_succeeds": false,
+    "merge_status": "can_be_merged",
+    "sha": "34b3b319044987ba86af00b19ab5259d54aa8365",
+    "merge_commit_sha": null,
+    "discussion_locked": null,
+    "should_remove_source_branch": null,
+    "force_remove_source_branch": false,
+    "reference": "!15432",
+    "web_url": "https://gitlab.com/gitlab-org/gitlab-ee/merge_requests/15432",
+    "time_stats": {
+      "time_estimate": 0,
+      "total_time_spent": 0,
+      "human_time_estimate": null,
+      "human_total_time_spent": null
+    },
+    "squash": false,
+    "task_completion_status": {
+      "count": 12,
+      "completed_count": 0
+    },
+    "approvals_before_merge": 1
+  },
+  {
+    "id": 35333974,
+    "iid": 15431,
+    "project_id": 278964,
+    "title": "Quarantine failing test",
+    "description": "## What does this MR do?\n\nThe elasticsearch test fails because it uses a license file as a template, and the template is missing.\n\nSee https://gitlab.com/gitlab-org/quality/nightly/issues/127\n\n## Does this MR meet the acceptance criteria?\n\n### Conformity\n\n- [ ] [Changelog entry](https://docs.gitlab.com/ee/development/changelog.html) \n- [ ] [Documentation created/updated](https://docs.gitlab.com/ee/development/documentation/feature-change-workflow.html) or [follow-up review issue created](https://gitlab.com/gitlab-org/gitlab-ce/issues/new?issuable_template=Doc%20Review)\n- [ ] [Code review guidelines](https://docs.gitlab.com/ee/development/code_review.html)\n- [ ] [Merge request performance guidelines](https://docs.gitlab.com/ee/development/merge_request_performance_guidelines.html)\n- [ ] [Style guides](https://gitlab.com/gitlab-org/gitlab-ee/blob/master/doc/development/contributing/style_guides.md)\n- [ ] [Database guides](https://docs.gitlab.com/ee/development/README.html#databases-guides)\n- [ ] [Separation of EE specific content](https://docs.gitlab.com/ee/development/ee_features.html#separation-of-ee-code)\n\n### Performance and Testing\n\n<!-- What risks does this change pose? How might it affect the quality/performance of the product?\nWhat additional test coverage or changes to tests will be needed?\nWill it require cross-browser testing?\nSee the test engineering process for further guidelines: https://about.gitlab.com/handbook/engineering/quality/test-engineering/ -->\n\n<!-- If cross-browser testing is not required, please remove the relevant item, or mark it as not needed: [-] -->\n\n- [ ] [Review and add/update tests for this feature/bug](https://docs.gitlab.com/ee/development/testing_guide/index.html). Consider [all test levels](https://docs.gitlab.com/ee/development/testing_guide/testing_levels.html). See the [Test Planning Process](https://about.gitlab.com/handbook/engineering/quality/guidelines/test-engineering/).\n- [ ] [Tested in all supported browsers](https://docs.gitlab.com/ee/install/requirements.html#supported-web-browsers)\n\n### Security\n\nIf this MR contains changes to processing or storing of credentials or tokens, authorization and authentication methods and other items described in [the security review guidelines](https://about.gitlab.com/handbook/engineering/security/#when-to-request-a-security-review):\n\n- [ ] Label as ~security and @ mention `@gitlab-com/gl-security/appsec`\n- [ ] The MR includes necessary changes to maintain consistency between UI, API, email, or other methods\n- [ ] Security reports checked/validated by a reviewer from the AppSec team",
+    "state": "merged",
+    "created_at": "2019-08-20T03:34:46.802Z",
+    "updated_at": "2019-08-20T08:15:51.047Z",
+    "merged_by": {
+      "id": 178079,
+      "name": "Walmyr Lima e Silva Filho",
+      "username": "wlsf82",
+      "state": "active",
+      "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/178079/avatar.png",
+      "web_url": "https://gitlab.com/wlsf82"
+    },
+    "merged_at": "2019-08-20T08:15:51.244Z",
+    "closed_by": null,
+    "closed_at": null,
+    "target_branch": "master",
+    "source_branch": "qa-quarantine-templates-test",
+    "user_notes_count": 1,
+    "upvotes": 0,
+    "downvotes": 0,
+    "assignee": null,
+    "author": {
+      "id": 655908,
+      "name": "Mark Lapierre",
+      "username": "mlapierre",
+      "state": "active",
+      "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/655908/avatar.png",
+      "web_url": "https://gitlab.com/mlapierre"
+    },
+    "assignees": [],
+    "source_project_id": 278964,
+    "target_project_id": 278964,
+    "labels": [
+      "QA",
+      "Quality",
+      "backstage"
+    ],
+    "work_in_progress": false,
+    "milestone": {
+      "id": 693521,
+      "iid": 35,
+      "group_id": 9970,
+      "title": "12.2",
+      "description": "",
+      "state": "active",
+      "created_at": "2018-10-30T16:48:32.567Z",
+      "updated_at": "2019-01-16T19:50:02.455Z",
+      "due_date": "2019-08-22",
+      "start_date": "2019-07-08",
+      "web_url": "https://gitlab.com/groups/gitlab-org/-/milestones/35"
+    },
+    "merge_when_pipeline_succeeds": false,
+    "merge_status": "can_be_merged",
+    "sha": "cba824ca33a199303091c2870e43f897574a3f0e",
+    "merge_commit_sha": "6c3af2d1ce3c64bc559332b8b44dc3b33825781a",
+    "discussion_locked": null,
+    "should_remove_source_branch": null,
+    "force_remove_source_branch": true,
+    "reference": "!15431",
+    "web_url": "https://gitlab.com/gitlab-org/gitlab-ee/merge_requests/15431",
+    "time_stats": {
+      "time_estimate": 0,
+      "total_time_spent": 0,
+      "human_time_estimate": null,
+      "human_total_time_spent": null
+    },
+    "squash": false,
+    "task_completion_status": {
+      "count": 12,
+      "completed_count": 0
+    },
+    "approvals_before_merge": 1
+  },
+  {
+    "id": 35328489,
+    "iid": 15428,
+    "project_id": 278964,
+    "title": "Replace haml analytics stage-list-item with vue component",
+    "description": "## What does this MR do?\r\n\r\nUpdate the `stage-nav-item` component on the *analytics/cycle_analytics* page\r\n* Adds the `stage-nav-item` component\r\n* Updates css classes used on the table headers\r\n* Fixes broken UI introduced in !14910\r\n\r\n| Before | After |\r\n| --- | --- |\r\n| ![Screen_Shot_2019-08-20_at_11.09.02_am](/uploads/49c7a93b60362439a6773c15b7ecb500/Screen_Shot_2019-08-20_at_11.09.02_am.png) | ![Screen_Shot_2019-08-20_at_11.19.43_am](/uploads/250858f0f3b7cdd2fd59a2c3d43e250d/Screen_Shot_2019-08-20_at_11.19.43_am.png) |\r\n\r\n## Related issues\r\n#13076\r\n\r\n## Does this MR meet the acceptance criteria?\r\n\r\n### Conformity\r\n\r\n- [ ] [Changelog entry](https://docs.gitlab.com/ee/development/changelog.html) \r\n- [ ] [Documentation created/updated](https://docs.gitlab.com/ee/development/documentation/feature-change-workflow.html) or [follow-up review issue created](https://gitlab.com/gitlab-org/gitlab-ce/issues/new?issuable_template=Doc%20Review)\r\n- [ ] [Code review guidelines](https://docs.gitlab.com/ee/development/code_review.html)\r\n- [ ] [Merge request performance guidelines](https://docs.gitlab.com/ee/development/merge_request_performance_guidelines.html)\r\n- [ ] [Style guides](https://gitlab.com/gitlab-org/gitlab-ee/blob/master/doc/development/contributing/style_guides.md)\r\n- [ ] [Database guides](https://docs.gitlab.com/ee/development/README.html#databases-guides)\r\n- [ ] [Separation of EE specific content](https://docs.gitlab.com/ee/development/ee_features.html#separation-of-ee-code)\r\n\r\n### Performance and Testing\r\n\r\n<!-- What risks does this change pose? How might it affect the quality/performance of the product?\r\nWhat additional test coverage or changes to tests will be needed?\r\nWill it require cross-browser testing?\r\nSee the test engineering process for further guidelines: https://about.gitlab.com/handbook/engineering/quality/test-engineering/ -->\r\n\r\n<!-- If cross-browser testing is not required, please remove the relevant item, or mark it as not needed: [-] -->\r\n\r\n- [ ] [Review and add/update tests for this feature/bug](https://docs.gitlab.com/ee/development/testing_guide/index.html). Consider [all test levels](https://docs.gitlab.com/ee/development/testing_guide/testing_levels.html). See the [Test Planning Process](https://about.gitlab.com/handbook/engineering/quality/guidelines/test-engineering/).\r\n- [ ] [Tested in all supported browsers](https://docs.gitlab.com/ee/install/requirements.html#supported-web-browsers)\r\n\r\n### Security\r\n\r\nIf this MR contains changes to processing or storing of credentials or tokens, authorization and authentication methods and other items described in [the security review guidelines](https://about.gitlab.com/handbook/engineering/security/#when-to-request-a-security-review):\r\n\r\n- [ ] Label as ~security and @ mention `@gitlab-com/gl-security/appsec`\r\n- [ ] The MR includes necessary changes to maintain consistency between UI, API, email, or other methods\r\n- [ ] Security reports checked/validated by a reviewer from the AppSec team",
+    "state": "opened",
+    "created_at": "2019-08-20T01:33:19.691Z",
+    "updated_at": "2019-08-20T03:35:18.319Z",
+    "merged_by": null,
+    "merged_at": null,
+    "closed_by": null,
+    "closed_at": null,
+    "target_branch": "master",
+    "source_branch": "ek-replace-analytics-haml-stage-list-item",
+    "user_notes_count": 2,
+    "upvotes": 0,
+    "downvotes": 0,
+    "assignee": {
+      "id": 3732265,
+      "name": "Paul Gascou-Vaillancourt",
+      "username": "pgascouvaillancourt",
+      "state": "active",
+      "avatar_url": "https://secure.gravatar.com/avatar/7a190c0b1ff5772c9230b4d9a38ac608?s=80&d=identicon",
+      "web_url": "https://gitlab.com/pgascouvaillancourt"
+    },
+    "author": {
+      "id": 3397881,
+      "name": "Ezekiel Kigbo",
+      "username": "ekigbo",
+      "state": "active",
+      "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/3397881/avatar.png",
+      "web_url": "https://gitlab.com/ekigbo"
+    },
+    "assignees": [
+      {
+        "id": 3732265,
+        "name": "Paul Gascou-Vaillancourt",
+        "username": "pgascouvaillancourt",
+        "state": "active",
+        "avatar_url": "https://secure.gravatar.com/avatar/7a190c0b1ff5772c9230b4d9a38ac608?s=80&d=identicon",
+        "web_url": "https://gitlab.com/pgascouvaillancourt"
+      }
+    ],
+    "source_project_id": 278964,
+    "target_project_id": 278964,
+    "labels": [
+      "UI component",
+      "analytics",
+      "bug",
+      "cycle analytics",
+      "frontend"
+    ],
+    "work_in_progress": false,
+    "milestone": {
+      "id": 731038,
+      "iid": 37,
+      "group_id": 9970,
+      "title": "12.3",
+      "description": "",
+      "state": "active",
+      "created_at": "2018-12-07T12:40:55.400Z",
+      "updated_at": "2019-01-16T19:50:20.313Z",
+      "due_date": "2019-09-22",
+      "start_date": "2019-08-08",
+      "web_url": "https://gitlab.com/groups/gitlab-org/-/milestones/37"
+    },
+    "merge_when_pipeline_succeeds": false,
+    "merge_status": "can_be_merged",
+    "sha": "2ea513d63d0b03a15d19e34a170e406f7ebab1a6",
+    "merge_commit_sha": null,
+    "discussion_locked": null,
+    "should_remove_source_branch": null,
+    "force_remove_source_branch": false,
+    "reference": "!15428",
+    "web_url": "https://gitlab.com/gitlab-org/gitlab-ee/merge_requests/15428",
+    "time_stats": {
+      "time_estimate": 0,
+      "total_time_spent": 0,
+      "human_time_estimate": null,
+      "human_total_time_spent": null
+    },
+    "squash": false,
+    "task_completion_status": {
+      "count": 12,
+      "completed_count": 0
+    },
+    "approvals_before_merge": 1
+  },
+  {
+    "id": 35328403,
+    "iid": 15427,
+    "project_id": 278964,
+    "title": "Remove the store_designs_in_lfs feature flag",
+    "description": "## What does this MR do?\n\nThis MR removes the `store_designs_in_lfs` feature flag from the codebase. \n\nIssue https://gitlab.com/gitlab-org/gitlab-ee/issues/12158.\n\nThe feature flag was added in https://gitlab.com/gitlab-org/gitlab-ee/merge_requests/13389. \n\nThis MR does not include a changelog entry, because the feature has been enabled by default since https://gitlab.com/gitlab-org/gitlab-ee/merge_requests/13389 and that MR contained the changelog.\n\n## Does this MR meet the acceptance criteria?\n\n### Conformity\n\n- [-] [Changelog entry](https://docs.gitlab.com/ee/development/changelog.html) \n- [-] [Documentation created/updated](https://docs.gitlab.com/ee/development/documentation/feature-change-workflow.html) or [follow-up review issue created](https://gitlab.com/gitlab-org/gitlab-ce/issues/new?issuable_template=Doc%20Review)\n- [x] [Code review guidelines](https://docs.gitlab.com/ee/development/code_review.html)\n- [x] [Merge request performance guidelines](https://docs.gitlab.com/ee/development/merge_request_performance_guidelines.html)\n- [x] [Style guides](https://gitlab.com/gitlab-org/gitlab-ee/blob/master/doc/development/contributing/style_guides.md)\n- [-] [Database guides](https://docs.gitlab.com/ee/development/README.html#databases-guides)\n- [-] [Separation of EE specific content](https://docs.gitlab.com/ee/development/ee_features.html#separation-of-ee-code)\n\n### Performance and Testing\n\n<!-- What risks does this change pose? How might it affect the quality/performance of the product?\nWhat additional test coverage or changes to tests will be needed?\nWill it require cross-browser testing?\nSee the test engineering process for further guidelines: https://about.gitlab.com/handbook/engineering/quality/test-engineering/ -->\n\n<!-- If cross-browser testing is not required, please remove the relevant item, or mark it as not needed: [-] -->\n\n- [x] [Review and add/update tests for this feature/bug](https://docs.gitlab.com/ee/development/testing_guide/index.html). Consider [all test levels](https://docs.gitlab.com/ee/development/testing_guide/testing_levels.html). See the [Test Planning Process](https://about.gitlab.com/handbook/engineering/quality/guidelines/test-engineering/).\n- [-] [Tested in all supported browsers](https://docs.gitlab.com/ee/install/requirements.html#supported-web-browsers)",
+    "state": "opened",
+    "created_at": "2019-08-20T01:27:32.001Z",
+    "updated_at": "2019-08-20T09:57:31.340Z",
+    "merged_by": null,
+    "merged_at": null,
+    "closed_by": null,
+    "closed_at": null,
+    "target_branch": "master",
+    "source_branch": "12158-remove-store_designs_in_lfs-feature-flag",
+    "user_notes_count": 5,
+    "upvotes": 0,
+    "downvotes": 0,
+    "assignee": {
+      "id": 12452,
+      "name": "Kamil Trzciński",
+      "username": "ayufan",
+      "state": "active",
+      "avatar_url": "https://secure.gravatar.com/avatar/7a285e30f35d72526fb0954e8fe7cefa?s=80&d=identicon",
+      "web_url": "https://gitlab.com/ayufan"
+    },
+    "author": {
+      "id": 2702368,
+      "name": "Luke Duncalfe",
+      "username": ".luke",
+      "state": "active",
+      "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/2702368/avatar.png",
+      "web_url": "https://gitlab.com/.luke"
+    },
+    "assignees": [
+      {
+        "id": 12452,
+        "name": "Kamil Trzciński",
+        "username": "ayufan",
+        "state": "active",
+        "avatar_url": "https://secure.gravatar.com/avatar/7a285e30f35d72526fb0954e8fe7cefa?s=80&d=identicon",
+        "web_url": "https://gitlab.com/ayufan"
+      },
+      {
+        "id": 2702368,
+        "name": "Luke Duncalfe",
+        "username": ".luke",
+        "state": "active",
+        "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/2702368/avatar.png",
+        "web_url": "https://gitlab.com/.luke"
+      }
+    ],
+    "source_project_id": 278964,
+    "target_project_id": 278964,
+    "labels": [
+      "Deliverable",
+      "GitLab Enterprise Edition",
+      "backend",
+      "backstage",
+      "design management",
+      "devops::create",
+      "feature flag",
+      "group::knowledge",
+      "workflow::In review"
+    ],
+    "work_in_progress": false,
+    "milestone": {
+      "id": 731038,
+      "iid": 37,
+      "group_id": 9970,
+      "title": "12.3",
+      "description": "",
+      "state": "active",
+      "created_at": "2018-12-07T12:40:55.400Z",
+      "updated_at": "2019-01-16T19:50:20.313Z",
+      "due_date": "2019-09-22",
+      "start_date": "2019-08-08",
+      "web_url": "https://gitlab.com/groups/gitlab-org/-/milestones/37"
+    },
+    "merge_when_pipeline_succeeds": false,
+    "merge_status": "can_be_merged",
+    "sha": "2d3f756620c5de9785bf13a98b02d47c63a2ee1c",
+    "merge_commit_sha": null,
+    "discussion_locked": null,
+    "should_remove_source_branch": null,
+    "force_remove_source_branch": true,
+    "reference": "!15427",
+    "web_url": "https://gitlab.com/gitlab-org/gitlab-ee/merge_requests/15427",
+    "time_stats": {
+      "time_estimate": 0,
+      "total_time_spent": 0,
+      "human_time_estimate": null,
+      "human_total_time_spent": null
+    },
+    "squash": false,
+    "task_completion_status": {
+      "count": 4,
+      "completed_count": 4
+    },
+    "approvals_before_merge": 1
+  },
+  {
+    "id": 35323180,
+    "iid": 15426,
+    "project_id": 278964,
+    "title": "Resolve \"Broken master - Job Failed #275548923\"",
+    "description": "## What does this MR do?\r\n\r\nRegenerate gitlab pot file\r\n\r\n```diff\r\ndiff --git a/locale/gitlab.pot b/locale/gitlab.pot\r\nindex 816f4a2590c..6dc4e4b6bc4 100644\r\n--- a/locale/gitlab.pot\r\n+++ b/locale/gitlab.pot\r\n@@ -10705,6 +10705,9 @@ msgstr \"\"\r\n msgid \"Pipelines for last year\"\r\n msgstr \"\"\r\n \r\n+msgid \"Pipelines for merge requests are configured. A detached pipeline runs in the context of the merge request, and not against the merged result. Learn more on the documentation for Pipelines for Merged Results.\"\r\n+msgstr \"\"\r\n+\r\n msgid \"Pipelines settings for '%{project_name}' were successfully updated.\"\r\n msgstr \"\"\r\n \r\n@@ -14746,9 +14749,6 @@ msgstr \"\"\r\n msgid \"The character highlighter helps you keep the subject line to %{titleLength} characters and wrap the body at %{bodyLength} so they are readable in git.\"\r\n msgstr \"\"\r\n \r\n-msgid \"The code of a detached pipeline is tested against the source branch instead of merged results\"\r\n-msgstr \"\"\r\n-\r\n msgid \"The coding stage shows the time from the first commit to creating the merge request. The data will automatically be added here once you create your first merge request.\"\r\n msgstr \"\"\r\n \r\n\r\n```\r\n\r\n## Does this MR meet the acceptance criteria?\r\n\r\n### Conformity\r\n\r\n- [ ] [Changelog entry](https://docs.gitlab.com/ee/development/changelog.html) \r\n- [ ] [Documentation created/updated](https://docs.gitlab.com/ee/development/documentation/feature-change-workflow.html) or [follow-up review issue created](https://gitlab.com/gitlab-org/gitlab-ce/issues/new?issuable_template=Doc%20Review)\r\n- [ ] [Code review guidelines](https://docs.gitlab.com/ee/development/code_review.html)\r\n- [ ] [Merge request performance guidelines](https://docs.gitlab.com/ee/development/merge_request_performance_guidelines.html)\r\n- [ ] [Style guides](https://gitlab.com/gitlab-org/gitlab-ee/blob/master/doc/development/contributing/style_guides.md)\r\n- [ ] [Database guides](https://docs.gitlab.com/ee/development/README.html#databases-guides)\r\n- [ ] [Separation of EE specific content](https://docs.gitlab.com/ee/development/ee_features.html#separation-of-ee-code)\r\n\r\n### Performance and Testing\r\n\r\n<!-- What risks does this change pose? How might it affect the quality/performance of the product?\r\nWhat additional test coverage or changes to tests will be needed?\r\nWill it require cross-browser testing?\r\nSee the test engineering process for further guidelines: https://about.gitlab.com/handbook/engineering/quality/test-engineering/ -->\r\n\r\n<!-- If cross-browser testing is not required, please remove the relevant item, or mark it as not needed: [-] -->\r\n\r\n- [ ] [Review and add/update tests for this feature/bug](https://docs.gitlab.com/ee/development/testing_guide/index.html). Consider [all test levels](https://docs.gitlab.com/ee/development/testing_guide/testing_levels.html). See the [Test Planning Process](https://about.gitlab.com/handbook/engineering/quality/guidelines/test-engineering/).\r\n- [ ] [Tested in all supported browsers](https://docs.gitlab.com/ee/install/requirements.html#supported-web-browsers)\r\n\r\n### Security\r\n\r\nIf this MR contains changes to processing or storing of credentials or tokens, authorization and authentication methods and other items described in [the security review guidelines](https://about.gitlab.com/handbook/engineering/security/#when-to-request-a-security-review):\r\n\r\n- [ ] Label as ~security and @ mention `@gitlab-com/gl-security/appsec`\r\n- [ ] The MR includes necessary changes to maintain consistency between UI, API, email, or other methods\r\n- [ ] Security reports checked/validated by a reviewer from the AppSec team \r\n\r\n\r\nCloses #13660",
+    "state": "merged",
+    "created_at": "2019-08-20T00:49:43.170Z",
+    "updated_at": "2019-08-20T02:06:44.222Z",
+    "merged_by": {
+      "id": 2535118,
+      "name": "Thong Kuah",
+      "username": "tkuah",
+      "state": "active",
+      "avatar_url": "https://secure.gravatar.com/avatar/f7b51bdd49a4914d29504d7ff4c3f7b9?s=80&d=identicon",
+      "web_url": "https://gitlab.com/tkuah"
+    },
+    "merged_at": "2019-08-20T02:06:44.486Z",
+    "closed_by": null,
+    "closed_at": null,
+    "target_branch": "master",
+    "source_branch": "13660-broken-master-job-failed-275548923",
+    "user_notes_count": 1,
+    "upvotes": 0,
+    "downvotes": 0,
+    "assignee": {
+      "id": 3397881,
+      "name": "Ezekiel Kigbo",
+      "username": "ekigbo",
+      "state": "active",
+      "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/3397881/avatar.png",
+      "web_url": "https://gitlab.com/ekigbo"
+    },
+    "author": {
+      "id": 3397881,
+      "name": "Ezekiel Kigbo",
+      "username": "ekigbo",
+      "state": "active",
+      "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/3397881/avatar.png",
+      "web_url": "https://gitlab.com/ekigbo"
+    },
+    "assignees": [
+      {
+        "id": 3397881,
+        "name": "Ezekiel Kigbo",
+        "username": "ekigbo",
+        "state": "active",
+        "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/3397881/avatar.png",
+        "web_url": "https://gitlab.com/ekigbo"
+      }
+    ],
+    "source_project_id": 278964,
+    "target_project_id": 278964,
+    "labels": [
+      "internationalization",
+      "master:broken"
+    ],
+    "work_in_progress": false,
+    "milestone": null,
+    "merge_when_pipeline_succeeds": true,
+    "merge_status": "can_be_merged",
+    "sha": "c7a107ac0148339a18250d73834c3c6eb869be12",
+    "merge_commit_sha": "aef47a865512652d02fa6552636de903cda13e11",
+    "discussion_locked": null,
+    "should_remove_source_branch": true,
+    "force_remove_source_branch": false,
+    "reference": "!15426",
+    "web_url": "https://gitlab.com/gitlab-org/gitlab-ee/merge_requests/15426",
+    "time_stats": {
+      "time_estimate": 0,
+      "total_time_spent": 0,
+      "human_time_estimate": null,
+      "human_total_time_spent": null
+    },
+    "squash": false,
+    "task_completion_status": {
+      "count": 12,
+      "completed_count": 0
+    },
+    "approvals_before_merge": 1
+  },
+  {
+    "id": 35286273,
+    "iid": 15420,
+    "project_id": 278964,
+    "title": "Improve nplusone spec for PipelinesController#show",
+    "description": "## What does this MR do?\r\n\r\nRelated https://gitlab.com/gitlab-org/gitlab-ce/issues/60925\r\n\r\nCE MR https://gitlab.com/gitlab-org/gitlab-ce/merge_requests/31976\r\n\r\n## Does this MR meet the acceptance criteria?\r\n\r\n### Conformity\r\n\r\n- N/A [Changelog entry](https://docs.gitlab.com/ee/development/changelog.html) \r\n- N/A [Documentation created/updated](https://docs.gitlab.com/ee/development/documentation/feature-change-workflow.html) or [follow-up review issue created](https://gitlab.com/gitlab-org/gitlab-ce/issues/new?issuable_template=Doc%20Review)\r\n- [x] [Code review guidelines](https://docs.gitlab.com/ee/development/code_review.html)\r\n- [x] [Merge request performance guidelines](https://docs.gitlab.com/ee/development/merge_request_performance_guidelines.html)\r\n- [x] [Style guides](https://gitlab.com/gitlab-org/gitlab-ee/blob/master/doc/development/contributing/style_guides.md)\r\n- N/A [Database guides](https://docs.gitlab.com/ee/development/README.html#databases-guides)\r\n- N/A [Separation of EE specific content](https://docs.gitlab.com/ee/development/ee_features.html#separation-of-ee-code)\r\n\r\n### Performance and Testing\r\n\r\n<!-- What risks does this change pose? How might it affect the quality/performance of the product?\r\nWhat additional test coverage or changes to tests will be needed?\r\nWill it require cross-browser testing?\r\nSee the test engineering process for further guidelines: https://about.gitlab.com/handbook/engineering/quality/test-engineering/ -->\r\n\r\n<!-- If cross-browser testing is not required, please remove the relevant item, or mark it as not needed: [-] -->\r\n\r\n- N/A [Review and add/update tests for this feature/bug](https://docs.gitlab.com/ee/development/testing_guide/index.html). Consider [all test levels](https://docs.gitlab.com/ee/development/testing_guide/testing_levels.html). See the [Test Planning Process](https://about.gitlab.com/handbook/engineering/quality/guidelines/test-engineering/).\r\n- N/A [Tested in all supported browsers](https://docs.gitlab.com/ee/install/requirements.html#supported-web-browsers)\r\n\r\n### Security\r\n\r\nIf this MR contains changes to processing or storing of credentials or tokens, authorization and authentication methods and other items described in [the security review guidelines](https://about.gitlab.com/handbook/engineering/security/#when-to-request-a-security-review):\r\n\r\n- N/A Label as ~security and @ mention `@gitlab-com/gl-security/appsec`\r\n- N/A The MR includes necessary changes to maintain consistency between UI, API, email, or other methods\r\n- N/A Security reports checked/validated by a reviewer from the AppSec team",
+    "state": "closed",
+    "created_at": "2019-08-19T21:20:31.820Z",
+    "updated_at": "2019-08-19T21:53:45.483Z",
+    "merged_by": null,
+    "merged_at": null,
+    "closed_by": {
+      "id": 64248,
+      "name": "Stan Hu",
+      "username": "stanhu",
+      "state": "active",
+      "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/64248/stanhu.jpg",
+      "web_url": "https://gitlab.com/stanhu"
+    },
+    "closed_at": "2019-08-19T21:53:45.560Z",
+    "target_branch": "master",
+    "source_branch": "mc/bug/nplusone-pipelines-show-ee",
+    "user_notes_count": 2,
+    "upvotes": 0,
+    "downvotes": 0,
+    "assignee": {
+      "id": 722076,
+      "name": "Matija Čupić",
+      "username": "matteeyah",
+      "state": "active",
+      "avatar_url": "https://secure.gravatar.com/avatar/8bc04cc15e0adba406cf56fecd9d910a?s=80&d=identicon",
+      "web_url": "https://gitlab.com/matteeyah"
+    },
+    "author": {
+      "id": 722076,
+      "name": "Matija Čupić",
+      "username": "matteeyah",
+      "state": "active",
+      "avatar_url": "https://secure.gravatar.com/avatar/8bc04cc15e0adba406cf56fecd9d910a?s=80&d=identicon",
+      "web_url": "https://gitlab.com/matteeyah"
+    },
+    "assignees": [
+      {
+        "id": 722076,
+        "name": "Matija Čupić",
+        "username": "matteeyah",
+        "state": "active",
+        "avatar_url": "https://secure.gravatar.com/avatar/8bc04cc15e0adba406cf56fecd9d910a?s=80&d=identicon",
+        "web_url": "https://gitlab.com/matteeyah"
+      }
+    ],
+    "source_project_id": 278964,
+    "target_project_id": 278964,
+    "labels": [
+      "Category::Continuous Integration",
+      "backstage",
+      "devops::verify",
+      "group::continuous integration",
+      "performance"
+    ],
+    "work_in_progress": false,
+    "milestone": {
+      "id": 731038,
+      "iid": 37,
+      "group_id": 9970,
+      "title": "12.3",
+      "description": "",
+      "state": "active",
+      "created_at": "2018-12-07T12:40:55.400Z",
+      "updated_at": "2019-01-16T19:50:20.313Z",
+      "due_date": "2019-09-22",
+      "start_date": "2019-08-08",
+      "web_url": "https://gitlab.com/groups/gitlab-org/-/milestones/37"
+    },
+    "merge_when_pipeline_succeeds": false,
+    "merge_status": "can_be_merged",
+    "sha": "35d5a9f48cbc4602c5920890ea2636dabf2e8cd1",
+    "merge_commit_sha": null,
+    "discussion_locked": null,
+    "should_remove_source_branch": null,
+    "force_remove_source_branch": true,
+    "reference": "!15420",
+    "web_url": "https://gitlab.com/gitlab-org/gitlab-ee/merge_requests/15420",
+    "time_stats": {
+      "time_estimate": 0,
+      "total_time_spent": 0,
+      "human_time_estimate": null,
+      "human_total_time_spent": null
+    },
+    "squash": false,
+    "task_completion_status": {
+      "count": 3,
+      "completed_count": 3
+    },
+    "approvals_before_merge": 1
+  },
+  {
+    "id": 35280733,
+    "iid": 15412,
+    "project_id": 278964,
+    "title": "Return Last Deployment in Environment Dashboard",
+    "description": "## What does this MR do?\r\n\r\n<!--\r\n\r\nDescribe in detail what your merge request does and why.\r\n\r\nAre there any risks involved with the proposed change? What additional\r\ntest coverage is introduced to offset the risk?\r\n\r\nPlease keep this description up-to-date with any discussion that takes\r\nplace so that reviewers can understand your intent. This is especially\r\nimportant if they didn't participate in the discussion.\r\n\r\n-->\r\n\r\nReturn the last deployment for each environment for the Environment Dashboard.\r\n\r\nInclude the last deployment's user, commit, and deployable.\r\n\r\nThis fills in a significant portion of the data for the environment card:\r\n\r\n![Screen_Shot_2019-08-19_at_3.52.13_PM](/uploads/669768b74f6ddd772ba2296ed634289b/Screen_Shot_2019-08-19_at_3.52.13_PM.png)\r\n\r\nRelevant issue: https://gitlab.com/gitlab-org/gitlab-ee/issues/3713\r\n\r\n## Does this MR meet the acceptance criteria?\r\n\r\n### Conformity\r\n\r\n- [ ] [Changelog entry](https://docs.gitlab.com/ee/development/changelog.html) \r\n- [ ] [Documentation created/updated](https://docs.gitlab.com/ee/development/documentation/feature-change-workflow.html) or [follow-up review issue created](https://gitlab.com/gitlab-org/gitlab-ce/issues/new?issuable_template=Doc%20Review)\r\n- [ ] [Code review guidelines](https://docs.gitlab.com/ee/development/code_review.html)\r\n- [ ] [Merge request performance guidelines](https://docs.gitlab.com/ee/development/merge_request_performance_guidelines.html)\r\n- [ ] [Style guides](https://gitlab.com/gitlab-org/gitlab-ee/blob/master/doc/development/contributing/style_guides.md)\r\n- [ ] [Database guides](https://docs.gitlab.com/ee/development/README.html#databases-guides)\r\n- [ ] [Separation of EE specific content](https://docs.gitlab.com/ee/development/ee_features.html#separation-of-ee-code)\r\n\r\n### Performance and Testing\r\n\r\n<!-- What risks does this change pose? How might it affect the quality/performance of the product?\r\nWhat additional test coverage or changes to tests will be needed?\r\nWill it require cross-browser testing?\r\nSee the test engineering process for further guidelines: https://about.gitlab.com/handbook/engineering/quality/test-engineering/ -->\r\n\r\n<!-- If cross-browser testing is not required, please remove the relevant item, or mark it as not needed: [-] -->\r\n\r\n- [ ] [Review and add/update tests for this feature/bug](https://docs.gitlab.com/ee/development/testing_guide/index.html). Consider [all test levels](https://docs.gitlab.com/ee/development/testing_guide/testing_levels.html). See the [Test Planning Process](https://about.gitlab.com/handbook/engineering/quality/guidelines/test-engineering/).\r\n- [ ] [Tested in all supported browsers](https://docs.gitlab.com/ee/install/requirements.html#supported-web-browsers)\r\n\r\n### Security\r\n\r\nIf this MR contains changes to processing or storing of credentials or tokens, authorization and authentication methods and other items described in [the security review guidelines](https://about.gitlab.com/handbook/engineering/security/#when-to-request-a-security-review):\r\n\r\n- [ ] Label as ~security and @ mention `@gitlab-com/gl-security/appsec`\r\n- [ ] The MR includes necessary changes to maintain consistency between UI, API, email, or other methods\r\n- [ ] Security reports checked/validated by a reviewer from the AppSec team",
+    "state": "opened",
+    "created_at": "2019-08-19T19:56:07.690Z",
+    "updated_at": "2019-08-20T06:17:15.284Z",
+    "merged_by": null,
+    "merged_at": null,
+    "closed_by": null,
+    "closed_at": null,
+    "target_branch": "environments-list-data-a",
+    "source_branch": "environments-list-data-b",
+    "user_notes_count": 5,
+    "upvotes": 0,
+    "downvotes": 0,
+    "assignee": {
+      "id": 3716529,
+      "name": "Jason Goodman",
+      "username": "jagood",
+      "state": "active",
+      "avatar_url": "https://secure.gravatar.com/avatar/6696c95a1788e2d4bee67df636805ecc?s=80&d=identicon",
+      "web_url": "https://gitlab.com/jagood"
+    },
+    "author": {
+      "id": 3716529,
+      "name": "Jason Goodman",
+      "username": "jagood",
+      "state": "active",
+      "avatar_url": "https://secure.gravatar.com/avatar/6696c95a1788e2d4bee67df636805ecc?s=80&d=identicon",
+      "web_url": "https://gitlab.com/jagood"
+    },
+    "assignees": [
+      {
+        "id": 3716529,
+        "name": "Jason Goodman",
+        "username": "jagood",
+        "state": "active",
+        "avatar_url": "https://secure.gravatar.com/avatar/6696c95a1788e2d4bee67df636805ecc?s=80&d=identicon",
+        "web_url": "https://gitlab.com/jagood"
+      }
+    ],
+    "source_project_id": 278964,
+    "target_project_id": 278964,
+    "labels": [
+      "backend",
+      "devops::release",
+      "feature"
+    ],
+    "work_in_progress": false,
+    "milestone": {
+      "id": 731038,
+      "iid": 37,
+      "group_id": 9970,
+      "title": "12.3",
+      "description": "",
+      "state": "active",
+      "created_at": "2018-12-07T12:40:55.400Z",
+      "updated_at": "2019-01-16T19:50:20.313Z",
+      "due_date": "2019-09-22",
+      "start_date": "2019-08-08",
+      "web_url": "https://gitlab.com/groups/gitlab-org/-/milestones/37"
+    },
+    "merge_when_pipeline_succeeds": false,
+    "merge_status": "can_be_merged",
+    "sha": "2aaa325ba6b725d04859a35da8beb666ba4bbc65",
+    "merge_commit_sha": null,
+    "discussion_locked": null,
+    "should_remove_source_branch": null,
+    "force_remove_source_branch": true,
+    "reference": "!15412",
+    "web_url": "https://gitlab.com/gitlab-org/gitlab-ee/merge_requests/15412",
+    "time_stats": {
+      "time_estimate": 0,
+      "total_time_spent": 0,
+      "human_time_estimate": null,
+      "human_total_time_spent": null
+    },
+    "squash": true,
+    "task_completion_status": {
+      "count": 12,
+      "completed_count": 0
+    },
+    "approvals_before_merge": 1
+  },
+  {
+    "id": 35273259,
+    "iid": 15409,
+    "project_id": 278964,
+    "title": "Componentize metrics alerts modal form",
+    "description": "## What does this MR do?\r\n\r\n* Refactors metrics alerts to use only gitlab-ui components. \r\n* Removes `query.unit` from the label, since `query.label` includes the units already.  \r\nBefore:  \r\n![Screen_Shot_2019-08-19_at_5.21.20_PM](/uploads/47e04c85ef96a6ac7f24768873ff74cd/Screen_Shot_2019-08-19_at_5.21.20_PM.png)  \r\n\r\nAfter:  \r\n![Screen_Shot_2019-08-19_at_5.56.13_PM](/uploads/af315febb8278143b064f4e09cb82939/Screen_Shot_2019-08-19_at_5.56.13_PM.png)\r\n## Does this MR meet the acceptance criteria?\r\n\r\nCloses #13058",
+    "state": "opened",
+    "created_at": "2019-08-19T17:21:57.593Z",
+    "updated_at": "2019-08-19T22:31:03.279Z",
+    "merged_by": null,
+    "merged_at": null,
+    "closed_by": null,
+    "closed_at": null,
+    "target_branch": "master",
+    "source_branch": "13058-componentize-metrics-alerts-modal-form",
+    "user_notes_count": 2,
+    "upvotes": 0,
+    "downvotes": 0,
+    "assignee": {
+      "id": 829774,
+      "name": "Jose Ivan Vargas",
+      "username": "jivanvl",
+      "state": "active",
+      "avatar_url": "https://secure.gravatar.com/avatar/730cc1b85a20f2a3891829f7aa198972?s=80&d=identicon",
+      "web_url": "https://gitlab.com/jivanvl"
+    },
+    "author": {
+      "id": 3946912,
+      "name": "Laura Montemayor",
+      "username": "lauraMon",
+      "state": "active",
+      "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/3946912/avatar.png",
+      "web_url": "https://gitlab.com/lauraMon"
+    },
+    "assignees": [
+      {
+        "id": 829774,
+        "name": "Jose Ivan Vargas",
+        "username": "jivanvl",
+        "state": "active",
+        "avatar_url": "https://secure.gravatar.com/avatar/730cc1b85a20f2a3891829f7aa198972?s=80&d=identicon",
+        "web_url": "https://gitlab.com/jivanvl"
+      }
+    ],
+    "source_project_id": 278964,
+    "target_project_id": 278964,
+    "labels": [
+      "GitLab Enterprise Edition",
+      "Monitor [DEPRECATED]",
+      "devops::monitor",
+      "frontend",
+      "group::health",
+      "technical debt",
+      "workflow::In review"
+    ],
+    "work_in_progress": false,
+    "milestone": {
+      "id": 731038,
+      "iid": 37,
+      "group_id": 9970,
+      "title": "12.3",
+      "description": "",
+      "state": "active",
+      "created_at": "2018-12-07T12:40:55.400Z",
+      "updated_at": "2019-01-16T19:50:20.313Z",
+      "due_date": "2019-09-22",
+      "start_date": "2019-08-08",
+      "web_url": "https://gitlab.com/groups/gitlab-org/-/milestones/37"
+    },
+    "merge_when_pipeline_succeeds": false,
+    "merge_status": "can_be_merged",
+    "sha": "2c935d51b83c5b4f50ca688d5cbbb771b0e378fc",
+    "merge_commit_sha": null,
+    "discussion_locked": null,
+    "should_remove_source_branch": null,
+    "force_remove_source_branch": false,
+    "reference": "!15409",
+    "web_url": "https://gitlab.com/gitlab-org/gitlab-ee/merge_requests/15409",
+    "time_stats": {
+      "time_estimate": 0,
+      "total_time_spent": 0,
+      "human_time_estimate": null,
+      "human_total_time_spent": null
+    },
+    "squash": false,
+    "task_completion_status": {
+      "count": 0,
+      "completed_count": 0
+    },
+    "approvals_before_merge": 1
+  },
+  {
+    "id": 35273064,
+    "iid": 15408,
+    "project_id": 278964,
+    "title": "Geo: Tell primary which secondary redirected a Git push over HTTP",
+    "description": "## What does this MR do?\n\n<!--\n\nDescribe in detail what your merge request does and why.\n\nAre there any risks involved with the proposed change? What additional\ntest coverage is introduced to offset the risk?\n\nPlease keep this description up-to-date with any discussion that takes\nplace so that reviewers can understand your intent. This is especially\nimportant if they didn't participate in the discussion.\n\n-->\n\n## Does this MR meet the acceptance criteria?\n\n### Conformity\n\n- [ ] [Changelog entry](https://docs.gitlab.com/ee/development/changelog.html) \n- [ ] [Documentation created/updated](https://docs.gitlab.com/ee/development/documentation/feature-change-workflow.html) or [follow-up review issue created](https://gitlab.com/gitlab-org/gitlab-ce/issues/new?issuable_template=Doc%20Review)\n- [ ] [Code review guidelines](https://docs.gitlab.com/ee/development/code_review.html)\n- [ ] [Merge request performance guidelines](https://docs.gitlab.com/ee/development/merge_request_performance_guidelines.html)\n- [ ] [Style guides](https://gitlab.com/gitlab-org/gitlab-ee/blob/master/doc/development/contributing/style_guides.md)\n- [ ] [Database guides](https://docs.gitlab.com/ee/development/README.html#databases-guides)\n- [ ] [Separation of EE specific content](https://docs.gitlab.com/ee/development/ee_features.html#separation-of-ee-code)\n\n### Performance and Testing\n\n<!-- What risks does this change pose? How might it affect the quality/performance of the product?\nWhat additional test coverage or changes to tests will be needed?\nWill it require cross-browser testing?\nSee the test engineering process for further guidelines: https://about.gitlab.com/handbook/engineering/quality/test-engineering/ -->\n\n<!-- If cross-browser testing is not required, please remove the relevant item, or mark it as not needed: [-] -->\n\n- [ ] [Review and add/update tests for this feature/bug](https://docs.gitlab.com/ee/development/testing_guide/index.html). Consider [all test levels](https://docs.gitlab.com/ee/development/testing_guide/testing_levels.html). See the [Test Planning Process](https://about.gitlab.com/handbook/engineering/quality/guidelines/test-engineering/).\n- [ ] [Tested in all supported browsers](https://docs.gitlab.com/ee/install/requirements.html#supported-web-browsers)\n\n### Security\n\nIf this MR contains changes to processing or storing of credentials or tokens, authorization and authentication methods and other items described in [the security review guidelines](https://about.gitlab.com/handbook/engineering/security/#when-to-request-a-security-review):\n\n- [ ] Label as ~security and @ mention `@gitlab-com/gl-security/appsec`\n- [ ] The MR includes necessary changes to maintain consistency between UI, API, email, or other methods\n- [ ] Security reports checked/validated by a reviewer from the AppSec team",
+    "state": "closed",
+    "created_at": "2019-08-19T17:16:32.288Z",
+    "updated_at": "2019-08-20T00:02:08.608Z",
+    "merged_by": null,
+    "merged_at": null,
+    "closed_by": {
+      "id": 1144264,
+      "name": "Michael Kozono",
+      "username": "mkozono",
+      "state": "active",
+      "avatar_url": "https://secure.gravatar.com/avatar/ddaa576b4b6933a6fb7a996088c30f6c?s=80&d=identicon",
+      "web_url": "https://gitlab.com/mkozono"
+    },
+    "closed_at": "2019-08-20T00:02:08.635Z",
+    "target_branch": "master",
+    "source_branch": "mk/provide-geo-node-referrer-on-push-geo",
+    "user_notes_count": 1,
+    "upvotes": 0,
+    "downvotes": 0,
+    "assignee": {
+      "id": 1144264,
+      "name": "Michael Kozono",
+      "username": "mkozono",
+      "state": "active",
+      "avatar_url": "https://secure.gravatar.com/avatar/ddaa576b4b6933a6fb7a996088c30f6c?s=80&d=identicon",
+      "web_url": "https://gitlab.com/mkozono"
+    },
+    "author": {
+      "id": 1144264,
+      "name": "Michael Kozono",
+      "username": "mkozono",
+      "state": "active",
+      "avatar_url": "https://secure.gravatar.com/avatar/ddaa576b4b6933a6fb7a996088c30f6c?s=80&d=identicon",
+      "web_url": "https://gitlab.com/mkozono"
+    },
+    "assignees": [
+      {
+        "id": 1144264,
+        "name": "Michael Kozono",
+        "username": "mkozono",
+        "state": "active",
+        "avatar_url": "https://secure.gravatar.com/avatar/ddaa576b4b6933a6fb7a996088c30f6c?s=80&d=identicon",
+        "web_url": "https://gitlab.com/mkozono"
+      }
+    ],
+    "source_project_id": 278964,
+    "target_project_id": 278964,
+    "labels": [],
+    "work_in_progress": false,
+    "milestone": null,
+    "merge_when_pipeline_succeeds": false,
+    "merge_status": "can_be_merged",
+    "sha": "21dd0530baefaa2e4bce5d8a9857bad829c51d64",
+    "merge_commit_sha": null,
+    "discussion_locked": null,
+    "should_remove_source_branch": null,
+    "force_remove_source_branch": true,
+    "reference": "!15408",
+    "web_url": "https://gitlab.com/gitlab-org/gitlab-ee/merge_requests/15408",
+    "time_stats": {
+      "time_estimate": 0,
+      "total_time_spent": 0,
+      "human_time_estimate": null,
+      "human_total_time_spent": null
+    },
+    "squash": false,
+    "task_completion_status": {
+      "count": 12,
+      "completed_count": 0
+    },
+    "approvals_before_merge": 1
+  },
+  {
+    "id": 35270697,
+    "iid": 15406,
+    "project_id": 278964,
+    "title": "WIP: Resolve \"Move dependency scanning reports logic for the Merge Request widget to the backend - frontend part\"",
+    "description": "## What does this MR do?\n\n<!--\n\nDescribe in detail what your merge request does and why.\n\nAre there any risks involved with the proposed change? What additional\ntest coverage is introduced to offset the risk?\n\nPlease keep this description up-to-date with any discussion that takes\nplace so that reviewers can understand your intent. This is especially\nimportant if they didn't participate in the discussion.\n\n-->\n\n## Does this MR meet the acceptance criteria?\n\n### Conformity\n\n- [ ] [Changelog entry](https://docs.gitlab.com/ee/development/changelog.html) \n- [ ] [Documentation created/updated](https://docs.gitlab.com/ee/development/documentation/feature-change-workflow.html) or [follow-up review issue created](https://gitlab.com/gitlab-org/gitlab-ce/issues/new?issuable_template=Doc%20Review)\n- [ ] [Code review guidelines](https://docs.gitlab.com/ee/development/code_review.html)\n- [ ] [Merge request performance guidelines](https://docs.gitlab.com/ee/development/merge_request_performance_guidelines.html)\n- [ ] [Style guides](https://gitlab.com/gitlab-org/gitlab-ee/blob/master/doc/development/contributing/style_guides.md)\n- [ ] [Database guides](https://docs.gitlab.com/ee/development/README.html#databases-guides)\n- [ ] [Separation of EE specific content](https://docs.gitlab.com/ee/development/ee_features.html#separation-of-ee-code)\n\n### Performance and Testing\n\n<!-- What risks does this change pose? How might it affect the quality/performance of the product?\nWhat additional test coverage or changes to tests will be needed?\nWill it require cross-browser testing?\nSee the test engineering process for further guidelines: https://about.gitlab.com/handbook/engineering/quality/test-engineering/ -->\n\n<!-- If cross-browser testing is not required, please remove the relevant item, or mark it as not needed: [-] -->\n\n- [ ] [Review and add/update tests for this feature/bug](https://docs.gitlab.com/ee/development/testing_guide/index.html). Consider [all test levels](https://docs.gitlab.com/ee/development/testing_guide/testing_levels.html). See the [Test Planning Process](https://about.gitlab.com/handbook/engineering/quality/guidelines/test-engineering/).\n- [ ] [Tested in all supported browsers](https://docs.gitlab.com/ee/install/requirements.html#supported-web-browsers)\n\n### Security\n\nIf this MR contains changes to processing or storing of credentials or tokens, authorization and authentication methods and other items described in [the security review guidelines](https://about.gitlab.com/handbook/engineering/security/#when-to-request-a-security-review):\n\n- [ ] Label as ~security and @ mention `@gitlab-com/gl-security/appsec`\n- [ ] The MR includes necessary changes to maintain consistency between UI, API, email, or other methods\n- [ ] Security reports checked/validated by a reviewer from the AppSec team \n\n\nCloses #13649",
+    "state": "opened",
+    "created_at": "2019-08-19T16:41:11.685Z",
+    "updated_at": "2019-08-20T11:59:46.086Z",
+    "merged_by": null,
+    "merged_at": null,
+    "closed_by": null,
+    "closed_at": null,
+    "target_branch": "master",
+    "source_branch": "13649-move-dependency-scanning-reports-logic-for-the-merge-request-widget-to-the-backend-frontend-part",
+    "user_notes_count": 1,
+    "upvotes": 0,
+    "downvotes": 0,
+    "assignee": null,
+    "author": {
+      "id": 1125848,
+      "name": "Sam Beckham",
+      "username": "samdbeckham",
+      "state": "active",
+      "avatar_url": "https://secure.gravatar.com/avatar/359be2b7660c7b7542d63c41b507537d?s=80&d=identicon",
+      "web_url": "https://gitlab.com/samdbeckham"
+    },
+    "assignees": [],
+    "source_project_id": 278964,
+    "target_project_id": 278964,
+    "labels": [
+      "backstage",
+      "dependency scanning",
+      "devops::secure",
+      "frontend",
+      "sub-issue",
+      "workflow::ready for development"
+    ],
+    "work_in_progress": true,
+    "milestone": {
+      "id": 731038,
+      "iid": 37,
+      "group_id": 9970,
+      "title": "12.3",
+      "description": "",
+      "state": "active",
+      "created_at": "2018-12-07T12:40:55.400Z",
+      "updated_at": "2019-01-16T19:50:20.313Z",
+      "due_date": "2019-09-22",
+      "start_date": "2019-08-08",
+      "web_url": "https://gitlab.com/groups/gitlab-org/-/milestones/37"
+    },
+    "merge_when_pipeline_succeeds": false,
+    "merge_status": "can_be_merged",
+    "sha": "b2e35301e997a6b2eb7abacfb3943fd33532985c",
+    "merge_commit_sha": null,
+    "discussion_locked": null,
+    "should_remove_source_branch": null,
+    "force_remove_source_branch": null,
+    "reference": "!15406",
+    "web_url": "https://gitlab.com/gitlab-org/gitlab-ee/merge_requests/15406",
+    "time_stats": {
+      "time_estimate": 0,
+      "total_time_spent": 0,
+      "human_time_estimate": null,
+      "human_total_time_spent": null
+    },
+    "squash": false,
+    "task_completion_status": {
+      "count": 12,
+      "completed_count": 0
+    },
+    "approvals_before_merge": null
+  },
+  {
+    "id": 35269469,
+    "iid": 15404,
+    "project_id": 278964,
+    "title": "Fix broken link to Security Dashboard help page",
+    "description": "## What does this MR do?\n\nFixes broken link to help docs for ~\"security dashboard\"\n\n## Does this MR meet the acceptance criteria?\n\n### Conformity\n\n- [x] [Changelog entry](https://docs.gitlab.com/ee/development/changelog.html) \n- [x] [Documentation created/updated](https://docs.gitlab.com/ee/development/documentation/feature-change-workflow.html) or [follow-up review issue created](https://gitlab.com/gitlab-org/gitlab-ce/issues/new?issuable_template=Doc%20Review)\n- [ ] [Code review guidelines](https://docs.gitlab.com/ee/development/code_review.html)\n- [ ] [Merge request performance guidelines](https://docs.gitlab.com/ee/development/merge_request_performance_guidelines.html)\n- [ ] [Style guides](https://gitlab.com/gitlab-org/gitlab-ee/blob/master/doc/development/contributing/style_guides.md)\n- [ ] [Database guides](https://docs.gitlab.com/ee/development/README.html#databases-guides)\n- [ ] [Separation of EE specific content](https://docs.gitlab.com/ee/development/ee_features.html#separation-of-ee-code)\n\n### Performance and Testing\n\n<!-- What risks does this change pose? How might it affect the quality/performance of the product?\nWhat additional test coverage or changes to tests will be needed?\nWill it require cross-browser testing?\nSee the test engineering process for further guidelines: https://about.gitlab.com/handbook/engineering/quality/test-engineering/ -->\n\n<!-- If cross-browser testing is not required, please remove the relevant item, or mark it as not needed: [-] -->\n\n- [ ] [Review and add/update tests for this feature/bug](https://docs.gitlab.com/ee/development/testing_guide/index.html). Consider [all test levels](https://docs.gitlab.com/ee/development/testing_guide/testing_levels.html). See the [Test Planning Process](https://about.gitlab.com/handbook/engineering/quality/guidelines/test-engineering/).\n- [ ] [Tested in all supported browsers](https://docs.gitlab.com/ee/install/requirements.html#supported-web-browsers)\n\n### Security\n\nIf this MR contains changes to processing or storing of credentials or tokens, authorization and authentication methods and other items described in [the security review guidelines](https://about.gitlab.com/handbook/engineering/security/#when-to-request-a-security-review):\n\n- [ ] Label as ~security and @ mention `@gitlab-com/gl-security/appsec`\n- [ ] The MR includes necessary changes to maintain consistency between UI, API, email, or other methods\n- [ ] Security reports checked/validated by a reviewer from the AppSec team",
+    "state": "opened",
+    "created_at": "2019-08-19T16:26:00.171Z",
+    "updated_at": "2019-08-19T18:22:05.236Z",
+    "merged_by": null,
+    "merged_at": null,
+    "closed_by": null,
+    "closed_at": null,
+    "target_branch": "master",
+    "source_branch": "13645-fix-broken-sec-dashboard-help-link",
+    "user_notes_count": 2,
+    "upvotes": 0,
+    "downvotes": 0,
+    "assignee": {
+      "id": 1125848,
+      "name": "Sam Beckham",
+      "username": "samdbeckham",
+      "state": "active",
+      "avatar_url": "https://secure.gravatar.com/avatar/359be2b7660c7b7542d63c41b507537d?s=80&d=identicon",
+      "web_url": "https://gitlab.com/samdbeckham"
+    },
+    "author": {
+      "id": 401232,
+      "name": "Lucas Charles",
+      "username": "theoretick",
+      "state": "active",
+      "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/401232/squares-nail-wall-art.jpg",
+      "web_url": "https://gitlab.com/theoretick"
+    },
+    "assignees": [
+      {
+        "id": 1125848,
+        "name": "Sam Beckham",
+        "username": "samdbeckham",
+        "state": "active",
+        "avatar_url": "https://secure.gravatar.com/avatar/359be2b7660c7b7542d63c41b507537d?s=80&d=identicon",
+        "web_url": "https://gitlab.com/samdbeckham"
+      }
+    ],
+    "source_project_id": 278964,
+    "target_project_id": 278964,
+    "labels": [
+      "bug",
+      "devops::secure",
+      "group::static analysis"
+    ],
+    "work_in_progress": false,
+    "milestone": {
+      "id": 731038,
+      "iid": 37,
+      "group_id": 9970,
+      "title": "12.3",
+      "description": "",
+      "state": "active",
+      "created_at": "2018-12-07T12:40:55.400Z",
+      "updated_at": "2019-01-16T19:50:20.313Z",
+      "due_date": "2019-09-22",
+      "start_date": "2019-08-08",
+      "web_url": "https://gitlab.com/groups/gitlab-org/-/milestones/37"
+    },
+    "merge_when_pipeline_succeeds": false,
+    "merge_status": "can_be_merged",
+    "sha": "e3f350239176eb184accae9c4e380acda787cfbf",
+    "merge_commit_sha": null,
+    "discussion_locked": null,
+    "should_remove_source_branch": null,
+    "force_remove_source_branch": false,
+    "reference": "!15404",
+    "web_url": "https://gitlab.com/gitlab-org/gitlab-ee/merge_requests/15404",
+    "time_stats": {
+      "time_estimate": 0,
+      "total_time_spent": 0,
+      "human_time_estimate": null,
+      "human_total_time_spent": null
+    },
+    "squash": false,
+    "task_completion_status": {
+      "count": 12,
+      "completed_count": 2
+    },
+    "approvals_before_merge": 1
+  }
+]

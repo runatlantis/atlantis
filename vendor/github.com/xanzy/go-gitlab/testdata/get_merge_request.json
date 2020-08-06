@@ -1,0 +1,153 @@
+{
+  "id": 33092005,
+  "iid": 14656,
+  "project_id": 278964,
+  "title": "Add deletion support for designs",
+  "description": "## What does this MR do?\r\n\r\nThis adds the capability to destroy/hide designs.",
+  "state": "opened",
+  "created_at": "2019-07-11T22:34:43.500Z",
+  "updated_at": "2019-08-20T09:09:56.690Z",
+  "merged_by": null,
+  "merged_at": null,
+  "closed_by": null,
+  "closed_at": null,
+  "target_branch": "master",
+  "source_branch": "delete-designs-v2",
+  "user_notes_count": 245,
+  "upvotes": 1,
+  "downvotes": 0,
+  "assignee": {
+    "id": 2535118,
+    "name": "Thong Kuah",
+    "username": "tkuah",
+    "state": "active",
+    "avatar_url": "https://secure.gravatar.com/avatar/f7b51bdd49a4914d29504d7ff4c3f7b9?s=80&d=identicon",
+    "web_url": "https://gitlab.com/tkuah"
+  },
+  "author": {
+    "id": 3614858,
+    "name": "Alex Kalderimis",
+    "username": "alexkalderimis",
+    "state": "active",
+    "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/3614858/avatar.png",
+    "web_url": "https://gitlab.com/alexkalderimis"
+  },
+  "assignees": [
+    {
+      "id": 2535118,
+      "name": "Thong Kuah",
+      "username": "tkuah",
+      "state": "active",
+      "avatar_url": "https://secure.gravatar.com/avatar/f7b51bdd49a4914d29504d7ff4c3f7b9?s=80&d=identicon",
+      "web_url": "https://gitlab.com/tkuah"
+    }
+  ],
+  "source_project_id": 278964,
+  "target_project_id": 278964,
+  "labels": [
+    "GitLab Enterprise Edition",
+    "backend",
+    "database",
+    "database::reviewed",
+    "design management",
+    "feature",
+    "frontend",
+    "group::knowledge",
+    "missed:12.1"
+  ],
+  "work_in_progress": false,
+  "milestone": {
+    "id": 693521,
+    "iid": 35,
+    "group_id": 9970,
+    "title": "12.2",
+    "description": "",
+    "state": "active",
+    "created_at": "2018-10-30T16:48:32.567Z",
+    "updated_at": "2019-01-16T19:50:02.455Z",
+    "due_date": "2019-08-22",
+    "start_date": "2019-07-08",
+    "web_url": "https://gitlab.com/groups/gitlab-org/-/milestones/35"
+  },
+  "merge_when_pipeline_succeeds": false,
+  "merge_status": "can_be_merged",
+  "sha": "8e0b45049b6253b8984cde9241830d2851168142",
+  "merge_commit_sha": null,
+  "discussion_locked": null,
+  "should_remove_source_branch": null,
+  "force_remove_source_branch": true,
+  "reference": "!14656",
+  "web_url": "https://gitlab.com/gitlab-org/gitlab-ee/merge_requests/14656",
+  "time_stats": {
+    "time_estimate": 0,
+    "total_time_spent": 0,
+    "human_time_estimate": null,
+    "human_total_time_spent": null
+  },
+  "squash": true,
+  "task_completion_status": {
+    "count": 9,
+    "completed_count": 8
+  },
+  "subscribed": false,
+  "changes_count": "35",
+  "latest_build_started_at": "2019-08-19T09:51:06.545Z",
+  "latest_build_finished_at": "2019-08-19T19:22:29.632Z",
+  "first_deployed_to_production_at": null,
+  "pipeline": {
+    "id": 77056819,
+    "sha": "8e0b45049b6253b8984cde9241830d2851168142",
+    "ref": "delete-designs-v2",
+    "status": "success",
+    "web_url": "https://gitlab.com/gitlab-org/gitlab-ee/pipelines/77056819",
+    "created_at": "2019-08-19T09:50:58.157Z",
+    "updated_at": "2019-08-19T19:22:29.647Z"
+  },
+  "head_pipeline": {
+    "id": 77056819,
+    "sha": "8e0b45049b6253b8984cde9241830d2851168142",
+    "ref": "delete-designs-v2",
+    "status": "success",
+    "web_url": "https://gitlab.com/gitlab-org/gitlab-ee/pipelines/77056819",
+    "before_sha": "3fe568caacb261b63090886f5b879ca0d9c6f4c3",
+    "tag": false,
+    "yaml_errors": null,
+    "user": {
+      "id": 3614858,
+      "name": "Alex Kalderimis",
+      "username": "alexkalderimis",
+      "state": "active",
+      "avatar_url": "https://assets.gitlab-static.net/uploads/-/system/user/avatar/3614858/avatar.png",
+      "web_url": "https://gitlab.com/alexkalderimis"
+    },
+    "created_at": "2019-08-19T09:50:58.157Z",
+    "updated_at": "2019-08-19T19:22:29.647Z",
+    "started_at": "2019-08-19T09:51:06.545Z",
+    "finished_at": "2019-08-19T19:22:29.632Z",
+    "committed_at": null,
+    "duration": 4916,
+    "coverage": "82.68",
+    "detailed_status": {
+      "icon": "status_warning",
+      "text": "passed",
+      "label": "passed with warnings",
+      "group": "success-with-warnings",
+      "tooltip": "passed",
+      "has_details": true,
+      "details_path": "/gitlab-org/gitlab-ee/pipelines/77056819",
+      "illustration": null,
+      "favicon": "https://gitlab.com/assets/ci_favicons/favicon_status_success-8451333011eee8ce9f2ab25dc487fe24a8758c694827a582f17f42b0a90446a2.png"
+    }
+  },
+  "diff_refs": {
+    "base_sha": "dd692733bb84bc3e9e862e66c099daec2fa00c83",
+    "head_sha": "8e0b45049b6253b8984cde9241830d2851168142",
+    "start_sha": "dd692733bb84bc3e9e862e66c099daec2fa00c83"
+  },
+  "merge_error": null,
+  "user": {
+    "can_merge": false
+  },
+  "approvals_before_merge": 1,
+  "has_conflicts": true
+}

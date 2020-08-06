@@ -66,7 +66,13 @@ func (s *SystemHooksService) ListHooks(options ...OptionFunc) ([]*Hook, *Respons
 // GitLab API docs:
 // https://docs.gitlab.com/ce/api/system_hooks.html#add-new-system-hook-hook
 type AddHookOptions struct {
-	URL *string `url:"url,omitempty" json:"url,omitempty"`
+	URL                    *string `url:"url,omitempty" json:"url,omitempty"`
+	Token                  *string `url:"token,omitempty" json:"token,omitempty"`
+	PushEvents             *bool   `url:"push_events,omitempty" json:"push_events,omitempty"`
+	TagPushEvents          *bool   `url:"tag_push_events,omitempty" json:"tag_push_events,omitempty"`
+	MergeRequestsEvents    *bool   `url:"merge_requests_events,omitempty" json:"merge_requests_events,omitempty"`
+	RepositoryUpdateEvents *bool   `url:"repository_update_events,omitempty" json:"repository_update_events,omitempty"`
+	EnableSSLVerification  *bool   `url:"enable_ssl_verification,omitempty" json:"enable_ssl_verification,omitempty"`
 }
 
 // AddHook adds a new system hook hook.

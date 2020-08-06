@@ -39,6 +39,7 @@ type GroupVariable struct {
 	Value        string            `json:"value"`
 	VariableType VariableTypeValue `json:"variable_type"`
 	Protected    bool              `json:"protected"`
+	Masked       bool              `json:"masked"`
 }
 
 func (v GroupVariable) String() string {
@@ -112,6 +113,7 @@ type CreateGroupVariableOptions struct {
 	Value        *string            `url:"value,omitempty" json:"value,omitempty"`
 	VariableType *VariableTypeValue `url:"variable_type,omitempty" json:"variable_type,omitempty"`
 	Protected    *bool              `url:"protected,omitempty" json:"protected,omitempty"`
+	Masked       *bool              `url:"masked,omitempty" json:"masked,omitempty"`
 }
 
 // CreateVariable creates a new group variable.
@@ -148,6 +150,7 @@ type UpdateGroupVariableOptions struct {
 	Value        *string            `url:"value,omitempty" json:"value,omitempty"`
 	VariableType *VariableTypeValue `url:"variable_type,omitempty" json:"variable_type,omitempty"`
 	Protected    *bool              `url:"protected,omitempty" json:"protected,omitempty"`
+	Masked       *bool              `url:"masked,omitempty" json:"masked,omitempty"`
 }
 
 // UpdateVariable updates the position of an existing
