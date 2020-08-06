@@ -45,12 +45,16 @@ var gitlabClientUnderTest = false
 
 // NewGitlabClient returns a valid GitLab client.
 func NewGitlabClient(hostname string, token string, logger *logging.SimpleLogger) (*GitlabClient, error) {
-	client := &GitlabClient{
-		Client: gitlab.NewClient(nil, token),
-	}
+	client := &GitlabClient{}
 
-	// If not using gitlab.com we need to set the URL to the API.
-	if hostname != "gitlab.com" {
+	// Create the client differently depending on the base URL.
+	if hostname == "gitlab.com" {
+		glClient, err := gitlab.NewClient(token)
+		if err != nil {
+			return nil, err
+		}
+		client.Client = glClient
+	} else {
 		// We assume the url will be over HTTPS if the user doesn't specify a scheme.
 		absoluteURL := hostname
 		if !strings.HasPrefix(hostname, "http://") && !strings.HasPrefix(hostname, "https://") {
@@ -74,9 +78,11 @@ func NewGitlabClient(hostname string, token string, logger *logging.SimpleLogger
 		// Now we're ready to construct the client.
 		absoluteURL = strings.TrimSuffix(absoluteURL, "/")
 		apiURL := fmt.Sprintf("%s/api/v4/", absoluteURL)
-		if err := client.Client.SetBaseURL(apiURL); err != nil {
-			return nil, errors.Wrapf(err, "setting GitLab API URL: %s", apiURL)
+		glClient, err := gitlab.NewClient(token, gitlab.WithBaseURL(apiURL))
+		if err != nil {
+			return nil, err
 		}
+		client.Client = glClient
 	}
 
 	// Determine which version of GitLab is running.
