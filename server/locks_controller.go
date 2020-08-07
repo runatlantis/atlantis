@@ -157,10 +157,8 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 		// Once the lock has been deleted, comment back on the pull request.
 		comment := fmt.Sprintf("**Warning**: The plan for dir: `%s` workspace: `%s` was **discarded** via the Atlantis UI.\n\n"+
 			"To `apply` this plan you must run `plan` again.", lock.Project.Path, lock.Workspace)
-		err = l.VCSClient.CreateComment(lock.Pull.BaseRepo, lock.Pull.Num, comment, "")
-		if err != nil {
-			l.respond(w, logging.Error, http.StatusInternalServerError, "Failed commenting on pull request: %s", err)
-			return
+		if err = l.VCSClient.CreateComment(lock.Pull.BaseRepo, lock.Pull.Num, comment, ""); err != nil {
+			l.Logger.Warn("failed commenting on pull request: %s", err)
 		}
 	}
 	l.respond(w, logging.Info, http.StatusOK, "Deleted lock id %q", id)
