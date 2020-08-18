@@ -120,11 +120,22 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log *logging.SimpleLog
 			}
 			if match {
 				log.Debug("file %q matched pattern", file)
-				_, err := os.Stat(filepath.Join(absRepoDir, project.Dir))
-				if err == nil {
-					projects = append(projects, project)
+				// If we're checking using an atlantis.yaml file we downloaded
+				// directly from the repo (when doing a no-clone check) then
+				// absRepoDir will be empty. Since we didn't clone the repo
+				// yet we can't do this check. If there was a file modified
+				// in a deleted directory then when we finally do clone the repo
+				// we'll call this function again and then we'll detect the
+				// directory was deleted.
+				if absRepoDir != "" {
+					_, err := os.Stat(filepath.Join(absRepoDir, project.Dir))
+					if err == nil {
+						projects = append(projects, project)
+					} else {
+						log.Debug("project at dir %q not included because dir does not exist", project.Dir)
+					}
 				} else {
-					log.Debug("project at dir %q not included because dir does not exist", project.Dir)
+					projects = append(projects, project)
 				}
 				break
 			}

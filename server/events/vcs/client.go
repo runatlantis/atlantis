@@ -38,4 +38,10 @@ type Client interface {
 	UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error
 	MergePull(pull models.PullRequest) error
 	MarkdownPullLink(pull models.PullRequest) (string, error)
+
+	// DownloadRepoConfigFile return `atlantis.yaml` content from VCS (which support fetch a single file from repository)
+	// The first return value indicate that repo contain atlantis.yaml or not
+	// if BaseRepo had one repo config file, its content will placed on the second return value
+	DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error)
+	SupportsSingleFileDownload(repo models.Repo) bool
 }

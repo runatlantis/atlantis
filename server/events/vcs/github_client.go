@@ -15,17 +15,19 @@ package vcs
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
-
-	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/vcs/common"
-	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/Laisky/graphql"
 	"github.com/google/go-github/v31/github"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
+	"github.com/runatlantis/atlantis/server/events/yaml"
+	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -383,4 +385,30 @@ func (g *GithubClient) ExchangeCode(code string) (*GithubAppTemporarySecrets, er
 	}
 
 	return data, err
+}
+
+// DownloadRepoConfigFile return `atlantis.yaml` content from VCS (which support fetch a single file from repository)
+// The first return value indicate that repo contain atlantis.yaml or not
+// if BaseRepo had one repo config file, its content will placed on the second return value
+func (g *GithubClient) DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error) {
+	opt := github.RepositoryContentGetOptions{Ref: pull.HeadBranch}
+	fileContent, _, resp, err := g.client.Repositories.GetContents(g.ctx, pull.BaseRepo.Owner, pull.BaseRepo.Name, yaml.AtlantisYAMLFilename, &opt)
+
+	if resp.StatusCode == http.StatusNotFound {
+		return false, []byte{}, nil
+	}
+	if err != nil {
+		return true, []byte{}, err
+	}
+
+	decodedData, err := base64.StdEncoding.DecodeString(*fileContent.Content)
+	if err != nil {
+		return true, []byte{}, err
+	}
+
+	return true, decodedData, nil
+}
+
+func (g *GithubClient) SupportsSingleFileDownload(repo models.Repo) bool {
+	return true
 }
