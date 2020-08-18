@@ -88,6 +88,6 @@ func (d *ClientProxy) DownloadRepoConfigFile(pull models.PullRequest) (bool, []b
 	return d.clients[pull.BaseRepo.VCSHost.Type].DownloadRepoConfigFile(pull)
 }
 
-func (d *ClientProxy) IsSupportDownloadSingleFile(repo models.Repo) bool {
-	return d.clients[repo.VCSHost.Type].IsSupportDownloadSingleFile(repo)
+func (d *ClientProxy) SupportsSingleFileDownload(repo models.Repo) bool {
+	return d.clients[repo.VCSHost.Type].SupportsSingleFileDownload(repo)
 }

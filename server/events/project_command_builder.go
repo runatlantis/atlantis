@@ -104,20 +104,19 @@ func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *CommandContext, c
 func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext, commentFlags []string, verbose bool) ([]models.ProjectCommandContext, error) {
 	// We'll need the list of modified files.
 	modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.BaseRepo, ctx.Pull)
-
 	if err != nil {
 		return nil, err
 	}
 	ctx.Log.Debug("%d files were modified in this pull request", len(modifiedFiles))
 
-	if p.SkipCloneNoChanges && p.VCSClient.IsSupportDownloadSingleFile(ctx.BaseRepo) {
+	if p.SkipCloneNoChanges && p.VCSClient.SupportsSingleFileDownload(ctx.BaseRepo) {
 		hasRepoCfg, repoCfgData, err := p.VCSClient.DownloadRepoConfigFile(ctx.Pull)
 		if err != nil {
 			return nil, errors.Wrapf(err, "downloading %s", yaml.AtlantisYAMLFilename)
 		}
 
 		if hasRepoCfg {
-			repoCfg, err := p.ParserValidator.ParseRepoCfg(repoCfgData, "", p.GlobalCfg, ctx.BaseRepo.ID())
+			repoCfg, err := p.ParserValidator.ParseRepoCfgData(repoCfgData, p.GlobalCfg, ctx.BaseRepo.ID())
 			if err != nil {
 				return nil, errors.Wrapf(err, "parsing %s", yaml.AtlantisYAMLFilename)
 			}
@@ -131,6 +130,9 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 				ctx.Log.Info("skipping repo clone since no project was modified")
 				return []models.ProjectCommandContext{}, nil
 			}
+			// NOTE: We discard this work here and end up doing it again after
+			// cloning to ensure all the return values are set properly with
+			// the actual clone directory.
 		}
 	}
 
@@ -159,7 +161,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 	if hasRepoCfg {
 		// If there's a repo cfg then we'll use it to figure out which projects
 		// should be planed.
-		repoCfg, err := p.ParserValidator.ParseRepoCfg([]byte{}, repoDir, p.GlobalCfg, ctx.BaseRepo.ID())
+		repoCfg, err := p.ParserValidator.ParseRepoCfg(repoDir, p.GlobalCfg, ctx.BaseRepo.ID())
 		if err != nil {
 			return nil, errors.Wrapf(err, "parsing %s", yaml.AtlantisYAMLFilename)
 		}
@@ -343,7 +345,7 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *CommandContext, projectName s
 	}
 
 	var repoConfig valid.RepoCfg
-	repoConfig, err = p.ParserValidator.ParseRepoCfg([]byte{}, repoDir, p.GlobalCfg, ctx.BaseRepo.ID())
+	repoConfig, err = p.ParserValidator.ParseRepoCfg(repoDir, p.GlobalCfg, ctx.BaseRepo.ID())
 	if err != nil {
 		return
 	}

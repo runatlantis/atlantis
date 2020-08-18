@@ -15,11 +15,12 @@ package vcs
 
 import (
 	"fmt"
-	"github.com/runatlantis/atlantis/server/events/yaml"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/runatlantis/atlantis/server/events/yaml"
 
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 
@@ -290,6 +291,6 @@ func (g *GitlabClient) DownloadRepoConfigFile(pull models.PullRequest) (bool, []
 	return true, bytes, nil
 }
 
-func (g *GitlabClient) IsSupportDownloadSingleFile(repo models.Repo) bool {
+func (g *GitlabClient) SupportsSingleFileDownload(repo models.Repo) bool {
 	return true
 }

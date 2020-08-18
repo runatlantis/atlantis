@@ -365,7 +365,7 @@ func SplitAzureDevopsRepoFullName(repoFullName string) (owner string, project st
 	return repoFullName[:lastSlashIdx], "", repoFullName[lastSlashIdx+1:]
 }
 
-func (g *AzureDevopsClient) IsSupportDownloadSingleFile(repo models.Repo) bool {
+func (g *AzureDevopsClient) SupportsSingleFileDownload(repo models.Repo) bool {
 	return false
 }
 

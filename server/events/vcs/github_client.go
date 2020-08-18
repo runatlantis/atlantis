@@ -409,6 +409,6 @@ func (g *GithubClient) DownloadRepoConfigFile(pull models.PullRequest) (bool, []
 	return true, decodedData, nil
 }
 
-func (g *GithubClient) IsSupportDownloadSingleFile(repo models.Repo) bool {
+func (g *GithubClient) SupportsSingleFileDownload(repo models.Repo) bool {
 	return true
 }

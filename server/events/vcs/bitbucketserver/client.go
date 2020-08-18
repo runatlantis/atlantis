@@ -312,7 +312,7 @@ func (b *Client) makeRequest(method string, path string, reqBody io.Reader) ([]b
 	return respBody, nil
 }
 
-func (b *Client) IsSupportDownloadSingleFile(repo models.Repo) bool {
+func (b *Client) SupportsSingleFileDownload(repo models.Repo) bool {
 	return false
 }
 

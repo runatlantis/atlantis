@@ -894,3 +894,43 @@ projects:
 		})
 	}
 }
+
+// Test that we don't clone the repo if there were no changes based on the atlantis.yaml file.
+func TestDefaultProjectCommandBuilder_SkipCloneNoChanges(t *testing.T) {
+	atlantisYAML := `
+version: 3
+projects:
+- dir: dir1`
+
+	RegisterMockTestingT(t)
+	vcsClient := vcsmocks.NewMockClient()
+	When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
+	When(vcsClient.SupportsSingleFileDownload(matchers.AnyModelsRepo())).ThenReturn(true)
+	When(vcsClient.DownloadRepoConfigFile(matchers.AnyModelsPullRequest())).ThenReturn(true, []byte(atlantisYAML), nil)
+	workingDir := mocks.NewMockWorkingDir()
+
+	builder := &events.DefaultProjectCommandBuilder{
+		WorkingDirLocker:   events.NewDefaultWorkingDirLocker(),
+		WorkingDir:         workingDir,
+		ParserValidator:    &yaml.ParserValidator{},
+		VCSClient:          vcsClient,
+		ProjectFinder:      &events.DefaultProjectFinder{},
+		CommentBuilder:     &events.CommentParser{},
+		GlobalCfg:          valid.NewGlobalCfg(true, false, false),
+		SkipCloneNoChanges: true,
+	}
+
+	var actCtxs []models.ProjectCommandContext
+	var err error
+	actCtxs, err = builder.BuildAutoplanCommands(&events.CommandContext{
+		BaseRepo:      models.Repo{},
+		HeadRepo:      models.Repo{},
+		Pull:          models.PullRequest{},
+		User:          models.User{},
+		Log:           nil,
+		PullMergeable: true,
+	})
+	Ok(t, err)
+	Equals(t, 0, len(actCtxs))
+	workingDir.VerifyWasCalled(Never()).Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())
+}

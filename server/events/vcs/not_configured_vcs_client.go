@@ -54,7 +54,7 @@ func (a *NotConfiguredVCSClient) err() error {
 	return fmt.Errorf("atlantis was not configured to support repos from %s", a.Host.String())
 }
 
-func (a *NotConfiguredVCSClient) IsSupportDownloadSingleFile(repo models.Repo) bool {
+func (a *NotConfiguredVCSClient) SupportsSingleFileDownload(repo models.Repo) bool {
 	return false
 }
 

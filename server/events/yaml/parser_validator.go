@@ -44,28 +44,24 @@ func (p *ParserValidator) HasRepoCfg(absRepoDir string) (bool, error) {
 // ParseRepoCfg returns the parsed and validated atlantis.yaml config for the
 // repo at absRepoDir.
 // If there was no config file, it will return an os.IsNotExist(error).
-func (p *ParserValidator) ParseRepoCfg(repoCfgData []byte, absRepoDir string, globalCfg valid.GlobalCfg, repoID string) (valid.RepoCfg, error) {
-	var configData []byte
-	var err error
+func (p *ParserValidator) ParseRepoCfg(absRepoDir string, globalCfg valid.GlobalCfg, repoID string) (valid.RepoCfg, error) {
+	configFile := p.repoCfgPath(absRepoDir, AtlantisYAMLFilename)
+	configData, err := ioutil.ReadFile(configFile) // nolint: gosec
 
-	if len(repoCfgData) > 0 {
-		configData = repoCfgData
-	} else {
-		configFile := p.repoCfgPath(absRepoDir, AtlantisYAMLFilename)
-		configData, err = ioutil.ReadFile(configFile) // nolint: gosec
-
-		if err != nil {
-			if !os.IsNotExist(err) {
-				return valid.RepoCfg{}, errors.Wrapf(err, "unable to read %s file", AtlantisYAMLFilename)
-			}
-			// Don't wrap os.IsNotExist errors because we want our callers to be
-			// able to detect if it's a NotExist err.
-			return valid.RepoCfg{}, err
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return valid.RepoCfg{}, errors.Wrapf(err, "unable to read %s file", AtlantisYAMLFilename)
 		}
+		// Don't wrap os.IsNotExist errors because we want our callers to be
+		// able to detect if it's a NotExist err.
+		return valid.RepoCfg{}, err
 	}
+	return p.ParseRepoCfgData(configData, globalCfg, repoID)
+}
 
+func (p *ParserValidator) ParseRepoCfgData(repoCfgData []byte, globalCfg valid.GlobalCfg, repoID string) (valid.RepoCfg, error) {
 	var rawConfig raw.RepoCfg
-	if err := yaml.UnmarshalStrict(configData, &rawConfig); err != nil {
+	if err := yaml.UnmarshalStrict(repoCfgData, &rawConfig); err != nil {
 		return valid.RepoCfg{}, err
 	}
 
@@ -90,7 +86,7 @@ func (p *ParserValidator) ParseRepoCfg(repoCfgData []byte, absRepoDir string, gl
 		}
 	}
 
-	err = globalCfg.ValidateRepoCfg(validConfig, repoID)
+	err := globalCfg.ValidateRepoCfg(validConfig, repoID)
 	return validConfig, err
 }
 
