@@ -196,6 +196,22 @@ func TestRunCommentCommand_DisableApplyAllDisabled(t *testing.T) {
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "**Error:** Running `atlantis apply` without flags is disabled. You must specify which project to apply via the `-d <dir>`, `-w <workspace>` or `-p <project name>` flags.", "apply")
 }
 
+func TestRunCommentCommand_DisableDisableAutoplan(t *testing.T) {
+	t.Log("if \"DisableAutoplan is true\" are disabled and we are silencing return and do not comment with error")
+	setup(t)
+	ch.DisableAutoplan = true
+	defer func() { ch.DisableAutoplan = false }()
+
+	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())).
+		ThenReturn([]models.ProjectCommandContext{
+			{},
+			{},
+		}, nil)
+
+	ch.RunAutoplanCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
+	projectCommandBuilder.VerifyWasCalled(Never()).BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())
+}
+
 func TestRunCommentCommand_ClosedPull(t *testing.T) {
 	t.Log("if a command is run on a closed pull request atlantis should" +
 		" comment saying that this is not allowed")
