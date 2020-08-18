@@ -1,3 +1,42 @@
+# v0.15.0
+
+## Description
+Relatively small release with some bugfixes and a couple of features. Also sets
+default Terraform version to 0.13.0.
+
+## Features
+* Bump default Terraform version to 0.13.0
+* Retry GitHub calls to prevent 404 issues ([#1019](https://github.com/runatlantis/atlantis/issues/1019))
+* Update GitLab library to handle rate limiting issues ([#1142](https://github.com/runatlantis/atlantis/issues/1142) by @LAKostis)
+* Alpine version n Docker image is now 3.12 (up from 3.11) ([#1136](https://github.com/runatlantis/atlantis/pull/1136) by @lazzurs)
+* Add new flag `--skip-clone-no-changes` that will skip cloning the repo during autoplan if there are no changes to Terraform projects.
+  This will only apply for GitHub and GitLab and only for repos that have `atlantis.yaml` files. ([#1158](https://github.com/runatlantis/atlantis/pull/1158) by @cucxabong)
+* Add new flag `--disable-autoplan` that will globally disable autoplanning. ([#1159](https://github.com/runatlantis/atlantis/pull/1159) by @ValdirGuerra)
+
+## Bugfixes
+* Fix `--hide-prev-plan-comments` bug ([#1009](https://github.com/runatlantis/atlantis/issues/1009) by @goodspark)
+* Fix comment splitting bug ([#1109](https://github.com/runatlantis/atlantis/pull/1109) by @crainte)
+* Fix Azure DevOps bug when cloning a repo with spaces in its name ([#1079](https://github.com/runatlantis/atlantis/issues/1079) by @mcdafydd)
+
+## Backwards Incompatibilities / Notes:
+* If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
+  then the default version of Terraform will now be 0.13.0. Simply set the above
+  flag to your desired default version to avoid any issues.
+* `--repo-whitelist` is now deprecated in favour of `--repo-allowlist`. The previous
+  flag will still work.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.15.0/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.15.0/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.15.0/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.15.0/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.15.0`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.14.0..v0.15.0
+https://github.com/runatlantis/atlantis/compare/v0.14.0...v0.15.0
+
 # v0.14.0
 
 ## Description
