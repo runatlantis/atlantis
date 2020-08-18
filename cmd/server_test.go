@@ -94,7 +94,7 @@ var testFlags = map[string]interface{}{
 	TFETokenFlag:               "my-token",
 	VCSStatusName:              "my-status",
 	WriteGitCredsFlag:          true,
-	DisableAutoplanFlag:        false,
+	DisableAutoplanFlag:        true,
 }
 
 func TestExecute_Defaults(t *testing.T) {
