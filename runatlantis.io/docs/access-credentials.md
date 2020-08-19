@@ -39,11 +39,7 @@ Available in Atlantis versions **newer** than 0.13.0.
 :::
 
 
-The installation suggestions differ if you're installing into a user account or an organization.
-
-#### User
-
-- Start Atlantis with fake github username and token (`atlantis server --gh-user fake --gh-token fake --repo-allowlist 'github.com/your-org/*' --atlantis-url https://$ATLANTIS_HOST`)
+- Start Atlantis with fake github username and token (`atlantis server --gh-user fake --gh-token fake --repo-allowlist 'github.com/your-org/*' --atlantis-url https://$ATLANTIS_HOST`). If installing as an **Organization**, remember to add `--gh-org your-github-org` to this command.
 - Visit `https://$ATLANTIS_HOST/github-app/setup` and click on **Setup** to create the app on Github. You'll be redirected back to Atlantis
 - A link to install your app, along with its secrets, will be shown on the screen. Record your app's credentials and install your app for your user/org by following said link.
 - Create a file with the contents of the GitHub App Key, e.g. `atlantis-app-key.pem`
@@ -54,35 +50,6 @@ The installation suggestions differ if you're installing into a user account or 
 ::: warning
 Only a single installation per GitHub App is supported at the moment.
 :::
-
-#### Organization
-
-Follow the steps for User installation above and in addition:
-
-- Go to the users' **Settings**
-- Click **Developer Settings** in the left menu
-- With **GitHub Apps** chosen on the left, click **Edit** on the App
-- Click **Advanced** in the left menu
-- Click **Transfer ownership** and enter the name of the
-  GitHub App and the name of the organization
-- Click **Complete transfer**
-
-As an administrator of the organization. Visit the **Settings**.
-
-- Click **GitHub Apps**
-- Click **Edit** on the App
-- Choose **Install App** in the left menu
-- Click **Install** on the App,
-- Enable the App for one or more repositories (you can change this later) and click **Install**
-
-Since Atlantis currently only supports one installation, 
-and is now installed on both the user and the organisation,
-it needs to be uninstalled on the user account.
-
-- Go to the users' **Settings**.
-- Click **Applications**
-- On the Atlantis GitHub app, click **Configure**
-- Click **Uninstall** and confirm
 
 ### GitLab
 - Follow: [https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#creating-a-personal-access-token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#creating-a-personal-access-token)
