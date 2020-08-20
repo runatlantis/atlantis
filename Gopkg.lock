@@ -494,6 +494,18 @@
   revision = "5e7302b12ccef91dce9fde2f5bda6d5c7ea5d2eb"
 
 [[projects]]
+  digest = "1:612d70cd68843b3adc38d4a1005b6527b3a76632b474a7d9b8bcbcc3e40d7a9e"
+  name = "github.com/segmentio/stats"
+  packages = [
+    ".",
+    "datadog",
+    "statstest",
+  ]
+  pruneopts = "UT"
+  revision = "c7af809065985daa320866e54b6a35241c974ded"
+  version = "v4.4.1"
+
+[[projects]]
   digest = "1:9e9193aa51197513b3abcb108970d831fbcf40ef96aa845c4f03276e1fa316d2"
   name = "github.com/sirupsen/logrus"
   packages = ["."]
@@ -815,6 +827,9 @@
     "github.com/petergtz/pegomock",
     "github.com/pkg/errors",
     "github.com/remeh/sizedwaitgroup",
+    "github.com/segmentio/stats",
+    "github.com/segmentio/stats/datadog",
+    "github.com/segmentio/stats/statstest",
     "github.com/spf13/cobra",
     "github.com/spf13/pflag",
     "github.com/spf13/viper",

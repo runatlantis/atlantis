@@ -351,6 +351,8 @@ type ProjectCommandContext struct {
 	// Workspace is the Terraform workspace this project is in. It will always
 	// be set.
 	Workspace string
+	// Command is the command type being run in the current context: plan/apply
+	Command CommandName
 }
 
 // SplitRepoFullName splits a repo full name up into its owner and repo name

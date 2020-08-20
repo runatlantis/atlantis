@@ -98,6 +98,7 @@ type DefaultProjectCommandRunner struct {
 
 // Plan runs terraform plan for the project described by ctx.
 func (p *DefaultProjectCommandRunner) Plan(ctx models.ProjectCommandContext) models.ProjectResult {
+	ctx.Command = models.PlanCommand
 	planSuccess, failure, err := p.doPlan(ctx)
 	return models.ProjectResult{
 		Command:     models.PlanCommand,
@@ -112,6 +113,7 @@ func (p *DefaultProjectCommandRunner) Plan(ctx models.ProjectCommandContext) mod
 
 // Apply runs terraform apply for the project described by ctx.
 func (p *DefaultProjectCommandRunner) Apply(ctx models.ProjectCommandContext) models.ProjectResult {
+	ctx.Command = models.ApplyCommand
 	applyOut, failure, err := p.doApply(ctx)
 	return models.ProjectResult{
 		Command:      models.ApplyCommand,

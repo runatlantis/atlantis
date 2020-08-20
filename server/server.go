@@ -31,6 +31,8 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/segmentio/stats"
+	"github.com/segmentio/stats/datadog"
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
@@ -176,6 +178,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.DefaultTFVersion,
 		config.DefaultTFVersionFlag,
 		&terraform.DefaultDownloader{})
+
+	dd := datadog.NewClient("localhost:8125")
+	stats.Register(dd)
+	defer stats.Flush()
 	// The flag.Lookup call is to detect if we're running in a unit test. If we
 	// are, then we don't error out because we don't have/want terraform
 	// installed on our CI system where the unit tests run.
@@ -274,24 +280,24 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
 			Locker:           projectLocker,
 			LockURLGenerator: router,
-			InitStepRunner: &runtime.InitStepRunner{
+			InitStepRunner: events.InstrumentStepRunner(&runtime.InitStepRunner{
 				TerraformExecutor: terraformClient,
 				DefaultTFVersion:  defaultTfVersion,
-			},
-			PlanStepRunner: &runtime.PlanStepRunner{
+			}, stats.DefaultEngine, "init"),
+			PlanStepRunner: events.InstrumentStepRunner(&runtime.PlanStepRunner{
 				TerraformExecutor:   terraformClient,
 				DefaultTFVersion:    defaultTfVersion,
 				CommitStatusUpdater: commitStatusUpdater,
 				AsyncTFExec:         terraformClient,
-			},
-			ApplyStepRunner: &runtime.ApplyStepRunner{
+			}, stats.DefaultEngine, "plan"),
+			ApplyStepRunner: events.InstrumentStepRunner(&runtime.ApplyStepRunner{
 				TerraformExecutor:   terraformClient,
 				CommitStatusUpdater: commitStatusUpdater,
 				AsyncTFExec:         terraformClient,
-			},
-			RunStepRunner: &runtime.RunStepRunner{
+			}, stats.DefaultEngine, "apply"),
+			RunStepRunner: events.InstrumentCustomRunner(&runtime.RunStepRunner{
 				DefaultTFVersion: defaultTfVersion,
-			},
+			}, stats.DefaultEngine),
 			PullApprovedChecker: vcsClient,
 			WorkingDir:          workingDir,
 			Webhooks:            webhooksManager,
@@ -374,6 +380,14 @@ func (s *Server) Start() error {
 	// Stop on SIGINTs and SIGTERMs.
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
+	// Flush datadog metrics
+	go func() {
+		ticker := time.NewTicker(time.Second * 10)
+		for range ticker.C {
+			stats.Flush()
+		}
+	}()
+
 	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n}
 	go func() {
 		s.Logger.Info("Atlantis started - listening on port %v", s.Port)
@@ -392,6 +406,7 @@ func (s *Server) Start() error {
 	<-stop
 
 	s.Logger.Warn("Received interrupt. Safely shutting down")
+	stats.Flush()
 	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second) // nolint: vet
 	if err := server.Shutdown(ctx); err != nil {
 		return cli.NewExitError(fmt.Sprintf("while shutting down: %s", err), 1)

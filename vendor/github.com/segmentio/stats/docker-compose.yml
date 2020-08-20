@@ -1,0 +1,5 @@
+influxdb:
+  image: influxdb:alpine
+  ports:
+    - 8086:8086
+
