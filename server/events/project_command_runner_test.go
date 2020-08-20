@@ -102,6 +102,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		},
 		Workspace:  "default",
 		RepoRelDir: ".",
+		Command:    models.PlanCommand,
 	}
 	// Each step will output its step name.
 	When(mockInit.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("init", nil)

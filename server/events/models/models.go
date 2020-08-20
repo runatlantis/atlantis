@@ -364,9 +364,8 @@ type ProjectCommandContext struct {
 	// Workspace is the Terraform workspace this project is in. It will always
 	// be set.
 	Workspace string
-	// PolicySets represent the policies that are run on the plan as part of the
-	// policy check stage
-	PolicySets valid.PolicySets
+	// Command is the command type being run in the current context: plan/apply
+	Command CommandName
 }
 
 // GetShowResultFileName returns the filename (not the path) to store the tf show result

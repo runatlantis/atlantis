@@ -302,7 +302,7 @@ var policyCheckSuccessWrappedTmpl = template.Must(template.New("").Parse(
 // to do next.
 var policyCheckNextSteps = "* :arrow_forward: To **apply** this plan, comment:\n" +
 	"    * `{{.ApplyCmd}}`\n" +
-	"* :put_litter_in_its_place: To **delete** this plan, {{ if ne .LockURL \"\"}}click [here]({{.LockURL}}){{ else }}close this pull request{{ end }}\n" +
+	"* :put_litter_in_its_place: To **delete** this plan {{ if ne .LockURL \"\"}}click [here]({{.LockURL}}){{ else }}close this pull request{{ end }}\n" +
 	"* :repeat: To **plan** this project again, comment:\n" +
 	"    * `{{.RePlanCmd}}`{{end}}"
 var applyUnwrappedSuccessTmpl = template.Must(template.New("").Parse(
