@@ -49,11 +49,11 @@ func (ic *instrumentedStepRunner) Run(ctx models.ProjectCommandContext, extraArg
 	if err != nil {
 		tags = append(tags, stats.Tag{Name: "error_type", Value: errorTag(out)})
 
-		ic.stats.Incr("atlantis.steps.error", tags...)
+		ic.stats.Incr("steps.error", tags...)
 		return out, err
 	}
-	ic.stats.ClockAt("atlantis.steps.duration", start, tags...).Stop()
-	ic.stats.Incr("atlantis.steps.success", tags...)
+	ic.stats.ClockAt("steps.duration", start, tags...).Stop()
+	ic.stats.Incr("steps.success", tags...)
 	return out, err
 }
 
@@ -68,11 +68,11 @@ func (ic *instrumentedCustomRunner) Run(ctx models.ProjectCommandContext, cmd st
 
 	out, err := ic.runner.Run(ctx, cmd, path)
 	if err != nil {
-		ic.stats.Incr("atlantis.steps.error", tags...)
+		ic.stats.Incr("steps.error", tags...)
 		return out, err
 	}
-	ic.stats.ClockAt("atlantis.steps.duration", start, tags...).Stop()
-	ic.stats.Incr("atlantis.steps.success", tags...)
+	ic.stats.ClockAt("steps.duration", start, tags...).Stop()
+	ic.stats.Incr("steps.success", tags...)
 	return out, err
 }
 

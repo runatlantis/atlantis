@@ -64,7 +64,7 @@ func testStepRunSuccess(t *testing.T, eng *stats.Engine) {
 	}
 
 	checkHistogramEqual(t, found[0], stats.Measure{
-		Name:   "test.atlantis.steps.duration",
+		Name:   "test.steps.duration",
 		Fields: []stats.Field{stats.MakeField("", 1, stats.Histogram)},
 		Tags: []stats.Tag{
 			{Name: "command", Value: "plan"},
@@ -76,7 +76,7 @@ func testStepRunSuccess(t *testing.T, eng *stats.Engine) {
 	})
 
 	checkCounterEqual(t, found[1], stats.Measure{
-		Name:   "test.atlantis.steps.success",
+		Name:   "test.steps.success",
 		Fields: []stats.Field{stats.MakeField("", 1, stats.Counter)},
 		Tags: []stats.Tag{
 			{Name: "command", Value: "plan"},
@@ -103,7 +103,7 @@ func testStepRunError(t *testing.T, eng *stats.Engine) {
 	}
 
 	checkCounterEqual(t, found[0], stats.Measure{
-		Name:   "test.atlantis.steps.error",
+		Name:   "test.steps.error",
 		Fields: []stats.Field{stats.MakeField("", 1, stats.Counter)},
 		Tags: []stats.Tag{
 			{Name: "command", Value: "plan"},
