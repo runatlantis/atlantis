@@ -22,7 +22,7 @@ type instrumentedCustomRunner struct {
 // InstrumentStepRunner wraps step runners to provide metrics for: init, plan, and apply steps
 func InstrumentStepRunner(runner StepRunner, eng *stats.Engine, step string) StepRunner {
 	return &instrumentedStepRunner{
-		stats:  eng.WithPrefix("atlantis"),
+		stats:  eng,
 		runner: runner,
 		step:   step,
 	}
@@ -31,7 +31,7 @@ func InstrumentStepRunner(runner StepRunner, eng *stats.Engine, step string) Ste
 // InstrumentCustomRunner wraps step runners to provide metrics for: run steps
 func InstrumentCustomRunner(runner CustomStepRunner, eng *stats.Engine) CustomStepRunner {
 	return &instrumentedCustomRunner{
-		stats:  eng.WithPrefix("atlantis"),
+		stats:  eng,
 		runner: runner,
 	}
 }
@@ -49,11 +49,11 @@ func (ic *instrumentedStepRunner) Run(ctx models.ProjectCommandContext, extraArg
 	if err != nil {
 		tags = append(tags, stats.Tag{Name: "error_type", Value: errorTag(out)})
 
-		ic.stats.Incr("steps.error", tags...)
+		ic.stats.Incr("atlantis.steps.error", tags...)
 		return out, err
 	}
-	ic.stats.ClockAt("steps.duration", start, tags...).Stop()
-	ic.stats.Incr("steps.success", tags...)
+	ic.stats.ClockAt("atlantis.steps.duration", start, tags...).Stop()
+	ic.stats.Incr("atlantis.steps.success", tags...)
 	return out, err
 }
 
@@ -68,11 +68,11 @@ func (ic *instrumentedCustomRunner) Run(ctx models.ProjectCommandContext, cmd st
 
 	out, err := ic.runner.Run(ctx, cmd, path)
 	if err != nil {
-		ic.stats.Incr("steps.error", tags...)
+		ic.stats.Incr("atlantis.steps.error", tags...)
 		return out, err
 	}
-	ic.stats.ClockAt("steps.duration", start, tags...).Stop()
-	ic.stats.Incr("steps.success", tags...)
+	ic.stats.ClockAt("atlantis.steps.duration", start, tags...).Stop()
+	ic.stats.Incr("atlantis.steps.success", tags...)
 	return out, err
 }
 
