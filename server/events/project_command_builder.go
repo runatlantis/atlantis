@@ -476,6 +476,9 @@ func (p *DefaultProjectCommandBuilder) getTfVersion(ctx *CommandContext, absProj
 	module, diags := tfconfig.LoadModule(absProjDir)
 	if diags.HasErrors() {
 		ctx.Log.Err("trying to detect required version: %s", diags.Error())
+		for _, d := range diags {
+			ctx.Log.Debug("%s in %s:%d", d.Detail, d.Pos.Filename, d.Pos.Line)
+		}
 		return nil
 	}
 
