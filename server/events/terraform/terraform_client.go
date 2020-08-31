@@ -261,6 +261,8 @@ func (c *DefaultClient) prepCmd(log *logging.SimpleLogger, v *version.Version, w
 	// We add custom variables so that if `extra_args` is specified with env
 	// vars then they'll be substituted.
 	envVars := []string{
+		// Pass user-agent for Terraform and provider calls.
+		"TF_APPEND_USER_AGENT=Atlantis/1.0",
 		// Will de-emphasize specific commands to run in output.
 		"TF_IN_AUTOMATION=true",
 		// Cache plugins so terraform init runs faster.
