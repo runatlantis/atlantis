@@ -407,7 +407,7 @@ func (c *DefaultCommandRunner) runProjectCmdsParallel(cmds []models.ProjectComma
 	var results []models.ProjectResult
 	mux := &sync.Mutex{}
 
-	wg := sizedwaitgroup.New(c.ParallelPlansPoolSize)
+	wg := sizedwaitgroup.New(c.ParallelPoolSize)
 	for _, pCmd := range cmds {
 		pCmd := pCmd
 		var execute func()

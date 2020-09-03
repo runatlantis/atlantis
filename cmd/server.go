@@ -94,19 +94,19 @@ const (
 	WriteGitCredsFlag          = "write-git-creds"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
-	DefaultADBasicUser           = ""
-	DefaultADBasicPassword       = ""
-	DefaultCheckoutStrategy      = "branch"
-	DefaultBitbucketBaseURL      = bitbucketcloud.BaseURL
-	DefaultDataDir               = "~/.atlantis"
-	DefaultGHHostname            = "github.com"
-	DefaultGitlabHostname        = "gitlab.com"
-	DefaultLogLevel              = "info"
-	DefaultParallelPlansPoolSize = 15
-	DefaultPort                  = 4141
-	DefaultTFDownloadURL         = "https://releases.hashicorp.com"
-	DefaultTFEHostname           = "app.terraform.io"
-	DefaultVCSStatusName         = "atlantis"
+	DefaultADBasicUser      = ""
+	DefaultADBasicPassword  = ""
+	DefaultCheckoutStrategy = "branch"
+	DefaultBitbucketBaseURL = bitbucketcloud.BaseURL
+	DefaultDataDir          = "~/.atlantis"
+	DefaultGHHostname       = "github.com"
+	DefaultGitlabHostname   = "gitlab.com"
+	DefaultLogLevel         = "info"
+	DefaultParallelPoolSize = 15
+	DefaultPort             = 4141
+	DefaultTFDownloadURL    = "https://releases.hashicorp.com"
+	DefaultTFEHostname      = "app.terraform.io"
+	DefaultVCSStatusName    = "atlantis"
 )
 
 var stringFlags = map[string]stringFlag{
@@ -333,9 +333,9 @@ var boolFlags = map[string]boolFlag{
 	},
 }
 var intFlags = map[string]intFlag{
-	ParallelPlansPoolSize: {
+	ParallelPoolSize: {
 		description:  "Max size of the wait group that runs parallel plans and applies (if enabled).",
-		defaultValue: DefaultParallelPlansPoolSize,
+		defaultValue: DefaultParallelPoolSize,
 	},
 	PortFlag: {
 		description:  "Port to bind to.",
