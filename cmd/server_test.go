@@ -80,7 +80,7 @@ var testFlags = map[string]interface{}{
 	LogLevelFlag:               "debug",
 	AllowDraftPRs:              true,
 	PortFlag:                   8181,
-	ParallelPoolSize:           15,
+	ParallelPoolSize:           100,
 	RepoAllowlistFlag:          "github.com/runatlantis/atlantis",
 	RequireApprovalFlag:        true,
 	RequireMergeableFlag:       true,

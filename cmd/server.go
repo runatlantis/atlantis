@@ -559,6 +559,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	if c.LogLevel == "" {
 		c.LogLevel = DefaultLogLevel
 	}
+	if c.ParallelPoolSize == 0 {
+		c.ParallelPoolSize = DefaultParallelPoolSize
+	}
 	if c.Port == 0 {
 		c.Port = DefaultPort
 	}
