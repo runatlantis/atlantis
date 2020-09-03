@@ -370,6 +370,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		SilenceVCSStatusNoPlans:  userConfig.SilenceVCSStatusNoPlans,
 		DisableApplyAll:          userConfig.DisableApplyAll,
 		DisableAutoplan:          userConfig.DisableAutoplan,
+		ParallelPoolSize:         userConfig.ParallelPoolSize,
 		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
 			ParserValidator:    validator,
 			ProjectFinder:      &events.DefaultProjectFinder{},

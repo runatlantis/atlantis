@@ -82,6 +82,9 @@ type DefaultCommandRunner struct {
 	Logger                   logging.SimpleLogging
 	// AllowForkPRs controls whether we operate on pull requests from forks.
 	AllowForkPRs bool
+	// ParallelPoolSize controls the size of the wait group used to run
+	// parallel plans and applies (if enabled).
+	ParallelPoolSize int
 	// AllowForkPRsFlag is the name of the flag that controls fork PR's. We use
 	// this in our error message back to the user on a forked PR so they know
 	// how to enable this functionality.
@@ -404,7 +407,7 @@ func (c *DefaultCommandRunner) runProjectCmdsParallel(cmds []models.ProjectComma
 	var results []models.ProjectResult
 	mux := &sync.Mutex{}
 
-	wg := sizedwaitgroup.New(15)
+	wg := sizedwaitgroup.New(c.ParallelPlansPoolSize)
 	for _, pCmd := range cmds {
 		pCmd := pCmd
 		var execute func()
