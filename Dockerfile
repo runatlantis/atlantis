@@ -1,5 +1,5 @@
 # Build our upstream version of atlantis while this is being developed
-FROM golang:1.13 as builder
+FROM golang:1.14 as builder
 WORKDIR /go/src/github.com/runatlantis/atlantis
 COPY . /go/src/github.com/runatlantis/atlantis
 RUN GO111MODULE=off CGO_ENABLED=0 go build -o atlantis main.go
