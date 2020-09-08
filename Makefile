@@ -36,7 +36,7 @@ test: ## Run tests
 	@go test -short $(PKG)
 
 test-all: ## Run tests including integration
-	@go test  $(PKG)
+	@go test $(PKG)
 
 test-coverage:
 	@mkdir -p .cover
