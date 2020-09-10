@@ -307,7 +307,7 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
 
 	// Construct request body from supplied parameters
 	mergePull := new(azuredevops.GitPullRequest)
-	mergePull.AutoCompleteSetBy = &id
+
 	mergePull.CompletionOptions = &completionOpts
 
 	owner, project, repoName := SplitAzureDevopsRepoFullName(pull.BaseRepo.FullName)
@@ -323,7 +323,7 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
 		ID:         prResp.CreatedBy.ID,
 		ImageURL:   prResp.CreatedBy.ImageURL,
 	}
-	
+	mergePull.AutoCompleteSetBy = &id
 	mergeResult, _, err := g.Client.PullRequests.Merge(
 		g.ctx,
 		owner,

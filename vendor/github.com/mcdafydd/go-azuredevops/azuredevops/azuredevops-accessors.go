@@ -1231,6 +1231,62 @@ func (g *GitCommitChanges) GetChangeCounts() map[string]int {
 	return *g.ChangeCounts
 }
 
+// GetAheadCount returns the AheadCount field if it's non-nil, zero value otherwise.
+func (g *GitCommitDiffs) GetAheadCount() int {
+	if g == nil || g.AheadCount == nil {
+		return 0
+	}
+	return *g.AheadCount
+}
+
+// GetAllChangesIncluded returns the AllChangesIncluded field if it's non-nil, zero value otherwise.
+func (g *GitCommitDiffs) GetAllChangesIncluded() bool {
+	if g == nil || g.AllChangesIncluded == nil {
+		return false
+	}
+	return *g.AllChangesIncluded
+}
+
+// GetBaseCommit returns the BaseCommit field if it's non-nil, zero value otherwise.
+func (g *GitCommitDiffs) GetBaseCommit() string {
+	if g == nil || g.BaseCommit == nil {
+		return ""
+	}
+	return *g.BaseCommit
+}
+
+// GetBehindCount returns the BehindCount field if it's non-nil, zero value otherwise.
+func (g *GitCommitDiffs) GetBehindCount() int {
+	if g == nil || g.BehindCount == nil {
+		return 0
+	}
+	return *g.BehindCount
+}
+
+// GetChangeCounts returns the ChangeCounts field if it's non-nil, zero value otherwise.
+func (g *GitCommitDiffs) GetChangeCounts() map[VersionControlChangeType]int {
+	if g == nil || g.ChangeCounts == nil {
+		return map[VersionControlChangeType]int{}
+	}
+	return *g.ChangeCounts
+}
+
+// GetCommonCommit returns the CommonCommit field if it's non-nil, zero value otherwise.
+func (g *GitCommitDiffs) GetCommonCommit() string {
+	if g == nil || g.CommonCommit == nil {
+		return ""
+	}
+	return *g.CommonCommit
+}
+
+// GetTargetCommit returns the TargetCommit field if it's non-nil, zero value otherwise.
+func (g *GitCommitDiffs) GetTargetCommit() string {
+	if g == nil || g.TargetCommit == nil {
+		return ""
+	}
+	return *g.TargetCommit
+}
+
 // GetAuthor returns the Author field.
 func (g *GitCommitRef) GetAuthor() *GitUserDate {
 	if g == nil {
@@ -2909,6 +2965,158 @@ func (m *Message) GetText() string {
 		return ""
 	}
 	return *m.Text
+}
+
+// GetCreatedBy returns the CreatedBy field.
+func (p *PolicyConfiguration) GetCreatedBy() *IdentityRef {
+	if p == nil {
+		return nil
+	}
+	return p.CreatedBy
+}
+
+// GetCreatedDate returns the CreatedDate field if it's non-nil, zero value otherwise.
+func (p *PolicyConfiguration) GetCreatedDate() string {
+	if p == nil || p.CreatedDate == nil {
+		return ""
+	}
+	return *p.CreatedDate
+}
+
+// GetID returns the ID field if it's non-nil, zero value otherwise.
+func (p *PolicyConfiguration) GetID() int {
+	if p == nil || p.ID == nil {
+		return 0
+	}
+	return *p.ID
+}
+
+// GetIsBlocking returns the IsBlocking field if it's non-nil, zero value otherwise.
+func (p *PolicyConfiguration) GetIsBlocking() bool {
+	if p == nil || p.IsBlocking == nil {
+		return false
+	}
+	return *p.IsBlocking
+}
+
+// GetIsDeleted returns the IsDeleted field if it's non-nil, zero value otherwise.
+func (p *PolicyConfiguration) GetIsDeleted() bool {
+	if p == nil || p.IsDeleted == nil {
+		return false
+	}
+	return *p.IsDeleted
+}
+
+// GetIsEnabled returns the IsEnabled field if it's non-nil, zero value otherwise.
+func (p *PolicyConfiguration) GetIsEnabled() bool {
+	if p == nil || p.IsEnabled == nil {
+		return false
+	}
+	return *p.IsEnabled
+}
+
+// GetRevision returns the Revision field if it's non-nil, zero value otherwise.
+func (p *PolicyConfiguration) GetRevision() int {
+	if p == nil || p.Revision == nil {
+		return 0
+	}
+	return *p.Revision
+}
+
+// GetType returns the Type field.
+func (p *PolicyConfiguration) GetType() *PolicyTypeRef {
+	if p == nil {
+		return nil
+	}
+	return p.Type
+}
+
+// GetUrl returns the Url field if it's non-nil, zero value otherwise.
+func (p *PolicyConfiguration) GetUrl() string {
+	if p == nil || p.Url == nil {
+		return ""
+	}
+	return *p.Url
+}
+
+// GetArtifactID returns the ArtifactID field if it's non-nil, zero value otherwise.
+func (p *PolicyEvaluationRecord) GetArtifactID() string {
+	if p == nil || p.ArtifactID == nil {
+		return ""
+	}
+	return *p.ArtifactID
+}
+
+// GetCompletedDate returns the CompletedDate field if it's non-nil, zero value otherwise.
+func (p *PolicyEvaluationRecord) GetCompletedDate() string {
+	if p == nil || p.CompletedDate == nil {
+		return ""
+	}
+	return *p.CompletedDate
+}
+
+// GetConfiguration returns the Configuration field.
+func (p *PolicyEvaluationRecord) GetConfiguration() *PolicyConfiguration {
+	if p == nil {
+		return nil
+	}
+	return p.Configuration
+}
+
+// GetEvaluationID returns the EvaluationID field if it's non-nil, zero value otherwise.
+func (p *PolicyEvaluationRecord) GetEvaluationID() string {
+	if p == nil || p.EvaluationID == nil {
+		return ""
+	}
+	return *p.EvaluationID
+}
+
+// GetLinks returns the Links field if it's non-nil, zero value otherwise.
+func (p *PolicyEvaluationRecord) GetLinks() map[string]Link {
+	if p == nil || p.Links == nil {
+		return map[string]Link{}
+	}
+	return *p.Links
+}
+
+// GetStartedDate returns the StartedDate field if it's non-nil, zero value otherwise.
+func (p *PolicyEvaluationRecord) GetStartedDate() string {
+	if p == nil || p.StartedDate == nil {
+		return ""
+	}
+	return *p.StartedDate
+}
+
+// GetStatus returns the Status field if it's non-nil, zero value otherwise.
+func (p *PolicyEvaluationRecord) GetStatus() string {
+	if p == nil || p.Status == nil {
+		return ""
+	}
+	return *p.Status
+}
+
+// GetDisplayName returns the DisplayName field if it's non-nil, zero value otherwise.
+func (p *PolicyTypeRef) GetDisplayName() string {
+	if p == nil || p.DisplayName == nil {
+		return ""
+	}
+	return *p.DisplayName
+}
+
+// GetID returns the ID field if it's non-nil, zero value otherwise.
+func (p *PolicyTypeRef) GetID() string {
+	if p == nil || p.ID == nil {
+		return ""
+	}
+	return *p.ID
+}
+
+// GetUrl returns the Url field if it's non-nil, zero value otherwise.
+func (p *PolicyTypeRef) GetUrl() string {
+	if p == nil || p.Url == nil {
+		return ""
+	}
+	return *p.Url
 }
 
 // GetDescription returns the Description field if it's non-nil, zero value otherwise.
