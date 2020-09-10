@@ -83,7 +83,7 @@ func (d *DefaultWorkingDirLocker) TryLock(repoFullName string, pullNum int, work
 	for _, l := range d.locks {
 		if l == pullKey || l == workspaceKey {
 			return func() {}, fmt.Errorf("The %s workspace is currently locked by another"+
-				" command that is running for this pull request." + "\n" +
+				" command that is running for this pull request."+"\n"+
 				"Wait until the previous command is complete and try again.", workspace)
 		}
 	}
