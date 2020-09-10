@@ -289,14 +289,7 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
 // until we handle branch policies
 // https://docs.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops
 func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
-	descriptor := "Atlantis Terraform Pull Request Automation"
-	i := "atlantis"
-	imageURL := "https://github.com/runatlantis/atlantis/raw/master/runatlantis.io/.vuepress/public/hero.png"
-	id := azuredevops.IdentityRef{
-		Descriptor: &descriptor,
-		ID:         &i,
-		ImageURL:   &imageURL,
-	}
+	
 	// Set default pull request completion options
 	mcm := azuredevops.NoFastForward.String()
 	twi := new(bool)
@@ -318,6 +311,19 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
 	mergePull.CompletionOptions = &completionOpts
 
 	owner, project, repoName := SplitAzureDevopsRepoFullName(pull.BaseRepo.FullName)
+
+	//Before we issue the merge request we need to get the descriptor and uuid of the user who opened this pr
+	prResp, _ , err := g.Client.PullRequests.Get(g.ctx, owner, project, pull.Num, &azuredevops.PullRequestListOptions{})
+	if err != nil {
+		return fmt.Errorf("could not merge pull request: %s", err)
+	}
+
+	id := azuredevops.IdentityRef{
+		Descriptor: prResp.CreatedBy.Descriptor,
+		ID:         prResp.CreatedBy.ID,
+		ImageURL:   prResp.CreatedBy.ImageURL,
+	}
+	
 	mergeResult, _, err := g.Client.PullRequests.Merge(
 		g.ctx,
 		owner,
