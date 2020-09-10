@@ -1,0 +1,30 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- master
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- task: GoTool@0
+  inputs:
+    version: '1.14'
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: 'make build-service'
+  env:
+    GOFLAGS: "-mod=vendor"
+- task: Docker@2
+  inputs:
+    containerRegistry: 'atlantis-creg'
+    repository: 'upstreamatlantis'
+    command: 'buildAndPush'
+    Dockerfile: './Dockerfile'
+    tags: |
+      $(Build.BuildId)
+      latest
