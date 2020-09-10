@@ -164,6 +164,8 @@ type PullRequest struct {
 	State PullRequestState
 	// BaseRepo is the repository that the pull request will be merged into.
 	BaseRepo Repo
+	// DeleteSourceBranchOnMerge will set a field that tells the VCS to delete the source branch when the PR is merged
+	DeleteSourceBranchOnMerge bool
 }
 
 type PullRequestState int
@@ -317,6 +319,8 @@ type ProjectCommandContext struct {
 	AutoplanEnabled bool
 	// BaseRepo is the repository that the pull request will be merged into.
 	BaseRepo Repo
+	// DeleteSourceBranchOnMerge will attempt to allow a branch to be deleted when merged (AzureDevOps Support Only)
+	DeleteSourceBranchOnMerge bool
 	// EscapedCommentArgs are the extra arguments that were added to the atlantis
 	// command, ex. atlantis plan -- -target=resource. We then escape them
 	// by adding a \ before each character so that they can be used within

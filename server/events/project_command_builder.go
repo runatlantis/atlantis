@@ -30,6 +30,8 @@ const (
 	DefaultParallelApplyEnabled = false
 	// DefaultParallelPlanEnabled is the default for the parallel plan setting.
 	DefaultParallelPlanEnabled = false
+	// DefaultDeleteSourceBranchOnMerge being false is the default setting whether or not to remove a source branch on merge
+ 	DefaultDeleteSourceBranchOnMerge = false
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
@@ -174,7 +176,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		for _, mp := range matchingProjects {
 			ctx.Log.Debug("determining config for project at dir: %q workspace: %q", mp.Dir, mp.Workspace)
 			mergedCfg := p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.BaseRepo.ID(), mp, repoCfg)
-			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, mergedCfg, commentFlags, repoCfg.Automerge, repoCfg.ParallelApply, repoCfg.ParallelPlan, verbose, repoDir))
+			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, mergedCfg, commentFlags, repoCfg.Automerge, repoCfg.ParallelApply, repoCfg.ParallelPlan, verbose, repoDir, repoCfg.DeleteSourceBranchOnMerge))
 		}
 	} else {
 		// If there is no config file, then we'll plan each project that
@@ -185,7 +187,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		for _, mp := range modifiedProjects {
 			ctx.Log.Debug("determining config for project at dir: %q", mp.Path)
 			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.BaseRepo.ID(), mp.Path, DefaultWorkspace)
-			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, pCfg, commentFlags, DefaultAutomergeEnabled, DefaultParallelApplyEnabled, DefaultParallelPlanEnabled, verbose, repoDir))
+			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, pCfg, commentFlags, DefaultAutomergeEnabled, DefaultParallelApplyEnabled, DefaultParallelPlanEnabled, verbose, repoDir, DefaultDeleteSourceBranchOnMerge))
 		}
 	}
 
@@ -320,12 +322,14 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(
 	automerge := DefaultAutomergeEnabled
 	parallelApply := DefaultParallelApplyEnabled
 	parallelPlan := DefaultParallelPlanEnabled
+	deleteBranchOnMerge := DefaultDeleteSourceBranchOnMerge
 	if repoCfgPtr != nil {
 		automerge = repoCfgPtr.Automerge
 		parallelApply = repoCfgPtr.ParallelApply
 		parallelPlan = repoCfgPtr.ParallelPlan
+		deleteBranchOnMerge = repoCfgPtr.DeleteSourceBranchOnMerge
 	}
-	return p.buildCtx(ctx, cmd, projCfg, commentFlags, automerge, parallelApply, parallelPlan, verbose, repoDir), nil
+	return p.buildCtx(ctx, cmd, projCfg, commentFlags, automerge, parallelApply, parallelPlan, verbose, repoDir, deleteBranchOnMerge), nil
 }
 
 // getCfg returns the atlantis.yaml config (if it exists) for this project. If
@@ -409,15 +413,7 @@ func (p *DefaultProjectCommandBuilder) validateWorkspaceAllowed(repoCfg *valid.R
 }
 
 // buildCtx is a helper method that handles constructing the ProjectCommandContext.
-func (p *DefaultProjectCommandBuilder) buildCtx(ctx *CommandContext,
-	cmd models.CommandName,
-	projCfg valid.MergedProjectCfg,
-	commentArgs []string,
-	automergeEnabled bool,
-	parallelApplyEnabled bool,
-	parallelPlanEnabled bool,
-	verbose bool,
-	absRepoDir string) models.ProjectCommandContext {
+func (p *DefaultProjectCommandBuilder) buildCtx(ctx *CommandContext, cmd models.CommandName, projCfg valid.MergedProjectCfg, commentArgs []string, automergeEnabled bool, parallelApplyEnabled bool, parallelPlanEnabled bool, verbose bool, absRepoDir string, deleteBranchOnMerge bool) models.ProjectCommandContext {
 
 	var steps []valid.Step
 	switch cmd {
@@ -438,6 +434,7 @@ func (p *DefaultProjectCommandBuilder) buildCtx(ctx *CommandContext,
 		BaseRepo:             ctx.BaseRepo,
 		EscapedCommentArgs:   p.escapeArgs(commentArgs),
 		AutomergeEnabled:     automergeEnabled,
+		DeleteSourceBranchOnMerge: deleteBranchOnMerge,
 		ParallelApplyEnabled: parallelApplyEnabled,
 		ParallelPlanEnabled:  parallelPlanEnabled,
 		AutoplanEnabled:      projCfg.AutoplanEnabled,
