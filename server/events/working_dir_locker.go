@@ -64,7 +64,7 @@ func (d *DefaultWorkingDirLocker) TryLockPull(repoFullName string, pullNum int) 
 	for _, l := range d.locks {
 		if l == pullKey || strings.HasPrefix(l, pullKey+"/") {
 			return func() {}, fmt.Errorf("The Atlantis working dir is currently locked by another" +
-				" command that is running for this pull request." + "\n" +
+				" command that is running for this pull request.\n" +
 				"Wait until the previous command is complete and try again.")
 		}
 	}
