@@ -23,7 +23,7 @@ type AzureDevopsClient struct {
 }
 
 // NewAzureDevopsClient returns a valid Azure DevOps client.
-func NewAzureDevopsClient(hostname string, token string) (*AzureDevopsClient, error) {
+func NewAzureDevopsClient(hostname string, userGUID string, token string) (*AzureDevopsClient, error) {
 	tp := azuredevops.BasicAuthTransport{
 		Username: "",
 		Password: strings.TrimSpace(token),
@@ -44,10 +44,14 @@ func NewAzureDevopsClient(hostname string, token string) (*AzureDevopsClient, er
 		adClient.BaseURL = *base
 	}
 
+	if userGUID == "" {
+		userGUID = "auto"
+	}
+
 	client := &AzureDevopsClient{
 		Client:   adClient,
 		ctx:      context.Background(),
-		userGUID: "auto",
+		userGUID: userGUID,
 	}
 
 	return client, nil

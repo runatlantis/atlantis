@@ -81,7 +81,7 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
+			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user-guid", "token")
 			Ok(t, err)
 			defer disableSSLVerification()()
 
@@ -192,7 +192,7 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
+			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user-guid", "token")
 			Ok(t, err)
 			defer disableSSLVerification()()
 
@@ -255,7 +255,7 @@ func TestAzureDevopsClient_GetModifiedFiles(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
+	client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user-guid", "token")
 	Ok(t, err)
 	defer disableSSLVerification()()
 
@@ -336,7 +336,7 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
 
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
+			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user-guid", "token")
 			Ok(t, err)
 
 			defer disableSSLVerification()()
@@ -430,7 +430,7 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
 
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
+			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user-guid", "token")
 			Ok(t, err)
 
 			defer disableSSLVerification()()
@@ -475,7 +475,7 @@ func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 			}))
 		testServerURL, err := url.Parse(testServer.URL)
 		Ok(t, err)
-		client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
+		client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user-guid", "token")
 		Ok(t, err)
 		defer disableSSLVerification()()
 
@@ -495,7 +495,7 @@ func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 }
 
 func TestAzureDevopsClient_MarkdownPullLink(t *testing.T) {
-	client, err := vcs.NewAzureDevopsClient("hostname", "token")
+	client, err := vcs.NewAzureDevopsClient("hostname", "user-guid", "token")
 	Ok(t, err)
 	pull := models.PullRequest{Num: 1}
 	s, _ := client.MarkdownPullLink(pull)

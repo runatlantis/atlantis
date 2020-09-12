@@ -14,6 +14,7 @@ type UserConfig struct {
 	Automerge                  bool   `mapstructure:"automerge"`
 	AzureDevopsToken           string `mapstructure:"azuredevops-token"`
 	AzureDevopsUser            string `mapstructure:"azuredevops-user"`
+	AzureDevopsUserGUID        string `mapstructure:"azuredevops-user-guid"`
 	AzureDevopsWebhookPassword string `mapstructure:"azuredevops-webhook-password"`
 	AzureDevopsWebhookUser     string `mapstructure:"azuredevops-webhook-user"`
 	BitbucketBaseURL           string `mapstructure:"bitbucket-base-url"`
