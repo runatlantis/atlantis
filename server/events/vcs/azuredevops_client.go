@@ -9,16 +9,19 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 // AzureDevopsClient represents an Azure DevOps VCS client
 type AzureDevopsClient struct {
-	Client *azuredevops.Client
-	ctx    context.Context
+	Client   *azuredevops.Client
+	ctx      context.Context
+	userGUID string
 }
 
 // NewAzureDevopsClient returns a valid Azure DevOps client.
@@ -44,8 +47,9 @@ func NewAzureDevopsClient(hostname string, token string) (*AzureDevopsClient, er
 	}
 
 	client := &AzureDevopsClient{
-		Client: adClient,
-		ctx:    context.Background(),
+		Client:   adClient,
+		ctx:      context.Background(),
+		userGUID: "auto",
 	}
 
 	return client, nil
@@ -116,9 +120,33 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 		body := azuredevops.GitPullRequestCommentThread{
 			Comments: prComments,
 		}
-		_, _, err := g.Client.PullRequests.CreateComments(g.ctx, owner, project, repoName, pullNum, &body)
+		resp, _, err := g.Client.PullRequests.CreateComments(g.ctx, owner, project, repoName, pullNum, &body)
 		if err != nil {
 			return err
+		}
+		// When we create a single new comment, the only identity in the thread is us
+		log := logging.NewSimpleLogger("azdo", false, logging.Debug).Debug
+		if g.userGUID == "auto" {
+			log("user guid set to auto")
+			if len(resp.Comments) == 1 {
+				commentToCacheFrom := resp.Comments[0]
+				if commentToCacheFrom != nil && commentToCacheFrom.Author != nil {
+					guidToCache := *commentToCacheFrom.Author.ID
+					if guidToCache != "" {
+						log("Going to cache user GUID as %s", guidToCache)
+						g.userGUID = guidToCache
+					} else {
+						log("GUID to cache is empty")
+						log(spew.Sdump(resp))
+					}
+				} else {
+					log("Comment to cahe from is nil or author is nil")
+					log(spew.Sdump(resp))
+				}
+			} else {
+				log("User guid set to auto but response identities != 1")
+				log(spew.Sdump(resp))
+			}
 		}
 	}
 	return nil
@@ -289,13 +317,19 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
 // until we handle branch policies
 // https://docs.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops
 func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
-	descriptor := "Atlantis Terraform Pull Request Automation"
-	i := "atlantis"
-	imageURL := "https://github.com/runatlantis/atlantis/raw/master/runatlantis.io/.vuepress/public/hero.png"
+	if g.userGUID == "auto" {
+		// In this case, when we get an error it will comment and then it will be cached
+		// However, we should never get this case as we comment "auto merging" before we merge
+		return errors.New("User GUID set to auto but hasn't been cached yet. Please try again.")
+	} else if g.userGUID == "" {
+		// The user GUID must be set for automerge to happen, otherwise:
+		// - we get a 400 if the GUID is set to something besides the users' GUID
+		// - we get a 200 but it doesn't merge if the GUID is left empty
+		return errors.New("User GUID is empty. Try setting --azuredevops-user-guid in atlantis config")
+	}
+
 	id := azuredevops.IdentityRef{
-		Descriptor: &descriptor,
-		ID:         &i,
-		ImageURL:   &imageURL,
+		ID: &g.userGUID,
 	}
 	// Set default pull request completion options
 	mcm := azuredevops.NoFastForward.String()
@@ -312,11 +346,6 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
 		TriggeredByAutoComplete: new(bool),
 	}
 
-	// Construct request body from supplied parameters
-	mergePull := new(azuredevops.GitPullRequest)
-	mergePull.AutoCompleteSetBy = &id
-	mergePull.CompletionOptions = &completionOpts
-
 	owner, project, repoName := SplitAzureDevopsRepoFullName(pull.BaseRepo.FullName)
 	mergeResult, _, err := g.Client.PullRequests.Merge(
 		g.ctx,
@@ -324,7 +353,7 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
 		project,
 		repoName,
 		pull.Num,
-		mergePull,
+		nil,
 		completionOpts,
 		id,
 	)
