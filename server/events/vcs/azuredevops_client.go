@@ -312,12 +312,12 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
 	if g.userGUID == "auto" {
 		// In this case, when we get an error it will comment and then it will be cached
 		// However, we should never get this case as we comment "auto merging" before we merge
-		return errors.New("User GUID set to auto but hasn't been cached yet. Please try again.")
+		return errors.New("user GUID set to auto but hasn't been cached yet")
 	} else if g.userGUID == "" {
 		// The user GUID must be set for automerge to happen, otherwise:
 		// - we get a 400 if the GUID is set to something besides the users' GUID
 		// - we get a 200 but it doesn't merge if the GUID is left empty
-		return errors.New("User GUID is empty. Try setting --azuredevops-user-guid in atlantis config")
+		return errors.New("user GUID is empty, try setting --azuredevops-user-guid in atlantis config")
 	}
 
 	id := azuredevops.IdentityRef{
