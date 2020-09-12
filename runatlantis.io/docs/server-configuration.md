@@ -127,14 +127,23 @@ Values are chosen in this order:
   ```bash
   atlantis server --azuredevops-token="username@example.com"
   ```
-  Azure DevOps token of API user. Can also be specified via the ATLANTIS_AZUREDEVOPS_TOKEN
-  environment variable.
+  Azure DevOps token of API user. Can also be specified via the ATLANTIS_AZUREDEVOPS_TOKEN environment variable.
 
 * ### `--azuredevops-user`
   ```bash
   atlantis server --azuredevops-user="username@example.com"
   ```
   Azure DevOps username of API user.
+
+* ### `--azuredevops-user-guid`
+  ```bash
+  atlantis server --azuredevops-user-guid="8fbbc74a-1ec8-43bb-a23d-4b849a20f7ce"
+  # or
+  atlantis server --azuredevops-user-guid="auto"
+  ```
+  Azure DevOps GUID of API user.  Defaults to `auto`. Can also be specified via the ATLANTIS_AZUREDEVOPS_USER_GUID environment variable.
+
+  If set to `auto`, atlantis will cache the GUID when it comments on a PR in an attempt to "guess" the value.
 
 * ### `--bitbucket-base-url`
   ```bash
