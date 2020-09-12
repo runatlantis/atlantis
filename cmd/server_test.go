@@ -51,6 +51,7 @@ func (s *ServerStarterMock) Start() error {
 var testFlags = map[string]interface{}{
 	ADTokenFlag:                "ad-token",
 	ADUserFlag:                 "ad-user",
+	ADUserGUIDFlag:             "ad-user-guid",
 	ADWebhookPasswordFlag:      "ad-wh-pass",
 	ADWebhookUserFlag:          "ad-wh-user",
 	AtlantisURLFlag:            "url",

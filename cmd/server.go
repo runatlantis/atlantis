@@ -40,6 +40,7 @@ const (
 	ADWebhookUserFlag          = "azuredevops-webhook-user"
 	ADTokenFlag                = "azuredevops-token" // nolint: gosec
 	ADUserFlag                 = "azuredevops-user"
+	ADUserGUIDFlag             = "azuredevops-user-guid"
 	AllowForkPRsFlag           = "allow-fork-prs"
 	AllowRepoConfigFlag        = "allow-repo-config"
 	AtlantisURLFlag            = "atlantis-url"
@@ -93,18 +94,17 @@ const (
 	WriteGitCredsFlag          = "write-git-creds"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
-	DefaultADBasicUser      = ""
-	DefaultADBasicPassword  = ""
-	DefaultCheckoutStrategy = "branch"
-	DefaultBitbucketBaseURL = bitbucketcloud.BaseURL
-	DefaultDataDir          = "~/.atlantis"
-	DefaultGHHostname       = "github.com"
-	DefaultGitlabHostname   = "gitlab.com"
-	DefaultLogLevel         = "info"
-	DefaultPort             = 4141
-	DefaultTFDownloadURL    = "https://releases.hashicorp.com"
-	DefaultTFEHostname      = "app.terraform.io"
-	DefaultVCSStatusName    = "atlantis"
+	DefaultAzureDevopsUserGUID = "auto"
+	DefaultCheckoutStrategy    = "branch"
+	DefaultBitbucketBaseURL    = bitbucketcloud.BaseURL
+	DefaultDataDir             = "~/.atlantis"
+	DefaultGHHostname          = "github.com"
+	DefaultGitlabHostname      = "gitlab.com"
+	DefaultLogLevel            = "info"
+	DefaultPort                = 4141
+	DefaultTFDownloadURL       = "https://releases.hashicorp.com"
+	DefaultTFEHostname         = "app.terraform.io"
+	DefaultVCSStatusName       = "atlantis"
 )
 
 var stringFlags = map[string]stringFlag{
@@ -113,6 +113,10 @@ var stringFlags = map[string]stringFlag{
 	},
 	ADUserFlag: {
 		description: "Azure DevOps username of API user.",
+	},
+	ADUserGUIDFlag: {
+		description:  "Azure DevOps GUID of API user. Will be cached from a request if set to 'auto'",
+		defaultValue: DefaultAzureDevopsUserGUID,
 	},
 	ADWebhookPasswordFlag: {
 		description: "Azure DevOps basic HTTP authentication password for inbound webhooks " +
@@ -535,6 +539,9 @@ func (s *ServerCmd) run() error {
 }
 
 func (s *ServerCmd) setDefaults(c *server.UserConfig) {
+	if c.AzureDevopsUserGUID == "" {
+		c.AzureDevopsUserGUID = DefaultAzureDevopsUserGUID
+	}
 	if c.CheckoutStrategy == "" {
 		c.CheckoutStrategy = DefaultCheckoutStrategy
 	}
