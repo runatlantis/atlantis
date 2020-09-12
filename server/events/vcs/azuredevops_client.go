@@ -9,12 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
-	"github.com/runatlantis/atlantis/server/logging"
 )
 
 // AzureDevopsClient represents an Azure DevOps VCS client
@@ -124,28 +122,18 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 		if err != nil {
 			return err
 		}
-		// When we create a single new comment, the only identity in the thread is us
-		log := logging.NewSimpleLogger("azdo", false, logging.Debug).Debug
+		// If the userGUID is set to auto then we haven't cached it yet
 		if g.userGUID == "auto" {
-			log("user guid set to auto")
+			// THe hope/goal is that we're the only commenter.
+			// This should always be true as the parent comment ID, set above, is == 0
 			if len(resp.Comments) == 1 {
 				commentToCacheFrom := resp.Comments[0]
 				if commentToCacheFrom != nil && commentToCacheFrom.Author != nil {
 					guidToCache := *commentToCacheFrom.Author.ID
 					if guidToCache != "" {
-						log("Going to cache user GUID as %s", guidToCache)
 						g.userGUID = guidToCache
-					} else {
-						log("GUID to cache is empty")
-						log(spew.Sdump(resp))
 					}
-				} else {
-					log("Comment to cahe from is nil or author is nil")
-					log(spew.Sdump(resp))
 				}
-			} else {
-				log("User guid set to auto but response identities != 1")
-				log(spew.Sdump(resp))
 			}
 		}
 	}
