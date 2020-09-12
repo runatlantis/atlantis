@@ -115,7 +115,7 @@ var stringFlags = map[string]stringFlag{
 		description: "Azure DevOps username of API user.",
 	},
 	ADUserGUIDFlag: {
-		description:  "Azure DevOps GUID of API user. Will be cached from a request if set to 'auto'",
+		description:  "Azure DevOps GUID of API user. Will be cached from a request if set to 'auto'.",
 		defaultValue: DefaultAzureDevopsUserGUID,
 	},
 	ADWebhookPasswordFlag: {
