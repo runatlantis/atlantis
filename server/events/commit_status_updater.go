@@ -45,7 +45,6 @@ type DefaultCommitStatusUpdater struct {
 }
 
 func (d *DefaultCommitStatusUpdater) UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName) error {
-	src := fmt.Sprintf("%s/%s", d.StatusName, command.String())
 	var descripWords string
 	switch status {
 	case models.PendingCommitStatus:
@@ -56,16 +55,15 @@ func (d *DefaultCommitStatusUpdater) UpdateCombined(repo models.Repo, pull model
 		descripWords = "succeeded."
 	}
 	descrip := fmt.Sprintf("%s %s", strings.Title(command.String()), descripWords)
-	return d.Client.UpdateStatus(repo, pull, status, src, descrip, "")
+	return d.Client.UpdateStatus(repo, pull, status, command.String(), descrip, "")
 }
 
 func (d *DefaultCommitStatusUpdater) UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName, numSuccess int, numTotal int) error {
-	src := fmt.Sprintf("%s/%s", d.StatusName, command.String())
 	cmdVerb := "planned"
 	if command == models.ApplyCommand {
 		cmdVerb = "applied"
 	}
-	return d.Client.UpdateStatus(repo, pull, status, src, fmt.Sprintf("%d/%d projects %s successfully.", numSuccess, numTotal, cmdVerb), "")
+	return d.Client.UpdateStatus(repo, pull, status, command.String(), fmt.Sprintf("%d/%d projects %s successfully.", numSuccess, numTotal, cmdVerb), "")
 }
 
 func (d *DefaultCommitStatusUpdater) UpdateProject(ctx models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus, url string) error {
@@ -73,7 +71,7 @@ func (d *DefaultCommitStatusUpdater) UpdateProject(ctx models.ProjectCommandCont
 	if projectID == "" {
 		projectID = fmt.Sprintf("%s/%s", ctx.RepoRelDir, ctx.Workspace)
 	}
-	src := fmt.Sprintf("%s/%s: %s", d.StatusName, cmdName.String(), projectID)
+	src := fmt.Sprintf("%s: %s", cmdName.String(), projectID)
 	var descripWords string
 	switch status {
 	case models.PendingCommitStatus:

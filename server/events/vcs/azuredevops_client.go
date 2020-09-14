@@ -229,7 +229,7 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
 		adState = azuredevops.GitFailed.String()
 	}
 
-	genreStr := "Atlantis Bot"
+	genreStr := "Atlantis Bot/atlantis"
 	status := azuredevops.GitPullRequestStatus{}
 	status.Context = &azuredevops.GitStatusContext{
 		Name:  &src,
@@ -289,7 +289,7 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
 // until we handle branch policies
 // https://docs.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops
 func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
-	
+
 	// Set default pull request completion options
 	mcm := azuredevops.NoFastForward.String()
 	twi := new(bool)
@@ -313,7 +313,7 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
 	owner, project, repoName := SplitAzureDevopsRepoFullName(pull.BaseRepo.FullName)
 
 	//Before we issue the merge request we need to get the descriptor and uuid of the user who opened this pr
-	prResp, _ , err := g.Client.PullRequests.Get(g.ctx, owner, project, pull.Num, &azuredevops.PullRequestListOptions{})
+	prResp, _, err := g.Client.PullRequests.Get(g.ctx, owner, project, pull.Num, &azuredevops.PullRequestListOptions{})
 	if err != nil {
 		return fmt.Errorf("could not merge pull request: %s", err)
 	}

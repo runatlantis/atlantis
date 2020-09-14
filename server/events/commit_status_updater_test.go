@@ -70,8 +70,7 @@ func TestUpdateCombined(t *testing.T) {
 			err := s.UpdateCombined(models.Repo{}, models.PullRequest{}, c.status, c.command)
 			Ok(t, err)
 
-			expSrc := fmt.Sprintf("atlantis/%s", c.command)
-			client.VerifyWasCalledOnce().UpdateStatus(models.Repo{}, models.PullRequest{}, c.status, expSrc, c.expDescrip, "")
+			client.VerifyWasCalledOnce().UpdateStatus(models.Repo{}, models.PullRequest{}, c.status, c.command, c.expDescrip, "")
 		})
 	}
 }
@@ -136,8 +135,7 @@ func TestUpdateCombinedCount(t *testing.T) {
 			err := s.UpdateCombinedCount(models.Repo{}, models.PullRequest{}, c.status, c.command, c.numSuccess, c.numTotal)
 			Ok(t, err)
 
-			expSrc := fmt.Sprintf("%s/%s", s.StatusName, c.command)
-			client.VerifyWasCalledOnce().UpdateStatus(models.Repo{}, models.PullRequest{}, c.status, expSrc, c.expDescrip, "")
+			client.VerifyWasCalledOnce().UpdateStatus(models.Repo{}, models.PullRequest{}, c.status, c.command, c.expDescrip, "")
 		})
 	}
 }
@@ -156,13 +154,13 @@ func TestDefaultCommitStatusUpdater_UpdateProjectSrc(t *testing.T) {
 			projectName: "name",
 			repoRelDir:  ".",
 			workspace:   "default",
-			expSrc:      "atlantis/plan: name",
+			expSrc:      "plan: name",
 		},
 		{
 			projectName: "",
 			repoRelDir:  "dir1/dir2",
 			workspace:   "workspace",
-			expSrc:      "atlantis/plan: dir1/dir2/workspace",
+			expSrc:      "plan: dir1/dir2/workspace",
 		},
 	}
 
@@ -236,7 +234,7 @@ func TestDefaultCommitStatusUpdater_UpdateProject(t *testing.T) {
 				c.status,
 				"url")
 			Ok(t, err)
-			client.VerifyWasCalledOnce().UpdateStatus(models.Repo{}, models.PullRequest{}, c.status, fmt.Sprintf("atlantis/%s: ./default", c.cmd.String()), c.expDescrip, "url")
+			client.VerifyWasCalledOnce().UpdateStatus(models.Repo{}, models.PullRequest{}, c.status, fmt.Sprintf("%s: ./default", c.cmd.String()), c.expDescrip, "url")
 		})
 	}
 }
@@ -255,5 +253,5 @@ func TestDefaultCommitStatusUpdater_UpdateProjectCustomStatusName(t *testing.T) 
 		"url")
 	Ok(t, err)
 	client.VerifyWasCalledOnce().UpdateStatus(models.Repo{}, models.PullRequest{},
-		models.SuccessCommitStatus, "custom/apply: ./default", "Apply succeeded.", "url")
+		models.SuccessCommitStatus, "apply: ./default", "Apply succeeded.", "url")
 }
