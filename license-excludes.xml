@@ -1,4 +1,3 @@
 <excludes>
-  <exclude>src/server/</exclude>
-  <exclude>src/vendor/</exclude>
+  <exclude>src/**</exclude>
 </excludes>
