@@ -26,7 +26,7 @@ dockerizedBuildPipeline(
     go mod tidy
     go get -u github.com/jstemmer/go-junit-report
     go test ./... -v 2>&1 -p=1 | go-junit-report > test-results.xml
-    CGO_ENABLED=0 GOOS=linux go build -o nancy .
+    CGO_ENABLED=0 GOOS=linux go build -mod=mod -o nancy .
     '''
   },
   vulnerabilityScan: {
