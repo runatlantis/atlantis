@@ -1,0 +1,4 @@
+<excludes>
+  <exclude>src/server/</exclude>
+  <exclude>src/vendor/</exclude>
+</excludes>
