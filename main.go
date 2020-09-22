@@ -20,9 +20,10 @@ import (
 	"github.com/spf13/viper"
 )
 
-const atlantisVersion = "0.13.0"
+const atlantisVersion = "0.12.0-multienv-ght"
 
 func main() {
+	
 	v := viper.New()
 
 	// We're creating commands manually here rather than using init() functions
