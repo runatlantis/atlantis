@@ -97,6 +97,7 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 
 	// We url encode because we're using them in a URL and weird characters can
 	// mess up git.
+	cloneURL = strings.Replace(cloneURL, " ", "%20", -1)
 	escapedVCSUser := url.QueryEscape(vcsUser)
 	escapedVCSToken := url.QueryEscape(vcsToken)
 	auth := fmt.Sprintf("%s:%s@", escapedVCSUser, escapedVCSToken)
@@ -480,12 +481,15 @@ const (
 	// PlannedPlanStatus means that a plan has been successfully generated but
 	// not yet applied.
 	PlannedPlanStatus
-	// ErrorApplyStatus means that a plan has been generated but there was an
+	// ErroredApplyStatus means that a plan has been generated but there was an
 	// error while applying it.
 	ErroredApplyStatus
 	// AppliedPlanStatus means that a plan has been generated and applied
 	// successfully.
 	AppliedPlanStatus
+	// DiscardedPlanStatus means that there was an unapplied plan that was
+	// discarded due to a project being unlocked
+	DiscardedPlanStatus
 )
 
 // String returns a string representation of the status.
@@ -499,6 +503,8 @@ func (p ProjectPlanStatus) String() string {
 		return "apply_errored"
 	case AppliedPlanStatus:
 		return "applied"
+	case DiscardedPlanStatus:
+		return "plan_discarded"
 	default:
 		panic("missing String() impl for ProjectPlanStatus")
 	}
@@ -512,6 +518,8 @@ const (
 	ApplyCommand CommandName = iota
 	// PlanCommand is a command to run terraform plan.
 	PlanCommand
+	// UnlockCommand is a command to discard previous plans as well as the atlantis locks.
+	UnlockCommand
 	// Adding more? Don't forget to update String() below
 )
 
@@ -522,6 +530,8 @@ func (c CommandName) String() string {
 		return "apply"
 	case PlanCommand:
 		return "plan"
+	case UnlockCommand:
+		return "unlock"
 	}
 	return ""
 }

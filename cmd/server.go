@@ -53,11 +53,15 @@ const (
 	DataDirFlag                = "data-dir"
 	DefaultTFVersionFlag       = "default-tf-version"
 	DisableApplyAllFlag        = "disable-apply-all"
+	DisableAutoplanFlag        = "disable-autoplan"
 	DisableMarkdownFoldingFlag = "disable-markdown-folding"
 	GHHostnameFlag             = "gh-hostname"
 	GHTeamWhitelistFlag        = "gh-team-whitelist"
 	GHTokenFlag                = "gh-token"
 	GHUserFlag                 = "gh-user"
+	GHAppIDFlag                = "gh-app-id"
+	GHAppKeyFileFlag           = "gh-app-key-file"
+	GHOrganizationFlag         = "gh-org"
 	GHWebhookSecretFlag        = "gh-webhook-secret" // nolint: gosec
 	GitlabHostnameFlag         = "gitlab-hostname"
 	GitlabTokenFlag            = "gitlab-token"
@@ -69,12 +73,17 @@ const (
 	PortFlag                   = "port"
 	RepoConfigFlag             = "repo-config"
 	RepoConfigJSONFlag         = "repo-config-json"
+	// RepoWhitelistFlag is deprecated for RepoAllowlistFlag.
 	RepoWhitelistFlag          = "repo-whitelist"
+	RepoAllowlistFlag          = "repo-allowlist"
 	RequireApprovalFlag        = "require-approval"
 	RequireMergeableFlag       = "require-mergeable"
 	SilenceForkPRErrorsFlag    = "silence-fork-pr-errors"
 	SilenceVCSStatusNoPlans    = "silence-vcs-status-no-plans"
+	SilenceAllowlistErrorsFlag = "silence-allowlist-errors"
+	// SilenceWhitelistErrorsFlag is deprecated for SilenceAllowlistErrorsFlag.
 	SilenceWhitelistErrorsFlag = "silence-whitelist-errors"
+	SkipCloneNoChanges         = "skip-clone-no-changes"
 	SlackTokenFlag             = "slack-token"
 	SSLCertFileFlag            = "ssl-cert-file"
 	SSLKeyFileFlag             = "ssl-key-file"
@@ -173,10 +182,19 @@ var stringFlags = map[string]stringFlag{
 		defaultValue: DefaultGHTeamWhitelist,
 	},
 	GHUserFlag: {
-		description: "GitHub username of API user.",
+		description:  "GitHub username of API user.",
+		defaultValue: "",
 	},
 	GHTokenFlag: {
 		description: "GitHub token of API user. Can also be specified via the ATLANTIS_GH_TOKEN environment variable.",
+	},
+	GHAppKeyFileFlag: {
+		description:  "A path to a file containing the GitHub App's private key",
+		defaultValue: "",
+	},
+	GHOrganizationFlag: {
+		description:  "The name of the GitHub organization to use during the creation of a Github App for Atlantis",
+		defaultValue: "",
 	},
 	GHWebhookSecretFlag: {
 		description: "Secret used to validate GitHub webhooks (see https://developer.github.com/webhooks/securing/)." +
@@ -210,11 +228,15 @@ var stringFlags = map[string]stringFlag{
 	RepoConfigJSONFlag: {
 		description: "Specify repo config as a JSON string. Useful if you don't want to write a config file to disk.",
 	},
-	RepoWhitelistFlag: {
+	RepoAllowlistFlag: {
 		description: "Comma separated list of repositories that Atlantis will operate on. " +
 			"The format is {hostname}/{owner}/{repo}, ex. github.com/runatlantis/atlantis. '*' matches any characters until the next comma. Examples: " +
 			"all repos: '*' (not secure), an entire hostname: 'internalgithub.com/*' or an organization: 'github.com/runatlantis/*'." +
 			" For Bitbucket Server, {owner} is the name of the project (not the key).",
+	},
+	RepoWhitelistFlag: {
+		description: "[Deprecated for --repo-allowlist].",
+		hidden:      true,
 	},
 	SlackTokenFlag: {
 		description: "API token for Slack notifications.",
@@ -268,6 +290,10 @@ var boolFlags = map[string]boolFlag{
 		description:  "Disable \"atlantis apply\" command so a specific project/workspace/directory has to be specified for applies.",
 		defaultValue: false,
 	},
+	DisableAutoplanFlag: {
+		description:  "Disable atlantis auto planning feature",
+		defaultValue: false,
+	},
 	AllowDraftPRs: {
 		description:  "Enable autoplan for Github Draft Pull Requests",
 		defaultValue: false,
@@ -295,9 +321,14 @@ var boolFlags = map[string]boolFlag{
 		description:  "Silences VCS commit status when autoplan finds no projects to plan.",
 		defaultValue: false,
 	},
-	SilenceWhitelistErrorsFlag: {
-		description:  "Silences the posting of whitelist error comments.",
+	SilenceAllowlistErrorsFlag: {
+		description:  "Silences the posting of allowlist error comments.",
 		defaultValue: false,
+	},
+	SilenceWhitelistErrorsFlag: {
+		description:  "[Deprecated for --silence-allowlist-errors].",
+		defaultValue: false,
+		hidden:       true,
 	},
 	DisableMarkdownFoldingFlag: {
 		description:  "Toggle off folding in markdown output.",
@@ -308,11 +339,22 @@ var boolFlags = map[string]boolFlag{
 			" This writes secrets to disk and should only be enabled in a secure environment.",
 		defaultValue: false,
 	},
+	SkipCloneNoChanges: {
+		description:  "Skips cloning the PR repo if there are no projects were changed in the PR.",
+		defaultValue: false,
+	},
 }
 var intFlags = map[string]intFlag{
 	PortFlag: {
 		description:  "Port to bind to.",
 		defaultValue: DefaultPort,
+	},
+}
+
+var int64Flags = map[string]int64Flag{
+	GHAppIDFlag: {
+		description:  "GitHub App Id. If defined, initializes the GitHub client with app-based credentials",
+		defaultValue: 0,
 	},
 }
 
@@ -327,6 +369,11 @@ type stringFlag struct {
 type intFlag struct {
 	description  string
 	defaultValue int
+	hidden       bool
+}
+type int64Flag struct {
+	description  string
+	defaultValue int64
 	hidden       bool
 }
 type boolFlag struct {
@@ -412,6 +459,19 @@ func (s *ServerCmd) Init() *cobra.Command {
 
 	// Set int flags.
 	for name, f := range intFlags {
+		usage := f.description
+		if f.defaultValue != 0 {
+			usage = fmt.Sprintf("%s (default %d)", usage, f.defaultValue)
+		}
+		c.Flags().Int(name, 0, usage+"\n")
+		if f.hidden {
+			c.Flags().MarkHidden(name) // nolint: errcheck
+		}
+		s.Viper.BindPFlag(name, c.Flags().Lookup(name)) // nolint: errcheck
+	}
+
+	// Set int64 flags.
+	for name, f := range int64Flags {
 		usage := f.description
 		if f.defaultValue != 0 {
 			usage = fmt.Sprintf("%s (default %d)", usage, f.defaultValue)
@@ -545,21 +605,31 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	// 3. bitbucket user and token set
 	// 4. azuredevops user and token set
 	// 5. any combination of the above
-	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag)
-	if ((userConfig.GithubUser == "") != (userConfig.GithubToken == "")) || ((userConfig.GitlabUser == "") != (userConfig.GitlabToken == "")) || ((userConfig.BitbucketUser == "") != (userConfig.BitbucketToken == "")) || ((userConfig.AzureDevopsUser == "") != (userConfig.AzureDevopsToken == "")) {
+	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GHAppIDFlag, GHAppKeyFileFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag)
+	if ((userConfig.GithubUser == "") != (userConfig.GithubToken == "")) || ((userConfig.GithubAppID == 0) != (userConfig.GithubAppKey == "")) || ((userConfig.GitlabUser == "") != (userConfig.GitlabToken == "")) || ((userConfig.BitbucketUser == "") != (userConfig.BitbucketToken == "")) || ((userConfig.AzureDevopsUser == "") != (userConfig.AzureDevopsToken == "")) {
 		return vcsErr
 	}
 	// At this point, we know that there can't be a single user/token without
 	// its partner, but we haven't checked if any user/token is set at all.
-	if userConfig.GithubUser == "" && userConfig.GitlabUser == "" && userConfig.BitbucketUser == "" && userConfig.AzureDevopsUser == "" {
+	if userConfig.GithubAppID == 0 && userConfig.GithubUser == "" && userConfig.GitlabUser == "" && userConfig.BitbucketUser == "" && userConfig.AzureDevopsUser == "" {
 		return vcsErr
 	}
 
-	if userConfig.RepoWhitelist == "" {
-		return fmt.Errorf("--%s must be set for security purposes", RepoWhitelistFlag)
+	// Handle deprecation of repo whitelist.
+	if userConfig.RepoWhitelist == "" && userConfig.RepoAllowlist == "" {
+		return fmt.Errorf("--%s must be set for security purposes", RepoAllowlistFlag)
+	}
+	if userConfig.RepoAllowlist != "" && userConfig.RepoWhitelist != "" {
+		return fmt.Errorf("both --%s and --%s cannot be set–use --%s", RepoAllowlistFlag, RepoWhitelistFlag, RepoAllowlistFlag)
 	}
 	if strings.Contains(userConfig.RepoWhitelist, "://") {
 		return fmt.Errorf("--%s cannot contain ://, should be hostnames only", RepoWhitelistFlag)
+	}
+	if strings.Contains(userConfig.RepoAllowlist, "://") {
+		return fmt.Errorf("--%s cannot contain ://, should be hostnames only", RepoAllowlistFlag)
+	}
+	if userConfig.SilenceAllowlistErrors && userConfig.SilenceWhitelistErrors {
+		return fmt.Errorf("both --%s and --%s cannot be set–use --%s", SilenceAllowlistErrorsFlag, SilenceWhitelistErrorsFlag, SilenceAllowlistErrorsFlag)
 	}
 
 	if userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && userConfig.BitbucketWebhookSecret != "" {
@@ -654,7 +724,7 @@ func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 		s.Logger.Warn("no Bitbucket webhook secret set. This could allow attackers to spoof requests from Bitbucket")
 	}
 	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && !s.SilenceOutput {
-		s.Logger.Warn("Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are whitelisting Bitbucket IPs")
+		s.Logger.Warn("Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are allowing only Bitbucket IPs")
 	}
 	if userConfig.AzureDevopsWebhookUser != "" && userConfig.AzureDevopsWebhookPassword == "" && !s.SilenceOutput {
 		s.Logger.Warn("no Azure DevOps webhook user and password set. This could allow attackers to spoof requests from Azure DevOps.")
@@ -707,6 +777,15 @@ func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
 		)
 		fmt.Println(warning)
 	}
+
+	// Handle repo whitelist deprecation.
+	if userConfig.SilenceWhitelistErrors {
+		userConfig.SilenceAllowlistErrors = true
+	}
+	if userConfig.RepoWhitelist != "" {
+		userConfig.RepoAllowlist = userConfig.RepoWhitelist
+	}
+
 	return nil
 }
 

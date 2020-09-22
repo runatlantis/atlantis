@@ -19,7 +19,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/go-github/v28/github"
+	"github.com/google/go-github/v31/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/pkg/errors"
@@ -65,6 +65,10 @@ type EventsController struct {
 	// SilenceWhitelistErrors controls whether we write an error comment on
 	// pull requests from non-whitelisted repos.
 	SilenceWhitelistErrors bool
+	RepoAllowlistChecker   *events.RepoAllowlistChecker
+	// SilenceAllowlistErrors controls whether we write an error comment on
+	// pull requests from non-allowlisted repos.
+	SilenceAllowlistErrors bool
 	// SupportedVCSHosts is which VCS hosts Atlantis was configured upon
 	// startup to support.
 	SupportedVCSHosts []models.VCSHostType
@@ -320,16 +324,16 @@ func (e *EventsController) HandleGithubPullRequestEvent(w http.ResponseWriter, p
 }
 
 func (e *EventsController) handlePullRequestEvent(w http.ResponseWriter, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, eventType models.PullRequestEventType) {
-	if !e.RepoWhitelistChecker.IsWhitelisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
-		// If the repo isn't whitelisted and we receive an opened pull request
+	if !e.RepoAllowlistChecker.IsAllowlisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
+		// If the repo isn't allowlisted and we receive an opened pull request
 		// event we comment back on the pull request that the repo isn't
-		// whitelisted. This is because the user might be expecting Atlantis to
+		// allowlisted. This is because the user might be expecting Atlantis to
 		// autoplan. For other events, we just ignore them.
 		if eventType == models.OpenedPullEvent {
-			e.commentNotWhitelisted(baseRepo, pull.Num)
+			e.commentNotAllowlisted(baseRepo, pull.Num)
 		}
 		e.respond(w, logging.Debug, http.StatusForbidden,
-			"Ignoring pull request event from non-whitelisted repo \"%s/%s\"",
+			"Ignoring pull request event from non-allowlisted repo \"%s/%s\"",
 			baseRepo.VCSHost.Hostname, baseRepo.FullName)
 		return
 	}
@@ -418,9 +422,9 @@ func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo mo
 
 	// At this point we know it's a command we're not supposed to ignore, so now
 	// we check if this repo is allowed to run commands in the first place.
-	if !e.RepoWhitelistChecker.IsWhitelisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
-		e.commentNotWhitelisted(baseRepo, pullNum)
-		e.respond(w, logging.Warn, http.StatusForbidden, "Repo not whitelisted")
+	if !e.RepoAllowlistChecker.IsAllowlisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
+		e.commentNotAllowlisted(baseRepo, pullNum)
+		e.respond(w, logging.Warn, http.StatusForbidden, "Repo not allowlisted")
 		return
 	}
 
@@ -429,7 +433,7 @@ func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo mo
 	// We do this here rather than earlier because we need access to the pull
 	// variable to comment back on the pull request.
 	if parseResult.CommentResponse != "" {
-		if err := e.VCSClient.CreateComment(baseRepo, pullNum, parseResult.CommentResponse); err != nil {
+		if err := e.VCSClient.CreateComment(baseRepo, pullNum, parseResult.CommentResponse, ""); err != nil {
 			e.Logger.Err("unable to comment on pull request: %s", err)
 		}
 		e.respond(w, logging.Info, http.StatusOK, "Commenting back on pull request")
@@ -553,15 +557,15 @@ func (e *EventsController) respond(w http.ResponseWriter, lvl logging.LogLevel, 
 	fmt.Fprintln(w, response)
 }
 
-// commentNotWhitelisted comments on the pull request that the repo is not
-// whitelisted unless whitelist error comments are disabled.
-func (e *EventsController) commentNotWhitelisted(baseRepo models.Repo, pullNum int) {
-	if e.SilenceWhitelistErrors {
+// commentNotAllowlisted comments on the pull request that the repo is not
+// allowlisted unless allowlist error comments are disabled.
+func (e *EventsController) commentNotAllowlisted(baseRepo models.Repo, pullNum int) {
+	if e.SilenceAllowlistErrors {
 		return
 	}
 
-	errMsg := "```\nError: This repo is not whitelisted for Atlantis.\n```"
-	if err := e.VCSClient.CreateComment(baseRepo, pullNum, errMsg); err != nil {
+	errMsg := "```\nError: This repo is not allowlisted for Atlantis.\n```"
+	if err := e.VCSClient.CreateComment(baseRepo, pullNum, errMsg, ""); err != nil {
 		e.Logger.Err("unable to comment on pull request: %s", err)
 	}
 }

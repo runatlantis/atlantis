@@ -1,7 +1,7 @@
 # This Dockerfile builds our base image with gosu, dumb-init and the atlantis
 # user. We split this from the main Dockerfile because this base doesn't change
 # and also because it kept breaking the build due to flakiness.
-FROM alpine:3.11
+FROM alpine:3.12
 LABEL authors="Anubhav Mishra, Luke Kysow"
 
 # We use gosu to step down from root and run as the atlantis user so we need
@@ -19,7 +19,7 @@ RUN addgroup atlantis && \
 
 # Install dumb-init and gosu.
 ENV DUMB_INIT_VERSION=1.2.2
-ENV GOSU_VERSION=1.11
+ENV GOSU_VERSION=1.12
 RUN apk add --no-cache ca-certificates gnupg curl git git-lfs unzip bash openssh libcap openssl && \
     curl -L -s --output /bin/dumb-init "https://github.com/Yelp/dumb-init/releases/download/v${DUMB_INIT_VERSION}/dumb-init_${DUMB_INIT_VERSION}_amd64" && \
     chmod +x /bin/dumb-init && \

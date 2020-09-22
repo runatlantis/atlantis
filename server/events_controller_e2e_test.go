@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v28/github"
+	"github.com/google/go-github/v31/github"
 	"github.com/hashicorp/go-getter"
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
@@ -379,7 +379,7 @@ func TestGitHubWorkflow(t *testing.T) {
 				expNumReplies++
 			}
 
-			_, _, actReplies := vcsClient.VerifyWasCalled(Times(expNumReplies)).CreateComment(AnyRepo(), AnyInt(), AnyString()).GetAllCapturedArguments()
+			_, _, actReplies, _ := vcsClient.VerifyWasCalled(Times(expNumReplies)).CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString()).GetAllCapturedArguments()
 			Assert(t, len(c.ExpReplies) == len(actReplies), "missing expected replies, got %d but expected %d", len(actReplies), len(c.ExpReplies))
 			for i, expReply := range c.ExpReplies {
 				assertCommentEquals(t, expReply, actReplies[i], c.RepoDir, c.ExpParallel)
@@ -476,14 +476,15 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 		AllowForkPRs:             allowForkPRs,
 		AllowForkPRsFlag:         "allow-fork-prs",
 		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
-			ParserValidator:   parser,
-			ProjectFinder:     &events.DefaultProjectFinder{},
-			VCSClient:         e2eVCSClient,
-			WorkingDir:        workingDir,
-			WorkingDirLocker:  locker,
-			PendingPlanFinder: &events.DefaultPendingPlanFinder{},
-			CommentBuilder:    commentParser,
-			GlobalCfg:         globalCfg,
+			ParserValidator:    parser,
+			ProjectFinder:      &events.DefaultProjectFinder{},
+			VCSClient:          e2eVCSClient,
+			WorkingDir:         workingDir,
+			WorkingDirLocker:   locker,
+			PendingPlanFinder:  &events.DefaultPendingPlanFinder{},
+			CommentBuilder:     commentParser,
+			GlobalCfg:          globalCfg,
+			SkipCloneNoChanges: false,
 		},
 		DB:                boltdb,
 		PendingPlanFinder: &events.DefaultPendingPlanFinder{},
@@ -492,7 +493,7 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 		Drainer:           drainer,
 	}
 
-	repoWhitelistChecker, err := events.NewRepoWhitelistChecker("*")
+	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
 	Ok(t, err)
 
 	ctrl := server.EventsController{
@@ -511,7 +512,7 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 		GithubRequestValidator:       &server.DefaultGithubRequestValidator{},
 		GitlabRequestParserValidator: &server.DefaultGitlabRequestParserValidator{},
 		GitlabWebhookSecret:          nil,
-		RepoWhitelistChecker:         repoWhitelistChecker,
+		RepoAllowlistChecker:         repoAllowlistChecker,
 		SupportedVCSHosts:            []models.VCSHostType{models.Gitlab, models.Github, models.BitbucketCloud},
 		VCSClient:                    e2eVCSClient,
 	}

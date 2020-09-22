@@ -21,7 +21,7 @@ jobs:
         # We do this instead of setting --default-tf-version because setting
         # that flag starts the download asynchronously so we'd have a race
         # condition.
-        TERRAFORM_VERSION: 0.12.26
+        TERRAFORM_VERSION: 0.13.3
     steps:
     - checkout
     - run: make build-service

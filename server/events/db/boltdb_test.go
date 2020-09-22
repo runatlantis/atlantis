@@ -449,10 +449,10 @@ func TestPullStatus_UpdateDeleteGet(t *testing.T) {
 	Assert(t, maybeStatus == nil, "exp nil")
 }
 
-// Test we can create a status, delete a specific project's status within that
+// Test we can create a status, update a specific project's status within that
 // pull status, and when we get all the project statuses, that specific project
-// should not be there.
-func TestPullStatus_UpdateDeleteProject(t *testing.T) {
+// should be updated.
+func TestPullStatus_UpdateProject(t *testing.T) {
 	b, cleanup := newTestDB2(t)
 	defer cleanup()
 
@@ -492,7 +492,7 @@ func TestPullStatus_UpdateDeleteProject(t *testing.T) {
 		})
 	Ok(t, err)
 
-	err = b.DeleteProjectStatus(pull, "default", ".")
+	err = b.UpdateProjectStatus(pull, "default", ".", models.DiscardedPlanStatus)
 	Ok(t, err)
 
 	status, err := b.GetPullStatus(pull)
@@ -500,6 +500,12 @@ func TestPullStatus_UpdateDeleteProject(t *testing.T) {
 	Assert(t, status != nil, "exp non-nil")
 	Equals(t, pull, status.Pull) // nolint: staticcheck
 	Equals(t, []models.ProjectStatus{
+		{
+			Workspace:   "default",
+			RepoRelDir:  ".",
+			ProjectName: "",
+			Status:      models.DiscardedPlanStatus,
+		},
 		{
 			Workspace:   "staging",
 			RepoRelDir:  ".",

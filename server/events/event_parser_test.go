@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v28/github"
+	"github.com/google/go-github/v31/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/events"
@@ -248,12 +248,18 @@ func TestParseGithubPullEvent_EventType(t *testing.T) {
 			_, actType, _, _, _, err := parser.ParseGithubPullEvent(&event)
 			Ok(t, err)
 			Equals(t, c.exp, actType)
-			// Test draft parsing
+			// Test draft parsing when draft PRs disabled
 			draftPR := true
 			event.PullRequest.Draft = &draftPR
 			_, draftEvType, _, _, _, err := parser.ParseGithubPullEvent(&event)
 			Ok(t, err)
 			Equals(t, c.draftExp, draftEvType)
+			// Test draft parsing when draft PRs are enabled.
+			draftParser := parser
+			draftParser.AllowDraftPRs = true
+			_, draftEvType, _, _, _, err = draftParser.ParseGithubPullEvent(&event)
+			Ok(t, err)
+			Equals(t, c.exp, draftEvType)
 		})
 	}
 }

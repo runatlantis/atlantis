@@ -28,7 +28,7 @@ open your browser to http://localhost:8080.
     ```
 * Run Atlantis:
     ```
-    atlantis server --gh-user <your username> --gh-token <your token> --repo-whitelist <your repo> --gh-webhook-secret <your webhook secret> --log-level debug
+    atlantis server --gh-user <your username> --gh-token <your token> --repo-allowlist <your repo> --gh-webhook-secret <your webhook secret> --log-level debug
     ```
     If you get an error like `command not found: atlantis`, ensure that `$GOPATH/bin` is in your `$PATH`.
 
@@ -43,17 +43,17 @@ docker run --rm -v $(pwd):/go/src/github.com/runatlantis/atlantis -w /go/src/git
 
 ## Calling Your Local Atlantis From GitHub
 - Create a test terraform repository in your GitHub.
-- Create a personal access token for Atlantis. See [Create a GitHub token](https://github.com/runatlantis/atlantis#create-a-github-token).
+- Create a personal access token for Atlantis. See [Create a GitHub token](https://github.com/runatlantis/atlantis/tree/master/runatlantis.io/docs/access-credentials.md#generating-an-access-token).
 - Start Atlantis in server mode using that token:
 ```
-atlantis server --gh-user <your username> --gh-token <your token> --repo-whitelist <your repo> --gh-webhook-secret <your webhook secret> --log-level debug
+atlantis server --gh-user <your username> --gh-token <your token> --repo-allowlist <your repo> --gh-webhook-secret <your webhook secret> --log-level debug
 ```
 - Download ngrok from https://ngrok.com/download. This will enable you to expose Atlantis running on your laptop to the internet so GitHub can call it.
 - When you've downloaded and extracted ngrok, run it on port `4141`:
 ```
 ngrok http 4141
 ```
-- Create a Webhook in your repo and use the `https` url that `ngrok` printed out after running `ngrok http 4141`. Be sure to append `/events` so your webhook url looks something like `https://efce3bcd.ngrok.io/events`. See [Add GitHub Webhook](https://github.com/runatlantis/atlantis#add-github-webhook).
+- Create a Webhook in your repo and use the `https` url that `ngrok` printed out after running `ngrok http 4141`. Be sure to append `/events` so your webhook url looks something like `https://efce3bcd.ngrok.io/events`. See [Add GitHub Webhook](https://github.com/runatlantis/atlantis/blob/master/runatlantis.io/docs/configuring-webhooks.md#configuring-webhooks).
 - Create a pull request and type `atlantis help`. You should see the request in the `ngrok` and Atlantis logs and you should also see Atlantis comment back.
 
 ## Code Style

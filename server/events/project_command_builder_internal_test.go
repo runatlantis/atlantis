@@ -563,14 +563,15 @@ projects:
 			}
 
 			builder := &DefaultProjectCommandBuilder{
-				WorkingDirLocker:  NewDefaultWorkingDirLocker(),
-				WorkingDir:        workingDir,
-				ParserValidator:   parser,
-				VCSClient:         vcsClient,
-				ProjectFinder:     &DefaultProjectFinder{},
-				PendingPlanFinder: &DefaultPendingPlanFinder{},
-				CommentBuilder:    &CommentParser{},
-				GlobalCfg:         globalCfg,
+				WorkingDirLocker:   NewDefaultWorkingDirLocker(),
+				WorkingDir:         workingDir,
+				ParserValidator:    parser,
+				VCSClient:          vcsClient,
+				ProjectFinder:      &DefaultProjectFinder{},
+				PendingPlanFinder:  &DefaultPendingPlanFinder{},
+				CommentBuilder:     &CommentParser{},
+				GlobalCfg:          globalCfg,
+				SkipCloneNoChanges: false,
 			}
 
 			// We run a test for each type of command.

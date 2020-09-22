@@ -135,14 +135,15 @@ projects:
 			}
 
 			builder := &events.DefaultProjectCommandBuilder{
-				WorkingDirLocker:  events.NewDefaultWorkingDirLocker(),
-				WorkingDir:        workingDir,
-				ParserValidator:   &yaml.ParserValidator{},
-				VCSClient:         vcsClient,
-				ProjectFinder:     &events.DefaultProjectFinder{},
-				PendingPlanFinder: &events.DefaultPendingPlanFinder{},
-				CommentBuilder:    &events.CommentParser{},
-				GlobalCfg:         valid.NewGlobalCfg(false, false, false),
+				WorkingDirLocker:   events.NewDefaultWorkingDirLocker(),
+				WorkingDir:         workingDir,
+				ParserValidator:    &yaml.ParserValidator{},
+				VCSClient:          vcsClient,
+				ProjectFinder:      &events.DefaultProjectFinder{},
+				PendingPlanFinder:  &events.DefaultPendingPlanFinder{},
+				CommentBuilder:     &events.CommentParser{},
+				GlobalCfg:          valid.NewGlobalCfg(false, false, false),
+				SkipCloneNoChanges: false,
 			}
 
 			ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
@@ -358,13 +359,14 @@ projects:
 				}
 
 				builder := &events.DefaultProjectCommandBuilder{
-					WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
-					WorkingDir:       workingDir,
-					ParserValidator:  &yaml.ParserValidator{},
-					VCSClient:        vcsClient,
-					ProjectFinder:    &events.DefaultProjectFinder{},
-					CommentBuilder:   &events.CommentParser{},
-					GlobalCfg:        valid.NewGlobalCfg(true, false, false),
+					WorkingDirLocker:   events.NewDefaultWorkingDirLocker(),
+					WorkingDir:         workingDir,
+					ParserValidator:    &yaml.ParserValidator{},
+					VCSClient:          vcsClient,
+					ProjectFinder:      &events.DefaultProjectFinder{},
+					CommentBuilder:     &events.CommentParser{},
+					GlobalCfg:          valid.NewGlobalCfg(true, false, false),
+					SkipCloneNoChanges: false,
 				}
 
 				var actCtxs []models.ProjectCommandContext
@@ -491,13 +493,14 @@ projects:
 			}
 
 			builder := &events.DefaultProjectCommandBuilder{
-				WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
-				WorkingDir:       workingDir,
-				ParserValidator:  &yaml.ParserValidator{},
-				VCSClient:        vcsClient,
-				ProjectFinder:    &events.DefaultProjectFinder{},
-				CommentBuilder:   &events.CommentParser{},
-				GlobalCfg:        valid.NewGlobalCfg(true, false, false),
+				WorkingDirLocker:   events.NewDefaultWorkingDirLocker(),
+				WorkingDir:         workingDir,
+				ParserValidator:    &yaml.ParserValidator{},
+				VCSClient:          vcsClient,
+				ProjectFinder:      &events.DefaultProjectFinder{},
+				CommentBuilder:     &events.CommentParser{},
+				GlobalCfg:          valid.NewGlobalCfg(true, false, false),
+				SkipCloneNoChanges: false,
 			}
 
 			ctxs, err := builder.BuildPlanCommands(
@@ -562,14 +565,15 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		ThenReturn(tmpDir, nil)
 
 	builder := &events.DefaultProjectCommandBuilder{
-		WorkingDirLocker:  events.NewDefaultWorkingDirLocker(),
-		WorkingDir:        workingDir,
-		ParserValidator:   &yaml.ParserValidator{},
-		VCSClient:         nil,
-		ProjectFinder:     &events.DefaultProjectFinder{},
-		PendingPlanFinder: &events.DefaultPendingPlanFinder{},
-		CommentBuilder:    &events.CommentParser{},
-		GlobalCfg:         valid.NewGlobalCfg(false, false, false),
+		WorkingDirLocker:   events.NewDefaultWorkingDirLocker(),
+		WorkingDir:         workingDir,
+		ParserValidator:    &yaml.ParserValidator{},
+		VCSClient:          nil,
+		ProjectFinder:      &events.DefaultProjectFinder{},
+		PendingPlanFinder:  &events.DefaultPendingPlanFinder{},
+		CommentBuilder:     &events.CommentParser{},
+		GlobalCfg:          valid.NewGlobalCfg(false, false, false),
+		SkipCloneNoChanges: false,
 	}
 
 	ctxs, err := builder.BuildApplyCommands(
@@ -630,13 +634,14 @@ projects:
 		AnyString())).ThenReturn(repoDir, nil)
 
 	builder := &events.DefaultProjectCommandBuilder{
-		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
-		WorkingDir:       workingDir,
-		ParserValidator:  &yaml.ParserValidator{},
-		VCSClient:        nil,
-		ProjectFinder:    &events.DefaultProjectFinder{},
-		CommentBuilder:   &events.CommentParser{},
-		GlobalCfg:        valid.NewGlobalCfg(true, false, false),
+		WorkingDirLocker:   events.NewDefaultWorkingDirLocker(),
+		WorkingDir:         workingDir,
+		ParserValidator:    &yaml.ParserValidator{},
+		VCSClient:          nil,
+		ProjectFinder:      &events.DefaultProjectFinder{},
+		CommentBuilder:     &events.CommentParser{},
+		GlobalCfg:          valid.NewGlobalCfg(true, false, false),
+		SkipCloneNoChanges: false,
 	}
 
 	ctx := &events.CommandContext{
@@ -692,13 +697,14 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
 
 			builder := &events.DefaultProjectCommandBuilder{
-				WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
-				WorkingDir:       workingDir,
-				ParserValidator:  &yaml.ParserValidator{},
-				VCSClient:        vcsClient,
-				ProjectFinder:    &events.DefaultProjectFinder{},
-				CommentBuilder:   &events.CommentParser{},
-				GlobalCfg:        valid.NewGlobalCfg(true, false, false),
+				WorkingDirLocker:   events.NewDefaultWorkingDirLocker(),
+				WorkingDir:         workingDir,
+				ParserValidator:    &yaml.ParserValidator{},
+				VCSClient:          vcsClient,
+				ProjectFinder:      &events.DefaultProjectFinder{},
+				CommentBuilder:     &events.CommentParser{},
+				GlobalCfg:          valid.NewGlobalCfg(true, false, false),
+				SkipCloneNoChanges: false,
 			}
 
 			var actCtxs []models.ProjectCommandContext
@@ -856,13 +862,14 @@ projects:
 				AnyString())).ThenReturn(tmpDir, nil)
 
 			builder := &events.DefaultProjectCommandBuilder{
-				WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
-				WorkingDir:       workingDir,
-				VCSClient:        vcsClient,
-				ParserValidator:  &yaml.ParserValidator{},
-				ProjectFinder:    &events.DefaultProjectFinder{},
-				CommentBuilder:   &events.CommentParser{},
-				GlobalCfg:        valid.NewGlobalCfg(true, false, false),
+				WorkingDirLocker:   events.NewDefaultWorkingDirLocker(),
+				WorkingDir:         workingDir,
+				VCSClient:          vcsClient,
+				ParserValidator:    &yaml.ParserValidator{},
+				ProjectFinder:      &events.DefaultProjectFinder{},
+				CommentBuilder:     &events.CommentParser{},
+				GlobalCfg:          valid.NewGlobalCfg(true, false, false),
+				SkipCloneNoChanges: false,
 			}
 
 			actCtxs, err := builder.BuildPlanCommands(
@@ -886,4 +893,44 @@ projects:
 			}
 		})
 	}
+}
+
+// Test that we don't clone the repo if there were no changes based on the atlantis.yaml file.
+func TestDefaultProjectCommandBuilder_SkipCloneNoChanges(t *testing.T) {
+	atlantisYAML := `
+version: 3
+projects:
+- dir: dir1`
+
+	RegisterMockTestingT(t)
+	vcsClient := vcsmocks.NewMockClient()
+	When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
+	When(vcsClient.SupportsSingleFileDownload(matchers.AnyModelsRepo())).ThenReturn(true)
+	When(vcsClient.DownloadRepoConfigFile(matchers.AnyModelsPullRequest())).ThenReturn(true, []byte(atlantisYAML), nil)
+	workingDir := mocks.NewMockWorkingDir()
+
+	builder := &events.DefaultProjectCommandBuilder{
+		WorkingDirLocker:   events.NewDefaultWorkingDirLocker(),
+		WorkingDir:         workingDir,
+		ParserValidator:    &yaml.ParserValidator{},
+		VCSClient:          vcsClient,
+		ProjectFinder:      &events.DefaultProjectFinder{},
+		CommentBuilder:     &events.CommentParser{},
+		GlobalCfg:          valid.NewGlobalCfg(true, false, false),
+		SkipCloneNoChanges: true,
+	}
+
+	var actCtxs []models.ProjectCommandContext
+	var err error
+	actCtxs, err = builder.BuildAutoplanCommands(&events.CommandContext{
+		BaseRepo:      models.Repo{},
+		HeadRepo:      models.Repo{},
+		Pull:          models.PullRequest{},
+		User:          models.User{},
+		Log:           nil,
+		PullMergeable: true,
+	})
+	Ok(t, err)
+	Equals(t, 0, len(actCtxs))
+	workingDir.VerifyWasCalled(Never()).Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())
 }

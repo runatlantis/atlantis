@@ -59,7 +59,7 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
   <meta name="description" content="">
   <meta name="author" content="">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script src="{{ .CleanedBasePath }}/static/js/jquery-3.2.1.min.js"></script>
+  <script src="{{ .CleanedBasePath }}/static/js/jquery-3.5.1.min.js"></script>
   <script>
     $(document).ready(function () {
       $("p.js-discard-success").toggle(document.URL.indexOf("discard=true") !== -1);
@@ -141,7 +141,7 @@ var lockTemplate = template.Must(template.New("lock.html.tmpl").Parse(`
   <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
   <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/custom.css">
   <link rel="icon" type="image/png" href="{{ .CleanedBasePath }}/static/images/atlantis-icon.png">
-  <script src="{{ .CleanedBasePath }}/static/js/jquery-3.2.1.min.js"></script>
+  <script src="{{ .CleanedBasePath }}/static/js/jquery-3.5.1.min.js"></script>
 </head>
 <body>
   <div class="container">
@@ -226,6 +226,100 @@ v{{ .AtlantisVersion }}
       }
   }
 </script>
+</body>
+</html>
+`))
+
+// GithubSetupData holds the data for rendering the github app setup page
+type GithubSetupData struct {
+	Target        string
+	Manifest      string
+	ID            int64
+	Key           string
+	WebhookSecret string
+	URL           string
+}
+
+var githubAppSetupTemplate = template.Must(template.New("github-app.html.tmpl").Parse(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>atlantis</title>
+  <meta name="description" content="">
+  <meta name="author" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/static/css/normalize.css">
+  <link rel="stylesheet" href="/static/css/skeleton.css">
+  <link rel="stylesheet" href="/static/css/custom.css">
+  <style>
+
+    form {
+      width: 100%;
+    }
+
+    form button {
+      float: right;
+    }
+
+    textarea {
+      width: 100%;
+      height: 300px;
+      font-family: monospace;
+    }
+
+    .config {
+      display: flex;
+      flex-direction: row;
+      align-items: baseline;
+      border-bottom: 1px solid #eee;
+    }
+
+
+    .config strong {
+      width: 15%;
+    }
+
+    pre {
+      background-color: #eee;
+      padding: .5em;
+      width: 80%;
+    }
+  </style>
+  <link rel="icon" type="image/png" href="/static/images/atlantis-icon.png">
+  <script src="/static/js/jquery-3.5.1.min.js"></script>
+</head>
+<body>
+<div class="container">
+  <section class="header">
+    <a title="atlantis" href="/"><img class="hero" src="/static/images/atlantis-icon_512.png"/></a>
+    <p class="title-heading">atlantis</p>
+
+    <p class="js-discard-success"><strong>
+    {{ if .Target }}
+      Create a github app
+    {{ else }}
+      Github app created successfully!
+    {{ end }}
+    </strong></p>
+  </section>
+  <section>
+    {{ if .Target }}
+    <form action="{{ .Target }}" method="POST">
+      <textarea name="manifest">{{ .Manifest }}</textarea>
+      <button type="submit">Setup</button>
+    </form>
+    {{ else }}
+      <p>Visit <a href="{{ .URL }}/installations/new" target="_blank">{{ .URL }}/installations/new</a> to install the app for your user or organization, then <strong>update the following values</strong> in your config and <strong>restart Atlantis<strong>:</p>
+
+      <ul>
+        <li class="config"><strong>gh-app-id:</strong> <pre>{{ .ID }}</pre></li>
+        <li class="config"><strong>gh-app-key-file:</strong> <pre>{{ .Key }}</pre></li>
+        <li class="config"><strong>gh-webhook-secret:</strong> <pre>{{ .WebhookSecret }}</pre></li>
+      </ul>
+    {{ end }}
+  </section>
+</div>
 </body>
 </html>
 `))

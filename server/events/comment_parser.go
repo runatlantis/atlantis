@@ -156,8 +156,8 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		return CommentParseResult{CommentResponse: HelpComment}
 	}
 
-	// Need to have a plan or apply at this point.
-	if !e.stringInSlice(command, []string{models.PlanCommand.String(), models.ApplyCommand.String()}) {
+	// Need to have a plan, apply or unlock at this point.
+	if !e.stringInSlice(command, []string{models.PlanCommand.String(), models.ApplyCommand.String(), models.UnlockCommand.String()}) {
 		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown command %q.\nRun 'atlantis --help' for usage.\n```", command)}
 	}
 
@@ -186,6 +186,11 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Apply the plan for this directory, relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", fmt.Sprintf("Apply the plan for this project. Refers to the name of the project configured in %s. Cannot be used at same time as workspace or dir flags.", yaml.AtlantisYAMLFilename))
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
+	case models.UnlockCommand.String():
+		name = models.UnlockCommand
+		flagSet = pflag.NewFlagSet(models.UnlockCommand.String(), pflag.ContinueOnError)
+		flagSet.SetOutput(ioutil.Discard)
+
 	default:
 		return CommentParseResult{CommentResponse: fmt.Sprintf("Error: unknown command %q – this is a bug", command)}
 	}
@@ -197,6 +202,9 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nUsage of %s:\n%s\n```", command, flagSet.FlagUsagesWrapped(usagesCols))}
 	}
 	if err != nil {
+		if command == models.UnlockCommand.String() {
+			return CommentParseResult{CommentResponse: UnlockUsage}
+		}
 		return CommentParseResult{CommentResponse: e.errMarkdown(err.Error(), command, flagSet)}
 	}
 
@@ -342,11 +350,13 @@ Examples:
   atlantis apply -d . -w staging
 
 Commands:
-  plan   Runs 'terraform plan' for the changes in this pull request.
-         To plan a specific project, use the -d, -w and -p flags.
-  apply  Runs 'terraform apply' on all unapplied plans from this pull request.
-         To only apply a specific plan, use the -d, -w and -p flags.
-  help   View help.
+  plan     Runs 'terraform plan' for the changes in this pull request.
+           To plan a specific project, use the -d, -w and -p flags.
+  apply    Runs 'terraform apply' on all unapplied plans from this pull request.
+           To only apply a specific plan, use the -d, -w and -p flags.
+  unlock   Removes all atlantis locks and discards all plans for this PR.
+           To unlock a specific plan you can use the Atlantis UI.
+  help     View help.
 
 Flags:
   -h, --help   help for atlantis
@@ -357,3 +367,14 @@ Use "atlantis [command] --help" for more information about a command.` +
 // DidYouMeanAtlantisComment is the comment we add to the pull request when
 // someone runs a command with terraform instead of atlantis.
 var DidYouMeanAtlantisComment = "Did you mean to use `atlantis` instead of `terraform`?"
+
+// UnlockUsage is the comment we add to the pull request when someone runs
+// `atlantis unlock` with flags.
+
+var UnlockUsage = "`Usage of unlock:`\n\n ```cmake\n" +
+	`atlantis unlock	
+
+  Unlocks the entire PR and discards all plans in this PR.
+  Arguments or flags are not supported at the moment.
+  If you need to unlock a specific project please use the atlantis UI.` +
+	"\n```"

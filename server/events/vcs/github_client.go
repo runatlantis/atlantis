@@ -15,17 +15,19 @@ package vcs
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
-	"net/url"
+	"net/http"
 	"strings"
-
-	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/vcs/common"
-	"github.com/runatlantis/atlantis/server/logging"
+	"time"
 
 	"github.com/Laisky/graphql"
-	"github.com/google/go-github/v28/github"
+	"github.com/google/go-github/v31/github"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
+	"github.com/runatlantis/atlantis/server/events/yaml"
+	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -42,30 +44,39 @@ type GithubClient struct {
 	logger         *logging.SimpleLogger
 }
 
-// NewGithubClient returns a valid GitHub client.
-func NewGithubClient(hostname string, user string, pass string, logger *logging.SimpleLogger) (*GithubClient, error) {
-	tp := github.BasicAuthTransport{
-		Username: strings.TrimSpace(user),
-		Password: strings.TrimSpace(pass),
-	}
-	client := github.NewClient(tp.Client())
-	graphqlURL := "https://api.github.com/graphql"
+// GithubAppTemporarySecrets holds app credentials obtained from github after creation.
+type GithubAppTemporarySecrets struct {
+	// ID is the app id.
+	ID int64
+	// Key is the app's PEM-encoded key.
+	Key string
+	// Name is the app name.
+	Name string
+	// WebhookSecret is the generated webhook secret for this app.
+	WebhookSecret string
+	// URL is a link to the app, like https://github.com/apps/octoapp.
+	URL string
+}
 
-	// If we're using github.com then we don't need to do any additional configuration
-	// for the client. It we're using Github Enterprise, then we need to manually
-	// set the base url for the API.
-	if hostname != "github.com" {
-		baseURL := fmt.Sprintf("https://%s/api/v3/", hostname)
-		base, err := url.Parse(baseURL)
+// NewGithubClient returns a valid GitHub client.
+func NewGithubClient(hostname string, credentials GithubCredentials, logger *logging.SimpleLogger) (*GithubClient, error) {
+	transport, err := credentials.Client()
+	if err != nil {
+		return nil, errors.Wrap(err, "error initializing github authentication transport")
+	}
+
+	var graphqlURL string
+	var client *github.Client
+	if hostname == "github.com" {
+		client = github.NewClient(transport)
+		graphqlURL = "https://api.github.com/graphql"
+	} else {
+		apiURL := resolveGithubAPIURL(hostname)
+		client, err = github.NewEnterpriseClient(apiURL.String(), apiURL.String(), transport)
 		if err != nil {
-			return nil, errors.Wrapf(err, "Invalid github hostname trying to parse %s", baseURL)
+			return nil, err
 		}
-		client.BaseURL = base
-		graphqlURL = fmt.Sprintf("https://%s/graphql", hostname)
-		_, err = url.Parse(graphqlURL)
-		if err != nil {
-			return nil, errors.Wrapf(err, "Invalid GraphQL github hostname trying to parse %s", graphqlURL)
-		}
+		graphqlURL = fmt.Sprintf("https://%s/api/graphql", apiURL.Host)
 	}
 
 	// shurcooL's githubv4 library has a client ctor, but it doesn't support schema
@@ -77,12 +88,11 @@ func NewGithubClient(hostname string, user string, pass string, logger *logging.
 	// shurcooL's libraries completely.
 	v4MutateClient := graphql.NewClient(
 		graphqlURL,
-		tp.Client(),
+		transport,
 		graphql.WithHeader("Accept", "application/vnd.github.queen-beryl-preview+json"),
 	)
-
 	return &GithubClient{
-		user:           user,
+		user:           credentials.GetUser(),
 		client:         client,
 		v4MutateClient: v4MutateClient,
 		ctx:            context.Background(),
@@ -127,11 +137,19 @@ func (g *GithubClient) GetModifiedFiles(repo models.Repo, pull models.PullReques
 // CreateComment creates a comment on the pull request.
 // If comment length is greater than the max comment length we split into
 // multiple comments.
-func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment string) error {
+func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment string, command string) error {
+	var sepStart string
+
 	sepEnd := "\n```\n</details>" +
 		"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
-	sepStart := "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
-		"```diff\n"
+
+	if command != "" {
+		sepStart = fmt.Sprintf("Continued %s output from previous comment.\n<details><summary>Show Output</summary>\n\n", command) +
+			"```diff\n"
+	} else {
+		sepStart = "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
+			"```diff\n"
+	}
 
 	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
 	for _, c := range comments {
@@ -150,8 +168,8 @@ func (g *GithubClient) HidePrevPlanComments(repo models.Repo, pullNum int) error
 	for {
 		g.logger.Debug("GET /repos/%v/%v/issues/%d/comments", repo.Owner, repo.Name, pullNum)
 		comments, resp, err := g.client.Issues.ListComments(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueListCommentsOptions{
-			Sort:        "created",
-			Direction:   "asc",
+			Sort:        github.String("created"),
+			Direction:   github.String("asc"),
 			ListOptions: github.ListOptions{Page: nextPage},
 		})
 		if err != nil {
@@ -258,7 +276,25 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 
 // GetPullRequest returns the pull request.
 func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRequest, error) {
-	pull, _, err := g.client.PullRequests.Get(g.ctx, repo.Owner, repo.Name, num)
+	var err error
+	var pull *github.PullRequest
+
+	// GitHub has started to return 404's here (#1019) even after they send the webhook.
+	// They've got some eventual consistency issues going on so we're just going
+	// to retry up to 3 times with a 1s sleep.
+	numRetries := 3
+	retryDelay := 1 * time.Second
+	for i := 0; i < numRetries; i++ {
+		pull, _, err = g.client.PullRequests.Get(g.ctx, repo.Owner, repo.Name, num)
+		if err == nil {
+			return pull, nil
+		}
+		ghErr, ok := err.(*github.ErrorResponse)
+		if !ok || ghErr.Response.StatusCode != 404 {
+			return pull, err
+		}
+		time.Sleep(retryDelay)
+	}
 	return pull, err
 }
 
@@ -361,4 +397,45 @@ func (g *GithubClient) GetTeamNamesForUser(repo models.Repo, user models.User) (
 		opts.Page = resp.NextPage
 	}
 	return teamNames, nil
+}
+
+// ExchangeCode returns a newly created app's info
+func (g *GithubClient) ExchangeCode(code string) (*GithubAppTemporarySecrets, error) {
+	ctx := context.Background()
+	cfg, _, err := g.client.Apps.CompleteAppManifest(ctx, code)
+	data := &GithubAppTemporarySecrets{
+		ID:            cfg.GetID(),
+		Key:           cfg.GetPEM(),
+		WebhookSecret: cfg.GetWebhookSecret(),
+		Name:          cfg.GetName(),
+		URL:           cfg.GetHTMLURL(),
+	}
+
+	return data, err
+}
+
+// DownloadRepoConfigFile return `atlantis.yaml` content from VCS (which support fetch a single file from repository)
+// The first return value indicate that repo contain atlantis.yaml or not
+// if BaseRepo had one repo config file, its content will placed on the second return value
+func (g *GithubClient) DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error) {
+	opt := github.RepositoryContentGetOptions{Ref: pull.HeadBranch}
+	fileContent, _, resp, err := g.client.Repositories.GetContents(g.ctx, pull.BaseRepo.Owner, pull.BaseRepo.Name, yaml.AtlantisYAMLFilename, &opt)
+
+	if resp.StatusCode == http.StatusNotFound {
+		return false, []byte{}, nil
+	}
+	if err != nil {
+		return true, []byte{}, err
+	}
+
+	decodedData, err := base64.StdEncoding.DecodeString(*fileContent.Content)
+	if err != nil {
+		return true, []byte{}, err
+	}
+
+	return true, decodedData, nil
+}
+
+func (g *GithubClient) SupportsSingleFileDownload(repo models.Repo) bool {
+	return true
 }
