@@ -60,7 +60,6 @@ type EventsController struct {
 	// UI that identifies this call as coming from GitLab. If empty, no
 	// request validation is done.
 	GitlabWebhookSecret  []byte
-	RepoWhitelistChecker *events.RepoWhitelistChecker
 	TeamWhitelistChecker *events.TeamWhitelistChecker
 	// SilenceWhitelistErrors controls whether we write an error comment on
 	// pull requests from non-whitelisted repos.
@@ -574,7 +573,7 @@ func (e *EventsController) commentNotAllowlisted(baseRepo models.Repo, pullNum i
 // is not allowed to execute the command.
 func (e *EventsController) commentUserDoesNotHavePermissions(baseRepo models.Repo, pullNum int, user models.User, cmd *events.CommentCommand) {
 	errMsg := fmt.Sprintf("```\nError: User @%s does not have permissions to execute '%s' command.\n```", user.Username, cmd.Name)
-	if err := e.VCSClient.CreateComment(baseRepo, pullNum, errMsg); err != nil {
+	if err := e.VCSClient.CreateComment(baseRepo, pullNum, errMsg, ""); err != nil {
 		e.Logger.Err("unable to comment on pull request: %s", err)
 	}
 }
