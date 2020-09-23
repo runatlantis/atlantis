@@ -24,17 +24,17 @@ dockerizedBuildPipeline(
   vulnerabilityScan: {
     nancyEvaluation(workDir + '/go.sum')
   },
-  deploy: {
-    dir(workDir) {
-      def region = 'us-east-2'
-      withAWS(role: config.role, roleAccount: config.account, region: region) {
-        def odsPurgeName = "hds-${params.ENVIRONMENT}-ods-purge-${region}"
-        runSafely 'zip ods-purge.zip ods-purge'
-        s3Upload(acl: 'Private', bucket: odsPurgeName, sseAlgorithm:'AES256', file:'ods-purge.zip')
-        runSafely "aws lambda update-function-code --function-name ${odsPurgeName} --s3-bucket ${odsPurgeName} --s3-key ods-purge.zip"
-      }
-    }
-  },
+  // deploy: {
+  //   dir(workDir) {
+  //     def region = 'us-east-2'
+  //     withAWS(role: config.role, roleAccount: config.account, region: region) {
+  //       def odsPurgeName = "hds-${params.ENVIRONMENT}-ods-purge-${region}"
+  //       runSafely 'zip ods-purge.zip ods-purge'
+  //       s3Upload(acl: 'Private', bucket: odsPurgeName, sseAlgorithm:'AES256', file:'ods-purge.zip')
+  //       runSafely "aws lambda update-function-code --function-name ${odsPurgeName} --s3-bucket ${odsPurgeName} --s3-key ods-purge.zip"
+  //     }
+  //   }
+  // },
   onSuccess: {
     githubStatusUpdate('success')
   },
