@@ -16,12 +16,12 @@ dockerizedBuildPipeline(
   buildAndTest: {
     dir(workDir) {
       runSafely '''
-      go mod download
+      go get github.com/jstemmer/go-junit-report
       go mod tidy
-      go get -u github.com/jstemmer/go-junit-report
+      go mod vendor
       go test ./... -v 2>&1 -p=1 | go-junit-report > test-results.xml
       make test
-      GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o atlantis
+      GGO_ENABLED=0 go build -o atlantis
       '''
     }
   },
