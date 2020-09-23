@@ -1,19 +1,12 @@
 /*
- * Copyright 2018-present Sonatype Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright (c) 2011-present Sonatype, Inc. All rights reserved.
+ * Includes the third-party code listed at http://links.sonatype.com/products/clm/attributions.
+ * "Sonatype" is a trademark of Sonatype, Inc.
  */
+
 @Library(['private-pipeline-library', 'jenkins-shared']) _
+
+def workDir = "./"
 
 dockerizedBuildPipeline(
   buildImageId: "${sonatypeDockerRegistryId()}/cdi/golang-1.14:1",
@@ -21,29 +14,31 @@ dockerizedBuildPipeline(
     githubStatusUpdate('pending')
   },
   buildAndTest: {
-    sh '''
-    go mod download
-    go mod tidy
-    go get -u github.com/jstemmer/go-junit-report
-    go test ./... -v 2>&1 -p=1 | go-junit-report > test-results.xml
-    CGO_ENABLED=0 GOOS=linux go build -mod=mod -o nancy .
-    '''
+    dir(workDir) {
+      runSafely '''
+      go mod download
+      GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o atlantis
+      '''
+    }
   },
   vulnerabilityScan: {
-    withDockerImage(env.DOCKER_IMAGE_ID, {
-      withCredentials([usernamePassword(credentialsId: 'policy.s integration account',
-        usernameVariable: 'IQ_USERNAME', passwordVariable: 'IQ_PASSWORD')]) {
-        sh 'go list -json -mod=mod | ./nancy iq --iq-application nancy --iq-stage build --iq-username $IQ_USERNAME --iq-token $IQ_PASSWORD --iq-server-url https://policy.ci.sonatype.dev'
-      }
-    })
+    nancyEvaluation(workDir + '/go.sum')
   },
-  testResults: [ 'test-results.xml' ],
+  deploy: {
+    dir(workDir) {
+      def region = 'us-east-2'
+      withAWS(role: config.role, roleAccount: config.account, region: region) {
+        def odsPurgeName = "hds-${params.ENVIRONMENT}-ods-purge-${region}"
+        runSafely 'zip ods-purge.zip ods-purge'
+        s3Upload(acl: 'Private', bucket: odsPurgeName, sseAlgorithm:'AES256', file:'ods-purge.zip')
+        runSafely "aws lambda update-function-code --function-name ${odsPurgeName} --s3-bucket ${odsPurgeName} --s3-key ods-purge.zip"
+      }
+    }
+  },
   onSuccess: {
     githubStatusUpdate('success')
   },
   onFailure: {
     githubStatusUpdate('failure')
-    //notifyChat(currentBuild: currentBuild, env: env, room: 'community-oss-fun')
-   //sendEmailNotification(currentBuild, env, [], 'someone@sonatype.com')
   }
 )
