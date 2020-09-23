@@ -22,7 +22,7 @@ dockerizedBuildPipeline(
     }
   },
   vulnerabilityScan: {
-    nexusPolicyEvaluation iqStage: 'build', iqApplication: 'atlantis', iqScanPatterns: [[scanPattern: 'go.list']]
+    nexusPolicyEvaluation iqApplication: 'atlantis', iqScanPatterns: [[scanPattern: '**/Gopkg.lock'], [scanPattern: '**/go.sum'], [scanPattern: '**/go.list']], iqStage: 'build'
     //nancyEvaluation(workDir + '/go.sum')
   },
   // deploy: {
