@@ -20,7 +20,7 @@ dockerizedBuildPipeline(
       go mod tidy
       go mod vendor
       go test ./... -v 2>&1 -p=1 | go-junit-report > test-results.xml
-      make test
+      #make test
       GGO_ENABLED=0 go build -o atlantis
       '''
     }
