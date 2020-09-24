@@ -440,15 +440,17 @@ func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo mo
 	}
 
 	// Check if the user who commented has the permissions to execute the 'plan' or 'apply' commands
-	ok, err := e.checkUserPermissions(baseRepo, user, parseResult.Command)
-	if err != nil {
-		e.Logger.Err("unable to comment on pull request: %s", err)
-		return
-	}
-	if !ok {
-		e.commentUserDoesNotHavePermissions(baseRepo, pullNum, user, parseResult.Command)
-		e.respond(w, logging.Warn, http.StatusForbidden, "User @%s does not have permissions to execute '%s' command", user.Username, parseResult.Command.Name.String())
-		return
+	if parseResult.Command != nil && user.Username != "" {
+		ok, err := e.checkUserPermissions(baseRepo, user, parseResult.Command)
+		if err != nil {
+			e.Logger.Err("unable to comment on pull request: %s", err)
+			return
+		}
+		if !ok {
+			e.commentUserDoesNotHavePermissions(baseRepo, pullNum, user, parseResult.Command)
+			e.respond(w, logging.Warn, http.StatusForbidden, "User @%s does not have permissions to execute '%s' command", user.Username, parseResult.Command.Name.String())
+			return
+		}
 	}
 
 	e.Logger.Debug("executing command")
