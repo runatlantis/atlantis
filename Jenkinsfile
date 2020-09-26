@@ -20,12 +20,11 @@ dockerizedBuildPipeline(
   buildAndTest: {
     dir(workDir) {
       runSafely '''
-      export WORKSPACE=workspace
       go get github.com/jstemmer/go-junit-report
       go mod tidy
       go mod vendor
       go test ./... -v 2>&1 -p=1 | go-junit-report > test-results.xml
-      make test
+      WORKSPACE=workspace make test
       GGO_ENABLED=0 go build -o atlantis
       '''
     }
