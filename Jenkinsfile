@@ -17,7 +17,7 @@ dockerizedBuildPipeline(
     unzip terraform_0.13.3_linux_amd64.zip
     '''
   },
-  dockerArgs: "--env WORKSPACE=workspace",
+  dockerArgs: "-e WORKSPACE:workspace",
   buildAndTest: {
     dir(workDir) {
       runSafely '''
