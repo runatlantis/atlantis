@@ -20,6 +20,7 @@ dockerizedBuildPipeline(
   buildAndTest: {
     dir(workDir) {
       runSafely '''
+      export WORKSPACE=workspace
       go get github.com/jstemmer/go-junit-report
       go mod tidy
       go mod vendor
