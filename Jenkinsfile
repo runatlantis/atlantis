@@ -16,6 +16,8 @@ dockerizedBuildPipeline(
   buildAndTest: {
     dir(workDir) {
       runSafely '''
+      curl -o https://releases.hashicorp.com/terraform/0.13.3/terraform_0.13.3_linux_amd64.zip
+      unzip terraform_0.13.3_linux_amd64.zip
       go get github.com/jstemmer/go-junit-report
       go mod tidy
       go mod vendor
