@@ -6,28 +6,19 @@
 
 @Library(['private-pipeline-library', 'jenkins-shared']) _
 
-def workDir = "./"
 
 dockerizedBuildPipeline(
-  buildImageId: "${sonatypeDockerRegistryId()}/cdi/golang-1.14:1",
+  pathToDockerfile: 'jenkins/Dockerfile',
   prepare: {
     githubStatusUpdate('pending')
-    runSafely '''
-    curl -O https://releases.hashicorp.com/terraform/0.13.3/terraform_0.13.3_linux_amd64.zip
-    unzip terraform_0.13.3_linux_amd64.zip
-    '''
   },
-  dockerArgs: "-e WORKSPACE:workspace",
   buildAndTest: {
-    dir(workDir) {
-      runSafely '''
-      go get github.com/jstemmer/go-junit-report
-      go mod tidy
-      go mod vendor
-      go test ./... -v 2>&1 -p=1 | go-junit-report > test-results.xml
-      GGO_ENABLED=0 go build -o atlantis
-      '''
-    }
+    // Following instructions for building and testing from 
+    // https://github.com/runatlantis/atlantis/blob/master/CONTRIBUTING.md#running-atlantis-locally
+    runSafely '''
+    go install
+    make test
+    '''
   },
   vulnerabilityScan: {
     nexusPolicyEvaluation iqApplication: 'atlantis', iqScanPatterns: [[scanPattern: '**/Gopkg.lock'], [scanPattern: '**/go.sum'], [scanPattern: '**/go.list']], iqStage: 'build'
@@ -44,7 +35,7 @@ dockerizedBuildPipeline(
   //     }
   //   }
   // },
-  testResults: [ 'test-results.xml' ],
+//  testResults: [ 'test-results.xml' ],
   onSuccess: {
     githubStatusUpdate('success')
   },
