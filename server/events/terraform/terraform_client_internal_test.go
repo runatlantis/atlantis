@@ -104,8 +104,14 @@ func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
 		"ATLANTIS_TERRAFORM_VERSION=$ATLANTIS_TERRAFORM_VERSION",
 		"DIR=$DIR",
 	}
-	out, err := client.RunCommandWithVersion(nil, tmp, args, map[string]string{}, nil, "workspace")
+	// If this runs in Jenkins WORKSPACE is set to the jenkins workspace so this can't be set to a fix value
+	CurrentWorkspace := os.Getenv("WORKSPACE")
+	if CurrentWorkspace == "" {
+		CurrentWorkspace = "workspace"
+	}
+	out, err := client.RunCommandWithVersion(nil, tmp, args, map[string]string{}, nil, CurrentWorkspace)
 	Ok(t, err)
+
 	exp := fmt.Sprintf("TF_IN_AUTOMATION=true TF_PLUGIN_CACHE_DIR=%s WORKSPACE=workspace ATLANTIS_TERRAFORM_VERSION=0.11.11 DIR=%s\n", tmp, tmp)
 	Equals(t, exp, out)
 }
