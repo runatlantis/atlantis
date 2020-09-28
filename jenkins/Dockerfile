@@ -5,8 +5,8 @@ FROM docker-internal.repo.sonatype.com/cdi/golang-1.14:1
 # Install Terraform
 ENV TERRAFORM_VERSION=0.13.3
 RUN curl -LOks https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip && \
-    sudo mkdir -p /usr/local/bin/tf/versions/${TERRAFORM_VERSION} && \
-    sudo unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip -d /usr/local/bin/tf/versions/${TERRAFORM_VERSION} && \
-    sudo ln -s /usr/local/bin/tf/versions/${TERRAFORM_VERSION}/terraform /usr/local/bin/terraform && \
+    mkdir -p /usr/local/bin/tf/versions/${TERRAFORM_VERSION} && \
+    unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip -d /usr/local/bin/tf/versions/${TERRAFORM_VERSION} && \
+    ln -s /usr/local/bin/tf/versions/${TERRAFORM_VERSION}/terraform /usr/local/bin/terraform && \
     rm terraform_${TERRAFORM_VERSION}_linux_amd64.zip
 RUN go get golang.org/x/tools/cmd/goimports
