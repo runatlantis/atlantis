@@ -112,7 +112,7 @@ func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
 	out, err := client.RunCommandWithVersion(nil, tmp, args, map[string]string{}, nil, CurrentWorkspace)
 	Ok(t, err)
 
-	exp := fmt.Sprintf("TF_IN_AUTOMATION=true TF_PLUGIN_CACHE_DIR=%s WORKSPACE=workspace ATLANTIS_TERRAFORM_VERSION=0.11.11 DIR=%s\n", tmp, tmp)
+	exp := fmt.Sprintf("TF_IN_AUTOMATION=true TF_PLUGIN_CACHE_DIR=%s WORKSPACE=%s ATLANTIS_TERRAFORM_VERSION=0.11.11 DIR=%s\n", tmp, tmp, CurrentWorkspace)
 	Equals(t, exp, out)
 }
 
@@ -169,7 +169,7 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
-	exp := fmt.Sprintf("TF_IN_AUTOMATION=true TF_PLUGIN_CACHE_DIR=%s WORKSPACE=workspace ATLANTIS_TERRAFORM_VERSION=0.11.11 DIR=%s", tmp, tmp)
+	exp := fmt.Sprintf("TF_IN_AUTOMATION=true TF_PLUGIN_CACHE_DIR=%s WORKSPACE=%s ATLANTIS_TERRAFORM_VERSION=0.11.11 DIR=%s", tmp, tmp, CurrentWorkspace)
 	Equals(t, exp, out)
 }
 
