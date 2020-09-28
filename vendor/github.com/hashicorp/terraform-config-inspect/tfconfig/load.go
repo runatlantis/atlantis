@@ -2,17 +2,21 @@ package tfconfig
 
 import (
 	"fmt"
-	"io/ioutil"
 	"path/filepath"
 	"strings"
 
-	"github.com/hashicorp/hcl2/hcl"
+	"github.com/hashicorp/hcl/v2"
 )
 
 // LoadModule reads the directory at the given path and attempts to interpret
 // it as a Terraform module.
 func LoadModule(dir string) (*Module, Diagnostics) {
+	return LoadModuleFromFilesystem(NewOsFs(), dir)
+}
 
+// LoadModuleFromFilesystem reads the directory at the given path
+// in the given FS and attempts to interpret it as a Terraform module
+func LoadModuleFromFilesystem(fs FS, dir string) (*Module, Diagnostics) {
 	// For broad compatibility here we actually have two separate loader
 	// codepaths. The main one uses the new HCL parser and API and is intended
 	// for configurations from Terraform 0.12 onwards (though will work for
@@ -20,10 +24,10 @@ func LoadModule(dir string) (*Module, Diagnostics) {
 	// uses the _old_ HCL implementation so we can deal with some edge-cases
 	// that are not valid in new HCL.
 
-	module, diags := loadModule(dir)
+	module, diags := loadModule(fs, dir)
 	if diags.HasErrors() {
 		// Try using the legacy HCL parser and see if we fare better.
-		legacyModule, legacyDiags := loadModuleLegacyHCL(dir)
+		legacyModule, legacyDiags := loadModuleLegacyHCL(fs, dir)
 		if !legacyDiags.HasErrors() {
 			legacyModule.init(legacyDiags)
 			return legacyModule, legacyDiags
@@ -37,7 +41,14 @@ func LoadModule(dir string) (*Module, Diagnostics) {
 // IsModuleDir checks if the given path contains terraform configuration files.
 // This allows the caller to decide how to handle directories that do not have tf files.
 func IsModuleDir(dir string) bool {
-	primaryPaths, _ := dirFiles(dir)
+	return IsModuleDirOnFilesystem(NewOsFs(), dir)
+}
+
+// IsModuleDirOnFilesystem checks if the given path in the given FS contains
+// Terraform configuration files. This allows the caller to decide
+// how to handle directories that do not have tf files.
+func IsModuleDirOnFilesystem(fs FS, dir string) bool {
+	primaryPaths, _ := dirFiles(fs, dir)
 	if len(primaryPaths) == 0 {
 		return false
 	}
@@ -52,12 +63,12 @@ func (m *Module) init(diags Diagnostics) {
 	// case so callers can easily recognize it.
 	for _, r := range m.ManagedResources {
 		if _, exists := m.RequiredProviders[r.Provider.Name]; !exists {
-			m.RequiredProviders[r.Provider.Name] = []string{}
+			m.RequiredProviders[r.Provider.Name] = &ProviderRequirement{}
 		}
 	}
 	for _, r := range m.DataResources {
 		if _, exists := m.RequiredProviders[r.Provider.Name]; !exists {
-			m.RequiredProviders[r.Provider.Name] = []string{}
+			m.RequiredProviders[r.Provider.Name] = &ProviderRequirement{}
 		}
 	}
 
@@ -67,8 +78,8 @@ func (m *Module) init(diags Diagnostics) {
 	m.Diagnostics = diags
 }
 
-func dirFiles(dir string) (primary []string, diags hcl.Diagnostics) {
-	infos, err := ioutil.ReadDir(dir)
+func dirFiles(fs FS, dir string) (primary []string, diags hcl.Diagnostics) {
+	infos, err := fs.ReadDir(dir)
 	if err != nil {
 		diags = append(diags, &hcl.Diagnostic{
 			Severity: hcl.DiagError,

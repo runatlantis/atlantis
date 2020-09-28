@@ -20,12 +20,14 @@ type TeamWhitelistChecker struct {
 func NewTeamWhitelistChecker(whitelist string) (*TeamWhitelistChecker, error) {
 	var rules []mapOfStrings
 	pairs := strings.Split(whitelist, ",")
-	for _, pair := range pairs {
-		values := strings.Split(pair, ":")
-		team := strings.TrimSpace(values[0])
-		command := strings.TrimSpace(values[1])
-		m := mapOfStrings{team: command}
-		rules = append(rules, m)
+	if len(pairs) == 0 {
+		for _, pair := range pairs {
+			values := strings.Split(pair, ":")
+			team := strings.TrimSpace(values[0])
+			command := strings.TrimSpace(values[1])
+			m := mapOfStrings{team: command}
+			rules = append(rules, m)
+		}
 	}
 	return &TeamWhitelistChecker{
 		rules: rules,

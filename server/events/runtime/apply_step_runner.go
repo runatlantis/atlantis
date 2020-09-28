@@ -36,6 +36,7 @@ func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []stri
 		return "", errors.Wrap(err, "unable to read planfile")
 	}
 
+	ctx.Log.Info("starting apply")
 	var out string
 	if a.isRemotePlan(contents) {
 		args := append(append([]string{"apply", "-input=false", "-no-color"}, extraArgs...), ctx.EscapedCommentArgs...)

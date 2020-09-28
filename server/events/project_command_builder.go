@@ -2,6 +2,7 @@ package events
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -52,14 +53,15 @@ type ProjectCommandBuilder interface {
 // This class combines the data from the comment and any atlantis.yaml file or
 // Atlantis server config and then generates a set of contexts.
 type DefaultProjectCommandBuilder struct {
-	ParserValidator   *yaml.ParserValidator
-	ProjectFinder     ProjectFinder
-	VCSClient         vcs.Client
-	WorkingDir        WorkingDir
-	WorkingDirLocker  WorkingDirLocker
-	GlobalCfg         valid.GlobalCfg
-	PendingPlanFinder *DefaultPendingPlanFinder
-	CommentBuilder    CommentBuilder
+	ParserValidator    *yaml.ParserValidator
+	ProjectFinder      ProjectFinder
+	VCSClient          vcs.Client
+	WorkingDir         WorkingDir
+	WorkingDirLocker   WorkingDirLocker
+	GlobalCfg          valid.GlobalCfg
+	PendingPlanFinder  *DefaultPendingPlanFinder
+	CommentBuilder     CommentBuilder
+	SkipCloneNoChanges bool
 }
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
@@ -100,8 +102,43 @@ func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *CommandContext, c
 // buildPlanAllCommands builds plan contexts for all projects we determine were
 // modified in this ctx.
 func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext, commentFlags []string, verbose bool) ([]models.ProjectCommandContext, error) {
+	// We'll need the list of modified files.
+	modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.BaseRepo, ctx.Pull)
+	if err != nil {
+		return nil, err
+	}
+	ctx.Log.Debug("%d files were modified in this pull request", len(modifiedFiles))
+
+	if p.SkipCloneNoChanges && p.VCSClient.SupportsSingleFileDownload(ctx.BaseRepo) {
+		hasRepoCfg, repoCfgData, err := p.VCSClient.DownloadRepoConfigFile(ctx.Pull)
+		if err != nil {
+			return nil, errors.Wrapf(err, "downloading %s", yaml.AtlantisYAMLFilename)
+		}
+
+		if hasRepoCfg {
+			repoCfg, err := p.ParserValidator.ParseRepoCfgData(repoCfgData, p.GlobalCfg, ctx.BaseRepo.ID())
+			if err != nil {
+				return nil, errors.Wrapf(err, "parsing %s", yaml.AtlantisYAMLFilename)
+			}
+			ctx.Log.Info("successfully parsed remote %s file", yaml.AtlantisYAMLFilename)
+			matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, "")
+			if err != nil {
+				return nil, err
+			}
+			ctx.Log.Info("%d projects are changed on MR %q based on their when_modified config", len(matchingProjects), ctx.Pull.Num)
+			if len(matchingProjects) == 0 {
+				ctx.Log.Info("skipping repo clone since no project was modified")
+				return []models.ProjectCommandContext{}, nil
+			}
+			// NOTE: We discard this work here and end up doing it again after
+			// cloning to ensure all the return values are set properly with
+			// the actual clone directory.
+		}
+	}
+
 	// Need to lock the workspace we're about to clone to.
 	workspace := DefaultWorkspace
+
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.BaseRepo.FullName, ctx.Pull.Num, workspace)
 	if err != nil {
 		ctx.Log.Warn("workspace was locked")
@@ -110,18 +147,10 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 	ctx.Log.Debug("got workspace lock")
 	defer unlockFn()
 
-	// We'll need the list of modified files.
-	modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.BaseRepo, ctx.Pull)
-	if err != nil {
-		return nil, err
-	}
-	ctx.Log.Debug("%d files were modified in this pull request", len(modifiedFiles))
-
 	repoDir, _, err := p.WorkingDir.Clone(ctx.Log, ctx.BaseRepo, ctx.HeadRepo, ctx.Pull, workspace)
 	if err != nil {
 		return nil, err
 	}
-
 	// Parse config file if it exists.
 	hasRepoCfg, err := p.ParserValidator.HasRepoCfg(repoDir)
 	if err != nil {
@@ -241,7 +270,9 @@ func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *CommandCont
 	defer unlockFn()
 
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, workspace)
-	if err != nil {
+	if os.IsNotExist(errors.Cause(err)) {
+		return projCtx, errors.New("no working directory found–did you run plan?")
+	} else if err != nil {
 		return projCtx, err
 	}
 
@@ -445,6 +476,9 @@ func (p *DefaultProjectCommandBuilder) getTfVersion(ctx *CommandContext, absProj
 	module, diags := tfconfig.LoadModule(absProjDir)
 	if diags.HasErrors() {
 		ctx.Log.Err("trying to detect required version: %s", diags.Error())
+		for _, d := range diags {
+			ctx.Log.Debug("%s in %s:%d", d.Detail, d.Pos.Filename, d.Pos.Line)
+		}
 		return nil
 	}
 

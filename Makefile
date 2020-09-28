@@ -1,5 +1,5 @@
 BUILD_ID := $(shell git rev-parse --short HEAD 2>/dev/null || echo no-commit-id)
-WORKSPACE := $(shell pwd)
+#WORKSPACE := $(shell pwd)
 PKG := $(shell go list ./... | grep -v e2e | grep -v vendor | grep -v static | grep -v mocks | grep -v testing)
 PKG_COMMAS := $(shell go list ./... | grep -v e2e | grep -v vendor | grep -v static | grep -v mocks | grep -v testing | tr '\n' ',')
 IMAGE_NAME := runatlantis/atlantis

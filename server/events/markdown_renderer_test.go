@@ -159,6 +159,8 @@ $$$
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * $atlantis unlock$
 `,
 		},
 		{
@@ -195,6 +197,8 @@ $$$
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * $atlantis unlock$
 `,
 		},
 		{
@@ -229,6 +233,8 @@ $$$
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * $atlantis unlock$
 `,
 		},
 		{
@@ -328,6 +334,8 @@ $$$
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * $atlantis unlock$
 `,
 		},
 		{
@@ -462,6 +470,8 @@ $$$
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * $atlantis unlock$
 `,
 		},
 		{
@@ -982,6 +992,8 @@ $$$
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * $atlantis unlock$
 `
 						} else {
 							exp = `Ran Plan for dir: $.$ workspace: $default$
@@ -999,6 +1011,8 @@ $$$
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * $atlantis unlock$
 `
 						}
 					case models.ApplyCommand:
@@ -1141,6 +1155,8 @@ $$$
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * $atlantis apply$
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * $atlantis unlock$
 `
 	expWithBackticks := strings.Replace(exp, "$", "`", -1)
 	Equals(t, expWithBackticks, rendered)

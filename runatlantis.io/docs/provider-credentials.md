@@ -10,11 +10,11 @@ It's up to you how you provide credentials for your specific provider to Atlanti
     credentials. Read their docs.
 * If you're running Atlantis in a cloud then many clouds have ways to give cloud API access
   to applications running on them, ex:
-    * [AWS EC2 Roles](https://www.terraform.io/docs/providers/aws/#ec2-role)
+    * [AWS EC2 Roles](https://registry.terraform.io/providers/hashicorp/aws/latest/docs) (Search for "EC2 Role")
     * [GCE Instance Service Accounts](https://www.terraform.io/docs/providers/google/provider_reference.html#configuration-reference)
 * Many users set environment variables, ex. `AWS_ACCESS_KEY`, where Atlantis is running.
 * Others create the necessary config files, ex. `~/.aws/credentials`, where Atlantis is running.
-* Use the [HashiCorp Vault Provider](https://www.terraform.io/docs/providers/vault/index.html#using-vault-credentials-in-terraform-configuration)
+* Use the [HashiCorp Vault Provider](https://registry.terraform.io/providers/hashicorp/vault/latest/docs)
   to obtain provider credentials.
 
 :::tip
@@ -27,16 +27,16 @@ running and run `terraform` commands like you would locally, then Atlantis will 
 
 ### Multiple AWS Accounts
 Atlantis supports multiple AWS accounts through the use of Terraform's
-[AWS Authentication](https://www.terraform.io/docs/providers/aws/#authentication).
+[AWS Authentication](https://registry.terraform.io/providers/hashicorp/aws/latest/docs) (Search for "Authentication").
 
-If you're using the [Shared Credentials file](https://www.terraform.io/docs/providers/aws/#shared-credentials-file)
+If you're using the [Shared Credentials file](https://registry.terraform.io/providers/hashicorp/aws/latest/docs) (Search for "Shared Credentials file")
 you'll need to ensure the server that Atlantis is executing on has the corresponding credentials file.
 
-If you're using [Assume role](https://www.terraform.io/docs/providers/aws/#assume-role)
+If you're using [Assume role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs) (Search for "Assume role")
 you'll need to ensure that the credentials file has a `default` profile that is able
 to assume all required roles.
 
-Using multiple [Environment variables](https://www.terraform.io/docs/providers/aws/#environment-variables)
+Using multiple [Environment variables](https://registry.terraform.io/providers/hashicorp/aws/latest/docs) (Search for "Environment variables")
 won't work for multiple accounts since Atlantis wouldn't know which environment variables to execute
 Terraform with.
 

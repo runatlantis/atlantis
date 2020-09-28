@@ -1,7 +1,9 @@
 package events_test
 
 import (
+	"crypto/tls"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,6 +12,17 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/testing"
 )
+
+// disableSSLVerification disables ssl verification for the global http client
+// and returns a function to be called in a defer that will re-enable it.
+func disableSSLVerification() func() {
+	orig := http.DefaultTransport.(*http.Transport).TLSClientConfig
+	// nolint: gosec
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	return func() {
+		http.DefaultTransport.(*http.Transport).TLSClientConfig = orig
+	}
+}
 
 // Test that if we don't have any existing files, we check out the repo.
 func TestClone_NoneExisting(t *testing.T) {

@@ -104,9 +104,15 @@ func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
 		"ATLANTIS_TERRAFORM_VERSION=$ATLANTIS_TERRAFORM_VERSION",
 		"DIR=$DIR",
 	}
-	out, err := client.RunCommandWithVersion(nil, tmp, args, map[string]string{}, nil, "workspace")
+	// If this runs in Jenkins WORKSPACE is set to the jenkins workspace so this can't be set to a fix value
+	CurrentWorkspace := os.Getenv("WORKSPACE")
+	if CurrentWorkspace == "" {
+		CurrentWorkspace = "workspace"
+	}
+	out, err := client.RunCommandWithVersion(nil, tmp, args, map[string]string{}, nil, CurrentWorkspace)
 	Ok(t, err)
-	exp := fmt.Sprintf("TF_IN_AUTOMATION=true TF_PLUGIN_CACHE_DIR=%s WORKSPACE=workspace ATLANTIS_TERRAFORM_VERSION=0.11.11 DIR=%s\n", tmp, tmp)
+
+	exp := fmt.Sprintf("TF_IN_AUTOMATION=true TF_PLUGIN_CACHE_DIR=%s WORKSPACE=%s ATLANTIS_TERRAFORM_VERSION=0.11.11 DIR=%s\n", tmp, CurrentWorkspace, tmp)
 	Equals(t, exp, out)
 }
 
@@ -154,11 +160,16 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 		"ATLANTIS_TERRAFORM_VERSION=$ATLANTIS_TERRAFORM_VERSION",
 		"DIR=$DIR",
 	}
-	_, outCh := client.RunCommandAsync(nil, tmp, args, map[string]string{}, nil, "workspace")
+	// If this runs in Jenkins WORKSPACE is set to the jenkins workspace so this can't be set to a fix value
+	CurrentWorkspace := os.Getenv("WORKSPACE")
+	if CurrentWorkspace == "" {
+		CurrentWorkspace = "workspace"
+	}
+	_, outCh := client.RunCommandAsync(nil, tmp, args, map[string]string{}, nil, CurrentWorkspace)
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
-	exp := fmt.Sprintf("TF_IN_AUTOMATION=true TF_PLUGIN_CACHE_DIR=%s WORKSPACE=workspace ATLANTIS_TERRAFORM_VERSION=0.11.11 DIR=%s", tmp, tmp)
+	exp := fmt.Sprintf("TF_IN_AUTOMATION=true TF_PLUGIN_CACHE_DIR=%s WORKSPACE=%s ATLANTIS_TERRAFORM_VERSION=0.11.11 DIR=%s", tmp, CurrentWorkspace, tmp)
 	Equals(t, exp, out)
 }
 
@@ -219,6 +230,7 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 		overrideTF:              "echo",
 	}
 	log := logging.NewSimpleLogger("test", false, logging.Debug)
+
 	_, outCh := client.RunCommandAsync(log, tmp, []string{"dying", "&&", "exit", "1"}, map[string]string{}, nil, "workspace")
 
 	out, err := waitCh(outCh)

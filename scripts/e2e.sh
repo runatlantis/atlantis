@@ -14,7 +14,7 @@ cd "${CIRCLE_WORKING_DIRECTORY}/e2e"
   --gh-token="$GITHUB_PASSWORD" \
   --data-dir="/tmp" \
   --log-level="debug" \
-  --repo-whitelist="github.com/runatlantis/atlantis-tests" \
+  --repo-allowlist="github.com/runatlantis/atlantis-tests" \
   --allow-repo-config &> /tmp/atlantis-server.log &
 sleep 2
 

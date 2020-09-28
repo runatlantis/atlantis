@@ -19,7 +19,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/google/go-github/v28/github"
+	"github.com/google/go-github/v31/github"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_github_request_validator.go GithubRequestValidator
