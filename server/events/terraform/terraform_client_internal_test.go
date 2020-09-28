@@ -169,7 +169,7 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
-	exp := fmt.Sprintf("TF_IN_AUTOMATION=true TF_PLUGIN_CACHE_DIR=%s WORKSPACE=%s ATLANTIS_TERRAFORM_VERSION=0.11.11 DIR=%s", tmp, tmp, CurrentWorkspace)
+	exp := fmt.Sprintf("TF_IN_AUTOMATION=true TF_PLUGIN_CACHE_DIR=%s WORKSPACE=%s ATLANTIS_TERRAFORM_VERSION=0.11.11 DIR=%s", tmp, CurrentWorkspace, tmp)
 	Equals(t, exp, out)
 }
 
@@ -194,12 +194,7 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 		_, err = f.WriteString(s)
 		Ok(t, err)
 	}
-	// If this runs in Jenkins WORKSPACE is set to the jenkins workspace so this can't be set to a fix value
-	CurrentWorkspace := os.Getenv("WORKSPACE")
-	if CurrentWorkspace == "" {
-		CurrentWorkspace = "workspace"
-	}
-	_, outCh := client.RunCommandAsync(nil, tmp, []string{filename}, map[string]string{}, nil, CurrentWorkspace)
+	_, outCh := client.RunCommandAsync(nil, tmp, []string{filename}, map[string]string{}, nil, "workspace")
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
@@ -217,12 +212,7 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 		overrideTF:              "echo",
 	}
 	log := logging.NewSimpleLogger("test", false, logging.Debug)
-	// If this runs in Jenkins WORKSPACE is set to the jenkins workspace so this can't be set to a fix value
-	CurrentWorkspace := os.Getenv("WORKSPACE")
-	if CurrentWorkspace == "" {
-		CurrentWorkspace = "workspace"
-	}
-	_, outCh := client.RunCommandAsync(log, tmp, []string{"stderr", ">&2"}, map[string]string{}, nil, CurrentWorkspace)
+	_, outCh := client.RunCommandAsync(log, tmp, []string{"stderr", ">&2"}, map[string]string{}, nil, "workspace")
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
@@ -240,12 +230,7 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 		overrideTF:              "echo",
 	}
 	log := logging.NewSimpleLogger("test", false, logging.Debug)
-	// If this runs in Jenkins WORKSPACE is set to the jenkins workspace so this can't be set to a fix value
-	CurrentWorkspace := os.Getenv("WORKSPACE")
-	if CurrentWorkspace == "" {
-		CurrentWorkspace = "workspace"
-	}
-	_, outCh := client.RunCommandAsync(log, tmp, []string{"dying", "&&", "exit", "1"}, map[string]string{}, nil, CurrentWorkspace)
+	_, outCh := client.RunCommandAsync(log, tmp, []string{"dying", "&&", "exit", "1"}, map[string]string{}, nil, "workspace")
 
 	out, err := waitCh(outCh)
 	ErrEquals(t, fmt.Sprintf(`running "echo dying && exit 1" in %q: exit status 1`, tmp), err)
@@ -264,12 +249,7 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 		overrideTF:              "read",
 	}
 	log := logging.NewSimpleLogger("test", false, logging.Debug)
-	// If this runs in Jenkins WORKSPACE is set to the jenkins workspace so this can't be set to a fix value
-	CurrentWorkspace := os.Getenv("WORKSPACE")
-	if CurrentWorkspace == "" {
-		CurrentWorkspace = "workspace"
-	}
-	inCh, outCh := client.RunCommandAsync(log, tmp, []string{"a", "&&", "echo", "$a"}, map[string]string{}, nil, CurrentWorkspace)
+	inCh, outCh := client.RunCommandAsync(log, tmp, []string{"a", "&&", "echo", "$a"}, map[string]string{}, nil, "workspace")
 	inCh <- "echo me\n"
 
 	out, err := waitCh(outCh)
