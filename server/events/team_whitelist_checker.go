@@ -20,7 +20,7 @@ type TeamWhitelistChecker struct {
 func NewTeamWhitelistChecker(whitelist string) (*TeamWhitelistChecker, error) {
 	var rules []mapOfStrings
 	pairs := strings.Split(whitelist, ",")
-	if len(pairs) != 0 {
+	if pairs[0] != "" {
 		for _, pair := range pairs {
 			values := strings.Split(pair, ":")
 			team := strings.TrimSpace(values[0])
