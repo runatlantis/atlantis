@@ -17,7 +17,7 @@ import (
 )
 
 // AtlantisYAMLFilename is the name of the config file for each repo.
-var AtlantisYAMLFilename string
+const AtlantisYAMLFilename = "atlantis.yaml"
 
 // ParserValidator parses and validates server-side repo config files and
 // repo-level atlantis.yaml files.
