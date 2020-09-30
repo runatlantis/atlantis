@@ -384,7 +384,7 @@ func (g *GithubClient) GetTeamNamesForUser(repo models.Repo, user models.User) (
 			return nil, err
 		}
 		for _, t := range teams {
-			membership, _, err := g.client.Teams.GetTeamMembershipBySlug(g.ctx, org, *t.Name, user.Username)
+			membership, _, err := g.client.Teams.GetTeamMembershipBySlug(g.ctx, org, *t.Slug, user.Username)
 			//membership, _, err := g.client.Teams.GetTeamMembershipBySlug(g.ctx, org, t.GetID(), user.Username)
 			if err == nil && membership != nil {
 				if *membership.State == "active" && (*membership.Role == "member" || *membership.Role == "maintainer") {
