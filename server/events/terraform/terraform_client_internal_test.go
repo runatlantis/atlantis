@@ -104,11 +104,6 @@ func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
 		"ATLANTIS_TERRAFORM_VERSION=$ATLANTIS_TERRAFORM_VERSION",
 		"DIR=$DIR",
 	}
-	// If this runs in Jenkins WORKSPACE is set to the jenkins workspace so this can't be set to a fix value
-	CurrentWorkspace := os.Getenv("WORKSPACE")
-	if CurrentWorkspace == "" {
-		CurrentWorkspace = "workspace"
-	}
 	out, err := client.RunCommandWithVersion(nil, tmp, args, map[string]string{}, nil, CurrentWorkspace)
 	Ok(t, err)
 
@@ -159,11 +154,6 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 		"WORKSPACE=$WORKSPACE",
 		"ATLANTIS_TERRAFORM_VERSION=$ATLANTIS_TERRAFORM_VERSION",
 		"DIR=$DIR",
-	}
-	// If this runs in Jenkins WORKSPACE is set to the jenkins workspace so this can't be set to a fix value
-	CurrentWorkspace := os.Getenv("WORKSPACE")
-	if CurrentWorkspace == "" {
-		CurrentWorkspace = "workspace"
 	}
 	_, outCh := client.RunCommandAsync(nil, tmp, args, map[string]string{}, nil, CurrentWorkspace)
 
