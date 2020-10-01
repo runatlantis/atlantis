@@ -524,4 +524,40 @@ var adMergeSuccess = `{
 					"transitionWorkItems":true,
 					"triggeredByAutoComplete":false
 	}
-}`
+}
+`
+
+func TestAzureDevopsClient_GitStatusContextFromSrc(t *testing.T) {
+	cases := []struct {
+		src      string
+		expGenre string
+		expName  string
+	}{
+		{
+			"atlantis/plan",
+			"Atlantis Bot/atlantis",
+			"plan",
+		},
+		{
+			"atlantis/foo/bar/biz/baz",
+			"Atlantis Bot/atlantis/foo/bar/biz",
+			"baz",
+		},
+		{
+			"foo",
+			"Atlantis Bot",
+			"foo",
+		},
+		{
+			"",
+			"Atlantis Bot",
+			"",
+		},
+	}
+
+	for _, c := range cases {
+		result := vcs.GitStatusContextFromSrc(c.src)
+		Equals(t, &c.expName, result.Name)
+		Equals(t, &c.expGenre, result.Genre)
+	}
+}
