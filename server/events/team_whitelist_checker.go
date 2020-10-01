@@ -53,7 +53,7 @@ func (checker *TeamWhitelistChecker) IsCommandAllowedForTeam(team string, comman
 // and false otherwise.
 func (checker *TeamWhitelistChecker) IsCommandAllowedForAnyTeam(teams []string, command string) bool {
 	c := strings.TrimSpace(command)
-	if teams == nil || len(teams) == 0 {
+	if len(teams) == 0 {
 		for _, rule := range checker.rules {
 			for key, value := range rule {
 				if (key == wildcard) && (value == wildcard || strings.EqualFold(value, c)) {
