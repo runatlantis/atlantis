@@ -443,7 +443,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Logger:                          logger,
 		GithubWebhookSecret:             []byte(userConfig.GithubWebhookSecret),
 		GithubRequestValidator:          &DefaultGithubRequestValidator{},
-		TeamWhitelistChecker:            githubTeamWhitelistChecker,		
+		TeamWhitelistChecker:            githubTeamWhitelistChecker,
 		GitlabRequestParserValidator:    &DefaultGitlabRequestParserValidator{},
 		GitlabWebhookSecret:             []byte(userConfig.GitlabWebhookSecret),
 		RepoAllowlistChecker:            repoAllowlist,

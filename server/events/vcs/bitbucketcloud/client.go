@@ -245,7 +245,7 @@ func (b *Client) makeRequest(method string, path string, reqBody io.Reader) ([]b
 }
 
 // GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
-func (g *Client) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+func (b *Client) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
 	return nil, nil
 }
 
