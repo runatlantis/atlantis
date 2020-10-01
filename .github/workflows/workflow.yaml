@@ -1,0 +1,13 @@
+on: push
+name: Tests
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - uses: cedrickring/golang-action@1.14.0
+    env:
+        GO111MODULE: "on"
+        IMPORT: "lyft/atlantis"
+    with:
+        args: make test
