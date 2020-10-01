@@ -33,7 +33,12 @@ import (
 
 // maxCommentLength is the maximum number of chars allowed in a single comment
 // by GitHub.
-const maxCommentLength = 65536
+const (
+	maxCommentLength = 65536
+
+	SubmitQueueReadinessStatusContext = "sq-ready-to-merge"
+	OwnersStatusContext               = "_owners-check"
+)
 
 // GithubClient is used to perform GitHub actions.
 type GithubClient struct {
@@ -280,9 +285,45 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	//            hooks. Merging is allowed (green box).
 	// See: https://github.com/octokit/octokit.net/issues/1763
 	if state != "clean" && state != "unstable" && state != "has_hooks" {
-		return false, nil
+
+		if state != "blocked" {
+			return false, nil
+		}
+
+		return g.getSubmitQueueMergeability(repo, pull)
 	}
 	return true, nil
+}
+
+// Checks to make sure that all statuses are passing except the Submit Queue Readiness check
+// Additionally checks if the Owners Check has been applied and is successful.
+func (g *GithubClient) getSubmitQueueMergeability(repo models.Repo, pull models.PullRequest) (bool, error) {
+	statuses, err := g.getRepoStatuses(repo, pull)
+
+	if err != nil {
+		return false, errors.Wrapf(err, "fetching repo statuses for repo: %s, and pull number: %d", repo.FullName, pull.Num)
+	}
+
+	ownersCheckApplied := false
+	for _, status := range statuses {
+		state := status.GetState()
+
+		if status.GetContext() == OwnersStatusContext {
+			ownersCheckApplied = true
+		}
+
+		if state == "success" || (state == "pending" && status.GetContext() == SubmitQueueReadinessStatusContext) {
+			continue
+		}
+
+		// we either have a failure or a pending status check
+		// hence the PR is not mergeable
+		return false, nil
+	}
+
+	// all our status checks are successful by our definition,
+	// ensure that owners check has been applied as a check.
+	return ownersCheckApplied, nil
 }
 
 // GetPullRequest returns the pull request.
@@ -310,6 +351,38 @@ func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRe
 		}
 	}
 	return pull, err
+}
+
+func (g *GithubClient) getRepoStatuses(repo models.Repo, pull models.PullRequest) ([]*github.RepoStatus, error) {
+	// Get Combined statuses
+
+	nextPage := 0
+
+	var result []*github.RepoStatus
+
+	for {
+		opts := github.ListOptions{
+			// explicit default
+			// https://developer.github.com/v3/repos/statuses/#list-commit-statuses-for-a-reference
+			PerPage: 100,
+		}
+		if nextPage != 0 {
+			opts.Page = nextPage
+		}
+
+		combinedStatus, response, err := g.client.Repositories.GetCombinedStatus(g.ctx, repo.Owner, repo.Name, pull.HeadCommit, &opts)
+		result = append(result, combinedStatus.Statuses...)
+
+		if err != nil {
+			return nil, err
+		}
+		if response.NextPage == 0 {
+			break
+		}
+		nextPage = response.NextPage
+	}
+
+	return result, nil
 }
 
 // UpdateStatus updates the status badge on the pull request.
