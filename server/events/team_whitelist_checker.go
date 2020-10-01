@@ -10,14 +10,14 @@ const wildcard = "*"
 // mapOfStrings is an alias for map[string]string
 type mapOfStrings map[string]string
 
-// TeamWhitelistChecker implements checking the teams and the operations that the members
+// TeamAllowlistChecker implements checking the teams and the operations that the members
 // of a particular team are allowed to perform
-type TeamWhitelistChecker struct {
+type TeamAllowlistChecker struct {
 	rules []mapOfStrings
 }
 
-// NewTeamWhitelistChecker constructs a new checker
-func NewTeamWhitelistChecker(whitelist string) (*TeamWhitelistChecker, error) {
+// NewTeamAllowlistChecker constructs a new checker
+func NewTeamAllowlistChecker(whitelist string) (*TeamAllowlistChecker, error) {
 	var rules []mapOfStrings
 	pairs := strings.Split(whitelist, ",")
 	if pairs[0] != "" {
@@ -29,14 +29,14 @@ func NewTeamWhitelistChecker(whitelist string) (*TeamWhitelistChecker, error) {
 			rules = append(rules, m)
 		}
 	}
-	return &TeamWhitelistChecker{
+	return &TeamAllowlistChecker{
 		rules: rules,
 	}, nil
 }
 
 // IsCommandAllowedForTeam returns true if the team is allowed to execute the command
 // and false otherwise.
-func (checker *TeamWhitelistChecker) IsCommandAllowedForTeam(team string, command string) bool {
+func (checker *TeamAllowlistChecker) IsCommandAllowedForTeam(team string, command string) bool {
 	t := strings.TrimSpace(team)
 	c := strings.TrimSpace(command)
 	for _, rule := range checker.rules {
@@ -51,7 +51,7 @@ func (checker *TeamWhitelistChecker) IsCommandAllowedForTeam(team string, comman
 
 // IsCommandAllowedForAnyTeam returns true if any of the teams is allowed to execute the command
 // and false otherwise.
-func (checker *TeamWhitelistChecker) IsCommandAllowedForAnyTeam(teams []string, command string) bool {
+func (checker *TeamAllowlistChecker) IsCommandAllowedForAnyTeam(teams []string, command string) bool {
 	c := strings.TrimSpace(command)
 	if len(teams) == 0 {
 		for _, rule := range checker.rules {

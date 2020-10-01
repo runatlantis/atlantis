@@ -419,7 +419,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	githubTeamWhitelistChecker, err := events.NewTeamWhitelistChecker(userConfig.GithubTeamWhitelist)
+	githubTeamAllowlistChecker, err := events.NewTeamAllowlistChecker(userConfig.GithubTeamAllowlist)
 	if err != nil {
 		return nil, err
 	}
@@ -443,7 +443,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Logger:                          logger,
 		GithubWebhookSecret:             []byte(userConfig.GithubWebhookSecret),
 		GithubRequestValidator:          &DefaultGithubRequestValidator{},
-		TeamWhitelistChecker:            githubTeamWhitelistChecker,
+		TeamAllowlistChecker:            githubTeamAllowlistChecker,
 		GitlabRequestParserValidator:    &DefaultGitlabRequestParserValidator{},
 		GitlabWebhookSecret:             []byte(userConfig.GitlabWebhookSecret),
 		RepoAllowlistChecker:            repoAllowlist,
