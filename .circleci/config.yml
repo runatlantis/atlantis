@@ -47,22 +47,6 @@ jobs:
             --buffer-size 8192 \
             http://localhost:8080/
 
-  # Build and push Docker tag.
-  docker_tag:
-    docker:
-    - image: circleci/golang:1.17 # If you update this, update it in the Makefile too
-    steps:
-    - checkout
-    - run: make build-service
-    - setup_remote_docker
-    - run:
-        name: Build and tag
-        command: |
-          if [ -n "${CIRCLE_TAG}" ]; then
-            docker build -t "runatlantis/atlantis:${CIRCLE_TAG}" .
-            docker login -u "$DOCKER_USER" -p "$DOCKER_PASSWORD"
-            docker push "runatlantis/atlantis:${CIRCLE_TAG}"
-          fi
 workflows:
   version: 2
   branch:
