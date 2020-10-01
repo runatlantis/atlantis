@@ -1,4 +1,5 @@
 # Atlantis
+Atlantis is a fictional island mentioned in an allegory on the hubris of nations in Plato's works Timaeus and Critias, where it represents the antagonist naval power that besieges "Ancient Athens", the pseudo-historic embodiment of Plato's ideal state in The Republic.
 
 <p align="center">
   <img src="./runatlantis.io/.vuepress/public/hero.png" alt="Atlantis Logo"/><br><br>
