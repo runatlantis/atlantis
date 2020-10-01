@@ -60,7 +60,7 @@ type EventsController struct {
 	// UI that identifies this call as coming from GitLab. If empty, no
 	// request validation is done.
 	GitlabWebhookSecret  []byte
-	TeamWhitelistChecker *events.TeamWhitelistChecker
+	TeamAllowlistChecker *events.TeamAllowlistChecker
 	// SilenceWhitelistErrors controls whether we write an error comment on
 	// pull requests from non-whitelisted repos.
 	SilenceWhitelistErrors bool
@@ -589,7 +589,7 @@ func (e *EventsController) checkUserPermissions(repo models.Repo, user models.Us
 		if err != nil {
 			return false, err
 		}
-		ok := e.TeamWhitelistChecker.IsCommandAllowedForAnyTeam(teams, cmd.Name.String())
+		ok := e.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(teams, cmd.Name.String())
 		if !ok {
 			return false, nil
 		}
