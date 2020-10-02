@@ -38,6 +38,7 @@ const (
 
 	SubmitQueueReadinessStatusContext = "sq-ready-to-merge"
 	OwnersStatusContext               = "_owners-check"
+	AtlantisApplyStatusContext        = "atlantis/apply"
 )
 
 // GithubClient is used to perform GitHub actions.
@@ -295,7 +296,7 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	return true, nil
 }
 
-// Checks to make sure that all statuses are passing except the Submit Queue Readiness check
+// Checks to make sure that all statuses are passing except the Submit Queue Readiness check and atlantis/apply
 // Additionally checks if the Owners Check has been applied and is successful.
 func (g *GithubClient) getSubmitQueueMergeability(repo models.Repo, pull models.PullRequest) (bool, error) {
 	statuses, err := g.getRepoStatuses(repo, pull)
@@ -312,7 +313,9 @@ func (g *GithubClient) getSubmitQueueMergeability(repo models.Repo, pull models.
 			ownersCheckApplied = true
 		}
 
-		if state == "success" || (state == "pending" && status.GetContext() == SubmitQueueReadinessStatusContext) {
+		if status.GetContext() == AtlantisApplyStatusContext ||
+			state == "success" ||
+			(state == "pending" && status.GetContext() == SubmitQueueReadinessStatusContext) {
 			continue
 		}
 
