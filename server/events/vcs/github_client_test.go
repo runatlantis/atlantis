@@ -593,10 +593,11 @@ func TestGithubClient_PullisMergeable_BlockedStatus(t *testing.T) {
 		expMergeable bool
 	}{
 		{
-			"sq-pending+owners-success",
+			"sq-pending+owners-success+apply-failure",
 			[]string{
 				fmt.Sprintf(statusJSON, "pending", "sq-ready-to-merge"),
 				fmt.Sprintf(statusJSON, "success", "_owners-check"),
+				fmt.Sprintf(statusJSON, "failure", "atlantis/apply"),
 			},
 			true,
 		},
