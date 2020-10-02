@@ -6,7 +6,8 @@
                 "isEnabled": true,
                 "isBlocking": true,
                 "settings": {
-                    "statusName": "pending"
+                    "statusGenre": "Atlantis Bot/atlantis",
+                    "statusName": "plan"
                 }
             },
             "status": "approved"
