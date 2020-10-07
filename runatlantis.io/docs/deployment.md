@@ -43,13 +43,17 @@ Pick your deployment type:
 
 
 ### Kubernetes Helm Chart
-Atlantis has an [official Helm chart](https://hub.kubeapps.com/charts/stable/atlantis).
+Atlantis has an [official Helm chart](https://github.com/runatlantis/helm-charts/tree/main/charts/atlantis)
 
 To install:
+1. Add the runatlantis helm chart repository to helm
+    ```bash
+    helm repo add runatlantis https://runatlantis.github.io/helm-charts
+    ```
 1. `cd` into a directory where you're going to configure your Atlantis Helm chart
 1. Create a `values.yaml` file by running
     ```bash
-    helm inspect values stable/atlantis > values.yaml
+    helm inspect values runatlantis/atlantis > values.yaml
     ```
 1. Edit `values.yaml` and add your access credentials and webhook secret
     ```yaml
@@ -67,12 +71,12 @@ To install:
     for documentation)
 1. Run
     ```sh
-    helm install atlantis stable/atlantis -f values.yaml
+    helm install atlantis runatlantis/atlantis -f values.yaml
     ```
     
     If you are using helm v2, run:
     ```sh
-    helm install -f values.yaml stable/atlantis
+    helm install -f values.yaml runatlantis/atlantis
     ```
 
 
