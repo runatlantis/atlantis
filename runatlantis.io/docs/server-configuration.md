@@ -305,7 +305,7 @@ Values are chosen in this order:
 
 * ### `--gitlab-webhook-secret`
   ```bash
-  atlantis server --gh-webhook-secret="secret"
+  atlantis server --gitlab-webhook-secret="secret"
   # or (recommended)
   ATLANTIS_GITLAB_WEBHOOK_SECRET='secret' atlantis server
   ```
