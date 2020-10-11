@@ -41,7 +41,7 @@ If installing on a single repository, navigate to the repository home page and c
 
 ## GitLab
 If you're using GitLab, navigate to your project's home page in GitLab
-- Click **Settings > Integrations** in the sidebar
+- Click **Settings > Webooks** in the sidebar
 - set **URL** to `http://$URL/events` (or `https://$URL/events` if you're using SSL) where `$URL` is where Atlantis is hosted. **Be sure to add `/events`**
 - double-check you added `/events` to the end of your URL.
 - set **Secret Token** to the Webhook Secret you generated previously
