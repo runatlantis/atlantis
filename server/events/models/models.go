@@ -521,6 +521,8 @@ const (
 	// UnlockCommand is a command to discard previous plans as well as the atlantis locks.
 	UnlockCommand
 	// Adding more? Don't forget to update String() below
+	// PreWorkflowHookCommand is a command to run pre workflow steps
+	PreWorkflowHookCommand
 )
 
 // String returns the string representation of c.
@@ -532,6 +534,8 @@ func (c CommandName) String() string {
 		return "plan"
 	case UnlockCommand:
 		return "unlock"
+	case PreWorkflowHookCommand:
+		return "pre_workflow_steps"
 	}
 	return ""
 }

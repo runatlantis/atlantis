@@ -108,6 +108,7 @@ func TestNewGlobalCfg(t *testing.T) {
 			if c.approvedReq {
 				exp.Repos[0].ApplyRequirements = append(exp.Repos[0].ApplyRequirements, "approved")
 			}
+
 			Equals(t, exp, act)
 
 			// Have to hand-compare regexes because Equals doesn't do it.

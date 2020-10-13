@@ -1023,6 +1023,7 @@ workflows:
 			input: `
 repos:
 - id: github.com/owner/repo
+
   apply_requirements: [approved, mergeable]
   workflow: custom1
   allowed_overrides: [apply_requirements, workflow]

@@ -20,6 +20,7 @@ type GlobalCfg struct {
 type Repo struct {
 	ID                   string   `yaml:"id" json:"id"`
 	ApplyRequirements    []string `yaml:"apply_requirements" json:"apply_requirements"`
+	PreWorkflowHooks     []string `yaml:"pre_workflow_hooks" json:"pre_workflow_hooks"`
 	Workflow             *string  `yaml:"workflow,omitempty" json:"workflow,omitempty"`
 	AllowedWorkflows     []string `yaml:"allowed_workflows,omitempty" json:"allowed_workflows,omitempty"`
 	AllowedOverrides     []string `yaml:"allowed_overrides" json:"allowed_overrides"`

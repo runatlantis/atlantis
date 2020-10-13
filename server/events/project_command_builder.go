@@ -36,6 +36,9 @@ const (
 
 // ProjectCommandBuilder builds commands that run on individual projects.
 type ProjectCommandBuilder interface {
+	// BuildPreWorkflowHookCommands build project commands that will run before
+	// any other commands.
+	BuildPreWorkflowHookCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error)
 	// BuildAutoplanCommands builds project commands that will run plan on
 	// the projects determined to be modified.
 	BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error)
@@ -62,6 +65,15 @@ type DefaultProjectCommandBuilder struct {
 	PendingPlanFinder  *DefaultPendingPlanFinder
 	CommentBuilder     CommentBuilder
 	SkipCloneNoChanges bool
+}
+
+func (p *DefaultProjectCommandBuilder) BuildPreWorkflowHookCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error) {
+	projCtxs, err := p.buildPreWorkflowHookCommands(ctx, nil, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return projCtxs, nil
 }
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
@@ -97,6 +109,11 @@ func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *CommandContext, c
 	}
 	pac, err := p.buildProjectApplyCommand(ctx, cmd)
 	return []models.ProjectCommandContext{pac}, err
+}
+
+func (p *DefaultProjectCommandBuilder) buildPreWorkflowHookCommands(ctx *CommandContext, commentFlags []string, verbose bool) ([]models.ProjectCommandContext, error) {
+
+	return []models.ProjectCommandContext{}, nil
 }
 
 // buildPlanAllCommands builds plan contexts for all projects we determine were
@@ -151,6 +168,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 	if err != nil {
 		return nil, err
 	}
+
 	// Parse config file if it exists.
 	hasRepoCfg, err := p.ParserValidator.HasRepoCfg(repoDir)
 	if err != nil {

@@ -43,6 +43,25 @@ type PullCommand interface {
 	IsAutoplan() bool
 }
 
+// PreWorkflowHookCommand is a command that runs pre workflow commands specified
+// in the server config when pull request is opened or updated.
+type PreWorkflowHookCommand struct{}
+
+// CommandName is Plan.
+func (c PreWorkflowHookCommand) CommandName() models.CommandName {
+	return models.PreWorkflowHookCommand
+}
+
+// IsVerbose is false for autoplan commands.
+func (c PreWorkflowHookCommand) IsVerbose() bool {
+	return false
+}
+
+// IsAutoplan is false for non autoplan commands.
+func (c PreWorkflowHookCommand) IsAutoplan() bool {
+	return false
+}
+
 // AutoplanCommand is a plan command that is automatically triggered when a
 // pull request is opened or updated.
 type AutoplanCommand struct{}
