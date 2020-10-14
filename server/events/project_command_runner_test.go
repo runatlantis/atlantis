@@ -61,7 +61,6 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	When(mockWorkingDir.Clone(
 		matchers.AnyPtrToLoggingSimpleLogger(),
 		matchers.AnyModelsRepo(),
-		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
 		AnyString(),
 	)).ThenReturn(repoDir, false, nil)
@@ -372,7 +371,6 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 	defer cleanup()
 	When(mockWorkingDir.Clone(
 		matchers.AnyPtrToLoggingSimpleLogger(),
-		matchers.AnyModelsRepo(),
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
 		AnyString(),

@@ -37,7 +37,7 @@ type WorkingDir interface {
 	// absolute path to the root of the cloned repo. It also returns
 	// a boolean indicating if we should warn users that the branch we're
 	// merging into has been updated since we cloned it.
-	Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, workspace string) (string, bool, error)
+	Clone(log *logging.SimpleLogger, headRepo models.Repo, p models.PullRequest, workspace string) (string, bool, error)
 	// GetWorkingDir returns the path to the workspace for this repo and pull.
 	// If workspace does not exist on disk, error will be of type os.IsNotExist.
 	GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error)
@@ -72,11 +72,10 @@ type FileWorkspace struct {
 // multiple dirs of the same repo without deleting existing plans.
 func (w *FileWorkspace) Clone(
 	log *logging.SimpleLogger,
-	baseRepo models.Repo,
 	headRepo models.Repo,
 	p models.PullRequest,
 	workspace string) (string, bool, error) {
-	cloneDir := w.cloneDir(baseRepo, p, workspace)
+	cloneDir := w.cloneDir(p.BaseRepo, p, workspace)
 
 	// If the directory already exists, check if it's at the right commit.
 	// If so, then we do nothing.
