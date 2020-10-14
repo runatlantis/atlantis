@@ -521,8 +521,8 @@ const (
 	// UnlockCommand is a command to discard previous plans as well as the atlantis locks.
 	UnlockCommand
 	// Adding more? Don't forget to update String() below
-	// PreWorkflowHookCommand is a command to run pre workflow steps
-	PreWorkflowHookCommand
+	// WorkflowHooksCommand is a command to run pre workflow steps
+	WorkflowHooksCommand
 )
 
 // String returns the string representation of c.
@@ -534,8 +534,59 @@ func (c CommandName) String() string {
 		return "plan"
 	case UnlockCommand:
 		return "unlock"
-	case PreWorkflowHookCommand:
+	case WorkflowHooksCommand:
 		return "pre_workflow_steps"
 	}
 	return ""
+}
+
+// WorkflowHookCommandContext defines the context for a plan or apply stage that will
+// be executed for a project.
+type WorkflowHookCommandContext struct {
+	// BaseRepo is the repository that the pull request will be merged into.
+	BaseRepo Repo
+	// HeadRepo is the repository that is getting merged into the BaseRepo.
+	// If the pull request branch is from the same repository then HeadRepo will
+	// be the same as BaseRepo.
+	HeadRepo Repo
+	// Log is a logger that's been set up for this context.
+	Log *logging.SimpleLogger
+	// PullMergeable is true if the pull request for this project is able to be merged.
+	PullMergeable bool
+	// Pull is the pull request we're responding to.
+	Pull PullRequest
+	// RepoRelDir is the directory of this project relative to the repo root.
+	RepoRelDir string
+	// Steps are the sequence of commands we need to run for this project and this
+	// stage.
+	Steps []valid.Step
+	// User is the user that triggered this command.
+	User User
+	// Verbose is true when the user would like verbose output.
+	Verbose bool
+}
+
+// WorkflowHookCommandResult is the result of executing a plan/apply for a specific project.
+type WorkflowHookCommandResult struct {
+	Command    CommandName
+	RepoRelDir string
+	Error      error
+	Failure    string
+	Success    bool
+}
+
+// CommitStatus returns the vcs commit status of this project result.
+func (w WorkflowHookCommandResult) CommitStatus() CommitStatus {
+	if w.Error != nil {
+		return FailedCommitStatus
+	}
+	if w.Failure != "" {
+		return FailedCommitStatus
+	}
+	return SuccessCommitStatus
+}
+
+// IsSuccessful returns true if this project result had no errors.
+func (w WorkflowHookCommandResult) IsSuccessful() bool {
+	return w.Success
 }

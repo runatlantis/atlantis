@@ -885,6 +885,12 @@ func TestParseGlobalCfg_NotExist(t *testing.T) {
 
 func TestParseGlobalCfg(t *testing.T) {
 	defaultCfg := valid.NewGlobalCfg(false, false, false)
+	emptyWorkflowHooks := make([]valid.WorkflowHook, 0)
+	workflowHook := valid.WorkflowHook{
+		StepName:   "run",
+		RunCommand: "custom workflow command",
+	}
+
 	customWorkflow1 := valid.Workflow{
 		Name: "custom1",
 		Plan: valid.Stage{
@@ -1025,11 +1031,14 @@ repos:
 - id: github.com/owner/repo
 
   apply_requirements: [approved, mergeable]
+  pre_workflow_hooks:
+    - run: custom workflow command
   workflow: custom1
   allowed_overrides: [apply_requirements, workflow]
   allow_custom_workflows: true
 - id: /.*/
-
+  pre_workflow_hooks:
+    - run: custom workflow command
 workflows:
   custom1:
     plan:
@@ -1049,12 +1058,14 @@ workflows:
 					{
 						ID:                   "github.com/owner/repo",
 						ApplyRequirements:    []string{"approved", "mergeable"},
+						WorkflowHooks:        &[]valid.WorkflowHook{workflowHook},
 						Workflow:             &customWorkflow1,
 						AllowedOverrides:     []string{"apply_requirements", "workflow"},
 						AllowCustomWorkflows: Bool(true),
 					},
 					{
-						IDRegex: regexp.MustCompile(".*"),
+						IDRegex:       regexp.MustCompile(".*"),
+						WorkflowHooks: &[]valid.WorkflowHook{workflowHook},
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1072,7 +1083,8 @@ repos:
 				Repos: []valid.Repo{
 					defaultCfg.Repos[0],
 					{
-						IDRegex: regexp.MustCompile("github.com/"),
+						IDRegex:       regexp.MustCompile("github.com/"),
+						WorkflowHooks: &emptyWorkflowHooks,
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1090,8 +1102,9 @@ repos:
 				Repos: []valid.Repo{
 					defaultCfg.Repos[0],
 					{
-						ID:       "github.com/owner/repo",
-						Workflow: defaultCfg.Repos[0].Workflow,
+						ID:            "github.com/owner/repo",
+						WorkflowHooks: &emptyWorkflowHooks,
+						Workflow:      defaultCfg.Repos[0].Workflow,
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1114,6 +1127,7 @@ workflows:
 					{
 						IDRegex:           regexp.MustCompile(".*"),
 						ApplyRequirements: []string{},
+						WorkflowHooks:     &emptyWorkflowHooks,
 						Workflow: &valid.Workflow{
 							Name: "default",
 							Apply: valid.Stage{
@@ -1161,6 +1175,7 @@ workflows:
 			Ok(t, ioutil.WriteFile(path, []byte(c.input), 0600))
 
 			act, err := r.ParseGlobalCfg(path, valid.NewGlobalCfg(false, false, false))
+
 			if c.expErr != "" {
 				expErr := strings.Replace(c.expErr, "<tmp>", path, -1)
 				ErrEquals(t, expErr, err)
@@ -1182,6 +1197,7 @@ workflows:
 
 // Test that if we pass in JSON strings everything should parse fine.
 func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
+	emptyWorkflowHooks := make([]valid.WorkflowHook, 0)
 	customWorkflow := valid.Workflow{
 		Name: "custom",
 		Plan: valid.Stage{
@@ -1262,6 +1278,7 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 					{
 						IDRegex:              regexp.MustCompile(".*"),
 						ApplyRequirements:    []string{"mergeable", "approved"},
+						WorkflowHooks:        &emptyWorkflowHooks,
 						Workflow:             &customWorkflow,
 						AllowedWorkflows:     []string{"custom"},
 						AllowedOverrides:     []string{"workflow", "apply_requirements"},

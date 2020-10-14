@@ -42,7 +42,6 @@ type CommandRunner interface {
 	// and then calling the appropriate services to finish executing the command.
 	RunCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *CommentCommand)
 	RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User)
-	RunPreWorkflowHooks(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_github_pull_getter.go GithubPullGetter
@@ -112,54 +111,6 @@ type DefaultCommandRunner struct {
 	DB                *db.BoltDB
 	Drainer           *Drainer
 	DeleteLockCommand DeleteLockCommand
-}
-
-func (c *DefaultCommandRunner) RunPreWorkflowHooks(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) {
-	if opStarted := c.Drainer.StartOp(); !opStarted {
-		if commentErr := c.VCSClient.CreateComment(baseRepo, pull.Num, ShutdownComment, models.PreWorkflowHookCommand.String()); commentErr != nil {
-			c.Logger.Log(logging.Error, "unable to comment that Atlantis is shutting down: %s", commentErr)
-		}
-		return
-	}
-	defer c.Drainer.OpDone()
-
-	log := c.buildLogger(baseRepo.FullName, pull.Num)
-	defer c.logPanics(baseRepo, pull.Num, log)
-	ctx := &CommandContext{
-		User:     user,
-		Log:      log,
-		Pull:     pull,
-		HeadRepo: headRepo,
-		BaseRepo: baseRepo,
-	}
-	if !c.validateCtxAndComment(ctx) {
-		return
-	}
-
-	projectCmds, err := c.ProjectCommandBuilder.BuildPreWorkflowHookCommands(ctx)
-	if err != nil {
-		if statusErr := c.CommitStatusUpdater.UpdateCombined(ctx.BaseRepo, ctx.Pull, models.FailedCommitStatus, models.PreWorkflowHookCommand); statusErr != nil {
-			ctx.Log.Warn("unable to update commit status: %s", statusErr)
-		}
-
-		c.updatePull(ctx, PreWorkflowHookCommand{}, CommandResult{Error: err})
-		return
-	}
-	if len(projectCmds) == 0 {
-		log.Info("determined there was no pre workflow hooks to run")
-		return
-	}
-
-	var result CommandResult
-	result = c.runProjectCmds(projectCmds, models.PlanCommand)
-
-	c.updatePull(ctx, PreWorkflowHookCommand{}, result)
-	pullStatus, err := c.updateDB(ctx, ctx.Pull, result.ProjectResults)
-	if err != nil {
-		c.Logger.Err("writing results: %s", err)
-	}
-
-	c.updateCommitStatus(ctx, models.PreWorkflowHookCommand, pullStatus)
 }
 
 // RunAutoplanCommand runs plan when a pull request is opened or updated.

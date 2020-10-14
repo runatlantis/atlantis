@@ -36,9 +36,6 @@ const (
 
 // ProjectCommandBuilder builds commands that run on individual projects.
 type ProjectCommandBuilder interface {
-	// BuildPreWorkflowHookCommands build project commands that will run before
-	// any other commands.
-	BuildPreWorkflowHookCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error)
 	// BuildAutoplanCommands builds project commands that will run plan on
 	// the projects determined to be modified.
 	BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error)
@@ -67,8 +64,8 @@ type DefaultProjectCommandBuilder struct {
 	SkipCloneNoChanges bool
 }
 
-func (p *DefaultProjectCommandBuilder) BuildPreWorkflowHookCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error) {
-	projCtxs, err := p.buildPreWorkflowHookCommands(ctx, nil, false)
+func (p *DefaultProjectCommandBuilder) BuildWorkflowHooksCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error) {
+	projCtxs, err := p.buildWorkflowHooksCommands(ctx, nil, false)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +108,7 @@ func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *CommandContext, c
 	return []models.ProjectCommandContext{pac}, err
 }
 
-func (p *DefaultProjectCommandBuilder) buildPreWorkflowHookCommands(ctx *CommandContext, commentFlags []string, verbose bool) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) buildWorkflowHooksCommands(ctx *CommandContext, commentFlags []string, verbose bool) ([]models.ProjectCommandContext, error) {
 
 	return []models.ProjectCommandContext{}, nil
 }

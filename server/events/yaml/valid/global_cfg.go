@@ -12,7 +12,7 @@ import (
 const MergeableApplyReq = "mergeable"
 const ApprovedApplyReq = "approved"
 const ApplyRequirementsKey = "apply_requirements"
-const PreWorkflowHooksKey = "pre_workflow_hooks"
+const WorkflowHooksKey = "pre_workflow_hooks"
 const WorkflowKey = "workflow"
 const AllowedWorkflowsKey = "allowed_workflows"
 const AllowedOverridesKey = "allowed_overrides"
@@ -25,8 +25,8 @@ type GlobalCfg struct {
 	Workflows map[string]Workflow
 }
 
-// PreWorkflowHook is a map of custom run commands to run before workflows.
-type PreWorkflowHook struct {
+// WorkflowHook is a map of custom run commands to run before workflows.
+type WorkflowHook struct {
 	StepName   string
 	RunCommand string
 }
@@ -40,7 +40,7 @@ type Repo struct {
 	// If ID is set then this will be nil.
 	IDRegex              *regexp.Regexp
 	ApplyRequirements    []string
-	PreWorkflowHooks     []PreWorkflowHook
+	WorkflowHooks        *[]WorkflowHook
 	Workflow             *Workflow
 	AllowedWorkflows     []string
 	AllowedOverrides     []string
@@ -96,7 +96,7 @@ func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) Global
 	// we treat nil slices differently.
 	applyReqs := []string{}
 	allowedOverrides := []string{}
-	allowedWorkflows := []string{}
+	workflowHooks := []WorkflowHook{}
 	if mergeableReq {
 		applyReqs = append(applyReqs, MergeableApplyReq)
 	}
@@ -115,6 +115,7 @@ func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) Global
 			{
 				IDRegex:              regexp.MustCompile(".*"),
 				ApplyRequirements:    applyReqs,
+				WorkflowHooks:        &workflowHooks,
 				Workflow:             &defaultWorkflow,
 				AllowedWorkflows:     allowedWorkflows,
 				AllowedOverrides:     allowedOverrides,
@@ -326,7 +327,7 @@ func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (app
 		return fmt.Sprintf("setting %s: %s from %s", key, valStr, from)
 	}
 
-	for _, key := range []string{ApplyRequirementsKey, WorkflowKey, AllowedOverridesKey, AllowCustomWorkflowsKey, PreWorkflowHooksKey} {
+	for _, key := range []string{ApplyRequirementsKey, WorkflowKey, AllowedOverridesKey, AllowCustomWorkflowsKey, WorkflowHooksKey} {
 		for i, repo := range g.Repos {
 			if repo.IDMatches(repoID) {
 				switch key {

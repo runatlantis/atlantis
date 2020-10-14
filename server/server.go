@@ -66,22 +66,23 @@ const (
 
 // Server runs the Atlantis web server.
 type Server struct {
-	AtlantisVersion     string
-	AtlantisURL         *url.URL
-	Router              *mux.Router
-	Port                int
-	CommandRunner       *events.DefaultCommandRunner
-	Logger              *logging.SimpleLogger
-	Locker              locking.Locker
-	EventsController    *EventsController
-	GithubAppController *GithubAppController
-	LocksController     *LocksController
-	StatusController    *StatusController
-	IndexTemplate       TemplateWriter
-	LockDetailTemplate  TemplateWriter
-	SSLCertFile         string
-	SSLKeyFile          string
-	Drainer             *events.Drainer
+	AtlantisVersion            string
+	AtlantisURL                *url.URL
+	Router                     *mux.Router
+	Port                       int
+	WorkflowHooksCommandRunner *events.DefaultWorkflowHooksCommandRunner
+	CommandRunner              *events.DefaultCommandRunner
+	Logger                     *logging.SimpleLogger
+	Locker                     locking.Locker
+	EventsController           *EventsController
+	GithubAppController        *GithubAppController
+	LocksController            *LocksController
+	StatusController           *StatusController
+	IndexTemplate              TemplateWriter
+	LockDetailTemplate         TemplateWriter
+	SSLCertFile                string
+	SSLKeyFile                 string
+	Drainer                    *events.Drainer
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -355,6 +356,18 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Logger:  logger,
 		Drainer: drainer,
 	}
+	workflowHooksCommandRunner := &events.DefaultWorkflowHooksCommandRunner{
+		VCSClient:                vcsClient,
+		GithubPullGetter:         githubClient,
+		GitlabMergeRequestGetter: gitlabClient,
+		AzureDevopsPullGetter:    azuredevopsClient,
+		GlobalCfg:                globalCfg,
+		Logger:                   logger,
+		WorkingDir:               workingDir,
+		DB:                       boltdb,
+		Drainer:                  drainer,
+		DeleteLockCommand:        deleteLockCommand,
+	}
 	commandRunner := &events.DefaultCommandRunner{
 		VCSClient:                vcsClient,
 		GithubPullGetter:         githubClient,
@@ -464,22 +477,23 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	return &Server{
-		AtlantisVersion:     config.AtlantisVersion,
-		AtlantisURL:         parsedURL,
-		Router:              underlyingRouter,
-		Port:                userConfig.Port,
-		CommandRunner:       commandRunner,
-		Logger:              logger,
-		Locker:              lockingClient,
-		EventsController:    eventsController,
-		GithubAppController: githubAppController,
-		LocksController:     locksController,
-		StatusController:    statusController,
-		IndexTemplate:       indexTemplate,
-		LockDetailTemplate:  lockTemplate,
-		SSLKeyFile:          userConfig.SSLKeyFile,
-		SSLCertFile:         userConfig.SSLCertFile,
-		Drainer:             drainer,
+		AtlantisVersion:            config.AtlantisVersion,
+		AtlantisURL:                parsedURL,
+		Router:                     underlyingRouter,
+		Port:                       userConfig.Port,
+		WorkflowHooksCommandRunner: workflowHooksCommandRunner,
+		CommandRunner:              commandRunner,
+		Logger:                     logger,
+		Locker:                     lockingClient,
+		EventsController:           eventsController,
+		GithubAppController:        githubAppController,
+		LocksController:            locksController,
+		StatusController:           statusController,
+		IndexTemplate:              indexTemplate,
+		LockDetailTemplate:         lockTemplate,
+		SSLKeyFile:                 userConfig.SSLKeyFile,
+		SSLCertFile:                userConfig.SSLCertFile,
+		Drainer:                    drainer,
 	}, nil
 }
 
