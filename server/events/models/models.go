@@ -535,7 +535,7 @@ func (c CommandName) String() string {
 	case UnlockCommand:
 		return "unlock"
 	case WorkflowHooksCommand:
-		return "pre_workflow_steps"
+		return "pre_workflow_hooks"
 	}
 	return ""
 }
@@ -551,15 +551,8 @@ type WorkflowHookCommandContext struct {
 	HeadRepo Repo
 	// Log is a logger that's been set up for this context.
 	Log *logging.SimpleLogger
-	// PullMergeable is true if the pull request for this project is able to be merged.
-	PullMergeable bool
 	// Pull is the pull request we're responding to.
 	Pull PullRequest
-	// RepoRelDir is the directory of this project relative to the repo root.
-	RepoRelDir string
-	// Steps are the sequence of commands we need to run for this project and this
-	// stage.
-	Steps []valid.Step
 	// User is the user that triggered this command.
 	User User
 	// Verbose is true when the user would like verbose output.

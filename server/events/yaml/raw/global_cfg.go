@@ -170,7 +170,7 @@ func (r Repo) ToValid(workflows map[string]valid.Workflow) valid.Repo {
 		workflow = &ptr
 	}
 
-	workflowHooks := make([]valid.WorkflowHook, 0)
+	workflowHooks := make([]*valid.WorkflowHook, 0)
 	if len(r.WorkflowHooks) > 0 {
 		for _, hook := range r.WorkflowHooks {
 			workflowHooks = append(workflowHooks, hook.ToValid())
@@ -181,7 +181,7 @@ func (r Repo) ToValid(workflows map[string]valid.Workflow) valid.Repo {
 		ID:                   id,
 		IDRegex:              idRegex,
 		ApplyRequirements:    r.ApplyRequirements,
-		WorkflowHooks:        &workflowHooks,
+		WorkflowHooks:        workflowHooks,
 		Workflow:             workflow,
 		AllowedWorkflows:     r.AllowedWorkflows,
 		AllowedOverrides:     r.AllowedOverrides,

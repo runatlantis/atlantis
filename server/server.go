@@ -363,6 +363,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AzureDevopsPullGetter:    azuredevopsClient,
 		GlobalCfg:                globalCfg,
 		Logger:                   logger,
+		WorkingDirLocker:         workingDirLocker,
 		WorkingDir:               workingDir,
 		DB:                       boltdb,
 		Drainer:                  drainer,
@@ -449,6 +450,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DeleteLockCommand:  deleteLockCommand,
 	}
 	eventsController := &EventsController{
+		WorkflowHooksCommandRunner:      workflowHooksCommandRunner,
 		CommandRunner:                   commandRunner,
 		PullCleaner:                     pullClosedExecutor,
 		Parser:                          eventParser,

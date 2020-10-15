@@ -64,15 +64,6 @@ type DefaultProjectCommandBuilder struct {
 	SkipCloneNoChanges bool
 }
 
-func (p *DefaultProjectCommandBuilder) BuildWorkflowHooksCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error) {
-	projCtxs, err := p.buildWorkflowHooksCommands(ctx, nil, false)
-	if err != nil {
-		return nil, err
-	}
-
-	return projCtxs, nil
-}
-
 // See ProjectCommandBuilder.BuildAutoplanCommands.
 func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error) {
 	projCtxs, err := p.buildPlanAllCommands(ctx, nil, false)
@@ -106,11 +97,6 @@ func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *CommandContext, c
 	}
 	pac, err := p.buildProjectApplyCommand(ctx, cmd)
 	return []models.ProjectCommandContext{pac}, err
-}
-
-func (p *DefaultProjectCommandBuilder) buildWorkflowHooksCommands(ctx *CommandContext, commentFlags []string, verbose bool) ([]models.ProjectCommandContext, error) {
-
-	return []models.ProjectCommandContext{}, nil
 }
 
 // buildPlanAllCommands builds plan contexts for all projects we determine were

@@ -124,7 +124,7 @@ func TestWorkflowHook_ToValid(t *testing.T) {
 	cases := []struct {
 		description string
 		input       raw.WorkflowHook
-		exp         valid.WorkflowHook
+		exp         *valid.WorkflowHook
 	}{
 		{
 			description: "run step",
@@ -133,7 +133,7 @@ func TestWorkflowHook_ToValid(t *testing.T) {
 					"run": "my 'run command'",
 				},
 			},
-			exp: valid.WorkflowHook{
+			exp: &valid.WorkflowHook{
 				StepName:   "run",
 				RunCommand: "my 'run command'",
 			},
