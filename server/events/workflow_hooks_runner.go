@@ -14,7 +14,7 @@ import (
 )
 
 type WorkflowHooksCommandRunner interface {
-	RunPreHooks(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) error
+	RunPreHooks(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) (*WorkflowHookCommandResult, error)
 }
 
 // DefaultWorkflowHooksCommandRunner is the first step when processing a workflow hook commands.
