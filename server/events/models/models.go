@@ -559,27 +559,15 @@ type WorkflowHookCommandContext struct {
 	Verbose bool
 }
 
-// WorkflowHookCommandResult is the result of executing a plan/apply for a specific project.
-type WorkflowHookCommandResult struct {
-	Command    CommandName
-	RepoRelDir string
-	Error      error
-	Failure    string
-	Success    bool
-}
-
-// CommitStatus returns the vcs commit status of this project result.
-func (w WorkflowHookCommandResult) CommitStatus() CommitStatus {
-	if w.Error != nil {
-		return FailedCommitStatus
-	}
-	if w.Failure != "" {
-		return FailedCommitStatus
-	}
-	return SuccessCommitStatus
+// WorkflowHookResult is the result of executing a pre workflow hook for a repository.
+type WorkflowHookResult struct {
+	Command CommandName
+	Output  string
+	Error   error
+	Success bool
 }
 
 // IsSuccessful returns true if this project result had no errors.
-func (w WorkflowHookCommandResult) IsSuccessful() bool {
+func (w WorkflowHookResult) IsSuccessful() bool {
 	return w.Success
 }

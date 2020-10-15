@@ -13,10 +13,6 @@ import (
 	"github.com/runatlantis/atlantis/server/recovery"
 )
 
-// type WorkflowHookRunner interface {
-// 	Run(ctx models.WorkflowHookCommandContext)
-// }
-
 type WorkflowHooksCommandRunner interface {
 	RunPreHooks(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) error
 }
@@ -41,12 +37,12 @@ func (w *DefaultWorkflowHooksCommandRunner) RunPreHooks(
 	headRepo models.Repo,
 	pull models.PullRequest,
 	user models.User,
-) error {
+) (*WorkflowHookCommandResult, error) {
 	if opStarted := w.Drainer.StartOp(); !opStarted {
 		if commentErr := w.VCSClient.CreateComment(baseRepo, pull.Num, ShutdownComment, models.WorkflowHooksCommand.String()); commentErr != nil {
 			w.Logger.Log(logging.Error, "unable to comment that Atlantis is shutting down: %s", commentErr)
 		}
-		return nil
+		return nil, nil
 	}
 	defer w.Drainer.OpDone()
 
@@ -58,14 +54,14 @@ func (w *DefaultWorkflowHooksCommandRunner) RunPreHooks(
 	unlockFn, err := w.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, DefaultWorkspace)
 	if err != nil {
 		log.Warn("workspace was locked")
-		return err
+		return nil, err
 	}
 	log.Debug("got workspace lock")
 	defer unlockFn()
 
 	repoDir, _, err := w.WorkingDir.Clone(log, baseRepo, headRepo, pull, DefaultWorkspace)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	workflowHooks := make([]*valid.WorkflowHook, 0)
@@ -84,39 +80,43 @@ func (w *DefaultWorkflowHooksCommandRunner) RunPreHooks(
 		Verbose:  false,
 	}
 
+	outputs := w.runHooks(ctx, workflowHooks, repoDir)
+	return &WorkflowHookCommandResult{
+		WorkflowHookResults: outputs,
+	}, nil
+}
+
+func (w *DefaultWorkflowHooksCommandRunner) runHooks(
+	ctx models.WorkflowHookCommandContext,
+	workflowHooks []*valid.WorkflowHook,
+	repoDir string,
+) (outputs []models.WorkflowHookResult) {
 	for _, hook := range workflowHooks {
-		_, err := w.runHooks(ctx, hook.RunCommand, repoDir)
+		out, err := w.runCmd(ctx, hook.RunCommand, repoDir)
+
+		res := models.WorkflowHookResult{
+			Command: models.WorkflowHooksCommand,
+			Output:  out,
+		}
+
 		if err != nil {
-			log.Err("executing hooks: %s", err)
-			return err
+			res.Error = err
+			res.Success = false
+		} else {
+			res.Success = true
+		}
+
+		outputs = append(outputs, res)
+
+		if !res.IsSuccessful() {
+			return
 		}
 	}
 
-	return nil
+	return
 }
 
-func (w *DefaultWorkflowHooksCommandRunner) buildLogger(repoFullName string, pullNum int) *logging.SimpleLogger {
-	src := fmt.Sprintf("%s#%d", repoFullName, pullNum)
-	return w.Logger.NewLogger(src, true, w.Logger.GetLevel())
-}
-
-// logPanics logs and creates a comment on the pull request for panics.
-func (w *DefaultWorkflowHooksCommandRunner) logPanics(baseRepo models.Repo, pullNum int, logger logging.SimpleLogging) {
-	if err := recover(); err != nil {
-		stack := recovery.Stack(3)
-		logger.Err("PANIC: %s\n%s", err, stack)
-		if commentErr := w.VCSClient.CreateComment(
-			baseRepo,
-			pullNum,
-			fmt.Sprintf("**Error: goroutine panic. This is a bug.**\n```\n%s\n%s```", err, stack),
-			"",
-		); commentErr != nil {
-			logger.Err("unable to comment: %s", commentErr)
-		}
-	}
-}
-
-func (w *DefaultWorkflowHooksCommandRunner) runHooks(ctx models.WorkflowHookCommandContext, command string, path string) (string, error) {
+func (w *DefaultWorkflowHooksCommandRunner) runCmd(ctx models.WorkflowHookCommandContext, command string, path string) (string, error) {
 	cmd := exec.Command("sh", "-c", command) // #nosec
 	cmd.Dir = path
 
@@ -149,4 +149,25 @@ func (w *DefaultWorkflowHooksCommandRunner) runHooks(ctx models.WorkflowHookComm
 	}
 	ctx.Log.Info("successfully ran %q in %q", command, path)
 	return string(out), nil
+}
+
+func (w *DefaultWorkflowHooksCommandRunner) buildLogger(repoFullName string, pullNum int) *logging.SimpleLogger {
+	src := fmt.Sprintf("%s#%d", repoFullName, pullNum)
+	return w.Logger.NewLogger(src, true, w.Logger.GetLevel())
+}
+
+// logPanics logs and creates a comment on the pull request for panics.
+func (w *DefaultWorkflowHooksCommandRunner) logPanics(baseRepo models.Repo, pullNum int, logger logging.SimpleLogging) {
+	if err := recover(); err != nil {
+		stack := recovery.Stack(3)
+		logger.Err("PANIC: %s\n%s", err, stack)
+		if commentErr := w.VCSClient.CreateComment(
+			baseRepo,
+			pullNum,
+			fmt.Sprintf("**Error: goroutine panic. This is a bug.**\n```\n%s\n%s```", err, stack),
+			"",
+		); commentErr != nil {
+			logger.Err("unable to comment: %s", commentErr)
+		}
+	}
 }
