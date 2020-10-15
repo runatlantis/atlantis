@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"testing"
 
+	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events"
 	eventMocks "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
-	vcsMocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/events/vcs/fixtures"
+	vcsMocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	. "github.com/runatlantis/atlantis/testing"
-	. "github.com/petergtz/pegomock"
 )
 
 // Test that if we don't have any existing files, we check out the repo with a github app.
@@ -50,7 +50,7 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 	}
 
 	cloneDir, _, err := gwd.Clone(nil, models.Repo{}, models.PullRequest{
-		BaseRepo: models.Repo{},
+		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 	}, "default")
 	Ok(t, err)
@@ -66,8 +66,8 @@ func TestClone_GithubAppSetsCorrectUrl(t *testing.T) {
 	credentials := vcsMocks.NewMockGithubCredentials()
 
 	ghAppWorkingDir := events.GithubAppWorkingDir{
-		WorkingDir: workingDir,
-		Credentials: credentials,
+		WorkingDir:     workingDir,
+		Credentials:    credentials,
 		GithubHostname: "some-host",
 	}
 

@@ -157,7 +157,7 @@ func TestRunCommentCommand_ForkPRDisabled(t *testing.T) {
 	var pull github.PullRequest
 	modelPull := models.PullRequest{
 		BaseRepo: fixtures.GithubRepo,
-		State: models.OpenPullState,
+		State:    models.OpenPullState,
 	}
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
 

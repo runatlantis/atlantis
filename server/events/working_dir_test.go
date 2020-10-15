@@ -41,7 +41,7 @@ func TestClone_NoneExisting(t *testing.T) {
 	}
 
 	cloneDir, _, err := wd.Clone(nil, models.Repo{}, models.PullRequest{
-		BaseRepo: models.Repo{},
+		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 	}, "default")
 	Ok(t, err)
@@ -91,7 +91,7 @@ func TestClone_CheckoutMergeNoneExisting(t *testing.T) {
 	}
 
 	cloneDir, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.PullRequest{
-		BaseRepo: models.Repo{},
+		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
@@ -140,7 +140,7 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 	}
 
 	_, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.PullRequest{
-		BaseRepo: models.Repo{},
+		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
@@ -152,7 +152,7 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 
 	// Now run the clone again.
 	cloneDir, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.PullRequest{
-		BaseRepo: models.Repo{},
+		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
@@ -190,7 +190,7 @@ func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
 	}
 
 	_, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.PullRequest{
-		BaseRepo: models.Repo{},
+		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
@@ -202,7 +202,7 @@ func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
 
 	// Now run the clone again.
 	cloneDir, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.PullRequest{
-		BaseRepo: models.Repo{},
+		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
@@ -245,7 +245,7 @@ func TestClone_CheckoutMergeConflict(t *testing.T) {
 	}
 
 	_, _, err := wd.Clone(nil, models.Repo{}, models.PullRequest{
-		BaseRepo: models.Repo{},
+		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "master",
 	}, "default")
@@ -276,7 +276,7 @@ func TestClone_NoReclone(t *testing.T) {
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
 	}
 	cloneDir, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.PullRequest{
-		BaseRepo: models.Repo{},
+		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 	}, "default")
 	Ok(t, err)
@@ -312,7 +312,7 @@ func TestClone_RecloneWrongCommit(t *testing.T) {
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
 	}
 	cloneDir, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.PullRequest{
-		BaseRepo: models.Repo{},
+		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		HeadCommit: expCommit,
 	}, "default")
@@ -378,7 +378,7 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 		CheckoutMerge: true,
 	}
 	_, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.PullRequest{
-		BaseRepo: models.Repo{},
+		BaseRepo:   models.Repo{},
 		HeadBranch: "second-pr",
 		BaseBranch: "master",
 	}, "default")
@@ -389,7 +389,7 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	// false.
 	wd.CheckoutMerge = false
 	_, hasDiverged, err = wd.Clone(nil, models.Repo{}, models.PullRequest{
-		BaseRepo: models.Repo{},
+		BaseRepo:   models.Repo{},
 		HeadBranch: "second-pr",
 		BaseBranch: "master",
 	}, "default")
