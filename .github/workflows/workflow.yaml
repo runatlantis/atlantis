@@ -1,13 +1,16 @@
 on: push
 name: Tests
 jobs:
-  unit:
+  test:
     runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@master
-    - uses: cedrickring/golang-action@1.14.0
+    container: runatlantis/testing-env:latest
     env:
-        GO111MODULE: "on"
-        IMPORT: "lyft/atlantis"
-    with:
-        args: make test
+      GOFLAGS: "-mod=vendor"
+    steps:
+      # user in image needs write access to do anything
+    - name: Setup file system permissions
+      run: sudo chmod -R 777 $GITHUB_WORKSPACE /github /__w/_temp
+    - uses: actions/checkout@master
+    - run: make test-coverage
+    - run: make check-fmt
+    - run: make check-lint
