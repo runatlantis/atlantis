@@ -36,7 +36,7 @@ jobs:
     - run: yarn website:build
     - run:
         name: http-server
-        command: http-server runatlantis.io/.vuepress/dist
+        command: http-server runatlantis.io/.vuepress/di
         background: true
       # We use dockerize -wait here to wait until the server is up.
     - run: |
