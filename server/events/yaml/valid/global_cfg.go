@@ -25,12 +25,6 @@ type GlobalCfg struct {
 	Workflows map[string]Workflow
 }
 
-// WorkflowHook is a map of custom run commands to run before workflows.
-type WorkflowHook struct {
-	StepName   string
-	RunCommand string
-}
-
 // Repo is the final parsed version of server-side repo config.
 type Repo struct {
 	// ID is the exact match id of this config.
@@ -57,6 +51,12 @@ type MergedProjectCfg struct {
 	AutoplanEnabled   bool
 	TerraformVersion  *version.Version
 	RepoCfgVersion    int
+}
+
+// WorkflowHook is a map of custom run commands to run before workflows.
+type WorkflowHook struct {
+	StepName   string
+	RunCommand string
 }
 
 // DefaultApplyStage is the Atlantis default apply stage.

@@ -357,17 +357,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Drainer: drainer,
 	}
 	workflowHooksCommandRunner := &events.DefaultWorkflowHooksCommandRunner{
-		VCSClient:                vcsClient,
-		GithubPullGetter:         githubClient,
-		GitlabMergeRequestGetter: gitlabClient,
-		AzureDevopsPullGetter:    azuredevopsClient,
-		GlobalCfg:                globalCfg,
-		Logger:                   logger,
-		WorkingDirLocker:         workingDirLocker,
-		WorkingDir:               workingDir,
-		DB:                       boltdb,
-		Drainer:                  drainer,
-		DeleteLockCommand:        deleteLockCommand,
+		VCSClient:          vcsClient,
+		GlobalCfg:          globalCfg,
+		Logger:             logger,
+		WorkingDirLocker:   workingDirLocker,
+		WorkingDir:         workingDir,
+		Drainer:            drainer,
+		WorkflowHookRunner: &runtime.WorkflowHookRunner{},
 	}
 	commandRunner := &events.DefaultCommandRunner{
 		VCSClient:                vcsClient,

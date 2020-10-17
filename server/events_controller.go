@@ -344,8 +344,17 @@ func (e *EventsController) handlePullRequestEvent(w http.ResponseWriter, baseRep
 		// closed.
 		fmt.Fprintln(w, "Processing...")
 
-		e.Logger.Info("running pre workflow hooks")
-		e.WorkflowHooksCommandRunner.RunPreHooks(baseRepo, headRepo, pull, user)
+		e.Logger.Info("running pre workflow hooks if present")
+		preHookResults, err := e.WorkflowHooksCommandRunner.RunPreHooks(baseRepo, headRepo, pull, user)
+		if err != nil {
+			e.Logger.Err("unable to run pre workflow hooks: %s", err)
+		}
+
+		// If pre workflow produced error. log it and continue workflow execution.
+		// I decided this should not be blocking, but maybe it should?
+		if preHookResults.HasErrors() {
+			e.Logger.Err("pre workflow hook run error results: %s", preHookResults.Errors())
+		}
 
 		e.Logger.Info("executing autoplan")
 		if !e.TestingMode {
