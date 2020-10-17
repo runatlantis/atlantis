@@ -885,11 +885,11 @@ func TestParseGlobalCfg_NotExist(t *testing.T) {
 
 func TestParseGlobalCfg(t *testing.T) {
 	defaultCfg := valid.NewGlobalCfg(false, false, false)
-	workflowHook := &valid.WorkflowHook{
+	preWorkflowHook := &valid.PreWorkflowHook{
 		StepName:   "run",
 		RunCommand: "custom workflow command",
 	}
-	workflowHooks := []*valid.WorkflowHook{workflowHook}
+	preWorkflowHooks := []*valid.PreWorkflowHook{preWorkflowHook}
 
 	customWorkflow1 := valid.Workflow{
 		Name: "custom1",
@@ -1058,14 +1058,14 @@ workflows:
 					{
 						ID:                   "github.com/owner/repo",
 						ApplyRequirements:    []string{"approved", "mergeable"},
-						WorkflowHooks:        workflowHooks,
+						PreWorkflowHooks:     preWorkflowHooks,
 						Workflow:             &customWorkflow1,
 						AllowedOverrides:     []string{"apply_requirements", "workflow"},
 						AllowCustomWorkflows: Bool(true),
 					},
 					{
-						IDRegex:       regexp.MustCompile(".*"),
-						WorkflowHooks: workflowHooks,
+						IDRegex:          regexp.MustCompile(".*"),
+						PreWorkflowHooks: preWorkflowHooks,
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1083,8 +1083,8 @@ repos:
 				Repos: []valid.Repo{
 					defaultCfg.Repos[0],
 					{
-						IDRegex:       regexp.MustCompile("github.com/"),
-						WorkflowHooks: []*valid.WorkflowHook{},
+						IDRegex:          regexp.MustCompile("github.com/"),
+						PreWorkflowHooks: []*valid.PreWorkflowHook{},
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1102,9 +1102,9 @@ repos:
 				Repos: []valid.Repo{
 					defaultCfg.Repos[0],
 					{
-						ID:            "github.com/owner/repo",
-						WorkflowHooks: []*valid.WorkflowHook{},
-						Workflow:      defaultCfg.Repos[0].Workflow,
+						ID:               "github.com/owner/repo",
+						PreWorkflowHooks: []*valid.PreWorkflowHook{},
+						Workflow:         defaultCfg.Repos[0].Workflow,
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1126,7 +1126,7 @@ workflows:
 				Repos: []valid.Repo{
 					{
 						IDRegex:           regexp.MustCompile(".*"),
-						WorkflowHooks:     []*valid.WorkflowHook{},
+						PreWorkflowHooks:  []*valid.PreWorkflowHook{},
 						ApplyRequirements: []string{},
 						Workflow: &valid.Workflow{
 							Name: "default",
@@ -1277,7 +1277,7 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 					{
 						IDRegex:              regexp.MustCompile(".*"),
 						ApplyRequirements:    []string{"mergeable", "approved"},
-						WorkflowHooks:        []*valid.WorkflowHook{},
+						PreWorkflowHooks:     []*valid.PreWorkflowHook{},
 						Workflow:             &customWorkflow,
 						AllowedWorkflows:     []string{"custom"},
 						AllowedOverrides:     []string{"workflow", "apply_requirements"},
@@ -1286,7 +1286,7 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 					{
 						ID:                   "github.com/owner/repo",
 						IDRegex:              nil,
-						WorkflowHooks:        []*valid.WorkflowHook{},
+						PreWorkflowHooks:     []*valid.PreWorkflowHook{},
 						ApplyRequirements:    nil,
 						AllowedOverrides:     nil,
 						AllowCustomWorkflows: nil,

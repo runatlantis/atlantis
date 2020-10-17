@@ -108,6 +108,9 @@ func TestNewGlobalCfg(t *testing.T) {
 			if c.approvedReq {
 				exp.Repos[0].ApplyRequirements = append(exp.Repos[0].ApplyRequirements, "approved")
 			}
+			if exp.Repos[0].PreWorkflowHooks == nil {
+				exp.Repos[0].PreWorkflowHooks = []*valid.PreWorkflowHook{}
+			}
 
 			Equals(t, exp, act)
 

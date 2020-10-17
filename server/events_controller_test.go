@@ -732,7 +732,6 @@ func TestPost_PullOpenedOrUpdated(t *testing.T) {
 				pullRequest = models.PullRequest{State: models.ClosedPullState}
 				When(p.ParseGithubPullEvent(matchers.AnyPtrToGithubPullRequestEvent())).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
 			}
-			When(wh.RunPreHooks(repo, repo, pullRequest, models.User{})).ThenReturn(&events.WorkflowHooksCommandResult{}, nil)
 
 			w := httptest.NewRecorder()
 			e.Post(w, req)
@@ -743,33 +742,33 @@ func TestPost_PullOpenedOrUpdated(t *testing.T) {
 	}
 }
 
-func setup(t *testing.T) (server.EventsController, *mocks.MockGithubRequestValidator, *mocks.MockGitlabRequestParserValidator, *emocks.MockEventParsing, *emocks.MockCommandRunner, *emocks.MockWorkflowHooksRunner, *emocks.MockPullCleaner, *vcsmocks.MockClient, *emocks.MockCommentParsing) {
+func setup(t *testing.T) (server.EventsController, *mocks.MockGithubRequestValidator, *mocks.MockGitlabRequestParserValidator, *emocks.MockEventParsing, *emocks.MockCommandRunner, *emocks.MockPreWorkflowHooksCommandRunner, *emocks.MockPullCleaner, *vcsmocks.MockClient, *emocks.MockCommentParsing) {
 	RegisterMockTestingT(t)
 	v := mocks.NewMockGithubRequestValidator()
 	gl := mocks.NewMockGitlabRequestParserValidator()
 	p := emocks.NewMockEventParsing()
 	cp := emocks.NewMockCommentParsing()
-	wh := emocks.NewMockWorkflowHooksCommandRunner()
+	wh := emocks.NewMockPreWorkflowHooksCommandRunner()
 	cr := emocks.NewMockCommandRunner()
 	c := emocks.NewMockPullCleaner()
 	vcsmock := vcsmocks.NewMockClient()
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
 	Ok(t, err)
 	e := server.EventsController{
-		TestingMode:                  true,
-		Logger:                       logging.NewNoopLogger(),
-		GithubRequestValidator:       v,
-		Parser:                       p,
-		CommentParser:                cp,
-		CommandRunner:                cr,
-		WorkflowHooksCommandRunner:   wh,
-		PullCleaner:                  c,
-		GithubWebhookSecret:          secret,
-		SupportedVCSHosts:            []models.VCSHostType{models.Github, models.Gitlab},
-		GitlabWebhookSecret:          secret,
-		GitlabRequestParserValidator: gl,
-		RepoAllowlistChecker:         repoAllowlistChecker,
-		VCSClient:                    vcsmock,
+		TestingMode:                   true,
+		Logger:                        logging.NewNoopLogger(),
+		GithubRequestValidator:        v,
+		Parser:                        p,
+		CommentParser:                 cp,
+		CommandRunner:                 cr,
+		PreWorkflowHooksCommandRunner: wh,
+		PullCleaner:                   c,
+		GithubWebhookSecret:           secret,
+		SupportedVCSHosts:             []models.VCSHostType{models.Github, models.Gitlab},
+		GitlabWebhookSecret:           secret,
+		GitlabRequestParserValidator:  gl,
+		RepoAllowlistChecker:          repoAllowlistChecker,
+		VCSClient:                     vcsmock,
 	}
 	return e, v, gl, p, cr, wh, c, vcsmock, cp
 }

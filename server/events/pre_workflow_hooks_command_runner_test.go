@@ -10,18 +10,19 @@ import (
 	"github.com/runatlantis/atlantis/server/events/matchers"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models/fixtures"
+	"github.com/runatlantis/atlantis/server/events/runtime"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	logmocks "github.com/runatlantis/atlantis/server/logging/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-var wh events.DefaultWorkflowHooksCommandRunner
+var wh events.DefaultPreWorkflowHooksCommandRunner
 var whWorkingDir *mocks.MockWorkingDir
 var whWorkingDirLocker *mocks.MockWorkingDirLocker
 var whDrainer *events.Drainer
 
-func workflow_hooks_setup(t *testing.T) *vcsmocks.MockClient {
+func preWorkflowHooksSetup(t *testing.T) *vcsmocks.MockClient {
 	RegisterMockTestingT(t)
 	vcsClient := vcsmocks.NewMockClient()
 	logger := logmocks.NewMockSimpleLogging()
@@ -29,24 +30,24 @@ func workflow_hooks_setup(t *testing.T) *vcsmocks.MockClient {
 	whWorkingDirLocker = mocks.NewMockWorkingDirLocker()
 	whDrainer = &events.Drainer{}
 
-	wh = events.DefaultWorkflowHooksCommandRunner{
-		VCSClient:        vcsClient,
-		Logger:           logger,
-		WorkingDirLocker: whWorkingDirLocker,
-		WorkingDir:       whWorkingDir,
-		Drainer:          whDrainer,
+	wh = events.DefaultPreWorkflowHooksCommandRunner{
+		VCSClient:             vcsClient,
+		Logger:                logger,
+		WorkingDirLocker:      whWorkingDirLocker,
+		WorkingDir:            whWorkingDir,
+		Drainer:               whDrainer,
+		PreWorkflowHookRunner: &runtime.PreWorkflowHookRunner{},
 	}
 	return vcsClient
 }
 
-func TestWorkflowHooksCommand_LogPanics(t *testing.T) {
+func TestPreWorkflowHooksCommand_LogPanics(t *testing.T) {
 	t.Log("if there is a panic it is commented back on the pull request")
-	vcsClient := workflow_hooks_setup(t)
+	vcsClient := preWorkflowHooksSetup(t)
 	logger := wh.Logger.NewLogger("log", false, logging.LogLevel(1))
 
 	When(whWorkingDir.Clone(
 		logger,
-		fixtures.GithubRepo,
 		fixtures.GithubRepo,
 		fixtures.Pull,
 		events.DefaultWorkspace,
@@ -60,17 +61,17 @@ func TestWorkflowHooksCommand_LogPanics(t *testing.T) {
 // Test that if one plan fails and we are using automerge, that
 // we delete the plans.
 func TestRunPreHooks_Clone(t *testing.T) {
-	workflow_hooks_setup(t)
+	preWorkflowHooksSetup(t)
 	logger := wh.Logger.NewLogger("log", false, logging.LogLevel(1))
 
-	When(whWorkingDir.Clone(logger, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, events.DefaultWorkspace)).
+	When(whWorkingDir.Clone(logger, fixtures.GithubRepo, fixtures.Pull, events.DefaultWorkspace)).
 		ThenReturn("path/to/repo", false, nil)
 	wh.RunPreHooks(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
 }
 
 func TestRunPreHooks_DrainOngoing(t *testing.T) {
 	t.Log("if drain is ongoing then a message should be displayed")
-	vcsClient := workflow_hooks_setup(t)
+	vcsClient := preWorkflowHooksSetup(t)
 	whDrainer.ShutdownBlocking()
 	wh.RunPreHooks(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, fixtures.Pull.Num, "Atlantis server is shutting down, please try again later.", "pre_workflow_hooks")
@@ -78,9 +79,9 @@ func TestRunPreHooks_DrainOngoing(t *testing.T) {
 
 func TestRunPreHooks_DrainNotOngoing(t *testing.T) {
 	t.Log("if drain is not ongoing then remove ongoing operation must be called even if panic occured")
-	workflow_hooks_setup(t)
-	When(whWorkingDir.Clone(logger, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, events.DefaultWorkspace)).ThenPanic("panic test - if you're seeing this in a test failure this isn't the failing test")
+	preWorkflowHooksSetup(t)
+	When(whWorkingDir.Clone(logger, fixtures.GithubRepo, fixtures.Pull, events.DefaultWorkspace)).ThenPanic("panic test - if you're seeing this in a test failure this isn't the failing test")
 	wh.RunPreHooks(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
-	whWorkingDir.VerifyWasCalledOnce().Clone(logger, fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, events.DefaultWorkspace)
+	whWorkingDir.VerifyWasCalledOnce().Clone(logger, fixtures.GithubRepo, fixtures.Pull, events.DefaultWorkspace)
 	Equals(t, 0, whDrainer.GetStatus().InProgressOps)
 }

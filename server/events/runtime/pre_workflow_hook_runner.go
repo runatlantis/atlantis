@@ -8,9 +8,9 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-type WorkflowHookRunner struct{}
+type PreWorkflowHookRunner struct{}
 
-func (wh *WorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext, command string, path string) (string, error) {
+func (wh *PreWorkflowHookRunner) Run(ctx models.PreWorkflowHookCommandContext, command string, path string) (string, error) {
 	cmd := exec.Command("sh", "-c", command) // #nosec
 	cmd.Dir = path
 

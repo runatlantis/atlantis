@@ -521,8 +521,6 @@ const (
 	// UnlockCommand is a command to discard previous plans as well as the atlantis locks.
 	UnlockCommand
 	// Adding more? Don't forget to update String() below
-	// WorkflowHooksCommand is a command to run pre workflow steps
-	WorkflowHooksCommand
 )
 
 // String returns the string representation of c.
@@ -534,15 +532,13 @@ func (c CommandName) String() string {
 		return "plan"
 	case UnlockCommand:
 		return "unlock"
-	case WorkflowHooksCommand:
-		return "pre_workflow_hooks"
 	}
 	return ""
 }
 
-// WorkflowHookCommandContext defines the context for a plan or apply stage that will
+// PreWorkflowHookCommandContext defines the context for a plan or apply stage that will
 // be executed for a project.
-type WorkflowHookCommandContext struct {
+type PreWorkflowHookCommandContext struct {
 	// BaseRepo is the repository that the pull request will be merged into.
 	BaseRepo Repo
 	// HeadRepo is the repository that is getting merged into the BaseRepo.
@@ -550,24 +546,11 @@ type WorkflowHookCommandContext struct {
 	// be the same as BaseRepo.
 	HeadRepo Repo
 	// Log is a logger that's been set up for this context.
-	Log *logging.SimpleLogger
+	Log logging.SimpleLogging
 	// Pull is the pull request we're responding to.
 	Pull PullRequest
 	// User is the user that triggered this command.
 	User User
 	// Verbose is true when the user would like verbose output.
 	Verbose bool
-}
-
-// WorkflowHookResult is the result of executing a pre workflow hook for a repository.
-type WorkflowHookResult struct {
-	Command CommandName
-	Output  string
-	Error   error
-	Success bool
-}
-
-// IsSuccessful returns true if this project result had no errors.
-func (w WorkflowHookResult) IsSuccessful() bool {
-	return w.Success
 }
