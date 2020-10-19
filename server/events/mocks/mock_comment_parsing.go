@@ -26,7 +26,7 @@ func NewMockCommentParsing(options ...pegomock.Option) *MockCommentParsing {
 func (mock *MockCommentParsing) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockCommentParsing) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockCommentParsing) Parse(comment string, vcsHost models.VCSHostType) events.CommentParseResult {
+func (mock *MockCommentParsing) Parse(comment string, vcsHost models.VCSHostType, applyDisabled bool) events.CommentParseResult {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockCommentParsing().")
 	}

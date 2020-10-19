@@ -38,7 +38,7 @@ func TestParse_Ignored(t *testing.T) {
 		"This shouldn't error, but it does.",
 	}
 	for _, c := range ignoreComments {
-		r := commentParser.Parse(c, models.Github)
+		r := commentParser.Parse(c, models.Github, false)
 		Assert(t, r.Ignore, "expected Ignore to be true for comment %q", c)
 	}
 }
@@ -55,8 +55,25 @@ func TestParse_HelpResponse(t *testing.T) {
 		"atlantis help plan",
 	}
 	for _, c := range helpComments {
-		r := commentParser.Parse(c, models.Github)
+		r := commentParser.Parse(c, models.Github, false)
 		Equals(t, events.HelpComment, r.CommentResponse)
+	}
+}
+
+func TestParse_HelpResponseWithApplyDisabled(t *testing.T) {
+	helpComments := []string{
+		"run",
+		"atlantis",
+		"@github-user",
+		"atlantis help",
+		"atlantis --help",
+		"atlantis -h",
+		"atlantis help something else",
+		"atlantis help plan",
+	}
+	for _, c := range helpComments {
+		r := commentParser.Parse(c, models.Github, true)
+		Equals(t, events.HelpCommentWithoutApply, r.CommentResponse)
 	}
 }
 
@@ -116,7 +133,7 @@ func TestParse_UnusedArguments(t *testing.T) {
 	for _, c := range cases {
 		comment := fmt.Sprintf("atlantis %s %s", c.Command.String(), c.Args)
 		t.Run(comment, func(t *testing.T) {
-			r := commentParser.Parse(comment, models.Github)
+			r := commentParser.Parse(comment, models.Github, false)
 			usage := PlanUsage
 			if c.Command == models.ApplyCommand {
 				usage = ApplyUsage
@@ -128,7 +145,7 @@ func TestParse_UnusedArguments(t *testing.T) {
 
 func TestParse_UnknownShorthandFlag(t *testing.T) {
 	comment := "atlantis unlock -d ."
-	r := commentParser.Parse(comment, models.Github)
+	r := commentParser.Parse(comment, models.Github, false)
 
 	Equals(t, UnlockUsage, r.CommentResponse)
 }
@@ -146,7 +163,7 @@ func TestParse_DidYouMeanAtlantis(t *testing.T) {
 		"terraform plan -w workspace -d . -- test",
 	}
 	for _, c := range comments {
-		r := commentParser.Parse(c, models.Github)
+		r := commentParser.Parse(c, models.Github, false)
 		Assert(t, r.CommentResponse == events.DidYouMeanAtlantisComment,
 			"For comment %q expected CommentResponse==%q but got %q", c, events.DidYouMeanAtlantisComment, r.CommentResponse)
 	}
@@ -161,7 +178,7 @@ func TestParse_InvalidCommand(t *testing.T) {
 		"atlantis appely apply",
 	}
 	for _, c := range comments {
-		r := commentParser.Parse(c, models.Github)
+		r := commentParser.Parse(c, models.Github, false)
 		exp := fmt.Sprintf("```\nError: unknown command %q.\nRun 'atlantis --help' for usage.\n```", strings.Fields(c)[1])
 		Assert(t, r.CommentResponse == exp,
 			"For comment %q expected CommentResponse==%q but got %q", c, exp, r.CommentResponse)
@@ -178,7 +195,7 @@ func TestParse_SubcommandUsage(t *testing.T) {
 		"atlantis apply --help",
 	}
 	for _, c := range comments {
-		r := commentParser.Parse(c, models.Github)
+		r := commentParser.Parse(c, models.Github, false)
 		exp := "Usage of " + strings.Fields(c)[1]
 		Assert(t, strings.Contains(r.CommentResponse, exp),
 			"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
@@ -212,7 +229,7 @@ func TestParse_InvalidFlags(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		r := commentParser.Parse(c.comment, models.Github)
+		r := commentParser.Parse(c.comment, models.Github, false)
 		Assert(t, strings.Contains(r.CommentResponse, c.exp),
 			"For comment %q expected CommentResponse %q to contain %q", c.comment, r.CommentResponse, c.exp)
 		Assert(t, strings.Contains(r.CommentResponse, "Usage of "),
@@ -234,7 +251,7 @@ func TestParse_RelativeDirPath(t *testing.T) {
 		"atlantis apply -d a/../..",
 	}
 	for _, c := range comments {
-		r := commentParser.Parse(c, models.Github)
+		r := commentParser.Parse(c, models.Github, false)
 		exp := "Error: using a relative path"
 		Assert(t, strings.Contains(r.CommentResponse, exp),
 			"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
@@ -252,7 +269,7 @@ func TestParse_Multiline(t *testing.T) {
 	}
 	for _, comment := range comments {
 		t.Run(comment, func(t *testing.T) {
-			r := commentParser.Parse(comment, models.Github)
+			r := commentParser.Parse(comment, models.Github, false)
 			Equals(t, "", r.CommentResponse)
 			Equals(t, &events.CommentCommand{
 				RepoRelDir:  "",
@@ -279,7 +296,7 @@ func TestParse_InvalidWorkspace(t *testing.T) {
 		"atlantis apply -w ../../../etc/passwd",
 	}
 	for _, c := range comments {
-		r := commentParser.Parse(c, models.Github)
+		r := commentParser.Parse(c, models.Github, false)
 		exp := "Error: invalid workspace"
 		Assert(t, strings.Contains(r.CommentResponse, exp),
 			"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
@@ -294,7 +311,7 @@ func TestParse_UsingProjectAtSameTimeAsWorkspaceOrDir(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c, func(t *testing.T) {
-			r := commentParser.Parse(c, models.Github)
+			r := commentParser.Parse(c, models.Github, false)
 			exp := "Error: cannot use -p/--project at same time as -d/--dir or -w/--workspace"
 			Assert(t, strings.Contains(r.CommentResponse, exp),
 				"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
@@ -524,7 +541,7 @@ func TestParse_Parsing(t *testing.T) {
 		for _, cmdName := range []string{"plan", "apply"} {
 			comment := fmt.Sprintf("atlantis %s %s", cmdName, test.flags)
 			t.Run(comment, func(t *testing.T) {
-				r := commentParser.Parse(comment, models.Github)
+				r := commentParser.Parse(comment, models.Github, false)
 				Assert(t, r.CommentResponse == "", "CommentResponse should have been empty but was %q for comment %q", r.CommentResponse, comment)
 				Assert(t, test.expDir == r.Command.RepoRelDir, "exp dir to equal %q but was %q for comment %q", test.expDir, r.Command.RepoRelDir, comment)
 				Assert(t, test.expWorkspace == r.Command.Workspace, "exp workspace to equal %q but was %q for comment %q", test.expWorkspace, r.Command.Workspace, comment)
@@ -675,7 +692,7 @@ func TestParse_VCSUsername(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.vcs.String(), func(t *testing.T) {
-			r := cp.Parse(fmt.Sprintf("@%s %s", c.user, "help"), c.vcs)
+			r := cp.Parse(fmt.Sprintf("@%s %s", c.user, "help"), c.vcs, false)
 			Equals(t, events.HelpComment, r.CommentResponse)
 		})
 	}

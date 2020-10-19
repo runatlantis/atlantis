@@ -52,7 +52,7 @@ var multiLineRegex = regexp.MustCompile(`.*\r?\n[^\r\n]+`)
 type CommentParsing interface {
 	// Parse attempts to parse a pull request comment to see if it's an Atlantis
 	// command.
-	Parse(comment string, vcsHost models.VCSHostType) CommentParseResult
+	Parse(comment string, vcsHost models.VCSHostType, applyDisabled bool) CommentParseResult
 }
 
 // CommentBuilder builds comment commands that can be used on pull requests.
@@ -99,7 +99,7 @@ type CommentParseResult struct {
 // - atlantis plan -w staging -d dir --verbose
 // - atlantis plan --verbose -- -key=value -key2 value2
 //
-func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) CommentParseResult {
+func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType, applyDisabled bool) CommentParseResult {
 	if multiLineRegex.MatchString(comment) {
 		return CommentParseResult{Ignore: true}
 	}
@@ -147,13 +147,13 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	// If they've just typed the name of the executable then give them the help
 	// output.
 	if len(args) == 1 {
-		return CommentParseResult{CommentResponse: HelpComment}
+		return CommentParseResult{CommentResponse: getHelpComment(applyDisabled)}
 	}
 	command := args[1]
 
 	// Help output.
 	if e.stringInSlice(command, []string{"help", "-h", "--help"}) {
-		return CommentParseResult{CommentResponse: HelpComment}
+		return CommentParseResult{CommentResponse: getHelpComment(applyDisabled)}
 	}
 
 	// Need to have a plan, apply or unlock at this point.
@@ -330,6 +330,14 @@ func (e *CommentParser) errMarkdown(errMsg string, command string, flagSet *pfla
 	return fmt.Sprintf("```\nError: %s.\nUsage of %s:\n%s```", errMsg, command, flagSet.FlagUsagesWrapped(usagesCols))
 }
 
+func getHelpComment(applyDisabled bool) string {
+	if !applyDisabled {
+		return HelpComment
+
+	}
+	return HelpCommentWithoutApply
+}
+
 // HelpComment is the comment we add to the pull request when someone runs
 // `atlantis help`.
 var HelpComment = "```cmake\n" +
@@ -354,6 +362,32 @@ Commands:
            To plan a specific project, use the -d, -w and -p flags.
   apply    Runs 'terraform apply' on all unapplied plans from this pull request.
            To only apply a specific plan, use the -d, -w and -p flags.
+  unlock   Removes all atlantis locks and discards all plans for this PR.
+           To unlock a specific plan you can use the Atlantis UI.
+  help     View help.
+
+Flags:
+  -h, --help   help for atlantis
+
+Use "atlantis [command] --help" for more information about a command.` +
+	"\n```"
+
+// HelpCommentWithoutApply is the comment we add to the pull request when someone runs
+// `atlantis help` and apply is disabled globally.
+var HelpCommentWithoutApply = "```cmake\n" +
+	`atlantis
+Terraform Pull Request Automation
+
+Usage:
+  atlantis <command> [options] -- [terraform options]
+
+Examples:
+  # run plan in the root directory passing the -target flag to terraform
+  atlantis plan -d . -- -target=resource
+
+Commands:
+  plan     Runs 'terraform plan' for the changes in this pull request.
+           To plan a specific project, use the -d, -w and -p flags.
   unlock   Removes all atlantis locks and discards all plans for this PR.
            To unlock a specific plan you can use the Atlantis UI.
   help     View help.
