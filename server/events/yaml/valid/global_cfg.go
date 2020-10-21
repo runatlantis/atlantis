@@ -68,6 +68,15 @@ var DefaultApplyStage = Stage{
 	},
 }
 
+// DefaultPolicyCheckStage is the Atlantis default policy check stage.
+var DefaultPolicyCheckStage = Stage{
+	Steps: []Step{
+		{
+			StepName: "policy_check",
+		},
+	},
+}
+
 // DefaultPlanStage is the Atlantis default plan stage.
 var DefaultPlanStage = Stage{
 	Steps: []Step{
@@ -88,9 +97,10 @@ var DefaultPlanStage = Stage{
 // for all repos.
 func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) GlobalCfg {
 	defaultWorkflow := Workflow{
-		Name:  DefaultWorkflowName,
-		Apply: DefaultApplyStage,
-		Plan:  DefaultPlanStage,
+		Name:        DefaultWorkflowName,
+		Apply:       DefaultApplyStage,
+		Plan:        DefaultPlanStage,
+		PolicyCheck: DefaultPolicyCheckStage,
 	}
 	// Must construct slices here instead of using a `var` declaration because
 	// we treat nil slices differently.

@@ -141,6 +141,8 @@ workflows:
   default:
     plan:
       steps: []
+    policy_check:
+      steps: []
     apply:
      steps: []`,
 			exp: raw.RepoCfg{
@@ -167,6 +169,9 @@ workflows:
 							Steps: []raw.Step{},
 						},
 						Plan: &raw.Stage{
+							Steps: []raw.Step{},
+						},
+						PolicyCheck: &raw.Stage{
 							Steps: []raw.Step{},
 						},
 					},
@@ -295,8 +300,9 @@ func TestConfig_ToValid(t *testing.T) {
 				Version: Int(2),
 				Workflows: map[string]raw.Workflow{
 					"myworkflow": {
-						Plan:  &raw.Stage{},
-						Apply: nil,
+						Plan:        &raw.Stage{},
+						Apply:       nil,
+						PolicyCheck: nil,
 					},
 				},
 			},
@@ -308,6 +314,13 @@ func TestConfig_ToValid(t *testing.T) {
 					"myworkflow": {
 						Name: "myworkflow",
 						Plan: valid.DefaultPlanStage,
+						PolicyCheck: valid.Stage{
+							Steps: []valid.Step{
+								{
+									StepName: "policy_check",
+								},
+							},
+						},
 						Apply: valid.Stage{
 							Steps: []valid.Step{
 								{
@@ -331,6 +344,13 @@ func TestConfig_ToValid(t *testing.T) {
 							Steps: []raw.Step{
 								{
 									Key: String("apply"),
+								},
+							},
+						},
+						PolicyCheck: &raw.Stage{
+							Steps: []raw.Step{
+								{
+									Key: String("policy_check"),
 								},
 							},
 						},
@@ -360,6 +380,13 @@ func TestConfig_ToValid(t *testing.T) {
 							Steps: []valid.Step{
 								{
 									StepName: "apply",
+								},
+							},
+						},
+						PolicyCheck: valid.Stage{
+							Steps: []valid.Step{
+								{
+									StepName: "policy_check",
 								},
 							},
 						},

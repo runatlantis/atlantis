@@ -87,7 +87,8 @@ type Step struct {
 }
 
 type Workflow struct {
-	Name  string
-	Apply Stage
-	Plan  Stage
+	Name        string
+	Apply       Stage
+	Plan        Stage
+	PolicyCheck Stage
 }

@@ -21,16 +21,18 @@ func TestWorkflow_UnmarshalYAML(t *testing.T) {
 			description: "empty",
 			input:       ``,
 			exp: raw.Workflow{
-				Apply: nil,
-				Plan:  nil,
+				Apply:       nil,
+				PolicyCheck: nil,
+				Plan:        nil,
 			},
 		},
 		{
 			description: "yaml null",
 			input:       `~`,
 			exp: raw.Workflow{
-				Apply: nil,
-				Plan:  nil,
+				Apply:       nil,
+				PolicyCheck: nil,
+				Plan:        nil,
 			},
 		},
 		{
@@ -45,14 +47,32 @@ apply:
 			},
 		},
 		{
+			description: "only plan/policy_check/apply set",
+			input: `
+plan:
+policy_check:
+apply:
+`,
+			exp: raw.Workflow{
+				Apply:       nil,
+				PolicyCheck: nil,
+				Plan:        nil,
+			},
+		},
+		{
 			description: "steps set to null",
 			input: `
 plan:
+  steps: ~
+policy_check:
   steps: ~
 apply:
   steps: ~`,
 			exp: raw.Workflow{
 				Plan: &raw.Stage{
+					Steps: nil,
+				},
+				PolicyCheck: &raw.Stage{
 					Steps: nil,
 				},
 				Apply: &raw.Stage{
@@ -65,10 +85,15 @@ apply:
 			input: `
 plan:
   steps: []
+policy_check:
+  steps: []
 apply:
   steps: []`,
 			exp: raw.Workflow{
 				Plan: &raw.Stage{
+					Steps: []raw.Step{},
+				},
+				PolicyCheck: &raw.Stage{
 					Steps: []raw.Step{},
 				},
 				Apply: &raw.Stage{
@@ -120,8 +145,9 @@ func TestWorkflow_ToValid(t *testing.T) {
 			description: "nothing set",
 			input:       raw.Workflow{},
 			exp: valid.Workflow{
-				Apply: valid.DefaultApplyStage,
-				Plan:  valid.DefaultPlanStage,
+				Apply:       valid.DefaultApplyStage,
+				Plan:        valid.DefaultPlanStage,
+				PolicyCheck: valid.DefaultPolicyCheckStage,
 			},
 		},
 		{
@@ -131,6 +157,13 @@ func TestWorkflow_ToValid(t *testing.T) {
 					Steps: []raw.Step{
 						{
 							Key: String("init"),
+						},
+					},
+				},
+				PolicyCheck: &raw.Stage{
+					Steps: []raw.Step{
+						{
+							Key: String("policy_check"),
 						},
 					},
 				},
@@ -147,6 +180,13 @@ func TestWorkflow_ToValid(t *testing.T) {
 					Steps: []valid.Step{
 						{
 							StepName: "init",
+						},
+					},
+				},
+				PolicyCheck: valid.Stage{
+					Steps: []valid.Step{
+						{
+							StepName: "policy_check",
 						},
 					},
 				},

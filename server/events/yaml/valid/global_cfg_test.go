@@ -24,6 +24,13 @@ func TestNewGlobalCfg(t *testing.T) {
 				},
 			},
 		},
+		PolicyCheck: valid.Stage{
+			Steps: []valid.Step{
+				{
+					StepName: "policy_check",
+				},
+			},
+		},
 		Plan: valid.Stage{
 			Steps: []valid.Step{
 				{

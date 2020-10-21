@@ -434,6 +434,15 @@ func TestStep_ToValid(t *testing.T) {
 			},
 		},
 		{
+			description: "policy_check step",
+			input: raw.Step{
+				Key: String("policy_check"),
+			},
+			exp: valid.Step{
+				StepName: "policy_check",
+			},
+		},
+		{
 			description: "apply step",
 			input: raw.Step{
 				Key: String("apply"),
@@ -483,6 +492,20 @@ func TestStep_ToValid(t *testing.T) {
 			},
 			exp: valid.Step{
 				StepName:  "plan",
+				ExtraArgs: []string{"arg1", "arg2"},
+			},
+		},
+		{
+			description: "policy_check extra_args",
+			input: raw.Step{
+				Map: MapType{
+					"policy_check": {
+						"extra_args": []string{"arg1", "arg2"},
+					},
+				},
+			},
+			exp: valid.Step{
+				StepName:  "policy_check",
 				ExtraArgs: []string{"arg1", "arg2"},
 			},
 		},

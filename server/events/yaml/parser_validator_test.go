@@ -156,8 +156,9 @@ workflows:
 				Version: 2,
 				Workflows: map[string]valid.Workflow{
 					"custom": {
-						Name:  "custom",
-						Apply: valid.DefaultApplyStage,
+						Name:        "custom",
+						Apply:       valid.DefaultApplyStage,
+						PolicyCheck: valid.DefaultPolicyCheckStage,
 						Plan: valid.Stage{
 							Steps: []valid.Step{
 								{
@@ -333,9 +334,10 @@ workflows:
 				},
 				Workflows: map[string]valid.Workflow{
 					"default": {
-						Name:  "default",
-						Plan:  valid.DefaultPlanStage,
-						Apply: valid.DefaultApplyStage,
+						Name:        "default",
+						Plan:        valid.DefaultPlanStage,
+						Apply:       valid.DefaultApplyStage,
+						PolicyCheck: valid.DefaultPolicyCheckStage,
 					},
 				},
 			},
@@ -369,9 +371,10 @@ workflows:
 				},
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": {
-						Name:  "myworkflow",
-						Apply: valid.DefaultApplyStage,
-						Plan:  valid.DefaultPlanStage,
+						Name:        "myworkflow",
+						Apply:       valid.DefaultApplyStage,
+						Plan:        valid.DefaultPlanStage,
+						PolicyCheck: valid.DefaultPolicyCheckStage,
 					},
 				},
 			},
@@ -407,9 +410,10 @@ workflows:
 				},
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": {
-						Name:  "myworkflow",
-						Apply: valid.DefaultApplyStage,
-						Plan:  valid.DefaultPlanStage,
+						Name:        "myworkflow",
+						Apply:       valid.DefaultApplyStage,
+						Plan:        valid.DefaultPlanStage,
+						PolicyCheck: valid.DefaultPolicyCheckStage,
 					},
 				},
 			},
@@ -445,9 +449,10 @@ workflows:
 				},
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": {
-						Name:  "myworkflow",
-						Apply: valid.DefaultApplyStage,
-						Plan:  valid.DefaultPlanStage,
+						Name:        "myworkflow",
+						Apply:       valid.DefaultApplyStage,
+						Plan:        valid.DefaultPlanStage,
+						PolicyCheck: valid.DefaultPolicyCheckStage,
 					},
 				},
 			},
@@ -483,9 +488,10 @@ workflows:
 				},
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": {
-						Name:  "myworkflow",
-						Apply: valid.DefaultApplyStage,
-						Plan:  valid.DefaultPlanStage,
+						Name:        "myworkflow",
+						Apply:       valid.DefaultApplyStage,
+						Plan:        valid.DefaultPlanStage,
+						PolicyCheck: valid.DefaultPolicyCheckStage,
 					},
 				},
 			},
@@ -618,6 +624,10 @@ workflows:
       steps:
       - init
       - plan
+    policy_check:
+      steps:
+      - init
+      - policy_check
     apply:
       steps:
       - plan # NOTE: we don't validate if they make sense
@@ -645,6 +655,16 @@ workflows:
 								},
 								{
 									StepName: "plan",
+								},
+							},
+						},
+						PolicyCheck: valid.Stage{
+							Steps: []valid.Step{
+								{
+									StepName: "init",
+								},
+								{
+									StepName: "policy_check",
 								},
 							},
 						},
@@ -678,6 +698,11 @@ workflows:
           extra_args:
           - arg1
           - arg2
+    policy_check:
+      steps:
+      - policy_check:
+          extra_args:
+          - arg1
     apply:
       steps:
       - plan:
@@ -712,6 +737,14 @@ workflows:
 								},
 							},
 						},
+						PolicyCheck: valid.Stage{
+							Steps: []valid.Step{
+								{
+									StepName:  "policy_check",
+									ExtraArgs: []string{"arg1"},
+								},
+							},
+						},
 						Apply: valid.Stage{
 							Steps: []valid.Step{
 								{
@@ -739,6 +772,9 @@ workflows:
     plan:
       steps:
       - run: "echo \"plan hi\""
+    policy_check:
+      steps:
+      - run: "echo \"opa hi\""
     apply:
       steps:
       - run: echo apply "arg 2"
@@ -763,6 +799,14 @@ workflows:
 								{
 									StepName:   "run",
 									RunCommand: "echo \"plan hi\"",
+								},
+							},
+						},
+						PolicyCheck: valid.Stage{
+							Steps: []valid.Step{
+								{
+									StepName:   "run",
+									RunCommand: "echo \"opa hi\"",
 								},
 							},
 						},
@@ -791,6 +835,11 @@ workflows:
       - env:
           name: env_name
           value: env_value
+    policy_check:
+      steps:
+      - env:
+          name: env_name
+          value: env_value
     apply:
       steps:
       - env:
@@ -813,6 +862,15 @@ workflows:
 					"default": {
 						Name: "default",
 						Plan: valid.Stage{
+							Steps: []valid.Step{
+								{
+									StepName:    "env",
+									EnvVarName:  "env_name",
+									EnvVarValue: "env_value",
+								},
+							},
+						},
+						PolicyCheck: valid.Stage{
 							Steps: []valid.Step{
 								{
 									StepName:    "env",
@@ -908,6 +966,21 @@ func TestParseGlobalCfg(t *testing.T) {
 				},
 			},
 		},
+		PolicyCheck: valid.Stage{
+			Steps: []valid.Step{
+				{
+					StepName:   "run",
+					RunCommand: "custom command",
+				},
+				{
+					StepName:  "plan",
+					ExtraArgs: []string{"extra", "args"},
+				},
+				{
+					StepName: "policy_check",
+				},
+			},
+		},
 		Apply: valid.Stage{
 			Steps: []valid.Step{
 				{
@@ -979,9 +1052,10 @@ workflows:
 				Workflows: map[string]valid.Workflow{
 					"default": defaultCfg.Workflows["default"],
 					"name": {
-						Name:  "name",
-						Apply: valid.DefaultApplyStage,
-						Plan:  valid.DefaultPlanStage,
+						Name:        "name",
+						Apply:       valid.DefaultApplyStage,
+						Plan:        valid.DefaultPlanStage,
+						PolicyCheck: valid.DefaultPolicyCheckStage,
 					},
 				},
 			},
@@ -998,9 +1072,10 @@ workflows:
 				Workflows: map[string]valid.Workflow{
 					"default": defaultCfg.Workflows["default"],
 					"name": {
-						Name:  "name",
-						Apply: valid.DefaultApplyStage,
-						Plan:  valid.DefaultPlanStage,
+						Name:        "name",
+						Apply:       valid.DefaultApplyStage,
+						Plan:        valid.DefaultPlanStage,
+						PolicyCheck: valid.DefaultPolicyCheckStage,
 					},
 				},
 			},
@@ -1018,9 +1093,10 @@ workflows:
 				Workflows: map[string]valid.Workflow{
 					"default": defaultCfg.Workflows["default"],
 					"name": {
-						Name:  "name",
-						Plan:  valid.DefaultPlanStage,
-						Apply: valid.DefaultApplyStage,
+						Name:        "name",
+						Plan:        valid.DefaultPlanStage,
+						PolicyCheck: valid.DefaultPolicyCheckStage,
+						Apply:       valid.DefaultApplyStage,
 					},
 				},
 			},
@@ -1047,6 +1123,12 @@ workflows:
       - init:
           extra_args: [extra, args]
       - plan
+    policy_check:
+      steps:
+      - run: custom command
+      - plan:
+          extra_args: [extra, args]
+      - policy_check
     apply:
       steps:
       - run: custom command
@@ -1119,6 +1201,8 @@ workflows:
     plan:
       steps:
       - run: custom
+    policy_check:
+      steps: []
     apply:
      steps: []
 `,
@@ -1131,6 +1215,9 @@ workflows:
 						Workflow: &valid.Workflow{
 							Name: "default",
 							Apply: valid.Stage{
+								Steps: nil,
+							},
+							PolicyCheck: valid.Stage{
 								Steps: nil,
 							},
 							Plan: valid.Stage{
@@ -1214,6 +1301,17 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 				},
 			},
 		},
+		PolicyCheck: valid.Stage{
+			Steps: []valid.Step{
+				{
+					StepName: "plan",
+				},
+				{
+					StepName:   "run",
+					RunCommand: "custom policy_check",
+				},
+			},
+		},
 		Apply: valid.Stage{
 			Steps: []valid.Step{
 				{
@@ -1260,6 +1358,12 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
           "init",
           {"plan": {"extra_args": ["extra", "args"]}},
           {"run": "custom plan"}
+        ]
+      },
+      "policy_check": {
+        "steps": [
+          "plan",
+          {"run": "custom policy_check"}
         ]
       },
       "apply": {
