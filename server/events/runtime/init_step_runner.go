@@ -7,7 +7,7 @@ import (
 
 // InitStep runs `terraform init`.
 type InitStepRunner struct {
-	TerraformExecutor TerraformExec
+	TerraformExecutor StepCmdExec
 	DefaultTFVersion  *version.Version
 }
 

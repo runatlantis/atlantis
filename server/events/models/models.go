@@ -374,16 +374,17 @@ func SplitRepoFullName(repoFullName string) (owner string, repo string) {
 	return repoFullName[:lastSlashIdx], repoFullName[lastSlashIdx+1:]
 }
 
-// ProjectResult is the result of executing a plan/apply for a specific project.
+// ProjectResult is the result of executing a plan/policy_check/apply for a specific project.
 type ProjectResult struct {
-	Command      CommandName
-	RepoRelDir   string
-	Workspace    string
-	Error        error
-	Failure      string
-	PlanSuccess  *PlanSuccess
-	ApplySuccess string
-	ProjectName  string
+	Command            CommandName
+	RepoRelDir         string
+	Workspace          string
+	Error              error
+	Failure            string
+	PlanSuccess        *PlanSuccess
+	PolicyCheckSuccess *PolicyCheckSuccess
+	ApplySuccess       string
+	ProjectName        string
 }
 
 // CommitStatus returns the vcs commit status of this project result.
@@ -408,7 +409,13 @@ func (p ProjectResult) PlanStatus() ProjectPlanStatus {
 			return ErroredPlanStatus
 		}
 		return PlannedPlanStatus
-
+	case PolicyCheckCommand:
+		if p.Error != nil {
+			return ErroredPolicyCheckPlanStatus
+		} else if p.Failure != "" {
+			return ErroredPolicyCheckPlanStatus
+		}
+		return PassedPolicyCheckPlanStatus
 	case ApplyCommand:
 		if p.Error != nil {
 			return ErroredApplyStatus
@@ -423,7 +430,7 @@ func (p ProjectResult) PlanStatus() ProjectPlanStatus {
 
 // IsSuccessful returns true if this project result had no errors.
 func (p ProjectResult) IsSuccessful() bool {
-	return p.PlanSuccess != nil || p.ApplySuccess != ""
+	return p.PlanSuccess != nil || p.PolicyCheckSuccess != nil || p.ApplySuccess != ""
 }
 
 // PlanSuccess is the result of a successful plan.
@@ -431,6 +438,22 @@ type PlanSuccess struct {
 	// TerraformOutput is the output from Terraform of running plan.
 	TerraformOutput string
 	// LockURL is the full URL to the lock held by this plan.
+	LockURL string
+	// RePlanCmd is the command that users should run to re-plan this project.
+	RePlanCmd string
+	// ApplyCmd is the command that users should run to apply this plan.
+	ApplyCmd string
+	// HasDiverged is true if we're using the checkout merge strategy and the
+	// branch we're merging into has been updated since we cloned and merged
+	// it.
+	HasDiverged bool
+}
+
+// PolicyCheckSuccess is the result of a successful policy check run.
+type PolicyCheckSuccess struct {
+	// PolicyCheckOutput is the output from policy check binary(conftest|opa)
+	PolicyCheckOutput string
+	// LockURL is the full URL to the lock held by this policy check.
 	LockURL string
 	// RePlanCmd is the command that users should run to re-plan this project.
 	RePlanCmd string
@@ -490,6 +513,12 @@ const (
 	// DiscardedPlanStatus means that there was an unapplied plan that was
 	// discarded due to a project being unlocked
 	DiscardedPlanStatus
+	// ErroredPolicyCheckPlanStatus means that there was an unapplied plan that was
+	// discarded due to a project being unlocked
+	ErroredPolicyCheckPlanStatus
+	// PassedPolicyCheckPlanStatus means that there was an unapplied plan that was
+	// discarded due to a project being unlocked
+	PassedPolicyCheckPlanStatus
 )
 
 // String returns a string representation of the status.
@@ -505,6 +534,10 @@ func (p ProjectPlanStatus) String() string {
 		return "applied"
 	case DiscardedPlanStatus:
 		return "plan_discarded"
+	case ErroredPolicyCheckPlanStatus:
+		return "policy_check_errored"
+	case PassedPolicyCheckPlanStatus:
+		return "policy_check_passed"
 	default:
 		panic("missing String() impl for ProjectPlanStatus")
 	}
@@ -520,6 +553,8 @@ const (
 	PlanCommand
 	// UnlockCommand is a command to discard previous plans as well as the atlantis locks.
 	UnlockCommand
+	// PolicyCheckCommand is a command to run conftest test.
+	PolicyCheckCommand
 	// Adding more? Don't forget to update String() below
 )
 
@@ -532,6 +567,8 @@ func (c CommandName) String() string {
 		return "plan"
 	case UnlockCommand:
 		return "unlock"
+	case PolicyCheckCommand:
+		return "policy_check"
 	}
 	return ""
 }

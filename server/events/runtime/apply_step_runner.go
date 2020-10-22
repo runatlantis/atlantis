@@ -17,7 +17,7 @@ import (
 
 // ApplyStepRunner runs `terraform apply`.
 type ApplyStepRunner struct {
-	TerraformExecutor   TerraformExec
+	TerraformExecutor   StepCmdExec
 	CommitStatusUpdater StatusUpdater
 	AsyncTFExec         AsyncTFExec
 }
