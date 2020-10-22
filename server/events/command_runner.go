@@ -113,7 +113,7 @@ type DefaultCommandRunner struct {
 	DeleteLockCommand DeleteLockCommand
 }
 
-// RunAutoplanCommand runs plan when a pull request is opened or updated.
+// RunAutoplanCommand runs plan and policy_checks when a pull request is opened or updated.
 func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) {
 	if opStarted := c.Drainer.StartOp(); !opStarted {
 		if commentErr := c.VCSClient.CreateComment(baseRepo, pull.Num, ShutdownComment, models.PlanCommand.String()); commentErr != nil {
@@ -138,23 +138,44 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		return
 	}
 
-	projectCmds, err := c.ProjectCommandBuilder.BuildAutoplanCommands(ctx)
+	// Run plan command
+	c.runAutoCommand(ctx, models.PlanCommand)
+
+	// Run policy_check command
+	c.runAutoCommand(ctx, models.PolicyCheckCommand)
+}
+
+func (c *DefaultCommandRunner) runAutoCommand(ctx *CommandContext, cmdModel models.CommandName) {
+	var pullCommand PullCommand
+	var projectCmds []models.ProjectCommandContext
+	var err error
+
+	switch cmdModel.String() {
+	case "plan":
+		projectCmds, err = c.ProjectCommandBuilder.BuildAutoplanCommands(ctx)
+		pullCommand = AutoplanCommand{}
+	case "policy_check":
+		projectCmds, err = c.ProjectCommandBuilder.BuildAutoPolicyCheckCommands(ctx)
+		pullCommand = AutoPolicyCheckCommand{}
+	}
+
 	if err != nil {
-		if statusErr := c.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, models.PlanCommand); statusErr != nil {
+		if statusErr := c.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmdModel); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
 
-		c.updatePull(ctx, AutoplanCommand{}, CommandResult{Error: err})
+		c.updatePull(ctx, pullCommand, CommandResult{Error: err})
 		return
 	}
+
 	if len(projectCmds) == 0 {
-		log.Info("determined there was no project to run plan in")
+		ctx.Log.Info("determined there was no project to run %s in", cmdModel.String())
 		if !c.SilenceVCSStatusNoPlans {
 			// If there were no projects modified, we set successful commit statuses
 			// with 0/0 projects planned/applied successfully because some users require
 			// the Atlantis status to be passing for all pull requests.
 			ctx.Log.Debug("setting VCS status to success with no projects found")
-			if err := c.CommitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, models.PlanCommand, 0, 0); err != nil {
+			if err := c.CommitStatusUpdater.UpdateCombinedCount(ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, cmdModel, 0, 0); err != nil {
 				ctx.Log.Warn("unable to update commit status: %s", err)
 			}
 			if err := c.CommitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, models.ApplyCommand, 0, 0); err != nil {
@@ -165,7 +186,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	}
 
 	// At this point we are sure Atlantis has work to do, so set commit status to pending
-	if err := c.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, models.PlanCommand); err != nil {
+	if err := c.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, cmdModel); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
@@ -173,9 +194,9 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	var result CommandResult
 	if c.parallelPlanEnabled(ctx, projectCmds) {
 		ctx.Log.Info("Running plans in parallel")
-		result = c.runProjectCmdsParallel(projectCmds, models.PlanCommand)
+		result = c.runProjectCmdsParallel(projectCmds, cmdModel)
 	} else {
-		result = c.runProjectCmds(projectCmds, models.PlanCommand)
+		result = c.runProjectCmds(projectCmds, cmdModel)
 	}
 
 	if c.automergeEnabled(ctx, projectCmds) && result.HasErrors() {
@@ -183,13 +204,13 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		c.deletePlans(ctx)
 		result.PlansDeleted = true
 	}
-	c.updatePull(ctx, AutoplanCommand{}, result)
+	c.updatePull(ctx, pullCommand, result)
 	pullStatus, err := c.updateDB(ctx, ctx.Pull, result.ProjectResults)
 	if err != nil {
 		c.Logger.Err("writing results: %s", err)
 	}
 
-	c.updateCommitStatus(ctx, models.PlanCommand, pullStatus)
+	c.updateCommitStatus(ctx, cmdModel, pullStatus)
 }
 
 // RunCommentCommand executes the command.
@@ -328,7 +349,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		result = c.runProjectCmds(projectCmds, cmd.Name)
 	}
 
-	if cmd.Name == models.PlanCommand && c.automergeEnabled(ctx, projectCmds) && result.HasErrors() {
+	if c.automergeEnabled(ctx, projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
 		c.deletePlans(ctx)
 		result.PlansDeleted = true
@@ -432,6 +453,14 @@ func (c *DefaultCommandRunner) runProjectCmdsParallel(cmds []models.ProjectComma
 				results = append(results, res)
 				mux.Unlock()
 			}
+		case models.PolicyCheckCommand:
+			execute = func() {
+				defer wg.Done()
+				res := c.ProjectCommandRunner.PolicyCheck(pCmd)
+				mux.Lock()
+				results = append(results, res)
+				mux.Unlock()
+			}
 		case models.ApplyCommand:
 			execute = func() {
 				defer wg.Done()
@@ -455,6 +484,8 @@ func (c *DefaultCommandRunner) runProjectCmds(cmds []models.ProjectCommandContex
 		switch cmdName {
 		case models.PlanCommand:
 			res = c.ProjectCommandRunner.Plan(pCmd)
+		case models.PolicyCheckCommand:
+			res = c.ProjectCommandRunner.PolicyCheck(pCmd)
 		case models.ApplyCommand:
 			res = c.ProjectCommandRunner.Apply(pCmd)
 		}

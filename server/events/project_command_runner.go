@@ -245,41 +245,6 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 	}, "", nil
 }
 
-func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.ProjectCommandContext, absPath string) ([]string, error) {
-	var outputs []string
-	envs := make(map[string]string)
-	for _, step := range steps {
-		var out string
-		var err error
-		switch step.StepName {
-		case "init":
-			out, err = p.InitStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
-		case "plan":
-			out, err = p.PlanStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
-		case "policy_check":
-			out, err = p.PolicyStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
-		case "apply":
-			out, err = p.ApplyStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
-		case "run":
-			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath, envs)
-		case "env":
-			out, err = p.EnvStepRunner.Run(ctx, step.RunCommand, step.EnvVarValue, absPath, envs)
-			envs[step.EnvVarName] = out
-			// We reset out to the empty string because we don't want it to
-			// be printed to the PR, it's solely to set the environment variable.
-			out = ""
-		}
-
-		if out != "" {
-			outputs = append(outputs, out)
-		}
-		if err != nil {
-			return outputs, err
-		}
-	}
-	return outputs, nil
-}
-
 func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) (applyOut string, failure string, err error) {
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
 	if err != nil {
@@ -329,4 +294,39 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 		return "", "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
 	}
 	return strings.Join(outputs, "\n"), "", nil
+}
+
+func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.ProjectCommandContext, absPath string) ([]string, error) {
+	var outputs []string
+	envs := make(map[string]string)
+	for _, step := range steps {
+		var out string
+		var err error
+		switch step.StepName {
+		case "init":
+			out, err = p.InitStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+		case "plan":
+			out, err = p.PlanStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+		case "policy_check":
+			out, err = p.PolicyStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+		case "apply":
+			out, err = p.ApplyStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+		case "run":
+			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath, envs)
+		case "env":
+			out, err = p.EnvStepRunner.Run(ctx, step.RunCommand, step.EnvVarValue, absPath, envs)
+			envs[step.EnvVarName] = out
+			// We reset out to the empty string because we don't want it to
+			// be printed to the PR, it's solely to set the environment variable.
+			out = ""
+		}
+
+		if out != "" {
+			outputs = append(outputs, out)
+		}
+		if err != nil {
+			return outputs, err
+		}
+	}
+	return outputs, nil
 }

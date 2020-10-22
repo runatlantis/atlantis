@@ -39,6 +39,9 @@ type ProjectCommandBuilder interface {
 	// BuildAutoplanCommands builds project commands that will run plan on
 	// the projects determined to be modified.
 	BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error)
+	// BuildAutoPolicyCheckCommands builds project commands that will run policy_check on
+	// the projects determined to be modified.
+	BuildAutoPolicyCheckCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error)
 	// BuildPlanCommands builds project plan commands for this ctx and comment. If
 	// comment doesn't specify one project then there may be multiple commands
 	// to be run.
@@ -62,6 +65,11 @@ type DefaultProjectCommandBuilder struct {
 	PendingPlanFinder  *DefaultPendingPlanFinder
 	CommentBuilder     CommentBuilder
 	SkipCloneNoChanges bool
+}
+
+func (p *DefaultProjectCommandBuilder) BuildAutoPolicyCheckCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error) {
+
+	return []models.ProjectCommandContext{}, nil
 }
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
