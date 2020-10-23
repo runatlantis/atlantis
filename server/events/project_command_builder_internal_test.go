@@ -23,6 +23,9 @@ func TestBuildProjectCmdCtx(t *testing.T) {
 			Hostname: "github.com",
 		},
 	}
+	pull := models.PullRequest{
+		BaseRepo: baseRepo,
+	}
 	cases := map[string]struct {
 		globalCfg     string
 		repoCfg       string
@@ -57,7 +60,7 @@ workflows:
 				HeadRepo:           models.Repo{},
 				Log:                nil,
 				PullMergeable:      true,
-				Pull:               models.PullRequest{},
+				Pull:               pull,
 				ProjectName:        "",
 				ApplyRequirements:  []string{},
 				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
@@ -106,7 +109,7 @@ projects:
 				HeadRepo:           models.Repo{},
 				Log:                nil,
 				PullMergeable:      true,
-				Pull:               models.PullRequest{},
+				Pull:               pull,
 				ProjectName:        "",
 				ApplyRequirements:  []string{},
 				RepoConfigVersion:  3,
@@ -157,7 +160,7 @@ projects:
 				HeadRepo:           models.Repo{},
 				Log:                nil,
 				PullMergeable:      true,
-				Pull:               models.PullRequest{},
+				Pull:               pull,
 				ProjectName:        "",
 				ApplyRequirements:  []string{"approved", "mergeable"},
 				RepoConfigVersion:  3,
@@ -216,7 +219,7 @@ projects:
 				HeadRepo:           models.Repo{},
 				Log:                nil,
 				PullMergeable:      true,
-				Pull:               models.PullRequest{},
+				Pull:               pull,
 				ProjectName:        "",
 				ApplyRequirements:  []string{"approved"},
 				RepoConfigVersion:  3,
@@ -362,7 +365,7 @@ workflows:
 				HeadRepo:           models.Repo{},
 				Log:                nil,
 				PullMergeable:      true,
-				Pull:               models.PullRequest{},
+				Pull:               pull,
 				ProjectName:        "",
 				ApplyRequirements:  []string{},
 				RepoConfigVersion:  3,
@@ -417,7 +420,7 @@ projects:
 				HeadRepo:           models.Repo{},
 				Log:                nil,
 				PullMergeable:      true,
-				Pull:               models.PullRequest{},
+				Pull:               pull,
 				ProjectName:        "",
 				ApplyRequirements:  []string{},
 				RepoConfigVersion:  3,
@@ -475,7 +478,7 @@ workflows:
 				HeadRepo:           models.Repo{},
 				Log:                nil,
 				PullMergeable:      true,
-				Pull:               models.PullRequest{},
+				Pull:               pull,
 				ProjectName:        "",
 				ApplyRequirements:  []string{},
 				RepoConfigVersion:  3,
@@ -517,7 +520,7 @@ projects:
 				HeadRepo:           models.Repo{},
 				Log:                nil,
 				PullMergeable:      true,
-				Pull:               models.PullRequest{},
+				Pull:               pull,
 				ProjectName:        "",
 				ApplyRequirements:  []string{"approved"},
 				RepoConfigVersion:  3,
@@ -547,7 +550,7 @@ projects:
 			defer cleanup()
 
 			workingDir := NewMockWorkingDir()
-			When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmp, false, nil)
+			When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmp, false, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"modules/module/main.tf"}, nil)
 
@@ -578,7 +581,9 @@ projects:
 			for _, cmd := range []models.CommandName{models.PlanCommand, models.ApplyCommand} {
 				t.Run(cmd.String(), func(t *testing.T) {
 					ctx, err := builder.buildProjectCommandCtx(&CommandContext{
-						BaseRepo:      baseRepo,
+						Pull: models.PullRequest{
+							BaseRepo: baseRepo,
+						},
 						PullMergeable: true,
 					}, cmd, "", []string{"flag"}, tmp, "project1", "myworkspace", true)
 

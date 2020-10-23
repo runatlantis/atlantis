@@ -155,7 +155,10 @@ func TestRunCommentCommand_ForkPRDisabled(t *testing.T) {
 	ch.AllowForkPRs = false
 	ch.SilenceForkPRErrors = false
 	var pull github.PullRequest
-	modelPull := models.PullRequest{State: models.OpenPullState}
+	modelPull := models.PullRequest{
+		BaseRepo: fixtures.GithubRepo,
+		State:    models.OpenPullState,
+	}
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
 
 	headRepo := fixtures.GithubRepo
@@ -174,7 +177,7 @@ func TestRunCommentCommand_ForkPRDisabled_SilenceEnabled(t *testing.T) {
 	ch.AllowForkPRs = false // by default it's false so don't need to reset
 	ch.SilenceForkPRErrors = true
 	var pull github.PullRequest
-	modelPull := models.PullRequest{State: models.OpenPullState}
+	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState}
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
 
 	headRepo := fixtures.GithubRepo
@@ -191,7 +194,7 @@ func TestRunCommentCommand_DisableApplyAllDisabled(t *testing.T) {
 		" comment saying that this is not allowed")
 	vcsClient := setup(t)
 	ch.DisableApplyAll = true
-	modelPull := models.PullRequest{State: models.OpenPullState}
+	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState}
 	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, modelPull.Num, &events.CommentCommand{Name: models.ApplyCommand})
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "**Error:** Running `atlantis apply` without flags is disabled. You must specify which project to apply via the `-d <dir>`, `-w <workspace>` or `-p <project name>` flags.", "apply")
 }
@@ -219,7 +222,7 @@ func TestRunCommentCommand_ClosedPull(t *testing.T) {
 	pull := &github.PullRequest{
 		State: github.String("closed"),
 	}
-	modelPull := models.PullRequest{State: models.ClosedPullState}
+	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.ClosedPullState}
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
 
@@ -235,7 +238,7 @@ func TestRunUnlockCommand_VCSComment(t *testing.T) {
 	pull := &github.PullRequest{
 		State: github.String("open"),
 	}
-	modelPull := models.PullRequest{State: models.OpenPullState}
+	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState}
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
 
@@ -253,7 +256,7 @@ func TestRunUnlockCommandFail_VCSComment(t *testing.T) {
 	pull := &github.PullRequest{
 		State: github.String("open"),
 	}
-	modelPull := models.PullRequest{State: models.OpenPullState}
+	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState}
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
 	When(deleteLockCommand.DeleteLocksByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(errors.New("err"))
@@ -301,6 +304,7 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 
 	When(workingDir.GetPullDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).
 		ThenReturn(tmp, nil)
+	fixtures.Pull.BaseRepo = fixtures.GithubRepo
 	ch.RunAutoplanCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
 	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
 }
@@ -312,7 +316,7 @@ func TestApplyWithAutoMerge_VSCMerge(t *testing.T) {
 	pull := &github.PullRequest{
 		State: github.String("open"),
 	}
-	modelPull := models.PullRequest{State: models.OpenPullState}
+	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState}
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
 	ch.GlobalAutomerge = true
@@ -387,6 +391,7 @@ func TestRunAutoplanCommand_DrainOngoing(t *testing.T) {
 func TestRunAutoplanCommand_DrainNotOngoing(t *testing.T) {
 	t.Log("if drain is not ongoing then remove ongoing operation must be called even if panic occured")
 	setup(t)
+	fixtures.Pull.BaseRepo = fixtures.GithubRepo
 	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())).ThenPanic("panic test - if you're seeing this in a test failure this isn't the failing test")
 	ch.RunAutoplanCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
 	projectCommandBuilder.VerifyWasCalledOnce().BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())
