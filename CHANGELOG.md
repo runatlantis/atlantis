@@ -1,3 +1,31 @@
+# v0.15.1
+
+## Description
+Bugfix release.
+
+## Bugfixes
+* Fix `required_version` detection not working for Terraform 0.13.0 ([#1153](https://github.com/runatlantis/atlantis/issues/1153) by @joerx)
+* Fix editing comments on draft PRs causing plan to re-run ([#1194](https://github.com/runatlantis/atlantis/issues/1194))
+* Fix Azure DevOps apply status checks not working ([#1172](https://github.com/runatlantis/atlantis/issues/1172) by @acastle)
+* Fix checkout-strategy=merge not working when using the GitHub app installation ([#1193](https://github.com/runatlantis/atlantis/issues/1193) by @nishkrishnan)
+
+## Backwards Incompatibilities / Notes:
+* If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
+  then the default version of Terraform will now be 0.13.4. Simply set the above
+  flag to your desired default version to avoid any issues.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.15.1/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.15.1/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.15.1/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.15.1/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.15.1`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.15.0..v0.15.1
+https://github.com/runatlantis/atlantis/compare/v0.15.0...v0.15.1
+
 # v0.15.0
 
 ## Description
