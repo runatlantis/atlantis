@@ -276,11 +276,11 @@ var boolFlags = map[string]boolFlag{
 		defaultValue: false,
 	},
 	DisableApplyAllFlag: {
-		description:  "Disable \"atlantis apply\" command so a specific project/workspace/directory has to be specified for applies.",
+		description:  "Disable \"atlantis apply\" command without any flags (i.e. apply all). A specific project/workspace/directory has to be specified for applies.",
 		defaultValue: false,
 	},
 	DisableApplyFlag: {
-		description:  "Globally disable \"atlantis apply\" command",
+		description:  "Disable all \"atlantis apply\" command regardless of which flags are passed with it.",
 		defaultValue: false,
 	},
 	DisableAutoplanFlag: {

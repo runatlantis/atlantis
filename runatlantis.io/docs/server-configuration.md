@@ -159,6 +159,7 @@ Values are chosen in this order:
   Bitbucket username of API user.
 
 * ### `--bitbucket-webhook-secret`
+* ### `--bitbucket-webhook-secret`
   ```bash
   atlantis server --bitbucket-webhook-secret="secret"
   # or (recommended)
@@ -201,6 +202,12 @@ Values are chosen in this order:
   Terraform version to default to. Will download to `<data-dir>/bin/terraform<version>`
   if not in `PATH`. See [Terraform Versions](terraform-versions.html) for more details.
 
+* ### `--disable-apply`
+  ```bash
+  atlantis server --disable-apply
+  ```
+  Disable all \"atlantis apply\" commands, regardless of which flags are passed with it.
+  
 * ### `--disable-apply-all`
   ```bash
   atlantis server --disable-apply-all
