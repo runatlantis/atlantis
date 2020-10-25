@@ -658,13 +658,13 @@ func TestBuildPlanApplyComment(t *testing.T) {
 	}
 }
 
-func TestCommentParser_HelpComment(t *testing.T){
+func TestCommentParser_HelpComment(t *testing.T) {
 	cases := []struct {
-		applyDisabled  bool
-		expectResult         string
+		applyDisabled bool
+		expectResult  string
 	}{
 		{
-			applyDisabled:  false,
+			applyDisabled: false,
 			expectResult: "```cmake\n" +
 				`atlantis
 Terraform Pull Request Automation
@@ -698,7 +698,7 @@ Use "atlantis [command] --help" for more information about a command.` +
 				"\n```",
 		},
 		{
-			applyDisabled:  true,
+			applyDisabled: true,
 			expectResult: "```cmake\n" +
 				`atlantis
 Terraform Pull Request Automation

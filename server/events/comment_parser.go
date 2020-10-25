@@ -16,13 +16,14 @@ package events
 import (
 	"bytes"
 	"fmt"
-	"github.com/Masterminds/sprig"
 	"io/ioutil"
 	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"text/template"
+
+	"github.com/Masterminds/sprig"
 
 	"github.com/flynn-archive/go-shlex"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -337,7 +338,7 @@ func (e *CommentParser) errMarkdown(errMsg string, command string, flagSet *pfla
 func (e *CommentParser) HelpComment(applyDisabled bool) string {
 	buf := &bytes.Buffer{}
 	var tmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(helpCommentTemplate))
-	if err := tmpl.Execute(buf,struct {
+	if err := tmpl.Execute(buf, struct {
 		ApplyDisabled bool
 	}{
 		ApplyDisabled: applyDisabled,
