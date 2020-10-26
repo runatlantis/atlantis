@@ -174,6 +174,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 	return &models.PlanSuccess{
 		LockURL:         p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
 		TerraformOutput: strings.Join(outputs, "\n"),
+		ChangeSummary:   outputs[len(outputs)-2],
 		RePlanCmd:       ctx.RePlanCmd,
 		ApplyCmd:        ctx.ApplyCmd,
 		HasDiverged:     hasDiverged,
