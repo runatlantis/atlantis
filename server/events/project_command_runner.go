@@ -93,18 +93,18 @@ type ProjectCommandRunner interface {
 
 // DefaultProjectCommandRunner implements ProjectCommandRunner.
 type DefaultProjectCommandRunner struct {
-	Locker              ProjectLocker
-	LockURLGenerator    LockURLGenerator
-	InitStepRunner      StepRunner
-	PlanStepRunner      StepRunner
-	ApplyStepRunner     StepRunner
-	PolicyStepRunner    StepRunner
-	RunStepRunner       CustomStepRunner
-	EnvStepRunner       EnvStepRunner
-	PullApprovedChecker runtime.PullApprovedChecker
-	WorkingDir          WorkingDir
-	Webhooks            WebhooksSender
-	WorkingDirLocker    WorkingDirLocker
+	Locker                ProjectLocker
+	LockURLGenerator      LockURLGenerator
+	InitStepRunner        StepRunner
+	PlanStepRunner        StepRunner
+	ApplyStepRunner       StepRunner
+	PolicyCheckStepRunner StepRunner
+	RunStepRunner         CustomStepRunner
+	EnvStepRunner         EnvStepRunner
+	PullApprovedChecker   runtime.PullApprovedChecker
+	WorkingDir            WorkingDir
+	Webhooks              WebhooksSender
+	WorkingDirLocker      WorkingDirLocker
 }
 
 // Plan runs terraform plan for the project described by ctx.
@@ -308,7 +308,7 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.Pr
 		case "plan":
 			out, err = p.PlanStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "policy_check":
-			out, err = p.PolicyStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+			out, err = p.PolicyCheckStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "apply":
 			out, err = p.ApplyStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "run":

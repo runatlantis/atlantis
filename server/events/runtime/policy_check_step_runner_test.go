@@ -14,7 +14,7 @@ func TestRun_PolicyRunSuccess(t *testing.T) {
 	RegisterMockTestingT(t)
 	logger := logging.NewNoopLogger()
 	workspace := "default"
-	s := runtime.PolicyRunnerStep{}
+	s := runtime.PolicyCheckStepRunner{}
 
 	output, err := s.Run(models.ProjectCommandContext{
 		Log:                logger,
