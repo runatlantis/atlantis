@@ -138,25 +138,24 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		return
 	}
 
-	// Run plan command
-	c.runAutoCommand(ctx, models.PlanCommand)
+	// Run plan command for all projects
+	planErr := c.runAutoCommand(ctx, models.PlanCommand, AutoplanCommand{})
 
-	// Run policy_check command
-	c.runAutoCommand(ctx, models.PolicyCheckCommand)
+	if planErr == nil {
+		// Run policy_check command
+		_ = c.runAutoCommand(ctx, models.PolicyCheckCommand, AutoPolicyCheckCommand{})
+	}
 }
 
-func (c *DefaultCommandRunner) runAutoCommand(ctx *CommandContext, cmdModel models.CommandName) {
-	var pullCommand PullCommand
+func (c *DefaultCommandRunner) runAutoCommand(ctx *CommandContext, cmdModel models.CommandName, pullCommand PullCommand) error {
 	var projectCmds []models.ProjectCommandContext
 	var err error
 
 	switch cmdModel.String() {
 	case "plan":
 		projectCmds, err = c.ProjectCommandBuilder.BuildAutoplanCommands(ctx)
-		pullCommand = AutoplanCommand{}
 	case "policy_check":
 		projectCmds, err = c.ProjectCommandBuilder.BuildAutoPolicyCheckCommands(ctx)
-		pullCommand = AutoPolicyCheckCommand{}
 	}
 
 	if err != nil {
@@ -165,7 +164,7 @@ func (c *DefaultCommandRunner) runAutoCommand(ctx *CommandContext, cmdModel mode
 		}
 
 		c.updatePull(ctx, pullCommand, CommandResult{Error: err})
-		return
+		return err
 	}
 
 	if len(projectCmds) == 0 {
@@ -182,7 +181,7 @@ func (c *DefaultCommandRunner) runAutoCommand(ctx *CommandContext, cmdModel mode
 				ctx.Log.Warn("unable to update commit status: %s", err)
 			}
 		}
-		return
+		return err
 	}
 
 	// At this point we are sure Atlantis has work to do, so set commit status to pending
@@ -211,6 +210,16 @@ func (c *DefaultCommandRunner) runAutoCommand(ctx *CommandContext, cmdModel mode
 	}
 
 	c.updateCommitStatus(ctx, cmdModel, pullStatus)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.Failure != "" {
+		return errors.New(result.Failure)
+	}
+
+	return nil
 }
 
 // RunCommentCommand executes the command.
