@@ -191,10 +191,14 @@ func (c *DefaultCommandRunner) runAutoCommand(ctx *CommandContext, cmdModel mode
 
 	// Only run commands in parallel if enabled
 	var result CommandResult
-	if c.parallelPlanEnabled(ctx, projectCmds) {
+	switch {
+	case cmdModel == models.PlanCommand && c.parallelPlanEnabled(ctx, projectCmds):
 		ctx.Log.Info("Running plans in parallel")
 		result = c.runProjectCmdsParallel(projectCmds, cmdModel)
-	} else {
+	case cmdModel == models.PolicyCheckCommand && c.parallelPolicyCheckEnabled(ctx, projectCmds):
+		ctx.Log.Info("Running policy checks in parallel")
+		result = c.runProjectCmdsParallel(projectCmds, cmdModel)
+	default:
 		result = c.runProjectCmds(projectCmds, cmdModel)
 	}
 
@@ -348,13 +352,17 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 
 	// Only run commands in parallel if enabled
 	var result CommandResult
-	if cmd.Name == models.ApplyCommand && c.parallelApplyEnabled(ctx, projectCmds) {
-		ctx.Log.Info("Running applies in parallel")
-		result = c.runProjectCmdsParallel(projectCmds, cmd.Name)
-	} else if cmd.Name == models.PlanCommand && c.parallelPlanEnabled(ctx, projectCmds) {
+	switch {
+	case cmd.Name == models.PlanCommand && c.parallelPlanEnabled(ctx, projectCmds):
 		ctx.Log.Info("Running plans in parallel")
 		result = c.runProjectCmdsParallel(projectCmds, cmd.Name)
-	} else {
+	case cmd.Name == models.PolicyCheckCommand && c.parallelPolicyCheckEnabled(ctx, projectCmds):
+		ctx.Log.Info("Running policy checks in parallel")
+		result = c.runProjectCmdsParallel(projectCmds, cmd.Name)
+	case cmd.Name == models.ApplyCommand && c.parallelApplyEnabled(ctx, projectCmds):
+		ctx.Log.Info("Running applies in parallel")
+		result = c.runProjectCmdsParallel(projectCmds, cmd.Name)
+	default:
 		result = c.runProjectCmds(projectCmds, cmd.Name)
 	}
 
@@ -654,6 +662,11 @@ func (c *DefaultCommandRunner) parallelApplyEnabled(ctx *CommandContext, project
 // parallelPlanEnabled returns true if parallel plan is enabled in this context.
 func (c *DefaultCommandRunner) parallelPlanEnabled(ctx *CommandContext, projectCmds []models.ProjectCommandContext) bool {
 	return len(projectCmds) > 0 && projectCmds[0].ParallelPlanEnabled
+}
+
+// parallelPolicyCheckEnabled returns true if parallel plan is enabled in this context.
+func (c *DefaultCommandRunner) parallelPolicyCheckEnabled(ctx *CommandContext, projectCmds []models.ProjectCommandContext) bool {
+	return len(projectCmds) > 0 && projectCmds[0].ParallelPolicyCheckEnabled
 }
 
 // automergeComment is the comment that gets posted when Atlantis automatically
