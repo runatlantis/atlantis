@@ -368,7 +368,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		result = c.runProjectCmds(projectCmds, cmd.Name)
 	}
 
-	if c.automergeEnabled(ctx, projectCmds) && result.HasErrors() {
+	if cmd.Name == models.PlanCommand && c.automergeEnabled(ctx, projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
 		c.deletePlans(ctx)
 		result.PlansDeleted = true
