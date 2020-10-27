@@ -335,6 +335,12 @@ Values are chosen in this order:
   ```
   Log level. Defaults to `info`.
 
+* ### `--parallel-pool-size`
+  ```bash
+  atlantis server --parallel-pool-size=100
+  ```
+  Max size of the wait group that runs parallel plans and applies (if enabled). Defaults to `15`
+
 * ### `--port`
   ```bash
   atlantis server --port=8080
