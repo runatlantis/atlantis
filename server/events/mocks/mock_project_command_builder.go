@@ -45,25 +45,6 @@ func (mock *MockProjectCommandBuilder) BuildAutoplanCommands(ctx *events.Command
 	return ret0, ret1
 }
 
-func (mock *MockProjectCommandBuilder) BuildAutoPolicyCheckCommands(ctx *events.CommandContext) ([]models.ProjectCommandContext, error) {
-	if mock == nil {
-		panic("mock must not be nil. Use myMock := NewMockProjectCommandBuilder().")
-	}
-	params := []pegomock.Param{ctx}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("BuildAutoPolicyCheckCommands", params, []reflect.Type{reflect.TypeOf((*[]models.ProjectCommandContext)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 []models.ProjectCommandContext
-	var ret1 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].([]models.ProjectCommandContext)
-		}
-		if result[1] != nil {
-			ret1 = result[1].(error)
-		}
-	}
-	return ret0, ret1
-}
-
 func (mock *MockProjectCommandBuilder) BuildPlanCommands(ctx *events.CommandContext, comment *events.CommentCommand) ([]models.ProjectCommandContext, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandBuilder().")
@@ -175,33 +156,6 @@ func (c *MockProjectCommandBuilder_BuildAutoplanCommands_OngoingVerification) Ge
 }
 
 func (c *MockProjectCommandBuilder_BuildAutoplanCommands_OngoingVerification) GetAllCapturedArguments() (_param0 []*events.CommandContext) {
-	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(params) > 0 {
-		_param0 = make([]*events.CommandContext, len(c.methodInvocations))
-		for u, param := range params[0] {
-			_param0[u] = param.(*events.CommandContext)
-		}
-	}
-	return
-}
-
-func (verifier *VerifierMockProjectCommandBuilder) BuildAutoPolicyCheckCommands(ctx *events.CommandContext) *MockProjectCommandBuilder_BuildAutoPolicyCheckCommands_OngoingVerification {
-	params := []pegomock.Param{ctx}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "BuildAutoPolicyCheckCommands", params, verifier.timeout)
-	return &MockProjectCommandBuilder_BuildAutoPolicyCheckCommands_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
-}
-
-type MockProjectCommandBuilder_BuildAutoPolicyCheckCommands_OngoingVerification struct {
-	mock              *MockProjectCommandBuilder
-	methodInvocations []pegomock.MethodInvocation
-}
-
-func (c *MockProjectCommandBuilder_BuildAutoPolicyCheckCommands_OngoingVerification) GetCapturedArguments() *events.CommandContext {
-	ctx := c.GetAllCapturedArguments()
-	return ctx[len(ctx)-1]
-}
-
-func (c *MockProjectCommandBuilder_BuildAutoPolicyCheckCommands_OngoingVerification) GetAllCapturedArguments() (_param0 []*events.CommandContext) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]*events.CommandContext, len(c.methodInvocations))
