@@ -16,19 +16,16 @@ package events
 import (
 	"bytes"
 	"fmt"
+	"github.com/flynn-archive/go-shlex"
+	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/yaml"
+	"github.com/spf13/pflag"
 	"io/ioutil"
 	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"text/template"
-
-	"github.com/Masterminds/sprig"
-
-	"github.com/flynn-archive/go-shlex"
-	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/yaml"
-	"github.com/spf13/pflag"
 )
 
 const (
@@ -337,7 +334,7 @@ func (e *CommentParser) errMarkdown(errMsg string, command string, flagSet *pfla
 
 func (e *CommentParser) HelpComment(applyDisabled bool) string {
 	buf := &bytes.Buffer{}
-	var tmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(helpCommentTemplate))
+	var tmpl = template.Must(template.New("").Parse(helpCommentTemplate))
 	if err := tmpl.Execute(buf, struct {
 		ApplyDisabled bool
 	}{
@@ -358,20 +355,24 @@ Usage:
 
 Examples:
   # run plan in the root directory passing the -target flag to terraform
-  atlantis plan -d . -- -target=resource{{if not .ApplyDisabled}}
+  atlantis plan -d . -- -target=resource
+  {{- if not .ApplyDisabled }}
 
   # apply all unapplied plans from this pull request
   atlantis apply
 
   # apply the plan for the root directory and staging workspace
-  atlantis apply -d . -w staging{{end}}
+  atlantis apply -d . -w staging
+{{- end }}
 
 Commands:
   plan     Runs 'terraform plan' for the changes in this pull request.
            To plan a specific project, use the -d, -w and -p flags.
-{{if not .ApplyDisabled}}  apply    Runs 'terraform apply' on all unapplied plans from this pull request.
+{{- if not .ApplyDisabled }}
+  apply    Runs 'terraform apply' on all unapplied plans from this pull request.
            To only apply a specific plan, use the -d, -w and -p flags.
-{{end}}  unlock   Removes all atlantis locks and discards all plans for this PR.
+{{- end }}
+  unlock   Removes all atlantis locks and discards all plans for this PR.
            To unlock a specific plan you can use the Atlantis UI.
   help     View help.
 

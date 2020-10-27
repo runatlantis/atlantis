@@ -799,38 +799,3 @@ var UnlockUsage = "`Usage of unlock:`\n\n ```cmake\n" +
   Arguments or flags are not supported at the moment.
   If you need to unlock a specific project please use the atlantis UI.` +
 	"\n```"
-
-func TestCommentParser_helpComment(t *testing.T) {
-	type fields struct {
-		GithubUser      string
-		GitlabUser      string
-		BitbucketUser   string
-		AzureDevopsUser string
-		ApplyDisabled   bool
-	}
-	type args struct {
-		applyDisabled bool
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   string
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			e := &events.CommentParser{
-				GithubUser:      tt.fields.GithubUser,
-				GitlabUser:      tt.fields.GitlabUser,
-				BitbucketUser:   tt.fields.BitbucketUser,
-				AzureDevopsUser: tt.fields.AzureDevopsUser,
-				ApplyDisabled:   tt.fields.ApplyDisabled,
-			}
-			if got := e.HelpComment(tt.args.applyDisabled); got != tt.want {
-				t.Errorf("helpComment() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}

@@ -256,7 +256,7 @@ var planSuccessWrappedTmpl = template.Must(template.New("").Parse(
 // planNextSteps are instructions appended after successful plans as to what
 // to do next.
 var planNextSteps = "{{ if .PlanWasDeleted }}This plan was not saved because one or more projects failed and automerge requires all plans pass.{{ else }}" +
-	"{{if ne .DisableApply true }}* :arrow_forward: To **apply** this plan, comment:\n" +
+	"{{ if not .DisableApply }}* :arrow_forward: To **apply** this plan, comment:\n" +
 	"    * `{{.ApplyCmd}}`\n{{end}}" +
 	"* :put_litter_in_its_place: To **delete** this plan click [here]({{.LockURL}})\n" +
 	"* :repeat: To **plan** this project again, comment:\n" +

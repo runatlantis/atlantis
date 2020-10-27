@@ -261,7 +261,7 @@ func (e *EventsController) HandleGithubCommentEvent(w http.ResponseWriter, event
 
 	// We pass in nil for maybeHeadRepo because the head repo data isn't
 	// available in the GithubIssueComment event.
-	e.handleCommentEvent(w, baseRepo, nil, nil, user, pullNum, event.Comment.GetBody(), models.Github, e.ApplyDisabled)
+	e.handleCommentEvent(w, baseRepo, nil, nil, user, pullNum, event.Comment.GetBody(), models.Github)
 }
 
 // HandleBitbucketCloudCommentEvent handles comment events from Bitbucket.
@@ -271,7 +271,7 @@ func (e *EventsController) HandleBitbucketCloudCommentEvent(w http.ResponseWrite
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
 		return
 	}
-	e.handleCommentEvent(w, baseRepo, &headRepo, &pull, user, pull.Num, comment, models.BitbucketCloud, e.ApplyDisabled)
+	e.handleCommentEvent(w, baseRepo, &headRepo, &pull, user, pull.Num, comment, models.BitbucketCloud)
 }
 
 // HandleBitbucketServerCommentEvent handles comment events from Bitbucket.
@@ -281,7 +281,7 @@ func (e *EventsController) HandleBitbucketServerCommentEvent(w http.ResponseWrit
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
 		return
 	}
-	e.handleCommentEvent(w, baseRepo, &headRepo, &pull, user, pull.Num, comment, models.BitbucketCloud, e.ApplyDisabled)
+	e.handleCommentEvent(w, baseRepo, &headRepo, &pull, user, pull.Num, comment, models.BitbucketCloud)
 }
 
 func (e *EventsController) handleBitbucketCloudPullRequestEvent(w http.ResponseWriter, eventType string, body []byte, reqID string) {
@@ -400,10 +400,10 @@ func (e *EventsController) HandleGitlabCommentEvent(w http.ResponseWriter, event
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing webhook: %s", err)
 		return
 	}
-	e.handleCommentEvent(w, baseRepo, &headRepo, nil, user, event.MergeRequest.IID, event.ObjectAttributes.Note, models.Gitlab, e.ApplyDisabled)
+	e.handleCommentEvent(w, baseRepo, &headRepo, nil, user, event.MergeRequest.IID, event.ObjectAttributes.Note, models.Gitlab)
 }
 
-func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, comment string, vcsHost models.VCSHostType, applyDisabled bool) {
+func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, comment string, vcsHost models.VCSHostType) {
 	parseResult := e.CommentParser.Parse(comment, vcsHost)
 	if parseResult.Ignore {
 		truncated := comment
@@ -491,7 +491,7 @@ func (e *EventsController) HandleAzureDevopsPullRequestCommentedEvent(w http.Res
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull request repository field: %s; %s", err, azuredevopsReqID)
 		return
 	}
-	e.handleCommentEvent(w, baseRepo, nil, nil, user, resource.PullRequest.GetPullRequestID(), string(strippedComment), models.AzureDevops, e.ApplyDisabled)
+	e.handleCommentEvent(w, baseRepo, nil, nil, user, resource.PullRequest.GetPullRequestID(), string(strippedComment), models.AzureDevops)
 }
 
 // HandleAzureDevopsPullRequestEvent will delete any locks associated with the pull

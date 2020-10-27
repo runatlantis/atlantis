@@ -159,7 +159,6 @@ Values are chosen in this order:
   Bitbucket username of API user.
 
 * ### `--bitbucket-webhook-secret`
-* ### `--bitbucket-webhook-secret`
   ```bash
   atlantis server --bitbucket-webhook-secret="secret"
   # or (recommended)
