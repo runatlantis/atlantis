@@ -76,6 +76,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply.txt"},
 				{"exp-output-merge.txt"},
 			},
@@ -92,6 +93,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-autoplan.txt"},
 				{"exp-output-apply.txt"},
 				{"exp-output-merge.txt"},
@@ -108,6 +110,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-atlantis-plan-var-overridden.txt"},
 				{"exp-output-apply-var.txt"},
 				{"exp-output-merge.txt"},
@@ -126,6 +129,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-atlantis-plan.txt"},
 				{"exp-output-atlantis-plan-new-workspace.txt"},
 				{"exp-output-apply-var-default-workspace.txt"},
@@ -145,6 +149,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-atlantis-plan.txt"},
 				{"exp-output-atlantis-plan-new-workspace.txt"},
 				{"exp-output-apply-var-all.txt"},
@@ -162,6 +167,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-staging.txt"},
 				{"exp-output-apply-default.txt"},
 				{"exp-output-merge.txt"},
@@ -177,6 +183,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-all.txt"},
 				{"exp-output-merge.txt"},
 			},
@@ -192,6 +199,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-autoplan.txt"},
 				{"exp-output-apply-all.txt"},
 				{"exp-output-merge.txt"},
@@ -207,6 +215,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan-only-staging.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-staging.txt"},
 				{"exp-output-merge-only-staging.txt"},
 			},
@@ -241,6 +250,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-staging.txt"},
 				{"exp-output-apply-production.txt"},
 				{"exp-output-merge.txt"},
@@ -257,6 +267,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-staging.txt"},
 				{"exp-output-apply-default.txt"},
 				{"exp-output-merge.txt"},
@@ -293,6 +304,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-dir1.txt"},
 				{"exp-output-apply-dir2.txt"},
 				{"exp-output-automerge.txt"},
@@ -311,6 +323,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-staging-workspace.txt"},
 				{"exp-output-apply-default-workspace.txt"},
 				{"exp-output-merge.txt"},
@@ -327,6 +340,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan-staging.txt", "exp-output-autoplan-production.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-all-staging.txt", "exp-output-apply-all-production.txt"},
 				{"exp-output-merge.txt"},
 			},
@@ -373,6 +387,10 @@ func TestGitHubWorkflow(t *testing.T) {
 			// at the end.
 			expNumReplies := len(c.Comments) + 1
 			if c.ExpAutoplan {
+				// one for terraform plan
+				expNumReplies++
+
+				// one for policy_check
 				expNumReplies++
 			}
 			if c.ExpAutomerge {

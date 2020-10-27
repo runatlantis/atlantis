@@ -61,10 +61,17 @@ func (d *DefaultCommitStatusUpdater) UpdateCombined(repo models.Repo, pull model
 
 func (d *DefaultCommitStatusUpdater) UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName, numSuccess int, numTotal int) error {
 	src := fmt.Sprintf("%s/%s", d.StatusName, command.String())
-	cmdVerb := "planned"
-	if command == models.ApplyCommand {
+	var cmdVerb string
+
+	switch command {
+	case models.PlanCommand:
+		cmdVerb = "planned"
+	case models.PolicyCheckCommand:
+		cmdVerb = "policies checked"
+	case models.ApplyCommand:
 		cmdVerb = "applied"
 	}
+
 	return d.Client.UpdateStatus(repo, pull, status, src, fmt.Sprintf("%d/%d projects %s successfully.", numSuccess, numTotal, cmdVerb), "")
 }
 
