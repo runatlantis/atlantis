@@ -56,7 +56,25 @@ func TestParse_HelpResponse(t *testing.T) {
 	}
 	for _, c := range helpComments {
 		r := commentParser.Parse(c, models.Github)
-		Equals(t, events.HelpComment, r.CommentResponse)
+		Equals(t, commentParser.HelpComment(false), r.CommentResponse)
+	}
+}
+
+func TestParse_HelpResponseWithApplyDisabled(t *testing.T) {
+	helpComments := []string{
+		"run",
+		"atlantis",
+		"@github-user",
+		"atlantis help",
+		"atlantis --help",
+		"atlantis -h",
+		"atlantis help something else",
+		"atlantis help plan",
+	}
+	for _, c := range helpComments {
+		commentParser.ApplyDisabled = true
+		r := commentParser.Parse(c, models.Github)
+		Equals(t, commentParser.HelpComment(true), r.CommentResponse)
 	}
 }
 
@@ -640,6 +658,80 @@ func TestBuildPlanApplyComment(t *testing.T) {
 	}
 }
 
+func TestCommentParser_HelpComment(t *testing.T) {
+	cases := []struct {
+		applyDisabled bool
+		expectResult  string
+	}{
+		{
+			applyDisabled: false,
+			expectResult: "```cmake\n" +
+				`atlantis
+Terraform Pull Request Automation
+
+Usage:
+  atlantis <command> [options] -- [terraform options]
+
+Examples:
+  # run plan in the root directory passing the -target flag to terraform
+  atlantis plan -d . -- -target=resource
+
+  # apply all unapplied plans from this pull request
+  atlantis apply
+
+  # apply the plan for the root directory and staging workspace
+  atlantis apply -d . -w staging
+
+Commands:
+  plan     Runs 'terraform plan' for the changes in this pull request.
+           To plan a specific project, use the -d, -w and -p flags.
+  apply    Runs 'terraform apply' on all unapplied plans from this pull request.
+           To only apply a specific plan, use the -d, -w and -p flags.
+  unlock   Removes all atlantis locks and discards all plans for this PR.
+           To unlock a specific plan you can use the Atlantis UI.
+  help     View help.
+
+Flags:
+  -h, --help   help for atlantis
+
+Use "atlantis [command] --help" for more information about a command.` +
+				"\n```",
+		},
+		{
+			applyDisabled: true,
+			expectResult: "```cmake\n" +
+				`atlantis
+Terraform Pull Request Automation
+
+Usage:
+  atlantis <command> [options] -- [terraform options]
+
+Examples:
+  # run plan in the root directory passing the -target flag to terraform
+  atlantis plan -d . -- -target=resource
+
+Commands:
+  plan     Runs 'terraform plan' for the changes in this pull request.
+           To plan a specific project, use the -d, -w and -p flags.
+  unlock   Removes all atlantis locks and discards all plans for this PR.
+           To unlock a specific plan you can use the Atlantis UI.
+  help     View help.
+
+Flags:
+  -h, --help   help for atlantis
+
+Use "atlantis [command] --help" for more information about a command.` +
+				"\n```",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(fmt.Sprintf("ApplyDisabled: %v", c.applyDisabled), func(t *testing.T) {
+			Equals(t, commentParser.HelpComment(c.applyDisabled), c.expectResult)
+		})
+	}
+}
+
 func TestParse_VCSUsername(t *testing.T) {
 	cp := events.CommentParser{
 		GithubUser:      "gh",
@@ -676,7 +768,7 @@ func TestParse_VCSUsername(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.vcs.String(), func(t *testing.T) {
 			r := cp.Parse(fmt.Sprintf("@%s %s", c.user, "help"), c.vcs)
-			Equals(t, events.HelpComment, r.CommentResponse)
+			Equals(t, commentParser.HelpComment(false), r.CommentResponse)
 		})
 	}
 }

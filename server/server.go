@@ -252,6 +252,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GitlabSupportsCommonMark: gitlabClient.SupportsCommonMark(),
 		DisableApplyAll:          userConfig.DisableApplyAll,
 		DisableMarkdownFolding:   userConfig.DisableMarkdownFolding,
+		DisableApply:             userConfig.DisableApply,
 	}
 
 	boltdb, err := db.New(userConfig.DataDir)
@@ -369,6 +370,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		SilenceForkPRErrorsFlag:  config.SilenceForkPRErrorsFlag,
 		SilenceVCSStatusNoPlans:  userConfig.SilenceVCSStatusNoPlans,
 		DisableApplyAll:          userConfig.DisableApplyAll,
+		DisableApply:             userConfig.DisableApply,
 		DisableAutoplan:          userConfig.DisableAutoplan,
 		ParallelPoolSize:         userConfig.ParallelPoolSize,
 		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
@@ -438,6 +440,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Parser:                          eventParser,
 		CommentParser:                   commentParser,
 		Logger:                          logger,
+		ApplyDisabled:                   userConfig.DisableApply,
 		GithubWebhookSecret:             []byte(userConfig.GithubWebhookSecret),
 		GithubRequestValidator:          &DefaultGithubRequestValidator{},
 		GitlabRequestParserValidator:    &DefaultGitlabRequestParserValidator{},

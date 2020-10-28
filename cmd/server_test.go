@@ -65,6 +65,7 @@ var testFlags = map[string]interface{}{
 	DataDirFlag:                "/path",
 	DefaultTFVersionFlag:       "v0.11.0",
 	DisableApplyAllFlag:        true,
+	DisableApplyFlag:           true,
 	DisableMarkdownFoldingFlag: true,
 	GHHostnameFlag:             "ghhostname",
 	GHTokenFlag:                "token",

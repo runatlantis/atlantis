@@ -14,17 +14,18 @@
 package events
 
 import (
+	"bytes"
 	"fmt"
+	"github.com/flynn-archive/go-shlex"
+	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/yaml"
+	"github.com/spf13/pflag"
 	"io/ioutil"
 	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
-
-	"github.com/flynn-archive/go-shlex"
-	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/yaml"
-	"github.com/spf13/pflag"
+	"text/template"
 )
 
 const (
@@ -69,6 +70,7 @@ type CommentParser struct {
 	GitlabUser      string
 	BitbucketUser   string
 	AzureDevopsUser string
+	ApplyDisabled   bool
 }
 
 // CommentParseResult describes the result of parsing a comment as a command.
@@ -147,13 +149,13 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	// If they've just typed the name of the executable then give them the help
 	// output.
 	if len(args) == 1 {
-		return CommentParseResult{CommentResponse: HelpComment}
+		return CommentParseResult{CommentResponse: e.HelpComment(e.ApplyDisabled)}
 	}
 	command := args[1]
 
 	// Help output.
 	if e.stringInSlice(command, []string{"help", "-h", "--help"}) {
-		return CommentParseResult{CommentResponse: HelpComment}
+		return CommentParseResult{CommentResponse: e.HelpComment(e.ApplyDisabled)}
 	}
 
 	// Need to have a plan, apply or unlock at this point.
@@ -330,9 +332,21 @@ func (e *CommentParser) errMarkdown(errMsg string, command string, flagSet *pfla
 	return fmt.Sprintf("```\nError: %s.\nUsage of %s:\n%s```", errMsg, command, flagSet.FlagUsagesWrapped(usagesCols))
 }
 
-// HelpComment is the comment we add to the pull request when someone runs
-// `atlantis help`.
-var HelpComment = "```cmake\n" +
+func (e *CommentParser) HelpComment(applyDisabled bool) string {
+	buf := &bytes.Buffer{}
+	var tmpl = template.Must(template.New("").Parse(helpCommentTemplate))
+	if err := tmpl.Execute(buf, struct {
+		ApplyDisabled bool
+	}{
+		ApplyDisabled: applyDisabled,
+	}); err != nil {
+		return fmt.Sprintf("Failed to render template, this is a bug: %v", err)
+	}
+	return buf.String()
+
+}
+
+var helpCommentTemplate = "```cmake\n" +
 	`atlantis
 Terraform Pull Request Automation
 
@@ -342,18 +356,22 @@ Usage:
 Examples:
   # run plan in the root directory passing the -target flag to terraform
   atlantis plan -d . -- -target=resource
+  {{- if not .ApplyDisabled }}
 
   # apply all unapplied plans from this pull request
   atlantis apply
 
   # apply the plan for the root directory and staging workspace
   atlantis apply -d . -w staging
+{{- end }}
 
 Commands:
   plan     Runs 'terraform plan' for the changes in this pull request.
            To plan a specific project, use the -d, -w and -p flags.
+{{- if not .ApplyDisabled }}
   apply    Runs 'terraform apply' on all unapplied plans from this pull request.
            To only apply a specific plan, use the -d, -w and -p flags.
+{{- end }}
   unlock   Removes all atlantis locks and discards all plans for this PR.
            To unlock a specific plan you can use the Atlantis UI.
   help     View help.

@@ -472,6 +472,7 @@ func TestPost_AzureDevopsPullRequestIgnoreEvent(t *testing.T) {
 	e := server.EventsController{
 		TestingMode:                     true,
 		Logger:                          logging.NewNoopLogger(),
+		ApplyDisabled:                   false,
 		AzureDevopsWebhookBasicUser:     user,
 		AzureDevopsWebhookBasicPassword: secret,
 		AzureDevopsRequestValidator:     v,
