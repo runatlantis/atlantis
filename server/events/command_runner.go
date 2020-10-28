@@ -144,8 +144,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		if statusErr := c.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, models.PlanCommand); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
-		errResult := CommandResult{Error: err}
-		c.updatePull(ctx, AutoplanCommand{}, errResult)
+		c.updatePull(ctx, AutoplanCommand{}, CommandResult{Error: err})
 		return
 	}
 
@@ -156,7 +155,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 			// with 0/0 projects planned/applied successfully because some users require
 			// the Atlantis status to be passing for all pull requests.
 			ctx.Log.Debug("setting VCS status to success with no projects found")
-			if err := c.CommitStatusUpdater.UpdateCombinedCount(ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, models.PlanCommand, 0, 0); err != nil {
+			if err := c.CommitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, models.PlanCommand, 0, 0); err != nil {
 				ctx.Log.Warn("unable to update commit status: %s", err)
 			}
 			if err := c.CommitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, models.ApplyCommand, 0, 0); err != nil {
