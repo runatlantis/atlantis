@@ -61,7 +61,7 @@ func (d *DefaultCommitStatusUpdater) UpdateCombined(repo models.Repo, pull model
 
 func (d *DefaultCommitStatusUpdater) UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName, numSuccess int, numTotal int) error {
 	src := fmt.Sprintf("%s/%s", d.StatusName, command.String())
-	var cmdVerb string
+	cmdVerb := "unknown"
 
 	switch command {
 	case models.PlanCommand:
