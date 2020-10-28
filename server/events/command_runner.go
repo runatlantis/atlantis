@@ -422,6 +422,9 @@ func (c *DefaultCommandRunner) updateCommitStatus(ctx *CommandContext, cmd model
 	case models.ApplyCommand:
 		numSuccess = pullStatus.StatusCount(models.AppliedPlanStatus)
 		numErrored = pullStatus.StatusCount(models.ErroredApplyStatus)
+	default:
+		ctx.Log.Err("cmd %s is not supported", cmd)
+		return
 	}
 
 	if numErrored > 0 {
