@@ -452,14 +452,14 @@ func TestProjectResult_PlanStatus(t *testing.T) {
 				Command:            models.PolicyCheckCommand,
 				PolicyCheckSuccess: &models.PolicyCheckSuccess{},
 			},
-			expStatus: models.PassedPolicyCheckPlanStatus,
+			expStatus: models.PassedPolicyCheckStatus,
 		},
 		{
 			p: models.ProjectResult{
 				Command: models.PolicyCheckCommand,
 				Failure: "failure",
 			},
-			expStatus: models.ErroredPolicyCheckPlanStatus,
+			expStatus: models.ErroredPolicyCheckStatus,
 		},
 	}
 
@@ -489,10 +489,10 @@ func TestPullStatus_StatusCount(t *testing.T) {
 				Status: models.DiscardedPlanStatus,
 			},
 			{
-				Status: models.ErroredPolicyCheckPlanStatus,
+				Status: models.ErroredPolicyCheckStatus,
 			},
 			{
-				Status: models.PassedPolicyCheckPlanStatus,
+				Status: models.PassedPolicyCheckStatus,
 			},
 		},
 	}
@@ -502,8 +502,8 @@ func TestPullStatus_StatusCount(t *testing.T) {
 	Equals(t, 1, ps.StatusCount(models.ErroredApplyStatus))
 	Equals(t, 0, ps.StatusCount(models.ErroredPlanStatus))
 	Equals(t, 1, ps.StatusCount(models.DiscardedPlanStatus))
-	Equals(t, 1, ps.StatusCount(models.ErroredPolicyCheckPlanStatus))
-	Equals(t, 1, ps.StatusCount(models.PassedPolicyCheckPlanStatus))
+	Equals(t, 1, ps.StatusCount(models.ErroredPolicyCheckStatus))
+	Equals(t, 1, ps.StatusCount(models.PassedPolicyCheckStatus))
 }
 
 func TestApplyCommand_String(t *testing.T) {

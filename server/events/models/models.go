@@ -413,11 +413,11 @@ func (p ProjectResult) PlanStatus() ProjectPlanStatus {
 		return PlannedPlanStatus
 	case PolicyCheckCommand:
 		if p.Error != nil {
-			return ErroredPolicyCheckPlanStatus
+			return ErroredPolicyCheckStatus
 		} else if p.Failure != "" {
-			return ErroredPolicyCheckPlanStatus
+			return ErroredPolicyCheckStatus
 		}
-		return PassedPolicyCheckPlanStatus
+		return PassedPolicyCheckStatus
 	case ApplyCommand:
 		if p.Error != nil {
 			return ErroredApplyStatus
@@ -515,12 +515,12 @@ const (
 	// DiscardedPlanStatus means that there was an unapplied plan that was
 	// discarded due to a project being unlocked
 	DiscardedPlanStatus
-	// ErroredPolicyCheckPlanStatus means that there was an unapplied plan that was
+	// ErroredPolicyCheckStatus means that there was an unapplied plan that was
 	// discarded due to a project being unlocked
-	ErroredPolicyCheckPlanStatus
-	// PassedPolicyCheckPlanStatus means that there was an unapplied plan that was
+	ErroredPolicyCheckStatus
+	// PassedPolicyCheckStatus means that there was an unapplied plan that was
 	// discarded due to a project being unlocked
-	PassedPolicyCheckPlanStatus
+	PassedPolicyCheckStatus
 )
 
 // String returns a string representation of the status.
@@ -536,9 +536,9 @@ func (p ProjectPlanStatus) String() string {
 		return "applied"
 	case DiscardedPlanStatus:
 		return "plan_discarded"
-	case ErroredPolicyCheckPlanStatus:
+	case ErroredPolicyCheckStatus:
 		return "policy_check_errored"
-	case PassedPolicyCheckPlanStatus:
+	case PassedPolicyCheckStatus:
 		return "policy_check_passed"
 	default:
 		panic("missing String() impl for ProjectPlanStatus")
