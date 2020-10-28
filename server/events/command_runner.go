@@ -350,7 +350,6 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	if cmd.Name == models.PlanCommand &&
 		!(commandResult.HasErrors() || commandResult.PlansDeleted) &&
 		len(commandResult.ProjectResults) > 0 {
-
 		ctx.Log.Info("Running policy check for %s", cmd.String())
 		c.runPolicyCheckCommand(ctx, commandResult.ProjectResults, projectCmds)
 	}
@@ -427,10 +426,10 @@ func (c *DefaultCommandRunner) updateCommitStatus(ctx *CommandContext, cmd model
 
 	switch cmd {
 	case models.PlanCommand:
+		numErrored = pullStatus.StatusCount(models.ErroredPlanStatus)
 		// We consider anything that isn't a plan error as a plan success.
 		// For example, if there is an apply error, that means that at least a
 		// plan was generated successfully.
-		numErrored = pullStatus.StatusCount(models.ErroredPlanStatus)
 		numSuccess = len(pullStatus.Projects) - numErrored
 	case models.PolicyCheckCommand:
 		numSuccess = pullStatus.StatusCount(models.PassedPolicyCheckStatus)

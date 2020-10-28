@@ -95,6 +95,7 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-autoplan.txt"},
 				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply.txt"},
 				{"exp-output-merge.txt"},
 			},
@@ -112,6 +113,7 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-autoplan.txt"},
 				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-atlantis-plan-var-overridden.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-var.txt"},
 				{"exp-output-merge.txt"},
 			},
@@ -131,7 +133,9 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-autoplan.txt"},
 				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-atlantis-plan.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-atlantis-plan-new-workspace.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-var-default-workspace.txt"},
 				{"exp-output-apply-var-new-workspace.txt"},
 				{"exp-output-merge-workspaces.txt"},
@@ -151,7 +155,9 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-autoplan.txt"},
 				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-atlantis-plan.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-atlantis-plan-new-workspace.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-var-all.txt"},
 				{"exp-output-merge-workspaces.txt"},
 			},
@@ -201,6 +207,7 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-autoplan.txt"},
 				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-all.txt"},
 				{"exp-output-merge.txt"},
 			},
@@ -233,7 +240,9 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-plan-staging.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-plan-production.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-staging.txt"},
 				{"exp-output-apply-production.txt"},
 				{"exp-output-merge-all-dirs.txt"},
@@ -286,7 +295,9 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-plan-staging.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-plan-default.txt"},
+				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-staging.txt"},
 				{"exp-output-apply-default.txt"},
 				{"exp-output-merge.txt"},
@@ -381,11 +392,20 @@ func TestGitHubWorkflow(t *testing.T) {
 			ctrl.Post(w, pullClosedReq)
 			responseContains(t, w, 200, "Pull request cleaned successfully")
 
-			// Now we're ready to verify Atlantis made all the comments back
-			// (or replies) that we expect.
-			// We expect replies for each comment plus one for the locks deleted
-			// at the end.
-			expNumReplies := len(c.Comments) + 1
+			// Now we're ready to verify Atlantis made all the comments back (or
+			// replies) that we expect.  We expect each plan to have 2 comments,
+			// one for plan one for policy check and apply have 1 for each
+			// comment plus one for the locks deleted at the end.
+			expNumReplies := 1
+			var planRegex = regexp.MustCompile("plan")
+			for _, comment := range c.Comments {
+				if planRegex.MatchString(comment) {
+					// extra for plans due to policy check runs
+					expNumReplies++
+				}
+				expNumReplies++
+			}
+
 			if c.ExpAutoplan {
 				// one for terraform plan
 				expNumReplies++
