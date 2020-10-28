@@ -13,7 +13,7 @@ import (
 
 // RunStepRunner runs custom commands.
 type RunStepRunner struct {
-	TerraformExecutor StepCmdExec
+	TerraformExecutor TerraformExec
 	DefaultTFVersion  *version.Version
 	// TerraformBinDir is the directory where Atlantis downloads Terraform binaries.
 	TerraformBinDir string

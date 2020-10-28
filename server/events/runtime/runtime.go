@@ -21,16 +21,16 @@ const (
 	planfileSlashReplace = "::"
 )
 
-// StepCmdExec brings the interface from TerraformClient into this package
+// TerraformExec brings the interface from TerraformClient into this package
 // without causing circular imports.
-type StepCmdExec interface {
+type TerraformExec interface {
 	RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, envs map[string]string, v *version.Version, workspace string) (string, error)
 	EnsureVersion(log *logging.SimpleLogger, v *version.Version) error
 }
 
 // AsyncTFExec brings the interface from TerraformClient into this package
 // without causing circular imports.
-// It's split from StepCmdExec because due to a bug in pegomock with channels,
+// It's split from TerraformExec because due to a bug in pegomock with channels,
 // we can't generate a mock for it so we hand-write it for this specific method.
 type AsyncTFExec interface {
 	// RunCommandAsync runs terraform with args. It immediately returns an

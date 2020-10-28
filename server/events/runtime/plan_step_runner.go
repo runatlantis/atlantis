@@ -27,7 +27,7 @@ var (
 )
 
 type PlanStepRunner struct {
-	TerraformExecutor   StepCmdExec
+	TerraformExecutor   TerraformExec
 	DefaultTFVersion    *version.Version
 	CommitStatusUpdater StatusUpdater
 	AsyncTFExec         AsyncTFExec

@@ -47,10 +47,6 @@ type ProjectCommandBuilder interface {
 	// comment doesn't specify one project then there may be multiple commands
 	// to be run.
 	BuildApplyCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error)
-	// BuildPolicyCheckCommands builds project policy_check commands for ctx and
-	// comment. If comment doesn't specify one project then there may be
-	// multiple commands to be run.
-	BuildPolicyCheckCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error)
 }
 
 // DefaultProjectCommandBuilder implements ProjectCommandBuilder.
@@ -83,11 +79,6 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext
 		autoplanEnabled = append(autoplanEnabled, projCtx)
 	}
 	return autoplanEnabled, nil
-}
-
-// See ProjectCommandBuilder.BuildPolicyCheckCommands.
-func (p *DefaultProjectCommandBuilder) BuildPolicyCheckCommands(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
-	return []models.ProjectCommandContext{}, nil
 }
 
 // See ProjectCommandBuilder.BuildPlanCommands.
