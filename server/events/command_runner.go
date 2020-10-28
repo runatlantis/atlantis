@@ -145,11 +145,11 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	if len(commandResult.ProjectResults) > 0 && !(commandResult.HasErrors() || commandResult.PlansDeleted) {
 		// Run policy_check command
 		ctx.Log.Info("Running policy_checks for all plans")
-		c.runAutoPolicyCheckCommand(ctx, commandResult.ProjectResults, projectCmds)
+		c.runPolicyCheckCommand(ctx, commandResult.ProjectResults, projectCmds)
 	}
 }
 
-func (c *DefaultCommandRunner) runAutoPolicyCheckCommand(
+func (c *DefaultCommandRunner) runPolicyCheckCommand(
 	ctx *CommandContext,
 	projectResults []models.ProjectResult,
 	projectCmds []models.ProjectCommandContext,
@@ -342,24 +342,38 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
-	var projectCmds []models.ProjectCommandContext
-	switch cmd.Name {
-	case models.PlanCommand:
-		projectCmds, err = c.ProjectCommandBuilder.BuildPlanCommands(ctx, cmd)
-	case models.ApplyCommand:
-		projectCmds, err = c.ProjectCommandBuilder.BuildApplyCommands(ctx, cmd)
-	case models.PolicyCheckCommand:
-		projectCmds, err = c.ProjectCommandBuilder.BuildPolicyCheckCommands(ctx, cmd)
-	default:
-		ctx.Log.Err("failed to determine desired command, neither plan nor apply")
-		return
+	// runCommentCommand executes a comment command. And if current comment is
+	// atlantis plan it will also run policyCheckCommand to execute all the
+	// policies for the plan
+	commandResult, projectCmds := c.runCommentCommand(ctx, pull, cmd)
+
+	if cmd.Name == models.PlanCommand &&
+		!(commandResult.HasErrors() || commandResult.PlansDeleted) &&
+		len(commandResult.ProjectResults) > 0 {
+
+		ctx.Log.Info("Running policy check for %s", cmd.String())
+		c.runPolicyCheckCommand(ctx, commandResult.ProjectResults, projectCmds)
 	}
+}
+
+func (c *DefaultCommandRunner) runCommentCommand(
+	ctx *CommandContext,
+	pull models.PullRequest,
+	cmd *CommentCommand,
+) (CommandResult, []models.ProjectCommandContext) {
+	var err error
+
+	projectCmds, commandNotFound, err := c.ProjectCommandBuilder.BuildCommands(ctx, cmd)
+	if commandNotFound {
+		return CommandResult{}, projectCmds
+	}
+
 	if err != nil {
 		if statusErr := c.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
 		c.updatePull(ctx, cmd, CommandResult{Error: err})
-		return
+		return CommandResult{Error: err}, projectCmds
 	}
 
 	// Only run commands in parallel if enabled
@@ -369,6 +383,8 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		ctx.Log.Info("Running plans in parallel")
 		result = c.runProjectCmdsParallel(projectCmds, cmd.Name)
 	case cmd.Name == models.PolicyCheckCommand && c.parallelPolicyCheckEnabled(ctx, projectCmds):
+		// Adding policy check comment support for policy approvals.
+		// This step is valid only when some policies have already failed.
 		ctx.Log.Info("Running policy checks in parallel")
 		result = c.runProjectCmdsParallel(projectCmds, cmd.Name)
 	case cmd.Name == models.ApplyCommand && c.parallelApplyEnabled(ctx, projectCmds):
@@ -392,7 +408,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	pullStatus, err := c.updateDB(ctx, pull, result.ProjectResults)
 	if err != nil {
 		c.Logger.Err("writing results: %s", err)
-		return
+		return CommandResult{Error: err}, projectCmds
 	}
 
 	c.updateCommitStatus(ctx, cmd.Name, pullStatus)
@@ -400,6 +416,8 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	if cmd.Name == models.ApplyCommand && c.automergeEnabled(ctx, projectCmds) {
 		c.automerge(ctx, pullStatus)
 	}
+
+	return result, projectCmds
 }
 
 func (c *DefaultCommandRunner) updateCommitStatus(ctx *CommandContext, cmd models.CommandName, pullStatus models.PullStatus) {

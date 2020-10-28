@@ -36,6 +36,7 @@ const (
 
 // ProjectCommandBuilder builds commands that run on individual projects.
 type ProjectCommandBuilder interface {
+	BuildCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, bool, error)
 	// BuildAutoplanCommands builds project commands that will run plan on
 	// the projects determined to be modified.
 	BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error)
@@ -51,6 +52,25 @@ type ProjectCommandBuilder interface {
 	// comment. If comment doesn't specify one project then there may be
 	// multiple commands to be run.
 	BuildPolicyCheckCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error)
+}
+
+func (p *DefaultProjectCommandBuilder) BuildCommands(
+	ctx *CommandContext,
+	cmd *CommentCommand,
+) (projectCmds []models.ProjectCommandContext, commandNotFound bool, err error) {
+	switch cmd.Name {
+	case models.PlanCommand:
+		projectCmds, err = p.BuildPlanCommands(ctx, cmd)
+	case models.ApplyCommand:
+		projectCmds, err = p.BuildApplyCommands(ctx, cmd)
+	default:
+		ctx.Log.Err("failed to determine desired command, neither plan nor apply")
+		commandNotFound = true
+
+		return
+	}
+
+	return
 }
 
 // DefaultProjectCommandBuilder implements ProjectCommandBuilder.
