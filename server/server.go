@@ -41,6 +41,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/runtime"
+	"github.com/runatlantis/atlantis/server/events/runtime/policy"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
@@ -415,7 +416,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 				CommitStatusUpdater: commitStatusUpdater,
 				AsyncTFExec:         terraformClient,
 			},
-			PolicyCheckStepRunner: &runtime.PolicyCheckStepRunner{},
+			PolicyCheckStepRunner: runtime.NewPolicyCheckStepRunner(
+				policy.NewConfTestExecutorWorkflow(),
+			),
 			ApplyStepRunner: &runtime.ApplyStepRunner{
 				TerraformExecutor:   terraformClient,
 				CommitStatusUpdater: commitStatusUpdater,
