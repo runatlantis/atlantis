@@ -30,6 +30,10 @@ import (
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 )
 
+const (
+	planfileSlashReplace = "::"
+)
+
 // Repo is a VCS repository.
 type Repo struct {
 	// FullName is the owner and repo name separated
@@ -362,6 +366,15 @@ type ProjectCommandContext struct {
 	// PolicySets represent the policies that are run on the plan as part of the
 	// policy check stage
 	PolicySets PolicySets
+}
+
+// GetShowResultFileName returns the filename (not the path) to store the tf show result
+func (p ProjectCommandContext) GetShowResultFileName() string {
+	if p.ProjectName == "" {
+		return fmt.Sprintf("%s.json", p.Workspace)
+	}
+	projName := strings.Replace(p.ProjectName, "/", planfileSlashReplace, -1)
+	return fmt.Sprintf("%s-%s.json", projName, p.Workspace)
 }
 
 // SplitRepoFullName splits a repo full name up into its owner and repo

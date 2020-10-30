@@ -72,6 +72,9 @@ var DefaultApplyStage = Stage{
 var DefaultPolicyCheckStage = Stage{
 	Steps: []Step{
 		{
+			StepName: "show",
+		},
+		{
 			StepName: "policy_check",
 		},
 	},

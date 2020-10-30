@@ -97,6 +97,7 @@ type DefaultProjectCommandRunner struct {
 	LockURLGenerator      LockURLGenerator
 	InitStepRunner        StepRunner
 	PlanStepRunner        StepRunner
+	ShowStepRunner        StepRunner
 	ApplyStepRunner       StepRunner
 	PolicyCheckStepRunner StepRunner
 	RunStepRunner         CustomStepRunner
@@ -307,6 +308,8 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.Pr
 			out, err = p.InitStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "plan":
 			out, err = p.PlanStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+		case "show":
+			out, err = p.ShowStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "policy_check":
 			out, err = p.PolicyCheckStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "apply":
