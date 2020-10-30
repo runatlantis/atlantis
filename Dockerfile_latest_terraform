@@ -1,0 +1,16 @@
+# The runatlantis/atlantis-base is created by docker-base/Dockerfile.
+FROM runatlantis/atlantis-base:v3.5
+LABEL authors="Anubhav Mishra, Luke Kysow"
+
+COPY terraform-install.sh /scripts
+RUN chmod +x /scripts/terraform-install.sh
+RUN /scripts/terraform-install.sh
+
+# copy binary
+COPY atlantis /usr/local/bin/atlantis
+
+# copy docker entrypoint
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["server"]
