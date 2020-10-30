@@ -304,6 +304,7 @@ func (h VCSHostType) String() string {
 // ProjectCommandContext defines the context for a plan or apply stage that will
 // be executed for a project.
 type ProjectCommandContext struct {
+	CommandName CommandName
 	// ApplyCmd is the command that users should run to apply this plan. If
 	// this is an apply then this will be empty.
 	ApplyCmd string

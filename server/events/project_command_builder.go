@@ -176,6 +176,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 			ctx.Log.Debug("determining config for project at dir: %q workspace: %q", mp.Dir, mp.Workspace)
 			mergedCfg := p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp, repoCfg)
 			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, mergedCfg, commentFlags, repoCfg.Automerge, repoCfg.ParallelApply, repoCfg.ParallelPlan, verbose, repoDir))
+			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PolicyCheckCommand, mergedCfg, commentFlags, repoCfg.Automerge, repoCfg.ParallelApply, repoCfg.ParallelPlan, verbose, repoDir))
 		}
 	} else {
 		// If there is no config file, then we'll plan each project that
@@ -187,6 +188,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 			ctx.Log.Debug("determining config for project at dir: %q", mp.Path)
 			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp.Path, DefaultWorkspace)
 			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, pCfg, commentFlags, DefaultAutomergeEnabled, DefaultParallelApplyEnabled, DefaultParallelPlanEnabled, verbose, repoDir))
+			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PolicyCheckCommand, pCfg, commentFlags, DefaultAutomergeEnabled, DefaultParallelApplyEnabled, DefaultParallelPlanEnabled, verbose, repoDir))
 		}
 	}
 
@@ -421,9 +423,12 @@ func (p *DefaultProjectCommandBuilder) buildCtx(ctx *CommandContext,
 	absRepoDir string) models.ProjectCommandContext {
 
 	var steps []valid.Step
+	var policySets models.PolicySets
 	switch cmd {
 	case models.PlanCommand:
 		steps = projCfg.Workflow.Plan.Steps
+	case models.PolicyCheckCommand:
+		steps = projCfg.Workflow.PolicyCheck.Steps
 	case models.ApplyCommand:
 		steps = projCfg.Workflow.Apply.Steps
 	}
@@ -435,6 +440,7 @@ func (p *DefaultProjectCommandBuilder) buildCtx(ctx *CommandContext,
 	}
 
 	return models.ProjectCommandContext{
+		CommandName:          cmd,
 		ApplyCmd:             p.CommentBuilder.BuildApplyComment(projCfg.RepoRelDir, projCfg.Workspace, projCfg.Name),
 		BaseRepo:             ctx.Pull.BaseRepo,
 		EscapedCommentArgs:   p.escapeArgs(commentArgs),
@@ -456,6 +462,7 @@ func (p *DefaultProjectCommandBuilder) buildCtx(ctx *CommandContext,
 		User:                 ctx.User,
 		Verbose:              verbose,
 		Workspace:            projCfg.Workspace,
+		PolicySets:           policySets,
 	}
 }
 
