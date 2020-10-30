@@ -205,9 +205,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
-				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-autoplan.txt"},
-				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-all.txt"},
 				{"exp-output-merge.txt"},
 			},
@@ -396,23 +394,12 @@ func TestGitHubWorkflow(t *testing.T) {
 			// replies) that we expect.  We expect each plan to have 2 comments,
 			// one for plan one for policy check and apply have 1 for each
 			// comment plus one for the locks deleted at the end.
-			expNumReplies := 1
-			var planRegex = regexp.MustCompile("plan")
-			for _, comment := range c.Comments {
-				if planRegex.MatchString(comment) {
-					// extra for plans due to policy check runs
-					expNumReplies++
-				}
-				expNumReplies++
-			}
+			expNumReplies := len(c.Comments) + 1
 
 			if c.ExpAutoplan {
-				// one for terraform plan
-				expNumReplies++
-
-				// one for policy_check
 				expNumReplies++
 			}
+
 			if c.ExpAutomerge {
 				expNumReplies++
 			}

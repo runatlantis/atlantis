@@ -124,6 +124,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var bitbucketCloudClient *bitbucketcloud.Client
 	var bitbucketServerClient *bitbucketserver.Client
 	var azuredevopsClient *vcs.AzureDevopsClient
+
+	policyChecksEnabled := false
+	if userConfig.EnablePolicyChecksFlag && !(userConfig.TFEHostname != "" || userConfig.TFEToken != "") {
+		logger.Info("Policy Checks are enabled")
+		policyChecksEnabled = true
+	}
+
 	if userConfig.GithubUser != "" || userConfig.GithubAppID != 0 {
 		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		if userConfig.GithubUser != "" {
@@ -373,6 +380,18 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Drainer:               drainer,
 		PreWorkflowHookRunner: &runtime.PreWorkflowHookRunner{},
 	}
+	projectCommandBuilder := events.NewProjectCommandBuilder(
+		policyChecksEnabled,
+		validator,
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		workingDirLocker,
+		globalCfg,
+		pendingPlanFinder,
+		commentParser,
+		userConfig.SkipCloneNoChanges,
+	)
 	commandRunner := &events.DefaultCommandRunner{
 		VCSClient:                vcsClient,
 		GithubPullGetter:         githubClient,
@@ -391,18 +410,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DisableApplyAll:          userConfig.DisableApplyAll,
 		DisableApply:             userConfig.DisableApply,
 		DisableAutoplan:          userConfig.DisableAutoplan,
-		ParallelPoolSize:         userConfig.ParallelPoolSize,
-		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
-			ParserValidator:    validator,
-			ProjectFinder:      &events.DefaultProjectFinder{},
-			VCSClient:          vcsClient,
-			WorkingDir:         workingDir,
-			WorkingDirLocker:   workingDirLocker,
-			GlobalCfg:          globalCfg,
-			PendingPlanFinder:  pendingPlanFinder,
-			CommentBuilder:     commentParser,
-			SkipCloneNoChanges: userConfig.SkipCloneNoChanges,
-		},
+		ProjectCommandBuilder:    projectCommandBuilder,
 		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
 			Locker:           projectLocker,
 			LockURLGenerator: router,

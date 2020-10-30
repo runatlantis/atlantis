@@ -148,6 +148,8 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		return
 	}
 
+	projectCmds, policyCheckCmds := c.partitionProjectCmds(ctx, projectCmds)
+
 	if len(projectCmds) == 0 {
 		ctx.Log.Info("determined there was no project to run plan in")
 		if !c.SilenceVCSStatusNoPlans {
@@ -194,18 +196,26 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 
 	// Check if there are any planned projects and if there are any errors or if plans are being deleted
 	if len(result.ProjectResults) > 0 &&
+		len(policyCheckCmds) > 0 &&
 		!(result.HasErrors() || result.PlansDeleted) {
 		// Run policy_check command
 		ctx.Log.Info("Running policy_checks for all plans")
-		c.runPolicyCheckCommand(ctx, result.ProjectResults, projectCmds)
+		c.runPolicyCheckCommands(ctx, result.ProjectResults, policyCheckCmds)
 	}
 }
 
-func (c *DefaultCommandRunner) runPolicyCheckCommand(
+func (c *DefaultCommandRunner) runPolicyCheckCommands(
 	ctx *CommandContext,
 	projectResults []models.ProjectResult,
 	projectCmds []models.ProjectCommandContext,
 ) {
+	// TODO(sarvar): Refactor policy check logic from command_runner.go to
+	// policy_command_runner.go. This will remove this if condition and overall
+	// return DefaultCommandRunner to its vanilla state
+	if len(projectCmds) == 0 {
+		return
+	}
+
 	// So set policy_check commit status to pending
 	if err := c.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, models.PolicyCheckCommand); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
@@ -227,6 +237,26 @@ func (c *DefaultCommandRunner) runPolicyCheckCommand(
 	}
 
 	c.updateCommitStatus(ctx, models.PolicyCheckCommand, pullStatus)
+}
+
+func (c *DefaultCommandRunner) partitionProjectCmds(
+	ctx *CommandContext,
+	cmds []models.ProjectCommandContext,
+) (
+	planCmds []models.ProjectCommandContext,
+	policyCheckCmds []models.ProjectCommandContext,
+) {
+	for _, cmd := range cmds {
+		switch cmd.CommandName {
+		case models.PlanCommand:
+			planCmds = append(planCmds, cmd)
+		case models.PolicyCheckCommand:
+			policyCheckCmds = append(policyCheckCmds, cmd)
+		default:
+			ctx.Log.Err("only plan and policy_check commands are supported: %s command is not supported", cmd.CommandName)
+		}
+	}
+	return
 }
 
 // RunCommentCommand executes the command.
@@ -336,9 +366,11 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	}
 
 	var projectCmds []models.ProjectCommandContext
+	var policyCheckCmds []models.ProjectCommandContext
 	switch cmd.Name {
 	case models.PlanCommand:
 		projectCmds, err = c.ProjectCommandBuilder.BuildPlanCommands(ctx, cmd)
+		projectCmds, policyCheckCmds = c.partitionProjectCmds(ctx, projectCmds)
 	case models.ApplyCommand:
 		projectCmds, err = c.ProjectCommandBuilder.BuildApplyCommands(ctx, cmd)
 	default:
@@ -359,11 +391,6 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	switch {
 	case cmd.Name == models.PlanCommand && c.parallelPlanEnabled(ctx, projectCmds):
 		ctx.Log.Info("Running plans in parallel")
-		result = c.runProjectCmdsParallel(projectCmds, cmd.Name)
-	case cmd.Name == models.PolicyCheckCommand && c.parallelPolicyCheckEnabled(ctx, projectCmds):
-		// Adding policy check comment support for policy approvals.
-		// This step is valid only when some policies have already failed.
-		ctx.Log.Info("Running policy checks in parallel")
 		result = c.runProjectCmdsParallel(projectCmds, cmd.Name)
 	case cmd.Name == models.ApplyCommand && c.parallelApplyEnabled(ctx, projectCmds):
 		ctx.Log.Info("Running applies in parallel")
@@ -397,10 +424,10 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 
 	// Runs policy checks step after all plans are successful
 	if cmd.Name == models.PlanCommand &&
-		!(result.HasErrors() || result.PlansDeleted) &&
-		len(result.ProjectResults) > 0 {
+		len(policyCheckCmds) > 0 &&
+		!(result.HasErrors() || result.PlansDeleted) {
 		ctx.Log.Info("Running policy check for %s", cmd.String())
-		c.runPolicyCheckCommand(ctx, result.ProjectResults, projectCmds)
+		c.runPolicyCheckCommands(ctx, result.ProjectResults, projectCmds)
 	}
 }
 
