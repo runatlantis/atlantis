@@ -1,2 +1,3 @@
 FROM runatlantis/atlantis:latest
 COPY atlantis /usr/local/bin/atlantis
+WORKDIR /go/src/github.com/runatlantis/atlantis
