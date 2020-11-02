@@ -317,6 +317,9 @@ func TestConfig_ToValid(t *testing.T) {
 						PolicyCheck: valid.Stage{
 							Steps: []valid.Step{
 								{
+									StepName: "show",
+								},
+								{
 									StepName: "policy_check",
 								},
 							},

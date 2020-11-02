@@ -2,8 +2,8 @@ package runtime
 
 import (
 	"io/ioutil"
-	"path/filepath"
 	"os"
+	"path/filepath"
 
 	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
@@ -12,8 +12,8 @@ import (
 
 // ShowStepRunner runs terraform show on an existing plan file and outputs it to a json file
 type ShowStepRunner struct {
-	TerraformExecutor   TerraformExec
-	DefaultTFVersion    *version.Version
+	TerraformExecutor TerraformExec
+	DefaultTFVersion  *version.Version
 }
 
 func (p *ShowStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error) {
