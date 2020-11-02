@@ -76,7 +76,6 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
-				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply.txt"},
 				{"exp-output-merge.txt"},
 			},
@@ -93,9 +92,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
-				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-autoplan.txt"},
-				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply.txt"},
 				{"exp-output-merge.txt"},
 			},
@@ -111,9 +108,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
-				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-atlantis-plan-var-overridden.txt"},
-				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-var.txt"},
 				{"exp-output-merge.txt"},
 			},
@@ -131,11 +126,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
-				{"exp-output-auto-policy-check.txt"},
-				{"exp-output-atlantis-plan.txt"},
-				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-atlantis-plan-new-workspace.txt"},
-				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-var-default-workspace.txt"},
 				{"exp-output-apply-var-new-workspace.txt"},
 				{"exp-output-merge-workspaces.txt"},
@@ -153,11 +144,8 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
-				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-atlantis-plan.txt"},
-				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-atlantis-plan-new-workspace.txt"},
-				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-var-all.txt"},
 				{"exp-output-merge-workspaces.txt"},
 			},
@@ -173,7 +161,6 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
-				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-staging.txt"},
 				{"exp-output-apply-default.txt"},
 				{"exp-output-merge.txt"},
@@ -189,7 +176,6 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
-				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-all.txt"},
 				{"exp-output-merge.txt"},
 			},
@@ -220,7 +206,6 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan-only-staging.txt"},
-				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-staging.txt"},
 				{"exp-output-merge-only-staging.txt"},
 			},
@@ -238,9 +223,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-plan-staging.txt"},
-				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-plan-production.txt"},
-				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-staging.txt"},
 				{"exp-output-apply-production.txt"},
 				{"exp-output-merge-all-dirs.txt"},
@@ -257,24 +240,6 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
-				{"exp-output-auto-policy-check.txt"},
-				{"exp-output-apply-staging.txt"},
-				{"exp-output-apply-production.txt"},
-				{"exp-output-merge.txt"},
-			},
-		},
-		{
-			Description:   "tfvars-yaml",
-			RepoDir:       "tfvars-yaml",
-			ModifiedFiles: []string{"main.tf"},
-			ExpAutoplan:   true,
-			Comments: []string{
-				"atlantis apply -p staging",
-				"atlantis apply -p default",
-			},
-			ExpReplies: [][]string{
-				{"exp-output-autoplan.txt"},
-				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-staging.txt"},
 				{"exp-output-apply-default.txt"},
 				{"exp-output-merge.txt"},
@@ -293,9 +258,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-plan-staging.txt"},
-				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-plan-default.txt"},
-				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-staging.txt"},
 				{"exp-output-apply-default.txt"},
 				{"exp-output-merge.txt"},
@@ -313,7 +276,6 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
-				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-dir1.txt"},
 				{"exp-output-apply-dir2.txt"},
 				{"exp-output-automerge.txt"},
@@ -332,7 +294,6 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
-				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-staging-workspace.txt"},
 				{"exp-output-apply-default-workspace.txt"},
 				{"exp-output-merge.txt"},
@@ -349,7 +310,6 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan-staging.txt", "exp-output-autoplan-production.txt"},
-				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-all-staging.txt", "exp-output-apply-all-production.txt"},
 				{"exp-output-merge.txt"},
 			},

@@ -243,17 +243,17 @@ func (c *DefaultCommandRunner) partitionProjectCmds(
 	ctx *CommandContext,
 	cmds []models.ProjectCommandContext,
 ) (
-	planCmds []models.ProjectCommandContext,
+	projectCmds []models.ProjectCommandContext,
 	policyCheckCmds []models.ProjectCommandContext,
 ) {
 	for _, cmd := range cmds {
 		switch cmd.CommandName {
-		case models.PlanCommand:
-			planCmds = append(planCmds, cmd)
+		case models.PlanCommand, models.ApplyCommand:
+			projectCmds = append(projectCmds, cmd)
 		case models.PolicyCheckCommand:
 			policyCheckCmds = append(policyCheckCmds, cmd)
 		default:
-			ctx.Log.Err("only plan and policy_check commands are supported: %s command is not supported", cmd.CommandName)
+			ctx.Log.Err("%s is not supported", cmd.CommandName)
 		}
 	}
 	return

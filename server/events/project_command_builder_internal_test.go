@@ -17,6 +17,10 @@ import (
 
 // Test different permutations of global and repo config.
 func TestBuildProjectCmdCtx(t *testing.T) {
+	emptyPolicySets := models.PolicySets{
+		Version:    nil,
+		PolicySets: []models.PolicySet{},
+	}
 	baseRepo := models.Repo{
 		FullName: "owner/repo",
 		VCSHost: models.VCSHost{
@@ -68,6 +72,7 @@ workflows:
 				User:               models.User{},
 				Verbose:            true,
 				Workspace:          "myworkspace",
+				PolicySets:         emptyPolicySets,
 			},
 			expPlanSteps:  []string{"init", "plan"},
 			expApplySteps: []string{"apply"},
@@ -119,6 +124,7 @@ projects:
 				User:               models.User{},
 				Verbose:            true,
 				Workspace:          "myworkspace",
+				PolicySets:         emptyPolicySets,
 			},
 			expPlanSteps:  []string{"init", "plan"},
 			expApplySteps: []string{"apply"},
@@ -170,6 +176,7 @@ projects:
 				User:               models.User{},
 				Verbose:            true,
 				Workspace:          "myworkspace",
+				PolicySets:         emptyPolicySets,
 			},
 			expPlanSteps:  []string{"init", "plan"},
 			expApplySteps: []string{"apply"},
@@ -229,6 +236,7 @@ projects:
 				User:               models.User{},
 				Verbose:            true,
 				Workspace:          "myworkspace",
+				PolicySets:         emptyPolicySets,
 			},
 			expPlanSteps:  []string{"plan"},
 			expApplySteps: []string{},
@@ -375,6 +383,7 @@ workflows:
 				User:               models.User{},
 				Verbose:            true,
 				Workspace:          "myworkspace",
+				PolicySets:         emptyPolicySets,
 			},
 			expPlanSteps:  []string{"plan"},
 			expApplySteps: []string{"apply"},
@@ -430,6 +439,7 @@ projects:
 				User:               models.User{},
 				Verbose:            true,
 				Workspace:          "myworkspace",
+				PolicySets:         emptyPolicySets,
 			},
 			expPlanSteps:  []string{"plan"},
 			expApplySteps: []string{"apply"},
@@ -488,6 +498,7 @@ workflows:
 				User:               models.User{},
 				Verbose:            true,
 				Workspace:          "myworkspace",
+				PolicySets:         emptyPolicySets,
 			},
 			expPlanSteps:  []string{},
 			expApplySteps: []string{},
@@ -529,6 +540,7 @@ projects:
 				User:               models.User{},
 				Verbose:            true,
 				Workspace:          "myworkspace",
+				PolicySets:         emptyPolicySets,
 			},
 			expPlanSteps:  []string{"plan"},
 			expApplySteps: []string{"apply"},
@@ -609,8 +621,10 @@ projects:
 						})
 					}
 
+					c.expCtx.CommandName = cmd
 					// Init fields we couldn't in our cases map.
 					c.expCtx.Steps = expSteps
+					ctx.PolicySets = emptyPolicySets
 
 					Equals(t, c.expCtx, ctx)
 					// Equals() doesn't compare TF version properly so have to
