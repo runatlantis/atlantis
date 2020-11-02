@@ -592,7 +592,7 @@ projects:
 			// We run a test for each type of command.
 			for _, cmd := range []models.CommandName{models.PlanCommand, models.ApplyCommand} {
 				t.Run(cmd.String(), func(t *testing.T) {
-					ctx, err := builder.buildProjectCommandCtx(&CommandContext{
+					ctx, err := builder.buildProjectCommandCtx(&models.CommandContext{
 						Pull: models.PullRequest{
 							BaseRepo: baseRepo,
 						},

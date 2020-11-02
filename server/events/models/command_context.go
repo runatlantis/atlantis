@@ -1,3 +1,7 @@
+package models
+
+import "github.com/runatlantis/atlantis/server/logging"
+
 // Copyright 2017 HootSuite Media Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the License);
@@ -11,13 +15,6 @@
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
 
-package events
-
-import (
-	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/logging"
-)
-
 // CommandContext represents the context of a command that should be executed
 // for a pull request.
 type CommandContext struct {
@@ -25,10 +22,10 @@ type CommandContext struct {
 	// If the pull request branch is from the same repository then HeadRepo will
 	// be the same as BaseRepo.
 	// See https://help.github.com/articles/about-pull-request-merges/.
-	HeadRepo models.Repo
-	Pull     models.PullRequest
+	HeadRepo Repo
+	Pull     PullRequest
 	// User is the user that triggered this command.
-	User models.User
+	User User
 	Log  *logging.SimpleLogger
 	// PullMergeable is true if Pull is able to be merged. This is available in
 	// the CommandContext because we want to collect this information before we

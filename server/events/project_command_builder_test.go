@@ -146,7 +146,7 @@ projects:
 				SkipCloneNoChanges: false,
 			}
 
-			ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
+			ctxs, err := builder.BuildAutoplanCommands(&models.CommandContext{
 				PullMergeable: true,
 			})
 			Ok(t, err)
@@ -372,9 +372,9 @@ projects:
 				var actCtxs []models.ProjectCommandContext
 				var err error
 				if cmdName == models.PlanCommand {
-					actCtxs, err = builder.BuildPlanCommands(&events.CommandContext{}, &c.Cmd)
+					actCtxs, err = builder.BuildPlanCommands(&models.CommandContext{}, &c.Cmd)
 				} else {
-					actCtxs, err = builder.BuildApplyCommands(&events.CommandContext{}, &c.Cmd)
+					actCtxs, err = builder.BuildApplyCommands(&models.CommandContext{}, &c.Cmd)
 				}
 
 				if c.ExpErr != "" {
@@ -504,7 +504,7 @@ projects:
 			}
 
 			ctxs, err := builder.BuildPlanCommands(
-				&events.CommandContext{},
+				&models.CommandContext{},
 				&events.CommentCommand{
 					RepoRelDir:  "",
 					Flags:       nil,
@@ -577,7 +577,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	}
 
 	ctxs, err := builder.BuildApplyCommands(
-		&events.CommandContext{},
+		&models.CommandContext{},
 		&events.CommentCommand{
 			RepoRelDir:  "",
 			Flags:       nil,
@@ -643,7 +643,7 @@ projects:
 		SkipCloneNoChanges: false,
 	}
 
-	ctx := &events.CommandContext{
+	ctx := &models.CommandContext{
 		HeadRepo: models.Repo{},
 		Pull:     models.PullRequest{},
 		User:     models.User{},
@@ -707,7 +707,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 
 			var actCtxs []models.ProjectCommandContext
 			var err error
-			actCtxs, err = builder.BuildPlanCommands(&events.CommandContext{}, &events.CommentCommand{
+			actCtxs, err = builder.BuildPlanCommands(&models.CommandContext{}, &events.CommentCommand{
 				RepoRelDir: ".",
 				Flags:      c.ExtraArgs,
 				Name:       models.PlanCommand,
@@ -870,7 +870,7 @@ projects:
 			}
 
 			actCtxs, err := builder.BuildPlanCommands(
-				&events.CommandContext{},
+				&models.CommandContext{},
 				&events.CommentCommand{
 					RepoRelDir: "",
 					Flags:      nil,
@@ -919,7 +919,7 @@ projects:
 
 	var actCtxs []models.ProjectCommandContext
 	var err error
-	actCtxs, err = builder.BuildAutoplanCommands(&events.CommandContext{
+	actCtxs, err = builder.BuildAutoplanCommands(&models.CommandContext{
 		HeadRepo:      models.Repo{},
 		Pull:          models.PullRequest{},
 		User:          models.User{},

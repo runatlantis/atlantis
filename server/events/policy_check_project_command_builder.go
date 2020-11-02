@@ -33,7 +33,7 @@ type PolicyCheckProjectCommandBuilder struct {
 	SkipCloneNoChanges    bool
 }
 
-func (p *PolicyCheckProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error) {
+func (p *PolicyCheckProjectCommandBuilder) BuildAutoplanCommands(ctx *models.CommandContext) ([]models.ProjectCommandContext, error) {
 	projectCmds, err := p.ProjectCommandBuilder.BuildAutoplanCommands(ctx)
 	if err != nil {
 		return nil, err
@@ -47,10 +47,10 @@ func (p *PolicyCheckProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandCon
 	policyCheckCmds, err := p.buildProjectCommands(ctx, models.PolicyCheckCommand, commentCmd)
 
 	projectCmds = append(projectCmds, policyCheckCmds...)
-	return policyCheckCmds, nil
+	return projectCmds, nil
 }
 
-func (p *PolicyCheckProjectCommandBuilder) BuildPlanCommands(ctx *CommandContext, commentCmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+func (p *PolicyCheckProjectCommandBuilder) BuildPlanCommands(ctx *models.CommandContext, commentCmd *CommentCommand) ([]models.ProjectCommandContext, error) {
 	projectCmds, err := p.ProjectCommandBuilder.BuildPlanCommands(ctx, commentCmd)
 	if err != nil {
 		return nil, err
@@ -63,14 +63,14 @@ func (p *PolicyCheckProjectCommandBuilder) BuildPlanCommands(ctx *CommandContext
 	}
 
 	projectCmds = append(projectCmds, policyCheckCmds...)
-	return policyCheckCmds, nil
+	return projectCmds, nil
 }
 
-func (p *PolicyCheckProjectCommandBuilder) BuildApplyCommands(ctx *CommandContext, commentCmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+func (p *PolicyCheckProjectCommandBuilder) BuildApplyCommands(ctx *models.CommandContext, commentCmd *CommentCommand) ([]models.ProjectCommandContext, error) {
 	return p.ProjectCommandBuilder.BuildApplyCommands(ctx, commentCmd)
 }
 
-func (p *PolicyCheckProjectCommandBuilder) buildProjectCommands(ctx *CommandContext, cmdName models.CommandName, commentCmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+func (p *PolicyCheckProjectCommandBuilder) buildProjectCommands(ctx *models.CommandContext, cmdName models.CommandName, commentCmd *CommentCommand) ([]models.ProjectCommandContext, error) {
 	policyCheckCmds, err := buildProjectCommands(
 		ctx,
 		models.PolicyCheckCommand,

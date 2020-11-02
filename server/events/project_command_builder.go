@@ -63,15 +63,15 @@ func NewProjectCommandBuilder(
 type ProjectCommandBuilder interface {
 	// BuildAutoplanCommands builds project commands that will run plan on
 	// the projects determined to be modified.
-	BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error)
+	BuildAutoplanCommands(ctx *models.CommandContext) ([]models.ProjectCommandContext, error)
 	// BuildPlanCommands builds project plan commands for this ctx and comment. If
 	// comment doesn't specify one project then there may be multiple commands
 	// to be run.
-	BuildPlanCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error)
+	BuildPlanCommands(ctx *models.CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error)
 	// BuildApplyCommands builds project apply commands for ctx and comment. If
 	// comment doesn't specify one project then there may be multiple commands
 	// to be run.
-	BuildApplyCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error)
+	BuildApplyCommands(ctx *models.CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error)
 }
 
 // DefaultProjectCommandBuilder implements ProjectCommandBuilder.
@@ -90,7 +90,7 @@ type DefaultProjectCommandBuilder struct {
 }
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
-func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *models.CommandContext) ([]models.ProjectCommandContext, error) {
 	projCtxs, err := p.buildPlanAllCommands(ctx, nil, false)
 	if err != nil {
 		return nil, err
@@ -107,7 +107,7 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *CommandContext
 }
 
 // See ProjectCommandBuilder.BuildPlanCommands.
-func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *models.CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
 	if !cmd.IsForSpecificProject() {
 		return p.buildPlanAllCommands(ctx, cmd.Flags, cmd.Verbose)
 	}
@@ -116,7 +116,7 @@ func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *CommandContext, cm
 }
 
 // See ProjectCommandBuilder.BuildApplyCommands.
-func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *models.CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
 	if !cmd.IsForSpecificProject() {
 		return p.buildApplyAllCommands(ctx, cmd)
 	}
@@ -126,7 +126,7 @@ func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *CommandContext, c
 
 // buildPlanAllCommands builds plan contexts for all projects we determine were
 // modified in this ctx.
-func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext, commentFlags []string, verbose bool) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *models.CommandContext, commentFlags []string, verbose bool) ([]models.ProjectCommandContext, error) {
 	// We'll need the list of modified files.
 	modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.Pull.BaseRepo, ctx.Pull)
 	if err != nil {
@@ -197,10 +197,32 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 			return nil, err
 		}
 		ctx.Log.Info("%d projects are to be planned based on their when_modified config", len(matchingProjects))
+
 		for _, mp := range matchingProjects {
 			ctx.Log.Debug("determining config for project at dir: %q workspace: %q", mp.Dir, mp.Workspace)
 			mergedCfg := p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp, repoCfg)
-			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, mergedCfg, commentFlags, repoCfg.Automerge, repoCfg.ParallelApply, repoCfg.ParallelPlan, verbose, repoDir))
+
+			applyCmd, planCmd := buildRePlanAndApplyComments(
+				p.CommentBuilder,
+				mergedCfg.RepoRelDir,
+				mergedCfg.Workspace,
+				mergedCfg.Name,
+			)
+
+			prjCtx := models.NewProjectCommandContext(
+				ctx,
+				models.PlanCommand,
+				applyCmd,
+				planCmd,
+				mergedCfg,
+				commentFlags,
+				repoCfg.Automerge,
+				repoCfg.ParallelApply,
+				repoCfg.ParallelPlan,
+				verbose,
+				repoDir,
+			)
+			projCtxs = append(projCtxs, prjCtx)
 		}
 	} else {
 		// If there is no config file, then we'll plan each project that
@@ -211,7 +233,28 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		for _, mp := range modifiedProjects {
 			ctx.Log.Debug("determining config for project at dir: %q", mp.Path)
 			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp.Path, DefaultWorkspace)
-			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, pCfg, commentFlags, DefaultAutomergeEnabled, DefaultParallelApplyEnabled, DefaultParallelPlanEnabled, verbose, repoDir))
+
+			applyCmd, planCmd := buildRePlanAndApplyComments(
+				p.CommentBuilder,
+				pCfg.RepoRelDir,
+				pCfg.Workspace,
+				pCfg.Name,
+			)
+
+			prjCtx := models.NewProjectCommandContext(
+				ctx,
+				models.PlanCommand,
+				applyCmd,
+				planCmd,
+				pCfg,
+				commentFlags,
+				DefaultAutomergeEnabled,
+				DefaultParallelApplyEnabled,
+				DefaultParallelPlanEnabled,
+				verbose,
+				repoDir,
+			)
+			projCtxs = append(projCtxs, prjCtx)
 		}
 	}
 
@@ -220,7 +263,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 
 // buildProjectPlanCommand builds a plan context for a single project.
 // cmd must be for only one project.
-func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *CommandContext, cmd *CommentCommand) (models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *models.CommandContext, cmd *CommentCommand) (models.ProjectCommandContext, error) {
 	workspace := DefaultWorkspace
 	if cmd.Workspace != "" {
 		workspace = cmd.Workspace
@@ -250,7 +293,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *CommandConte
 
 // buildApplyAllCommands builds contexts for any command for every project that has
 // pending plans in this ctx.
-func (p *DefaultProjectCommandBuilder) buildApplyAllCommands(ctx *CommandContext, commentCmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) buildApplyAllCommands(ctx *models.CommandContext, commentCmd *CommentCommand) ([]models.ProjectCommandContext, error) {
 	return buildProjectCommands(ctx,
 		models.ApplyCommand,
 		commentCmd,
@@ -263,7 +306,7 @@ func (p *DefaultProjectCommandBuilder) buildApplyAllCommands(ctx *CommandContext
 
 // buildProjectApplyCommand builds an apply command for the single project
 // identified by cmd.
-func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *CommandContext, cmd *CommentCommand) (models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *models.CommandContext, cmd *CommentCommand) (models.ProjectCommandContext, error) {
 	workspace := DefaultWorkspace
 	if cmd.Workspace != "" {
 		workspace = cmd.Workspace
@@ -294,7 +337,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *CommandCont
 // buildProjectCommandCtx builds a context for a single project identified
 // by the parameters.
 func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(
-	ctx *CommandContext,
+	ctx *models.CommandContext,
 	cmd models.CommandName,
 	projectName string,
 	commentFlags []string,
@@ -312,30 +355,5 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(
 		repoRelDir,
 		workspace,
 		verbose,
-	)
-}
-
-// buildCtx is a helper method that handles constructing the ProjectCommandContext.
-func (p *DefaultProjectCommandBuilder) buildCtx(
-	ctx *CommandContext,
-	cmd models.CommandName,
-	projCfg valid.MergedProjectCfg,
-	commentArgs []string,
-	automergeEnabled bool,
-	parallelApplyEnabled bool,
-	parallelPlanEnabled bool,
-	verbose bool,
-	absRepoDir string,
-) models.ProjectCommandContext {
-	return buildCtx(ctx,
-		cmd,
-		p.CommentBuilder,
-		projCfg,
-		commentArgs,
-		automergeEnabled,
-		parallelApplyEnabled,
-		parallelPlanEnabled,
-		verbose,
-		absRepoDir,
 	)
 }
