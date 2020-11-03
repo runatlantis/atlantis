@@ -25,6 +25,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sort"
 	"strings"
 	"syscall"
@@ -63,6 +64,14 @@ const (
 	// route. ex:
 	//   mux.Router.Get(LockViewRouteName).URL(LockViewRouteIDQueryParam, "my id")
 	LockViewRouteIDQueryParam = "id"
+
+	// binDirName is the name of the directory inside our data dir where
+	// we download binaries.
+	BinDirName = "bin"
+
+	// terraformPluginCacheDir is the name of the dir inside our data dir
+	// where we tell terraform to cache plugins and modules.
+	TerraformPluginCacheDirName = "plugin-cache"
 )
 
 // Server runs the Atlantis web server.
@@ -242,9 +251,23 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	vcsClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient)
 	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient, StatusName: userConfig.VCSStatusName}
+
+	binDir, err := mkSubDir(userConfig.DataDir, BinDirName)
+
+	if err != nil {
+		return nil, err
+	}
+
+	cacheDir, err := mkSubDir(userConfig.DataDir, TerraformPluginCacheDirName)
+
+	if err != nil {
+		return nil, err
+	}
+
 	terraformClient, err := terraform.NewClient(
 		logger,
-		userConfig.DataDir,
+		binDir,
+		cacheDir,
 		userConfig.TFEToken,
 		userConfig.TFEHostname,
 		userConfig.DefaultTFVersion,
@@ -429,7 +452,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 				DefaultTFVersion:  defaultTfVersion,
 			},
 			PolicyCheckStepRunner: runtime.NewPolicyCheckStepRunner(
-				policy.NewConfTestExecutorWorkflow(),
+				policy.NewConfTestExecutorWorkflow(logger, binDir),
 			),
 			ApplyStepRunner: &runtime.ApplyStepRunner{
 				TerraformExecutor:   terraformClient,
@@ -626,6 +649,15 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	if err != nil {
 		s.Logger.Err(err.Error())
 	}
+}
+
+func mkSubDir(parentDir string, subDir string) (string, error) {
+	fullDir := filepath.Join(parentDir, subDir)
+	if err := os.MkdirAll(fullDir, 0700); err != nil {
+		return "", errors.Wrapf(err, "unable to creare dir %q", fullDir)
+	}
+
+	return fullDir, nil
 }
 
 // Healthz returns the health check response. It always returns a 200 currently.
