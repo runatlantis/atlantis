@@ -577,22 +577,23 @@ projects:
 				Ok(t, ioutil.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
 
-			builder := &DefaultProjectCommandBuilder{
-				WorkingDirLocker:   NewDefaultWorkingDirLocker(),
-				WorkingDir:         workingDir,
-				ParserValidator:    parser,
-				VCSClient:          vcsClient,
-				ProjectFinder:      &DefaultProjectFinder{},
-				PendingPlanFinder:  &DefaultPendingPlanFinder{},
-				CommentBuilder:     &CommentParser{},
-				GlobalCfg:          globalCfg,
-				SkipCloneNoChanges: false,
-			}
+			builder := NewProjectCommandBuilder(
+				false,
+				parser,
+				&DefaultProjectFinder{},
+				vcsClient,
+				workingDir,
+				NewDefaultWorkingDirLocker(),
+				globalCfg,
+				&DefaultPendingPlanFinder{},
+				&CommentParser{},
+				false,
+			)
 
 			// We run a test for each type of command.
 			for _, cmd := range []models.CommandName{models.PlanCommand, models.ApplyCommand} {
 				t.Run(cmd.String(), func(t *testing.T) {
-					ctx, err := builder.buildProjectCommandCtx(&models.CommandContext{
+					ctxs, err := builder.buildProjectCommandCtx(&CommandContext{
 						Pull: models.PullRequest{
 							BaseRepo: baseRepo,
 						},
@@ -603,6 +604,7 @@ projects:
 						ErrEquals(t, c.expErr, err)
 						return
 					}
+					ctx := ctxs[0]
 
 					Ok(t, err)
 

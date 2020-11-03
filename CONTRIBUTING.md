@@ -139,7 +139,7 @@ Each interface that is mocked has a `go:generate` command above it, e.g.
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
 
 type ProjectCommandBuilder interface {
-	BuildAutoplanCommands(ctx *models.CommandContext) ([]models.ProjectCommandContext, error)
+	BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error)
 }
 ```
 

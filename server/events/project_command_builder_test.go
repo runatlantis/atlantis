@@ -134,19 +134,20 @@ projects:
 				Ok(t, err)
 			}
 
-			builder := &events.DefaultProjectCommandBuilder{
-				WorkingDirLocker:   events.NewDefaultWorkingDirLocker(),
-				WorkingDir:         workingDir,
-				ParserValidator:    &yaml.ParserValidator{},
-				VCSClient:          vcsClient,
-				ProjectFinder:      &events.DefaultProjectFinder{},
-				PendingPlanFinder:  &events.DefaultPendingPlanFinder{},
-				CommentBuilder:     &events.CommentParser{},
-				GlobalCfg:          valid.NewGlobalCfg(false, false, false),
-				SkipCloneNoChanges: false,
-			}
+			builder := events.NewProjectCommandBuilder(
+				false,
+				&yaml.ParserValidator{},
+				&events.DefaultProjectFinder{},
+				vcsClient,
+				workingDir,
+				events.NewDefaultWorkingDirLocker(),
+				valid.NewGlobalCfg(false, false, false),
+				&events.DefaultPendingPlanFinder{},
+				&events.CommentParser{},
+				false,
+			)
 
-			ctxs, err := builder.BuildAutoplanCommands(&models.CommandContext{
+			ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
 				PullMergeable: true,
 			})
 			Ok(t, err)
@@ -358,23 +359,25 @@ projects:
 					Ok(t, err)
 				}
 
-				builder := &events.DefaultProjectCommandBuilder{
-					WorkingDirLocker:   events.NewDefaultWorkingDirLocker(),
-					WorkingDir:         workingDir,
-					ParserValidator:    &yaml.ParserValidator{},
-					VCSClient:          vcsClient,
-					ProjectFinder:      &events.DefaultProjectFinder{},
-					CommentBuilder:     &events.CommentParser{},
-					GlobalCfg:          valid.NewGlobalCfg(true, false, false),
-					SkipCloneNoChanges: false,
-				}
+				builder := events.NewProjectCommandBuilder(
+					false,
+					&yaml.ParserValidator{},
+					&events.DefaultProjectFinder{},
+					vcsClient,
+					workingDir,
+					events.NewDefaultWorkingDirLocker(),
+					valid.NewGlobalCfg(true, false, false),
+					&events.DefaultPendingPlanFinder{},
+					&events.CommentParser{},
+					false,
+				)
 
 				var actCtxs []models.ProjectCommandContext
 				var err error
 				if cmdName == models.PlanCommand {
-					actCtxs, err = builder.BuildPlanCommands(&models.CommandContext{}, &c.Cmd)
+					actCtxs, err = builder.BuildPlanCommands(&events.CommandContext{}, &c.Cmd)
 				} else {
-					actCtxs, err = builder.BuildApplyCommands(&models.CommandContext{}, &c.Cmd)
+					actCtxs, err = builder.BuildApplyCommands(&events.CommandContext{}, &c.Cmd)
 				}
 
 				if c.ExpErr != "" {
@@ -492,19 +495,21 @@ projects:
 				Ok(t, err)
 			}
 
-			builder := &events.DefaultProjectCommandBuilder{
-				WorkingDirLocker:   events.NewDefaultWorkingDirLocker(),
-				WorkingDir:         workingDir,
-				ParserValidator:    &yaml.ParserValidator{},
-				VCSClient:          vcsClient,
-				ProjectFinder:      &events.DefaultProjectFinder{},
-				CommentBuilder:     &events.CommentParser{},
-				GlobalCfg:          valid.NewGlobalCfg(true, false, false),
-				SkipCloneNoChanges: false,
-			}
+			builder := events.NewProjectCommandBuilder(
+				false,
+				&yaml.ParserValidator{},
+				&events.DefaultProjectFinder{},
+				vcsClient,
+				workingDir,
+				events.NewDefaultWorkingDirLocker(),
+				valid.NewGlobalCfg(true, false, false),
+				&events.DefaultPendingPlanFinder{},
+				&events.CommentParser{},
+				false,
+			)
 
 			ctxs, err := builder.BuildPlanCommands(
-				&models.CommandContext{},
+				&events.CommandContext{},
 				&events.CommentCommand{
 					RepoRelDir:  "",
 					Flags:       nil,
@@ -564,20 +569,21 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		matchers.AnyModelsPullRequest())).
 		ThenReturn(tmpDir, nil)
 
-	builder := &events.DefaultProjectCommandBuilder{
-		WorkingDirLocker:   events.NewDefaultWorkingDirLocker(),
-		WorkingDir:         workingDir,
-		ParserValidator:    &yaml.ParserValidator{},
-		VCSClient:          nil,
-		ProjectFinder:      &events.DefaultProjectFinder{},
-		PendingPlanFinder:  &events.DefaultPendingPlanFinder{},
-		CommentBuilder:     &events.CommentParser{},
-		GlobalCfg:          valid.NewGlobalCfg(false, false, false),
-		SkipCloneNoChanges: false,
-	}
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&yaml.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfg(false, false, false),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{},
+		false,
+	)
 
 	ctxs, err := builder.BuildApplyCommands(
-		&models.CommandContext{},
+		&events.CommandContext{},
 		&events.CommentCommand{
 			RepoRelDir:  "",
 			Flags:       nil,
@@ -632,18 +638,20 @@ projects:
 		matchers.AnyModelsPullRequest(),
 		AnyString())).ThenReturn(repoDir, nil)
 
-	builder := &events.DefaultProjectCommandBuilder{
-		WorkingDirLocker:   events.NewDefaultWorkingDirLocker(),
-		WorkingDir:         workingDir,
-		ParserValidator:    &yaml.ParserValidator{},
-		VCSClient:          nil,
-		ProjectFinder:      &events.DefaultProjectFinder{},
-		CommentBuilder:     &events.CommentParser{},
-		GlobalCfg:          valid.NewGlobalCfg(true, false, false),
-		SkipCloneNoChanges: false,
-	}
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&yaml.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfg(true, false, false),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{},
+		false,
+	)
 
-	ctx := &models.CommandContext{
+	ctx := &events.CommandContext{
 		HeadRepo: models.Repo{},
 		Pull:     models.PullRequest{},
 		User:     models.User{},
@@ -694,20 +702,22 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
 
-			builder := &events.DefaultProjectCommandBuilder{
-				WorkingDirLocker:   events.NewDefaultWorkingDirLocker(),
-				WorkingDir:         workingDir,
-				ParserValidator:    &yaml.ParserValidator{},
-				VCSClient:          vcsClient,
-				ProjectFinder:      &events.DefaultProjectFinder{},
-				CommentBuilder:     &events.CommentParser{},
-				GlobalCfg:          valid.NewGlobalCfg(true, false, false),
-				SkipCloneNoChanges: false,
-			}
+			builder := events.NewProjectCommandBuilder(
+				false,
+				&yaml.ParserValidator{},
+				&events.DefaultProjectFinder{},
+				vcsClient,
+				workingDir,
+				events.NewDefaultWorkingDirLocker(),
+				valid.NewGlobalCfg(true, false, false),
+				&events.DefaultPendingPlanFinder{},
+				&events.CommentParser{},
+				false,
+			)
 
 			var actCtxs []models.ProjectCommandContext
 			var err error
-			actCtxs, err = builder.BuildPlanCommands(&models.CommandContext{}, &events.CommentCommand{
+			actCtxs, err = builder.BuildPlanCommands(&events.CommandContext{}, &events.CommentCommand{
 				RepoRelDir: ".",
 				Flags:      c.ExtraArgs,
 				Name:       models.PlanCommand,
@@ -858,19 +868,21 @@ projects:
 				matchers.AnyModelsPullRequest(),
 				AnyString())).ThenReturn(tmpDir, nil)
 
-			builder := &events.DefaultProjectCommandBuilder{
-				WorkingDirLocker:   events.NewDefaultWorkingDirLocker(),
-				WorkingDir:         workingDir,
-				VCSClient:          vcsClient,
-				ParserValidator:    &yaml.ParserValidator{},
-				ProjectFinder:      &events.DefaultProjectFinder{},
-				CommentBuilder:     &events.CommentParser{},
-				GlobalCfg:          valid.NewGlobalCfg(true, false, false),
-				SkipCloneNoChanges: false,
-			}
+			builder := events.NewProjectCommandBuilder(
+				false,
+				&yaml.ParserValidator{},
+				&events.DefaultProjectFinder{},
+				vcsClient,
+				workingDir,
+				events.NewDefaultWorkingDirLocker(),
+				valid.NewGlobalCfg(true, false, false),
+				&events.DefaultPendingPlanFinder{},
+				&events.CommentParser{},
+				false,
+			)
 
 			actCtxs, err := builder.BuildPlanCommands(
-				&models.CommandContext{},
+				&events.CommandContext{},
 				&events.CommentCommand{
 					RepoRelDir: "",
 					Flags:      nil,
@@ -906,20 +918,22 @@ projects:
 	When(vcsClient.DownloadRepoConfigFile(matchers.AnyModelsPullRequest())).ThenReturn(true, []byte(atlantisYAML), nil)
 	workingDir := mocks.NewMockWorkingDir()
 
-	builder := &events.DefaultProjectCommandBuilder{
-		WorkingDirLocker:   events.NewDefaultWorkingDirLocker(),
-		WorkingDir:         workingDir,
-		ParserValidator:    &yaml.ParserValidator{},
-		VCSClient:          vcsClient,
-		ProjectFinder:      &events.DefaultProjectFinder{},
-		CommentBuilder:     &events.CommentParser{},
-		GlobalCfg:          valid.NewGlobalCfg(true, false, false),
-		SkipCloneNoChanges: true,
-	}
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&yaml.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfg(true, false, false),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{},
+		true,
+	)
 
 	var actCtxs []models.ProjectCommandContext
 	var err error
-	actCtxs, err = builder.BuildAutoplanCommands(&models.CommandContext{
+	actCtxs, err = builder.BuildAutoplanCommands(&events.CommandContext{
 		HeadRepo:      models.Repo{},
 		Pull:          models.PullRequest{},
 		User:          models.User{},

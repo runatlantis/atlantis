@@ -109,7 +109,7 @@ func TestUpdateCommitStatus(t *testing.T) {
 			cr := &DefaultCommandRunner{
 				CommitStatusUpdater: csu,
 			}
-			cr.updateCommitStatus(&models.CommandContext{}, c.cmd, c.pullStatus)
+			cr.updateCommitStatus(&CommandContext{}, c.cmd, c.pullStatus)
 			Equals(t, models.Repo{}, csu.CalledRepo)
 			Equals(t, models.PullRequest{}, csu.CalledPull)
 			Equals(t, c.expStatus, csu.CalledStatus)
