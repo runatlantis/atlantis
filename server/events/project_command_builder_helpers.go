@@ -2,7 +2,6 @@ package events
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -20,6 +19,7 @@ func buildProjectCommands(
 	cmdName models.CommandName,
 	commentCmd *CommentCommand,
 	commentBuilder CommentBuilder,
+	parser *yaml.ParserValidator,
 	globalCfg valid.GlobalCfg,
 	workingDirLocker WorkingDirLocker,
 	workingDir WorkingDir,
@@ -49,6 +49,7 @@ func buildProjectCommands(
 		cmd, err := buildProjectCommandCtx(
 			ctx,
 			cmdName,
+			parser,
 			globalCfg,
 			commentBuilder,
 			plan.ProjectName,
@@ -69,6 +70,7 @@ func buildProjectCommands(
 func buildProjectCommandCtx(
 	ctx *models.CommandContext,
 	cmd models.CommandName,
+	parser *yaml.ParserValidator,
 	globalCfg valid.GlobalCfg,
 	commentBuilder CommentBuilder,
 	projectName string,
@@ -78,7 +80,7 @@ func buildProjectCommandCtx(
 	workspace string,
 	verbose bool) (models.ProjectCommandContext, error) {
 
-	projCfgPtr, repoCfgPtr, err := getCfg(ctx, globalCfg, projectName, repoRelDir, workspace, repoDir)
+	projCfgPtr, repoCfgPtr, err := getCfg(ctx, parser, globalCfg, projectName, repoRelDir, workspace, repoDir)
 	if err != nil {
 		return models.ProjectCommandContext{}, err
 	}
@@ -146,97 +148,20 @@ func validateWorkspaceAllowed(repoCfg *valid.RepoCfg, repoRelDir string, workspa
 		return nil
 	}
 
-	projects := repoCfg.FindProjectsByDir(repoRelDir)
-
-	// If that directory doesn't have any projects configured then we don't
-	// enforce workspace names.
-	if len(projects) == 0 {
-		return nil
-	}
-
-	var configuredSpaces []string
-	for _, p := range projects {
-		if p.Workspace == workspace {
-			return nil
-		}
-		configuredSpaces = append(configuredSpaces, p.Workspace)
-	}
-
-	return fmt.Errorf(
-		"running commands in workspace %q is not allowed because this"+
-			" directory is only configured for the following workspaces: %s",
-		workspace,
-		strings.Join(configuredSpaces, ", "),
-	)
+	return repoCfg.ValidateWorkspaceAllowed(repoRelDir, workspace)
 }
-
-// // buildCtx is a helper method that handles constructing the ProjectCommandContext.
-// func buildCtx(ctx *models.CommandContext,
-// 	cmd models.CommandName,
-// 	commentBuilder CommentBuilder,
-// 	projCfg valid.MergedProjectCfg,
-// 	commentArgs []string,
-// 	automergeEnabled bool,
-// 	parallelApplyEnabled bool,
-// 	parallelPlanEnabled bool,
-// 	verbose bool,
-// 	absRepoDir string) models.ProjectCommandContext {
-
-// 	var policySets models.PolicySets
-// 	var steps []valid.Step
-// 	switch cmd {
-// 	case models.PlanCommand:
-// 		steps = projCfg.Workflow.Plan.Steps
-// 	case models.ApplyCommand:
-// 		steps = projCfg.Workflow.Apply.Steps
-// 	case models.PolicyCheckCommand:
-// 		steps = projCfg.Workflow.PolicyCheck.Steps
-// 	}
-
-// 	// If TerraformVersion not defined in config file look for a
-// 	// terraform.require_version block.
-// 	if projCfg.TerraformVersion == nil {
-// 		projCfg.TerraformVersion = getTfVersion(ctx, filepath.Join(absRepoDir, projCfg.RepoRelDir))
-// 	}
-
-// 	return models.ProjectCommandContext{
-// 		CommandName:          cmd,
-// 		ApplyCmd:             commentBuilder.BuildApplyComment(projCfg.RepoRelDir, projCfg.Workspace, projCfg.Name),
-// 		BaseRepo:             ctx.Pull.BaseRepo,
-// 		EscapedCommentArgs:   escapeArgs(commentArgs),
-// 		AutomergeEnabled:     automergeEnabled,
-// 		ParallelApplyEnabled: parallelApplyEnabled,
-// 		ParallelPlanEnabled:  parallelPlanEnabled,
-// 		AutoplanEnabled:      projCfg.AutoplanEnabled,
-// 		Steps:                steps,
-// 		HeadRepo:             ctx.HeadRepo,
-// 		Log:                  ctx.Log,
-// 		PullMergeable:        ctx.PullMergeable,
-// 		Pull:                 ctx.Pull,
-// 		ProjectName:          projCfg.Name,
-// 		ApplyRequirements:    projCfg.ApplyRequirements,
-// 		RePlanCmd:            commentBuilder.BuildPlanComment(projCfg.RepoRelDir, projCfg.Workspace, projCfg.Name, commentArgs),
-// 		RepoRelDir:           projCfg.RepoRelDir,
-// 		RepoConfigVersion:    projCfg.RepoCfgVersion,
-// 		TerraformVersion:     projCfg.TerraformVersion,
-// 		User:                 ctx.User,
-// 		Verbose:              verbose,
-// 		Workspace:            projCfg.Workspace,
-// 		PolicySets:           policySets,
-// 	}
-// }
 
 // getCfg returns the atlantis.yaml config (if it exists) for this project. If
 // there is no config, then projectCfg and repoCfg will be nil.
 func getCfg(
 	ctx *models.CommandContext,
+	parserValidator *yaml.ParserValidator,
 	globalCfg valid.GlobalCfg,
 	projectName string,
 	dir string,
 	workspace string,
 	repoDir string,
 ) (projectCfg *valid.Project, repoCfg *valid.RepoCfg, err error) {
-	parserValidator := &yaml.ParserValidator{}
 
 	hasConfigFile, err := parserValidator.HasRepoCfg(repoDir)
 	if err != nil {

@@ -126,6 +126,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
+				{"exp-output-atlantis-plan.txt"},
 				{"exp-output-atlantis-plan-new-workspace.txt"},
 				{"exp-output-apply-var-default-workspace.txt"},
 				{"exp-output-apply-var-new-workspace.txt"},
@@ -237,6 +238,22 @@ func TestGitHubWorkflow(t *testing.T) {
 			Comments: []string{
 				"atlantis apply -d staging",
 				"atlantis apply -d production",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-apply-staging.txt"},
+				{"exp-output-apply-production.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description:   "tfvars-yaml",
+			RepoDir:       "tfvars-yaml",
+			ModifiedFiles: []string{"main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis apply -p staging",
+				"atlantis apply -p default",
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},

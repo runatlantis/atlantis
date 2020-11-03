@@ -207,6 +207,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *models.CommandC
 				mergedCfg.RepoRelDir,
 				mergedCfg.Workspace,
 				mergedCfg.Name,
+				commentFlags...,
 			)
 
 			prjCtx := models.NewProjectCommandContext(
@@ -239,6 +240,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *models.CommandC
 				pCfg.RepoRelDir,
 				pCfg.Workspace,
 				pCfg.Name,
+				commentFlags...,
 			)
 
 			prjCtx := models.NewProjectCommandContext(
@@ -288,16 +290,27 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *models.Comma
 		repoRelDir = cmd.RepoRelDir
 	}
 
-	return p.buildProjectCommandCtx(ctx, models.PlanCommand, cmd.ProjectName, cmd.Flags, repoDir, repoRelDir, workspace, cmd.Verbose)
+	return p.buildProjectCommandCtx(
+		ctx,
+		models.PlanCommand,
+		cmd.ProjectName,
+		cmd.Flags,
+		repoDir,
+		repoRelDir,
+		workspace,
+		cmd.Verbose,
+	)
 }
 
 // buildApplyAllCommands builds contexts for any command for every project that has
 // pending plans in this ctx.
 func (p *DefaultProjectCommandBuilder) buildApplyAllCommands(ctx *models.CommandContext, commentCmd *CommentCommand) ([]models.ProjectCommandContext, error) {
-	return buildProjectCommands(ctx,
+	return buildProjectCommands(
+		ctx,
 		models.ApplyCommand,
 		commentCmd,
 		p.CommentBuilder,
+		p.ParserValidator,
 		p.GlobalCfg,
 		p.WorkingDirLocker,
 		p.WorkingDir,
@@ -331,13 +344,21 @@ func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *models.Comm
 		repoRelDir = cmd.RepoRelDir
 	}
 
-	return p.buildProjectCommandCtx(ctx, models.ApplyCommand, cmd.ProjectName, cmd.Flags, repoDir, repoRelDir, workspace, cmd.Verbose)
+	return p.buildProjectCommandCtx(
+		ctx,
+		models.ApplyCommand,
+		cmd.ProjectName,
+		cmd.Flags,
+		repoDir,
+		repoRelDir,
+		workspace,
+		cmd.Verbose,
+	)
 }
 
 // buildProjectCommandCtx builds a context for a single project identified
 // by the parameters.
-func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(
-	ctx *models.CommandContext,
+func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *models.CommandContext,
 	cmd models.CommandName,
 	projectName string,
 	commentFlags []string,
@@ -347,6 +368,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(
 	verbose bool) (models.ProjectCommandContext, error) {
 	return buildProjectCommandCtx(ctx,
 		cmd,
+		p.ParserValidator,
 		p.GlobalCfg,
 		p.CommentBuilder,
 		projectName,

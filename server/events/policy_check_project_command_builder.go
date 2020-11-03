@@ -45,6 +45,9 @@ func (p *PolicyCheckProjectCommandBuilder) BuildAutoplanCommands(ctx *models.Com
 	}
 
 	policyCheckCmds, err := p.buildProjectCommands(ctx, models.PolicyCheckCommand, commentCmd)
+	if err != nil {
+		return nil, err
+	}
 
 	projectCmds = append(projectCmds, policyCheckCmds...)
 	return projectCmds, nil
@@ -57,7 +60,6 @@ func (p *PolicyCheckProjectCommandBuilder) BuildPlanCommands(ctx *models.Command
 	}
 
 	policyCheckCmds, err := p.buildProjectCommands(ctx, models.PolicyCheckCommand, commentCmd)
-
 	if err != nil {
 		return nil, err
 	}
@@ -76,6 +78,7 @@ func (p *PolicyCheckProjectCommandBuilder) buildProjectCommands(ctx *models.Comm
 		models.PolicyCheckCommand,
 		commentCmd,
 		p.CommentBuilder,
+		p.ParserValidator,
 		p.GlobalCfg,
 		p.WorkingDirLocker,
 		p.WorkingDir,
