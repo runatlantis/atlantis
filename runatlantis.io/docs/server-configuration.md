@@ -206,7 +206,7 @@ Values are chosen in this order:
   atlantis server --disable-apply
   ```
   Disable all \"atlantis apply\" commands, regardless of which flags are passed with it.
-  
+
 * ### `--disable-apply-all`
   ```bash
   atlantis server --disable-apply-all
@@ -218,7 +218,7 @@ Values are chosen in this order:
   ```bash
   atlantis server --disable-autoplan
   ```
-  Disable atlantis auto planning    
+  Disable atlantis auto planning
 
 * ### `--gh-hostname`
   ```bash
@@ -478,6 +478,12 @@ Values are chosen in this order:
 
   Some users find this useful because they prefer to add the Atlantis webhook
   at an organization level rather than on each repo.
+
+* ### `--skip-clone-no-changes`
+  ```bash
+  atlantis server --skip-clone-no-changes
+  ```
+  `--skip-clone-no-changes` will skip cloning the repo during autoplan if there are no changes to Terraform projects. This will only apply for GitHub and GitLab and only for repos that have `atlantis.yaml` file. Defaults to `false`.
 
 * ### `--slack-token`
   ```bash
