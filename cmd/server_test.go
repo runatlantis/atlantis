@@ -100,6 +100,7 @@ var testFlags = map[string]interface{}{
 	VCSStatusName:              "my-status",
 	WriteGitCredsFlag:          true,
 	DisableAutoplanFlag:        true,
+	EnablePolicyChecksFlag:     false,
 }
 
 func TestExecute_Defaults(t *testing.T) {
@@ -670,6 +671,19 @@ func TestExecute_RepoCfgFlags(t *testing.T) {
 	})
 	err := c.Execute()
 	ErrEquals(t, "cannot use --repo-config and --repo-config-json at the same time", err)
+}
+
+func TestExecute_PolicyCheck(t *testing.T) {
+	c := setup(map[string]interface{}{
+		GHUserFlag:             "user",
+		GHTokenFlag:            "token",
+		RepoAllowlistFlag:      "github.com",
+		TFEHostnameFlag:        "not-app.terraform.io",
+		EnablePolicyChecksFlag: true,
+	})
+	err := c.Execute()
+
+	ErrEquals(t, "--enable-policy-checks flag cannot be used together with --tfe-hostname or --tfe-token", err)
 }
 
 // Can't use both --tfe-hostname flag without --tfe-token.

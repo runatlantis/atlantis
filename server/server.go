@@ -135,7 +135,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var azuredevopsClient *vcs.AzureDevopsClient
 
 	policyChecksEnabled := false
-	if userConfig.EnablePolicyChecksFlag && !(userConfig.TFEHostname != "" || userConfig.TFEToken != "") {
+	if userConfig.EnablePolicyChecksFlag {
 		logger.Info("Policy Checks are enabled")
 		policyChecksEnabled = true
 	}
