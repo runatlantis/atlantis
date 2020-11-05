@@ -2,14 +2,50 @@ package policy
 
 import (
 	"errors"
+	"fmt"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events/runtime/cache/mocks"
+	terraform_mocks "github.com/runatlantis/atlantis/server/events/terraform/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
+
+func TestConfTestVersionDownloader(t *testing.T) {
+
+	version, _ := version.NewVersion("0.21.0")
+	destPath := "some/path"
+
+	fullURL := fmt.Sprintf("https://github.com/open-policy-agent/conftest/releases/download/v0.21.0/conftest_0.21.0_%s_x86_64.tar.gz?checksum=file:https://github.com/open-policy-agent/conftest/releases/download/v0.21.0/checksums.txt", strings.Title(runtime.GOOS))
+
+	RegisterMockTestingT(t)
+
+	mockDownloader := terraform_mocks.NewMockDownloader()
+
+	subject := ConfTestVersionDownloader{downloader: mockDownloader}
+
+	t.Run("success", func(t *testing.T) {
+
+		When(mockDownloader.GetFile(EqString(destPath), EqString(fullURL))).ThenReturn(nil)
+		err := subject.downloadConfTestVersion(version, destPath)
+
+		mockDownloader.VerifyWasCalledOnce().GetFile(EqString(destPath), EqString(fullURL))
+
+		Ok(t, err)
+	})
+
+	t.Run("error", func(t *testing.T) {
+
+		When(mockDownloader.GetFile(EqString(destPath), EqString(fullURL))).ThenReturn(errors.New("err"))
+		err := subject.downloadConfTestVersion(version, destPath)
+
+		Assert(t, err != nil, "err is expected")
+	})
+}
 
 func TestEnsureExecutorVersion(t *testing.T) {
 

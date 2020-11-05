@@ -3,7 +3,6 @@ package policy
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -65,10 +64,6 @@ func (c ConfTestVersionDownloader) downloadConfTestVersion(v *version.Version, d
 	// i know i know, I'm assuming an interface implementation with my inputs.
 	// realistically though the interface just exists for testing so ¯\_(ツ)_/¯
 	fullSrcURL := fmt.Sprintf("%s?checksum=file:%s", binURL, checksumURL)
-
-	binLocation := fmt.Sprintf("usr/local/bin/cft/versions/%s", v.Original())
-
-	filepath.Join(binLocation, conftestBinaryName)
 
 	if err := c.downloader.GetFile(destPath, fullSrcURL); err != nil {
 		return errors.Wrapf(err, "downloading conftest version %s at %q", v.String(), fullSrcURL)
