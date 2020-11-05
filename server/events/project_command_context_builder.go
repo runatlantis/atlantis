@@ -47,7 +47,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 	prjCfg valid.MergedProjectCfg,
 	commentFlags []string,
 	repoDir string,
-	automerge, parallelPlan, parallelApply, verbose bool,
+	automerge, parallelApply, parallelPlan, verbose bool,
 ) (projectCmds []models.ProjectCommandContext) {
 	ctx.Log.Debug("Building project command context for %s", cmdName)
 
@@ -95,23 +95,23 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 	prjCfg valid.MergedProjectCfg,
 	commentFlags []string,
 	repoDir string,
-	automerge, parallelPlan, parallelApply, verbose bool,
+	automerge, parallelApply, parallelPlan, verbose bool,
 ) (projectCmds []models.ProjectCommandContext) {
 	ctx.Log.Debug("PolicyChecks are enabled")
-	ctx.Log.Debug("Building project command context for %s", cmdName)
 	projectCmds = cb.ProjectCommandContextBuilder.BuildProjectContext(
 		ctx,
 		cmdName,
 		prjCfg,
-		escapeArgs(commentFlags),
+		commentFlags,
 		repoDir,
-		verbose,
 		automerge,
-		parallelPlan,
 		parallelApply,
+		parallelPlan,
+		verbose,
 	)
 
 	if cmdName == models.PlanCommand {
+		ctx.Log.Debug("Building project command context for %s", models.PolicyCheckCommand)
 		var policySets models.PolicySets
 		steps := prjCfg.Workflow.PolicyCheck.Steps
 

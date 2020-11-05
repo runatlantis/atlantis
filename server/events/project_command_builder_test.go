@@ -944,3 +944,43 @@ projects:
 	Equals(t, 0, len(actCtxs))
 	workingDir.VerifyWasCalled(Never()).Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())
 }
+
+func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanCommand(t *testing.T) {
+	RegisterMockTestingT(t)
+	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
+		"main.tf": nil,
+	})
+	defer cleanup()
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, false, nil)
+	vcsClient := vcsmocks.NewMockClient()
+	When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
+	globalCfg := valid.NewGlobalCfg(false, false, false)
+
+	builder := events.NewProjectCommandBuilder(
+		true,
+		&yaml.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{},
+		false,
+	)
+
+	ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
+		PullMergeable: true,
+	})
+
+	Ok(t, err)
+	Equals(t, 2, len(ctxs))
+	planCtx := ctxs[0]
+	policyCheckCtx := ctxs[1]
+	Equals(t, models.PlanCommand, planCtx.CommandName)
+	Equals(t, globalCfg.Workflows["default"].Plan.Steps, planCtx.Steps)
+	Equals(t, models.PolicyCheckCommand, policyCheckCtx.CommandName)
+	Equals(t, globalCfg.Workflows["default"].PolicyCheck.Steps, policyCheckCtx.Steps)
+}

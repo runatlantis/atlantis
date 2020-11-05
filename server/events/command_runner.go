@@ -220,7 +220,7 @@ func (c *DefaultCommandRunner) runPolicyCheckCommands(
 
 	var result CommandResult
 	if c.parallelPolicyCheckEnabled(ctx, projectCmds) {
-		ctx.Log.Info("Running plans in parallel")
+		ctx.Log.Info("Running policy_checks in parallel")
 		result = c.runProjectCmdsParallel(projectCmds, models.PolicyCheckCommand)
 	} else {
 		result = c.runProjectCmds(projectCmds, models.PolicyCheckCommand)
@@ -245,7 +245,7 @@ func (c *DefaultCommandRunner) partitionProjectCmds(
 ) {
 	for _, cmd := range cmds {
 		switch cmd.CommandName {
-		case models.PlanCommand, models.ApplyCommand:
+		case models.PlanCommand:
 			projectCmds = append(projectCmds, cmd)
 		case models.PolicyCheckCommand:
 			policyCheckCmds = append(policyCheckCmds, cmd)
@@ -421,10 +421,10 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 
 	// Runs policy checks step after all plans are successful
 	if cmd.Name == models.PlanCommand &&
-		len(policyCheckCmds) > 0 &&
+		len(result.ProjectResults) > 0 &&
 		!(result.HasErrors() || result.PlansDeleted) {
 		ctx.Log.Info("Running policy check for %s", cmd.String())
-		c.runPolicyCheckCommands(ctx, result.ProjectResults, projectCmds)
+		c.runPolicyCheckCommands(ctx, result.ProjectResults, policyCheckCmds)
 	}
 }
 

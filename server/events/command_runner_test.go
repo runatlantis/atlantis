@@ -217,8 +217,12 @@ func TestRunCommentCommand_DisableDisableAutoplan(t *testing.T) {
 
 	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())).
 		ThenReturn([]models.ProjectCommandContext{
-			{},
-			{},
+			{
+				CommandName: models.PlanCommand,
+			},
+			{
+				CommandName: models.PlanCommand,
+			},
 		}, nil)
 
 	ch.RunAutoplanCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
@@ -290,8 +294,12 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 
 	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())).
 		ThenReturn([]models.ProjectCommandContext{
-			{},
-			{},
+			{
+				CommandName: models.PlanCommand,
+			},
+			{
+				CommandName: models.PlanCommand,
+			},
 		}, nil)
 	callCount := 0
 	When(projectCommandRunner.Plan(matchers.AnyModelsProjectCommandContext())).Then(func(_ []Param) ReturnValues {
