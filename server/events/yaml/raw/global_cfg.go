@@ -14,6 +14,7 @@ import (
 type GlobalCfg struct {
 	Repos     []Repo              `yaml:"repos" json:"repos"`
 	Workflows map[string]Workflow `yaml:"workflows" json:"workflows"`
+	Policies  Policies            `yaml:"policies" json:"policies"`
 }
 
 // Repo is the raw schema for repos in the server-side repo config.
