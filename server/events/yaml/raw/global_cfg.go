@@ -12,9 +12,9 @@ import (
 
 // GlobalCfg is the raw schema for server-side repo config.
 type GlobalCfg struct {
-	Repos     []Repo              `yaml:"repos" json:"repos"`
-	Workflows map[string]Workflow `yaml:"workflows" json:"workflows"`
-	Policies  Policies            `yaml:"policies" json:"policies"`
+	Repos      []Repo              `yaml:"repos" json:"repos"`
+	Workflows  map[string]Workflow `yaml:"workflows" json:"workflows"`
+	PolicySets PolicySets          `yaml:"policies" json:"policies"`
 }
 
 // Repo is the raw schema for repos in the server-side repo config.

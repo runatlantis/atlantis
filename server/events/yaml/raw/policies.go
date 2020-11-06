@@ -10,21 +10,21 @@ const (
 	GithubSourceType string = "github"
 )
 
-// Policies is the raw schema for repo-level atlantis.yaml config.
-type Policies struct {
+// PolicySets is the raw schema for repo-level atlantis.yaml config.
+type PolicySets struct {
 	Version    string      `yaml:"conftest_version,omitempty" json:"conftest_version,omitempty"`
 	PolicySets []PolicySet `yaml:"policy_sets" json:"policy_sets"`
 }
 
-func (p Policies) Validate() error {
+func (p PolicySets) Validate() error {
 	return validation.ValidateStruct(&p,
 		validation.Field(&p.Version),
 		validation.Field(&p.PolicySets, validation.Required.Error("cannot be empty; Declare policies that you would like to enforce")),
 	)
 }
 
-func (p Policies) ToValid() valid.Policies {
-	v := valid.Policies{
+func (p PolicySets) ToValid() valid.PolicySets {
+	v := valid.PolicySets{
 		Version: p.Version,
 	}
 

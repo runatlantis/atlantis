@@ -9,12 +9,12 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
-func TestPoliciesConfig_YAMLMarshalling(t *testing.T) {
+func TestPolicySetsConfig_YAMLMarshalling(t *testing.T) {
 	version := "v1.0.0"
 	cases := []struct {
 		description string
 		input       string
-		exp         raw.Policies
+		exp         raw.PolicySets
 		expErr      string
 	}{
 
@@ -28,7 +28,7 @@ policy_sets:
     type: "local"
     path: "rel/path/to/policy-set"
 `,
-			exp: raw.Policies{
+			exp: raw.PolicySets{
 				Version: version,
 				PolicySets: []raw.PolicySet{
 					{
@@ -45,7 +45,7 @@ policy_sets:
 
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			var got raw.Policies
+			var got raw.PolicySets
 			err := yaml.UnmarshalStrict([]byte(c.input), &got)
 			if c.expErr != "" {
 				ErrEquals(t, c.expErr, err)
@@ -57,7 +57,7 @@ policy_sets:
 			_, err = yaml.Marshal(got)
 			Ok(t, err)
 
-			var got2 raw.Policies
+			var got2 raw.PolicySets
 			err = yaml.UnmarshalStrict([]byte(c.input), &got2)
 			Ok(t, err)
 			Equals(t, got2, got)
@@ -65,17 +65,17 @@ policy_sets:
 	}
 }
 
-func TestPolicies_Validate(t *testing.T) {
+func TestPolicySets_Validate(t *testing.T) {
 	version := "v1.0.0"
 	cases := []struct {
 		description string
-		input       raw.Policies
+		input       raw.PolicySets
 		expErr      string
 	}{
 		// Valid inputs.
 		{
 			description: "policies",
-			input: raw.Policies{
+			input: raw.PolicySets{
 				Version: version,
 				PolicySets: []raw.PolicySet{
 					{
@@ -104,12 +104,12 @@ func TestPolicies_Validate(t *testing.T) {
 		// Invalid inputs.
 		{
 			description: "empty elem",
-			input:       raw.Policies{},
+			input:       raw.PolicySets{},
 			expErr:      "policy_sets: cannot be empty; Declare policies that you would like to enforce.",
 		},
 		{
 			description: "missing policy name and source path",
-			input: raw.Policies{
+			input: raw.PolicySets{
 				PolicySets: []raw.PolicySet{
 					{},
 				},
@@ -118,7 +118,7 @@ func TestPolicies_Validate(t *testing.T) {
 		},
 		{
 			description: "invalid source type",
-			input: raw.Policies{
+			input: raw.PolicySets{
 				PolicySets: []raw.PolicySet{
 					{
 						Name: "good-policy",
@@ -145,16 +145,16 @@ func TestPolicies_Validate(t *testing.T) {
 	}
 }
 
-func TestPolicies_ToValid(t *testing.T) {
+func TestPolicySets_ToValid(t *testing.T) {
 	version := "v1.0.0"
 	cases := []struct {
 		description string
-		input       raw.Policies
-		exp         valid.Policies
+		input       raw.PolicySets
+		exp         valid.PolicySets
 	}{
 		{
 			description: "valid policies",
-			input: raw.Policies{
+			input: raw.PolicySets{
 				Version: version,
 				PolicySets: []raw.PolicySet{
 					{
@@ -170,7 +170,7 @@ func TestPolicies_ToValid(t *testing.T) {
 					},
 				},
 			},
-			exp: valid.Policies{
+			exp: valid.PolicySets{
 				Version: version,
 				PolicySets: []valid.PolicySet{
 					{

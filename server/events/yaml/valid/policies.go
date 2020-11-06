@@ -1,9 +1,9 @@
 package valid
 
-// Policies defines version of policy checker binary(conftest) and a list of
-// PolicySet objects. Policies struct is used by PolicyCheck workflow to build
+// PolicySets defines version of policy checker binary(conftest) and a list of
+// PolicySet objects. PolicySets struct is used by PolicyCheck workflow to build
 // context to enforce policies.
-type Policies struct {
+type PolicySets struct {
 	Version    string
 	PolicySets []PolicySet
 }

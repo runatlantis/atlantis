@@ -21,9 +21,9 @@ const DefaultWorkflowName = "default"
 
 // GlobalCfg is the final parsed version of server-side repo config.
 type GlobalCfg struct {
-	Repos     []Repo
-	Workflows map[string]Workflow
-	Policies  Policies
+	Repos      []Repo
+	Workflows  map[string]Workflow
+	PolicySets PolicySets
 }
 
 // Repo is the final parsed version of server-side repo config.
