@@ -36,14 +36,6 @@ func (p Project) Validate() error {
 		return nil
 	}
 
-	validTFVersion := func(value interface{}) error {
-		strPtr := value.(*string)
-		if strPtr == nil {
-			return nil
-		}
-		_, err := version.NewVersion(*strPtr)
-		return errors.Wrapf(err, "version %q could not be parsed", *strPtr)
-	}
 	validName := func(value interface{}) error {
 		strPtr := value.(*string)
 		if strPtr == nil {
@@ -60,7 +52,7 @@ func (p Project) Validate() error {
 	return validation.ValidateStruct(&p,
 		validation.Field(&p.Dir, validation.Required, validation.By(hasDotDot)),
 		validation.Field(&p.ApplyRequirements, validation.By(validApplyReq)),
-		validation.Field(&p.TerraformVersion, validation.By(validTFVersion)),
+		validation.Field(&p.TerraformVersion, validation.By(VersionValidator)),
 		validation.Field(&p.Name, validation.By(validName)),
 	)
 }

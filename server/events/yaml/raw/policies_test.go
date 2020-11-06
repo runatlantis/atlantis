@@ -3,6 +3,7 @@ package raw_test
 import (
 	"testing"
 
+	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/yaml/raw"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	. "github.com/runatlantis/atlantis/testing"
@@ -10,14 +11,12 @@ import (
 )
 
 func TestPolicySetsConfig_YAMLMarshalling(t *testing.T) {
-	version := "v1.0.0"
 	cases := []struct {
 		description string
 		input       string
 		exp         raw.PolicySets
 		expErr      string
 	}{
-
 		{
 			description: "valid yaml",
 			input: `
@@ -29,14 +28,12 @@ policy_sets:
     path: "rel/path/to/policy-set"
 `,
 			exp: raw.PolicySets{
-				Version: version,
+				Version: String("v1.0.0"),
 				PolicySets: []raw.PolicySet{
 					{
-						Name: "policy-name",
-						Source: raw.PolicySetSource{
-							Type: raw.LocalSourceType,
-							Path: "rel/path/to/policy-set",
-						},
+						Name:   "policy-name",
+						Source: raw.LocalSourceType,
+						Path:   "rel/path/to/policy-set",
 					},
 				},
 			},
@@ -66,7 +63,6 @@ policy_sets:
 }
 
 func TestPolicySets_Validate(t *testing.T) {
-	version := "v1.0.0"
 	cases := []struct {
 		description string
 		input       raw.PolicySets
@@ -76,14 +72,12 @@ func TestPolicySets_Validate(t *testing.T) {
 		{
 			description: "policies",
 			input: raw.PolicySets{
-				Version: version,
+				Version: String("v1.0.0"),
 				PolicySets: []raw.PolicySet{
 					{
-						Name: "policy-name-1",
-						Source: raw.PolicySetSource{
-							Path: "rel/path/to/source",
-							Type: raw.LocalSourceType,
-						},
+						Name:   "policy-name-1",
+						Path:   "rel/path/to/source",
+						Source: raw.LocalSourceType,
 					},
 					{
 						Name: "policy-name-2",
@@ -91,10 +85,8 @@ func TestPolicySets_Validate(t *testing.T) {
 							"john-doe",
 							"jane-doe",
 						},
-						Source: raw.PolicySetSource{
-							Path: "rel/path/to/source",
-							Type: raw.GithubSourceType,
-						},
+						Path:   "rel/path/to/source",
+						Source: raw.GithubSourceType,
 					},
 				},
 			},
@@ -107,6 +99,7 @@ func TestPolicySets_Validate(t *testing.T) {
 			input:       raw.PolicySets{},
 			expErr:      "policy_sets: cannot be empty; Declare policies that you would like to enforce.",
 		},
+
 		{
 			description: "missing policy name and source path",
 			input: raw.PolicySets{
@@ -121,15 +114,41 @@ func TestPolicySets_Validate(t *testing.T) {
 			input: raw.PolicySets{
 				PolicySets: []raw.PolicySet{
 					{
-						Name: "good-policy",
-						Source: raw.PolicySetSource{
-							Type: "invalid-source-type",
-							Path: "rel/path/to/source",
-						},
+						Name:   "good-policy",
+						Source: "invalid-source-type",
+						Path:   "rel/path/to/source",
 					},
 				},
 			},
 			expErr: "policy_sets: (0: (source: (type: only 'local' and 'github' source types are supported.).).).",
+		},
+		{
+			description: "empty string version",
+			input: raw.PolicySets{
+				Version: String(""),
+				PolicySets: []raw.PolicySet{
+					{
+						Name:   "policy-name-1",
+						Path:   "rel/path/to/source",
+						Source: raw.LocalSourceType,
+					},
+				},
+			},
+			expErr: "conftest_version: version \"\" could not be parsed: Malformed version: .",
+		},
+		{
+			description: "invalid version",
+			input: raw.PolicySets{
+				Version: String("version123"),
+				PolicySets: []raw.PolicySet{
+					{
+						Name:   "policy-name-1",
+						Path:   "rel/path/to/source",
+						Source: raw.LocalSourceType,
+					},
+				},
+			},
+			expErr: "conftest_version: version \"version123\" could not be parsed: Malformed version: version123.",
 		},
 	}
 
@@ -146,7 +165,7 @@ func TestPolicySets_Validate(t *testing.T) {
 }
 
 func TestPolicySets_ToValid(t *testing.T) {
-	version := "v1.0.0"
+	version, _ := version.NewVersion("v1.0.0")
 	cases := []struct {
 		description string
 		input       raw.PolicySets
@@ -155,7 +174,7 @@ func TestPolicySets_ToValid(t *testing.T) {
 		{
 			description: "valid policies",
 			input: raw.PolicySets{
-				Version: version,
+				Version: String("v1.0.0"),
 				PolicySets: []raw.PolicySet{
 					{
 						Name: "good-policy",
@@ -163,10 +182,8 @@ func TestPolicySets_ToValid(t *testing.T) {
 							"john-doe",
 							"jane-doe",
 						},
-						Source: raw.PolicySetSource{
-							Path: "rel/path/to/source",
-							Type: raw.LocalSourceType,
-						},
+						Path:   "rel/path/to/source",
+						Source: raw.LocalSourceType,
 					},
 				},
 			},
@@ -179,10 +196,8 @@ func TestPolicySets_ToValid(t *testing.T) {
 							"john-doe",
 							"jane-doe",
 						},
-						Source: valid.PolicySetSource{
-							Path: "rel/path/to/source",
-							Type: "local",
-						},
+						Path:   "rel/path/to/source",
+						Source: "local",
 					},
 				},
 			},
