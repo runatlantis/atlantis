@@ -10,16 +10,57 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/runtime/cache"
+	runtime_models "github.com/runatlantis/atlantis/server/events/runtime/models"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
 const (
-	defaultConftestVersionEnvKey = "DEFAULT_CONFTEST_VERSION"
+	DefaultConftestVersionEnvKey = "DEFAULT_CONFTEST_VERSION"
 	conftestBinaryName           = "conftest"
 	conftestDownloadURLPrefix    = "https://github.com/open-policy-agent/conftest/releases/download/v"
 	conftestArch                 = "x86_64"
 )
+
+type Arg struct {
+	Param  string
+	Option string
+}
+
+func (a Arg) build() []string {
+	return []string{a.Option, a.Param}
+}
+
+func NewPolicyArg(parameter string) Arg {
+	return Arg{
+		Param:  parameter,
+		Option: "-p",
+	}
+}
+
+type ConftestTestCommandArgs struct {
+	PolicyArgs []Arg
+	InputFile  string
+	Command    string
+}
+
+func (c ConftestTestCommandArgs) build() ([]string, error) {
+
+	if len(c.PolicyArgs) == 0 {
+		return []string{}, errors.New("no policies specified")
+	}
+
+	// add the subcommand
+	commandArgs := []string{c.Command, "test"}
+
+	for _, a := range c.PolicyArgs {
+		commandArgs = append(commandArgs, a.build()...)
+	}
+
+	commandArgs = append(commandArgs, c.InputFile)
+
+	return commandArgs, nil
+}
 
 // SourceResolver resolves the policy set to a local fs path
 type SourceResolver interface {
@@ -78,11 +119,12 @@ type ConfTestExecutorWorkflow struct {
 	SourceResolver         SourceResolver
 	VersionCache           cache.ExecutionVersionCache
 	DefaultConftestVersion *version.Version
+	Exec                   runtime_models.Exec
 }
 
-func NewConfTestExecutorWorkflow(log *logging.SimpleLogger, versionRootDir string) *ConfTestExecutorWorkflow {
+func NewConfTestExecutorWorkflow(log *logging.SimpleLogger, versionRootDir string, conftestDownloder terraform.Downloader) *ConfTestExecutorWorkflow {
 	downloader := ConfTestVersionDownloader{
-		downloader: &terraform.DefaultDownloader{},
+		downloader: conftestDownloder,
 	}
 	version, err := getDefaultVersion()
 
@@ -103,12 +145,38 @@ func NewConfTestExecutorWorkflow(log *logging.SimpleLogger, versionRootDir strin
 		SourceResolver: &SourceResolverProxy{
 			localSourceResolver: &LocalSourceResolver{},
 		},
+		Exec: runtime_models.LocalExec{},
 	}
 }
 
-func (c *ConfTestExecutorWorkflow) Run(log *logging.SimpleLogger, executablePath string, envs map[string]string, args []string) (string, error) {
-	return "success", nil
+func (c *ConfTestExecutorWorkflow) Run(ctx models.ProjectCommandContext, executablePath string, envs map[string]string) (string, error) {
+	policyArgs := []Arg{}
+	for _, policySet := range ctx.PolicySets.PolicySets {
+		path, err := c.SourceResolver.Resolve(policySet)
 
+		// Let's not fail the whole step because of a single failure. Log and fail silently
+		if err != nil {
+			ctx.Log.Err("Error resolving policyset %s. err: %s", policySet.Name, err.Error())
+			continue
+		}
+
+		policyArg := NewPolicyArg(path)
+		policyArgs = append(policyArgs, policyArg)
+	}
+
+	args := ConftestTestCommandArgs{
+		PolicyArgs: policyArgs,
+		InputFile:  ctx.GetShowResultFileName(),
+		Command:    executablePath,
+	}
+
+	serializedArgs, err := args.build()
+
+	if err != nil {
+		return "", errors.Wrap(err, "building args")
+	}
+
+	return c.Exec.CombinedOutput(serializedArgs, envs)
 }
 
 func (c *ConfTestExecutorWorkflow) EnsureExecutorVersion(log *logging.SimpleLogger, v *version.Version) (string, error) {
@@ -138,10 +206,10 @@ func (c *ConfTestExecutorWorkflow) EnsureExecutorVersion(log *logging.SimpleLogg
 func getDefaultVersion() (*version.Version, error) {
 	// ensure version is not default version.
 	// first check for the env var and if that doesn't exist use the local executable version
-	defaultVersion, exists := os.LookupEnv(defaultConftestVersionEnvKey)
+	defaultVersion, exists := os.LookupEnv(DefaultConftestVersionEnvKey)
 
 	if !exists {
-		return nil, errors.New(fmt.Sprintf("%s not set.", defaultConftestVersionEnvKey))
+		return nil, errors.New(fmt.Sprintf("%s not set.", DefaultConftestVersionEnvKey))
 	}
 
 	wrappedVersion, err := version.NewVersion(defaultVersion)
@@ -150,8 +218,4 @@ func getDefaultVersion() (*version.Version, error) {
 		return nil, errors.Wrapf(err, "wrapping version %s", defaultVersion)
 	}
 	return wrappedVersion, nil
-}
-
-func (c *ConfTestExecutorWorkflow) ResolveArgs(ctx models.ProjectCommandContext) ([]string, error) {
-	return []string{""}, nil
 }

@@ -874,6 +874,13 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 	dataDir, binDir, cacheDir, cleanup := mkSubDirs(t)
 	defer cleanup()
 
+	//env vars
+
+	if policyChecksEnabled {
+		// need this to be set or we'll fail the policy check step
+		os.Setenv(policy.DefaultConftestVersionEnvKey, "0.21.0")
+	}
+
 	// Mocks.
 	e2eVCSClient := vcsmocks.NewMockClient()
 	e2eStatusUpdater := &events.DefaultCommitStatusUpdater{Client: e2eVCSClient}
@@ -955,7 +962,7 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 				DefaultTFVersion:  defaultTFVersion,
 			},
 			PolicyCheckStepRunner: runtime.NewPolicyCheckStepRunner(
-				policy.NewConfTestExecutorWorkflow(),
+				policy.NewConfTestExecutorWorkflow(logger, binDir, &NoopTFDownloader{}),
 			),
 			ApplyStepRunner: &runtime.ApplyStepRunner{
 				TerraformExecutor: terraformClient,

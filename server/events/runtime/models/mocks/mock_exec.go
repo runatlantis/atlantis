@@ -43,6 +43,25 @@ func (mock *MockExec) LookPath(file string) (string, error) {
 	return ret0, ret1
 }
 
+func (mock *MockExec) CombinedOutput(args []string, envs map[string]string) (string, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockExec().")
+	}
+	params := []pegomock.Param{args, envs}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("CombinedOutput", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 string
+	var ret1 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(string)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(error)
+		}
+	}
+	return ret0, ret1
+}
+
 func (mock *MockExec) VerifyWasCalledOnce() *VerifierMockExec {
 	return &VerifierMockExec{
 		mock:                   mock,
@@ -102,6 +121,37 @@ func (c *MockExec_LookPath_OngoingVerification) GetAllCapturedArguments() (_para
 		_param0 = make([]string, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockExec) CombinedOutput(args []string, envs map[string]string) *MockExec_CombinedOutput_OngoingVerification {
+	params := []pegomock.Param{args, envs}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "CombinedOutput", params, verifier.timeout)
+	return &MockExec_CombinedOutput_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockExec_CombinedOutput_OngoingVerification struct {
+	mock              *MockExec
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockExec_CombinedOutput_OngoingVerification) GetCapturedArguments() ([]string, map[string]string) {
+	args, envs := c.GetAllCapturedArguments()
+	return args[len(args)-1], envs[len(envs)-1]
+}
+
+func (c *MockExec_CombinedOutput_OngoingVerification) GetAllCapturedArguments() (_param0 [][]string, _param1 []map[string]string) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([][]string, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.([]string)
+		}
+		_param1 = make([]map[string]string, len(c.methodInvocations))
+		for u, param := range params[1] {
+			_param1[u] = param.(map[string]string)
 		}
 	}
 	return

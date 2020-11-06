@@ -11,21 +11,15 @@ import (
 // VersionedExecutorWorkflow defines a versioned execution for a given project context
 type VersionedExecutorWorkflow interface {
 	ExecutorVersionEnsurer
-	ExecutorArgsResolver
 	Executor
 }
 
 // Executor runs an executable with provided environment variables and arguments and returns stdout
 type Executor interface {
-	Run(log *logging.SimpleLogger, executablePath string, envs map[string]string, args []string) (string, error)
+	Run(ctx models.ProjectCommandContext, executablePath string, envs map[string]string) (string, error)
 }
 
 // ExecutorVersionEnsurer ensures a given version exists and outputs a path to the executable
 type ExecutorVersionEnsurer interface {
 	EnsureExecutorVersion(log *logging.SimpleLogger, v *version.Version) (string, error)
-}
-
-// ExecutorArgsBuilder builds an arg string
-type ExecutorArgsResolver interface {
-	ResolveArgs(ctx models.ProjectCommandContext) ([]string, error)
 }

@@ -678,12 +678,12 @@ func TestExecute_PolicyCheck(t *testing.T) {
 		GHUserFlag:             "user",
 		GHTokenFlag:            "token",
 		RepoAllowlistFlag:      "github.com",
-		TFEHostnameFlag:        "not-app.terraform.io",
+		TFETokenFlag:           "tfetoken",
 		EnablePolicyChecksFlag: true,
 	})
 	err := c.Execute()
 
-	ErrEquals(t, "--enable-policy-checks flag cannot be used together with --tfe-hostname or --tfe-token", err)
+	ErrEquals(t, "--enable-policy-checks flag cannot be used together with --tfe-token", err)
 }
 
 // Can't use both --tfe-hostname flag without --tfe-token.

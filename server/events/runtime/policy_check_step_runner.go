@@ -8,7 +8,6 @@ import (
 // PolicyCheckStepRunner runs a policy check command given a ctx
 type PolicyCheckStepRunner struct {
 	versionEnsurer ExecutorVersionEnsurer
-	argsResolver   ExecutorArgsResolver
 	executor       Executor
 }
 
@@ -16,7 +15,6 @@ type PolicyCheckStepRunner struct {
 func NewPolicyCheckStepRunner(executorWorkflow VersionedExecutorWorkflow) *PolicyCheckStepRunner {
 	return &PolicyCheckStepRunner{
 		versionEnsurer: executorWorkflow,
-		argsResolver:   executorWorkflow,
 		executor:       executorWorkflow,
 	}
 }
@@ -29,13 +27,7 @@ func (p *PolicyCheckStepRunner) Run(ctx models.ProjectCommandContext, extraArgs 
 		return "", errors.Wrapf(err, "ensuring policy executor version")
 	}
 
-	args, err := p.argsResolver.ResolveArgs(ctx)
-
-	if err != nil {
-		return "", errors.Wrapf(err, "resolving policy executor args")
-	}
-
-	stdOut, err := p.executor.Run(ctx.Log, executable, envs, args)
+	stdOut, err := p.executor.Run(ctx, executable, envs)
 
 	if err != nil {
 		return "", errors.Wrapf(err, "running policy executor")

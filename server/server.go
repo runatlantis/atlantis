@@ -452,7 +452,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 				DefaultTFVersion:  defaultTfVersion,
 			},
 			PolicyCheckStepRunner: runtime.NewPolicyCheckStepRunner(
-				policy.NewConfTestExecutorWorkflow(logger, binDir),
+				policy.NewConfTestExecutorWorkflow(logger, binDir, &terraform.DefaultDownloader{}),
 			),
 			ApplyStepRunner: &runtime.ApplyStepRunner{
 				TerraformExecutor:   terraformClient,
