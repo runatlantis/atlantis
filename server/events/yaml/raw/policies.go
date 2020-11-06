@@ -6,11 +6,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 )
 
-const (
-	LocalSourceType  string = "local"
-	GithubSourceType string = "github"
-)
-
 // PolicySets is the raw schema for repo-level atlantis.yaml config.
 type PolicySets struct {
 	Version    *string     `yaml:"conftest_version,omitempty" json:"conftest_version,omitempty"`
@@ -25,19 +20,19 @@ func (p PolicySets) Validate() error {
 }
 
 func (p PolicySets) ToValid() valid.PolicySets {
-	v := valid.PolicySets{}
+	policySets := valid.PolicySets{}
 
 	if p.Version != nil {
-		v.Version, _ = version.NewVersion(*p.Version)
+		policySets.Version, _ = version.NewVersion(*p.Version)
 	}
 
 	validPolicySets := make([]valid.PolicySet, 0)
 	for _, rawPolicySet := range p.PolicySets {
 		validPolicySets = append(validPolicySets, rawPolicySet.ToValid())
 	}
-	v.PolicySets = validPolicySets
+	policySets.PolicySets = validPolicySets
 
-	return v
+	return policySets
 }
 
 type PolicySet struct {
@@ -52,7 +47,7 @@ func (p PolicySet) Validate() error {
 		validation.Field(&p.Name, validation.Required.Error("is required")),
 		validation.Field(&p.Owners),
 		validation.Field(&p.Path, validation.Required.Error("is required")),
-		validation.Field(&p.Source, validation.In(LocalSourceType, GithubSourceType).Error("only 'local' and 'github' source types are supported")),
+		validation.Field(&p.Source, validation.In(valid.LocalPolicySet, valid.GithubPolicySet).Error("only 'local' and 'github' source types are supported")),
 	)
 }
 

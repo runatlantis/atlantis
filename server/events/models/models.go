@@ -366,7 +366,7 @@ type ProjectCommandContext struct {
 	Workspace string
 	// PolicySets represent the policies that are run on the plan as part of the
 	// policy check stage
-	PolicySets PolicySets
+	PolicySets valid.PolicySets
 }
 
 // GetShowResultFileName returns the filename (not the path) to store the tf show result

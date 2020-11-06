@@ -17,9 +17,9 @@ import (
 
 // Test different permutations of global and repo config.
 func TestBuildProjectCmdCtx(t *testing.T) {
-	emptyPolicySets := models.PolicySets{
+	emptyPolicySets := valid.PolicySets{
 		Version:    nil,
-		PolicySets: []models.PolicySet{},
+		PolicySets: []valid.PolicySet{},
 	}
 	baseRepo := models.Repo{
 		FullName: "owner/repo",
@@ -641,9 +641,9 @@ projects:
 }
 
 func TestBuildProjectCmdCtx_WithPolicCheckEnabled(t *testing.T) {
-	emptyPolicySets := models.PolicySets{
+	emptyPolicySets := valid.PolicySets{
 		Version:    nil,
-		PolicySets: []models.PolicySet{},
+		PolicySets: []valid.PolicySet{},
 	}
 	baseRepo := models.Repo{
 		FullName: "owner/repo",

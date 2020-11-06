@@ -24,6 +24,7 @@ type RepoCfg struct {
 	Version       *int                `yaml:"version,omitempty"`
 	Projects      []Project           `yaml:"projects,omitempty"`
 	Workflows     map[string]Workflow `yaml:"workflows,omitempty"`
+	PolicySets    PolicySets          `yaml:"policies,omitempty"`
 	Automerge     *bool               `yaml:"automerge,omitempty"`
 	ParallelApply *bool               `yaml:"parallel_apply,omitempty"`
 	ParallelPlan  *bool               `yaml:"parallel_plan,omitempty"`

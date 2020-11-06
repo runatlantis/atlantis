@@ -107,9 +107,11 @@ func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 		repos = append(repos, r.ToValid(workflows))
 	}
 	repos = append(defaultCfg.Repos, repos...)
+
 	return valid.GlobalCfg{
-		Repos:     repos,
-		Workflows: workflows,
+		Repos:      repos,
+		Workflows:  workflows,
+		PolicySets: g.PolicySets.ToValid(),
 	}
 }
 

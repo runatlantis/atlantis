@@ -23,16 +23,15 @@ func TestPolicySetsConfig_YAMLMarshalling(t *testing.T) {
 conftest_version: v1.0.0
 policy_sets:
 - name: policy-name
-  source:
-    type: "local"
-    path: "rel/path/to/policy-set"
+  source: "local"
+  path: "rel/path/to/policy-set"
 `,
 			exp: raw.PolicySets{
 				Version: String("v1.0.0"),
 				PolicySets: []raw.PolicySet{
 					{
 						Name:   "policy-name",
-						Source: raw.LocalSourceType,
+						Source: valid.LocalPolicySet,
 						Path:   "rel/path/to/policy-set",
 					},
 				},
@@ -77,7 +76,7 @@ func TestPolicySets_Validate(t *testing.T) {
 					{
 						Name:   "policy-name-1",
 						Path:   "rel/path/to/source",
-						Source: raw.LocalSourceType,
+						Source: valid.LocalPolicySet,
 					},
 					{
 						Name: "policy-name-2",
@@ -86,7 +85,7 @@ func TestPolicySets_Validate(t *testing.T) {
 							"jane-doe",
 						},
 						Path:   "rel/path/to/source",
-						Source: raw.GithubSourceType,
+						Source: valid.GithubPolicySet,
 					},
 				},
 			},
@@ -107,7 +106,7 @@ func TestPolicySets_Validate(t *testing.T) {
 					{},
 				},
 			},
-			expErr: "policy_sets: (0: (name: is required; source: (path: is required.).).).",
+			expErr: "policy_sets: (0: (name: is required; path: is required.).).",
 		},
 		{
 			description: "invalid source type",
@@ -120,7 +119,7 @@ func TestPolicySets_Validate(t *testing.T) {
 					},
 				},
 			},
-			expErr: "policy_sets: (0: (source: (type: only 'local' and 'github' source types are supported.).).).",
+			expErr: "policy_sets: (0: (source: only 'local' and 'github' source types are supported.).).",
 		},
 		{
 			description: "empty string version",
@@ -130,7 +129,7 @@ func TestPolicySets_Validate(t *testing.T) {
 					{
 						Name:   "policy-name-1",
 						Path:   "rel/path/to/source",
-						Source: raw.LocalSourceType,
+						Source: valid.LocalPolicySet,
 					},
 				},
 			},
@@ -144,7 +143,7 @@ func TestPolicySets_Validate(t *testing.T) {
 					{
 						Name:   "policy-name-1",
 						Path:   "rel/path/to/source",
-						Source: raw.LocalSourceType,
+						Source: valid.LocalPolicySet,
 					},
 				},
 			},
@@ -183,7 +182,7 @@ func TestPolicySets_ToValid(t *testing.T) {
 							"jane-doe",
 						},
 						Path:   "rel/path/to/source",
-						Source: raw.LocalSourceType,
+						Source: valid.LocalPolicySet,
 					},
 				},
 			},

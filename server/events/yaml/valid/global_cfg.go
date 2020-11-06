@@ -52,6 +52,7 @@ type MergedProjectCfg struct {
 	AutoplanEnabled   bool
 	TerraformVersion  *version.Version
 	RepoCfgVersion    int
+	PolicySets        PolicySets
 }
 
 // PreWorkflowHook is a map of custom run commands to run before workflows.
@@ -209,6 +210,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		AutoplanEnabled:   proj.Autoplan.Enabled,
 		TerraformVersion:  proj.TerraformVersion,
 		RepoCfgVersion:    rCfg.Version,
+		PolicySets:        g.PolicySets,
 	}
 }
 

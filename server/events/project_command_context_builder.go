@@ -51,7 +51,6 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 ) (projectCmds []models.ProjectCommandContext) {
 	ctx.Log.Debug("Building project command context for %s", cmdName)
 
-	var policySets models.PolicySets
 	var steps []valid.Step
 	switch cmdName {
 	case models.PlanCommand:
@@ -73,7 +72,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		cb.CommentBuilder.BuildPlanComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, commentFlags),
 		prjCfg,
 		steps,
-		policySets,
+		prjCfg.PolicySets,
 		escapeArgs(commentFlags),
 		automerge,
 		parallelApply,
@@ -112,7 +111,6 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 
 	if cmdName == models.PlanCommand {
 		ctx.Log.Debug("Building project command context for %s", models.PolicyCheckCommand)
-		var policySets models.PolicySets
 		steps := prjCfg.Workflow.PolicyCheck.Steps
 
 		projectCmds = append(projectCmds, newProjectCommandContext(
@@ -122,7 +120,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 			cb.CommentBuilder.BuildPlanComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, commentFlags),
 			prjCfg,
 			steps,
-			policySets,
+			prjCfg.PolicySets,
 			escapeArgs(commentFlags),
 			automerge,
 			parallelApply,
@@ -142,7 +140,7 @@ func newProjectCommandContext(ctx *CommandContext,
 	planCmd string,
 	projCfg valid.MergedProjectCfg,
 	steps []valid.Step,
-	policySets models.PolicySets,
+	policySets valid.PolicySets,
 	escapedCommentArgs []string,
 	automergeEnabled bool,
 	parallelApplyEnabled bool,
