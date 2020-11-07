@@ -34,36 +34,48 @@ type ExecutionVersionDiskLayer struct {
 	versionRootDir models.FilePath
 	exec           models.Exec
 	keySerializer  KeySerializer
-	loader         func(v *version.Version, destPath string) error
+	loader         func(v *version.Version, destPath string) (string, error)
+	binaryName     string
 }
 
 // Gets a path from cache
 func (v *ExecutionVersionDiskLayer) Get(key *version.Version) (string, error) {
-	binaryName, err := v.keySerializer.Serialize(key)
+	binaryVersion, err := v.keySerializer.Serialize(key)
 
 	if err != nil {
 		return "", errors.Wrapf(err, "serializing key for disk lookup")
 	}
 
 	// first check for the binary in our path
-	path, err := v.exec.LookPath(binaryName)
+	path, err := v.exec.LookPath(binaryVersion)
 
 	if err == nil {
 		return path, nil
 	}
 
 	// if the binary is not in our path, let's look in the version root directory
-	binaryPath := v.versionRootDir.Join(binaryName)
-	resolvedPath := binaryPath.Resolve()
+	binaryPath := v.versionRootDir.Join(binaryVersion)
 
 	// if the binary doesn't exist there, we need to load it.
 	if binaryPath.NotExists() {
-		if err = v.loader(key, resolvedPath); err != nil {
-			return "", errors.Wrapf(err, "loading %s", binaryPath)
+
+		// load it into a directory first and then sym link it to the serialized key aka binary version
+		loaderPath := v.versionRootDir.Join(v.binaryName, "versions", key.Original())
+
+		loadedBinary, err := v.loader(key, loaderPath.Resolve())
+
+		if err != nil {
+			return "", errors.Wrapf(err, "loading %s", loaderPath)
+		}
+
+		binaryPath, err = loaderPath.Symlink(loadedBinary)
+
+		if err != nil {
+			return "", errors.Wrapf(err, "linking %s to %s", loaderPath, loadedBinary)
 		}
 	}
 
-	return resolvedPath, nil
+	return binaryPath.Resolve(), nil
 }
 
 // ExecutionVersionMemoryLayer is an in-memory cache which delegates to a disk layer
@@ -102,7 +114,7 @@ func (v *ExecutionVersionMemoryLayer) Get(key *version.Version) (string, error) 
 func NewExecutionVersionLayeredLoadingCache(
 	binaryName string,
 	versionRootDir string,
-	loader func(v *version.Version, destPath string) error,
+	loader func(v *version.Version, destPath string) (string, error),
 ) ExecutionVersionCache {
 
 	diskLayer := &ExecutionVersionDiskLayer{
@@ -110,6 +122,7 @@ func NewExecutionVersionLayeredLoadingCache(
 		versionRootDir: models.LocalFilePath(versionRootDir),
 		keySerializer:  &DefaultDiskLookupKeySerializer{binaryName: binaryName},
 		loader:         loader,
+		binaryName:     binaryName,
 	}
 
 	return &ExecutionVersionMemoryLayer{

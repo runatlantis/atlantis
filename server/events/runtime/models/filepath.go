@@ -10,6 +10,7 @@ import (
 type FilePath interface {
 	NotExists() bool
 	Join(elem ...string) FilePath
+	Symlink(newname string) (FilePath, error)
 	Resolve() string
 }
 
@@ -28,6 +29,10 @@ func (fp LocalFilePath) Join(elem ...string) FilePath {
 	pathComponents = append(pathComponents, elem...)
 
 	return LocalFilePath(filepath.Join(pathComponents...))
+}
+
+func (fp LocalFilePath) Symlink(newname string) (FilePath, error) {
+	return LocalFilePath(newname), os.Symlink(fp.Resolve(), newname)
 }
 
 func (fp LocalFilePath) Resolve() string {

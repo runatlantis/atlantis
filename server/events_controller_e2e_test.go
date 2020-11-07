@@ -41,6 +41,10 @@ func (m *NoopTFDownloader) GetFile(dst, src string, opts ...getter.ClientOption)
 	return nil
 }
 
+func (m *NoopTFDownloader) GetAny(dst, src string, opts ...getter.ClientOption) error {
+	return nil
+}
+
 func TestGitHubWorkflow(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()

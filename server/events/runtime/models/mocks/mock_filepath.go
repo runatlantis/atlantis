@@ -58,6 +58,25 @@ func (mock *MockFilePath) Join(elem ...string) models.FilePath {
 	return ret0
 }
 
+func (mock *MockFilePath) Symlink(newname string) (models.FilePath, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockFilePath().")
+	}
+	params := []pegomock.Param{newname}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("Symlink", params, []reflect.Type{reflect.TypeOf((*models.FilePath)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 models.FilePath
+	var ret1 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(models.FilePath)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(error)
+		}
+	}
+	return ret0, ret1
+}
+
 func (mock *MockFilePath) Resolve() string {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockFilePath().")
@@ -157,6 +176,33 @@ func (c *MockFilePath_Join_OngoingVerification) GetAllCapturedArguments() (_para
 					_param0[u][x-0] = params[x][u].(string)
 				}
 			}
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockFilePath) Symlink(newname string) *MockFilePath_Symlink_OngoingVerification {
+	params := []pegomock.Param{newname}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Symlink", params, verifier.timeout)
+	return &MockFilePath_Symlink_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockFilePath_Symlink_OngoingVerification struct {
+	mock              *MockFilePath
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockFilePath_Symlink_OngoingVerification) GetCapturedArguments() string {
+	newname := c.GetAllCapturedArguments()
+	return newname[len(newname)-1]
+}
+
+func (c *MockFilePath_Symlink_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]string, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(string)
 		}
 	}
 	return

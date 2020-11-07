@@ -11,7 +11,7 @@ import (
 
 type Exec interface {
 	LookPath(file string) (string, error)
-	CombinedOutput(args []string, envs map[string]string) (string, error)
+	CombinedOutput(args []string, envs map[string]string, workdir string) (string, error)
 }
 
 type LocalExec struct{}
@@ -24,7 +24,7 @@ func (e LocalExec) LookPath(file string) (string, error) {
 // how to flexibly add parameters here as this is meant to satisfy very simple usecases
 // for more complex usecases we can add a Command function to this method which will
 // allow us to edit a Cmd directly.
-func (e LocalExec) CombinedOutput(args []string, envs map[string]string) (string, error) {
+func (e LocalExec) CombinedOutput(args []string, envs map[string]string, workdir string) (string, error) {
 	formattedArgs := strings.Join(args, " ")
 
 	envVars := []string{}
@@ -40,6 +40,7 @@ func (e LocalExec) CombinedOutput(args []string, envs map[string]string) (string
 	// for the terraform binary so copying it for now
 	cmd := exec.Command("sh", "-c", formattedArgs)
 	cmd.Env = envVars
+	cmd.Dir = workdir
 
 	output, err := cmd.CombinedOutput()
 

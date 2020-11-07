@@ -77,6 +77,7 @@ type DefaultClient struct {
 // Downloader is for downloading terraform versions.
 type Downloader interface {
 	GetFile(dst, src string, opts ...getter.ClientOption) error
+	GetAny(dst, src string, opts ...getter.ClientOption) error
 }
 
 // versionRegex extracts the version from `terraform version` output.
@@ -471,4 +472,9 @@ type DefaultDownloader struct{}
 // See go-getter.GetFile.
 func (d *DefaultDownloader) GetFile(dst, src string, opts ...getter.ClientOption) error {
 	return getter.GetFile(dst, src, opts...)
+}
+
+// See go-getter.GetFile.
+func (d *DefaultDownloader) GetAny(dst, src string, opts ...getter.ClientOption) error {
+	return getter.GetAny(dst, src, opts...)
 }
