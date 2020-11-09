@@ -536,8 +536,8 @@ func (c CommandName) String() string {
 	return ""
 }
 
-// PreWorkflowHookCommandContext defines the context for a plan or apply stage that will
-// be executed for a project.
+// PreWorkflowHookCommandContext defines the context for a pre_worklfow_hooks that will
+// be executed before workflows.
 type PreWorkflowHookCommandContext struct {
 	// BaseRepo is the repository that the pull request will be merged into.
 	BaseRepo Repo
