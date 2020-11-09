@@ -3,7 +3,9 @@ name: Tests
 jobs:
   test:
     runs-on: ubuntu-latest
-    container: runatlantis/testing-env:latest
+    # This is re-using runatlantis/testing-env with the addition of conftest
+    # TODO: Move this from personal account
+    container: nishkrishnan/atlantis:latest
     env:
       GOFLAGS: "-mod=vendor"
     steps:
