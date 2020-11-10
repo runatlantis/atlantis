@@ -548,7 +548,6 @@ func (c *DefaultCommandRunner) runProjectCmds(cmds []models.ProjectCommandContex
 		case models.ApplyCommand:
 			res = c.ProjectCommandRunner.Apply(pCmd)
 		}
-
 		results = append(results, res)
 	}
 	return CommandResult{ProjectResults: results}

@@ -42,7 +42,7 @@ func TestConfTestVersionDownloader(t *testing.T) {
 
 		Ok(t, err)
 
-		Assert(t, binPath == filepath.Join(destPath, "conftest"), "expected binpath")
+		Assert(t, binPath.Resolve() == filepath.Join(destPath, "conftest"), "expected binpath")
 	})
 
 	t.Run("error", func(t *testing.T) {
@@ -133,9 +133,11 @@ func TestRun(t *testing.T) {
 		Exec:           mockExec,
 	}
 
+	policySetName1 := "policy1"
 	policySetPath1 := "/some/path"
 	localPolicySetPath1 := "/tmp/some/path"
 
+	policySetName2 := "policy2"
 	policySetPath2 := "/some/path2"
 	localPolicySetPath2 := "/tmp/some/path2"
 	executablePath := "/usr/bin/conftest"
@@ -147,11 +149,13 @@ func TestRun(t *testing.T) {
 	policySet1 := valid.PolicySet{
 		Source: valid.LocalPolicySet,
 		Path:   policySetPath1,
+		Name:   policySetName1,
 	}
 
 	policySet2 := valid.PolicySet{
 		Source: valid.LocalPolicySet,
 		Path:   policySetPath2,
+		Name:   policySetName2,
 	}
 
 	ctx := models.ProjectCommandContext{
@@ -167,15 +171,18 @@ func TestRun(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 
-		expectedResult := "Success"
-		expectedArgs := []string{executablePath, "test", "-p", localPolicySetPath1, "-p", localPolicySetPath2, "/some_workdir/testproj-default.json"}
+		expectedOutput := "Success"
+		expectedResult := "Checking plan against the following policies: \n  policy1\n  policy2\nSuccess"
+		expectedArgs := []string{executablePath, "test", "-p", localPolicySetPath1, "-p", localPolicySetPath2, "/some_workdir/testproj-default.json", "--no-color"}
 
 		When(mockResolver.Resolve(policySet1)).ThenReturn(localPolicySetPath1, nil)
 		When(mockResolver.Resolve(policySet2)).ThenReturn(localPolicySetPath2, nil)
 
-		When(mockExec.CombinedOutput(expectedArgs, envs, workdir)).ThenReturn(expectedResult, nil)
+		When(mockExec.CombinedOutput(expectedArgs, envs, workdir)).ThenReturn(expectedOutput, nil)
 
 		result, err := subject.Run(ctx, executablePath, envs, workdir)
+
+		fmt.Println(result)
 
 		Ok(t, err)
 
@@ -185,13 +192,14 @@ func TestRun(t *testing.T) {
 
 	t.Run("error resolving one policy source", func(t *testing.T) {
 
-		expectedResult := "Success"
-		expectedArgs := []string{executablePath, "test", "-p", localPolicySetPath1, "/some_workdir/testproj-default.json"}
+		expectedOutput := "Success"
+		expectedResult := "Checking plan against the following policies: \n  policy1\nSuccess"
+		expectedArgs := []string{executablePath, "test", "-p", localPolicySetPath1, "/some_workdir/testproj-default.json", "--no-color"}
 
 		When(mockResolver.Resolve(policySet1)).ThenReturn(localPolicySetPath1, nil)
 		When(mockResolver.Resolve(policySet2)).ThenReturn("", errors.New("err"))
 
-		When(mockExec.CombinedOutput(expectedArgs, envs, workdir)).ThenReturn(expectedResult, nil)
+		When(mockExec.CombinedOutput(expectedArgs, envs, workdir)).ThenReturn(expectedOutput, nil)
 
 		result, err := subject.Run(ctx, executablePath, envs, workdir)
 
@@ -204,7 +212,7 @@ func TestRun(t *testing.T) {
 	t.Run("error resolving both policy sources", func(t *testing.T) {
 
 		expectedResult := "Success"
-		expectedArgs := []string{executablePath, "test", "-p", localPolicySetPath1, "/some_workdir/testproj-default.json"}
+		expectedArgs := []string{executablePath, "test", "-p", localPolicySetPath1, "/some_workdir/testproj-default.json", "--no-color"}
 
 		When(mockResolver.Resolve(policySet1)).ThenReturn("", errors.New("err"))
 		When(mockResolver.Resolve(policySet2)).ThenReturn("", errors.New("err"))
@@ -220,15 +228,18 @@ func TestRun(t *testing.T) {
 	})
 
 	t.Run("error running cmd", func(t *testing.T) {
-		expectedArgs := []string{executablePath, "test", "-p", localPolicySetPath1, "-p", localPolicySetPath2, "/some_workdir/testproj-default.json"}
+		expectedOutput := "FAIL - /some_workdir/testproj-default.json - failure"
+		expectedResult := "Checking plan against the following policies: \n  policy1\n  policy2\nFAIL - <redacted plan file> - failure"
+		expectedArgs := []string{executablePath, "test", "-p", localPolicySetPath1, "-p", localPolicySetPath2, "/some_workdir/testproj-default.json", "--no-color"}
 
 		When(mockResolver.Resolve(policySet1)).ThenReturn(localPolicySetPath1, nil)
 		When(mockResolver.Resolve(policySet2)).ThenReturn(localPolicySetPath2, nil)
 
-		When(mockExec.CombinedOutput(expectedArgs, envs, workdir)).ThenReturn("", errors.New("err"))
+		When(mockExec.CombinedOutput(expectedArgs, envs, workdir)).ThenReturn(expectedOutput, errors.New("exit status code 1"))
 
-		_, err := subject.Run(ctx, executablePath, envs, workdir)
+		result, err := subject.Run(ctx, executablePath, envs, workdir)
 
+		Assert(t, result == expectedResult, "rseult is expected")
 		Assert(t, err != nil, "error is expected")
 
 	})

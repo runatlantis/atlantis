@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
 	cache_mocks "github.com/runatlantis/atlantis/server/events/runtime/cache/mocks"
+	"github.com/runatlantis/atlantis/server/events/runtime/models"
 	models_mocks "github.com/runatlantis/atlantis/server/events/runtime/models/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -17,7 +18,7 @@ func TestExecutionVersionDiskLayer(t *testing.T) {
 	binaryVersion := "bin1.0"
 	binaryName := "bin"
 
-	expectedPath := "some/path"
+	expectedPath := "some/path/bin1.0"
 	versionInput, _ := version.NewVersion("1.0")
 
 	RegisterMockTestingT(t)
@@ -30,14 +31,14 @@ func TestExecutionVersionDiskLayer(t *testing.T) {
 		subject := &ExecutionVersionDiskLayer{
 			versionRootDir: mockFilePath,
 			exec:           mockExec,
-			loader: func(v *version.Version, destPath string) (string, error) {
+			loader: func(v *version.Version, destPath string) (models.FilePath, error) {
 				if destPath == expectedPath && v == versionInput {
-					return filepath.Join(destPath, "bin"), nil
+					return models.LocalFilePath(filepath.Join(destPath, "bin")), nil
 				}
 
 				t.Fatalf("unexpected inputs to loader")
 
-				return "", nil
+				return models.LocalFilePath(""), nil
 			},
 			keySerializer: mockSerializer,
 		}
@@ -59,10 +60,10 @@ func TestExecutionVersionDiskLayer(t *testing.T) {
 		subject := &ExecutionVersionDiskLayer{
 			versionRootDir: mockFilePath,
 			exec:           mockExec,
-			loader: func(v *version.Version, destPath string) (string, error) {
+			loader: func(v *version.Version, destPath string) (models.FilePath, error) {
 				t.Fatalf("shouldn't be called")
 
-				return "", nil
+				return models.LocalFilePath(""), nil
 			},
 			keySerializer: mockSerializer,
 		}
@@ -85,11 +86,11 @@ func TestExecutionVersionDiskLayer(t *testing.T) {
 		subject := &ExecutionVersionDiskLayer{
 			versionRootDir: mockFilePath,
 			exec:           mockExec,
-			loader: func(v *version.Version, destPath string) (string, error) {
+			loader: func(v *version.Version, destPath string) (models.FilePath, error) {
 
 				t.Fatalf("shouldn't be called")
 
-				return "", nil
+				return models.LocalFilePath(""), nil
 			},
 			keySerializer: mockSerializer,
 		}
@@ -112,20 +113,22 @@ func TestExecutionVersionDiskLayer(t *testing.T) {
 	t.Run("loads version", func(t *testing.T) {
 		mockLoaderPath := models_mocks.NewMockFilePath()
 		mockSymlinkPath := models_mocks.NewMockFilePath()
+		mockLoadedBinaryPath := models_mocks.NewMockFilePath()
 		expectedLoaderPath := "/some/path/to/binary"
+		expectedBinaryVersionPath := filepath.Join(expectedPath, binaryVersion)
 
 		subject := &ExecutionVersionDiskLayer{
 			versionRootDir: mockFilePath,
 			exec:           mockExec,
-			loader: func(v *version.Version, destPath string) (string, error) {
+			loader: func(v *version.Version, destPath string) (models.FilePath, error) {
 
 				if destPath == expectedLoaderPath && v == versionInput {
-					return filepath.Join(destPath, "bin"), nil
+					return mockLoadedBinaryPath, nil
 				}
 
 				t.Fatalf("unexpected inputs to loader")
 
-				return "", nil
+				return models.LocalFilePath(""), nil
 			},
 			binaryName:    binaryName,
 			keySerializer: mockSerializer,
@@ -135,13 +138,14 @@ func TestExecutionVersionDiskLayer(t *testing.T) {
 		When(mockExec.LookPath(binaryVersion)).ThenReturn("", errors.New("error"))
 
 		When(mockFilePath.Join(binaryVersion)).ThenReturn(mockFilePath)
+		When(mockFilePath.Resolve()).ThenReturn(expectedBinaryVersionPath)
 
 		When(mockFilePath.NotExists()).ThenReturn(true)
 
 		When(mockFilePath.Join(binaryName, "versions", versionInput.Original())).ThenReturn(mockLoaderPath)
 
 		When(mockLoaderPath.Resolve()).ThenReturn(expectedLoaderPath)
-		When(mockLoaderPath.Symlink(filepath.Join(expectedLoaderPath, "bin"))).ThenReturn(mockSymlinkPath, nil)
+		When(mockLoadedBinaryPath.Symlink(expectedBinaryVersionPath)).ThenReturn(mockSymlinkPath, nil)
 
 		When(mockSymlinkPath.Resolve()).ThenReturn(expectedPath)
 
@@ -158,15 +162,15 @@ func TestExecutionVersionDiskLayer(t *testing.T) {
 		subject := &ExecutionVersionDiskLayer{
 			versionRootDir: mockFilePath,
 			exec:           mockExec,
-			loader: func(v *version.Version, destPath string) (string, error) {
+			loader: func(v *version.Version, destPath string) (models.FilePath, error) {
 
 				if destPath == expectedLoaderPath && v == versionInput {
-					return "", errors.New("error")
+					return models.LocalFilePath(""), errors.New("error")
 				}
 
 				t.Fatalf("unexpected inputs to loader")
 
-				return "", nil
+				return models.LocalFilePath(""), nil
 			},
 			keySerializer: mockSerializer,
 			binaryName:    binaryName,

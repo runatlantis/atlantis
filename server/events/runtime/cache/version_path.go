@@ -34,7 +34,7 @@ type ExecutionVersionDiskLayer struct {
 	versionRootDir models.FilePath
 	exec           models.Exec
 	keySerializer  KeySerializer
-	loader         func(v *version.Version, destPath string) (string, error)
+	loader         func(v *version.Version, destPath string) (models.FilePath, error)
 	binaryName     string
 }
 
@@ -68,7 +68,7 @@ func (v *ExecutionVersionDiskLayer) Get(key *version.Version) (string, error) {
 			return "", errors.Wrapf(err, "loading %s", loaderPath)
 		}
 
-		binaryPath, err = loaderPath.Symlink(loadedBinary)
+		binaryPath, err = loadedBinary.Symlink(binaryPath.Resolve())
 
 		if err != nil {
 			return "", errors.Wrapf(err, "linking %s to %s", loaderPath, loadedBinary)
@@ -114,7 +114,7 @@ func (v *ExecutionVersionMemoryLayer) Get(key *version.Version) (string, error) 
 func NewExecutionVersionLayeredLoadingCache(
 	binaryName string,
 	versionRootDir string,
-	loader func(v *version.Version, destPath string) (string, error),
+	loader func(v *version.Version, destPath string) (models.FilePath, error),
 ) ExecutionVersionCache {
 
 	diskLayer := &ExecutionVersionDiskLayer{

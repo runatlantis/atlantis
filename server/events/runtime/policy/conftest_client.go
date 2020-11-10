@@ -59,7 +59,7 @@ func (c ConftestTestCommandArgs) build() ([]string, error) {
 		commandArgs = append(commandArgs, a.build()...)
 	}
 
-	commandArgs = append(commandArgs, c.InputFile)
+	commandArgs = append(commandArgs, c.InputFile, "--no-color")
 
 	return commandArgs, nil
 }
@@ -75,7 +75,7 @@ type LocalSourceResolver struct {
 }
 
 func (p *LocalSourceResolver) Resolve(policySet valid.PolicySet) (string, error) {
-	return "some/path", nil
+	return policySet.Path, nil
 
 }
 
@@ -97,7 +97,7 @@ type ConfTestVersionDownloader struct {
 	downloader terraform.Downloader
 }
 
-func (c ConfTestVersionDownloader) downloadConfTestVersion(v *version.Version, destPath string) (string, error) {
+func (c ConfTestVersionDownloader) downloadConfTestVersion(v *version.Version, destPath string) (runtime_models.FilePath, error) {
 	versionURLPrefix := fmt.Sprintf("%s%s", conftestDownloadURLPrefix, v.Original())
 
 	// download binary in addition to checksum file
@@ -110,10 +110,12 @@ func (c ConfTestVersionDownloader) downloadConfTestVersion(v *version.Version, d
 	fullSrcURL := fmt.Sprintf("%s?checksum=file:%s", binURL, checksumURL)
 
 	if err := c.downloader.GetAny(destPath, fullSrcURL); err != nil {
-		return "", errors.Wrapf(err, "downloading conftest version %s at %q", v.String(), fullSrcURL)
+		return runtime_models.LocalFilePath(""), errors.Wrapf(err, "downloading conftest version %s at %q", v.String(), fullSrcURL)
 	}
 
-	return filepath.Join(destPath, "conftest"), nil
+	binPath := filepath.Join(destPath, "conftest")
+
+	return runtime_models.LocalFilePath(binPath), nil
 }
 
 // ConfTestExecutorWorkflow runs a versioned conftest binary with the args built from the project context.
@@ -154,6 +156,8 @@ func NewConfTestExecutorWorkflow(log *logging.SimpleLogger, versionRootDir strin
 
 func (c *ConfTestExecutorWorkflow) Run(ctx models.ProjectCommandContext, executablePath string, envs map[string]string, workdir string) (string, error) {
 	policyArgs := []Arg{}
+	policySetNames := []string{}
+	ctx.Log.Debug("policy sets, %s ", ctx.PolicySets)
 	for _, policySet := range ctx.PolicySets.PolicySets {
 		path, err := c.SourceResolver.Resolve(policySet)
 
@@ -165,23 +169,36 @@ func (c *ConfTestExecutorWorkflow) Run(ctx models.ProjectCommandContext, executa
 
 		policyArg := NewPolicyArg(path)
 		policyArgs = append(policyArgs, policyArg)
+
+		policySetNames = append(policySetNames, policySet.Name)
 	}
+
+	inputFile := filepath.Join(workdir, ctx.GetShowResultFileName())
 
 	args := ConftestTestCommandArgs{
 		PolicyArgs: policyArgs,
-		InputFile:  filepath.Join(workdir, ctx.GetShowResultFileName()),
+		InputFile:  inputFile,
 		Command:    executablePath,
 	}
 
 	serializedArgs, err := args.build()
 
 	if err != nil {
+		ctx.Log.Warn("No policies have been configured")
 		return "", nil
 		// TODO: enable when we can pass policies in otherwise e2e tests with policy checks fail
 		// return "", errors.Wrap(err, "building args")
 	}
 
-	return c.Exec.CombinedOutput(serializedArgs, envs, workdir)
+	initialOutput := fmt.Sprintf("Checking plan against the following policies: \n  %s\n", strings.Join(policySetNames, "\n  "))
+	cmdOutput, err := c.Exec.CombinedOutput(serializedArgs, envs, workdir)
+
+	return c.sanitizeOutput(inputFile, initialOutput+cmdOutput), err
+
+}
+
+func (c *ConfTestExecutorWorkflow) sanitizeOutput(inputFile string, output string) string {
+	return strings.Replace(output, inputFile, "<redacted plan file>", -1)
 }
 
 func (c *ConfTestExecutorWorkflow) EnsureExecutorVersion(log *logging.SimpleLogger, v *version.Version) (string, error) {

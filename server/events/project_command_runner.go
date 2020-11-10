@@ -309,7 +309,7 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.Pr
 		case "plan":
 			out, err = p.PlanStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "show":
-			out, err = p.ShowStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+			_, err = p.ShowStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "policy_check":
 			out, err = p.PolicyCheckStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "apply":

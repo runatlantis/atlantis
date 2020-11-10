@@ -1,1 +1,33 @@
-no template matched–this is a bug
+Ran Policy Check for 2 projects:
+
+1. dir: `dir1` workspace: `default`
+1. dir: `dir2` workspace: `default`
+
+### 1. dir: `dir1` workspace: `default`
+```diff
+
+```
+
+* :arrow_forward: To **apply** this plan, comment:
+    * `atlantis apply -d dir1`
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+    * `atlantis plan -d dir1`
+
+---
+### 2. dir: `dir2` workspace: `default`
+```diff
+
+```
+
+* :arrow_forward: To **apply** this plan, comment:
+    * `atlantis apply -d dir2`
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+    * `atlantis plan -d dir2`
+
+---
+* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
+    * `atlantis apply`
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * `atlantis unlock`

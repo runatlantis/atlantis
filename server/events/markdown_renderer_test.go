@@ -44,6 +44,12 @@ func TestRenderErr(t *testing.T) {
 			err,
 			"**Plan Error**\n```\nerr\n```\n",
 		},
+		{
+			"policy check error",
+			models.PolicyCheckCommand,
+			err,
+			"**Policy Check Error**\n```\nerr\n```\n",
+		},
 	}
 
 	r := events.MarkdownRenderer{}
@@ -82,6 +88,12 @@ func TestRenderFailure(t *testing.T) {
 			models.PlanCommand,
 			"failure",
 			"**Plan Failed**: failure\n",
+		},
+		{
+			"policy check failure",
+			models.PolicyCheckCommand,
+			"failure",
+			"**Policy Check Failed**: failure\n",
 		},
 	}
 
@@ -238,6 +250,42 @@ $$$
 `,
 		},
 		{
+			"single successful policy check with project name",
+			models.PolicyCheckCommand,
+			[]models.ProjectResult{
+				{
+					PolicyCheckSuccess: &models.PolicyCheckSuccess{
+						PolicyCheckOutput: "2 tests, 1 passed, 0 warnings, 0 failure, 0 exceptions",
+						LockURL:           "lock-url",
+						RePlanCmd:         "atlantis plan -d path -w workspace",
+						ApplyCmd:          "atlantis apply -d path -w workspace",
+					},
+					Workspace:   "workspace",
+					RepoRelDir:  "path",
+					ProjectName: "projectname",
+				},
+			},
+			models.Github,
+			`Ran Policy Check for project: $projectname$ dir: $path$ workspace: $workspace$
+
+$$$diff
+2 tests, 1 passed, 0 warnings, 0 failure, 0 exceptions
+$$$
+
+* :arrow_forward: To **apply** this plan, comment:
+    * $atlantis apply -d path -w workspace$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+    * $atlantis plan -d path -w workspace$
+
+---
+* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
+    * $atlantis apply$
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * $atlantis unlock$
+`,
+		},
+		{
 			"single successful apply",
 			models.ApplyCommand,
 			[]models.ProjectResult{
@@ -329,6 +377,68 @@ $$$
     * $atlantis apply -d path2 -w workspace$
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url2)
 * :repeat: To **plan** this project again, comment:
+    * $atlantis plan -d path2 -w workspace$
+
+---
+* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
+    * $atlantis apply$
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * $atlantis unlock$
+`,
+		},
+		{
+			"multiple successful policy checks",
+			models.PolicyCheckCommand,
+			[]models.ProjectResult{
+				{
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					PolicyCheckSuccess: &models.PolicyCheckSuccess{
+						PolicyCheckOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+						LockURL:           "lock-url",
+						ApplyCmd:          "atlantis apply -d path -w workspace",
+						RePlanCmd:         "atlantis plan -d path -w workspace",
+					},
+				},
+				{
+					Workspace:   "workspace",
+					RepoRelDir:  "path2",
+					ProjectName: "projectname",
+					PolicyCheckSuccess: &models.PolicyCheckSuccess{
+						PolicyCheckOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+						LockURL:           "lock-url2",
+						ApplyCmd:          "atlantis apply -d path2 -w workspace",
+						RePlanCmd:         "atlantis plan -d path2 -w workspace",
+					},
+				},
+			},
+			models.Github,
+			`Ran Policy Check for 2 projects:
+
+1. dir: $path$ workspace: $workspace$
+1. project: $projectname$ dir: $path2$ workspace: $workspace$
+
+### 1. dir: $path$ workspace: $workspace$
+$$$diff
+4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions
+$$$
+
+* :arrow_forward: To **apply** this plan, comment:
+    * $atlantis apply -d path -w workspace$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+    * $atlantis plan -d path -w workspace$
+
+---
+### 2. project: $projectname$ dir: $path2$ workspace: $workspace$
+$$$diff
+4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions
+$$$
+
+* :arrow_forward: To **apply** this plan, comment:
+    * $atlantis apply -d path2 -w workspace$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url2)
+* :repeat: To re-run policies **plan** this project again by commenting:
     * $atlantis plan -d path2 -w workspace$
 
 ---
@@ -463,6 +573,68 @@ $$$
 ---
 ### 3. project: $projectname$ dir: $path3$ workspace: $workspace$
 **Plan Error**
+$$$
+error
+$$$
+
+---
+* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
+    * $atlantis apply$
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * $atlantis unlock$
+`,
+		},
+		{
+			"successful, failed, and errored policy check",
+			models.PolicyCheckCommand,
+			[]models.ProjectResult{
+				{
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					PolicyCheckSuccess: &models.PolicyCheckSuccess{
+						PolicyCheckOutput: "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+						LockURL:           "lock-url",
+						ApplyCmd:          "atlantis apply -d path -w workspace",
+						RePlanCmd:         "atlantis plan -d path -w workspace",
+					},
+				},
+				{
+					Workspace:  "workspace",
+					RepoRelDir: "path2",
+					Failure:    "failure",
+				},
+				{
+					Workspace:   "workspace",
+					RepoRelDir:  "path3",
+					ProjectName: "projectname",
+					Error:       errors.New("error"),
+				},
+			},
+			models.Github,
+			`Ran Policy Check for 3 projects:
+
+1. dir: $path$ workspace: $workspace$
+1. dir: $path2$ workspace: $workspace$
+1. project: $projectname$ dir: $path3$ workspace: $workspace$
+
+### 1. dir: $path$ workspace: $workspace$
+$$$diff
+4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions
+$$$
+
+* :arrow_forward: To **apply** this plan, comment:
+    * $atlantis apply -d path -w workspace$
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+    * $atlantis plan -d path -w workspace$
+
+---
+### 2. dir: $path2$ workspace: $workspace$
+**Policy Check Failed**: failure
+
+---
+### 3. project: $projectname$ dir: $path3$ workspace: $workspace$
+**Policy Check Error**
 $$$
 error
 $$$

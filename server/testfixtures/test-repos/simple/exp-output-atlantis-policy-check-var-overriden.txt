@@ -1,14 +1,14 @@
-Ran Policy Check for dir: `staging` workspace: `default`
+Ran Policy Check for dir: `.` workspace: `default`
 
 ```diff
 
 ```
 
 * :arrow_forward: To **apply** this plan, comment:
-    * `atlantis apply -d staging`
+    * `atlantis apply -d .`
 * :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
 * :repeat: To re-run policies **plan** this project again by commenting:
-    * `atlantis plan -d staging`
+    * `atlantis plan -d . -- -var var=overridden`
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
