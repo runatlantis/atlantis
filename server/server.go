@@ -37,6 +37,7 @@ import (
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
+	stats "github.com/lyft/gostats"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/controllers"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
@@ -88,6 +89,7 @@ type Server struct {
 	PreWorkflowHooksCommandRunner  *events.DefaultPreWorkflowHooksCommandRunner
 	CommandRunner                  *events.DefaultCommandRunner
 	Logger                         logging.SimpleLogging
+	StatsScope                    stats.Scope
 	Locker                         locking.Locker
 	ApplyLocker                    locking.ApplyLocker
 	VCSEventsController            *events_controllers.VCSEventsController
@@ -142,6 +144,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	statsScope := stats.NewDefaultStore().Scope("atlantis")
+	statsScope.Store().AddStatGenerator(stats.NewRuntimeStats(statsScope.Scope("go")))
 
 	var supportedVCSHosts []models.VCSHostType
 	var githubClient *vcs.GithubClient
@@ -731,6 +736,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
 		CommandRunner:                  commandRunner,
 		Logger:                         logger,
+		StatsScope:                    statsScope,
 		Locker:                         lockingClient,
 		ApplyLocker:                    applyLockingClient,
 		VCSEventsController:            eventsController,
@@ -809,6 +815,10 @@ func (s *Server) Start() error {
 
 	s.Logger.Warn("Received interrupt. Waiting for in-progress operations to complete")
 	s.waitForDrain()
+
+	// flush stats before shutdown
+	s.StatsScope.Store().Flush()
+
 	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second) // nolint: vet
 	if err := server.Shutdown(ctx); err != nil {
 		return cli.NewExitError(fmt.Sprintf("while shutting down: %s", err), 1)
