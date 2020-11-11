@@ -37,6 +37,7 @@ import (
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
+	stats "github.com/lyft/gostats"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/locking"
@@ -83,6 +84,7 @@ type Server struct {
 	PreWorkflowHooksCommandRunner *events.DefaultPreWorkflowHooksCommandRunner
 	CommandRunner                 *events.DefaultCommandRunner
 	Logger                        *logging.SimpleLogger
+	StatsScope                    stats.Scope
 	Locker                        locking.Locker
 	EventsController              *EventsController
 	GithubAppController           *GithubAppController
@@ -125,6 +127,10 @@ type WebhookConfig struct {
 // for the server CLI command because it injects all the dependencies.
 func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	logger := logging.NewSimpleLogger("server", false, userConfig.ToLogLevel())
+
+	statsScope := stats.NewDefaultStore().Scope("atlantis")
+	statsScope.Store().AddStatGenerator(stats.NewRuntimeStats(statsScope.Scope("go")))
+
 	var supportedVCSHosts []models.VCSHostType
 	var githubClient *vcs.GithubClient
 	var githubAppEnabled bool
@@ -599,6 +605,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 		CommandRunner:                 commandRunner,
 		Logger:                        logger,
+		StatsScope:                    statsScope,
 		Locker:                        lockingClient,
 		EventsController:              eventsController,
 		GithubAppController:           githubAppController,
@@ -658,6 +665,10 @@ func (s *Server) Start() error {
 
 	s.Logger.Warn("Received interrupt. Waiting for in-progress operations to complete")
 	s.waitForDrain()
+
+	// flush stats before shutdown
+	s.StatsScope.Store().Flush()
+
 	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second) // nolint: vet
 	if err := server.Shutdown(ctx); err != nil {
 		return cli.NewExitError(fmt.Sprintf("while shutting down: %s", err), 1)

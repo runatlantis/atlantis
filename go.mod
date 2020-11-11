@@ -30,14 +30,13 @@ require (
 	github.com/leodido/go-urn v1.2.0 // indirect
 	github.com/lusis/go-slackbot v0.0.0-20180109053408-401027ccfef5 // indirect
 	github.com/lusis/slack-test v0.0.0-20190426140909-c40012f20018 // indirect
+	github.com/lyft/gostats v0.4.5
 	github.com/mcdafydd/go-azuredevops v0.12.0
 	github.com/microcosm-cc/bluemonday v1.0.4
 	github.com/mitchellh/colorstring v0.0.0-20150917214807-8631ce90f286
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb
 	github.com/nlopes/slack v0.4.0
-	github.com/onsi/ginkgo v1.9.0 // indirect
-	github.com/onsi/gomega v1.4.3 // indirect
 	github.com/petergtz/pegomock v2.9.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/remeh/sizedwaitgroup v1.0.0
@@ -52,7 +51,6 @@ require (
 	github.com/zclconf/go-cty v1.5.1 // indirect
 	go.etcd.io/bbolt v1.3.5
 	golang.org/x/crypto v0.0.0-20200414173820-0848c9571904
-	golang.org/x/net v0.0.0-20191126235420-ef20fe5d7933 // indirect
 	golang.org/x/oauth2 v0.0.0-20191122200657-5d9234df094c // indirect
 	golang.org/x/text v0.3.3 // indirect
 	google.golang.org/appengine v1.6.5 // indirect
