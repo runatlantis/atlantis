@@ -58,9 +58,7 @@ func NewProjectCommandBuilder(
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
-
-// ProjectCommandBuilder builds commands that run on individual projects.
-type ProjectCommandBuilder interface {
+type ProjectPlanCommandBuilder interface {
 	// BuildAutoplanCommands builds project commands that will run plan on
 	// the projects determined to be modified.
 	BuildAutoplanCommands(ctx *CommandContext) ([]models.ProjectCommandContext, error)
@@ -68,10 +66,19 @@ type ProjectCommandBuilder interface {
 	// comment doesn't specify one project then there may be multiple commands
 	// to be run.
 	BuildPlanCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error)
-	// BuildApplyCommands builds project apply commands for ctx and comment. If
+}
+
+type ProjectApplyCommandBuilder interface {
+	// BuildApplyCommands builds project Apply commands for this ctx and comment. If
 	// comment doesn't specify one project then there may be multiple commands
 	// to be run.
 	BuildApplyCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error)
+}
+
+// ProjectCommandBuilder builds commands that run on individual projects.
+type ProjectCommandBuilder interface {
+	ProjectPlanCommandBuilder
+	ProjectApplyCommandBuilder
 }
 
 // DefaultProjectCommandBuilder implements ProjectCommandBuilder.

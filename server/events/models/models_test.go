@@ -461,6 +461,20 @@ func TestProjectResult_PlanStatus(t *testing.T) {
 			},
 			expStatus: models.ErroredPolicyCheckStatus,
 		},
+		{
+			p: models.ProjectResult{
+				Command:            models.ApprovePoliciesCommand,
+				PolicyCheckSuccess: &models.PolicyCheckSuccess{},
+			},
+			expStatus: models.PassedPolicyCheckStatus,
+		},
+		{
+			p: models.ProjectResult{
+				Command: models.ApprovePoliciesCommand,
+				Failure: "failure",
+			},
+			expStatus: models.ErroredPolicyCheckStatus,
+		},
 	}
 
 	for _, c := range cases {

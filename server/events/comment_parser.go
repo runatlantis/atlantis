@@ -91,7 +91,7 @@ type CommentParseResult struct {
 // Valid commands contain:
 // - The initial "executable" name, 'run' or 'atlantis' or '@GithubUser'
 //   where GithubUser is the API user Atlantis is running as.
-// - Then a command, either 'plan', 'apply', or 'help'.
+// - Then a command, either 'plan', 'apply', 'approve_policies', or 'help'.
 // - Then optional flags, then an optional separator '--' followed by optional
 //   extra flags to be appended to the terraform plan/apply command.
 //
@@ -101,6 +101,7 @@ type CommentParseResult struct {
 // - @GithubUser plan -w staging
 // - atlantis plan -w staging -d dir --verbose
 // - atlantis plan --verbose -- -key=value -key2 value2
+// - atlantis approve_policies
 //
 func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) CommentParseResult {
 	if multiLineRegex.MatchString(comment) {
@@ -159,8 +160,8 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		return CommentParseResult{CommentResponse: e.HelpComment(e.ApplyDisabled)}
 	}
 
-	// Need to have a plan, apply or unlock at this point.
-	if !e.stringInSlice(command, []string{models.PlanCommand.String(), models.ApplyCommand.String(), models.UnlockCommand.String()}) {
+	// Need to have a plan, apply, approve_policy or unlock at this point.
+	if !e.stringInSlice(command, []string{models.PlanCommand.String(), models.ApplyCommand.String(), models.UnlockCommand.String(), models.ApprovePoliciesCommand.String()}) {
 		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown command %q.\nRun 'atlantis --help' for usage.\n```", command)}
 	}
 
@@ -189,11 +190,15 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Apply the plan for this directory, relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", fmt.Sprintf("Apply the plan for this project. Refers to the name of the project configured in %s. Cannot be used at same time as workspace or dir flags.", yaml.AtlantisYAMLFilename))
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
+	case models.ApprovePoliciesCommand.String():
+		name = models.ApprovePoliciesCommand
+		flagSet = pflag.NewFlagSet(models.ApprovePoliciesCommand.String(), pflag.ContinueOnError)
+		flagSet.SetOutput(ioutil.Discard)
+		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 	case models.UnlockCommand.String():
 		name = models.UnlockCommand
 		flagSet = pflag.NewFlagSet(models.UnlockCommand.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(ioutil.Discard)
-
 	default:
 		return CommentParseResult{CommentResponse: fmt.Sprintf("Error: unknown command %q – this is a bug", command)}
 	}
