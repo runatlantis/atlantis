@@ -77,6 +77,7 @@ type DefaultCommandRunner struct {
 	CommitStatusUpdater      CommitStatusUpdater
 	DisableApplyAll          bool
 	DisableApply             bool
+	UnlockAfterPlan          bool
 	DisableAutoplan          bool
 	EventParser              EventParsing
 	MarkdownRenderer         *MarkdownRenderer
@@ -347,6 +348,15 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	if cmd.Name == models.ApplyCommand && c.automergeEnabled(ctx, projectCmds) {
 		c.automerge(ctx, pullStatus)
 	}
+
+	if c.UnlockAfterPlan && cmd.Name == models.PlanCommand {
+		ctx.Log.Info("Unlocking project %v  as UnlockAfterPlan is set", baseRepo.FullName)
+		err := c.DeleteLockCommand.DeleteLocksByPull(baseRepo.FullName, pullNum)
+		if err != nil {
+			log.Err("failed to delete locks by pull %s", err.Error())
+		}
+	}
+
 }
 
 func (c *DefaultCommandRunner) updateCommitStatus(ctx *CommandContext, cmd models.CommandName, pullStatus models.PullStatus) {

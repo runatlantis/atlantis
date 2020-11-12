@@ -214,6 +214,12 @@ Values are chosen in this order:
   Disable \"atlantis apply\" command so a specific project/workspace/directory has to
   be specified for applies.
 
+* ### `--unlock-after-plan`
+  ```bash
+  atlantis server --unlock-after-plan
+  ```
+  Removes all logs on a given repo after a plan has been run.
+
 * ### `--disable-autoplan`
   ```bash
   atlantis server --disable-autoplan

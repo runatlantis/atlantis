@@ -66,6 +66,7 @@ var testFlags = map[string]interface{}{
 	DefaultTFVersionFlag:       "v0.11.0",
 	DisableApplyAllFlag:        true,
 	DisableApplyFlag:           true,
+	UnlockAfterPlanFlag:        true,
 	DisableMarkdownFoldingFlag: true,
 	GHHostnameFlag:             "ghhostname",
 	GHTokenFlag:                "token",

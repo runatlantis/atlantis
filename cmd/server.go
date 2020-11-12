@@ -54,6 +54,7 @@ const (
 	DefaultTFVersionFlag       = "default-tf-version"
 	DisableApplyAllFlag        = "disable-apply-all"
 	DisableApplyFlag           = "disable-apply"
+	UnlockAfterPlanFlag        = "unlock-after-plan"
 	DisableAutoplanFlag        = "disable-autoplan"
 	DisableMarkdownFoldingFlag = "disable-markdown-folding"
 	GHHostnameFlag             = "gh-hostname"
@@ -285,6 +286,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	DisableApplyFlag: {
 		description:  "Disable all \"atlantis apply\" command regardless of which flags are passed with it.",
+		defaultValue: false,
+	},
+	UnlockAfterPlanFlag: {
+		description:  "Unlock the repo and discard plans after running a plan",
 		defaultValue: false,
 	},
 	DisableAutoplanFlag: {
