@@ -17,8 +17,10 @@ import (
 	"fmt"
 
 	"github.com/google/go-github/v31/github"
+	stats "github.com/lyft/gostats"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/metrics"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -94,6 +96,7 @@ type DefaultCommandRunner struct {
 	DisableAutoplan          bool
 	EventParser              EventParsing
 	Logger                   logging.SimpleLogging
+	StatsScope               stats.Scope
 	// AllowForkPRs controls whether we operate on pull requests from forks.
 	AllowForkPRs bool
 	// ParallelPoolSize controls the size of the wait group used to run
@@ -126,9 +129,15 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 
 	log := c.buildLogger(baseRepo.FullName, pull.Num)
 	defer c.logPanics(baseRepo, pull.Num, log)
+
+	scope := c.StatsScope.Scope("autoplan")
+	timer := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
+	defer timer.Complete()
+
 	ctx := &CommandContext{
 		User:     user,
 		Log:      log,
+		Scope:    scope,
 		Pull:     pull,
 		HeadRepo: headRepo,
 		Trigger:  Auto,
@@ -168,6 +177,14 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	log := c.buildLogger(baseRepo.FullName, pullNum)
 	defer c.logPanics(baseRepo, pullNum, log)
 
+	scope := c.StatsScope.Scope("comment")
+
+	if cmd != nil {
+		scope = scope.Scope(cmd.Name.String())
+	}
+	timer := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
+	defer timer.Complete()
+
 	headRepo, pull, err := c.ensureValidRepoMetadata(baseRepo, maybeHeadRepo, maybePull, user, pullNum, log)
 	if err != nil {
 		return
@@ -179,6 +196,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		Pull:     pull,
 		HeadRepo: headRepo,
 		Trigger:  Comment,
+		Scope:    scope,
 	}
 
 	if !c.validateCtxAndComment(ctx) {

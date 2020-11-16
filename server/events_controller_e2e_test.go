@@ -16,6 +16,7 @@ import (
 	"github.com/google/go-github/v31/github"
 	"github.com/hashicorp/go-getter"
 	"github.com/hashicorp/go-version"
+	stats "github.com/lyft/gostats"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events"
@@ -629,6 +630,8 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 		WorkingDir:            workingDir,
 		PreWorkflowHookRunner: mockPreWorkflowHookRunner,
 	}
+	statsScope := stats.NewStore(stats.NewNullSink(), false)
+
 	projectCommandBuilder := events.NewProjectCommandBuilder(
 		policyChecksEnabled,
 		parser,
@@ -640,6 +643,8 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 		&events.DefaultPendingPlanFinder{},
 		commentParser,
 		false,
+		statsScope,
+		logger,
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTFVersion)
@@ -765,6 +770,7 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 		GithubPullGetter:              e2eGithubGetter,
 		GitlabMergeRequestGetter:      e2eGitlabGetter,
 		Logger:                        logger,
+		StatsScope:                    statsScope,
 		AllowForkPRs:                  allowForkPRs,
 		AllowForkPRsFlag:              "allow-fork-prs",
 		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,

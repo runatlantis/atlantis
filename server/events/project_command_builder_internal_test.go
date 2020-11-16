@@ -577,18 +577,19 @@ projects:
 				Ok(t, ioutil.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
 
-			builder := NewProjectCommandBuilder(
-				false,
-				parser,
-				&DefaultProjectFinder{},
-				vcsClient,
-				workingDir,
-				NewDefaultWorkingDirLocker(),
-				globalCfg,
-				&DefaultPendingPlanFinder{},
-				&CommentParser{},
-				false,
-			)
+			builder := &DefaultProjectCommandBuilder{
+				ParserValidator:    &yaml.ParserValidator{},
+				ProjectFinder:      &DefaultProjectFinder{},
+				VCSClient:          vcsClient,
+				WorkingDir:         workingDir,
+				WorkingDirLocker:   NewDefaultWorkingDirLocker(),
+				GlobalCfg:          globalCfg,
+				PendingPlanFinder:  &DefaultPendingPlanFinder{},
+				SkipCloneNoChanges: false,
+				ProjectCommandContextBuilder: &DefaultProjectCommandContextBuilder{
+					CommentBuilder: &CommentParser{},
+				},
+			}
 
 			// We run a test for each type of command.
 			for _, cmd := range []models.CommandName{models.PlanCommand, models.ApplyCommand} {
@@ -640,7 +641,7 @@ projects:
 	}
 }
 
-func TestBuildProjectCmdCtx_WithPolicCheckEnabled(t *testing.T) {
+func TestBuildProjectCmdCtx_WithPolicyCheckEnabled(t *testing.T) {
 	emptyPolicySets := valid.PolicySets{
 		Version:    nil,
 		PolicySets: []valid.PolicySet{},
@@ -779,18 +780,22 @@ workflows:
 				Ok(t, ioutil.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
 
-			builder := NewProjectCommandBuilder(
-				true,
-				parser,
-				&DefaultProjectFinder{},
-				vcsClient,
-				workingDir,
-				NewDefaultWorkingDirLocker(),
-				globalCfg,
-				&DefaultPendingPlanFinder{},
-				&CommentParser{},
-				false,
-			)
+			builder := &DefaultProjectCommandBuilder{
+				ParserValidator:    &yaml.ParserValidator{},
+				ProjectFinder:      &DefaultProjectFinder{},
+				VCSClient:          vcsClient,
+				WorkingDir:         workingDir,
+				WorkingDirLocker:   NewDefaultWorkingDirLocker(),
+				GlobalCfg:          globalCfg,
+				PendingPlanFinder:  &DefaultPendingPlanFinder{},
+				SkipCloneNoChanges: true,
+				ProjectCommandContextBuilder: &PolicyCheckProjectCommandContextBuilder{
+					ProjectCommandContextBuilder: &DefaultProjectCommandContextBuilder{
+						CommentBuilder: &CommentParser{},
+					},
+					CommentBuilder: &CommentParser{},
+				},
+			}
 
 			cmd := models.PolicyCheckCommand
 			t.Run(cmd.String(), func(t *testing.T) {

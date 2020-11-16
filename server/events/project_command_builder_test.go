@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	stats "github.com/lyft/gostats"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/matchers"
@@ -117,6 +118,9 @@ projects:
 		},
 	}
 
+	scope := stats.NewStore(stats.NewLoggingSink(), false)
+	logger := logging.NewNoopLogger()
+
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			RegisterMockTestingT(t)
@@ -145,10 +149,13 @@ projects:
 				&events.DefaultPendingPlanFinder{},
 				&events.CommentParser{},
 				false,
+				scope,
+				logger,
 			)
 
 			ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
 				PullMergeable: true,
+				Scope:         scope,
 			})
 			Ok(t, err)
 			Equals(t, len(c.exp), len(ctxs))
@@ -339,6 +346,9 @@ projects:
 		},
 	}
 
+	scope := stats.NewStore(stats.NewNullSink(), false)
+	logger := logging.NewNoopLogger()
+
 	for _, c := range cases {
 		// NOTE: we're testing both plan and apply here.
 		for _, cmdName := range []models.CommandName{models.PlanCommand, models.ApplyCommand} {
@@ -370,14 +380,18 @@ projects:
 					&events.DefaultPendingPlanFinder{},
 					&events.CommentParser{},
 					false,
+					scope,
+					logger,
 				)
 
 				var actCtxs []models.ProjectCommandContext
 				var err error
 				if cmdName == models.PlanCommand {
-					actCtxs, err = builder.BuildPlanCommands(&events.CommandContext{}, &c.Cmd)
+					actCtxs, err = builder.BuildPlanCommands(&events.CommandContext{
+						Scope: scope,
+					}, &c.Cmd)
 				} else {
-					actCtxs, err = builder.BuildApplyCommands(&events.CommandContext{}, &c.Cmd)
+					actCtxs, err = builder.BuildApplyCommands(&events.CommandContext{Scope: scope}, &c.Cmd)
 				}
 
 				if c.ExpErr != "" {
@@ -479,6 +493,9 @@ projects:
 			},
 		},
 	}
+
+	scope := stats.NewStore(stats.NewNullSink(), false)
+	logger := logging.NewNoopLogger()
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			RegisterMockTestingT(t)
@@ -506,10 +523,14 @@ projects:
 				&events.DefaultPendingPlanFinder{},
 				&events.CommentParser{},
 				false,
+				scope,
+				logger,
 			)
 
 			ctxs, err := builder.BuildPlanCommands(
-				&events.CommandContext{},
+				&events.CommandContext{
+					Scope: scope,
+				},
 				&events.CommentCommand{
 					RepoRelDir:  "",
 					Flags:       nil,
@@ -569,6 +590,9 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		matchers.AnyModelsPullRequest())).
 		ThenReturn(tmpDir, nil)
 
+	scope := stats.NewStore(stats.NewNullSink(), false)
+	logger := logging.NewNoopLogger()
+
 	builder := events.NewProjectCommandBuilder(
 		false,
 		&yaml.ParserValidator{},
@@ -580,10 +604,14 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		&events.DefaultPendingPlanFinder{},
 		&events.CommentParser{},
 		false,
+		scope,
+		logger,
 	)
 
 	ctxs, err := builder.BuildApplyCommands(
-		&events.CommandContext{},
+		&events.CommandContext{
+			Scope: scope,
+		},
 		&events.CommentCommand{
 			RepoRelDir:  "",
 			Flags:       nil,
@@ -638,6 +666,9 @@ projects:
 		matchers.AnyModelsPullRequest(),
 		AnyString())).ThenReturn(repoDir, nil)
 
+	scope := stats.NewStore(stats.NewNullSink(), false)
+	logger := logging.NewNoopLogger()
+
 	builder := events.NewProjectCommandBuilder(
 		false,
 		&yaml.ParserValidator{},
@@ -649,6 +680,8 @@ projects:
 		&events.DefaultPendingPlanFinder{},
 		&events.CommentParser{},
 		false,
+		scope,
+		logger,
 	)
 
 	ctx := &events.CommandContext{
@@ -656,6 +689,7 @@ projects:
 		Pull:     models.PullRequest{},
 		User:     models.User{},
 		Log:      logging.NewNoopLogger(),
+		Scope:    scope,
 	}
 	_, err = builder.BuildPlanCommands(ctx, &events.CommentCommand{
 		RepoRelDir:  ".",
@@ -688,6 +722,9 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 		},
 	}
 
+	scope := stats.NewStore(stats.NewNullSink(), false)
+	logger := logging.NewNoopLogger()
+
 	for _, c := range cases {
 		t.Run(strings.Join(c.ExtraArgs, " "), func(t *testing.T) {
 			RegisterMockTestingT(t)
@@ -713,11 +750,15 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				&events.DefaultPendingPlanFinder{},
 				&events.CommentParser{},
 				false,
+				scope,
+				logger,
 			)
 
 			var actCtxs []models.ProjectCommandContext
 			var err error
-			actCtxs, err = builder.BuildPlanCommands(&events.CommandContext{}, &events.CommentCommand{
+			actCtxs, err = builder.BuildPlanCommands(&events.CommandContext{
+				Scope: scope,
+			}, &events.CommentCommand{
 				RepoRelDir: ".",
 				Flags:      c.ExtraArgs,
 				Name:       models.PlanCommand,
@@ -846,6 +887,9 @@ projects:
 		},
 	}
 
+	scope := stats.NewStore(stats.NewNullSink(), false)
+	logger := logging.NewNoopLogger()
+
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			RegisterMockTestingT(t)
@@ -879,10 +923,14 @@ projects:
 				&events.DefaultPendingPlanFinder{},
 				&events.CommentParser{},
 				false,
+				scope,
+				logger,
 			)
 
 			actCtxs, err := builder.BuildPlanCommands(
-				&events.CommandContext{},
+				&events.CommandContext{
+					Scope: scope,
+				},
 				&events.CommentCommand{
 					RepoRelDir: "",
 					Flags:      nil,
@@ -918,6 +966,9 @@ projects:
 	When(vcsClient.DownloadRepoConfigFile(matchers.AnyModelsPullRequest())).ThenReturn(true, []byte(atlantisYAML), nil)
 	workingDir := mocks.NewMockWorkingDir()
 
+	scope := stats.NewStore(stats.NewNullSink(), false)
+	logger := logging.NewNoopLogger()
+
 	builder := events.NewProjectCommandBuilder(
 		false,
 		&yaml.ParserValidator{},
@@ -929,6 +980,8 @@ projects:
 		&events.DefaultPendingPlanFinder{},
 		&events.CommentParser{},
 		true,
+		scope,
+		logger,
 	)
 
 	var actCtxs []models.ProjectCommandContext
@@ -939,6 +992,7 @@ projects:
 		User:          models.User{},
 		Log:           nil,
 		PullMergeable: true,
+		Scope:         scope,
 	})
 	Ok(t, err)
 	Equals(t, 0, len(actCtxs))
@@ -951,6 +1005,9 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		"main.tf": nil,
 	})
 	defer cleanup()
+
+	scope := stats.NewStore(stats.NewNullSink(), false)
+	logger := logging.NewNoopLogger()
 
 	workingDir := mocks.NewMockWorkingDir()
 	When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, false, nil)
@@ -969,10 +1026,13 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		&events.DefaultPendingPlanFinder{},
 		&events.CommentParser{},
 		false,
+		scope,
+		logger,
 	)
 
 	ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
 		PullMergeable: true,
+		Scope:         scope,
 	})
 
 	Ok(t, err)
