@@ -20,6 +20,7 @@ import (
 	"strings"
 	"testing"
 
+	stats "github.com/lyft/gostats"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -192,6 +193,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	When(postWorkflowHooksCommandRunner.RunPostHooks(matchers.AnyPtrToEventsCommandContext())).ThenReturn(nil)
 
 	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{})
+	scope := stats.NewStore(stats.NewNullSink(), false)
 
 	ch = events.DefaultCommandRunner{
 		VCSClient:                      vcsClient,
@@ -201,6 +203,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		GitlabMergeRequestGetter:       gitlabGetter,
 		AzureDevopsPullGetter:          azuredevopsGetter,
 		Logger:                         logger,
+		StatsScope:                     scope,
 		GlobalCfg:                      globalCfg,
 		AllowForkPRs:                   false,
 		AllowForkPRsFlag:               "allow-fork-prs-flag",

@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-version"
+	stats "github.com/lyft/gostats"
 	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/pkg/errors"
@@ -375,6 +376,8 @@ type ProjectCommandContext struct {
 	HeadRepo Repo
 	// Log is a logger that's been set up for this context.
 	Log logging.SimpleLogging
+	// Scope is the scope for reporting stats setup for this context
+	Scope stats.Scope
 	// PullReqStatus holds state about the PR that requires additional computation outside models.PullRequest
 	PullReqStatus PullReqStatus
 	// CurrentProjectPlanStatus is the status of the current project prior to this command.
@@ -413,6 +416,12 @@ type ProjectCommandContext struct {
 	DeleteSourceBranchOnMerge bool
 	// UUID for atlantis logs
 	JobID string
+}
+
+// SetScope sets the scope of the stats object field. Note: we deliberately set this on the value
+// instead of a pointer since we want scopes to mirror our function stack
+func (p ProjectCommandContext) SetScope(scope string) {
+	p.Scope = p.Scope.Scope(scope)
 }
 
 // GetShowResultFileName returns the filename (not the path) to store the tf show result

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	stats "github.com/lyft/gostats"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -118,6 +119,7 @@ projects:
 	}
 
 	logger := logging.NewNoopLogger(t)
+	scope := stats.NewStore(stats.NewLoggingSink(), false)
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
@@ -156,13 +158,16 @@ projects:
 				false,
 				false,
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				scope,
+				logger,
 			)
 
 			ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
 				PullRequestStatus: models.PullReqStatus{
 					Mergeable: true,
 				},
-				Log: logger,
+				Log:   logger,
+				Scope: scope,
 			})
 			Ok(t, err)
 			Equals(t, len(c.exp), len(ctxs))
@@ -379,6 +384,7 @@ projects:
 	}
 
 	logger := logging.NewNoopLogger(t)
+	scope := stats.NewStore(stats.NewNullSink(), false)
 
 	for _, c := range cases {
 		// NOTE: we're testing both plan and apply here.
@@ -420,16 +426,19 @@ projects:
 					false,
 					true,
 					"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+					scope,
+					logger,
 				)
 
 				var actCtxs []models.ProjectCommandContext
 				var err error
 				if cmdName == models.PlanCommand {
 					actCtxs, err = builder.BuildPlanCommands(&events.CommandContext{
-						Log: logger,
+						Log:   logger,
+						Scope: scope,
 					}, &c.Cmd)
 				} else {
-					actCtxs, err = builder.BuildApplyCommands(&events.CommandContext{Log: logger}, &c.Cmd)
+					actCtxs, err = builder.BuildApplyCommands(&events.CommandContext{Log: logger, Scope: scope}, &c.Cmd)
 				}
 
 				if c.ExpErr != "" {
@@ -535,6 +544,7 @@ projects:
 	}
 
 	logger := logging.NewNoopLogger(t)
+	scope := stats.NewStore(stats.NewNullSink(), false)
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			RegisterMockTestingT(t)
@@ -571,11 +581,14 @@ projects:
 				false,
 				false,
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				scope,
+				logger,
 			)
 
 			ctxs, err := builder.BuildPlanCommands(
 				&events.CommandContext{
-					Log: logger,
+					Log:   logger,
+					Scope: scope,
 				},
 				&events.CommentCommand{
 					RepoRelDir:  "",
@@ -644,6 +657,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		ApprovedReq:   false,
 		UnDivergedReq: false,
 	}
+	scope := stats.NewStore(stats.NewNullSink(), false)
 
 	builder := events.NewProjectCommandBuilder(
 		false,
@@ -658,11 +672,14 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		false,
 		false,
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+		scope,
+		logger,
 	)
 
 	ctxs, err := builder.BuildApplyCommands(
 		&events.CommandContext{
-			Log: logger,
+			Log:   logger,
+			Scope: scope,
 		},
 		&events.CommentCommand{
 			RepoRelDir:  "",
@@ -724,6 +741,8 @@ projects:
 		ApprovedReq:   false,
 		UnDivergedReq: false,
 	}
+	scope := stats.NewStore(stats.NewNullSink(), false)
+	logger := logging.NewNoopLogger(t)
 
 	builder := events.NewProjectCommandBuilder(
 		false,
@@ -738,13 +757,16 @@ projects:
 		false,
 		false,
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+		scope,
+		logger,
 	)
 
 	ctx := &events.CommandContext{
 		HeadRepo: models.Repo{},
 		Pull:     models.PullRequest{},
 		User:     models.User{},
-		Log:      logging.NewNoopLogger(t),
+		Log:      logger,
+		Scope:    scope,
 	}
 	_, err = builder.BuildPlanCommands(ctx, &events.CommentCommand{
 		RepoRelDir:  ".",
@@ -778,6 +800,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 	}
 
 	logger := logging.NewNoopLogger(t)
+	scope := stats.NewStore(stats.NewNullSink(), false)
 
 	for _, c := range cases {
 		t.Run(strings.Join(c.ExtraArgs, " "), func(t *testing.T) {
@@ -813,12 +836,15 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				false,
 				false,
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				scope,
+				logger,
 			)
 
 			var actCtxs []models.ProjectCommandContext
 			var err error
 			actCtxs, err = builder.BuildPlanCommands(&events.CommandContext{
-				Log: logger,
+				Log:   logger,
+				Scope: scope,
 			}, &events.CommentCommand{
 				RepoRelDir: ".",
 				Flags:      c.ExtraArgs,
@@ -949,6 +975,7 @@ projects:
 	}
 
 	logger := logging.NewNoopLogger(t)
+	scope := stats.NewStore(stats.NewNullSink(), false)
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
@@ -992,11 +1019,14 @@ projects:
 				false,
 				false,
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				scope,
+				logger,
 			)
 
 			actCtxs, err := builder.BuildPlanCommands(
 				&events.CommandContext{
-					Log: logger,
+					Log:   logger,
+					Scope: scope,
 				},
 				&events.CommentCommand{
 					RepoRelDir: "",
@@ -1041,6 +1071,7 @@ projects:
 		ApprovedReq:   false,
 		UnDivergedReq: false,
 	}
+	scope := stats.NewStore(stats.NewNullSink(), false)
 
 	builder := events.NewProjectCommandBuilder(
 		false,
@@ -1055,6 +1086,8 @@ projects:
 		true,
 		false,
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+		scope,
+		logger,
 	)
 
 	var actCtxs []models.ProjectCommandContext
@@ -1064,6 +1097,7 @@ projects:
 		Pull:     models.PullRequest{},
 		User:     models.User{},
 		Log:      logger,
+		Scope:    scope,
 		PullRequestStatus: models.PullReqStatus{
 			Mergeable: true,
 		},
@@ -1081,6 +1115,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 	defer cleanup()
 
 	logger := logging.NewNoopLogger(t)
+	scope := stats.NewStore(stats.NewNullSink(), false)
 
 	workingDir := mocks.NewMockWorkingDir()
 	When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, false, nil)
@@ -1109,13 +1144,16 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		false,
 		false,
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+		scope,
+		logger,
 	)
 
 	ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
 		PullRequestStatus: models.PullReqStatus{
 			Mergeable: true,
 		},
-		Log: logger,
+		Log:   logger,
+		Scope: scope,
 	})
 
 	Ok(t, err)
@@ -1166,6 +1204,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		ThenReturn(tmpDir, nil)
 
 	logger := logging.NewNoopLogger(t)
+	scope := stats.NewStore(stats.NewNullSink(), false)
 
 	globalCfgArgs := valid.GlobalCfgArgs{
 		AllowRepoCfg:  false,
@@ -1187,11 +1226,14 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		false,
 		false,
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+		scope,
+		logger,
 	)
 
 	ctxs, err := builder.BuildVersionCommands(
 		&events.CommandContext{
-			Log: logger,
+			Log:   logger,
+			Scope: scope,
 		},
 		&events.CommentCommand{
 			RepoRelDir:  "",

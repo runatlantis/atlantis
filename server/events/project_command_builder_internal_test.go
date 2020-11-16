@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	version "github.com/hashicorp/go-version"
+	stats "github.com/lyft/gostats"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -20,6 +21,7 @@ import (
 // Test different permutations of global and repo config.
 func TestBuildProjectCmdCtx(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
+	statsScope := stats.NewStore(stats.NewNullSink(), false)
 	emptyPolicySets := valid.PolicySets{
 		Version:    nil,
 		PolicySets: []valid.PolicySet{},
@@ -66,6 +68,7 @@ workflows:
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
+				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
 					Mergeable: true,
 				},
@@ -118,6 +121,7 @@ projects:
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
+				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
 					Mergeable: true,
 				},
@@ -172,6 +176,7 @@ projects:
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
+				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
 					Mergeable: true,
 				},
@@ -234,6 +239,7 @@ projects:
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
+				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
 					Mergeable: true,
 				},
@@ -383,6 +389,7 @@ workflows:
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
+				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
 					Mergeable: true,
 				},
@@ -441,6 +448,7 @@ projects:
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
+				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
 					Mergeable: true,
 				},
@@ -502,6 +510,7 @@ workflows:
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
+				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
 					Mergeable: true,
 				},
@@ -547,6 +556,7 @@ projects:
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
+				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
 					Mergeable: true,
 				},
@@ -615,13 +625,16 @@ projects:
 				false,
 				false,
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				statsScope,
+				logger,
 			)
 
 			// We run a test for each type of command.
 			for _, cmd := range []models.CommandName{models.PlanCommand, models.ApplyCommand} {
 				t.Run(cmd.String(), func(t *testing.T) {
 					ctxs, err := builder.buildProjectCommandCtx(&CommandContext{
-						Log: logger,
+						Log:   logger,
+						Scope: statsScope,
 						Pull: models.PullRequest{
 							BaseRepo: baseRepo,
 						},
@@ -674,6 +687,7 @@ projects:
 }
 
 func TestBuildProjectCmdCtx_WithRegExpCmdEnabled(t *testing.T) {
+	statsScope := stats.NewStore(stats.NewNullSink(), false)
 	emptyPolicySets := valid.PolicySets{
 		Version:    nil,
 		PolicySets: []valid.PolicySet{},
@@ -746,6 +760,7 @@ projects:
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logging.NewNoopLogger(t),
+				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
 					Mergeable: true,
 				},
@@ -796,6 +811,9 @@ projects:
 				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
 
+			logger := logging.NewNoopLogger(t)
+			statsScope := stats.NewStore(stats.NewNullSink(), false)
+
 			builder := NewProjectCommandBuilder(
 				false,
 				parser,
@@ -809,6 +827,8 @@ projects:
 				false,
 				true,
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				statsScope,
+				logger,
 			)
 
 			// We run a test for each type of command, again specific projects
@@ -818,7 +838,8 @@ projects:
 						Pull: models.PullRequest{
 							BaseRepo: baseRepo,
 						},
-						Log: logging.NewNoopLogger(t),
+						Log:   logging.NewNoopLogger(t),
+						Scope: statsScope,
 						PullRequestStatus: models.PullReqStatus{
 							Mergeable: true,
 						},
@@ -870,6 +891,7 @@ projects:
 
 func TestBuildProjectCmdCtx_WithPolicCheckEnabled(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
+	statsScope := stats.NewStore(stats.NewNullSink(), false)
 	emptyPolicySets := valid.PolicySets{
 		Version:    nil,
 		PolicySets: []valid.PolicySet{},
@@ -906,6 +928,7 @@ repos:
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
+				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
 					Mergeable: true,
 				},
@@ -963,6 +986,7 @@ workflows:
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
+				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
 					Mergeable: true,
 				},
@@ -1018,6 +1042,7 @@ workflows:
 			if c.repoCfg != "" {
 				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
+			statsScope := stats.NewStore(stats.NewNullSink(), false)
 
 			builder := NewProjectCommandBuilder(
 				true,
@@ -1032,12 +1057,15 @@ workflows:
 				false,
 				false,
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				statsScope,
+				logger,
 			)
 
 			cmd := models.PolicyCheckCommand
 			t.Run(cmd.String(), func(t *testing.T) {
 				ctxs, err := builder.buildProjectCommandCtx(&CommandContext{
-					Log: logger,
+					Log:   logger,
+					Scope: statsScope,
 					Pull: models.PullRequest{
 						BaseRepo: baseRepo,
 					},

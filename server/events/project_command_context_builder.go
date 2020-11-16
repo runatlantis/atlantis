@@ -7,11 +7,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-version"
 	"github.com/hashicorp/terraform-config-inspect/tfconfig"
+	stats "github.com/lyft/gostats"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-func NewProjectCommandContextBuilder(policyCheckEnabled bool, commentBuilder CommentBuilder) ProjectCommandContextBuilder {
+func NewProjectCommandContextBuilder(policyCheckEnabled bool, commentBuilder CommentBuilder, scope stats.Scope) ProjectCommandContextBuilder {
 	projectCommandContextBuilder := &DefaultProjectCommandContextBuilder{
 		CommentBuilder: commentBuilder,
 	}
@@ -23,7 +24,10 @@ func NewProjectCommandContextBuilder(policyCheckEnabled bool, commentBuilder Com
 		}
 	}
 
-	return projectCommandContextBuilder
+	return &CommandScopedStatsProjectCommandContextBuilder{
+		ProjectCommandContextBuilder: projectCommandContextBuilder,
+		ProjectCounter:               scope.NewCounter("projects"),
+	}
 }
 
 type ProjectCommandContextBuilder interface {
@@ -36,6 +40,43 @@ type ProjectCommandContextBuilder interface {
 		repoDir string,
 		automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose bool,
 	) []models.ProjectCommandContext
+}
+
+// CommandScopedStatsProjectCommandContextBuilder ensures that project command context contains a scoped stats
+// object relevant to the command it applies to.
+type CommandScopedStatsProjectCommandContextBuilder struct {
+	ProjectCommandContextBuilder
+	// Conciously making this global since it gets flushed periodically anyways
+	ProjectCounter stats.Counter
+}
+
+// BuildProjectContext builds the context and injects the appropriate command level scope after the fact.
+func (cb *CommandScopedStatsProjectCommandContextBuilder) BuildProjectContext(
+	ctx *CommandContext,
+	cmdName models.CommandName,
+	prjCfg valid.MergedProjectCfg,
+	commentFlags []string,
+	repoDir string,
+	automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose bool,
+) (projectCmds []models.ProjectCommandContext) {
+	cb.ProjectCounter.Inc()
+
+	cmds := cb.ProjectCommandContextBuilder.BuildProjectContext(
+		ctx, cmdName, prjCfg, commentFlags, repoDir, automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose,
+	)
+
+	projectCmds = []models.ProjectCommandContext{}
+
+	for _, cmd := range cmds {
+
+		// specifically use the command name in the context instead of the arg
+		// since we can return multiple commands worth of contexts for a given command name arg
+		// to effectively pipeline them.
+		cmd.SetScope(cmd.CommandName.String())
+		projectCmds = append(projectCmds, cmd)
+	}
+
+	return
 }
 
 type DefaultProjectCommandContextBuilder struct {
@@ -86,6 +127,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		parallelApply,
 		parallelPlan,
 		verbose,
+		ctx.Scope,
 		ctx.PullRequestStatus,
 	)
 
@@ -147,6 +189,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 			parallelApply,
 			parallelPlan,
 			verbose,
+			ctx.Scope,
 			ctx.PullRequestStatus,
 		))
 	}
@@ -170,6 +213,7 @@ func newProjectCommandContext(ctx *CommandContext,
 	parallelApplyEnabled bool,
 	parallelPlanEnabled bool,
 	verbose bool,
+	scope stats.Scope,
 	pullStatus models.PullReqStatus,
 ) models.ProjectCommandContext {
 
@@ -205,6 +249,7 @@ func newProjectCommandContext(ctx *CommandContext,
 		Steps:                      steps,
 		HeadRepo:                   ctx.HeadRepo,
 		Log:                        ctx.Log,
+		Scope:                      scope,
 		ProjectPlanStatus:          projectPlanStatus,
 		Pull:                       ctx.Pull,
 		ProjectName:                projCfg.Name,

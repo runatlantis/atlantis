@@ -13,6 +13,7 @@
 package events
 
 import (
+	stats "github.com/lyft/gostats"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -38,8 +39,9 @@ type CommandContext struct {
 	HeadRepo models.Repo
 	Pull     models.PullRequest
 	// User is the user that triggered this command.
-	User models.User
-	Log  logging.SimpleLogging
+	User  models.User
+	Log   logging.SimpleLogging
+	Scope stats.Scope
 
 	// Current PR state
 	PullRequestStatus models.PullReqStatus

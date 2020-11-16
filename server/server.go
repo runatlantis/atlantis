@@ -89,7 +89,7 @@ type Server struct {
 	PreWorkflowHooksCommandRunner  *events.DefaultPreWorkflowHooksCommandRunner
 	CommandRunner                  *events.DefaultCommandRunner
 	Logger                         logging.SimpleLogging
-	StatsScope                    stats.Scope
+	StatsScope                     stats.Scope
 	Locker                         locking.Locker
 	ApplyLocker                    locking.ApplyLocker
 	VCSEventsController            *events_controllers.VCSEventsController
@@ -145,11 +145,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, err
 	}
 
-	statsScope := stats.NewDefaultStore().Scope("atlantis")
+	statsScope := stats.NewDefaultStore().Scope(userConfig.StatsNamespace)
 	statsScope.Store().AddStatGenerator(stats.NewRuntimeStats(statsScope.Scope("go")))
 
 	var supportedVCSHosts []models.VCSHostType
-	var githubClient *vcs.GithubClient
+	var githubClient vcs.IGithubClient
 	var githubAppEnabled bool
 	var githubCredentials vcs.GithubCredentials
 	var gitlabClient *vcs.GitlabClient
@@ -193,10 +193,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 
 		var err error
-		githubClient, err = vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, logger)
+		rawGithubClient, err := vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, logger)
 		if err != nil {
 			return nil, err
 		}
+
+		githubClient = vcs.NewInstrumentedGithubClient(rawGithubClient, statsScope, logger)
 	}
 	if userConfig.GitlabUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Gitlab)
@@ -473,7 +475,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDir:             workingDir,
 		PostWorkflowHookRunner: runtime.DefaultPostWorkflowHookRunner{},
 	}
-	projectCommandBuilder := events.NewProjectCommandBuilder(
+	projectCommandBuilder := events.NewInstrumentedProjectCommandBuilder(
 		policyChecksEnabled,
 		validator,
 		&events.DefaultProjectFinder{},
@@ -486,6 +488,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.SkipCloneNoChanges,
 		userConfig.EnableRegExpCmd,
 		userConfig.AutoplanFileList,
+		statsScope,
+		logger,
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTfVersion)
@@ -562,12 +566,15 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		ProjectCommandRunner: projectCommandRunner,
 		JobURLSetter:         jobs.NewJobURLSetter(router, commitStatusUpdater),
 	}
+	instrumentedProjectCmdRunner := &events.InstrumentedProjectCommandRunner{
+		ProjectCommandRunner: projectOutputWrapper,
+	}
 
 	policyCheckCommandRunner := events.NewPolicyCheckCommandRunner(
 		dbUpdater,
 		pullUpdater,
 		commitStatusUpdater,
-		projectOutputWrapper,
+		instrumentedProjectCmdRunner,
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceVCSStatusNoProjects,
 	)
@@ -580,7 +587,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		workingDir,
 		commitStatusUpdater,
 		projectCommandBuilder,
-		projectOutputWrapper,
+		instrumentedProjectCmdRunner,
 		dbUpdater,
 		pullUpdater,
 		policyCheckCommandRunner,
@@ -597,7 +604,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		applyLockingClient,
 		commitStatusUpdater,
 		projectCommandBuilder,
-		projectOutputWrapper,
+		instrumentedProjectCmdRunner,
 		autoMerger,
 		pullUpdater,
 		dbUpdater,
@@ -611,7 +618,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
 		commitStatusUpdater,
 		projectCommandBuilder,
-		projectOutputWrapper,
+		instrumentedProjectCmdRunner,
 		pullUpdater,
 		dbUpdater,
 		userConfig.SilenceNoProjects,
@@ -654,6 +661,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		EventParser:                    eventParser,
 		Logger:                         logger,
 		GlobalCfg:                      globalCfg,
+		StatsScope:                     statsScope.Scope("cmd"),
 		AllowForkPRs:                   userConfig.AllowForkPRs,
 		AllowForkPRsFlag:               config.AllowForkPRsFlag,
 		SilenceForkPRErrors:            userConfig.SilenceForkPRErrors,
@@ -736,7 +744,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
 		CommandRunner:                  commandRunner,
 		Logger:                         logger,
-		StatsScope:                    statsScope,
+		StatsScope:                     statsScope,
 		Locker:                         lockingClient,
 		ApplyLocker:                    applyLockingClient,
 		VCSEventsController:            eventsController,
