@@ -76,6 +76,7 @@ const (
 	HidePrevPlanComments       = "hide-prev-plan-comments"
 	LogLevelFlag               = "log-level"
 	ParallelPoolSize           = "parallel-pool-size"
+	StatsNamespace             = "stats-namespace"
 	AllowDraftPRs              = "allow-draft-prs"
 	PortFlag                   = "port"
 	RepoConfigFlag             = "repo-config"
@@ -112,6 +113,7 @@ const (
 	DefaultGitlabHostname   = "gitlab.com"
 	DefaultLogLevel         = "info"
 	DefaultParallelPoolSize = 15
+	DefaultStatsNamespace   = "atlantis"
 	DefaultPort             = 4141
 	DefaultTFDownloadURL    = "https://releases.hashicorp.com"
 	DefaultTFEHostname      = "app.terraform.io"
@@ -228,6 +230,10 @@ var stringFlags = map[string]stringFlag{
 	LogLevelFlag: {
 		description:  "Log level. Either debug, info, warn, or error.",
 		defaultValue: DefaultLogLevel,
+	},
+	StatsNamespace: {
+		description:  "Namespace for aggregating stats.",
+		defaultValue: DefaultStatsNamespace,
 	},
 	RepoConfigFlag: {
 		description: "Path to a repo config file, used to customize how Atlantis runs on each repo. See runatlantis.io/docs for more details.",
@@ -602,6 +608,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	}
 	if c.ParallelPoolSize == 0 {
 		c.ParallelPoolSize = DefaultParallelPoolSize
+	}
+	if c.StatsNamespace == "" {
+		c.StatsNamespace = DefaultStatsNamespace
 	}
 	if c.Port == 0 {
 		c.Port = DefaultPort

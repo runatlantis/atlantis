@@ -586,20 +586,21 @@ projects:
 				Ok(t, ioutil.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
 
-			builder := NewProjectCommandBuilder(
-				false,
-				parser,
-				&DefaultProjectFinder{},
-				vcsClient,
-				workingDir,
-				NewDefaultWorkingDirLocker(),
-				globalCfg,
-				&DefaultPendingPlanFinder{},
-				&CommentParser{},
-				false,
-				false,
-				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
-			)
+			builder := &DefaultProjectCommandBuilder{
+				ParserValidator:    &yaml.ParserValidator{},
+				ProjectFinder:      &DefaultProjectFinder{},
+				VCSClient:          vcsClient,
+				WorkingDir:         workingDir,
+				WorkingDirLocker:   NewDefaultWorkingDirLocker(),
+				GlobalCfg:          globalCfg,
+				PendingPlanFinder:  &DefaultPendingPlanFinder{},
+				SkipCloneNoChanges: false,
+				ProjectCommandContextBuilder: &DefaultProjectCommandContextBuilder{
+					CommentBuilder: &CommentParser{},
+				},
+				AutoplanFileList: "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+				EnableRegExpCmd:  false,
+			}
 
 			// We run a test for each type of command.
 			for _, cmd := range []models.CommandName{models.PlanCommand, models.ApplyCommand} {
@@ -773,20 +774,21 @@ projects:
 				Ok(t, ioutil.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
 
-			builder := NewProjectCommandBuilder(
-				false,
-				parser,
-				&DefaultProjectFinder{},
-				vcsClient,
-				workingDir,
-				NewDefaultWorkingDirLocker(),
-				globalCfg,
-				&DefaultPendingPlanFinder{},
-				&CommentParser{},
-				false,
-				true,
-				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
-			)
+			builder := &DefaultProjectCommandBuilder{
+				ParserValidator:    &yaml.ParserValidator{},
+				ProjectFinder:      &DefaultProjectFinder{},
+				VCSClient:          vcsClient,
+				WorkingDir:         workingDir,
+				WorkingDirLocker:   NewDefaultWorkingDirLocker(),
+				GlobalCfg:          globalCfg,
+				PendingPlanFinder:  &DefaultPendingPlanFinder{},
+				SkipCloneNoChanges: true,
+				ProjectCommandContextBuilder: &DefaultProjectCommandContextBuilder{
+					CommentBuilder: &CommentParser{},
+				},
+				AutoplanFileList: "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+				EnableRegExpCmd:  true,
+			}
 
 			// We run a test for each type of command, again specific projects
 			for _, cmd := range []models.CommandName{models.PlanCommand, models.ApplyCommand} {
@@ -986,20 +988,23 @@ workflows:
 				Ok(t, ioutil.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
 
-			builder := NewProjectCommandBuilder(
-				true,
-				parser,
-				&DefaultProjectFinder{},
-				vcsClient,
-				workingDir,
-				NewDefaultWorkingDirLocker(),
-				globalCfg,
-				&DefaultPendingPlanFinder{},
-				&CommentParser{},
-				false,
-				false,
-				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
-			)
+			builder := &DefaultProjectCommandBuilder{
+				ParserValidator:    &yaml.ParserValidator{},
+				ProjectFinder:      &DefaultProjectFinder{},
+				VCSClient:          vcsClient,
+				WorkingDir:         workingDir,
+				WorkingDirLocker:   NewDefaultWorkingDirLocker(),
+				GlobalCfg:          globalCfg,
+				PendingPlanFinder:  &DefaultPendingPlanFinder{},
+				SkipCloneNoChanges: true,
+				ProjectCommandContextBuilder: &PolicyCheckProjectCommandContextBuilder{
+					ProjectCommandContextBuilder: &DefaultProjectCommandContextBuilder{
+						CommentBuilder: &CommentParser{},
+					},
+					CommentBuilder: &CommentParser{},
+				},
+				AutoplanFileList: "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+			}
 
 			cmd := models.PolicyCheckCommand
 			t.Run(cmd.String(), func(t *testing.T) {

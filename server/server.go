@@ -136,11 +136,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, err
 	}
 
-	statsScope := stats.NewDefaultStore().Scope("atlantis")
+	statsScope := stats.NewDefaultStore().Scope(userConfig.StatsNamespace)
 	statsScope.Store().AddStatGenerator(stats.NewRuntimeStats(statsScope.Scope("go")))
 
 	var supportedVCSHosts []models.VCSHostType
-	var githubClient *vcs.GithubClient
+	var githubClient vcs.IGithubClient
 	var githubAppEnabled bool
 	var githubCredentials vcs.GithubCredentials
 	var gitlabClient *vcs.GitlabClient
@@ -172,10 +172,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 
 		var err error
-		githubClient, err = vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, logger)
+		rawGithubClient, err := vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, logger)
 		if err != nil {
 			return nil, err
 		}
+
+		githubClient = vcs.NewInstrumentedGithubClient(rawGithubClient, statsScope, logger)
 	}
 	if userConfig.GitlabUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Gitlab)
@@ -437,6 +439,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.SkipCloneNoChanges,
 		userConfig.EnableRegExpCmd,
 		userConfig.AutoplanFileList,
+		statsScope,
+		logger,
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTfVersion)
@@ -499,11 +503,15 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GlobalAutomerge: userConfig.Automerge,
 	}
 
+	instrumentedProjectCmdRunner := &events.InstrumentedProjectCommandRunner{
+		ProjectCommandRunner: projectCommandRunner,
+	}
+
 	policyCheckCommandRunner := events.NewPolicyCheckCommandRunner(
 		dbUpdater,
 		pullUpdater,
 		commitStatusUpdater,
-		projectCommandRunner,
+		instrumentedProjectCmdRunner,
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceVCSStatusNoProjects,
 	)
@@ -516,7 +524,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		workingDir,
 		commitStatusUpdater,
 		projectCommandBuilder,
-		projectCommandRunner,
+		instrumentedProjectCmdRunner,
 		dbUpdater,
 		pullUpdater,
 		policyCheckCommandRunner,
@@ -532,7 +540,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		applyLockingClient,
 		commitStatusUpdater,
 		projectCommandBuilder,
-		projectCommandRunner,
+		instrumentedProjectCmdRunner,
 		autoMerger,
 		pullUpdater,
 		dbUpdater,
@@ -545,7 +553,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
 		commitStatusUpdater,
 		projectCommandBuilder,
-		projectCommandRunner,
+		instrumentedProjectCmdRunner,
 		pullUpdater,
 		dbUpdater,
 		userConfig.SilenceNoProjects,
@@ -573,6 +581,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
 		EventParser:                   eventParser,
 		Logger:                        logger,
+		StatsScope:                    statsScope.Scope("cmd"),
 		AllowForkPRs:                  userConfig.AllowForkPRs,
 		AllowForkPRsFlag:              config.AllowForkPRsFlag,
 		SilenceForkPRErrors:           userConfig.SilenceForkPRErrors,
