@@ -20,6 +20,7 @@ import (
 	"strings"
 	"testing"
 
+	stats "github.com/lyft/gostats"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -184,6 +185,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	When(preWorkflowHooksCommandRunner.RunPreHooks(matchers.AnyPtrToEventsCommandContext())).ThenReturn(nil)
 
 	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{})
+	scope := stats.NewDefaultStore()
 
 	ch = events.DefaultCommandRunner{
 		VCSClient:                     vcsClient,
@@ -194,6 +196,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		AzureDevopsPullGetter:         azuredevopsGetter,
 		Logger:                        logger,
 		GlobalCfg:                     globalCfg,
+		StatsScope:                    scope,
 		AllowForkPRs:                  false,
 		AllowForkPRsFlag:              "allow-fork-prs-flag",
 		Drainer:                       drainer,

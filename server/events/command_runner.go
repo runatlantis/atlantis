@@ -18,8 +18,10 @@ import (
 	"strconv"
 
 	"github.com/google/go-github/v31/github"
+	stats "github.com/lyft/gostats"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/metrics"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
@@ -97,6 +99,7 @@ type DefaultCommandRunner struct {
 	EventParser              EventParsing
 	Logger                   logging.SimpleLogging
 	GlobalCfg                valid.GlobalCfg
+	StatsScope               stats.Scope
 	// AllowForkPRs controls whether we operate on pull requests from forks.
 	AllowForkPRs bool
 	// ParallelPoolSize controls the size of the wait group used to run
@@ -136,9 +139,14 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		log.Err("Unable to fetch pull status, this is likely a bug.", err)
 	}
 
+	scope := c.StatsScope.Scope("autoplan")
+	timer := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
+	defer timer.Complete()
+
 	ctx := &CommandContext{
 		User:       user,
 		Log:        log,
+		Scope:      scope,
 		Pull:       pull,
 		HeadRepo:   headRepo,
 		PullStatus: status,
@@ -179,6 +187,14 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	log := c.buildLogger(baseRepo.FullName, pullNum)
 	defer c.logPanics(baseRepo, pullNum, log)
 
+	scope := c.StatsScope.Scope("comment")
+
+	if cmd != nil {
+		scope = scope.Scope(cmd.Name.String())
+	}
+	timer := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
+	defer timer.Complete()
+
 	headRepo, pull, err := c.ensureValidRepoMetadata(baseRepo, maybeHeadRepo, maybePull, user, pullNum, log)
 	if err != nil {
 		return
@@ -197,6 +213,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		PullStatus: status,
 		HeadRepo:   headRepo,
 		Trigger:    Comment,
+		Scope:      scope,
 	}
 
 	if !c.validateCtxAndComment(ctx) {

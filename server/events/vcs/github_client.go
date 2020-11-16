@@ -326,8 +326,7 @@ func (g *GithubClient) getSubmitQueueMergeability(repo models.Repo, pull models.
 	return ownersCheckApplied, nil
 }
 
-// GetPullRequest returns the pull request.
-func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRequest, error) {
+func (g *GithubClient) GetPullRequestFromName(repoName string, repoOwner string, num int) (*github.PullRequest, error) {
 	var err error
 	var pull *github.PullRequest
 
@@ -337,7 +336,7 @@ func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRe
 	numRetries := 3
 	retryDelay := 1 * time.Second
 	for i := 0; i < numRetries; i++ {
-		pull, _, err = g.client.PullRequests.Get(g.ctx, repo.Owner, repo.Name, num)
+		pull, _, err = g.client.PullRequests.Get(g.ctx, repoOwner, repoName, num)
 		if err == nil {
 			return pull, nil
 		}
@@ -348,6 +347,11 @@ func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRe
 		time.Sleep(retryDelay)
 	}
 	return pull, err
+}
+
+// GetPullRequest returns the pull request.
+func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRequest, error) {
+	return g.GetPullRequestFromName(repo.Name, repo.Owner, num)
 }
 
 func (g *GithubClient) getRepoStatuses(repo models.Repo, pull models.PullRequest) ([]*github.RepoStatus, error) {

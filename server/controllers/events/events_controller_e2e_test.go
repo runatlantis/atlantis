@@ -16,6 +16,7 @@ import (
 	"github.com/google/go-github/v31/github"
 	"github.com/hashicorp/go-getter"
 	"github.com/hashicorp/go-version"
+	stats "github.com/lyft/gostats"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
@@ -877,6 +878,8 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		WorkingDir:            workingDir,
 		PreWorkflowHookRunner: mockPreWorkflowHookRunner,
 	}
+	statsScope := stats.NewStore(stats.NewNullSink(), false)
+
 	projectCommandBuilder := events.NewProjectCommandBuilder(
 		userConfig.EnablePolicyChecksFlag,
 		parser,
@@ -890,6 +893,8 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		false,
 		false,
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+		statsScope,
+		logger,
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTFVersion)
@@ -1037,6 +1042,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		GitlabMergeRequestGetter:      e2eGitlabGetter,
 		Logger:                        logger,
 		GlobalCfg:                     globalCfg,
+		StatsScope:                    statsScope,
 		AllowForkPRs:                  allowForkPRs,
 		AllowForkPRsFlag:              "allow-fork-prs",
 		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,

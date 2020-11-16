@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 
+	stats "github.com/lyft/gostats"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -42,7 +44,9 @@ func NewProjectCommandBuilder(
 	skipCloneNoChanges bool,
 	EnableRegExpCmd bool,
 	AutoplanFileList string,
-) *DefaultProjectCommandBuilder {
+	scope stats.Scope,
+	logger logging.SimpleLogging,
+) ProjectCommandBuilder {
 	projectCommandBuilder := &DefaultProjectCommandBuilder{
 		ParserValidator:    parserValidator,
 		ProjectFinder:      projectFinder,
@@ -57,10 +61,14 @@ func NewProjectCommandBuilder(
 		ProjectCommandContextBuilder: NewProjectCommandContextBulder(
 			policyChecksSupported,
 			commentBuilder,
+			scope,
 		),
 	}
 
-	return projectCommandBuilder
+	return &InstrumentedProjectCommandBuilder{
+		ProjectCommandBuilder: projectCommandBuilder,
+		Logger:                logger,
+	}
 }
 
 type ProjectPlanCommandBuilder interface {
