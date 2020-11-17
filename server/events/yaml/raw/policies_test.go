@@ -171,7 +171,42 @@ func TestPolicySets_ToValid(t *testing.T) {
 		exp         valid.PolicySets
 	}{
 		{
-			description: "valid policies",
+			description: "valid policies with owners",
+			input: raw.PolicySets{
+				Version: String("v1.0.0"),
+				Owners: []string{
+					"test",
+				},
+				PolicySets: []raw.PolicySet{
+					{
+						Name: "good-policy",
+						Owners: []string{
+							"john-doe",
+							"jane-doe",
+						},
+						Path:   "rel/path/to/source",
+						Source: valid.LocalPolicySet,
+					},
+				},
+			},
+			exp: valid.PolicySets{
+				Version: version,
+				Owners:  []string{"test"},
+				PolicySets: []valid.PolicySet{
+					{
+						Name: "good-policy",
+						Owners: []string{
+							"john-doe",
+							"jane-doe",
+						},
+						Path:   "rel/path/to/source",
+						Source: "local",
+					},
+				},
+			},
+		},
+		{
+			description: "valid policies wihthout owners",
 			input: raw.PolicySets{
 				Version: String("v1.0.0"),
 				PolicySets: []raw.PolicySet{

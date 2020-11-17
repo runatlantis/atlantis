@@ -48,7 +48,8 @@ func TestRenderErr(t *testing.T) {
 			"policy check error",
 			models.PolicyCheckCommand,
 			err,
-			"**Policy Check Error**\n```\nerr\n```\n",
+			"**Policy Check Error**\n```\nerr\n```" +
+				"\n* :heavy_check_mark: To **approve** failing policies either request an approval from approvers or address the failure by modifying the codebase.\n\n",
 		},
 	}
 
@@ -638,6 +639,8 @@ $$$
 $$$
 error
 $$$
+* :heavy_check_mark: To **approve** failing policies either request an approval from approvers or address the failure by modifying the codebase.
+
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:

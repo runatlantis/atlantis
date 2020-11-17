@@ -109,8 +109,6 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 		verbose,
 	)
 
-	ctx.Log.Debug("policy sets %s", prjCfg.PolicySets)
-
 	if cmdName == models.PlanCommand {
 		ctx.Log.Debug("Building project command context for %s", models.PolicyCheckCommand)
 		steps := prjCfg.Workflow.PolicyCheck.Steps

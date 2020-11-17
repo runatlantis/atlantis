@@ -24,9 +24,10 @@ import (
 )
 
 const (
-	planCommandTitle        = "Plan"
-	applyCommandTitle       = "Apply"
-	policyCheckCommandTitle = "Policy Check"
+	planCommandTitle            = "Plan"
+	applyCommandTitle           = "Apply"
+	policyCheckCommandTitle     = "Policy Check"
+	approvePoliciesCommandTitle = "Approve Policies"
 	// maxUnwrappedLines is the maximum number of lines the Terraform output
 	// can be before we wrap it in an expandable template.
 	maxUnwrappedLines = 12
@@ -182,8 +183,11 @@ func (m *MarkdownRenderer) renderProjectResults(results []models.ProjectResult, 
 		tmpl = singleProjectPlanUnsuccessfulTmpl
 	case len(resultsTmplData) == 1 && common.Command == applyCommandTitle:
 		tmpl = singleProjectApplyTmpl
-	case common.Command == planCommandTitle || common.Command == policyCheckCommandTitle:
+	case common.Command == planCommandTitle,
+		common.Command == policyCheckCommandTitle:
 		tmpl = multiProjectPlanTmpl
+	case common.Command == approvePoliciesCommandTitle:
+		tmpl = approveAllProjectsTmpl
 	case common.Command == applyCommandTitle:
 		tmpl = multiProjectApplyTmpl
 	default:
@@ -235,6 +239,11 @@ var singleProjectPlanSuccessTmpl = template.Must(template.New("").Parse(
 var singleProjectPlanUnsuccessfulTmpl = template.Must(template.New("").Parse(
 	"{{$result := index .Results 0}}Ran {{.Command}} for dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n" +
 		"{{$result.Rendered}}\n" + logTmpl))
+var approveAllProjectsTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
+	"Approved Policies for {{ len .Results }} projects:\n\n" +
+		"{{ range $result := .Results }}" +
+		"1. {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n" +
+		"{{end}}\n" + logTmpl))
 var multiProjectPlanTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
 	"Ran {{.Command}} for {{ len .Results }} projects:\n\n" +
 		"{{ range $result := .Results }}" +
@@ -318,7 +327,10 @@ var applyWrappedSuccessTmpl = template.Must(template.New("").Parse(
 var unwrappedErrTmplText = "**{{.Command}} Error**\n" +
 	"```\n" +
 	"{{.Error}}\n" +
-	"```"
+	"```" +
+	"{{ if eq .Command \"Policy Check\" }}" +
+	"\n* :heavy_check_mark: To **approve** failing policies either request an approval from approvers or address the failure by modifying the codebase.\n" +
+	"{{ end }}"
 var wrappedErrTmplText = "**{{.Command}} Error**\n" +
 	"<details><summary>Show Output</summary>\n\n" +
 	"```\n" +

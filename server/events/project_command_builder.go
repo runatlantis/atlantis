@@ -57,7 +57,6 @@ func NewProjectCommandBuilder(
 	return projectCommandBuilder
 }
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
 type ProjectPlanCommandBuilder interface {
 	// BuildAutoplanCommands builds project commands that will run plan on
 	// the projects determined to be modified.
@@ -75,10 +74,18 @@ type ProjectApplyCommandBuilder interface {
 	BuildApplyCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error)
 }
 
+type ProjectApprovePoliciesCommandBuilder interface {
+	// BuildApprovePoliciesCommands builds project PolicyCheck commands for this ctx and comment.
+	BuildApprovePoliciesCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error)
+}
+
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
+
 // ProjectCommandBuilder builds commands that run on individual projects.
 type ProjectCommandBuilder interface {
 	ProjectPlanCommandBuilder
 	ProjectApplyCommandBuilder
+	ProjectApprovePoliciesCommandBuilder
 }
 
 // DefaultProjectCommandBuilder implements ProjectCommandBuilder.
@@ -125,10 +132,14 @@ func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *CommandContext, cm
 // See ProjectCommandBuilder.BuildApplyCommands.
 func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
 	if !cmd.IsForSpecificProject() {
-		return p.buildApplyAllCommands(ctx, cmd)
+		return p.buildAllProjectCommands(ctx, cmd)
 	}
 	pac, err := p.buildProjectApplyCommand(ctx, cmd)
 	return pac, err
+}
+
+func (p *DefaultProjectCommandBuilder) BuildApprovePoliciesCommands(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+	return p.buildAllProjectCommands(ctx, cmd)
 }
 
 // buildPlanAllCommands builds plan contexts for all projects we determine were
@@ -336,11 +347,11 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *CommandContext, projectName s
 	return
 }
 
-// buildApplyAllCommands builds contexts for apply for every project that has
+// buildAllProjectCommands builds contexts for a command for every project that has
 // pending plans in this ctx.
-func (p *DefaultProjectCommandBuilder) buildApplyAllCommands(ctx *CommandContext, commentCmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+func (p *DefaultProjectCommandBuilder) buildAllProjectCommands(ctx *CommandContext, commentCmd *CommentCommand) ([]models.ProjectCommandContext, error) {
 	// Lock all dirs in this pull request (instead of a single dir) because we
-	// don't know how many dirs we'll need to apply in.
+	// don't know how many dirs we'll need to run the command in.
 	unlockFn, err := p.WorkingDirLocker.TryLockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num)
 	if err != nil {
 		return nil, err
@@ -359,11 +370,11 @@ func (p *DefaultProjectCommandBuilder) buildApplyAllCommands(ctx *CommandContext
 
 	var cmds []models.ProjectCommandContext
 	for _, plan := range plans {
-		applyCmds, err := p.buildProjectCommandCtx(ctx, models.ApplyCommand, plan.ProjectName, commentCmd.Flags, plan.RepoDir, plan.RepoRelDir, plan.Workspace, commentCmd.Verbose)
+		commentCmds, err := p.buildProjectCommandCtx(ctx, commentCmd.CommandName(), plan.ProjectName, commentCmd.Flags, plan.RepoDir, plan.RepoRelDir, plan.Workspace, commentCmd.Verbose)
 		if err != nil {
 			return nil, errors.Wrapf(err, "building command for dir %q", plan.RepoRelDir)
 		}
-		cmds = append(cmds, applyCmds...)
+		cmds = append(cmds, commentCmds...)
 	}
 	return cmds, nil
 }

@@ -88,6 +88,8 @@ func buildCommentCommandRunner(
 		)
 	case models.PlanCommand:
 		return NewPlanCommandRunner(cmdRunner, isAutoplan)
+	case models.ApprovePoliciesCommand:
+		return NewApprovePoliciesCommandRunner(cmdRunner)
 	}
 
 	return nil
