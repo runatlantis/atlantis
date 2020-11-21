@@ -187,12 +187,12 @@ func NewClient(
 		// Create the outputCmdDir if it's not created
 		if os.IsNotExist(err) {
 			if err = os.MkdirAll(outputCmdDir, 0700); err != nil {
-				return nil, errors.Wrapf(err, "unable to create terraform output dir at %s", outputCmdDir)
+				return nil, errors.Wrapf(err, "can't create terraform output dir at %s", outputCmdDir)
 			}
 		}
 
 		if err != nil {
-			return nil, errors.Wrapf(err, "unable to create terraform output dir at %s", outputCmdDir)
+			return nil, errors.Wrapf(err, "can't verify terraform output dir at %s", outputCmdDir)
 		}
 	}
 
@@ -274,7 +274,7 @@ func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path st
 		outputFilePath := filepath.Join(c.outputCmdDir, outputFileName)
 		outputFile, err := os.OpenFile(outputFilePath, os.O_CREATE|os.O_WRONLY, 0444)
 		if err != nil {
-			return "", errors.Wrapf(err, "unable to create tf output file %s", outputFilePath)
+			return "", errors.Wrapf(err, "can't create tf output file %q", outputFilePath)
 		}
 		defer outputFile.Close()
 
