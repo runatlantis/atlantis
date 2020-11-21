@@ -258,10 +258,18 @@ func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path st
 
 	// If outputCmdDir configured, create the file to write the output from the command
 	if len(c.outputCmdDir) > 0 {
-		tfAction := strings.Split(tfCmd, " ")[1]
-		outputFileName := fmt.Sprintf("%d-%s-%s", time.Now().UnixNano(), tfAction, workspace)
+		now := time.Now().UTC()
+		// Output file has to be unique per tf command and per project in Atlantis
+		outputFileName := fmt.Sprintf("%s-%s-%s-%s",
+			now.Format("20060102150405"),
+			args[0], // tf command, plan, apply, ...
+			workspace,
+			strings.ReplaceAll(path, string(os.PathSeparator), "-")[1:])
 
-		log.Debug("terraform output file for %q, file %q", tfAction, outputFileName)
+		// Remove any dot
+		outputFileName = strings.ReplaceAll(outputFileName, ".", "")
+
+		log.Debug("terraform output file for %q, file %q", args[0], outputFileName)
 
 		outputFilePath := filepath.Join(c.outputCmdDir, outputFileName)
 		outputFile, err := os.OpenFile(outputFilePath, os.O_CREATE|os.O_WRONLY, 0444)
