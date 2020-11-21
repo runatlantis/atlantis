@@ -16,6 +16,7 @@ package terraform
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -26,6 +27,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/hashicorp/go-getter"
 	"github.com/hashicorp/go-version"
@@ -68,6 +70,9 @@ type DefaultClient struct {
 
 	// usePluginCache determines whether or not to set the TF_PLUGIN_CACHE_DIR env var
 	usePluginCache bool
+
+	// outputCmdDir specify where the tf commands should write its output (stdout and stderr)
+	outputCmdDir string
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_downloader.go Downloader
@@ -111,7 +116,8 @@ func NewClient(
 	defaultVersionFlagName string,
 	tfDownloadURL string,
 	tfDownloader Downloader,
-	usePluginCache bool) (*DefaultClient, error) {
+	usePluginCache bool,
+	outputCmdDir string) (*DefaultClient, error) {
 	var finalDefaultVersion *version.Version
 	var localVersion *version.Version
 	versions := make(map[string]string)
@@ -175,6 +181,21 @@ func NewClient(
 		return nil, errors.Wrapf(err, "unable to create terraform plugin cache directory at %q", terraformPluginCacheDirName)
 	}
 
+	// If outputCmdDir is configured, verify if the outputCmdDir exists
+	if len(outputCmdDir) > 0 {
+		_, err := os.Stat(outputCmdDir)
+		// Create the outputCmdDir if it's not created
+		if os.IsNotExist(err) {
+			if err = os.MkdirAll(outputCmdDir, 0700); err != nil {
+				return nil, errors.Wrapf(err, "unable to create terraform output dir at %s", outputCmdDir)
+			}
+		}
+
+		if err != nil {
+			return nil, errors.Wrapf(err, "unable to create terraform output dir at %s", outputCmdDir)
+		}
+	}
+
 	return &DefaultClient{
 		defaultVersion:          finalDefaultVersion,
 		terraformPluginCacheDir: cacheDir,
@@ -184,6 +205,7 @@ func NewClient(
 		versionsLock:            &versionsLock,
 		versions:                versions,
 		usePluginCache:          usePluginCache,
+		outputCmdDir:            outputCmdDir,
 	}, nil
 }
 
@@ -221,19 +243,51 @@ func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path st
 	if err != nil {
 		return "", err
 	}
+
 	envVars := cmd.Env
 	for key, val := range customEnvVars {
 		envVars = append(envVars, fmt.Sprintf("%s=%s", key, val))
 	}
 	cmd.Env = envVars
-	out, err := cmd.CombinedOutput()
+
+	// Default string writer
+	strBuff := bytes.NewBuffer([]byte{})
+
+	var writer io.Writer
+	writer = strBuff
+
+	// If outputCmdDir configured, create the file to write the output from the command
+	if len(c.outputCmdDir) > 0 {
+		tfAction := strings.Split(tfCmd, " ")[1]
+		outputFileName := fmt.Sprintf("%d-%s-%s", time.Now().UnixNano(), tfAction, workspace)
+
+		log.Debug("terraform output file for %q, file %q", tfAction, outputFileName)
+
+		outputFilePath := filepath.Join(c.outputCmdDir, outputFileName)
+		outputFile, err := os.OpenFile(outputFilePath, os.O_CREATE|os.O_WRONLY, 0444)
+		if err != nil {
+			return "", errors.Wrapf(err, "unable to create tf output file %s", outputFilePath)
+		}
+		defer outputFile.Close()
+
+		// Multi writer to handle stdout and stderr in both outputs string and file.
+		writer = io.MultiWriter(strBuff, outputFile)
+	}
+
+	// Set writer in both stds
+	cmd.Stdout = writer
+	cmd.Stderr = writer
+
+	err = cmd.Run()
 	if err != nil {
 		err = errors.Wrapf(err, "running %q in %q", tfCmd, path)
 		log.Err(err.Error())
-		return string(out), err
+		return strBuff.String(), err
 	}
+
 	log.Info("successfully ran %q in %q", tfCmd, path)
-	return string(out), nil
+
+	return strBuff.String(), nil
 }
 
 // prepCmd builds a ready to execute command based on the version of terraform

@@ -69,6 +69,7 @@ const (
 	GitlabWebhookSecretFlag    = "gitlab-webhook-secret" // nolint: gosec
 	HidePrevPlanComments       = "hide-prev-plan-comments"
 	LogLevelFlag               = "log-level"
+	OutputCmdDirFlag           = "output-cmd-dir"
 	ParallelPoolSize           = "parallel-pool-size"
 	AllowDraftPRs              = "allow-draft-prs"
 	PortFlag                   = "port"
@@ -210,6 +211,10 @@ var stringFlags = map[string]stringFlag{
 	LogLevelFlag: {
 		description:  "Log level. Either debug, info, warn, or error.",
 		defaultValue: DefaultLogLevel,
+	},
+	OutputCmdDirFlag: {
+		description:  "Output directory for terraform commands",
+		defaultValue: "",
 	},
 	RepoConfigFlag: {
 		description: "Path to a repo config file, used to customize how Atlantis runs on each repo. See runatlantis.io/docs for more details.",
