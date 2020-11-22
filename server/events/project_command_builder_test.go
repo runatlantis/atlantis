@@ -746,7 +746,6 @@ projects:
 
 	type testCase struct {
 		DirStructure  map[string]interface{}
-		AtlantisYAML  string
 		ModifiedFiles []string
 		Exp           map[string][]int
 	}

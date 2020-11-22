@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
+	"sort"
 	"strings"
 
+	semver "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 
 	"github.com/hashicorp/go-version"
@@ -15,6 +16,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/yaml"
+	lib "github.com/warrensbox/terraform-switcher/lib"
 )
 
 const (
@@ -30,6 +32,10 @@ const (
 	DefaultParallelApplyEnabled = false
 	// DefaultParallelPlanEnabled is the default for the parallel plan setting.
 	DefaultParallelPlanEnabled = false
+)
+
+const (
+	tfReleasesURL = "https://releases.hashicorp.com/terraform/"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
@@ -483,26 +489,52 @@ func (p *DefaultProjectCommandBuilder) getTfVersion(ctx *CommandContext, absProj
 		return nil
 	}
 
-	if len(module.RequiredCore) != 1 {
-		ctx.Log.Info("cannot determine which version to use from terraform configuration, detected %d possibilities.", len(module.RequiredCore))
+	if len(module.RequiredCore) == 0 {
+		ctx.Log.Debug("no version constraints detected from terrafrom configuration.")
 		return nil
 	}
-	requiredVersionSetting := module.RequiredCore[0]
 
-	// We allow `= x.y.z`, `=x.y.z` or `x.y.z` where `x`, `y` and `z` are integers.
-	re := regexp.MustCompile(`^=?\s*([^\s]+)\s*$`)
-	matched := re.FindStringSubmatch(requiredVersionSetting)
-	if len(matched) == 0 {
-		ctx.Log.Debug("did not specify exact version in terraform configuration, found %q", requiredVersionSetting)
-		return nil
-	}
-	ctx.Log.Debug("found required_version setting of %q", requiredVersionSetting)
-	version, err := version.NewVersion(matched[1])
+	// build constraints
+	constraintStrings := strings.Join(module.RequiredCore, ",")
+
+	constraints, err := semver.NewConstraint(constraintStrings)
 	if err != nil {
-		ctx.Log.Debug(err.Error())
+		ctx.Log.Err("trying to build constraints: %s", err)
 		return nil
 	}
 
-	ctx.Log.Info("detected module requires version: %q", version.String())
-	return version
+	// build versions
+	includePrerelease := true
+
+	versionStrings, err := lib.GetTFList(tfReleasesURL, includePrerelease)
+	if err != nil {
+		ctx.Log.Err("trying to get list of terraform versions from %s", tfReleasesURL)
+		return nil
+	}
+
+	versions := make([]*semver.Version, len(versionStrings))
+	for i, versionString := range versionStrings {
+		version, err := semver.NewVersion(versionString)
+		if err != nil {
+			ctx.Log.Err("trying to build version list: %s", err)
+			return nil
+		}
+
+		versions[i] = version
+	}
+
+	// sortVersions
+	sort.Sort(sort.Reverse(semver.Collection(versions)))
+
+	for _, version := range versions {
+		if constraints.Check(version) {
+			ctx.Log.Info("detected module requires version: %q", version)
+			return version
+		}
+
+	}
+
+	ctx.Log.Info("no versions matched constraint: %s", constraints)
+	return nil
+
 }
