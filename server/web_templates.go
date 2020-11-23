@@ -103,6 +103,11 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
     <p class="placeholder">No locks found.</p>
     {{ end }}
   </section>
+  <br>
+  <div class="navbar-spacer"></div>
+  <section>
+	<p class="title-heading small"><strong>Terraform outputs</strong></p>
+  </section>
 </div>
 <footer>
 v{{ .AtlantisVersion }}
