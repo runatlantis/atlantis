@@ -16,7 +16,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/yaml"
-	lib "github.com/warrensbox/terraform-switcher/lib"
 )
 
 const (
@@ -32,10 +31,6 @@ const (
 	DefaultParallelApplyEnabled = false
 	// DefaultParallelPlanEnabled is the default for the parallel plan setting.
 	DefaultParallelPlanEnabled = false
-)
-
-const (
-	tfReleasesURL = "https://releases.hashicorp.com/terraform/"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
@@ -68,6 +63,7 @@ type DefaultProjectCommandBuilder struct {
 	PendingPlanFinder  *DefaultPendingPlanFinder
 	CommentBuilder     CommentBuilder
 	SkipCloneNoChanges bool
+	ReleasesLister     ReleasesLister
 }
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
@@ -504,17 +500,15 @@ func (p *DefaultProjectCommandBuilder) getTfVersion(ctx *CommandContext, absProj
 	}
 
 	// build versions
-	includePrerelease := true
-
-	versionStrings, err := lib.GetTFList(tfReleasesURL, includePrerelease)
+	releaseList, err := p.ReleasesLister.ListReleases()
 	if err != nil {
-		ctx.Log.Err("trying to get list of terraform versions from %s", tfReleasesURL)
+		ctx.Log.Err("trying to get list of terraform versions: %s", err)
 		return nil
 	}
 
-	versions := make([]*semver.Version, len(versionStrings))
-	for i, versionString := range versionStrings {
-		version, err := semver.NewVersion(versionString)
+	versions := make([]*semver.Version, len(releaseList))
+	for i, release := range releaseList {
+		version, err := semver.NewVersion(release)
 		if err != nil {
 			ctx.Log.Err("trying to build version list: %s", err)
 			return nil
