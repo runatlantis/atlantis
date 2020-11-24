@@ -73,6 +73,7 @@ type Server struct {
 	CommandRunner       *events.DefaultCommandRunner
 	Logger              *logging.SimpleLogger
 	Locker              locking.Locker
+	TfOutput            terraform.Output
 	EventsController    *EventsController
 	GithubAppController *GithubAppController
 	LocksController     *LocksController
@@ -465,6 +466,16 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubOrg:           userConfig.GithubOrg,
 	}
 
+	var tfOutput terraform.Output
+	if len(userConfig.OutputCmdDir) > 0 {
+		tfOutput, err = terraform.NewOutput(userConfig.OutputCmdDir)
+		if err != nil {
+			return nil, errors.Wrap(err, "can't create terraform output service")
+		}
+	}
+
+
+
 	return &Server{
 		AtlantisVersion:     config.AtlantisVersion,
 		AtlantisURL:         parsedURL,
@@ -473,6 +484,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CommandRunner:       commandRunner,
 		Logger:              logger,
 		Locker:              lockingClient,
+		TfOutput: 			 tfOutput,
 		EventsController:    eventsController,
 		GithubAppController: githubAppController,
 		LocksController:     locksController,
@@ -582,11 +594,31 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 		})
 	}
 
+	// Check if terraform output was configured
+	var tfOutputs []TfOutputIndexData
+	if s.TfOutput != nil {
+		outputs, err := s.TfOutput.List()
+		if err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			fmt.Fprintf(w, "Could not retrieve terraform outputs: %s", err)
+			return
+		}
+
+		for _, tfOutput := range outputs {
+			tfOutputs = append(tfOutputs, TfOutputIndexData{
+				CreatedAtFormatted: tfOutput.CreatedAt.Format("02-01-2006 15:04:05"),
+				TfCommand:          tfOutput.TfCommand,
+				Path:               tfOutput.Path,
+			})
+		}
+	}
+
 	//Sort by date - newest to oldest.
 	sort.SliceStable(lockResults, func(i, j int) bool { return lockResults[i].Time.After(lockResults[j].Time) })
 
 	err = s.IndexTemplate.Execute(w, IndexData{
 		Locks:           lockResults,
+		TfOutputs: 		 tfOutputs,
 		AtlantisVersion: s.AtlantisVersion,
 		CleanedBasePath: s.AtlantisURL.Path,
 	})

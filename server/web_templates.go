@@ -40,9 +40,17 @@ type LockIndexData struct {
 	TimeFormatted string
 }
 
+// TfOutputIndexData hols de the fields to display the index view for terraform outputs.
+type TfOutputIndexData struct {
+	CreatedAtFormatted string
+	TfCommand          string
+	Path               string
+}
+
 // IndexData holds the data for rendering the index page
 type IndexData struct {
 	Locks           []LockIndexData
+	TfOutputs       []TfOutputIndexData
 	AtlantisVersion string
 	// CleanedBasePath is the path Atlantis is accessible at externally. If
 	// not using a path-based proxy, this will be an empty string. Never ends
@@ -107,6 +115,15 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
   <div class="navbar-spacer"></div>
   <section>
 	<p class="title-heading small"><strong>Terraform outputs</strong></p>
+    {{ range .TfOutputs }}
+	<a>
+	  <div class="twelve columns button content lock-row">
+        <div class="list-title">{{.Path}}</div>
+        <div class="list-status"><code>{{.TfCommand}}</code></div>
+        <div class="list-timestamp"><span class="heading-font-size">{{.CreatedAtFormatted}}</span></div>
+      </div>
+    </a>
+	{{ end }}
   </section>
 </div>
 <footer>

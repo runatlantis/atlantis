@@ -264,15 +264,13 @@ func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path st
 			now.Format("20060102150405"),
 			args[0], // tf command, plan, apply, ...
 			workspace,
-			strings.ReplaceAll(path, string(os.PathSeparator), "-")[1:])
-
-		outputFileName = strings.ReplaceAll(outputFileName, ".", "")
+			strings.ReplaceAll(path, string(os.PathSeparator), "_")[1:])
 
 		log.Debug("terraform output file for %q, file %q", args[0], outputFileName)
 
 		outputFilePath := filepath.Join(c.outputCmdDir, outputFileName)
 		// Create the file with only read mode
-		outputFile, err := os.OpenFile(outputFilePath, os.O_CREATE|os.O_WRONLY, 0444)
+		outputFile, err := os.OpenFile(outputFilePath, os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			return "", errors.Wrapf(err, "can't create tf output file %q", outputFilePath)
 		}
