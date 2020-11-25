@@ -238,7 +238,7 @@ tbody {
   color: #FFFFFF;
 }
 
-.commit code {
+.commit {
   text-transform: lowercase;
 }
 
