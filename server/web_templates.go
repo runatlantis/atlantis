@@ -43,6 +43,11 @@ type LockIndexData struct {
 // TfOutputIndexData hols de the fields to display the index view for terraform outputs.
 type TfOutputIndexData struct {
 	CreatedAtFormatted string
+	RepoFullName       string
+	PullNum            int
+	HeadCommit         string
+	Project            string
+	Workspace          string
 	TfCommand          string
 	Path               string
 }
@@ -118,8 +123,7 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
     {{ range .TfOutputs }}
 	<a>
 	  <div class="twelve columns button content lock-row">
-        <div class="list-title">{{.Path}}</div>
-        <div class="list-status"><code>{{.TfCommand}}</code></div>
+		<div class="list-title">{{.RepoFullName}} <span class="heading-font-size">#{{.PullNum}}</span> <code>{{.Project}}</code> <code>{{.TfCommand}}</code> <code class="commit">{{.HeadCommit}}</code> </div>
         <div class="list-timestamp"><span class="heading-font-size">{{.CreatedAtFormatted}}</span></div>
       </div>
     </a>

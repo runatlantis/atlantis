@@ -18,6 +18,12 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/hashicorp/go-getter"
+	"github.com/hashicorp/go-version"
+	"github.com/mitchellh/go-homedir"
+	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/logging"
 	"io"
 	"io/ioutil"
 	"os"
@@ -27,13 +33,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"time"
-
-	"github.com/hashicorp/go-getter"
-	"github.com/hashicorp/go-version"
-	"github.com/mitchellh/go-homedir"
-	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/logging"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_terraform_client.go Client
@@ -42,7 +41,7 @@ type Client interface {
 	// RunCommandWithVersion executes terraform with args in path. If v is nil,
 	// it will use the default Terraform version. workspace is the Terraform
 	// workspace which should be set as an environment variable.
-	RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, envs map[string]string, v *version.Version, workspace string) (string, error)
+	RunCommandWithVersion(ctx models.ProjectCommandContext, path string, args []string, customEnvVars map[string]string, v *version.Version) (string, error)
 
 	// EnsureVersion makes sure that terraform version `v` is available to use
 	EnsureVersion(log *logging.SimpleLogger, v *version.Version) error
@@ -73,6 +72,9 @@ type DefaultClient struct {
 
 	// outputCmdDir specify where the tf commands should write its output (stdout and stderr)
 	outputCmdDir string
+
+	// outputHelper deals with the tf file output operations
+	outputHelper FileOutputHelper
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_downloader.go Downloader
@@ -238,8 +240,8 @@ func (c *DefaultClient) EnsureVersion(log *logging.SimpleLogger, v *version.Vers
 }
 
 // See Client.RunCommandWithVersion.
-func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (string, error) {
-	tfCmd, cmd, err := c.prepCmd(log, v, workspace, path, args)
+func (c *DefaultClient) RunCommandWithVersion(ctx models.ProjectCommandContext, path string, args []string, customEnvVars map[string]string, v *version.Version) (string, error) {
+	tfCmd, cmd, err := c.prepCmd(ctx.Log, v, ctx.Workspace, path, args)
 	if err != nil {
 		return "", err
 	}
@@ -258,18 +260,19 @@ func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path st
 
 	// If outputCmdDir configured, create the file to write the output from the command
 	if len(c.outputCmdDir) > 0 {
-		now := time.Now().UTC()
-		// Output file has to be unique per tf command and per Atlantis project
-		outputFileName := fmt.Sprintf("%s-%s-%s-%s",
-			now.Format("20060102150405"),
-			args[0], // tf command, plan, apply, ...
-			workspace,
-			strings.ReplaceAll(path, string(os.PathSeparator), "_")[1:])
+		outputFileName := c.outputHelper.CreateFileName(
+			ctx.HeadRepo.FullName,
+			ctx.Pull.Num,
+			ctx.Pull.HeadCommit,
+			ctx.ProjectName,
+			ctx.Workspace,
+			args[0], // Tf command (e.g. plan and apply) is always the first argument.
+		)
 
-		log.Debug("terraform output file for %q, file %q", args[0], outputFileName)
+		ctx.Log.Debug("terraform output file for project %q and tf command %q, file %q will be created", ctx.ProjectName, args[0], outputFileName)
 
 		outputFilePath := filepath.Join(c.outputCmdDir, outputFileName)
-		// Create the file with only read mode
+		// Create the file with read mode
 		outputFile, err := os.OpenFile(outputFilePath, os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			return "", errors.Wrapf(err, "can't create tf output file %q", outputFilePath)
@@ -287,11 +290,11 @@ func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path st
 	err = cmd.Run()
 	if err != nil {
 		err = errors.Wrapf(err, "running %q in %q", tfCmd, path)
-		log.Err(err.Error())
+		ctx.Log.Err(err.Error())
 		return strBuff.String(), err
 	}
 
-	log.Info("successfully ran %q in %q", tfCmd, path)
+	ctx.Log.Info("successfully ran %q in %q", tfCmd, path)
 
 	return strBuff.String(), nil
 }
@@ -465,7 +468,7 @@ func ensureVersion(log *logging.SimpleLogger, dl Downloader, versions map[string
 
 	// This tf version might not yet be in the versions map even though it
 	// exists on disk. This would happen if users have manually added
-	// terraform{version} binaries. In this case we don't want to re-download.
+	// terraform{version} binaries. In this case we don't exp to re-download.
 	binFile := "terraform" + v.String()
 	if binPath, err := exec.LookPath(binFile); err == nil {
 		versions[v.String()] = binPath
@@ -503,7 +506,7 @@ func generateRCFile(tfeToken string, tfeHostname string, home string) error {
 
 	// If there is already a .terraformrc file and its contents aren't exactly
 	// what we would have written to it, then we error out because we don't
-	// want to overwrite anything.
+	// exp to overwrite anything.
 	if _, err := os.Stat(rcFile); err == nil {
 		currContents, err := ioutil.ReadFile(rcFile) // nolint: gosec
 		if err != nil {

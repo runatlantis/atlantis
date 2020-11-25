@@ -395,7 +395,7 @@ func (r *remoteApplyMock) RunCommandAsync(log *logging.SimpleLogger, path string
 }
 
 var preConfirmOutFmt = `
-Running apply in the remote backend. Output will stream here. Pressing Ctrl-C
+Running apply in the remote backend. OutputHelper will stream here. Pressing Ctrl-C
 will cancel the remote apply if its still pending. If the apply started it
 will stop streaming the logs, but will not stop the apply running remotely.
 

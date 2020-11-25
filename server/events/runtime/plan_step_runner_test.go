@@ -826,7 +826,7 @@ func stringSliceEquals(a, b []string) bool {
 	return true
 }
 
-var remotePlanOutput = `Running plan in the remote backend. Output will stream here. Pressing Ctrl-C
+var remotePlanOutput = `Running plan in the remote backend. OutputHelper will stream here. Pressing Ctrl-C
 will stop streaming the logs, but will not stop the plan running remotely.
 
 Preparing the remote plan...

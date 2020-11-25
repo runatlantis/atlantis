@@ -237,6 +237,11 @@ tbody {
   border: #E74C3C;
   color: #FFFFFF;
 }
+
+.commit code {
+  text-transform: lowercase;
+}
+
 .unlock{
   height: 16px;
   margin-top: 12px;

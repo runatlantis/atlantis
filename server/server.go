@@ -73,7 +73,7 @@ type Server struct {
 	CommandRunner       *events.DefaultCommandRunner
 	Logger              *logging.SimpleLogger
 	Locker              locking.Locker
-	TfOutput            terraform.Output
+	TfOutput            terraform.OutputHelper
 	EventsController    *EventsController
 	GithubAppController *GithubAppController
 	LocksController     *LocksController
@@ -466,9 +466,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubOrg:           userConfig.GithubOrg,
 	}
 
-	var tfOutput terraform.Output
+	var tfOutput terraform.OutputHelper
 	if len(userConfig.OutputCmdDir) > 0 {
-		tfOutput, err = terraform.NewOutput(userConfig.OutputCmdDir)
+		tfOutput, err = terraform.NewOutputHelper(userConfig.OutputCmdDir)
 		if err != nil {
 			return nil, errors.Wrap(err, "can't create terraform output service")
 		}
@@ -607,6 +607,11 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 		for _, tfOutput := range outputs {
 			tfOutputs = append(tfOutputs, TfOutputIndexData{
 				CreatedAtFormatted: tfOutput.CreatedAt.Format("02-01-2006 15:04:05"),
+				RepoFullName:       tfOutput.FullRepoName,
+				PullNum:            tfOutput.PullRequestNr,
+				HeadCommit:         tfOutput.HeadCommit,
+				Project:            tfOutput.Project,
+				Workspace:          tfOutput.Workspace,
 				TfCommand:          tfOutput.TfCommand,
 				Path:               tfOutput.Path,
 			})
