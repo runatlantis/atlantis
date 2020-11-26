@@ -78,6 +78,7 @@ type Server struct {
 	GithubAppController *GithubAppController
 	LocksController     *LocksController
 	StatusController    *StatusController
+	TfOutputsController *TfOutputsController
 	IndexTemplate       TemplateWriter
 	LockDetailTemplate  TemplateWriter
 	SSLCertFile         string
@@ -474,7 +475,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 	}
 
-
+	tfOutputsController := &TfOutputsController{
+		log:            logger,
+		tfOutputHelper: tfOutput,
+	}
 
 	return &Server{
 		AtlantisVersion:     config.AtlantisVersion,
@@ -491,6 +495,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		StatusController:    statusController,
 		IndexTemplate:       indexTemplate,
 		LockDetailTemplate:  lockTemplate,
+		TfOutputsController: tfOutputsController,
 		SSLKeyFile:          userConfig.SSLKeyFile,
 		SSLCertFile:         userConfig.SSLCertFile,
 		Drainer:             drainer,
@@ -511,6 +516,7 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
 	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
+	s.Router.HandleFunc("/tf-output", s.TfOutputsController.GetTfOutput).Methods("GET").Queries(s.TfOutputsController.GetTfOutputParams()...)
 	n := negroni.New(&negroni.Recovery{
 		Logger:     log.New(os.Stdout, "", log.LstdFlags),
 		PrintStack: false,

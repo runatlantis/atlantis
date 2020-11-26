@@ -135,6 +135,9 @@ github.com/gorilla/context
 # github.com/gorilla/mux v1.6.2
 ## explicit
 github.com/gorilla/mux
+# github.com/gorilla/websocket v1.4.2
+## explicit
+github.com/gorilla/websocket
 # github.com/hashicorp/go-cleanhttp v0.5.1
 github.com/hashicorp/go-cleanhttp
 # github.com/hashicorp/go-getter v1.4.0
@@ -173,6 +176,13 @@ github.com/hashicorp/hcl/v2/json
 # github.com/hashicorp/terraform-config-inspect v0.0.0-20200806211835-c481b8bfa41e
 ## explicit
 github.com/hashicorp/terraform-config-inspect/tfconfig
+# github.com/hpcloud/tail v1.0.0
+## explicit
+github.com/hpcloud/tail
+github.com/hpcloud/tail/ratelimiter
+github.com/hpcloud/tail/util
+github.com/hpcloud/tail/watch
+github.com/hpcloud/tail/winfile
 # github.com/huandu/xstrings v1.0.0
 ## explicit
 github.com/huandu/xstrings
@@ -418,11 +428,15 @@ google.golang.org/grpc/resolver/passthrough
 google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
+# gopkg.in/fsnotify.v1 v1.4.7
+gopkg.in/fsnotify.v1
 # gopkg.in/go-playground/assert.v1 v1.2.1
 ## explicit
 # gopkg.in/go-playground/validator.v9 v9.20.2
 ## explicit
 gopkg.in/go-playground/validator.v9
+# gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7
+gopkg.in/tomb.v1
 # gopkg.in/yaml.v2 v2.2.2
 ## explicit
 gopkg.in/yaml.v2

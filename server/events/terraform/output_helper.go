@@ -2,7 +2,10 @@ package terraform
 
 import (
 	"fmt"
+	"github.com/hpcloud/tail"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/logging"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -10,7 +13,10 @@ import (
 	"time"
 )
 
-const outputTimeFmt = "20060102150405"
+const (
+	outputTimeFmt = "20060102150405"
+	fileFormat
+)
 
 // TfOutputFile hold terraform output file data
 type TfOutputFile struct {
@@ -32,6 +38,10 @@ type OutputHelper interface {
 	ParseFileName(fileName string) (TfOutputFile, error)
 	// CreateFileName creates the file name for a terraform output.
 	CreateFileName(fullRepoName string, pullRequestNr int, headCommit string, project string, workspace string, tfCommand string) string
+	// ContinueReadFile continue reads the tf output file
+	ContinueReadFile(Log *logging.SimpleLogger, fileName string, writer io.Writer, done chan bool) error
+	// FindOutputFile finds the output file
+	FindOutputFile(createdAt, fullRepoName, pullNr, project, headCommit, workspace, tfCommand string) (string, error)
 }
 
 type FileOutputHelper struct {
@@ -120,4 +130,49 @@ func (f *FileOutputHelper) CreateFileName(fullRepoName string, pullRequestNr int
 		workspace,
 		tfCommand,
 	)
+}
+
+func (f *FileOutputHelper) ContinueReadFile(log *logging.SimpleLogger, fileName string, writer io.Writer, done chan bool) error {
+	tfOutputFileName := filepath.Join(f.outputCmdDir, fileName)
+	// This will work as `tail -f` command
+	t, err := tail.TailFile(filepath.Join(f.outputCmdDir, fileName), tail.Config{Follow: true})
+	if err != nil {
+		return errors.Wrapf(err, "can't tail %q", tfOutputFileName)
+	}
+
+	log.Debug("starting to tail file %q", tfOutputFileName)
+
+	for {
+		select {
+		case <-done:
+			log.Debug("stopping tailing file %q", tfOutputFileName)
+			return nil
+		case line := <-t.Lines:
+			_, err = fmt.Fprint(writer, line.Text)
+			if err != nil {
+				return errors.Wrap(err, "can't write on writer")
+			}
+		}
+	}
+}
+
+func (f *FileOutputHelper) FindOutputFile(createdAt, fullRepoName, pullNr, project, headCommit, workspace, tfCommand string) (string, error) {
+	// Format the file name
+	fileName := fmt.Sprintf("%s-%s-%s-%s-%s-%s-%s",
+		createdAt,
+		fullRepoName,
+		pullNr,
+		headCommit,
+		project,
+		workspace,
+		tfCommand,
+	)
+
+	// Verify if the file exists
+	stat, err := os.Stat(filepath.Join(f.outputCmdDir, fileName))
+	if err != nil || stat.IsDir() {
+		return "", errors.Wrapf(err, "can't stat the file %q or it's a dir", fileName)
+	}
+
+	return fileName, nil
 }

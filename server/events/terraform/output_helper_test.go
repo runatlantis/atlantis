@@ -1,10 +1,14 @@
 package terraform
 
 import (
+	"bytes"
+	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -124,8 +128,8 @@ func TestParseFileName(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "It should fail with invalid file name",
-			args:    args{
+			name: "It should fail with invalid file name",
+			args: args{
 				fileName: "test123",
 			},
 			exp:     TfOutputFile{},
@@ -145,4 +149,39 @@ func TestParseFileName(t *testing.T) {
 			Equals(t, tt.exp, got)
 		})
 	}
+}
+
+func TestFileOutputHelper_ContinueReadFile(t *testing.T) {
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+
+	testFileName := strconv.FormatInt(time.Now().UnixNano(), 10)
+	testFile, err := os.OpenFile(filepath.Join(tmp, testFileName), os.O_CREATE|os.O_WRONLY, os.ModePerm)
+	Ok(t, err)
+	defer testFile.Close()
+
+	helper, err := NewOutputHelper(tmp)
+	Ok(t, err)
+
+	log := logging.NewSimpleLogger("test", false, logging.Debug)
+	var buffTest bytes.Buffer
+	done := make(chan bool)
+	go func() {
+		err = helper.ContinueReadFile(log, testFileName, &buffTest, done)
+		Ok(t, err)
+	}()
+
+	testNewLines := []string{"ab\n", "cd\n", "ef\n"}
+	for i, data := range testNewLines {
+		_, err = testFile.WriteString(data)
+		Ok(t, err)
+
+		// Sleep to wait helper.ContinueReadFile to write into the buffTest
+		time.Sleep(10 * time.Millisecond)
+
+		// Verify if the buff has all the data written in the file being read
+		Equals(t, strings.ReplaceAll(strings.Join(testNewLines[:i+1], ""), "\n", ""), buffTest.String())
+	}
+	// Stop the continue read file method
+	done <- true
 }

@@ -26,11 +26,13 @@ require (
 	github.com/google/uuid v0.0.0-20161128191214-064e2069ce9c // indirect
 	github.com/gorilla/context v0.0.0-20160226214623-1ea25387ff6f // indirect
 	github.com/gorilla/mux v1.6.2
+	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/go-getter v1.4.0
 	github.com/hashicorp/go-version v1.2.0
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/hashicorp/hcl/v2 v2.6.0 // indirect
 	github.com/hashicorp/terraform-config-inspect v0.0.0-20200806211835-c481b8bfa41e
+	github.com/hpcloud/tail v1.0.0
 	github.com/huandu/xstrings v1.0.0 // indirect
 	github.com/imdario/mergo v0.3.5 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
