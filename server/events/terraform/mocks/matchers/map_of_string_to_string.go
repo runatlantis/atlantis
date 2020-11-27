@@ -5,7 +5,6 @@ import (
 	"reflect"
 	"github.com/petergtz/pegomock"
 	
-
 )
 
 func AnyMapOfStringToString() map[string]string {

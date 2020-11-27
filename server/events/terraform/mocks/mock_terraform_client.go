@@ -6,6 +6,7 @@ package mocks
 import (
 	go_version "github.com/hashicorp/go-version"
 	pegomock "github.com/petergtz/pegomock"
+	models "github.com/runatlantis/atlantis/server/events/models"
 	logging "github.com/runatlantis/atlantis/server/logging"
 	"reflect"
 	"time"
@@ -26,11 +27,11 @@ func NewMockClient(options ...pegomock.Option) *MockClient {
 func (mock *MockClient) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockClient) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockClient) RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, envs map[string]string, v *go_version.Version, workspace string) (string, error) {
+func (mock *MockClient) RunCommandWithVersion(ctx models.ProjectCommandContext, path string, args []string, customEnvVars map[string]string, v *go_version.Version) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}
-	params := []pegomock.Param{log, path, args, envs, v, workspace}
+	params := []pegomock.Param{ctx, path, args, customEnvVars, v}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("RunCommandWithVersion", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
 	var ret1 error
@@ -97,8 +98,8 @@ type VerifierMockClient struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockClient) RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, envs map[string]string, v *go_version.Version, workspace string) *MockClient_RunCommandWithVersion_OngoingVerification {
-	params := []pegomock.Param{log, path, args, envs, v, workspace}
+func (verifier *VerifierMockClient) RunCommandWithVersion(ctx models.ProjectCommandContext, path string, args []string, customEnvVars map[string]string, v *go_version.Version) *MockClient_RunCommandWithVersion_OngoingVerification {
+	params := []pegomock.Param{ctx, path, args, customEnvVars, v}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "RunCommandWithVersion", params, verifier.timeout)
 	return &MockClient_RunCommandWithVersion_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -108,17 +109,17 @@ type MockClient_RunCommandWithVersion_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockClient_RunCommandWithVersion_OngoingVerification) GetCapturedArguments() (*logging.SimpleLogger, string, []string, map[string]string, *go_version.Version, string) {
-	log, path, args, envs, v, workspace := c.GetAllCapturedArguments()
-	return log[len(log)-1], path[len(path)-1], args[len(args)-1], envs[len(envs)-1], v[len(v)-1], workspace[len(workspace)-1]
+func (c *MockClient_RunCommandWithVersion_OngoingVerification) GetCapturedArguments() (models.ProjectCommandContext, string, []string, map[string]string, *go_version.Version) {
+	ctx, path, args, customEnvVars, v := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1], path[len(path)-1], args[len(args)-1], customEnvVars[len(customEnvVars)-1], v[len(v)-1]
 }
 
-func (c *MockClient_RunCommandWithVersion_OngoingVerification) GetAllCapturedArguments() (_param0 []*logging.SimpleLogger, _param1 []string, _param2 [][]string, _param3 []map[string]string, _param4 []*go_version.Version, _param5 []string) {
+func (c *MockClient_RunCommandWithVersion_OngoingVerification) GetAllCapturedArguments() (_param0 []models.ProjectCommandContext, _param1 []string, _param2 [][]string, _param3 []map[string]string, _param4 []*go_version.Version) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]*logging.SimpleLogger, len(c.methodInvocations))
+		_param0 = make([]models.ProjectCommandContext, len(c.methodInvocations))
 		for u, param := range params[0] {
-			_param0[u] = param.(*logging.SimpleLogger)
+			_param0[u] = param.(models.ProjectCommandContext)
 		}
 		_param1 = make([]string, len(c.methodInvocations))
 		for u, param := range params[1] {
@@ -135,10 +136,6 @@ func (c *MockClient_RunCommandWithVersion_OngoingVerification) GetAllCapturedArg
 		_param4 = make([]*go_version.Version, len(c.methodInvocations))
 		for u, param := range params[4] {
 			_param4[u] = param.(*go_version.Version)
-		}
-		_param5 = make([]string, len(c.methodInvocations))
-		for u, param := range params[5] {
-			_param5[u] = param.(string)
 		}
 	}
 	return

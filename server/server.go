@@ -488,7 +488,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CommandRunner:       commandRunner,
 		Logger:              logger,
 		Locker:              lockingClient,
-		TfOutput: 			 tfOutput,
+		TfOutput:            tfOutput,
 		EventsController:    eventsController,
 		GithubAppController: githubAppController,
 		LocksController:     locksController,
@@ -516,7 +516,8 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
 	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
-	s.Router.HandleFunc("/tf-output", s.TfOutputsController.GetTfOutput).Methods("GET").Queries(s.TfOutputsController.GetTfOutputParams()...)
+	s.Router.HandleFunc("/tf-output", s.TfOutputsController.GetTfOutput).Methods("GET")
+
 	n := negroni.New(&negroni.Recovery{
 		Logger:     log.New(os.Stdout, "", log.LstdFlags),
 		PrintStack: false,
@@ -629,7 +630,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 
 	err = s.IndexTemplate.Execute(w, IndexData{
 		Locks:           lockResults,
-		TfOutputs: 		 tfOutputs,
+		TfOutputs:       tfOutputs,
 		AtlantisVersion: s.AtlantisVersion,
 		CleanedBasePath: s.AtlantisURL.Path,
 	})

@@ -1,7 +1,6 @@
 package terraform
 
 import (
-	"bytes"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 	"os"
@@ -164,23 +163,25 @@ func TestFileOutputHelper_ContinueReadFile(t *testing.T) {
 	Ok(t, err)
 
 	log := logging.NewSimpleLogger("test", false, logging.Debug)
-	var buffTest bytes.Buffer
+	content := make(chan string)
 	done := make(chan bool)
 	go func() {
-		err = helper.ContinueReadFile(log, testFileName, &buffTest, done)
+		err = helper.ContinueReadFile(log, testFileName, content, done)
 		Ok(t, err)
 	}()
 
 	testNewLines := []string{"ab\n", "cd\n", "ef\n"}
+	fullMsg := ""
 	for i, data := range testNewLines {
 		_, err = testFile.WriteString(data)
 		Ok(t, err)
 
-		// Sleep to wait helper.ContinueReadFile to write into the buffTest
-		time.Sleep(10 * time.Millisecond)
+		// Receives the output file from the channel
+		msg := <- content
+		fullMsg += msg
 
 		// Verify if the buff has all the data written in the file being read
-		Equals(t, strings.ReplaceAll(strings.Join(testNewLines[:i+1], ""), "\n", ""), buffTest.String())
+		Equals(t, strings.Join(testNewLines[:i+1], ""), fullMsg)
 	}
 	// Stop the continue read file method
 	done <- true

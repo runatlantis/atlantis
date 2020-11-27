@@ -1,8 +1,8 @@
 package terraform
 
 import (
+	"bufio"
 	"fmt"
-	"github.com/hpcloud/tail"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/logging"
 	"io"
@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 )
+
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_output_helper.go OutputHelper
 
 const (
 	outputTimeFmt = "20060102150405"
@@ -39,9 +41,9 @@ type OutputHelper interface {
 	// CreateFileName creates the file name for a terraform output.
 	CreateFileName(fullRepoName string, pullRequestNr int, headCommit string, project string, workspace string, tfCommand string) string
 	// ContinueReadFile continue reads the tf output file
-	ContinueReadFile(Log *logging.SimpleLogger, fileName string, writer io.Writer, done chan bool) error
+	ContinueReadFile(Log *logging.SimpleLogger, fileName string, fileText chan<- string, done chan bool) error
 	// FindOutputFile finds the output file
-	FindOutputFile(createdAt, fullRepoName, pullNr, project, headCommit, workspace, tfCommand string) (string, error)
+	FindOutputFile(createdAt, fullRepoName, pullNr, headCommit, project, workspace, tfCommand string) (string, error)
 }
 
 type FileOutputHelper struct {
@@ -132,31 +134,69 @@ func (f *FileOutputHelper) CreateFileName(fullRepoName string, pullRequestNr int
 	)
 }
 
-func (f *FileOutputHelper) ContinueReadFile(log *logging.SimpleLogger, fileName string, writer io.Writer, done chan bool) error {
+func (f *FileOutputHelper) ContinueReadFile(log *logging.SimpleLogger, fileName string, fileText chan<- string, done chan bool) error {
 	tfOutputFileName := filepath.Join(f.outputCmdDir, fileName)
-	// This will work as `tail -f` command
-	t, err := tail.TailFile(filepath.Join(f.outputCmdDir, fileName), tail.Config{Follow: true})
+	file, _ := os.Open(tfOutputFileName)
+	reader := bufio.NewReader(file)
+
+	//o, _ := ioutil.ReadAll(reader)
+	//log.Debug(string(o))
+
+	stat, err := file.Stat()
 	if err != nil {
-		return errors.Wrapf(err, "can't tail %q", tfOutputFileName)
+		return err
 	}
+	log.Debug(stat.Mode().String())
 
 	log.Debug("starting to tail file %q", tfOutputFileName)
 
 	for {
 		select {
 		case <-done:
+			close(fileText)
 			log.Debug("stopping tailing file %q", tfOutputFileName)
 			return nil
-		case line := <-t.Lines:
-			_, err = fmt.Fprint(writer, line.Text)
+		default:
+			// Read bytes until the break line
+			line, err := reader.ReadBytes('\n')
 			if err != nil {
-				return errors.Wrap(err, "can't write on writer")
+				// If it has reached the end of file, wait a bit to continue reading.
+				if err == io.EOF {
+					time.Sleep(time.Second)
+					continue
+				}
+
+				return errors.Wrapf(err, "error reading line from file %q", tfOutputFileName)
 			}
+
+			fileText <- string(line)
 		}
 	}
+
+	//// This will work as `tail -f` command
+	//t, err := tail.TailFile(tfOutputFileName, tail.Config{Follow: true, MustExist: true, ReOpen: false})
+	//if err != nil {
+	//	return errors.Wrapf(err, "can't tail %q", tfOutputFileName)
+	//}
+	//
+	//log.Debug("starting to tail file %q", tfOutputFileName)
+	//
+	//for {
+	//	select {
+	//	case <-done:
+	//		log.Debug("stopping tailing file %q", tfOutputFileName)
+	//		return nil
+	//	case line := <-t.Lines:
+	//		if t.Err() != nil {
+	//			fmt.Println(t.Err())
+	//		}
+	//		log.Debug("writing new line")
+	//		fileText <- line.Text
+	//	}
+	//}
 }
 
-func (f *FileOutputHelper) FindOutputFile(createdAt, fullRepoName, pullNr, project, headCommit, workspace, tfCommand string) (string, error) {
+func (f *FileOutputHelper) FindOutputFile(createdAt, fullRepoName, pullNr, headCommit, project, workspace, tfCommand string) (string, error) {
 	// Format the file name
 	fileName := fmt.Sprintf("%s-%s-%s-%s-%s-%s-%s",
 		createdAt,
@@ -167,6 +207,8 @@ func (f *FileOutputHelper) FindOutputFile(createdAt, fullRepoName, pullNr, proje
 		workspace,
 		tfCommand,
 	)
+
+	fmt.Println(fileName)
 
 	// Verify if the file exists
 	stat, err := os.Stat(filepath.Join(f.outputCmdDir, fileName))

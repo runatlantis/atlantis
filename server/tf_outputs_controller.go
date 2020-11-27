@@ -1,14 +1,12 @@
 package server
 
 import (
-	"bufio"
 	"fmt"
-	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	"github.com/runatlantis/atlantis/server/logging"
-	"log"
 	"net/http"
+	"strings"
 )
 
 type TfOutputsController struct {
@@ -17,56 +15,12 @@ type TfOutputsController struct {
 	wcUpgrader     websocket.Upgrader
 }
 
-func (o *TfOutputsController) GetTfOutputParams() []string {
-	return []string{"createdAt", "fullRepoName", "pullNr", "project", "headCommit", "workspace", "tfCommand"}
-}
-
 func (o *TfOutputsController) GetTfOutput(w http.ResponseWriter, r *http.Request) {
-	o.log.Debug("starting a websocket for getting a tf output file, request %s", r.URL.String())
-	// Get all the parameters from the query string
-	paramValues := make(map[string]string, len(o.GetTfOutputParams()))
-	mux.Vars()
-	for _, param := range o.GetTfOutputParams() {
-		ok := false
-		paramValues[param], ok = mux.Vars(r)[param]
-		if !ok {
-			o.log.Warn("no %s parameter found", param)
-			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprintf(w, "No %s parameter found \n", param)
-			return
-		}
+	o.wcUpgrader.CheckOrigin = func(r *http.Request) bool {
+		return true
 	}
 
-	tfOutputFileName, err := o.tfOutputHelper.FindOutputFile(
-		paramValues["createdAt"],
-		paramValues["fullRepoName"],
-		paramValues["pullNr"],
-		paramValues["project"],
-		paramValues["headCommit"],
-		paramValues["workspace"],
-		paramValues["tfCommand"],
-	)
-	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprintln(w, "No tf output file found")
-		return
-	}
-
-	// writer
-	done := make(chan bool)
-	var buff bufio.ReadWriter
-	go func() {
-		o.log.Debug("reading file %q", tfOutputFileName)
-		err := o.tfOutputHelper.ContinueReadFile(o.log, tfOutputFileName, &buff, done)
-		if err != nil {
-			o.log.Err("Fail to tail tf output file, %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintln(w, "Fail to tail tf output file")
-			return
-		}
-	}()
-
-	// Creates the websocket
+	// Creates the websocket by upgrading the request
 	c, err := o.wcUpgrader.Upgrade(w, r, nil)
 	if err != nil {
 		o.log.Err("fail to start websocket server, %v", err)
@@ -76,20 +30,79 @@ func (o *TfOutputsController) GetTfOutput(w http.ResponseWriter, r *http.Request
 	}
 	defer c.Close()
 
+	// Channel to close the method tailing the tf output file
+	done := make(chan bool)
 	c.SetCloseHandler(func(code int, text string) error {
 		// Stopping reading the file (tail -f)
 		done <- true
 		return nil
 	})
 
-	// Reads the messages written by the tf output file
-	scanner := bufio.NewScanner(&buff)
-	// For every single message writes a message in the websocket
-	for scanner.Scan() {
-		err = c.WriteMessage(websocket.TextMessage, scanner.Bytes())
+	for {
+		// Websocket start with the client sending a message
+		mt, msg, err := c.ReadMessage()
 		if err != nil {
-			log.Println("write:", err)
-			break
+			o.log.Err("fail to read message from the websocket server, %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintln(w, "Fail to read message from the websocket server")
+			return
+		}
+		o.log.Debug("Received %q", string(msg))
+
+		// The message contains the tf output file infos to stream the log in messages
+		tfOutputInfos := strings.Split(string(msg), "|")
+
+		// Gets the tf output file name to stream
+		tfOutputFileName, err := o.tfOutputHelper.FindOutputFile(
+			tfOutputInfos[0],
+			tfOutputInfos[1],
+			tfOutputInfos[2],
+			tfOutputInfos[3],
+			tfOutputInfos[4],
+			tfOutputInfos[5],
+			tfOutputInfos[6],
+		)
+		if err != nil {
+			o.log.Err("can't find file %v", tfOutputInfos)
+			err = c.WriteMessage(mt, []byte("file not found"))
+			if err != nil {
+				o.log.Err("fail to write in the websocket server, %v", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintln(w, "Fail to write in the websocket server")
+			}
+			return
+		}
+
+		// Call a go function to start the continue read file method, and as a return the channel  will receive the messages
+		// to reply back in the websocket
+		fileText := make(chan string)
+		go func() {
+			err := o.tfOutputHelper.ContinueReadFile(o.log, tfOutputFileName, fileText, done)
+			if err != nil {
+				err = c.WriteMessage(mt, []byte("failed to tail the file"))
+				if err != nil {
+					o.log.Err("fail to write in the websocket server, %v", err)
+					w.WriteHeader(http.StatusInternalServerError)
+					fmt.Fprintln(w, "Fail to write in the websocket server")
+				}
+				return
+			}
+		}()
+
+		for {
+			select {
+			// For a new message in the channel, post it in the websocket
+			case text := <-fileText:
+				o.log.Debug("receiving new message")
+				err = c.WriteMessage(websocket.TextMessage, []byte(text))
+				if err != nil {
+					o.log.Err("fail to write in the websocket, %v", err)
+					w.WriteHeader(http.StatusInternalServerError)
+					fmt.Fprintln(w, "Fail to write in the websocket")
+					return
+				}
+			}
 		}
 	}
+
 }
