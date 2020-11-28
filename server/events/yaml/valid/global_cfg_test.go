@@ -41,6 +41,7 @@ func TestNewGlobalCfg(t *testing.T) {
 				IDRegex:              regexp.MustCompile(".*"),
 				ApplyRequirements:    []string{},
 				Workflow:             &expDefaultWorkflow,
+				AllowedWorkflows:     []string{},
 				AllowedOverrides:     []string{},
 				AllowCustomWorkflows: Bool(false),
 			},
@@ -128,6 +129,62 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 		repoID string
 		expErr string
 	}{
+		"repo uses workflow that is defined but not allowed": {
+			gCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					valid.NewGlobalCfg(true, false, false).Repos[0],
+					{
+						ID:                   "github.com/owner/repo",
+						AllowCustomWorkflows: Bool(true),
+						AllowedOverrides:     []string{"workflow"},
+						AllowedWorkflows:     []string{"allowed"},
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"allowed":   {},
+					"forbidden": {},
+				},
+			},
+			rCfg: valid.RepoCfg{
+				Projects: []valid.Project{
+					{
+						Dir:          ".",
+						Workspace:    "default",
+						WorkflowName: String("forbidden"),
+					},
+				},
+			},
+			repoID: "github.com/owner/repo",
+			expErr: "workflow 'forbidden' is not allowed for this repo",
+		},
+		"repo uses workflow that is defined AND allowed": {
+			gCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					valid.NewGlobalCfg(true, false, false).Repos[0],
+					{
+						ID:                   "github.com/owner/repo",
+						AllowCustomWorkflows: Bool(true),
+						AllowedOverrides:     []string{"workflow"},
+						AllowedWorkflows:     []string{"allowed"},
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"allowed":   {},
+					"forbidden": {},
+				},
+			},
+			rCfg: valid.RepoCfg{
+				Projects: []valid.Project{
+					{
+						Dir:          ".",
+						Workspace:    "default",
+						WorkflowName: String("allowed"),
+					},
+				},
+			},
+			repoID: "github.com/owner/repo",
+			expErr: "",
+		},
 		"workflow not allowed": {
 			gCfg: valid.NewGlobalCfg(false, false, false),
 			rCfg: valid.RepoCfg{
@@ -298,7 +355,7 @@ workflows:
 repos:
 - id: /.*/
   allowed_overrides: [apply_requirements]
-  apply_requirements: [approved] 
+  apply_requirements: [approved]
 `,
 			repoID: "github.com/owner/repo",
 			proj: valid.Project{
@@ -324,11 +381,11 @@ repos:
 			gCfg: `
 repos:
 - id: /.*/
-  apply_requirements: [approved] 
+  apply_requirements: [approved]
 - id: /github.com/.*/
-  apply_requirements: [mergeable] 
+  apply_requirements: [mergeable]
 - id: github.com/owner/repo
-  apply_requirements: [approved, mergeable] 
+  apply_requirements: [approved, mergeable]
 `,
 			repoID: "github.com/owner/repo",
 			proj: valid.Project{

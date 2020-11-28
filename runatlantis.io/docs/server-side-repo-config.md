@@ -40,6 +40,10 @@ repos:
   # its atlantis.yaml file.
   allowed_overrides: [apply_requirements, workflow]
 
+  # allowed_workflows specifies which workflows the repos that match 
+  # are allowed to select.
+  allowed_workflows: [custom]
+
   # allow_custom_workflows defines whether this repo can define its own
   # workflows. If false (default), the repo can only use server-side defined
   # workflows.
@@ -204,6 +208,39 @@ workflows:
       steps:
       - run: another custom command
 ```
+Or, if you want to restrict what workflows each repo has access to, use the `allowed_workflows` 
+key:
+
+```yaml
+# repos.yaml
+# Restrict which workflows repos can select.
+repos:
+- id: /.*/
+  allowed_overrides: [workflow]
+
+- id: /my_repo/
+  allowed_overrides: [workflow]
+  allowed_workflows: [custom1]
+
+# Define your custom workflows.
+workflows:
+  custom1:
+    plan:
+      steps:
+      - init
+      - run: my custom plan command
+    apply:
+      steps:
+      - run: my custom apply command
+
+  custom2:
+    plan:
+      steps:
+      - run: another custom command
+    apply:
+      steps:
+      - run: another custom command
+```
 
 Then each allowed repo can choose one of the workflows in their `atlantis.yaml`
 files:
@@ -310,6 +347,7 @@ If you set a workflow with the key `default`, it will override this.
 | workflow               | string   | none    | no       | A custom workflow.                                                                                                                                                                                                                                                                                       |
 | apply_requirements     | []string | none    | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved` and `mergeable`. See [Apply Requirements](apply-requirements.html) for more details.                                                                                    |
 | allowed_overrides      | []string | none    | no       | A list of restricted keys that `atlantis.yaml` files can override. The only supported keys are `apply_requirements` and `workflow`                                                                                                                                                                       |
+| allowed_workflows      | []string | none    | no       | A list of workflows that `atlantis.yaml` files can select from.                                                                                                                                                                        |
 | allow_custom_workflows | bool     | false   | no       | Whether or not to allow [Custom Workflows](custom-workflows.html).                                                                                                                                                                       |
 
 

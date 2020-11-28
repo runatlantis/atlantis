@@ -1127,6 +1127,7 @@ workflows:
 								},
 							},
 						},
+						AllowedWorkflows:     []string{},
 						AllowedOverrides:     []string{},
 						AllowCustomWorkflows: Bool(false),
 					},
@@ -1227,6 +1228,7 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
     {
       "id": "/.*/",
       "workflow": "custom",
+      "allowed_workflows": ["custom"],
       "apply_requirements": ["mergeable", "approved"],
       "allowed_overrides": ["workflow", "apply_requirements"],
       "allow_custom_workflows": true
@@ -1260,12 +1262,14 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 						IDRegex:              regexp.MustCompile(".*"),
 						ApplyRequirements:    []string{"mergeable", "approved"},
 						Workflow:             &customWorkflow,
+						AllowedWorkflows:     []string{"custom"},
 						AllowedOverrides:     []string{"workflow", "apply_requirements"},
 						AllowCustomWorkflows: Bool(true),
 					},
 					{
 						ID:                   "github.com/owner/repo",
 						IDRegex:              nil,
+						AllowedWorkflows:     nil,
 						ApplyRequirements:    nil,
 						AllowedOverrides:     nil,
 						AllowCustomWorkflows: nil,
