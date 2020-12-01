@@ -1,55 +1,55 @@
 <!DOCTYPE html>
-<meta charset="utf-8" />
+<meta charset="utf-8"/>
 <title>WebSocket Test</title>
 <script language="javascript" type="text/javascript">
 
     var wsUri = "ws://localhost:4141/tf-output";
     var output;
 
-    function init()
-    {
+    function init() {
         output = document.getElementById("output");
         testWebSocket();
     }
 
-    function testWebSocket()
-    {
+    function testWebSocket() {
         websocket = new WebSocket(wsUri);
-        websocket.onopen = function(evt) { onOpen(evt) };
-        websocket.onclose = function(evt) { onClose(evt) };
-        websocket.onmessage = function(evt) { onMessage(evt) };
-        websocket.onerror = function(evt) { onError(evt) };
+        websocket.onopen = function (evt) {
+            onOpen(evt)
+        };
+        websocket.onclose = function (evt) {
+            onClose(evt)
+        };
+        websocket.onmessage = function (evt) {
+            onMessage(evt)
+        };
+        websocket.onerror = function (evt) {
+            onError(evt)
+        };
     }
 
-    function onOpen(evt)
-    {
+    function onOpen(evt) {
         writeToScreen("CONNECTED");
         doSend("20201125134803|alexrocco_atlantis__test|2|2db8726|test|default|init");
     }
 
-    function onClose(evt)
-    {
+    function onClose(evt) {
         writeToScreen("DISCONNECTED");
     }
 
-    function onMessage(evt)
-    {
+    function onMessage(evt) {
         writeToScreen('<span>' + evt.data + '</span>');
     }
 
-    function onError(evt)
-    {
+    function onError(evt) {
         writeToScreen('<span style="color: red;">ERROR:</span> ' + evt.data);
     }
 
-    function doSend(message)
-    {
+    function doSend(message) {
         writeToScreen(message);
         websocket.send(message);
     }
 
-    function writeToScreen(message)
-    {
+    function writeToScreen(message) {
         var pre = document.createElement("p");
         pre.style.wordWrap = "break-word";
         pre.innerHTML = message;

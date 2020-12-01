@@ -13,11 +13,8 @@ import (
 	"time"
 )
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_output_helper.go OutputHelper
-
 const (
 	outputTimeFmt = "20060102150405"
-	fileFormat
 )
 
 // TfOutputFile hold terraform output file data
@@ -29,7 +26,6 @@ type TfOutputFile struct {
 	Project       string
 	TfCommand     string
 	Workspace     string
-	Path          string
 }
 
 // OutputHelper define the operations related to the terraform output files
@@ -41,7 +37,7 @@ type OutputHelper interface {
 	// CreateFileName creates the file name for a terraform output.
 	CreateFileName(fullRepoName string, pullRequestNr int, headCommit string, project string, workspace string, tfCommand string) string
 	// ContinueReadFile continue reads the tf output file
-	ContinueReadFile(Log *logging.SimpleLogger, fileName string, fileText chan<- string, done chan bool) error
+	ContinueReadFile(Log *logging.SimpleLogger, fileName string, fileLines chan<- string, done chan bool) error
 	// FindOutputFile finds the output file
 	FindOutputFile(createdAt, fullRepoName, pullNr, headCommit, project, workspace, tfCommand string) (string, error)
 }
@@ -106,7 +102,6 @@ func (f *FileOutputHelper) ParseFileName(fileName string) (TfOutputFile, error) 
 		Project:       parts[4],
 		Workspace:     parts[5],
 		TfCommand:     parts[6],
-		Path:          filepath.Join(f.outputCmdDir, fileName),
 	}, nil
 }
 
@@ -122,7 +117,6 @@ func (f *FileOutputHelper) CreateFileName(fullRepoName string, pullRequestNr int
 	headCommit = headCommit[:7]
 
 	// OutputHelper file has to be unique per repo, pull request, commit and command
-	//[timestamp]-[full repo name]-[pull request number]-[head commit]-[atlantis project]-[workspace]-[tf command]
 	return fmt.Sprintf("%s-%s-%d-%s-%s-%s-%s",
 		now.Format(outputTimeFmt),
 		fullRepoName,
@@ -134,31 +128,23 @@ func (f *FileOutputHelper) CreateFileName(fullRepoName string, pullRequestNr int
 	)
 }
 
-func (f *FileOutputHelper) ContinueReadFile(log *logging.SimpleLogger, fileName string, fileText chan<- string, done chan bool) error {
+func (f *FileOutputHelper) ContinueReadFile(log *logging.SimpleLogger, fileName string, fileLInes chan<- string, done chan bool) error {
 	tfOutputFileName := filepath.Join(f.outputCmdDir, fileName)
 	file, _ := os.Open(tfOutputFileName)
 	reader := bufio.NewReader(file)
-
-	//o, _ := ioutil.ReadAll(reader)
-	//log.Debug(string(o))
-
-	stat, err := file.Stat()
-	if err != nil {
-		return err
-	}
-	log.Debug(stat.Mode().String())
 
 	log.Debug("starting to tail file %q", tfOutputFileName)
 
 	for {
 		select {
 		case <-done:
-			close(fileText)
+			close(fileLInes)
 			log.Debug("stopping tailing file %q", tfOutputFileName)
 			return nil
 		default:
-			// Read bytes until the break line
-			line, err := reader.ReadBytes('\n')
+			// Read the line until the break line
+			line, err := reader.ReadString('\n')
+			log.Debug("line: %s", line)
 			if err != nil {
 				// If it has reached the end of file, wait a bit to continue reading.
 				if err == io.EOF {
@@ -169,34 +155,17 @@ func (f *FileOutputHelper) ContinueReadFile(log *logging.SimpleLogger, fileName 
 				return errors.Wrapf(err, "error reading line from file %q", tfOutputFileName)
 			}
 
-			fileText <- string(line)
+			// Post the new line into the string channel
+			fileLInes <- line
 		}
 	}
-
-	//// This will work as `tail -f` command
-	//t, err := tail.TailFile(tfOutputFileName, tail.Config{Follow: true, MustExist: true, ReOpen: false})
-	//if err != nil {
-	//	return errors.Wrapf(err, "can't tail %q", tfOutputFileName)
-	//}
-	//
-	//log.Debug("starting to tail file %q", tfOutputFileName)
-	//
-	//for {
-	//	select {
-	//	case <-done:
-	//		log.Debug("stopping tailing file %q", tfOutputFileName)
-	//		return nil
-	//	case line := <-t.Lines:
-	//		if t.Err() != nil {
-	//			fmt.Println(t.Err())
-	//		}
-	//		log.Debug("writing new line")
-	//		fileText <- line.Text
-	//	}
-	//}
 }
 
 func (f *FileOutputHelper) FindOutputFile(createdAt, fullRepoName, pullNr, headCommit, project, workspace, tfCommand string) (string, error) {
+	// Format the repo name
+	fullRepoName = strings.ReplaceAll(fullRepoName, "-", "__")
+	fullRepoName = strings.ReplaceAll(fullRepoName, "/", "_")
+
 	// Format the file name
 	fileName := fmt.Sprintf("%s-%s-%s-%s-%s-%s-%s",
 		createdAt,
@@ -207,8 +176,6 @@ func (f *FileOutputHelper) FindOutputFile(createdAt, fullRepoName, pullNr, headC
 		workspace,
 		tfCommand,
 	)
-
-	fmt.Println(fileName)
 
 	// Verify if the file exists
 	stat, err := os.Stat(filepath.Join(f.outputCmdDir, fileName))

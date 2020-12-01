@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
 	"net/url"
@@ -78,7 +79,7 @@ type Server struct {
 	GithubAppController *GithubAppController
 	LocksController     *LocksController
 	StatusController    *StatusController
-	TfOutputsController *TfOutputsController
+	TfOutputsController *TfOutputController
 	IndexTemplate       TemplateWriter
 	LockDetailTemplate  TemplateWriter
 	SSLCertFile         string
@@ -475,9 +476,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 	}
 
-	tfOutputsController := &TfOutputsController{
-		log:            logger,
-		tfOutputHelper: tfOutput,
+	tfOutputsController := &TfOutputController{
+		AtlantisVersion:        config.AtlantisVersion,
+		AtlantisURL:            parsedURL,
+		Log:                    logger,
+		TfOutputHelper:         tfOutput,
+		WsUpgrader:             websocket.Upgrader{},
+		TfOutputDetailTemplate: tfOutputTemplate,
 	}
 
 	return &Server{
@@ -516,7 +521,28 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
 	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
-	s.Router.HandleFunc("/tf-output", s.TfOutputsController.GetTfOutput).Methods("GET")
+	//s.Router.HandleFunc("/tf-output", s.TfOutputsController.GetTfOutputDetail).Methods("GET").Queries(
+	//	"createAt", "{createAt:[0-9]{14}}",
+	//	"createdAtFormatted", "{createdAtFormatted:.*}",
+	//	"repoFullName", "{repoFullName:.*}",
+	//	"pullNum", "{pullNum:[0-9]+}",
+	//	"headCommit", "{headCommit:.*}",
+	//	"project", "{project:.*}",
+	//	"workspace", "{workspace:.*}",
+	//	"tfCommand", "{tfCommand:.*}",
+	//)
+	s.Router.HandleFunc("/tf-output", s.TfOutputsController.GetTfOutputDetail).Methods("GET").Queries(
+		"createdAt", "",
+		"createdAtFormatted", "",
+		"repoFullName", "",
+		"pullNum", "",
+		"headCommit", "",
+		"project", "",
+		"workspace", "",
+		"tfCommand", "",
+	)
+
+	s.Router.HandleFunc("/tf-output-ws", s.TfOutputsController.GetTfOutputWebsocket)
 
 	n := negroni.New(&negroni.Recovery{
 		Logger:     log.New(os.Stdout, "", log.LstdFlags),
@@ -612,15 +638,32 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 		}
 
 		for _, tfOutput := range outputs {
+			createdAt := tfOutput.CreatedAt.Format("20060102150405")
+			createdAtFormatter := tfOutput.CreatedAt.Format("02-01-2006 15:04:05")
+
+			path := fmt.Sprintf("/tf-output?createdAt=%s&createdAtFormatted=%s&repoFullName=%s&pullNum=%d&headCommit=%s&project=%s&workspace=%s&tfCommand=%s",
+				url.QueryEscape(createdAt),
+				url.QueryEscape(createdAtFormatter),
+				url.QueryEscape(tfOutput.FullRepoName),
+				tfOutput.PullRequestNr,
+				url.QueryEscape(tfOutput.HeadCommit),
+				url.QueryEscape(tfOutput.Project),
+				url.QueryEscape(tfOutput.Workspace),
+				url.QueryEscape(tfOutput.TfCommand),
+			)
+
+			fmt.Println(path)
+
 			tfOutputs = append(tfOutputs, TfOutputIndexData{
-				CreatedAtFormatted: tfOutput.CreatedAt.Format("02-01-2006 15:04:05"),
+				Path:               path,
+				CreatedAt:          createdAt,
+				CreatedAtFormatted: createdAtFormatter,
 				RepoFullName:       tfOutput.FullRepoName,
 				PullNum:            tfOutput.PullRequestNr,
 				HeadCommit:         tfOutput.HeadCommit,
 				Project:            tfOutput.Project,
 				Workspace:          tfOutput.Workspace,
 				TfCommand:          tfOutput.TfCommand,
-				Path:               tfOutput.Path,
 			})
 		}
 	}
