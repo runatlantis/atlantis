@@ -521,25 +521,15 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
 	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
-	//s.Router.HandleFunc("/tf-output", s.TfOutputsController.GetTfOutputDetail).Methods("GET").Queries(
-	//	"createAt", "{createAt:[0-9]{14}}",
-	//	"createdAtFormatted", "{createdAtFormatted:.*}",
-	//	"repoFullName", "{repoFullName:.*}",
-	//	"pullNum", "{pullNum:[0-9]+}",
-	//	"headCommit", "{headCommit:.*}",
-	//	"project", "{project:.*}",
-	//	"workspace", "{workspace:.*}",
-	//	"tfCommand", "{tfCommand:.*}",
-	//)
 	s.Router.HandleFunc("/tf-output", s.TfOutputsController.GetTfOutputDetail).Methods("GET").Queries(
-		"createdAt", "",
-		"createdAtFormatted", "",
-		"repoFullName", "",
-		"pullNum", "",
-		"headCommit", "",
-		"project", "",
-		"workspace", "",
-		"tfCommand", "",
+		"createdAt", "{createAt:[0-9]{14}}",
+		"createdAtFormatted", "{createdAtFormatted:.*}",
+		"repoFullName", "{repoFullName:.*}",
+		"pullNum", "{pullNum:[0-9]+}",
+		"headCommit", "{headCommit:.*}",
+		"project", "{project:.*}",
+		"workspace", "{workspace:.*}",
+		"tfCommand", "{tfCommand:.*}",
 	)
 
 	s.Router.HandleFunc("/tf-output-ws", s.TfOutputsController.GetTfOutputWebsocket)
@@ -670,7 +660,8 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 
 	//Sort by date - newest to oldest.
 	sort.SliceStable(lockResults, func(i, j int) bool { return lockResults[i].Time.After(lockResults[j].Time) })
-
+	sort.SliceStable(tfOutputs, func(i, j int) bool { return tfOutputs[i].CreatedAt > tfOutputs[j].CreatedAt })
+	
 	err = s.IndexTemplate.Execute(w, IndexData{
 		Locks:           lockResults,
 		TfOutputs:       tfOutputs,

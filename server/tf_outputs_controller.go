@@ -58,8 +58,14 @@ func (t *TfOutputController) GetTfOutputDetail(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// Format web socket urls
+	// FIXME create a constant for this path
+	wsUrl := fmt.Sprintf("ws://%s/tf-output-ws", t.AtlantisURL.Host)
+	if t.AtlantisURL.Scheme == "https" {
+		wsUrl = strings.Replace(wsUrl, "ws://", "wss://", 1)
+	}
+
 	viewData := TfOutputDetailData{
-		CleanedBasePath:    t.AtlantisURL.Path,
 		CreatedAt:          queryValues[createdAt],
 		CreatedAtFormatted: queryValues[createdAtFormatted],
 		RepoFullName:       queryValues[repoFullName],
@@ -68,6 +74,8 @@ func (t *TfOutputController) GetTfOutputDetail(w http.ResponseWriter, r *http.Re
 		Project:            queryValues[project],
 		Workspace:          queryValues[workspace],
 		TfCommand:          queryValues[tfCommand],
+		CleanedBasePath:    t.AtlantisURL.Path,
+		WebSocketUrl:       wsUrl,
 	}
 
 	err = t.TfOutputDetailTemplate.Execute(w, viewData)

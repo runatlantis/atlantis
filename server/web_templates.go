@@ -270,6 +270,8 @@ type TfOutputDetailData struct {
 	// not using a path-based proxy, this will be an empty string. Never ends
 	// in a '/' (hence "cleaned").
 	CleanedBasePath string
+	// WebSocketUrl is the URL which the javascript will use to open the web socket connection.
+	WebSocketUrl    string
 }
 
 var tfOutputTemplate = template.Must(template.New("tfoutput.html.tmpl").Parse(`
@@ -310,7 +312,6 @@ var tfOutputTemplate = template.Must(template.New("tfoutput.html.tmpl").Parse(`
   </div>
   <div id="output" class="container" style="border: 1px solid; padding-left: 5px; padding-right: 5px; margin-bottom: 20px; min-height: 300px;"></div>
 <script>
-    let wsUri = "ws://localhost:4141/tf-output-ws";
     let output;
 
     function init() {
@@ -319,7 +320,7 @@ var tfOutputTemplate = template.Must(template.New("tfoutput.html.tmpl").Parse(`
     }
 
     function testWebSocket() {
-        websocket = new WebSocket(wsUri);
+        websocket = new WebSocket({{.WebSocketUrl}});
         websocket.onopen = function (evt) {
             onOpen(evt)
         };
@@ -345,6 +346,7 @@ var tfOutputTemplate = template.Must(template.New("tfoutput.html.tmpl").Parse(`
     }
 
     function writeToScreen(message) {
+		// When it's an empty message add an break line
 		if (message.length == 1) {
 			message = "<br />"
 		}
