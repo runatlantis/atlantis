@@ -3,10 +3,9 @@ package runtime_test
 import (
 	"testing"
 
-	version "github.com/hashicorp/go-version"
+	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
@@ -47,13 +46,15 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 				TerraformExecutor: terraform,
 				DefaultTFVersion:  tfVersion,
 			}
-			When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+			When(terraform.RunCommandWithVersion(matchers2.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion())).
 				ThenReturn("output", nil)
 
-			output, err := iso.Run(models.ProjectCommandContext{
+			ctx := models.ProjectCommandContext{
 				Workspace:  "workspace",
 				RepoRelDir: ".",
-			}, []string{"extra", "args"}, "/path", map[string]string(nil))
+			}
+
+			output, err := iso.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
 			Ok(t, err)
 			// When there is no error, should not return init output to PR.
 			Equals(t, "", output)
@@ -63,7 +64,7 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 			if c.expCmd == "get" {
 				expArgs = []string{c.expCmd, "-no-color", "-upgrade", "extra", "args"}
 			}
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, "/path", expArgs, map[string]string(nil), tfVersion, "workspace")
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, "/path", expArgs, map[string]string(nil), tfVersion)
 		})
 	}
 }
@@ -72,7 +73,7 @@ func TestRun_ShowInitOutputOnError(t *testing.T) {
 	// If there was an error during init then we want the output to be returned.
 	RegisterMockTestingT(t)
 	tfClient := mocks.NewMockClient()
-	When(tfClient.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(tfClient.RunCommandWithVersion(matchers2.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion())).
 		ThenReturn("output", errors.New("error"))
 
 	tfVersion, _ := version.NewVersion("0.11.0")

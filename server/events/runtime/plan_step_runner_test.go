@@ -14,7 +14,6 @@ import (
 
 	. "github.com/petergtz/pegomock"
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
@@ -36,9 +35,10 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 		TerraformExecutor: terraform,
 	}
 
-	When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(matchers2.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion())).
 		ThenReturn("output", nil)
-	output, err := s.Run(models.ProjectCommandContext{
+
+	ctx := models.ProjectCommandContext{
 		Log:                logger,
 		EscapedCommentArgs: []string{"comment", "args"},
 		Workspace:          workspace,
@@ -52,12 +52,14 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 			Owner:    "owner",
 			Name:     "repo",
 		},
-	}, []string{"extra", "args"}, "/path", map[string]string(nil))
+	}
+
+	output, err := s.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
 	Ok(t, err)
 
 	Equals(t, "output", output)
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(
-		logger,
+		ctx,
 		"/path",
 		[]string{"plan",
 			"-input=false",
@@ -80,28 +82,28 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 			"comment",
 			"args"},
 		map[string]string(nil),
-		tfVersion,
-		workspace)
+		tfVersion)
 
 	// Verify that no env or workspace commands were run
-	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(logger,
+	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(
+		ctx,
 		"/path",
 		[]string{"env",
 			"select",
 			"-no-color",
 			"workspace"},
 		map[string]string(nil),
-		tfVersion,
-		workspace)
-	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(logger,
+		tfVersion)
+
+	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(
+		ctx,
 		"/path",
 		[]string{"workspace",
 			"select",
 			"-no-color",
 			"workspace"},
 		map[string]string(nil),
-		tfVersion,
-		workspace)
+		tfVersion)
 }
 
 func TestRun_ErrWorkspaceIn08(t *testing.T) {
@@ -118,7 +120,7 @@ func TestRun_ErrWorkspaceIn08(t *testing.T) {
 		DefaultTFVersion:  tfVersion,
 	}
 
-	When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(matchers2.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion())).
 		ThenReturn("output", nil)
 	_, err := s.Run(models.ProjectCommandContext{
 		Log:        logger,
@@ -166,9 +168,10 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 				DefaultTFVersion:  tfVersion,
 			}
 
-			When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+			When(terraform.RunCommandWithVersion(matchers2.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion())).
 				ThenReturn("output", nil)
-			output, err := s.Run(models.ProjectCommandContext{
+
+			ctx := models.ProjectCommandContext{
 				Log:                logger,
 				Workspace:          "workspace",
 				RepoRelDir:         ".",
@@ -182,21 +185,26 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 					Owner:    "owner",
 					Name:     "repo",
 				},
-			}, []string{"extra", "args"}, "/path", map[string]string(nil))
+			}
+
+			output, err := s.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
 			Ok(t, err)
 
 			Equals(t, "output", output)
+
 			// Verify that env select was called as well as plan.
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger,
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(
+				ctx,
 				"/path",
 				[]string{c.expWorkspaceCmd,
 					"select",
 					"-no-color",
 					"workspace"},
 				map[string]string(nil),
-				tfVersion,
-				"workspace")
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger,
+				tfVersion)
+
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(
+				ctx,
 				"/path",
 				[]string{"plan",
 					"-input=false",
@@ -219,8 +227,7 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 					"comment",
 					"args"},
 				map[string]string(nil),
-				tfVersion,
-				"workspace")
+				tfVersion)
 		})
 	}
 }
@@ -261,12 +268,28 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 				DefaultTFVersion:  tfVersion,
 			}
 
+			ctx := models.ProjectCommandContext{
+				Log:                logger,
+				Workspace:          "workspace",
+				RepoRelDir:         ".",
+				User:               models.User{Username: "username"},
+				EscapedCommentArgs: []string{"comment", "args"},
+				Pull: models.PullRequest{
+					Num: 2,
+				},
+				BaseRepo: models.Repo{
+					FullName: "owner/repo",
+					Owner:    "owner",
+					Name:     "repo",
+				},
+			}
+
 			// Ensure that we actually try to switch workspaces by making the
 			// output of `workspace show` to be a different name.
-			When(terraform.RunCommandWithVersion(logger, "/path", []string{"workspace", "show"}, map[string]string(nil), tfVersion, "workspace")).ThenReturn("diffworkspace\n", nil)
+			When(terraform.RunCommandWithVersion(ctx, "/path", []string{"workspace", "show"}, map[string]string(nil), tfVersion)).ThenReturn("diffworkspace\n", nil)
 
 			expWorkspaceArgs := []string{c.expWorkspaceCommand, "select", "-no-color", "workspace"}
-			When(terraform.RunCommandWithVersion(logger, "/path", expWorkspaceArgs, map[string]string(nil), tfVersion, "workspace")).ThenReturn("", errors.New("workspace does not exist"))
+			When(terraform.RunCommandWithVersion(ctx, "/path", expWorkspaceArgs, map[string]string(nil), tfVersion)).ThenReturn("", errors.New("workspace does not exist"))
 
 			expPlanArgs := []string{"plan",
 				"-input=false",
@@ -288,29 +311,15 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 				"args",
 				"comment",
 				"args"}
-			When(terraform.RunCommandWithVersion(logger, "/path", expPlanArgs, map[string]string(nil), tfVersion, "workspace")).ThenReturn("output", nil)
+			When(terraform.RunCommandWithVersion(ctx, "/path", expPlanArgs, map[string]string(nil), tfVersion)).ThenReturn("output", nil)
 
-			output, err := s.Run(models.ProjectCommandContext{
-				Log:                logger,
-				Workspace:          "workspace",
-				RepoRelDir:         ".",
-				User:               models.User{Username: "username"},
-				EscapedCommentArgs: []string{"comment", "args"},
-				Pull: models.PullRequest{
-					Num: 2,
-				},
-				BaseRepo: models.Repo{
-					FullName: "owner/repo",
-					Owner:    "owner",
-					Name:     "repo",
-				},
-			}, []string{"extra", "args"}, "/path", map[string]string(nil))
+			output, err := s.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
 			Ok(t, err)
 
 			Equals(t, "output", output)
 			// Verify that env select was called as well as plan.
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", expWorkspaceArgs, map[string]string(nil), tfVersion, "workspace")
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", expPlanArgs, map[string]string(nil), tfVersion, "workspace")
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, "/path", expWorkspaceArgs, map[string]string(nil), tfVersion)
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, "/path", expPlanArgs, map[string]string(nil), tfVersion)
 		})
 	}
 }
@@ -326,7 +335,24 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
 	}
-	When(terraform.RunCommandWithVersion(logger, "/path", []string{"workspace", "show"}, map[string]string(nil), tfVersion, "workspace")).ThenReturn("workspace\n", nil)
+
+	ctx := models.ProjectCommandContext{
+		Log:                logger,
+		Workspace:          "workspace",
+		RepoRelDir:         ".",
+		User:               models.User{Username: "username"},
+		EscapedCommentArgs: []string{"comment", "args"},
+		Pull: models.PullRequest{
+			Num: 2,
+		},
+		BaseRepo: models.Repo{
+			FullName: "owner/repo",
+			Owner:    "owner",
+			Name:     "repo",
+		},
+	}
+
+	When(terraform.RunCommandWithVersion(ctx, "/path", []string{"workspace", "show"}, map[string]string(nil), tfVersion)).ThenReturn("workspace\n", nil)
 
 	expPlanArgs := []string{"plan",
 		"-input=false",
@@ -348,30 +374,16 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 		"args",
 		"comment",
 		"args"}
-	When(terraform.RunCommandWithVersion(logger, "/path", expPlanArgs, map[string]string(nil), tfVersion, "workspace")).ThenReturn("output", nil)
+	When(terraform.RunCommandWithVersion(ctx, "/path", expPlanArgs, map[string]string(nil), tfVersion)).ThenReturn("output", nil)
 
-	output, err := s.Run(models.ProjectCommandContext{
-		Log:                logger,
-		Workspace:          "workspace",
-		RepoRelDir:         ".",
-		User:               models.User{Username: "username"},
-		EscapedCommentArgs: []string{"comment", "args"},
-		Pull: models.PullRequest{
-			Num: 2,
-		},
-		BaseRepo: models.Repo{
-			FullName: "owner/repo",
-			Owner:    "owner",
-			Name:     "repo",
-		},
-	}, []string{"extra", "args"}, "/path", map[string]string(nil))
+	output, err := s.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
 	Ok(t, err)
 
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", expPlanArgs, map[string]string(nil), tfVersion, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, "/path", expPlanArgs, map[string]string(nil), tfVersion)
 
 	// Verify that workspace select was never called.
-	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(logger, "/path", []string{"workspace", "select", "-no-color", "workspace"}, map[string]string(nil), tfVersion, "workspace")
+	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(ctx, "/path", []string{"workspace", "select", "-no-color", "workspace"}, map[string]string(nil), tfVersion)
 }
 
 func TestRun_AddsEnvVarFile(t *testing.T) {
@@ -419,9 +431,8 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 		"-var-file",
 		envVarsFile,
 	}
-	When(terraform.RunCommandWithVersion(logger, tmpDir, expPlanArgs, map[string]string(nil), tfVersion, "workspace")).ThenReturn("output", nil)
 
-	output, err := s.Run(models.ProjectCommandContext{
+	ctx := models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
@@ -435,12 +446,16 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 			Owner:    "owner",
 			Name:     "repo",
 		},
-	}, []string{"extra", "args"}, tmpDir, map[string]string(nil))
+	}
+
+	When(terraform.RunCommandWithVersion(ctx, tmpDir, expPlanArgs, map[string]string(nil), tfVersion)).ThenReturn("output", nil)
+
+	output, err := s.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	Ok(t, err)
 
 	// Verify that env select was never called since we're in version >= 0.10
-	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(logger, tmpDir, []string{"env", "select", "-no-color", "workspace"}, map[string]string(nil), tfVersion, "workspace")
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, tmpDir, expPlanArgs, map[string]string(nil), tfVersion, "workspace")
+	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(ctx, tmpDir, []string{"env", "select", "-no-color", "workspace"}, map[string]string(nil), tfVersion)
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, expPlanArgs, map[string]string(nil), tfVersion)
 	Equals(t, "output", output)
 }
 
@@ -455,7 +470,25 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
 	}
-	When(terraform.RunCommandWithVersion(logger, "/path", []string{"workspace", "show"}, map[string]string(nil), tfVersion, "workspace")).ThenReturn("workspace\n", nil)
+
+	ctx := models.ProjectCommandContext{
+		Log:                logger,
+		Workspace:          "default",
+		RepoRelDir:         ".",
+		User:               models.User{Username: "username"},
+		EscapedCommentArgs: []string{"comment", "args"},
+		ProjectName:        "projectname",
+		Pull: models.PullRequest{
+			Num: 2,
+		},
+		BaseRepo: models.Repo{
+			FullName: "owner/repo",
+			Owner:    "owner",
+			Name:     "repo",
+		},
+	}
+
+	When(terraform.RunCommandWithVersion(ctx, "/path", []string{"workspace", "show"}, map[string]string(nil), tfVersion)).ThenReturn("workspace\n", nil)
 
 	expPlanArgs := []string{"plan",
 		"-input=false",
@@ -478,24 +511,9 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 		"comment",
 		"args",
 	}
-	When(terraform.RunCommandWithVersion(logger, "/path", expPlanArgs, map[string]string(nil), tfVersion, "default")).ThenReturn("output", nil)
+	When(terraform.RunCommandWithVersion(ctx, "/path", expPlanArgs, map[string]string(nil), tfVersion)).ThenReturn("output", nil)
 
-	output, err := s.Run(models.ProjectCommandContext{
-		Log:                logger,
-		Workspace:          "default",
-		RepoRelDir:         ".",
-		User:               models.User{Username: "username"},
-		EscapedCommentArgs: []string{"comment", "args"},
-		ProjectName:        "projectname",
-		Pull: models.PullRequest{
-			Num: 2,
-		},
-		BaseRepo: models.Repo{
-			FullName: "owner/repo",
-			Owner:    "owner",
-			Name:     "repo",
-		},
-	}, []string{"extra", "args"}, "/path", map[string]string(nil))
+	output, err := s.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
 	Ok(t, err)
 	Equals(t, "output", output)
 }
@@ -536,12 +554,11 @@ Terraform will perform the following actions:
 		DefaultTFVersion:  tfVersion,
 	}
 	When(terraform.RunCommandWithVersion(
-		matchers.AnyPtrToLoggingSimpleLogger(),
+		matchers2.AnyModelsProjectCommandContext(),
 		AnyString(),
 		AnyStringSlice(),
 		matchers2.AnyMapOfStringToString(),
-		matchers2.AnyPtrToGoVersionVersion(),
-		AnyString())).
+		matchers2.AnyPtrToGoVersionVersion())).
 		Then(func(params []Param) ReturnValues {
 			// This code allows us to return different values depending on the
 			// tf command being run while still using the wildcard matchers above.
@@ -590,12 +607,11 @@ func TestRun_OutputOnErr(t *testing.T) {
 	expOutput := "expected output"
 	expErrMsg := "error!"
 	When(terraform.RunCommandWithVersion(
-		matchers.AnyPtrToLoggingSimpleLogger(),
+		matchers2.AnyModelsProjectCommandContext(),
 		AnyString(),
 		AnyStringSlice(),
 		matchers2.AnyMapOfStringToString(),
-		matchers2.AnyPtrToGoVersionVersion(),
-		AnyString())).
+		matchers2.AnyPtrToGoVersionVersion())).
 		Then(func(params []Param) ReturnValues {
 			// This code allows us to return different values depending on the
 			// tf command being run while still using the wildcard matchers above.
@@ -627,14 +643,13 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 	}
 
 	When(terraform.RunCommandWithVersion(
-		matchers.AnyPtrToLoggingSimpleLogger(),
+		matchers2.AnyModelsProjectCommandContext(),
 		AnyString(),
 		AnyStringSlice(),
 		matchers2.AnyMapOfStringToString(),
-		matchers2.AnyPtrToGoVersionVersion(),
-		AnyString())).ThenReturn("output", nil)
+		matchers2.AnyPtrToGoVersionVersion())).ThenReturn("output", nil)
 
-	output, err := s.Run(models.ProjectCommandContext{
+	ctx := models.ProjectCommandContext{
 		Workspace:          "default",
 		RepoRelDir:         ".",
 		User:               models.User{Username: "username"},
@@ -647,7 +662,9 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 			Owner:    "owner",
 			Name:     "repo",
 		},
-	}, []string{"extra", "args"}, "/path", map[string]string(nil))
+	}
+
+	output, err := s.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
 	Ok(t, err)
 	Equals(t, "output", output)
 
@@ -662,7 +679,7 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 		"comment",
 		"args",
 	}
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, "/path", expPlanArgs, map[string]string(nil), tfVersion, "default")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, "/path", expPlanArgs, map[string]string(nil), tfVersion)
 }
 
 // Test plans if using remote ops.
@@ -699,14 +716,29 @@ locally at this time.
 			absProjectPath, cleanup := TempDir(t)
 			defer cleanup()
 
+			// Now that mocking is set up, we're ready to run the plan.
+			ctx := models.ProjectCommandContext{
+				Workspace:          "default",
+				RepoRelDir:         ".",
+				User:               models.User{Username: "username"},
+				EscapedCommentArgs: []string{"comment", "args"},
+				Pull: models.PullRequest{
+					Num: 2,
+				},
+				BaseRepo: models.Repo{
+					FullName: "owner/repo",
+					Owner:    "owner",
+					Name:     "repo",
+				},
+			}
+
 			// First, terraform workspace gets run.
 			When(terraform.RunCommandWithVersion(
-				nil,
+				ctx,
 				absProjectPath,
 				[]string{"workspace", "show"},
 				map[string]string(nil),
-				tfVersion,
-				"default")).ThenReturn("default\n", nil)
+				tfVersion)).ThenReturn("default\n", nil)
 
 			// Then the first call to terraform plan should return the remote ops error.
 			expPlanArgs := []string{"plan",
@@ -734,24 +766,9 @@ locally at this time.
 			planErr := errors.New("exit status 1: err")
 			planOutput := "\n" + remoteOpsErr
 			asyncTf.LinesToSend = remotePlanOutput
-			When(terraform.RunCommandWithVersion(nil, absProjectPath, expPlanArgs, map[string]string(nil), tfVersion, "default")).
+			When(terraform.RunCommandWithVersion(ctx, absProjectPath, expPlanArgs, map[string]string(nil), tfVersion)).
 				ThenReturn(planOutput, planErr)
 
-			// Now that mocking is set up, we're ready to run the plan.
-			ctx := models.ProjectCommandContext{
-				Workspace:          "default",
-				RepoRelDir:         ".",
-				User:               models.User{Username: "username"},
-				EscapedCommentArgs: []string{"comment", "args"},
-				Pull: models.PullRequest{
-					Num: 2,
-				},
-				BaseRepo: models.Repo{
-					FullName: "owner/repo",
-					Owner:    "owner",
-					Name:     "repo",
-				},
-			}
 			output, err := s.Run(ctx, []string{"extra", "args"}, absProjectPath, map[string]string(nil))
 			Ok(t, err)
 			Equals(t, `
