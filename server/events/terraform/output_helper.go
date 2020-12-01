@@ -144,7 +144,7 @@ func (f *FileOutputHelper) ContinueReadFile(log *logging.SimpleLogger, fileName 
 		default:
 			// Read the line until the break line
 			line, err := reader.ReadString('\n')
-			log.Debug("line: %s", line)
+
 			if err != nil {
 				// If it has reached the end of file, wait a bit to continue reading.
 				if err == io.EOF {

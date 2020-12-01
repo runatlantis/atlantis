@@ -266,7 +266,6 @@ type TfOutputDetailData struct {
 	Project            string
 	Workspace          string
 	TfCommand          string
-	AtlantisVersion    string
 	// CleanedBasePath is the path Atlantis is accessible at externally. If
 	// not using a path-based proxy, this will be an empty string. Never ends
 	// in a '/' (hence "cleaned").
@@ -309,10 +308,7 @@ var tfOutputTemplate = template.Must(template.New("tfoutput.html.tmpl").Parse(`
       </div>
     </section>
   </div>
-  <div id="output"></div>
-<footer>
-v{{ .AtlantisVersion }}
-</footer>
+  <div id="output" class="container" style="border: 1px solid; padding-left: 5px; padding-right: 5px; margin-bottom: 20px; min-height: 300px;"></div>
 <script>
     let wsUri = "ws://localhost:4141/tf-output-ws";
     let output;
@@ -341,7 +337,7 @@ v{{ .AtlantisVersion }}
     }
 
     function onMessage(evt) {
-        writeToScreen('<span>' + evt.data + '</span>');
+        writeToScreen(evt.data);
     }
 
     function onError(evt) {
@@ -349,7 +345,11 @@ v{{ .AtlantisVersion }}
     }
 
     function writeToScreen(message) {
+		if (message.length == 1) {
+			message = "<br />"
+		}
         var div = document.createElement("div");
+		div.style = "line-height: 1.2;"
         div.innerHTML = message;
         output.appendChild(div);
     }

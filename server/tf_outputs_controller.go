@@ -59,7 +59,6 @@ func (t *TfOutputController) GetTfOutputDetail(w http.ResponseWriter, r *http.Re
 	}
 
 	viewData := TfOutputDetailData{
-		AtlantisVersion:    t.AtlantisVersion,
 		CleanedBasePath:    t.AtlantisURL.Path,
 		CreatedAt:          queryValues[createdAt],
 		CreatedAtFormatted: queryValues[createdAtFormatted],
