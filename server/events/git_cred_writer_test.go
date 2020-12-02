@@ -84,6 +84,24 @@ func TestWriteGitCreds_ReplaceApp(t *testing.T) {
 	Equals(t, expContets, string(actContents))
 }
 
+// Test that the github app credentials get updated when cred file is empty.
+func TestWriteGitCreds_AppendApp(t *testing.T) {
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+
+	credsFile := filepath.Join(tmp, ".git-credentials")
+	contents := ""
+	err := ioutil.WriteFile(credsFile, []byte(contents), 0600)
+	Ok(t, err)
+
+	err = events.WriteGitCreds("x-access-token", "token", "github.com", tmp, logger, true)
+	Ok(t, err)
+	expContets := "https://x-access-token:token@github.com"
+	actContents, err := ioutil.ReadFile(filepath.Join(tmp, ".git-credentials"))
+	Ok(t, err)
+	Equals(t, expContets, string(actContents))
+}
+
 // Test that if we can't read the existing file to see if the contents will be
 // the same that we just error out.
 func TestWriteGitCreds_ErrIfCannotRead(t *testing.T) {
