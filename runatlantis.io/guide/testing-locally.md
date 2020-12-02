@@ -164,7 +164,7 @@ TOKEN="{YOUR_TOKEN}"
 ```
 
 ### Bitbucket Cloud (bitbucket.org) Access Token
-- follow [https://support.atlassian.com/bitbucket-cloud/docs/app-passwords/#Apppasswords-Createanapppassword](https://support.atlassian.com/bitbucket-cloud/docs/app-passwords/#Apppasswords-Createanapppassword)
+- follow [https://support.atlassian.com/bitbucket-cloud/docs/app-passwords/](https://support.atlassian.com/bitbucket-cloud/docs/app-passwords/)
 - Label the password "atlantis"
 - Select **Pull requests**: **Read** and **Write** so that Atlantis can read your pull requests and write comments to them
 - set the token as an environment variable
