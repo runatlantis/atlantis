@@ -5,7 +5,7 @@
 FROM circleci/golang:1.14
 
 # Install Terraform
-ENV TERRAFORM_VERSION=0.13.5
+ENV TERRAFORM_VERSION=0.14.0
 RUN curl -LOks https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip && \
     sudo mkdir -p /usr/local/bin/tf/versions/${TERRAFORM_VERSION} && \
     sudo unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip -d /usr/local/bin/tf/versions/${TERRAFORM_VERSION} && \
