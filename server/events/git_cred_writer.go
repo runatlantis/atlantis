@@ -105,5 +105,12 @@ func fileLineReplace(line, user, host, filename string) error {
 			newLines = append(newLines, l)
 		}
 	}
-	return ioutil.WriteFile(filename, []byte(strings.Join(newLines, "\n")), 0600)
+	toWrite := strings.Join(newLines, "\n")
+
+	// there was nothing to replace so we need to append the creds
+	if toWrite == "" {
+		return fileAppend(line, filename)
+	}
+
+	return ioutil.WriteFile(filename, []byte(toWrite), 0600)
 }
