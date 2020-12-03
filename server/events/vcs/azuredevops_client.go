@@ -17,12 +17,13 @@ import (
 
 // AzureDevopsClient represents an Azure DevOps VCS client
 type AzureDevopsClient struct {
-	Client *azuredevops.Client
-	ctx    context.Context
+	Client   *azuredevops.Client
+	ctx      context.Context
+	UserName string
 }
 
 // NewAzureDevopsClient returns a valid Azure DevOps client.
-func NewAzureDevopsClient(hostname string, token string) (*AzureDevopsClient, error) {
+func NewAzureDevopsClient(hostname string, userName string, token string) (*AzureDevopsClient, error) {
 	tp := azuredevops.BasicAuthTransport{
 		Username: "",
 		Password: strings.TrimSpace(token),
@@ -44,8 +45,9 @@ func NewAzureDevopsClient(hostname string, token string) (*AzureDevopsClient, er
 	}
 
 	client := &AzureDevopsClient{
-		Client: adClient,
-		ctx:    context.Background(),
+		Client:   adClient,
+		UserName: userName,
+		ctx:      context.Background(),
 	}
 
 	return client, nil
@@ -287,12 +289,18 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
 // until we handle branch policies
 // https://docs.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops
 func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
+	owner, project, repoName := SplitAzureDevopsRepoFullName(pull.BaseRepo.FullName)
 	descriptor := "Atlantis Terraform Pull Request Automation"
-	i := "atlantis"
+
+	userID, err := g.Client.UserEntitlements.GetUserID(g.ctx, g.UserName, owner)
+	if err != nil {
+		return errors.Wrap(err, "getting user id")
+	}
+
 	imageURL := "https://github.com/runatlantis/atlantis/raw/master/runatlantis.io/.vuepress/public/hero.png"
 	id := azuredevops.IdentityRef{
 		Descriptor: &descriptor,
-		ID:         &i,
+		ID:         userID,
 		ImageURL:   &imageURL,
 	}
 	// Set default pull request completion options
@@ -315,7 +323,6 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
 	mergePull.AutoCompleteSetBy = &id
 	mergePull.CompletionOptions = &completionOpts
 
-	owner, project, repoName := SplitAzureDevopsRepoFullName(pull.BaseRepo.FullName)
 	mergeResult, _, err := g.Client.PullRequests.Merge(
 		g.ctx,
 		owner,
