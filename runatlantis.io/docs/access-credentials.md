@@ -76,6 +76,7 @@ Only a single installation per GitHub App is supported at the moment.
 - The minimum scopes required for this token are:
   - Code (Read & Write)
   - Code (Status)
+  - Member Entitlement Management (Read)
 - Record the access token
 
 ## Next Steps
