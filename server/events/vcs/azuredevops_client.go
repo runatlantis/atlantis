@@ -294,7 +294,7 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
 
 	userID, err := g.Client.UserEntitlements.GetUserID(g.ctx, g.UserName, owner)
 	if err != nil {
-		return errors.Wrap(err, "getting user id")
+		return errors.Wrapf(err, "Getting user id failed. User name: %s Organization %s ", g.UserName, owner)
 	}
 	if userID == nil {
 		return fmt.Errorf("the user %s is not found in the organization %s", g.UserName, owner)
