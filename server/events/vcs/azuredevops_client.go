@@ -296,6 +296,9 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
 	if err != nil {
 		return errors.Wrap(err, "getting user id")
 	}
+	if userID == nil {
+		return fmt.Errorf("the user %s is not found in the organization %s", g.UserName, owner)
+	}
 
 	imageURL := "https://github.com/runatlantis/atlantis/raw/master/runatlantis.io/.vuepress/public/hero.png"
 	id := azuredevops.IdentityRef{
