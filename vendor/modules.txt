@@ -229,7 +229,7 @@ github.com/pelletier/go-buffruneio
 # github.com/pelletier/go-toml v1.0.0
 ## explicit
 github.com/pelletier/go-toml
-# github.com/petergtz/pegomock v2.7.0+incompatible
+# github.com/petergtz/pegomock v2.8.0+incompatible
 ## explicit
 github.com/petergtz/pegomock
 github.com/petergtz/pegomock/internal/verify
