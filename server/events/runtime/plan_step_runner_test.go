@@ -618,40 +618,9 @@ func TestRun_OutputOnErr(t *testing.T) {
 // being used.
 func TestRun_NoOptionalVarsIn012(t *testing.T) {
 	RegisterMockTestingT(t)
-	terraform := mocks.NewMockClient()
 
-	tfVersion, _ := version.NewVersion("0.12.0")
-	s := runtime.PlanStepRunner{
-		TerraformExecutor: terraform,
-		DefaultTFVersion:  tfVersion,
-	}
-
-	When(terraform.RunCommandWithVersion(
-		matchers.AnyPtrToLoggingSimpleLogger(),
-		AnyString(),
-		AnyStringSlice(),
-		matchers2.AnyMapOfStringToString(),
-		matchers2.AnyPtrToGoVersionVersion(),
-		AnyString())).ThenReturn("output", nil)
-
-	output, err := s.Run(models.ProjectCommandContext{
-		Workspace:          "default",
-		RepoRelDir:         ".",
-		User:               models.User{Username: "username"},
-		EscapedCommentArgs: []string{"comment", "args"},
-		Pull: models.PullRequest{
-			Num: 2,
-		},
-		BaseRepo: models.Repo{
-			FullName: "owner/repo",
-			Owner:    "owner",
-			Name:     "repo",
-		},
-	}, []string{"extra", "args"}, "/path", map[string]string(nil))
-	Ok(t, err)
-	Equals(t, "output", output)
-
-	expPlanArgs := []string{"plan",
+	expPlanArgs := []string{
+		"plan",
 		"-input=false",
 		"-refresh",
 		"-no-color",
@@ -662,7 +631,59 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 		"comment",
 		"args",
 	}
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, "/path", expPlanArgs, map[string]string(nil), tfVersion, "default")
+
+	cases := []struct {
+		name      string
+		tfVersion string
+	}{
+		{
+			"stable version",
+			"0.12.0",
+		},
+		{
+			"with prerelease",
+			"0.14.0-rc1",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			terraform := mocks.NewMockClient()
+			When(terraform.RunCommandWithVersion(
+				matchers.AnyPtrToLoggingSimpleLogger(),
+				AnyString(),
+				AnyStringSlice(),
+				matchers2.AnyMapOfStringToString(),
+				matchers2.AnyPtrToGoVersionVersion(),
+				AnyString())).ThenReturn("output", nil)
+
+			tfVersion, _ := version.NewVersion(c.tfVersion)
+			s := runtime.PlanStepRunner{
+				TerraformExecutor: terraform,
+				DefaultTFVersion:  tfVersion,
+			}
+
+			output, err := s.Run(models.ProjectCommandContext{
+				Workspace:          "default",
+				RepoRelDir:         ".",
+				User:               models.User{Username: "username"},
+				EscapedCommentArgs: []string{"comment", "args"},
+				Pull: models.PullRequest{
+					Num: 2,
+				},
+				BaseRepo: models.Repo{
+					FullName: "owner/repo",
+					Owner:    "owner",
+					Name:     "repo",
+				},
+			}, []string{"extra", "args"}, "/path", map[string]string(nil))
+			Ok(t, err)
+			Equals(t, "output", output)
+
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, "/path", expPlanArgs, map[string]string(nil), tfVersion, "default")
+		})
+	}
+
 }
 
 // Test plans if using remote ops.
