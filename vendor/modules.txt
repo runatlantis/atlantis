@@ -129,8 +129,6 @@ github.com/google/go-querystring/query
 github.com/google/uuid
 # github.com/googleapis/gax-go/v2 v2.0.5
 github.com/googleapis/gax-go/v2
-# github.com/gorilla/context v0.0.0-20160226214623-1ea25387ff6f
-## explicit
 # github.com/gorilla/mux v1.8.0
 ## explicit
 github.com/gorilla/mux
@@ -185,6 +183,9 @@ github.com/inconshreveable/mousetrap
 github.com/jmespath/go-jmespath
 # github.com/konsorten/go-windows-terminal-sequences v1.0.1
 github.com/konsorten/go-windows-terminal-sequences
+# github.com/leodido/go-urn v1.2.0
+## explicit
+github.com/leodido/go-urn
 # github.com/magiconair/properties v1.7.3
 ## explicit
 github.com/magiconair/properties
@@ -418,7 +419,7 @@ google.golang.org/grpc/status
 google.golang.org/grpc/tap
 # gopkg.in/go-playground/assert.v1 v1.2.1
 ## explicit
-# gopkg.in/go-playground/validator.v9 v9.20.2
+# gopkg.in/go-playground/validator.v9 v9.31.0
 ## explicit
 gopkg.in/go-playground/validator.v9
 # gopkg.in/yaml.v2 v2.2.2
