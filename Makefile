@@ -49,7 +49,7 @@ test-coverage-html:
 
 dev-docker:
 	GOOS=linux GOARCH=amd64 go build -mod=vendor -o atlantis .
-	docker build -f dev-Dockerfile -t atlantis-dev .
+	docker build -f Dockerfile.dev -t atlantis-dev .
 
 dist: ## Package up everything in static/ using go-bindata-assetfs so it can be served by a single binary
 	rm -f server/static/bindata_assetfs.go && go-bindata-assetfs -pkg static -prefix server server/static/... && mv bindata_assetfs.go server/static
