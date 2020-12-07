@@ -12,7 +12,21 @@ import (
 	"strings"
 )
 
-// TfOutputController holds the attributes for the terraform outputs controller
+const (
+	TfOutputQueryCreatedAt          = "createdAt"
+	TfOutputQueryCreatedAtFormatted = "createdAtFormatted"
+	TfOutputQueryRepoFullName       = "repoFullName"
+	TfOutputQueryPullNum            = "pullNum"
+	TfOutputQueryHeadCommit         = "headCommit"
+	TfOutputQueryProject            = "project"
+	TfOutputQueryWorkspace          = "workspace"
+	TfOutputQueryTfCommand          = "tfCommand"
+
+	// TfOutputWbSocketPath is path used for the websocket endpoint.
+	TfOutputWbSocketPath = "/tf-output-ws"
+)
+
+// TfOutputController holds the attributes for the terraform outputs controller.
 type TfOutputController struct {
 	AtlantisVersion        string
 	AtlantisURL            *url.URL
@@ -22,26 +36,25 @@ type TfOutputController struct {
 	TfOutputDetailTemplate TemplateWriter
 }
 
-// requiredQuery type to describe all the required query strings
-type requiredQuery string
-
-const (
-	createdAt          requiredQuery = "createdAt"
-	createdAtFormatted requiredQuery = "createdAtFormatted"
-	repoFullName       requiredQuery = "repoFullName"
-	pullNum            requiredQuery = "pullNum"
-	headCommit         requiredQuery = "headCommit"
-	project            requiredQuery = "project"
-	workspace          requiredQuery = "workspace"
-	tfCommand          requiredQuery = "tfCommand"
-)
+// GetQueries return the query strings for the tf output detail view with its validation.
+func (t *TfOutputController) GetQueries() map[string]string {
+	return map[string]string{
+		TfOutputQueryCreatedAt:          fmt.Sprintf("{%s:[0-9]{14}}", TfOutputQueryCreatedAt),
+		TfOutputQueryCreatedAtFormatted: fmt.Sprintf("{%s:.*}", TfOutputQueryCreatedAtFormatted),
+		TfOutputQueryRepoFullName:       fmt.Sprintf("{%s:.*}", TfOutputQueryRepoFullName),
+		TfOutputQueryPullNum:            fmt.Sprintf("{%s:.[0-9]+}", TfOutputQueryPullNum),
+		TfOutputQueryHeadCommit:         fmt.Sprintf("{%s:.*}", TfOutputQueryHeadCommit),
+		TfOutputQueryProject:            fmt.Sprintf("{%s:.*}", TfOutputQueryProject),
+		TfOutputQueryWorkspace:          fmt.Sprintf("{%s:.*}", TfOutputQueryWorkspace),
+		TfOutputQueryTfCommand:          fmt.Sprintf("{%s:.*}", TfOutputQueryTfCommand),
+	}
+}
 
 // GetTfOutputDetail return the tf output detail page rendered.
 func (t *TfOutputController) GetTfOutputDetail(w http.ResponseWriter, r *http.Request) {
-	requiredQueries := []requiredQuery{createdAt, createdAtFormatted, repoFullName, pullNum, headCommit, project, workspace, tfCommand}
-	queryValues := make(map[requiredQuery]string)
-	for _, query := range requiredQueries {
-		value, ok := r.URL.Query()[string(query)]
+	queryValues := make(map[string]string)
+	for query, _ := range t.GetQueries() {
+		value, ok := r.URL.Query()[query]
 		// Verify if the query string exists in the request and only has one element.
 		if !ok || len(query) == 0 {
 			w.WriteHeader(http.StatusBadRequest)
@@ -51,29 +64,28 @@ func (t *TfOutputController) GetTfOutputDetail(w http.ResponseWriter, r *http.Re
 		queryValues[query] = value[0]
 	}
 
-	pullNum, err := strconv.Atoi(queryValues[pullNum])
+	pullNum, err := strconv.Atoi(queryValues[TfOutputQueryPullNum])
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, "error converting the pull request number, %v", err)
 		return
 	}
 
-	// Format web socket urls
-	// FIXME create a constant for this path
-	wsUrl := fmt.Sprintf("ws://%s/tf-output-ws", t.AtlantisURL.Host)
+	// Format web socket url
+	wsUrl := fmt.Sprintf("ws://%s%s", t.AtlantisURL.Host, TfOutputWbSocketPath)
 	if t.AtlantisURL.Scheme == "https" {
 		wsUrl = strings.Replace(wsUrl, "ws://", "wss://", 1)
 	}
 
 	viewData := TfOutputDetailData{
-		CreatedAt:          queryValues[createdAt],
-		CreatedAtFormatted: queryValues[createdAtFormatted],
-		RepoFullName:       queryValues[repoFullName],
+		CreatedAt:          queryValues[TfOutputQueryCreatedAt],
+		CreatedAtFormatted: queryValues[TfOutputQueryCreatedAtFormatted],
+		RepoFullName:       queryValues[TfOutputQueryRepoFullName],
 		PullNum:            pullNum,
-		HeadCommit:         queryValues[headCommit],
-		Project:            queryValues[project],
-		Workspace:          queryValues[workspace],
-		TfCommand:          queryValues[tfCommand],
+		HeadCommit:         queryValues[TfOutputQueryHeadCommit],
+		Project:            queryValues[TfOutputQueryProject],
+		Workspace:          queryValues[TfOutputQueryWorkspace],
+		TfCommand:          queryValues[TfOutputQueryTfCommand],
 		CleanedBasePath:    t.AtlantisURL.Path,
 		WebSocketUrl:       wsUrl,
 	}

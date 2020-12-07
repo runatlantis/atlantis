@@ -89,6 +89,9 @@ func (f *FileOutputHelper) ParseFileName(fileName string) (TfOutputFile, error) 
 	fullRepoName := strings.ReplaceAll(parts[1], "__", "-")
 	fullRepoName = strings.ReplaceAll(fullRepoName, "_", "/")
 
+	// Put back "-"
+	project := strings.ReplaceAll(parts[4], "_", "-")
+
 	pullRequestNr, err := strconv.Atoi(parts[2])
 	if err != nil {
 		return TfOutputFile{}, errors.Wrap(err, "can't convert pull request number to string")
@@ -99,7 +102,7 @@ func (f *FileOutputHelper) ParseFileName(fileName string) (TfOutputFile, error) 
 		FullRepoName:  fullRepoName,
 		PullRequestNr: pullRequestNr,
 		HeadCommit:    parts[3],
-		Project:       parts[4],
+		Project:       project,
 		Workspace:     parts[5],
 		TfCommand:     parts[6],
 	}, nil
@@ -112,6 +115,9 @@ func (f *FileOutputHelper) CreateFileName(fullRepoName string, pullRequestNr int
 	// Format full repo name to be able to parse it back to its original value
 	fullRepoName = strings.ReplaceAll(fullRepoName, "-", "__")
 	fullRepoName = strings.ReplaceAll(fullRepoName, "/", "_")
+
+	// Format project name
+	project = strings.ReplaceAll(project, "-", "_")
 
 	// Short the head commit
 	headCommit = headCommit[:7]
@@ -128,7 +134,7 @@ func (f *FileOutputHelper) CreateFileName(fullRepoName string, pullRequestNr int
 	)
 }
 
-func (f *FileOutputHelper) ContinueReadFile(log *logging.SimpleLogger, fileName string, fileLInes chan<- string, done chan bool) error {
+func (f *FileOutputHelper) ContinueReadFile(log *logging.SimpleLogger, fileName string, fileLines chan<- string, done chan bool) error {
 	tfOutputFileName := filepath.Join(f.outputCmdDir, fileName)
 	file, _ := os.Open(tfOutputFileName)
 	reader := bufio.NewReader(file)
@@ -138,7 +144,7 @@ func (f *FileOutputHelper) ContinueReadFile(log *logging.SimpleLogger, fileName 
 	for {
 		select {
 		case <-done:
-			close(fileLInes)
+			close(fileLines)
 			log.Debug("stopping tailing file %q", tfOutputFileName)
 			return nil
 		default:
@@ -156,7 +162,7 @@ func (f *FileOutputHelper) ContinueReadFile(log *logging.SimpleLogger, fileName 
 			}
 
 			// Post the new line into the string channel
-			fileLInes <- line
+			fileLines <- line
 		}
 	}
 }
@@ -165,6 +171,9 @@ func (f *FileOutputHelper) FindOutputFile(createdAt, fullRepoName, pullNr, headC
 	// Format the repo name
 	fullRepoName = strings.ReplaceAll(fullRepoName, "-", "__")
 	fullRepoName = strings.ReplaceAll(fullRepoName, "/", "_")
+
+	// Format project name
+	project = strings.ReplaceAll(project, "-", "_")
 
 	// Format the file name
 	fileName := fmt.Sprintf("%s-%s-%s-%s-%s-%s-%s",

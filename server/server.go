@@ -63,6 +63,8 @@ const (
 	// route. ex:
 	//   mux.Router.Get(LockViewRouteName).URL(LockViewRouteIDQueryParam, "my id")
 	LockViewRouteIDQueryParam = "id"
+	// TfOutputViewRouteName is the name for the route in mux.Router for the terraform output view.
+	TfOutputViewRouteName = "tf-output-detail"
 )
 
 // Server runs the Atlantis web server.
@@ -521,18 +523,21 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
 	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
-	s.Router.HandleFunc("/tf-output", s.TfOutputsController.GetTfOutputDetail).Methods("GET").Queries(
-		"createdAt", "{createAt:[0-9]{14}}",
-		"createdAtFormatted", "{createdAtFormatted:.*}",
-		"repoFullName", "{repoFullName:.*}",
-		"pullNum", "{pullNum:[0-9]+}",
-		"headCommit", "{headCommit:.*}",
-		"project", "{project:.*}",
-		"workspace", "{workspace:.*}",
-		"tfCommand", "{tfCommand:.*}",
-	)
 
-	s.Router.HandleFunc("/tf-output-ws", s.TfOutputsController.GetTfOutputWebsocket)
+	// Tf output handlers
+	// Tf output detail view
+	s.Router.HandleFunc("/tf-output", s.TfOutputsController.GetTfOutputDetail).Methods("GET").
+		Queries(func() []string {
+			var queries []string
+			// Format the map with the queries to mux.Router format
+			for query, validation := range s.TfOutputsController.GetQueries() {
+				queries = append(queries, query, validation)
+			}
+			return queries
+		}()...).Name(TfOutputViewRouteName)
+
+	// Tf output websocket endpoint
+	s.Router.HandleFunc(TfOutputWbSocketPath, s.TfOutputsController.GetTfOutputWebsocket)
 
 	n := negroni.New(&negroni.Recovery{
 		Logger:     log.New(os.Stdout, "", log.LstdFlags),
@@ -617,12 +622,12 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 		})
 	}
 
-	// Check if terraform output was configured
+	// Check if terraform output was configured before listing all the files.
 	var tfOutputs []TfOutputIndexData
 	if s.TfOutput != nil {
 		outputs, err := s.TfOutput.List()
 		if err != nil {
-			w.WriteHeader(http.StatusServiceUnavailable)
+			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, "Could not retrieve terraform outputs: %s", err)
 			return
 		}
@@ -631,21 +636,20 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 			createdAt := tfOutput.CreatedAt.Format("20060102150405")
 			createdAtFormatter := tfOutput.CreatedAt.Format("02-01-2006 15:04:05")
 
-			path := fmt.Sprintf("/tf-output?createdAt=%s&createdAtFormatted=%s&repoFullName=%s&pullNum=%d&headCommit=%s&project=%s&workspace=%s&tfCommand=%s",
-				url.QueryEscape(createdAt),
-				url.QueryEscape(createdAtFormatter),
-				url.QueryEscape(tfOutput.FullRepoName),
-				tfOutput.PullRequestNr,
-				url.QueryEscape(tfOutput.HeadCommit),
-				url.QueryEscape(tfOutput.Project),
-				url.QueryEscape(tfOutput.Workspace),
-				url.QueryEscape(tfOutput.TfCommand),
-			)
-
-			fmt.Println(path)
+			tfOutputDetailPath, _ := s.Router.Get(TfOutputViewRouteName).
+				Queries(
+					TfOutputQueryCreatedAt, url.QueryEscape(createdAt),
+					TfOutputQueryCreatedAtFormatted, url.QueryEscape(createdAtFormatter),
+					TfOutputQueryRepoFullName, url.QueryEscape(tfOutput.FullRepoName),
+					TfOutputQueryPullNum, string(rune(tfOutput.PullRequestNr)),
+					TfOutputQueryHeadCommit, url.QueryEscape(tfOutput.HeadCommit),
+					TfOutputQueryProject, url.QueryEscape(tfOutput.Project),
+					TfOutputQueryWorkspace, url.QueryEscape(tfOutput.Workspace),
+					TfOutputQueryTfCommand, url.QueryEscape(tfOutput.TfCommand),
+				).URL()
 
 			tfOutputs = append(tfOutputs, TfOutputIndexData{
-				Path:               path,
+				Path:               tfOutputDetailPath.String(),
 				CreatedAt:          createdAt,
 				CreatedAtFormatted: createdAtFormatter,
 				RepoFullName:       tfOutput.FullRepoName,
@@ -661,7 +665,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	//Sort by date - newest to oldest.
 	sort.SliceStable(lockResults, func(i, j int) bool { return lockResults[i].Time.After(lockResults[j].Time) })
 	sort.SliceStable(tfOutputs, func(i, j int) bool { return tfOutputs[i].CreatedAt > tfOutputs[j].CreatedAt })
-	
+
 	err = s.IndexTemplate.Execute(w, IndexData{
 		Locks:           lockResults,
 		TfOutputs:       tfOutputs,

@@ -125,6 +125,29 @@ func TestFileOutputHelper_ParseFileName(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "File name should be parsed when project name has '-'",
+			fields: fields{
+				outputCmdDir: "test",
+			},
+			args: args{
+				fileName: "20201125130042-runatlantis_atlantis__test-1-1a2b3c4-test_123-default-init",
+			},
+			exp: TfOutputFile{
+				CreatedAt: func() time.Time {
+					createdAt, err := time.Parse(outputTimeFmt, "20201125130042")
+					Ok(t, err)
+					return createdAt
+				}(),
+				FullRepoName:  "runatlantis/atlantis-test",
+				PullRequestNr: 1,
+				HeadCommit:    "1a2b3c4",
+				Project:       "test-123",
+				TfCommand:     "init",
+				Workspace:     "default",
+			},
+			wantErr: false,
+		},
+		{
 			name: "It should fail with invalid file name",
 			args: args{
 				fileName: "test123",

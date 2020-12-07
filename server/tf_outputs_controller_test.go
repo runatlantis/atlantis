@@ -1,9 +1,11 @@
 package server
 
 import (
+	"bytes"
 	"github.com/gorilla/websocket"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	"github.com/runatlantis/atlantis/server/logging"
+	sMocks "github.com/runatlantis/atlantis/server/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 	"net/http"
 	"net/http/httptest"
@@ -33,7 +35,7 @@ func (m *mockThfOutputHelper) ContinueReadFile(Log *logging.SimpleLogger, fileNa
 	for {
 		select {
 		// Gets the mock file line from the test
-		case mockFileLine := <- m.mockFileLines:
+		case mockFileLine := <-m.mockFileLines:
 			// Sends the mocked file line to the fileLines channel
 			fileLines <- mockFileLine
 		}
@@ -88,4 +90,65 @@ func TestTfOutputsController_GetTfOutputWebsocket(t *testing.T) {
 
 		Equals(t, data, string(msg))
 	}
+}
+
+func TestTfOutputController_GetTfOutputDetail(t *testing.T) {
+	t.Run("It should return render the template", func(t *testing.T) {
+		log := logging.NewSimpleLogger("test", false, logging.Debug)
+		atlantisUrl, err := url.Parse("http://test.com")
+		Ok(t, err)
+
+		mockTemplate := sMocks.NewMockTemplateWriter()
+
+		controller := TfOutputController{
+			Log:                    log,
+			AtlantisURL:            atlantisUrl,
+			TfOutputDetailTemplate: mockTemplate,
+		}
+
+		// Create the test request
+		req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+		// Set the required query strings
+		q := req.URL.Query()
+
+		q.Add("createdAt", "20200101000000")
+		q.Add("createdAtFormatted", "01-01-2020 00:00:00")
+		q.Add("repoFullName", "test/test-atlantis")
+		q.Add("pullNum", "1")
+		q.Add("headCommit", "1a2b3c4")
+		q.Add("project", "test")
+		q.Add("workspace", "default")
+		q.Add("tfCommand", "init")
+
+		req.URL.RawQuery = q.Encode()
+
+		w := httptest.NewRecorder()
+
+		controller.GetTfOutputDetail(w, req)
+
+		Equals(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("It should fail with no query string provided", func(t *testing.T) {
+		log := logging.NewSimpleLogger("test", false, logging.Debug)
+		atlantisUrl, err := url.Parse("http://test.com")
+		Ok(t, err)
+
+		mockTemplate := sMocks.NewMockTemplateWriter()
+
+		controller := TfOutputController{
+			Log:                    log,
+			AtlantisURL:            atlantisUrl,
+			TfOutputDetailTemplate: mockTemplate,
+		}
+
+		// Create the test request
+		req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+
+		w := httptest.NewRecorder()
+
+		controller.GetTfOutputDetail(w, req)
+
+		Equals(t, http.StatusBadRequest, w.Code)
+	})
 }
