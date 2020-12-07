@@ -536,7 +536,6 @@ func (s *Server) Start() error {
 				queries = append(queries, query, validation)
 			}
 
-			s.Logger.Debug("%v", queries)
 			return queries
 		}()...).Name(TfOutputViewRouteName)
 
