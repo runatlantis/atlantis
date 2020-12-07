@@ -235,10 +235,10 @@ func TestGithubClient_PaginatesComments(t *testing.T) {
 }
 
 func TestGithubClient_HideOldComments(t *testing.T) {
-  // Only comments 6, 8 and 9 should be minimized, because:
-  //   * it's by the same Atlantis bot user
+	// Only comments 6, 8 and 9 should be minimized, because:
+	//   * it's by the same Atlantis bot user
 	//   * it has "plan" or "Continued from previous comment." in the first line of the
-  //     comment body.
+	//     comment body.
 	issueResp := `[
 	{"node_id": "1", "body": "asd\nplan\nasd", "user": {"login": "someone-else"}},
 	{"node_id": "2", "body": "asd plan\nasd", "user": {"login": "someone-else"}},
