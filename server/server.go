@@ -27,6 +27,7 @@ import (
 	"os"
 	"os/signal"
 	"sort"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -63,7 +64,7 @@ const (
 	// route. ex:
 	//   mux.Router.Get(LockViewRouteName).URL(LockViewRouteIDQueryParam, "my id")
 	LockViewRouteIDQueryParam = "id"
-	// TfOutputViewRouteName is the name for the route in mux.Router for the terraform output view.
+	// TfOutputViewRouteName is the name for the route in mux.Router for the tf output view.
 	TfOutputViewRouteName = "tf-output-detail"
 )
 
@@ -322,6 +323,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AtlantisURL:               parsedURL,
 		LockViewRouteIDQueryParam: LockViewRouteIDQueryParam,
 		LockViewRouteName:         LockViewRouteName,
+		TfOutputViewRouteName:     TfOutputViewRouteName,
 		Underlying:                underlyingRouter,
 	}
 	pullClosedExecutor := &events.PullClosedExecutor{
@@ -533,6 +535,8 @@ func (s *Server) Start() error {
 			for query, validation := range s.TfOutputsController.GetQueries() {
 				queries = append(queries, query, validation)
 			}
+
+			s.Logger.Debug("%v", queries)
 			return queries
 		}()...).Name(TfOutputViewRouteName)
 
@@ -636,17 +640,22 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 			createdAt := tfOutput.CreatedAt.Format("20060102150405")
 			createdAtFormatter := tfOutput.CreatedAt.Format("02-01-2006 15:04:05")
 
-			tfOutputDetailPath, _ := s.Router.Get(TfOutputViewRouteName).
-				Queries(
+			tfOutputDetailPath, err := s.Router.Get(TfOutputViewRouteName).
+				URL(
 					TfOutputQueryCreatedAt, url.QueryEscape(createdAt),
 					TfOutputQueryCreatedAtFormatted, url.QueryEscape(createdAtFormatter),
 					TfOutputQueryRepoFullName, url.QueryEscape(tfOutput.FullRepoName),
-					TfOutputQueryPullNum, string(rune(tfOutput.PullRequestNr)),
+					TfOutputQueryPullNum, strconv.Itoa(tfOutput.PullRequestNr),
 					TfOutputQueryHeadCommit, url.QueryEscape(tfOutput.HeadCommit),
 					TfOutputQueryProject, url.QueryEscape(tfOutput.Project),
 					TfOutputQueryWorkspace, url.QueryEscape(tfOutput.Workspace),
 					TfOutputQueryTfCommand, url.QueryEscape(tfOutput.TfCommand),
-				).URL()
+				)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintf(w, "Could not parse tf output detail urls: %v", err)
+				return
+			}
 
 			tfOutputs = append(tfOutputs, TfOutputIndexData{
 				Path:               tfOutputDetailPath.String(),

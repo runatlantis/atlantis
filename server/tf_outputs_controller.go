@@ -42,7 +42,7 @@ func (t *TfOutputController) GetQueries() map[string]string {
 		TfOutputQueryCreatedAt:          fmt.Sprintf("{%s:[0-9]{14}}", TfOutputQueryCreatedAt),
 		TfOutputQueryCreatedAtFormatted: fmt.Sprintf("{%s:.*}", TfOutputQueryCreatedAtFormatted),
 		TfOutputQueryRepoFullName:       fmt.Sprintf("{%s:.*}", TfOutputQueryRepoFullName),
-		TfOutputQueryPullNum:            fmt.Sprintf("{%s:.[0-9]+}", TfOutputQueryPullNum),
+		TfOutputQueryPullNum:            fmt.Sprintf("{%s:[0-9]+}", TfOutputQueryPullNum),
 		TfOutputQueryHeadCommit:         fmt.Sprintf("{%s:.*}", TfOutputQueryHeadCommit),
 		TfOutputQueryProject:            fmt.Sprintf("{%s:.*}", TfOutputQueryProject),
 		TfOutputQueryWorkspace:          fmt.Sprintf("{%s:.*}", TfOutputQueryWorkspace),
@@ -61,7 +61,15 @@ func (t *TfOutputController) GetTfOutputDetail(w http.ResponseWriter, r *http.Re
 			fmt.Fprintf(w, "missing %s query string", query)
 			return
 		}
-		queryValues[query] = value[0]
+
+		valueUnescaped, err := url.QueryUnescape(value[0])
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "error unescaping %s query string: %v", query, err)
+			return
+		}
+
+		queryValues[query] = valueUnescaped
 	}
 
 	pullNum, err := strconv.Atoi(queryValues[TfOutputQueryPullNum])
@@ -76,6 +84,7 @@ func (t *TfOutputController) GetTfOutputDetail(w http.ResponseWriter, r *http.Re
 	if t.AtlantisURL.Scheme == "https" {
 		wsUrl = strings.Replace(wsUrl, "ws://", "wss://", 1)
 	}
+
 
 	viewData := TfOutputDetailData{
 		CreatedAt:          queryValues[TfOutputQueryCreatedAt],

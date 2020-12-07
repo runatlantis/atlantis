@@ -93,7 +93,7 @@ func TestTfOutputsController_GetTfOutputWebsocket(t *testing.T) {
 }
 
 func TestTfOutputController_GetTfOutputDetail(t *testing.T) {
-	t.Run("It should return render the template", func(t *testing.T) {
+	t.Run("It should render the template", func(t *testing.T) {
 		log := logging.NewSimpleLogger("test", false, logging.Debug)
 		atlantisUrl, err := url.Parse("http://test.com")
 		Ok(t, err)

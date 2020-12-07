@@ -18,6 +18,8 @@ type Router struct {
 	// LockViewRouteIDQueryParam is the query parameter needed to construct the
 	// lock view: underlying.Get(LockViewRouteName).URL(LockViewRouteIDQueryParam, "my id").
 	LockViewRouteIDQueryParam string
+	// TfOutputViewRouteName is the named route for the tf output detail view.
+	TfOutputViewRouteName string
 	// AtlantisURL is the fully qualified URL that Atlantis is
 	// accessible from externally.
 	AtlantisURL *url.URL
