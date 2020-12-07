@@ -292,7 +292,7 @@ github.com/zclconf/go-cty/cty/function/stdlib
 github.com/zclconf/go-cty/cty/gocty
 github.com/zclconf/go-cty/cty/json
 github.com/zclconf/go-cty/cty/set
-# go.etcd.io/bbolt v1.3.4
+# go.etcd.io/bbolt v1.3.5
 ## explicit
 go.etcd.io/bbolt
 # go.opencensus.io v0.22.0

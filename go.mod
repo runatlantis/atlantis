@@ -62,7 +62,7 @@ require (
 	github.com/urfave/negroni v0.3.0
 	github.com/xanzy/go-gitlab v0.34.1
 	github.com/zclconf/go-cty v1.5.1 // indirect
-	go.etcd.io/bbolt v1.3.4
+	go.etcd.io/bbolt v1.3.5
 	golang.org/x/crypto v0.0.0-20200403201458-baeed622b8d8
 	golang.org/x/net v0.0.0-20191126235420-ef20fe5d7933 // indirect
 	golang.org/x/oauth2 v0.0.0-20191122200657-5d9234df094c // indirect
