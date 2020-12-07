@@ -5,12 +5,13 @@ import (
 	"html/template"
 	"os"
 	"path"
+	"reflect"
 	"strconv"
 	"strings"
 	ttemplate "text/template"
 	"time"
 
-	util "github.com/aokoli/goutils"
+	util "github.com/Masterminds/goutils"
 	"github.com/huandu/xstrings"
 )
 
@@ -24,7 +25,7 @@ func FuncMap() template.FuncMap {
 	return HtmlFuncMap()
 }
 
-// HermeticTextFuncMap returns a 'text/template'.FuncMap with only repeatable functions.
+// HermeticTxtFuncMap returns a 'text/template'.FuncMap with only repeatable functions.
 func HermeticTxtFuncMap() ttemplate.FuncMap {
 	r := TxtFuncMap()
 	for _, name := range nonhermeticFunctions {
@@ -42,7 +43,7 @@ func HermeticHtmlFuncMap() template.FuncMap {
 	return r
 }
 
-// TextFuncMap returns a 'text/template'.FuncMap
+// TxtFuncMap returns a 'text/template'.FuncMap
 func TxtFuncMap() ttemplate.FuncMap {
 	return ttemplate.FuncMap(GenericFuncMap())
 }
@@ -84,6 +85,9 @@ var nonhermeticFunctions = []string{
 	// OS
 	"env",
 	"expandenv",
+
+	// Network
+	"getHostByName",
 }
 
 var genericMap = map[string]interface{}{
@@ -100,6 +104,7 @@ var genericMap = map[string]interface{}{
 	"dateModify":     dateModify,
 	"ago":            dateAgo,
 	"toDate":         toDate,
+	"unixEpoch":      unixEpoch,
 
 	// Strings
 	"abbrev":     abbrev,
@@ -129,28 +134,31 @@ var genericMap = map[string]interface{}{
 	"shuffle":      xstrings.Shuffle,
 	"snakecase":    xstrings.ToSnakeCase,
 	"camelcase":    xstrings.ToCamelCase,
+	"kebabcase":    xstrings.ToKebabCase,
 	"wrap":         func(l int, s string) string { return util.Wrap(s, l) },
 	"wrapWith":     func(l int, sep, str string) string { return util.WrapCustom(str, l, sep, true) },
 	// Switch order so that "foobar" | contains "foo"
-	"contains":  func(substr string, str string) bool { return strings.Contains(str, substr) },
-	"hasPrefix": func(substr string, str string) bool { return strings.HasPrefix(str, substr) },
-	"hasSuffix": func(substr string, str string) bool { return strings.HasSuffix(str, substr) },
-	"quote":     quote,
-	"squote":    squote,
-	"cat":       cat,
-	"indent":    indent,
-	"nindent":   nindent,
-	"replace":   replace,
-	"plural":    plural,
-	"sha1sum":   sha1sum,
-	"sha256sum": sha256sum,
-	"toString":  strval,
+	"contains":   func(substr string, str string) bool { return strings.Contains(str, substr) },
+	"hasPrefix":  func(substr string, str string) bool { return strings.HasPrefix(str, substr) },
+	"hasSuffix":  func(substr string, str string) bool { return strings.HasSuffix(str, substr) },
+	"quote":      quote,
+	"squote":     squote,
+	"cat":        cat,
+	"indent":     indent,
+	"nindent":    nindent,
+	"replace":    replace,
+	"plural":     plural,
+	"sha1sum":    sha1sum,
+	"sha256sum":  sha256sum,
+	"adler32sum": adler32sum,
+	"toString":   strval,
 
 	// Wrap Atoi to stop errors.
-	"atoi":    func(a string) int { i, _ := strconv.Atoi(a); return i },
-	"int64":   toInt64,
-	"int":     toInt,
-	"float64": toFloat64,
+	"atoi":      func(a string) int { i, _ := strconv.Atoi(a); return i },
+	"int64":     toInt64,
+	"int":       toInt,
+	"float64":   toFloat64,
+	"toDecimal": toDecimal,
 
 	//"gt": func(a, b int) bool {return a > b},
 	//"gte": func(a, b int) bool {return a >= b},
@@ -160,6 +168,8 @@ var genericMap = map[string]interface{}{
 	// split "/" foo/bar returns map[int]string{0: foo, 1: bar}
 	"split":     split,
 	"splitList": func(sep, orig string) []string { return strings.Split(orig, sep) },
+	// splitn "/" foo/bar/fuu returns map[int]string{0: foo, 1: bar/fuu}
+	"splitn":    splitn,
 	"toStrings": strslice,
 
 	"until":     until,
@@ -201,6 +211,7 @@ var genericMap = map[string]interface{}{
 	"empty":        empty,
 	"coalesce":     coalesce,
 	"compact":      compact,
+	"deepCopy":     deepCopy,
 	"toJson":       toJson,
 	"toPrettyJson": toPrettyJson,
 	"ternary":      ternary,
@@ -211,10 +222,14 @@ var genericMap = map[string]interface{}{
 	"typeIsLike": typeIsLike,
 	"kindOf":     kindOf,
 	"kindIs":     kindIs,
+	"deepEqual":  reflect.DeepEqual,
 
 	// OS:
 	"env":       func(s string) string { return os.Getenv(s) },
 	"expandenv": func(s string) string { return os.ExpandEnv(s) },
+
+	// Network:
+	"getHostByName": getHostByName,
 
 	// File Paths:
 	"base":  path.Base,
@@ -230,17 +245,19 @@ var genericMap = map[string]interface{}{
 	"b32dec": base32decode,
 
 	// Data Structures:
-	"tuple":  list, // FIXME: with the addition of append/prepend these are no longer immutable.
-	"list":   list,
-	"dict":   dict,
-	"set":    set,
-	"unset":  unset,
-	"hasKey": hasKey,
-	"pluck":  pluck,
-	"keys":   keys,
-	"pick":   pick,
-	"omit":   omit,
-	"merge":  merge,
+	"tuple":          list, // FIXME: with the addition of append/prepend these are no longer immutable.
+	"list":           list,
+	"dict":           dict,
+	"set":            set,
+	"unset":          unset,
+	"hasKey":         hasKey,
+	"pluck":          pluck,
+	"keys":           keys,
+	"pick":           pick,
+	"omit":           omit,
+	"merge":          merge,
+	"mergeOverwrite": mergeOverwrite,
+	"values":         values,
 
 	"append": push, "push": push,
 	"prepend": prepend,
@@ -252,6 +269,8 @@ var genericMap = map[string]interface{}{
 	"uniq":    uniq,
 	"without": without,
 	"has":     has,
+	"slice":   slice,
+	"concat":  concat,
 
 	// Crypto:
 	"genPrivateKey":     generatePrivateKey,
@@ -260,6 +279,8 @@ var genericMap = map[string]interface{}{
 	"genCA":             generateCertificateAuthority,
 	"genSelfSignedCert": generateSelfSignedCertificate,
 	"genSignedCert":     generateSignedCertificate,
+	"encryptAES":        encryptAES,
+	"decryptAES":        decryptAES,
 
 	// UUIDs:
 	"uuidv4": uuidv4,
@@ -278,4 +299,8 @@ var genericMap = map[string]interface{}{
 	"regexReplaceAll":        regexReplaceAll,
 	"regexReplaceAllLiteral": regexReplaceAllLiteral,
 	"regexSplit":             regexSplit,
+
+	// URLs:
+	"urlParse": urlParse,
+	"urlJoin":  urlJoin,
 }

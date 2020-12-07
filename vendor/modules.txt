@@ -11,10 +11,13 @@ cloud.google.com/go/storage
 github.com/Laisky/graphql
 github.com/Laisky/graphql/ident
 github.com/Laisky/graphql/internal/jsonutil
+# github.com/Masterminds/goutils v1.1.0
+## explicit
+github.com/Masterminds/goutils
 # github.com/Masterminds/semver v1.4.2
 ## explicit
 github.com/Masterminds/semver
-# github.com/Masterminds/sprig v2.15.0+incompatible
+# github.com/Masterminds/sprig v2.22.0+incompatible
 ## explicit
 github.com/Masterminds/sprig
 # github.com/agext/levenshtein v1.2.3
@@ -22,7 +25,6 @@ github.com/Masterminds/sprig
 github.com/agext/levenshtein
 # github.com/aokoli/goutils v1.0.1
 ## explicit
-github.com/aokoli/goutils
 # github.com/apparentlymart/go-textseg/v12 v12.0.0
 github.com/apparentlymart/go-textseg/v12/textseg
 # github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
@@ -129,8 +131,6 @@ github.com/google/go-querystring/query
 github.com/google/uuid
 # github.com/googleapis/gax-go/v2 v2.0.5
 github.com/googleapis/gax-go/v2
-# github.com/gorilla/context v0.0.0-20160226214623-1ea25387ff6f
-## explicit
 # github.com/gorilla/mux v1.8.0
 ## explicit
 github.com/gorilla/mux
@@ -201,6 +201,9 @@ github.com/microcosm-cc/bluemonday
 # github.com/mitchellh/colorstring v0.0.0-20150917214807-8631ce90f286
 ## explicit
 github.com/mitchellh/colorstring
+# github.com/mitchellh/copystructure v1.0.0
+## explicit
+github.com/mitchellh/copystructure
 # github.com/mitchellh/go-homedir v1.0.0
 ## explicit
 github.com/mitchellh/go-homedir
@@ -211,6 +214,8 @@ github.com/mitchellh/go-wordwrap
 # github.com/mitchellh/mapstructure v0.0.0-20170523030023-d0303fe80992
 ## explicit
 github.com/mitchellh/mapstructure
+# github.com/mitchellh/reflectwalk v1.0.0
+github.com/mitchellh/reflectwalk
 # github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb
 ## explicit
 github.com/mohae/deepcopy

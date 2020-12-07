@@ -4,10 +4,10 @@ go 1.14
 
 require (
 	github.com/Laisky/graphql v1.0.4
+	github.com/Masterminds/goutils v1.1.0 // indirect
 	github.com/Masterminds/semver v1.4.2 // indirect
-	github.com/Masterminds/sprig v2.15.0+incompatible
+	github.com/Masterminds/sprig v2.22.0+incompatible
 	github.com/agext/levenshtein v1.2.3 // indirect
-	github.com/aokoli/goutils v1.0.1 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a // indirect
 	github.com/aws/aws-sdk-go v1.17.14 // indirect
 	github.com/bradleyfalzon/ghinstallation v1.1.1
@@ -37,6 +37,7 @@ require (
 	github.com/mcdafydd/go-azuredevops v0.11.1
 	github.com/microcosm-cc/bluemonday v1.0.1
 	github.com/mitchellh/colorstring v0.0.0-20150917214807-8631ce90f286
+	github.com/mitchellh/copystructure v1.0.0 // indirect
 	github.com/mitchellh/go-homedir v1.0.0
 	github.com/mitchellh/mapstructure v0.0.0-20170523030023-d0303fe80992 // indirect
 	github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb
