@@ -440,7 +440,6 @@ func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo mo
 	}
 
 	// Check if the user who commented has the permissions to execute the 'plan' or 'apply' commands
-	// if parseResult.Command != nil && user.Username != "" {
 	if !e.TestingMode {
 		ok, err := e.checkUserPermissions(baseRepo, user, parseResult.Command)
 		if err != nil {
@@ -453,7 +452,6 @@ func (e *EventsController) handleCommentEvent(w http.ResponseWriter, baseRepo mo
 			return
 		}
 	}
-	// }
 
 	e.Logger.Debug("executing command")
 	fmt.Fprintln(w, "Processing...")

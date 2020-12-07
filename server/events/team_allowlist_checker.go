@@ -17,9 +17,9 @@ type TeamAllowlistChecker struct {
 }
 
 // NewTeamAllowlistChecker constructs a new checker
-func NewTeamAllowlistChecker(whitelist string) (*TeamAllowlistChecker, error) {
+func NewTeamAllowlistChecker(allowlist string) (*TeamAllowlistChecker, error) {
 	var rules []mapOfStrings
-	pairs := strings.Split(whitelist, ",")
+	pairs := strings.Split(allowlist, ",")
 	if pairs[0] != "" {
 		for _, pair := range pairs {
 			values := strings.Split(pair, ":")
