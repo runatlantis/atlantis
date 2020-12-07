@@ -422,7 +422,7 @@ google.golang.org/grpc/tap
 # gopkg.in/go-playground/validator.v9 v9.31.0
 ## explicit
 gopkg.in/go-playground/validator.v9
-# gopkg.in/yaml.v2 v2.2.2
+# gopkg.in/yaml.v2 v2.4.0
 ## explicit
 gopkg.in/yaml.v2
 # gotest.tools v2.2.0+incompatible
