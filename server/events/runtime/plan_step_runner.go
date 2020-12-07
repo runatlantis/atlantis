@@ -192,7 +192,7 @@ func (p *PlanStepRunner) buildPlanCmd(ctx models.ProjectCommandContext, extraArg
 // actually used in the configuration. Since there's no way for us to detect
 // if the configuration is using those variables, we don't set them.
 func (p *PlanStepRunner) tfVars(ctx models.ProjectCommandContext, tfVersion *version.Version) []string {
-	if vTwelveAndUp.Check(tfVersion) {
+	if tfVersion.GreaterThanOrEqual(version.Must(version.NewVersion("0.12.0"))) {
 		return nil
 	}
 
@@ -298,8 +298,6 @@ func (p *PlanStepRunner) runRemotePlan(
 	}
 	return output, err
 }
-
-var vTwelveAndUp = MustConstraint(">=0.12-a")
 
 // remoteOpsErr01114 is the error terraform plan will return if this project is
 // using TFE remote operations in TF 0.11.14.

@@ -1,0 +1,24 @@
+# Note: This file is only used for Atlantis local development
+version: "3.8"
+services:
+    ngrok:
+        image: wernight/ngrok:latest
+        ports:
+        - 4040:4040
+        environment:
+            NGROK_PROTOCOL: http
+            NGROK_PORT: atlantis:4141
+        depends_on:
+        - atlantis
+    atlantis:
+        build:
+            context: .
+            dockerfile: Dockerfile.dev
+        ports:
+        - 4141:4141
+        volumes:
+            - ~/.ssh:/.ssh
+            - ./:/atlantis/src
+        # Contains the flags that atlantis uses in env var form
+        env_file:
+            - ./atlantis.env
