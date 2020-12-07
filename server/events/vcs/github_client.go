@@ -198,7 +198,7 @@ func (g *GithubClient) HidePrevPlanComments(repo models.Repo, pullNum int) error
 			continue
 		}
 		firstLine := strings.ToLower(body[0])
-		if !strings.Contains(firstLine, models.PlanCommand.String()) {
+		if !strings.Contains(firstLine, models.PlanCommand.String()) && !strings.Contains(firstLine, "Continued from previous comment.") {
 			continue
 		}
 		var m struct {
