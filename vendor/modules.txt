@@ -137,7 +137,7 @@ github.com/gorilla/context
 github.com/gorilla/mux
 # github.com/hashicorp/go-cleanhttp v0.5.1
 github.com/hashicorp/go-cleanhttp
-# github.com/hashicorp/go-getter v1.4.0
+# github.com/hashicorp/go-getter v1.5.1
 ## explicit
 github.com/hashicorp/go-getter
 github.com/hashicorp/go-getter/helper/url
@@ -233,7 +233,7 @@ github.com/pelletier/go-toml
 ## explicit
 github.com/petergtz/pegomock
 github.com/petergtz/pegomock/internal/verify
-# github.com/pkg/errors v0.8.0
+# github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
 # github.com/remeh/sizedwaitgroup v1.0.0
@@ -269,8 +269,7 @@ github.com/spf13/pflag
 # github.com/spf13/viper v1.0.0
 ## explicit
 github.com/spf13/viper
-# github.com/ulikunitz/xz v0.5.6
-## explicit
+# github.com/ulikunitz/xz v0.5.8
 github.com/ulikunitz/xz
 github.com/ulikunitz/xz/internal/hash
 github.com/ulikunitz/xz/internal/xlog
@@ -278,7 +277,7 @@ github.com/ulikunitz/xz/lzma
 # github.com/urfave/cli v1.20.0
 ## explicit
 github.com/urfave/cli
-# github.com/urfave/negroni v0.2.0
+# github.com/urfave/negroni v0.3.0
 ## explicit
 github.com/urfave/negroni
 # github.com/xanzy/go-gitlab v0.34.1

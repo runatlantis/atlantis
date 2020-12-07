@@ -76,12 +76,16 @@ type DefaultCommandRunner struct {
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
 	CommitStatusUpdater      CommitStatusUpdater
 	DisableApplyAll          bool
+	DisableApply             bool
 	DisableAutoplan          bool
 	EventParser              EventParsing
 	MarkdownRenderer         *MarkdownRenderer
 	Logger                   logging.SimpleLogging
 	// AllowForkPRs controls whether we operate on pull requests from forks.
 	AllowForkPRs bool
+	// ParallelPoolSize controls the size of the wait group used to run
+	// parallel plans and applies (if enabled).
+	ParallelPoolSize int
 	// AllowForkPRsFlag is the name of the flag that controls fork PR's. We use
 	// this in our error message back to the user on a forked PR so they know
 	// how to enable this functionality.
@@ -201,6 +205,14 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 
 	log := c.buildLogger(baseRepo.FullName, pullNum)
 	defer c.logPanics(baseRepo, pullNum, log)
+
+	if c.DisableApply && cmd.Name == models.ApplyCommand {
+		log.Info("ignoring apply command since apply disabled globally")
+		if err := c.VCSClient.CreateComment(baseRepo, pullNum, applyDisabledComment, models.ApplyCommand.String()); err != nil {
+			log.Err("unable to comment on pull request: %s", err)
+		}
+		return
+	}
 
 	if c.DisableApplyAll && cmd.Name == models.ApplyCommand && !cmd.IsForSpecificProject() {
 		log.Info("ignoring apply command without flags since apply all is disabled")
@@ -402,7 +414,7 @@ func (c *DefaultCommandRunner) runProjectCmdsParallel(cmds []models.ProjectComma
 	var results []models.ProjectResult
 	mux := &sync.Mutex{}
 
-	wg := sizedwaitgroup.New(15)
+	wg := sizedwaitgroup.New(c.ParallelPoolSize)
 	for _, pCmd := range cmds {
 		pCmd := pCmd
 		var execute func()
@@ -609,3 +621,6 @@ var automergeComment = `Automatically merging because all plans have been succes
 // are disabled and an apply all command is issued.
 var applyAllDisabledComment = "**Error:** Running `atlantis apply` without flags is disabled." +
 	" You must specify which project to apply via the `-d <dir>`, `-w <workspace>` or `-p <project name>` flags."
+
+// applyDisabledComment is posted when apply commands are disabled globally and an apply command is issued.
+var applyDisabledComment = "**Error:** Running `atlantis apply` is disabled."

@@ -53,6 +53,7 @@ const (
 	DataDirFlag                = "data-dir"
 	DefaultTFVersionFlag       = "default-tf-version"
 	DisableApplyAllFlag        = "disable-apply-all"
+	DisableApplyFlag           = "disable-apply"
 	DisableAutoplanFlag        = "disable-autoplan"
 	DisableMarkdownFoldingFlag = "disable-markdown-folding"
 	GHHostnameFlag             = "gh-hostname"
@@ -68,6 +69,7 @@ const (
 	GitlabWebhookSecretFlag    = "gitlab-webhook-secret" // nolint: gosec
 	HidePrevPlanComments       = "hide-prev-plan-comments"
 	LogLevelFlag               = "log-level"
+	ParallelPoolSize           = "parallel-pool-size"
 	AllowDraftPRs              = "allow-draft-prs"
 	PortFlag                   = "port"
 	RepoConfigFlag             = "repo-config"
@@ -101,6 +103,7 @@ const (
 	DefaultGHHostname       = "github.com"
 	DefaultGitlabHostname   = "gitlab.com"
 	DefaultLogLevel         = "info"
+	DefaultParallelPoolSize = 15
 	DefaultPort             = 4141
 	DefaultTFDownloadURL    = "https://releases.hashicorp.com"
 	DefaultTFEHostname      = "app.terraform.io"
@@ -273,7 +276,11 @@ var boolFlags = map[string]boolFlag{
 		defaultValue: false,
 	},
 	DisableApplyAllFlag: {
-		description:  "Disable \"atlantis apply\" command so a specific project/workspace/directory has to be specified for applies.",
+		description:  "Disable \"atlantis apply\" command without any flags (i.e. apply all). A specific project/workspace/directory has to be specified for applies.",
+		defaultValue: false,
+	},
+	DisableApplyFlag: {
+		description:  "Disable all \"atlantis apply\" command regardless of which flags are passed with it.",
 		defaultValue: false,
 	},
 	DisableAutoplanFlag: {
@@ -331,6 +338,10 @@ var boolFlags = map[string]boolFlag{
 	},
 }
 var intFlags = map[string]intFlag{
+	ParallelPoolSize: {
+		description:  "Max size of the wait group that runs parallel plans and applies (if enabled).",
+		defaultValue: DefaultParallelPoolSize,
+	},
 	PortFlag: {
 		description:  "Port to bind to.",
 		defaultValue: DefaultPort,
@@ -552,6 +563,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	}
 	if c.LogLevel == "" {
 		c.LogLevel = DefaultLogLevel
+	}
+	if c.ParallelPoolSize == 0 {
+		c.ParallelPoolSize = DefaultParallelPoolSize
 	}
 	if c.Port == 0 {
 		c.Port = DefaultPort

@@ -201,6 +201,12 @@ Values are chosen in this order:
   Terraform version to default to. Will download to `<data-dir>/bin/terraform<version>`
   if not in `PATH`. See [Terraform Versions](terraform-versions.html) for more details.
 
+* ### `--disable-apply`
+  ```bash
+  atlantis server --disable-apply
+  ```
+  Disable all \"atlantis apply\" commands, regardless of which flags are passed with it.
+  
 * ### `--disable-apply-all`
   ```bash
   atlantis server --disable-apply-all
@@ -334,6 +340,12 @@ Values are chosen in this order:
   atlantis server --log-level="<debug|info|warn|error>"
   ```
   Log level. Defaults to `info`.
+
+* ### `--parallel-pool-size`
+  ```bash
+  atlantis server --parallel-pool-size=100
+  ```
+  Max size of the wait group that runs parallel plans and applies (if enabled). Defaults to `15`
 
 * ### `--port`
   ```bash

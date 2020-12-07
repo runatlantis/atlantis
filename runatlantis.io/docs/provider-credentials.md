@@ -11,7 +11,7 @@ It's up to you how you provide credentials for your specific provider to Atlanti
 * If you're running Atlantis in a cloud then many clouds have ways to give cloud API access
   to applications running on them, ex:
     * [AWS EC2 Roles](https://registry.terraform.io/providers/hashicorp/aws/latest/docs) (Search for "EC2 Role")
-    * [GCE Instance Service Accounts](https://www.terraform.io/docs/providers/google/provider_reference.html#configuration-reference)
+    * [GCE Instance Service Accounts](https://registry.terraform.io/providers/hashicorp/google/latest/docs/guides/provider_reference)
 * Many users set environment variables, ex. `AWS_ACCESS_KEY`, where Atlantis is running.
 * Others create the necessary config files, ex. `~/.aws/credentials`, where Atlantis is running.
 * Use the [HashiCorp Vault Provider](https://registry.terraform.io/providers/hashicorp/vault/latest/docs)

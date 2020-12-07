@@ -524,7 +524,7 @@ OpenShift runs Docker images with random user id's that use `/` as their home di
 
 ### AWS Fargate
 If you'd like to run Atlantis on [AWS Fargate](https://aws.amazon.com/fargate/)
- check out the Atlantis module on the Terraform Module Registry: [https://registry.terraform.io/modules/terraform-aws-modules/atlantis/aws](https://registry.terraform.io/modules/terraform-aws-modules/atlantis/aws)
+ check out the Atlantis module on the [Terraform Module Registry](https://tf-registry.herokuapp.com/modules/terraform-aws-modules/atlantis/aws/latest)
  and then check out the [Next Steps](#next-steps).
 
 ### Google Kubernetes Engine (GKE)

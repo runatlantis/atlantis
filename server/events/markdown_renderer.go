@@ -38,6 +38,7 @@ type MarkdownRenderer struct {
 	// If we're not configured with a GitLab client, this will be false.
 	GitlabSupportsCommonMark bool
 	DisableApplyAll          bool
+	DisableApply             bool
 	DisableMarkdownFolding   bool
 }
 
@@ -48,6 +49,7 @@ type commonData struct {
 	Log             string
 	PlansDeleted    bool
 	DisableApplyAll bool
+	DisableApply    bool
 }
 
 // errData is data about an error response.
@@ -71,6 +73,7 @@ type resultData struct {
 type planSuccessData struct {
 	models.PlanSuccess
 	PlanWasDeleted bool
+	DisableApply   bool
 }
 
 type projectResultTmplData struct {
@@ -89,7 +92,8 @@ func (m *MarkdownRenderer) Render(res CommandResult, cmdName models.CommandName,
 		Verbose:         verbose,
 		Log:             log,
 		PlansDeleted:    res.PlansDeleted,
-		DisableApplyAll: m.DisableApplyAll,
+		DisableApplyAll: m.DisableApplyAll || m.DisableApply,
+		DisableApply:    m.DisableApply,
 	}
 	if res.Error != nil {
 		return m.renderTemplate(unwrappedErrWithLogTmpl, errData{res.Error.Error(), common})
@@ -132,9 +136,9 @@ func (m *MarkdownRenderer) renderProjectResults(results []models.ProjectResult, 
 			})
 		} else if result.PlanSuccess != nil {
 			if m.shouldUseWrappedTmpl(vcsHost, result.PlanSuccess.TerraformOutput) {
-				resultData.Rendered = m.renderTemplate(planSuccessWrappedTmpl, planSuccessData{PlanSuccess: *result.PlanSuccess, PlanWasDeleted: common.PlansDeleted})
+				resultData.Rendered = m.renderTemplate(planSuccessWrappedTmpl, planSuccessData{PlanSuccess: *result.PlanSuccess, PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply})
 			} else {
-				resultData.Rendered = m.renderTemplate(planSuccessUnwrappedTmpl, planSuccessData{PlanSuccess: *result.PlanSuccess, PlanWasDeleted: common.PlansDeleted})
+				resultData.Rendered = m.renderTemplate(planSuccessUnwrappedTmpl, planSuccessData{PlanSuccess: *result.PlanSuccess, PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply})
 			}
 			numPlanSuccesses++
 		} else if result.ApplySuccess != "" {
@@ -251,8 +255,9 @@ var planSuccessWrappedTmpl = template.Must(template.New("").Parse(
 
 // planNextSteps are instructions appended after successful plans as to what
 // to do next.
-var planNextSteps = "{{ if .PlanWasDeleted }}This plan was not saved because one or more projects failed and automerge requires all plans pass.{{ else }}* :arrow_forward: To **apply** this plan, comment:\n" +
-	"    * `{{.ApplyCmd}}`\n" +
+var planNextSteps = "{{ if .PlanWasDeleted }}This plan was not saved because one or more projects failed and automerge requires all plans pass.{{ else }}" +
+	"{{ if not .DisableApply }}* :arrow_forward: To **apply** this plan, comment:\n" +
+	"    * `{{.ApplyCmd}}`\n{{end}}" +
 	"* :put_litter_in_its_place: To **delete** this plan click [here]({{.LockURL}})\n" +
 	"* :repeat: To **plan** this project again, comment:\n" +
 	"    * `{{.RePlanCmd}}`{{end}}"

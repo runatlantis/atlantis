@@ -50,6 +50,7 @@ type EventsController struct {
 	Logger        *logging.SimpleLogger
 	Parser        events.EventParsing
 	CommentParser events.CommentParsing
+	ApplyDisabled bool
 	// GithubWebhookSecret is the secret added to this webhook via the GitHub
 	// UI that identifies this call as coming from GitHub. If empty, no
 	// request validation is done.
