@@ -235,8 +235,10 @@ func TestGithubClient_PaginatesComments(t *testing.T) {
 }
 
 func TestGithubClient_HideOldComments(t *testing.T) {
-	// Only comment 6 should be minimized, because it's by the same Atlantis bot user
-	// and it has "plan" in the first line of the comment body.
+  // Only comments 6, 8 and 9 should be minimized, because:
+  //   * it's by the same Atlantis bot user
+	//   * it has "plan" or "Continued from previous comment." in the first line of the
+  //     comment body.
 	issueResp := `[
 	{"node_id": "1", "body": "asd\nplan\nasd", "user": {"login": "someone-else"}},
 	{"node_id": "2", "body": "asd plan\nasd", "user": {"login": "someone-else"}},
@@ -246,7 +248,7 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 	{"node_id": "6", "body": "asd plan\nasd", "user": {"login": "user"}},
 	{"node_id": "7", "body": "asdasdasd", "user": {"login": "user"}},
 	{"node_id": "8", "body": "asd plan\nasd", "user": {"login": "user"}},
-	{"node_id": "9", "body": "Continued Plan from previous comment\nasd", "user": {"login": "user"}}
+	{"node_id": "9", "body": "Continued from previous comment.\nasd", "user": {"login": "user"}}
 ]`
 	minimizeResp := "{}"
 	type graphQLCall struct {
@@ -317,6 +319,7 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 	Ok(t, err)
 	Equals(t, 3, len(gotMinimizeCalls))
 	Equals(t, "6", gotMinimizeCalls[0].Variables.Input.SubjectID)
+	Equals(t, "8", gotMinimizeCalls[1].Variables.Input.SubjectID)
 	Equals(t, "9", gotMinimizeCalls[2].Variables.Input.SubjectID)
 	Equals(t, githubv4.ReportedContentClassifiersOutdated, gotMinimizeCalls[0].Variables.Input.Classifier)
 }
