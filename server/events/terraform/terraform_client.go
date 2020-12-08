@@ -468,7 +468,7 @@ func ensureVersion(log *logging.SimpleLogger, dl Downloader, versions map[string
 
 	// This tf version might not yet be in the versions map even though it
 	// exists on disk. This would happen if users have manually added
-	// terraform{version} binaries. In this case we don't exp to re-download.
+	// terraform{version} binaries. In this case we don't want to re-download.
 	binFile := "terraform" + v.String()
 	if binPath, err := exec.LookPath(binFile); err == nil {
 		versions[v.String()] = binPath
@@ -506,7 +506,7 @@ func generateRCFile(tfeToken string, tfeHostname string, home string) error {
 
 	// If there is already a .terraformrc file and its contents aren't exactly
 	// what we would have written to it, then we error out because we don't
-	// exp to overwrite anything.
+	// want to overwrite anything.
 	if _, err := os.Stat(rcFile); err == nil {
 		currContents, err := ioutil.ReadFile(rcFile) // nolint: gosec
 		if err != nil {
