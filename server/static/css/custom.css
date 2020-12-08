@@ -322,7 +322,7 @@ tbody {
 /* Footer contains the Atlantis version */
 footer {
   font-family: monospace, monospace; font-size: 1.2rem;
-  position: absolute;
+  float: right;
   bottom: 0;
   right: 0;
   color: grey;
