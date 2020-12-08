@@ -206,7 +206,7 @@ projects:
 						WorkflowName:     nil,
 						TerraformVersion: nil,
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: []string{"**/*.tf*", "**/*.hcl"},
 							Enabled:      true,
 						},
 						ApplyRequirements: nil,
@@ -229,7 +229,7 @@ projects:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: []string{"**/*.tf*", "**/*.hcl"},
 							Enabled:      true,
 						},
 					},
@@ -275,7 +275,7 @@ projects:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: []string{"**/*.tf*", "**/*.hcl"},
 							Enabled:      true,
 						},
 					},
@@ -298,7 +298,7 @@ workflows: ~
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: []string{"**/*.tf*", "**/*.hcl"},
 							Enabled:      true,
 						},
 					},
@@ -326,7 +326,7 @@ workflows:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: []string{"**/*.tf*", "**/*.hcl"},
 							Enabled:      true,
 						},
 					},
@@ -361,7 +361,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: []string{"**/*.tf*", "**/*.hcl"},
 							Enabled:      true,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -399,7 +399,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: []string{"**/*.tf*", "**/*.hcl"},
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -437,7 +437,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: []string{"**/*.tf*", "**/*.hcl"},
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"mergeable"},
@@ -475,7 +475,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: []string{"**/*.tf*", "**/*.hcl"},
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"mergeable", "approved"},
@@ -589,7 +589,7 @@ projects:
 						Dir:       ".",
 						Workspace: "workspace",
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: []string{"**/*.tf*", "**/*.hcl"},
 							Enabled:      true,
 						},
 					},
@@ -598,7 +598,7 @@ projects:
 						Dir:       ".",
 						Workspace: "workspace",
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: []string{"**/*.tf*", "**/*.hcl"},
 							Enabled:      true,
 						},
 					},
@@ -630,7 +630,7 @@ workflows:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: []string{"**/*.tf*", "**/*.hcl"},
 							Enabled:      true,
 						},
 					},
@@ -692,7 +692,7 @@ workflows:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: []string{"**/*.tf*", "**/*.hcl"},
 							Enabled:      true,
 						},
 					},
@@ -750,7 +750,7 @@ workflows:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: []string{"**/*.tf*", "**/*.hcl"},
 							Enabled:      true,
 						},
 					},
@@ -804,7 +804,7 @@ workflows:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: []string{"**/*.tf*", "**/terragrunt.hcl"},
+							WhenModified: []string{"**/*.tf*", "**/*.hcl"},
 							Enabled:      true,
 						},
 					},
