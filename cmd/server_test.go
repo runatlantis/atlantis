@@ -673,19 +673,6 @@ func TestExecute_RepoCfgFlags(t *testing.T) {
 	ErrEquals(t, "cannot use --repo-config and --repo-config-json at the same time", err)
 }
 
-func TestExecute_PolicyCheck(t *testing.T) {
-	c := setup(map[string]interface{}{
-		GHUserFlag:             "user",
-		GHTokenFlag:            "token",
-		RepoAllowlistFlag:      "github.com",
-		TFETokenFlag:           "tfetoken",
-		EnablePolicyChecksFlag: true,
-	})
-	err := c.Execute()
-
-	ErrEquals(t, "--enable-policy-checks flag cannot be used together with --tfe-token", err)
-}
-
 // Can't use both --tfe-hostname flag without --tfe-token.
 func TestExecute_TFEHostnameOnly(t *testing.T) {
 	c := setup(map[string]interface{}{
