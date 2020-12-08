@@ -64,7 +64,7 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 		PullRequestID: azuredevops.Int(22),
 	}
 
-	userIdResponse := `{
+	userIDResponse := `{
 		"members": [
 			{
 				"id": "6416203b-98bb-4910-8f8a-b12aa19a399f"
@@ -90,7 +90,7 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 						w.Write([]byte(c.response)) // nolint: errcheck
 					case "/owner/_apis/userentitlements?$filter=name+eq+'user'&$api-version=6.0-preview.3":
 						w.WriteHeader(c.code)
-						w.Write([]byte(userIdResponse))
+						w.Write([]byte(userIDResponse)) // nolint: errcheck
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
 						http.Error(w, "not found", http.StatusNotFound)
