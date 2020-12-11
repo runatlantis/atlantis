@@ -22,8 +22,8 @@ right before Atlantis can parse it.
 ```yaml
 repos:
     - id: /.*/
-    pre_workflow_hooks:
-    - run: ./repo-config-genarator.sh
+      pre_workflow_hooks:
+        - run: ./repo-config-genarator.sh
 ```
 ### Reference
 #### Custom `run` Command

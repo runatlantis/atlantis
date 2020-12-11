@@ -165,9 +165,8 @@ custom workflows, you can create a `pre-workflow-hooks`:
 repos:
   - id: /.*/
     pre_workflow_hooks:
-    
-- run: my custom command
-    - run: |
+      - run: my custom command
+      - run: |
           my bash script inline
 ```
 See [Pre Workflow Hooks](pre-workflow-hooks.html) for more details on writing
