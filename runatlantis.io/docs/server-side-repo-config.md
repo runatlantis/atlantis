@@ -18,7 +18,7 @@ If you don't wish to write a config file to disk, you can use the
 `--repo-config-json` flag or `ATLANTIS_REPO_CONFIG_JSON` environment variable
 to specify your config as JSON. See [--repo-config-json](server-configuration.html#repo-config-json)
 for an example.
-
+  
 ## Example Server Side Repo
 ```yaml
 # repos lists the config for specific repos.
@@ -48,6 +48,10 @@ repos:
   # workflows. If false (default), the repo can only use server-side defined
   # workflows.
   allow_custom_workflows: true
+  
+  # pre_workflow_hooks defines arbitrary list of scripts to execute before workflow execution.
+  pre_workflow_hooks: 
+    - run: my-pre-workflow-hook-command arg1
 
   # id can also be an exact match.
 - id: github.com/myorg/specific-repo
@@ -152,6 +156,22 @@ projects:
 - dir: .
   apply_requirements: []
 ```
+
+### Running Scripts Before Atlantis Workflows
+If you want to run scripts that would execute before Atlantis can run default or
+custom workflows, you can create a `pre-workflow-hooks`:
+
+```yaml
+repos:
+  - id: /.*/
+    pre_workflow_hooks:
+    
+- run: my custom command
+    - run: |
+          my bash script inline
+```
+See [Pre Workflow Hooks](pre-workflow-hooks.html) for more details on writing
+pre workflow hooks.
 
 ### Change The Default Atlantis Workflow
 If you want to change the default commands that Atlantis runs during `plan` and `apply`
