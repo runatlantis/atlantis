@@ -11,18 +11,16 @@ cloud.google.com/go/storage
 github.com/Laisky/graphql
 github.com/Laisky/graphql/ident
 github.com/Laisky/graphql/internal/jsonutil
-# github.com/Masterminds/semver v1.4.2
+# github.com/Masterminds/goutils v1.1.0
+github.com/Masterminds/goutils
+# github.com/Masterminds/semver/v3 v3.1.0
+github.com/Masterminds/semver/v3
+# github.com/Masterminds/sprig/v3 v3.1.0
 ## explicit
-github.com/Masterminds/semver
-# github.com/Masterminds/sprig v2.15.0+incompatible
-## explicit
-github.com/Masterminds/sprig
+github.com/Masterminds/sprig/v3
 # github.com/agext/levenshtein v1.2.3
 ## explicit
 github.com/agext/levenshtein
-# github.com/aokoli/goutils v1.0.1
-## explicit
-github.com/aokoli/goutils
 # github.com/apparentlymart/go-textseg/v12 v12.0.0
 github.com/apparentlymart/go-textseg/v12/textseg
 # github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
@@ -124,8 +122,7 @@ github.com/google/go-github/v29/github
 github.com/google/go-github/v31/github
 # github.com/google/go-querystring v1.0.0
 github.com/google/go-querystring/query
-# github.com/google/uuid v0.0.0-20161128191214-064e2069ce9c
-## explicit
+# github.com/google/uuid v1.1.1
 github.com/google/uuid
 # github.com/googleapis/gax-go/v2 v2.0.5
 github.com/googleapis/gax-go/v2
@@ -170,11 +167,9 @@ github.com/hashicorp/hcl/v2/json
 # github.com/hashicorp/terraform-config-inspect v0.0.0-20200806211835-c481b8bfa41e
 ## explicit
 github.com/hashicorp/terraform-config-inspect/tfconfig
-# github.com/huandu/xstrings v1.0.0
-## explicit
+# github.com/huandu/xstrings v1.3.1
 github.com/huandu/xstrings
-# github.com/imdario/mergo v0.3.5
-## explicit
+# github.com/imdario/mergo v0.3.8
 github.com/imdario/mergo
 # github.com/inconshreveable/mousetrap v1.0.0
 ## explicit
@@ -202,6 +197,8 @@ github.com/microcosm-cc/bluemonday
 # github.com/mitchellh/colorstring v0.0.0-20150917214807-8631ce90f286
 ## explicit
 github.com/mitchellh/colorstring
+# github.com/mitchellh/copystructure v1.0.0
+github.com/mitchellh/copystructure
 # github.com/mitchellh/go-homedir v1.0.0
 ## explicit
 github.com/mitchellh/go-homedir
@@ -212,6 +209,8 @@ github.com/mitchellh/go-wordwrap
 # github.com/mitchellh/mapstructure v0.0.0-20170523030023-d0303fe80992
 ## explicit
 github.com/mitchellh/mapstructure
+# github.com/mitchellh/reflectwalk v1.0.0
+github.com/mitchellh/reflectwalk
 # github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb
 ## explicit
 github.com/mohae/deepcopy
@@ -254,8 +253,7 @@ github.com/sirupsen/logrus
 ## explicit
 github.com/spf13/afero
 github.com/spf13/afero/mem
-# github.com/spf13/cast v1.1.0
-## explicit
+# github.com/spf13/cast v1.3.1
 github.com/spf13/cast
 # github.com/spf13/cobra v0.0.0-20170905172051-b78744579491
 ## explicit
@@ -312,8 +310,10 @@ go.opencensus.io/trace
 go.opencensus.io/trace/internal
 go.opencensus.io/trace/propagation
 go.opencensus.io/trace/tracestate
-# golang.org/x/crypto v0.0.0-20200403201458-baeed622b8d8
+# golang.org/x/crypto v0.0.0-20200414173820-0848c9571904
 ## explicit
+golang.org/x/crypto/bcrypt
+golang.org/x/crypto/blowfish
 golang.org/x/crypto/cast5
 golang.org/x/crypto/openpgp
 golang.org/x/crypto/openpgp/armor
