@@ -33,7 +33,7 @@ import "github.com/pelletier/go-toml"
 Read a TOML document:
 
 ```go
-config, _ := toml.LoadString(`
+config, _ := toml.Load(`
 [postgres]
 user = "pelletier"
 password = "mypassword"`)
@@ -42,7 +42,7 @@ user := config.Get("postgres.user").(string)
 
 // or using an intermediate object
 postgresConfig := config.Get("postgres").(*toml.Tree)
-password = postgresConfig.Get("password").(string)
+password := postgresConfig.Get("password").(string)
 ```
 
 Or use Unmarshal:
@@ -57,12 +57,12 @@ type Config struct {
 }
 
 doc := []byte(`
-[postgres]
-user = "pelletier"
-password = "mypassword"`)
+[Postgres]
+User = "pelletier"
+Password = "mypassword"`)
 
 config := Config{}
-Unmarshal(doc, &config)
+toml.Unmarshal(doc, &config)
 fmt.Println("user=", config.Postgres.User)
 ```
 
@@ -70,7 +70,8 @@ Or use a query:
 
 ```go
 // use a query to gather elements without walking the tree
-results, _ := config.Query("$..[user,password]")
+q, _ := query.Compile("$..[user,password]")
+results := q.Execute(config)
 for ii, item := range results.Values() {
     fmt.Println("Query result %d: %v", ii, item)
 }
@@ -112,6 +113,18 @@ You have to make sure two kind of tests run:
 2. The TOML examples base
 
 You can run both of them using `./test.sh`.
+
+### Fuzzing
+
+The script `./fuzz.sh` is available to
+run [go-fuzz](https://github.com/dvyukov/go-fuzz) on go-toml.
+
+## Versioning
+
+Go-toml follows [Semantic Versioning](http://semver.org/). The supported version
+of [TOML](https://github.com/toml-lang/toml) is indicated at the beginning of
+this document. The last two major versions of Go are supported
+(see [Go Release Policy](https://golang.org/doc/devel/release.html#policy)).
 
 ## License
 
