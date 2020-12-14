@@ -25,7 +25,7 @@ import (
 // If under the maximum number of chars, we shouldn't split the comments.
 func TestSplitComment_UnderMax(t *testing.T) {
 	comment := "comment under max size"
-	split := common.SplitComment(comment, len(comment)+1, "sepEnd", "sepStart")
+	split := common.SplitComment(comment, len(comment)+1)
 	Equals(t, []string{comment}, split)
 }
 
@@ -33,31 +33,27 @@ func TestSplitComment_UnderMax(t *testing.T) {
 // separators properly.
 func TestSplitComment_TwoComments(t *testing.T) {
 	comment := strings.Repeat("a", 1000)
-	sepEnd := "-sepEnd"
-	sepStart := "-sepStart"
-	split := common.SplitComment(comment, len(comment)-1, sepEnd, sepStart)
+	split := common.SplitComment(comment, len(comment)-1)
 
-	expCommentLen := len(comment) - len(sepEnd) - len(sepStart) - 1
+	expCommentLen := len(comment) - len(common.SepEndComment) - len(common.SepStartComment) - 1
 	expFirstComment := comment[:expCommentLen]
 	expSecondComment := comment[expCommentLen:]
 	Equals(t, 2, len(split))
-	Equals(t, expFirstComment+sepEnd, split[0])
-	Equals(t, sepStart+expSecondComment, split[1])
+	Equals(t, expFirstComment+common.SepEndComment, split[0])
+	Equals(t, common.SepStartComment+expSecondComment, split[1])
 }
 
 // If the comment needs to be split into 4 we should do the split and add the
 // separators properly.
 func TestSplitComment_FourComments(t *testing.T) {
 	comment := strings.Repeat("a", 1000)
-	sepEnd := "-sepEnd"
-	sepStart := "-sepStart"
-	max := (len(comment) / 4) + len(sepEnd) + len(sepStart)
-	split := common.SplitComment(comment, max, sepEnd, sepStart)
+	max := (len(comment) / 4) + len(common.SepEndComment) + len(common.SepStartComment)
+	split := common.SplitComment(comment, max)
 
 	expMax := len(comment) / 4
 	Equals(t, []string{
-		comment[:expMax] + sepEnd,
-		sepStart + comment[expMax:expMax*2] + sepEnd,
-		sepStart + comment[expMax*2:expMax*3] + sepEnd,
-		sepStart + comment[expMax*3:]}, split)
+		comment[:expMax] + common.SepEndComment,
+		common.SepStartComment + comment[expMax:expMax*2] + common.SepEndComment,
+		common.SepStartComment + comment[expMax*2:expMax*3] + common.SepEndComment,
+		common.SepStartComment + comment[expMax*3:]}, split)
 }

@@ -145,20 +145,7 @@ func (g *GithubClient) GetModifiedFiles(repo models.Repo, pull models.PullReques
 // If comment length is greater than the max comment length we split into
 // multiple comments.
 func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment string, command string) error {
-	var sepStart string
-
-	sepEnd := "\n```\n</details>" +
-		"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
-
-	if command != "" {
-		sepStart = fmt.Sprintf("Continued %s output from previous comment.\n<details><summary>Show Output</summary>\n\n", command) +
-			"```diff\n"
-	} else {
-		sepStart = "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
-			"```diff\n"
-	}
-
-	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
+	comments := common.SplitComment(comment, maxCommentLength)
 	for _, c := range comments {
 		g.logger.Debug("POST /repos/%v/%v/issues/%d/comments", repo.Owner, repo.Name, pullNum)
 		_, _, err := g.client.Issues.CreateComment(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueComment{Body: &c})
@@ -197,15 +184,19 @@ func (g *GithubClient) HidePrevPlanComments(repo models.Repo, pullNum int) error
 			continue
 		}
 		// Crude filtering: The comment templates typically include the command name
-		// somewhere in the first line. It's a bit of an assumption, but seems like
-		// a reasonable one, given we've already filtered the comments by the
-		// configured Atlantis user.
-		body := strings.Split(comment.GetBody(), "\n")
-		if len(body) == 0 {
+		// somewhere in the first line or starts with the split separator text. It's
+		// a bit of an assumption, but seems like a reasonable one, given we've
+		// already filtered the comments by the configured Atlantis user.
+		body := comment.GetBody()
+		splitBody := strings.Split(comment.GetBody(), "\n")
+		if len(splitBody) == 0 {
 			continue
 		}
-		firstLine := strings.ToLower(body[0])
-		if !(strings.Contains(firstLine, models.PlanCommand.String()) || strings.Contains(firstLine, strings.ToLower("Continued from previous comment."))) {
+		firstLine := strings.ToLower(splitBody[0])
+		commentFirstLineContainsCommand := strings.Contains(firstLine, models.PlanCommand.String())
+		commentStartsWithSepStartComment := strings.HasPrefix(body, common.SepStartComment)
+
+		if !(commentFirstLineContainsCommand || commentStartsWithSepStartComment) {
 			continue
 		}
 		var m struct {
