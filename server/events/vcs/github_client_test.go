@@ -13,6 +13,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	. "github.com/runatlantis/atlantis/testing"
 
 	"github.com/shurcooL/githubv4"
@@ -239,7 +240,7 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 	//   * it's by the same Atlantis bot user
 	//   * it has "plan" or "Continued from previous comment." in the first line of the
 	//     comment body.
-	issueResp := `[
+	issueResp := fmt.Sprintf(`[
 	{"node_id": "1", "body": "asd\nplan\nasd", "user": {"login": "someone-else"}},
 	{"node_id": "2", "body": "asd plan\nasd", "user": {"login": "someone-else"}},
 	{"node_id": "3", "body": "asdasdasd\nasdasdasd", "user": {"login": "someone-else"}},
@@ -248,8 +249,9 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 	{"node_id": "6", "body": "asd plan\nasd", "user": {"login": "user"}},
 	{"node_id": "7", "body": "asdasdasd", "user": {"login": "user"}},
 	{"node_id": "8", "body": "asd plan\nasd", "user": {"login": "user"}},
-	{"node_id": "9", "body": "Continued from previous comment.\nasd", "user": {"login": "user"}}
-]`
+	{"node_id": "9", "body": "%s\nasd", "user": {"login": "user"}}
+]`, strings.Replace(common.SepStartComment, "\n", "\\n", -1))
+
 	minimizeResp := "{}"
 	type graphQLCall struct {
 		Variables struct {
@@ -846,14 +848,16 @@ func TestGithubClient_SplitComments(t *testing.T) {
 	err = client.CreateComment(repo, pull.Num, comment, "")
 	Ok(t, err)
 
-	body := strings.Split(githubComments[1].Body, "\n")
-	firstSplit := strings.ToLower(body[0])
-	body = strings.Split(githubComments[3].Body, "\n")
-	secondSplit := strings.ToLower(body[0])
+	firstComment := githubComments[0].Body
+	secondComment := githubComments[1].Body
+	thirdComment := githubComments[2].Body
+	fourthComment := githubComments[3].Body
 
 	Equals(t, 4, len(githubComments))
-	Assert(t, strings.Contains(firstSplit, models.PlanCommand.String()), fmt.Sprintf("comment should contain the command name but was %q", firstSplit))
-	Assert(t, strings.Contains(secondSplit, "continued from previous comment"), fmt.Sprintf("comment should contain no reference to the command name but was %q", secondSplit))
+	Assert(t, strings.HasSuffix(firstComment, common.SepEndComment), fmt.Sprintf("comment should end with warning but was: %q", firstComment))
+	Assert(t, strings.HasPrefix(secondComment, common.SepStartComment), fmt.Sprintf("comment should start with continued but was: %q", secondComment))
+	Assert(t, strings.HasSuffix(thirdComment, common.SepEndComment), fmt.Sprintf("comment should end with warning but was: %q", thirdComment))
+	Assert(t, strings.HasPrefix(fourthComment, common.SepStartComment), fmt.Sprintf("comment should start with continued but was: %q", fourthComment))
 }
 
 // Test that we retry the get pull request call if it 404s.

@@ -90,17 +90,12 @@ func (g *AzureDevopsClient) GetModifiedFiles(repo models.Repo, pull models.PullR
 // If comment length is greater than the max comment length we split into
 // multiple comments.
 func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment string, command string) error {
-	sepEnd := "\n```\n</details>" +
-		"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
-	sepStart := "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
-		"```diff\n"
-
 	// maxCommentLength is the maximum number of chars allowed in a single comment
 	// This length was copied from the Github client - haven't found documentation
 	// or tested limit in Azure DevOps.
 	const maxCommentLength = 65536
 
-	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
+	comments := common.SplitComment(comment, maxCommentLength)
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	for _, c := range comments {
