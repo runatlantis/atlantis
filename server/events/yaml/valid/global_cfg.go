@@ -12,6 +12,7 @@ import (
 const MergeableApplyReq = "mergeable"
 const ApprovedApplyReq = "approved"
 const ApplyRequirementsKey = "apply_requirements"
+const PreWorkflowHooksKey = "pre_workflow_hooks"
 const WorkflowKey = "workflow"
 const AllowedWorkflowsKey = "allowed_workflows"
 const AllowedOverridesKey = "allowed_overrides"
@@ -33,6 +34,7 @@ type Repo struct {
 	// If ID is set then this will be nil.
 	IDRegex              *regexp.Regexp
 	ApplyRequirements    []string
+	PreWorkflowHooks     []*PreWorkflowHook
 	Workflow             *Workflow
 	AllowedWorkflows     []string
 	AllowedOverrides     []string
@@ -49,6 +51,12 @@ type MergedProjectCfg struct {
 	AutoplanEnabled   bool
 	TerraformVersion  *version.Version
 	RepoCfgVersion    int
+}
+
+// PreWorkflowHook is a map of custom run commands to run before workflows.
+type PreWorkflowHook struct {
+	StepName   string
+	RunCommand string
 }
 
 // DefaultApplyStage is the Atlantis default apply stage.
@@ -89,6 +97,7 @@ func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) Global
 	applyReqs := []string{}
 	allowedOverrides := []string{}
 	allowedWorkflows := []string{}
+	preWorkflowHooks := make([]*PreWorkflowHook, 0)
 	if mergeableReq {
 		applyReqs = append(applyReqs, MergeableApplyReq)
 	}
@@ -107,6 +116,7 @@ func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) Global
 			{
 				IDRegex:              regexp.MustCompile(".*"),
 				ApplyRequirements:    applyReqs,
+				PreWorkflowHooks:     preWorkflowHooks,
 				Workflow:             &defaultWorkflow,
 				AllowedWorkflows:     allowedWorkflows,
 				AllowedOverrides:     allowedOverrides,
@@ -318,7 +328,7 @@ func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (app
 		return fmt.Sprintf("setting %s: %s from %s", key, valStr, from)
 	}
 
-	for _, key := range []string{ApplyRequirementsKey, WorkflowKey, AllowedOverridesKey, AllowCustomWorkflowsKey} {
+	for _, key := range []string{ApplyRequirementsKey, WorkflowKey, AllowedOverridesKey, AllowCustomWorkflowsKey, PreWorkflowHooksKey} {
 		for i, repo := range g.Repos {
 			if repo.IDMatches(repoID) {
 				switch key {
