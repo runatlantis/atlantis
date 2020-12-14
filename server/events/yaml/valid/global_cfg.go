@@ -96,6 +96,7 @@ func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) Global
 	// we treat nil slices differently.
 	applyReqs := []string{}
 	allowedOverrides := []string{}
+	allowedWorkflows := []string{}
 	preWorkflowHooks := make([]*PreWorkflowHook, 0)
 	if mergeableReq {
 		applyReqs = append(applyReqs, MergeableApplyReq)

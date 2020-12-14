@@ -22,6 +22,7 @@ type Repo struct {
 	ApplyRequirements    []string          `yaml:"apply_requirements" json:"apply_requirements"`
 	PreWorkflowHooks     []PreWorkflowHook `yaml:"pre_workflow_hooks" json:"pre_workflow_hooks"`
 	Workflow             *string           `yaml:"workflow,omitempty" json:"workflow,omitempty"`
+	AllowedWorkflows     []string          `yaml:"allowed_workflows,omitempty" json:"allowed_workflows,omitempty"`
 	AllowedOverrides     []string          `yaml:"allowed_overrides" json:"allowed_overrides"`
 	AllowCustomWorkflows *bool             `yaml:"allow_custom_workflows,omitempty" json:"allow_custom_workflows,omitempty"`
 }
