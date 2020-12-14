@@ -12,10 +12,13 @@ type PolicyCheckStepRunner struct {
 }
 
 // NewPolicyCheckStepRunner creates a new step runner from an executor workflow
-func NewPolicyCheckStepRunner(executorWorkflow VersionedExecutorWorkflow) *PolicyCheckStepRunner {
-	return &PolicyCheckStepRunner{
-		versionEnsurer: executorWorkflow,
-		executor:       executorWorkflow,
+func NewPolicyCheckStepRunner(executorWorkflow VersionedExecutorWorkflow) Runner {
+	return &PlanTypeStepRunnerDelegate{
+		defaultRunner: &PolicyCheckStepRunner{
+			versionEnsurer: executorWorkflow,
+			executor:       executorWorkflow,
+		},
+		remotePlanRunner: RemoteBackendUnsupportedRunner{},
 	}
 }
 

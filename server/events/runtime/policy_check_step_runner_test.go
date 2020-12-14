@@ -1,4 +1,4 @@
-package runtime_test
+package runtime
 
 import (
 	"errors"
@@ -7,7 +7,6 @@ import (
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/runtime/mocks"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -43,7 +42,10 @@ func TestRun(t *testing.T) {
 	}
 
 	executorWorkflow := mocks.NewMockVersionedExecutorWorkflow()
-	s := runtime.NewPolicyCheckStepRunner(executorWorkflow)
+	s := &PolicyCheckStepRunner{
+		versionEnsurer: executorWorkflow,
+		executor:       executorWorkflow,
+	}
 
 	t.Run("success", func(t *testing.T) {
 		When(executorWorkflow.EnsureExecutorVersion(logger, v)).ThenReturn(executablePath, nil)

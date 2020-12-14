@@ -415,6 +415,38 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		commentParser,
 		userConfig.SkipCloneNoChanges,
 	)
+
+	projectCommandRunner := &events.DefaultProjectCommandRunner{
+		Locker:           projectLocker,
+		LockURLGenerator: router,
+		InitStepRunner: &runtime.InitStepRunner{
+			TerraformExecutor: terraformClient,
+			DefaultTFVersion:  defaultTfVersion,
+		},
+		PlanStepRunner: &runtime.PlanStepRunner{
+			TerraformExecutor:   terraformClient,
+			DefaultTFVersion:    defaultTfVersion,
+			CommitStatusUpdater: commitStatusUpdater,
+			AsyncTFExec:         terraformClient,
+		},
+		ShowStepRunner: runtime.NewShowStepRunner(terraformClient, defaultTfVersion),
+		PolicyCheckStepRunner: runtime.NewPolicyCheckStepRunner(
+			policy.NewConfTestExecutorWorkflow(logger, binDir, &terraform.DefaultDownloader{}),
+		),
+		ApplyStepRunner: &runtime.ApplyStepRunner{
+			TerraformExecutor:   terraformClient,
+			CommitStatusUpdater: commitStatusUpdater,
+			AsyncTFExec:         terraformClient,
+		},
+		RunStepRunner: runStepRunner,
+		EnvStepRunner: &runtime.EnvStepRunner{
+			RunStepRunner: runStepRunner,
+		},
+		PullApprovedChecker: vcsClient,
+		WorkingDir:          workingDir,
+		Webhooks:            webhooksManager,
+		WorkingDirLocker:    workingDirLocker,
+	}
 	commandRunner := &events.DefaultCommandRunner{
 		VCSClient:                vcsClient,
 		GithubPullGetter:         githubClient,
