@@ -18,11 +18,13 @@ type GlobalCfg struct {
 
 // Repo is the raw schema for repos in the server-side repo config.
 type Repo struct {
-	ID                   string   `yaml:"id" json:"id"`
-	ApplyRequirements    []string `yaml:"apply_requirements" json:"apply_requirements"`
-	Workflow             *string  `yaml:"workflow,omitempty" json:"workflow,omitempty"`
-	AllowedOverrides     []string `yaml:"allowed_overrides" json:"allowed_overrides"`
-	AllowCustomWorkflows *bool    `yaml:"allow_custom_workflows,omitempty" json:"allow_custom_workflows,omitempty"`
+	ID                   string            `yaml:"id" json:"id"`
+	ApplyRequirements    []string          `yaml:"apply_requirements" json:"apply_requirements"`
+	PreWorkflowHooks     []PreWorkflowHook `yaml:"pre_workflow_hooks" json:"pre_workflow_hooks"`
+	Workflow             *string           `yaml:"workflow,omitempty" json:"workflow,omitempty"`
+	AllowedWorkflows     []string          `yaml:"allowed_workflows,omitempty" json:"allowed_workflows,omitempty"`
+	AllowedOverrides     []string          `yaml:"allowed_overrides" json:"allowed_overrides"`
+	AllowCustomWorkflows *bool             `yaml:"allow_custom_workflows,omitempty" json:"allow_custom_workflows,omitempty"`
 }
 
 func (g GlobalCfg) Validate() error {
@@ -52,6 +54,29 @@ func (g GlobalCfg) Validate() error {
 		}
 		if !found {
 			return fmt.Errorf("workflow %q is not defined", name)
+		}
+	}
+
+	// Check that all allowed workflows are defined
+	for _, repo := range g.Repos {
+		if repo.AllowedWorkflows == nil {
+			continue
+		}
+		for _, name := range repo.AllowedWorkflows {
+			if name == valid.DefaultWorkflowName {
+				// The 'default' workflow will always be defined.
+				continue
+			}
+			found := false
+			for w := range g.Workflows {
+				if w == name {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return fmt.Errorf("workflow %q is not defined", name)
+			}
 		}
 	}
 	return nil
@@ -146,11 +171,20 @@ func (r Repo) ToValid(workflows map[string]valid.Workflow) valid.Repo {
 		workflow = &ptr
 	}
 
+	preWorkflowHooks := make([]*valid.PreWorkflowHook, 0)
+	if len(r.PreWorkflowHooks) > 0 {
+		for _, hook := range r.PreWorkflowHooks {
+			preWorkflowHooks = append(preWorkflowHooks, hook.ToValid())
+		}
+	}
+
 	return valid.Repo{
 		ID:                   id,
 		IDRegex:              idRegex,
 		ApplyRequirements:    r.ApplyRequirements,
+		PreWorkflowHooks:     preWorkflowHooks,
 		Workflow:             workflow,
+		AllowedWorkflows:     r.AllowedWorkflows,
 		AllowedOverrides:     r.AllowedOverrides,
 		AllowCustomWorkflows: r.AllowCustomWorkflows,
 	}

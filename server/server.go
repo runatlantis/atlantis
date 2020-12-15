@@ -66,22 +66,23 @@ const (
 
 // Server runs the Atlantis web server.
 type Server struct {
-	AtlantisVersion     string
-	AtlantisURL         *url.URL
-	Router              *mux.Router
-	Port                int
-	CommandRunner       *events.DefaultCommandRunner
-	Logger              *logging.SimpleLogger
-	Locker              locking.Locker
-	EventsController    *EventsController
-	GithubAppController *GithubAppController
-	LocksController     *LocksController
-	StatusController    *StatusController
-	IndexTemplate       TemplateWriter
-	LockDetailTemplate  TemplateWriter
-	SSLCertFile         string
-	SSLKeyFile          string
-	Drainer             *events.Drainer
+	AtlantisVersion               string
+	AtlantisURL                   *url.URL
+	Router                        *mux.Router
+	Port                          int
+	PreWorkflowHooksCommandRunner *events.DefaultPreWorkflowHooksCommandRunner
+	CommandRunner                 *events.DefaultCommandRunner
+	Logger                        *logging.SimpleLogger
+	Locker                        locking.Locker
+	EventsController              *EventsController
+	GithubAppController           *GithubAppController
+	LocksController               *LocksController
+	StatusController              *StatusController
+	IndexTemplate                 TemplateWriter
+	LockDetailTemplate            TemplateWriter
+	SSLCertFile                   string
+	SSLKeyFile                    string
+	Drainer                       *events.Drainer
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -355,6 +356,15 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Logger:  logger,
 		Drainer: drainer,
 	}
+	preWorkflowHooksCommandRunner := &events.DefaultPreWorkflowHooksCommandRunner{
+		VCSClient:             vcsClient,
+		GlobalCfg:             globalCfg,
+		Logger:                logger,
+		WorkingDirLocker:      workingDirLocker,
+		WorkingDir:            workingDir,
+		Drainer:               drainer,
+		PreWorkflowHookRunner: &runtime.PreWorkflowHookRunner{},
+	}
 	commandRunner := &events.DefaultCommandRunner{
 		VCSClient:                vcsClient,
 		GithubPullGetter:         githubClient,
@@ -436,6 +446,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DeleteLockCommand:  deleteLockCommand,
 	}
 	eventsController := &EventsController{
+		PreWorkflowHooksCommandRunner:   preWorkflowHooksCommandRunner,
 		CommandRunner:                   commandRunner,
 		PullCleaner:                     pullClosedExecutor,
 		Parser:                          eventParser,
@@ -464,22 +475,23 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	return &Server{
-		AtlantisVersion:     config.AtlantisVersion,
-		AtlantisURL:         parsedURL,
-		Router:              underlyingRouter,
-		Port:                userConfig.Port,
-		CommandRunner:       commandRunner,
-		Logger:              logger,
-		Locker:              lockingClient,
-		EventsController:    eventsController,
-		GithubAppController: githubAppController,
-		LocksController:     locksController,
-		StatusController:    statusController,
-		IndexTemplate:       indexTemplate,
-		LockDetailTemplate:  lockTemplate,
-		SSLKeyFile:          userConfig.SSLKeyFile,
-		SSLCertFile:         userConfig.SSLCertFile,
-		Drainer:             drainer,
+		AtlantisVersion:               config.AtlantisVersion,
+		AtlantisURL:                   parsedURL,
+		Router:                        underlyingRouter,
+		Port:                          userConfig.Port,
+		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
+		CommandRunner:                 commandRunner,
+		Logger:                        logger,
+		Locker:                        lockingClient,
+		EventsController:              eventsController,
+		GithubAppController:           githubAppController,
+		LocksController:               locksController,
+		StatusController:              statusController,
+		IndexTemplate:                 indexTemplate,
+		LockDetailTemplate:            lockTemplate,
+		SSLKeyFile:                    userConfig.SSLKeyFile,
+		SSLCertFile:                   userConfig.SSLCertFile,
+		Drainer:                       drainer,
 	}, nil
 }
 

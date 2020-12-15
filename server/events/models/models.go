@@ -535,3 +535,22 @@ func (c CommandName) String() string {
 	}
 	return ""
 }
+
+// PreWorkflowHookCommandContext defines the context for a pre_worklfow_hooks that will
+// be executed before workflows.
+type PreWorkflowHookCommandContext struct {
+	// BaseRepo is the repository that the pull request will be merged into.
+	BaseRepo Repo
+	// HeadRepo is the repository that is getting merged into the BaseRepo.
+	// If the pull request branch is from the same repository then HeadRepo will
+	// be the same as BaseRepo.
+	HeadRepo Repo
+	// Log is a logger that's been set up for this context.
+	Log logging.SimpleLogging
+	// Pull is the pull request we're responding to.
+	Pull PullRequest
+	// User is the user that triggered this command.
+	User User
+	// Verbose is true when the user would like verbose output.
+	Verbose bool
+}

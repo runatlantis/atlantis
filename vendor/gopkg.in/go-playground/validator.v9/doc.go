@@ -31,7 +31,7 @@ Custom Validation Functions
 Custom Validation functions can be added. Example:
 
 	// Structure
-	func customFunc(fl FieldLevel) bool {
+	func customFunc(fl validator.FieldLevel) bool {
 
 		if fl.Field().String() == "invalid" {
 			return false
@@ -168,7 +168,7 @@ StructOnly
 
 When a field that is a nested struct is encountered, and contains this flag
 any validation on the nested struct will be run, but none of the nested
-struct fields will be validated. This is useful if inside of you program
+struct fields will be validated. This is useful if inside of your program
 you know the struct will be valid, but need to verify it has been assigned.
 NOTE: only "required" and "omitempty" can be used on a struct itself.
 
@@ -244,6 +244,68 @@ not "". For slices, maps, pointers, interfaces, channels and functions
 ensures the value is not nil.
 
 	Usage: required
+
+Required With
+
+The field under validation must be present and not empty only if any
+of the other specified fields are present. For strings ensures value is
+not "". For slices, maps, pointers, interfaces, channels and functions
+ensures the value is not nil.
+
+	Usage: required_with
+
+Examples:
+
+	// require the field if the Field1 is present:
+	Usage: required_with=Field1
+
+	// require the field if the Field1 or Field2 is present:
+	Usage: required_with=Field1 Field2
+
+Required With All
+
+The field under validation must be present and not empty only if all
+of the other specified fields are present. For strings ensures value is
+not "". For slices, maps, pointers, interfaces, channels and functions
+ensures the value is not nil.
+
+	Usage: required_with_all
+
+Example:
+
+	// require the field if the Field1 and Field2 is present:
+	Usage: required_with_all=Field1 Field2
+
+Required Without
+
+The field under validation must be present and not empty only when any
+of the other specified fields are not present. For strings ensures value is
+not "". For slices, maps, pointers, interfaces, channels and functions
+ensures the value is not nil.
+
+	Usage: required_without
+
+Examples:
+
+	// require the field if the Field1 is not present:
+	Usage: required_without=Field1
+
+	// require the field if the Field1 or Field2 is not present:
+	Usage: required_without=Field1 Field2
+
+Required Without All
+
+The field under validation must be present and not empty only when all
+of the other specified fields are not present. For strings ensures value is
+not "". For slices, maps, pointers, interfaces, channels and functions
+ensures the value is not nil.
+
+	Usage: required_without_all
+
+Example:
+
+	// require the field if the Field1 and Field2 is not present:
+	Usage: required_without_all=Field1 Field2
 
 Is Default
 
@@ -503,12 +565,34 @@ to the top level struct.
 
 	Usage: ltecsfield=InnerStructField.Field
 
+Field Contains Another Field
+
+This does the same as contains except for struct fields. It should only be used
+with string types. See the behavior of reflect.Value.String() for behavior on
+other types.
+
+	Usage: containsfield=InnerStructField.Field
+
+Field Excludes Another Field
+
+This does the same as excludes except for struct fields. It should only be used
+with string types. See the behavior of reflect.Value.String() for behavior on
+other types.
+
+	Usage: excludesfield=InnerStructField.Field
+
 Unique
 
 For arrays & slices, unique will ensure that there are no duplicates.
 For maps, unique will ensure that there are no duplicate values.
+For slices of struct, unique will ensure that there are no duplicate values
+in a field of the struct specified via a parameter.
 
+	// For arrays, slices, and maps:
 	Usage: unique
+
+	// For slices of struct:
+	Usage: unique=field
 
 Alpha Only
 
@@ -583,18 +667,18 @@ E-mail String
 
 This validates that a string value contains a valid email
 This may not conform to all possibilities of any rfc standard, but neither
-does any email provider accept all posibilities.
+does any email provider accept all possibilities.
 
 	Usage: email
 
 File path
 
-This validates that a string value contains a valid file path and that 
-the file exists on the machine. 
-This is done using os.Stat, which is a platform independent function. 
+This validates that a string value contains a valid file path and that
+the file exists on the machine.
+This is done using os.Stat, which is a platform independent function.
 
 	Usage: file
-	
+
 URL String
 
 This validates that a string value contains a valid url
@@ -609,6 +693,13 @@ This validates that a string value contains a valid uri
 This will accept any uri the golang request uri accepts
 
 	Usage: uri
+
+Urn RFC 2141 String
+
+This validataes that a string value contains a valid URN
+according to the RFC 2141 spec.
+
+	Usage: urn_rfc2141
 
 Base64 String
 
@@ -691,6 +782,18 @@ This validates that a string value does not contain the supplied rune value.
 
 	Usage: excludesrune=@
 
+Starts With
+
+This validates that a string value starts with the supplied string value
+
+	Usage: startswith=hello
+
+Ends With
+
+This validates that a string value ends with the supplied string value
+
+	Usage: endswith=goodbye
+
 International Standard Book Number
 
 This validates that a string value contains a valid isbn10 or isbn13 value.
@@ -711,25 +814,25 @@ This validates that a string value contains a valid isbn13 value.
 
 Universally Unique Identifier UUID
 
-This validates that a string value contains a valid UUID.
+This validates that a string value contains a valid UUID. Uppercase UUID values will not pass - use `uuid_rfc4122` instead.
 
 	Usage: uuid
 
 Universally Unique Identifier UUID v3
 
-This validates that a string value contains a valid version 3 UUID.
+This validates that a string value contains a valid version 3 UUID.  Uppercase UUID values will not pass - use `uuid3_rfc4122` instead.
 
 	Usage: uuid3
 
 Universally Unique Identifier UUID v4
 
-This validates that a string value contains a valid version 4 UUID.
+This validates that a string value contains a valid version 4 UUID.  Uppercase UUID values will not pass - use `uuid4_rfc4122` instead.
 
 	Usage: uuid4
 
 Universally Unique Identifier UUID v5
 
-This validates that a string value contains a valid version 5 UUID.
+This validates that a string value contains a valid version 5 UUID.  Uppercase UUID values will not pass - use `uuid5_rfc4122` instead.
 
 	Usage: uuid5
 
@@ -924,6 +1027,14 @@ to https://tools.ietf.org/html/rfc3986#section-2.1
 
 	Usage: url_encoded
 
+Directory
+
+This validates that a string value contains a valid directory and that
+it exists on the machine.
+This is done using os.Stat, which is a platform independent function.
+
+	Usage: dir
+
 Alias Validators and Tags
 
 NOTE: When returning an error, the tag returned in "FieldError" will be
@@ -952,6 +1063,35 @@ Validator notes:
 
 		And the best reason, you can submit a pull request and we can keep on
 		adding to the validation library of this package!
+
+Non standard validators
+
+A collection of validation rules that are frequently needed but are more
+complex than the ones found in the baked in validators.
+A non standard validator must be registered manually like you would
+with your own custom validation functions.
+
+Example of registration and use:
+
+	type Test struct {
+		TestField string `validate:"yourtag"`
+	}
+
+	t := &Test{
+		TestField: "Test"
+	}
+
+	validate := validator.New()
+	validate.RegisterValidation("yourtag", validators.NotBlank)
+
+Here is a list of the current non standard validators:
+
+	NotBlank
+		This validates that the value is not blank or with length zero.
+		For strings ensures they do not contain only spaces. For channels, maps, slices and arrays
+		ensures they don't have zero length. For others, a non empty value is required.
+
+		Usage: notblank
 
 Panics
 

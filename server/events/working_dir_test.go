@@ -377,8 +377,8 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 		DataDir:       repoDir,
 		CheckoutMerge: true,
 	}
-	_, hasDiverged, err := wd.Clone(nil, models.Repo{}, models.PullRequest{
-		BaseRepo:   models.Repo{},
+	_, hasDiverged, err := wd.Clone(nil, models.Repo{CloneURL: repoDir}, models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: repoDir},
 		HeadBranch: "second-pr",
 		BaseBranch: "master",
 	}, "default")

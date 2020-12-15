@@ -17,6 +17,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
@@ -147,11 +148,14 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log *logging.SimpleLog
 // filterToTerraform filters non-terraform files from files.
 func (p *DefaultProjectFinder) filterToTerraform(files []string) []string {
 	var filtered []string
+	fileNameRe, _ := regexp.Compile(`^.*(\.tf|\.tfvars)$`)
+
 	for _, fileName := range files {
-		if !p.shouldIgnore(fileName) && (strings.Contains(fileName, ".tf") || filepath.Base(fileName) == "terragrunt.hcl") {
+		if !p.shouldIgnore(fileName) && (fileNameRe.MatchString(fileName) || filepath.Base(fileName) == "terragrunt.hcl") {
 			filtered = append(filtered, fileName)
 		}
 	}
+
 	return filtered
 }
 
