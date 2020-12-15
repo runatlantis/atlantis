@@ -120,7 +120,7 @@ func TestDetermineProjects(t *testing.T) {
 		},
 		{
 			"Should ignore non .tf files and return an empty list",
-			[]string{"non-tf"},
+			[]string{"non-tf", "non.tf.suffix"},
 			nil,
 			nestedModules1,
 		},

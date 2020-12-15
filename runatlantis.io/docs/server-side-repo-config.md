@@ -18,7 +18,7 @@ If you don't wish to write a config file to disk, you can use the
 `--repo-config-json` flag or `ATLANTIS_REPO_CONFIG_JSON` environment variable
 to specify your config as JSON. See [--repo-config-json](server-configuration.html#repo-config-json)
 for an example.
-
+  
 ## Example Server Side Repo
 ```yaml
 # repos lists the config for specific repos.
@@ -40,10 +40,18 @@ repos:
   # its atlantis.yaml file.
   allowed_overrides: [apply_requirements, workflow]
 
+  # allowed_workflows specifies which workflows the repos that match 
+  # are allowed to select.
+  allowed_workflows: [custom]
+
   # allow_custom_workflows defines whether this repo can define its own
   # workflows. If false (default), the repo can only use server-side defined
   # workflows.
   allow_custom_workflows: true
+  
+  # pre_workflow_hooks defines arbitrary list of scripts to execute before workflow execution.
+  pre_workflow_hooks: 
+    - run: my-pre-workflow-hook-command arg1
 
   # id can also be an exact match.
 - id: github.com/myorg/specific-repo
@@ -149,6 +157,21 @@ projects:
   apply_requirements: []
 ```
 
+### Running Scripts Before Atlantis Workflows
+If you want to run scripts that would execute before Atlantis can run default or
+custom workflows, you can create a `pre-workflow-hooks`:
+
+```yaml
+repos:
+  - id: /.*/
+    pre_workflow_hooks:
+      - run: my custom command
+      - run: |
+          my bash script inline
+```
+See [Pre Workflow Hooks](pre-workflow-hooks.html) for more details on writing
+pre workflow hooks.
+
 ### Change The Default Atlantis Workflow
 If you want to change the default commands that Atlantis runs during `plan` and `apply`
 phases, you can create a new `workflow`.
@@ -184,6 +207,39 @@ server-side and then allow each repo to override the `workflow` key:
 repos:
 - id: /.*/
   allowed_overrides: [workflow]
+
+# Define your custom workflows.
+workflows:
+  custom1:
+    plan:
+      steps:
+      - init
+      - run: my custom plan command
+    apply:
+      steps:
+      - run: my custom apply command
+
+  custom2:
+    plan:
+      steps:
+      - run: another custom command
+    apply:
+      steps:
+      - run: another custom command
+```
+Or, if you want to restrict what workflows each repo has access to, use the `allowed_workflows` 
+key:
+
+```yaml
+# repos.yaml
+# Restrict which workflows repos can select.
+repos:
+- id: /.*/
+  allowed_overrides: [workflow]
+
+- id: /my_repo/
+  allowed_overrides: [workflow]
+  allowed_workflows: [custom1]
 
 # Define your custom workflows.
 workflows:
@@ -310,6 +366,7 @@ If you set a workflow with the key `default`, it will override this.
 | workflow               | string   | none    | no       | A custom workflow.                                                                                                                                                                                                                                                                                       |
 | apply_requirements     | []string | none    | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved` and `mergeable`. See [Apply Requirements](apply-requirements.html) for more details.                                                                                    |
 | allowed_overrides      | []string | none    | no       | A list of restricted keys that `atlantis.yaml` files can override. The only supported keys are `apply_requirements` and `workflow`                                                                                                                                                                       |
+| allowed_workflows      | []string | none    | no       | A list of workflows that `atlantis.yaml` files can select from.                                                                                                                                                                        |
 | allow_custom_workflows | bool     | false   | no       | Whether or not to allow [Custom Workflows](custom-workflows.html).                                                                                                                                                                       |
 
 
