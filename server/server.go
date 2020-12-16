@@ -466,46 +466,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DisableApply:             userConfig.DisableApply,
 		DisableAutoplan:          userConfig.DisableAutoplan,
 		ProjectCommandBuilder:    projectCommandBuilder,
-		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
-			Locker:           projectLocker,
-			LockURLGenerator: router,
-			InitStepRunner: &runtime.InitStepRunner{
-				TerraformExecutor: terraformClient,
-				DefaultTFVersion:  defaultTfVersion,
-			},
-			PlanStepRunner: &runtime.PlanStepRunner{
-				TerraformExecutor:   terraformClient,
-				DefaultTFVersion:    defaultTfVersion,
-				CommitStatusUpdater: commitStatusUpdater,
-				AsyncTFExec:         terraformClient,
-			},
-			ShowStepRunner: &runtime.ShowStepRunner{
-				TerraformExecutor: terraformClient,
-				DefaultTFVersion:  defaultTfVersion,
-			},
-			PolicyCheckStepRunner: runtime.NewPolicyCheckStepRunner(
-				policy.NewConfTestExecutorWorkflow(logger, binDir, &terraform.DefaultDownloader{}),
-			),
-			ApplyStepRunner: &runtime.ApplyStepRunner{
-				TerraformExecutor:   terraformClient,
-				CommitStatusUpdater: commitStatusUpdater,
-				AsyncTFExec:         terraformClient,
-			},
-			RunStepRunner: runStepRunner,
-			EnvStepRunner: &runtime.EnvStepRunner{
-				RunStepRunner: runStepRunner,
-			},
-			PullApprovedChecker: vcsClient,
-			WorkingDir:          workingDir,
-			Webhooks:            webhooksManager,
-			WorkingDirLocker:    workingDirLocker,
-		},
-		WorkingDir:        workingDir,
-		PendingPlanFinder: pendingPlanFinder,
-		DB:                boltdb,
-		DeleteLockCommand: deleteLockCommand,
-		GlobalAutomerge:   userConfig.Automerge,
-		Drainer:           drainer,
+		ProjectCommandRunner:     projectCommandRunner,
+		WorkingDir:               workingDir,
+		PendingPlanFinder:        pendingPlanFinder,
+		DB:                       boltdb,
+		DeleteLockCommand:        deleteLockCommand,
+		GlobalAutomerge:          userConfig.Automerge,
+		Drainer:                  drainer,
 	}
 	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
 	if err != nil {

@@ -10,6 +10,7 @@ func NewApplyCommandRunner(cmdRunner *DefaultCommandRunner) *ApplyCommandRunner 
 		cmdRunner:           cmdRunner,
 		vcsClient:           cmdRunner.VCSClient,
 		disableApplyAll:     cmdRunner.DisableApplyAll,
+		disableApply:        cmdRunner.DisableApply,
 		commitStatusUpdater: cmdRunner.CommitStatusUpdater,
 		prjCmdBuilder:       cmdRunner.ProjectCommandBuilder,
 		prjCmdRunner:        cmdRunner.ProjectCommandRunner,
@@ -19,6 +20,7 @@ func NewApplyCommandRunner(cmdRunner *DefaultCommandRunner) *ApplyCommandRunner 
 type ApplyCommandRunner struct {
 	cmdRunner           *DefaultCommandRunner
 	disableApplyAll     bool
+	disableApply        bool
 	vcsClient           vcs.Client
 	commitStatusUpdater CommitStatusUpdater
 	prjCmdBuilder       ProjectApplyCommandBuilder
@@ -30,10 +32,10 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
 
-	if a.DisableApply {
+	if a.disableApply {
 		ctx.Log.Info("ignoring apply command since apply disabled globally")
-		if err := a.vcsClient.CreateComment(baseRepo, pullNum, applyDisabledComment, models.ApplyCommand.String()); err != nil {
-			log.Err("unable to comment on pull request: %s", err)
+		if err := a.vcsClient.CreateComment(baseRepo, pull.Num, applyDisabledComment, models.ApplyCommand.String()); err != nil {
+			ctx.Log.Err("unable to comment on pull request: %s", err)
 		}
 		return
 	}

@@ -2,12 +2,10 @@ module github.com/runatlantis/atlantis
 
 go 1.14
 
+require(
 	github.com/Laisky/graphql v1.0.5
 	github.com/Masterminds/sprig/v3 v3.2.0
 	github.com/agext/levenshtein v1.2.3 // indirect
-	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
-	github.com/alecthomas/units v0.0.0-20201120081800-1786d5ef83d4 // indirect
-	github.com/aokoli/goutils v1.0.1 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a // indirect
 	github.com/aws/aws-sdk-go v1.17.14 // indirect
 	github.com/bradleyfalzon/ghinstallation v1.1.1
@@ -38,8 +36,6 @@ go 1.14
 	github.com/nlopes/slack v0.4.0
 	github.com/onsi/ginkgo v1.9.0 // indirect
 	github.com/onsi/gomega v1.4.3 // indirect
-	github.com/pelletier/go-buffruneio v0.2.0 // indirect
-	github.com/pelletier/go-toml v1.0.0 // indirect
 	github.com/petergtz/pegomock v2.9.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/remeh/sizedwaitgroup v1.0.0
@@ -58,7 +54,6 @@ go 1.14
 	golang.org/x/oauth2 v0.0.0-20191122200657-5d9234df094c // indirect
 	golang.org/x/text v0.3.3 // indirect
 	google.golang.org/appengine v1.6.5 // indirect
-	gopkg.in/alecthomas/kingpin.v2 v2.2.6 // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v9 v9.31.0
 	gopkg.in/yaml.v2 v2.4.0
