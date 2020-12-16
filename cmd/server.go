@@ -61,6 +61,7 @@ const (
 	GHUserFlag                 = "gh-user"
 	GHAppIDFlag                = "gh-app-id"
 	GHAppKeyFileFlag           = "gh-app-key-file"
+	GHAppSlugFlag              = "gh-app-slug"
 	GHOrganizationFlag         = "gh-org"
 	GHWebhookSecretFlag        = "gh-webhook-secret" // nolint: gosec
 	GitlabHostnameFlag         = "gitlab-hostname"
@@ -180,6 +181,9 @@ var stringFlags = map[string]stringFlag{
 	GHAppKeyFileFlag: {
 		description:  "A path to a file containing the GitHub App's private key",
 		defaultValue: "",
+	},
+	GHAppSlugFlag: {
+		description: "The Github app slug (ie. the URL-friendly name of your GitHub App)",
 	},
 	GHOrganizationFlag: {
 		description:  "The name of the GitHub organization to use during the creation of a Github App for Atlantis",
