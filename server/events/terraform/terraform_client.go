@@ -239,7 +239,7 @@ func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path st
 	filtered := make([]string, len(lines))
 	for _, s := range lines {
 		if !strings.Contains(s, "Refreshing state...") {
-			filtered = append(filtered, s + "\n");
+			filtered = append(filtered, s+"\n")
 		}
 	}
 	log.Info("successfully ran %q in %q", tfCmd, path)
