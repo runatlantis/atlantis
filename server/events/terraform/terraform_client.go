@@ -227,13 +227,23 @@ func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path st
 	}
 	cmd.Env = envVars
 	out, err := cmd.CombinedOutput()
+
 	if err != nil {
 		err = errors.Wrapf(err, "running %q in %q", tfCmd, path)
 		log.Err(err.Error())
 		return string(out), err
 	}
+
+	// Filter out terraform fetching resources if no errors happened
+	lines := strings.Split(string(out), "\n")
+	filtered := make([]string, len(lines))
+	for _, s := range lines {
+		if !strings.Contains(s, "Refreshing state...") {
+			filtered = append(filtered, s + "\n");
+		}
+	}
 	log.Info("successfully ran %q in %q", tfCmd, path)
-	return string(out), nil
+	return strings.Join(filtered, "\n"), nil
 }
 
 // prepCmd builds a ready to execute command based on the version of terraform
