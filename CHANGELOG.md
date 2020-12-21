@@ -1,3 +1,44 @@
+# v0.16.0
+
+## Description
+Feature release with some new flags and bugfixes.
+
+This release is thanks to our new Atlantis maintainer team:
+* [@chenrui333](https://github.com/chenrui333)
+* [@nishkrishnan](https://github.com/nishkrishnan)
+* [@acastle](https://github.com/acastle)
+* [@unRob](https://github.com/unRob)
+* [@jamengual](https://github.com/jamengual)
+
+## Features
+* Allow configuring number of concurrent plans/applies via new `-parallel-pool-size` flag ([#1177](https://github.com/runatlantis/atlantis/pull/1177) by @dmattia)
+* Add new flag `-disable-apply` that will disable the ability to run all applies ([#1230](https://github.com/runatlantis/atlantis/pull/1230) by @gezb)
+* This release will release with an arm64 binary ([#1291](https://github.com/runatlantis/atlantis/pull/1291) by @pgroudas)
+* Add `pre_workflow_hooks` steps to allow for running custom scripts before workflow execution ([#1255](https://github.com/runatlantis/atlantis/pull/1255) by @msarvar)
+* Update default Terraform version to 0.14.3
+
+## Bugfixes
+* Fix bug checking for up to date branches when using GitHub App installation and `-checkout-strategy=merge` (Fixes [#1236](https://github.com/runatlantis/atlantis/issues/1236) by @nishkrishnan)
+* Fix version detection for versions with prereleases when running Terraform >= 0.12.0 (Fixes [#1276](https://github.com/runatlantis/atlantis/issues/1276) by @acastle)
+* Fix bug detecting Terraform files ([#1253](https://github.com/runatlantis/atlantis/pull/1253) by @surminus)
+
+## Backwards Incompatibilities / Notes:
+* If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
+  then the default version of Terraform will now be 0.14.3. Simply set the above
+  flag to your desired default version to avoid any issues.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.16.0/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.16.0/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.16.0/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.16.0/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.16.0`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.15.1..v0.16.0
+https://github.com/runatlantis/atlantis/compare/v0.15.1...v0.16.0
+
 # v0.15.1
 
 ## Description
