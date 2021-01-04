@@ -93,6 +93,7 @@ func setupTmpRepos(t *testing.T) {
 	// env/
 	//   staging.tfvars
 	//   production.tfvars
+	//   global-env-config.auto.tfvars.json
 	envDir, err = ioutil.TempDir("", "")
 	Ok(t, err)
 	err = os.MkdirAll(filepath.Join(envDir, "env"), 0700)
@@ -245,6 +246,7 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 	// main.tf
 	// project1/
 	//   main.tf
+	//   terraform.tfvars.json
 	// project2/
 	//   main.tf
 	//   terraform.tfvars
@@ -254,7 +256,8 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
 		"main.tf": nil,
 		"project1": map[string]interface{}{
-			"main.tf": nil,
+			"main.tf":               nil,
+			"terraform.tfvars.json": nil,
 		},
 		"project2": map[string]interface{}{
 			"main.tf":          nil,
