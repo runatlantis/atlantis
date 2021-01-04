@@ -256,7 +256,7 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
 		"main.tf": nil,
 		"project1": map[string]interface{}{
-			"main.tf": nil,
+			"main.tf":               nil,
 			"terraform.tfvars.json": nil,
 		},
 		"project2": map[string]interface{}{
