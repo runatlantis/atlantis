@@ -247,7 +247,7 @@ Values are chosen in this order:
   # or (recommended)
   ATLANTIS_GH_WEBHOOK_SECRET='secret' atlantis server
   ```
-  Secret used to validate GitHub webhooks (see [https://developer.github.com/webhooks/securing/](https://developer.github.com/webhooks/securing/)).
+  Secret used to validate GitHub webhooks (see [https://developer.github.com/webhooks/securing/](https://docs.github.com/en/free-pro-team@latest/developers/webhooks-and-events/securing-your-webhooks)).
 
   ::: warning SECURITY WARNING
   If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitHub.
