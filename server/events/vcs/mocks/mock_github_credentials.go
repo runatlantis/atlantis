@@ -63,19 +63,23 @@ func (mock *MockGithubCredentials) GetToken() (string, error) {
 	return ret0, ret1
 }
 
-func (mock *MockGithubCredentials) GetUser() string {
+func (mock *MockGithubCredentials) GetUser() (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockGithubCredentials().")
 	}
 	params := []pegomock.Param{}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("GetUser", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem()})
+	result := pegomock.GetGenericMockFrom(mock).Invoke("GetUser", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
+	var ret1 error
 	if len(result) != 0 {
 		if result[0] != nil {
 			ret0 = result[0].(string)
 		}
+		if result[1] != nil {
+			ret1 = result[1].(error)
+		}
 	}
-	return ret0
+	return ret0, ret1
 }
 
 func (mock *MockGithubCredentials) VerifyWasCalledOnce() *VerifierMockGithubCredentials {
@@ -85,14 +89,14 @@ func (mock *MockGithubCredentials) VerifyWasCalledOnce() *VerifierMockGithubCred
 	}
 }
 
-func (mock *MockGithubCredentials) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockGithubCredentials {
+func (mock *MockGithubCredentials) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockGithubCredentials {
 	return &VerifierMockGithubCredentials{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockGithubCredentials) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockGithubCredentials {
+func (mock *MockGithubCredentials) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockGithubCredentials {
 	return &VerifierMockGithubCredentials{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -100,7 +104,7 @@ func (mock *MockGithubCredentials) VerifyWasCalledInOrder(invocationCountMatcher
 	}
 }
 
-func (mock *MockGithubCredentials) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockGithubCredentials {
+func (mock *MockGithubCredentials) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockGithubCredentials {
 	return &VerifierMockGithubCredentials{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -110,7 +114,7 @@ func (mock *MockGithubCredentials) VerifyWasCalledEventually(invocationCountMatc
 
 type VerifierMockGithubCredentials struct {
 	mock                   *MockGithubCredentials
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

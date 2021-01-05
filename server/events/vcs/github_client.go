@@ -91,8 +91,15 @@ func NewGithubClient(hostname string, credentials GithubCredentials, logger *log
 		transport,
 		graphql.WithHeader("Accept", "application/vnd.github.queen-beryl-preview+json"),
 	)
+
+	user, err := credentials.GetUser()
+	logger.Debug("GH User: %s", user)
+
+	if err != nil {
+		return nil, errors.Wrap(err, "getting user")
+	}
 	return &GithubClient{
-		user:           credentials.GetUser(),
+		user:           user,
 		client:         client,
 		v4MutateClient: v4MutateClient,
 		ctx:            context.Background(),
@@ -173,7 +180,7 @@ func (g *GithubClient) HidePrevPlanComments(repo models.Repo, pullNum int) error
 			ListOptions: github.ListOptions{Page: nextPage},
 		})
 		if err != nil {
-			return err
+			return errors.Wrap(err, "listing comments")
 		}
 		allComments = append(allComments, comments...)
 		if resp.NextPage == 0 {
