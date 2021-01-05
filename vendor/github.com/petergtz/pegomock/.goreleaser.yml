@@ -11,8 +11,8 @@ builds:
   goarch:
   - amd64
 
-archive:
-  replacements:
+archives:
+- replacements:
     # darwin: Darwin
     # linux: Linux
     # windows: Windows

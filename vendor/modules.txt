@@ -235,7 +235,7 @@ github.com/nlopes/slack
 github.com/onsi/gomega/format
 # github.com/pelletier/go-toml v1.2.0
 github.com/pelletier/go-toml
-# github.com/petergtz/pegomock v2.8.0+incompatible
+# github.com/petergtz/pegomock v2.9.0+incompatible
 ## explicit
 github.com/petergtz/pegomock
 github.com/petergtz/pegomock/internal/verify
