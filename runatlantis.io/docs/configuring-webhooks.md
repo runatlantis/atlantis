@@ -117,8 +117,6 @@ Repeat the process above until you have webhook subscriptions for the following 
 
 - See [Next Steps](#next-steps)
 
-## GitLab
-If you're using GitLab, navigate to your project's home page in GitLab
 ## Next Steps
 * To verify that Atlantis is receiving your webhooks, create a test pull request
   to your repo. 

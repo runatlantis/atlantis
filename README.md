@@ -1,9 +1,15 @@
-# Atlantis
+# Atlantis <!-- omit in toc -->
 
 <p align="center">
   <img src="./runatlantis.io/.vuepress/public/hero.png" alt="Atlantis Logo"/><br><br>
   <b>Terraform Pull Request Automation</b>
 </p>
+
+- [Resources](#resources)
+- [What is Atlantis?](#what-is-atlantis)
+- [What does it do?](#what-does-it-do)
+- [Why should you use it?](#why-should-you-use-it)
+- [Badges!](#badges)
 
 ## Resources
 * How to get started: [www.runatlantis.io/guide](https://www.runatlantis.io/guide)

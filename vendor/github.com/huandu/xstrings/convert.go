@@ -10,15 +10,14 @@ import (
 	"unicode/utf8"
 )
 
-// ToCamelCase can convert all lower case characters behind underscores
-// to upper case character.
-// Underscore character will be removed in result except following cases.
-//     * More than 1 underscore.
-//           "a__b" => "A_B"
-//     * At the beginning of string.
-//           "_a" => "_A"
-//     * At the end of string.
-//           "ab_" => "Ab_"
+// ToCamelCase is to convert words separated by space, underscore and hyphen to camel case.
+//
+// Some samples.
+//     "some_words"      => "SomeWords"
+//     "http_server"     => "HttpServer"
+//     "no_https"        => "NoHttps"
+//     "_complex__case_" => "_Complex_Case_"
+//     "some words"      => "SomeWords"
 func ToCamelCase(str string) string {
 	if len(str) == 0 {
 		return ""
@@ -28,12 +27,13 @@ func ToCamelCase(str string) string {
 	var r0, r1 rune
 	var size int
 
-	// leading '_' will appear in output.
+	// leading connector will appear in output.
 	for len(str) > 0 {
 		r0, size = utf8.DecodeRuneInString(str)
 		str = str[size:]
 
-		if r0 != '_' {
+		if !isConnector(r0) {
+			r0 = unicode.ToUpper(r0)
 			break
 		}
 
@@ -41,28 +41,28 @@ func ToCamelCase(str string) string {
 	}
 
 	if len(str) == 0 {
+		// A special case for a string contains only 1 rune.
+		if size != 0 {
+			buf.WriteRune(r0)
+		}
+
 		return buf.String()
 	}
-	
-	r0 = unicode.ToUpper(r0)
 
 	for len(str) > 0 {
 		r1 = r0
 		r0, size = utf8.DecodeRuneInString(str)
 		str = str[size:]
 
-		if r1 == '_' && r0 == '_' {
+		if isConnector(r0) && isConnector(r1) {
 			buf.WriteRune(r1)
 			continue
 		}
 
-		if r1 == '_' {
+		if isConnector(r1) {
 			r0 = unicode.ToUpper(r0)
 		} else {
 			r0 = unicode.ToLower(r0)
-		}
-
-		if r1 != '_' {
 			buf.WriteRune(r1)
 		}
 	}
@@ -72,101 +72,328 @@ func ToCamelCase(str string) string {
 }
 
 // ToSnakeCase can convert all upper case characters in a string to
-// underscore format.
+// snake case format.
 //
 // Some samples.
-//     "FirstName"  => "first_name"
-//     "HTTPServer" => "http_server"
-//     "NoHTTPS"    => "no_https"
-//     "GO_PATH"    => "go_path"
-//     "GO PATH"    => "go_path"      // space is converted to underscore.
-//     "GO-PATH"    => "go_path"      // hyphen is converted to underscore.
+//     "FirstName"    => "first_name"
+//     "HTTPServer"   => "http_server"
+//     "NoHTTPS"      => "no_https"
+//     "GO_PATH"      => "go_path"
+//     "GO PATH"      => "go_path"  // space is converted to underscore.
+//     "GO-PATH"      => "go_path"  // hyphen is converted to underscore.
+//     "http2xx"      => "http_2xx" // insert an underscore before a number and after an alphabet.
+//     "HTTP20xOK"    => "http_20x_ok"
+//     "Duration2m3s" => "duration_2m3s"
+//     "Bld4Floor3rd" => "bld4_floor_3rd"
 func ToSnakeCase(str string) string {
+	return camelCaseToLowerCase(str, '_')
+}
+
+// ToKebabCase can convert all upper case characters in a string to
+// kebab case format.
+//
+// Some samples.
+//     "FirstName"    => "first-name"
+//     "HTTPServer"   => "http-server"
+//     "NoHTTPS"      => "no-https"
+//     "GO_PATH"      => "go-path"
+//     "GO PATH"      => "go-path"  // space is converted to '-'.
+//     "GO-PATH"      => "go-path"  // hyphen is converted to '-'.
+//     "http2xx"      => "http-2xx" // insert an underscore before a number and after an alphabet.
+//     "HTTP20xOK"    => "http-20x-ok"
+//     "Duration2m3s" => "duration-2m3s"
+//     "Bld4Floor3rd" => "bld4-floor-3rd"
+func ToKebabCase(str string) string {
+	return camelCaseToLowerCase(str, '-')
+}
+
+func camelCaseToLowerCase(str string, connector rune) string {
 	if len(str) == 0 {
 		return ""
 	}
 
 	buf := &bytes.Buffer{}
-	var prev, r0, r1 rune
-	var size int
+	wt, word, remaining := nextWord(str)
 
-	r0 = '_'
+	for len(remaining) > 0 {
+		if wt != connectorWord {
+			toLower(buf, wt, word, connector)
+		}
 
-	for len(str) > 0 {
-		prev = r0
-		r0, size = utf8.DecodeRuneInString(str)
-		str = str[size:]
+		prev := wt
+		last := word
+		wt, word, remaining = nextWord(remaining)
 
-		switch {
-		case r0 == utf8.RuneError:
-			buf.WriteByte(byte(str[0]))
-
-		case unicode.IsUpper(r0):
-			if prev != '_' {
-				buf.WriteRune('_')
+		switch prev {
+		case numberWord:
+			for wt == alphabetWord || wt == numberWord {
+				toLower(buf, wt, word, connector)
+				wt, word, remaining = nextWord(remaining)
 			}
 
-			buf.WriteRune(unicode.ToLower(r0))
-
-			if len(str) == 0 {
-				break
+			if wt != invalidWord && wt != punctWord {
+				buf.WriteRune(connector)
 			}
 
-			r0, size = utf8.DecodeRuneInString(str)
-			str = str[size:]
+		case connectorWord:
+			toLower(buf, prev, last, connector)
 
-			if !unicode.IsUpper(r0) {
-				buf.WriteRune(r0)
-				break
-			}
-
-			// find next non-upper-case character and insert `_` properly.
-			// it's designed to convert `HTTPServer` to `http_server`.
-			// if there are more than 2 adjacent upper case characters in a word,
-			// treat them as an abbreviation plus a normal word.
-			for len(str) > 0 {
-				r1 = r0
-				r0, size = utf8.DecodeRuneInString(str)
-				str = str[size:]
-
-				if r0 == utf8.RuneError {
-					buf.WriteRune(unicode.ToLower(r1))
-					buf.WriteByte(byte(str[0]))
-					break
-				}
-
-				if !unicode.IsUpper(r0) {
-					if r0 == '_' || r0 == ' ' || r0 == '-' {
-						r0 = '_'
-
-						buf.WriteRune(unicode.ToLower(r1))
-					} else {
-						buf.WriteRune('_')
-						buf.WriteRune(unicode.ToLower(r1))
-						buf.WriteRune(r0)
-					}
-
-					break
-				}
-
-				buf.WriteRune(unicode.ToLower(r1))
-			}
-
-			if len(str) == 0 || r0 == '_' {
-				buf.WriteRune(unicode.ToLower(r0))
-				break
-			}
+		case punctWord:
+			// nothing.
 
 		default:
-			if r0 == ' ' || r0 == '-' {
-				r0 = '_'
+			if wt != numberWord {
+				if wt != connectorWord && wt != punctWord {
+					buf.WriteRune(connector)
+				}
+
+				break
 			}
 
-			buf.WriteRune(r0)
+			if len(remaining) == 0 {
+				break
+			}
+
+			last := word
+			wt, word, remaining = nextWord(remaining)
+
+			// consider number as a part of previous word.
+			// e.g. "Bld4Floor" => "bld4_floor"
+			if wt != alphabetWord {
+				toLower(buf, numberWord, last, connector)
+
+				if wt != connectorWord && wt != punctWord {
+					buf.WriteRune(connector)
+				}
+
+				break
+			}
+
+			// if there are some lower case letters following a number,
+			// add connector before the number.
+			// e.g. "HTTP2xx" => "http_2xx"
+			buf.WriteRune(connector)
+			toLower(buf, numberWord, last, connector)
+
+			for wt == alphabetWord || wt == numberWord {
+				toLower(buf, wt, word, connector)
+				wt, word, remaining = nextWord(remaining)
+			}
+
+			if wt != invalidWord && wt != connectorWord && wt != punctWord {
+				buf.WriteRune(connector)
+			}
 		}
 	}
 
+	toLower(buf, wt, word, connector)
 	return buf.String()
+}
+
+func isConnector(r rune) bool {
+	return r == '-' || r == '_' || unicode.IsSpace(r)
+}
+
+type wordType int
+
+const (
+	invalidWord wordType = iota
+	numberWord
+	upperCaseWord
+	alphabetWord
+	connectorWord
+	punctWord
+	otherWord
+)
+
+func nextWord(str string) (wt wordType, word, remaining string) {
+	if len(str) == 0 {
+		return
+	}
+
+	var offset int
+	remaining = str
+	r, size := nextValidRune(remaining, utf8.RuneError)
+	offset += size
+
+	if r == utf8.RuneError {
+		wt = invalidWord
+		word = str[:offset]
+		remaining = str[offset:]
+		return
+	}
+
+	switch {
+	case isConnector(r):
+		wt = connectorWord
+		remaining = remaining[size:]
+
+		for len(remaining) > 0 {
+			r, size = nextValidRune(remaining, r)
+
+			if !isConnector(r) {
+				break
+			}
+
+			offset += size
+			remaining = remaining[size:]
+		}
+
+	case unicode.IsPunct(r):
+		wt = punctWord
+		remaining = remaining[size:]
+
+		for len(remaining) > 0 {
+			r, size = nextValidRune(remaining, r)
+
+			if !unicode.IsPunct(r) {
+				break
+			}
+
+			offset += size
+			remaining = remaining[size:]
+		}
+
+	case unicode.IsUpper(r):
+		wt = upperCaseWord
+		remaining = remaining[size:]
+
+		if len(remaining) == 0 {
+			break
+		}
+
+		r, size = nextValidRune(remaining, r)
+
+		switch {
+		case unicode.IsUpper(r):
+			prevSize := size
+			offset += size
+			remaining = remaining[size:]
+
+			for len(remaining) > 0 {
+				r, size = nextValidRune(remaining, r)
+
+				if !unicode.IsUpper(r) {
+					break
+				}
+
+				prevSize = size
+				offset += size
+				remaining = remaining[size:]
+			}
+
+			// it's a bit complex when dealing with a case like "HTTPStatus".
+			// it's expected to be splitted into "HTTP" and "Status".
+			// Therefore "S" should be in remaining instead of word.
+			if len(remaining) > 0 && isAlphabet(r) {
+				offset -= prevSize
+				remaining = str[offset:]
+			}
+
+		case isAlphabet(r):
+			offset += size
+			remaining = remaining[size:]
+
+			for len(remaining) > 0 {
+				r, size = nextValidRune(remaining, r)
+
+				if !isAlphabet(r) || unicode.IsUpper(r) {
+					break
+				}
+
+				offset += size
+				remaining = remaining[size:]
+			}
+		}
+
+	case isAlphabet(r):
+		wt = alphabetWord
+		remaining = remaining[size:]
+
+		for len(remaining) > 0 {
+			r, size = nextValidRune(remaining, r)
+
+			if !isAlphabet(r) || unicode.IsUpper(r) {
+				break
+			}
+
+			offset += size
+			remaining = remaining[size:]
+		}
+
+	case unicode.IsNumber(r):
+		wt = numberWord
+		remaining = remaining[size:]
+
+		for len(remaining) > 0 {
+			r, size = nextValidRune(remaining, r)
+
+			if !unicode.IsNumber(r) {
+				break
+			}
+
+			offset += size
+			remaining = remaining[size:]
+		}
+
+	default:
+		wt = otherWord
+		remaining = remaining[size:]
+
+		for len(remaining) > 0 {
+			r, size = nextValidRune(remaining, r)
+
+			if size == 0 || isConnector(r) || isAlphabet(r) || unicode.IsNumber(r) || unicode.IsPunct(r) {
+				break
+			}
+
+			offset += size
+			remaining = remaining[size:]
+		}
+	}
+
+	word = str[:offset]
+	return
+}
+
+func nextValidRune(str string, prev rune) (r rune, size int) {
+	var sz int
+
+	for len(str) > 0 {
+		r, sz = utf8.DecodeRuneInString(str)
+		size += sz
+
+		if r != utf8.RuneError {
+			return
+		}
+
+		str = str[sz:]
+	}
+
+	r = prev
+	return
+}
+
+func toLower(buf *bytes.Buffer, wt wordType, str string, connector rune) {
+	buf.Grow(buf.Len() + len(str))
+
+	if wt != upperCaseWord && wt != connectorWord {
+		buf.WriteString(str)
+		return
+	}
+
+	for len(str) > 0 {
+		r, size := utf8.DecodeRuneInString(str)
+		str = str[size:]
+
+		if isConnector(r) {
+			buf.WriteRune(connector)
+		} else if unicode.IsUpper(r) {
+			buf.WriteRune(unicode.ToLower(r))
+		} else {
+			buf.WriteRune(r)
+		}
+	}
 }
 
 // SwapCase will swap characters case from upper to lower or lower to upper.

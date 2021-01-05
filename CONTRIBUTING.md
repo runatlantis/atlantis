@@ -32,6 +32,36 @@ open your browser to http://localhost:8080.
     ```
     If you get an error like `command not found: atlantis`, ensure that `$GOPATH/bin` is in your `$PATH`.
 
+## Running Atlantis With Local Changes
+Docker compose is set up to start an atlantis container and ngrok container in the same network in order to expose the atlantis instance to the internet.  In order to do this, create a file in the repository called `atlantis.env` and add the required env vars for the atlantis server configuration.
+
+e.g.
+```
+ATLANTIS_GH_APP_ID=123
+ATLANTIS_GH_APP_KEY_FILE="/.ssh/somekey.pem"
+ATLANTIS_GH_WEBHOOK_SECRET=12345
+```
+
+Note: `~/.ssh` is mounted to allow for referencing any local ssh keys
+
+Following this just run:
+
+```
+make build-service
+docker-compose up
+```
+
+### Rebuilding
+
+If the ngrok container is restarted, the url will change which is a hassle. Fortunately, when we make a code change, we can rebuild and restart the atlantis container easily without disrupting ngrok.
+
+e.g.
+
+```
+make build-service
+docker-compose up --detach --build
+```
+
 ## Running Tests Locally:
 
 `make test`. If you want to run the integration tests that actually run real `terraform` commands, run `make test-all`.

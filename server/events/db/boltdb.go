@@ -147,7 +147,7 @@ func (b *BoltDB) List() ([]models.ProjectLock, error) {
 	for k, v := range locksBytes {
 		var lock models.ProjectLock
 		if err := json.Unmarshal(v, &lock); err != nil {
-			return locks, errors.Wrap(err, fmt.Sprintf("failed to deserialize lock at key %q", string(k)))
+			return locks, errors.Wrap(err, fmt.Sprintf("failed to deserialize lock at key '%d'", k))
 		}
 		locks = append(locks, lock)
 	}

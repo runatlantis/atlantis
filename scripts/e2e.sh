@@ -15,7 +15,8 @@ cd "${CIRCLE_WORKING_DIRECTORY}/e2e"
   --data-dir="/tmp" \
   --log-level="debug" \
   --repo-allowlist="github.com/runatlantis/atlantis-tests" \
-  --allow-repo-config &> /tmp/atlantis-server.log &
+  --repo-config-json='{"repos":[{"id":"/.*/", "allowed_overrides":["apply_requirements","workflow"], "allow_custom_workflows":true}]}' \
+  &> /tmp/atlantis-server.log &
 sleep 2
 
 # start ngrok in the background and wait for it to start

@@ -1,5 +1,7 @@
 repos:
 - id: /.*/
+  pre_workflow_hooks:
+    - run: echo "hello"
   workflow: custom
   allowed_overrides: [workflow]
 workflows:
