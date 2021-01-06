@@ -218,7 +218,7 @@ Values are chosen in this order:
   ```bash
   atlantis server --unlock-after-plan
   ```
-  Removes all logs on a given repo after a plan has been run.
+  Removes all locks on a given repo after a plan has been run.
 
 * ### `--disable-autoplan`
   ```bash
