@@ -26,6 +26,7 @@ type UserConfig struct {
 	DisableApply               bool   `mapstructure:"disable-apply"`
 	DisableAutoplan            bool   `mapstructure:"disable-autoplan"`
 	DisableMarkdownFolding     bool   `mapstructure:"disable-markdown-folding"`
+	DisableRepoLocking         bool   `mapstructure:"disable-repo-locking"`
 	GithubHostname             string `mapstructure:"gh-hostname"`
 	GithubToken                string `mapstructure:"gh-token"`
 	GithubUser                 string `mapstructure:"gh-user"`

@@ -56,6 +56,7 @@ const (
 	DisableApplyFlag           = "disable-apply"
 	DisableAutoplanFlag        = "disable-autoplan"
 	DisableMarkdownFoldingFlag = "disable-markdown-folding"
+	DisableRepoLockingFlag     = "disable-repo-locking"
 	GHHostnameFlag             = "gh-hostname"
 	GHTokenFlag                = "gh-token"
 	GHUserFlag                 = "gh-user"
@@ -289,6 +290,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	DisableAutoplanFlag: {
 		description:  "Disable atlantis auto planning feature",
+		defaultValue: false,
+	},
+	DisableRepoLockingFlag: {
+		description:  "Disable atlantis locking repos",
 		defaultValue: false,
 	},
 	AllowDraftPRs: {

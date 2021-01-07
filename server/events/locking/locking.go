@@ -146,3 +146,47 @@ func (c *Client) lockKeyToProjectWorkspace(key string) (models.Project, string, 
 
 	return models.Project{RepoFullName: matches[1], Path: matches[2]}, matches[3], nil
 }
+
+type NoOpLocker struct{}
+
+// NewNoOpLocker returns a new lno operation lockingclient.
+func NewNoOpLocker() *NoOpLocker {
+	return &NoOpLocker{}
+}
+
+// TryLock attempts to acquire a lock to a project and workspace.
+func (c *NoOpLocker) TryLock(p models.Project, workspace string, pull models.PullRequest, user models.User) (TryLockResponse, error) {
+	return TryLockResponse{true, models.ProjectLock{}, c.key(p, workspace)}, nil
+}
+
+// Unlock attempts to unlock a project and workspace. If successful,
+// a pointer to the now deleted lock will be returned. Else, that
+// pointer will be nil. An error will only be returned if there was
+// an error deleting the lock (i.e. not if there was no lock).
+func (c *NoOpLocker) Unlock(key string) (*models.ProjectLock, error) {
+	return &models.ProjectLock{}, nil
+}
+
+// List returns a map of all locks with their lock key as the map key.
+// The lock key can be used in GetLock() and Unlock().
+func (c *NoOpLocker) List() (map[string]models.ProjectLock, error) {
+	m := make(map[string]models.ProjectLock)
+	return m, nil
+}
+
+// UnlockByPull deletes all locks associated with that pull request.
+func (c *NoOpLocker) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
+	return []models.ProjectLock{}, nil
+}
+
+// GetLock attempts to get the lock stored at key. If successful,
+// a pointer to the lock will be returned. Else, the pointer will be nil.
+// An error will only be returned if there was an error getting the lock
+// (i.e. not if there was no lock).
+func (c *NoOpLocker) GetLock(key string) (*models.ProjectLock, error) {
+	return nil, nil
+}
+
+func (c *NoOpLocker) key(p models.Project, workspace string) string {
+	return fmt.Sprintf("%s/%s/%s", p.RepoFullName, p.Path, workspace)
+}
