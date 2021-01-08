@@ -264,9 +264,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	var lockingClient locking.Locker
 	if userConfig.DisableRepoLocking {
-		lockingClient = locking.NewClient(boltdb)
-	} else {
 		lockingClient = locking.NewNoOpLocker()
+	} else {
+		lockingClient = locking.NewClient(boltdb)
 	}
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 
