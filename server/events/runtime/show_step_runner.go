@@ -10,14 +10,18 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-func NewShowStepRunner(executor TerraformExec, defaultTFVersion *version.Version) Runner {
-	return &PlanTypeStepRunnerDelegate{
+const minimumShowTfVersion string = "0.12.0"
+
+func NewShowStepRunner(executor TerraformExec, defaultTFVersion *version.Version) (Runner, error) {
+	runner := &PlanTypeStepRunnerDelegate{
 		defaultRunner: &ShowStepRunner{
 			TerraformExecutor: executor,
 			DefaultTFVersion:  defaultTFVersion,
 		},
 		remotePlanRunner: NullRunner{},
 	}
+
+	return NewMinimumVersionStepRunnerDelegate(minimumShowTfVersion, defaultTFVersion, runner)
 }
 
 // ShowStepRunner runs terraform show on an existing plan file and outputs it to a json file

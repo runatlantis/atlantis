@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
@@ -12,14 +13,17 @@ type PolicyCheckStepRunner struct {
 }
 
 // NewPolicyCheckStepRunner creates a new step runner from an executor workflow
-func NewPolicyCheckStepRunner(executorWorkflow VersionedExecutorWorkflow) Runner {
-	return &PlanTypeStepRunnerDelegate{
+func NewPolicyCheckStepRunner(defaultTfVersion *version.Version, executorWorkflow VersionedExecutorWorkflow) (Runner, error) {
+
+	runner := &PlanTypeStepRunnerDelegate{
 		defaultRunner: &PolicyCheckStepRunner{
 			versionEnsurer: executorWorkflow,
 			executor:       executorWorkflow,
 		},
 		remotePlanRunner: RemoteBackendUnsupportedRunner{},
 	}
+
+	return NewMinimumVersionStepRunnerDelegate(minimumShowTfVersion, defaultTfVersion, runner)
 }
 
 // Run ensures a given version for the executable, builds the args from the project context and then runs executable returning the result

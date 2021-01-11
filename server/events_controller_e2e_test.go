@@ -513,6 +513,17 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 		false,
 	)
 
+	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTFVersion)
+
+	Ok(t, err)
+
+	policyCheckRunner, err := runtime.NewPolicyCheckStepRunner(
+		defaultTFVersion,
+		policy.NewConfTestExecutorWorkflow(logger, binDir, &NoopTFDownloader{}),
+	)
+
+	Ok(t, err)
+
 	commandRunner := &events.DefaultCommandRunner{
 		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
 			Locker:           projectLocker,
@@ -525,13 +536,8 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 				TerraformExecutor: terraformClient,
 				DefaultTFVersion:  defaultTFVersion,
 			},
-			ShowStepRunner: &runtime.ShowStepRunner{
-				TerraformExecutor: terraformClient,
-				DefaultTFVersion:  defaultTFVersion,
-			},
-			PolicyCheckStepRunner: runtime.NewPolicyCheckStepRunner(
-				policy.NewConfTestExecutorWorkflow(logger, binDir, &NoopTFDownloader{}),
-			),
+			ShowStepRunner:        showStepRunner,
+			PolicyCheckStepRunner: policyCheckRunner,
 			ApplyStepRunner: &runtime.ApplyStepRunner{
 				TerraformExecutor: terraformClient,
 			},
