@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/url"
 	paths "path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -370,6 +371,16 @@ type ProjectCommandContext struct {
 	// PolicySets represent the policies that are run on the plan as part of the
 	// policy check stage
 	PolicySets valid.PolicySets
+}
+
+// ProjectCloneDir creates relative path to clone the repo to. If we are running
+// plans and apply in parallel we want to have a directory per project.
+func (p ProjectCommandContext) ProjectCloneDir() string {
+	if p.ParallelPlanEnabled || p.ParallelApplyEnabled {
+		return filepath.Join(p.ProjectName, p.Workspace)
+	}
+
+	return p.Workspace
 }
 
 // SetScope sets the scope of the stats object field. Note: we deliberately set this on the value
