@@ -21,6 +21,7 @@ import (
 	"net/url"
 	paths "path"
 	"regexp"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -403,6 +404,16 @@ type ProjectCommandContext struct {
 	PolicySets valid.PolicySets
 	// DeleteSourceBranchOnMerge will attempt to allow a branch to be deleted when merged (AzureDevOps & GitLab Support Only)
 	DeleteSourceBranchOnMerge bool
+}
+
+// ProjectCloneDir creates relative path to clone the repo to. If we are running
+// plans and apply in parallel we want to have a directory per project.
+func (p ProjectCommandContext) ProjectCloneDir() string {
+	if p.ParallelPlanEnabled || p.ParallelApplyEnabled {
+		return filepath.Join(p.ProjectName, p.Workspace)
+	}
+
+	return p.Workspace
 }
 
 // SetScope sets the scope of the stats object field. Note: we deliberately set this on the value
