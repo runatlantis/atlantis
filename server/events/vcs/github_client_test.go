@@ -598,6 +598,7 @@ func TestGithubClient_PullisMergeable_BlockedStatus(t *testing.T) {
 				fmt.Sprintf(statusJSON, "pending", "sq-ready-to-merge"),
 				fmt.Sprintf(statusJSON, "success", "_owners-check"),
 				fmt.Sprintf(statusJSON, "failure", "atlantis/apply"),
+				fmt.Sprintf(statusJSON, "failure", "atlantis/apply: terraform_cloud_workspace"),
 			},
 			true,
 		},

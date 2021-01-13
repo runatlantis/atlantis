@@ -310,7 +310,7 @@ func (g *GithubClient) getSubmitQueueMergeability(repo models.Repo, pull models.
 			ownersCheckApplied = true
 		}
 
-		if status.GetContext() == AtlantisApplyStatusContext ||
+		if strings.HasPrefix(status.GetContext(), AtlantisApplyStatusContext) ||
 			state == "success" ||
 			(state == "pending" && status.GetContext() == SubmitQueueReadinessStatusContext) {
 			continue
