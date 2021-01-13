@@ -194,28 +194,65 @@ func (a *ApplyStepRunner) runRemoteApply(
 	return output, err
 }
 
+// removeAdditionalStepOutputIfPresent removes any additional output that is not the plan output
+// remotePlans can contain additional steps in between the plan and apply steps
+// these are differentiated via the refreshSeparator
+func removeAdditionalStepOutputIfPresent(output string) string {
+	extracted := output
+	planEndIdx := strings.Index(output, refreshSeparator)
+
+	if planEndIdx > 0 {
+		extracted = strings.TrimSpace(output[:planEndIdx])
+	}
+
+	return extracted
+}
+
+func extractExpectedPlanFromFileContents(planfileContents string) string {
+	// Ensure we strip the remoteOpsHeader from the plan contents so the
+	// comparison is fair. We add this header in the plan phase so we can
+	// identify that this planfile came from a remote plan.
+	expPlan := strings.TrimSpace(planfileContents[len(remoteOpsHeader):])
+
+	// ensure we are comparing just plan output and not cost analysis, sentinel policies etc.
+	expPlan = removeAdditionalStepOutputIfPresent(expPlan)
+
+	return expPlan
+}
+
+func extractPlanFromApplyOutput(applyOut string) (string, error) {
+	// The plan is between the refresh separator...
+	planStartIdx := strings.Index(applyOut, refreshSeparator)
+	if planStartIdx < 0 {
+		return "", fmt.Errorf("Couldn't find refresh separator when parsing apply output:\n%q", applyOut)
+	}
+
+	currPlan := strings.TrimSpace(applyOut[planStartIdx+len(refreshSeparator):])
+
+	// ensure we are comparing just plan output and not cost analysis, sentinel policies etc.
+	currPlan = removeAdditionalStepOutputIfPresent(currPlan)
+
+	// ...and the prompt to execute the plan.
+	planEndIdx := strings.Index(currPlan, "Do you want to perform these actions in workspace \"")
+	if planEndIdx > 0 {
+		currPlan = strings.TrimSpace(currPlan[:planEndIdx])
+	}
+
+	return currPlan, nil
+}
+
 // remotePlanChanged checks if the plan generated during the plan phase matches
 // the one we're about to apply in the apply phase.
 // If the plans don't match, it returns an error with a diff of the two plans
 // that can be printed to the pull request.
 func (a *ApplyStepRunner) remotePlanChanged(planfileContents string, applyOut string) error {
-	// The plan is between the refresh separator...
-	planStartIdx := strings.Index(applyOut, refreshSeparator)
-	if planStartIdx < 0 {
-		return fmt.Errorf("Couldn't find refresh separator when parsing apply output:\n%q", applyOut)
+	currPlan, err := extractPlanFromApplyOutput(applyOut)
+
+	if err != nil {
+		return err
 	}
 
-	// ...and the prompt to execute the plan.
-	planEndIdx := strings.Index(applyOut, "Do you want to perform these actions in workspace \"")
-	if planEndIdx < 0 {
-		return fmt.Errorf("Couldn't find plan end when parsing apply output:\n%q", applyOut)
-	}
-	currPlan := strings.TrimSpace(applyOut[planStartIdx+len(refreshSeparator) : planEndIdx])
-
-	// Ensure we strip the remoteOpsHeader from the plan contents so the
-	// comparison is fair. We add this header in the plan phase so we can
-	// identify that this planfile came from a remote plan.
-	expPlan := strings.TrimSpace(planfileContents[len(remoteOpsHeader):])
+	expPlan := extractExpectedPlanFromFileContents(planfileContents)
 
 	if currPlan != expPlan {
 		return fmt.Errorf(planChangedErrFmt, expPlan, currPlan)

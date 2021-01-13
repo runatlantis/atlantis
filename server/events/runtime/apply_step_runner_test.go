@@ -23,6 +23,10 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
+const (
+	refreshSeparator = "------------------------------------------------------------------------\n"
+)
+
 func TestRun_NoDir(t *testing.T) {
 	o := runtime.ApplyStepRunner{
 		TerraformExecutor: nil,
@@ -340,6 +344,98 @@ To resolve, re-run plan.`, err)
 	// Planfile should not be deleted.
 	_, err = os.Stat(planPath)
 	Ok(t, err)
+}
+
+func TestRun_RemoteApply_RemovesAdditionalSteps(t *testing.T) {
+	tmpDir, cleanup := TempDir(t)
+	defer cleanup()
+	planPath := filepath.Join(tmpDir, "workspace.tfplan")
+	planFileContents := `
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+	+ create
+
+Terraform will perform the following actions:
+
+	# aws_sns_topic.test_topic will be created
+	+ resource "aws_sns_topic" "test_topic" {
+		+ arn    = (known after apply)
+		+ id     = (known after apply)
+		+ name   = "test_topic_10"
+		+ policy = (known after apply)
+	}
+
+Plan: 1 to add, 0 to change, 0 to destroy.
+
+------------------------------------------------------------------------
+
+Cost estimation:
+
+Resources: 0 of 0 estimated
+			$0.0/mo +$0.0
+
+------------------------------------------------------------------------
+
+Organization policy check:
+
+================ Results for policy set: random_policy ===============
+
+Sentinel Result: true
+
+This result means that Sentinel policies returned true and the protected
+behavior is allowed by Sentinel policies.
+1 policies evaluated.
+
+## Policy 1: random_policy (soft-mandatory)
+
+Result: true
+
+Description:
+	This policy is a random policy
+
+TRUE - ./random_policy.sentinel:51:1 - Rule "main"
+
+`
+	err := ioutil.WriteFile(planPath, []byte("Atlantis: this plan was created by remote ops\n"+planFileContents), 0644)
+	Ok(t, err)
+
+	RegisterMockTestingT(t)
+	tfOut := fmt.Sprintf(preConfirmOutFmt, planFileContents+refreshSeparator) + postConfirmOut
+	tfExec := &remoteApplyMock{LinesToSend: tfOut, DoneCh: make(chan bool)}
+	updater := mocks2.NewMockCommitStatusUpdater()
+	o := runtime.ApplyStepRunner{
+		AsyncTFExec:         tfExec,
+		CommitStatusUpdater: updater,
+	}
+	tfVersion, _ := version.NewVersion("0.11.0")
+	ctx := models.ProjectCommandContext{
+		Log:                logging.NewSimpleLogger("testing", false, logging.Debug),
+		Workspace:          "workspace",
+		RepoRelDir:         ".",
+		EscapedCommentArgs: []string{"comment", "args"},
+		TerraformVersion:   tfVersion,
+	}
+	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
+	<-tfExec.DoneCh
+
+	Ok(t, err)
+	Equals(t, "yes\n", tfExec.PassedInput)
+	Equals(t, `
+2019/02/27 21:47:36 [DEBUG] Using modified User-Agent: Terraform/0.11.11 TFE/d161c1b
+null_resource.dir2[1]: Destroying... (ID: 8554368366766418126)
+null_resource.dir2[1]: Destruction complete after 0s
+
+Apply complete! Resources: 0 added, 0 changed, 1 destroyed.
+`, output)
+
+	Equals(t, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args"}, tfExec.CalledArgs)
+	_, err = os.Stat(planPath)
+	Assert(t, os.IsNotExist(err), "planfile should be deleted")
+
+	// Check that the status was updated with the run url.
+	runURL := "https://app.terraform.io/app/lkysow-enterprises/atlantis-tfe-test-dir2/runs/run-PiDsRYKGcerTttV2"
+	updater.VerifyWasCalledOnce().UpdateProject(ctx, models.ApplyCommand, models.PendingCommitStatus, runURL)
+	updater.VerifyWasCalledOnce().UpdateProject(ctx, models.ApplyCommand, models.SuccessCommitStatus, runURL)
 }
 
 type remoteApplyMock struct {
