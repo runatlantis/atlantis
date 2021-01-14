@@ -63,6 +63,13 @@ func (m *MessageTooLongEvent) Error() string {
 	return fmt.Sprintf("Message too long (max %d characters)", m.MaxLength)
 }
 
+// RateLimitEvent is used when Slack warns that rate-limits are being hit.
+type RateLimitEvent struct{}
+
+func (e *RateLimitEvent) Error() string {
+	return "Messages are being sent too fast."
+}
+
 // OutgoingErrorEvent contains information in case there were errors sending messages
 type OutgoingErrorEvent struct {
 	Message  OutgoingMessage
