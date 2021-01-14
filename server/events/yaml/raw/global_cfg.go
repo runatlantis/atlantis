@@ -18,13 +18,14 @@ type GlobalCfg struct {
 
 // Repo is the raw schema for repos in the server-side repo config.
 type Repo struct {
-	ID                   string            `yaml:"id" json:"id"`
-	ApplyRequirements    []string          `yaml:"apply_requirements" json:"apply_requirements"`
-	PreWorkflowHooks     []PreWorkflowHook `yaml:"pre_workflow_hooks" json:"pre_workflow_hooks"`
-	Workflow             *string           `yaml:"workflow,omitempty" json:"workflow,omitempty"`
-	AllowedWorkflows     []string          `yaml:"allowed_workflows,omitempty" json:"allowed_workflows,omitempty"`
-	AllowedOverrides     []string          `yaml:"allowed_overrides" json:"allowed_overrides"`
-	AllowCustomWorkflows *bool             `yaml:"allow_custom_workflows,omitempty" json:"allow_custom_workflows,omitempty"`
+	ID                        string            `yaml:"id" json:"id"`
+	ApplyRequirements         []string          `yaml:"apply_requirements" json:"apply_requirements"`
+	PreWorkflowHooks          []PreWorkflowHook `yaml:"pre_workflow_hooks" json:"pre_workflow_hooks"`
+	Workflow                  *string           `yaml:"workflow,omitempty" json:"workflow,omitempty"`
+	AllowedWorkflows          []string          `yaml:"allowed_workflows,omitempty" json:"allowed_workflows,omitempty"`
+	AllowedOverrides          []string          `yaml:"allowed_overrides" json:"allowed_overrides"`
+	AllowCustomWorkflows      *bool             `yaml:"allow_custom_workflows,omitempty" json:"allow_custom_workflows,omitempty"`
+	DeleteSourceBranchOnMerge *bool             `yaml:"delete_source_branch_on_merge,omitempty" json:"delete_source_branch_on_merge,omitempty"`
 }
 
 func (g GlobalCfg) Validate() error {
@@ -131,8 +132,8 @@ func (r Repo) Validate() error {
 	overridesValid := func(value interface{}) error {
 		overrides := value.([]string)
 		for _, o := range overrides {
-			if o != valid.ApplyRequirementsKey && o != valid.WorkflowKey {
-				return fmt.Errorf("%q is not a valid override, only %q and %q are supported", o, valid.ApplyRequirementsKey, valid.WorkflowKey)
+			if o != valid.ApplyRequirementsKey && o != valid.WorkflowKey && o != valid.DeleteSourceBranchOnMergeKey {
+				return fmt.Errorf("%q is not a valid override, only %q, %q and %q are supported", o, valid.ApplyRequirementsKey, valid.WorkflowKey, valid.DeleteSourceBranchOnMergeKey)
 			}
 		}
 		return nil
@@ -144,11 +145,17 @@ func (r Repo) Validate() error {
 		return nil
 	}
 
+	deleteSourceBranchOnMergeValid := func(value interface{}) error {
+		//TOBE IMPLEMENTED
+		return nil
+	}
+
 	return validation.ValidateStruct(&r,
 		validation.Field(&r.ID, validation.Required, validation.By(idValid)),
 		validation.Field(&r.AllowedOverrides, validation.By(overridesValid)),
 		validation.Field(&r.ApplyRequirements, validation.By(validApplyReq)),
 		validation.Field(&r.Workflow, validation.By(workflowExists)),
+		validation.Field(&r.DeleteSourceBranchOnMerge, validation.By(deleteSourceBranchOnMergeValid)),
 	)
 }
 
@@ -179,13 +186,14 @@ func (r Repo) ToValid(workflows map[string]valid.Workflow) valid.Repo {
 	}
 
 	return valid.Repo{
-		ID:                   id,
-		IDRegex:              idRegex,
-		ApplyRequirements:    r.ApplyRequirements,
-		PreWorkflowHooks:     preWorkflowHooks,
-		Workflow:             workflow,
-		AllowedWorkflows:     r.AllowedWorkflows,
-		AllowedOverrides:     r.AllowedOverrides,
-		AllowCustomWorkflows: r.AllowCustomWorkflows,
+		ID:                        id,
+		IDRegex:                   idRegex,
+		ApplyRequirements:         r.ApplyRequirements,
+		PreWorkflowHooks:          preWorkflowHooks,
+		Workflow:                  workflow,
+		AllowedWorkflows:          r.AllowedWorkflows,
+		AllowedOverrides:          r.AllowedOverrides,
+		AllowCustomWorkflows:      r.AllowCustomWorkflows,
+		DeleteSourceBranchOnMerge: r.DeleteSourceBranchOnMerge,
 	}
 }

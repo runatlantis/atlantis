@@ -7,12 +7,13 @@ import version "github.com/hashicorp/go-version"
 // RepoCfg is the atlantis.yaml config after it's been parsed and validated.
 type RepoCfg struct {
 	// Version is the version of the atlantis YAML file.
-	Version       int
-	Projects      []Project
-	Workflows     map[string]Workflow
-	Automerge     bool
-	ParallelApply bool
-	ParallelPlan  bool
+	Version                   int
+	Projects                  []Project
+	Workflows                 map[string]Workflow
+	Automerge                 bool
+	ParallelApply             bool
+	ParallelPlan              bool
+	DeleteSourceBranchOnMerge bool
 }
 
 func (r RepoCfg) FindProjectsByDirWorkspace(repoRelDir string, workspace string) []Project {
@@ -46,13 +47,14 @@ func (r RepoCfg) FindProjectByName(name string) *Project {
 }
 
 type Project struct {
-	Dir               string
-	Workspace         string
-	Name              *string
-	WorkflowName      *string
-	TerraformVersion  *version.Version
-	Autoplan          Autoplan
-	ApplyRequirements []string
+	Dir                       string
+	Workspace                 string
+	Name                      *string
+	WorkflowName              *string
+	TerraformVersion          *version.Version
+	Autoplan                  Autoplan
+	ApplyRequirements         []string
+	DeleteSourceBranchOnMerge *bool
 }
 
 // GetName returns the name of the project or an empty string if there is no

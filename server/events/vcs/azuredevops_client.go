@@ -313,7 +313,7 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
 	completionOpts := azuredevops.GitPullRequestCompletionOptions{
 		BypassPolicy:            new(bool),
 		BypassReason:            azuredevops.String(""),
-		DeleteSourceBranch:      new(bool),
+		DeleteSourceBranch:      &pull.DeleteSourceBranchOnMerge,
 		MergeCommitMessage:      azuredevops.String(common.AutomergeCommitMsg),
 		MergeStrategy:           &mcm,
 		SquashMerge:             new(bool),

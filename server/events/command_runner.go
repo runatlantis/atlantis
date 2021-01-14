@@ -345,7 +345,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	c.updateCommitStatus(ctx, cmd.Name, pullStatus)
 
 	if cmd.Name == models.ApplyCommand && c.automergeEnabled(ctx, projectCmds) {
-		c.automerge(ctx, pullStatus)
+		c.automerge(ctx, pullStatus, c.deleteSourceBranchOnMergeEnabled(ctx, projectCmds))
 	}
 }
 
@@ -381,7 +381,7 @@ func (c *DefaultCommandRunner) updateCommitStatus(ctx *CommandContext, cmd model
 	}
 }
 
-func (c *DefaultCommandRunner) automerge(ctx *CommandContext, pullStatus models.PullStatus) {
+func (c *DefaultCommandRunner) automerge(ctx *CommandContext, pullStatus models.PullStatus, deleteSourceBranch bool) {
 	// We only automerge if all projects have been successfully applied.
 	for _, p := range pullStatus.Projects {
 		if p.Status != models.AppliedPlanStatus {
@@ -395,6 +395,8 @@ func (c *DefaultCommandRunner) automerge(ctx *CommandContext, pullStatus models.
 		ctx.Log.Err("failed to comment about automerge: %s", err)
 		// Commenting isn't required so continue.
 	}
+
+	ctx.Pull.DeleteSourceBranchOnMerge = deleteSourceBranch
 
 	// Make the API call to perform the merge.
 	ctx.Log.Info("automerging pull request")
@@ -611,6 +613,12 @@ func (c *DefaultCommandRunner) parallelApplyEnabled(ctx *CommandContext, project
 // parallelPlanEnabled returns true if parallel plan is enabled in this context.
 func (c *DefaultCommandRunner) parallelPlanEnabled(ctx *CommandContext, projectCmds []models.ProjectCommandContext) bool {
 	return len(projectCmds) > 0 && projectCmds[0].ParallelPlanEnabled
+}
+
+// deleteSourceBranchOnMergeEnabled returns true if we should delete the source branch on merge in this context.
+func (c *DefaultCommandRunner) deleteSourceBranchOnMergeEnabled(ctx *CommandContext, projectCmds []models.ProjectCommandContext) bool {
+	//check if this repo is configured for automerging.
+	return (len(projectCmds) > 0 && projectCmds[0].DeleteSourceBranchOnMerge)
 }
 
 // automergeComment is the comment that gets posted when Atlantis automatically

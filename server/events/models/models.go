@@ -164,6 +164,9 @@ type PullRequest struct {
 	State PullRequestState
 	// BaseRepo is the repository that the pull request will be merged into.
 	BaseRepo Repo
+	// When DeleteSourceBranchOnMerge flag is set to true VCS deletes the source branch after the PR is merged
+	// Applied by GitLab & AzureDevops
+	DeleteSourceBranchOnMerge bool
 }
 
 type PullRequestState int
@@ -357,6 +360,8 @@ type ProjectCommandContext struct {
 	// Workspace is the Terraform workspace this project is in. It will always
 	// be set.
 	Workspace string
+	// DeleteSourceBranchOnMerge will attempt to allow a branch to be deleted when merged (AzureDevOps & GitLab Support Only)
+	DeleteSourceBranchOnMerge bool
 }
 
 // SplitRepoFullName splits a repo full name up into its owner and repo
