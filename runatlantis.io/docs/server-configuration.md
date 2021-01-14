@@ -220,6 +220,12 @@ Values are chosen in this order:
   ```
   Disable atlantis auto planning
 
+* ### `--disable-repo-locking`
+  ```bash
+  atlantis server --disable-repo-locking
+  ```
+  Stops atlantis locking projects and or workspaces when running terraform
+
 * ### `--gh-hostname`
   ```bash
   atlantis server --gh-hostname="my.github.enterprise.com"
