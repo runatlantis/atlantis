@@ -169,7 +169,7 @@ func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment stri
 	return nil
 }
 
-func (g *GithubClient) HidePrevPlanComments(repo models.Repo, pullNum int) error {
+func (g *GithubClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
 	var allComments []*github.IssueComment
 	nextPage := 0
 	for {
@@ -205,7 +205,9 @@ func (g *GithubClient) HidePrevPlanComments(repo models.Repo, pullNum int) error
 			continue
 		}
 		firstLine := strings.ToLower(body[0])
-		if !strings.Contains(firstLine, models.PlanCommand.String()) {
+		g.logger.Debug("Command Name: %s", command)
+		g.logger.Debug("First line: %s", firstLine)
+		if !strings.Contains(firstLine, strings.ToLower(command)) {
 			continue
 		}
 		var m struct {
