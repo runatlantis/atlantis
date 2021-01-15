@@ -23,11 +23,11 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-const (
-	planCommandTitle            = "Plan"
-	applyCommandTitle           = "Apply"
-	policyCheckCommandTitle     = "Policy Check"
-	approvePoliciesCommandTitle = "Approve Policies"
+var (
+	planCommandTitle            = models.PlanCommand.TitleString()
+	applyCommandTitle           = models.ApplyCommand.TitleString()
+	policyCheckCommandTitle     = models.PolicyCheckCommand.TitleString()
+	approvePoliciesCommandTitle = models.ApprovePoliciesCommand.TitleString()
 	// maxUnwrappedLines is the maximum number of lines the Terraform output
 	// can be before we wrap it in an expandable template.
 	maxUnwrappedLines = 12

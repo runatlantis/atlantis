@@ -601,6 +601,12 @@ const (
 	// Adding more? Don't forget to update String() below
 )
 
+// TitleString returns the string representation in title form.
+// ie. policy_check becomes Policy Check
+func (c CommandName) TitleString() string {
+	return strings.Title(strings.ReplaceAll(strings.ToLower(c.String()), "_", " "))
+}
+
 // String returns the string representation of c.
 func (c CommandName) String() string {
 	switch c {

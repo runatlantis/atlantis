@@ -118,7 +118,7 @@ func (c *InstrumentedClient) CreateComment(repo models.Repo, pullNum int, commen
 	executionSuccess.Inc()
 	return nil
 }
-func (c *InstrumentedClient) HidePrevPlanComments(repo models.Repo, pullNum int) error {
+func (c *InstrumentedClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
 	scope := c.StatsScope.Scope("hide_prev_plan_comments")
 	logger := c.Logger.NewLogger(fmtLogSrc(repo, pullNum), true, c.Logger.GetLevel())
 
@@ -128,9 +128,9 @@ func (c *InstrumentedClient) HidePrevPlanComments(repo models.Repo, pullNum int)
 	executionSuccess := scope.NewCounter(metrics.ExecutionSuccessMetric)
 	executionError := scope.NewCounter(metrics.ExecutionErrorMetric)
 
-	if err := c.Client.HidePrevPlanComments(repo, pullNum); err != nil {
+	if err := c.Client.HidePrevCommandComments(repo, pullNum, command); err != nil {
 		executionError.Inc()
-		logger.Err("Unable to hide previous plan comments, error: %s", err.Error())
+		logger.Err("Unable to hide previous %s comments, error: %s", command, err.Error())
 		return err
 	}
 
