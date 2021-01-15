@@ -59,9 +59,9 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 			Equals(t, "", output)
 
 			// If using init then we specify -input=false but not for get.
-			expArgs := []string{c.expCmd, "-input=false", "-no-color", "-upgrade", "extra", "args"}
+			expArgs := []string{c.expCmd, "-input=false", "-no-color", "extra", "args"}
 			if c.expCmd == "get" {
-				expArgs = []string{c.expCmd, "-no-color", "-upgrade", "extra", "args"}
+				expArgs = []string{c.expCmd, "-no-color", "extra", "args"}
 			}
 			terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, "/path", expArgs, map[string]string(nil), tfVersion, "workspace")
 		})
