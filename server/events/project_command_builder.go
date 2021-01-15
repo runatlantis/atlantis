@@ -177,7 +177,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		for _, mp := range matchingProjects {
 			ctx.Log.Debug("determining config for project at dir: %q workspace: %q", mp.Dir, mp.Workspace)
 			mergedCfg := p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp, repoCfg)
-			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, mergedCfg, commentFlags, repoCfg.Automerge, repoCfg.ParallelApply, repoCfg.ParallelPlan, verbose, repoDir, repoCfg.DeleteSourceBranchOnMerge))
+			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, mergedCfg, commentFlags, repoCfg.Automerge, repoCfg.ParallelApply, repoCfg.ParallelPlan, verbose, repoDir, mergedCfg.DeleteSourceBranchOnMerge))
 		}
 	} else {
 		// If there is no config file, then we'll plan each project that
@@ -188,7 +188,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		for _, mp := range modifiedProjects {
 			ctx.Log.Debug("determining config for project at dir: %q", mp.Path)
 			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp.Path, DefaultWorkspace)
-			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, pCfg, commentFlags, DefaultAutomergeEnabled, DefaultParallelApplyEnabled, DefaultParallelPlanEnabled, verbose, repoDir, DefaultDeleteSourceBranchOnMerge))
+			projCtxs = append(projCtxs, p.buildCtx(ctx, models.PlanCommand, pCfg, commentFlags, DefaultAutomergeEnabled, DefaultParallelApplyEnabled, DefaultParallelPlanEnabled, verbose, repoDir, pCfg.DeleteSourceBranchOnMerge))
 		}
 	}
 
@@ -328,7 +328,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(
 		automerge = repoCfgPtr.Automerge
 		parallelApply = repoCfgPtr.ParallelApply
 		parallelPlan = repoCfgPtr.ParallelPlan
-		deleteBranchOnMerge = repoCfgPtr.DeleteSourceBranchOnMerge
+		deleteBranchOnMerge = projCfg.DeleteSourceBranchOnMerge
 	}
 	return p.buildCtx(ctx, cmd, projCfg, commentFlags, automerge, parallelApply, parallelPlan, verbose, repoDir, deleteBranchOnMerge), nil
 }

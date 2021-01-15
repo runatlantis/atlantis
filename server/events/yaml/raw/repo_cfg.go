@@ -74,11 +74,6 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		parallelPlan = *r.ParallelPlan
 	}
 
-	deleteBranchOnMerge := DefaultDeleteSourceBranchOnMerge
-	if r.DeleteSourceBranchOnMerge != nil {
-		deleteBranchOnMerge = *r.DeleteSourceBranchOnMerge
-	}
-
 	return valid.RepoCfg{
 		Version:                   *r.Version,
 		Projects:                  validProjects,
@@ -86,6 +81,6 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		Automerge:                 automerge,
 		ParallelApply:             parallelApply,
 		ParallelPlan:              parallelPlan,
-		DeleteSourceBranchOnMerge: deleteBranchOnMerge,
+		DeleteSourceBranchOnMerge: r.DeleteSourceBranchOnMerge,
 	}
 }

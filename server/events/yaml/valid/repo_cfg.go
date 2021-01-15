@@ -13,7 +13,7 @@ type RepoCfg struct {
 	Automerge                 bool
 	ParallelApply             bool
 	ParallelPlan              bool
-	DeleteSourceBranchOnMerge bool
+	DeleteSourceBranchOnMerge *bool
 }
 
 func (r RepoCfg) FindProjectsByDirWorkspace(repoRelDir string, workspace string) []Project {

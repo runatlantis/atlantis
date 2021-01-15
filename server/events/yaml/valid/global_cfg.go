@@ -188,19 +188,23 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 				log.Debug("overriding server-defined %s with repo-specified workflow: %q", WorkflowKey, workflow.Name)
 			}
 		case DeleteSourceBranchOnMergeKey:
-			//We check whether the server configured value and repo-root level
-			//config is different. If it is then we change to the more granular.
-			log.Debug("global deleteSourceBranchOnMerge: [%t]", deleteSourceBranchOnMerge)
-			log.Debug("repo deleteSourceBranchOnMerge: [%t]", rCfg.DeleteSourceBranchOnMerge)
+			log.Debug("global deleteSourceBranchOnMerge: %t", deleteSourceBranchOnMerge)
+			if rCfg.DeleteSourceBranchOnMerge == nil {
+				log.Debug("repo deleteSourceBranchOnMerge: nil")
+			} else {
+				log.Debug("repo deleteSourceBranchOnMerge: %t", *rCfg.DeleteSourceBranchOnMerge)
+			}
 			if proj.DeleteSourceBranchOnMerge == nil {
 				log.Debug("project deleteSourceBranchOnMerge: nil")
 			} else {
-				log.Debug("project deleteSourceBranchOnMerge: [%t]", *proj.DeleteSourceBranchOnMerge)
+				log.Debug("project deleteSourceBranchOnMerge: %t", *proj.DeleteSourceBranchOnMerge)
 			}
 
-			if rCfg.DeleteSourceBranchOnMerge != deleteSourceBranchOnMerge {
+			//We check whether the server configured value and repo-root level
+			//config is different. If it is then we change to the more granular.
+			if rCfg.DeleteSourceBranchOnMerge != nil && deleteSourceBranchOnMerge != *rCfg.DeleteSourceBranchOnMerge {
 				log.Debug("overriding server-defined %s with repo settings: [%t]", DeleteSourceBranchOnMergeKey, rCfg.DeleteSourceBranchOnMerge)
-				deleteSourceBranchOnMerge = rCfg.DeleteSourceBranchOnMerge
+				deleteSourceBranchOnMerge = *rCfg.DeleteSourceBranchOnMerge
 			}
 			//Then we check whether the more granular project based config is
 			//different. If it is then we set it.
