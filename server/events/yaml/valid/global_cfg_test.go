@@ -38,12 +38,13 @@ func TestNewGlobalCfg(t *testing.T) {
 	baseCfg := valid.GlobalCfg{
 		Repos: []valid.Repo{
 			{
-				IDRegex:              regexp.MustCompile(".*"),
-				ApplyRequirements:    []string{},
-				Workflow:             &expDefaultWorkflow,
-				AllowedWorkflows:     []string{},
-				AllowedOverrides:     []string{},
-				AllowCustomWorkflows: Bool(false),
+				IDRegex:                   regexp.MustCompile(".*"),
+				ApplyRequirements:         []string{},
+				Workflow:                  &expDefaultWorkflow,
+				AllowedWorkflows:          []string{},
+				AllowedOverrides:          []string{},
+				AllowCustomWorkflows:      Bool(false),
+				DeleteSourceBranchOnMerge: Bool(false),
 			},
 		},
 		Workflows: map[string]valid.Workflow{
