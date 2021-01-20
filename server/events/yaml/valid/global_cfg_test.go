@@ -44,7 +44,7 @@ func TestNewGlobalCfg(t *testing.T) {
 				AllowedWorkflows:          []string{},
 				AllowedOverrides:          []string{},
 				AllowCustomWorkflows:      Bool(false),
-				DeleteSourceBranchOnMerge: Bool(true),
+				DeleteSourceBranchOnMerge: Bool(false),
 			},
 		},
 		Workflows: map[string]valid.Workflow{
