@@ -109,7 +109,7 @@ func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) Global
 	}
 
 	allowCustomWorkflows := false
-	// deleteSourceBranchOnMerge := false
+	deleteSourceBranchOnMerge := false
 	if allowRepoCfg {
 		allowedOverrides = []string{ApplyRequirementsKey, WorkflowKey}
 		allowCustomWorkflows = true
@@ -119,14 +119,14 @@ func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) Global
 	return GlobalCfg{
 		Repos: []Repo{
 			{
-				IDRegex:              regexp.MustCompile(".*"),
-				ApplyRequirements:    applyReqs,
-				PreWorkflowHooks:     preWorkflowHooks,
-				Workflow:             &defaultWorkflow,
-				AllowedWorkflows:     allowedWorkflows,
-				AllowedOverrides:     allowedOverrides,
-				AllowCustomWorkflows: &allowCustomWorkflows,
-				// DeleteSourceBranchOnMerge: &deleteSourceBranchOnMerge,
+				IDRegex:                   regexp.MustCompile(".*"),
+				ApplyRequirements:         applyReqs,
+				PreWorkflowHooks:          preWorkflowHooks,
+				Workflow:                  &defaultWorkflow,
+				AllowedWorkflows:          allowedWorkflows,
+				AllowedOverrides:          allowedOverrides,
+				AllowCustomWorkflows:      &allowCustomWorkflows,
+				DeleteSourceBranchOnMerge: &deleteSourceBranchOnMerge,
 			},
 		},
 		Workflows: map[string]Workflow{
