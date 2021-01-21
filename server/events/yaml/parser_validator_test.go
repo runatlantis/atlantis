@@ -1056,12 +1056,13 @@ workflows:
 				Repos: []valid.Repo{
 					defaultCfg.Repos[0],
 					{
-						ID:                   "github.com/owner/repo",
-						ApplyRequirements:    []string{"approved", "mergeable"},
-						PreWorkflowHooks:     preWorkflowHooks,
-						Workflow:             &customWorkflow1,
-						AllowedOverrides:     []string{"apply_requirements", "workflow"},
-						AllowCustomWorkflows: Bool(true),
+						ID:                        "github.com/owner/repo",
+						ApplyRequirements:         []string{"approved", "mergeable"},
+						PreWorkflowHooks:          preWorkflowHooks,
+						Workflow:                  &customWorkflow1,
+						AllowedOverrides:          []string{"apply_requirements", "workflow"},
+						AllowCustomWorkflows:      Bool(true),
+						DeleteSourceBranchOnMerge: Bool(false),
 					},
 					{
 						IDRegex:          regexp.MustCompile(".*"),
@@ -1142,9 +1143,10 @@ workflows:
 								},
 							},
 						},
-						AllowedWorkflows:     []string{},
-						AllowedOverrides:     []string{},
-						AllowCustomWorkflows: Bool(false),
+						AllowedWorkflows:          []string{},
+						AllowedOverrides:          []string{},
+						AllowCustomWorkflows:      Bool(false),
+						DeleteSourceBranchOnMerge: Bool(false),
 					},
 				},
 				Workflows: map[string]valid.Workflow{
