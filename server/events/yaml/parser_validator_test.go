@@ -1142,9 +1142,10 @@ workflows:
 								},
 							},
 						},
-						AllowedWorkflows:     []string{},
-						AllowedOverrides:     []string{},
-						AllowCustomWorkflows: Bool(false),
+						AllowedWorkflows:          []string{},
+						AllowedOverrides:          []string{},
+						AllowCustomWorkflows:      Bool(false),
+						DeleteSourceBranchOnMerge: Bool(false),
 					},
 				},
 				Workflows: map[string]valid.Workflow{
