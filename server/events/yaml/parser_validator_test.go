@@ -1034,9 +1034,11 @@ repos:
   pre_workflow_hooks:
     - run: custom workflow command
   workflow: custom1
-  allowed_overrides: [delete_source_branch_on_merge, apply_requirements, workflow]
+  allowed_overrides: [apply_requirements, workflow]
   allow_custom_workflows: true
+  delete_source_branch_on_merge: false
 - id: /.*/
+  delete_source_branch_on_merge: false
   pre_workflow_hooks:
     - run: custom workflow command
 workflows:
