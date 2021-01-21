@@ -1056,18 +1056,16 @@ workflows:
 				Repos: []valid.Repo{
 					defaultCfg.Repos[0],
 					{
-						ID:                        "github.com/owner/repo",
-						ApplyRequirements:         []string{"approved", "mergeable"},
-						PreWorkflowHooks:          preWorkflowHooks,
-						Workflow:                  &customWorkflow1,
-						AllowedOverrides:          []string{"apply_requirements", "workflow"},
-						AllowCustomWorkflows:      Bool(true),
-						DeleteSourceBranchOnMerge: Bool(false),
+						ID:                   "github.com/owner/repo",
+						ApplyRequirements:    []string{"approved", "mergeable"},
+						PreWorkflowHooks:     preWorkflowHooks,
+						Workflow:             &customWorkflow1,
+						AllowedOverrides:     []string{"apply_requirements", "workflow"},
+						AllowCustomWorkflows: Bool(true),
 					},
 					{
-						IDRegex:                   regexp.MustCompile(".*"),
-						PreWorkflowHooks:          preWorkflowHooks,
-						DeleteSourceBranchOnMerge: Bool(false),
+						IDRegex:          regexp.MustCompile(".*"),
+						PreWorkflowHooks: preWorkflowHooks,
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1085,9 +1083,8 @@ repos:
 				Repos: []valid.Repo{
 					defaultCfg.Repos[0],
 					{
-						IDRegex:                   regexp.MustCompile("github.com/"),
-						PreWorkflowHooks:          []*valid.PreWorkflowHook{},
-						DeleteSourceBranchOnMerge: Bool(false),
+						IDRegex:          regexp.MustCompile("github.com/"),
+						PreWorkflowHooks: []*valid.PreWorkflowHook{},
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1105,10 +1102,9 @@ repos:
 				Repos: []valid.Repo{
 					defaultCfg.Repos[0],
 					{
-						ID:                        "github.com/owner/repo",
-						PreWorkflowHooks:          []*valid.PreWorkflowHook{},
-						Workflow:                  defaultCfg.Repos[0].Workflow,
-						DeleteSourceBranchOnMerge: Bool(false),
+						ID:               "github.com/owner/repo",
+						PreWorkflowHooks: []*valid.PreWorkflowHook{},
+						Workflow:         defaultCfg.Repos[0].Workflow,
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1146,10 +1142,9 @@ workflows:
 								},
 							},
 						},
-						AllowedWorkflows:          []string{},
-						AllowedOverrides:          []string{},
-						AllowCustomWorkflows:      Bool(false),
-						DeleteSourceBranchOnMerge: Bool(false),
+						AllowedWorkflows:     []string{},
+						AllowedOverrides:     []string{},
+						AllowCustomWorkflows: Bool(false),
 					},
 				},
 				Workflows: map[string]valid.Workflow{
