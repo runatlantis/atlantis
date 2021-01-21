@@ -1034,7 +1034,7 @@ repos:
   pre_workflow_hooks:
     - run: custom workflow command
   workflow: custom1
-  allowed_overrides: [apply_requirements, workflow]
+  allowed_overrides: [delete_source_branch_on_merge, apply_requirements, workflow]
   allow_custom_workflows: true
 - id: /.*/
   pre_workflow_hooks:
@@ -1060,13 +1060,14 @@ workflows:
 						ApplyRequirements:         []string{"approved", "mergeable"},
 						PreWorkflowHooks:          preWorkflowHooks,
 						Workflow:                  &customWorkflow1,
-						AllowedOverrides:          []string{"apply_requirements", "workflow"},
+						AllowedOverrides:          []string{"delete_source_branch_on_merge, apply_requirements", "workflow"},
 						AllowCustomWorkflows:      Bool(true),
 						DeleteSourceBranchOnMerge: Bool(false),
 					},
 					{
-						IDRegex:          regexp.MustCompile(".*"),
-						PreWorkflowHooks: preWorkflowHooks,
+						IDRegex:                   regexp.MustCompile(".*"),
+						PreWorkflowHooks:          preWorkflowHooks,
+						DeleteSourceBranchOnMerge: Bool(false),
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1084,8 +1085,9 @@ repos:
 				Repos: []valid.Repo{
 					defaultCfg.Repos[0],
 					{
-						IDRegex:          regexp.MustCompile("github.com/"),
-						PreWorkflowHooks: []*valid.PreWorkflowHook{},
+						IDRegex:                   regexp.MustCompile("github.com/"),
+						PreWorkflowHooks:          []*valid.PreWorkflowHook{},
+						DeleteSourceBranchOnMerge: Bool(false),
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1103,9 +1105,10 @@ repos:
 				Repos: []valid.Repo{
 					defaultCfg.Repos[0],
 					{
-						ID:               "github.com/owner/repo",
-						PreWorkflowHooks: []*valid.PreWorkflowHook{},
-						Workflow:         defaultCfg.Repos[0].Workflow,
+						ID:                        "github.com/owner/repo",
+						PreWorkflowHooks:          []*valid.PreWorkflowHook{},
+						Workflow:                  defaultCfg.Repos[0].Workflow,
+						DeleteSourceBranchOnMerge: Bool(false),
 					},
 				},
 				Workflows: map[string]valid.Workflow{
