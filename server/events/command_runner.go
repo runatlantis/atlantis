@@ -301,6 +301,13 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		projectCmds, err = c.ProjectCommandBuilder.BuildPlanCommands(ctx, cmd)
 	case models.ApplyCommand:
 		projectCmds, err = c.ProjectCommandBuilder.BuildApplyCommands(ctx, cmd)
+		if len(projectCmds) > 0 && cmd.Empty {
+			log.Info("ignoring apply command with empty flag since at least on plan exists")
+			if err := c.VCSClient.CreateComment(baseRepo, pullNum, applyEmptyComment, models.ApplyCommand.String()); err != nil {
+				log.Err("unable to comment on pull request: %s", err)
+			}
+			return
+		}
 	default:
 		ctx.Log.Err("failed to determine desired command, neither plan nor apply")
 		return
@@ -625,3 +632,7 @@ var applyAllDisabledComment = "**Error:** Running `atlantis apply` without flags
 
 // applyDisabledComment is posted when apply commands are disabled globally and an apply command is issued.
 var applyDisabledComment = "**Error:** Running `atlantis apply` is disabled."
+
+// applyEmptyComment is posted when apply empty commands (i.e. "atlantis apply -e")
+// is issued but there are plans to apply.
+var applyEmptyComment = "**Error:** Running `atlantis apply -e` is only allowed if there is no projects to apply."
