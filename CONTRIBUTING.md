@@ -28,9 +28,39 @@ open your browser to http://localhost:8080.
     ```
 * Run Atlantis:
     ```
-    atlantis server --gh-user <your username> --gh-token <your token> --repo-whitelist <your repo> --gh-webhook-secret <your webhook secret> --log-level debug
+    atlantis server --gh-user <your username> --gh-token <your token> --repo-allowlist <your repo> --gh-webhook-secret <your webhook secret> --log-level debug
     ```
     If you get an error like `command not found: atlantis`, ensure that `$GOPATH/bin` is in your `$PATH`.
+
+## Running Atlantis With Local Changes
+Docker compose is set up to start an atlantis container and ngrok container in the same network in order to expose the atlantis instance to the internet.  In order to do this, create a file in the repository called `atlantis.env` and add the required env vars for the atlantis server configuration.
+
+e.g.
+```
+ATLANTIS_GH_APP_ID=123
+ATLANTIS_GH_APP_KEY_FILE="/.ssh/somekey.pem"
+ATLANTIS_GH_WEBHOOK_SECRET=12345
+```
+
+Note: `~/.ssh` is mounted to allow for referencing any local ssh keys
+
+Following this just run:
+
+```
+make build-service
+docker-compose up
+```
+
+### Rebuilding
+
+If the ngrok container is restarted, the url will change which is a hassle. Fortunately, when we make a code change, we can rebuild and restart the atlantis container easily without disrupting ngrok.
+
+e.g.
+
+```
+make build-service
+docker-compose up --detach --build
+```
 
 ## Running Tests Locally:
 
@@ -46,7 +76,7 @@ docker run --rm -v $(pwd):/go/src/github.com/runatlantis/atlantis -w /go/src/git
 - Create a personal access token for Atlantis. See [Create a GitHub token](https://github.com/runatlantis/atlantis/tree/master/runatlantis.io/docs/access-credentials.md#generating-an-access-token).
 - Start Atlantis in server mode using that token:
 ```
-atlantis server --gh-user <your username> --gh-token <your token> --repo-whitelist <your repo> --gh-webhook-secret <your webhook secret> --log-level debug
+atlantis server --gh-user <your username> --gh-token <your token> --repo-allowlist <your repo> --gh-webhook-secret <your webhook secret> --log-level debug
 ```
 - Download ngrok from https://ngrok.com/download. This will enable you to expose Atlantis running on your laptop to the internet so GitHub can call it.
 - When you've downloaded and extracted ngrok, run it on port `4141`:
@@ -136,4 +166,4 @@ go get github.com/petergtz/pegomock/...
     1. Fill in description by copying from the CHANGELOG just without the Downloads section
     1. Drag in binaries made with `make release`
 1. Re-run master branch build to ensure tag gets pushed to Docker hub: https://hub.docker.com/r/runatlantis/atlantis/tags/
-1. Update the default version in `Chart.yaml` in [the official Helm chart](https://github.com/helm/charts/blob/master/stable/atlantis/Chart.yaml).
+1. Update the default version in `Chart.yaml` in [the official Helm chart](https://github.com/runatlantis/helm-charts/blob/main/charts/atlantis/values.yaml).

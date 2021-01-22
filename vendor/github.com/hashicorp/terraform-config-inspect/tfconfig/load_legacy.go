@@ -1,14 +1,13 @@
 package tfconfig
 
 import (
-	"io/ioutil"
 	"strings"
 
 	legacyhcl "github.com/hashicorp/hcl"
 	legacyast "github.com/hashicorp/hcl/hcl/ast"
 )
 
-func loadModuleLegacyHCL(dir string) (*Module, Diagnostics) {
+func loadModuleLegacyHCL(fs FS, dir string) (*Module, Diagnostics) {
 	// This implementation is intentionally more quick-and-dirty than the
 	// main loader. In particular, it doesn't bother to keep careful track
 	// of multiple error messages because we always fall back on returning
@@ -16,13 +15,13 @@ func loadModuleLegacyHCL(dir string) (*Module, Diagnostics) {
 	// an error, and thus the errors here are not seen by the end-caller.
 	mod := newModule(dir)
 
-	primaryPaths, diags := dirFiles(dir)
+	primaryPaths, diags := dirFiles(fs, dir)
 	if diags.HasErrors() {
 		return mod, diagnosticsHCL(diags)
 	}
 
 	for _, filename := range primaryPaths {
-		src, err := ioutil.ReadFile(filename)
+		src, err := fs.ReadFile(filename)
 		if err != nil {
 			return mod, diagnosticsErrorf("Error reading %s: %s", filename, err)
 		}
@@ -49,12 +48,20 @@ func loadModuleLegacyHCL(dir string) (*Module, Diagnostics) {
 			}
 
 			type TerraformBlock struct {
-				RequiredVersion string `hcl:"required_version"`
+				RequiredVersion   string      `hcl:"required_version"`
+				RequiredProviders interface{} `hcl:"required_providers"`
+				Fields            []string    `hcl:",decodedFields"`
 			}
 			var block TerraformBlock
 			err = legacyhcl.DecodeObject(&block, item.Val)
 			if err != nil {
 				return nil, diagnosticsErrorf("terraform block: %s", err)
+			}
+
+			for _, field := range block.Fields {
+				if field == "RequiredProviders" {
+					return nil, diagnosticsErrorf("terraform.required_providers must not exist")
+				}
 			}
 
 			if block.RequiredVersion != "" {
@@ -102,6 +109,7 @@ func loadModuleLegacyHCL(dir string) (*Module, Diagnostics) {
 					Type:        block.Type,
 					Description: block.Description,
 					Default:     block.Default,
+					Required:    block.Default == nil,
 					Pos:         sourcePosLegacyHCL(item.Pos(), filename),
 				}
 				if _, exists := mod.Variables[name]; exists {
@@ -267,17 +275,15 @@ func loadModuleLegacyHCL(dir string) (*Module, Diagnostics) {
 				if err != nil {
 					return nil, diagnosticsErrorf("invalid provider block at %s: %s", item.Pos(), err)
 				}
-
-				if block.Version != "" {
-					mod.RequiredProviders[name] = append(mod.RequiredProviders[name], block.Version)
-				}
-
 				// Even if there wasn't an explicit version required, we still
 				// need an entry in our map to signal the unversioned dependency.
 				if _, exists := mod.RequiredProviders[name]; !exists {
-					mod.RequiredProviders[name] = []string{}
+					mod.RequiredProviders[name] = &ProviderRequirement{}
 				}
 
+				if block.Version != "" {
+					mod.RequiredProviders[name].VersionConstraints = append(mod.RequiredProviders[name].VersionConstraints, block.Version)
+				}
 			}
 		}
 	}
@@ -313,7 +319,7 @@ func unwrapLegacyHCLObjectKeysFromJSON(item *legacyast.ObjectItem, depth int) {
 			item.Val = &legacyast.ObjectType{
 				List: &legacyast.ObjectList{
 					Items: []*legacyast.ObjectItem{
-						&legacyast.ObjectItem{
+						{
 							Keys: []*legacyast.ObjectKey{key},
 							Val:  item.Val,
 						},

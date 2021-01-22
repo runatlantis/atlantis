@@ -66,22 +66,23 @@ const (
 
 // Server runs the Atlantis web server.
 type Server struct {
-	AtlantisVersion     string
-	AtlantisURL         *url.URL
-	Router              *mux.Router
-	Port                int
-	CommandRunner       *events.DefaultCommandRunner
-	Logger              *logging.SimpleLogger
-	Locker              locking.Locker
-	EventsController    *EventsController
-	GithubAppController *GithubAppController
-	LocksController     *LocksController
-	StatusController    *StatusController
-	IndexTemplate       TemplateWriter
-	LockDetailTemplate  TemplateWriter
-	SSLCertFile         string
-	SSLKeyFile          string
-	Drainer             *events.Drainer
+	AtlantisVersion               string
+	AtlantisURL                   *url.URL
+	Router                        *mux.Router
+	Port                          int
+	PreWorkflowHooksCommandRunner *events.DefaultPreWorkflowHooksCommandRunner
+	CommandRunner                 *events.DefaultCommandRunner
+	Logger                        *logging.SimpleLogger
+	Locker                        locking.Locker
+	EventsController              *EventsController
+	GithubAppController           *GithubAppController
+	LocksController               *LocksController
+	StatusController              *StatusController
+	IndexTemplate                 TemplateWriter
+	LockDetailTemplate            TemplateWriter
+	SSLCertFile                   string
+	SSLKeyFile                    string
+	Drainer                       *events.Drainer
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -134,6 +135,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 				AppID:    userConfig.GithubAppID,
 				KeyPath:  userConfig.GithubAppKey,
 				Hostname: userConfig.GithubHostname,
+				AppSlug:  userConfig.GithubAppSlug,
 			}
 			githubAppEnabled = true
 		}
@@ -177,7 +179,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if userConfig.AzureDevopsUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.AzureDevops)
 		var err error
-		azuredevopsClient, err = vcs.NewAzureDevopsClient("dev.azure.com", userConfig.AzureDevopsToken)
+		azuredevopsClient, err = vcs.NewAzureDevopsClient("dev.azure.com", userConfig.AzureDevopsUser, userConfig.AzureDevopsToken)
 		if err != nil {
 			return nil, err
 		}
@@ -252,13 +254,20 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GitlabSupportsCommonMark: gitlabClient.SupportsCommonMark(),
 		DisableApplyAll:          userConfig.DisableApplyAll,
 		DisableMarkdownFolding:   userConfig.DisableMarkdownFolding,
+		DisableApply:             userConfig.DisableApply,
+		DisableRepoLocking:       userConfig.DisableRepoLocking,
 	}
 
 	boltdb, err := db.New(userConfig.DataDir)
 	if err != nil {
 		return nil, err
 	}
-	lockingClient := locking.NewClient(boltdb)
+	var lockingClient locking.Locker
+	if userConfig.DisableRepoLocking {
+		lockingClient = locking.NewNoOpLocker()
+	} else {
+		lockingClient = locking.NewClient(boltdb)
+	}
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 
 	var workingDir events.WorkingDir = &events.FileWorkspace{
@@ -340,6 +349,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GitlabUser:      userConfig.GitlabUser,
 		BitbucketUser:   userConfig.BitbucketUser,
 		AzureDevopsUser: userConfig.AzureDevopsUser,
+		ApplyDisabled:   userConfig.DisableApply,
 	}
 	defaultTfVersion := terraformClient.DefaultVersion()
 	pendingPlanFinder := &events.DefaultPendingPlanFinder{}
@@ -352,6 +362,15 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	statusController := &StatusController{
 		Logger:  logger,
 		Drainer: drainer,
+	}
+	preWorkflowHooksCommandRunner := &events.DefaultPreWorkflowHooksCommandRunner{
+		VCSClient:             vcsClient,
+		GlobalCfg:             globalCfg,
+		Logger:                logger,
+		WorkingDirLocker:      workingDirLocker,
+		WorkingDir:            workingDir,
+		Drainer:               drainer,
+		PreWorkflowHookRunner: &runtime.PreWorkflowHookRunner{},
 	}
 	commandRunner := &events.DefaultCommandRunner{
 		VCSClient:                vcsClient,
@@ -369,15 +388,19 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		SilenceForkPRErrorsFlag:  config.SilenceForkPRErrorsFlag,
 		SilenceVCSStatusNoPlans:  userConfig.SilenceVCSStatusNoPlans,
 		DisableApplyAll:          userConfig.DisableApplyAll,
+		DisableApply:             userConfig.DisableApply,
+		DisableAutoplan:          userConfig.DisableAutoplan,
+		ParallelPoolSize:         userConfig.ParallelPoolSize,
 		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
-			ParserValidator:   validator,
-			ProjectFinder:     &events.DefaultProjectFinder{},
-			VCSClient:         vcsClient,
-			WorkingDir:        workingDir,
-			WorkingDirLocker:  workingDirLocker,
-			GlobalCfg:         globalCfg,
-			PendingPlanFinder: pendingPlanFinder,
-			CommentBuilder:    commentParser,
+			ParserValidator:    validator,
+			ProjectFinder:      &events.DefaultProjectFinder{},
+			VCSClient:          vcsClient,
+			WorkingDir:         workingDir,
+			WorkingDirLocker:   workingDirLocker,
+			GlobalCfg:          globalCfg,
+			PendingPlanFinder:  pendingPlanFinder,
+			CommentBuilder:     commentParser,
+			SkipCloneNoChanges: userConfig.SkipCloneNoChanges,
 		},
 		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
 			Locker:           projectLocker,
@@ -413,7 +436,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GlobalAutomerge:   userConfig.Automerge,
 		Drainer:           drainer,
 	}
-	repoWhitelist, err := events.NewRepoWhitelistChecker(userConfig.RepoWhitelist)
+	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
 	if err != nil {
 		return nil, err
 	}
@@ -430,17 +453,19 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DeleteLockCommand:  deleteLockCommand,
 	}
 	eventsController := &EventsController{
+		PreWorkflowHooksCommandRunner:   preWorkflowHooksCommandRunner,
 		CommandRunner:                   commandRunner,
 		PullCleaner:                     pullClosedExecutor,
 		Parser:                          eventParser,
 		CommentParser:                   commentParser,
 		Logger:                          logger,
+		ApplyDisabled:                   userConfig.DisableApply,
 		GithubWebhookSecret:             []byte(userConfig.GithubWebhookSecret),
 		GithubRequestValidator:          &DefaultGithubRequestValidator{},
 		GitlabRequestParserValidator:    &DefaultGitlabRequestParserValidator{},
 		GitlabWebhookSecret:             []byte(userConfig.GitlabWebhookSecret),
-		RepoWhitelistChecker:            repoWhitelist,
-		SilenceWhitelistErrors:          userConfig.SilenceWhitelistErrors,
+		RepoAllowlistChecker:            repoAllowlist,
+		SilenceAllowlistErrors:          userConfig.SilenceAllowlistErrors,
 		SupportedVCSHosts:               supportedVCSHosts,
 		VCSClient:                       vcsClient,
 		BitbucketWebhookSecret:          []byte(userConfig.BitbucketWebhookSecret),
@@ -457,22 +482,23 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	return &Server{
-		AtlantisVersion:     config.AtlantisVersion,
-		AtlantisURL:         parsedURL,
-		Router:              underlyingRouter,
-		Port:                userConfig.Port,
-		CommandRunner:       commandRunner,
-		Logger:              logger,
-		Locker:              lockingClient,
-		EventsController:    eventsController,
-		GithubAppController: githubAppController,
-		LocksController:     locksController,
-		StatusController:    statusController,
-		IndexTemplate:       indexTemplate,
-		LockDetailTemplate:  lockTemplate,
-		SSLKeyFile:          userConfig.SSLKeyFile,
-		SSLCertFile:         userConfig.SSLCertFile,
-		Drainer:             drainer,
+		AtlantisVersion:               config.AtlantisVersion,
+		AtlantisURL:                   parsedURL,
+		Router:                        underlyingRouter,
+		Port:                          userConfig.Port,
+		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
+		CommandRunner:                 commandRunner,
+		Logger:                        logger,
+		Locker:                        lockingClient,
+		EventsController:              eventsController,
+		GithubAppController:           githubAppController,
+		LocksController:               locksController,
+		StatusController:              statusController,
+		IndexTemplate:                 indexTemplate,
+		LockDetailTemplate:            lockTemplate,
+		SSLKeyFile:                    userConfig.SSLKeyFile,
+		SSLCertFile:                   userConfig.SSLCertFile,
+		Drainer:                       drainer,
 	}, nil
 }
 

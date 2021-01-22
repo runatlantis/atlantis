@@ -21,6 +21,8 @@ const (
 	DefaultBaseURL string = "https://dev.azure.com/"
 	// DefaultVsspsBaseURL is the default URI base for some Azure Devops REST API endpoints
 	DefaultVsspsBaseURL string = "https://vssps.dev.azure.com/"
+	// DefaultVsaexBaseURL is the default URI base for some Azure Devops REST API endpoints
+	DefaultVsaexBaseURL string = "https://vsaex.dev.azure.com/"
 	// userAgent our HTTP client's user-agent
 	userAgent string = "go-azuredevops"
 )
@@ -33,6 +35,8 @@ type Client struct {
 	BaseURL url.URL
 
 	VsspsBaseURL url.URL
+
+	VsaexBaseURL url.URL
 
 	UserAgent string
 
@@ -52,6 +56,7 @@ type Client struct {
 	Teams             *TeamsService
 	Tests             *TestsService
 	Users             *UsersService
+	UserEntitlements  *UserEntitlementsService
 	WorkItems         *WorkItemsService
 }
 
@@ -65,12 +70,15 @@ func NewClient(httpClient *http.Client) (*Client, error) {
 	}
 
 	c := &Client{}
+
 	baseURL, _ := url.Parse(DefaultBaseURL)
 	vsspsBaseURL, _ := url.Parse(DefaultVsspsBaseURL)
+	vsaexBaseURL, _ := url.Parse(DefaultVsaexBaseURL)
 
 	c.client = httpClient
 	c.BaseURL = *baseURL
 	c.VsspsBaseURL = *vsspsBaseURL
+	c.VsaexBaseURL = *vsaexBaseURL
 	c.UserAgent = userAgent
 
 	c.Boards = &BoardsService{client: c}
@@ -85,6 +93,7 @@ func NewClient(httpClient *http.Client) (*Client, error) {
 	c.Teams = &TeamsService{client: c}
 	c.Tests = &TestsService{client: c}
 	c.Users = &UsersService{client: c}
+	c.UserEntitlements = &UserEntitlementsService{client: c}
 	c.WorkItems = &WorkItemsService{client: c}
 
 	return c, nil

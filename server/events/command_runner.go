@@ -76,11 +76,16 @@ type DefaultCommandRunner struct {
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
 	CommitStatusUpdater      CommitStatusUpdater
 	DisableApplyAll          bool
+	DisableApply             bool
+	DisableAutoplan          bool
 	EventParser              EventParsing
 	MarkdownRenderer         *MarkdownRenderer
 	Logger                   logging.SimpleLogging
 	// AllowForkPRs controls whether we operate on pull requests from forks.
 	AllowForkPRs bool
+	// ParallelPoolSize controls the size of the wait group used to run
+	// parallel plans and applies (if enabled).
+	ParallelPoolSize int
 	// AllowForkPRsFlag is the name of the flag that controls fork PR's. We use
 	// this in our error message back to the user on a forked PR so they know
 	// how to enable this functionality.
@@ -111,7 +116,7 @@ type DefaultCommandRunner struct {
 // RunAutoplanCommand runs plan when a pull request is opened or updated.
 func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) {
 	if opStarted := c.Drainer.StartOp(); !opStarted {
-		if commentErr := c.VCSClient.CreateComment(baseRepo, pull.Num, ShutdownComment); commentErr != nil {
+		if commentErr := c.VCSClient.CreateComment(baseRepo, pull.Num, ShutdownComment, models.PlanCommand.String()); commentErr != nil {
 			c.Logger.Log(logging.Error, "unable to comment that Atlantis is shutting down: %s", commentErr)
 		}
 		return
@@ -125,15 +130,17 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		Log:      log,
 		Pull:     pull,
 		HeadRepo: headRepo,
-		BaseRepo: baseRepo,
 	}
 	if !c.validateCtxAndComment(ctx) {
+		return
+	}
+	if c.DisableAutoplan {
 		return
 	}
 
 	projectCmds, err := c.ProjectCommandBuilder.BuildAutoplanCommands(ctx)
 	if err != nil {
-		if statusErr := c.CommitStatusUpdater.UpdateCombined(ctx.BaseRepo, ctx.Pull, models.FailedCommitStatus, models.PlanCommand); statusErr != nil {
+		if statusErr := c.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, models.PlanCommand); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
 
@@ -155,7 +162,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	}
 
 	// At this point we are sure Atlantis has work to do, so set commit status to pending
-	if err := c.CommitStatusUpdater.UpdateCombined(ctx.BaseRepo, ctx.Pull, models.PendingCommitStatus, models.PlanCommand); err != nil {
+	if err := c.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, models.PlanCommand); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
@@ -189,7 +196,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 // wasteful) call to get the necessary data.
 func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *CommentCommand) {
 	if opStarted := c.Drainer.StartOp(); !opStarted {
-		if commentErr := c.VCSClient.CreateComment(baseRepo, pullNum, ShutdownComment); commentErr != nil {
+		if commentErr := c.VCSClient.CreateComment(baseRepo, pullNum, ShutdownComment, ""); commentErr != nil {
 			c.Logger.Log(logging.Error, "unable to comment that Atlantis is shutting down: %s", commentErr)
 		}
 		return
@@ -199,9 +206,17 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	log := c.buildLogger(baseRepo.FullName, pullNum)
 	defer c.logPanics(baseRepo, pullNum, log)
 
+	if c.DisableApply && cmd.Name == models.ApplyCommand {
+		log.Info("ignoring apply command since apply disabled globally")
+		if err := c.VCSClient.CreateComment(baseRepo, pullNum, applyDisabledComment, models.ApplyCommand.String()); err != nil {
+			log.Err("unable to comment on pull request: %s", err)
+		}
+		return
+	}
+
 	if c.DisableApplyAll && cmd.Name == models.ApplyCommand && !cmd.IsForSpecificProject() {
 		log.Info("ignoring apply command without flags since apply all is disabled")
-		if err := c.VCSClient.CreateComment(baseRepo, pullNum, applyAllDisabledComment); err != nil {
+		if err := c.VCSClient.CreateComment(baseRepo, pullNum, applyAllDisabledComment, models.ApplyCommand.String()); err != nil {
 			log.Err("unable to comment on pull request: %s", err)
 		}
 		return
@@ -232,7 +247,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	}
 	if err != nil {
 		log.Err(err.Error())
-		if commentErr := c.VCSClient.CreateComment(baseRepo, pullNum, fmt.Sprintf("`Error: %s`", err)); commentErr != nil {
+		if commentErr := c.VCSClient.CreateComment(baseRepo, pullNum, fmt.Sprintf("`Error: %s`", err), ""); commentErr != nil {
 			log.Err("unable to comment: %s", commentErr)
 		}
 		return
@@ -242,7 +257,6 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		Log:      log,
 		Pull:     pull,
 		HeadRepo: headRepo,
-		BaseRepo: baseRepo,
 	}
 	if !c.validateCtxAndComment(ctx) {
 		return
@@ -255,7 +269,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 			vcsMessage = "Failed to delete PR locks"
 			log.Err("failed to delete locks by pull %s", err.Error())
 		}
-		if commentErr := c.VCSClient.CreateComment(baseRepo, pullNum, vcsMessage); commentErr != nil {
+		if commentErr := c.VCSClient.CreateComment(baseRepo, pullNum, vcsMessage, models.UnlockCommand.String()); commentErr != nil {
 			log.Err("unable to comment: %s", commentErr)
 		}
 		return
@@ -292,7 +306,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 	if err != nil {
-		if statusErr := c.CommitStatusUpdater.UpdateCombined(ctx.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
+		if statusErr := c.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
 		c.updatePull(ctx, cmd, CommandResult{Error: err})
@@ -362,7 +376,7 @@ func (c *DefaultCommandRunner) updateCommitStatus(ctx *CommandContext, cmd model
 		}
 	}
 
-	if err := c.CommitStatusUpdater.UpdateCombinedCount(ctx.BaseRepo, ctx.Pull, status, cmd, numSuccess, len(pullStatus.Projects)); err != nil {
+	if err := c.CommitStatusUpdater.UpdateCombinedCount(ctx.Pull.BaseRepo, ctx.Pull, status, cmd, numSuccess, len(pullStatus.Projects)); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 }
@@ -377,7 +391,7 @@ func (c *DefaultCommandRunner) automerge(ctx *CommandContext, pullStatus models.
 	}
 
 	// Comment that we're automerging the pull request.
-	if err := c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, automergeComment); err != nil {
+	if err := c.VCSClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, automergeComment, models.ApplyCommand.String()); err != nil {
 		ctx.Log.Err("failed to comment about automerge: %s", err)
 		// Commenting isn't required so continue.
 	}
@@ -390,7 +404,7 @@ func (c *DefaultCommandRunner) automerge(ctx *CommandContext, pullStatus models.
 		ctx.Log.Err("automerging failed: %s", err)
 
 		failureComment := fmt.Sprintf("Automerging failed:\n```\n%s\n```", err)
-		if commentErr := c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, failureComment); commentErr != nil {
+		if commentErr := c.VCSClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, failureComment, models.ApplyCommand.String()); commentErr != nil {
 			ctx.Log.Err("failed to comment about automerge failing: %s", err)
 		}
 	}
@@ -400,7 +414,7 @@ func (c *DefaultCommandRunner) runProjectCmdsParallel(cmds []models.ProjectComma
 	var results []models.ProjectResult
 	mux := &sync.Mutex{}
 
-	wg := sizedwaitgroup.New(15)
+	wg := sizedwaitgroup.New(c.ParallelPoolSize)
 	for _, pCmd := range cmds {
 		pCmd := pCmd
 		var execute func()
@@ -494,12 +508,12 @@ func (c *DefaultCommandRunner) buildLogger(repoFullName string, pullNum int) *lo
 }
 
 func (c *DefaultCommandRunner) validateCtxAndComment(ctx *CommandContext) bool {
-	if !c.AllowForkPRs && ctx.HeadRepo.Owner != ctx.BaseRepo.Owner {
+	if !c.AllowForkPRs && ctx.HeadRepo.Owner != ctx.Pull.BaseRepo.Owner {
 		if c.SilenceForkPRErrors {
 			return false
 		}
 		ctx.Log.Info("command was run on a fork pull request which is disallowed")
-		if err := c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, fmt.Sprintf("Atlantis commands can't be run on fork pull requests. To enable, set --%s  or, to disable this message, set --%s", c.AllowForkPRsFlag, c.SilenceForkPRErrorsFlag)); err != nil {
+		if err := c.VCSClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, fmt.Sprintf("Atlantis commands can't be run on fork pull requests. To enable, set --%s  or, to disable this message, set --%s", c.AllowForkPRsFlag, c.SilenceForkPRErrorsFlag), ""); err != nil {
 			ctx.Log.Err("unable to comment: %s", err)
 		}
 		return false
@@ -507,7 +521,7 @@ func (c *DefaultCommandRunner) validateCtxAndComment(ctx *CommandContext) bool {
 
 	if ctx.Pull.State != models.OpenPullState {
 		ctx.Log.Info("command was run on closed pull request")
-		if err := c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, "Atlantis commands can't be run on closed pull requests"); err != nil {
+		if err := c.VCSClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, "Atlantis commands can't be run on closed pull requests", ""); err != nil {
 			ctx.Log.Err("unable to comment: %s", err)
 		}
 		return false
@@ -527,13 +541,13 @@ func (c *DefaultCommandRunner) updatePull(ctx *CommandContext, command PullComma
 	// clutter in a pull/merge request. This will not delete the comment, since the
 	// comment trail may be useful in auditing or backtracing problems.
 	if c.HidePrevPlanComments {
-		if err := c.VCSClient.HidePrevPlanComments(ctx.BaseRepo, ctx.Pull.Num); err != nil {
+		if err := c.VCSClient.HidePrevPlanComments(ctx.Pull.BaseRepo, ctx.Pull.Num); err != nil {
 			ctx.Log.Err("unable to hide old comments: %s", err)
 		}
 	}
 
-	comment := c.MarkdownRenderer.Render(res, command.CommandName(), ctx.Log.History.String(), command.IsVerbose(), ctx.BaseRepo.VCSHost.Type)
-	if err := c.VCSClient.CreateComment(ctx.BaseRepo, ctx.Pull.Num, comment); err != nil {
+	comment := c.MarkdownRenderer.Render(res, command.CommandName(), ctx.Log.History.String(), command.IsVerbose(), ctx.Pull.BaseRepo.VCSHost.Type)
+	if err := c.VCSClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, comment, command.CommandName().String()); err != nil {
 		ctx.Log.Err("unable to comment: %s", err)
 	}
 }
@@ -547,6 +561,7 @@ func (c *DefaultCommandRunner) logPanics(baseRepo models.Repo, pullNum int, logg
 			baseRepo,
 			pullNum,
 			fmt.Sprintf("**Error: goroutine panic. This is a bug.**\n```\n%s\n%s```", err, stack),
+			"",
 		); commentErr != nil {
 			logger.Err("unable to comment: %s", commentErr)
 		}
@@ -555,7 +570,7 @@ func (c *DefaultCommandRunner) logPanics(baseRepo models.Repo, pullNum int, logg
 
 // deletePlans deletes all plans generated in this ctx.
 func (c *DefaultCommandRunner) deletePlans(ctx *CommandContext) {
-	pullDir, err := c.WorkingDir.GetPullDir(ctx.BaseRepo, ctx.Pull)
+	pullDir, err := c.WorkingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
 	if err != nil {
 		ctx.Log.Err("getting pull dir: %s", err)
 	}
@@ -606,3 +621,6 @@ var automergeComment = `Automatically merging because all plans have been succes
 // are disabled and an apply all command is issued.
 var applyAllDisabledComment = "**Error:** Running `atlantis apply` without flags is disabled." +
 	" You must specify which project to apply via the `-d <dir>`, `-w <workspace>` or `-p <project name>` flags."
+
+// applyDisabledComment is posted when apply commands are disabled globally and an apply command is issued.
+var applyDisabledComment = "**Error:** Running `atlantis apply` is disabled."

@@ -21,7 +21,7 @@ type GithubAppWorkingDir struct {
 }
 
 // Clone writes a fresh token for Github App authentication
-func (g *GithubAppWorkingDir) Clone(log *logging.SimpleLogger, baseRepo models.Repo, headRepo models.Repo, p models.PullRequest, workspace string) (string, bool, error) {
+func (g *GithubAppWorkingDir) Clone(log *logging.SimpleLogger, headRepo models.Repo, p models.PullRequest, workspace string) (string, bool, error) {
 
 	log.Info("Refreshing git tokens for Github App")
 
@@ -40,8 +40,16 @@ func (g *GithubAppWorkingDir) Clone(log *logging.SimpleLogger, baseRepo models.R
 		return "", false, err
 	}
 
+	baseRepo := &p.BaseRepo
+
+	// Realistically, this is a super brittle way of supporting clones using gh app installation tokens
+	// This URL should be built during Repo creation and the struct should be immutable going forward.
+	// Doing this requires a larger refactor however, and can probably be coupled with supporting > 1 installation
 	authURL := fmt.Sprintf("://x-access-token:%s", token)
 	baseRepo.CloneURL = strings.Replace(baseRepo.CloneURL, "://:", authURL, 1)
+	baseRepo.SanitizedCloneURL = strings.Replace(baseRepo.SanitizedCloneURL, "://:", "://x-access-token:", 1)
 	headRepo.CloneURL = strings.Replace(headRepo.CloneURL, "://:", authURL, 1)
-	return g.WorkingDir.Clone(log, baseRepo, headRepo, p, workspace)
+	headRepo.SanitizedCloneURL = strings.Replace(baseRepo.SanitizedCloneURL, "://:", "://x-access-token:", 1)
+
+	return g.WorkingDir.Clone(log, headRepo, p, workspace)
 }

@@ -1,5 +1,5 @@
 # The runatlantis/atlantis-base is created by docker-base/Dockerfile.
-FROM runatlantis/atlantis-base:v3.3
+FROM runatlantis/atlantis-base:v3.5
 LABEL authors="Anubhav Mishra, Luke Kysow"
 
 # install terraform binaries
@@ -17,6 +17,9 @@ RUN curl -o aws-iam-authenticator https://amazon-eks.s3.us-west-2.amazonaws.com/
 
 # In the official Atlantis image we only have the latest of each Terraform version.
 RUN AVAILABLE_TERRAFORM_VERSIONS="0.11.14 0.12.18 ${DEFAULT_TERRAFORM_VERSION}" && \
+
+# In the official Atlantis image we only have the latest of each Terraform version.
+RUN AVAILABLE_TERRAFORM_VERSIONS="0.8.8 0.9.11 0.10.8 0.11.14 0.12.30 0.13.6 ${DEFAULT_TERRAFORM_VERSION}" && \
     for VERSION in ${AVAILABLE_TERRAFORM_VERSIONS}; do \
         curl -LOs https://releases.hashicorp.com/terraform/${VERSION}/terraform_${VERSION}_linux_amd64.zip && \
         curl -LOs https://releases.hashicorp.com/terraform/${VERSION}/terraform_${VERSION}_SHA256SUMS && \

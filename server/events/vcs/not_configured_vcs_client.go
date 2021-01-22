@@ -29,7 +29,7 @@ type NotConfiguredVCSClient struct {
 func (a *NotConfiguredVCSClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	return nil, a.err()
 }
-func (a *NotConfiguredVCSClient) CreateComment(repo models.Repo, pullNum int, comment string) error {
+func (a *NotConfiguredVCSClient) CreateComment(repo models.Repo, pullNum int, comment string, command string) error {
 	return a.err()
 }
 func (a *NotConfiguredVCSClient) HidePrevPlanComments(repo models.Repo, pullNum int) error {
@@ -52,4 +52,12 @@ func (a *NotConfiguredVCSClient) MarkdownPullLink(pull models.PullRequest) (stri
 }
 func (a *NotConfiguredVCSClient) err() error {
 	return fmt.Errorf("atlantis was not configured to support repos from %s", a.Host.String())
+}
+
+func (a *NotConfiguredVCSClient) SupportsSingleFileDownload(repo models.Repo) bool {
+	return false
+}
+
+func (a *NotConfiguredVCSClient) DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error) {
+	return true, []byte{}, a.err()
 }

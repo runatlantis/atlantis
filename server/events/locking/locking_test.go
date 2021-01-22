@@ -144,3 +144,40 @@ func TestGetLock(t *testing.T) {
 	Ok(t, err)
 	Equals(t, &pl, lock)
 }
+
+func TestTryLock_NoOpLocker(t *testing.T) {
+	RegisterMockTestingT(t)
+	currLock := models.ProjectLock{}
+	l := locking.NewNoOpLocker()
+	r, err := l.TryLock(project, workspace, pull, user)
+	Ok(t, err)
+	Equals(t, locking.TryLockResponse{LockAcquired: true, CurrLock: currLock, LockKey: "owner/repo/path/workspace"}, r)
+}
+
+func TestUnlock_NoOpLocker(t *testing.T) {
+	l := locking.NewNoOpLocker()
+	lock, err := l.Unlock("owner/repo/path/workspace")
+	Ok(t, err)
+	Equals(t, &models.ProjectLock{}, lock)
+}
+
+func TestList_NoOpLocker(t *testing.T) {
+	l := locking.NewNoOpLocker()
+	list, err := l.List()
+	Ok(t, err)
+	Equals(t, map[string]models.ProjectLock{}, list)
+}
+
+func TestUnlockByPull_NoOpLocker(t *testing.T) {
+	l := locking.NewNoOpLocker()
+	_, err := l.UnlockByPull("owner/repo", 1)
+	Ok(t, err)
+}
+
+func TestGetLock_NoOpLocker(t *testing.T) {
+	l := locking.NewNoOpLocker()
+	lock, err := l.GetLock("owner/repo/path/workspace")
+	Ok(t, err)
+	var expected *models.ProjectLock = nil
+	Equals(t, expected, lock)
+}

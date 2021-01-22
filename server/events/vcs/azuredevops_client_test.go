@@ -64,6 +64,21 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 		PullRequestID: azuredevops.Int(22),
 	}
 
+	userIDResponse := `{
+		"members": [
+			{
+				"id": "6416203b-98bb-4910-8f8a-b12aa19a399f"
+			}
+		],
+		"continuationToken": null,
+		"totalCount": 0,
+		"items": [
+			{
+				"id": "6416203b-98bb-4910-8f8a-b12aa19a399f"
+			}
+		]
+	}`
+
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			testServer := httptest.NewTLSServer(
@@ -73,6 +88,9 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 					case "/owner/project/_apis/git/repositories/repo/pullrequests/22?api-version=5.1-preview.1":
 						w.WriteHeader(c.code)
 						w.Write([]byte(c.response)) // nolint: errcheck
+					case "/owner/_apis/userentitlements?$filter=name+eq+'user'&$api-version=6.0-preview.3":
+						w.WriteHeader(c.code)
+						w.Write([]byte(userIDResponse)) // nolint: errcheck
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
 						http.Error(w, "not found", http.StatusNotFound)
@@ -81,7 +99,8 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
+			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
+			client.Client.VsaexBaseURL = *testServerURL
 			Ok(t, err)
 			defer disableSSLVerification()()
 
@@ -192,7 +211,7 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
+			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
 			Ok(t, err)
 			defer disableSSLVerification()()
 
@@ -255,7 +274,7 @@ func TestAzureDevopsClient_GetModifiedFiles(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
+	client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
 	Ok(t, err)
 	defer disableSSLVerification()()
 
@@ -277,28 +296,65 @@ func TestAzureDevopsClient_GetModifiedFiles(t *testing.T) {
 }
 
 func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
+	type Policy struct {
+		genre  string
+		name   string
+		status string
+	}
 	cases := []struct {
 		testName     string
 		mergeStatus  string
-		policyStatus string
+		policy       Policy
 		expMergeable bool
 	}{
 		{
 			"merge conflicts",
 			azuredevops.MergeConflicts.String(),
-			"approved",
+			Policy{
+				"Not Atlantis",
+				"foo",
+				"approved",
+			},
 			false,
 		},
 		{
 			"rejected policy status",
 			azuredevops.MergeSucceeded.String(),
-			"rejected",
+			Policy{
+				"Not Atlantis",
+				"foo",
+				"rejected",
+			},
 			false,
 		},
 		{
 			"merge succeeded",
 			azuredevops.MergeSucceeded.String(),
-			"approved",
+			Policy{
+				"Not Atlantis",
+				"foo",
+				"approved",
+			},
+			true,
+		},
+		{
+			"pending policy status",
+			azuredevops.MergeSucceeded.String(),
+			Policy{
+				"Not Atlantis",
+				"foo",
+				"pending",
+			},
+			false,
+		},
+		{
+			"atlantis apply status rejected",
+			azuredevops.MergeSucceeded.String(),
+			Policy{
+				"Atlantis Bot/atlantis",
+				"apply",
+				"rejected",
+			},
 			true,
 		},
 	}
@@ -315,7 +371,9 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.testName, func(t *testing.T) {
 			pullRequestResponse := strings.Replace(pullRequestBody, `"mergeStatus": "notSet"`, fmt.Sprintf(`"mergeStatus": "%s"`, c.mergeStatus), 1)
-			policyEvaluationsResponse := strings.Replace(policyEvaluationsBody, `"status": "approved"`, fmt.Sprintf(`"status": "%s"`, c.policyStatus), 1)
+			policyEvaluationsResponse := strings.Replace(policyEvaluationsBody, `"status": "approved"`, fmt.Sprintf(`"status": "%s"`, c.policy.status), 1)
+			policyEvaluationsResponse = strings.Replace(policyEvaluationsResponse, `"statusGenre": "Atlantis Bot/atlantis"`, fmt.Sprintf(`"statusGenre": "%s"`, c.policy.genre), 1)
+			policyEvaluationsResponse = strings.Replace(policyEvaluationsResponse, `"statusName": "plan"`, fmt.Sprintf(`"statusName": "%s"`, c.policy.name), 1)
 
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -336,7 +394,7 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
 
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
+			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
 			Ok(t, err)
 
 			defer disableSSLVerification()()
@@ -430,7 +488,7 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
 
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
+			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
 			Ok(t, err)
 
 			defer disableSSLVerification()()
@@ -475,7 +533,7 @@ func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 			}))
 		testServerURL, err := url.Parse(testServer.URL)
 		Ok(t, err)
-		client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "token")
+		client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
 		Ok(t, err)
 		defer disableSSLVerification()()
 
@@ -495,7 +553,7 @@ func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 }
 
 func TestAzureDevopsClient_MarkdownPullLink(t *testing.T) {
-	client, err := vcs.NewAzureDevopsClient("hostname", "token")
+	client, err := vcs.NewAzureDevopsClient("hostname", "user", "token")
 	Ok(t, err)
 	pull := models.PullRequest{Num: 1}
 	s, _ := client.MarkdownPullLink(pull)
@@ -524,4 +582,40 @@ var adMergeSuccess = `{
 					"transitionWorkItems":true,
 					"triggeredByAutoComplete":false
 	}
-}`
+}
+`
+
+func TestAzureDevopsClient_GitStatusContextFromSrc(t *testing.T) {
+	cases := []struct {
+		src      string
+		expGenre string
+		expName  string
+	}{
+		{
+			"atlantis/plan",
+			"Atlantis Bot/atlantis",
+			"plan",
+		},
+		{
+			"atlantis/foo/bar/biz/baz",
+			"Atlantis Bot/atlantis/foo/bar/biz",
+			"baz",
+		},
+		{
+			"foo",
+			"Atlantis Bot",
+			"foo",
+		},
+		{
+			"",
+			"Atlantis Bot",
+			"",
+		},
+	}
+
+	for _, c := range cases {
+		result := vcs.GitStatusContextFromSrc(c.src)
+		Equals(t, &c.expName, result.Name)
+		Equals(t, &c.expGenre, result.Genre)
+	}
+}

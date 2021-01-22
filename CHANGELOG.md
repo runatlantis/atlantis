@@ -1,3 +1,149 @@
+# v0.16.0
+
+## Description
+Feature release with some new flags and bugfixes.
+
+This release is thanks to our new Atlantis maintainer team:
+* [@chenrui333](https://github.com/chenrui333)
+* [@nishkrishnan](https://github.com/nishkrishnan)
+* [@acastle](https://github.com/acastle)
+* [@unRob](https://github.com/unRob)
+* [@jamengual](https://github.com/jamengual)
+
+## Features
+* Allow configuring number of concurrent plans/applies via new `-parallel-pool-size` flag ([#1177](https://github.com/runatlantis/atlantis/pull/1177) by @dmattia)
+* Add new flag `-disable-apply` that will disable the ability to run all applies ([#1230](https://github.com/runatlantis/atlantis/pull/1230) by @gezb)
+* This release will release with an arm64 binary ([#1291](https://github.com/runatlantis/atlantis/pull/1291) by @pgroudas)
+* Add `pre_workflow_hooks` steps to allow for running custom scripts before workflow execution ([#1255](https://github.com/runatlantis/atlantis/pull/1255) by @msarvar)
+* Update default Terraform version to 0.14.3
+
+## Bugfixes
+* Fix bug checking for up to date branches when using GitHub App installation and `-checkout-strategy=merge` (Fixes [#1236](https://github.com/runatlantis/atlantis/issues/1236) by @nishkrishnan)
+* Fix version detection for versions with prereleases when running Terraform >= 0.12.0 (Fixes [#1276](https://github.com/runatlantis/atlantis/issues/1276) by @acastle)
+* Fix bug detecting Terraform files ([#1253](https://github.com/runatlantis/atlantis/pull/1253) by @surminus)
+
+## Backwards Incompatibilities / Notes:
+* If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
+  then the default version of Terraform will now be 0.14.3. Simply set the above
+  flag to your desired default version to avoid any issues.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.16.0/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.16.0/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.16.0/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.16.0/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.16.0`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.15.1..v0.16.0
+https://github.com/runatlantis/atlantis/compare/v0.15.1...v0.16.0
+
+# v0.15.1
+
+## Description
+Bugfix release.
+
+## Bugfixes
+* Fix `required_version` detection not working for Terraform 0.13.0 ([#1153](https://github.com/runatlantis/atlantis/issues/1153) by @joerx)
+* Fix editing comments on draft PRs causing plan to re-run ([#1194](https://github.com/runatlantis/atlantis/issues/1194))
+* Fix Azure DevOps apply status checks not working ([#1172](https://github.com/runatlantis/atlantis/issues/1172) by @acastle)
+* Fix checkout-strategy=merge not working when using the GitHub app installation ([#1193](https://github.com/runatlantis/atlantis/issues/1193) by @nishkrishnan)
+
+## Backwards Incompatibilities / Notes:
+* If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
+  then the default version of Terraform will now be 0.13.4. Simply set the above
+  flag to your desired default version to avoid any issues.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.15.1/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.15.1/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.15.1/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.15.1/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.15.1`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.15.0..v0.15.1
+https://github.com/runatlantis/atlantis/compare/v0.15.0...v0.15.1
+
+# v0.15.0
+
+## Description
+Relatively small release with some bugfixes and a couple of features. Also sets
+default Terraform version to 0.13.0.
+
+## Features
+* Bump default Terraform version to 0.13.0
+* Retry GitHub calls to prevent 404 issues ([#1019](https://github.com/runatlantis/atlantis/issues/1019))
+* Update GitLab library to handle rate limiting issues ([#1142](https://github.com/runatlantis/atlantis/issues/1142) by @LAKostis)
+* Alpine version n Docker image is now 3.12 (up from 3.11) ([#1136](https://github.com/runatlantis/atlantis/pull/1136) by @lazzurs)
+* Add new flag `--skip-clone-no-changes` that will skip cloning the repo during autoplan if there are no changes to Terraform projects.
+  This will only apply for GitHub and GitLab and only for repos that have `atlantis.yaml` files. ([#1158](https://github.com/runatlantis/atlantis/pull/1158) by @cucxabong)
+* Add new flag `--disable-autoplan` that will globally disable autoplanning. ([#1159](https://github.com/runatlantis/atlantis/pull/1159) by @ValdirGuerra)
+
+## Bugfixes
+* Fix `--hide-prev-plan-comments` bug ([#1009](https://github.com/runatlantis/atlantis/issues/1009) by @goodspark)
+* Fix comment splitting bug ([#1109](https://github.com/runatlantis/atlantis/pull/1109) by @crainte)
+* Fix Azure DevOps bug when cloning a repo with spaces in its name ([#1079](https://github.com/runatlantis/atlantis/issues/1079) by @mcdafydd)
+
+## Backwards Incompatibilities / Notes:
+* If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
+  then the default version of Terraform will now be 0.13.0. Simply set the above
+  flag to your desired default version to avoid any issues.
+* `--repo-whitelist` is now deprecated in favour of `--repo-allowlist`. The previous
+  flag will still work.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.15.0/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.15.0/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.15.0/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.15.0/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.15.0`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.14.0..v0.15.0
+https://github.com/runatlantis/atlantis/compare/v0.14.0...v0.15.0
+
+# v0.14.0
+
+## Description
+This release brings a big new feature: the ability to install Atlantis as a GitHub App! Thanks to [@unRob](https://github.com/unRob) for this amazing feature.
+
+## Features
+* Support installation via a GitHub App. See https://www.runatlantis.io/docs/access-credentials.html#github-app for instructions. ([#1088](https://github.com/runatlantis/atlantis/pull/1088) by @unRob)
+* Add new `atlantis unlock` command that can be run on pull requests to discard all plans and unlock all projects associated with that PR. ([#1091](https://github.com/runatlantis/atlantis/pull/1091) by @parmouraly)
+* Add debug-level logging for GitHub calls ([#1042](https://github.com/runatlantis/atlantis/pull/1042) by @cket)
+* The repo-relative directory is now available in custom workflows via the environment variable `REPO_REL_DIR` ([#1063](https://github.com/runatlantis/atlantis/pull/1063) by @llamahunter)
+* Upgrade the default Terraform version to 0.12.27.
+* Update jQuery to 1.5.1 to fix a security issue with the older version.
+* Update `gosu` in the Atlantis Docker image to 1.12 ([#1104](https://github.com/runatlantis/atlantis/pull/1104) by @lazzurs)
+* Ignore changes to `.tflint.hcl` ([#1075](https://github.com/runatlantis/atlantis/pull/1075) by @unRob)
+
+## Bugfixes
+* `--write-git-credentials` now works with Azure DevOps ([#1070](https://github.com/runatlantis/atlantis/pull/1070) by @markbrennan)
+* Partly fix `--hide-prev-plan-comments` on GitHub Enterprise ([#1072](https://github.com/runatlantis/atlantis/pull/1072) by @goodspark)
+* Fix bug where Atlantis would auto-merge a PR if `apply` was run after the locks were discarded (Fixes [#1006](https://github.com/runatlantis/atlantis/issues/1006) by @parmouraly)
+* Fix bug when using `--hide-prev-plan-comments` where if a plan output was split across multiple comments only the first comment would get hidden (Fixes [#1021](https://github.com/runatlantis/atlantis/issues/1021) by @crainte)
+
+## Backwards Incompatibilities / Notes:
+* If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
+  then the default version of Terraform will now be 0.12.27. Simply set the above
+  flag to your desired default version to avoid any issues.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.14.0/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.14.0/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.14.0/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.14.0/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.14.0`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.13.0..v0.14.0
+https://github.com/runatlantis/atlantis/compare/v0.13.0...v0.14.0
+
 # v0.13.0
 
 ## Description

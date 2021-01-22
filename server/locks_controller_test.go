@@ -189,7 +189,7 @@ func TestDeleteLock_OldFormat(t *testing.T) {
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
 	responseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
-	cp.VerifyWasCalled(Never()).CreateComment(AnyRepo(), AnyInt(), AnyString())
+	cp.VerifyWasCalled(Never()).CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString())
 }
 
 func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
@@ -269,7 +269,7 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 	cp := vcsmocks.NewMockClient()
 	workingDir := mocks2.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
-	When(cp.CreateComment(AnyRepo(), AnyInt(), AnyString())).ThenReturn(errors.New("err"))
+	When(cp.CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString())).ThenReturn(errors.New("err"))
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 	db, err := db.New(tmp)
@@ -326,5 +326,5 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	responseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
 	cp.VerifyWasCalled(Once()).CreateComment(pull.BaseRepo, pull.Num,
 		"**Warning**: The plan for dir: `path` workspace: `workspace` was **discarded** via the Atlantis UI.\n\n"+
-			"To `apply` this plan you must run `plan` again.")
+			"To `apply` this plan you must run `plan` again.", "")
 }

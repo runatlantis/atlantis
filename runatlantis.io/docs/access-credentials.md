@@ -33,16 +33,22 @@ Your Atlantis user must also have "Write permissions" (for repos in an organizat
 :::
 
 ### GitHub app
-- Start Atlantis with fake github username and token (`atlantis server --gh-user fake --gh-token fake --repo-whitelist 'github.com/your-org/*' --atlantis-url https://$ATLANTIS_HOST`)
+
+::: warning
+Available in Atlantis versions **newer** than 0.13.0.
+:::
+
+
+- Start Atlantis with fake github username and token (`atlantis server --gh-user fake --gh-token fake --repo-allowlist 'github.com/your-org/*' --atlantis-url https://$ATLANTIS_HOST`). If installing as an **Organization**, remember to add `--gh-org your-github-org` to this command.
 - Visit `https://$ATLANTIS_HOST/github-app/setup` and click on **Setup** to create the app on Github. You'll be redirected back to Atlantis
 - A link to install your app, along with its secrets, will be shown on the screen. Record your app's credentials and install your app for your user/org by following said link.
 - Create a file with the contents of the GitHub App Key, e.g. `atlantis-app-key.pem`
-- Restart Atlantis with new flags: `atlantis server --gh-app-id <your id> --gh-app-key-file atlantis-app-key.pem --gh-webhook-secret <your secret> --write-git-creds --repo-whitelist 'github.com/your-org/*' --atlantis-url https://$ATLANTIS_HOST`.
-  
+- Restart Atlantis with new flags: `atlantis server --gh-app-id <your id> --gh-app-key-file atlantis-app-key.pem --gh-webhook-secret <your secret> --write-git-creds --repo-allowlist 'github.com/your-org/*' --atlantis-url https://$ATLANTIS_HOST`.
+
   NOTE: You can also create a config file instead of using flags. See [Server Configuration](/docs/server-configuration.html#config-file).
 
 ::: warning
-Only a single installation per Github App is supported at the moment.
+Only a single installation per GitHub App is supported at the moment.
 :::
 
 ### GitLab
@@ -51,7 +57,7 @@ Only a single installation per Github App is supported at the moment.
 - Record the access token
 
 ### Bitbucket Cloud (bitbucket.org)
-- Create an App Password by following [https://confluence.atlassian.com/bitbucket/app-passwords-828781300.html#Apppasswords-Createanapppassword](https://confluence.atlassian.com/bitbucket/app-passwords-828781300.html#Apppasswords-Createanapppassword)
+- Create an App Password by following [https://support.atlassian.com/bitbucket-cloud/docs/app-passwords/#Create-an-app-password](https://support.atlassian.com/bitbucket-cloud/docs/app-passwords/#Create-an-app-password)
 - Label the password "atlantis"
 - Select **Pull requests**: **Read** and **Write** so that Atlantis can read your pull requests and write comments to them
 - Record the access token
@@ -70,6 +76,7 @@ Only a single installation per Github App is supported at the moment.
 - The minimum scopes required for this token are:
   - Code (Read & Write)
   - Code (Status)
+  - Member Entitlement Management (Read)
 - Record the access token
 
 ## Next Steps

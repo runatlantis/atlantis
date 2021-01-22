@@ -21,8 +21,6 @@ import (
 // CommandContext represents the context of a command that should be executed
 // for a pull request.
 type CommandContext struct {
-	// BaseRepo is the repository that the pull request will be merged into.
-	BaseRepo models.Repo
 	// HeadRepo is the repository that is getting merged into the BaseRepo.
 	// If the pull request branch is from the same repository then HeadRepo will
 	// be the same as BaseRepo.

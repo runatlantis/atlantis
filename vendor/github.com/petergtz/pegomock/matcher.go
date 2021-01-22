@@ -27,7 +27,23 @@ func (matcher *EqMatcher) FailureMessage() string {
 }
 
 func (matcher *EqMatcher) String() string {
-	return fmt.Sprintf("Eq(%v)", matcher.Value)
+	return fmt.Sprintf("Eq(%#v)", matcher.Value)
+}
+
+type NotEqMatcher struct {
+	Value Param
+}
+
+func (matcher *NotEqMatcher) Matches(param Param) bool {
+	return !reflect.DeepEqual(matcher.Value, param)
+}
+
+func (matcher *NotEqMatcher) FailureMessage() string {
+	return fmt.Sprintf("Expected: not %v; but got: %v", matcher.Value, matcher.Value)
+}
+
+func (matcher *NotEqMatcher) String() string {
+	return fmt.Sprintf("NotEq(%#v)", matcher.Value)
 }
 
 type AnyMatcher struct {

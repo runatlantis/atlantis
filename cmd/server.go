@@ -53,12 +53,16 @@ const (
 	DataDirFlag                = "data-dir"
 	DefaultTFVersionFlag       = "default-tf-version"
 	DisableApplyAllFlag        = "disable-apply-all"
+	DisableApplyFlag           = "disable-apply"
+	DisableAutoplanFlag        = "disable-autoplan"
 	DisableMarkdownFoldingFlag = "disable-markdown-folding"
+	DisableRepoLockingFlag     = "disable-repo-locking"
 	GHHostnameFlag             = "gh-hostname"
 	GHTokenFlag                = "gh-token"
 	GHUserFlag                 = "gh-user"
 	GHAppIDFlag                = "gh-app-id"
 	GHAppKeyFileFlag           = "gh-app-key-file"
+	GHAppSlugFlag              = "gh-app-slug"
 	GHOrganizationFlag         = "gh-org"
 	GHWebhookSecretFlag        = "gh-webhook-secret" // nolint: gosec
 	GitlabHostnameFlag         = "gitlab-hostname"
@@ -67,16 +71,22 @@ const (
 	GitlabWebhookSecretFlag    = "gitlab-webhook-secret" // nolint: gosec
 	HidePrevPlanComments       = "hide-prev-plan-comments"
 	LogLevelFlag               = "log-level"
+	ParallelPoolSize           = "parallel-pool-size"
 	AllowDraftPRs              = "allow-draft-prs"
 	PortFlag                   = "port"
 	RepoConfigFlag             = "repo-config"
 	RepoConfigJSONFlag         = "repo-config-json"
+	// RepoWhitelistFlag is deprecated for RepoAllowlistFlag.
 	RepoWhitelistFlag          = "repo-whitelist"
+	RepoAllowlistFlag          = "repo-allowlist"
 	RequireApprovalFlag        = "require-approval"
 	RequireMergeableFlag       = "require-mergeable"
 	SilenceForkPRErrorsFlag    = "silence-fork-pr-errors"
 	SilenceVCSStatusNoPlans    = "silence-vcs-status-no-plans"
+	SilenceAllowlistErrorsFlag = "silence-allowlist-errors"
+	// SilenceWhitelistErrorsFlag is deprecated for SilenceAllowlistErrorsFlag.
 	SilenceWhitelistErrorsFlag = "silence-whitelist-errors"
+	SkipCloneNoChanges         = "skip-clone-no-changes"
 	SlackTokenFlag             = "slack-token"
 	SSLCertFileFlag            = "ssl-cert-file"
 	SSLKeyFileFlag             = "ssl-key-file"
@@ -95,6 +105,7 @@ const (
 	DefaultGHHostname       = "github.com"
 	DefaultGitlabHostname   = "gitlab.com"
 	DefaultLogLevel         = "info"
+	DefaultParallelPoolSize = 15
 	DefaultPort             = 4141
 	DefaultTFDownloadURL    = "https://releases.hashicorp.com"
 	DefaultTFEHostname      = "app.terraform.io"
@@ -172,6 +183,9 @@ var stringFlags = map[string]stringFlag{
 		description:  "A path to a file containing the GitHub App's private key",
 		defaultValue: "",
 	},
+	GHAppSlugFlag: {
+		description: "The Github app slug (ie. the URL-friendly name of your GitHub App)",
+	},
 	GHOrganizationFlag: {
 		description:  "The name of the GitHub organization to use during the creation of a Github App for Atlantis",
 		defaultValue: "",
@@ -208,11 +222,15 @@ var stringFlags = map[string]stringFlag{
 	RepoConfigJSONFlag: {
 		description: "Specify repo config as a JSON string. Useful if you don't want to write a config file to disk.",
 	},
-	RepoWhitelistFlag: {
+	RepoAllowlistFlag: {
 		description: "Comma separated list of repositories that Atlantis will operate on. " +
 			"The format is {hostname}/{owner}/{repo}, ex. github.com/runatlantis/atlantis. '*' matches any characters until the next comma. Examples: " +
 			"all repos: '*' (not secure), an entire hostname: 'internalgithub.com/*' or an organization: 'github.com/runatlantis/*'." +
 			" For Bitbucket Server, {owner} is the name of the project (not the key).",
+	},
+	RepoWhitelistFlag: {
+		description: "[Deprecated for --repo-allowlist].",
+		hidden:      true,
 	},
 	SlackTokenFlag: {
 		description: "API token for Slack notifications.",
@@ -263,7 +281,19 @@ var boolFlags = map[string]boolFlag{
 		defaultValue: false,
 	},
 	DisableApplyAllFlag: {
-		description:  "Disable \"atlantis apply\" command so a specific project/workspace/directory has to be specified for applies.",
+		description:  "Disable \"atlantis apply\" command without any flags (i.e. apply all). A specific project/workspace/directory has to be specified for applies.",
+		defaultValue: false,
+	},
+	DisableApplyFlag: {
+		description:  "Disable all \"atlantis apply\" command regardless of which flags are passed with it.",
+		defaultValue: false,
+	},
+	DisableAutoplanFlag: {
+		description:  "Disable atlantis auto planning feature",
+		defaultValue: false,
+	},
+	DisableRepoLockingFlag: {
+		description:  "Disable atlantis locking repos",
 		defaultValue: false,
 	},
 	AllowDraftPRs: {
@@ -293,9 +323,14 @@ var boolFlags = map[string]boolFlag{
 		description:  "Silences VCS commit status when autoplan finds no projects to plan.",
 		defaultValue: false,
 	},
-	SilenceWhitelistErrorsFlag: {
-		description:  "Silences the posting of whitelist error comments.",
+	SilenceAllowlistErrorsFlag: {
+		description:  "Silences the posting of allowlist error comments.",
 		defaultValue: false,
+	},
+	SilenceWhitelistErrorsFlag: {
+		description:  "[Deprecated for --silence-allowlist-errors].",
+		defaultValue: false,
+		hidden:       true,
 	},
 	DisableMarkdownFoldingFlag: {
 		description:  "Toggle off folding in markdown output.",
@@ -306,8 +341,16 @@ var boolFlags = map[string]boolFlag{
 			" This writes secrets to disk and should only be enabled in a secure environment.",
 		defaultValue: false,
 	},
+	SkipCloneNoChanges: {
+		description:  "Skips cloning the PR repo if there are no projects were changed in the PR.",
+		defaultValue: false,
+	},
 }
 var intFlags = map[string]intFlag{
+	ParallelPoolSize: {
+		description:  "Max size of the wait group that runs parallel plans and applies (if enabled).",
+		defaultValue: DefaultParallelPoolSize,
+	},
 	PortFlag: {
 		description:  "Port to bind to.",
 		defaultValue: DefaultPort,
@@ -530,6 +573,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	if c.LogLevel == "" {
 		c.LogLevel = DefaultLogLevel
 	}
+	if c.ParallelPoolSize == 0 {
+		c.ParallelPoolSize = DefaultParallelPoolSize
+	}
 	if c.Port == 0 {
 		c.Port = DefaultPort
 	}
@@ -575,11 +621,21 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		return vcsErr
 	}
 
-	if userConfig.RepoWhitelist == "" {
-		return fmt.Errorf("--%s must be set for security purposes", RepoWhitelistFlag)
+	// Handle deprecation of repo whitelist.
+	if userConfig.RepoWhitelist == "" && userConfig.RepoAllowlist == "" {
+		return fmt.Errorf("--%s must be set for security purposes", RepoAllowlistFlag)
+	}
+	if userConfig.RepoAllowlist != "" && userConfig.RepoWhitelist != "" {
+		return fmt.Errorf("both --%s and --%s cannot be set–use --%s", RepoAllowlistFlag, RepoWhitelistFlag, RepoAllowlistFlag)
 	}
 	if strings.Contains(userConfig.RepoWhitelist, "://") {
 		return fmt.Errorf("--%s cannot contain ://, should be hostnames only", RepoWhitelistFlag)
+	}
+	if strings.Contains(userConfig.RepoAllowlist, "://") {
+		return fmt.Errorf("--%s cannot contain ://, should be hostnames only", RepoAllowlistFlag)
+	}
+	if userConfig.SilenceAllowlistErrors && userConfig.SilenceWhitelistErrors {
+		return fmt.Errorf("both --%s and --%s cannot be set–use --%s", SilenceAllowlistErrorsFlag, SilenceWhitelistErrorsFlag, SilenceAllowlistErrorsFlag)
 	}
 
 	if userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && userConfig.BitbucketWebhookSecret != "" {
@@ -674,7 +730,7 @@ func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 		s.Logger.Warn("no Bitbucket webhook secret set. This could allow attackers to spoof requests from Bitbucket")
 	}
 	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && !s.SilenceOutput {
-		s.Logger.Warn("Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are whitelisting Bitbucket IPs")
+		s.Logger.Warn("Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are allowing only Bitbucket IPs")
 	}
 	if userConfig.AzureDevopsWebhookUser != "" && userConfig.AzureDevopsWebhookPassword == "" && !s.SilenceOutput {
 		s.Logger.Warn("no Azure DevOps webhook user and password set. This could allow attackers to spoof requests from Azure DevOps.")
@@ -727,6 +783,15 @@ func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
 		)
 		fmt.Println(warning)
 	}
+
+	// Handle repo whitelist deprecation.
+	if userConfig.SilenceWhitelistErrors {
+		userConfig.SilenceAllowlistErrors = true
+	}
+	if userConfig.RepoWhitelist != "" {
+		userConfig.RepoAllowlist = userConfig.RepoWhitelist
+	}
+
 	return nil
 }
 
