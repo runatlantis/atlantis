@@ -560,6 +560,62 @@ func TestParse_Parsing(t *testing.T) {
 	}
 }
 
+func TestBuildApplyEmpytComment(t *testing.T) {
+	cases := []struct {
+		flags        string
+		expWorkspace string
+		expDir       string
+		expEmpty     bool
+		expVerbose   bool
+		expExtraArgs string
+		expProject   string
+	}{
+		{
+			"",
+			"",
+			"",
+			false,
+			false,
+			"",
+			"",
+		},
+		{
+			"-e",
+			"",
+			"",
+			true,
+			false,
+			"",
+			"",
+		},
+		{
+			"--empty",
+			"",
+			"",
+			true,
+			false,
+			"",
+			"",
+		},
+	}
+
+	for _, test := range cases {
+		comment := fmt.Sprintf("atlantis %s %s", "apply", test.flags)
+		t.Run(comment, func(t *testing.T) {
+			r := commentParser.Parse(comment, models.Github)
+			Assert(t, r.CommentResponse == "", "CommentResponse should have been empty but was %q for comment %q", r.CommentResponse, comment)
+			Assert(t, test.expDir == r.Command.RepoRelDir, "exp dir to equal %q but was %q for comment %q", test.expDir, r.Command.RepoRelDir, comment)
+			Assert(t, test.expWorkspace == r.Command.Workspace, "exp workspace to equal %q but was %q for comment %q", test.expWorkspace, r.Command.Workspace, comment)
+			Assert(t, test.expEmpty == r.Command.Empty, "exp empty to equal %v but was %v for comment %q", test.expEmpty, r.Command.Empty, comment)
+			Assert(t, test.expVerbose == r.Command.Verbose, "exp verbose to equal %v but was %v for comment %q", test.expVerbose, r.Command.Verbose, comment)
+			actExtraArgs := strings.Join(r.Command.Flags, " ")
+			Assert(t, test.expExtraArgs == actExtraArgs, "exp extra args to equal %v but got %v for comment %q", test.expExtraArgs, actExtraArgs, comment)
+			Assert(t, r.Command.Name == models.ApplyCommand, "did not parse comment %q as apply command", comment)
+		})
+	}
+
+}
+
 func TestBuildPlanApplyComment(t *testing.T) {
 	cases := []struct {
 		repoRelDir    string

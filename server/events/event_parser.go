@@ -72,6 +72,8 @@ type CommentCommand struct {
 	Flags []string
 	// Name is the name of the command the comment specified.
 	Name models.CommandName
+	// Empty is true if the command should only allow apply when no projects where planned.
+	Empty bool
 	// Verbose is true if the command should output verbosely.
 	Verbose bool
 	// Workspace is the name of the Terraform workspace to run the command in.
@@ -111,7 +113,7 @@ func (c CommentCommand) String() string {
 }
 
 // NewCommentCommand constructs a CommentCommand, setting all missing fields to defaults.
-func NewCommentCommand(repoRelDir string, flags []string, name models.CommandName, verbose bool, workspace string, project string) *CommentCommand {
+func NewCommentCommand(repoRelDir string, flags []string, name models.CommandName, empty, verbose bool, workspace string, project string) *CommentCommand {
 	// If repoRelDir was empty we want to keep it that way to indicate that it
 	// wasn't specified in the comment.
 	if repoRelDir != "" {
@@ -124,6 +126,7 @@ func NewCommentCommand(repoRelDir string, flags []string, name models.CommandNam
 		RepoRelDir:  repoRelDir,
 		Flags:       flags,
 		Name:        name,
+		Empty:       empty,
 		Verbose:     verbose,
 		Workspace:   workspace,
 		ProjectName: project,

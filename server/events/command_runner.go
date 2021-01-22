@@ -214,7 +214,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
-	if c.DisableApplyAll && cmd.Name == models.ApplyCommand && !cmd.IsForSpecificProject() {
+	if c.DisableApplyAll && !cmd.Empty && cmd.Name == models.ApplyCommand && !cmd.IsForSpecificProject() {
 		log.Info("ignoring apply command without flags since apply all is disabled")
 		if err := c.VCSClient.CreateComment(baseRepo, pullNum, applyAllDisabledComment, models.ApplyCommand.String()); err != nil {
 			log.Err("unable to comment on pull request: %s", err)
@@ -620,7 +620,8 @@ var automergeComment = `Automatically merging because all plans have been succes
 // applyAllDisabledComment is posted when apply all commands (i.e. "atlantis apply")
 // are disabled and an apply all command is issued.
 var applyAllDisabledComment = "**Error:** Running `atlantis apply` without flags is disabled." +
-	" You must specify which project to apply via the `-d <dir>`, `-w <workspace>` or `-p <project name>` flags."
+	" You must specify which project to apply via the `-d <dir>`, `-w <workspace>` or `-p <project name>` flags." +
+	" Or apply zero projects with the `-e` flag."
 
 // applyDisabledComment is posted when apply commands are disabled globally and an apply command is issued.
 var applyDisabledComment = "**Error:** Running `atlantis apply` is disabled."
