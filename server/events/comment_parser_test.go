@@ -221,8 +221,8 @@ func TestParse_InvalidFlags(t *testing.T) {
 			"Error: unknown flag: --abc",
 		},
 		{
-			"atlantis apply -e",
-			"Error: unknown shorthand flag: 'e' in -e",
+			"atlantis apply -x",
+			"Error: unknown shorthand flag: 'x' in -x",
 		},
 		{
 			"atlantis apply --abc",
@@ -786,6 +786,7 @@ var PlanUsage = `Usage of plan:
 var ApplyUsage = `Usage of apply:
   -d, --dir string         Apply the plan for this directory, relative to root of
                            repo, ex. 'child/dir'.
+  -e, --empty              Apply when there is no projects planned.
   -p, --project string     Apply the plan for this project. Refers to the name of
                            the project configured in atlantis.yaml. Cannot be used
                            at same time as workspace or dir flags.

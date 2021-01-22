@@ -38,6 +38,8 @@ const (
 	projectFlagShort   = "p"
 	verboseFlagLong    = "verbose"
 	verboseFlagShort   = ""
+	emptyFlagLong      = "empty"
+	emptyFlagShort     = "e"
 	atlantisExecutable = "atlantis"
 )
 
@@ -167,6 +169,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	var workspace string
 	var dir string
 	var project string
+	var empty bool
 	var verbose bool
 	var flagSet *pflag.FlagSet
 	var name models.CommandName
@@ -188,6 +191,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Apply the plan for this Terraform workspace.")
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Apply the plan for this directory, relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", fmt.Sprintf("Apply the plan for this project. Refers to the name of the project configured in %s. Cannot be used at same time as workspace or dir flags.", yaml.AtlantisYAMLFilename))
+		flagSet.BoolVarP(&empty, emptyFlagLong, emptyFlagShort, false, "Apply when there is no projects planned.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 	case models.UnlockCommand.String():
 		name = models.UnlockCommand
@@ -245,6 +249,11 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	// an error.
 	if project != "" && (workspace != "" || dir != "") {
 		err := fmt.Sprintf("cannot use -%s/--%s at same time as -%s/--%s or -%s/--%s", projectFlagShort, projectFlagLong, dirFlagShort, dirFlagLong, workspaceFlagShort, workspaceFlagLong)
+		return CommentParseResult{CommentResponse: e.errMarkdown(err, command, flagSet)}
+	}
+
+	if empty && (project != "" || workspace != "" || dir != "") {
+		err := fmt.Sprintf("cannot use -%s/--%s at same time as any of -%s/--%s, -%s/--%s, or -%s/--%s", emptyFlagShort, emptyFlagLong, projectFlagShort, projectFlagLong, dirFlagShort, dirFlagLong, workspaceFlagShort, workspaceFlagLong)
 		return CommentParseResult{CommentResponse: e.errMarkdown(err, command, flagSet)}
 	}
 
