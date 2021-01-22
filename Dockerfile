@@ -4,6 +4,8 @@ LABEL authors="Anubhav Mishra, Luke Kysow"
 
 # install terraform binaries
 ENV DEFAULT_TERRAFORM_VERSION=0.12.24
+ENV DEFAULT_ROOT_DIR="/root"
+ENV DEFAULT_ATLANTIS_DIR="/home/atlantis"
 
 #Download jq
 RUN wget -O jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 && \
@@ -17,9 +19,6 @@ RUN curl -o aws-iam-authenticator https://amazon-eks.s3.us-west-2.amazonaws.com/
 
 # In the official Atlantis image we only have the latest of each Terraform version.
 RUN AVAILABLE_TERRAFORM_VERSIONS="0.11.14 0.12.18 ${DEFAULT_TERRAFORM_VERSION}" && \
-
-# In the official Atlantis image we only have the latest of each Terraform version.
-RUN AVAILABLE_TERRAFORM_VERSIONS="0.8.8 0.9.11 0.10.8 0.11.14 0.12.30 0.13.6 ${DEFAULT_TERRAFORM_VERSION}" && \
     for VERSION in ${AVAILABLE_TERRAFORM_VERSIONS}; do \
         curl -LOs https://releases.hashicorp.com/terraform/${VERSION}/terraform_${VERSION}_linux_amd64.zip && \
         curl -LOs https://releases.hashicorp.com/terraform/${VERSION}/terraform_${VERSION}_SHA256SUMS && \
@@ -32,11 +31,18 @@ RUN AVAILABLE_TERRAFORM_VERSIONS="0.8.8 0.9.11 0.10.8 0.11.14 0.12.30 0.13.6 ${D
     done && \
     ln -s /usr/local/bin/tf/versions/${DEFAULT_TERRAFORM_VERSION}/terraform /usr/local/bin/terraform
 
-# copy binary
-COPY atlantis /usr/local/bin/atlantis
+#Download databricks plugin
+RUN mkdir -p ${DEFAULT_ATLANTIS_DIR}/.terraform.d/plugins
+RUN curl https://raw.githubusercontent.com/databrickslabs/databricks-terraform/master/godownloader-databricks-provider.sh | bash -s -- -b ${DEFAULT_ATLANTIS_DIR}/.terraform.d/plugins
+
+RUN mkdir -p ${DEFAULT_ROOT_DIR}/.terraform.d/plugins
+RUN curl https://raw.githubusercontent.com/databrickslabs/databricks-terraform/master/godownloader-databricks-provider.sh | bash -s -- -b ${DEFAULT_ROOT_DIR}/.terraform.d/plugins
 
 # copy docker entrypoint
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+
+# copy binary
+COPY atlantis /usr/local/bin/atlantis
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["server"]
