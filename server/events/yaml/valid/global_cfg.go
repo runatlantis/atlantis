@@ -287,7 +287,7 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 		if p.ApplyRequirements != nil && !sliceContainsF(allowedOverrides, ApplyRequirementsKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", ApplyRequirementsKey, AllowedOverridesKey, ApplyRequirementsKey)
 		}
-		if !sliceContainsF(allowedOverrides, DeleteSourceBranchOnMergeKey) {
+		if p.DeleteSourceBranchOnMerge != nil && !sliceContainsF(allowedOverrides, DeleteSourceBranchOnMergeKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", DeleteSourceBranchOnMergeKey, AllowedOverridesKey, DeleteSourceBranchOnMergeKey)
 		}
 	}
