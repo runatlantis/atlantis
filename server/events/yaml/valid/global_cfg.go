@@ -111,7 +111,7 @@ func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) Global
 	allowCustomWorkflows := false
 	deleteSourceBranchOnMerge := false
 	if allowRepoCfg {
-		allowedOverrides = []string{ApplyRequirementsKey, WorkflowKey}
+		allowedOverrides = []string{ApplyRequirementsKey, WorkflowKey, AllowedOverridesKey}
 		allowCustomWorkflows = true
 		//deleteSourceBranchOnMerge = true
 	}
