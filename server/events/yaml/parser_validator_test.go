@@ -1060,7 +1060,7 @@ workflows:
 						ApplyRequirements:    []string{"approved", "mergeable"},
 						PreWorkflowHooks:     preWorkflowHooks,
 						Workflow:             &customWorkflow1,
-						AllowedOverrides:     []string{"apply_requirements", "workflow"},
+						AllowedOverrides:     []string{"apply_requirements", "workflow", "delete_source_branch_on_merge"},
 						AllowCustomWorkflows: Bool(true),
 					},
 					{
