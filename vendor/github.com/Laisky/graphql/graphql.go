@@ -11,11 +11,11 @@ import (
 	"github.com/Laisky/graphql/internal/jsonutil"
 )
 
-var (
-	defaultClientHeaders = map[string]string{
+func defaultClientHeaders() map[string]string {
+	return map[string]string{
 		"Content-Type": "application/json",
 	}
-)
+}
 
 // ClientOptFunc graphql client option
 type ClientOptFunc func(*Client)
@@ -53,7 +53,7 @@ func NewClient(url string, httpClient *http.Client, opts ...ClientOptFunc) (c *C
 		httpClient = http.DefaultClient
 	}
 	c = &Client{
-		headers:    defaultClientHeaders,
+		headers:    defaultClientHeaders(),
 		url:        url,
 		httpClient: httpClient,
 	}
@@ -146,7 +146,7 @@ func (c *Client) do(ctx context.Context, op operationType, v interface{}, variab
 	}
 	var out struct {
 		Data   *json.RawMessage
-		Errors errors
+		Errors Errors
 		//Extensions interface{} // Unused.
 	}
 	err = json.NewDecoder(resp.Body).Decode(&out)
@@ -167,20 +167,21 @@ func (c *Client) do(ctx context.Context, op operationType, v interface{}, variab
 	return nil
 }
 
-// errors represents the "errors" array in a response from a GraphQL server.
+// Errors represents the "errors" array in a response from a GraphQL server.
 // If returned via error interface, the slice is expected to contain at least 1 element.
 //
 // Specification: https://facebook.github.io/graphql/#sec-Errors.
-type errors []struct {
+type Errors []struct {
 	Message   string
 	Locations []struct {
 		Line   int
 		Column int
 	}
+	Extensions interface{}
 }
 
 // Error implements error interface.
-func (e errors) Error() string {
+func (e Errors) Error() string {
 	return e[0].Message
 }
 

@@ -3,7 +3,7 @@ module github.com/runatlantis/atlantis
 go 1.14
 
 require (
-	github.com/Laisky/graphql v1.0.4
+	github.com/Laisky/graphql v1.0.5
 	github.com/Masterminds/sprig/v3 v3.1.0
 	github.com/agext/levenshtein v1.2.3 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a // indirect
@@ -27,9 +27,8 @@ require (
 	github.com/hashicorp/hcl/v2 v2.6.0 // indirect
 	github.com/hashicorp/terraform-config-inspect v0.0.0-20200806211835-c481b8bfa41e
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
-	github.com/magiconair/properties v1.8.1 // indirect
-	github.com/mcdafydd/go-azuredevops v0.12.0
 	github.com/leodido/go-urn v1.2.0 // indirect
+	github.com/mcdafydd/go-azuredevops v0.12.0
 	github.com/microcosm-cc/bluemonday v1.0.1
 	github.com/mitchellh/colorstring v0.0.0-20150917214807-8631ce90f286
 	github.com/mitchellh/go-homedir v1.0.0
