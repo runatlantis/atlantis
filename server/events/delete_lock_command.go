@@ -12,6 +12,7 @@ import (
 // DeleteLockCommand is the first step after a command request has been parsed.
 type DeleteLockCommand interface {
 	DeleteLock(id string) (*models.ProjectLock, error)
+	DeleteLocks() ([]*models.ProjectLock, error)
 	DeleteLocksByPull(repoFullName string, pullNum int) error
 }
 
@@ -36,6 +37,22 @@ func (l *DefaultDeleteLockCommand) DeleteLock(id string) (*models.ProjectLock, e
 
 	l.deleteWorkingDir(*lock)
 	return lock, nil
+}
+
+func (l *DefaultDeleteLockCommand) DeleteLocks() ([]*models.ProjectLock, error) {
+	response := []*models.ProjectLock{}
+	locks, err := l.Locker.List()
+	if err != nil {
+		return nil, err
+	}
+	for id, lock := range locks {
+		_, err = l.DeleteLock(id)
+		if err != nil {
+			return nil, err
+		}
+		response = append(response, &lock)
+	}
+	return response, nil
 }
 
 // DeleteLocksByPull handles deleting all locks for the pull request

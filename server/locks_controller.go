@@ -74,55 +74,71 @@ func (l *LocksController) GetLock(w http.ResponseWriter, r *http.Request) {
 // DeleteLock handles deleting the lock at id and commenting back on the
 // pull request that the lock has been deleted.
 func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
+	idUnencoded := ""
+	var locks []*models.ProjectLock 
+	var err error
+
 	id, ok := mux.Vars(r)["id"]
 	if !ok || id == "" {
 		l.respond(w, logging.Warn, http.StatusBadRequest, "No lock id in request")
 		return
 	}
 
-	idUnencoded, err := url.PathUnescape(id)
-	if err != nil {
-		l.respond(w, logging.Warn, http.StatusBadRequest, "Invalid lock id %q. Failed with error: %s", id, err)
-		return
+	if id == "*" {
+		idUnencoded = id
+		locks, err = l.DeleteLockCommand.DeleteLocks()
+	} else {
+		idUnencoded, err = url.PathUnescape(id)
+		if err != nil {
+			l.respond(w, logging.Warn, http.StatusBadRequest, "Invalid lock id %q. Failed with error: %s", id, err)
+			return
+		}
+		var lock *models.ProjectLock 
+		lock, err = l.DeleteLockCommand.DeleteLock(idUnencoded)
+		if lock == nil {
+			locks = []*models.ProjectLock{}
+		} else {
+			locks = []*models.ProjectLock{lock}
+		}
 	}
-
-	lock, err := l.DeleteLockCommand.DeleteLock(idUnencoded)
 	if err != nil {
 		l.respond(w, logging.Error, http.StatusInternalServerError, "deleting lock failed with: %s", err)
 		return
 	}
 
-	if lock == nil {
+	if len(locks) == 0 {
 		l.respond(w, logging.Info, http.StatusNotFound, "No lock found at id %q", idUnencoded)
 		return
 	}
 
-	// NOTE: Because BaseRepo was added to the PullRequest model later, previous
-	// installations of Atlantis will have locks in their DB that do not have
-	// this field on PullRequest. We skip commenting in this case.
-	if lock.Pull.BaseRepo != (models.Repo{}) {
-		unlock, err := l.WorkingDirLocker.TryLock(lock.Pull.BaseRepo.FullName, lock.Pull.Num, lock.Workspace)
-		if err != nil {
-			l.Logger.Err("unable to obtain working dir lock when trying to delete old plans: %s", err)
-		} else {
-			defer unlock()
-			// nolint: vetshadow
-			if err := l.WorkingDir.DeleteForWorkspace(lock.Pull.BaseRepo, lock.Pull, lock.Workspace); err != nil {
-				l.Logger.Err("unable to delete workspace: %s", err)
+	for _, lock := range locks {
+		// NOTE: Because BaseRepo was added to the PullRequest model later, previous
+		// installations of Atlantis will have locks in their DB that do not have
+		// this field on PullRequest. We skip commenting in this case.
+		if lock.Pull.BaseRepo != (models.Repo{}) {
+			unlock, err := l.WorkingDirLocker.TryLock(lock.Pull.BaseRepo.FullName, lock.Pull.Num, lock.Workspace)
+			if err != nil {
+				l.Logger.Err("unable to obtain working dir lock when trying to delete old plans: %s", err)
+			} else {
+				defer unlock()
+				// nolint: vetshadow
+				if err := l.WorkingDir.DeleteForWorkspace(lock.Pull.BaseRepo, lock.Pull, lock.Workspace); err != nil {
+					l.Logger.Err("unable to delete workspace: %s", err)
+				}
 			}
-		}
-		if err := l.DB.UpdateProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path, models.DiscardedPlanStatus); err != nil {
-			l.Logger.Err("unable to update project status: %s", err)
-		}
+			if err := l.DB.UpdateProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path, models.DiscardedPlanStatus); err != nil {
+				l.Logger.Err("unable to update project status: %s", err)
+			}
 
-		// Once the lock has been deleted, comment back on the pull request.
-		comment := fmt.Sprintf("**Warning**: The plan for dir: `%s` workspace: `%s` was **discarded** via the Atlantis UI.\n\n"+
-			"To `apply` this plan you must run `plan` again.", lock.Project.Path, lock.Workspace)
-		if err = l.VCSClient.CreateComment(lock.Pull.BaseRepo, lock.Pull.Num, comment, ""); err != nil {
-			l.Logger.Warn("failed commenting on pull request: %s", err)
+			// Once the lock has been deleted, comment back on the pull request.
+			comment := fmt.Sprintf("**Warning**: The plan for dir: `%s` workspace: `%s` was **discarded** via the Atlantis UI.\n\n"+
+				"To `apply` this plan you must run `plan` again.", lock.Project.Path, lock.Workspace)
+			if err = l.VCSClient.CreateComment(lock.Pull.BaseRepo, lock.Pull.Num, comment, ""); err != nil {
+				l.Logger.Warn("failed commenting on pull request: %s", err)
+			}
+		} else {
+			l.Logger.Debug("skipping commenting on pull request and deleting workspace because BaseRepo field is empty")
 		}
-	} else {
-		l.Logger.Debug("skipping commenting on pull request and deleting workspace because BaseRepo field is empty")
 	}
 	l.respond(w, logging.Info, http.StatusOK, "Deleted lock id %q", id)
 }

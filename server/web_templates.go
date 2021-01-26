@@ -99,14 +99,65 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
         </div>
       </a>
     {{ end }}
+    <a class="button button-default" id="discardAll">Discard All Locks</a>
     {{ else }}
     <p class="placeholder">No locks found.</p>
     {{ end }}
   </section>
 </div>
+<div id="discardMessageModal" class="modal">
+<!-- Modal content -->
+<div class="modal-content">
+  <div class="modal-header">
+    <span class="close">&times;</span>
+  </div>
+  <div class="modal-body">
+    <p><strong>Are you sure you want to discard all locks?</strong></p>
+    <input class="button-primary" id="discardYes" type="submit" value="Yes">
+    <input type="button" class="cancel" value="Cancel">
+  </div>
+</div>
+</div>
 <footer>
 v{{ .AtlantisVersion }}
 </footer>
+<script>
+  // Modified from discard modal at line 239 below 
+  var modal = $("#discardMessageModal");
+  
+  var btn = $("#discardAll");
+  var btnDiscard = $("#discardYes");
+  var lockId = btnDiscard.attr('data');
+  var span = document.getElementsByClassName("close")[0];
+  var cancelBtn = document.getElementsByClassName("cancel")[0];
+
+  btn.click(function() {
+    modal.css("display", "block");
+  });
+
+  span.onclick = function() {
+    modal.css("display", "none");
+  }
+  cancelBtn.onclick = function() {
+    modal.css("display", "none");
+  }
+
+  btnDiscard.click(function() {
+    $.ajax({
+        url: '{{ .CleanedBasePath }}/locks?id=*',
+        type: 'DELETE',
+        success: function(result) {
+          window.location.replace("{{ .CleanedBasePath }}/?discard=true");
+        }
+    });
+  });
+
+  window.onclick = function(event) {
+      if (event.target == modal) {
+          modal.css("display", "none");
+      }
+  }
+</script>
 </body>
 </html>
 `))
