@@ -257,6 +257,18 @@ type GitPullRequestMergeOptions struct {
 	DisableRenames             *bool `json:"disableRenames,omitempty"`
 }
 
+// GitCommitDiffs describes the difference between two commits
+type GitCommitDiffs struct {
+	AheadCount         *int                              `json:"aheadCount,omitempty"`
+	AllChangesIncluded *bool                             `json:"allChangesIncluded,omitempty"`
+	BaseCommit         *string                           `json:"baseCommit,omitempty"`
+	BehindCount        *int                              `json:"behindCount,omitempty"`
+	ChangeCounts       *map[VersionControlChangeType]int `json:"changeCounts,omitempty"`
+	Changes            []*GitChange                      `json:"changes,omitempty"`
+	CommonCommit       *string                           `json:"commonCommit,omitempty"`
+	TargetCommit       *string                           `json:"targetCommit,omitempty"`
+}
+
 // GitPullRequestMergeStrategy specifies the strategy used to merge the pull request
 // during completion.
 type GitPullRequestMergeStrategy int
@@ -523,6 +535,30 @@ func (s *GitService) CreateStatus(ctx context.Context, owner, project, repoName,
 		return nil, nil, err
 	}
 	r := new(GitStatus)
+	resp, err := s.client.Execute(ctx, req, r)
+
+	return r, resp, err
+}
+
+// GetDiffs finds the closest common commit (the merge base) between base and target commits,
+// and get the diff between either the base and target commits or common and target commits.
+// https://docs.microsoft.com/en-us/rest/api/azure/devops/git/diffs/get?view=azure-devops-rest-5.1
+func (s *GitService) GetDiffs(ctx context.Context, owner string, project string, repoName string, baseVersion string, targetVersion string) (*GitCommitDiffs, *http.Response, error) {
+	URL := fmt.Sprintf(
+		"%s/%s/_apis/git/repositories/%s/diffs/commits?api-version=5.1&baseVersion=%s&targetVersion=%s",
+		owner,
+		project,
+		repoName,
+		baseVersion,
+		targetVersion,
+	)
+
+	req, err := s.client.NewRequest("GET", URL, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	r := new(GitCommitDiffs)
 	resp, err := s.client.Execute(ctx, req, r)
 
 	return r, resp, err

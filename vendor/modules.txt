@@ -148,7 +148,7 @@ github.com/hashicorp/go-getter/helper/url
 github.com/hashicorp/go-retryablehttp
 # github.com/hashicorp/go-safetemp v1.0.0
 github.com/hashicorp/go-safetemp
-# github.com/hashicorp/go-version v1.2.0
+# github.com/hashicorp/go-version v1.2.1
 ## explicit
 github.com/hashicorp/go-version
 # github.com/hashicorp/golang-lru v0.5.1
@@ -201,10 +201,11 @@ github.com/konsorten/go-windows-terminal-sequences
 ## explicit
 github.com/leodido/go-urn
 # github.com/magiconair/properties v1.8.1
-## explicit
 github.com/magiconair/properties
 # github.com/mattn/go-colorable v0.0.9
 github.com/mattn/go-colorable
+# github.com/mattn/go-isatty v0.0.4
+github.com/mattn/go-isatty
 # github.com/mcdafydd/go-azuredevops v0.12.0
 ## explicit
 github.com/mcdafydd/go-azuredevops/azuredevops
