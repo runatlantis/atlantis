@@ -75,7 +75,7 @@ func (l *LocksController) GetLock(w http.ResponseWriter, r *http.Request) {
 // pull request that the lock has been deleted.
 func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 	idUnencoded := ""
-	var locks []*models.ProjectLock 
+	var locks []*models.ProjectLock
 	var err error
 
 	id, ok := mux.Vars(r)["id"]
@@ -93,7 +93,7 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 			l.respond(w, logging.Warn, http.StatusBadRequest, "Invalid lock id %q. Failed with error: %s", id, err)
 			return
 		}
-		var lock *models.ProjectLock 
+		var lock *models.ProjectLock
 		lock, err = l.DeleteLockCommand.DeleteLock(idUnencoded)
 		if lock == nil {
 			locks = []*models.ProjectLock{}

@@ -94,7 +94,7 @@ func TestDeleteLocks_Success(t *testing.T) {
 	RegisterMockTestingT(t)
 	l := lockmocks.NewMockLocker()
 	When(l.List()).ThenReturn(map[string]models.ProjectLock{
-		"id": models.ProjectLock{},
+		"id": {},
 	}, nil)
 	When(l.Unlock("id")).ThenReturn(&models.ProjectLock{}, nil)
 	workingDir := events.NewMockWorkingDir()
@@ -132,7 +132,7 @@ func TestDeleteLocks_ListError(t *testing.T) {
 	RegisterMockTestingT(t)
 	l := lockmocks.NewMockLocker()
 	When(l.List()).ThenReturn(map[string]models.ProjectLock{
-		"id": models.ProjectLock{},
+		"id": {},
 	}, errors.New("err"))
 	dlc := events.DefaultDeleteLockCommand{
 		Locker: l,
@@ -147,7 +147,7 @@ func TestDeleteLocks_UnlockError(t *testing.T) {
 	RegisterMockTestingT(t)
 	l := lockmocks.NewMockLocker()
 	When(l.List()).ThenReturn(map[string]models.ProjectLock{
-		"id": models.ProjectLock{},
+		"id": {},
 	}, nil)
 	When(l.Unlock("id")).ThenReturn(nil, errors.New("err"))
 	dlc := events.DefaultDeleteLockCommand{
