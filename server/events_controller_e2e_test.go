@@ -524,47 +524,111 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 
 	Ok(t, err)
 
-	commandRunner := &events.DefaultCommandRunner{
-		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
-			Locker:           projectLocker,
-			LockURLGenerator: &mockLockURLGenerator{},
-			InitStepRunner: &runtime.InitStepRunner{
-				TerraformExecutor: terraformClient,
-				DefaultTFVersion:  defaultTFVersion,
-			},
-			PlanStepRunner: &runtime.PlanStepRunner{
-				TerraformExecutor: terraformClient,
-				DefaultTFVersion:  defaultTFVersion,
-			},
-			ShowStepRunner:        showStepRunner,
-			PolicyCheckStepRunner: policyCheckRunner,
-			ApplyStepRunner: &runtime.ApplyStepRunner{
-				TerraformExecutor: terraformClient,
-			},
-			RunStepRunner: &runtime.RunStepRunner{
-				TerraformExecutor: terraformClient,
-				DefaultTFVersion:  defaultTFVersion,
-			},
-			PullApprovedChecker: e2eVCSClient,
-			WorkingDir:          workingDir,
-			Webhooks:            &mockWebhookSender{},
-			WorkingDirLocker:    locker,
+	projectCommandRunner := &events.DefaultProjectCommandRunner{
+		Locker:           projectLocker,
+		LockURLGenerator: &mockLockURLGenerator{},
+		InitStepRunner: &runtime.InitStepRunner{
+			TerraformExecutor: terraformClient,
+			DefaultTFVersion:  defaultTFVersion,
 		},
-		EventParser:              eventParser,
-		VCSClient:                e2eVCSClient,
-		GithubPullGetter:         e2eGithubGetter,
-		GitlabMergeRequestGetter: e2eGitlabGetter,
-		CommitStatusUpdater:      e2eStatusUpdater,
-		MarkdownRenderer:         &events.MarkdownRenderer{},
-		Logger:                   logger,
-		AllowForkPRs:             allowForkPRs,
-		AllowForkPRsFlag:         "allow-fork-prs",
-		ProjectCommandBuilder:    projectCommandBuilder,
-		DB:                       boltdb,
-		PendingPlanFinder:        &events.DefaultPendingPlanFinder{},
-		GlobalAutomerge:          false,
-		WorkingDir:               workingDir,
-		Drainer:                  drainer,
+		PlanStepRunner: &runtime.PlanStepRunner{
+			TerraformExecutor: terraformClient,
+			DefaultTFVersion:  defaultTFVersion,
+		},
+		ShowStepRunner:        showStepRunner,
+		PolicyCheckStepRunner: policyCheckRunner,
+		ApplyStepRunner: &runtime.ApplyStepRunner{
+			TerraformExecutor: terraformClient,
+		},
+		RunStepRunner: &runtime.RunStepRunner{
+			TerraformExecutor: terraformClient,
+			DefaultTFVersion:  defaultTFVersion,
+		},
+		PullApprovedChecker: e2eVCSClient,
+		WorkingDir:          workingDir,
+		Webhooks:            &mockWebhookSender{},
+		WorkingDirLocker:    locker,
+	}
+
+	dbUpdater := &events.DBUpdater{
+		DB: boltdb,
+	}
+
+	pullUpdater := &events.PullUpdater{
+		HidePrevCommandComments: false,
+		VCSClient:               e2eVCSClient,
+		MarkdownRenderer:        &events.MarkdownRenderer{},
+	}
+
+	autoMerger := &events.AutoMerger{
+		VCSClient:       e2eVCSClient,
+		GlobalAutomerge: false,
+	}
+
+	policyCheckCommandRunner := events.NewPolicyCheckCommandRunner(
+		dbUpdater,
+		pullUpdater,
+		e2eStatusUpdater,
+		projectCommandRunner,
+	)
+
+	planCommandRunner := events.NewPlanCommandRunner(
+		false,
+		e2eVCSClient,
+		&events.DefaultPendingPlanFinder{},
+		workingDir,
+		e2eStatusUpdater,
+		projectCommandBuilder,
+		projectCommandRunner,
+		dbUpdater,
+		pullUpdater,
+		policyCheckCommandRunner,
+		autoMerger,
+	)
+
+	applyCommandRunner := events.NewApplyCommandRunner(
+		e2eVCSClient,
+		false,
+		e2eStatusUpdater,
+		projectCommandBuilder,
+		projectCommandRunner,
+		autoMerger,
+		pullUpdater,
+		dbUpdater,
+		boltdb,
+	)
+
+	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
+		e2eStatusUpdater,
+		projectCommandBuilder,
+		projectCommandRunner,
+		pullUpdater,
+		dbUpdater,
+	)
+
+	unlockCommandRunner := events.NewUnlockCommandRunner(
+		mocks.NewMockDeleteLockCommand(),
+		e2eVCSClient,
+	)
+
+	commentCommandRunnerByCmd := map[models.CommandName]events.CommentCommandRunner{
+		models.PlanCommand:            planCommandRunner,
+		models.ApplyCommand:           applyCommandRunner,
+		models.ApprovePoliciesCommand: approvePoliciesCommandRunner,
+		models.UnlockCommand:          unlockCommandRunner,
+	}
+
+	commandRunner := &events.DefaultCommandRunner{
+		EventParser:               eventParser,
+		VCSClient:                 e2eVCSClient,
+		GithubPullGetter:          e2eGithubGetter,
+		GitlabMergeRequestGetter:  e2eGitlabGetter,
+		Logger:                    logger,
+		StatsScope:                statsScope,
+		AllowForkPRs:              allowForkPRs,
+		AllowForkPRsFlag:          "allow-fork-prs",
+		CommentCommandRunnerByCmd: commentCommandRunnerByCmd,
+		Drainer:                   drainer,
 	}
 
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")

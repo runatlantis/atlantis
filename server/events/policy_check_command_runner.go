@@ -3,26 +3,28 @@ package events
 import "github.com/runatlantis/atlantis/server/events/models"
 
 func NewPolicyCheckCommandRunner(
-	cmdRunner *DefaultCommandRunner,
-	prjCmds []models.ProjectCommandContext,
+	dbUpdater *DBUpdater,
+	pullUpdater *PullUpdater,
+	commitStatusUpdater CommitStatusUpdater,
+	projectCommandRunner ProjectPolicyCheckCommandRunner,
 ) *PolicyCheckCommandRunner {
 	return &PolicyCheckCommandRunner{
-		cmdRunner:           cmdRunner,
-		cmds:                prjCmds,
-		commitStatusUpdater: cmdRunner.CommitStatusUpdater,
-		prjCmdRunner:        cmdRunner.ProjectCommandRunner,
+		dbUpdater:           dbUpdater,
+		pullUpdater:         pullUpdater,
+		commitStatusUpdater: commitStatusUpdater,
+		prjCmdRunner:        projectCommandRunner,
 	}
 }
 
 type PolicyCheckCommandRunner struct {
-	cmdRunner           *DefaultCommandRunner
-	cmds                []models.ProjectCommandContext
+	dbUpdater           *DBUpdater
+	pullUpdater         *PullUpdater
 	commitStatusUpdater CommitStatusUpdater
 	prjCmdRunner        ProjectPolicyCheckCommandRunner
 }
 
-func (p *PolicyCheckCommandRunner) Run(ctx *CommandContext) {
-	if len(p.cmds) == 0 {
+func (p *PolicyCheckCommandRunner) Run(ctx *CommandContext, cmds []models.ProjectCommandContext) {
+	if len(cmds) == 0 {
 		return
 	}
 
@@ -32,18 +34,18 @@ func (p *PolicyCheckCommandRunner) Run(ctx *CommandContext) {
 	}
 
 	var result CommandResult
-	if p.isParallelEnabled() {
+	if p.isParallelEnabled(cmds) {
 		ctx.Log.Info("Running policy_checks in parallel")
-		result = runProjectCmdsParallel(p.cmds, p.prjCmdRunner.PolicyCheck)
+		result = runProjectCmdsParallel(cmds, p.prjCmdRunner.PolicyCheck)
 	} else {
-		result = runProjectCmds(p.cmds, p.prjCmdRunner.PolicyCheck)
+		result = runProjectCmds(cmds, p.prjCmdRunner.PolicyCheck)
 	}
 
-	p.cmdRunner.updatePull(ctx, PolicyCheckCommand{}, result)
+	p.pullUpdater.updatePull(ctx, PolicyCheckCommand{}, result)
 
-	pullStatus, err := p.cmdRunner.updateDB(ctx, ctx.Pull, result.ProjectResults)
+	pullStatus, err := p.dbUpdater.updateDB(ctx, ctx.Pull, result.ProjectResults)
 	if err != nil {
-		p.cmdRunner.Logger.Err("writing results: %s", err)
+		ctx.Log.Err("writing results: %s", err)
 	}
 
 	p.updateCommitStatus(ctx, pullStatus)
@@ -66,6 +68,6 @@ func (p *PolicyCheckCommandRunner) updateCommitStatus(ctx *CommandContext, pullS
 	}
 }
 
-func (p *PolicyCheckCommandRunner) isParallelEnabled() bool {
-	return len(p.cmds) > 0 && p.cmds[0].ParallelPolicyCheckEnabled
+func (p *PolicyCheckCommandRunner) isParallelEnabled(cmds []models.ProjectCommandContext) bool {
+	return len(cmds) > 0 && cmds[0].ParallelPolicyCheckEnabled
 }

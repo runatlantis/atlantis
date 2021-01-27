@@ -1,30 +1,45 @@
 package events
 
 import (
+	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
-func NewApplyCommandRunner(cmdRunner *DefaultCommandRunner) *ApplyCommandRunner {
+func NewApplyCommandRunner(
+	vcsClient vcs.Client,
+	disableApplyAll bool,
+	commitStatusUpdater CommitStatusUpdater,
+	prjCommandBuilder ProjectApplyCommandBuilder,
+	prjCmdRunner ProjectApplyCommandRunner,
+	autoMerger *AutoMerger,
+	pullUpdater *PullUpdater,
+	dbUpdater *DBUpdater,
+	db *db.BoltDB,
+) *ApplyCommandRunner {
 	return &ApplyCommandRunner{
-		cmdRunner:           cmdRunner,
-		vcsClient:           cmdRunner.VCSClient,
-		disableApplyAll:     cmdRunner.DisableApplyAll,
-		disableApply:        cmdRunner.DisableApply,
-		commitStatusUpdater: cmdRunner.CommitStatusUpdater,
-		prjCmdBuilder:       cmdRunner.ProjectCommandBuilder,
-		prjCmdRunner:        cmdRunner.ProjectCommandRunner,
+		vcsClient:           vcsClient,
+		DisableApplyAll:     disableApplyAll,
+		commitStatusUpdater: commitStatusUpdater,
+		prjCmdBuilder:       prjCommandBuilder,
+		prjCmdRunner:        prjCmdRunner,
+		autoMerger:          autoMerger,
+		pullUpdater:         pullUpdater,
+		dbUpdater:           dbUpdater,
+		DB:                  db,
 	}
 }
 
 type ApplyCommandRunner struct {
-	cmdRunner           *DefaultCommandRunner
-	disableApplyAll     bool
-	disableApply        bool
+	DisableApplyAll     bool
+	DB                  *db.BoltDB
 	vcsClient           vcs.Client
 	commitStatusUpdater CommitStatusUpdater
 	prjCmdBuilder       ProjectApplyCommandBuilder
 	prjCmdRunner        ProjectApplyCommandRunner
+	autoMerger          *AutoMerger
+	pullUpdater         *PullUpdater
+	dbUpdater           *DBUpdater
 }
 
 func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
@@ -32,15 +47,7 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
 
-	if a.disableApply {
-		ctx.Log.Info("ignoring apply command since apply disabled globally")
-		if err := a.vcsClient.CreateComment(baseRepo, pull.Num, applyDisabledComment, models.ApplyCommand.String()); err != nil {
-			ctx.Log.Err("unable to comment on pull request: %s", err)
-		}
-		return
-	}
-
-	if a.disableApplyAll && !cmd.IsForSpecificProject() {
+	if a.DisableApplyAll && !cmd.IsForSpecificProject() {
 		ctx.Log.Info("ignoring apply command without flags since apply all is disabled")
 		if err := a.vcsClient.CreateComment(baseRepo, pull.Num, applyAllDisabledComment, models.ApplyCommand.String()); err != nil {
 			ctx.Log.Err("unable to comment on pull request: %s", err)
@@ -82,7 +89,7 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
-		a.cmdRunner.updatePull(ctx, cmd, CommandResult{Error: err})
+		a.pullUpdater.updatePull(ctx, cmd, CommandResult{Error: err})
 		return
 	}
 
@@ -95,21 +102,21 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 		result = runProjectCmds(projectCmds, a.prjCmdRunner.Apply)
 	}
 
-	a.cmdRunner.updatePull(
+	a.pullUpdater.updatePull(
 		ctx,
 		cmd,
 		result)
 
-	pullStatus, err := a.cmdRunner.updateDB(ctx, pull, result.ProjectResults)
+	pullStatus, err := a.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
 	if err != nil {
-		a.cmdRunner.Logger.Err("writing results: %s", err)
+		ctx.Log.Err("writing results: %s", err)
 		return
 	}
 
 	a.updateCommitStatus(ctx, pullStatus)
 
-	if a.cmdRunner.automergeEnabled(projectCmds) {
-		a.cmdRunner.automerge(ctx, pullStatus)
+	if a.autoMerger.automergeEnabled(projectCmds) {
+		a.autoMerger.automerge(ctx, pullStatus)
 	}
 }
 
@@ -146,7 +153,7 @@ func (a *ApplyCommandRunner) updateCommitStatus(ctx *CommandContext, pullStatus 
 }
 
 func (a *ApplyCommandRunner) anyFailedPolicyChecks(pull models.PullRequest) bool {
-	policyCheckPullStatus, _ := a.cmdRunner.DB.GetPullStatus(pull)
+	policyCheckPullStatus, _ := a.DB.GetPullStatus(pull)
 	if policyCheckPullStatus != nil && policyCheckPullStatus.StatusCount(models.ErroredPolicyCheckStatus) > 0 {
 		return true
 	}

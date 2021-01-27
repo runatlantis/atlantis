@@ -50,6 +50,18 @@ var drainer *events.Drainer
 var deleteLockCommand *mocks.MockDeleteLockCommand
 var commitUpdater *mocks.MockCommitStatusUpdater
 
+// TODO: refactor these into their own unit tests.
+// these were all split out from default command runner in an effort to improve
+// readability however the tests were kept as is.
+var dbUpdater *events.DBUpdater
+var pullUpdater *events.PullUpdater
+var autoMerger *events.AutoMerger
+var policyCheckCommandRunner *events.PolicyCheckCommandRunner
+var approvePoliciesCommandRunner *events.ApprovePoliciesCommandRunner
+var planCommandRunner *events.PlanCommandRunner
+var applyCommandRunner *events.ApplyCommandRunner
+var unlockCommandRunner *events.UnlockCommandRunner
+
 func setup(t *testing.T) *vcsmocks.MockClient {
 	RegisterMockTestingT(t)
 	projectCommandBuilder = mocks.NewMockProjectCommandBuilder()
@@ -75,25 +87,88 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	When(logger.GetLevel()).ThenReturn(logging.Info)
 	When(logger.NewLogger("runatlantis/atlantis#1", true, logging.Info)).
 		ThenReturn(pullLogger)
+
+	scope := stats.NewDefaultStore()
+	dbUpdater = &events.DBUpdater{
+		DB: defaultBoltDB,
+	}
+
+	pullUpdater = &events.PullUpdater{
+		HidePrevCommandComments: false,
+		VCSClient:               vcsClient,
+		MarkdownRenderer:        &events.MarkdownRenderer{},
+	}
+
+	autoMerger = &events.AutoMerger{
+		VCSClient:       vcsClient,
+		GlobalAutomerge: false,
+	}
+
+	policyCheckCommandRunner = events.NewPolicyCheckCommandRunner(
+		dbUpdater,
+		pullUpdater,
+		commitUpdater,
+		projectCommandRunner,
+	)
+
+	planCommandRunner = events.NewPlanCommandRunner(
+		false,
+		vcsClient,
+		pendingPlanFinder,
+		workingDir,
+		commitUpdater,
+		projectCommandBuilder,
+		projectCommandRunner,
+		dbUpdater,
+		pullUpdater,
+		policyCheckCommandRunner,
+		autoMerger,
+	)
+
+	applyCommandRunner = events.NewApplyCommandRunner(
+		vcsClient,
+		false,
+		commitUpdater,
+		projectCommandBuilder,
+		projectCommandRunner,
+		autoMerger,
+		pullUpdater,
+		dbUpdater,
+		defaultBoltDB,
+	)
+
+	approvePoliciesCommandRunner = events.NewApprovePoliciesCommandRunner(
+		commitUpdater,
+		projectCommandBuilder,
+		projectCommandRunner,
+		pullUpdater,
+		dbUpdater,
+	)
+
+	unlockCommandRunner = events.NewUnlockCommandRunner(
+		deleteLockCommand,
+		vcsClient,
+	)
+
+	commentCommandRunnerByCmd := map[models.CommandName]events.CommentCommandRunner{
+		models.PlanCommand:            planCommandRunner,
+		models.ApplyCommand:           applyCommandRunner,
+		models.ApprovePoliciesCommand: approvePoliciesCommandRunner,
+		models.UnlockCommand:          unlockCommandRunner,
+	}
+
 	ch = events.DefaultCommandRunner{
-		VCSClient:                vcsClient,
-		CommitStatusUpdater:      commitUpdater, //&events.DefaultCommitStatusUpdater{vcsClient, "atlantis"},
-		EventParser:              eventParsing,
-		MarkdownRenderer:         &events.MarkdownRenderer{},
-		GithubPullGetter:         githubGetter,
-		GitlabMergeRequestGetter: gitlabGetter,
-		AzureDevopsPullGetter:    azuredevopsGetter,
-		Logger:                   logger,
-		AllowForkPRs:             false,
-		AllowForkPRsFlag:         "allow-fork-prs-flag",
-		ProjectCommandBuilder:    projectCommandBuilder,
-		ProjectCommandRunner:     projectCommandRunner,
-		PendingPlanFinder:        pendingPlanFinder,
-		WorkingDir:               workingDir,
-		DisableApplyAll:          false,
-		DB:                       defaultBoltDB,
-		Drainer:                  drainer,
-		DeleteLockCommand:        deleteLockCommand,
+		VCSClient:                 vcsClient,
+		CommentCommandRunnerByCmd: commentCommandRunnerByCmd,
+		EventParser:               eventParsing,
+		GithubPullGetter:          githubGetter,
+		GitlabMergeRequestGetter:  gitlabGetter,
+		AzureDevopsPullGetter:     azuredevopsGetter,
+		Logger:                    logger,
+		StatsScope:                scope,
+		AllowForkPRs:              false,
+		AllowForkPRsFlag:          "allow-fork-prs-flag",
+		Drainer:                   drainer,
 	}
 	return vcsClient
 }
@@ -196,7 +271,7 @@ func TestRunCommentCommand_DisableApplyAllDisabled(t *testing.T) {
 	t.Log("if \"atlantis apply\" is run and this is disabled atlantis should" +
 		" comment saying that this is not allowed")
 	vcsClient := setup(t)
-	ch.DisableApplyAll = true
+	applyCommandRunner.DisableApplyAll = true
 	pull := &github.PullRequest{
 		State: github.String("open"),
 	}
@@ -303,9 +378,10 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 	defer cleanup()
 	boltDB, err := db.New(tmp)
 	Ok(t, err)
-	ch.DB = boltDB
-	ch.GlobalAutomerge = true
-	defer func() { ch.GlobalAutomerge = false }()
+	dbUpdater.DB = boltDB
+	applyCommandRunner.DB = boltDB
+	autoMerger.GlobalAutomerge = true
+	defer func() { autoMerger.GlobalAutomerge = false }()
 
 	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())).
 		ThenReturn([]models.ProjectCommandContext{
@@ -349,9 +425,10 @@ func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {
 	defer cleanup()
 	boltDB, err := db.New(tmp)
 	Ok(t, err)
-	ch.DB = boltDB
-	ch.GlobalAutomerge = true
-	defer func() { ch.GlobalAutomerge = false }()
+	dbUpdater.DB = boltDB
+	applyCommandRunner.DB = boltDB
+	autoMerger.GlobalAutomerge = true
+	defer func() { autoMerger.GlobalAutomerge = false }()
 
 	pull := &github.PullRequest{
 		State: github.String("open"),
@@ -394,9 +471,10 @@ func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
 	defer cleanup()
 	boltDB, err := db.New(tmp)
 	Ok(t, err)
-	ch.DB = boltDB
-	ch.GlobalAutomerge = true
-	defer func() { ch.GlobalAutomerge = false }()
+	dbUpdater.DB = boltDB
+	applyCommandRunner.DB = boltDB
+	autoMerger.GlobalAutomerge = true
+	defer func() { autoMerger.GlobalAutomerge = false }()
 
 	pull := &github.PullRequest{
 		State: github.String("open"),
@@ -439,9 +517,10 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 	defer cleanup()
 	boltDB, err := db.New(tmp)
 	Ok(t, err)
-	ch.DB = boltDB
-	ch.GlobalAutomerge = true
-	defer func() { ch.GlobalAutomerge = false }()
+	dbUpdater.DB = boltDB
+	applyCommandRunner.DB = boltDB
+	autoMerger.GlobalAutomerge = true
+	defer func() { autoMerger.GlobalAutomerge = false }()
 
 	pull := &github.PullRequest{
 		State: github.String("open"),
@@ -498,8 +577,8 @@ func TestApplyWithAutoMerge_VSCMerge(t *testing.T) {
 	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState}
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
-	ch.GlobalAutomerge = true
-	defer func() { ch.GlobalAutomerge = false }()
+	autoMerger.GlobalAutomerge = true
+	defer func() { autoMerger.GlobalAutomerge = false }()
 
 	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.ApplyCommand})
 	vcsClient.VerifyWasCalledOnce().MergePull(modelPull)
@@ -509,13 +588,14 @@ func TestRunApply_DiscardedProjects(t *testing.T) {
 	t.Log("if \"atlantis apply\" is run with automerge and at least one project" +
 		" has a discarded plan, automerge should not take place")
 	vcsClient := setup(t)
-	ch.GlobalAutomerge = true
-	defer func() { ch.GlobalAutomerge = false }()
+	autoMerger.GlobalAutomerge = true
+	defer func() { autoMerger.GlobalAutomerge = false }()
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 	boltDB, err := db.New(tmp)
 	Ok(t, err)
-	ch.DB = boltDB
+	dbUpdater.DB = boltDB
+	applyCommandRunner.DB = boltDB
 	pull := fixtures.Pull
 	pull.BaseRepo = fixtures.GithubRepo
 	_, err = boltDB.UpdatePullWithResults(pull, []models.ProjectResult{

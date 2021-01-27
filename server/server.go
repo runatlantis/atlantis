@@ -460,32 +460,93 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Webhooks:            webhooksManager,
 		WorkingDirLocker:    workingDirLocker,
 	}
+	instrumentedProjectCmdRunner := &events.InstrumentedProjectCommandRunner{
+		ProjectCommandRunner: projectCommandRunner,
+	}
+
+	dbUpdater := &events.DBUpdater{
+		DB: boltdb,
+	}
+
+	pullUpdater := &events.PullUpdater{
+		HidePrevCommandComments: userConfig.HidePrevPlanComments,
+		VCSClient:               vcsClient,
+		MarkdownRenderer:        markdownRenderer,
+	}
+
+	autoMerger := &events.AutoMerger{
+		VCSClient:       vcsClient,
+		GlobalAutomerge: userConfig.Automerge,
+	}
+
+	policyCheckCommandRunner := events.NewPolicyCheckCommandRunner(
+		dbUpdater,
+		pullUpdater,
+		commitStatusUpdater,
+		instrumentedProjectCmdRunner,
+	)
+
+	planCommandRunner := events.NewPlanCommandRunner(
+		userConfig.SilenceVCSStatusNoPlans,
+		vcsClient,
+		pendingPlanFinder,
+		workingDir,
+		commitStatusUpdater,
+		projectCommandBuilder,
+		instrumentedProjectCmdRunner,
+		dbUpdater,
+		pullUpdater,
+		policyCheckCommandRunner,
+		autoMerger,
+	)
+
+	applyCommandRunner := events.NewApplyCommandRunner(
+		vcsClient,
+		userConfig.DisableApplyAll,
+		commitStatusUpdater,
+		projectCommandBuilder,
+		instrumentedProjectCmdRunner,
+		autoMerger,
+		pullUpdater,
+		dbUpdater,
+		boltdb,
+	)
+
+	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
+		commitStatusUpdater,
+		projectCommandBuilder,
+		instrumentedProjectCmdRunner,
+		pullUpdater,
+		dbUpdater,
+	)
+
+	unlockCommandRunner := events.NewUnlockCommandRunner(
+		deleteLockCommand,
+		vcsClient,
+	)
+
+	commentCommandRunnerByCmd := map[models.CommandName]events.CommentCommandRunner{
+		models.PlanCommand:            planCommandRunner,
+		models.ApplyCommand:           applyCommandRunner,
+		models.ApprovePoliciesCommand: approvePoliciesCommandRunner,
+		models.UnlockCommand:          unlockCommandRunner,
+	}
+
 	commandRunner := &events.DefaultCommandRunner{
-		VCSClient:                vcsClient,
-		GithubPullGetter:         githubClient,
-		GitlabMergeRequestGetter: gitlabClient,
-		AzureDevopsPullGetter:    azuredevopsClient,
-		CommitStatusUpdater:      commitStatusUpdater,
-		EventParser:              eventParser,
-		MarkdownRenderer:         markdownRenderer,
-		Logger:                   logger,
-		AllowForkPRs:             userConfig.AllowForkPRs,
-		AllowForkPRsFlag:         config.AllowForkPRsFlag,
-		HidePrevPlanComments:     userConfig.HidePrevPlanComments,
-		SilenceForkPRErrors:      userConfig.SilenceForkPRErrors,
-		SilenceForkPRErrorsFlag:  config.SilenceForkPRErrorsFlag,
-		SilenceVCSStatusNoPlans:  userConfig.SilenceVCSStatusNoPlans,
-		DisableApplyAll:          userConfig.DisableApplyAll,
-		DisableApply:             userConfig.DisableApply,
-		DisableAutoplan:          userConfig.DisableAutoplan,
-		ProjectCommandBuilder:    projectCommandBuilder,
-		ProjectCommandRunner:     projectCommandRunner,
-		WorkingDir:               workingDir,
-		PendingPlanFinder:        pendingPlanFinder,
-		DB:                       boltdb,
-		DeleteLockCommand:        deleteLockCommand,
-		GlobalAutomerge:          userConfig.Automerge,
-		Drainer:                  drainer,
+		VCSClient:                 vcsClient,
+		GithubPullGetter:          githubClient,
+		GitlabMergeRequestGetter:  gitlabClient,
+		AzureDevopsPullGetter:     azuredevopsClient,
+		CommentCommandRunnerByCmd: commentCommandRunnerByCmd,
+		EventParser:               eventParser,
+		Logger:                    logger,
+		StatsScope:                statsScope.Scope("cmd"),
+		AllowForkPRs:              userConfig.AllowForkPRs,
+		AllowForkPRsFlag:          config.AllowForkPRsFlag,
+		SilenceForkPRErrors:       userConfig.SilenceForkPRErrors,
+		SilenceForkPRErrorsFlag:   config.SilenceForkPRErrorsFlag,
+		DisableAutoplan:           userConfig.DisableAutoplan,
+		Drainer:                   drainer,
 	}
 	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
 	if err != nil {

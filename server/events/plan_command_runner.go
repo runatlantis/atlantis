@@ -6,34 +6,47 @@ import (
 )
 
 func NewPlanCommandRunner(
-	cmdRunner *DefaultCommandRunner,
-	isAutoplan bool,
+	silenceVCSStatusNoPlans bool,
+	vcsClient vcs.Client,
+	pendingPlanFinder PendingPlanFinder,
+	workingDir WorkingDir,
+	commitStatusUpdater CommitStatusUpdater,
+	projectCommandBuilder ProjectPlanCommandBuilder,
+	projectCommandRunner ProjectPlanCommandRunner,
+	dbUpdater *DBUpdater,
+	pullUpdater *PullUpdater,
+	policyCheckCommandRunner *PolicyCheckCommandRunner,
+	autoMerger *AutoMerger,
 ) *PlanCommandRunner {
 	return &PlanCommandRunner{
-		isAutoplan:              isAutoplan,
-		cmdRunner:               cmdRunner,
-		silenceVCSStatusNoPlans: cmdRunner.SilenceVCSStatusNoPlans,
-		globalAutomerge:         cmdRunner.GlobalAutomerge,
-		vcsClient:               cmdRunner.VCSClient,
-		pendingPlanFinder:       cmdRunner.PendingPlanFinder,
-		workingDir:              cmdRunner.WorkingDir,
-		commitStatusUpdater:     cmdRunner.CommitStatusUpdater,
-		prjCmdBuilder:           cmdRunner.ProjectCommandBuilder,
-		prjCmdRunner:            cmdRunner.ProjectCommandRunner,
+		silenceVCSStatusNoPlans:  silenceVCSStatusNoPlans,
+		vcsClient:                vcsClient,
+		pendingPlanFinder:        pendingPlanFinder,
+		workingDir:               workingDir,
+		commitStatusUpdater:      commitStatusUpdater,
+		prjCmdBuilder:            projectCommandBuilder,
+		prjCmdRunner:             projectCommandRunner,
+		dbUpdater:                dbUpdater,
+		pullUpdater:              pullUpdater,
+		policyCheckCommandRunner: policyCheckCommandRunner,
+		autoMerger:               autoMerger,
 	}
 }
 
 type PlanCommandRunner struct {
-	cmdRunner               *DefaultCommandRunner
-	vcsClient               vcs.Client
-	globalAutomerge         bool
-	isAutoplan              bool
-	silenceVCSStatusNoPlans bool
-	commitStatusUpdater     CommitStatusUpdater
-	pendingPlanFinder       PendingPlanFinder
-	workingDir              WorkingDir
-	prjCmdBuilder           ProjectPlanCommandBuilder
-	prjCmdRunner            ProjectPlanCommandRunner
+	vcsClient vcs.Client
+	// SilenceVCSStatusNoPlans is whether autoplan should set commit status if no plans
+	// are found
+	silenceVCSStatusNoPlans  bool
+	commitStatusUpdater      CommitStatusUpdater
+	pendingPlanFinder        PendingPlanFinder
+	workingDir               WorkingDir
+	prjCmdBuilder            ProjectPlanCommandBuilder
+	prjCmdRunner             ProjectPlanCommandRunner
+	dbUpdater                *DBUpdater
+	pullUpdater              *PullUpdater
+	policyCheckCommandRunner *PolicyCheckCommandRunner
+	autoMerger               *AutoMerger
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *CommandContext) {
@@ -45,7 +58,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *CommandContext) {
 		if statusErr := p.commitStatusUpdater.UpdateCombined(baseRepo, pull, models.FailedCommitStatus, models.PlanCommand); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
-		p.cmdRunner.updatePull(ctx, AutoplanCommand{}, CommandResult{Error: err})
+		p.pullUpdater.updatePull(ctx, AutoplanCommand{}, CommandResult{Error: err})
 		return
 	}
 
@@ -85,17 +98,17 @@ func (p *PlanCommandRunner) runAutoplan(ctx *CommandContext) {
 		result = runProjectCmds(projectCmds, p.prjCmdRunner.Plan)
 	}
 
-	if p.cmdRunner.automergeEnabled(projectCmds) && result.HasErrors() {
+	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
 		p.deletePlans(ctx)
 		result.PlansDeleted = true
 	}
 
-	p.cmdRunner.updatePull(ctx, AutoplanCommand{}, result)
+	p.pullUpdater.updatePull(ctx, AutoplanCommand{}, result)
 
-	pullStatus, err := p.cmdRunner.updateDB(ctx, ctx.Pull, result.ProjectResults)
+	pullStatus, err := p.dbUpdater.updateDB(ctx, ctx.Pull, result.ProjectResults)
 	if err != nil {
-		p.cmdRunner.Logger.Err("writing results: %s", err)
+		ctx.Log.Err("writing results: %s", err)
 	}
 
 	p.updateCommitStatus(ctx, pullStatus)
@@ -105,8 +118,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *CommandContext) {
 		!(result.HasErrors() || result.PlansDeleted) {
 		// Run policy_check command
 		ctx.Log.Info("Running policy_checks for all plans")
-		pcCmdRunner := NewPolicyCheckCommandRunner(p.cmdRunner, policyCheckCmds)
-		pcCmdRunner.Run(ctx)
+		p.policyCheckCommandRunner.Run(ctx, policyCheckCmds)
 	}
 }
 
@@ -124,7 +136,7 @@ func (p *PlanCommandRunner) run(ctx *CommandContext, cmd *CommentCommand) {
 		if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, models.PlanCommand); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
-		p.cmdRunner.updatePull(ctx, cmd, CommandResult{Error: err})
+		p.pullUpdater.updatePull(ctx, cmd, CommandResult{Error: err})
 		return
 	}
 
@@ -139,20 +151,20 @@ func (p *PlanCommandRunner) run(ctx *CommandContext, cmd *CommentCommand) {
 		result = runProjectCmds(projectCmds, p.prjCmdRunner.Plan)
 	}
 
-	if p.cmdRunner.automergeEnabled(projectCmds) && result.HasErrors() {
+	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
 		p.deletePlans(ctx)
 		result.PlansDeleted = true
 	}
 
-	p.cmdRunner.updatePull(
+	p.pullUpdater.updatePull(
 		ctx,
 		cmd,
 		result)
 
-	pullStatus, err := p.cmdRunner.updateDB(ctx, pull, result.ProjectResults)
+	pullStatus, err := p.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
 	if err != nil {
-		p.cmdRunner.Logger.Err("writing results: %s", err)
+		ctx.Log.Err("writing results: %s", err)
 		return
 	}
 
@@ -163,13 +175,12 @@ func (p *PlanCommandRunner) run(ctx *CommandContext, cmd *CommentCommand) {
 	if len(result.ProjectResults) > 0 &&
 		!(result.HasErrors() || result.PlansDeleted) {
 		ctx.Log.Info("Running policy check for %s", cmd.String())
-		pcCmdRunner := NewPolicyCheckCommandRunner(p.cmdRunner, policyCheckCmds)
-		pcCmdRunner.Run(ctx)
+		p.policyCheckCommandRunner.Run(ctx, policyCheckCmds)
 	}
 }
 
 func (p *PlanCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
-	if p.isAutoplan {
+	if ctx.Trigger == Auto {
 		p.runAutoplan(ctx)
 	} else {
 		p.run(ctx, cmd)

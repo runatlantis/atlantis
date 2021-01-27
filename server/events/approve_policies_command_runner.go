@@ -7,19 +7,25 @@ import (
 )
 
 func NewApprovePoliciesCommandRunner(
-	cmdRunner *DefaultCommandRunner,
+	commitStatusUpdater CommitStatusUpdater,
+	prjCommandBuilder ProjectApprovePoliciesCommandBuilder,
+	prjCommandRunner ProjectPolicyCheckCommandRunner,
+	pullUpdater *PullUpdater,
+	dbUpdater *DBUpdater,
 ) *ApprovePoliciesCommandRunner {
 	return &ApprovePoliciesCommandRunner{
-		cmdRunner:           cmdRunner,
-		commitStatusUpdater: cmdRunner.CommitStatusUpdater,
-		prjCmdBuilder:       cmdRunner.ProjectCommandBuilder,
-		prjCmdRunner:        cmdRunner.ProjectCommandRunner,
+		commitStatusUpdater: commitStatusUpdater,
+		prjCmdBuilder:       prjCommandBuilder,
+		prjCmdRunner:        prjCommandRunner,
+		pullUpdater:         pullUpdater,
+		dbUpdater:           dbUpdater,
 	}
 }
 
 type ApprovePoliciesCommandRunner struct {
-	cmdRunner           *DefaultCommandRunner
 	commitStatusUpdater CommitStatusUpdater
+	pullUpdater         *PullUpdater
+	dbUpdater           *DBUpdater
 	prjCmdBuilder       ProjectApprovePoliciesCommandBuilder
 	prjCmdRunner        ProjectPolicyCheckCommandRunner
 }
@@ -37,21 +43,21 @@ func (a *ApprovePoliciesCommandRunner) Run(ctx *CommandContext, cmd *CommentComm
 		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, models.PolicyCheckCommand); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
-		a.cmdRunner.updatePull(ctx, cmd, CommandResult{Error: err})
+		a.pullUpdater.updatePull(ctx, cmd, CommandResult{Error: err})
 		return
 	}
 
 	result := a.buildApprovePolicyCommandResults(ctx, projectCmds)
 
-	a.cmdRunner.updatePull(
+	a.pullUpdater.updatePull(
 		ctx,
 		cmd,
 		result,
 	)
 
-	pullStatus, err := a.cmdRunner.updateDB(ctx, pull, result.ProjectResults)
+	pullStatus, err := a.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
 	if err != nil {
-		a.cmdRunner.Logger.Err("writing results: %s", err)
+		ctx.Log.Err("writing results: %s", err)
 		return
 	}
 
