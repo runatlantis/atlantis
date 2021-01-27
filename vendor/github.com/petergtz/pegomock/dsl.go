@@ -43,7 +43,7 @@ var (
 
 var globalArgMatchers Matchers
 
-func RegisterMatcher(matcher Matcher) {
+func RegisterMatcher(matcher ArgumentMatcher) {
 	globalArgMatchers.append(matcher)
 }
 
@@ -72,11 +72,11 @@ func (genericMock *GenericMock) Invoke(methodName string, params []Param, return
 	return genericMock.getOrCreateMockedMethod(methodName).Invoke(params)
 }
 
-func (genericMock *GenericMock) stub(methodName string, paramMatchers []Matcher, returnValues ReturnValues) {
+func (genericMock *GenericMock) stub(methodName string, paramMatchers []ArgumentMatcher, returnValues ReturnValues) {
 	genericMock.stubWithCallback(methodName, paramMatchers, func([]Param) ReturnValues { return returnValues })
 }
 
-func (genericMock *GenericMock) stubWithCallback(methodName string, paramMatchers []Matcher, callback func([]Param) ReturnValues) {
+func (genericMock *GenericMock) stubWithCallback(methodName string, paramMatchers []ArgumentMatcher, callback func([]Param) ReturnValues) {
 	genericMock.getOrCreateMockedMethod(methodName).stub(paramMatchers, callback)
 }
 
@@ -89,13 +89,13 @@ func (genericMock *GenericMock) getOrCreateMockedMethod(methodName string) *mock
 	return genericMock.mockedMethods[methodName]
 }
 
-func (genericMock *GenericMock) reset(methodName string, paramMatchers []Matcher) {
+func (genericMock *GenericMock) reset(methodName string, paramMatchers []ArgumentMatcher) {
 	genericMock.getOrCreateMockedMethod(methodName).reset(paramMatchers)
 }
 
 func (genericMock *GenericMock) Verify(
 	inOrderContext *InOrderContext,
-	invocationCountMatcher Matcher,
+	invocationCountMatcher InvocationCountMatcher,
 	methodName string,
 	params []Param,
 	options ...interface{},
@@ -175,7 +175,7 @@ func (genericMock *GenericMock) GetInvocationParams(methodInvocations []MethodIn
 	return result
 }
 
-func (genericMock *GenericMock) methodInvocations(methodName string, params []Param, matchers []Matcher) []MethodInvocation {
+func (genericMock *GenericMock) methodInvocations(methodName string, params []Param, matchers []ArgumentMatcher) []MethodInvocation {
 	var invocations []MethodInvocation
 	if method, exists := genericMock.mockedMethods[methodName]; exists {
 		method.Lock()
@@ -200,7 +200,7 @@ func formatInteractions(interactions map[string][]MethodInvocation) string {
 	if len(interactions) == 0 {
 		return "There were no other interactions with this mock"
 	}
-	result := "But other interactions with this mock were:\n"
+	result := "Actual interactions with this mock were:\n"
 	for _, methodName := range sortedMethodNames(interactions) {
 		result += formatInvocations(methodName, interactions[methodName])
 	}
@@ -224,7 +224,7 @@ func formatParams(params []Param) (result string) {
 	return
 }
 
-func formatMatchers(matchers []Matcher) (result string) {
+func formatMatchers(matchers []ArgumentMatcher) (result string) {
 	for i, matcher := range matchers {
 		if i > 0 {
 			result += ", "
@@ -366,7 +366,7 @@ func (stubbing *Stubbing) Invoke(params []Param) ReturnValues {
 	return stubbing.callbackSequence[stubbing.sequencePointer](params)
 }
 
-type Matchers []Matcher
+type Matchers []ArgumentMatcher
 
 func (matchers Matchers) Matches(params []Param) bool {
 	if len(matchers) != len(params) { // Technically, this is not an error. Variadic arguments can cause this
@@ -381,14 +381,14 @@ func (matchers Matchers) Matches(params []Param) bool {
 	return true
 }
 
-func (matchers *Matchers) append(matcher Matcher) {
+func (matchers *Matchers) append(matcher ArgumentMatcher) {
 	*matchers = append(*matchers, matcher)
 }
 
 type ongoingStubbing struct {
 	genericMock   *GenericMock
 	MethodName    string
-	ParamMatchers []Matcher
+	ParamMatchers []ArgumentMatcher
 	returnTypes   []reflect.Type
 }
 
@@ -434,7 +434,7 @@ func actualTypeOf(iface interface{}) reflect.Type {
 	return reflect.TypeOf(iface)
 }
 
-func paramMatchersFromArgMatchersOrParams(argMatchers []Matcher, params []Param) []Matcher {
+func paramMatchersFromArgMatchersOrParams(argMatchers []ArgumentMatcher, params []Param) []ArgumentMatcher {
 	if len(argMatchers) != 0 {
 		verifyArgMatcherUse(argMatchers, params)
 		return argMatchers
@@ -442,7 +442,7 @@ func paramMatchersFromArgMatchersOrParams(argMatchers []Matcher, params []Param)
 	return transformParamsIntoEqMatchers(params)
 }
 
-func verifyArgMatcherUse(argMatchers []Matcher, params []Param) {
+func verifyArgMatcherUse(argMatchers []ArgumentMatcher, params []Param) {
 	verify.Argument(len(argMatchers) == len(params),
 		"Invalid use of matchers!\n\n %v matchers expected, %v recorded.\n\n"+
 			"This error may occur if matchers are combined with raw values:\n"+
@@ -456,8 +456,8 @@ func verifyArgMatcherUse(argMatchers []Matcher, params []Param) {
 	)
 }
 
-func transformParamsIntoEqMatchers(params []Param) []Matcher {
-	paramMatchers := make([]Matcher, len(params))
+func transformParamsIntoEqMatchers(params []Param) []ArgumentMatcher {
+	paramMatchers := make([]ArgumentMatcher, len(params))
 	for i, param := range params {
 		paramMatchers[i] = &EqMatcher{Value: param}
 	}
@@ -528,8 +528,22 @@ type InOrderContext struct {
 	lastInvokedMethodParams []Param
 }
 
-// Matcher ... it is guaranteed that FailureMessage will always be called after Matches
-// so an implementation can save state
+// ArgumentMatcher can be used to match arguments.
+type ArgumentMatcher interface {
+	Matches(param Param) bool
+	fmt.Stringer
+}
+
+// InvocationCountMatcher can be used to match invocation counts. It is guaranteed that
+// FailureMessage will always be called after Matches so an implementation can save state.
+type InvocationCountMatcher interface {
+	Matches(param Param) bool
+	FailureMessage() string
+}
+
+// Matcher can be used to match arguments as well as invocation counts.
+// Note that support for overlapping embedded interfaces was added in Go 1.14, which is why
+// ArgumentMatcher and InvocationCountMatcher are not embedded here.
 type Matcher interface {
 	Matches(param Param) bool
 	FailureMessage() string

@@ -3,6 +3,13 @@
 Pre workflow hooks can be defined to run scripts right before default or custom
 workflows are executed. 
 
+::: tip Note
+Defined pre workflow hooks will be executed only once when a new pull 
+request is opened, and later only if this pull request has been updated.
+The pre workflow hooks are not run on manual `atlantis plan` or
+`atlantis apply` commands.
+::: 
+
 [[toc]]
 
 ## Usage
@@ -33,7 +40,7 @@ command](custom-workflows.html#custom-run-command).
 - run: custom-command
 ```
 | Key | Type   | Default | Required | Description          |
-|-----|--------|---------|----------|----------------------|
+| --- | ------ | ------- | -------- | -------------------- |
 | run | string | none    | no       | Run a custom command |
 
 ::: tip Notes

@@ -18,7 +18,7 @@ import (
 type GithubCredentials interface {
 	Client() (*http.Client, error)
 	GetToken() (string, error)
-	GetUser() string
+	GetUser() (string, error)
 }
 
 // GithubAnonymousCredentials expose no credentials.
@@ -31,8 +31,8 @@ func (c *GithubAnonymousCredentials) Client() (*http.Client, error) {
 }
 
 // GetUser returns the username for these credentials.
-func (c *GithubAnonymousCredentials) GetUser() string {
-	return "anonymous"
+func (c *GithubAnonymousCredentials) GetUser() (string, error) {
+	return "anonymous", nil
 }
 
 // GetToken returns an empty token.
@@ -56,8 +56,8 @@ func (c *GithubUserCredentials) Client() (*http.Client, error) {
 }
 
 // GetUser returns the username for these credentials.
-func (c *GithubUserCredentials) GetUser() string {
-	return c.User
+func (c *GithubUserCredentials) GetUser() (string, error) {
+	return c.User, nil
 }
 
 // GetToken returns the user token.
@@ -73,6 +73,7 @@ type GithubAppCredentials struct {
 	apiURL         *url.URL
 	installationID int64
 	tr             *ghinstallation.Transport
+	AppSlug        string
 }
 
 // Client returns a github app installation client.
@@ -85,8 +86,29 @@ func (c *GithubAppCredentials) Client() (*http.Client, error) {
 }
 
 // GetUser returns the username for these credentials.
-func (c *GithubAppCredentials) GetUser() string {
-	return ""
+func (c *GithubAppCredentials) GetUser() (string, error) {
+	// Keeping backwards compatibility since this flag is optional
+	if c.AppSlug == "" {
+		return "", nil
+	}
+	client, err := c.Client()
+
+	if err != nil {
+		return "", errors.Wrap(err, "initializing client")
+	}
+
+	ghClient := github.NewClient(client)
+	ghClient.BaseURL = c.getAPIURL()
+	ctx := context.Background()
+
+	app, _, err := ghClient.Apps.Get(ctx, c.AppSlug)
+
+	if err != nil {
+		return "", errors.Wrap(err, "getting app details")
+	}
+	// Currently there is no way to get the bot's login info, so this is a
+	// hack until Github exposes that.
+	return fmt.Sprintf("%s[bot]", app.GetName()), nil
 }
 
 // GetToken returns a fresh installation token.
