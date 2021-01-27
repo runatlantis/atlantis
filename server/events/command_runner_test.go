@@ -492,7 +492,9 @@ func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
 		{
 			CommandName: models.ApprovePoliciesCommand,
 			PolicySets: valid.PolicySets{
-				Owners: []string{fixtures.User.Username},
+				Owners: valid.PolicyOwners{
+					Users: []string{fixtures.User.Username},
+				},
 			},
 		},
 	}, nil)

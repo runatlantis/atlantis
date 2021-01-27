@@ -14,15 +14,19 @@ const (
 // context to enforce policies.
 type PolicySets struct {
 	Version    *version.Version
-	Owners     []string
+	Owners     PolicyOwners
 	PolicySets []PolicySet
+}
+
+type PolicyOwners struct {
+	Users []string
 }
 
 type PolicySet struct {
 	Source string
 	Path   string
 	Name   string
-	Owners []string
+	Owners PolicyOwners
 }
 
 func (p *PolicySets) HasPolicies() bool {
@@ -30,7 +34,7 @@ func (p *PolicySets) HasPolicies() bool {
 }
 
 func (p *PolicySets) IsOwner(username string) bool {
-	for _, uname := range p.Owners {
+	for _, uname := range p.Owners.Users {
 		if uname == username {
 			return true
 		}

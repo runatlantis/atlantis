@@ -80,9 +80,11 @@ func TestPolicySets_Validate(t *testing.T) {
 					},
 					{
 						Name: "policy-name-2",
-						Owners: []string{
-							"john-doe",
-							"jane-doe",
+						Owners: raw.PolicyOwners{
+							Users: []string{
+								"john-doe",
+								"jane-doe",
+							},
 						},
 						Path:   "rel/path/to/source",
 						Source: valid.GithubPolicySet,
@@ -174,15 +176,19 @@ func TestPolicySets_ToValid(t *testing.T) {
 			description: "valid policies with owners",
 			input: raw.PolicySets{
 				Version: String("v1.0.0"),
-				Owners: []string{
-					"test",
+				Owners: raw.PolicyOwners{
+					Users: []string{
+						"test",
+					},
 				},
 				PolicySets: []raw.PolicySet{
 					{
 						Name: "good-policy",
-						Owners: []string{
-							"john-doe",
-							"jane-doe",
+						Owners: raw.PolicyOwners{
+							Users: []string{
+								"john-doe",
+								"jane-doe",
+							},
 						},
 						Path:   "rel/path/to/source",
 						Source: valid.LocalPolicySet,
@@ -191,13 +197,17 @@ func TestPolicySets_ToValid(t *testing.T) {
 			},
 			exp: valid.PolicySets{
 				Version: version,
-				Owners:  []string{"test"},
+				Owners: valid.PolicyOwners{
+					Users: []string{"test"},
+				},
 				PolicySets: []valid.PolicySet{
 					{
 						Name: "good-policy",
-						Owners: []string{
-							"john-doe",
-							"jane-doe",
+						Owners: valid.PolicyOwners{
+							Users: []string{
+								"john-doe",
+								"jane-doe",
+							},
 						},
 						Path:   "rel/path/to/source",
 						Source: "local",
@@ -206,15 +216,17 @@ func TestPolicySets_ToValid(t *testing.T) {
 			},
 		},
 		{
-			description: "valid policies wihthout owners",
+			description: "valid policies without owners",
 			input: raw.PolicySets{
 				Version: String("v1.0.0"),
 				PolicySets: []raw.PolicySet{
 					{
 						Name: "good-policy",
-						Owners: []string{
-							"john-doe",
-							"jane-doe",
+						Owners: raw.PolicyOwners{
+							Users: []string{
+								"john-doe",
+								"jane-doe",
+							},
 						},
 						Path:   "rel/path/to/source",
 						Source: valid.LocalPolicySet,
@@ -226,9 +238,11 @@ func TestPolicySets_ToValid(t *testing.T) {
 				PolicySets: []valid.PolicySet{
 					{
 						Name: "good-policy",
-						Owners: []string{
-							"john-doe",
-							"jane-doe",
+						Owners: valid.PolicyOwners{
+							Users: []string{
+								"john-doe",
+								"jane-doe",
+							},
 						},
 						Path:   "rel/path/to/source",
 						Source: "local",

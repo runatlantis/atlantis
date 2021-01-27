@@ -8,9 +8,9 @@ import (
 
 // PolicySets is the raw schema for repo-level atlantis.yaml config.
 type PolicySets struct {
-	Version    *string     `yaml:"conftest_version,omitempty" json:"conftest_version,omitempty"`
-	Owners     []string    `yaml:"owners,omitempty" json:"owners,omitempty"`
-	PolicySets []PolicySet `yaml:"policy_sets" json:"policy_sets"`
+	Version    *string      `yaml:"conftest_version,omitempty" json:"conftest_version,omitempty"`
+	Owners     PolicyOwners `yaml:"owners,omitempty" json:"owners,omitempty"`
+	PolicySets []PolicySet  `yaml:"policy_sets" json:"policy_sets"`
 }
 
 func (p PolicySets) Validate() error {
@@ -27,9 +27,7 @@ func (p PolicySets) ToValid() valid.PolicySets {
 		policySets.Version, _ = version.NewVersion(*p.Version)
 	}
 
-	if len(p.Owners) > 0 {
-		policySets.Owners = p.Owners
-	}
+	policySets.Owners = p.Owners.ToValid()
 
 	validPolicySets := make([]valid.PolicySet, 0)
 	for _, rawPolicySet := range p.PolicySets {
@@ -40,11 +38,24 @@ func (p PolicySets) ToValid() valid.PolicySets {
 	return policySets
 }
 
+type PolicyOwners struct {
+	Users []string `yaml:"users,omitempty" json:"users,omitempty"`
+}
+
+func (o PolicyOwners) ToValid() valid.PolicyOwners {
+	var policyOwners valid.PolicyOwners
+
+	if len(o.Users) > 0 {
+		policyOwners.Users = o.Users
+	}
+	return policyOwners
+}
+
 type PolicySet struct {
-	Path   string   `yaml:"path" json:"path"`
-	Source string   `yaml:"source" json:"source"`
-	Name   string   `yaml:"name" json:"name"`
-	Owners []string `yaml:"owners,omitempty" json:"owners,omitempty"`
+	Path   string       `yaml:"path" json:"path"`
+	Source string       `yaml:"source" json:"source"`
+	Name   string       `yaml:"name" json:"name"`
+	Owners PolicyOwners `yaml:"owners,omitempty" json:"owners,omitempty"`
 }
 
 func (p PolicySet) Validate() error {
@@ -62,7 +73,7 @@ func (p PolicySet) ToValid() valid.PolicySet {
 	policySet.Name = p.Name
 	policySet.Path = p.Path
 	policySet.Source = p.Source
-	policySet.Owners = p.Owners
+	policySet.Owners = p.Owners.ToValid()
 
 	return policySet
 }
