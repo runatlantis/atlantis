@@ -1,14 +1,15 @@
 package slack
 
 import (
+	"context"
 	"errors"
 	"net/url"
 	"strconv"
 )
 
 const (
-	DEFAULT_LOGINS_COUNT   = 100
-	DEFAULT_LOGINS_PAGE    = 1
+	DEFAULT_LOGINS_COUNT = 100
+	DEFAULT_LOGINS_PAGE  = 1
 )
 
 type TeamResponse struct {
@@ -26,10 +27,9 @@ type TeamInfo struct {
 
 type LoginResponse struct {
 	Logins []Login `json:"logins"`
-	Paging         `json:"paging"`
+	Paging `json:"paging"`
 	SlackResponse
 }
-
 
 type Login struct {
 	UserID    string `json:"user_id"`
@@ -47,7 +47,6 @@ type Login struct {
 type BillableInfoResponse struct {
 	BillableInfo map[string]BillingActive `json:"billable_info"`
 	SlackResponse
-
 }
 
 type BillingActive struct {
@@ -56,8 +55,8 @@ type BillingActive struct {
 
 // AccessLogParameters contains all the parameters necessary (including the optional ones) for a GetAccessLogs() request
 type AccessLogParameters struct {
-	Count         int
-	Page          int
+	Count int
+	Page  int
 }
 
 // NewAccessLogParameters provides an instance of AccessLogParameters with all the sane default values set
@@ -68,10 +67,9 @@ func NewAccessLogParameters() AccessLogParameters {
 	}
 }
 
-
-func teamRequest(path string, values url.Values, debug bool) (*TeamResponse, error) {
+func teamRequest(ctx context.Context, client HTTPRequester, path string, values url.Values, debug bool) (*TeamResponse, error) {
 	response := &TeamResponse{}
-	err := post(path, values, response, debug)
+	err := postSlackMethod(ctx, client, path, values, response, debug)
 	if err != nil {
 		return nil, err
 	}
@@ -83,9 +81,9 @@ func teamRequest(path string, values url.Values, debug bool) (*TeamResponse, err
 	return response, nil
 }
 
-func billableInfoRequest(path string, values url.Values, debug bool) (map[string]BillingActive, error) {
+func billableInfoRequest(ctx context.Context, client HTTPRequester, path string, values url.Values, debug bool) (map[string]BillingActive, error) {
 	response := &BillableInfoResponse{}
-	err := post(path, values, response, debug)
+	err := postSlackMethod(ctx, client, path, values, response, debug)
 	if err != nil {
 		return nil, err
 	}
@@ -97,9 +95,9 @@ func billableInfoRequest(path string, values url.Values, debug bool) (map[string
 	return response.BillableInfo, nil
 }
 
-func accessLogsRequest(path string, values url.Values, debug bool) (*LoginResponse, error) {
+func accessLogsRequest(ctx context.Context, client HTTPRequester, path string, values url.Values, debug bool) (*LoginResponse, error) {
 	response := &LoginResponse{}
-	err := post(path, values, response, debug)
+	err := postSlackMethod(ctx, client, path, values, response, debug)
 	if err != nil {
 		return nil, err
 	}
@@ -109,14 +107,18 @@ func accessLogsRequest(path string, values url.Values, debug bool) (*LoginRespon
 	return response, nil
 }
 
-
 // GetTeamInfo gets the Team Information of the user
 func (api *Client) GetTeamInfo() (*TeamInfo, error) {
+	return api.GetTeamInfoContext(context.Background())
+}
+
+// GetTeamInfoContext gets the Team Information of the user with a custom context
+func (api *Client) GetTeamInfoContext(ctx context.Context) (*TeamInfo, error) {
 	values := url.Values{
-		"token": {api.config.token},
+		"token": {api.token},
 	}
 
-	response, err := teamRequest("team.info", values, api.debug)
+	response, err := teamRequest(ctx, api.httpclient, "team.info", values, api.debug)
 	if err != nil {
 		return nil, err
 	}
@@ -125,8 +127,13 @@ func (api *Client) GetTeamInfo() (*TeamInfo, error) {
 
 // GetAccessLogs retrieves a page of logins according to the parameters given
 func (api *Client) GetAccessLogs(params AccessLogParameters) ([]Login, *Paging, error) {
+	return api.GetAccessLogsContext(context.Background(), params)
+}
+
+// GetAccessLogsContext retrieves a page of logins according to the parameters given with a custom context
+func (api *Client) GetAccessLogsContext(ctx context.Context, params AccessLogParameters) ([]Login, *Paging, error) {
 	values := url.Values{
-		"token": {api.config.token},
+		"token": {api.token},
 	}
 	if params.Count != DEFAULT_LOGINS_COUNT {
 		values.Add("count", strconv.Itoa(params.Count))
@@ -134,7 +141,8 @@ func (api *Client) GetAccessLogs(params AccessLogParameters) ([]Login, *Paging, 
 	if params.Page != DEFAULT_LOGINS_PAGE {
 		values.Add("page", strconv.Itoa(params.Page))
 	}
-	response, err := accessLogsRequest("team.accessLogs", values, api.debug)
+
+	response, err := accessLogsRequest(ctx, api.httpclient, "team.accessLogs", values, api.debug)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -142,19 +150,28 @@ func (api *Client) GetAccessLogs(params AccessLogParameters) ([]Login, *Paging, 
 }
 
 func (api *Client) GetBillableInfo(user string) (map[string]BillingActive, error) {
+	return api.GetBillableInfoContext(context.Background(), user)
+}
+
+func (api *Client) GetBillableInfoContext(ctx context.Context, user string) (map[string]BillingActive, error) {
 	values := url.Values{
-		"token": {api.config.token},
-		"user": {user},
+		"token": {api.token},
+		"user":  {user},
 	}
 
-	return billableInfoRequest("team.billableInfo", values, api.debug)
+	return billableInfoRequest(ctx, api.httpclient, "team.billableInfo", values, api.debug)
 }
 
 // GetBillableInfoForTeam returns the billing_active status of all users on the team.
 func (api *Client) GetBillableInfoForTeam() (map[string]BillingActive, error) {
+	return api.GetBillableInfoForTeamContext(context.Background())
+}
+
+// GetBillableInfoForTeamContext returns the billing_active status of all users on the team with a custom context
+func (api *Client) GetBillableInfoForTeamContext(ctx context.Context) (map[string]BillingActive, error) {
 	values := url.Values{
-		"token": {api.config.token},
+		"token": {api.token},
 	}
 
-	return billableInfoRequest("team.billableInfo", values, api.debug)
+	return billableInfoRequest(ctx, api.httpclient, "team.billableInfo", values, api.debug)
 }

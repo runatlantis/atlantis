@@ -40,7 +40,7 @@ type SlackClient interface {
 // we can mock it during tests.
 type UnderlyingSlackClient interface {
 	AuthTest() (response *slack.AuthTestResponse, error error)
-	GetChannels(excludeArchived bool) ([]slack.Channel, error)
+	GetConversations(conversationParams *slack.GetConversationsParameters) (channels []slack.Channel, nextCursor string, err error)
 	PostMessage(channel, text string, parameters slack.PostMessageParameters) (string, string, error)
 }
 
@@ -66,15 +66,27 @@ func (d *DefaultSlackClient) TokenIsSet() bool {
 }
 
 func (d *DefaultSlackClient) ChannelExists(channelName string) (bool, error) {
-	channels, err := d.Slack.GetChannels(true)
-	if err != nil {
-		return false, err
-	}
-	for _, channel := range channels {
-		if channel.Name == channelName {
-			return true, nil
+	var (
+		cursor   string
+		channels []slack.Channel
+		err      error
+	)
+
+	for {
+		channels, cursor, err = d.Slack.GetConversations(&slack.GetConversationsParameters{Cursor: cursor})
+		if err != nil {
+			return false, err
+		}
+		for _, channel := range channels {
+			if channel.Name == channelName {
+				return true, nil
+			}
+		}
+		if cursor == "" {
+			break
 		}
 	}
+
 	return false, nil
 }
 

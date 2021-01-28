@@ -3,9 +3,10 @@ package slack
 import (
 	"encoding/json"
 	"errors"
+	"sync"
 	"time"
 
-	"golang.org/x/net/websocket"
+	"github.com/gorilla/websocket"
 )
 
 const (
@@ -19,14 +20,16 @@ const (
 //
 // Create this element with Client's NewRTM() or NewRTMWithOptions(*RTMOptions)
 type RTM struct {
-	idGen IDGenerator
-	pings map[int]time.Time
+	idGen        IDGenerator
+	pingInterval time.Duration
+	pingDeadman  *time.Timer
 
 	// Connection life-cycle
 	conn             *websocket.Conn
 	IncomingEvents   chan RTMEvent
 	outgoingMessages chan OutgoingMessage
 	killChannel      chan bool
+	disconnected     chan struct{} // disconnected is closed when Disconnect is invoked, regardless of connection state. Allows for ManagedConnection to not leak.
 	forcePing        chan bool
 	rawEvents        chan json.RawMessage
 	wasIntentional   bool
@@ -43,6 +46,13 @@ type RTM struct {
 	// rtm.start to connect to Slack, otherwise it will use
 	// rtm.connect
 	useRTMStart bool
+
+	// dialer is a gorilla/websocket Dialer. If nil, use the default
+	// Dialer.
+	dialer *websocket.Dialer
+
+	// mu is mutex used to prevent RTM connection race conditions
+	mu *sync.Mutex
 }
 
 // RTMOptions allows configuration of various options available for RTM messaging
@@ -59,16 +69,23 @@ type RTMOptions struct {
 
 // Disconnect and wait, blocking until a successful disconnection.
 func (rtm *RTM) Disconnect() error {
+	// avoid RTM disconnect race conditions
+	rtm.mu.Lock()
+	defer rtm.mu.Unlock()
+
+	// always push into the disconnected channel when invoked,
+	// this lets the ManagedConnection() function properly clean up.
+	// if the buffer is full then just continue on.
+	select {
+	case rtm.disconnected <- struct{}{}:
+	default:
+	}
+
 	if !rtm.isConnected {
 		return errors.New("Invalid call to Disconnect - Slack API is already disconnected")
 	}
-	rtm.killChannel <- true
-	return nil
-}
 
-// Reconnect only makes sense if you've successfully disconnectd with Disconnect().
-func (rtm *RTM) Reconnect() error {
-	logger.Println("RTM::Reconnect not implemented!")
+	rtm.killChannel <- true
 	return nil
 }
 
@@ -90,4 +107,12 @@ func (rtm *RTM) SendMessage(msg *OutgoingMessage) {
 	}
 
 	rtm.outgoingMessages <- *msg
+}
+
+func (rtm *RTM) resetDeadman() {
+	timerReset(rtm.pingDeadman, deadmanDuration(rtm.pingInterval))
+}
+
+func deadmanDuration(d time.Duration) time.Duration {
+	return d * 4
 }
