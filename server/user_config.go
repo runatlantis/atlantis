@@ -45,6 +45,7 @@ type UserConfig struct {
 	HidePrevPlanComments       bool   `mapstructure:"hide-prev-plan-comments"`
 	LogLevel                   string `mapstructure:"log-level"`
 	ParallelPoolSize           int    `mapstructure:"parallel-pool-size"`
+	MaxProjectsPerPR           int    `mapstructure:"max-projects-per-pr"`
 	StatsNamespace             string `mapstructure:"stats-namespace"`
 	PlanDrafts                 bool   `mapstructure:"allow-draft-prs"`
 	Port                       int    `mapstructure:"port"`

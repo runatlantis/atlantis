@@ -29,6 +29,9 @@ const (
 	DefaultParallelPlanEnabled = false
 	// DefaultDeleteSourceBranchOnMerge being false is the default setting whether or not to remove a source branch on merge
 	DefaultDeleteSourceBranchOnMerge = false
+	// InfiniteProjectLimitPerPR is the default setting for number of projects per PR.
+	// this is set to -1 to signify no limit.
+	InfiniteProjectsPerPR = -1
 )
 
 func NewProjectCommandBuilder(
@@ -47,7 +50,43 @@ func NewProjectCommandBuilder(
 	scope stats.Scope,
 	logger logging.SimpleLogging,
 ) ProjectCommandBuilder {
-	projectCommandBuilder := &DefaultProjectCommandBuilder{
+	return NewProjectCommandBuilderWithLimit(
+		policyChecksSupported,
+		parserValidator,
+		projectFinder,
+		vcsClient,
+		workingDir,
+		workingDirLocker,
+		globalCfg,
+		pendingPlanFinder,
+		commentBuilder,
+		skipCloneNoChanges,
+		EnableRegExpCmd,
+		AutoplanFileList,
+		scope,
+		logger,
+		InfiniteProjectsPerPR,
+	)
+}
+
+func NewProjectCommandBuilderWithLimit(
+	policyChecksSupported bool,
+	parserValidator *yaml.ParserValidator,
+	projectFinder ProjectFinder,
+	vcsClient vcs.Client,
+	workingDir WorkingDir,
+	workingDirLocker WorkingDirLocker,
+	globalCfg valid.GlobalCfg,
+	pendingPlanFinder *DefaultPendingPlanFinder,
+	commentBuilder CommentBuilder,
+	skipCloneNoChanges bool,
+	EnableRegExpCmd bool,
+	AutoplanFileList string,
+	scope stats.Scope,
+	logger logging.SimpleLogging,
+	limit int,
+) ProjectCommandBuilder {
+	var projectCommandBuilder ProjectCommandBuilder = &DefaultProjectCommandBuilder{
 		ParserValidator:    parserValidator,
 		ProjectFinder:      projectFinder,
 		VCSClient:          vcsClient,
@@ -63,6 +102,11 @@ func NewProjectCommandBuilder(
 			commentBuilder,
 			scope,
 		),
+	}
+
+	projectCommandBuilder = &SizeLimitedProjectCommandBuilder{
+		Limit:                 limit,
+		ProjectCommandBuilder: projectCommandBuilder,
 	}
 
 	return &InstrumentedProjectCommandBuilder{
