@@ -10,7 +10,7 @@ cloud.google.com/go/internal/version
 cloud.google.com/go/storage
 # github.com/BurntSushi/toml v0.3.1
 github.com/BurntSushi/toml
-# github.com/Laisky/graphql v1.0.4
+# github.com/Laisky/graphql v1.0.5
 ## explicit
 github.com/Laisky/graphql
 github.com/Laisky/graphql/ident
@@ -201,10 +201,11 @@ github.com/konsorten/go-windows-terminal-sequences
 ## explicit
 github.com/leodido/go-urn
 # github.com/magiconair/properties v1.8.1
-## explicit
 github.com/magiconair/properties
 # github.com/mattn/go-colorable v0.0.9
 github.com/mattn/go-colorable
+# github.com/mattn/go-isatty v0.0.4
+github.com/mattn/go-isatty
 # github.com/mcdafydd/go-azuredevops v0.12.0
 ## explicit
 github.com/mcdafydd/go-azuredevops/azuredevops
