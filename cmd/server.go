@@ -23,6 +23,7 @@ import (
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server"
+	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -73,6 +74,7 @@ const (
 	HidePrevPlanComments       = "hide-prev-plan-comments"
 	LogLevelFlag               = "log-level"
 	ParallelPoolSize           = "parallel-pool-size"
+	MaxProjectsPerPR           = "max-projects-per-pr"
 	StatsNamespace             = "stats-namespace"
 	AllowDraftPRs              = "allow-draft-prs"
 	PortFlag                   = "port"
@@ -361,6 +363,10 @@ var intFlags = map[string]intFlag{
 		description:  "Max size of the wait group that runs parallel plans and applies (if enabled).",
 		defaultValue: DefaultParallelPoolSize,
 	},
+	MaxProjectsPerPR: {
+		description:  "Max number of projects to operate on in a given pull request.",
+		defaultValue: events.InfiniteProjectsPerPR,
+	},
 	PortFlag: {
 		description:  "Port to bind to.",
 		defaultValue: DefaultPort,
@@ -600,6 +606,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	}
 	if c.TFEHostname == "" {
 		c.TFEHostname = DefaultTFEHostname
+	}
+	if c.MaxProjectsPerPR == 0 {
+		c.MaxProjectsPerPR = events.InfiniteProjectsPerPR
 	}
 }
 

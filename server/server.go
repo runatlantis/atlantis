@@ -409,7 +409,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDir:            workingDir,
 		PreWorkflowHookRunner: runtime.DefaultPreWorkflowHookRunner{},
 	}
-	projectCommandBuilder := events.NewProjectCommandBuilder(
+	projectCommandBuilder := events.NewProjectCommandBuilderWithLimit(
 		policyChecksEnabled,
 		validator,
 		&events.DefaultProjectFinder{},
@@ -422,6 +422,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.SkipCloneNoChanges,
 		statsScope,
 		logger,
+		userConfig.MaxProjectsPerPR,
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTfVersion)

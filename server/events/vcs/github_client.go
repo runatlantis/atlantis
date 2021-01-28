@@ -211,8 +211,6 @@ func (g *GithubClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 			continue
 		}
 		firstLine := strings.ToLower(body[0])
-		g.logger.Debug("Command Name: %s", command)
-		g.logger.Debug("First line: %s", firstLine)
 		if !strings.Contains(firstLine, strings.ToLower(command)) {
 			continue
 		}

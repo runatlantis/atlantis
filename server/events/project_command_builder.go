@@ -27,6 +27,9 @@ const (
 	DefaultParallelApplyEnabled = false
 	// DefaultParallelPlanEnabled is the default for the parallel plan setting.
 	DefaultParallelPlanEnabled = false
+	// InfiniteProjectLimitPerPR is the default setting for number of projects per PR.
+	// this is set to -1 to signify no limit.
+	InfiniteProjectsPerPR = -1
 )
 
 func NewProjectCommandBuilder(
@@ -43,7 +46,39 @@ func NewProjectCommandBuilder(
 	scope stats.Scope,
 	logger *logging.SimpleLogger,
 ) ProjectCommandBuilder {
-	projectCommandBuilder := &DefaultProjectCommandBuilder{
+	return NewProjectCommandBuilderWithLimit(
+		policyChecksSupported,
+		parserValidator,
+		projectFinder,
+		vcsClient,
+		workingDir,
+		workingDirLocker,
+		globalCfg,
+		pendingPlanFinder,
+		commentBuilder,
+		skipCloneNoChanges,
+		scope,
+		logger,
+		InfiniteProjectsPerPR,
+	)
+}
+
+func NewProjectCommandBuilderWithLimit(
+	policyChecksSupported bool,
+	parserValidator *yaml.ParserValidator,
+	projectFinder ProjectFinder,
+	vcsClient vcs.Client,
+	workingDir WorkingDir,
+	workingDirLocker WorkingDirLocker,
+	globalCfg valid.GlobalCfg,
+	pendingPlanFinder *DefaultPendingPlanFinder,
+	commentBuilder CommentBuilder,
+	skipCloneNoChanges bool,
+	scope stats.Scope,
+	logger *logging.SimpleLogger,
+	limit int,
+) ProjectCommandBuilder {
+	var projectCommandBuilder ProjectCommandBuilder = &DefaultProjectCommandBuilder{
 		ParserValidator:    parserValidator,
 		ProjectFinder:      projectFinder,
 		VCSClient:          vcsClient,
@@ -57,6 +92,11 @@ func NewProjectCommandBuilder(
 			commentBuilder,
 			scope,
 		),
+	}
+
+	projectCommandBuilder = &SizeLimitedProjectCommandBuilder{
+		Limit:                 limit,
+		ProjectCommandBuilder: projectCommandBuilder,
 	}
 
 	return &InstrumentedProjectCommandBuilder{
