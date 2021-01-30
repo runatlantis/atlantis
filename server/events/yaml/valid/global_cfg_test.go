@@ -338,6 +338,7 @@ workflows:
 			repoWorkflows: nil,
 			exp: valid.MergedProjectCfg{
 				ApplyRequirements: []string{},
+				BranchAllowlist:   []string{},
 				Workflow: valid.Workflow{
 					Name:  "custom",
 					Apply: valid.DefaultApplyStage,
@@ -371,6 +372,7 @@ repos:
 			repoWorkflows: nil,
 			exp: valid.MergedProjectCfg{
 				ApplyRequirements: []string{"mergeable"},
+				BranchAllowlist:   []string{},
 				Workflow: valid.Workflow{
 					Name:  "default",
 					Apply: valid.DefaultApplyStage,
@@ -401,6 +403,7 @@ repos:
 			repoWorkflows: nil,
 			exp: valid.MergedProjectCfg{
 				ApplyRequirements: []string{"approved", "mergeable"},
+				BranchAllowlist:   []string{},
 				Workflow: valid.Workflow{
 					Name:  "default",
 					Apply: valid.DefaultApplyStage,
@@ -427,6 +430,7 @@ repos:
 			repoWorkflows: nil,
 			exp: valid.MergedProjectCfg{
 				ApplyRequirements: []string{},
+				BranchAllowlist:   []string{},
 				Workflow: valid.Workflow{
 					Name:  "default",
 					Apply: valid.DefaultApplyStage,

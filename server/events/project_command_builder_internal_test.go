@@ -54,6 +54,7 @@ workflows:
 			expCtx: models.ProjectCommandContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
+				BranchAllowlist:    []string{},
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   false,
 				AutoplanEnabled:    true,
@@ -103,6 +104,7 @@ projects:
 			expCtx: models.ProjectCommandContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
+				BranchAllowlist:    []string{},
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
@@ -154,6 +156,7 @@ projects:
 			expCtx: models.ProjectCommandContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
+				BranchAllowlist:    []string{},
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
@@ -163,6 +166,59 @@ projects:
 				Pull:               pull,
 				ProjectName:        "",
 				ApplyRequirements:  []string{"approved", "mergeable"},
+				RepoConfigVersion:  3,
+				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
+				RepoRelDir:         "project1",
+				TerraformVersion:   mustVersion("10.0"),
+				User:               models.User{},
+				Verbose:            true,
+				Workspace:          "myworkspace",
+			},
+			expPlanSteps:  []string{"init", "plan"},
+			expApplySteps: []string{"apply"},
+		},
+
+		// Set a global apply req that should be used.
+		"global branch_allowlist": {
+			globalCfg: `
+repos:
+- id: /.*/
+  workflow: default
+  apply_requirements: [mergeable]
+  branch_allowlist: [master]
+workflows:
+  default:
+    plan:
+      steps:
+      - init
+      - plan
+    apply:
+      steps:
+      - apply`,
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project1
+  workspace: myworkspace
+  autoplan:
+    enabled: true
+    when_modified: [../modules/**/*.tf]
+  terraform_version: v10.0
+`,
+			expCtx: models.ProjectCommandContext{
+				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
+				BaseRepo:           baseRepo,
+				BranchAllowlist:    []string{"master"},
+				EscapedCommentArgs: []string{`\f\l\a\g`},
+				AutomergeEnabled:   true,
+				AutoplanEnabled:    true,
+				HeadRepo:           models.Repo{},
+				Log:                nil,
+				PullMergeable:      true,
+				Pull:               pull,
+				ProjectName:        "",
+				ApplyRequirements:  []string{"mergeable"},
 				RepoConfigVersion:  3,
 				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
 				RepoRelDir:         "project1",
@@ -213,6 +269,7 @@ projects:
 			expCtx: models.ProjectCommandContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
+				BranchAllowlist:    []string{},
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
@@ -359,6 +416,7 @@ workflows:
 			expCtx: models.ProjectCommandContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
+				BranchAllowlist:    []string{},
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
@@ -414,6 +472,7 @@ projects:
 			expCtx: models.ProjectCommandContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
+				BranchAllowlist:    []string{},
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
@@ -472,6 +531,7 @@ workflows:
 			expCtx: models.ProjectCommandContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
+				BranchAllowlist:    []string{},
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
@@ -514,6 +574,7 @@ projects:
 			expCtx: models.ProjectCommandContext{
 				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
 				BaseRepo:           baseRepo,
+				BranchAllowlist:    []string{},
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   false,
 				AutoplanEnabled:    true,
