@@ -26,6 +26,7 @@ type Project struct {
 	TerraformVersion  *string   `yaml:"terraform_version,omitempty"`
 	Autoplan          *Autoplan `yaml:"autoplan,omitempty"`
 	ApplyRequirements []string  `yaml:"apply_requirements,omitempty"`
+	BranchAllowlist   []string  `yaml:"branch_allowlist,omitempty"`
 }
 
 func (p Project) Validate() error {
@@ -92,6 +93,7 @@ func (p Project) ToValid() valid.Project {
 	// There are no default apply requirements.
 	v.ApplyRequirements = p.ApplyRequirements
 
+	v.BranchAllowlist = p.BranchAllowlist
 	v.Name = p.Name
 
 	return v

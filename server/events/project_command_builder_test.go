@@ -164,15 +164,16 @@ projects:
 // Test building a plan and apply command for one project.
 func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) {
 	cases := []struct {
-		Description    string
-		AtlantisYAML   string
-		Cmd            events.CommentCommand
-		ExpCommentArgs []string
-		ExpWorkspace   string
-		ExpDir         string
-		ExpProjectName string
-		ExpErr         string
-		ExpApplyReqs   []string
+		Description        string
+		AtlantisYAML       string
+		Cmd                events.CommentCommand
+		ExpCommentArgs     []string
+		ExpWorkspace       string
+		ExpDir             string
+		ExpProjectName     string
+		ExpErr             string
+		ExpApplyReqs       []string
+		ExpBranchAllowlist []string
 	}{
 		{
 			Description: "no atlantis.yaml",
@@ -182,11 +183,12 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) 
 				Name:       models.PlanCommand,
 				Workspace:  "myworkspace",
 			},
-			AtlantisYAML:   "",
-			ExpCommentArgs: []string{`\c\o\m\m\e\n\t\a\r\g`},
-			ExpWorkspace:   "myworkspace",
-			ExpDir:         ".",
-			ExpApplyReqs:   []string{},
+			AtlantisYAML:       "",
+			ExpCommentArgs:     []string{`\c\o\m\m\e\n\t\a\r\g`},
+			ExpWorkspace:       "myworkspace",
+			ExpDir:             ".",
+			ExpApplyReqs:       []string{},
+			ExpBranchAllowlist: []string{},
 		},
 		{
 			Description: "no atlantis.yaml with project flag",
@@ -211,9 +213,10 @@ projects:
 - dir: .
   workspace: myworkspace
   apply_requirements: [approved]`,
-			ExpApplyReqs: []string{"approved"},
-			ExpWorkspace: "myworkspace",
-			ExpDir:       ".",
+			ExpApplyReqs:       []string{"approved"},
+			ExpWorkspace:       "myworkspace",
+			ExpDir:             ".",
+			ExpBranchAllowlist: []string{},
 		},
 		{
 			Description: "atlantis.yaml wrong dir",
@@ -228,9 +231,10 @@ projects:
 - dir: notroot
   workspace: myworkspace
   apply_requirements: [approved]`,
-			ExpWorkspace: "myworkspace",
-			ExpDir:       ".",
-			ExpApplyReqs: []string{},
+			ExpWorkspace:       "myworkspace",
+			ExpDir:             ".",
+			ExpApplyReqs:       []string{},
+			ExpBranchAllowlist: []string{},
 		},
 		{
 			Description: "atlantis.yaml wrong workspace",
@@ -260,10 +264,11 @@ projects:
   dir: .
   workspace: myworkspace
   apply_requirements: [approved]`,
-			ExpApplyReqs:   []string{"approved"},
-			ExpProjectName: "myproject",
-			ExpWorkspace:   "myworkspace",
-			ExpDir:         ".",
+			ExpApplyReqs:       []string{"approved"},
+			ExpProjectName:     "myproject",
+			ExpWorkspace:       "myworkspace",
+			ExpDir:             ".",
+			ExpBranchAllowlist: []string{},
 		},
 		{
 			Description: "atlantis.yaml with mergeable apply requirement",
@@ -278,10 +283,31 @@ projects:
   dir: .
   workspace: myworkspace
   apply_requirements: [mergeable]`,
-			ExpApplyReqs:   []string{"mergeable"},
-			ExpProjectName: "myproject",
-			ExpWorkspace:   "myworkspace",
-			ExpDir:         ".",
+			ExpApplyReqs:       []string{"mergeable"},
+			ExpProjectName:     "myproject",
+			ExpWorkspace:       "myworkspace",
+			ExpDir:             ".",
+			ExpBranchAllowlist: []string{},
+		},
+		{
+			Description: "atlantis.yaml with branch_allowlist requirement",
+			Cmd: events.CommentCommand{
+				Name:        models.PlanCommand,
+				ProjectName: "myproject",
+			},
+			AtlantisYAML: `
+version: 3
+projects:
+- name: myproject
+  dir: .
+  workspace: myworkspace
+  apply_requirements: [mergeable]
+  branch_allowlist: [master]`,
+			ExpApplyReqs:       []string{"mergeable"},
+			ExpBranchAllowlist: []string{"master"},
+			ExpProjectName:     "myproject",
+			ExpWorkspace:       "myworkspace",
+			ExpDir:             ".",
 		},
 		{
 			Description: "atlantis.yaml with mergeable and approved apply requirements",
@@ -296,10 +322,11 @@ projects:
   dir: .
   workspace: myworkspace
   apply_requirements: [mergeable, approved]`,
-			ExpApplyReqs:   []string{"mergeable", "approved"},
-			ExpProjectName: "myproject",
-			ExpWorkspace:   "myworkspace",
-			ExpDir:         ".",
+			ExpApplyReqs:       []string{"mergeable", "approved"},
+			ExpBranchAllowlist: []string{},
+			ExpProjectName:     "myproject",
+			ExpWorkspace:       "myworkspace",
+			ExpDir:             ".",
 		},
 		{
 			Description: "atlantis.yaml with multiple dir/workspaces matching",
@@ -389,6 +416,7 @@ projects:
 				Equals(t, c.ExpCommentArgs, actCtx.EscapedCommentArgs)
 				Equals(t, c.ExpProjectName, actCtx.ProjectName)
 				Equals(t, c.ExpApplyReqs, actCtx.ApplyRequirements)
+				Equals(t, c.ExpBranchAllowlist, actCtx.BranchAllowlist)
 			})
 		}
 	}

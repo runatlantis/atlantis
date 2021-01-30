@@ -214,10 +214,12 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 		steps       []valid.Step
 		applyReqs   []string
 
-		expSteps      []string
-		expOut        string
-		expFailure    string
-		pullMergeable bool
+		expSteps        []string
+		expOut          string
+		expFailure      string
+		pullMergeable   bool
+		branchAllowlist []string
+		pull            models.PullRequest
 	}{
 		{
 			description: "normal workflow",
@@ -248,6 +250,16 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			expSteps:      []string{""},
 			expOut:        "",
 			expFailure:    "Pull request must be mergeable before running apply.",
+		},
+		{
+			description:     "mergeable required, branch_allowlist match",
+			steps:           valid.DefaultApplyStage.Steps,
+			pullMergeable:   false,
+			applyReqs:       []string{"mergeable"},
+			pull:            models.PullRequest{BaseBranch: "master"},
+			branchAllowlist: []string{"master"},
+			expSteps:        []string{"apply"},
+			expOut:          "apply",
 		},
 		{
 			description:   "mergeable and approved required",
@@ -325,7 +337,9 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				Steps:             c.steps,
 				Workspace:         "default",
 				ApplyRequirements: c.applyReqs,
+				Pull:              c.pull,
 				RepoRelDir:        ".",
+				BranchAllowlist:   c.branchAllowlist,
 				PullMergeable:     c.pullMergeable,
 			}
 			expEnvs := map[string]string{

@@ -101,7 +101,7 @@ func TestNewGlobalCfg(t *testing.T) {
 
 			if c.allowRepoCfg {
 				exp.Repos[0].AllowCustomWorkflows = Bool(true)
-				exp.Repos[0].AllowedOverrides = []string{"apply_requirements", "workflow"}
+				exp.Repos[0].AllowedOverrides = []string{"apply_requirements", "branch_allowlist", "workflow"}
 			}
 			if c.mergeableReq {
 				exp.Repos[0].ApplyRequirements = append(exp.Repos[0].ApplyRequirements, "mergeable")

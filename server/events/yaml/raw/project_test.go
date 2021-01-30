@@ -27,11 +27,12 @@ func TestProject_UnmarshalYAML(t *testing.T) {
 				TerraformVersion:  nil,
 				Autoplan:          nil,
 				ApplyRequirements: nil,
+				BranchAllowlist:   nil,
 				Name:              nil,
 			},
 		},
 		{
-			description: "all fields set including mergeable apply requirement",
+			description: "all fields set including mergeable apply requirement and branch_allowlist master",
 			input: `
 name: myname
 dir: mydir
@@ -42,7 +43,9 @@ autoplan:
   when_modified: []
   enabled: false
 apply_requirements:
-- mergeable`,
+- mergeable
+branch_allowlist:
+- master`,
 			exp: raw.Project{
 				Name:             String("myname"),
 				Dir:              String("mydir"),
@@ -54,6 +57,7 @@ apply_requirements:
 					Enabled:      Bool(false),
 				},
 				ApplyRequirements: []string{"mergeable"},
+				BranchAllowlist:   []string{"master"},
 			},
 		},
 	}
@@ -124,6 +128,22 @@ func TestProject_Validate(t *testing.T) {
 			input: raw.Project{
 				Dir:               String("."),
 				ApplyRequirements: []string{"mergeable", "approved"},
+			},
+			expErr: "",
+		},
+		{
+			description: "empty branch_allowlist",
+			input: raw.Project{
+				Dir:             String("."),
+				BranchAllowlist: []string{},
+			},
+			expErr: "",
+		},
+		{
+			description: "branch_allowlist with master branch",
+			input: raw.Project{
+				Dir:             String("."),
+				BranchAllowlist: []string{"master"},
 			},
 			expErr: "",
 		},
@@ -235,6 +255,7 @@ func TestProject_ToValid(t *testing.T) {
 					Enabled:      true,
 				},
 				ApplyRequirements: nil,
+				BranchAllowlist:   nil,
 				Name:              nil,
 			},
 		},
@@ -250,6 +271,7 @@ func TestProject_ToValid(t *testing.T) {
 					Enabled:      Bool(false),
 				},
 				ApplyRequirements: []string{"approved"},
+				BranchAllowlist:   []string{"master"},
 				Name:              String("myname"),
 			},
 			exp: valid.Project{
@@ -262,6 +284,7 @@ func TestProject_ToValid(t *testing.T) {
 					Enabled:      false,
 				},
 				ApplyRequirements: []string{"approved"},
+				BranchAllowlist:   []string{"master"},
 				Name:              String("myname"),
 			},
 		},
