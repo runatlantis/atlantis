@@ -12,6 +12,7 @@ import (
 const MergeableApplyReq = "mergeable"
 const ApprovedApplyReq = "approved"
 const ApplyRequirementsKey = "apply_requirements"
+const BranchAllowlistKey = "branch_allowlist"
 const PreWorkflowHooksKey = "pre_workflow_hooks"
 const WorkflowKey = "workflow"
 const AllowedWorkflowsKey = "allowed_workflows"
@@ -34,6 +35,7 @@ type Repo struct {
 	// If ID is set then this will be nil.
 	IDRegex              *regexp.Regexp
 	ApplyRequirements    []string
+	BranchAllowlist      []string
 	PreWorkflowHooks     []*PreWorkflowHook
 	Workflow             *Workflow
 	AllowedWorkflows     []string
@@ -43,6 +45,7 @@ type Repo struct {
 
 type MergedProjectCfg struct {
 	ApplyRequirements []string
+	BranchAllowlist   []string
 	Workflow          Workflow
 	AllowedWorkflows  []string
 	RepoRelDir        string
@@ -95,6 +98,7 @@ func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) Global
 	// Must construct slices here instead of using a `var` declaration because
 	// we treat nil slices differently.
 	applyReqs := []string{}
+	branchAllowlist := []string{}
 	allowedOverrides := []string{}
 	allowedWorkflows := []string{}
 	preWorkflowHooks := make([]*PreWorkflowHook, 0)
@@ -116,6 +120,7 @@ func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) Global
 			{
 				IDRegex:              regexp.MustCompile(".*"),
 				ApplyRequirements:    applyReqs,
+				BranchAllowlist:      branchAllowlist,
 				PreWorkflowHooks:     preWorkflowHooks,
 				Workflow:             &defaultWorkflow,
 				AllowedWorkflows:     allowedWorkflows,
@@ -148,7 +153,7 @@ func (r Repo) IDString() string {
 // MergeProjectCfg merges proj and rCfg with the global config to return a
 // final config. It assumes that all configs have been validated.
 func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, proj Project, rCfg RepoCfg) MergedProjectCfg {
-	applyReqs, workflow, allowedOverrides, allowCustomWorkflows := g.getMatchingCfg(log, repoID)
+	applyReqs, branchAllowlist, workflow, allowedOverrides, allowCustomWorkflows := g.getMatchingCfg(log, repoID)
 
 	// If repos are allowed to override certain keys then override them.
 	for _, key := range allowedOverrides {
@@ -157,6 +162,11 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 			if proj.ApplyRequirements != nil {
 				log.Debug("overriding server-defined %s with repo settings: [%s]", ApplyRequirementsKey, strings.Join(proj.ApplyRequirements, ","))
 				applyReqs = proj.ApplyRequirements
+			}
+		case BranchAllowlistKey:
+			if proj.BranchAllowlist != nil {
+				log.Debug("overriding server-defined %s with repo settings: [%s]", BranchAllowlistKey, strings.Join(proj.BranchAllowlist, ","))
+				branchAllowlist = proj.BranchAllowlist
 			}
 		case WorkflowKey:
 			if proj.WorkflowName != nil {
@@ -188,6 +198,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 
 	return MergedProjectCfg{
 		ApplyRequirements: applyReqs,
+		BranchAllowlist:   branchAllowlist,
 		Workflow:          workflow,
 		RepoRelDir:        proj.Dir,
 		Workspace:         proj.Workspace,
@@ -202,9 +213,10 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 // repo with id repoID. It is used when there is no repo config.
 func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repoRelDir string, workspace string) MergedProjectCfg {
 	log.Debug("building config based on server-side config")
-	applyReqs, workflow, _, _ := g.getMatchingCfg(log, repoID)
+	applyReqs, branchAllowlist, workflow, _, _ := g.getMatchingCfg(log, repoID)
 	return MergedProjectCfg{
 		ApplyRequirements: applyReqs,
+		BranchAllowlist:   branchAllowlist,
 		Workflow:          workflow,
 		RepoRelDir:        repoRelDir,
 		Workspace:         workspace,
@@ -306,7 +318,7 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 }
 
 // getMatchingCfg returns the key settings for repoID.
-func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (applyReqs []string, workflow Workflow, allowedOverrides []string, allowCustomWorkflows bool) {
+func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (applyReqs []string, branchAllowlist []string, workflow Workflow, allowedOverrides []string, allowCustomWorkflows bool) {
 	toLog := make(map[string]string)
 	traceF := func(repoIdx int, repoID string, key string, val interface{}) string {
 		from := "default server config"
@@ -328,7 +340,7 @@ func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (app
 		return fmt.Sprintf("setting %s: %s from %s", key, valStr, from)
 	}
 
-	for _, key := range []string{ApplyRequirementsKey, WorkflowKey, AllowedOverridesKey, AllowCustomWorkflowsKey, PreWorkflowHooksKey} {
+	for _, key := range []string{ApplyRequirementsKey, BranchAllowlistKey, WorkflowKey, AllowedOverridesKey, AllowCustomWorkflowsKey, PreWorkflowHooksKey} {
 		for i, repo := range g.Repos {
 			if repo.IDMatches(repoID) {
 				switch key {
@@ -336,6 +348,11 @@ func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (app
 					if repo.ApplyRequirements != nil {
 						toLog[ApplyRequirementsKey] = traceF(i, repo.IDString(), ApplyRequirementsKey, repo.ApplyRequirements)
 						applyReqs = repo.ApplyRequirements
+					}
+				case BranchAllowlistKey:
+					if repo.BranchAllowlist != nil {
+						toLog[BranchAllowlistKey] = traceF(i, repo.IDString(), BranchAllowlistKey, repo.BranchAllowlist)
+						branchAllowlist = repo.BranchAllowlist
 					}
 				case WorkflowKey:
 					if repo.Workflow != nil {

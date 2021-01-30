@@ -53,6 +53,7 @@ type Project struct {
 	TerraformVersion  *version.Version
 	Autoplan          Autoplan
 	ApplyRequirements []string
+	BranchAllowlist   []string
 }
 
 // GetName returns the name of the project or an empty string if there is no

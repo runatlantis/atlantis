@@ -1128,6 +1128,7 @@ workflows:
 						IDRegex:           regexp.MustCompile(".*"),
 						PreWorkflowHooks:  []*valid.PreWorkflowHook{},
 						ApplyRequirements: []string{},
+						BranchAllowlist:   []string{},
 						Workflow: &valid.Workflow{
 							Name: "default",
 							Apply: valid.Stage{

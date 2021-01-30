@@ -306,6 +306,9 @@ type ProjectCommandContext struct {
 	// ApplyRequirements is the list of requirements that must be satisfied
 	// before we will run the apply stage.
 	ApplyRequirements []string
+	// BranchAllowlist is the list of base branches that are allowed targets
+	// if `mergeable` is an ApplyRequirement
+	BranchAllowlist []string
 	// AutomergeEnabled is true if automerge is enabled for the repo that this
 	// project is in.
 	AutomergeEnabled bool

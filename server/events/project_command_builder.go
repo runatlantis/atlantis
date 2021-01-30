@@ -437,6 +437,7 @@ func (p *DefaultProjectCommandBuilder) buildCtx(ctx *CommandContext,
 	return models.ProjectCommandContext{
 		ApplyCmd:             p.CommentBuilder.BuildApplyComment(projCfg.RepoRelDir, projCfg.Workspace, projCfg.Name),
 		BaseRepo:             ctx.Pull.BaseRepo,
+		BranchAllowlist:      projCfg.BranchAllowlist,
 		EscapedCommentArgs:   p.escapeArgs(commentArgs),
 		AutomergeEnabled:     automergeEnabled,
 		ParallelApplyEnabled: parallelApplyEnabled,

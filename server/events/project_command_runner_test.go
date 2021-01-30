@@ -184,6 +184,29 @@ func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 	Equals(t, "Pull request must be mergeable before running apply.", res.Failure)
 }
 
+// Test that if mergeable and a branch match is required and the PR isn't using the base branch
+// we give an error.
+func TestDefaultProjectCommandRunner_ApplyMergeableNoBranchMatch(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	runner := &events.DefaultProjectCommandRunner{
+		WorkingDir:       mockWorkingDir,
+		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+	}
+	ctx := models.ProjectCommandContext{
+		PullMergeable:     true,
+		Pull:              models.PullRequest{BaseBranch: "test"},
+		ApplyRequirements: []string{"mergeable"},
+		BranchAllowlist:   []string{"master"},
+	}
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
+
+	res := runner.Apply(ctx)
+	Equals(t, "Base branch must be in branch_allowlist.", res.Failure)
+}
+
 // Test that it runs the expected apply steps.
 func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 	cases := []struct {

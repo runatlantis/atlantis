@@ -240,6 +240,17 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 			if !ctx.PullMergeable {
 				return "", "Pull request must be mergeable before running apply.", nil
 			}
+			if len(ctx.BranchAllowlist) > 0 {
+				allowed := false
+				for _, branch := range ctx.BranchAllowlist {
+					if branch == ctx.Pull.BaseBranch {
+						allowed = true
+					}
+				}
+				if !allowed {
+					return "", "Base branch must be in branch_allowlist.", nil
+				}
+			}
 		}
 	}
 	// Acquire internal lock for the directory we're going to operate in.
