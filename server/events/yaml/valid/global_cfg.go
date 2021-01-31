@@ -292,12 +292,15 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 		// default is always allowed
 		if p.WorkflowName != nil && len(allowedWorkflows) != 0 {
 			name := *p.WorkflowName
-			if !sliceContainsF(allowedWorkflows, name) || !allowCustomWorkflows {
-				return fmt.Errorf("workflow '%s' is not allowed for this repo", name)
+			if allowCustomWorkflows {
+				// If we allow CustomWorkflows we need to check that workflow name is defined inside repo and not global.
+				if mapContainsF(rCfg.Workflows, name) {
+					break
+				}
 			}
 
-			if allowCustomWorkflows {
-				break
+			if !sliceContainsF(allowedWorkflows, name) {
+				return fmt.Errorf("workflow '%s' is not allowed for this repo", name)
 			}
 		}
 	}
