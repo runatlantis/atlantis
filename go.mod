@@ -2,7 +2,7 @@ module github.com/runatlantis/atlantis
 
 go 1.14
 
-require(
+require (
 	github.com/Laisky/graphql v1.0.5
 	github.com/Masterminds/sprig/v3 v3.2.0
 	github.com/agext/levenshtein v1.2.3 // indirect
