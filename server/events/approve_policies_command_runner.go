@@ -69,7 +69,7 @@ func (a *ApprovePoliciesCommandRunner) buildApprovePolicyCommandResults(ctx *Com
 	// share the same Owners list at this time so no reason to iterate over each
 	// project.
 	if len(prjCmds) > 0 && !prjCmds[0].PolicySets.IsOwner(ctx.User.Username) {
-		result.Error = fmt.Errorf("contact #orchestration channel for policy approvals")
+		result.Error = fmt.Errorf("contact policy owners to approve failing policies")
 		return
 	}
 
