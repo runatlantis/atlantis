@@ -175,7 +175,6 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		Log:      log,
 		Pull:     pull,
 		HeadRepo: headRepo,
-		Scope:    scope,
 		Trigger:  Comment,
 	}
 
