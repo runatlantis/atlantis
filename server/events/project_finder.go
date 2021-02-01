@@ -148,7 +148,7 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log *logging.SimpleLog
 // filterToTerraform filters non-terraform files from files.
 func (p *DefaultProjectFinder) filterToTerraform(files []string) []string {
 	var filtered []string
-	fileNameRe, _ := regexp.Compile(`^.*(\.tf|\.tfvars)$`)
+	fileNameRe, _ := regexp.Compile(`^.*(\.tf|\.tfvars|\.tfvars.json)$`)
 
 	for _, fileName := range files {
 		if !p.shouldIgnore(fileName) && (fileNameRe.MatchString(fileName) || filepath.Base(fileName) == "terragrunt.hcl") {

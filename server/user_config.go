@@ -26,6 +26,7 @@ type UserConfig struct {
 	DisableApply               bool   `mapstructure:"disable-apply"`
 	DisableAutoplan            bool   `mapstructure:"disable-autoplan"`
 	DisableMarkdownFolding     bool   `mapstructure:"disable-markdown-folding"`
+	DisableRepoLocking         bool   `mapstructure:"disable-repo-locking"`
 	GithubHostname             string `mapstructure:"gh-hostname"`
 	GithubToken                string `mapstructure:"gh-token"`
 	GithubUser                 string `mapstructure:"gh-user"`
@@ -33,6 +34,7 @@ type UserConfig struct {
 	GithubOrg                  string `mapstructure:"gh-org"`
 	GithubAppID                int64  `mapstructure:"gh-app-id"`
 	GithubAppKey               string `mapstructure:"gh-app-key-file"`
+	GithubAppSlug              string `mapstructure:"gh-app-slug"`
 	GitlabHostname             string `mapstructure:"gitlab-hostname"`
 	GitlabToken                string `mapstructure:"gitlab-token"`
 	GitlabUser                 string `mapstructure:"gitlab-user"`

@@ -220,6 +220,12 @@ Values are chosen in this order:
   ```
   Disable atlantis auto planning
 
+* ### `--disable-repo-locking`
+  ```bash
+  atlantis server --disable-repo-locking
+  ```
+  Stops atlantis locking projects and or workspaces when running terraform
+
 * ### `--gh-hostname`
   ```bash
   atlantis server --gh-hostname="my.github.enterprise.com"
@@ -247,7 +253,7 @@ Values are chosen in this order:
   # or (recommended)
   ATLANTIS_GH_WEBHOOK_SECRET='secret' atlantis server
   ```
-  Secret used to validate GitHub webhooks (see [https://developer.github.com/webhooks/securing/](https://developer.github.com/webhooks/securing/)).
+  Secret used to validate GitHub webhooks (see [https://developer.github.com/webhooks/securing/](https://docs.github.com/en/free-pro-team@latest/developers/webhooks-and-events/securing-your-webhooks)).
 
   ::: warning SECURITY WARNING
   If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitHub.
