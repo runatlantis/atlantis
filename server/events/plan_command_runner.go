@@ -74,10 +74,10 @@ func (p *PlanCommandRunner) runAutoplan(ctx *CommandContext) {
 			if err := p.commitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, models.PlanCommand, 0, 0); err != nil {
 				ctx.Log.Warn("unable to update commit status: %s", err)
 			}
-			if err := p.CommitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, models.PolicyCheckCommand, 0, 0); err != nil {
+			if err := p.commitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, models.PolicyCheckCommand, 0, 0); err != nil {
 				ctx.Log.Warn("unable to update commit status: %s", err)
 			}
-			if err := p.CommitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, models.ApplyCommand, 0, 0); err != nil {
+			if err := p.commitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, models.ApplyCommand, 0, 0); err != nil {
 				ctx.Log.Warn("unable to update commit status: %s", err)
 			}
 		}
