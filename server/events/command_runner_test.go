@@ -88,15 +88,14 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	When(logger.NewLogger("runatlantis/atlantis#1", true, logging.Info)).
 		ThenReturn(pullLogger)
 
-	scope := stats.NewDefaultStore()
 	dbUpdater = &events.DBUpdater{
 		DB: defaultBoltDB,
 	}
 
 	pullUpdater = &events.PullUpdater{
-		HidePrevCommandComments: false,
-		VCSClient:               vcsClient,
-		MarkdownRenderer:        &events.MarkdownRenderer{},
+		HidePrevPlanComments: false,
+		VCSClient:            vcsClient,
+		MarkdownRenderer:     &events.MarkdownRenderer{},
 	}
 
 	autoMerger = &events.AutoMerger{
@@ -127,6 +126,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 
 	applyCommandRunner = events.NewApplyCommandRunner(
 		vcsClient,
+		false,
 		false,
 		commitUpdater,
 		projectCommandBuilder,
@@ -165,7 +165,6 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		GitlabMergeRequestGetter:  gitlabGetter,
 		AzureDevopsPullGetter:     azuredevopsGetter,
 		Logger:                    logger,
-		StatsScope:                scope,
 		AllowForkPRs:              false,
 		AllowForkPRsFlag:          "allow-fork-prs-flag",
 		Drainer:                   drainer,
@@ -287,7 +286,8 @@ func TestRunCommentCommand_ApplyDisabled(t *testing.T) {
 	t.Log("if \"atlantis apply\" is run and this is disabled globally atlantis should" +
 		" comment saying that this is not allowed")
 	vcsClient := setup(t)
-	ch.DisableApply = true
+	applyCommandRunner.DisableApply = true
+	defer func() { applyCommandRunner.DisableApply = false }()
 	pull := &github.PullRequest{
 		State: github.String("open"),
 	}
@@ -499,6 +499,7 @@ func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
 		},
 	}, nil)
 
+	When(workingDir.GetPullDir(fixtures.GithubRepo, fixtures.Pull)).ThenReturn(tmp, nil)
 	When(projectCommandRunner.ApprovePolicies(matchers.AnyModelsProjectCommandContext())).Then(func(_ []Param) ReturnValues {
 		return ReturnValues{
 			models.ProjectResult{
@@ -507,8 +508,6 @@ func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
 			},
 		}
 	})
-
-	When(workingDir.GetPullDir(fixtures.GithubRepo, fixtures.Pull)).ThenReturn(tmp, nil)
 
 	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, &fixtures.Pull, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.ApprovePoliciesCommand})
 	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(

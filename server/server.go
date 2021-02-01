@@ -460,18 +460,15 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Webhooks:            webhooksManager,
 		WorkingDirLocker:    workingDirLocker,
 	}
-	instrumentedProjectCmdRunner := &events.InstrumentedProjectCommandRunner{
-		ProjectCommandRunner: projectCommandRunner,
-	}
 
 	dbUpdater := &events.DBUpdater{
 		DB: boltdb,
 	}
 
 	pullUpdater := &events.PullUpdater{
-		HidePrevCommandComments: userConfig.HidePrevPlanComments,
-		VCSClient:               vcsClient,
-		MarkdownRenderer:        markdownRenderer,
+		HidePrevPlanComments: userConfig.HidePrevPlanComments,
+		VCSClient:            vcsClient,
+		MarkdownRenderer:     markdownRenderer,
 	}
 
 	autoMerger := &events.AutoMerger{
@@ -483,7 +480,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		dbUpdater,
 		pullUpdater,
 		commitStatusUpdater,
-		instrumentedProjectCmdRunner,
+		projectCommandRunner,
 	)
 
 	planCommandRunner := events.NewPlanCommandRunner(
@@ -493,7 +490,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		workingDir,
 		commitStatusUpdater,
 		projectCommandBuilder,
-		instrumentedProjectCmdRunner,
+		projectCommandRunner,
 		dbUpdater,
 		pullUpdater,
 		policyCheckCommandRunner,
@@ -503,9 +500,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	applyCommandRunner := events.NewApplyCommandRunner(
 		vcsClient,
 		userConfig.DisableApplyAll,
+		userConfig.DisableApply,
 		commitStatusUpdater,
 		projectCommandBuilder,
-		instrumentedProjectCmdRunner,
+		projectCommandRunner,
 		autoMerger,
 		pullUpdater,
 		dbUpdater,
@@ -515,7 +513,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
 		commitStatusUpdater,
 		projectCommandBuilder,
-		instrumentedProjectCmdRunner,
+		projectCommandRunner,
 		pullUpdater,
 		dbUpdater,
 	)
@@ -540,7 +538,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CommentCommandRunnerByCmd: commentCommandRunnerByCmd,
 		EventParser:               eventParser,
 		Logger:                    logger,
-		StatsScope:                statsScope.Scope("cmd"),
 		AllowForkPRs:              userConfig.AllowForkPRs,
 		AllowForkPRsFlag:          config.AllowForkPRsFlag,
 		SilenceForkPRErrors:       userConfig.SilenceForkPRErrors,

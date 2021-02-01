@@ -686,9 +686,9 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 	}
 
 	pullUpdater := &events.PullUpdater{
-		HidePrevCommandComments: false,
-		VCSClient:               e2eVCSClient,
-		MarkdownRenderer:        &events.MarkdownRenderer{},
+		HidePrevPlanComments: false,
+		VCSClient:            e2eVCSClient,
+		MarkdownRenderer:     &events.MarkdownRenderer{},
 	}
 
 	autoMerger := &events.AutoMerger{
@@ -719,6 +719,7 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 
 	applyCommandRunner := events.NewApplyCommandRunner(
 		e2eVCSClient,
+		false,
 		false,
 		e2eStatusUpdater,
 		projectCommandBuilder,
@@ -755,7 +756,6 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 		GithubPullGetter:          e2eGithubGetter,
 		GitlabMergeRequestGetter:  e2eGitlabGetter,
 		Logger:                    logger,
-		StatsScope:                statsScope,
 		AllowForkPRs:              allowForkPRs,
 		AllowForkPRsFlag:          "allow-fork-prs",
 		CommentCommandRunnerByCmd: commentCommandRunnerByCmd,
