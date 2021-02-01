@@ -95,12 +95,18 @@ type ProjectPolicyCheckCommandRunner interface {
 	PolicyCheck(ctx models.ProjectCommandContext) models.ProjectResult
 }
 
+type ProjectApprovePoliciesCommandRunner interface {
+	// Approves any failing OPA policies.
+	ApprovePolicies(ctx models.ProjectCommandContext) models.ProjectResult
+}
+
 // ProjectCommandRunner runs project commands. A project command is a command
 // for a specific TF project.
 type ProjectCommandRunner interface {
 	ProjectPlanCommandRunner
 	ProjectApplyCommandRunner
 	ProjectPolicyCheckCommandRunner
+	ProjectApprovePoliciesCommandRunner
 }
 
 // DefaultProjectCommandRunner implements ProjectCommandRunner.
@@ -160,6 +166,36 @@ func (p *DefaultProjectCommandRunner) Apply(ctx models.ProjectCommandContext) mo
 		Workspace:    ctx.Workspace,
 		ProjectName:  ctx.ProjectName,
 	}
+}
+
+func (p *DefaultProjectCommandRunner) ApprovePolicies(ctx models.ProjectCommandContext) models.ProjectResult {
+	approvedOut, failure, err := p.doApprovePolicies(ctx)
+	return models.ProjectResult{
+		Command:            models.PolicyCheckCommand,
+		Failure:            failure,
+		Error:              err,
+		PolicyCheckSuccess: approvedOut,
+		RepoRelDir:         ctx.RepoRelDir,
+		Workspace:          ctx.Workspace,
+		ProjectName:        ctx.ProjectName,
+	}
+}
+
+func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx models.ProjectCommandContext) (*models.PolicyCheckSuccess, string, error) {
+	// Acquire Atlantis lock for this repo/dir/workspace.
+	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir))
+	if err != nil {
+		return nil, "", errors.Wrap(err, "acquiring lock")
+	}
+	if !lockAttempt.LockAcquired {
+		return nil, lockAttempt.LockFailureReason, nil
+	}
+	ctx.Log.Debug("acquired lock for project")
+
+	return &models.PolicyCheckSuccess{
+		LockURL:           p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
+		PolicyCheckOutput: "Policies approved",
+	}, "", nil
 }
 
 func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx models.ProjectCommandContext) (*models.PolicyCheckSuccess, string, error) {

@@ -45,6 +45,13 @@ func (m *NoopTFDownloader) GetAny(dst, src string, opts ...getter.ClientOption) 
 	return nil
 }
 
+type LocalConftestCache struct {
+}
+
+func (m *LocalConftestCache) Get(key *version.Version) (string, error) {
+	return exec.LookPath("conftest0.21.0")
+}
+
 func TestGitHubWorkflow(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -67,12 +74,14 @@ func TestGitHubWorkflow(t *testing.T) {
 		ExpAutoplan bool
 		// ExpParallel is true if we expect Atlantis to run parallel plans or applies.
 		ExpParallel bool
+		// ExpMergeable is true if we expect Atlantis to be able to merge.
+		// If for instance policy check is failing and there are no approvals
+		// ExpMergeable should be false
+		ExpMergeable bool
 		// ExpReplies is a list of files containing the expected replies that
 		// Atlantis writes to the pull request in order. A reply from a parallel operation
 		// will be matched using a substring check.
 		ExpReplies [][]string
-		// PolicyCheckEnabled runs integration tests through PolicyCheckProjectCommandBuilder.
-		PolicyCheckEnabled bool
 	}{
 		{
 			Description:   "simple",
@@ -86,8 +95,7 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-apply.txt"},
 				{"exp-output-merge.txt"},
 			},
-			ExpAutoplan:        true,
-			PolicyCheckEnabled: false,
+			ExpAutoplan: true,
 		},
 		{
 			Description:   "simple with plan comment",
@@ -104,7 +112,6 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-apply.txt"},
 				{"exp-output-merge.txt"},
 			},
-			PolicyCheckEnabled: false,
 		},
 		{
 			Description:   "simple with comment -var",
@@ -121,7 +128,6 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-apply-var.txt"},
 				{"exp-output-merge.txt"},
 			},
-			PolicyCheckEnabled: false,
 		},
 		{
 			Description:   "simple with workspaces",
@@ -142,7 +148,6 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-apply-var-new-workspace.txt"},
 				{"exp-output-merge-workspaces.txt"},
 			},
-			PolicyCheckEnabled: false,
 		},
 		{
 			Description:   "simple with workspaces and apply all",
@@ -161,7 +166,6 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-apply-var-all.txt"},
 				{"exp-output-merge-workspaces.txt"},
 			},
-			PolicyCheckEnabled: false,
 		},
 		{
 			Description:   "simple with atlantis.yaml",
@@ -178,7 +182,6 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-apply-default.txt"},
 				{"exp-output-merge.txt"},
 			},
-			PolicyCheckEnabled: false,
 		},
 		{
 			Description:   "simple with atlantis.yaml and apply all",
@@ -193,24 +196,6 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-apply-all.txt"},
 				{"exp-output-merge.txt"},
 			},
-			PolicyCheckEnabled: false,
-		},
-		{
-			Description:   "simple with atlantis.yaml and plan/apply all",
-			RepoDir:       "simple-yaml",
-			ModifiedFiles: []string{"main.tf"},
-			ExpAutoplan:   true,
-			Comments: []string{
-				"atlantis plan",
-				"atlantis apply",
-			},
-			ExpReplies: [][]string{
-				{"exp-output-autoplan.txt"},
-				{"exp-output-autoplan.txt"},
-				{"exp-output-apply-all.txt"},
-				{"exp-output-merge.txt"},
-			},
-			PolicyCheckEnabled: false,
 		},
 		{
 			Description:   "modules staging only",
@@ -225,7 +210,6 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-apply-staging.txt"},
 				{"exp-output-merge-only-staging.txt"},
 			},
-			PolicyCheckEnabled: false,
 		},
 		{
 			Description:   "modules modules only",
@@ -245,7 +229,6 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-apply-production.txt"},
 				{"exp-output-merge-all-dirs.txt"},
 			},
-			PolicyCheckEnabled: false,
 		},
 		{
 			Description:   "modules-yaml",
@@ -262,7 +245,6 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-apply-production.txt"},
 				{"exp-output-merge.txt"},
 			},
-			PolicyCheckEnabled: false,
 		},
 		{
 			Description:   "tfvars-yaml",
@@ -279,7 +261,6 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-apply-default.txt"},
 				{"exp-output-merge.txt"},
 			},
-			PolicyCheckEnabled: false,
 		},
 		{
 			Description:   "tfvars no autoplan",
@@ -299,7 +280,6 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-apply-default.txt"},
 				{"exp-output-merge.txt"},
 			},
-			PolicyCheckEnabled: false,
 		},
 		{
 			Description:   "automerge",
@@ -318,7 +298,6 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-automerge.txt"},
 				{"exp-output-merge.txt"},
 			},
-			PolicyCheckEnabled: false,
 		},
 		{
 			Description:   "server-side cfg",
@@ -336,7 +315,6 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-apply-default-workspace.txt"},
 				{"exp-output-merge.txt"},
 			},
-			PolicyCheckEnabled: false,
 		},
 		{
 			Description:   "workspaces parallel with atlantis.yaml",
@@ -352,14 +330,13 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-apply-all-staging.txt", "exp-output-apply-all-production.txt"},
 				{"exp-output-merge.txt"},
 			},
-			PolicyCheckEnabled: false,
 		},
 	}
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			RegisterMockTestingT(t)
 
-			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir, c.PolicyCheckEnabled)
+			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir, false)
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
 			defer cleanup()
@@ -391,28 +368,174 @@ func TestGitHubWorkflow(t *testing.T) {
 			responseContains(t, w, 200, "Pull request cleaned successfully")
 
 			// Now we're ready to verify Atlantis made all the comments back (or
-			// replies) that we expect.  We expect each plan to have 2 comments,
-			// one for plan one for policy check and apply have 1 for each
-			// comment plus one for the locks deleted at the end.
+			// replies) that we expect.  We expect each plan to have 1 comment,
+			// and apply have 1 for each comment plus one for the locks deleted at the
+			// end.
 			expNumReplies := len(c.Comments) + 1
 
 			if c.ExpAutoplan {
 				expNumReplies++
 			}
 
-			// When enabled policy_check runs right after plan. So whenever
-			// comment matches plan we add additional call to expected
-			// number.
-			if c.PolicyCheckEnabled {
-				var planRegex = regexp.MustCompile("plan")
-				for _, comment := range c.Comments {
-					if planRegex.MatchString(comment) {
-						expNumReplies++
-					}
-				}
+			if c.ExpAutomerge {
+				expNumReplies++
+			}
 
-				// Adding 1 for policy_check autorun
-				if c.ExpAutoplan {
+			_, _, actReplies, _ := vcsClient.VerifyWasCalled(Times(expNumReplies)).CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString()).GetAllCapturedArguments()
+			Assert(t, len(c.ExpReplies) == len(actReplies), "missing expected replies, got %d but expected %d", len(actReplies), len(c.ExpReplies))
+			for i, expReply := range c.ExpReplies {
+				assertCommentEquals(t, expReply, actReplies[i], c.RepoDir, c.ExpParallel)
+			}
+
+			if c.ExpAutomerge {
+				// Verify that the merge API call was made.
+				vcsClient.VerifyWasCalledOnce().MergePull(matchers.AnyModelsPullRequest())
+			} else {
+				vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest())
+			}
+		})
+	}
+}
+
+func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	// Ensure we have >= TF 0.12 locally.
+	ensureRunning012(t)
+	// Ensure we have >= Conftest 0.21 locally.
+	ensureRunningConftest(t)
+
+	cases := []struct {
+		Description string
+		// RepoDir is relative to testfixtures/test-repos.
+		RepoDir string
+		// ModifiedFiles are the list of files that have been modified in this
+		// pull request.
+		ModifiedFiles []string
+		// Comments are what our mock user writes to the pull request.
+		Comments []string
+		// ExpAutomerge is true if we expect Atlantis to automerge.
+		ExpAutomerge bool
+		// ExpMergeable is true if we expect Atlantis to be able to merge.
+		// If for instance policy check is failing and there are no approvals
+		// ExpMergeable should be false
+		ExpMergeable bool
+		// ExpAutoplan is true if we expect Atlantis to autoplan.
+		ExpAutoplan bool
+		// ExpParallel is true if we expect Atlantis to run parallel plans or applies.
+		ExpParallel bool
+		// ExpReplies is a list of files containing the expected replies that
+		// Atlantis writes to the pull request in order. A reply from a parallel operation
+		// will be matched using a substring check.
+		ExpReplies [][]string
+	}{
+		{
+			Description:   "failing policy approved by the owner",
+			RepoDir:       "policy-checks",
+			ModifiedFiles: []string{"main.tf"},
+			ExpAutoplan:   true,
+			ExpMergeable:  true,
+			Comments: []string{
+				"atlantis approve_policies",
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
+				{"exp-output-approve-policies.txt"},
+				{"exp-output-apply.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description:   "failing policy without approval",
+			RepoDir:       "policy-checks",
+			ModifiedFiles: []string{"main.tf"},
+			ExpAutoplan:   true,
+			ExpMergeable:  false,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
+				{"exp-output-apply-failed.txt"},
+			},
+		},
+		{
+			Description:   "failing policy approved by non owner",
+			RepoDir:       "policy-checks-diff-owner",
+			ModifiedFiles: []string{"main.tf"},
+			ExpAutoplan:   true,
+			ExpMergeable:  false,
+			Comments: []string{
+				"atlantis approve_policies",
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
+				{"exp-output-approve-policies.txt"},
+				{"exp-output-apply-failed.txt"},
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.Description, func(t *testing.T) {
+			RegisterMockTestingT(t)
+
+			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir, true)
+			// Set the repo to be cloned through the testing backdoor.
+			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
+			defer cleanup()
+			atlantisWorkspace.TestingOverrideHeadCloneURL = fmt.Sprintf("file://%s", repoDir)
+
+			// Setup test dependencies.
+			w := httptest.NewRecorder()
+			When(vcsClient.PullIsMergeable(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(true, nil)
+			When(githubGetter.GetPullRequest(AnyRepo(), AnyInt())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
+			When(vcsClient.GetModifiedFiles(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
+
+			// First, send the open pull request event which triggers autoplan.
+			pullOpenedReq := GitHubPullRequestOpenedEvent(t, headSHA)
+			ctrl.Post(w, pullOpenedReq)
+			responseContains(t, w, 200, "Processing...")
+
+			// Now send any other comments.
+			for _, comment := range c.Comments {
+				commentReq := GitHubCommentEvent(t, comment)
+				w = httptest.NewRecorder()
+				ctrl.Post(w, commentReq)
+				responseContains(t, w, 200, "Processing...")
+			}
+
+			// Send the "pull closed" event which would be triggered by the
+			// automerge or a manual merge.
+			pullClosedReq := GitHubPullRequestClosedEvent(t)
+			w = httptest.NewRecorder()
+			ctrl.Post(w, pullClosedReq)
+			responseContains(t, w, 200, "Pull request cleaned successfully")
+
+			// Now we're ready to verify Atlantis made all the comments back (or
+			// replies) that we expect.  We expect each plan to have 2 comments,
+			// one for plan one for policy check and apply have 1 for each
+			// comment plus one for the locks deleted at the end.
+			expNumReplies := len(c.Comments)
+
+			if c.ExpMergeable {
+				expNumReplies++
+			}
+
+			if c.ExpAutoplan {
+				expNumReplies++
+				expNumReplies++
+			}
+
+			var planRegex = regexp.MustCompile("plan")
+			for _, comment := range c.Comments {
+				if planRegex.MatchString(comment) {
 					expNumReplies++
 				}
 			}
@@ -517,9 +640,17 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 
 	Ok(t, err)
 
+	conftestVersion, _ := version.NewVersion("0.21.0")
+
+	conftextExec := policy.NewConfTestExecutorWorkflow(logger, binDir, &NoopTFDownloader{})
+
+	// swapping out version cache to something that always returns local contest
+	// binary
+	conftextExec.VersionCache = &LocalConftestCache{}
+
 	policyCheckRunner, err := runtime.NewPolicyCheckStepRunner(
-		defaultTFVersion,
-		policy.NewConfTestExecutorWorkflow(logger, binDir, &NoopTFDownloader{}),
+		conftestVersion,
+		conftextExec,
 	)
 
 	Ok(t, err)
@@ -848,6 +979,34 @@ func mkSubDirs(t *testing.T) (string, string, string, func()) {
 	return tmp, binDir, cachedir, cleanup
 }
 
+// Will fail test if conftest isn't in path and isn't version >= 0.21.0
+func ensureRunningConftest(t *testing.T) {
+	localPath, err := exec.LookPath("conftest0.21.0")
+	if err != nil {
+		t.Log("conftest >= 0.21 must be installed to run this test")
+		t.FailNow()
+	}
+	versionOutBytes, err := exec.Command(localPath, "--version").Output() // #nosec
+	if err != nil {
+		t.Logf("error running conftest version: %s", err)
+		t.FailNow()
+	}
+	versionOutput := string(versionOutBytes)
+	match := versionConftestRegex.FindStringSubmatch(versionOutput)
+	if len(match) <= 1 {
+		t.Logf("could not parse contest version from %s", versionOutput)
+		t.FailNow()
+	}
+	localVersion, err := version.NewVersion(match[1])
+	Ok(t, err)
+	minVersion, err := version.NewVersion("0.21.0")
+	Ok(t, err)
+	if localVersion.LessThan(minVersion) {
+		t.Logf("must have contest version >= %s, you have %s", minVersion, localVersion)
+		t.FailNow()
+	}
+}
+
 // Will fail test if terraform isn't in path and isn't version >= 0.12
 func ensureRunning012(t *testing.T) {
 	localPath, err := exec.LookPath("terraform")
@@ -883,3 +1042,5 @@ func ensureRunning012(t *testing.T) {
 //     Terraform v0.11.10
 //	   => 0.11.10
 var versionRegex = regexp.MustCompile("Terraform v(.*?)(\\s.*)?\n")
+
+var versionConftestRegex = regexp.MustCompile("Version: (.*?)(\\s.*)?\n")

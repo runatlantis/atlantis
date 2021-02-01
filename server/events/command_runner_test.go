@@ -497,6 +497,15 @@ func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
 		},
 	}, nil)
 
+	When(projectCommandRunner.ApprovePolicies(matchers.AnyModelsProjectCommandContext())).Then(func(_ []Param) ReturnValues {
+		return ReturnValues{
+			models.ProjectResult{
+				Command:            models.PolicyCheckCommand,
+				PolicyCheckSuccess: &models.PolicyCheckSuccess{},
+			},
+		}
+	})
+
 	When(workingDir.GetPullDir(fixtures.GithubRepo, fixtures.Pull)).ThenReturn(tmp, nil)
 
 	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, &fixtures.Pull, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.ApprovePoliciesCommand})

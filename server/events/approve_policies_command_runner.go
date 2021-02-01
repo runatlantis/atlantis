@@ -9,7 +9,7 @@ import (
 func NewApprovePoliciesCommandRunner(
 	commitStatusUpdater CommitStatusUpdater,
 	prjCommandBuilder ProjectApprovePoliciesCommandBuilder,
-	prjCommandRunner ProjectPolicyCheckCommandRunner,
+	prjCommandRunner ProjectApprovePoliciesCommandRunner,
 	pullUpdater *PullUpdater,
 	dbUpdater *DBUpdater,
 ) *ApprovePoliciesCommandRunner {
@@ -27,7 +27,7 @@ type ApprovePoliciesCommandRunner struct {
 	pullUpdater         *PullUpdater
 	dbUpdater           *DBUpdater
 	prjCmdBuilder       ProjectApprovePoliciesCommandBuilder
-	prjCmdRunner        ProjectPolicyCheckCommandRunner
+	prjCmdRunner        ProjectApprovePoliciesCommandRunner
 }
 
 func (a *ApprovePoliciesCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
@@ -76,16 +76,7 @@ func (a *ApprovePoliciesCommandRunner) buildApprovePolicyCommandResults(ctx *Com
 	var prjResults []models.ProjectResult
 
 	for _, prjCmd := range prjCmds {
-
-		prjResult := models.ProjectResult{
-			Command: models.PolicyCheckCommand,
-			PolicyCheckSuccess: &models.PolicyCheckSuccess{
-				PolicyCheckOutput: "Policies approved",
-			},
-			RepoRelDir:  prjCmd.RepoRelDir,
-			Workspace:   prjCmd.Workspace,
-			ProjectName: prjCmd.ProjectName,
-		}
+		prjResult := a.prjCmdRunner.ApprovePolicies(prjCmd)
 		prjResults = append(prjResults, prjResult)
 	}
 	result.ProjectResults = prjResults
