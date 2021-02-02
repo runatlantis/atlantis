@@ -34,6 +34,7 @@ type Repo struct {
 	// IDRegex is the regex match for this config.
 	// If ID is set then this will be nil.
 	IDRegex              *regexp.Regexp
+	BranchRegex          *regexp.Regexp
 	ApplyRequirements    []string
 	PreWorkflowHooks     []*PreWorkflowHook
 	Workflow             *Workflow
@@ -123,6 +124,7 @@ func NewGlobalCfgWithHooks(allowRepoCfg bool, mergeableReq bool, approvedReq boo
 		Repos: []Repo{
 			{
 				IDRegex:              regexp.MustCompile(".*"),
+				BranchRegex:          regexp.MustCompile(".*"),
 				ApplyRequirements:    applyReqs,
 				PreWorkflowHooks:     preWorkflowHooks,
 				Workflow:             &defaultWorkflow,
@@ -156,6 +158,14 @@ func (r Repo) IDMatches(otherID string) bool {
 		return r.ID == otherID
 	}
 	return r.IDRegex.MatchString(otherID)
+}
+
+// BranchMatches returns true if the branch other matches a branch regex (if preset).
+func (r Repo) BranchMatches(other string) bool {
+	if r.BranchRegex == nil {
+		return true
+	}
+	return r.BranchRegex.MatchString(other)
 }
 
 // IDString returns a string representation of this config.

@@ -34,7 +34,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(
 
 	preWorkflowHooks := make([]*valid.PreWorkflowHook, 0)
 	for _, repo := range w.GlobalCfg.Repos {
-		if repo.IDMatches(baseRepo.ID()) && len(repo.PreWorkflowHooks) > 0 {
+		if repo.IDMatches(baseRepo.ID()) && repo.BranchMatches(pull.BaseBranch) && len(repo.PreWorkflowHooks) > 0 {
 			preWorkflowHooks = append(preWorkflowHooks, repo.PreWorkflowHooks...)
 		}
 	}

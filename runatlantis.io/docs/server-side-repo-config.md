@@ -28,6 +28,10 @@ repos:
   # Repo ID's are of the form {VCS hostname}/{org}/{repo name}, ex.
   # github.com/runatlantis/atlantis.
 - id: /.*/
+  # branch is an regex matching pull requests by base branch
+  # (the branch the pull request is getting merged into).
+  # By default, all branches are matched
+  branch: /.*/
 
   # apply_requirements sets the Apply Requirements for all repos that match.
   apply_requirements: [approved, mergeable]
