@@ -18,7 +18,7 @@ RUN curl -o aws-iam-authenticator https://amazon-eks.s3.us-west-2.amazonaws.com/
       mv aws-iam-authenticator /usr/local/bin
 
 # In the official Atlantis image we only have the latest of each Terraform version.
-RUN AVAILABLE_TERRAFORM_VERSIONS="0.11.14 0.12.18 ${DEFAULT_TERRAFORM_VERSION}" && \
+RUN AVAILABLE_TERRAFORM_VERSIONS="0.11.14 0.12.18 0.13.5 ${DEFAULT_TERRAFORM_VERSION}" && \
     for VERSION in ${AVAILABLE_TERRAFORM_VERSIONS}; do \
         curl -LOs https://releases.hashicorp.com/terraform/${VERSION}/terraform_${VERSION}_linux_amd64.zip && \
         curl -LOs https://releases.hashicorp.com/terraform/${VERSION}/terraform_${VERSION}_SHA256SUMS && \
