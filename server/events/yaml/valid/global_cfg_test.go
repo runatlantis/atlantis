@@ -133,7 +133,7 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 		repoID string
 		expErr string
 	}{
-		"repo uses workflow that is defined but not allowed": {
+		"repo uses workflow that is defined server side but not allowed (with custom workflows)": {
 			gCfg: valid.GlobalCfg{
 				Repos: []valid.Repo{
 					valid.NewGlobalCfg(true, false, false).Repos[0],
@@ -161,7 +161,123 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 			repoID: "github.com/owner/repo",
 			expErr: "workflow 'forbidden' is not allowed for this repo",
 		},
-		"repo uses workflow that is defined AND allowed": {
+		"repo uses workflow that is defined server side but not allowed (without custom workflows)": {
+			gCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					valid.NewGlobalCfg(true, false, false).Repos[0],
+					{
+						ID:                   "github.com/owner/repo",
+						AllowCustomWorkflows: Bool(false),
+						AllowedOverrides:     []string{"workflow"},
+						AllowedWorkflows:     []string{"allowed"},
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"allowed":   {},
+					"forbidden": {},
+				},
+			},
+			rCfg: valid.RepoCfg{
+				Projects: []valid.Project{
+					{
+						Dir:          ".",
+						Workspace:    "default",
+						WorkflowName: String("forbidden"),
+					},
+				},
+			},
+			repoID: "github.com/owner/repo",
+			expErr: "workflow 'forbidden' is not allowed for this repo",
+		},
+		"repo uses workflow that is defined in both places with same name (without custom workflows)": {
+			gCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					valid.NewGlobalCfg(true, false, false).Repos[0],
+					{
+						ID:                   "github.com/owner/repo",
+						AllowCustomWorkflows: Bool(false),
+						AllowedOverrides:     []string{"workflow"},
+						AllowedWorkflows:     []string{"duplicated"},
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"duplicated": {},
+				},
+			},
+			rCfg: valid.RepoCfg{
+				Projects: []valid.Project{
+					{
+						Dir:          ".",
+						Workspace:    "default",
+						WorkflowName: String("duplicated"),
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"duplicated": {},
+				},
+			},
+			repoID: "github.com/owner/repo",
+			expErr: "repo config not allowed to define custom workflows: server-side config needs 'allow_custom_workflows: true'",
+		},
+		"repo uses workflow that is defined repo side, but not allowed (with custom workflows)": {
+			gCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					valid.NewGlobalCfg(true, false, false).Repos[0],
+					{
+						ID:                   "github.com/owner/repo",
+						AllowCustomWorkflows: Bool(true),
+						AllowedOverrides:     []string{"workflow"},
+						AllowedWorkflows:     []string{"none"},
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"forbidden": {},
+				},
+			},
+			rCfg: valid.RepoCfg{
+				Projects: []valid.Project{
+					{
+						Dir:          ".",
+						Workspace:    "default",
+						WorkflowName: String("repodefined"),
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"repodefined": {},
+				},
+			},
+			repoID: "github.com/owner/repo",
+			expErr: "",
+		},
+		"repo uses workflow that is defined server side and allowed (without custom workflows)": {
+			gCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					valid.NewGlobalCfg(true, false, false).Repos[0],
+					{
+						ID:                   "github.com/owner/repo",
+						AllowCustomWorkflows: Bool(false),
+						AllowedOverrides:     []string{"workflow"},
+						AllowedWorkflows:     []string{"allowed"},
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"allowed":   {},
+					"forbidden": {},
+				},
+			},
+			rCfg: valid.RepoCfg{
+				Projects: []valid.Project{
+					{
+						Dir:          ".",
+						Workspace:    "default",
+						WorkflowName: String("allowed"),
+					},
+				},
+			},
+			repoID: "github.com/owner/repo",
+			expErr: "",
+		},
+		"repo uses workflow that is defined server side and allowed (with custom workflows)": {
 			gCfg: valid.GlobalCfg{
 				Repos: []valid.Repo{
 					valid.NewGlobalCfg(true, false, false).Repos[0],

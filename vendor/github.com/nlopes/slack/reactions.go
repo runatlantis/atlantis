@@ -1,6 +1,7 @@
 package slack
 
 import (
+	"context"
 	"errors"
 	"net/url"
 	"strconv"
@@ -129,86 +130,100 @@ func (res listReactionsResponseFull) extractReactedItems() []ReactedItem {
 
 // AddReaction adds a reaction emoji to a message, file or file comment.
 func (api *Client) AddReaction(name string, item ItemRef) error {
+	return api.AddReactionContext(context.Background(), name, item)
+}
+
+// AddReactionContext adds a reaction emoji to a message, file or file comment with a custom context.
+func (api *Client) AddReactionContext(ctx context.Context, name string, item ItemRef) error {
 	values := url.Values{
-		"token": {api.config.token},
+		"token": {api.token},
 	}
 	if name != "" {
 		values.Set("name", name)
 	}
 	if item.Channel != "" {
-		values.Set("channel", string(item.Channel))
+		values.Set("channel", item.Channel)
 	}
 	if item.Timestamp != "" {
-		values.Set("timestamp", string(item.Timestamp))
+		values.Set("timestamp", item.Timestamp)
 	}
 	if item.File != "" {
-		values.Set("file", string(item.File))
+		values.Set("file", item.File)
 	}
 	if item.Comment != "" {
-		values.Set("file_comment", string(item.Comment))
+		values.Set("file_comment", item.Comment)
 	}
+
 	response := &SlackResponse{}
-	if err := post("reactions.add", values, response, api.debug); err != nil {
+	if err := postSlackMethod(ctx, api.httpclient, "reactions.add", values, response, api.debug); err != nil {
 		return err
 	}
-	if !response.Ok {
-		return errors.New(response.Error)
-	}
-	return nil
+
+	return response.Err()
 }
 
 // RemoveReaction removes a reaction emoji from a message, file or file comment.
 func (api *Client) RemoveReaction(name string, item ItemRef) error {
+	return api.RemoveReactionContext(context.Background(), name, item)
+}
+
+// RemoveReactionContext removes a reaction emoji from a message, file or file comment with a custom context.
+func (api *Client) RemoveReactionContext(ctx context.Context, name string, item ItemRef) error {
 	values := url.Values{
-		"token": {api.config.token},
+		"token": {api.token},
 	}
 	if name != "" {
 		values.Set("name", name)
 	}
 	if item.Channel != "" {
-		values.Set("channel", string(item.Channel))
+		values.Set("channel", item.Channel)
 	}
 	if item.Timestamp != "" {
-		values.Set("timestamp", string(item.Timestamp))
+		values.Set("timestamp", item.Timestamp)
 	}
 	if item.File != "" {
-		values.Set("file", string(item.File))
+		values.Set("file", item.File)
 	}
 	if item.Comment != "" {
-		values.Set("file_comment", string(item.Comment))
+		values.Set("file_comment", item.Comment)
 	}
+
 	response := &SlackResponse{}
-	if err := post("reactions.remove", values, response, api.debug); err != nil {
+	if err := postSlackMethod(ctx, api.httpclient, "reactions.remove", values, response, api.debug); err != nil {
 		return err
 	}
-	if !response.Ok {
-		return errors.New(response.Error)
-	}
-	return nil
+
+	return response.Err()
 }
 
 // GetReactions returns details about the reactions on an item.
 func (api *Client) GetReactions(item ItemRef, params GetReactionsParameters) ([]ItemReaction, error) {
+	return api.GetReactionsContext(context.Background(), item, params)
+}
+
+// GetReactionsContext returns details about the reactions on an item with a custom context
+func (api *Client) GetReactionsContext(ctx context.Context, item ItemRef, params GetReactionsParameters) ([]ItemReaction, error) {
 	values := url.Values{
-		"token": {api.config.token},
+		"token": {api.token},
 	}
 	if item.Channel != "" {
-		values.Set("channel", string(item.Channel))
+		values.Set("channel", item.Channel)
 	}
 	if item.Timestamp != "" {
-		values.Set("timestamp", string(item.Timestamp))
+		values.Set("timestamp", item.Timestamp)
 	}
 	if item.File != "" {
-		values.Set("file", string(item.File))
+		values.Set("file", item.File)
 	}
 	if item.Comment != "" {
-		values.Set("file_comment", string(item.Comment))
+		values.Set("file_comment", item.Comment)
 	}
 	if params.Full != DEFAULT_REACTIONS_FULL {
 		values.Set("full", strconv.FormatBool(params.Full))
 	}
+
 	response := &getReactionsResponseFull{}
-	if err := post("reactions.get", values, response, api.debug); err != nil {
+	if err := postSlackMethod(ctx, api.httpclient, "reactions.get", values, response, api.debug); err != nil {
 		return nil, err
 	}
 	if !response.Ok {
@@ -219,8 +234,13 @@ func (api *Client) GetReactions(item ItemRef, params GetReactionsParameters) ([]
 
 // ListReactions returns information about the items a user reacted to.
 func (api *Client) ListReactions(params ListReactionsParameters) ([]ReactedItem, *Paging, error) {
+	return api.ListReactionsContext(context.Background(), params)
+}
+
+// ListReactionsContext returns information about the items a user reacted to with a custom context.
+func (api *Client) ListReactionsContext(ctx context.Context, params ListReactionsParameters) ([]ReactedItem, *Paging, error) {
 	values := url.Values{
-		"token": {api.config.token},
+		"token": {api.token},
 	}
 	if params.User != DEFAULT_REACTIONS_USER {
 		values.Add("user", params.User)
@@ -234,8 +254,9 @@ func (api *Client) ListReactions(params ListReactionsParameters) ([]ReactedItem,
 	if params.Full != DEFAULT_REACTIONS_FULL {
 		values.Add("full", strconv.FormatBool(params.Full))
 	}
+
 	response := &listReactionsResponseFull{}
-	err := post("reactions.list", values, response, api.debug)
+	err := postSlackMethod(ctx, api.httpclient, "reactions.list", values, response, api.debug)
 	if err != nil {
 		return nil, nil, err
 	}

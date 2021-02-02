@@ -1,0 +1,17 @@
+ignored = ["github.com/lusis/slack-test"]
+
+[[constraint]]
+  name = "github.com/gorilla/websocket"
+  version = "1.2.0"
+
+[[constraint]]
+  name = "github.com/stretchr/testify"
+  version = "1.2.1"
+
+[[constraint]]
+  name = "github.com/pkg/errors"
+  version = "0.8.0"
+
+[prune]
+  go-tests = true
+  unused-packages = true

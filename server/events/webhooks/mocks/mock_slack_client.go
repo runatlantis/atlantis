@@ -96,14 +96,14 @@ func (mock *MockSlackClient) VerifyWasCalledOnce() *VerifierMockSlackClient {
 	}
 }
 
-func (mock *MockSlackClient) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockSlackClient {
+func (mock *MockSlackClient) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockSlackClient {
 	return &VerifierMockSlackClient{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockSlackClient) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockSlackClient {
+func (mock *MockSlackClient) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockSlackClient {
 	return &VerifierMockSlackClient{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -111,7 +111,7 @@ func (mock *MockSlackClient) VerifyWasCalledInOrder(invocationCountMatcher pegom
 	}
 }
 
-func (mock *MockSlackClient) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockSlackClient {
+func (mock *MockSlackClient) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockSlackClient {
 	return &VerifierMockSlackClient{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -121,7 +121,7 @@ func (mock *MockSlackClient) VerifyWasCalledEventually(invocationCountMatcher pe
 
 type VerifierMockSlackClient struct {
 	mock                   *MockSlackClient
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

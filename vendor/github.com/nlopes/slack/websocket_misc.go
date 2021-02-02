@@ -80,7 +80,7 @@ type EmojiChangedEvent struct {
 	SubType        string   `json:"subtype"`
 	Name           string   `json:"name"`
 	Names          []string `json:"names"`
-	Value          string   `json:"value"` 
+	Value          string   `json:"value"`
 	EventTimestamp string   `json:"event_ts"`
 }
 
@@ -118,4 +118,23 @@ type AccountsChangedEvent struct {
 type ReconnectUrlEvent struct {
 	Type string `json:"type"`
 	URL  string `json:"url"`
+}
+
+// MemberJoinedChannelEvent, a user joined a public or private channel
+type MemberJoinedChannelEvent struct {
+	Type        string `json:"type"`
+	User        string `json:"user"`
+	Channel     string `json:"channel"`
+	ChannelType string `json:"channel_type"`
+	Team        string `json:"team"`
+	Inviter     string `json:"inviter"`
+}
+
+// MemberJoinedChannelEvent, a user left a public or private channel
+type MemberLeftChannelEvent struct {
+	Type        string `json:"type"`
+	User        string `json:"user"`
+	Channel     string `json:"channel"`
+	ChannelType string `json:"channel_type"`
+	Team        string `json:"team"`
 }

@@ -2,8 +2,9 @@
 package matchers
 
 import (
-	"reflect"
 	"github.com/petergtz/pegomock"
+	"reflect"
+
 	slack "github.com/nlopes/slack"
 )
 
@@ -15,6 +16,18 @@ func AnySlackPostMessageParameters() slack.PostMessageParameters {
 
 func EqSlackPostMessageParameters(value slack.PostMessageParameters) slack.PostMessageParameters {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
+	var nullValue slack.PostMessageParameters
+	return nullValue
+}
+
+func NotEqSlackPostMessageParameters(value slack.PostMessageParameters) slack.PostMessageParameters {
+	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
+	var nullValue slack.PostMessageParameters
+	return nullValue
+}
+
+func SlackPostMessageParametersThat(matcher pegomock.ArgumentMatcher) slack.PostMessageParameters {
+	pegomock.RegisterMatcher(matcher)
 	var nullValue slack.PostMessageParameters
 	return nullValue
 }
