@@ -182,25 +182,24 @@ func (p *DefaultProjectCommandRunner) ApprovePolicies(ctx models.ProjectCommandC
 }
 
 func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx models.ProjectCommandContext) (*models.PolicyCheckSuccess, string, error) {
-	// Acquire Atlantis lock for this repo/dir/workspace.
-	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir))
-	if err != nil {
-		return nil, "", errors.Wrap(err, "acquiring lock")
-	}
-	if !lockAttempt.LockAcquired {
-		return nil, lockAttempt.LockFailureReason, nil
-	}
-	ctx.Log.Debug("acquired lock for project")
+
+	// TODO: Make this a bit smarter
+	// without checking some sort of state that the policy check has indeed passed this is likely to cause issues
 
 	return &models.PolicyCheckSuccess{
-		LockURL:           p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
 		PolicyCheckOutput: "Policies approved",
 	}, "", nil
 }
 
 func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx models.ProjectCommandContext) (*models.PolicyCheckSuccess, string, error) {
 	// Acquire Atlantis lock for this repo/dir/workspace.
+	// This should already be acquired from the prior plan operation.
+	// if for some reason an unlock happens between the plan and policy check step
+	// we will attempt to capture the lock here but fail to get the working directory
+	// at which point we will unlock again to preserve functionality
+	// If we fail to capture the lock here (super unlikely) then we error out and the user is forced to replan
 	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir))
+
 	if err != nil {
 		return nil, "", errors.Wrap(err, "acquiring lock")
 	}
@@ -210,30 +209,44 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx models.ProjectCommandCon
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
+	// We should refactor this to keep the lock for the duration of plan and policy check since as of now
+	// there is a small gap where we don't have the lock and if we can't get this here, we should just unlock the PR.
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace)
 	if err != nil {
 		return nil, "", err
 	}
 	defer unlockFn()
 
-	// Clone is idempotent so okay to run even if the repo was already cloned.
-	repoDir, hasDiverged, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
-	if cloneErr != nil {
+	// we shouldn't attempt to clone this again. If changes occur to the pull request while the plan is happening
+	// that shouldn't affect this particular operation.
+	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
+	if err != nil {
+
+		// let's unlock here since something probably nuked our directory between the plan and policy check phase
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Err("error unlocking state after policy_check error: %v", unlockErr)
+			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
 		}
-		return nil, "", cloneErr
+
+		if os.IsNotExist(err) {
+			return nil, "", errors.New("project has not been cloned–did you run plan?")
+		}
+		return nil, "", err
 	}
-	projAbsPath := filepath.Join(repoDir, ctx.RepoRelDir)
-	if _, err = os.Stat(projAbsPath); os.IsNotExist(err) {
+	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
+	if _, err = os.Stat(absPath); os.IsNotExist(err) {
+
+		// let's unlock here since something probably nuked our directory between the plan and policy check phase
+		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
+			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+		}
+
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
-	outputs, err := p.runSteps(ctx.Steps, ctx, projAbsPath)
+	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
 	if err != nil {
-		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Err("error unlocking state after policy_check error: %v", unlockErr)
-		}
+		// Note: we are explicitly not unlocking the pr here since a failing policy check will require
+		// approval
 		return nil, "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
 	}
 
@@ -242,7 +255,10 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx models.ProjectCommandCon
 		PolicyCheckOutput: strings.Join(outputs, "\n"),
 		RePlanCmd:         ctx.RePlanCmd,
 		ApplyCmd:          ctx.ApplyCmd,
-		HasDiverged:       hasDiverged,
+
+		// set this to false right now because we don't have this information
+		// TODO: refactor the templates in a sane way so we don't need this
+		HasDiverged: false,
 	}, "", nil
 }
 

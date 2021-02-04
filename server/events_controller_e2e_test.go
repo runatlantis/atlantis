@@ -417,10 +417,6 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 		Comments []string
 		// ExpAutomerge is true if we expect Atlantis to automerge.
 		ExpAutomerge bool
-		// ExpMergeable is true if we expect Atlantis to be able to merge.
-		// If for instance policy check is failing and there are no approvals
-		// ExpMergeable should be false
-		ExpMergeable bool
 		// ExpAutoplan is true if we expect Atlantis to autoplan.
 		ExpAutoplan bool
 		// ExpParallel is true if we expect Atlantis to run parallel plans or applies.
@@ -435,7 +431,6 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			RepoDir:       "policy-checks",
 			ModifiedFiles: []string{"main.tf"},
 			ExpAutoplan:   true,
-			ExpMergeable:  true,
 			Comments: []string{
 				"atlantis approve_policies",
 				"atlantis apply",
@@ -453,7 +448,6 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			RepoDir:       "policy-checks",
 			ModifiedFiles: []string{"main.tf"},
 			ExpAutoplan:   true,
-			ExpMergeable:  false,
 			Comments: []string{
 				"atlantis apply",
 			},
@@ -461,6 +455,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 				{"exp-output-autoplan.txt"},
 				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-apply-failed.txt"},
+				{"exp-output-merge.txt"},
 			},
 		},
 		{
@@ -468,7 +463,6 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			RepoDir:       "policy-checks-diff-owner",
 			ModifiedFiles: []string{"main.tf"},
 			ExpAutoplan:   true,
-			ExpMergeable:  false,
 			Comments: []string{
 				"atlantis approve_policies",
 				"atlantis apply",
@@ -478,6 +472,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-approve-policies.txt"},
 				{"exp-output-apply-failed.txt"},
+				{"exp-output-merge.txt"},
 			},
 		},
 	}
@@ -522,11 +517,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			// replies) that we expect.  We expect each plan to have 2 comments,
 			// one for plan one for policy check and apply have 1 for each
 			// comment plus one for the locks deleted at the end.
-			expNumReplies := len(c.Comments)
-
-			if c.ExpMergeable {
-				expNumReplies++
-			}
+			expNumReplies := len(c.Comments) + 1
 
 			if c.ExpAutoplan {
 				expNumReplies++
@@ -579,7 +570,7 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 	e2eGitlabGetter := mocks.NewMockGitlabMergeRequestGetter()
 
 	// Real dependencies.
-	logger := logging.NewSimpleLogger("server", true, logging.Debug)
+	logger := logging.NewSimpleLogger("server", true, logging.Error)
 	eventParser := &events.EventParser{
 		GithubUser:  "github-user",
 		GithubToken: "github-token",
