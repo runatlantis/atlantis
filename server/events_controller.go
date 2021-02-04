@@ -45,7 +45,6 @@ const bitbucketServerSignatureHeader = "X-Hub-Signature"
 // EventsController handles all webhook requests which signify 'events' in the
 // VCS host, ex. GitHub.
 type EventsController struct {
-	PreWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
 	CommandRunner                 events.CommandRunner
 	PullCleaner                   events.PullCleaner
 	Logger                        *logging.SimpleLogger
@@ -343,9 +342,6 @@ func (e *EventsController) handlePullRequestEvent(w http.ResponseWriter, baseRep
 		// We use a goroutine so that this function returns and the connection is
 		// closed.
 		fmt.Fprintln(w, "Processing...")
-
-		e.Logger.Info("running pre workflow hooks if present")
-		e.PreWorkflowHooksCommandRunner.RunPreHooks(baseRepo, headRepo, pull, user)
 
 		e.Logger.Info("executing autoplan")
 		if !e.TestingMode {

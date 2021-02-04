@@ -397,11 +397,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	preWorkflowHooksCommandRunner := &events.DefaultPreWorkflowHooksCommandRunner{
 		VCSClient:             vcsClient,
 		GlobalCfg:             globalCfg,
-		Logger:                logger,
 		WorkingDirLocker:      workingDirLocker,
 		WorkingDir:            workingDir,
-		Drainer:               drainer,
-		PreWorkflowHookRunner: &runtime.PreWorkflowHookRunner{},
+		PreWorkflowHookRunner: runtime.DefaultPreWorkflowHookRunner{},
 	}
 	projectCommandBuilder := events.NewProjectCommandBuilder(
 		policyChecksEnabled,
@@ -534,19 +532,20 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	commandRunner := &events.DefaultCommandRunner{
-		VCSClient:                 vcsClient,
-		GithubPullGetter:          githubClient,
-		GitlabMergeRequestGetter:  gitlabClient,
-		AzureDevopsPullGetter:     azuredevopsClient,
-		CommentCommandRunnerByCmd: commentCommandRunnerByCmd,
-		EventParser:               eventParser,
-		Logger:                    logger,
-		AllowForkPRs:              userConfig.AllowForkPRs,
-		AllowForkPRsFlag:          config.AllowForkPRsFlag,
-		SilenceForkPRErrors:       userConfig.SilenceForkPRErrors,
-		SilenceForkPRErrorsFlag:   config.SilenceForkPRErrorsFlag,
-		DisableAutoplan:           userConfig.DisableAutoplan,
-		Drainer:                   drainer,
+		VCSClient:                     vcsClient,
+		GithubPullGetter:              githubClient,
+		GitlabMergeRequestGetter:      gitlabClient,
+		AzureDevopsPullGetter:         azuredevopsClient,
+		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
+		EventParser:                   eventParser,
+		Logger:                        logger,
+		AllowForkPRs:                  userConfig.AllowForkPRs,
+		AllowForkPRsFlag:              config.AllowForkPRsFlag,
+		SilenceForkPRErrors:           userConfig.SilenceForkPRErrors,
+		SilenceForkPRErrorsFlag:       config.SilenceForkPRErrorsFlag,
+		DisableAutoplan:               userConfig.DisableAutoplan,
+		Drainer:                       drainer,
+		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 	}
 	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
 	if err != nil {
@@ -565,7 +564,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DeleteLockCommand:  deleteLockCommand,
 	}
 	eventsController := &EventsController{
-		PreWorkflowHooksCommandRunner:   preWorkflowHooksCommandRunner,
 		CommandRunner:                   commandRunner,
 		PullCleaner:                     pullClosedExecutor,
 		Parser:                          eventParser,

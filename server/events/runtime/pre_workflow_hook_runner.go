@@ -8,9 +8,14 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-type PreWorkflowHookRunner struct{}
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_pre_workflows_hook_runner.go PreWorkflowHookRunner
+type PreWorkflowHookRunner interface {
+	Run(ctx models.PreWorkflowHookCommandContext, command string, path string) (string, error)
+}
 
-func (wh *PreWorkflowHookRunner) Run(ctx models.PreWorkflowHookCommandContext, command string, path string) (string, error) {
+type DefaultPreWorkflowHookRunner struct{}
+
+func (wh DefaultPreWorkflowHookRunner) Run(ctx models.PreWorkflowHookCommandContext, command string, path string) (string, error) {
 	cmd := exec.Command("sh", "-c", command) // #nosec
 	cmd.Dir = path
 
