@@ -5,6 +5,7 @@ Few improvements and a number of bug fixes
 * Add `--gh-app-slug` which allows fetching of gh app user. ([#1334](https://github.com/runatlantis/atlantis/pull/1334) by @nishkrishnan) (Also fixes [#1161](https://github.com/runatlantis/atlantis/issues/1161))
 * Add `--disable-repo-locking` flag. ([#1340](https://github.com/runatlantis/atlantis/pull/1340) by @gezb) (Closes [#1212](https://github.com/runatlantis/atlantis/issues/1212))
 * Pass atlantis/apply when there are no plans ([#1323](https://github.com/runatlantis/atlantis/pull/1323) by @raxod502-plaid)
+* Update terraform version to 0.14.5
 
 ## BugFixes
 * Fix bug with error messaging and incorrect casting ([#1327](https://github.com/runatlantis/atlantis/pull/1327) by @acastle)
