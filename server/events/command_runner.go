@@ -396,11 +396,13 @@ func (c *DefaultCommandRunner) automerge(ctx *CommandContext, pullStatus models.
 		// Commenting isn't required so continue.
 	}
 
-	ctx.Pull.DeleteSourceBranchOnMerge = deleteSourceBranch
+	var pullOptions models.PullRequestOptions
+	pullOptions.DeleteSourceBranchOnMerge = deleteSourceBranch
+	// ctx.Pull.DeleteSourceBranchOnMerge = deleteSourceBranch
 
 	// Make the API call to perform the merge.
 	ctx.Log.Info("automerging pull request")
-	err := c.VCSClient.MergePull(ctx.Pull)
+	err := c.VCSClient.MergePull(ctx.Pull, pullOptions)
 
 	if err != nil {
 		ctx.Log.Err("automerging failed: %s", err)

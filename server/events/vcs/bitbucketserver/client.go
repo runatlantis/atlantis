@@ -244,7 +244,7 @@ func (b *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, status 
 }
 
 // MergePull merges the pull request.
-func (b *Client) MergePull(pull models.PullRequest) error {
+func (b *Client) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	projectKey, err := b.GetProjectKey(pull.BaseRepo.Name, pull.BaseRepo.SanitizedCloneURL)
 	if err != nil {
 		return err

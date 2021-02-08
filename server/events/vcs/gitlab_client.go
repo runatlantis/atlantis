@@ -214,14 +214,14 @@ func (g *GitlabClient) GetMergeRequest(repoFullName string, pullNum int) (*gitla
 }
 
 // MergePull merges the merge request.
-func (g *GitlabClient) MergePull(pull models.PullRequest) error {
+func (g *GitlabClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	commitMsg := common.AutomergeCommitMsg
 	_, _, err := g.Client.MergeRequests.AcceptMergeRequest(
 		pull.BaseRepo.FullName,
 		pull.Num,
 		&gitlab.AcceptMergeRequestOptions{
 			MergeCommitMessage:       &commitMsg,
-			ShouldRemoveSourceBranch: &pull.DeleteSourceBranchOnMerge,
+			ShouldRemoveSourceBranch: &pullOptions.DeleteSourceBranchOnMerge,
 		})
 	return errors.Wrap(err, "unable to merge merge request, it may not be in a mergeable state")
 }

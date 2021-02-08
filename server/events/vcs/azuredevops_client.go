@@ -288,7 +288,7 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
 // If the user has set a branch policy that disallows no fast-forward, the merge will fail
 // until we handle branch policies
 // https://docs.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops
-func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
+func (g *AzureDevopsClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	owner, project, repoName := SplitAzureDevopsRepoFullName(pull.BaseRepo.FullName)
 	descriptor := "Atlantis Terraform Pull Request Automation"
 
@@ -313,7 +313,7 @@ func (g *AzureDevopsClient) MergePull(pull models.PullRequest) error {
 	completionOpts := azuredevops.GitPullRequestCompletionOptions{
 		BypassPolicy:            new(bool),
 		BypassReason:            azuredevops.String(""),
-		DeleteSourceBranch:      &pull.DeleteSourceBranchOnMerge,
+		DeleteSourceBranch:      &pullOptions.DeleteSourceBranchOnMerge,
 		MergeCommitMessage:      azuredevops.String(common.AutomergeCommitMsg),
 		MergeStrategy:           &mcm,
 		SquashMerge:             new(bool),
