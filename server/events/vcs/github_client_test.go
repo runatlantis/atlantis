@@ -638,6 +638,8 @@ func TestGithubClient_MergePullHandlesError(t *testing.T) {
 						},
 					},
 					Num: 1,
+				}, models.PullRequestOptions{
+					DeleteSourceBranchOnMerge: false,
 				})
 
 			if c.expErr == "" {
@@ -759,7 +761,10 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 						},
 					},
 					Num: 1,
+				}, models.PullRequestOptions{
+					DeleteSourceBranchOnMerge: false,
 				})
+
 			Ok(t, err)
 		})
 	}
