@@ -7,7 +7,7 @@ Few improvements and a number of bug fixes
 * Pass atlantis/apply when there are no plans ([#1323](https://github.com/runatlantis/atlantis/pull/1323) by @raxod502-plaid)
 * Update terraform version to 0.14.5
 
-## BugFixes
+## Bugfixes
 * Fix bug with error messaging and incorrect casting ([#1327](https://github.com/runatlantis/atlantis/pull/1327) by @acastle)
 * Fix bug where .auto.tfvars.json files were being ignored in 0.16.0 (Fixes [#1330](https://github.com/runatlantis/atlantis/issues/1330) by @gekO)
 * Fix Azure DevOps automerge by dynamically fetching user id (Fixes [#1152](https://github.com/runatlantis/atlantis/issues/1152) by @tapaszto)
