@@ -1,3 +1,38 @@
+# v0.16.1
+Few improvements and a number of bug fixes
+
+## Features/Improvements
+* Add `--gh-app-slug` which allows fetching of gh app user. ([#1334](https://github.com/runatlantis/atlantis/pull/1334) by @nishkrishnan) (Also fixes [#1161](https://github.com/runatlantis/atlantis/issues/1161))
+* Add `--disable-repo-locking` flag. ([#1340](https://github.com/runatlantis/atlantis/pull/1340) by @gezb) (Closes [#1212](https://github.com/runatlantis/atlantis/issues/1212))
+* Pass atlantis/apply when there are no plans ([#1323](https://github.com/runatlantis/atlantis/pull/1323) by @raxod502-plaid)
+* Update terraform version to 0.14.5
+
+## Bugfixes
+* Fix bug with error messaging and incorrect casting ([#1327](https://github.com/runatlantis/atlantis/pull/1327) by @acastle)
+* Fix bug where .auto.tfvars.json files were being ignored in 0.16.0 (Fixes [#1330](https://github.com/runatlantis/atlantis/issues/1330) by @gekO)
+* Fix Azure DevOps automerge by dynamically fetching user id (Fixes [#1152](https://github.com/runatlantis/atlantis/issues/1152) by @tapaszto)
+* Replace slack GetChannels with GetConversations due to API deprecation (Fixes [#1210](https://github.com/runatlantis/atlantis/issues/1210) by @thlacroix)
+* Set TF_WORKSPACE for remote runs to target correct workspace (Fixes [#661](https://github.com/runatlantis/atlantis/issues/661) by @m1pl)
+* Fix for restricting what workflows each repo has access to without exposing custom workflow definitions (Fixes [#1358](https://github.com/runatlantis/atlantis/issues/1358) by @netguino)
+
+## Backwards Incompatibilities / Notes:
+* If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
+  then the default version of Terraform will now be 0.14.5. Simply set the above
+  flag to your desired default version to avoid any issues.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.16.1/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.16.1/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.16.1/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.16.1/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.16.1`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.16.0..v0.16.1
+https://github.com/runatlantis/atlantis/compare/v0.16.0...v0.16.1
+
+
 # v0.16.0
 
 ## Description
