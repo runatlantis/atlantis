@@ -1,4 +1,4 @@
 **Approve Policies Error**
 ```
-contact #orchestration channel for policy approvals
+contact policy owners to approve failing policies
 ```
