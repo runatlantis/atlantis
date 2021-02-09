@@ -17,8 +17,8 @@ State path: terraform.tfstate
 
 Outputs:
 
-var = fromconfig
-workspace = default
+var = "fromconfig"
+workspace = "default"
 
 ```
 </details>

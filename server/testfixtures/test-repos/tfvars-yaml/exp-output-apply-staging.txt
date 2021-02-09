@@ -17,8 +17,8 @@ State path: staging.tfstate
 
 Outputs:
 
-var = staging
-workspace = default
+var = "staging"
+workspace = "default"
 
 ```
 </details>

@@ -23,6 +23,10 @@ Terraform will perform the following actions:
 
 Plan: 1 to add, 0 to change, 0 to destroy.
 
+Changes to Outputs:
++ var       = "fromconfig"
++ workspace = "default"
+
 postplan
 
 ```
@@ -52,6 +56,10 @@ Terraform will perform the following actions:
     }
 
 Plan: 1 to add, 0 to change, 0 to destroy.
+
+Changes to Outputs:
++ var       = "fromfile"
++ workspace = "staging"
 
 ```
 

@@ -17,8 +17,8 @@ State path: default.tfstate
 
 Outputs:
 
-var = default
-workspace = default
+var = "default"
+workspace = "default"
 
 ```
 </details>

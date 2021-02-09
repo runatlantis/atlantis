@@ -17,6 +17,9 @@ Terraform will perform the following actions:
 
 Plan: 1 to add, 0 to change, 0 to destroy.
 
+Changes to Outputs:
++ var = "staging"
+
 ```
 
 * :arrow_forward: To **apply** this plan, comment:
