@@ -1,7 +1,7 @@
 BUILD_ID := $(shell git rev-parse --short HEAD 2>/dev/null || echo no-commit-id)
 WORKSPACE := $(shell pwd)
-PKG := $(shell go list ./... | grep -v e2e | grep -v vendor | grep -v static | grep -v mocks | grep -v testing)
-PKG_COMMAS := $(shell go list ./... | grep -v e2e | grep -v vendor | grep -v static | grep -v mocks | grep -v testing | tr '\n' ',')
+PKG := $(shell go list ./... | grep -v e2e | grep -v static | grep -v mocks | grep -v testing)
+PKG_COMMAS := $(shell go list ./... | grep -v e2e | grep -v static | grep -v mocks | grep -v testing | tr '\n' ',')
 IMAGE_NAME := runatlantis/atlantis
 
 .PHONY: test
@@ -26,11 +26,11 @@ go-generate: ## Run go generate in all packages
 	go generate $(PKG)
 
 regen-mocks: ## Delete all mocks and matchers and then run go generate to regen them.
-	find . -type f | grep mocks/mock_ | grep -v vendor | xargs rm
-	find . -type f | grep mocks/matchers | grep -v vendor | xargs rm
+	find . -type f | grep mocks/mock_ | xargs rm
+	find . -type f | grep mocks/matchers | xargs rm
 	@# not using $(PKG) here because that includes directories that have now
 	@# been made empty, causing go generate to fail.
-	go list ./... | grep -v e2e | grep -v vendor | grep -v static | xargs go generate
+	go list ./... | grep -v e2e | grep -v static | xargs go generate
 
 test: ## Run tests
 	@go test -short $(PKG)
