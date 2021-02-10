@@ -481,6 +481,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		pullUpdater,
 		commitStatusUpdater,
 		projectCommandRunner,
+		userConfig.ParallelPoolSize,
 	)
 
 	planCommandRunner := events.NewPlanCommandRunner(
@@ -495,6 +496,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		pullUpdater,
 		policyCheckCommandRunner,
 		autoMerger,
+		userConfig.ParallelPoolSize,
 	)
 
 	applyCommandRunner := events.NewApplyCommandRunner(
@@ -508,6 +510,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		pullUpdater,
 		dbUpdater,
 		boltdb,
+		userConfig.ParallelPoolSize,
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(

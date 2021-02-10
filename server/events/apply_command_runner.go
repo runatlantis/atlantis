@@ -17,6 +17,7 @@ func NewApplyCommandRunner(
 	pullUpdater *PullUpdater,
 	dbUpdater *DBUpdater,
 	db *db.BoltDB,
+	parallelPoolSize int,
 ) *ApplyCommandRunner {
 	return &ApplyCommandRunner{
 		vcsClient:           vcsClient,
@@ -29,6 +30,7 @@ func NewApplyCommandRunner(
 		pullUpdater:         pullUpdater,
 		dbUpdater:           dbUpdater,
 		DB:                  db,
+		parallelPoolSize:    parallelPoolSize,
 	}
 }
 
@@ -43,6 +45,7 @@ type ApplyCommandRunner struct {
 	autoMerger          *AutoMerger
 	pullUpdater         *PullUpdater
 	dbUpdater           *DBUpdater
+	parallelPoolSize    int
 }
 
 func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
@@ -109,7 +112,7 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 	var result CommandResult
 	if a.isParallelEnabled(projectCmds) {
 		ctx.Log.Info("Running applies in parallel")
-		result = runProjectCmdsParallel(projectCmds, a.prjCmdRunner.Apply)
+		result = runProjectCmdsParallel(projectCmds, a.prjCmdRunner.Apply, a.parallelPoolSize)
 	} else {
 		result = runProjectCmds(projectCmds, a.prjCmdRunner.Apply)
 	}

@@ -103,11 +103,13 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		GlobalAutomerge: false,
 	}
 
+	parallelPoolSize := 1
 	policyCheckCommandRunner = events.NewPolicyCheckCommandRunner(
 		dbUpdater,
 		pullUpdater,
 		commitUpdater,
 		projectCommandRunner,
+		parallelPoolSize,
 	)
 
 	planCommandRunner = events.NewPlanCommandRunner(
@@ -122,6 +124,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		pullUpdater,
 		policyCheckCommandRunner,
 		autoMerger,
+		parallelPoolSize,
 	)
 
 	applyCommandRunner = events.NewApplyCommandRunner(
@@ -135,6 +138,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		pullUpdater,
 		dbUpdater,
 		defaultBoltDB,
+		parallelPoolSize,
 	)
 
 	approvePoliciesCommandRunner = events.NewApprovePoliciesCommandRunner(

@@ -17,6 +17,7 @@ func NewPlanCommandRunner(
 	pullUpdater *PullUpdater,
 	policyCheckCommandRunner *PolicyCheckCommandRunner,
 	autoMerger *AutoMerger,
+	parallelPoolSize int,
 ) *PlanCommandRunner {
 	return &PlanCommandRunner{
 		silenceVCSStatusNoPlans:  silenceVCSStatusNoPlans,
@@ -30,6 +31,7 @@ func NewPlanCommandRunner(
 		pullUpdater:              pullUpdater,
 		policyCheckCommandRunner: policyCheckCommandRunner,
 		autoMerger:               autoMerger,
+		parallelPoolSize:         parallelPoolSize,
 	}
 }
 
@@ -47,6 +49,7 @@ type PlanCommandRunner struct {
 	pullUpdater              *PullUpdater
 	policyCheckCommandRunner *PolicyCheckCommandRunner
 	autoMerger               *AutoMerger
+	parallelPoolSize         int
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *CommandContext) {
@@ -93,7 +96,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *CommandContext) {
 	var result CommandResult
 	if p.isParallelEnabled(projectCmds) {
 		ctx.Log.Info("Running plans in parallel")
-		result = runProjectCmdsParallel(projectCmds, p.prjCmdRunner.Plan)
+		result = runProjectCmdsParallel(projectCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
 	} else {
 		result = runProjectCmds(projectCmds, p.prjCmdRunner.Plan)
 	}
@@ -146,7 +149,7 @@ func (p *PlanCommandRunner) run(ctx *CommandContext, cmd *CommentCommand) {
 	var result CommandResult
 	if p.isParallelEnabled(projectCmds) {
 		ctx.Log.Info("Running applies in parallel")
-		result = runProjectCmdsParallel(projectCmds, p.prjCmdRunner.Plan)
+		result = runProjectCmdsParallel(projectCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
 	} else {
 		result = runProjectCmds(projectCmds, p.prjCmdRunner.Plan)
 	}

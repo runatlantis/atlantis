@@ -606,6 +606,9 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 		Ok(t, err)
 	}
 	drainer := &events.Drainer{}
+
+	parallelPoolSize := 1
+
 	preWorkflowHooksCommandRunner := &events.DefaultPreWorkflowHooksCommandRunner{
 		VCSClient:             e2eVCSClient,
 		GlobalCfg:             globalCfg,
@@ -693,6 +696,7 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 		pullUpdater,
 		e2eStatusUpdater,
 		projectCommandRunner,
+		parallelPoolSize,
 	)
 
 	planCommandRunner := events.NewPlanCommandRunner(
@@ -707,6 +711,7 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 		pullUpdater,
 		policyCheckCommandRunner,
 		autoMerger,
+		parallelPoolSize,
 	)
 
 	applyCommandRunner := events.NewApplyCommandRunner(
@@ -720,6 +725,7 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 		pullUpdater,
 		dbUpdater,
 		boltdb,
+		parallelPoolSize,
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(

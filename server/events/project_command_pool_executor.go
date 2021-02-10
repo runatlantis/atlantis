@@ -12,6 +12,7 @@ type prjCmdRunnerFunc func(ctx models.ProjectCommandContext) models.ProjectResul
 func runProjectCmdsParallel(
 	cmds []models.ProjectCommandContext,
 	runnerFunc prjCmdRunnerFunc,
+	poolSize int,
 ) CommandResult {
 	var results []models.ProjectResult
 	mux := &sync.Mutex{}
