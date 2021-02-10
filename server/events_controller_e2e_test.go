@@ -53,6 +53,7 @@ func (m *LocalConftestCache) Get(key *version.Version) (string, error) {
 }
 
 func TestGitHubWorkflow(t *testing.T) {
+
 	if testing.Short() {
 		t.SkipNow()
 	}
