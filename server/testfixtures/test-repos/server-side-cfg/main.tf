@@ -3,5 +3,5 @@ resource "null_resource" "simple" {
 }
 
 output "workspace" {
-  value = "${terraform.workspace}"
+  value = terraform.workspace
 }

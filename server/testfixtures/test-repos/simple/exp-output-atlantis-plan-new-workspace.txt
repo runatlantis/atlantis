@@ -27,6 +27,10 @@ Terraform will perform the following actions:
 
 Plan: 3 to add, 0 to change, 0 to destroy.
 
+Changes to Outputs:
++ var       = "new_workspace"
++ workspace = "new_workspace"
+
 ```
 
 * :arrow_forward: To **apply** this plan, comment:

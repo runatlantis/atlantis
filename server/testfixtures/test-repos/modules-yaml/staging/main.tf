@@ -3,5 +3,5 @@ module "null" {
   var = "staging"
 }
 output "var" {
-  value = "${module.null.var}"
+  value = module.null.var
 }
