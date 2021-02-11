@@ -1,9 +1,3 @@
-Ran Plan for 2 projects:
-
-1. dir: `production` workspace: `production`
-1. dir: `staging` workspace: `staging`
-
-### 1. dir: `production` workspace: `production`
 <details><summary>Show Output</summary>
 
 ```diff
@@ -22,7 +16,6 @@ Terraform will perform the following actions:
 Plan: 1 to add, 0 to change, 0 to destroy.
 
 Changes to Outputs:
-
 + workspace = "staging"
 
 ```
@@ -33,9 +26,3 @@ Changes to Outputs:
 * :repeat: To **plan** this project again, comment:
     * `atlantis plan -d staging -w staging`
 </details>
-
----
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * `atlantis apply`
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
-    * `atlantis unlock`
