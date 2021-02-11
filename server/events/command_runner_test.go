@@ -332,8 +332,12 @@ func TestApplyWithAutoMerge_VSCMerge(t *testing.T) {
 	ch.GlobalAutomerge = true
 	defer func() { ch.GlobalAutomerge = false }()
 
+	pullOptions := models.PullRequestOptions{
+		DeleteSourceBranchOnMerge: false,
+	}
+
 	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.ApplyCommand})
-	vcsClient.VerifyWasCalledOnce().MergePull(modelPull, matchers.AnyModelsPullRequestOptions())
+	vcsClient.VerifyWasCalledOnce().MergePull(modelPull, pullOptions)
 }
 
 func TestRunApply_DiscardedProjects(t *testing.T) {
