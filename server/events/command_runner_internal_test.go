@@ -7,7 +7,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-func TestUpdateCommitStatus(t *testing.T) {
+func TestApplyUpdateCommitStatus(t *testing.T) {
 	cases := map[string]struct {
 		cmd           models.CommandName
 		pullStatus    models.PullStatus
@@ -15,41 +15,6 @@ func TestUpdateCommitStatus(t *testing.T) {
 		expNumSuccess int
 		expNumTotal   int
 	}{
-		"single plan success": {
-			cmd: models.PlanCommand,
-			pullStatus: models.PullStatus{
-				Projects: []models.ProjectStatus{
-					{
-						Status: models.PlannedPlanStatus,
-					},
-				},
-			},
-			expStatus:     models.SuccessCommitStatus,
-			expNumSuccess: 1,
-			expNumTotal:   1,
-		},
-		"one plan error, other errors": {
-			cmd: models.PlanCommand,
-			pullStatus: models.PullStatus{
-				Projects: []models.ProjectStatus{
-					{
-						Status: models.ErroredPlanStatus,
-					},
-					{
-						Status: models.PlannedPlanStatus,
-					},
-					{
-						Status: models.AppliedPlanStatus,
-					},
-					{
-						Status: models.ErroredApplyStatus,
-					},
-				},
-			},
-			expStatus:     models.FailedCommitStatus,
-			expNumSuccess: 3,
-			expNumTotal:   4,
-		},
 		"apply, one pending": {
 			cmd: models.ApplyCommand,
 			pullStatus: models.PullStatus{
@@ -106,10 +71,72 @@ func TestUpdateCommitStatus(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			csu := &MockCSU{}
-			cr := &DefaultCommandRunner{
-				CommitStatusUpdater: csu,
+			cr := &ApplyCommandRunner{
+				commitStatusUpdater: csu,
 			}
-			cr.updateCommitStatus(&CommandContext{}, c.cmd, c.pullStatus)
+			cr.updateCommitStatus(&CommandContext{}, c.pullStatus)
+			Equals(t, models.Repo{}, csu.CalledRepo)
+			Equals(t, models.PullRequest{}, csu.CalledPull)
+			Equals(t, c.expStatus, csu.CalledStatus)
+			Equals(t, c.cmd, csu.CalledCommand)
+			Equals(t, c.expNumSuccess, csu.CalledNumSuccess)
+			Equals(t, c.expNumTotal, csu.CalledNumTotal)
+		})
+	}
+}
+
+func TestPlanUpdateCommitStatus(t *testing.T) {
+	cases := map[string]struct {
+		cmd           models.CommandName
+		pullStatus    models.PullStatus
+		expStatus     models.CommitStatus
+		expNumSuccess int
+		expNumTotal   int
+	}{
+		"single plan success": {
+			cmd: models.PlanCommand,
+			pullStatus: models.PullStatus{
+				Projects: []models.ProjectStatus{
+					{
+						Status: models.PlannedPlanStatus,
+					},
+				},
+			},
+			expStatus:     models.SuccessCommitStatus,
+			expNumSuccess: 1,
+			expNumTotal:   1,
+		},
+		"one plan error, other errors": {
+			cmd: models.PlanCommand,
+			pullStatus: models.PullStatus{
+				Projects: []models.ProjectStatus{
+					{
+						Status: models.ErroredPlanStatus,
+					},
+					{
+						Status: models.PlannedPlanStatus,
+					},
+					{
+						Status: models.AppliedPlanStatus,
+					},
+					{
+						Status: models.ErroredApplyStatus,
+					},
+				},
+			},
+			expStatus:     models.FailedCommitStatus,
+			expNumSuccess: 3,
+			expNumTotal:   4,
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			csu := &MockCSU{}
+			cr := &PlanCommandRunner{
+				commitStatusUpdater: csu,
+			}
+			cr.updateCommitStatus(&CommandContext{}, c.pullStatus)
 			Equals(t, models.Repo{}, csu.CalledRepo)
 			Equals(t, models.PullRequest{}, csu.CalledPull)
 			Equals(t, c.expStatus, csu.CalledStatus)

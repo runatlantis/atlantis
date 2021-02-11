@@ -100,6 +100,7 @@ var testFlags = map[string]interface{}{
 	VCSStatusName:              "my-status",
 	WriteGitCredsFlag:          true,
 	DisableAutoplanFlag:        true,
+	EnablePolicyChecksFlag:     false,
 }
 
 func TestExecute_Defaults(t *testing.T) {

@@ -57,6 +57,7 @@ const (
 	DisableAutoplanFlag        = "disable-autoplan"
 	DisableMarkdownFoldingFlag = "disable-markdown-folding"
 	DisableRepoLockingFlag     = "disable-repo-locking"
+	EnablePolicyChecksFlag     = "enable-policy-checks"
 	GHHostnameFlag             = "gh-hostname"
 	GHTokenFlag                = "gh-token"
 	GHUserFlag                 = "gh-user"
@@ -293,7 +294,10 @@ var boolFlags = map[string]boolFlag{
 		defaultValue: false,
 	},
 	DisableRepoLockingFlag: {
-		description:  "Disable atlantis locking repos",
+		description: "Disable atlantis locking repos",
+	},
+	EnablePolicyChecksFlag: {
+		description:  "Enable atlantis to run user defined policy checks.  This is explicitly disabled for TFE/TFC backends since plan files are inaccessible.",
 		defaultValue: false,
 	},
 	AllowDraftPRs: {

@@ -49,7 +49,9 @@ type Client interface {
 type DefaultClient struct {
 	// defaultVersion is the default version of terraform to use if another
 	// version isn't specified.
-	defaultVersion          *version.Version
+	defaultVersion *version.Version
+	// We will run terraform with the TF_PLUGIN_CACHE_DIR env var set to this
+	// directory inside our data dir.
 	terraformPluginCacheDir string
 	binDir                  string
 	// overrideTF can be used to override the terraform binary during testing
@@ -75,16 +77,8 @@ type DefaultClient struct {
 // Downloader is for downloading terraform versions.
 type Downloader interface {
 	GetFile(dst, src string, opts ...getter.ClientOption) error
+	GetAny(dst, src string, opts ...getter.ClientOption) error
 }
-
-const (
-	// terraformPluginCacheDir is the name of the dir inside our data dir
-	// where we tell terraform to cache plugins and modules.
-	terraformPluginCacheDirName = "plugin-cache"
-	// binDirName is the name of the directory inside our data dir where
-	// we download terraform binaries.
-	binDirName = "bin"
-)
 
 // versionRegex extracts the version from `terraform version` output.
 //     Terraform v0.12.0-alpha4 (2c36829d3265661d8edbd5014de8090ea7e2a076)
@@ -104,7 +98,8 @@ var versionRegex = regexp.MustCompile("Terraform v(.*?)(\\s.*)?\n")
 // Will asynchronously download the required version if it doesn't exist already.
 func NewClient(
 	log *logging.SimpleLogger,
-	dataDir string,
+	binDir string,
+	cacheDir string,
 	tfeToken string,
 	tfeHostname string,
 	defaultVersionStr string,
@@ -134,11 +129,6 @@ func NewClient(
 		}
 	}
 
-	binDir := filepath.Join(dataDir, binDirName)
-	if err := os.MkdirAll(binDir, 0700); err != nil {
-		return nil, errors.Wrapf(err, "unable to create terraform bin dir %q", binDir)
-	}
-
 	if defaultVersionStr != "" {
 		defaultVersion, err := version.NewVersion(defaultVersionStr)
 		if err != nil {
@@ -166,13 +156,6 @@ func NewClient(
 		if err := generateRCFile(tfeToken, tfeHostname, home); err != nil {
 			return nil, err
 		}
-	}
-
-	// We will run terraform with the TF_PLUGIN_CACHE_DIR env var set to this
-	// directory inside our data dir.
-	cacheDir := filepath.Join(dataDir, terraformPluginCacheDirName)
-	if err := os.MkdirAll(cacheDir, 0700); err != nil {
-		return nil, errors.Wrapf(err, "unable to create terraform plugin cache directory at %q", terraformPluginCacheDirName)
 	}
 
 	return &DefaultClient{
@@ -489,4 +472,9 @@ type DefaultDownloader struct{}
 // See go-getter.GetFile.
 func (d *DefaultDownloader) GetFile(dst, src string, opts ...getter.ClientOption) error {
 	return getter.GetFile(dst, src, opts...)
+}
+
+// See go-getter.GetFile.
+func (d *DefaultDownloader) GetAny(dst, src string, opts ...getter.ClientOption) error {
+	return getter.GetAny(dst, src, opts...)
 }

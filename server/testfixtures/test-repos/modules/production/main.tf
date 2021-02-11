@@ -1,6 +1,6 @@
 module "null" {
   source = "../modules/null"
-  var = "production"
+  var    = "production"
 }
 output "var" {
   value = module.null.var

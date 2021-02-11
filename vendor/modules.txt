@@ -202,6 +202,10 @@ github.com/konsorten/go-windows-terminal-sequences
 # github.com/leodido/go-urn v1.2.0
 ## explicit
 github.com/leodido/go-urn
+# github.com/lusis/go-slackbot v0.0.0-20180109053408-401027ccfef5
+## explicit
+# github.com/lusis/slack-test v0.0.0-20190426140909-c40012f20018
+## explicit
 # github.com/magiconair/properties v1.8.1
 github.com/magiconair/properties
 # github.com/mattn/go-colorable v0.0.9

@@ -21,8 +21,9 @@ const DefaultWorkflowName = "default"
 
 // GlobalCfg is the final parsed version of server-side repo config.
 type GlobalCfg struct {
-	Repos     []Repo
-	Workflows map[string]Workflow
+	Repos      []Repo
+	Workflows  map[string]Workflow
+	PolicySets PolicySets
 }
 
 // Repo is the final parsed version of server-side repo config.
@@ -51,6 +52,7 @@ type MergedProjectCfg struct {
 	AutoplanEnabled   bool
 	TerraformVersion  *version.Version
 	RepoCfgVersion    int
+	PolicySets        PolicySets
 }
 
 // PreWorkflowHook is a map of custom run commands to run before workflows.
@@ -64,6 +66,18 @@ var DefaultApplyStage = Stage{
 	Steps: []Step{
 		{
 			StepName: "apply",
+		},
+	},
+}
+
+// DefaultPolicyCheckStage is the Atlantis default policy check stage.
+var DefaultPolicyCheckStage = Stage{
+	Steps: []Step{
+		{
+			StepName: "show",
+		},
+		{
+			StepName: "policy_check",
 		},
 	},
 }
@@ -88,9 +102,10 @@ var DefaultPlanStage = Stage{
 // for all repos.
 func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) GlobalCfg {
 	defaultWorkflow := Workflow{
-		Name:  DefaultWorkflowName,
-		Apply: DefaultApplyStage,
-		Plan:  DefaultPlanStage,
+		Name:        DefaultWorkflowName,
+		Apply:       DefaultApplyStage,
+		Plan:        DefaultPlanStage,
+		PolicyCheck: DefaultPolicyCheckStage,
 	}
 	// Must construct slices here instead of using a `var` declaration because
 	// we treat nil slices differently.
@@ -195,6 +210,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		AutoplanEnabled:   proj.Autoplan.Enabled,
 		TerraformVersion:  proj.TerraformVersion,
 		RepoCfgVersion:    rCfg.Version,
+		PolicySets:        g.PolicySets,
 	}
 }
 
@@ -211,6 +227,7 @@ func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repo
 		Name:              "",
 		AutoplanEnabled:   DefaultAutoPlanEnabled,
 		TerraformVersion:  nil,
+		PolicySets:        g.PolicySets,
 	}
 }
 
