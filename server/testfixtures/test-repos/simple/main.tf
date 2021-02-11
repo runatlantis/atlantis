@@ -10,9 +10,9 @@ variable "var" {
 }
 
 output "var" {
-  value = "${var.var}"
+  value = var.var
 }
 
 output "workspace" {
-  value = "${terraform.workspace}"
+  value = terraform.workspace
 }

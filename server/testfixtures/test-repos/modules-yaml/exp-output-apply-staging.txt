@@ -17,7 +17,7 @@ State path: terraform.tfstate
 
 Outputs:
 
-var = staging
+var = "staging"
 
 ```
 </details>

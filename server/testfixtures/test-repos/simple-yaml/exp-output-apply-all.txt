@@ -21,8 +21,8 @@ State path: terraform.tfstate
 
 Outputs:
 
-var = fromconfig
-workspace = default
+var = "fromconfig"
+workspace = "default"
 
 ```
 </details>
@@ -48,8 +48,8 @@ State path: terraform.tfstate
 
 Outputs:
 
-var = fromfile
-workspace = staging
+var = "fromfile"
+workspace = "staging"
 
 postapply
 

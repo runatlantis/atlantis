@@ -21,8 +21,8 @@ State path: terraform.tfstate
 
 Outputs:
 
-var = overridden
-workspace = default
+var = "overridden"
+workspace = "default"
 
 ```
 </details>
