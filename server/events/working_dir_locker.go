@@ -38,6 +38,7 @@ type WorkingDirLocker interface {
 	// an error if the workspace is already locked. The error is expected to
 	// be printed to the pull request.
 	TryLockPull(repoFullName string, pullNum int) (func(), error)
+	IsPullLocked(repoFullName string, pullNum int) (bool, error)
 }
 
 // DefaultWorkingDirLocker implements WorkingDirLocker.
@@ -127,4 +128,14 @@ func (d *DefaultWorkingDirLocker) workspaceKey(repo string, pull int, workspace 
 
 func (d *DefaultWorkingDirLocker) pullKey(repo string, pull int) string {
 	return fmt.Sprintf("%s/%d", repo, pull)
+}
+
+func (d *DefaultWorkingDirLocker) IsPullLocked(repoFullName string, pullNum int) (bool, error) {
+	pullKey := d.pullKey(repoFullName, pullNum)
+	for _, l := range d.locks {
+		if l == pullKey || strings.HasPrefix(l, pullKey+"/") {
+			return true, nil
+		}
+	}
+	return false, nil
 }

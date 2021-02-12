@@ -196,3 +196,24 @@ func TestLockPull_WorkspaceFirst(t *testing.T) {
 	_, err = locker.TryLockPull("owner/repo", 1)
 	Ok(t, err)
 }
+
+func TestIsPullLocked(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+
+	isLocked, err := locker.IsPullLocked("owner/repo", 1)
+	Ok(t, err)
+	Assert(t, isLocked == false, "exp unlocked")
+
+	unlock, err := locker.TryLockPull("owner/repo", 1)
+	Ok(t, err)
+
+	isLocked, err = locker.IsPullLocked("owner/repo", 1)
+	Ok(t, err)
+	Assert(t, isLocked == true, "exp locked")
+
+	// After unlocking, should be able to get a pull lock.
+	unlock()
+	isLocked, err = locker.IsPullLocked("owner/repo", 1)
+	Ok(t, err)
+	Assert(t, isLocked == false, "exp unlocked")
+}
