@@ -178,7 +178,21 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 			// the actual clone directory.
 		}
 	}
-
+	pullDir, err := p.WorkingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
+	if err != nil {
+		return nil, err
+	}
+	// Check if the PR has been already locked and if so drop all pending plans
+	locked, err := p.WorkingDirLocker.IsPullLocked(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num)
+	if err != nil {
+		return nil, err
+	}
+	if locked {
+		errDeletePlans := p.PendingPlanFinder.DeletePlans(pullDir)
+		if errDeletePlans != nil {
+			return nil, errDeletePlans
+		}
+	}
 	// Need to lock the workspace we're about to clone to.
 	workspace := DefaultWorkspace
 
