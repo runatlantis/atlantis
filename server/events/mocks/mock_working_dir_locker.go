@@ -62,6 +62,25 @@ func (mock *MockWorkingDirLocker) TryLockPull(repoFullName string, pullNum int) 
 	return ret0, ret1
 }
 
+func (mock *MockWorkingDirLocker) IsPullLocked(repoFullName string, pullNum int) (bool, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockWorkingDirLocker().")
+	}
+	params := []pegomock.Param{repoFullName, pullNum}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("IsPullLocked", params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 bool
+	var ret1 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(bool)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(error)
+		}
+	}
+	return ret0, ret1
+}
+
 func (mock *MockWorkingDirLocker) VerifyWasCalledOnce() *VerifierMockWorkingDirLocker {
 	return &VerifierMockWorkingDirLocker{
 		mock:                   mock,
@@ -69,14 +88,14 @@ func (mock *MockWorkingDirLocker) VerifyWasCalledOnce() *VerifierMockWorkingDirL
 	}
 }
 
-func (mock *MockWorkingDirLocker) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockWorkingDirLocker {
+func (mock *MockWorkingDirLocker) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockWorkingDirLocker {
 	return &VerifierMockWorkingDirLocker{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockWorkingDirLocker) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockWorkingDirLocker {
+func (mock *MockWorkingDirLocker) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockWorkingDirLocker {
 	return &VerifierMockWorkingDirLocker{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -84,7 +103,7 @@ func (mock *MockWorkingDirLocker) VerifyWasCalledInOrder(invocationCountMatcher 
 	}
 }
 
-func (mock *MockWorkingDirLocker) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockWorkingDirLocker {
+func (mock *MockWorkingDirLocker) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockWorkingDirLocker {
 	return &VerifierMockWorkingDirLocker{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -94,7 +113,7 @@ func (mock *MockWorkingDirLocker) VerifyWasCalledEventually(invocationCountMatch
 
 type VerifierMockWorkingDirLocker struct {
 	mock                   *MockWorkingDirLocker
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }
@@ -151,6 +170,37 @@ func (c *MockWorkingDirLocker_TryLockPull_OngoingVerification) GetCapturedArgume
 }
 
 func (c *MockWorkingDirLocker_TryLockPull_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []int) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]string, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(string)
+		}
+		_param1 = make([]int, len(c.methodInvocations))
+		for u, param := range params[1] {
+			_param1[u] = param.(int)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockWorkingDirLocker) IsPullLocked(repoFullName string, pullNum int) *MockWorkingDirLocker_IsPullLocked_OngoingVerification {
+	params := []pegomock.Param{repoFullName, pullNum}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "IsPullLocked", params, verifier.timeout)
+	return &MockWorkingDirLocker_IsPullLocked_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockWorkingDirLocker_IsPullLocked_OngoingVerification struct {
+	mock              *MockWorkingDirLocker
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockWorkingDirLocker_IsPullLocked_OngoingVerification) GetCapturedArguments() (string, int) {
+	repoFullName, pullNum := c.GetAllCapturedArguments()
+	return repoFullName[len(repoFullName)-1], pullNum[len(pullNum)-1]
+}
+
+func (c *MockWorkingDirLocker_IsPullLocked_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []int) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]string, len(c.methodInvocations))
