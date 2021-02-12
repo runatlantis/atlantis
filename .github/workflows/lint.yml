@@ -1,0 +1,20 @@
+name: linter
+
+on:
+  push:
+    branches:
+    - master
+  pull_request:
+    branches:
+    - master
+
+jobs:
+  linter:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: golangci-lint
+      uses: reviewdog/action-golangci-lint@v1
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        tool_name: golangci-lint
