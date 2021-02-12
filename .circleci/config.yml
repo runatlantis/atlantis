@@ -3,8 +3,6 @@ jobs:
   test:
     docker:
     - image: runatlantis/testing-env:latest
-      environment:
-        GOFLAGS: "-mod=vendor"
     steps:
     - checkout
     - run: make test-coverage
@@ -55,8 +53,6 @@ jobs:
   docker_master:
     docker:
     - image: circleci/golang:1.14 # If you update this, update it in the Makefile too
-      environment:
-        GOFLAGS: "-mod=vendor"
     steps:
     - checkout
     - run: make build-service
@@ -78,8 +74,6 @@ jobs:
   docker_tag:
     docker:
     - image: circleci/golang:1.14 # If you update this, update it in the Makefile too
-      environment:
-        GOFLAGS: "-mod=vendor"
     steps:
     - checkout
     - run: make build-service

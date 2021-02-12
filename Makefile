@@ -1,7 +1,7 @@
 BUILD_ID := $(shell git rev-parse --short HEAD 2>/dev/null || echo no-commit-id)
 WORKSPACE := $(shell pwd)
-PKG := $(shell go list ./... | grep -v e2e | grep -v vendor | grep -v static | grep -v mocks | grep -v testing)
-PKG_COMMAS := $(shell go list ./... | grep -v e2e | grep -v vendor | grep -v static | grep -v mocks | grep -v testing | tr '\n' ',')
+PKG := $(shell go list ./... | grep -v e2e | grep -v static | grep -v mocks | grep -v testing)
+PKG_COMMAS := $(shell go list ./... | grep -v e2e | grep -v static | grep -v mocks | grep -v testing | tr '\n' ',')
 IMAGE_NAME := runatlantis/atlantis
 
 .PHONY: test
@@ -20,23 +20,23 @@ debug: ## Output internal make variables
 	@echo PKG = $(PKG)
 
 build-service: ## Build the main Go service
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=vendor -v -o atlantis .
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o atlantis .
 
 go-generate: ## Run go generate in all packages
 	go generate $(PKG)
 
 regen-mocks: ## Delete all mocks and matchers and then run go generate to regen them.
-	find . -type f | grep mocks/mock_ | grep -v vendor | xargs rm
-	find . -type f | grep mocks/matchers | grep -v vendor | xargs rm
+	find . -type f | grep mocks/mock_ | xargs rm
+	find . -type f | grep mocks/matchers | xargs rm
 	@# not using $(PKG) here because that includes directories that have now
 	@# been made empty, causing go generate to fail.
-	go list ./... | grep -v e2e | grep -v vendor | grep -v static | xargs go generate
+	go list ./... | grep -v e2e | grep -v static | xargs go generate
 
 test: ## Run tests
-	@go test -mod=vendor -short $(PKG)
+	@go test -short $(PKG)
 
 test-all: ## Run tests including integration
-	@go test -mod=vendor  $(PKG)
+	@go test  $(PKG)
 
 test-coverage:
 	@mkdir -p .cover
@@ -48,7 +48,7 @@ test-coverage-html:
 	go tool cover -html .cover/cover.out
 
 dev-docker:
-	GOOS=linux GOARCH=amd64 go build -mod=vendor -o atlantis .
+	GOOS=linux GOARCH=amd64 go build -o atlantis .
 	docker build -f Dockerfile.dev -t atlantis-dev .
 
 dist: ## Package up everything in static/ using go-bindata-assetfs so it can be served by a single binary
