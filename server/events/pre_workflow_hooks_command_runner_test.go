@@ -22,9 +22,7 @@ var wh events.DefaultPreWorkflowHooksCommandRunner
 var whWorkingDir *mocks.MockWorkingDir
 var whWorkingDirLocker *mocks.MockWorkingDirLocker
 var whDrainer *events.Drainer
-var whGlobalCfg valid.GlobalCfg
 var whLogger *logmocks.MockSimpleLogging
-var whPullLogger *logging.SimpleLogger
 
 func preWorkflowHooksSetup(t *testing.T) *vcsmocks.MockClient {
 	RegisterMockTestingT(t)
