@@ -53,6 +53,17 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(
 
 	log.Info("running pre hooks")
 
+	preWorkflowHooks := make([]*valid.PreWorkflowHook, 0)
+	for _, repo := range w.GlobalCfg.Repos {
+		if repo.IDMatches(baseRepo.ID()) && len(repo.PreWorkflowHooks) > 0 {
+			preWorkflowHooks = append(preWorkflowHooks, repo.PreWorkflowHooks...)
+		}
+	}
+
+	if len(preWorkflowHooks) == 0 {
+		return
+	}
+
 	unlockFn, err := w.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, DefaultWorkspace)
 	if err != nil {
 		log.Warn("workspace is locked")
@@ -65,13 +76,6 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(
 	if err != nil {
 		log.Err("unable to run pre workflow hooks: %s", err)
 		return
-	}
-
-	preWorkflowHooks := make([]*valid.PreWorkflowHook, 0)
-	for _, repo := range w.GlobalCfg.Repos {
-		if repo.IDMatches(baseRepo.ID()) && len(repo.PreWorkflowHooks) > 0 {
-			preWorkflowHooks = append(preWorkflowHooks, repo.PreWorkflowHooks...)
-		}
 	}
 
 	ctx := models.PreWorkflowHookCommandContext{
@@ -100,7 +104,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 		_, err := w.PreWorkflowHookRunner.Run(ctx, hook.RunCommand, repoDir)
 
 		if err != nil {
-			return nil
+			return err
 		}
 	}
 
