@@ -1,6 +1,6 @@
 module github.com/runatlantis/atlantis
 
-go 1.14
+go 1.16
 
 require (
 	github.com/Laisky/graphql v1.0.5
