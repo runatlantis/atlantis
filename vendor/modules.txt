@@ -10,16 +10,16 @@ cloud.google.com/go/internal/version
 cloud.google.com/go/storage
 # github.com/BurntSushi/toml v0.3.1
 github.com/BurntSushi/toml
-# github.com/Laisky/graphql v1.0.4
+# github.com/Laisky/graphql v1.0.5
 ## explicit
 github.com/Laisky/graphql
 github.com/Laisky/graphql/ident
 github.com/Laisky/graphql/internal/jsonutil
 # github.com/Masterminds/goutils v1.1.0
 github.com/Masterminds/goutils
-# github.com/Masterminds/semver/v3 v3.1.0
+# github.com/Masterminds/semver/v3 v3.1.1
 github.com/Masterminds/semver/v3
-# github.com/Masterminds/sprig/v3 v3.1.0
+# github.com/Masterminds/sprig/v3 v3.2.0
 ## explicit
 github.com/Masterminds/sprig/v3
 # github.com/agext/levenshtein v1.2.3
@@ -138,6 +138,8 @@ github.com/googleapis/gax-go/v2
 # github.com/gorilla/mux v1.8.0
 ## explicit
 github.com/gorilla/mux
+# github.com/gorilla/websocket v1.4.2
+github.com/gorilla/websocket
 # github.com/hashicorp/go-cleanhttp v0.5.1
 github.com/hashicorp/go-cleanhttp
 # github.com/hashicorp/go-getter v1.5.2
@@ -148,7 +150,7 @@ github.com/hashicorp/go-getter/helper/url
 github.com/hashicorp/go-retryablehttp
 # github.com/hashicorp/go-safetemp v1.0.0
 github.com/hashicorp/go-safetemp
-# github.com/hashicorp/go-version v1.2.0
+# github.com/hashicorp/go-version v1.2.1
 ## explicit
 github.com/hashicorp/go-version
 # github.com/hashicorp/golang-lru v0.5.1
@@ -178,7 +180,7 @@ github.com/hashicorp/hcl/v2/json
 github.com/hashicorp/terraform-config-inspect/tfconfig
 # github.com/huandu/xstrings v1.3.1
 github.com/huandu/xstrings
-# github.com/imdario/mergo v0.3.8
+# github.com/imdario/mergo v0.3.11
 github.com/imdario/mergo
 # github.com/inconshreveable/mousetrap v1.0.0
 ## explicit
@@ -200,11 +202,16 @@ github.com/konsorten/go-windows-terminal-sequences
 # github.com/leodido/go-urn v1.2.0
 ## explicit
 github.com/leodido/go-urn
-# github.com/magiconair/properties v1.8.1
+# github.com/lusis/go-slackbot v0.0.0-20180109053408-401027ccfef5
 ## explicit
+# github.com/lusis/slack-test v0.0.0-20190426140909-c40012f20018
+## explicit
+# github.com/magiconair/properties v1.8.1
 github.com/magiconair/properties
 # github.com/mattn/go-colorable v0.0.9
 github.com/mattn/go-colorable
+# github.com/mattn/go-isatty v0.0.4
+github.com/mattn/go-isatty
 # github.com/mcdafydd/go-azuredevops v0.12.0
 ## explicit
 github.com/mcdafydd/go-azuredevops/azuredevops
@@ -230,9 +237,10 @@ github.com/mitchellh/reflectwalk
 # github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb
 ## explicit
 github.com/mohae/deepcopy
-# github.com/nlopes/slack v0.1.0
+# github.com/nlopes/slack v0.4.0
 ## explicit
 github.com/nlopes/slack
+github.com/nlopes/slack/slackutilsx
 # github.com/onsi/ginkgo v1.9.0
 ## explicit
 # github.com/onsi/gomega v1.4.3
@@ -250,6 +258,8 @@ github.com/pkg/errors
 # github.com/remeh/sizedwaitgroup v1.0.0
 ## explicit
 github.com/remeh/sizedwaitgroup
+# github.com/shopspring/decimal v1.2.0
+github.com/shopspring/decimal
 # github.com/shurcooL/githubv4 v0.0.0-20191127044304-8f68eb5628d0
 ## explicit
 github.com/shurcooL/githubv4
@@ -353,7 +363,6 @@ golang.org/x/net/http2/hpack
 golang.org/x/net/idna
 golang.org/x/net/internal/timeseries
 golang.org/x/net/trace
-golang.org/x/net/websocket
 # golang.org/x/oauth2 v0.0.0-20191122200657-5d9234df094c
 ## explicit
 golang.org/x/oauth2

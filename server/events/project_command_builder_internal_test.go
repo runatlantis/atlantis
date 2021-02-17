@@ -17,6 +17,10 @@ import (
 
 // Test different permutations of global and repo config.
 func TestBuildProjectCmdCtx(t *testing.T) {
+	emptyPolicySets := valid.PolicySets{
+		Version:    nil,
+		PolicySets: []valid.PolicySet{},
+	}
 	baseRepo := models.Repo{
 		FullName: "owner/repo",
 		VCSHost: models.VCSHost{
@@ -68,6 +72,7 @@ workflows:
 				User:               models.User{},
 				Verbose:            true,
 				Workspace:          "myworkspace",
+				PolicySets:         emptyPolicySets,
 			},
 			expPlanSteps:  []string{"init", "plan"},
 			expApplySteps: []string{"apply"},
@@ -119,6 +124,7 @@ projects:
 				User:               models.User{},
 				Verbose:            true,
 				Workspace:          "myworkspace",
+				PolicySets:         emptyPolicySets,
 			},
 			expPlanSteps:  []string{"init", "plan"},
 			expApplySteps: []string{"apply"},
@@ -170,6 +176,7 @@ projects:
 				User:               models.User{},
 				Verbose:            true,
 				Workspace:          "myworkspace",
+				PolicySets:         emptyPolicySets,
 			},
 			expPlanSteps:  []string{"init", "plan"},
 			expApplySteps: []string{"apply"},
@@ -229,6 +236,7 @@ projects:
 				User:               models.User{},
 				Verbose:            true,
 				Workspace:          "myworkspace",
+				PolicySets:         emptyPolicySets,
 			},
 			expPlanSteps:  []string{"plan"},
 			expApplySteps: []string{},
@@ -375,6 +383,7 @@ workflows:
 				User:               models.User{},
 				Verbose:            true,
 				Workspace:          "myworkspace",
+				PolicySets:         emptyPolicySets,
 			},
 			expPlanSteps:  []string{"plan"},
 			expApplySteps: []string{"apply"},
@@ -430,6 +439,7 @@ projects:
 				User:               models.User{},
 				Verbose:            true,
 				Workspace:          "myworkspace",
+				PolicySets:         emptyPolicySets,
 			},
 			expPlanSteps:  []string{"plan"},
 			expApplySteps: []string{"apply"},
@@ -488,6 +498,7 @@ workflows:
 				User:               models.User{},
 				Verbose:            true,
 				Workspace:          "myworkspace",
+				PolicySets:         emptyPolicySets,
 			},
 			expPlanSteps:  []string{},
 			expApplySteps: []string{},
@@ -529,6 +540,7 @@ projects:
 				User:               models.User{},
 				Verbose:            true,
 				Workspace:          "myworkspace",
+				PolicySets:         emptyPolicySets,
 			},
 			expPlanSteps:  []string{"plan"},
 			expApplySteps: []string{"apply"},
@@ -565,22 +577,23 @@ projects:
 				Ok(t, ioutil.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
 
-			builder := &DefaultProjectCommandBuilder{
-				WorkingDirLocker:   NewDefaultWorkingDirLocker(),
-				WorkingDir:         workingDir,
-				ParserValidator:    parser,
-				VCSClient:          vcsClient,
-				ProjectFinder:      &DefaultProjectFinder{},
-				PendingPlanFinder:  &DefaultPendingPlanFinder{},
-				CommentBuilder:     &CommentParser{},
-				GlobalCfg:          globalCfg,
-				SkipCloneNoChanges: false,
-			}
+			builder := NewProjectCommandBuilder(
+				false,
+				parser,
+				&DefaultProjectFinder{},
+				vcsClient,
+				workingDir,
+				NewDefaultWorkingDirLocker(),
+				globalCfg,
+				&DefaultPendingPlanFinder{},
+				&CommentParser{},
+				false,
+			)
 
 			// We run a test for each type of command.
 			for _, cmd := range []models.CommandName{models.PlanCommand, models.ApplyCommand} {
 				t.Run(cmd.String(), func(t *testing.T) {
-					ctx, err := builder.buildProjectCommandCtx(&CommandContext{
+					ctxs, err := builder.buildProjectCommandCtx(&CommandContext{
 						Pull: models.PullRequest{
 							BaseRepo: baseRepo,
 						},
@@ -591,6 +604,7 @@ projects:
 						ErrEquals(t, c.expErr, err)
 						return
 					}
+					ctx := ctxs[0]
 
 					Ok(t, err)
 
@@ -609,8 +623,10 @@ projects:
 						})
 					}
 
+					c.expCtx.CommandName = cmd
 					// Init fields we couldn't in our cases map.
 					c.expCtx.Steps = expSteps
+					ctx.PolicySets = emptyPolicySets
 
 					Equals(t, c.expCtx, ctx)
 					// Equals() doesn't compare TF version properly so have to
@@ -620,6 +636,203 @@ projects:
 					}
 				})
 			}
+		})
+	}
+}
+
+func TestBuildProjectCmdCtx_WithPolicCheckEnabled(t *testing.T) {
+	emptyPolicySets := valid.PolicySets{
+		Version:    nil,
+		PolicySets: []valid.PolicySet{},
+	}
+	baseRepo := models.Repo{
+		FullName: "owner/repo",
+		VCSHost: models.VCSHost{
+			Hostname: "github.com",
+		},
+	}
+	pull := models.PullRequest{
+		BaseRepo: baseRepo,
+	}
+	cases := map[string]struct {
+		globalCfg           string
+		repoCfg             string
+		expErr              string
+		expCtx              models.ProjectCommandContext
+		expPolicyCheckSteps []string
+	}{
+		// Test that if we've set global defaults and no project config
+		// that the global defaults are used.
+		"global defaults": {
+			globalCfg: `
+repos:
+- id: /.*/
+`,
+			repoCfg: "",
+			expCtx: models.ProjectCommandContext{
+				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
+				BaseRepo:           baseRepo,
+				EscapedCommentArgs: []string{`\f\l\a\g`},
+				AutomergeEnabled:   false,
+				AutoplanEnabled:    true,
+				HeadRepo:           models.Repo{},
+				Log:                nil,
+				PullMergeable:      true,
+				Pull:               pull,
+				ProjectName:        "",
+				ApplyRequirements:  []string{},
+				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
+				RepoRelDir:         "project1",
+				User:               models.User{},
+				Verbose:            true,
+				Workspace:          "myworkspace",
+				PolicySets:         emptyPolicySets,
+			},
+			expPolicyCheckSteps: []string{"show", "policy_check"},
+		},
+
+		// If the repos are allowed to set everything then their config should
+		// come through.
+		"full repo permissions": {
+			globalCfg: `
+repos:
+- id: /.*/
+  workflow: default
+  apply_requirements: [approved]
+  allowed_overrides: [apply_requirements, workflow]
+  allow_custom_workflows: true
+workflows:
+  default:
+    policy_check:
+      steps: []
+`,
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project1
+  workspace: myworkspace
+  autoplan:
+    enabled: true
+    when_modified: [../modules/**/*.tf]
+  terraform_version: v10.0
+  apply_requirements: []
+  workflow: custom
+workflows:
+  custom:
+    policy_check:
+      steps:
+      - policy_check
+`,
+			expCtx: models.ProjectCommandContext{
+				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
+				BaseRepo:           baseRepo,
+				EscapedCommentArgs: []string{`\f\l\a\g`},
+				AutomergeEnabled:   true,
+				AutoplanEnabled:    true,
+				HeadRepo:           models.Repo{},
+				Log:                nil,
+				PullMergeable:      true,
+				Pull:               pull,
+				ProjectName:        "",
+				ApplyRequirements:  []string{},
+				RepoConfigVersion:  3,
+				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
+				RepoRelDir:         "project1",
+				TerraformVersion:   mustVersion("10.0"),
+				User:               models.User{},
+				Verbose:            true,
+				Workspace:          "myworkspace",
+				PolicySets:         emptyPolicySets,
+			},
+			expPolicyCheckSteps: []string{"policy_check"},
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			tmp, cleanup := DirStructure(t, map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"modules": map[string]interface{}{
+					"module": map[string]interface{}{
+						"main.tf": nil,
+					},
+				},
+			})
+			defer cleanup()
+
+			workingDir := NewMockWorkingDir()
+			When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmp, false, nil)
+			vcsClient := vcsmocks.NewMockClient()
+			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"modules/module/main.tf"}, nil)
+
+			// Write and parse the global config file.
+			globalCfgPath := filepath.Join(tmp, "global.yaml")
+			Ok(t, ioutil.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
+			parser := &yaml.ParserValidator{}
+			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfg(false, false, false))
+			Ok(t, err)
+
+			if c.repoCfg != "" {
+				Ok(t, ioutil.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
+			}
+
+			builder := NewProjectCommandBuilder(
+				true,
+				parser,
+				&DefaultProjectFinder{},
+				vcsClient,
+				workingDir,
+				NewDefaultWorkingDirLocker(),
+				globalCfg,
+				&DefaultPendingPlanFinder{},
+				&CommentParser{},
+				false,
+			)
+
+			cmd := models.PolicyCheckCommand
+			t.Run(cmd.String(), func(t *testing.T) {
+				ctxs, err := builder.buildProjectCommandCtx(&CommandContext{
+					Pull: models.PullRequest{
+						BaseRepo: baseRepo,
+					},
+					PullMergeable: true,
+				}, models.PlanCommand, "", []string{"flag"}, tmp, "project1", "myworkspace", true)
+
+				if c.expErr != "" {
+					ErrEquals(t, c.expErr, err)
+					return
+				}
+
+				ctx := ctxs[1]
+
+				Ok(t, err)
+
+				// Construct expected steps.
+				var stepNames []string
+				var expSteps []valid.Step
+
+				stepNames = c.expPolicyCheckSteps
+				for _, stepName := range stepNames {
+					expSteps = append(expSteps, valid.Step{
+						StepName: stepName,
+					})
+				}
+
+				c.expCtx.CommandName = cmd
+				// Init fields we couldn't in our cases map.
+				c.expCtx.Steps = expSteps
+				ctx.PolicySets = emptyPolicySets
+
+				Equals(t, c.expCtx, ctx)
+				// Equals() doesn't compare TF version properly so have to
+				// use .String().
+				if c.expCtx.TerraformVersion != nil {
+					Equals(t, c.expCtx.TerraformVersion.String(), ctx.TerraformVersion.String())
+				}
+			})
 		})
 	}
 }

@@ -10,12 +10,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
-
 package events
 
 import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
+)
+
+// CommandTrigger represents the how the command was triggered
+type CommandTrigger int
+
+const (
+	// Commands that are automatically triggered (ie. automatic plans)
+	Auto CommandTrigger = iota
+
+	// Commands that are triggered by comments (ie. atlantis plan)
+	Comment
 )
 
 // CommandContext represents the context of a command that should be executed
@@ -35,4 +45,6 @@ type CommandContext struct {
 	// set our own build statuses which can affect mergeability if users have
 	// required the Atlantis status to be successful prior to merging.
 	PullMergeable bool
+
+	Trigger CommandTrigger
 }

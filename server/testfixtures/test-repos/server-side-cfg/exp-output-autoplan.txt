@@ -23,6 +23,9 @@ Terraform will perform the following actions:
 
 Plan: 1 to add, 0 to change, 0 to destroy.
 
+Changes to Outputs:
++ workspace = "default"
+
 postplan custom
 
 ```
@@ -54,6 +57,9 @@ Terraform will perform the following actions:
     }
 
 Plan: 1 to add, 0 to change, 0 to destroy.
+
+Changes to Outputs:
++ workspace = "staging"
 
 ```
 

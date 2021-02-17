@@ -2,9 +2,9 @@
 package matchers
 
 import (
-	"reflect"
 	"github.com/petergtz/pegomock"
 	events "github.com/runatlantis/atlantis/server/events"
+	"reflect"
 )
 
 func AnyEventsCommentParseResult() events.CommentParseResult {

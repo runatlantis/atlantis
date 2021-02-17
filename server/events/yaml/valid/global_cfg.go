@@ -22,8 +22,9 @@ const DeleteSourceBranchOnMergeKey = "delete_source_branch_on_merge"
 
 // GlobalCfg is the final parsed version of server-side repo config.
 type GlobalCfg struct {
-	Repos     []Repo
-	Workflows map[string]Workflow
+	Repos      []Repo
+	Workflows  map[string]Workflow
+	PolicySets PolicySets
 }
 
 // Repo is the final parsed version of server-side repo config.
@@ -53,6 +54,7 @@ type MergedProjectCfg struct {
 	AutoplanEnabled           bool
 	TerraformVersion          *version.Version
 	RepoCfgVersion            int
+	PolicySets                PolicySets
 	DeleteSourceBranchOnMerge bool
 }
 
@@ -67,6 +69,18 @@ var DefaultApplyStage = Stage{
 	Steps: []Step{
 		{
 			StepName: "apply",
+		},
+	},
+}
+
+// DefaultPolicyCheckStage is the Atlantis default policy check stage.
+var DefaultPolicyCheckStage = Stage{
+	Steps: []Step{
+		{
+			StepName: "show",
+		},
+		{
+			StepName: "policy_check",
 		},
 	},
 }
@@ -91,9 +105,10 @@ var DefaultPlanStage = Stage{
 // for all repos.
 func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) GlobalCfg {
 	defaultWorkflow := Workflow{
-		Name:  DefaultWorkflowName,
-		Apply: DefaultApplyStage,
-		Plan:  DefaultPlanStage,
+		Name:        DefaultWorkflowName,
+		Apply:       DefaultApplyStage,
+		Plan:        DefaultPlanStage,
+		PolicyCheck: DefaultPolicyCheckStage,
 	}
 	// Must construct slices here instead of using a `var` declaration because
 	// we treat nil slices differently.
@@ -217,6 +232,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		AutoplanEnabled:           proj.Autoplan.Enabled,
 		TerraformVersion:          proj.TerraformVersion,
 		RepoCfgVersion:            rCfg.Version,
+		PolicySets:                g.PolicySets,
 		DeleteSourceBranchOnMerge: deleteSourceBranchOnMerge,
 	}
 }
@@ -234,6 +250,7 @@ func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repo
 		Name:                      "",
 		AutoplanEnabled:           DefaultAutoPlanEnabled,
 		TerraformVersion:          nil,
+		PolicySets:                g.PolicySets,
 		DeleteSourceBranchOnMerge: deleteSourceBranchOnMerge,
 	}
 }
@@ -319,12 +336,15 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 		// default is always allowed
 		if p.WorkflowName != nil && len(allowedWorkflows) != 0 {
 			name := *p.WorkflowName
-			if !sliceContainsF(allowedWorkflows, name) || !allowCustomWorkflows {
-				return fmt.Errorf("workflow '%s' is not allowed for this repo", name)
+			if allowCustomWorkflows {
+				// If we allow CustomWorkflows we need to check that workflow name is defined inside repo and not global.
+				if mapContainsF(rCfg.Workflows, name) {
+					break
+				}
 			}
 
-			if allowCustomWorkflows {
-				break
+			if !sliceContainsF(allowedWorkflows, name) {
+				return fmt.Errorf("workflow '%s' is not allowed for this repo", name)
 			}
 		}
 	}

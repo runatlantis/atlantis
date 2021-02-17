@@ -1,0 +1,4 @@
+Ran Apply for dir: `.` workspace: `default`
+
+**Apply Failed**: Pull request must be mergeable before running apply.
+

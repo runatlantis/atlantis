@@ -10,6 +10,7 @@
 - [What does it do?](#what-does-it-do)
 - [Why should you use it?](#why-should-you-use-it)
 - [Badges!](#badges)
+- [Stargazers over time](#stargazers-over-time)
 
 ## Resources
 * How to get started: [www.runatlantis.io/guide](https://www.runatlantis.io/guide)
@@ -37,3 +38,7 @@ Runs `terraform plan` and `apply` remotely and comments back on the pull request
 [![Docker Image Metadata](https://images.microbadger.com/badges/image/runatlantis/atlantis.svg)](https://microbadger.com/images/runatlantis/atlantis)
 [![Slack](https://img.shields.io/badge/Join-Atlantis%20Community%20Slack-red)](https://join.slack.com/t/atlantis-community/shared_invite/enQtNzc4NDM3OTA3ODI0LTA5NDQ4YTA3NTAxM2I3ZmIxMGNiYWJhNmY4YjBjZjM3OWMzNGI0NTcxNzY2NjRhODIyODA4YmNjOTBiOThhNTI)
 [![Gitter chat](https://badges.gitter.im/runatlantis.png)](https://gitter.im/runatlantis)
+
+## Stargazers over time
+
+[![Stargazers over time](https://starchart.cc/runatlantis/atlantis.svg)](https://starchart.cc/runatlantis/atlantis)

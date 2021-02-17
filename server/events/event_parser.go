@@ -43,11 +43,30 @@ type PullCommand interface {
 	IsAutoplan() bool
 }
 
+// PolicyCheckCommand is a policy_check command that is automatically triggered
+// after successful plan command.
+type PolicyCheckCommand struct{}
+
+// CommandName is policy_check.
+func (c PolicyCheckCommand) CommandName() models.CommandName {
+	return models.PolicyCheckCommand
+}
+
+// IsVerbose is false for policy_check commands.
+func (c PolicyCheckCommand) IsVerbose() bool {
+	return false
+}
+
+// IsAutoplan is true for policy_check commands.
+func (c PolicyCheckCommand) IsAutoplan() bool {
+	return false
+}
+
 // AutoplanCommand is a plan command that is automatically triggered when a
 // pull request is opened or updated.
 type AutoplanCommand struct{}
 
-// CommandName is Plan.
+// CommandName is plan.
 func (c AutoplanCommand) CommandName() models.CommandName {
 	return models.PlanCommand
 }

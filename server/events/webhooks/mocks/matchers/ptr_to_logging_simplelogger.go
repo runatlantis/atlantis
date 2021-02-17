@@ -2,8 +2,9 @@
 package matchers
 
 import (
-	"reflect"
 	"github.com/petergtz/pegomock"
+	"reflect"
+
 	logging "github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -15,6 +16,18 @@ func AnyPtrToLoggingSimpleLogger() *logging.SimpleLogger {
 
 func EqPtrToLoggingSimpleLogger(value *logging.SimpleLogger) *logging.SimpleLogger {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
+	var nullValue *logging.SimpleLogger
+	return nullValue
+}
+
+func NotEqPtrToLoggingSimpleLogger(value *logging.SimpleLogger) *logging.SimpleLogger {
+	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
+	var nullValue *logging.SimpleLogger
+	return nullValue
+}
+
+func PtrToLoggingSimpleLoggerThat(matcher pegomock.ArgumentMatcher) *logging.SimpleLogger {
+	pegomock.RegisterMatcher(matcher)
 	var nullValue *logging.SimpleLogger
 	return nullValue
 }

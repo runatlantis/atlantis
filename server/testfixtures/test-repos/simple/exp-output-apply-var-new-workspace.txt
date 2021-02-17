@@ -21,8 +21,8 @@ State path: terraform.tfstate
 
 Outputs:
 
-var = new_workspace
-workspace = new_workspace
+var = "new_workspace"
+workspace = "new_workspace"
 
 ```
 </details>

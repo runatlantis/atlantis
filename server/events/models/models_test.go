@@ -367,6 +367,12 @@ func TestProjectResult_IsSuccessful(t *testing.T) {
 			},
 			true,
 		},
+		"policy_check success": {
+			models.ProjectResult{
+				PolicyCheckSuccess: &models.PolicyCheckSuccess{},
+			},
+			true,
+		},
 		"apply success": {
 			models.ProjectResult{
 				ApplySuccess: "success",
@@ -441,6 +447,34 @@ func TestProjectResult_PlanStatus(t *testing.T) {
 			},
 			expStatus: models.AppliedPlanStatus,
 		},
+		{
+			p: models.ProjectResult{
+				Command:            models.PolicyCheckCommand,
+				PolicyCheckSuccess: &models.PolicyCheckSuccess{},
+			},
+			expStatus: models.PassedPolicyCheckStatus,
+		},
+		{
+			p: models.ProjectResult{
+				Command: models.PolicyCheckCommand,
+				Failure: "failure",
+			},
+			expStatus: models.ErroredPolicyCheckStatus,
+		},
+		{
+			p: models.ProjectResult{
+				Command:            models.ApprovePoliciesCommand,
+				PolicyCheckSuccess: &models.PolicyCheckSuccess{},
+			},
+			expStatus: models.PassedPolicyCheckStatus,
+		},
+		{
+			p: models.ProjectResult{
+				Command: models.ApprovePoliciesCommand,
+				Failure: "failure",
+			},
+			expStatus: models.ErroredPolicyCheckStatus,
+		},
 	}
 
 	for _, c := range cases {
@@ -468,6 +502,12 @@ func TestPullStatus_StatusCount(t *testing.T) {
 			{
 				Status: models.DiscardedPlanStatus,
 			},
+			{
+				Status: models.ErroredPolicyCheckStatus,
+			},
+			{
+				Status: models.PassedPolicyCheckStatus,
+			},
 		},
 	}
 
@@ -476,6 +516,8 @@ func TestPullStatus_StatusCount(t *testing.T) {
 	Equals(t, 1, ps.StatusCount(models.ErroredApplyStatus))
 	Equals(t, 0, ps.StatusCount(models.ErroredPlanStatus))
 	Equals(t, 1, ps.StatusCount(models.DiscardedPlanStatus))
+	Equals(t, 1, ps.StatusCount(models.ErroredPolicyCheckStatus))
+	Equals(t, 1, ps.StatusCount(models.PassedPolicyCheckStatus))
 }
 
 func TestApplyCommand_String(t *testing.T) {
@@ -488,6 +530,12 @@ func TestPlanCommand_String(t *testing.T) {
 	uc := models.PlanCommand
 
 	Equals(t, "plan", uc.String())
+}
+
+func TestPolicyCheckCommand_String(t *testing.T) {
+	uc := models.PolicyCheckCommand
+
+	Equals(t, "policy_check", uc.String())
 }
 
 func TestUnlockCommand_String(t *testing.T) {

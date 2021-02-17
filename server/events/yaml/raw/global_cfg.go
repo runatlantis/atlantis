@@ -12,8 +12,9 @@ import (
 
 // GlobalCfg is the raw schema for server-side repo config.
 type GlobalCfg struct {
-	Repos     []Repo              `yaml:"repos" json:"repos"`
-	Workflows map[string]Workflow `yaml:"workflows" json:"workflows"`
+	Repos      []Repo              `yaml:"repos" json:"repos"`
+	Workflows  map[string]Workflow `yaml:"workflows" json:"workflows"`
+	PolicySets PolicySets          `yaml:"policies" json:"policies"`
 }
 
 // Repo is the raw schema for repos in the server-side repo config.
@@ -107,9 +108,11 @@ func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 		repos = append(repos, r.ToValid(workflows))
 	}
 	repos = append(defaultCfg.Repos, repos...)
+
 	return valid.GlobalCfg{
-		Repos:     repos,
-		Workflows: workflows,
+		Repos:      repos,
+		Workflows:  workflows,
+		PolicySets: g.PolicySets.ToValid(),
 	}
 }
 

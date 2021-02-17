@@ -1,7 +1,9 @@
 package slack
 
 import (
+	"bytes"
 	"fmt"
+	"strconv"
 	"time"
 )
 
@@ -127,6 +129,19 @@ func (t JSONTime) Time() time.Time {
 	return time.Unix(int64(t), 0)
 }
 
+// UnmarshalJSON will unmarshal both string and int JSON values
+func (t *JSONTime) UnmarshalJSON(buf []byte) error {
+	s := bytes.Trim(buf, `"`)
+
+	v, err := strconv.Atoi(string(s))
+	if err != nil {
+		return err
+	}
+
+	*t = JSONTime(int64(v))
+	return nil
+}
+
 // Team contains details about a team
 type Team struct {
 	ID     string `json:"id"`
@@ -156,7 +171,7 @@ type Info struct {
 
 type infoResponseFull struct {
 	Info
-	WebResponse
+	SlackResponse
 }
 
 // GetBotByID returns a bot given a bot id

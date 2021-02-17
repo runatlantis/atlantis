@@ -15,13 +15,10 @@ package events
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/google/go-github/v31/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
-	"github.com/remeh/sizedwaitgroup"
-	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -68,18 +65,34 @@ type GitlabMergeRequestGetter interface {
 	GetMergeRequest(repoFullName string, pullNum int) (*gitlab.MergeRequest, error)
 }
 
+// CommentCommandRunner runs individual command workflows.
+type CommentCommandRunner interface {
+	Run(*CommandContext, *CommentCommand)
+}
+
+func buildCommentCommandRunner(
+	cmdRunner *DefaultCommandRunner,
+	cmdName models.CommandName,
+) CommentCommandRunner {
+	// panic here, we want to fail fast and hard since
+	// this would be an internal service configuration error.
+	runner, ok := cmdRunner.CommentCommandRunnerByCmd[cmdName]
+
+	if !ok {
+		panic(fmt.Sprintf("command runner not configured for command %s", cmdName.String()))
+	}
+
+	return runner
+}
+
 // DefaultCommandRunner is the first step when processing a comment command.
 type DefaultCommandRunner struct {
 	VCSClient                vcs.Client
 	GithubPullGetter         GithubPullGetter
 	AzureDevopsPullGetter    AzureDevopsPullGetter
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
-	CommitStatusUpdater      CommitStatusUpdater
-	DisableApplyAll          bool
-	DisableApply             bool
 	DisableAutoplan          bool
 	EventParser              EventParsing
-	MarkdownRenderer         *MarkdownRenderer
 	Logger                   logging.SimpleLogging
 	// AllowForkPRs controls whether we operate on pull requests from forks.
 	AllowForkPRs bool
@@ -90,30 +103,17 @@ type DefaultCommandRunner struct {
 	// this in our error message back to the user on a forked PR so they know
 	// how to enable this functionality.
 	AllowForkPRsFlag string
-	// HidePrevPlanComments will hide previous plan comments to declutter PRs.
-	HidePrevPlanComments bool
 	// SilenceForkPRErrors controls whether to comment on Fork PRs when AllowForkPRs = False
 	SilenceForkPRErrors bool
 	// SilenceForkPRErrorsFlag is the name of the flag that controls fork PR's. We use
 	// this in our error message back to the user on a forked PR so they know
 	// how to disable error comment
-	SilenceForkPRErrorsFlag string
-	// SilenceVCSStatusNoPlans is whether autoplan should set commit status if no plans
-	// are found
-	SilenceVCSStatusNoPlans bool
-	ProjectCommandBuilder   ProjectCommandBuilder
-	ProjectCommandRunner    ProjectCommandRunner
-	// GlobalAutomerge is true if we should automatically merge pull requests if all
-	// plans have been successfully applied. This is set via a CLI flag.
-	GlobalAutomerge   bool
-	PendingPlanFinder PendingPlanFinder
-	WorkingDir        WorkingDir
-	DB                *db.BoltDB
-	Drainer           *Drainer
-	DeleteLockCommand DeleteLockCommand
+	SilenceForkPRErrorsFlag   string
+	CommentCommandRunnerByCmd map[models.CommandName]CommentCommandRunner
+	Drainer                   *Drainer
 }
 
-// RunAutoplanCommand runs plan when a pull request is opened or updated.
+// RunAutoplanCommand runs plan and policy_checks when a pull request is opened or updated.
 func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) {
 	if opStarted := c.Drainer.StartOp(); !opStarted {
 		if commentErr := c.VCSClient.CreateComment(baseRepo, pull.Num, ShutdownComment, models.PlanCommand.String()); commentErr != nil {
@@ -130,6 +130,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		Log:      log,
 		Pull:     pull,
 		HeadRepo: headRepo,
+		Trigger:  Auto,
 	}
 	if !c.validateCtxAndComment(ctx) {
 		return
@@ -138,55 +139,13 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		return
 	}
 
-	projectCmds, err := c.ProjectCommandBuilder.BuildAutoplanCommands(ctx)
-	if err != nil {
-		if statusErr := c.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, models.PlanCommand); statusErr != nil {
-			ctx.Log.Warn("unable to update commit status: %s", statusErr)
-		}
-
-		c.updatePull(ctx, AutoplanCommand{}, CommandResult{Error: err})
-		return
-	}
-	if len(projectCmds) == 0 {
-		log.Info("determined there was no project to run plan in")
-		if !c.SilenceVCSStatusNoPlans {
-			// If there were no projects modified, we set a successful commit status
-			// with 0/0 projects planned successfully because some users require
-			// the Atlantis status to be passing for all pull requests.
-			ctx.Log.Debug("setting VCS status to success with no projects found")
-			if err := c.CommitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, models.PlanCommand, 0, 0); err != nil {
-				ctx.Log.Warn("unable to update commit status: %s", err)
-			}
-		}
+	autoPlanRunner := buildCommentCommandRunner(c, models.PlanCommand)
+	if autoPlanRunner == nil {
+		ctx.Log.Err("invalid autoplan command")
 		return
 	}
 
-	// At this point we are sure Atlantis has work to do, so set commit status to pending
-	if err := c.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, models.PlanCommand); err != nil {
-		ctx.Log.Warn("unable to update commit status: %s", err)
-	}
-
-	// Only run commands in parallel if enabled
-	var result CommandResult
-	if c.parallelPlanEnabled(ctx, projectCmds) {
-		ctx.Log.Info("Running plans in parallel")
-		result = c.runProjectCmdsParallel(projectCmds, models.PlanCommand)
-	} else {
-		result = c.runProjectCmds(projectCmds, models.PlanCommand)
-	}
-
-	if c.automergeEnabled(ctx, projectCmds) && result.HasErrors() {
-		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
-		c.deletePlans(ctx)
-		result.PlansDeleted = true
-	}
-	c.updatePull(ctx, AutoplanCommand{}, result)
-	pullStatus, err := c.updateDB(ctx, ctx.Pull, result.ProjectResults)
-	if err != nil {
-		c.Logger.Err("writing results: %s", err)
-	}
-
-	c.updateCommitStatus(ctx, models.PlanCommand, pullStatus)
+	autoPlanRunner.Run(ctx, nil)
 }
 
 // RunCommentCommand executes the command.
@@ -206,263 +165,154 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	log := c.buildLogger(baseRepo.FullName, pullNum)
 	defer c.logPanics(baseRepo, pullNum, log)
 
-	if c.DisableApply && cmd.Name == models.ApplyCommand {
-		log.Info("ignoring apply command since apply disabled globally")
-		if err := c.VCSClient.CreateComment(baseRepo, pullNum, applyDisabledComment, models.ApplyCommand.String()); err != nil {
-			log.Err("unable to comment on pull request: %s", err)
-		}
-		return
-	}
-
-	if c.DisableApplyAll && cmd.Name == models.ApplyCommand && !cmd.IsForSpecificProject() {
-		log.Info("ignoring apply command without flags since apply all is disabled")
-		if err := c.VCSClient.CreateComment(baseRepo, pullNum, applyAllDisabledComment, models.ApplyCommand.String()); err != nil {
-			log.Err("unable to comment on pull request: %s", err)
-		}
-		return
-	}
-
-	var headRepo models.Repo
-	if maybeHeadRepo != nil {
-		headRepo = *maybeHeadRepo
-	}
-
-	var err error
-	var pull models.PullRequest
-	switch baseRepo.VCSHost.Type {
-	case models.Github:
-		pull, headRepo, err = c.getGithubData(baseRepo, pullNum)
-	case models.Gitlab:
-		pull, err = c.getGitlabData(baseRepo, pullNum)
-	case models.BitbucketCloud, models.BitbucketServer:
-		if maybePull == nil {
-			err = errors.New("pull request should not be nil–this is a bug")
-			break
-		}
-		pull = *maybePull
-	case models.AzureDevops:
-		pull, headRepo, err = c.getAzureDevopsData(baseRepo, pullNum)
-	default:
-		err = errors.New("Unknown VCS type–this is a bug")
-	}
+	headRepo, pull, err := c.ensureValidRepoMetadata(baseRepo, maybeHeadRepo, maybePull, user, pullNum, log)
 	if err != nil {
-		log.Err(err.Error())
-		if commentErr := c.VCSClient.CreateComment(baseRepo, pullNum, fmt.Sprintf("`Error: %s`", err), ""); commentErr != nil {
-			log.Err("unable to comment: %s", commentErr)
-		}
 		return
 	}
+
 	ctx := &CommandContext{
 		User:     user,
 		Log:      log,
 		Pull:     pull,
 		HeadRepo: headRepo,
+		Trigger:  Comment,
 	}
+
 	if !c.validateCtxAndComment(ctx) {
 		return
 	}
 
-	if cmd.Name == models.UnlockCommand {
-		vcsMessage := "All Atlantis locks for this PR have been unlocked and plans discarded"
-		err := c.DeleteLockCommand.DeleteLocksByPull(baseRepo.FullName, pullNum)
-		if err != nil {
-			vcsMessage = "Failed to delete PR locks"
-			log.Err("failed to delete locks by pull %s", err.Error())
-		}
-		if commentErr := c.VCSClient.CreateComment(baseRepo, pullNum, vcsMessage, models.UnlockCommand.String()); commentErr != nil {
-			log.Err("unable to comment: %s", commentErr)
-		}
+	cmdRunner := buildCommentCommandRunner(c, cmd.CommandName())
+	if cmdRunner == nil {
+		ctx.Log.Err("command %s is not supported", cmd.Name.String())
 		return
 	}
 
-	if cmd.CommandName() == models.ApplyCommand {
-		// Get the mergeable status before we set any build statuses of our own.
-		// We do this here because when we set a "Pending" status, if users have
-		// required the Atlantis status checks to pass, then we've now changed
-		// the mergeability status of the pull request.
-		ctx.PullMergeable, err = c.VCSClient.PullIsMergeable(baseRepo, pull)
-		if err != nil {
-			// On error we continue the request with mergeable assumed false.
-			// We want to continue because not all apply's will need this status,
-			// only if they rely on the mergeability requirement.
-			ctx.PullMergeable = false
-			ctx.Log.Warn("unable to get mergeable status: %s. Continuing with mergeable assumed false", err)
-		}
-		ctx.Log.Info("pull request mergeable status: %t", ctx.PullMergeable)
-	}
+	cmdRunner.Run(ctx, cmd)
 
-	if err = c.CommitStatusUpdater.UpdateCombined(baseRepo, pull, models.PendingCommitStatus, cmd.CommandName()); err != nil {
-		ctx.Log.Warn("unable to update commit status: %s", err)
-	}
+	////////////// This was my version
+	// c.updateCommitStatus(ctx, cmd.Name, pullStatus)
 
-	var projectCmds []models.ProjectCommandContext
-	switch cmd.Name {
-	case models.PlanCommand:
-		projectCmds, err = c.ProjectCommandBuilder.BuildPlanCommands(ctx, cmd)
-	case models.ApplyCommand:
-		projectCmds, err = c.ProjectCommandBuilder.BuildApplyCommands(ctx, cmd)
-	default:
-		ctx.Log.Err("failed to determine desired command, neither plan nor apply")
-		return
-	}
-	if err != nil {
-		if statusErr := c.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
-			ctx.Log.Warn("unable to update commit status: %s", statusErr)
-		}
-		c.updatePull(ctx, cmd, CommandResult{Error: err})
-		return
-	}
-
-	// Only run commands in parallel if enabled
-	var result CommandResult
-	if cmd.Name == models.ApplyCommand && c.parallelApplyEnabled(ctx, projectCmds) {
-		ctx.Log.Info("Running applies in parallel")
-		result = c.runProjectCmdsParallel(projectCmds, cmd.Name)
-	} else if cmd.Name == models.PlanCommand && c.parallelPlanEnabled(ctx, projectCmds) {
-		ctx.Log.Info("Running plans in parallel")
-		result = c.runProjectCmdsParallel(projectCmds, cmd.Name)
-	} else {
-		result = c.runProjectCmds(projectCmds, cmd.Name)
-	}
-
-	if cmd.Name == models.PlanCommand && c.automergeEnabled(ctx, projectCmds) && result.HasErrors() {
-		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
-		c.deletePlans(ctx)
-		result.PlansDeleted = true
-	}
-
-	c.updatePull(
-		ctx,
-		cmd,
-		result)
-
-	pullStatus, err := c.updateDB(ctx, pull, result.ProjectResults)
-	if err != nil {
-		c.Logger.Err("writing results: %s", err)
-		return
-	}
-
-	c.updateCommitStatus(ctx, cmd.Name, pullStatus)
-
-	if cmd.Name == models.ApplyCommand && c.automergeEnabled(ctx, projectCmds) {
-		c.automerge(ctx, pullStatus, c.deleteSourceBranchOnMergeEnabled(ctx, projectCmds))
-	}
+	// if cmd.Name == models.ApplyCommand && c.automergeEnabled(ctx, projectCmds) {
+	// 	c.automerge(ctx, pullStatus, c.deleteSourceBranchOnMergeEnabled(ctx, projectCmds))
+	// }
+	//////////////
 }
 
-func (c *DefaultCommandRunner) updateCommitStatus(ctx *CommandContext, cmd models.CommandName, pullStatus models.PullStatus) {
-	var numSuccess int
-	var status models.CommitStatus
+// func (c *DefaultCommandRunner) updateCommitStatus(ctx *CommandContext, cmd models.CommandName, pullStatus models.PullStatus) {
+// 	var numSuccess int
+// 	var status models.CommitStatus
 
-	if cmd == models.PlanCommand {
-		// We consider anything that isn't a plan error as a plan success.
-		// For example, if there is an apply error, that means that at least a
-		// plan was generated successfully.
-		numSuccess = len(pullStatus.Projects) - pullStatus.StatusCount(models.ErroredPlanStatus)
-		status = models.SuccessCommitStatus
-		if numSuccess != len(pullStatus.Projects) {
-			status = models.FailedCommitStatus
-		}
-	} else {
-		numSuccess = pullStatus.StatusCount(models.AppliedPlanStatus)
+// 	if cmd == models.PlanCommand {
+// 		// We consider anything that isn't a plan error as a plan success.
+// 		// For example, if there is an apply error, that means that at least a
+// 		// plan was generated successfully.
+// 		numSuccess = len(pullStatus.Projects) - pullStatus.StatusCount(models.ErroredPlanStatus)
+// 		status = models.SuccessCommitStatus
+// 		if numSuccess != len(pullStatus.Projects) {
+// 			status = models.FailedCommitStatus
+// 		}
+// 	} else {
+// 		numSuccess = pullStatus.StatusCount(models.AppliedPlanStatus)
 
-		numErrored := pullStatus.StatusCount(models.ErroredApplyStatus)
-		status = models.SuccessCommitStatus
-		if numErrored > 0 {
-			status = models.FailedCommitStatus
-		} else if numSuccess < len(pullStatus.Projects) {
-			// If there are plans that haven't been applied yet, we'll use a pending
-			// status.
-			status = models.PendingCommitStatus
-		}
-	}
+// 		numErrored := pullStatus.StatusCount(models.ErroredApplyStatus)
+// 		status = models.SuccessCommitStatus
+// 		if numErrored > 0 {
+// 			status = models.FailedCommitStatus
+// 		} else if numSuccess < len(pullStatus.Projects) {
+// 			// If there are plans that haven't been applied yet, we'll use a pending
+// 			// status.
+// 			status = models.PendingCommitStatus
+// 		}
+// 	}
 
-	if err := c.CommitStatusUpdater.UpdateCombinedCount(ctx.Pull.BaseRepo, ctx.Pull, status, cmd, numSuccess, len(pullStatus.Projects)); err != nil {
-		ctx.Log.Warn("unable to update commit status: %s", err)
-	}
-}
+// 	if err := c.CommitStatusUpdater.UpdateCombinedCount(ctx.Pull.BaseRepo, ctx.Pull, status, cmd, numSuccess, len(pullStatus.Projects)); err != nil {
+// 		ctx.Log.Warn("unable to update commit status: %s", err)
+// 	}
+// }
 
-func (c *DefaultCommandRunner) automerge(ctx *CommandContext, pullStatus models.PullStatus, deleteSourceBranch bool) {
-	// We only automerge if all projects have been successfully applied.
-	for _, p := range pullStatus.Projects {
-		if p.Status != models.AppliedPlanStatus {
-			ctx.Log.Info("not automerging because project at dir %q, workspace %q has status %q", p.RepoRelDir, p.Workspace, p.Status.String())
-			return
-		}
-	}
+// func (c *DefaultCommandRunner) automerge(ctx *CommandContext, pullStatus models.PullStatus, deleteSourceBranch bool) {
+// 	// We only automerge if all projects have been successfully applied.
+// 	for _, p := range pullStatus.Projects {
+// 		if p.Status != models.AppliedPlanStatus {
+// 			ctx.Log.Info("not automerging because project at dir %q, workspace %q has status %q", p.RepoRelDir, p.Workspace, p.Status.String())
+// 			return
+// 		}
+// 	}
 
-	// Comment that we're automerging the pull request.
-	if err := c.VCSClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, automergeComment, models.ApplyCommand.String()); err != nil {
-		ctx.Log.Err("failed to comment about automerge: %s", err)
-		// Commenting isn't required so continue.
-	}
+// 	// Comment that we're automerging the pull request.
+// 	if err := c.VCSClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, automergeComment, models.ApplyCommand.String()); err != nil {
+// 		ctx.Log.Err("failed to comment about automerge: %s", err)
+// 		// Commenting isn't required so continue.
+// 	}
 
-	var pullOptions models.PullRequestOptions
-	pullOptions.DeleteSourceBranchOnMerge = deleteSourceBranch
-	// ctx.Pull.DeleteSourceBranchOnMerge = deleteSourceBranch
+// 	var pullOptions models.PullRequestOptions
+// 	pullOptions.DeleteSourceBranchOnMerge = deleteSourceBranch
+// 	// ctx.Pull.DeleteSourceBranchOnMerge = deleteSourceBranch
 
-	// Make the API call to perform the merge.
-	ctx.Log.Info("automerging pull request")
-	err := c.VCSClient.MergePull(ctx.Pull, pullOptions)
+// 	// Make the API call to perform the merge.
+// 	ctx.Log.Info("automerging pull request")
+// 	err := c.VCSClient.MergePull(ctx.Pull, pullOptions)
 
-	if err != nil {
-		ctx.Log.Err("automerging failed: %s", err)
+// 	if err != nil {
+// 		ctx.Log.Err("automerging failed: %s", err)
 
-		failureComment := fmt.Sprintf("Automerging failed:\n```\n%s\n```", err)
-		if commentErr := c.VCSClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, failureComment, models.ApplyCommand.String()); commentErr != nil {
-			ctx.Log.Err("failed to comment about automerge failing: %s", err)
-		}
-	}
-}
+// 		failureComment := fmt.Sprintf("Automerging failed:\n```\n%s\n```", err)
+// 		if commentErr := c.VCSClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, failureComment, models.ApplyCommand.String()); commentErr != nil {
+// 			ctx.Log.Err("failed to comment about automerge failing: %s", err)
+// 		}
+// 	}
+// }
 
-func (c *DefaultCommandRunner) runProjectCmdsParallel(cmds []models.ProjectCommandContext, cmdName models.CommandName) CommandResult {
-	var results []models.ProjectResult
-	mux := &sync.Mutex{}
+// func (c *DefaultCommandRunner) runProjectCmdsParallel(cmds []models.ProjectCommandContext, cmdName models.CommandName) CommandResult {
+// 	var results []models.ProjectResult
+// 	mux := &sync.Mutex{}
 
-	wg := sizedwaitgroup.New(c.ParallelPoolSize)
-	for _, pCmd := range cmds {
-		pCmd := pCmd
-		var execute func()
-		wg.Add()
+// 	wg := sizedwaitgroup.New(c.ParallelPoolSize)
+// 	for _, pCmd := range cmds {
+// 		pCmd := pCmd
+// 		var execute func()
+// 		wg.Add()
 
-		switch cmdName {
-		case models.PlanCommand:
-			execute = func() {
-				defer wg.Done()
-				res := c.ProjectCommandRunner.Plan(pCmd)
-				mux.Lock()
-				results = append(results, res)
-				mux.Unlock()
-			}
-		case models.ApplyCommand:
-			execute = func() {
-				defer wg.Done()
-				res := c.ProjectCommandRunner.Apply(pCmd)
-				mux.Lock()
-				results = append(results, res)
-				mux.Unlock()
-			}
-		}
-		go execute()
-	}
+// 		switch cmdName {
+// 		case models.PlanCommand:
+// 			execute = func() {
+// 				defer wg.Done()
+// 				res := c.ProjectCommandRunner.Plan(pCmd)
+// 				mux.Lock()
+// 				results = append(results, res)
+// 				mux.Unlock()
+// 			}
+// 		case models.ApplyCommand:
+// 			execute = func() {
+// 				defer wg.Done()
+// 				res := c.ProjectCommandRunner.Apply(pCmd)
+// 				mux.Lock()
+// 				results = append(results, res)
+// 				mux.Unlock()
+// 			}
+// 		}
+// 		go execute()
+// 	}
 
-	wg.Wait()
-	return CommandResult{ProjectResults: results}
-}
+// 	wg.Wait()
+// 	return CommandResult{ProjectResults: results}
+// }
 
-func (c *DefaultCommandRunner) runProjectCmds(cmds []models.ProjectCommandContext, cmdName models.CommandName) CommandResult {
-	var results []models.ProjectResult
-	for _, pCmd := range cmds {
-		var res models.ProjectResult
-		switch cmdName {
-		case models.PlanCommand:
-			res = c.ProjectCommandRunner.Plan(pCmd)
-		case models.ApplyCommand:
-			res = c.ProjectCommandRunner.Apply(pCmd)
-		}
-		results = append(results, res)
-	}
-	return CommandResult{ProjectResults: results}
-}
+// func (c *DefaultCommandRunner) runProjectCmds(cmds []models.ProjectCommandContext, cmdName models.CommandName) CommandResult {
+// 	var results []models.ProjectResult
+// 	for _, pCmd := range cmds {
+// 		var res models.ProjectResult
+// 		switch cmdName {
+// 		case models.PlanCommand:
+// 			res = c.ProjectCommandRunner.Plan(pCmd)
+// 		case models.ApplyCommand:
+// 			res = c.ProjectCommandRunner.Apply(pCmd)
+// 		}
+// 		results = append(results, res)
+// 	}
+// 	return CommandResult{ProjectResults: results}
+// }
 
 func (c *DefaultCommandRunner) getGithubData(baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {
 	if c.GithubPullGetter == nil {
@@ -511,6 +361,45 @@ func (c *DefaultCommandRunner) buildLogger(repoFullName string, pullNum int) *lo
 	return c.Logger.NewLogger(src, true, c.Logger.GetLevel())
 }
 
+func (c *DefaultCommandRunner) ensureValidRepoMetadata(
+	baseRepo models.Repo,
+	maybeHeadRepo *models.Repo,
+	maybePull *models.PullRequest,
+	user models.User,
+	pullNum int,
+	log *logging.SimpleLogger,
+) (headRepo models.Repo, pull models.PullRequest, err error) {
+	if maybeHeadRepo != nil {
+		headRepo = *maybeHeadRepo
+	}
+
+	switch baseRepo.VCSHost.Type {
+	case models.Github:
+		pull, headRepo, err = c.getGithubData(baseRepo, pullNum)
+	case models.Gitlab:
+		pull, err = c.getGitlabData(baseRepo, pullNum)
+	case models.BitbucketCloud, models.BitbucketServer:
+		if maybePull == nil {
+			err = errors.New("pull request should not be nil–this is a bug")
+			break
+		}
+		pull = *maybePull
+	case models.AzureDevops:
+		pull, headRepo, err = c.getAzureDevopsData(baseRepo, pullNum)
+	default:
+		err = errors.New("Unknown VCS type–this is a bug")
+	}
+
+	if err != nil {
+		log.Err(err.Error())
+		if commentErr := c.VCSClient.CreateComment(baseRepo, pullNum, fmt.Sprintf("`Error: %s`", err), ""); commentErr != nil {
+			log.Err("unable to comment: %s", commentErr)
+		}
+	}
+
+	return
+}
+
 func (c *DefaultCommandRunner) validateCtxAndComment(ctx *CommandContext) bool {
 	if !c.AllowForkPRs && ctx.HeadRepo.Owner != ctx.Pull.BaseRepo.Owner {
 		if c.SilenceForkPRErrors {
@@ -533,29 +422,6 @@ func (c *DefaultCommandRunner) validateCtxAndComment(ctx *CommandContext) bool {
 	return true
 }
 
-func (c *DefaultCommandRunner) updatePull(ctx *CommandContext, command PullCommand, res CommandResult) {
-	// Log if we got any errors or failures.
-	if res.Error != nil {
-		ctx.Log.Err(res.Error.Error())
-	} else if res.Failure != "" {
-		ctx.Log.Warn(res.Failure)
-	}
-
-	// HidePrevPlanComments will hide old comments left from previous plan runs to reduce
-	// clutter in a pull/merge request. This will not delete the comment, since the
-	// comment trail may be useful in auditing or backtracing problems.
-	if c.HidePrevPlanComments {
-		if err := c.VCSClient.HidePrevPlanComments(ctx.Pull.BaseRepo, ctx.Pull.Num); err != nil {
-			ctx.Log.Err("unable to hide old comments: %s", err)
-		}
-	}
-
-	comment := c.MarkdownRenderer.Render(res, command.CommandName(), ctx.Log.History.String(), command.IsVerbose(), ctx.Pull.BaseRepo.VCSHost.Type)
-	if err := c.VCSClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, comment, command.CommandName().String()); err != nil {
-		ctx.Log.Err("unable to comment: %s", err)
-	}
-}
-
 // logPanics logs and creates a comment on the pull request for panics.
 func (c *DefaultCommandRunner) logPanics(baseRepo models.Repo, pullNum int, logger logging.SimpleLogging) {
 	if err := recover(); err != nil {
@@ -573,64 +439,56 @@ func (c *DefaultCommandRunner) logPanics(baseRepo models.Repo, pullNum int, logg
 }
 
 // deletePlans deletes all plans generated in this ctx.
-func (c *DefaultCommandRunner) deletePlans(ctx *CommandContext) {
-	pullDir, err := c.WorkingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
-	if err != nil {
-		ctx.Log.Err("getting pull dir: %s", err)
-	}
-	if err := c.PendingPlanFinder.DeletePlans(pullDir); err != nil {
-		ctx.Log.Err("deleting pending plans: %s", err)
-	}
-}
+// func (c *DefaultCommandRunner) deletePlans(ctx *CommandContext) {
+// 	pullDir, err := c.WorkingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
+// 	if err != nil {
+// 		ctx.Log.Err("getting pull dir: %s", err)
+// 	}
+// 	if err := c.PendingPlanFinder.DeletePlans(pullDir); err != nil {
+// 		ctx.Log.Err("deleting pending plans: %s", err)
+// 	}
+// }
 
-func (c *DefaultCommandRunner) updateDB(ctx *CommandContext, pull models.PullRequest, results []models.ProjectResult) (models.PullStatus, error) {
-	// Filter out results that errored due to the directory not existing. We
-	// don't store these in the database because they would never be "apply-able"
-	// and so the pull request would always have errors.
-	var filtered []models.ProjectResult
-	for _, r := range results {
-		if _, ok := r.Error.(DirNotExistErr); ok {
-			ctx.Log.Debug("ignoring error result from project at dir %q workspace %q because it is dir not exist error", r.RepoRelDir, r.Workspace)
-			continue
-		}
-		filtered = append(filtered, r)
-	}
-	ctx.Log.Debug("updating DB with pull results")
-	return c.DB.UpdatePullWithResults(pull, filtered)
-}
+// func (c *DefaultCommandRunner) updateDB(ctx *CommandContext, pull models.PullRequest, results []models.ProjectResult) (models.PullStatus, error) {
+// 	// Filter out results that errored due to the directory not existing. We
+// 	// don't store these in the database because they would never be "apply-able"
+// 	// and so the pull request would always have errors.
+// 	var filtered []models.ProjectResult
+// 	for _, r := range results {
+// 		if _, ok := r.Error.(DirNotExistErr); ok {
+// 			ctx.Log.Debug("ignoring error result from project at dir %q workspace %q because it is dir not exist error", r.RepoRelDir, r.Workspace)
+// 			continue
+// 		}
+// 		filtered = append(filtered, r)
+// 	}
+// 	ctx.Log.Debug("updating DB with pull results")
+// 	return c.DB.UpdatePullWithResults(pull, filtered)
+// }
 
-// automergeEnabled returns true if automerging is enabled in this context.
-func (c *DefaultCommandRunner) automergeEnabled(ctx *CommandContext, projectCmds []models.ProjectCommandContext) bool {
-	// If the global automerge is set, we always automerge.
-	return c.GlobalAutomerge ||
-		// Otherwise we check if this repo is configured for automerging.
-		(len(projectCmds) > 0 && projectCmds[0].AutomergeEnabled)
-}
+// // automergeEnabled returns true if automerging is enabled in this context.
+// func (c *DefaultCommandRunner) automergeEnabled(ctx *CommandContext, projectCmds []models.ProjectCommandContext) bool {
+// 	// If the global automerge is set, we always automerge.
+// 	return c.GlobalAutomerge ||
+// 		// Otherwise we check if this repo is configured for automerging.
+// 		(len(projectCmds) > 0 && projectCmds[0].AutomergeEnabled)
+// }
 
-// parallelApplyEnabled returns true if parallel apply is enabled in this context.
-func (c *DefaultCommandRunner) parallelApplyEnabled(ctx *CommandContext, projectCmds []models.ProjectCommandContext) bool {
-	return len(projectCmds) > 0 && projectCmds[0].ParallelApplyEnabled
-}
+// // parallelApplyEnabled returns true if parallel apply is enabled in this context.
+// func (c *DefaultCommandRunner) parallelApplyEnabled(ctx *CommandContext, projectCmds []models.ProjectCommandContext) bool {
+// 	return len(projectCmds) > 0 && projectCmds[0].ParallelApplyEnabled
+// }
 
-// parallelPlanEnabled returns true if parallel plan is enabled in this context.
-func (c *DefaultCommandRunner) parallelPlanEnabled(ctx *CommandContext, projectCmds []models.ProjectCommandContext) bool {
-	return len(projectCmds) > 0 && projectCmds[0].ParallelPlanEnabled
-}
+// // parallelPlanEnabled returns true if parallel plan is enabled in this context.
+// func (c *DefaultCommandRunner) parallelPlanEnabled(ctx *CommandContext, projectCmds []models.ProjectCommandContext) bool {
+// 	return len(projectCmds) > 0 && projectCmds[0].ParallelPlanEnabled
+// }
 
-// deleteSourceBranchOnMergeEnabled returns true if we should delete the source branch on merge in this context.
-func (c *DefaultCommandRunner) deleteSourceBranchOnMergeEnabled(ctx *CommandContext, projectCmds []models.ProjectCommandContext) bool {
-	//check if this repo is configured for automerging.
-	return (len(projectCmds) > 0 && projectCmds[0].DeleteSourceBranchOnMerge)
-}
+// // deleteSourceBranchOnMergeEnabled returns true if we should delete the source branch on merge in this context.
+// func (c *DefaultCommandRunner) deleteSourceBranchOnMergeEnabled(ctx *CommandContext, projectCmds []models.ProjectCommandContext) bool {
+// 	//check if this repo is configured for automerging.
+// 	return (len(projectCmds) > 0 && projectCmds[0].DeleteSourceBranchOnMerge)
+// }
 
 // automergeComment is the comment that gets posted when Atlantis automatically
 // merges the PR.
 var automergeComment = `Automatically merging because all plans have been successfully applied.`
-
-// applyAllDisabledComment is posted when apply all commands (i.e. "atlantis apply")
-// are disabled and an apply all command is issued.
-var applyAllDisabledComment = "**Error:** Running `atlantis apply` without flags is disabled." +
-	" You must specify which project to apply via the `-d <dir>`, `-w <workspace>` or `-p <project name>` flags."
-
-// applyDisabledComment is posted when apply commands are disabled globally and an apply command is issued.
-var applyDisabledComment = "**Error:** Running `atlantis apply` is disabled."

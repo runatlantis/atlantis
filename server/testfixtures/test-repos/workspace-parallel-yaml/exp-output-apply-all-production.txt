@@ -15,7 +15,7 @@ State path: terraform.tfstate
 
 Outputs:
 
-workspace = production
+workspace = "production"
 
 ```
 </details>
