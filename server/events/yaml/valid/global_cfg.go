@@ -106,7 +106,6 @@ func NewGlobalCfgWithHooks(allowRepoCfg bool, mergeableReq bool, approvedReq boo
 	applyReqs := []string{}
 	allowedOverrides := []string{}
 	allowedWorkflows := []string{}
-	preWorkflowHooks := make([]*PreWorkflowHook, 0)
 	if mergeableReq {
 		applyReqs = append(applyReqs, MergeableApplyReq)
 	}
