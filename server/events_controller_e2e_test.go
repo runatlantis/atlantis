@@ -760,15 +760,15 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 	}
 
 	commandRunner := &events.DefaultCommandRunner{
-		EventParser:               eventParser,
-		VCSClient:                 e2eVCSClient,
-		GithubPullGetter:          e2eGithubGetter,
-		GitlabMergeRequestGetter:  e2eGitlabGetter,
-		Logger:                    logger,
-		AllowForkPRs:              allowForkPRs,
-		AllowForkPRsFlag:          "allow-fork-prs",
-		CommentCommandRunnerByCmd: commentCommandRunnerByCmd,
-		Drainer:                   drainer,
+		EventParser:                   eventParser,
+		VCSClient:                     e2eVCSClient,
+		GithubPullGetter:              e2eGithubGetter,
+		GitlabMergeRequestGetter:      e2eGitlabGetter,
+		Logger:                        logger,
+		AllowForkPRs:                  allowForkPRs,
+		AllowForkPRsFlag:              "allow-fork-prs",
+		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
+		Drainer:                       drainer,
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 	}
 
