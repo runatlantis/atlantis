@@ -70,7 +70,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 
 		logger := logging.NewNoopLogger()
 
-		r := runtime.PreWorkflowHookRunner{}
+		r := runtime.DefaultPreWorkflowHookRunner{}
 		t.Run(c.Command, func(t *testing.T) {
 			tmpDir, cleanup := TempDir(t)
 			defer cleanup()

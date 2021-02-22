@@ -94,13 +94,7 @@ var DefaultPlanStage = Stage{
 	},
 }
 
-// NewGlobalCfg returns a global config that respects the parameters.
-// allowRepoCfg is true if users want to allow repos full config functionality.
-// mergeableReq is true if users want to set the mergeable apply requirement
-// for all repos.
-// approvedReq is true if users want to set the approved apply requirement
-// for all repos.
-func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) GlobalCfg {
+func NewGlobalCfgWithHooks(allowRepoCfg bool, mergeableReq bool, approvedReq bool, preWorkflowHooks []*PreWorkflowHook) GlobalCfg {
 	defaultWorkflow := Workflow{
 		Name:        DefaultWorkflowName,
 		Apply:       DefaultApplyStage,
@@ -112,7 +106,6 @@ func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) Global
 	applyReqs := []string{}
 	allowedOverrides := []string{}
 	allowedWorkflows := []string{}
-	preWorkflowHooks := make([]*PreWorkflowHook, 0)
 	if mergeableReq {
 		applyReqs = append(applyReqs, MergeableApplyReq)
 	}
@@ -142,6 +135,19 @@ func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) Global
 			DefaultWorkflowName: defaultWorkflow,
 		},
 	}
+}
+
+// NewGlobalCfg returns a global config that respects the parameters.
+// allowRepoCfg is true if users want to allow repos full config functionality.
+// mergeableReq is true if users want to set the mergeable apply requirement
+// for all repos.
+// approvedReq is true if users want to set the approved apply requirement
+// for all repos.
+
+func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) GlobalCfg {
+	preWorkflowHooks := make([]*PreWorkflowHook, 0)
+
+	return NewGlobalCfgWithHooks(allowRepoCfg, mergeableReq, approvedReq, preWorkflowHooks)
 }
 
 // IDMatches returns true if the repo ID otherID matches this config.

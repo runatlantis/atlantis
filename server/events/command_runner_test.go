@@ -61,6 +61,7 @@ var approvePoliciesCommandRunner *events.ApprovePoliciesCommandRunner
 var planCommandRunner *events.PlanCommandRunner
 var applyCommandRunner *events.ApplyCommandRunner
 var unlockCommandRunner *events.UnlockCommandRunner
+var preWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
 
 func setup(t *testing.T) *vcsmocks.MockClient {
 	RegisterMockTestingT(t)
@@ -161,17 +162,22 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		models.UnlockCommand:          unlockCommandRunner,
 	}
 
+	preWorkflowHooksCommandRunner = mocks.NewMockPreWorkflowHooksCommandRunner()
+
+	When(preWorkflowHooksCommandRunner.RunPreHooks(matchers.AnyPtrToEventsCommandContext())).ThenReturn(nil)
+
 	ch = events.DefaultCommandRunner{
-		VCSClient:                 vcsClient,
-		CommentCommandRunnerByCmd: commentCommandRunnerByCmd,
-		EventParser:               eventParsing,
-		GithubPullGetter:          githubGetter,
-		GitlabMergeRequestGetter:  gitlabGetter,
-		AzureDevopsPullGetter:     azuredevopsGetter,
-		Logger:                    logger,
-		AllowForkPRs:              false,
-		AllowForkPRsFlag:          "allow-fork-prs-flag",
-		Drainer:                   drainer,
+		VCSClient:                     vcsClient,
+		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
+		EventParser:                   eventParsing,
+		GithubPullGetter:              githubGetter,
+		GitlabMergeRequestGetter:      gitlabGetter,
+		AzureDevopsPullGetter:         azuredevopsGetter,
+		Logger:                        logger,
+		AllowForkPRs:                  false,
+		AllowForkPRsFlag:              "allow-fork-prs-flag",
+		Drainer:                       drainer,
+		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 	}
 	return vcsClient
 }

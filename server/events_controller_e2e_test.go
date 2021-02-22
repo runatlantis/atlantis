@@ -25,6 +25,8 @@ import (
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/runtime"
+	runtimemocks "github.com/runatlantis/atlantis/server/events/runtime/mocks"
+	runtimematchers "github.com/runatlantis/atlantis/server/events/runtime/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/runtime/policy"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
@@ -36,6 +38,8 @@ import (
 )
 
 type NoopTFDownloader struct{}
+
+var mockPreWorkflowHookRunner *runtimemocks.MockPreWorkflowHookRunner
 
 func (m *NoopTFDownloader) GetFile(dst, src string, opts ...getter.ClientOption) error {
 	return nil
@@ -368,6 +372,9 @@ func TestGitHubWorkflow(t *testing.T) {
 			ctrl.Post(w, pullClosedReq)
 			responseContains(t, w, 200, "Pull request cleaned successfully")
 
+			// Let's verify the pre-workflow hook was called for each comment including the pull request opened event
+			mockPreWorkflowHookRunner.VerifyWasCalled(Times(len(c.Comments)+1)).Run(runtimematchers.AnyModelsPreWorkflowHookCommandContext(), EqString("some dummy command"), AnyString())
+
 			// Now we're ready to verify Atlantis made all the comments back (or
 			// replies) that we expect.  We expect each plan to have 1 comment,
 			// and apply have 1 for each comment plus one for the locks deleted at the
@@ -599,7 +606,12 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 	defaultTFVersion := terraformClient.DefaultVersion()
 	locker := events.NewDefaultWorkingDirLocker()
 	parser := &yaml.ParserValidator{}
-	globalCfg := valid.NewGlobalCfg(true, false, false)
+	globalCfg := valid.NewGlobalCfgWithHooks(true, false, false, []*valid.PreWorkflowHook{
+		{
+			StepName:   "global_hook",
+			RunCommand: "some dummy command",
+		},
+	})
 	expCfgPath := filepath.Join(absRepoPath(t, repoDir), "repos.yaml")
 	if _, err := os.Stat(expCfgPath); err == nil {
 		globalCfg, err = parser.ParseGlobalCfg(expCfgPath, globalCfg)
@@ -609,14 +621,13 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 
 	parallelPoolSize := 1
 
+	mockPreWorkflowHookRunner = runtimemocks.NewMockPreWorkflowHookRunner()
 	preWorkflowHooksCommandRunner := &events.DefaultPreWorkflowHooksCommandRunner{
 		VCSClient:             e2eVCSClient,
 		GlobalCfg:             globalCfg,
-		Logger:                logger,
 		WorkingDirLocker:      locker,
 		WorkingDir:            workingDir,
-		Drainer:               drainer,
-		PreWorkflowHookRunner: &runtime.PreWorkflowHookRunner{},
+		PreWorkflowHookRunner: mockPreWorkflowHookRunner,
 	}
 	projectCommandBuilder := events.NewProjectCommandBuilder(
 		policyChecksEnabled,
@@ -749,24 +760,24 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 	}
 
 	commandRunner := &events.DefaultCommandRunner{
-		EventParser:               eventParser,
-		VCSClient:                 e2eVCSClient,
-		GithubPullGetter:          e2eGithubGetter,
-		GitlabMergeRequestGetter:  e2eGitlabGetter,
-		Logger:                    logger,
-		AllowForkPRs:              allowForkPRs,
-		AllowForkPRsFlag:          "allow-fork-prs",
-		CommentCommandRunnerByCmd: commentCommandRunnerByCmd,
-		Drainer:                   drainer,
+		EventParser:                   eventParser,
+		VCSClient:                     e2eVCSClient,
+		GithubPullGetter:              e2eGithubGetter,
+		GitlabMergeRequestGetter:      e2eGitlabGetter,
+		Logger:                        logger,
+		AllowForkPRs:                  allowForkPRs,
+		AllowForkPRsFlag:              "allow-fork-prs",
+		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
+		Drainer:                       drainer,
+		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 	}
 
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
 	Ok(t, err)
 
 	ctrl := server.EventsController{
-		TestingMode:                   true,
-		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
-		CommandRunner:                 commandRunner,
+		TestingMode:   true,
+		CommandRunner: commandRunner,
 		PullCleaner: &events.PullClosedExecutor{
 			Locker:     lockingClient,
 			VCSClient:  e2eVCSClient,
