@@ -12,7 +12,6 @@ Feature release. Due to a sizeable refactor and the number of configuration sett
 * If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
   then the default version of Terraform will now be 0.14.7. Simply set the above
   flag to your desired default version to avoid any issues.
-  
 
 ## Downloads
 * [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.0-beta/atlantis_darwin_amd64.zip)
