@@ -331,6 +331,7 @@ custom workflows.
 |-----------|---------------------------------------------------------|-----------|----------|---------------------------------------------------------------------------------------|
 | repos     | array[[Repo](#repo)]                                    | see below | no       | List of repos to apply settings to.                                                   |
 | workflows | map[string: [Workflow](custom-workflows.html#workflow)] | see below | no       | Map from workflow name to workflow. Workflows override the default Atlantis commands. |
+| policies  | [Policies](#Policies)                                    | none      | no       | List of policy sets to run and associated metadata                                      |
 
 
 ::: tip A Note On Defaults
@@ -355,6 +356,7 @@ workflows:
     apply:
       steps: [apply]
 ```
+
 This gets merged with whatever config you write.
 If you set a workflow with the key `default`, it will override this.
 :::
@@ -400,3 +402,24 @@ If you set a workflow with the key `default`, it will override this.
   * `allow_custom_workflows` is set from the `id: /.*/` config and isn't unset
     by the `id: github.com/owner/repo` config because it didn't define that key.
 :::
+
+### Policies
+
+| Key                    | Type            | Default | Required  | Description                              |
+|------------------------|-----------------|---------|-----------|------------------------------------------|
+| conftest_version       | string          | none    | no        | conftest version to run all policy sets  |
+| owners                 | Owners(#Owners) | none    | yes       | owners that can approve failing policies |
+| policy_sets            | []PolicySet     | none    | yes       | set of policies to run on a plan output  |
+
+### Owners
+| Key         | Type              | Default | Required   | Description                                             |
+|-------------|-------------------|---------|------------|---------------------------------------------------------|
+| users       | []string          | none    | yes        | list of github users that can approve failing policies  |
+
+### PolicySet
+| Key                    | Type            | Default | Required  | Description                              |
+|------------------------|-----------------|---------|-----------|------------------------------------------|
+| name                   | string          | none    | yes       | unique name for the policy set           |
+| path                   | string          | none    | yes       | path to the rego policies                |
+| source                 | string          | none    | yes       | only `local` is supported at this time   |
+
