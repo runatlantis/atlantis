@@ -651,7 +651,7 @@ func TestRunCommentCommand_DrainOngoing(t *testing.T) {
 }
 
 func TestRunCommentCommand_DrainNotOngoing(t *testing.T) {
-	t.Log("if drain is not ongoing then remove ongoing operation must be called even if panic occured")
+	t.Log("if drain is not ongoing then remove ongoing operation must be called even if panic occurred")
 	setup(t)
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenPanic("panic test - if you're seeing this in a test failure this isn't the failing test")
 	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, nil)
@@ -668,7 +668,7 @@ func TestRunAutoplanCommand_DrainOngoing(t *testing.T) {
 }
 
 func TestRunAutoplanCommand_DrainNotOngoing(t *testing.T) {
-	t.Log("if drain is not ongoing then remove ongoing operation must be called even if panic occured")
+	t.Log("if drain is not ongoing then remove ongoing operation must be called even if panic occurred")
 	setup(t)
 	fixtures.Pull.BaseRepo = fixtures.GithubRepo
 	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())).ThenPanic("panic test - if you're seeing this in a test failure this isn't the failing test")
