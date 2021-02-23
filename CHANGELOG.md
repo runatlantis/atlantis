@@ -21,7 +21,7 @@ Feature release. Due to a sizeable refactor and the number of configuration sett
 * [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.0-beta/atlantis_linux_arm.zip)
 
 ## Docker
-[`runatlantis/atlantis:v0.16.1`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+[`runatlantis/atlantis:v0.17.0-beta`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
 
 ## Diff v0.16.1..v0.17.0-beta
 https://github.com/runatlantis/atlantis/compare/v0.16.1...v0.17.0-beta
