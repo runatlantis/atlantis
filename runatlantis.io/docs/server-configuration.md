@@ -231,7 +231,7 @@ Values are chosen in this order:
   ```bash
   atlantis server --enable-policy-checks
   ```
-  Enables atlantis to run server side policies on the result of a terraform plan
+  Enables atlantis to run server side policies on the result of a terraform plan. Policies are defined in [server side repo config](https://www.runatlantis.io/docs/server-side-repo-config.html#reference).
 
 * ### `--gh-hostname`
   ```bash
