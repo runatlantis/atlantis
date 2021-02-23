@@ -26,6 +26,7 @@ func (wh DefaultPreWorkflowHookRunner) Run(ctx models.PreWorkflowHookCommandCont
 		"BASE_REPO_OWNER":  ctx.BaseRepo.Owner,
 		"DIR":              path,
 		"HEAD_BRANCH_NAME": ctx.Pull.HeadBranch,
+		"HEAD_COMMIT":      ctx.Pull.HeadCommit,
 		"HEAD_REPO_NAME":   ctx.HeadRepo.Name,
 		"HEAD_REPO_OWNER":  ctx.HeadRepo.Owner,
 		"PULL_AUTHOR":      ctx.Pull.Author,
