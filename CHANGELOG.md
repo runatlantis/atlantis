@@ -1,3 +1,32 @@
+# v0.17.0-beta
+Feature release. Due to a sizeable refactor and the number of configuration settings supported in Atlantis, this is a pre-release and should not be considered fully stable.
+
+## Features
+* Add `--enable-policy-checks` which adds a policy checking step to the Atlantis workflow and runs server-side conftest policies on the terraform plan output. ([#1317](https://github.com/runatlantis/atlantis/pull/1317) by @msarvar and @nishkrishnan)
+    - Supports `atlantis approve_policies` which allows a set of blessed github users to approve failing policies.
+* Support pre-workflow hooks on all comment/auto triggered commands ([#1418](https://github.com/runatlantis/atlantis/pull/1418) by @nishkrishnan)
+* Add `HEAD_COMMIT` to run steps
+* Update terraform version to 0.14.7
+
+## Backwards Incompatibilities/Notes
+* If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
+  then the default version of Terraform will now be 0.14.7. Simply set the above
+  flag to your desired default version to avoid any issues.
+  
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.0-beta/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.0-beta/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.0-beta/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.0-beta/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.16.1`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.16.1..v0.17.0-beta
+https://github.com/runatlantis/atlantis/compare/v0.16.1...v0.17.0-beta
+
+
 # v0.16.1
 Few improvements and a number of bug fixes
 
