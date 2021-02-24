@@ -1014,10 +1014,16 @@ func TestParseGlobalCfg(t *testing.T) {
 - apply_requirements: []`,
 			expErr: "repos: (0: (id: cannot be blank.).).",
 		},
-		"invalid regex": {
+		"invalid id regex": {
 			input: `repos:
 - id: /?/`,
 			expErr: "repos: (0: (id: parsing: /?/: error parsing regexp: missing argument to repetition operator: `?`.).).",
+		},
+		"invalid branch regex": {
+			input: `repos:
+- id: /.*/
+  branch: /?/`,
+			expErr: "repos: (0: (branch: parsing: /?/: error parsing regexp: missing argument to repetition operator: `?`.).).",
 		},
 		"workflow doesn't exist": {
 			input: `repos:
@@ -1115,6 +1121,7 @@ repos:
   allowed_overrides: [apply_requirements, workflow]
   allow_custom_workflows: true
 - id: /.*/
+  branch: /(master|main)/
   pre_workflow_hooks:
     - run: custom workflow command
 workflows:
@@ -1155,6 +1162,7 @@ policies:
 					},
 					{
 						IDRegex:          regexp.MustCompile(".*"),
+						BranchRegex:      regexp.MustCompile("(master|main)"),
 						PreWorkflowHooks: preWorkflowHooks,
 					},
 				},
@@ -1228,6 +1236,7 @@ workflows:
 				Repos: []valid.Repo{
 					{
 						IDRegex:           regexp.MustCompile(".*"),
+						BranchRegex:       regexp.MustCompile(".*"),
 						PreWorkflowHooks:  []*valid.PreWorkflowHook{},
 						ApplyRequirements: []string{},
 						Workflow: &valid.Workflow{
@@ -1300,6 +1309,10 @@ workflows:
 				if expRepo.IDRegex != nil {
 					Assert(t, expRepo.IDRegex.String() == actRepo.IDRegex.String(),
 						"%q != %q for repos[%d]", expRepo.IDRegex.String(), actRepo.IDRegex.String(), i)
+				}
+				if expRepo.BranchRegex != nil {
+					Assert(t, expRepo.BranchRegex.String() == actRepo.BranchRegex.String(),
+						"%q != %q for repos[%d]", expRepo.BranchRegex.String(), actRepo.BranchRegex.String(), i)
 				}
 			}
 		})
