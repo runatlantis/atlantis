@@ -19,10 +19,17 @@ func TestSizeLimitedProjectCommandBuilder_autoplan(t *testing.T) {
 
 	project1 := models.ProjectCommandContext{
 		ProjectName: "test1",
+		CommandName: models.PlanCommand,
 	}
 
 	project2 := models.ProjectCommandContext{
 		ProjectName: "test2",
+		CommandName: models.PlanCommand,
+	}
+
+	project3 := models.ProjectCommandContext{
+		ProjectName: "test1",
+		CommandName: models.PolicyCheckCommand,
 	}
 
 	expectedResult := []models.ProjectCommandContext{project1, project2}
@@ -73,6 +80,23 @@ Please break this pull request into smaller batches and try again.`, err)
 
 		Assert(t, len(result) == len(expectedResult), "size is expected")
 	})
+
+	t.Run("Only plan commands counted in limit", func(t *testing.T) {
+		subject := &events.SizeLimitedProjectCommandBuilder{
+			Limit:                 2,
+			ProjectCommandBuilder: delegate,
+		}
+
+		resultWithPolicyCheckCommand := []models.ProjectCommandContext{project1, project2, project3}
+
+		When(delegate.BuildAutoplanCommands(ctx)).ThenReturn(resultWithPolicyCheckCommand, nil)
+
+		result, err := subject.BuildAutoplanCommands(ctx)
+
+		Ok(t, err)
+
+		Assert(t, len(result) == len(resultWithPolicyCheckCommand), "size is expected")
+	})
 }
 
 func TestSizeLimitedProjectCommandBuilder_planComment(t *testing.T) {
@@ -86,10 +110,12 @@ func TestSizeLimitedProjectCommandBuilder_planComment(t *testing.T) {
 
 	project1 := models.ProjectCommandContext{
 		ProjectName: "test1",
+		CommandName: models.PlanCommand,
 	}
 
 	project2 := models.ProjectCommandContext{
 		ProjectName: "test2",
+		CommandName: models.PlanCommand,
 	}
 
 	expectedResult := []models.ProjectCommandContext{project1, project2}
