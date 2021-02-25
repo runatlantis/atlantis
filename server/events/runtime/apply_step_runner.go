@@ -90,7 +90,7 @@ func (a *ApplyStepRunner) cleanRemoteApplyOutput(out string) string {
 	applyStartText := `  Terraform will perform the actions described above.
   Only 'yes' will be accepted to approve.
 
-  Enter a value: 
+  Enter a value:
 `
 	applyStartIdx := strings.Index(out, applyStartText)
 	if applyStartIdx < 0 {
@@ -162,7 +162,7 @@ func (a *ApplyStepRunner) runRemoteApply(
 			ctx.Log.Debug("remote apply is waiting for confirmation")
 
 			// Check if the plan is as expected.
-			planChangedErr = a.remotePlanChanged(string(planfileBytes), strings.Join(lines, "\n"))
+			planChangedErr = a.remotePlanChanged(string(planfileBytes), strings.Join(lines, "\n"), tfVersion)
 			if planChangedErr != nil {
 				ctx.Log.Err("plan generated during apply does not match expected plan, aborting")
 				inCh <- "no\n"
@@ -198,19 +198,15 @@ func (a *ApplyStepRunner) runRemoteApply(
 // the one we're about to apply in the apply phase.
 // If the plans don't match, it returns an error with a diff of the two plans
 // that can be printed to the pull request.
-func (a *ApplyStepRunner) remotePlanChanged(planfileContents string, applyOut string) error {
-	// The plan is between the refresh separator...
-	planStartIdx := strings.Index(applyOut, refreshSeparator)
-	if planStartIdx < 0 {
-		return fmt.Errorf("Couldn't find refresh separator when parsing apply output:\n%q", applyOut)
-	}
+func (a *ApplyStepRunner) remotePlanChanged(planfileContents string, applyOut string, tfVersion *version.Version) error {
+	output := StripRefreshingFromPlanOutput(applyOut, tfVersion)
 
-	// ...and the prompt to execute the plan.
-	planEndIdx := strings.Index(applyOut, "Do you want to perform these actions in workspace \"")
+	// Strip plan output after the prompt to execute the plan.
+	planEndIdx := strings.Index(output, "Do you want to perform these actions in workspace \"")
 	if planEndIdx < 0 {
 		return fmt.Errorf("Couldn't find plan end when parsing apply output:\n%q", applyOut)
 	}
-	currPlan := strings.TrimSpace(applyOut[planStartIdx+len(refreshSeparator) : planEndIdx])
+	currPlan := strings.TrimSpace(output[: planEndIdx])
 
 	// Ensure we strip the remoteOpsHeader from the plan contents so the
 	// comparison is fair. We add this header in the plan phase so we can
