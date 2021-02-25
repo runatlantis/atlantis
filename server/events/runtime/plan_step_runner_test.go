@@ -816,15 +816,15 @@ Plan: 0 to add, 0 to change, 1 to destroy.`, string(bytes))
 
 // Test striping output method
 func TestStripRefreshingFromPlanOutput(t *testing.T) {
-	tfVersion_0135, _ := version.NewVersion("0.13.5")
-	tfVersion_0140, _ := version.NewVersion("0.14.0")
+	tfVersion0135, _ := version.NewVersion("0.13.5")
+	tfVersion0140, _ := version.NewVersion("0.14.0")
 	cases := []struct {
 		out       string
 		tfVersion *version.Version
 	}{
 		{
 			remotePlanOutput,
-			tfVersion_0135,
+			tfVersion0135,
 		},
 		{
 			`Running plan in the remote backend. Output will stream here. Pressing Ctrl-C
@@ -859,7 +859,7 @@ Terraform will perform the following actions:
 
 
 Plan: 0 to add, 0 to change, 1 to destroy.`,
-			tfVersion_0140,
+			tfVersion0140,
 		},
 	}
 

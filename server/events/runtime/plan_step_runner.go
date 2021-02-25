@@ -302,7 +302,6 @@ func StripRefreshingFromPlanOutput(output string, tfVersion *version.Version) st
 		if finalIndex != 0 {
 			output = strings.Join(lines[finalIndex+1:], "\n")
 		}
-		return output
 	} else {
 		// Plan output contains a lot of "Refreshing..." lines followed by a
 		// separator. We want to remove everything before that separator.
@@ -310,8 +309,8 @@ func StripRefreshingFromPlanOutput(output string, tfVersion *version.Version) st
 		if sepIdx > -1 {
 			output = output[sepIdx+len(refreshSeparator):]
 		}
-		return output
 	}
+	return output
 }
 
 // remoteOpsErr01114 is the error terraform plan will return if this project is
