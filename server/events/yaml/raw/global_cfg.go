@@ -20,6 +20,7 @@ type GlobalCfg struct {
 // Repo is the raw schema for repos in the server-side repo config.
 type Repo struct {
 	ID                        string            `yaml:"id" json:"id"`
+	Branch                    string            `yaml:"branch" json:"branch"`
 	ApplyRequirements         []string          `yaml:"apply_requirements" json:"apply_requirements"`
 	PreWorkflowHooks          []PreWorkflowHook `yaml:"pre_workflow_hooks" json:"pre_workflow_hooks"`
 	Workflow                  *string           `yaml:"workflow,omitempty" json:"workflow,omitempty"`
@@ -122,6 +123,11 @@ func (r Repo) HasRegexID() bool {
 	return strings.HasPrefix(r.ID, "/") && strings.HasSuffix(r.ID, "/")
 }
 
+// HasRegexBranch returns true if a branch regex was set.
+func (r Repo) HasRegexBranch() bool {
+	return strings.HasPrefix(r.Branch, "/") && strings.HasSuffix(r.Branch, "/")
+}
+
 func (r Repo) Validate() error {
 	idValid := func(value interface{}) error {
 		id := value.(string)
@@ -130,6 +136,15 @@ func (r Repo) Validate() error {
 		}
 		_, err := regexp.Compile(id[1 : len(id)-1])
 		return errors.Wrapf(err, "parsing: %s", id)
+	}
+
+	branchValid := func(value interface{}) error {
+		branch := value.(string)
+		if !r.HasRegexBranch() {
+			return nil
+		}
+		_, err := regexp.Compile(branch[1 : len(branch)-1])
+		return errors.Wrapf(err, "parsing: %s", branch)
 	}
 
 	overridesValid := func(value interface{}) error {
@@ -155,6 +170,7 @@ func (r Repo) Validate() error {
 
 	return validation.ValidateStruct(&r,
 		validation.Field(&r.ID, validation.Required, validation.By(idValid)),
+		validation.Field(&r.Branch, validation.By(branchValid)),
 		validation.Field(&r.AllowedOverrides, validation.By(overridesValid)),
 		validation.Field(&r.ApplyRequirements, validation.By(validApplyReq)),
 		validation.Field(&r.Workflow, validation.By(workflowExists)),
@@ -171,6 +187,13 @@ func (r Repo) ToValid(workflows map[string]valid.Workflow) valid.Repo {
 		idRegex = regexp.MustCompile(withoutSlashes)
 	} else {
 		id = r.ID
+	}
+
+	var branchRegex *regexp.Regexp
+	if r.HasRegexBranch() {
+		withoutSlashes := r.Branch[1 : len(r.Branch)-1]
+		// Safe to use MustCompile because we test it in Validate().
+		branchRegex = regexp.MustCompile(withoutSlashes)
 	}
 
 	var workflow *valid.Workflow
@@ -191,6 +214,7 @@ func (r Repo) ToValid(workflows map[string]valid.Workflow) valid.Repo {
 	return valid.Repo{
 		ID:                        id,
 		IDRegex:                   idRegex,
+		BranchRegex:               branchRegex,
 		ApplyRequirements:         r.ApplyRequirements,
 		PreWorkflowHooks:          preWorkflowHooks,
 		Workflow:                  workflow,

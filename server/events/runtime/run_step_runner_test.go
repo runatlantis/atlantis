@@ -65,8 +65,8 @@ func TestRunStepRunner_Run(t *testing.T) {
 			ExpOut:      "workspace=myworkspace version=0.11.0 dir=$DIR planfile=$DIR/my::project::name-myworkspace.tfplan project=my/project/name\n",
 		},
 		{
-			Command: "echo base_repo_name=$BASE_REPO_NAME base_repo_owner=$BASE_REPO_OWNER head_repo_name=$HEAD_REPO_NAME head_repo_owner=$HEAD_REPO_OWNER head_branch_name=$HEAD_BRANCH_NAME base_branch_name=$BASE_BRANCH_NAME pull_num=$PULL_NUM pull_author=$PULL_AUTHOR repo_rel_dir=$REPO_REL_DIR",
-			ExpOut:  "base_repo_name=basename base_repo_owner=baseowner head_repo_name=headname head_repo_owner=headowner head_branch_name=add-feat base_branch_name=master pull_num=2 pull_author=acme repo_rel_dir=mydir\n",
+			Command: "echo base_repo_name=$BASE_REPO_NAME base_repo_owner=$BASE_REPO_OWNER head_repo_name=$HEAD_REPO_NAME head_repo_owner=$HEAD_REPO_OWNER head_branch_name=$HEAD_BRANCH_NAME head_commit=$HEAD_COMMIT base_branch_name=$BASE_BRANCH_NAME pull_num=$PULL_NUM pull_author=$PULL_AUTHOR repo_rel_dir=$REPO_REL_DIR",
+			ExpOut:  "base_repo_name=basename base_repo_owner=baseowner head_repo_name=headname head_repo_owner=headowner head_branch_name=add-feat head_commit=12345abcdef base_branch_name=master pull_num=2 pull_author=acme repo_rel_dir=mydir\n",
 		},
 		{
 			Command: "echo user_name=$USER_NAME",
@@ -124,6 +124,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 				Pull: models.PullRequest{
 					Num:        2,
 					HeadBranch: "add-feat",
+					HeadCommit: "12345abcdef",
 					BaseBranch: "master",
 					Author:     "acme",
 				},
