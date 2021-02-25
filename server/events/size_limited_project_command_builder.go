@@ -33,7 +33,17 @@ func (b *SizeLimitedProjectCommandBuilder) BuildPlanCommands(ctx *CommandContext
 }
 
 func (b *SizeLimitedProjectCommandBuilder) CheckAgainstLimit(projects []models.ProjectCommandContext) error {
-	if b.Limit != InfiniteProjectsPerPR && len(projects) > b.Limit {
+
+	var planCommands []models.ProjectCommandContext
+
+	for _, project := range projects {
+
+		if project.CommandName == models.PlanCommand {
+			planCommands = append(planCommands, project)
+		}
+	}
+
+	if b.Limit != InfiniteProjectsPerPR && len(planCommands) > b.Limit {
 		return errors.New(
 			fmt.Sprintf(
 				"Number of projects cannot exceed %d.  This can either be caused by:\n"+
