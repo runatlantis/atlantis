@@ -819,7 +819,7 @@ func TestStripRefreshingFromPlanOutput(t *testing.T) {
 	tfVersion_0135, _ := version.NewVersion("0.13.5")
 	tfVersion_0140, _ := version.NewVersion("0.14.0")
 	cases := []struct {
-		out string
+		out       string
 		tfVersion *version.Version
 	}{
 		{

@@ -214,7 +214,7 @@ func (a *ApplyStepRunner) remotePlanChanged(planfileContents string, applyOut st
 	if planEndIdx < 0 {
 		return fmt.Errorf("Couldn't find plan end when parsing apply output:\n%q", applyOut)
 	}
-	currPlan := strings.TrimSpace(output[: planEndIdx])
+	currPlan := strings.TrimSpace(output[:planEndIdx])
 
 	// Ensure we strip the remoteOpsHeader from the plan contents so the
 	// comparison is fair. We add this header in the plan phase so we can

@@ -15,7 +15,7 @@ import (
 
 const (
 	defaultWorkspace = "default"
-	refreshKeyword = "Refreshing state..."
+	refreshKeyword   = "Refreshing state..."
 	refreshSeparator = "------------------------------------------------------------------------\n"
 )
 
@@ -300,7 +300,7 @@ func StripRefreshingFromPlanOutput(output string, tfVersion *version.Version) st
 		}
 
 		if finalIndex != 0 {
-			output = strings.Join(lines[finalIndex + 1:], "\n")
+			output = strings.Join(lines[finalIndex+1:], "\n")
 		}
 		return output
 	} else {
