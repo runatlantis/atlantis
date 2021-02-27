@@ -38,6 +38,7 @@ func NewProjectCommandBuilder(
 	pendingPlanFinder *DefaultPendingPlanFinder,
 	commentBuilder CommentBuilder,
 	skipCloneNoChanges bool,
+	EnableRegExpCmd bool,
 ) *DefaultProjectCommandBuilder {
 	projectCommandBuilder := &DefaultProjectCommandBuilder{
 		ParserValidator:    parserValidator,
@@ -48,6 +49,7 @@ func NewProjectCommandBuilder(
 		GlobalCfg:          globalCfg,
 		PendingPlanFinder:  pendingPlanFinder,
 		SkipCloneNoChanges: skipCloneNoChanges,
+		EnableRegExpCmd:    EnableRegExpCmd,
 		ProjectCommandContextBuilder: NewProjectCommandContextBulder(
 			policyChecksSupported,
 			commentBuilder,
@@ -101,6 +103,7 @@ type DefaultProjectCommandBuilder struct {
 	PendingPlanFinder            *DefaultPendingPlanFinder
 	ProjectCommandContextBuilder ProjectCommandContextBuilder
 	SkipCloneNoChanges           bool
+	EnableRegExpCmd              bool
 }
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
@@ -327,7 +330,13 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *CommandContext, projectName s
 	// If they've specified a project by name we look it up. Otherwise we
 	// use the dir and workspace.
 	if projectName != "" {
-		projectsCfg = repoCfg.FindProjectsByName(projectName)
+		if p.EnableRegExpCmd {
+			projectsCfg = repoCfg.FindProjectsByName(projectName)
+		} else {
+			if p := repoCfg.FindProjectByName(projectName); p != nil {
+				projectsCfg = append(projectsCfg, *p)
+			}
+		}
 		if len(projectsCfg) == 0 {
 			err = fmt.Errorf("no project with name %q is defined in %s", projectName, yaml.AtlantisYAMLFilename)
 			return

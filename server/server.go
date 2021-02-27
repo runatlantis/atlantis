@@ -414,6 +414,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		pendingPlanFinder,
 		commentParser,
 		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTfVersion)
