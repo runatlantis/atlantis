@@ -554,7 +554,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
 		EventParser:                   eventParser,
 		Logger:                        logger,
-		StatsScope:               statsScope.Scope("cmd"),
+		StatsScope:                    statsScope.Scope("cmd"),
 		AllowForkPRs:                  userConfig.AllowForkPRs,
 		AllowForkPRsFlag:              config.AllowForkPRsFlag,
 		SilenceForkPRErrors:           userConfig.SilenceForkPRErrors,

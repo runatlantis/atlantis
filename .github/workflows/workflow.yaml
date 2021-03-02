@@ -3,11 +3,7 @@ name: Tests
 jobs:
   test:
     runs-on: ubuntu-latest
-    # This is re-using runatlantis/testing-env with the addition of conftest
-    # TODO: Move this from personal account
-    container: nishkrishnan/atlantis:latest
-    env:
-      GOFLAGS: "-mod=vendor"
+    container: runatlantis/testing-env:latest
     steps:
       # user in image needs write access to do anything
     - name: Setup file system permissions
