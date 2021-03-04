@@ -20,7 +20,7 @@ RUN addgroup atlantis && \
 # Install dumb-init and gosu.
 ENV DUMB_INIT_VERSION=1.2.5
 ENV GOSU_VERSION=1.12
-RUN apk add --no-cache ca-certificates gnupg curl git git-lfs unzip bash openssh libcap openssl && \
+RUN apk add --no-cache ca-certificates gnupg curl git git-lfs unzip bash openssh libcap openssl nodejs npm python3 py3-pip && \
     curl -L -s --output /bin/dumb-init "https://github.com/Yelp/dumb-init/releases/download/v${DUMB_INIT_VERSION}/dumb-init_${DUMB_INIT_VERSION}_x86_64" && \
     chmod +x /bin/dumb-init && \
     mkdir -p /tmp/build && \
@@ -40,7 +40,9 @@ RUN apk add --no-cache ca-certificates gnupg curl git git-lfs unzip bash openssh
         cd /tmp && \
         rm -rf /tmp/build && \
         apk del gnupg openssl && \
-        rm -rf /root/.gnupg && rm -rf /var/cache/apk/*
+        rm -rf /root/.gnupg && rm -rf /var/cache/apk/* && \
+    npm install --global cdktf-cli && \
+    python3 -m pip install -U pip virtualenv
 
 # Set up nsswitch.conf for Go's "netgo" implementation
 # - https://github.com/golang/go/blob/go1.9.1/src/net/conf.go#L194-L275
