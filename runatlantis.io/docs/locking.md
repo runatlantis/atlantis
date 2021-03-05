@@ -64,5 +64,5 @@ Atlantis is doing is running `terraform plan` and `apply` and so all of the
 locking built in to those commands by Terraform isn't affected.
 
 In more detail, Terraform state locking locks the state while you run `terraform apply`
-so that multiple apply's can't run concurrently. Atlantis's locking is at a higher
+so that multiple applies can't run concurrently. Atlantis's locking is at a higher
 level because it prevents multiple pull requests from working on the same state.

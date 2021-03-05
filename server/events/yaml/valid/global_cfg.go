@@ -34,6 +34,7 @@ type Repo struct {
 	// IDRegex is the regex match for this config.
 	// If ID is set then this will be nil.
 	IDRegex              *regexp.Regexp
+	BranchRegex          *regexp.Regexp
 	ApplyRequirements    []string
 	PreWorkflowHooks     []*PreWorkflowHook
 	Workflow             *Workflow
@@ -94,13 +95,7 @@ var DefaultPlanStage = Stage{
 	},
 }
 
-// NewGlobalCfg returns a global config that respects the parameters.
-// allowRepoCfg is true if users want to allow repos full config functionality.
-// mergeableReq is true if users want to set the mergeable apply requirement
-// for all repos.
-// approvedReq is true if users want to set the approved apply requirement
-// for all repos.
-func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) GlobalCfg {
+func NewGlobalCfgWithHooks(allowRepoCfg bool, mergeableReq bool, approvedReq bool, preWorkflowHooks []*PreWorkflowHook) GlobalCfg {
 	defaultWorkflow := Workflow{
 		Name:        DefaultWorkflowName,
 		Apply:       DefaultApplyStage,
@@ -112,7 +107,6 @@ func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) Global
 	applyReqs := []string{}
 	allowedOverrides := []string{}
 	allowedWorkflows := []string{}
-	preWorkflowHooks := make([]*PreWorkflowHook, 0)
 	if mergeableReq {
 		applyReqs = append(applyReqs, MergeableApplyReq)
 	}
@@ -130,6 +124,7 @@ func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) Global
 		Repos: []Repo{
 			{
 				IDRegex:              regexp.MustCompile(".*"),
+				BranchRegex:          regexp.MustCompile(".*"),
 				ApplyRequirements:    applyReqs,
 				PreWorkflowHooks:     preWorkflowHooks,
 				Workflow:             &defaultWorkflow,
@@ -144,12 +139,33 @@ func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) Global
 	}
 }
 
+// NewGlobalCfg returns a global config that respects the parameters.
+// allowRepoCfg is true if users want to allow repos full config functionality.
+// mergeableReq is true if users want to set the mergeable apply requirement
+// for all repos.
+// approvedReq is true if users want to set the approved apply requirement
+// for all repos.
+
+func NewGlobalCfg(allowRepoCfg bool, mergeableReq bool, approvedReq bool) GlobalCfg {
+	preWorkflowHooks := make([]*PreWorkflowHook, 0)
+
+	return NewGlobalCfgWithHooks(allowRepoCfg, mergeableReq, approvedReq, preWorkflowHooks)
+}
+
 // IDMatches returns true if the repo ID otherID matches this config.
 func (r Repo) IDMatches(otherID string) bool {
 	if r.ID != "" {
 		return r.ID == otherID
 	}
 	return r.IDRegex.MatchString(otherID)
+}
+
+// BranchMatches returns true if the branch other matches a branch regex (if preset).
+func (r Repo) BranchMatches(other string) bool {
+	if r.BranchRegex == nil {
+		return true
+	}
+	return r.BranchRegex.MatchString(other)
 }
 
 // IDString returns a string representation of this config.

@@ -226,6 +226,13 @@ Values are chosen in this order:
   ```
   Stops atlantis locking projects and or workspaces when running terraform
 
+* ### `--enable-policy-checks`
+  <Badge text="beta" type="warn"/>
+  ```bash
+  atlantis server --enable-policy-checks
+  ```
+  Enables atlantis to run server side policies on the result of a terraform plan. Policies are defined in [server side repo config](https://www.runatlantis.io/docs/server-side-repo-config.html#reference).
+
 * ### `--enable-regexp-cmd`
   ```bash
   atlantis server --enable-regexp-cmd

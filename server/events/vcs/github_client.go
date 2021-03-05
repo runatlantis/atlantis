@@ -361,7 +361,7 @@ func (g *GithubClient) MergePull(pull models.PullRequest) error {
 		pull.BaseRepo.Owner,
 		pull.BaseRepo.Name,
 		pull.Num,
-		// NOTE: Using the emtpy string here causes GitHub to autogenerate
+		// NOTE: Using the empty string here causes GitHub to autogenerate
 		// the commit message as it normally would.
 		"",
 		options)

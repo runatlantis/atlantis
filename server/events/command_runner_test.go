@@ -61,6 +61,7 @@ var approvePoliciesCommandRunner *events.ApprovePoliciesCommandRunner
 var planCommandRunner *events.PlanCommandRunner
 var applyCommandRunner *events.ApplyCommandRunner
 var unlockCommandRunner *events.UnlockCommandRunner
+var preWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
 
 func setup(t *testing.T) *vcsmocks.MockClient {
 	RegisterMockTestingT(t)
@@ -161,17 +162,22 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		models.UnlockCommand:          unlockCommandRunner,
 	}
 
+	preWorkflowHooksCommandRunner = mocks.NewMockPreWorkflowHooksCommandRunner()
+
+	When(preWorkflowHooksCommandRunner.RunPreHooks(matchers.AnyPtrToEventsCommandContext())).ThenReturn(nil)
+
 	ch = events.DefaultCommandRunner{
-		VCSClient:                 vcsClient,
-		CommentCommandRunnerByCmd: commentCommandRunnerByCmd,
-		EventParser:               eventParsing,
-		GithubPullGetter:          githubGetter,
-		GitlabMergeRequestGetter:  gitlabGetter,
-		AzureDevopsPullGetter:     azuredevopsGetter,
-		Logger:                    logger,
-		AllowForkPRs:              false,
-		AllowForkPRsFlag:          "allow-fork-prs-flag",
-		Drainer:                   drainer,
+		VCSClient:                     vcsClient,
+		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
+		EventParser:                   eventParsing,
+		GithubPullGetter:              githubGetter,
+		GitlabMergeRequestGetter:      gitlabGetter,
+		AzureDevopsPullGetter:         azuredevopsGetter,
+		Logger:                        logger,
+		AllowForkPRs:                  false,
+		AllowForkPRsFlag:              "allow-fork-prs-flag",
+		Drainer:                       drainer,
+		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 	}
 	return vcsClient
 }
@@ -645,7 +651,7 @@ func TestRunCommentCommand_DrainOngoing(t *testing.T) {
 }
 
 func TestRunCommentCommand_DrainNotOngoing(t *testing.T) {
-	t.Log("if drain is not ongoing then remove ongoing operation must be called even if panic occured")
+	t.Log("if drain is not ongoing then remove ongoing operation must be called even if panic occurred")
 	setup(t)
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenPanic("panic test - if you're seeing this in a test failure this isn't the failing test")
 	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, nil)
@@ -662,7 +668,7 @@ func TestRunAutoplanCommand_DrainOngoing(t *testing.T) {
 }
 
 func TestRunAutoplanCommand_DrainNotOngoing(t *testing.T) {
-	t.Log("if drain is not ongoing then remove ongoing operation must be called even if panic occured")
+	t.Log("if drain is not ongoing then remove ongoing operation must be called even if panic occurred")
 	setup(t)
 	fixtures.Pull.BaseRepo = fixtures.GithubRepo
 	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())).ThenPanic("panic test - if you're seeing this in a test failure this isn't the failing test")

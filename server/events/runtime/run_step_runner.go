@@ -44,6 +44,7 @@ func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command string, pa
 		"COMMENT_ARGS":               strings.Join(ctx.EscapedCommentArgs, ","),
 		"DIR":                        path,
 		"HEAD_BRANCH_NAME":           ctx.Pull.HeadBranch,
+		"HEAD_COMMIT":                ctx.Pull.HeadCommit,
 		"HEAD_REPO_NAME":             ctx.HeadRepo.Name,
 		"HEAD_REPO_OWNER":            ctx.HeadRepo.Owner,
 		"PATH":                       fmt.Sprintf("%s:%s", os.Getenv("PATH"), r.TerraformBinDir),
