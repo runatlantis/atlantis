@@ -1,4 +1,5 @@
 # Conftest Policy Checking
+<Badge text="beta" type="warn"/>
 
 Atlantis supports running server-side [conftest](https://www.conftest.dev/) policies against the plan output.  Common usecases
 for using this step include:
