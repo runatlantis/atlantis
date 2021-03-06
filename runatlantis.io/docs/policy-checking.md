@@ -10,19 +10,19 @@ for using this step include:
 
 ## How it works?
 
-Enabling Policy Checking in addition to the mergeable apply requirement blocks applies on plans that fail any of the defined conftest policies.
+Enabling "policy checking" in addition to the [mergeable apply requirement](https://www.runatlantis.io/docs/apply-requirements.html#supported-requirements) blocks applies on plans that fail any of the defined conftest policies.
 
-**ADD SCREENSHOT**
+![Policy Check Apply Failure](./images/policy-check-apply-failure.png)
+
+![Policy Check Apply Status Failure](./images/policy-check-apply-status-failure.png)
 
 :::warning
 Without the mergeable requirement applies will still go through in the event of a policy failure.
 :::
 
-Any failures need to either be addressed in a successive commit, or approved by a blessed owner. This approval is independent of the approval apply requirement which can coexist in the policy checking workflow.
+Any failures need to either be addressed in a successive commit, or approved by a blessed owner. This approval is independent of the approval apply requirement which can coexist in the policy checking workflow. After an approval, the apply can proceed.
 
-**ADD SCREENSHOT**
-
-After an approval, the apply can proceed.
+![Policy Check Approval](./images/policy-check-approval.png)
 
 :::warning
 Any plans following the approval will discard any policy approval and prompt again for it.
@@ -91,5 +91,6 @@ deny[msg] {
 
 ```
 
+That's it! Now your Atlantis instance is configured to run policies on your Terraform plans 🎉
 
 
