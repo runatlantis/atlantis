@@ -38,6 +38,7 @@ func NewProjectCommandBuilder(
 	pendingPlanFinder *DefaultPendingPlanFinder,
 	commentBuilder CommentBuilder,
 	skipCloneNoChanges bool,
+	EnableRegExpCmd bool,
 ) *DefaultProjectCommandBuilder {
 	projectCommandBuilder := &DefaultProjectCommandBuilder{
 		ParserValidator:    parserValidator,
@@ -48,6 +49,7 @@ func NewProjectCommandBuilder(
 		GlobalCfg:          globalCfg,
 		PendingPlanFinder:  pendingPlanFinder,
 		SkipCloneNoChanges: skipCloneNoChanges,
+		EnableRegExpCmd:    EnableRegExpCmd,
 		ProjectCommandContextBuilder: NewProjectCommandContextBulder(
 			policyChecksSupported,
 			commentBuilder,
@@ -101,6 +103,7 @@ type DefaultProjectCommandBuilder struct {
 	PendingPlanFinder            *DefaultPendingPlanFinder
 	ProjectCommandContextBuilder ProjectCommandContextBuilder
 	SkipCloneNoChanges           bool
+	EnableRegExpCmd              bool
 }
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
@@ -303,7 +306,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *CommandConte
 
 // getCfg returns the atlantis.yaml config (if it exists) for this project. If
 // there is no config, then projectCfg and repoCfg will be nil.
-func (p *DefaultProjectCommandBuilder) getCfg(ctx *CommandContext, projectName string, dir string, workspace string, repoDir string) (projectCfg *valid.Project, repoCfg *valid.RepoCfg, err error) {
+func (p *DefaultProjectCommandBuilder) getCfg(ctx *CommandContext, projectName string, dir string, workspace string, repoDir string) (projectsCfg []valid.Project, repoCfg *valid.RepoCfg, err error) {
 	hasConfigFile, err := p.ParserValidator.HasRepoCfg(repoDir)
 	if err != nil {
 		err = errors.Wrapf(err, "looking for %s file in %q", yaml.AtlantisYAMLFilename, repoDir)
@@ -327,8 +330,14 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *CommandContext, projectName s
 	// If they've specified a project by name we look it up. Otherwise we
 	// use the dir and workspace.
 	if projectName != "" {
-		projectCfg = repoCfg.FindProjectByName(projectName)
-		if projectCfg == nil {
+		if p.EnableRegExpCmd {
+			projectsCfg = repoCfg.FindProjectsByName(projectName)
+		} else {
+			if p := repoCfg.FindProjectByName(projectName); p != nil {
+				projectsCfg = append(projectsCfg, *p)
+			}
+		}
+		if len(projectsCfg) == 0 {
 			err = fmt.Errorf("no project with name %q is defined in %s", projectName, yaml.AtlantisYAMLFilename)
 			return
 		}
@@ -343,7 +352,7 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *CommandContext, projectName s
 		err = fmt.Errorf("must specify project name: more than one project defined in %s matched dir: %q workspace: %q", yaml.AtlantisYAMLFilename, dir, workspace)
 		return
 	}
-	projectCfg = &projCfgs[0]
+	projectsCfg = projCfgs
 	return
 }
 
@@ -418,7 +427,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *CommandCont
 	)
 }
 
-// buildProjectCommandCtx builds a context for a single project identified
+// buildProjectCommandCtx builds a context for a single or several projects identified
 // by the parameters.
 func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContext,
 	cmd models.CommandName,
@@ -429,27 +438,12 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 	workspace string,
 	verbose bool) ([]models.ProjectCommandContext, error) {
 
-	projCfgPtr, repoCfgPtr, err := p.getCfg(ctx, projectName, repoRelDir, workspace, repoDir)
+	matchingProjects, repoCfgPtr, err := p.getCfg(ctx, projectName, repoRelDir, workspace, repoDir)
 	if err != nil {
 		return []models.ProjectCommandContext{}, err
 	}
-
+	var projCtxs []models.ProjectCommandContext
 	var projCfg valid.MergedProjectCfg
-	if projCfgPtr != nil {
-		// Override any dir/workspace defined on the comment with what was
-		// defined in config. This shouldn't matter since we don't allow comments
-		// with both project name and dir/workspace.
-		repoRelDir = projCfg.RepoRelDir
-		workspace = projCfg.Workspace
-		projCfg = p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), *projCfgPtr, *repoCfgPtr)
-	} else {
-		projCfg = p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), repoRelDir, workspace)
-	}
-
-	if err := p.validateWorkspaceAllowed(repoCfgPtr, repoRelDir, workspace); err != nil {
-		return []models.ProjectCommandContext{}, err
-	}
-
 	automerge := DefaultAutomergeEnabled
 	parallelApply := DefaultParallelApplyEnabled
 	parallelPlan := DefaultParallelPlanEnabled
@@ -459,17 +453,51 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 		parallelPlan = repoCfgPtr.ParallelPlan
 	}
 
-	return p.ProjectCommandContextBuilder.BuildProjectContext(
-		ctx,
-		cmd,
-		projCfg,
-		commentFlags,
-		repoDir,
-		automerge,
-		parallelApply,
-		parallelPlan,
-		verbose,
-	), nil
+	if len(matchingProjects) > 0 {
+		// Override any dir/workspace defined on the comment with what was
+		// defined in config. This shouldn't matter since we don't allow comments
+		// with both project name and dir/workspace.
+		repoRelDir = projCfg.RepoRelDir
+		workspace = projCfg.Workspace
+		for _, mp := range matchingProjects {
+			ctx.Log.Debug("Merging config for project at dir: %q workspace: %q", mp.Dir, mp.Workspace)
+			projCfg = p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp, *repoCfgPtr)
+
+			projCtxs = append(projCtxs,
+				p.ProjectCommandContextBuilder.BuildProjectContext(
+					ctx,
+					cmd,
+					projCfg,
+					commentFlags,
+					repoDir,
+					automerge,
+					parallelApply,
+					parallelPlan,
+					verbose,
+				)...)
+		}
+	} else {
+		projCfg = p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), repoRelDir, workspace)
+		projCtxs = append(projCtxs,
+			p.ProjectCommandContextBuilder.BuildProjectContext(
+				ctx,
+				cmd,
+				projCfg,
+				commentFlags,
+				repoDir,
+				automerge,
+				parallelApply,
+				parallelPlan,
+				verbose,
+			)...)
+	}
+
+	if err := p.validateWorkspaceAllowed(repoCfgPtr, repoRelDir, workspace); err != nil {
+		return []models.ProjectCommandContext{}, err
+	}
+
+	return projCtxs, nil
+
 }
 
 // validateWorkspaceAllowed returns an error if repoCfg defines projects in

@@ -640,6 +640,7 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 		&events.DefaultPendingPlanFinder{},
 		commentParser,
 		false,
+		false,
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTFVersion)
