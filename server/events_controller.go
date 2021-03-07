@@ -146,6 +146,7 @@ func (e *EventsController) handleGithubPost(w http.ResponseWriter, r *http.Reque
 	e.Logger.Debug("request valid")
 
 	githubReqID := "X-Github-Delivery=" + r.Header.Get("X-Github-Delivery")
+	e.Logger.Info(fmt.Sprintf("handling '%s'", githubReqID))
 	event, _ := github.ParseWebHook(github.WebHookType(r), payload)
 	switch event := event.(type) {
 	case *github.IssueCommentEvent:
@@ -168,6 +169,8 @@ func (e *EventsController) handleBitbucketCloudPost(w http.ResponseWriter, r *ht
 		e.respond(w, logging.Error, http.StatusBadRequest, "Unable to read body: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
 		return
 	}
+
+	e.Logger.Info(fmt.Sprintf("handling '%s'", reqID))
 	switch eventType {
 	case bitbucketcloud.PullCreatedHeader, bitbucketcloud.PullUpdatedHeader, bitbucketcloud.PullFulfilledHeader, bitbucketcloud.PullRejectedHeader:
 		e.Logger.Debug("handling as pull request state changed event")
@@ -192,6 +195,8 @@ func (e *EventsController) handleBitbucketServerPost(w http.ResponseWriter, r *h
 		e.respond(w, logging.Error, http.StatusBadRequest, "Unable to read body: %s %s=%s", err, bitbucketServerRequestIDHeader, reqID)
 		return
 	}
+
+	e.Logger.Info(fmt.Sprintf("handling '%s'", reqID))
 	if eventType == bitbucketserver.DiagnosticsPingHeader {
 		// Specially handle the diagnostics:ping event because Bitbucket Server
 		// doesn't send the signature with this event for some reason.
@@ -228,6 +233,7 @@ func (e *EventsController) handleAzureDevopsPost(w http.ResponseWriter, r *http.
 	e.Logger.Debug("request valid")
 
 	azuredevopsReqID := "Request-Id=" + r.Header.Get("Request-Id")
+	e.Logger.Info(fmt.Sprintf("handling '%s'", azuredevopsReqID))
 	event, err := azuredevops.ParseWebHook(payload)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Failed parsing webhook: %v %s", err, azuredevopsReqID)
