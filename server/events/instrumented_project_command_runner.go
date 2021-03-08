@@ -44,7 +44,7 @@ func RunAndEmitStats(commandName string, ctx models.ProjectCommandContext, execu
 		return result
 	}
 
-	if result.Failure == "" {
+	if result.Failure != "" {
 		executionFailure.Inc()
 		logger.Err("Failure running %s operation: %s", commandName, result.Failure)
 		return result
