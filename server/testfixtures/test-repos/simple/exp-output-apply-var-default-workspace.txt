@@ -21,8 +21,8 @@ State path: terraform.tfstate
 
 Outputs:
 
-var = default_workspace
-workspace = default
+var = "default_workspace"
+workspace = "default"
 
 ```
 </details>

@@ -19,8 +19,8 @@ State path: terraform.tfstate
 
 Outputs:
 
-var = fromfile
-workspace = staging
+var = "fromfile"
+workspace = "staging"
 
 postapply
 

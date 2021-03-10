@@ -12,21 +12,23 @@ import (
 )
 
 const (
-	ExtraArgsKey  = "extra_args"
-	NameArgKey    = "name"
-	CommandArgKey = "command"
-	ValueArgKey   = "value"
-	RunStepName   = "run"
-	PlanStepName  = "plan"
-	ApplyStepName = "apply"
-	InitStepName  = "init"
-	EnvStepName   = "env"
+	ExtraArgsKey        = "extra_args"
+	NameArgKey          = "name"
+	CommandArgKey       = "command"
+	ValueArgKey         = "value"
+	RunStepName         = "run"
+	PlanStepName        = "plan"
+	PolicyCheckStepName = "policy_check"
+	ApplyStepName       = "apply"
+	InitStepName        = "init"
+	EnvStepName         = "env"
 )
 
 // Step represents a single action/command to perform. In YAML, it can be set as
 // 1. A single string for a built-in command:
 //    - init
 //    - plan
+//    - policy_check
 // 2. A map for an env step with name and command or value
 //    - env:
 //        name: test
@@ -73,10 +75,18 @@ func (s *Step) MarshalJSON() ([]byte, error) {
 	return json.Marshal(out)
 }
 
+func (s Step) validStepName(stepName string) bool {
+	return stepName == InitStepName ||
+		stepName == PlanStepName ||
+		stepName == ApplyStepName ||
+		stepName == EnvStepName ||
+		stepName == PolicyCheckStepName
+}
+
 func (s Step) Validate() error {
 	validStep := func(value interface{}) error {
 		str := *value.(*string)
-		if str != InitStepName && str != PlanStepName && str != ApplyStepName && str != EnvStepName {
+		if !s.validStepName(str) {
 			return fmt.Errorf("%q is not a valid step type, maybe you omitted the 'run' key", str)
 		}
 		return nil
@@ -96,7 +106,7 @@ func (s Step) Validate() error {
 				len(keys), strings.Join(keys, ","))
 		}
 		for stepName, args := range elem {
-			if stepName != InitStepName && stepName != PlanStepName && stepName != ApplyStepName {
+			if !s.validStepName(stepName) {
 				return fmt.Errorf("%q is not a valid step type", stepName)
 			}
 			var argKeys []string

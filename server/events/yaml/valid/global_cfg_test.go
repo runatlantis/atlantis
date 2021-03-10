@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/hashicorp/go-version"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
@@ -21,6 +22,16 @@ func TestNewGlobalCfg(t *testing.T) {
 			Steps: []valid.Step{
 				{
 					StepName: "apply",
+				},
+			},
+		},
+		PolicyCheck: valid.Stage{
+			Steps: []valid.Step{
+				{
+					StepName: "show",
+				},
+				{
+					StepName: "policy_check",
 				},
 			},
 		},
@@ -39,6 +50,7 @@ func TestNewGlobalCfg(t *testing.T) {
 		Repos: []valid.Repo{
 			{
 				IDRegex:              regexp.MustCompile(".*"),
+				BranchRegex:          regexp.MustCompile(".*"),
 				ApplyRequirements:    []string{},
 				Workflow:             &expDefaultWorkflow,
 				AllowedWorkflows:     []string{},
@@ -97,6 +109,7 @@ func TestNewGlobalCfg(t *testing.T) {
 			// For each test, we change our expected cfg based on the parameters.
 			exp := deepcopy.Copy(baseCfg).(valid.GlobalCfg)
 			exp.Repos[0].IDRegex = regexp.MustCompile(".*") // deepcopy doesn't copy the regex.
+			exp.Repos[0].BranchRegex = regexp.MustCompile(".*")
 
 			if c.allowRepoCfg {
 				exp.Repos[0].AllowCustomWorkflows = Bool(true)
@@ -121,6 +134,10 @@ func TestNewGlobalCfg(t *testing.T) {
 					Assert(t, expRepo.IDRegex.String() == actRepo.IDRegex.String(),
 						"%q != %q for repos[%d]", expRepo.IDRegex.String(), actRepo.IDRegex.String(), i)
 				}
+				if expRepo.BranchRegex != nil {
+					Assert(t, expRepo.BranchRegex.String() == actRepo.BranchRegex.String(),
+						"%q != %q for repos[%d]", expRepo.BranchRegex.String(), actRepo.BranchRegex.String(), i)
+				}
 			}
 		})
 	}
@@ -133,7 +150,7 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 		repoID string
 		expErr string
 	}{
-		"repo uses workflow that is defined but not allowed": {
+		"repo uses workflow that is defined server side but not allowed (with custom workflows)": {
 			gCfg: valid.GlobalCfg{
 				Repos: []valid.Repo{
 					valid.NewGlobalCfg(true, false, false).Repos[0],
@@ -161,7 +178,123 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 			repoID: "github.com/owner/repo",
 			expErr: "workflow 'forbidden' is not allowed for this repo",
 		},
-		"repo uses workflow that is defined AND allowed": {
+		"repo uses workflow that is defined server side but not allowed (without custom workflows)": {
+			gCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					valid.NewGlobalCfg(true, false, false).Repos[0],
+					{
+						ID:                   "github.com/owner/repo",
+						AllowCustomWorkflows: Bool(false),
+						AllowedOverrides:     []string{"workflow"},
+						AllowedWorkflows:     []string{"allowed"},
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"allowed":   {},
+					"forbidden": {},
+				},
+			},
+			rCfg: valid.RepoCfg{
+				Projects: []valid.Project{
+					{
+						Dir:          ".",
+						Workspace:    "default",
+						WorkflowName: String("forbidden"),
+					},
+				},
+			},
+			repoID: "github.com/owner/repo",
+			expErr: "workflow 'forbidden' is not allowed for this repo",
+		},
+		"repo uses workflow that is defined in both places with same name (without custom workflows)": {
+			gCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					valid.NewGlobalCfg(true, false, false).Repos[0],
+					{
+						ID:                   "github.com/owner/repo",
+						AllowCustomWorkflows: Bool(false),
+						AllowedOverrides:     []string{"workflow"},
+						AllowedWorkflows:     []string{"duplicated"},
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"duplicated": {},
+				},
+			},
+			rCfg: valid.RepoCfg{
+				Projects: []valid.Project{
+					{
+						Dir:          ".",
+						Workspace:    "default",
+						WorkflowName: String("duplicated"),
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"duplicated": {},
+				},
+			},
+			repoID: "github.com/owner/repo",
+			expErr: "repo config not allowed to define custom workflows: server-side config needs 'allow_custom_workflows: true'",
+		},
+		"repo uses workflow that is defined repo side, but not allowed (with custom workflows)": {
+			gCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					valid.NewGlobalCfg(true, false, false).Repos[0],
+					{
+						ID:                   "github.com/owner/repo",
+						AllowCustomWorkflows: Bool(true),
+						AllowedOverrides:     []string{"workflow"},
+						AllowedWorkflows:     []string{"none"},
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"forbidden": {},
+				},
+			},
+			rCfg: valid.RepoCfg{
+				Projects: []valid.Project{
+					{
+						Dir:          ".",
+						Workspace:    "default",
+						WorkflowName: String("repodefined"),
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"repodefined": {},
+				},
+			},
+			repoID: "github.com/owner/repo",
+			expErr: "",
+		},
+		"repo uses workflow that is defined server side and allowed (without custom workflows)": {
+			gCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					valid.NewGlobalCfg(true, false, false).Repos[0],
+					{
+						ID:                   "github.com/owner/repo",
+						AllowCustomWorkflows: Bool(false),
+						AllowedOverrides:     []string{"workflow"},
+						AllowedWorkflows:     []string{"allowed"},
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"allowed":   {},
+					"forbidden": {},
+				},
+			},
+			rCfg: valid.RepoCfg{
+				Projects: []valid.Project{
+					{
+						Dir:          ".",
+						Workspace:    "default",
+						WorkflowName: String("allowed"),
+					},
+				},
+			},
+			repoID: "github.com/owner/repo",
+			expErr: "",
+		},
+		"repo uses workflow that is defined server side and allowed (with custom workflows)": {
 			gCfg: valid.GlobalCfg{
 				Repos: []valid.Repo{
 					valid.NewGlobalCfg(true, false, false).Repos[0],
@@ -311,7 +444,121 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 	}
 }
 
+func TestGlobalCfg_WithPolicySets(t *testing.T) {
+	version, _ := version.NewVersion("v1.0.0")
+	cases := map[string]struct {
+		gCfg   string
+		proj   valid.Project
+		repoID string
+		exp    valid.MergedProjectCfg
+	}{
+		"policies are added to MergedProjectCfg when present": {
+			gCfg: `
+repos:
+- id: /.*/
+policies:
+  policy_sets:
+    - name: good-policy
+      source: local
+      path: rel/path/to/source
+`,
+			repoID: "github.com/owner/repo",
+			proj: valid.Project{
+				Dir:          ".",
+				Workspace:    "default",
+				WorkflowName: String("custom"),
+			},
+			exp: valid.MergedProjectCfg{
+				ApplyRequirements: []string{},
+				Workflow: valid.Workflow{
+					Name:        "default",
+					Apply:       valid.DefaultApplyStage,
+					Plan:        valid.DefaultPlanStage,
+					PolicyCheck: valid.DefaultPolicyCheckStage,
+				},
+				PolicySets: valid.PolicySets{
+					Version: nil,
+					PolicySets: []valid.PolicySet{
+						{
+							Name:   "good-policy",
+							Path:   "rel/path/to/source",
+							Source: "local",
+						},
+					},
+				},
+				RepoRelDir:      ".",
+				Workspace:       "default",
+				Name:            "",
+				AutoplanEnabled: false,
+			},
+		},
+		"policies set correct version if specified": {
+			gCfg: `
+repos:
+- id: /.*/
+policies:
+  conftest_version: v1.0.0
+  policy_sets:
+    - name: good-policy
+      source: local
+      path: rel/path/to/source
+`,
+			repoID: "github.com/owner/repo",
+			proj: valid.Project{
+				Dir:          ".",
+				Workspace:    "default",
+				WorkflowName: String("custom"),
+			},
+			exp: valid.MergedProjectCfg{
+				ApplyRequirements: []string{},
+				Workflow: valid.Workflow{
+					Name:        "default",
+					Apply:       valid.DefaultApplyStage,
+					Plan:        valid.DefaultPlanStage,
+					PolicyCheck: valid.DefaultPolicyCheckStage,
+				},
+				PolicySets: valid.PolicySets{
+					Version: version,
+					PolicySets: []valid.PolicySet{
+						{
+							Name:   "good-policy",
+							Path:   "rel/path/to/source",
+							Source: "local",
+						},
+					},
+				},
+				RepoRelDir:      ".",
+				Workspace:       "default",
+				Name:            "",
+				AutoplanEnabled: false,
+			},
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			tmp, cleanup := TempDir(t)
+			defer cleanup()
+			var global valid.GlobalCfg
+			if c.gCfg != "" {
+				path := filepath.Join(tmp, "config.yaml")
+				Ok(t, ioutil.WriteFile(path, []byte(c.gCfg), 0600))
+				var err error
+				global, err = (&yaml.ParserValidator{}).ParseGlobalCfg(path, valid.NewGlobalCfg(false, false, false))
+				Ok(t, err)
+			} else {
+				global = valid.NewGlobalCfg(false, false, false)
+			}
+
+			Equals(t,
+				c.exp,
+				global.MergeProjectCfg(logging.NewNoopLogger(), c.repoID, c.proj, valid.RepoCfg{}))
+		})
+	}
+}
+
 func TestGlobalCfg_MergeProjectCfg(t *testing.T) {
+	var emptyPolicySets valid.PolicySets
+
 	cases := map[string]struct {
 		gCfg          string
 		repoID        string
@@ -338,8 +585,9 @@ workflows:
 			exp: valid.MergedProjectCfg{
 				ApplyRequirements: []string{},
 				Workflow: valid.Workflow{
-					Name:  "custom",
-					Apply: valid.DefaultApplyStage,
+					Name:        "custom",
+					Apply:       valid.DefaultApplyStage,
+					PolicyCheck: valid.DefaultPolicyCheckStage,
 					Plan: valid.Stage{
 						Steps: []valid.Step{
 							{
@@ -352,6 +600,7 @@ workflows:
 				Workspace:       "default",
 				Name:            "",
 				AutoplanEnabled: false,
+				PolicySets:      emptyPolicySets,
 			},
 		},
 		"repo-side apply reqs win out if allowed": {
@@ -371,14 +620,16 @@ repos:
 			exp: valid.MergedProjectCfg{
 				ApplyRequirements: []string{"mergeable"},
 				Workflow: valid.Workflow{
-					Name:  "default",
-					Apply: valid.DefaultApplyStage,
-					Plan:  valid.DefaultPlanStage,
+					Name:        "default",
+					Apply:       valid.DefaultApplyStage,
+					PolicyCheck: valid.DefaultPolicyCheckStage,
+					Plan:        valid.DefaultPlanStage,
 				},
 				RepoRelDir:      ".",
 				Workspace:       "default",
 				Name:            "",
 				AutoplanEnabled: false,
+				PolicySets:      emptyPolicySets,
 			},
 		},
 		"last server-side match wins": {
@@ -401,14 +652,16 @@ repos:
 			exp: valid.MergedProjectCfg{
 				ApplyRequirements: []string{"approved", "mergeable"},
 				Workflow: valid.Workflow{
-					Name:  "default",
-					Apply: valid.DefaultApplyStage,
-					Plan:  valid.DefaultPlanStage,
+					Name:        "default",
+					Apply:       valid.DefaultApplyStage,
+					PolicyCheck: valid.DefaultPolicyCheckStage,
+					Plan:        valid.DefaultPlanStage,
 				},
 				RepoRelDir:      "mydir",
 				Workspace:       "myworkspace",
 				Name:            "myname",
 				AutoplanEnabled: false,
+				PolicySets:      emptyPolicySets,
 			},
 		},
 		"autoplan is set properly": {
@@ -427,14 +680,16 @@ repos:
 			exp: valid.MergedProjectCfg{
 				ApplyRequirements: []string{},
 				Workflow: valid.Workflow{
-					Name:  "default",
-					Apply: valid.DefaultApplyStage,
-					Plan:  valid.DefaultPlanStage,
+					Name:        "default",
+					Apply:       valid.DefaultApplyStage,
+					PolicyCheck: valid.DefaultPolicyCheckStage,
+					Plan:        valid.DefaultPlanStage,
 				},
 				RepoRelDir:      "mydir",
 				Workspace:       "myworkspace",
 				Name:            "myname",
 				AutoplanEnabled: true,
+				PolicySets:      emptyPolicySets,
 			},
 		},
 	}
@@ -453,6 +708,7 @@ repos:
 				global = valid.NewGlobalCfg(false, false, false)
 			}
 
+			global.PolicySets = emptyPolicySets
 			Equals(t, c.exp, global.MergeProjectCfg(logging.NewNoopLogger(), c.repoID, c.proj, valid.RepoCfg{Workflows: c.repoWorkflows}))
 		})
 	}
@@ -474,6 +730,21 @@ func TestRepo_IDMatches(t *testing.T) {
 func TestRepo_IDString(t *testing.T) {
 	Equals(t, "github.com/owner/repo", (valid.Repo{ID: "github.com/owner/repo"}).IDString())
 	Equals(t, "/regex.*/", (valid.Repo{IDRegex: regexp.MustCompile("regex.*")}).IDString())
+}
+
+func TestRepo_BranchMatches(t *testing.T) {
+	// Test matches when no branch regex is set.
+	Equals(t, true, (valid.Repo{}).BranchMatches("main"))
+
+	// Test regexes.
+	Equals(t, true, (valid.Repo{BranchRegex: regexp.MustCompile(".*")}).BranchMatches("main"))
+	Equals(t, true, (valid.Repo{BranchRegex: regexp.MustCompile("main")}).BranchMatches("main"))
+	Equals(t, false, (valid.Repo{BranchRegex: regexp.MustCompile("^main$")}).BranchMatches("foo-main"))
+	Equals(t, false, (valid.Repo{BranchRegex: regexp.MustCompile("^main$")}).BranchMatches("main-foo"))
+	Equals(t, true, (valid.Repo{BranchRegex: regexp.MustCompile("(main|master)")}).BranchMatches("main"))
+	Equals(t, true, (valid.Repo{BranchRegex: regexp.MustCompile("(main|master)")}).BranchMatches("master"))
+	Equals(t, true, (valid.Repo{BranchRegex: regexp.MustCompile("release")}).BranchMatches("release-stage"))
+	Equals(t, false, (valid.Repo{BranchRegex: regexp.MustCompile("release")}).BranchMatches("main"))
 }
 
 // String is a helper routine that allocates a new string value

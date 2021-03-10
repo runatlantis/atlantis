@@ -156,8 +156,9 @@ workflows:
 				Version: 2,
 				Workflows: map[string]valid.Workflow{
 					"custom": {
-						Name:  "custom",
-						Apply: valid.DefaultApplyStage,
+						Name:        "custom",
+						Apply:       valid.DefaultApplyStage,
+						PolicyCheck: valid.DefaultPolicyCheckStage,
 						Plan: valid.Stage{
 							Steps: []valid.Step{
 								{
@@ -333,9 +334,10 @@ workflows:
 				},
 				Workflows: map[string]valid.Workflow{
 					"default": {
-						Name:  "default",
-						Plan:  valid.DefaultPlanStage,
-						Apply: valid.DefaultApplyStage,
+						Name:        "default",
+						Plan:        valid.DefaultPlanStage,
+						Apply:       valid.DefaultApplyStage,
+						PolicyCheck: valid.DefaultPolicyCheckStage,
 					},
 				},
 			},
@@ -369,9 +371,10 @@ workflows:
 				},
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": {
-						Name:  "myworkflow",
-						Apply: valid.DefaultApplyStage,
-						Plan:  valid.DefaultPlanStage,
+						Name:        "myworkflow",
+						Apply:       valid.DefaultApplyStage,
+						Plan:        valid.DefaultPlanStage,
+						PolicyCheck: valid.DefaultPolicyCheckStage,
 					},
 				},
 			},
@@ -407,9 +410,10 @@ workflows:
 				},
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": {
-						Name:  "myworkflow",
-						Apply: valid.DefaultApplyStage,
-						Plan:  valid.DefaultPlanStage,
+						Name:        "myworkflow",
+						Apply:       valid.DefaultApplyStage,
+						Plan:        valid.DefaultPlanStage,
+						PolicyCheck: valid.DefaultPolicyCheckStage,
 					},
 				},
 			},
@@ -445,9 +449,10 @@ workflows:
 				},
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": {
-						Name:  "myworkflow",
-						Apply: valid.DefaultApplyStage,
-						Plan:  valid.DefaultPlanStage,
+						Name:        "myworkflow",
+						Apply:       valid.DefaultApplyStage,
+						Plan:        valid.DefaultPlanStage,
+						PolicyCheck: valid.DefaultPolicyCheckStage,
 					},
 				},
 			},
@@ -483,9 +488,10 @@ workflows:
 				},
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": {
-						Name:  "myworkflow",
-						Apply: valid.DefaultApplyStage,
-						Plan:  valid.DefaultPlanStage,
+						Name:        "myworkflow",
+						Apply:       valid.DefaultApplyStage,
+						Plan:        valid.DefaultPlanStage,
+						PolicyCheck: valid.DefaultPolicyCheckStage,
 					},
 				},
 			},
@@ -618,6 +624,10 @@ workflows:
       steps:
       - init
       - plan
+    policy_check:
+      steps:
+      - init
+      - policy_check
     apply:
       steps:
       - plan # NOTE: we don't validate if they make sense
@@ -645,6 +655,16 @@ workflows:
 								},
 								{
 									StepName: "plan",
+								},
+							},
+						},
+						PolicyCheck: valid.Stage{
+							Steps: []valid.Step{
+								{
+									StepName: "init",
+								},
+								{
+									StepName: "policy_check",
 								},
 							},
 						},
@@ -678,6 +698,11 @@ workflows:
           extra_args:
           - arg1
           - arg2
+    policy_check:
+      steps:
+      - policy_check:
+          extra_args:
+          - arg1
     apply:
       steps:
       - plan:
@@ -712,6 +737,14 @@ workflows:
 								},
 							},
 						},
+						PolicyCheck: valid.Stage{
+							Steps: []valid.Step{
+								{
+									StepName:  "policy_check",
+									ExtraArgs: []string{"arg1"},
+								},
+							},
+						},
 						Apply: valid.Stage{
 							Steps: []valid.Step{
 								{
@@ -739,6 +772,9 @@ workflows:
     plan:
       steps:
       - run: "echo \"plan hi\""
+    policy_check:
+      steps:
+      - run: "echo \"opa hi\""
     apply:
       steps:
       - run: echo apply "arg 2"
@@ -763,6 +799,14 @@ workflows:
 								{
 									StepName:   "run",
 									RunCommand: "echo \"plan hi\"",
+								},
+							},
+						},
+						PolicyCheck: valid.Stage{
+							Steps: []valid.Step{
+								{
+									StepName:   "run",
+									RunCommand: "echo \"opa hi\"",
 								},
 							},
 						},
@@ -791,6 +835,11 @@ workflows:
       - env:
           name: env_name
           value: env_value
+    policy_check:
+      steps:
+      - env:
+          name: env_name
+          value: env_value
     apply:
       steps:
       - env:
@@ -813,6 +862,15 @@ workflows:
 					"default": {
 						Name: "default",
 						Plan: valid.Stage{
+							Steps: []valid.Step{
+								{
+									StepName:    "env",
+									EnvVarName:  "env_name",
+									EnvVarValue: "env_value",
+								},
+							},
+						},
+						PolicyCheck: valid.Stage{
 							Steps: []valid.Step{
 								{
 									StepName:    "env",
@@ -908,6 +966,21 @@ func TestParseGlobalCfg(t *testing.T) {
 				},
 			},
 		},
+		PolicyCheck: valid.Stage{
+			Steps: []valid.Step{
+				{
+					StepName:   "run",
+					RunCommand: "custom command",
+				},
+				{
+					StepName:  "plan",
+					ExtraArgs: []string{"extra", "args"},
+				},
+				{
+					StepName: "policy_check",
+				},
+			},
+		},
 		Apply: valid.Stage{
 			Steps: []valid.Step{
 				{
@@ -920,6 +993,8 @@ func TestParseGlobalCfg(t *testing.T) {
 			},
 		},
 	}
+
+	conftestVersion, _ := version.NewVersion("v1.0.0")
 
 	cases := map[string]struct {
 		input  string
@@ -939,10 +1014,16 @@ func TestParseGlobalCfg(t *testing.T) {
 - apply_requirements: []`,
 			expErr: "repos: (0: (id: cannot be blank.).).",
 		},
-		"invalid regex": {
+		"invalid id regex": {
 			input: `repos:
 - id: /?/`,
 			expErr: "repos: (0: (id: parsing: /?/: error parsing regexp: missing argument to repetition operator: `?`.).).",
+		},
+		"invalid branch regex": {
+			input: `repos:
+- id: /.*/
+  branch: /?/`,
+			expErr: "repos: (0: (branch: parsing: /?/: error parsing regexp: missing argument to repetition operator: `?`.).).",
 		},
 		"workflow doesn't exist": {
 			input: `repos:
@@ -979,9 +1060,10 @@ workflows:
 				Workflows: map[string]valid.Workflow{
 					"default": defaultCfg.Workflows["default"],
 					"name": {
-						Name:  "name",
-						Apply: valid.DefaultApplyStage,
-						Plan:  valid.DefaultPlanStage,
+						Name:        "name",
+						Apply:       valid.DefaultApplyStage,
+						Plan:        valid.DefaultPlanStage,
+						PolicyCheck: valid.DefaultPolicyCheckStage,
 					},
 				},
 			},
@@ -998,9 +1080,10 @@ workflows:
 				Workflows: map[string]valid.Workflow{
 					"default": defaultCfg.Workflows["default"],
 					"name": {
-						Name:  "name",
-						Apply: valid.DefaultApplyStage,
-						Plan:  valid.DefaultPlanStage,
+						Name:        "name",
+						Apply:       valid.DefaultApplyStage,
+						Plan:        valid.DefaultPlanStage,
+						PolicyCheck: valid.DefaultPolicyCheckStage,
 					},
 				},
 			},
@@ -1018,9 +1101,10 @@ workflows:
 				Workflows: map[string]valid.Workflow{
 					"default": defaultCfg.Workflows["default"],
 					"name": {
-						Name:  "name",
-						Plan:  valid.DefaultPlanStage,
-						Apply: valid.DefaultApplyStage,
+						Name:        "name",
+						Plan:        valid.DefaultPlanStage,
+						PolicyCheck: valid.DefaultPolicyCheckStage,
+						Apply:       valid.DefaultApplyStage,
 					},
 				},
 			},
@@ -1037,6 +1121,7 @@ repos:
   allowed_overrides: [apply_requirements, workflow]
   allow_custom_workflows: true
 - id: /.*/
+  branch: /(master|main)/
   pre_workflow_hooks:
     - run: custom workflow command
 workflows:
@@ -1047,10 +1132,22 @@ workflows:
       - init:
           extra_args: [extra, args]
       - plan
+    policy_check:
+      steps:
+      - run: custom command
+      - plan:
+          extra_args: [extra, args]
+      - policy_check
     apply:
       steps:
       - run: custom command
       - apply
+policies:
+  conftest_version: v1.0.0
+  policy_sets:
+    - name: good-policy
+      path: rel/path/to/policy
+      source: local
 `,
 			exp: valid.GlobalCfg{
 				Repos: []valid.Repo{
@@ -1065,12 +1162,23 @@ workflows:
 					},
 					{
 						IDRegex:          regexp.MustCompile(".*"),
+						BranchRegex:      regexp.MustCompile("(master|main)"),
 						PreWorkflowHooks: preWorkflowHooks,
 					},
 				},
 				Workflows: map[string]valid.Workflow{
 					"default": defaultCfg.Workflows["default"],
 					"custom1": customWorkflow1,
+				},
+				PolicySets: valid.PolicySets{
+					Version: conftestVersion,
+					PolicySets: []valid.PolicySet{
+						{
+							Name:   "good-policy",
+							Path:   "rel/path/to/policy",
+							Source: valid.LocalPolicySet,
+						},
+					},
 				},
 			},
 		},
@@ -1119,6 +1227,8 @@ workflows:
     plan:
       steps:
       - run: custom
+    policy_check:
+      steps: []
     apply:
      steps: []
 `,
@@ -1126,11 +1236,15 @@ workflows:
 				Repos: []valid.Repo{
 					{
 						IDRegex:           regexp.MustCompile(".*"),
+						BranchRegex:       regexp.MustCompile(".*"),
 						PreWorkflowHooks:  []*valid.PreWorkflowHook{},
 						ApplyRequirements: []string{},
 						Workflow: &valid.Workflow{
 							Name: "default",
 							Apply: valid.Stage{
+								Steps: nil,
+							},
+							PolicyCheck: valid.Stage{
 								Steps: nil,
 							},
 							Plan: valid.Stage{
@@ -1166,6 +1280,7 @@ workflows:
 			},
 		},
 	}
+
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			r := yaml.ParserValidator{}
@@ -1182,6 +1297,11 @@ workflows:
 				return
 			}
 			Ok(t, err)
+
+			if !act.PolicySets.HasPolicies() {
+				c.exp.PolicySets = act.PolicySets
+			}
+
 			Equals(t, c.exp, act)
 			// Have to hand-compare regexes because Equals doesn't do it.
 			for i, actRepo := range act.Repos {
@@ -1189,6 +1309,10 @@ workflows:
 				if expRepo.IDRegex != nil {
 					Assert(t, expRepo.IDRegex.String() == actRepo.IDRegex.String(),
 						"%q != %q for repos[%d]", expRepo.IDRegex.String(), actRepo.IDRegex.String(), i)
+				}
+				if expRepo.BranchRegex != nil {
+					Assert(t, expRepo.BranchRegex.String() == actRepo.BranchRegex.String(),
+						"%q != %q for repos[%d]", expRepo.BranchRegex.String(), actRepo.BranchRegex.String(), i)
 				}
 			}
 		})
@@ -1214,6 +1338,17 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 				},
 			},
 		},
+		PolicyCheck: valid.Stage{
+			Steps: []valid.Step{
+				{
+					StepName: "plan",
+				},
+				{
+					StepName:   "run",
+					RunCommand: "custom policy_check",
+				},
+			},
+		},
 		Apply: valid.Stage{
 			Steps: []valid.Step{
 				{
@@ -1223,6 +1358,8 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 			},
 		},
 	}
+
+	conftestVersion, _ := version.NewVersion("v1.0.0")
 
 	cases := map[string]struct {
 		json   string
@@ -1262,12 +1399,28 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
           {"run": "custom plan"}
         ]
       },
+      "policy_check": {
+        "steps": [
+          "plan",
+          {"run": "custom policy_check"}
+        ]
+      },
       "apply": {
         "steps": [
           {"run": "my custom command"}
         ]
       }
     }
+  },
+  "policies": {
+    "conftest_version": "v1.0.0",
+    "policy_sets": [
+      {
+        "name": "good-policy",
+        "source": "local",
+        "path": "rel/path/to/policy"
+      }
+    ]
   }
 }
 `,
@@ -1296,6 +1449,16 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 					"default": valid.NewGlobalCfg(false, false, false).Workflows["default"],
 					"custom":  customWorkflow,
 				},
+				PolicySets: valid.PolicySets{
+					Version: conftestVersion,
+					PolicySets: []valid.PolicySet{
+						{
+							Name:   "good-policy",
+							Path:   "rel/path/to/policy",
+							Source: valid.LocalPolicySet,
+						},
+					},
+				},
 			},
 		},
 	}
@@ -1308,6 +1471,11 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 				return
 			}
 			Ok(t, err)
+
+			if !cfg.PolicySets.HasPolicies() {
+				c.exp.PolicySets = cfg.PolicySets
+			}
+
 			Equals(t, c.exp, cfg)
 		})
 	}

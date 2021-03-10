@@ -1,7 +1,7 @@
 module "null" {
   source = "../modules/null"
-  var = "staging"
+  var    = "staging"
 }
 output "var" {
-  value = "${module.null.var}"
+  value = module.null.var
 }

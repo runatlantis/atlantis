@@ -1,87 +1,221 @@
 package events_test
 
 import (
-	"fmt"
-	"strings"
+	"errors"
 	"testing"
 
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events"
-	"github.com/runatlantis/atlantis/server/events/matchers"
 	"github.com/runatlantis/atlantis/server/events/mocks"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/fixtures"
-	"github.com/runatlantis/atlantis/server/events/runtime"
+	runtime_mocks "github.com/runatlantis/atlantis/server/events/runtime/mocks"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
-	logmocks "github.com/runatlantis/atlantis/server/logging/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 var wh events.DefaultPreWorkflowHooksCommandRunner
 var whWorkingDir *mocks.MockWorkingDir
 var whWorkingDirLocker *mocks.MockWorkingDirLocker
-var whDrainer *events.Drainer
+var whPreWorkflowHookRunner *runtime_mocks.MockPreWorkflowHookRunner
 
-func preWorkflowHooksSetup(t *testing.T) *vcsmocks.MockClient {
+func preWorkflowHooksSetup(t *testing.T) {
 	RegisterMockTestingT(t)
 	vcsClient := vcsmocks.NewMockClient()
-	logger := logmocks.NewMockSimpleLogging()
 	whWorkingDir = mocks.NewMockWorkingDir()
 	whWorkingDirLocker = mocks.NewMockWorkingDirLocker()
-	whDrainer = &events.Drainer{}
+	whPreWorkflowHookRunner = runtime_mocks.NewMockPreWorkflowHookRunner()
 
 	wh = events.DefaultPreWorkflowHooksCommandRunner{
 		VCSClient:             vcsClient,
-		Logger:                logger,
 		WorkingDirLocker:      whWorkingDirLocker,
 		WorkingDir:            whWorkingDir,
-		Drainer:               whDrainer,
-		PreWorkflowHookRunner: &runtime.PreWorkflowHookRunner{},
+		PreWorkflowHookRunner: whPreWorkflowHookRunner,
 	}
-	return vcsClient
 }
 
-func TestPreWorkflowHooksCommand_LogPanics(t *testing.T) {
-	t.Log("if there is a panic it is commented back on the pull request")
-	vcsClient := preWorkflowHooksSetup(t)
-	logger := wh.Logger.NewLogger("log", false, logging.LogLevel(1))
-
-	When(whWorkingDir.Clone(
-		logger,
-		fixtures.GithubRepo,
-		fixtures.Pull,
-		events.DefaultWorkspace,
-	)).ThenPanic("panic test - if you're seeing this in a test failure this isn't the failing test")
-
-	wh.RunPreHooks(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
-	_, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString()).GetCapturedArguments()
-	Assert(t, strings.Contains(comment, "Error: goroutine panic"), fmt.Sprintf("comment should be about a goroutine panic but was %q", comment))
+func newBool(b bool) *bool {
+	return &b
 }
 
-// Test that if one plan fails and we are using automerge, that
-// we delete the plans.
 func TestRunPreHooks_Clone(t *testing.T) {
-	preWorkflowHooksSetup(t)
-	logger := wh.Logger.NewLogger("log", false, logging.LogLevel(1))
 
-	When(whWorkingDir.Clone(logger, fixtures.GithubRepo, fixtures.Pull, events.DefaultWorkspace)).
-		ThenReturn("path/to/repo", false, nil)
-	wh.RunPreHooks(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
-}
+	log := logging.NewNoopLogger()
 
-func TestRunPreHooks_DrainOngoing(t *testing.T) {
-	t.Log("if drain is ongoing then a message should be displayed")
-	vcsClient := preWorkflowHooksSetup(t)
-	whDrainer.ShutdownBlocking()
-	wh.RunPreHooks(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
-	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, fixtures.Pull.Num, "Atlantis server is shutting down, please try again later.", "pre_workflow_hooks")
-}
+	var newPull = fixtures.Pull
+	newPull.BaseRepo = fixtures.GithubRepo
 
-func TestRunPreHooks_DrainNotOngoing(t *testing.T) {
-	t.Log("if drain is not ongoing then remove ongoing operation must be called even if panic occured")
-	preWorkflowHooksSetup(t)
-	When(whWorkingDir.Clone(logger, fixtures.GithubRepo, fixtures.Pull, events.DefaultWorkspace)).ThenPanic("panic test - if you're seeing this in a test failure this isn't the failing test")
-	wh.RunPreHooks(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
-	whWorkingDir.VerifyWasCalledOnce().Clone(logger, fixtures.GithubRepo, fixtures.Pull, events.DefaultWorkspace)
-	Equals(t, 0, whDrainer.GetStatus().InProgressOps)
+	ctx := &events.CommandContext{
+		Pull:     newPull,
+		HeadRepo: fixtures.GithubRepo,
+		User:     fixtures.User,
+		Log:      log,
+	}
+
+	testHook := valid.PreWorkflowHook{
+		StepName:   "test",
+		RunCommand: "some command",
+	}
+
+	pCtx := models.PreWorkflowHookCommandContext{
+		BaseRepo: fixtures.GithubRepo,
+		HeadRepo: fixtures.GithubRepo,
+		Pull:     newPull,
+		Log:      log,
+		User:     fixtures.User,
+		Verbose:  false,
+	}
+
+	repoDir := "path/to/repo"
+	result := "some result"
+
+	t.Run("success hooks in cfg", func(t *testing.T) {
+		preWorkflowHooksSetup(t)
+
+		var unlockCalled *bool = newBool(false)
+		unlockFn := func() {
+			unlockCalled = newBool(true)
+		}
+
+		globalCfg := valid.GlobalCfg{
+			Repos: []valid.Repo{
+				{
+					ID: fixtures.GithubRepo.ID(),
+					PreWorkflowHooks: []*valid.PreWorkflowHook{
+						&testHook,
+					},
+				},
+			},
+		}
+
+		wh.GlobalCfg = globalCfg
+
+		When(whWorkingDirLocker.TryLock(fixtures.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace)).ThenReturn(unlockFn, nil)
+		When(whWorkingDir.Clone(log, fixtures.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, nil)
+		When(whPreWorkflowHookRunner.Run(pCtx, testHook.RunCommand, repoDir)).ThenReturn(result, nil)
+
+		err := wh.RunPreHooks(ctx)
+
+		Ok(t, err)
+		whPreWorkflowHookRunner.VerifyWasCalledOnce().Run(pCtx, testHook.RunCommand, repoDir)
+		Assert(t, *unlockCalled == true, "unlock function called")
+	})
+	t.Run("success hooks not in cfg", func(t *testing.T) {
+		preWorkflowHooksSetup(t)
+		globalCfg := valid.GlobalCfg{
+			Repos: []valid.Repo{
+				// one with hooks but mismatched id
+				{
+					ID: "id1",
+					PreWorkflowHooks: []*valid.PreWorkflowHook{
+						&testHook,
+					},
+				},
+				// one with the correct id but no hooks
+				{
+					ID:               fixtures.GithubRepo.ID(),
+					PreWorkflowHooks: []*valid.PreWorkflowHook{},
+				},
+			},
+		}
+
+		wh.GlobalCfg = globalCfg
+
+		err := wh.RunPreHooks(ctx)
+
+		Ok(t, err)
+
+		whPreWorkflowHookRunner.VerifyWasCalled(Never()).Run(pCtx, testHook.RunCommand, repoDir)
+		whWorkingDirLocker.VerifyWasCalled(Never()).TryLock(fixtures.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace)
+		whWorkingDir.VerifyWasCalled(Never()).Clone(log, fixtures.GithubRepo, newPull, events.DefaultWorkspace)
+	})
+	t.Run("error locking work dir", func(t *testing.T) {
+		preWorkflowHooksSetup(t)
+
+		globalCfg := valid.GlobalCfg{
+			Repos: []valid.Repo{
+				{
+					ID: fixtures.GithubRepo.ID(),
+					PreWorkflowHooks: []*valid.PreWorkflowHook{
+						&testHook,
+					},
+				},
+			},
+		}
+
+		wh.GlobalCfg = globalCfg
+
+		When(whWorkingDirLocker.TryLock(fixtures.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace)).ThenReturn(func() {}, errors.New("some error"))
+
+		err := wh.RunPreHooks(ctx)
+
+		Assert(t, err != nil, "error not nil")
+		whWorkingDir.VerifyWasCalled(Never()).Clone(log, fixtures.GithubRepo, newPull, events.DefaultWorkspace)
+		whPreWorkflowHookRunner.VerifyWasCalled(Never()).Run(pCtx, testHook.RunCommand, repoDir)
+	})
+
+	t.Run("error cloning", func(t *testing.T) {
+		preWorkflowHooksSetup(t)
+
+		var unlockCalled *bool = newBool(false)
+		unlockFn := func() {
+			unlockCalled = newBool(true)
+		}
+
+		globalCfg := valid.GlobalCfg{
+			Repos: []valid.Repo{
+				{
+					ID: fixtures.GithubRepo.ID(),
+					PreWorkflowHooks: []*valid.PreWorkflowHook{
+						&testHook,
+					},
+				},
+			},
+		}
+
+		wh.GlobalCfg = globalCfg
+
+		When(whWorkingDirLocker.TryLock(fixtures.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace)).ThenReturn(unlockFn, nil)
+		When(whWorkingDir.Clone(log, fixtures.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, errors.New("some error"))
+
+		err := wh.RunPreHooks(ctx)
+
+		Assert(t, err != nil, "error not nil")
+
+		whPreWorkflowHookRunner.VerifyWasCalled(Never()).Run(pCtx, testHook.RunCommand, repoDir)
+		Assert(t, *unlockCalled == true, "unlock function called")
+	})
+
+	t.Run("error running pre hook", func(t *testing.T) {
+		preWorkflowHooksSetup(t)
+
+		var unlockCalled *bool = newBool(false)
+		unlockFn := func() {
+			unlockCalled = newBool(true)
+		}
+
+		globalCfg := valid.GlobalCfg{
+			Repos: []valid.Repo{
+				{
+					ID: fixtures.GithubRepo.ID(),
+					PreWorkflowHooks: []*valid.PreWorkflowHook{
+						&testHook,
+					},
+				},
+			},
+		}
+
+		wh.GlobalCfg = globalCfg
+
+		When(whWorkingDirLocker.TryLock(fixtures.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace)).ThenReturn(unlockFn, nil)
+		When(whWorkingDir.Clone(log, fixtures.GithubRepo, newPull, events.DefaultWorkspace)).ThenReturn(repoDir, false, nil)
+		When(whPreWorkflowHookRunner.Run(pCtx, testHook.RunCommand, repoDir)).ThenReturn(result, errors.New("some error"))
+
+		err := wh.RunPreHooks(ctx)
+
+		Assert(t, err != nil, "error not nil")
+		Assert(t, *unlockCalled == true, "unlock function called")
+	})
 }

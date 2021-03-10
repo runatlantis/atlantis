@@ -2,8 +2,9 @@
 package matchers
 
 import (
-	"reflect"
 	"github.com/petergtz/pegomock"
+	"reflect"
+
 	slack "github.com/nlopes/slack"
 )
 
@@ -15,6 +16,18 @@ func AnyPtrToSlackAuthTestResponse() *slack.AuthTestResponse {
 
 func EqPtrToSlackAuthTestResponse(value *slack.AuthTestResponse) *slack.AuthTestResponse {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
+	var nullValue *slack.AuthTestResponse
+	return nullValue
+}
+
+func NotEqPtrToSlackAuthTestResponse(value *slack.AuthTestResponse) *slack.AuthTestResponse {
+	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
+	var nullValue *slack.AuthTestResponse
+	return nullValue
+}
+
+func PtrToSlackAuthTestResponseThat(matcher pegomock.ArgumentMatcher) *slack.AuthTestResponse {
+	pegomock.RegisterMatcher(matcher)
 	var nullValue *slack.AuthTestResponse
 	return nullValue
 }

@@ -25,6 +25,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sort"
 	"strings"
 	"syscall"
@@ -41,6 +42,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/runtime"
+	"github.com/runatlantis/atlantis/server/events/runtime/policy"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
@@ -62,6 +64,14 @@ const (
 	// route. ex:
 	//   mux.Router.Get(LockViewRouteName).URL(LockViewRouteIDQueryParam, "my id")
 	LockViewRouteIDQueryParam = "id"
+
+	// binDirName is the name of the directory inside our data dir where
+	// we download binaries.
+	BinDirName = "bin"
+
+	// terraformPluginCacheDir is the name of the dir inside our data dir
+	// where we tell terraform to cache plugins and modules.
+	TerraformPluginCacheDirName = "plugin-cache"
 )
 
 // Server runs the Atlantis web server.
@@ -123,6 +133,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var bitbucketCloudClient *bitbucketcloud.Client
 	var bitbucketServerClient *bitbucketserver.Client
 	var azuredevopsClient *vcs.AzureDevopsClient
+
+	policyChecksEnabled := false
+	if userConfig.EnablePolicyChecksFlag {
+		logger.Info("Policy Checks are enabled")
+		policyChecksEnabled = true
+	}
+
 	if userConfig.GithubUser != "" || userConfig.GithubAppID != 0 {
 		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		if userConfig.GithubUser != "" {
@@ -234,9 +251,23 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	vcsClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient)
 	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient, StatusName: userConfig.VCSStatusName}
+
+	binDir, err := mkSubDir(userConfig.DataDir, BinDirName)
+
+	if err != nil {
+		return nil, err
+	}
+
+	cacheDir, err := mkSubDir(userConfig.DataDir, TerraformPluginCacheDirName)
+
+	if err != nil {
+		return nil, err
+	}
+
 	terraformClient, err := terraform.NewClient(
 		logger,
-		userConfig.DataDir,
+		binDir,
+		cacheDir,
 		userConfig.TFEToken,
 		userConfig.TFEHostname,
 		userConfig.DefaultTFVersion,
@@ -366,75 +397,156 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	preWorkflowHooksCommandRunner := &events.DefaultPreWorkflowHooksCommandRunner{
 		VCSClient:             vcsClient,
 		GlobalCfg:             globalCfg,
-		Logger:                logger,
 		WorkingDirLocker:      workingDirLocker,
 		WorkingDir:            workingDir,
-		Drainer:               drainer,
-		PreWorkflowHookRunner: &runtime.PreWorkflowHookRunner{},
+		PreWorkflowHookRunner: runtime.DefaultPreWorkflowHookRunner{},
 	}
-	commandRunner := &events.DefaultCommandRunner{
-		VCSClient:                vcsClient,
-		GithubPullGetter:         githubClient,
-		GitlabMergeRequestGetter: gitlabClient,
-		AzureDevopsPullGetter:    azuredevopsClient,
-		CommitStatusUpdater:      commitStatusUpdater,
-		EventParser:              eventParser,
-		MarkdownRenderer:         markdownRenderer,
-		Logger:                   logger,
-		AllowForkPRs:             userConfig.AllowForkPRs,
-		AllowForkPRsFlag:         config.AllowForkPRsFlag,
-		HidePrevPlanComments:     userConfig.HidePrevPlanComments,
-		SilenceForkPRErrors:      userConfig.SilenceForkPRErrors,
-		SilenceForkPRErrorsFlag:  config.SilenceForkPRErrorsFlag,
-		SilenceVCSStatusNoPlans:  userConfig.SilenceVCSStatusNoPlans,
-		DisableApplyAll:          userConfig.DisableApplyAll,
-		DisableApply:             userConfig.DisableApply,
-		DisableAutoplan:          userConfig.DisableAutoplan,
-		ParallelPoolSize:         userConfig.ParallelPoolSize,
-		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
-			ParserValidator:    validator,
-			ProjectFinder:      &events.DefaultProjectFinder{},
-			VCSClient:          vcsClient,
-			WorkingDir:         workingDir,
-			WorkingDirLocker:   workingDirLocker,
-			GlobalCfg:          globalCfg,
-			PendingPlanFinder:  pendingPlanFinder,
-			CommentBuilder:     commentParser,
-			SkipCloneNoChanges: userConfig.SkipCloneNoChanges,
+	projectCommandBuilder := events.NewProjectCommandBuilder(
+		policyChecksEnabled,
+		validator,
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		workingDirLocker,
+		globalCfg,
+		pendingPlanFinder,
+		commentParser,
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+	)
+
+	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTfVersion)
+
+	if err != nil {
+		return nil, errors.Wrap(err, "initializing show step runner")
+	}
+
+	policyCheckRunner, err := runtime.NewPolicyCheckStepRunner(
+		defaultTfVersion,
+		policy.NewConfTestExecutorWorkflow(logger, binDir, &terraform.DefaultDownloader{}),
+	)
+
+	if err != nil {
+		return nil, errors.Wrap(err, "initializing policy check runner")
+	}
+
+	projectCommandRunner := &events.DefaultProjectCommandRunner{
+		Locker:           projectLocker,
+		LockURLGenerator: router,
+		InitStepRunner: &runtime.InitStepRunner{
+			TerraformExecutor: terraformClient,
+			DefaultTFVersion:  defaultTfVersion,
 		},
-		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
-			Locker:           projectLocker,
-			LockURLGenerator: router,
-			InitStepRunner: &runtime.InitStepRunner{
-				TerraformExecutor: terraformClient,
-				DefaultTFVersion:  defaultTfVersion,
-			},
-			PlanStepRunner: &runtime.PlanStepRunner{
-				TerraformExecutor:   terraformClient,
-				DefaultTFVersion:    defaultTfVersion,
-				CommitStatusUpdater: commitStatusUpdater,
-				AsyncTFExec:         terraformClient,
-			},
-			ApplyStepRunner: &runtime.ApplyStepRunner{
-				TerraformExecutor:   terraformClient,
-				CommitStatusUpdater: commitStatusUpdater,
-				AsyncTFExec:         terraformClient,
-			},
+		PlanStepRunner: &runtime.PlanStepRunner{
+			TerraformExecutor:   terraformClient,
+			DefaultTFVersion:    defaultTfVersion,
+			CommitStatusUpdater: commitStatusUpdater,
+			AsyncTFExec:         terraformClient,
+		},
+		ShowStepRunner:        showStepRunner,
+		PolicyCheckStepRunner: policyCheckRunner,
+		ApplyStepRunner: &runtime.ApplyStepRunner{
+			TerraformExecutor:   terraformClient,
+			CommitStatusUpdater: commitStatusUpdater,
+			AsyncTFExec:         terraformClient,
+		},
+		RunStepRunner: runStepRunner,
+		EnvStepRunner: &runtime.EnvStepRunner{
 			RunStepRunner: runStepRunner,
-			EnvStepRunner: &runtime.EnvStepRunner{
-				RunStepRunner: runStepRunner,
-			},
-			PullApprovedChecker: vcsClient,
-			WorkingDir:          workingDir,
-			Webhooks:            webhooksManager,
-			WorkingDirLocker:    workingDirLocker,
 		},
-		WorkingDir:        workingDir,
-		PendingPlanFinder: pendingPlanFinder,
-		DB:                boltdb,
-		DeleteLockCommand: deleteLockCommand,
-		GlobalAutomerge:   userConfig.Automerge,
-		Drainer:           drainer,
+		PullApprovedChecker: vcsClient,
+		WorkingDir:          workingDir,
+		Webhooks:            webhooksManager,
+		WorkingDirLocker:    workingDirLocker,
+	}
+
+	dbUpdater := &events.DBUpdater{
+		DB: boltdb,
+	}
+
+	pullUpdater := &events.PullUpdater{
+		HidePrevPlanComments: userConfig.HidePrevPlanComments,
+		VCSClient:            vcsClient,
+		MarkdownRenderer:     markdownRenderer,
+	}
+
+	autoMerger := &events.AutoMerger{
+		VCSClient:       vcsClient,
+		GlobalAutomerge: userConfig.Automerge,
+	}
+
+	policyCheckCommandRunner := events.NewPolicyCheckCommandRunner(
+		dbUpdater,
+		pullUpdater,
+		commitStatusUpdater,
+		projectCommandRunner,
+		userConfig.ParallelPoolSize,
+	)
+
+	planCommandRunner := events.NewPlanCommandRunner(
+		userConfig.SilenceVCSStatusNoPlans,
+		vcsClient,
+		pendingPlanFinder,
+		workingDir,
+		commitStatusUpdater,
+		projectCommandBuilder,
+		projectCommandRunner,
+		dbUpdater,
+		pullUpdater,
+		policyCheckCommandRunner,
+		autoMerger,
+		userConfig.ParallelPoolSize,
+	)
+
+	applyCommandRunner := events.NewApplyCommandRunner(
+		vcsClient,
+		userConfig.DisableApplyAll,
+		userConfig.DisableApply,
+		commitStatusUpdater,
+		projectCommandBuilder,
+		projectCommandRunner,
+		autoMerger,
+		pullUpdater,
+		dbUpdater,
+		boltdb,
+		userConfig.ParallelPoolSize,
+	)
+
+	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
+		commitStatusUpdater,
+		projectCommandBuilder,
+		projectCommandRunner,
+		pullUpdater,
+		dbUpdater,
+	)
+
+	unlockCommandRunner := events.NewUnlockCommandRunner(
+		deleteLockCommand,
+		vcsClient,
+	)
+
+	commentCommandRunnerByCmd := map[models.CommandName]events.CommentCommandRunner{
+		models.PlanCommand:            planCommandRunner,
+		models.ApplyCommand:           applyCommandRunner,
+		models.ApprovePoliciesCommand: approvePoliciesCommandRunner,
+		models.UnlockCommand:          unlockCommandRunner,
+	}
+
+	commandRunner := &events.DefaultCommandRunner{
+		VCSClient:                     vcsClient,
+		GithubPullGetter:              githubClient,
+		GitlabMergeRequestGetter:      gitlabClient,
+		AzureDevopsPullGetter:         azuredevopsClient,
+		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
+		EventParser:                   eventParser,
+		Logger:                        logger,
+		AllowForkPRs:                  userConfig.AllowForkPRs,
+		AllowForkPRsFlag:              config.AllowForkPRsFlag,
+		SilenceForkPRErrors:           userConfig.SilenceForkPRErrors,
+		SilenceForkPRErrorsFlag:       config.SilenceForkPRErrorsFlag,
+		DisableAutoplan:               userConfig.DisableAutoplan,
+		Drainer:                       drainer,
+		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 	}
 	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
 	if err != nil {
@@ -453,7 +565,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DeleteLockCommand:  deleteLockCommand,
 	}
 	eventsController := &EventsController{
-		PreWorkflowHooksCommandRunner:   preWorkflowHooksCommandRunner,
 		CommandRunner:                   commandRunner,
 		PullCleaner:                     pullClosedExecutor,
 		Parser:                          eventParser,
@@ -610,6 +721,15 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	if err != nil {
 		s.Logger.Err(err.Error())
 	}
+}
+
+func mkSubDir(parentDir string, subDir string) (string, error) {
+	fullDir := filepath.Join(parentDir, subDir)
+	if err := os.MkdirAll(fullDir, 0700); err != nil {
+		return "", errors.Wrapf(err, "unable to creare dir %q", fullDir)
+	}
+
+	return fullDir, nil
 }
 
 // Healthz returns the health check response. It always returns a 200 currently.
