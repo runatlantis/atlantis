@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/go-github/v31/github"
+	stats "github.com/lyft/gostats"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
@@ -46,6 +47,8 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 		t.Run(c.Description, func(t *testing.T) {
 			vcsClient := setup(t)
 
+			scopeNull := stats.NewStore(stats.NewNullSink(), false)
+
 			pull := &github.PullRequest{
 				State: github.String("open"),
 			}
@@ -59,6 +62,7 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 				Pull:     modelPull,
 				HeadRepo: fixtures.GithubRepo,
 				Trigger:  events.Comment,
+				Scope:    scopeNull,
 			}
 
 			When(applyLockChecker.CheckApplyLock()).ThenReturn(locking.ApplyCommandLock{Locked: c.ApplyLocked}, c.ApplyLockError)
