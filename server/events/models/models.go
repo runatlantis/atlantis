@@ -208,6 +208,27 @@ type User struct {
 	Username string
 }
 
+// LockMetadata contains additional data provided to the lock
+type LockMetadata struct {
+	UnixTime int64
+}
+
+// CommandLock represents a global lock for an atlantis command (plan, apply, policy_check).
+// It is used to prevent commands from being executed
+type CommandLock struct {
+	// Time is the time at which the lock was first created.
+	LockMetadata LockMetadata
+	CommandName  CommandName
+}
+
+func (l *CommandLock) LockTime() time.Time {
+	return time.Unix(l.LockMetadata.UnixTime, 0)
+}
+
+func (l *CommandLock) IsLocked() bool {
+	return !l.LockTime().IsZero()
+}
+
 // ProjectLock represents a lock on a project.
 type ProjectLock struct {
 	// Project is the project that is being locked.

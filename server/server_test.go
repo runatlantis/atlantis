@@ -76,6 +76,7 @@ func TestIndex_Success(t *testing.T) {
 	t.Log("Index should render the index template successfully.")
 	RegisterMockTestingT(t)
 	l := mocks.NewMockLocker()
+	al := mocks.NewMockApplyLocker()
 	// These are the locks that we expect to be rendered.
 	now := time.Now()
 	locks := map[string]models.ProjectLock{
@@ -100,6 +101,7 @@ func TestIndex_Success(t *testing.T) {
 	Ok(t, err)
 	s := server.Server{
 		Locker:          l,
+		ApplyLocker:     al,
 		IndexTemplate:   it,
 		Router:          r,
 		AtlantisVersion: atlantisVersion,
@@ -109,6 +111,11 @@ func TestIndex_Success(t *testing.T) {
 	w := httptest.NewRecorder()
 	s.Index(w, req)
 	it.VerifyWasCalledOnce().Execute(w, server.IndexData{
+		ApplyLock: server.ApplyLockData{
+			Locked:        false,
+			Time:          time.Time{},
+			TimeFormatted: "01-01-0001 00:00:00",
+		},
 		Locks: []server.LockIndexData{
 			{
 				LockPath:      "/lock?id=lkysow%252Fatlantis-example%252F.%252Fdefault",

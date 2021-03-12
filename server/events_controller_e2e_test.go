@@ -38,6 +38,9 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
+var applyLocker locking.ApplyLocker
+var userConfig server.UserConfig
+
 type NoopTFDownloader struct{}
 
 var mockPreWorkflowHookRunner *runtimemocks.MockPreWorkflowHookRunner
@@ -74,6 +77,10 @@ func TestGitHubWorkflow(t *testing.T) {
 		ModifiedFiles []string
 		// Comments are what our mock user writes to the pull request.
 		Comments []string
+		// DisableApply flag used by userConfig object when initializing atlantis server.
+		DisableApply bool
+		// ApplyLock creates an apply lock that temporarily disables apply command
+		ApplyLock bool
 		// ExpAutomerge is true if we expect Atlantis to automerge.
 		ExpAutomerge bool
 		// ExpAutoplan is true if we expect Atlantis to autoplan.
@@ -337,12 +344,48 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-merge.txt"},
 			},
 		},
+		{
+			Description:   "global apply lock disables apply commands",
+			RepoDir:       "simple-yaml",
+			ModifiedFiles: []string{"main.tf"},
+			DisableApply:  false,
+			ApplyLock:     true,
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-apply-locked.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description:   "disable apply flag always takes presedence",
+			RepoDir:       "simple-yaml",
+			ModifiedFiles: []string{"main.tf"},
+			DisableApply:  true,
+			ApplyLock:     false,
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-apply-locked.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			RegisterMockTestingT(t)
 
-			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir, false)
+			// reset userConfig
+			userConfig = server.UserConfig{}
+			userConfig.DisableApply = c.DisableApply
+
+			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir)
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
 			defer cleanup()
@@ -357,6 +400,11 @@ func TestGitHubWorkflow(t *testing.T) {
 			pullOpenedReq := GitHubPullRequestOpenedEvent(t, headSHA)
 			ctrl.Post(w, pullOpenedReq)
 			responseContains(t, w, 200, "Processing...")
+
+			// Create global apply lock if required
+			if c.ApplyLock {
+				_, _ = applyLocker.LockApply()
+			}
 
 			// Now send any other comments.
 			for _, comment := range c.Comments {
@@ -490,7 +538,11 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 		t.Run(c.Description, func(t *testing.T) {
 			RegisterMockTestingT(t)
 
-			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir, true)
+			// reset userConfig
+			userConfig = server.UserConfig{}
+			userConfig.EnablePolicyChecksFlag = true
+
+			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir)
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
 			defer cleanup()
@@ -560,14 +612,14 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 	}
 }
 
-func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.EventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
+func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
 	allowForkPRs := false
 	dataDir, binDir, cacheDir, cleanup := mkSubDirs(t)
 	defer cleanup()
 
 	//env vars
 
-	if policyChecksEnabled {
+	if userConfig.EnablePolicyChecksFlag {
 		// need this to be set or we'll fail the policy check step
 		os.Setenv(policy.DefaultConftestVersionEnvKey, "0.21.0")
 	}
@@ -595,6 +647,7 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 	boltdb, err := db.New(dataDir)
 	Ok(t, err)
 	lockingClient := locking.NewClient(boltdb)
+	applyLocker = locking.NewApplyClient(boltdb, userConfig.DisableApply)
 	projectLocker := &events.DefaultProjectLocker{
 		Locker:    lockingClient,
 		VCSClient: e2eVCSClient,
@@ -633,7 +686,7 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 	statsScope := stats.NewStore(stats.NewNullSink(), false)
 
 	projectCommandBuilder := events.NewProjectCommandBuilder(
-		policyChecksEnabled,
+		userConfig.EnablePolicyChecksFlag,
 		parser,
 		&events.DefaultProjectFinder{},
 		e2eVCSClient,
@@ -733,7 +786,7 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 	applyCommandRunner := events.NewApplyCommandRunner(
 		e2eVCSClient,
 		false,
-		false,
+		applyLocker,
 		e2eStatusUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,

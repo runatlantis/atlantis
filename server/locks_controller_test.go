@@ -3,13 +3,16 @@ package server_test
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/runatlantis/atlantis/server/events/db"
+	"github.com/runatlantis/atlantis/server/events/locking"
 
 	"github.com/gorilla/mux"
 	. "github.com/petergtz/pegomock"
@@ -28,6 +31,84 @@ import (
 func AnyRepo() models.Repo {
 	RegisterMatcher(NewAnyMatcher(reflect.TypeOf(models.Repo{})))
 	return models.Repo{}
+}
+
+func TestCreateApplyLock(t *testing.T) {
+	t.Run("Creates apply lock", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+		w := httptest.NewRecorder()
+
+		layout := "2006-01-02T15:04:05.000Z"
+		strLockTime := "2020-09-01T00:45:26.371Z"
+		expLockTime := "2020-09-01 00:45:26"
+		lockTime, _ := time.Parse(layout, strLockTime)
+
+		l := mocks.NewMockApplyLocker()
+		When(l.LockApply()).ThenReturn(locking.ApplyCommandLock{
+			Locked: true,
+			Time:   lockTime,
+		}, nil)
+
+		lc := server.LocksController{
+			Logger:      logging.NewNoopLogger(),
+			ApplyLocker: l,
+		}
+		lc.LockApply(w, req)
+
+		responseContains(t, w, http.StatusOK, fmt.Sprintf("Apply Lock is acquired on %s", expLockTime))
+	})
+
+	t.Run("Apply lock creation fails", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+		w := httptest.NewRecorder()
+
+		l := mocks.NewMockApplyLocker()
+		When(l.LockApply()).ThenReturn(locking.ApplyCommandLock{
+			Locked: false,
+		}, errors.New("failed to acquire lock"))
+
+		lc := server.LocksController{
+			Logger:      logging.NewNoopLogger(),
+			ApplyLocker: l,
+		}
+		lc.LockApply(w, req)
+
+		responseContains(t, w, http.StatusInternalServerError, fmt.Sprintf("creating apply lock failed with: failed to acquire lock"))
+	})
+}
+
+func TestUnlockApply(t *testing.T) {
+	t.Run("Apply lock deleted successfully", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+		w := httptest.NewRecorder()
+
+		l := mocks.NewMockApplyLocker()
+		When(l.UnlockApply()).ThenReturn(nil)
+
+		lc := server.LocksController{
+			Logger:      logging.NewNoopLogger(),
+			ApplyLocker: l,
+		}
+		lc.UnlockApply(w, req)
+
+		responseContains(t, w, http.StatusOK, fmt.Sprintf("Deleted apply lock"))
+	})
+
+	t.Run("Apply lock deletion failed", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+		w := httptest.NewRecorder()
+
+		l := mocks.NewMockApplyLocker()
+		When(l.UnlockApply()).ThenReturn(errors.New("failed to delete lock"))
+
+		lc := server.LocksController{
+			Logger:      logging.NewNoopLogger(),
+			ApplyLocker: l,
+		}
+		lc.UnlockApply(w, req)
+
+		responseContains(t, w, http.StatusInternalServerError, fmt.Sprintf("deleting apply lock failed with: failed to delete lock"))
+	})
 }
 
 func TestGetLockRoute_NoLockID(t *testing.T) {
