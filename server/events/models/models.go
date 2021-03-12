@@ -314,12 +314,12 @@ type ProjectCommandContext struct {
 	// AutomergeEnabled is true if automerge is enabled for the repo that this
 	// project is in.
 	AutomergeEnabled bool
-	// ParallelPlansEnabled is true if parallel plans is enabled for the repo that this
-	// project is in.
-	ParallelPlansEnabled bool
-	// ProjectLocksEnabled is true if project locks is enabled for the repo that this
-	// project is in.
-	ProjectLocksEnabled bool
+	// ParallelApplyEnabled is true if parallel apply is enabled for this project.
+	ParallelApplyEnabled bool
+	// ParallelPlanEnabled is true if parallel plan is enabled for this project.
+	ParallelPlanEnabled bool
+	// ParallelPolicyCheckEnabled is true if parallel policy_check is enabled for this project.
+	ParallelPolicyCheckEnabled bool
 	// AutoplanEnabled is true if autoplanning is enabled for this project.
 	AutoplanEnabled bool
 	// BaseRepo is the repository that the pull request will be merged into.
@@ -364,8 +364,9 @@ type ProjectCommandContext struct {
 	// Workspace is the Terraform workspace this project is in. It will always
 	// be set.
 	Workspace string
-	// Command is the command type being run in the current context: plan/apply
-	Command CommandName
+	// PolicySets represent the policies that are run on the plan as part of the
+	// policy check stage
+	PolicySets valid.PolicySets
 }
 
 // GetShowResultFileName returns the filename (not the path) to store the tf show result

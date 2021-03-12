@@ -128,7 +128,6 @@ type DefaultProjectCommandRunner struct {
 
 // Plan runs terraform plan for the project described by ctx.
 func (p *DefaultProjectCommandRunner) Plan(ctx models.ProjectCommandContext) models.ProjectResult {
-	ctx.Command = models.PlanCommand
 	planSuccess, failure, err := p.doPlan(ctx)
 	return models.ProjectResult{
 		Command:     models.PlanCommand,
@@ -157,7 +156,6 @@ func (p *DefaultProjectCommandRunner) PolicyCheck(ctx models.ProjectCommandConte
 
 // Apply runs terraform apply for the project described by ctx.
 func (p *DefaultProjectCommandRunner) Apply(ctx models.ProjectCommandContext) models.ProjectResult {
-	ctx.Command = models.ApplyCommand
 	applyOut, failure, err := p.doApply(ctx)
 	return models.ProjectResult{
 		Command:      models.ApplyCommand,
@@ -265,19 +263,13 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx models.ProjectCommandCon
 }
 
 func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (*models.PlanSuccess, string, error) {
-	var lockAttempt *TryLockResponse
-	var lockURL string
-	if ctx.ProjectLocksEnabled {
-		// Acquire Atlantis lock for this repo/dir/workspace.
-		lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.BaseRepo.FullName, ctx.RepoRelDir))
-		if err != nil {
-			return nil, "", errors.Wrap(err, "acquiring lock")
-		}
-		if !lockAttempt.LockAcquired {
-			return nil, lockAttempt.LockFailureReason, nil
-		}
-		ctx.Log.Debug("acquired lock for project")
-		lockURL = p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey)
+	// Acquire Atlantis lock for this repo/dir/workspace.
+	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir))
+	if err != nil {
+		return nil, "", errors.Wrap(err, "acquiring lock")
+	}
+	if !lockAttempt.LockAcquired {
+		return nil, lockAttempt.LockFailureReason, nil
 	}
 
 	// Acquire internal lock for the directory we're going to operate in.
@@ -313,7 +305,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 	}
 
 	return &models.PlanSuccess{
-		LockURL:         lockURL,
+		LockURL:         p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
 		TerraformOutput: strings.Join(outputs, "\n"),
 		RePlanCmd:       ctx.RePlanCmd,
 		ApplyCmd:        ctx.ApplyCmd,

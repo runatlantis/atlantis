@@ -227,7 +227,8 @@ projects:
 - dir: "."
 `,
 			exp: valid.RepoCfg{
-				Version: 3,
+				Version:      3,
+				ProjectLocks: true,
 				Projects: []valid.Project{
 					{
 						Dir:       ".",
@@ -862,7 +863,8 @@ workflows:
           command: command and args
 `,
 			exp: valid.RepoCfg{
-				Version: 3,
+				Version:      3,
+				ProjectLocks: true,
 				Projects: []valid.Project{
 					{
 						Dir:       ".",

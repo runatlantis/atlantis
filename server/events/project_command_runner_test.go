@@ -79,8 +79,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		"name": "value",
 	}
 	ctx := models.ProjectCommandContext{
-		Log:                 logging.NewNoopLogger(),
-		ProjectLocksEnabled: true,
+		Log: logging.NewNoopLogger(),
 		Steps: []valid.Step{
 			{
 				StepName:    "env",
@@ -100,9 +99,9 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 				StepName: "init",
 			},
 		},
-		Workspace:  "default",
-		RepoRelDir: ".",
-		Command:    models.PlanCommand,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		CommandName: models.PlanCommand,
 	}
 	// Each step will output its step name.
 	When(mockInit.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("init", nil)

@@ -302,7 +302,16 @@ var policyCheckSuccessWrappedTmpl = template.Must(template.New("").Parse(
 // to do next.
 var policyCheckNextSteps = "* :arrow_forward: To **apply** this plan, comment:\n" +
 	"    * `{{.ApplyCmd}}`\n" +
-	"* :put_litter_in_its_place: To **delete** this plan {{ if ne .LockURL \"\"}}click [here]({{.LockURL}}){{ else }}close this pull request{{ end }}\n" +
+	"* :put_litter_in_its_place: To **delete** this plan click [here]({{.LockURL}})\n" +
+	"* :repeat: To re-run policies **plan** this project again by commenting:\n" +
+	"    * `{{.RePlanCmd}}`"
+
+// planNextSteps are instructions appended after successful plans as to what
+// to do next.
+var planNextSteps = "{{ if .PlanWasDeleted }}This plan was not saved because one or more projects failed and automerge requires all plans pass.{{ else }}" +
+	"{{ if not .DisableApply }}* :arrow_forward: To **apply** this plan, comment:\n" +
+	"    * `{{.ApplyCmd}}`\n{{end}}" +
+	"{{ if not .DisableRepoLocking }}* :put_litter_in_its_place: To **delete** this plan click [here]({{.LockURL}})\n{{end}}" +
 	"* :repeat: To **plan** this project again, comment:\n" +
 	"    * `{{.RePlanCmd}}`{{end}}"
 var applyUnwrappedSuccessTmpl = template.Must(template.New("").Parse(

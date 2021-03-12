@@ -7,19 +7,19 @@ import (
 
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/segmentio/stats"
-	"github.com/segmentio/stats/statstest"
+	"github.com/segmentio/stats/v4"
+	"github.com/segmentio/stats/v4/statstest"
 )
 
 type stepRunner struct{}
 
-func (c *stepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string) (string, error) {
+func (c *stepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error) {
 	return "success", nil
 }
 
 type errStepRunner struct{}
 
-func (c *errStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string) (string, error) {
+func (c *errStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error) {
 	return "TLS handshake timeout", errors.New("error")
 }
 
@@ -52,11 +52,11 @@ func testStepRunSuccess(t *testing.T, eng *stats.Engine) {
 	ic := InstrumentStepRunner(&stepRunner{}, eng, "plan")
 	tfVersion, _ := version.NewVersion("0.12.18")
 	projectContext := models.ProjectCommandContext{
-		Command:          models.PlanCommand,
+		CommandName:      models.PlanCommand,
 		Workspace:        "test-workspace",
 		TerraformVersion: tfVersion,
 	}
-	ic.Run(projectContext, nil, "/path")
+	ic.Run(projectContext, nil, "/path", nil)
 
 	found := measures(t, eng)
 	if len(found) != 2 {
@@ -64,8 +64,8 @@ func testStepRunSuccess(t *testing.T, eng *stats.Engine) {
 	}
 
 	checkHistogramEqual(t, found[0], stats.Measure{
-		Name:   "test.steps.duration",
-		Fields: []stats.Field{stats.MakeField("", 1, stats.Histogram)},
+		Name:   "test.steps",
+		Fields: []stats.Field{stats.MakeField("duration", 1, stats.Histogram)},
 		Tags: []stats.Tag{
 			{Name: "command", Value: "plan"},
 			{Name: "stamp", Value: "total"},
@@ -76,8 +76,8 @@ func testStepRunSuccess(t *testing.T, eng *stats.Engine) {
 	})
 
 	checkCounterEqual(t, found[1], stats.Measure{
-		Name:   "test.steps.success",
-		Fields: []stats.Field{stats.MakeField("", 1, stats.Counter)},
+		Name:   "test.steps",
+		Fields: []stats.Field{stats.MakeField("success", 1, stats.Counter)},
 		Tags: []stats.Tag{
 			{Name: "command", Value: "plan"},
 			{Name: "step", Value: "plan"},
@@ -91,11 +91,11 @@ func testStepRunError(t *testing.T, eng *stats.Engine) {
 	ic := InstrumentStepRunner(&errStepRunner{}, eng, "plan")
 	tfVersion, _ := version.NewVersion("0.12.18")
 	projectContext := models.ProjectCommandContext{
-		Command:          models.PlanCommand,
+		CommandName:      models.PlanCommand,
 		Workspace:        "test-workspace",
 		TerraformVersion: tfVersion,
 	}
-	ic.Run(projectContext, nil, "/path")
+	ic.Run(projectContext, nil, "/path", nil)
 
 	found := measures(t, eng)
 	if len(found) != 1 {
@@ -103,8 +103,8 @@ func testStepRunError(t *testing.T, eng *stats.Engine) {
 	}
 
 	checkCounterEqual(t, found[0], stats.Measure{
-		Name:   "test.steps.error",
-		Fields: []stats.Field{stats.MakeField("", 1, stats.Counter)},
+		Name:   "test.steps",
+		Fields: []stats.Field{stats.MakeField("error", 1, stats.Counter)},
 		Tags: []stats.Tag{
 			{Name: "command", Value: "plan"},
 			{Name: "error_type", Value: "tls"},

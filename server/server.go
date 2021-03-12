@@ -34,8 +34,8 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
-	"github.com/segmentio/stats"
-	"github.com/segmentio/stats/datadog"
+	"github.com/segmentio/stats/v4"
+	"github.com/segmentio/stats/v4/datadog"
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
@@ -274,7 +274,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.TFEHostname,
 		userConfig.DefaultTFVersion,
 		config.DefaultTFVersionFlag,
-		&terraform.DefaultDownloader{})
+		userConfig.TFDownloadURL,
+		&terraform.DefaultDownloader{},
+		true)
 
 	dd := datadog.NewClient("localhost:8125")
 	stats.Register(dd)
@@ -388,53 +390,75 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	defaultTfVersion := terraformClient.DefaultVersion()
 	pendingPlanFinder := &events.DefaultPendingPlanFinder{}
-	commandRunner := &events.DefaultCommandRunner{
-		VCSClient:                vcsClient,
-		GithubPullGetter:         githubClient,
-		GitlabMergeRequestGetter: gitlabClient,
-		CommitStatusUpdater:      commitStatusUpdater,
-		EventParser:              eventParser,
-		MarkdownRenderer:         markdownRenderer,
-		Logger:                   logger,
-		AllowForkPRs:             userConfig.AllowForkPRs,
-		AllowForkPRsFlag:         config.AllowForkPRsFlag,
-		DisableApplyAll:          userConfig.DisableApplyAll,
-		ParallelPlansPoolSize:    userConfig.ParallelPlansPoolSize,
-		ProjectCommandBuilder: &events.DefaultProjectCommandBuilder{
-			ParserValidator:   validator,
-			ProjectFinder:     &events.DefaultProjectFinder{},
-			VCSClient:         vcsClient,
-			WorkingDir:        workingDir,
-			WorkingDirLocker:  workingDirLocker,
-			GlobalCfg:         globalCfg,
-			PendingPlanFinder: pendingPlanFinder,
-			CommentBuilder:    commentParser,
-		},
-		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
-			Locker:           projectLocker,
-			LockURLGenerator: router,
-			InitStepRunner: events.InstrumentStepRunner(&runtime.InitStepRunner{
-				TerraformExecutor: terraformClient,
-				DefaultTFVersion:  defaultTfVersion,
-			}, stats.DefaultEngine, "init"),
-			PlanStepRunner: events.InstrumentStepRunner(&runtime.PlanStepRunner{
-				TerraformExecutor:   terraformClient,
-				DefaultTFVersion:    defaultTfVersion,
-				CommitStatusUpdater: commitStatusUpdater,
-				AsyncTFExec:         terraformClient,
-			}, stats.DefaultEngine, "plan"),
-			ApplyStepRunner: events.InstrumentStepRunner(&runtime.ApplyStepRunner{
-				TerraformExecutor:   terraformClient,
-				CommitStatusUpdater: commitStatusUpdater,
-				AsyncTFExec:         terraformClient,
-			}, stats.DefaultEngine, "apply"),
-			RunStepRunner: events.InstrumentCustomRunner(&runtime.RunStepRunner{
-				DefaultTFVersion: defaultTfVersion,
-			}, stats.DefaultEngine),
-			PullApprovedChecker: vcsClient,
-			WorkingDir:          workingDir,
-			Webhooks:            webhooksManager,
-			WorkingDirLocker:    workingDirLocker,
+	runStepRunner := &runtime.RunStepRunner{
+		TerraformExecutor: terraformClient,
+		DefaultTFVersion:  defaultTfVersion,
+		TerraformBinDir:   terraformClient.TerraformBinDir(),
+	}
+	drainer := &events.Drainer{}
+	statusController := &StatusController{
+		Logger:  logger,
+		Drainer: drainer,
+	}
+	preWorkflowHooksCommandRunner := &events.DefaultPreWorkflowHooksCommandRunner{
+		VCSClient:             vcsClient,
+		GlobalCfg:             globalCfg,
+		Logger:                logger,
+		WorkingDirLocker:      workingDirLocker,
+		WorkingDir:            workingDir,
+		Drainer:               drainer,
+		PreWorkflowHookRunner: &runtime.PreWorkflowHookRunner{},
+	}
+	projectCommandBuilder := events.NewProjectCommandBuilder(
+		policyChecksEnabled,
+		validator,
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		workingDirLocker,
+		globalCfg,
+		pendingPlanFinder,
+		commentParser,
+		userConfig.SkipCloneNoChanges,
+	)
+
+	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTfVersion)
+
+	if err != nil {
+		return nil, errors.Wrap(err, "initializing show step runner")
+	}
+
+	policyCheckRunner, err := runtime.NewPolicyCheckStepRunner(
+		defaultTfVersion,
+		policy.NewConfTestExecutorWorkflow(logger, binDir, &terraform.DefaultDownloader{}),
+	)
+
+	if err != nil {
+		return nil, errors.Wrap(err, "initializing policy check runner")
+	}
+	projectCommandRunner := &events.DefaultProjectCommandRunner{
+		Locker:           projectLocker,
+		LockURLGenerator: router,
+		InitStepRunner: events.InstrumentStepRunner(&runtime.InitStepRunner{
+			TerraformExecutor: terraformClient,
+			DefaultTFVersion:  defaultTfVersion,
+		}, stats.DefaultEngine, "init"),
+		PlanStepRunner: events.InstrumentStepRunner(&runtime.PlanStepRunner{
+			TerraformExecutor:   terraformClient,
+			DefaultTFVersion:    defaultTfVersion,
+			CommitStatusUpdater: commitStatusUpdater,
+			AsyncTFExec:         terraformClient,
+		}, stats.DefaultEngine, "plan"),
+		ApplyStepRunner: events.InstrumentStepRunner(&runtime.ApplyStepRunner{
+			TerraformExecutor:   terraformClient,
+			CommitStatusUpdater: commitStatusUpdater,
+			AsyncTFExec:         terraformClient,
+		}, stats.DefaultEngine, "apply"),
+		ShowStepRunner:        events.InstrumentRunner(showStepRunner, stats.DefaultEngine),
+		PolicyCheckStepRunner: events.InstrumentRunner(policyCheckRunner, stats.DefaultEngine),
+		RunStepRunner:         events.InstrumentCustomRunner(runStepRunner, stats.DefaultEngine),
+		EnvStepRunner: &runtime.EnvStepRunner{
+			RunStepRunner: runStepRunner,
 		},
 		PullApprovedChecker: vcsClient,
 		WorkingDir:          workingDir,
@@ -647,7 +671,8 @@ func (s *Server) Start() error {
 	}()
 	<-stop
 
-	s.Logger.Warn("Received interrupt. Safely shutting down")
+	s.Logger.Warn("Received interrupt. Waiting for in-progress operations to complete")
+	s.waitForDrain()
 	stats.Flush()
 	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second) // nolint: vet
 	if err := server.Shutdown(ctx); err != nil {

@@ -10,10 +10,16 @@ import (
 // DefaultAutomerge is the default setting for automerge.
 const DefaultAutomerge = false
 
-// DefaultParallelPlans is the default setting for parallel plans
-const DefaultParallelPlans = false
+// DefaultParallelApply is the default setting for parallel apply
+const DefaultParallelApply = false
 
-// DefaultProjectLocks is the default setting for project_locks
+// DefaultParallelPlan is the default setting for parallel plan
+const DefaultParallelPlan = false
+
+// DefaultParallelPolicyCheck is the default setting for parallel plan
+const DefaultParallelPolicyCheck = false
+
+// DefaultProjectLocks is the default setting for project locks
 const DefaultProjectLocks = true
 
 // RepoCfg is the raw schema for repo-level atlantis.yaml config.
@@ -21,7 +27,10 @@ type RepoCfg struct {
 	Version       *int                `yaml:"version,omitempty"`
 	Projects      []Project           `yaml:"projects,omitempty"`
 	Workflows     map[string]Workflow `yaml:"workflows,omitempty"`
+	PolicySets    PolicySets          `yaml:"policies,omitempty"`
 	Automerge     *bool               `yaml:"automerge,omitempty"`
+	ParallelApply *bool               `yaml:"parallel_apply,omitempty"`
+	ParallelPlan  *bool               `yaml:"parallel_plan,omitempty"`
 	ParallelPlans *bool               `yaml:"parallel_plans,omitempty"`
 	ProjectLocks  *bool               `yaml:"project_locks,omitempty"`
 }
@@ -60,9 +69,17 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		automerge = *r.Automerge
 	}
 
-	parallelPlans := DefaultParallelPlans
-	if r.ParallelPlans != nil {
-		parallelPlans = *r.ParallelPlans
+	parallelApply := DefaultParallelApply
+	if r.ParallelApply != nil {
+		parallelApply = *r.ParallelApply
+	}
+
+	parallelPlan := DefaultParallelPlan
+	if r.ParallelPlan != nil {
+		parallelPlan = *r.ParallelPlan
+	} else if r.ParallelPlans != nil {
+		// For legacy reasons, we also support parallel_plans as a flag
+		parallelPlan = *r.ParallelPlans
 	}
 
 	projectLocks := DefaultProjectLocks
@@ -71,11 +88,13 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 	}
 
 	return valid.RepoCfg{
-		Version:       *r.Version,
-		Projects:      validProjects,
-		Workflows:     validWorkflows,
-		Automerge:     automerge,
-		ParallelPlans: parallelPlans,
-		ProjectLocks:  projectLocks,
+		Version:             *r.Version,
+		Projects:            validProjects,
+		Workflows:           validWorkflows,
+		Automerge:           automerge,
+		ParallelApply:       parallelApply,
+		ParallelPlan:        parallelPlan,
+		ParallelPolicyCheck: parallelPlan,
+		ProjectLocks:        projectLocks,
 	}
 }
