@@ -409,6 +409,11 @@ func TestGitHubWorkflow(t *testing.T) {
 				_, _ = applyLocker.LockApply()
 			}
 
+			// Create global apply lock if required
+			if c.ApplyLock {
+				_, _ = applyLocker.LockApply()
+			}
+
 			// Now send any other comments.
 			for _, comment := range c.Comments {
 				commentReq := GitHubCommentEvent(t, comment)
