@@ -40,9 +40,17 @@ type LockIndexData struct {
 	TimeFormatted string
 }
 
+// ApplyLockData holds the fields to display in the index view
+type ApplyLockData struct {
+	Locked        bool
+	Time          time.Time
+	TimeFormatted string
+}
+
 // IndexData holds the data for rendering the index page
 type IndexData struct {
 	Locks           []LockIndexData
+	ApplyLock       ApplyLockData
 	AtlantisVersion string
 	// CleanedBasePath is the path Atlantis is accessible at externally. If
 	// not using a path-based proxy, this will be an empty string. Never ends
@@ -80,11 +88,23 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
     <p class="title-heading">atlantis</p>
     <p class="js-discard-success"><strong>Plan discarded and unlocked!</strong></p>
   </section>
-  <nav class="navbar">
-    <div class="container">
+  <section>
+    {{ if .ApplyLock.Locked }}
+    <div class="twelve center columns">
+      <h6><strong>Apply commands are disabled globally</strong></h6>
+      <h6><code>Lock Status</code>: <strong>Active</strong></h6>
+      <h6><code>Active Since</code>: <strong>{{ .ApplyLock.TimeFormatted }}</strong></h6>
+      <a class="button button-primary" id="applyUnlockPrompt">Enable Apply Commands</a>
     </div>
-  </nav>
-  <div class="navbar-spacer"></div>
+    {{ else }}
+    <div class="twelve columns">
+      <h6><strong>Apply commands are enabled</strong></h6>
+      <a class="button button-primary" id="applyLockPrompt">Disable Apply Commands</a>
+    </div>
+    {{ end }}
+  </section>
+  <br>
+  <br>
   <br>
   <section>
     <p class="title-heading small"><strong>Locks</strong></p>
@@ -103,10 +123,112 @@ var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
     <p class="placeholder">No locks found.</p>
     {{ end }}
   </section>
+  <div id="applyLockMessageModal" class="modal">
+    <!-- Modal content -->
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="close">&times;</span>
+      </div>
+      <div class="modal-body">
+        <p><strong>Are you sure you want to create a global apply lock? It will disable applies globally</strong></p>
+        <input class="button-primary" id="applyLockYes" type="submit" value="Yes">
+        <input type="button" class="cancel" value="Cancel">
+      </div>
+    </div>
+  </div>
+  <div id="applyUnlockMessageModal" class="modal">
+    <!-- Modal content -->
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="close">&times;</span>
+      </div>
+      <div class="modal-body">
+        <p><strong>Are you sure you want to release global apply lock?</strong></p>
+        <input class="button-primary" id="applyUnlockYes" type="submit" value="Yes">
+        <input type="button" class="cancel" value="Cancel">
+      </div>
+    </div>
+  </div>
 </div>
 <footer>
 v{{ .AtlantisVersion }}
 </footer>
+<script>
+
+  function applyLockModalSetup(lockOrUnlock) {
+      // Get the modal
+      switch( lockOrUnlock ) {
+      case "lock":
+          var modal = $("#applyLockMessageModal");
+
+          var btn = $("#applyLockPrompt");
+
+          $("#applyLockYes").click(function() {
+            $.ajax({
+                url: '{{ .CleanedBasePath }}/apply/lock',
+                type: 'POST',
+                success: function(result) {
+                  window.location.replace("{{ .CleanedBasePath }}/?discard=true");
+                }
+            });
+          });
+
+          break;
+      case "unlock":
+          var modal = $("#applyUnlockMessageModal");
+
+          var btn = $("#applyUnlockPrompt");
+          var btnApplyUnlock =
+
+          $("#applyUnlockYes").click(function() {
+            $.ajax({
+                url: '{{ .CleanedBasePath }}/apply/unlock',
+                type: 'DELETE',
+                success: function(result) {
+                  window.location.replace("{{ .CleanedBasePath }}/?discard=true");
+                }
+            });
+          });
+
+          break;
+      default:
+          throw("unsupported command " + lockOrUnlock)
+      }
+
+      return [modal, btn];
+  }
+
+  {{ if .ApplyLock.Locked }}
+  var [modal, btn] = applyLockModalSetup("unlock");
+  {{ else }}
+  var [modal, btn] = applyLockModalSetup("lock");
+  {{ end }}
+
+  // Get the <span> element that closes the modal
+  // using document.getElementsByClassName since jquery $("close") doesn't seem to work for btn click events
+  var span = document.getElementsByClassName("close")[0];
+  var cancelBtn = document.getElementsByClassName("cancel")[0];
+
+  // When the user clicks the button, open the modal
+  btn.click(function() {
+    modal.css("display", "block");
+  });
+
+  // When the user clicks on <span> (x), close the modal
+  span.onclick = function() {
+    modal.css("display", "none");
+  }
+  cancelBtn.onclick = function() {
+    modal.css("display", "none");
+  }
+
+  // When the user clicks anywhere outside of the modal, close it
+  window.onclick = function(event) {
+      if (event.target == modal) {
+          modal.css("display", "none");
+      }
+  }
+</script>
 </body>
 </html>
 `))
@@ -185,7 +307,7 @@ v{{ .AtlantisVersion }}
 <script>
   // Get the modal
   var modal = $("#discardMessageModal");
-  
+
   // Get the button that opens the modal
   var btn = $("#discardPlanUnlock");
   var btnDiscard = $("#discardYes");
@@ -196,7 +318,7 @@ v{{ .AtlantisVersion }}
   var span = document.getElementsByClassName("close")[0];
   var cancelBtn = document.getElementsByClassName("cancel")[0];
 
-  // When the user clicks the button, open the modal 
+  // When the user clicks the button, open the modal
   btn.click(function() {
     modal.css("display", "block");
   });
