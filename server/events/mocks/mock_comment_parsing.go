@@ -79,7 +79,7 @@ type VerifierMockCommentParsing struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockCommentParsing) Parse(comment string, vcsHost models.VCSHostType) *MockCommentParsing_Parse_OngoingVerification {
+func (verifier *VerifierMockCommentParsing) Parse(comment string, user models.User, vcsHost models.VCSHostType) *MockCommentParsing_Parse_OngoingVerification {
 	params := []pegomock.Param{comment, vcsHost}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Parse", params, verifier.timeout)
 	return &MockCommentParsing_Parse_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
@@ -90,21 +90,25 @@ type MockCommentParsing_Parse_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockCommentParsing_Parse_OngoingVerification) GetCapturedArguments() (string, models.VCSHostType) {
-	comment, vcsHost := c.GetAllCapturedArguments()
-	return comment[len(comment)-1], vcsHost[len(vcsHost)-1]
+func (c *MockCommentParsing_Parse_OngoingVerification) GetCapturedArguments() (string, models.User, models.VCSHostType) {
+	comment, user, vcsHost := c.GetAllCapturedArguments()
+	return comment[len(comment)-1], user[len(user)-1], vcsHost[len(vcsHost)-1]
 }
 
-func (c *MockCommentParsing_Parse_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []models.VCSHostType) {
+func (c *MockCommentParsing_Parse_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []models.User, _param2 []models.VCSHostType) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]string, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
 		}
-		_param1 = make([]models.VCSHostType, len(c.methodInvocations))
+		_param1 = make([]models.User, len(c.methodInvocations))
 		for u, param := range params[1] {
-			_param1[u] = param.(models.VCSHostType)
+			_param1[u] = param.(models.User)
+		}
+		_param2 = make([]models.VCSHostType, len(c.methodInvocations))
+		for u, param := range params[1] {
+			_param2[u] = param.(models.VCSHostType)
 		}
 	}
 	return

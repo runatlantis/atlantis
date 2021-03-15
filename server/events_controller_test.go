@@ -328,6 +328,8 @@ func TestPost_GithubCommentResponse(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	e.Post(w, req)
+
+	cp.VerifyWasCalledOnce().Parse("", user, models.Github)
 	vcsClient.VerifyWasCalledOnce().CreateComment(baseRepo, 1, "a comment", "")
 	responseContains(t, w, http.StatusOK, "Commenting back on pull request")
 }
