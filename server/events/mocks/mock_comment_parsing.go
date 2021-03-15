@@ -27,11 +27,11 @@ func NewMockCommentParsing(options ...pegomock.Option) *MockCommentParsing {
 func (mock *MockCommentParsing) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockCommentParsing) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockCommentParsing) Parse(comment string, vcsHost models.VCSHostType) events.CommentParseResult {
+func (mock *MockCommentParsing) Parse(comment string, user models.User, vcsHost models.VCSHostType) events.CommentParseResult {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockCommentParsing().")
 	}
-	params := []pegomock.Param{comment, vcsHost}
+	params := []pegomock.Param{comment, user, vcsHost}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Parse", params, []reflect.Type{reflect.TypeOf((*events.CommentParseResult)(nil)).Elem()})
 	var ret0 events.CommentParseResult
 	if len(result) != 0 {
