@@ -763,7 +763,7 @@ projects:
 		HeadRepo: models.Repo{},
 		Pull:     models.PullRequest{},
 		User:     models.User{},
-		Log:      logger,
+		Log:      logging.NewNoopLogger(t),
 		Scope:    scope,
 	}
 	_, err = builder.BuildPlanCommands(ctx, &events.CommentCommand{

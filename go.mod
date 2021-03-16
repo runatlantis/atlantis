@@ -54,6 +54,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jmespath/go-jmespath v0.3.1-0.20200310193758-2437e8417af5 // indirect
 	github.com/jstemmer/go-junit-report v0.9.1 // indirect
+	github.com/kelseyhightower/envconfig v1.4.1-0.20200624135755-c974cae29cf5 // indirect
 	github.com/klauspost/compress v1.11.2 // indirect
 	github.com/leodido/go-urn v1.2.0 // indirect
 	github.com/lusis/slack-test v0.0.0-20190426140909-c40012f20018 // indirect
