@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"net/url"
 	paths "path"
-	"regexp"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 

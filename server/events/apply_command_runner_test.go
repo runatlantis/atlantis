@@ -45,6 +45,7 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
+			logger := logging.NewNoopLogger(t)
 			vcsClient := setup(t)
 
 			scopeNull := stats.NewStore(stats.NewNullSink(), false)
@@ -58,7 +59,7 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 
 			ctx := &events.CommandContext{
 				User:     fixtures.User,
-				Log:      logging.NewNoopLogger(t),
+				Log:      logger,
 				Pull:     modelPull,
 				HeadRepo: fixtures.GithubRepo,
 				Trigger:  events.Comment,
