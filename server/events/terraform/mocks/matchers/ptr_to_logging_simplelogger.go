@@ -2,19 +2,19 @@
 package matchers
 
 import (
-	"reflect"
 	"github.com/petergtz/pegomock"
 	logging "github.com/runatlantis/atlantis/server/logging"
+	"reflect"
 )
 
-func AnyPtrToLoggingSimpleLogger() *logging.SimpleLogger {
-	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(*logging.SimpleLogger))(nil)).Elem()))
-	var nullValue *logging.SimpleLogger
+func AnyPtrToLoggingSimpleLogger() logging.SimpleLogging {
+	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(logging.SimpleLogging))(nil)).Elem()))
+	var nullValue logging.SimpleLogging
 	return nullValue
 }
 
-func EqPtrToLoggingSimpleLogger(value *logging.SimpleLogger) *logging.SimpleLogger {
+func EqPtrToLoggingSimpleLogger(value logging.SimpleLogging) logging.SimpleLogging {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
-	var nullValue *logging.SimpleLogger
+	var nullValue logging.SimpleLogging
 	return nullValue
 }

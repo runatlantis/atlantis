@@ -127,7 +127,7 @@ type ConfTestExecutorWorkflow struct {
 	Exec                   runtime_models.Exec
 }
 
-func NewConfTestExecutorWorkflow(log *logging.SimpleLogger, versionRootDir string, conftestDownloder terraform.Downloader) *ConfTestExecutorWorkflow {
+func NewConfTestExecutorWorkflow(log logging.SimpleLogging, versionRootDir string, conftestDownloder terraform.Downloader) *ConfTestExecutorWorkflow {
 	downloader := ConfTestVersionDownloader{
 		downloader: conftestDownloder,
 	}
@@ -201,7 +201,7 @@ func (c *ConfTestExecutorWorkflow) sanitizeOutput(inputFile string, output strin
 	return strings.Replace(output, inputFile, "<redacted plan file>", -1)
 }
 
-func (c *ConfTestExecutorWorkflow) EnsureExecutorVersion(log *logging.SimpleLogger, v *version.Version) (string, error) {
+func (c *ConfTestExecutorWorkflow) EnsureExecutorVersion(log logging.SimpleLogging, v *version.Version) (string, error) {
 	// we have no information to proceed so fail hard
 	if c.DefaultConftestVersion == nil && v == nil {
 		return "", errors.New("no conftest version configured/specified")

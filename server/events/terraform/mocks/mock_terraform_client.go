@@ -26,7 +26,7 @@ func NewMockClient(options ...pegomock.Option) *MockClient {
 func (mock *MockClient) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockClient) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockClient) RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, envs map[string]string, v *go_version.Version, workspace string) (string, error) {
+func (mock *MockClient) RunCommandWithVersion(log logging.SimpleLogging, path string, args []string, envs map[string]string, v *go_version.Version, workspace string) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}
@@ -45,7 +45,7 @@ func (mock *MockClient) RunCommandWithVersion(log *logging.SimpleLogger, path st
 	return ret0, ret1
 }
 
-func (mock *MockClient) EnsureVersion(log *logging.SimpleLogger, v *go_version.Version) error {
+func (mock *MockClient) EnsureVersion(log logging.SimpleLogging, v *go_version.Version) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}
@@ -97,7 +97,7 @@ type VerifierMockClient struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockClient) RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, envs map[string]string, v *go_version.Version, workspace string) *MockClient_RunCommandWithVersion_OngoingVerification {
+func (verifier *VerifierMockClient) RunCommandWithVersion(log logging.SimpleLogging, path string, args []string, envs map[string]string, v *go_version.Version, workspace string) *MockClient_RunCommandWithVersion_OngoingVerification {
 	params := []pegomock.Param{log, path, args, envs, v, workspace}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "RunCommandWithVersion", params, verifier.timeout)
 	return &MockClient_RunCommandWithVersion_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
@@ -108,17 +108,17 @@ type MockClient_RunCommandWithVersion_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockClient_RunCommandWithVersion_OngoingVerification) GetCapturedArguments() (*logging.SimpleLogger, string, []string, map[string]string, *go_version.Version, string) {
+func (c *MockClient_RunCommandWithVersion_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, string, []string, map[string]string, *go_version.Version, string) {
 	log, path, args, envs, v, workspace := c.GetAllCapturedArguments()
 	return log[len(log)-1], path[len(path)-1], args[len(args)-1], envs[len(envs)-1], v[len(v)-1], workspace[len(workspace)-1]
 }
 
-func (c *MockClient_RunCommandWithVersion_OngoingVerification) GetAllCapturedArguments() (_param0 []*logging.SimpleLogger, _param1 []string, _param2 [][]string, _param3 []map[string]string, _param4 []*go_version.Version, _param5 []string) {
+func (c *MockClient_RunCommandWithVersion_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []string, _param2 [][]string, _param3 []map[string]string, _param4 []*go_version.Version, _param5 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]*logging.SimpleLogger, len(c.methodInvocations))
+		_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
 		for u, param := range params[0] {
-			_param0[u] = param.(*logging.SimpleLogger)
+			_param0[u] = param.(logging.SimpleLogging)
 		}
 		_param1 = make([]string, len(c.methodInvocations))
 		for u, param := range params[1] {
@@ -144,7 +144,7 @@ func (c *MockClient_RunCommandWithVersion_OngoingVerification) GetAllCapturedArg
 	return
 }
 
-func (verifier *VerifierMockClient) EnsureVersion(log *logging.SimpleLogger, v *go_version.Version) *MockClient_EnsureVersion_OngoingVerification {
+func (verifier *VerifierMockClient) EnsureVersion(log logging.SimpleLogging, v *go_version.Version) *MockClient_EnsureVersion_OngoingVerification {
 	params := []pegomock.Param{log, v}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "EnsureVersion", params, verifier.timeout)
 	return &MockClient_EnsureVersion_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
@@ -155,17 +155,17 @@ type MockClient_EnsureVersion_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockClient_EnsureVersion_OngoingVerification) GetCapturedArguments() (*logging.SimpleLogger, *go_version.Version) {
+func (c *MockClient_EnsureVersion_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, *go_version.Version) {
 	log, v := c.GetAllCapturedArguments()
 	return log[len(log)-1], v[len(v)-1]
 }
 
-func (c *MockClient_EnsureVersion_OngoingVerification) GetAllCapturedArguments() (_param0 []*logging.SimpleLogger, _param1 []*go_version.Version) {
+func (c *MockClient_EnsureVersion_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []*go_version.Version) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]*logging.SimpleLogger, len(c.methodInvocations))
+		_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
 		for u, param := range params[0] {
-			_param0[u] = param.(*logging.SimpleLogger)
+			_param0[u] = param.(logging.SimpleLogging)
 		}
 		_param1 = make([]*go_version.Version, len(c.methodInvocations))
 		for u, param := range params[1] {

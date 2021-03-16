@@ -104,7 +104,8 @@ func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
 		"ATLANTIS_TERRAFORM_VERSION=$ATLANTIS_TERRAFORM_VERSION",
 		"DIR=$DIR",
 	}
-	out, err := client.RunCommandWithVersion(nil, tmp, args, map[string]string{}, nil, "workspace")
+	log := logging.NewNoopLogger(t)
+	out, err := client.RunCommandWithVersion(log, tmp, args, map[string]string{}, nil, "workspace")
 	Ok(t, err)
 	exp := fmt.Sprintf("TF_IN_AUTOMATION=true TF_PLUGIN_CACHE_DIR=%s WORKSPACE=workspace ATLANTIS_TERRAFORM_VERSION=0.11.11 DIR=%s\n", tmp, tmp)
 	Equals(t, exp, out)
@@ -128,7 +129,7 @@ func TestDefaultClient_RunCommandWithVersion_Error(t *testing.T) {
 		"exit",
 		"1",
 	}
-	log := logging.NewSimpleLogger("test", false, logging.Debug)
+	log := logging.NewNoopLogger(t)
 	out, err := client.RunCommandWithVersion(log, tmp, args, map[string]string{}, nil, "workspace")
 	ErrEquals(t, fmt.Sprintf(`running "echo dying && exit 1" in %q: exit status 1`, tmp), err)
 	// Test that we still get our output.
@@ -154,7 +155,8 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 		"ATLANTIS_TERRAFORM_VERSION=$ATLANTIS_TERRAFORM_VERSION",
 		"DIR=$DIR",
 	}
-	_, outCh := client.RunCommandAsync(nil, tmp, args, map[string]string{}, nil, "workspace")
+	log := logging.NewNoopLogger(t)
+	_, outCh := client.RunCommandAsync(log, tmp, args, map[string]string{}, nil, "workspace")
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
@@ -183,7 +185,8 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 		_, err = f.WriteString(s)
 		Ok(t, err)
 	}
-	_, outCh := client.RunCommandAsync(nil, tmp, []string{filename}, map[string]string{}, nil, "workspace")
+	log := logging.NewNoopLogger(t)
+	_, outCh := client.RunCommandAsync(log, tmp, []string{filename}, map[string]string{}, nil, "workspace")
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
@@ -200,7 +203,7 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 		terraformPluginCacheDir: tmp,
 		overrideTF:              "echo",
 	}
-	log := logging.NewSimpleLogger("test", false, logging.Debug)
+	log := logging.NewNoopLogger(t)
 	_, outCh := client.RunCommandAsync(log, tmp, []string{"stderr", ">&2"}, map[string]string{}, nil, "workspace")
 
 	out, err := waitCh(outCh)
@@ -218,7 +221,7 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 		terraformPluginCacheDir: tmp,
 		overrideTF:              "echo",
 	}
-	log := logging.NewSimpleLogger("test", false, logging.Debug)
+	log := logging.NewNoopLogger(t)
 	_, outCh := client.RunCommandAsync(log, tmp, []string{"dying", "&&", "exit", "1"}, map[string]string{}, nil, "workspace")
 
 	out, err := waitCh(outCh)
@@ -237,7 +240,7 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 		terraformPluginCacheDir: tmp,
 		overrideTF:              "read",
 	}
-	log := logging.NewSimpleLogger("test", false, logging.Debug)
+	log := logging.NewNoopLogger(t)
 	inCh, outCh := client.RunCommandAsync(log, tmp, []string{"a", "&&", "echo", "$a"}, map[string]string{}, nil, "workspace")
 	inCh <- "echo me\n"
 

@@ -17,211 +17,192 @@ package logging
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
-	"log"
-	"os"
-	"runtime"
-	"time"
-	"unicode"
+	"testing"
+
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_simple_logging.go SimpleLogging
 
-// SimpleLogging is the interface that our SimpleLogger implements.
-// It's really only used for mocking when we need to test what's being logged.
+// SimpleLogging is the interface used for logging throughout the codebase.
 type SimpleLogging interface {
+
+	// These basically just fmt.Sprintf() the message and args.
 	Debug(format string, a ...interface{})
 	Info(format string, a ...interface{})
 	Warn(format string, a ...interface{})
 	Err(format string, a ...interface{})
 	Log(level LogLevel, format string, a ...interface{})
-	// Underlying returns the underlying logger.
-	Underlying() *log.Logger
-	// GetLevel returns the current log level.
-	GetLevel() LogLevel
-	NewLogger(string, bool, LogLevel) *SimpleLogger
+	SetLevel(lvl LogLevel)
+
+	// With adds a variadic number of fields to the logging context. It accepts a
+	// mix of strongly-typed Field objects and loosely-typed key-value pairs. When
+	// processing pairs, the first element of the pair is used as the field key
+	// and the second as the field value.
+	With(a ...interface{}) SimpleLogging
+
+	// Deprecated
+	// log storage + search strategies should be used instead of managing this ourselves.
+	// keeping as a separate method to ensure that usage of history is completely intentional.
+	WithHistory(a ...interface{}) SimpleLogging
+
+	// Deprecated
+	// log storage + search strategies should be used instead of managing this ourselves.
+	// Fetches the history we've stored associated with the logging context
+	GetHistory() string
 }
 
-// SimpleLogger wraps the standard logger with leveled logging
-// and the ability to store log history for later adding it
-// to a VCS comment.
-type SimpleLogger struct {
-	// Source is added as a prefix to each log entry.
-	// It's useful if you want to trace a log entry back to a
-	// context, for example a pull request id.
-	Source string
+type StructuredLogger struct {
+	z           *zap.SugaredLogger
+	level       zap.AtomicLevel
+	keepHistory bool
 	// History stores all log entries ever written using
 	// this logger. This is safe for short-lived loggers
 	// like those used during plan/apply commands.
-	History     bytes.Buffer
-	Logger      *log.Logger
-	KeepHistory bool
-	Level       LogLevel
+	// TODO: Deprecate this
+	// this is added here to maintain backwards compatibility
+	// This doesn't really make sense to keep given that structured logging
+	// gives us the ability to query our logs across multiple dimensions
+	// I don't believe we should mix this in with atlantis commands and expose this to the user
+	history bytes.Buffer
 }
 
-type LogLevel int
+func NewStructuredLoggerFromLevel(lvl LogLevel) (SimpleLogging, error) {
+	cfg := zap.NewProductionConfig()
 
-const (
-	Debug LogLevel = iota
-	Info
-	Warn
-	Error
-)
+	cfg.Level = zap.NewAtomicLevelAt(lvl.zLevel)
+	return newStructuredLogger(cfg)
+}
 
-// NewSimpleLogger creates a new logger.
-// source is added as a prefix to each log entry. It's useful if you want to
-// trace a log entry back to a specific context, for example a pull request id.
-// keepHistory set to true will store all log entries written using this logger.
-// level will set the level at which logs >= than that level will be written.
-// If keepHistory is set to true, we'll store logs at all levels, regardless of
-// what level is set to.
-func NewSimpleLogger(source string, keepHistory bool, level LogLevel) *SimpleLogger {
-	return &SimpleLogger{
-		Source:      source,
-		Logger:      log.New(os.Stderr, "", 0),
-		Level:       level,
-		KeepHistory: keepHistory,
+func NewStructuredLogger() (SimpleLogging, error) {
+	cfg := zap.NewProductionConfig()
+	return newStructuredLogger(cfg)
+}
+
+func newStructuredLogger(cfg zap.Config) (*StructuredLogger, error) {
+	baseLogger, err := cfg.Build()
+
+	baseLogger = baseLogger.
+		// ensures that the caller doesn't just say logging/simple_logger each time
+		WithOptions(zap.AddCallerSkip(1)).
+		WithOptions(zap.AddStacktrace(zapcore.WarnLevel)).
+		// creates isolated context for all future kv pairs, name can be flexible as needed
+		With(zap.Namespace("json"))
+
+	if err != nil {
+		return nil, errors.Wrap(err, " initializing structured logger")
 	}
+
+	return &StructuredLogger{
+		z:     baseLogger.Sugar(),
+		level: cfg.Level,
+	}, nil
+}
+
+func (l *StructuredLogger) With(a ...interface{}) SimpleLogging {
+	return &StructuredLogger{
+		z:     l.z.With(a...),
+		level: l.level,
+	}
+}
+
+func (l *StructuredLogger) WithHistory(a ...interface{}) SimpleLogging {
+	logger := &StructuredLogger{
+		z:     l.z.With(a...),
+		level: l.level,
+	}
+
+	// ensure that the history is kept across loggers.
+	logger.keepHistory = true
+	logger.history = l.history
+
+	return logger
+}
+
+func (l *StructuredLogger) GetHistory() string {
+	return l.history.String()
+}
+
+func (l *StructuredLogger) Debug(format string, a ...interface{}) {
+	l.z.Debugf(format, a...)
+	l.saveToHistory(Debug, format, a...)
+}
+
+func (l *StructuredLogger) Info(format string, a ...interface{}) {
+	l.z.Infof(format, a...)
+	l.saveToHistory(Info, format, a...)
+}
+
+func (l *StructuredLogger) Warn(format string, a ...interface{}) {
+	l.z.Warnf(format, a...)
+	l.saveToHistory(Warn, format, a...)
+}
+
+func (l *StructuredLogger) Err(format string, a ...interface{}) {
+	l.z.Errorf(format, a...)
+	l.saveToHistory(Error, format, a...)
+}
+
+func (l *StructuredLogger) Log(level LogLevel, format string, a ...interface{}) {
+	switch level {
+	case Debug:
+		l.Debug(format, a...)
+	case Info:
+		l.Info(format, a...)
+	case Warn:
+		l.Warn(format, a...)
+	case Error:
+		l.Err(format, a...)
+	}
+}
+
+func (l *StructuredLogger) SetLevel(lvl LogLevel) {
+	if l != nil {
+		l.level.SetLevel(lvl.zLevel)
+	}
+}
+
+func (l *StructuredLogger) saveToHistory(lvl LogLevel, format string, a ...interface{}) {
+	if !l.keepHistory {
+		return
+	}
+	msg := fmt.Sprintf(format, a...)
+	l.history.WriteString(fmt.Sprintf("[%s] %s\n", lvl.shortStr, msg))
 }
 
 // NewNoopLogger creates a logger instance that discards all logs and never
 // writes them. Used for testing.
-func NewNoopLogger() *SimpleLogger {
-	logger := log.New(os.Stderr, "", 0)
-	logger.SetOutput(ioutil.Discard)
-	return &SimpleLogger{
-		Source:      "",
-		Logger:      logger,
-		Level:       Info,
-		KeepHistory: false,
+func NewNoopLogger(t *testing.T) SimpleLogging {
+	level := zap.DebugLevel
+	return &StructuredLogger{
+		z:     zaptest.NewLogger(t, zaptest.Level(level)).Sugar(),
+		level: zap.NewAtomicLevelAt(level),
 	}
 }
 
-// NewLogger returns a new logger that reuses the underlying logger.
-func (l *SimpleLogger) NewLogger(source string, keepHistory bool, lvl LogLevel) *SimpleLogger {
-	if l == nil {
-		return nil
+type LogLevel struct {
+	zLevel   zapcore.Level
+	shortStr string
+}
+
+var (
+	Debug = LogLevel{
+		zLevel:   zapcore.DebugLevel,
+		shortStr: "DBUG",
 	}
-	return &SimpleLogger{
-		Source:      source,
-		Level:       lvl,
-		Logger:      l.Underlying(),
-		KeepHistory: keepHistory,
+	Info = LogLevel{
+		zLevel:   zapcore.InfoLevel,
+		shortStr: "INFO",
 	}
-}
-
-// SetLevel changes the level that this logger is writing at to lvl.
-func (l *SimpleLogger) SetLevel(lvl LogLevel) {
-	if l != nil {
-		l.Level = lvl
+	Warn = LogLevel{
+		zLevel:   zapcore.WarnLevel,
+		shortStr: "WARN",
 	}
-}
-
-// Debug logs at debug level.
-func (l *SimpleLogger) Debug(format string, a ...interface{}) {
-	if l != nil {
-		l.Log(Debug, format, a...)
+	Error = LogLevel{
+		zLevel:   zapcore.ErrorLevel,
+		shortStr: "EROR",
 	}
-}
-
-// Info logs at info level.
-func (l *SimpleLogger) Info(format string, a ...interface{}) {
-	if l != nil {
-		l.Log(Info, format, a...)
-	}
-}
-
-// Warn logs at warn level.
-func (l *SimpleLogger) Warn(format string, a ...interface{}) {
-	if l != nil {
-		l.Log(Warn, format, a...)
-	}
-}
-
-// Err logs at error level.
-func (l *SimpleLogger) Err(format string, a ...interface{}) {
-	if l != nil {
-		l.Log(Error, format, a...)
-	}
-}
-
-// Log writes the log at level.
-func (l *SimpleLogger) Log(level LogLevel, format string, a ...interface{}) {
-	if l != nil {
-		levelStr := l.levelToString(level)
-		msg := l.capitalizeFirstLetter(fmt.Sprintf(format, a...))
-
-		// Only log this message if configured to log at this level.
-		if l.Level <= level {
-			datetime := time.Now().Format("2006/01/02 15:04:05-0700")
-			var caller string
-			if l.Level <= Debug {
-				file, line := l.callSite(3)
-				caller = fmt.Sprintf(" %s:%d", file, line)
-			}
-			l.Logger.Printf("%s [%s]%s %s: %s\n", datetime, levelStr, caller, l.Source, msg) // noline: errcheck
-		}
-
-		// Keep history at all log levels.
-		if l.KeepHistory {
-			l.saveToHistory(levelStr, msg)
-		}
-	}
-}
-
-// Underlying returns the underlying logger.
-func (l *SimpleLogger) Underlying() *log.Logger {
-	return l.Logger
-}
-
-// GetLevel returns the current log level of the logger.
-func (l *SimpleLogger) GetLevel() LogLevel {
-	return l.Level
-}
-
-func (l *SimpleLogger) saveToHistory(level string, msg string) {
-	l.History.WriteString(fmt.Sprintf("[%s] %s\n", level, msg))
-}
-
-func (l *SimpleLogger) capitalizeFirstLetter(s string) string {
-	runes := []rune(s)
-	runes[0] = unicode.ToUpper(runes[0])
-	return string(runes)
-}
-
-// levelToString returns the logging level as a 4 character string. DEBUG and ERROR are shortened intentionally
-// so that logs line up.
-func (l *SimpleLogger) levelToString(level LogLevel) string {
-	switch level {
-	case Debug:
-		return "DBUG"
-	case Info:
-		return "INFO"
-	case Warn:
-		return "WARN"
-	case Error:
-		return "EROR"
-	}
-	return "????"
-}
-
-// callSite returns the location of the caller of this function via its
-// filename and line number. skip is the number of stack frames to skip.
-func (l *SimpleLogger) callSite(skip int) (string, int) {
-	_, file, line, ok := runtime.Caller(skip)
-	if !ok {
-		return "???", 0
-	}
-
-	// file is the full filepath but we just want the filename.
-	// NOTE: rather than calling path.Base we're using code from the stdlib
-	// logging package which I assume is optimized.
-	short := file
-	for i := len(file) - 1; i > 0; i-- {
-		if file[i] == '/' {
-			short = file[i+1:]
-			break
-		}
-	}
-	return short, line
-}
+)

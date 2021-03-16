@@ -47,7 +47,7 @@ const bitbucketServerSignatureHeader = "X-Hub-Signature"
 type EventsController struct {
 	CommandRunner events.CommandRunner
 	PullCleaner   events.PullCleaner
-	Logger        *logging.SimpleLogger
+	Logger        logging.SimpleLogging
 	Parser        events.EventParsing
 	CommentParser events.CommentParsing
 	ApplyDisabled bool
