@@ -47,6 +47,12 @@ Values are chosen in this order:
 
 
 ## Flags
+* ### `--allow-draft-prs`
+  ```bash
+  atlantis server --allow-draft-prs
+  ```
+  Respond to pull requests from draft prs. Defaults to `false`.
+  
 * ### `--allow-fork-prs`
   ```bash
   atlantis server --allow-fork-prs
