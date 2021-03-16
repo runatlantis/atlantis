@@ -25,7 +25,6 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-var noopLogger = logging.NewNoopLogger()
 var modifiedRepo = "owner/repo"
 var m = events.DefaultProjectFinder{}
 var nestedModules1 string
@@ -105,6 +104,7 @@ func setupTmpRepos(t *testing.T) {
 }
 
 func TestDetermineProjects(t *testing.T) {
+	noopLogger := logging.NewNoopLogger(t)
 	setupTmpRepos(t)
 
 	cases := []struct {
@@ -459,7 +459,7 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			pf := events.DefaultProjectFinder{}
-			projects, err := pf.DetermineProjectsViaConfig(logging.NewNoopLogger(), c.modified, c.config, tmpDir)
+			projects, err := pf.DetermineProjectsViaConfig(logging.NewNoopLogger(t), c.modified, c.config, tmpDir)
 			Ok(t, err)
 			Equals(t, len(c.expProjPaths), len(projects))
 			for i, proj := range projects {

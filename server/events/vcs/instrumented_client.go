@@ -1,17 +1,16 @@
 package vcs
 
 import (
-	"fmt"
-
 	"github.com/google/go-github/v31/github"
 	stats "github.com/lyft/gostats"
 	"github.com/runatlantis/atlantis/server/events/metrics"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
+	"strconv"
 )
 
 // NewInstrumentedGithubClient creates a client proxy responsible for gathering stats and logging
-func NewInstrumentedGithubClient(client *GithubClient, statsScope stats.Scope, logger *logging.SimpleLogger) IGithubClient {
+func NewInstrumentedGithubClient(client *GithubClient, statsScope stats.Scope, logger logging.SimpleLogging) IGithubClient {
 	scope := statsScope.Scope("github")
 
 	instrumentedGHClient := &InstrumentedClient{
@@ -45,12 +44,12 @@ type InstrumentedGithubClient struct {
 	*InstrumentedClient
 	PullRequestGetter GithubPullRequestGetter
 	StatsScope        stats.Scope
-	Logger            *logging.SimpleLogger
+	Logger            logging.SimpleLogging
 }
 
 func (c *InstrumentedGithubClient) GetPullRequest(repo models.Repo, pullNum int) (*github.PullRequest, error) {
 	scope := c.StatsScope.Scope("get_pull_request")
-	logger := c.Logger.NewLogger(fmtLogSrc(repo, pullNum), true, c.Logger.GetLevel())
+	logger := c.Logger.WithHistory(fmtLogSrc(repo, pullNum)...)
 
 	executionTime := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
 	defer executionTime.Complete()
@@ -74,12 +73,12 @@ func (c *InstrumentedGithubClient) GetPullRequest(repo models.Repo, pullNum int)
 type InstrumentedClient struct {
 	Client
 	StatsScope stats.Scope
-	Logger     *logging.SimpleLogger
+	Logger     logging.SimpleLogging
 }
 
 func (c *InstrumentedClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	scope := c.StatsScope.Scope("get_modified_files")
-	logger := c.Logger.NewLogger(fmtLogSrc(repo, pull.Num), true, c.Logger.GetLevel())
+	logger := c.Logger.WithHistory(fmtLogSrc(repo, pull.Num)...)
 
 	executionTime := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
 	defer executionTime.Complete()
@@ -101,7 +100,7 @@ func (c *InstrumentedClient) GetModifiedFiles(repo models.Repo, pull models.Pull
 }
 func (c *InstrumentedClient) CreateComment(repo models.Repo, pullNum int, comment string, command string) error {
 	scope := c.StatsScope.Scope("create_comment")
-	logger := c.Logger.NewLogger(fmtLogSrc(repo, pullNum), true, c.Logger.GetLevel())
+	logger := c.Logger.WithHistory(fmtLogSrc(repo, pullNum)...)
 
 	executionTime := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
 	defer executionTime.Complete()
@@ -120,7 +119,7 @@ func (c *InstrumentedClient) CreateComment(repo models.Repo, pullNum int, commen
 }
 func (c *InstrumentedClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
 	scope := c.StatsScope.Scope("hide_prev_plan_comments")
-	logger := c.Logger.NewLogger(fmtLogSrc(repo, pullNum), true, c.Logger.GetLevel())
+	logger := c.Logger.WithHistory(fmtLogSrc(repo, pullNum)...)
 
 	executionTime := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
 	defer executionTime.Complete()
@@ -140,7 +139,7 @@ func (c *InstrumentedClient) HidePrevCommandComments(repo models.Repo, pullNum i
 }
 func (c *InstrumentedClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
 	scope := c.StatsScope.Scope("pull_is_approved")
-	logger := c.Logger.NewLogger(fmtLogSrc(repo, pull.Num), true, c.Logger.GetLevel())
+	logger := c.Logger.WithHistory(fmtLogSrc(repo, pull.Num)...)
 
 	executionTime := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
 	defer executionTime.Complete()
@@ -162,7 +161,7 @@ func (c *InstrumentedClient) PullIsApproved(repo models.Repo, pull models.PullRe
 }
 func (c *InstrumentedClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
 	scope := c.StatsScope.Scope("pull_is_mergeable")
-	logger := c.Logger.NewLogger(fmtLogSrc(repo, pull.Num), true, c.Logger.GetLevel())
+	logger := c.Logger.WithHistory(fmtLogSrc(repo, pull.Num)...)
 
 	executionTime := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
 	defer executionTime.Complete()
@@ -184,7 +183,7 @@ func (c *InstrumentedClient) PullIsMergeable(repo models.Repo, pull models.PullR
 
 func (c *InstrumentedClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
 	scope := c.StatsScope.Scope("update_status")
-	logger := c.Logger.NewLogger(fmtLogSrc(repo, pull.Num), true, c.Logger.GetLevel())
+	logger := c.Logger.WithHistory(fmtLogSrc(repo, pull.Num)...)
 
 	executionTime := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
 	defer executionTime.Complete()
@@ -204,7 +203,7 @@ func (c *InstrumentedClient) UpdateStatus(repo models.Repo, pull models.PullRequ
 }
 func (c *InstrumentedClient) MergePull(pull models.PullRequest) error {
 	scope := c.StatsScope.Scope("merge_pull")
-	logger := c.Logger.NewLogger(fmt.Sprintf("#%d", pull.Num), true, c.Logger.GetLevel())
+	logger := c.Logger.WithHistory("pull-num", pull.Num)
 
 	executionTime := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
 	defer executionTime.Complete()
@@ -223,6 +222,9 @@ func (c *InstrumentedClient) MergePull(pull models.PullRequest) error {
 }
 
 // taken from other parts of the code, would be great to have this in a shared spot
-func fmtLogSrc(repo models.Repo, pullNum int) string {
-	return fmt.Sprintf("%s#%d", repo.FullName, pullNum)
+func fmtLogSrc(repo models.Repo, pullNum int) []interface{} {
+	return []interface{}{
+		"repository", repo.FullName,
+		"pull-num", strconv.Itoa(pullNum),
+	}
 }

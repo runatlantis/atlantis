@@ -119,7 +119,7 @@ projects:
 	}
 
 	scope := stats.NewStore(stats.NewLoggingSink(), false)
-	logger := logging.NewNoopLogger()
+	logger := logging.NewNoopLogger(t)
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
@@ -156,6 +156,7 @@ projects:
 			ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
 				PullMergeable: true,
 				Scope:         scope,
+				Log:           logger,
 			})
 			Ok(t, err)
 			Equals(t, len(c.exp), len(ctxs))
@@ -347,7 +348,7 @@ projects:
 	}
 
 	scope := stats.NewStore(stats.NewNullSink(), false)
-	logger := logging.NewNoopLogger()
+	logger := logging.NewNoopLogger(t)
 
 	for _, c := range cases {
 		// NOTE: we're testing both plan and apply here.
@@ -389,9 +390,10 @@ projects:
 				if cmdName == models.PlanCommand {
 					actCtxs, err = builder.BuildPlanCommands(&events.CommandContext{
 						Scope: scope,
+						Log:   logger,
 					}, &c.Cmd)
 				} else {
-					actCtxs, err = builder.BuildApplyCommands(&events.CommandContext{Scope: scope}, &c.Cmd)
+					actCtxs, err = builder.BuildApplyCommands(&events.CommandContext{Scope: scope, Log: logger}, &c.Cmd)
 				}
 
 				if c.ExpErr != "" {
@@ -495,7 +497,7 @@ projects:
 	}
 
 	scope := stats.NewStore(stats.NewNullSink(), false)
-	logger := logging.NewNoopLogger()
+	logger := logging.NewNoopLogger(t)
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			RegisterMockTestingT(t)
@@ -530,6 +532,7 @@ projects:
 			ctxs, err := builder.BuildPlanCommands(
 				&events.CommandContext{
 					Scope: scope,
+					Log:   logger,
 				},
 				&events.CommentCommand{
 					RepoRelDir:  "",
@@ -591,7 +594,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		ThenReturn(tmpDir, nil)
 
 	scope := stats.NewStore(stats.NewNullSink(), false)
-	logger := logging.NewNoopLogger()
+	logger := logging.NewNoopLogger(t)
 
 	builder := events.NewProjectCommandBuilder(
 		false,
@@ -611,6 +614,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	ctxs, err := builder.BuildApplyCommands(
 		&events.CommandContext{
 			Scope: scope,
+			Log:   logger,
 		},
 		&events.CommentCommand{
 			RepoRelDir:  "",
@@ -667,7 +671,7 @@ projects:
 		AnyString())).ThenReturn(repoDir, nil)
 
 	scope := stats.NewStore(stats.NewNullSink(), false)
-	logger := logging.NewNoopLogger()
+	logger := logging.NewNoopLogger(t)
 
 	builder := events.NewProjectCommandBuilder(
 		false,
@@ -688,7 +692,7 @@ projects:
 		HeadRepo: models.Repo{},
 		Pull:     models.PullRequest{},
 		User:     models.User{},
-		Log:      logging.NewNoopLogger(),
+		Log:      logging.NewNoopLogger(t),
 		Scope:    scope,
 	}
 	_, err = builder.BuildPlanCommands(ctx, &events.CommentCommand{
@@ -723,7 +727,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 	}
 
 	scope := stats.NewStore(stats.NewNullSink(), false)
-	logger := logging.NewNoopLogger()
+	logger := logging.NewNoopLogger(t)
 
 	for _, c := range cases {
 		t.Run(strings.Join(c.ExtraArgs, " "), func(t *testing.T) {
@@ -758,6 +762,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 			var err error
 			actCtxs, err = builder.BuildPlanCommands(&events.CommandContext{
 				Scope: scope,
+				Log:   logger,
 			}, &events.CommentCommand{
 				RepoRelDir: ".",
 				Flags:      c.ExtraArgs,
@@ -888,7 +893,7 @@ projects:
 	}
 
 	scope := stats.NewStore(stats.NewNullSink(), false)
-	logger := logging.NewNoopLogger()
+	logger := logging.NewNoopLogger(t)
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
@@ -930,6 +935,7 @@ projects:
 			actCtxs, err := builder.BuildPlanCommands(
 				&events.CommandContext{
 					Scope: scope,
+					Log:   logger,
 				},
 				&events.CommentCommand{
 					RepoRelDir: "",
@@ -967,7 +973,7 @@ projects:
 	workingDir := mocks.NewMockWorkingDir()
 
 	scope := stats.NewStore(stats.NewNullSink(), false)
-	logger := logging.NewNoopLogger()
+	logger := logging.NewNoopLogger(t)
 
 	builder := events.NewProjectCommandBuilder(
 		false,
@@ -990,7 +996,7 @@ projects:
 		HeadRepo:      models.Repo{},
 		Pull:          models.PullRequest{},
 		User:          models.User{},
-		Log:           nil,
+		Log:           logger,
 		PullMergeable: true,
 		Scope:         scope,
 	})
@@ -1007,7 +1013,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 	defer cleanup()
 
 	scope := stats.NewStore(stats.NewNullSink(), false)
-	logger := logging.NewNoopLogger()
+	logger := logging.NewNoopLogger(t)
 
 	workingDir := mocks.NewMockWorkingDir()
 	When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, false, nil)
@@ -1033,6 +1039,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 	ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
 		PullMergeable: true,
 		Scope:         scope,
+		Log:           logger,
 	})
 
 	Ok(t, err)

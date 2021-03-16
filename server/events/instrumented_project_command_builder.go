@@ -8,7 +8,7 @@ import (
 
 type InstrumentedProjectCommandBuilder struct {
 	ProjectCommandBuilder
-	Logger *logging.SimpleLogger
+	Logger logging.SimpleLogging
 }
 
 func (b *InstrumentedProjectCommandBuilder) BuildApplyCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error) {

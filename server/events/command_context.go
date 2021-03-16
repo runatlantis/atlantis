@@ -40,7 +40,7 @@ type CommandContext struct {
 	Pull     models.PullRequest
 	// User is the user that triggered this command.
 	User  models.User
-	Log   *logging.SimpleLogger
+	Log   logging.SimpleLogging
 	Scope stats.Scope
 	// PullMergeable is true if Pull is able to be merged. This is available in
 	// the CommandContext because we want to collect this information before we

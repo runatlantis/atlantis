@@ -47,7 +47,7 @@ type GithubClient struct {
 	client         *github.Client
 	v4MutateClient *graphql.Client
 	ctx            context.Context
-	logger         *logging.SimpleLogger
+	logger         logging.SimpleLogging
 }
 
 // GithubAppTemporarySecrets holds app credentials obtained from github after creation.
@@ -65,7 +65,7 @@ type GithubAppTemporarySecrets struct {
 }
 
 // NewGithubClient returns a valid GitHub client.
-func NewGithubClient(hostname string, credentials GithubCredentials, logger *logging.SimpleLogger) (*GithubClient, error) {
+func NewGithubClient(hostname string, credentials GithubCredentials, logger logging.SimpleLogging) (*GithubClient, error) {
 	transport, err := credentials.Client()
 	if err != nil {
 		return nil, errors.Wrap(err, "error initializing github authentication transport")

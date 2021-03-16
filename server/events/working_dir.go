@@ -37,7 +37,7 @@ type WorkingDir interface {
 	// absolute path to the root of the cloned repo. It also returns
 	// a boolean indicating if we should warn users that the branch we're
 	// merging into has been updated since we cloned it.
-	Clone(log *logging.SimpleLogger, headRepo models.Repo, p models.PullRequest, projectCloneDir string) (string, bool, error)
+	Clone(log logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, projectCloneDir string) (string, bool, error)
 	// GetWorkingDir returns the path to the workspace for this repo and pull.
 	// If workspace does not exist on disk, error will be of type os.IsNotExist.
 	GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error)
@@ -71,7 +71,7 @@ type FileWorkspace struct {
 // the right commit it does nothing. This is to support running commands in
 // multiple dirs of the same repo without deleting existing plans.
 func (w *FileWorkspace) Clone(
-	log *logging.SimpleLogger,
+	log logging.SimpleLogging,
 	headRepo models.Repo,
 	p models.PullRequest,
 	projectCloneDir string) (string, bool, error) {
@@ -122,7 +122,7 @@ func (w *FileWorkspace) Clone(
 // Then users won't be getting the merge functionality they expected.
 // If there are any errors we return false since we prefer things to succeed
 // vs. stopping the plan/apply.
-func (w *FileWorkspace) warnDiverged(log *logging.SimpleLogger, p models.PullRequest, headRepo models.Repo, cloneDir string) bool {
+func (w *FileWorkspace) warnDiverged(log logging.SimpleLogging, p models.PullRequest, headRepo models.Repo, cloneDir string) bool {
 	if !w.CheckoutMerge {
 		// It only makes sense to warn that master has diverged if we're using
 		// the checkout merge strategy. If we're just checking out the branch,
@@ -177,7 +177,7 @@ func (w *FileWorkspace) warnDiverged(log *logging.SimpleLogger, p models.PullReq
 	return hasDiverged
 }
 
-func (w *FileWorkspace) forceClone(log *logging.SimpleLogger,
+func (w *FileWorkspace) forceClone(log logging.SimpleLogging,
 	cloneDir string,
 	headRepo models.Repo,
 	p models.PullRequest) error {

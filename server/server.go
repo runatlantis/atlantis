@@ -83,7 +83,7 @@ type Server struct {
 	Port                          int
 	PreWorkflowHooksCommandRunner *events.DefaultPreWorkflowHooksCommandRunner
 	CommandRunner                 *events.DefaultCommandRunner
-	Logger                        *logging.SimpleLogger
+	Logger                        logging.SimpleLogging
 	StatsScope                    stats.Scope
 	Locker                        locking.Locker
 	ApplyLocker                   locking.ApplyLocker
@@ -127,7 +127,11 @@ type WebhookConfig struct {
 // its dependencies an error will be returned. This is like the main() function
 // for the server CLI command because it injects all the dependencies.
 func NewServer(userConfig UserConfig, config Config) (*Server, error) {
-	logger := logging.NewSimpleLogger("server", false, userConfig.ToLogLevel())
+	logger, err := logging.NewStructuredLoggerFromLevel(userConfig.ToLogLevel())
+
+	if err != nil {
+		return nil, err
+	}
 
 	statsScope := stats.NewDefaultStore().Scope(userConfig.StatsNamespace)
 	statsScope.Store().AddStatGenerator(stats.NewRuntimeStats(statsScope.Scope("go")))

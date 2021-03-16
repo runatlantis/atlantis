@@ -413,7 +413,7 @@ type ServerCmd struct {
 	// Useful for testing to keep the logs clean.
 	SilenceOutput   bool
 	AtlantisVersion string
-	Logger          *logging.SimpleLogger
+	Logger          logging.SimpleLogging
 }
 
 // ServerCreator creates servers.

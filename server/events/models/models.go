@@ -357,7 +357,7 @@ type ProjectCommandContext struct {
 	// be the same as BaseRepo.
 	HeadRepo Repo
 	// Log is a logger that's been set up for this context.
-	Log *logging.SimpleLogger
+	Log logging.SimpleLogging
 	// Scope is the scope for reporting stats setup for this context
 	Scope stats.Scope
 	// PullMergeable is true if the pull request for this project is able to be merged.

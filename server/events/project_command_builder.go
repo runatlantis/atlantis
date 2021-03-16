@@ -44,7 +44,7 @@ func NewProjectCommandBuilder(
 	commentBuilder CommentBuilder,
 	skipCloneNoChanges bool,
 	scope stats.Scope,
-	logger *logging.SimpleLogger,
+	logger logging.SimpleLogging,
 ) ProjectCommandBuilder {
 	return NewProjectCommandBuilderWithLimit(
 		policyChecksSupported,
@@ -75,7 +75,7 @@ func NewProjectCommandBuilderWithLimit(
 	commentBuilder CommentBuilder,
 	skipCloneNoChanges bool,
 	scope stats.Scope,
-	logger *logging.SimpleLogger,
+	logger logging.SimpleLogging,
 	limit int,
 ) ProjectCommandBuilder {
 	var projectCommandBuilder ProjectCommandBuilder = &DefaultProjectCommandBuilder{

@@ -102,7 +102,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 		When(terraform.EnsureVersion(matchers.AnyPtrToLoggingSimpleLogger(), matchers2.AnyPtrToGoVersionVersion())).
 			ThenReturn(nil)
 
-		logger := logging.NewNoopLogger()
+		logger := logging.NewNoopLogger(t)
 
 		r := runtime.RunStepRunner{
 			TerraformExecutor: terraform,

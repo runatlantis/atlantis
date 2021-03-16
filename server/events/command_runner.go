@@ -15,6 +15,7 @@ package events
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/google/go-github/v31/github"
 	stats "github.com/lyft/gostats"
@@ -256,9 +257,12 @@ func (c *DefaultCommandRunner) getAzureDevopsData(baseRepo models.Repo, pullNum 
 	return pull, headRepo, nil
 }
 
-func (c *DefaultCommandRunner) buildLogger(repoFullName string, pullNum int) *logging.SimpleLogger {
-	src := fmt.Sprintf("%s#%d", repoFullName, pullNum)
-	return c.Logger.NewLogger(src, true, c.Logger.GetLevel())
+func (c *DefaultCommandRunner) buildLogger(repoFullName string, pullNum int) logging.SimpleLogging {
+
+	return c.Logger.WithHistory(
+		"repository", repoFullName,
+		"pull-num", strconv.Itoa(pullNum),
+	)
 }
 
 func (c *DefaultCommandRunner) ensureValidRepoMetadata(
@@ -267,7 +271,7 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 	maybePull *models.PullRequest,
 	user models.User,
 	pullNum int,
-	log *logging.SimpleLogger,
+	log logging.SimpleLogging,
 ) (headRepo models.Repo, pull models.PullRequest, err error) {
 	if maybeHeadRepo != nil {
 		headRepo = *maybeHeadRepo

@@ -20,6 +20,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
 	matchers2 "github.com/runatlantis/atlantis/server/events/terraform/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/logging"
+	logging_matchers "github.com/runatlantis/atlantis/server/logging/mocks/matchers"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -63,17 +64,19 @@ func TestRun_Success(t *testing.T) {
 	o := runtime.ApplyStepRunner{
 		TerraformExecutor: terraform,
 	}
+	logger := logging.NewNoopLogger(t)
 
 	When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
 	output, err := o.Run(models.ProjectCommandContext{
+		Log:                logger,
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
 		EscapedCommentArgs: []string{"comment", "args"},
 	}, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	Ok(t, err)
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), nil, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), nil, "workspace")
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
@@ -91,10 +94,12 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 	o := runtime.ApplyStepRunner{
 		TerraformExecutor: terraform,
 	}
+	logger := logging.NewNoopLogger(t)
 
 	When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
 	output, err := o.Run(models.ProjectCommandContext{
+		Log:                logger,
 		Workspace:          "default",
 		RepoRelDir:         ".",
 		ProjectName:        "projectname",
@@ -102,7 +107,7 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 	}, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	Ok(t, err)
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), nil, "default")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), nil, "default")
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
@@ -119,19 +124,21 @@ func TestRun_UsesConfiguredTFVersion(t *testing.T) {
 	o := runtime.ApplyStepRunner{
 		TerraformExecutor: terraform,
 	}
+	logger := logging.NewNoopLogger(t)
 	tfVersion, _ := version.NewVersion("0.11.0")
 
-	When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(logging_matchers.AnyLoggingSimpleLogging(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
 	output, err := o.Run(models.ProjectCommandContext{
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
 		EscapedCommentArgs: []string{"comment", "args"},
 		TerraformVersion:   tfVersion,
+		Log:                logger,
 	}, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	Ok(t, err)
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(nil, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), tfVersion, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), tfVersion, "workspace")
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
@@ -139,6 +146,7 @@ func TestRun_UsesConfiguredTFVersion(t *testing.T) {
 // Apply ignores the -target flag when used with a planfile so we should give
 // an error if it's being used with -target.
 func TestRun_UsingTarget(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	cases := []struct {
 		commentFlags []string
 		extraArgs    []string
@@ -201,6 +209,7 @@ func TestRun_UsingTarget(t *testing.T) {
 			}
 
 			output, err := step.Run(models.ProjectCommandContext{
+				Log:                logger,
 				Workspace:          "workspace",
 				RepoRelDir:         ".",
 				EscapedCommentArgs: c.commentFlags,
@@ -244,7 +253,7 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 	}
 	tfVersion, _ := version.NewVersion("0.11.0")
 	ctx := models.ProjectCommandContext{
-		Log:                logging.NewSimpleLogger("testing", false, logging.Debug),
+		Log:                logging.NewNoopLogger(t),
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
 		EscapedCommentArgs: []string{"comment", "args"},
@@ -306,7 +315,7 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 	tfVersion, _ := version.NewVersion("0.11.0")
 
 	output, err := o.Run(models.ProjectCommandContext{
-		Log:                logging.NewSimpleLogger("testing", false, logging.Debug),
+		Log:                logging.NewNoopLogger(t),
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
 		EscapedCommentArgs: []string{"comment", "args"},
@@ -409,7 +418,7 @@ TRUE - ./random_policy.sentinel:51:1 - Rule "main"
 	}
 	tfVersion, _ := version.NewVersion("0.11.0")
 	ctx := models.ProjectCommandContext{
-		Log:                logging.NewSimpleLogger("testing", false, logging.Debug),
+		Log:                logging.NewNoopLogger(t),
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
 		EscapedCommentArgs: []string{"comment", "args"},
@@ -452,7 +461,7 @@ type remoteApplyMock struct {
 }
 
 // RunCommandAsync fakes out running terraform async.
-func (r *remoteApplyMock) RunCommandAsync(log *logging.SimpleLogger, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan terraform.Line) {
+func (r *remoteApplyMock) RunCommandAsync(log logging.SimpleLogging, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan terraform.Line) {
 	r.CalledArgs = args
 
 	in := make(chan string)

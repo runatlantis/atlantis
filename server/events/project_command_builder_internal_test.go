@@ -12,11 +12,13 @@ import (
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 // Test different permutations of global and repo config.
 func TestBuildProjectCmdCtx(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	emptyPolicySets := valid.PolicySets{
 		Version:    nil,
 		PolicySets: []valid.PolicySet{},
@@ -62,7 +64,7 @@ workflows:
 				AutomergeEnabled:   false,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -112,7 +114,7 @@ projects:
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -164,7 +166,7 @@ projects:
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -224,7 +226,7 @@ projects:
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -371,7 +373,7 @@ workflows:
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -427,7 +429,7 @@ projects:
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -486,7 +488,7 @@ workflows:
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -529,7 +531,7 @@ projects:
 				AutomergeEnabled:   false,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -595,6 +597,7 @@ projects:
 			for _, cmd := range []models.CommandName{models.PlanCommand, models.ApplyCommand} {
 				t.Run(cmd.String(), func(t *testing.T) {
 					ctxs, err := builder.buildProjectCommandCtx(&CommandContext{
+						Log: logger,
 						Pull: models.PullRequest{
 							BaseRepo: baseRepo,
 						},
@@ -642,6 +645,7 @@ projects:
 }
 
 func TestBuildProjectCmdCtx_WithPolicyCheckEnabled(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	emptyPolicySets := valid.PolicySets{
 		Version:    nil,
 		PolicySets: []valid.PolicySet{},
@@ -677,7 +681,7 @@ repos:
 				AutomergeEnabled:   false,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -732,7 +736,7 @@ workflows:
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -800,6 +804,7 @@ workflows:
 			cmd := models.PolicyCheckCommand
 			t.Run(cmd.String(), func(t *testing.T) {
 				ctxs, err := builder.buildProjectCommandCtx(&CommandContext{
+					Log: logger,
 					Pull: models.PullRequest{
 						BaseRepo: baseRepo,
 					},

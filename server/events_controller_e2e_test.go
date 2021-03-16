@@ -631,7 +631,14 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 	e2eGitlabGetter := mocks.NewMockGitlabMergeRequestGetter()
 
 	// Real dependencies.
-	logger := logging.NewSimpleLogger("server", true, logging.Error)
+	logger, err := logging.NewStructuredLogger()
+
+	if err != nil {
+		panic("Could not setup logger for e2e")
+	}
+
+	logger.SetLevel(logging.Error)
+
 	eventParser := &events.EventParser{
 		GithubUser:  "github-user",
 		GithubToken: "github-token",
@@ -865,7 +872,7 @@ func (m *mockLockURLGenerator) GenerateLockURL(lockID string) string {
 
 type mockWebhookSender struct{}
 
-func (w *mockWebhookSender) Send(log *logging.SimpleLogger, result webhooks.ApplyResult) error {
+func (w *mockWebhookSender) Send(log logging.SimpleLogging, result webhooks.ApplyResult) error {
 	return nil
 }
 

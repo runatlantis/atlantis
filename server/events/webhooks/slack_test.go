@@ -42,7 +42,7 @@ func TestSend_PostMessage(t *testing.T) {
 	}
 
 	t.Log("PostMessage should be called, doesn't matter if it errors or not")
-	_ = hook.Send(logging.NewNoopLogger(), result)
+	_ = hook.Send(logging.NewNoopLogger(t), result)
 	client.VerifyWasCalledOnce().PostMessage(channel, result)
 }
 
@@ -62,7 +62,7 @@ func TestSend_NoopSuccess(t *testing.T) {
 	result := webhooks.ApplyResult{
 		Workspace: "production",
 	}
-	err = hook.Send(logging.NewNoopLogger(), result)
+	err = hook.Send(logging.NewNoopLogger(t), result)
 	Ok(t, err)
 	client.VerifyWasCalled(Never()).PostMessage(channel, result)
 }
