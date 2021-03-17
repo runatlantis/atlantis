@@ -27,6 +27,7 @@ func RunAndEmitStats(commandName string, ctx models.ProjectCommandContext, execu
 	ctx.SetScope("project")
 
 	scope := ctx.Scope
+	ctx.Log = ctx.Log.WithHistory("project", ctx.ProjectName)
 	logger := ctx.Log
 
 	executionTime := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
@@ -49,6 +50,8 @@ func RunAndEmitStats(commandName string, ctx models.ProjectCommandContext, execu
 		logger.Err("Failure running %s operation: %s", commandName, result.Failure)
 		return result
 	}
+
+	logger.Info("%s success. output available at: %s", commandName, ctx.Pull.URL)
 
 	executionSuccess.Inc()
 	return result
