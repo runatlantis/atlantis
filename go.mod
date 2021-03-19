@@ -48,7 +48,7 @@ require (
 	github.com/spf13/viper v1.7.1
 	github.com/urfave/cli v1.22.5
 	github.com/urfave/negroni v0.3.0
-	github.com/xanzy/go-gitlab v0.45.0
+	github.com/xanzy/go-gitlab v0.47.0
 	github.com/zclconf/go-cty v1.5.1 // indirect
 	go.etcd.io/bbolt v1.3.5
 	golang.org/x/crypto v0.0.0-20200414173820-0848c9571904
