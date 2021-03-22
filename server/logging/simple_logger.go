@@ -44,7 +44,7 @@ type SimpleLogging interface {
 	// and the second as the field value.
 	With(a ...interface{}) SimpleLogging
 
-	// Creates a new logger with history preserved . log storage + search strategies 
+	// Creates a new logger with history preserved . log storage + search strategies
 	// should ideally be used instead of managing this ourselves.
 	// keeping as a separate method to ensure that usage of history is completely intentional
 	WithHistory(a ...interface{}) SimpleLogging
