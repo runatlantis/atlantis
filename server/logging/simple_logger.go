@@ -53,6 +53,9 @@ type SimpleLogging interface {
 	// log storage + search strategies should be used instead of managing this ourselves.
 	// Fetches the history we've stored associated with the logging context
 	GetHistory() string
+
+	// Flushes anything left in the buffer
+	Flush() error
 }
 
 type StructuredLogger struct {
@@ -163,6 +166,10 @@ func (l *StructuredLogger) SetLevel(lvl LogLevel) {
 	if l != nil {
 		l.level.SetLevel(lvl.zLevel)
 	}
+}
+
+func (l *StructuredLogger) Flush() error {
+	return l.z.Sync()
 }
 
 func (l *StructuredLogger) saveToHistory(lvl LogLevel, format string, a ...interface{}) {

@@ -640,6 +640,8 @@ func (s *Server) Start() error {
 	}, NewRequestLogger(s.Logger))
 	n.UseHandler(s.Router)
 
+	defer s.Logger.Flush()
+
 	// Ensure server gracefully drains connections when stopped.
 	stop := make(chan os.Signal, 1)
 	// Stop on SIGINTs and SIGTERMs.
