@@ -44,13 +44,11 @@ type SimpleLogging interface {
 	// and the second as the field value.
 	With(a ...interface{}) SimpleLogging
 
-	// Deprecated
-	// log storage + search strategies should be used instead of managing this ourselves.
-	// keeping as a separate method to ensure that usage of history is completely intentional.
+	// Creates a new logger with history preserved . log storage + search strategies 
+	// should ideally be used instead of managing this ourselves.
+	// keeping as a separate method to ensure that usage of history is completely intentional
 	WithHistory(a ...interface{}) SimpleLogging
 
-	// Deprecated
-	// log storage + search strategies should be used instead of managing this ourselves.
 	// Fetches the history we've stored associated with the logging context
 	GetHistory() string
 
