@@ -185,20 +185,6 @@ func TestRunCommentCommand_LogPanics(t *testing.T) {
 	Assert(t, strings.Contains(comment, "Error: goroutine panic"), fmt.Sprintf("comment should be about a goroutine panic but was %q", comment))
 }
 
-func TestRunCommentCommand_NoGithubPullGetter(t *testing.T) {
-	t.Log("if DefaultCommandRunner was constructed with a nil GithubPullGetter an error should be logged")
-	setup(t)
-	ch.GithubPullGetter = nil
-	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, 1, nil)
-}
-
-func TestRunCommentCommand_NoGitlabMergeGetter(t *testing.T) {
-	t.Log("if DefaultCommandRunner was constructed with a nil GitlabMergeRequestGetter an error should be logged")
-	setup(t)
-	ch.GitlabMergeRequestGetter = nil
-	ch.RunCommentCommand(fixtures.GitlabRepo, &fixtures.GitlabRepo, nil, fixtures.User, 1, nil)
-}
-
 func TestRunCommentCommand_GithubPullErr(t *testing.T) {
 	t.Log("if getting the github pull request fails an error should be logged")
 	vcsClient := setup(t)
