@@ -771,7 +771,7 @@ projects:
 				parser,
 				&DefaultProjectFinder{},
 				vcsClient,
-				workingDir,i
+				workingDir,
 				NewDefaultWorkingDirLocker(),
 				globalCfg,
 				&DefaultPendingPlanFinder{},

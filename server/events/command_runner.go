@@ -242,8 +242,8 @@ func (c *DefaultCommandRunner) getAzureDevopsData(baseRepo models.Repo, pullNum 
 func (c *DefaultCommandRunner) buildLogger(repoFullName string, pullNum int) logging.SimpleLogging {
 
 	return c.Logger.WithHistory(
-		"repository", repoFullName,
-		"pull-num", strconv.Itoa(pullNum),
+		"repo", repoFullName,
+		"pull", strconv.Itoa(pullNum),
 	)
 }
 
