@@ -18,6 +18,7 @@ func NewPlanCommandRunner(
 	policyCheckCommandRunner *PolicyCheckCommandRunner,
 	autoMerger *AutoMerger,
 	parallelPoolSize int,
+	silenceNoProjects bool,
 ) *PlanCommandRunner {
 	return &PlanCommandRunner{
 		silenceVCSStatusNoPlans:  silenceVCSStatusNoPlans,
@@ -32,11 +33,15 @@ func NewPlanCommandRunner(
 		policyCheckCommandRunner: policyCheckCommandRunner,
 		autoMerger:               autoMerger,
 		parallelPoolSize:         parallelPoolSize,
+		silenceNoProjects:        silenceNoProjects,
 	}
 }
 
 type PlanCommandRunner struct {
 	vcsClient vcs.Client
+	// silenceNoProjects is whether Atlantis should respond to PRs if no projects
+	// are found
+	silenceNoProjects bool
 	// SilenceVCSStatusNoPlans is whether autoplan should set commit status if no plans
 	// are found
 	silenceVCSStatusNoPlans  bool
@@ -69,7 +74,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *CommandContext) {
 
 	if len(projectCmds) == 0 {
 		ctx.Log.Info("determined there was no project to run plan in")
-		if !p.silenceVCSStatusNoPlans {
+		if !p.silenceVCSStatusNoPlans && !p.silenceNoProjects {
 			// If there were no projects modified, we set successful commit statuses
 			// with 0/0 projects planned/policy_checked/applied successfully because some users require
 			// the Atlantis status to be passing for all pull requests.
@@ -145,6 +150,11 @@ func (p *PlanCommandRunner) run(ctx *CommandContext, cmd *CommentCommand) {
 
 	projectCmds, policyCheckCmds := p.partitionProjectCmds(ctx, projectCmds)
 
+	if len(projectCmds) == 0 && p.silenceNoProjects {
+		ctx.Log.Info("determined there was no project to run plan in.")
+		return
+	}
+
 	// Only run commands in parallel if enabled
 	var result CommandResult
 	if p.isParallelEnabled(projectCmds) {
@@ -191,6 +201,11 @@ func (p *PlanCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 }
 
 func (p *PlanCommandRunner) updateCommitStatus(ctx *CommandContext, pullStatus models.PullStatus) {
+	// Don't updateCommitStatus either!
+	if p.silenceNoProjects {
+		return
+	}
+
 	var numSuccess int
 	var numErrored int
 	status := models.SuccessCommitStatus

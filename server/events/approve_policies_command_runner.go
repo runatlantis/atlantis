@@ -12,6 +12,7 @@ func NewApprovePoliciesCommandRunner(
 	prjCommandRunner ProjectApprovePoliciesCommandRunner,
 	pullUpdater *PullUpdater,
 	dbUpdater *DBUpdater,
+	silenceNoProjects bool,
 ) *ApprovePoliciesCommandRunner {
 	return &ApprovePoliciesCommandRunner{
 		commitStatusUpdater: commitStatusUpdater,
@@ -19,6 +20,7 @@ func NewApprovePoliciesCommandRunner(
 		prjCmdRunner:        prjCommandRunner,
 		pullUpdater:         pullUpdater,
 		dbUpdater:           dbUpdater,
+		silenceNoProjects:   silenceNoProjects,
 	}
 }
 
@@ -28,6 +30,7 @@ type ApprovePoliciesCommandRunner struct {
 	dbUpdater           *DBUpdater
 	prjCmdBuilder       ProjectApprovePoliciesCommandBuilder
 	prjCmdRunner        ProjectApprovePoliciesCommandRunner
+	silenceNoProjects   bool
 }
 
 func (a *ApprovePoliciesCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
@@ -44,6 +47,11 @@ func (a *ApprovePoliciesCommandRunner) Run(ctx *CommandContext, cmd *CommentComm
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
 		a.pullUpdater.updatePull(ctx, cmd, CommandResult{Error: err})
+		return
+	}
+
+	if len(projectCmds) == 0 && a.silenceNoProjects {
+		ctx.Log.Info("determined there was no project to run approve_policies in")
 		return
 	}
 
@@ -84,6 +92,11 @@ func (a *ApprovePoliciesCommandRunner) buildApprovePolicyCommandResults(ctx *Com
 }
 
 func (a *ApprovePoliciesCommandRunner) updateCommitStatus(ctx *CommandContext, pullStatus models.PullStatus) {
+	// Don't updateCommitStatus either!
+	if a.silenceNoProjects {
+		return
+	}
+
 	var numSuccess int
 	var numErrored int
 	status := models.SuccessCommitStatus

@@ -673,6 +673,7 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 	drainer := &events.Drainer{}
 
 	parallelPoolSize := 1
+	silenceNoProjects := false
 
 	mockPreWorkflowHookRunner = runtimemocks.NewMockPreWorkflowHookRunner()
 	preWorkflowHooksCommandRunner := &events.DefaultPreWorkflowHooksCommandRunner{
@@ -777,6 +778,7 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 		policyCheckCommandRunner,
 		autoMerger,
 		parallelPoolSize,
+		silenceNoProjects,
 	)
 
 	applyCommandRunner := events.NewApplyCommandRunner(
@@ -791,6 +793,7 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 		dbUpdater,
 		boltdb,
 		parallelPoolSize,
+		silenceNoProjects,
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
@@ -799,11 +802,13 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 		projectCommandRunner,
 		pullUpdater,
 		dbUpdater,
+		silenceNoProjects,
 	)
 
 	unlockCommandRunner := events.NewUnlockCommandRunner(
 		mocks.NewMockDeleteLockCommand(),
 		e2eVCSClient,
+		silenceNoProjects,
 	)
 
 	commentCommandRunnerByCmd := map[models.CommandName]events.CommentCommandRunner{

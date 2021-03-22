@@ -19,6 +19,7 @@ func NewApplyCommandRunner(
 	dbUpdater *DBUpdater,
 	db *db.BoltDB,
 	parallelPoolSize int,
+	silenceNoProjects bool,
 ) *ApplyCommandRunner {
 	return &ApplyCommandRunner{
 		vcsClient:           vcsClient,
@@ -32,6 +33,7 @@ func NewApplyCommandRunner(
 		dbUpdater:           dbUpdater,
 		DB:                  db,
 		parallelPoolSize:    parallelPoolSize,
+		silenceNoProjects:   silenceNoProjects,
 	}
 }
 
@@ -47,6 +49,7 @@ type ApplyCommandRunner struct {
 	pullUpdater         *PullUpdater
 	dbUpdater           *DBUpdater
 	parallelPoolSize    int
+	silenceNoProjects   bool
 }
 
 func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
@@ -80,6 +83,23 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 		return
 	}
 
+	var projectCmds []models.ProjectCommandContext
+	projectCmds, err = a.prjCmdBuilder.BuildApplyCommands(ctx, cmd)
+
+	if err != nil {
+		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
+		a.pullUpdater.updatePull(ctx, cmd, CommandResult{Error: err})
+		return
+	}
+
+	// If there are no projects to apply, don't respond to the PR and ignore
+	if len(projectCmds) == 0 && a.silenceNoProjects {
+		ctx.Log.Info("determined there was no project to run apply in.")
+		return
+	}
+
 	// Get the mergeable status before we set any build statuses of our own.
 	// We do this here because when we set a "Pending" status, if users have
 	// required the Atlantis status checks to pass, then we've now changed
@@ -104,17 +124,6 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 
 	if err = a.commitStatusUpdater.UpdateCombined(baseRepo, pull, models.PendingCommitStatus, cmd.CommandName()); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
-	}
-
-	var projectCmds []models.ProjectCommandContext
-	projectCmds, err = a.prjCmdBuilder.BuildApplyCommands(ctx, cmd)
-
-	if err != nil {
-		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
-			ctx.Log.Warn("unable to update commit status: %s", statusErr)
-		}
-		a.pullUpdater.updatePull(ctx, cmd, CommandResult{Error: err})
-		return
 	}
 
 	// Only run commands in parallel if enabled
@@ -155,6 +164,11 @@ func (a *ApplyCommandRunner) isParallelEnabled(projectCmds []models.ProjectComma
 }
 
 func (a *ApplyCommandRunner) updateCommitStatus(ctx *CommandContext, pullStatus models.PullStatus) {
+	// Don't updateCommitStatus either!
+	if a.silenceNoProjects {
+		return
+	}
+
 	var numSuccess int
 	var numErrored int
 	status := models.SuccessCommitStatus

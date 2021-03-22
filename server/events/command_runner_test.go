@@ -108,6 +108,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	}
 
 	parallelPoolSize := 1
+	silenceNoProjects := false
 	policyCheckCommandRunner = events.NewPolicyCheckCommandRunner(
 		dbUpdater,
 		pullUpdater,
@@ -129,6 +130,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		policyCheckCommandRunner,
 		autoMerger,
 		parallelPoolSize,
+		silenceNoProjects,
 	)
 
 	applyCommandRunner = events.NewApplyCommandRunner(
@@ -143,6 +145,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		dbUpdater,
 		defaultBoltDB,
 		parallelPoolSize,
+		silenceNoProjects,
 	)
 
 	approvePoliciesCommandRunner = events.NewApprovePoliciesCommandRunner(
@@ -151,11 +154,13 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		projectCommandRunner,
 		pullUpdater,
 		dbUpdater,
+		silenceNoProjects,
 	)
 
 	unlockCommandRunner = events.NewUnlockCommandRunner(
 		deleteLockCommand,
 		vcsClient,
+		silenceNoProjects,
 	)
 
 	commentCommandRunnerByCmd := map[models.CommandName]events.CommentCommandRunner{

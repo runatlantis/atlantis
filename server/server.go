@@ -251,7 +251,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, errors.Wrap(err, "initializing webhooks")
 	}
 	vcsClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient)
-	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient, StatusName: userConfig.VCSStatusName}
+	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient, StatusName: userConfig.VCSStatusName, SilenceNoProjects: userConfig.SilenceNoProjects}
 
 	binDir, err := mkSubDir(userConfig.DataDir, BinDirName)
 
@@ -499,6 +499,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		policyCheckCommandRunner,
 		autoMerger,
 		userConfig.ParallelPoolSize,
+		userConfig.SilenceNoProjects,
 	)
 
 	applyCommandRunner := events.NewApplyCommandRunner(
@@ -513,6 +514,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		dbUpdater,
 		boltdb,
 		userConfig.ParallelPoolSize,
+		userConfig.SilenceNoProjects,
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
@@ -521,11 +523,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		projectCommandRunner,
 		pullUpdater,
 		dbUpdater,
+		userConfig.SilenceNoProjects,
 	)
 
 	unlockCommandRunner := events.NewUnlockCommandRunner(
 		deleteLockCommand,
 		vcsClient,
+		userConfig.SilenceNoProjects,
 	)
 
 	commentCommandRunnerByCmd := map[models.CommandName]events.CommentCommandRunner{

@@ -57,7 +57,9 @@ type UserConfig struct {
 	RequireApproval bool `mapstructure:"require-approval"`
 	// RequireMergeable is whether to require pull requests to be mergeable before
 	// allowing terraform apply's to run.
-	RequireMergeable    bool `mapstructure:"require-mergeable"`
+	RequireMergeable bool `mapstructure:"require-mergeable"`
+	// SilenceNoProjects is whether Atlantis should respond to a PR if no projects are found.
+	SilenceNoProjects   bool `mapstructure:"silence-no-projects"`
 	SilenceForkPRErrors bool `mapstructure:"silence-fork-pr-errors"`
 	// SilenceVCSStatusNoPlans is whether autoplan should set commit status if no plans
 	// are found.

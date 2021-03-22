@@ -8,16 +8,19 @@ import (
 func NewUnlockCommandRunner(
 	deleteLockCommand DeleteLockCommand,
 	vcsClient vcs.Client,
+	silenceNoProjects bool,
 ) *UnlockCommandRunner {
 	return &UnlockCommandRunner{
 		deleteLockCommand: deleteLockCommand,
 		vcsClient:         vcsClient,
+		silenceNoProjects: silenceNoProjects,
 	}
 }
 
 type UnlockCommandRunner struct {
 	vcsClient         vcs.Client
 	deleteLockCommand DeleteLockCommand
+	silenceNoProjects bool
 }
 
 func (u *UnlockCommandRunner) Run(
@@ -33,7 +36,7 @@ func (u *UnlockCommandRunner) Run(
 		vcsMessage = "Failed to delete PR locks"
 		ctx.Log.Err("failed to delete locks by pull %s", err.Error())
 	}
-	if commentErr := u.vcsClient.CreateComment(baseRepo, pullNum, vcsMessage, models.UnlockCommand.String()); commentErr != nil {
+	if commentErr := u.vcsClient.CreateComment(baseRepo, pullNum, vcsMessage, models.UnlockCommand.String()); commentErr != nil && !u.silenceNoProjects {
 		ctx.Log.Err("unable to comment: %s", commentErr)
 	}
 }
