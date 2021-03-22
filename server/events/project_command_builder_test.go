@@ -383,7 +383,7 @@ projects:
 				var err error
 				if cmdName == models.PlanCommand {
 					actCtxs, err = builder.BuildPlanCommands(&events.CommandContext{
-						Log:   logger,
+						Log: logger,
 					}, &c.Cmd)
 				} else {
 					actCtxs, err = builder.BuildApplyCommands(&events.CommandContext{Log: logger}, &c.Cmd)
@@ -522,7 +522,7 @@ projects:
 
 			ctxs, err := builder.BuildPlanCommands(
 				&events.CommandContext{
-					Log:   logger,
+					Log: logger,
 				},
 				&events.CommentCommand{
 					RepoRelDir:  "",
@@ -601,7 +601,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 
 	ctxs, err := builder.BuildApplyCommands(
 		&events.CommandContext{
-			Log:   logger,
+			Log: logger,
 		},
 		&events.CommentCommand{
 			RepoRelDir:  "",
@@ -741,7 +741,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 			var actCtxs []models.ProjectCommandContext
 			var err error
 			actCtxs, err = builder.BuildPlanCommands(&events.CommandContext{
-				Log:   logger,
+				Log: logger,
 			}, &events.CommentCommand{
 				RepoRelDir: ".",
 				Flags:      c.ExtraArgs,
@@ -911,7 +911,7 @@ projects:
 
 			actCtxs, err := builder.BuildPlanCommands(
 				&events.CommandContext{
-					Log:   logger,
+					Log: logger,
 				},
 				&events.CommentCommand{
 					RepoRelDir: "",
