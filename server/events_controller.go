@@ -143,10 +143,10 @@ func (e *EventsController) handleGithubPost(w http.ResponseWriter, r *http.Reque
 		e.respond(w, logging.Warn, http.StatusBadRequest, err.Error())
 		return
 	}
-	e.Logger.Debug("request valid")
 
 	githubReqID := "X-Github-Delivery=" + r.Header.Get("X-Github-Delivery")
-	e.Logger.Info(fmt.Sprintf("handling '%s'", githubReqID))
+	e.Logger.Debug("request valid %s", githubReqID)
+
 	event, _ := github.ParseWebHook(github.WebHookType(r), payload)
 	switch event := event.(type) {
 	case *github.IssueCommentEvent:
@@ -170,10 +170,9 @@ func (e *EventsController) handleBitbucketCloudPost(w http.ResponseWriter, r *ht
 		return
 	}
 
-	e.Logger.Info(fmt.Sprintf("handling '%s'", reqID))
 	switch eventType {
 	case bitbucketcloud.PullCreatedHeader, bitbucketcloud.PullUpdatedHeader, bitbucketcloud.PullFulfilledHeader, bitbucketcloud.PullRejectedHeader:
-		e.Logger.Debug("handling as pull request state changed event")
+		e.Logger.Debug("handling as pull request state changed event %s=%s", bitbucketCloudRequestIDHeader, reqID)
 		e.handleBitbucketCloudPullRequestEvent(w, eventType, body, reqID)
 		return
 	case bitbucketcloud.PullCommentCreatedHeader:
@@ -196,7 +195,6 @@ func (e *EventsController) handleBitbucketServerPost(w http.ResponseWriter, r *h
 		return
 	}
 
-	e.Logger.Info(fmt.Sprintf("handling '%s'", reqID))
 	if eventType == bitbucketserver.DiagnosticsPingHeader {
 		// Specially handle the diagnostics:ping event because Bitbucket Server
 		// doesn't send the signature with this event for some reason.
@@ -211,7 +209,7 @@ func (e *EventsController) handleBitbucketServerPost(w http.ResponseWriter, r *h
 	}
 	switch eventType {
 	case bitbucketserver.PullCreatedHeader, bitbucketserver.PullMergedHeader, bitbucketserver.PullDeclinedHeader, bitbucketserver.PullDeletedHeader:
-		e.Logger.Debug("handling as pull request state changed event")
+		e.Logger.Debug("handling as pull request state changed event %s=%s", bitbucketServerRequestIDHeader, reqID)
 		e.handleBitbucketServerPullRequestEvent(w, eventType, body, reqID)
 		return
 	case bitbucketserver.PullCommentCreatedHeader:
@@ -230,10 +228,10 @@ func (e *EventsController) handleAzureDevopsPost(w http.ResponseWriter, r *http.
 		e.respond(w, logging.Warn, http.StatusUnauthorized, err.Error())
 		return
 	}
-	e.Logger.Debug("request valid")
 
 	azuredevopsReqID := "Request-Id=" + r.Header.Get("Request-Id")
-	e.Logger.Info(fmt.Sprintf("handling '%s'", azuredevopsReqID))
+	e.Logger.Debug("request valid %s", azuredevopsReqID)
+
 	event, err := azuredevops.ParseWebHook(payload)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Failed parsing webhook: %v %s", err, azuredevopsReqID)
