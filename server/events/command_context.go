@@ -38,8 +38,8 @@ type CommandContext struct {
 	HeadRepo models.Repo
 	Pull     models.PullRequest
 	// User is the user that triggered this command.
-	User  models.User
-	Log   logging.SimpleLogging
+	User models.User
+	Log  logging.SimpleLogging
 	// PullMergeable is true if Pull is able to be merged. This is available in
 	// the CommandContext because we want to collect this information before we
 	// set our own build statuses which can affect mergeability if users have
