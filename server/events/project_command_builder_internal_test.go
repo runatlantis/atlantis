@@ -592,6 +592,7 @@ projects:
 				&CommentParser{},
 				false,
 				false,
+				"",
 			)
 
 			// We run a test for each type of command.
@@ -778,6 +779,7 @@ projects:
 				&CommentParser{},
 				false,
 				true,
+				"",
 			)
 
 			// We run a test for each type of command, again specific projects
@@ -983,6 +985,7 @@ workflows:
 				&CommentParser{},
 				false,
 				false,
+				"",
 			)
 
 			cmd := models.PolicyCheckCommand

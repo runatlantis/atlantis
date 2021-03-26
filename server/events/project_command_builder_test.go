@@ -148,6 +148,7 @@ projects:
 				&events.CommentParser{},
 				false,
 				false,
+				"",
 			)
 
 			ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
@@ -377,6 +378,7 @@ projects:
 					&events.CommentParser{},
 					false,
 					true,
+					"",
 				)
 
 				var actCtxs []models.ProjectCommandContext
@@ -518,6 +520,7 @@ projects:
 				&events.CommentParser{},
 				false,
 				false,
+				"",
 			)
 
 			ctxs, err := builder.BuildPlanCommands(
@@ -597,6 +600,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		&events.CommentParser{},
 		false,
 		false,
+		"",
 	)
 
 	ctxs, err := builder.BuildApplyCommands(
@@ -669,6 +673,7 @@ projects:
 		&events.CommentParser{},
 		false,
 		false,
+		"",
 	)
 
 	ctx := &events.CommandContext{
@@ -736,6 +741,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				&events.CommentParser{},
 				false,
 				false,
+				"",
 			)
 
 			var actCtxs []models.ProjectCommandContext
@@ -907,6 +913,7 @@ projects:
 				&events.CommentParser{},
 				false,
 				false,
+				"",
 			)
 
 			actCtxs, err := builder.BuildPlanCommands(
@@ -962,6 +969,7 @@ projects:
 		&events.CommentParser{},
 		true,
 		false,
+		"",
 	)
 
 	var actCtxs []models.ProjectCommandContext
@@ -1005,6 +1013,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		&events.CommentParser{},
 		false,
 		false,
+		"",
 	)
 
 	ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{

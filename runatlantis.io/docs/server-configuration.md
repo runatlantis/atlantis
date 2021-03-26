@@ -110,6 +110,29 @@ Values are chosen in this order:
   Automatically merge pull requests after all plans have been successfully applied.
   Defaults to `false`. See [Automerging](automerging.html) for more details.
 
+* ### `--autoplan-file-list`
+  ```bash
+  # NOTE: Use single quotes to avoid shell expansion of *.
+  atlantis server --autoplan-file-list='**/*.tf,project1/*.pkr.hcl'
+  ```
+  List of file patterns that Atlantis will use to check if a directory contains modified files that should trigger project planning.
+
+  Notes:
+  * Accepts a comma separated list, ex. `pattern1,pattern2`.
+  * Patterns use the [`.dockerignore` syntax](https://docs.docker.com/engine/reference/builder/#dockerignore-file)
+  * List of file patterns will be used by both automatic and manually run plans.
+  * When not set, defaults to all `.tf`, `.tfvars` and `.tfvars.json` files (`--autoplan-file-list='**/*.tf,**/*.tfvars,**/*.tfvars.json'`).
+  * Setting `--autoplan-file-list` will override the defaults. You **must** add `**/*.tf` and other defaults if you want to include them.
+  * A custom [Workflow](repo-level-atlantis-yaml.html#configuring-planning) that uses autoplan `when_modified` will ignore this value.
+
+  Examples:
+  * Autoplan when any `*.tf` or `*.tfvars` file is modified.
+    * `--autoplan-file-list='**/*.tf,**/*.tfvars'`
+  * Autoplan when any `*.tf` file is modified except in `project2/` directory
+    * `--autoplan-file-list='**/*.tf,!project2'`
+  * Autoplan when any `*.tf` files or `.yml` files in subfolder of `project1` is modified.
+    * `--autoplan-file-list='**/*.tf,project2/**/*.yml'`
+
 * ### `--azuredevops-webhook-password`
   ```bash
   atlantis server --azuredevops-webhook-password="password123"

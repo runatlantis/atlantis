@@ -44,6 +44,7 @@ const (
 	AllowRepoConfigFlag        = "allow-repo-config"
 	AtlantisURLFlag            = "atlantis-url"
 	AutomergeFlag              = "automerge"
+	AutoplanFileListFlag       = "autoplan-file-list"
 	BitbucketBaseURLFlag       = "bitbucket-base-url"
 	BitbucketTokenFlag         = "bitbucket-token"
 	BitbucketUserFlag          = "bitbucket-user"
@@ -135,6 +136,13 @@ var stringFlags = map[string]stringFlag{
 	},
 	AtlantisURLFlag: {
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path ex. https://example.com/basepath.",
+	},
+	AutoplanFileListFlag: {
+		description: "Comma separated list of file patterns that Atlantis will use to check if a directory contains modified files that should trigger project planning." +
+			" Patterns use the dockerignore (https://docs.docker.com/engine/reference/builder/#dockerignore-file) syntax." +
+			" Use single quotes to avoid shell expansion of '*'. Defaults to '**/*.tf,**/*.tfvars,**/*.tfvars.json'." +
+			" A custom Workflow that uses autoplan 'when_modified' will ignore this value.",
+		defaultValue: "",
 	},
 	BitbucketUserFlag: {
 		description: "Bitbucket username of API user.",
