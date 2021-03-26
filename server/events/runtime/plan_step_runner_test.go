@@ -814,6 +814,71 @@ Plan: 0 to add, 0 to change, 1 to destroy.`, string(bytes))
 	}
 }
 
+// Test striping output method
+func TestStripRefreshingFromPlanOutput(t *testing.T) {
+	tfVersion0135, _ := version.NewVersion("0.13.5")
+	tfVersion0140, _ := version.NewVersion("0.14.0")
+	cases := []struct {
+		out       string
+		tfVersion *version.Version
+	}{
+		{
+			remotePlanOutput,
+			tfVersion0135,
+		},
+		{
+			`Running plan in the remote backend. Output will stream here. Pressing Ctrl-C
+will stop streaming the logs, but will not stop the plan running remotely.
+
+Preparing the remote plan...
+
+To view this run in a browser, visit:
+https://app.terraform.io/app/lkysow-enterprises/atlantis-tfe-test/runs/run-is4oVvJfrkud1KvE
+
+Waiting for the plan to start...
+
+Terraform v0.14.0
+
+Configuring remote state backend...
+Initializing Terraform configuration...
+2019/02/20 22:40:52 [DEBUG] Using modified User-Agent: Terraform/0.14.0TFE/202eeff
+Refreshing Terraform state in-memory prior to plan...
+The refreshed state will be used to calculate this plan, but will not be
+persisted to local or remote state storage.
+
+null_resource.hi: Refreshing state... (ID: 217661332516885645)
+null_resource.hi[1]: Refreshing state... (ID: 6064510335076839362)
+
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+  - destroy
+
+Terraform will perform the following actions:
+
+  - null_resource.hi[1]
+
+
+Plan: 0 to add, 0 to change, 1 to destroy.`,
+			tfVersion0140,
+		},
+	}
+
+	for _, c := range cases {
+		output := runtime.StripRefreshingFromPlanOutput(c.out, c.tfVersion)
+		Equals(t, `
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+  - destroy
+
+Terraform will perform the following actions:
+
+  - null_resource.hi[1]
+
+
+Plan: 0 to add, 0 to change, 1 to destroy.`, output)
+	}
+}
+
 type remotePlanMock struct {
 	// LinesToSend will be sent on the channel.
 	LinesToSend string

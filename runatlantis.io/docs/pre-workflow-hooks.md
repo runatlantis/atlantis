@@ -1,14 +1,13 @@
 # Pre Workflow Hooks
 
-Pre workflow hooks can be defined to run scripts right before default or custom
-workflows are executed. 
+Pre workflow hooks can be defined to run scripts before default or custom
+workflows are executed. Pre workflow hooks differ from [custom
+workflows](custom-workflows.html#custom-run-command) in several ways.
 
-::: tip Note
-Defined pre workflow hooks will be executed only once when a new pull 
-request is opened, and later only if this pull request has been updated.
-The pre workflow hooks are not run on manual `atlantis plan` or
-`atlantis apply` commands.
-::: 
+1. Pre workflow hooks do not require for repository configuration to be
+   present. This be utilized to [dynamically generate repo configs](pre-workflow-hooks.html#dynamic-repo-config-generation).
+2. Pre workflow hooks are ran outside of Atlantis commands. Which means
+   they do not surface their output back to the PR as a comment.
 
 [[toc]]
 

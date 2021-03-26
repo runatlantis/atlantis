@@ -101,6 +101,7 @@ var testFlags = map[string]interface{}{
 	WriteGitCredsFlag:          true,
 	DisableAutoplanFlag:        true,
 	EnablePolicyChecksFlag:     false,
+	EnableRegExpCmdFlag:        false,
 }
 
 func TestExecute_Defaults(t *testing.T) {

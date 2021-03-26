@@ -4,6 +4,7 @@ package valid
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	version "github.com/hashicorp/go-version"
@@ -51,6 +52,20 @@ func (r RepoCfg) FindProjectByName(name string) *Project {
 		}
 	}
 	return nil
+}
+
+// FindProjectsByName returns all projects that match with name.
+func (r RepoCfg) FindProjectsByName(name string) []Project {
+	var ps []Project
+	sanitizedName := "^" + name + "$"
+	for _, p := range r.Projects {
+		if p.Name != nil {
+			if match, _ := regexp.MatchString(sanitizedName, *p.Name); match {
+				ps = append(ps, p)
+			}
+		}
+	}
+	return ps
 }
 
 // validateWorkspaceAllowed returns an error if repoCfg defines projects in

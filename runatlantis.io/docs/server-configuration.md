@@ -47,6 +47,12 @@ Values are chosen in this order:
 
 
 ## Flags
+* ### `--allow-draft-prs`
+  ```bash
+  atlantis server --allow-draft-prs
+  ```
+  Respond to pull requests from draft prs. Defaults to `false`.
+  
 * ### `--allow-fork-prs`
   ```bash
   atlantis server --allow-fork-prs
@@ -232,6 +238,17 @@ Values are chosen in this order:
   atlantis server --enable-policy-checks
   ```
   Enables atlantis to run server side policies on the result of a terraform plan. Policies are defined in [server side repo config](https://www.runatlantis.io/docs/server-side-repo-config.html#reference).
+
+* ### `--enable-regexp-cmd`
+  ```bash
+  atlantis server --enable-regexp-cmd
+  ```
+  Enable Atlantis to use regular expressions on plan/apply commands when \"-p\" flag is passed with it.
+
+  ::: warning SECURITY WARNING
+  It's not supposed to be used with `--disable-apply-all`.
+  The command `atlantis apply -p .*` will bypass the restriction and run apply on every projects
+  :::
 
 * ### `--gh-hostname`
   ```bash

@@ -58,6 +58,7 @@ const (
 	DisableMarkdownFoldingFlag = "disable-markdown-folding"
 	DisableRepoLockingFlag     = "disable-repo-locking"
 	EnablePolicyChecksFlag     = "enable-policy-checks"
+	EnableRegExpCmdFlag        = "enable-regexp-cmd"
 	GHHostnameFlag             = "gh-hostname"
 	GHTokenFlag                = "gh-token"
 	GHUserFlag                 = "gh-user"
@@ -298,6 +299,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	EnablePolicyChecksFlag: {
 		description:  "Enable atlantis to run user defined policy checks.  This is explicitly disabled for TFE/TFC backends since plan files are inaccessible.",
+		defaultValue: false,
+	},
+	EnableRegExpCmdFlag: {
+		description:  "Enable Atlantis to use regular expressions on plan/apply commands when \"-p\" flag is passed with it.",
 		defaultValue: false,
 	},
 	AllowDraftPRs: {

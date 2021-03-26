@@ -15,8 +15,7 @@ import (
 
 const (
 	defaultWorkspace = "default"
-	// refreshSeparator is what separates the refresh stage from the calculated
-	// plan during a terraform plan.
+	refreshKeyword   = "Refreshing state..."
 	refreshSeparator = "------------------------------------------------------------------------\n"
 )
 
@@ -55,7 +54,7 @@ func (p *PlanStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []strin
 	if err != nil {
 		return output, err
 	}
-	return p.fmtPlanOutput(output), nil
+	return p.fmtPlanOutput(output, tfVersion), nil
 }
 
 // isRemoteOpsErr returns true if there was an error caused due to this
@@ -89,11 +88,7 @@ func (p *PlanStepRunner) remotePlan(ctx models.ProjectCommandContext, extraArgs 
 	// plan. To ensure that what gets applied is the plan we printed to the PR,
 	// during the apply phase, we diff the output we stored in the fake
 	// planfile with the pending apply output.
-	planOutput := output
-	sepIdx := strings.Index(planOutput, refreshSeparator)
-	if sepIdx > -1 {
-		planOutput = planOutput[sepIdx+len(refreshSeparator):]
-	}
+	planOutput := StripRefreshingFromPlanOutput(output, tfVersion)
 
 	// We also prepend our own remote ops header to the file so during apply we
 	// know this is a remote apply.
@@ -102,7 +97,7 @@ func (p *PlanStepRunner) remotePlan(ctx models.ProjectCommandContext, extraArgs 
 		return output, errors.Wrap(err, "unable to create planfile for remote ops")
 	}
 
-	return p.fmtPlanOutput(output), nil
+	return p.fmtPlanOutput(output, tfVersion), nil
 }
 
 // switchWorkspace changes the terraform workspace if necessary and will create
@@ -228,14 +223,8 @@ func (p *PlanStepRunner) flatten(slices [][]string) []string {
 // "- aws_security_group_rule.allow_all"
 // We do it for +, ~ and -.
 // It also removes the "Refreshing..." preamble.
-func (p *PlanStepRunner) fmtPlanOutput(output string) string {
-	// Plan output contains a lot of "Refreshing..." lines followed by a
-	// separator. We want to remove everything before that separator.
-	sepIdx := strings.Index(output, refreshSeparator)
-	if sepIdx > -1 {
-		output = output[sepIdx+len(refreshSeparator):]
-	}
-
+func (p *PlanStepRunner) fmtPlanOutput(output string, tfVersion *version.Version) string {
+	output = StripRefreshingFromPlanOutput(output, tfVersion)
 	output = plusDiffRegex.ReplaceAllString(output, "+")
 	output = tildeDiffRegex.ReplaceAllString(output, "~")
 	return minusDiffRegex.ReplaceAllString(output, "-")
@@ -297,6 +286,31 @@ func (p *PlanStepRunner) runRemotePlan(
 		updateStatusF(models.SuccessCommitStatus, runURL)
 	}
 	return output, err
+}
+
+func StripRefreshingFromPlanOutput(output string, tfVersion *version.Version) string {
+	if tfVersion.GreaterThanOrEqual(version.Must(version.NewVersion("0.14.0"))) {
+		// Plan output contains a lot of "Refreshing..." lines, remove it
+		lines := strings.Split(output, "\n")
+		finalIndex := 0
+		for i, line := range lines {
+			if strings.Contains(line, refreshKeyword) {
+				finalIndex = i
+			}
+		}
+
+		if finalIndex != 0 {
+			output = strings.Join(lines[finalIndex+1:], "\n")
+		}
+	} else {
+		// Plan output contains a lot of "Refreshing..." lines followed by a
+		// separator. We want to remove everything before that separator.
+		sepIdx := strings.Index(output, refreshSeparator)
+		if sepIdx > -1 {
+			output = output[sepIdx+len(refreshSeparator):]
+		}
+	}
+	return output
 }
 
 // remoteOpsErr01114 is the error terraform plan will return if this project is
