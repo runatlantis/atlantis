@@ -19,7 +19,7 @@ func NewApplyCommandRunner(
 	dbUpdater *DBUpdater,
 	db *db.BoltDB,
 	parallelPoolSize int,
-	silenceNoProjects bool,
+	SilenceNoProjects bool,
 ) *ApplyCommandRunner {
 	return &ApplyCommandRunner{
 		vcsClient:           vcsClient,
@@ -33,7 +33,7 @@ func NewApplyCommandRunner(
 		dbUpdater:           dbUpdater,
 		DB:                  db,
 		parallelPoolSize:    parallelPoolSize,
-		silenceNoProjects:   silenceNoProjects,
+		SilenceNoProjects:   SilenceNoProjects,
 	}
 }
 
@@ -49,13 +49,32 @@ type ApplyCommandRunner struct {
 	pullUpdater         *PullUpdater
 	dbUpdater           *DBUpdater
 	parallelPoolSize    int
-	silenceNoProjects   bool
+	// SilenceNoProjects is whether Atlantis should respond to PRs if no projects
+	// are found
+	SilenceNoProjects bool
 }
 
 func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 	var err error
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
+
+	var projectCmds []models.ProjectCommandContext
+	projectCmds, err = a.prjCmdBuilder.BuildApplyCommands(ctx, cmd)
+
+	if err != nil {
+		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil && !a.SilenceNoProjects {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
+		a.pullUpdater.updatePull(ctx, cmd, CommandResult{Error: err})
+		return
+	}
+
+	// If there are no projects to apply, don't respond to the PR and ignore
+	if len(projectCmds) == 0 && a.SilenceNoProjects {
+		ctx.Log.Info("determined there was no project to run apply in.")
+		return
+	}
 
 	locked, err := a.IsLocked()
 	// CheckApplyLock falls back to DisableApply flag if fetching the lock
@@ -80,23 +99,6 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 			ctx.Log.Err("unable to comment on pull request: %s", err)
 		}
 
-		return
-	}
-
-	var projectCmds []models.ProjectCommandContext
-	projectCmds, err = a.prjCmdBuilder.BuildApplyCommands(ctx, cmd)
-
-	if err != nil {
-		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
-			ctx.Log.Warn("unable to update commit status: %s", statusErr)
-		}
-		a.pullUpdater.updatePull(ctx, cmd, CommandResult{Error: err})
-		return
-	}
-
-	// If there are no projects to apply, don't respond to the PR and ignore
-	if len(projectCmds) == 0 && a.silenceNoProjects {
-		ctx.Log.Info("determined there was no project to run apply in.")
 		return
 	}
 
@@ -164,11 +166,6 @@ func (a *ApplyCommandRunner) isParallelEnabled(projectCmds []models.ProjectComma
 }
 
 func (a *ApplyCommandRunner) updateCommitStatus(ctx *CommandContext, pullStatus models.PullStatus) {
-	// Don't updateCommitStatus either!
-	if a.silenceNoProjects {
-		return
-	}
-
 	var numSuccess int
 	var numErrored int
 	status := models.SuccessCommitStatus

@@ -108,7 +108,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	}
 
 	parallelPoolSize := 1
-	silenceNoProjects := false
+	SilenceNoProjects := false
 	policyCheckCommandRunner = events.NewPolicyCheckCommandRunner(
 		dbUpdater,
 		pullUpdater,
@@ -130,7 +130,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		policyCheckCommandRunner,
 		autoMerger,
 		parallelPoolSize,
-		silenceNoProjects,
+		SilenceNoProjects,
 	)
 
 	applyCommandRunner = events.NewApplyCommandRunner(
@@ -145,7 +145,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		dbUpdater,
 		defaultBoltDB,
 		parallelPoolSize,
-		silenceNoProjects,
+		SilenceNoProjects,
 	)
 
 	approvePoliciesCommandRunner = events.NewApprovePoliciesCommandRunner(
@@ -154,13 +154,13 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		projectCommandRunner,
 		pullUpdater,
 		dbUpdater,
-		silenceNoProjects,
+		SilenceNoProjects,
 	)
 
 	unlockCommandRunner = events.NewUnlockCommandRunner(
 		deleteLockCommand,
 		vcsClient,
-		silenceNoProjects,
+		SilenceNoProjects,
 	)
 
 	commentCommandRunnerByCmd := map[models.CommandName]events.CommentCommandRunner{
@@ -284,6 +284,31 @@ func TestRunCommentCommand_ForkPRDisabled_SilenceEnabled(t *testing.T) {
 	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
 }
 
+func TestRunCommentCommand_NoProjects_SilenceEnabled(t *testing.T) {
+	t.Log("if a command is run on a pull request and SilenceNoProjects is enabled and we are silencing all comments if the modified files don't have a matching project")
+	vcsClient := setup(t)
+	planCommandRunner.SilenceNoProjects = true
+	applyCommandRunner.SilenceNoProjects = true
+	approvePoliciesCommandRunner.SilenceNoProjects = true
+	unlockCommandRunner.SilenceNoProjects = true
+	var pull github.PullRequest
+	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState}
+	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
+	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
+
+	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.PlanCommand})
+	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
+
+	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.ApplyCommand})
+	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
+
+	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.ApprovePoliciesCommand})
+	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
+
+	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.UnlockCommand})
+	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
+}
+
 func TestRunCommentCommand_DisableApplyAllDisabled(t *testing.T) {
 	t.Log("if \"atlantis apply\" is run and this is disabled atlantis should" +
 		" comment saying that this is not allowed")
@@ -364,7 +389,7 @@ func TestRunUnlockCommandFail_VCSComment(t *testing.T) {
 	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState, Num: fixtures.Pull.Num}
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
-	When(deleteLockCommand.DeleteLocksByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(errors.New("err"))
+	When(deleteLockCommand.DeleteLocksByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(0, errors.New("err"))
 
 	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.UnlockCommand})
 

@@ -28,6 +28,7 @@ type PolicyCheckCommandRunner struct {
 
 func (p *PolicyCheckCommandRunner) Run(ctx *CommandContext, cmds []models.ProjectCommandContext) {
 	if len(cmds) == 0 {
+		ctx.Log.Info("no projects to run policy_check in")
 		return
 	}
 

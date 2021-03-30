@@ -12,7 +12,7 @@ func NewApprovePoliciesCommandRunner(
 	prjCommandRunner ProjectApprovePoliciesCommandRunner,
 	pullUpdater *PullUpdater,
 	dbUpdater *DBUpdater,
-	silenceNoProjects bool,
+	SilenceNoProjects bool,
 ) *ApprovePoliciesCommandRunner {
 	return &ApprovePoliciesCommandRunner{
 		commitStatusUpdater: commitStatusUpdater,
@@ -20,7 +20,7 @@ func NewApprovePoliciesCommandRunner(
 		prjCmdRunner:        prjCommandRunner,
 		pullUpdater:         pullUpdater,
 		dbUpdater:           dbUpdater,
-		silenceNoProjects:   silenceNoProjects,
+		SilenceNoProjects:   SilenceNoProjects,
 	}
 }
 
@@ -30,7 +30,9 @@ type ApprovePoliciesCommandRunner struct {
 	dbUpdater           *DBUpdater
 	prjCmdBuilder       ProjectApprovePoliciesCommandBuilder
 	prjCmdRunner        ProjectApprovePoliciesCommandRunner
-	silenceNoProjects   bool
+	// SilenceNoProjects is whether Atlantis should respond to PRs if no projects
+	// are found
+	SilenceNoProjects bool
 }
 
 func (a *ApprovePoliciesCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
@@ -50,7 +52,7 @@ func (a *ApprovePoliciesCommandRunner) Run(ctx *CommandContext, cmd *CommentComm
 		return
 	}
 
-	if len(projectCmds) == 0 && a.silenceNoProjects {
+	if len(projectCmds) == 0 && a.SilenceNoProjects {
 		ctx.Log.Info("determined there was no project to run approve_policies in")
 		return
 	}
@@ -92,11 +94,6 @@ func (a *ApprovePoliciesCommandRunner) buildApprovePolicyCommandResults(ctx *Com
 }
 
 func (a *ApprovePoliciesCommandRunner) updateCommitStatus(ctx *CommandContext, pullStatus models.PullStatus) {
-	// Don't updateCommitStatus either!
-	if a.silenceNoProjects {
-		return
-	}
-
 	var numSuccess int
 	var numErrored int
 	status := models.SuccessCommitStatus

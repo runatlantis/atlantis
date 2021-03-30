@@ -41,8 +41,7 @@ type CommitStatusUpdater interface {
 type DefaultCommitStatusUpdater struct {
 	Client vcs.Client
 	// StatusName is the name used to identify Atlantis when creating PR statuses.
-	StatusName        string
-	SilenceNoProjects bool
+	StatusName string
 }
 
 func (d *DefaultCommitStatusUpdater) UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName) error {

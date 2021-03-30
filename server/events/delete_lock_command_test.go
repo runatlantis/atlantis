@@ -100,7 +100,7 @@ func TestDeleteLocksByPull_LockerErr(t *testing.T) {
 		Locker: l,
 		Logger: logging.NewNoopLogger(),
 	}
-	err := dlc.DeleteLocksByPull(repoName, pullNum)
+	_, err := dlc.DeleteLocksByPull(repoName, pullNum)
 	ErrEquals(t, "err", err)
 }
 
@@ -115,7 +115,7 @@ func TestDeleteLocksByPull_None(t *testing.T) {
 		Locker: l,
 		Logger: logging.NewNoopLogger(),
 	}
-	err := dlc.DeleteLocksByPull(repoName, pullNum)
+	_, err := dlc.DeleteLocksByPull(repoName, pullNum)
 	Ok(t, err)
 }
 
@@ -130,6 +130,6 @@ func TestDeleteLocksByPull_OldFormat(t *testing.T) {
 		Locker: l,
 		Logger: logging.NewNoopLogger(),
 	}
-	err := dlc.DeleteLocksByPull(repoName, pullNum)
+	_, err := dlc.DeleteLocksByPull(repoName, pullNum)
 	Ok(t, err)
 }
