@@ -59,6 +59,28 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
 
+	// Get the mergeable status before we set any build statuses of our own.
+	// We do this here because when we set a "Pending" status, if users have
+	// required the Atlantis status checks to pass, then we've now changed
+	// the mergeability status of the pull request.
+	ctx.PullMergeable, err = a.vcsClient.PullIsMergeable(baseRepo, pull)
+	if err != nil {
+		// On error we continue the request with mergeable assumed false.
+		// We want to continue because not all apply's will need this status,
+		// only if they rely on the mergeability requirement.
+		ctx.PullMergeable = false
+		ctx.Log.Warn("unable to get mergeable status: %s. Continuing with mergeable assumed false", err)
+	}
+
+	// TODO: This needs to be revisited and new PullMergeable like conditions should
+	// be added to check against it.
+	if a.anyFailedPolicyChecks(pull) {
+		ctx.PullMergeable = false
+		ctx.Log.Warn("when using policy checks all policies have to be approved or pass. Continuing with mergeable assumed false")
+	}
+
+	ctx.Log.Info("pull request mergeable status: %t", ctx.PullMergeable)
+
 	var projectCmds []models.ProjectCommandContext
 	projectCmds, err = a.prjCmdBuilder.BuildApplyCommands(ctx, cmd)
 
@@ -102,28 +124,7 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 		return
 	}
 
-	// Get the mergeable status before we set any build statuses of our own.
-	// We do this here because when we set a "Pending" status, if users have
-	// required the Atlantis status checks to pass, then we've now changed
-	// the mergeability status of the pull request.
-	ctx.PullMergeable, err = a.vcsClient.PullIsMergeable(baseRepo, pull)
-	if err != nil {
-		// On error we continue the request with mergeable assumed false.
-		// We want to continue because not all apply's will need this status,
-		// only if they rely on the mergeability requirement.
-		ctx.PullMergeable = false
-		ctx.Log.Warn("unable to get mergeable status: %s. Continuing with mergeable assumed false", err)
-	}
-
-	// TODO: This needs to be revisited and new PullMergeable like conditions should
-	// be added to check against it.
-	if a.anyFailedPolicyChecks(pull) {
-		ctx.PullMergeable = false
-		ctx.Log.Warn("when using policy checks all policies have to be approved or pass. Continuing with mergeable assumed false")
-	}
-
-	ctx.Log.Info("pull request mergeable status: %t", ctx.PullMergeable)
-
+	// At this point we are sure Atlantis has work to do, so set commit status to pending
 	if err = a.commitStatusUpdater.UpdateCombined(baseRepo, pull, models.PendingCommitStatus, cmd.CommandName()); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
