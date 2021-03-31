@@ -513,7 +513,7 @@ Values are chosen in this order:
   ```bash
   atlantis server --silence-no-projects
   ```
-  `--silence-no-projects` will tell Atlantis to ignore PRs if none of the modified files are part of a projects defined in the `atlantis.yaml` file.
+  `--silence-no-projects` will tell Atlantis to ignore PRs if none of the modified files are part of a project defined in the `atlantis.yaml` file.
 
   This is useful when running multiple Atlantis servers against a single repository so you can
   delegate work to each Atlantis server. Also useful when used with pre_workflow_hooks to dynamically generate an `atlantis.yaml` file.
