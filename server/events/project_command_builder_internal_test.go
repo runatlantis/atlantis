@@ -592,7 +592,7 @@ projects:
 				&CommentParser{},
 				false,
 				false,
-				"",
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 			)
 
 			// We run a test for each type of command.
@@ -779,7 +779,7 @@ projects:
 				&CommentParser{},
 				false,
 				true,
-				"",
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 			)
 
 			// We run a test for each type of command, again specific projects
@@ -985,7 +985,7 @@ workflows:
 				&CommentParser{},
 				false,
 				false,
-				"",
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 			)
 
 			cmd := models.PolicyCheckCommand

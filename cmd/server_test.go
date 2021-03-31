@@ -738,6 +738,53 @@ func TestExecute_RepoWhitelistDeprecation(t *testing.T) {
 	Equals(t, "*", passedConfig.RepoAllowlist)
 }
 
+func TestExecute_AutoplanFileList(t *testing.T) {
+	cases := []struct {
+		description string
+		flags       map[string]interface{}
+		expectErr   string
+	}{
+		{
+			"default value",
+			map[string]interface{}{
+				AutoplanFileListFlag: DefaultAutoplanFileList,
+			},
+			"",
+		},
+		{
+			"valid value",
+			map[string]interface{}{
+				AutoplanFileListFlag: "**/*.tf",
+			},
+			"",
+		},
+		{
+			"invalid exclusion pattern",
+			map[string]interface{}{
+				AutoplanFileListFlag: "**/*.yml,!",
+			},
+			"invalid pattern in --autoplan-file-list, **/*.yml,!: illegal exclusion pattern: \"!\"",
+		},
+		{
+			"invalid pattern",
+			map[string]interface{}{
+				AutoplanFileListFlag: "?[",
+			},
+			"invalid pattern in --autoplan-file-list, ?[: syntax error in pattern",
+		},
+	}
+	for _, testCase := range cases {
+		t.Log("Should validate autoplan file list when " + testCase.description)
+		c := setupWithDefaults(testCase.flags, t)
+		err := c.Execute()
+		if testCase.expectErr != "" {
+			ErrEquals(t, testCase.expectErr, err)
+		} else {
+			Ok(t, err)
+		}
+	}
+}
+
 func setup(flags map[string]interface{}, t *testing.T) *cobra.Command {
 	vipr := viper.New()
 	for k, v := range flags {

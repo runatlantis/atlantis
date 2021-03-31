@@ -148,7 +148,7 @@ projects:
 				&events.CommentParser{},
 				false,
 				false,
-				"",
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 			)
 
 			ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
@@ -378,7 +378,7 @@ projects:
 					&events.CommentParser{},
 					false,
 					true,
-					"",
+					"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 				)
 
 				var actCtxs []models.ProjectCommandContext
@@ -520,7 +520,7 @@ projects:
 				&events.CommentParser{},
 				false,
 				false,
-				"",
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 			)
 
 			ctxs, err := builder.BuildPlanCommands(
@@ -600,7 +600,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		&events.CommentParser{},
 		false,
 		false,
-		"",
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 	)
 
 	ctxs, err := builder.BuildApplyCommands(
@@ -673,7 +673,7 @@ projects:
 		&events.CommentParser{},
 		false,
 		false,
-		"",
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 	)
 
 	ctx := &events.CommandContext{
@@ -741,7 +741,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				&events.CommentParser{},
 				false,
 				false,
-				"",
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 			)
 
 			var actCtxs []models.ProjectCommandContext
@@ -913,7 +913,7 @@ projects:
 				&events.CommentParser{},
 				false,
 				false,
-				"",
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 			)
 
 			actCtxs, err := builder.BuildPlanCommands(
@@ -969,7 +969,7 @@ projects:
 		&events.CommentParser{},
 		true,
 		false,
-		"",
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 	)
 
 	var actCtxs []models.ProjectCommandContext
@@ -1013,7 +1013,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		&events.CommentParser{},
 		false,
 		false,
-		"",
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 	)
 
 	ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{

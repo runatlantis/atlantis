@@ -107,149 +107,126 @@ func TestDetermineProjects(t *testing.T) {
 	noopLogger := logging.NewNoopLogger(t)
 	setupTmpRepos(t)
 
+	defaultAutoplanFileList := "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl"
+
 	cases := []struct {
 		description      string
 		files            []string
 		expProjectPaths  []string
 		repoDir          string
 		autoplanFileList string
-		expErr           string
 	}{
 		{
 			"If no files were modified then should return an empty list",
 			nil,
 			nil,
 			nestedModules1,
-			"",
-			"",
+			defaultAutoplanFileList,
 		},
 		{
 			"Should ignore non .tf files and return an empty list",
 			[]string{"non-tf", "non.tf.suffix"},
 			nil,
 			nestedModules1,
-			"",
-			"",
+			defaultAutoplanFileList,
 		},
 		{
 			"Should ignore .tflint.hcl files and return an empty list",
 			[]string{".tflint.hcl", "project1/.tflint.hcl"},
 			nil,
 			nestedModules1,
-			"",
-			"",
+			defaultAutoplanFileList,
 		},
 		{
 			"Should plan in the parent directory from modules if that dir has a main.tf",
 			[]string{"project1/modules/main.tf"},
 			[]string{"project1"},
 			nestedModules1,
-			"",
-			"",
+			defaultAutoplanFileList,
 		},
 		{
 			"Should plan in the parent directory from modules if that dir has a main.tf",
 			[]string{"modules/main.tf"},
 			[]string{"."},
 			nestedModules2,
-			"",
-			"",
+			defaultAutoplanFileList,
 		},
 		{
 			"Should plan in the parent directory from modules when module is in a subdir if that dir has a main.tf",
 			[]string{"modules/subdir/main.tf"},
 			[]string{"."},
 			nestedModules2,
-			"",
-			"",
+			defaultAutoplanFileList,
 		},
 		{
 			"Should not plan in the parent directory from modules if that dir does not have a main.tf",
 			[]string{"modules/main.tf"},
 			[]string{},
 			topLevelModules,
-			"",
-			"",
+			defaultAutoplanFileList,
 		},
 		{
 			"Should not plan in the parent directory from modules if that dir does not have a main.tf",
 			[]string{"modules/main.tf", "project1/main.tf"},
 			[]string{"project1"},
 			topLevelModules,
-			"",
-			"",
+			defaultAutoplanFileList,
 		},
 		{
 			"Should ignore tfstate files and return an empty list",
 			[]string{"terraform.tfstate", "terraform.tfstate.backup", "parent/terraform.tfstate", "parent/terraform.tfstate.backup"},
 			nil,
 			nestedModules1,
-			"",
-			"",
+			defaultAutoplanFileList,
 		},
 		{
 			"Should return '.' when changed file is at root",
 			[]string{"a.tf"},
 			[]string{"."},
 			nestedModules2,
-			"",
-			"",
+			defaultAutoplanFileList,
 		},
 		{
 			"Should return directory when changed file is in a dir",
 			[]string{"project1/a.tf"},
 			[]string{"project1"},
 			nestedModules1,
-			"",
-			"",
+			defaultAutoplanFileList,
 		},
 		{
 			"Should return parent dir when changed file is in an env/ dir",
 			[]string{"env/staging.tfvars"},
 			[]string{"."},
 			envDir,
-			"",
-			"",
+			defaultAutoplanFileList,
 		},
 		{
 			"Should de-duplicate when multiple files changed in the same dir",
 			[]string{"env/staging.tfvars", "main.tf", "other.tf"},
 			[]string{"."},
 			"",
-			"",
-			"",
+			defaultAutoplanFileList,
 		},
 		{
 			"Should ignore changes in a dir that was deleted",
 			[]string{"wasdeleted/main.tf"},
 			[]string{},
 			"",
-			"",
-			"",
+			defaultAutoplanFileList,
 		},
 		{
 			"Should not ignore terragrunt.hcl files",
 			[]string{"terragrunt.hcl"},
 			[]string{"."},
 			nestedModules2,
-			"",
-			"",
+			defaultAutoplanFileList,
 		},
 		{
 			"Should find terragrunt.hcl file inside a nested directory",
 			[]string{"project1/terragrunt.hcl"},
 			[]string{"project1"},
 			nestedModules1,
-			"",
-			"",
-		},
-		{
-			"Should error on invalid pattern",
-			[]string{"project1/main.tf"},
-			[]string{"project1"},
-			nestedModules1,
-			"*[]",
-			"filtering modified files by autoplanFileList: *[]: filtering modified files with patterns: [*[]]: syntax error in pattern",
+			defaultAutoplanFileList,
 		},
 		{
 			"Should find packer files and ignore default tf files",
@@ -257,7 +234,6 @@ func TestDetermineProjects(t *testing.T) {
 			[]string{"project1"},
 			topLevelModules,
 			"**/*.pkr.hcl",
-			"",
 		},
 		{
 			"Should find yaml files in addition to defaults",
@@ -265,7 +241,6 @@ func TestDetermineProjects(t *testing.T) {
 			[]string{"project1", "project2"},
 			topLevelModules,
 			"**/*.tf,**/*.yml",
-			"",
 		},
 		{
 			"Should find yaml files unless excluded",
@@ -273,17 +248,11 @@ func TestDetermineProjects(t *testing.T) {
 			[]string{"project1"},
 			topLevelModules,
 			"**/*.yml,!project2/*.yml",
-			"",
 		},
 	}
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			projects, err := m.DetermineProjects(noopLogger, c.files, modifiedRepo, c.repoDir, c.autoplanFileList)
-			if c.expErr != "" {
-				ErrEquals(t, c.expErr, err)
-				return
-			}
-			Ok(t, err)
+			projects := m.DetermineProjects(noopLogger, c.files, modifiedRepo, c.repoDir, c.autoplanFileList)
 
 			// Extract the paths from the projects. We use a slice here instead of a
 			// map so we can test whether there are duplicates returned.

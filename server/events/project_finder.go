@@ -33,7 +33,7 @@ type ProjectFinder interface {
 	// DetermineProjects returns the list of projects that were modified based on
 	// the modifiedFiles. The list will be de-duplicated.
 	// absRepoDir is the path to the cloned repo on disk.
-	DetermineProjects(log logging.SimpleLogging, modifiedFiles []string, repoFullName string, absRepoDir string, autoplanFileList string) ([]models.Project, error)
+	DetermineProjects(log logging.SimpleLogging, modifiedFiles []string, repoFullName string, absRepoDir string, autoplanFileList string) []models.Project
 	// DetermineProjectsViaConfig returns the list of projects that were modified
 	// based on modifiedFiles and the repo's config.
 	// absRepoDir is the path to the cloned repo on disk.
@@ -47,16 +47,12 @@ var ignoredFilenameFragments = []string{"terraform.tfstate", "terraform.tfstate.
 type DefaultProjectFinder struct{}
 
 // See ProjectFinder.DetermineProjects.
-func (p *DefaultProjectFinder) DetermineProjects(log logging.SimpleLogging, modifiedFiles []string, repoFullName string, absRepoDir string, autoplanFileList string) ([]models.Project, error) {
+func (p *DefaultProjectFinder) DetermineProjects(log logging.SimpleLogging, modifiedFiles []string, repoFullName string, absRepoDir string, autoplanFileList string) []models.Project {
 	var projects []models.Project
 
-	modifiedTerraformFiles, err := p.filterToFileList(log, modifiedFiles, autoplanFileList)
-	if err != nil {
-		return nil, errors.Wrapf(err, "filtering modified files by autoplanFileList: %s", autoplanFileList)
-	}
-
+	modifiedTerraformFiles := p.filterToFileList(log, modifiedFiles, autoplanFileList)
 	if len(modifiedTerraformFiles) == 0 {
-		return projects, nil
+		return projects
 	}
 	log.Info("filtered modified files to %d .tf or terragrunt.hcl files: %v",
 		len(modifiedTerraformFiles), modifiedTerraformFiles)
@@ -81,7 +77,7 @@ func (p *DefaultProjectFinder) DetermineProjects(log logging.SimpleLogging, modi
 	}
 	log.Info("there are %d modified project(s) at path(s): %v",
 		len(projects), strings.Join(exists, ", "))
-	return projects, nil
+	return projects
 }
 
 // See ProjectFinder.DetermineProjectsViaConfig.
@@ -149,17 +145,15 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log logging.SimpleLogg
 }
 
 // filterToFileList filters out files not included in the file list
-func (p *DefaultProjectFinder) filterToFileList(log *logging.SimpleLogger, files []string, fileList string) ([]string, error) {
+func (p *DefaultProjectFinder) filterToFileList(log logging.SimpleLogging, files []string, fileList string) []string {
 	var filtered []string
 	if fileList == "" {
 		fileList = "**/*.tf,**/*.tfvars,**/*.tfvars.json"
 	}
 
 	patterns := strings.Split(fileList, ",")
-	patternMatcher, err := fileutils.NewPatternMatcher(patterns)
-	if err != nil {
-		return nil, errors.Wrapf(err, "filtering modified files with patterns: %v", patterns)
-	}
+	// Ignore pattern matcher error here as it was checked for errors in server validation
+	patternMatcher, _ := fileutils.NewPatternMatcher(patterns)
 
 	for _, fileName := range files {
 		if p.shouldIgnore(fileName) {
@@ -170,12 +164,12 @@ func (p *DefaultProjectFinder) filterToFileList(log *logging.SimpleLogger, files
 			log.Debug("filter err for file %q: %s", fileName, err)
 			continue
 		}
-		if match || filepath.Base(fileName) == "terragrunt.hcl" {
+		if match {
 			filtered = append(filtered, fileName)
 		}
 	}
 
-	return filtered, nil
+	return filtered
 }
 
 // shouldIgnore returns true if we shouldn't trigger a plan on changes to this file.

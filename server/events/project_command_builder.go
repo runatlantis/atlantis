@@ -244,7 +244,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		// If there is no config file, then we'll plan each project that
 		// our algorithm determines was modified.
 		ctx.Log.Info("found no %s file", yaml.AtlantisYAMLFilename)
-		modifiedProjects, err := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir, p.AutoplanFileList)
+		modifiedProjects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir, p.AutoplanFileList)
 		if err != nil {
 			return nil, errors.Wrapf(err, "finding modified projects: %s", modifiedFiles)
 		}
