@@ -509,6 +509,15 @@ Values are chosen in this order:
   Some users find this useful because they prefer to add the Atlantis webhook
   at an organization level rather than on each repo.
 
+* ### `--silence-no-projects`
+  ```bash
+  atlantis server --silence-no-projects
+  ```
+  `--silence-no-projects` will tell Atlantis to ignore PRs if none of the modified files are part of a projects defined in the `atlantis.yaml` file.
+
+  This is useful when running multiple Atlantis servers against a single repository so you can
+  delegate work to each Atlantis server. Also useful when used with pre_workflow_hooks to dynamically generate an `atlantis.yaml` file.
+
 * ### `--skip-clone-no-changes`
   ```bash
   atlantis server --skip-clone-no-changes
