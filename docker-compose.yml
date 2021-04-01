@@ -21,4 +21,4 @@ services:
             - ./:/atlantis/src
         # Contains the flags that atlantis uses in env var form
         env_file:
-            - ./atlantis.env
+            - ~/.atlantis.env
