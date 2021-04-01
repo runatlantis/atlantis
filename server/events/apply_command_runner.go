@@ -2,6 +2,7 @@ package events
 
 import (
 	"github.com/runatlantis/atlantis/server/events/db"
+	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
@@ -9,7 +10,7 @@ import (
 func NewApplyCommandRunner(
 	vcsClient vcs.Client,
 	disableApplyAll bool,
-	disableApply bool,
+	applyCommandLocker locking.ApplyLockChecker,
 	commitStatusUpdater CommitStatusUpdater,
 	prjCommandBuilder ProjectApplyCommandBuilder,
 	prjCmdRunner ProjectApplyCommandRunner,
@@ -22,7 +23,7 @@ func NewApplyCommandRunner(
 	return &ApplyCommandRunner{
 		vcsClient:           vcsClient,
 		DisableApplyAll:     disableApplyAll,
-		DisableApply:        disableApply,
+		locker:              applyCommandLocker,
 		commitStatusUpdater: commitStatusUpdater,
 		prjCmdBuilder:       prjCommandBuilder,
 		prjCmdRunner:        prjCmdRunner,
@@ -36,8 +37,8 @@ func NewApplyCommandRunner(
 
 type ApplyCommandRunner struct {
 	DisableApplyAll     bool
-	DisableApply        bool
 	DB                  *db.BoltDB
+	locker              locking.ApplyLockChecker
 	vcsClient           vcs.Client
 	commitStatusUpdater CommitStatusUpdater
 	prjCmdBuilder       ProjectApplyCommandBuilder
@@ -53,7 +54,15 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
 
-	if a.DisableApply {
+	locked, err := a.IsLocked()
+	// CheckApplyLock falls back to DisableApply flag if fetching the lock
+	// raises an erro r
+	// We will log failure as warning
+	if err != nil {
+		ctx.Log.Warn("checking global apply lock: %s", err)
+	}
+
+	if locked {
 		ctx.Log.Info("ignoring apply command since apply disabled globally")
 		if err := a.vcsClient.CreateComment(baseRepo, pull.Num, applyDisabledComment, models.ApplyCommand.String()); err != nil {
 			ctx.Log.Err("unable to comment on pull request: %s", err)
@@ -133,6 +142,12 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 	if a.autoMerger.automergeEnabled(projectCmds) {
 		a.autoMerger.automerge(ctx, pullStatus)
 	}
+}
+
+func (a *ApplyCommandRunner) IsLocked() (bool, error) {
+	lock, err := a.locker.CheckApplyLock()
+
+	return lock.Locked, err
 }
 
 func (a *ApplyCommandRunner) isParallelEnabled(projectCmds []models.ProjectCommandContext) bool {
