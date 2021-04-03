@@ -17,3 +17,5 @@ atlantis
 
 # gitreleaser
 dist/
+atlantis_amd64
+atlantis_arm64
