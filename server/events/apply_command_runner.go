@@ -20,20 +20,22 @@ func NewApplyCommandRunner(
 	db *db.BoltDB,
 	parallelPoolSize int,
 	SilenceNoProjects bool,
+	silenceVCSStatusNoProjects bool,
 ) *ApplyCommandRunner {
 	return &ApplyCommandRunner{
-		vcsClient:           vcsClient,
-		DisableApplyAll:     disableApplyAll,
-		locker:              applyCommandLocker,
-		commitStatusUpdater: commitStatusUpdater,
-		prjCmdBuilder:       prjCommandBuilder,
-		prjCmdRunner:        prjCmdRunner,
-		autoMerger:          autoMerger,
-		pullUpdater:         pullUpdater,
-		dbUpdater:           dbUpdater,
-		DB:                  db,
-		parallelPoolSize:    parallelPoolSize,
-		SilenceNoProjects:   SilenceNoProjects,
+		vcsClient:                  vcsClient,
+		DisableApplyAll:            disableApplyAll,
+		locker:                     applyCommandLocker,
+		commitStatusUpdater:        commitStatusUpdater,
+		prjCmdBuilder:              prjCommandBuilder,
+		prjCmdRunner:               prjCmdRunner,
+		autoMerger:                 autoMerger,
+		pullUpdater:                pullUpdater,
+		dbUpdater:                  dbUpdater,
+		DB:                         db,
+		parallelPoolSize:           parallelPoolSize,
+		SilenceNoProjects:          SilenceNoProjects,
+		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
 	}
 }
 
@@ -52,12 +54,45 @@ type ApplyCommandRunner struct {
 	// SilenceNoProjects is whether Atlantis should respond to PRs if no projects
 	// are found
 	SilenceNoProjects bool
+	// SilenceVCSStatusNoPlans is whether any plan should set commit status if no projects
+	// are found
+	silenceVCSStatusNoProjects bool
 }
 
 func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 	var err error
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
+
+	locked, err := a.IsLocked()
+	// CheckApplyLock falls back to DisableApply flag if fetching the lock
+	// raises an error
+	// We will log failure as warning
+	if err != nil {
+		ctx.Log.Warn("checking global apply lock: %s", err)
+	}
+
+	if locked {
+		ctx.Log.Info("ignoring apply command since apply disabled globally")
+		if err := a.vcsClient.CreateComment(baseRepo, pull.Num, applyDisabledComment, models.ApplyCommand.String()); err != nil {
+			ctx.Log.Err("unable to comment on pull request: %s", err)
+		}
+
+		return
+	}
+
+	if a.DisableApplyAll && !cmd.IsForSpecificProject() {
+		ctx.Log.Info("ignoring apply command without flags since apply all is disabled")
+		if err := a.vcsClient.CreateComment(baseRepo, pull.Num, applyAllDisabledComment, models.ApplyCommand.String()); err != nil {
+			ctx.Log.Err("unable to comment on pull request: %s", err)
+		}
+
+		return
+	}
+
+	if err = a.commitStatusUpdater.UpdateCombined(baseRepo, pull, models.PendingCommitStatus, cmd.CommandName()); err != nil {
+		ctx.Log.Warn("unable to update commit status: %s", err)
+	}
 
 	// Get the mergeable status before we set any build statuses of our own.
 	// We do this here because when we set a "Pending" status, if users have
@@ -85,7 +120,7 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 	projectCmds, err = a.prjCmdBuilder.BuildApplyCommands(ctx, cmd)
 
 	if err != nil {
-		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil && !a.SilenceNoProjects {
+		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
 		a.pullUpdater.updatePull(ctx, cmd, CommandResult{Error: err})
@@ -95,38 +130,16 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 	// If there are no projects to apply, don't respond to the PR and ignore
 	if len(projectCmds) == 0 && a.SilenceNoProjects {
 		ctx.Log.Info("determined there was no project to run apply in.")
-		return
-	}
-
-	locked, err := a.IsLocked()
-	// CheckApplyLock falls back to DisableApply flag if fetching the lock
-	// raises an erro r
-	// We will log failure as warning
-	if err != nil {
-		ctx.Log.Warn("checking global apply lock: %s", err)
-	}
-
-	if locked {
-		ctx.Log.Info("ignoring apply command since apply disabled globally")
-		if err := a.vcsClient.CreateComment(baseRepo, pull.Num, applyDisabledComment, models.ApplyCommand.String()); err != nil {
-			ctx.Log.Err("unable to comment on pull request: %s", err)
+		if !a.silenceVCSStatusNoProjects {
+			// If there were no projects modified, we set successful commit statuses
+			// with 0/0 projects planned/policy_checked/applied successfully because some users require
+			// the Atlantis status to be passing for all pull requests.
+			ctx.Log.Debug("setting VCS status to success with no projects found")
+			if err := a.commitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, models.ApplyCommand, 0, 0); err != nil {
+				ctx.Log.Warn("unable to update commit status: %s", err)
+			}
 		}
-
 		return
-	}
-
-	if a.DisableApplyAll && !cmd.IsForSpecificProject() {
-		ctx.Log.Info("ignoring apply command without flags since apply all is disabled")
-		if err := a.vcsClient.CreateComment(baseRepo, pull.Num, applyAllDisabledComment, models.ApplyCommand.String()); err != nil {
-			ctx.Log.Err("unable to comment on pull request: %s", err)
-		}
-
-		return
-	}
-
-	// At this point we are sure Atlantis has work to do, so set commit status to pending
-	if err = a.commitStatusUpdater.UpdateCombined(baseRepo, pull, models.PendingCommitStatus, cmd.CommandName()); err != nil {
-		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
 	// Only run commands in parallel if enabled

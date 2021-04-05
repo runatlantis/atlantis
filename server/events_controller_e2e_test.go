@@ -763,9 +763,11 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 		e2eStatusUpdater,
 		projectCommandRunner,
 		parallelPoolSize,
+		false,
 	)
 
 	planCommandRunner := events.NewPlanCommandRunner(
+		false,
 		false,
 		e2eVCSClient,
 		&events.DefaultPendingPlanFinder{},
@@ -794,6 +796,7 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 		boltdb,
 		parallelPoolSize,
 		silenceNoProjects,
+		false,
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
@@ -803,6 +806,7 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 		pullUpdater,
 		dbUpdater,
 		silenceNoProjects,
+		false,
 	)
 
 	unlockCommandRunner := events.NewUnlockCommandRunner(

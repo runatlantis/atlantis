@@ -64,7 +64,10 @@ type UserConfig struct {
 	// SilenceVCSStatusNoPlans is whether autoplan should set commit status if no plans
 	// are found.
 	SilenceVCSStatusNoPlans bool `mapstructure:"silence-vcs-status-no-plans"`
-	SilenceAllowlistErrors  bool `mapstructure:"silence-allowlist-errors"`
+	// SilenceVCSStatusNoProjects is whether autoplan should set commit status if no projects
+	// are found.
+	SilenceVCSStatusNoProjects bool `mapstructure:"silence-vcs-status-no-projects"`
+	SilenceAllowlistErrors     bool `mapstructure:"silence-allowlist-errors"`
 	// SilenceWhitelistErrors is deprecated in favour of SilenceAllowlistErrors
 	SilenceWhitelistErrors bool            `mapstructure:"silence-whitelist-errors"`
 	SkipCloneNoChanges     bool            `mapstructure:"skip-clone-no-changes"`

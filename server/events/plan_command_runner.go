@@ -7,6 +7,7 @@ import (
 
 func NewPlanCommandRunner(
 	silenceVCSStatusNoPlans bool,
+	silenceVCSStatusNoProjects bool,
 	vcsClient vcs.Client,
 	pendingPlanFinder PendingPlanFinder,
 	workingDir WorkingDir,
@@ -21,19 +22,20 @@ func NewPlanCommandRunner(
 	SilenceNoProjects bool,
 ) *PlanCommandRunner {
 	return &PlanCommandRunner{
-		silenceVCSStatusNoPlans:  silenceVCSStatusNoPlans,
-		vcsClient:                vcsClient,
-		pendingPlanFinder:        pendingPlanFinder,
-		workingDir:               workingDir,
-		commitStatusUpdater:      commitStatusUpdater,
-		prjCmdBuilder:            projectCommandBuilder,
-		prjCmdRunner:             projectCommandRunner,
-		dbUpdater:                dbUpdater,
-		pullUpdater:              pullUpdater,
-		policyCheckCommandRunner: policyCheckCommandRunner,
-		autoMerger:               autoMerger,
-		parallelPoolSize:         parallelPoolSize,
-		SilenceNoProjects:        SilenceNoProjects,
+		silenceVCSStatusNoPlans:    silenceVCSStatusNoPlans,
+		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
+		vcsClient:                  vcsClient,
+		pendingPlanFinder:          pendingPlanFinder,
+		workingDir:                 workingDir,
+		commitStatusUpdater:        commitStatusUpdater,
+		prjCmdBuilder:              projectCommandBuilder,
+		prjCmdRunner:               projectCommandRunner,
+		dbUpdater:                  dbUpdater,
+		pullUpdater:                pullUpdater,
+		policyCheckCommandRunner:   policyCheckCommandRunner,
+		autoMerger:                 autoMerger,
+		parallelPoolSize:           parallelPoolSize,
+		SilenceNoProjects:          SilenceNoProjects,
 	}
 }
 
@@ -44,17 +46,20 @@ type PlanCommandRunner struct {
 	SilenceNoProjects bool
 	// SilenceVCSStatusNoPlans is whether autoplan should set commit status if no plans
 	// are found
-	silenceVCSStatusNoPlans  bool
-	commitStatusUpdater      CommitStatusUpdater
-	pendingPlanFinder        PendingPlanFinder
-	workingDir               WorkingDir
-	prjCmdBuilder            ProjectPlanCommandBuilder
-	prjCmdRunner             ProjectPlanCommandRunner
-	dbUpdater                *DBUpdater
-	pullUpdater              *PullUpdater
-	policyCheckCommandRunner *PolicyCheckCommandRunner
-	autoMerger               *AutoMerger
-	parallelPoolSize         int
+	silenceVCSStatusNoPlans bool
+	// SilenceVCSStatusNoPlans is whether any plan should set commit status if no projects
+	// are found
+	silenceVCSStatusNoProjects bool
+	commitStatusUpdater        CommitStatusUpdater
+	pendingPlanFinder          PendingPlanFinder
+	workingDir                 WorkingDir
+	prjCmdBuilder              ProjectPlanCommandBuilder
+	prjCmdRunner               ProjectPlanCommandRunner
+	dbUpdater                  *DBUpdater
+	pullUpdater                *PullUpdater
+	policyCheckCommandRunner   *PolicyCheckCommandRunner
+	autoMerger                 *AutoMerger
+	parallelPoolSize           int
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *CommandContext) {
@@ -74,7 +79,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *CommandContext) {
 
 	if len(projectCmds) == 0 {
 		ctx.Log.Info("determined there was no project to run plan in")
-		if !p.silenceVCSStatusNoPlans {
+		if !p.silenceVCSStatusNoPlans || !p.silenceVCSStatusNoProjects {
 			// If there were no projects modified, we set successful commit statuses
 			// with 0/0 projects planned/policy_checked/applied successfully because some users require
 			// the Atlantis status to be passing for all pull requests.
@@ -135,6 +140,10 @@ func (p *PlanCommandRunner) run(ctx *CommandContext, cmd *CommentCommand) {
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
 
+	if err = p.commitStatusUpdater.UpdateCombined(baseRepo, pull, models.PendingCommitStatus, models.PlanCommand); err != nil {
+		ctx.Log.Warn("unable to update commit status: %s", err)
+	}
+
 	projectCmds, err := p.prjCmdBuilder.BuildPlanCommands(ctx, cmd)
 	if err != nil {
 		if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, models.PlanCommand); statusErr != nil {
@@ -144,17 +153,21 @@ func (p *PlanCommandRunner) run(ctx *CommandContext, cmd *CommentCommand) {
 		return
 	}
 
-	projectCmds, policyCheckCmds := p.partitionProjectCmds(ctx, projectCmds)
-
 	if len(projectCmds) == 0 && p.SilenceNoProjects {
 		ctx.Log.Info("determined there was no project to run plan in")
+		if !p.silenceVCSStatusNoProjects {
+			// If there were no projects modified, we set successful commit statuses
+			// with 0/0 projects planned/policy_checked/applied successfully because some users require
+			// the Atlantis status to be passing for all pull requests.
+			ctx.Log.Debug("setting VCS status to success with no projects found")
+			if err := p.commitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, models.PlanCommand, 0, 0); err != nil {
+				ctx.Log.Warn("unable to update commit status: %s", err)
+			}
+		}
 		return
 	}
 
-	// At this point we are sure Atlantis has work to do, so set commit status to pending
-	if err = p.commitStatusUpdater.UpdateCombined(baseRepo, pull, models.PendingCommitStatus, models.PlanCommand); err != nil {
-		ctx.Log.Warn("unable to update commit status: %s", err)
-	}
+	projectCmds, policyCheckCmds := p.partitionProjectCmds(ctx, projectCmds)
 
 	// Only run commands in parallel if enabled
 	var result CommandResult
