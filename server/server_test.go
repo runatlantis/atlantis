@@ -29,6 +29,7 @@ import (
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/logging"
 	sMocks "github.com/runatlantis/atlantis/server/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -106,6 +107,7 @@ func TestIndex_Success(t *testing.T) {
 		Router:          r,
 		AtlantisVersion: atlantisVersion,
 		AtlantisURL:     u,
+		Logger:          logging.NewNoopLogger(t),
 	}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()

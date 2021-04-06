@@ -8,25 +8,25 @@ import (
 	logging "github.com/runatlantis/atlantis/server/logging"
 )
 
-func AnyPtrToLoggingSimpleLogger() logging.SimpleLogging {
+func AnyLoggingSimpleLogging() logging.SimpleLogging {
 	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf((*(logging.SimpleLogging))(nil)).Elem()))
 	var nullValue logging.SimpleLogging
 	return nullValue
 }
 
-func EqPtrToLoggingSimpleLogger(value logging.SimpleLogging) logging.SimpleLogging {
+func EqLoggingSimpleLogging(value logging.SimpleLogging) logging.SimpleLogging {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
 	var nullValue logging.SimpleLogging
 	return nullValue
 }
 
-func NotEqPtrToLoggingSimpleLogger(value logging.SimpleLogging) logging.SimpleLogging {
+func NotEqLoggingSimpleLogging(value logging.SimpleLogging) logging.SimpleLogging {
 	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
 	var nullValue logging.SimpleLogging
 	return nullValue
 }
 
-func PtrToLoggingSimpleLoggerThat(matcher pegomock.ArgumentMatcher) logging.SimpleLogging {
+func LoggingSimpleLoggingThat(matcher pegomock.ArgumentMatcher) logging.SimpleLogging {
 	pegomock.RegisterMatcher(matcher)
 	var nullValue logging.SimpleLogging
 	return nullValue

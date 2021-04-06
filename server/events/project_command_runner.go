@@ -75,7 +75,7 @@ type EnvStepRunner interface {
 // WebhooksSender sends webhook.
 type WebhooksSender interface {
 	// Send sends the webhook.
-	Send(log *logging.SimpleLogger, res webhooks.ApplyResult) error
+	Send(log logging.SimpleLogging, res webhooks.ApplyResult) error
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_runner.go ProjectCommandRunner

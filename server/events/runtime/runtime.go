@@ -25,8 +25,8 @@ const (
 // TerraformExec brings the interface from TerraformClient into this package
 // without causing circular imports.
 type TerraformExec interface {
-	RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, envs map[string]string, v *version.Version, workspace string) (string, error)
-	EnsureVersion(log *logging.SimpleLogger, v *version.Version) error
+	RunCommandWithVersion(log logging.SimpleLogging, path string, args []string, envs map[string]string, v *version.Version, workspace string) (string, error)
+	EnsureVersion(log logging.SimpleLogging, v *version.Version) error
 }
 
 // AsyncTFExec brings the interface from TerraformClient into this package
@@ -40,7 +40,7 @@ type AsyncTFExec interface {
 	// Callers can use the input channel to pass stdin input to the command.
 	// If any error is passed on the out channel, there will be no
 	// further output (so callers are free to exit).
-	RunCommandAsync(log *logging.SimpleLogger, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan terraform.Line)
+	RunCommandAsync(log logging.SimpleLogging, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan terraform.Line)
 }
 
 // StatusUpdater brings the interface from CommitStatusUpdater into this package

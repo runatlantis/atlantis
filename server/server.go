@@ -82,7 +82,7 @@ type Server struct {
 	Port                          int
 	PreWorkflowHooksCommandRunner *events.DefaultPreWorkflowHooksCommandRunner
 	CommandRunner                 *events.DefaultCommandRunner
-	Logger                        *logging.SimpleLogger
+	Logger                        logging.SimpleLogging
 	Locker                        locking.Locker
 	ApplyLocker                   locking.ApplyLocker
 	EventsController              *EventsController
@@ -125,7 +125,12 @@ type WebhookConfig struct {
 // its dependencies an error will be returned. This is like the main() function
 // for the server CLI command because it injects all the dependencies.
 func NewServer(userConfig UserConfig, config Config) (*Server, error) {
-	logger := logging.NewSimpleLogger("server", false, userConfig.ToLogLevel())
+	logger, err := logging.NewStructuredLoggerFromLevel(userConfig.ToLogLevel())
+
+	if err != nil {
+		return nil, err
+	}
+
 	var supportedVCSHosts []models.VCSHostType
 	var githubClient *vcs.GithubClient
 	var githubAppEnabled bool
@@ -641,6 +646,8 @@ func (s *Server) Start() error {
 		StackSize:  1024 * 8,
 	}, NewRequestLogger(s.Logger))
 	n.UseHandler(s.Router)
+
+	defer s.Logger.Flush()
 
 	// Ensure server gracefully drains connections when stopped.
 	stop := make(chan os.Signal, 1)

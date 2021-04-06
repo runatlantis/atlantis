@@ -27,7 +27,7 @@ func NewMockVersionedExecutorWorkflow(options ...pegomock.Option) *MockVersioned
 func (mock *MockVersionedExecutorWorkflow) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockVersionedExecutorWorkflow) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockVersionedExecutorWorkflow) EnsureExecutorVersion(log *logging.SimpleLogger, v *go_version.Version) (string, error) {
+func (mock *MockVersionedExecutorWorkflow) EnsureExecutorVersion(log logging.SimpleLogging, v *go_version.Version) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockVersionedExecutorWorkflow().")
 	}
@@ -102,7 +102,7 @@ type VerifierMockVersionedExecutorWorkflow struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockVersionedExecutorWorkflow) EnsureExecutorVersion(log *logging.SimpleLogger, v *go_version.Version) *MockVersionedExecutorWorkflow_EnsureExecutorVersion_OngoingVerification {
+func (verifier *VerifierMockVersionedExecutorWorkflow) EnsureExecutorVersion(log logging.SimpleLogging, v *go_version.Version) *MockVersionedExecutorWorkflow_EnsureExecutorVersion_OngoingVerification {
 	params := []pegomock.Param{log, v}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "EnsureExecutorVersion", params, verifier.timeout)
 	return &MockVersionedExecutorWorkflow_EnsureExecutorVersion_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
@@ -113,17 +113,17 @@ type MockVersionedExecutorWorkflow_EnsureExecutorVersion_OngoingVerification str
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockVersionedExecutorWorkflow_EnsureExecutorVersion_OngoingVerification) GetCapturedArguments() (*logging.SimpleLogger, *go_version.Version) {
+func (c *MockVersionedExecutorWorkflow_EnsureExecutorVersion_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, *go_version.Version) {
 	log, v := c.GetAllCapturedArguments()
 	return log[len(log)-1], v[len(v)-1]
 }
 
-func (c *MockVersionedExecutorWorkflow_EnsureExecutorVersion_OngoingVerification) GetAllCapturedArguments() (_param0 []*logging.SimpleLogger, _param1 []*go_version.Version) {
+func (c *MockVersionedExecutorWorkflow_EnsureExecutorVersion_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []*go_version.Version) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]*logging.SimpleLogger, len(c.methodInvocations))
+		_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
 		for u, param := range params[0] {
-			_param0[u] = param.(*logging.SimpleLogger)
+			_param0[u] = param.(logging.SimpleLogging)
 		}
 		_param1 = make([]*go_version.Version, len(c.methodInvocations))
 		for u, param := range params[1] {

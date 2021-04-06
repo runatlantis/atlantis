@@ -9,6 +9,7 @@ import (
 
 	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/logging"
 	gitlab "github.com/xanzy/go-gitlab"
 
 	. "github.com/runatlantis/atlantis/testing"
@@ -54,7 +55,8 @@ func TestNewGitlabClient_BaseURL(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Hostname, func(t *testing.T) {
-			client, err := NewGitlabClient(c.Hostname, "token", nil)
+			log := logging.NewNoopLogger(t)
+			client, err := NewGitlabClient(c.Hostname, "token", log)
 			Ok(t, err)
 			Equals(t, c.ExpBaseURL, client.Client.BaseURL().String())
 		})

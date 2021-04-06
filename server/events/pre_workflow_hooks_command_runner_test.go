@@ -42,7 +42,7 @@ func newBool(b bool) *bool {
 
 func TestRunPreHooks_Clone(t *testing.T) {
 
-	log := logging.NewNoopLogger()
+	log := logging.NewNoopLogger(t)
 
 	var newPull = fixtures.Pull
 	newPull.BaseRepo = fixtures.GithubRepo

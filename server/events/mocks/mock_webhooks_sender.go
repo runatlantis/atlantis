@@ -26,7 +26,7 @@ func NewMockWebhooksSender(options ...pegomock.Option) *MockWebhooksSender {
 func (mock *MockWebhooksSender) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockWebhooksSender) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockWebhooksSender) Send(log *logging.SimpleLogger, res webhooks.ApplyResult) error {
+func (mock *MockWebhooksSender) Send(log logging.SimpleLogging, res webhooks.ApplyResult) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockWebhooksSender().")
 	}
@@ -78,7 +78,7 @@ type VerifierMockWebhooksSender struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockWebhooksSender) Send(log *logging.SimpleLogger, res webhooks.ApplyResult) *MockWebhooksSender_Send_OngoingVerification {
+func (verifier *VerifierMockWebhooksSender) Send(log logging.SimpleLogging, res webhooks.ApplyResult) *MockWebhooksSender_Send_OngoingVerification {
 	params := []pegomock.Param{log, res}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Send", params, verifier.timeout)
 	return &MockWebhooksSender_Send_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
@@ -89,17 +89,17 @@ type MockWebhooksSender_Send_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockWebhooksSender_Send_OngoingVerification) GetCapturedArguments() (*logging.SimpleLogger, webhooks.ApplyResult) {
+func (c *MockWebhooksSender_Send_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, webhooks.ApplyResult) {
 	log, res := c.GetAllCapturedArguments()
 	return log[len(log)-1], res[len(res)-1]
 }
 
-func (c *MockWebhooksSender_Send_OngoingVerification) GetAllCapturedArguments() (_param0 []*logging.SimpleLogger, _param1 []webhooks.ApplyResult) {
+func (c *MockWebhooksSender_Send_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []webhooks.ApplyResult) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]*logging.SimpleLogger, len(c.methodInvocations))
+		_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
 		for u, param := range params[0] {
-			_param0[u] = param.(*logging.SimpleLogger)
+			_param0[u] = param.(logging.SimpleLogging)
 		}
 		_param1 = make([]webhooks.ApplyResult, len(c.methodInvocations))
 		for u, param := range params[1] {

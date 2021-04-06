@@ -20,8 +20,8 @@ type LocksController struct {
 	AtlantisVersion    string
 	AtlantisURL        *url.URL
 	Locker             locking.Locker
+	Logger             logging.SimpleLogging
 	ApplyLocker        locking.ApplyLocker
-	Logger             *logging.SimpleLogger
 	VCSClient          vcs.Client
 	LockDetailTemplate TemplateWriter
 	WorkingDir         events.WorkingDir

@@ -20,7 +20,7 @@ func TestDeleteLock_LockerErr(t *testing.T) {
 	When(l.Unlock("id")).ThenReturn(nil, errors.New("err"))
 	dlc := events.DefaultDeleteLockCommand{
 		Locker: l,
-		Logger: logging.NewNoopLogger(),
+		Logger: logging.NewNoopLogger(t),
 	}
 	_, err := dlc.DeleteLock("id")
 	ErrEquals(t, "err", err)
@@ -33,7 +33,7 @@ func TestDeleteLock_None(t *testing.T) {
 	When(l.Unlock("id")).ThenReturn(nil, nil)
 	dlc := events.DefaultDeleteLockCommand{
 		Locker: l,
-		Logger: logging.NewNoopLogger(),
+		Logger: logging.NewNoopLogger(t),
 	}
 	lock, err := dlc.DeleteLock("id")
 	Ok(t, err)
@@ -47,7 +47,7 @@ func TestDeleteLock_OldFormat(t *testing.T) {
 	When(l.Unlock("id")).ThenReturn(&models.ProjectLock{}, nil)
 	dlc := events.DefaultDeleteLockCommand{
 		Locker: l,
-		Logger: logging.NewNoopLogger(),
+		Logger: logging.NewNoopLogger(t),
 	}
 	lock, err := dlc.DeleteLock("id")
 	Ok(t, err)
@@ -78,7 +78,7 @@ func TestDeleteLock_Success(t *testing.T) {
 	Ok(t, err)
 	dlc := events.DefaultDeleteLockCommand{
 		Locker:           l,
-		Logger:           logging.NewNoopLogger(),
+		Logger:           logging.NewNoopLogger(t),
 		DB:               db,
 		WorkingDirLocker: workingDirLocker,
 		WorkingDir:       workingDir,
@@ -98,7 +98,7 @@ func TestDeleteLocksByPull_LockerErr(t *testing.T) {
 	When(l.UnlockByPull(repoName, pullNum)).ThenReturn(nil, errors.New("err"))
 	dlc := events.DefaultDeleteLockCommand{
 		Locker: l,
-		Logger: logging.NewNoopLogger(),
+		Logger: logging.NewNoopLogger(t),
 	}
 	err := dlc.DeleteLocksByPull(repoName, pullNum)
 	ErrEquals(t, "err", err)
@@ -113,7 +113,7 @@ func TestDeleteLocksByPull_None(t *testing.T) {
 	When(l.UnlockByPull(repoName, pullNum)).ThenReturn([]models.ProjectLock{}, nil)
 	dlc := events.DefaultDeleteLockCommand{
 		Locker: l,
-		Logger: logging.NewNoopLogger(),
+		Logger: logging.NewNoopLogger(t),
 	}
 	err := dlc.DeleteLocksByPull(repoName, pullNum)
 	Ok(t, err)
@@ -128,7 +128,7 @@ func TestDeleteLocksByPull_OldFormat(t *testing.T) {
 	When(l.UnlockByPull(repoName, pullNum)).ThenReturn([]models.ProjectLock{{}}, nil)
 	dlc := events.DefaultDeleteLockCommand{
 		Locker: l,
-		Logger: logging.NewNoopLogger(),
+		Logger: logging.NewNoopLogger(t),
 	}
 	err := dlc.DeleteLocksByPull(repoName, pullNum)
 	Ok(t, err)

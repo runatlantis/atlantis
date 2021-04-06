@@ -33,7 +33,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/fixtures"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
-	logmocks "github.com/runatlantis/atlantis/server/logging/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -44,7 +43,6 @@ var azuredevopsGetter *mocks.MockAzureDevopsPullGetter
 var githubGetter *mocks.MockGithubPullGetter
 var gitlabGetter *mocks.MockGitlabMergeRequestGetter
 var ch events.DefaultCommandRunner
-var pullLogger *logging.SimpleLogger
 var workingDir events.WorkingDir
 var pendingPlanFinder *mocks.MockPendingPlanFinder
 var drainer *events.Drainer
@@ -73,8 +71,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	githubGetter = mocks.NewMockGithubPullGetter()
 	gitlabGetter = mocks.NewMockGitlabMergeRequestGetter()
 	azuredevopsGetter = mocks.NewMockAzureDevopsPullGetter()
-	logger := logmocks.NewMockSimpleLogging()
-	pullLogger = logging.NewSimpleLogger("runatlantis/atlantis#1", true, logging.Info)
+	logger = logging.NewNoopLogger(t)
 	projectCommandRunner = mocks.NewMockProjectCommandRunner()
 	workingDir = mocks.NewMockWorkingDir()
 	pendingPlanFinder = mocks.NewMockPendingPlanFinder()
@@ -88,9 +85,6 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	drainer = &events.Drainer{}
 	deleteLockCommand = eventmocks.NewMockDeleteLockCommand()
 	applyLockChecker = lockingmocks.NewMockApplyLockChecker()
-	When(logger.GetLevel()).ThenReturn(logging.Info)
-	When(logger.NewLogger("runatlantis/atlantis#1", true, logging.Info)).
-		ThenReturn(pullLogger)
 
 	dbUpdater = &events.DBUpdater{
 		DB: defaultBoltDB,
@@ -192,22 +186,6 @@ func TestRunCommentCommand_LogPanics(t *testing.T) {
 	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, 1, &events.CommentCommand{Name: models.PlanCommand})
 	_, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString()).GetCapturedArguments()
 	Assert(t, strings.Contains(comment, "Error: goroutine panic"), fmt.Sprintf("comment should be about a goroutine panic but was %q", comment))
-}
-
-func TestRunCommentCommand_NoGithubPullGetter(t *testing.T) {
-	t.Log("if DefaultCommandRunner was constructed with a nil GithubPullGetter an error should be logged")
-	setup(t)
-	ch.GithubPullGetter = nil
-	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, 1, nil)
-	Equals(t, "[EROR] Atlantis not configured to support GitHub\n", pullLogger.History.String())
-}
-
-func TestRunCommentCommand_NoGitlabMergeGetter(t *testing.T) {
-	t.Log("if DefaultCommandRunner was constructed with a nil GitlabMergeRequestGetter an error should be logged")
-	setup(t)
-	ch.GitlabMergeRequestGetter = nil
-	ch.RunCommentCommand(fixtures.GitlabRepo, &fixtures.GitlabRepo, nil, fixtures.User, 1, nil)
-	Equals(t, "[EROR] Atlantis not configured to support GitLab\n", pullLogger.History.String())
 }
 
 func TestRunCommentCommand_GithubPullErr(t *testing.T) {
