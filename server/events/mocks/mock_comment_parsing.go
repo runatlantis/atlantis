@@ -4,12 +4,11 @@
 package mocks
 
 import (
-	"reflect"
-	"time"
-
 	pegomock "github.com/petergtz/pegomock"
 	events "github.com/runatlantis/atlantis/server/events"
 	models "github.com/runatlantis/atlantis/server/events/models"
+	"reflect"
+	"time"
 )
 
 type MockCommentParsing struct {
@@ -49,14 +48,14 @@ func (mock *MockCommentParsing) VerifyWasCalledOnce() *VerifierMockCommentParsin
 	}
 }
 
-func (mock *MockCommentParsing) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockCommentParsing {
+func (mock *MockCommentParsing) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockCommentParsing {
 	return &VerifierMockCommentParsing{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockCommentParsing) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockCommentParsing {
+func (mock *MockCommentParsing) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockCommentParsing {
 	return &VerifierMockCommentParsing{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -64,7 +63,7 @@ func (mock *MockCommentParsing) VerifyWasCalledInOrder(invocationCountMatcher pe
 	}
 }
 
-func (mock *MockCommentParsing) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockCommentParsing {
+func (mock *MockCommentParsing) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockCommentParsing {
 	return &VerifierMockCommentParsing{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -74,7 +73,7 @@ func (mock *MockCommentParsing) VerifyWasCalledEventually(invocationCountMatcher
 
 type VerifierMockCommentParsing struct {
 	mock                   *MockCommentParsing
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

@@ -116,6 +116,7 @@ type DefaultCommandRunner struct {
 	CommentCommandRunnerByCmd     map[models.CommandName]CommentCommandRunner
 	Drainer                       *Drainer
 	PreWorkflowHooksCommandRunner PreWorkflowHooksCommandRunner
+	PullStatusFetcher             PullStatusFetcher
 }
 
 // RunAutoplanCommand runs plan and policy_checks when a pull request is opened or updated.
@@ -135,13 +136,20 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	timer := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
 	defer timer.Complete()
 
+	status, err := c.PullStatusFetcher.GetPullStatus(pull)
+
+	if err != nil {
+		log.Err("Unable to fetch pull status, this is likely a bug.", err)
+	}
+
 	ctx := &CommandContext{
-		User:     user,
-		Log:      log,
-		Scope:    scope,
-		Pull:     pull,
-		HeadRepo: headRepo,
-		Trigger:  Auto,
+		User:       user,
+		Log:        log,
+		Scope:      scope,
+		Pull:       pull,
+		HeadRepo:   headRepo,
+		PullStatus: status,
+		Trigger:    Auto,
 	}
 	if !c.validateCtxAndComment(ctx) {
 		return
@@ -150,7 +158,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		return
 	}
 
-	err := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx)
+	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx)
 
 	if err != nil {
 		ctx.Log.Err("Error running pre-workflow hooks %s. Proceeding with %s command.", err, models.PlanCommand)
@@ -191,13 +199,20 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
+	status, err := c.PullStatusFetcher.GetPullStatus(pull)
+
+	if err != nil {
+		log.Err("Unable to fetch pull status, this is likely a bug.", err)
+	}
+
 	ctx := &CommandContext{
-		User:     user,
-		Log:      log,
-		Pull:     pull,
-		HeadRepo: headRepo,
-		Trigger:  Comment,
-		Scope:    scope,
+		User:       user,
+		Log:        log,
+		Pull:       pull,
+		PullStatus: status,
+		HeadRepo:   headRepo,
+		Trigger:    Comment,
+		Scope:      scope,
 	}
 
 	if !c.validateCtxAndComment(ctx) {

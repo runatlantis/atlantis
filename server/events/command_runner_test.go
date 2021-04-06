@@ -124,6 +124,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		policyCheckCommandRunner,
 		autoMerger,
 		parallelPoolSize,
+		defaultBoltDB,
 	)
 
 	applyCommandRunner = events.NewApplyCommandRunner(
@@ -179,6 +180,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		AllowForkPRsFlag:              "allow-fork-prs-flag",
 		Drainer:                       drainer,
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
+		PullStatusFetcher:             defaultBoltDB,
 	}
 	return vcsClient
 }
@@ -549,16 +551,14 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 	When(ch.VCSClient.PullIsMergeable(fixtures.GithubRepo, modelPull)).ThenReturn(true, nil)
 
 	When(projectCommandBuilder.BuildApplyCommands(matchers.AnyPtrToEventsCommandContext(), matchers.AnyPtrToEventsCommentCommand())).Then(func(args []Param) ReturnValues {
-		ctx := args[0].(*events.CommandContext)
-		Equals(t, false, ctx.PullMergeable)
-
 		return ReturnValues{
 			[]models.ProjectCommandContext{
 				{
-					CommandName: models.ApplyCommand,
-					ProjectName: "default",
-					Workspace:   "default",
-					RepoRelDir:  ".",
+					CommandName:       models.ApplyCommand,
+					ProjectName:       "default",
+					Workspace:         "default",
+					RepoRelDir:        ".",
+					ProjectPlanStatus: models.ErroredPolicyCheckStatus,
 				},
 			},
 			nil,

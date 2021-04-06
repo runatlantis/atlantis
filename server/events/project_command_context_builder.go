@@ -191,6 +191,25 @@ func newProjectCommandContext(ctx *CommandContext,
 	verbose bool,
 	scope stats.Scope,
 ) models.ProjectCommandContext {
+
+	var projectPlanStatus models.ProjectPlanStatus
+
+	if ctx.PullStatus != nil {
+		for _, project := range ctx.PullStatus.Projects {
+
+			// if name is not used, let's match the directory
+			if projCfg.Name == "" && project.RepoRelDir == projCfg.RepoRelDir {
+				projectPlanStatus = project.Status
+				break
+			}
+
+			if projCfg.Name != "" && project.ProjectName == projCfg.Name {
+				projectPlanStatus = project.Status
+				break
+			}
+		}
+	}
+
 	return models.ProjectCommandContext{
 		CommandName:          cmd,
 		ApplyCmd:             applyCmd,
@@ -205,6 +224,7 @@ func newProjectCommandContext(ctx *CommandContext,
 		Log:                  ctx.Log,
 		Scope:                scope,
 		PullMergeable:        ctx.PullMergeable,
+		ProjectPlanStatus:    projectPlanStatus,
 		Pull:                 ctx.Pull,
 		ProjectName:          projCfg.Name,
 		ApplyRequirements:    projCfg.ApplyRequirements,
