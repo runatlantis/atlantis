@@ -21,12 +21,37 @@ type LocksController struct {
 	AtlantisURL        *url.URL
 	Locker             locking.Locker
 	Logger             logging.SimpleLogging
+	ApplyLocker        locking.ApplyLocker
 	VCSClient          vcs.Client
 	LockDetailTemplate TemplateWriter
 	WorkingDir         events.WorkingDir
 	WorkingDirLocker   events.WorkingDirLocker
 	DB                 *db.BoltDB
 	DeleteLockCommand  events.DeleteLockCommand
+}
+
+// LockApply handles creating a global apply lock.
+// If Lock already exists it will be a no-op
+func (l *LocksController) LockApply(w http.ResponseWriter, r *http.Request) {
+	lock, err := l.ApplyLocker.LockApply()
+	if err != nil {
+		l.respond(w, logging.Error, http.StatusInternalServerError, "creating apply lock failed with: %s", err)
+		return
+	}
+
+	l.respond(w, logging.Info, http.StatusOK, "Apply Lock is acquired on %s", lock.Time.Format("2006-01-02 15:04:05"))
+}
+
+// UnlockApply handles releasing a global apply lock.
+// If Lock doesn't exists it will be a no-op
+func (l *LocksController) UnlockApply(w http.ResponseWriter, r *http.Request) {
+	err := l.ApplyLocker.UnlockApply()
+	if err != nil {
+		l.respond(w, logging.Error, http.StatusInternalServerError, "deleting apply lock failed with: %s", err)
+		return
+	}
+
+	l.respond(w, logging.Info, http.StatusOK, "Deleted apply lock")
 }
 
 // GetLock is the GET /locks/{id} route. It renders the lock detail view.

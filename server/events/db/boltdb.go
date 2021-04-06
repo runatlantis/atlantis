@@ -17,15 +17,17 @@ import (
 
 // BoltDB is a database using BoltDB
 type BoltDB struct {
-	db              *bolt.DB
-	locksBucketName []byte
-	pullsBucketName []byte
+	db                    *bolt.DB
+	locksBucketName       []byte
+	pullsBucketName       []byte
+	globalLocksBucketName []byte
 }
 
 const (
-	locksBucketName  = "runLocks"
-	pullsBucketName  = "pulls"
-	pullKeySeparator = "::"
+	locksBucketName       = "runLocks"
+	pullsBucketName       = "pulls"
+	globalLocksBucketName = "globalLocks"
+	pullKeySeparator      = "::"
 )
 
 // New returns a valid locker. We need to be able to write to dataDir
@@ -50,18 +52,31 @@ func New(dataDir string) (*BoltDB, error) {
 		if _, err = tx.CreateBucketIfNotExists([]byte(pullsBucketName)); err != nil {
 			return errors.Wrapf(err, "creating bucket %q", pullsBucketName)
 		}
+		if _, err = tx.CreateBucketIfNotExists([]byte(globalLocksBucketName)); err != nil {
+			return errors.Wrapf(err, "creating bucket %q", globalLocksBucketName)
+		}
 		return nil
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "starting BoltDB")
 	}
 	// todo: close BoltDB when server is sigtermed
-	return &BoltDB{db: db, locksBucketName: []byte(locksBucketName), pullsBucketName: []byte(pullsBucketName)}, nil
+	return &BoltDB{
+		db:                    db,
+		locksBucketName:       []byte(locksBucketName),
+		pullsBucketName:       []byte(pullsBucketName),
+		globalLocksBucketName: []byte(globalLocksBucketName),
+	}, nil
 }
 
 // NewWithDB is used for testing.
-func NewWithDB(db *bolt.DB, bucket string) (*BoltDB, error) {
-	return &BoltDB{db: db, locksBucketName: []byte(bucket), pullsBucketName: []byte(pullsBucketName)}, nil
+func NewWithDB(db *bolt.DB, bucket string, globalBucket string) (*BoltDB, error) {
+	return &BoltDB{
+		db:                    db,
+		locksBucketName:       []byte(bucket),
+		pullsBucketName:       []byte(pullsBucketName),
+		globalLocksBucketName: []byte(globalBucket),
+	}, nil
 }
 
 // TryLock attempts to create a new lock. If the lock is
@@ -153,6 +168,87 @@ func (b *BoltDB) List() ([]models.ProjectLock, error) {
 	}
 
 	return locks, nil
+}
+
+// LockCommand attempts to create a new lock for a CommandName.
+// If the lock doesn't exists, it will create a lock and return a pointer to it.
+// If the lock already exists, it will return an "lock already exists" error
+func (b *BoltDB) LockCommand(cmdName models.CommandName, lockTime time.Time) (*models.CommandLock, error) {
+	lock := models.CommandLock{
+		CommandName: cmdName,
+		LockMetadata: models.LockMetadata{
+			UnixTime: lockTime.Unix(),
+		},
+	}
+
+	newLockSerialized, _ := json.Marshal(lock)
+	transactionErr := b.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(b.globalLocksBucketName)
+
+		currLockSerialized := bucket.Get([]byte(b.commandLockKey(cmdName)))
+		if currLockSerialized != nil {
+			return errors.New("lock already exists")
+		}
+
+		// This will only error on readonly buckets, it's okay to ignore.
+		bucket.Put([]byte(b.commandLockKey(cmdName)), newLockSerialized) // nolint: errcheck
+		return nil
+	})
+
+	if transactionErr != nil {
+		return nil, errors.Wrap(transactionErr, "db transaction failed")
+	}
+
+	return &lock, nil
+}
+
+// UnlockCommand removes CommandName lock if present.
+// If there are no lock it returns an error.
+func (b *BoltDB) UnlockCommand(cmdName models.CommandName) error {
+	transactionErr := b.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(b.globalLocksBucketName)
+
+		if l := bucket.Get([]byte(b.commandLockKey(cmdName))); l == nil {
+			return errors.New("no lock exists")
+		}
+
+		return bucket.Delete([]byte(b.commandLockKey(cmdName)))
+	})
+
+	if transactionErr != nil {
+		return errors.Wrap(transactionErr, "db transaction failed")
+	}
+
+	return nil
+}
+
+// CheckCommandLock checks if CommandName lock was set.
+// If the lock exists return the pointer to the lock object, otherwise return nil
+func (b *BoltDB) CheckCommandLock(cmdName models.CommandName) (*models.CommandLock, error) {
+	cmdLock := models.CommandLock{}
+
+	found := false
+
+	err := b.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(b.globalLocksBucketName)
+
+		serializedLock := bucket.Get([]byte(b.commandLockKey(cmdName)))
+
+		if serializedLock != nil {
+			if err := json.Unmarshal(serializedLock, &cmdLock); err != nil {
+				return errors.Wrap(err, "failed to deserialize UserConfig")
+			}
+			found = true
+		}
+
+		return nil
+	})
+
+	if found {
+		return &cmdLock, err
+	}
+
+	return nil, err
 }
 
 // UnlockByPull deletes all locks associated with that pull request and returns them.
@@ -353,6 +449,10 @@ func (b *BoltDB) pullKey(pull models.PullRequest) ([]byte, error) {
 
 	return []byte(fmt.Sprintf("%s::%s::%d", hostname, repo, pull.Num)),
 		nil
+}
+
+func (b *BoltDB) commandLockKey(cmdName models.CommandName) string {
+	return fmt.Sprintf("%s/lock", cmdName)
 }
 
 func (b *BoltDB) lockKey(p models.Project, workspace string) string {
