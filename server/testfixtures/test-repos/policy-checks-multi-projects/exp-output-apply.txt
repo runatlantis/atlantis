@@ -1,0 +1,34 @@
+Ran Apply for 2 projects:
+
+1. dir: `dir1` workspace: `default`
+1. dir: `dir2` workspace: `default`
+
+### 1. dir: `dir1` workspace: `default`
+<details><summary>Show Output</summary>
+
+```diff
+null_resource.simple:
+null_resource.simple:
+
+Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+
+The state of your infrastructure has been saved to the path
+below. This state is required to modify and destroy your
+infrastructure, so keep it safe. To inspect the complete state
+use the `terraform show` command.
+
+State path: terraform.tfstate
+
+Outputs:
+
+workspace = "default"
+
+```
+</details>
+
+---
+### 2. dir: `dir2` workspace: `default`
+**Apply Failed**: All policies must pass for project before running apply
+
+---
+

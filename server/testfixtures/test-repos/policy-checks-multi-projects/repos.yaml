@@ -1,9 +1,9 @@
 policies:
   owners:
     users:
-      - someoneelse
+      - runatlantis
   policy_sets:
     - name: test_policy
-      path: policies/policy.rego
+      path: ../policies/policy.rego
       source: local
         

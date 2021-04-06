@@ -333,6 +333,11 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 			if !approved {
 				return "", "Pull request must be approved by at least one person other than the author before running apply.", nil
 			}
+		// this should come before mergeability check since mergeability is a superset of this check.
+		case valid.PoliciesPassedApplyReq:
+			if ctx.ProjectPlanStatus == models.ErroredPolicyCheckStatus {
+				return "", "All policies must pass for project before running apply", nil
+			}
 		case raw.MergeableApplyRequirement:
 			if !ctx.PullMergeable {
 				return "", "Pull request must be mergeable before running apply.", nil

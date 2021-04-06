@@ -2,8 +2,9 @@
 package matchers
 
 import (
-	"reflect"
 	"github.com/petergtz/pegomock"
+	"reflect"
+
 	models "github.com/runatlantis/atlantis/server/events/models"
 )
 
@@ -15,6 +16,18 @@ func AnyModelsVCSHostType() models.VCSHostType {
 
 func EqModelsVCSHostType(value models.VCSHostType) models.VCSHostType {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
+	var nullValue models.VCSHostType
+	return nullValue
+}
+
+func NotEqModelsVCSHostType(value models.VCSHostType) models.VCSHostType {
+	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
+	var nullValue models.VCSHostType
+	return nullValue
+}
+
+func ModelsVCSHostTypeThat(matcher pegomock.ArgumentMatcher) models.VCSHostType {
+	pegomock.RegisterMatcher(matcher)
 	var nullValue models.VCSHostType
 	return nullValue
 }
