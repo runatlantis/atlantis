@@ -50,7 +50,7 @@ func TestCreateApplyLock(t *testing.T) {
 		}, nil)
 
 		lc := server.LocksController{
-			Logger:      logging.NewNoopLogger(),
+			Logger:      logging.NewNoopLogger(t),
 			ApplyLocker: l,
 		}
 		lc.LockApply(w, req)
@@ -68,7 +68,7 @@ func TestCreateApplyLock(t *testing.T) {
 		}, errors.New("failed to acquire lock"))
 
 		lc := server.LocksController{
-			Logger:      logging.NewNoopLogger(),
+			Logger:      logging.NewNoopLogger(t),
 			ApplyLocker: l,
 		}
 		lc.LockApply(w, req)
@@ -86,7 +86,7 @@ func TestUnlockApply(t *testing.T) {
 		When(l.UnlockApply()).ThenReturn(nil)
 
 		lc := server.LocksController{
-			Logger:      logging.NewNoopLogger(),
+			Logger:      logging.NewNoopLogger(t),
 			ApplyLocker: l,
 		}
 		lc.UnlockApply(w, req)
@@ -102,7 +102,7 @@ func TestUnlockApply(t *testing.T) {
 		When(l.UnlockApply()).ThenReturn(errors.New("failed to delete lock"))
 
 		lc := server.LocksController{
-			Logger:      logging.NewNoopLogger(),
+			Logger:      logging.NewNoopLogger(t),
 			ApplyLocker: l,
 		}
 		lc.UnlockApply(w, req)
