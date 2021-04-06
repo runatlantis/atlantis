@@ -130,8 +130,8 @@ func (c *MockCommentBuilder_BuildPlanComment_OngoingVerification) GetAllCaptured
 	return
 }
 
-func (verifier *VerifierMockCommentBuilder) BuildApplyComment(repoRelDir string, workspace string, project string) *MockCommentBuilder_BuildApplyComment_OngoingVerification {
-	params := []pegomock.Param{repoRelDir, workspace, project}
+func (verifier *VerifierMockCommentBuilder) BuildApplyComment(repoRelDir string, workspace string, project string, autoMergeDisabled bool) *MockCommentBuilder_BuildApplyComment_OngoingVerification {
+	params := []pegomock.Param{repoRelDir, workspace, project, autoMergeDisabled}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "BuildApplyComment", params, verifier.timeout)
 	return &MockCommentBuilder_BuildApplyComment_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -141,12 +141,12 @@ type MockCommentBuilder_BuildApplyComment_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockCommentBuilder_BuildApplyComment_OngoingVerification) GetCapturedArguments() (string, string, string) {
-	repoRelDir, workspace, project := c.GetAllCapturedArguments()
-	return repoRelDir[len(repoRelDir)-1], workspace[len(workspace)-1], project[len(project)-1]
+func (c *MockCommentBuilder_BuildApplyComment_OngoingVerification) GetCapturedArguments() (string, string, string, bool) {
+	repoRelDir, workspace, project, autoMergeDisabled := c.GetAllCapturedArguments()
+	return repoRelDir[len(repoRelDir)-1], workspace[len(workspace)-1], project[len(project)-1], autoMergeDisabled[len(autoMergeDisabled)-1]
 }
 
-func (c *MockCommentBuilder_BuildApplyComment_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []string, _param2 []string) {
+func (c *MockCommentBuilder_BuildApplyComment_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []string, _param2 []string, _param3 []bool) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]string, len(c.methodInvocations))
@@ -160,6 +160,10 @@ func (c *MockCommentBuilder_BuildApplyComment_OngoingVerification) GetAllCapture
 		_param2 = make([]string, len(c.methodInvocations))
 		for u, param := range params[2] {
 			_param2[u] = param.(string)
+		}
+		_param3 = make([]bool, len(c.methodInvocations))
+		for u, param := range params[3] {
+			_param3[u] = param.(bool)
 		}
 	}
 	return
