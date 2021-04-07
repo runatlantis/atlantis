@@ -132,7 +132,7 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 		ctx.Log.Info("determined there was no project to run apply in.")
 		if !a.silenceVCSStatusNoProjects {
 			// If there were no projects modified, we set successful commit statuses
-			// with 0/0 projects planned/policy_checked/applied successfully because some users require
+			// with 0/0 projects applied successfully because some users require
 			// the Atlantis status to be passing for all pull requests.
 			ctx.Log.Debug("setting VCS status to success with no projects found")
 			if err := a.commitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, models.ApplyCommand, 0, 0); err != nil {

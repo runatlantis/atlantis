@@ -36,7 +36,7 @@ func (p *PolicyCheckCommandRunner) Run(ctx *CommandContext, cmds []models.Projec
 		ctx.Log.Info("no projects to run policy_check in")
 		if !p.silenceVCSStatusNoProjects {
 			// If there were no projects modified, we set successful commit statuses
-			// with 0/0 projects planned/policy_checked/applied successfully because some users require
+			// with 0/0 projects policy_checked successfully because some users require
 			// the Atlantis status to be passing for all pull requests.
 			ctx.Log.Debug("setting VCS status to success with no projects found")
 			if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, models.PolicyCheckCommand, 0, 0); err != nil {
