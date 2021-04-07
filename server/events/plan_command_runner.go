@@ -79,7 +79,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *CommandContext) {
 
 	if len(projectCmds) == 0 {
 		ctx.Log.Info("determined there was no project to run plan in")
-		if !p.silenceVCSStatusNoPlans || !p.silenceVCSStatusNoProjects {
+		if !(p.silenceVCSStatusNoPlans || p.silenceVCSStatusNoProjects) {
 			// If there were no projects modified, we set successful commit statuses
 			// with 0/0 projects planned/policy_checked/applied successfully because some users require
 			// the Atlantis status to be passing for all pull requests.
