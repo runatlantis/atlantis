@@ -52,11 +52,16 @@ func InstrumentRunner(runner runtime.Runner, eng *stats.Engine) runtime.Runner {
 
 func (ic *instrumentedStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error) {
 	start := time.Now()
+	var tfVersion string
+	if ctx.TerraformVersion != nil {
+		tfVersion = ctx.TerraformVersion.String()
+	}
+
 	tags := []stats.Tag{
 		{Name: "step", Value: ic.step},
 		{Name: "command", Value: ctx.CommandName.String()},
 		{Name: "workspace", Value: ctx.Workspace},
-		{Name: "terraform_version", Value: ctx.TerraformVersion.String()},
+		{Name: "terraform_version", Value: tfVersion},
 	}
 
 	out, err := ic.runner.Run(ctx, extraArgs, path, envs)
@@ -73,11 +78,16 @@ func (ic *instrumentedStepRunner) Run(ctx models.ProjectCommandContext, extraArg
 
 func (ic *instrumentedCustomRunner) Run(ctx models.ProjectCommandContext, cmd string, path string, envs map[string]string) (string, error) {
 	start := time.Now()
+	var tfVersion string
+	if ctx.TerraformVersion != nil {
+		tfVersion = ctx.TerraformVersion.String()
+	}
+
 	tags := []stats.Tag{
 		{Name: "step", Value: "run"},
 		{Name: "command", Value: ctx.CommandName.String()},
 		{Name: "workspace", Value: ctx.Workspace},
-		{Name: "terraform_version", Value: ctx.TerraformVersion.String()},
+		{Name: "terraform_version", Value: tfVersion},
 	}
 
 	out, err := ic.runner.Run(ctx, cmd, path, envs)
@@ -92,11 +102,16 @@ func (ic *instrumentedCustomRunner) Run(ctx models.ProjectCommandContext, cmd st
 
 func (ic *instrumentedRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error) {
 	start := time.Now()
+	var tfVersion string
+	if ctx.TerraformVersion != nil {
+		tfVersion = ctx.TerraformVersion.String()
+	}
+
 	tags := []stats.Tag{
 		{Name: "step", Value: "run"},
 		{Name: "command", Value: ctx.CommandName.String()},
 		{Name: "workspace", Value: ctx.Workspace},
-		{Name: "terraform_version", Value: ctx.TerraformVersion.String()},
+		{Name: "terraform_version", Value: tfVersion},
 	}
 
 	out, err := ic.runner.Run(ctx, extraArgs, path, envs)
