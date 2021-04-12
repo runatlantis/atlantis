@@ -768,9 +768,9 @@ func TestExecute_AutoplanFileList(t *testing.T) {
 		{
 			"invalid pattern",
 			map[string]interface{}{
-				AutoplanFileListFlag: "?[",
+				AutoplanFileListFlag: "[^]",
 			},
-			"invalid pattern in --autoplan-file-list, ?[: syntax error in pattern",
+			"invalid pattern in --autoplan-file-list, [^]: syntax error in pattern",
 		},
 	}
 	for _, testCase := range cases {
