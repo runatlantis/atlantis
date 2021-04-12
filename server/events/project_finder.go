@@ -147,10 +147,6 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log logging.SimpleLogg
 // filterToFileList filters out files not included in the file list
 func (p *DefaultProjectFinder) filterToFileList(log logging.SimpleLogging, files []string, fileList string) []string {
 	var filtered []string
-	if fileList == "" {
-		fileList = "**/*.tf,**/*.tfvars,**/*.tfvars.json"
-	}
-
 	patterns := strings.Split(fileList, ",")
 	// Ignore pattern matcher error here as it was checked for errors in server validation
 	patternMatcher, _ := fileutils.NewPatternMatcher(patterns)
