@@ -358,6 +358,8 @@ type ProjectCommandContext struct {
 	Log logging.SimpleLogging
 	// PullMergeable is true if the pull request for this project is able to be merged.
 	PullMergeable bool
+	// CurrentProjectPlanStatus is the status of the current project prior to this command.
+	ProjectPlanStatus ProjectPlanStatus
 	// Pull is the pull request we're responding to.
 	Pull PullRequest
 	// ProjectName is the name of the project set in atlantis.yaml. If there was

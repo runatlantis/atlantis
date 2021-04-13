@@ -1191,8 +1191,7 @@ repos:
 				Repos: []valid.Repo{
 					defaultCfg.Repos[0],
 					{
-						IDRegex:          regexp.MustCompile("github.com/"),
-						PreWorkflowHooks: []*valid.PreWorkflowHook{},
+						IDRegex: regexp.MustCompile("github.com/"),
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1210,9 +1209,8 @@ repos:
 				Repos: []valid.Repo{
 					defaultCfg.Repos[0],
 					{
-						ID:               "github.com/owner/repo",
-						PreWorkflowHooks: []*valid.PreWorkflowHook{},
-						Workflow:         defaultCfg.Repos[0].Workflow,
+						ID:       "github.com/owner/repo",
+						Workflow: defaultCfg.Repos[0].Workflow,
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1237,7 +1235,6 @@ workflows:
 					{
 						IDRegex:           regexp.MustCompile(".*"),
 						BranchRegex:       regexp.MustCompile(".*"),
-						PreWorkflowHooks:  []*valid.PreWorkflowHook{},
 						ApplyRequirements: []string{},
 						Workflow: &valid.Workflow{
 							Name: "default",
@@ -1430,7 +1427,6 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 					{
 						IDRegex:              regexp.MustCompile(".*"),
 						ApplyRequirements:    []string{"mergeable", "approved"},
-						PreWorkflowHooks:     []*valid.PreWorkflowHook{},
 						Workflow:             &customWorkflow,
 						AllowedWorkflows:     []string{"custom"},
 						AllowedOverrides:     []string{"workflow", "apply_requirements"},
@@ -1439,7 +1435,6 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 					{
 						ID:                   "github.com/owner/repo",
 						IDRegex:              nil,
-						PreWorkflowHooks:     []*valid.PreWorkflowHook{},
 						ApplyRequirements:    nil,
 						AllowedOverrides:     nil,
 						AllowCustomWorkflows: nil,
