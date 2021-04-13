@@ -701,7 +701,7 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 		commentParser,
 		false,
 		false,
-		"",
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTFVersion)
