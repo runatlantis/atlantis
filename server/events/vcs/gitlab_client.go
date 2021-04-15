@@ -47,7 +47,7 @@ var commonMarkSupported = MustConstraint(">=11.1")
 var gitlabClientUnderTest = false
 
 // NewGitlabClient returns a valid GitLab client.
-func NewGitlabClient(hostname string, token string, logger *logging.SimpleLogger) (*GitlabClient, error) {
+func NewGitlabClient(hostname string, token string, logger logging.SimpleLogging) (*GitlabClient, error) {
 	client := &GitlabClient{}
 
 	// Create the client differently depending on the base URL.

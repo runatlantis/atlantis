@@ -12,11 +12,14 @@ import (
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/logging"
+	logging_matchers "github.com/runatlantis/atlantis/server/logging/mocks/matchers"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 // Test different permutations of global and repo config.
 func TestBuildProjectCmdCtx(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	emptyPolicySets := valid.PolicySets{
 		Version:    nil,
 		PolicySets: []valid.PolicySet{},
@@ -62,7 +65,7 @@ workflows:
 				AutomergeEnabled:   false,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -112,7 +115,7 @@ projects:
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -164,7 +167,7 @@ projects:
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -224,7 +227,7 @@ projects:
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -371,7 +374,7 @@ workflows:
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -427,7 +430,7 @@ projects:
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -486,7 +489,7 @@ workflows:
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -529,7 +532,7 @@ projects:
 				AutomergeEnabled:   false,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -595,6 +598,7 @@ projects:
 			for _, cmd := range []models.CommandName{models.PlanCommand, models.ApplyCommand} {
 				t.Run(cmd.String(), func(t *testing.T) {
 					ctxs, err := builder.buildProjectCommandCtx(&CommandContext{
+						Log: logger,
 						Pull: models.PullRequest{
 							BaseRepo: baseRepo,
 						},
@@ -713,7 +717,7 @@ projects:
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logging.NewNoopLogger(t),
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "myproject_1",
@@ -747,7 +751,7 @@ projects:
 			defer cleanup()
 
 			workingDir := NewMockWorkingDir()
-			When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmp, false, nil)
+			When(workingDir.Clone(logging_matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmp, false, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"modules/module/main.tf"}, nil)
 
@@ -783,6 +787,7 @@ projects:
 						Pull: models.PullRequest{
 							BaseRepo: baseRepo,
 						},
+						Log:           logging.NewNoopLogger(t),
 						PullMergeable: true,
 					}, cmd, "myproject_[1-2]", []string{"flag"}, tmp, "project1", "myworkspace", true)
 
@@ -827,6 +832,7 @@ projects:
 }
 
 func TestBuildProjectCmdCtx_WithPolicCheckEnabled(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	emptyPolicySets := valid.PolicySets{
 		Version:    nil,
 		PolicySets: []valid.PolicySet{},
@@ -862,7 +868,7 @@ repos:
 				AutomergeEnabled:   false,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -917,7 +923,7 @@ workflows:
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -982,6 +988,7 @@ workflows:
 			cmd := models.PolicyCheckCommand
 			t.Run(cmd.String(), func(t *testing.T) {
 				ctxs, err := builder.buildProjectCommandCtx(&CommandContext{
+					Log: logger,
 					Pull: models.PullRequest{
 						BaseRepo: baseRepo,
 					},

@@ -187,7 +187,7 @@ func TestPost_GitlabCommentNotAllowlisted(t *testing.T) {
 	RegisterMockTestingT(t)
 	vcsClient := vcsmocks.NewMockClient()
 	e := server.EventsController{
-		Logger:                       logging.NewNoopLogger(),
+		Logger:                       logging.NewNoopLogger(t),
 		CommentParser:                &events.CommentParser{},
 		GitlabRequestParserValidator: &server.DefaultGitlabRequestParserValidator{},
 		Parser:                       &events.EventParser{},
@@ -215,7 +215,7 @@ func TestPost_GitlabCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 	RegisterMockTestingT(t)
 	vcsClient := vcsmocks.NewMockClient()
 	e := server.EventsController{
-		Logger:                       logging.NewNoopLogger(),
+		Logger:                       logging.NewNoopLogger(t),
 		CommentParser:                &events.CommentParser{},
 		GitlabRequestParserValidator: &server.DefaultGitlabRequestParserValidator{},
 		Parser:                       &events.EventParser{},
@@ -244,7 +244,7 @@ func TestPost_GithubCommentNotAllowlisted(t *testing.T) {
 	RegisterMockTestingT(t)
 	vcsClient := vcsmocks.NewMockClient()
 	e := server.EventsController{
-		Logger:                 logging.NewNoopLogger(),
+		Logger:                 logging.NewNoopLogger(t),
 		GithubRequestValidator: &server.DefaultGithubRequestValidator{},
 		CommentParser:          &events.CommentParser{},
 		Parser:                 &events.EventParser{},
@@ -273,7 +273,7 @@ func TestPost_GithubCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 	RegisterMockTestingT(t)
 	vcsClient := vcsmocks.NewMockClient()
 	e := server.EventsController{
-		Logger:                 logging.NewNoopLogger(),
+		Logger:                 logging.NewNoopLogger(t),
 		GithubRequestValidator: &server.DefaultGithubRequestValidator{},
 		CommentParser:          &events.CommentParser{},
 		Parser:                 &events.EventParser{},
@@ -471,7 +471,7 @@ func TestPost_AzureDevopsPullRequestIgnoreEvent(t *testing.T) {
 	Ok(t, err)
 	e := server.EventsController{
 		TestingMode:                     true,
-		Logger:                          logging.NewNoopLogger(),
+		Logger:                          logging.NewNoopLogger(t),
 		ApplyDisabled:                   false,
 		AzureDevopsWebhookBasicUser:     user,
 		AzureDevopsWebhookBasicPassword: secret,
@@ -635,6 +635,7 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 				RepoAllowlistChecker: allowlist,
 				SupportedVCSHosts:    []models.VCSHostType{models.BitbucketServer},
 				VCSClient:            nil,
+				Logger:               logging.NewNoopLogger(t),
 			}
 
 			// Build HTTP request.
@@ -754,7 +755,7 @@ func setup(t *testing.T) (server.EventsController, *mocks.MockGithubRequestValid
 	Ok(t, err)
 	e := server.EventsController{
 		TestingMode:                  true,
-		Logger:                       logging.NewNoopLogger(),
+		Logger:                       logging.NewNoopLogger(t),
 		GithubRequestValidator:       v,
 		Parser:                       p,
 		CommentParser:                cp,

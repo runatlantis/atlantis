@@ -28,6 +28,7 @@ import (
 )
 
 var lockBucket = "bucket"
+var configBucket = "configBucket"
 var project = models.NewProject("owner/repo", "parent/child")
 var workspace = "default"
 var pullNum = 1
@@ -41,6 +42,82 @@ var lock = models.ProjectLock{
 	Workspace: workspace,
 	Project:   project,
 	Time:      time.Now(),
+}
+
+func TestLockCommandNotSet(t *testing.T) {
+	t.Log("retrieving apply lock when there are none should return empty LockCommand")
+	db, b := newTestDB()
+	defer cleanupDB(db)
+	exists, err := b.CheckCommandLock(models.ApplyCommand)
+	Ok(t, err)
+	Assert(t, exists == nil, "exp nil")
+}
+
+func TestLockCommandEnabled(t *testing.T) {
+	t.Log("setting the apply lock")
+	db, b := newTestDB()
+	defer cleanupDB(db)
+	timeNow := time.Now()
+	_, err := b.LockCommand(models.ApplyCommand, timeNow)
+	Ok(t, err)
+
+	config, err := b.CheckCommandLock(models.ApplyCommand)
+	Ok(t, err)
+	Equals(t, true, config.IsLocked())
+}
+
+func TestLockCommandFail(t *testing.T) {
+	t.Log("setting the apply lock")
+	db, b := newTestDB()
+	defer cleanupDB(db)
+	timeNow := time.Now()
+	_, err := b.LockCommand(models.ApplyCommand, timeNow)
+	Ok(t, err)
+
+	_, err = b.LockCommand(models.ApplyCommand, timeNow)
+	ErrEquals(t, "db transaction failed: lock already exists", err)
+}
+
+func TestUnlockCommandDisabled(t *testing.T) {
+	t.Log("unsetting the apply lock")
+	db, b := newTestDB()
+	defer cleanupDB(db)
+	timeNow := time.Now()
+	_, err := b.LockCommand(models.ApplyCommand, timeNow)
+	Ok(t, err)
+
+	config, err := b.CheckCommandLock(models.ApplyCommand)
+	Ok(t, err)
+	Equals(t, true, config.IsLocked())
+
+	err = b.UnlockCommand(models.ApplyCommand)
+	Ok(t, err)
+
+	config, err = b.CheckCommandLock(models.ApplyCommand)
+	Ok(t, err)
+	Assert(t, config == nil, "exp nil object")
+}
+
+func TestUnlockCommandFail(t *testing.T) {
+	t.Log("setting the apply lock")
+	db, b := newTestDB()
+	defer cleanupDB(db)
+	err := b.UnlockCommand(models.ApplyCommand)
+	ErrEquals(t, "db transaction failed: no lock exists", err)
+}
+
+func TestMixedLocksPresent(t *testing.T) {
+	db, b := newTestDB()
+	defer cleanupDB(db)
+	timeNow := time.Now()
+	_, err := b.LockCommand(models.ApplyCommand, timeNow)
+	Ok(t, err)
+
+	_, _, err = b.TryLock(lock)
+	Ok(t, err)
+	ls, err := b.List()
+	Ok(t, err)
+	Equals(t, 1, len(ls))
 }
 
 func TestListNoLocks(t *testing.T) {
@@ -353,7 +430,7 @@ func TestGetLock(t *testing.T) {
 	Equals(t, lock.User, l.User)
 }
 
-// Test we can create a status and then get it.
+// Test we can create a status and then getCommandLock it.
 func TestPullStatus_UpdateGet(t *testing.T) {
 	b, cleanup := newTestDB2(t)
 	defer cleanup()
@@ -404,7 +481,7 @@ func TestPullStatus_UpdateGet(t *testing.T) {
 	}, status.Projects)
 }
 
-// Test we can create a status, delete it, and then we shouldn't be able to get
+// Test we can create a status, delete it, and then we shouldn't be able to getCommandLock
 // it.
 func TestPullStatus_UpdateDeleteGet(t *testing.T) {
 	b, cleanup := newTestDB2(t)
@@ -450,7 +527,7 @@ func TestPullStatus_UpdateDeleteGet(t *testing.T) {
 }
 
 // Test we can create a status, update a specific project's status within that
-// pull status, and when we get all the project statuses, that specific project
+// pull status, and when we getCommandLock all the project statuses, that specific project
 // should be updated.
 func TestPullStatus_UpdateProject(t *testing.T) {
 	b, cleanup := newTestDB2(t)
@@ -661,7 +738,7 @@ func TestPullStatus_UpdateMerge(t *testing.T) {
 	getStatus, err := b.GetPullStatus(pull)
 	Ok(t, err)
 
-	// Test both the pull state returned from the update call *and* the get
+	// Test both the pull state returned from the update call *and* the getCommandLock
 	// call.
 	for _, s := range []models.PullStatus{updateStatus, *getStatus} {
 		Equals(t, pull, s.Pull)
@@ -710,11 +787,14 @@ func newTestDB() (*bolt.DB, *db.BoltDB) {
 		if _, err := tx.CreateBucketIfNotExists([]byte(lockBucket)); err != nil {
 			return errors.Wrap(err, "failed to create bucket")
 		}
+		if _, err := tx.CreateBucketIfNotExists([]byte(configBucket)); err != nil {
+			return errors.Wrap(err, "failed to create bucket")
+		}
 		return nil
 	}); err != nil {
 		panic(errors.Wrap(err, "could not create bucket"))
 	}
-	b, _ := db.NewWithDB(boltDB, lockBucket)
+	b, _ := db.NewWithDB(boltDB, lockBucket, configBucket)
 	return boltDB, b
 }
 

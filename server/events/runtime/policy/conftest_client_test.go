@@ -62,7 +62,7 @@ func TestEnsureExecutorVersion(t *testing.T) {
 	RegisterMockTestingT(t)
 
 	mockCache := mocks.NewMockExecutionVersionCache()
-	log := logging.NewNoopLogger()
+	log := logging.NewNoopLogger(t)
 
 	t.Run("no specified version or default version", func(t *testing.T) {
 		subject := &ConfTestExecutorWorkflow{
@@ -132,6 +132,7 @@ func TestRun(t *testing.T) {
 		SourceResolver: mockResolver,
 		Exec:           mockExec,
 	}
+	log := logging.NewNoopLogger(t)
 
 	policySetName1 := "policy1"
 	policySetPath1 := "/some/path"
@@ -167,6 +168,7 @@ func TestRun(t *testing.T) {
 		},
 		ProjectName: "testproj",
 		Workspace:   "default",
+		Log:         log,
 	}
 
 	t.Run("success", func(t *testing.T) {

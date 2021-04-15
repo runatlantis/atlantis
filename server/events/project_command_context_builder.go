@@ -151,31 +151,51 @@ func newProjectCommandContext(ctx *CommandContext,
 	parallelPlanEnabled bool,
 	verbose bool,
 ) models.ProjectCommandContext {
+
+	var projectPlanStatus models.ProjectPlanStatus
+
+	if ctx.PullStatus != nil {
+		for _, project := range ctx.PullStatus.Projects {
+
+			// if name is not used, let's match the directory
+			if projCfg.Name == "" && project.RepoRelDir == projCfg.RepoRelDir {
+				projectPlanStatus = project.Status
+				break
+			}
+
+			if projCfg.Name != "" && project.ProjectName == projCfg.Name {
+				projectPlanStatus = project.Status
+				break
+			}
+		}
+	}
+
 	return models.ProjectCommandContext{
-		CommandName:               cmd,
-		ApplyCmd:                  applyCmd,
-		BaseRepo:                  ctx.Pull.BaseRepo,
-		EscapedCommentArgs:        escapedCommentArgs,
-		AutomergeEnabled:          automergeEnabled,
+		CommandName:          cmd,
+		ApplyCmd:             applyCmd,
+		BaseRepo:             ctx.Pull.BaseRepo,
+		EscapedCommentArgs:   escapedCommentArgs,
+		AutomergeEnabled:     automergeEnabled,
 		DeleteSourceBranchOnMerge: deleteSourceBranchOnMerge,
-		ParallelApplyEnabled:      parallelApplyEnabled,
-		ParallelPlanEnabled:       parallelPlanEnabled,
-		AutoplanEnabled:           projCfg.AutoplanEnabled,
-		Steps:                     steps,
-		HeadRepo:                  ctx.HeadRepo,
-		Log:                       ctx.Log,
-		PullMergeable:             ctx.PullMergeable,
-		Pull:                      ctx.Pull,
-		ProjectName:               projCfg.Name,
-		ApplyRequirements:         projCfg.ApplyRequirements,
-		RePlanCmd:                 planCmd,
-		RepoRelDir:                projCfg.RepoRelDir,
-		RepoConfigVersion:         projCfg.RepoCfgVersion,
-		TerraformVersion:          projCfg.TerraformVersion,
-		User:                      ctx.User,
-		Verbose:                   verbose,
-		Workspace:                 projCfg.Workspace,
-		PolicySets:                policySets,
+		ParallelApplyEnabled: parallelApplyEnabled,
+		ParallelPlanEnabled:  parallelPlanEnabled,
+		AutoplanEnabled:      projCfg.AutoplanEnabled,
+		Steps:                steps,
+		HeadRepo:             ctx.HeadRepo,
+		Log:                  ctx.Log,
+		PullMergeable:        ctx.PullMergeable,
+		ProjectPlanStatus:    projectPlanStatus,
+		Pull:                 ctx.Pull,
+		ProjectName:          projCfg.Name,
+		ApplyRequirements:    projCfg.ApplyRequirements,
+		RePlanCmd:            planCmd,
+		RepoRelDir:           projCfg.RepoRelDir,
+		RepoConfigVersion:    projCfg.RepoCfgVersion,
+		TerraformVersion:     projCfg.TerraformVersion,
+		User:                 ctx.User,
+		Verbose:              verbose,
+		Workspace:            projCfg.Workspace,
+		PolicySets:           policySets,
 	}
 }
 

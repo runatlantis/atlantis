@@ -82,8 +82,9 @@ type Server struct {
 	Port                          int
 	PreWorkflowHooksCommandRunner *events.DefaultPreWorkflowHooksCommandRunner
 	CommandRunner                 *events.DefaultCommandRunner
-	Logger                        *logging.SimpleLogger
+	Logger                        logging.SimpleLogging
 	Locker                        locking.Locker
+	ApplyLocker                   locking.ApplyLocker
 	EventsController              *EventsController
 	GithubAppController           *GithubAppController
 	LocksController               *LocksController
@@ -124,7 +125,12 @@ type WebhookConfig struct {
 // its dependencies an error will be returned. This is like the main() function
 // for the server CLI command because it injects all the dependencies.
 func NewServer(userConfig UserConfig, config Config) (*Server, error) {
-	logger := logging.NewSimpleLogger("server", false, userConfig.ToLogLevel())
+	logger, err := logging.NewStructuredLoggerFromLevel(userConfig.ToLogLevel())
+
+	if err != nil {
+		return nil, err
+	}
+
 	var supportedVCSHosts []models.VCSHostType
 	var githubClient *vcs.GithubClient
 	var githubAppEnabled bool
@@ -294,10 +300,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, err
 	}
 	var lockingClient locking.Locker
+	var applyLockingClient locking.ApplyLocker
 	if userConfig.DisableRepoLocking {
 		lockingClient = locking.NewNoOpLocker()
 	} else {
 		lockingClient = locking.NewClient(boltdb)
+		applyLockingClient = locking.NewApplyClient(boltdb, userConfig.DisableApply)
 	}
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 
@@ -336,7 +344,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	validator := &yaml.ParserValidator{}
 
-	globalCfg := valid.NewGlobalCfg(userConfig.AllowRepoConfig, userConfig.RequireMergeable, userConfig.RequireApproval)
+	globalCfg := valid.NewGlobalCfgFromArgs(
+		valid.GlobalCfgArgs{
+			AllowRepoCfg:       userConfig.AllowRepoConfig,
+			MergeableReq:       userConfig.RequireMergeable,
+			ApprovedReq:        userConfig.RequireApproval,
+			PolicyCheckEnabled: userConfig.EnablePolicyChecksFlag,
+		})
 	if userConfig.RepoConfig != "" {
 		globalCfg, err = validator.ParseGlobalCfg(userConfig.RepoConfig, globalCfg)
 		if err != nil {
@@ -496,12 +510,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		policyCheckCommandRunner,
 		autoMerger,
 		userConfig.ParallelPoolSize,
+		boltdb,
 	)
 
 	applyCommandRunner := events.NewApplyCommandRunner(
 		vcsClient,
 		userConfig.DisableApplyAll,
-		userConfig.DisableApply,
+		applyLockingClient,
 		commitStatusUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
@@ -547,6 +562,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DisableAutoplan:               userConfig.DisableAutoplan,
 		Drainer:                       drainer,
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
+		PullStatusFetcher:             boltdb,
 	}
 	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
 	if err != nil {
@@ -556,6 +572,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AtlantisVersion:    config.AtlantisVersion,
 		AtlantisURL:        parsedURL,
 		Locker:             lockingClient,
+		ApplyLocker:        applyLockingClient,
 		Logger:             logger,
 		VCSClient:          vcsClient,
 		LockDetailTemplate: lockTemplate,
@@ -601,6 +618,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CommandRunner:                 commandRunner,
 		Logger:                        logger,
 		Locker:                        lockingClient,
+		ApplyLocker:                   applyLockingClient,
 		EventsController:              eventsController,
 		GithubAppController:           githubAppController,
 		LocksController:               locksController,
@@ -624,6 +642,8 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/events", s.EventsController.Post).Methods("POST")
 	s.Router.HandleFunc("/github-app/exchange-code", s.GithubAppController.ExchangeCode).Methods("GET")
 	s.Router.HandleFunc("/github-app/setup", s.GithubAppController.New).Methods("GET")
+	s.Router.HandleFunc("/apply/lock", s.LocksController.LockApply).Methods("POST").Queries()
+	s.Router.HandleFunc("/apply/unlock", s.LocksController.UnlockApply).Methods("DELETE").Queries()
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
 	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
@@ -634,6 +654,8 @@ func (s *Server) Start() error {
 		StackSize:  1024 * 8,
 	}, NewRequestLogger(s.Logger))
 	n.UseHandler(s.Router)
+
+	defer s.Logger.Flush()
 
 	// Ensure server gracefully drains connections when stopped.
 	stop := make(chan os.Signal, 1)
@@ -710,11 +732,25 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 		})
 	}
 
+	applyCmdLock, err := s.ApplyLocker.CheckApplyLock()
+	s.Logger.Info("Apply Lock: %v", applyCmdLock)
+	if err != nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		fmt.Fprintf(w, "Could not retrieve global apply lock: %s", err)
+		return
+	}
+
+	applyLockData := ApplyLockData{
+		Time:          applyCmdLock.Time,
+		Locked:        applyCmdLock.Locked,
+		TimeFormatted: applyCmdLock.Time.Format("02-01-2006 15:04:05"),
+	}
 	//Sort by date - newest to oldest.
 	sort.SliceStable(lockResults, func(i, j int) bool { return lockResults[i].Time.After(lockResults[j].Time) })
 
 	err = s.IndexTemplate.Execute(w, IndexData{
 		Locks:           lockResults,
+		ApplyLock:       applyLockData,
 		AtlantisVersion: s.AtlantisVersion,
 		CleanedBasePath: s.AtlantisURL.Path,
 	})

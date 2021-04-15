@@ -122,9 +122,6 @@ func TestNewGlobalCfg(t *testing.T) {
 			if c.approvedReq {
 				exp.Repos[0].ApplyRequirements = append(exp.Repos[0].ApplyRequirements, "approved")
 			}
-			if exp.Repos[0].PreWorkflowHooks == nil {
-				exp.Repos[0].PreWorkflowHooks = []*valid.PreWorkflowHook{}
-			}
 
 			Equals(t, exp, act)
 
@@ -552,7 +549,7 @@ policies:
 
 			Equals(t,
 				c.exp,
-				global.MergeProjectCfg(logging.NewNoopLogger(), c.repoID, c.proj, valid.RepoCfg{}))
+				global.MergeProjectCfg(logging.NewNoopLogger(t), c.repoID, c.proj, valid.RepoCfg{}))
 		})
 	}
 }
@@ -710,7 +707,7 @@ repos:
 			}
 
 			global.PolicySets = emptyPolicySets
-			Equals(t, c.exp, global.MergeProjectCfg(logging.NewNoopLogger(), c.repoID, c.proj, valid.RepoCfg{Workflows: c.repoWorkflows}))
+			Equals(t, c.exp, global.MergeProjectCfg(logging.NewNoopLogger(t), c.repoID, c.proj, valid.RepoCfg{Workflows: c.repoWorkflows}))
 		})
 	}
 }

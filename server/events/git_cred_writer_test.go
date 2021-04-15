@@ -12,7 +12,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-var logger *logging.SimpleLogger
+var logger logging.SimpleLogging
 
 // Test that we write the file as expected
 func TestWriteGitCreds_WriteFile(t *testing.T) {
