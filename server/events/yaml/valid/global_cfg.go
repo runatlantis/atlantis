@@ -172,14 +172,14 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 	return GlobalCfg{
 		Repos: []Repo{
 			{
-				IDRegex:              regexp.MustCompile(".*"),
-				BranchRegex:          regexp.MustCompile(".*"),
-				ApplyRequirements:    applyReqs,
-				PreWorkflowHooks:     args.PreWorkflowHooks,
-				Workflow:             &defaultWorkflow,
-				AllowedWorkflows:     allowedWorkflows,
-				AllowedOverrides:     allowedOverrides,
-				AllowCustomWorkflows: &allowCustomWorkflows,
+				IDRegex:                   regexp.MustCompile(".*"),
+				BranchRegex:               regexp.MustCompile(".*"),
+				ApplyRequirements:         applyReqs,
+				PreWorkflowHooks:          args.PreWorkflowHooks,
+				Workflow:                  &defaultWorkflow,
+				AllowedWorkflows:          allowedWorkflows,
+				AllowedOverrides:          allowedOverrides,
+				AllowCustomWorkflows:      &allowCustomWorkflows,
 				DeleteSourceBranchOnMerge: &deleteSourceBranchOnMerge,
 			},
 		},

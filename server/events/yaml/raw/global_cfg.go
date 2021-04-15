@@ -241,15 +241,15 @@ OUTER:
 	}
 
 	return valid.Repo{
-		ID:                   id,
-		IDRegex:              idRegex,
-		BranchRegex:          branchRegex,
-		ApplyRequirements:    mergedApplyReqs,
-		PreWorkflowHooks:     preWorkflowHooks,
-		Workflow:             workflow,
-		AllowedWorkflows:     r.AllowedWorkflows,
-		AllowedOverrides:     r.AllowedOverrides,
-		AllowCustomWorkflows: r.AllowCustomWorkflows,
+		ID:                        id,
+		IDRegex:                   idRegex,
+		BranchRegex:               branchRegex,
+		ApplyRequirements:         mergedApplyReqs,
+		PreWorkflowHooks:          preWorkflowHooks,
+		Workflow:                  workflow,
+		AllowedWorkflows:          r.AllowedWorkflows,
+		AllowedOverrides:          r.AllowedOverrides,
+		AllowCustomWorkflows:      r.AllowCustomWorkflows,
 		DeleteSourceBranchOnMerge: r.DeleteSourceBranchOnMerge,
 	}
 }
