@@ -20,6 +20,7 @@ func NewPlanCommandRunner(
 	autoMerger *AutoMerger,
 	parallelPoolSize int,
 	SilenceNoProjects bool,
+  pullStatusFetcher PullStatusFetcher,
 ) *PlanCommandRunner {
 	return &PlanCommandRunner{
 		silenceVCSStatusNoPlans:    silenceVCSStatusNoPlans,
@@ -36,6 +37,7 @@ func NewPlanCommandRunner(
 		autoMerger:                 autoMerger,
 		parallelPoolSize:           parallelPoolSize,
 		SilenceNoProjects:          SilenceNoProjects,
+    pullStatusFetcher:        pullStatusFetcher,
 	}
 }
 
@@ -60,6 +62,7 @@ type PlanCommandRunner struct {
 	policyCheckCommandRunner   *PolicyCheckCommandRunner
 	autoMerger                 *AutoMerger
 	parallelPoolSize           int
+  pullStatusFetcher        PullStatusFetcher
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *CommandContext) {
@@ -131,6 +134,13 @@ func (p *PlanCommandRunner) runAutoplan(ctx *CommandContext) {
 		!(result.HasErrors() || result.PlansDeleted) {
 		// Run policy_check command
 		ctx.Log.Info("Running policy_checks for all plans")
+
+		// refresh ctx's view of pull status since we just wrote to it.
+		// realistically each command should refresh this at the start,
+		// however, policy checking is weird since it's called within the plan command itself
+		// we need to better structure how this command works.
+		ctx.PullStatus = &pullStatus
+
 		p.policyCheckCommandRunner.Run(ctx, policyCheckCmds)
 	}
 }

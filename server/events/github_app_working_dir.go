@@ -21,7 +21,7 @@ type GithubAppWorkingDir struct {
 }
 
 // Clone writes a fresh token for Github App authentication
-func (g *GithubAppWorkingDir) Clone(log *logging.SimpleLogger, headRepo models.Repo, p models.PullRequest, workspace string) (string, bool, error) {
+func (g *GithubAppWorkingDir) Clone(log logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) (string, bool, error) {
 
 	log.Info("Refreshing git tokens for Github App")
 

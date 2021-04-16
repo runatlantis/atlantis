@@ -16,7 +16,7 @@ import (
 // used for authenticating with git over HTTPS
 // It will create the file in home/.git-credentials
 // If ghAccessToken is true we will look for a line starting with https://x-access-token and ending with gitHostname and replace it.
-func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home string, logger *logging.SimpleLogger, ghAccessToken bool) error {
+func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home string, logger logging.SimpleLogging, ghAccessToken bool) error {
 	const credsFilename = ".git-credentials"
 	credsFile := filepath.Join(home, credsFilename)
 	credsFileContentsPattern := `https://%s:%s@%s`

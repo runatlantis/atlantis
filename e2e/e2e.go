@@ -70,8 +70,8 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	log.Printf("checking out branch %q", branchName)
 	checkoutCmd := exec.Command("git", "checkout", "-b", branchName)
 	checkoutCmd.Dir = cloneDir
-	if err := checkoutCmd.Run(); err != nil {
-		return e2eResult, fmt.Errorf("failed to git checkout branch %q: %v", branchName, err)
+	if output, err := checkoutCmd.CombinedOutput(); err != nil {
+		return e2eResult, fmt.Errorf("failed to git checkout branch %q: %v: %s", branchName, err, string(output))
 	}
 
 	// write a file for running the tests
@@ -87,16 +87,15 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	log.Printf("git add file %q", filePath)
 	addCmd := exec.Command("git", "add", filePath)
 	addCmd.Dir = cloneDir
-	if err = addCmd.Run(); err != nil {
-		return e2eResult, fmt.Errorf("failed to git add file %q: %v", filePath, err)
+	if output, err := addCmd.CombinedOutput(); err != nil {
+		return e2eResult, fmt.Errorf("failed to git add file %q: %v: %s", filePath, err, string(output))
 	}
 
 	// commit the file
 	log.Printf("git commit file %q", filePath)
 	commitCmd := exec.Command("git", "commit", "-am", "test commit")
 	commitCmd.Dir = cloneDir
-	var output []byte
-	if output, err = commitCmd.CombinedOutput(); err != nil {
+	if output, err := commitCmd.CombinedOutput(); err != nil {
 		return e2eResult, fmt.Errorf("failed to run git commit in %q: %v: %v", cloneDir, err, string(output))
 	}
 
@@ -104,8 +103,8 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	log.Printf("git push branch %q", branchName)
 	pushCmd := exec.Command("git", "push", "origin", branchName)
 	pushCmd.Dir = cloneDir
-	if err = pushCmd.Run(); err != nil {
-		return e2eResult, fmt.Errorf("failed to git push branch %q: %v", branchName, err)
+	if output, err := pushCmd.CombinedOutput(); err != nil {
+		return e2eResult, fmt.Errorf("failed to git push branch %q: %v: %s", branchName, err, string(output))
 	}
 
 	// create a new pr

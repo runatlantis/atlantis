@@ -10,6 +10,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/fixtures"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 func TestApplyCommandRunner_IsLocked(t *testing.T) {
@@ -54,7 +55,7 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 
 			ctx := &events.CommandContext{
 				User:     fixtures.User,
-				Log:      noopLogger,
+				Log:      logging.NewNoopLogger(t),
 				Pull:     modelPull,
 				HeadRepo: fixtures.GithubRepo,
 				Trigger:  events.Comment,

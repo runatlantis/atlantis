@@ -17,10 +17,6 @@ Enabling "policy checking" in addition to the [mergeable apply requirement](http
 
 ![Policy Check Apply Status Failure](./images/policy-check-apply-status-failure.png)
 
-:::warning
-Without the mergeable requirement applies will still go through in the event of a policy failure.
-:::
-
 Any failures need to either be addressed in a successive commit, or approved by a blessed owner. This approval is independent of the approval apply requirement which can coexist in the policy checking workflow. After an approval, the apply can proceed.
 
 ![Policy Check Approval](./images/policy-check-approval.png)

@@ -24,6 +24,7 @@ import (
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/runatlantis/atlantis/server"
+	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -112,7 +113,7 @@ func TestExecute_Defaults(t *testing.T) {
 		GHUserFlag:        "user",
 		GHTokenFlag:       "token",
 		RepoAllowlistFlag: "*",
-	})
+	}, t)
 	err := c.Execute()
 	Ok(t, err)
 
@@ -156,7 +157,7 @@ func TestExecute_Defaults(t *testing.T) {
 
 func TestExecute_Flags(t *testing.T) {
 	t.Log("Should use all flags that are set.")
-	c := setup(testFlags)
+	c := setup(testFlags, t)
 	err := c.Execute()
 	Ok(t, err)
 	for flag, exp := range testFlags {
@@ -174,7 +175,7 @@ func TestExecute_ConfigFile(t *testing.T) {
 	defer os.Remove(tmpFile) // nolint: errcheck
 	c := setup(map[string]interface{}{
 		ConfigFlag: tmpFile,
-	})
+	}, t)
 	err := c.Execute()
 	Ok(t, err)
 	for flag, exp := range testFlags {
@@ -189,7 +190,7 @@ func TestExecute_EnvironmentVariables(t *testing.T) {
 		os.Setenv(envKey, fmt.Sprintf("%v", value)) // nolint: errcheck
 		defer func(key string) { os.Unsetenv(key) }(envKey)
 	}
-	c := setup(nil)
+	c := setup(nil, t)
 	err := c.Execute()
 	Ok(t, err)
 	for flag, exp := range testFlags {
@@ -201,7 +202,7 @@ func TestExecute_NoConfigFlag(t *testing.T) {
 	t.Log("If there is no config flag specified Execute should return nil.")
 	c := setupWithDefaults(map[string]interface{}{
 		ConfigFlag: "",
-	})
+	}, t)
 	err := c.Execute()
 	Ok(t, err)
 }
@@ -210,7 +211,7 @@ func TestExecute_ConfigFileExtension(t *testing.T) {
 	t.Log("If the config file doesn't have an extension then error.")
 	c := setupWithDefaults(map[string]interface{}{
 		ConfigFlag: "does-not-exist",
-	})
+	}, t)
 	err := c.Execute()
 	Equals(t, "invalid config: reading does-not-exist: Unsupported Config Type \"\"", err.Error())
 }
@@ -219,7 +220,7 @@ func TestExecute_ConfigFileMissing(t *testing.T) {
 	t.Log("If the config file doesn't exist then error.")
 	c := setupWithDefaults(map[string]interface{}{
 		ConfigFlag: "does-not-exist.yaml",
-	})
+	}, t)
 	err := c.Execute()
 	Equals(t, "invalid config: reading does-not-exist.yaml: open does-not-exist.yaml: no such file or directory", err.Error())
 }
@@ -230,7 +231,7 @@ func TestExecute_ConfigFileExists(t *testing.T) {
 	defer os.Remove(tmpFile) // nolint: errcheck
 	c := setupWithDefaults(map[string]interface{}{
 		ConfigFlag: tmpFile,
-	})
+	}, t)
 	err := c.Execute()
 	Ok(t, err)
 }
@@ -241,7 +242,7 @@ func TestExecute_InvalidConfig(t *testing.T) {
 	defer os.Remove(tmpFile) // nolint: errcheck
 	c := setupWithDefaults(map[string]interface{}{
 		ConfigFlag: tmpFile,
-	})
+	}, t)
 	err := c.Execute()
 	Assert(t, strings.Contains(err.Error(), "unmarshal errors"), "should be an unmarshal error")
 }
@@ -252,7 +253,7 @@ func TestExecute_RepoAllowlistScheme(t *testing.T) {
 		GHUserFlag:        "user",
 		GHTokenFlag:       "token",
 		RepoAllowlistFlag: "http://github.com/*",
-	})
+	}, t)
 	err := c.Execute()
 	Assert(t, err != nil, "should be an error")
 	Equals(t, "--repo-allowlist cannot contain ://, should be hostnames only", err.Error())
@@ -281,7 +282,7 @@ func TestExecute_ValidateLogLevel(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Log("Should validate log level when " + testCase.description)
-		c := setupWithDefaults(testCase.flags)
+		c := setupWithDefaults(testCase.flags, t)
 		err := c.Execute()
 		if testCase.expectError {
 			Assert(t, err != nil, "should be an error")
@@ -294,7 +295,7 @@ func TestExecute_ValidateLogLevel(t *testing.T) {
 func TestExecute_ValidateCheckoutStrategy(t *testing.T) {
 	c := setupWithDefaults(map[string]interface{}{
 		CheckoutStrategyFlag: "invalid",
-	})
+	}, t)
 	err := c.Execute()
 	ErrEquals(t, "invalid checkout strategy: not one of branch or merge", err)
 }
@@ -336,7 +337,7 @@ func TestExecute_ValidateSSLConfig(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Log("Should validate ssl config when " + testCase.description)
-		c := setupWithDefaults(testCase.flags)
+		c := setupWithDefaults(testCase.flags, t)
 		err := c.Execute()
 		if testCase.expectError {
 			Assert(t, err != nil, "should be an error")
@@ -512,7 +513,7 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 		t.Log("Should validate vcs config when " + testCase.description)
 		testCase.flags[RepoAllowlistFlag] = "*"
 
-		c := setup(testCase.flags)
+		c := setup(testCase.flags, t)
 		err := c.Execute()
 		if testCase.expectError {
 			Assert(t, err != nil, "should be an error")
@@ -530,7 +531,7 @@ func TestExecute_ExpandHomeInDataDir(t *testing.T) {
 		GHTokenFlag:       "token",
 		RepoAllowlistFlag: "*",
 		DataDirFlag:       "~/this/is/a/path",
-	})
+	}, t)
 	err := c.Execute()
 	Ok(t, err)
 
@@ -543,7 +544,7 @@ func TestExecute_RelativeDataDir(t *testing.T) {
 	t.Log("Should convert relative dir to absolute.")
 	c := setupWithDefaults(map[string]interface{}{
 		DataDirFlag: "../",
-	})
+	}, t)
 
 	// Figure out what ../ should be as an absolute path.
 	expectedAbsolutePath, err := filepath.Abs("../")
@@ -560,7 +561,7 @@ func TestExecute_GithubUser(t *testing.T) {
 		GHUserFlag:        "@user",
 		GHTokenFlag:       "token",
 		RepoAllowlistFlag: "*",
-	})
+	}, t)
 	err := c.Execute()
 	Ok(t, err)
 
@@ -573,7 +574,7 @@ func TestExecute_GithubApp(t *testing.T) {
 		GHAppKeyFileFlag:  "key.pem",
 		GHAppIDFlag:       "1",
 		RepoAllowlistFlag: "*",
-	})
+	}, t)
 	err := c.Execute()
 	Ok(t, err)
 
@@ -586,7 +587,7 @@ func TestExecute_GitlabUser(t *testing.T) {
 		GitlabUserFlag:    "@user",
 		GitlabTokenFlag:   "token",
 		RepoAllowlistFlag: "*",
-	})
+	}, t)
 	err := c.Execute()
 	Ok(t, err)
 
@@ -599,7 +600,7 @@ func TestExecute_BitbucketUser(t *testing.T) {
 		BitbucketUserFlag:  "@user",
 		BitbucketTokenFlag: "token",
 		RepoAllowlistFlag:  "*",
-	})
+	}, t)
 	err := c.Execute()
 	Ok(t, err)
 
@@ -612,7 +613,7 @@ func TestExecute_ADUser(t *testing.T) {
 		ADUserFlag:        "@user",
 		ADTokenFlag:       "token",
 		RepoAllowlistFlag: "*",
-	})
+	}, t)
 	err := c.Execute()
 	Ok(t, err)
 
@@ -626,7 +627,7 @@ func TestExecute_BitbucketCloudWithWebhookSecret(t *testing.T) {
 		BitbucketTokenFlag:         "token",
 		RepoAllowlistFlag:          "*",
 		BitbucketWebhookSecretFlag: "my secret",
-	})
+	}, t)
 	err := c.Execute()
 	ErrEquals(t, "--bitbucket-webhook-secret cannot be specified for Bitbucket Cloud because it is not supported by Bitbucket", err)
 }
@@ -638,7 +639,7 @@ func TestExecute_BitbucketServerBaseURLScheme(t *testing.T) {
 		BitbucketTokenFlag:   "token",
 		RepoAllowlistFlag:    "*",
 		BitbucketBaseURLFlag: "mydomain.com",
-	})
+	}, t)
 	ErrEquals(t, "--bitbucket-base-url must have http:// or https://, got \"mydomain.com\"", c.Execute())
 
 	c = setup(map[string]interface{}{
@@ -646,7 +647,7 @@ func TestExecute_BitbucketServerBaseURLScheme(t *testing.T) {
 		BitbucketTokenFlag:   "token",
 		RepoAllowlistFlag:    "*",
 		BitbucketBaseURLFlag: "://mydomain.com",
-	})
+	}, t)
 	ErrEquals(t, "error parsing --bitbucket-webhook-secret flag value \"://mydomain.com\": parse \"://mydomain.com\": missing protocol scheme", c.Execute())
 }
 
@@ -657,7 +658,7 @@ func TestExecute_BitbucketServerBaseURLPort(t *testing.T) {
 		BitbucketTokenFlag:   "token",
 		RepoAllowlistFlag:    "*",
 		BitbucketBaseURLFlag: "http://mydomain.com:7990",
-	})
+	}, t)
 	Ok(t, c.Execute())
 	Equals(t, "http://mydomain.com:7990", passedConfig.BitbucketBaseURL)
 }
@@ -670,7 +671,7 @@ func TestExecute_RepoCfgFlags(t *testing.T) {
 		RepoAllowlistFlag:  "github.com",
 		RepoConfigFlag:     "repos.yaml",
 		RepoConfigJSONFlag: "{}",
-	})
+	}, t)
 	err := c.Execute()
 	ErrEquals(t, "cannot use --repo-config and --repo-config-json at the same time", err)
 }
@@ -682,7 +683,7 @@ func TestExecute_TFEHostnameOnly(t *testing.T) {
 		GHTokenFlag:       "token",
 		RepoAllowlistFlag: "github.com",
 		TFEHostnameFlag:   "not-app.terraform.io",
-	})
+	}, t)
 	err := c.Execute()
 	ErrEquals(t, "if setting --tfe-hostname, must set --tfe-token", err)
 }
@@ -694,7 +695,7 @@ func TestExecute_BothAllowAndWhitelist(t *testing.T) {
 		GHTokenFlag:       "token",
 		RepoAllowlistFlag: "github.com",
 		RepoWhitelistFlag: "github.com",
-	})
+	}, t)
 	err := c.Execute()
 	ErrEquals(t, "both --repo-allowlist and --repo-whitelist cannot be set–use --repo-allowlist", err)
 }
@@ -704,7 +705,7 @@ func TestExecute_AllowAndWhitelist(t *testing.T) {
 	c := setup(map[string]interface{}{
 		GHUserFlag:  "user",
 		GHTokenFlag: "token",
-	})
+	}, t)
 	err := c.Execute()
 	ErrEquals(t, "--repo-allowlist must be set for security purposes", err)
 }
@@ -717,7 +718,7 @@ func TestExecute_BothSilenceAllowAndWhitelistErrors(t *testing.T) {
 		RepoAllowlistFlag:          "*",
 		SilenceWhitelistErrorsFlag: true,
 		SilenceAllowlistErrorsFlag: true,
-	})
+	}, t)
 	err := c.Execute()
 	ErrEquals(t, "both --silence-allowlist-errors and --silence-whitelist-errors cannot be set–use --silence-allowlist-errors", err)
 }
@@ -730,14 +731,14 @@ func TestExecute_RepoWhitelistDeprecation(t *testing.T) {
 		GHTokenFlag:                "token",
 		RepoWhitelistFlag:          "*",
 		SilenceWhitelistErrorsFlag: true,
-	})
+	}, t)
 	err := c.Execute()
 	Ok(t, err)
 	Equals(t, true, passedConfig.SilenceAllowlistErrors)
 	Equals(t, "*", passedConfig.RepoAllowlist)
 }
 
-func setup(flags map[string]interface{}) *cobra.Command {
+func setup(flags map[string]interface{}, t *testing.T) *cobra.Command {
 	vipr := viper.New()
 	for k, v := range flags {
 		vipr.Set(k, v)
@@ -746,11 +747,12 @@ func setup(flags map[string]interface{}) *cobra.Command {
 		ServerCreator: &ServerCreatorMock{},
 		Viper:         vipr,
 		SilenceOutput: true,
+		Logger:        logging.NewNoopLogger(t),
 	}
 	return c.Init()
 }
 
-func setupWithDefaults(flags map[string]interface{}) *cobra.Command {
+func setupWithDefaults(flags map[string]interface{}, t *testing.T) *cobra.Command {
 	vipr := viper.New()
 	flags[GHUserFlag] = "user"
 	flags[GHTokenFlag] = "token"
@@ -763,6 +765,7 @@ func setupWithDefaults(flags map[string]interface{}) *cobra.Command {
 		ServerCreator: &ServerCreatorMock{},
 		Viper:         vipr,
 		SilenceOutput: true,
+		Logger:        logging.NewNoopLogger(t),
 	}
 	return c.Init()
 }

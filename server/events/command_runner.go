@@ -15,6 +15,7 @@ package events
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/google/go-github/v31/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
@@ -112,6 +113,7 @@ type DefaultCommandRunner struct {
 	CommentCommandRunnerByCmd     map[models.CommandName]CommentCommandRunner
 	Drainer                       *Drainer
 	PreWorkflowHooksCommandRunner PreWorkflowHooksCommandRunner
+	PullStatusFetcher             PullStatusFetcher
 }
 
 // RunAutoplanCommand runs plan and policy_checks when a pull request is opened or updated.
@@ -126,12 +128,19 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 
 	log := c.buildLogger(baseRepo.FullName, pull.Num)
 	defer c.logPanics(baseRepo, pull.Num, log)
+	status, err := c.PullStatusFetcher.GetPullStatus(pull)
+
+	if err != nil {
+		log.Err("Unable to fetch pull status, this is likely a bug.", err)
+	}
+
 	ctx := &CommandContext{
-		User:     user,
-		Log:      log,
-		Pull:     pull,
-		HeadRepo: headRepo,
-		Trigger:  Auto,
+		User:       user,
+		Log:        log,
+		Pull:       pull,
+		HeadRepo:   headRepo,
+		PullStatus: status,
+		Trigger:    Auto,
 	}
 	if !c.validateCtxAndComment(ctx) {
 		return
@@ -140,7 +149,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		return
 	}
 
-	err := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx)
+	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx)
 
 	if err != nil {
 		ctx.Log.Err("Error running pre-workflow hooks %s. Proceeding with %s command.", err, models.PlanCommand)
@@ -173,12 +182,19 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
+	status, err := c.PullStatusFetcher.GetPullStatus(pull)
+
+	if err != nil {
+		log.Err("Unable to fetch pull status, this is likely a bug.", err)
+	}
+
 	ctx := &CommandContext{
-		User:     user,
-		Log:      log,
-		Pull:     pull,
-		HeadRepo: headRepo,
-		Trigger:  Comment,
+		User:       user,
+		Log:        log,
+		Pull:       pull,
+		PullStatus: status,
+		HeadRepo:   headRepo,
+		Trigger:    Comment,
 	}
 
 	if !c.validateCtxAndComment(ctx) {
@@ -238,9 +254,12 @@ func (c *DefaultCommandRunner) getAzureDevopsData(baseRepo models.Repo, pullNum 
 	return pull, headRepo, nil
 }
 
-func (c *DefaultCommandRunner) buildLogger(repoFullName string, pullNum int) *logging.SimpleLogger {
-	src := fmt.Sprintf("%s#%d", repoFullName, pullNum)
-	return c.Logger.NewLogger(src, true, c.Logger.GetLevel())
+func (c *DefaultCommandRunner) buildLogger(repoFullName string, pullNum int) logging.SimpleLogging {
+
+	return c.Logger.WithHistory(
+		"repo", repoFullName,
+		"pull", strconv.Itoa(pullNum),
+	)
 }
 
 func (c *DefaultCommandRunner) ensureValidRepoMetadata(
@@ -249,7 +268,7 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 	maybePull *models.PullRequest,
 	user models.User,
 	pullNum int,
-	log *logging.SimpleLogger,
+	log logging.SimpleLogging,
 ) (headRepo models.Repo, pull models.PullRequest, err error) {
 	if maybeHeadRepo != nil {
 		headRepo = *maybeHeadRepo

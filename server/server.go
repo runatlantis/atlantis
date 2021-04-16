@@ -82,7 +82,7 @@ type Server struct {
 	Port                          int
 	PreWorkflowHooksCommandRunner *events.DefaultPreWorkflowHooksCommandRunner
 	CommandRunner                 *events.DefaultCommandRunner
-	Logger                        *logging.SimpleLogger
+	Logger                        logging.SimpleLogging
 	Locker                        locking.Locker
 	ApplyLocker                   locking.ApplyLocker
 	EventsController              *EventsController
@@ -125,7 +125,12 @@ type WebhookConfig struct {
 // its dependencies an error will be returned. This is like the main() function
 // for the server CLI command because it injects all the dependencies.
 func NewServer(userConfig UserConfig, config Config) (*Server, error) {
-	logger := logging.NewSimpleLogger("server", false, userConfig.ToLogLevel())
+	logger, err := logging.NewStructuredLoggerFromLevel(userConfig.ToLogLevel())
+
+	if err != nil {
+		return nil, err
+	}
+
 	var supportedVCSHosts []models.VCSHostType
 	var githubClient *vcs.GithubClient
 	var githubAppEnabled bool
@@ -339,7 +344,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	validator := &yaml.ParserValidator{}
 
-	globalCfg := valid.NewGlobalCfg(userConfig.AllowRepoConfig, userConfig.RequireMergeable, userConfig.RequireApproval)
+	globalCfg := valid.NewGlobalCfgFromArgs(
+		valid.GlobalCfgArgs{
+			AllowRepoCfg:       userConfig.AllowRepoConfig,
+			MergeableReq:       userConfig.RequireMergeable,
+			ApprovedReq:        userConfig.RequireApproval,
+			PolicyCheckEnabled: userConfig.EnablePolicyChecksFlag,
+		})
 	if userConfig.RepoConfig != "" {
 		globalCfg, err = validator.ParseGlobalCfg(userConfig.RepoConfig, globalCfg)
 		if err != nil {
@@ -502,6 +513,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		autoMerger,
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
+		boltdb,
 	)
 
 	applyCommandRunner := events.NewApplyCommandRunner(
@@ -558,6 +570,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DisableAutoplan:               userConfig.DisableAutoplan,
 		Drainer:                       drainer,
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
+		PullStatusFetcher:             boltdb,
 	}
 	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
 	if err != nil {
@@ -649,6 +662,8 @@ func (s *Server) Start() error {
 		StackSize:  1024 * 8,
 	}, NewRequestLogger(s.Logger))
 	n.UseHandler(s.Router)
+
+	defer s.Logger.Flush()
 
 	// Ensure server gracefully drains connections when stopped.
 	stop := make(chan os.Signal, 1)

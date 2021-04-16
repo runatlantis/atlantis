@@ -86,6 +86,20 @@ func (g GlobalCfg) Validate() error {
 
 func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 	workflows := make(map[string]valid.Workflow)
+
+	// assumes: globalcfg is always initialized with one repo .*
+	applyReqs := defaultCfg.Repos[0].ApplyRequirements
+
+	var globalApplyReqs []string
+
+	for _, req := range applyReqs {
+		for _, nonOverrideableReq := range valid.NonOverrideableApplyReqs {
+			if req == nonOverrideableReq {
+				globalApplyReqs = append(globalApplyReqs, req)
+			}
+		}
+	}
+
 	for k, v := range g.Workflows {
 		validatedWorkflow := v.ToValid(k)
 		workflows[k] = validatedWorkflow
@@ -105,7 +119,7 @@ func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 
 	var repos []valid.Repo
 	for _, r := range g.Repos {
-		repos = append(repos, r.ToValid(workflows))
+		repos = append(repos, r.ToValid(workflows, globalApplyReqs))
 	}
 	repos = append(defaultCfg.Repos, repos...)
 
@@ -171,7 +185,7 @@ func (r Repo) Validate() error {
 	)
 }
 
-func (r Repo) ToValid(workflows map[string]valid.Workflow) valid.Repo {
+func (r Repo) ToValid(workflows map[string]valid.Workflow, globalApplyReqs []string) valid.Repo {
 	var id string
 	var idRegex *regexp.Regexp
 	if r.HasRegexID() {
@@ -197,18 +211,33 @@ func (r Repo) ToValid(workflows map[string]valid.Workflow) valid.Repo {
 		workflow = &ptr
 	}
 
-	preWorkflowHooks := make([]*valid.PreWorkflowHook, 0)
+	var preWorkflowHooks []*valid.PreWorkflowHook
 	if len(r.PreWorkflowHooks) > 0 {
 		for _, hook := range r.PreWorkflowHooks {
 			preWorkflowHooks = append(preWorkflowHooks, hook.ToValid())
 		}
 	}
 
+	var mergedApplyReqs []string
+
+	mergedApplyReqs = append(mergedApplyReqs, r.ApplyRequirements...)
+
+	// only add global reqs if they don't exist already.
+OUTER:
+	for _, globalReq := range globalApplyReqs {
+		for _, currReq := range r.ApplyRequirements {
+			if globalReq == currReq {
+				continue OUTER
+			}
+		}
+		mergedApplyReqs = append(mergedApplyReqs, globalReq)
+	}
+
 	return valid.Repo{
 		ID:                   id,
 		IDRegex:              idRegex,
 		BranchRegex:          branchRegex,
-		ApplyRequirements:    r.ApplyRequirements,
+		ApplyRequirements:    mergedApplyReqs,
 		PreWorkflowHooks:     preWorkflowHooks,
 		Workflow:             workflow,
 		AllowedWorkflows:     r.AllowedWorkflows,

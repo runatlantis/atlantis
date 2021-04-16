@@ -18,7 +18,7 @@ type DeleteLockCommand interface {
 // DefaultDeleteLockCommand deletes a specific lock after a request from the LocksController.
 type DefaultDeleteLockCommand struct {
 	Locker           locking.Locker
-	Logger           *logging.SimpleLogger
+	Logger           logging.SimpleLogging
 	WorkingDir       WorkingDir
 	WorkingDirLocker WorkingDirLocker
 	DB               *db.BoltDB

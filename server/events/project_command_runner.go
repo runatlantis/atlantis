@@ -75,7 +75,7 @@ type EnvStepRunner interface {
 // WebhooksSender sends webhook.
 type WebhooksSender interface {
 	// Send sends the webhook.
-	Send(log *logging.SimpleLogger, res webhooks.ApplyResult) error
+	Send(log logging.SimpleLogging, res webhooks.ApplyResult) error
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_runner.go ProjectCommandRunner
@@ -332,6 +332,11 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 			}
 			if !approved {
 				return "", "Pull request must be approved by at least one person other than the author before running apply.", nil
+			}
+		// this should come before mergeability check since mergeability is a superset of this check.
+		case valid.PoliciesPassedApplyReq:
+			if ctx.ProjectPlanStatus == models.ErroredPolicyCheckStatus {
+				return "", "All policies must pass for project before running apply", nil
 			}
 		case raw.MergeableApplyRequirement:
 			if !ctx.PullMergeable {
