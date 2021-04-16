@@ -20,7 +20,7 @@ func NewPlanCommandRunner(
 	autoMerger *AutoMerger,
 	parallelPoolSize int,
 	SilenceNoProjects bool,
-  pullStatusFetcher PullStatusFetcher,
+	pullStatusFetcher PullStatusFetcher,
 ) *PlanCommandRunner {
 	return &PlanCommandRunner{
 		silenceVCSStatusNoPlans:    silenceVCSStatusNoPlans,
@@ -37,7 +37,7 @@ func NewPlanCommandRunner(
 		autoMerger:                 autoMerger,
 		parallelPoolSize:           parallelPoolSize,
 		SilenceNoProjects:          SilenceNoProjects,
-    pullStatusFetcher:        pullStatusFetcher,
+		pullStatusFetcher:          pullStatusFetcher,
 	}
 }
 
@@ -62,7 +62,7 @@ type PlanCommandRunner struct {
 	policyCheckCommandRunner   *PolicyCheckCommandRunner
 	autoMerger                 *AutoMerger
 	parallelPoolSize           int
-  pullStatusFetcher        PullStatusFetcher
+	pullStatusFetcher          PullStatusFetcher
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *CommandContext) {
