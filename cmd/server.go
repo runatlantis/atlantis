@@ -83,6 +83,7 @@ const (
 	RepoAllowlistFlag          = "repo-allowlist"
 	RequireApprovalFlag        = "require-approval"
 	RequireMergeableFlag       = "require-mergeable"
+	SilenceNoProjectsFlag      = "silence-no-projects"
 	SilenceForkPRErrorsFlag    = "silence-fork-pr-errors"
 	SilenceVCSStatusNoPlans    = "silence-vcs-status-no-plans"
 	SilenceAllowlistErrorsFlag = "silence-allowlist-errors"
@@ -323,6 +324,10 @@ var boolFlags = map[string]boolFlag{
 		description:  "Require pull requests to be mergeable before allowing the apply command to be run.",
 		defaultValue: false,
 		hidden:       true,
+	},
+	SilenceNoProjectsFlag: {
+		description:  "Silences Atlants from responding to PRs when it finds no projects.",
+		defaultValue: false,
 	},
 	SilenceForkPRErrorsFlag: {
 		description:  "Silences the posting of fork pull requests not allowed error comments.",
