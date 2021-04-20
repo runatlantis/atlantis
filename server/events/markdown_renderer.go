@@ -76,6 +76,7 @@ type resultData struct {
 
 type planSuccessData struct {
 	models.PlanSuccess
+	PlanSummary        string
 	PlanWasDeleted     bool
 	DisableApply       bool
 	DisableRepoLocking bool
@@ -147,7 +148,7 @@ func (m *MarkdownRenderer) renderProjectResults(results []models.ProjectResult, 
 			})
 		} else if result.PlanSuccess != nil {
 			if m.shouldUseWrappedTmpl(vcsHost, result.PlanSuccess.TerraformOutput) {
-				resultData.Rendered = m.renderTemplate(planSuccessWrappedTmpl, planSuccessData{PlanSuccess: *result.PlanSuccess, PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking})
+				resultData.Rendered = m.renderTemplate(planSuccessWrappedTmpl, planSuccessData{PlanSuccess: *result.PlanSuccess, PlanSummary: result.PlanSuccess.Summary(), PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking})
 			} else {
 				resultData.Rendered = m.renderTemplate(planSuccessUnwrappedTmpl, planSuccessData{PlanSuccess: *result.PlanSuccess, PlanWasDeleted: common.PlansDeleted, DisableApply: common.DisableApply, DisableRepoLocking: common.DisableRepoLocking})
 			}
@@ -281,6 +282,7 @@ var planSuccessWrappedTmpl = template.Must(template.New("").Parse(
 		"```\n\n" +
 		planNextSteps + "\n" +
 		"</details>" +
+		"{{.PlanSummary}}" + "\n\n" +
 		"{{ if .HasDiverged }}\n\n:warning: The branch we're merging into is ahead, it is recommended to pull new commits first.{{end}}"))
 
 var policyCheckSuccessUnwrappedTmpl = template.Must(template.New("").Parse(
