@@ -281,8 +281,8 @@ var planSuccessWrappedTmpl = template.Must(template.New("").Parse(
 		"{{.TerraformOutput}}\n" +
 		"```\n\n" +
 		planNextSteps + "\n" +
-		"</details>" +
-		"{{.PlanSummary}}" + "\n\n" +
+		"</details>" + "\n" +
+		"{{.PlanSummary}}" +
 		"{{ if .HasDiverged }}\n\n:warning: The branch we're merging into is ahead, it is recommended to pull new commits first.{{end}}"))
 
 var policyCheckSuccessUnwrappedTmpl = template.Must(template.New("").Parse(
