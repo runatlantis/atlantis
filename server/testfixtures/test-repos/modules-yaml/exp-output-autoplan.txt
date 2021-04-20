@@ -32,6 +32,7 @@ Changes to Outputs:
 * :repeat: To **plan** this project again, comment:
     * `atlantis plan -d staging`
 </details>
+Plan: 1 to add, 0 to change, 0 to destroy.
 
 ---
 ### 2. dir: `production` workspace: `default`
@@ -63,6 +64,7 @@ Changes to Outputs:
 * :repeat: To **plan** this project again, comment:
     * `atlantis plan -d production`
 </details>
+Plan: 1 to add, 0 to change, 0 to destroy.
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
