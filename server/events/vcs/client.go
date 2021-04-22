@@ -36,7 +36,7 @@ type Client interface {
 	// url is an optional link that users should click on for more information
 	// about this status.
 	UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error
-	MergePull(pull models.PullRequest) error
+	MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error
 	MarkdownPullLink(pull models.PullRequest) (string, error)
 
 	// DownloadRepoConfigFile return `atlantis.yaml` content from VCS (which support fetch a single file from repository)

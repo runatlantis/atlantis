@@ -164,6 +164,8 @@ func TestGitlabClient_MergePull(t *testing.T) {
 					Owner:    "runatlantis",
 					Name:     "atlantis",
 				},
+			}, models.PullRequestOptions{
+				DeleteSourceBranchOnMerge: false,
 			})
 			if c.expErr == "" {
 				Ok(t, err)

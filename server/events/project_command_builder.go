@@ -25,6 +25,8 @@ const (
 	DefaultParallelApplyEnabled = false
 	// DefaultParallelPlanEnabled is the default for the parallel plan setting.
 	DefaultParallelPlanEnabled = false
+	// DefaultDeleteSourceBranchOnMerge being false is the default setting whether or not to remove a source branch on merge
+	DefaultDeleteSourceBranchOnMerge = false
 )
 
 func NewProjectCommandBuilder(
@@ -235,6 +237,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 					commentFlags,
 					repoDir,
 					repoCfg.Automerge,
+					mergedCfg.DeleteSourceBranchOnMerge,
 					repoCfg.ParallelApply,
 					repoCfg.ParallelPlan,
 					verbose,
@@ -261,6 +264,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 					commentFlags,
 					repoDir,
 					DefaultAutomergeEnabled,
+					pCfg.DeleteSourceBranchOnMerge,
 					DefaultParallelApplyEnabled,
 					DefaultParallelPlanEnabled,
 					verbose,
@@ -451,10 +455,12 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 	var projCtxs []models.ProjectCommandContext
 	var projCfg valid.MergedProjectCfg
 	automerge := DefaultAutomergeEnabled
+	deleteBranchOnMerge := DefaultDeleteSourceBranchOnMerge
 	parallelApply := DefaultParallelApplyEnabled
 	parallelPlan := DefaultParallelPlanEnabled
 	if repoCfgPtr != nil {
 		automerge = repoCfgPtr.Automerge
+		deleteBranchOnMerge = projCfg.DeleteSourceBranchOnMerge
 		parallelApply = repoCfgPtr.ParallelApply
 		parallelPlan = repoCfgPtr.ParallelPlan
 	}
@@ -477,8 +483,9 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 					commentFlags,
 					repoDir,
 					automerge,
-					parallelApply,
+					deleteBranchOnMerge,
 					parallelPlan,
+					parallelApply,
 					verbose,
 				)...)
 		}
@@ -492,8 +499,9 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 				commentFlags,
 				repoDir,
 				automerge,
-				parallelApply,
+				deleteBranchOnMerge,
 				parallelPlan,
+				parallelApply,
 				verbose,
 			)...)
 	}
@@ -503,7 +511,6 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 	}
 
 	return projCtxs, nil
-
 }
 
 // validateWorkspaceAllowed returns an error if repoCfg defines projects in

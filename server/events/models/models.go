@@ -171,6 +171,13 @@ type PullRequest struct {
 	BaseRepo Repo
 }
 
+// PullRequestOptions is used to set optional paralmeters for PullRequest
+type PullRequestOptions struct {
+	// When DeleteSourceBranchOnMerge flag is set to true VCS deletes the source branch after the PR is merged
+	// Applied by GitLab & AzureDevops
+	DeleteSourceBranchOnMerge bool
+}
+
 type PullRequestState int
 
 const (
@@ -391,6 +398,8 @@ type ProjectCommandContext struct {
 	// PolicySets represent the policies that are run on the plan as part of the
 	// policy check stage
 	PolicySets valid.PolicySets
+	// DeleteSourceBranchOnMerge will attempt to allow a branch to be deleted when merged (AzureDevOps & GitLab Support Only)
+	DeleteSourceBranchOnMerge bool
 }
 
 // GetShowResultFileName returns the filename (not the path) to store the tf show result
