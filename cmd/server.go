@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/docker/docker/pkg/fileutils"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server"
@@ -44,6 +45,7 @@ const (
 	AllowRepoConfigFlag        = "allow-repo-config"
 	AtlantisURLFlag            = "atlantis-url"
 	AutomergeFlag              = "automerge"
+	AutoplanFileListFlag       = "autoplan-file-list"
 	BitbucketBaseURLFlag       = "bitbucket-base-url"
 	BitbucketTokenFlag         = "bitbucket-token"
 	BitbucketUserFlag          = "bitbucket-user"
@@ -102,6 +104,7 @@ const (
 	// NOTE: Must manually set these as defaults in the setDefaults function.
 	DefaultADBasicUser      = ""
 	DefaultADBasicPassword  = ""
+	DefaultAutoplanFileList = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl"
 	DefaultCheckoutStrategy = "branch"
 	DefaultBitbucketBaseURL = bitbucketcloud.BaseURL
 	DefaultDataDir          = "~/.atlantis"
@@ -136,6 +139,13 @@ var stringFlags = map[string]stringFlag{
 	},
 	AtlantisURLFlag: {
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path ex. https://example.com/basepath.",
+	},
+	AutoplanFileListFlag: {
+		description: "Comma separated list of file patterns that Atlantis will use to check if a directory contains modified files that should trigger project planning." +
+			" Patterns use the dockerignore (https://docs.docker.com/engine/reference/builder/#dockerignore-file) syntax." +
+			" Use single quotes to avoid shell expansion of '*'. Defaults to '" + DefaultAutoplanFileList + "'." +
+			" A custom Workflow that uses autoplan 'when_modified' will ignore this value.",
+		defaultValue: DefaultAutoplanFileList,
 	},
 	BitbucketUserFlag: {
 		description: "Bitbucket username of API user.",
@@ -569,6 +579,9 @@ func (s *ServerCmd) run() error {
 }
 
 func (s *ServerCmd) setDefaults(c *server.UserConfig) {
+	if c.AutoplanFileList == "" {
+		c.AutoplanFileList = DefaultAutoplanFileList
+	}
 	if c.CheckoutStrategy == "" {
 		c.CheckoutStrategy = DefaultCheckoutStrategy
 	}
@@ -684,6 +697,11 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 
 	if userConfig.TFEHostname != DefaultTFEHostname && userConfig.TFEToken == "" {
 		return fmt.Errorf("if setting --%s, must set --%s", TFEHostnameFlag, TFETokenFlag)
+	}
+
+	_, patternErr := fileutils.NewPatternMatcher(strings.Split(userConfig.AutoplanFileList, ","))
+	if patternErr != nil {
+		return errors.Wrapf(patternErr, "invalid pattern in --%s, %s", AutoplanFileListFlag, userConfig.AutoplanFileList)
 	}
 
 	return nil

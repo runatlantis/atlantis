@@ -39,6 +39,7 @@ func NewProjectCommandBuilder(
 	commentBuilder CommentBuilder,
 	skipCloneNoChanges bool,
 	EnableRegExpCmd bool,
+	AutoplanFileList string,
 ) *DefaultProjectCommandBuilder {
 	projectCommandBuilder := &DefaultProjectCommandBuilder{
 		ParserValidator:    parserValidator,
@@ -50,6 +51,7 @@ func NewProjectCommandBuilder(
 		PendingPlanFinder:  pendingPlanFinder,
 		SkipCloneNoChanges: skipCloneNoChanges,
 		EnableRegExpCmd:    EnableRegExpCmd,
+		AutoplanFileList:   AutoplanFileList,
 		ProjectCommandContextBuilder: NewProjectCommandContextBulder(
 			policyChecksSupported,
 			commentBuilder,
@@ -104,6 +106,7 @@ type DefaultProjectCommandBuilder struct {
 	ProjectCommandContextBuilder ProjectCommandContextBuilder
 	SkipCloneNoChanges           bool
 	EnableRegExpCmd              bool
+	AutoplanFileList             string
 }
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
@@ -241,7 +244,10 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		// If there is no config file, then we'll plan each project that
 		// our algorithm determines was modified.
 		ctx.Log.Info("found no %s file", yaml.AtlantisYAMLFilename)
-		modifiedProjects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir)
+		modifiedProjects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir, p.AutoplanFileList)
+		if err != nil {
+			return nil, errors.Wrapf(err, "finding modified projects: %s", modifiedFiles)
+		}
 		ctx.Log.Info("automatically determined that there were %d projects modified in this pull request: %s", len(modifiedProjects), modifiedProjects)
 		for _, mp := range modifiedProjects {
 			ctx.Log.Debug("determining config for project at dir: %q", mp.Path)

@@ -28,6 +28,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v2"
 )
 
 // passedConfig is set to whatever config ended up being passed to NewServer.
@@ -58,6 +59,7 @@ var testFlags = map[string]interface{}{
 	AllowForkPRsFlag:           true,
 	AllowRepoConfigFlag:        true,
 	AutomergeFlag:              true,
+	AutoplanFileListFlag:       "**/*.tf,**/*.yml",
 	BitbucketBaseURLFlag:       "https://bitbucket-base-url.com",
 	BitbucketTokenFlag:         "bitbucket-token",
 	BitbucketUserFlag:          "bitbucket-user",
@@ -167,11 +169,10 @@ func TestExecute_Flags(t *testing.T) {
 
 func TestExecute_ConfigFile(t *testing.T) {
 	t.Log("Should use all the values from the config file.")
-	var cfgContents string
-	for flag, value := range testFlags {
-		cfgContents += fmt.Sprintf("%s: %v\n", flag, value)
-	}
-	tmpFile := tempFile(t, cfgContents)
+	// Use yaml package to quote values that need quoting
+	cfgContents, yamlErr := yaml.Marshal(&testFlags)
+	Ok(t, yamlErr)
+	tmpFile := tempFile(t, string(cfgContents))
 	defer os.Remove(tmpFile) // nolint: errcheck
 	c := setup(map[string]interface{}{
 		ConfigFlag: tmpFile,
@@ -736,6 +737,53 @@ func TestExecute_RepoWhitelistDeprecation(t *testing.T) {
 	Ok(t, err)
 	Equals(t, true, passedConfig.SilenceAllowlistErrors)
 	Equals(t, "*", passedConfig.RepoAllowlist)
+}
+
+func TestExecute_AutoplanFileList(t *testing.T) {
+	cases := []struct {
+		description string
+		flags       map[string]interface{}
+		expectErr   string
+	}{
+		{
+			"default value",
+			map[string]interface{}{
+				AutoplanFileListFlag: DefaultAutoplanFileList,
+			},
+			"",
+		},
+		{
+			"valid value",
+			map[string]interface{}{
+				AutoplanFileListFlag: "**/*.tf",
+			},
+			"",
+		},
+		{
+			"invalid exclusion pattern",
+			map[string]interface{}{
+				AutoplanFileListFlag: "**/*.yml,!",
+			},
+			"invalid pattern in --autoplan-file-list, **/*.yml,!: illegal exclusion pattern: \"!\"",
+		},
+		{
+			"invalid pattern",
+			map[string]interface{}{
+				AutoplanFileListFlag: "[^]",
+			},
+			"invalid pattern in --autoplan-file-list, [^]: syntax error in pattern",
+		},
+	}
+	for _, testCase := range cases {
+		t.Log("Should validate autoplan file list when " + testCase.description)
+		c := setupWithDefaults(testCase.flags, t)
+		err := c.Execute()
+		if testCase.expectErr != "" {
+			ErrEquals(t, testCase.expectErr, err)
+		} else {
+			Ok(t, err)
+		}
+	}
 }
 
 func setup(flags map[string]interface{}, t *testing.T) *cobra.Command {
