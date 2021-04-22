@@ -57,31 +57,38 @@ func NewAzureDevopsClient(hostname string, userName string, token string) (*Azur
 // relative to the repo root, e.g. parent/child/file.txt.
 func (g *AzureDevopsClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	var files []string
+	filesSet := make(map[string]bool)
 
-	opts := azuredevops.PullRequestGetOptions{
-		IncludeWorkItemRefs: true,
-	}
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
-	commitIDResponse, _, _ := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, pull.Num, &opts)
 
-	commitID := commitIDResponse.GetLastMergeSourceCommit().GetCommitID()
+	commitRefs, _, _ := g.Client.PullRequests.ListCommits(g.ctx, owner, project, repoName, pull.Num)
+	_ = commitRefs
+	for _, ref := range commitRefs {
+		commitID := *ref.CommitID
 
-	r, _, _ := g.Client.Git.GetChanges(g.ctx, owner, project, repoName, commitID)
+		r, _, _ := g.Client.Git.GetChanges(g.ctx, owner, project, repoName, commitID)
 
-	for _, change := range r.Changes {
-		item := change.GetItem()
-		// Convert the path to a relative path from the repo's root.
-		relativePath := filepath.Clean("./" + item.GetPath())
-		files = append(files, relativePath)
+		for _, change := range r.Changes {
+			item := change.GetItem()
+			if *item.GitObjectType == "blob" {
+				// Convert the path to a relative path from the repo's root.
+				relativePath := filepath.Clean("./" + item.GetPath())
+				filesSet[relativePath] = true
 
-		// If the file was renamed, we'll want to run plan in the directory
-		// it was moved from as well.
-		changeType := azuredevops.Rename.String()
-		if change.ChangeType == &changeType {
-			// Convert the path to a relative path from the repo's root.
-			relativePath = filepath.Clean("./" + change.GetSourceServerItem())
-			files = append(files, relativePath)
+				// If the file was renamed, we'll want to run plan in the directory
+				// it was moved from as well.
+				changeType := azuredevops.Rename.String()
+				if change.ChangeType == &changeType {
+					// Convert the path to a relative path from the repo's root.
+					relativePath = filepath.Clean("./" + change.GetSourceServerItem())
+					filesSet[relativePath] = true
+				}
+			}
 		}
+	}
+
+	for file := range filesSet {
+		files = append(files, file)
 	}
 
 	return files, nil

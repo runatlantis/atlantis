@@ -13,7 +13,6 @@ import (
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
-	"github.com/runatlantis/atlantis/server/events/vcs/fixtures"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -236,36 +235,73 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 // GetModifiedFiles should make multiple requests if more than one page
 // and concat results.
 func TestAzureDevopsClient_GetModifiedFiles(t *testing.T) {
-	itemRespTemplate := `{
+	commitsResp := `{
+		"count": 2,
+		"value": [
+			{
+				"commitId": "f14e5c5227145a262c455b95696ca5647567390e",
+				"author": {
+					"name": "Jamal Hartnett",
+					"email": "fabrikamfiber4@hotmail.com",
+					"date": "2000-01-01T01:00:00Z"
+				},
+				"committer": {
+					"name": "Jamal Hartnett",
+					"email": "fabrikamfiber4@hotmail.com",
+					"date": "2000-01-01T01:00:00Z"
+				},
+				"comment": "foo bar 1",
+				"url": "https://dev.azure.com/fabrikam/1fbf87b9-64d3-4dea-94ff-352ce2647578/_apis/git/repositories/278d5cd2-584d-4b63-824a-2ba458937249/commits/f14e5c5227145a262c455b95696ca5647567390e"
+			},
+			{
+				"commitId": "39480e5a326c08131981f0bc9d6d411441ad73be",
+				"author": {
+					"name": "Jamal Hartnett",
+					"email": "fabrikamfiber4@hotmail.com",
+					"date": "2000-01-01T01:00:00Z"
+				},
+				"committer": {
+					"name": "Jamal Hartnett",
+					"email": "fabrikamfiber4@hotmail.com",
+					"date": "2000-01-01T01:00:00Z"
+				},
+				"comment": "foo bar 2",
+				"url": "https://dev.azure.com/fabrikam/1fbf87b9-64d3-4dea-94ff-352ce2647578/_apis/git/repositories/278d5cd2-584d-4b63-824a-2ba458937249/commits/39480e5a326c08131981f0bc9d6d411441ad73be"
+			}
+		]}`
+	changesRespTemplate := `{
+		"changeCounts": {
+			"Edit": 1
+		},
 		"changes": [
-	{
-		"item": {
-			"gitObjectType": "blob",
-			"path": "%s",
-			"url": "https://dev.azure.com/fabrikam/_apis/git/repositories/278d5cd2-584d-4b63-824a-2ba458937249/items/MyWebSite/MyWebSite/%s?versionType=Commit"
-		},
-		"changeType": "add"
-	},
-	{
-		"item": {
-			"gitObjectType": "blob",
-			"path": "%s",
-			"url": "https://dev.azure.com/fabrikam/_apis/git/repositories/278d5cd2-584d-4b63-824a-2ba458937249/items/MyWebSite/MyWebSite/%s?versionType=Commit"
-		},
-		"changeType": "add"
-	}
-]}`
-	resp := fmt.Sprintf(itemRespTemplate, "/file1.txt", "/file1.txt", "/file2.txt", "/file2.txt")
+			{
+				"item": {
+					"objectId": "9347d78903e37be34de91a8c35818561baa6913f",
+					"originalObjectId": "573530927d35a9289083224c429bc15ee7f667e2",
+					"gitObjectType": "blob",
+					"commitId": "%[1]s",
+					"path": "%[2]s",
+					"url": "https://dev.azure.com/fabrikam/1fbf87b9-64d3-4dea-94ff-352ce2647578/_apis/git/repositories/278d5cd2-584d-4b63-824a-2ba458937249/commits/items/%[2]s?versionType=Commit&version=%[1]s"
+				},
+				"changeType": "edit"
+			}
+		]
+	}`
+
 	testServer := httptest.NewTLSServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.RequestURI {
-			// The first request should hit this URL.
-			case "/owner/project/_apis/git/repositories/repo/pullrequests/1?api-version=5.1-preview.1&includeWorkItemRefs=true":
-				w.Write([]byte(fixtures.ADPullJSON)) // nolint: errcheck
-			// The second should hit this URL.
-			case "/owner/project/_apis/git/repositories/repo/commits/b60280bc6e62e2f880f1b63c1e24987664d3bda3/changes?api-version=5.1-preview.1":
-				// We write a header that means there's an additional page.
-				w.Write([]byte(resp)) // nolint: errcheck
+			// The first should hit this URL.
+			case "/owner/project/_apis/git/repositories/repo/pullrequests/1/commits?api-version=5.1-preview.1":
+				w.Write([]byte(commitsResp)) // nolint: errcheck
+				return
+			// get changes for first commit
+			case "/owner/project/_apis/git/repositories/repo/commits/f14e5c5227145a262c455b95696ca5647567390e/changes?api-version=5.1-preview.1":
+				w.Write([]byte(fmt.Sprintf(changesRespTemplate, "f14e5c5227145a262c455b95696ca5647567390e", "/file1.txt"))) // nolint: errcheck
+				return
+			// get changes for second commit
+			case "/owner/project/_apis/git/repositories/repo/commits/39480e5a326c08131981f0bc9d6d411441ad73be/changes?api-version=5.1-preview.1":
+				w.Write([]byte(fmt.Sprintf(changesRespTemplate, "39480e5a326c08131981f0bc9d6d411441ad73be", "/file2.txt"))) // nolint: errcheck
 				return
 			default:
 				t.Errorf("got unexpected request at %q", r.RequestURI)
