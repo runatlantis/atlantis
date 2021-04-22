@@ -258,7 +258,7 @@ func TestEnsureVersion_downloaded(t *testing.T) {
 
 	mockDownloader := mocks.NewMockDownloader()
 
-	c, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, mockDownloader, true)
+	c, err := terraform.NewTestClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, mockDownloader, true)
 	Ok(t, err)
 
 	Equals(t, "0.11.10", c.DefaultVersion().String())
