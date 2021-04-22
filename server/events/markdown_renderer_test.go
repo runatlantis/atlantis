@@ -1210,7 +1210,7 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 		},
 		{
 			VCSHost:    models.Github,
-			Output:     strings.Repeat("line\n", 13),
+			Output:     strings.Repeat("line\n", 13) + fmt.Sprintf("No changes. Infrastructure is up-to-date."),
 			ShouldWrap: true,
 		},
 		{
@@ -1234,7 +1234,7 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 		{
 			VCSHost:                 models.Gitlab,
 			GitlabCommonMarkSupport: true,
-			Output:                  strings.Repeat("line\n", 13),
+			Output:                  strings.Repeat("line\n", 13) + fmt.Sprintf("No changes. Infrastructure is up-to-date."),
 			ShouldWrap:              true,
 		},
 		{
@@ -1309,6 +1309,7 @@ $$$
 * :repeat: To **plan** this project again, comment:
     * $replancmd$
 </details>
+No changes. Infrastructure is up-to-date.
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
@@ -1414,7 +1415,7 @@ $$$
 
 func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 	mr := events.MarkdownRenderer{}
-	tfOut := strings.Repeat("line\n", 13)
+	tfOut := strings.Repeat("line\n", 13) + fmt.Sprintf("Plan: 1 to add, 0 to change, 0 to destroy.")
 	rendered := mr.Render(events.CommandResult{
 		ProjectResults: []models.ProjectResult{
 			{
@@ -1457,6 +1458,7 @@ $$$
 * :repeat: To **plan** this project again, comment:
     * $staging-replan-cmd$
 </details>
+Plan: 1 to add, 0 to change, 0 to destroy.
 
 ---
 ### 2. dir: $.$ workspace: $production$
@@ -1472,6 +1474,7 @@ $$$
 * :repeat: To **plan** this project again, comment:
     * $production-replan-cmd$
 </details>
+Plan: 1 to add, 0 to change, 0 to destroy.
 
 ---
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:

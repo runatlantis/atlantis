@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/url"
 	paths "path"
+	"regexp"
 	"strings"
 	"time"
 
@@ -489,6 +490,16 @@ type PlanSuccess struct {
 	// branch we're merging into has been updated since we cloned and merged
 	// it.
 	HasDiverged bool
+}
+
+// Summary extracts one line summary of plan changes from TerraformOutput.
+func (p *PlanSuccess) Summary() string {
+	r := regexp.MustCompile(`Plan: \d+ to add, \d+ to change, \d+ to destroy.`)
+	if match := r.FindString(p.TerraformOutput); match != "" {
+		return match
+	}
+	r = regexp.MustCompile(`No changes. Infrastructure is up-to-date.`)
+	return r.FindString(p.TerraformOutput)
 }
 
 // PolicyCheckSuccess is the result of a successful policy check run.
