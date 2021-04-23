@@ -4,11 +4,12 @@
 package events
 
 import (
+	"reflect"
+	"time"
+
 	pegomock "github.com/petergtz/pegomock"
 	models "github.com/runatlantis/atlantis/server/events/models"
 	logging "github.com/runatlantis/atlantis/server/logging"
-	"reflect"
-	"time"
 )
 
 type MockWorkingDir struct {
