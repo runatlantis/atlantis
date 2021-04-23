@@ -66,14 +66,14 @@ func (mock *MockPendingPlanFinder) VerifyWasCalledOnce() *VerifierMockPendingPla
 	}
 }
 
-func (mock *MockPendingPlanFinder) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockPendingPlanFinder {
+func (mock *MockPendingPlanFinder) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockPendingPlanFinder {
 	return &VerifierMockPendingPlanFinder{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockPendingPlanFinder) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockPendingPlanFinder {
+func (mock *MockPendingPlanFinder) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockPendingPlanFinder {
 	return &VerifierMockPendingPlanFinder{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -81,7 +81,7 @@ func (mock *MockPendingPlanFinder) VerifyWasCalledInOrder(invocationCountMatcher
 	}
 }
 
-func (mock *MockPendingPlanFinder) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockPendingPlanFinder {
+func (mock *MockPendingPlanFinder) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockPendingPlanFinder {
 	return &VerifierMockPendingPlanFinder{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -91,7 +91,7 @@ func (mock *MockPendingPlanFinder) VerifyWasCalledEventually(invocationCountMatc
 
 type VerifierMockPendingPlanFinder struct {
 	mock                   *MockPendingPlanFinder
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

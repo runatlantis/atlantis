@@ -46,11 +46,13 @@ need to be defined.
 ```yaml
 version: 3
 automerge: true
+delete_source_branch_on_merge: true
 projects:
 - name: my-project-name
   dir: .
   workspace: default
   terraform_version: v0.11.0
+  delete_source_branch_on_merge: true
   autoplan:
     when_modified: ["*.tf", "../modules/**.tf"]
     enabled: true
@@ -189,13 +191,15 @@ See [Custom Workflow Use Cases: Custom Backend Config](custom-workflows.html#cus
 ```yaml
 version:
 automerge:
+delete_source_branch_on_merge:
 projects:
 workflows:
 ```
 | Key                           | Type                                                     | Default | Required | Description                                                 |
 |-------------------------------|----------------------------------------------------------|---------|----------|-------------------------------------------------------------|
 | version                       | int                                                      | none    | **yes**  | This key is required and must be set to `3`                 |
-| automerge                     | bool                                                     | `false` | no       | Automatically merge pull request when all plans are applied |
+| automerge                     | bool                                                     | `false` | no       | Automatically merges pull request when all plans are applied|
+| delete_source_branch_on_merge | bool                                                     | `false` | no       | Automatically deletes the source branch on merge            |
 | projects                      | array[[Project](repo-level-atlantis-yaml.html#project)]  | `[]`    | no       | Lists the projects in this repo                             |
 | workflows<br />*(restricted)* | map[string: [Workflow](custom-workflows.html#reference)] | `{}`    | no       | Custom workflows                                            |
 
@@ -204,6 +208,7 @@ workflows:
 name: myname
 dir: mydir
 workspace: myworkspace
+delete_source_branch_on_merge:
 autoplan:
 terraform_version: 0.11.0
 apply_requirements: ["approved"]
@@ -216,6 +221,7 @@ workflow: myworkflow
 | dir                                    | string                | none        | **yes**  | The directory of this project relative to the repo root. For example if the project was under `./project1` then use `project1`. Use `.` to indicate the repo root.                                                    |
 | workspace                              | string                | `"default"` | no       | The [Terraform workspace](https://www.terraform.io/docs/state/workspaces.html) for this project. Atlantis will switch to this workplace when planning/applying and will create it if it doesn't exist.                |
 | autoplan                               | [Autoplan](#autoplan) | none        | no       | A custom autoplan configuration. If not specified, will use the autoplan config. See [Autoplanning](autoplanning.html).                                                                                               |
+| delete_source_branch_on_merge          | bool                  | `false`     | no       | Automatically deletes the source branch on merge                                                                                                                                                                      |
 | terraform_version                      | string                | none        | no       | A specific Terraform version to use when running commands for this project. Must be [Semver compatible](https://semver.org/), ex. `v0.11.0`, `0.12.0-beta1`.                                                          |
 | apply_requirements<br />*(restricted)* | array[string]         | none        | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved` and `mergeable`. See [Apply Requirements](apply-requirements.html) for more details. |
 | workflow <br />*(restricted)*          | string                | none        | no       | A custom workflow. If not specified, Atlantis will use its default workflow.                                                                                                                                          |

@@ -127,11 +127,11 @@ func (mock *MockClient) UpdateStatus(repo models.Repo, pull models.PullRequest, 
 	return ret0
 }
 
-func (mock *MockClient) MergePull(pull models.PullRequest) error {
+func (mock *MockClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}
-	params := []pegomock.Param{pull}
+	params := []pegomock.Param{pull, pullOptions}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("MergePull", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
 	if len(result) != 0 {
@@ -206,14 +206,14 @@ func (mock *MockClient) VerifyWasCalledOnce() *VerifierMockClient {
 	}
 }
 
-func (mock *MockClient) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockClient {
+func (mock *MockClient) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockClient {
 	return &VerifierMockClient{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockClient) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockClient {
+func (mock *MockClient) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockClient {
 	return &VerifierMockClient{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -221,7 +221,7 @@ func (mock *MockClient) VerifyWasCalledInOrder(invocationCountMatcher pegomock.M
 	}
 }
 
-func (mock *MockClient) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockClient {
+func (mock *MockClient) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockClient {
 	return &VerifierMockClient{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -231,7 +231,7 @@ func (mock *MockClient) VerifyWasCalledEventually(invocationCountMatcher pegomoc
 
 type VerifierMockClient struct {
 	mock                   *MockClient
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }
@@ -446,8 +446,8 @@ func (c *MockClient_UpdateStatus_OngoingVerification) GetAllCapturedArguments() 
 	return
 }
 
-func (verifier *VerifierMockClient) MergePull(pull models.PullRequest) *MockClient_MergePull_OngoingVerification {
-	params := []pegomock.Param{pull}
+func (verifier *VerifierMockClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) *MockClient_MergePull_OngoingVerification {
+	params := []pegomock.Param{pull, pullOptions}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "MergePull", params, verifier.timeout)
 	return &MockClient_MergePull_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -457,17 +457,21 @@ type MockClient_MergePull_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockClient_MergePull_OngoingVerification) GetCapturedArguments() models.PullRequest {
-	pull := c.GetAllCapturedArguments()
-	return pull[len(pull)-1]
+func (c *MockClient_MergePull_OngoingVerification) GetCapturedArguments() (models.PullRequest, models.PullRequestOptions) {
+	pull, pullOptions := c.GetAllCapturedArguments()
+	return pull[len(pull)-1], pullOptions[len(pullOptions)-1]
 }
 
-func (c *MockClient_MergePull_OngoingVerification) GetAllCapturedArguments() (_param0 []models.PullRequest) {
+func (c *MockClient_MergePull_OngoingVerification) GetAllCapturedArguments() (_param0 []models.PullRequest, _param1 []models.PullRequestOptions) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.PullRequest, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(models.PullRequest)
+		}
+		_param1 = make([]models.PullRequestOptions, len(c.methodInvocations))
+		for u, param := range params[1] {
+			_param1[u] = param.(models.PullRequestOptions)
 		}
 	}
 	return

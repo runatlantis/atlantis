@@ -19,19 +19,23 @@ func NewApplyCommandRunner(
 	dbUpdater *DBUpdater,
 	db *db.BoltDB,
 	parallelPoolSize int,
+	SilenceNoProjects bool,
+	silenceVCSStatusNoProjects bool,
 ) *ApplyCommandRunner {
 	return &ApplyCommandRunner{
-		vcsClient:           vcsClient,
-		DisableApplyAll:     disableApplyAll,
-		locker:              applyCommandLocker,
-		commitStatusUpdater: commitStatusUpdater,
-		prjCmdBuilder:       prjCommandBuilder,
-		prjCmdRunner:        prjCmdRunner,
-		autoMerger:          autoMerger,
-		pullUpdater:         pullUpdater,
-		dbUpdater:           dbUpdater,
-		DB:                  db,
-		parallelPoolSize:    parallelPoolSize,
+		vcsClient:                  vcsClient,
+		DisableApplyAll:            disableApplyAll,
+		locker:                     applyCommandLocker,
+		commitStatusUpdater:        commitStatusUpdater,
+		prjCmdBuilder:              prjCommandBuilder,
+		prjCmdRunner:               prjCmdRunner,
+		autoMerger:                 autoMerger,
+		pullUpdater:                pullUpdater,
+		dbUpdater:                  dbUpdater,
+		DB:                         db,
+		parallelPoolSize:           parallelPoolSize,
+		SilenceNoProjects:          SilenceNoProjects,
+		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
 	}
 }
 
@@ -47,6 +51,12 @@ type ApplyCommandRunner struct {
 	pullUpdater         *PullUpdater
 	dbUpdater           *DBUpdater
 	parallelPoolSize    int
+	// SilenceNoProjects is whether Atlantis should respond to PRs if no projects
+	// are found
+	SilenceNoProjects bool
+	// SilenceVCSStatusNoPlans is whether any plan should set commit status if no projects
+	// are found
+	silenceVCSStatusNoProjects bool
 }
 
 func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
@@ -56,7 +66,7 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 
 	locked, err := a.IsLocked()
 	// CheckApplyLock falls back to DisableApply flag if fetching the lock
-	// raises an erro r
+	// raises an error
 	// We will log failure as warning
 	if err != nil {
 		ctx.Log.Warn("checking global apply lock: %s", err)
@@ -80,6 +90,10 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 		return
 	}
 
+	if err = a.commitStatusUpdater.UpdateCombined(baseRepo, pull, models.PendingCommitStatus, cmd.CommandName()); err != nil {
+		ctx.Log.Warn("unable to update commit status: %s", err)
+	}
+
 	// Get the mergeable status before we set any build statuses of our own.
 	// We do this here because when we set a "Pending" status, if users have
 	// required the Atlantis status checks to pass, then we've now changed
@@ -95,10 +109,6 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 
 	ctx.Log.Info("pull request mergeable status: %t", ctx.PullMergeable)
 
-	if err = a.commitStatusUpdater.UpdateCombined(baseRepo, pull, models.PendingCommitStatus, cmd.CommandName()); err != nil {
-		ctx.Log.Warn("unable to update commit status: %s", err)
-	}
-
 	var projectCmds []models.ProjectCommandContext
 	projectCmds, err = a.prjCmdBuilder.BuildApplyCommands(ctx, cmd)
 
@@ -107,6 +117,21 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
 		a.pullUpdater.updatePull(ctx, cmd, CommandResult{Error: err})
+		return
+	}
+
+	// If there are no projects to apply, don't respond to the PR and ignore
+	if len(projectCmds) == 0 && a.SilenceNoProjects {
+		ctx.Log.Info("determined there was no project to run apply in.")
+		if !a.silenceVCSStatusNoProjects {
+			// If there were no projects modified, we set successful commit statuses
+			// with 0/0 projects applied successfully because some users require
+			// the Atlantis status to be passing for all pull requests.
+			ctx.Log.Debug("setting VCS status to success with no projects found")
+			if err := a.commitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, models.ApplyCommand, 0, 0); err != nil {
+				ctx.Log.Warn("unable to update commit status: %s", err)
+			}
+		}
 		return
 	}
 
@@ -133,7 +158,7 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 	a.updateCommitStatus(ctx, pullStatus)
 
 	if a.autoMerger.automergeEnabled(projectCmds) {
-		a.autoMerger.automerge(ctx, pullStatus)
+		a.autoMerger.automerge(ctx, pullStatus, a.autoMerger.deleteSourceBranchOnMergeEnabled(projectCmds))
 	}
 }
 

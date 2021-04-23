@@ -51,14 +51,14 @@ func (mock *MockSourceResolver) VerifyWasCalledOnce() *VerifierMockSourceResolve
 	}
 }
 
-func (mock *MockSourceResolver) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockSourceResolver {
+func (mock *MockSourceResolver) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockSourceResolver {
 	return &VerifierMockSourceResolver{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockSourceResolver) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockSourceResolver {
+func (mock *MockSourceResolver) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockSourceResolver {
 	return &VerifierMockSourceResolver{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -66,7 +66,7 @@ func (mock *MockSourceResolver) VerifyWasCalledInOrder(invocationCountMatcher pe
 	}
 }
 
-func (mock *MockSourceResolver) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockSourceResolver {
+func (mock *MockSourceResolver) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockSourceResolver {
 	return &VerifierMockSourceResolver{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -76,7 +76,7 @@ func (mock *MockSourceResolver) VerifyWasCalledEventually(invocationCountMatcher
 
 type VerifierMockSourceResolver struct {
 	mock                   *MockSourceResolver
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

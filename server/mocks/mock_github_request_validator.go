@@ -51,14 +51,14 @@ func (mock *MockGithubRequestValidator) VerifyWasCalledOnce() *VerifierMockGithu
 	}
 }
 
-func (mock *MockGithubRequestValidator) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockGithubRequestValidator {
+func (mock *MockGithubRequestValidator) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockGithubRequestValidator {
 	return &VerifierMockGithubRequestValidator{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockGithubRequestValidator) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockGithubRequestValidator {
+func (mock *MockGithubRequestValidator) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockGithubRequestValidator {
 	return &VerifierMockGithubRequestValidator{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -66,7 +66,7 @@ func (mock *MockGithubRequestValidator) VerifyWasCalledInOrder(invocationCountMa
 	}
 }
 
-func (mock *MockGithubRequestValidator) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockGithubRequestValidator {
+func (mock *MockGithubRequestValidator) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockGithubRequestValidator {
 	return &VerifierMockGithubRequestValidator{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -76,7 +76,7 @@ func (mock *MockGithubRequestValidator) VerifyWasCalledEventually(invocationCoun
 
 type VerifierMockGithubRequestValidator struct {
 	mock                   *MockGithubRequestValidator
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

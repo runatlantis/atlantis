@@ -2,21 +2,10 @@ version: 2
 jobs:
   test:
     docker:
-    - image: runatlantis/testing-env:latest
+    - image: runatlantis/testing-env:20296f9638a4eca04733f60b39e1d3025b9d708a
     steps:
     - checkout
-    - run: make test-coverage
-    - run:
-        name: post coverage to codecov.io
-        command: |
-          curl -s https://codecov.io/bash > codecov
-          VERSION=$(grep 'VERSION=\".*\"' codecov | cut -d'"' -f2);
-          for i in 1 256 512
-          do
-            diff <(shasum -a $i codecov) <(curl -s https://raw.githubusercontent.com/codecov/codecov-bash/$VERSION/SHA${i}SUM)
-          done
-          chmod +x codecov
-          ./codecov
+    - run: make test-all
     - run: make check-fmt
     - run: make check-lint
   e2e:
@@ -103,11 +92,15 @@ workflows:
           branches:
             ignore: /.*-docs/
     - e2e:
+        context:
+          - atlantis-e2e-tests
         requires: [test]
         filters:
           branches:
             ignore: /.*-docs/
     - docker_master:
+        context:
+          - docker-push
         requires: [e2e]
         filters:
           branches:
@@ -116,6 +109,8 @@ workflows:
   tag:
     jobs:
     - docker_tag:
+        context:
+          - docker-push
         filters:
           branches:
             ignore: /.*/

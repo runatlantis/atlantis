@@ -12,6 +12,7 @@ type UserConfig struct {
 	AllowRepoConfig            bool   `mapstructure:"allow-repo-config"`
 	AtlantisURL                string `mapstructure:"atlantis-url"`
 	Automerge                  bool   `mapstructure:"automerge"`
+	AutoplanFileList           string `mapstructure:"autoplan-file-list"`
 	AzureDevopsToken           string `mapstructure:"azuredevops-token"`
 	AzureDevopsUser            string `mapstructure:"azuredevops-user"`
 	AzureDevopsWebhookPassword string `mapstructure:"azuredevops-webhook-password"`
@@ -57,12 +58,17 @@ type UserConfig struct {
 	RequireApproval bool `mapstructure:"require-approval"`
 	// RequireMergeable is whether to require pull requests to be mergeable before
 	// allowing terraform apply's to run.
-	RequireMergeable    bool `mapstructure:"require-mergeable"`
+	RequireMergeable bool `mapstructure:"require-mergeable"`
+	// SilenceNoProjects is whether Atlantis should respond to a PR if no projects are found.
+	SilenceNoProjects   bool `mapstructure:"silence-no-projects"`
 	SilenceForkPRErrors bool `mapstructure:"silence-fork-pr-errors"`
 	// SilenceVCSStatusNoPlans is whether autoplan should set commit status if no plans
 	// are found.
 	SilenceVCSStatusNoPlans bool `mapstructure:"silence-vcs-status-no-plans"`
-	SilenceAllowlistErrors  bool `mapstructure:"silence-allowlist-errors"`
+	// SilenceVCSStatusNoProjects is whether autoplan should set commit status if no projects
+	// are found.
+	SilenceVCSStatusNoProjects bool `mapstructure:"silence-vcs-status-no-projects"`
+	SilenceAllowlistErrors     bool `mapstructure:"silence-allowlist-errors"`
 	// SilenceWhitelistErrors is deprecated in favour of SilenceAllowlistErrors
 	SilenceWhitelistErrors bool            `mapstructure:"silence-whitelist-errors"`
 	SkipCloneNoChanges     bool            `mapstructure:"skip-clone-no-changes"`

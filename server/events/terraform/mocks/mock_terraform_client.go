@@ -67,14 +67,14 @@ func (mock *MockClient) VerifyWasCalledOnce() *VerifierMockClient {
 	}
 }
 
-func (mock *MockClient) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockClient {
+func (mock *MockClient) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockClient {
 	return &VerifierMockClient{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockClient) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockClient {
+func (mock *MockClient) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockClient {
 	return &VerifierMockClient{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -82,7 +82,7 @@ func (mock *MockClient) VerifyWasCalledInOrder(invocationCountMatcher pegomock.M
 	}
 }
 
-func (mock *MockClient) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockClient {
+func (mock *MockClient) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockClient {
 	return &VerifierMockClient{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -92,7 +92,7 @@ func (mock *MockClient) VerifyWasCalledEventually(invocationCountMatcher pegomoc
 
 type VerifierMockClient struct {
 	mock                   *MockClient
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }
