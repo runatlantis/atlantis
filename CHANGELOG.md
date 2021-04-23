@@ -1,3 +1,41 @@
+# v0.17.0
+Feature release encompassing this version's pre-release with some bug fixes and improvements that make this stable.
+
+## Features/Improvements
+* Add branch allowlist matcher to server side repo config ([#1383](https://github.com/runatlantis/atlantis/pull/1383) by @dghubble)
+* Add support for regex commands ([#1419](https://github.com/runatlantis/atlantis/pull/1419) by @bewie)
+* Add support for a global apply lock ([#1473](https://github.com/runatlantis/atlantis/pull/1473) by @msarvar)
+* Add structured logging support ([#1467](https://github.com/runatlantis/atlantis/pull/1467) by @nishkrishnan)
+* Ensure policy checks is its own apply requirement ([#1499](https://github.com/runatlantis/atlantis/pull/1499) by @nishkrishnan)
+* Add `--silence-no-projects` which silences Atlantis from responding to PRs when there are no projects ([#1469](https://github.com/runatlantis/atlantis/pull/1469) by @GenPage)
+* Add plan summary to unfolded part of the comment ([#1518](https://github.com/runatlantis/atlantis/pull/1518) by @wkrysmann)
+* Add `--autoplan-file-list` which allows modifying the global list of files that trigger project planning ([#1475](https://github.com/runatlantis/atlantis/pull/1475) by @Omicron7)
+* Add server-side repo config support to delete the source branch when automerge is configured ([#1357](https://github.com/runatlantis/atlantis/pull/1357) by @tapaszto)
+
+## Bug Fixes
+* Fix output for Terraform0.14 projects not filtering out refreshing of state. ([#1352](https://github.com/runatlantis/atlantis/pull/1352) by @mathcantin)
+
+## Dependencies
+* Upgrade conftest binary version to 0.23 ([#1516](https://github.com/runatlantis/atlantis/pull/1516) by @msarvar)
+* Upgrade default tf version to 0.14.9 ([#1472](https://github.com/runatlantis/atlantis/pull/1472) by @chenrui333)
+
+## Backwards Incompatibilities/Notes
+* If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
+  then the default version of Terraform will now be 0.14.9. Simply set the above
+  flag to your desired default version to avoid any issues.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.0/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.0/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.0/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.0/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.17.0`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Diff v0.17.0-beta..v0.17.0
+https://github.com/runatlantis/atlantis/compare/v0.17.0-beta...v0.17.0
+
 # v0.17.0-beta
 Feature release. Due to a sizeable refactor and the number of configuration settings supported in Atlantis, this is a pre-release and should not be considered fully stable.
 
