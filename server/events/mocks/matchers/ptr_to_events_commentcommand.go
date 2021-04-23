@@ -3,8 +3,9 @@ package matchers
 
 import (
 	"github.com/petergtz/pegomock"
-	events "github.com/runatlantis/atlantis/server/events"
 	"reflect"
+
+	events "github.com/runatlantis/atlantis/server/events"
 )
 
 func AnyPtrToEventsCommentCommand() *events.CommentCommand {
@@ -15,6 +16,18 @@ func AnyPtrToEventsCommentCommand() *events.CommentCommand {
 
 func EqPtrToEventsCommentCommand(value *events.CommentCommand) *events.CommentCommand {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
+	var nullValue *events.CommentCommand
+	return nullValue
+}
+
+func NotEqPtrToEventsCommentCommand(value *events.CommentCommand) *events.CommentCommand {
+	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
+	var nullValue *events.CommentCommand
+	return nullValue
+}
+
+func PtrToEventsCommentCommandThat(matcher pegomock.ArgumentMatcher) *events.CommentCommand {
+	pegomock.RegisterMatcher(matcher)
 	var nullValue *events.CommentCommand
 	return nullValue
 }

@@ -72,14 +72,14 @@ func (mock *MockVersionedExecutorWorkflow) VerifyWasCalledOnce() *VerifierMockVe
 	}
 }
 
-func (mock *MockVersionedExecutorWorkflow) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockVersionedExecutorWorkflow {
+func (mock *MockVersionedExecutorWorkflow) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockVersionedExecutorWorkflow {
 	return &VerifierMockVersionedExecutorWorkflow{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockVersionedExecutorWorkflow) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockVersionedExecutorWorkflow {
+func (mock *MockVersionedExecutorWorkflow) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockVersionedExecutorWorkflow {
 	return &VerifierMockVersionedExecutorWorkflow{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -87,7 +87,7 @@ func (mock *MockVersionedExecutorWorkflow) VerifyWasCalledInOrder(invocationCoun
 	}
 }
 
-func (mock *MockVersionedExecutorWorkflow) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockVersionedExecutorWorkflow {
+func (mock *MockVersionedExecutorWorkflow) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockVersionedExecutorWorkflow {
 	return &VerifierMockVersionedExecutorWorkflow{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -97,7 +97,7 @@ func (mock *MockVersionedExecutorWorkflow) VerifyWasCalledEventually(invocationC
 
 type VerifierMockVersionedExecutorWorkflow struct {
 	mock                   *MockVersionedExecutorWorkflow
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

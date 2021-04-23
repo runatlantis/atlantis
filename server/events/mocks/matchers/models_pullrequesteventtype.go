@@ -2,8 +2,9 @@
 package matchers
 
 import (
-	"reflect"
 	"github.com/petergtz/pegomock"
+	"reflect"
+
 	models "github.com/runatlantis/atlantis/server/events/models"
 )
 
@@ -15,6 +16,18 @@ func AnyModelsPullRequestEventType() models.PullRequestEventType {
 
 func EqModelsPullRequestEventType(value models.PullRequestEventType) models.PullRequestEventType {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
+	var nullValue models.PullRequestEventType
+	return nullValue
+}
+
+func NotEqModelsPullRequestEventType(value models.PullRequestEventType) models.PullRequestEventType {
+	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
+	var nullValue models.PullRequestEventType
+	return nullValue
+}
+
+func ModelsPullRequestEventTypeThat(matcher pegomock.ArgumentMatcher) models.PullRequestEventType {
+	pegomock.RegisterMatcher(matcher)
 	var nullValue models.PullRequestEventType
 	return nullValue
 }

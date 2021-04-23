@@ -139,6 +139,21 @@ func (mock *MockSimpleLogging) GetHistory() string {
 	return ret0
 }
 
+func (mock *MockSimpleLogging) Flush() error {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockSimpleLogging().")
+	}
+	params := []pegomock.Param{}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("Flush", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(error)
+		}
+	}
+	return ret0
+}
+
 func (mock *MockSimpleLogging) VerifyWasCalledOnce() *VerifierMockSimpleLogging {
 	return &VerifierMockSimpleLogging{
 		mock:                   mock,
@@ -487,4 +502,21 @@ func (c *MockSimpleLogging_GetHistory_OngoingVerification) GetCapturedArguments(
 }
 
 func (c *MockSimpleLogging_GetHistory_OngoingVerification) GetAllCapturedArguments() {
+}
+
+func (verifier *VerifierMockSimpleLogging) Flush() *MockSimpleLogging_Flush_OngoingVerification {
+	params := []pegomock.Param{}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Flush", params, verifier.timeout)
+	return &MockSimpleLogging_Flush_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockSimpleLogging_Flush_OngoingVerification struct {
+	mock              *MockSimpleLogging
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockSimpleLogging_Flush_OngoingVerification) GetCapturedArguments() {
+}
+
+func (c *MockSimpleLogging_Flush_OngoingVerification) GetAllCapturedArguments() {
 }

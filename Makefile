@@ -23,14 +23,14 @@ build-service: ## Build the main Go service
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o atlantis .
 
 go-generate: ## Run go generate in all packages
-	go generate $(PKG)
+	./scripts/go-generate.sh
 
 regen-mocks: ## Delete all mocks and matchers and then run go generate to regen them.
 	find . -type f | grep mocks/mock_ | xargs rm
 	find . -type f | grep mocks/matchers | xargs rm
 	@# not using $(PKG) here because that includes directories that have now
 	@# been made empty, causing go generate to fail.
-	go list ./... | grep -v e2e | grep -v static | xargs go generate
+	./scripts/go-generate.sh
 
 test: ## Run tests
 	@go test -short $(PKG)

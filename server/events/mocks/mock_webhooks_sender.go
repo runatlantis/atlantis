@@ -48,14 +48,14 @@ func (mock *MockWebhooksSender) VerifyWasCalledOnce() *VerifierMockWebhooksSende
 	}
 }
 
-func (mock *MockWebhooksSender) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockWebhooksSender {
+func (mock *MockWebhooksSender) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockWebhooksSender {
 	return &VerifierMockWebhooksSender{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockWebhooksSender) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockWebhooksSender {
+func (mock *MockWebhooksSender) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockWebhooksSender {
 	return &VerifierMockWebhooksSender{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -63,7 +63,7 @@ func (mock *MockWebhooksSender) VerifyWasCalledInOrder(invocationCountMatcher pe
 	}
 }
 
-func (mock *MockWebhooksSender) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockWebhooksSender {
+func (mock *MockWebhooksSender) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockWebhooksSender {
 	return &VerifierMockWebhooksSender{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -73,7 +73,7 @@ func (mock *MockWebhooksSender) VerifyWasCalledEventually(invocationCountMatcher
 
 type VerifierMockWebhooksSender struct {
 	mock                   *MockWebhooksSender
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

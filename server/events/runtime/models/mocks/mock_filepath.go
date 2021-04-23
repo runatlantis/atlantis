@@ -99,14 +99,14 @@ func (mock *MockFilePath) VerifyWasCalledOnce() *VerifierMockFilePath {
 	}
 }
 
-func (mock *MockFilePath) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockFilePath {
+func (mock *MockFilePath) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockFilePath {
 	return &VerifierMockFilePath{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockFilePath) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockFilePath {
+func (mock *MockFilePath) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockFilePath {
 	return &VerifierMockFilePath{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -114,7 +114,7 @@ func (mock *MockFilePath) VerifyWasCalledInOrder(invocationCountMatcher pegomock
 	}
 }
 
-func (mock *MockFilePath) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockFilePath {
+func (mock *MockFilePath) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockFilePath {
 	return &VerifierMockFilePath{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -124,7 +124,7 @@ func (mock *MockFilePath) VerifyWasCalledEventually(invocationCountMatcher pegom
 
 type VerifierMockFilePath struct {
 	mock                   *MockFilePath
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

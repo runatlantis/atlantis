@@ -69,14 +69,14 @@ func (mock *MockWorkingDirLocker) VerifyWasCalledOnce() *VerifierMockWorkingDirL
 	}
 }
 
-func (mock *MockWorkingDirLocker) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockWorkingDirLocker {
+func (mock *MockWorkingDirLocker) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockWorkingDirLocker {
 	return &VerifierMockWorkingDirLocker{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockWorkingDirLocker) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockWorkingDirLocker {
+func (mock *MockWorkingDirLocker) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockWorkingDirLocker {
 	return &VerifierMockWorkingDirLocker{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -84,7 +84,7 @@ func (mock *MockWorkingDirLocker) VerifyWasCalledInOrder(invocationCountMatcher 
 	}
 }
 
-func (mock *MockWorkingDirLocker) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockWorkingDirLocker {
+func (mock *MockWorkingDirLocker) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockWorkingDirLocker {
 	return &VerifierMockWorkingDirLocker{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -94,7 +94,7 @@ func (mock *MockWorkingDirLocker) VerifyWasCalledEventually(invocationCountMatch
 
 type VerifierMockWorkingDirLocker struct {
 	mock                   *MockWorkingDirLocker
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

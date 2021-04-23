@@ -2,9 +2,8 @@
 package matchers
 
 import (
-	"reflect"
 	"github.com/petergtz/pegomock"
-	
+	"reflect"
 )
 
 func AnySliceOfByte() []byte {
@@ -15,6 +14,18 @@ func AnySliceOfByte() []byte {
 
 func EqSliceOfByte(value []byte) []byte {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
+	var nullValue []byte
+	return nullValue
+}
+
+func NotEqSliceOfByte(value []byte) []byte {
+	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
+	var nullValue []byte
+	return nullValue
+}
+
+func SliceOfByteThat(matcher pegomock.ArgumentMatcher) []byte {
+	pegomock.RegisterMatcher(matcher)
 	var nullValue []byte
 	return nullValue
 }

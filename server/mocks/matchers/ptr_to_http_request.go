@@ -2,8 +2,9 @@
 package matchers
 
 import (
-	"reflect"
 	"github.com/petergtz/pegomock"
+	"reflect"
+
 	http "net/http"
 )
 
@@ -15,6 +16,18 @@ func AnyPtrToHttpRequest() *http.Request {
 
 func EqPtrToHttpRequest(value *http.Request) *http.Request {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
+	var nullValue *http.Request
+	return nullValue
+}
+
+func NotEqPtrToHttpRequest(value *http.Request) *http.Request {
+	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
+	var nullValue *http.Request
+	return nullValue
+}
+
+func PtrToHttpRequestThat(matcher pegomock.ArgumentMatcher) *http.Request {
+	pegomock.RegisterMatcher(matcher)
 	var nullValue *http.Request
 	return nullValue
 }

@@ -2,8 +2,9 @@
 package matchers
 
 import (
-	"reflect"
 	"github.com/petergtz/pegomock"
+	"reflect"
+
 	go_getter "github.com/hashicorp/go-getter"
 )
 
@@ -15,6 +16,18 @@ func AnyGoGetterClientOption() go_getter.ClientOption {
 
 func EqGoGetterClientOption(value go_getter.ClientOption) go_getter.ClientOption {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
+	var nullValue go_getter.ClientOption
+	return nullValue
+}
+
+func NotEqGoGetterClientOption(value go_getter.ClientOption) go_getter.ClientOption {
+	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
+	var nullValue go_getter.ClientOption
+	return nullValue
+}
+
+func GoGetterClientOptionThat(matcher pegomock.ArgumentMatcher) go_getter.ClientOption {
+	pegomock.RegisterMatcher(matcher)
 	var nullValue go_getter.ClientOption
 	return nullValue
 }

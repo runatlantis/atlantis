@@ -47,14 +47,14 @@ func (mock *MockTemplateWriter) VerifyWasCalledOnce() *VerifierMockTemplateWrite
 	}
 }
 
-func (mock *MockTemplateWriter) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockTemplateWriter {
+func (mock *MockTemplateWriter) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockTemplateWriter {
 	return &VerifierMockTemplateWriter{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockTemplateWriter) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockTemplateWriter {
+func (mock *MockTemplateWriter) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockTemplateWriter {
 	return &VerifierMockTemplateWriter{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -62,7 +62,7 @@ func (mock *MockTemplateWriter) VerifyWasCalledInOrder(invocationCountMatcher pe
 	}
 }
 
-func (mock *MockTemplateWriter) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockTemplateWriter {
+func (mock *MockTemplateWriter) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockTemplateWriter {
 	return &VerifierMockTemplateWriter{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -72,7 +72,7 @@ func (mock *MockTemplateWriter) VerifyWasCalledEventually(invocationCountMatcher
 
 type VerifierMockTemplateWriter struct {
 	mock                   *MockTemplateWriter
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }
