@@ -91,11 +91,15 @@ workflows:
           branches:
             ignore: /.*-docs/
     - e2e:
+        context:
+          - atlantis-e2e-tests
         requires: [test]
         filters:
           branches:
             ignore: /.*-docs/
     - docker_master:
+        context:
+          - docker-push
         requires: [e2e]
         filters:
           branches:
@@ -104,6 +108,8 @@ workflows:
   tag:
     jobs:
     - docker_tag:
+        context:
+          - docker-push
         filters:
           branches:
             ignore: /.*/
