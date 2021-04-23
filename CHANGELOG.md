@@ -13,7 +13,7 @@ Feature release encompassing this version's pre-release with some bug fixes and 
 * Add server-side repo config support to delete the source branch when automerge is configured ([#1357](https://github.com/runatlantis/atlantis/pull/1357) by @tapaszto)
 
 ## Bug Fixes
-* Fix output for Terraform0.14 projects not filtering out refreshing of state. ([#1352](https://github.com/runatlantis/atlantis/pull/1352) by @mathcantin)
+* Fix output for Terraform 0.14 projects not filtering out refreshing of state. ([#1352](https://github.com/runatlantis/atlantis/pull/1352) by @mathcantin)
 
 ## Dependencies
 * Upgrade conftest binary version to 0.23 ([#1516](https://github.com/runatlantis/atlantis/pull/1516) by @msarvar)
