@@ -339,6 +339,4 @@ func (c *DefaultCommandRunner) logPanics(baseRepo models.Repo, pullNum int, logg
 	}
 }
 
-// automergeComment is the comment that gets posted when Atlantis automatically
-// merges the PR.
 var automergeComment = `Automatically merging because all plans have been successfully applied.`

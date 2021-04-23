@@ -484,6 +484,58 @@ func TestProjectResult_PlanStatus(t *testing.T) {
 	}
 }
 
+func TestPlanSuccess_Summary(t *testing.T) {
+	cases := []struct {
+		p         models.ProjectResult
+		expResult string
+	}{
+		{
+			p: models.ProjectResult{
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: `
+					An execution plan has been generated and is shown below.
+					Resource actions are indicated with the following symbols:
+					  - destroy
+
+					Terraform will perform the following actions:
+
+					  - null_resource.hi[1]
+
+
+					Plan: 0 to add, 0 to change, 1 to destroy.`,
+				},
+			},
+			expResult: "Plan: 0 to add, 0 to change, 1 to destroy.",
+		},
+		{
+			p: models.ProjectResult{
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: `
+					An execution plan has been generated and is shown below.
+					Resource actions are indicated with the following symbols:
+
+					No changes. Infrastructure is up-to-date.`,
+				},
+			},
+			expResult: "No changes. Infrastructure is up-to-date.",
+		},
+		{
+			p: models.ProjectResult{
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: `No match, expect empty`,
+				},
+			},
+			expResult: "",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.expResult, func(t *testing.T) {
+			Equals(t, c.expResult, c.p.PlanSuccess.Summary())
+		})
+	}
+}
+
 func TestPullStatus_StatusCount(t *testing.T) {
 	ps := models.PullStatus{
 		Projects: []models.ProjectStatus{

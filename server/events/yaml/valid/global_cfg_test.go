@@ -49,13 +49,14 @@ func TestNewGlobalCfg(t *testing.T) {
 	baseCfg := valid.GlobalCfg{
 		Repos: []valid.Repo{
 			{
-				IDRegex:              regexp.MustCompile(".*"),
-				BranchRegex:          regexp.MustCompile(".*"),
-				ApplyRequirements:    []string{},
-				Workflow:             &expDefaultWorkflow,
-				AllowedWorkflows:     []string{},
-				AllowedOverrides:     []string{},
-				AllowCustomWorkflows: Bool(false),
+				IDRegex:                   regexp.MustCompile(".*"),
+				BranchRegex:               regexp.MustCompile(".*"),
+				ApplyRequirements:         []string{},
+				Workflow:                  &expDefaultWorkflow,
+				AllowedWorkflows:          []string{},
+				AllowedOverrides:          []string{},
+				AllowCustomWorkflows:      Bool(false),
+				DeleteSourceBranchOnMerge: Bool(false),
 			},
 		},
 		Workflows: map[string]valid.Workflow{
@@ -113,7 +114,7 @@ func TestNewGlobalCfg(t *testing.T) {
 
 			if c.allowRepoCfg {
 				exp.Repos[0].AllowCustomWorkflows = Bool(true)
-				exp.Repos[0].AllowedOverrides = []string{"apply_requirements", "workflow"}
+				exp.Repos[0].AllowedOverrides = []string{"apply_requirements", "workflow", "delete_source_branch_on_merge"}
 			}
 			if c.mergeableReq {
 				exp.Repos[0].ApplyRequirements = append(exp.Repos[0].ApplyRequirements, "mergeable")

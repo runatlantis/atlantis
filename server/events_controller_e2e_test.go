@@ -447,9 +447,9 @@ func TestGitHubWorkflow(t *testing.T) {
 
 			if c.ExpAutomerge {
 				// Verify that the merge API call was made.
-				vcsClient.VerifyWasCalledOnce().MergePull(matchers.AnyModelsPullRequest())
+				vcsClient.VerifyWasCalledOnce().MergePull(matchers.AnyModelsPullRequest(), matchers.AnyModelsPullRequestOptions())
 			} else {
-				vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest())
+				vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest(), matchers.AnyModelsPullRequestOptions())
 			}
 		})
 	}
@@ -619,9 +619,9 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 
 			if c.ExpAutomerge {
 				// Verify that the merge API call was made.
-				vcsClient.VerifyWasCalledOnce().MergePull(matchers.AnyModelsPullRequest())
+				vcsClient.VerifyWasCalledOnce().MergePull(matchers.AnyModelsPullRequest(), matchers.AnyModelsPullRequestOptions())
 			} else {
-				vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest())
+				vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest(), matchers.AnyModelsPullRequestOptions())
 			}
 		})
 	}
@@ -698,6 +698,7 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 	drainer := &events.Drainer{}
 
 	parallelPoolSize := 1
+	silenceNoProjects := false
 
 	mockPreWorkflowHookRunner = runtimemocks.NewMockPreWorkflowHookRunner()
 	preWorkflowHooksCommandRunner := &events.DefaultPreWorkflowHooksCommandRunner{
@@ -719,6 +720,7 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 		commentParser,
 		false,
 		false,
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTFVersion)
@@ -787,9 +789,11 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 		e2eStatusUpdater,
 		projectCommandRunner,
 		parallelPoolSize,
+		false,
 	)
 
 	planCommandRunner := events.NewPlanCommandRunner(
+		false,
 		false,
 		e2eVCSClient,
 		&events.DefaultPendingPlanFinder{},
@@ -802,6 +806,7 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 		policyCheckCommandRunner,
 		autoMerger,
 		parallelPoolSize,
+		silenceNoProjects,
 		boltdb,
 	)
 
@@ -817,6 +822,8 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 		dbUpdater,
 		boltdb,
 		parallelPoolSize,
+		silenceNoProjects,
+		false,
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
@@ -825,11 +832,14 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 		projectCommandRunner,
 		pullUpdater,
 		dbUpdater,
+		silenceNoProjects,
+		false,
 	)
 
 	unlockCommandRunner := events.NewUnlockCommandRunner(
 		mocks.NewMockDeleteLockCommand(),
 		e2eVCSClient,
+		silenceNoProjects,
 	)
 
 	commentCommandRunnerByCmd := map[models.CommandName]events.CommentCommandRunner{

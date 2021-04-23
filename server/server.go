@@ -427,6 +427,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		commentParser,
 		userConfig.SkipCloneNoChanges,
 		userConfig.EnableRegExpCmd,
+		userConfig.AutoplanFileList,
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTfVersion)
@@ -495,10 +496,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		commitStatusUpdater,
 		projectCommandRunner,
 		userConfig.ParallelPoolSize,
+		userConfig.SilenceVCSStatusNoProjects,
 	)
 
 	planCommandRunner := events.NewPlanCommandRunner(
 		userConfig.SilenceVCSStatusNoPlans,
+		userConfig.SilenceVCSStatusNoProjects,
 		vcsClient,
 		pendingPlanFinder,
 		workingDir,
@@ -510,6 +513,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		policyCheckCommandRunner,
 		autoMerger,
 		userConfig.ParallelPoolSize,
+		userConfig.SilenceNoProjects,
 		boltdb,
 	)
 
@@ -525,6 +529,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		dbUpdater,
 		boltdb,
 		userConfig.ParallelPoolSize,
+		userConfig.SilenceNoProjects,
+		userConfig.SilenceVCSStatusNoProjects,
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
@@ -533,11 +539,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		projectCommandRunner,
 		pullUpdater,
 		dbUpdater,
+		userConfig.SilenceNoProjects,
+		userConfig.SilenceVCSStatusNoPlans,
 	)
 
 	unlockCommandRunner := events.NewUnlockCommandRunner(
 		deleteLockCommand,
 		vcsClient,
+		userConfig.SilenceNoProjects,
 	)
 
 	commentCommandRunnerByCmd := map[models.CommandName]events.CommentCommandRunner{

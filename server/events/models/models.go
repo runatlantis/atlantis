@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/url"
 	paths "path"
+	"regexp"
 	"strings"
 	"time"
 
@@ -168,6 +169,13 @@ type PullRequest struct {
 	State PullRequestState
 	// BaseRepo is the repository that the pull request will be merged into.
 	BaseRepo Repo
+}
+
+// PullRequestOptions is used to set optional paralmeters for PullRequest
+type PullRequestOptions struct {
+	// When DeleteSourceBranchOnMerge flag is set to true VCS deletes the source branch after the PR is merged
+	// Applied by GitLab & AzureDevops
+	DeleteSourceBranchOnMerge bool
 }
 
 type PullRequestState int
@@ -390,6 +398,8 @@ type ProjectCommandContext struct {
 	// PolicySets represent the policies that are run on the plan as part of the
 	// policy check stage
 	PolicySets valid.PolicySets
+	// DeleteSourceBranchOnMerge will attempt to allow a branch to be deleted when merged (AzureDevOps & GitLab Support Only)
+	DeleteSourceBranchOnMerge bool
 }
 
 // GetShowResultFileName returns the filename (not the path) to store the tf show result
@@ -489,6 +499,16 @@ type PlanSuccess struct {
 	// branch we're merging into has been updated since we cloned and merged
 	// it.
 	HasDiverged bool
+}
+
+// Summary extracts one line summary of plan changes from TerraformOutput.
+func (p *PlanSuccess) Summary() string {
+	r := regexp.MustCompile(`Plan: \d+ to add, \d+ to change, \d+ to destroy.`)
+	if match := r.FindString(p.TerraformOutput); match != "" {
+		return match
+	}
+	r = regexp.MustCompile(`No changes. Infrastructure is up-to-date.`)
+	return r.FindString(p.TerraformOutput)
 }
 
 // PolicyCheckSuccess is the result of a successful policy check run.

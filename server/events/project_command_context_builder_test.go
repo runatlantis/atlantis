@@ -57,7 +57,7 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 			},
 		}
 
-		result := subject.BuildProjectContext(commandCtx, models.PlanCommand, projCfg, []string{}, "some/dir", false, false, false, false)
+		result := subject.BuildProjectContext(commandCtx, models.PlanCommand, projCfg, []string{}, "some/dir", false, false, false, false, false)
 
 		assert.Equal(t, models.ErroredPolicyCheckStatus, result[0].ProjectPlanStatus)
 	})
@@ -77,7 +77,7 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 			},
 		}
 
-		result := subject.BuildProjectContext(commandCtx, models.PlanCommand, projCfg, []string{}, "some/dir", false, false, false, false)
+		result := subject.BuildProjectContext(commandCtx, models.PlanCommand, projCfg, []string{}, "some/dir", false, false, false, false, false)
 
 		assert.Equal(t, models.ErroredPolicyCheckStatus, result[0].ProjectPlanStatus)
 	})

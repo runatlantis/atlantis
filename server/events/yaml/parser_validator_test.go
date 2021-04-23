@@ -1035,7 +1035,7 @@ func TestParseGlobalCfg(t *testing.T) {
 			input: `repos:
 - id: /.*/
   allowed_overrides: [invalid]`,
-			expErr: "repos: (0: (allowed_overrides: \"invalid\" is not a valid override, only \"apply_requirements\" and \"workflow\" are supported.).).",
+			expErr: "repos: (0: (allowed_overrides: \"invalid\" is not a valid override, only \"apply_requirements\", \"workflow\" and \"delete_source_branch_on_merge\" are supported.).).",
 		},
 		"invalid apply_requirement": {
 			input: `repos:
@@ -1118,7 +1118,7 @@ repos:
   pre_workflow_hooks:
     - run: custom workflow command
   workflow: custom1
-  allowed_overrides: [apply_requirements, workflow]
+  allowed_overrides: [apply_requirements, workflow, delete_source_branch_on_merge]
   allow_custom_workflows: true
 - id: /.*/
   branch: /(master|main)/
@@ -1157,7 +1157,7 @@ policies:
 						ApplyRequirements:    []string{"approved", "mergeable"},
 						PreWorkflowHooks:     preWorkflowHooks,
 						Workflow:             &customWorkflow1,
-						AllowedOverrides:     []string{"apply_requirements", "workflow"},
+						AllowedOverrides:     []string{"apply_requirements", "workflow", "delete_source_branch_on_merge"},
 						AllowCustomWorkflows: Bool(true),
 					},
 					{
@@ -1253,9 +1253,10 @@ workflows:
 								},
 							},
 						},
-						AllowedWorkflows:     []string{},
-						AllowedOverrides:     []string{},
-						AllowCustomWorkflows: Bool(false),
+						AllowedWorkflows:          []string{},
+						AllowedOverrides:          []string{},
+						AllowCustomWorkflows:      Bool(false),
+						DeleteSourceBranchOnMerge: Bool(false),
 					},
 				},
 				Workflows: map[string]valid.Workflow{

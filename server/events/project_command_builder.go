@@ -25,6 +25,8 @@ const (
 	DefaultParallelApplyEnabled = false
 	// DefaultParallelPlanEnabled is the default for the parallel plan setting.
 	DefaultParallelPlanEnabled = false
+	// DefaultDeleteSourceBranchOnMerge being false is the default setting whether or not to remove a source branch on merge
+	DefaultDeleteSourceBranchOnMerge = false
 )
 
 func NewProjectCommandBuilder(
@@ -39,6 +41,7 @@ func NewProjectCommandBuilder(
 	commentBuilder CommentBuilder,
 	skipCloneNoChanges bool,
 	EnableRegExpCmd bool,
+	AutoplanFileList string,
 ) *DefaultProjectCommandBuilder {
 	projectCommandBuilder := &DefaultProjectCommandBuilder{
 		ParserValidator:    parserValidator,
@@ -50,6 +53,7 @@ func NewProjectCommandBuilder(
 		PendingPlanFinder:  pendingPlanFinder,
 		SkipCloneNoChanges: skipCloneNoChanges,
 		EnableRegExpCmd:    EnableRegExpCmd,
+		AutoplanFileList:   AutoplanFileList,
 		ProjectCommandContextBuilder: NewProjectCommandContextBulder(
 			policyChecksSupported,
 			commentBuilder,
@@ -104,6 +108,7 @@ type DefaultProjectCommandBuilder struct {
 	ProjectCommandContextBuilder ProjectCommandContextBuilder
 	SkipCloneNoChanges           bool
 	EnableRegExpCmd              bool
+	AutoplanFileList             string
 }
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
@@ -232,6 +237,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 					commentFlags,
 					repoDir,
 					repoCfg.Automerge,
+					mergedCfg.DeleteSourceBranchOnMerge,
 					repoCfg.ParallelApply,
 					repoCfg.ParallelPlan,
 					verbose,
@@ -241,7 +247,10 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 		// If there is no config file, then we'll plan each project that
 		// our algorithm determines was modified.
 		ctx.Log.Info("found no %s file", yaml.AtlantisYAMLFilename)
-		modifiedProjects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir)
+		modifiedProjects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir, p.AutoplanFileList)
+		if err != nil {
+			return nil, errors.Wrapf(err, "finding modified projects: %s", modifiedFiles)
+		}
 		ctx.Log.Info("automatically determined that there were %d projects modified in this pull request: %s", len(modifiedProjects), modifiedProjects)
 		for _, mp := range modifiedProjects {
 			ctx.Log.Debug("determining config for project at dir: %q", mp.Path)
@@ -255,6 +264,7 @@ func (p *DefaultProjectCommandBuilder) buildPlanAllCommands(ctx *CommandContext,
 					commentFlags,
 					repoDir,
 					DefaultAutomergeEnabled,
+					pCfg.DeleteSourceBranchOnMerge,
 					DefaultParallelApplyEnabled,
 					DefaultParallelPlanEnabled,
 					verbose,
@@ -445,10 +455,12 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 	var projCtxs []models.ProjectCommandContext
 	var projCfg valid.MergedProjectCfg
 	automerge := DefaultAutomergeEnabled
+	deleteBranchOnMerge := DefaultDeleteSourceBranchOnMerge
 	parallelApply := DefaultParallelApplyEnabled
 	parallelPlan := DefaultParallelPlanEnabled
 	if repoCfgPtr != nil {
 		automerge = repoCfgPtr.Automerge
+		deleteBranchOnMerge = projCfg.DeleteSourceBranchOnMerge
 		parallelApply = repoCfgPtr.ParallelApply
 		parallelPlan = repoCfgPtr.ParallelPlan
 	}
@@ -471,8 +483,9 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 					commentFlags,
 					repoDir,
 					automerge,
-					parallelApply,
+					deleteBranchOnMerge,
 					parallelPlan,
+					parallelApply,
 					verbose,
 				)...)
 		}
@@ -486,8 +499,9 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 				commentFlags,
 				repoDir,
 				automerge,
-				parallelApply,
+				deleteBranchOnMerge,
 				parallelPlan,
+				parallelApply,
 				verbose,
 			)...)
 	}
@@ -497,7 +511,6 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 	}
 
 	return projCtxs, nil
-
 }
 
 // validateWorkspaceAllowed returns an error if repoCfg defines projects in

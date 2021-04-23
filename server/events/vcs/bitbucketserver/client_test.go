@@ -177,6 +177,8 @@ func TestClient_MergePull(t *testing.T) {
 				Hostname: "bitbucket.org",
 			},
 		},
+	}, models.PullRequestOptions{
+		DeleteSourceBranchOnMerge: false,
 	})
 	Ok(t, err)
 }
