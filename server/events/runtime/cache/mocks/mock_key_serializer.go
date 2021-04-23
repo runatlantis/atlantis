@@ -51,14 +51,14 @@ func (mock *MockKeySerializer) VerifyWasCalledOnce() *VerifierMockKeySerializer 
 	}
 }
 
-func (mock *MockKeySerializer) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockKeySerializer {
+func (mock *MockKeySerializer) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockKeySerializer {
 	return &VerifierMockKeySerializer{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockKeySerializer) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockKeySerializer {
+func (mock *MockKeySerializer) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockKeySerializer {
 	return &VerifierMockKeySerializer{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -66,7 +66,7 @@ func (mock *MockKeySerializer) VerifyWasCalledInOrder(invocationCountMatcher peg
 	}
 }
 
-func (mock *MockKeySerializer) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockKeySerializer {
+func (mock *MockKeySerializer) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockKeySerializer {
 	return &VerifierMockKeySerializer{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -76,7 +76,7 @@ func (mock *MockKeySerializer) VerifyWasCalledEventually(invocationCountMatcher 
 
 type VerifierMockKeySerializer struct {
 	mock                   *MockKeySerializer
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

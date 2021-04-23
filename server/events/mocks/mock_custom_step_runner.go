@@ -51,14 +51,14 @@ func (mock *MockCustomStepRunner) VerifyWasCalledOnce() *VerifierMockCustomStepR
 	}
 }
 
-func (mock *MockCustomStepRunner) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockCustomStepRunner {
+func (mock *MockCustomStepRunner) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockCustomStepRunner {
 	return &VerifierMockCustomStepRunner{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockCustomStepRunner) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockCustomStepRunner {
+func (mock *MockCustomStepRunner) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockCustomStepRunner {
 	return &VerifierMockCustomStepRunner{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -66,7 +66,7 @@ func (mock *MockCustomStepRunner) VerifyWasCalledInOrder(invocationCountMatcher 
 	}
 }
 
-func (mock *MockCustomStepRunner) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockCustomStepRunner {
+func (mock *MockCustomStepRunner) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockCustomStepRunner {
 	return &VerifierMockCustomStepRunner{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -76,7 +76,7 @@ func (mock *MockCustomStepRunner) VerifyWasCalledEventually(invocationCountMatch
 
 type VerifierMockCustomStepRunner struct {
 	mock                   *MockCustomStepRunner
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

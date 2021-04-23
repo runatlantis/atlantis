@@ -2,8 +2,9 @@
 package matchers
 
 import (
-	"reflect"
 	"github.com/petergtz/pegomock"
+	"reflect"
+
 	models "github.com/runatlantis/atlantis/server/events/models"
 )
 
@@ -15,6 +16,18 @@ func AnyModelsProject() models.Project {
 
 func EqModelsProject(value models.Project) models.Project {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
+	var nullValue models.Project
+	return nullValue
+}
+
+func NotEqModelsProject(value models.Project) models.Project {
+	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
+	var nullValue models.Project
+	return nullValue
+}
+
+func ModelsProjectThat(matcher pegomock.ArgumentMatcher) models.Project {
+	pegomock.RegisterMatcher(matcher)
 	var nullValue models.Project
 	return nullValue
 }

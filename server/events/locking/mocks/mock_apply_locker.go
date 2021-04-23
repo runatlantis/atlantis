@@ -85,14 +85,14 @@ func (mock *MockApplyLocker) VerifyWasCalledOnce() *VerifierMockApplyLocker {
 	}
 }
 
-func (mock *MockApplyLocker) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockApplyLocker {
+func (mock *MockApplyLocker) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockApplyLocker {
 	return &VerifierMockApplyLocker{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockApplyLocker) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockApplyLocker {
+func (mock *MockApplyLocker) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockApplyLocker {
 	return &VerifierMockApplyLocker{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -100,7 +100,7 @@ func (mock *MockApplyLocker) VerifyWasCalledInOrder(invocationCountMatcher pegom
 	}
 }
 
-func (mock *MockApplyLocker) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockApplyLocker {
+func (mock *MockApplyLocker) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockApplyLocker {
 	return &VerifierMockApplyLocker{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -110,7 +110,7 @@ func (mock *MockApplyLocker) VerifyWasCalledEventually(invocationCountMatcher pe
 
 type VerifierMockApplyLocker struct {
 	mock                   *MockApplyLocker
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

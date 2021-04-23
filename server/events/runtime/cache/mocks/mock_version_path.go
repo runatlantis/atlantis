@@ -51,14 +51,14 @@ func (mock *MockExecutionVersionCache) VerifyWasCalledOnce() *VerifierMockExecut
 	}
 }
 
-func (mock *MockExecutionVersionCache) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockExecutionVersionCache {
+func (mock *MockExecutionVersionCache) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockExecutionVersionCache {
 	return &VerifierMockExecutionVersionCache{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockExecutionVersionCache) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockExecutionVersionCache {
+func (mock *MockExecutionVersionCache) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockExecutionVersionCache {
 	return &VerifierMockExecutionVersionCache{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -66,7 +66,7 @@ func (mock *MockExecutionVersionCache) VerifyWasCalledInOrder(invocationCountMat
 	}
 }
 
-func (mock *MockExecutionVersionCache) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockExecutionVersionCache {
+func (mock *MockExecutionVersionCache) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockExecutionVersionCache {
 	return &VerifierMockExecutionVersionCache{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -76,7 +76,7 @@ func (mock *MockExecutionVersionCache) VerifyWasCalledEventually(invocationCount
 
 type VerifierMockExecutionVersionCache struct {
 	mock                   *MockExecutionVersionCache
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

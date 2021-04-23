@@ -51,14 +51,14 @@ func (mock *MockAzureDevopsRequestValidator) VerifyWasCalledOnce() *VerifierMock
 	}
 }
 
-func (mock *MockAzureDevopsRequestValidator) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockAzureDevopsRequestValidator {
+func (mock *MockAzureDevopsRequestValidator) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockAzureDevopsRequestValidator {
 	return &VerifierMockAzureDevopsRequestValidator{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockAzureDevopsRequestValidator) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockAzureDevopsRequestValidator {
+func (mock *MockAzureDevopsRequestValidator) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockAzureDevopsRequestValidator {
 	return &VerifierMockAzureDevopsRequestValidator{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -66,7 +66,7 @@ func (mock *MockAzureDevopsRequestValidator) VerifyWasCalledInOrder(invocationCo
 	}
 }
 
-func (mock *MockAzureDevopsRequestValidator) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockAzureDevopsRequestValidator {
+func (mock *MockAzureDevopsRequestValidator) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockAzureDevopsRequestValidator {
 	return &VerifierMockAzureDevopsRequestValidator{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -76,7 +76,7 @@ func (mock *MockAzureDevopsRequestValidator) VerifyWasCalledEventually(invocatio
 
 type VerifierMockAzureDevopsRequestValidator struct {
 	mock                   *MockAzureDevopsRequestValidator
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

@@ -47,14 +47,14 @@ func (mock *MockPullCleaner) VerifyWasCalledOnce() *VerifierMockPullCleaner {
 	}
 }
 
-func (mock *MockPullCleaner) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockPullCleaner {
+func (mock *MockPullCleaner) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockPullCleaner {
 	return &VerifierMockPullCleaner{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockPullCleaner) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockPullCleaner {
+func (mock *MockPullCleaner) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockPullCleaner {
 	return &VerifierMockPullCleaner{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -62,7 +62,7 @@ func (mock *MockPullCleaner) VerifyWasCalledInOrder(invocationCountMatcher pegom
 	}
 }
 
-func (mock *MockPullCleaner) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockPullCleaner {
+func (mock *MockPullCleaner) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockPullCleaner {
 	return &VerifierMockPullCleaner{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -72,7 +72,7 @@ func (mock *MockPullCleaner) VerifyWasCalledEventually(invocationCountMatcher pe
 
 type VerifierMockPullCleaner struct {
 	mock                   *MockPullCleaner
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

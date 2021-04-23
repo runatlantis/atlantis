@@ -4,12 +4,11 @@
 package events
 
 import (
-	"reflect"
-	"time"
-
 	pegomock "github.com/petergtz/pegomock"
 	models "github.com/runatlantis/atlantis/server/events/models"
 	logging "github.com/runatlantis/atlantis/server/logging"
+	"reflect"
+	"time"
 )
 
 type MockWorkingDir struct {
@@ -125,14 +124,14 @@ func (mock *MockWorkingDir) VerifyWasCalledOnce() *VerifierMockWorkingDir {
 	}
 }
 
-func (mock *MockWorkingDir) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockWorkingDir {
+func (mock *MockWorkingDir) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockWorkingDir {
 	return &VerifierMockWorkingDir{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockWorkingDir) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockWorkingDir {
+func (mock *MockWorkingDir) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockWorkingDir {
 	return &VerifierMockWorkingDir{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -140,7 +139,7 @@ func (mock *MockWorkingDir) VerifyWasCalledInOrder(invocationCountMatcher pegomo
 	}
 }
 
-func (mock *MockWorkingDir) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockWorkingDir {
+func (mock *MockWorkingDir) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockWorkingDir {
 	return &VerifierMockWorkingDir{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -150,7 +149,7 @@ func (mock *MockWorkingDir) VerifyWasCalledEventually(invocationCountMatcher peg
 
 type VerifierMockWorkingDir struct {
 	mock                   *MockWorkingDir
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

@@ -46,14 +46,14 @@ func (mock *MockLockURLGenerator) VerifyWasCalledOnce() *VerifierMockLockURLGene
 	}
 }
 
-func (mock *MockLockURLGenerator) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockLockURLGenerator {
+func (mock *MockLockURLGenerator) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockLockURLGenerator {
 	return &VerifierMockLockURLGenerator{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockLockURLGenerator) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockLockURLGenerator {
+func (mock *MockLockURLGenerator) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockLockURLGenerator {
 	return &VerifierMockLockURLGenerator{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -61,7 +61,7 @@ func (mock *MockLockURLGenerator) VerifyWasCalledInOrder(invocationCountMatcher 
 	}
 }
 
-func (mock *MockLockURLGenerator) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockLockURLGenerator {
+func (mock *MockLockURLGenerator) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockLockURLGenerator {
 	return &VerifierMockLockURLGenerator{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -71,7 +71,7 @@ func (mock *MockLockURLGenerator) VerifyWasCalledEventually(invocationCountMatch
 
 type VerifierMockLockURLGenerator struct {
 	mock                   *MockLockURLGenerator
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

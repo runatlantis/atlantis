@@ -2,8 +2,9 @@
 package matchers
 
 import (
-	"reflect"
 	"github.com/petergtz/pegomock"
+	"reflect"
+
 	models "github.com/runatlantis/atlantis/server/events/models"
 )
 
@@ -15,6 +16,18 @@ func AnyPtrToModelsCommandLock() *models.CommandLock {
 
 func EqPtrToModelsCommandLock(value *models.CommandLock) *models.CommandLock {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
+	var nullValue *models.CommandLock
+	return nullValue
+}
+
+func NotEqPtrToModelsCommandLock(value *models.CommandLock) *models.CommandLock {
+	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
+	var nullValue *models.CommandLock
+	return nullValue
+}
+
+func PtrToModelsCommandLockThat(matcher pegomock.ArgumentMatcher) *models.CommandLock {
+	pegomock.RegisterMatcher(matcher)
 	var nullValue *models.CommandLock
 	return nullValue
 }

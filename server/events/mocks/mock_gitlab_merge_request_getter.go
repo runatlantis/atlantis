@@ -51,14 +51,14 @@ func (mock *MockGitlabMergeRequestGetter) VerifyWasCalledOnce() *VerifierMockGit
 	}
 }
 
-func (mock *MockGitlabMergeRequestGetter) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockGitlabMergeRequestGetter {
+func (mock *MockGitlabMergeRequestGetter) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockGitlabMergeRequestGetter {
 	return &VerifierMockGitlabMergeRequestGetter{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockGitlabMergeRequestGetter) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockGitlabMergeRequestGetter {
+func (mock *MockGitlabMergeRequestGetter) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockGitlabMergeRequestGetter {
 	return &VerifierMockGitlabMergeRequestGetter{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -66,7 +66,7 @@ func (mock *MockGitlabMergeRequestGetter) VerifyWasCalledInOrder(invocationCount
 	}
 }
 
-func (mock *MockGitlabMergeRequestGetter) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockGitlabMergeRequestGetter {
+func (mock *MockGitlabMergeRequestGetter) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockGitlabMergeRequestGetter {
 	return &VerifierMockGitlabMergeRequestGetter{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -76,7 +76,7 @@ func (mock *MockGitlabMergeRequestGetter) VerifyWasCalledEventually(invocationCo
 
 type VerifierMockGitlabMergeRequestGetter struct {
 	mock                   *MockGitlabMergeRequestGetter
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

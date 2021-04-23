@@ -2,8 +2,9 @@
 package matchers
 
 import (
-	"reflect"
 	"github.com/petergtz/pegomock"
+	"reflect"
+
 	events "github.com/runatlantis/atlantis/server/events"
 )
 
@@ -15,6 +16,18 @@ func AnyPtrToEventsTryLockResponse() *events.TryLockResponse {
 
 func EqPtrToEventsTryLockResponse(value *events.TryLockResponse) *events.TryLockResponse {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
+	var nullValue *events.TryLockResponse
+	return nullValue
+}
+
+func NotEqPtrToEventsTryLockResponse(value *events.TryLockResponse) *events.TryLockResponse {
+	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
+	var nullValue *events.TryLockResponse
+	return nullValue
+}
+
+func PtrToEventsTryLockResponseThat(matcher pegomock.ArgumentMatcher) *events.TryLockResponse {
+	pegomock.RegisterMatcher(matcher)
 	var nullValue *events.TryLockResponse
 	return nullValue
 }
