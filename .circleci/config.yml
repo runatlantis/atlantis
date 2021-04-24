@@ -90,14 +90,16 @@ workflows:
     - test:
         filters:
           branches:
-            ignore: /.*-docs/
+            ignore: /docs\/./
     - e2e:
         context:
           - atlantis-e2e-tests
         requires: [test]
         filters:
           branches:
-            ignore: /.*-docs/
+            # Ignore fork PRs since they don't have access to
+            # the atlantis-e2e-tests context (and also doc PRs).
+            ignore: /(pull\/\d+)|(docs\/.*)/
     - docker_master:
         context:
           - docker-push
