@@ -34,7 +34,7 @@ Feature release encompassing this version's pre-release with some bug fixes and 
 [`runatlantis/atlantis:v0.17.0`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
 
 ## Diff v0.17.0-beta..v0.17.0
-https://github.com/runatlantis/atlantis/compare/v0.17.0-beta...v0.17.0
+https://github.com/runatlantis/atlantis/compare/v0.16.1...v0.17.0
 
 # v0.17.0-beta
 Feature release. Due to a sizeable refactor and the number of configuration settings supported in Atlantis, this is a pre-release and should not be considered fully stable.
