@@ -47,7 +47,7 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 
 	t.Run("with project name defined", func(t *testing.T) {
 		When(mockCommentBuilder.BuildPlanComment(projRepoRelDir, projWorkspace, projName, []string{})).ThenReturn(expectedPlanCmt)
-		When(mockCommentBuilder.BuildApplyComment(projRepoRelDir, projWorkspace, projName)).ThenReturn(expectedApplyCmt)
+		When(mockCommentBuilder.BuildApplyComment(projRepoRelDir, projWorkspace, projName, false)).ThenReturn(expectedApplyCmt)
 
 		pullStatus.Projects = []models.ProjectStatus{
 			{
@@ -65,7 +65,7 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 	t.Run("with no project name defined", func(t *testing.T) {
 		projCfg.Name = ""
 		When(mockCommentBuilder.BuildPlanComment(projRepoRelDir, projWorkspace, "", []string{})).ThenReturn(expectedPlanCmt)
-		When(mockCommentBuilder.BuildApplyComment(projRepoRelDir, projWorkspace, "")).ThenReturn(expectedApplyCmt)
+		When(mockCommentBuilder.BuildApplyComment(projRepoRelDir, projWorkspace, "", false)).ThenReturn(expectedApplyCmt)
 		pullStatus.Projects = []models.ProjectStatus{
 			{
 				Status:     models.ErroredPlanStatus,

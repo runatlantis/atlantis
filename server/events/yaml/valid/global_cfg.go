@@ -61,6 +61,7 @@ type MergedProjectCfg struct {
 	Workspace                 string
 	Name                      string
 	AutoplanEnabled           bool
+	AutoMergeDisabled         bool
 	TerraformVersion          *version.Version
 	RepoCfgVersion            int
 	PolicySets                PolicySets
