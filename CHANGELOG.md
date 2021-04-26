@@ -2,6 +2,9 @@
 Feature release encompassing this version's pre-release with some bug fixes and improvements that make this stable.
 
 ## Features/Improvements
+* Add `--enable-policy-checks` which adds a policy checking step to the Atlantis workflow and runs server-side conftest policies on the terraform plan output. ([#1317](https://github.com/runatlantis/atlantis/pull/1317) by @msarvar and @nishkrishnan)
+    - Supports `atlantis approve_policies` which allows a set of blessed github users to approve failing policies.
+* Support pre-workflow hooks on all comment/auto triggered commands ([#1418](https://github.com/runatlantis/atlantis/pull/1418) by @nishkrishnan)
 * Add branch allowlist matcher to server side repo config ([#1383](https://github.com/runatlantis/atlantis/pull/1383) by @dghubble)
 * Add support for regex commands ([#1419](https://github.com/runatlantis/atlantis/pull/1419) by @bewie)
 * Add support for a global apply lock ([#1473](https://github.com/runatlantis/atlantis/pull/1473) by @msarvar)
@@ -17,12 +20,14 @@ Feature release encompassing this version's pre-release with some bug fixes and 
 
 ## Dependencies
 * Upgrade conftest binary version to 0.23 ([#1516](https://github.com/runatlantis/atlantis/pull/1516) by @msarvar)
-* Upgrade default tf version to 0.14.9 ([#1472](https://github.com/runatlantis/atlantis/pull/1472) by @chenrui333)
+* Upgrade default tf version to 0.15.1 and add latest patch versions for old terraform minor versions ([#1472](https://github.com/runatlantis/atlantis/pull/1512) by @bryantbiggs)
 
 ## Backwards Incompatibilities/Notes
 * If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
-  then the default version of Terraform will now be 0.14.9. Simply set the above
+  then the default version of Terraform will now be 0.15.1. Simply set the above
   flag to your desired default version to avoid any issues.
+* Hashicorp's GPG keys were [exposed](https://discuss.hashicorp.com/t/hcsec-2021-12-codecov-security-event-and-hashicorp-gpg-key-exposure/23512). This PR adds the latest patch versions for each Terraform minor version which has new keys.
+  
 
 ## Downloads
 * [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.0/atlantis_darwin_amd64.zip)
