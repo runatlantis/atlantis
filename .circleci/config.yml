@@ -2,7 +2,7 @@ version: 2
 jobs:
   test:
     docker:
-    - image: runatlantis/testing-env:latest
+    - image: runatlantis/testing-env:20296f9638a4eca04733f60b39e1d3025b9d708a
     steps:
     - checkout
     - run: make test-coverage
