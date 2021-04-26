@@ -29,7 +29,7 @@ right before Atlantis can parse it.
 repos:
     - id: /.*/
       pre_workflow_hooks:
-        - run: ./repo-config-genarator.sh
+        - run: ./repo-config-generator.sh
 ```
 ### Reference
 #### Custom `run` Command
