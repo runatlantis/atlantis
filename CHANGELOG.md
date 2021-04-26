@@ -33,7 +33,7 @@ Feature release encompassing this version's pre-release with some bug fixes and 
 ## Docker
 [`runatlantis/atlantis:v0.17.0`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
 
-## Diff v0.17.0-beta..v0.17.0
+## Diff v0.16.1..v0.17.0
 https://github.com/runatlantis/atlantis/compare/v0.16.1...v0.17.0
 
 # v0.17.0-beta
