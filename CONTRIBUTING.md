@@ -165,6 +165,7 @@ go get github.com/petergtz/pegomock/...
 1. Create a pull request and merge to master
 1. Check out master and fetch latest
 1. Run `make release`
+    1. If you get `signal: killed` errors, bump up your Docker resources to have more memory, e.g. 6 G.B.
 1. Go to https://github.com/runatlantis/atlantis/releases and click "Draft a new release"
     1. Prefix version with `v`
     1. The title of the release is the same as the tag (ex. v0.2.2)
