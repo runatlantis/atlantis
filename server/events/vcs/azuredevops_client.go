@@ -105,13 +105,13 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
-	for _, c := range comments {
+	for i := range comments {
 		commentType := "text"
 		parentCommentID := 0
 
 		prComment := azuredevops.Comment{
 			CommentType:     &commentType,
-			Content:         &c,
+			Content:         &comments[i],
 			ParentCommentID: &parentCommentID,
 		}
 		prComments := []*azuredevops.Comment{&prComment}

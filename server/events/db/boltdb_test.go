@@ -469,7 +469,6 @@ func TestPullStatus_UpdateGet(t *testing.T) {
 
 	maybeStatus, err := b.GetPullStatus(pull)
 	Ok(t, err)
-	Assert(t, maybeStatus != nil, "exp non-nil")
 	Equals(t, pull, maybeStatus.Pull) // nolint: staticcheck
 	Equals(t, []models.ProjectStatus{
 		{
@@ -574,7 +573,6 @@ func TestPullStatus_UpdateProject(t *testing.T) {
 
 	status, err := b.GetPullStatus(pull)
 	Ok(t, err)
-	Assert(t, status != nil, "exp non-nil")
 	Equals(t, pull, status.Pull) // nolint: staticcheck
 	Equals(t, []models.ProjectStatus{
 		{

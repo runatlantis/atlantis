@@ -1210,7 +1210,7 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 		},
 		{
 			VCSHost:    models.Github,
-			Output:     strings.Repeat("line\n", 13) + fmt.Sprintf("No changes. Infrastructure is up-to-date."),
+			Output:     strings.Repeat("line\n", 13) + "No changes. Infrastructure is up-to-date.",
 			ShouldWrap: true,
 		},
 		{
@@ -1234,7 +1234,7 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 		{
 			VCSHost:                 models.Gitlab,
 			GitlabCommonMarkSupport: true,
-			Output:                  strings.Repeat("line\n", 13) + fmt.Sprintf("No changes. Infrastructure is up-to-date."),
+			Output:                  strings.Repeat("line\n", 13) + "No changes. Infrastructure is up-to-date.",
 			ShouldWrap:              true,
 		},
 		{
@@ -1415,7 +1415,7 @@ $$$
 
 func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 	mr := events.MarkdownRenderer{}
-	tfOut := strings.Repeat("line\n", 13) + fmt.Sprintf("Plan: 1 to add, 0 to change, 0 to destroy.")
+	tfOut := strings.Repeat("line\n", 13) + "Plan: 1 to add, 0 to change, 0 to destroy."
 	rendered := mr.Render(events.CommandResult{
 		ProjectResults: []models.ProjectResult{
 			{
