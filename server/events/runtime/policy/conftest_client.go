@@ -59,7 +59,7 @@ func (c ConftestTestCommandArgs) build() ([]string, error) {
 		commandArgs = append(commandArgs, a.build()...)
 	}
 
-	commandArgs = append(commandArgs, c.InputFile, "--no-color")
+	commandArgs = append(commandArgs, c.InputFile, "--no-color", "--all-namespaces")
 
 	return commandArgs, nil
 }
