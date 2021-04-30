@@ -500,6 +500,21 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			},
 		},
 		{
+			Description:   "failing policy without policies passing using extra args",
+			RepoDir:       "policy-checks-extra-args",
+			ModifiedFiles: []string{"main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
+				{"exp-output-apply-failed.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
 			Description:   "failing policy without policies passing",
 			RepoDir:       "policy-checks",
 			ModifiedFiles: []string{"main.tf"},

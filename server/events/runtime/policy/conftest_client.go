@@ -42,6 +42,7 @@ func NewPolicyArg(parameter string) Arg {
 
 type ConftestTestCommandArgs struct {
 	PolicyArgs []Arg
+	ExtraArgs  []string
 	InputFile  string
 	Command    string
 }
@@ -59,7 +60,11 @@ func (c ConftestTestCommandArgs) build() ([]string, error) {
 		commandArgs = append(commandArgs, a.build()...)
 	}
 
+	// add hardcoded options
 	commandArgs = append(commandArgs, c.InputFile, "--no-color")
+
+	// add extra args provided through server config
+	commandArgs = append(commandArgs, c.ExtraArgs...)
 
 	return commandArgs, nil
 }
@@ -154,7 +159,7 @@ func NewConfTestExecutorWorkflow(log logging.SimpleLogging, versionRootDir strin
 	}
 }
 
-func (c *ConfTestExecutorWorkflow) Run(ctx models.ProjectCommandContext, executablePath string, envs map[string]string, workdir string) (string, error) {
+func (c *ConfTestExecutorWorkflow) Run(ctx models.ProjectCommandContext, executablePath string, envs map[string]string, workdir string, extraArgs []string) (string, error) {
 	policyArgs := []Arg{}
 	policySetNames := []string{}
 	ctx.Log.Debug("policy sets, %s ", ctx.PolicySets)
@@ -177,6 +182,7 @@ func (c *ConfTestExecutorWorkflow) Run(ctx models.ProjectCommandContext, executa
 
 	args := ConftestTestCommandArgs{
 		PolicyArgs: policyArgs,
+		ExtraArgs:  extraArgs,
 		InputFile:  inputFile,
 		Command:    executablePath,
 	}
