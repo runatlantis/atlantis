@@ -1,5 +1,4 @@
 # Conftest Policy Checking
-<Badge text="beta" type="warn"/>
 
 Atlantis supports running server-side [conftest](https://www.conftest.dev/) policies against the plan output.  Common usecases
 for using this step include:
@@ -55,7 +54,7 @@ policies:
 Conftest policies are based on [Open Policy Agent (OPA)](https://www.openpolicyagent.org/) and written in [rego](https://www.openpolicyagent.org/docs/latest/policy-language/#what-is-rego). The following shows a simple policy written to fail for plans containing newly created `null_resource`s.
 
 ```
-package null_resource_warning
+package main
 
 resource_types = {"null_resource"}
 
@@ -88,6 +87,8 @@ deny[msg] {
 
 ```
 
+::: tip Notes
+By default conftest is configured to only run the `main` package.  If you want to change this behavior [`extra_args`](https://www.runatlantis.io/docs/custom-workflows.html#adding-extra-arguments-to-terraform-commands) can be used to pass in flags to conftest such as `--namespace` or `--all-namespaces`
+:::
+
 That's it! Now your Atlantis instance is configured to run policies on your Terraform plans 🎉
-
-

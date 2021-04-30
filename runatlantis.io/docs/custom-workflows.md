@@ -103,6 +103,18 @@ workflows:
           extra_args: ["-lock=false"]
 ```
 
+If [policy checking](https://www.runatlantis.io/docs/policy-checking.html#how-it-works) is enabled, `extra_args` can also be used to change the default behaviour of conftest.
+
+```yaml
+workflows:
+  myworkflow:
+    policy_check:
+      steps:
+      - show
+      - policy_check:
+          extra_args: ["--all-namespaces"]
+```
+
 ### Custom init/plan/apply Commands
 If you want to customize `terraform init`, `plan` or `apply` in ways that
 aren't supported by `extra_args`, you can completely override those commands.
