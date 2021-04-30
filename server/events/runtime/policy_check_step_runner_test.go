@@ -48,28 +48,31 @@ func TestRun(t *testing.T) {
 	}
 
 	t.Run("success", func(t *testing.T) {
+		extraArgs := []string{"extra", "args"}
 		When(executorWorkflow.EnsureExecutorVersion(logger, v)).ThenReturn(executablePath, nil)
-		When(executorWorkflow.Run(context, executablePath, map[string]string(nil), workdir)).ThenReturn("Success!", nil)
+		When(executorWorkflow.Run(context, executablePath, map[string]string(nil), workdir, extraArgs)).ThenReturn("Success!", nil)
 
-		output, err := s.Run(context, []string{"extra", "args"}, workdir, map[string]string(nil))
+		output, err := s.Run(context, extraArgs, workdir, map[string]string(nil))
 
 		Ok(t, err)
 		Equals(t, "Success!", output)
 	})
 
 	t.Run("ensure version failure", func(t *testing.T) {
+		extraArgs := []string{"extra", "args"}
 		expectedErr := errors.New("error ensuring version")
 		When(executorWorkflow.EnsureExecutorVersion(logger, v)).ThenReturn("", expectedErr)
 
-		_, err := s.Run(context, []string{"extra", "args"}, workdir, map[string]string(nil))
+		_, err := s.Run(context, extraArgs, workdir, map[string]string(nil))
 
 		Assert(t, err != nil, "error is not nil")
 	})
 	t.Run("executor failure", func(t *testing.T) {
+		extraArgs := []string{"extra", "args"}
 		When(executorWorkflow.EnsureExecutorVersion(logger, v)).ThenReturn(executablePath, nil)
-		When(executorWorkflow.Run(context, executablePath, map[string]string(nil), workdir)).ThenReturn("", errors.New("error running executor"))
+		When(executorWorkflow.Run(context, executablePath, map[string]string(nil), workdir, extraArgs)).ThenReturn("", errors.New("error running executor"))
 
-		_, err := s.Run(context, []string{"extra", "args"}, workdir, map[string]string(nil))
+		_, err := s.Run(context, extraArgs, workdir, map[string]string(nil))
 
 		Assert(t, err != nil, "error is not nil")
 	})

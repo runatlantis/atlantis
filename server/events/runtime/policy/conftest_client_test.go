@@ -172,6 +172,7 @@ func TestRun(t *testing.T) {
 	}
 
 	t.Run("success", func(t *testing.T) {
+		var extraArgs []string
 
 		expectedOutput := "Success"
 		expectedResult := "Checking plan against the following policies: \n  policy1\n  policy2\nSuccess"
@@ -182,7 +183,29 @@ func TestRun(t *testing.T) {
 
 		When(mockExec.CombinedOutput(expectedArgs, envs, workdir)).ThenReturn(expectedOutput, nil)
 
-		result, err := subject.Run(ctx, executablePath, envs, workdir)
+		result, err := subject.Run(ctx, executablePath, envs, workdir, extraArgs)
+
+		fmt.Println(result)
+
+		Ok(t, err)
+
+		Assert(t, result == expectedResult, "result is expected")
+
+	})
+
+	t.Run("success extra args", func(t *testing.T) {
+		extraArgs := []string{"--all-namespaces"}
+
+		expectedOutput := "Success"
+		expectedResult := "Checking plan against the following policies: \n  policy1\n  policy2\nSuccess"
+		expectedArgs := []string{executablePath, "test", "-p", localPolicySetPath1, "-p", localPolicySetPath2, "/some_workdir/testproj-default.json", "--no-color", "--all-namespaces"}
+
+		When(mockResolver.Resolve(policySet1)).ThenReturn(localPolicySetPath1, nil)
+		When(mockResolver.Resolve(policySet2)).ThenReturn(localPolicySetPath2, nil)
+
+		When(mockExec.CombinedOutput(expectedArgs, envs, workdir)).ThenReturn(expectedOutput, nil)
+
+		result, err := subject.Run(ctx, executablePath, envs, workdir, extraArgs)
 
 		fmt.Println(result)
 
@@ -193,6 +216,7 @@ func TestRun(t *testing.T) {
 	})
 
 	t.Run("error resolving one policy source", func(t *testing.T) {
+		var extraArgs []string
 
 		expectedOutput := "Success"
 		expectedResult := "Checking plan against the following policies: \n  policy1\nSuccess"
@@ -203,7 +227,7 @@ func TestRun(t *testing.T) {
 
 		When(mockExec.CombinedOutput(expectedArgs, envs, workdir)).ThenReturn(expectedOutput, nil)
 
-		result, err := subject.Run(ctx, executablePath, envs, workdir)
+		result, err := subject.Run(ctx, executablePath, envs, workdir, extraArgs)
 
 		Ok(t, err)
 
@@ -212,6 +236,7 @@ func TestRun(t *testing.T) {
 	})
 
 	t.Run("error resolving both policy sources", func(t *testing.T) {
+		var extraArgs []string
 
 		expectedResult := "Success"
 		expectedArgs := []string{executablePath, "test", "-p", localPolicySetPath1, "/some_workdir/testproj-default.json", "--no-color"}
@@ -221,7 +246,7 @@ func TestRun(t *testing.T) {
 
 		When(mockExec.CombinedOutput(expectedArgs, envs, workdir)).ThenReturn(expectedResult, nil)
 
-		result, err := subject.Run(ctx, executablePath, envs, workdir)
+		result, err := subject.Run(ctx, executablePath, envs, workdir, extraArgs)
 
 		Ok(t, err)
 
@@ -230,6 +255,8 @@ func TestRun(t *testing.T) {
 	})
 
 	t.Run("error running cmd", func(t *testing.T) {
+		var extraArgs []string
+
 		expectedOutput := "FAIL - /some_workdir/testproj-default.json - failure"
 		expectedResult := "Checking plan against the following policies: \n  policy1\n  policy2\nFAIL - <redacted plan file> - failure"
 		expectedArgs := []string{executablePath, "test", "-p", localPolicySetPath1, "-p", localPolicySetPath2, "/some_workdir/testproj-default.json", "--no-color"}
@@ -239,7 +266,7 @@ func TestRun(t *testing.T) {
 
 		When(mockExec.CombinedOutput(expectedArgs, envs, workdir)).ThenReturn(expectedOutput, errors.New("exit status code 1"))
 
-		result, err := subject.Run(ctx, executablePath, envs, workdir)
+		result, err := subject.Run(ctx, executablePath, envs, workdir, extraArgs)
 
 		Assert(t, result == expectedResult, "rseult is expected")
 		Assert(t, err != nil, "error is expected")
