@@ -34,5 +34,5 @@ func (p *PolicyCheckStepRunner) Run(ctx models.ProjectCommandContext, extraArgs 
 		return "", errors.Wrapf(err, "ensuring policy executor version")
 	}
 
-	return p.executor.Run(ctx, executable, envs, path)
+	return p.executor.Run(ctx, executable, envs, path, extraArgs)
 }

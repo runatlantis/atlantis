@@ -16,7 +16,7 @@ type VersionedExecutorWorkflow interface {
 
 // Executor runs an executable with provided environment variables and arguments and returns stdout
 type Executor interface {
-	Run(ctx models.ProjectCommandContext, executablePath string, envs map[string]string, workdir string) (string, error)
+	Run(ctx models.ProjectCommandContext, executablePath string, envs map[string]string, workdir string, extraArgs []string) (string, error)
 }
 
 // ExecutorVersionEnsurer ensures a given version exists and outputs a path to the executable
