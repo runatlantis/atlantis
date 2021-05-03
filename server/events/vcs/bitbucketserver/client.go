@@ -141,7 +141,7 @@ func (b *Client) CreateComment(repo models.Repo, pullNum int, comment string, co
 	return nil
 }
 
-func (b *Client) HidePrevPlanComments(repo models.Repo, pullNum int) error {
+func (b *Client) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
 	return nil
 }
 
