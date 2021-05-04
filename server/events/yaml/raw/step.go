@@ -18,6 +18,7 @@ const (
 	ValueArgKey         = "value"
 	RunStepName         = "run"
 	PlanStepName        = "plan"
+	ShowStepName        = "show"
 	PolicyCheckStepName = "policy_check"
 	ApplyStepName       = "apply"
 	InitStepName        = "init"
@@ -80,6 +81,7 @@ func (s Step) validStepName(stepName string) bool {
 		stepName == PlanStepName ||
 		stepName == ApplyStepName ||
 		stepName == EnvStepName ||
+		stepName == ShowStepName ||
 		stepName == PolicyCheckStepName
 }
 

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/url"
 	paths "path"
+	"regexp"
 	"strings"
 	"time"
 
@@ -170,6 +171,13 @@ type PullRequest struct {
 	BaseRepo Repo
 }
 
+// PullRequestOptions is used to set optional paralmeters for PullRequest
+type PullRequestOptions struct {
+	// When DeleteSourceBranchOnMerge flag is set to true VCS deletes the source branch after the PR is merged
+	// Applied by GitLab & AzureDevops
+	DeleteSourceBranchOnMerge bool
+}
+
 type PullRequestState int
 
 const (
@@ -204,6 +212,27 @@ func (p PullRequestEventType) String() string {
 // During an autoplan, the user will be the Atlantis API user.
 type User struct {
 	Username string
+}
+
+// LockMetadata contains additional data provided to the lock
+type LockMetadata struct {
+	UnixTime int64
+}
+
+// CommandLock represents a global lock for an atlantis command (plan, apply, policy_check).
+// It is used to prevent commands from being executed
+type CommandLock struct {
+	// Time is the time at which the lock was first created.
+	LockMetadata LockMetadata
+	CommandName  CommandName
+}
+
+func (l *CommandLock) LockTime() time.Time {
+	return time.Unix(l.LockMetadata.UnixTime, 0)
+}
+
+func (l *CommandLock) IsLocked() bool {
+	return !l.LockTime().IsZero()
 }
 
 // ProjectLock represents a lock on a project.
@@ -334,9 +363,11 @@ type ProjectCommandContext struct {
 	// be the same as BaseRepo.
 	HeadRepo Repo
 	// Log is a logger that's been set up for this context.
-	Log *logging.SimpleLogger
+	Log logging.SimpleLogging
 	// PullMergeable is true if the pull request for this project is able to be merged.
 	PullMergeable bool
+	// CurrentProjectPlanStatus is the status of the current project prior to this command.
+	ProjectPlanStatus ProjectPlanStatus
 	// Pull is the pull request we're responding to.
 	Pull PullRequest
 	// ProjectName is the name of the project set in atlantis.yaml. If there was
@@ -367,6 +398,8 @@ type ProjectCommandContext struct {
 	// PolicySets represent the policies that are run on the plan as part of the
 	// policy check stage
 	PolicySets valid.PolicySets
+	// DeleteSourceBranchOnMerge will attempt to allow a branch to be deleted when merged (AzureDevOps & GitLab Support Only)
+	DeleteSourceBranchOnMerge bool
 }
 
 // GetShowResultFileName returns the filename (not the path) to store the tf show result
@@ -466,6 +499,16 @@ type PlanSuccess struct {
 	// branch we're merging into has been updated since we cloned and merged
 	// it.
 	HasDiverged bool
+}
+
+// Summary extracts one line summary of plan changes from TerraformOutput.
+func (p *PlanSuccess) Summary() string {
+	r := regexp.MustCompile(`Plan: \d+ to add, \d+ to change, \d+ to destroy.`)
+	if match := r.FindString(p.TerraformOutput); match != "" {
+		return match
+	}
+	r = regexp.MustCompile(`No changes. Infrastructure is up-to-date.`)
+	return r.FindString(p.TerraformOutput)
 }
 
 // PolicyCheckSuccess is the result of a successful policy check run.
@@ -580,6 +623,12 @@ const (
 	AutoplanCommand
 	// Adding more? Don't forget to update String() below
 )
+
+// TitleString returns the string representation in title form.
+// ie. policy_check becomes Policy Check
+func (c CommandName) TitleString() string {
+	return strings.Title(strings.ReplaceAll(strings.ToLower(c.String()), "_", " "))
+}
 
 // String returns the string representation of c.
 func (c CommandName) String() string {

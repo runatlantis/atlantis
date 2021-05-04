@@ -28,6 +28,10 @@ repos:
   # Repo ID's are of the form {VCS hostname}/{org}/{repo name}, ex.
   # github.com/runatlantis/atlantis.
 - id: /.*/
+  # branch is an regex matching pull requests by base branch
+  # (the branch the pull request is getting merged into).
+  # By default, all branches are matched
+  branch: /.*/
 
   # apply_requirements sets the Apply Requirements for all repos that match.
   apply_requirements: [approved, mergeable]
@@ -38,7 +42,7 @@ repos:
 
   # allowed_overrides specifies which keys can be overridden by this repo in
   # its atlantis.yaml file.
-  allowed_overrides: [apply_requirements, workflow]
+  allowed_overrides: [apply_requirements, workflow, delete_source_branch_on_merge]
 
   # allowed_workflows specifies which workflows the repos that match 
   # are allowed to select.
@@ -48,6 +52,10 @@ repos:
   # workflows. If false (default), the repo can only use server-side defined
   # workflows.
   allow_custom_workflows: true
+
+  # delete_source_branch_on_merge defines whether the source branch would be deleted on merge
+  # If false (default), the source branch won't be deleted on merge
+  delete_source_branch_on_merge: true
   
   # pre_workflow_hooks defines arbitrary list of scripts to execute before workflow execution.
   pre_workflow_hooks: 
@@ -331,6 +339,7 @@ custom workflows.
 |-----------|---------------------------------------------------------|-----------|----------|---------------------------------------------------------------------------------------|
 | repos     | array[[Repo](#repo)]                                    | see below | no       | List of repos to apply settings to.                                                   |
 | workflows | map[string: [Workflow](custom-workflows.html#workflow)] | see below | no       | Map from workflow name to workflow. Workflows override the default Atlantis commands. |
+| policies  | Policies.                                               | none      | no       | List of policy sets to run and associated metadata                                      |
 
 
 ::: tip A Note On Defaults
@@ -355,19 +364,21 @@ workflows:
     apply:
       steps: [apply]
 ```
+
 This gets merged with whatever config you write.
 If you set a workflow with the key `default`, it will override this.
 :::
 
 ### Repo
-| Key                    | Type     | Default | Required | Description                                                                                                                                                                                                                                                                                              |
-|------------------------|----------|---------|----------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| id                     | string   | none    | yes      | Value can be a regular expression when specified as /&lt;regex&gt;/ or an exact string match. Repo IDs are of the form `{vcs hostname}/{org}/{name}`, ex. `github.com/owner/repo`. Hostname is specified without scheme or port. For Bitbucket Server, {org} is the **name** of the project, not the key. |
-| workflow               | string   | none    | no       | A custom workflow.                                                                                                                                                                                                                                                                                       |
-| apply_requirements     | []string | none    | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved` and `mergeable`. See [Apply Requirements](apply-requirements.html) for more details.                                                                                    |
-| allowed_overrides      | []string | none    | no       | A list of restricted keys that `atlantis.yaml` files can override. The only supported keys are `apply_requirements` and `workflow`                                                                                                                                                                       |
-| allowed_workflows      | []string | none    | no       | A list of workflows that `atlantis.yaml` files can select from.                                                                                                                                                                        |
-| allow_custom_workflows | bool     | false   | no       | Whether or not to allow [Custom Workflows](custom-workflows.html).                                                                                                                                                                       |
+| Key                           | Type     | Default | Required | Description                                                                                                                                                                                                                                                                                              |
+|-------------------------------|----------|---------|----------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| id                            | string   | none    | yes      | Value can be a regular expression when specified as /&lt;regex&gt;/ or an exact string match. Repo IDs are of the form `{vcs hostname}/{org}/{name}`, ex. `github.com/owner/repo`. Hostname is specified without scheme or port. For Bitbucket Server, {org} is the **name** of the project, not the key. |
+| workflow                      | string   | none    | no       | A custom workflow.                                                                                                                                                                                                                                                                                       |
+| apply_requirements            | []string | none    | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved` and `mergeable`. See [Apply Requirements](apply-requirements.html) for more details.                                                                                    |
+| allowed_overrides             | []string | none    | no       | A list of restricted keys that `atlantis.yaml` files can override. The only supported keys are `apply_requirements`, `workflow` and `delete_source_branch_on_merge`                                                                                                                                      |
+| allowed_workflows             | []string | none    | no       | A list of workflows that `atlantis.yaml` files can select from.                                                                                                                                                                        |
+| allow_custom_workflows        | bool     | false   | no       | Whether or not to allow [Custom Workflows](custom-workflows.html).                                                                                                                                                                       |
+| delete_source_branch_on_merge | bool     | false   | no       | Whether or not to delete the source branch on merge (only AzureDevOps and GitLab support)                                                                                                                                                                      |
 
 
 :::tip Notes
@@ -400,3 +411,24 @@ If you set a workflow with the key `default`, it will override this.
   * `allow_custom_workflows` is set from the `id: /.*/` config and isn't unset
     by the `id: github.com/owner/repo` config because it didn't define that key.
 :::
+
+### Policies
+
+| Key                    | Type            | Default | Required  | Description                              |
+|------------------------|-----------------|---------|-----------|------------------------------------------|
+| conftest_version       | string          | none    | no        | conftest version to run all policy sets  |
+| owners                 | Owners(#Owners) | none    | yes       | owners that can approve failing policies |
+| policy_sets            | []PolicySet     | none    | yes       | set of policies to run on a plan output  |
+
+### Owners
+| Key         | Type              | Default | Required   | Description                                             |
+|-------------|-------------------|---------|------------|---------------------------------------------------------|
+| users       | []string          | none    | yes        | list of github users that can approve failing policies  |
+
+### PolicySet
+| Key                    | Type            | Default | Required  | Description                              |
+|------------------------|-----------------|---------|-----------|------------------------------------------|
+| name                   | string          | none    | yes       | unique name for the policy set           |
+| path                   | string          | none    | yes       | path to the rego policies                |
+| source                 | string          | none    | yes       | only `local` is supported at this time   |
+

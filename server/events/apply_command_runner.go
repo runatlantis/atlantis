@@ -2,6 +2,7 @@ package events
 
 import (
 	"github.com/runatlantis/atlantis/server/events/db"
+	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
@@ -9,7 +10,7 @@ import (
 func NewApplyCommandRunner(
 	vcsClient vcs.Client,
 	disableApplyAll bool,
-	disableApply bool,
+	applyCommandLocker locking.ApplyLockChecker,
 	commitStatusUpdater CommitStatusUpdater,
 	prjCommandBuilder ProjectApplyCommandBuilder,
 	prjCmdRunner ProjectApplyCommandRunner,
@@ -18,26 +19,30 @@ func NewApplyCommandRunner(
 	dbUpdater *DBUpdater,
 	db *db.BoltDB,
 	parallelPoolSize int,
+	SilenceNoProjects bool,
+	silenceVCSStatusNoProjects bool,
 ) *ApplyCommandRunner {
 	return &ApplyCommandRunner{
-		vcsClient:           vcsClient,
-		DisableApplyAll:     disableApplyAll,
-		DisableApply:        disableApply,
-		commitStatusUpdater: commitStatusUpdater,
-		prjCmdBuilder:       prjCommandBuilder,
-		prjCmdRunner:        prjCmdRunner,
-		autoMerger:          autoMerger,
-		pullUpdater:         pullUpdater,
-		dbUpdater:           dbUpdater,
-		DB:                  db,
-		parallelPoolSize:    parallelPoolSize,
+		vcsClient:                  vcsClient,
+		DisableApplyAll:            disableApplyAll,
+		locker:                     applyCommandLocker,
+		commitStatusUpdater:        commitStatusUpdater,
+		prjCmdBuilder:              prjCommandBuilder,
+		prjCmdRunner:               prjCmdRunner,
+		autoMerger:                 autoMerger,
+		pullUpdater:                pullUpdater,
+		dbUpdater:                  dbUpdater,
+		DB:                         db,
+		parallelPoolSize:           parallelPoolSize,
+		SilenceNoProjects:          SilenceNoProjects,
+		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
 	}
 }
 
 type ApplyCommandRunner struct {
 	DisableApplyAll     bool
-	DisableApply        bool
 	DB                  *db.BoltDB
+	locker              locking.ApplyLockChecker
 	vcsClient           vcs.Client
 	commitStatusUpdater CommitStatusUpdater
 	prjCmdBuilder       ProjectApplyCommandBuilder
@@ -46,6 +51,12 @@ type ApplyCommandRunner struct {
 	pullUpdater         *PullUpdater
 	dbUpdater           *DBUpdater
 	parallelPoolSize    int
+	// SilenceNoProjects is whether Atlantis should respond to PRs if no projects
+	// are found
+	SilenceNoProjects bool
+	// SilenceVCSStatusNoPlans is whether any plan should set commit status if no projects
+	// are found
+	silenceVCSStatusNoProjects bool
 }
 
 func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
@@ -53,7 +64,15 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
 
-	if a.DisableApply {
+	locked, err := a.IsLocked()
+	// CheckApplyLock falls back to DisableApply flag if fetching the lock
+	// raises an error
+	// We will log failure as warning
+	if err != nil {
+		ctx.Log.Warn("checking global apply lock: %s", err)
+	}
+
+	if locked {
 		ctx.Log.Info("ignoring apply command since apply disabled globally")
 		if err := a.vcsClient.CreateComment(baseRepo, pull.Num, applyDisabledComment, models.ApplyCommand.String()); err != nil {
 			ctx.Log.Err("unable to comment on pull request: %s", err)
@@ -71,6 +90,10 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 		return
 	}
 
+	if err = a.commitStatusUpdater.UpdateCombined(baseRepo, pull, models.PendingCommitStatus, cmd.CommandName()); err != nil {
+		ctx.Log.Warn("unable to update commit status: %s", err)
+	}
+
 	// Get the mergeable status before we set any build statuses of our own.
 	// We do this here because when we set a "Pending" status, if users have
 	// required the Atlantis status checks to pass, then we've now changed
@@ -84,18 +107,7 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 		ctx.Log.Warn("unable to get mergeable status: %s. Continuing with mergeable assumed false", err)
 	}
 
-	// TODO: This needs to be revisited and new PullMergeable like conditions should
-	// be added to check against it.
-	if a.anyFailedPolicyChecks(pull) {
-		ctx.PullMergeable = false
-		ctx.Log.Warn("when using policy checks all policies have to be approved or pass. Continuing with mergeable assumed false")
-	}
-
 	ctx.Log.Info("pull request mergeable status: %t", ctx.PullMergeable)
-
-	if err = a.commitStatusUpdater.UpdateCombined(baseRepo, pull, models.PendingCommitStatus, cmd.CommandName()); err != nil {
-		ctx.Log.Warn("unable to update commit status: %s", err)
-	}
 
 	var projectCmds []models.ProjectCommandContext
 	projectCmds, err = a.prjCmdBuilder.BuildApplyCommands(ctx, cmd)
@@ -105,6 +117,21 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
 		a.pullUpdater.updatePull(ctx, cmd, CommandResult{Error: err})
+		return
+	}
+
+	// If there are no projects to apply, don't respond to the PR and ignore
+	if len(projectCmds) == 0 && a.SilenceNoProjects {
+		ctx.Log.Info("determined there was no project to run apply in.")
+		if !a.silenceVCSStatusNoProjects {
+			// If there were no projects modified, we set successful commit statuses
+			// with 0/0 projects applied successfully because some users require
+			// the Atlantis status to be passing for all pull requests.
+			ctx.Log.Debug("setting VCS status to success with no projects found")
+			if err := a.commitStatusUpdater.UpdateCombinedCount(baseRepo, pull, models.SuccessCommitStatus, models.ApplyCommand, 0, 0); err != nil {
+				ctx.Log.Warn("unable to update commit status: %s", err)
+			}
+		}
 		return
 	}
 
@@ -131,8 +158,14 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 	a.updateCommitStatus(ctx, pullStatus)
 
 	if a.autoMerger.automergeEnabled(projectCmds) {
-		a.autoMerger.automerge(ctx, pullStatus)
+		a.autoMerger.automerge(ctx, pullStatus, a.autoMerger.deleteSourceBranchOnMergeEnabled(projectCmds))
 	}
+}
+
+func (a *ApplyCommandRunner) IsLocked() (bool, error) {
+	lock, err := a.locker.CheckApplyLock()
+
+	return lock.Locked, err
 }
 
 func (a *ApplyCommandRunner) isParallelEnabled(projectCmds []models.ProjectCommandContext) bool {
@@ -165,16 +198,6 @@ func (a *ApplyCommandRunner) updateCommitStatus(ctx *CommandContext, pullStatus 
 	); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
-}
-
-func (a *ApplyCommandRunner) anyFailedPolicyChecks(pull models.PullRequest) bool {
-	policyCheckPullStatus, _ := a.DB.GetPullStatus(pull)
-	if policyCheckPullStatus != nil && policyCheckPullStatus.StatusCount(models.ErroredPolicyCheckStatus) > 0 {
-		return true
-	}
-
-	return false
-
 }
 
 // applyAllDisabledComment is posted when apply all commands (i.e. "atlantis apply")

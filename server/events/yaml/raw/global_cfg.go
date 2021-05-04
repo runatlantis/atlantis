@@ -19,13 +19,15 @@ type GlobalCfg struct {
 
 // Repo is the raw schema for repos in the server-side repo config.
 type Repo struct {
-	ID                   string            `yaml:"id" json:"id"`
-	ApplyRequirements    []string          `yaml:"apply_requirements" json:"apply_requirements"`
-	PreWorkflowHooks     []PreWorkflowHook `yaml:"pre_workflow_hooks" json:"pre_workflow_hooks"`
-	Workflow             *string           `yaml:"workflow,omitempty" json:"workflow,omitempty"`
-	AllowedWorkflows     []string          `yaml:"allowed_workflows,omitempty" json:"allowed_workflows,omitempty"`
-	AllowedOverrides     []string          `yaml:"allowed_overrides" json:"allowed_overrides"`
-	AllowCustomWorkflows *bool             `yaml:"allow_custom_workflows,omitempty" json:"allow_custom_workflows,omitempty"`
+	ID                        string            `yaml:"id" json:"id"`
+	Branch                    string            `yaml:"branch" json:"branch"`
+	ApplyRequirements         []string          `yaml:"apply_requirements" json:"apply_requirements"`
+	PreWorkflowHooks          []PreWorkflowHook `yaml:"pre_workflow_hooks" json:"pre_workflow_hooks"`
+	Workflow                  *string           `yaml:"workflow,omitempty" json:"workflow,omitempty"`
+	AllowedWorkflows          []string          `yaml:"allowed_workflows,omitempty" json:"allowed_workflows,omitempty"`
+	AllowedOverrides          []string          `yaml:"allowed_overrides" json:"allowed_overrides"`
+	AllowCustomWorkflows      *bool             `yaml:"allow_custom_workflows,omitempty" json:"allow_custom_workflows,omitempty"`
+	DeleteSourceBranchOnMerge *bool             `yaml:"delete_source_branch_on_merge,omitempty" json:"delete_source_branch_on_merge,omitempty"`
 }
 
 func (g GlobalCfg) Validate() error {
@@ -85,6 +87,20 @@ func (g GlobalCfg) Validate() error {
 
 func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 	workflows := make(map[string]valid.Workflow)
+
+	// assumes: globalcfg is always initialized with one repo .*
+	applyReqs := defaultCfg.Repos[0].ApplyRequirements
+
+	var globalApplyReqs []string
+
+	for _, req := range applyReqs {
+		for _, nonOverrideableReq := range valid.NonOverrideableApplyReqs {
+			if req == nonOverrideableReq {
+				globalApplyReqs = append(globalApplyReqs, req)
+			}
+		}
+	}
+
 	for k, v := range g.Workflows {
 		validatedWorkflow := v.ToValid(k)
 		workflows[k] = validatedWorkflow
@@ -104,7 +120,7 @@ func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 
 	var repos []valid.Repo
 	for _, r := range g.Repos {
-		repos = append(repos, r.ToValid(workflows))
+		repos = append(repos, r.ToValid(workflows, globalApplyReqs))
 	}
 	repos = append(defaultCfg.Repos, repos...)
 
@@ -121,6 +137,11 @@ func (r Repo) HasRegexID() bool {
 	return strings.HasPrefix(r.ID, "/") && strings.HasSuffix(r.ID, "/")
 }
 
+// HasRegexBranch returns true if a branch regex was set.
+func (r Repo) HasRegexBranch() bool {
+	return strings.HasPrefix(r.Branch, "/") && strings.HasSuffix(r.Branch, "/")
+}
+
 func (r Repo) Validate() error {
 	idValid := func(value interface{}) error {
 		id := value.(string)
@@ -131,11 +152,20 @@ func (r Repo) Validate() error {
 		return errors.Wrapf(err, "parsing: %s", id)
 	}
 
+	branchValid := func(value interface{}) error {
+		branch := value.(string)
+		if !r.HasRegexBranch() {
+			return nil
+		}
+		_, err := regexp.Compile(branch[1 : len(branch)-1])
+		return errors.Wrapf(err, "parsing: %s", branch)
+	}
+
 	overridesValid := func(value interface{}) error {
 		overrides := value.([]string)
 		for _, o := range overrides {
-			if o != valid.ApplyRequirementsKey && o != valid.WorkflowKey {
-				return fmt.Errorf("%q is not a valid override, only %q and %q are supported", o, valid.ApplyRequirementsKey, valid.WorkflowKey)
+			if o != valid.ApplyRequirementsKey && o != valid.WorkflowKey && o != valid.DeleteSourceBranchOnMergeKey {
+				return fmt.Errorf("%q is not a valid override, only %q, %q and %q are supported", o, valid.ApplyRequirementsKey, valid.WorkflowKey, valid.DeleteSourceBranchOnMergeKey)
 			}
 		}
 		return nil
@@ -147,15 +177,22 @@ func (r Repo) Validate() error {
 		return nil
 	}
 
+	deleteSourceBranchOnMergeValid := func(value interface{}) error {
+		//TOBE IMPLEMENTED
+		return nil
+	}
+
 	return validation.ValidateStruct(&r,
 		validation.Field(&r.ID, validation.Required, validation.By(idValid)),
+		validation.Field(&r.Branch, validation.By(branchValid)),
 		validation.Field(&r.AllowedOverrides, validation.By(overridesValid)),
 		validation.Field(&r.ApplyRequirements, validation.By(validApplyReq)),
 		validation.Field(&r.Workflow, validation.By(workflowExists)),
+		validation.Field(&r.DeleteSourceBranchOnMerge, validation.By(deleteSourceBranchOnMergeValid)),
 	)
 }
 
-func (r Repo) ToValid(workflows map[string]valid.Workflow) valid.Repo {
+func (r Repo) ToValid(workflows map[string]valid.Workflow, globalApplyReqs []string) valid.Repo {
 	var id string
 	var idRegex *regexp.Regexp
 	if r.HasRegexID() {
@@ -166,6 +203,13 @@ func (r Repo) ToValid(workflows map[string]valid.Workflow) valid.Repo {
 		id = r.ID
 	}
 
+	var branchRegex *regexp.Regexp
+	if r.HasRegexBranch() {
+		withoutSlashes := r.Branch[1 : len(r.Branch)-1]
+		// Safe to use MustCompile because we test it in Validate().
+		branchRegex = regexp.MustCompile(withoutSlashes)
+	}
+
 	var workflow *valid.Workflow
 	if r.Workflow != nil {
 		// This key is guaranteed to exist because we test for it in
@@ -174,21 +218,38 @@ func (r Repo) ToValid(workflows map[string]valid.Workflow) valid.Repo {
 		workflow = &ptr
 	}
 
-	preWorkflowHooks := make([]*valid.PreWorkflowHook, 0)
+	var preWorkflowHooks []*valid.PreWorkflowHook
 	if len(r.PreWorkflowHooks) > 0 {
 		for _, hook := range r.PreWorkflowHooks {
 			preWorkflowHooks = append(preWorkflowHooks, hook.ToValid())
 		}
 	}
 
+	var mergedApplyReqs []string
+
+	mergedApplyReqs = append(mergedApplyReqs, r.ApplyRequirements...)
+
+	// only add global reqs if they don't exist already.
+OUTER:
+	for _, globalReq := range globalApplyReqs {
+		for _, currReq := range r.ApplyRequirements {
+			if globalReq == currReq {
+				continue OUTER
+			}
+		}
+		mergedApplyReqs = append(mergedApplyReqs, globalReq)
+	}
+
 	return valid.Repo{
-		ID:                   id,
-		IDRegex:              idRegex,
-		ApplyRequirements:    r.ApplyRequirements,
-		PreWorkflowHooks:     preWorkflowHooks,
-		Workflow:             workflow,
-		AllowedWorkflows:     r.AllowedWorkflows,
-		AllowedOverrides:     r.AllowedOverrides,
-		AllowCustomWorkflows: r.AllowCustomWorkflows,
+		ID:                        id,
+		IDRegex:                   idRegex,
+		BranchRegex:               branchRegex,
+		ApplyRequirements:         mergedApplyReqs,
+		PreWorkflowHooks:          preWorkflowHooks,
+		Workflow:                  workflow,
+		AllowedWorkflows:          r.AllowedWorkflows,
+		AllowedOverrides:          r.AllowedOverrides,
+		AllowCustomWorkflows:      r.AllowCustomWorkflows,
+		DeleteSourceBranchOnMerge: r.DeleteSourceBranchOnMerge,
 	}
 }

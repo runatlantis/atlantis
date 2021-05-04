@@ -117,6 +117,8 @@ projects:
 		},
 	}
 
+	logger := logging.NewNoopLogger(t)
+
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			RegisterMockTestingT(t)
@@ -145,10 +147,13 @@ projects:
 				&events.DefaultPendingPlanFinder{},
 				&events.CommentParser{},
 				false,
+				false,
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 			)
 
 			ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
 				PullMergeable: true,
+				Log:           logger,
 			})
 			Ok(t, err)
 			Equals(t, len(c.exp), len(ctxs))
@@ -339,6 +344,8 @@ projects:
 		},
 	}
 
+	logger := logging.NewNoopLogger(t)
+
 	for _, c := range cases {
 		// NOTE: we're testing both plan and apply here.
 		for _, cmdName := range []models.CommandName{models.PlanCommand, models.ApplyCommand} {
@@ -370,14 +377,18 @@ projects:
 					&events.DefaultPendingPlanFinder{},
 					&events.CommentParser{},
 					false,
+					true,
+					"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 				)
 
 				var actCtxs []models.ProjectCommandContext
 				var err error
 				if cmdName == models.PlanCommand {
-					actCtxs, err = builder.BuildPlanCommands(&events.CommandContext{}, &c.Cmd)
+					actCtxs, err = builder.BuildPlanCommands(&events.CommandContext{
+						Log: logger,
+					}, &c.Cmd)
 				} else {
-					actCtxs, err = builder.BuildApplyCommands(&events.CommandContext{}, &c.Cmd)
+					actCtxs, err = builder.BuildApplyCommands(&events.CommandContext{Log: logger}, &c.Cmd)
 				}
 
 				if c.ExpErr != "" {
@@ -479,6 +490,8 @@ projects:
 			},
 		},
 	}
+
+	logger := logging.NewNoopLogger(t)
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			RegisterMockTestingT(t)
@@ -506,10 +519,14 @@ projects:
 				&events.DefaultPendingPlanFinder{},
 				&events.CommentParser{},
 				false,
+				false,
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 			)
 
 			ctxs, err := builder.BuildPlanCommands(
-				&events.CommandContext{},
+				&events.CommandContext{
+					Log: logger,
+				},
 				&events.CommentCommand{
 					RepoRelDir:  "",
 					Flags:       nil,
@@ -569,6 +586,8 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		matchers.AnyModelsPullRequest())).
 		ThenReturn(tmpDir, nil)
 
+	logger := logging.NewNoopLogger(t)
+
 	builder := events.NewProjectCommandBuilder(
 		false,
 		&yaml.ParserValidator{},
@@ -580,10 +599,14 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		&events.DefaultPendingPlanFinder{},
 		&events.CommentParser{},
 		false,
+		false,
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 	)
 
 	ctxs, err := builder.BuildApplyCommands(
-		&events.CommandContext{},
+		&events.CommandContext{
+			Log: logger,
+		},
 		&events.CommentCommand{
 			RepoRelDir:  "",
 			Flags:       nil,
@@ -649,13 +672,15 @@ projects:
 		&events.DefaultPendingPlanFinder{},
 		&events.CommentParser{},
 		false,
+		false,
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 	)
 
 	ctx := &events.CommandContext{
 		HeadRepo: models.Repo{},
 		Pull:     models.PullRequest{},
 		User:     models.User{},
-		Log:      logging.NewNoopLogger(),
+		Log:      logging.NewNoopLogger(t),
 	}
 	_, err = builder.BuildPlanCommands(ctx, &events.CommentCommand{
 		RepoRelDir:  ".",
@@ -688,6 +713,8 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 		},
 	}
 
+	logger := logging.NewNoopLogger(t)
+
 	for _, c := range cases {
 		t.Run(strings.Join(c.ExtraArgs, " "), func(t *testing.T) {
 			RegisterMockTestingT(t)
@@ -713,11 +740,15 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				&events.DefaultPendingPlanFinder{},
 				&events.CommentParser{},
 				false,
+				false,
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 			)
 
 			var actCtxs []models.ProjectCommandContext
 			var err error
-			actCtxs, err = builder.BuildPlanCommands(&events.CommandContext{}, &events.CommentCommand{
+			actCtxs, err = builder.BuildPlanCommands(&events.CommandContext{
+				Log: logger,
+			}, &events.CommentCommand{
 				RepoRelDir: ".",
 				Flags:      c.ExtraArgs,
 				Name:       models.PlanCommand,
@@ -846,6 +877,8 @@ projects:
 		},
 	}
 
+	logger := logging.NewNoopLogger(t)
+
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			RegisterMockTestingT(t)
@@ -879,10 +912,14 @@ projects:
 				&events.DefaultPendingPlanFinder{},
 				&events.CommentParser{},
 				false,
+				false,
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 			)
 
 			actCtxs, err := builder.BuildPlanCommands(
-				&events.CommandContext{},
+				&events.CommandContext{
+					Log: logger,
+				},
 				&events.CommentCommand{
 					RepoRelDir: "",
 					Flags:      nil,
@@ -918,6 +955,8 @@ projects:
 	When(vcsClient.DownloadRepoConfigFile(matchers.AnyModelsPullRequest())).ThenReturn(true, []byte(atlantisYAML), nil)
 	workingDir := mocks.NewMockWorkingDir()
 
+	logger := logging.NewNoopLogger(t)
+
 	builder := events.NewProjectCommandBuilder(
 		false,
 		&yaml.ParserValidator{},
@@ -929,6 +968,8 @@ projects:
 		&events.DefaultPendingPlanFinder{},
 		&events.CommentParser{},
 		true,
+		false,
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 	)
 
 	var actCtxs []models.ProjectCommandContext
@@ -937,7 +978,7 @@ projects:
 		HeadRepo:      models.Repo{},
 		Pull:          models.PullRequest{},
 		User:          models.User{},
-		Log:           nil,
+		Log:           logger,
 		PullMergeable: true,
 	})
 	Ok(t, err)
@@ -951,6 +992,8 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		"main.tf": nil,
 	})
 	defer cleanup()
+
+	logger := logging.NewNoopLogger(t)
 
 	workingDir := mocks.NewMockWorkingDir()
 	When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, false, nil)
@@ -969,10 +1012,13 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		&events.DefaultPendingPlanFinder{},
 		&events.CommentParser{},
 		false,
+		false,
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 	)
 
 	ctxs, err := builder.BuildAutoplanCommands(&events.CommandContext{
 		PullMergeable: true,
+		Log:           logger,
 	})
 
 	Ok(t, err)

@@ -2,8 +2,9 @@
 package matchers
 
 import (
-	"reflect"
 	"github.com/petergtz/pegomock"
+	"reflect"
+
 	io "io"
 )
 
@@ -15,6 +16,18 @@ func AnyIoWriter() io.Writer {
 
 func EqIoWriter(value io.Writer) io.Writer {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
+	var nullValue io.Writer
+	return nullValue
+}
+
+func NotEqIoWriter(value io.Writer) io.Writer {
+	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
+	var nullValue io.Writer
+	return nullValue
+}
+
+func IoWriterThat(matcher pegomock.ArgumentMatcher) io.Writer {
+	pegomock.RegisterMatcher(matcher)
 	var nullValue io.Writer
 	return nullValue
 }

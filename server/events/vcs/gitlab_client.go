@@ -47,7 +47,7 @@ var commonMarkSupported = MustConstraint(">=11.1")
 var gitlabClientUnderTest = false
 
 // NewGitlabClient returns a valid GitLab client.
-func NewGitlabClient(hostname string, token string, logger *logging.SimpleLogger) (*GitlabClient, error) {
+func NewGitlabClient(hostname string, token string, logger logging.SimpleLogging) (*GitlabClient, error) {
 	client := &GitlabClient{}
 
 	// Create the client differently depending on the base URL.
@@ -148,7 +148,7 @@ func (g *GitlabClient) CreateComment(repo models.Repo, pullNum int, comment stri
 	return err
 }
 
-func (g *GitlabClient) HidePrevPlanComments(repo models.Repo, pullNum int) error {
+func (g *GitlabClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
 	return nil
 }
 
@@ -214,13 +214,14 @@ func (g *GitlabClient) GetMergeRequest(repoFullName string, pullNum int) (*gitla
 }
 
 // MergePull merges the merge request.
-func (g *GitlabClient) MergePull(pull models.PullRequest) error {
+func (g *GitlabClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	commitMsg := common.AutomergeCommitMsg
 	_, _, err := g.Client.MergeRequests.AcceptMergeRequest(
 		pull.BaseRepo.FullName,
 		pull.Num,
 		&gitlab.AcceptMergeRequestOptions{
-			MergeCommitMessage: &commitMsg,
+			MergeCommitMessage:       &commitMsg,
+			ShouldRemoveSourceBranch: &pullOptions.DeleteSourceBranchOnMerge,
 		})
 	return errors.Wrap(err, "unable to merge merge request, it may not be in a mergeable state")
 }

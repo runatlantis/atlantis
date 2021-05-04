@@ -26,13 +26,13 @@ import (
 	"github.com/google/go-github/v31/github"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events"
+	lockingmocks "github.com/runatlantis/atlantis/server/events/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	eventmocks "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/fixtures"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
-	logmocks "github.com/runatlantis/atlantis/server/logging/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -43,7 +43,6 @@ var azuredevopsGetter *mocks.MockAzureDevopsPullGetter
 var githubGetter *mocks.MockGithubPullGetter
 var gitlabGetter *mocks.MockGitlabMergeRequestGetter
 var ch events.DefaultCommandRunner
-var pullLogger *logging.SimpleLogger
 var workingDir events.WorkingDir
 var pendingPlanFinder *mocks.MockPendingPlanFinder
 var drainer *events.Drainer
@@ -59,8 +58,10 @@ var autoMerger *events.AutoMerger
 var policyCheckCommandRunner *events.PolicyCheckCommandRunner
 var approvePoliciesCommandRunner *events.ApprovePoliciesCommandRunner
 var planCommandRunner *events.PlanCommandRunner
+var applyLockChecker *lockingmocks.MockApplyLockChecker
 var applyCommandRunner *events.ApplyCommandRunner
 var unlockCommandRunner *events.UnlockCommandRunner
+var preWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
 
 func setup(t *testing.T) *vcsmocks.MockClient {
 	RegisterMockTestingT(t)
@@ -70,8 +71,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	githubGetter = mocks.NewMockGithubPullGetter()
 	gitlabGetter = mocks.NewMockGitlabMergeRequestGetter()
 	azuredevopsGetter = mocks.NewMockAzureDevopsPullGetter()
-	logger := logmocks.NewMockSimpleLogging()
-	pullLogger = logging.NewSimpleLogger("runatlantis/atlantis#1", true, logging.Info)
+	logger = logging.NewNoopLogger(t)
 	projectCommandRunner = mocks.NewMockProjectCommandRunner()
 	workingDir = mocks.NewMockWorkingDir()
 	pendingPlanFinder = mocks.NewMockPendingPlanFinder()
@@ -84,9 +84,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 
 	drainer = &events.Drainer{}
 	deleteLockCommand = eventmocks.NewMockDeleteLockCommand()
-	When(logger.GetLevel()).ThenReturn(logging.Info)
-	When(logger.NewLogger("runatlantis/atlantis#1", true, logging.Info)).
-		ThenReturn(pullLogger)
+	applyLockChecker = lockingmocks.NewMockApplyLockChecker()
 
 	dbUpdater = &events.DBUpdater{
 		DB: defaultBoltDB,
@@ -104,15 +102,18 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	}
 
 	parallelPoolSize := 1
+	SilenceNoProjects := false
 	policyCheckCommandRunner = events.NewPolicyCheckCommandRunner(
 		dbUpdater,
 		pullUpdater,
 		commitUpdater,
 		projectCommandRunner,
 		parallelPoolSize,
+		false,
 	)
 
 	planCommandRunner = events.NewPlanCommandRunner(
+		false,
 		false,
 		vcsClient,
 		pendingPlanFinder,
@@ -125,12 +126,14 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		policyCheckCommandRunner,
 		autoMerger,
 		parallelPoolSize,
+		SilenceNoProjects,
+		defaultBoltDB,
 	)
 
 	applyCommandRunner = events.NewApplyCommandRunner(
 		vcsClient,
 		false,
-		false,
+		applyLockChecker,
 		commitUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
@@ -139,6 +142,8 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		dbUpdater,
 		defaultBoltDB,
 		parallelPoolSize,
+		SilenceNoProjects,
+		false,
 	)
 
 	approvePoliciesCommandRunner = events.NewApprovePoliciesCommandRunner(
@@ -147,11 +152,14 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		projectCommandRunner,
 		pullUpdater,
 		dbUpdater,
+		SilenceNoProjects,
+		false,
 	)
 
 	unlockCommandRunner = events.NewUnlockCommandRunner(
 		deleteLockCommand,
 		vcsClient,
+		SilenceNoProjects,
 	)
 
 	commentCommandRunnerByCmd := map[models.CommandName]events.CommentCommandRunner{
@@ -161,17 +169,23 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		models.UnlockCommand:          unlockCommandRunner,
 	}
 
+	preWorkflowHooksCommandRunner = mocks.NewMockPreWorkflowHooksCommandRunner()
+
+	When(preWorkflowHooksCommandRunner.RunPreHooks(matchers.AnyPtrToEventsCommandContext())).ThenReturn(nil)
+
 	ch = events.DefaultCommandRunner{
-		VCSClient:                 vcsClient,
-		CommentCommandRunnerByCmd: commentCommandRunnerByCmd,
-		EventParser:               eventParsing,
-		GithubPullGetter:          githubGetter,
-		GitlabMergeRequestGetter:  gitlabGetter,
-		AzureDevopsPullGetter:     azuredevopsGetter,
-		Logger:                    logger,
-		AllowForkPRs:              false,
-		AllowForkPRsFlag:          "allow-fork-prs-flag",
-		Drainer:                   drainer,
+		VCSClient:                     vcsClient,
+		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
+		EventParser:                   eventParsing,
+		GithubPullGetter:              githubGetter,
+		GitlabMergeRequestGetter:      gitlabGetter,
+		AzureDevopsPullGetter:         azuredevopsGetter,
+		Logger:                        logger,
+		AllowForkPRs:                  false,
+		AllowForkPRsFlag:              "allow-fork-prs-flag",
+		Drainer:                       drainer,
+		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
+		PullStatusFetcher:             defaultBoltDB,
 	}
 	return vcsClient
 }
@@ -183,22 +197,6 @@ func TestRunCommentCommand_LogPanics(t *testing.T) {
 	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, 1, &events.CommentCommand{Name: models.PlanCommand})
 	_, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString()).GetCapturedArguments()
 	Assert(t, strings.Contains(comment, "Error: goroutine panic"), fmt.Sprintf("comment should be about a goroutine panic but was %q", comment))
-}
-
-func TestRunCommentCommand_NoGithubPullGetter(t *testing.T) {
-	t.Log("if DefaultCommandRunner was constructed with a nil GithubPullGetter an error should be logged")
-	setup(t)
-	ch.GithubPullGetter = nil
-	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, 1, nil)
-	Equals(t, "[EROR] Atlantis not configured to support GitHub\n", pullLogger.History.String())
-}
-
-func TestRunCommentCommand_NoGitlabMergeGetter(t *testing.T) {
-	t.Log("if DefaultCommandRunner was constructed with a nil GitlabMergeRequestGetter an error should be logged")
-	setup(t)
-	ch.GitlabMergeRequestGetter = nil
-	ch.RunCommentCommand(fixtures.GitlabRepo, &fixtures.GitlabRepo, nil, fixtures.User, 1, nil)
-	Equals(t, "[EROR] Atlantis not configured to support GitLab\n", pullLogger.History.String())
 }
 
 func TestRunCommentCommand_GithubPullErr(t *testing.T) {
@@ -270,6 +268,82 @@ func TestRunCommentCommand_ForkPRDisabled_SilenceEnabled(t *testing.T) {
 	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
 }
 
+func TestRunCommentCommandPlan_NoProjects_SilenceEnabled(t *testing.T) {
+	t.Log("if a plan command is run on a pull request and SilenceNoProjects is enabled and we are silencing all comments if the modified files don't have a matching project")
+	vcsClient := setup(t)
+	planCommandRunner.SilenceNoProjects = true
+	var pull github.PullRequest
+	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState}
+	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
+	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
+
+	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.PlanCommand})
+	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
+	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+		matchers.AnyModelsRepo(),
+		matchers.AnyModelsPullRequest(),
+		matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
+		matchers.EqModelsCommandName(models.PlanCommand),
+		EqInt(0),
+		EqInt(0),
+	)
+}
+
+func TestRunCommentCommandApply_NoProjects_SilenceEnabled(t *testing.T) {
+	t.Log("if an apply command is run on a pull request and SilenceNoProjects is enabled and we are silencing all comments if the modified files don't have a matching project")
+	vcsClient := setup(t)
+	applyCommandRunner.SilenceNoProjects = true
+	var pull github.PullRequest
+	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState}
+	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
+	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
+
+	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.ApplyCommand})
+	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
+	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+		matchers.AnyModelsRepo(),
+		matchers.AnyModelsPullRequest(),
+		matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
+		matchers.EqModelsCommandName(models.ApplyCommand),
+		EqInt(0),
+		EqInt(0),
+	)
+}
+
+func TestRunCommentCommandApprovePolicy_NoProjects_SilenceEnabled(t *testing.T) {
+	t.Log("if an approve_policy command is run on a pull request and SilenceNoProjects is enabled and we are silencing all comments if the modified files don't have a matching project")
+	vcsClient := setup(t)
+	approvePoliciesCommandRunner.SilenceNoProjects = true
+	var pull github.PullRequest
+	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState}
+	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
+	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
+
+	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.ApprovePoliciesCommand})
+	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
+	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+		matchers.AnyModelsRepo(),
+		matchers.AnyModelsPullRequest(),
+		matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
+		matchers.EqModelsCommandName(models.ApprovePoliciesCommand),
+		EqInt(0),
+		EqInt(0),
+	)
+}
+
+func TestRunCommentCommandUnlock_NoProjects_SilenceEnabled(t *testing.T) {
+	t.Log("if an unlock command is run on a pull request and SilenceNoProjects is enabled and we are silencing all comments if the modified files don't have a matching project")
+	vcsClient := setup(t)
+	unlockCommandRunner.SilenceNoProjects = true
+	var pull github.PullRequest
+	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState}
+	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
+	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
+
+	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.UnlockCommand})
+	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
+}
+
 func TestRunCommentCommand_DisableApplyAllDisabled(t *testing.T) {
 	t.Log("if \"atlantis apply\" is run and this is disabled atlantis should" +
 		" comment saying that this is not allowed")
@@ -284,23 +358,6 @@ func TestRunCommentCommand_DisableApplyAllDisabled(t *testing.T) {
 
 	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, modelPull.Num, &events.CommentCommand{Name: models.ApplyCommand})
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "**Error:** Running `atlantis apply` without flags is disabled. You must specify which project to apply via the `-d <dir>`, `-w <workspace>` or `-p <project name>` flags.", "apply")
-}
-
-func TestRunCommentCommand_ApplyDisabled(t *testing.T) {
-	t.Log("if \"atlantis apply\" is run and this is disabled globally atlantis should" +
-		" comment saying that this is not allowed")
-	vcsClient := setup(t)
-	applyCommandRunner.DisableApply = true
-	defer func() { applyCommandRunner.DisableApply = false }()
-	pull := &github.PullRequest{
-		State: github.String("open"),
-	}
-	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState, Num: fixtures.Pull.Num}
-	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
-	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
-
-	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, modelPull.Num, &events.CommentCommand{Name: models.ApplyCommand})
-	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "**Error:** Running `atlantis apply` is disabled.", "apply")
 }
 
 func TestRunCommentCommand_DisableDisableAutoplan(t *testing.T) {
@@ -367,7 +424,7 @@ func TestRunUnlockCommandFail_VCSComment(t *testing.T) {
 	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, State: models.OpenPullState, Num: fixtures.Pull.Num}
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
-	When(deleteLockCommand.DeleteLocksByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(errors.New("err"))
+	When(deleteLockCommand.DeleteLocksByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(0, errors.New("err"))
 
 	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.UnlockCommand})
 
@@ -561,16 +618,14 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 	When(ch.VCSClient.PullIsMergeable(fixtures.GithubRepo, modelPull)).ThenReturn(true, nil)
 
 	When(projectCommandBuilder.BuildApplyCommands(matchers.AnyPtrToEventsCommandContext(), matchers.AnyPtrToEventsCommentCommand())).Then(func(args []Param) ReturnValues {
-		ctx := args[0].(*events.CommandContext)
-		Equals(t, false, ctx.PullMergeable)
-
 		return ReturnValues{
 			[]models.ProjectCommandContext{
 				{
-					CommandName: models.ApplyCommand,
-					ProjectName: "default",
-					Workspace:   "default",
-					RepoRelDir:  ".",
+					CommandName:       models.ApplyCommand,
+					ProjectName:       "default",
+					Workspace:         "default",
+					RepoRelDir:        ".",
+					ProjectPlanStatus: models.ErroredPolicyCheckStatus,
 				},
 			},
 			nil,
@@ -594,8 +649,12 @@ func TestApplyWithAutoMerge_VSCMerge(t *testing.T) {
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
+	pullOptions := models.PullRequestOptions{
+		DeleteSourceBranchOnMerge: false,
+	}
+
 	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.ApplyCommand})
-	vcsClient.VerifyWasCalledOnce().MergePull(modelPull)
+	vcsClient.VerifyWasCalledOnce().MergePull(modelPull, pullOptions)
 }
 
 func TestRunApply_DiscardedProjects(t *testing.T) {
@@ -633,7 +692,8 @@ func TestRunApply_DiscardedProjects(t *testing.T) {
 	When(workingDir.GetPullDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).
 		ThenReturn(tmp, nil)
 	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, &pull, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.ApplyCommand})
-	vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest())
+
+	vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest(), matchers.AnyModelsPullRequestOptions())
 }
 
 func TestRunCommentCommand_DrainOngoing(t *testing.T) {
@@ -645,7 +705,7 @@ func TestRunCommentCommand_DrainOngoing(t *testing.T) {
 }
 
 func TestRunCommentCommand_DrainNotOngoing(t *testing.T) {
-	t.Log("if drain is not ongoing then remove ongoing operation must be called even if panic occured")
+	t.Log("if drain is not ongoing then remove ongoing operation must be called even if panic occurred")
 	setup(t)
 	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenPanic("panic test - if you're seeing this in a test failure this isn't the failing test")
 	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, nil)
@@ -662,7 +722,7 @@ func TestRunAutoplanCommand_DrainOngoing(t *testing.T) {
 }
 
 func TestRunAutoplanCommand_DrainNotOngoing(t *testing.T) {
-	t.Log("if drain is not ongoing then remove ongoing operation must be called even if panic occured")
+	t.Log("if drain is not ongoing then remove ongoing operation must be called even if panic occurred")
 	setup(t)
 	fixtures.Pull.BaseRepo = fixtures.GithubRepo
 	When(projectCommandBuilder.BuildAutoplanCommands(matchers.AnyPtrToEventsCommandContext())).ThenPanic("panic test - if you're seeing this in a test failure this isn't the failing test")

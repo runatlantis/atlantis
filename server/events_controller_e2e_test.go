@@ -25,6 +25,8 @@ import (
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/runtime"
+	runtimemocks "github.com/runatlantis/atlantis/server/events/runtime/mocks"
+	runtimematchers "github.com/runatlantis/atlantis/server/events/runtime/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/runtime/policy"
 	"github.com/runatlantis/atlantis/server/events/terraform"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
@@ -35,7 +37,14 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
+const ConftestVersion = "0.23.0"
+
+var applyLocker locking.ApplyLocker
+var userConfig server.UserConfig
+
 type NoopTFDownloader struct{}
+
+var mockPreWorkflowHookRunner *runtimemocks.MockPreWorkflowHookRunner
 
 func (m *NoopTFDownloader) GetFile(dst, src string, opts ...getter.ClientOption) error {
 	return nil
@@ -49,7 +58,7 @@ type LocalConftestCache struct {
 }
 
 func (m *LocalConftestCache) Get(key *version.Version) (string, error) {
-	return exec.LookPath("conftest0.21.0")
+	return exec.LookPath(fmt.Sprintf("conftest%s", ConftestVersion))
 }
 
 func TestGitHubWorkflow(t *testing.T) {
@@ -69,6 +78,10 @@ func TestGitHubWorkflow(t *testing.T) {
 		ModifiedFiles []string
 		// Comments are what our mock user writes to the pull request.
 		Comments []string
+		// DisableApply flag used by userConfig object when initializing atlantis server.
+		DisableApply bool
+		// ApplyLock creates an apply lock that temporarily disables apply command
+		ApplyLock bool
 		// ExpAutomerge is true if we expect Atlantis to automerge.
 		ExpAutomerge bool
 		// ExpAutoplan is true if we expect Atlantis to autoplan.
@@ -332,12 +345,48 @@ func TestGitHubWorkflow(t *testing.T) {
 				{"exp-output-merge.txt"},
 			},
 		},
+		{
+			Description:   "global apply lock disables apply commands",
+			RepoDir:       "simple-yaml",
+			ModifiedFiles: []string{"main.tf"},
+			DisableApply:  false,
+			ApplyLock:     true,
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-apply-locked.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description:   "disable apply flag always takes presedence",
+			RepoDir:       "simple-yaml",
+			ModifiedFiles: []string{"main.tf"},
+			DisableApply:  true,
+			ApplyLock:     false,
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-apply-locked.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			RegisterMockTestingT(t)
 
-			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir, false)
+			// reset userConfig
+			userConfig = server.UserConfig{}
+			userConfig.DisableApply = c.DisableApply
+
+			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir)
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
 			defer cleanup()
@@ -353,6 +402,11 @@ func TestGitHubWorkflow(t *testing.T) {
 			ctrl.Post(w, pullOpenedReq)
 			responseContains(t, w, 200, "Processing...")
 
+			// Create global apply lock if required
+			if c.ApplyLock {
+				_, _ = applyLocker.LockApply()
+			}
+
 			// Now send any other comments.
 			for _, comment := range c.Comments {
 				commentReq := GitHubCommentEvent(t, comment)
@@ -367,6 +421,9 @@ func TestGitHubWorkflow(t *testing.T) {
 			w = httptest.NewRecorder()
 			ctrl.Post(w, pullClosedReq)
 			responseContains(t, w, 200, "Pull request cleaned successfully")
+
+			// Let's verify the pre-workflow hook was called for each comment including the pull request opened event
+			mockPreWorkflowHookRunner.VerifyWasCalled(Times(len(c.Comments)+1)).Run(runtimematchers.AnyModelsPreWorkflowHookCommandContext(), EqString("some dummy command"), AnyString())
 
 			// Now we're ready to verify Atlantis made all the comments back (or
 			// replies) that we expect.  We expect each plan to have 1 comment,
@@ -390,9 +447,9 @@ func TestGitHubWorkflow(t *testing.T) {
 
 			if c.ExpAutomerge {
 				// Verify that the merge API call was made.
-				vcsClient.VerifyWasCalledOnce().MergePull(matchers.AnyModelsPullRequest())
+				vcsClient.VerifyWasCalledOnce().MergePull(matchers.AnyModelsPullRequest(), matchers.AnyModelsPullRequestOptions())
 			} else {
-				vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest())
+				vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest(), matchers.AnyModelsPullRequestOptions())
 			}
 		})
 	}
@@ -428,25 +485,53 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 		ExpReplies [][]string
 	}{
 		{
-			Description:   "failing policy approved by the owner",
-			RepoDir:       "policy-checks",
-			ModifiedFiles: []string{"main.tf"},
+			Description:   "1 failing policy and 1 passing policy ",
+			RepoDir:       "policy-checks-multi-projects",
+			ModifiedFiles: []string{"dir1/main.tf,", "dir2/main.tf"},
 			ExpAutoplan:   true,
 			Comments: []string{
-				"atlantis approve_policies",
 				"atlantis apply",
 			},
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
 				{"exp-output-auto-policy-check.txt"},
-				{"exp-output-approve-policies.txt"},
 				{"exp-output-apply.txt"},
 				{"exp-output-merge.txt"},
 			},
 		},
 		{
-			Description:   "failing policy without approval",
+			Description:   "failing policy without policies passing using extra args",
+			RepoDir:       "policy-checks-extra-args",
+			ModifiedFiles: []string{"main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
+				{"exp-output-apply-failed.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description:   "failing policy without policies passing",
 			RepoDir:       "policy-checks",
+			ModifiedFiles: []string{"main.tf"},
+			ExpAutoplan:   true,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
+				{"exp-output-apply-failed.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description:   "failing policy additional apply requirements specified",
+			RepoDir:       "policy-checks-apply-reqs",
 			ModifiedFiles: []string{"main.tf"},
 			ExpAutoplan:   true,
 			Comments: []string{
@@ -482,7 +567,11 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 		t.Run(c.Description, func(t *testing.T) {
 			RegisterMockTestingT(t)
 
-			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir, true)
+			// reset userConfig
+			userConfig = server.UserConfig{}
+			userConfig.EnablePolicyChecksFlag = true
+
+			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir)
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
 			defer cleanup()
@@ -491,6 +580,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			// Setup test dependencies.
 			w := httptest.NewRecorder()
 			When(vcsClient.PullIsMergeable(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(true, nil)
+			When(vcsClient.PullIsApproved(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(true, nil)
 			When(githubGetter.GetPullRequest(AnyRepo(), AnyInt())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
 			When(vcsClient.GetModifiedFiles(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
 
@@ -544,24 +634,24 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 
 			if c.ExpAutomerge {
 				// Verify that the merge API call was made.
-				vcsClient.VerifyWasCalledOnce().MergePull(matchers.AnyModelsPullRequest())
+				vcsClient.VerifyWasCalledOnce().MergePull(matchers.AnyModelsPullRequest(), matchers.AnyModelsPullRequestOptions())
 			} else {
-				vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest())
+				vcsClient.VerifyWasCalled(Never()).MergePull(matchers.AnyModelsPullRequest(), matchers.AnyModelsPullRequestOptions())
 			}
 		})
 	}
 }
 
-func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.EventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
+func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
 	allowForkPRs := false
 	dataDir, binDir, cacheDir, cleanup := mkSubDirs(t)
 	defer cleanup()
 
 	//env vars
 
-	if policyChecksEnabled {
+	if userConfig.EnablePolicyChecksFlag {
 		// need this to be set or we'll fail the policy check step
-		os.Setenv(policy.DefaultConftestVersionEnvKey, "0.21.0")
+		os.Setenv(policy.DefaultConftestVersionEnvKey, "0.23.0")
 	}
 
 	// Mocks.
@@ -571,7 +661,8 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 	e2eGitlabGetter := mocks.NewMockGitlabMergeRequestGetter()
 
 	// Real dependencies.
-	logger := logging.NewSimpleLogger("server", true, logging.Error)
+	logger := logging.NewNoopLogger(t)
+
 	eventParser := &events.EventParser{
 		GithubUser:  "github-user",
 		GithubToken: "github-token",
@@ -587,6 +678,7 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 	boltdb, err := db.New(dataDir)
 	Ok(t, err)
 	lockingClient := locking.NewClient(boltdb)
+	applyLocker = locking.NewApplyClient(boltdb, userConfig.DisableApply)
 	projectLocker := &events.DefaultProjectLocker{
 		Locker:    lockingClient,
 		VCSClient: e2eVCSClient,
@@ -599,7 +691,20 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 	defaultTFVersion := terraformClient.DefaultVersion()
 	locker := events.NewDefaultWorkingDirLocker()
 	parser := &yaml.ParserValidator{}
-	globalCfg := valid.NewGlobalCfg(true, false, false)
+
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowRepoCfg: true,
+		MergeableReq: false,
+		ApprovedReq:  false,
+		PreWorkflowHooks: []*valid.PreWorkflowHook{
+			{
+				StepName:   "global_hook",
+				RunCommand: "some dummy command",
+			},
+		},
+		PolicyCheckEnabled: userConfig.EnablePolicyChecksFlag,
+	}
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
 	expCfgPath := filepath.Join(absRepoPath(t, repoDir), "repos.yaml")
 	if _, err := os.Stat(expCfgPath); err == nil {
 		globalCfg, err = parser.ParseGlobalCfg(expCfgPath, globalCfg)
@@ -608,18 +713,18 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 	drainer := &events.Drainer{}
 
 	parallelPoolSize := 1
+	silenceNoProjects := false
 
+	mockPreWorkflowHookRunner = runtimemocks.NewMockPreWorkflowHookRunner()
 	preWorkflowHooksCommandRunner := &events.DefaultPreWorkflowHooksCommandRunner{
 		VCSClient:             e2eVCSClient,
 		GlobalCfg:             globalCfg,
-		Logger:                logger,
 		WorkingDirLocker:      locker,
 		WorkingDir:            workingDir,
-		Drainer:               drainer,
-		PreWorkflowHookRunner: &runtime.PreWorkflowHookRunner{},
+		PreWorkflowHookRunner: mockPreWorkflowHookRunner,
 	}
 	projectCommandBuilder := events.NewProjectCommandBuilder(
-		policyChecksEnabled,
+		userConfig.EnablePolicyChecksFlag,
 		parser,
 		&events.DefaultProjectFinder{},
 		e2eVCSClient,
@@ -629,13 +734,15 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 		&events.DefaultPendingPlanFinder{},
 		commentParser,
 		false,
+		false,
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTFVersion)
 
 	Ok(t, err)
 
-	conftestVersion, _ := version.NewVersion("0.21.0")
+	conftestVersion, _ := version.NewVersion(ConftestVersion)
 
 	conftextExec := policy.NewConfTestExecutorWorkflow(logger, binDir, &NoopTFDownloader{})
 
@@ -697,9 +804,11 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 		e2eStatusUpdater,
 		projectCommandRunner,
 		parallelPoolSize,
+		false,
 	)
 
 	planCommandRunner := events.NewPlanCommandRunner(
+		false,
 		false,
 		e2eVCSClient,
 		&events.DefaultPendingPlanFinder{},
@@ -712,12 +821,14 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 		policyCheckCommandRunner,
 		autoMerger,
 		parallelPoolSize,
+		silenceNoProjects,
+		boltdb,
 	)
 
 	applyCommandRunner := events.NewApplyCommandRunner(
 		e2eVCSClient,
 		false,
-		false,
+		applyLocker,
 		e2eStatusUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
@@ -726,6 +837,8 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 		dbUpdater,
 		boltdb,
 		parallelPoolSize,
+		silenceNoProjects,
+		false,
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
@@ -734,11 +847,14 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 		projectCommandRunner,
 		pullUpdater,
 		dbUpdater,
+		silenceNoProjects,
+		false,
 	)
 
 	unlockCommandRunner := events.NewUnlockCommandRunner(
 		mocks.NewMockDeleteLockCommand(),
 		e2eVCSClient,
+		silenceNoProjects,
 	)
 
 	commentCommandRunnerByCmd := map[models.CommandName]events.CommentCommandRunner{
@@ -749,24 +865,25 @@ func setupE2E(t *testing.T, repoDir string, policyChecksEnabled bool) (server.Ev
 	}
 
 	commandRunner := &events.DefaultCommandRunner{
-		EventParser:               eventParser,
-		VCSClient:                 e2eVCSClient,
-		GithubPullGetter:          e2eGithubGetter,
-		GitlabMergeRequestGetter:  e2eGitlabGetter,
-		Logger:                    logger,
-		AllowForkPRs:              allowForkPRs,
-		AllowForkPRsFlag:          "allow-fork-prs",
-		CommentCommandRunnerByCmd: commentCommandRunnerByCmd,
-		Drainer:                   drainer,
+		EventParser:                   eventParser,
+		VCSClient:                     e2eVCSClient,
+		GithubPullGetter:              e2eGithubGetter,
+		GitlabMergeRequestGetter:      e2eGitlabGetter,
+		Logger:                        logger,
+		AllowForkPRs:                  allowForkPRs,
+		AllowForkPRsFlag:              "allow-fork-prs",
+		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
+		Drainer:                       drainer,
+		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
+		PullStatusFetcher:             boltdb,
 	}
 
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
 	Ok(t, err)
 
 	ctrl := server.EventsController{
-		TestingMode:                   true,
-		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
-		CommandRunner:                 commandRunner,
+		TestingMode:   true,
+		CommandRunner: commandRunner,
 		PullCleaner: &events.PullClosedExecutor{
 			Locker:     lockingClient,
 			VCSClient:  e2eVCSClient,
@@ -795,7 +912,7 @@ func (m *mockLockURLGenerator) GenerateLockURL(lockID string) string {
 
 type mockWebhookSender struct{}
 
-func (w *mockWebhookSender) Send(log *logging.SimpleLogger, result webhooks.ApplyResult) error {
+func (w *mockWebhookSender) Send(log logging.SimpleLogging, result webhooks.ApplyResult) error {
 	return nil
 }
 
@@ -977,11 +1094,11 @@ func mkSubDirs(t *testing.T) (string, string, string, func()) {
 	return tmp, binDir, cachedir, cleanup
 }
 
-// Will fail test if conftest isn't in path and isn't version >= 0.21.0
+// Will fail test if conftest isn't in path and isn't version >= 0.23.0
 func ensureRunningConftest(t *testing.T) {
-	localPath, err := exec.LookPath("conftest0.21.0")
+	localPath, err := exec.LookPath(fmt.Sprintf("conftest%s", ConftestVersion))
 	if err != nil {
-		t.Log("conftest >= 0.21 must be installed to run this test")
+		t.Logf("conftest >= %s must be installed to run this test", ConftestVersion)
 		t.FailNow()
 	}
 	versionOutBytes, err := exec.Command(localPath, "--version").Output() // #nosec
@@ -997,7 +1114,7 @@ func ensureRunningConftest(t *testing.T) {
 	}
 	localVersion, err := version.NewVersion(match[1])
 	Ok(t, err)
-	minVersion, err := version.NewVersion("0.21.0")
+	minVersion, err := version.NewVersion(ConftestVersion)
 	Ok(t, err)
 	if localVersion.LessThan(minVersion) {
 		t.Logf("must have contest version >= %s, you have %s", minVersion, localVersion)

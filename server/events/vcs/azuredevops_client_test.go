@@ -127,6 +127,8 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 					Owner:    "owner",
 					Name:     "repo",
 				},
+			}, models.PullRequestOptions{
+				DeleteSourceBranchOnMerge: false,
 			})
 			if c.expErr == "" {
 				Ok(t, err)

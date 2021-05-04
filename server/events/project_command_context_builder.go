@@ -33,7 +33,7 @@ type ProjectCommandContextBuilder interface {
 		prjCfg valid.MergedProjectCfg,
 		commentFlags []string,
 		repoDir string,
-		automerge, parallelPlan, parallelApply, verbose bool,
+		automerge, deleteSourceBranchOnMerge, parallelPlan, parallelApply, verbose bool,
 	) []models.ProjectCommandContext
 }
 
@@ -47,7 +47,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 	prjCfg valid.MergedProjectCfg,
 	commentFlags []string,
 	repoDir string,
-	automerge, parallelApply, parallelPlan, verbose bool,
+	automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose bool,
 ) (projectCmds []models.ProjectCommandContext) {
 	ctx.Log.Debug("Building project command context for %s", cmdName)
 
@@ -75,6 +75,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		prjCfg.PolicySets,
 		escapeArgs(commentFlags),
 		automerge,
+		deleteSourceBranchOnMerge,
 		parallelApply,
 		parallelPlan,
 		verbose,
@@ -94,7 +95,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 	prjCfg valid.MergedProjectCfg,
 	commentFlags []string,
 	repoDir string,
-	automerge, parallelApply, parallelPlan, verbose bool,
+	automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose bool,
 ) (projectCmds []models.ProjectCommandContext) {
 	ctx.Log.Debug("PolicyChecks are enabled")
 	projectCmds = cb.ProjectCommandContextBuilder.BuildProjectContext(
@@ -104,6 +105,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 		commentFlags,
 		repoDir,
 		automerge,
+		deleteSourceBranchOnMerge,
 		parallelApply,
 		parallelPlan,
 		verbose,
@@ -123,6 +125,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 			prjCfg.PolicySets,
 			escapeArgs(commentFlags),
 			automerge,
+			deleteSourceBranchOnMerge,
 			parallelApply,
 			parallelPlan,
 			verbose,
@@ -143,34 +146,56 @@ func newProjectCommandContext(ctx *CommandContext,
 	policySets valid.PolicySets,
 	escapedCommentArgs []string,
 	automergeEnabled bool,
+	deleteSourceBranchOnMerge,
 	parallelApplyEnabled bool,
 	parallelPlanEnabled bool,
 	verbose bool,
 ) models.ProjectCommandContext {
+
+	var projectPlanStatus models.ProjectPlanStatus
+
+	if ctx.PullStatus != nil {
+		for _, project := range ctx.PullStatus.Projects {
+
+			// if name is not used, let's match the directory
+			if projCfg.Name == "" && project.RepoRelDir == projCfg.RepoRelDir {
+				projectPlanStatus = project.Status
+				break
+			}
+
+			if projCfg.Name != "" && project.ProjectName == projCfg.Name {
+				projectPlanStatus = project.Status
+				break
+			}
+		}
+	}
+
 	return models.ProjectCommandContext{
-		CommandName:          cmd,
-		ApplyCmd:             applyCmd,
-		BaseRepo:             ctx.Pull.BaseRepo,
-		EscapedCommentArgs:   escapedCommentArgs,
-		AutomergeEnabled:     automergeEnabled,
-		ParallelApplyEnabled: parallelApplyEnabled,
-		ParallelPlanEnabled:  parallelPlanEnabled,
-		AutoplanEnabled:      projCfg.AutoplanEnabled,
-		Steps:                steps,
-		HeadRepo:             ctx.HeadRepo,
-		Log:                  ctx.Log,
-		PullMergeable:        ctx.PullMergeable,
-		Pull:                 ctx.Pull,
-		ProjectName:          projCfg.Name,
-		ApplyRequirements:    projCfg.ApplyRequirements,
-		RePlanCmd:            planCmd,
-		RepoRelDir:           projCfg.RepoRelDir,
-		RepoConfigVersion:    projCfg.RepoCfgVersion,
-		TerraformVersion:     projCfg.TerraformVersion,
-		User:                 ctx.User,
-		Verbose:              verbose,
-		Workspace:            projCfg.Workspace,
-		PolicySets:           policySets,
+		CommandName:               cmd,
+		ApplyCmd:                  applyCmd,
+		BaseRepo:                  ctx.Pull.BaseRepo,
+		EscapedCommentArgs:        escapedCommentArgs,
+		AutomergeEnabled:          automergeEnabled,
+		DeleteSourceBranchOnMerge: deleteSourceBranchOnMerge,
+		ParallelApplyEnabled:      parallelApplyEnabled,
+		ParallelPlanEnabled:       parallelPlanEnabled,
+		AutoplanEnabled:           projCfg.AutoplanEnabled,
+		Steps:                     steps,
+		HeadRepo:                  ctx.HeadRepo,
+		Log:                       ctx.Log,
+		PullMergeable:             ctx.PullMergeable,
+		ProjectPlanStatus:         projectPlanStatus,
+		Pull:                      ctx.Pull,
+		ProjectName:               projCfg.Name,
+		ApplyRequirements:         projCfg.ApplyRequirements,
+		RePlanCmd:                 planCmd,
+		RepoRelDir:                projCfg.RepoRelDir,
+		RepoConfigVersion:         projCfg.RepoCfgVersion,
+		TerraformVersion:          projCfg.TerraformVersion,
+		User:                      ctx.User,
+		Verbose:                   verbose,
+		Workspace:                 projCfg.Workspace,
+		PolicySets:                policySets,
 	}
 }
 

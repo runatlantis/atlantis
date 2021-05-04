@@ -1,0 +1,16 @@
+policies:
+  owners:
+    users:
+      - runatlantis
+  policy_sets:
+    - name: test_policy
+      path: policies/policy.rego
+      source: local
+workflows:
+  default:
+    policy_check:
+      steps:
+        - show
+        - policy_check:
+            extra_args: ["--all-namespaces"]
+        

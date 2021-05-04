@@ -161,7 +161,7 @@ func TestSend_SingleSuccess(t *testing.T) {
 	manager := webhooks.MultiWebhookSender{
 		Webhooks: []webhooks.Sender{sender},
 	}
-	logger := logging.NewNoopLogger()
+	logger := logging.NewNoopLogger(t)
 	result := webhooks.ApplyResult{}
 	manager.Send(logger, result) // nolint: errcheck
 	sender.VerifyWasCalledOnce().Send(logger, result)
@@ -178,7 +178,7 @@ func TestSend_MultipleSuccess(t *testing.T) {
 	manager := webhooks.MultiWebhookSender{
 		Webhooks: []webhooks.Sender{senders[0], senders[1], senders[2]},
 	}
-	logger := logging.NewNoopLogger()
+	logger := logging.NewNoopLogger(t)
 	result := webhooks.ApplyResult{}
 	err := manager.Send(logger, result)
 	Ok(t, err)

@@ -16,16 +16,16 @@ func (c *PullUpdater) updatePull(ctx *CommandContext, command PullCommand, res C
 		ctx.Log.Warn(res.Failure)
 	}
 
-	// HidePrevPlanComments will hide old comments left from previous plan runs to reduce
+	// HidePrevCommandComments will hide old comments left from previous runs to reduce
 	// clutter in a pull/merge request. This will not delete the comment, since the
 	// comment trail may be useful in auditing or backtracing problems.
 	if c.HidePrevPlanComments {
-		if err := c.VCSClient.HidePrevPlanComments(ctx.Pull.BaseRepo, ctx.Pull.Num); err != nil {
+		if err := c.VCSClient.HidePrevCommandComments(ctx.Pull.BaseRepo, ctx.Pull.Num, command.CommandName().TitleString()); err != nil {
 			ctx.Log.Err("unable to hide old comments: %s", err)
 		}
 	}
 
-	comment := c.MarkdownRenderer.Render(res, command.CommandName(), ctx.Log.History.String(), command.IsVerbose(), ctx.Pull.BaseRepo.VCSHost.Type)
+	comment := c.MarkdownRenderer.Render(res, command.CommandName(), ctx.Log.GetHistory(), command.IsVerbose(), ctx.Pull.BaseRepo.VCSHost.Type)
 	if err := c.VCSClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, comment, command.CommandName().String()); err != nil {
 		ctx.Log.Err("unable to comment: %s", err)
 	}

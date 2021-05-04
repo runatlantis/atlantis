@@ -49,12 +49,14 @@ func TestNewGlobalCfg(t *testing.T) {
 	baseCfg := valid.GlobalCfg{
 		Repos: []valid.Repo{
 			{
-				IDRegex:              regexp.MustCompile(".*"),
-				ApplyRequirements:    []string{},
-				Workflow:             &expDefaultWorkflow,
-				AllowedWorkflows:     []string{},
-				AllowedOverrides:     []string{},
-				AllowCustomWorkflows: Bool(false),
+				IDRegex:                   regexp.MustCompile(".*"),
+				BranchRegex:               regexp.MustCompile(".*"),
+				ApplyRequirements:         []string{},
+				Workflow:                  &expDefaultWorkflow,
+				AllowedWorkflows:          []string{},
+				AllowedOverrides:          []string{},
+				AllowCustomWorkflows:      Bool(false),
+				DeleteSourceBranchOnMerge: Bool(false),
 			},
 		},
 		Workflows: map[string]valid.Workflow{
@@ -108,19 +110,17 @@ func TestNewGlobalCfg(t *testing.T) {
 			// For each test, we change our expected cfg based on the parameters.
 			exp := deepcopy.Copy(baseCfg).(valid.GlobalCfg)
 			exp.Repos[0].IDRegex = regexp.MustCompile(".*") // deepcopy doesn't copy the regex.
+			exp.Repos[0].BranchRegex = regexp.MustCompile(".*")
 
 			if c.allowRepoCfg {
 				exp.Repos[0].AllowCustomWorkflows = Bool(true)
-				exp.Repos[0].AllowedOverrides = []string{"apply_requirements", "workflow"}
+				exp.Repos[0].AllowedOverrides = []string{"apply_requirements", "workflow", "delete_source_branch_on_merge"}
 			}
 			if c.mergeableReq {
 				exp.Repos[0].ApplyRequirements = append(exp.Repos[0].ApplyRequirements, "mergeable")
 			}
 			if c.approvedReq {
 				exp.Repos[0].ApplyRequirements = append(exp.Repos[0].ApplyRequirements, "approved")
-			}
-			if exp.Repos[0].PreWorkflowHooks == nil {
-				exp.Repos[0].PreWorkflowHooks = []*valid.PreWorkflowHook{}
 			}
 
 			Equals(t, exp, act)
@@ -131,6 +131,10 @@ func TestNewGlobalCfg(t *testing.T) {
 				if expRepo.IDRegex != nil {
 					Assert(t, expRepo.IDRegex.String() == actRepo.IDRegex.String(),
 						"%q != %q for repos[%d]", expRepo.IDRegex.String(), actRepo.IDRegex.String(), i)
+				}
+				if expRepo.BranchRegex != nil {
+					Assert(t, expRepo.BranchRegex.String() == actRepo.BranchRegex.String(),
+						"%q != %q for repos[%d]", expRepo.BranchRegex.String(), actRepo.BranchRegex.String(), i)
 				}
 			}
 		})
@@ -545,7 +549,7 @@ policies:
 
 			Equals(t,
 				c.exp,
-				global.MergeProjectCfg(logging.NewNoopLogger(), c.repoID, c.proj, valid.RepoCfg{}))
+				global.MergeProjectCfg(logging.NewNoopLogger(t), c.repoID, c.proj, valid.RepoCfg{}))
 		})
 	}
 }
@@ -703,7 +707,7 @@ repos:
 			}
 
 			global.PolicySets = emptyPolicySets
-			Equals(t, c.exp, global.MergeProjectCfg(logging.NewNoopLogger(), c.repoID, c.proj, valid.RepoCfg{Workflows: c.repoWorkflows}))
+			Equals(t, c.exp, global.MergeProjectCfg(logging.NewNoopLogger(t), c.repoID, c.proj, valid.RepoCfg{Workflows: c.repoWorkflows}))
 		})
 	}
 }
@@ -724,6 +728,21 @@ func TestRepo_IDMatches(t *testing.T) {
 func TestRepo_IDString(t *testing.T) {
 	Equals(t, "github.com/owner/repo", (valid.Repo{ID: "github.com/owner/repo"}).IDString())
 	Equals(t, "/regex.*/", (valid.Repo{IDRegex: regexp.MustCompile("regex.*")}).IDString())
+}
+
+func TestRepo_BranchMatches(t *testing.T) {
+	// Test matches when no branch regex is set.
+	Equals(t, true, (valid.Repo{}).BranchMatches("main"))
+
+	// Test regexes.
+	Equals(t, true, (valid.Repo{BranchRegex: regexp.MustCompile(".*")}).BranchMatches("main"))
+	Equals(t, true, (valid.Repo{BranchRegex: regexp.MustCompile("main")}).BranchMatches("main"))
+	Equals(t, false, (valid.Repo{BranchRegex: regexp.MustCompile("^main$")}).BranchMatches("foo-main"))
+	Equals(t, false, (valid.Repo{BranchRegex: regexp.MustCompile("^main$")}).BranchMatches("main-foo"))
+	Equals(t, true, (valid.Repo{BranchRegex: regexp.MustCompile("(main|master)")}).BranchMatches("main"))
+	Equals(t, true, (valid.Repo{BranchRegex: regexp.MustCompile("(main|master)")}).BranchMatches("master"))
+	Equals(t, true, (valid.Repo{BranchRegex: regexp.MustCompile("release")}).BranchMatches("release-stage"))
+	Equals(t, false, (valid.Repo{BranchRegex: regexp.MustCompile("release")}).BranchMatches("main"))
 }
 
 // String is a helper routine that allocates a new string value

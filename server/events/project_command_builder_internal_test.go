@@ -12,11 +12,14 @@ import (
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/events/yaml"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/logging"
+	logging_matchers "github.com/runatlantis/atlantis/server/logging/mocks/matchers"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 // Test different permutations of global and repo config.
 func TestBuildProjectCmdCtx(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	emptyPolicySets := valid.PolicySets{
 		Version:    nil,
 		PolicySets: []valid.PolicySet{},
@@ -62,7 +65,7 @@ workflows:
 				AutomergeEnabled:   false,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -112,7 +115,7 @@ projects:
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -164,7 +167,7 @@ projects:
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -225,7 +228,7 @@ projects:
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -372,7 +375,7 @@ workflows:
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -428,7 +431,7 @@ projects:
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -487,7 +490,7 @@ workflows:
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -530,7 +533,7 @@ projects:
 				AutomergeEnabled:   false,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -589,12 +592,15 @@ projects:
 				&DefaultPendingPlanFinder{},
 				&CommentParser{},
 				false,
+				false,
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 			)
 
 			// We run a test for each type of command.
 			for _, cmd := range []models.CommandName{models.PlanCommand, models.ApplyCommand} {
 				t.Run(cmd.String(), func(t *testing.T) {
 					ctxs, err := builder.buildProjectCommandCtx(&CommandContext{
+						Log: logger,
 						Pull: models.PullRequest{
 							BaseRepo: baseRepo,
 						},
@@ -641,7 +647,195 @@ projects:
 	}
 }
 
+func TestBuildProjectCmdCtx_WithRegExpCmdEnabled(t *testing.T) {
+	emptyPolicySets := valid.PolicySets{
+		Version:    nil,
+		PolicySets: []valid.PolicySet{},
+	}
+	baseRepo := models.Repo{
+		FullName: "owner/repo",
+		VCSHost: models.VCSHost{
+			Hostname: "github.com",
+		},
+	}
+	pull := models.PullRequest{
+		BaseRepo: baseRepo,
+	}
+	cases := map[string]struct {
+		globalCfg     string
+		repoCfg       string
+		expErr        string
+		expCtx        models.ProjectCommandContext
+		expPlanSteps  []string
+		expApplySteps []string
+	}{
+
+		// Test that if we've set global defaults, that they are used but the
+		// allowed project config values also come through.
+		"global defaults with repo cfg": {
+			globalCfg: `
+repos:
+- id: /.*/
+  workflow: default
+workflows:
+  default:
+    plan:
+      steps:
+      - init
+      - plan
+    apply:
+      steps:
+      - apply`,
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- name: myproject_1
+  dir: project1
+  workspace: myworkspace
+  autoplan:
+    enabled: true
+    when_modified: [../modules/**/*.tf]
+  terraform_version: v10.0
+- name: myproject_2
+  dir: project2
+  workspace: myworkspace
+  autoplan:
+    enabled: true
+    when_modified: [../modules/**/*.tf]
+  terraform_version: v10.0
+- name: myproject_3
+  dir: project3
+  workspace: myworkspace
+  autoplan:
+    enabled: true
+    when_modified: [../modules/**/*.tf]
+  terraform_version: v10.0
+  `,
+			expCtx: models.ProjectCommandContext{
+				ApplyCmd:           "atlantis apply -p myproject_1",
+				BaseRepo:           baseRepo,
+				EscapedCommentArgs: []string{`\f\l\a\g`},
+				AutomergeEnabled:   true,
+				AutoplanEnabled:    true,
+				HeadRepo:           models.Repo{},
+				Log:                logging.NewNoopLogger(t),
+				PullMergeable:      true,
+				Pull:               pull,
+				ProjectName:        "myproject_1",
+				ApplyRequirements:  []string{},
+				RepoConfigVersion:  3,
+				RePlanCmd:          "atlantis plan -p myproject_1 -- flag",
+				RepoRelDir:         "project1",
+				TerraformVersion:   mustVersion("10.0"),
+				User:               models.User{},
+				Verbose:            true,
+				Workspace:          "myworkspace",
+				PolicySets:         emptyPolicySets,
+			},
+			expPlanSteps:  []string{"init", "plan"},
+			expApplySteps: []string{"apply"},
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			tmp, cleanup := DirStructure(t, map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"modules": map[string]interface{}{
+					"module": map[string]interface{}{
+						"main.tf": nil,
+					},
+				},
+			})
+			defer cleanup()
+
+			workingDir := NewMockWorkingDir()
+			When(workingDir.Clone(logging_matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmp, false, nil)
+			vcsClient := vcsmocks.NewMockClient()
+			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"modules/module/main.tf"}, nil)
+
+			// Write and parse the global config file.
+			globalCfgPath := filepath.Join(tmp, "global.yaml")
+			Ok(t, ioutil.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
+			parser := &yaml.ParserValidator{}
+			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfg(false, false, false))
+			Ok(t, err)
+
+			if c.repoCfg != "" {
+				Ok(t, ioutil.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
+			}
+
+			builder := NewProjectCommandBuilder(
+				false,
+				parser,
+				&DefaultProjectFinder{},
+				vcsClient,
+				workingDir,
+				NewDefaultWorkingDirLocker(),
+				globalCfg,
+				&DefaultPendingPlanFinder{},
+				&CommentParser{},
+				false,
+				true,
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+			)
+
+			// We run a test for each type of command, again specific projects
+			for _, cmd := range []models.CommandName{models.PlanCommand, models.ApplyCommand} {
+				t.Run(cmd.String(), func(t *testing.T) {
+					ctxs, err := builder.buildProjectCommandCtx(&CommandContext{
+						Pull: models.PullRequest{
+							BaseRepo: baseRepo,
+						},
+						Log:           logging.NewNoopLogger(t),
+						PullMergeable: true,
+					}, cmd, "myproject_[1-2]", []string{"flag"}, tmp, "project1", "myworkspace", true)
+
+					if c.expErr != "" {
+						ErrEquals(t, c.expErr, err)
+						return
+					}
+					ctx := ctxs[0]
+
+					Ok(t, err)
+
+					Equals(t, 2, len(ctxs))
+					// Construct expected steps.
+					var stepNames []string
+					switch cmd {
+					case models.PlanCommand:
+						stepNames = c.expPlanSteps
+					case models.ApplyCommand:
+						stepNames = c.expApplySteps
+					}
+					var expSteps []valid.Step
+					for _, stepName := range stepNames {
+						expSteps = append(expSteps, valid.Step{
+							StepName: stepName,
+						})
+					}
+
+					c.expCtx.CommandName = cmd
+					// Init fields we couldn't in our cases map.
+					c.expCtx.Steps = expSteps
+					ctx.PolicySets = emptyPolicySets
+					Equals(t, c.expCtx, ctx)
+					// Equals() doesn't compare TF version properly so have to
+					// use .String().
+					if c.expCtx.TerraformVersion != nil {
+						Equals(t, c.expCtx.TerraformVersion.String(), ctx.TerraformVersion.String())
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestBuildProjectCmdCtx_WithPolicCheckEnabled(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	emptyPolicySets := valid.PolicySets{
 		Version:    nil,
 		PolicySets: []valid.PolicySet{},
@@ -677,7 +871,7 @@ repos:
 				AutomergeEnabled:   false,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -732,7 +926,7 @@ workflows:
 				AutomergeEnabled:   true,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
-				Log:                nil,
+				Log:                logger,
 				PullMergeable:      true,
 				Pull:               pull,
 				ProjectName:        "",
@@ -791,11 +985,14 @@ workflows:
 				&DefaultPendingPlanFinder{},
 				&CommentParser{},
 				false,
+				false,
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
 			)
 
 			cmd := models.PolicyCheckCommand
 			t.Run(cmd.String(), func(t *testing.T) {
 				ctxs, err := builder.buildProjectCommandCtx(&CommandContext{
+					Log: logger,
 					Pull: models.PullRequest{
 						BaseRepo: baseRepo,
 					},

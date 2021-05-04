@@ -6,9 +6,6 @@ jobs:
     steps:
       - checkout
       - run: make test-coverage
-      - run:
-          name: post coverage to codecov.io
-          command: bash <(curl -s https://codecov.io/bash)
       - run: make check-fmt
       - run: make check-lint
 

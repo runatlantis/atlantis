@@ -41,7 +41,7 @@ type GithubClient struct {
 	client         *github.Client
 	v4MutateClient *graphql.Client
 	ctx            context.Context
-	logger         *logging.SimpleLogger
+	logger         logging.SimpleLogging
 }
 
 // GithubAppTemporarySecrets holds app credentials obtained from github after creation.
@@ -59,7 +59,7 @@ type GithubAppTemporarySecrets struct {
 }
 
 // NewGithubClient returns a valid GitHub client.
-func NewGithubClient(hostname string, credentials GithubCredentials, logger *logging.SimpleLogger) (*GithubClient, error) {
+func NewGithubClient(hostname string, credentials GithubCredentials, logger logging.SimpleLogging) (*GithubClient, error) {
 	transport, err := credentials.Client()
 	if err != nil {
 		return nil, errors.Wrap(err, "error initializing github authentication transport")
@@ -169,7 +169,7 @@ func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment stri
 	return nil
 }
 
-func (g *GithubClient) HidePrevPlanComments(repo models.Repo, pullNum int) error {
+func (g *GithubClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
 	var allComments []*github.IssueComment
 	nextPage := 0
 	for {
@@ -205,7 +205,7 @@ func (g *GithubClient) HidePrevPlanComments(repo models.Repo, pullNum int) error
 			continue
 		}
 		firstLine := strings.ToLower(body[0])
-		if !strings.Contains(firstLine, models.PlanCommand.String()) {
+		if !strings.Contains(firstLine, strings.ToLower(command)) {
 			continue
 		}
 		var m struct {
@@ -329,7 +329,7 @@ func (g *GithubClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 }
 
 // MergePull merges the pull request.
-func (g *GithubClient) MergePull(pull models.PullRequest) error {
+func (g *GithubClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	// Users can set their repo to disallow certain types of merging.
 	// We detect which types aren't allowed and use the type that is.
 	g.logger.Debug("GET /repos/%v/%v", pull.BaseRepo.Owner, pull.BaseRepo.Name)
@@ -361,7 +361,7 @@ func (g *GithubClient) MergePull(pull models.PullRequest) error {
 		pull.BaseRepo.Owner,
 		pull.BaseRepo.Name,
 		pull.Num,
-		// NOTE: Using the emtpy string here causes GitHub to autogenerate
+		// NOTE: Using the empty string here causes GitHub to autogenerate
 		// the commit message as it normally would.
 		"",
 		options)

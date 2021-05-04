@@ -42,6 +42,7 @@ func NewPolicyArg(parameter string) Arg {
 
 type ConftestTestCommandArgs struct {
 	PolicyArgs []Arg
+	ExtraArgs  []string
 	InputFile  string
 	Command    string
 }
@@ -59,7 +60,11 @@ func (c ConftestTestCommandArgs) build() ([]string, error) {
 		commandArgs = append(commandArgs, a.build()...)
 	}
 
-	commandArgs = append(commandArgs, c.InputFile, "--no-color", "--all-namespaces")
+	// add hardcoded options
+	commandArgs = append(commandArgs, c.InputFile, "--no-color")
+
+	// add extra args provided through server config
+	commandArgs = append(commandArgs, c.ExtraArgs...)
 
 	return commandArgs, nil
 }
@@ -127,7 +132,7 @@ type ConfTestExecutorWorkflow struct {
 	Exec                   runtime_models.Exec
 }
 
-func NewConfTestExecutorWorkflow(log *logging.SimpleLogger, versionRootDir string, conftestDownloder terraform.Downloader) *ConfTestExecutorWorkflow {
+func NewConfTestExecutorWorkflow(log logging.SimpleLogging, versionRootDir string, conftestDownloder terraform.Downloader) *ConfTestExecutorWorkflow {
 	downloader := ConfTestVersionDownloader{
 		downloader: conftestDownloder,
 	}
@@ -154,7 +159,7 @@ func NewConfTestExecutorWorkflow(log *logging.SimpleLogger, versionRootDir strin
 	}
 }
 
-func (c *ConfTestExecutorWorkflow) Run(ctx models.ProjectCommandContext, executablePath string, envs map[string]string, workdir string) (string, error) {
+func (c *ConfTestExecutorWorkflow) Run(ctx models.ProjectCommandContext, executablePath string, envs map[string]string, workdir string, extraArgs []string) (string, error) {
 	policyArgs := []Arg{}
 	policySetNames := []string{}
 	ctx.Log.Debug("policy sets, %s ", ctx.PolicySets)
@@ -177,6 +182,7 @@ func (c *ConfTestExecutorWorkflow) Run(ctx models.ProjectCommandContext, executa
 
 	args := ConftestTestCommandArgs{
 		PolicyArgs: policyArgs,
+		ExtraArgs:  extraArgs,
 		InputFile:  inputFile,
 		Command:    executablePath,
 	}
@@ -201,7 +207,7 @@ func (c *ConfTestExecutorWorkflow) sanitizeOutput(inputFile string, output strin
 	return strings.Replace(output, inputFile, "<redacted plan file>", -1)
 }
 
-func (c *ConfTestExecutorWorkflow) EnsureExecutorVersion(log *logging.SimpleLogger, v *version.Version) (string, error) {
+func (c *ConfTestExecutorWorkflow) EnsureExecutorVersion(log logging.SimpleLogging, v *version.Version) (string, error) {
 	// we have no information to proceed so fail hard
 	if c.DefaultConftestVersion == nil && v == nil {
 		return "", errors.New("no conftest version configured/specified")

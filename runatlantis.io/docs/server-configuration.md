@@ -47,6 +47,12 @@ Values are chosen in this order:
 
 
 ## Flags
+* ### `--allow-draft-prs`
+  ```bash
+  atlantis server --allow-draft-prs
+  ```
+  Respond to pull requests from draft prs. Defaults to `false`.
+  
 * ### `--allow-fork-prs`
   ```bash
   atlantis server --allow-fork-prs
@@ -103,6 +109,30 @@ Values are chosen in this order:
   ```
   Automatically merge pull requests after all plans have been successfully applied.
   Defaults to `false`. See [Automerging](automerging.html) for more details.
+
+* ### `--autoplan-file-list`
+  ```bash
+  # NOTE: Use single quotes to avoid shell expansion of *.
+  atlantis server --autoplan-file-list='**/*.tf,project1/*.pkr.hcl'
+  ```
+  List of file patterns that Atlantis will use to check if a directory contains modified files that should trigger project planning.
+
+  Notes:
+  * Accepts a comma separated list, ex. `pattern1,pattern2`.
+  * Patterns use the [`.dockerignore` syntax](https://docs.docker.com/engine/reference/builder/#dockerignore-file)
+  * List of file patterns will be used by both automatic and manually run plans.
+  * When not set, defaults to all `.tf`, `.tfvars`, `.tfvars.json` and `terragrunt.hcl` files
+    (`--autoplan-file-list='**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl'`).
+  * Setting `--autoplan-file-list` will override the defaults. You **must** add `**/*.tf` and other defaults if you want to include them.
+  * A custom [Workflow](repo-level-atlantis-yaml.html#configuring-planning) that uses autoplan `when_modified` will ignore this value.
+
+  Examples:
+  * Autoplan when any `*.tf` or `*.tfvars` file is modified.
+    * `--autoplan-file-list='**/*.tf,**/*.tfvars'`
+  * Autoplan when any `*.tf` file is modified except in `project2/` directory
+    * `--autoplan-file-list='**/*.tf,!project2'`
+  * Autoplan when any `*.tf` files or `.yml` files in subfolder of `project1` is modified.
+    * `--autoplan-file-list='**/*.tf,project2/**/*.yml'`
 
 * ### `--azuredevops-webhook-password`
   ```bash
@@ -225,6 +255,24 @@ Values are chosen in this order:
   atlantis server --disable-repo-locking
   ```
   Stops atlantis locking projects and or workspaces when running terraform
+
+* ### `--enable-policy-checks`
+  <Badge text="beta" type="warn"/>
+  ```bash
+  atlantis server --enable-policy-checks
+  ```
+  Enables atlantis to run server side policies on the result of a terraform plan. Policies are defined in [server side repo config](https://www.runatlantis.io/docs/server-side-repo-config.html#reference).
+
+* ### `--enable-regexp-cmd`
+  ```bash
+  atlantis server --enable-regexp-cmd
+  ```
+  Enable Atlantis to use regular expressions on plan/apply commands when \"-p\" flag is passed with it.
+
+  ::: warning SECURITY WARNING
+  It's not supposed to be used with `--disable-apply-all`.
+  The command `atlantis apply -p .*` will bypass the restriction and run apply on every projects
+  :::
 
 * ### `--gh-hostname`
   ```bash
@@ -484,6 +532,15 @@ Values are chosen in this order:
 
   Some users find this useful because they prefer to add the Atlantis webhook
   at an organization level rather than on each repo.
+
+* ### `--silence-no-projects`
+  ```bash
+  atlantis server --silence-no-projects
+  ```
+  `--silence-no-projects` will tell Atlantis to ignore PRs if none of the modified files are part of a project defined in the `atlantis.yaml` file.
+
+  This is useful when running multiple Atlantis servers against a single repository so you can
+  delegate work to each Atlantis server. Also useful when used with pre_workflow_hooks to dynamically generate an `atlantis.yaml` file.
 
 * ### `--skip-clone-no-changes`
   ```bash

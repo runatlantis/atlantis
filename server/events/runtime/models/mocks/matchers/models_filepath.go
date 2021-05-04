@@ -2,8 +2,9 @@
 package matchers
 
 import (
-	"reflect"
 	"github.com/petergtz/pegomock"
+	"reflect"
+
 	models "github.com/runatlantis/atlantis/server/events/runtime/models"
 )
 
@@ -15,6 +16,18 @@ func AnyModelsFilePath() models.FilePath {
 
 func EqModelsFilePath(value models.FilePath) models.FilePath {
 	pegomock.RegisterMatcher(&pegomock.EqMatcher{Value: value})
+	var nullValue models.FilePath
+	return nullValue
+}
+
+func NotEqModelsFilePath(value models.FilePath) models.FilePath {
+	pegomock.RegisterMatcher(&pegomock.NotEqMatcher{Value: value})
+	var nullValue models.FilePath
+	return nullValue
+}
+
+func ModelsFilePathThat(matcher pegomock.ArgumentMatcher) models.FilePath {
+	pegomock.RegisterMatcher(matcher)
 	var nullValue models.FilePath
 	return nullValue
 }

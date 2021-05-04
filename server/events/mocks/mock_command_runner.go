@@ -49,14 +49,14 @@ func (mock *MockCommandRunner) VerifyWasCalledOnce() *VerifierMockCommandRunner 
 	}
 }
 
-func (mock *MockCommandRunner) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockCommandRunner {
+func (mock *MockCommandRunner) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockCommandRunner {
 	return &VerifierMockCommandRunner{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockCommandRunner) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockCommandRunner {
+func (mock *MockCommandRunner) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockCommandRunner {
 	return &VerifierMockCommandRunner{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -64,7 +64,7 @@ func (mock *MockCommandRunner) VerifyWasCalledInOrder(invocationCountMatcher peg
 	}
 }
 
-func (mock *MockCommandRunner) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockCommandRunner {
+func (mock *MockCommandRunner) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockCommandRunner {
 	return &VerifierMockCommandRunner{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -74,7 +74,7 @@ func (mock *MockCommandRunner) VerifyWasCalledEventually(invocationCountMatcher 
 
 type VerifierMockCommandRunner struct {
 	mock                   *MockCommandRunner
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

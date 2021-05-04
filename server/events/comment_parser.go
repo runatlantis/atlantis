@@ -57,6 +57,8 @@ type CommentParsing interface {
 	Parse(comment string, vcsHost models.VCSHostType) CommentParseResult
 }
 
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_comment_building.go CommentBuilder
+
 // CommentBuilder builds comment commands that can be used on pull requests.
 type CommentBuilder interface {
 	// BuildPlanComment builds a plan comment for the specified args.

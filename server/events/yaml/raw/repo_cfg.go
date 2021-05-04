@@ -24,15 +24,16 @@ const DefaultProjectLocks = true
 
 // RepoCfg is the raw schema for repo-level atlantis.yaml config.
 type RepoCfg struct {
-	Version       *int                `yaml:"version,omitempty"`
-	Projects      []Project           `yaml:"projects,omitempty"`
-	Workflows     map[string]Workflow `yaml:"workflows,omitempty"`
-	PolicySets    PolicySets          `yaml:"policies,omitempty"`
-	Automerge     *bool               `yaml:"automerge,omitempty"`
-	ParallelApply *bool               `yaml:"parallel_apply,omitempty"`
-	ParallelPlan  *bool               `yaml:"parallel_plan,omitempty"`
-	ParallelPlans *bool               `yaml:"parallel_plans,omitempty"`
-	ProjectLocks  *bool               `yaml:"project_locks,omitempty"`
+	Version                   *int                `yaml:"version,omitempty"`
+	Projects                  []Project           `yaml:"projects,omitempty"`
+	Workflows                 map[string]Workflow `yaml:"workflows,omitempty"`
+	PolicySets                PolicySets          `yaml:"policies,omitempty"`
+	Automerge                 *bool               `yaml:"automerge,omitempty"`
+	ParallelApply             *bool               `yaml:"parallel_apply,omitempty"`
+	ParallelPlan              *bool               `yaml:"parallel_plan,omitempty"`
+	ParallelPlans             *bool               `yaml:"parallel_plans,omitempty"`
+	ProjectLocks              *bool               `yaml:"project_locks,omitempty"`
+	DeleteSourceBranchOnMerge *bool               `yaml:"delete_source_branch_on_merge,omitempty"`
 }
 
 func (r RepoCfg) Validate() error {
@@ -88,13 +89,14 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 	}
 
 	return valid.RepoCfg{
-		Version:             *r.Version,
-		Projects:            validProjects,
-		Workflows:           validWorkflows,
-		Automerge:           automerge,
-		ParallelApply:       parallelApply,
-		ParallelPlan:        parallelPlan,
-		ParallelPolicyCheck: parallelPlan,
-		ProjectLocks:        projectLocks,
+		Version:                   *r.Version,
+		Projects:                  validProjects,
+		Workflows:                 validWorkflows,
+		Automerge:                 automerge,
+		ParallelApply:             parallelApply,
+		ParallelPlan:              parallelPlan,
+		ParallelPolicyCheck:       parallelPlan,
+		ProjectLocks:              projectLocks,
+		DeleteSourceBranchOnMerge: r.DeleteSourceBranchOnMerge,
 	}
 }

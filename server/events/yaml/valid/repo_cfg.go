@@ -4,6 +4,7 @@ package valid
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	version "github.com/hashicorp/go-version"
@@ -12,16 +13,17 @@ import (
 // RepoCfg is the atlantis.yaml config after it's been parsed and validated.
 type RepoCfg struct {
 	// Version is the version of the atlantis YAML file.
-	Version             int
-	Projects            []Project
-	Workflows           map[string]Workflow
-	PolicySets          PolicySets
-	Automerge           bool
-	ParallelApply       bool
-	ParallelPlan        bool
-	ParallelPlans       bool
-	ProjectLocks        bool
-	ParallelPolicyCheck bool
+	Version                   int
+	Projects                  []Project
+	Workflows                 map[string]Workflow
+	PolicySets                PolicySets
+	Automerge                 bool
+	ParallelApply             bool
+	ParallelPlan              bool
+	ParallelPlans             bool
+	ProjectLocks              bool
+	ParallelPolicyCheck       bool
+	DeleteSourceBranchOnMerge *bool
 }
 
 func (r RepoCfg) FindProjectsByDirWorkspace(repoRelDir string, workspace string) []Project {
@@ -52,6 +54,20 @@ func (r RepoCfg) FindProjectByName(name string) *Project {
 		}
 	}
 	return nil
+}
+
+// FindProjectsByName returns all projects that match with name.
+func (r RepoCfg) FindProjectsByName(name string) []Project {
+	var ps []Project
+	sanitizedName := "^" + name + "$"
+	for _, p := range r.Projects {
+		if p.Name != nil {
+			if match, _ := regexp.MatchString(sanitizedName, *p.Name); match {
+				ps = append(ps, p)
+			}
+		}
+	}
+	return ps
 }
 
 // validateWorkspaceAllowed returns an error if repoCfg defines projects in
@@ -85,13 +101,14 @@ func (r RepoCfg) ValidateWorkspaceAllowed(repoRelDir string, workspace string) e
 }
 
 type Project struct {
-	Dir               string
-	Workspace         string
-	Name              *string
-	WorkflowName      *string
-	TerraformVersion  *version.Version
-	Autoplan          Autoplan
-	ApplyRequirements []string
+	Dir                       string
+	Workspace                 string
+	Name                      *string
+	WorkflowName              *string
+	TerraformVersion          *version.Version
+	Autoplan                  Autoplan
+	ApplyRequirements         []string
+	DeleteSourceBranchOnMerge *bool
 }
 
 // GetName returns the name of the project or an empty string if there is no

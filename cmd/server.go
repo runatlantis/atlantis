@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/docker/docker/pkg/fileutils"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server"
@@ -44,6 +45,7 @@ const (
 	AllowRepoConfigFlag        = "allow-repo-config"
 	AtlantisURLFlag            = "atlantis-url"
 	AutomergeFlag              = "automerge"
+	AutoplanFileListFlag       = "autoplan-file-list"
 	BitbucketBaseURLFlag       = "bitbucket-base-url"
 	BitbucketTokenFlag         = "bitbucket-token"
 	BitbucketUserFlag          = "bitbucket-user"
@@ -58,6 +60,7 @@ const (
 	DisableMarkdownFoldingFlag = "disable-markdown-folding"
 	DisableRepoLockingFlag     = "disable-repo-locking"
 	EnablePolicyChecksFlag     = "enable-policy-checks"
+	EnableRegExpCmdFlag        = "enable-regexp-cmd"
 	GHHostnameFlag             = "gh-hostname"
 	GHTokenFlag                = "gh-token"
 	GHUserFlag                 = "gh-user"
@@ -82,6 +85,7 @@ const (
 	RepoAllowlistFlag          = "repo-allowlist"
 	RequireApprovalFlag        = "require-approval"
 	RequireMergeableFlag       = "require-mergeable"
+	SilenceNoProjectsFlag      = "silence-no-projects"
 	SilenceForkPRErrorsFlag    = "silence-fork-pr-errors"
 	SilenceVCSStatusNoPlans    = "silence-vcs-status-no-plans"
 	SilenceAllowlistErrorsFlag = "silence-allowlist-errors"
@@ -98,20 +102,20 @@ const (
 	WriteGitCredsFlag          = "write-git-creds"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
-	DefaultADBasicUser           = ""
-	DefaultADBasicPassword       = ""
-	DefaultCheckoutStrategy      = "branch"
-	DefaultBitbucketBaseURL      = bitbucketcloud.BaseURL
-	DefaultDataDir               = "~/.atlantis"
-	DefaultGHHostname            = "github.com"
-	DefaultGitlabHostname        = "gitlab.com"
-	DefaultLogLevel              = "info"
-	DefaultParallelPoolSize      = 15
-	DefaultParallelPlansPoolSize = 10
-	DefaultPort                  = 4141
-	DefaultTFDownloadURL         = "https://releases.hashicorp.com"
-	DefaultTFEHostname           = "app.terraform.io"
-	DefaultVCSStatusName         = "atlantis"
+	DefaultADBasicUser      = ""
+	DefaultADBasicPassword  = ""
+	DefaultAutoplanFileList = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl"
+	DefaultCheckoutStrategy = "branch"
+	DefaultBitbucketBaseURL = bitbucketcloud.BaseURL
+	DefaultDataDir          = "~/.atlantis"
+	DefaultGHHostname       = "github.com"
+	DefaultGitlabHostname   = "gitlab.com"
+	DefaultLogLevel         = "info"
+	DefaultParallelPoolSize = 15
+	DefaultPort             = 4141
+	DefaultTFDownloadURL    = "https://releases.hashicorp.com"
+	DefaultTFEHostname      = "app.terraform.io"
+	DefaultVCSStatusName    = "atlantis"
 )
 
 var stringFlags = map[string]stringFlag{
@@ -135,6 +139,13 @@ var stringFlags = map[string]stringFlag{
 	},
 	AtlantisURLFlag: {
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path ex. https://example.com/basepath.",
+	},
+	AutoplanFileListFlag: {
+		description: "Comma separated list of file patterns that Atlantis will use to check if a directory contains modified files that should trigger project planning." +
+			" Patterns use the dockerignore (https://docs.docker.com/engine/reference/builder/#dockerignore-file) syntax." +
+			" Use single quotes to avoid shell expansion of '*'. Defaults to '" + DefaultAutoplanFileList + "'." +
+			" A custom Workflow that uses autoplan 'when_modified' will ignore this value.",
+		defaultValue: DefaultAutoplanFileList,
 	},
 	BitbucketUserFlag: {
 		description: "Bitbucket username of API user.",
@@ -301,6 +312,10 @@ var boolFlags = map[string]boolFlag{
 		description:  "Enable atlantis to run user defined policy checks.  This is explicitly disabled for TFE/TFC backends since plan files are inaccessible.",
 		defaultValue: false,
 	},
+	EnableRegExpCmdFlag: {
+		description:  "Enable Atlantis to use regular expressions on plan/apply commands when \"-p\" flag is passed with it.",
+		defaultValue: false,
+	},
 	AllowDraftPRs: {
 		description:  "Enable autoplan for Github Draft Pull Requests",
 		defaultValue: false,
@@ -319,6 +334,10 @@ var boolFlags = map[string]boolFlag{
 		description:  "Require pull requests to be mergeable before allowing the apply command to be run.",
 		defaultValue: false,
 		hidden:       true,
+	},
+	SilenceNoProjectsFlag: {
+		description:  "Silences Atlants from responding to PRs when it finds no projects.",
+		defaultValue: false,
 	},
 	SilenceForkPRErrorsFlag: {
 		description:  "Silences the posting of fork pull requests not allowed error comments.",
@@ -402,7 +421,7 @@ type ServerCmd struct {
 	// Useful for testing to keep the logs clean.
 	SilenceOutput   bool
 	AtlantisVersion string
-	Logger          *logging.SimpleLogger
+	Logger          logging.SimpleLogging
 }
 
 // ServerCreator creates servers.
@@ -560,6 +579,9 @@ func (s *ServerCmd) run() error {
 }
 
 func (s *ServerCmd) setDefaults(c *server.UserConfig) {
+	if c.AutoplanFileList == "" {
+		c.AutoplanFileList = DefaultAutoplanFileList
+	}
 	if c.CheckoutStrategy == "" {
 		c.CheckoutStrategy = DefaultCheckoutStrategy
 	}
@@ -675,6 +697,11 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 
 	if userConfig.TFEHostname != DefaultTFEHostname && userConfig.TFEToken == "" {
 		return fmt.Errorf("if setting --%s, must set --%s", TFEHostnameFlag, TFETokenFlag)
+	}
+
+	_, patternErr := fileutils.NewPatternMatcher(strings.Split(userConfig.AutoplanFileList, ","))
+	if patternErr != nil {
+		return errors.Wrapf(patternErr, "invalid pattern in --%s, %s", AutoplanFileListFlag, userConfig.AutoplanFileList)
 	}
 
 	return nil

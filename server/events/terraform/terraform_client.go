@@ -40,10 +40,10 @@ type Client interface {
 	// RunCommandWithVersion executes terraform with args in path. If v is nil,
 	// it will use the default Terraform version. workspace is the Terraform
 	// workspace which should be set as an environment variable.
-	RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, envs map[string]string, v *version.Version, workspace string) (string, error)
+	RunCommandWithVersion(log logging.SimpleLogging, path string, args []string, envs map[string]string, v *version.Version, workspace string) (string, error)
 
 	// EnsureVersion makes sure that terraform version `v` is available to use
-	EnsureVersion(log *logging.SimpleLogger, v *version.Version) error
+	EnsureVersion(log logging.SimpleLogging, v *version.Version) error
 }
 
 type DefaultClient struct {
@@ -88,16 +88,9 @@ type Downloader interface {
 //	   => 0.11.10
 var versionRegex = regexp.MustCompile("Terraform v(.*?)(\\s.*)?\n")
 
-// NewClient constructs a terraform client.
-// tfeToken is an optional terraform enterprise token.
-// defaultVersionStr is an optional default terraform version to use unless
-// a specific version is set.
-// defaultVersionFlagName is the name of the flag that sets the default terraform
-// version.
-// tfDownloader is used to download terraform versions.
-// Will asynchronously download the required version if it doesn't exist already.
-func NewClient(
-	log *logging.SimpleLogger,
+// NewClientWithDefaultVersion creates a new terraform client and pre-fetches the default version
+func NewClientWithDefaultVersion(
+	log logging.SimpleLogging,
 	binDir string,
 	cacheDir string,
 	tfeToken string,
@@ -106,7 +99,9 @@ func NewClient(
 	defaultVersionFlagName string,
 	tfDownloadURL string,
 	tfDownloader Downloader,
-	usePluginCache bool) (*DefaultClient, error) {
+	usePluginCache bool,
+	fetchAsync bool,
+) (*DefaultClient, error) {
 	var finalDefaultVersion *version.Version
 	var localVersion *version.Version
 	versions := make(map[string]string)
@@ -135,7 +130,7 @@ func NewClient(
 			return nil, err
 		}
 		finalDefaultVersion = defaultVersion
-		go func() {
+		ensureVersionFunc := func() {
 			// Since ensureVersion might end up downloading terraform,
 			// we call it asynchronously so as to not delay server startup.
 			versionsLock.Lock()
@@ -144,7 +139,13 @@ func NewClient(
 			if err != nil {
 				log.Err("could not download terraform %s: %s", defaultVersion.String(), err)
 			}
-		}()
+		}
+
+		if fetchAsync {
+			go ensureVersionFunc()
+		} else {
+			ensureVersionFunc()
+		}
 	}
 
 	// If tfeToken is set, we try to create a ~/.terraformrc file.
@@ -168,6 +169,67 @@ func NewClient(
 		versions:                versions,
 		usePluginCache:          usePluginCache,
 	}, nil
+
+}
+
+func NewTestClient(
+	log logging.SimpleLogging,
+	binDir string,
+	cacheDir string,
+	tfeToken string,
+	tfeHostname string,
+	defaultVersionStr string,
+	defaultVersionFlagName string,
+	tfDownloadURL string,
+	tfDownloader Downloader,
+	usePluginCache bool) (*DefaultClient, error) {
+	return NewClientWithDefaultVersion(
+		log,
+		binDir,
+		cacheDir,
+		tfeToken,
+		tfeHostname,
+		defaultVersionStr,
+		defaultVersionFlagName,
+		tfDownloadURL,
+		tfDownloader,
+		usePluginCache,
+		false,
+	)
+}
+
+// NewClient constructs a terraform client.
+// tfeToken is an optional terraform enterprise token.
+// defaultVersionStr is an optional default terraform version to use unless
+// a specific version is set.
+// defaultVersionFlagName is the name of the flag that sets the default terraform
+// version.
+// tfDownloader is used to download terraform versions.
+// Will asynchronously download the required version if it doesn't exist already.
+func NewClient(
+	log logging.SimpleLogging,
+	binDir string,
+	cacheDir string,
+	tfeToken string,
+	tfeHostname string,
+	defaultVersionStr string,
+	defaultVersionFlagName string,
+	tfDownloadURL string,
+	tfDownloader Downloader,
+	usePluginCache bool) (*DefaultClient, error) {
+	return NewClientWithDefaultVersion(
+		log,
+		binDir,
+		cacheDir,
+		tfeToken,
+		tfeHostname,
+		defaultVersionStr,
+		defaultVersionFlagName,
+		tfDownloadURL,
+		tfDownloader,
+		usePluginCache,
+		true,
+	)
 }
 
 // Version returns the default version of Terraform we use if no other version
@@ -182,7 +244,7 @@ func (c *DefaultClient) TerraformBinDir() string {
 }
 
 // See Client.EnsureVersion.
-func (c *DefaultClient) EnsureVersion(log *logging.SimpleLogger, v *version.Version) error {
+func (c *DefaultClient) EnsureVersion(log logging.SimpleLogging, v *version.Version) error {
 	if v == nil {
 		v = c.defaultVersion
 	}
@@ -199,7 +261,7 @@ func (c *DefaultClient) EnsureVersion(log *logging.SimpleLogger, v *version.Vers
 }
 
 // See Client.RunCommandWithVersion.
-func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (string, error) {
+func (c *DefaultClient) RunCommandWithVersion(log logging.SimpleLogging, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (string, error) {
 	tfCmd, cmd, err := c.prepCmd(log, v, workspace, path, args)
 	if err != nil {
 		return "", err
@@ -222,7 +284,7 @@ func (c *DefaultClient) RunCommandWithVersion(log *logging.SimpleLogger, path st
 // prepCmd builds a ready to execute command based on the version of terraform
 // v, and args. It returns a printable representation of the command that will
 // be run and the actual command.
-func (c *DefaultClient) prepCmd(log *logging.SimpleLogger, v *version.Version, workspace string, path string, args []string) (string, *exec.Cmd, error) {
+func (c *DefaultClient) prepCmd(log logging.SimpleLogging, v *version.Version, workspace string, path string, args []string) (string, *exec.Cmd, error) {
 	if v == nil {
 		v = c.defaultVersion
 	}
@@ -278,7 +340,7 @@ type Line struct {
 // Callers can use the input channel to pass stdin input to the command.
 // If any error is passed on the out channel, there will be no
 // further output (so callers are free to exit).
-func (c *DefaultClient) RunCommandAsync(log *logging.SimpleLogger, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (chan<- string, <-chan Line) {
+func (c *DefaultClient) RunCommandAsync(log logging.SimpleLogging, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (chan<- string, <-chan Line) {
 	outCh := make(chan Line)
 	inCh := make(chan string)
 
@@ -381,7 +443,7 @@ func MustConstraint(v string) version.Constraints {
 
 // ensureVersion returns the path to a terraform binary of version v.
 // It will download this version if we don't have it.
-func ensureVersion(log *logging.SimpleLogger, dl Downloader, versions map[string]string, v *version.Version, binDir string, downloadURL string) (string, error) {
+func ensureVersion(log logging.SimpleLogging, dl Downloader, versions map[string]string, v *version.Version, binDir string, downloadURL string) (string, error) {
 	if binPath, ok := versions[v.String()]; ok {
 		return binPath, nil
 	}

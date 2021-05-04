@@ -100,7 +100,7 @@ func (b *Client) CreateComment(repo models.Repo, pullNum int, comment string, co
 	return err
 }
 
-func (b *Client) HidePrevPlanComments(repo models.Repo, pullNum int) error {
+func (b *Client) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
 	return nil
 }
 
@@ -194,7 +194,7 @@ func (b *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, status 
 }
 
 // MergePull merges the pull request.
-func (b *Client) MergePull(pull models.PullRequest) error {
+func (b *Client) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	path := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/merge", b.BaseURL, pull.BaseRepo.FullName, pull.Num)
 	_, err := b.makeRequest("POST", path, nil)
 	return err

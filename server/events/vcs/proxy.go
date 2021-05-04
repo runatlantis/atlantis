@@ -60,8 +60,8 @@ func (d *ClientProxy) CreateComment(repo models.Repo, pullNum int, comment strin
 	return d.clients[repo.VCSHost.Type].CreateComment(repo, pullNum, comment, command)
 }
 
-func (d *ClientProxy) HidePrevPlanComments(repo models.Repo, pullNum int) error {
-	return d.clients[repo.VCSHost.Type].HidePrevPlanComments(repo, pullNum)
+func (d *ClientProxy) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
+	return d.clients[repo.VCSHost.Type].HidePrevCommandComments(repo, pullNum, command)
 }
 
 func (d *ClientProxy) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
@@ -76,8 +76,8 @@ func (d *ClientProxy) UpdateStatus(repo models.Repo, pull models.PullRequest, st
 	return d.clients[repo.VCSHost.Type].UpdateStatus(repo, pull, state, src, description, url)
 }
 
-func (d *ClientProxy) MergePull(pull models.PullRequest) error {
-	return d.clients[pull.BaseRepo.VCSHost.Type].MergePull(pull)
+func (d *ClientProxy) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
+	return d.clients[pull.BaseRepo.VCSHost.Type].MergePull(pull, pullOptions)
 }
 
 func (d *ClientProxy) MarkdownPullLink(pull models.PullRequest) (string, error) {

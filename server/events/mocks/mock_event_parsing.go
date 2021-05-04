@@ -4,14 +4,13 @@
 package mocks
 
 import (
-	"reflect"
-	"time"
-
 	github "github.com/google/go-github/v31/github"
 	azuredevops "github.com/mcdafydd/go-azuredevops/azuredevops"
 	pegomock "github.com/petergtz/pegomock"
 	models "github.com/runatlantis/atlantis/server/events/models"
 	go_gitlab "github.com/xanzy/go-gitlab"
+	"reflect"
+	"time"
 )
 
 type MockEventParsing struct {
@@ -464,14 +463,14 @@ func (mock *MockEventParsing) VerifyWasCalledOnce() *VerifierMockEventParsing {
 	}
 }
 
-func (mock *MockEventParsing) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockEventParsing {
+func (mock *MockEventParsing) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockEventParsing {
 	return &VerifierMockEventParsing{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockEventParsing) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockEventParsing {
+func (mock *MockEventParsing) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockEventParsing {
 	return &VerifierMockEventParsing{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -479,7 +478,7 @@ func (mock *MockEventParsing) VerifyWasCalledInOrder(invocationCountMatcher pego
 	}
 }
 
-func (mock *MockEventParsing) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockEventParsing {
+func (mock *MockEventParsing) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockEventParsing {
 	return &VerifierMockEventParsing{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -489,7 +488,7 @@ func (mock *MockEventParsing) VerifyWasCalledEventually(invocationCountMatcher p
 
 type VerifierMockEventParsing struct {
 	mock                   *MockEventParsing
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

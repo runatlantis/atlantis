@@ -20,6 +20,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/terraform/mocks"
 	matchers2 "github.com/runatlantis/atlantis/server/events/terraform/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/logging"
+	logging_matchers "github.com/runatlantis/atlantis/server/logging/mocks/matchers"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -29,14 +30,14 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 	terraform := mocks.NewMockClient()
 
 	tfVersion, _ := version.NewVersion("0.8")
-	logger := logging.NewNoopLogger()
+	logger := logging.NewNoopLogger(t)
 	workspace := "default"
 	s := runtime.PlanStepRunner{
 		DefaultTFVersion:  tfVersion,
 		TerraformExecutor: terraform,
 	}
 
-	When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(logging_matchers.AnyLoggingSimpleLogging(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
 	output, err := s.Run(models.ProjectCommandContext{
 		Log:                logger,
@@ -111,14 +112,14 @@ func TestRun_ErrWorkspaceIn08(t *testing.T) {
 	terraform := mocks.NewMockClient()
 
 	tfVersion, _ := version.NewVersion("0.8")
-	logger := logging.NewNoopLogger()
+	logger := logging.NewNoopLogger(t)
 	workspace := "notdefault"
 	s := runtime.PlanStepRunner{
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
 	}
 
-	When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(logging_matchers.AnyLoggingSimpleLogging(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
 	_, err := s.Run(models.ProjectCommandContext{
 		Log:        logger,
@@ -159,14 +160,14 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 			terraform := mocks.NewMockClient()
 
 			tfVersion, _ := version.NewVersion(c.tfVersion)
-			logger := logging.NewNoopLogger()
+			logger := logging.NewNoopLogger(t)
 
 			s := runtime.PlanStepRunner{
 				TerraformExecutor: terraform,
 				DefaultTFVersion:  tfVersion,
 			}
 
-			When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+			When(terraform.RunCommandWithVersion(logging_matchers.AnyLoggingSimpleLogging(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 				ThenReturn("output", nil)
 			output, err := s.Run(models.ProjectCommandContext{
 				Log:                logger,
@@ -255,7 +256,7 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 		t.Run(c.tfVersion, func(t *testing.T) {
 			terraform := mocks.NewMockClient()
 			tfVersion, _ := version.NewVersion(c.tfVersion)
-			logger := logging.NewNoopLogger()
+			logger := logging.NewNoopLogger(t)
 			s := runtime.PlanStepRunner{
 				TerraformExecutor: terraform,
 				DefaultTFVersion:  tfVersion,
@@ -321,7 +322,7 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 	RegisterMockTestingT(t)
 	terraform := mocks.NewMockClient()
 	tfVersion, _ := version.NewVersion("0.10.0")
-	logger := logging.NewNoopLogger()
+	logger := logging.NewNoopLogger(t)
 	s := runtime.PlanStepRunner{
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
@@ -390,7 +391,7 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 
 	// Using version >= 0.10 here so we don't expect any env commands.
 	tfVersion, _ := version.NewVersion("0.10.0")
-	logger := logging.NewNoopLogger()
+	logger := logging.NewNoopLogger(t)
 	s := runtime.PlanStepRunner{
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
@@ -450,7 +451,7 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 	RegisterMockTestingT(t)
 	terraform := mocks.NewMockClient()
 	tfVersion, _ := version.NewVersion("0.10.0")
-	logger := logging.NewNoopLogger()
+	logger := logging.NewNoopLogger(t)
 	s := runtime.PlanStepRunner{
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
@@ -705,6 +706,8 @@ locally at this time.
 	for name, remoteOpsErr := range cases {
 		t.Run(name, func(t *testing.T) {
 
+			logger := logging.NewNoopLogger(t)
+
 			RegisterMockTestingT(t)
 			terraform := mocks.NewMockClient()
 			asyncTf := &remotePlanMock{}
@@ -722,7 +725,7 @@ locally at this time.
 
 			// First, terraform workspace gets run.
 			When(terraform.RunCommandWithVersion(
-				nil,
+				logger,
 				absProjectPath,
 				[]string{"workspace", "show"},
 				map[string]string(nil),
@@ -755,11 +758,12 @@ locally at this time.
 			planErr := errors.New("exit status 1: err")
 			planOutput := "\n" + remoteOpsErr
 			asyncTf.LinesToSend = remotePlanOutput
-			When(terraform.RunCommandWithVersion(nil, absProjectPath, expPlanArgs, map[string]string(nil), tfVersion, "default")).
+			When(terraform.RunCommandWithVersion(logger, absProjectPath, expPlanArgs, map[string]string(nil), tfVersion, "default")).
 				ThenReturn(planOutput, planErr)
 
 			// Now that mocking is set up, we're ready to run the plan.
 			ctx := models.ProjectCommandContext{
+				Log:                logger,
 				Workspace:          "default",
 				RepoRelDir:         ".",
 				User:               models.User{Username: "username"},
@@ -814,6 +818,71 @@ Plan: 0 to add, 0 to change, 1 to destroy.`, string(bytes))
 	}
 }
 
+// Test striping output method
+func TestStripRefreshingFromPlanOutput(t *testing.T) {
+	tfVersion0135, _ := version.NewVersion("0.13.5")
+	tfVersion0140, _ := version.NewVersion("0.14.0")
+	cases := []struct {
+		out       string
+		tfVersion *version.Version
+	}{
+		{
+			remotePlanOutput,
+			tfVersion0135,
+		},
+		{
+			`Running plan in the remote backend. Output will stream here. Pressing Ctrl-C
+will stop streaming the logs, but will not stop the plan running remotely.
+
+Preparing the remote plan...
+
+To view this run in a browser, visit:
+https://app.terraform.io/app/lkysow-enterprises/atlantis-tfe-test/runs/run-is4oVvJfrkud1KvE
+
+Waiting for the plan to start...
+
+Terraform v0.14.0
+
+Configuring remote state backend...
+Initializing Terraform configuration...
+2019/02/20 22:40:52 [DEBUG] Using modified User-Agent: Terraform/0.14.0TFE/202eeff
+Refreshing Terraform state in-memory prior to plan...
+The refreshed state will be used to calculate this plan, but will not be
+persisted to local or remote state storage.
+
+null_resource.hi: Refreshing state... (ID: 217661332516885645)
+null_resource.hi[1]: Refreshing state... (ID: 6064510335076839362)
+
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+  - destroy
+
+Terraform will perform the following actions:
+
+  - null_resource.hi[1]
+
+
+Plan: 0 to add, 0 to change, 1 to destroy.`,
+			tfVersion0140,
+		},
+	}
+
+	for _, c := range cases {
+		output := runtime.StripRefreshingFromPlanOutput(c.out, c.tfVersion)
+		Equals(t, `
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+  - destroy
+
+Terraform will perform the following actions:
+
+  - null_resource.hi[1]
+
+
+Plan: 0 to add, 0 to change, 1 to destroy.`, output)
+	}
+}
+
 type remotePlanMock struct {
 	// LinesToSend will be sent on the channel.
 	LinesToSend string
@@ -821,7 +890,7 @@ type remotePlanMock struct {
 	CalledArgs []string
 }
 
-func (r *remotePlanMock) RunCommandAsync(log *logging.SimpleLogger, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan terraform.Line) {
+func (r *remotePlanMock) RunCommandAsync(log logging.SimpleLogging, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan terraform.Line) {
 	r.CalledArgs = args
 	in := make(chan string)
 	out := make(chan terraform.Line)
