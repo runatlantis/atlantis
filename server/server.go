@@ -303,6 +303,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var applyLockingClient locking.ApplyLocker
 	if userConfig.DisableRepoLocking {
 		lockingClient = locking.NewNoOpLocker()
+		applyLockingClient = locking.NewApplyClient(boltdb, userConfig.DisableApply)
 	} else {
 		lockingClient = locking.NewClient(boltdb)
 		applyLockingClient = locking.NewApplyClient(boltdb, userConfig.DisableApply)
