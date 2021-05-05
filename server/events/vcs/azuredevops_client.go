@@ -61,16 +61,28 @@ func (g *AzureDevopsClient) GetModifiedFiles(repo models.Repo, pull models.PullR
 
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
-	commitRefs, _, _ := g.Client.PullRequests.ListCommits(g.ctx, owner, project, repoName, pull.Num)
-	_ = commitRefs
-	for _, ref := range commitRefs {
-		commitID := *ref.CommitID
+	commitRefs, resp, err := g.Client.PullRequests.ListCommits(g.ctx, owner, project, repoName, pull.Num)
+	if err != nil {
+		return nil, errors.Wrap(err, "getting list of pull request commits")
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.Wrapf(err, "http response code %d getting list of pull request commits", resp.StatusCode)
+	}
 
-		r, _, _ := g.Client.Git.GetChanges(g.ctx, owner, project, repoName, commitID)
+	for _, ref := range commitRefs {
+		commitID := ref.GetCommitID()
+
+		r, resp, err := g.Client.Git.GetChanges(g.ctx, owner, project, repoName, commitID)
+		if err != nil {
+			return nil, errors.Wrap(err, "getting commit changes")
+		}
+		if resp.StatusCode != http.StatusOK {
+			return nil, errors.Wrapf(err, "http response code %d getting commit changes", resp.StatusCode)
+		}
 
 		for _, change := range r.Changes {
 			item := change.GetItem()
-			if *item.GitObjectType == "blob" {
+			if item.GetGitObjectType() == "blob" {
 				// Convert the path to a relative path from the repo's root.
 				relativePath := filepath.Clean("./" + item.GetPath())
 				filesSet[relativePath] = true
