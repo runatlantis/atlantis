@@ -303,11 +303,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var applyLockingClient locking.ApplyLocker
 	if userConfig.DisableRepoLocking {
 		lockingClient = locking.NewNoOpLocker()
-		applyLockingClient = locking.NewApplyClient(boltdb, userConfig.DisableApply)
 	} else {
 		lockingClient = locking.NewClient(boltdb)
-		applyLockingClient = locking.NewApplyClient(boltdb, userConfig.DisableApply)
 	}
+	applyLockingClient = locking.NewApplyClient(boltdb, userConfig.DisableApply)
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 
 	var workingDir events.WorkingDir = &events.FileWorkspace{
