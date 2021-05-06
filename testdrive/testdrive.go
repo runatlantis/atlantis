@@ -124,7 +124,7 @@ Follow these instructions to create a token (we don't store any tokens):
 	colorstring.Println("[green]=> fork completed![reset]")
 
 	// Detect terraform and install it if not installed.
-	_, err := exec.LookPath("terraform")
+	terraformPath, err := exec.LookPath("terraform")
 	if err != nil {
 		colorstring.Println("[yellow]=> terraform not found in $PATH.[reset]")
 		colorstring.Println("=> downloading terraform ")
@@ -142,11 +142,11 @@ Follow these instructions to create a token (we don't store any tokens):
 		}
 		colorstring.Println("[green]=> installed terraform successfully at /usr/local/bin[reset]")
 	} else {
-		colorstring.Println("[green]=> terraform found in $PATH![reset]")
+		colorstring.Printf("[green]=> terraform found in $PATH at %s\n[reset]", terraformPath)
 	}
 
 	// Detect ngrok and install it if not installed
-	_, ngrokErr := exec.LookPath("ngrok")
+	ngrokPath, ngrokErr := exec.LookPath("ngrok")
 	if ngrokErr != nil {
 		colorstring.Println("[yellow]=> ngrok not found in $PATH.[reset]")
 		colorstring.Println("=> downloading ngrok")
@@ -158,7 +158,7 @@ Follow these instructions to create a token (we don't store any tokens):
 		s.Stop()
 		colorstring.Println("[green]=> downloaded ngrok successfully![reset]")
 	} else {
-		colorstring.Println("[green]=> ngrok found in $PATH![reset]")
+		colorstring.Printf("[green]=> ngrok found in $PATH at %s\n[reset]", ngrokPath)
 	}
 
 	// Create ngrok tunnel.
