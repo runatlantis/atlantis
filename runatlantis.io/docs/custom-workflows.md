@@ -175,7 +175,9 @@ workflows:
       - env:
           name: TERRAGRUNT_TFPATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
-      - run: terragrunt plan -no-color -out=$PLANFILE
+      # The COMMENT_ARGS here allows a comment of `atlantis plan -- -destroy`
+      # in order to destroy a particular config.
+      - run: terragrunt plan -no-color -out=$PLANFILE ${COMMENT_ARGS}
     apply:
       steps:
       - env:
