@@ -57,50 +57,35 @@ func NewAzureDevopsClient(hostname string, userName string, token string) (*Azur
 // relative to the repo root, e.g. parent/child/file.txt.
 func (g *AzureDevopsClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	var files []string
-	filesSet := make(map[string]bool)
 
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
-
-	commitRefs, resp, err := g.Client.PullRequests.ListCommits(g.ctx, owner, project, repoName, pull.Num)
-	if err != nil {
-		return nil, errors.Wrap(err, "getting list of pull request commits")
+	opts := azuredevops.PullRequestGetOptions{
+		IncludeWorkItemRefs: true,
 	}
+	pullRequest, _, _ := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, pull.Num, &opts)
+
+	targetRefName := strings.Replace(pullRequest.GetTargetRefName(), "refs/heads/", "", 1)
+	sourceRefName := strings.Replace(pullRequest.GetSourceRefName(), "refs/heads/", "", 1)
+
+	r, resp, err := g.Client.Git.GetDiffs(g.ctx, owner, project, repoName, targetRefName, sourceRefName)
 	if resp.StatusCode != http.StatusOK {
-		return nil, errors.Wrapf(err, "http response code %d getting list of pull request commits", resp.StatusCode)
+		return nil, errors.Wrapf(err, "http response code %d getting diff %s to %s", resp.StatusCode, sourceRefName, targetRefName)
 	}
 
-	for _, ref := range commitRefs {
-		commitID := ref.GetCommitID()
+	for _, change := range r.Changes {
+		item := change.GetItem()
+		// Convert the path to a relative path from the repo's root.
+		relativePath := filepath.Clean("./" + item.GetPath())
+		files = append(files, relativePath)
 
-		r, resp, err := g.Client.Git.GetChanges(g.ctx, owner, project, repoName, commitID)
-		if err != nil {
-			return nil, errors.Wrap(err, "getting commit changes")
+		// If the file was renamed, we'll want to run plan in the directory
+		// it was moved from as well.
+		changeType := azuredevops.Rename.String()
+		if change.ChangeType == &changeType {
+			// Convert the path to a relative path from the repo's root.
+			relativePath = filepath.Clean("./" + change.GetSourceServerItem())
+			files = append(files, relativePath)
 		}
-		if resp.StatusCode != http.StatusOK {
-			return nil, errors.Wrapf(err, "http response code %d getting commit changes", resp.StatusCode)
-		}
-
-		for _, change := range r.Changes {
-			item := change.GetItem()
-			if item.GetGitObjectType() == "blob" {
-				// Convert the path to a relative path from the repo's root.
-				relativePath := filepath.Clean("./" + item.GetPath())
-				filesSet[relativePath] = true
-
-				// If the file was renamed, we'll want to run plan in the directory
-				// it was moved from as well.
-				changeType := azuredevops.Rename.String()
-				if change.ChangeType == &changeType {
-					// Convert the path to a relative path from the repo's root.
-					relativePath = filepath.Clean("./" + change.GetSourceServerItem())
-					filesSet[relativePath] = true
-				}
-			}
-		}
-	}
-
-	for file := range filesSet {
-		files = append(files, file)
 	}
 
 	return files, nil
