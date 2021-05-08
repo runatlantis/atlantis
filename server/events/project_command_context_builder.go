@@ -33,7 +33,7 @@ type ProjectCommandContextBuilder interface {
 		prjCfg valid.MergedProjectCfg,
 		commentFlags []string,
 		repoDir string,
-		automerge, deleteSourceBranchOnMerge, parallelPlan, parallelApply, verbose bool,
+		automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose bool,
 	) []models.ProjectCommandContext
 }
 

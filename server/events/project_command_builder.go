@@ -484,8 +484,8 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 					repoDir,
 					automerge,
 					deleteBranchOnMerge,
-					parallelPlan,
 					parallelApply,
+					parallelPlan,
 					verbose,
 				)...)
 		}
@@ -500,8 +500,8 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 				repoDir,
 				automerge,
 				deleteBranchOnMerge,
-				parallelPlan,
 				parallelApply,
+				parallelPlan,
 				verbose,
 			)...)
 	}
