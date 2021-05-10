@@ -455,12 +455,10 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 	var projCtxs []models.ProjectCommandContext
 	var projCfg valid.MergedProjectCfg
 	automerge := DefaultAutomergeEnabled
-	deleteBranchOnMerge := DefaultDeleteSourceBranchOnMerge
 	parallelApply := DefaultParallelApplyEnabled
 	parallelPlan := DefaultParallelPlanEnabled
 	if repoCfgPtr != nil {
 		automerge = repoCfgPtr.Automerge
-		deleteBranchOnMerge = projCfg.DeleteSourceBranchOnMerge
 		parallelApply = repoCfgPtr.ParallelApply
 		parallelPlan = repoCfgPtr.ParallelPlan
 	}
@@ -483,7 +481,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 					commentFlags,
 					repoDir,
 					automerge,
-					deleteBranchOnMerge,
+					projCfg.DeleteSourceBranchOnMerge,
 					parallelApply,
 					parallelPlan,
 					verbose,
@@ -499,7 +497,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 				commentFlags,
 				repoDir,
 				automerge,
-				deleteBranchOnMerge,
+				projCfg.DeleteSourceBranchOnMerge,
 				parallelApply,
 				parallelPlan,
 				verbose,

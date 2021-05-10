@@ -314,7 +314,7 @@ func StripRefreshingFromPlanOutput(output string, tfVersion *version.Version) st
 }
 
 // remoteOpsErr01114 is the error terraform plan will return if this project is
-// using TFE remote operations in TF 0.11.14.
+// using TFE remote operations in TF 0.11.15.
 var remoteOpsErr01114 = `Error: Saving a generated plan is currently not supported!
 
 The "remote" backend does not support saving the generated execution

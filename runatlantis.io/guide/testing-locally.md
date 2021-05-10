@@ -156,7 +156,7 @@ TOKEN="{YOUR_TOKEN}"
 ```
 
 ### GitLab or GitLab Enterprise Access Token
-- follow [https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#creating-a-personal-access-token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#creating-a-personal-access-token)
+- follow [https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token)
 - create a token with **api** scope
 - set the token as an environment variable
 ```
