@@ -11,7 +11,7 @@
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
 
-package server_test
+package events_test
 
 import (
 	"bytes"
@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -42,6 +43,11 @@ const gitlabHeader = "X-Gitlab-Event"
 const azuredevopsHeader = "Request-Id"
 
 var secret = []byte("secret")
+
+func AnyRepo() models.Repo {
+	RegisterMatcher(NewAnyMatcher(reflect.TypeOf(models.Repo{})))
+	return models.Repo{}
+}
 
 func TestPost_NotGithubOrGitlab(t *testing.T) {
 	t.Log("when the request is not for gitlab or github a 400 is returned")

@@ -1,4 +1,4 @@
-package server_test
+package controllers_test
 
 import (
 	"bytes"
@@ -13,6 +13,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/events/locking"
+	"github.com/runatlantis/atlantis/server/controllers"
 
 	"github.com/gorilla/mux"
 	. "github.com/petergtz/pegomock"
@@ -27,11 +28,6 @@ import (
 	sMocks "github.com/runatlantis/atlantis/server/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
-
-func AnyRepo() models.Repo {
-	RegisterMatcher(NewAnyMatcher(reflect.TypeOf(models.Repo{})))
-	return models.Repo{}
-}
 
 func TestCreateApplyLock(t *testing.T) {
 	t.Run("Creates apply lock", func(t *testing.T) {
@@ -49,13 +45,13 @@ func TestCreateApplyLock(t *testing.T) {
 			Time:   lockTime,
 		}, nil)
 
-		lc := server.LocksController{
+		lc := controllers.LocksController{
 			Logger:      logging.NewNoopLogger(t),
 			ApplyLocker: l,
 		}
 		lc.LockApply(w, req)
 
-		responseContains(t, w, http.StatusOK, fmt.Sprintf("Apply Lock is acquired on %s", expLockTime))
+		ResponseContains(t, w, http.StatusOK, fmt.Sprintf("Apply Lock is acquired on %s", expLockTime))
 	})
 
 	t.Run("Apply lock creation fails", func(t *testing.T) {
@@ -67,13 +63,13 @@ func TestCreateApplyLock(t *testing.T) {
 			Locked: false,
 		}, errors.New("failed to acquire lock"))
 
-		lc := server.LocksController{
+		lc := controllers.LocksController{
 			Logger:      logging.NewNoopLogger(t),
 			ApplyLocker: l,
 		}
 		lc.LockApply(w, req)
 
-		responseContains(t, w, http.StatusInternalServerError, fmt.Sprintf("creating apply lock failed with: failed to acquire lock"))
+		ResponseContains(t, w, http.StatusInternalServerError, fmt.Sprintf("creating apply lock failed with: failed to acquire lock"))
 	})
 }
 
@@ -85,13 +81,13 @@ func TestUnlockApply(t *testing.T) {
 		l := mocks.NewMockApplyLocker()
 		When(l.UnlockApply()).ThenReturn(nil)
 
-		lc := server.LocksController{
+		lc := controllers.LocksController{
 			Logger:      logging.NewNoopLogger(t),
 			ApplyLocker: l,
 		}
 		lc.UnlockApply(w, req)
 
-		responseContains(t, w, http.StatusOK, fmt.Sprintf("Deleted apply lock"))
+		ResponseContains(t, w, http.StatusOK, fmt.Sprintf("Deleted apply lock"))
 	})
 
 	t.Run("Apply lock deletion failed", func(t *testing.T) {
@@ -101,13 +97,13 @@ func TestUnlockApply(t *testing.T) {
 		l := mocks.NewMockApplyLocker()
 		When(l.UnlockApply()).ThenReturn(errors.New("failed to delete lock"))
 
-		lc := server.LocksController{
+		lc := controllers.LocksController{
 			Logger:      logging.NewNoopLogger(t),
 			ApplyLocker: l,
 		}
 		lc.UnlockApply(w, req)
 
-		responseContains(t, w, http.StatusInternalServerError, fmt.Sprintf("deleting apply lock failed with: failed to delete lock"))
+		ResponseContains(t, w, http.StatusInternalServerError, fmt.Sprintf("deleting apply lock failed with: failed to delete lock"))
 	})
 }
 
@@ -115,23 +111,23 @@ func TestGetLockRoute_NoLockID(t *testing.T) {
 	t.Log("If there is no lock ID in the request then we should get a 400")
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
-	lc := server.LocksController{
+	lc := controllers.LocksController{
 		Logger: logging.NewNoopLogger(t),
 	}
 	lc.GetLock(w, req)
-	responseContains(t, w, http.StatusBadRequest, "No lock id in request")
+	ResponseContains(t, w, http.StatusBadRequest, "No lock id in request")
 }
 
 func TestGetLock_InvalidLockID(t *testing.T) {
 	t.Log("If the lock ID is invalid then we should get a 400")
-	lc := server.LocksController{
+	lc := controllers.LocksController{
 		Logger: logging.NewNoopLogger(t),
 	}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req = mux.SetURLVars(req, map[string]string{"id": "%A@"})
 	w := httptest.NewRecorder()
 	lc.GetLock(w, req)
-	responseContains(t, w, http.StatusBadRequest, "Invalid lock id")
+	ResponseContains(t, w, http.StatusBadRequest, "Invalid lock id")
 }
 
 func TestGetLock_LockerErr(t *testing.T) {
@@ -139,7 +135,7 @@ func TestGetLock_LockerErr(t *testing.T) {
 	RegisterMockTestingT(t)
 	l := mocks.NewMockLocker()
 	When(l.GetLock("id")).ThenReturn(nil, errors.New("err"))
-	lc := server.LocksController{
+	lc := controllers.LocksController{
 		Logger: logging.NewNoopLogger(t),
 		Locker: l,
 	}
@@ -147,7 +143,7 @@ func TestGetLock_LockerErr(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.GetLock(w, req)
-	responseContains(t, w, http.StatusInternalServerError, "err")
+	ResponseContains(t, w, http.StatusInternalServerError, "err")
 }
 
 func TestGetLock_None(t *testing.T) {
@@ -155,7 +151,7 @@ func TestGetLock_None(t *testing.T) {
 	RegisterMockTestingT(t)
 	l := mocks.NewMockLocker()
 	When(l.GetLock("id")).ThenReturn(nil, nil)
-	lc := server.LocksController{
+	lc := controllers.LocksController{
 		Logger: logging.NewNoopLogger(t),
 		Locker: l,
 	}
@@ -163,7 +159,7 @@ func TestGetLock_None(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.GetLock(w, req)
-	responseContains(t, w, http.StatusNotFound, "No lock found at id \"id\"")
+	ResponseContains(t, w, http.StatusNotFound, "No lock found at id \"id\"")
 }
 
 func TestGetLock_Success(t *testing.T) {
@@ -178,7 +174,7 @@ func TestGetLock_Success(t *testing.T) {
 	tmpl := sMocks.NewMockTemplateWriter()
 	atlantisURL, err := url.Parse("https://example.com/basepath")
 	Ok(t, err)
-	lc := server.LocksController{
+	lc := controllers.LocksController{
 		Logger:             logging.NewNoopLogger(t),
 		Locker:             l,
 		LockDetailTemplate: tmpl,
@@ -189,7 +185,7 @@ func TestGetLock_Success(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.GetLock(w, req)
-	tmpl.VerifyWasCalledOnce().Execute(w, server.LockDetailData{
+	tmpl.VerifyWasCalledOnce().Execute(w, controllers.LockDetailData{
 		LockKeyEncoded:  "id",
 		LockKey:         "id",
 		RepoOwner:       "owner",
@@ -200,26 +196,26 @@ func TestGetLock_Success(t *testing.T) {
 		AtlantisVersion: "1300135",
 		CleanedBasePath: "/basepath",
 	})
-	responseContains(t, w, http.StatusOK, "")
+	ResponseContains(t, w, http.StatusOK, "")
 }
 
 func TestDeleteLock_NoLockID(t *testing.T) {
 	t.Log("If there is no lock ID in the request then we should get a 400")
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
-	lc := server.LocksController{Logger: logging.NewNoopLogger(t)}
+	lc := controllers.LocksController{Logger: logging.NewNoopLogger(t)}
 	lc.DeleteLock(w, req)
-	responseContains(t, w, http.StatusBadRequest, "No lock id in request")
+	ResponseContains(t, w, http.StatusBadRequest, "No lock id in request")
 }
 
 func TestDeleteLock_InvalidLockID(t *testing.T) {
 	t.Log("If the lock ID is invalid then we should get a 400")
-	lc := server.LocksController{Logger: logging.NewNoopLogger(t)}
+	lc := controllers.LocksController{Logger: logging.NewNoopLogger(t)}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req = mux.SetURLVars(req, map[string]string{"id": "%A@"})
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
-	responseContains(t, w, http.StatusBadRequest, "Invalid lock id \"%A@\"")
+	ResponseContains(t, w, http.StatusBadRequest, "Invalid lock id \"%A@\"")
 }
 
 func TestDeleteLock_LockerErr(t *testing.T) {
@@ -227,7 +223,7 @@ func TestDeleteLock_LockerErr(t *testing.T) {
 	RegisterMockTestingT(t)
 	dlc := mocks2.NewMockDeleteLockCommand()
 	When(dlc.DeleteLock("id")).ThenReturn(nil, errors.New("err"))
-	lc := server.LocksController{
+	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),
 	}
@@ -235,7 +231,7 @@ func TestDeleteLock_LockerErr(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
-	responseContains(t, w, http.StatusInternalServerError, "err")
+	ResponseContains(t, w, http.StatusInternalServerError, "err")
 }
 
 func TestDeleteLock_None(t *testing.T) {
@@ -243,7 +239,7 @@ func TestDeleteLock_None(t *testing.T) {
 	RegisterMockTestingT(t)
 	dlc := mocks2.NewMockDeleteLockCommand()
 	When(dlc.DeleteLock("id")).ThenReturn(nil, nil)
-	lc := server.LocksController{
+	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),
 	}
@@ -251,7 +247,7 @@ func TestDeleteLock_None(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
-	responseContains(t, w, http.StatusNotFound, "No lock found at id \"id\"")
+	ResponseContains(t, w, http.StatusNotFound, "No lock found at id \"id\"")
 }
 
 func TestDeleteLock_OldFormat(t *testing.T) {
@@ -260,7 +256,7 @@ func TestDeleteLock_OldFormat(t *testing.T) {
 	cp := vcsmocks.NewMockClient()
 	dlc := mocks2.NewMockDeleteLockCommand()
 	When(dlc.DeleteLock("id")).ThenReturn(&models.ProjectLock{}, nil)
-	lc := server.LocksController{
+	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),
 		VCSClient:         cp,
@@ -269,7 +265,7 @@ func TestDeleteLock_OldFormat(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
-	responseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
+	ResponseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
 	cp.VerifyWasCalled(Never()).CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString())
 }
 
@@ -313,7 +309,7 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 		},
 	})
 	Ok(t, err)
-	lc := server.LocksController{
+	lc := controllers.LocksController{
 		DeleteLockCommand: l,
 		Logger:            logging.NewNoopLogger(t),
 		VCSClient:         cp,
@@ -325,7 +321,7 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
-	responseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
+	ResponseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
 	status, err := db.GetPullStatus(pull)
 	Ok(t, err)
 	Assert(t, status != nil, "status was nil")
@@ -367,7 +363,7 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
-	responseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
+	ResponseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
 }
 
 func TestDeleteLock_CommentSuccess(t *testing.T) {
@@ -392,7 +388,7 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	defer cleanup()
 	db, err := db.New(tmp)
 	Ok(t, err)
-	lc := server.LocksController{
+	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),
 		VCSClient:         cp,
@@ -404,7 +400,7 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
-	responseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
+	ResponseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
 	cp.VerifyWasCalled(Once()).CreateComment(pull.BaseRepo, pull.Num,
 		"**Warning**: The plan for dir: `path` workspace: `workspace` was **discarded** via the Atlantis UI.\n\n"+
 			"To `apply` this plan you must run `plan` again.", "")

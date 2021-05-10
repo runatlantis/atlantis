@@ -20,7 +20,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strings"
 	"testing"
 	"time"
 
@@ -70,7 +69,7 @@ func TestIndex_LockErr(t *testing.T) {
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
 	s.Index(w, req)
-	responseContains(t, w, 503, "Could not retrieve locks: err")
+	ResponseContains(t, w, 503, "Could not retrieve locks: err")
 }
 
 func TestIndex_Success(t *testing.T) {
@@ -129,7 +128,7 @@ func TestIndex_Success(t *testing.T) {
 		},
 		AtlantisVersion: atlantisVersion,
 	})
-	responseContains(t, w, http.StatusOK, "")
+	ResponseContains(t, w, http.StatusOK, "")
 }
 
 func TestHealthz(t *testing.T) {
@@ -224,12 +223,4 @@ func TestParseAtlantisURL(t *testing.T) {
 			}
 		})
 	}
-}
-
-func responseContains(t *testing.T, r *httptest.ResponseRecorder, status int, bodySubstr string) {
-	t.Helper()
-	body, err := ioutil.ReadAll(r.Result().Body)
-	Ok(t, err)
-	Assert(t, status == r.Result().StatusCode, "exp %d got %d, body: %s", status, r.Result().StatusCode, string(body))
-	Assert(t, strings.Contains(string(body), bodySubstr), "exp %q to be contained in %q", bodySubstr, string(body))
 }

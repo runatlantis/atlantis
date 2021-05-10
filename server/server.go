@@ -39,6 +39,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/controllers"
 	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/runtime"
@@ -85,7 +86,7 @@ type Server struct {
 	Logger                        logging.SimpleLogging
 	Locker                        locking.Locker
 	ApplyLocker                   locking.ApplyLocker
-	EventsController              *EventsController
+	EventsController              *controllers.EventsController
 	GithubAppController           *GithubAppController
 	LocksController               *LocksController
 	StatusController              *StatusController

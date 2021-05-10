@@ -1,4 +1,4 @@
-package server_test
+package events_test
 
 import (
 	"bytes"

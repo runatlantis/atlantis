@@ -1,0 +1,3 @@
+repos:
+    - id: /github.com/n7sh/*/
+      branch: /(main|master)/
