@@ -170,15 +170,17 @@ projects:
 // Test building a plan and apply command for one project.
 func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) {
 	cases := []struct {
-		Description    string
-		AtlantisYAML   string
-		Cmd            events.CommentCommand
-		ExpCommentArgs []string
-		ExpWorkspace   string
-		ExpDir         string
-		ExpProjectName string
-		ExpErr         string
-		ExpApplyReqs   []string
+		Description      string
+		AtlantisYAML     string
+		Cmd              events.CommentCommand
+		ExpCommentArgs   []string
+		ExpWorkspace     string
+		ExpDir           string
+		ExpProjectName   string
+		ExpErr           string
+		ExpApplyReqs     []string
+		ExpParallelApply bool
+		ExpParallelPlan  bool
 	}{
 		{
 			Description: "no atlantis.yaml",
@@ -342,6 +344,29 @@ projects:
 `,
 			ExpErr: "no project with name \"notconfigured\" is defined in atlantis.yaml",
 		},
+		{
+			Description: "atlantis.yaml with ParallelPlan Set to true",
+			Cmd: events.CommentCommand{
+				Name:        models.PlanCommand,
+				RepoRelDir:  ".",
+				Workspace:   "default",
+				ProjectName: "myproject",
+			},
+			AtlantisYAML: `
+version: 3
+parallel_plan: true
+projects:
+- name: myproject
+  dir: .
+  workspace: myworkspace
+`,
+			ExpParallelPlan:  true,
+			ExpParallelApply: false,
+			ExpDir:           ".",
+			ExpWorkspace:     "myworkspace",
+			ExpProjectName:   "myproject",
+			ExpApplyReqs:     []string{},
+		},
 	}
 
 	logger := logging.NewNoopLogger(t)
@@ -403,6 +428,8 @@ projects:
 				Equals(t, c.ExpCommentArgs, actCtx.EscapedCommentArgs)
 				Equals(t, c.ExpProjectName, actCtx.ProjectName)
 				Equals(t, c.ExpApplyReqs, actCtx.ApplyRequirements)
+				Equals(t, c.ExpParallelApply, actCtx.ParallelApplyEnabled)
+				Equals(t, c.ExpParallelPlan, actCtx.ParallelPlanEnabled)
 			})
 		}
 	}
