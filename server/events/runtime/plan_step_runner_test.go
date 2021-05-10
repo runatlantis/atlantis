@@ -690,7 +690,7 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 // Test plans if using remote ops.
 func TestRun_RemoteOps(t *testing.T) {
 	cases := map[string]string{
-		"0.11.14 error": `Error: Saving a generated plan is currently not supported!
+		"0.11.15 error": `Error: Saving a generated plan is currently not supported!
 
 The "remote" backend does not support saving the generated execution
 plan locally at this time.

@@ -16,7 +16,7 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 	mockDelegate := mocks.NewMockRunner()
 
 	tfVersion12, _ := version.NewVersion("0.12.0")
-	tfVersion11, _ := version.NewVersion("0.11.14")
+	tfVersion11, _ := version.NewVersion("0.11.15")
 
 	// these stay the same for all tests
 	extraArgs := []string{"extra", "args"}
@@ -89,7 +89,7 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 
 		mockDelegate.VerifyWasCalled(Never())
 
-		Equals(t, "Version: 0.11.14 is unsupported for this step. Minimum version is: 0.12.0", output)
+		Equals(t, "Version: 0.11.15 is unsupported for this step. Minimum version is: 0.12.0", output)
 		Ok(t, err)
 	})
 
@@ -113,7 +113,7 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 
 		mockDelegate.VerifyWasCalled(Never())
 
-		Equals(t, "Version: 0.11.14 is unsupported for this step. Minimum version is: 0.12.0", output)
+		Equals(t, "Version: 0.11.15 is unsupported for this step. Minimum version is: 0.12.0", output)
 		Ok(t, err)
 	})
 
