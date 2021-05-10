@@ -52,7 +52,7 @@ Only a single installation per GitHub App is supported at the moment.
 :::
 
 ### GitLab
-- Follow: [https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#creating-a-personal-access-token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#creating-a-personal-access-token)
+- Follow: [https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token)
 - Create a token with **api** scope
 - Record the access token
 
