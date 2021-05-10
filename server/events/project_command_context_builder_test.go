@@ -81,4 +81,25 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 
 		assert.Equal(t, models.ErroredPolicyCheckStatus, result[0].ProjectPlanStatus)
 	})
+
+	t.Run("when ParallelApply is set to true", func(t *testing.T) {
+		projCfg.Name = "Apply Comment"
+		When(mockCommentBuilder.BuildPlanComment(projRepoRelDir, projWorkspace, "", []string{})).ThenReturn(expectedPlanCmt)
+		When(mockCommentBuilder.BuildApplyComment(projRepoRelDir, projWorkspace, "")).ThenReturn(expectedApplyCmt)
+		pullStatus.Projects = []models.ProjectStatus{
+			{
+				Status:     models.ErroredPlanStatus,
+				RepoRelDir: "dir2",
+			},
+			{
+				Status:     models.ErroredPolicyCheckStatus,
+				RepoRelDir: "dir1",
+			},
+		}
+
+		result := subject.BuildProjectContext(commandCtx, models.PlanCommand, projCfg, []string{}, "some/dir", false, false, true, false, false)
+
+		assert.True(t, result[0].ParallelApplyEnabled)
+		assert.False(t, result[0].ParallelPlanEnabled)
+	})
 }
