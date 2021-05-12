@@ -398,6 +398,70 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	Equals(t, hasDiverged, false)
 }
 
+func TestHasDiverged_MasterHasDiverged(t *testing.T) {
+	// Initialize the git repo.
+	repoDir, cleanup := initRepo(t)
+	defer cleanup()
+
+	// Simulate first PR.
+	runCmd(t, repoDir, "git", "checkout", "-b", "first-pr")
+	runCmd(t, repoDir, "touch", "file1")
+	runCmd(t, repoDir, "git", "add", "file1")
+	runCmd(t, repoDir, "git", "commit", "-m", "file1")
+
+	// Atlantis checkout first PR.
+	firstPRDir := repoDir + "/first-pr"
+	runCmd(t, repoDir, "mkdir", "-p", "first-pr")
+	runCmd(t, firstPRDir, "git", "clone", "--branch", "master", "--single-branch", repoDir, ".")
+	runCmd(t, firstPRDir, "git", "remote", "add", "head", repoDir)
+	runCmd(t, firstPRDir, "git", "fetch", "head", "+refs/heads/first-pr")
+	runCmd(t, firstPRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, firstPRDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, firstPRDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	// Simulate second PR.
+	runCmd(t, repoDir, "git", "checkout", "master")
+	runCmd(t, repoDir, "git", "checkout", "-b", "second-pr")
+	runCmd(t, repoDir, "touch", "file2")
+	runCmd(t, repoDir, "git", "add", "file2")
+	runCmd(t, repoDir, "git", "commit", "-m", "file2")
+
+	// Atlantis checkout second PR.
+	secondPRDir := repoDir + "/second-pr"
+	runCmd(t, repoDir, "mkdir", "-p", "second-pr")
+	runCmd(t, secondPRDir, "git", "clone", "--branch", "master", "--single-branch", repoDir, ".")
+	runCmd(t, secondPRDir, "git", "remote", "add", "head", repoDir)
+	runCmd(t, secondPRDir, "git", "fetch", "head", "+refs/heads/second-pr")
+	runCmd(t, secondPRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, secondPRDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, secondPRDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	// Merge first PR
+	runCmd(t, repoDir, "git", "checkout", "master")
+	runCmd(t, repoDir, "git", "merge", "first-pr")
+
+	// Copy the second-pr repo to our data dir which has diverged remote master
+	runCmd(t, repoDir, "mkdir", "-p", "repos/0/")
+	runCmd(t, repoDir, "cp", "-R", secondPRDir, "repos/0/default")
+
+	// "git", "remote", "set-url", "origin", p.BaseRepo.CloneURL,
+	runCmd(t, repoDir+"/repos/0/default", "git", "remote", "update")
+
+	// Run the clone.
+	wd := &events.FileWorkspace{
+		DataDir:       repoDir,
+		CheckoutMerge: true,
+	}
+	hasDiverged := wd.HasDiverged(logging.NewNoopLogger(t), repoDir+"/repos/0/default")
+	Equals(t, hasDiverged, true)
+
+	// Run it again but without the checkout merge strategy. It should return
+	// false.
+	wd.CheckoutMerge = false
+	hasDiverged = wd.HasDiverged(logging.NewNoopLogger(t), repoDir+"/repos/0/default")
+	Equals(t, hasDiverged, false)
+}
+
 func initRepo(t *testing.T) (string, func()) {
 	repoDir, cleanup := TempDir(t)
 	runCmd(t, repoDir, "git", "init")
