@@ -41,6 +41,7 @@ type WorkingDir interface {
 	// GetWorkingDir returns the path to the workspace for this repo and pull.
 	// If workspace does not exist on disk, error will be of type os.IsNotExist.
 	GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error)
+	HasDiverged(log logging.SimpleLogging, cloneDir string) bool
 	GetPullDir(r models.Repo, p models.PullRequest) (string, error)
 	// Delete deletes the workspace for this repo and pull.
 	Delete(r models.Repo, p models.PullRequest) error
@@ -160,6 +161,21 @@ func (w *FileWorkspace) warnDiverged(log logging.SimpleLogging, p models.PullReq
 		}
 	}
 
+	hasDiverged := w.HasDiverged(log, cloneDir)
+	if hasDiverged {
+		log.Info("remote master branch is ahead and thereby has new commits, it is recommended to pull new commits")
+	} else {
+		log.Debug("remote master branch has no new commits")
+	}
+	return hasDiverged
+}
+
+func (w *FileWorkspace) HasDiverged(log logging.SimpleLogging, cloneDir string) bool {
+	if !w.CheckoutMerge {
+		// Both the diverged warning and the UnDiverged apply requirement only apply to merge checkout strategy so
+		// we assume false here for 'branch' strategy.
+		return false
+	}
 	// Check if remote master branch has diverged.
 	statusUnoCmd := exec.Command("git", "status", "--untracked-files=no")
 	statusUnoCmd.Dir = cloneDir
@@ -169,11 +185,6 @@ func (w *FileWorkspace) warnDiverged(log logging.SimpleLogging, p models.PullReq
 		return false
 	}
 	hasDiverged := strings.Contains(string(outputStatusUno), "have diverged")
-	if hasDiverged {
-		log.Info("remote master branch is ahead and thereby has new commits, it is recommended to pull new commits")
-	} else {
-		log.Debug("remote master branch has no new commits")
-	}
 	return hasDiverged
 }
 

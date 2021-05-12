@@ -136,6 +136,13 @@ projects:
 				Ok(t, err)
 			}
 
+			globalCfgArgs := valid.GlobalCfgArgs{
+				AllowRepoCfg:  false,
+				MergeableReq:  false,
+				ApprovedReq:   false,
+				UnDivergedReq: false,
+			}
+
 			builder := events.NewProjectCommandBuilder(
 				false,
 				&yaml.ParserValidator{},
@@ -143,7 +150,7 @@ projects:
 				vcsClient,
 				workingDir,
 				events.NewDefaultWorkingDirLocker(),
-				valid.NewGlobalCfg(false, false, false),
+				valid.NewGlobalCfgFromArgs(globalCfgArgs),
 				&events.DefaultPendingPlanFinder{},
 				&events.CommentParser{},
 				false,
@@ -391,6 +398,13 @@ projects:
 					Ok(t, err)
 				}
 
+				globalCfgArgs := valid.GlobalCfgArgs{
+					AllowRepoCfg:  true,
+					MergeableReq:  false,
+					ApprovedReq:   false,
+					UnDivergedReq: false,
+				}
+
 				builder := events.NewProjectCommandBuilder(
 					false,
 					&yaml.ParserValidator{},
@@ -398,7 +412,7 @@ projects:
 					vcsClient,
 					workingDir,
 					events.NewDefaultWorkingDirLocker(),
-					valid.NewGlobalCfg(true, false, false),
+					valid.NewGlobalCfgFromArgs(globalCfgArgs),
 					&events.DefaultPendingPlanFinder{},
 					&events.CommentParser{},
 					false,
@@ -535,6 +549,13 @@ projects:
 				Ok(t, err)
 			}
 
+			globalCfgArgs := valid.GlobalCfgArgs{
+				AllowRepoCfg:  true,
+				MergeableReq:  false,
+				ApprovedReq:   false,
+				UnDivergedReq: false,
+			}
+
 			builder := events.NewProjectCommandBuilder(
 				false,
 				&yaml.ParserValidator{},
@@ -542,7 +563,7 @@ projects:
 				vcsClient,
 				workingDir,
 				events.NewDefaultWorkingDirLocker(),
-				valid.NewGlobalCfg(true, false, false),
+				valid.NewGlobalCfgFromArgs(globalCfgArgs),
 				&events.DefaultPendingPlanFinder{},
 				&events.CommentParser{},
 				false,
@@ -615,6 +636,13 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 
 	logger := logging.NewNoopLogger(t)
 
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowRepoCfg:  false,
+		MergeableReq:  false,
+		ApprovedReq:   false,
+		UnDivergedReq: false,
+	}
+
 	builder := events.NewProjectCommandBuilder(
 		false,
 		&yaml.ParserValidator{},
@@ -622,7 +650,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		nil,
 		workingDir,
 		events.NewDefaultWorkingDirLocker(),
-		valid.NewGlobalCfg(false, false, false),
+		valid.NewGlobalCfgFromArgs(globalCfgArgs),
 		&events.DefaultPendingPlanFinder{},
 		&events.CommentParser{},
 		false,
@@ -688,6 +716,19 @@ projects:
 		matchers.AnyModelsPullRequest(),
 		AnyString())).ThenReturn(repoDir, nil)
 
+<<<<<<< HEAD
+=======
+	scope := stats.NewStore(stats.NewNullSink(), false)
+	logger := logging.NewNoopLogger(t)
+
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowRepoCfg:  true,
+		MergeableReq:  false,
+		ApprovedReq:   false,
+		UnDivergedReq: false,
+	}
+
+>>>>>>> 4ec5e5fa... ORCA-731 Force PR authors to rebase if master has diverged (#70)
 	builder := events.NewProjectCommandBuilder(
 		false,
 		&yaml.ParserValidator{},
@@ -695,7 +736,7 @@ projects:
 		nil,
 		workingDir,
 		events.NewDefaultWorkingDirLocker(),
-		valid.NewGlobalCfg(true, false, false),
+		valid.NewGlobalCfgFromArgs(globalCfgArgs),
 		&events.DefaultPendingPlanFinder{},
 		&events.CommentParser{},
 		false,
@@ -756,6 +797,13 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
 
+			globalCfgArgs := valid.GlobalCfgArgs{
+				AllowRepoCfg:  true,
+				MergeableReq:  false,
+				ApprovedReq:   false,
+				UnDivergedReq: false,
+			}
+
 			builder := events.NewProjectCommandBuilder(
 				false,
 				&yaml.ParserValidator{},
@@ -763,7 +811,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				vcsClient,
 				workingDir,
 				events.NewDefaultWorkingDirLocker(),
-				valid.NewGlobalCfg(true, false, false),
+				valid.NewGlobalCfgFromArgs(globalCfgArgs),
 				&events.DefaultPendingPlanFinder{},
 				&events.CommentParser{},
 				false,
@@ -928,6 +976,13 @@ projects:
 				matchers.AnyModelsPullRequest(),
 				AnyString())).ThenReturn(tmpDir, nil)
 
+			globalCfgArgs := valid.GlobalCfgArgs{
+				AllowRepoCfg:  true,
+				MergeableReq:  false,
+				ApprovedReq:   false,
+				UnDivergedReq: false,
+			}
+
 			builder := events.NewProjectCommandBuilder(
 				false,
 				&yaml.ParserValidator{},
@@ -935,7 +990,7 @@ projects:
 				vcsClient,
 				workingDir,
 				events.NewDefaultWorkingDirLocker(),
-				valid.NewGlobalCfg(true, false, false),
+				valid.NewGlobalCfgFromArgs(globalCfgArgs),
 				&events.DefaultPendingPlanFinder{},
 				&events.CommentParser{},
 				false,
@@ -984,6 +1039,13 @@ projects:
 
 	logger := logging.NewNoopLogger(t)
 
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowRepoCfg:  true,
+		MergeableReq:  false,
+		ApprovedReq:   false,
+		UnDivergedReq: false,
+	}
+
 	builder := events.NewProjectCommandBuilder(
 		false,
 		&yaml.ParserValidator{},
@@ -991,7 +1053,7 @@ projects:
 		vcsClient,
 		workingDir,
 		events.NewDefaultWorkingDirLocker(),
-		valid.NewGlobalCfg(true, false, false),
+		valid.NewGlobalCfgFromArgs(globalCfgArgs),
 		&events.DefaultPendingPlanFinder{},
 		&events.CommentParser{},
 		true,
@@ -1026,7 +1088,15 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 	When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, false, nil)
 	vcsClient := vcsmocks.NewMockClient()
 	When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
-	globalCfg := valid.NewGlobalCfg(false, false, false)
+
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowRepoCfg:  false,
+		MergeableReq:  false,
+		ApprovedReq:   false,
+		UnDivergedReq: false,
+	}
+
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
 
 	builder := events.NewProjectCommandBuilder(
 		true,
