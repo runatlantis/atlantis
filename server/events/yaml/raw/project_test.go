@@ -101,7 +101,7 @@ func TestProject_Validate(t *testing.T) {
 				Dir:               String("."),
 				ApplyRequirements: []string{"unsupported"},
 			},
-			expErr: "apply_requirements: \"unsupported\" is not a valid apply_requirement, only \"approved\" and \"mergeable\" are supported.",
+			expErr: "apply_requirements: \"unsupported\" is not a valid apply_requirement, only \"approved\", \"mergeable\" and \"undiverged\" are supported.",
 		},
 		{
 			description: "apply reqs with approved requirement",
@@ -120,10 +120,42 @@ func TestProject_Validate(t *testing.T) {
 			expErr: "",
 		},
 		{
+			description: "apply reqs with undiverged requirement",
+			input: raw.Project{
+				Dir:               String("."),
+				ApplyRequirements: []string{"undiverged"},
+			},
+			expErr: "",
+		},
+		{
 			description: "apply reqs with mergeable and approved requirements",
 			input: raw.Project{
 				Dir:               String("."),
 				ApplyRequirements: []string{"mergeable", "approved"},
+			},
+			expErr: "",
+		},
+		{
+			description: "apply reqs with undiverged and approved requirements",
+			input: raw.Project{
+				Dir:               String("."),
+				ApplyRequirements: []string{"undiverged", "approved"},
+			},
+			expErr: "",
+		},
+		{
+			description: "apply reqs with undiverged and mergeable requirements",
+			input: raw.Project{
+				Dir:               String("."),
+				ApplyRequirements: []string{"undiverged", "mergeable"},
+			},
+			expErr: "",
+		},
+		{
+			description: "apply reqs with undiverged, mergeable and approved requirements",
+			input: raw.Project{
+				Dir:               String("."),
+				ApplyRequirements: []string{"undiverged", "mergeable", "approved"},
 			},
 			expErr: "",
 		},

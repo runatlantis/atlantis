@@ -342,6 +342,10 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 			if !ctx.PullMergeable {
 				return "", "Pull request must be mergeable before running apply.", nil
 			}
+		case raw.UnDivergedApplyRequirement:
+			if p.WorkingDir.HasDiverged(ctx.Log, repoDir) {
+				return "", "Default branch must be rebased onto pull request before running apply.", nil
+			}
 		}
 	}
 	// Acquire internal lock for the directory we're going to operate in.
