@@ -268,7 +268,7 @@ workflows:
       - init:
           extra_args: [-backend-config=production.backend.tfvars]
       - plan:
-          extra_args: [-var-file=production.tfvars
+          extra_args: [-var-file=production.tfvars]
 ```
 ::: warning NOTE
 We have to use a custom `run` step to `rm -rf .terraform` because otherwise Terraform
