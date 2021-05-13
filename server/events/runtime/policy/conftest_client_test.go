@@ -22,10 +22,10 @@ import (
 
 func TestConfTestVersionDownloader(t *testing.T) {
 
-	version, _ := version.NewVersion("0.23.0")
+	version, _ := version.NewVersion("0.25.0")
 	destPath := "some/path"
 
-	fullURL := fmt.Sprintf("https://github.com/open-policy-agent/conftest/releases/download/v0.23.0/conftest_0.23.0_%s_x86_64.tar.gz?checksum=file:https://github.com/open-policy-agent/conftest/releases/download/v0.23.0/checksums.txt", strings.Title(runtime.GOOS))
+	fullURL := fmt.Sprintf("https://github.com/open-policy-agent/conftest/releases/download/v0.25.0/conftest_0.25.0_%s_x86_64.tar.gz?checksum=file:https://github.com/open-policy-agent/conftest/releases/download/v0.25.0/checksums.txt", strings.Title(runtime.GOOS))
 
 	RegisterMockTestingT(t)
 
