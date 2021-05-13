@@ -2,7 +2,7 @@ version: 2
 jobs:
   test:
     docker:
-    - image: runatlantis/testing-env:01216b26cd75183360909a50217a39d55a9265e7
+    - image: runatlantis/testing-env:805e94e7f648eddb0484e539a7b51410d39529bc
     steps:
     - checkout
     - run: make test-all
