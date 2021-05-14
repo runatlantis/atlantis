@@ -1037,44 +1037,61 @@ func assertCommentEquals(t *testing.T, expReplies []string, act string, repoDir 
 	resourceRegex := regexp.MustCompile(`null_resource\.simple(\[\d])?\d?:.*`)
 	act = resourceRegex.ReplaceAllString(act, "null_resource.simple:")
 
-	// For parallel plans and applies, do a substring match since output may be out of order
-	var replyMatchesExpected func(string, string) bool
+	// For parallel plans and applies, we go through all expected replies and
+	// look for any 1 match. They can be out of order
 	if parallel {
-		replyMatchesExpected = func(act string, expStr string) bool {
-			return strings.Contains(act, expStr)
-		}
-	} else {
-		replyMatchesExpected = func(act string, expStr string) bool {
-			return expStr == act
-		}
-	}
-
-	for _, expFile := range expReplies {
-		exp, err := ioutil.ReadFile(filepath.Join(absRepoPath(t, repoDir), expFile))
-		Ok(t, err)
-		expStr := string(exp)
-		// My editor adds a newline to all the files, so if the actual comment
-		// doesn't end with a newline then strip the last newline from the file's
-		// contents.
-		if !strings.HasSuffix(act, "\n") {
-			expStr = strings.TrimSuffix(expStr, "\n")
+		anyMatch := false
+		for _, expFile := range expReplies {
+			exp, err := ioutil.ReadFile(filepath.Join(absRepoPath(t, repoDir), expFile))
+			Ok(t, err)
+			expStr := string(exp)
+			// My editor adds a newline to all the files, so if the actual comment
+			// doesn't end with a newline then strip the last newline from the file's
+			// contents.
+			if !strings.HasSuffix(act, "\n") {
+				expStr = strings.TrimSuffix(expStr, "\n")
+			}
+			anyMatch = expStr == act
 		}
 
-		if !replyMatchesExpected(act, expStr) {
+		if !anyMatch {
 			// If in CI, we write the diff to the console. Otherwise we write the diff
 			// to file so we can use our local diff viewer.
 			if os.Getenv("CI") == "true" {
-				t.Logf("exp: %s, got: %s", expStr, act)
+				t.Logf("got: %s, \nnone of the expected fixtures matches", act)
 				t.FailNow()
 			} else {
-				actFile := filepath.Join(absRepoPath(t, repoDir), expFile+".act")
-				err := ioutil.WriteFile(actFile, []byte(act), 0600)
-				Ok(t, err)
-				cwd, err := os.Getwd()
-				Ok(t, err)
-				rel, err := filepath.Rel(cwd, actFile)
-				Ok(t, err)
-				t.Errorf("%q was different, wrote actual comment to %q", expFile, rel)
+				t.Errorf("got: %s, \nnone of the expected fixtures matches", act)
+			}
+		}
+	} else {
+		for _, expFile := range expReplies {
+			exp, err := ioutil.ReadFile(filepath.Join(absRepoPath(t, repoDir), expFile))
+			Ok(t, err)
+			expStr := string(exp)
+			// My editor adds a newline to all the files, so if the actual comment
+			// doesn't end with a newline then strip the last newline from the file's
+			// contents.
+			if !strings.HasSuffix(act, "\n") {
+				expStr = strings.TrimSuffix(expStr, "\n")
+			}
+
+			if expStr != act {
+				// If in CI, we write the diff to the console. Otherwise we write the diff
+				// to file so we can use our local diff viewer.
+				if os.Getenv("CI") == "true" {
+					t.Logf("exp: %s, got: %s", expStr, act)
+					t.FailNow()
+				} else {
+					actFile := filepath.Join(absRepoPath(t, repoDir), expFile+".act")
+					err := ioutil.WriteFile(actFile, []byte(act), 0600)
+					Ok(t, err)
+					cwd, err := os.Getwd()
+					Ok(t, err)
+					rel, err := filepath.Rel(cwd, actFile)
+					Ok(t, err)
+					t.Errorf("%q was different, wrote actual comment to %q", expFile, rel)
+				}
 			}
 		}
 	}
