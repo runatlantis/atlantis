@@ -104,7 +104,7 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 	// maxCommentLength is the maximum number of chars allowed in a single comment
 	// This length was copied from the Github client - haven't found documentation
 	// or tested limit in Azure DevOps.
-	const maxCommentLength = 65536
+	const maxCommentLength = 150000
 
 	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
