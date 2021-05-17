@@ -28,6 +28,10 @@ import (
 
 const workingDirPrefix = "repos"
 
+type WorkingDirIterator interface {
+	ListCurrentWorkingDirs() []WorkingDir
+}
+
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_working_dir.go WorkingDir
 //go:generate pegomock generate -m --use-experimental-model-gen --package events WorkingDir
 

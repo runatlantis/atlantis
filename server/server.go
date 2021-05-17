@@ -99,6 +99,7 @@ type Server struct {
 	SSLCertFile                   string
 	SSLKeyFile                    string
 	Drainer                       *events.Drainer
+	ScheduledExecutorService      *ScheduledExecutorService
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -642,6 +643,17 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubOrg:           userConfig.GithubOrg,
 	}
 
+	scheduledExecutorService := NewScheduledExecutorService(
+		events.NewFileWorkDirIterator(
+			githubClient,
+			eventParser,
+			userConfig.DataDir,
+			logger,
+		),
+		statsScope,
+		logger,
+	)
+
 	return &Server{
 		AtlantisVersion:               config.AtlantisVersion,
 		AtlantisURL:                   parsedURL,
@@ -662,6 +674,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		SSLKeyFile:                    userConfig.SSLKeyFile,
 		SSLCertFile:                   userConfig.SSLCertFile,
 		Drainer:                       drainer,
+		ScheduledExecutorService:      scheduledExecutorService,
 	}, nil
 }
 
@@ -695,6 +708,8 @@ func (s *Server) Start() error {
 	stop := make(chan os.Signal, 1)
 	// Stop on SIGINTs and SIGTERMs.
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	go s.ScheduledExecutorService.Run()
 
 	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n}
 	go func() {
