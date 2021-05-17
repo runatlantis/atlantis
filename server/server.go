@@ -395,13 +395,18 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		LockViewRouteName:         LockViewRouteName,
 		Underlying:                underlyingRouter,
 	}
-	pullClosedExecutor := &events.PullClosedExecutor{
-		VCSClient:  vcsClient,
-		Locker:     lockingClient,
-		WorkingDir: workingDir,
-		Logger:     logger,
-		DB:         boltdb,
-	}
+
+	pullClosedExecutor := events.NewInstrumentedPullClosedExecutor(
+		statsScope,
+		logger,
+		&events.PullClosedExecutor{
+			VCSClient:  vcsClient,
+			Locker:     lockingClient,
+			WorkingDir: workingDir,
+			Logger:     logger,
+			DB:         boltdb,
+		},
+	)
 	eventParser := &events.EventParser{
 		GithubUser:         userConfig.GithubUser,
 		GithubToken:        userConfig.GithubToken,
