@@ -16,6 +16,7 @@ package events
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 	"text/template"
@@ -42,16 +43,27 @@ type PullCleaner interface {
 // PullClosedExecutor executes the tasks required to clean up a closed pull
 // request.
 type PullClosedExecutor struct {
-	Locker     locking.Locker
-	VCSClient  vcs.Client
-	WorkingDir WorkingDir
-	Logger     logging.SimpleLogging
-	DB         *db.BoltDB
+	Locker             locking.Locker
+	VCSClient          vcs.Client
+	WorkingDir         WorkingDir
+	Logger             logging.SimpleLogging
+	DB                 *db.BoltDB
+	PullClosedTemplate PullCleanupTemplate
 }
 
 type templatedProject struct {
 	RepoRelDir string
 	Workspaces string
+}
+
+type PullCleanupTemplate interface {
+	Execute(wr io.Writer, data interface{}) error
+}
+
+type PullClosedEventTemplate struct{}
+
+func (t *PullClosedEventTemplate) Execute(wr io.Writer, data interface{}) error {
+	return pullClosedTemplate.Execute(wr, data)
 }
 
 var pullClosedTemplate = template.Must(template.New("").Parse(
@@ -85,7 +97,7 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 
 	templateData := p.buildTemplateData(locks)
 	var buf bytes.Buffer
-	if err = pullClosedTemplate.Execute(&buf, templateData); err != nil {
+	if err = p.PullClosedTemplate.Execute(&buf, templateData); err != nil {
 		return errors.Wrap(err, "rendering template for comment")
 	}
 	return p.VCSClient.CreateComment(repo, pull.Num, buf.String(), "")
