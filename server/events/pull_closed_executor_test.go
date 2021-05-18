@@ -35,7 +35,8 @@ func TestCleanUpPullWorkspaceErr(t *testing.T) {
 	RegisterMockTestingT(t)
 	w := mocks.NewMockWorkingDir()
 	pce := events.PullClosedExecutor{
-		WorkingDir: w,
+		WorkingDir:         w,
+		PullClosedTemplate: &events.PullClosedEventTemplate{},
 	}
 	err := errors.New("err")
 	When(w.Delete(fixtures.GithubRepo, fixtures.Pull)).ThenReturn(err)
@@ -49,8 +50,9 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 	w := mocks.NewMockWorkingDir()
 	l := lockmocks.NewMockLocker()
 	pce := events.PullClosedExecutor{
-		Locker:     l,
-		WorkingDir: w,
+		Locker:             l,
+		WorkingDir:         w,
+		PullClosedTemplate: &events.PullClosedEventTemplate{},
 	}
 	err := errors.New("err")
 	When(l.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(nil, err)
@@ -69,10 +71,11 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 	db, err := db.New(tmp)
 	Ok(t, err)
 	pce := events.PullClosedExecutor{
-		Locker:     l,
-		VCSClient:  cp,
-		WorkingDir: w,
-		DB:         db,
+		Locker:             l,
+		VCSClient:          cp,
+		WorkingDir:         w,
+		DB:                 db,
+		PullClosedTemplate: &events.PullClosedEventTemplate{},
 	}
 	When(l.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(nil, nil)
 	err = pce.CleanUpPull(fixtures.GithubRepo, fixtures.Pull)
@@ -155,10 +158,11 @@ func TestCleanUpPullComments(t *testing.T) {
 			db, err := db.New(tmp)
 			Ok(t, err)
 			pce := events.PullClosedExecutor{
-				Locker:     l,
-				VCSClient:  cp,
-				WorkingDir: w,
-				DB:         db,
+				Locker:             l,
+				VCSClient:          cp,
+				WorkingDir:         w,
+				DB:                 db,
+				PullClosedTemplate: &events.PullClosedEventTemplate{},
 			}
 			t.Log("testing: " + c.Description)
 			When(l.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(c.Locks, nil)

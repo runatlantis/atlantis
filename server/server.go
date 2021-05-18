@@ -387,11 +387,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		statsScope,
 		logger,
 		&events.PullClosedExecutor{
-			VCSClient:  vcsClient,
-			Locker:     lockingClient,
-			WorkingDir: workingDir,
-			Logger:     logger,
-			DB:         boltdb,
+			VCSClient:          vcsClient,
+			Locker:             lockingClient,
+			WorkingDir:         workingDir,
+			Logger:             logger,
+			DB:                 boltdb,
+			PullClosedTemplate: &events.PullClosedEventTemplate{},
 		},
 	)
 	eventParser := &events.EventParser{
@@ -652,6 +653,16 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		),
 		statsScope,
 		logger,
+		&events.PullClosedExecutor{
+			VCSClient:  vcsClient,
+			Locker:     lockingClient,
+			WorkingDir: workingDir,
+			Logger:     logger,
+			DB:         boltdb,
+
+			// using a specific template to signal that this is from an async process
+			PullClosedTemplate: &GCStalePullTemplate{},
+		},
 	)
 
 	return &Server{
