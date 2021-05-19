@@ -716,11 +716,6 @@ projects:
 		matchers.AnyModelsPullRequest(),
 		AnyString())).ThenReturn(repoDir, nil)
 
-<<<<<<< HEAD
-=======
-	scope := stats.NewStore(stats.NewNullSink(), false)
-	logger := logging.NewNoopLogger(t)
-
 	globalCfgArgs := valid.GlobalCfgArgs{
 		AllowRepoCfg:  true,
 		MergeableReq:  false,
@@ -728,7 +723,6 @@ projects:
 		UnDivergedReq: false,
 	}
 
->>>>>>> 4ec5e5fa... ORCA-731 Force PR authors to rebase if master has diverged (#70)
 	builder := events.NewProjectCommandBuilder(
 		false,
 		&yaml.ParserValidator{},
