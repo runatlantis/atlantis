@@ -3,7 +3,7 @@ FROM runatlantis/atlantis-base:v3.5
 LABEL authors="Anubhav Mishra, Luke Kysow"
 
 # install terraform binaries
-ENV DEFAULT_TERRAFORM_VERSION=0.15.3
+ENV DEFAULT_TERRAFORM_VERSION=0.15.4
 
 # In the official Atlantis image we only have the latest of each Terraform version.
 RUN AVAILABLE_TERRAFORM_VERSIONS="0.8.8 0.9.11 0.10.8 0.11.15 0.12.31 0.13.7 0.14.11 ${DEFAULT_TERRAFORM_VERSION}" && \
