@@ -503,12 +503,18 @@ type PlanSuccess struct {
 
 // Summary extracts one line summary of plan changes from TerraformOutput.
 func (p *PlanSuccess) Summary() string {
-	r := regexp.MustCompile(`Plan: \d+ to add, \d+ to change, \d+ to destroy.`)
+	note := ""
+	r := regexp.MustCompile(`Note: Objects have changed outside of Terraform`)
 	if match := r.FindString(p.TerraformOutput); match != "" {
-		return match
+		note = fmt.Sprintf("\n**%s**\n", match)
 	}
-	r = regexp.MustCompile(`No changes. Infrastructure is up-to-date.`)
-	return r.FindString(p.TerraformOutput)
+
+	r = regexp.MustCompile(`Plan: \d+ to add, \d+ to change, \d+ to destroy.`)
+	if match := r.FindString(p.TerraformOutput); match != "" {
+		return note + match
+	}
+	r = regexp.MustCompile(`No changes. (Infrastructure is up-to-date|Your infrastructure matches the configuration).`)
+	return note + r.FindString(p.TerraformOutput)
 }
 
 // PolicyCheckSuccess is the result of a successful policy check run.
