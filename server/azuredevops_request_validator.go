@@ -12,7 +12,6 @@ import (
 
 // AzureDevopsRequestValidator handles checking if Azure DevOps requests
 // contain a valid Basic authentication username and password.
-//
 type AzureDevopsRequestValidator interface {
 	// Validate returns the JSON payload of the request.
 	// If both username and password values have a length greater than zero,
