@@ -20,12 +20,12 @@ import (
 	"testing"
 
 	. "github.com/petergtz/pegomock"
-	"github.com/runatlantis/atlantis/server"
+  "github.com/runatlantis/atlantis/server/controllers/events"
 	. "github.com/runatlantis/atlantis/testing"
 	gitlab "github.com/xanzy/go-gitlab"
 )
 
-var parser = server.DefaultGitlabRequestParserValidator{}
+var parser = events.DefaultGitlabRequestParserValidator{}
 
 func TestValidate_InvalidSecret(t *testing.T) {
 	t.Log("If the secret header is set and doesn't match expected an error is returned")

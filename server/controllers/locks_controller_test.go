@@ -14,10 +14,10 @@ import (
 	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/controllers"
+	"github.com/runatlantis/atlantis/server/controllers/templates"
 
 	"github.com/gorilla/mux"
 	. "github.com/petergtz/pegomock"
-	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events"
 
 	"github.com/runatlantis/atlantis/server/events/locking/mocks"
@@ -28,6 +28,11 @@ import (
 	sMocks "github.com/runatlantis/atlantis/server/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
+
+func AnyRepo() models.Repo {
+	RegisterMatcher(NewAnyMatcher(reflect.TypeOf(models.Repo{})))
+	return models.Repo{}
+}
 
 func TestCreateApplyLock(t *testing.T) {
 	t.Run("Creates apply lock", func(t *testing.T) {
@@ -185,7 +190,7 @@ func TestGetLock_Success(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.GetLock(w, req)
-	tmpl.VerifyWasCalledOnce().Execute(w, controllers.LockDetailData{
+	tmpl.VerifyWasCalledOnce().Execute(w, templates.LockDetailData{
 		LockKeyEncoded:  "id",
 		LockKey:         "id",
 		RepoOwner:       "owner",
@@ -351,7 +356,7 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 	defer cleanup()
 	db, err := db.New(tmp)
 	Ok(t, err)
-	lc := server.LocksController{
+	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),
 		VCSClient:         cp,

@@ -26,6 +26,7 @@ import (
 	"github.com/gorilla/mux"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server"
+	"github.com/runatlantis/atlantis/server/controllers/templates"
 	"github.com/runatlantis/atlantis/server/events/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -111,13 +112,13 @@ func TestIndex_Success(t *testing.T) {
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
 	s.Index(w, req)
-	it.VerifyWasCalledOnce().Execute(w, server.IndexData{
-		ApplyLock: server.ApplyLockData{
+	it.VerifyWasCalledOnce().Execute(w, templates.IndexData{
+		ApplyLock: templates.ApplyLockData{
 			Locked:        false,
 			Time:          time.Time{},
 			TimeFormatted: "01-01-0001 00:00:00",
 		},
-		Locks: []server.LockIndexData{
+		Locks: []templates.LockIndexData{
 			{
 				LockPath:      "/lock?id=lkysow%252Fatlantis-example%252F.%252Fdefault",
 				RepoFullName:  "lkysow/atlantis-example",

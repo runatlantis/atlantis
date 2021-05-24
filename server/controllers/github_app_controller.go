@@ -1,4 +1,4 @@
-package server
+package controllers
 
 import (
 	"encoding/json"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/controllers/templates"
 )
 
 // GithubAppController handles the creation and setup of a new GitHub app
@@ -68,7 +69,7 @@ func (g *GithubAppController) ExchangeCode(w http.ResponseWriter, r *http.Reques
 
 	g.Logger.Debug("Found credentials for GitHub app %q with id %d", app.Name, app.ID)
 
-	err = githubAppSetupTemplate.Execute(w, GithubSetupData{
+	err = templates.GithubAppSetupTemplate.Execute(w, templates.GithubSetupData{
 		Target:        "",
 		Manifest:      "",
 		ID:            app.ID,
@@ -137,7 +138,7 @@ func (g *GithubAppController) New(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = githubAppSetupTemplate.Execute(w, GithubSetupData{
+	err = templates.GithubAppSetupTemplate.Execute(w, templates.GithubSetupData{
 		Target:   url.String(),
 		Manifest: string(jsonManifest),
 	})

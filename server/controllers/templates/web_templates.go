@@ -11,7 +11,7 @@
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
 
-package server
+package templates
 
 import (
 	"html/template"
@@ -58,7 +58,7 @@ type IndexData struct {
 	CleanedBasePath string
 }
 
-var indexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
+var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -250,7 +250,7 @@ type LockDetailData struct {
 	CleanedBasePath string
 }
 
-var lockTemplate = template.Must(template.New("lock.html.tmpl").Parse(`
+var LockTemplate = template.Must(template.New("lock.html.tmpl").Parse(`
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -362,7 +362,7 @@ type GithubSetupData struct {
 	URL           string
 }
 
-var githubAppSetupTemplate = template.Must(template.New("github-app.html.tmpl").Parse(`
+var GithubAppSetupTemplate = template.Must(template.New("github-app.html.tmpl").Parse(`
 <!DOCTYPE html>
 <html lang="en">
 <head>

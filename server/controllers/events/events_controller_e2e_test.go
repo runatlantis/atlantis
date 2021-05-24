@@ -18,6 +18,7 @@ import (
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server"
+	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/events/locking"
@@ -400,7 +401,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			// First, send the open pull request event which triggers autoplan.
 			pullOpenedReq := GitHubPullRequestOpenedEvent(t, headSHA)
 			ctrl.Post(w, pullOpenedReq)
-			responseContains(t, w, 200, "Processing...")
+			ResponseContains(t, w, 200, "Processing...")
 
 			// Create global apply lock if required
 			if c.ApplyLock {
@@ -412,7 +413,7 @@ func TestGitHubWorkflow(t *testing.T) {
 				commentReq := GitHubCommentEvent(t, comment)
 				w = httptest.NewRecorder()
 				ctrl.Post(w, commentReq)
-				responseContains(t, w, 200, "Processing...")
+				ResponseContains(t, w, 200, "Processing...")
 			}
 
 			// Send the "pull closed" event which would be triggered by the
@@ -420,7 +421,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			pullClosedReq := GitHubPullRequestClosedEvent(t)
 			w = httptest.NewRecorder()
 			ctrl.Post(w, pullClosedReq)
-			responseContains(t, w, 200, "Pull request cleaned successfully")
+			ResponseContains(t, w, 200, "Pull request cleaned successfully")
 
 			// Let's verify the pre-workflow hook was called for each comment including the pull request opened event
 			mockPreWorkflowHookRunner.VerifyWasCalled(Times(len(c.Comments)+1)).Run(runtimematchers.AnyModelsPreWorkflowHookCommandContext(), EqString("some dummy command"), AnyString())
@@ -587,14 +588,14 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			// First, send the open pull request event which triggers autoplan.
 			pullOpenedReq := GitHubPullRequestOpenedEvent(t, headSHA)
 			ctrl.Post(w, pullOpenedReq)
-			responseContains(t, w, 200, "Processing...")
+			ResponseContains(t, w, 200, "Processing...")
 
 			// Now send any other comments.
 			for _, comment := range c.Comments {
 				commentReq := GitHubCommentEvent(t, comment)
 				w = httptest.NewRecorder()
 				ctrl.Post(w, commentReq)
-				responseContains(t, w, 200, "Processing...")
+				ResponseContains(t, w, 200, "Processing...")
 			}
 
 			// Send the "pull closed" event which would be triggered by the
@@ -602,7 +603,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			pullClosedReq := GitHubPullRequestClosedEvent(t)
 			w = httptest.NewRecorder()
 			ctrl.Post(w, pullClosedReq)
-			responseContains(t, w, 200, "Pull request cleaned successfully")
+			ResponseContains(t, w, 200, "Pull request cleaned successfully")
 
 			// Now we're ready to verify Atlantis made all the comments back (or
 			// replies) that we expect.  We expect each plan to have 2 comments,
@@ -642,7 +643,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 	}
 }
 
-func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
+func setupE2E(t *testing.T, repoDir string) (events_controllers.EventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
 	allowForkPRs := false
 	dataDir, binDir, cacheDir, cleanup := mkSubDirs(t)
 	defer cleanup()
@@ -881,7 +882,7 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
 	Ok(t, err)
 
-	ctrl := server.EventsController{
+	ctrl := events_controllers.EventsController{
 		TestingMode:   true,
 		CommandRunner: commandRunner,
 		PullCleaner: &events.PullClosedExecutor{
@@ -894,8 +895,8 @@ func setupE2E(t *testing.T, repoDir string) (server.EventsController, *vcsmocks.
 		Parser:                       eventParser,
 		CommentParser:                commentParser,
 		GithubWebhookSecret:          nil,
-		GithubRequestValidator:       &server.DefaultGithubRequestValidator{},
-		GitlabRequestParserValidator: &server.DefaultGitlabRequestParserValidator{},
+		GithubRequestValidator:       &events_controllers.DefaultGithubRequestValidator{},
+		GitlabRequestParserValidator: &events_controllers.DefaultGitlabRequestParserValidator{},
 		GitlabWebhookSecret:          nil,
 		RepoAllowlistChecker:         repoAllowlistChecker,
 		SupportedVCSHosts:            []models.VCSHostType{models.Gitlab, models.Github, models.BitbucketCloud},

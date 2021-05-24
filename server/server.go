@@ -40,6 +40,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/controllers"
+	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
+	"github.com/runatlantis/atlantis/server/controllers/templates"
 	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/runtime"
@@ -86,12 +88,12 @@ type Server struct {
 	Logger                        logging.SimpleLogging
 	Locker                        locking.Locker
 	ApplyLocker                   locking.ApplyLocker
-	EventsController              *controllers.EventsController
-	GithubAppController           *GithubAppController
-	LocksController               *LocksController
-	StatusController              *StatusController
-	IndexTemplate                 TemplateWriter
-	LockDetailTemplate            TemplateWriter
+	EventsController              *events_controllers.EventsController
+	GithubAppController           *controllers.GithubAppController
+	LocksController               *controllers.LocksController
+	StatusController              *controllers.StatusController
+	IndexTemplate                 templates.TemplateWriter
+	LockDetailTemplate            templates.TemplateWriter
 	SSLCertFile                   string
 	SSLKeyFile                    string
 	Drainer                       *events.Drainer
@@ -405,7 +407,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		TerraformBinDir:   terraformClient.TerraformBinDir(),
 	}
 	drainer := &events.Drainer{}
-	statusController := &StatusController{
+	statusController := &controllers.StatusController{
 		Logger:  logger,
 		Drainer: drainer,
 	}
@@ -578,20 +580,20 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	locksController := &LocksController{
+	locksController := &controllers.LocksController{
 		AtlantisVersion:    config.AtlantisVersion,
 		AtlantisURL:        parsedURL,
 		Locker:             lockingClient,
 		ApplyLocker:        applyLockingClient,
 		Logger:             logger,
 		VCSClient:          vcsClient,
-		LockDetailTemplate: lockTemplate,
+		LockDetailTemplate: templates.LockTemplate,
 		WorkingDir:         workingDir,
 		WorkingDirLocker:   workingDirLocker,
 		DB:                 boltdb,
 		DeleteLockCommand:  deleteLockCommand,
 	}
-	eventsController := &EventsController{
+	eventsController := &events_controllers.EventsController{
 		CommandRunner:                   commandRunner,
 		PullCleaner:                     pullClosedExecutor,
 		Parser:                          eventParser,
@@ -599,8 +601,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Logger:                          logger,
 		ApplyDisabled:                   userConfig.DisableApply,
 		GithubWebhookSecret:             []byte(userConfig.GithubWebhookSecret),
-		GithubRequestValidator:          &DefaultGithubRequestValidator{},
-		GitlabRequestParserValidator:    &DefaultGitlabRequestParserValidator{},
+		GithubRequestValidator:          &events_controllers.DefaultGithubRequestValidator{},
+		GitlabRequestParserValidator:    &events_controllers.DefaultGitlabRequestParserValidator{},
 		GitlabWebhookSecret:             []byte(userConfig.GitlabWebhookSecret),
 		RepoAllowlistChecker:            repoAllowlist,
 		SilenceAllowlistErrors:          userConfig.SilenceAllowlistErrors,
@@ -609,9 +611,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		BitbucketWebhookSecret:          []byte(userConfig.BitbucketWebhookSecret),
 		AzureDevopsWebhookBasicUser:     []byte(userConfig.AzureDevopsWebhookUser),
 		AzureDevopsWebhookBasicPassword: []byte(userConfig.AzureDevopsWebhookPassword),
-		AzureDevopsRequestValidator:     &DefaultAzureDevopsRequestValidator{},
+		AzureDevopsRequestValidator:     &events_controllers.DefaultAzureDevopsRequestValidator{},
 	}
-	githubAppController := &GithubAppController{
+	githubAppController := &controllers.GithubAppController{
 		AtlantisURL:         parsedURL,
 		Logger:              logger,
 		GithubSetupComplete: githubAppEnabled,
@@ -633,8 +635,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubAppController:           githubAppController,
 		LocksController:               locksController,
 		StatusController:              statusController,
-		IndexTemplate:                 indexTemplate,
-		LockDetailTemplate:            lockTemplate,
+		IndexTemplate:                 templates.IndexTemplate,
+		LockDetailTemplate:            templates.LockTemplate,
 		SSLKeyFile:                    userConfig.SSLKeyFile,
 		SSLCertFile:                   userConfig.SSLCertFile,
 		Drainer:                       drainer,
@@ -726,10 +728,10 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 
-	var lockResults []LockIndexData
+	var lockResults []templates.LockIndexData
 	for id, v := range locks {
 		lockURL, _ := s.Router.Get(LockViewRouteName).URL("id", url.QueryEscape(id))
-		lockResults = append(lockResults, LockIndexData{
+		lockResults = append(lockResults, templates.LockIndexData{
 			// NOTE: must use .String() instead of .Path because we need the
 			// query params as part of the lock URL.
 			LockPath:      lockURL.String(),
@@ -750,7 +752,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 
-	applyLockData := ApplyLockData{
+	applyLockData := templates.ApplyLockData{
 		Time:          applyCmdLock.Time,
 		Locked:        applyCmdLock.Locked,
 		TimeFormatted: applyCmdLock.Time.Format("02-01-2006 15:04:05"),
@@ -758,7 +760,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	//Sort by date - newest to oldest.
 	sort.SliceStable(lockResults, func(i, j int) bool { return lockResults[i].Time.After(lockResults[j].Time) })
 
-	err = s.IndexTemplate.Execute(w, IndexData{
+	err = s.IndexTemplate.Execute(w, templates.IndexData{
 		Locks:           lockResults,
 		ApplyLock:       applyLockData,
 		AtlantisVersion: s.AtlantisVersion,
