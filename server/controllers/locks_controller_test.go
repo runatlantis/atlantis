@@ -15,6 +15,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/controllers"
 	"github.com/runatlantis/atlantis/server/controllers/templates"
+	tMocks "github.com/runatlantis/atlantis/server/controllers/templates/mocks"
 
 	"github.com/gorilla/mux"
 	. "github.com/petergtz/pegomock"
@@ -25,7 +26,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
-	sMocks "github.com/runatlantis/atlantis/server/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -176,7 +176,7 @@ func TestGetLock_Success(t *testing.T) {
 		Pull:      models.PullRequest{URL: "url", Author: "lkysow"},
 		Workspace: "workspace",
 	}, nil)
-	tmpl := sMocks.NewMockTemplateWriter()
+	tmpl := tMocks.NewMockTemplateWriter()
 	atlantisURL, err := url.Parse("https://example.com/basepath")
 	Ok(t, err)
 	lc := controllers.LocksController{

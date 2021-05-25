@@ -27,10 +27,10 @@ import (
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/controllers/templates"
+	tMocks "github.com/runatlantis/atlantis/server/controllers/templates/mocks"
 	"github.com/runatlantis/atlantis/server/events/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
-	sMocks "github.com/runatlantis/atlantis/server/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -92,7 +92,7 @@ func TestIndex_Success(t *testing.T) {
 		},
 	}
 	When(l.List()).ThenReturn(locks, nil)
-	it := sMocks.NewMockTemplateWriter()
+	it := tMocks.NewMockTemplateWriter()
 	r := mux.NewRouter()
 	atlantisVersion := "0.3.1"
 	// Need to create a lock route since the server expects this route to exist.

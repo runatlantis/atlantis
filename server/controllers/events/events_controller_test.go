@@ -33,7 +33,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/mocks"
+	"github.com/runatlantis/atlantis/server/controllers/events/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 	gitlab "github.com/xanzy/go-gitlab"
 )
