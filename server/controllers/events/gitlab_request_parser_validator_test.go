@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	. "github.com/petergtz/pegomock"
-  "github.com/runatlantis/atlantis/server/controllers/events"
+	"github.com/runatlantis/atlantis/server/controllers/events"
 	. "github.com/runatlantis/atlantis/testing"
 	gitlab "github.com/xanzy/go-gitlab"
 )

@@ -88,7 +88,7 @@ type Server struct {
 	Logger                        logging.SimpleLogging
 	Locker                        locking.Locker
 	ApplyLocker                   locking.ApplyLocker
-	EventsController              *events_controllers.EventsController
+	VCSEventsController           *events_controllers.VCSEventsController
 	GithubAppController           *controllers.GithubAppController
 	LocksController               *controllers.LocksController
 	StatusController              *controllers.StatusController
@@ -593,7 +593,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DB:                 boltdb,
 		DeleteLockCommand:  deleteLockCommand,
 	}
-	eventsController := &events_controllers.EventsController{
+	eventsController := &events_controllers.VCSEventsController{
 		CommandRunner:                   commandRunner,
 		PullCleaner:                     pullClosedExecutor,
 		Parser:                          eventParser,
@@ -631,7 +631,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Logger:                        logger,
 		Locker:                        lockingClient,
 		ApplyLocker:                   applyLockingClient,
-		EventsController:              eventsController,
+		VCSEventsController:           eventsController,
 		GithubAppController:           githubAppController,
 		LocksController:               locksController,
 		StatusController:              statusController,
@@ -651,7 +651,7 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/healthz", s.Healthz).Methods("GET")
 	s.Router.HandleFunc("/status", s.StatusController.Get).Methods("GET")
 	s.Router.PathPrefix("/static/").Handler(http.FileServer(&assetfs.AssetFS{Asset: static.Asset, AssetDir: static.AssetDir, AssetInfo: static.AssetInfo}))
-	s.Router.HandleFunc("/events", s.EventsController.Post).Methods("POST")
+	s.Router.HandleFunc("/events", s.VCSEventsController.Post).Methods("POST")
 	s.Router.HandleFunc("/github-app/exchange-code", s.GithubAppController.ExchangeCode).Methods("GET")
 	s.Router.HandleFunc("/github-app/setup", s.GithubAppController.New).Methods("GET")
 	s.Router.HandleFunc("/apply/lock", s.LocksController.LockApply).Methods("POST").Queries()

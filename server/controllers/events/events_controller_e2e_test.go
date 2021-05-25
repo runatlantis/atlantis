@@ -643,7 +643,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 	}
 }
 
-func setupE2E(t *testing.T, repoDir string) (events_controllers.EventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
+func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
 	allowForkPRs := false
 	dataDir, binDir, cacheDir, cleanup := mkSubDirs(t)
 	defer cleanup()
@@ -882,7 +882,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.EventsController
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
 	Ok(t, err)
 
-	ctrl := events_controllers.EventsController{
+	ctrl := events_controllers.VCSEventsController{
 		TestingMode:   true,
 		CommandRunner: commandRunner,
 		PullCleaner: &events.PullClosedExecutor{
