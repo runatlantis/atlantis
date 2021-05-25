@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/runatlantis/atlantis/server/events/db"
-	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/controllers"
 	"github.com/runatlantis/atlantis/server/controllers/templates"
 	tMocks "github.com/runatlantis/atlantis/server/controllers/templates/mocks"
+	"github.com/runatlantis/atlantis/server/events/db"
+	"github.com/runatlantis/atlantis/server/events/locking"
 
 	"github.com/gorilla/mux"
 	. "github.com/petergtz/pegomock"
