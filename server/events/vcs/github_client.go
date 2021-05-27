@@ -159,9 +159,9 @@ func (g *GithubClient) CreateComment(repo models.Repo, pullNum int, comment stri
 	}
 
 	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
-	for _, c := range comments {
+	for i := range comments {
 		g.logger.Debug("POST /repos/%v/%v/issues/%d/comments", repo.Owner, repo.Name, pullNum)
-		_, _, err := g.client.Issues.CreateComment(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueComment{Body: &c})
+		_, _, err := g.client.Issues.CreateComment(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueComment{Body: &comments[i]})
 		if err != nil {
 			return err
 		}

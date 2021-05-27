@@ -52,7 +52,7 @@ func TestRun_Success(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
 	planPath := filepath.Join(tmpDir, "workspace.tfplan")
-	err := ioutil.WriteFile(planPath, nil, 0644)
+	err := ioutil.WriteFile(planPath, nil, 0600)
 	Ok(t, err)
 
 	RegisterMockTestingT(t)
@@ -82,7 +82,7 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
 	planPath := filepath.Join(tmpDir, "projectname-default.tfplan")
-	err := ioutil.WriteFile(planPath, nil, 0644)
+	err := ioutil.WriteFile(planPath, nil, 0600)
 	Ok(t, err)
 
 	RegisterMockTestingT(t)
@@ -112,7 +112,7 @@ func TestRun_UsesConfiguredTFVersion(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
 	planPath := filepath.Join(tmpDir, "workspace.tfplan")
-	err := ioutil.WriteFile(planPath, nil, 0644)
+	err := ioutil.WriteFile(planPath, nil, 0600)
 	Ok(t, err)
 
 	RegisterMockTestingT(t)
@@ -197,7 +197,7 @@ func TestRun_UsingTarget(t *testing.T) {
 			tmpDir, cleanup := TempDir(t)
 			defer cleanup()
 			planPath := filepath.Join(tmpDir, "workspace.tfplan")
-			err := ioutil.WriteFile(planPath, nil, 0644)
+			err := ioutil.WriteFile(planPath, nil, 0600)
 			Ok(t, err)
 			terraform := mocks.NewMockClient()
 			step := runtime.ApplyStepRunner{
@@ -236,7 +236,7 @@ Terraform will perform the following actions:
 
 
 Plan: 0 to add, 0 to change, 1 to destroy.`
-	err := ioutil.WriteFile(planPath, []byte("Atlantis: this plan was created by remote ops\n"+planFileContents), 0644)
+	err := ioutil.WriteFile(planPath, []byte("Atlantis: this plan was created by remote ops\n"+planFileContents), 0600)
 	Ok(t, err)
 
 	RegisterMockTestingT(t)
@@ -294,7 +294,7 @@ Terraform will perform the following actions:
 
 
 Plan: 0 to add, 0 to change, 1 to destroy.`
-	err := ioutil.WriteFile(planPath, []byte("Atlantis: this plan was created by remote ops\n"+planFileContents), 0644)
+	err := ioutil.WriteFile(planPath, []byte("Atlantis: this plan was created by remote ops\n"+planFileContents), 0600)
 	Ok(t, err)
 
 	RegisterMockTestingT(t)
