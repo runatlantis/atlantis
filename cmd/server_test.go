@@ -824,7 +824,7 @@ func tempFile(t *testing.T, contents string) string {
 	newName := f.Name() + ".yaml"
 	err = os.Rename(f.Name(), newName)
 	Ok(t, err)
-	ioutil.WriteFile(newName, []byte(contents), 0644) // nolint: errcheck
+	ioutil.WriteFile(newName, []byte(contents), 0600) // nolint: errcheck
 	return newName
 }
 

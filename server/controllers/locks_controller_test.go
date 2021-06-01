@@ -74,7 +74,7 @@ func TestCreateApplyLock(t *testing.T) {
 		}
 		lc.LockApply(w, req)
 
-		ResponseContains(t, w, http.StatusInternalServerError, fmt.Sprintf("creating apply lock failed with: failed to acquire lock"))
+		ResponseContains(t, w, http.StatusInternalServerError, "creating apply lock failed with: failed to acquire lock")
 	})
 }
 
@@ -92,7 +92,7 @@ func TestUnlockApply(t *testing.T) {
 		}
 		lc.UnlockApply(w, req)
 
-		ResponseContains(t, w, http.StatusOK, fmt.Sprintf("Deleted apply lock"))
+		ResponseContains(t, w, http.StatusOK, "Deleted apply lock")
 	})
 
 	t.Run("Apply lock deletion failed", func(t *testing.T) {
@@ -108,7 +108,7 @@ func TestUnlockApply(t *testing.T) {
 		}
 		lc.UnlockApply(w, req)
 
-		ResponseContains(t, w, http.StatusInternalServerError, fmt.Sprintf("deleting apply lock failed with: failed to delete lock"))
+		ResponseContains(t, w, http.StatusInternalServerError, "deleting apply lock failed with: failed to delete lock")
 	})
 }
 
@@ -329,7 +329,7 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 	ResponseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
 	status, err := db.GetPullStatus(pull)
 	Ok(t, err)
-	Assert(t, status != nil, "status was nil")
+	Assert(t, status.Projects != nil, "status projects was nil")
 	Equals(t, []models.ProjectStatus{
 		{
 			Workspace:  workspaceName,
