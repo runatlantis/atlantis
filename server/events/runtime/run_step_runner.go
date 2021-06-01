@@ -49,6 +49,7 @@ func (r *RunStepRunner) Run(ctx models.ProjectCommandContext, command string, pa
 		"HEAD_REPO_OWNER":            ctx.HeadRepo.Owner,
 		"PATH":                       fmt.Sprintf("%s:%s", os.Getenv("PATH"), r.TerraformBinDir),
 		"PLANFILE":                   filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName)),
+		"SHOWFILE":                   filepath.Join(path, ctx.GetShowResultFileName()),
 		"PROJECT_NAME":               ctx.ProjectName,
 		"PULL_AUTHOR":                ctx.Pull.Author,
 		"PULL_NUM":                   fmt.Sprintf("%d", ctx.Pull.Num),
