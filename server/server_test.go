@@ -20,17 +20,17 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/gorilla/mux"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server"
+	"github.com/runatlantis/atlantis/server/controllers/templates"
+	tMocks "github.com/runatlantis/atlantis/server/controllers/templates/mocks"
 	"github.com/runatlantis/atlantis/server/events/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
-	sMocks "github.com/runatlantis/atlantis/server/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -70,7 +70,7 @@ func TestIndex_LockErr(t *testing.T) {
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
 	s.Index(w, req)
-	responseContains(t, w, 503, "Could not retrieve locks: err")
+	ResponseContains(t, w, 503, "Could not retrieve locks: err")
 }
 
 func TestIndex_Success(t *testing.T) {
@@ -92,7 +92,7 @@ func TestIndex_Success(t *testing.T) {
 		},
 	}
 	When(l.List()).ThenReturn(locks, nil)
-	it := sMocks.NewMockTemplateWriter()
+	it := tMocks.NewMockTemplateWriter()
 	r := mux.NewRouter()
 	atlantisVersion := "0.3.1"
 	// Need to create a lock route since the server expects this route to exist.
@@ -112,13 +112,13 @@ func TestIndex_Success(t *testing.T) {
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
 	s.Index(w, req)
-	it.VerifyWasCalledOnce().Execute(w, server.IndexData{
-		ApplyLock: server.ApplyLockData{
+	it.VerifyWasCalledOnce().Execute(w, templates.IndexData{
+		ApplyLock: templates.ApplyLockData{
 			Locked:        false,
 			Time:          time.Time{},
 			TimeFormatted: "01-01-0001 00:00:00",
 		},
-		Locks: []server.LockIndexData{
+		Locks: []templates.LockIndexData{
 			{
 				LockPath:      "/lock?id=lkysow%252Fatlantis-example%252F.%252Fdefault",
 				RepoFullName:  "lkysow/atlantis-example",
@@ -129,7 +129,7 @@ func TestIndex_Success(t *testing.T) {
 		},
 		AtlantisVersion: atlantisVersion,
 	})
-	responseContains(t, w, http.StatusOK, "")
+	ResponseContains(t, w, http.StatusOK, "")
 }
 
 func TestHealthz(t *testing.T) {
@@ -224,12 +224,4 @@ func TestParseAtlantisURL(t *testing.T) {
 			}
 		})
 	}
-}
-
-func responseContains(t *testing.T, r *httptest.ResponseRecorder, status int, bodySubstr string) {
-	t.Helper()
-	body, err := ioutil.ReadAll(r.Result().Body)
-	Ok(t, err)
-	Assert(t, status == r.Result().StatusCode, "exp %d got %d, body: %s", status, r.Result().StatusCode, string(body))
-	Assert(t, strings.Contains(string(body), bodySubstr), "exp %q to be contained in %q", bodySubstr, string(body))
 }
