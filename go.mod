@@ -55,7 +55,7 @@ require (
 	github.com/urfave/negroni v0.3.0
 	github.com/xanzy/go-gitlab v0.50.0
 	github.com/zclconf/go-cty v1.5.1 // indirect
-	go.etcd.io/bbolt v1.3.5
+	go.etcd.io/bbolt v1.3.6
 	go.opencensus.io v0.22.3 // indirect
 	go.uber.org/zap v1.17.0
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
