@@ -196,6 +196,7 @@ func newProjectCommandContext(ctx *CommandContext,
 		Verbose:                   verbose,
 		Workspace:                 projCfg.Workspace,
 		PolicySets:                policySets,
+		Backend:                   projCfg.Backend,
 	}
 }
 

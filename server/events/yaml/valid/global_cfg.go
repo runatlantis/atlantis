@@ -65,6 +65,7 @@ type MergedProjectCfg struct {
 	RepoCfgVersion            int
 	PolicySets                PolicySets
 	DeleteSourceBranchOnMerge bool
+	Backend                   string
 }
 
 // PreWorkflowHook is a map of custom run commands to run before workflows.
@@ -281,6 +282,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		RepoCfgVersion:            rCfg.Version,
 		PolicySets:                g.PolicySets,
 		DeleteSourceBranchOnMerge: deleteSourceBranchOnMerge,
+		Backend:                   proj.GetBackend(),
 	}
 }
 
