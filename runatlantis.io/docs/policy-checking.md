@@ -49,9 +49,9 @@ policies:
       source: local
 ```
 
-::: tip Notes
-`path` can be set as a path to policy directory. Conftest is able to read all policy rules within the folder.
-:::
+`name` - A name of your policy set.
+`path` - Path to a policies directory.
+`source` - Tells atlantis where to fetch the policies from. Currently you can only host policies locally by using `local`.
 
 ### Step 3: Write the policy
 
