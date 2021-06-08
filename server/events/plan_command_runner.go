@@ -106,6 +106,10 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		ctx.Log.Warn("unable to update plan commit status: %s", err)
 	}
 
+	// discard previous plans that might not be relevant anymore
+	ctx.Log.Debug("deleting previous plans")
+	p.deletePlans(ctx)
+
 	// Only run commands in parallel if enabled
 	var result command.Result
 	if p.isParallelEnabled(projectCmds) {
@@ -179,6 +183,13 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	}
 
 	projectCmds, policyCheckCmds := p.partitionProjectCmds(ctx, projectCmds)
+
+	// if the plan is generic, new plans will be generated based on changes
+	// discard previous plans that might not be relevant anymore
+	if !cmd.IsForSpecificProject() {
+		ctx.Log.Debug("deleting previous plans")
+		p.deletePlans(ctx)
+	}
 
 	// Only run commands in parallel if enabled
 	var result command.Result
