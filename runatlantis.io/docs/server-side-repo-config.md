@@ -426,9 +426,9 @@ If you set a workflow with the key `default`, it will override this.
 | users       | []string          | none    | yes        | list of github users that can approve failing policies  |
 
 ### PolicySet
-| Key                    | Type            | Default | Required  | Description                              |
-|------------------------|-----------------|---------|-----------|------------------------------------------|
-| name                   | string          | none    | yes       | unique name for the policy set           |
-| path                   | string          | none    | yes       | path to the rego policies                |
-| source                 | string          | none    | yes       | only `local` is supported at this time   |
 
+| Key    | Type   | Default | Required | Description                            |
+| ------ | ------ | ------- | -------- | -------------------------------------- |
+| name   | string | none    | yes      | unique name for the policy set         |
+| path   | string | none    | yes      | path to the rego policies directory    |
+| source | string | none    | yes      | only `local` is supported at this time |
