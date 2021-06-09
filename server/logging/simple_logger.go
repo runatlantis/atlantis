@@ -74,12 +74,14 @@ type StructuredLogger struct {
 func NewStructuredLoggerFromLevel(lvl LogLevel) (SimpleLogging, error) {
 	cfg := zap.NewProductionConfig()
 
+	cfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	cfg.Level = zap.NewAtomicLevelAt(lvl.zLevel)
 	return newStructuredLogger(cfg)
 }
 
 func NewStructuredLogger() (SimpleLogging, error) {
 	cfg := zap.NewProductionConfig()
+	cfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	return newStructuredLogger(cfg)
 }
 
