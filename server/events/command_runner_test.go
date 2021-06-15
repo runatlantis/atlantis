@@ -451,7 +451,7 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 				CommandName: models.PlanCommand,
 			},
 		}, nil)
-	When(projectCommandRunner.Plan(matchers.AnyModelsProjectCommandContext())).ThenReturn(models.ProjectResult{PlanSuccess: &models.PlanSuccess{}}, nil)
+	When(projectCommandRunner.Plan(matchers.AnyModelsProjectCommandContext())).ThenReturn(models.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
 	When(workingDir.GetPullDir(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(tmp, nil)
 	fixtures.Pull.BaseRepo = fixtures.GithubRepo
 	ch.RunAutoplanCommand(fixtures.GithubRepo, fixtures.GithubRepo, fixtures.Pull, fixtures.User)
