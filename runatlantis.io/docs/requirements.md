@@ -19,7 +19,7 @@ because Atlantis does not have permanent storage and it doesn't commit the new
 statefile back to version control.
 
 :::tip
-If you're looking for an easy remote state solution, check out [free remote state](https://app.terraform.io/signup)
+If you're looking for an easy remote state solution, check out [free remote state](https://app.terraform.io)
 storage from Terraform Cloud. This is fully supported by Atlantis.
 :::
 
