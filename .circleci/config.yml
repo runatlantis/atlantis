@@ -29,7 +29,7 @@ jobs:
   website_link_check:
     docker:
       # This image's Dockerfile is at runatlantis.io/Dockerfile
-    - image: runatlantis/ci-link-checker:0.1
+    - image: runatlantis/ci-link-checker:0.2
     steps:
     - checkout
     - run: yarn install
@@ -44,6 +44,7 @@ jobs:
           muffet \
             -e 'https://github\.com/runatlantis/atlantis/edit/master/.*' \
             -e 'https://github.com/helm/charts/tree/master/stable/atlantis#customization' \
+            --buffer-size 8192 \
             http://localhost:8080/
 
   # Build and push 'latest' Docker tag.
