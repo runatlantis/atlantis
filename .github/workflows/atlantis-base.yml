@@ -1,0 +1,25 @@
+name: atlantis-base
+
+on:
+  push:
+    paths:
+      - 'docker-base/**'
+    # branches:
+    #   - "master"
+
+defaults:
+  run:
+    working-directory: docker-base
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - run: echo "TODAY=$(date +"%m%d%Y")" >> $GITHUB_ENV
+    - name: build image
+      run: |
+        docker build -t runatlantis/atlantis-base:$TODAY .
+    - name: publish image
+      run: |
+        docker push runatlantis/atlantis-base:$TODAY
