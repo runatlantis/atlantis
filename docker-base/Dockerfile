@@ -39,7 +39,10 @@ RUN apk add --no-cache ca-certificates gnupg curl git git-lfs unzip bash openssh
     cp gosu /bin && \
         cd /tmp && \
         rm -rf /tmp/build && \
+        gpgconf --kill dirmngr && \
+        gpgconf --kill gpg-agent && \
         apk del gnupg openssl && \
+        rm -rf /root/.gnupg && \
         rm -rf /var/cache/apk/*
 
 # Set up nsswitch.conf for Go's "netgo" implementation
