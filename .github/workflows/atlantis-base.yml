@@ -29,3 +29,5 @@ jobs:
     - name: publish atlantis-base:${{env.TODAY}} image
       run: |
         docker push ghcr.io/runatlantis/atlantis-base:${{env.TODAY}}
+        docker tag ghcr.io/runatlantis/atlantis-base:${{env.TODAY}} ghcr.io/runatlantis/atlantis-base:latest
+        docker push ghcr.io/runatlantis/atlantis-base:latest
