@@ -2,10 +2,10 @@ name: ci-link-checker-image
 
 on:
   push:
-    paths:
-      - '.github/website_link_checker/**'
-    branches:
-      - "master"
+    # paths:
+    #   - '.github/website_link_checker/**'
+    # branches:
+    #   - "master"
   workflow_dispatch:
 
 defaults:
