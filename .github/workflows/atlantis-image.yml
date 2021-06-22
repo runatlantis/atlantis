@@ -2,10 +2,8 @@ name: atlantis-image
 
 on:
   push:
-    # paths:
-    #   - '.github/website_link_checker/**'
-    # branches:
-    #   - "master"
+    branches:
+      - "master"
   workflow_dispatch:
 
 jobs:
@@ -22,13 +20,10 @@ jobs:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
-    - run: echo "TODAY=$(date +"%m%d%Y")" >> $GITHUB_ENV
-    - name: build atlantis:${{env.TODAY}} image
+    - name: build atlantis:latest image
       run: |
         make build-service
-        docker build -t ghcr.io/runatlantis/atlantis:${{env.TODAY}} .
-    - name: publish atlantis:${{env.TODAY}} image
+        docker build -t ghcr.io/runatlantis/atlantis:latest .
+    - name: publish atlantis:latest image
       run: |
-        # docker push ghcr.io/runatlantis/atlantis:${{env.TODAY}}
-        docker tag ghcr.io/runatlantis/atlantis:${{env.TODAY}} ghcr.io/runatlantis/atlantis:latest
         docker push ghcr.io/runatlantis/atlantis:latest
