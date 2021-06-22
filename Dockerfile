@@ -1,6 +1,5 @@
 # The runatlantis/atlantis-base is created by docker-base/Dockerfile.
-FROM runatlantis/atlantis-base:v3.5
-LABEL authors="Anubhav Mishra, Luke Kysow"
+FROM ghcr.io/runatlantis/atlantis-base:2021.06.22
 
 # install terraform binaries
 ENV DEFAULT_TERRAFORM_VERSION=1.0.0
