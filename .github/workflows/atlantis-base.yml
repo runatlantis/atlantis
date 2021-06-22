@@ -16,10 +16,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
+    - name: Login to Packages Container registry
+      uses: docker/login-action@v1
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     - run: echo "TODAY=$(date +"%m%d%Y")" >> $GITHUB_ENV
-    - name: build image
+    - name: build atlantis-base:${{env.TODAY}} image
       run: |
-        docker build -t ghcr.io/runatlantis/atlantis-base:$TODAY .
-    - name: publish image
+        docker build -t ghcr.io/runatlantis/atlantis-base:${{env.TODAY}} .
+    - name: publish atlantis-base:${{env.TODAY}} image
       run: |
-        docker push ghcr.io/runatlantis/atlantis-base:$TODAY
+        docker push ghcr.io/runatlantis/atlantis-base:${{env.TODAY}}
