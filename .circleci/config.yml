@@ -47,6 +47,27 @@ jobs:
             --buffer-size 8192 \
             http://localhost:8080/
 
+  # Build and push 'latest' Docker tag.
+  docker_master:
+    docker:
+    - image: circleci/golang:1.16 # If you update this, update it in the Makefile too
+    steps:
+    - checkout
+    - run: make build-service
+    - setup_remote_docker
+    - run:
+        name: Build image
+        command: |
+          if [ "${CIRCLE_BRANCH}" == "master" ]; then
+            docker build -t runatlantis/atlantis:latest .
+          fi
+    - run:
+        name: Push image
+        command: |
+          if [ "${CIRCLE_BRANCH}" == "master" ]; then
+            docker login -u "$DOCKER_USER" -p "$DOCKER_PASSWORD"
+            docker push runatlantis/atlantis:latest
+          fi
   # Build and push Docker tag.
   docker_tag:
     docker:
@@ -80,6 +101,13 @@ workflows:
             # Ignore fork PRs since they don't have access to
             # the atlantis-e2e-tests context (and also doc PRs).
             ignore: /(pull\/\d+)|(docs\/.*)/
+    - docker_master:
+        context:
+          - docker-push
+        requires: [e2e]
+        filters:
+          branches:
+            only: master
     - website_link_check
   tag:
     jobs:
