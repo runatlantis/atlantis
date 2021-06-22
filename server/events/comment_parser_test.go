@@ -578,12 +578,13 @@ func TestParse_Parsing(t *testing.T) {
 
 func TestBuildPlanApplyComment(t *testing.T) {
 	cases := []struct {
-		repoRelDir    string
-		workspace     string
-		project       string
-		commentArgs   []string
-		expPlanFlags  string
-		expApplyFlags string
+		repoRelDir        string
+		workspace         string
+		project           string
+		autoMergeDisabled bool
+		commentArgs       []string
+		expPlanFlags      string
+		expApplyFlags     string
 	}{
 		{
 			repoRelDir:    ".",
@@ -656,6 +657,15 @@ func TestBuildPlanApplyComment(t *testing.T) {
 			expPlanFlags:  "-d \"dir with spaces\"",
 			expApplyFlags: "-d \"dir with spaces\"",
 		},
+		{
+			repoRelDir:        "dir",
+			workspace:         "workspace",
+			project:           "",
+			autoMergeDisabled: true,
+			commentArgs:       []string{`"arg1"`, `"arg2"`, `arg3`},
+			expPlanFlags:      "-d dir -w workspace -- arg1 arg2 arg3",
+			expApplyFlags:     "-d dir -w workspace --auto-merge-disabled",
+		},
 	}
 
 	for _, c := range cases {
@@ -666,7 +676,7 @@ func TestBuildPlanApplyComment(t *testing.T) {
 					actComment := commentParser.BuildPlanComment(c.repoRelDir, c.workspace, c.project, c.commentArgs)
 					Equals(t, fmt.Sprintf("atlantis plan %s", c.expPlanFlags), actComment)
 				case models.ApplyCommand:
-					actComment := commentParser.BuildApplyComment(c.repoRelDir, c.workspace, c.project)
+					actComment := commentParser.BuildApplyComment(c.repoRelDir, c.workspace, c.project, c.autoMergeDisabled)
 					Equals(t, fmt.Sprintf("atlantis apply %s", c.expApplyFlags), actComment)
 				}
 			}
@@ -800,13 +810,14 @@ var PlanUsage = `Usage of plan:
 `
 
 var ApplyUsage = `Usage of apply:
-  -d, --dir string         Apply the plan for this directory, relative to root of
-                           repo, ex. 'child/dir'.
-  -p, --project string     Apply the plan for this project. Refers to the name of
-                           the project configured in atlantis.yaml. Cannot be used
-                           at same time as workspace or dir flags.
-      --verbose            Append Atlantis log to comment.
-  -w, --workspace string   Apply the plan for this Terraform workspace.
+      --auto-merge-disabled   Disable automerge after apply.
+  -d, --dir string            Apply the plan for this directory, relative to root of
+                              repo, ex. 'child/dir'.
+  -p, --project string        Apply the plan for this project. Refers to the name of
+                              the project configured in atlantis.yaml. Cannot be
+                              used at same time as workspace or dir flags.
+      --verbose               Append Atlantis log to comment.
+  -w, --workspace string      Apply the plan for this Terraform workspace.
 `
 
 var ApprovePolicyUsage = `Usage of approve_policies:

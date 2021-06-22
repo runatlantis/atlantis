@@ -39,11 +39,11 @@ func (mock *MockCommentBuilder) BuildPlanComment(repoRelDir string, workspace st
 	return ret0
 }
 
-func (mock *MockCommentBuilder) BuildApplyComment(repoRelDir string, workspace string, project string) string {
+func (mock *MockCommentBuilder) BuildApplyComment(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockCommentBuilder().")
 	}
-	params := []pegomock.Param{repoRelDir, workspace, project}
+	params := []pegomock.Param{repoRelDir, workspace, project, autoMergeDisabled}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("BuildApplyComment", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem()})
 	var ret0 string
 	if len(result) != 0 {
