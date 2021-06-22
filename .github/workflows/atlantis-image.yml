@@ -13,6 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
+    - uses: actions/setup-go@v2.1.3
+      with:
+        go-version: 1.16
     - name: Login to Packages Container registry
       uses: docker/login-action@v1
       with:
@@ -22,6 +25,7 @@ jobs:
     - run: echo "TODAY=$(date +"%m%d%Y")" >> $GITHUB_ENV
     - name: build atlantis:${{env.TODAY}} image
       run: |
+        make build-service
         docker build -t ghcr.io/runatlantis/atlantis:${{env.TODAY}} .
     - name: publish atlantis:${{env.TODAY}} image
       run: |
