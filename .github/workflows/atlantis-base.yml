@@ -2,10 +2,10 @@ name: atlantis-base
 
 on:
   push:
-    # paths:
-    #   - 'docker-base/**'
-    # branches:
-    #   - "master"
+    paths:
+      - 'docker-base/**'
+    branches:
+      - "master"
 
 defaults:
   run:
