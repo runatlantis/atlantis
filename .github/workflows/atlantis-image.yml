@@ -1,0 +1,30 @@
+name: atlantis-image
+
+on:
+  push:
+    # paths:
+    #   - '.github/website_link_checker/**'
+    # branches:
+    #   - "master"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Login to Packages Container registry
+      uses: docker/login-action@v1
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - run: echo "TODAY=$(date +"%m%d%Y")" >> $GITHUB_ENV
+    - name: build atlantis:${{env.TODAY}} image
+      run: |
+        docker build -t ghcr.io/runatlantis/atlantis:${{env.TODAY}} .
+    - name: publish atlantis:${{env.TODAY}} image
+      run: |
+        # docker push ghcr.io/runatlantis/atlantis:${{env.TODAY}}
+        docker tag ghcr.io/runatlantis/atlantis:${{env.TODAY}} ghcr.io/runatlantis/atlantis:latest
+        docker push ghcr.io/runatlantis/atlantis:latest
