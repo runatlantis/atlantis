@@ -2,7 +2,7 @@ version: 2
 jobs:
   test:
     docker:
-    - image: runatlantis/testing-env:805e94e7f648eddb0484e539a7b51410d39529bc
+    - image: ghcr.io/runatlantis/testing-env:805e94e7f648eddb0484e539a7b51410d39529bc
     steps:
     - checkout
     - run: make test-all
@@ -29,7 +29,7 @@ jobs:
   website_link_check:
     docker:
       # This image's Dockerfile is at runatlantis.io/Dockerfile
-    - image: runatlantis/ci-link-checker:0.2
+    - image: ghcr.io/runatlantis/ci-link-checker:2021.06.22
     steps:
     - checkout
     - run: yarn install
