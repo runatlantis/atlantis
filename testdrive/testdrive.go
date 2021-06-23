@@ -157,6 +157,7 @@ Follow these instructions to create a token (we don't store any tokens):
 		}
 		s.Stop()
 		colorstring.Println("[green]=> downloaded ngrok successfully![reset]")
+		ngrokPath = "/tmp/ngrok"
 	} else {
 		colorstring.Printf("[green]=> ngrok found in $PATH at %s\n[reset]", ngrokPath)
 	}
@@ -194,7 +195,7 @@ tunnels:
 	tunnelReadyLog := regexp.MustCompile("client session established")
 	tunnelTimeout := 20 * time.Second
 	cancelNgrok, ngrokErrors, err := execAndWaitForStderr(&wg, tunnelReadyLog, tunnelTimeout,
-		"/tmp/ngrok", "start", "atlantis", "--config", ngrokConfigFile.Name(), "--log", "stderr", "--log-format", "term")
+		ngrokPath, "start", "atlantis", "--config", ngrokConfigFile.Name(), "--log", "stderr", "--log-format", "term")
 	// Check if we got a fast error. Move on if we haven't (the command is still running).
 	if err != nil {
 		s.Stop()
