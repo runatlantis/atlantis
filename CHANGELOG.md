@@ -1,5 +1,7 @@
 # v0.17.1
-Feature release containing a number of bug fixes.
+Feature release containing a number of bug fixes. 
+
+Note: as of this release we are now also publishing releases to [Github Container Registry](https://github.blog/2020-09-01-introducing-github-container-registry/). We will stop publishing releases to Dockerhub in a subsequent major version release, please migrate any workflows to start using Github Container Registry in the meantime.
 
 ## Features/Improvements
 * Add extra args support for policy checking command ([#1511](https://github.com/runatlantis/atlantis/pull/1511) by @nishkrishnan)
@@ -36,6 +38,9 @@ Feature release containing a number of bug fixes.
 
 ## Docker
 [`runatlantis/atlantis:v0.17.1`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Github Container Registry
+[`runatlantis/atlantis:v0.17.1`](https://github.com/runatlantis/atlantis/pkgs/container/atlantis)
 
 ## Diff v0.17.0..v0.17.1
 https://github.com/runatlantis/atlantis/compare/v0.17.0...v0.17.1
