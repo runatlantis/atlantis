@@ -7,6 +7,8 @@ Feature release containing a number of bug fixes.
 * Modify logging timestamp to be ISO8601 ([#1625](https://github.com/runatlantis/atlantis/pull/1625) by @tkishore1192)
 * Add run step environment variable SHOWFILE ([#1611](https://github.com/runatlantis/atlantis/pull/1611) by @mhennecke)
 * Add flag to disable automerge for `atlantis apply` ([#1533](https://github.com/runatlantis/atlantis/pull/1533) by @spirosoik)
+* Add support for deduping extra terraform args ([#1651](https://github.com/runatlantis/atlantis/pull/1651) by @gezb)
+* Preserving terraform.lock.hcl when present by not upgrading during terraform init ([#1651](https://github.com/runatlantis/atlantis/pull/1651) by @gezb)
 
 ## Bug Fixes
 * Fix a bug with the hide previous command logic ([#1549](https://github.com/runatlantis/atlantis/pull/1549) by @nishkrishnan)
@@ -15,6 +17,7 @@ Feature release containing a number of bug fixes.
 * Fix regression with parallelApply and parallelPlan args being in the wrong order and therefore swapped. ([#1574](https://github.com/runatlantis/atlantis/pull/1574) by @Fauzyy)
 * Fix nil pointer deference when `disable-repo-locking` is true. ([#1557](https://github.com/runatlantis/atlantis/pull/1557) by @Fauzyy)
 * Fix azure dev ops max comment characters to api limit ([#1585](https://github.com/runatlantis/atlantis/pull/1585) by @mhennecke)
+* Fix bug where required terraform version was not being loaded when policy checks are enabled ([#1658](https://github.com/runatlantis/atlantis/pull/1658) by @msarvar)
 
 ## Dependencies
 * Upgrade conftest binary version to 0.25 ([#1516](https://github.com/runatlantis/atlantis/pull/1579) by @msarvar)
