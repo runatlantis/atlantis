@@ -98,6 +98,13 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 	automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose bool,
 ) (projectCmds []models.ProjectCommandContext) {
 	ctx.Log.Debug("PolicyChecks are enabled")
+
+	// If TerraformVersion not defined in config file look for a
+	// terraform.require_version block.
+	if prjCfg.TerraformVersion == nil {
+		prjCfg.TerraformVersion = getTfVersion(ctx, filepath.Join(repoDir, prjCfg.RepoRelDir))
+	}
+
 	projectCmds = cb.ProjectCommandContextBuilder.BuildProjectContext(
 		ctx,
 		cmdName,
