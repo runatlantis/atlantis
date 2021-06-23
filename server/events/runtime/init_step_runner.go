@@ -3,10 +3,10 @@ package runtime
 import (
 	"os"
 	"path/filepath"
-	"strings"
 
 	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/runtime/common"
 )
 
 // InitStep runs `terraform init`.
@@ -38,34 +38,7 @@ func (i *InitStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []strin
 		terraformInitArgs = append(terraformInitArgs, "-upgrade")
 	}
 
-	// work if any of the core args have been overridden
-	finalArgs := []string{}
-	usedExtraArgs := []string{}
-	for _, arg := range terraformInitArgs {
-		override := ""
-		prefix := arg
-		argSplit := strings.Split(arg, "=")
-		if len(argSplit) == 2 {
-			prefix = argSplit[0]
-		}
-		for _, extraArg := range extraArgs {
-			if strings.HasPrefix(extraArg, prefix) {
-				override = extraArg
-			}
-		}
-		if override != "" {
-			finalArgs = append(finalArgs, override)
-			usedExtraArgs = append(usedExtraArgs, override)
-		} else {
-			finalArgs = append(finalArgs, arg)
-		}
-	}
-	// add any extra args that are not overrides
-	for _, extraArg := range extraArgs {
-		if !stringInSlice(usedExtraArgs, extraArg) {
-			finalArgs = append(finalArgs, extraArg)
-		}
-	}
+	finalArgs := common.DeDuplicateExtraArgs(terraformInitArgs, extraArgs)
 
 	terraformInitCmd := append(terraformInitVerb, finalArgs...)
 
@@ -81,15 +54,6 @@ func (i *InitStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []strin
 func fileDoesNotExists(name string) bool {
 	if _, err := os.Stat(name); err != nil {
 		if os.IsNotExist(err) {
-			return true
-		}
-	}
-	return false
-}
-
-func stringInSlice(stringSlice []string, target string) bool {
-	for _, value := range stringSlice {
-		if value == target {
 			return true
 		}
 	}
