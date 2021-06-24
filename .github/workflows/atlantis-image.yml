@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - "master"
+  release:
+    types:
+      - "published"
   workflow_dispatch:
 
 jobs:
@@ -20,10 +23,28 @@ jobs:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
+
+    # Publish latest image to container registry
     - name: build atlantis:latest image
+      if: ${{ github.event_name == 'push'}}
       run: |
         make build-service
         docker build -t ghcr.io/runatlantis/atlantis:latest .
     - name: publish atlantis:latest image
+      if: ${{ github.event_name == 'push'}}
       run: |
         docker push ghcr.io/runatlantis/atlantis:latest
+
+    # Publish release to container registry
+    - name: populate release version
+      if: ${{ github.event_name == 'release'}}
+      run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV    
+    - name: build atlantis:$RELEASE_VERSION release image
+      if: ${{ github.event_name == 'release'}}
+      run: |
+        make build-service
+        docker build -t ghcr.io/runatlantis/atlantis:$RELEASE_VERSION .
+    - name: publish atlantis:$RELEASE_VERSION release image
+      if: ${{ github.event_name == 'release'}}
+      run: |
+        docker push ghcr.io/runatlantis/atlantis:$RELEASE_VERSION
