@@ -41,7 +41,7 @@ jobs:
       run: |
         make build-service
         docker build -t ghcr.io/runatlantis/atlantis:$GITHUB_REF .
-    - name: publish atlantis release image
+    - name: publish atlantis:$GIHUB_REF release image
       if: ${{ github.event_name == 'release'}}
       run: |
         docker push ghcr.io/runatlantis/atlantis:$GITHUB_REF
