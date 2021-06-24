@@ -36,12 +36,15 @@ jobs:
         docker push ghcr.io/runatlantis/atlantis:latest
 
     # Publish release to container registry
-    - name: build atlantis:$GITHUB_REF release image
+    - name: populate release version
+      if: ${{ github.event_name == 'release'}}
+      run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV    
+    - name: build atlantis:$RELEASE_VERSION release image
       if: ${{ github.event_name == 'release'}}
       run: |
         make build-service
-        docker build -t ghcr.io/runatlantis/atlantis:$GITHUB_REF .
-    - name: publish atlantis:$GIHUB_REF release image
+        docker build -t ghcr.io/runatlantis/atlantis:$RELEASE_VERSION .
+    - name: publish atlantis:$RELEASE_VERSION release image
       if: ${{ github.event_name == 'release'}}
       run: |
-        docker push ghcr.io/runatlantis/atlantis:$GITHUB_REF
+        docker push ghcr.io/runatlantis/atlantis:$RELEASE_VERSION
