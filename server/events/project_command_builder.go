@@ -292,7 +292,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *CommandConte
 	defer unlockFn()
 
 	ctx.Log.Debug("cloning repository")
-	repoDir, _, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
+	_, _, err = p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
 	if err != nil {
 		return pcc, err
 	}
@@ -302,12 +302,19 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *CommandConte
 		repoRelDir = cmd.RepoRelDir
 	}
 
+	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
+	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
+	defaultRepoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
+	if err != nil {
+		return pcc, err
+	}
+
 	return p.buildProjectCommandCtx(
 		ctx,
 		models.PlanCommand,
 		cmd.ProjectName,
 		cmd.Flags,
-		repoDir,
+		defaultRepoDir,
 		repoRelDir,
 		workspace,
 		cmd.Verbose,
@@ -387,9 +394,16 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommands(ctx *CommandConte
 		return nil, err
 	}
 
+	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
+	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
+	defaultRepoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
+	if err != nil {
+		return nil, err
+	}
+
 	var cmds []models.ProjectCommandContext
 	for _, plan := range plans {
-		commentCmds, err := p.buildProjectCommandCtx(ctx, commentCmd.CommandName(), plan.ProjectName, commentCmd.Flags, plan.RepoDir, plan.RepoRelDir, plan.Workspace, commentCmd.Verbose)
+		commentCmds, err := p.buildProjectCommandCtx(ctx, commentCmd.CommandName(), plan.ProjectName, commentCmd.Flags, defaultRepoDir, plan.RepoRelDir, plan.Workspace, commentCmd.Verbose)
 		if err != nil {
 			return nil, errors.Wrapf(err, "building command for dir %q", plan.RepoRelDir)
 		}
@@ -413,7 +427,9 @@ func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *CommandCont
 	}
 	defer unlockFn()
 
-	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, workspace)
+	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
+	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
+	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
 	if os.IsNotExist(errors.Cause(err)) {
 		return projCtx, errors.New("no working directory found–did you run plan?")
 	} else if err != nil {
