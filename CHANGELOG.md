@@ -1,3 +1,52 @@
+# v0.17.1
+Feature release containing a number of bug fixes. 
+
+Note: as of this release we are now also publishing releases to [Github Container Registry](https://github.blog/2020-09-01-introducing-github-container-registry/). We will stop publishing releases to Dockerhub in a subsequent major version release, please migrate any workflows to start using Github Container Registry in the meantime.
+
+## Features/Improvements
+* Add extra args support for policy checking command ([#1511](https://github.com/runatlantis/atlantis/pull/1511) by @nishkrishnan)
+* Add undiverged apply requirement ([#1587](https://github.com/runatlantis/atlantis/pull/1587) by @pcalley)
+* Modify logging timestamp to be ISO8601 ([#1625](https://github.com/runatlantis/atlantis/pull/1625) by @tkishore1192)
+* Add run step environment variable SHOWFILE ([#1611](https://github.com/runatlantis/atlantis/pull/1611) by @mhennecke)
+* Add flag to disable automerge for `atlantis apply` ([#1533](https://github.com/runatlantis/atlantis/pull/1533) by @spirosoik)
+* Add support for deduping extra terraform args ([#1651](https://github.com/runatlantis/atlantis/pull/1651) by @gezb)
+* Preserving terraform.lock.hcl when present by not upgrading during terraform init ([#1651](https://github.com/runatlantis/atlantis/pull/1651) by @gezb)
+
+## Bug Fixes
+* Fix a bug with the hide previous command logic ([#1549](https://github.com/runatlantis/atlantis/pull/1549) by @nishkrishnan)
+* Fix a bug with Azure Dev ops Prs where only the recent commit was used to get the diff ([#1521](https://github.com/runatlantis/atlantis/pull/1521) by @nishkrishnan)
+* Fix bug with deleting source branch on merging Azure Dev Ops PRs ([#1560](https://github.com/runatlantis/atlantis/pull/1560) by @tapaszto)
+* Fix regression with parallelApply and parallelPlan args being in the wrong order and therefore swapped. ([#1574](https://github.com/runatlantis/atlantis/pull/1574) by @Fauzyy)
+* Fix nil pointer deference when `disable-repo-locking` is true. ([#1557](https://github.com/runatlantis/atlantis/pull/1557) by @Fauzyy)
+* Fix azure dev ops max comment characters to api limit ([#1585](https://github.com/runatlantis/atlantis/pull/1585) by @mhennecke)
+* Fix bug where required terraform version was not being loaded when policy checks are enabled ([#1658](https://github.com/runatlantis/atlantis/pull/1658) by @msarvar)
+* Fix bug where plan summary was not shown when changes outside of Terraform were detected ([#1593](https://github.com/runatlantis/atlantis/pull/1593) by @chroju)
+
+## Dependencies
+* Upgrade conftest binary version to 0.25 ([#1516](https://github.com/runatlantis/atlantis/pull/1579) by @msarvar)
+* Upgrade default tf version to 1.0 ([#1622](https://github.com/runatlantis/atlantis/pull/1622) by @chenrui333)
+
+## Backwards Incompatibilities/Notes
+* If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
+  then the default version of Terraform will now be 1.0. Simply set the above
+  flag to your desired default version to avoid any issues.
+  
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.1/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.1/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.1/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.1/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.17.1`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Github Container Registry
+[`runatlantis/atlantis:v0.17.1`](https://github.com/runatlantis/atlantis/pkgs/container/atlantis)
+
+## Diff v0.17.0..v0.17.1
+https://github.com/runatlantis/atlantis/compare/v0.17.0...v0.17.1
+
+
 # v0.17.0
 Feature release encompassing this version's pre-release with some bug fixes and improvements that make this stable.
 
