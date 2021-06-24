@@ -1,0 +1,48 @@
+Ran Plan for dir: `.` workspace: `default`
+
+<details><summary>Show Output</summary>
+
+```diff
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
++ create
+
+Terraform will perform the following actions:
+
+  # null_resource.simple[0] will be created
++ resource "null_resource" "simple" {
+      + id = (known after apply)
+    }
+
+  # null_resource.simple2 will be created
++ resource "null_resource" "simple2" {
+      + id = (known after apply)
+    }
+
+  # null_resource.simple3 will be created
++ resource "null_resource" "simple3" {
+      + id = (known after apply)
+    }
+
+Plan: 3 to add, 0 to change, 0 to destroy.
+
+Changes to Outputs:
++ var       = "default_workspace"
++ workspace = "default"
+
+```
+
+* :arrow_forward: To **apply** this plan, comment:
+    * `atlantis apply -d .`
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+    * `atlantis plan -d . -- -var var=default_workspace`
+</details>
+Plan: 3 to add, 0 to change, 0 to destroy.
+
+---
+* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
+    * `atlantis apply`
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * `atlantis unlock`

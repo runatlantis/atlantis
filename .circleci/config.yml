@@ -2,7 +2,7 @@ version: 2
 jobs:
   test:
     docker:
-    - image: runatlantis/testing-env:805e94e7f648eddb0484e539a7b51410d39529bc
+    - image: ghcr.io/runatlantis/testing-env:805e94e7f648eddb0484e539a7b51410d39529bc
     steps:
     - checkout
     - run: make test-all
@@ -16,7 +16,7 @@ jobs:
         # We do this instead of setting --default-tf-version because setting
         # that flag starts the download asynchronously so we'd have a race
         # condition.
-        TERRAFORM_VERSION: 0.15.4
+        TERRAFORM_VERSION: 1.0.0
     steps:
     - checkout
     - run: make build-service
@@ -29,7 +29,7 @@ jobs:
   website_link_check:
     docker:
       # This image's Dockerfile is at runatlantis.io/Dockerfile
-    - image: runatlantis/ci-link-checker:0.1
+    - image: ghcr.io/runatlantis/ci-link-checker:2021.06.22
     steps:
     - checkout
     - run: yarn install
@@ -44,29 +44,9 @@ jobs:
           muffet \
             -e 'https://github\.com/runatlantis/atlantis/edit/master/.*' \
             -e 'https://github.com/helm/charts/tree/master/stable/atlantis#customization' \
+            --buffer-size 8192 \
             http://localhost:8080/
 
-  # Build and push 'latest' Docker tag.
-  docker_master:
-    docker:
-    - image: circleci/golang:1.16 # If you update this, update it in the Makefile too
-    steps:
-    - checkout
-    - run: make build-service
-    - setup_remote_docker
-    - run:
-        name: Build image
-        command: |
-          if [ "${CIRCLE_BRANCH}" == "master" ]; then
-            docker build -t runatlantis/atlantis:latest .
-          fi
-    - run:
-        name: Push image
-        command: |
-          if [ "${CIRCLE_BRANCH}" == "master" ]; then
-            docker login -u "$DOCKER_USER" -p "$DOCKER_PASSWORD"
-            docker push runatlantis/atlantis:latest
-          fi
   # Build and push Docker tag.
   docker_tag:
     docker:
@@ -100,13 +80,6 @@ workflows:
             # Ignore fork PRs since they don't have access to
             # the atlantis-e2e-tests context (and also doc PRs).
             ignore: /(pull\/\d+)|(docs\/.*)/
-    - docker_master:
-        context:
-          - docker-push
-        requires: [e2e]
-        filters:
-          branches:
-            only: master
     - website_link_check
   tag:
     jobs:

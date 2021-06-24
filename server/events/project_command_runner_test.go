@@ -184,6 +184,25 @@ func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 	Equals(t, "Pull request must be mergeable before running apply.", res.Failure)
 }
 
+// Test that if undiverged is required and the PR is diverged we give an error.
+func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	runner := &events.DefaultProjectCommandRunner{
+		WorkingDir:       mockWorkingDir,
+		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+	}
+	ctx := models.ProjectCommandContext{
+		ApplyRequirements: []string{"undiverged"},
+	}
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
+
+	res := runner.Apply(ctx)
+	Equals(t, "Default branch must be rebased onto pull request before running apply.", res.Failure)
+}
+
 // Test that it runs the expected apply steps.
 func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 	cases := []struct {

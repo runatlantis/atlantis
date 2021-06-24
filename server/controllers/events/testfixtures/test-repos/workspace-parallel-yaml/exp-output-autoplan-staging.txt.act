@@ -1,0 +1,73 @@
+Ran Plan for 2 projects:
+
+1. dir: `production` workspace: `production`
+1. dir: `staging` workspace: `staging`
+
+### 1. dir: `production` workspace: `production`
+<details><summary>Show Output</summary>
+
+```diff
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
++ create
+
+Terraform will perform the following actions:
+
+  # null_resource.this will be created
++ resource "null_resource" "this" {
+      + id = (known after apply)
+    }
+
+Plan: 1 to add, 0 to change, 0 to destroy.
+
+Changes to Outputs:
++ workspace = "production"
+
+```
+
+* :arrow_forward: To **apply** this plan, comment:
+    * `atlantis apply -d production -w production`
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+    * `atlantis plan -d production -w production`
+</details>
+Plan: 1 to add, 0 to change, 0 to destroy.
+
+---
+### 2. dir: `staging` workspace: `staging`
+<details><summary>Show Output</summary>
+
+```diff
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
++ create
+
+Terraform will perform the following actions:
+
+  # null_resource.this will be created
++ resource "null_resource" "this" {
+      + id = (known after apply)
+    }
+
+Plan: 1 to add, 0 to change, 0 to destroy.
+
+Changes to Outputs:
++ workspace = "staging"
+
+```
+
+* :arrow_forward: To **apply** this plan, comment:
+    * `atlantis apply -d staging -w staging`
+* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+    * `atlantis plan -d staging -w staging`
+</details>
+Plan: 1 to add, 0 to change, 0 to destroy.
+
+---
+* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
+    * `atlantis apply`
+* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
+    * `atlantis unlock`

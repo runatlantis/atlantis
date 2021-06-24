@@ -92,7 +92,7 @@ func (p *PlanStepRunner) remotePlan(ctx models.ProjectCommandContext, extraArgs 
 
 	// We also prepend our own remote ops header to the file so during apply we
 	// know this is a remote apply.
-	err = ioutil.WriteFile(planFile, []byte(remoteOpsHeader+planOutput), 0644)
+	err = ioutil.WriteFile(planFile, []byte(remoteOpsHeader+planOutput), 0600)
 	if err != nil {
 		return output, errors.Wrap(err, "unable to create planfile for remote ops")
 	}

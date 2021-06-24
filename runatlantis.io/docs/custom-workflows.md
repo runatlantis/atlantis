@@ -165,6 +165,7 @@ If using the server `repos.yaml` file, you would use the following config:
 ```yaml
 # repos.yaml
 # Specify TERRAGRUNT_TFPATH environment variable to accomodate setting --default-tf-version
+# Generate json plan via terragrunt for policy checks
 repos:
 - id: "/.*/"
   workflow: terragrunt
@@ -176,6 +177,7 @@ workflows:
           name: TERRAGRUNT_TFPATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
       - run: terragrunt plan -no-color -out=$PLANFILE
+      - run: terragrunt show -no-color -json $PLANFILE > $SHOWFILE
     apply:
       steps:
       - env:
@@ -356,6 +358,9 @@ Or a custom command
   * `PLANFILE` - Absolute path to the location where Atlantis expects the plan to
   either be generated (by plan) or already exist (if running apply). Can be used to
   override the built-in `plan`/`apply` commands, ex. `run: terraform plan -out $PLANFILE`.
+  * `SHOWFILE` - Absolute path to the location where Atlantis expects the plan in json format to
+  either be generated (by show) or already exist (if running policy checks). Can be used to
+  override the built-in `plan`/`apply` commands, ex. `run: terraform show -json $PLANFILE > $SHOWFILE`.
   * `BASE_REPO_NAME` - Name of the repository that the pull request will be merged into, ex. `atlantis`.
   * `BASE_REPO_OWNER` - Owner of the repository that the pull request will be merged into, ex. `runatlantis`.
   * `HEAD_REPO_NAME` - Name of the repository that is getting merged into the base repository, ex. `atlantis`.

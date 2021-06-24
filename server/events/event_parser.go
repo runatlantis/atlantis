@@ -91,6 +91,8 @@ type CommentCommand struct {
 	Flags []string
 	// Name is the name of the command the comment specified.
 	Name models.CommandName
+	// AutoMergeDisabled is true if the command should not automerge after apply.
+	AutoMergeDisabled bool
 	// Verbose is true if the command should output verbosely.
 	Verbose bool
 	// Workspace is the name of the Terraform workspace to run the command in.
@@ -130,7 +132,7 @@ func (c CommentCommand) String() string {
 }
 
 // NewCommentCommand constructs a CommentCommand, setting all missing fields to defaults.
-func NewCommentCommand(repoRelDir string, flags []string, name models.CommandName, verbose bool, workspace string, project string) *CommentCommand {
+func NewCommentCommand(repoRelDir string, flags []string, name models.CommandName, verbose, autoMergeDisabled bool, workspace string, project string) *CommentCommand {
 	// If repoRelDir was empty we want to keep it that way to indicate that it
 	// wasn't specified in the comment.
 	if repoRelDir != "" {
@@ -140,12 +142,13 @@ func NewCommentCommand(repoRelDir string, flags []string, name models.CommandNam
 		}
 	}
 	return &CommentCommand{
-		RepoRelDir:  repoRelDir,
-		Flags:       flags,
-		Name:        name,
-		Verbose:     verbose,
-		Workspace:   workspace,
-		ProjectName: project,
+		RepoRelDir:        repoRelDir,
+		Flags:             flags,
+		Name:              name,
+		Verbose:           verbose,
+		Workspace:         workspace,
+		AutoMergeDisabled: autoMergeDisabled,
+		ProjectName:       project,
 	}
 }
 
