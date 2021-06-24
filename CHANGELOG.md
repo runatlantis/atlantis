@@ -41,7 +41,7 @@ Note: as of this release we are now also publishing releases to [Github Containe
 [`runatlantis/atlantis:v0.17.1`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
 
 ## Github Container Registry
-[`runatlantis/atlantis:v0.17.1`](https://github.com/runatlantis/atlantis/pkgs/container/atlantis)
+[`ghcr.io/runatlantis/atlantis:v0.17.1`](https://github.com/runatlantis/atlantis/pkgs/container/atlantis)
 
 ## Diff v0.17.0..v0.17.1
 https://github.com/runatlantis/atlantis/compare/v0.17.0...v0.17.1
