@@ -1,7 +1,7 @@
 # v0.17.1
-Feature release containing a number of bug fixes. 
+Feature release containing a number of bug fixes.
 
-Note: as of this release we are now also publishing releases to [Github Container Registry](https://github.blog/2020-09-01-introducing-github-container-registry/). We will stop publishing releases to Dockerhub in a subsequent major version release, please migrate any workflows to start using Github Container Registry in the meantime.
+Note: as of this release we are now also publishing releases to [Github Container Registry](https://github.com/runatlantis/atlantis/pkgs/container/atlantis/). We will stop publishing releases to [Dockerhub](https://hub.docker.com/r/runatlantis/atlantis/) in a subsequent major version release, please migrate any workflows to start using Github Container Registry in the meantime.
 
 ## Features/Improvements
 * Add extra args support for policy checking command ([#1511](https://github.com/runatlantis/atlantis/pull/1511) by @nishkrishnan)
@@ -30,7 +30,7 @@ Note: as of this release we are now also publishing releases to [Github Containe
 * If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
   then the default version of Terraform will now be 1.0. Simply set the above
   flag to your desired default version to avoid any issues.
-  
+
 ## Downloads
 * [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.1/atlantis_darwin_amd64.zip)
 * [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.1/atlantis_linux_386.zip)
@@ -76,7 +76,7 @@ Feature release encompassing this version's pre-release with some bug fixes and 
   then the default version of Terraform will now be 0.15.1. Simply set the above
   flag to your desired default version to avoid any issues.
 * Hashicorp's GPG keys were [exposed](https://discuss.hashicorp.com/t/hcsec-2021-12-codecov-security-event-and-hashicorp-gpg-key-exposure/23512). This PR adds the latest patch versions for each Terraform minor version which has new keys.
-  
+
 
 ## Downloads
 * [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.0/atlantis_darwin_amd64.zip)
@@ -309,23 +309,23 @@ See below for the complete list.
 ## Features
 * Upgrade default Terraform version in Docker image to 0.12.26.
 * Add support for parallel plans and applies ([#926](https://github.com/runatlantis/atlantis/pull/926) by @Fauzyy)
-  
+
   Running in parallel is only supported if you're using workspaces to separate your projects.
   Projects in separate directories can **not** be run in parallel currently.
   To use, set
-  
+
   ```yaml
   parallel_plan: true
   parallel_apply: true
   ```
-  
+
   In your repo-level `atlantis.yaml` file.
 * Add support for graceful shutdown ([#1051](https://github.com/runatlantis/atlantis/pull/1051) by @benoit74).
   When Atlantis receive a SIGINT or SIGTERM it won't shut down immediately. It will wait for
   in-progress plans and applies to complete. Any new actions, e.g. comments or autoplans
   will be refused and an error comment will be posted to the PR indicating that Atlantis is shutting
   down and the user should try again later.
-  
+
   In addition, a new `/status` endpoint has been added that currently only returns
   the number of in-progress operations and whether the server is shutting down.
 
@@ -333,7 +333,7 @@ See below for the complete list.
   for users to run plan and apply on GitHub draft PRs. This ability was removed in
   v0.12.0. ([#1053](https://github.com/runatlantis/atlantis/pull/1053) by @cket)
 * GitHub: Preserve original commit message when automerging ([#1049](https://github.com/runatlantis/atlantis/pull/1049) by @pratikmallya).
-  
+
   This change removes the `[Atlantis] Automatically merging after successful apply` commit message
   and instead has GitHub autogenerate the commit message similarly to how it would when
   you click the "Merge" button in the UI.
@@ -606,7 +606,7 @@ workflows:
 * Upgrade Terraform to 0.12.7 in our base Docker image.
 * Support for Terragrunt > 0.19.0 ([#748](https://github.com/runatlantis/atlantis/pull/748))
 * The directory where Atlantis downloads Terraform binaries is now in the PATH
-of custom workflows ([#678](https://github.com/runatlantis/atlantis/pull/678)) 
+of custom workflows ([#678](https://github.com/runatlantis/atlantis/pull/678))
 * `dumb-init` and `gosu` upgraded in our Docker image ([#730](https://github.com/runatlantis/atlantis/pull/730))
 
 ## Bugfixes
@@ -690,7 +690,7 @@ Small bugfix release for Bitbucket Cloud users running with "require mergeable".
 * Include directory in Slack message ([#660](https://github.com/runatlantis/atlantis/issues/660)).
 
 ## Bugfixes
-* Atlantis would not allow applies for all Bitbucket Cloud pull requests if running with "require mergeable" 
+* Atlantis would not allow applies for all Bitbucket Cloud pull requests if running with "require mergeable"
   even if the pull request *was* mergeable due to an API change. (Fixes [#672](https://github.com/runatlantis/atlantis/issues/672))
 
 ## Backwards Incompatibilities / Notes:
@@ -861,7 +861,7 @@ repos can do in their `atlantis.yaml` files. Read [docs](https://www.runatlantis
   will experience no changes. If you want to upgrade to version `3`, then
   if you're not using any custom `run` steps in your workflows you can upgrade
   the version number without additional changes.
-  
+
   If you are using `run` steps, check our [upgrade guide](https://www.runatlantis.io/docs/upgrading-atlantis-yaml.html#upgrading-from-v2-to-v3)
   to see if you need to make any changes before upgrading.
 * Flags `--require-approval`, `--require-mergeable` and `--allow-repo-config` are
@@ -872,7 +872,7 @@ repos can do in their `atlantis.yaml` files. Read [docs](https://www.runatlantis
 * If you have projects configured with the same directory and workspace (which means
   you're probably using the `-backend-config` flag) **and** their names contain `/`'s,
   then you'll have to re-run `atlantis plan` after upgrading if you had any unapplied plans.
-  
+
   An example of what config would mean you need to re-plan:
   ```yaml
   projects:
@@ -947,19 +947,19 @@ None
 * The Atlantis status checks have been renamed from what they looked like in `v0.5.*`.
   Previously the names were: `plan/atlantis` and `apply/atlantis`. Now the
   names are `atlantis/plan` and `atlantis/apply`.
-  
+
   This change will only affect you if you're requiring those status checks to pass via a setting in
   your Git host (ex. via GitHub protected branches). If so, you'll need to change
   your settings to require the new names to pass and un-require the old names.
-  
+
   > If you were on a version lower than `v0.5.*` then read the backwards compatibility
     notes for release `0.5.0`.
-    
+
   **NOTE from the maintainer**: I take backwards compatibility seriously and I
   apologize that the status checks are changing again so soon after the 0.5 release
   also changed them. I know that if you have many repos and require the checks
   to pass that it is a large task to change them all again.
-  
+
   In this case, I decided that the tradeoff was worth it because the
   0.5 release has only been out for a couple of weeks so hopefully not everyone
   has upgraded to it. The new check names makes them a lot easier to read
@@ -1106,7 +1106,7 @@ Diff: https://github.com/runatlantis/atlantis/compare/v0.4.15...v0.5.0
   previously, if you had already run `atlantis plan` before `master` was updated,
   a new `atlantis plan` wouldn't pull the latest changes and would just use
   the cached version.
-  
+
   This is unlikely to cause any issues because most users already expected Atlantis
   to use the most up-to-date version of modules/plugins within the set constraints.
 
