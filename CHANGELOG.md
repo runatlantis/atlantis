@@ -20,6 +20,7 @@ Note: as of this release we are now also publishing releases to [Github Containe
 * Fix nil pointer deference when `disable-repo-locking` is true. ([#1557](https://github.com/runatlantis/atlantis/pull/1557) by @Fauzyy)
 * Fix azure dev ops max comment characters to api limit ([#1585](https://github.com/runatlantis/atlantis/pull/1585) by @mhennecke)
 * Fix bug where required terraform version was not being loaded when policy checks are enabled ([#1658](https://github.com/runatlantis/atlantis/pull/1658) by @msarvar)
+* Fix bug where plan summary was not shown when changes outside of Terraform were detected ([#1593](https://github.com/runatlantis/atlantis/pull/1593) by @chroju)
 
 ## Dependencies
 * Upgrade conftest binary version to 0.25 ([#1516](https://github.com/runatlantis/atlantis/pull/1579) by @msarvar)
