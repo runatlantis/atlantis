@@ -522,6 +522,43 @@ func TestPlanSuccess_Summary(t *testing.T) {
 		{
 			p: models.ProjectResult{
 				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: `
+					Note: Objects have changed outside of Terraform
+
+					Terraform detected the following changes made outside of Terraform since the
+					last "terraform apply":
+
+					No changes. Your infrastructure matches the configuration.`,
+				},
+			},
+			expResult: "\n**Note: Objects have changed outside of Terraform**\nNo changes. Your infrastructure matches the configuration.",
+		},
+		{
+			p: models.ProjectResult{
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: `
+					Note: Objects have changed outside of Terraform
+
+					Terraform detected the following changes made outside of Terraform since the
+					last "terraform apply":
+
+					An execution plan has been generated and is shown below.
+					Resource actions are indicated with the following symbols:
+					  - destroy
+
+					Terraform will perform the following actions:
+
+					  - null_resource.hi[1]
+
+
+					Plan: 0 to add, 0 to change, 1 to destroy.`,
+				},
+			},
+			expResult: "\n**Note: Objects have changed outside of Terraform**\nPlan: 0 to add, 0 to change, 1 to destroy.",
+		},
+		{
+			p: models.ProjectResult{
+				PlanSuccess: &models.PlanSuccess{
 					TerraformOutput: `No match, expect empty`,
 				},
 			},
