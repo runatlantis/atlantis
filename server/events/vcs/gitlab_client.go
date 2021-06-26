@@ -167,11 +167,9 @@ func (g *GitlabClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 // PullIsMergeable returns true if the merge request can be merged.
 // In GitLab, there isn't a single field that tells us if the pull request is
 // mergeable so for now we check the merge_status and approvals_before_merge
-// fields. We aren't checking if there are unresolved discussions or failing
-// pipelines because those only block merges if the repo is set to require that.
+// fields.
 // In order to check if the repo required these, we'd need to make another API
-// call to get the repo settings. For now I'm going to leave this as is and if
-// some users require checking this as well then we can revisit.
+// call to get the repo settings.
 // It's also possible that GitLab implements their own "mergeable" field in
 // their API in the future.
 // See:
@@ -182,7 +180,33 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	if err != nil {
 		return false, err
 	}
-	if mr.MergeStatus == "can_be_merged" && mr.ApprovalsBeforeMerge <= 0 {
+
+	// Get project configuration
+	project, _, err2 := g.Client.Projects.GetProject(mr.ProjectID, nil)
+	if err2 != nil {
+		return false, err2
+	}
+
+	// Get Commit Statuses
+	statuses, _, err3 := g.Client.Commits.GetCommitStatuses(mr.ProjectID, mr.HeadPipeline.SHA, nil)
+	if err3 != nil {
+		return false, err3
+	}
+
+	for _, status := range statuses {
+		if !strings.HasSuffix(status.Name, fmt.Sprintf("/%s", models.ApplyCommand.String())) {
+			if !status.AllowFailure && project.OnlyAllowMergeIfPipelineSucceeds && status.Status != "success" {
+				return false, nil
+			}
+		}
+	}
+
+	isPipelineSkipped := mr.HeadPipeline.Status == "skipped"
+	allowSkippedPipeline := project.AllowMergeOnSkippedPipeline && isPipelineSkipped
+	if mr.MergeStatus == "can_be_merged" &&
+		mr.ApprovalsBeforeMerge <= 0 &&
+		mr.BlockingDiscussionsResolved &&
+		(allowSkippedPipeline || !isPipelineSkipped) {
 		return true, nil
 	}
 	return false, nil
