@@ -2,9 +2,7 @@
 // running into circular dependency issues.
 package common
 
-import (
-	"math"
-)
+import "strings"
 
 // AutomergeCommitMsg is the commit message Atlantis will use when automatically
 // merging pull requests.
@@ -20,17 +18,30 @@ func SplitComment(comment string, maxSize int, sepEnd string, sepStart string) [
 
 	maxWithSep := maxSize - len(sepEnd) - len(sepStart)
 	var comments []string
-	numComments := int(math.Ceil(float64(len(comment)) / float64(maxWithSep)))
-	for i := 0; i < numComments; i++ {
-		upTo := min(len(comment), (i+1)*maxWithSep)
-		portion := comment[i*maxWithSep : upTo]
-		if i < numComments-1 {
-			portion += sepEnd
+	head := 0
+	for head < len(comment) {
+		tail := min(len(comment), head+maxWithSep)
+		portion := comment[head:tail]
+		lastLF := strings.LastIndex(portion, "\n")
+		if lastLF > 0 {
+			portion = portion[:lastLF]
 		}
-		if i > 0 {
-			portion = sepStart + portion
+
+		rawPortionLength := len(portion)
+		portion = strings.TrimSpace(portion)
+
+		if len(portion) > 0 {
+			if head > 0 {
+				portion = sepStart + portion
+			}
+			head += rawPortionLength
+			if head < len(comment) {
+				portion += sepEnd
+			}
+			comments = append(comments, portion)
+		} else {
+			head += rawPortionLength
 		}
-		comments = append(comments, portion)
 	}
 	return comments
 }

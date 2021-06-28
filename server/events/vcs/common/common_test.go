@@ -61,3 +61,27 @@ func TestSplitComment_FourComments(t *testing.T) {
 		sepStart + comment[expMax*2:expMax*3] + sepEnd,
 		sepStart + comment[expMax*3:]}, split)
 }
+
+func TestSplitComment_WithLineFeeds(t *testing.T) {
+	comment := strings.Join([]string{
+		"a",
+		"bb",
+		"cccc",
+		"dddddddd",
+		"eeeeeeeeeeeeeeee",
+		"ffffffffffffffffffffffffffffffff",
+	}, "\n")
+	sepEnd := "-START-"
+	sepStart := "-STOP-"
+	split := common.SplitComment(comment, 24, sepEnd, sepStart)
+
+	Equals(t, []string{
+		"a\nbb\ncccc-START-",
+		"-STOP-dddddddd-START-",
+		"-STOP-eeeeeeeeee-START-",
+		"-STOP-eeeeee-START-",
+		"-STOP-ffffffffff-START-",
+		"-STOP-fffffffffff-START-",
+		"-STOP-fffffffffff",
+	}, split)
+}
