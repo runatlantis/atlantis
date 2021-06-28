@@ -53,7 +53,7 @@ func TestHasRepoCfg_InvalidFileExtension(t *testing.T) {
 
 func TestParseRepoCfg_DirDoesNotExist(t *testing.T) {
 	r := yaml.ParserValidator{}
-	_, err := r.ParseRepoCfg("/not/exist", globalCfg, "")
+	_, err := r.ParseRepoCfg("/not/exist", globalCfg, "", "")
 	Assert(t, os.IsNotExist(err), "exp not exist err")
 }
 
@@ -61,7 +61,7 @@ func TestParseRepoCfg_FileDoesNotExist(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
 	r := yaml.ParserValidator{}
-	_, err := r.ParseRepoCfg(tmpDir, globalCfg, "")
+	_, err := r.ParseRepoCfg(tmpDir, globalCfg, "", "")
 	Assert(t, os.IsNotExist(err), "exp not exist err")
 }
 
@@ -72,7 +72,7 @@ func TestParseRepoCfg_BadPermissions(t *testing.T) {
 	Ok(t, err)
 
 	r := yaml.ParserValidator{}
-	_, err = r.ParseRepoCfg(tmpDir, globalCfg, "")
+	_, err = r.ParseRepoCfg(tmpDir, globalCfg, "", "")
 	ErrContains(t, "unable to read atlantis.yaml file: ", err)
 }
 
@@ -106,7 +106,7 @@ func TestParseCfgs_InvalidYAML(t *testing.T) {
 			err := ioutil.WriteFile(confPath, []byte(c.input), 0600)
 			Ok(t, err)
 			r := yaml.ParserValidator{}
-			_, err = r.ParseRepoCfg(tmpDir, globalCfg, "")
+			_, err = r.ParseRepoCfg(tmpDir, globalCfg, "", "")
 			ErrContains(t, c.expErr, err)
 			globalCfgArgs := valid.GlobalCfgArgs{
 				AllowRepoCfg:  false,
@@ -1072,7 +1072,7 @@ workflows:
 			Ok(t, err)
 
 			r := yaml.ParserValidator{}
-			act, err := r.ParseRepoCfg(tmpDir, globalCfg, "")
+			act, err := r.ParseRepoCfg(tmpDir, globalCfg, "", "")
 			if c.expErr != "" {
 				ErrEquals(t, c.expErr, err)
 				return
@@ -1107,7 +1107,7 @@ workflows:
 		UnDivergedReq: false,
 	}
 
-	_, err = r.ParseRepoCfg(tmpDir, valid.NewGlobalCfgFromArgs(globalCfgArgs), "repo_id")
+	_, err = r.ParseRepoCfg(tmpDir, valid.NewGlobalCfgFromArgs(globalCfgArgs), "repo_id", "branch")
 	ErrEquals(t, "repo config not allowed to set 'workflow' key: server-side config needs 'allowed_overrides: [workflow]'", err)
 }
 
@@ -1745,7 +1745,7 @@ func TestParseRepoCfg_V2ShellParsing(t *testing.T) {
 				ApprovedReq:   false,
 				UnDivergedReq: false,
 			}
-			v2Cfg, err := p.ParseRepoCfg(v2Dir, valid.NewGlobalCfgFromArgs(globalCfgArgs), "")
+			v2Cfg, err := p.ParseRepoCfg(v2Dir, valid.NewGlobalCfgFromArgs(globalCfgArgs), "", "")
 			if c.expV2Err != "" {
 				ErrEquals(t, c.expV2Err, err)
 			} else {
@@ -1759,7 +1759,7 @@ func TestParseRepoCfg_V2ShellParsing(t *testing.T) {
 				ApprovedReq:   false,
 				UnDivergedReq: false,
 			}
-			v3Cfg, err := p.ParseRepoCfg(v3Dir, valid.NewGlobalCfgFromArgs(globalCfgArgs), "")
+			v3Cfg, err := p.ParseRepoCfg(v3Dir, valid.NewGlobalCfgFromArgs(globalCfgArgs), "", "")
 			Ok(t, err)
 			Equals(t, c.in, v3Cfg.Workflows["custom"].Plan.Steps[0].RunCommand)
 			Equals(t, c.in, v3Cfg.Workflows["custom"].Apply.Steps[0].RunCommand)

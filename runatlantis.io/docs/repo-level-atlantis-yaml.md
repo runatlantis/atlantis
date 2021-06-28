@@ -49,6 +49,7 @@ automerge: true
 delete_source_branch_on_merge: true
 projects:
 - name: my-project-name
+  branch: /main/
   dir: .
   workspace: default
   terraform_version: v0.11.0
@@ -206,6 +207,7 @@ workflows:
 ### Project
 ```yaml
 name: myname
+branch: /mybranch/
 dir: mydir
 workspace: myworkspace
 delete_source_branch_on_merge:
@@ -218,6 +220,7 @@ workflow: myworkflow
 | Key                                    | Type                  | Default     | Required | Description                                                                                                                                                                                                           |
 |----------------------------------------|-----------------------|-------------|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | name                                   | string                | none        | maybe    | Required if there is more than one project with the same `dir` and `workspace`. This project name can be used with the `-p` flag.                                                                                     |
+| branch                                 | string                | none        | no       | Regex matching projects by the base branch of pull request (the branch the pull request is getting merged into). Only projects that match the PR's branch will be considered. By default, all branches are matched.   |
 | dir                                    | string                | none        | **yes**  | The directory of this project relative to the repo root. For example if the project was under `./project1` then use `project1`. Use `.` to indicate the repo root.                                                    |
 | workspace                              | string                | `"default"` | no       | The [Terraform workspace](https://www.terraform.io/docs/state/workspaces.html) for this project. Atlantis will switch to this workplace when planning/applying and will create it if it doesn't exist.                |
 | autoplan                               | [Autoplan](#autoplan) | none        | no       | A custom autoplan configuration. If not specified, will use the autoplan config. See [Autoplanning](autoplanning.html).                                                                                               |

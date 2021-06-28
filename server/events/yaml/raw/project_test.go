@@ -28,12 +28,14 @@ func TestProject_UnmarshalYAML(t *testing.T) {
 				Autoplan:          nil,
 				ApplyRequirements: nil,
 				Name:              nil,
+				Branch:            nil,
 			},
 		},
 		{
 			description: "all fields set including mergeable apply requirement",
 			input: `
 name: myname
+branch: mybranch
 dir: mydir
 workspace: workspace
 workflow: workflow
@@ -45,6 +47,7 @@ apply_requirements:
 - mergeable`,
 			exp: raw.Project{
 				Name:             String("myname"),
+				Branch:           String("mybranch"),
 				Dir:              String("mydir"),
 				Workspace:        String("workspace"),
 				Workflow:         String("workflow"),
@@ -94,6 +97,22 @@ func TestProject_Validate(t *testing.T) {
 				Dir: String("../mydir"),
 			},
 			expErr: "dir: cannot contain '..'.",
+		},
+		{
+			description: "not a regexp for branch",
+			input: raw.Project{
+				Branch: String("text"),
+				Dir:    String("."),
+			},
+			expErr: "branch: regex must begin and end with a slash '/'.",
+		},
+		{
+			description: "invalid regexp for branch",
+			input: raw.Project{
+				Branch: String("/(text/"),
+				Dir:    String("."),
+			},
+			expErr: "branch: parsing: /(text/: error parsing regexp: missing closing ): `(text`.",
 		},
 		{
 			description: "apply reqs with unsupported",
@@ -259,6 +278,7 @@ func TestProject_ToValid(t *testing.T) {
 			},
 			exp: valid.Project{
 				Dir:              ".",
+				BranchRegex:      nil,
 				Workspace:        "default",
 				WorkflowName:     nil,
 				TerraformVersion: nil,
