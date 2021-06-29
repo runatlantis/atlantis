@@ -329,7 +329,7 @@ func TestRunCommentCommandApprovePolicy_NoProjects_SilenceEnabled(t *testing.T) 
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
 		matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
-		matchers.EqModelsCommandName(models.ApprovePoliciesCommand),
+		matchers.EqModelsCommandName(models.PolicyCheckCommand),
 		EqInt(0),
 		EqInt(0),
 	)
