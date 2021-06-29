@@ -3,7 +3,7 @@ name: Tests
 jobs:
   test:
     runs-on: ubuntu-latest
-    container: runatlantis/testing-env:20296f9638a4eca04733f60b39e1d3025b9d708a
+    container: ghcr.io/runatlantis/testing-env:805e94e7f648eddb0484e539a7b51410d39529bc
     steps:
       # user in image needs write access to do anything
     - name: Setup file system permissions
