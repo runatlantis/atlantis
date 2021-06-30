@@ -3,7 +3,7 @@ Patch release containing bug fixes.
 
 ## Bug Fixes
 * Fix a regression introduced where approving failing policies would create a secondary status in pending without ever being marked as successful ([#1672](https://github.com/runatlantis/atlantis/pull/1672) by @nishkrishnan)
-* Fix a bug where pre-workflow hooks cannot find atlantis.yaml when run on non-default workspaces. ([#1620](https://github.com/runatlantis/atlantis/pull/1620))
+* Fix a bug where pre-workflow hooks cannot find atlantis.yaml when run on non-default workspaces. ([#1620](https://github.com/runatlantis/atlantis/pull/1620) by @giuli007)
 
 ## Dependencies
 * Upgrade default tf version to 1.0.1 ([#1662](https://github.com/runatlantis/atlantis/pull/1662) by @chenrui333)
