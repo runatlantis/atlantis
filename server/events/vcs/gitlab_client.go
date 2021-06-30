@@ -246,12 +246,13 @@ func (g *GitlabClient) WaitForSuccessPipeline(ctx context.Context, pull models.P
 	for wait := true; wait; {
 		select {
 		case <-ctx.Done():
-			fmt.Println("TIME OUT")
+			// validation check time out
 			cancel()
 			return //ctx.Err()
 
 		default:
 			mr, _ := g.GetMergeRequest(pull.BaseRepo.FullName, pull.Num)
+			// check if pipeline has a success state to merge
 			if mr.HeadPipeline.Status == "success" {
 				return
 			}
