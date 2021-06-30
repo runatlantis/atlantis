@@ -1,3 +1,34 @@
+# v0.17.2
+Patch release containing bug fixes.
+
+## Bug Fixes
+* Fix a regression introduced where approving failing policies would create a secondary status in pending without ever being marked as successful ([#1672](https://github.com/runatlantis/atlantis/pull/1672) by @nishkrishnan)
+* Fix a bug where pre-workflow hooks cannot find atlantis.yaml when run on non-default workspaces. ([#1620](https://github.com/runatlantis/atlantis/pull/1620))
+
+## Dependencies
+* Upgrade default tf version to 1.0.1 ([#1662](https://github.com/runatlantis/atlantis/pull/1662) by @chenrui333)
+
+## Backwards Incompatibilities/Notes
+* If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
+  then the default version of Terraform will now be 1.0.1. Simply set the above
+  flag to your desired default version to avoid any issues.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.2/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.2/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.2/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.2/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.17.2`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Github Container Registry
+[`ghcr.io/runatlantis/atlantis:v0.17.2`](https://github.com/runatlantis/atlantis/pkgs/container/atlantis)
+
+## Diff v0.17.1..v0.17.2
+https://github.com/runatlantis/atlantis/compare/v0.17.1...v0.17.2
+
+
 # v0.17.1
 Feature release containing a number of bug fixes.
 
