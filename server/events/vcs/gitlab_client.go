@@ -14,11 +14,13 @@
 package vcs
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/runatlantis/atlantis/server/events/yaml"
 
@@ -213,17 +215,54 @@ func (g *GitlabClient) GetMergeRequest(repoFullName string, pullNum int) (*gitla
 	return mr, err
 }
 
+func (g *GitlabClient) WaitForSuccessPipeline(ctx context.Context, pull models.PullRequest) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	for wait := true; wait; {
+		select {
+		case <-ctx.Done():
+			fmt.Println("TIME OUT")
+			cancel()
+			return //ctx.Err()
+
+		default:
+			mr, _ := g.GetMergeRequest(pull.BaseRepo.FullName, pull.Num)
+			if mr.HeadPipeline.Status == "success" {
+				return
+			}
+			time.Sleep(time.Second)
+		}
+	}
+}
+
 // MergePull merges the merge request.
 func (g *GitlabClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	commitMsg := common.AutomergeCommitMsg
-	_, _, err := g.Client.MergeRequests.AcceptMergeRequest(
+
+	mr, err := g.GetMergeRequest(pull.BaseRepo.FullName, pull.Num)
+	if err != nil {
+		return errors.Wrap(
+			err, "unable to merge merge request, it was not possible to retrieve the merge request")
+	}
+	project, _, err2 := g.Client.Projects.GetProject(mr.ProjectID, nil)
+	if err2 != nil {
+		return errors.Wrap(
+			err2, "unable to merge merge request, it was not possible to check the project requirements")
+	}
+
+	if project != nil && project.OnlyAllowMergeIfPipelineSucceeds {
+		g.WaitForSuccessPipeline(context.Background(), pull)
+	}
+
+	_, _, err3 := g.Client.MergeRequests.AcceptMergeRequest(
 		pull.BaseRepo.FullName,
 		pull.Num,
 		&gitlab.AcceptMergeRequestOptions{
 			MergeCommitMessage:       &commitMsg,
 			ShouldRemoveSourceBranch: &pullOptions.DeleteSourceBranchOnMerge,
 		})
-	return errors.Wrap(err, "unable to merge merge request, it may not be in a mergeable state")
+	return errors.Wrap(err3, "unable to merge merge request, it may not be in a mergeable state")
 }
 
 // MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.
