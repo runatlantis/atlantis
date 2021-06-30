@@ -28,7 +28,6 @@ Patch release containing bug fixes.
 ## Diff v0.17.1..v0.17.2
 https://github.com/runatlantis/atlantis/compare/v0.17.1...v0.17.2
 
-
 # v0.17.1
 Feature release containing a number of bug fixes.
 
