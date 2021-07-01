@@ -1,7 +1,7 @@
 package events
 
 import (
-	"github.com/runatlantis/atlantis/server/events/db"
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
