@@ -435,6 +435,11 @@ func (p ProjectCommandContext) GetShowResultFileName() string {
 	return fmt.Sprintf("%s-%s.json", projName, p.Workspace)
 }
 
+// Gets a unique identifier for the current pull request as a single string
+func (c *ProjectCommandContext) PullInfo() string {
+	return fmt.Sprintf("%s/%d/%s", c.BaseRepo.FullName, c.Pull.Num, c.CommandName)
+}
+
 // SplitRepoFullName splits a repo full name up into its owner and repo
 // name segments. If the repoFullName is malformed, may return empty
 // strings for owner or repo.
