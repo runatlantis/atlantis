@@ -10,8 +10,8 @@ import (
 	. "github.com/petergtz/pegomock"
 	. "github.com/runatlantis/atlantis/testing"
 
-	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/core/runtime/mocks"
+	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 var planFileContents = `
