@@ -24,16 +24,16 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    # Publish nightly image to container registry
-    - name: build atlantis:nightly image
+    # Publish dev image to container registry
+    - name: build atlantis:dev image
       if: ${{ github.event_name == 'push'}}
       run: |
         make build-service
-        docker build -t ghcr.io/runatlantis/atlantis:nightly .
-    - name: publish atlantis:nightly image
+        docker build -t ghcr.io/runatlantis/atlantis:dev .
+    - name: publish atlantis:dev image
       if: ${{ github.event_name == 'push'}}
       run: |
-        docker push ghcr.io/runatlantis/atlantis:nightly
+        docker push ghcr.io/runatlantis/atlantis:dev
 
     # Publish release to container registry
     - name: populate release version
