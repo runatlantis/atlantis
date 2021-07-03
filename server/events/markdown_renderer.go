@@ -28,6 +28,7 @@ var (
 	applyCommandTitle           = models.ApplyCommand.TitleString()
 	policyCheckCommandTitle     = models.PolicyCheckCommand.TitleString()
 	approvePoliciesCommandTitle = models.ApprovePoliciesCommand.TitleString()
+	versionCommandTitle         = models.VersionCommand.TitleString()
 	// maxUnwrappedLines is the maximum number of lines the Terraform output
 	// can be before we wrap it in an expandable template.
 	maxUnwrappedLines = 12
@@ -119,6 +120,7 @@ func (m *MarkdownRenderer) renderProjectResults(results []models.ProjectResult, 
 	var resultsTmplData []projectResultTmplData
 	numPlanSuccesses := 0
 	numPolicyCheckSuccesses := 0
+	numVersionSuccesses := 0
 
 	for _, result := range results {
 		resultData := projectResultTmplData{
@@ -166,6 +168,13 @@ func (m *MarkdownRenderer) renderProjectResults(results []models.ProjectResult, 
 			} else {
 				resultData.Rendered = m.renderTemplate(applyUnwrappedSuccessTmpl, struct{ Output string }{result.ApplySuccess})
 			}
+		} else if result.VersionSuccess != "" {
+			if m.shouldUseWrappedTmpl(vcsHost, result.VersionSuccess) {
+				resultData.Rendered = m.renderTemplate(versionWrappedSuccessTmpl, struct{ Output string }{result.VersionSuccess})
+			} else {
+				resultData.Rendered = m.renderTemplate(versionUnwrappedSuccessTmpl, struct{ Output string }{result.VersionSuccess})
+			}
+			numVersionSuccesses++
 		} else {
 			resultData.Rendered = "Found no template. This is a bug!"
 		}
@@ -182,6 +191,10 @@ func (m *MarkdownRenderer) renderProjectResults(results []models.ProjectResult, 
 		tmpl = singleProjectPlanSuccessTmpl
 	case len(resultsTmplData) == 1 && common.Command == policyCheckCommandTitle && numPolicyCheckSuccesses == 0:
 		tmpl = singleProjectPlanUnsuccessfulTmpl
+	case len(resultsTmplData) == 1 && common.Command == versionCommandTitle && numVersionSuccesses > 0:
+		tmpl = singleProjectVersionSuccessTmpl
+	case len(resultsTmplData) == 1 && common.Command == versionCommandTitle && numVersionSuccesses == 0:
+		tmpl = singleProjectVersionUnsuccessfulTmpl
 	case len(resultsTmplData) == 1 && common.Command == applyCommandTitle:
 		tmpl = singleProjectApplyTmpl
 	case common.Command == planCommandTitle,
@@ -191,6 +204,8 @@ func (m *MarkdownRenderer) renderProjectResults(results []models.ProjectResult, 
 		tmpl = approveAllProjectsTmpl
 	case common.Command == applyCommandTitle:
 		tmpl = multiProjectApplyTmpl
+	case common.Command == versionCommandTitle:
+		tmpl = multiProjectVersionTmpl
 	default:
 		return "no template matched–this is a bug"
 	}
@@ -240,6 +255,10 @@ var singleProjectPlanSuccessTmpl = template.Must(template.New("").Parse(
 var singleProjectPlanUnsuccessfulTmpl = template.Must(template.New("").Parse(
 	"{{$result := index .Results 0}}Ran {{.Command}} for dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n" +
 		"{{$result.Rendered}}\n" + logTmpl))
+var singleProjectVersionSuccessTmpl = template.Must(template.New("").Parse(
+	"{{$result := index .Results 0}}Ran {{.Command}} for {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" + logTmpl))
+var singleProjectVersionUnsuccessfulTmpl = template.Must(template.New("").Parse(
+	"{{$result := index .Results 0}}Ran {{.Command}} for dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n\n{{$result.Rendered}}\n" + logTmpl))
 var approveAllProjectsTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
 	"Approved Policies for {{ len .Results }} projects:\n\n" +
 		"{{ range $result := .Results }}" +
@@ -260,6 +279,16 @@ var multiProjectPlanTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap
 		"{{end}}{{end}}" +
 		logTmpl))
 var multiProjectApplyTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
+	"Ran {{.Command}} for {{ len .Results }} projects:\n\n" +
+		"{{ range $result := .Results }}" +
+		"1. {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n" +
+		"{{end}}\n" +
+		"{{ range $i, $result := .Results }}" +
+		"### {{add $i 1}}. {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n" +
+		"{{$result.Rendered}}\n\n" +
+		"---\n{{end}}" +
+		logTmpl))
+var multiProjectVersionTmpl = template.Must(template.New("").Funcs(sprig.TxtFuncMap()).Parse(
 	"Ran {{.Command}} for {{ len .Results }} projects:\n\n" +
 		"{{ range $result := .Results }}" +
 		"1. {{ if $result.ProjectName }}project: `{{$result.ProjectName}}` {{ end }}dir: `{{$result.RepoRelDir}}` workspace: `{{$result.Workspace}}`\n" +
@@ -324,6 +353,13 @@ var applyWrappedSuccessTmpl = template.Must(template.New("").Parse(
 	"<details><summary>Show Output</summary>\n\n" +
 		"```diff\n" +
 		"{{.Output}}\n" +
+		"```\n" +
+		"</details>"))
+var versionUnwrappedSuccessTmpl = template.Must(template.New("").Parse("```\n{{.Output}}```"))
+var versionWrappedSuccessTmpl = template.Must(template.New("").Parse(
+	"<details><summary>Show Output</summary>\n\n" +
+		"```\n" +
+		"{{.Output}}" +
 		"```\n" +
 		"</details>"))
 var unwrappedErrTmplText = "**{{.Command}} Error**\n" +

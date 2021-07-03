@@ -473,6 +473,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		EnvStepRunner: &runtime.EnvStepRunner{
 			RunStepRunner: runStepRunner,
 		},
+		VersionStepRunner: &runtime.VersionStepRunner{
+			TerraformExecutor: terraformClient,
+			DefaultTFVersion:  defaultTfVersion,
+		},
 		PullApprovedChecker: vcsClient,
 		WorkingDir:          workingDir,
 		Webhooks:            webhooksManager,
@@ -553,11 +557,20 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.SilenceNoProjects,
 	)
 
+	versionCommandRunner := events.NewVersionCommandRunner(
+		pullUpdater,
+		projectCommandBuilder,
+		projectCommandRunner,
+		userConfig.ParallelPoolSize,
+		userConfig.SilenceNoProjects,
+	)
+
 	commentCommandRunnerByCmd := map[models.CommandName]events.CommentCommandRunner{
 		models.PlanCommand:            planCommandRunner,
 		models.ApplyCommand:           applyCommandRunner,
 		models.ApprovePoliciesCommand: approvePoliciesCommandRunner,
 		models.UnlockCommand:          unlockCommandRunner,
+		models.VersionCommand:         versionCommandRunner,
 	}
 
 	commandRunner := &events.DefaultCommandRunner{

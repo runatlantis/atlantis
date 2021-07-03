@@ -162,11 +162,20 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		SilenceNoProjects,
 	)
 
+	versionCommandRunner := events.NewVersionCommandRunner(
+		pullUpdater,
+		projectCommandBuilder,
+		projectCommandRunner,
+		parallelPoolSize,
+		SilenceNoProjects,
+	)
+
 	commentCommandRunnerByCmd := map[models.CommandName]events.CommentCommandRunner{
 		models.PlanCommand:            planCommandRunner,
 		models.ApplyCommand:           applyCommandRunner,
 		models.ApprovePoliciesCommand: approvePoliciesCommandRunner,
 		models.UnlockCommand:          unlockCommandRunner,
+		models.VersionCommand:         versionCommandRunner,
 	}
 
 	preWorkflowHooksCommandRunner = mocks.NewMockPreWorkflowHooksCommandRunner()

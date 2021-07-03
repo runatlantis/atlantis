@@ -858,11 +858,20 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		silenceNoProjects,
 	)
 
+	versionCommandRunner := events.NewVersionCommandRunner(
+		pullUpdater,
+		projectCommandBuilder,
+		projectCommandRunner,
+		parallelPoolSize,
+		silenceNoProjects,
+	)
+
 	commentCommandRunnerByCmd := map[models.CommandName]events.CommentCommandRunner{
 		models.PlanCommand:            planCommandRunner,
 		models.ApplyCommand:           applyCommandRunner,
 		models.ApprovePoliciesCommand: approvePoliciesCommandRunner,
 		models.UnlockCommand:          unlockCommandRunner,
+		models.VersionCommand:         versionCommandRunner,
 	}
 
 	commandRunner := &events.DefaultCommandRunner{
