@@ -113,6 +113,20 @@ func NewGithubClient(hostname string, credentials GithubCredentials, logger logg
 	}, nil
 }
 
+func (g *GithubClient) GetRateLimits() (*github.RateLimits, error) {
+	rateLimits, resp, err := g.client.RateLimits(g.ctx)
+
+	if err != nil {
+		g.logger.Err("error retrieving rate limits: %s", err)
+		return nil, errors.Wrap(err, "retrieving rate limits")
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("error retrieving rate limits: %s", resp.Status)
+	}
+	return rateLimits, nil
+}
+
 // GetModifiedFiles returns the names of files that were modified in the pull request
 // relative to the repo root, e.g. parent/child/file.txt.
 func (g *GithubClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {

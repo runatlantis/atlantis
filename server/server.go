@@ -32,7 +32,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/google/go-github/v31/github"
 	"github.com/mitchellh/go-homedir"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
@@ -146,7 +145,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	// not to be used directly, currently this is just used
 	// for reporting rate limits
-	var rawGithubClient *github.Client
+	var rawGithubClient *vcs.GithubClient
 
 	var githubClient vcs.IGithubClient
 	var githubAppEnabled bool
@@ -192,7 +191,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 
 		var err error
-		rawGithubClient, err := vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, logger)
+		rawGithubClient, err = vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, logger)
 		if err != nil {
 			return nil, err
 		}
