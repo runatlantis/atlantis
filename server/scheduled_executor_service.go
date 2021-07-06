@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"io"
 	"os"
 	"os/signal"
@@ -9,6 +10,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/google/go-github/v31/github"
 	stats "github.com/lyft/gostats"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/metrics"
@@ -20,7 +22,8 @@ type ScheduledExecutorService struct {
 	log logging.SimpleLogging
 
 	// jobs
-	garbageCollector CronDefinition
+	garbageCollector   JobDefinition
+	rateLimitPublisher JobDefinition
 }
 
 func NewScheduledExecutorService(
@@ -28,28 +31,45 @@ func NewScheduledExecutorService(
 	statsScope stats.Scope,
 	log logging.SimpleLogging,
 	pullCleaner events.PullCleaner,
+	githubClient *github.Client,
 ) *ScheduledExecutorService {
+
+	scheduledScope := statsScope.Scope("scheduled")
 	garbageCollector := &GarbageCollector{
 		workingDirIterator: workingDirIterator,
-		stats:              statsScope.Scope("scheduled.garbagecollector"),
+		stats:              scheduledScope.Scope("garbagecollector"),
 		log:                log,
 		cleaner:            pullCleaner,
 	}
 
-	garbageCollectorCron := CronDefinition{
+	garbageCollectorJob := JobDefinition{
 		Job: garbageCollector,
 
 		// 5 minutes should probably be the lowest to prevent GH rate limits
 		Period: 5 * time.Minute,
 	}
 
+	rateLimitPublisher := &RateLimitStatsPublisher{
+		client: githubClient,
+		stats:  scheduledScope.Scope("ratelimitpublisher"),
+		log:    log,
+	}
+
+	rateLimitPublisherJob := JobDefinition{
+		Job: rateLimitPublisher,
+
+		// since rate limit api doesn't contribute to the rate limit we can call this every minute
+		Period: 1 * time.Minute,
+	}
+
 	return &ScheduledExecutorService{
-		log:              log,
-		garbageCollector: garbageCollectorCron,
+		log:                log,
+		garbageCollector:   garbageCollectorJob,
+		rateLimitPublisher: rateLimitPublisherJob,
 	}
 }
 
-type CronDefinition struct {
+type JobDefinition struct {
 	Job    Job
 	Period time.Duration
 }
@@ -60,6 +80,9 @@ func (s *ScheduledExecutorService) Run() {
 	// create tickers
 	garbageCollectorTicker := time.NewTicker(s.garbageCollector.Period)
 	defer garbageCollectorTicker.Stop()
+
+	rateLimitPublisherTicker := time.NewTicker(s.rateLimitPublisher.Period)
+	defer rateLimitPublisherTicker.Stop()
 
 	interrupt := make(chan os.Signal, 1)
 
@@ -73,12 +96,46 @@ func (s *ScheduledExecutorService) Run() {
 			return
 		case <-garbageCollectorTicker.C:
 			go s.garbageCollector.Job.Run()
+		case <-rateLimitPublisherTicker.C:
+			go s.rateLimitPublisher.Job.Run()
 		}
 	}
 }
 
 type Job interface {
 	Run()
+}
+
+type RateLimitStatsPublisher struct {
+	log    logging.SimpleLogging
+	stats  stats.Scope
+	client *github.Client
+}
+
+func (r *RateLimitStatsPublisher) Run() {
+
+	// since we are calling this at timed intervals it's probably ok to create our own context here.
+	// it's not critical to cancel this context
+	ctx := context.Background()
+
+	errCounter := r.stats.NewCounter(metrics.ExecutionErrorMetric)
+	rateLimitRemainingCounter := r.stats.NewCounter("ratelimitremaining")
+
+	rateLimits, resp, err := r.client.RateLimits(ctx)
+
+	if err != nil {
+		r.log.Err("error retrieving rate limits: %s", err)
+		errCounter.Inc()
+		return
+	}
+
+	if resp.StatusCode != 200 {
+		r.log.Err("error retrieving rate limits: %s", resp.Status)
+		errCounter.Inc()
+		return
+	}
+
+	rateLimitRemainingCounter.Add(uint64(rateLimits.GetCore().Remaining))
 }
 
 var gcStaleClosedPullTemplate = template.Must(template.New("").Parse(
