@@ -6,15 +6,16 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"sync"
 	"syscall"
 	"text/template"
 	"time"
 
-	"github.com/google/go-github/v31/github"
 	stats "github.com/lyft/gostats"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/metrics"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -31,7 +32,7 @@ func NewScheduledExecutorService(
 	statsScope stats.Scope,
 	log logging.SimpleLogging,
 	pullCleaner events.PullCleaner,
-	githubClient *github.Client,
+	githubClient *vcs.GithubClient,
 ) *ScheduledExecutorService {
 
 	scheduledScope := statsScope.Scope("scheduled")
@@ -77,29 +78,55 @@ type JobDefinition struct {
 func (s *ScheduledExecutorService) Run() {
 	s.log.Info("Scheduled Executor Service started")
 
-	// create tickers
-	garbageCollectorTicker := time.NewTicker(s.garbageCollector.Period)
-	defer garbageCollectorTicker.Stop()
+	ctx, cancel := context.WithCancel(context.Background())
 
-	rateLimitPublisherTicker := time.NewTicker(s.rateLimitPublisher.Period)
-	defer rateLimitPublisherTicker.Stop()
+	var wg sync.WaitGroup
+
+	s.runScheduledJob(ctx, &wg, s.garbageCollector)
+	s.runScheduledJob(ctx, &wg, s.rateLimitPublisher)
 
 	interrupt := make(chan os.Signal, 1)
 
 	// Stop on SIGINTs and SIGTERMs.
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
 
-	for {
-		select {
-		case <-interrupt:
-			s.log.Warn("Received interrupt. Shutting down scheduled executor service")
-			return
-		case <-garbageCollectorTicker.C:
-			go s.garbageCollector.Job.Run()
-		case <-rateLimitPublisherTicker.C:
-			go s.rateLimitPublisher.Job.Run()
+	<-interrupt
+
+	s.log.Warn("Received interrupt. Attempting to Shut down scheduled executor service")
+
+	cancel()
+	wg.Wait()
+
+	s.log.Warn("All jobs completed, exiting.")
+}
+
+func (s *ScheduledExecutorService) runScheduledJob(ctx context.Context, wg *sync.WaitGroup, jd JobDefinition) {
+	ticker := time.NewTicker(jd.Period)
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		defer ticker.Stop()
+
+		// Ensure we recover from any panics to keep the jobs isolated.
+		// Keep the recovery outside the select to ensure that we don't infinitely panic.
+		defer func() {
+			if r := recover(); r != nil {
+				s.log.Err("Recovered from panic: %v", r)
+			}
+		}()
+
+		for {
+			select {
+			case <-ctx.Done():
+				s.log.Warn("Received interrupt, cancelling job")
+				return
+			case <-ticker.C:
+				jd.Job.Run()
+			}
 		}
-	}
+	}()
+
 }
 
 type Job interface {
@@ -109,28 +136,16 @@ type Job interface {
 type RateLimitStatsPublisher struct {
 	log    logging.SimpleLogging
 	stats  stats.Scope
-	client *github.Client
+	client *vcs.GithubClient
 }
 
 func (r *RateLimitStatsPublisher) Run() {
-
-	// since we are calling this at timed intervals it's probably ok to create our own context here.
-	// it's not critical to cancel this context
-	ctx := context.Background()
-
 	errCounter := r.stats.NewCounter(metrics.ExecutionErrorMetric)
 	rateLimitRemainingCounter := r.stats.NewCounter("ratelimitremaining")
 
-	rateLimits, resp, err := r.client.RateLimits(ctx)
+	rateLimits, err := r.client.GetRateLimits()
 
 	if err != nil {
-		r.log.Err("error retrieving rate limits: %s", err)
-		errCounter.Inc()
-		return
-	}
-
-	if resp.StatusCode != 200 {
-		r.log.Err("error retrieving rate limits: %s", resp.Status)
 		errCounter.Inc()
 		return
 	}
