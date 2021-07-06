@@ -31,6 +31,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/go-github/v31/github"
 	"github.com/mitchellh/go-homedir"
 	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
@@ -141,6 +142,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	statsScope.Store().AddStatGenerator(stats.NewRuntimeStats(statsScope.Scope("go")))
 
 	var supportedVCSHosts []models.VCSHostType
+
+	// not to be used directly, currently this is just used
+	// for reporting rate limits
+	var rawGithubClient *github.Client
+
 	var githubClient vcs.IGithubClient
 	var githubAppEnabled bool
 	var githubCredentials vcs.GithubCredentials
@@ -663,6 +669,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			// using a specific template to signal that this is from an async process
 			PullClosedTemplate: &GCStalePullTemplate{},
 		},
+		rawGithubClient,
 	)
 
 	return &Server{
