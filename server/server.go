@@ -717,8 +717,8 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
 	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
-	s.Router.HandleFunc("/logStreaming", s.LogStreamingController.GetLogStream).Methods("GET")
-	s.Router.HandleFunc("/log_streaming_ws", s.LogStreamingController.GetLogStreamWS).Methods("GET")
+	s.Router.HandleFunc("/logStreaming/{org}/{repo}/{pull}/{project}", s.LogStreamingController.GetLogStream).Methods("GET")
+	s.Router.HandleFunc("/logStreaming/{org}/{repo}/{pull}/{project}/ws", s.LogStreamingController.GetLogStreamWS).Methods("GET")
 	n := negroni.New(&negroni.Recovery{
 		Logger:     log.New(os.Stdout, "", log.LstdFlags),
 		PrintStack: false,
@@ -782,13 +782,6 @@ func (s *Server) waitForDrain() {
 		case <-ticker.C:
 			s.Logger.Info("Waiting for in-progress operations to complete, current in-progress ops: %d", s.Drainer.GetStatus().InProgressOps)
 		}
-	}
-}
-
-func (s *Server) LogStreaming(w http.ResponseWriter, _ *http.Request) {
-	err := templates.LogStreamingTemplate.Execute(w, struct{}{})
-	if err != nil {
-		s.Logger.Err(err.Error())
 	}
 }
 
