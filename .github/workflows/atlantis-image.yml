@@ -24,21 +24,21 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    # Publish latest image to container registry
-    - name: build atlantis:latest image
+    # Publish dev image to container registry
+    - name: build atlantis:dev image
       if: ${{ github.event_name == 'push'}}
       run: |
         make build-service
-        docker build -t ghcr.io/runatlantis/atlantis:latest .
-    - name: publish atlantis:latest image
+        docker build -t ghcr.io/runatlantis/atlantis:dev .
+    - name: publish atlantis:dev image
       if: ${{ github.event_name == 'push'}}
       run: |
-        docker push ghcr.io/runatlantis/atlantis:latest
+        docker push ghcr.io/runatlantis/atlantis:dev
 
     # Publish release to container registry
     - name: populate release version
       if: ${{ github.event_name == 'release'}}
-      run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV    
+      run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
     - name: build atlantis:$RELEASE_VERSION release image
       if: ${{ github.event_name == 'release'}}
       run: |
@@ -48,3 +48,5 @@ jobs:
       if: ${{ github.event_name == 'release'}}
       run: |
         docker push ghcr.io/runatlantis/atlantis:$RELEASE_VERSION
+        docker tag ghcr.io/runatlantis/atlantis:$RELEASE_VERSION ghcr.io/runatlantis/atlantis:latest
+        docker push ghcr.io/runatlantis/atlantis:latest
