@@ -94,8 +94,10 @@ type Server struct {
 	GithubAppController           *controllers.GithubAppController
 	LocksController               *controllers.LocksController
 	StatusController              *controllers.StatusController
+	LogStreamingController        *controllers.LogStreamingController
 	IndexTemplate                 templates.TemplateWriter
 	LockDetailTemplate            templates.TemplateWriter
+	LogStreamingTemplate          templates.TemplateWriter
 	SSLCertFile                   string
 	SSLKeyFile                    string
 	Drainer                       *events.Drainer
@@ -616,6 +618,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DB:                 boltdb,
 		DeleteLockCommand:  deleteLockCommand,
 	}
+
+	logStreamingController := &controllers.LogStreamingController{
+		AtlantisVersion:   config.AtlantisVersion,
+		AtlantisURL:       parsedURL,
+		Logger:            logger,
+		LogStreamTemplate: templates.LogStreamingTemplate,
+	}
+
 	eventsController := &events_controllers.VCSEventsController{
 		CommandRunner:                   commandRunner,
 		PullCleaner:                     pullClosedExecutor,
@@ -679,9 +689,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		VCSEventsController:           eventsController,
 		GithubAppController:           githubAppController,
 		LocksController:               locksController,
+		LogStreamingController:        logStreamingController,
 		StatusController:              statusController,
 		IndexTemplate:                 templates.IndexTemplate,
 		LockDetailTemplate:            templates.LockTemplate,
+		LogStreamingTemplate:          templates.LogStreamingTemplate,
 		SSLKeyFile:                    userConfig.SSLKeyFile,
 		SSLCertFile:                   userConfig.SSLCertFile,
 		Drainer:                       drainer,
@@ -705,7 +717,8 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
 	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
-	s.Router.HandleFunc("/logStreaming", s.LogStreaming).Methods("GET")
+	s.Router.HandleFunc("/logStreaming", s.LogStreamingController.GetLogStream).Methods("GET")
+	s.Router.HandleFunc("/log_streaming_ws", s.LogStreamingController.GetLogStreamWS).Methods("GET")
 	n := negroni.New(&negroni.Recovery{
 		Logger:     log.New(os.Stdout, "", log.LstdFlags),
 		PrintStack: false,
@@ -773,7 +786,7 @@ func (s *Server) waitForDrain() {
 }
 
 func (s *Server) LogStreaming(w http.ResponseWriter, _ *http.Request) {
-	err := logStreamingTemplate.Execute(w, struct{}{})
+	err := templates.LogStreamingTemplate.Execute(w, struct{}{})
 	if err != nil {
 		s.Logger.Err(err.Error())
 	}

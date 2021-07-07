@@ -1,4 +1,4 @@
-package server
+package controllers
 
 import (
 	"fmt"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	"github.com/runatlantis/atlantis/server/controllers/templates"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -15,7 +16,7 @@ type LogStreamingController struct {
 	AtlantisVersion   string
 	AtlantisURL       *url.URL
 	Logger            logging.SimpleLogging
-	LogStreamTemplate TemplateWriter
+	LogStreamTemplate templates.TemplateWriter
 }
 
 // Gets the PR information from the HTTP request params
@@ -44,18 +45,19 @@ func getPullInfo(r *http.Request) (string, error) {
 func (j *LogStreamingController) GetLogStream(w http.ResponseWriter, r *http.Request) {
 	pullInfo, err := getPullInfo(r)
 	if err != nil {
-		fmt.Println(err) //j.respond(w, logging.Error, http.StatusInternalServerError, err.Error()) //come back to this***
+		j.respond(w, logging.Error, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	viewData := logStreamData{
+	viewData := templates.LogStreamData{
 		AtlantisVersion: j.AtlantisVersion,
 		PullInfo:        pullInfo,
 		CleanedBasePath: j.AtlantisURL.Path,
 	}
 
-	if err := j.LogStreamTemplate.Execute(w, viewData); err != nil {
-		j.Logger.Err(err.Error()) //***Go through simplelogger to see if there is a better
+	err = j.LogStreamTemplate.Execute(w, viewData)
+	if err != nil {
+		j.Logger.Err(err.Error())
 	}
 }
 
@@ -64,8 +66,7 @@ var upgrader = websocket.Upgrader{}
 func (j *LogStreamingController) GetLogStreamWS(w http.ResponseWriter, r *http.Request) {
 	pullInfo, err := getPullInfo(r)
 	if err != nil {
-		fmt.Println(err)
-		//j.respond(w, logging.Error, http.StatusInternalServerError, err.Error())
+		j.respond(w, logging.Error, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -73,25 +74,24 @@ func (j *LogStreamingController) GetLogStreamWS(w http.ResponseWriter, r *http.R
 
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		fmt.Println(err) //.Logger.Warn("Failed to upgrade websocket: %s", err)
+		j.Logger.Warn("Failed to upgrade websocket: %s", err)
 		return
 	}
 
 	defer c.Close()
 
-	ch := make(chan string, 1000)
-	//Need to output something simple, add 1sec buffer
-	for msg := range ch {
-		_ = msg
+	for {
+		if err := c.WriteMessage(websocket.BinaryMessage, []byte("\r\n")); err != nil {
+			j.Logger.Warn("Failed to write ws message: %s", err)
+			return
+		}
 		time.Sleep(1 * time.Second)
 	}
 }
 
-/*
 func (j *LogStreamingController) respond(w http.ResponseWriter, lvl logging.LogLevel, responseCode int, format string, args ...interface{}) {
 	response := fmt.Sprintf(format, args...)
 	j.Logger.Log(lvl, response)
 	w.WriteHeader(responseCode)
 	fmt.Fprintln(w, response)
 }
-*/
