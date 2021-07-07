@@ -68,11 +68,12 @@ const (
 	// route. ex:
 	//   mux.Router.Get(LockViewRouteName).URL(LockViewRouteIDQueryParam, "my id")
 	LockViewRouteIDQueryParam = "id"
-
+	//LogViewRouteName is the named route in mux.Router for the log stream view.
+	//Can be retrieved by mux.Router.Get(LogViewRouteName)
+	LogViewRouteName = "log-detail"
 	// binDirName is the name of the directory inside our data dir where
 	// we download binaries.
 	BinDirName = "bin"
-
 	// terraformPluginCacheDir is the name of the dir inside our data dir
 	// where we tell terraform to cache plugins and modules.
 	TerraformPluginCacheDirName = "plugin-cache"
@@ -382,6 +383,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AtlantisURL:               parsedURL,
 		LockViewRouteIDQueryParam: LockViewRouteIDQueryParam,
 		LockViewRouteName:         LockViewRouteName,
+		LogViewRouteName:          LogViewRouteName,
 		Underlying:                underlyingRouter,
 	}
 
@@ -717,7 +719,7 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
 	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
-	s.Router.HandleFunc("/logStreaming/{org}/{repo}/{pull}/{project}", s.LogStreamingController.GetLogStream).Methods("GET")
+	s.Router.HandleFunc("/logStreaming/{org}/{repo}/{pull}/{project}", s.LogStreamingController.GetLogStream).Methods("GET").Name(LogViewRouteName)
 	s.Router.HandleFunc("/logStreaming/{org}/{repo}/{pull}/{project}/ws", s.LogStreamingController.GetLogStreamWS).Methods("GET")
 	n := negroni.New(&negroni.Recovery{
 		Logger:     log.New(os.Stdout, "", log.LstdFlags),

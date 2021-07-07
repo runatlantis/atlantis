@@ -408,7 +408,11 @@ var LogStreamingTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
 
     <script>
       var term = new Terminal();
-      var socket = new WebSocket(document.location.protocol === "http:" ? "ws://" : "wss://") + document.location.host + "/ws");
+      var socket = new WebSocket(
+        (document.location.protocol === "http:" ? "ws://" : "wss://") + 
+        document.location.host +
+        document.location.pathname +
+        "/ws");
       var attachAddon = new AttachAddon.AttachAddon(socket);
       var fitAddon = new FitAddon.FitAddon();
       term.loadAddon(attachAddon);
