@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
@@ -80,13 +79,13 @@ func (j *LogStreamingController) GetLogStreamWS(w http.ResponseWriter, r *http.R
 
 	defer c.Close()
 
-	for {
-		if err := c.WriteMessage(websocket.BinaryMessage, []byte("\r\n")); err != nil {
-			j.Logger.Warn("Failed to write ws message: %s", err)
-			return
-		}
-		time.Sleep(1 * time.Second)
+	//for {
+	if err := c.WriteMessage(websocket.BinaryMessage, []byte("Hello world"+"\r\n")); err != nil {
+		j.Logger.Warn("Failed to write ws message: %s", err)
+		return
 	}
+	//time.Sleep(1 * time.Second)
+	//}
 }
 
 func (j *LogStreamingController) respond(w http.ResponseWriter, lvl logging.LogLevel, responseCode int, format string, args ...interface{}) {
