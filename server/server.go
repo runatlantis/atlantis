@@ -99,6 +99,7 @@ type Server struct {
 	IndexTemplate                 templates.TemplateWriter
 	LockDetailTemplate            templates.TemplateWriter
 	LogStreamingTemplate          templates.TemplateWriter
+	LogStreamErrorTemplate        templates.TemplateWriter
 	SSLCertFile                   string
 	SSLKeyFile                    string
 	Drainer                       *events.Drainer
@@ -622,10 +623,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	logStreamingController := &controllers.LogStreamingController{
-		AtlantisVersion:   config.AtlantisVersion,
-		AtlantisURL:       parsedURL,
-		Logger:            logger,
-		LogStreamTemplate: templates.LogStreamingTemplate,
+		AtlantisVersion:        config.AtlantisVersion,
+		AtlantisURL:            parsedURL,
+		Logger:                 logger,
+		LogStreamTemplate:      templates.LogStreamingTemplate,
+		LogStreamErrorTemplate: templates.LogStreamErrorTemplate,
+		Db:                     boltdb,
 	}
 
 	eventsController := &events_controllers.VCSEventsController{
@@ -696,6 +699,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		IndexTemplate:                 templates.IndexTemplate,
 		LockDetailTemplate:            templates.LockTemplate,
 		LogStreamingTemplate:          templates.LogStreamingTemplate,
+		LogStreamErrorTemplate:        templates.LogStreamErrorTemplate,
 		SSLKeyFile:                    userConfig.SSLKeyFile,
 		SSLCertFile:                   userConfig.SSLCertFile,
 		Drainer:                       drainer,
