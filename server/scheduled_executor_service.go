@@ -31,7 +31,8 @@ func NewScheduledExecutorService(
 	workingDirIterator events.WorkDirIterator,
 	statsScope stats.Scope,
 	log logging.SimpleLogging,
-	pullCleaner events.PullCleaner,
+	closedPullCleaner events.PullCleaner,
+	openPullCleaner events.PullCleaner,
 	githubClient *vcs.GithubClient,
 ) *ScheduledExecutorService {
 
@@ -40,7 +41,8 @@ func NewScheduledExecutorService(
 		workingDirIterator: workingDirIterator,
 		stats:              scheduledScope.Scope("garbagecollector"),
 		log:                log,
-		cleaner:            pullCleaner,
+		closedPullCleaner:  closedPullCleaner,
+		openPullCleaner:    openPullCleaner,
 	}
 
 	garbageCollectorJob := JobDefinition{
@@ -158,17 +160,37 @@ var gcStaleClosedPullTemplate = template.Must(template.New("").Parse(
 		"{{ range . }}\n" +
 		"- dir: `{{ .RepoRelDir }}` {{ .Workspaces }}{{ end }}"))
 
-type GCStalePullTemplate struct{}
+var gcStaleOpenPullTemplate = template.Must(template.New("").Parse(
+	"Pull Request has not been updated for 30 days. Atlantis GC has deleted the locks and plans for the following projects and workspaces:\n" +
+		"{{ range . }}\n" +
+		"- dir: `{{ .RepoRelDir }}` {{ .Workspaces }}{{ end }}"))
+
+type GCStalePullTemplate struct {
+	template *template.Template
+}
+
+func NewGCStaleClosedPull() events.PullCleanupTemplate {
+	return &GCStalePullTemplate{
+		template: gcStaleClosedPullTemplate,
+	}
+}
+
+func NewGCStaleOpenPull() events.PullCleanupTemplate {
+	return &GCStalePullTemplate{
+		template: gcStaleOpenPullTemplate,
+	}
+}
 
 func (t *GCStalePullTemplate) Execute(wr io.Writer, data interface{}) error {
-	return gcStaleClosedPullTemplate.Execute(wr, data)
+	return t.template.Execute(wr, data)
 }
 
 type GarbageCollector struct {
 	workingDirIterator events.WorkDirIterator
 	stats              stats.Scope
 	log                logging.SimpleLogging
-	cleaner            events.PullCleaner
+	closedPullCleaner  events.PullCleaner
+	openPullCleaner    events.PullCleaner
 }
 
 func (g *GarbageCollector) Run() {
@@ -202,6 +224,14 @@ func (g *GarbageCollector) Run() {
 				updatedthirtyDaysAgoOpenPullsCounter.Inc()
 
 				logger.Warn("Pull hasn't been updated for more than 30 days.")
+
+				err := g.openPullCleaner.CleanUpPull(pull.BaseRepo, pull)
+
+				if err != nil {
+					logger.Err("Error cleaning up open pulls that haven't been updated in 30 days %s", err)
+					errCounter.Inc()
+					return
+				}
 			}
 			continue
 		}
@@ -214,7 +244,7 @@ func (g *GarbageCollector) Run() {
 
 			logger.Warn("Pull closed for more than 30 days but data still on disk")
 
-			err := g.cleaner.CleanUpPull(pull.BaseRepo, pull)
+			err := g.closedPullCleaner.CleanUpPull(pull.BaseRepo, pull)
 
 			if err != nil {
 				logger.Err("Error cleaning up 30 days old closed pulls %s", err)

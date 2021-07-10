@@ -666,8 +666,21 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			DB:         boltdb,
 
 			// using a specific template to signal that this is from an async process
-			PullClosedTemplate: &GCStalePullTemplate{},
+			PullClosedTemplate: NewGCStaleClosedPull(),
 		},
+
+		// using a pullclosed executor for stale open PRs. Naming is weird, we need to come up with something better.
+		&events.PullClosedExecutor{
+			VCSClient:  vcsClient,
+			Locker:     lockingClient,
+			WorkingDir: workingDir,
+			Logger:     logger,
+			DB:         boltdb,
+
+			// using a specific template to signal that this is from an async process
+			PullClosedTemplate: NewGCStaleOpenPull(),
+		},
+
 		rawGithubClient,
 	)
 
