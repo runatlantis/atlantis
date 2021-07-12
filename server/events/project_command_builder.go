@@ -85,6 +85,13 @@ type ProjectApprovePoliciesCommandBuilder interface {
 	BuildApprovePoliciesCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error)
 }
 
+type ProjectVersionCommandBuilder interface {
+	// BuildVersionCommands builds project Version commands for this ctx and comment. If
+	// comment doesn't specify one project then there may be multiple commands
+	// to be run.
+	BuildVersionCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error)
+}
+
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
 
 // ProjectCommandBuilder builds commands that run on individual projects.
@@ -92,6 +99,7 @@ type ProjectCommandBuilder interface {
 	ProjectPlanCommandBuilder
 	ProjectApplyCommandBuilder
 	ProjectApprovePoliciesCommandBuilder
+	ProjectVersionCommandBuilder
 }
 
 // DefaultProjectCommandBuilder implements ProjectCommandBuilder.
@@ -148,6 +156,14 @@ func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *CommandContext, c
 
 func (p *DefaultProjectCommandBuilder) BuildApprovePoliciesCommands(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
 	return p.buildAllProjectCommands(ctx, cmd)
+}
+
+func (p *DefaultProjectCommandBuilder) BuildVersionCommands(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+	if !cmd.IsForSpecificProject() {
+		return p.buildAllProjectCommands(ctx, cmd)
+	}
+	pac, err := p.buildProjectVersionCommand(ctx, cmd)
+	return pac, err
 }
 
 // buildPlanAllCommands builds plan contexts for all projects we determine were
@@ -444,6 +460,47 @@ func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *CommandCont
 	return p.buildProjectCommandCtx(
 		ctx,
 		models.ApplyCommand,
+		cmd.ProjectName,
+		cmd.Flags,
+		repoDir,
+		repoRelDir,
+		workspace,
+		cmd.Verbose,
+	)
+}
+
+// buildProjectVersionCommand builds a version command for the single project
+// identified by cmd.
+func (p *DefaultProjectCommandBuilder) buildProjectVersionCommand(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+	workspace := DefaultWorkspace
+	if cmd.Workspace != "" {
+		workspace = cmd.Workspace
+	}
+
+	var projCtx []models.ProjectCommandContext
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace)
+	if err != nil {
+		return projCtx, err
+	}
+	defer unlockFn()
+
+	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
+	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
+	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
+	if os.IsNotExist(errors.Cause(err)) {
+		return projCtx, errors.New("no working directory found–did you run plan?")
+	} else if err != nil {
+		return projCtx, err
+	}
+
+	repoRelDir := DefaultRepoRelDir
+	if cmd.RepoRelDir != "" {
+		repoRelDir = cmd.RepoRelDir
+	}
+
+	return p.buildProjectCommandCtx(
+		ctx,
+		models.VersionCommand,
 		cmd.ProjectName,
 		cmd.Flags,
 		repoDir,
