@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sync"
+	"time"
 
 	"strconv"
 
@@ -22,7 +24,11 @@ type LogStreamingController struct {
 	LogStreamTemplate      templates.TemplateWriter
 	LogStreamErrorTemplate templates.TemplateWriter
 	Db                     *db.BoltDB
-	//TerraformOutputChan <-chan *models.TerraformOutputLine
+	TerraformOutputChan    <-chan *models.TerraformOutputLine
+
+	logBuffers map[string][]string
+	wsChans    map[string]map[chan string]bool
+	chanLock   sync.RWMutex
 }
 
 type PullInfo struct {
@@ -30,6 +36,72 @@ type PullInfo struct {
 	Repo        string
 	Pull        int
 	ProjectName string
+}
+
+//Add channel to get Terraform output for current PR project
+//Send output currently in buffer
+func (j *LogStreamingController) addChan(pull string) chan string {
+	ch := make(chan string, 1000)
+	j.chanLock.Lock()
+	for _, line := range j.logBuffers[pull] {
+		ch <- line
+	}
+	if j.wsChans == nil {
+		j.wsChans = map[string]map[chan string]bool{}
+	}
+	if j.wsChans[pull] == nil {
+		j.wsChans[pull] = map[chan string]bool{}
+	}
+	j.wsChans[pull][ch] = true
+	j.chanLock.Unlock()
+	return ch
+}
+
+//Remove channel, so client no longer receives Terraform output
+func (j *LogStreamingController) removeChan(pull string, ch chan string) {
+	j.chanLock.Lock()
+	delete(j.wsChans[pull], ch)
+	j.chanLock.Unlock()
+}
+
+//Add log line to buffer and send to all current channels
+func (j *LogStreamingController) writeLogLine(pull string, line string) {
+	j.chanLock.Lock()
+	if j.logBuffers == nil {
+		j.logBuffers = map[string][]string{}
+	}
+	for ch, _ := range j.wsChans[pull] {
+		select {
+		case ch <- line:
+		default:
+
+			delete(j.wsChans[pull], ch)
+		}
+	}
+	if j.logBuffers[pull] == nil {
+		j.logBuffers[pull] = []string{}
+	}
+	j.logBuffers[pull] = append(j.logBuffers[pull], line)
+	j.chanLock.Unlock()
+}
+
+//Clear log lines in buffer
+func (j *LogStreamingController) clearLogLines(pull string) {
+	j.chanLock.Lock()
+	delete(j.logBuffers, pull)
+	j.chanLock.Unlock()
+}
+
+func (j *LogStreamingController) Listen() {
+	for msg := range j.TerraformOutputChan {
+		if msg.ClearBuffBefore {
+			j.clearLogLines(msg.PullInfo)
+		}
+		j.writeLogLine(msg.PullInfo, msg.Line)
+		if msg.ClearBuffAfter {
+			j.clearLogLines(msg.PullInfo)
+		}
+	}
 }
 
 func (p *PullInfo) String() string {
@@ -118,13 +190,17 @@ func (j *LogStreamingController) GetLogStreamWS(w http.ResponseWriter, r *http.R
 
 	defer c.Close()
 
-	//for {
-	if err := c.WriteMessage(websocket.BinaryMessage, []byte("Hello World"+"\r\n")); err != nil {
-		j.Logger.Warn("Failed to write ws message: %s", err)
-		return
+	pull := pullInfo.String()
+	ch := j.addChan(pull)
+	defer j.removeChan(pull, ch)
+
+	for msg := range ch {
+		if err := c.WriteMessage(websocket.BinaryMessage, []byte(msg+"\r\n")); err != nil {
+			j.Logger.Warn("Failed to write ws message: %s", err)
+			return
+		}
+		time.Sleep(1 * time.Second)
 	}
-	//time.Sleep(1 * time.Second)
-	//}
 }
 
 func (j *LogStreamingController) respond(w http.ResponseWriter, lvl logging.LogLevel, responseCode int, format string, args ...interface{}) {
@@ -134,7 +210,6 @@ func (j *LogStreamingController) respond(w http.ResponseWriter, lvl logging.LogL
 	fmt.Fprintln(w, response)
 }
 
-//var pullObj, err = LogStreamingController.Vcs.GetPullRequestFromName() //Do I still need to create this object?
 //repo, pull num, project name moved to db
 func (j *LogStreamingController) RetrievePrStatus(pullInfo *PullInfo) (bool, error) { //either implement new func in boltdb
 	pull := models.PullRequest{
