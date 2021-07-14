@@ -639,6 +639,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
 		backend,
+		lockingClient,
 	)
 
 	pullReqStatusFetcher := vcs.NewPullReqStatusFetcher(vcsClient)
