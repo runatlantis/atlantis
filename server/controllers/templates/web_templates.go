@@ -490,6 +490,7 @@ var LogStreamErrorTemplate = template.Must(template.New("blank.html.tmpl").Parse
       term.loadAddon(attachAddon);
       term.loadAddon(fitAddon);
       term.open(document.getElementById("terminal"));
+      term.write('Project Does Not Exist in PR')
       fitAddon.fit();
       window.addEventListener("resize", () => fitAddon.fit());
     </script>

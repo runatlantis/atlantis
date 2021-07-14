@@ -32,7 +32,7 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 
-	//"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -73,7 +73,7 @@ type DefaultClient struct {
 	// usePluginCache determines whether or not to set the TF_PLUGIN_CACHE_DIR env var
 	usePluginCache bool
 
-	//	terraformOutputChan chan<- *models.TerraformOutputLine
+	terraformOutputChan chan<- *models.TerraformOutputLine
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_downloader.go Downloader
@@ -163,7 +163,7 @@ func NewClientWithDefaultVersion(
 		}
 	}
 
-	//terraformOutputChan := make(chan *models.TerraformOutputLine)
+	terraformOutputChan := make(chan *models.TerraformOutputLine)
 	return &DefaultClient{
 		defaultVersion:          finalDefaultVersion,
 		terraformPluginCacheDir: cacheDir,
@@ -173,7 +173,7 @@ func NewClientWithDefaultVersion(
 		versionsLock:            &versionsLock,
 		versions:                versions,
 		usePluginCache:          usePluginCache,
-		//	terraformOutputChan:     terraformOutputChan,
+		terraformOutputChan:     terraformOutputChan,
 	}, nil
 
 }
@@ -223,7 +223,7 @@ func NewClient(
 	tfDownloadURL string,
 	tfDownloader Downloader,
 	usePluginCache bool,
-	//	terraformOutputChan chan<- *models.TerraformOutputLine,
+	terraformOutputChan chan<- *models.TerraformOutputLine,
 ) (*DefaultClient, error) {
 	return NewClientWithDefaultVersion(
 		log,

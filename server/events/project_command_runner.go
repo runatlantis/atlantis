@@ -124,6 +124,8 @@ type DefaultProjectCommandRunner struct {
 	WorkingDir            WorkingDir
 	Webhooks              WebhooksSender
 	WorkingDirLocker      WorkingDirLocker
+	TerraformOutputChan   chan<- *models.TerraformOutputLine
+	LogStreamURLGenerator LogStreamURLGenerator
 }
 
 // Plan runs terraform plan for the project described by ctx.
@@ -293,7 +295,25 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
-	outputs, err := p.runSteps(ctx.Steps, ctx, projAbsPath)
+	//Fix this????
+	for idx, _ := range ctx.Steps {
+		if idx == 0 {
+			p.TerraformOutputChan <- &models.TerraformOutputLine{
+				PullInfo:        ctx.PullInfo(),
+				ClearBuffBefore: true,
+				Line:            fmt.Sprintf(":: Start processing pull request %s", ctx.PullInfo()),
+			}
+		}
+		p.TerraformOutputChan <- &models.TerraformOutputLine{
+			PullInfo: ctx.PullInfo(),
+			Line: fmt.Sprintf(
+				":::: [%d/%d] Start processing project %s",
+				idx+1, len(), ctx.PullInfo(),
+			),
+		}
+	}
+
+	outputs, err := p.runSteps(ctx.Steps, ctx, projAbsPath) //send to channel
 	if err != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
@@ -372,6 +392,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 
 func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.ProjectCommandContext, absPath string) ([]string, error) {
 	var outputs []string
+
 	envs := make(map[string]string)
 	for _, step := range steps {
 		var out string
