@@ -6,11 +6,11 @@ import (
 	"net/url"
 
 	"github.com/runatlantis/atlantis/server/controllers/templates"
-	"github.com/runatlantis/atlantis/server/events/db"
+	"github.com/runatlantis/atlantis/server/core/db"
 
 	"github.com/gorilla/mux"
+	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
-	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"

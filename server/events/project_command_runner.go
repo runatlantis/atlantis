@@ -20,8 +20,8 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/events/yaml/raw"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
@@ -100,6 +100,11 @@ type ProjectApprovePoliciesCommandRunner interface {
 	ApprovePolicies(ctx models.ProjectCommandContext) models.ProjectResult
 }
 
+type ProjectVersionCommandRunner interface {
+	// Version runs terraform version for the project described by ctx.
+	Version(ctx models.ProjectCommandContext) models.ProjectResult
+}
+
 // ProjectCommandRunner runs project commands. A project command is a command
 // for a specific TF project.
 type ProjectCommandRunner interface {
@@ -107,6 +112,7 @@ type ProjectCommandRunner interface {
 	ProjectApplyCommandRunner
 	ProjectPolicyCheckCommandRunner
 	ProjectApprovePoliciesCommandRunner
+	ProjectVersionCommandRunner
 }
 
 // DefaultProjectCommandRunner implements ProjectCommandRunner.
@@ -118,6 +124,7 @@ type DefaultProjectCommandRunner struct {
 	ShowStepRunner        StepRunner
 	ApplyStepRunner       StepRunner
 	PolicyCheckStepRunner StepRunner
+	VersionStepRunner     StepRunner
 	RunStepRunner         CustomStepRunner
 	EnvStepRunner         EnvStepRunner
 	PullApprovedChecker   runtime.PullApprovedChecker
@@ -178,6 +185,19 @@ func (p *DefaultProjectCommandRunner) ApprovePolicies(ctx models.ProjectCommandC
 		RepoRelDir:         ctx.RepoRelDir,
 		Workspace:          ctx.Workspace,
 		ProjectName:        ctx.ProjectName,
+	}
+}
+
+func (p *DefaultProjectCommandRunner) Version(ctx models.ProjectCommandContext) models.ProjectResult {
+	versionOut, failure, err := p.doVersion(ctx)
+	return models.ProjectResult{
+		Command:        models.VersionCommand,
+		Failure:        failure,
+		Error:          err,
+		VersionSuccess: versionOut,
+		RepoRelDir:     ctx.RepoRelDir,
+		Workspace:      ctx.Workspace,
+		ProjectName:    ctx.ProjectName,
 	}
 }
 
@@ -370,6 +390,34 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 	return strings.Join(outputs, "\n"), "", nil
 }
 
+func (p *DefaultProjectCommandRunner) doVersion(ctx models.ProjectCommandContext) (versionOut string, failure string, err error) {
+	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", "", errors.New("project has not been cloned–did you run plan?")
+		}
+		return "", "", err
+	}
+	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
+	if _, err = os.Stat(absPath); os.IsNotExist(err) {
+		return "", "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+	}
+
+	// Acquire internal lock for the directory we're going to operate in.
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace)
+	if err != nil {
+		return "", "", err
+	}
+	defer unlockFn()
+
+	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
+	if err != nil {
+		return "", "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
+	}
+
+	return strings.Join(outputs, "\n"), "", nil
+}
+
 func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.ProjectCommandContext, absPath string) ([]string, error) {
 	var outputs []string
 	envs := make(map[string]string)
@@ -387,6 +435,8 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.Pr
 			out, err = p.PolicyCheckStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "apply":
 			out, err = p.ApplyStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+		case "version":
+			out, err = p.VersionStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "run":
 			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath, envs)
 		case "env":

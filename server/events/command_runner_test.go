@@ -19,14 +19,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/runatlantis/atlantis/server/events/db"
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/google/go-github/v31/github"
 	. "github.com/petergtz/pegomock"
+	lockingmocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
-	lockingmocks "github.com/runatlantis/atlantis/server/events/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	eventmocks "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
@@ -162,11 +162,20 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		SilenceNoProjects,
 	)
 
+	versionCommandRunner := events.NewVersionCommandRunner(
+		pullUpdater,
+		projectCommandBuilder,
+		projectCommandRunner,
+		parallelPoolSize,
+		SilenceNoProjects,
+	)
+
 	commentCommandRunnerByCmd := map[models.CommandName]events.CommentCommandRunner{
 		models.PlanCommand:            planCommandRunner,
 		models.ApplyCommand:           applyCommandRunner,
 		models.ApprovePoliciesCommand: approvePoliciesCommandRunner,
 		models.UnlockCommand:          unlockCommandRunner,
+		models.VersionCommand:         versionCommandRunner,
 	}
 
 	preWorkflowHooksCommandRunner = mocks.NewMockPreWorkflowHooksCommandRunner()

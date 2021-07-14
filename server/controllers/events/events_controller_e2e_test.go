@@ -19,17 +19,17 @@ import (
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
+	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/locking"
+	"github.com/runatlantis/atlantis/server/core/runtime"
+	runtimemocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
+	runtimematchers "github.com/runatlantis/atlantis/server/core/runtime/mocks/matchers"
+	"github.com/runatlantis/atlantis/server/core/runtime/policy"
+	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events"
-	"github.com/runatlantis/atlantis/server/events/db"
-	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/runtime"
-	runtimemocks "github.com/runatlantis/atlantis/server/events/runtime/mocks"
-	runtimematchers "github.com/runatlantis/atlantis/server/events/runtime/mocks/matchers"
-	"github.com/runatlantis/atlantis/server/events/runtime/policy"
-	"github.com/runatlantis/atlantis/server/events/terraform"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/events/yaml"
@@ -858,11 +858,20 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		silenceNoProjects,
 	)
 
+	versionCommandRunner := events.NewVersionCommandRunner(
+		pullUpdater,
+		projectCommandBuilder,
+		projectCommandRunner,
+		parallelPoolSize,
+		silenceNoProjects,
+	)
+
 	commentCommandRunnerByCmd := map[models.CommandName]events.CommentCommandRunner{
 		models.PlanCommand:            planCommandRunner,
 		models.ApplyCommand:           applyCommandRunner,
 		models.ApprovePoliciesCommand: approvePoliciesCommandRunner,
 		models.UnlockCommand:          unlockCommandRunner,
+		models.VersionCommand:         versionCommandRunner,
 	}
 
 	commandRunner := &events.DefaultCommandRunner{

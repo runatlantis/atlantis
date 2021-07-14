@@ -436,6 +436,7 @@ type ProjectResult struct {
 	PlanSuccess        *PlanSuccess
 	PolicyCheckSuccess *PolicyCheckSuccess
 	ApplySuccess       string
+	VersionSuccess     string
 	ProjectName        string
 }
 
@@ -533,6 +534,10 @@ type PolicyCheckSuccess struct {
 	HasDiverged bool
 }
 
+type VersionSuccess struct {
+	VersionOutput string
+}
+
 // PullStatus is the current status of a pull request that is in progress.
 type PullStatus struct {
 	// Projects are the projects that have been modified in this pull request.
@@ -627,6 +632,8 @@ const (
 	ApprovePoliciesCommand
 	// AutoplanCommand is a command to run terrafor plan on PR open/update if autoplan is enabled
 	AutoplanCommand
+	// VersionCommand is a command to run terraform version.
+	VersionCommand
 	// Adding more? Don't forget to update String() below
 )
 
@@ -649,6 +656,8 @@ func (c CommandName) String() string {
 		return "policy_check"
 	case ApprovePoliciesCommand:
 		return "approve_policies"
+	case VersionCommand:
+		return "version"
 	}
 	return ""
 }
