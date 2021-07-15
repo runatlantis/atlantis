@@ -95,11 +95,11 @@ func (j *LogStreamingController) clearLogLines(pull string) {
 func (j *LogStreamingController) Listen() {
 	for msg := range j.TerraformOutputChan {
 		if msg.ClearBuffBefore {
-			j.clearLogLines(msg.PullInfo)
+			j.clearLogLines(msg.ProjectInfo)
 		}
-		j.writeLogLine(msg.PullInfo, msg.Line)
+		j.writeLogLine(msg.ProjectInfo, msg.Line)
 		if msg.ClearBuffAfter {
-			j.clearLogLines(msg.PullInfo)
+			j.clearLogLines(msg.ProjectInfo)
 		}
 	}
 }
@@ -195,6 +195,8 @@ func (j *LogStreamingController) GetLogStreamWS(w http.ResponseWriter, r *http.R
 	defer j.removeChan(pull, ch)
 
 	for msg := range ch {
+		<-j.TerraformOutputChan
+
 		if err := c.WriteMessage(websocket.BinaryMessage, []byte(msg+"\r\n")); err != nil {
 			j.Logger.Warn("Failed to write ws message: %s", err)
 			return

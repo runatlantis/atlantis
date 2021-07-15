@@ -41,6 +41,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	realEnv := runtime.EnvStepRunner{}
 	mockWorkingDir := mocks.NewMockWorkingDir()
 	mockLocker := mocks.NewMockProjectLocker()
+	mockChannel := make(chan *models.TerraformOutputLine)
 
 	runner := events.DefaultProjectCommandRunner{
 		Locker:              mockLocker,
@@ -54,6 +55,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		WorkingDir:          mockWorkingDir,
 		Webhooks:            nil,
 		WorkingDirLocker:    events.NewDefaultWorkingDirLocker(),
+		TerraformOutputChan: mockChannel,
 	}
 
 	repoDir, cleanup := TempDir(t)
@@ -112,6 +114,8 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	Assert(t, res.PlanSuccess != nil, "exp plan success")
 	Equals(t, "https://lock-key", res.PlanSuccess.LockURL)
 	Equals(t, "run\napply\nplan\ninit", res.PlanSuccess.TerraformOutput)
+	terraformOutput := <-mockChannel
+	Equals(t, "run\napply\nplan\ninit", terraformOutput.Line)
 
 	expSteps := []string{"run", "apply", "plan", "init", "env"}
 	for _, step := range expSteps {

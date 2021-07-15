@@ -285,7 +285,6 @@ func (c *DefaultClient) RunCommandWithVersion(log logging.SimpleLogging, path st
 		log.Err(err.Error())
 		return string(out), err
 	}
-	log.Info("successfully ran %q in %q", tfCmd, path)
 	return string(out), nil
 }
 

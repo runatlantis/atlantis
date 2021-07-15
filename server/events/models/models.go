@@ -660,7 +660,7 @@ func (c CommandName) TitleString() string {
 }
 
 type TerraformOutputLine struct {
-	PullInfo string
+	ProjectInfo string
 
 	Line string
 

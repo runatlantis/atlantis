@@ -110,7 +110,7 @@ type ProjectCommandRunner interface {
 }
 
 // DefaultProjectCommandRunner implements ProjectCommandRunner.
-type DefaultProjectCommandRunner struct {
+type DefaultProjectCommandRunner struct { //create object and test
 	Locker                ProjectLocker
 	LockURLGenerator      LockURLGenerator
 	InitStepRunner        StepRunner
@@ -295,25 +295,19 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
-	//Fix this????
-	for idx, _ := range ctx.Steps {
-		if idx == 0 {
-			p.TerraformOutputChan <- &models.TerraformOutputLine{
-				PullInfo:        ctx.PullInfo(),
-				ClearBuffBefore: true,
-				Line:            fmt.Sprintf(":: Start processing pull request %s", ctx.PullInfo()),
-			}
-		}
-		p.TerraformOutputChan <- &models.TerraformOutputLine{
-			PullInfo: ctx.PullInfo(),
-			Line: fmt.Sprintf(
-				":::: [%d/%d] Start processing project %s",
-				idx+1, len(), ctx.PullInfo(),
-			),
-		}
+	outputs, err := p.runSteps(ctx.Steps, ctx, projAbsPath)
+	outputString := strings.Join(outputs, "\n")
+	projectInfoString := ctx.PullInfo()
+	chanInfo := &models.TerraformOutputLine{
+		ProjectInfo: projectInfoString,
+		Line:        outputString,
 	}
 
-	outputs, err := p.runSteps(ctx.Steps, ctx, projAbsPath) //send to channel
+	go func() {
+		p.TerraformOutputChan <- chanInfo
+
+	}()
+
 	if err != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
