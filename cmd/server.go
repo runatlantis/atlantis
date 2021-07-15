@@ -639,11 +639,13 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 
 	// The following combinations are valid.
 	// 1. github user and token set
-	// 2. gitlab user and token set
-	// 3. bitbucket user and token set
-	// 4. azuredevops user and token set
-	// 5. any combination of the above
-	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GHAppIDFlag, GHAppKeyFileFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag)
+	// 2. github app ID and key file set
+	// 3. github app ID and key set
+	// 4. gitlab user and token set
+	// 5. bitbucket user and token set
+	// 6. azuredevops user and token set
+	// 7. any combination of the above
+	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GHAppIDFlag, GHAppKeyFileFlag, GHAppIDFlag, GHAppKeyFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag)
 	if ((userConfig.GithubUser == "") != (userConfig.GithubToken == "")) || ((userConfig.GithubAppID == 0) != (userConfig.GithubAppKey == "")) || ((userConfig.GitlabUser == "") != (userConfig.GitlabToken == "")) || ((userConfig.BitbucketUser == "") != (userConfig.BitbucketToken == "")) || ((userConfig.AzureDevopsUser == "") != (userConfig.AzureDevopsToken == "")) {
 		return vcsErr
 	}
