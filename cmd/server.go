@@ -65,6 +65,7 @@ const (
 	GHTokenFlag                = "gh-token"
 	GHUserFlag                 = "gh-user"
 	GHAppIDFlag                = "gh-app-id"
+	GHAppKeyFlag               = "gh-app-key"
 	GHAppKeyFileFlag           = "gh-app-key-file"
 	GHAppSlugFlag              = "gh-app-slug"
 	GHOrganizationFlag         = "gh-org"
@@ -191,6 +192,10 @@ var stringFlags = map[string]stringFlag{
 	},
 	GHTokenFlag: {
 		description: "GitHub token of API user. Can also be specified via the ATLANTIS_GH_TOKEN environment variable.",
+	},
+	GHAppKeyFlag: {
+		description:  "The GitHub App's private key",
+		defaultValue: "",
 	},
 	GHAppKeyFileFlag: {
 		description:  "A path to a file containing the GitHub App's private key",
