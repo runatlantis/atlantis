@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/url"
 	"sync"
-	"time"
 
 	"strconv"
 
@@ -24,7 +23,7 @@ type LogStreamingController struct {
 	LogStreamTemplate      templates.TemplateWriter
 	LogStreamErrorTemplate templates.TemplateWriter
 	Db                     *db.BoltDB
-	TerraformOutputChan    <-chan *models.TerraformOutputLine
+	TerraformOutputChan    chan *models.TerraformOutputLine
 
 	logBuffers map[string][]string
 	wsChans    map[string]map[chan string]bool
@@ -70,6 +69,8 @@ func (j *LogStreamingController) writeLogLine(pull string, line string) {
 	if j.logBuffers == nil {
 		j.logBuffers = map[string][]string{}
 	}
+	j.Logger.Info("Project info: %s, content: %s", pull, line)
+
 	for ch, _ := range j.wsChans[pull] {
 		select {
 		case ch <- line:
@@ -94,6 +95,7 @@ func (j *LogStreamingController) clearLogLines(pull string) {
 
 func (j *LogStreamingController) Listen() {
 	for msg := range j.TerraformOutputChan {
+		j.Logger.Info("Recieving message %s", msg.Line)
 		if msg.ClearBuffBefore {
 			j.clearLogLines(msg.ProjectInfo)
 		}
@@ -180,8 +182,6 @@ func (j *LogStreamingController) GetLogStreamWS(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	fmt.Println(pullInfo)
-
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		j.Logger.Warn("Failed to upgrade websocket: %s", err)
@@ -195,13 +195,11 @@ func (j *LogStreamingController) GetLogStreamWS(w http.ResponseWriter, r *http.R
 	defer j.removeChan(pull, ch)
 
 	for msg := range ch {
-		<-j.TerraformOutputChan
-
+		j.Logger.Info(msg)
 		if err := c.WriteMessage(websocket.BinaryMessage, []byte(msg+"\r\n")); err != nil {
 			j.Logger.Warn("Failed to write ws message: %s", err)
 			return
 		}
-		time.Sleep(1 * time.Second)
 	}
 }
 

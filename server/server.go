@@ -501,6 +501,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDir:          workingDir,
 		Webhooks:            webhooksManager,
 		WorkingDirLocker:    workingDirLocker,
+		TerraformOutputChan: terraformOutputChan,
 	}
 
 	dbUpdater := &events.DBUpdater{
@@ -631,6 +632,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		LogStreamTemplate:      templates.LogStreamingTemplate,
 		LogStreamErrorTemplate: templates.LogStreamErrorTemplate,
 		Db:                     boltdb,
+		TerraformOutputChan:    terraformOutputChan,
 	}
 
 	eventsController := &events_controllers.VCSEventsController{

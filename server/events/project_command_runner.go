@@ -302,8 +302,9 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 		ProjectInfo: projectInfoString,
 		Line:        outputString,
 	}
-
+	ctx.Log.Info("Before Terraform output: %s", chanInfo.Line)
 	go func() {
+		ctx.Log.Info("After Terraform output: %s", chanInfo.Line)
 		p.TerraformOutputChan <- chanInfo
 
 	}()
