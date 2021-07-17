@@ -1,7 +1,6 @@
 package vcs_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -21,15 +20,9 @@ func TestGithubClient_GetUser_AppSlug(t *testing.T) {
 	tempSecrets, err := anonClient.ExchangeCode("good-code")
 	Ok(t, err)
 
-	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
-		"key.pem": tempSecrets.Key,
-	})
-	defer cleanup()
-	keyPath := fmt.Sprintf("%v/key.pem", tmpDir)
-
 	appCreds := &vcs.GithubAppCredentials{
 		AppID:    tempSecrets.ID,
-		KeyPath:  keyPath,
+		Key:      []byte(fixtures.GithubPrivateKey),
 		Hostname: testServer,
 		AppSlug:  "some-app",
 	}
@@ -51,15 +44,9 @@ func TestGithubClient_AppAuthentication(t *testing.T) {
 	tempSecrets, err := anonClient.ExchangeCode("good-code")
 	Ok(t, err)
 
-	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
-		"key.pem": tempSecrets.Key,
-	})
-	defer cleanup()
-	keyPath := fmt.Sprintf("%v/key.pem", tmpDir)
-
 	appCreds := &vcs.GithubAppCredentials{
 		AppID:    tempSecrets.ID,
-		KeyPath:  keyPath,
+		Key:      []byte(fixtures.GithubPrivateKey),
 		Hostname: testServer,
 	}
 	_, err = vcs.NewGithubClient(testServer, appCreds, logging.NewNoopLogger(t))
