@@ -24,6 +24,7 @@ import (
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/runatlantis/atlantis/server"
+	"github.com/runatlantis/atlantis/server/events/vcs/fixtures"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 	"github.com/spf13/cobra"
@@ -414,7 +415,7 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 		{
 			"just github app key set",
 			map[string]interface{}{
-				GHAppKeyFlag: "-----BEGIN RSA PRIVATE KEY-----",
+				GHAppKeyFlag: fixtures.GithubPrivateKey,
 			},
 			true,
 		},
@@ -483,7 +484,7 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			"github app and key set and should be successful",
 			map[string]interface{}{
 				GHAppIDFlag:  "1",
-				GHAppKeyFlag: "-----BEGIN RSA PRIVATE KEY-----",
+				GHAppKeyFlag: fixtures.GithubPrivateKey,
 			},
 			false,
 		},
@@ -588,7 +589,7 @@ func TestExecute_GithubUser(t *testing.T) {
 func TestExecute_GithubApp(t *testing.T) {
 	t.Log("Should remove the @ from the github username if it's passed.")
 	c := setup(map[string]interface{}{
-		GHAppKeyFileFlag:  "key.pem",
+		GHAppKeyFlag:      fixtures.GithubPrivateKey,
 		GHAppIDFlag:       "1",
 		RepoAllowlistFlag: "*",
 	}, t)
