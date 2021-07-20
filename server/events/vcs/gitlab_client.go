@@ -106,9 +106,10 @@ func NewGitlabClient(hostname string, token string, logger logging.SimpleLogging
 func (g *GitlabClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	const maxPerPage = 100
 	var files []string
+	var commits []string
 	nextPage := 1
 	// Constructing the api url by hand so we can do pagination.
-	apiURL := fmt.Sprintf("projects/%s/merge_requests/%d/changes", url.QueryEscape(repo.FullName), pull.Num)
+	apiURL := fmt.Sprintf("projects/%s/merge_requests/%d/commits", url.QueryEscape(repo.FullName), pull.Num)
 	for {
 		opts := gitlab.ListOptions{
 			Page:    nextPage,
@@ -118,24 +119,73 @@ func (g *GitlabClient) GetModifiedFiles(repo models.Repo, pull models.PullReques
 		if err != nil {
 			return nil, err
 		}
-		mr := new(gitlab.MergeRequest)
-		resp, err := g.Client.Do(req, mr)
+		glCommits := new([]gitlab.Commit)
+		resp, err := g.Client.Do(req, glCommits)
 		if err != nil {
 			return nil, err
 		}
 
-		for _, f := range mr.Changes {
-			files = append(files, f.NewPath)
-
-			// If the file was renamed, we'll want to run plan in the directory
-			// it was moved from as well.
-			if f.RenamedFile {
-				files = append(files, f.OldPath)
-			}
+		for _, commit := range *glCommits {
+			commits = append(commits, commit.ID)
 		}
 		if resp.NextPage == 0 {
 			break
 		}
+		nextPage = resp.NextPage
+	}
+
+	for _, commit := range commits {
+		commitFiles, err := g.GetCommitFiles(repo, commit)
+
+		if err != nil {
+			return nil, err
+		}
+
+		files = append(files, commitFiles...)
+	}
+
+	return files, nil
+}
+
+// GetCommitFiles get files changed in a commit
+func (g *GitlabClient) GetCommitFiles(repo models.Repo, commitID string) ([]string, error) {
+	const maxPerPage = 100
+	var files []string
+	nextPage := 1
+
+	apiURL := fmt.Sprintf("projects/%s/repository/commits/%s/diff", url.QueryEscape(repo.FullName), commitID)
+
+	for {
+		opts := gitlab.ListOptions{
+			Page:    nextPage,
+			PerPage: maxPerPage,
+		}
+
+		req, err := g.Client.NewRequest("GET", apiURL, opts, nil)
+
+		if err != nil {
+			return nil, err
+		}
+
+		glDiffs := new([]gitlab.Diff)
+		resp, err := g.Client.Do(req, glDiffs)
+
+		if err != nil {
+			return nil, err
+		}
+
+		for _, diff := range *glDiffs {
+			files = append(files, diff.NewPath)
+
+			if diff.RenamedFile {
+				files = append(files, diff.OldPath)
+			}
+		}
+
+		if resp.NextPage == 0 {
+			break
+		}
+
 		nextPage = resp.NextPage
 	}
 
