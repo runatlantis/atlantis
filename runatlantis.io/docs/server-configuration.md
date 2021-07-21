@@ -155,7 +155,7 @@ Values are chosen in this order:
 
 * ### `--azuredevops-token`
   ```bash
-  atlantis server --azuredevops-token="username@example.com"
+  atlantis server --azuredevops-token="RandomStringProducedByAzureDevOps"
   ```
   Azure DevOps token of API user. Can also be specified via the ATLANTIS_AZUREDEVOPS_TOKEN
   environment variable.
