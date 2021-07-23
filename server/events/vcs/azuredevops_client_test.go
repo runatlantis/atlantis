@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -19,28 +20,39 @@ import (
 
 func TestAzureDevopsClient_MergePull(t *testing.T) {
 	cases := []struct {
-		description string
-		response    string
-		code        int
-		expErr      string
+		description  string
+		response     string
+		code         int
+		expErr       string
+		throttleTime time.Duration
 	}{
 		{
 			"success",
 			adMergeSuccess,
 			200,
 			"",
+			0 * time.Second,
 		},
 		{
 			"405",
 			`{"message":"405 Method Not Allowed"}`,
 			405,
 			"405 {message: 405 Method Not Allowed}",
+			0 * time.Second,
 		},
 		{
 			"406",
 			`{"message":"406 Branch cannot be merged"}`,
 			406,
 			"406 {message: 406 Branch cannot be merged}",
+			0 * time.Second,
+		},
+		{
+			"success",
+			adMergeSuccess,
+			200,
+			"",
+			1 * time.Second,
 		},
 	}
 
@@ -81,8 +93,21 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
+			// Use lastquery to keep track of the last request that hit our server
+			var lastQuery time.Time = time.Time{}
+
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					currentTime := time.Now()
+					if !currentTime.After(lastQuery.Add(c.throttleTime)) {
+						t.Errorf("Did not respect retry-after header from azdo")
+						http.Error(w, "throttle not honored", http.StatusBadRequest)
+						return
+					}
+					lastQuery = currentTime
+					// We always set the retry-after
+					w.Header().Set("retry-after", fmt.Sprint(int64(c.throttleTime/time.Second)))
+
 					switch r.RequestURI {
 					// The first request should hit this URL.
 					case "/owner/project/_apis/git/repositories/repo/pullrequests/22?api-version=5.1-preview.1":
@@ -99,7 +124,7 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
+			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token", 5*time.Second, true)
 			client.Client.VsaexBaseURL = *testServerURL
 			Ok(t, err)
 			defer disableSSLVerification()()
@@ -213,7 +238,7 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
+			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token", 1*time.Second, true)
 			Ok(t, err)
 			defer disableSSLVerification()()
 
@@ -276,7 +301,7 @@ func TestAzureDevopsClient_GetModifiedFiles(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
+	client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token", 1*time.Second, true)
 	Ok(t, err)
 	defer disableSSLVerification()()
 
@@ -396,7 +421,7 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
 
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
+			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token", 1*time.Second, true)
 			Ok(t, err)
 
 			defer disableSSLVerification()()
@@ -490,7 +515,7 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
 
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
+			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token", 1*time.Second, true)
 			Ok(t, err)
 
 			defer disableSSLVerification()()
@@ -535,7 +560,7 @@ func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 			}))
 		testServerURL, err := url.Parse(testServer.URL)
 		Ok(t, err)
-		client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
+		client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token", 1*time.Second, true)
 		Ok(t, err)
 		defer disableSSLVerification()()
 
@@ -555,7 +580,7 @@ func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 }
 
 func TestAzureDevopsClient_MarkdownPullLink(t *testing.T) {
-	client, err := vcs.NewAzureDevopsClient("hostname", "user", "token")
+	client, err := vcs.NewAzureDevopsClient("hostname", "user", "token", 1*time.Second, true)
 	Ok(t, err)
 	pull := models.PullRequest{Num: 1}
 	s, _ := client.MarkdownPullLink(pull)

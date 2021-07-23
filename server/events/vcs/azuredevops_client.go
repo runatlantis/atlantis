@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -22,14 +23,53 @@ type AzureDevopsClient struct {
 	UserName string
 }
 
+type ThrottleRoundtripper struct {
+	// If azure devops is throttling, this is how long to wait before the next request
+	RetryAfter         time.Duration
+	ParentRoundtripper http.RoundTripper
+}
+
+func NewThrottleRoundtripper(rt http.RoundTripper) http.RoundTripper {
+	return &ThrottleRoundtripper{
+		ParentRoundtripper: rt,
+	}
+}
+
+// RoundTrip follows http.Transport interface and will automatically sleep for retryAfter seconds
+// This allows us to honor the Retry-After header from Azdo
+func (rt *ThrottleRoundtripper) RoundTrip(req *http.Request) (resp *http.Response, err error) {
+	time.Sleep(rt.RetryAfter)
+	rt.RetryAfter = 0
+
+	resp, err = rt.ParentRoundtripper.RoundTrip(req)
+	if err != nil {
+		return
+	}
+
+	retryAfterVal := resp.Header.Get("retry-after")
+	if retryAfterVal != "" {
+		retryAfterSec, err := strconv.Atoi(retryAfterVal)
+		if err == nil {
+			rt.RetryAfter = time.Duration(retryAfterSec) * time.Second
+		}
+	}
+
+	return
+}
+
 // NewAzureDevopsClient returns a valid Azure DevOps client.
-func NewAzureDevopsClient(hostname string, userName string, token string) (*AzureDevopsClient, error) {
+func NewAzureDevopsClient(hostname string, userName string, token string, timeout time.Duration, honorRetryAfterHeader bool) (*AzureDevopsClient, error) {
 	tp := azuredevops.BasicAuthTransport{
 		Username: "",
 		Password: strings.TrimSpace(token),
 	}
 	httpClient := tp.Client()
-	httpClient.Timeout = time.Second * 10
+	httpClient.Timeout = timeout
+
+	if honorRetryAfterHeader {
+		httpClient.Transport = NewThrottleRoundtripper(httpClient.Transport)
+	}
+
 	var adClient, err = azuredevops.NewClient(httpClient)
 	if err != nil {
 		return nil, err

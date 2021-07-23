@@ -13,6 +13,8 @@ type UserConfig struct {
 	AtlantisURL                string `mapstructure:"atlantis-url"`
 	Automerge                  bool   `mapstructure:"automerge"`
 	AutoplanFileList           string `mapstructure:"autoplan-file-list"`
+	AzureDevopsHonorRetryAfter bool   `mapstructure:"azuredevops-honor-retry-after"`
+	AzureDevopsTimeoutSecondss int    `mapstructure:"azuredevops-timeout-seconds"`
 	AzureDevopsToken           string `mapstructure:"azuredevops-token"`
 	AzureDevopsUser            string `mapstructure:"azuredevops-user"`
 	AzureDevopsWebhookPassword string `mapstructure:"azuredevops-webhook-password"`
