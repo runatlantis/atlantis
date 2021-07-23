@@ -35,12 +35,15 @@ import (
 // 1. Add a const with the flag name (in alphabetic order).
 // 2. Add a new field to server.UserConfig and set the mapstructure tag equal to the flag name.
 // 3. Add your flag's description etc. to the stringFlags, intFlags, or boolFlags slices.
+// 4. If appropriate, modify the setDefaults function to assign teh default value
 const (
 	// Flag names.
-	ADWebhookPasswordFlag      = "azuredevops-webhook-password" // nolint: gosec
-	ADWebhookUserFlag          = "azuredevops-webhook-user"
+	ADHonorRetryAfter          = "azuredevops-honor-retry-after"
+	ADTimeoutSeconds           = "azuredevops-timeout-seconds"
 	ADTokenFlag                = "azuredevops-token" // nolint: gosec
 	ADUserFlag                 = "azuredevops-user"
+	ADWebhookPasswordFlag      = "azuredevops-webhook-password" // nolint: gosec
+	ADWebhookUserFlag          = "azuredevops-webhook-user"
 	AllowForkPRsFlag           = "allow-fork-prs"
 	AllowRepoConfigFlag        = "allow-repo-config"
 	AtlantisURLFlag            = "atlantis-url"
@@ -104,6 +107,7 @@ const (
 	// NOTE: Must manually set these as defaults in the setDefaults function.
 	DefaultADBasicUser      = ""
 	DefaultADBasicPassword  = ""
+	DefaultADTimeoutSeconds = 10
 	DefaultAutoplanFileList = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl"
 	DefaultCheckoutStrategy = "branch"
 	DefaultBitbucketBaseURL = bitbucketcloud.BaseURL
@@ -278,6 +282,10 @@ var stringFlags = map[string]stringFlag{
 }
 
 var boolFlags = map[string]boolFlag{
+	ADHonorRetryAfter: {
+		description:  "If set to true, the Azure DevOps client will sleep according to the Retry-After response header",
+		defaultValue: false,
+	},
 	AllowForkPRsFlag: {
 		description:  "Allow Atlantis to run on pull requests from forks. A security issue for public repos.",
 		defaultValue: false,
@@ -371,6 +379,10 @@ var boolFlags = map[string]boolFlag{
 	},
 }
 var intFlags = map[string]intFlag{
+	ADTimeoutSeconds: {
+		description:  "Sets timeout seconds for the Azure DevOps api client",
+		defaultValue: DefaultADTimeoutSeconds,
+	},
 	ParallelPoolSize: {
 		description:  "Max size of the wait group that runs parallel plans and applies (if enabled).",
 		defaultValue: DefaultParallelPoolSize,
@@ -581,6 +593,9 @@ func (s *ServerCmd) run() error {
 func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	if c.AutoplanFileList == "" {
 		c.AutoplanFileList = DefaultAutoplanFileList
+	}
+	if c.AzureDevopsTimeoutSeconds == 0 {
+		c.AzureDevopsTimeoutSeconds = DefaultADTimeoutSeconds
 	}
 	if c.CheckoutStrategy == "" {
 		c.CheckoutStrategy = DefaultCheckoutStrategy

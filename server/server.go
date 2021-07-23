@@ -204,8 +204,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	if userConfig.AzureDevopsUser != "" {
 		azureDevopsTimeout := 10 * time.Second
-		if userConfig.AzureDevopsTimeoutSecondss != 0 {
-			azureDevopsTimeout = time.Duration(userConfig.AzureDevopsTimeoutSecondss) * time.Second
+		if userConfig.AzureDevopsTimeoutSeconds != 0 {
+			azureDevopsTimeout = time.Duration(userConfig.AzureDevopsTimeoutSeconds) * time.Second
 		}
 		supportedVCSHosts = append(supportedVCSHosts, models.AzureDevops)
 		var err error

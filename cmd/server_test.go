@@ -51,6 +51,8 @@ func (s *ServerStarterMock) Start() error {
 // Adding a new flag? Add it to this slice for testing in alphabetical
 // order.
 var testFlags = map[string]interface{}{
+	ADHonorRetryAfter:          true,
+	ADTimeoutSeconds:           12,
 	ADTokenFlag:                "ad-token",
 	ADUserFlag:                 "ad-user",
 	ADWebhookPasswordFlag:      "ad-wh-pass",
