@@ -352,6 +352,148 @@ v{{ .AtlantisVersion }}
 </html>
 `))
 
+// pullStreamData holds the data needed to stream the current PR information
+type LogStreamData struct {
+	AtlantisVersion string
+	PullInfo        string
+	CleanedBasePath string
+}
+
+var LogStreamingTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>atlantis</title>
+    <meta name="description" content>
+    <meta name="author" content>
+    <link
+       rel="stylesheet"
+       href="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.14.5/xterm.min.css"
+       integrity="sha256-uTIrmf95e6IHlacC0wpDaPS58eWF314UC7OgdrD6AdU="
+       crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="/static/css/normalize.css">
+    <link rel="stylesheet" href="/static/css/skeleton.css">
+    <link rel="stylesheet" href="/static/css/custom.css">
+    <link rel="icon" type="image/png" href="/static/images/atlantis-icon.png">
+    <style>
+      #terminal {
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <section class="header">
+      <a title="atlantis" href="/"><img class="hero" src="/static/images/atlantis-icon_512.png"/></a>
+      <p class="title-heading">atlantis</p>
+      <p class="title-heading"><strong></strong></p>
+      </section>
+      <div class="spacer"></div>
+      <br>
+      <section>
+        <div id="terminal"></div>
+      </section>
+    </div>
+    <footer>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/xterm@4.9.0/lib/xterm.js"></script>
+    <script src="https://unpkg.com/xterm-addon-attach@0.6.0/lib/xterm-addon-attach.js"></script>
+    <script src="https://unpkg.com/xterm-addon-fit@0.4.0/lib/xterm-addon-fit.js"></script>
+
+    <script>
+      var term = new Terminal();
+      var socket = new WebSocket(
+        (document.location.protocol === "http:" ? "ws://" : "wss://") + 
+        document.location.host +
+        document.location.pathname +
+        "/ws");
+      var attachAddon = new AttachAddon.AttachAddon(socket);
+      var fitAddon = new FitAddon.FitAddon();
+      term.loadAddon(attachAddon);
+      term.loadAddon(fitAddon);
+      term.open(document.getElementById("terminal"));
+      fitAddon.fit();
+      window.addEventListener("resize", () => fitAddon.fit());
+    </script>
+  </body>
+</html>
+`))
+
+type LogStreamError struct {
+	AtlantisVersion string
+	PullInfo        string
+	CleanedBasePath string
+}
+
+var LogStreamErrorTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>atlantis</title>
+    <meta name="description" content>
+    <meta name="author" content>
+    <link
+       rel="stylesheet"
+       href="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.14.5/xterm.min.css"
+       integrity="sha256-uTIrmf95e6IHlacC0wpDaPS58eWF314UC7OgdrD6AdU="
+       crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="/static/css/normalize.css">
+    <link rel="stylesheet" href="/static/css/skeleton.css">
+    <link rel="stylesheet" href="/static/css/custom.css">
+    <link rel="icon" type="image/png" href="/static/images/atlantis-icon.png">
+    <style>
+      #terminal {
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <section class="header">
+      <a title="atlantis" href="/"><img class="hero" src="/static/images/atlantis-icon_512.png"/></a>
+      <p class="title-heading">atlantis</p>
+      <p class="title-heading"><strong></strong></p>
+      </section>
+      <div class="spacer"></div>
+      <br>
+      <section>
+        <div id="terminal"></div>
+      </section>
+    </div>
+    <footer>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/xterm@4.9.0/lib/xterm.js"></script>
+    <script src="https://unpkg.com/xterm-addon-attach@0.6.0/lib/xterm-addon-attach.js"></script>
+    <script src="https://unpkg.com/xterm-addon-fit@0.4.0/lib/xterm-addon-fit.js"></script>
+
+    <script>
+      var term = new Terminal();
+      var socket = new WebSocket("Page not Found");
+      var attachAddon = new AttachAddon.AttachAddon(socket);
+      var fitAddon = new FitAddon.FitAddon();
+      term.loadAddon(attachAddon);
+      term.loadAddon(fitAddon);
+      term.open(document.getElementById("terminal"));
+      term.write('Project Does Not Exist in PR')
+      fitAddon.fit();
+      window.addEventListener("resize", () => fitAddon.fit());
+    </script>
+  </body>
+</html>
+`))
+
 // GithubSetupData holds the data for rendering the github app setup page
 type GithubSetupData struct {
 	Target        string
