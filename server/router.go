@@ -1,9 +1,11 @@
 package server
 
 import (
+	"fmt"
 	"net/url"
 
 	"github.com/gorilla/mux"
+	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 // Router can be used to retrieve Atlantis URLs. It acts as an intermediary
@@ -15,6 +17,8 @@ type Router struct {
 	// LockViewRouteName is the named route for the lock view that can be Get'd
 	// from the Underlying router.
 	LockViewRouteName string
+	//JobViewRouteName is the named route for the log stream view
+	LogViewRouteName string
 	// LockViewRouteIDQueryParam is the query parameter needed to construct the
 	// lock view: underlying.Get(LockViewRouteName).URL(LockViewRouteIDQueryParam, "my id").
 	LockViewRouteIDQueryParam string
@@ -32,4 +36,14 @@ func (r *Router) GenerateLockURL(lockID string) string {
 	// We're not doing anything fancy here with the actual url object because
 	// golang likes to double escape the lockURL path when using url.Parse().
 	return r.AtlantisURL.String() + lockURL.String()
+}
+
+func (r *Router) GenerateLogStreamURL(pull models.PullRequest, p models.ProjectCommandContext) string {
+	jobURL, _ := r.Underlying.Get(r.LogViewRouteName).URL(
+		"org", pull.BaseRepo.Owner,
+		"repo", pull.BaseRepo.Name,
+		"pull", fmt.Sprintf("%d", pull.Num),
+		"project", p.ProjectName,
+	)
+	return r.AtlantisURL.String() + jobURL.String()
 }
