@@ -344,10 +344,13 @@ Values are chosen in this order:
 
 - ### `--gh-app-key`
   ```bash
-  export PRIVATE_KEY=$(cat path/to/app-key.pem)
-  atlantis server --gh-app-key=$PRIVATE_KEY
+  atlantis server --gh-app-key="-----BEGIN RSA PRIVATE KEY-----(...)" 
   ```
   The PEM encoded private key for the GitHub App.
+
+  ::: warning SECURITY WARNING
+  The contents of the private key will be visible by anyone that can run `ps` or look at the shell history of the machine where Atlantis is running. Use `--gh-app-key-file` to mitigate that risk.
+  :::
 
 * ### `--gitlab-hostname`
   ```bash
