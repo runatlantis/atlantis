@@ -38,7 +38,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-const ConftestVersion = "0.25.0"
+const ConftestVersion = "0.26.0"
 
 var applyLocker locking.ApplyLocker
 var userConfig server.UserConfig
@@ -805,7 +805,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 
 	if userConfig.EnablePolicyChecksFlag {
 		// need this to be set or we'll fail the policy check step
-		os.Setenv(policy.DefaultConftestVersionEnvKey, "0.25.0")
+		os.Setenv(policy.DefaultConftestVersionEnvKey, "0.26.0")
 	}
 
 	// Mocks.
@@ -1261,7 +1261,7 @@ func mkSubDirs(t *testing.T) (string, string, string, func()) {
 	return tmp, binDir, cachedir, cleanup
 }
 
-// Will fail test if conftest isn't in path and isn't version >= 0.25.0
+// Will fail test if conftest isn't in path and isn't version >= 0.26.0
 func ensureRunningConftest(t *testing.T) {
 	localPath, err := exec.LookPath(fmt.Sprintf("conftest%s", ConftestVersion))
 	if err != nil {
