@@ -262,6 +262,9 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 // and concat results.
 func TestAzureDevopsClient_GetModifiedFiles(t *testing.T) {
 	itemRespTemplate := `{
+		"changeCounts": {
+			"Add": 2
+		},
 		"changes": [
 	{
 		"item": {
