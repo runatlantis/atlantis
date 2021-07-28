@@ -108,6 +108,9 @@ func (g *AzureDevopsClient) GetModifiedFiles(repo models.Repo, pull models.PullR
 	sourceRefName := strings.Replace(pullRequest.GetSourceRefName(), "refs/heads/", "", 1)
 
 	r, resp, err := g.Client.Git.GetDiffs(g.ctx, owner, project, repoName, targetRefName, sourceRefName)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Error getting diff %s to %s", sourceRefName, targetRefName)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.Wrapf(err, "http response code %d getting diff %s to %s", resp.StatusCode, sourceRefName, targetRefName)
 	}
