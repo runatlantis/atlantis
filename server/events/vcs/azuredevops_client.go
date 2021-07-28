@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -109,7 +110,12 @@ func (g *AzureDevopsClient) GetModifiedFiles(repo models.Repo, pull models.PullR
 
 	r, resp, err := g.Client.Git.GetDiffs(g.ctx, owner, project, repoName, targetRefName, sourceRefName)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Error getting diff %s to %s", sourceRefName, targetRefName)
+		// There is a bug in the underlying azdo library which does not unmarshal requests correctly
+		// If this PR gets merged, then this bug will go away: https://github.com/mcdafydd/go-azuredevops/pull/12
+		matched, err := regexp.MatchString(`cannot unmarshal number [A-Za-z]+ into Go struct field GitCommitDiffs.changeCounts of type azuredevops.VersionControlChangeType`, err.Error())
+		if !matched {
+			return nil, errors.Wrapf(err, "Error getting diff %s to %s", sourceRefName, targetRefName)
+		}
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.Wrapf(err, "http response code %d getting diff %s to %s", resp.StatusCode, sourceRefName, targetRefName)
