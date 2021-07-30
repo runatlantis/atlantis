@@ -92,15 +92,15 @@ func (c *Client) TryLock(p models.Project, workspace string, pull models.PullReq
 }
 
 // Unlock attempts to unlock a project and workspace. If successful,
-// a pointer to the now deleted lock will be returned. Else, that
-// pointer will be nil. An error will only be returned if there was
+// pointers to the now deleted lock and the next dequeued lock (optional) will be returned.
+// Else, both pointers will be nil. An error will only be returned if there was
 // an error deleting the lock (i.e. not if there was no lock).
 func (c *Client) Unlock(key string) (*models.ProjectLock, *models.ProjectLock, error) {
 	project, workspace, err := c.lockKeyToProjectWorkspace(key)
 	if err != nil {
 		return nil, nil, err
 	}
-	return c.backend.Unlock(project, workspace) // TODO Monika
+	return c.backend.Unlock(project, workspace)
 }
 
 // List returns a map of all locks with their lock key as the map key.
@@ -117,6 +117,7 @@ func (c *Client) List() (map[string]models.ProjectLock, error) {
 	return m, nil
 }
 
+// TODO monikma extend the tests
 // UnlockByPull deletes all locks associated with that pull request.
 func (c *Client) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, models.DequeueStatus, error) {
 	return c.backend.UnlockByPull(repoFullName, pullNum)
@@ -166,8 +167,8 @@ func (c *NoOpLocker) TryLock(p models.Project, workspace string, pull models.Pul
 }
 
 // Unlock attempts to unlock a project and workspace. If successful,
-// a pointer to the now deleted lock will be returned. Else, that
-// pointer will be nil. An error will only be returned if there was
+// pointers to the now deleted lock and the next dequeued lock (optional) will be returned.
+// Else, both pointers will be nil. An error will only be returned if there was
 // an error deleting the lock (i.e. not if there was no lock).
 func (c *NoOpLocker) Unlock(key string) (*models.ProjectLock, *models.ProjectLock, error) {
 	return &models.ProjectLock{}, &models.ProjectLock{}, nil

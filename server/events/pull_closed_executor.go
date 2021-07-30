@@ -63,6 +63,7 @@ var pullClosedTemplate = template.Must(template.New("").Parse(
 
 // CleanUpPull cleans up after a closed pull request.
 func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullRequest) error {
+	// TODO monikma extend the tests
 	if err := p.WorkingDir.Delete(repo, pull); err != nil {
 		return errors.Wrap(err, "cleaning workspace")
 	}
@@ -93,14 +94,23 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 
 	var commentErr = p.VCSClient.CreateComment(repo, pull.Num, buf.String(), "")
 
-	// start planning the dequeued PRs
+	// TODO monikma do you know a nicer method for potentially appending new error to the existing one
+	commentErr = p.triggerPlansForDequeuedPRs(repo, dequeueStatus, commentErr)
+
+	// TODO monikma if I am not mistaken, this method executes asynchronusly and the information of PRs being dequeued will not
+	// bubble up to the Atlantis "Pull request closed" comment. That is not nice.
+	return commentErr
+}
+
+func (p *PullClosedExecutor) triggerPlansForDequeuedPRs(repo models.Repo, dequeueStatus models.DequeueStatus, commentErr error) error {
+	// TODO monikma #4 use exact dequeued comment instead of hardcoding it
 	for _, lock := range dequeueStatus.ProjectLocks {
 		planVcsMessage := "atlantis plan -d " + lock.Project.Path
 		if err := p.VCSClient.CreateComment(repo, lock.Pull.Num, planVcsMessage, ""); err != nil {
+			// TODO monikma at this point planning queue will be interrupted, how to resolve from this?
 			commentErr = fmt.Errorf("%s\nunable to comment on PR %s: %s", commentErr, lock.Pull.Num, commentErr)
 		}
 	}
-
 	return commentErr
 }
 

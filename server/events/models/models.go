@@ -699,15 +699,18 @@ type EnqueueStatus struct {
 	ProjectLocksInFront int
 }
 
+// TODO monikma extend the tests
 type DequeueStatus struct {
 	// the PR's lock that should be planned next
+	// TODO monikma #4 Queue the whole command rather than just the lock
 	ProjectLocks []ProjectLock
 }
 
 func (dequeueStatus DequeueStatus) String() string {
 	b := new(bytes.Buffer)
 	for _, value := range dequeueStatus.ProjectLocks {
-		if value.Pull.Num > 0 { // TODO(Monika) This was a quick fix: value.Pull.Num > 0, to prevent empty values
+		// TODO monikma sometimes the PR gets a number = 0 and empty values, and then this fails. Find out when this happens and maybe find a proper solution.
+		if value.Pull.Num > 0 {
 			fmt.Fprintf(b,
 				"%s: PR %s (by @%s)\n",
 				value.Project.Path,
@@ -718,10 +721,11 @@ func (dequeueStatus DequeueStatus) String() string {
 	return "\n\nTriggered plans for the queued PRs:\n" + b.String()
 }
 
-func (dequeueStatus DequeueStatus) StringFilterProject(project string) string { // TODO(Monika) this could be refactored
+func (dequeueStatus DequeueStatus) StringFilterProject(project string) string { // TODO monikma remove code duplication with the method above
 	b := new(bytes.Buffer)
 	for _, value := range dequeueStatus.ProjectLocks {
-		if value.Pull.Num > 0 && value.Project.Path == project { // TODO(Monika) This was a quick fix: value.Pull.Num > 0, to prevent empty values
+		// TODO monikma sometimes the PR gets a number = 0 and empty values, and then this fails. Find out when this happens and maybe find a proper solution.
+		if value.Pull.Num > 0 && value.Project.Path == project {
 			fmt.Fprintf(b,
 				"%s: PR %s (by @%s)\n",
 				value.Project.Path,
