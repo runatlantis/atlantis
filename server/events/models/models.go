@@ -17,6 +17,7 @@
 package models
 
 import (
+	"bytes"
 	"fmt"
 	"net/url"
 	paths "path"
@@ -689,9 +690,6 @@ const (
 
 	// AlreadyInTheQueue means the ProjectLock is already in the queue
 	AlreadyInTheQueue
-
-	// FailedToEnqueue means the ProjectLock failed to enter the queue
-	FailedToEnqueue
 )
 
 type EnqueueStatus struct {
@@ -699,4 +697,21 @@ type EnqueueStatus struct {
 	Status EnqueueStatusType
 	// ProjectLocksInFront tells how many PRs are in line before the current one
 	ProjectLocksInFront int
+}
+
+type DequeueStatus struct {
+	// the PR's lock that should be planned next
+	ProjectLocks []ProjectLock
+}
+
+func (dequeueStatus DequeueStatus) String() string {
+	b := new(bytes.Buffer)
+	for _, value := range dequeueStatus.ProjectLocks {
+		fmt.Fprintf(b,
+			"%s: PR %s (by @%s)\n",
+			value.Project.Path,
+			value.Pull.URL,
+			value.Pull.Author)
+	}
+	return "\n\nTriggered plans for the queued PRs:\n" + b.String()
 }

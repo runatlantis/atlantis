@@ -90,7 +90,7 @@ func (p *DefaultProjectLocker) TryLock(log logging.SimpleLogging, pull models.Pu
 	return &TryLockResponse{
 		LockAcquired: true,
 		UnlockFn: func() error {
-			_, err := p.Locker.Unlock(lockAttempt.LockKey)
+			_, _, err := p.Locker.Unlock(lockAttempt.LockKey) // TODO(Ghais, Monika) figure out what to do here
 			return err
 		},
 		LockKey: lockAttempt.LockKey,

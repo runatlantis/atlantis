@@ -50,14 +50,16 @@ type PullClosedExecutor struct {
 }
 
 type templatedProject struct {
-	RepoRelDir string
-	Workspaces string
+	RepoRelDir    string
+	Workspaces    string
+	DequeueStatus string
 }
 
 var pullClosedTemplate = template.Must(template.New("").Parse(
 	"Locks and plans deleted for the projects and workspaces modified in this pull request:\n" +
 		"{{ range . }}\n" +
-		"- dir: `{{ .RepoRelDir }}` {{ .Workspaces }}{{ end }}"))
+		"- dir: `{{ .RepoRelDir }}` {{ .Workspaces }}{{ end }}" +
+		"{{ .DequeueStatus }}")) // TODO Monika this was not tested
 
 // CleanUpPull cleans up after a closed pull request.
 func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullRequest) error {
@@ -68,7 +70,7 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 	// Finally, delete locks. We do this last because when someone
 	// unlocks a project, right now we don't actually delete the plan
 	// so we might have plans laying around but no locks.
-	locks, err := p.Locker.UnlockByPull(repo.FullName, pull.Num)
+	locks, dequeueStatus, err := p.Locker.UnlockByPull(repo.FullName, pull.Num)
 	if err != nil {
 		return errors.Wrap(err, "cleaning up locks")
 	}
@@ -83,7 +85,7 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 		return nil
 	}
 
-	templateData := p.buildTemplateData(locks)
+	templateData := p.buildTemplateData(locks, dequeueStatus)
 	var buf bytes.Buffer
 	if err = pullClosedTemplate.Execute(&buf, templateData); err != nil {
 		return errors.Wrap(err, "rendering template for comment")
@@ -95,7 +97,7 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 // templated for the VCS comment. We organize all the workspaces by their
 // respective project paths so the comment can look like:
 // dir: {dir}, workspaces: {all-workspaces}
-func (p *PullClosedExecutor) buildTemplateData(locks []models.ProjectLock) []templatedProject {
+func (p *PullClosedExecutor) buildTemplateData(locks []models.ProjectLock, dequeueStatus models.DequeueStatus) []templatedProject {
 	workspacesByPath := make(map[string][]string)
 	for _, l := range locks {
 		path := l.Project.Path
@@ -115,13 +117,15 @@ func (p *PullClosedExecutor) buildTemplateData(locks []models.ProjectLock) []tem
 		workspacesStr := fmt.Sprintf("`%s`", strings.Join(workspace, "`, `"))
 		if len(workspace) == 1 {
 			projects = append(projects, templatedProject{
-				RepoRelDir: p,
-				Workspaces: "workspace: " + workspacesStr,
+				RepoRelDir:    p,
+				Workspaces:    "workspace: " + workspacesStr,
+				DequeueStatus: dequeueStatus.String(),
 			})
 		} else {
 			projects = append(projects, templatedProject{
-				RepoRelDir: p,
-				Workspaces: "workspaces: " + workspacesStr,
+				RepoRelDir:    p,
+				Workspaces:    "workspaces: " + workspacesStr,
+				DequeueStatus: dequeueStatus.String(),
 			})
 
 		}

@@ -12,7 +12,7 @@ import (
 // DeleteLockCommand is the first step after a command request has been parsed.
 type DeleteLockCommand interface {
 	DeleteLock(id string) (*models.ProjectLock, error)
-	DeleteLocksByPull(repoFullName string, pullNum int) (int, error)
+	DeleteLocksByPull(repoFullName string, pullNum int) (int, models.DequeueStatus, error)
 }
 
 // DefaultDeleteLockCommand deletes a specific lock after a request from the LocksController.
@@ -26,7 +26,7 @@ type DefaultDeleteLockCommand struct {
 
 // DeleteLock handles deleting the lock at id
 func (l *DefaultDeleteLockCommand) DeleteLock(id string) (*models.ProjectLock, error) {
-	lock, err := l.Locker.Unlock(id)
+	lock, _, err := l.Locker.Unlock(id) // TODO(Monika, Ghais) also grant the lock to the next person here
 	if err != nil {
 		return nil, err
 	}
@@ -39,15 +39,15 @@ func (l *DefaultDeleteLockCommand) DeleteLock(id string) (*models.ProjectLock, e
 }
 
 // DeleteLocksByPull handles deleting all locks for the pull request
-func (l *DefaultDeleteLockCommand) DeleteLocksByPull(repoFullName string, pullNum int) (int, error) {
-	locks, err := l.Locker.UnlockByPull(repoFullName, pullNum)
+func (l *DefaultDeleteLockCommand) DeleteLocksByPull(repoFullName string, pullNum int) (int, models.DequeueStatus, error) {
+	locks, dequeueStatus, err := l.Locker.UnlockByPull(repoFullName, pullNum)
 	numLocks := len(locks)
 	if err != nil {
-		return numLocks, err
+		return numLocks, dequeueStatus, err
 	}
 	if numLocks == 0 {
 		l.Logger.Debug("No locks found for pull")
-		return numLocks, nil
+		return numLocks, dequeueStatus, nil
 	}
 
 	for i := 0; i < numLocks; i++ {
@@ -55,7 +55,7 @@ func (l *DefaultDeleteLockCommand) DeleteLocksByPull(repoFullName string, pullNu
 		l.deleteWorkingDir(lock)
 	}
 
-	return numLocks, nil
+	return numLocks, dequeueStatus, nil
 }
 
 func (l *DefaultDeleteLockCommand) deleteWorkingDir(lock models.ProjectLock) {
