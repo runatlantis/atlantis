@@ -68,10 +68,19 @@ func (p *DefaultProjectLocker) TryLock(log logging.SimpleLogging, pull models.Pu
 		if err != nil {
 			return nil, err
 		}
-		failureMsg := fmt.Sprintf(
-			"This project is currently locked by an unapplied plan from pull %s. To continue, delete the lock from %s or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.",
-			link,
-			link)
+		failureMsg := fmt.Sprintf("This project is currently locked by an unapplied plan from pull %s.", link)
+		switch lockAttempt.EnqueueStatus.Status {
+		case models.Enqueued:
+			failureMsg = fmt.Sprintf("%s This PR entered the waiting queue :clock130:, number of PRs ahead of you: **%d**.", failureMsg, lockAttempt.EnqueueStatus.ProjectLocksInFront)
+		case models.AlreadyInTheQueue:
+			failureMsg = fmt.Sprintf("%s This PR is already in the queue :clock130:, number of PRs ahead of you: **%d**.", failureMsg, lockAttempt.EnqueueStatus.ProjectLocksInFront)
+		default:
+			failureMsg = fmt.Sprintf(
+				"[%s] This project is currently locked by an unapplied plan from pull %s. To continue, delete the lock from %s or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.",
+				"Fatal error, could not enqueue for some reason. Please check atlantis logs",
+				link,
+				link)
+		}
 		return &TryLockResponse{
 			LockAcquired:      false,
 			LockFailureReason: failureMsg,
