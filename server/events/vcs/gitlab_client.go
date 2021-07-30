@@ -184,15 +184,15 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	}
 
 	// Get project configuration
-	project, _, err2 := g.Client.Projects.GetProject(mr.ProjectID, nil)
-	if err2 != nil {
-		return false, err2
+	project, _, err := g.Client.Projects.GetProject(mr.ProjectID, nil)
+	if err != nil {
+		return false, err
 	}
 
 	// Get Commit Statuses
-	statuses, _, err3 := g.Client.Commits.GetCommitStatuses(mr.ProjectID, mr.HeadPipeline.SHA, nil)
-	if err3 != nil {
-		return false, err3
+	statuses, _, err := g.Client.Commits.GetCommitStatuses(mr.ProjectID, mr.HeadPipeline.SHA, nil)
+	if err != nil {
+		return false, err
 	}
 
 	for _, status := range statuses {
