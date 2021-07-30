@@ -184,13 +184,13 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	}
 
 	// Get project configuration
-	project, _, err = g.Client.Projects.GetProject(mr.ProjectID, nil)
+	project, _, err := g.Client.Projects.GetProject(mr.ProjectID, nil)
 	if err != nil {
 		return false, err
 	}
 
 	// Get Commit Statuses
-	statuses, _, err = g.Client.Commits.GetCommitStatuses(mr.ProjectID, mr.HeadPipeline.SHA, nil)
+	statuses, _, err := g.Client.Commits.GetCommitStatuses(mr.ProjectID, mr.HeadPipeline.SHA, nil)
 	if err != nil {
 		return false, err
 	}
@@ -270,7 +270,7 @@ func (g *GitlabClient) MergePull(pull models.PullRequest, pullOptions models.Pul
 		return errors.Wrap(
 			err, "unable to merge merge request, it was not possible to retrieve the merge request")
 	}
-	project, _, err = g.Client.Projects.GetProject(mr.ProjectID, nil)
+	project, _, err := g.Client.Projects.GetProject(mr.ProjectID, nil)
 	if err != nil {
 		return errors.Wrap(
 			err, "unable to merge merge request, it was not possible to check the project requirements")
