@@ -707,11 +707,13 @@ type DequeueStatus struct {
 func (dequeueStatus DequeueStatus) String() string {
 	b := new(bytes.Buffer)
 	for _, value := range dequeueStatus.ProjectLocks {
-		fmt.Fprintf(b,
-			"%s: PR %s (by @%s)\n",
-			value.Project.Path,
-			value.Pull.URL,
-			value.Pull.Author)
+		if value.Pull.Num > 0 { // TODO(Monika) This was a quick fix: value.Pull.Num > 0, to prevent empty values
+			fmt.Fprintf(b,
+				"%s: PR %s (by @%s)\n",
+				value.Project.Path,
+				value.Pull.URL,
+				value.Pull.Author)
+		}
 	}
 	return "\n\nTriggered plans for the queued PRs:\n" + b.String()
 }
