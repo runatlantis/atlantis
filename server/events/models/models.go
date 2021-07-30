@@ -719,7 +719,7 @@ func (dequeueStatus DequeueStatus) String() string {
 func (dequeueStatus DequeueStatus) StringFilterProject(project string) string { // TODO(Monika) this could be refactored
 	b := new(bytes.Buffer)
 	for _, value := range dequeueStatus.ProjectLocks {
-		if value.Project.Path == project {
+		if value.Pull.Num > 0 && value.Project.Path == project { // TODO(Monika) This was a quick fix: value.Pull.Num > 0, to prevent empty values
 			fmt.Fprintf(b,
 				"%s: PR %s (by @%s)\n",
 				value.Project.Path,
