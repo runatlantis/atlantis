@@ -715,3 +715,17 @@ func (dequeueStatus DequeueStatus) String() string {
 	}
 	return "\n\nTriggered plans for the queued PRs:\n" + b.String()
 }
+
+func (dequeueStatus DequeueStatus) StringFilterProject(project string) string { // TODO(Monika) this could be refactored
+	b := new(bytes.Buffer)
+	for _, value := range dequeueStatus.ProjectLocks {
+		if value.Project.Path == project {
+			fmt.Fprintf(b,
+				"%s: PR %s (by @%s)\n",
+				value.Project.Path,
+				value.Pull.URL,
+				value.Pull.Author)
+		}
+	}
+	return "\n\nTriggered plans for the queued PRs:\n" + b.String()
+}

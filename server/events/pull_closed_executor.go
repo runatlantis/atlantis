@@ -58,8 +58,8 @@ type templatedProject struct {
 var pullClosedTemplate = template.Must(template.New("").Parse(
 	"Locks and plans deleted for the projects and workspaces modified in this pull request:\n" +
 		"{{ range . }}\n" +
-		"- dir: `{{ .RepoRelDir }}` {{ .Workspaces }}{{ end }}" +
-		"{{ .DequeueStatus }}")) // TODO Monika this was not tested
+		"- dir: `{{ .RepoRelDir }}` {{ .Workspaces }}\n" +
+		"{{ .DequeueStatus }}{{ end }}"))
 
 // CleanUpPull cleans up after a closed pull request.
 func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullRequest) error {
@@ -90,7 +90,18 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 	if err = pullClosedTemplate.Execute(&buf, templateData); err != nil {
 		return errors.Wrap(err, "rendering template for comment")
 	}
-	return p.VCSClient.CreateComment(repo, pull.Num, buf.String(), "")
+
+	var commentErr = p.VCSClient.CreateComment(repo, pull.Num, buf.String(), "")
+
+	// start planning the dequeued PRs
+	for _, lock := range dequeueStatus.ProjectLocks {
+		planVcsMessage := "atlantis plan -d " + lock.Project.Path
+		if err := p.VCSClient.CreateComment(repo, lock.Pull.Num, planVcsMessage, ""); err != nil {
+			commentErr = fmt.Errorf("%s\nunable to comment on PR %s: %s", commentErr, lock.Pull.Num, commentErr)
+		}
+	}
+
+	return commentErr
 }
 
 // buildTemplateData formats the lock data into a slice that can easily be
@@ -119,13 +130,13 @@ func (p *PullClosedExecutor) buildTemplateData(locks []models.ProjectLock, deque
 			projects = append(projects, templatedProject{
 				RepoRelDir:    p,
 				Workspaces:    "workspace: " + workspacesStr,
-				DequeueStatus: dequeueStatus.String(),
+				DequeueStatus: dequeueStatus.StringFilterProject(p),
 			})
 		} else {
 			projects = append(projects, templatedProject{
 				RepoRelDir:    p,
 				Workspaces:    "workspaces: " + workspacesStr,
-				DequeueStatus: dequeueStatus.String(),
+				DequeueStatus: dequeueStatus.StringFilterProject(p),
 			})
 
 		}
