@@ -680,3 +680,23 @@ type PreWorkflowHookCommandContext struct {
 	// Verbose is true when the user would like verbose output.
 	Verbose bool
 }
+
+type EnqueueStatusType int
+
+const (
+	// Enqueued means the ProjectLock entered the queue
+	Enqueued EnqueueStatusType = iota
+
+	// AlreadyInTheQueue means the ProjectLock is already in the queue
+	AlreadyInTheQueue
+
+	// FailedToEnqueue means the ProjectLock failed to enter the queue
+	FailedToEnqueue
+)
+
+type EnqueueStatus struct {
+	// Status is the status of the enqueue operation
+	Status EnqueueStatusType
+	// ProjectLocksInFront tells how many PRs are in line before the current one
+	ProjectLocksInFront int
+}
