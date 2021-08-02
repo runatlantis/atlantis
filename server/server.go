@@ -290,6 +290,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	vcsClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient)
 	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient, StatusName: userConfig.VCSStatusName}
+	terraformOutputChan := make(chan *models.TerraformOutputLine)
 
 	binDir, err := mkSubDir(userConfig.DataDir, BinDirName)
 
@@ -313,7 +314,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		config.DefaultTFVersionFlag,
 		userConfig.TFDownloadURL,
 		&terraform.DefaultDownloader{},
-		true)
+		true,
+		terraformOutputChan)
 	// The flag.Lookup call is to detect if we're running in a unit test. If we
 	// are, then we don't error out because we don't have/want terraform
 	// installed on our CI system where the unit tests run.
@@ -527,6 +529,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Webhooks:                   webhooksManager,
 		WorkingDirLocker:           workingDirLocker,
 		AggregateApplyRequirements: applyRequirementHandler,
+		TerraformOutputChan:        terraformOutputChan,
 	}
 
 	dbUpdater := &events.DBUpdater{
@@ -667,6 +670,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		LogStreamTemplate:      templates.LogStreamingTemplate,
 		LogStreamErrorTemplate: templates.LogStreamErrorTemplate,
 		Db:                     boltdb,
+		TerraformOutputChan:    terraformOutputChan,
+		WebsocketHandler:       controllers.NewWebsocketHandler(),
 	}
 
 	eventsController := &events_controllers.VCSEventsController{
@@ -793,6 +798,10 @@ func (s *Server) Start() error {
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
 	go s.ScheduledExecutorService.Run()
+
+	go func() {
+		s.LogStreamingController.Listen()
+	}()
 
 	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n}
 	go func() {
