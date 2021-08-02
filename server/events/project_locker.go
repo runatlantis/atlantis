@@ -59,6 +59,7 @@ type TryLockResponse struct {
 
 // TryLock implements ProjectLocker.TryLock.
 func (p *DefaultProjectLocker) TryLock(log logging.SimpleLogging, pull models.PullRequest, user models.User, workspace string, project models.Project) (*TryLockResponse, error) {
+	// TODO monikma extend the tests
 	lockAttempt, err := p.Locker.TryLock(project, workspace, pull, user)
 	if err != nil {
 		return nil, err
@@ -90,7 +91,9 @@ func (p *DefaultProjectLocker) TryLock(log logging.SimpleLogging, pull models.Pu
 	return &TryLockResponse{
 		LockAcquired: true,
 		UnlockFn: func() error {
-			_, err := p.Locker.Unlock(lockAttempt.LockKey)
+			// TODO monikma #8 this will be called if there was a plan error and the lock was automatically dropped;
+			// Should we assure dequeuing of the next PR here too?
+			_, _, err := p.Locker.Unlock(lockAttempt.LockKey)
 			return err
 		},
 		LockKey: lockAttempt.LockKey,

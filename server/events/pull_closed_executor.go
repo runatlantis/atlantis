@@ -50,17 +50,20 @@ type PullClosedExecutor struct {
 }
 
 type templatedProject struct {
-	RepoRelDir string
-	Workspaces string
+	RepoRelDir    string
+	Workspaces    string
+	DequeueStatus string
 }
 
 var pullClosedTemplate = template.Must(template.New("").Parse(
 	"Locks and plans deleted for the projects and workspaces modified in this pull request:\n" +
 		"{{ range . }}\n" +
-		"- dir: `{{ .RepoRelDir }}` {{ .Workspaces }}{{ end }}"))
+		"- dir: `{{ .RepoRelDir }}` {{ .Workspaces }}\n" +
+		"{{ .DequeueStatus }}{{ end }}"))
 
 // CleanUpPull cleans up after a closed pull request.
 func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullRequest) error {
+	// TODO monikma extend the tests
 	if err := p.WorkingDir.Delete(repo, pull); err != nil {
 		return errors.Wrap(err, "cleaning workspace")
 	}
@@ -68,7 +71,7 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 	// Finally, delete locks. We do this last because when someone
 	// unlocks a project, right now we don't actually delete the plan
 	// so we might have plans laying around but no locks.
-	locks, err := p.Locker.UnlockByPull(repo.FullName, pull.Num)
+	locks, dequeueStatus, err := p.Locker.UnlockByPull(repo.FullName, pull.Num)
 	if err != nil {
 		return errors.Wrap(err, "cleaning up locks")
 	}
@@ -83,19 +86,39 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 		return nil
 	}
 
-	templateData := p.buildTemplateData(locks)
+	templateData := p.buildTemplateData(locks, dequeueStatus)
 	var buf bytes.Buffer
 	if err = pullClosedTemplate.Execute(&buf, templateData); err != nil {
 		return errors.Wrap(err, "rendering template for comment")
 	}
-	return p.VCSClient.CreateComment(repo, pull.Num, buf.String(), "")
+
+	var commentErr = p.VCSClient.CreateComment(repo, pull.Num, buf.String(), "")
+
+	// TODO monikma do you know a nicer method for potentially appending new error to the existing one
+	commentErr = p.triggerPlansForDequeuedPRs(repo, dequeueStatus, commentErr)
+
+	// TODO monikma if I am not mistaken, this method executes asynchronusly and the information of PRs being dequeued will not
+	// bubble up to the Atlantis "Pull request closed" comment. That is not nice.
+	return commentErr
+}
+
+func (p *PullClosedExecutor) triggerPlansForDequeuedPRs(repo models.Repo, dequeueStatus models.DequeueStatus, commentErr error) error {
+	// TODO monikma #4 use exact dequeued comment instead of hardcoding it
+	for _, lock := range dequeueStatus.ProjectLocks {
+		planVcsMessage := "atlantis plan -d " + lock.Project.Path
+		if err := p.VCSClient.CreateComment(repo, lock.Pull.Num, planVcsMessage, ""); err != nil {
+			// TODO monikma at this point planning queue will be interrupted, how to resolve from this?
+			commentErr = fmt.Errorf("%s\nunable to comment on PR %s: %s", commentErr, lock.Pull.Num, commentErr)
+		}
+	}
+	return commentErr
 }
 
 // buildTemplateData formats the lock data into a slice that can easily be
 // templated for the VCS comment. We organize all the workspaces by their
 // respective project paths so the comment can look like:
 // dir: {dir}, workspaces: {all-workspaces}
-func (p *PullClosedExecutor) buildTemplateData(locks []models.ProjectLock) []templatedProject {
+func (p *PullClosedExecutor) buildTemplateData(locks []models.ProjectLock, dequeueStatus models.DequeueStatus) []templatedProject {
 	workspacesByPath := make(map[string][]string)
 	for _, l := range locks {
 		path := l.Project.Path
@@ -115,13 +138,15 @@ func (p *PullClosedExecutor) buildTemplateData(locks []models.ProjectLock) []tem
 		workspacesStr := fmt.Sprintf("`%s`", strings.Join(workspace, "`, `"))
 		if len(workspace) == 1 {
 			projects = append(projects, templatedProject{
-				RepoRelDir: p,
-				Workspaces: "workspace: " + workspacesStr,
+				RepoRelDir:    p,
+				Workspaces:    "workspace: " + workspacesStr,
+				DequeueStatus: dequeueStatus.StringFilterProject(p),
 			})
 		} else {
 			projects = append(projects, templatedProject{
-				RepoRelDir: p,
-				Workspaces: "workspaces: " + workspacesStr,
+				RepoRelDir:    p,
+				Workspaces:    "workspaces: " + workspacesStr,
+				DequeueStatus: dequeueStatus.StringFilterProject(p),
 			})
 
 		}

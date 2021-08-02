@@ -188,8 +188,10 @@ func findPullRequest(locks []models.ProjectLock, pullRequestNumber int) int {
 // If there is no lock, then it will return a nil pointer.
 // If there is a lock, then it will delete it, and then return a pointer
 // to the deleted lock.
-func (b *BoltDB) Unlock(p models.Project, workspace string) (*models.ProjectLock, error) {
+func (b *BoltDB) Unlock(p models.Project, workspace string) (*models.ProjectLock, *models.ProjectLock, error) {
+	// TODO monikma extend the tests
 	var lock models.ProjectLock
+	var dequeuedLock models.ProjectLock
 	foundLock := false
 	key := b.lockKey(p, workspace)
 	err := b.db.Update(func(tx *bolt.Tx) error {
@@ -201,13 +203,50 @@ func (b *BoltDB) Unlock(p models.Project, workspace string) (*models.ProjectLock
 			}
 			foundLock = true
 		}
-		return bucket.Delete([]byte(key))
+
+		// Dequeue next item
+		queueBucket := tx.Bucket(b.queueBucketName)
+		currQueueSerialized := queueBucket.Get([]byte(key))
+
+		// Queue doesn't exist
+		if currQueueSerialized == nil {
+			return bucket.Delete([]byte(key))
+		}
+
+		// Queue exists
+		var currQueue []models.ProjectLock
+		if err := json.Unmarshal(currQueueSerialized, &currQueue); err != nil {
+			return errors.Wrap(err, "failed to deserialize queue for current lock")
+		}
+
+		// Queue is empty
+		if len(currQueue) == 0 {
+			return bucket.Delete([]byte(key))
+		}
+
+		// Queue has items, get the next in line
+		// TODO monikma will this dequeueing info not get to the PR comment?
+		return b.dequeueNextInLine(dequeuedLock, currQueue, bucket, key, queueBucket)
 	})
+
 	err = errors.Wrap(err, "DB transaction failed")
 	if foundLock {
-		return &lock, err
+		return &lock, &dequeuedLock, err
 	}
-	return nil, err
+	return nil, nil, err
+}
+
+func (b *BoltDB) dequeueNextInLine(dequeuedLock models.ProjectLock, currQueue []models.ProjectLock, bucket *bolt.Bucket, key string, queueBucket *bolt.Bucket) error {
+	dequeuedLock = currQueue[0]
+	newQueue := currQueue[1:]
+
+	dequeuedLockSerialized, _ := json.Marshal(dequeuedLock)
+	if err := bucket.Put([]byte(key), dequeuedLockSerialized); err != nil {
+		return errors.Wrap(err, "failed to give the lock to next PR in the queue")
+	}
+
+	newQueueSerialized, _ := json.Marshal(newQueue)
+	return queueBucket.Put([]byte(key), newQueueSerialized)
 }
 
 // List lists all current locks.
@@ -320,7 +359,7 @@ func (b *BoltDB) CheckCommandLock(cmdName models.CommandName) (*models.CommandLo
 }
 
 // UnlockByPull deletes all locks associated with that pull request and returns them.
-func (b *BoltDB) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
+func (b *BoltDB) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, models.DequeueStatus, error) {
 	var locks []models.ProjectLock
 	err := b.db.View(func(tx *bolt.Tx) error {
 		c := tx.Bucket(b.locksBucketName).Cursor()
@@ -335,19 +374,28 @@ func (b *BoltDB) UnlockByPull(repoFullName string, pullNum int) ([]models.Projec
 				locks = append(locks, lock)
 			}
 		}
+
 		return nil
 	})
+
 	if err != nil {
-		return locks, err
+		return locks, models.DequeueStatus{ProjectLocks: nil}, err
 	}
+
+	var dequeuedLocks = make([]models.ProjectLock, 0, len(locks))
 
 	// delete the locks
 	for _, lock := range locks {
-		if _, err = b.Unlock(lock.Project, lock.Workspace); err != nil {
-			return locks, errors.Wrapf(err, "unlocking repo %s, path %s, workspace %s", lock.Project.RepoFullName, lock.Project.Path, lock.Workspace)
+		var dequeuedLock *models.ProjectLock
+		if _, dequeuedLock, err = b.Unlock(lock.Project, lock.Workspace); err != nil {
+			return locks, models.DequeueStatus{ProjectLocks: nil}, errors.Wrapf(err, "unlocking repo %s, path %s, workspace %s", lock.Project.RepoFullName, lock.Project.Path, lock.Workspace)
+		}
+		if dequeuedLock != nil {
+			dequeuedLocks = append(dequeuedLocks, *dequeuedLock)
 		}
 	}
-	return locks, nil
+
+	return locks, models.DequeueStatus{ProjectLocks: dequeuedLocks}, nil
 }
 
 // GetLock returns a pointer to the lock for that project and workspace.
