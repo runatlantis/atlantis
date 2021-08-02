@@ -69,7 +69,7 @@ func (i *InitStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []strin
 
 	terraformInitCmd := append(terraformInitVerb, finalArgs...)
 
-	out, err := i.TerraformExecutor.RunCommandWithVersion(ctx.Log, path, terraformInitCmd, envs, tfVersion, ctx.Workspace)
+	out, err := i.TerraformExecutor.RunCommandWithVersion(ctx, path, terraformInitCmd, envs, tfVersion, ctx.Workspace)
 	// Only include the init output if there was an error. Otherwise it's
 	// unnecessary and lengthens the comment.
 	if err != nil {

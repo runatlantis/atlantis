@@ -659,6 +659,15 @@ func (c CommandName) TitleString() string {
 	return strings.Title(strings.ReplaceAll(strings.ToLower(c.String()), "_", " "))
 }
 
+type TerraformOutputLine struct {
+	ProjectInfo string
+
+	Line string
+
+	ClearBuffBefore bool
+	ClearBuffAfter  bool
+}
+
 // String returns the string representation of c.
 func (c CommandName) String() string {
 	switch c {

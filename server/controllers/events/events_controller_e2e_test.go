@@ -666,6 +666,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	e2eStatusUpdater := &events.DefaultCommitStatusUpdater{Client: e2eVCSClient}
 	e2eGithubGetter := mocks.NewMockGithubPullGetter()
 	e2eGitlabGetter := mocks.NewMockGitlabMergeRequestGetter()
+	tempchan := make(chan *models.TerraformOutputLine)
 
 	// Real dependencies.
 	logger := logging.NewNoopLogger(t)
@@ -680,7 +681,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		GithubUser: "github-user",
 		GitlabUser: "gitlab-user",
 	}
-	terraformClient, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{}, false)
+	terraformClient, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{}, false, tempchan)
 	Ok(t, err)
 	boltdb, err := db.New(dataDir)
 	Ok(t, err)
@@ -792,6 +793,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		WorkingDir:          workingDir,
 		Webhooks:            &mockWebhookSender{},
 		WorkingDirLocker:    locker,
+		TerraformOutputChan: tempchan,
 	}
 
 	dbUpdater := &events.DBUpdater{
@@ -892,6 +894,11 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
 	Ok(t, err)
+
+	go func() {
+		for range tempchan {
+		}
+	}()
 
 	ctrl := events_controllers.VCSEventsController{
 		TestingMode:   true,
