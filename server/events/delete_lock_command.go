@@ -15,6 +15,10 @@ type DeleteLockCommand interface {
 	DeleteLocksByPull(repoFullName string, pullNum int) (int, error)
 }
 
+type LogStreamURLGenerator interface {
+	GenerateJobURL(pull models.PullRequest) string
+}
+
 // DefaultDeleteLockCommand deletes a specific lock after a request from the LocksController.
 type DefaultDeleteLockCommand struct {
 	Locker           locking.Locker

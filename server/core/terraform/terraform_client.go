@@ -30,6 +30,8 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
+
+	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -69,6 +71,8 @@ type DefaultClient struct {
 
 	// usePluginCache determines whether or not to set the TF_PLUGIN_CACHE_DIR env var
 	usePluginCache bool
+
+	terraformOutputChan chan<- *models.TerraformOutputLine
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_downloader.go Downloader
@@ -100,6 +104,7 @@ func NewClientWithDefaultVersion(
 	tfDownloader Downloader,
 	usePluginCache bool,
 	fetchAsync bool,
+	terraformOutputChan chan<- *models.TerraformOutputLine,
 ) (*DefaultClient, error) {
 	var finalDefaultVersion *version.Version
 	var localVersion *version.Version
@@ -157,7 +162,6 @@ func NewClientWithDefaultVersion(
 			return nil, err
 		}
 	}
-
 	return &DefaultClient{
 		defaultVersion:          finalDefaultVersion,
 		terraformPluginCacheDir: cacheDir,
@@ -167,6 +171,7 @@ func NewClientWithDefaultVersion(
 		versionsLock:            &versionsLock,
 		versions:                versions,
 		usePluginCache:          usePluginCache,
+		terraformOutputChan:     terraformOutputChan,
 	}, nil
 
 }
@@ -181,7 +186,9 @@ func NewTestClient(
 	defaultVersionFlagName string,
 	tfDownloadURL string,
 	tfDownloader Downloader,
-	usePluginCache bool) (*DefaultClient, error) {
+	usePluginCache bool,
+	terraformOutputChan chan<- *models.TerraformOutputLine,
+) (*DefaultClient, error) {
 	return NewClientWithDefaultVersion(
 		log,
 		binDir,
@@ -194,6 +201,7 @@ func NewTestClient(
 		tfDownloader,
 		usePluginCache,
 		false,
+		terraformOutputChan,
 	)
 }
 
@@ -215,7 +223,9 @@ func NewClient(
 	defaultVersionFlagName string,
 	tfDownloadURL string,
 	tfDownloader Downloader,
-	usePluginCache bool) (*DefaultClient, error) {
+	usePluginCache bool,
+	terraformOutputChan chan<- *models.TerraformOutputLine,
+) (*DefaultClient, error) {
 	return NewClientWithDefaultVersion(
 		log,
 		binDir,
@@ -228,6 +238,7 @@ func NewClient(
 		tfDownloader,
 		usePluginCache,
 		true,
+		terraformOutputChan,
 	)
 }
 
@@ -260,24 +271,19 @@ func (c *DefaultClient) EnsureVersion(log logging.SimpleLogging, v *version.Vers
 }
 
 // See Client.RunCommandWithVersion.
-func (c *DefaultClient) RunCommandWithVersion(log logging.SimpleLogging, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (string, error) {
-	tfCmd, cmd, err := c.prepCmd(log, v, workspace, path, args)
-	if err != nil {
-		return "", err
+func (c *DefaultClient) RunCommandWithVersion(ctx models.ProjectCommandContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (string, error) {
+	_, outCh := c.RunCommandAsync(ctx, path, args, customEnvVars, v, workspace)
+	var lines []string
+	var err error
+	for line := range outCh {
+		if line.Err != nil {
+			err = line.Err
+			break
+		}
+		lines = append(lines, line.Line)
 	}
-	envVars := cmd.Env
-	for key, val := range customEnvVars {
-		envVars = append(envVars, fmt.Sprintf("%s=%s", key, val))
-	}
-	cmd.Env = envVars
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		err = errors.Wrapf(err, "running %q in %q", tfCmd, path)
-		log.Err(err.Error())
-		return string(out), err
-	}
-	log.Info("successfully ran %q in %q", tfCmd, path)
-	return string(out), nil
+	output := strings.Join(lines, "\n")
+	return fmt.Sprintf("%s\n", output), err
 }
 
 // prepCmd builds a ready to execute command based on the version of terraform
@@ -340,7 +346,7 @@ type Line struct {
 // Callers can use the input channel to pass stdin input to the command.
 // If any error is passed on the out channel, there will be no
 // further output (so callers are free to exit).
-func (c *DefaultClient) RunCommandAsync(log logging.SimpleLogging, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (chan<- string, <-chan Line) {
+func (c *DefaultClient) RunCommandAsync(ctx models.ProjectCommandContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (chan<- string, <-chan Line) {
 	outCh := make(chan Line)
 	inCh := make(chan string)
 
@@ -354,9 +360,9 @@ func (c *DefaultClient) RunCommandAsync(log logging.SimpleLogging, path string, 
 			close(inCh)
 		}()
 
-		tfCmd, cmd, err := c.prepCmd(log, v, workspace, path, args)
+		tfCmd, cmd, err := c.prepCmd(ctx.Log, v, workspace, path, args)
 		if err != nil {
-			log.Err(err.Error())
+			ctx.Log.Err(err.Error())
 			outCh <- Line{Err: err}
 			return
 		}
@@ -369,11 +375,11 @@ func (c *DefaultClient) RunCommandAsync(log logging.SimpleLogging, path string, 
 		}
 		cmd.Env = envVars
 
-		log.Debug("starting %q in %q", tfCmd, path)
+		ctx.Log.Debug("starting %q in %q", tfCmd, path)
 		err = cmd.Start()
 		if err != nil {
 			err = errors.Wrapf(err, "running %q in %q", tfCmd, path)
-			log.Err(err.Error())
+			ctx.Log.Err(err.Error())
 			outCh <- Line{Err: err}
 			return
 		}
@@ -382,10 +388,10 @@ func (c *DefaultClient) RunCommandAsync(log logging.SimpleLogging, path string, 
 		// This function will exit when inCh is closed which we do in our defer.
 		go func() {
 			for line := range inCh {
-				log.Debug("writing %q to remote command's stdin", line)
+				ctx.Log.Debug("writing %q to remote command's stdin", line)
 				_, err := io.WriteString(stdin, line)
 				if err != nil {
-					log.Err(errors.Wrapf(err, "writing %q to process", line).Error())
+					ctx.Log.Err(errors.Wrapf(err, "writing %q to process", line).Error())
 				}
 			}
 		}()
@@ -398,14 +404,24 @@ func (c *DefaultClient) RunCommandAsync(log logging.SimpleLogging, path string, 
 		go func() {
 			s := bufio.NewScanner(stdout)
 			for s.Scan() {
-				outCh <- Line{Line: s.Text()}
+				message := s.Text()
+				outCh <- Line{Line: message}
+				c.terraformOutputChan <- &models.TerraformOutputLine{
+					ProjectInfo: ctx.PullInfo(),
+					Line:        message,
+				}
 			}
 			wg.Done()
 		}()
 		go func() {
 			s := bufio.NewScanner(stderr)
 			for s.Scan() {
-				outCh <- Line{Line: s.Text()}
+				message := s.Text()
+				outCh <- Line{Line: message}
+				c.terraformOutputChan <- &models.TerraformOutputLine{
+					ProjectInfo: ctx.PullInfo(),
+					Line:        message,
+				}
 			}
 			wg.Done()
 		}()
@@ -420,10 +436,10 @@ func (c *DefaultClient) RunCommandAsync(log logging.SimpleLogging, path string, 
 		// We're done now. Send an error if there was one.
 		if err != nil {
 			err = errors.Wrapf(err, "running %q in %q", tfCmd, path)
-			log.Err(err.Error())
+			ctx.Log.Err(err.Error())
 			outCh <- Line{Err: err}
 		} else {
-			log.Info("successfully ran %q in %q", tfCmd, path)
+			ctx.Log.Info("successfully ran %q in %q", tfCmd, path)
 		}
 	}()
 

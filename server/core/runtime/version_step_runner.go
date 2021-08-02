@@ -21,5 +21,5 @@ func (v *VersionStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []st
 	}
 
 	versionCmd := []string{"version"}
-	return v.TerraformExecutor.RunCommandWithVersion(ctx.Log, filepath.Clean(path), versionCmd, envs, tfVersion, ctx.Workspace)
+	return v.TerraformExecutor.RunCommandWithVersion(ctx, filepath.Clean(path), versionCmd, envs, tfVersion, ctx.Workspace)
 }

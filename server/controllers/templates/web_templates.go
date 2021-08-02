@@ -116,7 +116,7 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
         <div class="list-title">{{.RepoFullName}} <span class="heading-font-size">#{{.PullNum}}</span> <code>{{.Path}}</code> <code>{{.Workspace}}</code></div>
         <div class="list-status"><code>Locked</code></div>
         <div class="list-timestamp"><span class="heading-font-size">{{.TimeFormatted}}</span></div>
-        </div>
+        </div>x
       </a>
     {{ end }}
     {{ else }}
@@ -480,7 +480,11 @@ var LogStreamErrorTemplate = template.Must(template.New("blank.html.tmpl").Parse
 
     <script>
       var term = new Terminal();
-      var socket = new WebSocket("Page not Found");
+      var socket = new WebSocket(
+        (document.location.protocol === "http:" ? "ws://" : "wss://") + 
+        document.location.host +
+        document.location.pathname +
+        "/ws");
       var attachAddon = new AttachAddon.AttachAddon(socket);
       var fitAddon = new FitAddon.FitAddon();
       term.loadAddon(attachAddon);
