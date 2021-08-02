@@ -27,7 +27,7 @@ import (
 
 // Backend is an implementation of the locking API we require.
 type Backend interface {
-	TryLock(lock models.ProjectLock) (bool, models.ProjectLock, error)
+	TryLock(lock models.ProjectLock) (bool, models.ProjectLock, models.EnqueueStatus, error)
 	Unlock(project models.Project, workspace string) (*models.ProjectLock, error)
 	List() ([]models.ProjectLock, error)
 	GetLock(project models.Project, workspace string) (*models.ProjectLock, error)
@@ -44,6 +44,8 @@ type TryLockResponse struct {
 	LockAcquired bool
 	// CurrLock is what project is currently holding the lock.
 	CurrLock models.ProjectLock
+	// CurrLock is what project is currently holding the lock.
+	EnqueueStatus models.EnqueueStatus
 	// LockKey is an identified by which to lookup and delete this lock.
 	LockKey string
 }
@@ -82,11 +84,11 @@ func (c *Client) TryLock(p models.Project, workspace string, pull models.PullReq
 		User:      user,
 		Pull:      pull,
 	}
-	lockAcquired, currLock, err := c.backend.TryLock(lock)
+	lockAcquired, currLock, enqueueStatus, err := c.backend.TryLock(lock)
 	if err != nil {
 		return TryLockResponse{}, err
 	}
-	return TryLockResponse{lockAcquired, currLock, c.key(p, workspace)}, nil
+	return TryLockResponse{lockAcquired, currLock, enqueueStatus, c.key(p, workspace)}, nil
 }
 
 // Unlock attempts to unlock a project and workspace. If successful,
@@ -160,7 +162,7 @@ func NewNoOpLocker() *NoOpLocker {
 
 // TryLock attempts to acquire a lock to a project and workspace.
 func (c *NoOpLocker) TryLock(p models.Project, workspace string, pull models.PullRequest, user models.User) (TryLockResponse, error) {
-	return TryLockResponse{true, models.ProjectLock{}, c.key(p, workspace)}, nil
+	return TryLockResponse{true, models.ProjectLock{}, models.EnqueueStatus{}, c.key(p, workspace)}, nil
 }
 
 // Unlock attempts to unlock a project and workspace. If successful,
