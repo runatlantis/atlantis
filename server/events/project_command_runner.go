@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
@@ -114,7 +115,7 @@ type ProjectCommandRunner interface {
 }
 
 // DefaultProjectCommandRunner implements ProjectCommandRunner.
-type DefaultProjectCommandRunner struct {
+type DefaultProjectCommandRunner struct { //create object and test
 	Locker                     ProjectLocker
 	LockURLGenerator           LockURLGenerator
 	InitStepRunner             StepRunner
@@ -122,13 +123,15 @@ type DefaultProjectCommandRunner struct {
 	ShowStepRunner             StepRunner
 	ApplyStepRunner            StepRunner
 	PolicyCheckStepRunner      StepRunner
-	VersionStepRunner          StepRunner
 	RunStepRunner              CustomStepRunner
 	EnvStepRunner              EnvStepRunner
+	PullApprovedChecker        runtime.PullApprovedChecker
 	WorkingDir                 WorkingDir
 	Webhooks                   WebhooksSender
 	WorkingDirLocker           WorkingDirLocker
 	AggregateApplyRequirements ApplyRequirement
+	TerraformOutputChan        chan<- *models.TerraformOutputLine
+	LogStreamURLGenerator      LogStreamURLGenerator
 }
 
 // Plan runs terraform plan for the project described by ctx.
@@ -312,6 +315,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 	}
 
 	outputs, err := p.runSteps(ctx.Steps, ctx, projAbsPath)
+
 	if err != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
@@ -398,6 +402,7 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx models.ProjectCommandContext
 
 func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.ProjectCommandContext, absPath string) ([]string, error) {
 	var outputs []string
+
 	envs := make(map[string]string)
 	for _, step := range steps {
 		var out string
