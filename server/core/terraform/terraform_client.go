@@ -16,6 +16,7 @@ package terraform
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -26,6 +27,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/hashicorp/go-getter"
 	"github.com/hashicorp/go-version"
@@ -70,6 +72,9 @@ type DefaultClient struct {
 
 	// usePluginCache determines whether or not to set the TF_PLUGIN_CACHE_DIR env var
 	usePluginCache bool
+
+	// optional directory where command output is saved
+	cmdOutputDir string
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_downloader.go Downloader
@@ -101,6 +106,7 @@ func NewClientWithDefaultVersion(
 	tfDownloader Downloader,
 	usePluginCache bool,
 	fetchAsync bool,
+	cmdOutputDir string,
 ) (*DefaultClient, error) {
 	var finalDefaultVersion *version.Version
 	var localVersion *version.Version
@@ -168,6 +174,7 @@ func NewClientWithDefaultVersion(
 		versionsLock:            &versionsLock,
 		versions:                versions,
 		usePluginCache:          usePluginCache,
+		cmdOutputDir:            cmdOutputDir,
 	}, nil
 
 }
@@ -182,7 +189,8 @@ func NewTestClient(
 	defaultVersionFlagName string,
 	tfDownloadURL string,
 	tfDownloader Downloader,
-	usePluginCache bool) (*DefaultClient, error) {
+	usePluginCache bool,
+	cmdOutputDir string) (*DefaultClient, error) {
 	return NewClientWithDefaultVersion(
 		log,
 		binDir,
@@ -195,6 +203,7 @@ func NewTestClient(
 		tfDownloader,
 		usePluginCache,
 		false,
+		cmdOutputDir,
 	)
 }
 
@@ -216,7 +225,8 @@ func NewClient(
 	defaultVersionFlagName string,
 	tfDownloadURL string,
 	tfDownloader Downloader,
-	usePluginCache bool) (*DefaultClient, error) {
+	usePluginCache bool,
+	cmdOutputDir string) (*DefaultClient, error) {
 	return NewClientWithDefaultVersion(
 		log,
 		binDir,
@@ -229,6 +239,7 @@ func NewClient(
 		tfDownloader,
 		usePluginCache,
 		true,
+		cmdOutputDir,
 	)
 }
 
@@ -270,15 +281,36 @@ func (c *DefaultClient) RunCommandWithVersion(log logging.SimpleLogging, path st
 	for key, val := range customEnvVars {
 		envVars = append(envVars, fmt.Sprintf("%s=%s", key, val))
 	}
+	var buf bytes.Buffer
+	writers := []io.Writer{&buf}
+	var loggedOutput *os.File
+	defer func() {
+		if loggedOutput != nil {
+			loggedOutput.Sync()
+			loggedOutput.Close()
+		}
+	}()
+	if c.cmdOutputDir != "" {
+		ts := time.Now().Format("20060102-150405")
+		loggedOutput, err = ioutil.TempFile(c.cmdOutputDir, "tf."+ts+".*.log")
+		if err != nil {
+			return "", err
+		}
+		log.Debug("saving output to %s", loggedOutput.Name())
+		writers = append(writers, loggedOutput)
+	}
+	mw := io.MultiWriter(writers...)
 	cmd.Env = envVars
-	out, err := cmd.CombinedOutput()
+	cmd.Stdout = mw
+	cmd.Stderr = mw
+	err = cmd.Run()
 	if err != nil {
 		err = errors.Wrapf(err, "running %q in %q", tfCmd, path)
 		log.Err(err.Error())
-		return string(out), err
+		return string(buf.Bytes()), err
 	}
 	log.Info("successfully ran %q in %q", tfCmd, path)
-	return string(out), nil
+	return string(buf.Bytes()), nil
 }
 
 // prepCmd builds a ready to execute command based on the version of terraform

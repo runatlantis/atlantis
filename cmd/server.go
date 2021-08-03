@@ -61,6 +61,7 @@ const (
 	DisableRepoLockingFlag     = "disable-repo-locking"
 	EnablePolicyChecksFlag     = "enable-policy-checks"
 	EnableRegExpCmdFlag        = "enable-regexp-cmd"
+	ExposeTFCmdOutput          = "expose-tf-cmd-output"
 	GHHostnameFlag             = "gh-hostname"
 	GHTokenFlag                = "gh-token"
 	GHUserFlag                 = "gh-user"
@@ -97,6 +98,7 @@ const (
 	SSLKeyFileFlag             = "ssl-key-file"
 	TFDownloadURLFlag          = "tf-download-url"
 	VCSStatusName              = "vcs-status-name"
+	TFCmdOutputDir             = "tf-cmd-output-dir"
 	TFEHostnameFlag            = "tfe-hostname"
 	TFETokenFlag               = "tfe-token"
 	WriteGitCredsFlag          = "write-git-creds"
@@ -254,6 +256,10 @@ var stringFlags = map[string]stringFlag{
 	SSLKeyFileFlag: {
 		description: fmt.Sprintf("File containing x509 private key matching --%s.", SSLCertFileFlag),
 	},
+	TFCmdOutputDir: {
+		description:  "Optional directory to save terraform client operation logs to.",
+		defaultValue: "",
+	},
 	TFDownloadURLFlag: {
 		description:  "Base URL to download Terraform versions from.",
 		defaultValue: DefaultTFDownloadURL,
@@ -314,6 +320,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	EnableRegExpCmdFlag: {
 		description:  "Enable Atlantis to use regular expressions on plan/apply commands when \"-p\" flag is passed with it.",
+		defaultValue: false,
+	},
+	ExposeTFCmdOutput: {
+		description:  "Enable HTTP access to logs in the TFCmdOutputDir directory.",
 		defaultValue: false,
 	},
 	AllowDraftPRs: {

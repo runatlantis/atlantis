@@ -30,6 +30,7 @@ type UserConfig struct {
 	DisableRepoLocking         bool   `mapstructure:"disable-repo-locking"`
 	EnablePolicyChecksFlag     bool   `mapstructure:"enable-policy-checks"`
 	EnableRegExpCmd            bool   `mapstructure:"enable-regexp-cmd"`
+	ExposeTFCmdOutput          bool   `mapstructure:"expose-tf-cmd-output"`
 	GithubHostname             string `mapstructure:"gh-hostname"`
 	GithubToken                string `mapstructure:"gh-token"`
 	GithubUser                 string `mapstructure:"gh-user"`
@@ -78,6 +79,7 @@ type UserConfig struct {
 	SlackToken             string          `mapstructure:"slack-token"`
 	SSLCertFile            string          `mapstructure:"ssl-cert-file"`
 	SSLKeyFile             string          `mapstructure:"ssl-key-file"`
+	TFCmdOutputDir         string          `mapstructure:"tf-cmd-output-dir"`
 	TFDownloadURL          string          `mapstructure:"tf-download-url"`
 	TFEHostname            string          `mapstructure:"tfe-hostname"`
 	TFEToken               string          `mapstructure:"tfe-token"`

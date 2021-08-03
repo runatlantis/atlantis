@@ -97,6 +97,7 @@ type Server struct {
 	SSLCertFile                   string
 	SSLKeyFile                    string
 	Drainer                       *events.Drainer
+	CommandOutputFs               http.FileSystem
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -283,7 +284,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		config.DefaultTFVersionFlag,
 		userConfig.TFDownloadURL,
 		&terraform.DefaultDownloader{},
-		true)
+		true,
+		userConfig.TFCmdOutputDir)
 	// The flag.Lookup call is to detect if we're running in a unit test. If we
 	// are, then we don't error out because we don't have/want terraform
 	// installed on our CI system where the unit tests run.
@@ -635,6 +637,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubOrg:           userConfig.GithubOrg,
 	}
 
+	var outputDirFs http.FileSystem
+	if userConfig.TFCmdOutputDir != "" && userConfig.ExposeTFCmdOutput {
+		outputDirFs = http.Dir(userConfig.TFCmdOutputDir)
+	}
+
 	return &Server{
 		AtlantisVersion:               config.AtlantisVersion,
 		AtlantisURL:                   parsedURL,
@@ -654,6 +661,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		SSLKeyFile:                    userConfig.SSLKeyFile,
 		SSLCertFile:                   userConfig.SSLCertFile,
 		Drainer:                       drainer,
+		CommandOutputFs:               outputDirFs,
 	}, nil
 }
 
@@ -673,6 +681,9 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
 	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
+	if s.CommandOutputFs != nil {
+		s.Router.PathPrefix("/cmdoutput/").Handler(http.StripPrefix("/cmdoutput/", http.FileServer(s.CommandOutputFs)))
+	}
 	n := negroni.New(&negroni.Recovery{
 		Logger:     log.New(os.Stdout, "", log.LstdFlags),
 		PrintStack: false,

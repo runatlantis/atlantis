@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -70,7 +71,7 @@ is 0.11.13. You can update by downloading from www.terraform.io/downloads.html
 	Ok(t, err)
 	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
 
-	c, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true)
+	c, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, "")
 	Ok(t, err)
 
 	Ok(t, err)
@@ -99,7 +100,7 @@ is 0.11.13. You can update by downloading from www.terraform.io/downloads.html
 	Ok(t, err)
 	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
 
-	c, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true)
+	c, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, "")
 	Ok(t, err)
 
 	Ok(t, err)
@@ -120,7 +121,7 @@ func TestNewClient_NoTF(t *testing.T) {
 	// Set PATH to only include our empty directory.
 	defer tempSetEnv(t, "PATH", tmp)()
 
-	_, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true)
+	_, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, "")
 	ErrEquals(t, "terraform not found in $PATH. Set --default-tf-version or download terraform from https://www.terraform.io/downloads.html", err)
 }
 
@@ -138,7 +139,7 @@ func TestNewClient_DefaultTFFlagInPath(t *testing.T) {
 	Ok(t, err)
 	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
 
-	c, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true)
+	c, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, "")
 	Ok(t, err)
 
 	Ok(t, err)
@@ -162,7 +163,7 @@ func TestNewClient_DefaultTFFlagInBinDir(t *testing.T) {
 	Ok(t, err)
 	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
 
-	c, err := terraform.NewClient(logging.NewNoopLogger(t), binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true)
+	c, err := terraform.NewClient(logging.NewNoopLogger(t), binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, "")
 	Ok(t, err)
 
 	Ok(t, err)
@@ -189,7 +190,7 @@ func TestNewClient_DefaultTFFlagDownload(t *testing.T) {
 		err := ioutil.WriteFile(params[0].(string), []byte("#!/bin/sh\necho '\nTerraform v0.11.10\n'"), 0700) // #nosec G306
 		return []pegomock.ReturnValue{err}
 	})
-	c, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, "https://my-mirror.releases.mycompany.com", mockDownloader, true)
+	c, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, "https://my-mirror.releases.mycompany.com", mockDownloader, true, "")
 	Ok(t, err)
 
 	Ok(t, err)
@@ -214,7 +215,7 @@ func TestNewClient_BadVersion(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	_, binDir, cacheDir, cleanup := mkSubDirs(t)
 	defer cleanup()
-	_, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "malformed", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true)
+	_, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "malformed", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, "")
 	ErrEquals(t, "Malformed version: malformed", err)
 }
 
@@ -238,7 +239,7 @@ func TestRunCommandWithVersion_DLsTF(t *testing.T) {
 		return []pegomock.ReturnValue{err}
 	})
 
-	c, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, mockDownloader, true)
+	c, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, mockDownloader, true, "")
 	Ok(t, err)
 	Equals(t, "0.11.10", c.DefaultVersion().String())
 
@@ -258,7 +259,7 @@ func TestEnsureVersion_downloaded(t *testing.T) {
 
 	mockDownloader := mocks.NewMockDownloader()
 
-	c, err := terraform.NewTestClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, mockDownloader, true)
+	c, err := terraform.NewTestClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, mockDownloader, true, "")
 	Ok(t, err)
 
 	Equals(t, "0.11.10", c.DefaultVersion().String())
@@ -277,6 +278,45 @@ func TestEnsureVersion_downloaded(t *testing.T) {
 		runtime.GOARCH,
 		baseURL)
 	mockDownloader.VerifyWasCalledEventually(Once(), 2*time.Second).GetFile(filepath.Join(tmp, "bin", "terraform99.99.99"), expURL)
+}
+
+// Test that we write command output to a provided directory
+func TestCmdOutput_saved(t *testing.T) {
+	fakeBinOut := "Terraform v0.11.10\n"
+	logger := logging.NewNoopLogger(t)
+	tmp, binDir, cacheDir, cleanup := mkSubDirs(t)
+	defer cleanup()
+
+	// We're testing this by adding our own "fake" terraform binary to path that
+	// outputs what would normally come from terraform version.
+	err := ioutil.WriteFile(filepath.Join(tmp, "terraform0.11.10"), []byte(fmt.Sprintf("#!/bin/sh\necho '%s'", fakeBinOut)), 0700) // #nosec G306
+	Ok(t, err)
+	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
+
+	c, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, tmp)
+	Ok(t, err)
+
+	Ok(t, err)
+	Equals(t, "0.11.10", c.DefaultVersion().String())
+
+	output, err := c.RunCommandWithVersion(logger, tmp, nil, map[string]string{}, nil, "")
+	Ok(t, err)
+	Equals(t, fakeBinOut+"\n", output)
+
+	tmpEntries, err := os.ReadDir(tmp)
+	Ok(t, err)
+
+	logFiles := []string{}
+	for _, x := range tmpEntries {
+		if strings.HasPrefix(x.Name(), "tf.") && strings.HasSuffix(x.Name(), ".log") {
+			logFiles = append(logFiles, x.Name())
+		}
+	}
+	Assert(t, len(logFiles) == 1, "expected one log file", logFiles)
+
+	logContents, err := ioutil.ReadFile(filepath.Join(tmp, logFiles[0]))
+	Ok(t, err)
+	Equals(t, string(logContents), output)
 }
 
 // tempSetEnv sets env var key to value. It returns a function that when called
