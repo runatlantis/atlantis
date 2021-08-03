@@ -296,7 +296,7 @@ func (c *DefaultClient) RunCommandWithVersion(log logging.SimpleLogging, path st
 		if err != nil {
 			return "", err
 		}
-		log.Debug("saving output to %s", loggedOutput.Name())
+		log.Debug("saving output to %q", loggedOutput.Name())
 		writers = append(writers, loggedOutput)
 	}
 	mw := io.MultiWriter(writers...)
