@@ -47,6 +47,12 @@ Values are chosen in this order:
 
 
 ## Flags
+* ### `--allow-apply-disable`
+  ```bash
+  atlantis server --allow-apply-disable=true
+  ```
+  Disable the "Disable Apply Commands" button on the web UI
+
 * ### `--allow-draft-prs`
   ```bash
   atlantis server --allow-draft-prs

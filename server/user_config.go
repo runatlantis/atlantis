@@ -8,6 +8,7 @@ import (
 // The mapstructure tags correspond to flags in cmd/server.go and are used when
 // the config is parsed from a YAML file.
 type UserConfig struct {
+	AllowApplyDisable          bool   `mapstructure:"allow-apply-disable"`
 	AllowForkPRs               bool   `mapstructure:"allow-fork-prs"`
 	AllowRepoConfig            bool   `mapstructure:"allow-repo-config"`
 	AtlantisURL                string `mapstructure:"atlantis-url"`

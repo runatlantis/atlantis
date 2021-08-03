@@ -55,7 +55,8 @@ type IndexData struct {
 	// CleanedBasePath is the path Atlantis is accessible at externally. If
 	// not using a path-based proxy, this will be an empty string. Never ends
 	// in a '/' (hence "cleaned").
-	CleanedBasePath string
+	CleanedBasePath   string
+	AllowApplyDisable bool
 }
 
 var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
@@ -96,7 +97,8 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
       <h6><code>Active Since</code>: <strong>{{ .ApplyLock.TimeFormatted }}</strong></h6>
       <a class="button button-primary" id="applyUnlockPrompt">Enable Apply Commands</a>
     </div>
-    {{ else }}
+    {{ end }}
+    {{ if .AllowApplyDisable }}
     <div class="twelve columns">
       <h6><strong>Apply commands are enabled</strong></h6>
       <a class="button button-primary" id="applyLockPrompt">Disable Apply Commands</a>

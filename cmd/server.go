@@ -56,6 +56,7 @@ const (
 	DefaultTFVersionFlag       = "default-tf-version"
 	DisableApplyAllFlag        = "disable-apply-all"
 	DisableApplyFlag           = "disable-apply"
+	AllowApplyDisable          = "allow-apply-disable"
 	DisableAutoplanFlag        = "disable-autoplan"
 	DisableMarkdownFoldingFlag = "disable-markdown-folding"
 	DisableRepoLockingFlag     = "disable-repo-locking"
@@ -300,6 +301,10 @@ var boolFlags = map[string]boolFlag{
 	DisableApplyFlag: {
 		description:  "Disable all \"atlantis apply\" command regardless of which flags are passed with it.",
 		defaultValue: false,
+	},
+	AllowApplyDisable: {
+		description:  "Disable the \"Disable Apply Commands\" button from the Web UI",
+		defaultValue: true,
 	},
 	DisableAutoplanFlag: {
 		description:  "Disable atlantis auto planning feature",

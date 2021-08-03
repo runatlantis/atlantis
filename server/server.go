@@ -97,6 +97,7 @@ type Server struct {
 	SSLCertFile                   string
 	SSLKeyFile                    string
 	Drainer                       *events.Drainer
+	UserConfig                    UserConfig
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -654,6 +655,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		SSLKeyFile:                    userConfig.SSLKeyFile,
 		SSLCertFile:                   userConfig.SSLCertFile,
 		Drainer:                       drainer,
+		UserConfig:                    userConfig,
 	}, nil
 }
 
@@ -775,10 +777,11 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	sort.SliceStable(lockResults, func(i, j int) bool { return lockResults[i].Time.After(lockResults[j].Time) })
 
 	err = s.IndexTemplate.Execute(w, templates.IndexData{
-		Locks:           lockResults,
-		ApplyLock:       applyLockData,
-		AtlantisVersion: s.AtlantisVersion,
-		CleanedBasePath: s.AtlantisURL.Path,
+		Locks:             lockResults,
+		ApplyLock:         applyLockData,
+		AtlantisVersion:   s.AtlantisVersion,
+		CleanedBasePath:   s.AtlantisURL.Path,
+		AllowApplyDisable: s.UserConfig.AllowApplyDisable,
 	})
 	if err != nil {
 		s.Logger.Err(err.Error())
