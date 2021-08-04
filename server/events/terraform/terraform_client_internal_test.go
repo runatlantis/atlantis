@@ -91,7 +91,7 @@ func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	logger := logging.NewNoopLogger(t)
-	tempchan := make(chan *models.TerraformOutputLine)
+	tempchan := make(chan *models.ProjectCmdOutputLine)
 	ctx := models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "default",
@@ -138,7 +138,7 @@ func TestDefaultClient_RunCommandWithVersion_Error(t *testing.T) {
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	logger := logging.NewNoopLogger(t)
-	tempchan := make(chan *models.TerraformOutputLine)
+	tempchan := make(chan *models.ProjectCmdOutputLine)
 	ctx := models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "default",
@@ -181,7 +181,7 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	logger := logging.NewNoopLogger(t)
-	tempchan := make(chan *models.TerraformOutputLine)
+	tempchan := make(chan *models.ProjectCmdOutputLine)
 	ctx := models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "default",
@@ -228,7 +228,7 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	logger := logging.NewNoopLogger(t)
-	tempchan := make(chan *models.TerraformOutputLine)
+	tempchan := make(chan *models.ProjectCmdOutputLine)
 	ctx := models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "default",
@@ -276,7 +276,7 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	logger := logging.NewNoopLogger(t)
-	tempchan := make(chan *models.TerraformOutputLine)
+	tempchan := make(chan *models.ProjectCmdOutputLine)
 	ctx := models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "default",
@@ -313,7 +313,7 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	logger := logging.NewNoopLogger(t)
-	tempchan := make(chan *models.TerraformOutputLine)
+	tempchan := make(chan *models.ProjectCmdOutputLine)
 	ctx := models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "default",
@@ -351,7 +351,7 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	logger := logging.NewNoopLogger(t)
-	tempchan := make(chan *models.TerraformOutputLine)
+	tempchan := make(chan *models.ProjectCmdOutputLine)
 	ctx := models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "default",
@@ -395,7 +395,7 @@ func waitCh(ch <-chan Line) (string, error) {
 	return strings.Join(ls, "\n"), nil
 }
 
-func waitTfStreaming(ch chan *models.TerraformOutputLine) {
+func waitTfStreaming(ch chan *models.ProjectCmdOutputLine) {
 	go func() {
 		for range ch {
 		}

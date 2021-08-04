@@ -61,7 +61,7 @@ Your version of Terraform is out of date! The latest version
 is 0.11.13. You can update by downloading from www.terraform.io/downloads.html
 `
 	tmp, binDir, cacheDir, cleanup := mkSubDirs(t)
-	tempchan := make(chan *models.TerraformOutputLine)
+	tempchan := make(chan *models.ProjectCmdOutputLine)
 	ctx := models.ProjectCommandContext{
 		Log:        logging.NewNoopLogger(t),
 		Workspace:  "default",
@@ -100,7 +100,7 @@ is 0.11.13. You can update by downloading from www.terraform.io/downloads.html
 `
 	logger := logging.NewNoopLogger(t)
 	tmp, binDir, cacheDir, cleanup := mkSubDirs(t)
-	tempchan := make(chan *models.TerraformOutputLine)
+	tempchan := make(chan *models.ProjectCmdOutputLine)
 	ctx := models.ProjectCommandContext{
 		Log:        logging.NewNoopLogger(t),
 		Workspace:  "default",
@@ -131,7 +131,7 @@ is 0.11.13. You can update by downloading from www.terraform.io/downloads.html
 func TestNewClient_NoTF(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	tmp, binDir, cacheDir, cleanup := mkSubDirs(t)
-	tempchan := make(chan<- *models.TerraformOutputLine)
+	tempchan := make(chan<- *models.ProjectCmdOutputLine)
 	defer cleanup()
 
 	// Set PATH to only include our empty directory.
@@ -147,7 +147,7 @@ func TestNewClient_DefaultTFFlagInPath(t *testing.T) {
 	fakeBinOut := "Terraform v0.11.10\n"
 	logger := logging.NewNoopLogger(t)
 	tmp, binDir, cacheDir, cleanup := mkSubDirs(t)
-	tempchan := make(chan *models.TerraformOutputLine)
+	tempchan := make(chan *models.ProjectCmdOutputLine)
 	ctx := models.ProjectCommandContext{
 		Log:        logging.NewNoopLogger(t),
 		Workspace:  "default",
@@ -179,7 +179,7 @@ func TestNewClient_DefaultTFFlagInPath(t *testing.T) {
 func TestNewClient_DefaultTFFlagInBinDir(t *testing.T) {
 	fakeBinOut := "Terraform v0.11.10\n"
 	tmp, binDir, cacheDir, cleanup := mkSubDirs(t)
-	tempchan := make(chan *models.TerraformOutputLine)
+	tempchan := make(chan *models.ProjectCmdOutputLine)
 	ctx := models.ProjectCommandContext{
 		Log:        logging.NewNoopLogger(t),
 		Workspace:  "default",
@@ -210,7 +210,7 @@ func TestNewClient_DefaultTFFlagDownload(t *testing.T) {
 	RegisterMockTestingT(t)
 	logger := logging.NewNoopLogger(t)
 	tmp, binDir, cacheDir, cleanup := mkSubDirs(t)
-	tempchan := make(chan *models.TerraformOutputLine)
+	tempchan := make(chan *models.ProjectCmdOutputLine)
 	ctx := models.ProjectCommandContext{
 		Log:        logging.NewNoopLogger(t),
 		Workspace:  "default",
@@ -253,7 +253,7 @@ func TestNewClient_DefaultTFFlagDownload(t *testing.T) {
 func TestNewClient_BadVersion(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	_, binDir, cacheDir, cleanup := mkSubDirs(t)
-	tempchan := make(chan<- *models.TerraformOutputLine)
+	tempchan := make(chan<- *models.ProjectCmdOutputLine)
 	defer cleanup()
 	_, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "malformed", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, nil, true, tempchan)
 	ErrEquals(t, "Malformed version: malformed", err)
@@ -264,7 +264,7 @@ func TestRunCommandWithVersion_DLsTF(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	RegisterMockTestingT(t)
 	tmp, binDir, cacheDir, cleanup := mkSubDirs(t)
-	tempchan := make(chan *models.TerraformOutputLine)
+	tempchan := make(chan *models.ProjectCmdOutputLine)
 	ctx := models.ProjectCommandContext{
 		Log:        logging.NewNoopLogger(t),
 		Workspace:  "default",
@@ -305,7 +305,7 @@ func TestEnsureVersion_downloaded(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	RegisterMockTestingT(t)
 	tmp, binDir, cacheDir, cleanup := mkSubDirs(t)
-	tempchan := make(chan<- *models.TerraformOutputLine)
+	tempchan := make(chan<- *models.ProjectCmdOutputLine)
 	defer cleanup()
 
 	mockDownloader := mocks.NewMockDownloader()
@@ -353,7 +353,7 @@ func mkSubDirs(t *testing.T) (string, string, string, func()) {
 	return tmp, binDir, cachedir, cleanup
 }
 
-func waitTfStreaming(ch chan *models.TerraformOutputLine) {
+func waitTfStreaming(ch chan *models.ProjectCmdOutputLine) {
 	go func() {
 		for range ch {
 		}

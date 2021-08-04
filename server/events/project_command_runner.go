@@ -124,7 +124,7 @@ type DefaultProjectCommandRunner struct { //create object and test
 	WorkingDir            WorkingDir
 	Webhooks              WebhooksSender
 	WorkingDirLocker      WorkingDirLocker
-	TerraformOutputChan   chan<- *models.TerraformOutputLine
+	TerraformOutputChan   chan<- *models.ProjectCmdOutputLine
 	LogStreamURLGenerator LogStreamURLGenerator
 }
 

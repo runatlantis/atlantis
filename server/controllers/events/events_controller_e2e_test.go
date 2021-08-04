@@ -666,7 +666,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	e2eStatusUpdater := &events.DefaultCommitStatusUpdater{Client: e2eVCSClient}
 	e2eGithubGetter := mocks.NewMockGithubPullGetter()
 	e2eGitlabGetter := mocks.NewMockGitlabMergeRequestGetter()
-	tempchan := make(chan *models.TerraformOutputLine)
+	tempchan := make(chan *models.ProjectCmdOutputLine)
 
 	// Real dependencies.
 	logger := logging.NewNoopLogger(t)

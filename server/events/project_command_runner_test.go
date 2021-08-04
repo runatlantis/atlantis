@@ -41,7 +41,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	realEnv := runtime.EnvStepRunner{}
 	mockWorkingDir := mocks.NewMockWorkingDir()
 	mockLocker := mocks.NewMockProjectLocker()
-	mockChannel := make(chan *models.TerraformOutputLine)
+	mockChannel := make(chan *models.ProjectCmdOutputLine)
 
 	runner := events.DefaultProjectCommandRunner{
 		Locker:              mockLocker,
