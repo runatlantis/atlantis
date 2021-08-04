@@ -41,7 +41,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	realEnv := runtime.EnvStepRunner{}
 	mockWorkingDir := mocks.NewMockWorkingDir()
 	mockLocker := mocks.NewMockProjectLocker()
-	mockApplyReqHandler := mocks.NewMockApplyRequirementHandler()
+	mockApplyReqHandler := mocks.NewMockIAggregateApplyRequirements()
 
 	runner := events.DefaultProjectCommandRunner{
 		Locker:                  mockLocker,
@@ -151,7 +151,7 @@ func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 	runner := &events.DefaultProjectCommandRunner{
 		WorkingDir:       mockWorkingDir,
 		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
-		ApplyRequirementHandler: &events.DefaultApplyRequirementHandler{
+		ApplyRequirementHandler: &events.AggregateApplyRequirements{
 			PullApprovedChecker: mockApproved,
 			WorkingDir:          mockWorkingDir,
 		},
@@ -175,7 +175,7 @@ func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 	runner := &events.DefaultProjectCommandRunner{
 		WorkingDir:       mockWorkingDir,
 		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
-		ApplyRequirementHandler: &events.DefaultApplyRequirementHandler{
+		ApplyRequirementHandler: &events.AggregateApplyRequirements{
 			WorkingDir: mockWorkingDir,
 		},
 	}
@@ -198,7 +198,7 @@ func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 	runner := &events.DefaultProjectCommandRunner{
 		WorkingDir:       mockWorkingDir,
 		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
-		ApplyRequirementHandler: &events.DefaultApplyRequirementHandler{
+		ApplyRequirementHandler: &events.AggregateApplyRequirements{
 			WorkingDir: mockWorkingDir,
 		},
 	}
@@ -304,7 +304,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			mockWorkingDir := mocks.NewMockWorkingDir()
 			mockLocker := mocks.NewMockProjectLocker()
 			mockSender := mocks.NewMockWebhooksSender()
-			applyReqHandler := &events.DefaultApplyRequirementHandler{
+			applyReqHandler := &events.AggregateApplyRequirements{
 				PullApprovedChecker: mockApproved,
 				WorkingDir:          mockWorkingDir,
 			}

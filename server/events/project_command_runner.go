@@ -128,7 +128,7 @@ type DefaultProjectCommandRunner struct {
 	WorkingDir              WorkingDir
 	Webhooks                WebhooksSender
 	WorkingDirLocker        WorkingDirLocker
-	ApplyRequirementHandler ApplyRequirementHandler
+	ApplyRequirementHandler IAggregateApplyRequirements
 }
 
 // Plan runs terraform plan for the project described by ctx.
@@ -341,10 +341,9 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 		return "", "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
-	var isApplied bool
-	applyOut, failure, isApplied, err = p.ApplyRequirementHandler.HandleApplyRequirements(repoDir, ctx)
-	if isApplied {
-		return applyOut, failure, err
+	failure, err = p.ApplyRequirementHandler.ValidateProject(repoDir, ctx)
+	if failure != "" || err != nil {
+		return "", failure, err
 	}
 
 	// Acquire internal lock for the directory we're going to operate in.

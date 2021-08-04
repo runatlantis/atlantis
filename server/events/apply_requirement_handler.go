@@ -8,43 +8,43 @@ import (
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 )
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_apply_handler.go ApplyRequirementHandler
-type ApplyRequirementHandler interface {
-	HandleApplyRequirements(repoDir string, ctx models.ProjectCommandContext) (string, string, bool, error)
+//go:generate pegomock generate -m --package mocks -o mocks/mock_apply_handler.go IAggregateApplyRequirements
+type IAggregateApplyRequirements interface {
+	ValidateProject(repoDir string, ctx models.ProjectCommandContext) (string, error)
 }
 
-type DefaultApplyRequirementHandler struct {
+type AggregateApplyRequirements struct {
 	PullApprovedChecker runtime.PullApprovedChecker
 	WorkingDir          WorkingDir
 }
 
-func (a *DefaultApplyRequirementHandler) HandleApplyRequirements(repoDir string, ctx models.ProjectCommandContext) (applyOut string, failure string, isApplied bool, err error) {
+func (a *AggregateApplyRequirements) ValidateProject(repoDir string, ctx models.ProjectCommandContext) (failure string, err error) {
 
 	for _, req := range ctx.ApplyRequirements {
 		switch req {
 		case raw.ApprovedApplyRequirement:
 			approved, err := a.PullApprovedChecker.PullIsApproved(ctx.Pull.BaseRepo, ctx.Pull) // nolint: vetshadow
 			if err != nil {
-				return "", "", true, errors.Wrap(err, "checking if pull request was approved")
+				return "", errors.Wrap(err, "checking if pull request was approved")
 			}
 			if !approved {
-				return "", "Pull request must be approved by at least one person other than the author before running apply.", true, nil
+				return "Pull request must be approved by at least one person other than the author before running apply.", nil
 			}
 		// this should come before mergeability check since mergeability is a superset of this check.
 		case valid.PoliciesPassedApplyReq:
 			if ctx.ProjectPlanStatus == models.ErroredPolicyCheckStatus {
-				return "", "All policies must pass for project before running apply", true, nil
+				return "All policies must pass for project before running apply", nil
 			}
 		case raw.MergeableApplyRequirement:
 			if !ctx.PullMergeable {
-				return "", "Pull request must be mergeable before running apply.", true, nil
+				return "Pull request must be mergeable before running apply.", nil
 			}
 		case raw.UnDivergedApplyRequirement:
 			if a.WorkingDir.HasDiverged(ctx.Log, repoDir) {
-				return "", "Default branch must be rebased onto pull request before running apply.", true, nil
+				return "Default branch must be rebased onto pull request before running apply.", nil
 			}
 		}
 	}
-	// No apply requirements applied.
-	return "", "", false, nil
+	// Passed all apply requirements configured.
+	return "", nil
 }

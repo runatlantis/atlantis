@@ -449,7 +449,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, errors.Wrap(err, "initializing policy check runner")
 	}
 
-	applyRequirementHandler := &events.DefaultApplyRequirementHandler{
+	applyRequirementHandler := &events.AggregateApplyRequirements{
 		PullApprovedChecker: vcsClient,
 		WorkingDir:          workingDir,
 	}
