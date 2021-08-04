@@ -115,20 +115,20 @@ type ProjectCommandRunner interface {
 
 // DefaultProjectCommandRunner implements ProjectCommandRunner.
 type DefaultProjectCommandRunner struct {
-	Locker                  ProjectLocker
-	LockURLGenerator        LockURLGenerator
-	InitStepRunner          StepRunner
-	PlanStepRunner          StepRunner
-	ShowStepRunner          StepRunner
-	ApplyStepRunner         StepRunner
-	PolicyCheckStepRunner   StepRunner
-	VersionStepRunner       StepRunner
-	RunStepRunner           CustomStepRunner
-	EnvStepRunner           EnvStepRunner
-	WorkingDir              WorkingDir
-	Webhooks                WebhooksSender
-	WorkingDirLocker        WorkingDirLocker
-	ApplyRequirementHandler IAggregateApplyRequirements
+	Locker                     ProjectLocker
+	LockURLGenerator           LockURLGenerator
+	InitStepRunner             StepRunner
+	PlanStepRunner             StepRunner
+	ShowStepRunner             StepRunner
+	ApplyStepRunner            StepRunner
+	PolicyCheckStepRunner      StepRunner
+	VersionStepRunner          StepRunner
+	RunStepRunner              CustomStepRunner
+	EnvStepRunner              EnvStepRunner
+	WorkingDir                 WorkingDir
+	Webhooks                   WebhooksSender
+	WorkingDirLocker           WorkingDirLocker
+	AggregateApplyRequirements ApplyRequirement
 }
 
 // Plan runs terraform plan for the project described by ctx.
@@ -341,7 +341,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 		return "", "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
-	failure, err = p.ApplyRequirementHandler.ValidateProject(repoDir, ctx)
+	failure, err = p.AggregateApplyRequirements.ValidateProject(repoDir, ctx)
 	if failure != "" || err != nil {
 		return "", failure, err
 	}

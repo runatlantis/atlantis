@@ -8,8 +8,8 @@ import (
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 )
 
-//go:generate pegomock generate -m --package mocks -o mocks/mock_apply_handler.go IAggregateApplyRequirements
-type IAggregateApplyRequirements interface {
+//go:generate pegomock generate -m --package mocks -o mocks/mock_apply_handler.go ApplyRequirement
+type ApplyRequirement interface {
 	ValidateProject(repoDir string, ctx models.ProjectCommandContext) (string, error)
 }
 
