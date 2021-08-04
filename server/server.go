@@ -482,10 +482,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTfVersion,
 		},
-		WorkingDir:              workingDir,
-		Webhooks:                webhooksManager,
-		WorkingDirLocker:        workingDirLocker,
-		ApplyRequirementHandler: applyRequirementHandler,
+		WorkingDir:                 workingDir,
+		Webhooks:                   webhooksManager,
+		WorkingDirLocker:           workingDirLocker,
+		AggregateApplyRequirements: applyRequirementHandler,
 	}
 
 	dbUpdater := &events.DBUpdater{
