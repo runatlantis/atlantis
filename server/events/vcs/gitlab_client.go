@@ -208,6 +208,7 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	if mr.MergeStatus == "can_be_merged" &&
 		mr.ApprovalsBeforeMerge <= 0 &&
 		mr.BlockingDiscussionsResolved &&
+		!mr.WorkInProgress &&
 		(allowSkippedPipeline || !isPipelineSkipped) {
 		return true, nil
 	}
