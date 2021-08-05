@@ -106,6 +106,7 @@ var testFlags = map[string]interface{}{
 	DisableAutoplanFlag:        true,
 	EnablePolicyChecksFlag:     false,
 	EnableRegExpCmdFlag:        false,
+	EnableDiffMarkdownFormat:   false,
 }
 
 func TestExecute_Defaults(t *testing.T) {

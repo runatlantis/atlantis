@@ -518,6 +518,17 @@ func (p *PlanSuccess) Summary() string {
 	return note + r.FindString(p.TerraformOutput)
 }
 
+// DiffMarkdownFormattedTerraformOutput formats the Terraform output to match diff markdown format
+func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
+	diffKeywordRegex := regexp.MustCompile(`(?m)^( +)([-+~])`)
+	diffTildeRegex := regexp.MustCompile(`(?m)^~`)
+
+	formattedTerraformOutput := diffKeywordRegex.ReplaceAllString(p.TerraformOutput, "$2$1")
+	formattedTerraformOutput = diffTildeRegex.ReplaceAllString(formattedTerraformOutput, "!")
+
+	return formattedTerraformOutput
+}
+
 // PolicyCheckSuccess is the result of a successful policy check run.
 type PolicyCheckSuccess struct {
 	// PolicyCheckOutput is the output from policy check binary(conftest|opa)

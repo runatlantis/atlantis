@@ -61,6 +61,7 @@ const (
 	DisableRepoLockingFlag     = "disable-repo-locking"
 	EnablePolicyChecksFlag     = "enable-policy-checks"
 	EnableRegExpCmdFlag        = "enable-regexp-cmd"
+	EnableDiffMarkdownFormat   = "enable-diff-markdown-format"
 	GHHostnameFlag             = "gh-hostname"
 	GHTokenFlag                = "gh-token"
 	GHUserFlag                 = "gh-user"
@@ -314,6 +315,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	EnableRegExpCmdFlag: {
 		description:  "Enable Atlantis to use regular expressions on plan/apply commands when \"-p\" flag is passed with it.",
+		defaultValue: false,
+	},
+	EnableDiffMarkdownFormat: {
+		description:  "Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.",
 		defaultValue: false,
 	},
 	AllowDraftPRs: {
