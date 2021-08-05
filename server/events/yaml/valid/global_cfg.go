@@ -12,6 +12,7 @@ import (
 const MergeableApplyReq = "mergeable"
 const ApprovedApplyReq = "approved"
 const UnDivergedApplyReq = "undiverged"
+const SQUnlockedApplyReq = "unlocked"
 const PoliciesPassedApplyReq = "policies_passed"
 const ApplyRequirementsKey = "apply_requirements"
 const PreWorkflowHooksKey = "pre_workflow_hooks"
@@ -109,12 +110,13 @@ var DefaultPlanStage = Stage{
 }
 
 // Deprecated: use NewGlobalCfgFromArgs
-func NewGlobalCfgWithHooks(allowRepoCfg bool, mergeableReq bool, approvedReq bool, unDivergedReq bool, preWorkflowHooks []*PreWorkflowHook) GlobalCfg {
+func NewGlobalCfgWithHooks(allowRepoCfg bool, mergeableReq bool, approvedReq bool, unDivergedReq bool, sqUnLockedReq bool, preWorkflowHooks []*PreWorkflowHook) GlobalCfg {
 	return NewGlobalCfgFromArgs(GlobalCfgArgs{
 		AllowRepoCfg:     allowRepoCfg,
 		MergeableReq:     mergeableReq,
 		ApprovedReq:      approvedReq,
 		UnDivergedReq:    unDivergedReq,
+		SQUnLockedReq:    sqUnLockedReq,
 		PreWorkflowHooks: preWorkflowHooks,
 	})
 }
@@ -139,6 +141,7 @@ type GlobalCfgArgs struct {
 	MergeableReq       bool
 	ApprovedReq        bool
 	UnDivergedReq      bool
+	SQUnLockedReq      bool
 	PolicyCheckEnabled bool
 	PreWorkflowHooks   []*PreWorkflowHook
 }
@@ -164,7 +167,9 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 	if args.UnDivergedReq {
 		applyReqs = append(applyReqs, UnDivergedApplyReq)
 	}
-
+	if args.SQUnLockedReq {
+		applyReqs = append(applyReqs, SQUnlockedApplyReq)
+	}
 	if args.PolicyCheckEnabled {
 		applyReqs = append(applyReqs, PoliciesPassedApplyReq)
 	}

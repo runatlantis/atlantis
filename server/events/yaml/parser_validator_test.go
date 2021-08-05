@@ -1230,7 +1230,7 @@ func TestParseGlobalCfg(t *testing.T) {
 			input: `repos:
 - id: /.*/
   apply_requirements: [invalid]`,
-			expErr: "repos: (0: (apply_requirements: \"invalid\" is not a valid apply_requirement, only \"approved\", \"mergeable\" and \"undiverged\" are supported.).).",
+			expErr: "repos: (0: (apply_requirements: \"invalid\" is not a valid apply_requirement, supported apply requirements are: \"approved\", \"mergeable\", \"undiverged\", \"unlocked\".).).",
 		},
 		"no workflows key": {
 			input: `repos: []`,

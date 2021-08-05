@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	validation "github.com/go-ozzo/ozzo-validation"
@@ -17,7 +18,17 @@ const (
 	ApprovedApplyRequirement   = "approved"
 	MergeableApplyRequirement  = "mergeable"
 	UnDivergedApplyRequirement = "undiverged"
+	UnlockedApplyRequirement   = "unlocked"
 )
+
+var applyRequirements = map[string]bool{
+	ApprovedApplyRequirement:   true,
+	MergeableApplyRequirement:  true,
+	UnDivergedApplyRequirement: true,
+	UnlockedApplyRequirement:   true,
+}
+
+var supportedApplyReqs = buildSupportedApplyReqs()
 
 type Project struct {
 	Name                      *string   `yaml:"name,omitempty"`
@@ -105,11 +116,28 @@ func validProjectName(name string) bool {
 }
 
 func validApplyReq(value interface{}) error {
+	applyRequirementsList := make([]string, 0, len(applyRequirements))
+	for applyReq := range applyRequirements {
+		applyRequirementsList = append(applyRequirementsList, applyReq)
+	}
+	sort.Strings(applyRequirementsList)
+
 	reqs := value.([]string)
-	for _, r := range reqs {
-		if r != ApprovedApplyRequirement && r != MergeableApplyRequirement && r != UnDivergedApplyRequirement {
-			return fmt.Errorf("%q is not a valid apply_requirement, only %q, %q and %q are supported", r, ApprovedApplyRequirement, MergeableApplyRequirement, UnDivergedApplyRequirement)
+	for _, req := range reqs {
+		if _, ok := applyRequirements[req]; !ok {
+			return fmt.Errorf("%q is not a valid apply_requirement, supported apply requirements are: %s", req, supportedApplyReqs)
 		}
 	}
 	return nil
+}
+
+func buildSupportedApplyReqs() string {
+	// Sort keys.
+	applyRequirementsList := make([]string, 0, len(applyRequirements))
+	for applyReq := range applyRequirements {
+		applyRequirementsList = append(applyRequirementsList, applyReq)
+	}
+	sort.Strings(applyRequirementsList)
+
+	return "\"" + strings.Join(applyRequirementsList, "\", \"") + "\""
 }
