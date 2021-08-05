@@ -65,7 +65,10 @@ type UserConfig struct {
 	SilenceNoProjects bool `mapstructure:"silence-no-projects"`
 	// RequireUnDiverged is whether to require pull requests to rebase default branch before
 	// allowing terraform apply's to run.
-	RequireUnDiverged   bool `mapstructure:"require-undiverged"`
+	RequireUnDiverged bool `mapstructure:"require-undiverged"`
+	// RequireSQUnlocked is whether to require pull requests to be unlocked before running
+	// terraform apply.
+	RequireSQUnlocked   bool `mapstructure:"require-unlocked"`
 	SilenceForkPRErrors bool `mapstructure:"silence-fork-pr-errors"`
 	// SilenceVCSStatusNoPlans is whether autoplan should set commit status if no plans
 	// are found.

@@ -87,6 +87,7 @@ const (
 	RepoWhitelistFlag          = "repo-whitelist"
 	RepoAllowlistFlag          = "repo-allowlist"
 	RequireApprovalFlag        = "require-approval"
+	RequireSQUnlockedFlag      = "require-unlocked"
 	RequireMergeableFlag       = "require-mergeable"
 	SilenceNoProjectsFlag      = "silence-no-projects"
 	SilenceForkPRErrorsFlag    = "silence-fork-pr-errors"
@@ -342,6 +343,10 @@ var boolFlags = map[string]boolFlag{
 		description:  "Require pull requests to be mergeable before allowing the apply command to be run.",
 		defaultValue: false,
 		hidden:       true,
+	},
+	RequireSQUnlockedFlag: {
+		description:  "Require pull requests to be \"Unlocked\" before allowing the apply command to be run.",
+		defaultValue: false,
 	},
 	SilenceNoProjectsFlag: {
 		description:  "Silences Atlants from responding to PRs when it finds no projects.",

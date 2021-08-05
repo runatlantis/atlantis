@@ -372,6 +372,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			MergeableReq:       userConfig.RequireMergeable,
 			ApprovedReq:        userConfig.RequireApproval,
 			UnDivergedReq:      userConfig.RequireUnDiverged,
+			SQUnLockedReq:      userConfig.RequireSQUnlocked,
 			PolicyCheckEnabled: userConfig.EnablePolicyChecksFlag,
 		})
 	if userConfig.RepoConfig != "" {

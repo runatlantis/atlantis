@@ -101,7 +101,7 @@ func TestProject_Validate(t *testing.T) {
 				Dir:               String("."),
 				ApplyRequirements: []string{"unsupported"},
 			},
-			expErr: "apply_requirements: \"unsupported\" is not a valid apply_requirement, only \"approved\", \"mergeable\" and \"undiverged\" are supported.",
+			expErr: "apply_requirements: \"unsupported\" is not a valid apply_requirement, supported apply requirements are: \"approved\", \"mergeable\", \"undiverged\", \"unlocked\".",
 		},
 		{
 			description: "apply reqs with approved requirement",
