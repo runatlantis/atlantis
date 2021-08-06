@@ -58,7 +58,7 @@ func TestRunDelegate(t *testing.T) {
 
 		expectedOut := "some random output"
 
-		When(mockRemoteRunner.Run(ctx, extraArgs, tmpDir, envs)).ThenReturn(expectedOut, nil)
+		When(mockRemoteRunner.Run(ctx, extraArgs, tmpDir, envs, models.NotParallel)).ThenReturn(expectedOut, nil)
 
 		output, err := subject.Run(ctx, extraArgs, tmpDir, envs, models.NotParallel)
 
@@ -87,7 +87,7 @@ func TestRunDelegate(t *testing.T) {
 
 		expectedOut := "some random output"
 
-		When(mockRemoteRunner.Run(ctx, extraArgs, tmpDir, envs)).ThenReturn(expectedOut, errors.New("err"))
+		When(mockRemoteRunner.Run(ctx, extraArgs, tmpDir, envs, models.NotParallel)).ThenReturn(expectedOut, errors.New("err"))
 
 		output, err := subject.Run(ctx, extraArgs, tmpDir, envs, models.NotParallel)
 
@@ -116,7 +116,7 @@ func TestRunDelegate(t *testing.T) {
 
 		expectedOut := "some random output"
 
-		When(mockDefaultRunner.Run(ctx, extraArgs, tmpDir, envs)).ThenReturn(expectedOut, nil)
+		When(mockDefaultRunner.Run(ctx, extraArgs, tmpDir, envs, models.NotParallel)).ThenReturn(expectedOut, nil)
 
 		output, err := subject.Run(ctx, extraArgs, tmpDir, envs, models.NotParallel)
 
@@ -145,7 +145,7 @@ func TestRunDelegate(t *testing.T) {
 
 		expectedOut := "some random output"
 
-		When(mockDefaultRunner.Run(ctx, extraArgs, tmpDir, envs)).ThenReturn(expectedOut, errors.New("err"))
+		When(mockDefaultRunner.Run(ctx, extraArgs, tmpDir, envs, models.NotParallel)).ThenReturn(expectedOut, errors.New("err"))
 
 		output, err := subject.Run(ctx, extraArgs, tmpDir, envs, models.NotParallel)
 

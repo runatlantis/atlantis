@@ -29,6 +29,7 @@ func TestUpdateCombined(t *testing.T) {
 		status     models.CommitStatus
 		command    models.CommandName
 		expDescrip string
+		jobUrl string
 	}{
 		{
 			status:     models.PendingCommitStatus,
@@ -67,11 +68,11 @@ func TestUpdateCombined(t *testing.T) {
 			RegisterMockTestingT(t)
 			client := mocks.NewMockClient()
 			s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis"}
-			err := s.UpdateCombined(models.Repo{}, models.PullRequest{}, c.status, c.command)
+			err := s.UpdateCombined(models.Repo{}, models.PullRequest{}, c.status, c.command, c.jobUrl)
 			Ok(t, err)
 
 			expSrc := fmt.Sprintf("atlantis/%s", c.command)
-			client.VerifyWasCalledOnce().UpdateStatus(models.Repo{}, models.PullRequest{}, c.status, expSrc, c.expDescrip, "")
+			client.VerifyWasCalledOnce().UpdateStatus(models.Repo{}, models.PullRequest{}, c.status, expSrc, c.expDescrip, c.jobUrl)
 		})
 	}
 }
@@ -133,7 +134,7 @@ func TestUpdateCombinedCount(t *testing.T) {
 			RegisterMockTestingT(t)
 			client := mocks.NewMockClient()
 			s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis-test"}
-			err := s.UpdateCombinedCount(models.Repo{}, models.PullRequest{}, c.status, c.command, c.numSuccess, c.numTotal)
+			err := s.UpdateCombinedCount(models.Repo{}, models.PullRequest{}, c.status, c.command, c.numSuccess, c.numTotal, "")
 			Ok(t, err)
 
 			expSrc := fmt.Sprintf("%s/%s", s.StatusName, c.command)

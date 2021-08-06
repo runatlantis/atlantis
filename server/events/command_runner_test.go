@@ -295,6 +295,7 @@ func TestRunCommentCommandPlan_NoProjects_SilenceEnabled(t *testing.T) {
 		matchers.EqModelsCommandName(models.PlanCommand),
 		EqInt(0),
 		EqInt(0),
+		AnyString(),
 	)
 }
 
@@ -316,6 +317,7 @@ func TestRunCommentCommandApply_NoProjects_SilenceEnabled(t *testing.T) {
 		matchers.EqModelsCommandName(models.ApplyCommand),
 		EqInt(0),
 		EqInt(0),
+		AnyString(),
 	)
 }
 
@@ -337,6 +339,7 @@ func TestRunCommentCommandApprovePolicy_NoProjects_SilenceEnabled(t *testing.T) 
 		matchers.EqModelsCommandName(models.PolicyCheckCommand),
 		EqInt(0),
 		EqInt(0),
+		AnyString(),
 	)
 }
 
@@ -531,6 +534,7 @@ func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {
 		matchers.EqModelsCommandName(models.PolicyCheckCommand),
 		EqInt(0),
 		EqInt(0),
+		AnyString(),
 	)
 }
 
@@ -587,6 +591,7 @@ func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
 		matchers.EqModelsCommandName(models.PolicyCheckCommand),
 		EqInt(1),
 		EqInt(1),
+		AnyString(),
 	)
 }
 

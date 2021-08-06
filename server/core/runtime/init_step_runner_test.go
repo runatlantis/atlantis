@@ -14,7 +14,6 @@ import (
 	matchers2 "github.com/runatlantis/atlantis/server/core/terraform/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
-	logging_matchers "github.com/runatlantis/atlantis/server/logging/mocks/matchers"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -53,14 +52,15 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 				TerraformExecutor: terraform,
 				DefaultTFVersion:  tfVersion,
 			}
-			When(terraform.RunCommandWithVersion(logging_matchers.AnyLoggingSimpleLogging(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+			When(terraform.RunCommandWithVersion(matchers2.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), matchers2.AnyModelsParallelCommand())).
 				ThenReturn("output", nil)
-
-			output, err := iso.Run(models.ProjectCommandContext{
+			context := models.ProjectCommandContext{
 				Workspace:  "workspace",
 				RepoRelDir: ".",
 				Log:        logger,
-			}, []string{"extra", "args"}, "/path", map[string]string(nil))
+			}
+
+			output, err := iso.Run(context, []string{"extra", "args"}, "/path", map[string]string(nil), models.NotParallel)
 			Ok(t, err)
 			// When there is no error, should not return init output to PR.
 			Equals(t, "", output)
@@ -70,7 +70,7 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 			if c.expCmd == "get" {
 				expArgs = []string{c.expCmd, "-no-color", "-upgrade", "extra", "args"}
 			}
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", expArgs, map[string]string(nil), tfVersion, "workspace")
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(context, "/path", expArgs, map[string]string(nil), tfVersion, models.NotParallel)
 		})
 	}
 }
@@ -80,7 +80,7 @@ func TestRun_ShowInitOutputOnError(t *testing.T) {
 	RegisterMockTestingT(t)
 	tfClient := mocks.NewMockClient()
 	logger := logging.NewNoopLogger(t)
-	When(tfClient.RunCommandWithVersion(logging_matchers.AnyLoggingSimpleLogging(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(tfClient.RunCommandWithVersion(matchers2.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), matchers2.AnyModelsParallelCommand())).
 		ThenReturn("output", errors.New("error"))
 
 	tfVersion, _ := version.NewVersion("0.11.0")
@@ -93,7 +93,7 @@ func TestRun_ShowInitOutputOnError(t *testing.T) {
 		Workspace:  "workspace",
 		RepoRelDir: ".",
 		Log:        logger,
-	}, nil, "/path", map[string]string(nil))
+	}, nil, "/path", map[string]string(nil), models.NotParallel)
 	ErrEquals(t, "error", err)
 	Equals(t, "output", output)
 }
@@ -115,20 +115,22 @@ func TestRun_InitOmitsUpgradeFlagIfLockFilePresent(t *testing.T) {
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
 	}
-	When(terraform.RunCommandWithVersion(logging_matchers.AnyLoggingSimpleLogging(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(matchers2.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), matchers2.AnyModelsParallelCommand())).
 		ThenReturn("output", nil)
 
-	output, err := iso.Run(models.ProjectCommandContext{
+	context := models.ProjectCommandContext{
 		Workspace:  "workspace",
 		RepoRelDir: ".",
 		Log:        logger,
-	}, []string{"extra", "args"}, tmpDir, map[string]string(nil))
+	}
+
+	output, err := iso.Run(context, []string{"extra", "args"}, tmpDir, map[string]string(nil), models.NotParallel)
 	Ok(t, err)
 	// When there is no error, should not return init output to PR.
 	Equals(t, "", output)
 
 	expectedArgs := []string{"init", "-input=false", "-no-color", "extra", "args"}
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, tmpDir, expectedArgs, map[string]string(nil), tfVersion, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(context, tmpDir, expectedArgs, map[string]string(nil), tfVersion, models.NotParallel)
 }
 
 func TestRun_InitKeepsUpgradeFlagIfLockFileNotPresent(t *testing.T) {
@@ -145,20 +147,22 @@ func TestRun_InitKeepsUpgradeFlagIfLockFileNotPresent(t *testing.T) {
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
 	}
-	When(terraform.RunCommandWithVersion(logging_matchers.AnyLoggingSimpleLogging(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(matchers2.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), matchers2.AnyModelsParallelCommand())).
 		ThenReturn("output", nil)
 
-	output, err := iso.Run(models.ProjectCommandContext{
+	context := models.ProjectCommandContext{
 		Workspace:  "workspace",
 		RepoRelDir: ".",
 		Log:        logger,
-	}, []string{"extra", "args"}, tmpDir, map[string]string(nil))
+	}
+
+	output, err := iso.Run(context, []string{"extra", "args"}, tmpDir, map[string]string(nil), models.NotParallel)
 	Ok(t, err)
 	// When there is no error, should not return init output to PR.
 	Equals(t, "", output)
 
 	expectedArgs := []string{"init", "-input=false", "-no-color", "-upgrade", "extra", "args"}
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, tmpDir, expectedArgs, map[string]string(nil), tfVersion, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(context, tmpDir, expectedArgs, map[string]string(nil), tfVersion, models.NotParallel)
 }
 
 func TestRun_InitKeepUpgradeFlagIfLockFilePresentAndTFLessThanPoint14(t *testing.T) {
@@ -178,20 +182,21 @@ func TestRun_InitKeepUpgradeFlagIfLockFilePresentAndTFLessThanPoint14(t *testing
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
 	}
-	When(terraform.RunCommandWithVersion(logging_matchers.AnyLoggingSimpleLogging(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(matchers2.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), matchers2.AnyModelsParallelCommand())).
 		ThenReturn("output", nil)
 
-	output, err := iso.Run(models.ProjectCommandContext{
+	context := models.ProjectCommandContext{
 		Workspace:  "workspace",
 		RepoRelDir: ".",
 		Log:        logger,
-	}, []string{"extra", "args"}, tmpDir, map[string]string(nil))
+	}
+	output, err := iso.Run(context, []string{"extra", "args"}, tmpDir, map[string]string(nil), models.NotParallel)
 	Ok(t, err)
 	// When there is no error, should not return init output to PR.
 	Equals(t, "", output)
 
 	expectedArgs := []string{"init", "-input=false", "-no-color", "-upgrade", "extra", "args"}
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, tmpDir, expectedArgs, map[string]string(nil), tfVersion, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(context, tmpDir, expectedArgs, map[string]string(nil), tfVersion, models.NotParallel)
 }
 
 func TestRun_InitExtraArgsDeDupe(t *testing.T) {
@@ -244,19 +249,20 @@ func TestRun_InitExtraArgsDeDupe(t *testing.T) {
 				TerraformExecutor: terraform,
 				DefaultTFVersion:  tfVersion,
 			}
-			When(terraform.RunCommandWithVersion(logging_matchers.AnyLoggingSimpleLogging(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+			When(terraform.RunCommandWithVersion(matchers2.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), matchers2.AnyModelsParallelCommand())).
 				ThenReturn("output", nil)
 
-			output, err := iso.Run(models.ProjectCommandContext{
+			context := models.ProjectCommandContext{
 				Workspace:  "workspace",
 				RepoRelDir: ".",
 				Log:        logger,
-			}, c.extraArgs, "/path", map[string]string(nil))
+			}
+			output, err := iso.Run(context, c.extraArgs, "/path", map[string]string(nil), models.NotParallel)
 			Ok(t, err)
 			// When there is no error, should not return init output to PR.
 			Equals(t, "", output)
 
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", c.expectedArgs, map[string]string(nil), tfVersion, "workspace")
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(context, "/path", c.expectedArgs, map[string]string(nil), tfVersion, models.NotParallel)
 		})
 	}
 }

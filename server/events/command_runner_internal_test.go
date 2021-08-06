@@ -14,6 +14,7 @@ func TestApplyUpdateCommitStatus(t *testing.T) {
 		expStatus     models.CommitStatus
 		expNumSuccess int
 		expNumTotal   int
+		expURL string
 	}{
 		"apply, one pending": {
 			cmd: models.ApplyCommand,
@@ -81,6 +82,7 @@ func TestApplyUpdateCommitStatus(t *testing.T) {
 			Equals(t, c.cmd, csu.CalledCommand)
 			Equals(t, c.expNumSuccess, csu.CalledNumSuccess)
 			Equals(t, c.expNumTotal, csu.CalledNumTotal)
+			Equals(t, c.expURL, csu.CalledURL)
 		})
 	}
 }
@@ -92,6 +94,7 @@ func TestPlanUpdateCommitStatus(t *testing.T) {
 		expStatus     models.CommitStatus
 		expNumSuccess int
 		expNumTotal   int
+		expURL string
 	}{
 		"single plan success": {
 			cmd: models.PlanCommand,
@@ -143,6 +146,7 @@ func TestPlanUpdateCommitStatus(t *testing.T) {
 			Equals(t, c.cmd, csu.CalledCommand)
 			Equals(t, c.expNumSuccess, csu.CalledNumSuccess)
 			Equals(t, c.expNumTotal, csu.CalledNumTotal)
+			Equals(t, c.expURL, csu.CalledURL)
 		})
 	}
 }
@@ -154,18 +158,20 @@ type MockCSU struct {
 	CalledCommand    models.CommandName
 	CalledNumSuccess int
 	CalledNumTotal   int
+	CalledURL string
 }
 
-func (m *MockCSU) UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName, numSuccess int, numTotal int) error {
+func (m *MockCSU) UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName, numSuccess int, numTotal int, url string) error {
 	m.CalledRepo = repo
 	m.CalledPull = pull
 	m.CalledStatus = status
 	m.CalledCommand = command
 	m.CalledNumSuccess = numSuccess
 	m.CalledNumTotal = numTotal
+	m.CalledURL = url
 	return nil
 }
-func (m *MockCSU) UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName) error {
+func (m *MockCSU) UpdateCombined(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName, url string) error {
 	return nil
 }
 func (m *MockCSU) UpdateProject(ctx models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus, url string) error {

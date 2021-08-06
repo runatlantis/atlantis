@@ -107,7 +107,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	When(mockPlan.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("plan", nil)
 	When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
 	When(mockRun.Run(ctx, "", repoDir, expEnvs)).ThenReturn("run", nil)
-	res := runner.Plan(ctx)
+	res := runner.Plan(ctx, models.NotParallel)
 
 	Assert(t, res.PlanSuccess != nil, "exp plan success")
 	Equals(t, "https://lock-key", res.PlanSuccess.LockURL)
@@ -138,7 +138,7 @@ func TestDefaultProjectCommandRunner_ApplyNotCloned(t *testing.T) {
 	ctx := models.ProjectCommandContext{}
 	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn("", os.ErrNotExist)
 
-	res := runner.Apply(ctx)
+	res := runner.Apply(ctx, models.NotParallel)
 	ErrEquals(t, "project has not been cloned–did you run plan?", res.Error)
 }
 
@@ -160,7 +160,7 @@ func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
 	When(mockApproved.PullIsApproved(ctx.BaseRepo, ctx.Pull)).ThenReturn(false, nil)
 
-	res := runner.Apply(ctx)
+	res := runner.Apply(ctx, models.NotParallel)
 	Equals(t, "Pull request must be approved by at least one person other than the author before running apply.", res.Failure)
 }
 
@@ -180,7 +180,7 @@ func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 	defer cleanup()
 	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
 
-	res := runner.Apply(ctx)
+	res := runner.Apply(ctx, models.NotParallel)
 	Equals(t, "Pull request must be mergeable before running apply.", res.Failure)
 }
 
@@ -199,7 +199,7 @@ func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 	defer cleanup()
 	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
 
-	res := runner.Apply(ctx)
+	res := runner.Apply(ctx, models.NotParallel)
 	Equals(t, "Default branch must be rebased onto pull request before running apply.", res.Failure)
 }
 

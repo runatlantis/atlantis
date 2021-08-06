@@ -20,7 +20,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
-	logging_matchers "github.com/runatlantis/atlantis/server/logging/mocks/matchers"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -31,7 +30,7 @@ func TestRun_NoDir(t *testing.T) {
 	_, err := o.Run(models.ProjectCommandContext{
 		RepoRelDir: ".",
 		Workspace:  "workspace",
-	}, nil, "/nonexistent/path", map[string]string(nil))
+	}, nil, "/nonexistent/path", map[string]string(nil), models.NotParallel)
 	ErrEquals(t, "no plan found at path \".\" and workspace \"workspace\"–did you run plan?", err)
 }
 
@@ -44,12 +43,13 @@ func TestRun_NoPlanFile(t *testing.T) {
 	_, err := o.Run(models.ProjectCommandContext{
 		RepoRelDir: ".",
 		Workspace:  "workspace",
-	}, nil, tmpDir, map[string]string(nil))
+	}, nil, tmpDir, map[string]string(nil), models.NotParallel)
 	ErrEquals(t, "no plan found at path \".\" and workspace \"workspace\"–did you run plan?", err)
 }
 
 func TestRun_Success(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
+	ctx := TestContext(t)
 	defer cleanup()
 	planPath := filepath.Join(tmpDir, "workspace.tfplan")
 	err := ioutil.WriteFile(planPath, nil, 0600)
@@ -62,17 +62,17 @@ func TestRun_Success(t *testing.T) {
 	}
 	logger := logging.NewNoopLogger(t)
 
-	When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(matchers.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), matchers2.AnyModelsParallelCommand())).
 		ThenReturn("output", nil)
 	output, err := o.Run(models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
 		EscapedCommentArgs: []string{"comment", "args"},
-	}, []string{"extra", "args"}, tmpDir, map[string]string(nil))
+	}, []string{"extra", "args"}, tmpDir, map[string]string(nil), models.NotParallel)
 	Ok(t, err)
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), nil, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), nil, models.NotParallel)
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
@@ -92,18 +92,20 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 	}
 	logger := logging.NewNoopLogger(t)
 
-	When(terraform.RunCommandWithVersion(matchers.AnyPtrToLoggingSimpleLogger(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
-		ThenReturn("output", nil)
-	output, err := o.Run(models.ProjectCommandContext{
+	context := models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "default",
 		RepoRelDir:         ".",
 		ProjectName:        "projectname",
 		EscapedCommentArgs: []string{"comment", "args"},
-	}, []string{"extra", "args"}, tmpDir, map[string]string(nil))
+	}
+
+	When(terraform.RunCommandWithVersion(matchers.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), matchers2.AnyModelsParallelCommand())).
+		ThenReturn("output", nil)
+	output, err := o.Run(context, []string{"extra", "args"}, tmpDir, map[string]string(nil), models.NotParallel)
 	Ok(t, err)
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), nil, "default")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(context, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), nil, models.NotParallel)
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
@@ -122,19 +124,20 @@ func TestRun_UsesConfiguredTFVersion(t *testing.T) {
 	}
 	logger := logging.NewNoopLogger(t)
 	tfVersion, _ := version.NewVersion("0.11.0")
-
-	When(terraform.RunCommandWithVersion(logging_matchers.AnyLoggingSimpleLogging(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
-		ThenReturn("output", nil)
-	output, err := o.Run(models.ProjectCommandContext{
+	context := models.ProjectCommandContext{
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
 		EscapedCommentArgs: []string{"comment", "args"},
 		TerraformVersion:   tfVersion,
 		Log:                logger,
-	}, []string{"extra", "args"}, tmpDir, map[string]string(nil))
+	}
+
+	When(terraform.RunCommandWithVersion(matchers.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), matchers2.AnyModelsParallelCommand())).
+		ThenReturn("output", nil)
+	output, err := o.Run(context, []string{"extra", "args"}, tmpDir, map[string]string(nil), models.NotParallel)
 	Ok(t, err)
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), tfVersion, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(context, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), tfVersion, models.NotParallel)
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
@@ -209,7 +212,7 @@ func TestRun_UsingTarget(t *testing.T) {
 				Workspace:          "workspace",
 				RepoRelDir:         ".",
 				EscapedCommentArgs: c.commentFlags,
-			}, c.extraArgs, tmpDir, map[string]string(nil))
+			}, c.extraArgs, tmpDir, map[string]string(nil), models.NotParallel)
 			Equals(t, "", output)
 			if c.expErr {
 				ErrEquals(t, "cannot run apply with -target because we are applying an already generated plan. Instead, run -target with atlantis plan", err)
@@ -255,7 +258,7 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 		EscapedCommentArgs: []string{"comment", "args"},
 		TerraformVersion:   tfVersion,
 	}
-	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
+	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil), models.NotParallel)
 	<-tfExec.DoneCh
 
 	Ok(t, err)
@@ -316,7 +319,7 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 		RepoRelDir:         ".",
 		EscapedCommentArgs: []string{"comment", "args"},
 		TerraformVersion:   tfVersion,
-	}, []string{"extra", "args"}, tmpDir, map[string]string(nil))
+	}, []string{"extra", "args"}, tmpDir, map[string]string(nil), models.NotParallel)
 	<-tfExec.DoneCh
 	ErrEquals(t, `Plan generated during apply phase did not match plan generated during plan phase.
 Aborting apply.
