@@ -52,7 +52,7 @@ func TestRun(t *testing.T) {
 		When(executorWorkflow.EnsureExecutorVersion(logger, v)).ThenReturn(executablePath, nil)
 		When(executorWorkflow.Run(context, executablePath, map[string]string(nil), workdir, extraArgs)).ThenReturn("Success!", nil)
 
-		output, err := s.Run(context, extraArgs, workdir, map[string]string(nil))
+		output, err := s.Run(context, extraArgs, workdir, map[string]string(nil), models.NotParallel)
 
 		Ok(t, err)
 		Equals(t, "Success!", output)
@@ -63,7 +63,7 @@ func TestRun(t *testing.T) {
 		expectedErr := errors.New("error ensuring version")
 		When(executorWorkflow.EnsureExecutorVersion(logger, v)).ThenReturn("", expectedErr)
 
-		_, err := s.Run(context, extraArgs, workdir, map[string]string(nil))
+		_, err := s.Run(context, extraArgs, workdir, map[string]string(nil), models.NotParallel)
 
 		Assert(t, err != nil, "error is not nil")
 	})
@@ -72,7 +72,7 @@ func TestRun(t *testing.T) {
 		When(executorWorkflow.EnsureExecutorVersion(logger, v)).ThenReturn(executablePath, nil)
 		When(executorWorkflow.Run(context, executablePath, map[string]string(nil), workdir, extraArgs)).ThenReturn("", errors.New("error running executor"))
 
-		_, err := s.Run(context, extraArgs, workdir, map[string]string(nil))
+		_, err := s.Run(context, extraArgs, workdir, map[string]string(nil), models.NotParallel)
 
 		Assert(t, err != nil, "error is not nil")
 	})

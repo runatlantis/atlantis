@@ -41,7 +41,7 @@ func TestShowStepRunnner(t *testing.T) {
 			logger, path, []string{"show", "-no-color", "-json", filepath.Join(path, "test-default.tfplan")}, envs, tfVersion, context.Workspace,
 		)).ThenReturn("success", nil)
 
-		r, err := subject.Run(context, []string{}, path, envs)
+		r, err := subject.Run(context, []string{}, path, envs, models.NotParallel)
 
 		Ok(t, err)
 
@@ -68,7 +68,7 @@ func TestShowStepRunnner(t *testing.T) {
 			logger, path, []string{"show", "-no-color", "-json", filepath.Join(path, "test-default.tfplan")}, envs, v, context.Workspace,
 		)).ThenReturn("success", nil)
 
-		r, err := subject.Run(contextWithVersionOverride, []string{}, path, envs)
+		r, err := subject.Run(contextWithVersionOverride, []string{}, path, envs, models.NotParallel)
 
 		Ok(t, err)
 
@@ -85,7 +85,7 @@ func TestShowStepRunnner(t *testing.T) {
 			logger, path, []string{"show", "-no-color", "-json", filepath.Join(path, "test-default.tfplan")}, envs, tfVersion, context.Workspace,
 		)).ThenReturn("success", errors.New("error"))
 
-		_, err := subject.Run(context, []string{}, path, envs)
+		_, err := subject.Run(context, []string{}, path, envs, models.NotParallel)
 
 		Assert(t, err != nil, "error is returned")
 

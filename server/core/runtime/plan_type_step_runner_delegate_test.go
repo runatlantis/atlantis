@@ -60,7 +60,7 @@ func TestRunDelegate(t *testing.T) {
 
 		When(mockRemoteRunner.Run(ctx, extraArgs, tmpDir, envs)).ThenReturn(expectedOut, nil)
 
-		output, err := subject.Run(ctx, extraArgs, tmpDir, envs)
+		output, err := subject.Run(ctx, extraArgs, tmpDir, envs, models.NotParallel)
 
 		mockDefaultRunner.VerifyWasCalled(Never())
 
@@ -89,7 +89,7 @@ func TestRunDelegate(t *testing.T) {
 
 		When(mockRemoteRunner.Run(ctx, extraArgs, tmpDir, envs)).ThenReturn(expectedOut, errors.New("err"))
 
-		output, err := subject.Run(ctx, extraArgs, tmpDir, envs)
+		output, err := subject.Run(ctx, extraArgs, tmpDir, envs, models.NotParallel)
 
 		mockDefaultRunner.VerifyWasCalled(Never())
 
@@ -118,7 +118,7 @@ func TestRunDelegate(t *testing.T) {
 
 		When(mockDefaultRunner.Run(ctx, extraArgs, tmpDir, envs)).ThenReturn(expectedOut, nil)
 
-		output, err := subject.Run(ctx, extraArgs, tmpDir, envs)
+		output, err := subject.Run(ctx, extraArgs, tmpDir, envs, models.NotParallel)
 
 		mockRemoteRunner.VerifyWasCalled(Never())
 
@@ -147,7 +147,7 @@ func TestRunDelegate(t *testing.T) {
 
 		When(mockDefaultRunner.Run(ctx, extraArgs, tmpDir, envs)).ThenReturn(expectedOut, errors.New("err"))
 
-		output, err := subject.Run(ctx, extraArgs, tmpDir, envs)
+		output, err := subject.Run(ctx, extraArgs, tmpDir, envs, models.NotParallel)
 
 		mockRemoteRunner.VerifyWasCalled(Never())
 

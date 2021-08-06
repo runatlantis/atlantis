@@ -674,7 +674,8 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		GithubUser: "github-user",
 		GitlabUser: "gitlab-user",
 	}
-	terraformClient, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{}, false)
+	terraformOutputChan := make(chan *models.TerraformOutputLine) // TODO: plumb this somewhere?
+	terraformClient, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{}, false, terraformOutputChan)
 	Ok(t, err)
 	boltdb, err := db.New(dataDir)
 	Ok(t, err)

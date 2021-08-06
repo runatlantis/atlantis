@@ -41,6 +41,7 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 			extraArgs,
 			path,
 			envs,
+			models.NotParallel,
 		)
 
 		Equals(t, expectedOut, output)
@@ -65,6 +66,7 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 			extraArgs,
 			path,
 			envs,
+			models.NotParallel,
 		)
 
 		Equals(t, expectedOut, output)
@@ -85,6 +87,7 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 			extraArgs,
 			path,
 			envs,
+			models.NotParallel,
 		)
 
 		mockDelegate.VerifyWasCalled(Never())
@@ -109,6 +112,7 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 			extraArgs,
 			path,
 			envs,
+			models.NotParallel,
 		)
 
 		mockDelegate.VerifyWasCalled(Never())
