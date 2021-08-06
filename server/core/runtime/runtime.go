@@ -25,7 +25,7 @@ const (
 // TerraformExec brings the interface from TerraformClient into this package
 // without causing circular imports.
 type TerraformExec interface {
-	RunCommandWithVersion(ctx models.ProjectCommandContext, path string, args []string, envs map[string]string, v *version.Version) (string, error)
+	RunCommandWithVersion(ctx models.ProjectCommandContext, path string, args []string, envs map[string]string, v *version.Version, parallel models.ParallelCommand) (string, error)
 	EnsureVersion(log logging.SimpleLogging, v *version.Version) error
 }
 
@@ -40,7 +40,7 @@ type AsyncTFExec interface {
 	// Callers can use the input channel to pass stdin input to the command.
 	// If any error is passed on the out channel, there will be no
 	// further output (so callers are free to exit).
-	RunCommandAsync(ctx models.ProjectCommandContext, path string, args []string, envs map[string]string, v *version.Version) (chan<- string, <-chan terraform.Line)
+	RunCommandAsync(ctx models.ProjectCommandContext, path string, args []string, envs map[string]string, v *version.Version, parallel models.ParallelCommand) (chan<- string, <-chan terraform.Line)
 }
 
 // StatusUpdater brings the interface from CommitStatusUpdater into this package
@@ -52,7 +52,7 @@ type StatusUpdater interface {
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_runner.go Runner
 // Runner mirrors events.StepRunner as a way to bring it into this package
 type Runner interface {
-	Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string, parallel ParallelCommand) (string, error)
+	Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string, parallel models.ParallelCommand) (string, error)
 }
 
 // MustConstraint returns a constraint. It panics on error.
@@ -97,10 +97,4 @@ func ProjectNameFromPlanfile(workspace string, filename string) (string, error) 
 	}
 	rawProjName := projMatch[0][1]
 	return strings.Replace(rawProjName, planfileSlashReplace, "/", -1), nil
-}
-
-// Indicator for whether a command is being run in parallel with others
-type ParallelCommand struct {
-	Index int
-	IsParallel bool
 }

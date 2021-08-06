@@ -30,7 +30,7 @@ func NewMinimumVersionStepRunnerDelegate(minimumVersionStr string, defaultVersio
 	}, nil
 }
 
-func (r *MinimumVersionStepRunnerDelegate) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string, parallel ParallelCommand) (string, error) {
+func (r *MinimumVersionStepRunnerDelegate) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string, parallel models.ParallelCommand) (string, error) {
 	tfVersion := r.defaultTfVersion
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion

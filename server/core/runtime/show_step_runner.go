@@ -30,7 +30,7 @@ type ShowStepRunner struct {
 	DefaultTFVersion  *version.Version
 }
 
-func (p *ShowStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string, parallel ParallelCommand) (string, error) {
+func (p *ShowStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string, parallel models.ParallelCommand) (string, error) {
 	tfVersion := p.DefaultTFVersion
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
@@ -45,6 +45,7 @@ func (p *ShowStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []strin
 		[]string{"show", "-no-color", "-json", filepath.Clean(planFile)},
 		envs,
 		tfVersion,
+		parallel,
 	)
 
 	if err != nil {

@@ -715,12 +715,19 @@ type PreWorkflowHookCommandContext struct {
 	Verbose bool
 }
 
+var NotParallel ParallelCommand
+
+type ParallelCommand struct {
+	Index      int
+	InParallel bool // true if command is being run in parallel with others
+}
+
 type TerraformOutputLine struct {
 	// pull request that generated this output line
 	PullSlug string
 
-	// parallel command number, if applicable
-	ParallelCmdIndex int
+	// parallel command info for this output
+	Parallel ParallelCommand
 
 	// thing to print in console on web interface, no trailing newline
 	Line string

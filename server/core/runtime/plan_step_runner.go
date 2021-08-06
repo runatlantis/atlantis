@@ -32,7 +32,7 @@ type PlanStepRunner struct {
 	AsyncTFExec         AsyncTFExec
 }
 
-func (p *PlanStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string, parallel ParallelCommand) (string, error) {
+func (p *PlanStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string, parallel models.ParallelCommand) (string, error) {
 	tfVersion := p.DefaultTFVersion
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
@@ -46,10 +46,10 @@ func (p *PlanStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []strin
 
 	planFile := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	planCmd := p.buildPlanCmd(ctx, extraArgs, path, tfVersion, planFile)
-	output, err := p.TerraformExecutor.RunCommandWithVersion(ctx, filepath.Clean(path), planCmd, envs, tfVersion)
+	output, err := p.TerraformExecutor.RunCommandWithVersion(ctx, filepath.Clean(path), planCmd, envs, tfVersion, parallel)
 	if p.isRemoteOpsErr(output, err) {
 		ctx.Log.Debug("detected that this project is using TFE remote ops")
-		return p.remotePlan(ctx, extraArgs, path, tfVersion, planFile, envs)
+		return p.remotePlan(ctx, extraArgs, path, tfVersion, planFile, envs, parallel)
 	}
 	if err != nil {
 		return output, err
@@ -68,14 +68,14 @@ func (p *PlanStepRunner) isRemoteOpsErr(output string, err error) bool {
 
 // remotePlan runs a terraform plan command compatible with TFE remote
 // operations.
-func (p *PlanStepRunner) remotePlan(ctx models.ProjectCommandContext, extraArgs []string, path string, tfVersion *version.Version, planFile string, envs map[string]string) (string, error) {
+func (p *PlanStepRunner) remotePlan(ctx models.ProjectCommandContext, extraArgs []string, path string, tfVersion *version.Version, planFile string, envs map[string]string, parallel models.ParallelCommand) (string, error) {
 	argList := [][]string{
 		{"plan", "-input=false", "-refresh", "-no-color"},
 		extraArgs,
 		ctx.EscapedCommentArgs,
 	}
 	args := p.flatten(argList)
-	output, err := p.runRemotePlan(ctx, args, path, tfVersion, envs)
+	output, err := p.runRemotePlan(ctx, args, path, tfVersion, envs, parallel) // can remote plans be parallel?
 	if err != nil {
 		return output, err
 	}
@@ -125,7 +125,7 @@ func (p *PlanStepRunner) switchWorkspace(ctx models.ProjectCommandContext, path 
 	// already in the right workspace then no need to switch. This will save us
 	// about ten seconds. This command is only available in > 0.10.
 	if !runningZeroPointNine {
-		workspaceShowOutput, err := p.TerraformExecutor.RunCommandWithVersion(ctx, path, []string{workspaceCmd, "show"}, envs, tfVersion)
+		workspaceShowOutput, err := p.TerraformExecutor.RunCommandWithVersion(ctx, path, []string{workspaceCmd, "show"}, envs, tfVersion, models.NotParallel)
 		if err != nil {
 			return err
 		}
@@ -140,11 +140,11 @@ func (p *PlanStepRunner) switchWorkspace(ctx models.ProjectCommandContext, path 
 	// To do this we can either select and catch the error or use list and then
 	// look for the workspace. Both commands take the same amount of time so
 	// that's why we're running select here.
-	_, err := p.TerraformExecutor.RunCommandWithVersion(ctx, path, []string{workspaceCmd, "select", "-no-color", ctx.Workspace}, envs, tfVersion)
+	_, err := p.TerraformExecutor.RunCommandWithVersion(ctx, path, []string{workspaceCmd, "select", "-no-color", ctx.Workspace}, envs, tfVersion, models.NotParallel)
 	if err != nil {
 		// If terraform workspace select fails we run terraform workspace
 		// new to create a new workspace automatically.
-		out, err := p.TerraformExecutor.RunCommandWithVersion(ctx, path, []string{workspaceCmd, "new", "-no-color", ctx.Workspace}, envs, tfVersion)
+		out, err := p.TerraformExecutor.RunCommandWithVersion(ctx, path, []string{workspaceCmd, "new", "-no-color", ctx.Workspace}, envs, tfVersion, models.ParallelCommand{})
 		if err != nil {
 			return fmt.Errorf("%s: %s", err, out)
 		}
@@ -242,7 +242,8 @@ func (p *PlanStepRunner) runRemotePlan(
 	cmdArgs []string,
 	path string,
 	tfVersion *version.Version,
-	envs map[string]string) (string, error) {
+	envs map[string]string,
+	parallel models.ParallelCommand) (string, error) {
 
 	// updateStatusF will update the commit status and log any error.
 	updateStatusF := func(status models.CommitStatus, url string) {
@@ -253,7 +254,7 @@ func (p *PlanStepRunner) runRemotePlan(
 
 	// Start the async command execution.
 	ctx.Log.Debug("starting async tf remote operation")
-	_, outCh := p.AsyncTFExec.RunCommandAsync(ctx, filepath.Clean(path), cmdArgs, envs, tfVersion)
+	_, outCh := p.AsyncTFExec.RunCommandAsync(ctx, filepath.Clean(path), cmdArgs, envs, tfVersion, parallel)
 	var lines []string
 	nextLineIsRunURL := false
 	var runURL string

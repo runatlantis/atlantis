@@ -52,7 +52,7 @@ type LockURLGenerator interface {
 // `terraform plan`.
 type StepRunner interface {
 	// Run runs the step.
-	Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string, parallel runtime.ParallelCommand) (string, error)
+	Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string, parallel models.ParallelCommand) (string, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_custom_step_runner.go CustomStepRunner
@@ -82,17 +82,17 @@ type WebhooksSender interface {
 
 type ProjectPlanCommandRunner interface {
 	// Plan runs terraform plan for the project described by ctx.
-	Plan(ctx models.ProjectCommandContext, parallelCmd runtime.ParallelCommand) models.ProjectResult
+	Plan(ctx models.ProjectCommandContext, parallelCmd models.ParallelCommand) models.ProjectResult
 }
 
 type ProjectApplyCommandRunner interface {
 	// Apply runs terraform apply for the project described by ctx.
-	Apply(ctx models.ProjectCommandContext, parallelCmd runtime.ParallelCommand) models.ProjectResult
+	Apply(ctx models.ProjectCommandContext, parallelCmd models.ParallelCommand) models.ProjectResult
 }
 
 type ProjectPolicyCheckCommandRunner interface {
 	// PolicyCheck runs OPA defined policies for the project desribed by ctx.
-	PolicyCheck(ctx models.ProjectCommandContext, parallelCmd runtime.ParallelCommand) models.ProjectResult
+	PolicyCheck(ctx models.ProjectCommandContext, parallelCmd models.ParallelCommand) models.ProjectResult
 }
 
 type ProjectApprovePoliciesCommandRunner interface {
@@ -102,7 +102,7 @@ type ProjectApprovePoliciesCommandRunner interface {
 
 type ProjectVersionCommandRunner interface {
 	// Version runs terraform version for the project described by ctx.
-	Version(ctx models.ProjectCommandContext, parallelCmd runtime.ParallelCommand) models.ProjectResult
+	Version(ctx models.ProjectCommandContext, parallelCmd models.ParallelCommand) models.ProjectResult
 }
 
 // ProjectCommandRunner runs project commands. A project command is a command
@@ -134,7 +134,7 @@ type DefaultProjectCommandRunner struct {
 }
 
 // Plan runs terraform plan for the project described by ctx.
-func (p *DefaultProjectCommandRunner) Plan(ctx models.ProjectCommandContext, parallel runtime.ParallelCommand) models.ProjectResult {
+func (p *DefaultProjectCommandRunner) Plan(ctx models.ProjectCommandContext, parallel models.ParallelCommand) models.ProjectResult {
 	planSuccess, failure, err := p.doPlan(ctx, parallel)
 	return models.ProjectResult{
 		Command:     models.PlanCommand,
@@ -148,7 +148,7 @@ func (p *DefaultProjectCommandRunner) Plan(ctx models.ProjectCommandContext, par
 }
 
 // PolicyCheck evaluates policies defined with Rego for the project described by ctx.
-func (p *DefaultProjectCommandRunner) PolicyCheck(ctx models.ProjectCommandContext, parallel runtime.ParallelCommand) models.ProjectResult {
+func (p *DefaultProjectCommandRunner) PolicyCheck(ctx models.ProjectCommandContext, parallel models.ParallelCommand) models.ProjectResult {
 	policySuccess, failure, err := p.doPolicyCheck(ctx, parallel)
 	return models.ProjectResult{
 		Command:            models.PolicyCheckCommand,
@@ -162,7 +162,7 @@ func (p *DefaultProjectCommandRunner) PolicyCheck(ctx models.ProjectCommandConte
 }
 
 // Apply runs terraform apply for the project described by ctx.
-func (p *DefaultProjectCommandRunner) Apply(ctx models.ProjectCommandContext, parallel runtime.ParallelCommand) models.ProjectResult {
+func (p *DefaultProjectCommandRunner) Apply(ctx models.ProjectCommandContext, parallel models.ParallelCommand) models.ProjectResult {
 	applyOut, failure, err := p.doApply(ctx, parallel)
 	return models.ProjectResult{
 		Command:      models.ApplyCommand,
@@ -188,7 +188,7 @@ func (p *DefaultProjectCommandRunner) ApprovePolicies(ctx models.ProjectCommandC
 	}
 }
 
-func (p *DefaultProjectCommandRunner) Version(ctx models.ProjectCommandContext, parallel runtime.ParallelCommand) models.ProjectResult {
+func (p *DefaultProjectCommandRunner) Version(ctx models.ProjectCommandContext, parallel models.ParallelCommand) models.ProjectResult {
 	versionOut, failure, err := p.doVersion(ctx, parallel)
 	return models.ProjectResult{
 		Command:        models.VersionCommand,
@@ -211,7 +211,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx models.ProjectComman
 	}, "", nil
 }
 
-func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx models.ProjectCommandContext, parallel runtime.ParallelCommand) (*models.PolicyCheckSuccess, string, error) {
+func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx models.ProjectCommandContext, parallel models.ParallelCommand) (*models.PolicyCheckSuccess, string, error) {
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	// This should already be acquired from the prior plan operation.
 	// if for some reason an unlock happens between the plan and policy check step
@@ -282,7 +282,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx models.ProjectCommandCon
 	}, "", nil
 }
 
-func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext, parallel runtime.ParallelCommand) (*models.PlanSuccess, string, error) {
+func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext, parallel models.ParallelCommand) (*models.PlanSuccess, string, error) {
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir))
 	if err != nil {
@@ -330,7 +330,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext, p
 	}, "", nil
 }
 
-func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext, parallel runtime.ParallelCommand) (applyOut string, failure string, err error) {
+func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext, parallel models.ParallelCommand) (applyOut string, failure string, err error) {
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -390,7 +390,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext, 
 	return strings.Join(outputs, "\n"), "", nil
 }
 
-func (p *DefaultProjectCommandRunner) doVersion(ctx models.ProjectCommandContext, parallel runtime.ParallelCommand) (versionOut string, failure string, err error) {
+func (p *DefaultProjectCommandRunner) doVersion(ctx models.ProjectCommandContext, parallel models.ParallelCommand) (versionOut string, failure string, err error) {
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -418,7 +418,7 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx models.ProjectCommandContext
 	return strings.Join(outputs, "\n"), "", nil
 }
 
-func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.ProjectCommandContext, absPath string, parallel runtime.ParallelCommand) ([]string, error) {
+func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.ProjectCommandContext, absPath string, parallel models.ParallelCommand) ([]string, error) {
 	var outputs []string
 	envs := make(map[string]string)
 	for _, step := range steps {
@@ -426,11 +426,11 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.Pr
 		var err error
 		switch step.StepName {
 		case "init":
-			out, err = p.InitStepRunner.Run(ctx, step.ExtraArgs, absPath, envs, runtime.ParallelCommand{})
+			out, err = p.InitStepRunner.Run(ctx, step.ExtraArgs, absPath, envs, models.ParallelCommand{})
 		case "plan":
 			out, err = p.PlanStepRunner.Run(ctx, step.ExtraArgs, absPath, envs, parallel)
 		case "show":
-			_, err = p.ShowStepRunner.Run(ctx, step.ExtraArgs, absPath, envs, runtime.ParallelCommand{})
+			_, err = p.ShowStepRunner.Run(ctx, step.ExtraArgs, absPath, envs, models.ParallelCommand{})
 		case "policy_check":
 			out, err = p.PolicyCheckStepRunner.Run(ctx, step.ExtraArgs, absPath, envs, parallel)
 		case "apply":

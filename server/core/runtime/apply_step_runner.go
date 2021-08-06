@@ -21,7 +21,7 @@ type ApplyStepRunner struct {
 	AsyncTFExec         AsyncTFExec
 }
 
-func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string, parallel ParallelCommand) (string, error) {
+func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string, parallel models.ParallelCommand) (string, error) {
 	if a.hasTargetFlag(ctx, extraArgs) {
 		return "", errors.New("cannot run apply with -target because we are applying an already generated plan. Instead, run -target with atlantis plan")
 	}
@@ -41,7 +41,7 @@ func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []stri
 	// TODO: Leverage PlanTypeStepRunnerDelegate here
 	if IsRemotePlan(contents) {
 		args := append(append([]string{"apply", "-input=false", "-no-color"}, extraArgs...), ctx.EscapedCommentArgs...)
-		out, err = a.runRemoteApply(ctx, args, path, planPath, ctx.TerraformVersion, envs)
+		out, err = a.runRemoteApply(ctx, args, path, planPath, ctx.TerraformVersion, envs, parallel) // can remote commands be parallel?
 		if err == nil {
 			out = a.cleanRemoteApplyOutput(out)
 		}
@@ -49,7 +49,7 @@ func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []stri
 		// NOTE: we need to quote the plan path because Bitbucket Server can
 		// have spaces in its repo owner names which is part of the path.
 		args := append(append(append([]string{"apply", "-input=false", "-no-color"}, extraArgs...), ctx.EscapedCommentArgs...), fmt.Sprintf("%q", planPath))
-		out, err = a.TerraformExecutor.RunCommandWithVersion(ctx, path, args, envs, ctx.TerraformVersion)
+		out, err = a.TerraformExecutor.RunCommandWithVersion(ctx, path, args, envs, ctx.TerraformVersion, parallel)
 	}
 
 	// If the apply was successful, delete the plan.
@@ -114,7 +114,8 @@ func (a *ApplyStepRunner) runRemoteApply(
 	path string,
 	absPlanPath string,
 	tfVersion *version.Version,
-	envs map[string]string) (string, error) {
+	envs map[string]string,
+	parallel models.ParallelCommand) (string, error) {
 
 	// The planfile contents are needed to ensure that the plan didn't change
 	// between plan and apply phases.
@@ -132,7 +133,7 @@ func (a *ApplyStepRunner) runRemoteApply(
 
 	// Start the async command execution.
 	ctx.Log.Debug("starting async tf remote operation")
-	inCh, outCh := a.AsyncTFExec.RunCommandAsync(ctx, filepath.Clean(path), applyArgs, envs, tfVersion)
+	inCh, outCh := a.AsyncTFExec.RunCommandAsync(ctx, filepath.Clean(path), applyArgs, envs, tfVersion, parallel)
 	var lines []string
 	nextLineIsRunURL := false
 	var runURL string

@@ -27,7 +27,7 @@ func NewPolicyCheckStepRunner(defaultTfVersion *version.Version, executorWorkflo
 }
 
 // Run ensures a given version for the executable, builds the args from the project context and then runs executable returning the result
-func (p *PolicyCheckStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string, parallel ParallelCommand) (string, error) {
+func (p *PolicyCheckStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string, parallel models.ParallelCommand) (string, error) {
 	executable, err := p.versionEnsurer.EnsureExecutorVersion(ctx.Log, ctx.PolicySets.Version)
 
 	if err != nil {
