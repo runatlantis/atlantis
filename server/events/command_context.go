@@ -49,4 +49,7 @@ type CommandContext struct {
 	PullStatus *models.PullStatus
 
 	Trigger CommandTrigger
+
+	// a fully qualified URL to view logs for work on the given pull request
+	JobURL string
 }

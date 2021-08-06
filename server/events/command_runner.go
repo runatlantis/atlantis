@@ -114,6 +114,8 @@ type DefaultCommandRunner struct {
 	Drainer                       *Drainer
 	PreWorkflowHooksCommandRunner PreWorkflowHooksCommandRunner
 	PullStatusFetcher             PullStatusFetcher
+	TerraformOutputChan           chan<- *models.TerraformOutputLine
+	JobURLGenerator               JobURLGenerator
 }
 
 // RunAutoplanCommand runs plan and policy_checks when a pull request is opened or updated.
@@ -141,6 +143,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		HeadRepo:   headRepo,
 		PullStatus: status,
 		Trigger:    Auto,
+		JobURL:     c.JobURLGenerator.GenerateJobURL(pull),
 	}
 	if !c.validateCtxAndComment(ctx) {
 		return
@@ -195,6 +198,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		PullStatus: status,
 		HeadRepo:   headRepo,
 		Trigger:    Comment,
+		JobURL:     c.JobURLGenerator.GenerateJobURL(pull),
 	}
 
 	if !c.validateCtxAndComment(ctx) {

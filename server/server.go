@@ -68,6 +68,11 @@ const (
 	//   mux.Router.Get(LockViewRouteName).URL(LockViewRouteIDQueryParam, "my id")
 	LockViewRouteIDQueryParam = "id"
 
+	// JobViewRouteName is the named route in mux.Router for the job view.
+	// The route can be retrieved by this name, ex:
+	//   mux.Router.Get(JobViewRouteName)
+	JobViewRouteName = "job-detail"
+
 	// binDirName is the name of the directory inside our data dir where
 	// we download binaries.
 	BinDirName = "bin"
@@ -90,9 +95,11 @@ type Server struct {
 	ApplyLocker                   locking.ApplyLocker
 	VCSEventsController           *events_controllers.VCSEventsController
 	GithubAppController           *controllers.GithubAppController
+	JobsController                *controllers.JobsController
 	LocksController               *controllers.LocksController
 	StatusController              *controllers.StatusController
 	IndexTemplate                 templates.TemplateWriter
+	JobTemplate                   templates.TemplateWriter
 	LockDetailTemplate            templates.TemplateWriter
 	SSLCertFile                   string
 	SSLKeyFile                    string
@@ -272,7 +279,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	terraformOutputChan := make(chan *models.TerraformOutputLine)
 	terraformClient, err := terraform.NewClient(
 		logger,
 		binDir,
@@ -283,7 +290,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		config.DefaultTFVersionFlag,
 		userConfig.TFDownloadURL,
 		&terraform.DefaultDownloader{},
-		true)
+		true,
+		terraformOutputChan)
 	// The flag.Lookup call is to detect if we're running in a unit test. If we
 	// are, then we don't error out because we don't have/want terraform
 	// installed on our CI system where the unit tests run.
@@ -372,6 +380,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AtlantisURL:               parsedURL,
 		LockViewRouteIDQueryParam: LockViewRouteIDQueryParam,
 		LockViewRouteName:         LockViewRouteName,
+		JobViewRouteName:          JobViewRouteName,
 		Underlying:                underlyingRouter,
 	}
 	pullClosedExecutor := &events.PullClosedExecutor{
@@ -589,6 +598,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Drainer:                       drainer,
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 		PullStatusFetcher:             boltdb,
+		TerraformOutputChan:           terraformOutputChan,
+		JobURLGenerator:               router,
 	}
 	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
 	if err != nil {
@@ -634,6 +645,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubHostname:      userConfig.GithubHostname,
 		GithubOrg:           userConfig.GithubOrg,
 	}
+	jobsController := &controllers.JobsController{
+		AtlantisVersion:     config.AtlantisVersion,
+		AtlantisURL:         parsedURL,
+		Logger:              logger,
+		JobTemplate:         templates.JobTemplate,
+		TerraformOutputChan: terraformOutputChan,
+	}
 
 	return &Server{
 		AtlantisVersion:               config.AtlantisVersion,
@@ -647,10 +665,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		ApplyLocker:                   applyLockingClient,
 		VCSEventsController:           eventsController,
 		GithubAppController:           githubAppController,
+		JobsController:                jobsController,
 		LocksController:               locksController,
 		StatusController:              statusController,
 		IndexTemplate:                 templates.IndexTemplate,
 		LockDetailTemplate:            templates.LockTemplate,
+		JobTemplate:                   templates.JobTemplate,
 		SSLKeyFile:                    userConfig.SSLKeyFile,
 		SSLCertFile:                   userConfig.SSLCertFile,
 		Drainer:                       drainer,
@@ -673,6 +693,8 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
 	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
+	s.Router.HandleFunc("/job/{org}/{repo}/{pull}", s.JobsController.GetJob).Methods("GET").Name(JobViewRouteName)
+	s.Router.HandleFunc("/job/{org}/{repo}/{pull}/ws", s.JobsController.GetJobWS).Methods("GET")
 	n := negroni.New(&negroni.Recovery{
 		Logger:     log.New(os.Stdout, "", log.LstdFlags),
 		PrintStack: false,
@@ -689,6 +711,9 @@ func (s *Server) Start() error {
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
 	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n}
+	go func() {
+		s.JobsController.Listen()
+	}()
 	go func() {
 		s.Logger.Info("Atlantis started - listening on port %v", s.Port)
 

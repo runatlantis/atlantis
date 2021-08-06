@@ -52,7 +52,7 @@ type LockURLGenerator interface {
 // `terraform plan`.
 type StepRunner interface {
 	// Run runs the step.
-	Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error)
+	Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string, parallel runtime.ParallelCommand) (string, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_custom_step_runner.go CustomStepRunner
@@ -82,17 +82,17 @@ type WebhooksSender interface {
 
 type ProjectPlanCommandRunner interface {
 	// Plan runs terraform plan for the project described by ctx.
-	Plan(ctx models.ProjectCommandContext) models.ProjectResult
+	Plan(ctx models.ProjectCommandContext, parallelCmd runtime.ParallelCommand) models.ProjectResult
 }
 
 type ProjectApplyCommandRunner interface {
 	// Apply runs terraform apply for the project described by ctx.
-	Apply(ctx models.ProjectCommandContext) models.ProjectResult
+	Apply(ctx models.ProjectCommandContext, parallelCmd runtime.ParallelCommand) models.ProjectResult
 }
 
 type ProjectPolicyCheckCommandRunner interface {
 	// PolicyCheck runs OPA defined policies for the project desribed by ctx.
-	PolicyCheck(ctx models.ProjectCommandContext) models.ProjectResult
+	PolicyCheck(ctx models.ProjectCommandContext, parallelCmd runtime.ParallelCommand) models.ProjectResult
 }
 
 type ProjectApprovePoliciesCommandRunner interface {
@@ -102,7 +102,7 @@ type ProjectApprovePoliciesCommandRunner interface {
 
 type ProjectVersionCommandRunner interface {
 	// Version runs terraform version for the project described by ctx.
-	Version(ctx models.ProjectCommandContext) models.ProjectResult
+	Version(ctx models.ProjectCommandContext, parallelCmd runtime.ParallelCommand) models.ProjectResult
 }
 
 // ProjectCommandRunner runs project commands. A project command is a command
@@ -134,8 +134,8 @@ type DefaultProjectCommandRunner struct {
 }
 
 // Plan runs terraform plan for the project described by ctx.
-func (p *DefaultProjectCommandRunner) Plan(ctx models.ProjectCommandContext) models.ProjectResult {
-	planSuccess, failure, err := p.doPlan(ctx)
+func (p *DefaultProjectCommandRunner) Plan(ctx models.ProjectCommandContext, parallel runtime.ParallelCommand) models.ProjectResult {
+	planSuccess, failure, err := p.doPlan(ctx, parallel)
 	return models.ProjectResult{
 		Command:     models.PlanCommand,
 		PlanSuccess: planSuccess,
@@ -148,8 +148,8 @@ func (p *DefaultProjectCommandRunner) Plan(ctx models.ProjectCommandContext) mod
 }
 
 // PolicyCheck evaluates policies defined with Rego for the project described by ctx.
-func (p *DefaultProjectCommandRunner) PolicyCheck(ctx models.ProjectCommandContext) models.ProjectResult {
-	policySuccess, failure, err := p.doPolicyCheck(ctx)
+func (p *DefaultProjectCommandRunner) PolicyCheck(ctx models.ProjectCommandContext, parallel runtime.ParallelCommand) models.ProjectResult {
+	policySuccess, failure, err := p.doPolicyCheck(ctx, parallel)
 	return models.ProjectResult{
 		Command:            models.PolicyCheckCommand,
 		PolicyCheckSuccess: policySuccess,
@@ -162,8 +162,8 @@ func (p *DefaultProjectCommandRunner) PolicyCheck(ctx models.ProjectCommandConte
 }
 
 // Apply runs terraform apply for the project described by ctx.
-func (p *DefaultProjectCommandRunner) Apply(ctx models.ProjectCommandContext) models.ProjectResult {
-	applyOut, failure, err := p.doApply(ctx)
+func (p *DefaultProjectCommandRunner) Apply(ctx models.ProjectCommandContext, parallel runtime.ParallelCommand) models.ProjectResult {
+	applyOut, failure, err := p.doApply(ctx, parallel)
 	return models.ProjectResult{
 		Command:      models.ApplyCommand,
 		Failure:      failure,
@@ -188,8 +188,8 @@ func (p *DefaultProjectCommandRunner) ApprovePolicies(ctx models.ProjectCommandC
 	}
 }
 
-func (p *DefaultProjectCommandRunner) Version(ctx models.ProjectCommandContext) models.ProjectResult {
-	versionOut, failure, err := p.doVersion(ctx)
+func (p *DefaultProjectCommandRunner) Version(ctx models.ProjectCommandContext, parallel runtime.ParallelCommand) models.ProjectResult {
+	versionOut, failure, err := p.doVersion(ctx, parallel)
 	return models.ProjectResult{
 		Command:        models.VersionCommand,
 		Failure:        failure,
@@ -211,7 +211,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx models.ProjectComman
 	}, "", nil
 }
 
-func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx models.ProjectCommandContext) (*models.PolicyCheckSuccess, string, error) {
+func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx models.ProjectCommandContext, parallel runtime.ParallelCommand) (*models.PolicyCheckSuccess, string, error) {
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	// This should already be acquired from the prior plan operation.
 	// if for some reason an unlock happens between the plan and policy check step
@@ -263,7 +263,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx models.ProjectCommandCon
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
-	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
+	outputs, err := p.runSteps(ctx.Steps, ctx, absPath, parallel)
 	if err != nil {
 		// Note: we are explicitly not unlocking the pr here since a failing policy check will require
 		// approval
@@ -282,7 +282,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx models.ProjectCommandCon
 	}, "", nil
 }
 
-func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (*models.PlanSuccess, string, error) {
+func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext, parallel runtime.ParallelCommand) (*models.PlanSuccess, string, error) {
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir))
 	if err != nil {
@@ -313,7 +313,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
-	outputs, err := p.runSteps(ctx.Steps, ctx, projAbsPath)
+	outputs, err := p.runSteps(ctx.Steps, ctx, projAbsPath, parallel)
 	if err != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
@@ -330,7 +330,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 	}, "", nil
 }
 
-func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) (applyOut string, failure string, err error) {
+func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext, parallel runtime.ParallelCommand) (applyOut string, failure string, err error) {
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -375,7 +375,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 	}
 	defer unlockFn()
 
-	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
+	outputs, err := p.runSteps(ctx.Steps, ctx, absPath, parallel)
 	p.Webhooks.Send(ctx.Log, webhooks.ApplyResult{ // nolint: errcheck
 		Workspace: ctx.Workspace,
 		User:      ctx.User,
@@ -390,7 +390,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 	return strings.Join(outputs, "\n"), "", nil
 }
 
-func (p *DefaultProjectCommandRunner) doVersion(ctx models.ProjectCommandContext) (versionOut string, failure string, err error) {
+func (p *DefaultProjectCommandRunner) doVersion(ctx models.ProjectCommandContext, parallel runtime.ParallelCommand) (versionOut string, failure string, err error) {
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -410,7 +410,7 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx models.ProjectCommandContext
 	}
 	defer unlockFn()
 
-	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
+	outputs, err := p.runSteps(ctx.Steps, ctx, absPath, parallel)
 	if err != nil {
 		return "", "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
 	}
@@ -418,7 +418,7 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx models.ProjectCommandContext
 	return strings.Join(outputs, "\n"), "", nil
 }
 
-func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.ProjectCommandContext, absPath string) ([]string, error) {
+func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.ProjectCommandContext, absPath string, parallel runtime.ParallelCommand) ([]string, error) {
 	var outputs []string
 	envs := make(map[string]string)
 	for _, step := range steps {
@@ -426,17 +426,17 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.Pr
 		var err error
 		switch step.StepName {
 		case "init":
-			out, err = p.InitStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+			out, err = p.InitStepRunner.Run(ctx, step.ExtraArgs, absPath, envs, runtime.ParallelCommand{})
 		case "plan":
-			out, err = p.PlanStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+			out, err = p.PlanStepRunner.Run(ctx, step.ExtraArgs, absPath, envs, parallel)
 		case "show":
-			_, err = p.ShowStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+			_, err = p.ShowStepRunner.Run(ctx, step.ExtraArgs, absPath, envs, runtime.ParallelCommand{})
 		case "policy_check":
-			out, err = p.PolicyCheckStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+			out, err = p.PolicyCheckStepRunner.Run(ctx, step.ExtraArgs, absPath, envs, parallel)
 		case "apply":
-			out, err = p.ApplyStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+			out, err = p.ApplyStepRunner.Run(ctx, step.ExtraArgs, absPath, envs, parallel)
 		case "version":
-			out, err = p.VersionStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+			out, err = p.VersionStepRunner.Run(ctx, step.ExtraArgs, absPath, envs, parallel)
 		case "run":
 			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath, envs)
 		case "env":

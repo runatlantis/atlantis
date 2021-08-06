@@ -5,6 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 // TempDir creates a temporary directory and returns its path along
@@ -70,3 +73,11 @@ func dirStructureGo(t *testing.T, parentDir string, structure map[string]interfa
 		}
 	}
 }
+
+func TestContext(t *testing.T) models.ProjectCommandContext {
+	return models.ProjectCommandContext{
+		Log:       logging.NewNoopLogger(t),
+		Workspace: "workspace",
+	}
+}
+

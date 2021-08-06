@@ -426,6 +426,40 @@ func SplitRepoFullName(repoFullName string) (owner string, repo string) {
 	return repoFullName[:lastSlashIdx], repoFullName[lastSlashIdx+1:]
 }
 
+// The next two functions are kind of hacks. In a few different places
+// we need to get a unique identifier for the current pull request as
+// a single string (and it has to be constructed the same way each
+// time). Same for getting a string that describes the current
+// Atlantis workspace (or "project", which I think is the technically
+// correct term). The easy way is to put this shared code as methods
+// on the ProjectCommandContext struct, so that it's easy to get the
+// relevant strings from anywhere. There might be a more appropriate
+// way to do it; I haven't looked very hard.
+
+func (c ProjectCommandContext) PullSlug() string {
+	return fmt.Sprintf("%s/%d", c.BaseRepo.FullName, c.Pull.Num)
+}
+
+// ProjectDesc returns a string that describes the current project in
+// human-readable terms, as concisely as possible.
+func (c ProjectCommandContext) ProjectDesc() string {
+	// If project name is set, it's supposed to be a unique
+	// string, we'll just use that.
+	if c.ProjectName != "" {
+		return c.ProjectName
+	}
+	// Otherwise we want to report the Terraform working directory
+	// which is the primary disambiguator.
+	desc := c.RepoRelDir
+	// Only if the configuration has specified custom workspaces
+	// do we want to tack those on (because multiple projects
+	// might then use the same working directory).
+	if c.Workspace != "default" {
+		desc += " (" + c.Workspace + ")"
+	}
+	return desc
+}
+
 // ProjectResult is the result of executing a plan/policy_check/apply for a specific project.
 type ProjectResult struct {
 	Command            CommandName
@@ -679,4 +713,21 @@ type PreWorkflowHookCommandContext struct {
 	User User
 	// Verbose is true when the user would like verbose output.
 	Verbose bool
+}
+
+type TerraformOutputLine struct {
+	// pull request that generated this output line
+	PullSlug string
+
+	// parallel command number, if applicable
+	ParallelCmdIndex int
+
+	// thing to print in console on web interface, no trailing newline
+	Line string
+
+	// true means we should clear the buffer of accumulated log
+	// lines before (resp. after) logging the given line, so that
+	// new clients connecting to the web interface don't see them
+	ClearBefore bool
+	ClearAfter  bool
 }

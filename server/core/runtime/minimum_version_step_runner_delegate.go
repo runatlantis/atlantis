@@ -30,7 +30,7 @@ func NewMinimumVersionStepRunnerDelegate(minimumVersionStr string, defaultVersio
 	}, nil
 }
 
-func (r *MinimumVersionStepRunnerDelegate) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+func (r *MinimumVersionStepRunnerDelegate) Run(ctx models.ProjectCommandContext, extraArgs []string, path string, envs map[string]string, parallel ParallelCommand) (string, error) {
 	tfVersion := r.defaultTfVersion
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
@@ -40,5 +40,5 @@ func (r *MinimumVersionStepRunnerDelegate) Run(ctx models.ProjectCommandContext,
 		return fmt.Sprintf("Version: %s is unsupported for this step. Minimum version is: %s", tfVersion.String(), r.minimumVersion.String()), nil
 	}
 
-	return r.delegate.Run(ctx, extraArgs, path, envs)
+	return r.delegate.Run(ctx, extraArgs, path, envs, parallel)
 }
