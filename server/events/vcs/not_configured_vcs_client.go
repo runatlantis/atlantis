@@ -61,3 +61,7 @@ func (a *NotConfiguredVCSClient) SupportsSingleFileDownload(repo models.Repo) bo
 func (a *NotConfiguredVCSClient) DownloadRepoConfigFile(pull models.PullRequest) (bool, []byte, error) {
 	return true, []byte{}, a.err()
 }
+
+func (a *NotConfiguredVCSClient) SyncPull(repo models.Repo, pull models.PullRequest) error {
+	return a.err()
+}

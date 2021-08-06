@@ -281,6 +281,15 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	return true, nil
 }
 
+// TODO @amir-elgayed add implementation for the other clients
+
+// SyncPull Merges master into current pull request's branch
+func (g *GithubClient) SyncPull(repo models.Repo, pull models.PullRequest) error {
+	var err error
+	_, _, err = g.client.PullRequests.UpdateBranch(g.ctx, repo.Owner, repo.Name, pull.Num, &github.PullRequestBranchUpdateOptions{})
+	return err
+}
+
 // GetPullRequest returns the pull request.
 func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRequest, error) {
 	var err error

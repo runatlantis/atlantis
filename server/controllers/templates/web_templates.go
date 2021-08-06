@@ -38,6 +38,19 @@ type LockIndexData struct {
 	Workspace     string
 	Time          time.Time
 	TimeFormatted string
+	Queue         []QueueItemIndexData
+}
+
+type QueueItemIndexData struct {
+	LockPath      string
+	RepoFullName  string
+	PullNum       int
+	Path          string
+	Workspace     string
+	Time          time.Time
+	TimeFormatted string
+	PullUrl       string
+	Author        string
 }
 
 // ApplyLockData holds the fields to display in the index view
@@ -50,6 +63,7 @@ type ApplyLockData struct {
 // IndexData holds the data for rendering the index page
 type IndexData struct {
 	Locks           []LockIndexData
+	Queues          map[string][]QueueItemIndexData
 	ApplyLock       ApplyLockData
 	AtlantisVersion string
 	// CleanedBasePath is the path Atlantis is accessible at externally. If
@@ -108,13 +122,29 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
   <br>
   <section>
     <p class="title-heading small"><strong>Locks</strong></p>
-    {{ if .Locks }}
+
+	{{ if .Locks }}
     {{ $basePath := .CleanedBasePath }}
     {{ range .Locks }}
       <a href="{{ $basePath }}{{.LockPath}}">
         <div class="twelve columns button content lock-row">
         <div class="list-title">{{.RepoFullName}} <span class="heading-font-size">#{{.PullNum}}</span> <code>{{.Path}}</code> <code>{{.Workspace}}</code></div>
         <div class="list-status"><code>Locked</code></div>
+		<div class="list-title" style="margin-left:10px">
+			Queue: [
+			{{ range .Queue}}
+				<a title=
+"Author: {{.Author}}
+Url: {{.PullUrl}}
+Pull Req No.: #{{.PullNum}}
+Time: {{.TimeFormatted}}"
+					href="{{.PullUrl}}">
+					#{{.PullNum}}
+				</a>
+			{{ end }}
+			]
+		</div>
+		<div class="list-status"><code>Locked</code></div>
         <div class="list-timestamp"><span class="heading-font-size">{{.TimeFormatted}}</span></div>
         </div>
       </a>
@@ -248,6 +278,7 @@ type LockDetailData struct {
 	// not using a path-based proxy, this will be an empty string. Never ends
 	// in a '/' (hence "cleaned").
 	CleanedBasePath string
+	Queue           []QueueItemIndexData
 }
 
 var LockTemplate = template.Must(template.New("lock.html.tmpl").Parse(`
@@ -281,6 +312,43 @@ var LockTemplate = template.Must(template.New("lock.html.tmpl").Parse(`
         <h6><code>Pull Request Link</code>: <a href="{{.PullRequestLink}}" target="_blank"><strong>{{.PullRequestLink}}</strong></a></h6>
         <h6><code>Locked By</code>: <strong>{{.LockedBy}}</strong></h6>
         <h6><code>Workspace</code>: <strong>{{.Workspace}}</strong></h6>
+		<h6><code>Queue</code>:
+			<ol>
+				{{ range .Queue}}
+				<li>
+					<!-- TODO @amir-elgayed move to CSS file -->
+					<div style=  "margin-left: 20px;
+								  text-align: left;
+								  padding: 0 20px;
+								  color: #555;
+								  font-size: 11px;
+								  font-weight: 600;
+								  line-height: 38px;
+								  letter-spacing: .1rem;
+								  white-space: nowrap;
+								  background-color: transparent;
+								  border-radius: 4px;
+								  border: 1px solid #bbb;
+								  box-sizing: border-box;"
+					>
+						<code>Url</code>: <a href="{{.PullUrl}}">{{.PullUrl}}</a>
+						</br>
+						<code>Author</code>: {{.Author}}
+						</br>
+						<code>Pull Req No.</code>: #{{.PullNum}}
+						</br>
+						<code>Time:</code>: {{.TimeFormatted}}"
+						</br>
+						<code>Repository</code>: {{.RepoFullName}}
+						</br>						
+						<code>Path</code>: {{.Path}}
+						</br>
+						<code>Workspace</code>:  {{.Workspace}}
+					</div>
+				</li>
+
+			{{ end }}
+			</ol>
         <br>
       </div>
       <div class="four columns">

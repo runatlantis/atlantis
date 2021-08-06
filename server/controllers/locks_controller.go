@@ -78,6 +78,29 @@ func (l *LocksController) GetLock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var queuesMap map[string][]models.ProjectLock
+	// TODO @amir-elgayed add a function in bolddb.go that gets queue by lock instead
+	queuesMap, _ = l.Locker.ListQueues()
+	var queue []models.ProjectLock
+	queue = queuesMap[fmt.Sprintf("%s/%s/%s", lock.Project.RepoFullName, lock.Project.Path, lock.Workspace)]
+	var lockDetailQueue []templates.QueueItemIndexData
+
+	if queue != nil {
+		for _, projectLock := range queue {
+			lockDetailQueue = append(lockDetailQueue, templates.QueueItemIndexData{
+				LockPath:      "Not yet acquired",
+				RepoFullName:  projectLock.Project.RepoFullName,
+				PullNum:       projectLock.Pull.Num,
+				Path:          projectLock.Project.Path,
+				Workspace:     projectLock.Workspace,
+				Time:          projectLock.Time,
+				TimeFormatted: projectLock.Time.Format("02-01-2006 15:04:05"),
+				PullUrl:       projectLock.Pull.URL,
+				Author:        projectLock.Pull.Author,
+			})
+		}
+	}
+
 	owner, repo := models.SplitRepoFullName(lock.Project.RepoFullName)
 	viewData := templates.LockDetailData{
 		LockKeyEncoded:  id,
@@ -89,6 +112,7 @@ func (l *LocksController) GetLock(w http.ResponseWriter, r *http.Request) {
 		CleanedBasePath: l.AtlantisURL.Path,
 		RepoOwner:       owner,
 		RepoName:        repo,
+		Queue:           lockDetailQueue,
 	}
 
 	err = l.LockDetailTemplate.Execute(w, viewData)

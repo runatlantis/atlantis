@@ -30,6 +30,8 @@ type Backend interface {
 	TryLock(lock models.ProjectLock) (bool, models.ProjectLock, models.EnqueueStatus, error)
 	Unlock(project models.Project, workspace string) (*models.ProjectLock, *models.ProjectLock, error)
 	List() ([]models.ProjectLock, error)
+	// GetQueues as a map<String, List<ProjectLock>>
+	GetQueues() (map[string][]models.ProjectLock, error)
 	GetLock(project models.Project, workspace string) (*models.ProjectLock, error)
 	UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, models.DequeueStatus, error)
 
@@ -61,6 +63,7 @@ type Locker interface {
 	TryLock(p models.Project, workspace string, pull models.PullRequest, user models.User) (TryLockResponse, error)
 	Unlock(key string) (*models.ProjectLock, *models.ProjectLock, error)
 	List() (map[string]models.ProjectLock, error)
+	ListQueues() (map[string][]models.ProjectLock, error)
 	UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, models.DequeueStatus, error)
 	GetLock(key string) (*models.ProjectLock, error)
 }
@@ -92,15 +95,15 @@ func (c *Client) TryLock(p models.Project, workspace string, pull models.PullReq
 }
 
 // Unlock attempts to unlock a project and workspace. If successful,
-// pointers to the now deleted lock and the next dequeued lock (optional) will be returned.
-// Else, both pointers will be nil. An error will only be returned if there was
+// a pointer to the now deleted lock will be returned. Else, that
+// pointer will be nil. An error will only be returned if there was
 // an error deleting the lock (i.e. not if there was no lock).
 func (c *Client) Unlock(key string) (*models.ProjectLock, *models.ProjectLock, error) {
 	project, workspace, err := c.lockKeyToProjectWorkspace(key)
 	if err != nil {
 		return nil, nil, err
 	}
-	return c.backend.Unlock(project, workspace)
+	return c.backend.Unlock(project, workspace) // TODO Monika
 }
 
 // List returns a map of all locks with their lock key as the map key.
@@ -115,6 +118,10 @@ func (c *Client) List() (map[string]models.ProjectLock, error) {
 		m[c.key(lock.Project, lock.Workspace)] = lock
 	}
 	return m, nil
+}
+
+func (c *Client) ListQueues() (map[string][]models.ProjectLock, error) {
+	return c.backend.GetQueues()
 }
 
 // TODO monikma extend the tests
@@ -178,6 +185,11 @@ func (c *NoOpLocker) Unlock(key string) (*models.ProjectLock, *models.ProjectLoc
 // The lock key can be used in GetLock() and Unlock().
 func (c *NoOpLocker) List() (map[string]models.ProjectLock, error) {
 	m := make(map[string]models.ProjectLock)
+	return m, nil
+}
+
+func (c *NoOpLocker) ListQueues() (map[string][]models.ProjectLock, error) {
+	m := make(map[string][]models.ProjectLock)
 	return m, nil
 }
 
