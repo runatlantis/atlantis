@@ -405,10 +405,13 @@ func (c *DefaultClient) RunCommandAsync(ctx models.ProjectCommandContext, path s
 			s := bufio.NewScanner(stdout)
 			for s.Scan() {
 				outCh <- Line{Line: s.Text()}
+				if c.terraformOutputChan != nil {
 				c.terraformOutputChan <- &models.TerraformOutputLine{
 					PullSlug: ctx.PullSlug(),
 					Line:     s.Text(),
+					Parallel: parallel,
 				}
+			}
 			}
 			wg.Done()
 		}()
@@ -416,10 +419,13 @@ func (c *DefaultClient) RunCommandAsync(ctx models.ProjectCommandContext, path s
 			s := bufio.NewScanner(stderr)
 			for s.Scan() {
 				outCh <- Line{Line: s.Text()}
+				if c.terraformOutputChan != nil {
 				c.terraformOutputChan <- &models.TerraformOutputLine{
 					PullSlug: ctx.PullSlug(),
 					Line:     s.Text(),
+					Parallel: parallel,
 				}
+			}
 			}
 			wg.Done()
 		}()
