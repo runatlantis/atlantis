@@ -113,6 +113,8 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	Equals(t, "https://lock-key", res.PlanSuccess.LockURL)
 	Equals(t, "run\napply\nplan\ninit", res.PlanSuccess.TerraformOutput)
 
+	mockWorkingDir.VerifyWasCalledOnce().IsFileTracked(ctx.Log, repoDir, ".terraform.lock.hcl")
+
 	expSteps := []string{"run", "apply", "plan", "init", "env"}
 	for _, step := range expSteps {
 		switch step {
@@ -125,6 +127,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		case "run":
 			mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir, expEnvs)
 		}
+
 	}
 }
 

@@ -462,6 +462,47 @@ func TestHasDiverged_MasterHasDiverged(t *testing.T) {
 	Equals(t, hasDiverged, false)
 }
 
+func TestIsFileTracked(t *testing.T) {
+	// Initialize the git repo.
+	repoDir, cleanup := initRepo(t)
+	defer cleanup()
+
+	wd := &events.FileWorkspace{
+		DataDir:       repoDir,
+		CheckoutMerge: true,
+	}
+
+	// file1 should not be tracked
+	isFileTracked, err := wd.IsFileTracked(logging.NewNoopLogger(t), repoDir, "file1")
+	Ok(t, err)
+	Equals(t, isFileTracked, false)
+
+	// stage file1
+	runCmd(t, repoDir, "touch", "file1")
+	runCmd(t, repoDir, "git", "add", "file1")
+	runCmd(t, repoDir, "git", "commit", "-m", "add file1")
+
+	// file1 should  be tracked
+	isFileTracked, err = wd.IsFileTracked(logging.NewNoopLogger(t), repoDir, "file1")
+	Ok(t, err)
+	Equals(t, isFileTracked, true)
+
+	// .terraform.lock.hcl should not be tracked
+	isFileTracked, err = wd.IsFileTracked(logging.NewNoopLogger(t), repoDir, ".terraform.lock.hcl")
+	Ok(t, err)
+	Equals(t, isFileTracked, false)
+
+	// stage .terraform.lock.hcl
+	runCmd(t, repoDir, "touch", ".terraform.lock.hcl")
+	runCmd(t, repoDir, "git", "add", ".terraform.lock.hcl")
+	runCmd(t, repoDir, "git", "commit", "-m", "add .terraform.lock.hcl")
+
+	// file1 should  be tracked
+	isFileTracked, err = wd.IsFileTracked(logging.NewNoopLogger(t), repoDir, ".terraform.lock.hcl")
+	Ok(t, err)
+	Equals(t, isFileTracked, true)
+}
+
 func initRepo(t *testing.T) (string, func()) {
 	repoDir, cleanup := TempDir(t)
 	runCmd(t, repoDir, "git", "init")

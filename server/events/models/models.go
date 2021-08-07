@@ -400,6 +400,8 @@ type ProjectCommandContext struct {
 	PolicySets valid.PolicySets
 	// DeleteSourceBranchOnMerge will attempt to allow a branch to be deleted when merged (AzureDevOps & GitLab Support Only)
 	DeleteSourceBranchOnMerge bool
+	// TerraformLockFileTracked is true if .terraform.lock.hcl is tracked in git
+	TerraformLockFileTracked bool
 }
 
 // GetShowResultFileName returns the filename (not the path) to store the tf show result

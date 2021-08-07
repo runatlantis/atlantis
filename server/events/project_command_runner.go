@@ -313,6 +313,11 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
+	ctx.TerraformLockFileTracked, err = p.WorkingDir.IsFileTracked(ctx.Log, repoDir, ".terraform.lock.hcl")
+	if err != nil {
+		return nil, "", err
+	}
+
 	outputs, err := p.runSteps(ctx.Steps, ctx, projAbsPath)
 	if err != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
