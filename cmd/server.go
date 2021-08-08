@@ -78,6 +78,7 @@ const (
 	ParallelPoolSize           = "parallel-pool-size"
 	AllowDraftPRs              = "allow-draft-prs"
 	PortFlag                   = "port"
+	QueueLocks  		       = "queue-locks"
 	RepoConfigFlag             = "repo-config"
 	RepoConfigJSONFlag         = "repo-config-json"
 	// RepoWhitelistFlag is deprecated for RepoAllowlistFlag.
@@ -323,6 +324,10 @@ var boolFlags = map[string]boolFlag{
 	HidePrevPlanComments: {
 		description: "Hide previous plan comments to reduce clutter in the PR. " +
 			"VCS support is limited to: GitHub.",
+		defaultValue: false,
+	},
+	QueueLocks: {
+		description: "Queue locks when a project is locked by another PR.",
 		defaultValue: false,
 	},
 	RequireApprovalFlag: {

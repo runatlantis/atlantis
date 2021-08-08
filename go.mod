@@ -32,6 +32,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jmespath/go-jmespath v0.3.1-0.20200310193758-2437e8417af5 // indirect
 	github.com/leodido/go-urn v1.2.0 // indirect
+	github.com/lusis/go-slackbot v0.0.0-20210303200821-3c34a039d473 // indirect
 	github.com/lusis/slack-test v0.0.0-20190426140909-c40012f20018 // indirect
 	github.com/mcdafydd/go-azuredevops v0.12.0
 	github.com/microcosm-cc/bluemonday v1.0.15
