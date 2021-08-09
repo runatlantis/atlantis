@@ -874,6 +874,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		models.UnlockCommand:          unlockCommandRunner,
 		models.VersionCommand:         versionCommandRunner,
 	}
+	mockUrlGen := mocks.NewMockJobURLGenerator()
 
 	commandRunner := &events.DefaultCommandRunner{
 		EventParser:                   eventParser,
@@ -887,6 +888,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		Drainer:                       drainer,
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 		PullStatusFetcher:             boltdb,
+		JobURLGenerator:               mockUrlGen,
 	}
 
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
