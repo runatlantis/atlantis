@@ -479,6 +479,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, errors.Wrap(err, "initializing policy check runner")
 	}
 
+	applyRequirementHandler := &events.AggregateApplyRequirements{
+		PullApprovedChecker: vcsClient,
+		WorkingDir:          workingDir,
+	}
+
 	projectCommandRunner := &events.DefaultProjectCommandRunner{
 		Locker:           projectLocker,
 		LockURLGenerator: router,
@@ -503,11 +508,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		EnvStepRunner: &runtime.EnvStepRunner{
 			RunStepRunner: runStepRunner,
 		},
-		PullApprovedChecker: vcsClient,
-		WorkingDir:          workingDir,
-		Webhooks:            webhooksManager,
-		WorkingDirLocker:    workingDirLocker,
-		TerraformOutputChan: terraformOutputChan,
+		WorkingDir:                 workingDir,
+		Webhooks:                   webhooksManager,
+		WorkingDirLocker:           workingDirLocker,
+		TerraformOutputChan:        terraformOutputChan,
+		AggregateApplyRequirements: applyRequirementHandler,
 	}
 
 	dbUpdater := &events.DBUpdater{

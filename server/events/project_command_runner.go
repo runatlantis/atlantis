@@ -21,9 +21,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
-	"github.com/runatlantis/atlantis/server/events/yaml/raw"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -110,22 +108,23 @@ type ProjectCommandRunner interface {
 }
 
 // DefaultProjectCommandRunner implements ProjectCommandRunner.
-type DefaultProjectCommandRunner struct { //create object and test
-	Locker                ProjectLocker
-	LockURLGenerator      LockURLGenerator
-	InitStepRunner        StepRunner
-	PlanStepRunner        StepRunner
-	ShowStepRunner        StepRunner
-	ApplyStepRunner       StepRunner
-	PolicyCheckStepRunner StepRunner
-	RunStepRunner         CustomStepRunner
-	EnvStepRunner         EnvStepRunner
-	PullApprovedChecker   runtime.PullApprovedChecker
-	WorkingDir            WorkingDir
-	Webhooks              WebhooksSender
-	WorkingDirLocker      WorkingDirLocker
-	TerraformOutputChan   chan<- *models.TerraformOutputLine
-	LogStreamURLGenerator LogStreamURLGenerator
+type DefaultProjectCommandRunner struct {
+	Locker                     ProjectLocker
+	LockURLGenerator           LockURLGenerator
+	InitStepRunner             StepRunner
+	PlanStepRunner             StepRunner
+	ShowStepRunner             StepRunner
+	ApplyStepRunner            StepRunner
+	PolicyCheckStepRunner      StepRunner
+	VersionStepRunner          StepRunner
+	RunStepRunner              CustomStepRunner
+	EnvStepRunner              EnvStepRunner
+	WorkingDir                 WorkingDir
+	Webhooks                   WebhooksSender
+	WorkingDirLocker           WorkingDirLocker
+	AggregateApplyRequirements ApplyRequirement
+	TerraformOutputChan        chan<- *models.TerraformOutputLine
+	LogStreamURLGenerator      LogStreamURLGenerator
 }
 
 // Plan runs terraform plan for the project described by ctx.
@@ -326,31 +325,11 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 		return "", "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
-	for _, req := range ctx.ApplyRequirements {
-		switch req {
-		case raw.ApprovedApplyRequirement:
-			approved, err := p.PullApprovedChecker.PullIsApproved(ctx.Pull.BaseRepo, ctx.Pull) // nolint: vetshadow
-			if err != nil {
-				return "", "", errors.Wrap(err, "checking if pull request was approved")
-			}
-			if !approved {
-				return "", "Pull request must be approved by at least one person other than the author before running apply.", nil
-			}
-		// this should come before mergeability check since mergeability is a superset of this check.
-		case valid.PoliciesPassedApplyReq:
-			if ctx.ProjectPlanStatus == models.ErroredPolicyCheckStatus {
-				return "", "All policies must pass for project before running apply", nil
-			}
-		case raw.MergeableApplyRequirement:
-			if !ctx.PullMergeable {
-				return "", "Pull request must be mergeable before running apply.", nil
-			}
-		case raw.UnDivergedApplyRequirement:
-			if p.WorkingDir.HasDiverged(ctx.Log, repoDir) {
-				return "", "Default branch must be rebased onto pull request before running apply.", nil
-			}
-		}
+	failure, err = p.AggregateApplyRequirements.ValidateProject(repoDir, ctx)
+	if failure != "" || err != nil {
+		return "", failure, err
 	}
+
 	// Acquire internal lock for the directory we're going to operate in.
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace)
 	if err != nil {

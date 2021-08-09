@@ -42,20 +42,21 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	mockWorkingDir := mocks.NewMockWorkingDir()
 	mockLocker := mocks.NewMockProjectLocker()
 	mockChannel := make(chan *models.TerraformOutputLine)
+	mockApplyReqHandler := mocks.NewMockApplyRequirement()
 
 	runner := events.DefaultProjectCommandRunner{
-		Locker:              mockLocker,
-		LockURLGenerator:    mockURLGenerator{},
-		InitStepRunner:      mockInit,
-		PlanStepRunner:      mockPlan,
-		ApplyStepRunner:     mockApply,
-		RunStepRunner:       mockRun,
-		EnvStepRunner:       &realEnv,
-		PullApprovedChecker: nil,
-		WorkingDir:          mockWorkingDir,
-		Webhooks:            nil,
-		WorkingDirLocker:    events.NewDefaultWorkingDirLocker(),
-		TerraformOutputChan: mockChannel,
+		Locker:                     mockLocker,
+		LockURLGenerator:           mockURLGenerator{},
+		InitStepRunner:             mockInit,
+		PlanStepRunner:             mockPlan,
+		ApplyStepRunner:            mockApply,
+		RunStepRunner:              mockRun,
+		EnvStepRunner:              &realEnv,
+		WorkingDir:                 mockWorkingDir,
+		Webhooks:                   nil,
+		WorkingDirLocker:           events.NewDefaultWorkingDirLocker(),
+		AggregateApplyRequirements: mockApplyReqHandler,
+		TerraformOutputChan:        mockChannel,
 	}
 
 	repoDir, cleanup := TempDir(t)
@@ -150,9 +151,12 @@ func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 	mockWorkingDir := mocks.NewMockWorkingDir()
 	mockApproved := mocks2.NewMockPullApprovedChecker()
 	runner := &events.DefaultProjectCommandRunner{
-		WorkingDir:          mockWorkingDir,
-		PullApprovedChecker: mockApproved,
-		WorkingDirLocker:    events.NewDefaultWorkingDirLocker(),
+		WorkingDir:       mockWorkingDir,
+		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+		AggregateApplyRequirements: &events.AggregateApplyRequirements{
+			PullApprovedChecker: mockApproved,
+			WorkingDir:          mockWorkingDir,
+		},
 	}
 	ctx := models.ProjectCommandContext{
 		ApplyRequirements: []string{"approved"},
@@ -173,6 +177,9 @@ func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 	runner := &events.DefaultProjectCommandRunner{
 		WorkingDir:       mockWorkingDir,
 		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+		AggregateApplyRequirements: &events.AggregateApplyRequirements{
+			WorkingDir: mockWorkingDir,
+		},
 	}
 	ctx := models.ProjectCommandContext{
 		PullMergeable:     false,
@@ -193,6 +200,9 @@ func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 	runner := &events.DefaultProjectCommandRunner{
 		WorkingDir:       mockWorkingDir,
 		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+		AggregateApplyRequirements: &events.AggregateApplyRequirements{
+			WorkingDir: mockWorkingDir,
+		},
 	}
 	ctx := models.ProjectCommandContext{
 		ApplyRequirements: []string{"undiverged"},
@@ -296,19 +306,23 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			mockWorkingDir := mocks.NewMockWorkingDir()
 			mockLocker := mocks.NewMockProjectLocker()
 			mockSender := mocks.NewMockWebhooksSender()
-
-			runner := events.DefaultProjectCommandRunner{
-				Locker:              mockLocker,
-				LockURLGenerator:    mockURLGenerator{},
-				InitStepRunner:      mockInit,
-				PlanStepRunner:      mockPlan,
-				ApplyStepRunner:     mockApply,
-				RunStepRunner:       mockRun,
-				EnvStepRunner:       mockEnv,
+			applyReqHandler := &events.AggregateApplyRequirements{
 				PullApprovedChecker: mockApproved,
 				WorkingDir:          mockWorkingDir,
-				Webhooks:            mockSender,
-				WorkingDirLocker:    events.NewDefaultWorkingDirLocker(),
+			}
+
+			runner := events.DefaultProjectCommandRunner{
+				Locker:                     mockLocker,
+				LockURLGenerator:           mockURLGenerator{},
+				InitStepRunner:             mockInit,
+				PlanStepRunner:             mockPlan,
+				ApplyStepRunner:            mockApply,
+				RunStepRunner:              mockRun,
+				EnvStepRunner:              mockEnv,
+				WorkingDir:                 mockWorkingDir,
+				Webhooks:                   mockSender,
+				WorkingDirLocker:           events.NewDefaultWorkingDirLocker(),
+				AggregateApplyRequirements: applyReqHandler,
 			}
 			repoDir, cleanup := TempDir(t)
 			defer cleanup()
@@ -378,14 +392,13 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 	mockLocker := mocks.NewMockProjectLocker()
 
 	runner := events.DefaultProjectCommandRunner{
-		Locker:              mockLocker,
-		LockURLGenerator:    mockURLGenerator{},
-		RunStepRunner:       &run,
-		EnvStepRunner:       &env,
-		PullApprovedChecker: nil,
-		WorkingDir:          mockWorkingDir,
-		Webhooks:            nil,
-		WorkingDirLocker:    events.NewDefaultWorkingDirLocker(),
+		Locker:           mockLocker,
+		LockURLGenerator: mockURLGenerator{},
+		RunStepRunner:    &run,
+		EnvStepRunner:    &env,
+		WorkingDir:       mockWorkingDir,
+		Webhooks:         nil,
+		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
 	}
 
 	repoDir, cleanup := TempDir(t)
