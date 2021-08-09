@@ -226,7 +226,7 @@ func (b *BoltDB) Unlock(p models.Project, workspace string) (*models.ProjectLock
 
 		// Queue has items, get the next in line
 		// TODO monikma will this dequeueing info not get to the PR comment?
-		return b.dequeueNextInLine(dequeuedLock, currQueue, bucket, key, queueBucket)
+		return b.dequeueNextInLine(&dequeuedLock, currQueue, bucket, key, queueBucket)
 	})
 
 	err = errors.Wrap(err, "DB transaction failed")
@@ -236,8 +236,8 @@ func (b *BoltDB) Unlock(p models.Project, workspace string) (*models.ProjectLock
 	return nil, nil, err
 }
 
-func (b *BoltDB) dequeueNextInLine(dequeuedLock models.ProjectLock, currQueue []models.ProjectLock, bucket *bolt.Bucket, key string, queueBucket *bolt.Bucket) error {
-	dequeuedLock = currQueue[0]
+func (b *BoltDB) dequeueNextInLine(dequeuedLock *models.ProjectLock, currQueue []models.ProjectLock, bucket *bolt.Bucket, key string, queueBucket *bolt.Bucket) error {
+	*dequeuedLock = currQueue[0]
 	newQueue := currQueue[1:]
 
 	dequeuedLockSerialized, _ := json.Marshal(dequeuedLock)
