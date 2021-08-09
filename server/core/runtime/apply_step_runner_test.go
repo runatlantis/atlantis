@@ -368,7 +368,7 @@ type remoteApplyMock struct {
 }
 
 // RunCommandAsync fakes out running terraform async.
-func (r *remoteApplyMock) RunCommandAsync(log logging.SimpleLogging, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan terraform.Line) {
+func (r *remoteApplyMock) RunCommandAsync(ctx models.ProjectCommandContext, path string, args []string, envs map[string]string, v *version.Version, parallel models.ParallelCommand) (chan<- string, <-chan terraform.Line) {
 	r.CalledArgs = args
 
 	in := make(chan string)

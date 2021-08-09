@@ -30,6 +30,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	eventmocks "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
+	matchers2 "github.com/runatlantis/atlantis/server/core/terraform/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/fixtures"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
@@ -466,7 +467,7 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 			},
 		}, nil)
 	callCount := 0
-	When(projectCommandRunner.Plan(matchers.AnyModelsProjectCommandContext())).Then(func(_ []Param) ReturnValues {
+	When(projectCommandRunner.Plan(matchers.AnyModelsProjectCommandContext(), matchers2.AnyModelsParallelCommand())).Then(func(_ []Param) ReturnValues {
 		if callCount == 0 {
 			// The first call, we return a successful result.
 			callCount++

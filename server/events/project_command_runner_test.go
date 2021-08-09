@@ -103,9 +103,9 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		RepoRelDir: ".",
 	}
 	// Each step will output its step name.
-	When(mockInit.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("init", nil)
-	When(mockPlan.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("plan", nil)
-	When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
+	When(mockInit.Run(ctx, nil, repoDir, expEnvs, models.NotParallel)).ThenReturn("init", nil)
+	When(mockPlan.Run(ctx, nil, repoDir, expEnvs, models.NotParallel)).ThenReturn("plan", nil)
+	When(mockApply.Run(ctx, nil, repoDir, expEnvs, models.NotParallel)).ThenReturn("apply", nil)
 	When(mockRun.Run(ctx, "", repoDir, expEnvs)).ThenReturn("run", nil)
 	res := runner.Plan(ctx, models.NotParallel)
 
@@ -117,11 +117,11 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	for _, step := range expSteps {
 		switch step {
 		case "init":
-			mockInit.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
+			mockInit.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs, models.NotParallel)
 		case "plan":
-			mockPlan.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
+			mockPlan.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs, models.NotParallel)
 		case "apply":
-			mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
+			mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs, models.NotParallel)
 		case "run":
 			mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir, expEnvs)
 		}
@@ -327,14 +327,14 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			expEnvs := map[string]string{
 				"key": "value",
 			}
-			When(mockInit.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("init", nil)
-			When(mockPlan.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("plan", nil)
-			When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
+			When(mockInit.Run(ctx, nil, repoDir, expEnvs, models.NotParallel)).ThenReturn("init", nil)
+			When(mockPlan.Run(ctx, nil, repoDir, expEnvs, models.NotParallel)).ThenReturn("plan", nil)
+			When(mockApply.Run(ctx, nil, repoDir, expEnvs, models.NotParallel)).ThenReturn("apply", nil)
 			When(mockRun.Run(ctx, "", repoDir, expEnvs)).ThenReturn("run", nil)
 			When(mockEnv.Run(ctx, "", "value", repoDir, make(map[string]string))).ThenReturn("value", nil)
 			When(mockApproved.PullIsApproved(ctx.BaseRepo, ctx.Pull)).ThenReturn(true, nil)
 
-			res := runner.Apply(ctx)
+			res := runner.Apply(ctx, models.NotParallel)
 			Equals(t, c.expOut, res.ApplySuccess)
 			Equals(t, c.expFailure, res.Failure)
 
@@ -343,11 +343,11 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				case "approved":
 					mockApproved.VerifyWasCalledOnce().PullIsApproved(ctx.BaseRepo, ctx.Pull)
 				case "init":
-					mockInit.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
+					mockInit.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs, models.NotParallel)
 				case "plan":
-					mockPlan.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
+					mockPlan.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs, models.NotParallel)
 				case "apply":
-					mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
+					mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs, models.NotParallel)
 				case "run":
 					mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir, expEnvs)
 				case "env":
@@ -444,7 +444,7 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 		Workspace:  "default",
 		RepoRelDir: ".",
 	}
-	res := runner.Plan(ctx)
+	res := runner.Plan(ctx, models.NotParallel)
 	Assert(t, res.PlanSuccess != nil, "exp plan success")
 	Equals(t, "https://lock-key", res.PlanSuccess.LockURL)
 	Equals(t, "var=\n\nvar=value\n\ndynamic_var=dynamic_value\n\ndynamic_var=overridden\n", res.PlanSuccess.TerraformOutput)
