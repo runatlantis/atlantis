@@ -458,6 +458,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, errors.Wrap(err, "initializing policy check runner")
 	}
 
+	applyRequirementHandler := &events.AggregateApplyRequirements{
+		PullApprovedChecker: vcsClient,
+		WorkingDir:          workingDir,
+	}
+
 	projectCommandRunner := &events.DefaultProjectCommandRunner{
 		Locker:           projectLocker,
 		LockURLGenerator: router,
@@ -486,10 +491,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTfVersion,
 		},
-		PullApprovedChecker: vcsClient,
-		WorkingDir:          workingDir,
-		Webhooks:            webhooksManager,
-		WorkingDirLocker:    workingDirLocker,
+		WorkingDir:                 workingDir,
+		Webhooks:                   webhooksManager,
+		WorkingDirLocker:           workingDirLocker,
+		AggregateApplyRequirements: applyRequirementHandler,
 	}
 
 	dbUpdater := &events.DBUpdater{
