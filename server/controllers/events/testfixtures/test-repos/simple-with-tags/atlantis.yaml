@@ -1,0 +1,33 @@
+version: 3
+projects:
+- dir: .
+  workspace: default
+  workflow: default
+  tags:
+    foo: bar
+- dir: .
+  workspace: staging
+  workflow: staging
+  tags:
+    foo: bar
+workflows:
+  default:
+    # Only specify plan so should use default apply workflow.
+    plan:
+      steps:
+      - run: echo preinit
+      - init
+      - plan:
+          extra_args: [-var, var=fromconfig]
+      - run: echo postplan
+  staging:
+    plan:
+      steps:
+      - init
+      - plan:
+          extra_args: [-var-file, staging.tfvars]
+    apply:
+      steps:
+      - run: echo preapply
+      - apply
+      - run: echo postapply

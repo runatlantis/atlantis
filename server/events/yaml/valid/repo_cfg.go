@@ -107,6 +107,7 @@ type Project struct {
 	Autoplan                  Autoplan
 	ApplyRequirements         []string
 	DeleteSourceBranchOnMerge *bool
+	Tags                      map[string]string
 }
 
 // GetName returns the name of the project or an empty string if there is no

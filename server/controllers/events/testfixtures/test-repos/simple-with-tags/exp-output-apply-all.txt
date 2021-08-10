@@ -1,0 +1,43 @@
+Ran Apply for 2 projects:
+
+1. dir: `.` workspace: `default`
+1. dir: `.` workspace: `staging`
+
+### 1. dir: `.` workspace: `default`
+```diff
+null_resource.simple:
+null_resource.simple:
+
+Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+var = "fromconfig"
+workspace = "default"
+
+```
+
+---
+### 2. dir: `.` workspace: `staging`
+<details><summary>Show Output</summary>
+
+```diff
+preapply
+
+null_resource.simple:
+null_resource.simple:
+
+Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+var = "fromfile"
+workspace = "staging"
+
+postapply
+
+```
+</details>
+
+---
+
