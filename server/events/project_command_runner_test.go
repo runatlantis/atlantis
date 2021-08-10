@@ -201,7 +201,6 @@ func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 		AggregateApplyRequirements: &events.AggregateApplyRequirements{
 			WorkingDir: mockWorkingDir,
 		},
-		Webhooks:         mocks.NewMockWebhooksSender(),
 	}
 	ctx := models.ProjectCommandContext{
 		ApplyRequirements: []string{"undiverged"},
@@ -209,6 +208,7 @@ func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
+	When(mockWorkingDir.HasDiverged(matchers.AnyPtrToLoggingSimpleLogger(), AnyString())).ThenReturn(true)
 
 	res := runner.Apply(ctx, models.NotParallel)
 	Equals(t, "Default branch must be rebased onto pull request before running apply.", res.Failure)
