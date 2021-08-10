@@ -94,7 +94,7 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
-	ctx.PullIsApproved, err = p.vcsClient.PullIsApproved(baseRepo, pull)
+	ctx.PullIsApproved, err = a.vcsClient.PullIsApproved(baseRepo, pull)
 	if err != nil {
 		// On error we continue the request is approved assumed false.
 		// We want to continue because not all apply's will need this status,
