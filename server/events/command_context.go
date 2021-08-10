@@ -40,6 +40,13 @@ type CommandContext struct {
 	// User is the user that triggered this command.
 	User models.User
 	Log  logging.SimpleLogging
+
+	// PullIsApproved is true if Pull is approved. This is available in
+	// the CommandContext because we want to collect this information before we
+	// set our own build statuses which can affect approve if users have
+	// required the Atlantis status to be successful prior to approved.
+	PullIsApproved bool
+
 	// PullMergeable is true if Pull is able to be merged. This is available in
 	// the CommandContext because we want to collect this information before we
 	// set our own build statuses which can affect mergeability if users have

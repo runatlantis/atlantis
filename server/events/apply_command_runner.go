@@ -94,6 +94,15 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
+	ctx.PullIsApproved, err = p.vcsClient.PullIsApproved(baseRepo, pull)
+	if err != nil {
+		// On error we continue the request is approved assumed false.
+		// We want to continue because not all apply's will need this status,
+		// only if they rely on the approved requirement.
+		ctx.PullIsApproved = false
+		ctx.Log.Warn("unable to get approved status: %s. Continuing with approved assumed false", err)
+	}
+
 	// Get the mergeable status before we set any build statuses of our own.
 	// We do this here because when we set a "Pending" status, if users have
 	// required the Atlantis status checks to pass, then we've now changed

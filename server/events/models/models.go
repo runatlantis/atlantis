@@ -364,6 +364,8 @@ type ProjectCommandContext struct {
 	HeadRepo Repo
 	// Log is a logger that's been set up for this context.
 	Log logging.SimpleLogging
+	// PullApproved is true if the pull request for this project is approved.
+	PullIsApproved bool
 	// PullMergeable is true if the pull request for this project is able to be merged.
 	PullMergeable bool
 	// CurrentProjectPlanStatus is the status of the current project prior to this command.
