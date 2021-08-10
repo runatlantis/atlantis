@@ -49,7 +49,6 @@ func TestRun_NoPlanFile(t *testing.T) {
 
 func TestRun_Success(t *testing.T) {
 	tmpDir, cleanup := TempDir(t)
-	ctx := TestContext(t)
 	defer cleanup()
 	planPath := filepath.Join(tmpDir, "workspace.tfplan")
 	err := ioutil.WriteFile(planPath, nil, 0600)
@@ -64,15 +63,16 @@ func TestRun_Success(t *testing.T) {
 
 	When(terraform.RunCommandWithVersion(matchers.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), matchers2.AnyModelsParallelCommand())).
 		ThenReturn("output", nil)
-	output, err := o.Run(models.ProjectCommandContext{
+	context := models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
 		EscapedCommentArgs: []string{"comment", "args"},
-	}, []string{"extra", "args"}, tmpDir, map[string]string(nil), models.NotParallel)
+	}
+	output, err := o.Run(context, []string{"extra", "args"}, tmpDir, map[string]string(nil), models.NotParallel)
 	Ok(t, err)
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), nil, models.NotParallel)
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(context, tmpDir, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), nil, models.NotParallel)
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }

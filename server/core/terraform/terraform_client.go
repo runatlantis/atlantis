@@ -282,7 +282,7 @@ func (c *DefaultClient) RunCommandWithVersion(ctx models.ProjectCommandContext, 
 		}
 		lines = append(lines, line.Line)
 	}
-	output := strings.Join(lines, "\n")
+	output := strings.Join(lines, "\n") + "\n"
 	return output, err
 }
 

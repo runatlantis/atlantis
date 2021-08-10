@@ -290,7 +290,6 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 				"args",
 				"comment",
 				"args"}
-			When(terraform.RunCommandWithVersion(ctx, "/path", expPlanArgs, map[string]string(nil), tfVersion, models.NotParallel)).ThenReturn("output", nil)
 
 			context := models.ProjectCommandContext{
 				Log:                logger,
@@ -307,6 +306,8 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 					Name:     "repo",
 				},
 			}
+
+			When(terraform.RunCommandWithVersion(context, "/path", expPlanArgs, map[string]string(nil), tfVersion, models.NotParallel)).ThenReturn("output", nil)
 
 			output, err := s.Run(context, []string{"extra", "args"}, "/path", map[string]string(nil), models.NotParallel)
 			Ok(t, err)
@@ -330,8 +331,24 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
 	}
-	ctx := TestContext(t)
-	When(terraform.RunCommandWithVersion(ctx, "/path", []string{"workspace", "show"}, map[string]string(nil), tfVersion, models.NotParallel)).ThenReturn("workspace\n", nil)
+
+	context := models.ProjectCommandContext{
+		Log:                logger,
+		Workspace:          "workspace",
+		RepoRelDir:         ".",
+		User:               models.User{Username: "username"},
+		EscapedCommentArgs: []string{"comment", "args"},
+		Pull: models.PullRequest{
+			Num: 2,
+		},
+		BaseRepo: models.Repo{
+			FullName: "owner/repo",
+			Owner:    "owner",
+			Name:     "repo",
+		},
+	}
+
+	When(terraform.RunCommandWithVersion(context, "/path", []string{"workspace", "show"}, map[string]string(nil), tfVersion, models.NotParallel)).ThenReturn("workspace\n", nil)
 
 	expPlanArgs := []string{"plan",
 		"-input=false",
@@ -353,23 +370,8 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 		"args",
 		"comment",
 		"args"}
-	When(terraform.RunCommandWithVersion(ctx, "/path", expPlanArgs, map[string]string(nil), tfVersion, models.NotParallel)).ThenReturn("output", nil)
+	When(terraform.RunCommandWithVersion(context, "/path", expPlanArgs, map[string]string(nil), tfVersion, models.NotParallel)).ThenReturn("output", nil)
 
-	context := models.ProjectCommandContext{
-		Log:                logger,
-		Workspace:          "workspace",
-		RepoRelDir:         ".",
-		User:               models.User{Username: "username"},
-		EscapedCommentArgs: []string{"comment", "args"},
-		Pull: models.PullRequest{
-			Num: 2,
-		},
-		BaseRepo: models.Repo{
-			FullName: "owner/repo",
-			Owner:    "owner",
-			Name:     "repo",
-		},
-	}
 	output, err := s.Run(context, []string{"extra", "args"}, "/path", map[string]string(nil), models.NotParallel)
 	Ok(t, err)
 
@@ -462,8 +464,23 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
 	}
-	ctx := TestContext(t)
-	When(terraform.RunCommandWithVersion(ctx, "/path", []string{"workspace", "show"}, map[string]string(nil), tfVersion, models.NotParallel)).ThenReturn("workspace\n", nil)
+	context := models.ProjectCommandContext{
+		Log:                logger,
+		Workspace:          "default",
+		RepoRelDir:         ".",
+		User:               models.User{Username: "username"},
+		EscapedCommentArgs: []string{"comment", "args"},
+		ProjectName:        "projectname",
+		Pull: models.PullRequest{
+			Num: 2,
+		},
+		BaseRepo: models.Repo{
+			FullName: "owner/repo",
+			Owner:    "owner",
+			Name:     "repo",
+		},
+	}
+	When(terraform.RunCommandWithVersion(context, "/path", []string{"workspace", "show"}, map[string]string(nil), tfVersion, models.NotParallel)).ThenReturn("workspace\n", nil)
 
 	expPlanArgs := []string{"plan",
 		"-input=false",
@@ -486,24 +503,9 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 		"comment",
 		"args",
 	}
-	When(terraform.RunCommandWithVersion(ctx, "/path", expPlanArgs, map[string]string(nil), tfVersion, models.NotParallel)).ThenReturn("output", nil)
+	When(terraform.RunCommandWithVersion(context, "/path", expPlanArgs, map[string]string(nil), tfVersion, models.NotParallel)).ThenReturn("output", nil)
 
-	output, err := s.Run(models.ProjectCommandContext{
-		Log:                logger,
-		Workspace:          "default",
-		RepoRelDir:         ".",
-		User:               models.User{Username: "username"},
-		EscapedCommentArgs: []string{"comment", "args"},
-		ProjectName:        "projectname",
-		Pull: models.PullRequest{
-			Num: 2,
-		},
-		BaseRepo: models.Repo{
-			FullName: "owner/repo",
-			Owner:    "owner",
-			Name:     "repo",
-		},
-	}, []string{"extra", "args"}, "/path", map[string]string(nil), models.NotParallel)
+	output, err := s.Run(context, []string{"extra", "args"}, "/path", map[string]string(nil), models.NotParallel)
 	Ok(t, err)
 	Equals(t, "output", output)
 }
@@ -766,10 +768,6 @@ locally at this time.
 			planErr := errors.New("exit status 1: err")
 			planOutput := "\n" + remoteOpsErr
 			asyncTf.LinesToSend = remotePlanOutput
-			When(terraform.RunCommandWithVersion(TestContext(t), absProjectPath, expPlanArgs, map[string]string(nil), tfVersion, models.NotParallel)).
-				ThenReturn(planOutput, planErr)
-
-			// Now that mocking is set up, we're ready to run the plan.
 			ctx := models.ProjectCommandContext{
 				Log:                logger,
 				Workspace:          "default",
@@ -785,6 +783,10 @@ locally at this time.
 					Name:     "repo",
 				},
 			}
+			When(terraform.RunCommandWithVersion(ctx, absProjectPath, expPlanArgs, map[string]string(nil), tfVersion, models.NotParallel)).
+				ThenReturn(planOutput, planErr)
+
+			// Now that mocking is set up, we're ready to run the plan.
 			output, err := s.Run(ctx, []string{"extra", "args"}, absProjectPath, map[string]string(nil), models.NotParallel)
 			Ok(t, err)
 			Equals(t, `

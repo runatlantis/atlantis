@@ -65,7 +65,7 @@ func TestShowStepRunnner(t *testing.T) {
 		}
 
 		When(mockExecutor.RunCommandWithVersion(
-			context, path, []string{"show", "-no-color", "-json", filepath.Join(path, "test-default.tfplan")}, envs, v, models.NotParallel,
+			contextWithVersionOverride, path, []string{"show", "-no-color", "-json", filepath.Join(path, "test-default.tfplan")}, envs, v, models.NotParallel,
 		)).ThenReturn("success", nil)
 
 		r, err := subject.Run(contextWithVersionOverride, []string{}, path, envs, models.NotParallel)
