@@ -14,7 +14,7 @@ func TestApplyUpdateCommitStatus(t *testing.T) {
 		expStatus     models.CommitStatus
 		expNumSuccess int
 		expNumTotal   int
-		expURL string
+		expURL        string
 	}{
 		"apply, one pending": {
 			cmd: models.ApplyCommand,
@@ -94,7 +94,7 @@ func TestPlanUpdateCommitStatus(t *testing.T) {
 		expStatus     models.CommitStatus
 		expNumSuccess int
 		expNumTotal   int
-		expURL string
+		expURL        string
 	}{
 		"single plan success": {
 			cmd: models.PlanCommand,
@@ -158,7 +158,7 @@ type MockCSU struct {
 	CalledCommand    models.CommandName
 	CalledNumSuccess int
 	CalledNumTotal   int
-	CalledURL string
+	CalledURL        string
 }
 
 func (m *MockCSU) UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command models.CommandName, numSuccess int, numTotal int, url string) error {

@@ -29,7 +29,7 @@ func TestUpdateCombined(t *testing.T) {
 		status     models.CommitStatus
 		command    models.CommandName
 		expDescrip string
-		jobUrl string
+		jobUrl     string
 	}{
 		{
 			status:     models.PendingCommitStatus,

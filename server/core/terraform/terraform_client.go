@@ -35,7 +35,6 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_terraform_client.go Client
 
 type Client interface {
@@ -406,12 +405,12 @@ func (c *DefaultClient) RunCommandAsync(ctx models.ProjectCommandContext, path s
 			for s.Scan() {
 				outCh <- Line{Line: s.Text()}
 				if c.terraformOutputChan != nil {
-				c.terraformOutputChan <- &models.TerraformOutputLine{
-					PullSlug: ctx.PullSlug(),
-					Line:     s.Text(),
-					Parallel: parallel,
+					c.terraformOutputChan <- &models.TerraformOutputLine{
+						PullSlug: ctx.PullSlug(),
+						Line:     s.Text(),
+						Parallel: parallel,
+					}
 				}
-			}
 			}
 			wg.Done()
 		}()
@@ -420,12 +419,12 @@ func (c *DefaultClient) RunCommandAsync(ctx models.ProjectCommandContext, path s
 			for s.Scan() {
 				outCh <- Line{Line: s.Text()}
 				if c.terraformOutputChan != nil {
-				c.terraformOutputChan <- &models.TerraformOutputLine{
-					PullSlug: ctx.PullSlug(),
-					Line:     s.Text(),
-					Parallel: parallel,
+					c.terraformOutputChan <- &models.TerraformOutputLine{
+						PullSlug: ctx.PullSlug(),
+						Line:     s.Text(),
+						Parallel: parallel,
+					}
 				}
-			}
 			}
 			wg.Done()
 		}()

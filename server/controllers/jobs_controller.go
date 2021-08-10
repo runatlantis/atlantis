@@ -8,9 +8,9 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	"github.com/runatlantis/atlantis/server/controllers/templates"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/controllers/templates"
 )
 
 // Concurrency model in this controller:
@@ -117,7 +117,11 @@ func (j *JobsController) Listen() {
 		if msg.ClearBefore {
 			j.clearLogLines(msg.PullSlug)
 		}
-		j.writeLogLine(msg.PullSlug, msg.Line)
+		line := msg.Line
+		if msg.Parallel.InParallel {
+			line = fmt.Sprintf("[%d] %s", msg.Parallel.Index, msg.Line)
+		}
+		j.writeLogLine(msg.PullSlug, line)
 		if msg.ClearAfter {
 			j.clearLogLines(msg.PullSlug)
 		}

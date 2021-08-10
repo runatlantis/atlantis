@@ -58,8 +58,8 @@ func (p *PlanTypeStepRunnerDelegate) Run(ctx models.ProjectCommandContext, extra
 	}
 
 	if remotePlan {
-		return p.remotePlanRunner.Run(ctx, extraArgs, path, envs, parallel )
+		return p.remotePlanRunner.Run(ctx, extraArgs, path, envs, parallel)
 	}
 
-	return p.defaultRunner.Run(ctx, extraArgs, path, envs, parallel )
+	return p.defaultRunner.Run(ctx, extraArgs, path, envs, parallel)
 }
