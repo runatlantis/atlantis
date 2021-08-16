@@ -52,7 +52,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/urfave/cli v1.22.5
 	github.com/urfave/negroni v0.3.0
-	github.com/xanzy/go-gitlab v0.50.1
+	github.com/xanzy/go-gitlab v0.50.2
 	github.com/zclconf/go-cty v1.5.1 // indirect
 	go.etcd.io/bbolt v1.3.6
 	go.uber.org/zap v1.18.1
