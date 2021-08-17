@@ -27,6 +27,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	handlermocks "github.com/runatlantis/atlantis/server/handlers/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -41,8 +42,8 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	realEnv := runtime.EnvStepRunner{}
 	mockWorkingDir := mocks.NewMockWorkingDir()
 	mockLocker := mocks.NewMockProjectLocker()
+	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
 	mockApplyReqHandler := mocks.NewMockApplyRequirement()
-	mockChannel := make(chan *models.TerraformOutputLine)
 
 	runner := events.DefaultProjectCommandRunner{
 		Locker:                     mockLocker,
@@ -56,8 +57,8 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		WorkingDir:                 mockWorkingDir,
 		Webhooks:                   nil,
 		WorkingDirLocker:           events.NewDefaultWorkingDirLocker(),
+		ProjectCmdOutputHandler:    projectCmdOutputHandler,
 		AggregateApplyRequirements: mockApplyReqHandler,
-		TerraformOutputChan:        mockChannel,
 	}
 
 	repoDir, cleanup := TempDir(t)
@@ -393,13 +394,14 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 	mockLocker := mocks.NewMockProjectLocker()
 
 	runner := events.DefaultProjectCommandRunner{
-		Locker:           mockLocker,
-		LockURLGenerator: mockURLGenerator{},
-		RunStepRunner:    &run,
-		EnvStepRunner:    &env,
-		WorkingDir:       mockWorkingDir,
-		Webhooks:         nil,
-		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+		Locker:                  mockLocker,
+		LockURLGenerator:        mockURLGenerator{},
+		RunStepRunner:           &run,
+		EnvStepRunner:           &env,
+		WorkingDir:              mockWorkingDir,
+		Webhooks:                nil,
+		WorkingDirLocker:        events.NewDefaultWorkingDirLocker(),
+		ProjectCmdOutputHandler: handlermocks.NewMockProjectCommandOutputHandler(),
 	}
 
 	repoDir, cleanup := TempDir(t)

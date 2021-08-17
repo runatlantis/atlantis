@@ -9,8 +9,8 @@ import (
 
 	go_version "github.com/hashicorp/go-version"
 	pegomock "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/terraform"
 	logging "github.com/runatlantis/atlantis/server/logging"
 )
 
