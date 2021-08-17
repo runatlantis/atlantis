@@ -670,7 +670,7 @@ func (c CommandName) TitleString() string {
 	return strings.Title(strings.ReplaceAll(strings.ToLower(c.String()), "_", " "))
 }
 
-type TerraformOutputLine struct {
+type ProjectCmdOutputLine struct {
 	ProjectInfo string
 
 	Line string

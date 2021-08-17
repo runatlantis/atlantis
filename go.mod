@@ -39,7 +39,7 @@ require (
 	github.com/googleapis/gax-go/v2 v2.1.0 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/gorilla/mux v1.8.0
-	github.com/gorilla/websocket v1.4.2 // indirect
+	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-getter v1.5.9
 	github.com/hashicorp/go-retryablehttp v0.6.8 // indirect

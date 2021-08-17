@@ -24,6 +24,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/handlers"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -131,7 +132,8 @@ type DefaultProjectCommandRunner struct { //create object and test
 	Webhooks                   WebhooksSender
 	WorkingDirLocker           WorkingDirLocker
 	AggregateApplyRequirements ApplyRequirement
-	TerraformOutputChan        chan<- *models.TerraformOutputLine
+	ProjectCmdOutputLine       models.ProjectCmdOutputLine
+	ProjectCmdOutputHandler    handlers.ProjectCommandOutputHandler
 	LogStreamURLGenerator      LogStreamURLGenerator
 }
 
@@ -315,6 +317,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
+	p.ProjectCmdOutputHandler.Clear(ctx)
 	outputs, err := p.runSteps(ctx.Steps, ctx, projAbsPath)
 
 	if err != nil {

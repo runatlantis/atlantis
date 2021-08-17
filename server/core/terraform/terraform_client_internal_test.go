@@ -9,6 +9,7 @@ import (
 
 	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/models"
+	handlermocks "github.com/runatlantis/atlantis/server/handlers/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -90,7 +91,8 @@ func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	logger := logging.NewNoopLogger(t)
-	tempchan := make(chan *models.TerraformOutputLine)
+	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+
 	ctx := models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "default",
@@ -113,7 +115,7 @@ func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
 		terraformPluginCacheDir: tmp,
 		overrideTF:              "echo",
 		usePluginCache:          true,
-		terraformOutputChan:     tempchan,
+		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
 
 	args := []string{
@@ -124,7 +126,6 @@ func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
 		"DIR=$DIR",
 	}
 	customEnvVars := map[string]string{}
-	waitTfStreaming(tempchan)
 	out, err := client.RunCommandWithVersion(ctx, tmp, args, customEnvVars, nil, "workspace")
 	Ok(t, err)
 	exp := fmt.Sprintf("TF_IN_AUTOMATION=true TF_PLUGIN_CACHE_DIR=%s WORKSPACE=workspace ATLANTIS_TERRAFORM_VERSION=0.11.11 DIR=%s\n", tmp, tmp)
@@ -137,7 +138,8 @@ func TestDefaultClient_RunCommandWithVersion_Error(t *testing.T) {
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	logger := logging.NewNoopLogger(t)
-	tempchan := make(chan *models.TerraformOutputLine)
+	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+
 	ctx := models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "default",
@@ -159,7 +161,7 @@ func TestDefaultClient_RunCommandWithVersion_Error(t *testing.T) {
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
 		overrideTF:              "echo",
-		terraformOutputChan:     tempchan,
+		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
 
 	args := []string{
@@ -168,7 +170,6 @@ func TestDefaultClient_RunCommandWithVersion_Error(t *testing.T) {
 		"exit",
 		"1",
 	}
-	waitTfStreaming(tempchan)
 	out, err := client.RunCommandWithVersion(ctx, tmp, args, map[string]string{}, nil, "workspace")
 	ErrEquals(t, fmt.Sprintf(`running "echo dying && exit 1" in %q: exit status 1`, tmp), err)
 	// Test that we still get our output.
@@ -180,7 +181,8 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	logger := logging.NewNoopLogger(t)
-	tempchan := make(chan *models.TerraformOutputLine)
+	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+
 	ctx := models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "default",
@@ -203,7 +205,7 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 		terraformPluginCacheDir: tmp,
 		overrideTF:              "echo",
 		usePluginCache:          true,
-		terraformOutputChan:     tempchan,
+		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
 
 	args := []string{
@@ -213,7 +215,6 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 		"ATLANTIS_TERRAFORM_VERSION=$ATLANTIS_TERRAFORM_VERSION",
 		"DIR=$DIR",
 	}
-	waitTfStreaming(tempchan)
 	_, outCh := client.RunCommandAsync(ctx, tmp, args, map[string]string{}, nil, "workspace")
 
 	out, err := waitCh(outCh)
@@ -227,7 +228,8 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	logger := logging.NewNoopLogger(t)
-	tempchan := make(chan *models.TerraformOutputLine)
+	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+
 	ctx := models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "default",
@@ -249,7 +251,7 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
 		overrideTF:              "cat",
-		terraformOutputChan:     tempchan,
+		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
 	filename := filepath.Join(tmp, "data")
 	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
@@ -262,7 +264,6 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 		_, err = f.WriteString(s)
 		Ok(t, err)
 	}
-	waitTfStreaming(tempchan)
 	_, outCh := client.RunCommandAsync(ctx, tmp, []string{filename}, map[string]string{}, nil, "workspace")
 
 	out, err := waitCh(outCh)
@@ -275,7 +276,8 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	logger := logging.NewNoopLogger(t)
-	tempchan := make(chan *models.TerraformOutputLine)
+	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+
 	ctx := models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "default",
@@ -297,9 +299,8 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
 		overrideTF:              "echo",
-		terraformOutputChan:     tempchan,
+		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
-	waitTfStreaming(tempchan)
 	_, outCh := client.RunCommandAsync(ctx, tmp, []string{"stderr", ">&2"}, map[string]string{}, nil, "workspace")
 
 	out, err := waitCh(outCh)
@@ -312,7 +313,8 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	logger := logging.NewNoopLogger(t)
-	tempchan := make(chan *models.TerraformOutputLine)
+	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+
 	ctx := models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "default",
@@ -334,9 +336,8 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
 		overrideTF:              "echo",
-		terraformOutputChan:     tempchan,
+		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
-	waitTfStreaming(tempchan)
 	_, outCh := client.RunCommandAsync(ctx, tmp, []string{"dying", "&&", "exit", "1"}, map[string]string{}, nil, "workspace")
 
 	out, err := waitCh(outCh)
@@ -350,7 +351,8 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 	Ok(t, err)
 	tmp, cleanup := TempDir(t)
 	logger := logging.NewNoopLogger(t)
-	tempchan := make(chan *models.TerraformOutputLine)
+	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
+
 	ctx := models.ProjectCommandContext{
 		Log:                logger,
 		Workspace:          "default",
@@ -372,9 +374,9 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
 		overrideTF:              "read",
-		terraformOutputChan:     tempchan,
+		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
-	waitTfStreaming(tempchan)
+
 	inCh, outCh := client.RunCommandAsync(ctx, tmp, []string{"a", "&&", "echo", "$a"}, map[string]string{}, nil, "workspace")
 	inCh <- "echo me\n"
 
@@ -392,12 +394,4 @@ func waitCh(ch <-chan Line) (string, error) {
 		ls = append(ls, line.Line)
 	}
 	return strings.Join(ls, "\n"), nil
-}
-
-func waitTfStreaming(ch chan *models.TerraformOutputLine) {
-	go func() {
-		for range ch {
-		}
-		close(ch)
-	}()
 }
