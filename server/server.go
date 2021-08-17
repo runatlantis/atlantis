@@ -34,6 +34,7 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"github.com/runatlantis/atlantis/server/events/db"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/handlers"
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
@@ -104,6 +105,7 @@ type Server struct {
 	SSLKeyFile                    string
 	Drainer                       *events.Drainer
 	ScheduledExecutorService      *ScheduledExecutorService
+	ProjectCmdOutputHandler       handlers.ProjectCommandOutputHandler
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -277,7 +279,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	vcsClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient)
 	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient, StatusName: userConfig.VCSStatusName}
-	terraformOutputChan := make(chan *models.TerraformOutputLine)
+	projectCmdOutput := make(chan *models.ProjectCmdOutputLine)
+	projectCmdOutputHandler := handlers.NewProjectCommandOutputHandler(projectCmdOutput, logger)
 
 	binDir, err := mkSubDir(userConfig.DataDir, BinDirName)
 
@@ -302,7 +305,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.TFDownloadURL,
 		&terraform.DefaultDownloader{},
 		true,
-		terraformOutputChan)
+		projectCmdOutputHandler)
 	// The flag.Lookup call is to detect if we're running in a unit test. If we
 	// are, then we don't error out because we don't have/want terraform
 	// installed on our CI system where the unit tests run.
@@ -511,7 +514,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDir:                 workingDir,
 		Webhooks:                   webhooksManager,
 		WorkingDirLocker:           workingDirLocker,
-		TerraformOutputChan:        terraformOutputChan,
+		ProjectCmdOutputHandler:    projectCmdOutputHandler,
 		AggregateApplyRequirements: applyRequirementHandler,
 	}
 
@@ -637,14 +640,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	logStreamingController := &controllers.LogStreamingController{
-		AtlantisVersion:        config.AtlantisVersion,
-		AtlantisURL:            parsedURL,
-		Logger:                 logger,
-		LogStreamTemplate:      templates.LogStreamingTemplate,
-		LogStreamErrorTemplate: templates.LogStreamErrorTemplate,
-		Db:                     boltdb,
-		TerraformOutputChan:    terraformOutputChan,
-		WebsocketHandler:       controllers.NewWebsocketHandler(),
+		AtlantisVersion:             config.AtlantisVersion,
+		AtlantisURL:                 parsedURL,
+		Logger:                      logger,
+		LogStreamTemplate:           templates.LogStreamingTemplate,
+		LogStreamErrorTemplate:      templates.LogStreamErrorTemplate,
+		Db:                          boltdb,
+		WebsocketHandler:            handlers.NewWebsocketHandler(),
+		ProjectCommandOutputHandler: projectCmdOutputHandler,
 	}
 
 	eventsController := &events_controllers.VCSEventsController{
@@ -734,6 +737,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		SSLCertFile:                   userConfig.SSLCertFile,
 		Drainer:                       drainer,
 		ScheduledExecutorService:      scheduledExecutorService,
+		ProjectCmdOutputHandler:       projectCmdOutputHandler,
 	}, nil
 }
 
@@ -773,7 +777,7 @@ func (s *Server) Start() error {
 	go s.ScheduledExecutorService.Run()
 
 	go func() {
-		s.LogStreamingController.Listen()
+		s.ProjectCmdOutputHandler.Handle()
 	}()
 
 	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n}

@@ -27,6 +27,7 @@ import (
 	mocks2 "github.com/runatlantis/atlantis/server/events/runtime/mocks"
 	tmocks "github.com/runatlantis/atlantis/server/events/terraform/mocks"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	handlermocks "github.com/runatlantis/atlantis/server/handlers/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -41,7 +42,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	realEnv := runtime.EnvStepRunner{}
 	mockWorkingDir := mocks.NewMockWorkingDir()
 	mockLocker := mocks.NewMockProjectLocker()
-	mockChannel := make(chan *models.TerraformOutputLine)
+	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
 	mockApplyReqHandler := mocks.NewMockApplyRequirement()
 
 	runner := events.DefaultProjectCommandRunner{
@@ -55,8 +56,8 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		WorkingDir:                 mockWorkingDir,
 		Webhooks:                   nil,
 		WorkingDirLocker:           events.NewDefaultWorkingDirLocker(),
+		ProjectCmdOutputHandler:    projectCmdOutputHandler,
 		AggregateApplyRequirements: mockApplyReqHandler,
-		TerraformOutputChan:        mockChannel,
 	}
 
 	repoDir, cleanup := TempDir(t)
@@ -392,13 +393,14 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 	mockLocker := mocks.NewMockProjectLocker()
 
 	runner := events.DefaultProjectCommandRunner{
-		Locker:           mockLocker,
-		LockURLGenerator: mockURLGenerator{},
-		RunStepRunner:    &run,
-		EnvStepRunner:    &env,
-		WorkingDir:       mockWorkingDir,
-		Webhooks:         nil,
-		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+		Locker:                  mockLocker,
+		LockURLGenerator:        mockURLGenerator{},
+		RunStepRunner:           &run,
+		EnvStepRunner:           &env,
+		WorkingDir:              mockWorkingDir,
+		Webhooks:                nil,
+		WorkingDirLocker:        events.NewDefaultWorkingDirLocker(),
+		ProjectCmdOutputHandler: handlermocks.NewMockProjectCommandOutputHandler(),
 	}
 
 	repoDir, cleanup := TempDir(t)
