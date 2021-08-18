@@ -62,6 +62,10 @@ const (
 	DisableRepoLockingFlag     = "disable-repo-locking"
 	EnablePolicyChecksFlag     = "enable-policy-checks"
 	EnableRegExpCmdFlag        = "enable-regexp-cmd"
+	FFOwnerFlag                = "ff-owner"
+	FFRepoFlag                 = "ff-repo"
+	FFBranchFlag               = "ff-branch"
+	FFPathFlag                 = "ff-path"
 	GHHostnameFlag             = "gh-hostname"
 	GHTokenFlag                = "gh-token"
 	GHUserFlag                 = "gh-user"
@@ -185,6 +189,18 @@ var stringFlags = map[string]stringFlag{
 	DataDirFlag: {
 		description:  "Path to directory to store Atlantis data.",
 		defaultValue: DefaultDataDir,
+	},
+	FFOwnerFlag: {
+		description: "Owner of the repo used to house feature flag configuration.",
+	},
+	FFRepoFlag: {
+		description: "Repo used to house feature flag configuration.",
+	},
+	FFBranchFlag: {
+		description: "Branch on repo to pull the feature flag configuration.",
+	},
+	FFPathFlag: {
+		description: "Path in repo to get feature flag configuration.",
 	},
 	GHHostnameFlag: {
 		description:  "Hostname of your Github Enterprise installation. If using github.com, no need to set.",

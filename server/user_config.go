@@ -30,6 +30,10 @@ type UserConfig struct {
 	DisableRepoLocking         bool   `mapstructure:"disable-repo-locking"`
 	EnablePolicyChecksFlag     bool   `mapstructure:"enable-policy-checks"`
 	EnableRegExpCmd            bool   `mapstructure:"enable-regexp-cmd"`
+	FFOwner                    string `mapstructure:"ff-owner"`
+	FFRepo                     string `mapstructure:"ff-repo"`
+	FFBranch                   string `mapstructure:"ff-branch"`
+	FFPath                     string `mapstructure:"ff-path"`
 	GithubHostname             string `mapstructure:"gh-hostname"`
 	GithubToken                string `mapstructure:"gh-token"`
 	GithubUser                 string `mapstructure:"gh-user"`

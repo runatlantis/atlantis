@@ -511,6 +511,25 @@ func (g *GithubClient) DownloadRepoConfigFile(pull models.PullRequest) (bool, []
 	return true, decodedData, nil
 }
 
+func (g *GithubClient) GetContents(owner, repo, branch, path string) ([]byte, error) {
+	opt := github.RepositoryContentGetOptions{Ref: branch}
+	fileContent, _, resp, err := g.client.Repositories.GetContents(g.ctx, owner, repo, path, &opt)
+	if err != nil {
+		return []byte{}, errors.Wrap(err, "fetching file contents")
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		return []byte{}, fmt.Errorf("%s not found in %s/%s", path, owner, repo)
+	}
+
+	decodedData, err := base64.StdEncoding.DecodeString(*fileContent.Content)
+	if err != nil {
+		return []byte{}, errors.Wrapf(err, "decoding file content")
+	}
+
+	return decodedData, nil
+}
+
 func (g *GithubClient) SupportsSingleFileDownload(repo models.Repo) bool {
 	return true
 }

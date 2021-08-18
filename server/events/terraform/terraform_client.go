@@ -33,6 +33,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/feature"
 	"github.com/runatlantis/atlantis/server/handlers"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -74,6 +75,7 @@ type DefaultClient struct {
 	// usePluginCache determines whether or not to set the TF_PLUGIN_CACHE_DIR env var
 	usePluginCache bool
 
+	featureAllocator        feature.Allocator
 	projectCmdOutputHandler handlers.ProjectCommandOutputHandler
 }
 
@@ -107,6 +109,7 @@ func NewClientWithDefaultVersion(
 	usePluginCache bool,
 	fetchAsync bool,
 	projectCmdOutputHandler handlers.ProjectCommandOutputHandler,
+	featureAllocator feature.Allocator,
 ) (*DefaultClient, error) {
 	var finalDefaultVersion *version.Version
 	var localVersion *version.Version
@@ -173,6 +176,7 @@ func NewClientWithDefaultVersion(
 		versionsLock:            &versionsLock,
 		versions:                versions,
 		usePluginCache:          usePluginCache,
+		featureAllocator:        featureAllocator,
 		projectCmdOutputHandler: projectCmdOutputHandler,
 	}, nil
 
@@ -190,6 +194,7 @@ func NewTestClient(
 	tfDownloader Downloader,
 	usePluginCache bool,
 	projectCmdOutputHandler handlers.ProjectCommandOutputHandler,
+	featureAllocator feature.Allocator,
 ) (*DefaultClient, error) {
 	return NewClientWithDefaultVersion(
 		log,
@@ -204,6 +209,7 @@ func NewTestClient(
 		usePluginCache,
 		false,
 		projectCmdOutputHandler,
+		featureAllocator,
 	)
 }
 
@@ -227,6 +233,7 @@ func NewClient(
 	tfDownloader Downloader,
 	usePluginCache bool,
 	projectCmdOutputHandler handlers.ProjectCommandOutputHandler,
+	featureAllocator feature.Allocator,
 ) (*DefaultClient, error) {
 	return NewClientWithDefaultVersion(
 		log,
@@ -241,6 +248,7 @@ func NewClient(
 		usePluginCache,
 		true,
 		projectCmdOutputHandler,
+		featureAllocator,
 	)
 }
 
@@ -274,18 +282,48 @@ func (c *DefaultClient) EnsureVersion(log logging.SimpleLogging, v *version.Vers
 
 // See Client.RunCommandWithVersion.
 func (c *DefaultClient) RunCommandWithVersion(ctx models.ProjectCommandContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (string, error) {
-	_, outCh := c.RunCommandAsync(ctx, path, args, customEnvVars, v, workspace)
-	var lines []string
-	var err error
-	for line := range outCh {
-		if line.Err != nil {
-			err = line.Err
-			break
-		}
-		lines = append(lines, line.Line)
+
+	shouldAllocate, err := c.featureAllocator.ShouldAllocate(feature.LogStreaming, ctx.BaseRepo.FullName)
+
+	if err != nil {
+		ctx.Log.Err("unable to allocate for feature: %s, error: %s", feature.LogStreaming, err)
 	}
-	output := strings.Join(lines, "\n")
-	return fmt.Sprintf("%s\n", output), err
+
+	// if the feature is enabled, we use the async workflow else we default to the original sync workflow
+	if shouldAllocate {
+		_, outCh := c.RunCommandAsync(ctx, path, args, customEnvVars, v, workspace)
+		var lines []string
+		var err error
+		for line := range outCh {
+			if line.Err != nil {
+				err = line.Err
+				break
+			}
+			lines = append(lines, line.Line)
+		}
+		output := strings.Join(lines, "\n")
+		return fmt.Sprintf("%s\n", output), err
+
+	}
+
+	tfCmd, cmd, err := c.prepCmd(ctx.Log, v, workspace, path, args)
+	if err != nil {
+		return "", err
+	}
+	envVars := cmd.Env
+	for key, val := range customEnvVars {
+		envVars = append(envVars, fmt.Sprintf("%s=%s", key, val))
+	}
+	cmd.Env = envVars
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		err = errors.Wrapf(err, "running %q in %q", tfCmd, path)
+		ctx.Log.Err(err.Error())
+		return string(out), err
+	}
+	ctx.Log.Info("successfully ran %q in %q", tfCmd, path)
+
+	return string(out), nil
 }
 
 // prepCmd builds a ready to execute command based on the version of terraform
