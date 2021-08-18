@@ -46,8 +46,6 @@ type WorkingDir interface {
 	// Delete deletes the workspace for this repo and pull.
 	Delete(r models.Repo, p models.PullRequest) error
 	DeleteForWorkspace(r models.Repo, p models.PullRequest, workspace string) error
-	// IsFileTracked checks if the given file is tracked iin git
-	IsFileTracked(log logging.SimpleLogging, cloneDir string, filename string) (bool, error)
 }
 
 // FileWorkspace implements WorkingDir with the file system.
@@ -307,20 +305,6 @@ func (w *FileWorkspace) repoPullDir(r models.Repo, p models.PullRequest) string 
 
 func (w *FileWorkspace) cloneDir(r models.Repo, p models.PullRequest, workspace string) string {
 	return filepath.Join(w.repoPullDir(r, p), workspace)
-}
-
-func (w *FileWorkspace) IsFileTracked(log logging.SimpleLogging, cloneDir string, filename string) (bool, error) {
-	cmd := exec.Command("git", "ls-files", filename)
-	cmd.Dir = cloneDir
-
-	output, err := cmd.CombinedOutput()
-
-	if err != nil {
-		log.Warn("Error checking if %s is tracked: %s", filename, string(output))
-		return false, err
-	}
-	return len(output) > 0, nil
-
 }
 
 // sanitizeGitCredentials replaces any git clone urls that contain credentials

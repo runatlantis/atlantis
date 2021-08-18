@@ -2,6 +2,7 @@ package common
 
 import (
 	"os"
+	"os/exec"
 	"strings"
 )
 
@@ -64,6 +65,20 @@ func FileExists(path string) bool {
 		}
 	}
 	return true
+}
+
+// returns true if the given file is tracked by git
+func IsFileTracked(cloneDir string, filename string) (bool, error) {
+	cmd := exec.Command("git", "ls-files", filename)
+	cmd.Dir = cloneDir
+
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		return false, err
+	}
+	return len(output) > 0, nil
+
 }
 
 func stringInSlice(stringSlice []string, target string) bool {
