@@ -24,6 +24,7 @@ import (
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/runatlantis/atlantis/server"
+	"github.com/runatlantis/atlantis/server/events/vcs/fixtures"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 	"github.com/spf13/cobra"
@@ -75,6 +76,7 @@ var testFlags = map[string]interface{}{
 	GHTokenFlag:                "token",
 	GHUserFlag:                 "user",
 	GHAppIDFlag:                int64(0),
+	GHAppKeyFlag:               "",
 	GHAppKeyFileFlag:           "",
 	GHAppSlugFlag:              "atlantis",
 	GHOrganizationFlag:         "",
@@ -350,7 +352,7 @@ func TestExecute_ValidateSSLConfig(t *testing.T) {
 }
 
 func TestExecute_ValidateVCSConfig(t *testing.T) {
-	expErr := "--gh-user/--gh-token or --gh-app-id/--gh-app-key-file or --gitlab-user/--gitlab-token or --bitbucket-user/--bitbucket-token or --azuredevops-user/--azuredevops-token must be set"
+	expErr := "--gh-user/--gh-token or --gh-app-id/--gh-app-key-file or --gh-app-id/--gh-app-key or --gitlab-user/--gitlab-token or --bitbucket-user/--bitbucket-token or --azuredevops-user/--azuredevops-token must be set"
 	cases := []struct {
 		description string
 		flags       map[string]interface{}
@@ -404,9 +406,16 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			true,
 		},
 		{
-			"just github app key set",
+			"just github app key file set",
 			map[string]interface{}{
 				GHAppKeyFileFlag: "key.pem",
+			},
+			true,
+		},
+		{
+			"just github app key set",
+			map[string]interface{}{
+				GHAppKeyFlag: fixtures.GithubPrivateKey,
 			},
 			true,
 		},
@@ -464,10 +473,18 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			false,
 		},
 		{
-			"github app and key set and should be successful",
+			"github app and key file set and should be successful",
 			map[string]interface{}{
 				GHAppIDFlag:      "1",
 				GHAppKeyFileFlag: "key.pem",
+			},
+			false,
+		},
+		{
+			"github app and key set and should be successful",
+			map[string]interface{}{
+				GHAppIDFlag:  "1",
+				GHAppKeyFlag: fixtures.GithubPrivateKey,
 			},
 			false,
 		},
@@ -572,7 +589,7 @@ func TestExecute_GithubUser(t *testing.T) {
 func TestExecute_GithubApp(t *testing.T) {
 	t.Log("Should remove the @ from the github username if it's passed.")
 	c := setup(map[string]interface{}{
-		GHAppKeyFileFlag:  "key.pem",
+		GHAppKeyFlag:      fixtures.GithubPrivateKey,
 		GHAppIDFlag:       "1",
 		RepoAllowlistFlag: "*",
 	}, t)

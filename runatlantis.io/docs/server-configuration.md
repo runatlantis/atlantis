@@ -342,6 +342,16 @@ Values are chosen in this order:
   ```
   Path to a GitHub App PEM encoded private key file. If set, GitHub authentication will be performed as [an installation](https://developer.github.com/v3/apps/installations/).
 
+- ### `--gh-app-key`
+  ```bash
+  atlantis server --gh-app-key="-----BEGIN RSA PRIVATE KEY-----(...)" 
+  ```
+  The PEM encoded private key for the GitHub App.
+
+  ::: warning SECURITY WARNING
+  The contents of the private key will be visible by anyone that can run `ps` or look at the shell history of the machine where Atlantis is running. Use `--gh-app-key-file` to mitigate that risk.
+  :::
+
 * ### `--gitlab-hostname`
   ```bash
   atlantis server --gitlab-hostname="my.gitlab.enterprise.com"
