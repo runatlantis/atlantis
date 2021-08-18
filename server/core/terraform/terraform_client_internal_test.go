@@ -9,7 +9,10 @@ import (
 	"testing"
 
 	version "github.com/hashicorp/go-version"
+	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/feature"
+	fmocks "github.com/runatlantis/atlantis/server/feature/mocks"
 	handlermocks "github.com/runatlantis/atlantis/server/handlers/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -111,11 +114,14 @@ func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
 		},
 	}
 	defer cleanup()
+	allocator := fmocks.NewMockAllocator()
+	When(allocator.ShouldAllocate(feature.LogStreaming, "owner/repo")).ThenReturn(false, nil)
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
 		overrideTF:              "echo",
 		usePluginCache:          true,
+		featureAllocator:        allocator,
 		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
 
@@ -158,10 +164,13 @@ func TestDefaultClient_RunCommandWithVersion_Error(t *testing.T) {
 		},
 	}
 	defer cleanup()
+	allocator := fmocks.NewMockAllocator()
+	When(allocator.ShouldAllocate(feature.LogStreaming, "owner/repo")).ThenReturn(false, nil)
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
 		overrideTF:              "echo",
+		featureAllocator:        allocator,
 		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
 
@@ -201,11 +210,14 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 		},
 	}
 	defer cleanup()
+	allocator := fmocks.NewMockAllocator()
+	When(allocator.ShouldAllocate(feature.LogStreaming, "owner/repo")).ThenReturn(false, nil)
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
 		overrideTF:              "echo",
 		usePluginCache:          true,
+		featureAllocator:        allocator,
 		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
 
@@ -248,10 +260,13 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 		},
 	}
 	defer cleanup()
+	allocator := fmocks.NewMockAllocator()
+	When(allocator.ShouldAllocate(feature.LogStreaming, "owner/repo")).ThenReturn(false, nil)
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
 		overrideTF:              "cat",
+		featureAllocator:        allocator,
 		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
 	filename := filepath.Join(tmp, "data")
@@ -296,10 +311,13 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 		},
 	}
 	defer cleanup()
+	allocator := fmocks.NewMockAllocator()
+	When(allocator.ShouldAllocate(feature.LogStreaming, "owner/repo")).ThenReturn(false, nil)
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
 		overrideTF:              "echo",
+		featureAllocator:        allocator,
 		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
 	_, outCh := client.RunCommandAsync(ctx, tmp, []string{"stderr", ">&2"}, map[string]string{}, nil, "workspace")
@@ -333,10 +351,13 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 		},
 	}
 	defer cleanup()
+	allocator := fmocks.NewMockAllocator()
+	When(allocator.ShouldAllocate(feature.LogStreaming, "owner/repo")).ThenReturn(false, nil)
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
 		overrideTF:              "echo",
+		featureAllocator:        allocator,
 		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
 	_, outCh := client.RunCommandAsync(ctx, tmp, []string{"dying", "&&", "exit", "1"}, map[string]string{}, nil, "workspace")
@@ -371,10 +392,13 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 		},
 	}
 	defer cleanup()
+	allocator := fmocks.NewMockAllocator()
+	When(allocator.ShouldAllocate(feature.LogStreaming, "owner/repo")).ThenReturn(false, nil)
 	client := &DefaultClient{
 		defaultVersion:          v,
 		terraformPluginCacheDir: tmp,
 		overrideTF:              "read",
+		featureAllocator:        allocator,
 		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
 

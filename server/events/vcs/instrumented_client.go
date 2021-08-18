@@ -23,7 +23,7 @@ func NewInstrumentedGithubClient(client *GithubClient, statsScope stats.Scope, l
 
 	return &InstrumentedGithubClient{
 		InstrumentedClient: instrumentedGHClient,
-		PullRequestGetter:  client,
+		GhClient:           client,
 		StatsScope:         scope,
 		Logger:             logger,
 	}
@@ -41,15 +41,41 @@ type GithubPullRequestGetter interface {
 type IGithubClient interface {
 	Client
 	GithubPullRequestGetter
+
+	GetContents(owner, repo, branch, path string) ([]byte, error)
 }
 
 // InstrumentedGithubClient should delegate to the underlying InstrumentedClient for vcs provider-agnostic
 // methods and implement soley any github specific interfaces.
 type InstrumentedGithubClient struct {
 	*InstrumentedClient
-	PullRequestGetter GithubPullRequestGetter
-	StatsScope        stats.Scope
-	Logger            logging.SimpleLogging
+	GhClient   *GithubClient
+	StatsScope stats.Scope
+	Logger     logging.SimpleLogging
+}
+
+func (c *InstrumentedGithubClient) GetContents(owner, repo, branch, path string) ([]byte, error) {
+	scope := c.StatsScope.Scope("get_contents")
+	logger := c.Logger.WithHistory([]interface{}{
+		"repository", fmt.Sprintf("%s/%s", owner, repo),
+	}...)
+
+	executionTime := scope.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
+	defer executionTime.Complete()
+
+	executionSuccess := scope.NewCounter(metrics.ExecutionSuccessMetric)
+	executionError := scope.NewCounter(metrics.ExecutionErrorMetric)
+
+	contents, err := c.GhClient.GetContents(owner, repo, branch, path)
+
+	if err != nil {
+		executionError.Inc()
+		logger.Err("Unable to get contents, error: %s", err.Error())
+	} else {
+		executionSuccess.Inc()
+	}
+
+	return contents, err
 }
 
 func (c *InstrumentedGithubClient) GetPullRequest(repo models.Repo, pullNum int) (*github.PullRequest, error) {
@@ -70,7 +96,7 @@ func (c *InstrumentedGithubClient) GetPullRequestFromName(repoName string, repoO
 	executionSuccess := scope.NewCounter(metrics.ExecutionSuccessMetric)
 	executionError := scope.NewCounter(metrics.ExecutionErrorMetric)
 
-	pull, err := c.PullRequestGetter.GetPullRequestFromName(repoName, repoOwner, pullNum)
+	pull, err := c.GhClient.GetPullRequestFromName(repoName, repoOwner, pullNum)
 
 	if err != nil {
 		executionError.Inc()
