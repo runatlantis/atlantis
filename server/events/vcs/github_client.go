@@ -16,6 +16,7 @@ package vcs
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -39,6 +40,7 @@ const (
 	SubmitQueueReadinessStatusContext = "sq-ready-to-merge"
 	OwnersStatusContext               = "_owners-check"
 	AtlantisApplyStatusContext        = "atlantis/apply"
+	LockValue                         = "lock"
 )
 
 // GithubClient is used to perform GitHub actions.
@@ -296,30 +298,82 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 	//            hooks. Merging is allowed (green box).
 	// See: https://github.com/octokit/octokit.net/issues/1763
 	if state != "clean" && state != "unstable" && state != "has_hooks" {
+		return false, nil
+	}
+	return true, nil
+}
+
+// PullIsMergeable returns true if the pull request is mergeable.
+func (g *GithubClient) PullIsSQMergeable(repo models.Repo, pull models.PullRequest, statuses []*github.RepoStatus) (bool, error) {
+	githubPR, err := g.GetPullRequest(repo, pull.Num)
+	if err != nil {
+		return false, errors.Wrap(err, "getting pull request")
+	}
+	state := githubPR.GetMergeableState()
+	// We map our mergeable check to when the GitHub merge button is clickable.
+	// This corresponds to the following states:
+	// clean: No conflicts, all requirements satisfied.
+	//        Merging is allowed (green box).
+	// unstable: Failing/pending commit status that is not part of the required
+	//           status checks. Merging is allowed (yellow box).
+	// has_hooks: GitHub Enterprise only, if a repo has custom pre-receive
+	//            hooks. Merging is allowed (green box).
+	// See: https://github.com/octokit/octokit.net/issues/1763
+	if state != "clean" && state != "unstable" && state != "has_hooks" {
 
 		//blocked: Blocked by a failing/missing required status check.
 		if state != "blocked" {
 			return false, nil
 		}
 
-		return g.getSubmitQueueMergeability(repo, pull)
+		return g.getSubmitQueueMergeability(repo, pull, statuses)
 	}
 	return true, nil
 }
 
+// Check if the Pull Request is locked with :lock emoji
+func (g *GithubClient) PullIsLocked(repo models.Repo, pull models.PullRequest, statuses []*github.RepoStatus) (bool, error) {
+	for _, status := range statuses {
+		if status.GetContext() != SubmitQueueReadinessStatusContext {
+			continue
+		}
+
+		// Not using struct tags because there's no predefined schema for description.
+		description := make(map[string]interface{})
+		err := json.Unmarshal([]byte(status.GetDescription()), &description)
+		if err != nil {
+			return false, errors.Wrapf(err, "parsing status description for repo: %s, and pull number: %d", repo.FullName, pull.Num)
+		}
+
+		waitingList, ok := description["waiting"]
+		if !ok {
+			// No waiting key means no lock.
+			return false, nil
+		}
+
+		typedWaitingList, ok := waitingList.([]interface{})
+		if !ok {
+			return false, fmt.Errorf("cast failed for %v", waitingList)
+		}
+		for _, item := range typedWaitingList {
+			if item == LockValue {
+				return true, nil
+			}
+		}
+
+		// No waiting key means no lock.
+		return false, nil
+	}
+	// No Lock found.
+	return false, nil
+}
+
 // Checks to make sure that all statuses are passing except the Submit Queue Readiness check and atlantis/apply
 // Additionally checks if the Owners Check has been applied and is successful.
-func (g *GithubClient) getSubmitQueueMergeability(repo models.Repo, pull models.PullRequest) (bool, error) {
-	statuses, err := g.getRepoStatuses(repo, pull)
-
-	if err != nil {
-		return false, errors.Wrapf(err, "fetching repo statuses for repo: %s, and pull number: %d", repo.FullName, pull.Num)
-	}
-
+func (g *GithubClient) getSubmitQueueMergeability(repo models.Repo, pull models.PullRequest, statuses []*github.RepoStatus) (bool, error) {
 	ownersCheckApplied := false
 	for _, status := range statuses {
 		state := status.GetState()
-
 		if status.GetContext() == OwnersStatusContext {
 			ownersCheckApplied = true
 		}
@@ -368,7 +422,7 @@ func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRe
 	return g.GetPullRequestFromName(repo.Name, repo.Owner, num)
 }
 
-func (g *GithubClient) getRepoStatuses(repo models.Repo, pull models.PullRequest) ([]*github.RepoStatus, error) {
+func (g *GithubClient) GetRepoStatuses(repo models.Repo, pull models.PullRequest) ([]*github.RepoStatus, error) {
 	// Get Combined statuses
 
 	nextPage := 0

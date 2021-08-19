@@ -21,6 +21,7 @@ import (
 
 	stats "github.com/lyft/gostats"
 	"github.com/runatlantis/atlantis/server/events/db"
+	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 
@@ -69,6 +70,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	projectCommandBuilder = mocks.NewMockProjectCommandBuilder()
 	eventParsing = mocks.NewMockEventParsing()
 	vcsClient := vcsmocks.NewMockClient()
+	githubClient := vcsmocks.NewMockIGithubClient()
 	githubGetter = mocks.NewMockGithubPullGetter()
 	gitlabGetter = mocks.NewMockGitlabMergeRequestGetter()
 	azuredevopsGetter = mocks.NewMockAzureDevopsPullGetter()
@@ -131,6 +133,10 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		defaultBoltDB,
 	)
 
+	pullReqStatusFetcher := vcs.SQBasedPullStatusFetcher{
+		GithubClient: githubClient,
+	}
+
 	applyCommandRunner = events.NewApplyCommandRunner(
 		vcsClient,
 		false,
@@ -145,6 +151,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		parallelPoolSize,
 		SilenceNoProjects,
 		false,
+		&pullReqStatusFetcher,
 	)
 
 	approvePoliciesCommandRunner = events.NewApprovePoliciesCommandRunner(

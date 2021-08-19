@@ -31,6 +31,7 @@ import (
 	runtimematchers "github.com/runatlantis/atlantis/server/events/runtime/mocks/matchers"
 	"github.com/runatlantis/atlantis/server/events/runtime/policy"
 	"github.com/runatlantis/atlantis/server/events/terraform"
+	"github.com/runatlantis/atlantis/server/events/vcs"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/events/yaml"
@@ -390,7 +391,7 @@ func TestGitHubWorkflow(t *testing.T) {
 			userConfig = server.UserConfig{}
 			userConfig.DisableApply = c.DisableApply
 
-			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir)
+			ctrl, vcsClient, githubGetter, atlantisWorkspace, _ := setupE2E(t, c.RepoDir)
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
 			defer cleanup()
@@ -580,7 +581,8 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			userConfig = server.UserConfig{}
 			userConfig.EnablePolicyChecksFlag = true
 
-			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir)
+			ctrl, vcsClient, githubGetter, atlantisWorkspace, githubClient := setupE2E(t, c.RepoDir)
+
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA, cleanup := initializeRepo(t, c.RepoDir)
 			defer cleanup()
@@ -588,8 +590,8 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 
 			// Setup test dependencies.
 			w := httptest.NewRecorder()
-			When(vcsClient.PullIsMergeable(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(true, nil)
-			When(vcsClient.PullIsApproved(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(true, nil)
+			When(githubClient.PullIsSQMergeable(AnyRepo(), matchers.AnyModelsPullRequest(), AnyStatus())).ThenReturn(true, nil)
+			When(githubClient.PullIsApproved(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(true, nil)
 			When(githubGetter.GetPullRequest(AnyRepo(), AnyInt())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
 			When(vcsClient.GetModifiedFiles(AnyRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
 
@@ -651,7 +653,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 	}
 }
 
-func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
+func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace, *vcsmocks.MockIGithubClient) {
 	allowForkPRs := false
 	dataDir, binDir, cacheDir, cleanup := mkSubDirs(t)
 	defer cleanup()
@@ -798,8 +800,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		WorkingDirLocker:        locker,
 		ProjectCmdOutputHandler: projectCmdOutputHandler,
 		AggregateApplyRequirements: &events.AggregateApplyRequirements{
-			PullApprovedChecker: e2eVCSClient,
-			WorkingDir:          workingDir,
+			WorkingDir: workingDir,
 		},
 	}
 
@@ -845,6 +846,11 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		boltdb,
 	)
 
+	e2eMockGithubClient := vcsmocks.NewMockIGithubClient()
+	e2ePullReqStatusFetcher := vcs.SQBasedPullStatusFetcher{
+		GithubClient: e2eMockGithubClient,
+	}
+
 	applyCommandRunner := events.NewApplyCommandRunner(
 		e2eVCSClient,
 		false,
@@ -859,6 +865,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		parallelPoolSize,
 		silenceNoProjects,
 		false,
+		&e2ePullReqStatusFetcher,
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
@@ -923,7 +930,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		SupportedVCSHosts:            []models.VCSHostType{models.Gitlab, models.Github, models.BitbucketCloud},
 		VCSClient:                    e2eVCSClient,
 	}
-	return ctrl, e2eVCSClient, e2eGithubGetter, workingDir
+	return ctrl, e2eVCSClient, e2eGithubGetter, workingDir, e2eMockGithubClient
 }
 
 type mockLockURLGenerator struct{}

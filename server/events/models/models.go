@@ -37,6 +37,12 @@ const (
 	planfileSlashReplace = "::"
 )
 
+type PullReqStatus struct {
+	Approved  bool
+	Mergeable bool
+	SQLocked  bool
+}
+
 // Repo is a VCS repository.
 type Repo struct {
 	// FullName is the owner and repo name separated
@@ -374,6 +380,8 @@ type ProjectCommandContext struct {
 	Scope stats.Scope
 	// PullMergeable is true if the pull request for this project is able to be merged.
 	PullMergeable bool
+	// PullReqStatus holds state about the PR that requires additional computation outside models.PullRequest
+	PullReqStatus PullReqStatus
 	// CurrentProjectPlanStatus is the status of the current project prior to this command.
 	ProjectPlanStatus ProjectPlanStatus
 	// Pull is the pull request we're responding to.
@@ -425,7 +433,7 @@ func (p ProjectCommandContext) ProjectCloneDir() string {
 // SetScope sets the scope of the stats object field. Note: we deliberately set this on the value
 // instead of a pointer since we want scopes to mirror our function stack
 func (p ProjectCommandContext) SetScope(scope string) {
-	p.Scope = p.Scope.Scope(scope)
+	p.Scope = p.Scope.Scope(scope) //nolint
 }
 
 // GetShowResultFileName returns the filename (not the path) to store the tf show result
