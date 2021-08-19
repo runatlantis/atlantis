@@ -111,7 +111,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		prjCfg.TerraformVersion = getTfVersion(ctx, filepath.Join(repoDir, prjCfg.RepoRelDir))
 	}
 
-	projectCmds = append(projectCmds, newProjectCommandContext(
+	projectCmdContext := newProjectCommandContext(
 		ctx,
 		cmdName,
 		cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled),
@@ -127,7 +127,12 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		parallelPlan,
 		verbose,
 		ctx.Scope,
-	))
+	)
+
+	// Map the CommandContext PullReqStatus to ProjectCommandContext PullReqStatus.
+	projectCmdContext.PullReqStatus = ctx.PullRequestStatus
+
+	projectCmds = append(projectCmds, projectCmdContext)
 
 	return
 }
