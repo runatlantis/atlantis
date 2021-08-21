@@ -55,13 +55,6 @@ func (m *NoopTFDownloader) GetAny(dst, src string, opts ...getter.ClientOption) 
 	return nil
 }
 
-type LocalConftestCache struct {
-}
-
-func (m *LocalConftestCache) Get(key *version.Version) (string, error) {
-	return exec.LookPath(fmt.Sprintf("conftest%s", ConftestVersion))
-}
-
 func TestGitHubWorkflow(t *testing.T) {
 
 	if testing.Short() {
@@ -900,10 +893,6 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 
 	conftextExec := policy.NewConfTestExecutorWorkflow(logger, binDir, &NoopTFDownloader{})
 
-	// swapping out version cache to something that always returns local contest
-	// binary
-	conftextExec.VersionCache = &LocalConftestCache{}
-
 	policyCheckRunner, err := runtime.NewPolicyCheckStepRunner(
 		conftestVersion,
 		conftextExec,
@@ -1263,7 +1252,7 @@ func mkSubDirs(t *testing.T) (string, string, string, func()) {
 
 // Will fail test if conftest isn't in path and isn't version >= 0.26.0
 func ensureRunningConftest(t *testing.T) {
-	localPath, err := exec.LookPath(fmt.Sprintf("conftest%s", ConftestVersion))
+	localPath, err := exec.LookPath("conftest")
 	if err != nil {
 		t.Logf("conftest >= %s must be installed to run this test", ConftestVersion)
 		t.FailNow()
