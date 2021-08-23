@@ -467,3 +467,15 @@ func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (app
 	}
 	return
 }
+
+// MatchingRepo returns an instance of Repo which matches a given repoID.
+// If multiple repos match, return the last one for consistency with getMatchingCfg.
+func (g GlobalCfg) MatchingRepo(repoID string) *Repo {
+	for i := len(g.Repos) - 1; i >= 0; i-- {
+		repo := g.Repos[i]
+		if repo.IDMatches(repoID) {
+			return &repo
+		}
+	}
+	return nil
+}

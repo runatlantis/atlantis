@@ -883,6 +883,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		GithubPullGetter:              e2eGithubGetter,
 		GitlabMergeRequestGetter:      e2eGitlabGetter,
 		Logger:                        logger,
+		GlobalCfg:                     globalCfg,
 		AllowForkPRs:                  allowForkPRs,
 		AllowForkPRsFlag:              "allow-fork-prs",
 		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
