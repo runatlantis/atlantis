@@ -40,9 +40,11 @@ e.g.
 ATLANTIS_GH_APP_ID=123
 ATLANTIS_GH_APP_KEY_FILE="/.ssh/somekey.pem"
 ATLANTIS_GH_WEBHOOK_SECRET=12345
+ATLANTIS_REPO_ALLOWLIST=<repo-url> [Eg: github.com/Altlantis-Dev/Atlantis]
+ATLANTIS_WRITE_GIT_CREDS=true 
+USE_STATSD=false [To avoid statsd error messages during development]
 ```
-
-Note: `~/.ssh` is mounted to allow for referencing any local ssh keys
+- You can generate you GH_APP_KEY_FILE [here](https://github.com/settings/keys). Download the key file and save it to ~/.ssh directory. Note: `~/.ssh` is mounted to allow for referencing any local ssh keys.
 
 Following this just run:
 
@@ -77,6 +79,20 @@ docker run --rm -v $(pwd):/go/src/github.com/runatlantis/atlantis -w /go/src/git
 ```
 
 ## Calling Your Local Atlantis From GitHub
+- Create a Github organization by following the steps in this [tutorial](https://docs.github.com/en/organizations/collaborating-with-groups-in-organizations/creating-a-new-organization-from-scratch).
+- In the homepage of your organization, navigate to the settings, developer settings and finally to Github Apps. 
+- Click on new Github App. Set the homepage URL to https://www.atlantis.com and the setup the webhook URL as described in the steps below. 
+- Under Repository Permissions, set it to following: 
+```
+	- Metadata: Read-Only 
+	- Pull Requests: Read and Write
+	- Commit Statuses: Read and Write
+```
+Similarly, subscribe for the following events: 
+```
+	- Pull Request
+	- Issue Comment
+```
 - Create a test terraform repository in your GitHub.
 - Create a personal access token for Atlantis. See [Create a GitHub token](https://github.com/runatlantis/atlantis/tree/master/runatlantis.io/docs/access-credentials.md#generating-an-access-token).
 - Start Atlantis in server mode using that token:
