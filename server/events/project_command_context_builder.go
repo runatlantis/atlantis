@@ -1,14 +1,20 @@
 package events
 
 import (
+	"fmt"
 	"path/filepath"
-	"regexp"
+	"sort"
+
+	"github.com/Masterminds/semver"
+	"github.com/hashicorp/terraform-config-inspect/tfconfig"
 
 	"github.com/hashicorp/go-version"
-	"github.com/hashicorp/terraform-config-inspect/tfconfig"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	lib "github.com/warrensbox/terraform-switcher/lib"
 )
+
+var mirrorURL = "https://releases.hashicorp.com/terraform"
 
 func NewProjectCommandContextBulder(policyCheckEnabled bool, commentBuilder CommentBuilder) ProjectCommandContextBuilder {
 	projectCommandContextBuilder := &DefaultProjectCommandContextBuilder{
@@ -228,33 +234,34 @@ func escapeArgs(args []string) []string {
 
 // Extracts required_version from Terraform configuration.
 // Returns nil if unable to determine version from configuration.
+// Gets TFVersion from dir
 func getTfVersion(ctx *CommandContext, absProjDir string) *version.Version {
-	module, diags := tfconfig.LoadModule(absProjDir)
-	if diags.HasErrors() {
-		ctx.Log.Err("trying to detect required version: %s", diags.Error())
-		return nil
+
+	module, _ := tfconfig.LoadModule(absProjDir)
+	tfconstraint := module.RequiredCore[0]
+	tflist, _ := lib.GetTFList(mirrorURL, true)
+	constrains, _ := semver.NewConstraint(tfconstraint)
+	versions := make([]*semver.Version, len(tflist))
+
+	for i, tfvals := range tflist {
+		version, err := semver.NewVersion(tfvals) //NewVersion parses a given version and returns an instance of Version or an error if unable to parse the version.
+		if err == nil {
+			versions[i] = version
+		}
 	}
 
-	if len(module.RequiredCore) != 1 {
-		ctx.Log.Info("cannot determine which version to use from terraform configuration, detected %d possibilities.", len(module.RequiredCore))
-		return nil
-	}
-	requiredVersionSetting := module.RequiredCore[0]
+	sort.Sort(sort.Reverse(semver.Collection(versions)))
 
-	// We allow `= x.y.z`, `=x.y.z` or `x.y.z` where `x`, `y` and `z` are integers.
-	re := regexp.MustCompile(`^=?\s*([^\s]+)\s*$`)
-	matched := re.FindStringSubmatch(requiredVersionSetting)
-	if len(matched) == 0 {
-		ctx.Log.Debug("did not specify exact version in terraform configuration, found %q", requiredVersionSetting)
-		return nil
+	for _, element := range versions {
+		if constrains.Check(element) { // Validate a version against a constraint
+			tfversion_str := element.String()
+			if lib.ValidVersionFormat(tfversion_str) { //check if version format is correct
+				tfversion, _ := version.NewVersion(tfversion_str)
+				fmt.Println("found autoversion")
+				fmt.Println(tfversion_str)
+				return tfversion
+			}
+		}
 	}
-	ctx.Log.Debug("found required_version setting of %q", requiredVersionSetting)
-	version, err := version.NewVersion(matched[1])
-	if err != nil {
-		ctx.Log.Debug(err.Error())
-		return nil
-	}
-
-	ctx.Log.Info("detected module requires version: %q", version.String())
-	return version
+	return nil
 }

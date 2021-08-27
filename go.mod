@@ -6,6 +6,7 @@ replace google.golang.org/grpc => google.golang.org/grpc v1.29.1
 
 require (
 	github.com/Laisky/graphql v1.0.5
+	github.com/Masterminds/semver v1.5.0
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/agext/levenshtein v1.2.3 // indirect
 	github.com/aws/aws-sdk-go v1.31.15 // indirect
@@ -52,8 +53,8 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/urfave/cli v1.22.5
 	github.com/urfave/negroni v0.3.0
+	github.com/warrensbox/terraform-switcher v0.1.1-0.20210812002608-b9e469344b28
 	github.com/xanzy/go-gitlab v0.50.3
-	github.com/zclconf/go-cty v1.5.1 // indirect
 	go.etcd.io/bbolt v1.3.6
 	go.uber.org/zap v1.19.0
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
