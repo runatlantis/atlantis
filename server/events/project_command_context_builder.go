@@ -267,10 +267,10 @@ func getTfVersion(ctx *CommandContext, absProjDir string) *version.Version {
 
 	for _, element := range versions {
 		if constrains.Check(element) { // Validate a version against a constraint
-			tfversion_str := element.String()
-			if lib.ValidVersionFormat(tfversion_str) { //check if version format is correct
-				tfversion, _ := version.NewVersion(tfversion_str)
-				ctx.Log.Info("detected module requires version: %s", tfversion_str)
+			tfversionStr := element.String()
+			if lib.ValidVersionFormat(tfversionStr) { //check if version format is correct
+				tfversion, _ := version.NewVersion(tfversionStr)
+				ctx.Log.Info("detected module requires version: %s", tfversionStr)
 				return tfversion
 			}
 		}

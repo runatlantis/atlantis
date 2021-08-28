@@ -853,22 +853,22 @@ projects:
 
 	exactSymbols := []string{"", "="}
 	nonExactSymbols := []string{">", ">=", "<", "<=", "~>"}
-	nonExactVersions := map[string]map[string][]int {
-		">": 	map[string][]int{
-				"project1": {1, 0, 5},
-			},
-		">=": 	map[string][]int{
-				"project1": {1, 0, 5},
-			},
-		"<": 	map[string][]int{
-				"project1": {0, 12, 7},
-			},
-		"<=": 	map[string][]int{
-				"project1": {0, 12, 8},
-			},
-		"~>": 	map[string][]int{
-				"project1": {0, 12, 31},
-			},
+	nonExactVersions := map[string]map[string][]int{
+		">": {
+			"project1": {1, 0, 5},
+		},
+		">=": {
+			"project1": {1, 0, 5},
+		},
+		"<": {
+			"project1": {0, 12, 7},
+		},
+		"<=": {
+			"project1": {0, 12, 8},
+		},
+		"~>": {
+			"project1": {0, 12, 31},
+		},
 	}
 
 	type testCase struct {
@@ -902,7 +902,7 @@ projects:
 				},
 			},
 			ModifiedFiles: []string{"project1/main.tf"},
-			Exp: nonExactVersions[nonExactSymbol],
+			Exp:           nonExactVersions[nonExactSymbol],
 		}
 	}
 
