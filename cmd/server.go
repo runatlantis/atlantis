@@ -101,6 +101,9 @@ const (
 	TFEHostnameFlag            = "tfe-hostname"
 	TFETokenFlag               = "tfe-token"
 	WriteGitCredsFlag          = "write-git-creds"
+	WebBasicAuthFlag           = "web-basic-auth"
+	WebUsernameFlag            = "web-username"
+	WebPasswordFlag            = "web-password"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
 	DefaultADBasicUser      = ""
@@ -117,6 +120,9 @@ const (
 	DefaultTFDownloadURL    = "https://releases.hashicorp.com"
 	DefaultTFEHostname      = "app.terraform.io"
 	DefaultVCSStatusName    = "atlantis"
+	DefaultWebBasicAuth     = false
+	DefaultWebUsername      = "atlantis"
+	DefaultWebPassword      = "atlantis"
 )
 
 var stringFlags = map[string]stringFlag{
@@ -280,6 +286,14 @@ var stringFlags = map[string]stringFlag{
 		description:  "Name used to identify Atlantis for pull request statuses.",
 		defaultValue: DefaultVCSStatusName,
 	},
+	WebUsernameFlag: {
+		description:  "Username used for Web Basic Authentication on Atlantis HTTP Middleware",
+		defaultValue: DefaultWebUsername,
+	},
+	WebPasswordFlag: {
+		description:  "Password used for Web Basic Authentication on Atlantis HTTP Middleware",
+		defaultValue: DefaultWebPassword,
+	},
 }
 
 var boolFlags = map[string]boolFlag{
@@ -373,6 +387,10 @@ var boolFlags = map[string]boolFlag{
 	SkipCloneNoChanges: {
 		description:  "Skips cloning the PR repo if there are no projects were changed in the PR.",
 		defaultValue: false,
+	},
+	WebBasicAuthFlag: {
+		description:  "Switches on or off the Basic Authentication on the HTTP Middleware interface",
+		defaultValue: DefaultWebBasicAuth,
 	},
 }
 var intFlags = map[string]intFlag{
@@ -619,6 +637,12 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	}
 	if c.TFEHostname == "" {
 		c.TFEHostname = DefaultTFEHostname
+	}
+	if c.WebUsername == "" {
+		c.WebUsername = DefaultWebUsername
+	}
+	if c.WebPassword == "" {
+		c.WebPassword = DefaultWebPassword
 	}
 }
 
