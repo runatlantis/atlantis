@@ -852,7 +852,24 @@ projects:
 `
 
 	exactSymbols := []string{"", "="}
-	nonExactSymbols := []string{">", ">=", "<", "<=", "~="}
+	nonExactSymbols := []string{">", ">=", "<", "<=", "~>"}
+	nonExactVersions := map[string]map[string][]int {
+		">": 	map[string][]int{
+				"project1": {1, 0, 5},
+			},
+		">=": 	map[string][]int{
+				"project1": {1, 0, 5},
+			},
+		"<": 	map[string][]int{
+				"project1": {0, 12, 7},
+			},
+		"<=": 	map[string][]int{
+				"project1": {0, 12, 8},
+			},
+		"~>": 	map[string][]int{
+				"project1": {0, 12, 31},
+			},
+	}
 
 	type testCase struct {
 		DirStructure  map[string]interface{}
@@ -885,9 +902,7 @@ projects:
 				},
 			},
 			ModifiedFiles: []string{"project1/main.tf"},
-			Exp: map[string][]int{
-				"project1": nil,
-			},
+			Exp: nonExactVersions[nonExactSymbol],
 		}
 	}
 

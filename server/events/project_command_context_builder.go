@@ -1,7 +1,6 @@
 package events
 
 import (
-	"fmt"
 	"path/filepath"
 	"sort"
 
@@ -234,13 +233,22 @@ func escapeArgs(args []string) []string {
 
 // Extracts required_version from Terraform configuration.
 // Returns nil if unable to determine version from configuration.
-// Gets TFVersion from dir
 func getTfVersion(ctx *CommandContext, absProjDir string) *version.Version {
 
-	module, _ := tfconfig.LoadModule(absProjDir)
-	tfconstraint := module.RequiredCore[0]
+	module, diags := tfconfig.LoadModule(absProjDir)
+	if diags.HasErrors() {
+		ctx.Log.Err("trying to detect required version: %s", diags.Error())
+	}
+
+	if len(module.RequiredCore) != 1 {
+		ctx.Log.Info("cannot determine which version to use from terraform configuration, detected %d possibilities.", len(module.RequiredCore))
+		return nil
+	}
+	requiredVersionSetting := module.RequiredCore[0]
+	ctx.Log.Debug("found required_version setting of %q", requiredVersionSetting)
+
 	tflist, _ := lib.GetTFList(mirrorURL, true)
-	constrains, _ := semver.NewConstraint(tfconstraint)
+	constrains, _ := semver.NewConstraint(requiredVersionSetting)
 	versions := make([]*semver.Version, len(tflist))
 
 	for i, tfvals := range tflist {
@@ -250,6 +258,11 @@ func getTfVersion(ctx *CommandContext, absProjDir string) *version.Version {
 		}
 	}
 
+	if len(versions) == 0 {
+		ctx.Log.Debug("did not specify exact valid version in terraform configuration, found %q", requiredVersionSetting)
+		return nil
+	}
+
 	sort.Sort(sort.Reverse(semver.Collection(versions)))
 
 	for _, element := range versions {
@@ -257,11 +270,11 @@ func getTfVersion(ctx *CommandContext, absProjDir string) *version.Version {
 			tfversion_str := element.String()
 			if lib.ValidVersionFormat(tfversion_str) { //check if version format is correct
 				tfversion, _ := version.NewVersion(tfversion_str)
-				fmt.Println("found autoversion")
-				fmt.Println(tfversion_str)
+				ctx.Log.Info("detected module requires version: %s", tfversion_str)
 				return tfversion
 			}
 		}
 	}
+	ctx.Log.Debug("could not match any valid terraform version with %q", requiredVersionSetting)
 	return nil
 }
