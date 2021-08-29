@@ -68,6 +68,11 @@ type EnvStepRunner interface {
 	Run(ctx models.ProjectCommandContext, cmd string, value string, path string, envs map[string]string) (string, error)
 }
 
+type MultiEnvStepRunner interface {
+	// Run cmd in path.
+	Run(ctx models.ProjectCommandContext, cmd string, path string, envs map[string]string) (string, error)
+}
+
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_webhooks_sender.go WebhooksSender
 
 // WebhooksSender sends webhook.
@@ -125,6 +130,7 @@ type DefaultProjectCommandRunner struct {
 	VersionStepRunner          StepRunner
 	RunStepRunner              CustomStepRunner
 	EnvStepRunner              EnvStepRunner
+	MultiEnvStepRunner         MultiEnvStepRunner
 	WorkingDir                 WorkingDir
 	Webhooks                   WebhooksSender
 	WorkingDirLocker           WorkingDirLocker
@@ -423,8 +429,9 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx models.Pr
 			// We reset out to the empty string because we don't want it to
 			// be printed to the PR, it's solely to set the environment variable.
 			out = ""
+		case "multienv":
+			out, err = p.MultiEnvStepRunner.Run(ctx, step.RunCommand, absPath, envs)
 		}
-
 		if out != "" {
 			outputs = append(outputs, out)
 		}
