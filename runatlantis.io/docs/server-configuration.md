@@ -52,7 +52,7 @@ Values are chosen in this order:
   atlantis server --allow-draft-prs
   ```
   Respond to pull requests from draft prs. Defaults to `false`.
-  
+
 * ### `--allow-fork-prs`
   ```bash
   atlantis server --allow-fork-prs
@@ -273,6 +273,14 @@ Values are chosen in this order:
   It's not supposed to be used with `--disable-apply-all`.
   The command `atlantis apply -p .*` will bypass the restriction and run apply on every projects
   :::
+
+* ### `--enable-diff-markdown-format`
+  ```bash
+  atlantis server --enable-diff-markdown-format
+  ```
+  Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.
+
+  Useful to enable for use with Github.
 
 * ### `--gh-hostname`
   ```bash
