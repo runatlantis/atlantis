@@ -16,6 +16,7 @@ package events_test
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -182,6 +183,8 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 
 	When(preWorkflowHooksCommandRunner.RunPreHooks(matchers.AnyPtrToEventsCommandContext())).ThenReturn(nil)
 
+	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{})
+
 	ch = events.DefaultCommandRunner{
 		VCSClient:                     vcsClient,
 		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
@@ -190,6 +193,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		GitlabMergeRequestGetter:      gitlabGetter,
 		AzureDevopsPullGetter:         azuredevopsGetter,
 		Logger:                        logger,
+		GlobalCfg:                     globalCfg,
 		AllowForkPRs:                  false,
 		AllowForkPRsFlag:              "allow-fork-prs-flag",
 		Drainer:                       drainer,
@@ -402,6 +406,40 @@ func TestRunCommentCommand_ClosedPull(t *testing.T) {
 
 	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, nil, fixtures.User, fixtures.Pull.Num, nil)
 	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "Atlantis commands can't be run on closed pull requests", "")
+}
+
+func TestRunCommentCommand_MatchedBranch(t *testing.T) {
+	t.Log("if a command is run on a pull request which matches base branches run plan successfully")
+	vcsClient := setup(t)
+
+	ch.GlobalCfg.Repos = append(ch.GlobalCfg.Repos, valid.Repo{
+		IDRegex:     regexp.MustCompile(".*"),
+		BranchRegex: regexp.MustCompile("^main$"),
+	})
+	var pull github.PullRequest
+	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, BaseBranch: "main"}
+	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
+	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
+
+	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.PlanCommand})
+	vcsClient.VerifyWasCalledOnce().CreateComment(fixtures.GithubRepo, modelPull.Num, "Ran Plan for 0 projects:\n\n\n\n", "plan")
+}
+
+func TestRunCommentCommand_UnmatchedBranch(t *testing.T) {
+	t.Log("if a command is run on a pull request which doesn't match base branches do not comment with error")
+	vcsClient := setup(t)
+
+	ch.GlobalCfg.Repos = append(ch.GlobalCfg.Repos, valid.Repo{
+		IDRegex:     regexp.MustCompile(".*"),
+		BranchRegex: regexp.MustCompile("^main$"),
+	})
+	var pull github.PullRequest
+	modelPull := models.PullRequest{BaseRepo: fixtures.GithubRepo, BaseBranch: "foo"}
+	When(githubGetter.GetPullRequest(fixtures.GithubRepo, fixtures.Pull.Num)).ThenReturn(&pull, nil)
+	When(eventParsing.ParseGithubPull(&pull)).ThenReturn(modelPull, modelPull.BaseRepo, fixtures.GithubRepo, nil)
+
+	ch.RunCommentCommand(fixtures.GithubRepo, nil, nil, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.PlanCommand})
+	vcsClient.VerifyWasCalled(Never()).CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString())
 }
 
 func TestRunUnlockCommand_VCSComment(t *testing.T) {

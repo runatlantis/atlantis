@@ -600,6 +600,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
 		EventParser:                   eventParser,
 		Logger:                        logger,
+		GlobalCfg:                     globalCfg,
 		AllowForkPRs:                  userConfig.AllowForkPRs,
 		AllowForkPRsFlag:              config.AllowForkPRsFlag,
 		SilenceForkPRErrors:           userConfig.SilenceForkPRErrors,

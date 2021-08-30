@@ -892,6 +892,69 @@ func TestRepo_BranchMatches(t *testing.T) {
 	Equals(t, false, (valid.Repo{BranchRegex: regexp.MustCompile("release")}).BranchMatches("main"))
 }
 
+func TestGlobalCfg_MatchingRepo(t *testing.T) {
+	defaultRepo := valid.Repo{
+		IDRegex:           regexp.MustCompile(".*"),
+		BranchRegex:       regexp.MustCompile(".*"),
+		ApplyRequirements: []string{},
+	}
+	repo1 := valid.Repo{
+		IDRegex:           regexp.MustCompile(".*"),
+		BranchRegex:       regexp.MustCompile("^main$"),
+		ApplyRequirements: []string{"approved"},
+	}
+	repo2 := valid.Repo{
+		ID:                "github.com/owner/repo",
+		BranchRegex:       regexp.MustCompile("^master$"),
+		ApplyRequirements: []string{"approved", "mergeable"},
+	}
+
+	cases := map[string]struct {
+		gCfg   valid.GlobalCfg
+		repoID string
+		exp    *valid.Repo
+	}{
+		"matches to default": {
+			gCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					defaultRepo,
+					repo2,
+				},
+			},
+			repoID: "foo",
+			exp:    &defaultRepo,
+		},
+		"matches to IDRegex": {
+			gCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					defaultRepo,
+					repo1,
+					repo2,
+				},
+			},
+			repoID: "foo",
+			exp:    &repo1,
+		},
+		"matches to ID": {
+			gCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					defaultRepo,
+					repo1,
+					repo2,
+				},
+			},
+			repoID: "github.com/owner/repo",
+			exp:    &repo2,
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			Equals(t, c.exp, c.gCfg.MatchingRepo(c.repoID))
+		})
+	}
+}
+
 // String is a helper routine that allocates a new string value
 // to store v and returns a pointer to it.
 func String(v string) *string { return &v }
