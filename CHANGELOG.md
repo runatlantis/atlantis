@@ -18,7 +18,7 @@ Feature release with a number of improvements related to Gitlab support, a new c
 * Fix issue with branch regex matcher which would always allow all branches ([#1768](https://github.com/runatlantis/atlantis/pull/1768) by @minamijoyo)
 
 ## Dependencies
-* Upgrade default tf version to 1.0.1 ([#1662](https://github.com/runatlantis/atlantis/pull/1662) by @chenrui333)
+* Upgrade default tf version to 1.0.5 ([#1662](https://github.com/runatlantis/atlantis/pull/1765) by @chenrui333)
 
 ## Backwards Incompatibilities/Notes
 * If you are using GHCR and are using the `atlantis:latest` docker image, this now points to the latest release as opposed to the tip of master.  If you want to work off the tip of master, then you should now use `atlantis:dev`
