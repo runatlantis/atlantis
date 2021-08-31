@@ -19,6 +19,8 @@ Feature release with a number of improvements related to Gitlab support, a new c
 
 ## Dependencies
 * Upgrade default tf version to 1.0.5 ([#1662](https://github.com/runatlantis/atlantis/pull/1765) by @chenrui333)
+* Upgrade go version to 0.17 ([#1766](https://github.com/runatlantis/atlantis/pull/1766) by @chenrui1333)
+* Upgrade alpine to v3.14, addressing  CVE-2021-36159, CVE-2021-22924, CVE-2021-22923 and CVE-2021-22925 vulnerabilities ([#1770](https://github.com/runatlantis/atlantis/pull/1770) by @chenrui1333)
 
 ## Backwards Incompatibilities/Notes
 * If you are using GHCR and are using the `atlantis:latest` docker image, this now points to the latest release as opposed to the tip of master.  If you want to work off the tip of master, then you should now use `atlantis:dev`
