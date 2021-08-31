@@ -1,5 +1,7 @@
 name: tester
-on: [push]
+
+on: [ push ]
+
 jobs:
   test:
     name: runner / gotest
@@ -11,3 +13,37 @@ jobs:
         run: sudo chmod -R 777 $GITHUB_WORKSPACE /github /__w/_temp
       - uses: actions/checkout@v2
       - run: make test-all
+
+  e2e:
+    runs-on: ubuntu-latest
+    # dont run e2e tests on forked PRs
+    if: github.repository == 'runatlantis/atlantis'
+    env:
+      TERRAFORM_VERSION: 1.0.5
+      GITHUB_USERNAME: ${{ secrets.ATLANTISBOT_GITHUB_USERNAME }}
+      GITHUB_PASSWORD: ${{ secrets.ATLANTISBOT_GITHUB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v2
+        with:
+          go-version: 1.17
+
+      # This version of TF will be downloaded before Atlantis is started.
+      # We do this instead of setting --default-tf-version because setting
+      # that flag starts the download asynchronously so we'd have a race
+      # condition.
+      - uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.0.5
+
+      - name: Setup deps
+        run: |
+          wget -q https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip && \
+            sudo unzip ngrok-stable-linux-amd64.zip && \
+            sudo chmod +x ngrok
+          ./ngrok --help
+      - run: |
+          make build-service
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          ./scripts/e2e.sh
