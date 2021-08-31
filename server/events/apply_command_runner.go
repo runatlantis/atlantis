@@ -1,10 +1,13 @@
 package events
 
 import (
+	"strings"
+
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/feature"
 )
 
 func NewApplyCommandRunner(
@@ -22,6 +25,8 @@ func NewApplyCommandRunner(
 	SilenceNoProjects bool,
 	silenceVCSStatusNoProjects bool,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
+	logStreamURLGenerator LogStreamURLGenerator,
+	featureAllocator feature.Allocator,
 ) *ApplyCommandRunner {
 	return &ApplyCommandRunner{
 		vcsClient:                  vcsClient,
@@ -38,6 +43,8 @@ func NewApplyCommandRunner(
 		SilenceNoProjects:          SilenceNoProjects,
 		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
 		pullReqStatusFetcher:       pullReqStatusFetcher,
+		logStreamURLGenerator:      logStreamURLGenerator,
+		featureAllocator:           featureAllocator,
 	}
 }
 
@@ -60,6 +67,8 @@ type ApplyCommandRunner struct {
 	// SilenceVCSStatusNoPlans is whether any plan should set commit status if no projects
 	// are found
 	silenceVCSStatusNoProjects bool
+	logStreamURLGenerator      LogStreamURLGenerator
+	featureAllocator           feature.Allocator
 }
 
 func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
@@ -135,6 +144,25 @@ func (a *ApplyCommandRunner) Run(ctx *CommandContext, cmd *CommentCommand) {
 			}
 		}
 		return
+	}
+
+	shouldAllocate, err := a.featureAllocator.ShouldAllocate(feature.LogStreaming, ctx.HeadRepo.FullName)
+
+	if err != nil {
+		ctx.Log.Err("unable to allocate for feature: %s, error: %s", feature.LogStreaming, err)
+	}
+
+	if shouldAllocate {
+		projectLogStreamURLs := make([]string, 0)
+
+		for _, projectCommand := range projectCmds {
+			projectLogStreamURLs = append(projectLogStreamURLs, a.logStreamURLGenerator.GenerateLogStreamURL(pull, projectCommand))
+		}
+
+		err = a.vcsClient.CreateComment(baseRepo, pull.Num, ("Real-time terraform output for apply workflow: " + strings.Join(projectLogStreamURLs, "\n")), models.ApplyCommand.String())
+		if err != nil {
+			ctx.Log.Err("unable to comment on pull request: %s", err)
+		}
 	}
 
 	// Only run commands in parallel if enabled
