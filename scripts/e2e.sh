@@ -1,12 +1,6 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
 IFS=$'\n\t'
-
-# download all the tooling needed for e2e tests
-CIRCLE_WORKING_DIRECTORY="${CIRCLE_WORKING_DIRECTORY/#\~/$HOME}" # https://discuss.circleci.com/t/circle-working-directory-doesnt-expand/17007/5
-${CIRCLE_WORKING_DIRECTORY}/scripts/e2e-deps.sh
-cd "${CIRCLE_WORKING_DIRECTORY}/e2e"
 
 # start atlantis server in the background and wait for it to start
 ./atlantis server \
@@ -19,15 +13,20 @@ cd "${CIRCLE_WORKING_DIRECTORY}/e2e"
   &> /tmp/atlantis-server.log &
 sleep 2
 
+echo "Started atlantis server"
+
 # start ngrok in the background and wait for it to start
 ./ngrok config add-authtoken $NGROK_AUTH_TOKEN
 ./ngrok http 4141 > /tmp/ngrok.log &
-sleep 2
+sleep 4
 
 # find out what URL ngrok has given us
 export ATLANTIS_URL=$(curl -s 'http://localhost:4040/api/tunnels' | jq -r '.tunnels[] | select(.proto=="https") | .public_url')
 
+echo "ATLANTIS_URL is $ATLANTIS_URL"
+
 # Now we can start the e2e tests
+cd "${GITHUB_WORKSPACE}/e2e"
 echo "Running 'make build'"
 make build
 

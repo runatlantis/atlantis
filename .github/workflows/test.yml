@@ -100,3 +100,41 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - run: 'echo "No build required"'
+
+  e2e:
+    runs-on: ubuntu-latest
+    # dont run e2e tests on forked PRs
+    if: github.repository == 'runatlantis/atlantis'
+    env:
+      TERRAFORM_VERSION: 1.8.3
+      GITHUB_USERNAME: ${{ secrets.ATLANTISBOT_GITHUB_USERNAME }}
+      GITHUB_PASSWORD: ${{ secrets.ATLANTISBOT_GITHUB_PASSWORD }}
+      NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4
+      - uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5
+        with:
+          go-version-file: go.mod
+
+      # This version of TF will be downloaded before Atlantis is started.
+      # We do this instead of setting --default-tf-version because setting
+      # that flag starts the download asynchronously so we'd have a race
+      # condition.
+      - uses: hashicorp/setup-terraform@651471c36a6092792c552e8b1bef71e592b462d8 # v3
+        with:
+          terraform_version: 1.8.3
+
+      - name: Setup deps
+        run: |
+            wget -q -nc https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
+            tar -xzf ngrok-v3-stable-linux-amd64.tgz && \
+            chmod +x ngrok
+            ./ngrok --help
+      - name: Setup gitconfig
+        run: |
+          git config --global user.email "rui+atlantis@chenrui.dev"
+          git config --global user.name "atlantisbot"
+
+      - run: |
+          make build-service
+          ./scripts/e2e.sh
