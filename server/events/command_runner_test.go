@@ -35,6 +35,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/fixtures"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
+	fmocks "github.com/runatlantis/atlantis/server/feature/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -79,6 +80,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	workingDir = mocks.NewMockWorkingDir()
 	pendingPlanFinder = mocks.NewMockPendingPlanFinder()
 	commitUpdater = mocks.NewMockCommitStatusUpdater()
+	featureAllocator := fmocks.NewMockAllocator()
 
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
@@ -131,6 +133,8 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		parallelPoolSize,
 		SilenceNoProjects,
 		defaultBoltDB,
+		eventmocks.NewMockLogStreamURLGenerator(),
+		featureAllocator,
 	)
 
 	pullReqStatusFetcher := vcs.SQBasedPullStatusFetcher{
@@ -152,6 +156,8 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		SilenceNoProjects,
 		false,
 		&pullReqStatusFetcher,
+		eventmocks.NewMockLogStreamURLGenerator(),
+		featureAllocator,
 	)
 
 	approvePoliciesCommandRunner = events.NewApprovePoliciesCommandRunner(

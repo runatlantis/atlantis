@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -66,10 +65,7 @@ func (p *DefaultProjectCommandOutputHandler) Receive(projectInfo string, callbac
 }
 
 func (p *DefaultProjectCommandOutputHandler) Handle() {
-	fmt.Printf("Testing Handle func")
 	for msg := range p.ProjectCmdOutput {
-		p.logger.Info("Receiving message %s", msg.Line)
-		fmt.Printf("Receiving message %s", msg.Line)
 		if msg.ClearBuffBefore {
 			p.clearLogLines(msg.ProjectInfo)
 		}
@@ -111,7 +107,6 @@ func (p *DefaultProjectCommandOutputHandler) addChan(pull string) chan string {
 //Add log line to buffer and send to all current channels
 func (p *DefaultProjectCommandOutputHandler) writeLogLine(pull string, line string) {
 	p.controllerBufferLock.Lock()
-	p.logger.Info("Project info: %s, content: %s", pull, line)
 
 	for ch := range p.receiverBuffers[pull] {
 		select {

@@ -116,7 +116,7 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
         <div class="list-title">{{.RepoFullName}} <span class="heading-font-size">#{{.PullNum}}</span> <code>{{.Path}}</code> <code>{{.Workspace}}</code></div>
         <div class="list-status"><code>Locked</code></div>
         <div class="list-timestamp"><span class="heading-font-size">{{.TimeFormatted}}</span></div>
-        </div>x
+        </div>
       </a>
     {{ end }}
     {{ else }}

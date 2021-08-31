@@ -45,6 +45,12 @@ type LockURLGenerator interface {
 	GenerateLockURL(lockID string) string
 }
 
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_log_stream_url_generator.go LogStreamURLGenerator
+
+type LogStreamURLGenerator interface {
+	GenerateLogStreamURL(pull models.PullRequest, p models.ProjectCommandContext) string
+}
+
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_step_runner.go StepRunner
 
 // StepRunner runs steps. Steps are individual pieces of execution like
