@@ -42,8 +42,10 @@ jobs:
             sudo unzip ngrok-stable-linux-amd64.zip && \
             sudo chmod +x ngrok
           ./ngrok --help
+      - name: Setup gitconfig
+        run: |
+          git config --global user.email "lkysow+atlantis@gmail.com"
+          git config --global user.name "atlantisbot"
       - run: |
           make build-service
-          git config --global user.email "action@github.com"
-          git config --global user.name "GitHub Action"
           ./scripts/e2e.sh
