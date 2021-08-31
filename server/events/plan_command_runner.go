@@ -1,6 +1,8 @@
 package events
 
 import (
+	"strings"
+
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
@@ -21,6 +23,7 @@ func NewPlanCommandRunner(
 	parallelPoolSize int,
 	SilenceNoProjects bool,
 	pullStatusFetcher PullStatusFetcher,
+	logStreamURLGenerator LogStreamURLGenerator,
 ) *PlanCommandRunner {
 	return &PlanCommandRunner{
 		silenceVCSStatusNoPlans:    silenceVCSStatusNoPlans,
@@ -38,6 +41,7 @@ func NewPlanCommandRunner(
 		parallelPoolSize:           parallelPoolSize,
 		SilenceNoProjects:          SilenceNoProjects,
 		pullStatusFetcher:          pullStatusFetcher,
+		logStreamURLGenerator:      logStreamURLGenerator,
 	}
 }
 
@@ -63,6 +67,7 @@ type PlanCommandRunner struct {
 	autoMerger                 *AutoMerger
 	parallelPoolSize           int
 	pullStatusFetcher          PullStatusFetcher
+	logStreamURLGenerator      LogStreamURLGenerator
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *CommandContext) {
@@ -98,6 +103,17 @@ func (p *PlanCommandRunner) runAutoplan(ctx *CommandContext) {
 			}
 		}
 		return
+	}
+
+	projectLogStreamURLs := make([]string, 0)
+
+	for _, projectCommand := range projectCmds {
+		projectLogStreamURLs = append(projectLogStreamURLs, p.logStreamURLGenerator.GenerateLogStreamURL(pull, projectCommand))
+	}
+
+	err = p.vcsClient.CreateComment(baseRepo, pull.Num, ("Real-time terraform output for autoplan: " + strings.Join(projectLogStreamURLs, "\n")), models.PlanCommand.String())
+	if err != nil {
+		ctx.Log.Err("unable to comment on pull request: %s", err)
 	}
 
 	// At this point we are sure Atlantis has work to do, so set commit status to pending
@@ -175,6 +191,17 @@ func (p *PlanCommandRunner) run(ctx *CommandContext, cmd *CommentCommand) {
 			}
 		}
 		return
+	}
+
+	projectLogStreamURLs := make([]string, 0)
+	for _, projectCommand := range projectCmds {
+		tempURLHold := p.logStreamURLGenerator.GenerateLogStreamURL(pull, projectCommand)
+		projectLogStreamURLs = append(projectLogStreamURLs, tempURLHold)
+	}
+
+	err = p.vcsClient.CreateComment(baseRepo, pull.Num, ("Real-time terraform output for plan workflow: " + strings.Join(projectLogStreamURLs, "\n")), models.PlanCommand.String())
+	if err != nil {
+		ctx.Log.Err("unable to comment on pull request: %s", err)
 	}
 
 	projectCmds, policyCheckCmds := p.partitionProjectCmds(ctx, projectCmds)

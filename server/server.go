@@ -510,6 +510,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDirLocker:           workingDirLocker,
 		ProjectCmdOutputHandler:    projectCmdOutputHandler,
 		AggregateApplyRequirements: applyRequirementHandler,
+		LogStreamURLGenerator:      router,
 	}
 
 	dbUpdater := &events.DBUpdater{
@@ -552,6 +553,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
 		boltdb,
+		router,
 	)
 
 	pullReqStatusFetcher := vcs.NewPullReqStatusFetcher(vcsClient)
@@ -570,6 +572,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.SilenceNoProjects,
 		userConfig.SilenceVCSStatusNoProjects,
 		pullReqStatusFetcher,
+		router,
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
@@ -621,6 +624,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Drainer:                       drainer,
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 		PullStatusFetcher:             boltdb,
+		LogStreamURLGenerator:         router,
 	}
 	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
 	if err != nil {
@@ -721,8 +725,8 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
 	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
-	s.Router.HandleFunc("/logStreaming/{org}/{repo}/{pull}/{project}", s.LogStreamingController.GetLogStream).Methods("GET").Name(LogViewRouteName)
-	s.Router.HandleFunc("/logStreaming/{org}/{repo}/{pull}/{project}/ws", s.LogStreamingController.GetLogStreamWS).Methods("GET")
+	s.Router.HandleFunc("/log-streaming/{org}/{repo}/{pull}/{project}", s.LogStreamingController.GetLogStream).Methods("GET").Name(LogViewRouteName)
+	s.Router.HandleFunc("/log-streaming/{org}/{repo}/{pull}/{project}/ws", s.LogStreamingController.GetLogStreamWS).Methods("GET")
 	n := negroni.New(&negroni.Recovery{
 		Logger:     log.New(os.Stdout, "", log.LstdFlags),
 		PrintStack: false,
