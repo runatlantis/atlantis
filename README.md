@@ -1,5 +1,11 @@
 # Atlantis <!-- omit in toc -->
 
+[![SuperDopeBadge](./runatlantis.io/.vuepress/public/hightower-super-dope.svg)](https://twitter.com/kelseyhightower/status/893260922222813184)
+[![Go Report Card](https://goreportcard.com/badge/github.com/runatlantis/atlantis)](https://goreportcard.com/report/github.com/runatlantis/atlantis)
+[![codecov](https://codecov.io/gh/runatlantis/atlantis/branch/master/graph/badge.svg)](https://codecov.io/gh/runatlantis/atlantis)
+[![CircleCI](https://circleci.com/gh/runatlantis/atlantis/tree/master.svg?style=shield)](https://circleci.com/gh/runatlantis/atlantis/tree/master)
+[![Slack](https://img.shields.io/badge/Join-Atlantis%20Community%20Slack-red)](https://join.slack.com/t/atlantis-community/shared_invite/enQtNzc4NDM3OTA3ODI0LTA5NDQ4YTA3NTAxM2I3ZmIxMGNiYWJhNmY4YjBjZjM3OWMzNGI0NTcxNzY2NjRhODIyODA4YmNjOTBiOThhNTI)
+
 <p align="center">
   <img src="./runatlantis.io/.vuepress/public/hero.png" alt="Atlantis Logo"/><br><br>
   <b>Terraform Pull Request Automation</b>
@@ -9,7 +15,6 @@
 - [What is Atlantis?](#what-is-atlantis)
 - [What does it do?](#what-does-it-do)
 - [Why should you use it?](#why-should-you-use-it)
-- [Badges!](#badges)
 - [Stargazers over time](#stargazers-over-time)
 
 ## Resources
@@ -29,14 +34,6 @@ Runs `terraform plan` and `apply` remotely and comments back on the pull request
 * Make Terraform changes visible to your whole team.
 * Enable non-operations engineers to collaborate on Terraform.
 * Standardize your Terraform workflows.
-
-## Badges!
-[![SuperDopeBadge](./runatlantis.io/.vuepress/public/hightower-super-dope.svg)](https://twitter.com/kelseyhightower/status/893260922222813184)
-[![Go Report Card](https://goreportcard.com/badge/github.com/runatlantis/atlantis)](https://goreportcard.com/report/github.com/runatlantis/atlantis)
-[![codecov](https://codecov.io/gh/runatlantis/atlantis/branch/master/graph/badge.svg)](https://codecov.io/gh/runatlantis/atlantis)
-[![CircleCI](https://circleci.com/gh/runatlantis/atlantis/tree/master.svg?style=shield)](https://circleci.com/gh/runatlantis/atlantis/tree/master)
-[![Slack](https://img.shields.io/badge/Join-Atlantis%20Community%20Slack-red)](https://join.slack.com/t/atlantis-community/shared_invite/enQtNzc4NDM3OTA3ODI0LTA5NDQ4YTA3NTAxM2I3ZmIxMGNiYWJhNmY4YjBjZjM3OWMzNGI0NTcxNzY2NjRhODIyODA4YmNjOTBiOThhNTI)
-[![Gitter chat](https://badges.gitter.im/runatlantis.png)](https://gitter.im/runatlantis)
 
 ## Stargazers over time
 
