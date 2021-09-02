@@ -30,6 +30,11 @@ type Client struct {
 	AtlantisURL string
 }
 
+type DeleteBranch struct {
+	Name   string `json:"name"`
+	DryRun bool   `json:"dryRun"`
+}
+
 // NewClient builds a bitbucket cloud client. Returns an error if the baseURL is
 // malformed. httpClient is the client to use to make the requests, username
 // and password are used as basic auth in the requests, baseURL is the API's
@@ -265,6 +270,18 @@ func (b *Client) MergePull(pull models.PullRequest, pullOptions models.PullReque
 	}
 	path = fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d/merge?version=%d", b.BaseURL, projectKey, pull.BaseRepo.Name, pull.Num, *pullResp.Version)
 	_, err = b.makeRequest("POST", path, nil)
+	if err != nil {
+		return err
+	}
+	if pullOptions.DeleteSourceBranchOnMerge {
+		bodyBytes, err := json.Marshal(DeleteBranch{Name: "refs/heads/" + pull.HeadBranch, DryRun: false})
+		if err != nil {
+			return errors.Wrap(err, "json encoding")
+		}
+
+		path = fmt.Sprintf("%s/rest/branch-utils/1.0/projects/%s/repos/%s/branches", b.BaseURL, projectKey, pull.BaseRepo.Name)
+		_, err = b.makeRequest("DELETE", path, bytes.NewBuffer(bodyBytes))
+	}
 	return err
 }
 
