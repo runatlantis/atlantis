@@ -13,7 +13,7 @@ RUN curl -LOks https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/ter
     rm terraform_${TERRAFORM_VERSION}_linux_amd64.zip
 
 # Install conftest
-ENV DEFAULT_CONFTEST_VERSION=0.25.0
+ENV DEFAULT_CONFTEST_VERSION=0.27.0
 
 RUN AVAILABLE_CONFTEST_VERSIONS="${DEFAULT_CONFTEST_VERSION}" && \
     for VERSION in ${AVAILABLE_CONFTEST_VERSIONS}; do \
