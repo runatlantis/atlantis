@@ -9,14 +9,17 @@ RUN curl -LOks https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/ter
     rm terraform_${TERRAFORM_VERSION}_linux_amd64.zip
 
 # Install conftest
-ENV CONFTEST_VERSION=0.27.0
-RUN curl -LOs https://github.com/open-policy-agent/conftest/releases/download/v$CONFTEST_VERSION}/conftest_$CONFTEST_VERSION}_Linux_x86_64.tar.gz && \
-    curl -LOs https://github.com/open-policy-agent/conftest/releases/download/v$CONFTEST_VERSION}/checksums.txt && \
-    sed -n "/conftest_$CONFTEST_VERSION}_Linux_x86_64.tar.gz/p" checksums.txt | sha256sum -c && \
-    sudo mkdir -p /usr/local/bin/cft/versions/$CONFTEST_VERSION} && \
-    sudo tar -C  /usr/local/bin/cft/versions/$CONFTEST_VERSION} -xzf conftest_$CONFTEST_VERSION}_Linux_x86_64.tar.gz && \
-    sudo ln -s /usr/local/bin/cft/versions/$CONFTEST_VERSION}/conftest /usr/local/bin/conftest$CONFTEST_VERSION} && \
-    rm conftest_$CONFTEST_VERSION}_Linux_x86_64.tar.gz && \
-    rm checksums.txt
+ENV DEFAULT_CONFTEST_VERSION=0.27.0
+RUN AVAILABLE_CONFTEST_VERSIONS="${DEFAULT_CONFTEST_VERSION}" && \
+    for VERSION in ${AVAILABLE_CONFTEST_VERSIONS}; do \
+        curl -LOs https://github.com/open-policy-agent/conftest/releases/download/v${VERSION}/conftest_${VERSION}_Linux_x86_64.tar.gz && \
+        curl -LOs https://github.com/open-policy-agent/conftest/releases/download/v${VERSION}/checksums.txt && \
+        sed -n "/conftest_${VERSION}_Linux_x86_64.tar.gz/p" checksums.txt | sha256sum -c && \
+        sudo mkdir -p /usr/local/bin/cft/versions/${VERSION} && \
+        sudo tar -C  /usr/local/bin/cft/versions/${VERSION} -xzf conftest_${VERSION}_Linux_x86_64.tar.gz && \
+        sudo ln -s /usr/local/bin/cft/versions/${VERSION}/conftest /usr/local/bin/conftest${VERSION} && \
+        rm conftest_${VERSION}_Linux_x86_64.tar.gz && \
+        rm checksums.txt; \
+    done
 
 RUN go get golang.org/x/tools/cmd/goimports
