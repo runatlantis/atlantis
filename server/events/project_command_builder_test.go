@@ -855,10 +855,10 @@ projects:
 	nonExactSymbols := []string{">", ">=", "<", "<=", "~>"}
 	nonExactVersions := map[string]map[string][]int{
 		">": {
-			"project1": {1, 0, 5},
+			"project1": {1, 0, 6},
 		},
 		">=": {
-			"project1": {1, 0, 5},
+			"project1": {1, 0, 6},
 		},
 		"<": {
 			"project1": {0, 12, 7},
