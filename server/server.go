@@ -309,6 +309,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DisableMarkdownFolding:   userConfig.DisableMarkdownFolding,
 		DisableApply:             userConfig.DisableApply,
 		DisableRepoLocking:       userConfig.DisableRepoLocking,
+		EnableDiffMarkdownFormat: userConfig.EnableDiffMarkdownFormat,
 	}
 
 	boltdb, err := db.New(userConfig.DataDir)
@@ -599,6 +600,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
 		EventParser:                   eventParser,
 		Logger:                        logger,
+		GlobalCfg:                     globalCfg,
 		AllowForkPRs:                  userConfig.AllowForkPRs,
 		AllowForkPRsFlag:              config.AllowForkPRsFlag,
 		SilenceForkPRErrors:           userConfig.SilenceForkPRErrors,

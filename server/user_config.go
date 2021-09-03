@@ -30,6 +30,7 @@ type UserConfig struct {
 	DisableRepoLocking         bool   `mapstructure:"disable-repo-locking"`
 	EnablePolicyChecksFlag     bool   `mapstructure:"enable-policy-checks"`
 	EnableRegExpCmd            bool   `mapstructure:"enable-regexp-cmd"`
+	EnableDiffMarkdownFormat   bool   `mapstructure:"enable-diff-markdown-format"`
 	GithubHostname             string `mapstructure:"gh-hostname"`
 	GithubToken                string `mapstructure:"gh-token"`
 	GithubUser                 string `mapstructure:"gh-user"`

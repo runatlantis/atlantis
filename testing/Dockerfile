@@ -2,10 +2,10 @@
 # We need terraform installed for our full test suite so it installs that.
 # It's updated by running make build-testing-image which will also push a new
 # image.
-FROM circleci/golang:1.16
+FROM circleci/golang:1.17
 
 # Install Terraform
-ENV TERRAFORM_VERSION=1.0.5
+ENV TERRAFORM_VERSION=1.0.6
 RUN curl -LOks https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip && \
     sudo mkdir -p /usr/local/bin/tf/versions/${TERRAFORM_VERSION} && \
     sudo unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip -d /usr/local/bin/tf/versions/${TERRAFORM_VERSION} && \
