@@ -5,6 +5,8 @@ on:
     paths:
       - ./testing/**
       - .github/workflows/testing-env-image.yml
+    branches:
+      - "master"
   workflow_dispatch:
 
 defaults:
