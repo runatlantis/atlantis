@@ -6,7 +6,7 @@ on:
       - 'testing/**'
       - '.github/workflows/testing-env-image.yml'
     branches:
-      - 'update-e2e-dockerfile'
+      - 'master'
   workflow_dispatch:
 
 defaults:
