@@ -30,7 +30,7 @@ type Client struct {
 	AtlantisURL string
 }
 
-type DeleteBranch struct {
+type DeleteSourceBranch struct {
 	Name   string `json:"name"`
 	DryRun bool   `json:"dryRun"`
 }
@@ -274,7 +274,7 @@ func (b *Client) MergePull(pull models.PullRequest, pullOptions models.PullReque
 		return err
 	}
 	if pullOptions.DeleteSourceBranchOnMerge {
-		bodyBytes, err := json.Marshal(DeleteBranch{Name: "refs/heads/" + pull.HeadBranch, DryRun: false})
+		bodyBytes, err := json.Marshal(DeleteSourceBranch{Name: "refs/heads/" + pull.HeadBranch, DryRun: false})
 		if err != nil {
 			return errors.Wrap(err, "json encoding")
 		}
