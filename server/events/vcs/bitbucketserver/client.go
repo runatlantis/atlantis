@@ -281,6 +281,9 @@ func (b *Client) MergePull(pull models.PullRequest, pullOptions models.PullReque
 
 		path = fmt.Sprintf("%s/rest/branch-utils/1.0/projects/%s/repos/%s/branches", b.BaseURL, projectKey, pull.BaseRepo.Name)
 		_, err = b.makeRequest("DELETE", path, bytes.NewBuffer(bodyBytes))
+		if err != nil {
+			return err
+		}
 	}
 	return err
 }
