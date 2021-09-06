@@ -42,16 +42,12 @@ func (r *MultiEnvStepRunner) Run(ctx models.ProjectCommandContext, command strin
 						sb.WriteString("\n")
 					}
 					return sb.String(), nil
-				} else {
-					return "No dynamic environment variable added", nil
 				}
-			} else {
-				return callerResult.ErrorMessage, nil
+				return "No dynamic environment variable added", nil
 			}
-		} else {
-			return "Parsing the json result of the multienv step failed, json content: " + res, err
+			return callerResult.ErrorMessage, nil
 		}
-	} else {
-		return "", err
+		return "Parsing the json result of the multienv step failed, json content: " + res, err
 	}
+	return "", err
 }
