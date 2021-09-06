@@ -808,7 +808,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 func mkSubDir(parentDir string, subDir string) (string, error) {
 	fullDir := filepath.Join(parentDir, subDir)
 	if err := os.MkdirAll(fullDir, 0700); err != nil {
-		return "", errors.Wrapf(err, "unable to creare dir %q", fullDir)
+		return "", errors.Wrapf(err, "unable to create dir %q", fullDir)
 	}
 
 	return fullDir, nil
