@@ -98,7 +98,7 @@ require (
 	github.com/urfave/negroni v0.3.0
 	github.com/warrensbox/terraform-switcher v0.1.1-0.20210812002608-b9e469344b28
 	github.com/xanzy/go-gitlab v0.50.4
-	github.com/zclconf/go-cty v1.5.1 // indirect
+	github.com/zclconf/go-cty v1.8.0 // indirect
 	go.etcd.io/bbolt v1.3.6
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
@@ -127,7 +127,4 @@ require (
 	gotest.tools v2.2.0+incompatible // indirect
 )
 
-require (
-	github.com/apparentlymart/go-textseg/v13 v13.0.0 // indirect
-	github.com/zclconf/go-cty v1.8.0 // indirect
-)
+require github.com/apparentlymart/go-textseg/v13 v13.0.0 // indirect
