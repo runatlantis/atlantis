@@ -485,10 +485,10 @@ github.com/vmihailenco/msgpack/v4 v4.3.12/go.mod h1:gborTTJjAo/GWTqqRjrLCn9pgNN+
 github.com/vmihailenco/tagparser v0.1.1/go.mod h1:OeAg3pn3UbLjkWt+rN9oFYB6u/cQgqMEUPoW2WPyhdI=
 github.com/warrensbox/terraform-switcher v0.1.1-0.20210812002608-b9e469344b28 h1:MR55b6ALQxGtUJCWNZqT1T8+0/IewScSZ96sAFTggiQ=
 github.com/warrensbox/terraform-switcher v0.1.1-0.20210812002608-b9e469344b28/go.mod h1:LHlAMXsZCue9iGNkt+AwZ5HPntUdjOn7RZLXl8DdMGA=
-github.com/xanzy/go-gitlab v0.50.3 h1:M7ncgNhCN4jaFNyXxarJhCLa9Qi6fdmCxFFhMTQPZiY=
-github.com/xanzy/go-gitlab v0.50.3/go.mod h1:Q+hQhV508bDPoBijv7YjK/Lvlb4PhVhJdKqXVQrUoAE=
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
 github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
+github.com/xanzy/go-gitlab v0.50.4 h1:DA0+D9eTBnZvrGBOQ66XV4ZV9gOFXKbbgm9L99EKCUs=
+github.com/xanzy/go-gitlab v0.50.4/go.mod h1:Q+hQhV508bDPoBijv7YjK/Lvlb4PhVhJdKqXVQrUoAE=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

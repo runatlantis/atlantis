@@ -3,10 +3,10 @@ name: testing-env-image
 on:
   push:
     paths:
-      - ./testing/**
-      - .github/workflows/testing-env-image.yml
+      - 'testing/**'
+      - '.github/workflows/testing-env-image.yml'
     branches:
-      - "master"
+      - 'master'
   workflow_dispatch:
 
 defaults:
