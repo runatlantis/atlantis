@@ -676,7 +676,6 @@ type ProjectCmdOutputLine struct {
 	Line string
 
 	ClearBuffBefore bool
-	ClearBuffAfter  bool
 }
 
 // String returns the string representation of c.
