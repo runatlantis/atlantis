@@ -671,7 +671,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		LogStreamTemplate:           templates.LogStreamingTemplate,
 		LogStreamErrorTemplate:      templates.LogStreamErrorTemplate,
 		Db:                          boltdb,
-		WebsocketHandler:            handlers.NewWebsocketHandler(),
+		WebsocketHandler:            handlers.NewWebsocketHandler(logger),
 		ProjectCommandOutputHandler: projectCmdOutputHandler,
 	}
 

@@ -20,7 +20,7 @@ func TestGetLogStream_WebSockets(t *testing.T) {
 		websocketMock := mocks.NewMockWebsocketHandler()
 		projectOutputHandler := mocks.NewMockProjectCommandOutputHandler()
 		logger := logging.NewNoopLogger(t)
-		websocketWriterMock := mocks.NewMockWebsocketResponseWriter()
+		webSocketWrapper := mocks.NewMockWebsocketConnectionWrapper()
 		params := map[string]string{
 			"org":     "test-org",
 			"repo":    "test-repo",
@@ -36,10 +36,10 @@ func TestGetLogStream_WebSockets(t *testing.T) {
 			ProjectCommandOutputHandler: projectOutputHandler,
 		}
 
-		When(websocketMock.Upgrade(matchers.AnyHttpResponseWriter(), matchers.AnyPtrToHttpRequest(), matchers.AnyHttpHeader())).ThenReturn(websocketWriterMock, nil)
+		When(websocketMock.Upgrade(matchers.AnyHttpResponseWriter(), matchers.AnyPtrToHttpRequest(), matchers.AnyHttpHeader())).ThenReturn(webSocketWrapper, nil)
 
 		logStreamingController.GetLogStreamWS(response, request)
 
-		websocketWriterMock.VerifyWasCalled(Once())
+		webSocketWrapper.VerifyWasCalled(Once())
 	})
 }
