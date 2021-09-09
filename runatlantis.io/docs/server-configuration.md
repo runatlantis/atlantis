@@ -560,6 +560,12 @@ Values are chosen in this order:
   This is useful when running multiple Atlantis servers against a single repository so you can
   delegate work to each Atlantis server. Also useful when used with pre_workflow_hooks to dynamically generate an `atlantis.yaml` file.
 
+* ### `--silence-vcs-status-no-plans`
+  ```bash
+  atlantis server --silence-vcs-status-no-plans
+  ```
+  `--silence-vcs-status-no-plans` will tell Atlantis to ignore setting VCS status if none of the modified files are part of a project defined in the `atlantis.yaml` file.
+
 * ### `--skip-clone-no-changes`
   ```bash
   atlantis server --skip-clone-no-changes
