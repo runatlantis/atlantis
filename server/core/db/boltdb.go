@@ -277,7 +277,7 @@ func (b *BoltDB) List() ([]models.ProjectLock, error) {
 	return locks, nil
 }
 
-func (b *BoltDB) GetQueues() (map[string][]models.ProjectLock, error) {
+func (b *BoltDB) ListQueues() (map[string][]models.ProjectLock, error) {
 	var locks []models.ProjectLock
 	locks, _ = b.List()
 	var queues map[string][]models.ProjectLock
@@ -304,6 +304,30 @@ func (b *BoltDB) GetQueues() (map[string][]models.ProjectLock, error) {
 
 	}
 	return queues, err
+}
+
+func (b *BoltDB) GetQueueByLock(project models.Project, workspace string) ([]models.ProjectLock, error) {
+
+	var queue []models.ProjectLock = make([]models.ProjectLock, 0)
+
+	err := b.db.View(func(tx *bolt.Tx) error {
+		// construct lock key
+		key := b.lockKey(project, workspace)
+		queueBucket := tx.Bucket(b.queueBucketName)
+		currQueueSerialized := queueBucket.Get([]byte(key))
+		var currQueue []models.ProjectLock
+		if err := json.Unmarshal(currQueueSerialized, &currQueue); err != nil {
+			return errors.Wrapf(err, "failed to deserialize queue for lock %s", queue)
+		}
+		copy(queue[:], currQueue)
+
+		return nil
+	})
+	if err != nil {
+		return queue, errors.Wrap(err, "DB transaction failed while fetching Queue")
+
+	}
+	return queue, err
 }
 
 // LockCommand attempts to create a new lock for a CommandName.

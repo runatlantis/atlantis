@@ -78,11 +78,9 @@ func (l *LocksController) GetLock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var queuesMap map[string][]models.ProjectLock
-	// TODO @amir-elgayed add a function in bolddb.go that gets queue by lock instead
-	queuesMap, _ = l.Locker.ListQueues()
+	// get queues locks for this lock details page
 	var queue []models.ProjectLock
-	queue = queuesMap[fmt.Sprintf("%s/%s/%s", lock.Project.RepoFullName, lock.Project.Path, lock.Workspace)]
+	queue, _ = l.Locker.GetQueueByLock(lock.Project, lock.Workspace)
 	var lockDetailQueue []templates.QueueItemIndexData
 
 	if queue != nil {
