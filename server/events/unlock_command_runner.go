@@ -32,8 +32,12 @@ func (u *UnlockCommandRunner) Run(
 	baseRepo := ctx.Pull.BaseRepo
 	pullNum := ctx.Pull.Num
 
+	vcsMessage := "All Atlantis locks for this PR have been unlocked and plans discarded"
 	numLocks, dequeueStatus, err := u.deleteLockCommand.DeleteLocksByPull(baseRepo.FullName, pullNum)
-	vcsMessage := prepareUnlockedVcsMessage(dequeueStatus, err, ctx)
+	if err != nil {
+		vcsMessage = "Failed to delete PR locks"
+		ctx.Log.Err("failed to delete locks by pull %s", err.Error())
+	}
 
 	// if there are no locks to delete, no errors, and SilenceNoProjects is enabled, don't comment
 	if err == nil && numLocks == 0 && u.SilenceNoProjects {
@@ -56,16 +60,4 @@ func (u *UnlockCommandRunner) triggerPlansForDequeuedPRs(ctx *CommandContext, de
 			ctx.Log.Err("unable to comment on PR %s: %s", lock.Pull.Num, commentErr)
 		}
 	}
-}
-
-func prepareUnlockedVcsMessage(dequeueStatus models.DequeueStatus, err error, ctx *CommandContext) string {
-	vcsMessage := "All Atlantis locks for this PR have been unlocked and plans discarded"
-	if len(dequeueStatus.ProjectLocks) > 0 {
-		vcsMessage = vcsMessage + dequeueStatus.String()
-	}
-	if err != nil {
-		vcsMessage = "Failed to delete PR locks"
-		ctx.Log.Err("failed to delete locks by pull %s", err.Error())
-	}
-	return vcsMessage
 }
