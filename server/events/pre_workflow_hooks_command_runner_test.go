@@ -74,7 +74,7 @@ func TestRunPreHooks_Clone(t *testing.T) {
 	t.Run("success hooks in cfg", func(t *testing.T) {
 		preWorkflowHooksSetup(t)
 
-		var unlockCalled *bool = newBool(false)
+		var unlockCalled = newBool(false)
 		unlockFn := func() {
 			unlockCalled = newBool(true)
 		}
@@ -159,7 +159,7 @@ func TestRunPreHooks_Clone(t *testing.T) {
 	t.Run("error cloning", func(t *testing.T) {
 		preWorkflowHooksSetup(t)
 
-		var unlockCalled *bool = newBool(false)
+		var unlockCalled = newBool(false)
 		unlockFn := func() {
 			unlockCalled = newBool(true)
 		}
@@ -191,7 +191,7 @@ func TestRunPreHooks_Clone(t *testing.T) {
 	t.Run("error running pre hook", func(t *testing.T) {
 		preWorkflowHooksSetup(t)
 
-		var unlockCalled *bool = newBool(false)
+		var unlockCalled = newBool(false)
 		unlockFn := func() {
 			unlockCalled = newBool(true)
 		}
