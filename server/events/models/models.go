@@ -17,7 +17,6 @@
 package models
 
 import (
-	"bytes"
 	"fmt"
 	"net/url"
 	paths "path"
@@ -706,32 +705,3 @@ type DequeueStatus struct {
 	ProjectLocks []ProjectLock
 }
 
-func (dequeueStatus DequeueStatus) String() string {
-	b := new(bytes.Buffer)
-	for _, value := range dequeueStatus.ProjectLocks {
-		// TODO monikma sometimes the PR gets a number = 0 and empty values, and then this fails. Find out when this happens and maybe find a proper solution.
-		if value.Pull.Num > 0 {
-			fmt.Fprintf(b,
-				"%s: PR %s (by @%s)\n",
-				value.Project.Path,
-				value.Pull.URL,
-				value.Pull.Author)
-		}
-	}
-	return "\n\nTriggered plans for the queued PRs:\n" + b.String()
-}
-
-func (dequeueStatus DequeueStatus) StringFilterProject(project string) string { // TODO monikma remove code duplication with the method above
-	b := new(bytes.Buffer)
-	for _, value := range dequeueStatus.ProjectLocks {
-		// TODO monikma sometimes the PR gets a number = 0 and empty values, and then this fails. Find out when this happens and maybe find a proper solution.
-		if value.Pull.Num > 0 && value.Project.Path == project {
-			fmt.Fprintf(b,
-				"%s: PR %s (by @%s)\n",
-				value.Project.Path,
-				value.Pull.URL,
-				value.Pull.Author)
-		}
-	}
-	return "\n\nTriggered plans for the queued PRs:\n" + b.String()
-}
