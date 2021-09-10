@@ -288,10 +288,6 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
 	return err
 }
 
-func (g *AzureDevopsClient) SyncPull(repo models.Repo, pull models.PullRequest) error {
-	return fmt.Errorf("not implemented")
-}
-
 // MergePull merges the merge request using the default no fast-forward strategy
 // If the user has set a branch policy that disallows no fast-forward, the merge will fail
 // until we handle branch policies
