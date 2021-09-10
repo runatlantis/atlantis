@@ -136,25 +136,6 @@ func (mock *MockBackend) UnlockByPull(repoFullName string, pullNum int) ([]model
 	return ret0, ret1, ret2
 }
 
-func (mock *MockBackend) ListQueues() (map[string][]models.ProjectLock, error) {
-	if mock == nil {
-		panic("mock must not be nil. Use myMock := NewMockBackend().")
-	}
-	params := []pegomock.Param{}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("ListQueues", params, []reflect.Type{reflect.TypeOf((*map[string][]models.ProjectLock)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 map[string][]models.ProjectLock
-	var ret1 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(map[string][]models.ProjectLock)
-		}
-		if result[1] != nil {
-			ret1 = result[1].(error)
-		}
-	}
-	return ret0, ret1
-}
-
 func (mock *MockBackend) GetQueueByLock(project models.Project, workspace string) ([]models.ProjectLock, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockBackend().")
@@ -399,23 +380,6 @@ func (c *MockBackend_UnlockByPull_OngoingVerification) GetAllCapturedArguments()
 		}
 	}
 	return
-}
-
-func (verifier *VerifierMockBackend) ListQueues() *MockBackend_ListQueues_OngoingVerification {
-	params := []pegomock.Param{}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ListQueues", params, verifier.timeout)
-	return &MockBackend_ListQueues_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
-}
-
-type MockBackend_ListQueues_OngoingVerification struct {
-	mock              *MockBackend
-	methodInvocations []pegomock.MethodInvocation
-}
-
-func (c *MockBackend_ListQueues_OngoingVerification) GetCapturedArguments() {
-}
-
-func (c *MockBackend_ListQueues_OngoingVerification) GetAllCapturedArguments() {
 }
 
 func (verifier *VerifierMockBackend) GetQueueByLock(project models.Project, workspace string) *MockBackend_GetQueueByLock_OngoingVerification {

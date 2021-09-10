@@ -63,7 +63,6 @@ type ApplyLockData struct {
 // IndexData holds the data for rendering the index page
 type IndexData struct {
 	Locks           []LockIndexData
-	Queues          map[string][]QueueItemIndexData
 	ApplyLock       ApplyLockData
 	AtlantisVersion string
 	// CleanedBasePath is the path Atlantis is accessible at externally. If

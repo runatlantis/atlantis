@@ -33,7 +33,6 @@ type Backend interface {
 	GetLock(project models.Project, workspace string) (*models.ProjectLock, error)
 	UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, models.DequeueStatus, error)
 
-	ListQueues() (map[string][]models.ProjectLock, error)
 	GetQueueByLock(project models.Project, workspace string) ([]models.ProjectLock, error)
 
 	LockCommand(cmdName models.CommandName, lockTime time.Time) (*models.CommandLock, error)
@@ -64,7 +63,6 @@ type Locker interface {
 	TryLock(p models.Project, workspace string, pull models.PullRequest, user models.User) (TryLockResponse, error)
 	Unlock(key string) (*models.ProjectLock, *models.ProjectLock, error)
 	List() (map[string]models.ProjectLock, error)
-	ListQueues() (map[string][]models.ProjectLock, error)
 	GetQueueByLock(project models.Project, workspace string) ([]models.ProjectLock, error)
 	UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, models.DequeueStatus, error)
 	GetLock(key string) (*models.ProjectLock, error)
@@ -122,13 +120,6 @@ func (c *Client) List() (map[string]models.ProjectLock, error) {
 	return m, nil
 }
 
-// ListQueues returns a map of all lock queues (a lock queue is a list of locks)
-// with their lock key as map key
-func (c *Client) ListQueues() (map[string][]models.ProjectLock, error) {
-	return c.backend.ListQueues()
-}
-
-//
 func (c *Client) GetQueueByLock(project models.Project, workspace string) ([]models.ProjectLock, error) {
 	return c.backend.GetQueueByLock(project, workspace)
 }
@@ -194,13 +185,6 @@ func (c *NoOpLocker) Unlock(key string) (*models.ProjectLock, *models.ProjectLoc
 // The lock key can be used in GetLock() and Unlock().
 func (c *NoOpLocker) List() (map[string]models.ProjectLock, error) {
 	m := make(map[string]models.ProjectLock)
-	return m, nil
-}
-
-// ListQueues returns a map of all lock queues (a lock queue is a list of locks)
-// with their lock key as map key
-func (c *NoOpLocker) ListQueues() (map[string][]models.ProjectLock, error) {
-	m := make(map[string][]models.ProjectLock)
 	return m, nil
 }
 

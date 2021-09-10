@@ -277,50 +277,16 @@ func (b *BoltDB) List() ([]models.ProjectLock, error) {
 	return locks, nil
 }
 
-func (b *BoltDB) ListQueues() (map[string][]models.ProjectLock, error) {
-	var locks []models.ProjectLock
-	locks, _ = b.List()
-	var queues map[string][]models.ProjectLock
-	queues = make(map[string][]models.ProjectLock)
-
-	err := b.db.View(func(tx *bolt.Tx) error {
-		for _, lock := range locks {
-			// construct lock key
-			key := b.lockKey(lock.Project, lock.Workspace)
-			queueBucket := tx.Bucket(b.queueBucketName)
-			currQueueSerialized := queueBucket.Get([]byte(key))
-			var currQueue []models.ProjectLock
-			if err := json.Unmarshal(currQueueSerialized, &currQueue); err != nil {
-				return errors.Wrapf(err, "failed to deserialize queue for lock %q", lock)
-			}
-			queues[key] = currQueue
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return queues, errors.Wrap(err, "DB transaction failed while fetching Queues")
-
-	}
-	return queues, err
-}
-
 func (b *BoltDB) GetQueueByLock(project models.Project, workspace string) ([]models.ProjectLock, error) {
-
-	var queue []models.ProjectLock = make([]models.ProjectLock, 0)
-
+	var queue []models.ProjectLock
 	err := b.db.View(func(tx *bolt.Tx) error {
 		// construct lock key
 		key := b.lockKey(project, workspace)
 		queueBucket := tx.Bucket(b.queueBucketName)
 		currQueueSerialized := queueBucket.Get([]byte(key))
-		var currQueue []models.ProjectLock
-		if err := json.Unmarshal(currQueueSerialized, &currQueue); err != nil {
+		if err := json.Unmarshal(currQueueSerialized, &queue); err != nil {
 			return errors.Wrapf(err, "failed to deserialize queue for lock %q", queue)
 		}
-		copy(queue[:], currQueue)
-
 		return nil
 	})
 	if err != nil {

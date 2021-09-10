@@ -14,7 +14,6 @@
 package db_test
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -46,8 +45,8 @@ var lock = models.ProjectLock{
 	Time:      time.Now(),
 }
 
-func TestListQueues(t *testing.T) {
-	t.Log("Listing queues")
+func TestGetQueueByLock(t *testing.T) {
+	t.Log("Getting Queue By Lock")
 	db, b := newTestDB()
 	defer cleanupDB(db)
 
@@ -59,9 +58,7 @@ func TestListQueues(t *testing.T) {
 	lock2.Pull.Num = 3
 	b.TryLock(lock2) // this lock should be queued
 
-	queues, _ := b.ListQueues()
-	Equals(t, 1, len(queues))
-	queue := queues[fmt.Sprintf("%s/%s/%s", lock.Project.RepoFullName, lock.Project.Path, lock.Workspace)]
+	queue, _ := b.GetQueueByLock(lock.Project, lock.Workspace)
 	Equals(t, 2, len(queue))
 }
 
