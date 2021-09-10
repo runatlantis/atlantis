@@ -49,6 +49,9 @@ func (u *UnlockCommandRunner) Run(
 	u.commentOnDequeuedPullRequests(ctx, dequeueStatus, baseRepo)
 }
 
+// TODO(Ghais) extract to a common interface and use when:
+//  * Pull request is closed: server/events/pull_closed_executor.go:106
+//  * Unlocked from the UI
 func (u *UnlockCommandRunner) commentOnDequeuedPullRequests(ctx *CommandContext, dequeueStatus models.DequeueStatus, baseRepo models.Repo) {
 	locksByPullRequest := groupByPullRequests(dequeueStatus.ProjectLocks)
 	for pullRequestNumber, projectLocks := range locksByPullRequest {

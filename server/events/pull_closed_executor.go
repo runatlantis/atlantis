@@ -102,6 +102,7 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 	return commentErr
 }
 
+// TODO(Ghais) replace with same logic in server/events/unlock_command_runner.go:52
 func (p *PullClosedExecutor) triggerPlansForDequeuedPRs(repo models.Repo, dequeueStatus models.DequeueStatus, commentErr error) error {
 	// TODO monikma #4 use exact dequeued comment instead of hardcoding it
 	for _, lock := range dequeueStatus.ProjectLocks {
