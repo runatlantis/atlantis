@@ -42,7 +42,7 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
-	github.com/hashicorp/go-getter v1.5.7
+	github.com/hashicorp/go-getter v1.5.8
 	github.com/hashicorp/go-retryablehttp v0.6.8 // indirect
 	github.com/hashicorp/go-safetemp v1.0.0 // indirect
 	github.com/hashicorp/go-version v1.3.0
