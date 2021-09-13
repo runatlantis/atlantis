@@ -85,6 +85,13 @@ type ProjectApprovePoliciesCommandBuilder interface {
 	BuildApprovePoliciesCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error)
 }
 
+type ProjectVersionCommandBuilder interface {
+	// BuildVersionCommands builds project Version commands for this ctx and comment. If
+	// comment doesn't specify one project then there may be multiple commands
+	// to be run.
+	BuildVersionCommands(ctx *CommandContext, comment *CommentCommand) ([]models.ProjectCommandContext, error)
+}
+
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
 
 // ProjectCommandBuilder builds commands that run on individual projects.
@@ -92,6 +99,7 @@ type ProjectCommandBuilder interface {
 	ProjectPlanCommandBuilder
 	ProjectApplyCommandBuilder
 	ProjectApprovePoliciesCommandBuilder
+	ProjectVersionCommandBuilder
 }
 
 // DefaultProjectCommandBuilder implements ProjectCommandBuilder.
@@ -109,6 +117,7 @@ type DefaultProjectCommandBuilder struct {
 	SkipCloneNoChanges           bool
 	EnableRegExpCmd              bool
 	AutoplanFileList             string
+	EnableDiffMarkdownFormat     bool
 }
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
@@ -148,6 +157,14 @@ func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *CommandContext, c
 
 func (p *DefaultProjectCommandBuilder) BuildApprovePoliciesCommands(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
 	return p.buildAllProjectCommands(ctx, cmd)
+}
+
+func (p *DefaultProjectCommandBuilder) BuildVersionCommands(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+	if !cmd.IsForSpecificProject() {
+		return p.buildAllProjectCommands(ctx, cmd)
+	}
+	pac, err := p.buildProjectVersionCommand(ctx, cmd)
+	return pac, err
 }
 
 // buildPlanAllCommands builds plan contexts for all projects we determine were
@@ -292,7 +309,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *CommandConte
 	defer unlockFn()
 
 	ctx.Log.Debug("cloning repository")
-	repoDir, _, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
+	_, _, err = p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
 	if err != nil {
 		return pcc, err
 	}
@@ -302,12 +319,19 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *CommandConte
 		repoRelDir = cmd.RepoRelDir
 	}
 
+	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
+	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
+	defaultRepoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
+	if err != nil {
+		return pcc, err
+	}
+
 	return p.buildProjectCommandCtx(
 		ctx,
 		models.PlanCommand,
 		cmd.ProjectName,
 		cmd.Flags,
-		repoDir,
+		defaultRepoDir,
 		repoRelDir,
 		workspace,
 		cmd.Verbose,
@@ -387,9 +411,16 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommands(ctx *CommandConte
 		return nil, err
 	}
 
+	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
+	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
+	defaultRepoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
+	if err != nil {
+		return nil, err
+	}
+
 	var cmds []models.ProjectCommandContext
 	for _, plan := range plans {
-		commentCmds, err := p.buildProjectCommandCtx(ctx, commentCmd.CommandName(), plan.ProjectName, commentCmd.Flags, plan.RepoDir, plan.RepoRelDir, plan.Workspace, commentCmd.Verbose)
+		commentCmds, err := p.buildProjectCommandCtx(ctx, commentCmd.CommandName(), plan.ProjectName, commentCmd.Flags, defaultRepoDir, plan.RepoRelDir, plan.Workspace, commentCmd.Verbose)
 		if err != nil {
 			return nil, errors.Wrapf(err, "building command for dir %q", plan.RepoRelDir)
 		}
@@ -413,7 +444,9 @@ func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *CommandCont
 	}
 	defer unlockFn()
 
-	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, workspace)
+	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
+	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
+	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
 	if os.IsNotExist(errors.Cause(err)) {
 		return projCtx, errors.New("no working directory found–did you run plan?")
 	} else if err != nil {
@@ -428,6 +461,47 @@ func (p *DefaultProjectCommandBuilder) buildProjectApplyCommand(ctx *CommandCont
 	return p.buildProjectCommandCtx(
 		ctx,
 		models.ApplyCommand,
+		cmd.ProjectName,
+		cmd.Flags,
+		repoDir,
+		repoRelDir,
+		workspace,
+		cmd.Verbose,
+	)
+}
+
+// buildProjectVersionCommand builds a version command for the single project
+// identified by cmd.
+func (p *DefaultProjectCommandBuilder) buildProjectVersionCommand(ctx *CommandContext, cmd *CommentCommand) ([]models.ProjectCommandContext, error) {
+	workspace := DefaultWorkspace
+	if cmd.Workspace != "" {
+		workspace = cmd.Workspace
+	}
+
+	var projCtx []models.ProjectCommandContext
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace)
+	if err != nil {
+		return projCtx, err
+	}
+	defer unlockFn()
+
+	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
+	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
+	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
+	if os.IsNotExist(errors.Cause(err)) {
+		return projCtx, errors.New("no working directory found–did you run plan?")
+	} else if err != nil {
+		return projCtx, err
+	}
+
+	repoRelDir := DefaultRepoRelDir
+	if cmd.RepoRelDir != "" {
+		repoRelDir = cmd.RepoRelDir
+	}
+
+	return p.buildProjectCommandCtx(
+		ctx,
+		models.VersionCommand,
 		cmd.ProjectName,
 		cmd.Flags,
 		repoDir,
@@ -455,12 +529,10 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 	var projCtxs []models.ProjectCommandContext
 	var projCfg valid.MergedProjectCfg
 	automerge := DefaultAutomergeEnabled
-	deleteBranchOnMerge := DefaultDeleteSourceBranchOnMerge
 	parallelApply := DefaultParallelApplyEnabled
 	parallelPlan := DefaultParallelPlanEnabled
 	if repoCfgPtr != nil {
 		automerge = repoCfgPtr.Automerge
-		deleteBranchOnMerge = projCfg.DeleteSourceBranchOnMerge
 		parallelApply = repoCfgPtr.ParallelApply
 		parallelPlan = repoCfgPtr.ParallelPlan
 	}
@@ -483,7 +555,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 					commentFlags,
 					repoDir,
 					automerge,
-					deleteBranchOnMerge,
+					projCfg.DeleteSourceBranchOnMerge,
 					parallelApply,
 					parallelPlan,
 					verbose,
@@ -499,7 +571,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *CommandContex
 				commentFlags,
 				repoDir,
 				automerge,
-				deleteBranchOnMerge,
+				projCfg.DeleteSourceBranchOnMerge,
 				parallelApply,
 				parallelPlan,
 				verbose,

@@ -1,0 +1,22 @@
+Ran Apply for dir: `.` workspace: `default`
+
+<details><summary>Show Output</summary>
+
+```diff
+null_resource.simple:
+null_resource.simple:
+null_resource.simple:
+null_resource.simple:
+null_resource.simple:
+null_resource.simple:
+
+Apply complete! Resources: 3 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+var = "default_workspace"
+workspace = "default"
+
+```
+</details>
+

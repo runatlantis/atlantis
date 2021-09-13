@@ -58,15 +58,19 @@ func NewAzureDevopsClient(hostname string, userName string, token string) (*Azur
 func (g *AzureDevopsClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	var files []string
 
+	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 	opts := azuredevops.PullRequestGetOptions{
 		IncludeWorkItemRefs: true,
 	}
-	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
-	commitIDResponse, _, _ := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, pull.Num, &opts)
+	pullRequest, _, _ := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, pull.Num, &opts)
 
-	commitID := commitIDResponse.GetLastMergeSourceCommit().GetCommitID()
+	targetRefName := strings.Replace(pullRequest.GetTargetRefName(), "refs/heads/", "", 1)
+	sourceRefName := strings.Replace(pullRequest.GetSourceRefName(), "refs/heads/", "", 1)
 
-	r, _, _ := g.Client.Git.GetChanges(g.ctx, owner, project, repoName, commitID)
+	r, resp, err := g.Client.Git.GetDiffs(g.ctx, owner, project, repoName, targetRefName, sourceRefName)
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.Wrapf(err, "http response code %d getting diff %s to %s", resp.StatusCode, sourceRefName, targetRefName)
+	}
 
 	for _, change := range r.Changes {
 		item := change.GetItem()
@@ -100,18 +104,18 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 	// maxCommentLength is the maximum number of chars allowed in a single comment
 	// This length was copied from the Github client - haven't found documentation
 	// or tested limit in Azure DevOps.
-	const maxCommentLength = 65536
+	const maxCommentLength = 150000
 
 	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
-	for _, c := range comments {
+	for i := range comments {
 		commentType := "text"
 		parentCommentID := 0
 
 		prComment := azuredevops.Comment{
 			CommentType:     &commentType,
-			Content:         &c,
+			Content:         &comments[i],
 			ParentCommentID: &parentCommentID,
 		}
 		prComments := []*azuredevops.Comment{&prComment}

@@ -86,7 +86,7 @@ Take the URL that ngrok output and create a webhook in your GitHub, GitLab or Bi
     <summary>Expand</summary>
     <ul>
         <li>Go to your repo's home page</li>
-        <li>Click <strong>Settings &gt; Integrations</strong> in the sidebar</li>
+        <li>Click <strong>Settings &gt; Webhooks</strong> in the sidebar</li>
         <li>set <strong>URL</strong> to your ngrok url with <code>/events</code> at the end. Ex. <code>https://c5004d84.ngrok.io/events</code></li>
         <li>double-check you added <code>/events</code> to the end of your URL.</li>
         <li>set <strong>Secret Token</strong> to your random string</li>
@@ -156,7 +156,7 @@ TOKEN="{YOUR_TOKEN}"
 ```
 
 ### GitLab or GitLab Enterprise Access Token
-- follow [https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#creating-a-personal-access-token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#creating-a-personal-access-token)
+- follow [https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token)
 - create a token with **api** scope
 - set the token as an environment variable
 ```

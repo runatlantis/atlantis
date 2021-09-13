@@ -136,6 +136,13 @@ projects:
 				Ok(t, err)
 			}
 
+			globalCfgArgs := valid.GlobalCfgArgs{
+				AllowRepoCfg:  false,
+				MergeableReq:  false,
+				ApprovedReq:   false,
+				UnDivergedReq: false,
+			}
+
 			builder := events.NewProjectCommandBuilder(
 				false,
 				&yaml.ParserValidator{},
@@ -143,7 +150,7 @@ projects:
 				vcsClient,
 				workingDir,
 				events.NewDefaultWorkingDirLocker(),
-				valid.NewGlobalCfg(false, false, false),
+				valid.NewGlobalCfgFromArgs(globalCfgArgs),
 				&events.DefaultPendingPlanFinder{},
 				&events.CommentParser{},
 				false,
@@ -170,15 +177,17 @@ projects:
 // Test building a plan and apply command for one project.
 func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) {
 	cases := []struct {
-		Description    string
-		AtlantisYAML   string
-		Cmd            events.CommentCommand
-		ExpCommentArgs []string
-		ExpWorkspace   string
-		ExpDir         string
-		ExpProjectName string
-		ExpErr         string
-		ExpApplyReqs   []string
+		Description      string
+		AtlantisYAML     string
+		Cmd              events.CommentCommand
+		ExpCommentArgs   []string
+		ExpWorkspace     string
+		ExpDir           string
+		ExpProjectName   string
+		ExpErr           string
+		ExpApplyReqs     []string
+		ExpParallelApply bool
+		ExpParallelPlan  bool
 	}{
 		{
 			Description: "no atlantis.yaml",
@@ -342,6 +351,29 @@ projects:
 `,
 			ExpErr: "no project with name \"notconfigured\" is defined in atlantis.yaml",
 		},
+		{
+			Description: "atlantis.yaml with ParallelPlan Set to true",
+			Cmd: events.CommentCommand{
+				Name:        models.PlanCommand,
+				RepoRelDir:  ".",
+				Workspace:   "default",
+				ProjectName: "myproject",
+			},
+			AtlantisYAML: `
+version: 3
+parallel_plan: true
+projects:
+- name: myproject
+  dir: .
+  workspace: myworkspace
+`,
+			ExpParallelPlan:  true,
+			ExpParallelApply: false,
+			ExpDir:           ".",
+			ExpWorkspace:     "myworkspace",
+			ExpProjectName:   "myproject",
+			ExpApplyReqs:     []string{},
+		},
 	}
 
 	logger := logging.NewNoopLogger(t)
@@ -366,6 +398,13 @@ projects:
 					Ok(t, err)
 				}
 
+				globalCfgArgs := valid.GlobalCfgArgs{
+					AllowRepoCfg:  true,
+					MergeableReq:  false,
+					ApprovedReq:   false,
+					UnDivergedReq: false,
+				}
+
 				builder := events.NewProjectCommandBuilder(
 					false,
 					&yaml.ParserValidator{},
@@ -373,7 +412,7 @@ projects:
 					vcsClient,
 					workingDir,
 					events.NewDefaultWorkingDirLocker(),
-					valid.NewGlobalCfg(true, false, false),
+					valid.NewGlobalCfgFromArgs(globalCfgArgs),
 					&events.DefaultPendingPlanFinder{},
 					&events.CommentParser{},
 					false,
@@ -403,6 +442,8 @@ projects:
 				Equals(t, c.ExpCommentArgs, actCtx.EscapedCommentArgs)
 				Equals(t, c.ExpProjectName, actCtx.ProjectName)
 				Equals(t, c.ExpApplyReqs, actCtx.ApplyRequirements)
+				Equals(t, c.ExpParallelApply, actCtx.ParallelApplyEnabled)
+				Equals(t, c.ExpParallelPlan, actCtx.ParallelPlanEnabled)
 			})
 		}
 	}
@@ -508,6 +549,13 @@ projects:
 				Ok(t, err)
 			}
 
+			globalCfgArgs := valid.GlobalCfgArgs{
+				AllowRepoCfg:  true,
+				MergeableReq:  false,
+				ApprovedReq:   false,
+				UnDivergedReq: false,
+			}
+
 			builder := events.NewProjectCommandBuilder(
 				false,
 				&yaml.ParserValidator{},
@@ -515,7 +563,7 @@ projects:
 				vcsClient,
 				workingDir,
 				events.NewDefaultWorkingDirLocker(),
-				valid.NewGlobalCfg(true, false, false),
+				valid.NewGlobalCfgFromArgs(globalCfgArgs),
 				&events.DefaultPendingPlanFinder{},
 				&events.CommentParser{},
 				false,
@@ -588,6 +636,13 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 
 	logger := logging.NewNoopLogger(t)
 
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowRepoCfg:  false,
+		MergeableReq:  false,
+		ApprovedReq:   false,
+		UnDivergedReq: false,
+	}
+
 	builder := events.NewProjectCommandBuilder(
 		false,
 		&yaml.ParserValidator{},
@@ -595,7 +650,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		nil,
 		workingDir,
 		events.NewDefaultWorkingDirLocker(),
-		valid.NewGlobalCfg(false, false, false),
+		valid.NewGlobalCfgFromArgs(globalCfgArgs),
 		&events.DefaultPendingPlanFinder{},
 		&events.CommentParser{},
 		false,
@@ -661,6 +716,13 @@ projects:
 		matchers.AnyModelsPullRequest(),
 		AnyString())).ThenReturn(repoDir, nil)
 
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowRepoCfg:  true,
+		MergeableReq:  false,
+		ApprovedReq:   false,
+		UnDivergedReq: false,
+	}
+
 	builder := events.NewProjectCommandBuilder(
 		false,
 		&yaml.ParserValidator{},
@@ -668,7 +730,7 @@ projects:
 		nil,
 		workingDir,
 		events.NewDefaultWorkingDirLocker(),
-		valid.NewGlobalCfg(true, false, false),
+		valid.NewGlobalCfgFromArgs(globalCfgArgs),
 		&events.DefaultPendingPlanFinder{},
 		&events.CommentParser{},
 		false,
@@ -729,6 +791,13 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
 
+			globalCfgArgs := valid.GlobalCfgArgs{
+				AllowRepoCfg:  true,
+				MergeableReq:  false,
+				ApprovedReq:   false,
+				UnDivergedReq: false,
+			}
+
 			builder := events.NewProjectCommandBuilder(
 				false,
 				&yaml.ParserValidator{},
@@ -736,7 +805,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				vcsClient,
 				workingDir,
 				events.NewDefaultWorkingDirLocker(),
-				valid.NewGlobalCfg(true, false, false),
+				valid.NewGlobalCfgFromArgs(globalCfgArgs),
 				&events.DefaultPendingPlanFinder{},
 				&events.CommentParser{},
 				false,
@@ -901,6 +970,13 @@ projects:
 				matchers.AnyModelsPullRequest(),
 				AnyString())).ThenReturn(tmpDir, nil)
 
+			globalCfgArgs := valid.GlobalCfgArgs{
+				AllowRepoCfg:  true,
+				MergeableReq:  false,
+				ApprovedReq:   false,
+				UnDivergedReq: false,
+			}
+
 			builder := events.NewProjectCommandBuilder(
 				false,
 				&yaml.ParserValidator{},
@@ -908,7 +984,7 @@ projects:
 				vcsClient,
 				workingDir,
 				events.NewDefaultWorkingDirLocker(),
-				valid.NewGlobalCfg(true, false, false),
+				valid.NewGlobalCfgFromArgs(globalCfgArgs),
 				&events.DefaultPendingPlanFinder{},
 				&events.CommentParser{},
 				false,
@@ -957,6 +1033,13 @@ projects:
 
 	logger := logging.NewNoopLogger(t)
 
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowRepoCfg:  true,
+		MergeableReq:  false,
+		ApprovedReq:   false,
+		UnDivergedReq: false,
+	}
+
 	builder := events.NewProjectCommandBuilder(
 		false,
 		&yaml.ParserValidator{},
@@ -964,7 +1047,7 @@ projects:
 		vcsClient,
 		workingDir,
 		events.NewDefaultWorkingDirLocker(),
-		valid.NewGlobalCfg(true, false, false),
+		valid.NewGlobalCfgFromArgs(globalCfgArgs),
 		&events.DefaultPendingPlanFinder{},
 		&events.CommentParser{},
 		true,
@@ -999,7 +1082,15 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 	When(workingDir.Clone(matchers.AnyPtrToLoggingSimpleLogger(), matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest(), AnyString())).ThenReturn(tmpDir, false, nil)
 	vcsClient := vcsmocks.NewMockClient()
 	When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
-	globalCfg := valid.NewGlobalCfg(false, false, false)
+
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowRepoCfg:  false,
+		MergeableReq:  false,
+		ApprovedReq:   false,
+		UnDivergedReq: false,
+	}
+
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
 
 	builder := events.NewProjectCommandBuilder(
 		true,
@@ -1029,4 +1120,89 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 	Equals(t, globalCfg.Workflows["default"].Plan.Steps, planCtx.Steps)
 	Equals(t, models.PolicyCheckCommand, policyCheckCtx.CommandName)
 	Equals(t, globalCfg.Workflows["default"].PolicyCheck.Steps, policyCheckCtx.Steps)
+}
+
+// Test building version command for multiple projects
+func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
+	RegisterMockTestingT(t)
+	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
+		"workspace1": map[string]interface{}{
+			"project1": map[string]interface{}{
+				"main.tf":          nil,
+				"workspace.tfplan": nil,
+			},
+			"project2": map[string]interface{}{
+				"main.tf":          nil,
+				"workspace.tfplan": nil,
+			},
+		},
+		"workspace2": map[string]interface{}{
+			"project1": map[string]interface{}{
+				"main.tf":          nil,
+				"workspace.tfplan": nil,
+			},
+			"project2": map[string]interface{}{
+				"main.tf":          nil,
+				"workspace.tfplan": nil,
+			},
+		},
+	})
+	defer cleanup()
+	// Initialize git repos in each workspace so that the .tfplan files get
+	// picked up.
+	runCmd(t, filepath.Join(tmpDir, "workspace1"), "git", "init")
+	runCmd(t, filepath.Join(tmpDir, "workspace2"), "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(
+		matchers.AnyModelsRepo(),
+		matchers.AnyModelsPullRequest())).
+		ThenReturn(tmpDir, nil)
+
+	logger := logging.NewNoopLogger(t)
+
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowRepoCfg:  false,
+		MergeableReq:  false,
+		ApprovedReq:   false,
+		UnDivergedReq: false,
+	}
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&yaml.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(globalCfgArgs),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{},
+		false,
+		false,
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+	)
+
+	ctxs, err := builder.BuildVersionCommands(
+		&events.CommandContext{
+			Log: logger,
+		},
+		&events.CommentCommand{
+			RepoRelDir:  "",
+			Flags:       nil,
+			Name:        models.VersionCommand,
+			Verbose:     false,
+			Workspace:   "",
+			ProjectName: "",
+		})
+	Ok(t, err)
+	Equals(t, 4, len(ctxs))
+	Equals(t, "project1", ctxs[0].RepoRelDir)
+	Equals(t, "workspace1", ctxs[0].Workspace)
+	Equals(t, "project2", ctxs[1].RepoRelDir)
+	Equals(t, "workspace1", ctxs[1].Workspace)
+	Equals(t, "project1", ctxs[2].RepoRelDir)
+	Equals(t, "workspace2", ctxs[2].Workspace)
+	Equals(t, "project2", ctxs[3].RepoRelDir)
+	Equals(t, "workspace2", ctxs[3].Workspace)
 }

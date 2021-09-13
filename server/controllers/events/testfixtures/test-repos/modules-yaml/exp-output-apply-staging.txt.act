@@ -1,0 +1,14 @@
+Ran Apply for dir: `staging` workspace: `default`
+
+```diff
+module.null.null_resource.this: Creating...
+module.null.null_resource.this: Creation complete after *s [id=*******************]
+
+Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+var = "staging"
+
+```
+

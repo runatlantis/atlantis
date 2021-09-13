@@ -107,12 +107,11 @@ a pull request mergeable.
 :::
 
 #### GitLab
-For GitLab, a merge request will be mergeable if it has no conflicts and if all
-required approvers have approved the pull request.
+For GitLab, a merge request will be merged if there are no conflicts, no unresolved discussions if it is a project requirement and if all necessary approvers have approved the pull request.
 
-We **do not** check if there are [Unresolved Discussions](https://docs.gitlab.com/ee/user/discussions/#resolvable-comments-and-threads) because GitLab doesn't
-provide that information in their API response. If you need this feature please
-[open an issue](https://github.com/runatlantis/atlantis/issues/new).
+For pipelines, if the project requires that pipelines must succeed, all builds except the apply command status will be checked.
+
+For Jobs with allow_failure setting set to true, will be ignored. If the pipeline has been skipped and the project allows merging, it will be marked as mergeable.
 
 #### Bitbucket.org (Bitbucket Cloud) and Bitbucket Server (Stash)
 For Bitbucket, we just check if there is a conflict that is preventing a
@@ -134,6 +133,40 @@ In Azure DevOps, all pull requests are mergeable unless there is a conflict. You
 ::: warning
 At this time, the Azure DevOps client only supports merging using the default 'no fast-forward' strategy. Make sure your branch policies permit this type of merge.
 :::
+
+### UnDiverged
+Prevent applies if there are any changes on the base branch since the most recent plan. 
+Applies to `merge` checkout strategy only.
+
+#### Usage
+You can set the `undiverged` requirement by:
+1. Creating a `repos.yaml` file with the `apply_requirements` key:
+   ```yaml
+   repos:
+   - id: /.*/
+     apply_requirements: [undiverged]
+   ```
+1. Or by allowing an `atlantis.yaml` file to specify the `apply_requirements` key in your `repos.yaml` config:
+   #### repos.yaml
+    ```yaml
+    repos:
+    - id: /.*/
+      allowed_overrides: [apply_requirements]
+    ```
+
+   #### atlantis.yaml
+    ```yaml
+    version: 3
+    projects:
+    - dir: .
+      apply_requirements: [undiverged]
+     ```
+### Meaning
+The `merge` checkout strategy creates a temporary merge commit and runs the `plan` on the Atlantis local version of the PR 
+source and destination branch. The local destination branch can become out of date since changes to the destination branch are not fetched 
+if there are no changes to the source branch. `undiverged` enforces that Atlantis local version of master is up to date 
+with remote so that the state of the source during the `apply` is identical to that if you were to merge the PR at that 
+time. 
 
 ## Setting Apply Requirements
 As mentioned above, you can set apply requirements via flags, in `repos.yaml`, or in `atlantis.yaml` if `repos.yaml`

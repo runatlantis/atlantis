@@ -57,6 +57,11 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		steps = prjCfg.Workflow.Plan.Steps
 	case models.ApplyCommand:
 		steps = prjCfg.Workflow.Apply.Steps
+	case models.VersionCommand:
+		// Setting statically since there will only be one step
+		steps = []valid.Step{{
+			StepName: "version",
+		}}
 	}
 
 	// If TerraformVersion not defined in config file look for a
@@ -68,8 +73,9 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 	projectCmds = append(projectCmds, newProjectCommandContext(
 		ctx,
 		cmdName,
-		cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name),
+		cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled),
 		cb.CommentBuilder.BuildPlanComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, commentFlags),
+		cb.CommentBuilder.BuildVersionComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name),
 		prjCfg,
 		steps,
 		prjCfg.PolicySets,
@@ -98,6 +104,13 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 	automerge, deleteSourceBranchOnMerge, parallelApply, parallelPlan, verbose bool,
 ) (projectCmds []models.ProjectCommandContext) {
 	ctx.Log.Debug("PolicyChecks are enabled")
+
+	// If TerraformVersion not defined in config file look for a
+	// terraform.require_version block.
+	if prjCfg.TerraformVersion == nil {
+		prjCfg.TerraformVersion = getTfVersion(ctx, filepath.Join(repoDir, prjCfg.RepoRelDir))
+	}
+
 	projectCmds = cb.ProjectCommandContextBuilder.BuildProjectContext(
 		ctx,
 		cmdName,
@@ -118,8 +131,9 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 		projectCmds = append(projectCmds, newProjectCommandContext(
 			ctx,
 			models.PolicyCheckCommand,
-			cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name),
+			cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled),
 			cb.CommentBuilder.BuildPlanComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, commentFlags),
+			cb.CommentBuilder.BuildVersionComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name),
 			prjCfg,
 			steps,
 			prjCfg.PolicySets,
@@ -141,6 +155,7 @@ func newProjectCommandContext(ctx *CommandContext,
 	cmd models.CommandName,
 	applyCmd string,
 	planCmd string,
+	versionCmd string,
 	projCfg valid.MergedProjectCfg,
 	steps []valid.Step,
 	policySets valid.PolicySets,

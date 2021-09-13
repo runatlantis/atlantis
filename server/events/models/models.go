@@ -438,6 +438,7 @@ type ProjectResult struct {
 	PlanSuccess        *PlanSuccess
 	PolicyCheckSuccess *PolicyCheckSuccess
 	ApplySuccess       string
+	VersionSuccess     string
 	ProjectName        string
 }
 
@@ -505,12 +506,29 @@ type PlanSuccess struct {
 
 // Summary extracts one line summary of plan changes from TerraformOutput.
 func (p *PlanSuccess) Summary() string {
-	r := regexp.MustCompile(`Plan: \d+ to add, \d+ to change, \d+ to destroy.`)
+	note := ""
+	r := regexp.MustCompile(`Note: Objects have changed outside of Terraform`)
 	if match := r.FindString(p.TerraformOutput); match != "" {
-		return match
+		note = fmt.Sprintf("\n**%s**\n", match)
 	}
-	r = regexp.MustCompile(`No changes. Infrastructure is up-to-date.`)
-	return r.FindString(p.TerraformOutput)
+
+	r = regexp.MustCompile(`Plan: \d+ to add, \d+ to change, \d+ to destroy.`)
+	if match := r.FindString(p.TerraformOutput); match != "" {
+		return note + match
+	}
+	r = regexp.MustCompile(`No changes. (Infrastructure is up-to-date|Your infrastructure matches the configuration).`)
+	return note + r.FindString(p.TerraformOutput)
+}
+
+// DiffMarkdownFormattedTerraformOutput formats the Terraform output to match diff markdown format
+func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
+	diffKeywordRegex := regexp.MustCompile(`(?m)^( +)([-+~])`)
+	diffTildeRegex := regexp.MustCompile(`(?m)^~`)
+
+	formattedTerraformOutput := diffKeywordRegex.ReplaceAllString(p.TerraformOutput, "$2$1")
+	formattedTerraformOutput = diffTildeRegex.ReplaceAllString(formattedTerraformOutput, "!")
+
+	return formattedTerraformOutput
 }
 
 // PolicyCheckSuccess is the result of a successful policy check run.
@@ -527,6 +545,10 @@ type PolicyCheckSuccess struct {
 	// branch we're merging into has been updated since we cloned and merged
 	// it.
 	HasDiverged bool
+}
+
+type VersionSuccess struct {
+	VersionOutput string
 }
 
 // PullStatus is the current status of a pull request that is in progress.
@@ -623,6 +645,8 @@ const (
 	ApprovePoliciesCommand
 	// AutoplanCommand is a command to run terrafor plan on PR open/update if autoplan is enabled
 	AutoplanCommand
+	// VersionCommand is a command to run terraform version.
+	VersionCommand
 	// Adding more? Don't forget to update String() below
 )
 
@@ -645,6 +669,8 @@ func (c CommandName) String() string {
 		return "policy_check"
 	case ApprovePoliciesCommand:
 		return "approve_policies"
+	case VersionCommand:
+		return "version"
 	}
 	return ""
 }

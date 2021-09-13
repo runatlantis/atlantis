@@ -1,0 +1,9 @@
+```diff
+null_resource.this: Creating...
+null_resource.this: Creation complete after *s [id=*******************]
+
+Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+workspace = "staging"

@@ -22,6 +22,9 @@ const DefaultParallelPolicyCheck = false
 // DefaultProjectLocks is the default setting for project locks
 const DefaultProjectLocks = true
 
+// DefaultDeleteSourceBranchOnMerge being false is the default setting whether or not to remove a source branch on merge
+const DefaultDeleteSourceBranchOnMerge = false
+
 // RepoCfg is the raw schema for repo-level atlantis.yaml config.
 type RepoCfg struct {
 	Version                   *int                `yaml:"version,omitempty"`

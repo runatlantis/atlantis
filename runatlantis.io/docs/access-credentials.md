@@ -45,14 +45,14 @@ Available in Atlantis versions **newer** than 0.13.0.
 - Create a file with the contents of the GitHub App Key, e.g. `atlantis-app-key.pem`
 - Restart Atlantis with new flags: `atlantis server --gh-app-id <your id> --gh-app-key-file atlantis-app-key.pem --gh-webhook-secret <your secret> --write-git-creds --repo-allowlist 'github.com/your-org/*' --atlantis-url https://$ATLANTIS_HOST`.
 
-  NOTE: You can also create a config file instead of using flags. See [Server Configuration](/docs/server-configuration.html#config-file).
+  NOTE: Instead of using a file for the GitHub App Key you can also pass the key value directly using `--gh-app-key`. You can also create a config file instead of using flags. See [Server Configuration](/docs/server-configuration.html#config-file).
 
 ::: warning
 Only a single installation per GitHub App is supported at the moment.
 :::
 
 ### GitLab
-- Follow: [https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#creating-a-personal-access-token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#creating-a-personal-access-token)
+- Follow: [https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token)
 - Create a token with **api** scope
 - Record the access token
 

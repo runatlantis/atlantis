@@ -30,13 +30,15 @@ type UserConfig struct {
 	DisableRepoLocking         bool   `mapstructure:"disable-repo-locking"`
 	EnablePolicyChecksFlag     bool   `mapstructure:"enable-policy-checks"`
 	EnableRegExpCmd            bool   `mapstructure:"enable-regexp-cmd"`
+	EnableDiffMarkdownFormat   bool   `mapstructure:"enable-diff-markdown-format"`
 	GithubHostname             string `mapstructure:"gh-hostname"`
 	GithubToken                string `mapstructure:"gh-token"`
 	GithubUser                 string `mapstructure:"gh-user"`
 	GithubWebhookSecret        string `mapstructure:"gh-webhook-secret"`
 	GithubOrg                  string `mapstructure:"gh-org"`
 	GithubAppID                int64  `mapstructure:"gh-app-id"`
-	GithubAppKey               string `mapstructure:"gh-app-key-file"`
+	GithubAppKey               string `mapstructure:"gh-app-key"`
+	GithubAppKeyFile           string `mapstructure:"gh-app-key-file"`
 	GithubAppSlug              string `mapstructure:"gh-app-slug"`
 	GitlabHostname             string `mapstructure:"gitlab-hostname"`
 	GitlabToken                string `mapstructure:"gitlab-token"`
@@ -60,7 +62,10 @@ type UserConfig struct {
 	// allowing terraform apply's to run.
 	RequireMergeable bool `mapstructure:"require-mergeable"`
 	// SilenceNoProjects is whether Atlantis should respond to a PR if no projects are found.
-	SilenceNoProjects   bool `mapstructure:"silence-no-projects"`
+	SilenceNoProjects bool `mapstructure:"silence-no-projects"`
+	// RequireUnDiverged is whether to require pull requests to rebase default branch before
+	// allowing terraform apply's to run.
+	RequireUnDiverged   bool `mapstructure:"require-undiverged"`
 	SilenceForkPRErrors bool `mapstructure:"silence-fork-pr-errors"`
 	// SilenceVCSStatusNoPlans is whether autoplan should set commit status if no plans
 	// are found.

@@ -89,8 +89,14 @@ func unzip(archive, target string) error {
 		}
 		defer targetFile.Close() // nolint: errcheck
 
-		if _, err := io.Copy(targetFile, fileReader); err != nil {
-			return err
+		for {
+			_, err := io.CopyN(targetFile, fileReader, 1024)
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				return err
+			}
 		}
 	}
 

@@ -30,15 +30,17 @@ import (
 )
 
 const (
-	workspaceFlagLong  = "workspace"
-	workspaceFlagShort = "w"
-	dirFlagLong        = "dir"
-	dirFlagShort       = "d"
-	projectFlagLong    = "project"
-	projectFlagShort   = "p"
-	verboseFlagLong    = "verbose"
-	verboseFlagShort   = ""
-	atlantisExecutable = "atlantis"
+	workspaceFlagLong          = "workspace"
+	workspaceFlagShort         = "w"
+	dirFlagLong                = "dir"
+	dirFlagShort               = "d"
+	projectFlagLong            = "project"
+	projectFlagShort           = "p"
+	autoMergeDisabledFlagLong  = "auto-merge-disabled"
+	autoMergeDisabledFlagShort = ""
+	verboseFlagLong            = "verbose"
+	verboseFlagShort           = ""
+	atlantisExecutable         = "atlantis"
 )
 
 // multiLineRegex is used to ignore multi-line comments since those aren't valid
@@ -64,7 +66,9 @@ type CommentBuilder interface {
 	// BuildPlanComment builds a plan comment for the specified args.
 	BuildPlanComment(repoRelDir string, workspace string, project string, commentArgs []string) string
 	// BuildApplyComment builds an apply comment for the specified args.
-	BuildApplyComment(repoRelDir string, workspace string, project string) string
+	BuildApplyComment(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string
+	// BuildVersionComment builds a version comment for the specified args.
+	BuildVersionComment(repoRelDir string, workspace string, project string) string
 }
 
 // CommentParser implements CommentParsing
@@ -163,14 +167,14 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	}
 
 	// Need to have a plan, apply, approve_policy or unlock at this point.
-	if !e.stringInSlice(command, []string{models.PlanCommand.String(), models.ApplyCommand.String(), models.UnlockCommand.String(), models.ApprovePoliciesCommand.String()}) {
+	if !e.stringInSlice(command, []string{models.PlanCommand.String(), models.ApplyCommand.String(), models.UnlockCommand.String(), models.ApprovePoliciesCommand.String(), models.VersionCommand.String()}) {
 		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown command %q.\nRun 'atlantis --help' for usage.\n```", command)}
 	}
 
 	var workspace string
 	var dir string
 	var project string
-	var verbose bool
+	var verbose, autoMergeDisabled bool
 	var flagSet *pflag.FlagSet
 	var name models.CommandName
 
@@ -191,6 +195,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Apply the plan for this Terraform workspace.")
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Apply the plan for this directory, relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", fmt.Sprintf("Apply the plan for this project. Refers to the name of the project configured in %s. Cannot be used at same time as workspace or dir flags.", yaml.AtlantisYAMLFilename))
+		flagSet.BoolVarP(&autoMergeDisabled, autoMergeDisabledFlagLong, autoMergeDisabledFlagShort, false, "Disable automerge after apply.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 	case models.ApprovePoliciesCommand.String():
 		name = models.ApprovePoliciesCommand
@@ -201,6 +206,13 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		name = models.UnlockCommand
 		flagSet = pflag.NewFlagSet(models.UnlockCommand.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(ioutil.Discard)
+	case models.VersionCommand.String():
+		name = models.VersionCommand
+		flagSet = pflag.NewFlagSet(models.VersionCommand.String(), pflag.ContinueOnError)
+		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Switch to this Terraform workspace before running version.")
+		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run version in relative to root of repo, ex. 'child/dir'.")
+		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", fmt.Sprintf("Print the version for this project. Refers to the name of the project configured in %s.", yaml.AtlantisYAMLFilename))
+		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 	default:
 		return CommentParseResult{CommentResponse: fmt.Sprintf("Error: unknown command %q – this is a bug", command)}
 	}
@@ -256,13 +268,13 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	}
 
 	return CommentParseResult{
-		Command: NewCommentCommand(dir, extraArgs, name, verbose, workspace, project),
+		Command: NewCommentCommand(dir, extraArgs, name, verbose, autoMergeDisabled, workspace, project),
 	}
 }
 
 // BuildPlanComment builds a plan comment for the specified args.
 func (e *CommentParser) BuildPlanComment(repoRelDir string, workspace string, project string, commentArgs []string) string {
-	flags := e.buildFlags(repoRelDir, workspace, project)
+	flags := e.buildFlags(repoRelDir, workspace, project, false)
 	commentFlags := ""
 	if len(commentArgs) > 0 {
 		var flagsWithoutQuotes []string
@@ -277,36 +289,46 @@ func (e *CommentParser) BuildPlanComment(repoRelDir string, workspace string, pr
 }
 
 // BuildApplyComment builds an apply comment for the specified args.
-func (e *CommentParser) BuildApplyComment(repoRelDir string, workspace string, project string) string {
-	flags := e.buildFlags(repoRelDir, workspace, project)
+func (e *CommentParser) BuildApplyComment(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string {
+	flags := e.buildFlags(repoRelDir, workspace, project, autoMergeDisabled)
 	return fmt.Sprintf("%s %s%s", atlantisExecutable, models.ApplyCommand.String(), flags)
 }
 
-func (e *CommentParser) buildFlags(repoRelDir string, workspace string, project string) string {
+// BuildVersionComment builds a version comment for the specified args.
+func (e *CommentParser) BuildVersionComment(repoRelDir string, workspace string, project string) string {
+	flags := e.buildFlags(repoRelDir, workspace, project, false)
+	return fmt.Sprintf("%s %s%s", atlantisExecutable, models.VersionCommand.String(), flags)
+}
+
+func (e *CommentParser) buildFlags(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string {
 	// Add quotes if dir has spaces.
 	if strings.Contains(repoRelDir, " ") {
 		repoRelDir = fmt.Sprintf("%q", repoRelDir)
 	}
 
+	var flags string
 	switch {
 	// If project is specified we can just use its name.
 	case project != "":
-		return fmt.Sprintf(" -%s %s", projectFlagShort, project)
+		flags = fmt.Sprintf(" -%s %s", projectFlagShort, project)
 	case repoRelDir == DefaultRepoRelDir && workspace == DefaultWorkspace:
 		// If it's the root and default workspace then we just need to specify one
 		// of the flags and the other will get defaulted.
-		return fmt.Sprintf(" -%s %s", dirFlagShort, DefaultRepoRelDir)
+		flags = fmt.Sprintf(" -%s %s", dirFlagShort, DefaultRepoRelDir)
 	case repoRelDir == DefaultRepoRelDir:
 		// If dir is the default then we just need to specify workspace.
-		return fmt.Sprintf(" -%s %s", workspaceFlagShort, workspace)
+		flags = fmt.Sprintf(" -%s %s", workspaceFlagShort, workspace)
 	case workspace == DefaultWorkspace:
 		// If workspace is the default then we just need to specify the dir.
-
-		return fmt.Sprintf(" -%s %s", dirFlagShort, repoRelDir)
+		flags = fmt.Sprintf(" -%s %s", dirFlagShort, repoRelDir)
 	default:
 		// Otherwise we have to specify both flags.
-		return fmt.Sprintf(" -%s %s -%s %s", dirFlagShort, repoRelDir, workspaceFlagShort, workspace)
+		flags = fmt.Sprintf(" -%s %s -%s %s", dirFlagShort, repoRelDir, workspaceFlagShort, workspace)
 	}
+	if autoMergeDisabled {
+		flags = fmt.Sprintf("%s --%s", flags, autoMergeDisabledFlagLong)
+	}
+	return flags
 }
 
 func (e *CommentParser) validateDir(dir string) (string, error) {
@@ -382,6 +404,7 @@ Commands:
 {{- end }}
   unlock   Removes all atlantis locks and discards all plans for this PR.
            To unlock a specific plan you can use the Atlantis UI.
+  version  Print the output of 'terraform version'
   help     View help.
 
 Flags:

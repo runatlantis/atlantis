@@ -1,12 +1,12 @@
 # Conftest Policy Checking
 
-Atlantis supports running server-side [conftest](https://www.conftest.dev/) policies against the plan output.  Common usecases
+Atlantis supports running server-side [conftest](https://www.conftest.dev/) policies against the plan output. Common usecases
 for using this step include:
-* Denying usage of a list of modules
-* Asserting attributes of a resource at creation time
-* Catching unintentional resource deletions
-* Preventing security risks (ie. exposing secure ports to the public)
 
+- Denying usage of a list of modules
+- Asserting attributes of a resource at creation time
+- Catching unintentional resource deletions
+- Preventing security risks (ie. exposing secure ports to the public)
 
 ## How it works?
 
@@ -32,7 +32,7 @@ This section will provide a guide on how to get set up with a simple policy that
 
 Enable the workflow using the following server configuration flag `--enable-policy-checks`
 
-### Step 3: Define the policy configuration
+### Step 2: Define the policy configuration
 
 Policy Configuration is defined in the [server-side repo configuration](https://www.runatlantis.io/docs/server-side-repo-config.html#reference).
 
@@ -45,13 +45,17 @@ policies:
       - nishkrishnan
   policy_sets:
     - name: null_resource_warning
-      path: <CODE_DIRECTORY>/policies/null_resource_warning
+      path: <CODE_DIRECTORY>/policies/null_resource_warning/
       source: local
 ```
 
-### Step 4: Write the policy
+`name` - A name of your policy set.
+`path` - Path to a policies directory.
+`source` - Tells atlantis where to fetch the policies from. Currently you can only host policies locally by using `local`.
 
-Conftest policies are based on [Open Policy Agent (OPA)](https://www.openpolicyagent.org/) and written in [rego](https://www.openpolicyagent.org/docs/latest/policy-language/#what-is-rego). The following shows a simple policy written to fail for plans containing newly created `null_resource`s.
+### Step 3: Write the policy
+
+Conftest policies are based on [Open Policy Agent (OPA)](https://www.openpolicyagent.org/) and written in [rego](https://www.openpolicyagent.org/docs/latest/policy-language/#what-is-rego). Following our example, simply create a `rego` file in `null_resource_warning` folder with following code, the code below a simple policy that will fail for plans containing newly created `null_resource`s.
 
 ```
 package main
@@ -88,7 +92,11 @@ deny[msg] {
 ```
 
 ::: tip Notes
+<<<<<<< HEAD
 By default conftest is configured to only run the `main` package.  If you want to change this behavior [`extra_args`](https://www.runatlantis.io/docs/custom-workflows.html#adding-extra-arguments-to-terraform-commands) can be used to pass in flags to conftest such as `--namespace` or `--all-namespaces`
+=======
+By default conftest is configured to only run the `main` package. If you want to change this behavior [`extra_args`](https://www.runatlantis.io/docs/custom-workflows.html#adding-extra-arguments-to-terraform-commands) can be used to pass in flags to conftest such as `--namespace` or `--all-namespaces`
+>>>>>>> 8aabf00b672ae086abcb7c2c378d897122ad3d14
 :::
 
 That's it! Now your Atlantis instance is configured to run policies on your Terraform plans 🎉

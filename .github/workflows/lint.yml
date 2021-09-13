@@ -1,0 +1,43 @@
+name: linter
+
+on: [pull_request]
+
+jobs:
+  golangci-lint:
+    name: runner / golangci-lint
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: golangci-lint
+      uses: reviewdog/action-golangci-lint@v2
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        tool_name: golangci-lint
+
+  # Use golint via golangci-lint binary with "warning" level.
+  golint:
+    name: runner / golint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v1
+      - name: golint
+        uses: reviewdog/action-golangci-lint@v2
+        with:
+          golangci_lint_flags: "--disable-all -E golint"
+          tool_name: golint # Change reporter name.
+          level: warning # GitHub Status Check won't become failure with this level.
+
+  # You can add more and more supported linters with different config.
+  errcheck:
+    name: runner / errcheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v1
+      - name: errcheck
+        uses: reviewdog/action-golangci-lint@v2
+        with:
+          golangci_lint_flags: "--disable-all -E errcheck"
+          tool_name: errcheck
+          level: info

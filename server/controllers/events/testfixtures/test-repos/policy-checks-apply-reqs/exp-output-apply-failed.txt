@@ -1,0 +1,4 @@
+Ran Apply for dir: `.` workspace: `default`
+
+**Apply Failed**: All policies must pass for project before running apply
+

@@ -263,7 +263,7 @@ func TestAzureDevopsClient_GetModifiedFiles(t *testing.T) {
 			case "/owner/project/_apis/git/repositories/repo/pullrequests/1?api-version=5.1-preview.1&includeWorkItemRefs=true":
 				w.Write([]byte(fixtures.ADPullJSON)) // nolint: errcheck
 			// The second should hit this URL.
-			case "/owner/project/_apis/git/repositories/repo/commits/b60280bc6e62e2f880f1b63c1e24987664d3bda3/changes?api-version=5.1-preview.1":
+			case "/owner/project/_apis/git/repositories/repo/diffs/commits?api-version=5.1&baseVersion=new_feature&targetVersion=npaulk/my_work":
 				// We write a header that means there's an additional page.
 				w.Write([]byte(resp)) // nolint: errcheck
 				return

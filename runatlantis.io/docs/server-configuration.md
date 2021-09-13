@@ -52,7 +52,6 @@ Values are chosen in this order:
   atlantis server --allow-draft-prs
   ```
   Respond to pull requests from draft prs. Defaults to `false`.
-  
 * ### `--allow-fork-prs`
   ```bash
   atlantis server --allow-fork-prs
@@ -274,6 +273,14 @@ Values are chosen in this order:
   The command `atlantis apply -p .*` will bypass the restriction and run apply on every projects
   :::
 
+* ### `--enable-diff-markdown-format`
+  ```bash
+  atlantis server --enable-diff-markdown-format
+  ```
+  Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.
+
+  Useful to enable for use with Github.
+
 * ### `--gh-hostname`
   ```bash
   atlantis server --gh-hostname="my.github.enterprise.com"
@@ -341,6 +348,16 @@ Values are chosen in this order:
   atlantis server --gh-app-key-file="path/to/app-key.pem"
   ```
   Path to a GitHub App PEM encoded private key file. If set, GitHub authentication will be performed as [an installation](https://developer.github.com/v3/apps/installations/).
+
+- ### `--gh-app-key`
+  ```bash
+  atlantis server --gh-app-key="-----BEGIN RSA PRIVATE KEY-----(...)" 
+  ```
+  The PEM encoded private key for the GitHub App.
+
+  ::: warning SECURITY WARNING
+  The contents of the private key will be visible by anyone that can run `ps` or look at the shell history of the machine where Atlantis is running. Use `--gh-app-key-file` to mitigate that risk.
+  :::
 
 * ### `--gitlab-hostname`
   ```bash

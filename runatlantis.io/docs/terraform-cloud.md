@@ -6,7 +6,7 @@ and Private Terraform Enterprise was renamed Terraform Enterprise.
 :::
 
 Atlantis integrates seamlessly with Terraform Cloud and Terraform Enterprise, whether you're using:
-* [Free Remote State Management](https://app.terraform.io/signup)
+* [Free Remote State Management](https://app.terraform.io)
 * Terraform Cloud Paid Tiers
 * A Private Installation of Terraform Enterprise
 

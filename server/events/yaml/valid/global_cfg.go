@@ -11,6 +11,7 @@ import (
 
 const MergeableApplyReq = "mergeable"
 const ApprovedApplyReq = "approved"
+const UnDivergedApplyReq = "undiverged"
 const PoliciesPassedApplyReq = "policies_passed"
 const ApplyRequirementsKey = "apply_requirements"
 const PreWorkflowHooksKey = "pre_workflow_hooks"
@@ -61,6 +62,7 @@ type MergedProjectCfg struct {
 	Workspace                 string
 	Name                      string
 	AutoplanEnabled           bool
+	AutoMergeDisabled         bool
 	TerraformVersion          *version.Version
 	RepoCfgVersion            int
 	PolicySets                PolicySets
@@ -108,11 +110,12 @@ var DefaultPlanStage = Stage{
 }
 
 // Deprecated: use NewGlobalCfgFromArgs
-func NewGlobalCfgWithHooks(allowRepoCfg bool, mergeableReq bool, approvedReq bool, preWorkflowHooks []*PreWorkflowHook) GlobalCfg {
+func NewGlobalCfgWithHooks(allowRepoCfg bool, mergeableReq bool, approvedReq bool, unDivergedReq bool, preWorkflowHooks []*PreWorkflowHook) GlobalCfg {
 	return NewGlobalCfgFromArgs(GlobalCfgArgs{
 		AllowRepoCfg:     allowRepoCfg,
 		MergeableReq:     mergeableReq,
 		ApprovedReq:      approvedReq,
+		UnDivergedReq:    unDivergedReq,
 		PreWorkflowHooks: preWorkflowHooks,
 	})
 }
@@ -136,6 +139,7 @@ type GlobalCfgArgs struct {
 	AllowRepoCfg       bool
 	MergeableReq       bool
 	ApprovedReq        bool
+	UnDivergedReq      bool
 	PolicyCheckEnabled bool
 	PreWorkflowHooks   []*PreWorkflowHook
 }
@@ -157,6 +161,13 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 	}
 	if args.ApprovedReq {
 		applyReqs = append(applyReqs, ApprovedApplyReq)
+	}
+	if args.UnDivergedReq {
+		applyReqs = append(applyReqs, UnDivergedApplyReq)
+	}
+
+	if args.PolicyCheckEnabled {
+		applyReqs = append(applyReqs, PoliciesPassedApplyReq)
 	}
 
 	if args.PolicyCheckEnabled {
@@ -461,4 +472,16 @@ func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (app
 		log.Debug(l)
 	}
 	return
+}
+
+// MatchingRepo returns an instance of Repo which matches a given repoID.
+// If multiple repos match, return the last one for consistency with getMatchingCfg.
+func (g GlobalCfg) MatchingRepo(repoID string) *Repo {
+	for i := len(g.Repos) - 1; i >= 0; i-- {
+		repo := g.Repos[i]
+		if repo.IDMatches(repoID) {
+			return &repo
+		}
+	}
+	return nil
 }

@@ -85,6 +85,21 @@ func (mock *MockProjectCommandRunner) ApprovePolicies(ctx models.ProjectCommandC
 	return ret0
 }
 
+func (mock *MockProjectCommandRunner) Version(ctx models.ProjectCommandContext) models.ProjectResult {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockProjectCommandRunner().")
+	}
+	params := []pegomock.Param{ctx}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("Version", params, []reflect.Type{reflect.TypeOf((*models.ProjectResult)(nil)).Elem()})
+	var ret0 models.ProjectResult
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(models.ProjectResult)
+		}
+	}
+	return ret0
+}
+
 func (mock *MockProjectCommandRunner) VerifyWasCalledOnce() *VerifierMockProjectCommandRunner {
 	return &VerifierMockProjectCommandRunner{
 		mock:                   mock,
@@ -220,6 +235,33 @@ func (c *MockProjectCommandRunner_ApprovePolicies_OngoingVerification) GetCaptur
 }
 
 func (c *MockProjectCommandRunner_ApprovePolicies_OngoingVerification) GetAllCapturedArguments() (_param0 []models.ProjectCommandContext) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]models.ProjectCommandContext, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(models.ProjectCommandContext)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockProjectCommandRunner) Version(ctx models.ProjectCommandContext) *MockProjectCommandRunner_Version_OngoingVerification {
+	params := []pegomock.Param{ctx}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Version", params, verifier.timeout)
+	return &MockProjectCommandRunner_Version_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockProjectCommandRunner_Version_OngoingVerification struct {
+	mock              *MockProjectCommandRunner
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockProjectCommandRunner_Version_OngoingVerification) GetCapturedArguments() models.ProjectCommandContext {
+	ctx := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1]
+}
+
+func (c *MockProjectCommandRunner_Version_OngoingVerification) GetAllCapturedArguments() (_param0 []models.ProjectCommandContext) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]models.ProjectCommandContext, len(c.methodInvocations))

@@ -4,8 +4,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/runtime"
 	"github.com/segmentio/stats/v4"
 )
 
