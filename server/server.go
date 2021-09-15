@@ -71,9 +71,9 @@ const (
 	// route. ex:
 	//   mux.Router.Get(LockViewRouteName).URL(LockViewRouteIDQueryParam, "my id")
 	LockViewRouteIDQueryParam = "id"
-	//LogViewRouteName is the named route in mux.Router for the log stream view.
-	//Can be retrieved by mux.Router.Get(LogViewRouteName)
-	LogViewRouteName = "log-detail"
+	// ProjectJobsViewRouteName is the named route in mux.Router for the log stream view.
+	// Can be retrieved by mux.Router.Get(ProjectJobsViewRouteName)
+	ProjectJobsViewRouteName = "project-jobs-detail"
 	// binDirName is the name of the directory inside our data dir where
 	// we download binaries.
 	BinDirName = "bin"
@@ -98,11 +98,11 @@ type Server struct {
 	GithubAppController           *controllers.GithubAppController
 	LocksController               *controllers.LocksController
 	StatusController              *controllers.StatusController
-	LogStreamingController        *controllers.LogStreamingController
+	JobsController                *controllers.JobsController
 	IndexTemplate                 templates.TemplateWriter
 	LockDetailTemplate            templates.TemplateWriter
-	LogStreamingTemplate          templates.TemplateWriter
-	LogStreamErrorTemplate        templates.TemplateWriter
+	ProjectJobsTemplate           templates.TemplateWriter
+	ProjectJobsErrorTemplate      templates.TemplateWriter
 	SSLCertFile                   string
 	SSLKeyFile                    string
 	Drainer                       *events.Drainer
@@ -293,8 +293,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	vcsClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient)
 	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient, StatusName: userConfig.VCSStatusName}
-	projectCmdOutput := make(chan *models.ProjectCmdOutputLine)
-	projectCmdOutputHandler := handlers.NewProjectCommandOutputHandler(projectCmdOutput, logger)
 
 	binDir, err := mkSubDir(userConfig.DataDir, BinDirName)
 
@@ -319,6 +317,30 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing feature allocator")
 	}
+
+	parsedURL, err := ParseAtlantisURL(userConfig.AtlantisURL)
+	if err != nil {
+		return nil, errors.Wrapf(err,
+			"parsing --%s flag %q", config.AtlantisURLFlag, userConfig.AtlantisURL)
+	}
+
+	underlyingRouter := mux.NewRouter()
+	router := &Router{
+		AtlantisURL:               parsedURL,
+		LockViewRouteIDQueryParam: LockViewRouteIDQueryParam,
+		LockViewRouteName:         LockViewRouteName,
+		ProjectJobsViewRouteName:  ProjectJobsViewRouteName,
+		Underlying:                underlyingRouter,
+	}
+
+	projectCmdOutput := make(chan *models.ProjectCmdOutputLine)
+	projectCmdOutputHandler := handlers.NewFeatureAwareOutputHandler(
+		projectCmdOutput,
+		commitStatusUpdater,
+		router,
+		logger,
+		featureAllocator,
+	)
 
 	terraformClient, err := terraform.NewClient(
 		logger,
@@ -390,11 +412,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DB:               boltdb,
 	}
 
-	parsedURL, err := ParseAtlantisURL(userConfig.AtlantisURL)
-	if err != nil {
-		return nil, errors.Wrapf(err,
-			"parsing --%s flag %q", config.AtlantisURLFlag, userConfig.AtlantisURL)
-	}
 	validator := &yaml.ParserValidator{}
 
 	globalCfg := valid.NewGlobalCfgFromArgs(
@@ -416,15 +433,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		if err != nil {
 			return nil, errors.Wrapf(err, "parsing --%s", config.RepoConfigJSONFlag)
 		}
-	}
-
-	underlyingRouter := mux.NewRouter()
-	router := &Router{
-		AtlantisURL:               parsedURL,
-		LockViewRouteIDQueryParam: LockViewRouteIDQueryParam,
-		LockViewRouteName:         LockViewRouteName,
-		LogViewRouteName:          LogViewRouteName,
-		Underlying:                underlyingRouter,
 	}
 
 	pullClosedExecutor := events.NewInstrumentedPullClosedExecutor(
@@ -546,9 +554,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDir:                 workingDir,
 		Webhooks:                   webhooksManager,
 		WorkingDirLocker:           workingDirLocker,
-		ProjectCmdOutputHandler:    projectCmdOutputHandler,
 		AggregateApplyRequirements: applyRequirementHandler,
-		LogStreamURLGenerator:      router,
 	}
 
 	dbUpdater := &events.DBUpdater{
@@ -566,8 +572,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GlobalAutomerge: userConfig.Automerge,
 	}
 
+	projectOutputWrapper := &events.ProjectOutputWrapper{
+		ProjectCmdOutputHandler: projectCmdOutputHandler,
+		ProjectCommandRunner:    projectCommandRunner,
+	}
+
 	instrumentedProjectCmdRunner := &events.InstrumentedProjectCommandRunner{
-		ProjectCommandRunner: projectCommandRunner,
+		ProjectCommandRunner: projectOutputWrapper,
 	}
 
 	policyCheckCommandRunner := events.NewPolicyCheckCommandRunner(
@@ -595,8 +606,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
 		boltdb,
-		router,
-		featureAllocator,
 	)
 
 	pullReqStatusFetcher := vcs.SQBasedPullStatusFetcher{
@@ -618,8 +627,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.SilenceNoProjects,
 		userConfig.SilenceVCSStatusNoProjects,
 		&pullReqStatusFetcher,
-		router,
-		featureAllocator,
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
@@ -672,7 +679,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Drainer:                       drainer,
 		PreWorkflowHooksCommandRunner: preWorkflowHooksCommandRunner,
 		PullStatusFetcher:             boltdb,
-		LogStreamURLGenerator:         router,
 	}
 	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
 	if err != nil {
@@ -692,12 +698,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DeleteLockCommand:  deleteLockCommand,
 	}
 
-	logStreamingController := &controllers.LogStreamingController{
+	jobsController := &controllers.JobsController{
 		AtlantisVersion:             config.AtlantisVersion,
 		AtlantisURL:                 parsedURL,
 		Logger:                      logger,
-		LogStreamTemplate:           templates.LogStreamingTemplate,
-		LogStreamErrorTemplate:      templates.LogStreamErrorTemplate,
+		ProjectJobsTemplate:         templates.ProjectJobsTemplate,
+		ProjectJobsErrorTemplate:    templates.ProjectJobsErrorTemplate,
 		Db:                          boltdb,
 		WebsocketHandler:            handlers.NewWebsocketHandler(logger),
 		ProjectCommandOutputHandler: projectCmdOutputHandler,
@@ -780,12 +786,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		VCSEventsController:           eventsController,
 		GithubAppController:           githubAppController,
 		LocksController:               locksController,
-		LogStreamingController:        logStreamingController,
+		JobsController:                jobsController,
 		StatusController:              statusController,
 		IndexTemplate:                 templates.IndexTemplate,
 		LockDetailTemplate:            templates.LockTemplate,
-		LogStreamingTemplate:          templates.LogStreamingTemplate,
-		LogStreamErrorTemplate:        templates.LogStreamErrorTemplate,
+		ProjectJobsTemplate:           templates.ProjectJobsTemplate,
+		ProjectJobsErrorTemplate:      templates.ProjectJobsErrorTemplate,
 		SSLKeyFile:                    userConfig.SSLKeyFile,
 		SSLCertFile:                   userConfig.SSLCertFile,
 		Drainer:                       drainer,
@@ -810,8 +816,8 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
 	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
-	s.Router.HandleFunc("/log-streaming/{org}/{repo}/{pull}/{project}", s.LogStreamingController.GetLogStream).Methods("GET").Name(LogViewRouteName)
-	s.Router.HandleFunc("/log-streaming/{org}/{repo}/{pull}/{project}/ws", s.LogStreamingController.GetLogStreamWS).Methods("GET")
+	s.Router.HandleFunc("/jobs/{org}/{repo}/{pull}/{project}", s.JobsController.GetProjectJobs).Methods("GET").Name(ProjectJobsViewRouteName)
+	s.Router.HandleFunc("/jobs/{org}/{repo}/{pull}/{project}/ws", s.JobsController.GetProjectJobsWS).Methods("GET")
 	n := negroni.New(&negroni.Recovery{
 		Logger:     log.New(os.Stdout, "", log.LstdFlags),
 		PrintStack: false,

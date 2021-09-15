@@ -4,57 +4,86 @@ import (
 	"sync"
 
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/feature"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-type DefaultProjectCommandOutputHandler struct {
-	// this is TerraformOutputChan
-	ProjectCmdOutput chan *models.ProjectCmdOutputLine
-	// this logBuffers
+// AsyncProjectCommandOutputHandler is a handler to transport terraform client
+// outputs to the front end.
+type AsyncProjectCommandOutputHandler struct {
+	projectCmdOutput chan *models.ProjectCmdOutputLine
+
 	projectOutputBuffers     map[string][]string
 	projectOutputBuffersLock sync.RWMutex
 
-	// this is wsChans
 	receiverBuffers     map[string]map[chan string]bool
 	receiverBuffersLock sync.RWMutex
 
+	projectStatusUpdater   ProjectStatusUpdater
+	projectJobURLGenerator ProjectJobURLGenerator
+
 	logger logging.SimpleLogging
+}
+
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_job_url_generator.go ProjectJobURLGenerator
+
+// ProjectJobURLGenerator generates urls to view project's progress.
+type ProjectJobURLGenerator interface {
+	GenerateProjectJobURL(p models.ProjectCommandContext) string
+}
+
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_status_updater.go ProjectStatusUpdater
+
+type ProjectStatusUpdater interface {
+	// UpdateProject sets the commit status for the project represented by
+	// ctx.
+	UpdateProject(ctx models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus, url string) error
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_output_handler.go ProjectCommandOutputHandler
 
 type ProjectCommandOutputHandler interface {
+	// Clear clears the buffer from previous terraform output lines
+	Clear(ctx models.ProjectCommandContext)
+
 	// Send will enqueue the msg and wait for Handle() to receive the message.
 	Send(ctx models.ProjectCommandContext, msg string)
-
-	// Clears buffer for new project to run
-	Clear(ctx models.ProjectCommandContext)
 
 	// Receive will create a channel for projectPullInfo and run a callback function argument when the new channel receives a message.
 	Receive(projectInfo string, receiver chan string, callback func(msg string) error) error
 
 	// Listens for msg from channel
 	Handle()
+
+	// SetJobURLWithStatus sets the commit status for the project represented by
+	// ctx and updates the status with and url to a job.
+	SetJobURLWithStatus(ctx models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus) error
 }
 
-func NewProjectCommandOutputHandler(projectCmdOutput chan *models.ProjectCmdOutputLine, logger logging.SimpleLogging) ProjectCommandOutputHandler {
-	return &DefaultProjectCommandOutputHandler{
-		ProjectCmdOutput:     projectCmdOutput,
-		logger:               logger,
-		receiverBuffers:      map[string]map[chan string]bool{},
-		projectOutputBuffers: map[string][]string{},
+func NewAsyncProjectCommandOutputHandler(
+	projectCmdOutput chan *models.ProjectCmdOutputLine,
+	projectStatusUpdater ProjectStatusUpdater,
+	projectJobURLGenerator ProjectJobURLGenerator,
+	logger logging.SimpleLogging,
+) ProjectCommandOutputHandler {
+	return &AsyncProjectCommandOutputHandler{
+		projectCmdOutput:       projectCmdOutput,
+		logger:                 logger,
+		receiverBuffers:        map[string]map[chan string]bool{},
+		projectStatusUpdater:   projectStatusUpdater,
+		projectJobURLGenerator: projectJobURLGenerator,
+		projectOutputBuffers:   map[string][]string{},
 	}
 }
 
-func (p *DefaultProjectCommandOutputHandler) Send(ctx models.ProjectCommandContext, msg string) {
-	p.ProjectCmdOutput <- &models.ProjectCmdOutputLine{
+func (p *AsyncProjectCommandOutputHandler) Send(ctx models.ProjectCommandContext, msg string) {
+	p.projectCmdOutput <- &models.ProjectCmdOutputLine{
 		ProjectInfo: ctx.PullInfo(),
 		Line:        msg,
 	}
 }
 
-func (p *DefaultProjectCommandOutputHandler) Receive(projectInfo string, receiver chan string, callback func(msg string) error) error {
-
+func (p *AsyncProjectCommandOutputHandler) Receive(projectInfo string, receiver chan string, callback func(msg string) error) error {
 	// Avoid deadlock when projectOutputBuffer size is greater than the channel (currently set to 1000)
 	// Running this as a goroutine allows for the channel to be read in callback
 	go p.addChan(receiver, projectInfo)
@@ -69,8 +98,8 @@ func (p *DefaultProjectCommandOutputHandler) Receive(projectInfo string, receive
 	return nil
 }
 
-func (p *DefaultProjectCommandOutputHandler) Handle() {
-	for msg := range p.ProjectCmdOutput {
+func (p *AsyncProjectCommandOutputHandler) Handle() {
+	for msg := range p.projectCmdOutput {
 		if msg.ClearBuffBefore {
 			p.clearLogLines(msg.ProjectInfo)
 			continue
@@ -79,21 +108,26 @@ func (p *DefaultProjectCommandOutputHandler) Handle() {
 	}
 }
 
-func (p *DefaultProjectCommandOutputHandler) Clear(ctx models.ProjectCommandContext) {
-	p.ProjectCmdOutput <- &models.ProjectCmdOutputLine{
+func (p *AsyncProjectCommandOutputHandler) Clear(ctx models.ProjectCommandContext) {
+	p.projectCmdOutput <- &models.ProjectCmdOutputLine{
 		ProjectInfo:     ctx.PullInfo(),
-		Line:            "",
 		ClearBuffBefore: true,
+		Line:            "",
 	}
 }
 
-func (p *DefaultProjectCommandOutputHandler) clearLogLines(pull string) {
+func (p *AsyncProjectCommandOutputHandler) SetJobURLWithStatus(ctx models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus) error {
+	url := p.projectJobURLGenerator.GenerateProjectJobURL(ctx)
+	return p.projectStatusUpdater.UpdateProject(ctx, cmdName, status, url)
+}
+
+func (p *AsyncProjectCommandOutputHandler) clearLogLines(pull string) {
 	p.projectOutputBuffersLock.Lock()
 	delete(p.projectOutputBuffers, pull)
 	p.projectOutputBuffersLock.Unlock()
 }
 
-func (p *DefaultProjectCommandOutputHandler) addChan(ch chan string, pull string) {
+func (p *AsyncProjectCommandOutputHandler) addChan(ch chan string, pull string) {
 	p.receiverBuffersLock.Lock()
 	if p.receiverBuffers[pull] == nil {
 		p.receiverBuffers[pull] = map[chan string]bool{}
@@ -109,7 +143,7 @@ func (p *DefaultProjectCommandOutputHandler) addChan(ch chan string, pull string
 }
 
 //Add log line to buffer and send to all current channels
-func (p *DefaultProjectCommandOutputHandler) writeLogLine(pull string, line string) {
+func (p *AsyncProjectCommandOutputHandler) writeLogLine(pull string, line string) {
 	p.receiverBuffersLock.Lock()
 	for ch := range p.receiverBuffers[pull] {
 		select {
@@ -135,16 +169,77 @@ func (p *DefaultProjectCommandOutputHandler) writeLogLine(pull string, line stri
 }
 
 //Remove channel, so client no longer receives Terraform output
-func (p *DefaultProjectCommandOutputHandler) cleanUp(pull string, ch chan string) {
+func (p *AsyncProjectCommandOutputHandler) cleanUp(pull string, ch chan string) {
 	p.receiverBuffersLock.Lock()
 	delete(p.receiverBuffers[pull], ch)
 	p.receiverBuffersLock.Unlock()
 }
 
-func (p *DefaultProjectCommandOutputHandler) GetReceiverBufferForPull(pull string) map[chan string]bool {
+func (p *AsyncProjectCommandOutputHandler) GetReceiverBufferForPull(pull string) map[chan string]bool {
 	return p.receiverBuffers[pull]
 }
 
-func (p *DefaultProjectCommandOutputHandler) GetProjectOutputBuffer(pull string) []string {
+func (p *AsyncProjectCommandOutputHandler) GetProjectOutputBuffer(pull string) []string {
 	return p.projectOutputBuffers[pull]
+}
+
+// FeatureAwareOutputHandler is a decorator that add feature allocator
+// functionality to the AsyncProjectCommandOutputHandler
+type FeatureAwareOutputHandler struct {
+	FeatureAllocator feature.Allocator
+	ProjectCommandOutputHandler
+}
+
+func NewFeatureAwareOutputHandler(
+	projectCmdOutput chan *models.ProjectCmdOutputLine,
+	projectStatusUpdater ProjectStatusUpdater,
+	projectJobURLGenerator ProjectJobURLGenerator,
+	logger logging.SimpleLogging,
+	featureAllocator feature.Allocator,
+) ProjectCommandOutputHandler {
+	return &FeatureAwareOutputHandler{
+		FeatureAllocator: featureAllocator,
+		ProjectCommandOutputHandler: NewAsyncProjectCommandOutputHandler(
+			projectCmdOutput,
+			projectStatusUpdater,
+			projectJobURLGenerator,
+			logger,
+		),
+	}
+}
+
+// Helper function to check if the log-streaming feature is enabled
+// It dynamically decides based on repo name that is defined in the models.ProjectCommandContext
+func (p *FeatureAwareOutputHandler) featureEnabled(ctx models.ProjectCommandContext) bool {
+	shouldAllocate, err := p.FeatureAllocator.ShouldAllocate(feature.LogStreaming, ctx.Pull.BaseRepo.FullName)
+
+	if err != nil {
+		ctx.Log.Err("unable to allocate for feature: %s, error: %s", feature.LogStreaming, err)
+	}
+
+	return shouldAllocate
+}
+
+func (p *FeatureAwareOutputHandler) Clear(ctx models.ProjectCommandContext) {
+	if !p.featureEnabled(ctx) {
+		return
+	}
+
+	p.ProjectCommandOutputHandler.Clear(ctx)
+}
+
+func (p *FeatureAwareOutputHandler) Send(ctx models.ProjectCommandContext, msg string) {
+	if !p.featureEnabled(ctx) {
+		return
+	}
+
+	p.ProjectCommandOutputHandler.Send(ctx, msg)
+}
+
+func (p *FeatureAwareOutputHandler) SetJobURLWithStatus(ctx models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus) error {
+	if !p.featureEnabled(ctx) {
+		return nil
+	}
+
+	return p.ProjectCommandOutputHandler.SetJobURLWithStatus(ctx, cmdName, status)
 }

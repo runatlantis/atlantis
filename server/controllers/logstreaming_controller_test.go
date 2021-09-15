@@ -14,7 +14,7 @@ import (
 	"github.com/runatlantis/atlantis/server/handlers/mocks/matchers"
 )
 
-func TestGetLogStream_WebSockets(t *testing.T) {
+func TestGetProjectJobs_WebSockets(t *testing.T) {
 	t.Run("Should Group by Project Info", func(t *testing.T) {
 		RegisterMockTestingT(t)
 		websocketMock := mocks.NewMockWebsocketHandler()
@@ -30,7 +30,7 @@ func TestGetLogStream_WebSockets(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/logStreaming/org/repo/1/project/ws", nil)
 		request = mux.SetURLVars(request, params)
 		response := httptest.NewRecorder()
-		logStreamingController := &controllers.LogStreamingController{
+		jobsController := &controllers.JobsController{
 			Logger:                      logger,
 			WebsocketHandler:            websocketMock,
 			ProjectCommandOutputHandler: projectOutputHandler,
@@ -38,7 +38,7 @@ func TestGetLogStream_WebSockets(t *testing.T) {
 
 		When(websocketMock.Upgrade(matchers.AnyHttpResponseWriter(), matchers.AnyPtrToHttpRequest(), matchers.AnyHttpHeader())).ThenReturn(webSocketWrapper, nil)
 
-		logStreamingController.GetLogStreamWS(response, request)
+		jobsController.GetProjectJobsWS(response, request)
 
 		webSocketWrapper.VerifyWasCalled(Once())
 	})
