@@ -11,39 +11,42 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/runatlantis/atlantis/server/controllers/templates"
 	"github.com/runatlantis/atlantis/server/events/db"
-	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/handlers"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-type LogStreamingController struct {
-	AtlantisVersion        string
-	AtlantisURL            *url.URL
-	Logger                 logging.SimpleLogging
-	LogStreamTemplate      templates.TemplateWriter
-	LogStreamErrorTemplate templates.TemplateWriter
-	Db                     *db.BoltDB
+type JobsController struct {
+	AtlantisVersion          string
+	AtlantisURL              *url.URL
+	Logger                   logging.SimpleLogging
+	ProjectJobsTemplate      templates.TemplateWriter
+	ProjectJobsErrorTemplate templates.TemplateWriter
+	Db                       *db.BoltDB
 
 	WebsocketHandler            handlers.WebsocketHandler
 	ProjectCommandOutputHandler handlers.ProjectCommandOutputHandler
 }
 
-type PullInfo struct {
-	Org         string
-	Repo        string
-	Pull        int
-	ProjectName string
+type pullInfo struct {
+	org  string
+	repo string
+	pull int
 }
 
-func (p *PullInfo) String() string {
-	return fmt.Sprintf("%s/%s/%d/%s", p.Org, p.Repo, p.Pull, p.ProjectName)
+func (p *pullInfo) String() string {
+	return fmt.Sprintf("%s/%s/%d", p.org, p.repo, p.pull)
 }
 
-// Gets the PR information from the HTTP request params
-func newPullInfo(r *http.Request) (*PullInfo, error) {
-	fmt.Printf("%+v", r)
-	fmt.Printf("\n%+v", mux.Vars(r))
+type projectInfo struct {
+	projectName string
+	pullInfo
+}
 
+func (p *projectInfo) String() string {
+	return fmt.Sprintf("%s/%s/%d/%s", p.org, p.repo, p.pull, p.projectName)
+}
+
+func newPullInfo(r *http.Request) (*pullInfo, error) {
 	org, ok := mux.Vars(r)["org"]
 	if !ok {
 		return nil, fmt.Errorf("Internal error: no org in route")
@@ -56,61 +59,57 @@ func newPullInfo(r *http.Request) (*PullInfo, error) {
 	if !ok {
 		return nil, fmt.Errorf("Internal error: no pull in route")
 	}
-
-	project, ok := mux.Vars(r)["project"]
-	if !ok {
-		return nil, fmt.Errorf("Internal error: no project in route")
-	}
 	pullNum, err := strconv.Atoi(pull)
 	if err != nil {
 		return nil, err
 	}
 
-	return &PullInfo{
-		Org:         org,
-		Repo:        repo,
-		Pull:        pullNum,
-		ProjectName: project,
+	return &pullInfo{
+		org:  org,
+		repo: repo,
+		pull: pullNum,
 	}, nil
 }
 
-func (j *LogStreamingController) GetLogStream(w http.ResponseWriter, r *http.Request) {
+// Gets the PR information from the HTTP request params
+func newProjectInfo(r *http.Request) (*projectInfo, error) {
 	pullInfo, err := newPullInfo(r)
 	if err != nil {
-		j.respond(w, logging.Error, http.StatusInternalServerError, err.Error())
-		return
+		return nil, err
 	}
-	//check db if it has pull project ret true or false(404)
-	exist, err := j.RetrievePrStatus(pullInfo)
+
+	project, ok := mux.Vars(r)["project"]
+	if !ok {
+		return nil, fmt.Errorf("Internal error: no project in route")
+	}
+
+	return &projectInfo{
+		pullInfo:    *pullInfo,
+		projectName: project,
+	}, nil
+}
+
+func (j *JobsController) GetProjectJobs(w http.ResponseWriter, r *http.Request) {
+	projectInfo, err := newProjectInfo(r)
 	if err != nil {
 		j.respond(w, logging.Error, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	if !exist {
-		if err := j.LogStreamErrorTemplate.Execute(w, err); err != nil {
-			j.Logger.Err(err.Error())
-			j.respond(w, logging.Error, http.StatusInternalServerError, err.Error())
-			return
-		}
-		j.respond(w, logging.Warn, http.StatusNotFound, "")
-		return
-	}
-
-	viewData := templates.LogStreamData{
+	viewData := templates.ProjectJobData{
 		AtlantisVersion: j.AtlantisVersion,
-		PullInfo:        pullInfo.String(),
+		ProjectPath:     projectInfo.String(),
 		CleanedBasePath: j.AtlantisURL.Path,
 	}
 
-	err = j.LogStreamTemplate.Execute(w, viewData)
+	err = j.ProjectJobsTemplate.Execute(w, viewData)
 	if err != nil {
 		j.Logger.Err(err.Error())
 	}
 }
 
-func (j *LogStreamingController) GetLogStreamWS(w http.ResponseWriter, r *http.Request) {
-	pullInfo, err := newPullInfo(r)
+func (j *JobsController) GetProjectJobsWS(w http.ResponseWriter, r *http.Request) {
+	projectInfo, err := newProjectInfo(r)
 	if err != nil {
 		j.respond(w, logging.Error, http.StatusInternalServerError, err.Error())
 		return
@@ -130,7 +129,7 @@ func (j *LogStreamingController) GetLogStreamWS(w http.ResponseWriter, r *http.R
 	// Add a reader goroutine to listen for socket.close() events.
 	go j.WebsocketHandler.SetReadHandler(c)
 
-	pull := pullInfo.String()
+	pull := projectInfo.String()
 	err = j.ProjectCommandOutputHandler.Receive(pull, receiver, func(msg string) error {
 		if err := c.WriteMessage(websocket.BinaryMessage, []byte(msg+"\r\n\t")); err != nil {
 			j.Logger.Warn("Failed to write ws message: %s", err)
@@ -144,43 +143,11 @@ func (j *LogStreamingController) GetLogStreamWS(w http.ResponseWriter, r *http.R
 		j.respond(w, logging.Error, http.StatusInternalServerError, err.Error())
 		return
 	}
-
 }
 
-func (j *LogStreamingController) respond(w http.ResponseWriter, lvl logging.LogLevel, responseCode int, format string, args ...interface{}) {
+func (j *JobsController) respond(w http.ResponseWriter, lvl logging.LogLevel, responseCode int, format string, args ...interface{}) {
 	response := fmt.Sprintf(format, args...)
 	j.Logger.Log(lvl, response)
 	w.WriteHeader(responseCode)
 	fmt.Fprintln(w, response)
-}
-
-//repo, pull num, project name moved to db
-func (j *LogStreamingController) RetrievePrStatus(pullInfo *PullInfo) (bool, error) {
-	pull := models.PullRequest{
-		Num: pullInfo.Pull,
-		BaseRepo: models.Repo{
-			FullName: fmt.Sprintf("%s/%s", pullInfo.Org, pullInfo.Repo),
-			Owner:    pullInfo.Org,
-			Name:     pullInfo.Repo,
-			VCSHost: models.VCSHost{
-				Hostname: "github.com",
-				Type:     models.Github,
-			},
-		},
-	}
-
-	d, err := j.Db.GetPullStatus(pull)
-	//Checks if pull request status exists
-	if err != nil {
-		//Checks if project array contains said project
-		return false, err
-	}
-	if d != nil {
-		for _, ps := range d.Projects {
-			if ps.ProjectName == pullInfo.ProjectName {
-				return true, nil
-			}
-		}
-	}
-	return false, nil
 }

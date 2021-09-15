@@ -45,12 +45,6 @@ type LockURLGenerator interface {
 	GenerateLockURL(lockID string) string
 }
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_log_stream_url_generator.go LogStreamURLGenerator
-
-type LogStreamURLGenerator interface {
-	GenerateLogStreamURL(pull models.PullRequest, p models.ProjectCommandContext) string
-}
-
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_step_runner.go StepRunner
 
 // StepRunner runs steps. Steps are individual pieces of execution like
@@ -114,6 +108,50 @@ type ProjectCommandRunner interface {
 	ProjectApprovePoliciesCommandRunner
 }
 
+// ProjectOutputWrapper is a decorator that creates a new PR status check per project.
+// The status contains a url that outputs current progress of the terraform plan/apply command.
+type ProjectOutputWrapper struct {
+	ProjectCommandRunner
+	ProjectCmdOutputHandler handlers.ProjectCommandOutputHandler
+}
+
+func (p *ProjectOutputWrapper) Plan(ctx models.ProjectCommandContext) models.ProjectResult {
+	// Reset the buffer when running the plan. We only need to do this for plan,
+	// apply is a continuation of the same workflow
+	p.ProjectCmdOutputHandler.Clear(ctx)
+	return p.updateProjectPRStatus(models.PlanCommand, ctx, p.ProjectCommandRunner.Plan)
+}
+
+func (p *ProjectOutputWrapper) Apply(ctx models.ProjectCommandContext) models.ProjectResult {
+	return p.updateProjectPRStatus(models.ApplyCommand, ctx, p.ProjectCommandRunner.Apply)
+}
+
+func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName models.CommandName, ctx models.ProjectCommandContext, execute func(ctx models.ProjectCommandContext) models.ProjectResult) models.ProjectResult {
+	// Create a PR status to track project's plan status. The status will
+	// include a link to view the progress of atlantis plan command in real
+	// time
+	if err := p.ProjectCmdOutputHandler.SetJobURLWithStatus(ctx, commandName, models.PendingCommitStatus); err != nil {
+		ctx.Log.Err("updating project PR status", err)
+	}
+
+	// ensures we are differentiating between project level command and overall command
+	result := execute(ctx)
+
+	if result.Error != nil || result.Failure != "" {
+		if err := p.ProjectCmdOutputHandler.SetJobURLWithStatus(ctx, commandName, models.FailedCommitStatus); err != nil {
+			ctx.Log.Err("updating project PR status", err)
+		}
+
+		return result
+	}
+
+	if err := p.ProjectCmdOutputHandler.SetJobURLWithStatus(ctx, commandName, models.SuccessCommitStatus); err != nil {
+		ctx.Log.Err("updating project PR status", err)
+	}
+
+	return result
+}
+
 // DefaultProjectCommandRunner implements ProjectCommandRunner.
 type DefaultProjectCommandRunner struct {
 	Locker                     ProjectLocker
@@ -130,9 +168,6 @@ type DefaultProjectCommandRunner struct {
 	Webhooks                   WebhooksSender
 	WorkingDirLocker           WorkingDirLocker
 	AggregateApplyRequirements ApplyRequirement
-	ProjectCmdOutputLine       models.ProjectCmdOutputLine
-	ProjectCmdOutputHandler    handlers.ProjectCommandOutputHandler
-	LogStreamURLGenerator      LogStreamURLGenerator
 }
 
 // Plan runs terraform plan for the project described by ctx.
@@ -302,7 +337,6 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
-	p.ProjectCmdOutputHandler.Clear(ctx)
 	outputs, err := p.runSteps(ctx.Steps, ctx, projAbsPath)
 
 	if err != nil {
@@ -347,6 +381,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 	defer unlockFn()
 
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
+
 	p.Webhooks.Send(ctx.Log, webhooks.ApplyResult{ // nolint: errcheck
 		Workspace: ctx.Workspace,
 		User:      ctx.User,
@@ -355,9 +390,11 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 		Success:   err == nil,
 		Directory: ctx.RepoRelDir,
 	})
+
 	if err != nil {
 		return "", "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
 	}
+
 	return strings.Join(outputs, "\n"), "", nil
 }
 
