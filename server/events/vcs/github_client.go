@@ -294,7 +294,7 @@ func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRe
 	for i := 0; i < maxAttempts; i++ {
 		// First don't sleep, then sleep 1, 3, 7, etc.
 		time.Sleep(attemptDelay)
-		attemptDelay = 2 * attemptDelay + 1 * time.Second
+		attemptDelay = 2*attemptDelay + 1*time.Second
 
 		pull, _, err = g.client.PullRequests.Get(g.ctx, repo.Owner, repo.Name, num)
 		if err == nil {
