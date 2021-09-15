@@ -2,17 +2,10 @@
 # We need terraform installed for our full test suite so it installs that.
 # It's updated by running make build-testing-image which will also push a new
 # image.
-<<<<<<< HEAD
-FROM circleci/golang:1.16
-
-# Install Terraform
-ENV TERRAFORM_VERSION=0.15.1
-=======
 FROM circleci/golang:1.17
 
 # Install Terraform
 ENV TERRAFORM_VERSION=1.0.5
->>>>>>> 8aabf00b672ae086abcb7c2c378d897122ad3d14
 RUN curl -LOks https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip && \
     sudo mkdir -p /usr/local/bin/tf/versions/${TERRAFORM_VERSION} && \
     sudo unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip -d /usr/local/bin/tf/versions/${TERRAFORM_VERSION} && \
@@ -20,11 +13,7 @@ RUN curl -LOks https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/ter
     rm terraform_${TERRAFORM_VERSION}_linux_amd64.zip
 
 # Install conftest
-<<<<<<< HEAD
-ENV DEFAULT_CONFTEST_VERSION=0.23.0
-=======
 ENV DEFAULT_CONFTEST_VERSION=0.25.0
->>>>>>> 8aabf00b672ae086abcb7c2c378d897122ad3d14
 
 RUN AVAILABLE_CONFTEST_VERSIONS="${DEFAULT_CONFTEST_VERSION}" && \
     for VERSION in ${AVAILABLE_CONFTEST_VERSIONS}; do \

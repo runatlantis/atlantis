@@ -92,11 +92,7 @@ deny[msg] {
 ```
 
 ::: tip Notes
-<<<<<<< HEAD
-By default conftest is configured to only run the `main` package.  If you want to change this behavior [`extra_args`](https://www.runatlantis.io/docs/custom-workflows.html#adding-extra-arguments-to-terraform-commands) can be used to pass in flags to conftest such as `--namespace` or `--all-namespaces`
-=======
 By default conftest is configured to only run the `main` package. If you want to change this behavior [`extra_args`](https://www.runatlantis.io/docs/custom-workflows.html#adding-extra-arguments-to-terraform-commands) can be used to pass in flags to conftest such as `--namespace` or `--all-namespaces`
->>>>>>> 8aabf00b672ae086abcb7c2c378d897122ad3d14
 :::
 
 That's it! Now your Atlantis instance is configured to run policies on your Terraform plans 🎉

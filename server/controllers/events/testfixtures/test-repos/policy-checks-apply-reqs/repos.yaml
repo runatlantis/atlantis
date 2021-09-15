@@ -1,9 +1,6 @@
-<<<<<<< HEAD:server/testfixtures/test-repos/policy-checks/repos.yaml
-=======
 repos:
 - id: /.*/
   apply_requirements: [approved]
->>>>>>> 8aabf00b672ae086abcb7c2c378d897122ad3d14:server/controllers/events/testfixtures/test-repos/policy-checks-apply-reqs/repos.yaml
 policies:
   owners:
     users:
@@ -12,4 +9,4 @@ policies:
     - name: test_policy
       path: policies/policy.rego
       source: local
-        
+
