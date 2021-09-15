@@ -403,6 +403,7 @@ func (c *DefaultClient) RunCommandAsync(ctx models.ProjectCommandContext, path s
 
 		// Asynchronously copy from stdout/err to outCh.
 		go func() {
+			c.projectCmdOutputHandler.Send(ctx, fmt.Sprintf("\n----- running terraform %s -----\n", args[0]))
 			s := bufio.NewScanner(stdout)
 			for s.Scan() {
 				message := s.Text()

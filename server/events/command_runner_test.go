@@ -78,7 +78,6 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 	workingDir = mocks.NewMockWorkingDir()
 	pendingPlanFinder = mocks.NewMockPendingPlanFinder()
 	commitUpdater = mocks.NewMockCommitStatusUpdater()
-
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 	defaultBoltDB, err := db.New(tmp)
@@ -130,7 +129,6 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		parallelPoolSize,
 		SilenceNoProjects,
 		defaultBoltDB,
-		eventmocks.NewMockLogStreamURLGenerator(),
 	)
 
 	pullReqStatusFetcher := vcs.NewPullReqStatusFetcher(vcsClient)
@@ -150,7 +148,6 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		SilenceNoProjects,
 		false,
 		pullReqStatusFetcher,
-		eventmocks.NewMockLogStreamURLGenerator(),
 	)
 
 	approvePoliciesCommandRunner = events.NewApprovePoliciesCommandRunner(

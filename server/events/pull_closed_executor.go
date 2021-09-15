@@ -16,6 +16,7 @@ package events
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 	"text/template"
@@ -42,11 +43,12 @@ type PullCleaner interface {
 // PullClosedExecutor executes the tasks required to clean up a closed pull
 // request.
 type PullClosedExecutor struct {
-	Locker     locking.Locker
-	VCSClient  vcs.Client
-	WorkingDir WorkingDir
-	Logger     logging.SimpleLogging
-	DB         *db.BoltDB
+	Locker             locking.Locker
+	VCSClient          vcs.Client
+	WorkingDir         WorkingDir
+	Logger             logging.SimpleLogging
+	DB                 *db.BoltDB
+	PullClosedTemplate PullCleanupTemplate
 }
 
 type templatedProject struct {
@@ -58,6 +60,16 @@ var pullClosedTemplate = template.Must(template.New("").Parse(
 	"Locks and plans deleted for the projects and workspaces modified in this pull request:\n" +
 		"{{ range . }}\n" +
 		"- dir: `{{ .RepoRelDir }}` {{ .Workspaces }}{{ end }}"))
+
+type PullCleanupTemplate interface {
+	Execute(wr io.Writer, data interface{}) error
+}
+
+type PullClosedEventTemplate struct{}
+
+func (t *PullClosedEventTemplate) Execute(wr io.Writer, data interface{}) error {
+	return pullClosedTemplate.Execute(wr, data)
+}
 
 // CleanUpPull cleans up after a closed pull request.
 func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullRequest) error {

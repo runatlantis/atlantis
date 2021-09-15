@@ -936,14 +936,12 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTFVersion,
 		},
-		WorkingDir:              workingDir,
-		Webhooks:                &mockWebhookSender{},
-		WorkingDirLocker:        locker,
-		ProjectCmdOutputHandler: projectCmdOutputHandler,
+		WorkingDir:       workingDir,
+		Webhooks:         &mockWebhookSender{},
+		WorkingDirLocker: locker,
 		AggregateApplyRequirements: &events.AggregateApplyRequirements{
 			WorkingDir: workingDir,
 		},
-		LogStreamURLGenerator: mocks.NewMockLogStreamURLGenerator(),
 	}
 
 	dbUpdater := &events.DBUpdater{
@@ -986,7 +984,6 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		parallelPoolSize,
 		silenceNoProjects,
 		boltdb,
-		mocks.NewMockLogStreamURLGenerator(),
 	)
 
 	e2ePullReqStatusFetcher := vcs.NewPullReqStatusFetcher(e2eVCSClient)
@@ -1006,7 +1003,6 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		silenceNoProjects,
 		false,
 		e2ePullReqStatusFetcher,
-		mocks.NewMockLogStreamURLGenerator(),
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
