@@ -288,10 +288,14 @@ func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRe
 
 	// GitHub has started to return 404's here (#1019) even after they send the webhook.
 	// They've got some eventual consistency issues going on so we're just going
-	// to retry up to 3 times with a 1s sleep.
-	numRetries := 3
-	retryDelay := 1 * time.Second
-	for i := 0; i < numRetries; i++ {
+	// to attempt up to 5 times with exponential backoff.
+	maxAttempts := 5
+	attemptDelay := 0 * time.Second
+	for i := 0; i < maxAttempts; i++ {
+		// First don't sleep, then sleep 1, 3, 7, etc.
+		time.Sleep(attemptDelay)
+		attemptDelay = 2 * attemptDelay + 1 * time.Second
+
 		pull, _, err = g.client.PullRequests.Get(g.ctx, repo.Owner, repo.Name, num)
 		if err == nil {
 			return pull, nil
@@ -300,7 +304,6 @@ func (g *GithubClient) GetPullRequest(repo models.Repo, num int) (*github.PullRe
 		if !ok || ghErr.Response.StatusCode != 404 {
 			return pull, err
 		}
-		time.Sleep(retryDelay)
 	}
 	return pull, err
 }
