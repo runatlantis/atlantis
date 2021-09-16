@@ -133,7 +133,7 @@ func (j *JobsController) GetProjectJobsWS(w http.ResponseWriter, r *http.Request
 
 	pull := projectInfo.String()
 	err = j.ProjectCommandOutputHandler.Receive(pull, receiver, func(msg string) error {
-		if err := c.WriteMessage(websocket.BinaryMessage, []byte("\r"+msg+"\n")); err != nil {
+		if err := c.WriteMessage(websocket.BinaryMessage, []byte("\r\t"+msg+"\n")); err != nil {
 			j.Logger.Warn("Failed to write ws message: %s", err)
 			return err
 		}
