@@ -357,6 +357,7 @@ type ProjectJobData struct {
 	AtlantisVersion string
 	ProjectPath     string
 	CleanedBasePath string
+	ClearMsg        string
 }
 
 var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
@@ -413,6 +414,13 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
         document.location.host +
         document.location.pathname +
         "/ws");
+      socket.onmessage = function(event) {
+        var msg = String.fromCharCode.apply(null,  new Uint8Array(event.data))
+        if (msg.trim() === "-----Starting New Process-----") {
+          term.clear()
+          return 
+        }
+      }
       var attachAddon = new AttachAddon.AttachAddon(socket);
       var fitAddon = new FitAddon.FitAddon();
       term.loadAddon(attachAddon);

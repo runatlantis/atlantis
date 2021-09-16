@@ -86,6 +86,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		}()
 
 		projectOutputHandler.Send(ctx, Msg)
+		close(ch)
 
 		// Wait for the msg to be read.
 		wg.Wait()
@@ -114,6 +115,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 
 		// Send a clear msg
 		projectOutputHandler.Clear(ctx)
+		close(ch)
 
 		dfProjectOutputHandler, ok := projectOutputHandler.(*handlers.AsyncProjectCommandOutputHandler)
 		assert.True(t, ok)
@@ -183,10 +185,10 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		// Expecting two calls to callback.
 		wg.Add(2)
 
-		expectedMsg := []string{}
+		receivedMsgs := []string{}
 		go func() {
 			err := projectOutputHandler.Receive(ctx.PullInfo(), ch, func(msg string) error {
-				expectedMsg = append(expectedMsg, msg)
+				receivedMsgs = append(receivedMsgs, msg)
 				wg.Done()
 				return nil
 			})
@@ -201,7 +203,12 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		// Wait for the message to be read.
 		wg.Wait()
 		close(ch)
-		assert.Equal(t, []string{Msg, Msg}, expectedMsg)
+
+		expectedMsgs := []string{Msg, Msg}
+		assert.Equal(t, len(expectedMsgs), len(receivedMsgs))
+		for i := range expectedMsgs {
+			assert.Equal(t, expectedMsgs[i], receivedMsgs[i])
+		}
 	})
 
 	t.Run("update project status with project jobs url", func(t *testing.T) {
