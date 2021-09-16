@@ -452,7 +452,7 @@ func (c *DefaultClient) RunCommandAsync(ctx models.ProjectCommandContext, path s
 				message := s.Text()
 				outCh <- Line{Line: message}
 				if isValidCommand(cmds[1]) {
-					c.projectCmdOutputHandler.Send(ctx, message)
+					c.projectCmdOutputHandler.Send(ctx, "\t"+message)
 				}
 			}
 			wg.Done()
