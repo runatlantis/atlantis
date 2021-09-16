@@ -444,7 +444,9 @@ func (c *DefaultClient) RunCommandAsync(ctx models.ProjectCommandContext, path s
 		go func() {
 			// Don't stream terraform show output to outCh
 			cmds := strings.Split(tfCmd, " ")
-			c.projectCmdOutputHandler.Send(ctx, fmt.Sprintf("\n----- running terraform %s -----\n", args[0]))
+			if isValidCommand(cmds[1]) {
+				c.projectCmdOutputHandler.Send(ctx, fmt.Sprintf("\n----- running terraform %s -----", args[0]))
+			}
 			s := bufio.NewScanner(stdout)
 			for s.Scan() {
 				message := s.Text()

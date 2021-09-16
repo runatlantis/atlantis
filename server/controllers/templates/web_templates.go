@@ -415,7 +415,7 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
         document.location.pathname +
         "/ws");
       socket.onmessage = function(event) {
-        var msg = String.fromCharCode.apply(null,  new Uint8Array(event.data))
+        var msg = String.fromCharCode.apply(null, new Uint8Array(event.data))
         if (msg.trim() === "-----Starting New Process-----") {
           term.clear()
           return 
