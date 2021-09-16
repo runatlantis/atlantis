@@ -38,6 +38,8 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
+var LogStreamingValidCmds = [...]string{"init", "plan", "apply"}
+
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_terraform_client.go Client
 
 type Client interface {
@@ -440,21 +442,28 @@ func (c *DefaultClient) RunCommandAsync(ctx models.ProjectCommandContext, path s
 
 		// Asynchronously copy from stdout/err to outCh.
 		go func() {
+			// Don't stream terraform show output to outCh
+			cmds := strings.Split(tfCmd, " ")
 			c.projectCmdOutputHandler.Send(ctx, fmt.Sprintf("\n----- running terraform %s -----\n", args[0]))
 			s := bufio.NewScanner(stdout)
 			for s.Scan() {
 				message := s.Text()
 				outCh <- Line{Line: message}
-				c.projectCmdOutputHandler.Send(ctx, message)
+				if isValidCommand(cmds[1]) {
+					c.projectCmdOutputHandler.Send(ctx, message)
+				}
 			}
 			wg.Done()
 		}()
 		go func() {
+			cmds := strings.Split(tfCmd, " ")
 			s := bufio.NewScanner(stderr)
 			for s.Scan() {
 				message := s.Text()
 				outCh <- Line{Line: message}
-				c.projectCmdOutputHandler.Send(ctx, message)
+				if isValidCommand(cmds[1]) {
+					c.projectCmdOutputHandler.Send(ctx, message)
+				}
 			}
 			wg.Done()
 		}()
@@ -555,6 +564,15 @@ func generateRCFile(tfeToken string, tfeHostname string, home string) error {
 		return errors.Wrapf(err, "writing generated %s file with TFE token to %s", rcFilename, rcFile)
 	}
 	return nil
+}
+
+func isValidCommand(cmd string) bool {
+	for _, validCmd := range LogStreamingValidCmds {
+		if validCmd == cmd {
+			return true
+		}
+	}
+	return false
 }
 
 func getVersion(tfBinary string) (*version.Version, error) {
