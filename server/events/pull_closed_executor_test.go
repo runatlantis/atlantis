@@ -14,10 +14,15 @@
 package events_test
 
 import (
-	"errors"
+	"io/ioutil"
 	"testing"
 
+	"github.com/pkg/errors"
+	bolt "go.etcd.io/bbolt"
+
 	"github.com/runatlantis/atlantis/server/events/db"
+	"github.com/runatlantis/atlantis/server/handlers"
+	"github.com/stretchr/testify/assert"
 
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server/events"
@@ -27,6 +32,8 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/fixtures"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
+	handlermocks "github.com/runatlantis/atlantis/server/handlers/mocks"
+	loggermocks "github.com/runatlantis/atlantis/server/logging/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -34,11 +41,16 @@ func TestCleanUpPullWorkspaceErr(t *testing.T) {
 	t.Log("when workspace.Delete returns an error, we return it")
 	RegisterMockTestingT(t)
 	w := mocks.NewMockWorkingDir()
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	db, err := db.New(tmp)
+	Ok(t, err)
 	pce := events.PullClosedExecutor{
 		WorkingDir:         w,
 		PullClosedTemplate: &events.PullClosedEventTemplate{},
+		DB:                 db,
 	}
-	err := errors.New("err")
+	err = errors.New("err")
 	When(w.Delete(fixtures.GithubRepo, fixtures.Pull)).ThenReturn(err)
 	actualErr := pce.CleanUpPull(fixtures.GithubRepo, fixtures.Pull)
 	Equals(t, "cleaning workspace: err", actualErr.Error())
@@ -49,12 +61,17 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 	RegisterMockTestingT(t)
 	w := mocks.NewMockWorkingDir()
 	l := lockmocks.NewMockLocker()
+	tmp, cleanup := TempDir(t)
+	defer cleanup()
+	db, err := db.New(tmp)
+	Ok(t, err)
 	pce := events.PullClosedExecutor{
 		Locker:             l,
 		WorkingDir:         w,
+		DB:                 db,
 		PullClosedTemplate: &events.PullClosedEventTemplate{},
 	}
-	err := errors.New("err")
+	err = errors.New("err")
 	When(l.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(nil, err)
 	actualErr := pce.CleanUpPull(fixtures.GithubRepo, fixtures.Pull)
 	Equals(t, "cleaning up locks: err", actualErr.Error())
@@ -72,7 +89,6 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 	Ok(t, err)
 	pce := events.PullClosedExecutor{
 		Locker:             l,
-		VCSClient:          cp,
 		WorkingDir:         w,
 		DB:                 db,
 		PullClosedTemplate: &events.PullClosedEventTemplate{},
@@ -150,18 +166,18 @@ func TestCleanUpPullComments(t *testing.T) {
 	}
 	for _, c := range cases {
 		func() {
-			w := mocks.NewMockWorkingDir()
 			cp := vcsmocks.NewMockClient()
 			l := lockmocks.NewMockLocker()
+			w := mocks.NewMockWorkingDir()
 			tmp, cleanup := TempDir(t)
 			defer cleanup()
 			db, err := db.New(tmp)
 			Ok(t, err)
 			pce := events.PullClosedExecutor{
 				Locker:             l,
+				DB:                 db,
 				VCSClient:          cp,
 				WorkingDir:         w,
-				DB:                 db,
 				PullClosedTemplate: &events.PullClosedEventTemplate{},
 			}
 			t.Log("testing: " + c.Description)
@@ -174,4 +190,100 @@ func TestCleanUpPullComments(t *testing.T) {
 			Equals(t, expected, comment)
 		}()
 	}
+}
+
+func TestCleanUpLogStreaming(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	t.Run("Should Clean Up Log Streaming Resources When PR is closed", func(t *testing.T) {
+		prjStatusUpdater := handlermocks.NewMockProjectStatusUpdater()
+		prjJobURLGenerator := handlermocks.NewMockProjectJobURLGenerator()
+
+		// Create Log streaming resources
+		prjCmdOutput := make(chan *models.ProjectCmdOutputLine)
+		prjCmdOutHandler := handlers.NewAsyncProjectCommandOutputHandler(prjCmdOutput, prjStatusUpdater, prjJobURLGenerator, logger)
+		ctx := models.ProjectCommandContext{
+			BaseRepo:    fixtures.GithubRepo,
+			Pull:        fixtures.Pull,
+			ProjectName: *fixtures.Project.Name,
+		}
+
+		go prjCmdOutHandler.Handle()
+		prjCmdOutHandler.Send(ctx, "Test Message")
+
+		// Create boltdb and add pull request.
+		var lockBucket = "bucket"
+		var configBucket = "configBucket"
+		var pullsBucketName = "pulls"
+
+		f, err := ioutil.TempFile("", "")
+		if err != nil {
+			panic(errors.Wrap(err, "failed to create temp file"))
+		}
+		path := f.Name()
+		f.Close() // nolint: errcheck
+
+		// Open the database.
+		boltDB, err := bolt.Open(path, 0600, nil)
+		if err != nil {
+			panic(errors.Wrap(err, "could not start bolt DB"))
+		}
+		if err := boltDB.Update(func(tx *bolt.Tx) error {
+			if _, err := tx.CreateBucketIfNotExists([]byte(pullsBucketName)); err != nil {
+				return errors.Wrap(err, "failed to create bucket")
+			}
+			return nil
+		}); err != nil {
+			panic(errors.Wrap(err, "could not create bucket"))
+		}
+		db, _ := db.NewWithDB(boltDB, lockBucket, configBucket)
+		result := []models.ProjectResult{
+			{
+				RepoRelDir:  fixtures.GithubRepo.FullName,
+				Workspace:   "default",
+				ProjectName: *fixtures.Project.Name,
+			},
+		}
+
+		// Create a new record for pull
+		_, err = db.UpdatePullWithResults(fixtures.Pull, result)
+		Ok(t, err)
+
+		workingDir := mocks.NewMockWorkingDir()
+		locker := lockmocks.NewMockLocker()
+		client := vcsmocks.NewMockClient()
+		logger := loggermocks.NewMockSimpleLogging()
+
+		pullClosedExecutor := events.PullClosedExecutor{
+			Locker:                   locker,
+			WorkingDir:               workingDir,
+			DB:                       db,
+			VCSClient:                client,
+			PullClosedTemplate:       &events.PullClosedEventTemplate{},
+			LogStreamResourceCleaner: prjCmdOutHandler,
+			Logger:                   logger,
+		}
+
+		locks := []models.ProjectLock{
+			{
+				Project:   models.NewProject(fixtures.GithubRepo.FullName, ""),
+				Workspace: "default",
+			},
+		}
+		When(locker.UnlockByPull(fixtures.GithubRepo.FullName, fixtures.Pull.Num)).ThenReturn(locks, nil)
+
+		// Clean up.
+		err = pullClosedExecutor.CleanUpPull(fixtures.GithubRepo, fixtures.Pull)
+		Ok(t, err)
+
+		close(prjCmdOutput)
+		_, _, comment, _ := client.VerifyWasCalledOnce().CreateComment(matchers.AnyModelsRepo(), AnyInt(), AnyString(), AnyString()).GetCapturedArguments()
+		expectedComment := "Locks and plans deleted for the projects and workspaces modified in this pull request:\n\n" + "- dir: `.` workspace: `default`"
+		Equals(t, expectedComment, comment)
+
+		// Assert log streaming resources are cleaned up.
+		dfPrjCmdOutputHandler := prjCmdOutHandler.(*handlers.AsyncProjectCommandOutputHandler)
+		assert.Empty(t, dfPrjCmdOutputHandler.GetProjectOutputBuffer(ctx.PullInfo()))
+		assert.Empty(t, dfPrjCmdOutputHandler.GetReceiverBufferForPull(ctx.PullInfo()))
+	})
 }

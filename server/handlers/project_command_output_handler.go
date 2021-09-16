@@ -58,6 +58,14 @@ type ProjectCommandOutputHandler interface {
 	// SetJobURLWithStatus sets the commit status for the project represented by
 	// ctx and updates the status with and url to a job.
 	SetJobURLWithStatus(ctx models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus) error
+
+	ResourceCleaner
+}
+
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_resource_cleaner.go ResourceCleaner
+
+type ResourceCleaner interface {
+	CleanUp(pull string)
 }
 
 func NewAsyncProjectCommandOutputHandler(
@@ -87,7 +95,7 @@ func (p *AsyncProjectCommandOutputHandler) Receive(projectInfo string, receiver 
 	// Avoid deadlock when projectOutputBuffer size is greater than the channel (currently set to 1000)
 	// Running this as a goroutine allows for the channel to be read in callback
 	go p.addChan(receiver, projectInfo)
-	defer p.cleanUp(projectInfo, receiver)
+	defer p.removeChan(projectInfo, receiver)
 
 	for msg := range receiver {
 		if err := callback(msg); err != nil {
@@ -169,7 +177,7 @@ func (p *AsyncProjectCommandOutputHandler) writeLogLine(pull string, line string
 }
 
 //Remove channel, so client no longer receives Terraform output
-func (p *AsyncProjectCommandOutputHandler) cleanUp(pull string, ch chan string) {
+func (p *AsyncProjectCommandOutputHandler) removeChan(pull string, ch chan string) {
 	p.receiverBuffersLock.Lock()
 	delete(p.receiverBuffers[pull], ch)
 	p.receiverBuffersLock.Unlock()
@@ -181,6 +189,19 @@ func (p *AsyncProjectCommandOutputHandler) GetReceiverBufferForPull(pull string)
 
 func (p *AsyncProjectCommandOutputHandler) GetProjectOutputBuffer(pull string) []string {
 	return p.projectOutputBuffers[pull]
+}
+
+func (p *AsyncProjectCommandOutputHandler) CleanUp(pull string) {
+	p.projectOutputBuffersLock.Lock()
+	delete(p.projectOutputBuffers, pull)
+	p.projectOutputBuffersLock.Unlock()
+
+	p.receiverBuffersLock.Lock()
+	for ch := range p.receiverBuffers[pull] {
+		close(ch)
+	}
+	delete(p.receiverBuffers, pull)
+	p.receiverBuffersLock.Unlock()
 }
 
 // FeatureAwareOutputHandler is a decorator that add feature allocator

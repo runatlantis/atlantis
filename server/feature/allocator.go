@@ -6,7 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/thomaspoignant/go-feature-flag"
+	ffclient "github.com/thomaspoignant/go-feature-flag"
 	"github.com/thomaspoignant/go-feature-flag/ffuser"
 )
 

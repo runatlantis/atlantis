@@ -29,6 +29,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/handlers"
 )
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_pull_cleaner.go PullCleaner
@@ -43,12 +44,13 @@ type PullCleaner interface {
 // PullClosedExecutor executes the tasks required to clean up a closed pull
 // request.
 type PullClosedExecutor struct {
-	Locker             locking.Locker
-	VCSClient          vcs.Client
-	WorkingDir         WorkingDir
-	Logger             logging.SimpleLogging
-	DB                 *db.BoltDB
-	PullClosedTemplate PullCleanupTemplate
+	Locker                   locking.Locker
+	Logger                   logging.SimpleLogging
+	DB                       *db.BoltDB
+	PullClosedTemplate       PullCleanupTemplate
+	LogStreamResourceCleaner handlers.ResourceCleaner
+	VCSClient                vcs.Client
+	WorkingDir               WorkingDir
 }
 
 type templatedProject struct {
@@ -73,6 +75,24 @@ var pullClosedTemplate = template.Must(template.New("").Parse(
 
 // CleanUpPull cleans up after a closed pull request.
 func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullRequest) error {
+	pullStatus, err := p.DB.GetPullStatus(pull)
+	if err != nil {
+		// Log and continue to clean up other resources.
+		p.Logger.Err("retrieving pull status: %s", err)
+	}
+
+	if pullStatus != nil {
+		for _, project := range pullStatus.Projects {
+			// TODO [ORCA-943]: Set projectName to "<dir>/<workspace>" when project name is not set.
+			// Upstream atlantis only requires project name to be set if there's more than one project
+			// with same dir and workspace. If a project name has not been set, we'll use the dir and
+			// workspace to build project key.
+			// Source: https://www.runatlantis.io/docs/repo-level-atlantis-yaml.html#reference
+			projectKey := models.BuildPullInfo(pullStatus.Pull.BaseRepo.FullName, pull.Num, project.ProjectName)
+			p.LogStreamResourceCleaner.CleanUp(projectKey)
+		}
+	}
+
 	if err := p.WorkingDir.Delete(repo, pull); err != nil {
 		return errors.Wrap(err, "cleaning workspace")
 	}
