@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/runatlantis/atlantis/server/controllers/templates"
 	"github.com/runatlantis/atlantis/server/events/db"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/handlers"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -100,6 +101,7 @@ func (j *JobsController) GetProjectJobs(w http.ResponseWriter, r *http.Request) 
 		AtlantisVersion: j.AtlantisVersion,
 		ProjectPath:     projectInfo.String(),
 		CleanedBasePath: j.AtlantisURL.Path,
+		ClearMsg:        models.LogStreamingClearMsg,
 	}
 
 	err = j.ProjectJobsTemplate.Execute(w, viewData)

@@ -110,7 +110,6 @@ func (p *AsyncProjectCommandOutputHandler) Handle() {
 	for msg := range p.projectCmdOutput {
 		if msg.ClearBuffBefore {
 			p.clearLogLines(msg.ProjectInfo)
-			continue
 		}
 		p.writeLogLine(msg.ProjectInfo, msg.Line)
 	}
@@ -119,8 +118,8 @@ func (p *AsyncProjectCommandOutputHandler) Handle() {
 func (p *AsyncProjectCommandOutputHandler) Clear(ctx models.ProjectCommandContext) {
 	p.projectCmdOutput <- &models.ProjectCmdOutputLine{
 		ProjectInfo:     ctx.PullInfo(),
+		Line:            models.LogStreamingClearMsg,
 		ClearBuffBefore: true,
-		Line:            "",
 	}
 }
 
@@ -167,6 +166,11 @@ func (p *AsyncProjectCommandOutputHandler) writeLogLine(pull string, line string
 		}
 	}
 	p.receiverBuffersLock.Unlock()
+
+	// No need to write to projectOutputBuffers if clear msg.
+	if line == models.LogStreamingClearMsg {
+		return
+	}
 
 	p.projectOutputBuffersLock.Lock()
 	if p.projectOutputBuffers[pull] == nil {
