@@ -315,21 +315,7 @@ var LockTemplate = template.Must(template.New("lock.html.tmpl").Parse(`
 			<ol>
 				{{ range .Queue}}
 				<li>
-					<!-- TODO @amir-elgayed move to CSS file -->
-					<div style=  "margin-left: 20px;
-								  text-align: left;
-								  padding: 0 20px;
-								  color: #555;
-								  font-size: 11px;
-								  font-weight: 600;
-								  line-height: 38px;
-								  letter-spacing: .1rem;
-								  white-space: nowrap;
-								  background-color: transparent;
-								  border-radius: 4px;
-								  border: 1px solid #bbb;
-								  box-sizing: border-box;"
-					>
+					<div class="queue-item">
 						<code>Url</code>: <a href="{{.PullUrl}}">{{.PullUrl}}</a>
 						</br>
 						<code>Author</code>: {{.Author}}
