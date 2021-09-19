@@ -9,7 +9,7 @@ RUN curl -LOks https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/ter
     rm terraform_${TERRAFORM_VERSION}_linux_amd64.zip
 
 # Install conftest
-ENV CONFTEST_VERSION=0.27.0
+ENV CONFTEST_VERSION=0.28.0
 RUN curl -LOs https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/conftest_${CONFTEST_VERSION}_Linux_x86_64.tar.gz && \
     curl -LOs https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/checksums.txt && \
     sed -n "/conftest_${CONFTEST_VERSION}_Linux_x86_64.tar.gz/p" checksums.txt | sha256sum -c && \
