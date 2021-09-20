@@ -168,7 +168,7 @@ You can set the `undiverged` requirement by:
     - dir: .
       apply_requirements: [undiverged]
      ```
-### Meaning
+#### Meaning
 The `merge` checkout strategy creates a temporary merge commit and runs the `plan` on the Atlantis local version of the PR 
 source and destination branch. The local destination branch can become out of date since changes to the destination branch are not fetched 
 if there are no changes to the source branch. `undiverged` enforces that Atlantis local version of master is up to date 
