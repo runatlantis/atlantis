@@ -3,6 +3,7 @@ package handlers
 import (
 	"sync"
 
+	stats "github.com/lyft/gostats"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/feature"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -221,15 +222,17 @@ func NewFeatureAwareOutputHandler(
 	projectJobURLGenerator ProjectJobURLGenerator,
 	logger logging.SimpleLogging,
 	featureAllocator feature.Allocator,
+	scope stats.Scope,
 ) ProjectCommandOutputHandler {
+	prjCmdOutputHandler := NewAsyncProjectCommandOutputHandler(
+		projectCmdOutput,
+		projectStatusUpdater,
+		projectJobURLGenerator,
+		logger,
+	)
 	return &FeatureAwareOutputHandler{
-		FeatureAllocator: featureAllocator,
-		ProjectCommandOutputHandler: NewAsyncProjectCommandOutputHandler(
-			projectCmdOutput,
-			projectStatusUpdater,
-			projectJobURLGenerator,
-			logger,
-		),
+		FeatureAllocator:            featureAllocator,
+		ProjectCommandOutputHandler: NewInstrumentedProjectCommandOutputHandler(prjCmdOutputHandler, scope),
 	}
 }
 

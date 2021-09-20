@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/gorilla/mux"
+	stats "github.com/lyft/gostats"
 	"github.com/runatlantis/atlantis/server/controllers"
 	"github.com/runatlantis/atlantis/server/logging"
 
@@ -34,6 +35,7 @@ func TestGetProjectJobs_WebSockets(t *testing.T) {
 			Logger:                      logger,
 			WebsocketHandler:            websocketMock,
 			ProjectCommandOutputHandler: projectOutputHandler,
+			StatsScope:                  stats.NewDefaultStore(),
 		}
 
 		When(websocketMock.Upgrade(matchers.AnyHttpResponseWriter(), matchers.AnyPtrToHttpRequest(), matchers.AnyHttpHeader())).ThenReturn(webSocketWrapper, nil)

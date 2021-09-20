@@ -9,8 +9,10 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	stats "github.com/lyft/gostats"
 	"github.com/runatlantis/atlantis/server/controllers/templates"
 	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/events/metrics"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/handlers"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -26,6 +28,7 @@ type JobsController struct {
 
 	WebsocketHandler            handlers.WebsocketHandler
 	ProjectCommandOutputHandler handlers.ProjectCommandOutputHandler
+	StatsScope                  stats.Scope
 }
 
 type pullInfo struct {
@@ -111,14 +114,17 @@ func (j *JobsController) GetProjectJobs(w http.ResponseWriter, r *http.Request) 
 }
 
 func (j *JobsController) GetProjectJobsWS(w http.ResponseWriter, r *http.Request) {
+	jobsMetric := j.StatsScope.Scope("get_project_jobs_ws")
 	projectInfo, err := newProjectInfo(r)
 	if err != nil {
+		jobsMetric.Scope("project_info").NewCounter(metrics.ExecutionErrorMetric).Inc()
 		j.respond(w, logging.Error, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	c, err := j.WebsocketHandler.Upgrade(w, r, nil)
 	if err != nil {
+		jobsMetric.Scope("ws_upgrade").NewCounter(metrics.ExecutionErrorMetric).Inc()
 		j.Logger.Warn("Failed to upgrade websocket: %s", err)
 		return
 	}
@@ -141,6 +147,7 @@ func (j *JobsController) GetProjectJobsWS(w http.ResponseWriter, r *http.Request
 	})
 
 	if err != nil {
+		jobsMetric.Scope("ws_write").NewCounter(metrics.ExecutionErrorMetric).Inc()
 		j.Logger.Warn("Failed to receive message: %s", err)
 		j.respond(w, logging.Error, http.StatusInternalServerError, err.Error())
 		return
