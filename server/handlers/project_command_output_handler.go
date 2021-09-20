@@ -201,10 +201,10 @@ func (p *AsyncProjectCommandOutputHandler) CleanUp(pull string) {
 	delete(p.projectOutputBuffers, pull)
 	p.projectOutputBuffersLock.Unlock()
 
+	// Only delete the pull record from receiver buffers.
+	// WS channel will be closed when the user closes the browser tab
+	// in closeHanlder().
 	p.receiverBuffersLock.Lock()
-	for ch := range p.receiverBuffers[pull] {
-		close(ch)
-	}
 	delete(p.receiverBuffers, pull)
 	p.receiverBuffersLock.Unlock()
 }
