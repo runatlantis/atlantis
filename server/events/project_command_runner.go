@@ -24,6 +24,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/feature"
 	"github.com/runatlantis/atlantis/server/handlers"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -157,6 +158,31 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName models.CommandN
 	}
 
 	return result
+}
+
+type FeatureAwareProjectCommandRunner struct {
+	ProjectCommandRunner
+	FeatureAllocator feature.Allocator
+}
+
+func (f *FeatureAwareProjectCommandRunner) Apply(ctx models.ProjectCommandContext) models.ProjectResult {
+	shouldAllocate, err := f.FeatureAllocator.ShouldAllocate(feature.ForceApply, ctx.Pull.BaseRepo.FullName)
+
+	if err != nil {
+		ctx.Log.Err("unable to allocate for feature: %s, error: %s", feature.ForceApply, err)
+	}
+	if !shouldAllocate && ctx.ForceApply {
+		ctx.Log.Err("force apply feature not enabled in the current environment.")
+
+		return models.ProjectResult{
+			Command:     models.ApplyCommand,
+			Failure:     "Force applies not enabled in the current environment. Please remove the -f or --force and rerun the apply. ",
+			RepoRelDir:  ctx.RepoRelDir,
+			Workspace:   ctx.Workspace,
+			ProjectName: ctx.ProjectName,
+		}
+	}
+	return f.ProjectCommandRunner.Apply(ctx)
 }
 
 // DefaultProjectCommandRunner implements ProjectCommandRunner.
@@ -389,11 +415,12 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 		return "", "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
-	failure, err = p.AggregateApplyRequirements.ValidateProject(repoDir, ctx)
-	if failure != "" || err != nil {
-		return "", failure, err
+	if !ctx.ForceApply {
+		failure, err = p.AggregateApplyRequirements.ValidateProject(repoDir, ctx)
+		if failure != "" || err != nil {
+			return "", failure, err
+		}
 	}
-
 	// Acquire internal lock for the directory we're going to operate in.
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace)
 	if err != nil {

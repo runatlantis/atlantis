@@ -25,6 +25,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/feature"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/recovery"
 	gitlab "github.com/xanzy/go-gitlab"
@@ -367,3 +368,25 @@ func (c *DefaultCommandRunner) logPanics(baseRepo models.Repo, pullNum int, logg
 }
 
 var automergeComment = `Automatically merging because all plans have been successfully applied.`
+
+type FeatureAwareCommandRunner struct {
+	CommandRunner
+	FeatureAllocator feature.Allocator
+	Logger           logging.SimpleLogging
+	VCSClient        vcs.Client
+}
+
+func (f *FeatureAwareCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *CommentCommand) {
+	shouldAllocate, err := f.FeatureAllocator.ShouldAllocate(feature.ForceApply, baseRepo.FullName)
+	if err != nil {
+		f.Logger.Log(logging.Error, "unable to allocate for feature: %s, error: %s", feature.ForceApply, err)
+	}
+
+	if cmd.ForceApply && shouldAllocate {
+		warningMessage := "⚠️ WARNING ⚠️\n\n You have bypassed all apply requirements for this PR 🚀 . This can have unpredictable consequences 🙏🏽 and should only be used in an emergency 🆘 .\n\n 𝐓𝐡𝐢𝐬 𝐚𝐜𝐭𝐢𝐨𝐧 𝐰𝐢𝐥𝐥 𝐛𝐞 𝐚𝐮𝐝𝐢𝐭𝐞𝐝.\n"
+		if commentErr := f.VCSClient.CreateComment(baseRepo, pullNum, warningMessage, ""); commentErr != nil {
+			f.Logger.Log(logging.Error, "unable to comment: %s", commentErr)
+		}
+	}
+	f.CommandRunner.RunCommentCommand(baseRepo, maybeHeadRepo, maybePull, user, pullNum, cmd)
+}

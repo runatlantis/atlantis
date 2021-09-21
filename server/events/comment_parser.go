@@ -40,6 +40,8 @@ const (
 	autoMergeDisabledFlagShort = ""
 	verboseFlagLong            = "verbose"
 	verboseFlagShort           = ""
+	forceFlagLong              = "force"
+	forceFlagShort             = "f"
 	atlantisExecutable         = "atlantis"
 )
 
@@ -174,7 +176,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	var workspace string
 	var dir string
 	var project string
-	var verbose, autoMergeDisabled bool
+	var verbose, autoMergeDisabled, force bool
 	var flagSet *pflag.FlagSet
 	var name models.CommandName
 
@@ -197,6 +199,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", fmt.Sprintf("Apply the plan for this project. Refers to the name of the project configured in %s. Cannot be used at same time as workspace or dir flags.", yaml.AtlantisYAMLFilename))
 		flagSet.BoolVarP(&autoMergeDisabled, autoMergeDisabledFlagLong, autoMergeDisabledFlagShort, false, "Disable automerge after apply.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
+		flagSet.BoolVarP(&force, forceFlagLong, forceFlagShort, false, "Force Atlantis to ignore apply requirements.")
 	case models.ApprovePoliciesCommand.String():
 		name = models.ApprovePoliciesCommand
 		flagSet = pflag.NewFlagSet(models.ApprovePoliciesCommand.String(), pflag.ContinueOnError)
@@ -268,7 +271,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 	}
 
 	return CommentParseResult{
-		Command: NewCommentCommand(dir, extraArgs, name, verbose, autoMergeDisabled, workspace, project),
+		Command: NewCommentCommand(dir, extraArgs, name, verbose, force, autoMergeDisabled, workspace, project),
 	}
 }
 

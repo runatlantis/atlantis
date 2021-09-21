@@ -611,7 +611,7 @@ projects:
 							BaseRepo: baseRepo,
 						},
 						PullMergeable: true,
-					}, cmd, "", []string{"flag"}, tmp, "project1", "myworkspace", true)
+					}, cmd, "", []string{"flag"}, tmp, "project1", "myworkspace", true, false)
 
 					if c.expErr != "" {
 						ErrEquals(t, c.expErr, err)
@@ -799,7 +799,7 @@ projects:
 						},
 						Log:           logging.NewNoopLogger(t),
 						PullMergeable: true,
-					}, cmd, "myproject_[1-2]", []string{"flag"}, tmp, "project1", "myworkspace", true)
+					}, cmd, "myproject_[1-2]", []string{"flag"}, tmp, "project1", "myworkspace", true, false)
 
 					if c.expErr != "" {
 						ErrEquals(t, c.expErr, err)
@@ -1014,7 +1014,7 @@ workflows:
 						BaseRepo: baseRepo,
 					},
 					PullMergeable: true,
-				}, models.PlanCommand, "", []string{"flag"}, tmp, "project1", "myworkspace", true)
+				}, models.PlanCommand, "", []string{"flag"}, tmp, "project1", "myworkspace", true, false)
 
 				if c.expErr != "" {
 					ErrEquals(t, c.expErr, err)

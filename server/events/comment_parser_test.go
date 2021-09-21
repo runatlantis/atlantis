@@ -829,6 +829,7 @@ var ApplyUsage = `Usage of apply:
       --auto-merge-disabled   Disable automerge after apply.
   -d, --dir string            Apply the plan for this directory, relative to root of
                               repo, ex. 'child/dir'.
+  -f, --force                 Force Atlantis to ignore apply requirements.
   -p, --project string        Apply the plan for this project. Refers to the name of
                               the project configured in atlantis.yaml. Cannot be
                               used at same time as workspace or dir flags.

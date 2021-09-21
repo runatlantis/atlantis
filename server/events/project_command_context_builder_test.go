@@ -56,8 +56,15 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 				RepoRelDir:  "dir1",
 			},
 		}
-
-		result := subject.BuildProjectContext(commandCtx, models.PlanCommand, projCfg, []string{}, "some/dir", false, false, false, false, false)
+		contextFlags := &events.ContextFlags{
+			Automerge:                 false,
+			DeleteSourceBranchOnMerge: false,
+			ParallelApply:             false,
+			ParallelPlan:              false,
+			Verbose:                   false,
+			ForceApply:                false,
+		}
+		result := subject.BuildProjectContext(commandCtx, models.PlanCommand, projCfg, []string{}, "some/dir", contextFlags)
 
 		assert.Equal(t, models.ErroredPolicyCheckStatus, result[0].ProjectPlanStatus)
 	})
@@ -76,8 +83,16 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 				RepoRelDir: "dir1",
 			},
 		}
+		contextFlags := &events.ContextFlags{
+			Automerge:                 false,
+			DeleteSourceBranchOnMerge: false,
+			ParallelApply:             false,
+			ParallelPlan:              false,
+			Verbose:                   false,
+			ForceApply:                false,
+		}
 
-		result := subject.BuildProjectContext(commandCtx, models.PlanCommand, projCfg, []string{}, "some/dir", false, false, false, false, false)
+		result := subject.BuildProjectContext(commandCtx, models.PlanCommand, projCfg, []string{}, "some/dir", contextFlags)
 
 		assert.Equal(t, models.ErroredPolicyCheckStatus, result[0].ProjectPlanStatus)
 	})
@@ -96,8 +111,15 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 				RepoRelDir: "dir1",
 			},
 		}
-
-		result := subject.BuildProjectContext(commandCtx, models.PlanCommand, projCfg, []string{}, "some/dir", false, false, true, false, false)
+		contextFlags := &events.ContextFlags{
+			Automerge:                 false,
+			DeleteSourceBranchOnMerge: false,
+			ParallelApply:             true,
+			ParallelPlan:              false,
+			Verbose:                   false,
+			ForceApply:                false,
+		}
+		result := subject.BuildProjectContext(commandCtx, models.PlanCommand, projCfg, []string{}, "some/dir", contextFlags)
 
 		assert.True(t, result[0].ParallelApplyEnabled)
 		assert.False(t, result[0].ParallelPlanEnabled)
