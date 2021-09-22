@@ -100,16 +100,17 @@ const (
 	SilenceVCSStatusNoPlans    = "silence-vcs-status-no-plans"
 	SilenceAllowlistErrorsFlag = "silence-allowlist-errors"
 	// SilenceWhitelistErrorsFlag is deprecated for SilenceAllowlistErrorsFlag.
-	SilenceWhitelistErrorsFlag = "silence-whitelist-errors"
-	SkipCloneNoChanges         = "skip-clone-no-changes"
-	SlackTokenFlag             = "slack-token"
-	SSLCertFileFlag            = "ssl-cert-file"
-	SSLKeyFileFlag             = "ssl-key-file"
-	TFDownloadURLFlag          = "tf-download-url"
-	VCSStatusName              = "vcs-status-name"
-	TFEHostnameFlag            = "tfe-hostname"
-	TFETokenFlag               = "tfe-token"
-	WriteGitCredsFlag          = "write-git-creds"
+	SilenceWhitelistErrorsFlag   = "silence-whitelist-errors"
+	SkipCloneNoChanges           = "skip-clone-no-changes"
+	SlackTokenFlag               = "slack-token"
+	SSLCertFileFlag              = "ssl-cert-file"
+	SSLKeyFileFlag               = "ssl-key-file"
+	TFDownloadURLFlag            = "tf-download-url"
+	VCSStatusName                = "vcs-status-name"
+	TFEHostnameFlag              = "tfe-hostname"
+	TFETokenFlag                 = "tfe-token"
+	WriteGitCredsFlag            = "write-git-creds"
+	LyftAuditJobsSnsTopicArnFlag = "lyft-audit-jobs-sns-topic-arn"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
 	DefaultADBasicUser      = ""
@@ -305,6 +306,10 @@ var stringFlags = map[string]stringFlag{
 	VCSStatusName: {
 		description:  "Name used to identify Atlantis for pull request statuses.",
 		defaultValue: DefaultVCSStatusName,
+	},
+	LyftAuditJobsSnsTopicArnFlag: {
+		description:  "Provide SNS topic ARN to publish apply workflow's status. Sns topic is used for auditing purposes",
+		defaultValue: "",
 	},
 }
 

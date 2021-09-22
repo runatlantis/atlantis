@@ -37,6 +37,9 @@ import (
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/feature"
 	"github.com/runatlantis/atlantis/server/handlers"
+	"github.com/runatlantis/atlantis/server/lyft/aws"
+	"github.com/runatlantis/atlantis/server/lyft/aws/sns"
+	lyftDecorators "github.com/runatlantis/atlantis/server/lyft/decorators"
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
@@ -583,8 +586,24 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		ProjectCommandRunner: projectOutputWrapper,
 	}
 
-	instrumentedProjectCmdRunner := &events.InstrumentedProjectCommandRunner{
+	session, err := aws.NewSession()
+	if err != nil {
+		return nil, errors.Wrap(err, "initializing new aws session")
+	}
+
+	snsWriter := sns.NewWriterWithStats(
+		session,
+		userConfig.LyftAuditJobsSnsTopicArn,
+		statsScope,
+	)
+
+	auditProjectCmdRunner := &lyftDecorators.AuditProjectCommandWrapper{
+		SnsWriter:            snsWriter,
 		ProjectCommandRunner: featureAwareProjectCommandRunner,
+	}
+
+	instrumentedProjectCmdRunner := &events.InstrumentedProjectCommandRunner{
+		ProjectCommandRunner: auditProjectCmdRunner,
 	}
 
 	policyCheckCommandRunner := events.NewPolicyCheckCommandRunner(

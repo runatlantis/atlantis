@@ -84,18 +84,19 @@ type UserConfig struct {
 	SilenceVCSStatusNoProjects bool `mapstructure:"silence-vcs-status-no-projects"`
 	SilenceAllowlistErrors     bool `mapstructure:"silence-allowlist-errors"`
 	// SilenceWhitelistErrors is deprecated in favour of SilenceAllowlistErrors
-	SilenceWhitelistErrors bool            `mapstructure:"silence-whitelist-errors"`
-	SkipCloneNoChanges     bool            `mapstructure:"skip-clone-no-changes"`
-	SlackToken             string          `mapstructure:"slack-token"`
-	SSLCertFile            string          `mapstructure:"ssl-cert-file"`
-	SSLKeyFile             string          `mapstructure:"ssl-key-file"`
-	TFDownloadURL          string          `mapstructure:"tf-download-url"`
-	TFEHostname            string          `mapstructure:"tfe-hostname"`
-	TFEToken               string          `mapstructure:"tfe-token"`
-	VCSStatusName          string          `mapstructure:"vcs-status-name"`
-	DefaultTFVersion       string          `mapstructure:"default-tf-version"`
-	Webhooks               []WebhookConfig `mapstructure:"webhooks"`
-	WriteGitCreds          bool            `mapstructure:"write-git-creds"`
+	SilenceWhitelistErrors   bool            `mapstructure:"silence-whitelist-errors"`
+	SkipCloneNoChanges       bool            `mapstructure:"skip-clone-no-changes"`
+	SlackToken               string          `mapstructure:"slack-token"`
+	SSLCertFile              string          `mapstructure:"ssl-cert-file"`
+	SSLKeyFile               string          `mapstructure:"ssl-key-file"`
+	TFDownloadURL            string          `mapstructure:"tf-download-url"`
+	TFEHostname              string          `mapstructure:"tfe-hostname"`
+	TFEToken                 string          `mapstructure:"tfe-token"`
+	VCSStatusName            string          `mapstructure:"vcs-status-name"`
+	DefaultTFVersion         string          `mapstructure:"default-tf-version"`
+	Webhooks                 []WebhookConfig `mapstructure:"webhooks"`
+	WriteGitCreds            bool            `mapstructure:"write-git-creds"`
+	LyftAuditJobsSnsTopicArn string          `mapstructure:"lyft-audit-jobs-sns-topic-arn"`
 }
 
 // ToLogLevel returns the LogLevel object corresponding to the user-passed

@@ -13,7 +13,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/agext/levenshtein v1.2.3 // indirect
 	github.com/apparentlymart/go-textseg/v12 v12.0.0 // indirect
-	github.com/aws/aws-sdk-go v1.40.12 // indirect
+	github.com/aws/aws-sdk-go v1.40.12
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/bgentry/go-netrc v0.0.0-20140422174119-9fd32a8b3d3d // indirect
 	github.com/bradleyfalzon/ghinstallation v1.1.1
@@ -36,7 +36,7 @@ require (
 	github.com/google/go-github/v29 v29.0.2 // indirect
 	github.com/google/go-github/v31 v31.0.0
 	github.com/google/go-querystring v1.0.0 // indirect
-	github.com/google/uuid v1.1.2-0.20200519141726-cb32006e483f // indirect
+	github.com/google/uuid v1.1.2-0.20200519141726-cb32006e483f
 	github.com/googleapis/gax-go/v2 v2.0.5 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/gorilla/mux v1.8.0
