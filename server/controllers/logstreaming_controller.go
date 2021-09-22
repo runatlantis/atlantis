@@ -93,11 +93,11 @@ func newProjectInfo(r *http.Request) (*projectInfo, error) {
 	}, nil
 }
 
-func (j *JobsController) GetProjectJobs(w http.ResponseWriter, r *http.Request) {
+func (j *JobsController) getProjectJobs(w http.ResponseWriter, r *http.Request) error {
 	projectInfo, err := newProjectInfo(r)
 	if err != nil {
 		j.respond(w, logging.Error, http.StatusInternalServerError, err.Error())
-		return
+		return err
 	}
 
 	viewData := templates.ProjectJobData{
@@ -110,23 +110,31 @@ func (j *JobsController) GetProjectJobs(w http.ResponseWriter, r *http.Request) 
 	err = j.ProjectJobsTemplate.Execute(w, viewData)
 	if err != nil {
 		j.Logger.Err(err.Error())
+		return err
+	}
+
+	return nil
+}
+
+func (j *JobsController) GetProjectJobs(w http.ResponseWriter, r *http.Request) {
+	errorCounter := j.StatsScope.Scope("getprojectjobs").NewCounter(metrics.ExecutionErrorMetric)
+	err := j.getProjectJobs(w, r)
+	if err != nil {
+		errorCounter.Inc()
 	}
 }
 
-func (j *JobsController) GetProjectJobsWS(w http.ResponseWriter, r *http.Request) {
-	jobsMetric := j.StatsScope.Scope("get_project_jobs_ws")
+func (j *JobsController) getProjectJobsWS(w http.ResponseWriter, r *http.Request) error {
 	projectInfo, err := newProjectInfo(r)
 	if err != nil {
-		jobsMetric.Scope("project_info").NewCounter(metrics.ExecutionErrorMetric).Inc()
 		j.respond(w, logging.Error, http.StatusInternalServerError, err.Error())
-		return
+		return err
 	}
 
 	c, err := j.WebsocketHandler.Upgrade(w, r, nil)
 	if err != nil {
-		jobsMetric.Scope("ws_upgrade").NewCounter(metrics.ExecutionErrorMetric).Inc()
 		j.Logger.Warn("Failed to upgrade websocket: %s", err)
-		return
+		return err
 	}
 
 	// Buffer size set to 1000 to ensure messages get queued (upto 1000) if the receiverCh is not ready to
@@ -147,10 +155,23 @@ func (j *JobsController) GetProjectJobsWS(w http.ResponseWriter, r *http.Request
 	})
 
 	if err != nil {
-		jobsMetric.Scope("ws_write").NewCounter(metrics.ExecutionErrorMetric).Inc()
 		j.Logger.Warn("Failed to receive message: %s", err)
 		j.respond(w, logging.Error, http.StatusInternalServerError, err.Error())
-		return
+		return err
+	}
+
+	return nil
+}
+
+func (j *JobsController) GetProjectJobsWS(w http.ResponseWriter, r *http.Request) {
+	jobsMetric := j.StatsScope.Scope("getprojectjobs")
+	errorCounter := jobsMetric.NewCounter(metrics.ExecutionErrorMetric)
+	executionTime := jobsMetric.NewTimer(metrics.ExecutionTimeMetric).AllocateSpan()
+	defer executionTime.Complete()
+
+	err := j.getProjectJobsWS(w, r)
+	if err != nil {
+		errorCounter.Inc()
 	}
 }
 

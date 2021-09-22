@@ -421,6 +421,9 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
           return 
         }
       }
+      window.addEventListener("unload", function(event) {
+        websocket.close();
+      })
       var attachAddon = new AttachAddon.AttachAddon(socket);
       var fitAddon = new FitAddon.FitAddon();
       term.loadAddon(attachAddon);

@@ -209,6 +209,7 @@ func (p *AsyncProjectCommandOutputHandler) CleanUp(pull string) {
 	p.receiverBuffersLock.Unlock()
 }
 
+// [ORCA-955] - Remove feature flag for log-streaming
 // FeatureAwareOutputHandler is a decorator that add feature allocator
 // functionality to the AsyncProjectCommandOutputHandler
 type FeatureAwareOutputHandler struct {
@@ -232,7 +233,7 @@ func NewFeatureAwareOutputHandler(
 	)
 	return &FeatureAwareOutputHandler{
 		FeatureAllocator:            featureAllocator,
-		ProjectCommandOutputHandler: NewInstrumentedProjectCommandOutputHandler(prjCmdOutputHandler, scope),
+		ProjectCommandOutputHandler: NewInstrumentedProjectCommandOutputHandler(prjCmdOutputHandler, scope, logger),
 	}
 }
 

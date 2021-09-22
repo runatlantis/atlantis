@@ -45,7 +45,11 @@ func (wh *DefaultWebsocketHandler) SetReadHandler(w WebsocketConnectionWrapper) 
 	for {
 		_, _, err := w.ReadMessage()
 		if err != nil {
-			wh.Logger.Warn("Failed to read WS message: %s", err)
+			// CloseGoingAway (1001) when a browser tab is closed.
+			// Expected behaviour since we have a CloseHandler(), log warning if not a CloseGoingAway
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
+				wh.Logger.Warn("Failed to read WS message: %s", err)
+			}
 			return
 		}
 	}
