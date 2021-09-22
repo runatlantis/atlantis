@@ -16,6 +16,10 @@ type Writer interface {
 	Write([]byte) error
 }
 
+func NewNoopWriter() Writer {
+	return &noopWriter{}
+}
+
 // NewWriterWithStats returns a new instance of Writer that will connect to the specifed
 // sns topic using the specified session
 func NewWriterWithStats(
@@ -30,7 +34,6 @@ func NewWriterWithStats(
 			topicArn: aws.String(topicArn),
 		},
 	}
-
 }
 
 type writer struct {
@@ -62,5 +65,11 @@ func (w *writerWithStats) Write(payload []byte) error {
 	}
 
 	w.scope.NewCounter(metrics.ExecutionSuccessMetric)
+	return nil
+}
+
+type noopWriter struct{}
+
+func (n *noopWriter) Write(payload []byte) error {
 	return nil
 }
