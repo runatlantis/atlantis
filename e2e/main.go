@@ -15,6 +15,7 @@ package main
 
 import (
 	"context"
+	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -62,16 +63,15 @@ func main() {
 	}
 	// using https to clone the repo
 	repoURL := fmt.Sprintf("https://%s:%s@github.com/%s/%s.git", githubUsername, githubToken, ownerName, repoName)
+
 	cloneDirRoot := os.Getenv("CLONE_DIR")
 	if cloneDirRoot == "" {
-		cloneDirRoot = "/tmp/atlantis-tests"
-	}
+		cloneDirRoot, err := ioutil.TempDir("/tmp/atlantis-tests", "")
 
-	// clean workspace
-	log.Printf("cleaning workspace %s", cloneDirRoot)
-	err := cleanDir(cloneDirRoot)
-	if err != nil {
-		log.Fatalf("failed to clean dir %q before cloning, attempting to continue: %v", cloneDirRoot, err)
+		if err != nil {
+			log.Fatalf("failed to create clone dir %q", cloneDirRoot, err)
+			return
+		}
 	}
 
 	// create github client
