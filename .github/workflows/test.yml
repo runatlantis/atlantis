@@ -46,8 +46,8 @@ jobs:
         run: |
           git config --global user.email "lkysow+atlantis@gmail.com"
           git config --global user.name "atlantisbot"
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3          
+#       - name: Setup tmate session
+#         uses: mxschmitt/action-tmate@v3          
       - run: |
           make build-service
           ./scripts/e2e.sh
