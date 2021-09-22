@@ -275,7 +275,10 @@ func (c *DefaultClient) RunCommandWithVersion(log logging.SimpleLogging, path st
 	if err != nil {
 		err = errors.Wrapf(err, "running %q in %q", tfCmd, path)
 		log.Err(err.Error())
-		return string(out), err
+
+		outputStr := string(out)
+		log.Debug(outputStr)
+		return outputStr, err
 	}
 	log.Info("successfully ran %q in %q", tfCmd, path)
 	return string(out), nil
