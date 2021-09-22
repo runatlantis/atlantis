@@ -142,6 +142,16 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 	}, nil
 }
 
+type PullReqStatus struct {
+	Approved ApprovalStatus
+}
+
+type ApprovalStatus struct {
+	IsApproved bool
+	ApprovedBy string
+	Date       time.Time
+}
+
 // PullRequest is a VCS pull request.
 // GitLab calls these Merge Requests.
 type PullRequest struct {
@@ -366,6 +376,8 @@ type ProjectCommandContext struct {
 	Log logging.SimpleLogging
 	// PullMergeable is true if the pull request for this project is able to be merged.
 	PullMergeable bool
+	// CurrentProjectPlanStatus is the status of the current project prior to this command.
+	PullReqStatus PullReqStatus
 	// CurrentProjectPlanStatus is the status of the current project prior to this command.
 	ProjectPlanStatus ProjectPlanStatus
 	// Pull is the pull request we're responding to.
