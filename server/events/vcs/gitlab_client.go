@@ -168,15 +168,17 @@ func (g *GitlabClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 }
 
 // PullIsApproved returns true if the merge request was approved.
-func (g *GitlabClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (g *GitlabClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	approvals, _, err := g.Client.MergeRequests.GetMergeRequestApprovals(repo.FullName, pull.Num)
 	if err != nil {
-		return false, err
+		return approvalStatus, err
 	}
 	if approvals.ApprovalsLeft > 0 {
-		return false, nil
+		return approvalStatus, nil
 	}
-	return true, nil
+	return models.ApprovalStatus{
+		IsApproved: true,
+	}, nil
 }
 
 // PullIsMergeable returns true if the merge request can be merged.
