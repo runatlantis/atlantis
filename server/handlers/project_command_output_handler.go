@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"sync"
 
 	stats "github.com/lyft/gostats"
@@ -183,6 +184,7 @@ func (p *AsyncProjectCommandOutputHandler) writeLogLine(pull string, line string
 
 //Remove channel, so client no longer receives Terraform output
 func (p *AsyncProjectCommandOutputHandler) removeChan(pull string, ch chan string) {
+	p.logger.Info(fmt.Sprintf("Removing channel for %s", pull))
 	p.receiverBuffersLock.Lock()
 	delete(p.receiverBuffers[pull], ch)
 	p.receiverBuffersLock.Unlock()

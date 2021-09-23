@@ -86,10 +86,9 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		}()
 
 		projectOutputHandler.Send(ctx, Msg)
-		close(ch)
-
-		// Wait for the msg to be read.
 		wg.Wait()
+
+		close(ch)
 
 		Equals(t, expectedMsg, Msg)
 	})
@@ -110,12 +109,13 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		}()
 
 		projectOutputHandler.Send(ctx, Msg)
-
-		// Wait for the msg to be read.
 		wg.Wait()
 
 		// Send a clear msg
+		wg.Add(1)
 		projectOutputHandler.Clear(ctx)
+		wg.Wait()
+
 		close(ch)
 
 		dfProjectOutputHandler, ok := projectOutputHandler.(*handlers.AsyncProjectCommandOutputHandler)
