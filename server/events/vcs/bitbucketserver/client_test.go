@@ -204,7 +204,8 @@ func TestClient_MergePullDeleteSourceBranch(t *testing.T) {
 			b, err := ioutil.ReadAll(r.Body)
 			Ok(t, err)
 			var payload bitbucketserver.DeleteSourceBranch
-			json.Unmarshal(b, &payload)
+			err = json.Unmarshal(b, &payload)
+			Ok(t, err)
 			Equals(t, "refs/heads/foo", payload.Name)
 			w.WriteHeader(http.StatusNoContent) // nolint: errcheck
 		default:
