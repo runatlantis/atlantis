@@ -569,6 +569,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectVersionCommand(ctx *CommandCo
 		repoRelDir,
 		workspace,
 		cmd.Verbose,
+		cmd.ForceApply,
 	)
 }
 
