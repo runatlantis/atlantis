@@ -145,10 +145,12 @@ func (p *AsyncProjectCommandOutputHandler) addChan(ch chan string, pull string) 
 	p.receiverBuffersLock.Unlock()
 
 	p.projectOutputBuffersLock.RLock()
-	for _, line := range p.projectOutputBuffers[pull] {
+	buffer := p.projectOutputBuffers[pull]
+	p.projectOutputBuffersLock.RUnlock()
+
+	for _, line := range buffer {
 		ch <- line
 	}
-	p.projectOutputBuffersLock.RUnlock()
 }
 
 //Add log line to buffer and send to all current channels
