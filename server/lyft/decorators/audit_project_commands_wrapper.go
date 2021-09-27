@@ -14,9 +14,9 @@ import (
 
 // AtlantisJobState represent current state of the job
 // Job can be in 3 states:
-//   * running - when the job is initiated
-//   * failure - when the job fails the execution
-//   * success - when the job runs successfully
+//   * RUNNING - when the job is initiated
+//   * FAILURE - when the job fails the execution
+//   * SUCCESS - when the job runs successfully
 type AtlantisJobState string
 
 // AtlantisJobType represent the type of the job
@@ -24,11 +24,11 @@ type AtlantisJobState string
 type AtlantisJobType string
 
 const (
-	AtlantisJobStateRunning AtlantisJobState = "running"
-	AtlantisJobStateSuccess AtlantisJobState = "success"
-	AtlantisJobStateFailure AtlantisJobState = "failure"
+	AtlantisJobStateRunning AtlantisJobState = "RUNNING"
+	AtlantisJobStateSuccess AtlantisJobState = "SUCCESS"
+	AtlantisJobStateFailure AtlantisJobState = "FAILURE"
 
-	AtlantisApplyJob AtlantisJobType = "apply"
+	AtlantisApplyJob AtlantisJobType = "APPLY"
 )
 
 // AuditProjectCommandWrapper is a decorator that notifies sns topic
@@ -47,7 +47,7 @@ func (p *AuditProjectCommandWrapper) Apply(ctx models.ProjectCommandContext) mod
 		ID:             id.String(),
 		RootName:       ctx.ProjectName,
 		JobType:        AtlantisApplyJob,
-		Respository:    ctx.BaseRepo.FullName,
+		Repository:     ctx.BaseRepo.FullName,
 		Environment:    ctx.Tags["environment"],
 		PullNumber:     ctx.Pull.Num,
 		InitiatingUser: ctx.User.Username,
@@ -111,7 +111,7 @@ type AtlantisJobEvent struct {
 	State          AtlantisJobState `json:"state"`
 	JobType        AtlantisJobType  `json:"job_type"`
 	Revision       string           `json:"revision"`
-	Respository    string           `json:"repository"`
+	Repository     string           `json:"repository"`
 	PullNumber     int              `json:"pull_number"`
 	Environment    string           `json:"environment"`
 	InitiatingUser string           `json:"initiating_user"`
