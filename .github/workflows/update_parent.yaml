@@ -28,4 +28,4 @@ jobs:
           git checkout -b "update-submodule-${{ github.sha }}"
           git add --all
           git commit -m "Update submodules" || echo "No changes to commit"
-          git push -u origin update-submodule
+          git push -u origin update-submodule-${{ github.sha }}
