@@ -23,9 +23,9 @@ jobs:
           git submodule update --recursive --remote
       - name: commit
         run: |
-          git config user.email "$GITHUB_ACTOR@github.com"
-          git  config user.name "$GITHUB_ACTOR"
-          git checkout -b update-submodule
+          git config user.email "${{ env.GITHUB_ACTOR }} @github.com"
+          git config user.name "${{ env.GITHUB_ACTOR }}"
+          git checkout -b "update-submodule-${{ github.sha }}"
           git add --all
           git commit -m "Update submodules" || echo "No changes to commit"
           git push -u origin update-submodule
