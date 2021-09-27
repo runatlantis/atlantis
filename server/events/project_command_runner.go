@@ -166,6 +166,7 @@ type DefaultProjectCommandRunner struct { //create object and test
 	InitStepRunner             StepRunner
 	PlanStepRunner             StepRunner
 	ShowStepRunner             StepRunner
+	VersionStepRunner          StepRunner
 	ApplyStepRunner            StepRunner
 	PolicyCheckStepRunner      StepRunner
 	RunStepRunner              CustomStepRunner

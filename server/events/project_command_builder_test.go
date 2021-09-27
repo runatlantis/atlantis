@@ -1198,6 +1198,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		ThenReturn(tmpDir, nil)
 
 	logger := logging.NewNoopLogger(t)
+	scope := stats.NewStore(stats.NewNullSink(), false)
 
 	globalCfgArgs := valid.GlobalCfgArgs{
 		AllowRepoCfg:  false,
@@ -1219,6 +1220,8 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		false,
 		false,
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+		scope,
+		logger,
 	)
 
 	ctxs, err := builder.BuildVersionCommands(

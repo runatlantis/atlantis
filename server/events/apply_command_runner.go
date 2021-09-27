@@ -1,8 +1,6 @@
 package events
 
 import (
-	"strings"
-
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/models"

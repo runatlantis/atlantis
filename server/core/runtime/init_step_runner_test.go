@@ -131,25 +131,17 @@ func TestRun_InitOmitsUpgradeFlagIfLockFileTracked(t *testing.T) {
 	When(terraform.RunCommandWithVersion(matchers.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
 
-<<<<<<< HEAD:server/core/runtime/init_step_runner_test.go
 	output, err := iso.Run(models.ProjectCommandContext{
 		Workspace:  "workspace",
 		RepoRelDir: ".",
 		Log:        logger,
 	}, []string{"extra", "args"}, repoDir, map[string]string(nil))
-=======
-	output, err := iso.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
->>>>>>> 47798014... Orca 845 (#89):server/events/runtime/init_step_runner_test.go
 	Ok(t, err)
 	// When there is no error, should not return init output to PR.
 	Equals(t, "", output)
 
 	expectedArgs := []string{"init", "-input=false", "-no-color", "extra", "args"}
-<<<<<<< HEAD:server/core/runtime/init_step_runner_test.go
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, repoDir, expectedArgs, map[string]string(nil), tfVersion, "workspace")
-=======
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, expectedArgs, map[string]string(nil), tfVersion, "workspace")
->>>>>>> 47798014... Orca 845 (#89):server/events/runtime/init_step_runner_test.go
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, repoDir, expectedArgs, map[string]string(nil), tfVersion, "workspace")
 }
 
 func TestRun_InitKeepsUpgradeFlagIfLockFileNotPresent(t *testing.T) {
@@ -299,24 +291,25 @@ func TestRun_InitDeletesLockFileIfPresentAndNotTracked(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 
 	tfVersion, _ := version.NewVersion("0.14.0")
+	ctx := models.ProjectCommandContext{
+		Workspace:  "workspace",
+		RepoRelDir: ".",
+		Log:        logger,
+	}
 	iso := runtime.InitStepRunner{
 		TerraformExecutor: terraform,
 		DefaultTFVersion:  tfVersion,
 	}
-	When(terraform.RunCommandWithVersion(logging_matchers.AnyLoggingSimpleLogging(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+	When(terraform.RunCommandWithVersion(matchers.AnyModelsProjectCommandContext(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
 		ThenReturn("output", nil)
 
-	output, err := iso.Run(models.ProjectCommandContext{
-		Workspace:  "workspace",
-		RepoRelDir: ".",
-		Log:        logger,
-	}, []string{"extra", "args"}, repoDir, map[string]string(nil))
+	output, err := iso.Run(ctx, []string{"extra", "args"}, repoDir, map[string]string(nil))
 	Ok(t, err)
 	// When there is no error, should not return init output to PR.
 	Equals(t, "", output)
 
 	expectedArgs := []string{"init", "-input=false", "-no-color", "-upgrade", "extra", "args"}
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, repoDir, expectedArgs, map[string]string(nil), tfVersion, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, repoDir, expectedArgs, map[string]string(nil), tfVersion, "workspace")
 }
 
 func runCmd(t *testing.T, dir string, name string, args ...string) string {
