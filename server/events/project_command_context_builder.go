@@ -16,17 +16,19 @@ func NewProjectCommandContextBulder(policyCheckEnabled bool, commentBuilder Comm
 		CommentBuilder: commentBuilder,
 	}
 
-	if policyCheckEnabled {
-		return &PolicyCheckProjectCommandContextBuilder{
-			CommentBuilder:               commentBuilder,
-			ProjectCommandContextBuilder: projectCommandContextBuilder,
-		}
-	}
-
-	return &CommandScopedStatsProjectCommandContextBuilder{
+	contextBuilderWithStats := &CommandScopedStatsProjectCommandContextBuilder{
 		ProjectCommandContextBuilder: projectCommandContextBuilder,
 		ProjectCounter:               scope.NewCounter("projects"),
 	}
+
+	if policyCheckEnabled {
+		return &PolicyCheckProjectCommandContextBuilder{
+			CommentBuilder:               commentBuilder,
+			ProjectCommandContextBuilder: contextBuilderWithStats,
+		}
+	}
+
+	return projectCommandContextBuilder
 }
 
 type ContextFlags struct {
@@ -143,8 +145,8 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 }
 
 type PolicyCheckProjectCommandContextBuilder struct {
-	ProjectCommandContextBuilder *DefaultProjectCommandContextBuilder
-	CommentBuilder               CommentBuilder
+	ProjectCommandContextBuilder
+	CommentBuilder CommentBuilder
 }
 
 func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
