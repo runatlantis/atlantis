@@ -70,7 +70,9 @@ func TestAuditProjectCommandsWrapper(t *testing.T) {
 				},
 				Workspace: "default",
 				PullReqStatus: models.PullReqStatus{
-					Approved: false,
+					Approved: models.ApprovalStatus{
+						IsApproved: true,
+					},
 				},
 				RepoRelDir: ".",
 				Tags: map[string]string{

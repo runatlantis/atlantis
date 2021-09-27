@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-github/v31/github"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -415,7 +416,7 @@ func TestGithubClient_PullIsApproved(t *testing.T) {
 			},
 			"body": "Here is the body for the review.",
 			"commit_id": "ecdd80bb57125d7ba9641ffaa4d7d2c19d3f3091",
-			"state": "CHANGES_REQUESTED",
+			"state": "APPROVED",
 			"html_url": "https://github.com/octocat/Hello-World/pull/12#pullrequestreview-%d",
 			"pull_request_url": "https://api.github.com/repos/octocat/Hello-World/pulls/12",
 			"_links": {
@@ -425,7 +426,8 @@ func TestGithubClient_PullIsApproved(t *testing.T) {
 			  "pull_request": {
 				"href": "https://api.github.com/repos/octocat/Hello-World/pulls/12"
 			  }
-			}
+			},
+			"submitted_at": "2019-11-17T17:43:43Z"
 		  }
 ]`
 	firstResp := fmt.Sprintf(respTemplate, 80, 80, 80)
@@ -456,7 +458,7 @@ func TestGithubClient_PullIsApproved(t *testing.T) {
 	Ok(t, err)
 	defer disableSSLVerification()()
 
-	approved, err := client.PullIsApproved(models.Repo{
+	approvalStatus, err := client.PullIsApproved(models.Repo{
 		FullName:          "owner/repo",
 		Owner:             "owner",
 		Name:              "repo",
@@ -470,7 +472,16 @@ func TestGithubClient_PullIsApproved(t *testing.T) {
 		Num: 1,
 	})
 	Ok(t, err)
-	Equals(t, false, approved)
+
+	timeOfApproval, err := time.Parse("2006-01-02T15:04:05Z", "2019-11-17T17:43:43Z")
+	Ok(t, err)
+
+	expApprovalStatus := models.ApprovalStatus{
+		IsApproved: true,
+		ApprovedBy: "octocat",
+		Date:       timeOfApproval,
+	}
+	Equals(t, expApprovalStatus, approvalStatus)
 }
 
 func TestGithubClient_PullIsMergeable(t *testing.T) {

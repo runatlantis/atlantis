@@ -131,17 +131,17 @@ func (mock *MockClient) MergePull(_param0 models.PullRequest, _param1 models.Pul
 	return ret0
 }
 
-func (mock *MockClient) PullIsApproved(_param0 models.Repo, _param1 models.PullRequest) (bool, error) {
+func (mock *MockClient) PullIsApproved(_param0 models.Repo, _param1 models.PullRequest) (models.ApprovalStatus, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}
 	params := []pegomock.Param{_param0, _param1}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("PullIsApproved", params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 bool
+	result := pegomock.GetGenericMockFrom(mock).Invoke("PullIsApproved", params, []reflect.Type{reflect.TypeOf((*models.ApprovalStatus)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 models.ApprovalStatus
 	var ret1 error
 	if len(result) != 0 {
 		if result[0] != nil {
-			ret0 = result[0].(bool)
+			ret0 = result[0].(models.ApprovalStatus)
 		}
 		if result[1] != nil {
 			ret1 = result[1].(error)

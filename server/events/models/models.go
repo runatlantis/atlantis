@@ -38,12 +38,6 @@ const (
 	LogStreamingClearMsg = "\n-----Starting New Process-----"
 )
 
-type PullReqStatus struct {
-	Approved  bool
-	Mergeable bool
-	SQLocked  bool
-}
-
 // Repo is a VCS repository.
 type Repo struct {
 	// FullName is the owner and repo name separated
@@ -149,6 +143,18 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 			Hostname: cloneURLParsed.Hostname(),
 		},
 	}, nil
+}
+
+type PullReqStatus struct {
+	Approved  ApprovalStatus
+	Mergeable bool
+	SQLocked  bool
+}
+
+type ApprovalStatus struct {
+	IsApproved bool
+	ApprovedBy string
+	Date       time.Time
 }
 
 // PullRequest is a VCS pull request.

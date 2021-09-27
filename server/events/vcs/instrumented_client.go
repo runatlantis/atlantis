@@ -251,7 +251,7 @@ func (c *InstrumentedClient) HidePrevCommandComments(repo models.Repo, pullNum i
 	return nil
 
 }
-func (c *InstrumentedClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (c *InstrumentedClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error) {
 	scope := c.StatsScope.Scope("pull_is_approved")
 	logger := c.Logger.WithHistory(fmtLogSrc(repo, pull.Num)...)
 
@@ -261,7 +261,7 @@ func (c *InstrumentedClient) PullIsApproved(repo models.Repo, pull models.PullRe
 	executionSuccess := scope.NewCounter(metrics.ExecutionSuccessMetric)
 	executionError := scope.NewCounter(metrics.ExecutionErrorMetric)
 
-	approved, err := c.Client.PullIsApproved(repo, pull)
+	approvalStatus, err := c.Client.PullIsApproved(repo, pull)
 
 	if err != nil {
 		executionError.Inc()
@@ -270,7 +270,7 @@ func (c *InstrumentedClient) PullIsApproved(repo models.Repo, pull models.PullRe
 		executionSuccess.Inc()
 	}
 
-	return approved, err
+	return approvalStatus, err
 
 }
 func (c *InstrumentedClient) PullIsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {

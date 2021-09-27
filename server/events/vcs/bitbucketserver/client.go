@@ -161,29 +161,31 @@ func (b *Client) postComment(repo models.Repo, pullNum int, comment string) erro
 }
 
 // PullIsApproved returns true if the merge request was approved.
-func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	projectKey, err := b.GetProjectKey(repo.Name, repo.SanitizedCloneURL)
 	if err != nil {
-		return false, err
+		return approvalStatus, err
 	}
 	path := fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d", b.BaseURL, projectKey, repo.Name, pull.Num)
 	resp, err := b.makeRequest("GET", path, nil)
 	if err != nil {
-		return false, err
+		return approvalStatus, err
 	}
 	var pullResp PullRequest
 	if err := json.Unmarshal(resp, &pullResp); err != nil {
-		return false, errors.Wrapf(err, "Could not parse response %q", string(resp))
+		return approvalStatus, errors.Wrapf(err, "Could not parse response %q", string(resp))
 	}
 	if err := validator.New().Struct(pullResp); err != nil {
-		return false, errors.Wrapf(err, "API response %q was missing fields", string(resp))
+		return approvalStatus, errors.Wrapf(err, "API response %q was missing fields", string(resp))
 	}
 	for _, reviewer := range pullResp.Reviewers {
 		if *reviewer.Approved {
-			return true, nil
+			return models.ApprovalStatus{
+				IsApproved: true,
+			}, nil
 		}
 	}
-	return false, nil
+	return approvalStatus, nil
 }
 
 // PullIsMergeable returns true if the merge request has no conflicts and can be merged.
