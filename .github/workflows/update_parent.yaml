@@ -1,0 +1,30 @@
+name: parent-updater
+
+on:
+  push:
+    branches: 
+      - release-v0.17.1-lyft.1
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with: 
+          repository: ${{ secrets.PARENT_REPOSITORY }}
+          token: ${{ secrets.PARENT_REPO_TOKEN }}
+
+      - name: init
+        run: |
+          git submodule update --init --recursive
+      - name: update remote
+        run: |
+          git submodule update --recursive --remote
+      - name: commit
+        run: |
+          git config user.email "$GITHUB_ACTOR@github.com"
+          git  config user.name "$GITHUB_ACTOR"
+          git add --all
+          git commit -m "Update submodules" || echo "No changes to commit"
+          git push
