@@ -291,7 +291,8 @@ func (c *DefaultClient) RunCommandWithVersion(ctx models.ProjectCommandContext, 
 	}
 
 	// if the feature is enabled, we use the async workflow else we default to the original sync workflow
-	if shouldAllocate {
+	// Don't stream terraform show output to outCh
+	if shouldAllocate && isAsyncEligibleCommand(args[0]) {
 		_, outCh := c.RunCommandAsync(ctx, path, args, customEnvVars, v, workspace)
 		var lines []string
 		var err error
@@ -442,30 +443,21 @@ func (c *DefaultClient) RunCommandAsync(ctx models.ProjectCommandContext, path s
 
 		// Asynchronously copy from stdout/err to outCh.
 		go func() {
-			// Don't stream terraform show output to outCh
-			cmds := strings.Split(tfCmd, " ")
-			if isValidCommand(cmds[1]) {
-				c.projectCmdOutputHandler.Send(ctx, fmt.Sprintf("\n----- running terraform %s -----", args[0]))
-			}
+			c.projectCmdOutputHandler.Send(ctx, fmt.Sprintf("\n----- running terraform %s -----", args[0]))
 			s := bufio.NewScanner(stdout)
 			for s.Scan() {
 				message := s.Text()
 				outCh <- Line{Line: message}
-				if isValidCommand(cmds[1]) {
-					c.projectCmdOutputHandler.Send(ctx, "\t"+message)
-				}
+				c.projectCmdOutputHandler.Send(ctx, "\t"+message)
 			}
 			wg.Done()
 		}()
 		go func() {
-			cmds := strings.Split(tfCmd, " ")
 			s := bufio.NewScanner(stderr)
 			for s.Scan() {
 				message := s.Text()
 				outCh <- Line{Line: message}
-				if isValidCommand(cmds[1]) {
-					c.projectCmdOutputHandler.Send(ctx, message)
-				}
+				c.projectCmdOutputHandler.Send(ctx, message)
 			}
 			wg.Done()
 		}()
@@ -568,7 +560,7 @@ func generateRCFile(tfeToken string, tfeHostname string, home string) error {
 	return nil
 }
 
-func isValidCommand(cmd string) bool {
+func isAsyncEligibleCommand(cmd string) bool {
 	for _, validCmd := range LogStreamingValidCmds {
 		if validCmd == cmd {
 			return true
