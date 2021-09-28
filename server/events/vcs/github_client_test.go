@@ -455,7 +455,7 @@ func TestGithubClient_PullIsApproved(t *testing.T) {
 	Ok(t, err)
 	defer disableSSLVerification()()
 
-	approved, err := client.PullIsApproved(models.Repo{
+	approvalStatus, err := client.PullIsApproved(models.Repo{
 		FullName:          "owner/repo",
 		Owner:             "owner",
 		Name:              "repo",
@@ -469,7 +469,7 @@ func TestGithubClient_PullIsApproved(t *testing.T) {
 		Num: 1,
 	})
 	Ok(t, err)
-	Equals(t, false, approved)
+	Equals(t, false, approvalStatus.IsApproved)
 }
 
 func TestGithubClient_PullIsMergeable(t *testing.T) {

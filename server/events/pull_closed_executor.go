@@ -20,12 +20,12 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/runatlantis/atlantis/server/events/db"
+	"github.com/runatlantis/atlantis/server/core/db"
 
 	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/events/locking"
+	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )

@@ -30,6 +30,11 @@ type Client struct {
 	AtlantisURL string
 }
 
+type DeleteSourceBranch struct {
+	Name   string `json:"name"`
+	DryRun bool   `json:"dryRun"`
+}
+
 // NewClient builds a bitbucket cloud client. Returns an error if the baseURL is
 // malformed. httpClient is the client to use to make the requests, username
 // and password are used as basic auth in the requests, baseURL is the API's
@@ -161,29 +166,31 @@ func (b *Client) postComment(repo models.Repo, pullNum int, comment string) erro
 }
 
 // PullIsApproved returns true if the merge request was approved.
-func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	projectKey, err := b.GetProjectKey(repo.Name, repo.SanitizedCloneURL)
 	if err != nil {
-		return false, err
+		return approvalStatus, err
 	}
 	path := fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d", b.BaseURL, projectKey, repo.Name, pull.Num)
 	resp, err := b.makeRequest("GET", path, nil)
 	if err != nil {
-		return false, err
+		return approvalStatus, err
 	}
 	var pullResp PullRequest
 	if err := json.Unmarshal(resp, &pullResp); err != nil {
-		return false, errors.Wrapf(err, "Could not parse response %q", string(resp))
+		return approvalStatus, errors.Wrapf(err, "Could not parse response %q", string(resp))
 	}
 	if err := validator.New().Struct(pullResp); err != nil {
-		return false, errors.Wrapf(err, "API response %q was missing fields", string(resp))
+		return approvalStatus, errors.Wrapf(err, "API response %q was missing fields", string(resp))
 	}
 	for _, reviewer := range pullResp.Reviewers {
 		if *reviewer.Approved {
-			return true, nil
+			return models.ApprovalStatus{
+				IsApproved: true,
+			}, nil
 		}
 	}
-	return false, nil
+	return approvalStatus, nil
 }
 
 // PullIsMergeable returns true if the merge request has no conflicts and can be merged.
@@ -265,6 +272,21 @@ func (b *Client) MergePull(pull models.PullRequest, pullOptions models.PullReque
 	}
 	path = fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d/merge?version=%d", b.BaseURL, projectKey, pull.BaseRepo.Name, pull.Num, *pullResp.Version)
 	_, err = b.makeRequest("POST", path, nil)
+	if err != nil {
+		return err
+	}
+	if pullOptions.DeleteSourceBranchOnMerge {
+		bodyBytes, err := json.Marshal(DeleteSourceBranch{Name: "refs/heads/" + pull.HeadBranch, DryRun: false})
+		if err != nil {
+			return errors.Wrap(err, "json encoding")
+		}
+
+		path = fmt.Sprintf("%s/rest/branch-utils/1.0/projects/%s/repos/%s/branches", b.BaseURL, projectKey, pull.BaseRepo.Name)
+		_, err = b.makeRequest("DELETE", path, bytes.NewBuffer(bodyBytes))
+		if err != nil {
+			return err
+		}
+	}
 	return err
 }
 

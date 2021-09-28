@@ -202,14 +202,14 @@ func TestClient_PullIsApproved(t *testing.T) {
 
 			repo, err := models.NewRepo(models.BitbucketServer, "owner/repo", "https://bitbucket.org/owner/repo.git", "user", "token")
 			Ok(t, err)
-			approved, err := client.PullIsApproved(repo, models.PullRequest{
+			approvalStatus, err := client.PullIsApproved(repo, models.PullRequest{
 				Num:        1,
 				HeadBranch: "branch",
 				Author:     "author",
 				BaseRepo:   repo,
 			})
 			Ok(t, err)
-			Equals(t, c.exp, approved)
+			Equals(t, c.exp, approvalStatus.IsApproved)
 		})
 	}
 }

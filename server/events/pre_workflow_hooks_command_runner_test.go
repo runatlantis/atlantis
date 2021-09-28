@@ -5,11 +5,11 @@ import (
 	"testing"
 
 	. "github.com/petergtz/pegomock"
+	runtime_mocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/fixtures"
-	runtime_mocks "github.com/runatlantis/atlantis/server/events/runtime/mocks"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -74,7 +74,7 @@ func TestRunPreHooks_Clone(t *testing.T) {
 	t.Run("success hooks in cfg", func(t *testing.T) {
 		preWorkflowHooksSetup(t)
 
-		var unlockCalled *bool = newBool(false)
+		var unlockCalled = newBool(false)
 		unlockFn := func() {
 			unlockCalled = newBool(true)
 		}
@@ -159,7 +159,7 @@ func TestRunPreHooks_Clone(t *testing.T) {
 	t.Run("error cloning", func(t *testing.T) {
 		preWorkflowHooksSetup(t)
 
-		var unlockCalled *bool = newBool(false)
+		var unlockCalled = newBool(false)
 		unlockFn := func() {
 			unlockCalled = newBool(true)
 		}
@@ -191,7 +191,7 @@ func TestRunPreHooks_Clone(t *testing.T) {
 	t.Run("error running pre hook", func(t *testing.T) {
 		preWorkflowHooksSetup(t)
 
-		var unlockCalled *bool = newBool(false)
+		var unlockCalled = newBool(false)
 		unlockFn := func() {
 			unlockCalled = newBool(true)
 		}

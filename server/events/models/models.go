@@ -142,6 +142,16 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 	}, nil
 }
 
+type PullReqStatus struct {
+	Approved ApprovalStatus
+}
+
+type ApprovalStatus struct {
+	IsApproved bool
+	ApprovedBy string
+	Date       time.Time
+}
+
 // PullRequest is a VCS pull request.
 // GitLab calls these Merge Requests.
 type PullRequest struct {
@@ -367,6 +377,8 @@ type ProjectCommandContext struct {
 	// PullMergeable is true if the pull request for this project is able to be merged.
 	PullMergeable bool
 	// CurrentProjectPlanStatus is the status of the current project prior to this command.
+	PullReqStatus PullReqStatus
+	// CurrentProjectPlanStatus is the status of the current project prior to this command.
 	ProjectPlanStatus ProjectPlanStatus
 	// Pull is the pull request we're responding to.
 	Pull PullRequest
@@ -436,6 +448,7 @@ type ProjectResult struct {
 	PlanSuccess        *PlanSuccess
 	PolicyCheckSuccess *PolicyCheckSuccess
 	ApplySuccess       string
+	VersionSuccess     string
 	ProjectName        string
 }
 
@@ -517,6 +530,17 @@ func (p *PlanSuccess) Summary() string {
 	return note + r.FindString(p.TerraformOutput)
 }
 
+// DiffMarkdownFormattedTerraformOutput formats the Terraform output to match diff markdown format
+func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
+	diffKeywordRegex := regexp.MustCompile(`(?m)^( +)([-+~])`)
+	diffTildeRegex := regexp.MustCompile(`(?m)^~`)
+
+	formattedTerraformOutput := diffKeywordRegex.ReplaceAllString(p.TerraformOutput, "$2$1")
+	formattedTerraformOutput = diffTildeRegex.ReplaceAllString(formattedTerraformOutput, "!")
+
+	return formattedTerraformOutput
+}
+
 // PolicyCheckSuccess is the result of a successful policy check run.
 type PolicyCheckSuccess struct {
 	// PolicyCheckOutput is the output from policy check binary(conftest|opa)
@@ -531,6 +555,10 @@ type PolicyCheckSuccess struct {
 	// branch we're merging into has been updated since we cloned and merged
 	// it.
 	HasDiverged bool
+}
+
+type VersionSuccess struct {
+	VersionOutput string
 }
 
 // PullStatus is the current status of a pull request that is in progress.
@@ -627,6 +655,8 @@ const (
 	ApprovePoliciesCommand
 	// AutoplanCommand is a command to run terrafor plan on PR open/update if autoplan is enabled
 	AutoplanCommand
+	// VersionCommand is a command to run terraform version.
+	VersionCommand
 	// Adding more? Don't forget to update String() below
 )
 
@@ -649,6 +679,8 @@ func (c CommandName) String() string {
 		return "policy_check"
 	case ApprovePoliciesCommand:
 		return "approve_policies"
+	case VersionCommand:
+		return "version"
 	}
 	return ""
 }

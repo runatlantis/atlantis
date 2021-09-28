@@ -495,7 +495,7 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 
 			defer disableSSLVerification()()
 
-			actApproved, err := client.PullIsApproved(models.Repo{
+			approvalStatus, err := client.PullIsApproved(models.Repo{
 				FullName:          "owner/project/repo",
 				Owner:             "owner",
 				Name:              "repo",
@@ -509,7 +509,7 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 				Num: 1,
 			})
 			Ok(t, err)
-			Equals(t, c.expApproved, actApproved)
+			Equals(t, c.expApproved, approvalStatus.IsApproved)
 		})
 	}
 }

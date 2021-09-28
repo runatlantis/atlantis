@@ -1,3 +1,75 @@
+# v0.17.3
+Feature release with a number of improvements related to Gitlab support, a new command, better formatting etc. Some broken features have been fixed in along with some regressions.
+
+## Features/Improvements
+* Add version command to Atlantis for getting the current terraform version ([#1691](https://github.com/runatlantis/atlantis/pull/1691) by @pjsier)
+* Support "Pipelines must succeed", "All discussions must be resolved" in Gitlab `apply_requirements` ([#1675](https://github.com/runatlantis/atlantis/pull/1675) by @devlucasc)
+* Add support for specifying github app key as a string ([#1706](https://github.com/runatlantis/atlantis/pull/1706) by @dhaven)
+* Add flag to enable rich github markdown formatting of terraform outputs ([#1751](https://github.com/runatlantis/atlantis/pull/1751) by @enochlo)
+  * Note: Depending on feedback here, we will consider just enabling this by default in a future release.
+* Add support for splitting large comments into batches for Gitlab ([#1755](https://github.com/runatlantis/atlantis/pull/1755) by @krrrr38)
+
+## Bug Fixes
+* Fix remote ops detection for tf >= 1.0.0 ([#1687](https://github.com/runatlantis/atlantis/pull/1687) by @taavitani)
+* Fix Gitlab auto-merge race condition [#1609](https://github.com/runatlantis/atlantis/issues/1609) ([#1675](https://github.com/runatlantis/atlantis/pull/1675) by @devlucasc)
+* Fix an issue where `--parallel-pool-size` was being ignored ([#1705](https://github.com/runatlantis/atlantis/pull/1705) by @Schtolc)
+* Fix an issue where applies can occur on draft merge requests in Gitlab ([#1736](https://github.com/runatlantis/atlantis/pull/1736) by @devlucasc)
+* Fix regression where .terraform.lock.hcl would prevent future operations from upgrading providers even with the `-upgrade` present ([#1701](https://github.com/runatlantis/atlantis/pull/1701) by @gezb)
+* Fix issue with branch regex matcher which would always allow all branches ([#1768](https://github.com/runatlantis/atlantis/pull/1768) by @minamijoyo)
+
+## Dependencies
+* Upgrade default tf version to 1.0.5 ([#1662](https://github.com/runatlantis/atlantis/pull/1765) by @chenrui333)
+* Upgrade go version to 0.17 ([#1766](https://github.com/runatlantis/atlantis/pull/1766) by @chenrui1333)
+* Upgrade alpine to v3.14, addressing  CVE-2021-36159, CVE-2021-22924, CVE-2021-22923 and CVE-2021-22925 vulnerabilities ([#1770](https://github.com/runatlantis/atlantis/pull/1770) by @chenrui1333)
+
+## Backwards Incompatibilities/Notes
+* If you are using GHCR and are using the `atlantis:latest` docker image, this now points to the latest release as opposed to the tip of master.  If you want to work off the tip of master, then you should now use `atlantis:dev`
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.3/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.3/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.3/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.3/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.17.3`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Github Container Registry
+[`ghcr.io/runatlantis/atlantis:v0.17.3`](https://github.com/runatlantis/atlantis/pkgs/container/atlantis)
+
+## Diff v0.17.2..v0.17.3
+https://github.com/runatlantis/atlantis/compare/v0.17.2...v0.17.3
+
+# v0.17.2
+Patch release containing bug fixes.
+
+## Bug Fixes
+* Fix a regression introduced where approving failing policies would create a secondary status in pending without ever being marked as successful ([#1672](https://github.com/runatlantis/atlantis/pull/1672) by @nishkrishnan)
+* Fix a bug where pre-workflow hooks cannot find atlantis.yaml when run on non-default workspaces. ([#1620](https://github.com/runatlantis/atlantis/pull/1620) by @giuli007)
+
+## Dependencies
+* Upgrade default tf version to 1.0.1 ([#1662](https://github.com/runatlantis/atlantis/pull/1662) by @chenrui333)
+
+## Backwards Incompatibilities/Notes
+* If you're using the Atlantis Docker image and aren't setting the `--default-tf-version` flag
+  then the default version of Terraform will now be 1.0.1. Simply set the above
+  flag to your desired default version to avoid any issues.
+
+## Downloads
+* [atlantis_darwin_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.2/atlantis_darwin_amd64.zip)
+* [atlantis_linux_386.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.2/atlantis_linux_386.zip)
+* [atlantis_linux_amd64.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.2/atlantis_linux_amd64.zip)
+* [atlantis_linux_arm.zip](https://github.com/runatlantis/atlantis/releases/download/v0.17.2/atlantis_linux_arm.zip)
+
+## Docker
+[`runatlantis/atlantis:v0.17.2`](https://hub.docker.com/r/runatlantis/atlantis/tags/)
+
+## Github Container Registry
+[`ghcr.io/runatlantis/atlantis:v0.17.2`](https://github.com/runatlantis/atlantis/pkgs/container/atlantis)
+
+## Diff v0.17.1..v0.17.2
+https://github.com/runatlantis/atlantis/compare/v0.17.1...v0.17.2
+
 # v0.17.1
 Feature release containing a number of bug fixes.
 
