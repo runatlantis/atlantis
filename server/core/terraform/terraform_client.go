@@ -40,6 +40,9 @@ import (
 
 var LogStreamingValidCmds = [...]string{"init", "plan", "apply"}
 
+// Setting the buffer size to 10mb
+const BufioScannerBufferSize = 10 * 1024 * 1024
+
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_terraform_client.go Client
 
 type Client interface {
@@ -440,11 +443,13 @@ func (c *DefaultClient) RunCommandAsync(ctx models.ProjectCommandContext, path s
 		// Use a waitgroup to block until our stdout/err copying is complete.
 		wg := new(sync.WaitGroup)
 		wg.Add(2)
-
 		// Asynchronously copy from stdout/err to outCh.
 		go func() {
 			c.projectCmdOutputHandler.Send(ctx, fmt.Sprintf("\n----- running terraform %s -----", args[0]))
 			s := bufio.NewScanner(stdout)
+			buf := []byte{}
+			s.Buffer(buf, BufioScannerBufferSize)
+
 			for s.Scan() {
 				message := s.Text()
 				outCh <- Line{Line: message}
