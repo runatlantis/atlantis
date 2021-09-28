@@ -1145,3 +1145,32 @@ func TestGithubClient_PullIsLocked_WaitingKeyNotFound(t *testing.T) {
 	Ok(t, err)
 	Equals(t, false, locked)
 }
+
+func TestGithubClient_PullIsLocked_SQ_No_Tags(t *testing.T) {
+	client, err := vcs.NewGithubClient("temp", &vcs.GithubUserCredentials{"user", "pass"}, logging.NewNoopLogger(t))
+	Ok(t, err)
+
+	statuses := []*github.RepoStatus{
+		{
+			Context:     helper(vcs.SubmitQueueReadinessStatusContext),
+			Description: helper(""),
+		},
+	}
+
+	locked, err := client.PullIsLocked(models.Repo{
+		FullName:          "owner/repo",
+		Owner:             "owner",
+		Name:              "repo",
+		CloneURL:          "",
+		SanitizedCloneURL: "",
+		VCSHost: models.VCSHost{
+			Type:     models.Github,
+			Hostname: "github.com",
+		},
+	}, models.PullRequest{
+		Num:        1,
+		HeadCommit: "832812d4777ddc4197685c5a8f864eaf8a82d4ae",
+	}, statuses)
+	Ok(t, err)
+	Equals(t, false, locked)
+}

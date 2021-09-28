@@ -342,6 +342,11 @@ func (g *GithubClient) PullIsLocked(repo models.Repo, pull models.PullRequest, s
 			continue
 		}
 
+		// When Submit queue status does not have tags assume PR is not locked
+		if status.GetDescription() == "" {
+			return false, nil
+		}
+
 		// Not using struct tags because there's no predefined schema for description.
 		description := make(map[string]interface{})
 		err := json.Unmarshal([]byte(status.GetDescription()), &description)
