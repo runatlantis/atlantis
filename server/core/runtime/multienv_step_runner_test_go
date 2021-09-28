@@ -1,0 +1,77 @@
+package runtime_test
+
+import (
+	"testing"
+
+	version "github.com/hashicorp/go-version"
+	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/core/runtime"
+	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
+	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/logging"
+	. "github.com/runatlantis/atlantis/testing"
+)
+
+func TestMultiEnvStepRunner_Run(t *testing.T) {
+	cases := []struct {
+		Command     string
+		ProjectName string
+		ExpOut      string
+		ExpErr      string
+		Version     string
+	}{
+		{
+			Command: "echo {\"Success\": \"true\", \"ErrorMessage\":\"\", \"Result\":[{\"name\":\"TF_VAR_REPODEFINEDVARIABLE_ONE\",\"value\":\"value1\"}]}",
+			ExpOut:  "",
+			Version: "v1.2.3",
+		},
+	}
+	RegisterMockTestingT(t)
+	tfClient := mocks.NewMockClient()
+	tfVersion, err := version.NewVersion("0.12.0")
+	Ok(t, err)
+	runStepRunner := runtime.RunStepRunner{
+		TerraformExecutor: tfClient,
+		DefaultTFVersion:  tfVersion,
+	}
+	multiEnvStepRunner := runtime.MultiEnvStepRunner{
+		RunStepRunner: &runStepRunner,
+	}
+	for _, c := range cases {
+		t.Run(c.Command, func(t *testing.T) {
+			tmpDir, cleanup := TempDir(t)
+			defer cleanup()
+			ctx := models.ProjectCommandContext{
+				BaseRepo: models.Repo{
+					Name:  "basename",
+					Owner: "baseowner",
+				},
+				HeadRepo: models.Repo{
+					Name:  "headname",
+					Owner: "headowner",
+				},
+				Pull: models.PullRequest{
+					Num:        2,
+					HeadBranch: "add-feat",
+					BaseBranch: "master",
+					Author:     "acme",
+				},
+				User: models.User{
+					Username: "acme-user",
+				},
+				Log:              logging.NewNoopLogger(t),
+				Workspace:        "myworkspace",
+				RepoRelDir:       "mydir",
+				TerraformVersion: tfVersion,
+				ProjectName:      c.ProjectName,
+			}
+			value, err := multiEnvStepRunner.Run(ctx, c.Command, c.Value, tmpDir, map[string]string(nil))
+			if c.ExpErr != "" {
+				ErrContains(t, c.ExpErr, err)
+				return
+			}
+			Ok(t, err)
+			Equals(t, c.ExpValue, value)
+		})
+	}
+}
