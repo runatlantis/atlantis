@@ -409,15 +409,15 @@ as the environment variable value.
 :::
 
 #### Multiple Environment Variables `multienv` Command
-The `multienv` command allows you to set multiple environment variables that will be available
+The `multienv` command allows you to set dynamic number of multiple environment variables that will be available
 to all steps defined **below** the `multienv` step.
 ```yaml
 - multienv: custom-command
 ```
-| Key      | Type   | Default | Required | Description          |
-|----------|--------|---------|----------|----------------------|
-| multienv | string | none    | no       | Run a custom command |
-
+| Key      | Type   | Default | Required | Description                                   |
+|----------|--------|---------|----------|-----------------------------------------------|
+| multienv | string | none    | no       | Run a custom command and add set              |
+|          |        |         |          | environment variables according to the result |
 The result of the executed command must have a fixed format:
 ```yaml
 { 
