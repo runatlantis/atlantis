@@ -407,3 +407,34 @@ as the environment variable value.
 * `env` `command`'s can use any of the built-in environment variables available
   to `run` commands. 
 :::
+
+#### Multiple Environment Variables `multienv` Command
+The `multienv` command allows you to set multiple environment variables that will be available
+to all steps defined **below** the `multienv` step.
+```yaml
+- multienv: custom-command
+```
+| Key      | Type   | Default | Required | Description          |
+|----------|--------|---------|----------|----------------------|
+| multienv | string | none    | no       | Run a custom command |
+
+The result of the executed command must have a fixed format:
+```yaml
+{ 
+  "success":true, 
+  "errorMessage":null, 
+  "result": 
+    [ 
+      {"name":"TF_VAR_VARIABLE_ONE","value":"value1"},
+      {"name":"TF_VAR_VARIABLE_TWO","value":"value2"}, 
+      {"name":"TF_VAR_VARIABLE_THREE","value":"value3"} 
+    ] 
+}
+```
+The name-value pairs in the result are getting added as envinronment variables if success is true otherwise the workflow execution stops with error and the errorMessage is getting displayed.
+
+::: tip Notes
+* `multienv` `command`'s can use any of the built-in environment variables available
+  to `run` commands. 
+:::
+
