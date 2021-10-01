@@ -9,6 +9,7 @@ func NewPolicyCheckCommandRunner(
 	projectCommandRunner ProjectPolicyCheckCommandRunner,
 	parallelPoolSize int,
 	silenceVCSStatusNoProjects bool,
+	quietPolicyChecks bool,
 ) *PolicyCheckCommandRunner {
 	return &PolicyCheckCommandRunner{
 		dbUpdater:                  dbUpdater,
@@ -17,6 +18,7 @@ func NewPolicyCheckCommandRunner(
 		prjCmdRunner:               projectCommandRunner,
 		parallelPoolSize:           parallelPoolSize,
 		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
+		quietPolicyChecks:          quietPolicyChecks,
 	}
 }
 
@@ -29,6 +31,7 @@ type PolicyCheckCommandRunner struct {
 	// SilenceVCSStatusNoProjects is whether any plan should set commit status if no projects
 	// are found
 	silenceVCSStatusNoProjects bool
+	quietPolicyChecks          bool
 }
 
 func (p *PolicyCheckCommandRunner) Run(ctx *CommandContext, cmds []models.ProjectCommandContext) {
@@ -59,7 +62,10 @@ func (p *PolicyCheckCommandRunner) Run(ctx *CommandContext, cmds []models.Projec
 		result = runProjectCmds(cmds, p.prjCmdRunner.PolicyCheck)
 	}
 
-	p.pullUpdater.updatePull(ctx, PolicyCheckCommand{}, result)
+	// Quiet policy checks unless there's an error
+	if result.HasErrors() || !p.quietPolicyChecks {
+		p.pullUpdater.updatePull(ctx, PolicyCheckCommand{}, result)
+	}
 
 	pullStatus, err := p.dbUpdater.updateDB(ctx, ctx.Pull, result.ProjectResults)
 	if err != nil {

@@ -49,6 +49,7 @@ type UserConfig struct {
 	ParallelPoolSize           int    `mapstructure:"parallel-pool-size"`
 	PlanDrafts                 bool   `mapstructure:"allow-draft-prs"`
 	Port                       int    `mapstructure:"port"`
+	QuietPolicyChecks          bool   `mapstructure:"quiet-policy-checks"`
 	RepoConfig                 string `mapstructure:"repo-config"`
 	RepoConfigJSON             string `mapstructure:"repo-config-json"`
 	RepoAllowlist              string `mapstructure:"repo-allowlist"`

@@ -111,6 +111,7 @@ func setup(t *testing.T) *vcsmocks.MockClient {
 		projectCommandRunner,
 		parallelPoolSize,
 		false,
+		false,
 	)
 
 	planCommandRunner = events.NewPlanCommandRunner(

@@ -530,6 +530,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		projectCommandRunner,
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceVCSStatusNoProjects,
+		userConfig.QuietPolicyChecks,
 	)
 
 	planCommandRunner := events.NewPlanCommandRunner(
