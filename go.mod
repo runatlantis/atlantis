@@ -55,7 +55,6 @@ require (
 	github.com/jmespath/go-jmespath v0.3.1-0.20200310193758-2437e8417af5 // indirect
 	github.com/klauspost/compress v1.11.2 // indirect
 	github.com/leodido/go-urn v1.2.0 // indirect
-	github.com/lusis/slack-test v0.0.0-20190426140909-c40012f20018 // indirect
 	github.com/magiconair/properties v1.8.5 // indirect
 	github.com/mattn/go-colorable v0.1.6 // indirect
 	github.com/mattn/go-isatty v0.0.12 // indirect
@@ -69,7 +68,7 @@ require (
 	github.com/mitchellh/mapstructure v1.4.2 // indirect
 	github.com/mitchellh/reflectwalk v1.0.0 // indirect
 	github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb
-	github.com/nlopes/slack v0.4.0
+	github.com/nlopes/slack v0.6.0
 	github.com/onsi/ginkgo v1.14.0 // indirect
 	github.com/onsi/gomega v1.10.1 // indirect
 	github.com/pelletier/go-toml v1.9.4 // indirect
