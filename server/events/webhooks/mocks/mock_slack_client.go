@@ -74,11 +74,11 @@ func (mock *MockSlackClient) ChannelExists(channelName string) (bool, error) {
 	return ret0, ret1
 }
 
-func (mock *MockSlackClient) PostMessage(channel string, applyResult webhooks.ApplyResult) error {
+func (mock *MockSlackClient) PostMessage(channelID string, applyResult webhooks.ApplyResult) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockSlackClient().")
 	}
-	params := []pegomock.Param{channel, applyResult}
+	params := []pegomock.Param{channelID, applyResult}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("PostMessage", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 error
 	if len(result) != 0 {
@@ -187,8 +187,8 @@ func (c *MockSlackClient_ChannelExists_OngoingVerification) GetAllCapturedArgume
 	return
 }
 
-func (verifier *VerifierMockSlackClient) PostMessage(channel string, applyResult webhooks.ApplyResult) *MockSlackClient_PostMessage_OngoingVerification {
-	params := []pegomock.Param{channel, applyResult}
+func (verifier *VerifierMockSlackClient) PostMessage(channelID string, applyResult webhooks.ApplyResult) *MockSlackClient_PostMessage_OngoingVerification {
+	params := []pegomock.Param{channelID, applyResult}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "PostMessage", params, verifier.timeout)
 	return &MockSlackClient_PostMessage_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -199,8 +199,8 @@ type MockSlackClient_PostMessage_OngoingVerification struct {
 }
 
 func (c *MockSlackClient_PostMessage_OngoingVerification) GetCapturedArguments() (string, webhooks.ApplyResult) {
-	channel, applyResult := c.GetAllCapturedArguments()
-	return channel[len(channel)-1], applyResult[len(applyResult)-1]
+	channelID, applyResult := c.GetAllCapturedArguments()
+	return channelID[len(channelID)-1], applyResult[len(applyResult)-1]
 }
 
 func (c *MockSlackClient_PostMessage_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []webhooks.ApplyResult) {

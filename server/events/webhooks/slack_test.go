@@ -31,11 +31,11 @@ func TestSend_PostMessage(t *testing.T) {
 	regex, err := regexp.Compile(".*")
 	Ok(t, err)
 
-	channel := "somechannel"
+	channelID := "somechannelID"
 	hook := webhooks.SlackWebhook{
 		Client:         client,
 		WorkspaceRegex: regex,
-		Channel:        channel,
+		ChannelID:      channelID,
 	}
 	result := webhooks.ApplyResult{
 		Workspace: "production",
@@ -43,7 +43,7 @@ func TestSend_PostMessage(t *testing.T) {
 
 	t.Log("PostMessage should be called, doesn't matter if it errors or not")
 	_ = hook.Send(logging.NewNoopLogger(t), result)
-	client.VerifyWasCalledOnce().PostMessage(channel, result)
+	client.VerifyWasCalledOnce().PostMessage(channelID, result)
 }
 
 func TestSend_NoopSuccess(t *testing.T) {
@@ -53,16 +53,16 @@ func TestSend_NoopSuccess(t *testing.T) {
 	regex, err := regexp.Compile("weirdemv")
 	Ok(t, err)
 
-	channel := "somechannel"
+	channelID := "somechannelID"
 	hook := webhooks.SlackWebhook{
 		Client:         client,
 		WorkspaceRegex: regex,
-		Channel:        channel,
+		ChannelID:      channelID,
 	}
 	result := webhooks.ApplyResult{
 		Workspace: "production",
 	}
 	err = hook.Send(logging.NewNoopLogger(t), result)
 	Ok(t, err)
-	client.VerifyWasCalled(Never()).PostMessage(channel, result)
+	client.VerifyWasCalled(Never()).PostMessage(channelID, result)
 }

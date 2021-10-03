@@ -26,26 +26,26 @@ import (
 type SlackWebhook struct {
 	Client         SlackClient
 	WorkspaceRegex *regexp.Regexp
-	Channel        string
+	ChannelID      string
 }
 
-func NewSlack(r *regexp.Regexp, channel string, client SlackClient) (*SlackWebhook, error) {
+func NewSlack(r *regexp.Regexp, channelID string, client SlackClient) (*SlackWebhook, error) {
 	if err := client.AuthTest(); err != nil {
 		return nil, fmt.Errorf("testing slack authentication: %s. Verify your slack-token is valid", err)
 	}
 
-	channelExists, err := client.ChannelExists(channel)
+	channelExists, err := client.ChannelExists(channelID)
 	if err != nil {
 		return nil, err
 	}
 	if !channelExists {
-		return nil, errors.Errorf("slack channel %q doesn't exist", channel)
+		return nil, errors.Errorf("slack channelID %q doesn't exist", channelID)
 	}
 
 	return &SlackWebhook{
 		Client:         client,
 		WorkspaceRegex: r,
-		Channel:        channel,
+		ChannelID:      channelID,
 	}, nil
 }
 
@@ -54,5 +54,5 @@ func (s *SlackWebhook) Send(log logging.SimpleLogging, applyResult ApplyResult) 
 	if !s.WorkspaceRegex.MatchString(applyResult.Workspace) {
 		return nil
 	}
-	return s.Client.PostMessage(s.Channel, applyResult)
+	return s.Client.PostMessage(s.ChannelID, applyResult)
 }

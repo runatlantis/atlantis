@@ -98,7 +98,10 @@ func TestPostMessage_Success(t *testing.T) {
 	setup(t)
 
 	expParams := slack.NewPostMessageParameters()
-	expParams.Attachments = []slack.Attachment{{
+	expParams.AsUser = true
+	expParams.EscapeText = false
+
+	attachments := []slack.Attachment{{
 		Color: "good",
 		Text:  "Apply succeeded for <url|runatlantis/atlantis>",
 		Fields: []slack.AttachmentField{
@@ -119,22 +122,20 @@ func TestPostMessage_Success(t *testing.T) {
 			},
 		},
 	}}
-	expParams.AsUser = true
-	expParams.EscapeText = false
 
-	channel := "somechannel"
-	err := client.PostMessage(channel, result)
+	channelID := "somechannelID"
+	err := client.PostMessage(channelID, result)
 	Ok(t, err)
-	underlying.VerifyWasCalledOnce().PostMessage(channel, "", expParams)
+	underlying.VerifyWasCalledOnce().PostMessage(channelID, slack.MsgOptionText("", false), slack.MsgOptionAttachments(attachments...))
 
 	t.Log("When apply fails, function should succeed and indicate failure")
 	result.Success = false
-	expParams.Attachments[0].Color = "danger"
-	expParams.Attachments[0].Text = "Apply failed for <url|runatlantis/atlantis>"
+	attachments[0].Color = "danger"
+	attachments[0].Text = "Apply failed for <url|runatlantis/atlantis>"
 
-	err = client.PostMessage(channel, result)
+	err = client.PostMessage(channelID, result)
 	Ok(t, err)
-	underlying.VerifyWasCalledOnce().PostMessage(channel, "", expParams)
+	underlying.VerifyWasCalledOnce().PostMessage(channelID, slack.MsgOptionText("", false), slack.MsgOptionAttachments(attachments...))
 }
 
 func TestPostMessage_Error(t *testing.T) {
@@ -142,7 +143,10 @@ func TestPostMessage_Error(t *testing.T) {
 	setup(t)
 
 	expParams := slack.NewPostMessageParameters()
-	expParams.Attachments = []slack.Attachment{{
+	expParams.AsUser = true
+	expParams.EscapeText = false
+
+	attachments := []slack.Attachment{{
 		Color: "good",
 		Text:  "Apply succeeded for <url|runatlantis/atlantis>",
 		Fields: []slack.AttachmentField{
@@ -163,13 +167,11 @@ func TestPostMessage_Error(t *testing.T) {
 			},
 		},
 	}}
-	expParams.AsUser = true
-	expParams.EscapeText = false
 
-	channel := "somechannel"
-	When(underlying.PostMessage(channel, "", expParams)).ThenReturn("", "", errors.New(""))
+	channelID := "somechannelID"
+	When(underlying.PostMessage(channelID, slack.MsgOptionText("", false), slack.MsgOptionAttachments(attachments...))).ThenReturn("", "", errors.New(""))
 
-	err := client.PostMessage(channel, result)
+	err := client.PostMessage(channelID, result)
 	Assert(t, err != nil, "expected error")
 }
 
