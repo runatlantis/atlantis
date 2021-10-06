@@ -16,7 +16,6 @@ require (
 	github.com/aws/aws-sdk-go v1.31.15 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/bgentry/go-netrc v0.0.0-20140422174119-9fd32a8b3d3d // indirect
-	github.com/bradleyfalzon/ghinstallation v1.1.1
 	github.com/briandowns/spinner v0.0.0-20170614154858-48dbb65d7bd5
 	github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
@@ -35,7 +34,7 @@ require (
 	github.com/google/go-cmp v0.5.6 // indirect
 	github.com/google/go-github/v29 v29.0.2 // indirect
 	github.com/google/go-github/v31 v31.0.0
-	github.com/google/go-querystring v1.0.0 // indirect
+	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/uuid v1.1.2-0.20200519141726-cb32006e483f // indirect
 	github.com/googleapis/gax-go/v2 v2.1.0 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
@@ -120,4 +119,8 @@ require (
 	gotest.tools v2.2.0+incompatible // indirect
 )
 
-require golang.org/x/crypto v0.0.0-20210817164053-32db794688a5 // indirect
+require (
+	github.com/bradleyfalzon/ghinstallation/v2 v2.0.3 // indirect
+	github.com/google/go-github/v39 v39.1.0 // indirect
+	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
+)
