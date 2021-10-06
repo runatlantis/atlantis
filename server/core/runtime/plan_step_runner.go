@@ -70,7 +70,7 @@ func (p *PlanStepRunner) isRemoteOpsErr(output string, err error) bool {
 // operations.
 func (p *PlanStepRunner) remotePlan(ctx models.ProjectCommandContext, extraArgs []string, path string, tfVersion *version.Version, planFile string, envs map[string]string) (string, error) {
 	argList := [][]string{
-		{"plan", "-input=false", "-refresh", "-no-color"},
+		{"plan", "-input=false", "-refresh"},
 		extraArgs,
 		ctx.EscapedCommentArgs,
 	}
@@ -140,11 +140,11 @@ func (p *PlanStepRunner) switchWorkspace(ctx models.ProjectCommandContext, path 
 	// To do this we can either select and catch the error or use list and then
 	// look for the workspace. Both commands take the same amount of time so
 	// that's why we're running select here.
-	_, err := p.TerraformExecutor.RunCommandWithVersion(ctx, path, []string{workspaceCmd, "select", "-no-color", ctx.Workspace}, envs, tfVersion, ctx.Workspace)
+	_, err := p.TerraformExecutor.RunCommandWithVersion(ctx, path, []string{workspaceCmd, "select", ctx.Workspace}, envs, tfVersion, ctx.Workspace)
 	if err != nil {
 		// If terraform workspace select fails we run terraform workspace
 		// new to create a new workspace automatically.
-		out, err := p.TerraformExecutor.RunCommandWithVersion(ctx, path, []string{workspaceCmd, "new", "-no-color", ctx.Workspace}, envs, tfVersion, ctx.Workspace)
+		out, err := p.TerraformExecutor.RunCommandWithVersion(ctx, path, []string{workspaceCmd, "new", ctx.Workspace}, envs, tfVersion, ctx.Workspace)
 		if err != nil {
 			return fmt.Errorf("%s: %s", err, out)
 		}
@@ -168,7 +168,7 @@ func (p *PlanStepRunner) buildPlanCmd(ctx models.ProjectCommandContext, extraArg
 	argList := [][]string{
 		// NOTE: we need to quote the plan filename because Bitbucket Server can
 		// have spaces in its repo owner names.
-		{"plan", "-input=false", "-refresh", "-no-color", "-out", fmt.Sprintf("%q", planFile)},
+		{"plan", "-input=false", "-refresh", "-out", fmt.Sprintf("%q", planFile)},
 		tfVars,
 		extraArgs,
 		ctx.EscapedCommentArgs,

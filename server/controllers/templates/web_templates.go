@@ -383,6 +383,9 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
         width: 100%;
         height: 100%;
       }
+      .terminal.xterm {
+        padding: 10px;
+      }
     </style>
   </head>
 

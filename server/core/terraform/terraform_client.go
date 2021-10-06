@@ -33,6 +33,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/terraform/ansi"
 	"github.com/runatlantis/atlantis/server/feature"
 	"github.com/runatlantis/atlantis/server/handlers"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -307,6 +308,9 @@ func (c *DefaultClient) RunCommandWithVersion(ctx models.ProjectCommandContext, 
 			lines = append(lines, line.Line)
 		}
 		output := strings.Join(lines, "\n")
+
+		// sanitize output by stripping out any ansi characters.
+		output = ansi.Strip(output)
 		return fmt.Sprintf("%s\n", output), err
 	}
 
@@ -323,11 +327,11 @@ func (c *DefaultClient) RunCommandWithVersion(ctx models.ProjectCommandContext, 
 	if err != nil {
 		err = errors.Wrapf(err, "running %q in %q", tfCmd, path)
 		ctx.Log.Err(err.Error())
-		return string(out), err
+		return ansi.Strip(string(out)), err
 	}
 	ctx.Log.Info("successfully ran %q in %q", tfCmd, path)
 
-	return string(out), nil
+	return ansi.Strip(string(out)), nil
 }
 
 // prepCmd builds a ready to execute command based on the version of terraform
@@ -445,7 +449,6 @@ func (c *DefaultClient) RunCommandAsync(ctx models.ProjectCommandContext, path s
 		wg.Add(2)
 		// Asynchronously copy from stdout/err to outCh.
 		go func() {
-			c.projectCmdOutputHandler.Send(ctx, fmt.Sprintf("\n----- running terraform %s -----", args[0]))
 			s := bufio.NewScanner(stdout)
 			buf := []byte{}
 			s.Buffer(buf, BufioScannerBufferSize)
@@ -453,7 +456,7 @@ func (c *DefaultClient) RunCommandAsync(ctx models.ProjectCommandContext, path s
 			for s.Scan() {
 				message := s.Text()
 				outCh <- Line{Line: message}
-				c.projectCmdOutputHandler.Send(ctx, "\t"+message)
+				c.projectCmdOutputHandler.Send(ctx, message)
 			}
 			wg.Done()
 		}()

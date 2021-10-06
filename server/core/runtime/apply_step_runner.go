@@ -40,7 +40,7 @@ func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []stri
 
 	// TODO: Leverage PlanTypeStepRunnerDelegate here
 	if IsRemotePlan(contents) {
-		args := append(append([]string{"apply", "-input=false", "-no-color"}, extraArgs...), ctx.EscapedCommentArgs...)
+		args := append(append([]string{"apply", "-input=false"}, extraArgs...), ctx.EscapedCommentArgs...)
 		out, err = a.runRemoteApply(ctx, args, path, planPath, ctx.TerraformVersion, envs)
 		if err == nil {
 			out = a.cleanRemoteApplyOutput(out)
@@ -48,7 +48,7 @@ func (a *ApplyStepRunner) Run(ctx models.ProjectCommandContext, extraArgs []stri
 	} else {
 		// NOTE: we need to quote the plan path because Bitbucket Server can
 		// have spaces in its repo owner names which is part of the path.
-		args := append(append(append([]string{"apply", "-input=false", "-no-color"}, extraArgs...), ctx.EscapedCommentArgs...), fmt.Sprintf("%q", planPath))
+		args := append(append(append([]string{"apply", "-input=false"}, extraArgs...), ctx.EscapedCommentArgs...), fmt.Sprintf("%q", planPath))
 		out, err = a.TerraformExecutor.RunCommandWithVersion(ctx, path, args, envs, ctx.TerraformVersion, ctx.Workspace)
 	}
 
