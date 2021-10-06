@@ -1,3 +1,36 @@
+# v0.17.4
+
+## What's Changed
+
+* build(deps): bump tar from 4.4.15 to 4.4.19 by @dependabot in https://github.com/runatlantis/atlantis/pull/1783
+* build: tf 1.0.6 by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1786
+* Bump testing image conftest version to 0.27 by @nishkrishnan in https://github.com/runatlantis/atlantis/pull/1787
+* Actually bump testing image conftest version to 0.27 by @nishkrishnan in https://github.com/runatlantis/atlantis/pull/1788
+* build: fix testing-env img process by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1789
+* e2e: update dockerfile by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1790
+* build(deps): bump runatlantis/atlantis-base from 2021.06.22 to 2021.08.31 by @dependabot in https://github.com/runatlantis/atlantis/pull/1794
+* build(deps): bump github.com/xanzy/go-gitlab from 0.50.3 to 0.50.4 by @dependabot in https://github.com/runatlantis/atlantis/pull/1795
+* fix a log error typo by @danpilch in https://github.com/runatlantis/atlantis/pull/1796
+* Set ParallelPolicyCheckEnabled to the same value as ParallelPlanEnabled by @msarvar in https://github.com/runatlantis/atlantis/pull/1802
+* docs: Add missing --silence-vcs-status-no-plans flag by @franklad in https://github.com/runatlantis/atlantis/pull/1803
+* build(lint): use revive instead of golint by @minamijoyo in https://github.com/runatlantis/atlantis/pull/1801
+* build(deps): bump github.com/hashicorp/go-getter from 1.5.7 to 1.5.8 by @dependabot in https://github.com/runatlantis/atlantis/pull/1807
+* build(deps): bump go.uber.org/zap from 1.19.0 to 1.19.1 by @dependabot in https://github.com/runatlantis/atlantis/pull/1808
+* docs: add missing the `branch` key in the reference for server side repo config by @minamijoyo in https://github.com/runatlantis/atlantis/pull/1784
+* build: tf 1.0.7 by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1811
+* deps: conftest 0.28.0 by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1819
+* deps: conftest 0.28.1 by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1826
+* build(deps): bump prismjs from 1.24.0 to 1.25.0 by @dependabot in https://github.com/runatlantis/atlantis/pull/1823
+* Updating client interface and adding ApprovalStatus model by @Aayyush in https://github.com/runatlantis/atlantis/pull/1827
+* Fix title level by @xiao-pp in https://github.com/runatlantis/atlantis/pull/1822
+* build(deps): bump github.com/xanzy/go-gitlab from 0.50.4 to 0.51.1 by @dependabot in https://github.com/runatlantis/atlantis/pull/1831
+* Add support for deleting a branch on merge in BitBucket Server by @wpbeckwith in https://github.com/runatlantis/atlantis/pull/1792
+* deps: tf 1.0.8 by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1837
+* build(deps): bump github.com/spf13/viper from 1.8.1 to 1.9.0 by @dependabot in https://github.com/runatlantis/atlantis/pull/1821
+* Document --auto-merge-disabled option by @dupuy26 in https://github.com/runatlantis/atlantis/pull/1838
+* testdrive: update terraformVersion by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1839
+* Improve github pull request call retries by @aristocrates in https://github.com/runatlantis/atlantis/pull/1810
+
 # v0.17.3
 Feature release with a number of improvements related to Gitlab support, a new command, better formatting etc. Some broken features have been fixed in along with some regressions.
 
