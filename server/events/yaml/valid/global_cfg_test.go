@@ -2,7 +2,7 @@ package valid_test
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 	"testing"
@@ -661,7 +661,7 @@ policies:
 			var global valid.GlobalCfg
 			if c.gCfg != "" {
 				path := filepath.Join(tmp, "config.yaml")
-				Ok(t, ioutil.WriteFile(path, []byte(c.gCfg), 0600))
+				Ok(t, os.WriteFile(path, []byte(c.gCfg), 0600))
 				var err error
 				globalCfgArgs := valid.GlobalCfgArgs{
 					AllowRepoCfg:  false,
@@ -832,7 +832,7 @@ repos:
 			var global valid.GlobalCfg
 			if c.gCfg != "" {
 				path := filepath.Join(tmp, "config.yaml")
-				Ok(t, ioutil.WriteFile(path, []byte(c.gCfg), 0600))
+				Ok(t, os.WriteFile(path, []byte(c.gCfg), 0600))
 				var err error
 				globalCfgArgs := valid.GlobalCfgArgs{
 					AllowRepoCfg:  false,
