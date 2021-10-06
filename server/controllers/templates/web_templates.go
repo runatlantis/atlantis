@@ -380,9 +380,15 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
     <link rel="icon" type="image/png" href="/static/images/atlantis-icon.png">
     <style>
       #terminal {
-        width: 100%;
-        height: 100%;
-      }
+        position: fixed;
+        top: 200px;
+        left: 0px;
+        bottom: 0px;
+        right: 0px;
+        overflow: auto;
+        border: 5px solid white;
+        }
+
       .terminal.xterm {
         padding: 10px;
       }
@@ -390,20 +396,19 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
   </head>
 
   <body>
-    <div class="container">
-      <section class="header">
-      <a title="atlantis" href="/"><img class="hero" src="/static/images/atlantis-icon_512.png"/></a>
-      <p class="title-heading">atlantis</p>
-      <p class="title-heading"><strong></strong></p>
-      </section>
-      <div class="spacer"></div>
-      <br>
-      <section>
-        <div id="terminal"></div>
-      </section>
-    </div>
-    <footer>
-    </footer>
+    <section class="header">
+    <a title="atlantis" href="/"><img class="hero" src="/static/images/atlantis-icon_512.png"/></a>
+    <p class="title-heading">atlantis</p>
+    <p class="title-heading"><strong></strong></p>
+    </section>
+    <div class="spacer"></div>
+    <br>
+    <section>
+      <div id="terminal"></div>
+    </section>
+  </div>
+  <footer>
+  </footer>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
     <script src="https://unpkg.com/xterm@4.9.0/lib/xterm.js"></script>
