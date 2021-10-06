@@ -64,7 +64,6 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 		[]string{"plan",
 			"-input=false",
 			"-refresh",
-			"-no-color",
 			"-out",
 			"\"/path/default.tfplan\"",
 			"-var",
@@ -90,7 +89,6 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 		"/path",
 		[]string{"env",
 			"select",
-			"-no-color",
 			"workspace"},
 		map[string]string(nil),
 		tfVersion,
@@ -99,7 +97,6 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 		"/path",
 		[]string{"workspace",
 			"select",
-			"-no-color",
 			"workspace"},
 		map[string]string(nil),
 		tfVersion,
@@ -193,7 +190,6 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 				"/path",
 				[]string{c.expWorkspaceCmd,
 					"select",
-					"-no-color",
 					"workspace"},
 				map[string]string(nil),
 				tfVersion,
@@ -203,7 +199,6 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 				[]string{"plan",
 					"-input=false",
 					"-refresh",
-					"-no-color",
 					"-out",
 					"\"/path/workspace.tfplan\"",
 					"-var",
@@ -282,13 +277,12 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 			// output of `workspace show` to be a different name.
 			When(terraform.RunCommandWithVersion(ctx, "/path", []string{"workspace", "show"}, map[string]string(nil), tfVersion, "workspace")).ThenReturn("diffworkspace\n", nil)
 
-			expWorkspaceArgs := []string{c.expWorkspaceCommand, "select", "-no-color", "workspace"}
+			expWorkspaceArgs := []string{c.expWorkspaceCommand, "select", "workspace"}
 			When(terraform.RunCommandWithVersion(ctx, "/path", expWorkspaceArgs, map[string]string(nil), tfVersion, "workspace")).ThenReturn("", errors.New("workspace does not exist"))
 
 			expPlanArgs := []string{"plan",
 				"-input=false",
 				"-refresh",
-				"-no-color",
 				"-out",
 				"\"/path/workspace.tfplan\"",
 				"-var",
@@ -349,7 +343,6 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 	expPlanArgs := []string{"plan",
 		"-input=false",
 		"-refresh",
-		"-no-color",
 		"-out",
 		"\"/path/workspace.tfplan\"",
 		"-var",
@@ -375,7 +368,7 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, "/path", expPlanArgs, map[string]string(nil), tfVersion, "workspace")
 
 	// Verify that workspace select was never called.
-	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(ctx, "/path", []string{"workspace", "select", "-no-color", "workspace"}, map[string]string(nil), tfVersion, "workspace")
+	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(ctx, "/path", []string{"workspace", "select", "workspace"}, map[string]string(nil), tfVersion, "workspace")
 }
 
 func TestRun_AddsEnvVarFile(t *testing.T) {
@@ -403,7 +396,6 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 	expPlanArgs := []string{"plan",
 		"-input=false",
 		"-refresh",
-		"-no-color",
 		"-out",
 		fmt.Sprintf("%q", filepath.Join(tmpDir, "workspace.tfplan")),
 		"-var",
@@ -444,7 +436,7 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 	Ok(t, err)
 
 	// Verify that env select was never called since we're in version >= 0.10
-	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(ctx, tmpDir, []string{"env", "select", "-no-color", "workspace"}, map[string]string(nil), tfVersion, "workspace")
+	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(ctx, tmpDir, []string{"env", "select", "workspace"}, map[string]string(nil), tfVersion, "workspace")
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, expPlanArgs, map[string]string(nil), tfVersion, "workspace")
 	Equals(t, "output", output)
 }
@@ -481,7 +473,6 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 	expPlanArgs := []string{"plan",
 		"-input=false",
 		"-refresh",
-		"-no-color",
 		"-out",
 		"\"/path/projectname-default.tfplan\"",
 		"-var",
@@ -629,7 +620,6 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 		"plan",
 		"-input=false",
 		"-refresh",
-		"-no-color",
 		"-out",
 		fmt.Sprintf("%q", "/path/default.tfplan"),
 		"extra",
@@ -757,7 +747,6 @@ locally at this time.
 			expPlanArgs := []string{"plan",
 				"-input=false",
 				"-refresh",
-				"-no-color",
 				"-out",
 				fmt.Sprintf("%q", filepath.Join(absProjectPath, "default.tfplan")),
 				"-var",
@@ -796,7 +785,7 @@ Terraform will perform the following actions:
 
 Plan: 0 to add, 0 to change, 1 to destroy.`, output)
 
-			expRemotePlanArgs := []string{"plan", "-input=false", "-refresh", "-no-color", "extra", "args", "comment", "args"}
+			expRemotePlanArgs := []string{"plan", "-input=false", "-refresh", "extra", "args", "comment", "args"}
 			Equals(t, expRemotePlanArgs, asyncTf.CalledArgs)
 
 			// Verify that the fake plan file we write has the correct contents.
