@@ -20,7 +20,6 @@ require (
 	github.com/briandowns/spinner v0.0.0-20170614154858-48dbb65d7bd5
 	github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
-	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/docker/docker v0.0.0-20180620051407-e2593239d949
 	github.com/elazarl/go-bindata-assetfs v1.0.1
 	github.com/fatih/color v1.9.0 // indirect
@@ -30,6 +29,7 @@ require (
 	github.com/go-playground/locales v0.12.1 // indirect
 	github.com/go-playground/universal-translator v0.16.0 // indirect
 	github.com/go-test/deep v1.0.7
+	github.com/golang-jwt/jwt/v4 v4.1.0
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-cmp v0.5.6 // indirect
