@@ -257,6 +257,7 @@ func newProjectCommandContext(ctx *CommandContext,
 		ForceApply:                contextFlags.ForceApply,
 		Workspace:                 projCfg.Workspace,
 		PolicySets:                policySets,
+		Tags:                      projCfg.Tags,
 	}
 }
 
