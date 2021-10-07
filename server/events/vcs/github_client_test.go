@@ -4,10 +4,11 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 
@@ -169,7 +170,7 @@ func TestGithubClient_PaginatesComments(t *testing.T) {
 			switch r.Method + " " + r.RequestURI {
 			case "POST /api/graphql":
 				defer r.Body.Close() // nolint: errcheck
-				body, err := ioutil.ReadAll(r.Body)
+				body, err := io.ReadAll(r.Body)
 				if err != nil {
 					t.Errorf("read body error: %v", err)
 					http.Error(w, "server error", http.StatusInternalServerError)
@@ -272,7 +273,7 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 					return
 				}
 				defer r.Body.Close() // nolint: errcheck
-				body, err := ioutil.ReadAll(r.Body)
+				body, err := io.ReadAll(r.Body)
 				if err != nil {
 					t.Errorf("read body error: %v", err)
 					http.Error(w, "server error", http.StatusInternalServerError)
@@ -350,7 +351,7 @@ func TestGithubClient_UpdateStatus(t *testing.T) {
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch r.RequestURI {
 					case "/api/v3/repos/owner/repo/statuses/":
-						body, err := ioutil.ReadAll(r.Body)
+						body, err := io.ReadAll(r.Body)
 						Ok(t, err)
 						exp := fmt.Sprintf(`{"state":"%s","target_url":"https://google.com","description":"description","context":"src"}%s`, c.expState, "\n")
 						Equals(t, exp, string(body))
@@ -516,7 +517,7 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 	}
 
 	// Use a real GitHub json response and edit the mergeable_state field.
-	jsBytes, err := ioutil.ReadFile("fixtures/github-pull-request.json")
+	jsBytes, err := os.ReadFile("fixtures/github-pull-request.json")
 	Ok(t, err)
 	json := string(jsBytes)
 
@@ -590,7 +591,7 @@ func TestGithubClient_MergePullHandlesError(t *testing.T) {
 		},
 	}
 
-	jsBytes, err := ioutil.ReadFile("fixtures/github-repo.json")
+	jsBytes, err := os.ReadFile("fixtures/github-repo.json")
 	Ok(t, err)
 
 	for _, c := range cases {
@@ -602,7 +603,7 @@ func TestGithubClient_MergePullHandlesError(t *testing.T) {
 						w.Write(jsBytes) // nolint: errcheck
 						return
 					case "/api/v3/repos/owner/repo/pulls/1/merge":
-						body, err := ioutil.ReadAll(r.Body)
+						body, err := io.ReadAll(r.Body)
 						Ok(t, err)
 						exp := "{\"merge_method\":\"merge\"}\n"
 						Equals(t, exp, string(body))
@@ -700,7 +701,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 
 			// Modify response.
-			jsBytes, err := ioutil.ReadFile("fixtures/github-repo.json")
+			jsBytes, err := os.ReadFile("fixtures/github-repo.json")
 			Ok(t, err)
 			resp := string(jsBytes)
 			resp = strings.Replace(resp,
@@ -723,7 +724,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 						w.Write([]byte(resp)) // nolint: errcheck
 						return
 					case "/api/v3/repos/runatlantis/atlantis/pulls/1/merge":
-						body, err := ioutil.ReadAll(r.Body)
+						body, err := io.ReadAll(r.Body)
 						Ok(t, err)
 						defer r.Body.Close() // nolint: errcheck
 						type bodyJSON struct {
@@ -806,7 +807,7 @@ func TestGithubClient_SplitComments(t *testing.T) {
 			switch r.Method + " " + r.RequestURI {
 			case "POST /api/v3/repos/runatlantis/atlantis/issues/1/comments":
 				defer r.Body.Close() // nolint: errcheck
-				body, err := ioutil.ReadAll(r.Body)
+				body, err := io.ReadAll(r.Body)
 				if err != nil {
 					t.Errorf("read body error: %v", err)
 					http.Error(w, "server error", http.StatusInternalServerError)

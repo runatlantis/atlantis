@@ -3,9 +3,10 @@ package bitbucketserver_test
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -138,7 +139,7 @@ func TestClient_GetModifiedFilesPagination(t *testing.T) {
 // Test that we use the correct version parameter in our call to merge the pull
 // request.
 func TestClient_MergePull(t *testing.T) {
-	pullRequest, err := ioutil.ReadFile(filepath.Join("testdata", "pull-request.json"))
+	pullRequest, err := os.ReadFile(filepath.Join("testdata", "pull-request.json"))
 	Ok(t, err)
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.RequestURI {
@@ -187,7 +188,7 @@ func TestClient_MergePull(t *testing.T) {
 // Test that we delete the source branch in our call to merge the pull
 // request.
 func TestClient_MergePullDeleteSourceBranch(t *testing.T) {
-	pullRequest, err := ioutil.ReadFile(filepath.Join("testdata", "pull-request.json"))
+	pullRequest, err := os.ReadFile(filepath.Join("testdata", "pull-request.json"))
 	Ok(t, err)
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.RequestURI {
@@ -201,7 +202,7 @@ func TestClient_MergePullDeleteSourceBranch(t *testing.T) {
 		case "/rest/branch-utils/1.0/projects/ow/repos/repo/branches":
 			Equals(t, "DELETE", r.Method)
 			defer r.Body.Close()
-			b, err := ioutil.ReadAll(r.Body)
+			b, err := io.ReadAll(r.Body)
 			Ok(t, err)
 			var payload bitbucketserver.DeleteSourceBranch
 			err = json.Unmarshal(b, &payload)
