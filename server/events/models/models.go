@@ -142,6 +142,16 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 	}, nil
 }
 
+type PullReqStatus struct {
+	Approved ApprovalStatus
+}
+
+type ApprovalStatus struct {
+	IsApproved bool
+	ApprovedBy string
+	Date       time.Time
+}
+
 // PullRequest is a VCS pull request.
 // GitLab calls these Merge Requests.
 type PullRequest struct {
@@ -367,6 +377,8 @@ type ProjectCommandContext struct {
 	// PullMergeable is true if the pull request for this project is able to be merged.
 	PullMergeable bool
 	// CurrentProjectPlanStatus is the status of the current project prior to this command.
+	PullReqStatus PullReqStatus
+	// CurrentProjectPlanStatus is the status of the current project prior to this command.
 	ProjectPlanStatus ProjectPlanStatus
 	// Pull is the pull request we're responding to.
 	Pull PullRequest
@@ -516,6 +528,17 @@ func (p *PlanSuccess) Summary() string {
 	}
 	r = regexp.MustCompile(`No changes. (Infrastructure is up-to-date|Your infrastructure matches the configuration).`)
 	return note + r.FindString(p.TerraformOutput)
+}
+
+// DiffMarkdownFormattedTerraformOutput formats the Terraform output to match diff markdown format
+func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
+	diffKeywordRegex := regexp.MustCompile(`(?m)^( +)([-+~])`)
+	diffTildeRegex := regexp.MustCompile(`(?m)^~`)
+
+	formattedTerraformOutput := diffKeywordRegex.ReplaceAllString(p.TerraformOutput, "$2$1")
+	formattedTerraformOutput = diffTildeRegex.ReplaceAllString(formattedTerraformOutput, "!")
+
+	return formattedTerraformOutput
 }
 
 // PolicyCheckSuccess is the result of a successful policy check run.

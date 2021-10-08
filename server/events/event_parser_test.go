@@ -16,7 +16,7 @@ package events_test
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -325,7 +325,7 @@ func TestParseGithubPull(t *testing.T) {
 func TestParseGitlabMergeEvent(t *testing.T) {
 	t.Log("should properly parse a gitlab merge event")
 	path := filepath.Join("testdata", "gitlab-merge-request-event.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	Ok(t, err)
 	var event *gitlab.MergeEvent
 	err = json.Unmarshal(bytes, &event)
@@ -382,7 +382,7 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 // i.e. instead of under an owner/repo it's under an owner/group/subgroup/repo.
 func TestParseGitlabMergeEvent_Subgroup(t *testing.T) {
 	path := filepath.Join("testdata", "gitlab-merge-request-event-subgroup.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	Ok(t, err)
 	var event *gitlab.MergeEvent
 	err = json.Unmarshal(bytes, &event)
@@ -457,7 +457,7 @@ func TestParseGitlabMergeEvent_ActionType(t *testing.T) {
 	}
 
 	path := filepath.Join("testdata", "gitlab-merge-request-event.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	Ok(t, err)
 	mergeEventJSON := string(bytes)
 
@@ -479,7 +479,7 @@ func TestParseGitlabMergeEvent_ActionType(t *testing.T) {
 func TestParseGitlabMergeRequest(t *testing.T) {
 	t.Log("should properly parse a gitlab merge request")
 	path := filepath.Join("testdata", "gitlab-get-merge-request.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		Ok(t, err)
 	}
@@ -517,7 +517,7 @@ func TestParseGitlabMergeRequest(t *testing.T) {
 
 func TestParseGitlabMergeRequest_Subgroup(t *testing.T) {
 	path := filepath.Join("testdata", "gitlab-get-merge-request-subgroup.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		Ok(t, err)
 	}
@@ -552,7 +552,7 @@ func TestParseGitlabMergeRequest_Subgroup(t *testing.T) {
 func TestParseGitlabMergeCommentEvent(t *testing.T) {
 	t.Log("should properly parse a gitlab merge comment event")
 	path := filepath.Join("testdata", "gitlab-merge-request-comment-event.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	Ok(t, err)
 	var event *gitlab.MergeCommentEvent
 	err = json.Unmarshal(bytes, &event)
@@ -589,7 +589,7 @@ func TestParseGitlabMergeCommentEvent(t *testing.T) {
 // Should properly parse a gitlab merge comment event from a subgroup repo.
 func TestParseGitlabMergeCommentEvent_Subgroup(t *testing.T) {
 	path := filepath.Join("testdata", "gitlab-merge-request-comment-event-subgroup.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	Ok(t, err)
 	var event *gitlab.MergeCommentEvent
 	err = json.Unmarshal(bytes, &event)
@@ -738,7 +738,7 @@ func TestParseBitbucketCloudCommentEvent_EmptyObject(t *testing.T) {
 
 func TestParseBitbucketCloudCommentEvent_CommitHashMissing(t *testing.T) {
 	path := filepath.Join("testdata", "bitbucket-cloud-comment-event.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	Ok(t, err)
 	emptyCommitHash := strings.Replace(string(bytes), `        "hash": "e0624da46d3a",`, "", -1)
 	_, _, _, _, _, err = parser.ParseBitbucketCloudPullCommentEvent([]byte(emptyCommitHash))
@@ -747,7 +747,7 @@ func TestParseBitbucketCloudCommentEvent_CommitHashMissing(t *testing.T) {
 
 func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {
 	path := filepath.Join("testdata", "bitbucket-cloud-comment-event.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	Ok(t, err)
 	pull, baseRepo, headRepo, user, comment, err := parser.ParseBitbucketCloudPullCommentEvent(bytes)
 	Ok(t, err)
@@ -792,7 +792,7 @@ func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {
 
 func TestParseBitbucketCloudCommentEvent_MultipleStates(t *testing.T) {
 	path := filepath.Join("testdata", "bitbucket-cloud-comment-event.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		Ok(t, err)
 	}
@@ -831,7 +831,7 @@ func TestParseBitbucketCloudCommentEvent_MultipleStates(t *testing.T) {
 
 func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 	path := filepath.Join("testdata", "bitbucket-cloud-pull-event-created.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		Ok(t, err)
 	}
@@ -894,7 +894,7 @@ func TestParseBitbucketCloudPullEvent_States(t *testing.T) {
 		},
 	} {
 		path := filepath.Join("testdata", c.JSON)
-		bytes, err := ioutil.ReadFile(path)
+		bytes, err := os.ReadFile(path)
 		if err != nil {
 			Ok(t, err)
 		}
@@ -950,7 +950,7 @@ func TestParseBitbucketServerCommentEvent_EmptyObject(t *testing.T) {
 
 func TestParseBitbucketServerCommentEvent_CommitHashMissing(t *testing.T) {
 	path := filepath.Join("testdata", "bitbucket-server-comment-event.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		Ok(t, err)
 	}
@@ -961,7 +961,7 @@ func TestParseBitbucketServerCommentEvent_CommitHashMissing(t *testing.T) {
 
 func TestParseBitbucketServerCommentEvent_ValidEvent(t *testing.T) {
 	path := filepath.Join("testdata", "bitbucket-server-comment-event.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		Ok(t, err)
 	}
@@ -1008,7 +1008,7 @@ func TestParseBitbucketServerCommentEvent_ValidEvent(t *testing.T) {
 
 func TestParseBitbucketServerCommentEvent_MultipleStates(t *testing.T) {
 	path := filepath.Join("testdata", "bitbucket-server-comment-event.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		Ok(t, err)
 	}
@@ -1043,7 +1043,7 @@ func TestParseBitbucketServerCommentEvent_MultipleStates(t *testing.T) {
 
 func TestParseBitbucketServerPullEvent_ValidEvent(t *testing.T) {
 	path := filepath.Join("testdata", "bitbucket-server-pull-event-merged.json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		Ok(t, err)
 	}

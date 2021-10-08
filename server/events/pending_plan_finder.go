@@ -1,7 +1,6 @@
 package events
 
 import (
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -43,7 +42,7 @@ func (p *DefaultPendingPlanFinder) Find(pullDir string) ([]PendingPlan, error) {
 }
 
 func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPlan, []string, error) {
-	workspaceDirs, err := ioutil.ReadDir(pullDir)
+	workspaceDirs, err := os.ReadDir(pullDir)
 	if err != nil {
 		return nil, nil, err
 	}

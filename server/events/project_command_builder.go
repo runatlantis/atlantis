@@ -117,6 +117,7 @@ type DefaultProjectCommandBuilder struct {
 	SkipCloneNoChanges           bool
 	EnableRegExpCmd              bool
 	AutoplanFileList             string
+	EnableDiffMarkdownFormat     bool
 }
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.

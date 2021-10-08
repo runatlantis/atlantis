@@ -3,7 +3,7 @@ package controllers_test
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -26,7 +26,7 @@ func TestStatusController_Startup(t *testing.T) {
 	d.Get(w, r)
 
 	var result controllers.StatusResponse
-	body, err := ioutil.ReadAll(w.Result().Body)
+	body, err := io.ReadAll(w.Result().Body)
 	Ok(t, err)
 	Equals(t, 200, w.Result().StatusCode)
 	err = json.Unmarshal(body, &result)
@@ -49,7 +49,7 @@ func TestStatusController_InProgress(t *testing.T) {
 	d.Get(w, r)
 
 	var result controllers.StatusResponse
-	body, err := ioutil.ReadAll(w.Result().Body)
+	body, err := io.ReadAll(w.Result().Body)
 	Ok(t, err)
 	Equals(t, 200, w.Result().StatusCode)
 	err = json.Unmarshal(body, &result)
@@ -72,7 +72,7 @@ func TestStatusController_Shutdown(t *testing.T) {
 	d.Get(w, r)
 
 	var result controllers.StatusResponse
-	body, err := ioutil.ReadAll(w.Result().Body)
+	body, err := io.ReadAll(w.Result().Body)
 	Ok(t, err)
 	Equals(t, 200, w.Result().StatusCode)
 	err = json.Unmarshal(body, &result)

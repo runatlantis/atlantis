@@ -23,11 +23,11 @@ func (a *AggregateApplyRequirements) ValidateProject(repoDir string, ctx models.
 	for _, req := range ctx.ApplyRequirements {
 		switch req {
 		case raw.ApprovedApplyRequirement:
-			approved, err := a.PullApprovedChecker.PullIsApproved(ctx.Pull.BaseRepo, ctx.Pull) // nolint: vetshadow
+			approvalStatus, err := a.PullApprovedChecker.PullIsApproved(ctx.Pull.BaseRepo, ctx.Pull) // nolint: vetshadow
 			if err != nil {
 				return "", errors.Wrap(err, "checking if pull request was approved")
 			}
-			if !approved {
+			if !approvalStatus.IsApproved {
 				return "Pull request must be approved by at least one person other than the author before running apply.", nil
 			}
 		// this should come before mergeability check since mergeability is a superset of this check.

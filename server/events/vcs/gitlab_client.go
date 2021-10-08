@@ -34,6 +34,10 @@ import (
 	gitlab "github.com/xanzy/go-gitlab"
 )
 
+// gitlabMaxCommentLength is the maximum number of chars allowed by Gitlab in a
+// single comment.
+const gitlabMaxCommentLength = 1000000
+
 type GitlabClient struct {
 	Client *gitlab.Client
 	// Version is set to the server version.
@@ -146,8 +150,17 @@ func (g *GitlabClient) GetModifiedFiles(repo models.Repo, pull models.PullReques
 
 // CreateComment creates a comment on the merge request.
 func (g *GitlabClient) CreateComment(repo models.Repo, pullNum int, comment string, command string) error {
-	_, _, err := g.Client.Notes.CreateMergeRequestNote(repo.FullName, pullNum, &gitlab.CreateMergeRequestNoteOptions{Body: gitlab.String(comment)})
-	return err
+	sepEnd := "\n```\n</details>" +
+		"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
+	sepStart := "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
+		"```diff\n"
+	comments := common.SplitComment(comment, gitlabMaxCommentLength, sepEnd, sepStart)
+	for _, c := range comments {
+		if _, _, err := g.Client.Notes.CreateMergeRequestNote(repo.FullName, pullNum, &gitlab.CreateMergeRequestNoteOptions{Body: gitlab.String(c)}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (g *GitlabClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
@@ -155,15 +168,17 @@ func (g *GitlabClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 }
 
 // PullIsApproved returns true if the merge request was approved.
-func (g *GitlabClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (g *GitlabClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	approvals, _, err := g.Client.MergeRequests.GetMergeRequestApprovals(repo.FullName, pull.Num)
 	if err != nil {
-		return false, err
+		return approvalStatus, err
 	}
 	if approvals.ApprovalsLeft > 0 {
-		return false, nil
+		return approvalStatus, nil
 	}
-	return true, nil
+	return models.ApprovalStatus{
+		IsApproved: true,
+	}, nil
 }
 
 // PullIsMergeable returns true if the merge request can be merged.
