@@ -57,7 +57,7 @@ func (u *UnlockCommandRunner) commentOnDequeuedPullRequests(ctx *CommandContext,
 	for pullRequestNumber, projectLocks := range locksByPullRequest {
 		planVcsMessage := buildCommentOnDequeuedPullRequest(projectLocks)
 		if commentErr := u.vcsClient.CreateComment(baseRepo, pullRequestNumber, planVcsMessage, ""); commentErr != nil {
-			ctx.Log.Err("unable to comment on PR %s: %s", pullRequestNumber, commentErr)
+			ctx.Log.Err("unable to comment on PR %d: %s", pullRequestNumber, commentErr)
 		}
 	}
 }
