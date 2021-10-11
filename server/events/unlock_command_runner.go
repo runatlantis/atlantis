@@ -46,16 +46,14 @@ func (u *UnlockCommandRunner) Run(
 		ctx.Log.Err("unable to comment on PR %s: %s", pullNum, commentErr)
 	}
 
-	u.commentOnDequeuedPullRequests(ctx, dequeueStatus, baseRepo)
+	u.commentOnDequeuedPullRequests(ctx, dequeueStatus)
 }
 
-// TODO(Ghais) also do the same when:
-//  * Unlocked from the UI
-func (u *UnlockCommandRunner) commentOnDequeuedPullRequests(ctx *CommandContext, dequeueStatus models.DequeueStatus, baseRepo models.Repo) {
+func (u *UnlockCommandRunner) commentOnDequeuedPullRequests(ctx *CommandContext, dequeueStatus models.DequeueStatus) {
 	locksByPullRequest := groupByPullRequests(dequeueStatus.ProjectLocks)
 	for pullRequestNumber, projectLocks := range locksByPullRequest {
 		planVcsMessage := buildCommentOnDequeuedPullRequest(projectLocks)
-		if commentErr := u.vcsClient.CreateComment(baseRepo, pullRequestNumber, planVcsMessage, ""); commentErr != nil {
+		if commentErr := u.vcsClient.CreateComment(projectLocks[0].Pull.BaseRepo, pullRequestNumber, planVcsMessage, ""); commentErr != nil {
 			ctx.Log.Err("unable to comment on PR %d: %s", pullRequestNumber, commentErr)
 		}
 	}

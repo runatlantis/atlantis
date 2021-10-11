@@ -191,7 +191,7 @@ func findPullRequest(locks []models.ProjectLock, pullRequestNumber int) int {
 func (b *BoltDB) Unlock(p models.Project, workspace string) (*models.ProjectLock, *models.ProjectLock, error) {
 	// TODO monikma extend the tests
 	var lock models.ProjectLock
-	var dequeuedLock models.ProjectLock
+	var dequeuedLock *models.ProjectLock
 	foundLock := false
 	key := b.lockKey(p, workspace)
 	err := b.db.Update(func(tx *bolt.Tx) error {
@@ -225,28 +225,29 @@ func (b *BoltDB) Unlock(p models.Project, workspace string) (*models.ProjectLock
 		}
 
 		// Queue has items, get the next in line
-		// TODO monikma will this dequeueing info not get to the PR comment?
-		return b.dequeueNextInLine(&dequeuedLock, currQueue, bucket, key, queueBucket)
+		var err error
+		dequeuedLock, err = b.dequeueNextInLine(currQueue, bucket, key, queueBucket)
+		return err
 	})
 
 	err = errors.Wrap(err, "DB transaction failed")
 	if foundLock {
-		return &lock, &dequeuedLock, err
+		return &lock, dequeuedLock, err
 	}
 	return nil, nil, err
 }
 
-func (b *BoltDB) dequeueNextInLine(dequeuedLock *models.ProjectLock, currQueue []models.ProjectLock, bucket *bolt.Bucket, key string, queueBucket *bolt.Bucket) error {
-	*dequeuedLock = currQueue[0]
+func (b *BoltDB) dequeueNextInLine(currQueue []models.ProjectLock, bucket *bolt.Bucket, key string, queueBucket *bolt.Bucket) (*models.ProjectLock, error) {
+	dequeuedLock := &currQueue[0]
 	newQueue := currQueue[1:]
 
-	dequeuedLockSerialized, _ := json.Marshal(dequeuedLock)
+	dequeuedLockSerialized, _ := json.Marshal(*dequeuedLock)
 	if err := bucket.Put([]byte(key), dequeuedLockSerialized); err != nil {
-		return errors.Wrap(err, "failed to give the lock to next PR in the queue")
+		return nil, errors.Wrap(err, "failed to give the lock to next PR in the queue")
 	}
 
 	newQueueSerialized, _ := json.Marshal(newQueue)
-	return queueBucket.Put([]byte(key), newQueueSerialized)
+	return dequeuedLock, queueBucket.Put([]byte(key), newQueueSerialized)
 }
 
 // List lists all current locks.

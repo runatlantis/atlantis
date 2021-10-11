@@ -702,7 +702,6 @@ type EnqueueStatus struct {
 // TODO monikma extend the tests
 type DequeueStatus struct {
 	// the PR's lock that should be planned next
-	// TODO monikma #4 Queue the whole command rather than just the lock
 	ProjectLocks []ProjectLock
 }
 
