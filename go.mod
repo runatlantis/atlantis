@@ -16,6 +16,7 @@ require (
 	github.com/aws/aws-sdk-go v1.31.15 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/bgentry/go-netrc v0.0.0-20140422174119-9fd32a8b3d3d // indirect
+	github.com/bradleyfalzon/ghinstallation/v2 v2.0.3
 	github.com/briandowns/spinner v0.0.0-20170614154858-48dbb65d7bd5
 	github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
@@ -32,7 +33,6 @@ require (
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-cmp v0.5.6 // indirect
-	github.com/google/go-github/v29 v29.0.2 // indirect
 	github.com/google/go-github/v31 v31.0.0
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/uuid v1.1.2-0.20200519141726-cb32006e483f // indirect
@@ -41,7 +41,7 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
-	github.com/hashicorp/go-getter v1.5.8
+	github.com/hashicorp/go-getter v1.5.9
 	github.com/hashicorp/go-retryablehttp v0.6.8 // indirect
 	github.com/hashicorp/go-safetemp v1.0.0 // indirect
 	github.com/hashicorp/go-version v1.3.0
@@ -120,7 +120,6 @@ require (
 )
 
 require (
-	github.com/bradleyfalzon/ghinstallation/v2 v2.0.3 // indirect
 	github.com/google/go-github/v39 v39.1.0 // indirect
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
 )
