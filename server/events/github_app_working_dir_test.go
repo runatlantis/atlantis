@@ -31,11 +31,6 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
 	}
 
-	tmpDir, cleanup3 := DirStructure(t, map[string]interface{}{
-		"key.pem": fixtures.GithubPrivateKey,
-	})
-	defer cleanup3()
-
 	defer disableSSLVerification()()
 	testServer, err := fixtures.GithubAppTestServer(t)
 	Ok(t, err)
@@ -43,7 +38,7 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 	gwd := &events.GithubAppWorkingDir{
 		WorkingDir: wd,
 		Credentials: &vcs.GithubAppCredentials{
-			KeyPath:  fmt.Sprintf("%v/key.pem", tmpDir),
+			Key:      []byte(fixtures.GithubPrivateKey),
 			AppID:    1,
 			Hostname: testServer,
 		},

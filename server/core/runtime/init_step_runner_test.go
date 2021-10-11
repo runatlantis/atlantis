@@ -1,8 +1,10 @@
 package runtime_test
 
 import (
-	"io/ioutil"
+	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	version "github.com/hashicorp/go-version"
@@ -98,12 +100,17 @@ func TestRun_ShowInitOutputOnError(t *testing.T) {
 	Equals(t, "output", output)
 }
 
-func TestRun_InitOmitsUpgradeFlagIfLockFilePresent(t *testing.T) {
-	tmpDir, cleanup := TempDir(t)
+func TestRun_InitOmitsUpgradeFlagIfLockFileTracked(t *testing.T) {
+	// Initialize the git repo.
+	repoDir, cleanup := initRepo(t)
 	defer cleanup()
-	lockFilePath := filepath.Join(tmpDir, ".terraform.lock.hcl")
-	err := ioutil.WriteFile(lockFilePath, nil, 0600)
+
+	lockFilePath := filepath.Join(repoDir, ".terraform.lock.hcl")
+	err := os.WriteFile(lockFilePath, nil, 0600)
 	Ok(t, err)
+	// commit lock file
+	runCmd(t, repoDir, "git", "add", ".terraform.lock.hcl")
+	runCmd(t, repoDir, "git", "commit", "-m", "add .terraform.lock.hcl")
 
 	RegisterMockTestingT(t)
 	terraform := mocks.NewMockClient()
@@ -122,13 +129,13 @@ func TestRun_InitOmitsUpgradeFlagIfLockFilePresent(t *testing.T) {
 		Workspace:  "workspace",
 		RepoRelDir: ".",
 		Log:        logger,
-	}, []string{"extra", "args"}, tmpDir, map[string]string(nil))
+	}, []string{"extra", "args"}, repoDir, map[string]string(nil))
 	Ok(t, err)
 	// When there is no error, should not return init output to PR.
 	Equals(t, "", output)
 
 	expectedArgs := []string{"init", "-input=false", "-no-color", "extra", "args"}
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, tmpDir, expectedArgs, map[string]string(nil), tfVersion, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, repoDir, expectedArgs, map[string]string(nil), tfVersion, "workspace")
 }
 
 func TestRun_InitKeepsUpgradeFlagIfLockFileNotPresent(t *testing.T) {
@@ -165,7 +172,7 @@ func TestRun_InitKeepUpgradeFlagIfLockFilePresentAndTFLessThanPoint14(t *testing
 	tmpDir, cleanup := TempDir(t)
 	defer cleanup()
 	lockFilePath := filepath.Join(tmpDir, ".terraform.lock.hcl")
-	err := ioutil.WriteFile(lockFilePath, nil, 0600)
+	err := os.WriteFile(lockFilePath, nil, 0600)
 	Ok(t, err)
 
 	RegisterMockTestingT(t)
@@ -259,4 +266,60 @@ func TestRun_InitExtraArgsDeDupe(t *testing.T) {
 			terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, "/path", c.expectedArgs, map[string]string(nil), tfVersion, "workspace")
 		})
 	}
+}
+
+func TestRun_InitDeletesLockFileIfPresentAndNotTracked(t *testing.T) {
+	// Initialize the git repo.
+	repoDir, cleanup := initRepo(t)
+	defer cleanup()
+
+	lockFilePath := filepath.Join(repoDir, ".terraform.lock.hcl")
+	err := os.WriteFile(lockFilePath, nil, 0600)
+	Ok(t, err)
+
+	RegisterMockTestingT(t)
+	terraform := mocks.NewMockClient()
+
+	logger := logging.NewNoopLogger(t)
+
+	tfVersion, _ := version.NewVersion("0.14.0")
+	iso := runtime.InitStepRunner{
+		TerraformExecutor: terraform,
+		DefaultTFVersion:  tfVersion,
+	}
+	When(terraform.RunCommandWithVersion(logging_matchers.AnyLoggingSimpleLogging(), AnyString(), AnyStringSlice(), matchers2.AnyMapOfStringToString(), matchers2.AnyPtrToGoVersionVersion(), AnyString())).
+		ThenReturn("output", nil)
+
+	output, err := iso.Run(models.ProjectCommandContext{
+		Workspace:  "workspace",
+		RepoRelDir: ".",
+		Log:        logger,
+	}, []string{"extra", "args"}, repoDir, map[string]string(nil))
+	Ok(t, err)
+	// When there is no error, should not return init output to PR.
+	Equals(t, "", output)
+
+	expectedArgs := []string{"init", "-input=false", "-no-color", "-upgrade", "extra", "args"}
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(logger, repoDir, expectedArgs, map[string]string(nil), tfVersion, "workspace")
+}
+
+func runCmd(t *testing.T, dir string, name string, args ...string) string {
+	t.Helper()
+	cpCmd := exec.Command(name, args...)
+	cpCmd.Dir = dir
+	cpOut, err := cpCmd.CombinedOutput()
+	Assert(t, err == nil, "err running %q: %s", strings.Join(append([]string{name}, args...), " "), cpOut)
+	return string(cpOut)
+}
+
+func initRepo(t *testing.T) (string, func()) {
+	repoDir, cleanup := TempDir(t)
+	runCmd(t, repoDir, "git", "init")
+	runCmd(t, repoDir, "touch", ".gitkeep")
+	runCmd(t, repoDir, "git", "add", ".gitkeep")
+	runCmd(t, repoDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, repoDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, repoDir, "git", "commit", "-m", "initial commit")
+	runCmd(t, repoDir, "git", "branch", "branch")
+	return repoDir, cleanup
 }

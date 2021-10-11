@@ -22,6 +22,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/recovery"
 	gitlab "github.com/xanzy/go-gitlab"
@@ -95,6 +96,7 @@ type DefaultCommandRunner struct {
 	DisableAutoplan          bool
 	EventParser              EventParsing
 	Logger                   logging.SimpleLogging
+	GlobalCfg                valid.GlobalCfg
 	// AllowForkPRs controls whether we operate on pull requests from forks.
 	AllowForkPRs bool
 	// ParallelPoolSize controls the size of the wait group used to run
@@ -318,6 +320,13 @@ func (c *DefaultCommandRunner) validateCtxAndComment(ctx *CommandContext) bool {
 		if err := c.VCSClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, "Atlantis commands can't be run on closed pull requests", ""); err != nil {
 			ctx.Log.Err("unable to comment: %s", err)
 		}
+		return false
+	}
+
+	repo := c.GlobalCfg.MatchingRepo(ctx.Pull.BaseRepo.ID())
+	if !repo.BranchMatches(ctx.Pull.BaseBranch) {
+		ctx.Log.Info("command was run on a pull request which doesn't match base branches")
+		// just ignore it to allow us to use any git workflows without malicious intentions.
 		return false
 	}
 	return true

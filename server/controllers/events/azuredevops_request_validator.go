@@ -2,7 +2,7 @@ package events
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
@@ -47,7 +47,7 @@ func (d *DefaultAzureDevopsRequestValidator) validateWithBasicAuth(r *http.Reque
 func (d *DefaultAzureDevopsRequestValidator) validateWithoutBasicAuth(r *http.Request) ([]byte, error) {
 	ct := r.Header.Get("Content-Type")
 	if ct == "application/json" || ct == "application/json; charset=utf-8" {
-		payload, err := ioutil.ReadAll(r.Body)
+		payload, err := io.ReadAll(r.Body)
 		if err != nil {
 			return nil, fmt.Errorf("could not read body: %s", err)
 		}

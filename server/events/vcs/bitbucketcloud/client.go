@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/pkg/errors"
@@ -105,28 +104,30 @@ func (b *Client) HidePrevCommandComments(repo models.Repo, pullNum int, command 
 }
 
 // PullIsApproved returns true if the merge request was approved.
-func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	path := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d", b.BaseURL, repo.FullName, pull.Num)
 	resp, err := b.makeRequest("GET", path, nil)
 	if err != nil {
-		return false, err
+		return approvalStatus, err
 	}
 	var pullResp PullRequest
 	if err := json.Unmarshal(resp, &pullResp); err != nil {
-		return false, errors.Wrapf(err, "Could not parse response %q", string(resp))
+		return approvalStatus, errors.Wrapf(err, "Could not parse response %q", string(resp))
 	}
 	if err := validator.New().Struct(pullResp); err != nil {
-		return false, errors.Wrapf(err, "API response %q was missing fields", string(resp))
+		return approvalStatus, errors.Wrapf(err, "API response %q was missing fields", string(resp))
 	}
 	authorUUID := *pullResp.Author.UUID
 	for _, participant := range pullResp.Participants {
 		// Bitbucket allows the author to approve their own pull request. This
 		// defeats the purpose of approvals so we don't count that approval.
 		if *participant.Approved && *participant.User.UUID != authorUUID {
-			return true, nil
+			return models.ApprovalStatus{
+				IsApproved: true,
+			}, nil
 		}
 	}
-	return false, nil
+	return approvalStatus, nil
 }
 
 // PullIsMergeable returns true if the merge request has no conflicts and can be merged.
@@ -234,10 +235,10 @@ func (b *Client) makeRequest(method string, path string, reqBody io.Reader) ([]b
 	requestStr := fmt.Sprintf("%s %s", method, path)
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		respBody, _ := ioutil.ReadAll(resp.Body)
+		respBody, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("making request %q unexpected status code: %d, body: %s", requestStr, resp.StatusCode, string(respBody))
 	}
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, errors.Wrapf(err, "reading response from request %q", requestStr)
 	}

@@ -28,7 +28,7 @@ func (s *DefaultDiskLookupKeySerializer) Serialize(key *version.Version) (string
 	return fmt.Sprintf("%s%s", s.binaryName, key.Original()), nil
 }
 
-// ExecutionVersionDiskLayer is a cache layer which attempts to find the the version on disk,
+// ExecutionVersionDiskLayer is a cache layer which attempts to find the version on disk,
 // before calling the configured loading function.
 type ExecutionVersionDiskLayer struct {
 	versionRootDir models.FilePath

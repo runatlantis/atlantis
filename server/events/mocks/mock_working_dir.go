@@ -120,6 +120,25 @@ func (mock *MockWorkingDir) DeleteForWorkspace(r models.Repo, p models.PullReque
 	return ret0
 }
 
+func (mock *MockWorkingDir) IsFileTracked(log logging.SimpleLogging, cloneDir string, filename string) (bool, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
+	}
+	params := []pegomock.Param{log, cloneDir, filename}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("IsFileTracked", params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 bool
+	var ret1 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(bool)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(error)
+		}
+	}
+	return ret0, ret1
+}
+
 func (mock *MockWorkingDir) VerifyWasCalledOnce() *VerifierMockWorkingDir {
 	return &VerifierMockWorkingDir{
 		mock:                   mock,
@@ -231,6 +250,37 @@ func (c *MockWorkingDir_GetWorkingDir_OngoingVerification) GetAllCapturedArgumen
 	return
 }
 
+func (verifier *VerifierMockWorkingDir) HasDiverged(log logging.SimpleLogging, cloneDir string) *MockWorkingDir_HasDiverged_OngoingVerification {
+	params := []pegomock.Param{log, cloneDir}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "HasDiverged", params, verifier.timeout)
+	return &MockWorkingDir_HasDiverged_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockWorkingDir_HasDiverged_OngoingVerification struct {
+	mock              *MockWorkingDir
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockWorkingDir_HasDiverged_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, string) {
+	log, cloneDir := c.GetAllCapturedArguments()
+	return log[len(log)-1], cloneDir[len(cloneDir)-1]
+}
+
+func (c *MockWorkingDir_HasDiverged_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []string) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(logging.SimpleLogging)
+		}
+		_param1 = make([]string, len(c.methodInvocations))
+		for u, param := range params[1] {
+			_param1[u] = param.(string)
+		}
+	}
+	return
+}
+
 func (verifier *VerifierMockWorkingDir) GetPullDir(r models.Repo, p models.PullRequest) *MockWorkingDir_GetPullDir_OngoingVerification {
 	params := []pegomock.Param{r, p}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetPullDir", params, verifier.timeout)
@@ -319,6 +369,41 @@ func (c *MockWorkingDir_DeleteForWorkspace_OngoingVerification) GetAllCapturedAr
 		_param1 = make([]models.PullRequest, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(models.PullRequest)
+		}
+		_param2 = make([]string, len(c.methodInvocations))
+		for u, param := range params[2] {
+			_param2[u] = param.(string)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockWorkingDir) IsFileTracked(log logging.SimpleLogging, cloneDir string, filename string) *MockWorkingDir_IsFileTracked_OngoingVerification {
+	params := []pegomock.Param{log, cloneDir, filename}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "IsFileTracked", params, verifier.timeout)
+	return &MockWorkingDir_IsFileTracked_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockWorkingDir_IsFileTracked_OngoingVerification struct {
+	mock              *MockWorkingDir
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockWorkingDir_IsFileTracked_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, string, string) {
+	log, cloneDir, filename := c.GetAllCapturedArguments()
+	return log[len(log)-1], cloneDir[len(cloneDir)-1], filename[len(filename)-1]
+}
+
+func (c *MockWorkingDir_IsFileTracked_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []string, _param2 []string) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(logging.SimpleLogging)
+		}
+		_param1 = make([]string, len(c.methodInvocations))
+		for u, param := range params[1] {
+			_param1[u] = param.(string)
 		}
 		_param2 = make([]string, len(c.methodInvocations))
 		for u, param := range params[2] {

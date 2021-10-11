@@ -2,7 +2,7 @@ package runtime
 
 import (
 	"errors"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -44,7 +44,7 @@ func TestRunDelegate(t *testing.T) {
 		tmpDir, cleanup := TempDir(t)
 		defer cleanup()
 		planPath := filepath.Join(tmpDir, "workspace.tfplan")
-		err := ioutil.WriteFile(planPath, []byte("Atlantis: this plan was created by remote ops\n"+planFileContents), 0600)
+		err := os.WriteFile(planPath, []byte("Atlantis: this plan was created by remote ops\n"+planFileContents), 0600)
 		Ok(t, err)
 
 		ctx := models.ProjectCommandContext{
@@ -73,7 +73,7 @@ func TestRunDelegate(t *testing.T) {
 		tmpDir, cleanup := TempDir(t)
 		defer cleanup()
 		planPath := filepath.Join(tmpDir, "workspace.tfplan")
-		err := ioutil.WriteFile(planPath, []byte("Atlantis: this plan was created by remote ops\n"+planFileContents), 0600)
+		err := os.WriteFile(planPath, []byte("Atlantis: this plan was created by remote ops\n"+planFileContents), 0600)
 		Ok(t, err)
 
 		ctx := models.ProjectCommandContext{
@@ -102,7 +102,7 @@ func TestRunDelegate(t *testing.T) {
 		tmpDir, cleanup := TempDir(t)
 		defer cleanup()
 		planPath := filepath.Join(tmpDir, "workspace.tfplan")
-		err := ioutil.WriteFile(planPath, []byte(planFileContents), 0600)
+		err := os.WriteFile(planPath, []byte(planFileContents), 0600)
 		Ok(t, err)
 
 		ctx := models.ProjectCommandContext{
@@ -131,7 +131,7 @@ func TestRunDelegate(t *testing.T) {
 		tmpDir, cleanup := TempDir(t)
 		defer cleanup()
 		planPath := filepath.Join(tmpDir, "workspace.tfplan")
-		err := ioutil.WriteFile(planPath, []byte(planFileContents), 0600)
+		err := os.WriteFile(planPath, []byte(planFileContents), 0600)
 		Ok(t, err)
 
 		ctx := models.ProjectCommandContext{

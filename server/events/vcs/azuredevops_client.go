@@ -136,7 +136,7 @@ func (g *AzureDevopsClient) HidePrevCommandComments(repo models.Repo, pullNum in
 
 // PullIsApproved returns true if the merge request was approved by another reviewer.
 // https://docs.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops#require-a-minimum-number-of-reviewers
-func (g *AzureDevopsClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (bool, error) {
+func (g *AzureDevopsClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	opts := azuredevops.PullRequestGetOptions{
@@ -144,7 +144,7 @@ func (g *AzureDevopsClient) PullIsApproved(repo models.Repo, pull models.PullReq
 	}
 	adPull, _, err := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, pull.Num, &opts)
 	if err != nil {
-		return false, errors.Wrap(err, "getting pull request")
+		return approvalStatus, errors.Wrap(err, "getting pull request")
 	}
 
 	for _, review := range adPull.Reviewers {
@@ -157,11 +157,13 @@ func (g *AzureDevopsClient) PullIsApproved(repo models.Repo, pull models.PullReq
 		}
 
 		if review.GetVote() == azuredevops.VoteApproved || review.GetVote() == azuredevops.VoteApprovedWithSuggestions {
-			return true, nil
+			return models.ApprovalStatus{
+				IsApproved: true,
+			}, nil
 		}
 	}
 
-	return false, nil
+	return approvalStatus, nil
 }
 
 // PullIsMergeable returns true if the merge request can be merged.

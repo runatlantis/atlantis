@@ -162,7 +162,9 @@ func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 	tmp, cleanup := TempDir(t)
 	defer cleanup()
 	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
-	When(mockApproved.PullIsApproved(ctx.BaseRepo, ctx.Pull)).ThenReturn(false, nil)
+	When(mockApproved.PullIsApproved(ctx.BaseRepo, ctx.Pull)).ThenReturn(models.ApprovalStatus{
+		IsApproved: false,
+	}, nil)
 
 	res := runner.Apply(ctx)
 	Equals(t, "Pull request must be approved by at least one person other than the author before running apply.", res.Failure)
@@ -346,7 +348,9 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
 			When(mockRun.Run(ctx, "", repoDir, expEnvs)).ThenReturn("run", nil)
 			When(mockEnv.Run(ctx, "", "value", repoDir, make(map[string]string))).ThenReturn("value", nil)
-			When(mockApproved.PullIsApproved(ctx.BaseRepo, ctx.Pull)).ThenReturn(true, nil)
+			When(mockApproved.PullIsApproved(ctx.BaseRepo, ctx.Pull)).ThenReturn(models.ApprovalStatus{
+				IsApproved: true,
+			}, nil)
 
 			res := runner.Apply(ctx)
 			Equals(t, c.expOut, res.ApplySuccess)
