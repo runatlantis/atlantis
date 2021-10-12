@@ -1,8 +1,8 @@
 # The runatlantis/atlantis-base is created by docker-base/Dockerfile.
-FROM ghcr.io/runatlantis/atlantis-base:2021.06.22
+FROM ghcr.io/runatlantis/atlantis-base:2021.08.31
 
 # install terraform binaries
-ENV DEFAULT_TERRAFORM_VERSION=1.0.1
+ENV DEFAULT_TERRAFORM_VERSION=1.0.8
 
 # In the official Atlantis image we only have the latest of each Terraform version.
 RUN AVAILABLE_TERRAFORM_VERSIONS="0.8.8 0.9.11 0.10.8 0.11.15 0.12.31 0.13.7 0.14.11 0.15.5 ${DEFAULT_TERRAFORM_VERSION}" && \

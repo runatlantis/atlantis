@@ -156,10 +156,22 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 				User:  userConfig.GithubUser,
 				Token: userConfig.GithubToken,
 			}
-		} else if userConfig.GithubAppID != 0 {
+		} else if userConfig.GithubAppID != 0 && userConfig.GithubAppKeyFile != "" {
+			privateKey, err := os.ReadFile(userConfig.GithubAppKeyFile)
+			if err != nil {
+				return nil, err
+			}
 			githubCredentials = &vcs.GithubAppCredentials{
 				AppID:    userConfig.GithubAppID,
-				KeyPath:  userConfig.GithubAppKey,
+				Key:      privateKey,
+				Hostname: userConfig.GithubHostname,
+				AppSlug:  userConfig.GithubAppSlug,
+			}
+			githubAppEnabled = true
+		} else if userConfig.GithubAppID != 0 && userConfig.GithubAppKey != "" {
+			githubCredentials = &vcs.GithubAppCredentials{
+				AppID:    userConfig.GithubAppID,
+				Key:      []byte(userConfig.GithubAppKey),
 				Hostname: userConfig.GithubHostname,
 				AppSlug:  userConfig.GithubAppSlug,
 			}
@@ -296,6 +308,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DisableMarkdownFolding:   userConfig.DisableMarkdownFolding,
 		DisableApply:             userConfig.DisableApply,
 		DisableRepoLocking:       userConfig.DisableRepoLocking,
+		EnableDiffMarkdownFormat: userConfig.EnableDiffMarkdownFormat,
 	}
 
 	boltdb, err := db.New(userConfig.DataDir)
@@ -449,6 +462,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, errors.Wrap(err, "initializing policy check runner")
 	}
 
+	applyRequirementHandler := &events.AggregateApplyRequirements{
+		PullApprovedChecker: vcsClient,
+		WorkingDir:          workingDir,
+	}
+
 	projectCommandRunner := &events.DefaultProjectCommandRunner{
 		Locker:           projectLocker,
 		LockURLGenerator: router,
@@ -473,10 +491,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		EnvStepRunner: &runtime.EnvStepRunner{
 			RunStepRunner: runStepRunner,
 		},
-		PullApprovedChecker: vcsClient,
-		WorkingDir:          workingDir,
-		Webhooks:            webhooksManager,
-		WorkingDirLocker:    workingDirLocker,
+		VersionStepRunner: &runtime.VersionStepRunner{
+			TerraformExecutor: terraformClient,
+			DefaultTFVersion:  defaultTfVersion,
+		},
+		WorkingDir:                 workingDir,
+		Webhooks:                   webhooksManager,
+		WorkingDirLocker:           workingDirLocker,
+		AggregateApplyRequirements: applyRequirementHandler,
 	}
 
 	dbUpdater := &events.DBUpdater{
@@ -553,11 +575,20 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.SilenceNoProjects,
 	)
 
+	versionCommandRunner := events.NewVersionCommandRunner(
+		pullUpdater,
+		projectCommandBuilder,
+		projectCommandRunner,
+		userConfig.ParallelPoolSize,
+		userConfig.SilenceNoProjects,
+	)
+
 	commentCommandRunnerByCmd := map[models.CommandName]events.CommentCommandRunner{
 		models.PlanCommand:            planCommandRunner,
 		models.ApplyCommand:           applyCommandRunner,
 		models.ApprovePoliciesCommand: approvePoliciesCommandRunner,
 		models.UnlockCommand:          unlockCommandRunner,
+		models.VersionCommand:         versionCommandRunner,
 	}
 
 	commandRunner := &events.DefaultCommandRunner{
@@ -568,6 +599,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CommentCommandRunnerByCmd:     commentCommandRunnerByCmd,
 		EventParser:                   eventParser,
 		Logger:                        logger,
+		GlobalCfg:                     globalCfg,
 		AllowForkPRs:                  userConfig.AllowForkPRs,
 		AllowForkPRsFlag:              config.AllowForkPRsFlag,
 		SilenceForkPRErrors:           userConfig.SilenceForkPRErrors,
@@ -775,7 +807,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 func mkSubDir(parentDir string, subDir string) (string, error) {
 	fullDir := filepath.Join(parentDir, subDir)
 	if err := os.MkdirAll(fullDir, 0700); err != nil {
-		return "", errors.Wrapf(err, "unable to creare dir %q", fullDir)
+		return "", errors.Wrapf(err, "unable to create dir %q", fullDir)
 	}
 
 	return fullDir, nil

@@ -2,7 +2,7 @@ package events_test
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -132,7 +132,7 @@ projects:
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
 			if c.AtlantisYAML != "" {
-				err := ioutil.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
+				err := os.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
 				Ok(t, err)
 			}
 
@@ -394,7 +394,7 @@ projects:
 				vcsClient := vcsmocks.NewMockClient()
 				When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
 				if c.AtlantisYAML != "" {
-					err := ioutil.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
+					err := os.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
 					Ok(t, err)
 				}
 
@@ -545,7 +545,7 @@ projects:
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
 			if c.AtlantisYAML != "" {
-				err := ioutil.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
+				err := os.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
 				Ok(t, err)
 			}
 
@@ -703,7 +703,7 @@ projects:
 - dir: .
   workspace: staging
 `
-	err := ioutil.WriteFile(filepath.Join(repoDir, yaml.AtlantisYAMLFilename), []byte(yamlCfg), 0600)
+	err := os.WriteFile(filepath.Join(repoDir, yaml.AtlantisYAMLFilename), []byte(yamlCfg), 0600)
 	Ok(t, err)
 
 	When(workingDir.Clone(
@@ -1120,4 +1120,89 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 	Equals(t, globalCfg.Workflows["default"].Plan.Steps, planCtx.Steps)
 	Equals(t, models.PolicyCheckCommand, policyCheckCtx.CommandName)
 	Equals(t, globalCfg.Workflows["default"].PolicyCheck.Steps, policyCheckCtx.Steps)
+}
+
+// Test building version command for multiple projects
+func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
+	RegisterMockTestingT(t)
+	tmpDir, cleanup := DirStructure(t, map[string]interface{}{
+		"workspace1": map[string]interface{}{
+			"project1": map[string]interface{}{
+				"main.tf":          nil,
+				"workspace.tfplan": nil,
+			},
+			"project2": map[string]interface{}{
+				"main.tf":          nil,
+				"workspace.tfplan": nil,
+			},
+		},
+		"workspace2": map[string]interface{}{
+			"project1": map[string]interface{}{
+				"main.tf":          nil,
+				"workspace.tfplan": nil,
+			},
+			"project2": map[string]interface{}{
+				"main.tf":          nil,
+				"workspace.tfplan": nil,
+			},
+		},
+	})
+	defer cleanup()
+	// Initialize git repos in each workspace so that the .tfplan files get
+	// picked up.
+	runCmd(t, filepath.Join(tmpDir, "workspace1"), "git", "init")
+	runCmd(t, filepath.Join(tmpDir, "workspace2"), "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(
+		matchers.AnyModelsRepo(),
+		matchers.AnyModelsPullRequest())).
+		ThenReturn(tmpDir, nil)
+
+	logger := logging.NewNoopLogger(t)
+
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowRepoCfg:  false,
+		MergeableReq:  false,
+		ApprovedReq:   false,
+		UnDivergedReq: false,
+	}
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&yaml.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(globalCfgArgs),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{},
+		false,
+		false,
+		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl",
+	)
+
+	ctxs, err := builder.BuildVersionCommands(
+		&events.CommandContext{
+			Log: logger,
+		},
+		&events.CommentCommand{
+			RepoRelDir:  "",
+			Flags:       nil,
+			Name:        models.VersionCommand,
+			Verbose:     false,
+			Workspace:   "",
+			ProjectName: "",
+		})
+	Ok(t, err)
+	Equals(t, 4, len(ctxs))
+	Equals(t, "project1", ctxs[0].RepoRelDir)
+	Equals(t, "workspace1", ctxs[0].Workspace)
+	Equals(t, "project2", ctxs[1].RepoRelDir)
+	Equals(t, "workspace1", ctxs[1].Workspace)
+	Equals(t, "project1", ctxs[2].RepoRelDir)
+	Equals(t, "workspace2", ctxs[2].Workspace)
+	Equals(t, "project2", ctxs[3].RepoRelDir)
+	Equals(t, "workspace2", ctxs[3].Workspace)
 }

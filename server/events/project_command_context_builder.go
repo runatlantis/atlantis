@@ -57,6 +57,11 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		steps = prjCfg.Workflow.Plan.Steps
 	case models.ApplyCommand:
 		steps = prjCfg.Workflow.Apply.Steps
+	case models.VersionCommand:
+		// Setting statically since there will only be one step
+		steps = []valid.Step{{
+			StepName: "version",
+		}}
 	}
 
 	// If TerraformVersion not defined in config file look for a
@@ -70,6 +75,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		cmdName,
 		cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled),
 		cb.CommentBuilder.BuildPlanComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, commentFlags),
+		cb.CommentBuilder.BuildVersionComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name),
 		prjCfg,
 		steps,
 		prjCfg.PolicySets,
@@ -127,6 +133,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 			models.PolicyCheckCommand,
 			cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled),
 			cb.CommentBuilder.BuildPlanComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, commentFlags),
+			cb.CommentBuilder.BuildVersionComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name),
 			prjCfg,
 			steps,
 			prjCfg.PolicySets,
@@ -148,6 +155,7 @@ func newProjectCommandContext(ctx *CommandContext,
 	cmd models.CommandName,
 	applyCmd string,
 	planCmd string,
+	versionCmd string,
 	projCfg valid.MergedProjectCfg,
 	steps []valid.Step,
 	policySets valid.PolicySets,
@@ -178,31 +186,32 @@ func newProjectCommandContext(ctx *CommandContext,
 	}
 
 	return models.ProjectCommandContext{
-		CommandName:               cmd,
-		ApplyCmd:                  applyCmd,
-		BaseRepo:                  ctx.Pull.BaseRepo,
-		EscapedCommentArgs:        escapedCommentArgs,
-		AutomergeEnabled:          automergeEnabled,
-		DeleteSourceBranchOnMerge: deleteSourceBranchOnMerge,
-		ParallelApplyEnabled:      parallelApplyEnabled,
-		ParallelPlanEnabled:       parallelPlanEnabled,
-		AutoplanEnabled:           projCfg.AutoplanEnabled,
-		Steps:                     steps,
-		HeadRepo:                  ctx.HeadRepo,
-		Log:                       ctx.Log,
-		PullMergeable:             ctx.PullMergeable,
-		ProjectPlanStatus:         projectPlanStatus,
-		Pull:                      ctx.Pull,
-		ProjectName:               projCfg.Name,
-		ApplyRequirements:         projCfg.ApplyRequirements,
-		RePlanCmd:                 planCmd,
-		RepoRelDir:                projCfg.RepoRelDir,
-		RepoConfigVersion:         projCfg.RepoCfgVersion,
-		TerraformVersion:          projCfg.TerraformVersion,
-		User:                      ctx.User,
-		Verbose:                   verbose,
-		Workspace:                 projCfg.Workspace,
-		PolicySets:                policySets,
+		CommandName:                cmd,
+		ApplyCmd:                   applyCmd,
+		BaseRepo:                   ctx.Pull.BaseRepo,
+		EscapedCommentArgs:         escapedCommentArgs,
+		AutomergeEnabled:           automergeEnabled,
+		DeleteSourceBranchOnMerge:  deleteSourceBranchOnMerge,
+		ParallelApplyEnabled:       parallelApplyEnabled,
+		ParallelPlanEnabled:        parallelPlanEnabled,
+		ParallelPolicyCheckEnabled: parallelPlanEnabled,
+		AutoplanEnabled:            projCfg.AutoplanEnabled,
+		Steps:                      steps,
+		HeadRepo:                   ctx.HeadRepo,
+		Log:                        ctx.Log,
+		PullMergeable:              ctx.PullMergeable,
+		ProjectPlanStatus:          projectPlanStatus,
+		Pull:                       ctx.Pull,
+		ProjectName:                projCfg.Name,
+		ApplyRequirements:          projCfg.ApplyRequirements,
+		RePlanCmd:                  planCmd,
+		RepoRelDir:                 projCfg.RepoRelDir,
+		RepoConfigVersion:          projCfg.RepoCfgVersion,
+		TerraformVersion:           projCfg.TerraformVersion,
+		User:                       ctx.User,
+		Verbose:                    verbose,
+		Workspace:                  projCfg.Workspace,
+		PolicySets:                 policySets,
 	}
 }
 

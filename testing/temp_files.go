@@ -1,7 +1,6 @@
 package testing
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,7 +11,7 @@ import (
 //   dir, cleanup := TempDir()
 //   defer cleanup()
 func TempDir(t *testing.T) (string, func()) {
-	tmpDir, err := ioutil.TempDir("", "")
+	tmpDir, err := os.MkdirTemp("", "")
 	Ok(t, err)
 	return tmpDir, func() {
 		os.RemoveAll(tmpDir) // nolint: errcheck
@@ -65,7 +64,7 @@ func dirStructureGo(t *testing.T, parentDir string, structure map[string]interfa
 			dirStructureGo(t, subDir, dirContents)
 		} else if fileContent, ok := val.(string); ok {
 			// If val is a string then key is a file name and val is the file's content
-			err := ioutil.WriteFile(filepath.Join(parentDir, key), []byte(fileContent), 0600)
+			err := os.WriteFile(filepath.Join(parentDir, key), []byte(fileContent), 0600)
 			Ok(t, err)
 		}
 	}

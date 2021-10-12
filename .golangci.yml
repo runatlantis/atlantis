@@ -6,7 +6,7 @@ linters:
 # We don't use goconst because it gives false positives in the tests.
 #  - goconst
   - gofmt
-  - golint
+  - revive
   - gosec
   - gosimple
   - ineffassign

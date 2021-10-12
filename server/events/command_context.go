@@ -46,6 +46,9 @@ type CommandContext struct {
 	// required the Atlantis status to be successful prior to merging.
 	PullMergeable bool
 
+	// Current PR state
+	PullRequestStatus models.PullReqStatus
+
 	PullStatus *models.PullStatus
 
 	Trigger CommandTrigger
