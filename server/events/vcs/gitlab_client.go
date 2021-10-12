@@ -157,7 +157,8 @@ func (g *GitlabClient) GetModifiedFiles(repo models.Repo, pull models.PullReques
 
 // isMergeCommit check if it's merge commit
 func isMergeCommit(commit gitlab.Commit) bool {
-	return strings.Index(commit.Message, "Merge remote-tracking branch") > -1
+	return strings.Index(commit.Message, "Merge remote-tracking branch") > -1 ||
+		strings.Index(commit.Message, "Merge branch") > -1
 }
 
 // GetCommitFiles get files changed in a commit
