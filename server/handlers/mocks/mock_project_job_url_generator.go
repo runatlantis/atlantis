@@ -25,19 +25,23 @@ func NewMockProjectJobURLGenerator(options ...pegomock.Option) *MockProjectJobUR
 func (mock *MockProjectJobURLGenerator) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockProjectJobURLGenerator) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockProjectJobURLGenerator) GenerateProjectJobURL(p models.ProjectCommandContext) string {
+func (mock *MockProjectJobURLGenerator) GenerateProjectJobURL(p models.ProjectCommandContext) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectJobURLGenerator().")
 	}
 	params := []pegomock.Param{p}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("GenerateProjectJobURL", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem()})
+	result := pegomock.GetGenericMockFrom(mock).Invoke("GenerateProjectJobURL", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
+	var ret1 error
 	if len(result) != 0 {
 		if result[0] != nil {
 			ret0 = result[0].(string)
 		}
+		if result[1] != nil {
+			ret1 = result[1].(error)
+		}
 	}
-	return ret0
+	return ret0, ret1
 }
 
 func (mock *MockProjectJobURLGenerator) VerifyWasCalledOnce() *VerifierMockProjectJobURLGenerator {
@@ -47,14 +51,14 @@ func (mock *MockProjectJobURLGenerator) VerifyWasCalledOnce() *VerifierMockProje
 	}
 }
 
-func (mock *MockProjectJobURLGenerator) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockProjectJobURLGenerator {
+func (mock *MockProjectJobURLGenerator) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockProjectJobURLGenerator {
 	return &VerifierMockProjectJobURLGenerator{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockProjectJobURLGenerator) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockProjectJobURLGenerator {
+func (mock *MockProjectJobURLGenerator) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockProjectJobURLGenerator {
 	return &VerifierMockProjectJobURLGenerator{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -62,7 +66,7 @@ func (mock *MockProjectJobURLGenerator) VerifyWasCalledInOrder(invocationCountMa
 	}
 }
 
-func (mock *MockProjectJobURLGenerator) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockProjectJobURLGenerator {
+func (mock *MockProjectJobURLGenerator) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockProjectJobURLGenerator {
 	return &VerifierMockProjectJobURLGenerator{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -72,7 +76,7 @@ func (mock *MockProjectJobURLGenerator) VerifyWasCalledEventually(invocationCoun
 
 type VerifierMockProjectJobURLGenerator struct {
 	mock                   *MockProjectJobURLGenerator
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

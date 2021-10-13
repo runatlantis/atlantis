@@ -31,7 +31,7 @@ type AsyncProjectCommandOutputHandler struct {
 
 // ProjectJobURLGenerator generates urls to view project's progress.
 type ProjectJobURLGenerator interface {
-	GenerateProjectJobURL(p models.ProjectCommandContext) string
+	GenerateProjectJobURL(p models.ProjectCommandContext) (string, error)
 }
 
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_status_updater.go ProjectStatusUpdater
@@ -126,7 +126,11 @@ func (p *AsyncProjectCommandOutputHandler) Clear(ctx models.ProjectCommandContex
 }
 
 func (p *AsyncProjectCommandOutputHandler) SetJobURLWithStatus(ctx models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus) error {
-	url := p.projectJobURLGenerator.GenerateProjectJobURL(ctx)
+	url, err := p.projectJobURLGenerator.GenerateProjectJobURL(ctx)
+
+	if err != nil {
+		return err
+	}
 	return p.projectStatusUpdater.UpdateProject(ctx, cmdName, status, url)
 }
 

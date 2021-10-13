@@ -1,6 +1,7 @@
 package handlers_test
 
 import (
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -225,11 +226,29 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 			logger,
 		)
 
-		When(projectJobURLGenerator.GenerateProjectJobURL(matchers.EqModelsProjectCommandContext(ctx))).ThenReturn("url-to-project-jobs")
+		When(projectJobURLGenerator.GenerateProjectJobURL(matchers.EqModelsProjectCommandContext(ctx))).ThenReturn("url-to-project-jobs", nil)
 		err := prjCmdOutputHandler.SetJobURLWithStatus(ctx, models.PlanCommand, models.PendingCommitStatus)
 		Ok(t, err)
 
 		projectStatusUpdater.VerifyWasCalledOnce().UpdateProject(ctx, models.PlanCommand, models.PendingCommitStatus, "url-to-project-jobs")
+	})
+
+	t.Run("update project status with project jobs url error", func(t *testing.T) {
+		RegisterMockTestingT(t)
+		logger := logging.NewNoopLogger(t)
+		prjCmdOutputChan := make(chan *models.ProjectCmdOutputLine)
+		projectStatusUpdater := mocks.NewMockProjectStatusUpdater()
+		projectJobURLGenerator := mocks.NewMockProjectJobURLGenerator()
+		prjCmdOutputHandler := handlers.NewAsyncProjectCommandOutputHandler(
+			prjCmdOutputChan,
+			projectStatusUpdater,
+			projectJobURLGenerator,
+			logger,
+		)
+
+		When(projectJobURLGenerator.GenerateProjectJobURL(matchers.EqModelsProjectCommandContext(ctx))).ThenReturn("url-to-project-jobs", errors.New("some error"))
+		err := prjCmdOutputHandler.SetJobURLWithStatus(ctx, models.PlanCommand, models.PendingCommitStatus)
+		assert.Error(t, err)
 	})
 }
 
