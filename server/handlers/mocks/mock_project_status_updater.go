@@ -47,14 +47,14 @@ func (mock *MockProjectStatusUpdater) VerifyWasCalledOnce() *VerifierMockProject
 	}
 }
 
-func (mock *MockProjectStatusUpdater) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockProjectStatusUpdater {
+func (mock *MockProjectStatusUpdater) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockProjectStatusUpdater {
 	return &VerifierMockProjectStatusUpdater{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockProjectStatusUpdater) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockProjectStatusUpdater {
+func (mock *MockProjectStatusUpdater) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockProjectStatusUpdater {
 	return &VerifierMockProjectStatusUpdater{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -62,7 +62,7 @@ func (mock *MockProjectStatusUpdater) VerifyWasCalledInOrder(invocationCountMatc
 	}
 }
 
-func (mock *MockProjectStatusUpdater) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockProjectStatusUpdater {
+func (mock *MockProjectStatusUpdater) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockProjectStatusUpdater {
 	return &VerifierMockProjectStatusUpdater{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -72,7 +72,7 @@ func (mock *MockProjectStatusUpdater) VerifyWasCalledEventually(invocationCountM
 
 type VerifierMockProjectStatusUpdater struct {
 	mock                   *MockProjectStatusUpdater
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }

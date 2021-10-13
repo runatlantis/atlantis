@@ -5,6 +5,7 @@ import (
 	"net/url"
 
 	"github.com/gorilla/mux"
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
@@ -38,14 +39,19 @@ func (r *Router) GenerateLockURL(lockID string) string {
 	return r.AtlantisURL.String() + lockURL.String()
 }
 
-func (r *Router) GenerateProjectJobURL(ctx models.ProjectCommandContext) string {
+func (r *Router) GenerateProjectJobURL(ctx models.ProjectCommandContext) (string, error) {
 	pull := ctx.Pull
 
-	jobURL, _ := r.Underlying.Get(r.ProjectJobsViewRouteName).URL(
+	jobURL, err := r.Underlying.Get(r.ProjectJobsViewRouteName).URL(
 		"org", pull.BaseRepo.Owner,
 		"repo", pull.BaseRepo.Name,
 		"pull", fmt.Sprintf("%d", pull.Num),
 		"project", ctx.ProjectName,
 	)
-	return r.AtlantisURL.String() + jobURL.String()
+
+	if err != nil {
+		return "", errors.Wrapf(err, "creating job url for %s/%d/%s", pull.BaseRepo.FullName, pull.Num, ctx.ProjectName)
+	}
+
+	return r.AtlantisURL.String() + jobURL.String(), nil
 }
