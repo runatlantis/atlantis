@@ -468,8 +468,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	projectCommandRunner := &events.DefaultProjectCommandRunner{
-		Locker:           projectLocker,
-		LockURLGenerator: router,
 		InitStepRunner: &runtime.InitStepRunner{
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTfVersion,
@@ -497,8 +495,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		},
 		WorkingDir:                 workingDir,
 		Webhooks:                   webhooksManager,
-		WorkingDirLocker:           workingDirLocker,
 		AggregateApplyRequirements: applyRequirementHandler,
+	}
+
+	projectCmdRunnerLocker := &events.LockingProjectCommandRunner{
+		WorkingDirLocker:     workingDirLocker,
+		ProjectCommandRunner: projectCommandRunner,
+		Locker:               projectLocker,
+		LockURLGenerator:     router,
 	}
 
 	dbUpdater := &events.DBUpdater{
@@ -520,7 +524,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		dbUpdater,
 		pullUpdater,
 		commitStatusUpdater,
-		projectCommandRunner,
+		projectCmdRunnerLocker,
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceVCSStatusNoProjects,
 	)
@@ -533,7 +537,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		workingDir,
 		commitStatusUpdater,
 		projectCommandBuilder,
-		projectCommandRunner,
+		projectCmdRunnerLocker,
 		dbUpdater,
 		pullUpdater,
 		policyCheckCommandRunner,
@@ -549,7 +553,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		applyLockingClient,
 		commitStatusUpdater,
 		projectCommandBuilder,
-		projectCommandRunner,
+		projectCmdRunnerLocker,
 		autoMerger,
 		pullUpdater,
 		dbUpdater,
@@ -562,7 +566,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
 		commitStatusUpdater,
 		projectCommandBuilder,
-		projectCommandRunner,
+		projectCmdRunnerLocker,
 		pullUpdater,
 		dbUpdater,
 		userConfig.SilenceNoProjects,

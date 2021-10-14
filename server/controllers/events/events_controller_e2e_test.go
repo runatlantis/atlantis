@@ -834,10 +834,10 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	Ok(t, err)
 	lockingClient := locking.NewClient(boltdb)
 	applyLocker = locking.NewApplyClient(boltdb, userConfig.DisableApply)
-	projectLocker := &events.DefaultProjectLocker{
-		Locker:    lockingClient,
-		VCSClient: e2eVCSClient,
-	}
+	// projectLocker := &events.DefaultProjectLocker{
+	// 	Locker:    lockingClient,
+	// 	VCSClient: e2eVCSClient,
+	// }
 	workingDir := &events.FileWorkspace{
 		DataDir:                     dataDir,
 		TestingOverrideHeadCloneURL: "override-me",
@@ -872,9 +872,9 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 
 	mockPreWorkflowHookRunner = runtimemocks.NewMockPreWorkflowHookRunner()
 	preWorkflowHooksCommandRunner := &events.DefaultPreWorkflowHooksCommandRunner{
-		VCSClient:             e2eVCSClient,
-		GlobalCfg:             globalCfg,
-		WorkingDirLocker:      locker,
+		VCSClient: e2eVCSClient,
+		GlobalCfg: globalCfg,
+		// WorkingDirLocker:      locker,
 		WorkingDir:            workingDir,
 		PreWorkflowHookRunner: mockPreWorkflowHookRunner,
 	}
@@ -913,8 +913,8 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	Ok(t, err)
 
 	projectCommandRunner := &events.DefaultProjectCommandRunner{
-		Locker:           projectLocker,
-		LockURLGenerator: &mockLockURLGenerator{},
+		// Locker:           projectLocker,
+		// LockURLGenerator: &mockLockURLGenerator{},
 		InitStepRunner: &runtime.InitStepRunner{
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTFVersion,
@@ -932,9 +932,9 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTFVersion,
 		},
-		WorkingDir:       workingDir,
-		Webhooks:         &mockWebhookSender{},
-		WorkingDirLocker: locker,
+		WorkingDir: workingDir,
+		Webhooks:   &mockWebhookSender{},
+		// WorkingDirLocker: locker,
 		AggregateApplyRequirements: &events.AggregateApplyRequirements{
 			PullApprovedChecker: e2eVCSClient,
 			WorkingDir:          workingDir,
