@@ -38,6 +38,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		RunStepRunner:              mockRun,
 		EnvStepRunner:              &realEnv,
 		WorkingDir:                 mockWorkingDir,
+		WorkingDirLocker:           events.NewDefaultWorkingDirLocker(),
 		Webhooks:                   nil,
 		AggregateApplyRequirements: mockApplyReqHandler,
 	}
@@ -108,7 +109,8 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 func TestDefaultProjectCommandRunner_ApplyNotCloned(t *testing.T) {
 	mockWorkingDir := eventsMocks.NewMockWorkingDir()
 	runner := &projects.DefaultProjectCommandRunner{
-		WorkingDir: mockWorkingDir,
+		WorkingDir:       mockWorkingDir,
+		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
 	}
 	ctx := models.ProjectCommandContext{}
 	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn("", os.ErrNotExist)
@@ -123,7 +125,8 @@ func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 	mockWorkingDir := eventsMocks.NewMockWorkingDir()
 	mockApproved := mocks2.NewMockPullApprovedChecker()
 	runner := &projects.DefaultProjectCommandRunner{
-		WorkingDir: mockWorkingDir,
+		WorkingDir:       mockWorkingDir,
+		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
 		AggregateApplyRequirements: &events.AggregateApplyRequirements{
 			PullApprovedChecker: mockApproved,
 			WorkingDir:          mockWorkingDir,
@@ -148,7 +151,8 @@ func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 	RegisterMockTestingT(t)
 	mockWorkingDir := eventsMocks.NewMockWorkingDir()
 	runner := &projects.DefaultProjectCommandRunner{
-		WorkingDir: mockWorkingDir,
+		WorkingDir:       mockWorkingDir,
+		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
 		AggregateApplyRequirements: &events.AggregateApplyRequirements{
 			WorkingDir: mockWorkingDir,
 		},
@@ -170,7 +174,8 @@ func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 	RegisterMockTestingT(t)
 	mockWorkingDir := eventsMocks.NewMockWorkingDir()
 	runner := &projects.DefaultProjectCommandRunner{
-		WorkingDir: mockWorkingDir,
+		WorkingDir:       mockWorkingDir,
+		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
 		AggregateApplyRequirements: &events.AggregateApplyRequirements{
 			WorkingDir: mockWorkingDir,
 		},
@@ -288,6 +293,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				RunStepRunner:              mockRun,
 				EnvStepRunner:              mockEnv,
 				WorkingDir:                 mockWorkingDir,
+				WorkingDirLocker:           events.NewDefaultWorkingDirLocker(),
 				Webhooks:                   mockSender,
 				AggregateApplyRequirements: applyReqHandler,
 			}
@@ -360,10 +366,11 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 	mockWorkingDir := eventsMocks.NewMockWorkingDir()
 
 	runner := projects.DefaultProjectCommandRunner{
-		RunStepRunner: &run,
-		EnvStepRunner: &env,
-		WorkingDir:    mockWorkingDir,
-		Webhooks:      nil,
+		RunStepRunner:    &run,
+		EnvStepRunner:    &env,
+		WorkingDir:       mockWorkingDir,
+		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+		Webhooks:         nil,
 	}
 
 	repoDir, cleanup := TempDir(t)
@@ -415,7 +422,5 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 		RepoRelDir: ".",
 	}
 	res := runner.Plan(ctx)
-	Assert(t, res.PlanSuccess != nil, "exp plan success")
-	Equals(t, "https://lock-key", res.PlanSuccess.LockURL)
 	Equals(t, "var=\n\nvar=value\n\ndynamic_var=dynamic_value\n\ndynamic_var=overridden\n", res.PlanSuccess.TerraformOutput)
 }
