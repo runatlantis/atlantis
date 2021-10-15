@@ -1,9 +1,21 @@
 package events
 
 import (
+	"fmt"
+
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
+
+// DirNotExistErr is an error caused by the directory not existing.
+type DirNotExistErr struct {
+	RepoRelDir string
+}
+
+// Error implements the error interface.
+func (d DirNotExistErr) Error() string {
+	return fmt.Sprintf("dir %q does not exist", d.RepoRelDir)
+}
 
 type DBUpdater struct {
 	DB *db.BoltDB

@@ -70,16 +70,6 @@ type CommandRunner interface {
 	Version(ctx models.ProjectCommandContext) models.ProjectResult
 }
 
-// DirNotExistErr is an error caused by the directory not existing.
-type DirNotExistErr struct {
-	RepoRelDir string
-}
-
-// Error implements the error interface.
-func (d DirNotExistErr) Error() string {
-	return fmt.Sprintf("dir %q does not exist", d.RepoRelDir)
-}
-
 func NewProjectCommandRunner(
 	initStepRunner *runtime.InitStepRunner,
 	planStepRunner *runtime.PlanStepRunner,
@@ -236,7 +226,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx models.ProjectCommandCon
 	}
 	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
 	if _, err = os.Stat(absPath); os.IsNotExist(err) {
-		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+		return nil, "", events.DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
@@ -275,7 +265,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 
 	projAbsPath := filepath.Join(repoDir, ctx.RepoRelDir)
 	if _, err := os.Stat(projAbsPath); os.IsNotExist(err) {
-		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+		return nil, "", events.DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
 	outputs, err := p.runSteps(ctx.Steps, ctx, projAbsPath)
@@ -309,7 +299,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 
 	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
 	if _, err = os.Stat(absPath); os.IsNotExist(err) {
-		return "", "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+		return "", "", events.DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
 	failure, err = p.AggregateApplyRequirements.ValidateProject(repoDir, ctx)
@@ -342,7 +332,7 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx models.ProjectCommandContext
 	}
 	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
 	if _, err = os.Stat(absPath); os.IsNotExist(err) {
-		return "", "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+		return "", "", events.DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
