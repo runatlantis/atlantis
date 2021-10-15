@@ -34,6 +34,7 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
+	"github.com/runatlantis/atlantis/server/projects/runners"
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
@@ -467,7 +468,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDir:          workingDir,
 	}
 
-	projectCommandRunner := &events.DefaultProjectCommandRunner{
+	projectCommandRunner := &projects.DefaultProjectCommandRunner{
 		InitStepRunner: &runtime.InitStepRunner{
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTfVersion,
@@ -498,12 +499,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AggregateApplyRequirements: applyRequirementHandler,
 	}
 
-	projectCmdRunnerLocker := &events.LockingProjectCommandRunner{
-		WorkingDirLocker:     workingDirLocker,
-		ProjectCommandRunner: projectCommandRunner,
-		Locker:               projectLocker,
-		LockURLGenerator:     router,
-	}
+	projectCmdRunnerLocker := commands.WithLocking(
+		projectCommandRunner,
+		projectLocker,
+		router,
+		workingDirLocker,
+	)
 
 	dbUpdater := &events.DBUpdater{
 		DB: boltdb,
