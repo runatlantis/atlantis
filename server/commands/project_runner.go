@@ -284,13 +284,6 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 }
 
 func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) (applyOut string, failure string, err error) {
-	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace)
-	if err != nil {
-		return "", "", err
-	}
-	defer unlockFn()
-
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -303,6 +296,13 @@ func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) 
 	if _, err = os.Stat(absPath); os.IsNotExist(err) {
 		return "", "", events.DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
+
+	// Acquire internal lock for the directory we're going to operate in.
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace)
+	if err != nil {
+		return "", "", err
+	}
+	defer unlockFn()
 
 	failure, err = p.AggregateApplyRequirements.ValidateProject(repoDir, ctx)
 	if failure != "" || err != nil {
@@ -336,6 +336,13 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx models.ProjectCommandContext
 	if _, err = os.Stat(absPath); os.IsNotExist(err) {
 		return "", "", events.DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
+
+	// Acquire internal lock for the directory we're going to operate in.
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace)
+	if err != nil {
+		return "", "", err
+	}
+	defer unlockFn()
 
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
 	if err != nil {
