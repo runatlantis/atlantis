@@ -217,13 +217,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if userConfig.AzureDevopsUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.AzureDevops)
 
-		azureDevOpsHost := userConfig.AzureDevOpsHost
-		if userConfig.AzureDevOpsHost == "" {
-			azureDevOpsHost = "dev.azure.com"
-		}
-
 		var err error
-		azuredevopsClient, err = vcs.NewAzureDevopsClient(azureDevOpsHost, userConfig.AzureDevopsUser, userConfig.AzureDevopsToken)
+		azuredevopsClient, err = vcs.NewAzureDevopsClient(userConfig.AzureDevOpsHostname, userConfig.AzureDevopsUser, userConfig.AzureDevopsToken)
 		if err != nil {
 			return nil, err
 		}
