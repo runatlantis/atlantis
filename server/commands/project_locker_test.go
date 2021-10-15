@@ -62,6 +62,7 @@ func TestCommandLocker_Plan(t *testing.T) {
 		res := runner.Plan(ctx)
 
 		Equals(t, "https://lock-key", res.PlanSuccess.LockURL)
+		Equals(t, models.PlanCommand, res.Command)
 	})
 
 	t.Run("prevent planning on locked projects", func(t *testing.T) {
@@ -136,6 +137,7 @@ func TestCommandLocker_Plan(t *testing.T) {
 
 		Assert(t, res.PlanSuccess == nil, "plan success should be nil")
 		Equals(t, res.Failure, "This project is currently locked by an unapplied plan from pull other PR. To continue, delete the lock from other PR or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.")
+		Equals(t, models.PlanCommand, res.Command)
 	})
 }
 
@@ -173,16 +175,17 @@ func TestCommandLocker_PolicyCheck(t *testing.T) {
 		When(mockProjectCommandRunner.PolicyCheck(
 			matchers.EqModelsProjectCommandContext(ctx),
 		)).ThenReturn(models.ProjectResult{
-			Command:     models.PlanCommand,
-			RepoRelDir:  ctx.RepoRelDir,
-			Workspace:   ctx.Workspace,
-			ProjectName: ctx.ProjectName,
-			PlanSuccess: &models.PlanSuccess{},
+			Command:            models.PolicyCheckCommand,
+			RepoRelDir:         ctx.RepoRelDir,
+			Workspace:          ctx.Workspace,
+			ProjectName:        ctx.ProjectName,
+			PolicyCheckSuccess: &models.PolicyCheckSuccess{},
 		})
 
 		res := runner.PolicyCheck(ctx)
 
-		Equals(t, "https://lock-key", res.PlanSuccess.LockURL)
+		Equals(t, "https://lock-key", res.PolicyCheckSuccess.LockURL)
+		Equals(t, models.PolicyCheckCommand, res.Command)
 	})
 
 	t.Run("prevent policy checking on locked projects", func(t *testing.T) {
@@ -257,6 +260,7 @@ func TestCommandLocker_PolicyCheck(t *testing.T) {
 
 		Assert(t, res.PolicyCheckSuccess == nil, "plan success should be nil")
 		Equals(t, res.Failure, "This project is currently locked by an unapplied plan from pull other PR. To continue, delete the lock from other PR or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.")
+		Equals(t, models.PolicyCheckCommand, res.Command)
 	})
 }
 

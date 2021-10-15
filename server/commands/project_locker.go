@@ -14,7 +14,7 @@ type ProjectCommandLocker struct {
 }
 
 func (p *ProjectCommandLocker) Plan(ctx models.ProjectCommandContext) models.ProjectResult {
-	return p.runWithLocks(ctx, p.ProjectCommandRunner.Plan)
+	return p.runWithLocks(ctx, models.PlanCommand, p.ProjectCommandRunner.Plan)
 }
 
 func (p *ProjectCommandLocker) PolicyCheck(ctx models.ProjectCommandContext) models.ProjectResult {
@@ -24,15 +24,16 @@ func (p *ProjectCommandLocker) PolicyCheck(ctx models.ProjectCommandContext) mod
 	// we will attempt to capture the lock here but fail to get the working directory
 	// at which point we will unlock again to preserve functionality
 	// If we fail to capture the lock here (super unlikely) then we error out and the user is forced to replan
-	return p.runWithLocks(ctx, p.ProjectCommandRunner.PolicyCheck)
+	return p.runWithLocks(ctx, models.PolicyCheckCommand, p.ProjectCommandRunner.PolicyCheck)
 }
 
 func (p *ProjectCommandLocker) runWithLocks(
 	ctx models.ProjectCommandContext,
+	command models.CommandName,
 	execute func(ctx models.ProjectCommandContext) models.ProjectResult,
 ) (result models.ProjectResult) {
 	result = models.ProjectResult{
-		Command:     models.PlanCommand,
+		Command:     command,
 		RepoRelDir:  ctx.RepoRelDir,
 		Workspace:   ctx.Workspace,
 		ProjectName: ctx.ProjectName,
