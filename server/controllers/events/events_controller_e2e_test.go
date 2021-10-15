@@ -913,7 +913,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 
 	Ok(t, err)
 
-	projectCommandRunner := (&commands.DefaultProjectCommandRunner{
+	projectCommandRunner := &commands.DefaultProjectCommandRunner{
 		InitStepRunner: &runtime.InitStepRunner{
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTFVersion,
@@ -938,7 +938,8 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 			PullApprovedChecker: e2eVCSClient,
 			WorkingDir:          workingDir,
 		},
-	}).WithLocking(projectLocker, &mockLockURLGenerator{})
+	}
+	projectCommandRunnerWithLocking := projectCommandRunner.WithLocking(projectLocker, &mockLockURLGenerator{})
 
 	dbUpdater := &events.DBUpdater{
 		DB: boltdb,
@@ -959,7 +960,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		dbUpdater,
 		pullUpdater,
 		e2eStatusUpdater,
-		projectCommandRunner,
+		projectCommandRunnerWithLocking,
 		parallelPoolSize,
 		false,
 	)
@@ -972,7 +973,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		workingDir,
 		e2eStatusUpdater,
 		projectCommandBuilder,
-		projectCommandRunner,
+		projectCommandRunnerWithLocking,
 		dbUpdater,
 		pullUpdater,
 		policyCheckCommandRunner,
@@ -988,7 +989,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 		applyLocker,
 		e2eStatusUpdater,
 		projectCommandBuilder,
-		projectCommandRunner,
+		projectCommandRunnerWithLocking,
 		autoMerger,
 		pullUpdater,
 		dbUpdater,
@@ -1001,7 +1002,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
 		e2eStatusUpdater,
 		projectCommandBuilder,
-		projectCommandRunner,
+		projectCommandRunnerWithLocking,
 		pullUpdater,
 		dbUpdater,
 		silenceNoProjects,
@@ -1017,7 +1018,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	versionCommandRunner := events.NewVersionCommandRunner(
 		pullUpdater,
 		projectCommandBuilder,
-		projectCommandRunner,
+		projectCommandRunnerWithLocking,
 		parallelPoolSize,
 		silenceNoProjects,
 	)

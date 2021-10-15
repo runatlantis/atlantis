@@ -55,7 +55,7 @@ func (p *ProjectCommandLocker) runWithLocks(
 	result = execute(ctx)
 	if result.Error != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+			ctx.Log.Err("error unlocking state after %s error: %v", command, unlockErr)
 		}
 		return
 	}
