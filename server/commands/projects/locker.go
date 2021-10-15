@@ -1,4 +1,4 @@
-package runners
+package projects
 
 import (
 	"github.com/pkg/errors"
@@ -6,33 +6,18 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-func WithLocking(
-	prjCmdRunner ProjectCommandRunner,
-	locker events.ProjectLocker,
-	lockUrlGenerator LockURLGenerator,
-	workginDirLocker events.WorkingDirLocker,
-) ProjectCommandRunner {
-	return &LockingProjectCommandRunner{
-		ProjectCommandRunner: prjCmdRunner,
-		Locker:               locker,
-		LockURLGenerator:     lockUrlGenerator,
-		WorkingDirLocker:     workginDirLocker,
-	}
-}
-
-// LockingProjectCommandRunner implements project locks.
-type LockingProjectCommandRunner struct {
+// ProjectCommandLocker implements project locks.
+type ProjectCommandLocker struct {
 	ProjectCommandRunner
 	Locker           events.ProjectLocker
 	LockURLGenerator LockURLGenerator
-	WorkingDirLocker events.WorkingDirLocker
 }
 
-func (p *LockingProjectCommandRunner) Plan(ctx models.ProjectCommandContext) models.ProjectResult {
+func (p *ProjectCommandLocker) Plan(ctx models.ProjectCommandContext) models.ProjectResult {
 	return p.runWithLocks(ctx, p.ProjectCommandRunner.Plan)
 }
 
-func (p *LockingProjectCommandRunner) PolicyCheck(ctx models.ProjectCommandContext) models.ProjectResult {
+func (p *ProjectCommandLocker) PolicyCheck(ctx models.ProjectCommandContext) models.ProjectResult {
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	// This should already be acquired from the prior plan operation.
 	// if for some reason an unlock happens between the plan and policy check step
@@ -42,26 +27,7 @@ func (p *LockingProjectCommandRunner) PolicyCheck(ctx models.ProjectCommandConte
 	return p.runWithLocks(ctx, p.ProjectCommandRunner.PolicyCheck)
 }
 
-func (p *LockingProjectCommandRunner) Apply(ctx models.ProjectCommandContext) (result models.ProjectResult) {
-	result = models.ProjectResult{
-		Command:     models.ApplyCommand,
-		RepoRelDir:  ctx.RepoRelDir,
-		Workspace:   ctx.Workspace,
-		ProjectName: ctx.ProjectName,
-	}
-
-	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace)
-	if err != nil {
-		result.Error = err
-		return
-	}
-	defer unlockFn()
-
-	return p.ProjectCommandRunner.Apply(ctx)
-}
-
-func (p *LockingProjectCommandRunner) runWithLocks(
+func (p *ProjectCommandLocker) runWithLocks(
 	ctx models.ProjectCommandContext,
 	execute func(ctx models.ProjectCommandContext) models.ProjectResult,
 ) (result models.ProjectResult) {
@@ -84,14 +50,6 @@ func (p *LockingProjectCommandRunner) runWithLocks(
 		return
 	}
 	ctx.Log.Debug("acquired lock for project")
-
-	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace)
-	if err != nil {
-		result.Error = err
-		return
-	}
-	defer unlockFn()
 
 	result = execute(ctx)
 	if result.Error != nil {

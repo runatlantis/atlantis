@@ -1,10 +1,11 @@
-package runners_test
+package projects_test
 
 import (
-	"fmt"
 	"testing"
 
 	. "github.com/petergtz/pegomock"
+	"github.com/runatlantis/atlantis/server/commands/projects"
+	"github.com/runatlantis/atlantis/server/commands/projects/mocks"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
@@ -14,24 +15,21 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/projects/runners"
-	"github.com/runatlantis/atlantis/server/projects/runners/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 // Test that it runs the expected plan steps.
-func TestLockingProjectCommandRunner_Plan(t *testing.T) {
+func TestProjectCommandLocker_Plan(t *testing.T) {
 	RegisterMockTestingT(t)
 
 	t.Run("generate lock key url", func(t *testing.T) {
 		mockLocker := eventsMocks.NewMockProjectLocker()
 		mockProjectCommandRunner := mocks.NewMockProjectCommandRunner()
 
-		runner := runners.LockingProjectCommandRunner{
+		runner := projects.ProjectCommandLocker{
 			ProjectCommandRunner: mockProjectCommandRunner,
 			Locker:               mockLocker,
 			LockURLGenerator:     mockURLGenerator{},
-			WorkingDirLocker:     events.NewDefaultWorkingDirLocker(),
 		}
 
 		ctx := models.ProjectCommandContext{
@@ -80,11 +78,10 @@ func TestLockingProjectCommandRunner_Plan(t *testing.T) {
 
 		mockProjectCommandRunner := mocks.NewMockProjectCommandRunner()
 
-		lockAcquiredRunner := runners.LockingProjectCommandRunner{
+		lockAcquiredRunner := projects.ProjectCommandLocker{
 			ProjectCommandRunner: mockProjectCommandRunner,
 			Locker:               projectLocker,
 			LockURLGenerator:     mockURLGenerator{},
-			WorkingDirLocker:     events.NewDefaultWorkingDirLocker(),
 		}
 
 		thisCtx := models.ProjectCommandContext{
@@ -129,11 +126,10 @@ func TestLockingProjectCommandRunner_Plan(t *testing.T) {
 		When(vcsClientMock.MarkdownPullLink(matchers.AnyModelsPullRequest())).ThenReturn("other PR", nil)
 
 		mockProjectCommandRunner = mocks.NewMockProjectCommandRunner()
-		lockFailedRunner := runners.LockingProjectCommandRunner{
+		lockFailedRunner := projects.ProjectCommandLocker{
 			ProjectCommandRunner: mockProjectCommandRunner,
 			Locker:               projectLocker,
 			LockURLGenerator:     mockURLGenerator{},
-			WorkingDirLocker:     events.NewDefaultWorkingDirLocker(),
 		}
 
 		res = lockFailedRunner.Plan(thatCtx)
@@ -144,18 +140,17 @@ func TestLockingProjectCommandRunner_Plan(t *testing.T) {
 }
 
 // Test that it runs the expected policy_check steps.
-func TestLockingProjectCommandRunner_PolicyCheck(t *testing.T) {
+func TestProjectCommandLocker_PolicyCheck(t *testing.T) {
 	RegisterMockTestingT(t)
 
 	t.Run("generate lock key url", func(t *testing.T) {
 		mockLocker := eventsMocks.NewMockProjectLocker()
 		mockProjectCommandRunner := mocks.NewMockProjectCommandRunner()
 
-		runner := runners.LockingProjectCommandRunner{
+		runner := projects.ProjectCommandLocker{
 			ProjectCommandRunner: mockProjectCommandRunner,
 			Locker:               mockLocker,
 			LockURLGenerator:     mockURLGenerator{},
-			WorkingDirLocker:     events.NewDefaultWorkingDirLocker(),
 		}
 
 		ctx := models.ProjectCommandContext{
@@ -204,11 +199,10 @@ func TestLockingProjectCommandRunner_PolicyCheck(t *testing.T) {
 
 		mockProjectCommandRunner := mocks.NewMockProjectCommandRunner()
 
-		lockAcquiredRunner := runners.LockingProjectCommandRunner{
+		lockAcquiredRunner := projects.ProjectCommandLocker{
 			ProjectCommandRunner: mockProjectCommandRunner,
 			Locker:               projectLocker,
 			LockURLGenerator:     mockURLGenerator{},
-			WorkingDirLocker:     events.NewDefaultWorkingDirLocker(),
 		}
 
 		thisCtx := models.ProjectCommandContext{
@@ -253,52 +247,16 @@ func TestLockingProjectCommandRunner_PolicyCheck(t *testing.T) {
 		When(vcsClientMock.MarkdownPullLink(matchers.AnyModelsPullRequest())).ThenReturn("other PR", nil)
 
 		mockProjectCommandRunner = mocks.NewMockProjectCommandRunner()
-		lockFailed := runners.LockingProjectCommandRunner{
+		lockFailed := projects.ProjectCommandLocker{
 			ProjectCommandRunner: mockProjectCommandRunner,
 			Locker:               projectLocker,
 			LockURLGenerator:     mockURLGenerator{},
-			WorkingDirLocker:     events.NewDefaultWorkingDirLocker(),
 		}
 
 		res = lockFailed.PolicyCheck(thatCtx)
 
 		Assert(t, res.PolicyCheckSuccess == nil, "plan success should be nil")
 		Equals(t, res.Failure, "This project is currently locked by an unapplied plan from pull other PR. To continue, delete the lock from other PR or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.")
-	})
-}
-
-// Test that it attempts to lock working dir when running apply command.
-func TestLockingProjectCommandRunner_Apply(t *testing.T) {
-
-	t.Run("working directory is locked", func(t *testing.T) {
-		RegisterMockTestingT(t)
-		mockLocker := eventsMocks.NewMockProjectLocker()
-		mockProjectCommandRunner := mocks.NewMockProjectCommandRunner()
-		mockWorkingDirLocker := eventsMocks.NewMockWorkingDirLocker()
-
-		runner := runners.LockingProjectCommandRunner{
-			ProjectCommandRunner: mockProjectCommandRunner,
-			Locker:               mockLocker,
-			LockURLGenerator:     mockURLGenerator{},
-			WorkingDirLocker:     mockWorkingDirLocker,
-		}
-
-		ctx := models.ProjectCommandContext{
-			Log:        logging.NewNoopLogger(t),
-			Workspace:  "default",
-			RepoRelDir: ".",
-		}
-
-		When(mockWorkingDirLocker.TryLock(
-			AnyString(),
-			AnyInt(),
-			AnyString(),
-		)).ThenReturn(nil, fmt.Errorf("workspace dir is locked"))
-
-		res := runner.Apply(ctx)
-
-		Equals(t, res.Error, fmt.Errorf("workspace dir is locked"))
-		Assert(t, res.ApplySuccess == "", "apply should fail")
 	})
 }
 

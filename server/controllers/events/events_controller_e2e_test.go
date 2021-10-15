@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server"
+	"github.com/runatlantis/atlantis/server/commands/projects"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
@@ -834,10 +835,10 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 	Ok(t, err)
 	lockingClient := locking.NewClient(boltdb)
 	applyLocker = locking.NewApplyClient(boltdb, userConfig.DisableApply)
-	// projectLocker := &events.DefaultProjectLocker{
-	// 	Locker:    lockingClient,
-	// 	VCSClient: e2eVCSClient,
-	// }
+	projectLocker := &events.DefaultProjectLocker{
+		Locker:    lockingClient,
+		VCSClient: e2eVCSClient,
+	}
 	workingDir := &events.FileWorkspace{
 		DataDir:                     dataDir,
 		TestingOverrideHeadCloneURL: "override-me",
@@ -872,9 +873,9 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 
 	mockPreWorkflowHookRunner = runtimemocks.NewMockPreWorkflowHookRunner()
 	preWorkflowHooksCommandRunner := &events.DefaultPreWorkflowHooksCommandRunner{
-		VCSClient: e2eVCSClient,
-		GlobalCfg: globalCfg,
-		// WorkingDirLocker:      locker,
+		VCSClient:             e2eVCSClient,
+		GlobalCfg:             globalCfg,
+		WorkingDirLocker:      locker,
 		WorkingDir:            workingDir,
 		PreWorkflowHookRunner: mockPreWorkflowHookRunner,
 	}
@@ -912,9 +913,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 
 	Ok(t, err)
 
-	projectCommandRunner := &events.DefaultProjectCommandRunner{
-		// Locker:           projectLocker,
-		// LockURLGenerator: &mockLockURLGenerator{},
+	projectCommandRunner := (&projects.DefaultProjectCommandRunner{
 		InitStepRunner: &runtime.InitStepRunner{
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTFVersion,
@@ -932,14 +931,14 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTFVersion,
 		},
-		WorkingDir: workingDir,
-		Webhooks:   &mockWebhookSender{},
-		// WorkingDirLocker: locker,
+		WorkingDir:       workingDir,
+		Webhooks:         &mockWebhookSender{},
+		WorkingDirLocker: locker,
 		AggregateApplyRequirements: &events.AggregateApplyRequirements{
 			PullApprovedChecker: e2eVCSClient,
 			WorkingDir:          workingDir,
 		},
-	}
+	}).WithLocking(projectLocker, &mockLockURLGenerator{})
 
 	dbUpdater := &events.DBUpdater{
 		DB: boltdb,

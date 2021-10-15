@@ -32,9 +32,9 @@ import (
 	"time"
 
 	"github.com/mitchellh/go-homedir"
+	"github.com/runatlantis/atlantis/server/commands/projects"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
-	"github.com/runatlantis/atlantis/server/projects/runners"
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
@@ -468,42 +468,39 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDir:          workingDir,
 	}
 
-	projectCommandRunner := &projects.DefaultProjectCommandRunner{
-		InitStepRunner: &runtime.InitStepRunner{
+	projectCommandRunner := projects.NewProjectCommandRunner(
+		&runtime.InitStepRunner{
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTfVersion,
 		},
-		PlanStepRunner: &runtime.PlanStepRunner{
+		&runtime.PlanStepRunner{
 			TerraformExecutor:   terraformClient,
 			DefaultTFVersion:    defaultTfVersion,
 			CommitStatusUpdater: commitStatusUpdater,
 			AsyncTFExec:         terraformClient,
 		},
-		ShowStepRunner:        showStepRunner,
-		PolicyCheckStepRunner: policyCheckRunner,
-		ApplyStepRunner: &runtime.ApplyStepRunner{
+		showStepRunner,
+		policyCheckRunner,
+		&runtime.ApplyStepRunner{
 			TerraformExecutor:   terraformClient,
 			CommitStatusUpdater: commitStatusUpdater,
 			AsyncTFExec:         terraformClient,
 		},
-		RunStepRunner: runStepRunner,
-		EnvStepRunner: &runtime.EnvStepRunner{
+		runStepRunner,
+		&runtime.EnvStepRunner{
 			RunStepRunner: runStepRunner,
 		},
-		VersionStepRunner: &runtime.VersionStepRunner{
+		&runtime.VersionStepRunner{
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTfVersion,
 		},
-		WorkingDir:                 workingDir,
-		Webhooks:                   webhooksManager,
-		AggregateApplyRequirements: applyRequirementHandler,
-	}
-
-	projectCmdRunnerLocker := commands.WithLocking(
-		projectCommandRunner,
+		workingDir,
+		workingDirLocker,
+		webhooksManager,
+		applyRequirementHandler,
+	).WithLocking(
 		projectLocker,
 		router,
-		workingDirLocker,
 	)
 
 	dbUpdater := &events.DBUpdater{

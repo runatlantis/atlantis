@@ -1,4 +1,4 @@
-package runners
+package projects
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
@@ -101,6 +102,36 @@ func (d DirNotExistErr) Error() string {
 	return fmt.Sprintf("dir %q does not exist", d.RepoRelDir)
 }
 
+func NewProjectCommandRunner(
+	initStepRunner *runtime.InitStepRunner,
+	planStepRunner *runtime.PlanStepRunner,
+	showStepRunner runtime.Runner,
+	policyCheckStepRunner runtime.Runner,
+	applyStepRunner *runtime.ApplyStepRunner,
+	runStepRunner *runtime.RunStepRunner,
+	envStepRunner *runtime.EnvStepRunner,
+	versionStepRunner *runtime.VersionStepRunner,
+	workingDir events.WorkingDir,
+	workingDirLocker events.WorkingDirLocker,
+	webhookSender webhooks.Sender,
+	applyRequirementsHandler events.ApplyRequirement,
+) *DefaultProjectCommandRunner {
+	return &DefaultProjectCommandRunner{
+		InitStepRunner:             initStepRunner,
+		PlanStepRunner:             planStepRunner,
+		ShowStepRunner:             showStepRunner,
+		ApplyStepRunner:            applyStepRunner,
+		PolicyCheckStepRunner:      policyCheckStepRunner,
+		VersionStepRunner:          versionStepRunner,
+		RunStepRunner:              runStepRunner,
+		EnvStepRunner:              envStepRunner,
+		WorkingDir:                 workingDir,
+		WorkingDirLocker:           workingDirLocker,
+		Webhooks:                   webhookSender,
+		AggregateApplyRequirements: applyRequirementsHandler,
+	}
+}
+
 // DefaultProjectCommandRunner implements ProjectCommandRunner.
 type DefaultProjectCommandRunner struct {
 	InitStepRunner             StepRunner
@@ -112,8 +143,21 @@ type DefaultProjectCommandRunner struct {
 	RunStepRunner              CustomStepRunner
 	EnvStepRunner              EnvStepRunner
 	WorkingDir                 events.WorkingDir
+	WorkingDirLocker           events.WorkingDirLocker
 	Webhooks                   WebhooksSender
 	AggregateApplyRequirements events.ApplyRequirement
+}
+
+// WithLocking add project locking functionality to ProjectCommandRunner
+func (p *DefaultProjectCommandRunner) WithLocking(
+	locker events.ProjectLocker,
+	lockUrlGenerator LockURLGenerator,
+) *ProjectCommandLocker {
+	return &ProjectCommandLocker{
+		ProjectCommandRunner: p,
+		Locker:               locker,
+		LockURLGenerator:     lockUrlGenerator,
+	}
 }
 
 // Plan runs terraform plan for the project described by ctx.
@@ -194,6 +238,15 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx models.ProjectComman
 }
 
 func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx models.ProjectCommandContext) (*models.PolicyCheckSuccess, string, error) {
+	// Acquire internal lock for the directory we're going to operate in.
+	// We should refactor this to keep the lock for the duration of plan and policy check since as of now
+	// there is a small gap where we don't have the lock and if we can't get this here, we should just unlock the PR.
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace)
+	if err != nil {
+		return nil, "", err
+	}
+	defer unlockFn()
+
 	// we shouldn't attempt to clone this again. If changes occur to the pull request while the plan is happening
 	// that shouldn't affect this particular operation.
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
@@ -227,6 +280,15 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx models.ProjectCommandCon
 }
 
 func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (*models.PlanSuccess, string, error) {
+	// Acquire internal lock for the directory we're going to operate in.
+	// We should refactor this to keep the lock for the duration of plan and policy check since as of now
+	// there is a small gap where we don't have the lock and if we can't get this here, we should just unlock the PR.
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace)
+	if err != nil {
+		return nil, "", err
+	}
+	defer unlockFn()
+
 	// Clone is idempotent so okay to run even if the repo was already cloned.
 	repoDir, hasDiverged, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if cloneErr != nil {
@@ -252,6 +314,13 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx models.ProjectCommandContext) (
 }
 
 func (p *DefaultProjectCommandRunner) doApply(ctx models.ProjectCommandContext) (applyOut string, failure string, err error) {
+	// Acquire internal lock for the directory we're going to operate in.
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace)
+	if err != nil {
+		return "", "", err
+	}
+	defer unlockFn()
+
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
 	if err != nil {
 		if os.IsNotExist(err) {
