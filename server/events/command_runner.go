@@ -32,6 +32,31 @@ const (
 	ShutdownComment = "Atlantis server is shutting down, please try again later."
 )
 
+type ProjectPlanCommandRunner interface {
+	// Plan runs terraform plan for the project described by ctx.
+	Plan(ctx models.ProjectCommandContext) models.ProjectResult
+}
+
+type ProjectApplyCommandRunner interface {
+	// Apply runs terraform apply for the project described by ctx.
+	Apply(ctx models.ProjectCommandContext) models.ProjectResult
+}
+
+type ProjectPolicyCheckCommandRunner interface {
+	// PolicyCheck runs OPA defined policies for the project desribed by ctx.
+	PolicyCheck(ctx models.ProjectCommandContext) models.ProjectResult
+}
+
+type ProjectApprovePoliciesCommandRunner interface {
+	// Approves any failing OPA policies.
+	ApprovePolicies(ctx models.ProjectCommandContext) models.ProjectResult
+}
+
+type ProjectVersionCommandRunner interface {
+	// Version runs terraform version for the project described by ctx.
+	Version(ctx models.ProjectCommandContext) models.ProjectResult
+}
+
 //go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_command_runner.go CommandRunner
 
 // CommandRunner is the first step after a command request has been parsed.

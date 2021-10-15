@@ -55,41 +55,19 @@ type WebhooksSender interface {
 	Send(log logging.SimpleLogging, res webhooks.ApplyResult) error
 }
 
-//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_runner.go ProjectCommandRunner
-
-type ProjectPlanCommandRunner interface {
+// CommandRunner runs project commands. A project command is a command
+// for a specific TF project.
+type CommandRunner interface {
 	// Plan runs terraform plan for the project described by ctx.
 	Plan(ctx models.ProjectCommandContext) models.ProjectResult
-}
-
-type ProjectApplyCommandRunner interface {
 	// Apply runs terraform apply for the project described by ctx.
 	Apply(ctx models.ProjectCommandContext) models.ProjectResult
-}
-
-type ProjectPolicyCheckCommandRunner interface {
 	// PolicyCheck runs OPA defined policies for the project desribed by ctx.
 	PolicyCheck(ctx models.ProjectCommandContext) models.ProjectResult
-}
-
-type ProjectApprovePoliciesCommandRunner interface {
 	// Approves any failing OPA policies.
 	ApprovePolicies(ctx models.ProjectCommandContext) models.ProjectResult
-}
-
-type ProjectVersionCommandRunner interface {
 	// Version runs terraform version for the project described by ctx.
 	Version(ctx models.ProjectCommandContext) models.ProjectResult
-}
-
-// ProjectCommandRunner runs project commands. A project command is a command
-// for a specific TF project.
-type ProjectCommandRunner interface {
-	ProjectPlanCommandRunner
-	ProjectApplyCommandRunner
-	ProjectPolicyCheckCommandRunner
-	ProjectApprovePoliciesCommandRunner
-	ProjectVersionCommandRunner
 }
 
 // DirNotExistErr is an error caused by the directory not existing.
@@ -152,11 +130,11 @@ type DefaultProjectCommandRunner struct {
 func (p *DefaultProjectCommandRunner) WithLocking(
 	locker events.ProjectLocker,
 	lockUrlGenerator LockURLGenerator,
-) *ProjectCommandLocker {
-	return &ProjectCommandLocker{
-		ProjectCommandRunner: p,
-		Locker:               locker,
-		LockURLGenerator:     lockUrlGenerator,
+) *CommandLocker {
+	return &CommandLocker{
+		CommandRunner:    p,
+		Locker:           locker,
+		LockURLGenerator: lockUrlGenerator,
 	}
 }
 
