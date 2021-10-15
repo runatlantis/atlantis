@@ -562,13 +562,11 @@ func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {
 	When(workingDir.GetPullDir(fixtures.GithubRepo, fixtures.Pull)).ThenReturn(tmp, nil)
 
 	ch.RunCommentCommand(fixtures.GithubRepo, &fixtures.GithubRepo, &fixtures.Pull, fixtures.User, fixtures.Pull.Num, &events.CommentCommand{Name: models.ApprovePoliciesCommand})
-	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
 		matchers.AnyModelsRepo(),
 		matchers.AnyModelsPullRequest(),
-		matchers.EqModelsCommitStatus(models.SuccessCommitStatus),
+		matchers.EqModelsCommitStatus(models.FailedCommitStatus),
 		matchers.EqModelsCommandName(models.PolicyCheckCommand),
-		EqInt(0),
-		EqInt(0),
 	)
 }
 

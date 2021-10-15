@@ -70,6 +70,12 @@ func (a *ApprovePoliciesCommandRunner) Run(ctx *CommandContext, cmd *CommentComm
 	}
 
 	result := a.buildApprovePolicyCommandResults(ctx, projectCmds)
+	if result.Error != nil {
+		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, models.PolicyCheckCommand); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
+		return
+	}
 
 	a.pullUpdater.updatePull(
 		ctx,
