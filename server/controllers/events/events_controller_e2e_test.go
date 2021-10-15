@@ -17,7 +17,7 @@ import (
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
 	"github.com/runatlantis/atlantis/server"
-	"github.com/runatlantis/atlantis/server/commands/projects"
+	"github.com/runatlantis/atlantis/server/commands"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
@@ -913,7 +913,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 
 	Ok(t, err)
 
-	projectCommandRunner := (&projects.DefaultProjectCommandRunner{
+	projectCommandRunner := (&commands.DefaultProjectCommandRunner{
 		InitStepRunner: &runtime.InitStepRunner{
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTFVersion,

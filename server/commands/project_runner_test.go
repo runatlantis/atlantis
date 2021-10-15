@@ -1,4 +1,4 @@
-package projects_test
+package commands_test
 
 import (
 	"os"
@@ -6,8 +6,8 @@ import (
 
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock"
-	"github.com/runatlantis/atlantis/server/commands/projects"
-	"github.com/runatlantis/atlantis/server/commands/projects/mocks"
+	"github.com/runatlantis/atlantis/server/commands"
+	"github.com/runatlantis/atlantis/server/commands/mocks"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	mocks2 "github.com/runatlantis/atlantis/server/core/runtime/mocks"
 	tmocks "github.com/runatlantis/atlantis/server/core/terraform/mocks"
@@ -31,7 +31,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	mockWorkingDir := eventsMocks.NewMockWorkingDir()
 	mockApplyReqHandler := eventsMocks.NewMockApplyRequirement()
 
-	runner := &projects.DefaultProjectCommandRunner{
+	runner := &commands.DefaultProjectCommandRunner{
 		InitStepRunner:             mockInit,
 		PlanStepRunner:             mockPlan,
 		ApplyStepRunner:            mockApply,
@@ -108,7 +108,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 // was never planned.
 func TestDefaultProjectCommandRunner_ApplyNotCloned(t *testing.T) {
 	mockWorkingDir := eventsMocks.NewMockWorkingDir()
-	runner := &projects.DefaultProjectCommandRunner{
+	runner := &commands.DefaultProjectCommandRunner{
 		WorkingDir:       mockWorkingDir,
 		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
 	}
@@ -124,7 +124,7 @@ func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 	RegisterMockTestingT(t)
 	mockWorkingDir := eventsMocks.NewMockWorkingDir()
 	mockApproved := mocks2.NewMockPullApprovedChecker()
-	runner := &projects.DefaultProjectCommandRunner{
+	runner := &commands.DefaultProjectCommandRunner{
 		WorkingDir:       mockWorkingDir,
 		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
 		AggregateApplyRequirements: &events.AggregateApplyRequirements{
@@ -150,7 +150,7 @@ func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 	RegisterMockTestingT(t)
 	mockWorkingDir := eventsMocks.NewMockWorkingDir()
-	runner := &projects.DefaultProjectCommandRunner{
+	runner := &commands.DefaultProjectCommandRunner{
 		WorkingDir:       mockWorkingDir,
 		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
 		AggregateApplyRequirements: &events.AggregateApplyRequirements{
@@ -173,7 +173,7 @@ func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 	RegisterMockTestingT(t)
 	mockWorkingDir := eventsMocks.NewMockWorkingDir()
-	runner := &projects.DefaultProjectCommandRunner{
+	runner := &commands.DefaultProjectCommandRunner{
 		WorkingDir:       mockWorkingDir,
 		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
 		AggregateApplyRequirements: &events.AggregateApplyRequirements{
@@ -286,7 +286,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				WorkingDir:          mockWorkingDir,
 			}
 
-			runner := projects.DefaultProjectCommandRunner{
+			runner := &commands.DefaultProjectCommandRunner{
 				InitStepRunner:             mockInit,
 				PlanStepRunner:             mockPlan,
 				ApplyStepRunner:            mockApply,
@@ -365,7 +365,7 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 	}
 	mockWorkingDir := eventsMocks.NewMockWorkingDir()
 
-	runner := projects.DefaultProjectCommandRunner{
+	runner := &commands.DefaultProjectCommandRunner{
 		RunStepRunner:    &run,
 		EnvStepRunner:    &env,
 		WorkingDir:       mockWorkingDir,

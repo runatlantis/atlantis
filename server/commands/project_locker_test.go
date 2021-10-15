@@ -1,11 +1,11 @@
-package projects_test
+package commands_test
 
 import (
 	"testing"
 
 	. "github.com/petergtz/pegomock"
-	"github.com/runatlantis/atlantis/server/commands/projects"
-	"github.com/runatlantis/atlantis/server/commands/projects/mocks"
+	"github.com/runatlantis/atlantis/server/commands"
+	"github.com/runatlantis/atlantis/server/commands/mocks"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
@@ -19,14 +19,14 @@ import (
 )
 
 // Test that it runs the expected plan steps.
-func TestProjectCommandLocker_Plan(t *testing.T) {
+func TestCommandLocker_Plan(t *testing.T) {
 	RegisterMockTestingT(t)
 
 	t.Run("generate lock key url", func(t *testing.T) {
 		mockLocker := eventsMocks.NewMockProjectLocker()
 		mockProjectCommandRunner := mocks.NewMockProjectCommandRunner()
 
-		runner := projects.ProjectCommandLocker{
+		runner := commands.ProjectCommandLocker{
 			ProjectCommandRunner: mockProjectCommandRunner,
 			Locker:               mockLocker,
 			LockURLGenerator:     mockURLGenerator{},
@@ -78,7 +78,7 @@ func TestProjectCommandLocker_Plan(t *testing.T) {
 
 		mockProjectCommandRunner := mocks.NewMockProjectCommandRunner()
 
-		lockAcquiredRunner := projects.ProjectCommandLocker{
+		lockAcquiredRunner := commands.ProjectCommandLocker{
 			ProjectCommandRunner: mockProjectCommandRunner,
 			Locker:               projectLocker,
 			LockURLGenerator:     mockURLGenerator{},
@@ -126,7 +126,7 @@ func TestProjectCommandLocker_Plan(t *testing.T) {
 		When(vcsClientMock.MarkdownPullLink(matchers.AnyModelsPullRequest())).ThenReturn("other PR", nil)
 
 		mockProjectCommandRunner = mocks.NewMockProjectCommandRunner()
-		lockFailedRunner := projects.ProjectCommandLocker{
+		lockFailedRunner := commands.ProjectCommandLocker{
 			ProjectCommandRunner: mockProjectCommandRunner,
 			Locker:               projectLocker,
 			LockURLGenerator:     mockURLGenerator{},
@@ -140,14 +140,14 @@ func TestProjectCommandLocker_Plan(t *testing.T) {
 }
 
 // Test that it runs the expected policy_check steps.
-func TestProjectCommandLocker_PolicyCheck(t *testing.T) {
+func TestCommandLocker_PolicyCheck(t *testing.T) {
 	RegisterMockTestingT(t)
 
 	t.Run("generate lock key url", func(t *testing.T) {
 		mockLocker := eventsMocks.NewMockProjectLocker()
 		mockProjectCommandRunner := mocks.NewMockProjectCommandRunner()
 
-		runner := projects.ProjectCommandLocker{
+		runner := commands.ProjectCommandLocker{
 			ProjectCommandRunner: mockProjectCommandRunner,
 			Locker:               mockLocker,
 			LockURLGenerator:     mockURLGenerator{},
@@ -199,7 +199,7 @@ func TestProjectCommandLocker_PolicyCheck(t *testing.T) {
 
 		mockProjectCommandRunner := mocks.NewMockProjectCommandRunner()
 
-		lockAcquiredRunner := projects.ProjectCommandLocker{
+		lockAcquiredRunner := commands.ProjectCommandLocker{
 			ProjectCommandRunner: mockProjectCommandRunner,
 			Locker:               projectLocker,
 			LockURLGenerator:     mockURLGenerator{},
@@ -247,7 +247,7 @@ func TestProjectCommandLocker_PolicyCheck(t *testing.T) {
 		When(vcsClientMock.MarkdownPullLink(matchers.AnyModelsPullRequest())).ThenReturn("other PR", nil)
 
 		mockProjectCommandRunner = mocks.NewMockProjectCommandRunner()
-		lockFailed := projects.ProjectCommandLocker{
+		lockFailed := commands.ProjectCommandLocker{
 			ProjectCommandRunner: mockProjectCommandRunner,
 			Locker:               projectLocker,
 			LockURLGenerator:     mockURLGenerator{},

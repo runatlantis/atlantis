@@ -32,7 +32,7 @@ import (
 	"time"
 
 	"github.com/mitchellh/go-homedir"
-	"github.com/runatlantis/atlantis/server/commands/projects"
+	"github.com/runatlantis/atlantis/server/commands"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
 
@@ -468,7 +468,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDir:          workingDir,
 	}
 
-	projectCommandRunner := projects.NewProjectCommandRunner(
+	projectCommandRunner := commands.NewProjectCommandRunner(
 		&runtime.InitStepRunner{
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTfVersion,

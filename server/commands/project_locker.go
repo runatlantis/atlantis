@@ -1,4 +1,4 @@
-package projects
+package commands
 
 import (
 	"github.com/pkg/errors"
@@ -6,28 +6,28 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-// CommandLocker implements project locks.
-type CommandLocker struct {
-	CommandRunner
+// ProjectCommandLocker implements project locks.
+type ProjectCommandLocker struct {
+	ProjectCommandRunner
 	Locker           events.ProjectLocker
 	LockURLGenerator LockURLGenerator
 }
 
-func (p *CommandLocker) Plan(ctx models.ProjectCommandContext) models.ProjectResult {
-	return p.runWithLocks(ctx, p.CommandRunner.Plan)
+func (p *ProjectCommandLocker) Plan(ctx models.ProjectCommandContext) models.ProjectResult {
+	return p.runWithLocks(ctx, p.ProjectCommandRunner.Plan)
 }
 
-func (p *CommandLocker) PolicyCheck(ctx models.ProjectCommandContext) models.ProjectResult {
+func (p *ProjectCommandLocker) PolicyCheck(ctx models.ProjectCommandContext) models.ProjectResult {
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	// This should already be acquired from the prior plan operation.
 	// if for some reason an unlock happens between the plan and policy check step
 	// we will attempt to capture the lock here but fail to get the working directory
 	// at which point we will unlock again to preserve functionality
 	// If we fail to capture the lock here (super unlikely) then we error out and the user is forced to replan
-	return p.runWithLocks(ctx, p.CommandRunner.PolicyCheck)
+	return p.runWithLocks(ctx, p.ProjectCommandRunner.PolicyCheck)
 }
 
-func (p *CommandLocker) runWithLocks(
+func (p *ProjectCommandLocker) runWithLocks(
 	ctx models.ProjectCommandContext,
 	execute func(ctx models.ProjectCommandContext) models.ProjectResult,
 ) (result models.ProjectResult) {

@@ -1,4 +1,4 @@
-package projects
+package commands
 
 import (
 	"fmt"
@@ -55,9 +55,11 @@ type WebhooksSender interface {
 	Send(log logging.SimpleLogging, res webhooks.ApplyResult) error
 }
 
-// CommandRunner runs project commands. A project command is a command
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_project_command_runner.go ProjectCommandRunner
+
+// ProjectCommandRunner runs project commands. A project command is a command
 // for a specific TF project.
-type CommandRunner interface {
+type ProjectCommandRunner interface {
 	// Plan runs terraform plan for the project described by ctx.
 	Plan(ctx models.ProjectCommandContext) models.ProjectResult
 	// Apply runs terraform apply for the project described by ctx.
@@ -120,11 +122,11 @@ type DefaultProjectCommandRunner struct {
 func (p *DefaultProjectCommandRunner) WithLocking(
 	locker events.ProjectLocker,
 	lockUrlGenerator LockURLGenerator,
-) *CommandLocker {
-	return &CommandLocker{
-		CommandRunner:    p,
-		Locker:           locker,
-		LockURLGenerator: lockUrlGenerator,
+) *ProjectCommandLocker {
+	return &ProjectCommandLocker{
+		ProjectCommandRunner: p,
+		Locker:               locker,
+		LockURLGenerator:     lockUrlGenerator,
 	}
 }
 
