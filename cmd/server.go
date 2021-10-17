@@ -41,6 +41,7 @@ const (
 	ADWebhookUserFlag          = "azuredevops-webhook-user"
 	ADTokenFlag                = "azuredevops-token" // nolint: gosec
 	ADUserFlag                 = "azuredevops-user"
+	ADHostnameFlag             = "azuredevops-hostname"
 	AllowForkPRsFlag           = "allow-fork-prs"
 	AllowRepoConfigFlag        = "allow-repo-config"
 	AtlantisURLFlag            = "atlantis-url"
@@ -106,6 +107,7 @@ const (
 	// NOTE: Must manually set these as defaults in the setDefaults function.
 	DefaultADBasicUser      = ""
 	DefaultADBasicPassword  = ""
+	DefaultADHostname       = "dev.azure.com"
 	DefaultAutoplanFileList = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl"
 	DefaultCheckoutStrategy = "branch"
 	DefaultBitbucketBaseURL = bitbucketcloud.BaseURL
@@ -138,6 +140,10 @@ var stringFlags = map[string]stringFlag{
 	ADWebhookUserFlag: {
 		description:  "Azure DevOps basic HTTP authentication username for inbound webhooks.",
 		defaultValue: "",
+	},
+	ADHostnameFlag: {
+		description:  "Azure DevOps hostname to support cloud and self hosted instances.",
+		defaultValue: "dev.azure.com",
 	},
 	AtlantisURLFlag: {
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path ex. https://example.com/basepath.",
@@ -589,6 +595,9 @@ func (s *ServerCmd) run() error {
 }
 
 func (s *ServerCmd) setDefaults(c *server.UserConfig) {
+	if c.AzureDevOpsHostname == "" {
+		c.AzureDevOpsHostname = DefaultADHostname
+	}
 	if c.AutoplanFileList == "" {
 		c.AutoplanFileList = DefaultAutoplanFileList
 	}
