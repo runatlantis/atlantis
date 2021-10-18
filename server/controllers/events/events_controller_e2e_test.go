@@ -3,6 +3,7 @@ package events_test
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -710,7 +711,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 				{"exp-output-autoplan.txt"},
 				{"exp-output-auto-policy-check.txt"},
 				{"exp-output-approve-policies.txt"},
-				{"exp-output-apply-failed.txt"},
+				{"exp-output-approve-failed.txt"},
 			},
 		},
 	}
@@ -783,6 +784,8 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			_, _, actReplies, _ := vcsClient.VerifyWasCalled(Times(expNumReplies)).CreateComment(AnyRepo(), AnyInt(), AnyString(), AnyString()).GetAllCapturedArguments()
 			Assert(t, len(c.ExpReplies) == len(actReplies), "missing expected replies, got %d but expected %d", len(actReplies), len(c.ExpReplies))
 			for i, expReply := range c.ExpReplies {
+				log.Println(actReplies[i])
+				log.Println(expReply)
 				assertCommentEquals(t, expReply, actReplies[i], c.RepoDir, c.ExpParallel)
 			}
 
