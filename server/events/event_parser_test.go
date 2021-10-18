@@ -1214,7 +1214,6 @@ func TestParseAzureDevopsPullEvent(t *testing.T) {
 	Equals(t, models.User{Username: "user@example.com"}, actUser)
 }
 
-
 func TestParseAzureDevopsPullEvent_EventType(t *testing.T) {
 	cases := []struct {
 		action string
@@ -1315,8 +1314,6 @@ func TestParseAzureDevopsPull(t *testing.T) {
 	Equals(t, expBaseRepo, actHeadRepo)
 }
 
-
-
 func TestParseAzureDevopsSelfHostedRepo(t *testing.T) {
 	// this should be successful
 	repo := ADSelfRepo
@@ -1336,8 +1333,6 @@ func TestParseAzureDevopsSelfHostedRepo(t *testing.T) {
 	}, r)
 
 }
-
-
 
 func TestParseAzureDevopsSelfHostedPullEvent(t *testing.T) {
 	_, _, _, _, _, err := parser.ParseAzureDevopsPullEvent(ADSelfPullEvent)
@@ -1394,9 +1389,6 @@ func TestParseAzureDevopsSelfHostedPullEvent(t *testing.T) {
 	Equals(t, models.OpenedPullEvent, evType)
 	Equals(t, models.User{Username: "user@example.com"}, actUser)
 }
-
-
-
 
 func TestParseAzureDevopsSelfHostedPullEvent_EventType(t *testing.T) {
 	cases := []struct {

@@ -227,7 +227,6 @@ var ADPullJSON = `{
 	"artifactId": "vstfs:///Git/PullRequestId/a7573007-bbb3-4341-b726-0c4148a07853%2f3411ebc1-d5aa-464f-9615-0b527bc66719%2f22"
 }`
 
-
 var ADSelfPullEvent = azuredevops.Event{
 	EventType: "git.pullrequest.created",
 	Resource:  &ADSelfPull,
@@ -393,7 +392,6 @@ var ADSelfPullJSON = `{
 	"supportsIterations": true,
 	"artifactId": "vstfs:///Git/PullRequestId/a7573007-bbb3-4341-b726-0c4148a07853%2f3411ebc1-d5aa-464f-9615-0b527bc66719%2f22"
 }`
-
 
 const GithubPrivateKey = `-----BEGIN RSA PRIVATE KEY-----
 MIIEowIBAAKCAQEAuEPzOUE+kiEH1WLiMeBytTEF856j0hOVcSUSUkZxKvqczkWM

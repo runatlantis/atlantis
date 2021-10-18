@@ -786,7 +786,7 @@ func (e *EventParser) ParseAzureDevopsPull(pull *azuredevops.GitPullRequest) (pu
 		err = errors.New("url is null")
 		return
 	}
-	
+
 	headBranch := pull.GetSourceRefName()
 	if headBranch == "" {
 		err = errors.New("sourceRefName (branch name) is null")
@@ -853,7 +853,6 @@ func (e *EventParser) ParseAzureDevopsRepo(adRepo *azuredevops.GitRepository) (m
 	parent := adRepo.GetParentRepository()
 	owner := ""
 
-
 	uri, err := url.Parse(adRepo.GetWebURL())
 	if err != nil {
 		return models.Repo{}, err
@@ -879,12 +878,12 @@ func (e *EventParser) ParseAzureDevopsRepo(adRepo *azuredevops.GitRepository) (m
 	repo := adRepo.GetName()
 
 	host := uri.Host
-	if host== "" {
-		host="dev.azure.com"
+	if host == "" {
+		host = "dev.azure.com"
 	}
 
-	cloneURL := fmt.Sprintf("https://%s/%s/%s/_git/%s",host, owner, project, repo)
-	fmt.Println("%",	cloneURL )
+	cloneURL := fmt.Sprintf("https://%s/%s/%s/_git/%s", host, owner, project, repo)
+	fmt.Println("%", cloneURL)
 	fullName := fmt.Sprintf("%s/%s/%s", owner, project, repo)
 	return models.NewRepo(models.AzureDevops, fullName, cloneURL, e.AzureDevopsUser, e.AzureDevopsToken)
 }
