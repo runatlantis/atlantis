@@ -709,7 +709,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			ExpReplies: [][]string{
 				{"exp-output-autoplan.txt"},
 				{"exp-output-auto-policy-check.txt"},
-				{"exp-output-approve-failed.txt"},
+				{"exp-output-merge.txt"},
 			},
 		},
 	}
