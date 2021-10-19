@@ -35,19 +35,16 @@ import (
 // by GitHub.
 const (
 	maxCommentLength = 65536
-
-	SubmitQueueReadinessStatusContext = "sq-ready-to-merge"
-	OwnersStatusContext               = "_owners-check"
-	AtlantisApplyStatusContext        = "atlantis/apply"
 )
 
 // GithubClient is used to perform GitHub actions.
 type GithubClient struct {
-	user           string
-	client         *github.Client
-	v4MutateClient *graphql.Client
-	ctx            context.Context
-	logger         logging.SimpleLogging
+	user               string
+	client             *github.Client
+	v4MutateClient     *graphql.Client
+	ctx                context.Context
+	logger             logging.SimpleLogging
+	statusTitleMatcher StatusTitleMatcher
 }
 
 // GithubAppTemporarySecrets holds app credentials obtained from github after creation.
@@ -65,7 +62,7 @@ type GithubAppTemporarySecrets struct {
 }
 
 // NewGithubClient returns a valid GitHub client.
-func NewGithubClient(hostname string, credentials GithubCredentials, logger logging.SimpleLogging) (*GithubClient, error) {
+func NewGithubClient(hostname string, credentials GithubCredentials, logger logging.SimpleLogging, commitStatusPrefix string) (*GithubClient, error) {
 	transport, err := credentials.Client()
 	if err != nil {
 		return nil, errors.Wrap(err, "error initializing github authentication transport")
@@ -105,11 +102,12 @@ func NewGithubClient(hostname string, credentials GithubCredentials, logger logg
 		return nil, errors.Wrap(err, "getting user")
 	}
 	return &GithubClient{
-		user:           user,
-		client:         client,
-		v4MutateClient: v4MutateClient,
-		ctx:            context.Background(),
-		logger:         logger,
+		user:               user,
+		client:             client,
+		v4MutateClient:     v4MutateClient,
+		ctx:                context.Background(),
+		logger:             logger,
+		statusTitleMatcher: StatusTitleMatcher{TitlePrefix: commitStatusPrefix},
 	}, nil
 }
 
@@ -291,32 +289,27 @@ func (g *GithubClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 			return false, nil
 		}
 
-		return g.getSubmitQueueMergeability(repo, pull)
+		return g.getSupplementalMergeability(repo, pull)
 	}
 	return true, nil
 }
 
-// Checks to make sure that all statuses are passing except the Submit Queue Readiness check and atlantis/apply
-// Additionally checks if the Owners Check has been applied and is successful.
-func (g *GithubClient) getSubmitQueueMergeability(repo models.Repo, pull models.PullRequest) (bool, error) {
+// Checks to make sure that all statuses are passing except the atlantis/apply. If we only rely on GetMergeableState,
+// we can run into issues where if an apply failed, we can never apply again due to mergeability failures.
+func (g *GithubClient) getSupplementalMergeability(repo models.Repo, pull models.PullRequest) (bool, error) {
 	statuses, err := g.getRepoStatuses(repo, pull)
 
 	if err != nil {
 		return false, errors.Wrapf(err, "fetching repo statuses for repo: %s, and pull number: %d", repo.FullName, pull.Num)
 	}
 
-	ownersCheckApplied := false
 	for _, status := range statuses {
 		state := status.GetState()
 
-		if status.GetContext() == OwnersStatusContext {
-			ownersCheckApplied = true
-		}
-
-		if strings.HasPrefix(status.GetContext(), AtlantisApplyStatusContext) ||
-			state == "success" ||
-			(state == "pending" && status.GetContext() == SubmitQueueReadinessStatusContext) {
+		if g.statusTitleMatcher.MatchesCommand(status.GetContext(), "apply") ||
+			state == "success" {
 			continue
+
 		}
 
 		// we either have a failure or a pending status check
@@ -325,8 +318,7 @@ func (g *GithubClient) getSubmitQueueMergeability(repo models.Repo, pull models.
 	}
 
 	// all our status checks are successful by our definition,
-	// ensure that owners check has been applied as a check.
-	return ownersCheckApplied, nil
+	return true, nil
 }
 
 // GetPullRequest returns the pull request.
