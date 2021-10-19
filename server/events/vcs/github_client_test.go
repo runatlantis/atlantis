@@ -629,7 +629,7 @@ func TestGithubClient_PullisMergeable_BlockedStatus(t *testing.T) {
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch r.RequestURI {
 					case "/api/v3/repos/owner/repo/commits/2/status?per_page=100":
-						w.Write([]byte(
+						_, _ = w.Write([]byte(
 							fmt.Sprintf(combinedStatusJSON, strings.Join(c.statuses, ",")),
 						)) // nolint: errcheck
 						return

@@ -39,7 +39,7 @@ type CommitStatusUpdater interface {
 
 // DefaultCommitStatusUpdater implements CommitStatusUpdater.
 type DefaultCommitStatusUpdater struct {
-	Client vcs.Client
+	Client       vcs.Client
 	TitleBuilder vcs.StatusTitleBuilder
 }
 
