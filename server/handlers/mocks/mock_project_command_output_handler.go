@@ -79,6 +79,14 @@ func (mock *MockProjectCommandOutputHandler) SetJobURLWithStatus(ctx models.Proj
 	return ret0
 }
 
+func (mock *MockProjectCommandOutputHandler) CleanUp(pull string) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockProjectCommandOutputHandler().")
+	}
+	params := []pegomock.Param{pull}
+	pegomock.GetGenericMockFrom(mock).Invoke("CleanUp", params, []reflect.Type{})
+}
+
 func (mock *MockProjectCommandOutputHandler) VerifyWasCalledOnce() *VerifierMockProjectCommandOutputHandler {
 	return &VerifierMockProjectCommandOutputHandler{
 		mock:                   mock,
@@ -86,14 +94,14 @@ func (mock *MockProjectCommandOutputHandler) VerifyWasCalledOnce() *VerifierMock
 	}
 }
 
-func (mock *MockProjectCommandOutputHandler) VerifyWasCalled(invocationCountMatcher pegomock.Matcher) *VerifierMockProjectCommandOutputHandler {
+func (mock *MockProjectCommandOutputHandler) VerifyWasCalled(invocationCountMatcher pegomock.InvocationCountMatcher) *VerifierMockProjectCommandOutputHandler {
 	return &VerifierMockProjectCommandOutputHandler{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
 	}
 }
 
-func (mock *MockProjectCommandOutputHandler) VerifyWasCalledInOrder(invocationCountMatcher pegomock.Matcher, inOrderContext *pegomock.InOrderContext) *VerifierMockProjectCommandOutputHandler {
+func (mock *MockProjectCommandOutputHandler) VerifyWasCalledInOrder(invocationCountMatcher pegomock.InvocationCountMatcher, inOrderContext *pegomock.InOrderContext) *VerifierMockProjectCommandOutputHandler {
 	return &VerifierMockProjectCommandOutputHandler{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -101,7 +109,7 @@ func (mock *MockProjectCommandOutputHandler) VerifyWasCalledInOrder(invocationCo
 	}
 }
 
-func (mock *MockProjectCommandOutputHandler) VerifyWasCalledEventually(invocationCountMatcher pegomock.Matcher, timeout time.Duration) *VerifierMockProjectCommandOutputHandler {
+func (mock *MockProjectCommandOutputHandler) VerifyWasCalledEventually(invocationCountMatcher pegomock.InvocationCountMatcher, timeout time.Duration) *VerifierMockProjectCommandOutputHandler {
 	return &VerifierMockProjectCommandOutputHandler{
 		mock:                   mock,
 		invocationCountMatcher: invocationCountMatcher,
@@ -111,7 +119,7 @@ func (mock *MockProjectCommandOutputHandler) VerifyWasCalledEventually(invocatio
 
 type VerifierMockProjectCommandOutputHandler struct {
 	mock                   *MockProjectCommandOutputHandler
-	invocationCountMatcher pegomock.Matcher
+	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
 }
@@ -256,6 +264,33 @@ func (c *MockProjectCommandOutputHandler_SetJobURLWithStatus_OngoingVerification
 		_param2 = make([]models.CommitStatus, len(c.methodInvocations))
 		for u, param := range params[2] {
 			_param2[u] = param.(models.CommitStatus)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockProjectCommandOutputHandler) CleanUp(pull string) *MockProjectCommandOutputHandler_CleanUp_OngoingVerification {
+	params := []pegomock.Param{pull}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "CleanUp", params, verifier.timeout)
+	return &MockProjectCommandOutputHandler_CleanUp_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockProjectCommandOutputHandler_CleanUp_OngoingVerification struct {
+	mock              *MockProjectCommandOutputHandler
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockProjectCommandOutputHandler_CleanUp_OngoingVerification) GetCapturedArguments() string {
+	pull := c.GetAllCapturedArguments()
+	return pull[len(pull)-1]
+}
+
+func (c *MockProjectCommandOutputHandler_CleanUp_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]string, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(string)
 		}
 	}
 	return

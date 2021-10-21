@@ -57,6 +57,14 @@ type ProjectCommandOutputHandler interface {
 	// SetJobURLWithStatus sets the commit status for the project represented by
 	// ctx and updates the status with and url to a job.
 	SetJobURLWithStatus(ctx models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus) error
+
+	ResourceCleaner
+}
+
+//go:generate pegomock generate -m --use-experimental-model-gen --package mocks -o mocks/mock_resource_cleaner.go ResourceCleaner
+
+type ResourceCleaner interface {
+	CleanUp(pull string)
 }
 
 func NewAsyncProjectCommandOutputHandler(
@@ -190,4 +198,17 @@ func (p *AsyncProjectCommandOutputHandler) GetReceiverBufferForPull(pull string)
 
 func (p *AsyncProjectCommandOutputHandler) GetProjectOutputBuffer(pull string) []string {
 	return p.projectOutputBuffers[pull]
+}
+
+func (p *AsyncProjectCommandOutputHandler) CleanUp(pull string) {
+	p.projectOutputBuffersLock.Lock()
+	delete(p.projectOutputBuffers, pull)
+	p.projectOutputBuffersLock.Unlock()
+
+	// Only delete the pull record from receiver buffers.
+	// WS channel will be closed when the user closes the browser tab
+	// in closeHanlder().
+	p.receiverBuffersLock.Lock()
+	delete(p.receiverBuffers, pull)
+	p.receiverBuffersLock.Unlock()
 }
