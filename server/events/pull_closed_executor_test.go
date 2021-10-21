@@ -206,6 +206,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 			BaseRepo:    fixtures.GithubRepo,
 			Pull:        fixtures.Pull,
 			ProjectName: *fixtures.Project.Name,
+			Workspace:   "default",
 		}
 
 		go prjCmdOutHandler.Handle()

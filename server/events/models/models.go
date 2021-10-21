@@ -456,11 +456,19 @@ func (p ProjectCommandContext) GetShowResultFileName() string {
 
 // Gets a unique identifier for the current pull request as a single string
 func (p ProjectCommandContext) PullInfo() string {
-	return BuildPullInfo(p.BaseRepo.FullName, p.Pull.Num, p.ProjectName)
+	return BuildPullInfo(p.BaseRepo.FullName, p.Pull.Num, p.ProjectName, p.RepoRelDir, p.Workspace)
 }
 
-func BuildPullInfo(repoName string, pullNum int, projectName string) string {
-	return fmt.Sprintf("%s/%d/%s", repoName, pullNum, projectName)
+func BuildPullInfo(repoName string, pullNum int, projectName string, relDir string, workspace string) string {
+	projectIdentifier := GetProjectIdentifier(relDir, projectName)
+	return fmt.Sprintf("%s/%d/%s/%s", repoName, pullNum, projectIdentifier, workspace)
+}
+
+func GetProjectIdentifier(relRepoDir string, projectName string) string {
+	if projectName != "" {
+		return projectName
+	}
+	return strings.ReplaceAll(relRepoDir, "/", "-")
 }
 
 // SplitRepoFullName splits a repo full name up into its owner and repo

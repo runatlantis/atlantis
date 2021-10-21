@@ -41,16 +41,16 @@ func (r *Router) GenerateLockURL(lockID string) string {
 
 func (r *Router) GenerateProjectJobURL(ctx models.ProjectCommandContext) (string, error) {
 	pull := ctx.Pull
-
+	projectIdentifier := models.GetProjectIdentifier(ctx.RepoRelDir, ctx.ProjectName)
 	jobURL, err := r.Underlying.Get(r.ProjectJobsViewRouteName).URL(
 		"org", pull.BaseRepo.Owner,
 		"repo", pull.BaseRepo.Name,
 		"pull", fmt.Sprintf("%d", pull.Num),
-		"project", ctx.ProjectName,
+		"project", projectIdentifier,
+		"workspace", ctx.Workspace,
 	)
-
 	if err != nil {
-		return "", errors.Wrapf(err, "creating job url for %s/%d/%s", pull.BaseRepo.FullName, pull.Num, ctx.ProjectName)
+		return "", errors.Wrapf(err, "creating job url for %s/%d/%s/%s", pull.BaseRepo.FullName, pull.Num, projectIdentifier, ctx.Workspace)
 	}
 
 	return r.AtlantisURL.String() + jobURL.String(), nil

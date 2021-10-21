@@ -43,11 +43,12 @@ func (p *pullInfo) String() string {
 
 type projectInfo struct {
 	projectName string
+	workspace   string
 	pullInfo
 }
 
 func (p *projectInfo) String() string {
-	return fmt.Sprintf("%s/%s/%d/%s", p.org, p.repo, p.pull, p.projectName)
+	return fmt.Sprintf("%s/%s/%d/%s/%s", p.org, p.repo, p.pull, p.projectName, p.workspace)
 }
 
 func newPullInfo(r *http.Request) (*pullInfo, error) {
@@ -87,9 +88,15 @@ func newProjectInfo(r *http.Request) (*projectInfo, error) {
 		return nil, fmt.Errorf("Internal error: no project in route")
 	}
 
+	workspace, ok := mux.Vars(r)["workspace"]
+	if !ok {
+		return nil, fmt.Errorf("Internal error: no workspace in route")
+	}
+
 	return &projectInfo{
 		pullInfo:    *pullInfo,
 		projectName: project,
+		workspace:   workspace,
 	}, nil
 }
 
