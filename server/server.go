@@ -97,6 +97,9 @@ type Server struct {
 	SSLCertFile                   string
 	SSLKeyFile                    string
 	Drainer                       *events.Drainer
+	WebAuthentication             bool
+	WebUsername                   string
+	WebPassword                   string
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -655,7 +658,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubOrg:           userConfig.GithubOrg,
 		GithubStatusName:    userConfig.VCSStatusName,
 	}
-
 	return &Server{
 		AtlantisVersion:               config.AtlantisVersion,
 		AtlantisURL:                   parsedURL,
@@ -675,6 +677,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		SSLKeyFile:                    userConfig.SSLKeyFile,
 		SSLCertFile:                   userConfig.SSLCertFile,
 		Drainer:                       drainer,
+		WebAuthentication:             userConfig.WebBasicAuth,
+		WebUsername:                   userConfig.WebUsername,
+		WebPassword:                   userConfig.WebPassword,
 	}, nil
 }
 
@@ -699,7 +704,7 @@ func (s *Server) Start() error {
 		PrintStack: false,
 		StackAll:   false,
 		StackSize:  1024 * 8,
-	}, NewRequestLogger(s.Logger))
+	}, NewRequestLogger(s))
 	n.UseHandler(s.Router)
 
 	defer s.Logger.Flush()
