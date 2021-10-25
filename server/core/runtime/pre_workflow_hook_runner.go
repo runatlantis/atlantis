@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -38,15 +39,20 @@ func (wh DefaultPreWorkflowHookRunner) Run(ctx models.PreWorkflowHookCommandCont
 	for key, val := range customEnvVars {
 		finalEnvVars = append(finalEnvVars, fmt.Sprintf("%s=%s", key, val))
 	}
-
 	cmd.Env = finalEnvVars
-	out, err := cmd.CombinedOutput()
+
+	// pre-workflow hooks operate different than our terraform steps
+	// it's up to the underlying implementation to log errors/output accordingly.
+	// It doesn't make sense for us to capture it here since we do nothing special with the result.
+	// This also allows the use of the same logging pipeline as well in certain situations
+	// where std.out is captured.
+	err := cmd.Run()
 
 	if err != nil {
-		err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, out)
+		err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, err)
 		ctx.Log.Debug("error: %s", err)
 		return "", err
 	}
 	ctx.Log.Info("successfully ran %q in %q", command, path)
-	return string(out), nil
+	return "", nil
 }
