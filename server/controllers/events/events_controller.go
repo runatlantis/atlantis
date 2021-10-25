@@ -205,7 +205,7 @@ func (e *VCSEventsController) handleBitbucketServerPost(w http.ResponseWriter, r
 		}
 	}
 	switch eventType {
-	case bitbucketserver.PullCreatedHeader, bitbucketserver.PullMergedHeader, bitbucketserver.PullDeclinedHeader, bitbucketserver.PullDeletedHeader:
+	case bitbucketserver.PullCreatedHeader, bitbucketserver.PullFromRefUpdatedHeader, bitbucketserver.PullMergedHeader, bitbucketserver.PullDeclinedHeader, bitbucketserver.PullDeletedHeader:
 		e.Logger.Debug("handling as pull request state changed event")
 		e.handleBitbucketServerPullRequestEvent(w, eventType, body, reqID)
 		return
