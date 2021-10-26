@@ -1313,3 +1313,179 @@ func TestParseAzureDevopsPull(t *testing.T) {
 	Equals(t, expBaseRepo, actBaseRepo)
 	Equals(t, expBaseRepo, actHeadRepo)
 }
+
+func TestParseAzureDevopsSelfHostedRepo(t *testing.T) {
+	// this should be successful
+	repo := ADSelfRepo
+	repo.ParentRepository = nil
+	r, err := parser.ParseAzureDevopsRepo(&repo)
+	Ok(t, err)
+	Equals(t, models.Repo{
+		Owner:             "owner/project",
+		FullName:          "owner/project/repo",
+		CloneURL:          "https://azuredevops-user:azuredevops-token@devops.abc.com/owner/project/_git/repo",
+		SanitizedCloneURL: "https://azuredevops-user:<redacted>@devops.abc.com/owner/project/_git/repo",
+		Name:              "repo",
+		VCSHost: models.VCSHost{
+			Hostname: "devops.abc.com",
+			Type:     models.AzureDevops,
+		},
+	}, r)
+
+}
+
+func TestParseAzureDevopsSelfHostedPullEvent(t *testing.T) {
+	_, _, _, _, _, err := parser.ParseAzureDevopsPullEvent(ADSelfPullEvent)
+	Ok(t, err)
+
+	testPull := deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull.LastMergeSourceCommit.CommitID = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "lastMergeSourceCommit.commitID is null", err)
+
+	testPull = deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull.URL = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "url is null", err)
+	testEvent := deepcopy.Copy(ADSelfPullEvent).(azuredevops.Event)
+	resource := deepcopy.Copy(testEvent.Resource).(*azuredevops.GitPullRequest)
+	resource.CreatedBy = nil
+	testEvent.Resource = resource
+	_, _, _, _, _, err = parser.ParseAzureDevopsPullEvent(testEvent)
+	ErrEquals(t, "CreatedBy is null", err)
+
+	testEvent = deepcopy.Copy(ADSelfPullEvent).(azuredevops.Event)
+	resource = deepcopy.Copy(testEvent.Resource).(*azuredevops.GitPullRequest)
+	resource.CreatedBy.UniqueName = azuredevops.String("")
+	testEvent.Resource = resource
+	_, _, _, _, _, err = parser.ParseAzureDevopsPullEvent(testEvent)
+	ErrEquals(t, "CreatedBy.UniqueName is null", err)
+
+	actPull, evType, actBaseRepo, actHeadRepo, actUser, err := parser.ParseAzureDevopsPullEvent(ADSelfPullEvent)
+	Ok(t, err)
+	expBaseRepo := models.Repo{
+		Owner:             "owner/project",
+		FullName:          "owner/project/repo",
+		CloneURL:          "https://azuredevops-user:azuredevops-token@devops.abc.com/owner/project/_git/repo",
+		SanitizedCloneURL: "https://azuredevops-user:<redacted>@devops.abc.com/owner/project/_git/repo",
+		Name:              "repo",
+		VCSHost: models.VCSHost{
+			Hostname: "devops.abc.com",
+			Type:     models.AzureDevops,
+		},
+	}
+	Equals(t, expBaseRepo, actBaseRepo)
+	Equals(t, expBaseRepo, actHeadRepo)
+	Equals(t, models.PullRequest{
+		URL:        ADSelfPull.GetURL(),
+		Author:     ADSelfPull.CreatedBy.GetUniqueName(),
+		HeadBranch: "feature/sourceBranch",
+		BaseBranch: "targetBranch",
+		HeadCommit: ADSelfPull.LastMergeSourceCommit.GetCommitID(),
+		Num:        ADSelfPull.GetPullRequestID(),
+		State:      models.OpenPullState,
+		BaseRepo:   expBaseRepo,
+	}, actPull)
+	Equals(t, models.OpenedPullEvent, evType)
+	Equals(t, models.User{Username: "user@example.com"}, actUser)
+}
+
+func TestParseAzureDevopsSelfHostedPullEvent_EventType(t *testing.T) {
+	cases := []struct {
+		action string
+		exp    models.PullRequestEventType
+	}{
+		{
+			action: "git.pullrequest.updated",
+			exp:    models.UpdatedPullEvent,
+		},
+		{
+			action: "git.pullrequest.created",
+			exp:    models.OpenedPullEvent,
+		},
+		{
+			action: "git.pullrequest.updated",
+			exp:    models.ClosedPullEvent,
+		},
+		{
+			action: "anything_else",
+			exp:    models.OtherPullEvent,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.action, func(t *testing.T) {
+			event := deepcopy.Copy(ADSelfPullEvent).(azuredevops.Event)
+			if c.exp == models.ClosedPullEvent {
+				event = deepcopy.Copy(ADSelfPullClosedEvent).(azuredevops.Event)
+			}
+			event.EventType = c.action
+			_, actType, _, _, _, err := parser.ParseAzureDevopsPullEvent(event)
+			Ok(t, err)
+			Equals(t, c.exp, actType)
+		})
+	}
+}
+
+func TestParseAzureSelfHostedDevopsPull(t *testing.T) {
+	testPull := deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull.LastMergeSourceCommit.CommitID = nil
+	_, _, _, err := parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "lastMergeSourceCommit.commitID is null", err)
+
+	testPull = deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull.URL = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "url is null", err)
+
+	testPull = deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull.SourceRefName = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "sourceRefName (branch name) is null", err)
+
+	testPull = deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull.TargetRefName = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "targetRefName (branch name) is null", err)
+
+	testPull = deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull.CreatedBy = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "CreatedBy is null", err)
+
+	testPull = deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull.CreatedBy.UniqueName = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "CreatedBy.UniqueName is null", err)
+
+	testPull = deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull.PullRequestID = nil
+	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	ErrEquals(t, "pullRequestId is null", err)
+
+	actPull, actBaseRepo, actHeadRepo, err := parser.ParseAzureDevopsPull(&ADSelfPull)
+	Ok(t, err)
+	expBaseRepo := models.Repo{
+		Owner:             "owner/project",
+		FullName:          "owner/project/repo",
+		CloneURL:          "https://azuredevops-user:azuredevops-token@devops.abc.com/owner/project/_git/repo",
+		SanitizedCloneURL: "https://azuredevops-user:<redacted>@devops.abc.com/owner/project/_git/repo",
+		Name:              "repo",
+		VCSHost: models.VCSHost{
+			Hostname: "devops.abc.com",
+			Type:     models.AzureDevops,
+		},
+	}
+	Equals(t, models.PullRequest{
+		URL:        ADSelfPull.GetURL(),
+		Author:     ADSelfPull.CreatedBy.GetUniqueName(),
+		HeadBranch: "feature/sourceBranch",
+		BaseBranch: "targetBranch",
+		HeadCommit: ADSelfPull.LastMergeSourceCommit.GetCommitID(),
+		Num:        ADSelfPull.GetPullRequestID(),
+		State:      models.OpenPullState,
+		BaseRepo:   expBaseRepo,
+	}, actPull)
+	Equals(t, expBaseRepo, actBaseRepo)
+	Equals(t, expBaseRepo, actHeadRepo)
+}

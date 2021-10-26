@@ -786,6 +786,7 @@ func (e *EventParser) ParseAzureDevopsPull(pull *azuredevops.GitPullRequest) (pu
 		err = errors.New("url is null")
 		return
 	}
+
 	headBranch := pull.GetSourceRefName()
 	if headBranch == "" {
 		err = errors.New("sourceRefName (branch name) is null")
@@ -851,19 +852,22 @@ func (e *EventParser) ParseAzureDevopsRepo(adRepo *azuredevops.GitRepository) (m
 	teamProject := adRepo.GetProject()
 	parent := adRepo.GetParentRepository()
 	owner := ""
+
+	uri, err := url.Parse(adRepo.GetWebURL())
+	if err != nil {
+		return models.Repo{}, err
+	}
+
 	if parent != nil {
 		owner = parent.GetName()
 	} else {
-		uri, err := url.Parse(adRepo.GetWebURL())
-		if err != nil {
-			return models.Repo{}, err
-		}
+
 		if strings.Contains(uri.Host, "visualstudio.com") {
 			owner = strings.Split(uri.Host, ".")[0]
 		} else if strings.Contains(uri.Host, "dev.azure.com") {
 			owner = strings.Split(uri.Path, "/")[1]
 		} else {
-			owner = ""
+			owner = strings.Split(uri.Path, "/")[1] // to support owner for self hosted
 		}
 	}
 
@@ -872,7 +876,14 @@ func (e *EventParser) ParseAzureDevopsRepo(adRepo *azuredevops.GitRepository) (m
 	// https://docs.microsoft.com/en-us/azure/devops/release-notes/2018/sep-10-azure-devops-launch#switch-existing-organizations-to-use-the-new-domain-name-url
 	project := teamProject.GetName()
 	repo := adRepo.GetName()
-	cloneURL := fmt.Sprintf("https://dev.azure.com/%s/%s/_git/%s", owner, project, repo)
+
+	host := uri.Host
+	if host == "" {
+		host = "dev.azure.com"
+	}
+
+	cloneURL := fmt.Sprintf("https://%s/%s/%s/_git/%s", host, owner, project, repo)
+	fmt.Println("%", cloneURL)
 	fullName := fmt.Sprintf("%s/%s/%s", owner, project, repo)
 	return models.NewRepo(models.AzureDevops, fullName, cloneURL, e.AzureDevopsUser, e.AzureDevopsToken)
 }
