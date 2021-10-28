@@ -636,7 +636,9 @@ func (e *EventParser) ParseGitlabMergeRequest(mr *gitlab.MergeRequest, baseRepo 
 // event given the Bitbucket Server header.
 func (e *EventParser) GetBitbucketServerPullEventType(eventTypeHeader string) models.PullRequestEventType {
 	switch eventTypeHeader {
-	case bitbucketserver.PullCreatedHeader:
+	// PullFromRefUpdatedHeader event occurs on OPEN state pull request
+	// so no additional checks are needed.
+	case bitbucketserver.PullCreatedHeader, bitbucketserver.PullFromRefUpdatedHeader:
 		return models.OpenedPullEvent
 	case bitbucketserver.PullMergedHeader, bitbucketserver.PullDeclinedHeader, bitbucketserver.PullDeletedHeader:
 		return models.ClosedPullEvent
