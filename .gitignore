@@ -14,3 +14,6 @@ helm/test-values.yaml
 golangci-lint
 atlantis
 .devcontainer
+
+# gitreleaser
+dist/
