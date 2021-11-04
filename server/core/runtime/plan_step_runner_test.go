@@ -885,18 +885,23 @@ type remotePlanMock struct {
 	CalledArgs []string
 }
 
-func (r *remotePlanMock) RunCommandAsync(ctx models.ProjectCommandContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan terraform.Line) {
+func (r *remotePlanMock) RunCommandAsync(ctx models.ProjectCommandContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) <-chan terraform.Line {
+	input := make(chan string)
+	defer close(input)
+
+	return r.RunCommandAsyncWithInput(ctx, path, args, envs, v, workspace, input)
+}
+
+func (r *remotePlanMock) RunCommandAsyncWithInput(ctx models.ProjectCommandContext, path string, args []string, envs map[string]string, v *version.Version, workspace string, input <-chan string) <-chan terraform.Line {
 	r.CalledArgs = args
-	in := make(chan string)
 	out := make(chan terraform.Line)
 	go func() {
 		for _, line := range strings.Split(r.LinesToSend, "\n") {
 			out <- terraform.Line{Line: line}
 		}
 		close(out)
-		close(in)
 	}()
-	return in, out
+	return out
 }
 
 func stringSliceEquals(a, b []string) bool {

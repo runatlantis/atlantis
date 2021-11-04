@@ -253,7 +253,7 @@ func (p *PlanStepRunner) runRemotePlan(
 
 	// Start the async command execution.
 	ctx.Log.Debug("starting async tf remote operation")
-	_, outCh := p.AsyncTFExec.RunCommandAsync(ctx, filepath.Clean(path), cmdArgs, envs, tfVersion, ctx.Workspace)
+	outCh := p.AsyncTFExec.RunCommandAsync(ctx, filepath.Clean(path), cmdArgs, envs, tfVersion, ctx.Workspace)
 	var lines []string
 	nextLineIsRunURL := false
 	var runURL string

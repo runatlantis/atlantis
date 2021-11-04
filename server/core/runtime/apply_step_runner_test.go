@@ -369,11 +369,18 @@ type remoteApplyMock struct {
 	DoneCh chan bool
 }
 
+func (r *remoteApplyMock) RunCommandAsync(ctx models.ProjectCommandContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) <-chan terraform.Line {
+	in := make(chan string)
+
+	defer close(in)
+
+	return r.RunCommandAsyncWithInput(ctx, path, args, envs, v, workspace, in)
+}
+
 // RunCommandAsync fakes out running terraform async.
-func (r *remoteApplyMock) RunCommandAsync(ctx models.ProjectCommandContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan terraform.Line) {
+func (r *remoteApplyMock) RunCommandAsyncWithInput(ctx models.ProjectCommandContext, path string, args []string, envs map[string]string, v *version.Version, workspace string, input <-chan string) <-chan terraform.Line {
 	r.CalledArgs = args
 
-	in := make(chan string)
 	out := make(chan terraform.Line)
 
 	// We use a wait group to ensure our sending and receiving routines have
@@ -388,9 +395,8 @@ func (r *remoteApplyMock) RunCommandAsync(ctx models.ProjectCommandContext, path
 
 	// Asynchronously process input.
 	go func() {
-		inLine := <-in
+		inLine := <-input
 		r.PassedInput = inLine
-		close(in)
 		wg.Done()
 	}()
 
@@ -405,7 +411,7 @@ func (r *remoteApplyMock) RunCommandAsync(ctx models.ProjectCommandContext, path
 		close(out)
 		wg.Done()
 	}()
-	return in, out
+	return out
 }
 
 var preConfirmOutFmt = `

@@ -50,7 +50,7 @@ type Client interface {
 	// RunCommandWithVersion executes terraform with args in path. If v is nil,
 	// it will use the default Terraform version. workspace is the Terraform
 	// workspace which should be set as an environment variable.
-	RunCommandWithVersion(log logging.SimpleLogging, path string, args []string, envs map[string]string, v *version.Version, workspace string) (string, error)
+	RunCommandWithVersion(ctx models.ProjectCommandContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (string, error)
 
 	// EnsureVersion makes sure that terraform version `v` is available to use
 	EnsureVersion(log logging.SimpleLogging, v *version.Version) error
@@ -297,7 +297,8 @@ func (c *DefaultClient) RunCommandWithVersion(ctx models.ProjectCommandContext, 
 	// if the feature is enabled, we use the async workflow else we default to the original sync workflow
 	// Don't stream terraform show output to outCh
 	if shouldAllocate && isAsyncEligibleCommand(args[0]) {
-		_, outCh := c.RunCommandAsync(ctx, path, args, customEnvVars, v, workspace)
+		outCh := c.RunCommandAsync(ctx, path, args, customEnvVars, v, workspace)
+
 		var lines []string
 		var err error
 		for line := range outCh {
@@ -394,9 +395,15 @@ type Line struct {
 // Callers can use the input channel to pass stdin input to the command.
 // If any error is passed on the out channel, there will be no
 // further output (so callers are free to exit).
-func (c *DefaultClient) RunCommandAsync(ctx models.ProjectCommandContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (chan<- string, <-chan Line) {
+func (c *DefaultClient) RunCommandAsync(ctx models.ProjectCommandContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) <-chan Line {
+
+	input := make(chan string)
+	defer close(input)
+
+	return c.RunCommandAsyncWithInput(ctx, path, args, customEnvVars, v, workspace, input)
+}
+func (c *DefaultClient) RunCommandAsyncWithInput(ctx models.ProjectCommandContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string, input <-chan string) <-chan Line {
 	outCh := make(chan Line)
-	inCh := make(chan string)
 
 	// We start a goroutine to do our work asynchronously and then immediately
 	// return our channels.
@@ -405,7 +412,6 @@ func (c *DefaultClient) RunCommandAsync(ctx models.ProjectCommandContext, path s
 		// Ensure we close our channels when we exit.
 		defer func() {
 			close(outCh)
-			close(inCh)
 		}()
 
 		tfCmd, cmd, err := c.prepCmd(ctx.Log, v, workspace, path, args)
@@ -435,7 +441,7 @@ func (c *DefaultClient) RunCommandAsync(ctx models.ProjectCommandContext, path s
 		// If we get anything on inCh, write it to stdin.
 		// This function will exit when inCh is closed which we do in our defer.
 		go func() {
-			for line := range inCh {
+			for line := range input {
 				ctx.Log.Debug("writing %q to remote command's stdin", line)
 				_, err := io.WriteString(stdin, line)
 				if err != nil {
@@ -487,7 +493,7 @@ func (c *DefaultClient) RunCommandAsync(ctx models.ProjectCommandContext, path s
 		}
 	}()
 
-	return inCh, outCh
+	return outCh
 }
 
 // MustConstraint will parse one or more constraints from the given
