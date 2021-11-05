@@ -22,6 +22,7 @@ type RepoCfg struct {
 	ParallelPlan              bool
 	ParallelPolicyCheck       bool
 	DeleteSourceBranchOnMerge *bool
+	AllowedRegexpPrefixes     []string
 }
 
 func (r RepoCfg) FindProjectsByDirWorkspace(repoRelDir string, workspace string) []Project {
@@ -57,15 +58,29 @@ func (r RepoCfg) FindProjectByName(name string) *Project {
 // FindProjectsByName returns all projects that match with name.
 func (r RepoCfg) FindProjectsByName(name string) []Project {
 	var ps []Project
-	sanitizedName := "^" + name + "$"
-	for _, p := range r.Projects {
-		if p.Name != nil {
-			if match, _ := regexp.MatchString(sanitizedName, *p.Name); match {
-				ps = append(ps, p)
+	if isRegexAllowed(name, r.AllowedRegexpPrefixes) {
+		sanitizedName := "^" + name + "$"
+		for _, p := range r.Projects {
+			if p.Name != nil {
+				if match, _ := regexp.MatchString(sanitizedName, *p.Name); match {
+					ps = append(ps, p)
+				}
 			}
 		}
 	}
 	return ps
+}
+
+func isRegexAllowed(name string, allowedRegexpPrefixes []string) bool {
+	if len(allowedRegexpPrefixes) == 0 {
+		return true
+	}
+	for _, allowedRegexPrefix := range allowedRegexpPrefixes {
+		if strings.HasPrefix(name, allowedRegexPrefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // validateWorkspaceAllowed returns an error if repoCfg defines projects in

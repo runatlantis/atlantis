@@ -32,6 +32,7 @@ type RepoCfg struct {
 	ParallelApply             *bool               `yaml:"parallel_apply,omitempty"`
 	ParallelPlan              *bool               `yaml:"parallel_plan,omitempty"`
 	DeleteSourceBranchOnMerge *bool               `yaml:"delete_source_branch_on_merge,omitempty"`
+	AllowedRegexpPrefixes     []string            `yaml:"allowed_regexp_prefixes,omitempty"`
 }
 
 func (r RepoCfg) Validate() error {
@@ -87,5 +88,6 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		ParallelPlan:              parallelPlan,
 		ParallelPolicyCheck:       parallelPlan,
 		DeleteSourceBranchOnMerge: r.DeleteSourceBranchOnMerge,
+		AllowedRegexpPrefixes:     r.AllowedRegexpPrefixes,
 	}
 }
