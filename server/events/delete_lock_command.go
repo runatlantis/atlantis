@@ -11,7 +11,7 @@ import (
 
 // DeleteLockCommand is the first step after a command request has been parsed.
 type DeleteLockCommand interface {
-	DeleteLock(id string) (*models.ProjectLock, error)
+	DeleteLock(id string) (*models.ProjectLock, *models.ProjectLock, error)
 	DeleteLocksByPull(repoFullName string, pullNum int) (int, models.DequeueStatus, error)
 }
 
@@ -25,19 +25,19 @@ type DefaultDeleteLockCommand struct {
 }
 
 // DeleteLock handles deleting the lock at id
-func (l *DefaultDeleteLockCommand) DeleteLock(id string) (*models.ProjectLock, error) {
+func (l *DefaultDeleteLockCommand) DeleteLock(id string) (*models.ProjectLock, *models.ProjectLock, error) {
 	// TODO monikma extend the tests
 	// TODO monikma #9 When the lock(s) has(ve) been explicitly removed, also dequeue the next PR(s)
-	lock, _, err := l.Locker.Unlock(id)
+	lock, dequeuedLock, err := l.Locker.Unlock(id)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if lock == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	l.deleteWorkingDir(*lock)
-	return lock, nil
+	return lock, dequeuedLock, nil
 }
 
 // DeleteLocksByPull handles deleting all locks for the pull request
