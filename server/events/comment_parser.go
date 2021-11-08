@@ -97,16 +97,19 @@ type CommentParseResult struct {
 // Valid commands contain:
 // - The initial "executable" name, 'run' or 'atlantis' or '@GithubUser'
 //   where GithubUser is the API user Atlantis is running as.
-// - Then a command, either 'plan', 'apply', 'approve_policies', or 'help'.
+// - Then a command: 'plan', 'apply', 'unlock', 'version, 'approve_policies',
+//   or 'help'.
 // - Then optional flags, then an optional separator '--' followed by optional
 //   extra flags to be appended to the terraform plan/apply command.
 //
 // Examples:
 // - atlantis help
-// - run plan
+// - run apply
 // - @GithubUser plan -w staging
 // - atlantis plan -w staging -d dir --verbose
 // - atlantis plan --verbose -- -key=value -key2 value2
+// - atlantis unlock
+// - atlantis version
 // - atlantis approve_policies
 //
 func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) CommentParseResult {
@@ -166,7 +169,7 @@ func (e *CommentParser) Parse(comment string, vcsHost models.VCSHostType) Commen
 		return CommentParseResult{CommentResponse: e.HelpComment(e.ApplyDisabled)}
 	}
 
-	// Need to have a plan, apply, approve_policy or unlock at this point.
+	// Need plan, apply, unlock, approve_policies, or version at this point.
 	if !e.stringInSlice(command, []string{models.PlanCommand.String(), models.ApplyCommand.String(), models.UnlockCommand.String(), models.ApprovePoliciesCommand.String(), models.VersionCommand.String()}) {
 		return CommentParseResult{CommentResponse: fmt.Sprintf("```\nError: unknown command %q.\nRun 'atlantis --help' for usage.\n```", command)}
 	}
@@ -404,6 +407,8 @@ Commands:
 {{- end }}
   unlock   Removes all atlantis locks and discards all plans for this PR.
            To unlock a specific plan you can use the Atlantis UI.
+  approve_policies
+           Approves all current policy checking failures for the PR.
   version  Print the output of 'terraform version'
   help     View help.
 
