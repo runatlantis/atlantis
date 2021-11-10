@@ -335,15 +335,22 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Underlying:                underlyingRouter,
 	}
 
-	projectCmdOutput := make(chan *models.ProjectCmdOutputLine)
-	projectCmdOutputHandler := handlers.NewFeatureAwareOutputHandler(
-		projectCmdOutput,
-		commitStatusUpdater,
-		router,
-		logger,
-		featureAllocator,
-		statsScope.Scope("api"),
-	)
+	var projectCmdOutputHandler handlers.ProjectCommandOutputHandler
+	// When TFE is enabled log streaming is not necessary.
+
+	if userConfig.TFEToken != "" || userConfig.TFEHostname != "" {
+		projectCmdOutputHandler = &handlers.NoopProjectOutputHandler{}
+	} else {
+		projectCmdOutput := make(chan *models.ProjectCmdOutputLine)
+		projectCmdOutputHandler = handlers.NewFeatureAwareOutputHandler(
+			projectCmdOutput,
+			commitStatusUpdater,
+			router,
+			logger,
+			featureAllocator,
+			statsScope.Scope("api"),
+		)
+	}
 
 	terraformClient, err := terraform.NewClient(
 		logger,

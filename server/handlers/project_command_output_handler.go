@@ -280,3 +280,26 @@ func (p *FeatureAwareOutputHandler) SetJobURLWithStatus(ctx models.ProjectComman
 
 	return p.ProjectCommandOutputHandler.SetJobURLWithStatus(ctx, cmdName, status)
 }
+
+// NoopProjectOutputHandler is a mock that doesn't do anything
+type NoopProjectOutputHandler struct{}
+
+func (p *NoopProjectOutputHandler) Send(ctx models.ProjectCommandContext, msg string) {
+}
+
+func (p *NoopProjectOutputHandler) Receive(projectInfo string, receiver chan string, callback func(msg string) error) error {
+	return nil
+}
+
+func (p *NoopProjectOutputHandler) Handle() {
+}
+
+func (p *NoopProjectOutputHandler) Clear(ctx models.ProjectCommandContext) {
+}
+
+func (p *NoopProjectOutputHandler) SetJobURLWithStatus(ctx models.ProjectCommandContext, cmdName models.CommandName, status models.CommitStatus) error {
+	return nil
+}
+
+func (p *NoopProjectOutputHandler) CleanUp(pull string) {
+}
