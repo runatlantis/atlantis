@@ -1,4 +1,4 @@
-package server
+package scheduled
 
 import (
 	"context"
@@ -19,7 +19,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-type ScheduledExecutorService struct {
+type ExecutorService struct {
 	log logging.SimpleLogging
 
 	// jobs
@@ -27,14 +27,14 @@ type ScheduledExecutorService struct {
 	rateLimitPublisher JobDefinition
 }
 
-func NewScheduledExecutorService(
+func NewExecutorService(
 	workingDirIterator events.WorkDirIterator,
 	statsScope stats.Scope,
 	log logging.SimpleLogging,
 	closedPullCleaner events.PullCleaner,
 	openPullCleaner events.PullCleaner,
 	githubClient *vcs.GithubClient,
-) *ScheduledExecutorService {
+) *ExecutorService {
 
 	scheduledScope := statsScope.Scope("scheduled")
 	garbageCollector := &GarbageCollector{
@@ -65,7 +65,7 @@ func NewScheduledExecutorService(
 		Period: 1 * time.Minute,
 	}
 
-	return &ScheduledExecutorService{
+	return &ExecutorService{
 		log:                log,
 		garbageCollector:   garbageCollectorJob,
 		rateLimitPublisher: rateLimitPublisherJob,
@@ -77,7 +77,7 @@ type JobDefinition struct {
 	Period time.Duration
 }
 
-func (s *ScheduledExecutorService) Run() {
+func (s *ExecutorService) Run() {
 	s.log.Info("Scheduled Executor Service started")
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -102,7 +102,7 @@ func (s *ScheduledExecutorService) Run() {
 	s.log.Warn("All jobs completed, exiting.")
 }
 
-func (s *ScheduledExecutorService) runScheduledJob(ctx context.Context, wg *sync.WaitGroup, jd JobDefinition) {
+func (s *ExecutorService) runScheduledJob(ctx context.Context, wg *sync.WaitGroup, jd JobDefinition) {
 	ticker := time.NewTicker(jd.Period)
 	wg.Add(1)
 
@@ -206,7 +206,6 @@ func (g *GarbageCollector) Run() {
 	openPullsCounter := g.stats.NewCounter("pulls.open")
 	updatedthirtyDaysAgoOpenPullsCounter := g.stats.NewCounter("pulls.open.updated.thirtydaysago")
 	closedPullsCounter := g.stats.NewCounter("pulls.closed")
-	thirtyDaysAgoClosedPullsCounter := g.stats.NewCounter("pulls.closed.thirtydaysago")
 	fiveMinutesAgoClosedPullsCounter := g.stats.NewCounter("pulls.closed.fiveminutesago")
 
 	// we can make this shorter, but this allows us to see trends more clearly
@@ -239,25 +238,20 @@ func (g *GarbageCollector) Run() {
 		// assume only other state is closed
 		closedPullsCounter.Inc()
 
-		if pull.ClosedAt.Before(thirtyDaysAgo) {
-			thirtyDaysAgoClosedPullsCounter.Inc()
-
-			logger.Warn("Pull closed for more than 30 days but data still on disk")
-
-			err := g.closedPullCleaner.CleanUpPull(pull.BaseRepo, pull)
-
-			if err != nil {
-				logger.Err("Error cleaning up 30 days old closed pulls %s", err)
-				errCounter.Inc()
-				return
-			}
-		}
-
-		// This will allow us to catch leaks as soon as they happen (hopefully)
+		// Let's clean up any closed pulls within 5 minutes of closing to ensure that
+		// any locks are released.
 		if pull.ClosedAt.Before(fiveMinutesAgo) {
 			fiveMinutesAgoClosedPullsCounter.Inc()
 
 			logger.Warn("Pull closed for more than 5 minutes but data still on disk")
+
+			err := g.closedPullCleaner.CleanUpPull(pull.BaseRepo, pull)
+
+			if err != nil {
+				logger.Err("Error cleaning up 5 minutes old closed pulls %s", err)
+				errCounter.Inc()
+				return
+			}
 		}
 	}
 }

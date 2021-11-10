@@ -79,7 +79,15 @@ func (f *FileWorkDirIterator) ListCurrentWorkingDirPulls() ([]models.PullRequest
 		pull, err := f.GithubClient.GetPullRequestFromName(repoName, ownerName, pullNum)
 
 		if err != nil {
-			return errors.Wrapf(err, "fetching pull for %s", filepath.Join(pathComponents...))
+			// let's just continue if we can't find the pull, this is rare and has happened in situations
+			// where the repository is renamed
+			notFoundErr, ok := err.(*vcs.PullRequestNotFound)
+
+			if !ok {
+				return errors.Wrapf(err, "fetching pull for %s", filepath.Join(pathComponents...))
+			}
+
+			f.Log.Warn("%s/%s/#%d not found, %s", ownerName, repoName, pullNum, notFoundErr)
 		}
 
 		internalPull, _, _, err := f.EventParser.ParseGithubPull(pull)

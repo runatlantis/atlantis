@@ -38,6 +38,7 @@ import (
 	"github.com/runatlantis/atlantis/server/feature"
 	"github.com/runatlantis/atlantis/server/handlers"
 	"github.com/runatlantis/atlantis/server/lyft/aws"
+	"github.com/runatlantis/atlantis/server/lyft/scheduled"
 	"github.com/runatlantis/atlantis/server/lyft/aws/sns"
 	lyftDecorators "github.com/runatlantis/atlantis/server/lyft/decorators"
 
@@ -108,7 +109,7 @@ type Server struct {
 	SSLCertFile                   string
 	SSLKeyFile                    string
 	Drainer                       *events.Drainer
-	ScheduledExecutorService      *ScheduledExecutorService
+	ScheduledExecutorService      *scheduled.ExecutorService
 	ProjectCmdOutputHandler       handlers.ProjectCommandOutputHandler
 }
 
@@ -783,7 +784,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubOrg:           userConfig.GithubOrg,
 	}
 
-	scheduledExecutorService := NewScheduledExecutorService(
+	scheduledExecutorService := scheduled.NewExecutorService(
 		events.NewFileWorkDirIterator(
 			githubClient,
 			eventParser,
@@ -801,7 +802,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			LogStreamResourceCleaner: projectCmdOutputHandler,
 
 			// using a specific template to signal that this is from an async process
-			PullClosedTemplate: NewGCStaleClosedPull(),
+			PullClosedTemplate: scheduled.NewGCStaleClosedPull(),
 		},
 
 		// using a pullclosed executor for stale open PRs. Naming is weird, we need to come up with something better.
@@ -814,7 +815,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			LogStreamResourceCleaner: projectCmdOutputHandler,
 
 			// using a specific template to signal that this is from an async process
-			PullClosedTemplate: NewGCStaleOpenPull(),
+			PullClosedTemplate: scheduled.NewGCStaleOpenPull(),
 		},
 
 		rawGithubClient,
