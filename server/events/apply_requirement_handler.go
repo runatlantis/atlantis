@@ -24,7 +24,7 @@ func (a *AggregateApplyRequirements) ValidateProject(repoDir string, ctx models.
 			}
 		// this should come before mergeability check since mergeability is a superset of this check.
 		case valid.PoliciesPassedApplyReq:
-			if ctx.ProjectPlanStatus == models.ErroredPolicyCheckStatus {
+			if ctx.ProjectPlanStatus != models.PassedPolicyCheckStatus {
 				return "All policies must pass for project before running apply", nil
 			}
 		case raw.MergeableApplyRequirement:
