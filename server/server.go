@@ -38,9 +38,9 @@ import (
 	"github.com/runatlantis/atlantis/server/feature"
 	"github.com/runatlantis/atlantis/server/handlers"
 	"github.com/runatlantis/atlantis/server/lyft/aws"
-	"github.com/runatlantis/atlantis/server/lyft/scheduled"
 	"github.com/runatlantis/atlantis/server/lyft/aws/sns"
 	lyftDecorators "github.com/runatlantis/atlantis/server/lyft/decorators"
+	"github.com/runatlantis/atlantis/server/lyft/scheduled"
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 	"github.com/gorilla/mux"
@@ -339,7 +339,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var projectCmdOutputHandler handlers.ProjectCommandOutputHandler
 	// When TFE is enabled log streaming is not necessary.
 
-	if userConfig.TFEToken != "" || userConfig.TFEHostname != "" {
+	if userConfig.TFEToken != "" {
 		projectCmdOutputHandler = &handlers.NoopProjectOutputHandler{}
 	} else {
 		projectCmdOutput := make(chan *models.ProjectCmdOutputLine)
