@@ -28,6 +28,5 @@ Atlantis will automatically download the version specified.
 :::
 
 ::: tip NOTE
-The Atlantis [latest docker image](https://github.com/runatlantis/atlantis/pkgs/container/atlantis/9854680?tag=latest) tends to have recent versions of Terraform, but there may be a delay as new versions are released. The highest version of Terraform allowed in your code is the version specified by `DEFAULT_TERRAFORM_VERSION` in the image your server is running.
+The Atlantis [latest docker image](https://hub.docker.com/layers/runatlantis/atlantis/latest/images/sha256-4f80472e20bd899b03a619e593f9e7b9a55d9e630850de443b988295f63f5c7a?context=explore) tends to have recent versions of Terraform, but there may be a delay as new versions are released. The highest version of Terraform allowed in your code is the version specified by `DEFAULT_TERRAFORM_VERSION` in the image your server is running.
 :::
-
