@@ -427,14 +427,14 @@ func (g *GithubClient) GetPullRequestFromName(repoName string, repoOwner string,
 			return pull, nil
 		}
 		ghErr, ok := err.(*github.ErrorResponse)
-		if !ok || ghErr.Response.StatusCode != 404 {
+		if !ok || ghErr.Response.StatusCode != http.StatusNotFound {
 			return pull, err
 		}
 		time.Sleep(retryDelay)
 	}
 
 	ghErr, ok := err.(*github.ErrorResponse)
-	if ok && ghErr.Response.StatusCode != 404 {
+	if ok && ghErr.Response.StatusCode == http.StatusNotFound {
 		return pull, &PullRequestNotFound{Err: err}
 	}
 	return pull, err
