@@ -43,14 +43,13 @@ const (
 	LockValue                         = "lock"
 )
 
-
 // allows for custom handling of github 404s
 type PullRequestNotFound struct {
-	err error
+	Err error
 }
 
-func (p PullRequestNotFound) Error() string {
-	return "Pull request not found: " + p.err.Error()
+func (p *PullRequestNotFound) Error() string {
+	return "Pull request not found: " + p.Err.Error()
 }
 
 // GithubClient is used to perform GitHub actions.
@@ -436,7 +435,7 @@ func (g *GithubClient) GetPullRequestFromName(repoName string, repoOwner string,
 
 	ghErr, ok := err.(*github.ErrorResponse)
 	if ok && ghErr.Response.StatusCode != 404 {
-		return pull, PullRequestNotFound{err: err}
+		return pull, &PullRequestNotFound{Err: err}
 	}
 	return pull, err
 }

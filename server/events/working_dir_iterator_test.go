@@ -1,6 +1,7 @@
 package events_test
 
 import (
+	"errors"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events"
 	eventmocks "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/stretchr/testify/assert"
@@ -36,6 +38,29 @@ func TestListCurrentWorkingDirPulls(t *testing.T) {
 		pulls, err := subject.ListCurrentWorkingDirPulls()
 
 		assert.Nil(t, err)
+		assert.Empty(t, pulls)
+	})
+
+	t.Run("pull not found", func(t *testing.T) {
+
+		baseDir, _ := ioutil.TempDir("", "atlantis-data")
+
+		_ = os.MkdirAll(filepath.Join(baseDir, "repos", "nish", "repo1", "1", "default"), os.ModePerm)
+
+		pullNotFound := &vcs.PullRequestNotFound{Err: errors.New("error")}
+
+		pegomock.When(mockGHClient.GetPullRequestFromName("repo1", "nish", 1)).ThenReturn(nil, pullNotFound)
+
+		subject := &events.FileWorkDirIterator{
+			Log:          log,
+			GithubClient: mockGHClient,
+			EventParser:  mockEventParser,
+			DataDir:      baseDir,
+		}
+
+		pulls, err := subject.ListCurrentWorkingDirPulls()
+
+		assert.NoError(t, err)
 		assert.Empty(t, pulls)
 	})
 
