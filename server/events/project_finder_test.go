@@ -16,10 +16,13 @@ package events_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
+
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -510,6 +513,263 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 			Equals(t, len(c.expProjPaths), len(projects))
 			for i, proj := range projects {
 				Equals(t, c.expProjPaths[i], proj.Dir)
+			}
+		})
+	}
+}
+
+func createTerragruntFiles(t *testing.T, files []string, destroyFlagSet bool) (string, func()) {
+	content := ""
+
+	if destroyFlagSet {
+		content = "# ATLANTIS_PLEASE_DESTROY_STACK\n"
+	}
+
+	dirs := make(map[string]interface{})
+
+	for _, file := range files {
+		currentDirPtr := dirs
+
+		folders := strings.Split(file, string(os.PathSeparator))
+
+		for i, folder := range folders {
+			if i == len(folders)-1 { // last item in folders is the filename
+				currentDirPtr[folder] = content
+				continue
+			}
+
+			if _, ok := currentDirPtr[folder]; !ok {
+				currentDirPtr[folder] = make(map[string]interface{})
+			}
+
+			currentDirPtr = currentDirPtr[folder].(map[string]interface{})
+		}
+	}
+
+	return DirStructure(t, dirs)
+}
+
+func createDirEnv(t *testing.T, files []string, atlantisYaml string, destroyFlagSet bool) (valid.RepoCfg, string, func()) {
+	tmpDir, cleanup := createTerragruntFiles(t, files, destroyFlagSet)
+
+	if atlantisYaml != "" {
+		err := os.WriteFile(filepath.Join(tmpDir, config.AtlantisYAMLFilename), []byte(atlantisYaml), 0600)
+		Ok(t, err)
+	}
+	r := config.ParserValidator{}
+	var globalCfg = valid.NewGlobalCfg(true, false, false)
+	config, err := r.ParseRepoCfg(tmpDir, globalCfg, "")
+	Ok(t, err)
+
+	return config, tmpDir, cleanup
+}
+
+func TestDefaultProjectFinder_DetermineProjectsViaConfig_FindProjectNo(t *testing.T) {
+	noopLogger := logging.NewNoopLogger(t)
+	cases := []struct {
+		description  string
+		AtlantisYAML string
+		modified     []string
+	}{
+		{
+			description: "test FindProjectNo",
+			AtlantisYAML: `
+version: 3
+projects:
+- autoplan:
+    enabled: true
+    when_modified:
+    - '*.hcl'
+    - '*.tf*'
+  dir: dkprto/icawtopr/foo
+- autoplan:
+    enabled: true
+    when_modified:
+    - '*.hcl'
+    - '*.tf*'
+    - ../foo/terragrunt.hcl
+  dir: dkprto/icawtopr/foo-attachment
+`,
+			modified: []string{"dkprto/icawtopr/foo/terragrunt.hcl", "dkprto/icawtopr/foo-attachment/terragrunt.hcl"},
+		},
+		{
+			description: "test FindProjectNo with reverse atlantis config",
+			AtlantisYAML: `
+version: 3
+projects:
+- autoplan:
+    enabled: true
+    when_modified:
+    - '*.hcl'
+    - '*.tf*'
+    - ../foo/terragrunt.hcl
+  dir: dkprto/icawtopr/foo-attachment
+- autoplan:
+    enabled: true
+    when_modified:
+    - '*.hcl'
+    - '*.tf*'
+  dir: dkprto/icawtopr/foo
+`,
+			modified: []string{"dkprto/icawtopr/foo/terragrunt.hcl", "dkprto/icawtopr/foo-attachment/terragrunt.hcl"},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			config, tmpDir, cleanup := createDirEnv(t, c.modified, c.AtlantisYAML, false)
+			defer cleanup()
+
+			pf := events.DefaultProjectFinder{}
+
+			projects, err := pf.DetermineProjectsViaConfig(noopLogger, c.modified, config, tmpDir)
+			Ok(t, err)
+
+			for _, file := range c.modified {
+				index, err := events.FindProjectNo(projects, file)
+				Ok(t, err)
+				Equals(t, projects[index].Dir, filepath.Dir(file))
+			}
+		})
+	}
+}
+
+func TestDefaultProjectFinder_DetermineProjectsViaConfig_TestDependencyTracking(t *testing.T) {
+	noopLogger := logging.NewNoopLogger(t)
+	cases := []struct {
+		description    string
+		AtlantisYAML   string
+		modified       []string
+		expProjPaths   []string
+		destroyFlagSet bool
+		expError       string
+	}{
+		{
+			description: "test dependency ordering",
+			AtlantisYAML: `
+version: 3
+projects:
+- autoplan:
+    enabled: true
+    when_modified:
+    - '*.hcl'
+    - '*.tf*'
+    - ../4/terragrunt.hcl
+  dir: dependency-test/1
+- autoplan:
+    enabled: true
+    when_modified:
+    - '*.hcl'
+    - '*.tf*'
+    - ../3/terragrunt.hcl
+  dir: dependency-test/2
+- autoplan:
+    enabled: true
+    when_modified:
+    - '*.hcl'
+    - '*.tf*'
+    - ../1/terragrunt.hcl
+  dir: dependency-test/3
+- autoplan:
+    enabled: true
+    when_modified:
+    - '*.hcl'
+    - '*.tf*'
+  dir: dependency-test/4
+`,
+			modified:       []string{"dependency-test/1/terragrunt.hcl", "dependency-test/2/terragrunt.hcl", "dependency-test/3/terragrunt.hcl", "dependency-test/4/terragrunt.hcl"},
+			expProjPaths:   []string{"dependency-test/4", "dependency-test/1", "dependency-test/3", "dependency-test/2"},
+			destroyFlagSet: false,
+			expError:       "",
+		},
+		{
+			description: "test reverted dependency ordering for destroy workflows",
+			AtlantisYAML: `
+version: 3
+projects:
+- autoplan:
+    enabled: true
+    when_modified:
+    - '*.hcl'
+    - '*.tf*'
+    - ../4/terragrunt.hcl
+  dir: dependency-test/1
+- autoplan:
+    enabled: true
+    when_modified:
+    - '*.hcl'
+    - '*.tf*'
+    - ../3/terragrunt.hcl
+  dir: dependency-test/2
+- autoplan:
+    enabled: true
+    when_modified:
+    - '*.hcl'
+    - '*.tf*'
+    - ../1/terragrunt.hcl
+  dir: dependency-test/3
+- autoplan:
+    enabled: true
+    when_modified:
+    - '*.hcl'
+    - '*.tf*'
+  dir: dependency-test/4
+`,
+			modified:       []string{"dependency-test/1/terragrunt.hcl", "dependency-test/2/terragrunt.hcl", "dependency-test/3/terragrunt.hcl", "dependency-test/4/terragrunt.hcl"},
+			expProjPaths:   []string{"dependency-test/2", "dependency-test/3", "dependency-test/1", "dependency-test/4"},
+			destroyFlagSet: true,
+			expError:       "",
+		},
+		{
+			description: "test dependency loop",
+			AtlantisYAML: `
+version: 3
+projects:
+- autoplan:
+    enabled: true
+    when_modified:
+    - '*.hcl'
+    - '*.tf*'
+    - ../1/terragrunt.hcl
+  dir: dependency-test/2
+- autoplan:
+    enabled: true
+    when_modified:
+    - '*.hcl'
+    - '*.tf*'
+    - ../2/terragrunt.hcl
+  dir: dependency-test/3
+- autoplan:
+    enabled: true
+    when_modified:
+    - '*.hcl'
+    - '*.tf*'
+    - ../3/terragrunt.hcl
+  dir: dependency-test/1
+`,
+			modified:       []string{"dependency-test/1/terragrunt.hcl", "dependency-test/2/terragrunt.hcl", "dependency-test/3/terragrunt.hcl"},
+			expProjPaths:   []string{},
+			destroyFlagSet: false,
+			expError:       "topological sort failed",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			config, tmpDir, cleanup := createDirEnv(t, c.modified, c.AtlantisYAML, c.destroyFlagSet)
+			defer cleanup()
+
+			pf := events.DefaultProjectFinder{}
+
+			projects, err := pf.DetermineProjectsViaConfig(noopLogger, c.modified, config, tmpDir)
+			if c.expError == "" {
+				Ok(t, err)
+				Equals(t, len(c.expProjPaths), len(projects))
+				for i, proj := range projects {
+					Equals(t, c.expProjPaths[i], proj.Dir)
+				}
+			} else {
+				ErrContains(t, c.expError, err)
 			}
 		})
 	}

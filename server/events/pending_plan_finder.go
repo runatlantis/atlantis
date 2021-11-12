@@ -4,7 +4,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/runtime"
@@ -41,6 +43,47 @@ func (p *DefaultPendingPlanFinder) Find(pullDir string) ([]PendingPlan, error) {
 	return plans, err
 }
 
+func sortPendingPlansByModTime(repoDir, lsOut string) ([]string, error) {
+	type fileModTime struct {
+		File    string
+		ModTime time.Time
+	}
+
+	var files []fileModTime
+	for _, file := range strings.Split(lsOut, "\n") {
+		if filepath.Ext(file) != ".tfplan" {
+			continue
+		}
+		// Ignore .terragrunt-cache dirs (#487)
+		if strings.Contains(file, ".terragrunt-cache/") {
+			continue
+		}
+
+		fileInfo, err := os.Stat(filepath.Join(repoDir, file))
+
+		if err != nil {
+			return nil, err
+		}
+
+		files = append(files, fileModTime{
+			File:    file,
+			ModTime: fileInfo.ModTime(),
+		})
+	}
+
+	sort.Slice(files, func(i, j int) bool {
+		return 0 < files[j].ModTime.Sub(files[i].ModTime)
+	})
+
+	var sortedFiles []string
+
+	for _, el := range files {
+		sortedFiles = append(sortedFiles, el.File)
+	}
+
+	return sortedFiles, nil
+}
+
 func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPlan, []string, error) {
 	workspaceDirs, err := os.ReadDir(pullDir)
 	if err != nil {
@@ -61,25 +104,25 @@ func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPl
 			return nil, nil, errors.Wrapf(err, "running git ls-files . "+
 				"--others: %s", string(lsOut))
 		}
-		for _, file := range strings.Split(string(lsOut), "\n") {
-			if filepath.Ext(file) == ".tfplan" {
-				// Ignore .terragrunt-cache dirs (#487)
-				if strings.Contains(file, ".terragrunt-cache/") {
-					continue
-				}
 
-				projectName, err := runtime.ProjectNameFromPlanfile(workspace, filepath.Base(file))
-				if err != nil {
-					return nil, nil, err
-				}
-				plans = append(plans, PendingPlan{
-					RepoDir:     repoDir,
-					RepoRelDir:  filepath.Dir(file),
-					Workspace:   workspace,
-					ProjectName: projectName,
-				})
-				absPaths = append(absPaths, filepath.Join(repoDir, file))
+		files, err := sortPendingPlansByModTime(repoDir, string(lsOut))
+
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "sort pending plans by modTime")
+		}
+
+		for _, file := range files {
+			projectName, err := runtime.ProjectNameFromPlanfile(workspace, filepath.Base(file))
+			if err != nil {
+				return nil, nil, err
 			}
+			plans = append(plans, PendingPlan{
+				RepoDir:     repoDir,
+				RepoRelDir:  filepath.Dir(file),
+				Workspace:   workspace,
+				ProjectName: projectName,
+			})
+			absPaths = append(absPaths, filepath.Join(repoDir, file))
 		}
 	}
 	return plans, absPaths, nil

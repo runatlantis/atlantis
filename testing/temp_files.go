@@ -1,8 +1,10 @@
 package testing
 
 import (
+	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 )
 
@@ -48,23 +50,37 @@ func DirStructure(t *testing.T, structure map[string]interface{}) (string, func(
 	return tmpDir, cleanup
 }
 
+func sortHash(h map[string]interface{}) []string {
+	keys := make([]string, len(h))
+
+	i := 0
+	for k := range h {
+		keys[i] = k
+		i++
+	}
+
+	sort.Strings(keys)
+
+	return keys
+}
+
 func dirStructureGo(t *testing.T, parentDir string, structure map[string]interface{}) {
-	for key, val := range structure {
-		// If val is nil then key is a filename and we just create it
-		if val == nil {
+	for _, key := range sortHash(structure) {
+		// If structure[key] is nil then key is a filename and we just create it
+		if structure[key] == nil {
 			_, err := os.Create(filepath.Join(parentDir, key))
 			Ok(t, err)
 			continue
 		}
-		// If val is another map then key is a dir
-		if dirContents, ok := val.(map[string]interface{}); ok {
+		// If structure[key] is another map then key is a dir
+		if dirContents, ok := structure[key].(map[string]interface{}); ok {
 			subDir := filepath.Join(parentDir, key)
 			Ok(t, os.Mkdir(subDir, 0700))
 			// Recurse and create contents.
 			dirStructureGo(t, subDir, dirContents)
-		} else if fileContent, ok := val.(string); ok {
-			// If val is a string then key is a file name and val is the file's content
-			err := os.WriteFile(filepath.Join(parentDir, key), []byte(fileContent), 0600)
+		} else if fileContent, ok := structure[key].(string); ok {
+			// If structure[key] is a string then key is a file name and structure[key] is the file's content
+			err := ioutil.WriteFile(filepath.Join(parentDir, key), []byte(fileContent), 0600)
 			Ok(t, err)
 		}
 	}

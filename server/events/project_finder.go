@@ -14,12 +14,14 @@
 package events
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/yourbasic/graph"
 
 	"github.com/docker/docker/pkg/fileutils"
 	"github.com/pkg/errors"
@@ -83,6 +85,7 @@ func (p *DefaultProjectFinder) DetermineProjects(log logging.SimpleLogging, modi
 // See ProjectFinder.DetermineProjectsViaConfig.
 func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log logging.SimpleLogging, modifiedFiles []string, config valid.RepoCfg, absRepoDir string) ([]valid.Project, error) {
 	var projects []valid.Project
+	var projectsToDependentFiles [][]string
 	for _, project := range config.Projects {
 		log.Debug("checking if project at dir %q workspace %q was modified", project.Dir, project.Workspace)
 		var whenModifiedRelToRepoRoot []string
@@ -110,6 +113,8 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log logging.SimpleLogg
 			return nil, errors.Wrapf(err, "matching modified files with patterns: %v", project.Autoplan.WhenModified)
 		}
 
+		var matchedFiles []string
+
 		// If any of the modified files matches the pattern then this project is
 		// considered modified.
 		for _, file := range modifiedFiles {
@@ -118,30 +123,157 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log logging.SimpleLogg
 				log.Debug("match err for file %q: %s", file, err)
 				continue
 			}
-			if match {
-				log.Debug("file %q matched pattern", file)
-				// If we're checking using an atlantis.yaml file we downloaded
-				// directly from the repo (when doing a no-clone check) then
-				// absRepoDir will be empty. Since we didn't clone the repo
-				// yet we can't do this check. If there was a file modified
-				// in a deleted directory then when we finally do clone the repo
-				// we'll call this function again and then we'll detect the
-				// directory was deleted.
-				if absRepoDir != "" {
-					_, err := os.Stat(filepath.Join(absRepoDir, project.Dir))
-					if err == nil {
-						projects = append(projects, project)
-					} else {
-						log.Debug("project at dir %q not included because dir does not exist", project.Dir)
-					}
-				} else {
-					projects = append(projects, project)
-				}
-				break
+
+			if !match {
+				continue
+			}
+
+			log.Debug("file %q matched pattern", file)
+
+			// If we're checking using an atlantis.yaml file we downloaded
+			// directly from the repo (when doing a no-clone check) then
+			// absRepoDir will be empty. Since we didn't clone the repo
+			// yet we can't do this check. If there was a file modified
+			// in a deleted directory then when we finally do clone the repo
+			// we'll call this function again and then we'll detect the
+			// directory was deleted.
+			if projectDirDeleted(absRepoDir, project.Dir) {
+				log.Debug("project at dir %q not included because dir does not exist", project.Dir)
+				continue
+			}
+
+			matchedFiles = append(matchedFiles, file)
+		}
+
+		if 0 < len(matchedFiles) {
+			projects = append(projects, project)
+			projectsToDependentFiles = append(projectsToDependentFiles, matchedFiles)
+		}
+	}
+
+	if 1 < len(projects) {
+		sorted, err := sortProjectsByDependencies(log, projects, projectsToDependentFiles, absRepoDir)
+
+		if err != nil {
+			// return nil, errors.Wrapf(err, "Unable to sort plans: %s", err)
+			// Used unsorted projects instead
+		} else {
+			projects = sorted
+		}
+	}
+
+	return projects, nil
+}
+
+func projectDirDeleted(absRepoDir, projectDir string) bool {
+	if absRepoDir == "" {
+		return false
+	}
+
+	if _, err := os.Stat(filepath.Join(absRepoDir, projectDir)); err != nil {
+		return true
+	}
+
+	return false
+}
+
+func projectToBeDestroyed(project valid.Project, absRepoDir string) (bool, error) {
+	terragruntFile := filepath.Join(absRepoDir, project.Dir, "terragrunt.hcl")
+
+	if _, err := os.Stat(terragruntFile); err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+
+		return false, errors.Wrapf(err, "determining existance of %q", terragruntFile)
+	}
+
+	data, err := os.ReadFile(terragruntFile)
+	if err != nil {
+		return false, errors.Wrapf(err, "reading file %q", terragruntFile)
+	}
+
+	if strings.HasPrefix(strings.TrimSpace(string(data)), "# ATLANTIS_PLEASE_DESTROY_STACK") {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func printGraph(g *graph.Mutable, projects []valid.Project) string {
+	output := "digraph G {\n"
+
+	for i := 0; i < g.Order(); i++ {
+		output += fmt.Sprintf("    %d [label=\"%s\"];\n", i, projects[i].Dir)
+	}
+	for i := 0; i < g.Order(); i++ {
+		g.Visit(i, func(w int, to int64) bool { output += fmt.Sprintf("    %d -> %d;\n", i, w); return false })
+	}
+	output += "}\n"
+
+	return output
+}
+
+func sortProjectsByDependencies(log logging.SimpleLogging, projects []valid.Project, projectsToDependentFiles [][]string, absRepoDir string) ([]valid.Project, error) {
+	g := graph.New(len(projects))
+
+	for currentProjectIndex, files := range projectsToDependentFiles {
+		if 0 == len(files) {
+			continue
+		}
+
+		toBeDestroyed, err := projectToBeDestroyed(projects[currentProjectIndex], absRepoDir)
+
+		if err != nil {
+			return nil, errors.Wrapf(err, "determining whether or not to apply destroy order for topological sort")
+		}
+
+		for _, file := range files {
+			if !strings.Contains(file, string(os.PathSeparator)+"terragrunt.hcl") {
+				continue
+			}
+			from, err := FindProjectNo(projects, file)
+
+			if err != nil {
+				return nil, errors.Wrapf(err, "creating dependency graph for topological sort")
+			}
+
+			if currentProjectIndex == from {
+				continue // don't add an edge to itself e.g. (u,u)
+			}
+			if toBeDestroyed {
+				g.Add(currentProjectIndex, from)
+			} else {
+				g.Add(from, currentProjectIndex)
 			}
 		}
 	}
-	return projects, nil
+
+	// TODO before contributing to github, make this a Debug() or delete
+	log.Info("Dependency Graph:\n%s\n", printGraph(g, projects))
+	sortedIndices, isSorted := graph.TopSort(g)
+
+	if !isSorted {
+		return nil, fmt.Errorf("topological sort failed on %#v", projectsToDependentFiles)
+	}
+
+	var sortedProjects []valid.Project
+
+	for _, index := range sortedIndices {
+		sortedProjects = append(sortedProjects, projects[index])
+	}
+
+	return sortedProjects, nil
+}
+
+func FindProjectNo(projects []valid.Project, file string) (int, error) {
+	for i, project := range projects {
+		if strings.Contains(file, project.Dir+string(os.PathSeparator)) {
+			return i, nil
+		}
+	}
+
+	return -1, fmt.Errorf("Did not find %q in %#v", file, projects)
 }
 
 // filterToFileList filters out files not included in the file list
