@@ -89,7 +89,7 @@ func (f *FileWorkDirIterator) ListCurrentWorkingDirPulls() ([]models.PullRequest
 
 			f.Log.Warn("%s/%s/#%d not found, %s", ownerName, repoName, pullNum, notFoundErr)
 
-			return nil
+			return fs.SkipDir
 		}
 
 		internalPull, _, _, err := f.EventParser.ParseGithubPull(pull)
