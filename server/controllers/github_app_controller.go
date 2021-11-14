@@ -18,6 +18,7 @@ type GithubAppController struct {
 	GithubSetupComplete bool
 	GithubHostname      string
 	GithubOrg           string
+	GithubStatusName    string
 }
 
 type githubWebhook struct {
@@ -55,7 +56,7 @@ func (g *GithubAppController) ExchangeCode(w http.ResponseWriter, r *http.Reques
 
 	g.Logger.Debug("Exchanging GitHub app code for app credentials")
 	creds := &vcs.GithubAnonymousCredentials{}
-	client, err := vcs.NewGithubClient(g.GithubHostname, creds, g.Logger)
+	client, err := vcs.NewGithubClient(g.GithubHostname, creds, g.Logger, g.GithubStatusName)
 	if err != nil {
 		g.respond(w, logging.Error, http.StatusInternalServerError, "Failed to exchange code for github app: %s", err)
 		return

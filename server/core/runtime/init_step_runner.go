@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 
 	version "github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/core/runtime/common"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/runtime/common"
 )
 
 // InitStep runs `terraform init`.

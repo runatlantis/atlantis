@@ -17,6 +17,7 @@ type UserConfig struct {
 	AzureDevopsUser            string `mapstructure:"azuredevops-user"`
 	AzureDevopsWebhookPassword string `mapstructure:"azuredevops-webhook-password"`
 	AzureDevopsWebhookUser     string `mapstructure:"azuredevops-webhook-user"`
+	AzureDevOpsHostname        string `mapstructure:"azuredevops-hostname"`
 	BitbucketBaseURL           string `mapstructure:"bitbucket-base-url"`
 	BitbucketToken             string `mapstructure:"bitbucket-token"`
 	BitbucketUser              string `mapstructure:"bitbucket-user"`
@@ -86,6 +87,9 @@ type UserConfig struct {
 	VCSStatusName          string          `mapstructure:"vcs-status-name"`
 	DefaultTFVersion       string          `mapstructure:"default-tf-version"`
 	Webhooks               []WebhookConfig `mapstructure:"webhooks"`
+	WebBasicAuth           bool            `mapstructure:"web-basic-auth"`
+	WebUsername            string          `mapstructure:"web-username"`
+	WebPassword            string          `mapstructure:"web-password"`
 	WriteGitCreds          bool            `mapstructure:"write-git-creds"`
 }
 

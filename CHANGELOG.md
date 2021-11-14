@@ -1,3 +1,17 @@
+# v0.17.5
+
+## What's Changed
+
+* refactor: move from io/ioutil to io and os package by @Juneezee in https://github.com/runatlantis/atlantis/pull/1843
+* chore: use golang-jwt/jwt to replace dgrijalva/jwt-go by @barn in https://github.com/runatlantis/atlantis/pull/1845
+* fix(azure): allow host to be specified in user_config for on premise installation by @dandcg in https://github.com/runatlantis/atlantis/pull/1860
+* feat: filter out atlantis/apply from mergeability clause by @nishkrishnan in https://github.com/runatlantis/atlantis/pull/1856
+* feat: add BasicAuth Support to Atlantis ServeHTTP by @fblgit in https://github.com/runatlantis/atlantis/pull/1777
+* fix(azure): allow correct path to be derived for on premise installation  by @dandcg in https://github.com/runatlantis/atlantis/pull/1863
+* feat: add new bitbucket server webhook event type pr:from_ref_updated(#198) by @kuzm1ch in https://github.com/runatlantis/atlantis/pull/1866
+* Move runtime common under existing runtime package. by @nishkrishnan in https://github.com/runatlantis/atlantis/pull/1875
+* feat: use goreleaser to replace the binary-release script by @chenrui333 in https://github.com/runatlantis/atlantis/pull/1873
+
 # v0.17.4
 
 ## What's Changed

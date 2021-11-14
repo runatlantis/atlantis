@@ -97,6 +97,9 @@ type Server struct {
 	SSLCertFile                   string
 	SSLKeyFile                    string
 	Drainer                       *events.Drainer
+	WebAuthentication             bool
+	WebUsername                   string
+	WebPassword                   string
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -179,7 +182,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 
 		var err error
-		githubClient, err = vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, logger)
+		githubClient, err = vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, logger, userConfig.VCSStatusName)
 		if err != nil {
 			return nil, err
 		}
@@ -216,8 +219,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	if userConfig.AzureDevopsUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.AzureDevops)
+
 		var err error
-		azuredevopsClient, err = vcs.NewAzureDevopsClient("dev.azure.com", userConfig.AzureDevopsUser, userConfig.AzureDevopsToken)
+		azuredevopsClient, err = vcs.NewAzureDevopsClient(userConfig.AzureDevOpsHostname, userConfig.AzureDevopsUser, userConfig.AzureDevopsToken)
 		if err != nil {
 			return nil, err
 		}
@@ -271,7 +275,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, errors.Wrap(err, "initializing webhooks")
 	}
 	vcsClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient)
-	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient, StatusName: userConfig.VCSStatusName}
+	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient, TitleBuilder: vcs.StatusTitleBuilder{TitlePrefix: userConfig.VCSStatusName}}
 
 	binDir, err := mkSubDir(userConfig.DataDir, BinDirName)
 
@@ -652,8 +656,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubSetupComplete: githubAppEnabled,
 		GithubHostname:      userConfig.GithubHostname,
 		GithubOrg:           userConfig.GithubOrg,
+		GithubStatusName:    userConfig.VCSStatusName,
 	}
-
 	return &Server{
 		AtlantisVersion:               config.AtlantisVersion,
 		AtlantisURL:                   parsedURL,
@@ -673,6 +677,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		SSLKeyFile:                    userConfig.SSLKeyFile,
 		SSLCertFile:                   userConfig.SSLCertFile,
 		Drainer:                       drainer,
+		WebAuthentication:             userConfig.WebBasicAuth,
+		WebUsername:                   userConfig.WebUsername,
+		WebPassword:                   userConfig.WebPassword,
 	}, nil
 }
 
@@ -697,7 +704,7 @@ func (s *Server) Start() error {
 		PrintStack: false,
 		StackAll:   false,
 		StackSize:  1024 * 8,
-	}, NewRequestLogger(s.Logger))
+	}, NewRequestLogger(s))
 	n.UseHandler(s.Router)
 
 	defer s.Logger.Flush()

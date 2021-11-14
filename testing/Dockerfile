@@ -1,7 +1,7 @@
 FROM circleci/golang:1.17
 
 # Install Terraform
-ENV TERRAFORM_VERSION=1.0.8
+ENV TERRAFORM_VERSION=1.0.11
 RUN curl -LOks https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip && \
     sudo mkdir -p /usr/local/bin/tf/versions/${TERRAFORM_VERSION} && \
     sudo unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip -d /usr/local/bin/tf/versions/${TERRAFORM_VERSION} && \
@@ -9,7 +9,7 @@ RUN curl -LOks https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/ter
     rm terraform_${TERRAFORM_VERSION}_linux_amd64.zip
 
 # Install conftest
-ENV CONFTEST_VERSION=0.28.1
+ENV CONFTEST_VERSION=0.28.3
 RUN curl -LOs https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/conftest_${CONFTEST_VERSION}_Linux_x86_64.tar.gz && \
     curl -LOs https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/checksums.txt && \
     sed -n "/conftest_${CONFTEST_VERSION}_Linux_x86_64.tar.gz/p" checksums.txt | sha256sum -c && \
