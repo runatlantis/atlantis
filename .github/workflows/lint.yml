@@ -14,18 +14,18 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         tool_name: golangci-lint
 
-  # Use golint via golangci-lint binary with "warning" level.
-  golint:
-    name: runner / golint
+  # Use revive via golangci-lint binary with "warning" level.
+  revive:
+    name: runner / revive
     runs-on: ubuntu-latest
     steps:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v1
-      - name: golint
+      - name: revive
         uses: reviewdog/action-golangci-lint@v2
         with:
-          golangci_lint_flags: "--disable-all -E golint"
-          tool_name: golint # Change reporter name.
+          golangci_lint_flags: "--disable-all -E revive"
+          tool_name: revive # Change reporter name.
           level: warning # GitHub Status Check won't become failure with this level.
 
   # You can add more and more supported linters with different config.

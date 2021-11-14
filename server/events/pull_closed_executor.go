@@ -90,26 +90,24 @@ func (p *PullClosedExecutor) CleanUpPull(repo models.Repo, pull models.PullReque
 		return errors.Wrap(err, "rendering template for comment")
 	}
 
-	var commentErr = p.VCSClient.CreateComment(repo, pull.Num, buf.String(), "")
+	if err = p.VCSClient.CreateComment(repo, pull.Num, buf.String(), ""); err != nil {
+		return err
+	}
 
-	// TODO monikma do you know a nicer method for potentially appending new error to the existing one
-	commentErr = p.triggerPlansForDequeuedPRs(repo, dequeueStatus, commentErr)
+	var commentErr = p.commentOnDequeuedPullRequests(dequeueStatus)
 
-	// TODO monikma if I am not mistaken, this method executes asynchronusly and the information of PRs being dequeued will not
-	// bubble up to the Atlantis "Pull request closed" comment. That is not nice.
 	return commentErr
 }
 
-func (p *PullClosedExecutor) triggerPlansForDequeuedPRs(repo models.Repo, dequeueStatus models.DequeueStatus, commentErr error) error {
-	// TODO monikma #4 use exact dequeued comment instead of hardcoding it
-	for _, lock := range dequeueStatus.ProjectLocks {
-		planVcsMessage := "atlantis plan -d " + lock.Project.Path
-		if err := p.VCSClient.CreateComment(repo, lock.Pull.Num, planVcsMessage, ""); err != nil {
-			// TODO monikma at this point planning queue will be interrupted, how to resolve from this?
-			commentErr = fmt.Errorf("%s\nunable to comment on PR %s: %s", commentErr, lock.Pull.Num, commentErr)
+func (p *PullClosedExecutor) commentOnDequeuedPullRequests(dequeueStatus models.DequeueStatus) error {
+	locksByPullRequest := groupByPullRequests(dequeueStatus.ProjectLocks)
+	for pullRequestNumber, projectLocks := range locksByPullRequest {
+		planVcsMessage := buildCommentOnDequeuedPullRequest(projectLocks)
+		if err := p.VCSClient.CreateComment(projectLocks[0].Pull.BaseRepo, pullRequestNumber, planVcsMessage, ""); err != nil {
+			return errors.Wrapf(err, "unable to comment on PR %d", pullRequestNumber)
 		}
 	}
-	return commentErr
+	return nil
 }
 
 // buildTemplateData formats the lock data into a slice that can easily be

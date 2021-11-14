@@ -1,8 +1,10 @@
 package events
 
 import (
+	"fmt"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"strings"
 )
 
 func NewUnlockCommandRunner(
@@ -48,16 +50,37 @@ func (u *UnlockCommandRunner) Run(
 		ctx.Log.Err("unable to comment on PR %s: %s", pullNum, commentErr)
 	}
 
-	u.triggerPlansForDequeuedPRs(ctx, dequeueStatus, baseRepo)
+	u.commentOnDequeuedPullRequests(ctx, dequeueStatus)
 }
 
-func (u *UnlockCommandRunner) triggerPlansForDequeuedPRs(ctx *CommandContext, dequeueStatus models.DequeueStatus, baseRepo models.Repo) {
-	for _, lock := range dequeueStatus.ProjectLocks {
-		// TODO monikma #4 use exact dequeued comment instead of hardcoding it
-		planVcsMessage := "atlantis plan -d " + lock.Project.Path
-		if commentErr := u.vcsClient.CreateComment(baseRepo, lock.Pull.Num, planVcsMessage, ""); commentErr != nil {
-			// TODO monikma at this point planning queue will be interrupted, how to resolve from this?
-			ctx.Log.Err("unable to comment on PR %s: %s", lock.Pull.Num, commentErr)
+func (u *UnlockCommandRunner) commentOnDequeuedPullRequests(ctx *CommandContext, dequeueStatus models.DequeueStatus) {
+	locksByPullRequest := groupByPullRequests(dequeueStatus.ProjectLocks)
+	for pullRequestNumber, projectLocks := range locksByPullRequest {
+		planVcsMessage := buildCommentOnDequeuedPullRequest(projectLocks)
+		if commentErr := u.vcsClient.CreateComment(projectLocks[0].Pull.BaseRepo, pullRequestNumber, planVcsMessage, ""); commentErr != nil {
+			ctx.Log.Err("unable to comment on PR %d: %s", pullRequestNumber, commentErr)
 		}
 	}
+}
+
+func groupByPullRequests(projectLocks []models.ProjectLock) map[int][]models.ProjectLock {
+	result := make(map[int][]models.ProjectLock)
+	for _, lock := range projectLocks {
+		result[lock.Pull.Num] = append(result[lock.Pull.Num], lock)
+	}
+	return result
+}
+
+func buildCommentOnDequeuedPullRequest(projectLocks []models.ProjectLock) string {
+	var releasedLocksMessages []string
+	for _, lock := range projectLocks {
+		releasedLocksMessages = append(releasedLocksMessages, fmt.Sprintf("* dir: `%s` workspace: `%s`", lock.Project.Path, lock.Workspace))
+	}
+
+	// stick to the first User for now, if needed, create a list of unique users and mention them all
+	lockCreatorMention := "@" + projectLocks[0].User.Username
+	releasedLocksMessage := strings.Join(releasedLocksMessages, "\n")
+
+	return fmt.Sprintf("%s\nThe following locks have been aquired by this PR and can now be planned:\n%s",
+		lockCreatorMention, releasedLocksMessage)
 }

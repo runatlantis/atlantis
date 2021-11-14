@@ -27,7 +27,7 @@ const DeleteSourceBranchOnMergeKey = "delete_source_branch_on_merge"
 // TODO: Make this more customizable, not everyone wants this rigid workflow
 // maybe something along the lines of defining overridable/non-overrideable apply
 // requirements in the config and removing the flag to enable policy checking.
-var NonOverrideableApplyReqs []string = []string{PoliciesPassedApplyReq}
+var NonOverrideableApplyReqs = []string{PoliciesPassedApplyReq}
 
 // GlobalCfg is the final parsed version of server-side repo config.
 type GlobalCfg struct {
@@ -466,4 +466,16 @@ func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (app
 		log.Debug(l)
 	}
 	return
+}
+
+// MatchingRepo returns an instance of Repo which matches a given repoID.
+// If multiple repos match, return the last one for consistency with getMatchingCfg.
+func (g GlobalCfg) MatchingRepo(repoID string) *Repo {
+	for i := len(g.Repos) - 1; i >= 0; i-- {
+		repo := g.Repos[i]
+		if repo.IDMatches(repoID) {
+			return &repo
+		}
+	}
+	return nil
 }

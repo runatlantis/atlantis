@@ -87,6 +87,13 @@ You can set the `mergeable` requirement by:
      
 #### Meaning
 Each VCS provider has a different concept of "mergeability":
+
+::: warning
+Some VCS providers have a feature for branch protection to control "mergeability". If you want to use it,
+you probably need to limit the base branch not to bypass the branch protection.
+See also the `branch` keyword in [Server Side Repo Config](server-side-repo-config.html#reference) for more details.
+:::
+
 #### GitHub
 In GitHub, if you're not using [Protected Branches](https://help.github.com/articles/about-protected-branches/) then
 all pull requests are mergeable unless there is a conflict.
@@ -161,7 +168,7 @@ You can set the `undiverged` requirement by:
     - dir: .
       apply_requirements: [undiverged]
      ```
-### Meaning
+#### Meaning
 The `merge` checkout strategy creates a temporary merge commit and runs the `plan` on the Atlantis local version of the PR 
 source and destination branch. The local destination branch can become out of date since changes to the destination branch are not fetched 
 if there are no changes to the source branch. `undiverged` enforces that Atlantis local version of master is up to date 

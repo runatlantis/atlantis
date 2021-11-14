@@ -2,7 +2,7 @@ package events_test
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -132,7 +132,7 @@ projects:
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
 			if c.AtlantisYAML != "" {
-				err := ioutil.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
+				err := os.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
 				Ok(t, err)
 			}
 
@@ -394,7 +394,7 @@ projects:
 				vcsClient := vcsmocks.NewMockClient()
 				When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn([]string{"main.tf"}, nil)
 				if c.AtlantisYAML != "" {
-					err := ioutil.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
+					err := os.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
 					Ok(t, err)
 				}
 
@@ -545,7 +545,7 @@ projects:
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(matchers.AnyModelsRepo(), matchers.AnyModelsPullRequest())).ThenReturn(c.ModifiedFiles, nil)
 			if c.AtlantisYAML != "" {
-				err := ioutil.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
+				err := os.WriteFile(filepath.Join(tmpDir, yaml.AtlantisYAMLFilename), []byte(c.AtlantisYAML), 0600)
 				Ok(t, err)
 			}
 
@@ -703,7 +703,7 @@ projects:
 - dir: .
   workspace: staging
 `
-	err := ioutil.WriteFile(filepath.Join(repoDir, yaml.AtlantisYAMLFilename), []byte(yamlCfg), 0600)
+	err := os.WriteFile(filepath.Join(repoDir, yaml.AtlantisYAMLFilename), []byte(yamlCfg), 0600)
 	Ok(t, err)
 
 	When(workingDir.Clone(
