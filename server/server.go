@@ -761,15 +761,13 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 
-	var queuesMap map[string][]models.ProjectLock
-	queuesMap, _ = s.Locker.ListQueues()
+	var lockResults []templates.LockIndexData
+	for id, v := range locks {
+		lockURL, _ := s.Router.Get(LockViewRouteName).URL("id", url.QueryEscape(id))
 
-	var queuesIndexData map[string][]templates.QueueItemIndexData
-	queuesIndexData = make(map[string][]templates.QueueItemIndexData)
-	for key, projectLocks := range queuesMap {
-		//lockURL, _ := s.Router.Get(LockViewRouteName).URL("id", url.QueryEscape(id))
+		queue, _ := s.Locker.GetQueueByLock(v.Project, v.Workspace)
 		var queueIndexDataList []templates.QueueItemIndexData
-		for _, projectLock := range projectLocks {
+		for _, projectLock := range queue {
 			queueIndexDataList = append(queueIndexDataList, templates.QueueItemIndexData{
 				// NOTE: must use .String() instead of .Path because we need the
 				// query params as part of the lock URL.
@@ -783,16 +781,8 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 				PullUrl:       projectLock.Pull.URL,
 				Author:        projectLock.Pull.Author,
 			})
-			queuesIndexData[key] = queueIndexDataList
 		}
 
-	}
-
-	var lockResults []templates.LockIndexData
-	for id, v := range locks {
-		lockURL, _ := s.Router.Get(LockViewRouteName).URL("id", url.QueryEscape(id))
-		var queue []templates.QueueItemIndexData
-		queue = queuesIndexData[fmt.Sprintf("%s/%s/%s", v.Project.RepoFullName, v.Project.Path, v.Workspace)]
 		lockResults = append(lockResults, templates.LockIndexData{
 			// NOTE: must use .String() instead of .Path because we need the
 			// query params as part of the lock URL.
@@ -803,7 +793,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 			Workspace:     v.Workspace,
 			Time:          v.Time,
 			TimeFormatted: v.Time.Format("02-01-2006 15:04:05"),
-			Queue:         queue,
+			Queue:         queueIndexDataList,
 		})
 	}
 
@@ -825,7 +815,6 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 
 	err = s.IndexTemplate.Execute(w, templates.IndexData{
 		Locks:           lockResults,
-		Queues:          queuesIndexData,
 		ApplyLock:       applyLockData,
 		AtlantisVersion: s.AtlantisVersion,
 		CleanedBasePath: s.AtlantisURL.Path,

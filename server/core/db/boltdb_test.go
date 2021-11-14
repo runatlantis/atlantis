@@ -28,6 +28,7 @@ import (
 
 var lockBucket = "bucket"
 var configBucket = "configBucket"
+var queueBucket = "queue"
 var project = models.NewProject("owner/repo", "parent/child")
 var workspace = "default"
 var pullNum = 1
@@ -41,6 +42,23 @@ var lock = models.ProjectLock{
 	Workspace: workspace,
 	Project:   project,
 	Time:      time.Now(),
+}
+
+func TestGetQueueByLock(t *testing.T) {
+	t.Log("Getting Queue By Lock")
+	db, b := newTestDB()
+	defer cleanupDB(db)
+
+	b.TryLock(lock)
+	lock1 := lock
+	lock1.Pull.Num = 2
+	b.TryLock(lock1) // this lock should be queued
+	lock2 := lock
+	lock2.Pull.Num = 3
+	b.TryLock(lock2) // this lock should be queued
+
+	queue, _ := b.GetQueueByLock(lock.Project, lock.Workspace)
+	Equals(t, 2, len(queue))
 }
 
 func TestLockCommandNotSet(t *testing.T) {
@@ -112,7 +130,7 @@ func TestMixedLocksPresent(t *testing.T) {
 	_, err := b.LockCommand(models.ApplyCommand, timeNow)
 	Ok(t, err)
 
-	_, _, err = b.TryLock(lock)
+	_, _, _, err = b.TryLock(lock)
 	Ok(t, err)
 	ls, err := b.List()
 	Ok(t, err)
@@ -132,7 +150,7 @@ func TestListOneLock(t *testing.T) {
 	t.Log("listing locks when there is one should return it")
 	db, b := newTestDB()
 	defer cleanupDB(db)
-	_, _, err := b.TryLock(lock)
+	_, _, _, err := b.TryLock(lock)
 	Ok(t, err)
 	ls, err := b.List()
 	Ok(t, err)
@@ -155,7 +173,7 @@ func TestListMultipleLocks(t *testing.T) {
 	for _, r := range repos {
 		newLock := lock
 		newLock.Project = models.NewProject(r, "path")
-		_, _, err := b.TryLock(newLock)
+		_, _, _, err := b.TryLock(newLock)
 		Ok(t, err)
 	}
 	ls, err := b.List()
@@ -176,9 +194,9 @@ func TestListAddRemove(t *testing.T) {
 	t.Log("listing after adding and removing should return none")
 	db, b := newTestDB()
 	defer cleanupDB(db)
-	_, _, err := b.TryLock(lock)
+	_, _, _, err := b.TryLock(lock)
 	Ok(t, err)
-	_, err = b.Unlock(project, workspace)
+	_, _, err = b.Unlock(project, workspace)
 	Ok(t, err)
 
 	ls, err := b.List()
@@ -190,7 +208,7 @@ func TestLockingNoLocks(t *testing.T) {
 	t.Log("with no locks yet, lock should succeed")
 	db, b := newTestDB()
 	defer cleanupDB(db)
-	acquired, currLock, err := b.TryLock(lock)
+	acquired, currLock, _, err := b.TryLock(lock)
 	Ok(t, err)
 	Equals(t, true, acquired)
 	Equals(t, lock, currLock)
@@ -200,14 +218,14 @@ func TestLockingExistingLock(t *testing.T) {
 	t.Log("if there is an existing lock, lock should...")
 	db, b := newTestDB()
 	defer cleanupDB(db)
-	_, _, err := b.TryLock(lock)
+	_, _, _, err := b.TryLock(lock)
 	Ok(t, err)
 
 	t.Log("...succeed if the new project has a different path")
 	{
 		newLock := lock
 		newLock.Project = models.NewProject(project.RepoFullName, "different/path")
-		acquired, currLock, err := b.TryLock(newLock)
+		acquired, currLock, _, err := b.TryLock(newLock)
 		Ok(t, err)
 		Equals(t, true, acquired)
 		Equals(t, pullNum, currLock.Pull.Num)
@@ -217,7 +235,7 @@ func TestLockingExistingLock(t *testing.T) {
 	{
 		newLock := lock
 		newLock.Workspace = "different-workspace"
-		acquired, currLock, err := b.TryLock(newLock)
+		acquired, currLock, _, err := b.TryLock(newLock)
 		Ok(t, err)
 		Equals(t, true, acquired)
 		Equals(t, newLock, currLock)
@@ -227,7 +245,7 @@ func TestLockingExistingLock(t *testing.T) {
 	{
 		newLock := lock
 		newLock.Project = models.NewProject("different/repo", project.Path)
-		acquired, currLock, err := b.TryLock(newLock)
+		acquired, currLock, _, err := b.TryLock(newLock)
 		Ok(t, err)
 		Equals(t, true, acquired)
 		Equals(t, newLock, currLock)
@@ -237,7 +255,7 @@ func TestLockingExistingLock(t *testing.T) {
 	{
 		newLock := lock
 		newLock.Pull.Num = lock.Pull.Num + 1
-		acquired, currLock, err := b.TryLock(newLock)
+		acquired, currLock, _, err := b.TryLock(newLock)
 		Ok(t, err)
 		Equals(t, false, acquired)
 		Equals(t, currLock.Pull.Num, pullNum)
@@ -248,7 +266,7 @@ func TestUnlockingNoLocks(t *testing.T) {
 	t.Log("unlocking with no locks should succeed")
 	db, b := newTestDB()
 	defer cleanupDB(db)
-	_, err := b.Unlock(project, workspace)
+	_, _, err := b.Unlock(project, workspace)
 
 	Ok(t, err)
 }
@@ -258,9 +276,9 @@ func TestUnlocking(t *testing.T) {
 	db, b := newTestDB()
 	defer cleanupDB(db)
 
-	_, _, err := b.TryLock(lock)
+	_, _, _, err := b.TryLock(lock)
 	Ok(t, err)
-	_, err = b.Unlock(project, workspace)
+	_, _, err = b.Unlock(project, workspace)
 	Ok(t, err)
 
 	// should be no locks listed
@@ -271,7 +289,7 @@ func TestUnlocking(t *testing.T) {
 	// should be able to re-lock that repo with a new pull num
 	newLock := lock
 	newLock.Pull.Num = lock.Pull.Num + 1
-	acquired, currLock, err := b.TryLock(newLock)
+	acquired, currLock, _, err := b.TryLock(newLock)
 	Ok(t, err)
 	Equals(t, true, acquired)
 	Equals(t, newLock, currLock)
@@ -282,32 +300,32 @@ func TestUnlockingMultiple(t *testing.T) {
 	db, b := newTestDB()
 	defer cleanupDB(db)
 
-	_, _, err := b.TryLock(lock)
+	_, _, _, err := b.TryLock(lock)
 	Ok(t, err)
 
 	new := lock
 	new.Project.RepoFullName = "new/repo"
-	_, _, err = b.TryLock(new)
+	_, _, _, err = b.TryLock(new)
 	Ok(t, err)
 
 	new2 := lock
 	new2.Project.Path = "new/path"
-	_, _, err = b.TryLock(new2)
+	_, _, _, err = b.TryLock(new2)
 	Ok(t, err)
 
 	new3 := lock
 	new3.Workspace = "new-workspace"
-	_, _, err = b.TryLock(new3)
+	_, _, _, err = b.TryLock(new3)
 	Ok(t, err)
 
 	// now try and unlock them
-	_, err = b.Unlock(new3.Project, new3.Workspace)
+	_, _, err = b.Unlock(new3.Project, new3.Workspace)
 	Ok(t, err)
-	_, err = b.Unlock(new2.Project, workspace)
+	_, _, err = b.Unlock(new2.Project, workspace)
 	Ok(t, err)
-	_, err = b.Unlock(new.Project, workspace)
+	_, _, err = b.Unlock(new.Project, workspace)
 	Ok(t, err)
-	_, err = b.Unlock(project, workspace)
+	_, _, err = b.Unlock(project, workspace)
 	Ok(t, err)
 
 	// should be none left
@@ -321,7 +339,7 @@ func TestUnlockByPullNone(t *testing.T) {
 	db, b := newTestDB()
 	defer cleanupDB(db)
 
-	_, err := b.UnlockByPull("any/repo", 1)
+	_, _, err := b.UnlockByPull("any/repo", 1)
 	Ok(t, err)
 }
 
@@ -329,12 +347,12 @@ func TestUnlockByPullOne(t *testing.T) {
 	t.Log("with one lock, UnlockByPull should...")
 	db, b := newTestDB()
 	defer cleanupDB(db)
-	_, _, err := b.TryLock(lock)
+	_, _, _, err := b.TryLock(lock)
 	Ok(t, err)
 
 	t.Log("...delete nothing when its the same repo but a different pull")
 	{
-		_, err := b.UnlockByPull(project.RepoFullName, pullNum+1)
+		_, _, err := b.UnlockByPull(project.RepoFullName, pullNum+1)
 		Ok(t, err)
 		ls, err := b.List()
 		Ok(t, err)
@@ -342,7 +360,7 @@ func TestUnlockByPullOne(t *testing.T) {
 	}
 	t.Log("...delete nothing when its the same pull but a different repo")
 	{
-		_, err := b.UnlockByPull("different/repo", pullNum)
+		_, _, err := b.UnlockByPull("different/repo", pullNum)
 		Ok(t, err)
 		ls, err := b.List()
 		Ok(t, err)
@@ -350,7 +368,7 @@ func TestUnlockByPullOne(t *testing.T) {
 	}
 	t.Log("...delete the lock when its the same repo and pull")
 	{
-		_, err := b.UnlockByPull(project.RepoFullName, pullNum)
+		_, _, err := b.UnlockByPull(project.RepoFullName, pullNum)
 		Ok(t, err)
 		ls, err := b.List()
 		Ok(t, err)
@@ -362,12 +380,12 @@ func TestUnlockByPullAfterUnlock(t *testing.T) {
 	t.Log("after locking and unlocking, UnlockByPull should be successful")
 	db, b := newTestDB()
 	defer cleanupDB(db)
-	_, _, err := b.TryLock(lock)
+	_, _, _, err := b.TryLock(lock)
 	Ok(t, err)
-	_, err = b.Unlock(project, workspace)
+	_, _, err = b.Unlock(project, workspace)
 	Ok(t, err)
 
-	_, err = b.UnlockByPull(project.RepoFullName, pullNum)
+	_, _, err = b.UnlockByPull(project.RepoFullName, pullNum)
 	Ok(t, err)
 	ls, err := b.List()
 	Ok(t, err)
@@ -378,17 +396,17 @@ func TestUnlockByPullMatching(t *testing.T) {
 	t.Log("UnlockByPull should delete all locks in that repo and pull num")
 	db, b := newTestDB()
 	defer cleanupDB(db)
-	_, _, err := b.TryLock(lock)
+	_, _, _, err := b.TryLock(lock)
 	Ok(t, err)
 
 	// add additional locks with the same repo and pull num but different paths/workspaces
 	new := lock
 	new.Project.Path = "dif/path"
-	_, _, err = b.TryLock(new)
+	_, _, _, err = b.TryLock(new)
 	Ok(t, err)
 	new2 := lock
 	new2.Workspace = "new-workspace"
-	_, _, err = b.TryLock(new2)
+	_, _, _, err = b.TryLock(new2)
 	Ok(t, err)
 
 	// there should now be 3
@@ -397,7 +415,7 @@ func TestUnlockByPullMatching(t *testing.T) {
 	Equals(t, 3, len(ls))
 
 	// should all be unlocked
-	_, err = b.UnlockByPull(project.RepoFullName, pullNum)
+	_, _, err = b.UnlockByPull(project.RepoFullName, pullNum)
 	Ok(t, err)
 	ls, err = b.List()
 	Ok(t, err)
@@ -417,7 +435,7 @@ func TestGetLock(t *testing.T) {
 	t.Log("getting a lock should return the lock")
 	db, b := newTestDB()
 	defer cleanupDB(db)
-	_, _, err := b.TryLock(lock)
+	_, _, _, err := b.TryLock(lock)
 	Ok(t, err)
 
 	l, err := b.GetLock(project, workspace)
@@ -786,6 +804,9 @@ func newTestDB() (*bolt.DB, *db.BoltDB) {
 		}
 		if _, err := tx.CreateBucketIfNotExists([]byte(configBucket)); err != nil {
 			return errors.Wrap(err, "failed to create bucket")
+		}
+		if _, err = tx.CreateBucketIfNotExists([]byte(queueBucket)); err != nil {
+			return errors.Wrapf(err, "failed to create bucket")
 		}
 		return nil
 	}); err != nil {

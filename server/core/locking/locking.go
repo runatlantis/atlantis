@@ -30,10 +30,10 @@ type Backend interface {
 	TryLock(lock models.ProjectLock) (bool, models.ProjectLock, models.EnqueueStatus, error)
 	Unlock(project models.Project, workspace string) (*models.ProjectLock, *models.ProjectLock, error)
 	List() ([]models.ProjectLock, error)
-	// GetQueues as a map<String, List<ProjectLock>>
-	GetQueues() (map[string][]models.ProjectLock, error)
 	GetLock(project models.Project, workspace string) (*models.ProjectLock, error)
 	UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, models.DequeueStatus, error)
+
+	GetQueueByLock(project models.Project, workspace string) ([]models.ProjectLock, error)
 
 	LockCommand(cmdName models.CommandName, lockTime time.Time) (*models.CommandLock, error)
 	UnlockCommand(cmdName models.CommandName) error
@@ -63,7 +63,7 @@ type Locker interface {
 	TryLock(p models.Project, workspace string, pull models.PullRequest, user models.User) (TryLockResponse, error)
 	Unlock(key string) (*models.ProjectLock, *models.ProjectLock, error)
 	List() (map[string]models.ProjectLock, error)
-	ListQueues() (map[string][]models.ProjectLock, error)
+	GetQueueByLock(project models.Project, workspace string) ([]models.ProjectLock, error)
 	UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, models.DequeueStatus, error)
 	GetLock(key string) (*models.ProjectLock, error)
 }
@@ -120,8 +120,8 @@ func (c *Client) List() (map[string]models.ProjectLock, error) {
 	return m, nil
 }
 
-func (c *Client) ListQueues() (map[string][]models.ProjectLock, error) {
-	return c.backend.GetQueues()
+func (c *Client) GetQueueByLock(project models.Project, workspace string) ([]models.ProjectLock, error) {
+	return c.backend.GetQueueByLock(project, workspace)
 }
 
 // TODO monikma extend the tests
@@ -188,8 +188,8 @@ func (c *NoOpLocker) List() (map[string]models.ProjectLock, error) {
 	return m, nil
 }
 
-func (c *NoOpLocker) ListQueues() (map[string][]models.ProjectLock, error) {
-	m := make(map[string][]models.ProjectLock)
+func (c *NoOpLocker) GetQueueByLock(project models.Project, workspace string) ([]models.ProjectLock, error) {
+	m := make([]models.ProjectLock, 0)
 	return m, nil
 }
 
