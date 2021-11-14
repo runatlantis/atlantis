@@ -48,8 +48,7 @@ func NewExecutorService(
 	garbageCollectorJob := JobDefinition{
 		Job: garbageCollector,
 
-		// 5 minutes should probably be the lowest to prevent GH rate limits
-		Period: 5 * time.Minute,
+		Period: 30 * time.Minute,
 	}
 
 	rateLimitPublisher := &RateLimitStatsPublisher{
