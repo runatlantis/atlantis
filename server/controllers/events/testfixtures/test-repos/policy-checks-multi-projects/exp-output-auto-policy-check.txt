@@ -30,7 +30,9 @@ FAIL - <redacted plan file> - main - WARNING: Forbidden Resource creation is pro
 1 test, 0 passed, 0 warnings, 1 failure, 0 exceptions
 
 ```
-* :heavy_check_mark: To **approve** failing policies either request an approval from approvers or address the failure by modifying the codebase.
+* :heavy_check_mark: To **approve** failing policies an authorized approver can comment:
+    * `atlantis approve_policies`
+* :repeat: Or, address the policy failure by modifying the codebase and re-planning.
 
 
 ---
