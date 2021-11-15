@@ -43,7 +43,10 @@ type RequestLogger struct {
 func (l *RequestLogger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	l.logger.Debug("%s %s – from %s", r.Method, r.URL.RequestURI(), r.RemoteAddr)
 	allowed := false
-	if r.URL.Path == "/events" || !l.WebAuthentication {
+	if !l.WebAuthentication ||
+		r.URL.Path == "/events" ||
+		r.URL.Path == "/healthz" ||
+		r.URL.Path == "/status" {
 		allowed = true
 	} else {
 		user, pass, ok := r.BasicAuth()
