@@ -49,7 +49,9 @@ func TestRenderErr(t *testing.T) {
 			models.PolicyCheckCommand,
 			err,
 			"**Policy Check Error**\n```\nerr\n```" +
-				"\n* :heavy_check_mark: To **approve** failing policies either request an approval from approvers or address the failure by modifying the codebase.\n\n",
+				"\n* :heavy_check_mark: To **approve** failing policies an authorized approver can comment:\n" +
+				"    * `atlantis approve_policies`\n" +
+				"* :repeat: Or, address the policy failure by modifying the codebase and re-planning.\n\n",
 		},
 	}
 
@@ -639,7 +641,9 @@ $$$
 $$$
 error
 $$$
-* :heavy_check_mark: To **approve** failing policies either request an approval from approvers or address the failure by modifying the codebase.
+* :heavy_check_mark: To **approve** failing policies an authorized approver can comment:
+    * $atlantis approve_policies$
+* :repeat: Or, address the policy failure by modifying the codebase and re-planning.
 
 
 ---
