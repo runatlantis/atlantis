@@ -71,6 +71,9 @@ workflows:
       steps:
       - run: echo hi
       - apply
+allowed_regexp_prefixes:
+- dev/
+- staging/
 ```
 
 ## Use Cases
@@ -194,6 +197,7 @@ automerge:
 delete_source_branch_on_merge:
 projects:
 workflows:
+allowed_regexp_prefixes:
 ```
 | Key                           | Type                                                     | Default | Required | Description                                                 |
 |-------------------------------|----------------------------------------------------------|---------|----------|-------------------------------------------------------------|
@@ -202,6 +206,7 @@ workflows:
 | delete_source_branch_on_merge | bool                                                     | `false` | no       | Automatically deletes the source branch on merge            |
 | projects                      | array[[Project](repo-level-atlantis-yaml.html#project)]  | `[]`    | no       | Lists the projects in this repo                             |
 | workflows<br />*(restricted)* | map[string: [Workflow](custom-workflows.html#reference)] | `{}`    | no       | Custom workflows                                            |
+| allowed_regexp_prefixes       | array[string]                                            | `[]`    | no       | Lists the allowed regexp prefixes to use when the [`--enable-regexp-cmd`](server-configuration.html#enable-regexp-cmd) flag is used
 
 ### Project
 ```yaml
