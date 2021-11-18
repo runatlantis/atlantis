@@ -682,6 +682,19 @@ func TestGithubClient_PullisMergeable_BlockedStatus(t *testing.T) {
 }
 
 func TestGithubClient_PullisSQMergeable_BlockedStatus(t *testing.T) {
+	checksJson := `{
+		"check_runs": [
+		  {
+			"id": 4,
+			"status": "%s",
+			"conclusion": "%s",
+			"name": "mighty_readme",
+			"check_suite": {
+			  "id": 5
+			}
+		  }
+		]
+	  }`
 	// Use a real GitHub json response and edit the mergeable_state field.
 	jsBytes, err := ioutil.ReadFile("fixtures/github-pull-request.json")
 	Ok(t, err)
@@ -693,13 +706,16 @@ func TestGithubClient_PullisSQMergeable_BlockedStatus(t *testing.T) {
 		1,
 	)
 
+	completedCheckResponse := fmt.Sprintf(checksJson, "completed", "success")
+
 	cases := []struct {
-		description  string
-		statuses     []*github.RepoStatus
-		expMergeable bool
+		description    string
+		statuses       []*github.RepoStatus
+		checksResponse string
+		expMergeable   bool
 	}{
 		{
-			"sq-pending+owners-success",
+			"sq-pending+owners-success+check-success",
 			[]*github.RepoStatus{
 				{
 					State:   helper("pending"),
@@ -710,6 +726,7 @@ func TestGithubClient_PullisSQMergeable_BlockedStatus(t *testing.T) {
 					Context: helper("_owners-check"),
 				},
 			},
+			completedCheckResponse,
 			true,
 		},
 		{
@@ -720,6 +737,7 @@ func TestGithubClient_PullisSQMergeable_BlockedStatus(t *testing.T) {
 					Context: helper("sq-ready-to-merge"),
 				},
 			},
+			completedCheckResponse,
 			false,
 		},
 		{
@@ -734,6 +752,7 @@ func TestGithubClient_PullisSQMergeable_BlockedStatus(t *testing.T) {
 					Context: helper("_owners-check"),
 				},
 			},
+			completedCheckResponse,
 			false,
 		},
 		{
@@ -752,7 +771,57 @@ func TestGithubClient_PullisSQMergeable_BlockedStatus(t *testing.T) {
 					Context: helper("_owners-check"),
 				},
 			},
+			completedCheckResponse,
 			true,
+		},
+		{
+			"sq-pending+apply-failure+check-failure",
+			[]*github.RepoStatus{
+				{
+					State:   helper("pending"),
+					Context: helper("sq-ready-to-merge"),
+				},
+				{
+					State:   helper("failure"),
+					Context: helper("atlantis/apply"),
+				},
+				{
+					State:   helper("success"),
+					Context: helper("_owners-check"),
+				},
+			},
+			fmt.Sprintf(checksJson, "in_progress", ""),
+			false,
+		},
+		{
+			"sq-pending+check_pending",
+			[]*github.RepoStatus{
+				{
+					State:   helper("pending"),
+					Context: helper("sq-ready-to-merge"),
+				},
+				{
+					State:   helper("success"),
+					Context: helper("_owners-check"),
+				},
+			},
+			fmt.Sprintf(checksJson, "in_progress", ""),
+			false,
+		},
+		{
+			"sq-pending+check_failure",
+			[]*github.RepoStatus{
+				{
+					State:   helper("pending"),
+					Context: helper("sq-ready-to-merge"),
+				},
+				{
+					State:   helper("success"),
+					Context: helper("_owners-check"),
+				},
+			},
+			fmt.Sprintf(checksJson, "complete", "failure"),
+			false,
 		},
 	}
 
@@ -764,6 +833,9 @@ func TestGithubClient_PullisSQMergeable_BlockedStatus(t *testing.T) {
 					switch r.RequestURI {
 					case "/api/v3/repos/owner/repo/pulls/1":
 						w.Write([]byte(pullResponse)) // nolint: errcheck
+						return
+					case "/api/v3/repos/owner/repo/commits/2/check-runs?per_page=100":
+						_, _ = w.Write([]byte(c.checksResponse))
 						return
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
@@ -800,7 +872,6 @@ func TestGithubClient_PullisSQMergeable_BlockedStatus(t *testing.T) {
 	}
 
 }
-
 
 func helper(str string) *string {
 	temp := str
