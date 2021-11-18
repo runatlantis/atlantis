@@ -333,7 +333,9 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				ApplyRequirements: c.applyReqs,
 				RepoRelDir:        ".",
 				PullReqStatus: models.PullReqStatus{
-					Approved: true,
+					ApprovalStatus: models.ApprovalStatus{
+						IsApproved: true,
+					},
 					Mergeable: true,
 				},
 			}

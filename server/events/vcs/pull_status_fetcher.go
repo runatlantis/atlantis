@@ -20,7 +20,7 @@ func NewPullReqStatusFetcher(client Client) PullReqStatusFetcher {
 }
 
 func (f *pullReqStatusFetcher) FetchPullStatus(repo models.Repo, pull models.PullRequest) (pullStatus models.PullReqStatus, err error) {
-	approved, err := f.client.PullIsApproved(repo, pull)
+	approvalStatus, err := f.client.PullIsApproved(repo, pull)
 	if err != nil {
 		return pullStatus, errors.Wrapf(err, "fetching pull approval status for repo: %s, and pull number: %d", repo.FullName, pull.Num)
 	}
@@ -31,7 +31,7 @@ func (f *pullReqStatusFetcher) FetchPullStatus(repo models.Repo, pull models.Pul
 	}
 
 	return models.PullReqStatus{
-		Approved:  approved.IsApproved,
-		Mergeable: mergeable,
+		ApprovalStatus: approvalStatus,
+		Mergeable:      mergeable,
 	}, err
 }

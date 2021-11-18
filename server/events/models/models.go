@@ -36,8 +36,8 @@ const (
 )
 
 type PullReqStatus struct {
-	Approved  bool
-	Mergeable bool
+	ApprovalStatus ApprovalStatus
+	Mergeable      bool
 }
 
 // Repo is a VCS repository.
