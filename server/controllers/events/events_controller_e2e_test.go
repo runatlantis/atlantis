@@ -822,7 +822,7 @@ func setupE2E(t *testing.T, repoDir string) (events_controllers.VCSEventsControl
 
 	// Mocks.
 	e2eVCSClient := vcsmocks.NewMockClient()
-	e2eStatusUpdater := &events.DefaultCommitStatusUpdater{Client: e2eVCSClient}
+	e2eStatusUpdater := &events.DefaultCommitStatusUpdater{Client: e2eVCSClient, TitleBuilder: vcs.StatusTitleBuilder{TitlePrefix: "atlantis"}}
 	e2eGithubGetter := mocks.NewMockGithubPullGetter()
 	e2eGitlabGetter := mocks.NewMockGitlabMergeRequestGetter()
 	projectCmdOutputHandler := handlermocks.NewMockProjectCommandOutputHandler()
