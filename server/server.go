@@ -467,7 +467,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	applyRequirementHandler := &events.AggregateApplyRequirements{
-		WorkingDir:       workingDir,
+		WorkingDir: workingDir,
 	}
 
 	projectCommandRunner := &events.DefaultProjectCommandRunner{

@@ -815,7 +815,7 @@ projects:
 						Pull: models.PullRequest{
 							BaseRepo: baseRepo,
 						},
-						Log:           logging.NewNoopLogger(t),
+						Log: logging.NewNoopLogger(t),
 						PullRequestStatus: models.PullReqStatus{
 							Mergeable: true,
 						},
