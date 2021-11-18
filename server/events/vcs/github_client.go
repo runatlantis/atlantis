@@ -430,6 +430,7 @@ func (g *GithubClient) getSubmitQueueMergeability(repo models.Repo, pull models.
 		}
 
 		if state == "success" ||
+			g.statusTitleMatcher.MatchesCommand(status.GetContext(), "apply") ||
 			(state == "pending" && status.GetContext() == SubmitQueueReadinessStatusContext) {
 			continue
 		}

@@ -736,6 +736,24 @@ func TestGithubClient_PullisSQMergeable_BlockedStatus(t *testing.T) {
 			},
 			false,
 		},
+		{
+			"sq-pending+apply-failure",
+			[]*github.RepoStatus{
+				{
+					State:   helper("pending"),
+					Context: helper("sq-ready-to-merge"),
+				},
+				{
+					State:   helper("failure"),
+					Context: helper("atlantis/apply"),
+				},
+				{
+					State:   helper("success"),
+					Context: helper("_owners-check"),
+				},
+			},
+			true,
+		},
 	}
 
 	for _, c := range cases {
