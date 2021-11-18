@@ -1,8 +1,6 @@
 package events
 
 import (
-	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/yaml/raw"
 	"github.com/runatlantis/atlantis/server/events/yaml/valid"
@@ -14,20 +12,14 @@ type ApplyRequirement interface {
 }
 
 type AggregateApplyRequirements struct {
-	PullApprovedChecker runtime.PullApprovedChecker
-	WorkingDir          WorkingDir
+	WorkingDir WorkingDir
 }
 
 func (a *AggregateApplyRequirements) ValidateProject(repoDir string, ctx models.ProjectCommandContext) (failure string, err error) {
-
 	for _, req := range ctx.ApplyRequirements {
 		switch req {
 		case raw.ApprovedApplyRequirement:
-			approvalStatus, err := a.PullApprovedChecker.PullIsApproved(ctx.Pull.BaseRepo, ctx.Pull) // nolint: vetshadow
-			if err != nil {
-				return "", errors.Wrap(err, "checking if pull request was approved")
-			}
-			if !approvalStatus.IsApproved {
+			if !ctx.PullReqStatus.ApprovalStatus.IsApproved {
 				return "Pull request must be approved by at least one person other than the author before running apply.", nil
 			}
 		// this should come before mergeability check since mergeability is a superset of this check.
@@ -36,7 +28,7 @@ func (a *AggregateApplyRequirements) ValidateProject(repoDir string, ctx models.
 				return "All policies must pass for project before running apply", nil
 			}
 		case raw.MergeableApplyRequirement:
-			if !ctx.PullMergeable {
+			if !ctx.PullReqStatus.Mergeable {
 				return "Pull request must be mergeable before running apply.", nil
 			}
 		case raw.UnDivergedApplyRequirement:
